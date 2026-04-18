@@ -117,12 +117,17 @@ func retry(ctx context.Context, attempts int, delay time.Duration, operation fun
 			break
 		}
 
-		timer := time.NewTimer(delay)
-		select {
-		case <-ctx.Done():
-			timer.Stop()
-			return ctx.Err()
-		case <-timer.C:
+		if err = func(ctx context.Context) error {
+			timer := time.NewTimer(delay)
+			defer timer.Stop()
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-timer.C:
+				return nil
+			}
+		}(ctx); err != nil {
+			return err
 		}
 	}
 	return err

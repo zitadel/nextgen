@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestGetPort(t *testing.T) {
+func TestGetPort_LocksAndReleasesPort(t *testing.T) {
 	t.Parallel()
 
 	port, closePort, err := getPort()
