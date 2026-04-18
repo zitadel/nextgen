@@ -2,6 +2,7 @@
 package embedded
 
 import (
+	"fmt"
 	"net"
 	"os"
 
@@ -17,35 +18,48 @@ import (
 // its used for testing purposes only
 func StartEmbedded() (connector database.Connector, stop func(), err error) {
 	path, err := os.MkdirTemp("", "zitadel-embedded-postgres-*")
-	// logging.OnError(err).Fatal("unable to create temp dir")
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to create temp dir: %w", err)
+	}
 
-	port, close := getPort()
+	port, closePort, err := getPort()
+	if err != nil {
+		_ = os.RemoveAll(path)
+		return nil, nil, fmt.Errorf("unable to get free port: %w", err)
+	}
 
 	config := embeddedpostgres.DefaultConfig().Version(embeddedpostgres.V16).Port(uint32(port)).RuntimePath(path)
 	embedded := embeddedpostgres.NewDatabase(config)
+	closePort()
 
-	close()
 	err = embedded.Start()
-	// logging.OnError(err).Fatal("unable to start db")
+	if err != nil {
+		_ = os.RemoveAll(path)
+		return nil, nil, fmt.Errorf("unable to start embedded postgres: %w", err)
+	}
 
 	connector, err = postgres.DecodeConfig(config.GetConnectionURL())
 	if err != nil {
+		_ = embedded.Stop()
+		_ = os.RemoveAll(path)
 		return nil, nil, err
 	}
 
 	return connector, func() {
-		// logging.OnError(embedded.Stop()).Error("unable to stop db")
+		_ = embedded.Stop()
+		_ = os.RemoveAll(path)
 	}, nil
 }
 
 // getPort returns a free port and locks it until close is called
-func getPort() (port uint16, close func()) {
-	l, _ := net.Listen("tcp", ":0")
-	// l, err := net.Listen("tcp", ":0")
-	// logging.OnError(err).Fatal("unable to get port")
+func getPort() (port uint16, close func(), err error) {
+	l, err := net.Listen("tcp", ":0")
+	if err != nil {
+		return 0, nil, err
+	}
 	port = uint16(l.Addr().(*net.TCPAddr).Port)
 	// logging.WithFields("port", port).Info("Port is available")
 	return port, func() {
-		// logging.OnError(l.Close()).Error("unable to close port listener")
-	}
+		_ = l.Close()
+	}, nil
 }

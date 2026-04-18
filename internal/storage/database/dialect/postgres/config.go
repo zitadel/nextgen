@@ -5,6 +5,7 @@ import (
 	"errors"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/mitchellh/mapstructure"
@@ -16,6 +17,12 @@ var (
 	_          database.Connector = (*Config)(nil)
 	Name                          = "postgres"
 	isMigrated bool
+)
+
+const (
+	connectRetryAttempts = 5
+	connectRetryDelay    = 200 * time.Millisecond
+	connectRetryTimeout  = 5 * time.Second
 )
 
 type Config struct {
@@ -43,7 +50,12 @@ func (c *Config) Connect(ctx context.Context) (database.Pool, error) {
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	if err = pool.Ping(ctx); err != nil {
+	if err = retry(ctx, connectRetryAttempts, connectRetryDelay, func(ctx context.Context) error {
+		pingCtx, cancel := context.WithTimeout(ctx, connectRetryTimeout)
+		defer cancel()
+		return pool.Ping(pingCtx)
+	}); err != nil {
+		pool.Close()
 		return nil, wrapError(err)
 	}
 	return &pgxPool{Pool: pool}, nil
@@ -84,4 +96,34 @@ func DecodeConfig(input any) (database.Connector, error) {
 		return connector, nil
 	}
 	return nil, errors.New("invalid configuration")
+}
+
+func retry(ctx context.Context, attempts int, delay time.Duration, operation func(ctx context.Context) error) error {
+	if attempts < 1 {
+		attempts = 1
+	}
+
+	var err error
+	for i := 0; i < attempts; i++ {
+		if err = ctx.Err(); err != nil {
+			return err
+		}
+
+		if err = operation(ctx); err == nil {
+			return nil
+		}
+
+		if i == attempts-1 {
+			break
+		}
+
+		timer := time.NewTimer(delay)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return ctx.Err()
+		case <-timer.C:
+		}
+	}
+	return err
 }
