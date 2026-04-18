@@ -13,7 +13,7 @@ services:
     environment:
       POSTGRES_DB: nextgen
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: nextgen_dev_password
     volumes:
       - postgres-data:/var/lib/postgresql/data
     ports:
