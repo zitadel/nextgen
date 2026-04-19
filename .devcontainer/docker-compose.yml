@@ -1,0 +1,29 @@
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+    volumes:
+      - ..:/workspaces/nextgen:cached
+    command: sleep infinity
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:latest
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: zitadel 
+      POSTGRES_PASSWORD: zitadel
+      POSTGRES_DB: nextgen
+    volumes:
+      - nextgen-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zitadel -d nextgen"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  nextgen-data:

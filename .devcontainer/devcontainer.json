@@ -1,0 +1,30 @@
+{
+  "name": "nextgen",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "app",
+  "workspaceFolder": "/workspaces/nextgen",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "lts"
+    }
+  },
+  "postCreateCommand": "go mod download",
+  "containerEnv": {
+    "PGHOST": "postgres",
+    "PGPORT": "5432",
+    "PGDATABASE": "nextgen",
+    "PGUSER": "zitadel",
+    "PGPASSWORD": "zitadel",
+    "PGSSLMODE": "disable"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "golang.go",
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode"
+      ]
+    }
+  },
+  "remoteUser": "vscode"
+}
