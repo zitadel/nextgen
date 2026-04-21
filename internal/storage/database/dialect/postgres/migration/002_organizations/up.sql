@@ -3,8 +3,8 @@ CREATE TABLE zitadel_nextgen.organizations(
     REFERENCES zitadel_nextgen.instances (id)
     ON DELETE CASCADE
     , id TEXT NOT NULL
-    , created_at TIMESTAMPTZ NOT NULL
-    , updated_at TIMESTAMPTZ NOT NULL
+    , created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    , updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 
     /* TODO: add more columns here */
 
