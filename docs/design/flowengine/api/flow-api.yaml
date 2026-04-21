@@ -1,0 +1,749 @@
+openapi: 3.1.0
+info:
+  title: Zitadel Flow Engine API
+  version: 1.0.0-draft
+  description: |
+    Server-side state machine producing BDUI (Backend-Driven UI).
+    Used by web/frontend clients for ready-made login, registration, and recovery.
+    Operates on sessions internally. Flow state is stored in an encrypted HttpOnly
+    cookie — the server is stateless for flow orchestration. Only factor verifications
+    and user mutations touch the database.
+
+servers:
+  - url: https://{instance}.zitadel.cloud/v1
+    variables:
+      instance:
+        default: my-instance
+
+tags:
+  - name: Flows
+    description: Flow lifecycle — start, advance, re-render
+  - name: Flow Definitions
+    description: Flow definition management (CRUD, lifecycle, validation)
+
+paths:
+  # ── Flow runtime ──────────────────────────────────────────────
+
+  /flows:
+    post:
+      operationId: createFlow
+      summary: Start a new flow
+      description: |
+        Resolves a flow definition based on purpose + audience context,
+        creates a session internally, and returns the first BDUI step.
+      tags: [Flows]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateFlowRequest"
+      responses:
+        "201":
+          description: Flow started, first step returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FlowResponse"
+
+  /flows/{sessionId}:
+    parameters:
+      - $ref: "#/components/parameters/sessionId"
+    get:
+      operationId: getFlowStep
+      summary: Get current step (re-render)
+      description: Returns the current BDUI step without advancing the state machine.
+      tags: [Flows]
+      security:
+        - sessionToken: []
+      responses:
+        "200":
+          description: Current step
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FlowResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "410":
+          $ref: "#/components/responses/FlowCompleted"
+
+  /flows/{sessionId}/submit:
+    parameters:
+      - $ref: "#/components/parameters/sessionId"
+    post:
+      operationId: submitFlowStep
+      summary: Submit step data and advance
+      description: |
+        Submits user input for the current step. The server validates,
+        processes (e.g., verifies a credential), advances the state machine
+        through any invisible policy_check steps, and returns the next
+        visible step.
+      tags: [Flows]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FlowSubmitRequest"
+      responses:
+        "200":
+          description: Advanced to next step
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FlowResponse"
+        "400":
+          description: |
+            Validation or proof verification failed. Returns the same step
+            with an `error` field. The session token is still rotated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FlowResponse"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /flows/{sessionId}/event:
+    parameters:
+      - $ref: "#/components/parameters/sessionId"
+    post:
+      operationId: submitFlowEvent
+      summary: Submit client-side event
+      description: |
+        Submits telemetry or fingerprint data from the frontend.
+        Does not advance the state machine. Used for risk evaluation.
+      tags: [Flows]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FlowEventRequest"
+      responses:
+        "204":
+          description: Event recorded
+
+  # ── Flow definitions ──────────────────────────────────────────
+
+  /flow-definitions:
+    get:
+      operationId: listFlowDefinitions
+      summary: List flow definitions
+      tags: [Flow Definitions]
+      parameters:
+        - name: state
+          in: query
+          schema:
+            type: string
+            enum: [draft, active, archived]
+        - name: purpose
+          in: query
+          schema:
+            type: string
+            enum: [login, register, recovery, profiling, reauth, link_account]
+        - name: org_id
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Flow definition list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListDefinitionsResponse"
+
+    post:
+      operationId: createFlowDefinition
+      summary: Create a flow definition
+      tags: [Flow Definitions]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FlowDefinition"
+      responses:
+        "201":
+          description: Definition created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FlowDefinitionResponse"
+
+  /flow-definitions/{definitionId}:
+    parameters:
+      - $ref: "#/components/parameters/definitionId"
+
+    get:
+      operationId: getFlowDefinition
+      summary: Get a flow definition
+      tags: [Flow Definitions]
+      responses:
+        "200":
+          description: Flow definition
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FlowDefinitionResponse"
+
+    patch:
+      operationId: updateFlowDefinition
+      summary: Update a flow definition
+      tags: [Flow Definitions]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FlowDefinition"
+      responses:
+        "200":
+          description: Definition updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FlowDefinitionResponse"
+
+    delete:
+      operationId: deleteFlowDefinition
+      summary: Delete a flow definition
+      tags: [Flow Definitions]
+      responses:
+        "204":
+          description: Definition deleted
+
+  /flow-definitions/{definitionId}/activate:
+    parameters:
+      - $ref: "#/components/parameters/definitionId"
+    post:
+      operationId: activateFlowDefinition
+      summary: Activate a draft definition
+      tags: [Flow Definitions]
+      responses:
+        "200":
+          description: Definition activated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FlowDefinitionResponse"
+
+  /flow-definitions/{definitionId}/archive:
+    parameters:
+      - $ref: "#/components/parameters/definitionId"
+    post:
+      operationId: archiveFlowDefinition
+      summary: Archive an active definition
+      tags: [Flow Definitions]
+      responses:
+        "200":
+          description: Definition archived
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FlowDefinitionResponse"
+
+  /flow-definitions/{definitionId}/validate:
+    parameters:
+      - $ref: "#/components/parameters/definitionId"
+    post:
+      operationId: validateFlowDefinition
+      summary: Validate the step graph
+      description: Checks for dead ends, missing transitions, unreachable steps.
+      tags: [Flow Definitions]
+      responses:
+        "200":
+          description: Validation result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationResult"
+
+  /flow-definitions/{definitionId}/simulate:
+    parameters:
+      - $ref: "#/components/parameters/definitionId"
+    post:
+      operationId: simulateFlowDefinition
+      summary: Dry-run with mock input
+      tags: [Flow Definitions]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SimulateRequest"
+      responses:
+        "200":
+          description: Simulation result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SimulateResponse"
+
+  /flow-definitions/resolve:
+    post:
+      operationId: resolveFlowDefinition
+      summary: Resolve which definition applies for a given context
+      tags: [Flow Definitions]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResolveRequest"
+      responses:
+        "200":
+          description: Resolved definition
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FlowDefinitionResponse"
+
+components:
+  parameters:
+    sessionId:
+      name: sessionId
+      in: path
+      required: true
+      description: Session ID (also serves as the flow handle)
+      schema:
+        type: string
+        example: sess_xyz
+
+    definitionId:
+      name: definitionId
+      in: path
+      required: true
+      schema:
+        type: string
+        example: flow_enterprise
+
+  securitySchemes:
+    sessionToken:
+      type: http
+      scheme: bearer
+      description: Session token returned on flow creation or last submit
+
+  schemas:
+    # ── Flow runtime schemas ────────────────────────────────────
+
+    CreateFlowRequest:
+      type: object
+      required: [purpose]
+      properties:
+        purpose:
+          type: string
+          enum: [login, register, recovery, profiling, reauth, link_account]
+        auth_request_id:
+          type: string
+          description: OIDC/SAML auth request ID (links flow to protocol request)
+        redirect_uri:
+          type: string
+          format: uri
+        hint:
+          $ref: "#/components/schemas/FlowHint"
+
+    FlowHint:
+      type: object
+      properties:
+        login_name:
+          type: string
+          description: Auto-submits identifier step (maps to OIDC login_hint)
+        org_id:
+          type: string
+          description: Scopes flow resolution to an organization
+        schema_id:
+          type: string
+          description: Scopes to a specific user type
+        app_id:
+          type: string
+          description: Scopes to a specific application
+
+    FlowResponse:
+      type: object
+      required: [session_id, session_token, step]
+      properties:
+        session_id:
+          type: string
+        session_token:
+          type: string
+        step:
+          $ref: "#/components/schemas/FlowStep"
+        redirect_uri:
+          type: string
+          format: uri
+          description: Present on the `complete` step when a redirect is needed
+
+    FlowStep:
+      type: object
+      required: [name, type]
+      description: |
+        A step contains functional data: what to collect (fields) and what the
+        user can do (actions). Layout and styling are a separate concern.
+        See flow-engine-nodes.md for the response shape discussion.
+      properties:
+        name:
+          type: string
+          description: Step name from the flow definition
+        type:
+          type: string
+          enum: [identifier, credential, form, verification, consent, info, redirect, captcha, complete]
+          description: |
+            Step type. Note: `policy_check` and `action` steps never render —
+            the flow engine auto-transitions through them.
+        label:
+          type: string
+          description: Step heading / title
+        description:
+          type: string
+          description: Explanatory text for the step
+          nullable: true
+        error:
+          type: string
+          description: Error message from a previous failed submission
+          nullable: true
+        behavior:
+          type: string
+          enum: [redirect, show, continue]
+          description: |
+            Only present on `complete` steps. Tells the frontend what to do:
+            - redirect: navigate to redirect_uri immediately
+            - show: display the label as a success screen
+            - continue: call GET /flows/{session_id} for the next step (auto-pivot happened)
+        redirect_url:
+          type: string
+          format: uri
+          description: For `redirect` steps — URL to navigate to (e.g., SSO provider)
+        fields:
+          type: array
+          description: Input fields to collect from the user. Uniform schema, no type discrimination needed.
+          items:
+            $ref: "#/components/schemas/Field"
+          default: []
+        actions:
+          type: array
+          description: |
+            Ordered list of things the user can do. Each action has a `kind` discriminator.
+            Array order is the render order — the server controls positioning.
+          items:
+            $ref: "#/components/schemas/StepAction"
+          default: []
+
+    Field:
+      type: object
+      required: [name, type]
+      description: An input to collect from the user.
+      properties:
+        name:
+          type: string
+          description: Field identifier, used as the key in submit data
+          example: email
+        label:
+          type: string
+          example: Email address
+        type:
+          type: string
+          enum: [text, email, password, tel, number, url, date, hidden]
+        required:
+          type: boolean
+          default: false
+        value:
+          description: Pre-filled value (e.g., email carried over from a pivot)
+        validation:
+          type: object
+          properties:
+            format:
+              type: string
+            pattern:
+              type: string
+            min_length:
+              type: integer
+            max_length:
+              type: integer
+
+    StepAction:
+      type: object
+      required: [kind, name, label]
+      description: |
+        An interactive element in the actions list. The `kind` field determines
+        how the frontend renders it (button, SSO widget, passkey ceremony, etc.).
+      properties:
+        kind:
+          type: string
+          enum: [submit, sso, passkey, captcha, link]
+          description: |
+            - submit: primary form submission button
+            - sso: SSO provider button (has `provider` field)
+            - passkey: WebAuthn ceremony trigger
+            - captcha: proof-of-work challenge (has `config` field)
+            - link: secondary navigation (register, forgot password, back)
+        name:
+          type: string
+          description: Action identifier, sent back in the submit request
+          example: submit
+        label:
+          type: string
+          example: Continue
+        primary:
+          type: boolean
+          default: false
+          description: Whether this is the primary/default action (typically the first submit)
+        provider:
+          type: string
+          description: For `sso` kind — provider identifier (e.g., "google")
+        config:
+          type: object
+          description: For `captcha`/`passkey` kinds — challenge params, public key, etc.
+          additionalProperties: true
+
+    FlowSubmitRequest:
+      type: object
+      required: [session_token, action]
+      properties:
+        session_token:
+          type: string
+        action:
+          type: string
+          description: |
+            Which action to take. Maps to a transition name on the current step
+            (e.g., "submit", "register", "sso", "back", "skip").
+        data:
+          type: object
+          description: User input data. Shape depends on the step type.
+          additionalProperties: true
+
+    FlowEventRequest:
+      type: object
+      required: [session_token, type]
+      properties:
+        session_token:
+          type: string
+        type:
+          type: string
+          enum: [fingerprint, telemetry]
+        payload:
+          type: object
+          description: Event payload (fingerprint hash, timing data, etc.)
+          additionalProperties: true
+
+    # ── Flow definition schemas ─────────────────────────────────
+
+    FlowDefinition:
+      type: object
+      required: [name, purposes, initial_steps, steps]
+      properties:
+        name:
+          type: string
+          example: Enterprise Login & Registration
+        purposes:
+          type: array
+          items:
+            type: string
+            enum: [login, register, recovery, profiling, reauth, link_account]
+        initial_steps:
+          type: object
+          description: |
+            Map of purpose → step name. Defines the entry point for each purpose.
+          additionalProperties:
+            type: string
+          example:
+            login: identifier
+            register: register_profile
+        audience:
+          $ref: "#/components/schemas/Audience"
+        steps:
+          type: array
+          description: Ordered array of step definitions forming a directed graph.
+          items:
+            $ref: "#/components/schemas/StepDefinition"
+
+    FlowDefinitionResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          example: flow_enterprise
+        state:
+          type: string
+          enum: [draft, active, archived]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      allOf:
+        - $ref: "#/components/schemas/FlowDefinition"
+
+    Audience:
+      type: object
+      properties:
+        org_ids:
+          type: array
+          items:
+            type: string
+        app_ids:
+          type: array
+          items:
+            type: string
+        schema_ids:
+          type: array
+          items:
+            type: string
+
+    StepDefinition:
+      type: object
+      required: [name, type]
+      properties:
+        name:
+          type: string
+          description: Unique step name within this definition
+          example: identifier
+        type:
+          type: string
+          enum: [identifier, credential, form, verification, policy_check, consent, action, info, redirect, captcha, complete]
+        config:
+          type: object
+          description: Step-type-specific configuration
+          additionalProperties: true
+        transitions:
+          type: object
+          description: |
+            Map of transition name → target. Target is either a step name (string)
+            for in-graph transitions, or a pivot object for cross-purpose navigation.
+          additionalProperties:
+            oneOf:
+              - type: string
+                description: Step name within this definition
+              - type: object
+                required: [pivot]
+                properties:
+                  pivot:
+                    type: string
+                    enum: [login, register, recovery, profiling, reauth, link_account]
+                    description: Target purpose — flow engine resolves a new definition
+          example:
+            submit: check_user
+            register: { pivot: register }
+            recover: { pivot: recovery }
+
+    ValidationResult:
+      type: object
+      properties:
+        valid:
+          type: boolean
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              step:
+                type: string
+              message:
+                type: string
+
+    SimulateRequest:
+      type: object
+      properties:
+        purpose:
+          type: string
+        hint:
+          $ref: "#/components/schemas/FlowHint"
+        mock_user:
+          type: object
+          description: Mock user context for policy evaluation
+        mock_factors:
+          type: object
+          description: Pre-existing factors to simulate step-up
+
+    SimulateResponse:
+      type: object
+      properties:
+        path:
+          type: array
+          items:
+            type: string
+          description: Ordered list of step names visited during simulation
+        final_step:
+          type: string
+        policy_decisions:
+          type: array
+          items:
+            type: object
+
+    ResolveRequest:
+      type: object
+      required: [purpose]
+      properties:
+        purpose:
+          type: string
+        org_id:
+          type: string
+        app_id:
+          type: string
+        schema_id:
+          type: string
+
+    ListDefinitionsResponse:
+      type: object
+      properties:
+        result:
+          type: array
+          items:
+            $ref: "#/components/schemas/FlowDefinitionResponse"
+        total:
+          type: integer
+
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+
+  responses:
+    NotFound:
+      description: Session/flow not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    FlowCompleted:
+      description: Flow has already completed
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    InvalidProof:
+      description: Proof verification failed
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Conflict:
+      description: Version conflict — session was advanced by another request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    ValidationError:
+      description: Request validation failed
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"

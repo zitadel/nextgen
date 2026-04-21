@@ -1,0 +1,434 @@
+openapi: 3.1.0
+info:
+  title: Zitadel Session API
+  version: 1.0.0-draft
+  description: |
+    Low-level session primitive for factor accumulation.
+    Sessions are assurance-aware: they accumulate verified factors and expose
+    the current assurance level (ACR) computed from those factors.
+    Clients submit factor proofs; the server verifies and re-evaluates the ACR.
+
+servers:
+  - url: https://{instance}.zitadel.cloud/v1
+    variables:
+      instance:
+        default: my-instance
+
+tags:
+  - name: Sessions
+    description: Session lifecycle and factor accumulation
+
+paths:
+  /sessions:
+    post:
+      operationId: createSession
+      summary: Create a new session
+      tags: [Sessions]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSessionRequest"
+      responses:
+        "201":
+          description: Session created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionResponse"
+
+    get:
+      operationId: listSessions
+      summary: List sessions
+      tags: [Sessions]
+      parameters:
+        - name: user_id
+          in: query
+          schema:
+            type: string
+        - name: state
+          in: query
+          schema:
+            type: string
+            enum: [building, active, expired, revoked]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Session list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListSessionsResponse"
+
+  /sessions/{sessionId}:
+    parameters:
+      - $ref: "#/components/parameters/sessionId"
+
+    get:
+      operationId: getSession
+      summary: Get session state, factors, and assurance level
+      tags: [Sessions]
+      security:
+        - sessionToken: []
+      responses:
+        "200":
+          description: Session state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    patch:
+      operationId: submitFactorProofs
+      summary: Submit one or more factor proofs
+      description: |
+        Submit proofs as top-level keys. The server verifies each proof,
+        updates factors, re-evaluates the assurance level (ACR), and returns
+        the updated session state.
+      tags: [Sessions]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitProofsRequest"
+      responses:
+        "200":
+          description: Session updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionResponse"
+        "401":
+          $ref: "#/components/responses/InvalidProof"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+    delete:
+      operationId: revokeSession
+      summary: Revoke a session
+      tags: [Sessions]
+      security:
+        - sessionToken: []
+      responses:
+        "204":
+          description: Session revoked
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /sessions/{sessionId}/challenge:
+    parameters:
+      - $ref: "#/components/parameters/sessionId"
+    post:
+      operationId: requestChallenge
+      summary: Request a challenge for a factor type
+      description: |
+        Request a challenge for factor types that require one before proof
+        submission (passkey, OTP SMS, OTP email, captcha).
+      tags: [Sessions]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChallengeRequest"
+      responses:
+        "200":
+          description: Challenge issued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChallengeResponse"
+
+components:
+  parameters:
+    sessionId:
+      name: sessionId
+      in: path
+      required: true
+      schema:
+        type: string
+        example: sess_abc123
+
+  securitySchemes:
+    sessionToken:
+      type: http
+      scheme: bearer
+      description: Session token returned on creation or last mutation
+
+  schemas:
+    CreateSessionRequest:
+      type: object
+      properties:
+        user_agent:
+          $ref: "#/components/schemas/UserAgent"
+        user:
+          $ref: "#/components/schemas/UserProof"
+
+    SubmitProofsRequest:
+      type: object
+      required: [session_token]
+      properties:
+        session_token:
+          type: string
+          description: Token from the previous session response. Rotated on every mutation.
+        user:
+          $ref: "#/components/schemas/UserProof"
+        password:
+          $ref: "#/components/schemas/PasswordProof"
+        passkey:
+          $ref: "#/components/schemas/PasskeyProof"
+        totp:
+          $ref: "#/components/schemas/TOTPProof"
+        otp_sms:
+          $ref: "#/components/schemas/OTPProof"
+        otp_email:
+          $ref: "#/components/schemas/OTPProof"
+        idp:
+          $ref: "#/components/schemas/IdPProof"
+        recovery_code:
+          $ref: "#/components/schemas/RecoveryCodeProof"
+        captcha:
+          $ref: "#/components/schemas/CaptchaProof"
+
+    SessionResponse:
+      type: object
+      required: [session_id, session_token, state, factors, acr, amr]
+      properties:
+        session_id:
+          type: string
+          example: sess_abc123
+        session_token:
+          type: string
+          description: Rotated on every mutation. Use this token for the next request.
+          example: tok_xyz789
+        state:
+          type: string
+          enum: [building, active, expired, revoked]
+        factors:
+          type: object
+          description: |
+            Map of verified factors. Each key is a factor type, value contains
+            verification metadata including timestamps and authenticator properties.
+          additionalProperties:
+            $ref: "#/components/schemas/Factor"
+          example:
+            user: { user_id: u_123, verified_at: "2026-04-17T10:00:00Z" }
+            password: { verified_at: "2026-04-17T10:01:00Z" }
+            otp: { verified_at: "2026-04-17T10:02:00Z" }
+        acr:
+          type: string
+          description: |
+            Authentication Context Class Reference — the current assurance level
+            computed from the verified factors, their properties, and freshness.
+            Maps to the `acr` claim in OIDC ID tokens.
+          example: "urn:zitadel:aal:2"
+        amr:
+          type: array
+          items:
+            type: string
+          description: |
+            Authentication Methods References — list of method identifiers used
+            during authentication. Maps to the `amr` claim in OIDC ID tokens.
+          example: ["pwd", "otp", "mfa"]
+        need:
+          type: array
+          items:
+            type: string
+          description: |
+            Factor types that would raise the assurance level. When evaluated in
+            the context of a specific OIDC request, reflects what's needed to
+            reach the requested ACR. Otherwise, reflects what would reach the
+            next level above the current one.
+          example: [passkey]
+
+    Factor:
+      type: object
+      properties:
+        user_id:
+          type: string
+        verified_at:
+          type: string
+          format: date-time
+        hardware:
+          type: boolean
+          description: Whether the authenticator is hardware-based
+        phishing_resistant:
+          type: boolean
+          description: Whether the authenticator provides verifier impersonation resistance
+
+    UserAgent:
+      type: object
+      properties:
+        fingerprint:
+          type: string
+        ip:
+          type: string
+
+    UserProof:
+      type: object
+      properties:
+        login_name:
+          type: string
+        user_id:
+          type: string
+
+    PasswordProof:
+      type: object
+      required: [password]
+      properties:
+        password:
+          type: string
+
+    PasskeyProof:
+      type: object
+      required: [assertion]
+      properties:
+        assertion:
+          type: object
+          description: WebAuthn assertion response
+
+    TOTPProof:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+          pattern: "^[0-9]{6}$"
+
+    OTPProof:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+
+    IdPProof:
+      type: object
+      required: [intent_id, token]
+      properties:
+        intent_id:
+          type: string
+        token:
+          type: string
+
+    RecoveryCodeProof:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+
+    CaptchaProof:
+      type: object
+      description: |
+        Proof of captcha completion. Shape depends on the provider configured
+        for this instance/organization.
+      oneOf:
+        - title: AltchaProof
+          description: Proof-of-work solution (self-hosted Altcha)
+          type: object
+          required: [provider, salt, number]
+          properties:
+            provider:
+              type: string
+              const: altcha
+            salt:
+              type: string
+            number:
+              type: integer
+        - title: ExternalCaptchaProof
+          description: Token from a third-party captcha provider (reCAPTCHA, hCaptcha, Turnstile)
+          type: object
+          required: [provider, token]
+          properties:
+            provider:
+              type: string
+              enum: [recaptcha, hcaptcha, turnstile]
+            token:
+              type: string
+              description: Verification token returned by the provider's client-side widget
+
+    ChallengeRequest:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [passkey, otp_sms, otp_email, captcha]
+        session_token:
+          type: string
+
+    ChallengeResponse:
+      type: object
+      properties:
+        type:
+          type: string
+        challenge:
+          type: object
+          description: |
+            Challenge payload. Shape depends on the challenge type.
+            For captcha challenges, includes provider-specific config:
+            - Altcha: `{ provider, algorithm, challenge, salt, max_number }`
+            - reCAPTCHA/hCaptcha/Turnstile: `{ provider, site_key }`
+
+    ListSessionsResponse:
+      type: object
+      properties:
+        result:
+          type: array
+          items:
+            $ref: "#/components/schemas/SessionResponse"
+        total:
+          type: integer
+
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+
+  responses:
+    NotFound:
+      description: Session not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    InvalidProof:
+      description: Proof verification failed (wrong password, invalid code, etc.)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Conflict:
+      description: Version conflict — another request already advanced the session
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    ValidationError:
+      description: Request validation failed
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"

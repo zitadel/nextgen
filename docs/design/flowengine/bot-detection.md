@@ -1,0 +1,215 @@
+# Bot Detection & Captcha
+
+> **Status:** Preliminary — depends on policy engine design
+> **See also:** [Overview](README.md) · [Flow Engine](flow-engine.md) · [Session API](session-api.md)
+> **POC ADRs:** [021](https://github.com/zitadel/oxidel/blob/main/docs/adr/021-login-flow-schema.md) Bot Detection & Telemetry, [024](https://github.com/zitadel/oxidel/blob/main/docs/adr/024-risk-evaluation-policy-consumers.md) Risk Evaluation
+
+Bot detection is a **first-class, composable subsystem** — not an afterthought bolted onto login.
+
+## Principles
+
+1. **Self-hosted by default.** Altcha (proof-of-work) ships built-in with zero external dependencies. No data leaves the deployment unless the admin opts in to a third-party provider.
+2. **Pluggable providers.** Admins can configure third-party captcha services (reCAPTCHA, hCaptcha, Cloudflare Turnstile) via `x-captcha.provider`. The captcha interface is provider-agnostic.
+3. **Composable signals.** Captcha is one of several signals. The risk evaluator fuses them into a single `RiskResult`.
+4. **Risk-based activation.** Captcha is not always-on. The policy engine decides when to require it.
+5. **Works in both paths.** Flow engine injects captcha steps dynamically. Session API includes `captcha` in `need[]` when risk evaluation demands it.
+
+## Signal Architecture
+
+```
+┌─────────────────────────────────────────────────┐
+│                   Risk Evaluator                 │
+│                                                  │
+│  Inputs:                                         │
+│    * Captcha result (solved / not solved)         │
+│    * Device fingerprint (known / new / spoofed)   │
+│    * Behavioral telemetry (timing, interaction)   │
+│    * Rate limit state (attempts per IP/user)      │
+│    * Request context (geo, ASN, TLS)              │
+│                                                  │
+│  Output: RiskResult                              │
+│    score: 0.0-1.0                                │
+│    level: low | medium | high | unknown          │
+│    reasons: []                                   │
+│    recommendation: allow | require_captcha |     │
+│      require_step_up | block                     │
+└─────────────────────┬───────────────────────────┘
+                      │
+                      ▼
+              Policy Engine consumes
+              RiskResult and decides
+```
+
+## Captcha Providers
+
+The captcha subsystem is **provider-agnostic**. The flow definition or schema annotation specifies which provider to use. The server generates challenges and verifies solutions using a provider-specific adapter.
+
+### Built-in: Altcha (Proof-of-Work)
+
+The default captcha. Self-hosted, zero external dependencies, privacy-preserving.
+
+```
+Server                              Browser
+------                              -------
+Generate challenge:
+  salt = random(16)
+  secret = HMAC-SHA256(server_key, salt)
+  number = random(0..max_number)
+  challenge = SHA256(salt + number)
+  -> send { algorithm, challenge,
+           salt, max_number }
+                                    Brute-force solve:
+                                      for n in 0..max_number:
+                                        if SHA256(salt + n) == challenge:
+                                          -> send { number: n, salt }
+
+Verify:
+  recompute = SHA256(salt + number)
+  valid = (recompute == challenge)
+  -> record result in risk evaluator
+```
+
+| Parameter | Default | Purpose |
+|---|---|---|
+| `difficulty` | `3` (1-6 scale) | Computational cost. Higher = harder. |
+| `max_number` | `100_000` | Upper bound for brute-force range. |
+| `expiry` | `300s` | Challenge validity window. |
+
+Difficulty scales with risk level. `medium` risk → difficulty 2 (subsecond). `high` risk → difficulty 5 (several seconds).
+
+### Third-Party Providers
+
+Admins can configure external captcha services when they need ML-based detection or have compliance requirements that mandate a specific vendor.
+
+| Provider | `x-captcha.provider` value | How it works |
+|---|---|---|
+| **reCAPTCHA** (Google) | `recaptcha` | Server sends site key → browser renders widget → token submitted → server verifies via Google API |
+| **hCaptcha** | `hcaptcha` | Same flow as reCAPTCHA, verified via hCaptcha API |
+| **Cloudflare Turnstile** | `turnstile` | Invisible or managed challenge → token submitted → server verifies via Cloudflare API |
+
+Third-party providers require configuration (site key, secret key) at the instance or organization level. The captcha step in the flow response includes provider-specific config so the frontend knows which widget to render:
+
+```json
+{
+  "kind": "captcha",
+  "name": "captcha",
+  "label": "Complete the challenge",
+  "config": {
+    "provider": "recaptcha",
+    "site_key": "6Lc..."
+  }
+}
+```
+
+vs. the built-in Altcha:
+
+```json
+{
+  "kind": "captcha",
+  "name": "captcha",
+  "label": "Complete the challenge",
+  "config": {
+    "provider": "altcha",
+    "algorithm": "SHA-256",
+    "challenge": "abc...",
+    "salt": "xyz...",
+    "max_number": 100000
+  }
+}
+```
+
+The frontend dispatches on `config.provider` to render the right widget. The submit payload varies by provider (Altcha sends `{ salt, number }`, reCAPTCHA/hCaptcha/Turnstile send `{ token }`).
+
+### Schema Annotation
+
+Captcha is configured per flow via `x-captcha` in the flow definition or schema:
+
+```json
+{
+  "x-captcha": {
+    "provider": "altcha",
+    "mode": "risk_based",
+    "difficulty": 3
+  }
+}
+```
+
+| Field | Values | Meaning |
+|---|---|---|
+| `provider` | `altcha`, `recaptcha`, `hcaptcha`, `turnstile` | Which captcha service to use |
+| `mode` | `always`, `risk_based`, `disabled` | When to show the challenge |
+| `difficulty` | `1`-`6` (Altcha only) | PoW computational cost |
+
+## Fingerprinting
+
+Browser fingerprinting collects device signals for risk correlation. It does not block — it feeds the risk evaluator.
+
+- **Provider:** ThumbmarkJS (open-source, self-hosted) with fallback to a minimal built-in collector.
+- **Collection:** Flow engine emits a fingerprint collection action. Frontend submits via `POST /v1/flows/{session_id}/event`.
+- **Persistence:** Fingerprint hash stored on the session. Repeat visitors with the same fingerprint on the same user are lower risk.
+
+## Behavioral Telemetry
+
+| Signal | Captured via | Risk indicator |
+|---|---|---|
+| Keystroke timing | Event endpoint | Bots type at constant intervals |
+| Mouse movement | Event endpoint | Bots move in straight lines or not at all |
+| Time on step | Step transition timestamps | Bots complete forms in <100ms |
+| Copy/paste of credentials | Event endpoint | Unusual for real users on password fields |
+
+Signals are submitted via `POST /v1/flows/{session_id}/event`. They are **observation-only** — never blocking on their own.
+
+## Rate Limiting
+
+| Scope | Limit | Effect |
+|---|---|---|
+| IP + endpoint | Configurable (e.g., 20/min) | 429 Too Many Requests |
+| User + factor | Configurable (e.g., 5 attempts/10min) | Factor locked, risk score elevated |
+| Session | Configurable (e.g., 10 mutations/min) | Session throttled |
+
+Exceeding soft limits elevates risk (triggering captcha). Exceeding hard limits blocks.
+
+## Integration: Flow Engine
+
+Three modes:
+
+1. **Explicit step** — for flows that always want captcha (e.g., public registration):
+   ```json
+   {
+     "name": "bot_check",
+     "type": "captcha",
+     "config": { "provider": "altcha", "difficulty": 3 },
+     "transitions": { "verified": "register_profile" }
+   }
+   ```
+
+2. **Dynamic injection** — policy evaluates risk and injects captcha via the step injection mechanism.
+
+3. **Invisible assessment** — a `policy_check` step evaluates risk. Low score → skip. High score → inject captcha.
+
+## Integration: Session API
+
+When the risk evaluator flags a session, the policy engine adds `captcha` to the `need[]` array. The captcha factor does not affect the session's `acr` — it is a bot-detection gate, not an authentication factor.
+
+The client:
+1. Sees `"captcha"` in `need[]`
+2. Requests a challenge: `POST /v1/sessions/{id}/challenge { "type": "captcha" }`
+3. Solves the challenge client-side (widget or PoW depending on configured provider)
+4. Submits the proof: `PATCH /v1/sessions/{id} { "captcha": { ... } }`
+
+Captcha is a standard factor — no special-case API.
+
+## Risk Evaluation Event
+
+```json
+{
+  "event_type": "signal.risk_evaluated",
+  "score": 0.72,
+  "level": "high",
+  "reasons": ["new_device", "rate_limit_elevated", "geo_mismatch"],
+  "recommendation": "require_captcha",
+  "session_id": "sess_abc",
+  "fingerprint": "fp_abc",
+  "ip": "1.2.3.4"
+}
+```
