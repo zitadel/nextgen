@@ -15,6 +15,96 @@ func (s *ErrorDetailsStatusCode) Error() string {
 	return fmt.Sprintf("code %d: %+v", s.StatusCode, s.Response)
 }
 
+// AuthorizeGetFound is response for AuthorizeGet operation.
+type AuthorizeGetFound struct{}
+
+func (*AuthorizeGetFound) authorizeGetRes() {}
+
+// Ref: #
+type DeviceAuthorizationResponse struct {
+	// The device code that the client will use to poll for authorization.
+	DeviceCode OptString `json:"device_code"`
+	// The number of seconds until the device code expires.
+	ExpiresIn OptInt `json:"expires_in"`
+	// The minimum amount of time in seconds that the client should wait
+	// between polling requests.
+	Interval OptInt `json:"interval"`
+	// The user code that the user will enter to authorize the device.
+	UserCode OptString `json:"user_code"`
+	// The URI where the user will enter the user code to authorize the device.
+	VerificationURI OptString `json:"verification_uri"`
+	// The complete URI with the user code included, which the user can visit
+	// to authorize the device.
+	VerificationURIComplete OptString `json:"verification_uri_complete"`
+}
+
+// GetDeviceCode returns the value of DeviceCode.
+func (s *DeviceAuthorizationResponse) GetDeviceCode() OptString {
+	return s.DeviceCode
+}
+
+// GetExpiresIn returns the value of ExpiresIn.
+func (s *DeviceAuthorizationResponse) GetExpiresIn() OptInt {
+	return s.ExpiresIn
+}
+
+// GetInterval returns the value of Interval.
+func (s *DeviceAuthorizationResponse) GetInterval() OptInt {
+	return s.Interval
+}
+
+// GetUserCode returns the value of UserCode.
+func (s *DeviceAuthorizationResponse) GetUserCode() OptString {
+	return s.UserCode
+}
+
+// GetVerificationURI returns the value of VerificationURI.
+func (s *DeviceAuthorizationResponse) GetVerificationURI() OptString {
+	return s.VerificationURI
+}
+
+// GetVerificationURIComplete returns the value of VerificationURIComplete.
+func (s *DeviceAuthorizationResponse) GetVerificationURIComplete() OptString {
+	return s.VerificationURIComplete
+}
+
+// SetDeviceCode sets the value of DeviceCode.
+func (s *DeviceAuthorizationResponse) SetDeviceCode(val OptString) {
+	s.DeviceCode = val
+}
+
+// SetExpiresIn sets the value of ExpiresIn.
+func (s *DeviceAuthorizationResponse) SetExpiresIn(val OptInt) {
+	s.ExpiresIn = val
+}
+
+// SetInterval sets the value of Interval.
+func (s *DeviceAuthorizationResponse) SetInterval(val OptInt) {
+	s.Interval = val
+}
+
+// SetUserCode sets the value of UserCode.
+func (s *DeviceAuthorizationResponse) SetUserCode(val OptString) {
+	s.UserCode = val
+}
+
+// SetVerificationURI sets the value of VerificationURI.
+func (s *DeviceAuthorizationResponse) SetVerificationURI(val OptString) {
+	s.VerificationURI = val
+}
+
+// SetVerificationURIComplete sets the value of VerificationURIComplete.
+func (s *DeviceAuthorizationResponse) SetVerificationURIComplete(val OptString) {
+	s.VerificationURIComplete = val
+}
+
+func (*DeviceAuthorizationResponse) authorizeDeviceRes() {}
+
+// EndSessionNoContent is response for EndSession operation.
+type EndSessionNoContent struct{}
+
+func (*EndSessionNoContent) endSessionRes() {}
+
 // Standard error payload returned for failed API requests.
 // Ref: #
 type ErrorDetails struct {
@@ -56,6 +146,11 @@ func (s *ErrorDetails) SetDetails(val OptErrorDetailsDetails) {
 	s.Details = val
 }
 
+func (*ErrorDetails) authorizeDeviceRes() {}
+func (*ErrorDetails) authorizeGetRes()    {}
+func (*ErrorDetails) endSessionRes()      {}
+func (*ErrorDetails) introspectRes()      {}
+
 // Additional error-specific context.
 type ErrorDetailsDetails map[string]jx.Raw
 
@@ -95,9 +190,13 @@ func (s *ErrorDetailsStatusCode) SetResponse(val ErrorDetails) {
 }
 
 func (*ErrorDetailsStatusCode) getHealthRes()              {}
+func (*ErrorDetailsStatusCode) getKeysRes()                {}
 func (*ErrorDetailsStatusCode) getLiveRes()                {}
 func (*ErrorDetailsStatusCode) getOpenIDConfigurationRes() {}
 func (*ErrorDetailsStatusCode) getReadyRes()               {}
+func (*ErrorDetailsStatusCode) getTokenRes()               {}
+func (*ErrorDetailsStatusCode) getUserInfoRes()            {}
+func (*ErrorDetailsStatusCode) revokeTokenRes()            {}
 
 type GetHealthOK struct {
 	Data io.Reader
@@ -146,6 +245,513 @@ func (s GetReadyOK) Read(p []byte) (n int, err error) {
 }
 
 func (*GetReadyOK) getReadyRes() {}
+
+type GetUserInfoOK struct {
+	// The unique identifier for the user.
+	Sub OptString `json:"sub"`
+	// The full name of the user.
+	Name OptString `json:"name"`
+	// The email address of the user.
+	Email OptString `json:"email"`
+	// The preferred username of the user.
+	PreferredUsername OptString `json:"preferred_username"`
+	// The URL of the user's profile picture.
+	Picture OptURI `json:"picture"`
+	// The given name of the user.
+	GivenName OptString `json:"given_name"`
+	// The family name of the user.
+	FamilyName OptString `json:"family_name"`
+}
+
+// GetSub returns the value of Sub.
+func (s *GetUserInfoOK) GetSub() OptString {
+	return s.Sub
+}
+
+// GetName returns the value of Name.
+func (s *GetUserInfoOK) GetName() OptString {
+	return s.Name
+}
+
+// GetEmail returns the value of Email.
+func (s *GetUserInfoOK) GetEmail() OptString {
+	return s.Email
+}
+
+// GetPreferredUsername returns the value of PreferredUsername.
+func (s *GetUserInfoOK) GetPreferredUsername() OptString {
+	return s.PreferredUsername
+}
+
+// GetPicture returns the value of Picture.
+func (s *GetUserInfoOK) GetPicture() OptURI {
+	return s.Picture
+}
+
+// GetGivenName returns the value of GivenName.
+func (s *GetUserInfoOK) GetGivenName() OptString {
+	return s.GivenName
+}
+
+// GetFamilyName returns the value of FamilyName.
+func (s *GetUserInfoOK) GetFamilyName() OptString {
+	return s.FamilyName
+}
+
+// SetSub sets the value of Sub.
+func (s *GetUserInfoOK) SetSub(val OptString) {
+	s.Sub = val
+}
+
+// SetName sets the value of Name.
+func (s *GetUserInfoOK) SetName(val OptString) {
+	s.Name = val
+}
+
+// SetEmail sets the value of Email.
+func (s *GetUserInfoOK) SetEmail(val OptString) {
+	s.Email = val
+}
+
+// SetPreferredUsername sets the value of PreferredUsername.
+func (s *GetUserInfoOK) SetPreferredUsername(val OptString) {
+	s.PreferredUsername = val
+}
+
+// SetPicture sets the value of Picture.
+func (s *GetUserInfoOK) SetPicture(val OptURI) {
+	s.Picture = val
+}
+
+// SetGivenName sets the value of GivenName.
+func (s *GetUserInfoOK) SetGivenName(val OptString) {
+	s.GivenName = val
+}
+
+// SetFamilyName sets the value of FamilyName.
+func (s *GetUserInfoOK) SetFamilyName(val OptString) {
+	s.FamilyName = val
+}
+
+func (*GetUserInfoOK) getUserInfoRes() {}
+
+// Ref: #
+type IntrospectRequest struct {
+	// The token to introspect.
+	Token string `json:"token"`
+	// A hint about the type of the token (access_token or refresh_token).
+	TokenTypeHint OptString `json:"token_type_hint"`
+}
+
+// GetToken returns the value of Token.
+func (s *IntrospectRequest) GetToken() string {
+	return s.Token
+}
+
+// GetTokenTypeHint returns the value of TokenTypeHint.
+func (s *IntrospectRequest) GetTokenTypeHint() OptString {
+	return s.TokenTypeHint
+}
+
+// SetToken sets the value of Token.
+func (s *IntrospectRequest) SetToken(val string) {
+	s.Token = val
+}
+
+// SetTokenTypeHint sets the value of TokenTypeHint.
+func (s *IntrospectRequest) SetTokenTypeHint(val OptString) {
+	s.TokenTypeHint = val
+}
+
+// Ref: #
+type IntrospectResponse struct {
+	// Indicates whether the token is active.
+	Active OptBool `json:"active"`
+	// The audience of the token (if applicable).
+	Aud OptString `json:"aud"`
+	// The client ID associated with the token.
+	ClientID OptString `json:"client_id"`
+	// The expiration time of the token (in seconds since epoch).
+	Exp OptInt `json:"exp"`
+	// The time the token was issued (in seconds since epoch).
+	Iat OptInt `json:"iat"`
+	// The issuer of the token (if applicable).
+	Iss OptString `json:"iss"`
+	// The unique identifier for the token (if applicable).
+	Jti OptString `json:"jti"`
+	// The time before which the token is not valid (in seconds since epoch).
+	Nbf OptInt `json:"nbf"`
+	// The scopes associated with the token.
+	Scope OptString `json:"scope"`
+	// The subject of the token (if applicable).
+	Sub OptString `json:"sub"`
+	// The type of the token (access_token or refresh_token).
+	TokenType OptString `json:"token_type"`
+	// The username associated with the token (if applicable).
+	Username OptString `json:"username"`
+}
+
+// GetActive returns the value of Active.
+func (s *IntrospectResponse) GetActive() OptBool {
+	return s.Active
+}
+
+// GetAud returns the value of Aud.
+func (s *IntrospectResponse) GetAud() OptString {
+	return s.Aud
+}
+
+// GetClientID returns the value of ClientID.
+func (s *IntrospectResponse) GetClientID() OptString {
+	return s.ClientID
+}
+
+// GetExp returns the value of Exp.
+func (s *IntrospectResponse) GetExp() OptInt {
+	return s.Exp
+}
+
+// GetIat returns the value of Iat.
+func (s *IntrospectResponse) GetIat() OptInt {
+	return s.Iat
+}
+
+// GetIss returns the value of Iss.
+func (s *IntrospectResponse) GetIss() OptString {
+	return s.Iss
+}
+
+// GetJti returns the value of Jti.
+func (s *IntrospectResponse) GetJti() OptString {
+	return s.Jti
+}
+
+// GetNbf returns the value of Nbf.
+func (s *IntrospectResponse) GetNbf() OptInt {
+	return s.Nbf
+}
+
+// GetScope returns the value of Scope.
+func (s *IntrospectResponse) GetScope() OptString {
+	return s.Scope
+}
+
+// GetSub returns the value of Sub.
+func (s *IntrospectResponse) GetSub() OptString {
+	return s.Sub
+}
+
+// GetTokenType returns the value of TokenType.
+func (s *IntrospectResponse) GetTokenType() OptString {
+	return s.TokenType
+}
+
+// GetUsername returns the value of Username.
+func (s *IntrospectResponse) GetUsername() OptString {
+	return s.Username
+}
+
+// SetActive sets the value of Active.
+func (s *IntrospectResponse) SetActive(val OptBool) {
+	s.Active = val
+}
+
+// SetAud sets the value of Aud.
+func (s *IntrospectResponse) SetAud(val OptString) {
+	s.Aud = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *IntrospectResponse) SetClientID(val OptString) {
+	s.ClientID = val
+}
+
+// SetExp sets the value of Exp.
+func (s *IntrospectResponse) SetExp(val OptInt) {
+	s.Exp = val
+}
+
+// SetIat sets the value of Iat.
+func (s *IntrospectResponse) SetIat(val OptInt) {
+	s.Iat = val
+}
+
+// SetIss sets the value of Iss.
+func (s *IntrospectResponse) SetIss(val OptString) {
+	s.Iss = val
+}
+
+// SetJti sets the value of Jti.
+func (s *IntrospectResponse) SetJti(val OptString) {
+	s.Jti = val
+}
+
+// SetNbf sets the value of Nbf.
+func (s *IntrospectResponse) SetNbf(val OptInt) {
+	s.Nbf = val
+}
+
+// SetScope sets the value of Scope.
+func (s *IntrospectResponse) SetScope(val OptString) {
+	s.Scope = val
+}
+
+// SetSub sets the value of Sub.
+func (s *IntrospectResponse) SetSub(val OptString) {
+	s.Sub = val
+}
+
+// SetTokenType sets the value of TokenType.
+func (s *IntrospectResponse) SetTokenType(val OptString) {
+	s.TokenType = val
+}
+
+// SetUsername sets the value of Username.
+func (s *IntrospectResponse) SetUsername(val OptString) {
+	s.Username = val
+}
+
+func (*IntrospectResponse) introspectRes() {}
+
+// Ref: #
+type KeysResponse struct {
+	Keys []KeysResponseKeysItem `json:"keys"`
+}
+
+// GetKeys returns the value of Keys.
+func (s *KeysResponse) GetKeys() []KeysResponseKeysItem {
+	return s.Keys
+}
+
+// SetKeys sets the value of Keys.
+func (s *KeysResponse) SetKeys(val []KeysResponseKeysItem) {
+	s.Keys = val
+}
+
+func (*KeysResponse) getKeysRes() {}
+
+type KeysResponseKeysItem struct {
+	Use     OptString `json:"use"`
+	Kty     OptString `json:"kty"`
+	Kid     OptString `json:"kid"`
+	Crv     OptString `json:"crv"`
+	Alg     OptString `json:"alg"`
+	K       OptString `json:"k"`
+	X       OptString `json:"x"`
+	Y       OptString `json:"y"`
+	N       OptString `json:"n"`
+	E       OptString `json:"e"`
+	D       OptString `json:"d"`
+	P       OptString `json:"p"`
+	Q       OptString `json:"q"`
+	Dp      OptString `json:"dp"`
+	Dq      OptString `json:"dq"`
+	Qi      OptString `json:"qi"`
+	X5c     []string  `json:"x5c"`
+	X5u     OptString `json:"x5u"`
+	X5t     OptString `json:"x5t"`
+	X5tS256 OptString `json:"x5tS256"`
+}
+
+// GetUse returns the value of Use.
+func (s *KeysResponseKeysItem) GetUse() OptString {
+	return s.Use
+}
+
+// GetKty returns the value of Kty.
+func (s *KeysResponseKeysItem) GetKty() OptString {
+	return s.Kty
+}
+
+// GetKid returns the value of Kid.
+func (s *KeysResponseKeysItem) GetKid() OptString {
+	return s.Kid
+}
+
+// GetCrv returns the value of Crv.
+func (s *KeysResponseKeysItem) GetCrv() OptString {
+	return s.Crv
+}
+
+// GetAlg returns the value of Alg.
+func (s *KeysResponseKeysItem) GetAlg() OptString {
+	return s.Alg
+}
+
+// GetK returns the value of K.
+func (s *KeysResponseKeysItem) GetK() OptString {
+	return s.K
+}
+
+// GetX returns the value of X.
+func (s *KeysResponseKeysItem) GetX() OptString {
+	return s.X
+}
+
+// GetY returns the value of Y.
+func (s *KeysResponseKeysItem) GetY() OptString {
+	return s.Y
+}
+
+// GetN returns the value of N.
+func (s *KeysResponseKeysItem) GetN() OptString {
+	return s.N
+}
+
+// GetE returns the value of E.
+func (s *KeysResponseKeysItem) GetE() OptString {
+	return s.E
+}
+
+// GetD returns the value of D.
+func (s *KeysResponseKeysItem) GetD() OptString {
+	return s.D
+}
+
+// GetP returns the value of P.
+func (s *KeysResponseKeysItem) GetP() OptString {
+	return s.P
+}
+
+// GetQ returns the value of Q.
+func (s *KeysResponseKeysItem) GetQ() OptString {
+	return s.Q
+}
+
+// GetDp returns the value of Dp.
+func (s *KeysResponseKeysItem) GetDp() OptString {
+	return s.Dp
+}
+
+// GetDq returns the value of Dq.
+func (s *KeysResponseKeysItem) GetDq() OptString {
+	return s.Dq
+}
+
+// GetQi returns the value of Qi.
+func (s *KeysResponseKeysItem) GetQi() OptString {
+	return s.Qi
+}
+
+// GetX5c returns the value of X5c.
+func (s *KeysResponseKeysItem) GetX5c() []string {
+	return s.X5c
+}
+
+// GetX5u returns the value of X5u.
+func (s *KeysResponseKeysItem) GetX5u() OptString {
+	return s.X5u
+}
+
+// GetX5t returns the value of X5t.
+func (s *KeysResponseKeysItem) GetX5t() OptString {
+	return s.X5t
+}
+
+// GetX5tS256 returns the value of X5tS256.
+func (s *KeysResponseKeysItem) GetX5tS256() OptString {
+	return s.X5tS256
+}
+
+// SetUse sets the value of Use.
+func (s *KeysResponseKeysItem) SetUse(val OptString) {
+	s.Use = val
+}
+
+// SetKty sets the value of Kty.
+func (s *KeysResponseKeysItem) SetKty(val OptString) {
+	s.Kty = val
+}
+
+// SetKid sets the value of Kid.
+func (s *KeysResponseKeysItem) SetKid(val OptString) {
+	s.Kid = val
+}
+
+// SetCrv sets the value of Crv.
+func (s *KeysResponseKeysItem) SetCrv(val OptString) {
+	s.Crv = val
+}
+
+// SetAlg sets the value of Alg.
+func (s *KeysResponseKeysItem) SetAlg(val OptString) {
+	s.Alg = val
+}
+
+// SetK sets the value of K.
+func (s *KeysResponseKeysItem) SetK(val OptString) {
+	s.K = val
+}
+
+// SetX sets the value of X.
+func (s *KeysResponseKeysItem) SetX(val OptString) {
+	s.X = val
+}
+
+// SetY sets the value of Y.
+func (s *KeysResponseKeysItem) SetY(val OptString) {
+	s.Y = val
+}
+
+// SetN sets the value of N.
+func (s *KeysResponseKeysItem) SetN(val OptString) {
+	s.N = val
+}
+
+// SetE sets the value of E.
+func (s *KeysResponseKeysItem) SetE(val OptString) {
+	s.E = val
+}
+
+// SetD sets the value of D.
+func (s *KeysResponseKeysItem) SetD(val OptString) {
+	s.D = val
+}
+
+// SetP sets the value of P.
+func (s *KeysResponseKeysItem) SetP(val OptString) {
+	s.P = val
+}
+
+// SetQ sets the value of Q.
+func (s *KeysResponseKeysItem) SetQ(val OptString) {
+	s.Q = val
+}
+
+// SetDp sets the value of Dp.
+func (s *KeysResponseKeysItem) SetDp(val OptString) {
+	s.Dp = val
+}
+
+// SetDq sets the value of Dq.
+func (s *KeysResponseKeysItem) SetDq(val OptString) {
+	s.Dq = val
+}
+
+// SetQi sets the value of Qi.
+func (s *KeysResponseKeysItem) SetQi(val OptString) {
+	s.Qi = val
+}
+
+// SetX5c sets the value of X5c.
+func (s *KeysResponseKeysItem) SetX5c(val []string) {
+	s.X5c = val
+}
+
+// SetX5u sets the value of X5u.
+func (s *KeysResponseKeysItem) SetX5u(val OptString) {
+	s.X5u = val
+}
+
+// SetX5t sets the value of X5t.
+func (s *KeysResponseKeysItem) SetX5t(val OptString) {
+	s.X5t = val
+}
+
+// SetX5tS256 sets the value of X5tS256.
+func (s *KeysResponseKeysItem) SetX5tS256(val OptString) {
+	s.X5tS256 = val
+}
 
 type ListUsersBadRequest ErrorDetails
 
@@ -977,6 +1583,98 @@ func (o OptInt) Or(d int) int {
 	return d
 }
 
+// NewOptPostTokenRequestGrantType returns new OptPostTokenRequestGrantType with value set to v.
+func NewOptPostTokenRequestGrantType(v PostTokenRequestGrantType) OptPostTokenRequestGrantType {
+	return OptPostTokenRequestGrantType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptPostTokenRequestGrantType is optional PostTokenRequestGrantType.
+type OptPostTokenRequestGrantType struct {
+	Value PostTokenRequestGrantType
+	Set   bool
+}
+
+// IsSet returns true if OptPostTokenRequestGrantType was set.
+func (o OptPostTokenRequestGrantType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptPostTokenRequestGrantType) Reset() {
+	var v PostTokenRequestGrantType
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptPostTokenRequestGrantType) SetTo(v PostTokenRequestGrantType) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptPostTokenRequestGrantType) Get() (v PostTokenRequestGrantType, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptPostTokenRequestGrantType) Or(d PostTokenRequestGrantType) PostTokenRequestGrantType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptString returns new OptString with value set to v.
+func NewOptString(v string) OptString {
+	return OptString{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptString is optional string.
+type OptString struct {
+	Value string
+	Set   bool
+}
+
+// IsSet returns true if OptString was set.
+func (o OptString) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptString) Reset() {
+	var v string
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptString) SetTo(v string) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptString) Get() (v string, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptString) Or(d string) string {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptURI returns new OptURI with value set to v.
 func NewOptURI(v url.URL) OptURI {
 	return OptURI{
@@ -1021,4 +1719,289 @@ func (o OptURI) Or(d url.URL) url.URL {
 		return v
 	}
 	return d
+}
+
+// Ref: #
+type PostTokenRequest struct {
+	// The authorization code received from the authorization server. Required
+	// for the authorization_code grant type.
+	Code OptString `json:"code"`
+	// The client assertion, typically a JWT, used for client authentication.
+	ClientAssertion OptString `json:"client_assertion"`
+	// The type of client assertion being used. Required when the client is
+	// authenticating using a JWT assertion.
+	ClientAssertionType OptString `json:"client_assertion_type"`
+	// The client identifier issued to the client during the registration
+	// process. Required for all grant types.
+	ClientID OptString `json:"client_id"`
+	// The client secret issued to the client during the registration process.
+	// Required for all grant types except when using public clients.
+	ClientSecret OptString `json:"client_secret"`
+	// The code verifier used in PKCE (Proof Key for Code Exchange) flows. Required
+	// for the authorization_code grant type when PKCE is used.
+	CodeVerifier OptString `json:"code_verifier"`
+	// The type of grant being requested.
+	GrantType OptPostTokenRequestGrantType `json:"grant_type"`
+	// The redirect URI used in the authorization request. Required for the
+	// authorization_code grant type.
+	RedirectURI OptURI `json:"redirect_uri"`
+}
+
+// GetCode returns the value of Code.
+func (s *PostTokenRequest) GetCode() OptString {
+	return s.Code
+}
+
+// GetClientAssertion returns the value of ClientAssertion.
+func (s *PostTokenRequest) GetClientAssertion() OptString {
+	return s.ClientAssertion
+}
+
+// GetClientAssertionType returns the value of ClientAssertionType.
+func (s *PostTokenRequest) GetClientAssertionType() OptString {
+	return s.ClientAssertionType
+}
+
+// GetClientID returns the value of ClientID.
+func (s *PostTokenRequest) GetClientID() OptString {
+	return s.ClientID
+}
+
+// GetClientSecret returns the value of ClientSecret.
+func (s *PostTokenRequest) GetClientSecret() OptString {
+	return s.ClientSecret
+}
+
+// GetCodeVerifier returns the value of CodeVerifier.
+func (s *PostTokenRequest) GetCodeVerifier() OptString {
+	return s.CodeVerifier
+}
+
+// GetGrantType returns the value of GrantType.
+func (s *PostTokenRequest) GetGrantType() OptPostTokenRequestGrantType {
+	return s.GrantType
+}
+
+// GetRedirectURI returns the value of RedirectURI.
+func (s *PostTokenRequest) GetRedirectURI() OptURI {
+	return s.RedirectURI
+}
+
+// SetCode sets the value of Code.
+func (s *PostTokenRequest) SetCode(val OptString) {
+	s.Code = val
+}
+
+// SetClientAssertion sets the value of ClientAssertion.
+func (s *PostTokenRequest) SetClientAssertion(val OptString) {
+	s.ClientAssertion = val
+}
+
+// SetClientAssertionType sets the value of ClientAssertionType.
+func (s *PostTokenRequest) SetClientAssertionType(val OptString) {
+	s.ClientAssertionType = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *PostTokenRequest) SetClientID(val OptString) {
+	s.ClientID = val
+}
+
+// SetClientSecret sets the value of ClientSecret.
+func (s *PostTokenRequest) SetClientSecret(val OptString) {
+	s.ClientSecret = val
+}
+
+// SetCodeVerifier sets the value of CodeVerifier.
+func (s *PostTokenRequest) SetCodeVerifier(val OptString) {
+	s.CodeVerifier = val
+}
+
+// SetGrantType sets the value of GrantType.
+func (s *PostTokenRequest) SetGrantType(val OptPostTokenRequestGrantType) {
+	s.GrantType = val
+}
+
+// SetRedirectURI sets the value of RedirectURI.
+func (s *PostTokenRequest) SetRedirectURI(val OptURI) {
+	s.RedirectURI = val
+}
+
+// The type of grant being requested.
+type PostTokenRequestGrantType string
+
+const (
+	PostTokenRequestGrantTypeAuthorizationCode PostTokenRequestGrantType = "authorization_code"
+	PostTokenRequestGrantTypeClientCredentials PostTokenRequestGrantType = "client_credentials"
+	PostTokenRequestGrantTypePassword          PostTokenRequestGrantType = "password"
+	PostTokenRequestGrantTypeRefreshToken      PostTokenRequestGrantType = "refresh_token"
+)
+
+// AllValues returns all PostTokenRequestGrantType values.
+func (PostTokenRequestGrantType) AllValues() []PostTokenRequestGrantType {
+	return []PostTokenRequestGrantType{
+		PostTokenRequestGrantTypeAuthorizationCode,
+		PostTokenRequestGrantTypeClientCredentials,
+		PostTokenRequestGrantTypePassword,
+		PostTokenRequestGrantTypeRefreshToken,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s PostTokenRequestGrantType) MarshalText() ([]byte, error) {
+	switch s {
+	case PostTokenRequestGrantTypeAuthorizationCode:
+		return []byte(s), nil
+	case PostTokenRequestGrantTypeClientCredentials:
+		return []byte(s), nil
+	case PostTokenRequestGrantTypePassword:
+		return []byte(s), nil
+	case PostTokenRequestGrantTypeRefreshToken:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *PostTokenRequestGrantType) UnmarshalText(data []byte) error {
+	switch PostTokenRequestGrantType(data) {
+	case PostTokenRequestGrantTypeAuthorizationCode:
+		*s = PostTokenRequestGrantTypeAuthorizationCode
+		return nil
+	case PostTokenRequestGrantTypeClientCredentials:
+		*s = PostTokenRequestGrantTypeClientCredentials
+		return nil
+	case PostTokenRequestGrantTypePassword:
+		*s = PostTokenRequestGrantTypePassword
+		return nil
+	case PostTokenRequestGrantTypeRefreshToken:
+		*s = PostTokenRequestGrantTypeRefreshToken
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Ref: #
+type RevokeRequest struct {
+	// The token to revoke (access token or refresh token).
+	Token OptString `json:"token"`
+	// Optional hint about the type of the token being revoked (access_token or refresh_token).
+	TokenTypeHint OptString `json:"token_type_hint"`
+}
+
+// GetToken returns the value of Token.
+func (s *RevokeRequest) GetToken() OptString {
+	return s.Token
+}
+
+// GetTokenTypeHint returns the value of TokenTypeHint.
+func (s *RevokeRequest) GetTokenTypeHint() OptString {
+	return s.TokenTypeHint
+}
+
+// SetToken sets the value of Token.
+func (s *RevokeRequest) SetToken(val OptString) {
+	s.Token = val
+}
+
+// SetTokenTypeHint sets the value of TokenTypeHint.
+func (s *RevokeRequest) SetTokenTypeHint(val OptString) {
+	s.TokenTypeHint = val
+}
+
+// RevokeTokenOK is response for RevokeToken operation.
+type RevokeTokenOK struct{}
+
+func (*RevokeTokenOK) revokeTokenRes() {}
+
+// Ref: #
+type TokenResponse struct {
+	// The access token issued by the authorization server.
+	AccessToken OptString `json:"access_token"`
+	// The type of the token issued (e.g., Bearer).
+	TokenType OptString `json:"token_type"`
+	// The lifetime in seconds of the access token.
+	ExpiresIn OptInt `json:"expires_in"`
+	// The refresh token which can be used to obtain new access tokens.
+	RefreshToken OptString `json:"refresh_token"`
+}
+
+// GetAccessToken returns the value of AccessToken.
+func (s *TokenResponse) GetAccessToken() OptString {
+	return s.AccessToken
+}
+
+// GetTokenType returns the value of TokenType.
+func (s *TokenResponse) GetTokenType() OptString {
+	return s.TokenType
+}
+
+// GetExpiresIn returns the value of ExpiresIn.
+func (s *TokenResponse) GetExpiresIn() OptInt {
+	return s.ExpiresIn
+}
+
+// GetRefreshToken returns the value of RefreshToken.
+func (s *TokenResponse) GetRefreshToken() OptString {
+	return s.RefreshToken
+}
+
+// SetAccessToken sets the value of AccessToken.
+func (s *TokenResponse) SetAccessToken(val OptString) {
+	s.AccessToken = val
+}
+
+// SetTokenType sets the value of TokenType.
+func (s *TokenResponse) SetTokenType(val OptString) {
+	s.TokenType = val
+}
+
+// SetExpiresIn sets the value of ExpiresIn.
+func (s *TokenResponse) SetExpiresIn(val OptInt) {
+	s.ExpiresIn = val
+}
+
+// SetRefreshToken sets the value of RefreshToken.
+func (s *TokenResponse) SetRefreshToken(val OptString) {
+	s.RefreshToken = val
+}
+
+func (*TokenResponse) getTokenRes() {}
+
+type UsernamePassword struct {
+	Username string
+	Password string
+	Roles    []string
+}
+
+// GetUsername returns the value of Username.
+func (s *UsernamePassword) GetUsername() string {
+	return s.Username
+}
+
+// GetPassword returns the value of Password.
+func (s *UsernamePassword) GetPassword() string {
+	return s.Password
+}
+
+// GetRoles returns the value of Roles.
+func (s *UsernamePassword) GetRoles() []string {
+	return s.Roles
+}
+
+// SetUsername sets the value of Username.
+func (s *UsernamePassword) SetUsername(val string) {
+	s.Username = val
+}
+
+// SetPassword sets the value of Password.
+func (s *UsernamePassword) SetPassword(val string) {
+	s.Password = val
+}
+
+// SetRoles sets the value of Roles.
+func (s *UsernamePassword) SetRoles(val []string) {
+	s.Roles = val
 }

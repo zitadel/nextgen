@@ -15,16 +15,34 @@ servers:
 paths:
   /.well-known/openid-configuration:
     $ref: endpoints/.well-known/openid-configuration/methods.yaml
+  /auth/authorize:
+    $ref: endpoints/oauth/authorize/methods.yaml
+  /auth/device-authorization:
+    $ref: endpoints/oauth/device-authorization/methods.yaml
+  /auth/end-session:
+    $ref: endpoints/oauth/end-session/methods.yaml
+  /auth/introspect:
+    $ref: endpoints/oauth/introspect/methods.yaml
+  /auth/keys:
+    $ref: endpoints/oauth/keys/methods.yaml
+  /auth/revoke:
+    $ref: endpoints/oauth/revoke/methods.yaml
+  /auth/token:
+    $ref: endpoints/oauth/token/methods.yaml
+  /auth/userinfo:
+    $ref: endpoints/oauth/userinfo/methods.yaml
   /healthz:
     $ref: endpoints/healthz/methods.yaml
-  /readyz:
-    $ref: endpoints/readyz/methods.yaml
   /livez:
     $ref: endpoints/livez/methods.yaml
+  /readyz:
+    $ref: endpoints/readyz/methods.yaml
   /user:
     $ref: endpoints/users/methods.yaml
 
-components: 
+components:
   securitySchemes: 
     oauth2:
       $ref: security/oauth2.yaml
+    usernamePassword:
+      $ref: security/username-password.yaml

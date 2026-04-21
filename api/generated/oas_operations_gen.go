@@ -6,9 +6,17 @@ package api
 type OperationName = string
 
 const (
+	AuthorizeDeviceOperation        OperationName = "AuthorizeDevice"
+	AuthorizeGetOperation           OperationName = "AuthorizeGet"
+	EndSessionOperation             OperationName = "EndSession"
 	GetHealthOperation              OperationName = "GetHealth"
+	GetKeysOperation                OperationName = "GetKeys"
 	GetLiveOperation                OperationName = "GetLive"
 	GetOpenIDConfigurationOperation OperationName = "GetOpenIDConfiguration"
 	GetReadyOperation               OperationName = "GetReady"
+	GetTokenOperation               OperationName = "GetToken"
+	GetUserInfoOperation            OperationName = "GetUserInfo"
+	IntrospectOperation             OperationName = "Introspect"
 	ListUsersOperation              OperationName = "ListUsers"
+	RevokeTokenOperation            OperationName = "RevokeToken"
 )

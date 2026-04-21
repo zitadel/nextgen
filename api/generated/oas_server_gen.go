@@ -8,12 +8,36 @@ import (
 
 // Handler handles operations described by OpenAPI v3 specification.
 type Handler interface {
+	// AuthorizeDevice implements authorizeDevice operation.
+	//
+	// Authorize a device.
+	//
+	// GET /auth/device-authorization
+	AuthorizeDevice(ctx context.Context, params AuthorizeDeviceParams) (AuthorizeDeviceRes, error)
+	// AuthorizeGet implements authorizeGet operation.
+	//
+	// Authorize a user.
+	//
+	// GET /auth/authorize
+	AuthorizeGet(ctx context.Context, params AuthorizeGetParams) (AuthorizeGetRes, error)
+	// EndSession implements endSession operation.
+	//
+	// End a session.
+	//
+	// GET /auth/end-session
+	EndSession(ctx context.Context, params EndSessionParams) (EndSessionRes, error)
 	// GetHealth implements getHealth operation.
 	//
 	// Check whether the server is healthy.
 	//
 	// GET /healthz
 	GetHealth(ctx context.Context) (GetHealthRes, error)
+	// GetKeys implements getKeys operation.
+	//
+	// Get public keys.
+	//
+	// GET /auth/keys
+	GetKeys(ctx context.Context) (GetKeysRes, error)
 	// GetLive implements getLive operation.
 	//
 	// Check whether the server is started.
@@ -32,12 +56,36 @@ type Handler interface {
 	//
 	// GET /readyz
 	GetReady(ctx context.Context) (GetReadyRes, error)
+	// GetToken implements getToken operation.
+	//
+	// Get accesstoken.
+	//
+	// POST /auth/token
+	GetToken(ctx context.Context, req *PostTokenRequest) (GetTokenRes, error)
+	// GetUserInfo implements getUserInfo operation.
+	//
+	// Get user info.
+	//
+	// GET /auth/userinfo
+	GetUserInfo(ctx context.Context) (GetUserInfoRes, error)
+	// Introspect implements introspect operation.
+	//
+	// Introspect a token.
+	//
+	// POST /auth/introspect
+	Introspect(ctx context.Context, req *IntrospectRequest) (IntrospectRes, error)
 	// ListUsers implements listUsers operation.
 	//
 	// List users.
 	//
 	// GET /user
 	ListUsers(ctx context.Context, params ListUsersParams) (ListUsersRes, error)
+	// RevokeToken implements revokeToken operation.
+	//
+	// Revoke an access token or refresh token.
+	//
+	// POST /auth/revoke
+	RevokeToken(ctx context.Context, req *RevokeRequest) (RevokeTokenRes, error)
 	// NewError creates *ErrorDetailsStatusCode from error returned by handler.
 	//
 	// Used for common default response.

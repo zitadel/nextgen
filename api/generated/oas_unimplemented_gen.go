@@ -13,12 +13,48 @@ type UnimplementedHandler struct{}
 
 var _ Handler = UnimplementedHandler{}
 
+// AuthorizeDevice implements authorizeDevice operation.
+//
+// Authorize a device.
+//
+// GET /auth/device-authorization
+func (UnimplementedHandler) AuthorizeDevice(ctx context.Context, params AuthorizeDeviceParams) (r AuthorizeDeviceRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// AuthorizeGet implements authorizeGet operation.
+//
+// Authorize a user.
+//
+// GET /auth/authorize
+func (UnimplementedHandler) AuthorizeGet(ctx context.Context, params AuthorizeGetParams) (r AuthorizeGetRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// EndSession implements endSession operation.
+//
+// End a session.
+//
+// GET /auth/end-session
+func (UnimplementedHandler) EndSession(ctx context.Context, params EndSessionParams) (r EndSessionRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // GetHealth implements getHealth operation.
 //
 // Check whether the server is healthy.
 //
 // GET /healthz
 func (UnimplementedHandler) GetHealth(ctx context.Context) (r GetHealthRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// GetKeys implements getKeys operation.
+//
+// Get public keys.
+//
+// GET /auth/keys
+func (UnimplementedHandler) GetKeys(ctx context.Context) (r GetKeysRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -49,12 +85,48 @@ func (UnimplementedHandler) GetReady(ctx context.Context) (r GetReadyRes, _ erro
 	return r, ht.ErrNotImplemented
 }
 
+// GetToken implements getToken operation.
+//
+// Get accesstoken.
+//
+// POST /auth/token
+func (UnimplementedHandler) GetToken(ctx context.Context, req *PostTokenRequest) (r GetTokenRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// GetUserInfo implements getUserInfo operation.
+//
+// Get user info.
+//
+// GET /auth/userinfo
+func (UnimplementedHandler) GetUserInfo(ctx context.Context) (r GetUserInfoRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// Introspect implements introspect operation.
+//
+// Introspect a token.
+//
+// POST /auth/introspect
+func (UnimplementedHandler) Introspect(ctx context.Context, req *IntrospectRequest) (r IntrospectRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // ListUsers implements listUsers operation.
 //
 // List users.
 //
 // GET /user
 func (UnimplementedHandler) ListUsers(ctx context.Context, params ListUsersParams) (r ListUsersRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// RevokeToken implements revokeToken operation.
+//
+// Revoke an access token or refresh token.
+//
+// POST /auth/revoke
+func (UnimplementedHandler) RevokeToken(ctx context.Context, req *RevokeRequest) (r RevokeTokenRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

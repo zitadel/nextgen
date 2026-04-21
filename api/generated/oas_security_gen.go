@@ -15,6 +15,9 @@ import (
 type SecurityHandler interface {
 	// HandleOAuth2 handles oauth2 security.
 	HandleOAuth2(ctx context.Context, operationName OperationName, t OAuth2) (context.Context, error)
+	// HandleUsernamePassword handles usernamePassword security.
+	// Authorization requests (oauth).
+	HandleUsernamePassword(ctx context.Context, operationName OperationName, t UsernamePassword) (context.Context, error)
 }
 
 func findAuthorization(h http.Header, prefix string) (string, bool) {
@@ -34,9 +37,12 @@ func findAuthorization(h http.Header, prefix string) (string, bool) {
 
 // oauth2ScopesOAuth2 is a private map storing OAuth2 scopes per operation.
 var oauth2ScopesOAuth2 = map[string][]string{
+	GetUserInfoOperation: []string{},
+	IntrospectOperation:  []string{},
 	ListUsersOperation: []string{
 		"openid",
 	},
+	RevokeTokenOperation: []string{},
 }
 
 // GetOAuth2ScopesForOAuth2 returns the required OAuth2 scopes for the given operation.
@@ -61,6 +67,34 @@ func GetOAuth2ScopesForOAuth2(operation string) []string {
 	return result
 }
 
+// operationRolesUsernamePassword is a private map storing roles per operation.
+var operationRolesUsernamePassword = map[string][]string{
+	AuthorizeGetOperation: []string{},
+	EndSessionOperation:   []string{},
+	GetTokenOperation:     []string{},
+}
+
+// GetRolesForUsernamePassword returns the required roles for the given operation.
+//
+// This is useful for authorization scenarios where you need to know which roles
+// are required for an operation.
+//
+// Example:
+//
+//	requiredRoles := GetRolesForUsernamePassword(AddPetOperation)
+//
+// Returns nil if the operation has no role requirements or if the operation is unknown.
+func GetRolesForUsernamePassword(operation string) []string {
+	roles, ok := operationRolesUsernamePassword[operation]
+	if !ok {
+		return nil
+	}
+	// Return a copy to prevent external modification
+	result := make([]string, len(roles))
+	copy(result, roles)
+	return result
+}
+
 func (s *Server) securityOAuth2(ctx context.Context, operationName OperationName, req *http.Request) (context.Context, bool, error) {
 	var t OAuth2
 	token, ok := findAuthorization(req.Header, "Bearer")
@@ -78,10 +112,34 @@ func (s *Server) securityOAuth2(ctx context.Context, operationName OperationName
 	return rctx, true, err
 }
 
+func (s *Server) securityUsernamePassword(ctx context.Context, operationName OperationName, req *http.Request) (context.Context, bool, error) {
+	var t UsernamePassword
+	if _, ok := findAuthorization(req.Header, "Basic"); !ok {
+		return ctx, false, nil
+	}
+	username, password, ok := req.BasicAuth()
+	if !ok {
+		return nil, false, errors.New("invalid basic auth")
+	}
+	t.Username = username
+	t.Password = password
+	t.Roles = operationRolesUsernamePassword[operationName]
+	rctx, err := s.sec.HandleUsernamePassword(ctx, operationName, t)
+	if errors.Is(err, ogenerrors.ErrSkipServerSecurity) {
+		return nil, false, nil
+	} else if err != nil {
+		return nil, false, err
+	}
+	return rctx, true, err
+}
+
 // SecuritySource is provider of security values (tokens, passwords, etc.).
 type SecuritySource interface {
 	// OAuth2 provides oauth2 security value.
 	OAuth2(ctx context.Context, operationName OperationName) (OAuth2, error)
+	// UsernamePassword provides usernamePassword security value.
+	// Authorization requests (oauth).
+	UsernamePassword(ctx context.Context, operationName OperationName) (UsernamePassword, error)
 }
 
 func (s *Client) securityOAuth2(ctx context.Context, operationName OperationName, req *http.Request) error {
@@ -90,5 +148,13 @@ func (s *Client) securityOAuth2(ctx context.Context, operationName OperationName
 		return errors.Wrap(err, "security source \"OAuth2\"")
 	}
 	req.Header.Set("Authorization", "Bearer "+t.Token)
+	return nil
+}
+func (s *Client) securityUsernamePassword(ctx context.Context, operationName OperationName, req *http.Request) error {
+	t, err := s.sec.UsernamePassword(ctx, operationName)
+	if err != nil {
+		return errors.Wrap(err, "security source \"UsernamePassword\"")
+	}
+	req.SetBasicAuth(t.Username, t.Password)
 	return nil
 }
