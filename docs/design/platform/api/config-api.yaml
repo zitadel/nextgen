@@ -1,0 +1,462 @@
+openapi: 3.1.0
+info:
+  title: Zitadel Config API
+  version: 2.0.0-draft
+  description: |
+    Configuration upload, versioning, and drift detection.
+
+    The developer's `zitadel.json` (and companion files in `.zitadel/`) are
+    the source of truth for flow definitions, IDP configs, user schemas,
+    branding, policies, and per-environment declared issuers. `npx zitadel
+    push` uploads the server-behavior subset; branding markup, ejected
+    component source, and translation bundles are referenced by path and
+    remain client-side (Level 1: SSR + in-app). Deferred levels will
+    extend the upload surface — see docs/design/platform/overview.md.
+
+    The server stores versioned, content-hashed blobs keyed by
+    (project_id, environment).
+
+    Preview-secret lifecycle (mint, rotation, revocation) is handled by the
+    Claim API — preview secrets are minted at project creation alongside
+    the full project secret. See `api/claim-api.yaml`.
+
+    Stubs in this spec are marked `TODO` where the team has not yet
+    converged on field names, shapes, or semantics.
+
+servers:
+  - url: https://{region}.zitadel.cloud/v1
+    variables:
+      region:
+        default: global
+
+tags:
+  - name: Config
+    description: Upload, retrieve, and audit configuration blobs
+  - name: Drift
+    description: Detect divergence between repo and dashboard edits
+
+paths:
+
+  # ── Config upload / retrieval ─────────────────────────────────
+
+  /projects/{projectId}/config:
+    parameters:
+      - $ref: "#/components/parameters/projectId"
+      - $ref: "#/components/parameters/environment"
+
+    put:
+      operationId: uploadConfig
+      summary: Upload resolved configuration for an environment
+      description: |
+        Called by `npx zitadel push`. Uploads the server-behavior subset of
+        the resolved configuration for the specified environment. Content
+        is hashed server-side; if the hash matches the currently active
+        config, the response is a no-op 200 (idempotent).
+
+        The server validates against the current schema version and
+        returns a capabilities manifest. Any client-referenced step types,
+        IDP types, renderer modes, or other capabilities the server does
+        not support are returned as structured warnings (or errors for
+        hard incompatibilities).
+
+        TODO: decide whether validation failures are 400 (reject) or 200
+        with warnings (accept and warn). Leaning toward 400 for hard
+        unknowns and 200-with-warnings for deprecations.
+      tags: [Config]
+      security:
+        - secretAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfigUploadRequest"
+      responses:
+        "200":
+          description: Config stored (either new version or idempotent no-op).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfigUploadResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+    get:
+      operationId: getConfig
+      summary: Retrieve the currently active config for an environment
+      description: |
+        Returns the active config blob and hash for the specified
+        environment. Used by drift detection (the SDK compares this hash
+        to the `config_hash_<env>` entry cached locally from the last
+        push).
+      tags: [Config]
+      security:
+        - secretAuth: []
+      responses:
+        "200":
+          description: Current active config.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfigGetResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /projects/{projectId}/config/versions:
+    parameters:
+      - $ref: "#/components/parameters/projectId"
+      - $ref: "#/components/parameters/environment"
+    get:
+      operationId: listConfigVersions
+      summary: List historical config versions
+      description: |
+        Returns a paginated list of config versions for the specified
+        environment. Used by the dashboard's version history / revert UX.
+      tags: [Config]
+      security:
+        - secretAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 200
+        - name: cursor
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Paginated history.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfigVersionList"
+
+  # ── Drift detection ───────────────────────────────────────────
+
+  /projects/{projectId}/config/drift:
+    parameters:
+      - $ref: "#/components/parameters/projectId"
+      - $ref: "#/components/parameters/environment"
+    get:
+      operationId: getConfigDrift
+      summary: Report whether the dashboard has edited config since the last push
+      description: |
+        Returns a minimal drift summary. The repo always wins; this
+        endpoint exists so the dashboard UI can show a timestamp of the
+        last dashboard edit and the last `npx zitadel push`, for
+        informational display only. No diff, no merge, no prompt — the
+        next push overwrites dashboard edits silently.
+      tags: [Drift]
+      security:
+        - secretAuth: []
+      responses:
+        "200":
+          description: Drift summary.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfigDriftResponse"
+
+components:
+
+  parameters:
+    projectId:
+      name: projectId
+      in: path
+      required: true
+      description: Project identifier (e.g. `river-8421`).
+      schema:
+        type: string
+        example: river-8421
+
+    environment:
+      name: environment
+      in: query
+      required: true
+      description: |
+        One of `local`, `preview`, `production`. Environment values are
+        fixed; projects cannot define custom environments in the MVP.
+      schema:
+        type: string
+        enum: [local, preview, production]
+
+  securitySchemes:
+    secretAuth:
+      type: http
+      scheme: bearer
+      description: |
+        Server-issued bearer secret — the `zp_<base62>` project secret
+        (unclaimed or claimed) on the developer's laptop. **Preview
+        secrets (`zpp_<base62>`) cannot authenticate endpoints in this
+        API.** Configuration is developer intent and is pushed from the
+        full project secret only; preview secrets authenticate runtime
+        API calls (sessions, users, flows) from matching preview origins
+        and are excluded from the config surface. See the canonical
+        capability matrix in
+        [nonce.md](../nonce.md#capability-matrix).
+
+  schemas:
+
+    ConfigUploadRequest:
+      type: object
+      required: [config, hash]
+      properties:
+        config:
+          type: object
+          description: |
+            The full resolved configuration object for this environment.
+            Conforms to the project schema at the version declared in
+            `$schema`. All `${VAR}` references must be resolved
+            client-side before upload.
+
+            Top-level fields recognized in schema v2:
+
+              * `project`                 — project slug (must match .zitadel/secret)
+              * `flows`                   — flow definitions by purpose
+              * `idps`                    — identity providers
+              * `schemas`                 — user / profile schemas
+              * `branding.renderer`       — "default" | "template" | "ejected"
+              * `branding.attribution`    — "visible" | "hidden"
+                                            (Pro tier; server injects anyway on Free)
+              * `branding.template`       — LiquidJS template PATH (reference only;
+                                            file contents are NOT uploaded)
+              * `branding.theme`          — theme token PATH (reference only)
+              * `branding.translations`   — i18n directory PATH (reference only)
+              * `policies`                — password, MFA, risk, delivery
+              * `environments.<env>.issuer`          — single origin (string)
+              * `environments.<env>.issuer` (array)  — multiple origins
+              * `environments.<env>.issuer_pattern`  — wildcard for preview
+              * `environments.<env>.<any>`           — other per-env overrides
+
+            Notably absent at Level 1: `hosted.*` fields. Hosted login is a
+            Level 3 follow-up; the schema will be extended when it ships.
+          additionalProperties: true
+        hash:
+          type: string
+          description: |
+            SHA-256 hash of the canonicalized config body. Used for
+            idempotent upload — if this hash matches the currently active
+            config for (project, environment), the server returns 200
+            without storing a new version.
+          example: "sha256:a1b2c3..."
+        schema_version:
+          type: string
+          description: |
+            Schema version declared in the client's `$schema`, e.g. "2.0".
+            Used by the server to validate against the correct schema.
+          example: "2.0"
+        sdk_version:
+          type: string
+          description: |
+            Diagnostic field — version of `@zitadel/sdk` that produced this
+            upload. Reported in warnings and capability mismatches.
+          example: "2.0.1"
+        ejected_renderer_pin:
+          type: string
+          description: |
+            When `branding.renderer == "ejected"`, the compatibility range
+            declared in the ejected component source header, e.g.
+            `"^1.0 <1.4"`. Checked against the server's
+            `flow_protocol_version`; mismatches surface as upload warnings.
+            Full spec is deferred to the Flow v1 follow-up.
+          example: "^1.0 <1.4"
+
+    ConfigUploadResponse:
+      type: object
+      required: [config_version, hash, applied_at, server_capabilities]
+      properties:
+        config_version:
+          type: integer
+          description: Monotonically increasing per (project, environment).
+        hash:
+          type: string
+        applied_at:
+          type: string
+          format: date-time
+        server_capabilities:
+          $ref: "#/components/schemas/ServerCapabilities"
+        warnings:
+          type: array
+          items:
+            $ref: "#/components/schemas/ConfigWarning"
+          description: |
+            Non-fatal issues — deprecated fields, capabilities the server
+            will accept but recommend against, schema-version drift hints,
+            declared-issuer reachability warnings from the linter.
+
+    ConfigGetResponse:
+      type: object
+      required: [config, hash, config_version, applied_at]
+      properties:
+        config:
+          type: object
+          additionalProperties: true
+        hash:
+          type: string
+        config_version:
+          type: integer
+        applied_at:
+          type: string
+          format: date-time
+        source:
+          type: string
+          enum: [sdk_push, dashboard_edit]
+          description: |
+            Which surface applied this version. Dashboard edits produce
+            entries with `source: dashboard_edit`; they are overwritten
+            silently on the next `sdk_push`.
+
+    ConfigVersionList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ConfigVersionSummary"
+        next_cursor:
+          type: string
+
+    ConfigVersionSummary:
+      type: object
+      required: [config_version, hash, applied_at, source]
+      properties:
+        config_version:
+          type: integer
+        hash:
+          type: string
+        applied_at:
+          type: string
+          format: date-time
+        source:
+          type: string
+          enum: [sdk_push, dashboard_edit]
+        author:
+          type: string
+          description: |
+            For `dashboard_edit` entries: the user ID of the editor. For
+            `sdk_push` entries: the project secret identifier used.
+
+    ConfigDriftResponse:
+      type: object
+      required: [push_wins]
+      properties:
+        push_wins:
+          type: boolean
+          description: |
+            Always `true` in the MVP. Documents the behavior: the next
+            `npx zitadel push` overwrites dashboard edits silently.
+        last_push_at:
+          type: string
+          format: date-time
+        last_dashboard_edit_at:
+          type: string
+          format: date-time
+
+    ServerCapabilities:
+      type: object
+      description: |
+        Machine-readable manifest of what this server version supports.
+        The SDK compares this against the config it intended to upload
+        and surfaces mismatches in the developer's terminal.
+      properties:
+        schema_version:
+          type: string
+          example: "2.0"
+        flow_protocol_version:
+          type: string
+          description: |
+            Flow v1 protocol version supported by this server. Used by
+            ejected components to pin against a compatible range. Full
+            Flow v1 spec is a follow-up doc.
+          example: "1.0"
+        step_types:
+          type: array
+          items:
+            type: string
+        idp_types:
+          type: array
+          items:
+            type: string
+        delivery_modes:
+          type: array
+          items:
+            type: string
+            enum: [dev_inbox, byo, managed]
+        renderer_modes:
+          type: array
+          items:
+            type: string
+            enum: [default, template, ejected]
+          description: |
+            Renderer modes the server can drive. `default` = the published
+            auth web component; `template` = LiquidJS; `ejected` =
+            customer-owned Lit components (protocol-version pin checked
+            at upload).
+        features:
+          type: array
+          items:
+            type: string
+          description: |
+            Flag-style capability names — e.g. `preview_secrets`,
+            `capability_handshake_v2`. Grows over time. Notably absent at
+            Level 1: `hosted_login` (Level 3), `spa_bff` (Level 2),
+            `white_label_mapping` (Level 4).
+
+    ConfigWarning:
+      type: object
+      required: [code, path, message]
+      properties:
+        code:
+          type: string
+          description: Machine-readable warning code.
+          example: "unknown_step_type"
+        path:
+          type: string
+          description: JSON pointer into the uploaded config.
+          example: "/flows/login/steps/3/type"
+        message:
+          type: string
+          description: Human-readable message.
+        severity:
+          type: string
+          enum: [info, warning, error]
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+
+  responses:
+    BadRequest:
+      description: Request is malformed or fails validation.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Unauthorized:
+      description: Missing or invalid authentication.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: Resource does not exist.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
