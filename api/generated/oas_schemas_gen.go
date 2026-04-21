@@ -147,6 +147,43 @@ func (s GetReadyOK) Read(p []byte) (n int, err error) {
 
 func (*GetReadyOK) getReadyRes() {}
 
+type ListUsersBadRequest ErrorDetails
+
+func (*ListUsersBadRequest) listUsersRes() {}
+
+type ListUsersInternalServerError ErrorDetails
+
+func (*ListUsersInternalServerError) listUsersRes() {}
+
+type ListUsersOKApplicationJSON []jx.Raw
+
+func (*ListUsersOKApplicationJSON) listUsersRes() {}
+
+type OAuth2 struct {
+	Token  string
+	Scopes []string
+}
+
+// GetToken returns the value of Token.
+func (s *OAuth2) GetToken() string {
+	return s.Token
+}
+
+// GetScopes returns the value of Scopes.
+func (s *OAuth2) GetScopes() []string {
+	return s.Scopes
+}
+
+// SetToken sets the value of Token.
+func (s *OAuth2) SetToken(val string) {
+	s.Token = val
+}
+
+// SetScopes sets the value of Scopes.
+func (s *OAuth2) SetScopes(val []string) {
+	s.Scopes = val
+}
+
 // OpenID Connect configuration according to the OpenID Connect Discovery 1.0 specification.
 // Ref: #
 type OpenidConfiguration struct {
@@ -888,6 +925,52 @@ func (o OptErrorDetailsDetails) Get() (v ErrorDetailsDetails, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptErrorDetailsDetails) Or(d ErrorDetailsDetails) ErrorDetailsDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptInt returns new OptInt with value set to v.
+func NewOptInt(v int) OptInt {
+	return OptInt{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptInt is optional int.
+type OptInt struct {
+	Value int
+	Set   bool
+}
+
+// IsSet returns true if OptInt was set.
+func (o OptInt) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptInt) Reset() {
+	var v int
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptInt) SetTo(v int) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptInt) Get() (v int, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptInt) Or(d int) int {
 	if v, ok := o.Get(); ok {
 		return v
 	}

@@ -16,3 +16,7 @@ type GetOpenIDConfigurationRes interface {
 type GetReadyRes interface {
 	getReadyRes()
 }
+
+type ListUsersRes interface {
+	listUsersRes()
+}

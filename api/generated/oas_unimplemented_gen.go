@@ -49,6 +49,15 @@ func (UnimplementedHandler) GetReady(ctx context.Context) (r GetReadyRes, _ erro
 	return r, ht.ErrNotImplemented
 }
 
+// ListUsers implements listUsers operation.
+//
+// List users.
+//
+// GET /user
+func (UnimplementedHandler) ListUsers(ctx context.Context, params ListUsersParams) (r ListUsersRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // NewError creates *ErrorDetailsStatusCode from error returned by handler.
 //
 // Used for common default response.

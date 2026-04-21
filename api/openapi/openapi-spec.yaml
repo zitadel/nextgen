@@ -21,6 +21,8 @@ paths:
     $ref: endpoints/readyz/methods.yaml
   /livez:
     $ref: endpoints/livez/methods.yaml
+  /user:
+    $ref: endpoints/users/methods.yaml
 
 components: 
   securitySchemes: 

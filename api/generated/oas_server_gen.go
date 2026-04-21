@@ -32,6 +32,12 @@ type Handler interface {
 	//
 	// GET /readyz
 	GetReady(ctx context.Context) (GetReadyRes, error)
+	// ListUsers implements listUsers operation.
+	//
+	// List users.
+	//
+	// GET /user
+	ListUsers(ctx context.Context, params ListUsersParams) (ListUsersRes, error)
 	// NewError creates *ErrorDetailsStatusCode from error returned by handler.
 	//
 	// Used for common default response.
@@ -41,18 +47,20 @@ type Handler interface {
 // Server implements http server based on OpenAPI v3 specification and
 // calls Handler to handle requests.
 type Server struct {
-	h Handler
+	h   Handler
+	sec SecurityHandler
 	baseServer
 }
 
 // NewServer creates new Server.
-func NewServer(h Handler, opts ...ServerOption) (*Server, error) {
+func NewServer(h Handler, sec SecurityHandler, opts ...ServerOption) (*Server, error) {
 	s, err := newServerConfig(opts...).baseServer()
 	if err != nil {
 		return nil, err
 	}
 	return &Server{
 		h:          h,
+		sec:        sec,
 		baseServer: s,
 	}, nil
 }

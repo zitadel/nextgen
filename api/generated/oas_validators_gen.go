@@ -6,8 +6,17 @@ import (
 	"fmt"
 
 	"github.com/go-faster/errors"
+	"github.com/go-faster/jx"
 	"github.com/ogen-go/ogen/validate"
 )
+
+func (s ListUsersOKApplicationJSON) Validate() error {
+	alias := ([]jx.Raw)(s)
+	if alias == nil {
+		return errors.New("nil is invalid value")
+	}
+	return nil
+}
 
 func (s *OpenidConfiguration) Validate() error {
 	if s == nil {

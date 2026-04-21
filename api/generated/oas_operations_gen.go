@@ -10,4 +10,5 @@ const (
 	GetLiveOperation                OperationName = "GetLive"
 	GetOpenIDConfigurationOperation OperationName = "GetOpenIDConfiguration"
 	GetReadyOperation               OperationName = "GetReady"
+	ListUsersOperation              OperationName = "ListUsers"
 )
