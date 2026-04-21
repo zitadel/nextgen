@@ -1,0 +1,25 @@
+package api
+
+import (
+	"context"
+
+	"github.com/ogen-go/ogen/ogenerrors"
+	api "github.com/zitadel/nextgen/api/generated"
+)
+
+type SecurityHandler struct {
+}
+
+func (s SecurityHandler) HandleOAuth2(ctx context.Context, operationName api.OperationName, t api.OAuth2) (context.Context, error) {
+	if t.Token == "" {
+		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+	}
+	// TODO: add proper token validation
+	return ctx, nil
+}
+
+var _ api.SecurityHandler = (*SecurityHandler)(nil)
+
+func NewSecurityHandler() *SecurityHandler {
+	return &SecurityHandler{}
+}
