@@ -1,0 +1,28 @@
+openapi: 3.1.0
+info: 
+  # TODO: set correct information
+  title: Zitadel NextGen
+  description: This is the next generation of the Zitadel identity platform.
+  version: 0.0.1
+  license:
+    name: AGPL-3.0
+    identifier: AGPL-3.0
+
+servers: 
+  # TODO: put correct server here.
+  - url: https://acc.nextgen.zitadel.com 
+    
+paths:
+  /.well-known/openid-configuration:
+    $ref: endpoints/.well-known/openid-configuration/methods.yaml
+  /healthz:
+    $ref: endpoints/healthz/methods.yaml
+  /readyz:
+    $ref: endpoints/readyz/methods.yaml
+  /livez:
+    $ref: endpoints/livez/methods.yaml
+
+components: 
+  securitySchemes: 
+    oauth2:
+      $ref: security/oauth2.yaml

@@ -1,0 +1,29 @@
+get:
+  operationId: getReady
+  summary: Check server readiness
+  description: Check whether the server is ready to accept requests
+  security: []
+  responses:
+    '200':
+      description: The server is ready to accept requests
+      content:
+        text/plain:
+          examples:
+            ok:
+              summary: Server is ready
+              value: ok
+            fail:
+              summary: Server is not ready
+              value: fail
+    '4XX':
+      description: The request was rejected by the server.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    default:
+      description: Something went wrong on the server. This was not your fault.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml

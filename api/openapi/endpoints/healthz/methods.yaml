@@ -1,0 +1,29 @@
+get:
+  operationId: getHealth
+  summary: Check server health
+  description: Check whether the server is healthy
+  security: []
+  responses:
+    '200':
+      description: Server is healthy
+      content:
+        text/plain:
+          examples:
+            ok:
+              summary: Server is healthy
+              value: ok
+            fail:
+              summary: Server is not healthy
+              value: fail
+    '4XX':
+      description: The request was rejected by the server.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    default:
+      description: Unexpected error response.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
