@@ -1,8 +1,6 @@
 -- This SQL script populates the `zitadel_nextgen` schema with sample data for instances, organizations, users, and user attributes.
 -- It creates, 10 instances, each containing 100 organizations, and each organization containing 1,000 users, resulting in a total of 1,000,000 users.
 -- For each user, it generates 6 attributes: username, email, email_verified, nickname, address.country, and address.locality.
--- It generates a hierarchical structure of data where each instance contains multiple organizations,
--- and each organization contains multiple users with various attributes.
 --
 -- It's also a good test on insert performanceo of the model. On my system:
 --   Total execution time: 00:01:33.369
