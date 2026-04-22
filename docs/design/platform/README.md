@@ -9,7 +9,7 @@
 
 ## How this relates to the flow engine
 
-The [flow engine](../flowengine/README.md) runs the state machine that drives login, registration, and recovery — steps, factors, policy decisions, the resulting session. This folder describes what sits around that: how a Zitadel project comes into being without a signup form, how it is configured from source control, how the customer's app talks to Zitadel's backend, and how a project transitions from anonymous capability to owned organization.
+The [flow engine](../flowengine/README.md) runs the state machine that drives login, registration, and recovery — steps, factors, policy decisions, the resulting session. This folder describes what sits around that: how a Zitadel project comes into being without a signup form, how it is configured from source control, how the customer's app talks to Zitadel's backend, and how a project transitions from anonymous capability to owned-by-a-team.
 
 Both sets of documents are siblings. The flow engine docs can be read standalone if you only care about login/registration internals. The platform docs can be read standalone if you only care about setup, config, and claim. The two meet at `configuration-surface.md` (flow definitions are uploaded via `npx zitadel push`) and at `claim-flow.md` (claim attaches ownership; it does not move anything the flow engine cares about).
 
@@ -18,29 +18,29 @@ Both sets of documents are siblings. The flow engine docs can be read standalone
 | Document | Status | Description |
 |---|---|---|
 | [Overview](overview.md) | Revised (pass 3) | Thesis, three orthogonal axes, condensed walkthrough, deferred capability tiers, relationship to the flow engine. |
-| [Project Secret](nonce.md) | Revised (pass 3) | The server-issued bearer token that authenticates SDK/CLI calls. Dual-secret model (project + preview), storage in `.zitadel/secret`, rotation at claim. |
+| [Project Secret](secret.md) | Revised (pass 3) | The server-issued bearer token that authenticates SDK/CLI calls. Dual-secret model (project + preview), storage in `.zitadel/secret`, rotation at claim. |
 | [Configuration Surface](configuration-surface.md) | Revised (pass 3) | `zitadel.json` specification. Declared-issuer model, renderer modes, `npx zitadel push`, what uploads and what stays local, silent repo-wins drift. |
-| [Claim Flow](claim-flow.md) | Revised (pass 3) | The transaction that attaches ownership to a project. Auth methods, org resolution, what changes at claim, failure modes, agent boundary. |
+| [Claim Flow](claim-flow.md) | Revised (pass 3) | The transaction that attaches ownership to a project. Auth methods, team resolution, what changes at claim, failure modes, agent boundary. |
 | **API specs** | | |
-| [Claim API OpenAPI](api/claim-api.yaml) | Revised (pass 3) | Anonymous project create with `preview_origins`, dual-secret response, claim init/complete, org domain-match. |
+| [Claim API OpenAPI](api/claim-api.yaml) | Revised (pass 3) | Anonymous project create with `preview_origins`, dual-secret response, claim init/complete, team domain-match. |
 | [Config API OpenAPI](api/config-api.yaml) | Revised (pass 3) | `npx zitadel push` upload, capability manifest, drift query. |
 
 ## Glossary
 
-The docs use these terms with disciplined meanings. When in doubt, come back here.
+The canonical vocabulary for all design docs lives in [`../glossary.md`](../glossary.md). Quick platform-specific references:
 
-- **Flow** — the state machine that drives a user through login, registration, recovery, or profile steps. Owned by the flow engine. Defined by the developer in `zitadel.json`.
-- **Authentication** — the mechanic of verifying factors (passkey, password, OTP, etc.) during a flow. An *authentication* is a thing that happens; a *session* is what it produces.
-- **Session** — the result of a successful authentication. Carries the accumulated factors and assurance level. Lives longer than a flow; a flow can be reopened (step-up, reauth) against the same session.
-- **Project** — the top-level unit of configuration. Identified by a stable `project_id` minted by the server at `POST /v1/projects` (e.g. `river-8421`), drawn from a curated dictionary so it is also human-pronounceable. The vocabulary:
+- **Flow** — the state machine that drives a user through login, registration, recovery, or profile steps. Owned by the flow engine. Defined by the developer in `zitadel.json`. Full definition in [`../glossary.md`](../glossary.md).
+- **Session** — the durable post-auth container. Full definition in [`../glossary.md`](../glossary.md).
+- **Project** — the top-level tenant/deployment; what used to be called an "instance" in older design notes. Identified by a stable `project_id` minted by the server at `POST /projects` (e.g. `river-8421`), drawn from a curated dictionary so it is also human-pronounceable. Vocabulary:
   - `project_id` — the canonical identifier used in API paths, response bodies, and dashboard URLs.
   - **slug** — informal synonym for `project_id`, used when emphasizing its human-friendly dictionary shape.
   - `"project"` — the JSON field name in `zitadel.json` and `.zitadel/secret` that holds the `project_id` value.
 
   The `project_id` is never a user-facing origin; user-facing URLs are the customer's declared issuers per environment.
-- **Project secret** — the server-issued bearer token authenticating SDK/CLI calls against a project. Format `zp_<base62>`. Stored in `.zitadel/secret`. Rotated at claim.
-- **Preview secret** — a companion bearer token (`zpp_<base62>`) scoped to origin patterns declared at project creation (`*.vercel.app`, etc.). Uploaded to the deploy platform's env store by the setup CLI.
-- **Claim** — the transaction that attaches an organization (and an accountable human) to a project. Free. Forced at first production deploy.
+- **Team** — a tenant-grouping inside any project. A team in the **platform project** is the entity a customer project is attached to at claim (holds billing, user memberships, project ownership). A team in a **customer project** is a B2B end-customer tenant. Same resource, different project context. See [`../glossary.md`](../glossary.md).
+- **Project secret** — the server-issued bearer token authenticating SDK/CLI calls against a project. Format `sk_proj_<base62>`. Stored in `.zitadel/secret`. Rotated at claim. Full taxonomy in [`../api/credentials.md`](../api/credentials.md).
+- **Preview secret** — a companion `sk_proj_<base62>` scoped to origin patterns declared at project creation (`*.vercel.app`, etc.). Uploaded to the deploy platform's env store by the setup CLI.
+- **Claim** — the transaction that attaches a **Team** (and an accountable human) to a project. Free. Forced at first production deploy.
 - **Issuer** — the customer-owned origin on which the auth UI and OIDC endpoints run, declared per environment in `zitadel.json`. Serves as security allowlist, token `iss` claim, and magic-link hostname context.
 - **Renderer** — the client-side surface that turns server-sent Flow v1 nodes into HTML. One of `default` (published auth web component), `template` (LiquidJS), or `ejected` (customer's own Lit components).
 
@@ -48,31 +48,31 @@ The docs use these terms with disciplined meanings. When in doubt, come back her
 
 The platform design is built on four primitives:
 
-1. **Project Secret** — a bearer token. Authenticates SDK/CLI calls to Zitadel's backend. Pre-claim, the only authentication. Post-claim, rotated and bound to the organization that claimed. Not a user identity, not an account — just a secret.
+1. **Project Secret** — a bearer token. Authenticates SDK/CLI calls to Zitadel's backend. Pre-claim, the only authentication. Post-claim, rotated and bound to the team that claimed. Not a user identity, not an account — just a secret.
 2. **Configuration Surface** — `zitadel.json` plus `.zitadel/` subdirectories. Flow definitions, IDPs, schemas, branding, policies, per-environment declared issuers. Source-controlled, versioned by the repo. `npx zitadel push` is the canonical sync.
-3. **Claim** — an atomic transaction that attaches ownership and capabilities. `project_id` has been stable since creation; users, factors, sessions, config are bound to it from day one. Claim does not move them. It attaches an organization, rotates the project secret, and unlocks the post-claim capability surface.
+3. **Claim** — an atomic transaction that attaches ownership and capabilities. `project_id` has been stable since creation; users, factors, sessions, config are bound to it from day one. Claim does not move them. It attaches a team, rotates the project secret, and unlocks the post-claim capability surface.
 4. **Declared Issuers** — per-environment origin declarations (`"issuer": "https://acme.com"` or `"issuer_pattern": "https://*.vercel.app"`). Both a security allowlist (Origin validation on every request) and context (`iss` in tokens, hostnames in magic-link emails). Zitadel does not manage domains as infrastructure — only as context.
 
 ## Separation of concerns
 
 ```mermaid
 graph TD
-    Secret["**Project Secret**<br>zp_ (full) + zpp_ (preview)<br>.zitadel/secret"]
+    Secret["**Project Secret**<br>sk_proj_ (full) + sk_proj_ (origin-scoped)<br>.zitadel/secret"]
     Config["**Configuration Surface**<br>zitadel.json + .zitadel/<br>source-controlled"]
-    Claim["**Claim**<br>atomic transaction<br>attaches organization"]
+    Claim["**Claim**<br>atomic transaction<br>attaches team"]
     CustomerApp["**Customer's app**<br>(their origin)<br>UI, OIDC routes,<br>proxies to backend"]
     Backend["**Zitadel backend**<br>flow engine, policy,<br>storage, claim"]
 
     Secret -- "authenticates API calls" --> Backend
     Config -- "npx zitadel push" --> Backend
     Secret -- "rotates" --> Claim
-    Claim -- "attaches org" --> Backend
+    Claim -- "attaches team" --> Backend
     CustomerApp -- "proxies OIDC,<br>renders Flow v1 nodes" --> Backend
 ```
 
 | Concern | Owned By | Decides |
 |---|---|---|
-| How does a project come into existence without a signup form? | **Project Secret** | Server creates `project_id` on first `POST /v1/projects`. Returns `zp_…` (full) and `zpp_…` (preview-origin-scoped) secrets. |
+| How does a project come into existence without a signup form? | **Project Secret** | Server creates `project_id` on first `POST /projects`. Returns two `sk_proj_…` keys: a full-access pre-claim secret and an origin-scoped variant for preview deploys. |
 | What configures login, IDPs, schemas, branding? | **Configuration Surface** (`zitadel.json`) | Source of truth is the repo; `npx zitadel push` uploads the server-behavior subset. |
 | What origins may this project be authenticated from? | **Declared Issuers** | `environments.*.issuer` — allowlist for Origin validation; same value rendered into tokens and magic-link emails. |
 | What are the resources of the system? | **API / MCP** | Users, sessions, tokens, grants, audit — never in config. |
@@ -116,6 +116,8 @@ Integration level is orthogonal to pricing tier (Free / Pro / Enterprise). Full 
 
 ## See also
 
+- [Glossary](../glossary.md) — canonical vocabulary across all design docs
+- [API Design Guide](../api/README.md) — hierarchy, credentials, URL architecture, auth_attempts, conventions
 - [Flow Engine](../flowengine/README.md) — the state machine that runs inside sessions
 - [Session API](../flowengine/session-api.md) — the primitive the flow engine operates on
 - [User Schema Integration](../flowengine/user-schema.md) — schemas are a `configuration-surface.md` artifact

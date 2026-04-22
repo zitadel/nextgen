@@ -78,10 +78,10 @@ Flow state is stored as an **encrypted, HttpOnly cookie** set by the server on e
 ### Cookie shape
 
 ```
-Set-Cookie: _zflow=<encrypted-payload>; HttpOnly; Secure; SameSite=Strict; Path=/v1/flows
+Set-Cookie: _zflow=<encrypted-payload>; HttpOnly; Secure; SameSite=Strict; Path=/flows
 ```
 
-The cookie is scoped to `/v1/flows` — it's never sent to Session API or other endpoints.
+The cookie is scoped to `/flows` — it's never sent to Session API or other endpoints.
 
 ## Cookie Contents
 
@@ -146,7 +146,7 @@ The flow cookie contains `session_version`. On every submit that writes to the s
 UPDATE sessions
 SET factors = $new_factors,
     version = version + 1
-WHERE instance_id = $inst AND id = $sess AND version = $expected_version;
+WHERE project_id = $proj AND id = $sess AND version = $expected_version;
 -- 0 rows affected → 409 Conflict
 ```
 

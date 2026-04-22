@@ -1,35 +1,37 @@
 # Project Secret
 
 > **Status:** Draft
-> **See also:** [README](README.md) · [Overview](overview.md) · [Configuration Surface](configuration-surface.md) · [Claim Flow](claim-flow.md) · [Claim API](api/claim-api.yaml)
+> **See also:** [README](README.md) · [Overview](overview.md) · [Configuration Surface](configuration-surface.md) · [Claim Flow](claim-flow.md) · [Claim API](api/claim-api.yaml) · [Glossary](../glossary.md) · [Credentials (canonical taxonomy)](../api/credentials.md)
 
-The project secret is a server-issued bearer token that authenticates SDK and CLI calls against a project. Before claim, it is the only authentication on the project. After claim, it is rotated to a **claimed credential** bound to the organization that claimed the project. The same file on disk (`.zitadel/secret`) also carries a **preview secret** — a scoped, origin-restricted companion token that the setup CLI hands to the customer's deploy platform (Vercel, Netlify, Cloudflare) so preview builds work before the project is claimed.
+The project secret is a server-issued bearer token that authenticates SDK and CLI calls against a project. Before claim, it is the only authentication on the project. After claim, it is rotated to a **claimed credential** bound to the team that claimed the project. The same file on disk (`.zitadel/secret`) also carries an **origin-scoped project secret** (historically called the "preview secret") — a companion token that the setup CLI hands to the customer's deploy platform (Vercel, Netlify, Cloudflare) so preview builds work before the project is claimed.
 
-This document specifies how the secrets are generated, stored, validated, and rotated — and what each one can and cannot do.
+This document specifies how the secrets are generated, stored, validated, and rotated — and what each one can and cannot do. For the full credential taxonomy across the API, see [`../api/credentials.md`](../api/credentials.md).
 
 ## What this is, briefly
 
-The project secret is a bearer token. It authenticates API calls. That's it. It is not a user identity, not an organizational membership, not a billing account, not a long-term shared credential for a team. Teammates get access via claim and organization membership — not by passing `.zitadel/secret` around.
+The project secret is a bearer token. It authenticates API calls. That's it. It is not a user identity, not a team membership, not a billing account, not a long-term shared credential for a group of people. Teammates get access via claim and team membership — not by passing `.zitadel/secret` around.
 
 ## Generation
 
-Both secrets are **generated server-side** at `POST /v1/projects`. The client does not contribute randomness. Base62-encoded, prefixed by type for human recognition:
+Both secrets are **generated server-side** at `POST /projects`. The client does not contribute randomness. Base62-encoded, prefixed by type. All project-scoped secrets share the `sk_proj_` prefix; variants are distinguished by metadata the server records at mint time:
 
-- `zp_<base62>` — full-access project secret
-- `zpp_<base62>` — preview secret (scoped to origin patterns declared at mint time)
+- `sk_proj_<base62>` with `pre_claim: true` — the full-access pre-claim project secret.
+- `sk_proj_<base62>` with `origin_patterns: [...]` — the origin-scoped variant (the "preview secret"). Restricted to calls whose `Origin` matches one of the patterns.
 
 The setup CLI sends the desired `preview_origins` patterns (inferred from detected deploy tooling — e.g. `["*.vercel.app"]` when it sees a `vercel.json`, `["*.netlify.app"]` for Netlify, `["*.pages.dev"]` for Cloudflare Pages). The server validates the patterns against an allowed list and rejects anything it doesn't recognize.
 
 ```json
 {
   "project": "river-8421",
-  "secret": "zp_7kR2pXq9vN3wLmYhT4cB8A",
-  "preview_secret": "zpp_c3f7a8b2vL4nYwH6...",
+  "secret": "sk_proj_7kR2pXq9vN3wLmYhT4cB8A",
+  "preview_secret": "sk_proj_c3f7a8b2vL4nYwH6...",
   "preview_origins": ["*.vercel.app", "*.netlify.app"],
   "created_at": "2026-04-21T14:03:11Z",
   "schema_version": 2
 }
 ```
+
+> **Note:** `secret` and `preview_secret` share a prefix (`sk_proj_`). They are distinct keys with distinct scope metadata. The "preview" field name is retained for continuity; canonically it is an origin-scoped `sk_proj_`.
 
 ## Storage
 
@@ -50,7 +52,7 @@ my-app/
 
 ### Preview secret handoff
 
-After the file is written, the setup CLI looks for a supported deploy platform and uploads the preview secret to that platform's environment store automatically:
+After the file is written, the setup CLI looks for a supported deploy platform and uploads the origin-scoped secret to that platform's environment store automatically:
 
 | Detected tool | Command the CLI runs |
 |---|---|
@@ -59,23 +61,23 @@ After the file is written, the setup CLI looks for a supported deploy platform a
 | `wrangler` / Cloudflare Pages | `wrangler secret put ZITADEL_PREVIEW_SECRET` |
 | Nothing detected | CLI prints instructions and the value; developer pastes manually |
 
-The preview secret's origin scope is enforced server-side on every request, so an accidentally-leaked preview secret still cannot authenticate from `api.acme.com` or any other non-matching origin.
+The origin-scoped secret's origin patterns are enforced server-side on every request, so an accidentally-leaked preview secret still cannot authenticate from `api.acme.com` or any other non-matching origin.
 
 ## Validation and revocation
 
 Every SDK request presents the appropriate secret as a bearer token. The server looks up the secret, checks:
 
-1. **Format and existence** — is this a recognized `zp_…` or `zpp_…` token still on record?
-2. **Origin / Host** — does the incoming request's `Origin` header (or `Host`) match the allowed origins for the secret? For the project secret, the allowed origins are the declared issuer list for the current environment in the customer's `zitadel.json`. For the preview secret, the allowed origins are the patterns captured at mint time.
-3. **Environment scope** — preview secrets are implicitly scoped to non-production; they cannot authenticate production-origin requests.
+1. **Format and existence** — is this a recognized `sk_proj_…` token still on record?
+2. **Origin / Host** — does the incoming request's `Origin` header (or `Host`) match the allowed origins for the secret? For the full project secret, the allowed origins are the declared issuer list for the current environment in the customer's `zitadel.json`. For the origin-scoped variant, the allowed origins are the patterns captured at mint time.
+3. **Environment scope** — origin-scoped secrets are implicitly scoped to non-production; they cannot authenticate production-origin requests.
 
 Mismatches produce HTTP 403 with a structured error and are logged.
 
-Revocation is through rotation: `npx zitadel secret rotate` (post-claim only) issues a new `zp_…` and invalidates the old. The preview secret can be rotated independently from the dashboard.
+Revocation is through rotation: `npx zitadel secret rotate` (post-claim only) issues a new `sk_proj_…` and invalidates the old. The origin-scoped secret can be rotated independently from the dashboard.
 
 ## Capability matrix
 
-| Action | Project secret (`zp_…`, unclaimed) | Preview secret (`zpp_…`) | Claimed credential (`zp_…`, post-claim) |
+| Action | Project secret (`sk_proj_…`, pre-claim) | Origin-scoped secret (`sk_proj_…`) | Claimed credential (`sk_proj_…`, post-claim) |
 |---|---|---|---|
 | Read the project's own configuration | Yes | Read-only | Yes |
 | `npx zitadel push` — upload config | Yes | **No** | Yes |
@@ -86,7 +88,7 @@ Revocation is through rotation: `npx zitadel secret rotate` (post-claim only) is
 | Read resources of **another project** | No | No | No |
 | Create or modify billing state | No | No | Yes (owner role) |
 | Add IDP, SSO, SCIM, SAML connections | No | No | Yes (Pro-gated) |
-| Invite organization members | No (no org exists) | No | Yes (owner role) |
+| Invite team members | No (no team exists) | No | Yes (owner role) |
 | Claim this project | Requires human auth — secret alone cannot | No | — (already claimed) |
 
 All "No" rows are enforced server-side, not by SDK convention.
@@ -95,8 +97,8 @@ All "No" rows are enforced server-side, not by SDK convention.
 
 Claim is specified in [claim-flow.md](claim-flow.md). From the secret's perspective, the operation is:
 
-1. **The `zp_…` project secret is rotated.** The server invalidates the unclaimed-era value and issues a new `zp_…` bound to the newly attached organization. The CLI overwrites `.zitadel/secret` atomically.
-2. **The preview secret is preserved.** Its origin scope doesn't change. Any CI pipeline or deploy env using it keeps working.
+1. **The `sk_proj_…` project secret is rotated.** The server invalidates the pre-claim value and issues a new `sk_proj_…` bound to the newly attached team. The CLI overwrites `.zitadel/secret` atomically.
+2. **The origin-scoped secret is preserved.** Its origin patterns don't change. Any CI pipeline or deploy env using it keeps working.
 3. **Nothing else moves.** `project_id` has been stable since creation. Users, factors, sessions, configs, declared issuers — all bound to `project_id` from day one. Claim attaches *ownership*, not *identity*.
 
 Post-claim `.zitadel/secret`:
@@ -104,12 +106,12 @@ Post-claim `.zitadel/secret`:
 ```json
 {
   "project": "river-8421",
-  "secret": "zp_9f2Hx8LqT4vRmYpN2wCbVa",
-  "preview_secret": "zpp_c3f7a8b2vL4nYwH6...",
+  "secret": "sk_proj_9f2Hx8LqT4vRmYpN2wCbVa",
+  "preview_secret": "sk_proj_c3f7a8b2vL4nYwH6...",
   "preview_origins": ["*.vercel.app", "*.netlify.app"],
   "created_at": "2026-04-21T14:03:11Z",
   "claimed_at": "2026-04-22T09:17:45Z",
-  "organization_id": "org_acme",
+  "team_id": "team_acme",
   "schema_version": 2
 }
 ```
@@ -121,7 +123,7 @@ Post-claim `.zitadel/secret`:
 ```
 Zitadel is configured in this project but no secret was found on this machine.
   Restore from your Zitadel account:  npx zitadel secret restore
-  Create a fresh unclaimed project:   npx zitadel secret new
+  Create a fresh pre-claim project:   npx zitadel secret new
 ```
 
 `restore` authenticates the human via the standard claim methods and refreshes both secrets for any project the human owns. It only works post-claim — there is no human to authenticate against while the project is unclaimed.
@@ -133,7 +135,7 @@ Zitadel is configured in this project but no secret was found on this machine.
   claim it now: npx zitadel claim
 ```
 
-**Shared repo pull.** Two developers, one repo, neither has the secret. If claimed: both run `npx zitadel secret restore` and both succeed (organization membership authenticates them). If unclaimed: only the original creator can recover; everyone else creates a new project or waits for the first person to claim.
+**Shared repo pull.** Two developers, one repo, neither has the secret. If claimed: both run `npx zitadel secret restore` and both succeed (team membership authenticates them). If unclaimed: only the original creator can recover; everyone else creates a new project or waits for the first person to claim.
 
 ## Lifecycle
 
@@ -147,8 +149,8 @@ sequenceDiagram
 
     Dev->>CLI: npx @zitadel/setup
     CLI->>CLI: detect framework + deploy tool<br>infer preview_origins
-    CLI->>Srv: POST /v1/projects { preview_origins }
-    Srv->>Srv: generate secrets server-side
+    CLI->>Srv: POST /projects { preview_origins }
+    Srv->>Srv: generate sk_proj_ secrets server-side
     Srv-->>CLI: { project_id, secret, preview_secret, preview_origins }
     CLI->>Secret: write file (0600, gitignored)
     CLI->>Deploy: upload preview_secret to env store<br>(if deploy tool detected)
@@ -158,11 +160,11 @@ sequenceDiagram
 
     Dev->>CLI: npx zitadel claim
     CLI->>Srv: claim flow (see claim-flow.md)
-    Srv->>Srv: rotate zp_ secret<br>attach organization
-    Srv-->>CLI: { new_secret, organization_id, claimed_at }
+    Srv->>Srv: rotate sk_proj_ secret<br>attach team
+    Srv-->>CLI: { new_secret, team_id, claimed_at }
     CLI->>Secret: rewrite file atomically
 
-    Note over Dev,Srv: project_id, preview_secret, and all resources unchanged.<br>Only the zp_ bearer value rotates.
+    Note over Dev,Srv: project_id, preview_secret, and all resources unchanged.<br>Only the full-access sk_proj_ bearer value rotates.
 ```
 
 ## CLI surface
@@ -174,7 +176,7 @@ Full CLI spec is deferred. The commands that touch `.zitadel/secret`:
 | `npx @zitadel/setup` | Create project, write `.zitadel/secret`, upload preview secret to deploy platform. |
 | `npx zitadel secret show` | Print project slug, claim state, declared issuer origins. Never prints the secret values. |
 | `npx zitadel secret restore` | Post-claim only. Authenticate as a human; refresh both secrets. |
-| `npx zitadel secret new` | Create a fresh unclaimed project, replacing the current secret file. Prompts if one exists. |
+| `npx zitadel secret new` | Create a fresh pre-claim project, replacing the current secret file. Prompts if one exists. |
 | `npx zitadel secret rotate` | Post-claim only. Rotate the project secret without touching `project_id`. Use after a suspected leak. |
 | `npx zitadel claim` | See [claim-flow.md](claim-flow.md). |
 
@@ -183,3 +185,5 @@ Full CLI spec is deferred. The commands that touch `.zitadel/secret`:
 - [Claim Flow](claim-flow.md) — what changes when a project is claimed
 - [Configuration Surface](configuration-surface.md) — declared issuer origins and the full config that the secret authenticates uploads of
 - [Claim API](api/claim-api.yaml) — HTTP surface for project creation and secret lifecycle
+- [`../api/credentials.md`](../api/credentials.md) — canonical credential taxonomy across the whole API
+- [`../glossary.md`](../glossary.md) — vocabulary

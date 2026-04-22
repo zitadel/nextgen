@@ -1,11 +1,20 @@
 # Session API
 
 > **Status:** Preliminary — direction is set, details are open
-> **See also:** [Overview](README.md) · [OpenAPI spec](api/session-api.yaml)
+> **See also:** [Overview](README.md) · [OpenAPI spec](api/session-api.yaml) · [Glossary](../glossary.md) · [auth_attempts state machine](../api/authn-and-auth-flows.md)
 >
 > The session-as-factor-accumulator model and ACR-based assurance are the intended direction. The specifics — JSON Schema for ACR level definitions, `x-freshness` semantics, the `need[]` heuristic — are proposals, not decisions. The policy engine design (which consumes and evaluates ACR levels) is not yet written.
 
-Sessions are the core primitive. A session accumulates verified authentication factors. Any client can use it directly to build custom flows.
+Sessions are the durable, post-auth primitive. A session accumulates verified authentication factors and carries an assurance level (ACR). Any client can use it directly to build custom flows.
+
+## Relation to `auth_attempts`
+
+A session is produced by a completed [auth_attempt](../api/authn-and-auth-flows.md). auth_attempts are the **ephemeral pre-auth state machine** — they expose the primitives (challenges, verify, complete, handoff, OIDC code minting) that drive a single authentication round. The session is the durable outcome: it survives the attempt and becomes the thing the customer's app holds on to.
+
+- **auth_attempt**: ephemeral, 15-min TTL, one OAuth-code or handoff_token terminal.
+- **session**: durable, holds factors + ACR, can be stepped up via a new auth_attempt against the same session_id.
+
+Step-up re-authentication creates a new auth_attempt against the same session, adds factors, and raises the assurance level.
 
 ## Changes from the Current v2 Session API
 
@@ -21,7 +30,7 @@ The current v2 API (`CreateSession` / `SetSession` / `GetSession` / `DeleteSessi
 | **Step-up / re-auth** | Not modeled. Requires new session. | Same session — add factors to raise the assurance level. |
 | **Protocol** | gRPC + REST gateway | REST/JSON native |
 | **Factor types** | user, password, web_auth_n, idp_intent, totp, otp_sms, otp_email, recovery_code | Same set. Submitted as _proofs_, not _checks_. |
-| **Challenges** | `RequestChallenges` field inside `CreateSession`/`SetSession` | Separate endpoint: `POST /v1/sessions/{id}/challenge` |
+| **Challenges** | `RequestChallenges` field inside `CreateSession`/`SetSession` | Separate endpoint: `POST /sessions/{id}/challenge` |
 
 **Why this matters:**
 - **No "checks" anti-pattern.** The client submits proofs (a password value, an OTP code, a passkey assertion). The server verifies, updates factors, and re-evaluates the assurance level.
@@ -192,7 +201,7 @@ The session is still valid. An RP requesting AAL1 succeeds. An RP requesting AAL
 
 ### Custom ACR Levels
 
-Organizations can define custom ACR values with their own schemas:
+Teams can define custom ACR values with their own schemas:
 
 ```json
 {
@@ -218,13 +227,13 @@ Organizations can define custom ACR values with their own schemas:
 ## Endpoints
 
 ```
-POST   /v1/sessions                     Create session
-GET    /v1/sessions/{id}                Get session state + factors + acr
-PATCH  /v1/sessions/{id}                Submit factor proofs
-DELETE /v1/sessions/{id}                Revoke session
+POST   /sessions                     Create session
+GET    /sessions/{id}                Get session state + factors + acr
+PATCH  /sessions/{id}                Submit factor proofs
+DELETE /sessions/{id}                Revoke session
 
-POST   /v1/sessions/{id}/challenge      Request challenge (passkey, OTP, captcha)
-GET    /v1/sessions                      List sessions
+POST   /sessions/{id}/challenge      Request challenge (passkey, OTP, captcha)
+GET    /sessions                      List sessions
 ```
 
 ## Session Lifecycle
@@ -254,7 +263,7 @@ The client submits **proofs** — raw credentials or assertions. The server veri
 Proof fields are top-level keys on the PATCH body, not nested under a wrapper. Multiple proofs can be submitted in a single request.
 
 ```http
-PATCH /v1/sessions/sess_abc
+PATCH /sessions/sess_abc
 {
   "session_token": "tok_xyz",
   "user": { "login_name": "alice@acme.com" }
@@ -277,7 +286,7 @@ PATCH /v1/sessions/sess_abc
 ### After Password + OTP
 
 ```http
-PATCH /v1/sessions/sess_abc
+PATCH /sessions/sess_abc
 {
   "session_token": "tok_xyz3",
   "otp": { "code": "123456" }
@@ -337,7 +346,7 @@ The session stores factors and exposes its current `acr`. But whether that `acr`
 | OIDC auth request | RP via `acr_values` or `claims` parameter | IdP compares session `acr` against requested values |
 | Resource server (step-up) | RS via `WWW-Authenticate` header (RFC 9470) | Client re-authorizes with `acr_values` |
 | Flow engine | Policy engine per step | `policy_check` step evaluates session `acr` against step requirements |
-| Admin console action | Policy per action sensitivity | "Delete org" requires AAL3; "view settings" requires AAL1 |
+| Admin console action | Policy per action sensitivity | "Delete team" requires AAL3; "view settings" requires AAL1 |
 
 The session itself never says "I am sufficient." It says "I am at this level." The consumer decides if that level is enough.
 
@@ -390,7 +399,7 @@ When a factor has aged out, `need` can include factors the session already has �
 ```sql
 CREATE TABLE sessions (
     id              TEXT        NOT NULL,
-    instance_id     TEXT        NOT NULL,
+    project_id      TEXT        NOT NULL,
     version         INTEGER     NOT NULL DEFAULT 1,
     state           TEXT        NOT NULL,       -- 'building', 'active', 'expired', 'revoked'
     user_id         TEXT,
@@ -403,6 +412,6 @@ CREATE TABLE sessions (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     expires_at      TIMESTAMPTZ,
 
-    PRIMARY KEY (instance_id, id)
+    PRIMARY KEY (project_id, id)
 );
 ```

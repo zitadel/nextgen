@@ -1,7 +1,7 @@
 # Platform Overview
 
 > **Status:** Draft
-> **See also:** [README](README.md) · [Project Secret](nonce.md) · [Configuration Surface](configuration-surface.md) · [Claim Flow](claim-flow.md)
+> **See also:** [README](README.md) · [Project Secret](secret.md) · [Configuration Surface](configuration-surface.md) · [Claim Flow](claim-flow.md)
 
 Every identity provider on the market today assumes that identity precedes everything. Before a developer can write their first line of auth code, they must have a tenant, and before a tenant can exist, they must sign up. The signup form is the gate, the tenant is the primitive, and the developer is a downstream consequence of the account.
 
@@ -42,7 +42,7 @@ The setup CLI also prints a **scratch dashboard** URL (`https://zitadel.dev/scra
 > Production deploys require a claimed Zitadel project.
 > Claim this project now: `npx zitadel claim`
 
-They run `npx zitadel claim`. Browser opens at `https://zitadel.cloud/claim/river-8421`, GitHub/Google/email. One click on GitHub. Dashboard loads; the project is now owned by a newly-created "Acme" organization. Forty seconds. No credit card.
+They run `npx zitadel claim`. Browser opens at `https://zitadel.cloud/claim/river-8421`, GitHub/Google/email. One click on GitHub. Dashboard loads; the project is now owned by a newly-created "Acme" team. Forty seconds. No credit card.
 
 **Two weeks later.** They want password-reset emails in production instead of the dev inbox. The dashboard offers Dev Inbox (default), Bring Your Own Provider, or Zitadel Managed. They pick BYO, connect their existing Resend account, and password-reset emails start flowing from `noreply@acme.com`. Magic-link URLs in the emails render the declared production issuer — `https://acme.com` — because that's what the developer declared in `zitadel.json`'s `environments.production.issuer`.
 
@@ -71,11 +71,11 @@ Before claim, the project has no accountable owner — so it cannot have a "logg
 
 **What it shows.** The project's current config (as last uploaded by `npx zitadel push`), recently registered users, the dev inbox (magic-link and OTP payloads that would otherwise have been emailed), config version history with hashes, declared issuer origins per environment, and capability warnings from the most recent upload. Pre-claim, outbound delivery is always dev-inbox-only, so the scratch dashboard *is* where magic links land.
 
-**What it is not.** A team surface (no sharing, no roles — organizations do not exist pre-claim). A persistence guarantee (scratch sessions expire; loss of browser state means loss of inspection access, though the underlying project is unaffected as long as `.zitadel/secret` is intact). A production tool.
+**What it is not.** A multi-member surface (no sharing, no roles — teams do not exist pre-claim). A persistence guarantee (scratch sessions expire; loss of browser state means loss of inspection access, though the underlying project is unaffected as long as `.zitadel/secret` is intact). A production tool.
 
-**At claim time, the scratch URL retires** and the claim-complete flow redirects to the real dashboard at `dashboard.zitadel.cloud/<org>/projects/<slug>`. The scratch session cookie is invalidated; any future inspection is via the claimed dashboard, authenticated through the organization.
+**At claim time, the scratch URL retires** and the claim-complete flow redirects to the real dashboard at `dashboard.zitadel.cloud/<team>/projects/<slug>`. The scratch session cookie is invalidated; any future inspection is via the claimed dashboard, authenticated through the team.
 
-The scratch dashboard is also the recovery escape hatch referenced in [Project Secret — Failure modes](nonce.md#failure-modes): a developer whose laptop lost `.zitadel/secret` while the project was still unclaimed can, if they still have the scratch session in the same browser, read back the project slug and correlate with support. It is best-effort, not a guarantee — the system-level answer is *claim early*.
+The scratch dashboard is also the recovery escape hatch referenced in [Project Secret — Failure modes](secret.md#failure-modes): a developer whose laptop lost `.zitadel/secret` while the project was still unclaimed can, if they still have the scratch session in the same browser, read back the project slug and correlate with support. It is best-effort, not a guarantee — the system-level answer is *claim early*.
 
 ## Three orthogonal axes
 
@@ -85,7 +85,7 @@ The design separates three dimensions that product categories often collapse. Ke
 |---|---|---|
 | **Lifecycle** | Unclaimed, Claimed | Who is accountable for this project. Binary. Traversed exactly once. |
 | **Tier** | Free, Pro, Enterprise | What entitlements the claimed project has. Applies only post-claim. Moves up and down with needs and payment state. |
-| **Environment** | Local, Preview, Production | Deployment context for a running instance of the developer's app. |
+| **Environment** | Local, Preview, Production | Deployment context for a running copy of the developer's app. |
 
 Combinations that matter:
 
@@ -111,7 +111,7 @@ The invariants:
 
 The [flow engine](../flowengine/README.md) runs the state machine that drives login, registration, and recovery. It decides which step to render next, which factors to require, when a session has met the required assurance level. It knows nothing about whether the project hosting those sessions is claimed, which tier it sits on, or where its configuration came from.
 
-This folder owns the outer scope. It describes how the project came to exist, how it is configured, how it transitions from anonymous capability to owned organization, and how the customer's app talks to Zitadel's backend. The two meet at three seams:
+This folder owns the outer scope. It describes how the project came to exist, how it is configured, how it transitions from anonymous capability to owned-by-a-team, and how the customer's app talks to Zitadel's backend. The two meet at three seams:
 
 - **Configuration.** Flow definitions live in `zitadel.json` or the `.zitadel/flows/` directory. `npx zitadel push` uploads them to the server. The flow engine resolves them at runtime.
 - **Runtime transport.** The flow engine runs server-side; the auth web component renders on the customer's origin and talks to the flow engine via the customer's own proxy routes. See [Configuration Surface — Proxy endpoints](configuration-surface.md#proxy-endpoints-scaffolded-on-demand).
@@ -169,7 +169,9 @@ Pro-gated because DNS validation, cert rotation, and abuse takedown response all
 
 For B2B customers whose *own* customers each get their own auth hostname (`customer-a.auth.com`, `customer-b.auth.com`, `customer-c.auth.com`, …), with each hostname mapping to a different logical tenant in the customer's data model. Builds on Level 3 (custom domains per hostname) and adds a primitive for hostname-to-tenant resolution at request time.
 
-The primitive is not designed yet — candidates include a new `tenant` or `scope` object, or a reuse of project/application/organization. The distinguishing requirement is *one-to-many*: a single project owns many hostnames, each routed to different branding + flow configuration. Level 3's custom-domain primitive is one-to-one and does not solve this.
+The primitive is not designed yet — candidates include a new `tenant` or `scope` object, or a reuse of project / app_group / team. The distinguishing requirement is *one-to-many*: a single project owns many hostnames, each routed to different branding + flow configuration. Level 3's custom-domain primitive is one-to-one and does not solve this.
+
+> See also: [`../api/hierarchy.md`](../api/hierarchy.md) for the three-layer Project / Team / User model this folder's lifecycle narrative plays out within.
 
 ## Out of scope for this draft pass
 
@@ -195,7 +197,9 @@ Each deferred integration level gets its own spec when a concrete customer need 
 
 ## See also
 
-- [Project Secret](nonce.md) — the bearer token that authenticates API calls
+- [Project Secret](secret.md) — the bearer token that authenticates API calls
 - [Configuration Surface](configuration-surface.md) — the `zitadel.json` specification
 - [Claim Flow](claim-flow.md) — what changes at claim
 - [Flow Engine](../flowengine/README.md) — session-level state machine
+- [API Design Guide](../api/README.md) — protocol surface (hierarchy, credentials, auth_attempts)
+- [Glossary](../glossary.md) — canonical vocabulary

@@ -87,7 +87,7 @@ Admins can configure external captcha services when they need ML-based detection
 | **hCaptcha** | `hcaptcha` | Same flow as reCAPTCHA, verified via hCaptcha API |
 | **Cloudflare Turnstile** | `turnstile` | Invisible or managed challenge → token submitted → server verifies via Cloudflare API |
 
-Third-party providers require configuration (site key, secret key) at the instance or organization level. The captcha step in the flow response includes provider-specific config so the frontend knows which widget to render:
+Third-party providers require configuration (site key, secret key) at the project or team level. The captcha step in the flow response includes provider-specific config so the frontend knows which widget to render:
 
 ```json
 {
@@ -145,7 +145,7 @@ Captcha is configured per flow via `x-captcha` in the flow definition or schema:
 Browser fingerprinting collects device signals for risk correlation. It does not block — it feeds the risk evaluator.
 
 - **Provider:** ThumbmarkJS (open-source, self-hosted) with fallback to a minimal built-in collector.
-- **Collection:** Flow engine emits a fingerprint collection action. Frontend submits via `POST /v1/flows/{session_id}/event`.
+- **Collection:** Flow engine emits a fingerprint collection action. Frontend submits via `POST /flows/{session_id}/event`.
 - **Persistence:** Fingerprint hash stored on the session. Repeat visitors with the same fingerprint on the same user are lower risk.
 
 ## Behavioral Telemetry
@@ -157,7 +157,7 @@ Browser fingerprinting collects device signals for risk correlation. It does not
 | Time on step | Step transition timestamps | Bots complete forms in <100ms |
 | Copy/paste of credentials | Event endpoint | Unusual for real users on password fields |
 
-Signals are submitted via `POST /v1/flows/{session_id}/event`. They are **observation-only** — never blocking on their own.
+Signals are submitted via `POST /flows/{session_id}/event`. They are **observation-only** — never blocking on their own.
 
 ## Rate Limiting
 
@@ -193,9 +193,9 @@ When the risk evaluator flags a session, the policy engine adds `captcha` to the
 
 The client:
 1. Sees `"captcha"` in `need[]`
-2. Requests a challenge: `POST /v1/sessions/{id}/challenge { "type": "captcha" }`
+2. Requests a challenge: `POST /sessions/{id}/challenge { "type": "captcha" }`
 3. Solves the challenge client-side (widget or PoW depending on configured provider)
-4. Submits the proof: `PATCH /v1/sessions/{id} { "captcha": { ... } }`
+4. Submits the proof: `PATCH /sessions/{id} { "captcha": { ... } }`
 
 Captcha is a standard factor — no special-case API.
 

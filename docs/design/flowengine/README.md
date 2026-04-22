@@ -6,6 +6,8 @@
 >
 > **What needs feedback:** Flow engine architecture (state machine, BDUI, encrypted cookie storage, pivots, completion semantics).
 > **What's early draft:** Step response shape (Options A/B/C — need frontend feedback), session API details (ACR model, `x-freshness`), policy engine design (TBD).
+>
+> **See also:** [../glossary.md](../glossary.md) — canonical vocabulary · [../api/](../api/README.md) — API design guide · [../api/authn-and-auth-flows.md](../api/authn-and-auth-flows.md) — the auth_attempts primitives this engine runs on top of.
 
 ## Relevant POC ADRs
 
@@ -43,22 +45,25 @@ The architecture is built on four concepts:
 
 ## Two Paths to Authentication
 
+The flow engine orchestrates **which step renders when** (UI layer). The underlying auth primitives — start an attempt, issue a challenge, verify a proof, complete, mint a handoff — live in [`../api/authn-and-auth-flows.md`](../api/authn-and-auth-flows.md) as the `auth_attempts` state machine. Both paths below use the same primitives; they differ in who drives the UI.
+
 ```
 Web/frontend client                    Any other client (mobile, backend, CLI)
 ─────────────────────                  ─────────────────────────────────────────
 
-POST /v1/flows                         POST /v1/sessions
-  → get BDUI steps                       → get session + acr + need[]
-POST /v1/flows/{id}/submit             PATCH /v1/sessions/{id}
-  → server advances state machine        → submit factor proofs
-  → renders next step                    → server verifies, re-evaluates acr
-  → manages registration, profiling
-  → handles SSO redirects              Check acr against requested acr_values
-  ...                                    → build native UI, step-up if needed
-complete → redirect                    acr meets request → token exchange
+POST /flows                         POST /auth_attempts
+  → get BDUI steps                       → drive primitives directly
+POST /flows/{id}/submit             POST /auth_attempts/{id}/challenges
+  → server advances state machine        + /challenges/{cid}/verify
+  → renders next step                    → submit factor proofs
+  → manages registration, profiling      → server verifies, re-evaluates acr
+  → handles SSO redirects
+  ...                                  Check acr against requested acr_values
+complete → redirect                      → build native UI, step-up if needed
+                                       acr meets request → exchange / handoff
 
-Flow creates a session internally.     Client drives the session directly.
-Client never touches Session API.      Client never touches Flow API.
+Flow orchestrates UI; primitives       Client orchestrates its own UI;
+below come from auth_attempts.         calls auth_attempts + Session API.
 ```
 
 Both paths get the same policy enforcement — the policy engine evaluates sessions regardless of how factors were submitted.
@@ -98,7 +103,7 @@ graph TD
 
 3. **Sessions are the primitive.** A session is a bag of verified authentication factors. The flow engine creates and drives sessions internally, but sessions also exist independently. Clients that want full control (mobile apps, backend services, CLIs) skip the flow engine entirely and talk to the Session API directly.
 
-4. **Flows are configurable per audience.** Flow definitions are API resources that describe step graphs. An admin can create different flows for different organizations, applications, or user types. One org gets SSO-first login; another gets email + password. The flow engine resolves which definition to use based on the request context.
+4. **Flows are configurable per audience.** Flow definitions are API resources that describe step graphs. An admin can create different flows for different teams, applications, or user types. One team gets SSO-first login; another gets email + password. The flow engine resolves which definition to use based on the request context.
 
 5. **User schemas drive forms.** Registration fields, validation rules, and progressive profiling steps come from JSON Schema definitions — not hardcoded templates. When a schema adds a new field, every flow that references it picks it up automatically.
 

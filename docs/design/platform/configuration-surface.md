@@ -1,7 +1,7 @@
 # Configuration Surface
 
 > **Status:** Draft
-> **See also:** [README](README.md) · [Overview](overview.md) · [Project Secret](nonce.md) · [Claim Flow](claim-flow.md) · [Config API](api/config-api.yaml) · [Flow Engine](../flowengine/flow-engine.md)
+> **See also:** [README](README.md) · [Overview](overview.md) · [Project Secret](secret.md) · [Claim Flow](claim-flow.md) · [Config API](api/config-api.yaml) · [Flow Engine](../flowengine/flow-engine.md)
 
 The configuration surface is the set of artifacts a developer checks into source control to describe what their Zitadel project does: flow definitions, identity providers, user schemas, branding, environment-specific issuer origins. The server is **not** the source of truth for any of this; the repo is. `npx zitadel push` uploads the server-behavior subset on demand; the dev-server hook runs it automatically when the config hash changes.
 
@@ -163,7 +163,7 @@ The file-reference form is recommended for anything non-trivial so that diffs st
 my-app/
 ├── zitadel.json                        (source-controlled, root of config)
 ├── .zitadel/
-│   ├── secret                          (gitignored — see nonce.md)
+│   ├── secret                          (gitignored — see secret.md)
 │   ├── flows/
 │   │   ├── login.json                  (source-controlled)
 │   │   ├── register.json
@@ -256,11 +256,11 @@ The schema version corresponds to the installed `@zitadel/sdk` version. A develo
 
 **What the schema gives you at author time:** IDE autocomplete, inline field documentation, required-field checking, enum validation, and — critically — detection of new capabilities. When a future SDK introduces captcha steps, the new schema adds `captcha` to the step-type enum. An editor using the old schema that encounters `"type": "captcha"` will flag it immediately.
 
-**What the schema does not give you:** runtime capability verification. A project might be configured with v2.1 features while talking to a Zitadel instance that has not yet rolled out v2.1 server support. This is where the capabilities handshake comes in.
+**What the schema does not give you:** runtime capability verification. A project might be configured with v2.1 features while talking to a Zitadel deployment that has not yet rolled out v2.1 server support. This is where the capabilities handshake comes in.
 
 ### Capabilities handshake
 
-On every `PUT /v1/projects/{project_id}/config`, the server responds with:
+On every `PUT /projects/{project_id}/config`, the server responds with:
 
 ```json
 {
@@ -281,7 +281,7 @@ On every `PUT /v1/projects/{project_id}/config`, the server responds with:
 }
 ```
 
-If the client-side config references a step type, IDP type, or delivery mode the server does not support, the response includes structured warnings (or errors for hard incompatibilities). This lets the SDK surface a clear diagnostic: "Your `zitadel.json` uses `captcha` steps, but this Zitadel instance is on schema version 1.3. Upgrade the Zitadel instance or remove captcha steps."
+If the client-side config references a step type, IDP type, or delivery mode the server does not support, the response includes structured warnings (or errors for hard incompatibilities). This lets the SDK surface a clear diagnostic: "Your `zitadel.json` uses `captcha` steps, but this Zitadel deployment is on schema version 1.3. Upgrade the Zitadel deployment or remove captcha steps."
 
 For the MVP the handshake is a diagnostic; stricter enforcement (rejecting uploads that mention unknown step types) is a tunable on the server side.
 
@@ -408,7 +408,7 @@ The repo wins. On the next `npx zitadel push`, dashboard edits that diverge from
 
 ## Preview deploys
 
-Preview deploys work before claim via the **preview secret** minted at project creation and handed to the deploy platform's environment store automatically by the setup CLI. The preview secret is origin-scoped to the patterns declared at mint time (`["*.vercel.app"]` and similar). Full specification is in [Project Secret](nonce.md#preview-secret-handoff).
+Preview deploys work before claim via the **preview secret** minted at project creation and handed to the deploy platform's environment store automatically by the setup CLI. The preview secret is origin-scoped to the patterns declared at mint time (`["*.vercel.app"]` and similar). Full specification is in [Project Secret](secret.md#preview-secret-handoff).
 
 On production deployment (non-preview origin, first push to `main` → production hostname), the SDK refuses to start and prints:
 
@@ -427,7 +427,7 @@ Subdomain naming rules (phishing-kit string blocks, Levenshtein brand matching, 
 
 ## See also
 
-- [Project Secret](nonce.md) — what authenticates config uploads; preview-secret lifecycle
+- [Project Secret](secret.md) — what authenticates config uploads; preview-secret lifecycle
 - [Claim Flow](claim-flow.md) — what changes when a project is claimed
 - [Config API](api/config-api.yaml) — HTTP surface for config upload + drift
 - [Flow Engine](../flowengine/flow-engine.md) — consumer of flow definitions uploaded here

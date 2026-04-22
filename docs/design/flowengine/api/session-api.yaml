@@ -9,10 +9,10 @@ info:
     Clients submit factor proofs; the server verifies and re-evaluates the ACR.
 
 servers:
-  - url: https://{instance}.zitadel.cloud/v1
+  - url: https://{region}.zitadel.cloud
     variables:
-      instance:
-        default: my-instance
+      region:
+        default: eu-west-1
 
 tags:
   - name: Sessions
@@ -337,7 +337,7 @@ components:
       type: object
       description: |
         Proof of captcha completion. Shape depends on the provider configured
-        for this instance/organization.
+        for this project/team.
       oneOf:
         - title: AltchaProof
           description: Proof-of-work solution (self-hosted Altcha)

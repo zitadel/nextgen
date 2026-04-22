@@ -3,7 +3,7 @@ info:
   title: Zitadel Claim API
   version: 2.0.0-draft
   description: |
-    Anonymous project creation, claim lifecycle, and organization
+    Anonymous project creation, claim lifecycle, and team
     domain-matching.
 
     Projects are created without authentication. The server generates a
@@ -12,7 +12,7 @@ info:
     `preview_secret` (origin-scoped to patterns declared at creation time,
     handed to the deploy platform's env store by the setup CLI).
 
-    Claim is the transaction that attaches an organization and an accountable
+    Claim is the transaction that attaches a team and an accountable
     human to a project. It requires a human-authenticable method (GitHub
     OAuth, Google OAuth, or email magic link). Agents cannot claim on behalf
     of a human.
@@ -21,7 +21,7 @@ info:
     on field names, shapes, or semantics.
 
 servers:
-  - url: https://{region}.zitadel.cloud/v1
+  - url: https://{region}.zitadel.cloud
     variables:
       region:
         default: global
@@ -32,8 +32,8 @@ tags:
     description: Anonymous project creation and secret-authenticated retrieval
   - name: Claim
     description: The transaction that attaches ownership to a project
-  - name: Organizations
-    description: Organization domain-matching and public-email suppression
+  - name: Teams
+    description: Team domain-matching and public-email suppression
 
 paths:
 
@@ -45,8 +45,9 @@ paths:
       summary: Create an unclaimed project
       description: |
         Anonymous endpoint. Rate-limited per source IP. The server generates
-        a `project_id`, a full `project_secret` (`zp_<base62>`), and a scoped
-        `preview_secret` (`zpp_<base62>`) bound to the `preview_origins`
+        a `project_id`, a full `project_secret` (`sk_proj_<base62>`), and an
+        origin-scoped `preview_secret` (also `sk_proj_<base62>`, with metadata
+        recording the origin patterns) bound to the `preview_origins`
         patterns the client declared.
 
         No user-facing URL is minted at creation. Issuers are the customer's
@@ -108,9 +109,9 @@ paths:
       description: |
         Initiates a claim for the specified project. Returns a URL the CLI
         opens in the browser and a short-lived challenge ID. The CLI then
-        polls `GET /claim/status` (authenticated with its existing unclaimed
-        `zp_` secret) until the browser-side flow completes; on success the
-        status endpoint returns the rotated project secret. The rotated
+        polls `GET /claim/status` (authenticated with its existing pre-claim
+        `sk_proj_` secret) until the browser-side flow completes; on success
+        the status endpoint returns the rotated project secret. The rotated
         secret never touches the browser.
       tags: [Claim]
       security:
@@ -146,8 +147,8 @@ paths:
       description: |
         Called by the browser-side claim page after the human has
         authenticated with GitHub, Google, or email magic link. Runs the
-        atomic transaction: resolve or create the organization, create a
-        membership for the authenticated human, rotate the project secret,
+        atomic transaction: resolve or create the team, create a
+        team_membership for the authenticated human, rotate the project secret,
         stash the rotated secret server-side keyed by `challenge_id`, and
         mark the challenge complete.
 
@@ -157,7 +158,7 @@ paths:
 
         **This endpoint never returns the rotated project secret to the
         browser.** The CLI retrieves the rotated secret by polling
-        `/claim/status` with its existing `zp_` bearer, which is the
+        `/claim/status` with its existing `sk_proj_` bearer, which is the
         proof-of-possession that authorizes the retrieval.
       tags: [Claim]
       requestBody:
@@ -190,10 +191,10 @@ paths:
         Called by the CLI in a polling loop after `/claim/init`. Returns
         `pending` while the browser-side flow has not completed, and
         `completed` on the first poll after the atomic transaction — that
-        response carries the rotated project secret, organization id,
+        response carries the rotated project secret, team id,
         claimed timestamp, and dashboard URL.
 
-        **Authentication.** Requires the caller's current `zp_` unclaimed
+        **Authentication.** Requires the caller's current pre-claim `sk_proj_`
         bearer. The server rejects polls from any other secret. This is
         what makes CLI polling safe: only the process that initiated the
         challenge (and therefore already holds the pre-claim secret) can
@@ -205,7 +206,7 @@ paths:
         secret atomically on first receipt.
 
         **Expiry.** Challenges older than `expires_at` from `/claim/init`
-        return `410 Gone`. The pre-claim `zp_` remains valid until the
+        return `410 Gone`. The pre-claim `sk_proj_` remains valid until the
         atomic transaction commits; if the challenge expires before
         completion, nothing has rotated.
       tags: [Claim]
@@ -241,26 +242,26 @@ paths:
             retrieved. The CLI must persist the secret on first successful
             poll; it cannot be fetched twice.
 
-  # ── Organization domain-matching ──────────────────────────────
+  # ── Team domain-matching ──────────────────────────────────────
 
-  /organizations/domain-match:
+  /teams/domain-match:
     get:
-      operationId: matchOrganizationByDomain
-      summary: Match an email to existing organizations
+      operationId: matchTeamByDomain
+      summary: Match an email to existing teams
       description: |
-        Given a verified email address, returns candidate organizations
+        Given a verified email address, returns candidate teams
         whose primary domain matches the email's domain. Public-email
         providers (Gmail, Yahoo, Outlook, Hotmail, iCloud, Me.com,
         ProtonMail, AOL, GMX, Live.com, MSN, etc.) are suppressed — the
         response flags them and does not return matches.
 
-        Used by the claim completion flow to offer join-existing-org vs.
-        create-new-org UX.
+        Used by the claim completion flow to offer join-existing-team vs.
+        create-new-team UX.
 
         TODO: decide whether this endpoint requires authentication (probably
         yes — the `challenge_id` or a short-lived token from `/claim/init`),
         to prevent it from being used as a domain-enumeration oracle.
-      tags: [Organizations]
+      tags: [Teams]
       parameters:
         - name: email
           in: query
@@ -276,7 +277,7 @@ paths:
             type: string
       responses:
         "200":
-          description: Candidate organizations (may be empty).
+          description: Candidate teams (may be empty).
           content:
             application/json:
               schema:
@@ -301,12 +302,13 @@ components:
       type: http
       scheme: bearer
       description: |
-        Server-issued bearer secret authenticating API calls. Format
-        `zp_<base62>` for the project secret (unclaimed or claimed) or
-        `zpp_<base62>` for the preview secret. The server enforces
-        origin-scope rules on the preview-secret form. Neither is tied to
-        any Zitadel-hosted URL — they authenticate API calls to the Zitadel
-        backend.
+        Server-issued bearer secret authenticating API calls. All project-scoped
+        secrets share the `sk_proj_<base62>` prefix; variants are distinguished
+        by server-side metadata (pre-claim, claimed, origin-scoped). The
+        origin-scoped variant (historically the "preview secret") is enforced
+        server-side against the request `Origin`. Neither is tied to any
+        Zitadel-hosted URL — they authenticate API calls to the Zitadel backend.
+        For the full credential taxonomy, see `../../api/credentials.md`.
 
   schemas:
 
@@ -358,7 +360,7 @@ components:
           description: |
             Full-access bearer secret. Stored in `.zitadel/secret` on the
             developer's laptop. Returned once — not retrievable afterwards.
-          example: "zp_7kR2pXq9vN3wLmYhT4cB8A"
+          example: "sk_proj_7kR2pXq9vN3wLmYhT4cB8A"
         preview_secret:
           type: string
           description: |
@@ -367,9 +369,9 @@ components:
             env store by the setup CLI. Authenticates runtime API calls
             (sessions, users, flows) from matching preview origins; it
             cannot push configuration — see the capability matrix in
-            [nonce.md](../nonce.md#capability-matrix). No automatic expiry
+            [secret.md](../secret.md#capability-matrix). No automatic expiry
             in the MVP; rotatable from the dashboard post-claim.
-          example: "zpp_c3f7a8b2vL4nYwH6..."
+          example: "sk_proj_c3f7a8b2vL4nYwH6..."
         preview_origins:
           type: array
           description: |
@@ -417,7 +419,7 @@ components:
           description: Origin patterns the preview secret is scoped to.
           items:
             type: string
-        organization_id:
+        team_id:
           type: string
           description: Present only when `lifecycle == "claimed"`.
         created_at:
@@ -439,10 +441,10 @@ components:
     InitClaimRequest:
       type: object
       properties:
-        suggested_org_name:
+        suggested_team_name:
           type: string
           description: |
-            Optional name suggestion for new organization creation,
+            Optional name suggestion for new team creation,
             derived from the Git remote URL or package.json. The human
             can override.
           example: "Acme"
@@ -478,24 +480,24 @@ components:
             canonical shape — probably a JWT issued by the IdP proxy after
             OAuth completes, carrying email + email_verified + sub + iss.
           additionalProperties: true
-        organization_choice:
+        team_choice:
           type: object
           description: |
-            The human's choice in the org-resolution UX.
+            The human's choice in the team-resolution UX.
           properties:
             action:
               type: string
               enum: [join_existing, create_new]
-            organization_id:
+            team_id:
               type: string
               description: Required when action is `join_existing`.
-            new_organization_name:
+            new_team_name:
               type: string
               description: Required when action is `create_new`.
 
     CompleteClaimResponse:
       type: object
-      required: [project_id, organization_id, claimed_at]
+      required: [project_id, team_id, claimed_at]
       description: |
         Browser-side response. Intentionally does not carry the rotated
         project secret — the CLI retrieves that from `/claim/status` using
@@ -504,7 +506,7 @@ components:
       properties:
         project_id:
           type: string
-        organization_id:
+        team_id:
           type: string
         claimed_at:
           type: string
@@ -533,11 +535,11 @@ components:
         new_project_secret:
           type: string
           description: |
-            Rotated project secret (`zp_<base62>`). Replaces the pre-claim
+            Rotated project secret (`sk_proj_<base62>`). Replaces the pre-claim
             value in `.zitadel/secret`. The preview secret is untouched.
             Present only when `status == "completed"`.
-          example: "zp_9f2Hx8LqT4vRmYpN2wCbVa"
-        organization_id:
+          example: "sk_proj_9f2Hx8LqT4vRmYpN2wCbVa"
+        team_id:
           type: string
           description: Present only when `status == "completed"`.
         claimed_at:
@@ -555,20 +557,20 @@ components:
 
     AlreadyClaimedResponse:
       type: object
-      required: [error, organization_id, dashboard_url]
+      required: [error, team_id, dashboard_url]
       properties:
         error:
           type: string
           enum: [already_claimed]
         message:
           type: string
-        organization_id:
+        team_id:
           type: string
         dashboard_url:
           type: string
           format: uri
 
-    # ── Organizations ─────────────────────────────────────────
+    # ── Teams ─────────────────────────────────────────────────
 
     DomainMatchResponse:
       type: object
@@ -586,13 +588,13 @@ components:
         candidates:
           type: array
           items:
-            $ref: "#/components/schemas/OrganizationCandidate"
+            $ref: "#/components/schemas/TeamCandidate"
 
-    OrganizationCandidate:
+    TeamCandidate:
       type: object
-      required: [organization_id, name]
+      required: [team_id, name]
       properties:
-        organization_id:
+        team_id:
           type: string
         name:
           type: string

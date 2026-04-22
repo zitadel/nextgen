@@ -24,7 +24,7 @@ info:
     converged on field names, shapes, or semantics.
 
 servers:
-  - url: https://{region}.zitadel.cloud/v1
+  - url: https://{region}.zitadel.cloud
     variables:
       region:
         default: global
@@ -192,15 +192,15 @@ components:
       type: http
       scheme: bearer
       description: |
-        Server-issued bearer secret — the `zp_<base62>` project secret
-        (unclaimed or claimed) on the developer's laptop. **Preview
-        secrets (`zpp_<base62>`) cannot authenticate endpoints in this
-        API.** Configuration is developer intent and is pushed from the
-        full project secret only; preview secrets authenticate runtime
+        Server-issued bearer secret — the `sk_proj_<base62>` project secret
+        (pre-claim or claimed variant) on the developer's laptop. **Origin-scoped
+        `sk_proj_` secrets (historically the "preview secret") cannot authenticate
+        endpoints in this API.** Configuration is developer intent and is pushed
+        from the full project secret only; origin-scoped secrets authenticate runtime
         API calls (sessions, users, flows) from matching preview origins
         and are excluded from the config surface. See the canonical
         capability matrix in
-        [nonce.md](../nonce.md#capability-matrix).
+        [secret.md](../secret.md#capability-matrix).
 
   schemas:
 

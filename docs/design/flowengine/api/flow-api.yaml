@@ -10,10 +10,10 @@ info:
     and user mutations touch the database.
 
 servers:
-  - url: https://{instance}.zitadel.cloud/v1
+  - url: https://{region}.zitadel.cloud
     variables:
-      instance:
-        default: my-instance
+      region:
+        default: eu-west-1
 
 tags:
   - name: Flows
@@ -142,7 +142,7 @@ paths:
           schema:
             type: string
             enum: [login, register, recovery, profiling, reauth, link_account]
-        - name: org_id
+        - name: team_id
           in: query
           schema:
             type: string
@@ -360,9 +360,9 @@ components:
         login_name:
           type: string
           description: Auto-submits identifier step (maps to OIDC login_hint)
-        org_id:
+        team_id:
           type: string
-          description: Scopes flow resolution to an organization
+          description: Scopes flow resolution to a team
         schema_id:
           type: string
           description: Scopes to a specific user type
@@ -589,7 +589,7 @@ components:
     Audience:
       type: object
       properties:
-        org_ids:
+        team_ids:
           type: array
           items:
             type: string
@@ -688,7 +688,7 @@ components:
       properties:
         purpose:
           type: string
-        org_id:
+        team_id:
           type: string
         app_id:
           type: string
