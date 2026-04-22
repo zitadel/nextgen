@@ -2,26 +2,18 @@ DEALLOCATE ALL;
 
 PREPARE get_user_by_unique_attribute (
     TEXT,    -- $1 instance_id
-    TEXT,    -- $2 organization_id
+    TEXT,    -- $2 organization_id (Pass NULL for global, or the ID for org-scoped)
     TEXT,    -- $3 key
     JSONB,   -- $4 value
-    BOOLEAN, -- $5 use_global_index
-    TEXT[]   -- $6 attributes to fetch
+    TEXT[]   -- $5 attributes to fetch
 ) AS
 WITH target AS (
     SELECT user_id
-    FROM zitadel_nextgen.user_attributes
+    FROM zitadel_nextgen.user_unique_attributes
     WHERE instance_id = $1
-      AND key = $3
-      AND value = $4
-      -- 1. Satisfy the Partial Index condition
-      AND jsonb_typeof(value) IN ('string', 'number', 'boolean')
-      -- 2. Use a CASE or specific logic to isolate the branches
-      AND (
-          ($5 AND global_unique) 
-          OR 
-          (NOT $5 AND org_unique AND organization_id = $2)
-      )
+    AND organization_id = COALESCE($2, '')
+    AND key = $3
+    AND value_hash = digest($4::text, 'md5')
     LIMIT 2
 )
 SELECT 
@@ -31,7 +23,7 @@ SELECT
       FROM zitadel_nextgen.user_attributes a
       WHERE a.instance_id = u.instance_id 
         AND a.user_id = u.id
-        AND ($6 IS NULL OR a.key = ANY($6))
+        AND ($5 IS NULL OR a.key = ANY($5))
     ) AS attributes
 FROM target t
 JOIN zitadel_nextgen.users u 
@@ -44,17 +36,6 @@ EXECUTE get_user_by_unique_attribute(
     null, 
     'email', 
     '"U_000017@nextgen.zitadel.com"', 
-    TRUE, 
-    ARRAY['username', 'email', 'email_verified']
-);
-
--- Globally Unique Attribute (email) with organization context (should yield same result as above)
-EXECUTE get_user_by_unique_attribute(
-    'inst_10', 
-    'org_0001', 
-    'email', 
-    '"U_000017@nextgen.zitadel.com"', 
-    TRUE, 
     ARRAY['username', 'email', 'email_verified']
 );
 
@@ -64,6 +45,5 @@ EXECUTE get_user_by_unique_attribute(
     'org_0001', 
     'nickname', 
     '"N_0017"', 
-    FALSE, 
     ARRAY['username', 'email', 'email_verified']
 );

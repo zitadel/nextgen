@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/md5"
 	_ "embed"
 	"encoding/json"
 	"fmt"
@@ -12,19 +13,11 @@ import (
 )
 
 var (
-	//go:embed get.sql
-	getUserStmt string
+	//go:embed get_by_id.sql
+	getUserByIdStmt string
+	//go:embed create.sql
+	insertUserStmt string
 )
-
-func GetUser(ctx context.Context, instanceID, id string) (*User, error) {
-	rows, _ := conn.Query(ctx, getUserStmt, instanceID, id)
-	user, err := pgx.CollectExactlyOneRow(rows, pgx.RowToAddrOfStructByPos[User])
-	if err != nil {
-		return nil, fmt.Errorf("failed to get user: %w", err)
-	}
-	return user, nil
-
-}
 
 type Attribute struct {
 	Key   string
@@ -54,6 +47,82 @@ func (u *User) MarshalJSON() ([]byte, error) {
 
 }
 
+func GetUserByID(ctx context.Context, instanceID, id string) (*User, error) {
+	rows, _ := conn.Query(ctx, getUserByIdStmt, instanceID, id)
+	user, err := pgx.CollectExactlyOneRow(rows, pgx.RowToAddrOfStructByPos[User])
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user: %w", err)
+	}
+	return user, nil
+
+}
+
+//go:generate go run github.com/dmarkham/enumer -type=UserUniqueness -trimprefix=UserUniqueness -transform=lower -sql
+type UserUniqueness int
+
+const (
+	UserUniquenessUnspecified UserUniqueness = iota
+	UserUniquenessOrganization
+	UserUniquenessGlobal
+)
+
+type IncommingUserAttribute interface {
+	isAttribute()
+}
+
+type incommingUserAttribute struct {
+	Key         string         `json:"key"`
+	Value       any            `json:"value"`
+	ValueHash   []byte         `json:"value_hash"`
+	UniqueScope UserUniqueness `json:"unique_scope"`
+}
+
+func (*incommingUserAttribute) isAttribute() {}
+
+func NewIncommingUserAttribute(key string, value any, unique UserUniqueness) (*incommingUserAttribute, error) {
+	// Marshal the 'any' value into a JSON byte slice immediately
+	raw, err := json.Marshal(value)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal attribute value: %w", err)
+	}
+
+	// TODO(muhlemmer): use SHA-256 in prod code.
+	md5Hash := md5.Sum(raw)
+
+	return &incommingUserAttribute{
+		Key:         key,
+		Value:       raw,
+		ValueHash:   md5Hash[:],
+		UniqueScope: unique,
+	}, nil
+}
+
+type IncommingUser struct {
+	SchemaURL      string
+	ID             string
+	OrganizationID string
+	Attributes     []*incommingUserAttribute
+}
+
+func (u *IncommingUser) insertArgs(instanceID string) []any {
+	return []any{
+		instanceID,
+		u.SchemaURL,
+		u.ID,
+		u.OrganizationID,
+		u.Attributes,
+	}
+}
+
+func CreateUser(ctx context.Context, instanceID string, u *IncommingUser) (*User, error) {
+	rows, _ := conn.Query(ctx, insertUserStmt, u.insertArgs(instanceID)...)
+	user, err := pgx.CollectExactlyOneRow(rows, pgx.RowToAddrOfStructByPos[User])
+	if err != nil {
+		return nil, fmt.Errorf("failed to create user: %w", err)
+	}
+	return user, nil
+}
+
 func buildAttributeTree(attributes []Attribute) (map[string]any, error) {
 	tree := make(map[string]any)
 	for i, a := range attributes {
@@ -62,7 +131,7 @@ func buildAttributeTree(attributes []Attribute) (map[string]any, error) {
 		// empty keys are prevented in the DB schema,
 		// this is just a safety check to prevent panics in case of invalid data
 		if len(keyNodes) == 0 {
-			return nil, fmt.Errorf("illigal empty key for attribute at index %d", i)
+			return nil, fmt.Errorf("illegal empty key for attribute at index %d", i)
 		}
 
 		setAttribute(keyNodes, a.Value, tree)
