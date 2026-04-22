@@ -32,7 +32,7 @@ export default defineConfig(() => ({
     globals: true,
     environment: "jsdom",
     setupFiles: ["./src/test-setup.ts"],
-    include: ["{src,tests}/**/*.{spec}.{ts,tsx}"],
+    include: ["src/**/*.spec.{ts,tsx}"],
     reporters: ["default"],
     coverage: {
       reportsDirectory: "./test-output/vitest/coverage",
