@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compileOnSave": false,
+  "files": [],
+  "references": [
+    {
+      "path": "./frontend/console-e2e"
+    },
+    {
+      "path": "./frontend/console"
+    },
+    {
+      "path": "./frontend/components"
+    }
+  ]
+}

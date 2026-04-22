@@ -31,14 +31,25 @@ go.work.sum
 # .idea/
 # .vscode/
 
-# Angular / frontend
-node_modules/
-.angular/
-dist/
-tmp/
-out-tsc/
-coverage/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+# System Files
+.DS_Store
+
+#Frontend
+## compiled output
+dist
+tmp
+out-tsc
+
+## dependencies
+node_modules
 pnpm-debug.log*
+
+## vite
+vite.config.*.timestamp*
+vitest.config.*.timestamp*
+test-output
+coverage
+
+## nx
+.nx/cache
+.nx/workspace-data

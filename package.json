@@ -1,0 +1,19 @@
+{
+  "name": "@zitadel-nextgen/source",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "scripts": {},
+  "devDependencies": {
+    "@nx/devkit": "catalog:",
+    "@nx/esbuild": "catalog:",
+    "@nx/js": "catalog:",
+    "@nx/playwright": "catalog:",
+    "@nx/vite": "catalog:",
+    "@nx/vitest": "catalog:",
+    "@typescript/native-preview": "catalog:",
+    "nx": "catalog:",
+    "oxfmt": "catalog:",
+    "oxlint": "catalog:"
+  }
+}

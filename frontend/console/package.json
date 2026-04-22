@@ -1,0 +1,33 @@
+{
+  "name": "@zitadel-nextgen/console",
+  "version": "0.0.1",
+  "private": true,
+  "dependencies": {
+    "@lit/react": "catalog:",
+    "@tanstack/react-devtools": "catalog:",
+    "@tanstack/react-router": "catalog:",
+    "@tanstack/react-router-devtools": "catalog:",
+    "@zitadel-nextgen/components": "workspace:*",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "tailwindcss": "catalog:"
+  },
+  "devDependencies": {
+    "@nx/react": "catalog:",
+    "@tailwindcss/vite": "catalog:",
+    "@tanstack/devtools-vite": "catalog:",
+    "@tanstack/eslint-plugin-router": "catalog:",
+    "@tanstack/router-plugin": "catalog:",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "oxlint": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  },
+  "nx": {
+    "projectType": "application"
+  }
+}
