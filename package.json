@@ -6,6 +6,7 @@
   "scripts": {},
   "devDependencies": {
     "@nx/devkit": "catalog:",
+    "@nx/eslint-plugin": "catalog:",
     "@nx/js": "catalog:",
     "@nx/playwright": "catalog:",
     "@nx/vite": "catalog:",
