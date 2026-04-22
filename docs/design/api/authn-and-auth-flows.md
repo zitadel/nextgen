@@ -108,15 +108,36 @@ Exchange requirements (also documented in [`credentials.md`](credentials.md#hand
 
 ## Sessions
 
-Once an auth_attempt completes (modern or OIDC), the result is a durable session:
+Once an auth_attempt completes (modern or OIDC), the result is a durable session. **Sessions are never mutated directly by a client** — all factor mutations happen through `auth_attempts`. The session is a read model that reflects the accumulated, verified state.
 
 ```http
-GET    /sessions/{id}
-POST   /sessions/{id}/refresh
-DELETE /sessions/{id}                    # logout
+POST   /sessions                         # pre-allocate anonymous session (optional, pre-auth)
+GET    /sessions/{id}                    # read state, factors, acr[], amr
+DELETE /sessions/{id}                    # revoke (logout), requires session_token
+GET    /sessions                         # list (admin / management)
 ```
 
-Sessions carry the assurance level (ACR/AAL) computed from accumulated factors. Detail in [`../flowengine/session-api.md`](../flowengine/session-api.md). Step-up re-authentication creates a new auth_attempt against the same session, adds factors, raises assurance.
+`POST /sessions` is optional — it creates an anonymous shell (no user, no factors) for cases where a `session_id` must be pre-allocated before the user is known. Most clients skip this; the flow engine and direct `auth_attempts` callers create the session implicitly on first completion.
+
+Sessions carry `acr[]` — the list of all ACR levels the session's current factors satisfy — and `amr`. Detail in [`../flowengine/session-api.md`](../flowengine/session-api.md).
+
+### Step-Up
+
+Step-up re-authentication creates a new `auth_attempt` against the **same `session_id`**, adds factors, and raises the assurance level. No new session is created.
+
+```http
+POST /auth_attempts
+{
+  "project_id": "proj_…",
+  "challenge_nonce": "…",
+  "session_id": "sess_existing",          # references the live session
+  "oidc_context": {
+    "acr_values": "urn:zitadel:aal:2"    # target level
+  }
+}
+```
+
+The attempt proceeds normally (challenges → verify → complete). On completion, the session's `factors` and `acr` are updated in place.
 
 ## Flow engine integration
 
@@ -124,11 +145,235 @@ The flow engine is a separate concern from auth_attempts: it decides *which step
 
 Integration details and the full state machine of the UI orchestration layer live in [`../flowengine/flow-engine.md`](../flowengine/flow-engine.md).
 
-## See also
+## Sequence Diagrams
 
-- [`../glossary.md`](../glossary.md)
-- [`credentials.md`](credentials.md) — bootstrap nonce, handoff token hardening
-- [`authz.md`](authz.md) — who can create an auth_attempt
-- [`conventions.md`](conventions.md#idempotency) — Category B retry semantics
-- [`../flowengine/flow-engine.md`](../flowengine/flow-engine.md) — UI orchestration on top of these primitives
-- [`../flowengine/session-api.md`](../flowengine/session-api.md) — durable sessions, ACR/AAL
+Three flows share the same `auth_attempts` primitives. They differ in who drives the UI and what the terminal output is.
+
+### Path 1 — Web client via Flow Engine (embedded component + SSR handoff)
+
+The browser loads a Zitadel-hosted login component (or an embedded lit element). The flow engine drives all UI decisions server-side. The customer's backend exchanges the final `handoff_token` for a session.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Browser
+    participant FlowEngine as Flow Engine
+    participant AuthAttempts as auth_attempts
+    participant SessionDB as Sessions (DB)
+    participant CustomerBackend as Customer Backend
+
+    Note over Browser,CustomerBackend: Bootstrap
+
+    Browser->>FlowEngine: POST /bootstrap/challenge { project_id, client_type: "browser" }
+    FlowEngine-->>Browser: { challenge_nonce }
+
+    Note over Browser,CustomerBackend: Optional — pre-allocate session before user is known
+
+    Browser->>SessionDB: POST /sessions { project_id, user_agent }
+    SessionDB-->>Browser: { session_id, session_token, state: "building", acr: [] }
+
+    Note over Browser,CustomerBackend: Start auth attempt (flow engine path)
+
+    Browser->>FlowEngine: POST /flows { project_id, challenge_nonce, session_id? }
+    FlowEngine->>AuthAttempts: POST /auth_attempts { project_id, challenge_nonce, session_id? }
+    AuthAttempts-->>FlowEngine: { attempt_id }
+    FlowEngine-->>Browser: Set-Cookie: flow=<encrypted_state> · 200 { step: "identifier" }
+
+    Note over Browser,CustomerBackend: Factor 1 — identifier + password
+
+    Browser->>FlowEngine: POST /flows/{id}/submit { login_name: "alice@acme.com" }
+    FlowEngine->>AuthAttempts: POST /auth_attempts/{id}/challenges { method: "password" }
+    AuthAttempts-->>FlowEngine: { challenge_id, method: "password" }
+    FlowEngine-->>Browser: Set-Cookie: flow=<encrypted_state> · 200 { step: "password" }
+
+    Browser->>FlowEngine: POST /flows/{id}/submit { password: "…" }
+    FlowEngine->>AuthAttempts: POST /auth_attempts/{id}/challenges/{cid}/verify { password: "…" }
+    AuthAttempts-->>FlowEngine: 200 OK — factor written to session
+    FlowEngine-->>Browser: Set-Cookie: flow=<encrypted_state> · 200 { step: "totp" }
+
+    Note over Browser,CustomerBackend: Factor 2 — TOTP (policy required MFA)
+
+    Browser->>FlowEngine: POST /flows/{id}/submit { totp: { code: "123456" } }
+    FlowEngine->>AuthAttempts: POST /auth_attempts/{id}/challenges/{cid}/verify { totp: { code: "123456" } }
+    AuthAttempts-->>FlowEngine: 200 OK — factor written, acr[] updated
+    FlowEngine-->>Browser: Set-Cookie: flow=<cleared> · 200 { step: "complete" }
+
+    Note over Browser,CustomerBackend: Terminal — modern embedded handoff
+
+    Browser->>FlowEngine: POST /flows/{id}/complete
+    FlowEngine->>AuthAttempts: POST /auth_attempts/{id}/complete
+    AuthAttempts-->>FlowEngine: { handoff_token, exchange_url }
+    FlowEngine-->>Browser: { handoff_token, exchange_url }
+
+    Browser->>CustomerBackend: POST /auth/callback { handoff_token }
+    CustomerBackend->>SessionDB: POST /session_handoffs/{handoff_token}/exchange (sk_proj_ auth)
+    SessionDB-->>CustomerBackend: { session_id, session_token, acr: ["urn:zitadel:aal:1","urn:zitadel:aal:2"], factors: {…} }
+    CustomerBackend-->>Browser: Set-Cookie: session=… · 302 redirect to app
+
+    Note over Browser,CustomerBackend: Later — read session
+
+    CustomerBackend->>SessionDB: GET /sessions/{id} (Bearer session_token)
+    SessionDB-->>CustomerBackend: { acr: ["urn:zitadel:aal:1","urn:zitadel:aal:2"], factors: {…} }
+```
+
+---
+
+### Path 2 — Direct API client (mobile app, CLI, backend service)
+
+The client owns all UI. It drives `auth_attempts` directly without a flow engine.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Client
+    participant AuthAttempts as auth_attempts
+    participant SessionDB as Sessions (DB)
+
+    Note over Client,SessionDB: Bootstrap
+
+    Client->>AuthAttempts: POST /bootstrap/challenge { project_id, client_type: "native_ios" }
+    AuthAttempts-->>Client: { challenge_nonce }
+
+    Note over Client,SessionDB: Start attempt
+
+    Client->>AuthAttempts: POST /auth_attempts { project_id, challenge_nonce }
+    AuthAttempts-->>Client: { attempt_id }
+
+    Note over Client,SessionDB: Identify user
+
+    Client->>AuthAttempts: POST /auth_attempts/{id}/challenges { method: "identifier", login_name: "alice@acme.com" }
+    AuthAttempts-->>Client: { challenge_id, user_id, available_factors: ["password","passkey"] }
+
+    Note over Client,SessionDB: Factor 1 — password
+
+    Client->>AuthAttempts: POST /auth_attempts/{id}/challenges { method: "password" }
+    AuthAttempts-->>Client: { challenge_id }
+
+    Client->>AuthAttempts: POST /auth_attempts/{id}/challenges/{cid}/verify { password: "…" }
+    AuthAttempts-->>Client: 200 OK
+
+    Note over Client,SessionDB: Factor 2 — TOTP
+
+    Client->>AuthAttempts: POST /auth_attempts/{id}/challenges { method: "totp" }
+    AuthAttempts-->>Client: { challenge_id }
+
+    Client->>AuthAttempts: POST /auth_attempts/{id}/challenges/{cid}/verify { totp: { code: "123456" } }
+    AuthAttempts-->>Client: 200 OK
+
+    Note over Client,SessionDB: Complete — receive handoff_token, exchange for session
+
+    Client->>AuthAttempts: POST /auth_attempts/{id}/complete
+    AuthAttempts-->>Client: { handoff_token, exchange_url }
+
+    Client->>SessionDB: POST /session_handoffs/{handoff_token}/exchange (sk_proj_ auth)
+    SessionDB-->>Client: { session_id, session_token, acr: ["urn:zitadel:aal:1","urn:zitadel:aal:2"], factors: {…} }
+
+    Note over Client,SessionDB: Use session
+
+    Client->>SessionDB: GET /sessions/{id} (Bearer session_token)
+    SessionDB-->>Client: { acr: ["urn:zitadel:aal:1","urn:zitadel:aal:2"], factors: {…} }
+```
+
+---
+
+### Path 3 — OIDC RP (legacy relying party via /authorize)
+
+The RP redirects to `/authorize`. The OIDC Adapter is server-side code handling the request in-process — it creates an `auth_attempt` and reads sessions via the internal service layer, not over HTTP. Terminal output is an OAuth `code` at the `redirect_uri`.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Browser
+    participant RP as Relying Party
+    participant OIDCAdapter as OIDC Adapter
+    participant FlowEngine as Flow Engine
+    participant AuthService as Auth Service (internal)
+    participant DB as Database
+
+    Note over Browser,DB: RP initiates auth
+
+    Browser->>RP: GET /protected-resource
+    RP-->>Browser: 302 → /authorize?client_id=…&redirect_uri=…&scope=openid&acr_values=urn:zitadel:aal:2&state=…&nonce=…&code_challenge=…
+
+    Browser->>OIDCAdapter: GET /authorize?…
+    OIDCAdapter-)AuthService: create_auth_attempt(project_id, oidc_context: { client_id, redirect_uri, acr_values, … })
+    AuthService--)OIDCAdapter: attempt_id
+    OIDCAdapter-->>Browser: 302 → /login?attempt_id=… (hosted login UI)
+
+    Note over Browser,DB: Flow engine drives login (same as Path 1, steps omitted)
+
+    Browser->>FlowEngine: POST /flows { attempt_id }
+    FlowEngine-->>Browser: { step: "identifier" }
+    Note right of Browser: … identifier → password → totp steps …
+    FlowEngine-->>Browser: { step: "complete" }
+
+    Note over Browser,DB: Terminal — OIDC code
+
+    Browser->>FlowEngine: POST /flows/{id}/complete
+    FlowEngine-)AuthService: complete_attempt(attempt_id)
+    AuthService--)FlowEngine: { code, redirect_uri: "https://app.acme.com/callback?code=…&state=…" }
+    FlowEngine-->>Browser: 302 → https://app.acme.com/callback?code=…&state=…
+
+    Note over Browser,DB: RP exchanges code for tokens
+
+    Browser->>RP: GET /callback?code=…&state=…
+    RP->>OIDCAdapter: POST /token { code, code_verifier, redirect_uri }
+    OIDCAdapter-)DB: SELECT acr FROM sessions WHERE id = … (verify acr[] contains requested level)
+    DB--)OIDCAdapter: { acr: ["urn:zitadel:aal:1","urn:zitadel:aal:2"] }
+    OIDCAdapter-->>RP: { access_token, id_token (acr: "urn:zitadel:aal:2"), refresh_token }
+    RP-->>Browser: Set-Cookie: session · redirect to /protected-resource
+```
+
+---
+
+### Step-Up — existing session, RP requests higher ACR
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Browser
+    participant RP as Relying Party
+    participant OIDCAdapter as OIDC Adapter
+    participant FlowEngine as Flow Engine
+    participant AuthService as Auth Service (internal)
+    participant DB as Database
+
+    Note over Browser,DB: User has active session at AAL1
+
+    Browser->>RP: GET /sensitive-action
+    RP-->>Browser: 302 → /authorize?acr_values=urn:zitadel:aal:2&…
+
+    Browser->>OIDCAdapter: GET /authorize?acr_values=urn:zitadel:aal:2&…
+    OIDCAdapter-)DB: SELECT acr FROM sessions WHERE id = …
+    DB--)OIDCAdapter: { acr: ["urn:zitadel:aal:1"] }
+    Note right of OIDCAdapter: aal:2 not in acr[] → step-up required
+
+    OIDCAdapter-)AuthService: create_auth_attempt(session_id: "existing", oidc_context: { acr_values: "urn:zitadel:aal:2", … })
+    AuthService--)OIDCAdapter: attempt_id
+    OIDCAdapter-->>Browser: 302 → /login?attempt_id=… (step-up UI — identifier/password skipped)
+
+    Note over Browser,DB: Flow engine renders only the missing factor
+
+    Browser->>FlowEngine: POST /flows { attempt_id }
+    Note right of FlowEngine: policy_check: session already has password,<br/>only totp missing for aal:2
+    FlowEngine-->>Browser: { step: "totp" }
+
+    Browser->>FlowEngine: POST /flows/{id}/submit { totp: { code: "123456" } }
+    FlowEngine-)AuthService: verify_challenge(totp: { code: "123456" })
+    AuthService-)DB: write totp factor, recompute acr[]
+    DB--)AuthService: acr: ["urn:zitadel:aal:1","urn:zitadel:aal:2"]
+    AuthService--)FlowEngine: OK
+    FlowEngine-->>Browser: { step: "complete" }
+
+    Browser->>FlowEngine: POST /flows/{id}/complete
+    FlowEngine-)AuthService: complete_attempt(attempt_id)
+    AuthService--)FlowEngine: { code, redirect_uri }
+    FlowEngine-->>Browser: 302 → https://app.acme.com/callback?code=…&state=…
+
+    Browser->>RP: GET /callback?code=…
+    RP->>OIDCAdapter: POST /token { code, … }
+    OIDCAdapter-)DB: SELECT acr FROM sessions WHERE id = …
+    DB--)OIDCAdapter: { acr: ["urn:zitadel:aal:1","urn:zitadel:aal:2"] }
+    OIDCAdapter-->>RP: { id_token (acr: "urn:zitadel:aal:2") }
+    RP-->>Browser: access granted
+```
