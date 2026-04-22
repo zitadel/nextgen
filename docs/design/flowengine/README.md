@@ -28,6 +28,7 @@
 | [Session API](session-api.md) | Preliminary | Factor accumulation primitive. ACR/LoA model is directional, not final. |
 | [User Schema Integration](user-schema.md) | Preliminary | How the flow engine and policy engine consume user schema annotations. |
 | [Bot Detection](bot-detection.md) | Preliminary | Composable captcha, fingerprinting, and risk evaluation. Depends on policy engine. |
+| [Template Security](template-security.md) | In Review | XSS attack vectors, trust boundaries, and defense-in-depth for LiquidJS + innerHTML rendering. |
 | **API specs** | | |
 | [Session API OpenAPI](api/session-api.yaml) | Preliminary | OpenAPI 3.1 spec for the Session API |
 | [Flow API OpenAPI](api/flow-api.yaml) | In Review | OpenAPI 3.1 spec for the Flow Engine API |
