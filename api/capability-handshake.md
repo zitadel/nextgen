@@ -27,7 +27,7 @@ Here, the server responds to the initial handshake with a list of all supported 
 * **Graceful Upgrades:** When the Server expands its capabilities, older Clients/SDKs can handle the mismatch gracefully, preventing breaking changes and forced updates.
 * **Graceful Downgrades:** Likewise, when the Server is on an older version than the Client/SDK, the client can downgrade its UI to match the server’s older schema.
 * **Clear Deprecation Path:** Sharing deprecation statuses gives Client and SDK teams advance notice and a predictable timeline to upgrade their code.
-* **Predictable Flow:** By setting the schema_id in the initial request, the Server knows exactly what the client is capable of for the remainder of the session and can route the flow accordingly.
+* **Predictable Flow:** By setting the `schema_id` in the initial request, the Server knows exactly what the client is capable of for the remainder of the session and can route the flow accordingly.
 
 **Cons:**
 * **Increased Latency:** The required initial network call to exchange capabilities adds latency before the actual flow can begin.
