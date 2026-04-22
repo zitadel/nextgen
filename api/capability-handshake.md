@@ -1,4 +1,5 @@
 # Client/SDKs + API Version Compatibility
+> **Status:** Draft
 
 ## Problem Statement
 When a Flow Engine dictates which UI components should be rendered, version mismatches often occur: the Flow Engine API might be on a higher version than the Client/SDK can support, or vice versa. Left unhandled, this leads to a poor user experience, such as the UI rendering a blank screen (if the API requests an unknown state) or the API returning unhelpful error messages (if the Client/SDK requests a feature the server doesn’t yet support).
