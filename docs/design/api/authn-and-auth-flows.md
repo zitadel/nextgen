@@ -4,11 +4,12 @@
 
 ## Separation of responsibilities
 
-- **auth_attempts** — ephemeral state machine exposing the auth *primitives*: start an attempt, issue factor challenges, verify factor proofs, complete, mint handoff, mint OIDC code. Lives in `api/` because it's a core protocol surface.
+- **auth_attempts** — ephemeral state machine exposing the auth *primitives*: start an attempt, issue factor challenges, verify factor proofs, mint handoff tokens. Lives in `api/` because it's a core protocol surface.
+- **OIDC Adapter** — server-side handler for `/authorize` and `/token`. Stores OIDC request context in its own `auth_requests` table and drives `auth_attempts` internally. The auth_attempt has no knowledge of OIDC.
 - **flow engine** — orchestrates the *UI* around those primitives: which step renders when, which screen to show next, when to branch on policy. Does not hold primitives. See [`../flowengine/flow-engine.md`](../flowengine/flow-engine.md).
 - **sessions** — durable post-auth container produced by a completed auth_attempt. Carries accumulated factors and assurance level. Detail in [`../flowengine/session-api.md`](../flowengine/session-api.md).
 
-A flow runs on top of auth_attempt primitives without collapsing the resource model. A flow decides *what screen to draw*; an auth_attempt decides *what primitive to offer and what proof to accept*; a session is the durable post-auth outcome. The flow docs keep using `session_id` as the frontend handle for `/flows/*`, but that handle is not a blanket alias for `auth_attempt_id`.
+A flow runs on top of auth_attempt primitives without collapsing the resource model. A flow decides *what screen to draw*; an auth_attempt decides *what primitive to offer and what proof to accept*; a session is the durable post-auth outcome.
 
 ## Pre-session concepts
 
@@ -17,7 +18,7 @@ A flow runs on top of auth_attempt primitives without collapsing the resource mo
 | **Factor** | A verified credential: passkey, password, OTP, recovery code, federated assertion. |
 | **Auth method** | The operation that acquires a factor: `password verify`, `passkey assert`, `otp enroll`, `federation redirect`. |
 | **Challenge** | A single-factor prompt issued inside an auth_attempt. |
-| **Session** | The post-auth container holding verified factors. Carries an assurance level (ACR). |
+| **Session** | The post-auth container holding verified factors. Carries an assurance level list (acr[]). |
 | **Step-up** | Adding factors to an existing session to raise assurance. |
 
 ## Bootstrap challenge
@@ -43,16 +44,26 @@ POST   /auth_attempts                              # create
 GET    /auth_attempts/{id}                         # poll
 POST   /auth_attempts/{id}/challenges              # issue a factor challenge
 POST   /auth_attempts/{id}/challenges/{cid}/verify # submit proof
-POST   /auth_attempts/{id}/complete                # terminal
-POST   /auth_attempts/{id}/handoff                 # mint handoff_token (SSR)
+POST   /auth_attempts/{id}/handoff                 # terminal → handoff_token
 ```
 
-An attempt can complete in one of two terminal shapes depending on whether it carries OIDC context:
+`POST /auth_attempts` accepts only:
 
-- **Modern embedded**: `complete` yields a `handoff_token` that the customer's backend exchanges at `POST /session_handoffs/{id}/exchange` for a session payload.
-- **Legacy OIDC RP**: `complete` yields an OAuth `code` + redirect URL back to the RP's `redirect_uri`.
+```http
+POST /auth_attempts
+{
+  "project_id":      "proj_…",
+  "challenge_nonce": "…",        # from POST /bootstrap/challenge
+  "session_id":      "sess_…"    # optional — omit for new session, include for step-up
+}
+```
 
-Same state machine, two terminal behaviours.
+No OIDC context. The attempt does not know whether it is part of an OIDC flow, a direct embedded flow, or a step-up — that is the caller's concern.
+
+`handoff` always yields a `handoff_token`. Who calls it determines what happens next:
+
+- **Direct client / flow engine** → calls `POST /auth_attempts/{id}/handoff` over HTTP → receives `{ handoff_token }` → exchanges via `POST /session_handoffs/{id}/exchange`.
+- **OIDC Adapter** → calls `mint_handoff(attempt_id)` internally → receives `handoff_token` → immediately exchanges it for an OAuth `code` server-side → returns `code` + redirect URL to the browser. No external handoff exchange involved.
 
 ### TTL — LOCKED at 15 minutes
 
@@ -64,39 +75,28 @@ Industry standard for OIDC `state` cookies and magic link lifespans. **Not confi
 
 Zitadel is fundamentally an OIDC provider: legacy relying parties redirect to `/authorize` with `client_id`, `redirect_uri`, `state`, `nonce`, `code_challenge`, etc., and expect an OAuth `code` back at the `redirect_uri`.
 
-**LOCKED:** the auth_attempts state machine accepts OIDC context at initiation and adapts its completion behaviour accordingly.
+**LOCKED:** the OIDC Adapter handles this entirely server-side. When `/authorize` is received, the adapter stores the full OIDC request parameters in its own `auth_requests` table, creates an `auth_attempt` internally, and links `attempt_id → auth_request_id`. The `auth_attempt` carries no OIDC context — it remains a pure authentication primitive.
 
-```http
-POST /auth_attempts
-{
-  "project_id": "proj_…",
-  "challenge_nonce": "…",                   # from bootstrap
-  "oidc_context": {                         # optional
-    "request_uri": "urn:…",                 # PAR (RFC 9126), preferred
-    // or individual params if not using PAR:
-    "client_id": "app_…",
-    "redirect_uri": "https://app.customer.com/callback",
-    "response_type": "code",
-    "scope": "openid profile email",
-    "state": "…",
-    "nonce": "…",
-    "code_challenge": "…",
-    "code_challenge_method": "S256"
-  }
-}
+```
+GET /authorize?client_id=…&redirect_uri=…&scope=openid&acr_values=…&state=…&nonce=…&code_challenge=…
+  │
+  ├─ OIDC Adapter stores auth_request { client_id, redirect_uri, acr_values, state, nonce, code_challenge, … }
+  ├─ OIDC Adapter calls create_auth_attempt(project_id, session_id?) → attempt_id
+  ├─ links attempt_id → auth_request_id internally
+  └─ redirects browser to /login?attempt_id=…
 ```
 
-When `oidc_context` is present, `POST /auth_attempts/{id}/complete` yields an OAuth `code` + redirect URL instead of a `handoff_token`. When absent, the flow yields a `handoff_token`.
+When `mint_handoff(attempt_id)` is called after successful authentication, the OIDC Adapter looks up the stored `auth_request` by `attempt_id`, validates the session's `acr[]` against the requested `acr_values`, and generates the OAuth `code` + redirect URL. The auth_attempt has no knowledge of any of this.
 
-The `/authorize` OIDC endpoint becomes a thin adapter: it creates an `auth_attempt` with the appropriate `oidc_context` and redirects the user to the login UI (hosted or embedded) carrying the `auth_attempt_id`. The flow engine then orchestrates the UI on top of the same auth_attempt.
+For step-up, the OIDC Adapter creates a new auth_attempt against the existing `session_id`. The `acr_values` target lives in the stored `auth_request` — the flow engine retrieves it via the `attempt_id → auth_request_id` link when deciding which factors to prompt for.
 
 ## SSR handoff
 
 The embedded lit component completes auth in-browser and hands the customer's backend a short-lived `handoff_token` to exchange for a real session.
 
 ```http
-POST /auth_attempts/{id}/handoff         → { handoff_token: "…", exchange_url: "…" }
-POST /session_handoffs/{id}/exchange     → { session: {…} }
+POST /auth_attempts/{id}/handoff         → { handoff_token: "…", expires_at: "…" }
+POST /session_handoffs/{id}/exchange     → { session: {…}, session_token: "…" }
 ```
 
 Exchange requirements (also documented in [`credentials.md`](credentials.md#handoff-token-hardening)):
@@ -123,21 +123,18 @@ Sessions carry `acr[]` — the list of all ACR levels the session's current fact
 
 ### Step-Up
 
-Step-up re-authentication creates a new `auth_attempt` against the **same `session_id`**, adds factors, and raises the assurance level. No new session is created.
+Step-up re-authentication creates a new `auth_attempt` against the **same `session_id`**, adds factors, and expands `acr[]`. No new session is created. No OIDC context on the attempt — when triggered by an OIDC flow, the `acr_values` target is in the OIDC Adapter's stored `auth_request`.
 
 ```http
 POST /auth_attempts
 {
-  "project_id": "proj_…",
+  "project_id":      "proj_…",
   "challenge_nonce": "…",
-  "session_id": "sess_existing",          # references the live session
-  "oidc_context": {
-    "acr_values": "urn:zitadel:aal:2"    # target level
-  }
+  "session_id":      "sess_existing"
 }
 ```
 
-The attempt proceeds normally (challenges → verify → complete). On completion, the session's `factors` and `acr` are updated in place.
+The attempt proceeds normally (challenges → verify → handoff). On handoff, the session's `factors` and `acr[]` are updated in place.
 
 ## Flow engine integration
 
@@ -201,9 +198,9 @@ sequenceDiagram
     Note over Browser,CustomerBackend: Terminal — modern embedded handoff
 
     Browser->>FlowEngine: POST /flows/{id}/complete
-    FlowEngine->>AuthAttempts: POST /auth_attempts/{id}/complete
-    AuthAttempts-->>FlowEngine: { handoff_token, exchange_url }
-    FlowEngine-->>Browser: { handoff_token, exchange_url }
+    FlowEngine->>AuthAttempts: POST /auth_attempts/{id}/handoff
+    AuthAttempts-->>FlowEngine: { handoff_token, expires_at }
+    FlowEngine-->>Browser: { handoff_token, expires_at }
 
     Browser->>CustomerBackend: POST /auth/callback { handoff_token }
     CustomerBackend->>SessionDB: POST /session_handoffs/{handoff_token}/exchange (sk_proj_ auth)
@@ -262,8 +259,8 @@ sequenceDiagram
 
     Note over Client,SessionDB: Complete — receive handoff_token, exchange for session
 
-    Client->>AuthAttempts: POST /auth_attempts/{id}/complete
-    AuthAttempts-->>Client: { handoff_token, exchange_url }
+    Client->>AuthAttempts: POST /auth_attempts/{id}/handoff
+    AuthAttempts-->>Client: { handoff_token, expires_at }
 
     Client->>SessionDB: POST /session_handoffs/{handoff_token}/exchange (sk_proj_ auth)
     SessionDB-->>Client: { session_id, session_token, acr: ["urn:zitadel:aal:1","urn:zitadel:aal:2"], factors: {…} }
@@ -278,7 +275,7 @@ sequenceDiagram
 
 ### Path 3 — OIDC RP (legacy relying party via /authorize)
 
-The RP redirects to `/authorize`. The OIDC Adapter is server-side code handling the request in-process — it creates an `auth_attempt` and reads sessions via the internal service layer, not over HTTP. Terminal output is an OAuth `code` at the `redirect_uri`.
+The RP redirects to `/authorize`. The OIDC Adapter is server-side code handling the request in-process — it stores OIDC context in `auth_requests`, creates an `auth_attempt` via the internal service layer, and links them. Terminal output is an OAuth `code` at the `redirect_uri`.
 
 ```mermaid
 sequenceDiagram
@@ -296,8 +293,9 @@ sequenceDiagram
     RP-->>Browser: 302 → /authorize?client_id=…&redirect_uri=…&scope=openid&acr_values=urn:zitadel:aal:2&state=…&nonce=…&code_challenge=…
 
     Browser->>OIDCAdapter: GET /authorize?…
-    OIDCAdapter-)AuthService: create_auth_attempt(project_id, oidc_context: { client_id, redirect_uri, acr_values, … })
-    AuthService--)OIDCAdapter: attempt_id
+    OIDCAdapter-)DB: INSERT auth_requests { client_id, redirect_uri, acr_values, state, nonce, code_challenge, … }
+    OIDCAdapter-)AuthService: create_auth_attempt(project_id) → attempt_id
+    OIDCAdapter-)DB: link attempt_id → auth_request_id
     OIDCAdapter-->>Browser: 302 → /login?attempt_id=… (hosted login UI)
 
     Note over Browser,DB: Flow engine drives login (same as Path 1, steps omitted)
@@ -307,18 +305,24 @@ sequenceDiagram
     Note right of Browser: … identifier → password → totp steps …
     FlowEngine-->>Browser: { step: "complete" }
 
-    Note over Browser,DB: Terminal — OIDC code
+    Note over Browser,DB: Terminal — flow engine completes, OIDC Adapter exchanges handoff internally
 
     Browser->>FlowEngine: POST /flows/{id}/complete
-    FlowEngine-)AuthService: complete_attempt(attempt_id)
-    AuthService--)FlowEngine: { code, redirect_uri: "https://app.acme.com/callback?code=…&state=…" }
+    FlowEngine-)AuthService: mint_handoff(attempt_id) → handoff_token
+    AuthService--)FlowEngine: { handoff_token }
+    FlowEngine-)OIDCAdapter: exchange handoff_token (internal)
+    OIDCAdapter-)DB: SELECT auth_request WHERE attempt_id = …
+    DB--)OIDCAdapter: { acr_values, redirect_uri, state, nonce, … }
+    OIDCAdapter-)DB: SELECT acr FROM sessions WHERE id = … (verify acr[] ⊇ acr_values)
+    DB--)OIDCAdapter: { acr: ["urn:zitadel:aal:1","urn:zitadel:aal:2"] } ✓
+    OIDCAdapter--)FlowEngine: { code, redirect_uri: "https://app.acme.com/callback?code=…&state=…" }
     FlowEngine-->>Browser: 302 → https://app.acme.com/callback?code=…&state=…
 
     Note over Browser,DB: RP exchanges code for tokens
 
     Browser->>RP: GET /callback?code=…&state=…
     RP->>OIDCAdapter: POST /token { code, code_verifier, redirect_uri }
-    OIDCAdapter-)DB: SELECT acr FROM sessions WHERE id = … (verify acr[] contains requested level)
+    OIDCAdapter-)DB: SELECT acr FROM sessions WHERE id = …
     DB--)OIDCAdapter: { acr: ["urn:zitadel:aal:1","urn:zitadel:aal:2"] }
     OIDCAdapter-->>RP: { access_token, id_token (acr: "urn:zitadel:aal:2"), refresh_token }
     RP-->>Browser: Set-Cookie: session · redirect to /protected-resource
@@ -348,14 +352,15 @@ sequenceDiagram
     DB--)OIDCAdapter: { acr: ["urn:zitadel:aal:1"] }
     Note right of OIDCAdapter: aal:2 not in acr[] → step-up required
 
-    OIDCAdapter-)AuthService: create_auth_attempt(session_id: "existing", oidc_context: { acr_values: "urn:zitadel:aal:2", … })
-    AuthService--)OIDCAdapter: attempt_id
+    OIDCAdapter-)DB: INSERT auth_requests { acr_values: "urn:zitadel:aal:2", redirect_uri, state, … }
+    OIDCAdapter-)AuthService: create_auth_attempt(session_id: "existing") → attempt_id
+    OIDCAdapter-)DB: link attempt_id → auth_request_id
     OIDCAdapter-->>Browser: 302 → /login?attempt_id=… (step-up UI — identifier/password skipped)
 
-    Note over Browser,DB: Flow engine renders only the missing factor
+    Note over Browser,DB: Flow engine resolves acr_values from auth_request, renders only missing factor
 
     Browser->>FlowEngine: POST /flows { attempt_id }
-    Note right of FlowEngine: policy_check: session already has password,<br/>only totp missing for aal:2
+    Note right of FlowEngine: lookup auth_request via attempt_id → acr_values = aal:2<br/>policy_check: session has password, only totp missing
     FlowEngine-->>Browser: { step: "totp" }
 
     Browser->>FlowEngine: POST /flows/{id}/submit { totp: { code: "123456" } }
@@ -366,8 +371,12 @@ sequenceDiagram
     FlowEngine-->>Browser: { step: "complete" }
 
     Browser->>FlowEngine: POST /flows/{id}/complete
-    FlowEngine-)AuthService: complete_attempt(attempt_id)
-    AuthService--)FlowEngine: { code, redirect_uri }
+    FlowEngine-)AuthService: mint_handoff(attempt_id) → handoff_token
+    AuthService--)FlowEngine: { handoff_token }
+    FlowEngine-)OIDCAdapter: exchange handoff_token (internal)
+    OIDCAdapter-)DB: SELECT auth_request WHERE attempt_id = …
+    OIDCAdapter-)DB: SELECT acr FROM sessions WHERE id = … → acr[] ⊇ aal:2 ✓
+    OIDCAdapter--)FlowEngine: { code, redirect_uri }
     FlowEngine-->>Browser: 302 → https://app.acme.com/callback?code=…&state=…
 
     Browser->>RP: GET /callback?code=…
@@ -377,3 +386,12 @@ sequenceDiagram
     OIDCAdapter-->>RP: { id_token (acr: "urn:zitadel:aal:2") }
     RP-->>Browser: access granted
 ```
+
+## See also
+
+- [`../glossary.md`](../glossary.md)
+- [`credentials.md`](credentials.md) — bootstrap nonce, handoff token hardening
+- [`authz.md`](authz.md) — who can create an auth_attempt
+- [`conventions.md`](conventions.md#idempotency) — Category B retry semantics
+- [`../flowengine/flow-engine.md`](../flowengine/flow-engine.md) — UI orchestration on top of these primitives
+- [`../flowengine/session-api.md`](../flowengine/session-api.md) — durable sessions, ACR/AAL

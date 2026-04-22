@@ -9,14 +9,14 @@ Sessions are the durable, post-auth primitive. A session accumulates verified au
 
 ## Relation to `auth_attempts`
 
-A session is produced by a completed [auth_attempt](../api/authn-and-auth-flows.md). auth_attempts are the **ephemeral pre-auth state machine** — they expose the primitives (challenges, verify, complete, handoff, OIDC code minting) that drive a single authentication round. The session is the durable outcome: it survives the attempt and becomes the thing the customer's app holds on to.
+A session is produced by a completed [auth_attempt](../api/authn-and-auth-flows.md). auth_attempts are the **ephemeral pre-auth state machine** — they expose the primitives (challenges, verify, handoff token minting) that drive a single authentication round. The session is the durable outcome: it survives the attempt and becomes the thing the customer's app holds on to.
 
-- **auth_attempt**: ephemeral, 15-min TTL, one OAuth-code or handoff_token terminal. Accepts proofs, issues challenges, verifies credentials.
+- **auth_attempt**: ephemeral, 15-min TTL, one handoff_token terminal. Accepts proofs, issues challenges, verifies credentials.
 - **session**: durable, holds factors + ACR list, readable and revocable by the client. **Never mutated directly.** Factor mutations happen exclusively through `auth_attempts`.
 
 ```
 POST /auth_attempts                       →  drive verification (challenges, proofs)
-POST /auth_attempts/{id}/complete         →  produce handoff_token or OIDC code
+POST /auth_attempts/{id}/handoff          →  mint handoff_token
 POST /session_handoffs/{id}/exchange      →  receive { session, session_token }
 
 GET    /sessions/{id}                     →  read state, factors, acr[], amr
@@ -99,7 +99,7 @@ The session model is built around **Authentication Context Class Reference (ACR)
 
 | Concept | What it means |
 |---|---|
-| **ACR** (Authentication Context Class Reference) | A string identifying the assurance level of an authentication event. Appears in OIDC ID tokens as the `acr` claim. |
+| **ACR** (Authentication Context Class Reference) | Assurance level identifier. The session exposes `acr[]` (all satisfied levels). OIDC ID tokens carry a single `acr` claim chosen from that list for the specific request. |
 | **AMR** (Authentication Methods References) | List of method identifiers used during authentication (e.g., `["pwd", "otp", "mfa"]`). Appears in OIDC ID tokens as the `amr` claim. |
 | **AAL** (Authenticator Assurance Level) | NIST's classification: AAL1 (single factor), AAL2 (two factors), AAL3 (hardware + phishing-resistant). |
 
@@ -295,7 +295,7 @@ Factor proofs are **not submitted here**. They go to:
 POST   /auth_attempts                               Start authentication (references session_id optionally)
 POST   /auth_attempts/{id}/challenges               Issue a factor challenge
 POST   /auth_attempts/{id}/challenges/{cid}/verify  Submit proof
-POST   /auth_attempts/{id}/complete                 Complete attempt → handoff_token or OIDC code
+POST   /auth_attempts/{id}/handoff                  Mint handoff_token
 POST   /session_handoffs/{id}/exchange              Exchange handoff_token → { session, session_token }
 ```
 
@@ -359,10 +359,10 @@ RP → /authorize?acr_values=urn:zitadel:aal:2
 IdP: GET /sessions/{id} → acr[] = ["urn:zitadel:aal:1"]
 IdP: "urn:zitadel:aal:2 not in list — trigger step-up"
 
-→ POST /auth_attempts { session_id: "sess_abc", oidc_context: { acr_values: "urn:zitadel:aal:2" } }
+→ POST /auth_attempts { challenge_nonce: "…", session_id: "sess_abc" }
 → POST /auth_attempts/{id}/challenges { method: "totp" }
 → POST /auth_attempts/{id}/challenges/{cid}/verify { totp: { code: "123456" } }
-→ POST /auth_attempts/{id}/complete
+→ POST /auth_attempts/{id}/handoff
   → session acr[] updated to ["urn:zitadel:aal:1", "urn:zitadel:aal:2"]
 
 IdP: GET /sessions/{id} → "urn:zitadel:aal:2" ∈ acr[] ✓

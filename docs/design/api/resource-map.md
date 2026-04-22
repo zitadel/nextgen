@@ -112,11 +112,10 @@ Scope derived from payload; full walk-through in [`authn-and-auth-flows.md`](aut
 
 ```http
 POST /bootstrap/challenge                # { project_id, client_type }
-POST /auth_attempts                      # optionally accepts OIDC context
+POST /auth_attempts                      # { project_id, challenge_nonce, session_id? }
 GET  /auth_attempts/{id}
 POST /auth_attempts/{id}/challenges
 POST /auth_attempts/{id}/challenges/{challenge_id}/verify
-POST /auth_attempts/{id}/complete
 POST /auth_attempts/{id}/handoff
 POST /session_handoffs/{id}/exchange
 ```
@@ -126,8 +125,9 @@ POST /session_handoffs/{id}/exchange
 ## Sessions (durable, post-auth only)
 
 ```http
+POST   /sessions                         # optional anonymous pre-auth shell
+GET    /sessions                         # list (admin / management)
 GET    /sessions/{id}
-POST   /sessions/{id}/refresh
 DELETE /sessions/{id}                    # logout
 ```
 
@@ -201,7 +201,7 @@ Legacy / interop protocols. The REST API above is the primary surface; these sit
 ```http
 # OIDC
 /.well-known/openid-configuration
-/authorize                               # redirects into auth_attempts with oidc_context
+/authorize                               # OIDC Adapter stores auth_request, drives auth_attempts internally
 /token
 /userinfo
 /end_session

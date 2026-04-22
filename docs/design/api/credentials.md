@@ -118,8 +118,8 @@ For SSR embedding, the lit component completes auth in-browser and hands the cus
 The endpoint pair:
 
 ```http
-POST /auth_attempts/{id}/handoff            # mints a handoff_token
-POST /session_handoffs/{id}/exchange        # consumes it, returns a session
+POST /auth_attempts/{id}/handoff            # mints { handoff_token, expires_at }
+POST /session_handoffs/{id}/exchange        # consumes handoff_token, returns { session, session_token }
 ```
 
 Detail in [`authn-and-auth-flows.md`](authn-and-auth-flows.md).
