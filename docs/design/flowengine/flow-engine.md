@@ -3,7 +3,7 @@
 > **Status:** Draft
 > **See also:** [Overview](README.md) · [Step Response Shape](flow-engine-nodes.md) · [Storage](flow-engine-storage.md) · [OpenAPI spec](api/flow-api.yaml)
 
-The flow engine is a **server-side state machine** that produces BDUI (Backend-Driven UI). It is used by web/frontend clients that want a ready-made login and registration experience. Clients that want full control skip it entirely and use the Session API directly.
+The flow engine is a **server-side state machine** that produces **Capability payloads** (semantic descriptions of fields, actions, and gates) alongside a **LiquidJS template** for rendering. It is used by web/frontend clients that want a ready-made login and registration experience. Clients that want full control skip it entirely and use the Session API directly.
 
 ## Endpoints
 
@@ -149,7 +149,7 @@ After registration completes with a pending `auth_request_id`, the flow auto-piv
 
 ## Step Response Shape
 
-See [Flow Engine — Step Response Shape](flow-engine-nodes.md) for options on how steps are structured. **This is an open decision** — the examples in this document use the `fields[]` + `actions[]` format (Option C) but the final shape is pending frontend feedback.
+See [Flow Engine — Step Response Shape](flow-engine-nodes.md) for the decided response structure. Steps emit **unordered capability dictionaries** (`fields`, `actions`, `gates`) — the LiquidJS template controls all visual ordering and layout.
 
 ## Storage
 

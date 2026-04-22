@@ -3,8 +3,9 @@ info:
   title: Zitadel Flow Engine API
   version: 1.0.0-draft
   description: |
-    Server-side state machine producing BDUI (Backend-Driven UI).
-    Used by web/frontend clients for ready-made login, registration, and recovery.
+    Server-side state machine producing Capability payloads (fields, actions, gates)
+    alongside LiquidJS templates. Used by web/frontend clients for ready-made login,
+    registration, and recovery.
     Operates on sessions internally. Flow state is stored in an encrypted HttpOnly
     cookie — the server is stateless for flow orchestration. Only factor verifications
     and user mutations touch the database.
@@ -30,7 +31,7 @@ paths:
       summary: Start a new flow
       description: |
         Resolves a flow definition based on purpose + audience context,
-        creates a session internally, and returns the first BDUI step.
+        creates a session internally, and returns the first capability step.
       tags: [Flows]
       requestBody:
         required: true
@@ -52,7 +53,7 @@ paths:
     get:
       operationId: getFlowStep
       summary: Get current step (re-render)
-      description: Returns the current BDUI step without advancing the state machine.
+      description: Returns the current capability step without advancing the state machine.
       tags: [Flows]
       security:
         - sessionToken: []

@@ -1,9 +1,9 @@
 # Building Flows
 
 > **Status:** Draft
-> **Note:** Examples use `fields[]` + `actions[]` (Option C) — the step response shape is [pending feedback](flow-engine-nodes.md).
+> **Note:** The step response shape is [decided](flow-engine-nodes.md) — steps emit unordered capability dictionaries (`fields`, `actions`, `gates`) and a LiquidJS template controls layout.
 
-The flow engine is a **server-side state machine** that produces BDUI (Backend-Driven UI). It is used by web/frontend clients that want a ready-made login and registration experience. Clients that want full control skip it entirely and use the Session API directly.
+The flow engine is a **server-side state machine** that produces **Capability payloads** alongside a **LiquidJS template**. It is used by web/frontend clients that want a ready-made login and registration experience. Clients that want full control skip it entirely and use the Session API directly.
 
 This guide walks through how to build authentication flows from scratch. It starts with the simplest concepts and builds up to advanced patterns.
 
@@ -80,7 +80,7 @@ Every step the server returns has the same shape:
 { "kind": "link",    "name": "register", "label": "Create account" }
 ```
 
-The **order of the actions array is the render order**. The server controls positioning — the frontend doesn't rearrange them.
+Actions are **unordered capabilities**. The LiquidJS template decides where and how to render them — the server never controls visual positioning.
 
 ---
 
