@@ -26,7 +26,7 @@ Individual decisions are marked inline in each doc:
 
 1. [`hierarchy.md`](hierarchy.md) — three-layer model (Project / Team / User). Platform is a reserved project.
 2. [`credentials.md`](credentials.md) — bearer tokens (`sk_proj_` / `sk_team_`), origin-bound browser challenges, handoff tokens, api_keys as resources.
-3. [`url-architecture.md`](url-architecture.md) — flat-by-ID, resource-scope index, RLS backstop, slash verbs, no version segment.
+3. [`url-architecture.md`](url-architecture.md) — flat-by-ID, resource-scope index, scope-bound DAL, slash verbs, no version segment.
 4. [`conventions.md`](conventions.md) — IDs, errors, pagination, idempotency A/B split, capabilities split, header-based versioning.
 5. [`authn-and-auth-flows.md`](authn-and-auth-flows.md) — auth_attempts state machine, OIDC adapter, SSR handoff.
 6. [`authz.md`](authz.md) — credential × scope × permission.

@@ -18,7 +18,7 @@ The middleware executes, in order:
 ```
 1. path.id → resource_scope_index → ctx.project_id / ctx.team_id
 2. credential × required_perms × resolved_scope → permission_check
-3. DAL query bounded by ctx.*_id (with RLS as backstop)
+3. Scope-bound DAL query — the repository signature requires a resolved ScopeContext; no code path can query a scoped table without one
 ```
 
 Permission is denied before any resource content is fetched. Enumeration oracles are closed: failures return 404, not 403.

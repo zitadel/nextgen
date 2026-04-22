@@ -79,6 +79,6 @@ GET /me/memberships        # every team_membership the caller holds, across proj
 ## See also
 
 - [`../glossary.md`](../glossary.md) — canonical terms
-- [`url-architecture.md`](url-architecture.md) — flat-by-ID, resource-scope index, RLS
+- [`url-architecture.md`](url-architecture.md) — flat-by-ID, resource-scope index, scope-bound DAL
 - [`resource-map.md`](resource-map.md) — the full endpoint surface
 - [`../platform/overview.md`](../platform/overview.md) — orthogonal axes (lifecycle / tier / environment / integration level)

@@ -54,19 +54,21 @@ We deliberately do not encode scope hints into IDs. That would leak hierarchy st
 
 ## DAL-level tenant isolation
 
-Authorization at the middleware layer is necessary but not sufficient. Every SQL query against project-scoped data must append `AND project_id = $ctx.project_id`. But we don't rely on code review discipline for this — we enforce it mechanically.
+Authorization at the middleware layer is necessary but not sufficient. Every query against project-scoped data must constrain by `project_id`. We don't rely on code-review discipline for this — we enforce it mechanically at the DAL layer, engine-agnostic (portable across Postgres, Spanner, and anything else we might pick).
 
-**LOCKED: Postgres Row-Level Security as a backstop.** Authorization middleware, after resolving scope, executes:
+**LOCKED: scope-bound repositories.** Project-scoped tables are only reachable through repository functions that take a `ScopeContext` carrying the resolved `project_id` (and `team_id` where relevant). The repository layer is the *only* call site that issues queries against those tables; raw database access is not exposed for scoped tables.
 
-```sql
-SET LOCAL zitadel.current_project_id = 'proj_01HXY…';
-```
+Concretely:
 
-RLS policies on every project-scoped table gate access on this session variable. If a developer forgets `WHERE project_id = ?` in a query, Postgres physically refuses to return cross-project rows. This is defense-in-depth: the application-layer `WHERE` clause is the primary mechanism, RLS is the safety net that catches human error.
+- Every scoped repository function signature is `(ctx ScopeContext, …) → …`. The context type is non-constructible without a resolved `project_id` — it can only be produced by the authorization middleware after the resource-scope index has resolved scope.
+- The query builder unconditionally appends the scope predicate (`project_id = ctx.project_id`, plus `team_id = ctx.team_id` for team-scoped tables). There is no code path that issues a query against a scoped table without it.
+- Repositories never expose raw SQL handles or ORM escape hatches for scoped tables.
 
-Tables get RLS policies as part of their migration, not as a follow-up. No project-scoped table ships without RLS.
+This is defense-in-depth at the code-structure level: the primary mechanism (the `WHERE`-clause predicate) and the backstop (the type system + repository surface) are the same mechanism, enforced by the type checker and linted in CI.
 
-> **Note:** Build a migration lint that fails CI if a project-scoped table is added without an RLS policy on `zitadel.current_project_id`.
+> **Note:** Build a lint that fails CI if a project-scoped table is added without a matching repository function that takes a `ScopeContext`, or if raw query access to the table is exported. This is the portable equivalent of what Postgres RLS would give on a single-engine deployment.
+
+> **Why not database-level RLS?** Postgres RLS is a powerful per-row policy engine bound to session variables. Spanner and other targets we may deploy on do not have an equivalent. Relying on RLS would fork the enforcement story by engine. The scope-bound repository pattern enforces the same invariant uniformly regardless of the underlying store.
 
 ## Action verbs — LOCKED (slash)
 
