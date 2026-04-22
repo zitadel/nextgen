@@ -1,5 +1,5 @@
 {
-  "$schema": "./node_modules/nx/schemas/nx-schema.json",
+  "$schema": "./node_modules/nx/dist/schemas/nx-schema.json",
   "namedInputs": {
     "default": ["{projectRoot}/**/*", "sharedGlobals"],
     "production": [
@@ -19,61 +19,48 @@
     {
       "plugin": "@nx/js/typescript",
       "options": {
-        "typecheck": {
-          "targetName": "typecheck"
-        },
-        "build": {
-          "targetName": "build",
-          "configName": "tsconfig.lib.json",
-          "buildDepsName": "build-deps",
-          "watchDepsName": "watch-deps"
-        }
+        "compiler": "tsgo"
       }
     },
     {
       "plugin": "@nx/vite/plugin",
       "options": {
-        "buildTargetName": "build",
-        "serveTargetName": "serve",
-        "devTargetName": "dev",
-        "previewTargetName": "preview",
-        "serveStaticTargetName": "serve-static",
-        "typecheckTargetName": "typecheck",
-        "buildDepsTargetName": "build-deps",
-        "watchDepsTargetName": "watch-deps"
+        "typecheckTargetName": "typecheck-vite"
       }
     },
     {
-      "plugin": "@nx/playwright/plugin",
-      "options": {
-        "targetName": "e2e",
-        "ciTargetName": "e2e-ci"
-      }
+      "plugin": "@nx/playwright/plugin"
     },
     {
-      "plugin": "@nx/vitest",
-      "options": {
-        "testTargetName": "test"
-      }
+      "plugin": "@nx/vitest"
     }
   ],
   "targetDefaults": {
     "test": {
       "dependsOn": ["^build"]
     },
-    "@nx/js:tsc": {
-      "cache": true,
-      "dependsOn": ["^build"],
-      "inputs": ["production", "^production"]
-    },
     "typecheck": {
-      "cache": false,
+      "outputs": [
+        "{projectRoot}/dist/**/*.d.ts",
+        "{projectRoot}/dist/**/*.d.ts.map",
+        "{projectRoot}/dist/tsconfig.*.tsbuildinfo",
+        "{projectRoot}/out-tsc/vitest/**/*.d.ts",
+        "{projectRoot}/out-tsc/vitest/**/*.d.ts.map",
+        "{projectRoot}/out-tsc/vitest/tsconfig.*.tsbuildinfo"
+      ]
+    },
+    "typecheck-vite": {
       "options": {
-        "command": "tsgo --build --emitDeclarationOnly"
+        "command": "echo 'use nx target typecheck instead' >&2 && exit 1"
       }
     },
     "build": {
-      "cache": false
+      "outputs": [
+        "{projectRoot}/dist/**/*.html",
+        "{projectRoot}/dist/**/*.css",
+        "{projectRoot}/dist/**/*.mjs",
+        "{projectRoot}/dist/**/*.js"
+      ]
     }
   },
   "nxCloudId": "69e8763623c9710313345f8a",

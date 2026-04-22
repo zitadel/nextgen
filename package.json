@@ -6,7 +6,6 @@
   "scripts": {},
   "devDependencies": {
     "@nx/devkit": "catalog:",
-    "@nx/esbuild": "catalog:",
     "@nx/js": "catalog:",
     "@nx/playwright": "catalog:",
     "@nx/vite": "catalog:",
