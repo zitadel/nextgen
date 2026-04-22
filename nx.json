@@ -37,7 +37,7 @@
   ],
   "targetDefaults": {
     "test": {
-      "dependsOn": ["^build"]
+      "dependsOn": ["^build", "^typecheck"]
     },
     "typecheck": {
       "outputs": [
@@ -55,6 +55,7 @@
       }
     },
     "build": {
+      "dependsOn": ["^build", "^typecheck"],
       "outputs": [
         "{projectRoot}/dist/**/*.html",
         "{projectRoot}/dist/**/*.css",
