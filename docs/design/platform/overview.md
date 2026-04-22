@@ -85,16 +85,16 @@ The design separates three dimensions that product categories often collapse. Ke
 |---|---|---|
 | **Lifecycle** | Unclaimed, Claimed | Who is accountable for this project. Binary. Traversed exactly once. |
 | **Tier** | Free, Pro, Enterprise | What entitlements the claimed project has. Applies only post-claim. Moves up and down with needs and payment state. |
-| **Environment** | Local, Preview, Production | Deployment context for a running copy of the developer's app. |
+| **Environment** | Development, Preview, Production | Deployment context for a running copy of the developer's app. |
 
 Combinations that matter:
 
 | Combination | Supported? | Notes |
 |---|---|---|
-| Unclaimed × Local | Yes | Default first-run state. `.zitadel/secret` written locally. Dev inbox only. UI and OIDC routes run on `localhost:3000`. |
+| Unclaimed × Development | Yes | Default first-run state. `.zitadel/secret` written locally. Dev inbox only. UI and OIDC routes run on `localhost:3000`. |
 | Unclaimed × Preview | Yes, via preview secret | Preview secret is origin-scoped to the patterns declared at project creation. No outbound delivery. |
 | Unclaimed × Production | No | Production deploys force claim. First attempt blocks with a clear banner. |
-| Claimed × Free × Local | Yes | Typical dev loop post-claim. |
+| Claimed × Free × Development | Yes | Typical dev loop post-claim. |
 | Claimed × Free × Preview | Yes | Preview hibernation applies after 14 days idle (deferred spec). |
 | Claimed × Free × Production | Yes | UI and OIDC on the customer's own origin, BYO email, fair-use operational limits. Explicitly viable — the product does not force Pro at production. |
 | Claimed × Pro / Enterprise × any | Yes | Pro unlocks managed delivery, SSO/SCIM/SAML, and related operational-cost capabilities. Enterprise adds contractual commitments. |
@@ -102,7 +102,7 @@ Combinations that matter:
 The invariants:
 
 - **Zitadel is a backend API.** The customer's app serves every user-visible surface on its own origin. Always.
-- **Declared issuers are the security boundary.** Every API request's `Origin` must match a declared issuer for the active environment. Same allowlist is used for token `iss` claims and magic-link hostname rendering.
+- **Declared issuers are the browser/runtime security boundary.** Browser and origin-bound runtime API requests must present an `Origin` that matches a declared issuer for the active environment. The same allowlist is used for token `iss` claims and magic-link hostname rendering.
 - **Unclaimed projects cannot send real email or SMS**, regardless of environment or (hypothetical) tier. Dev inbox only.
 - **Previews work without claim**, via the preview secret minted at project creation.
 - **Users are free across all tiers.** Identity count is never the monetization boundary.

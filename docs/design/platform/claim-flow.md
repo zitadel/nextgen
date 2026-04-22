@@ -47,25 +47,25 @@ sequenceDiagram
 
     Dev->>CLI: npx zitadel claim
     CLI->>Secret: read project_id + current sk_proj_
-    CLI->>Srv: POST /projects/{id}/claim/init<br>(Bearer: current sk_proj_)
+    CLI->>Srv: POST /projects/{projectId}/claim/init<br>(Bearer: current sk_proj_)
     Srv-->>CLI: { claim_url, challenge_id, expires_at }
     CLI->>Browser: open claim_url
 
     loop until completed or challenge expires
-      CLI->>Srv: GET /claim/status?challenge_id=...<br>(Bearer: current sk_proj_)
+      CLI->>Srv: GET /projects/{projectId}/claim/status?challenge_id=...<br>(Bearer: current sk_proj_)
       Srv-->>CLI: { status: "pending" }
     end
 
-    Browser->>Srv: GET /claim/{challenge_id}
+    Browser->>Srv: GET claim_url
     Srv-->>Browser: claim page (GitHub / Google / Email)
     Browser->>IdP: OAuth / magic link
     IdP-->>Browser: verified identity assertion
-    Browser->>Srv: POST /claim/{challenge_id}/complete<br>(verified identity, team_choice)
+    Browser->>Srv: POST /projects/{projectId}/claim/complete<br>({ challenge_id, verified_identity, team_choice })
 
     Srv->>Srv: atomic transaction:<br>1. resolve/create team<br>2. create team_membership<br>3. rotate sk_proj_ project secret<br>4. stash rotated secret<br>   keyed by challenge_id<br>5. mark challenge completed
     Srv-->>Browser: success page → redirect to dashboard
 
-    CLI->>Srv: GET /claim/status?challenge_id=...<br>(Bearer: current sk_proj_)
+    CLI->>Srv: GET /projects/{projectId}/claim/status?challenge_id=...<br>(Bearer: current sk_proj_)
     Srv-->>CLI: { status: "completed", new_project_secret,<br>team_id, claimed_at, dashboard_url }
     Srv->>Srv: erase stashed secret<br>(one-shot retrieval)
     CLI->>Secret: rewrite .zitadel/secret atomically
@@ -74,7 +74,7 @@ sequenceDiagram
 
 **Why the CLI polls instead of the browser handing the secret back.** The rotated project secret is a production-grade bearer — we do not want it traversing the browser (where a hostile script on the claim page, a malicious browser extension, or an accidentally-logged response body could exfiltrate it). The CLI already holds the pre-claim `sk_proj_`, which is also the proof-of-possession the server uses to authorize retrieval of the rotated secret: only a poller presenting the exact bearer that initiated the challenge gets the rotated value, and only once. This is the OAuth 2.0 Device Authorization Grant shape (RFC 8628), adapted to a CLI that already has a secret.
 
-The pre-claim `sk_proj_` stays valid until the atomic transaction commits; the server erases the stashed rotated value after a single successful retrieval. If the CLI crashes between "transaction committed" and "wrote `.zitadel/secret`," recovery is `npx zitadel secret restore` (post-claim), which re-authenticates the human and refreshes the local file. See [Recovery](#recovery).
+The pre-claim `sk_proj_` stays valid until the atomic transaction commits; the server erases the stashed rotated value after a single successful retrieval from `GET /projects/{projectId}/claim/status?challenge_id=...`. If the CLI crashes between "transaction committed" and "wrote `.zitadel/secret`," recovery is `npx zitadel secret restore` (post-claim), which re-authenticates the human and refreshes the local file. See [Recovery](#recovery).
 
 ## The atomic transaction
 
@@ -83,8 +83,8 @@ All of the following happen in a single database transaction at the server:
 1. **Resolve or create team.** Match the verified email's domain against existing teams (see [Team resolution](#team-resolution)). If a match is found and the human confirms, the project is attached to the existing team. If the human chooses "create new" or the domain is a public-email provider, a new team is created with the human as first owner.
 2. **Create team_membership.** The authenticated human becomes a member of the resolved team with owner role.
 3. **Rotate the project secret.** The pre-claim `sk_proj_…` secret is invalidated; a new `sk_proj_…` bound to the claimed project + team is issued. The origin-scoped secret is untouched.
-4. **Stash the rotated secret** server-side, keyed by `challenge_id` and bound to the hash of the pre-claim secret that initiated the challenge. The CLI retrieves it once via `/claim/status`; the stashed value is erased on retrieval or at challenge expiry.
-5. **Mark challenge completed.** The `challenge_id` from `/claim/init` transitions to `completed`; subsequent completion attempts return 410.
+4. **Stash the rotated secret** server-side, keyed by `challenge_id` and bound to the hash of the pre-claim secret that initiated the challenge. The CLI retrieves it once via `GET /projects/{projectId}/claim/status?challenge_id=...`; the stashed value is erased on retrieval or at challenge expiry.
+5. **Mark challenge completed.** The `challenge_id` from `POST /projects/{projectId}/claim/init` transitions to `completed`; subsequent completion attempts return 410.
 
 If any step fails, the entire transaction rolls back. The project stays unclaimed. The developer retries.
 
@@ -148,7 +148,7 @@ Post-hoc consolidation — transferring a project from one team to another — i
 
 ### Duplicate claim attempt
 
-If the project is already claimed when `POST /projects/{id}/claim/init` is called, the server returns HTTP 409 with the existing dashboard URL and team name in the response body:
+If the project is already claimed when `POST /projects/{projectId}/claim/init` is called, the server returns HTTP 409 with the existing dashboard URL and team name in the response body:
 
 ```json
 {
@@ -234,7 +234,7 @@ These let agents perform preview deploys, E2E test runs, and similar automation 
 
 - [Project Secret](secret.md) — what the project secret is and how it rotates at claim
 - [Configuration Surface](configuration-surface.md) — uploaded configs are preserved across claim
-- [Claim API](api/claim-api.yaml) — HTTP surface for `/claim/init` and `/claim/complete`
+- [Claim API](api/claim-api.yaml) — HTTP surface for `/projects/{projectId}/claim/*`
 - [Flow Engine — Storage](../flowengine/flow-engine-storage.md) — session storage that must survive reparenting
 - [Session API](../flowengine/session-api.md) — session tokens that must remain valid
 - [`../api/credentials.md`](../api/credentials.md) — canonical credential taxonomy

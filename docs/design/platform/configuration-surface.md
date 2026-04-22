@@ -9,7 +9,7 @@ This document specifies the file format, directory layout, versioning mechanism,
 
 ## Zitadel does not manage domains as infrastructure
 
-In the MVP, Zitadel does not mint subdomains, provision TLS certificates, or configure DNS. What Zitadel *does* is **know about the origins a project is allowed to operate under** — as a security boundary (Origin validation on every API request), as token issuer context (the `iss` claim rendered in issued tokens), and as email-rendering context (the hostname that appears in magic-link URLs).
+In the MVP, Zitadel does not mint subdomains, provision TLS certificates, or configure DNS. What Zitadel *does* is **know about the origins a project is allowed to operate under** — as a security boundary (Origin validation on browser and origin-bound runtime requests), as token issuer context (the `iss` claim rendered in issued tokens), and as email-rendering context (the hostname that appears in magic-link URLs).
 
 Those declarations live in `environments.*.issuer` and are enforced at runtime. The customer's app serves every user-visible surface on its own origin. When a future tier adds SPA support or Zitadel-hosted login, infrastructure-level domain management will come with it — scoped to that tier, not retroactively bolted on.
 
@@ -57,7 +57,7 @@ A minimal example:
     "register": ".zitadel/flows/register.json"
   },
   "environments": {
-    "local":      { "issuer": "http://localhost:3000" },
+    "development": { "issuer": "http://localhost:3000" },
     "production": { "issuer": "https://acme.com" }
   }
 }
@@ -112,7 +112,7 @@ A comprehensive example showing every top-level field:
   },
 
   "environments": {
-    "local":      { "issuer": "http://localhost:3000" },
+    "development": { "issuer": "http://localhost:3000" },
     "preview":    {
       "issuer_pattern": "https://*.vercel.app",
       "branding": { "theme": ".zitadel/branding/theme.preview.json" }
@@ -314,7 +314,7 @@ Every environment carries an `issuer` (or `issuer_pattern`) — the customer-own
 
 ```json
 "environments": {
-  "local":      { "issuer": "http://localhost:3000" },
+  "development": { "issuer": "http://localhost:3000" },
   "preview":    { "issuer_pattern": "https://*.vercel.app" },
   "production": { "issuer": ["https://acme.com", "https://app.acme.com"] }
 }
@@ -327,7 +327,7 @@ Each environment may declare:
 
 Declared issuers serve three purposes simultaneously:
 
-1. **Security allowlist.** The server rejects any API request whose `Origin` header does not match the declared issuer list for the active environment. The match must be exact (or match the pattern). Bearer-secret compromise + an unknown origin is rejected at the edge.
+1. **Security allowlist.** The server rejects any browser or origin-scoped API request whose `Origin` header does not match the declared issuer list for the active environment. The match must be exact (or match the pattern). Bearer-secret compromise + an unknown origin is rejected at the edge.
 2. **Token issuer context.** The `iss` claim in OIDC tokens is the matched issuer for the request. Third-party OIDC clients (Grafana, etc.) pin to this value.
 3. **Email rendering context.** Magic-link URLs in outgoing emails are rendered against the matched issuer. If the user started their flow at `https://acme.com`, the magic link in their email points at `https://acme.com` — not at any other declared origin.
 
@@ -335,7 +335,7 @@ Declared issuers serve three purposes simultaneously:
 
 | Platform | Detection signal |
 |---|---|
-| Local | No `VERCEL_ENV`, `NETLIFY`, `RAILWAY_ENVIRONMENT`, etc.; `NODE_ENV != 'production'` |
+| Development | No `VERCEL_ENV`, `NETLIFY`, `RAILWAY_ENVIRONMENT`, etc.; `NODE_ENV != 'production'` |
 | Preview | `VERCEL_ENV == 'preview'`, `NETLIFY_CONTEXT == 'deploy-preview'`, Railway non-production environments, etc. |
 | Production | `VERCEL_ENV == 'production'`, `NETLIFY_CONTEXT == 'production'`, `NODE_ENV == 'production'` with no preview signals |
 
@@ -343,7 +343,7 @@ Declared issuers serve three purposes simultaneously:
 
 | Environment | Resolution |
 |---|---|
-| `local` | Auto-derived from the dev-server origin (`http://localhost:3000` and similar). Explicit declaration overrides. |
+| `development` | Auto-derived from the dev-server origin (`http://localhost:3000` and similar). Explicit declaration overrides. |
 | `preview` | Typically declared as `issuer_pattern` because preview URLs are dynamic. The CLI infers a default pattern from detected deploy tooling. |
 | `production` | **Must be declared explicitly.** The `npx zitadel push` linter rejects production configs without an explicit `issuer`. Third-party integrations pin to the production issuer; getting it wrong silently breaks downstream consumers. |
 

@@ -109,10 +109,11 @@ paths:
       description: |
         Initiates a claim for the specified project. Returns a URL the CLI
         opens in the browser and a short-lived challenge ID. The CLI then
-        polls `GET /claim/status` (authenticated with its existing pre-claim
-        `sk_proj_` secret) until the browser-side flow completes; on success
-        the status endpoint returns the rotated project secret. The rotated
-        secret never touches the browser.
+        polls `GET /projects/{projectId}/claim/status?challenge_id=...`
+        (authenticated with its existing pre-claim `sk_proj_` secret) until
+        the browser-side flow completes; on success the status endpoint
+        returns the rotated project secret. The rotated secret never touches
+        the browser.
       tags: [Claim]
       security:
         - secretAuth: []
@@ -158,7 +159,8 @@ paths:
 
         **This endpoint never returns the rotated project secret to the
         browser.** The CLI retrieves the rotated secret by polling
-        `/claim/status` with its existing `sk_proj_` bearer, which is the
+        `GET /projects/{projectId}/claim/status` with its existing
+        `sk_proj_` bearer plus the `challenge_id`, which is the
         proof-of-possession that authorizes the retrieval.
       tags: [Claim]
       requestBody:
@@ -179,7 +181,8 @@ paths:
         "410":
           description: |
             Challenge expired or already completed. The claim did not
-            execute. Client should call `/claim/init` again.
+            execute. Client should call `/projects/{projectId}/claim/init`
+            again.
 
   /projects/{projectId}/claim/status:
     parameters:
@@ -188,7 +191,8 @@ paths:
       operationId: getClaimStatus
       summary: Poll the status of a claim challenge (CLI-side)
       description: |
-        Called by the CLI in a polling loop after `/claim/init`. Returns
+        Called by the CLI in a polling loop after
+        `/projects/{projectId}/claim/init`. Returns
         `pending` while the browser-side flow has not completed, and
         `completed` on the first poll after the atomic transaction — that
         response carries the rotated project secret, team id,
@@ -205,10 +209,10 @@ paths:
         same `challenge_id` return `410 Gone`. The CLI must persist the
         secret atomically on first receipt.
 
-        **Expiry.** Challenges older than `expires_at` from `/claim/init`
-        return `410 Gone`. The pre-claim `sk_proj_` remains valid until the
-        atomic transaction commits; if the challenge expires before
-        completion, nothing has rotated.
+        **Expiry.** Challenges older than `expires_at` from
+        `/projects/{projectId}/claim/init` return `410 Gone`. The pre-claim
+        `sk_proj_` remains valid until the atomic transaction commits; if
+        the challenge expires before completion, nothing has rotated.
       tags: [Claim]
       security:
         - secretAuth: []
@@ -216,7 +220,7 @@ paths:
         - name: challenge_id
           in: query
           required: true
-          description: Challenge identifier returned by `/claim/init`.
+          description: Challenge identifier returned by `/projects/{projectId}/claim/init`.
           schema:
             type: string
       responses:
@@ -259,7 +263,8 @@ paths:
         create-new-team UX.
 
         TODO: decide whether this endpoint requires authentication (probably
-        yes — the `challenge_id` or a short-lived token from `/claim/init`),
+        yes — the `challenge_id` or a short-lived token from
+        `/projects/{projectId}/claim/init`),
         to prevent it from being used as a domain-enumeration oracle.
       tags: [Teams]
       parameters:
@@ -410,7 +415,7 @@ components:
             (`{ "pattern": "https://*.vercel.app" }`).
           additionalProperties: true
           example:
-            local: "http://localhost:3000"
+            development: "http://localhost:3000"
             preview:
               pattern: "https://*.vercel.app"
             production: ["https://acme.com", "https://app.acme.com"]
@@ -500,8 +505,9 @@ components:
       required: [project_id, team_id, claimed_at]
       description: |
         Browser-side response. Intentionally does not carry the rotated
-        project secret — the CLI retrieves that from `/claim/status` using
-        its existing bearer. The browser just renders success and
+        project secret — the CLI retrieves that from
+        `GET /projects/{projectId}/claim/status` using its existing bearer
+        plus the `challenge_id`. The browser just renders success and
         redirects to the dashboard.
       properties:
         project_id:

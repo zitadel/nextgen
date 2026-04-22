@@ -77,7 +77,7 @@ graph TD
 | What origins may this project be authenticated from? | **Declared Issuers** | `environments.*.issuer` — allowlist for Origin validation; same value rendered into tokens and magic-link emails. |
 | What are the resources of the system? | **API / MCP** | Users, sessions, tokens, grants, audit — never in config. |
 | What turns an anonymous project into an owned one? | **Claim** | Single atomic transaction; human-authenticated; agents cannot claim. |
-| Which environment (local / preview / production) is the SDK running in? | **SDK runtime detection** | Chooses the right `environments` overrides from `zitadel.json`. |
+| Which environment (development / preview / production) is the SDK running in? | **SDK runtime detection** | Chooses the right `environments` overrides from `zitadel.json`. |
 | How does a preview deploy work before claim? | **Preview Secret** | Minted at project creation, uploaded to the deploy platform's env store by the setup CLI. Origin-scoped. |
 | What happens if the dashboard edits something the repo also defines? | **Silent repo-wins** | The next `npx zitadel push` overwrites dashboard state. Same model as Vercel source-control-wins. |
 
@@ -91,7 +91,7 @@ graph TD
 
 4. **Claim is the accountability event.** Agents build, humans claim. The claim endpoint requires a human-authenticable method (GitHub, Google, email magic link). An agent cannot claim on behalf of a user, because attribution is the entire point.
 
-5. **Declared issuers are the security boundary.** Every API request's `Origin` is validated against the declared-issuer list for the active environment. The same list is the token `iss` claim and the magic-link hostname. Zitadel never binds a project to a URL the customer does not own.
+5. **Declared issuers are the browser/runtime security boundary.** Browser and origin-bound runtime API requests validate `Origin` against the declared-issuer list for the active environment. The same list is the token `iss` claim and the magic-link hostname. Zitadel never binds a project to a URL the customer does not own.
 
 6. **Zitadel is a backend API. Your app serves every user-visible surface.** The auth web component renders in the customer's app. `/authorize`, `/token`, `/userinfo`, `/.well-known/*` are scaffolded as proxy routes on the customer's own origin (on demand, when an OIDC client or IDP is first added). This is unconditional in the MVP.
 

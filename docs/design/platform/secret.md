@@ -68,8 +68,10 @@ The origin-scoped secret's origin patterns are enforced server-side on every req
 Every SDK request presents the appropriate secret as a bearer token. The server looks up the secret, checks:
 
 1. **Format and existence** — is this a recognized `sk_proj_…` token still on record?
-2. **Origin / Host** — does the incoming request's `Origin` header (or `Host`) match the allowed origins for the secret? For the full project secret, the allowed origins are the declared issuer list for the current environment in the customer's `zitadel.json`. For the origin-scoped variant, the allowed origins are the patterns captured at mint time.
+2. **Origin / Host (origin-bound requests)** — for the origin-scoped variant, does the incoming request's `Origin` header (or `Host`, where the runtime cannot send `Origin`) match the patterns captured at mint time? Browser/runtime requests authenticated with the full project secret may also be checked against the declared issuer list for the active environment.
 3. **Environment scope** — origin-scoped secrets are implicitly scoped to non-production; they cannot authenticate production-origin requests.
+
+CLI and other direct platform calls authenticated with the full project secret are not expected to present a customer origin; they remain valid without that check.
 
 Mismatches produce HTTP 403 with a structured error and are logged.
 
@@ -79,7 +81,7 @@ Revocation is through rotation: `npx zitadel secret rotate` (post-claim only) is
 
 | Action | Project secret (`sk_proj_…`, pre-claim) | Origin-scoped secret (`sk_proj_…`) | Claimed credential (`sk_proj_…`, post-claim) |
 |---|---|---|---|
-| Read the project's own configuration | Yes | Read-only | Yes |
+| Read the project's own configuration | Yes | No | Yes |
 | `npx zitadel push` — upload config | Yes | **No** | Yes |
 | Read users this project has created | Yes | Yes (scoped to preview environments) | Yes |
 | Register new users, authenticate sessions | Yes | Yes (scoped origins) | Yes |

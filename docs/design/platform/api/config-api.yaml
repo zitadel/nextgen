@@ -181,11 +181,11 @@ components:
       in: query
       required: true
       description: |
-        One of `local`, `preview`, `production`. Environment values are
+        One of `development`, `preview`, `production`. Environment values are
         fixed; projects cannot define custom environments in the MVP.
       schema:
         type: string
-        enum: [local, preview, production]
+        enum: [development, preview, production]
 
   securitySchemes:
     secretAuth:
@@ -195,7 +195,7 @@ components:
         Server-issued bearer secret — the `sk_proj_<base62>` project secret
         (pre-claim or claimed variant) on the developer's laptop. **Origin-scoped
         `sk_proj_` secrets (historically the "preview secret") cannot authenticate
-        endpoints in this API.** Configuration is developer intent and is pushed
+        endpoints in this API, including reads.** Configuration is developer intent and is pushed
         from the full project secret only; origin-scoped secrets authenticate runtime
         API calls (sessions, users, flows) from matching preview origins
         and are excluded from the config surface. See the canonical

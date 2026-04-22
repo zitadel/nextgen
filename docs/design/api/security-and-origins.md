@@ -4,7 +4,7 @@
 
 ## Origin validation is the security boundary
 
-Every API request's `Origin` header is validated against the project's `allowed_origins`. Browser clients do not hold secrets — an identifier in frontend code is an identifier, not a credential. The property we enforce is "this request comes from an origin the project has whitelisted", verified per request.
+Browser and origin-bound runtime requests present an `Origin` header that is validated against the project's `allowed_origins`. Browser clients do not hold secrets — an identifier in frontend code is an identifier, not a credential. The property we enforce is "this request comes from an origin the project has whitelisted", verified per request. CLI and other direct platform calls authenticated with the full project secret are not expected to present a customer origin.
 
 This means:
 

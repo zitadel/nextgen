@@ -8,7 +8,7 @@
 - **flow engine** — orchestrates the *UI* around those primitives: which step renders when, which screen to show next, when to branch on policy. Does not hold primitives. See [`../flowengine/flow-engine.md`](../flowengine/flow-engine.md).
 - **sessions** — durable post-auth container produced by a completed auth_attempt. Carries accumulated factors and assurance level. Detail in [`../flowengine/session-api.md`](../flowengine/session-api.md).
 
-An attempt and a flow reference the same `auth_attempt_id` (what the flow engine internally calls `session_id` for historical reasons). A flow decides *what screen to draw*; an auth_attempt decides *what primitive to offer and what proof to accept*.
+A flow runs on top of auth_attempt primitives without collapsing the resource model. A flow decides *what screen to draw*; an auth_attempt decides *what primitive to offer and what proof to accept*; a session is the durable post-auth outcome. The flow docs keep using `session_id` as the frontend handle for `/flows/*`, but that handle is not a blanket alias for `auth_attempt_id`.
 
 ## Pre-session concepts
 
