@@ -71,33 +71,33 @@ func runCreateUser() {
 		SchemaURL:      "./user.schema.json",
 		ID:             "test_99999999",
 		OrganizationID: "org_0001",
-		Attributes: []*incommingUserAttribute{
+		Attributes: []IncommingUserAttribute{
 			// Ignoring errors for brevity, in production code you should handle them properly
-			func() *incommingUserAttribute {
+			func() IncommingUserAttribute {
 				a, _ := NewIncommingUserAttribute("username", "johndoe", UserUniquenessGlobal)
 				return a
 			}(),
-			func() *incommingUserAttribute {
+			func() IncommingUserAttribute {
 				a, attrErr := NewIncommingUserAttribute("email", "johndoe@example.com", UserUniquenessGlobal)
 				err = errors.Join(err, attrErr)
 				return a
 			}(),
-			func() *incommingUserAttribute {
+			func() IncommingUserAttribute {
 				a, attrErr := NewIncommingUserAttribute("email_verified", false, UserUniquenessUnspecified)
 				err = errors.Join(err, attrErr)
 				return a
 			}(),
-			func() *incommingUserAttribute {
+			func() IncommingUserAttribute {
 				a, attrErr := NewIncommingUserAttribute("nickname", "Johnny", UserUniquenessOrganization)
 				err = errors.Join(err, attrErr)
 				return a
 			}(),
-			func() *incommingUserAttribute {
+			func() IncommingUserAttribute {
 				a, attrErr := NewIncommingUserAttribute("address.country", "USA", UserUniquenessUnspecified)
 				err = errors.Join(err, attrErr)
 				return a
 			}(),
-			func() *incommingUserAttribute {
+			func() IncommingUserAttribute {
 				a, attrErr := NewIncommingUserAttribute("address.city", "New York", UserUniquenessUnspecified)
 				err = errors.Join(err, attrErr)
 				return a

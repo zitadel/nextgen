@@ -79,7 +79,7 @@ type incommingUserAttribute struct {
 
 func (*incommingUserAttribute) isAttribute() {}
 
-func NewIncommingUserAttribute(key string, value any, unique UserUniqueness) (*incommingUserAttribute, error) {
+func NewIncommingUserAttribute(key string, value any, unique UserUniqueness) (IncommingUserAttribute, error) {
 	// Marshal the 'any' value into a JSON byte slice immediately
 	raw, err := json.Marshal(value)
 	if err != nil {
@@ -101,7 +101,7 @@ type IncommingUser struct {
 	SchemaURL      string
 	ID             string
 	OrganizationID string
-	Attributes     []*incommingUserAttribute
+	Attributes     []IncommingUserAttribute
 }
 
 func (u *IncommingUser) insertArgs(instanceID string) []any {
