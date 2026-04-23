@@ -384,9 +384,8 @@ components:
         branding:
           $ref: "#/components/schemas/Branding"
           description: |
-            Flow-level branding and layout configuration. Returned on every response
-            but does not change between steps. The orchestrator should cache this on
-            flow creation and reuse it for subsequent renders.
+            Resolved branding inherited from the app → organization → instance hierarchy.
+            Determined at flow creation based on audience context. Does not change between steps.
         redirect_uri:
           type: string
           format: uri
@@ -581,8 +580,9 @@ components:
     Branding:
       type: object
       description: |
-        Branding and layout configuration. The `liquid_template` contains the
-        LiquidJS template string that controls the entire visual structure.
+        Resolved branding configuration. Inherited from the app → organization → instance
+        hierarchy at flow creation time (most specific wins). This is a read-only projection —
+        branding is configured via the Organization/App Branding API, not the Flow API.
       properties:
         layout:
           type: string
@@ -620,12 +620,29 @@ components:
         action:
           type: string
           description: |
-            Which action to take. Maps to a transition name on the current step
-            (e.g., "submit", "register", "sso", "back", "skip").
-        data:
+            Which action to take. Either:
+            - A key from the step's `actions` dictionary (e.g., "submit", "register", "back")
+            - The reserved value "sso" — triggers SSO redirect (requires `sso_provider_id`)
+        fields:
           type: object
-          description: User input data. Shape depends on the step type.
+          description: |
+            User input values. Keys match field names from the step's `fields` dictionary.
           additionalProperties: true
+          example:
+            identifier: "alice@acme.com"
+        gate_proofs:
+          type: object
+          description: |
+            Solutions for security gates. Keys match gate names from the step's `gates` dictionary.
+            The orchestrator collects these from `<zl-captcha>` / `<zl-passkey>` component events.
+          additionalProperties:
+            type: string
+        sso_provider_id:
+          type: string
+          description: |
+            ID of the selected SSO provider (from `sso_providers[].id`).
+            Required when `action` is "sso".
+          example: google-1
 
     FlowEventRequest:
       type: object
