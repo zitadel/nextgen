@@ -7,7 +7,7 @@ require (
 	github.com/georgysavva/scany/v2 v2.1.4
 	github.com/go-faster/errors v0.7.1
 	github.com/go-faster/jx v1.2.0
-	github.com/jackc/pgx/v5 v5.9.1
+	github.com/jackc/pgx/v5 v5.9.2
 	github.com/jackc/tern/v2 v2.3.6
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/muhlemmer/gu v0.3.1
