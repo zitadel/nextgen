@@ -352,6 +352,12 @@ components:
         redirect_uri:
           type: string
           format: uri
+        liquid_template:
+          type: string
+          description: |
+            Optional LiquidJS template override. If provided, this template is used
+            instead of the one inherited from the app → organization → instance hierarchy.
+            Enables per-flow layout customization without changing the org-level branding.
         hint:
           $ref: "#/components/schemas/FlowHint"
 
@@ -734,9 +740,46 @@ components:
         type:
           type: string
           enum: [identifier, credential, form, verification, policy_check, consent, action, info, redirect, captcha, complete]
+        texts:
+          $ref: "#/components/schemas/StepTexts"
+          description: |
+            Localization keys for this step's title and description.
+            Resolved client-side via the `| t` LiquidJS filter.
+        fields:
+          type: object
+          description: |
+            Fields this step collects from the user. Keyed by field name.
+            Emitted as the `fields` capability dictionary at runtime.
+          additionalProperties:
+            $ref: "#/components/schemas/Field"
+          default: {}
+        actions:
+          type: object
+          description: |
+            Actions available to the user on this step. Keyed by action name.
+            Emitted as the `actions` capability dictionary at runtime.
+          additionalProperties:
+            $ref: "#/components/schemas/StepAction"
+          default: {}
+        gates:
+          type: object
+          description: |
+            Security gates required on this step. Keyed by gate type.
+            Emitted as the `gates` capability dictionary at runtime.
+          additionalProperties:
+            $ref: "#/components/schemas/Gate"
+          default: {}
+        sso_providers:
+          type: array
+          description: |
+            SSO providers available on this step. Resolved at runtime from the
+            organization's configured identity providers.
+          items:
+            $ref: "#/components/schemas/SSOProvider"
+          default: []
         config:
           type: object
-          description: Step-type-specific configuration
+          description: Step-type-specific configuration (e.g., credential type, verification method)
           additionalProperties: true
         transitions:
           type: object
