@@ -6,14 +6,17 @@ info:
     Session read model and anonymous session pre-creation.
 
     Sessions are assurance-aware: they accumulate verified factors and expose
-    the current assurance level (ACR) computed from those factors.
+    the current assurance levels computed from those factors.
+
+    Default profile examples use NIST-referenced identifiers (`urn:nist:aal:*`).
+    Deployments may add other profile packs and custom assurance schemas.
 
     **Sessions are never mutated directly by a client.** Factor proofs are
     submitted via the `auth_attempts` state machine:
       POST /auth_attempts
       POST /auth_attempts/{id}/challenges
       POST /auth_attempts/{id}/challenges/{cid}/verify
-      POST /auth_attempts/{id}/complete
+      POST /auth_attempts/{id}/handoff
       POST /session_handoffs/{id}/exchange  → returns session + session_token
 
     `POST /sessions` creates an anonymous session shell (no user, no factors)
@@ -158,7 +161,7 @@ components:
 
     SessionResponse:
       type: object
-      required: [session_id, session_token, state, factors, acr, amr]
+      required: [session_id, session_token, state, factors, assurance_levels]
       properties:
         session_id:
           type: string
@@ -186,28 +189,19 @@ components:
             user: { user_id: u_123, verified_at: "2026-04-17T10:00:00Z" }
             password: { verified_at: "2026-04-17T10:01:00Z" }
             otp: { verified_at: "2026-04-17T10:02:00Z" }
-        acr:
+        assurance_levels:
           type: array
           items:
             type: string
           description: |
-            All ACR levels the session's current factors satisfy, recomputed on
+            All assurance levels the session's current factors satisfy, recomputed on
             every auth_attempt completion. Empty for anonymous/building sessions
             with no auth factors. AAL levels are cumulative: a session satisfying
             AAL2 will always include AAL1 in this list.
 
-            When issuing an OIDC ID token, the IdP picks one value from this list
-            that satisfies the RP's acr_values request and places it in the `acr`
-            claim. The RP checks membership, not a single scalar comparison.
-          example: ["urn:zitadel:aal:1", "urn:zitadel:aal:2"]
-        amr:
-          type: array
-          items:
-            type: string
-          description: |
-            Authentication Methods References — list of method identifiers used
-            during authentication. Maps to the `amr` claim in OIDC ID tokens.
-          example: ["pwd", "otp", "mfa"]
+            OIDC adapters may map a value from this list to an ID token `acr`
+            claim when serving OIDC requests.
+          example: ["urn:nist:aal:1", "urn:nist:aal:2"]
         expires_at:
           type: string
           format: date-time

@@ -367,7 +367,7 @@ Multi-step registration spreads fields across multiple form steps. The flow engi
 }
 ```
 
-**`required_factors`** — evaluates what the session needs to reach the target ACR:
+**`required_factors`** — evaluates what the session needs to reach the target assurance level:
 
 ```json
 {
@@ -526,7 +526,7 @@ A session and a flow are different things with different lifetimes:
 | **Lifetime** | Hours to days | Seconds to minutes |
 | **Storage** | Postgres (durable) | Encrypted cookie (ephemeral) |
 | **One or many?** | One session can have many flows over time | Each flow operates on one session |
-| **What it knows** | user, factors, acr, amr | definition, step, history, collected data |
+| **What it knows** | user, factors, assurance_levels | definition, step, history, collected data |
 
 The session accumulates factors across flows. A login flow adds `user` + `password`. A step-up flow adds `totp`. A profiling flow doesn't add factors — it collects data. Each flow is independent, but they all contribute to the same session.
 

@@ -5,25 +5,25 @@
 >
 > The session-as-factor-accumulator model and ACR-based assurance are the intended direction. The specifics — JSON Schema for ACR level definitions, `x-freshness` semantics — are proposals, not decisions. The policy engine design (which consumes and evaluates ACR levels) is not yet written.
 
-Sessions are the durable, post-auth primitive. A session accumulates verified authentication factors and carries the set of ACR levels its current factors satisfy. Sessions are **read-only from the client's perspective** — factors only flow in through `auth_attempts`. The client reads the session state; it never pushes factor proofs directly to a session.
+Sessions are the durable, post-auth primitive. A session accumulates verified authentication factors and carries the set of assurance levels its current factors satisfy. Sessions are **read-only from the client's perspective** — factors only flow in through `auth_attempts`. The client reads the session state; it never pushes factor proofs directly to a session.
 
 ## Relation to `auth_attempts`
 
 A session is produced by a completed [auth_attempt](../api/authn-and-auth-flows.md). auth_attempts are the **ephemeral pre-auth state machine** — they expose the primitives (challenges, verify, handoff token minting) that drive a single authentication round. The session is the durable outcome: it survives the attempt and becomes the thing the customer's app holds on to.
 
 - **auth_attempt**: ephemeral, 15-min TTL, one handoff_token terminal. Accepts proofs, issues challenges, verifies credentials.
-- **session**: durable, holds factors + ACR list, readable and revocable by the client. **Never mutated directly.** Factor mutations happen exclusively through `auth_attempts`.
+- **session**: durable, holds factors + assurance level list, readable and revocable by the client. **Never mutated directly.** Factor mutations happen exclusively through `auth_attempts`.
 
 ```
 POST /auth_attempts                       →  drive verification (challenges, proofs)
 POST /auth_attempts/{id}/handoff          →  mint handoff_token
 POST /session_handoffs/{id}/exchange      →  receive { session, session_token }
 
-GET    /sessions/{id}                     →  read state, factors, acr[], amr
+GET    /sessions/{id}                     →  read state, factors, assurance_levels[]
 DELETE /sessions/{id}                     →  revoke (logout)
 ```
 
-Step-up re-authentication creates a **new auth_attempt against the same `session_id`**, adds factors, and expands the satisfied ACR list. The session accumulates.
+Step-up re-authentication creates a **new auth_attempt against the same `session_id`**, adds factors, and expands the satisfied assurance level list. The session accumulates.
 
 ## Anonymous Sessions
 
@@ -46,8 +46,7 @@ POST /sessions
   "session_token": "stok_initial_…",
   "state": "building",
   "factors": {},
-  "acr": [],
-  "amr": []
+  "assurance_levels": []
 }
 ```
 
@@ -81,17 +80,17 @@ The current v2 API (`CreateSession` / `SetSession` / `GetSession` / `DeleteSessi
 | **Who decides what's needed** | The caller. No guidance from the server. | The policy engine. Evaluates factors against ACR level definitions. |
 | **How the client interacts** | Client pushes "checks" — telling the server _what_ to verify. Anti-pattern: the client owns verification logic. | Client drives `auth_attempts`. Session is a read model. |
 | **Session lifecycle** | Implicit — exists or doesn't. | Explicit: `building → active → expired \| revoked`. |
-| **Assurance** | Not modeled. External logic decides "done." | `acr[]` — all ACR levels the current factors satisfy. Whether any of them is enough depends on the request context. |
-| **Step-up / re-auth** | Not modeled. Requires new session. | New `auth_attempt` against same session — adds factors, expands the satisfied ACR list. |
+| **Assurance** | Not modeled. External logic decides "done." | `assurance_levels[]` — all levels the current factors satisfy. Whether any of them is enough depends on the request context. |
+| **Step-up / re-auth** | Not modeled. Requires new session. | New `auth_attempt` against same session — adds factors, expands the satisfied assurance level list. |
 | **Protocol** | gRPC + REST gateway | REST/JSON native |
 | **Factor types** | user, password, web_auth_n, idp_intent, totp, otp_sms, otp_email, recovery_code | Same set. Submitted as _proofs_ via `auth_attempts`, not as _checks_ on the session. |
 
 **Why this matters:**
 - **No "checks" anti-pattern.** Proofs (a password value, an OTP code, a passkey assertion) go to `auth_attempts`. The session reflects the verified outcome.
-- **No binary "sufficient".** The session reports all ACR levels its factors satisfy; the consumer decides if its required level is in that list. A session satisfying AAL2 also satisfies AAL1.
-- Step-up auth works naturally: the RP requests a higher ACR → a new `auth_attempt` adds factors → the session's `acr[]` expands.
+- **No binary "sufficient".** The session reports all assurance levels its factors satisfy; the consumer decides if its required level is in that list. A session satisfying AAL2 also satisfies AAL1.
+- Step-up auth works naturally: the RP requests a higher ACR → a new `auth_attempt` adds factors → the session's `assurance_levels[]` expands.
 
-## Assurance Levels and ACR
+## Assurance Levels (and OIDC ACR Mapping)
 
 The session model is built around **Authentication Context Class Reference (ACR)** from OpenID Connect and **Authenticator Assurance Levels (AAL)** from NIST SP 800-63.
 
@@ -99,26 +98,36 @@ The session model is built around **Authentication Context Class Reference (ACR)
 
 | Concept | What it means |
 |---|---|
-| **ACR** (Authentication Context Class Reference) | Assurance level identifier. The session exposes `acr[]` (all satisfied levels). OIDC ID tokens carry a single `acr` claim chosen from that list for the specific request. |
-| **AMR** (Authentication Methods References) | List of method identifiers used during authentication (e.g., `["pwd", "otp", "mfa"]`). Appears in OIDC ID tokens as the `amr` claim. |
+| **ACR** (Authentication Context Class Reference) | OIDC claim name for assurance context. Core sessions expose `assurance_levels[]`; the OIDC adapter maps one requested/eligible value to the token `acr` claim. |
+| **AMR** (Authentication Methods References) | OIDC claim describing methods used. Not stored on the core session model; projected by protocol adapters when needed. |
 | **AAL** (Authenticator Assurance Level) | NIST's classification: AAL1 (single factor), AAL2 (two factors), AAL3 (hardware + phishing-resistant). |
 
 ### How It Works
 
 1. The session **accumulates factors** — each with `verified_at` timestamp and authenticator properties. Factors are written by completing `auth_attempts`.
-2. The policy engine **defines ACR levels as JSON Schema** — each level specifies which factors are required, their combination logic, and freshness constraints.
-3. The session's `acr[]` is the **list of all levels whose schemas the current factors satisfy**. AAL levels are cumulative: a session satisfying AAL2 always includes AAL1 in its list.
+2. The policy engine **defines assurance levels as JSON Schema** — each level specifies which factors are required, their combination logic, and freshness constraints.
+3. The session's `assurance_levels[]` is the **list of all levels whose schemas the current factors satisfy**. AAL levels are cumulative: a session satisfying AAL2 always includes AAL1 in its list.
 4. Whether any of those levels is "enough" depends on the **request context** (`acr_values`, application policy, action sensitivity).
 
-### ACR Level Definitions as JSON Schema
+### Default Profiles and JSON Schema
 
-Each ACR level is defined by a JSON Schema that the session's `factors` object must satisfy. The schema can encode factor requirements, alternatives, and **freshness constraints**.
+Zitadel can ship **default assurance profile packs** as starting points. The first default pack is expected to be **NIST-referenced** (SP 800-63 AAL1/AAL2/AAL3), using neutral ACR identifiers such as `urn:nist:aal:1`, `urn:nist:aal:2`, and `urn:nist:aal:3` in examples.
+
+The defaults are not exclusive. Teams can:
+
+- adopt additional profile packs (for other standards bodies),
+- define country- or sector-specific assurance schemas in their own deployment,
+- contribute reusable schema packs back to the ecosystem.
+
+Each deployment decides which profile packs are enabled and which identifiers are accepted for `acr_values`.
+
+Each assurance level is defined by a JSON Schema that the session's `factors` object must satisfy. The schema can encode factor requirements, alternatives, and **freshness constraints**.
 
 **AAL1 — single factor, verified within 24h:**
 
 ```json
 {
-  "acr": "urn:zitadel:aal:1",
+  "acr": "urn:nist:aal:1",
   "schema": {
     "type": "object",
     "required": ["user"],
@@ -154,7 +163,7 @@ Each ACR level is defined by a JSON Schema that the session's `factors` object m
 
 ```json
 {
-  "acr": "urn:zitadel:aal:2",
+  "acr": "urn:nist:aal:2",
   "schema": {
     "type": "object",
     "required": ["user"],
@@ -206,7 +215,7 @@ Each ACR level is defined by a JSON Schema that the session's `factors` object m
 
 ```json
 {
-  "acr": "urn:zitadel:aal:3",
+  "acr": "urn:nist:aal:3",
   "schema": {
     "type": "object",
     "required": ["user", "passkey"],
@@ -232,7 +241,7 @@ Each ACR level is defined by a JSON Schema that the session's `factors` object m
 
 This means:
 - A factor can satisfy AAL2 right after verification but stop satisfying it after the freshness window expires.
-- The session's `acr[]` **shrinks over time** without the session itself expiring — AAL2 drops out while AAL1 remains.
+- The session's `assurance_levels[]` **shrinks over time** without the session itself expiring — AAL2 drops out while AAL1 remains.
 - Step-up re-authentication (a new `auth_attempt` against the same session) refreshes the factor's `verified_at`, restoring the higher level to the list.
 
 ### Factor Freshness in Practice
@@ -248,14 +257,14 @@ Current time: 2026-04-17T14:00:00Z (6h later)
 AAL2 schema requires: totp.verified_at within 4h
 TOTP verified 6h ago → FAILS freshness check
 
-Current acr[]: ["urn:zitadel:aal:1"]   (AAL2 dropped out; password still fresh within 24h)
+Current assurance_levels[]: ["urn:nist:aal:1"]   (AAL2 dropped out; password still fresh within 24h)
 ```
 
 The session is still valid. An RP requiring AAL1 finds it in the list and succeeds. An RP requiring AAL2 does not find it — the IdP triggers step-up: a new `auth_attempt` is created against this session, the user re-verifies TOTP, and AAL2 is restored to the list.
 
-### Custom ACR Levels
+### Custom and Regional Profiles
 
-Teams can define custom ACR values with their own schemas:
+Teams can define deployment-specific assurance values with their own schemas:
 
 ```json
 {
@@ -278,13 +287,13 @@ Teams can define custom ACR values with their own schemas:
 }
 ```
 
-Custom levels appear in `acr[]` alongside standard AAL levels when their schemas are satisfied.
+Custom or regional levels appear in `assurance_levels[]` alongside default NIST levels when their schemas are satisfied.
 
 ## Endpoints
 
 ```
 POST   /sessions                     Create anonymous session shell (pre-auth)
-GET    /sessions/{id}                Get session state, factors, acr[], amr
+GET    /sessions/{id}                Get session state, factors, assurance_levels[]
 DELETE /sessions/{id}                Revoke session (logout)
 GET    /sessions                     List sessions (admin / management)
 ```
@@ -322,9 +331,9 @@ See [auth_attempts state machine](../api/authn-and-auth-flows.md) for the full e
                                   │ authentication factor
                                   ▼
                   ┌──────────────────────────────────────┐
-                  │                                      │
-                  │  active                              │◄─── step-up expands acr[]
-                  │  acr[] may shrink as factors age     │
+                   │                                      │
+                   │  active                              │◄─── step-up expands assurance_levels[]
+                   │  assurance_levels[] may shrink as factors age │
                   │                                      │
                   └──────────┬───────────────────────────┘
                         ┌────┴────┐
@@ -334,7 +343,7 @@ See [auth_attempts state machine](../api/authn-and-auth-flows.md) for the full e
                   └─────────┘ └─────────┘
 ```
 
-A session transitions to `active` when it has at least one verified authentication factor (beyond just user identification). `active` does not mean "enough for all purposes" — the consumer checks whether its required ACR level appears in `acr[]`.
+A session transitions to `active` when it has at least one verified authentication factor (beyond just user identification). `active` does not mean "enough for all purposes" — the consumer checks whether its required assurance level appears in `assurance_levels[]`.
 
 ## `session_token` Lifecycle
 
@@ -352,49 +361,49 @@ The token is **not** rolled on `GET` reads — it is a stable credential until t
 
 ## Step-Up Authentication
 
-A user has an active session. Its `acr[]` contains only AAL1. An RP requests AAL2:
+A user has an active session. Its `assurance_levels[]` contains only AAL1. An RP requests AAL2:
 
 ```
-RP → /authorize?acr_values=urn:zitadel:aal:2
-IdP: GET /sessions/{id} → acr[] = ["urn:zitadel:aal:1"]
-IdP: "urn:zitadel:aal:2 not in list — trigger step-up"
+RP → /authorize?acr_values=urn:nist:aal:2
+IdP: GET /sessions/{id} → assurance_levels[] = ["urn:nist:aal:1"]
+IdP: "urn:nist:aal:2 not in list — trigger step-up"
 
 → POST /auth_attempts { challenge_nonce: "…", session_id: "sess_abc" }
 → POST /auth_attempts/{id}/challenges { method: "totp" }
 → POST /auth_attempts/{id}/challenges/{cid}/verify { totp: { code: "123456" } }
 → POST /auth_attempts/{id}/handoff
-  → session acr[] updated to ["urn:zitadel:aal:1", "urn:zitadel:aal:2"]
+  → session assurance_levels[] updated to ["urn:nist:aal:1", "urn:nist:aal:2"]
 
-IdP: GET /sessions/{id} → "urn:zitadel:aal:2" ∈ acr[] ✓
-IdP: issues ID token with acr: "urn:zitadel:aal:2"
+IdP: GET /sessions/{id} → "urn:nist:aal:2" ∈ assurance_levels[] ✓
+IdP adapter issues ID token with acr: "urn:nist:aal:2"
 ```
 
-The **same session** is used. No new session is created. Factors accumulate and `acr[]` grows.
+The **same session** is used. No new session is created. Factors accumulate and `assurance_levels[]` grows.
 
 ### Factor Freshness Triggers Step-Up
 
 ```
-RP → /authorize?acr_values=urn:zitadel:aal:2
+RP → /authorize?acr_values=urn:nist:aal:2
 IdP: GET /sessions/{id}
-  acr[] = ["urn:zitadel:aal:1"]          ← AAL2 not present (TOTP stale)
+  assurance_levels[] = ["urn:nist:aal:1"]          ← AAL2 not present (TOTP stale)
   factors.totp.verified_at = 5h ago       ← exceeds 4h freshness window
 
-IdP: "urn:zitadel:aal:2 not in list — trigger step-up"
+IdP: "urn:nist:aal:2 not in assurance_levels[] — trigger step-up"
 → new auth_attempt against same session_id
 → user re-verifies TOTP → totp.verified_at updated
-→ acr[] = ["urn:zitadel:aal:1", "urn:zitadel:aal:2"]
+→ assurance_levels[] = ["urn:nist:aal:1", "urn:nist:aal:2"]
 ```
 
 ## Context-Specific Evaluation
 
-The session exposes `acr[]` — all levels its current factors satisfy. Whether any of those levels is "enough" is determined by the **request context**:
+The session exposes `assurance_levels[]` — all levels its current factors satisfy. Whether any of those levels is "enough" is determined by the **request context**:
 
 | Context | Who decides | How |
 |---|---|---|
-| OIDC auth request | RP via `acr_values` or `claims` parameter | IdP checks if required value is in session `acr[]` |
+| OIDC auth request | RP via `acr_values` or `claims` parameter | OIDC adapter checks if required value is in session `assurance_levels[]` and maps to token `acr` |
 | Resource server (step-up) | RS via `WWW-Authenticate` header (RFC 9470) | Client re-authorizes with `acr_values` |
-| Flow engine | Policy engine per step | `policy_check` step checks if required level is in session `acr[]` |
-| Admin console action | Policy per action sensitivity | "Delete team" requires AAL3 ∈ acr[]; "view settings" requires AAL1 ∈ acr[] |
+| Flow engine | Policy engine per step | `policy_check` step checks if required level is in session `assurance_levels[]` |
+| Admin console action | Policy per action sensitivity | "Delete team" requires AAL3 ∈ assurance_levels[]; "view settings" requires AAL1 ∈ assurance_levels[] |
 
 The session never says "I am sufficient." It says "I satisfy these levels." The consumer decides if its required level is in the list.
 
@@ -422,8 +431,7 @@ CREATE TABLE sessions (
     state           TEXT        NOT NULL,       -- 'building', 'active', 'expired', 'revoked'
     user_id         TEXT,
     factors         JSONB       NOT NULL DEFAULT '{}', -- verified factor events with timestamps + properties
-    acr             TEXT[]      DEFAULT '{}',   -- all ACR levels currently satisfied (recomputed on auth_attempt completion)
-    amr             TEXT[]      DEFAULT '{}',   -- authentication methods used
+    assurance_levels TEXT[]     DEFAULT '{}',   -- all assurance levels currently satisfied (recomputed on auth_attempt completion)
     metadata        JSONB       NOT NULL DEFAULT '{}',
     user_agent      JSONB,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),

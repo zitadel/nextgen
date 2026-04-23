@@ -27,7 +27,7 @@
 | [Flow Engine — Step Response Shape](flow-engine-nodes.md) | In Review (frontend) | How steps are structured: grouped sections vs single array vs hybrid. |
 | [Flow Engine — Storage](flow-engine-storage.md) | In Review | Encrypted cookie model, session/flow separation, optimistic locking, DB I/O analysis. |
 | [Flow Engine — Developer Guide](flow-engine-guide.md) | In Review | Progressive walkthrough of building flows: steps, pivots, completion, sessions, error handling. |
-| [Session API](session-api.md) | Preliminary | Factor accumulation primitive. ACR/LoA model is directional, not final. |
+| [Session API](session-api.md) | Preliminary | Factor accumulation primitive. Assurance-level model is directional, not final. |
 | [User Schema Integration](user-schema.md) | Preliminary | How the flow engine and policy engine consume user schema annotations. |
 | [Bot Detection](bot-detection.md) | Preliminary | Composable captcha, fingerprinting, and risk evaluation. Depends on policy engine. |
 | **API specs** | | |
@@ -39,7 +39,7 @@
 The architecture is built on four concepts:
 
 1. **auth_attempts** — ephemeral state machine for driving authentication. Issues challenges, verifies proofs, completes into a session or OIDC code. See [authn-and-auth-flows.md](../api/authn-and-auth-flows.md).
-2. **Session API** — durable read model. Reflects accumulated factors and the current assurance level (ACR). Never mutated directly by a client — factors flow in through `auth_attempts`. Supports pre-auth anonymous shells via `POST /sessions`.
+2. **Session API** — durable read model. Reflects accumulated factors and current `assurance_levels[]`. Never mutated directly by a client — factors flow in through `auth_attempts`. Supports pre-auth anonymous shells via `POST /sessions`.
 3. **Flow Engine** — server-driven state machine producing BDUI. Used by web/frontend clients. Orchestrates UI on top of `auth_attempts` internally.
 4. **Policy Engine** — the sole decision maker. Evaluates session state + context and determines what's required. **Design TBD** — not covered in these documents.
 5. **User Schema** — JSON Schema-based user definitions that drive registration forms, field validation, and claim mapping.
@@ -57,11 +57,11 @@ POST /flows                         POST /auth_attempts
 POST /flows/{id}/submit             POST /auth_attempts/{id}/challenges
   → server advances state machine        + /challenges/{cid}/verify
   → renders next step                    → submit factor proofs
-  → manages registration, profiling      → server verifies, re-evaluates acr
+  → manages registration, profiling      → server verifies, re-evaluates assurance levels
   → handles SSO redirects
-  ...                                  Check acr against requested acr_values
+  ...                                  Check assurance levels against requested acr_values
 complete → redirect                      → build native UI, step-up if needed
-                                       acr meets request → exchange / handoff
+                                        assurance level meets request → exchange / handoff
 
 Flow orchestrates UI; primitives       Client orchestrates its own UI;
 below come from auth_attempts.         calls auth_attempts + Session API.
@@ -74,10 +74,10 @@ Both paths get the same policy enforcement — the policy engine evaluates sessi
 ```mermaid
 graph TD
     Schema["**User Schema**<br>fields, annotations,<br>auth methods"]
-    Policy["**Policy Engine**<br>acr level, need[]"]
+    Policy["**Policy Engine**<br>assurance level requirements"]
     Flow["**Flow Engine**<br>state machine, BDUI"]
     Attempts["**auth_attempts**<br>challenges, proofs,<br>complete, handoff"]
-    Session["**Session API**<br>factors, acr, amr, need[]<br>(read model)"]
+    Session["**Session API**<br>factors, assurance_levels<br>(read model)"]
 
     Schema -- "narrows available methods" --> Policy
     Schema -- "field metadata for rendering" --> Flow
@@ -91,9 +91,9 @@ graph TD
 | Which fields exist on a user? | **User Schema** | Field types, validation, annotations, auth method availability |
 | What does the login/registration page look like? | **Flow Definition** | Branding, step graph, which schema fields on which step |
 | Which fields to show during registration? | **Flow Definition** (`form` steps) | References schema fields by name; schema provides metadata |
-| What assurance level does this session have? | **Policy Engine** | Evaluates factors + freshness + authenticator properties → computes `acr` |
+| What assurance level does this session have? | **Policy Engine** | Evaluates factors + freshness + authenticator properties → computes `assurance_levels[]` |
 | What screen does the user see next? | **Flow Engine** | Combines policy decision + flow definition + schema → BDUI |
-| Is this session usable for token exchange? | **OIDC/SAML endpoint** | Compares session `acr` against requested `acr_values`; triggers step-up if insufficient |
+| Is this session usable for token exchange? | **OIDC/SAML endpoint** | Compares session `assurance_levels[]` against requested `acr_values`; triggers step-up if insufficient |
 | Is captcha/bot detection needed? | **Risk Evaluator → Policy Engine** | Composable signals (fingerprint, telemetry, rate limits) → risk score → policy decides |
 | Where is flow state stored? | **Encrypted cookie** | Client-held, server-stateless. Only factor changes touch the DB. |
 | Which flow definition to use? | **Flow resolution** | `purpose` + `audience` matching with specificity ranking |

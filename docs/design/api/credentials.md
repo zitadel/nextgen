@@ -118,7 +118,7 @@ For SSR embedding, the lit component completes auth in-browser and hands the cus
 The endpoint pair:
 
 ```http
-POST /auth_attempts/{id}/handoff            # mints { handoff_token, expires_at }
+POST /auth_attempts/{id}/handoff            # mints { handoff_token, exchange_url }
 POST /session_handoffs/{id}/exchange        # consumes handoff_token, returns { session, session_token }
 ```
 

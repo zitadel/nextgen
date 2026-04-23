@@ -118,7 +118,7 @@ When `behavior` is `continue`, the frontend calls `GET /flows/{session_id}` to g
 
 | Purpose | Completion condition |
 |---|---|
-| `login` / `reauth` | `policy_check` confirms session `acr` meets the target (from `acr_values` or app default) |
+| `login` / `reauth` | `policy_check` confirms session `assurance_levels[]` meets the target (from `acr_values` or app default) |
 | `register` | `action` step creates user + session; `policy_check` confirms |
 | `recovery` | `action` step resets credential |
 | `profiling` | `policy_check` confirms user has required fields |

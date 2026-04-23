@@ -18,7 +18,7 @@ A flow runs on top of auth_attempt primitives without collapsing the resource mo
 | **Factor** | A verified credential: passkey, password, OTP, recovery code, federated assertion. |
 | **Auth method** | The operation that acquires a factor: `password verify`, `passkey assert`, `otp enroll`, `federation redirect`. |
 | **Challenge** | A single-factor prompt issued inside an auth_attempt. |
-| **Session** | The post-auth container holding verified factors. Carries an assurance level list (acr[]). |
+| **Session** | The post-auth container holding verified factors. Carries an assurance level list (`assurance_levels[]`). |
 | **Step-up** | Adding factors to an existing session to raise assurance. |
 
 ## Bootstrap challenge
@@ -86,9 +86,9 @@ GET /authorize?client_id=…&redirect_uri=…&scope=openid&acr_values=…&state=
   └─ redirects browser to /login?attempt_id=…
 ```
 
-When `mint_handoff(attempt_id)` is called after successful authentication, the OIDC Adapter looks up the stored `auth_request` by `attempt_id`, validates the session's `acr[]` against the requested `acr_values`, and generates the OAuth `code` + redirect URL. The auth_attempt has no knowledge of any of this.
+When `mint_handoff(attempt_id)` is called after successful authentication, the OIDC Adapter looks up the stored `auth_request` by `attempt_id`, validates the session's `assurance_levels[]` against the requested `acr_values`, and generates the OAuth `code` + redirect URL. The auth_attempt has no knowledge of any of this.
 
-For step-up, the OIDC Adapter creates a new auth_attempt against the existing `session_id`. The `acr_values` target lives in the stored `auth_request` — the flow engine retrieves it via the `attempt_id → auth_request_id` link when deciding which factors to prompt for.
+For step-up, the OIDC Adapter creates a new auth_attempt against the existing `session_id`. The `acr_values` target lives in the stored `auth_request` — the flow engine retrieves it via the `attempt_id → auth_request_id` link when deciding which factors to prompt for. `acr_values` identifiers come from the deployment's enabled assurance profiles (NIST defaults and any additional/custom packs).
 
 ## SSR handoff
 
@@ -112,18 +112,18 @@ Once an auth_attempt completes (modern or OIDC), the result is a durable session
 
 ```http
 POST   /sessions                         # pre-allocate anonymous session (optional, pre-auth)
-GET    /sessions/{id}                    # read state, factors, acr[], amr
+GET    /sessions/{id}                    # read state, factors, assurance_levels[]
 DELETE /sessions/{id}                    # revoke (logout), requires session_token
 GET    /sessions                         # list (admin / management)
 ```
 
 `POST /sessions` is optional — it creates an anonymous shell (no user, no factors) for cases where a `session_id` must be pre-allocated before the user is known. Most clients skip this; the flow engine and direct `auth_attempts` callers create the session implicitly on first completion.
 
-Sessions carry `acr[]` — the list of all ACR levels the session's current factors satisfy — and `amr`. Detail in [`../flowengine/session-api.md`](../flowengine/session-api.md).
+Sessions carry `assurance_levels[]` — the list of all assurance levels the session's current factors satisfy. OIDC-specific `acr`/`amr` claims are projected by the OIDC adapter. Detail in [`../flowengine/session-api.md`](../flowengine/session-api.md).
 
 ### Step-Up
 
-Step-up re-authentication creates a new `auth_attempt` against the **same `session_id`**, adds factors, and expands `acr[]`. No new session is created. No OIDC context on the attempt — when triggered by an OIDC flow, the `acr_values` target is in the OIDC Adapter's stored `auth_request`.
+Step-up re-authentication creates a new `auth_attempt` against the **same `session_id`**, adds factors, and expands `assurance_levels[]`. No new session is created. No OIDC context on the attempt — when triggered by an OIDC flow, the `acr_values` target is in the OIDC Adapter's stored `auth_request`.
 
 ```http
 POST /auth_attempts
@@ -134,7 +134,7 @@ POST /auth_attempts
 }
 ```
 
-The attempt proceeds normally (challenges → verify → handoff). On handoff, the session's `factors` and `acr[]` are updated in place.
+The attempt proceeds normally (challenges → verify → handoff). On handoff, the session's `factors` and `assurance_levels[]` are updated in place.
 
 ## Flow engine integration
 
@@ -167,7 +167,7 @@ sequenceDiagram
     Note over Browser,CustomerBackend: Optional — pre-allocate session before user is known
 
     Browser->>SessionDB: POST /sessions { project_id, user_agent }
-    SessionDB-->>Browser: { session_id, session_token, state: "building", acr: [] }
+    SessionDB-->>Browser: { session_id, session_token, state: "building", assurance_levels: [] }
 
     Note over Browser,CustomerBackend: Start auth attempt (flow engine path)
 
@@ -192,7 +192,7 @@ sequenceDiagram
 
     Browser->>FlowEngine: POST /flows/{id}/submit { totp: { code: "123456" } }
     FlowEngine->>AuthAttempts: POST /auth_attempts/{id}/challenges/{cid}/verify { totp: { code: "123456" } }
-    AuthAttempts-->>FlowEngine: 200 OK — factor written, acr[] updated
+    AuthAttempts-->>FlowEngine: 200 OK — factor written, assurance_levels[] updated
     FlowEngine-->>Browser: Set-Cookie: flow=<cleared> · 200 { step: "complete" }
 
     Note over Browser,CustomerBackend: Terminal — modern embedded handoff
@@ -204,13 +204,13 @@ sequenceDiagram
 
     Browser->>CustomerBackend: POST /auth/callback { handoff_token }
     CustomerBackend->>SessionDB: POST /session_handoffs/{handoff_token}/exchange (sk_proj_ auth)
-    SessionDB-->>CustomerBackend: { session_id, session_token, acr: ["urn:zitadel:aal:1","urn:zitadel:aal:2"], factors: {…} }
+    SessionDB-->>CustomerBackend: { session_id, session_token, assurance_levels: ["urn:nist:aal:1","urn:nist:aal:2"], factors: {…} }
     CustomerBackend-->>Browser: Set-Cookie: session=… · 302 redirect to app
 
     Note over Browser,CustomerBackend: Later — read session
 
     CustomerBackend->>SessionDB: GET /sessions/{id} (Bearer session_token)
-    SessionDB-->>CustomerBackend: { acr: ["urn:zitadel:aal:1","urn:zitadel:aal:2"], factors: {…} }
+    SessionDB-->>CustomerBackend: { assurance_levels: ["urn:nist:aal:1","urn:nist:aal:2"], factors: {…} }
 ```
 
 ---
@@ -263,12 +263,12 @@ sequenceDiagram
     AuthAttempts-->>Client: { handoff_token, expires_at }
 
     Client->>SessionDB: POST /session_handoffs/{handoff_token}/exchange (sk_proj_ auth)
-    SessionDB-->>Client: { session_id, session_token, acr: ["urn:zitadel:aal:1","urn:zitadel:aal:2"], factors: {…} }
+    SessionDB-->>Client: { session_id, session_token, assurance_levels: ["urn:nist:aal:1","urn:nist:aal:2"], factors: {…} }
 
     Note over Client,SessionDB: Use session
 
     Client->>SessionDB: GET /sessions/{id} (Bearer session_token)
-    SessionDB-->>Client: { acr: ["urn:zitadel:aal:1","urn:zitadel:aal:2"], factors: {…} }
+    SessionDB-->>Client: { assurance_levels: ["urn:nist:aal:1","urn:nist:aal:2"], factors: {…} }
 ```
 
 ---
@@ -290,7 +290,7 @@ sequenceDiagram
     Note over Browser,DB: RP initiates auth
 
     Browser->>RP: GET /protected-resource
-    RP-->>Browser: 302 → /authorize?client_id=…&redirect_uri=…&scope=openid&acr_values=urn:zitadel:aal:2&state=…&nonce=…&code_challenge=…
+    RP-->>Browser: 302 → /authorize?client_id=…&redirect_uri=…&scope=openid&acr_values=urn:nist:aal:2&state=…&nonce=…&code_challenge=…
 
     Browser->>OIDCAdapter: GET /authorize?…
     OIDCAdapter-)DB: INSERT auth_requests { client_id, redirect_uri, acr_values, state, nonce, code_challenge, … }
@@ -313,8 +313,8 @@ sequenceDiagram
     FlowEngine-)OIDCAdapter: exchange handoff_token (internal)
     OIDCAdapter-)DB: SELECT auth_request WHERE attempt_id = …
     DB--)OIDCAdapter: { acr_values, redirect_uri, state, nonce, … }
-    OIDCAdapter-)DB: SELECT acr FROM sessions WHERE id = … (verify acr[] ⊇ acr_values)
-    DB--)OIDCAdapter: { acr: ["urn:zitadel:aal:1","urn:zitadel:aal:2"] } ✓
+    OIDCAdapter-)DB: SELECT assurance_levels FROM sessions WHERE id = … (verify assurance_levels[] ⊇ acr_values)
+    DB--)OIDCAdapter: { assurance_levels: ["urn:nist:aal:1","urn:nist:aal:2"] } ✓
     OIDCAdapter--)FlowEngine: { code, redirect_uri: "https://app.acme.com/callback?code=…&state=…" }
     FlowEngine-->>Browser: 302 → https://app.acme.com/callback?code=…&state=…
 
@@ -322,9 +322,9 @@ sequenceDiagram
 
     Browser->>RP: GET /callback?code=…&state=…
     RP->>OIDCAdapter: POST /token { code, code_verifier, redirect_uri }
-    OIDCAdapter-)DB: SELECT acr FROM sessions WHERE id = …
-    DB--)OIDCAdapter: { acr: ["urn:zitadel:aal:1","urn:zitadel:aal:2"] }
-    OIDCAdapter-->>RP: { access_token, id_token (acr: "urn:zitadel:aal:2"), refresh_token }
+    OIDCAdapter-)DB: SELECT assurance_levels FROM sessions WHERE id = …
+    DB--)OIDCAdapter: { assurance_levels: ["urn:nist:aal:1","urn:nist:aal:2"] }
+    OIDCAdapter-->>RP: { access_token, id_token (acr: "urn:nist:aal:2"), refresh_token }
     RP-->>Browser: Set-Cookie: session · redirect to /protected-resource
 ```
 
@@ -345,14 +345,14 @@ sequenceDiagram
     Note over Browser,DB: User has active session at AAL1
 
     Browser->>RP: GET /sensitive-action
-    RP-->>Browser: 302 → /authorize?acr_values=urn:zitadel:aal:2&…
+    RP-->>Browser: 302 → /authorize?acr_values=urn:nist:aal:2&…
 
-    Browser->>OIDCAdapter: GET /authorize?acr_values=urn:zitadel:aal:2&…
-    OIDCAdapter-)DB: SELECT acr FROM sessions WHERE id = …
-    DB--)OIDCAdapter: { acr: ["urn:zitadel:aal:1"] }
-    Note right of OIDCAdapter: aal:2 not in acr[] → step-up required
+    Browser->>OIDCAdapter: GET /authorize?acr_values=urn:nist:aal:2&…
+    OIDCAdapter-)DB: SELECT assurance_levels FROM sessions WHERE id = …
+    DB--)OIDCAdapter: { assurance_levels: ["urn:nist:aal:1"] }
+    Note right of OIDCAdapter: aal:2 not in assurance_levels[] → step-up required
 
-    OIDCAdapter-)DB: INSERT auth_requests { acr_values: "urn:zitadel:aal:2", redirect_uri, state, … }
+    OIDCAdapter-)DB: INSERT auth_requests { acr_values: "urn:nist:aal:2", redirect_uri, state, … }
     OIDCAdapter-)AuthService: create_auth_attempt(session_id: "existing") → attempt_id
     OIDCAdapter-)DB: link attempt_id → auth_request_id
     OIDCAdapter-->>Browser: 302 → /login?attempt_id=… (step-up UI — identifier/password skipped)
@@ -365,8 +365,8 @@ sequenceDiagram
 
     Browser->>FlowEngine: POST /flows/{id}/submit { totp: { code: "123456" } }
     FlowEngine-)AuthService: verify_challenge(totp: { code: "123456" })
-    AuthService-)DB: write totp factor, recompute acr[]
-    DB--)AuthService: acr: ["urn:zitadel:aal:1","urn:zitadel:aal:2"]
+    AuthService-)DB: write totp factor, recompute assurance_levels[]
+    DB--)AuthService: assurance_levels: ["urn:nist:aal:1","urn:nist:aal:2"]
     AuthService--)FlowEngine: OK
     FlowEngine-->>Browser: { step: "complete" }
 
@@ -375,15 +375,15 @@ sequenceDiagram
     AuthService--)FlowEngine: { handoff_token }
     FlowEngine-)OIDCAdapter: exchange handoff_token (internal)
     OIDCAdapter-)DB: SELECT auth_request WHERE attempt_id = …
-    OIDCAdapter-)DB: SELECT acr FROM sessions WHERE id = … → acr[] ⊇ aal:2 ✓
+    OIDCAdapter-)DB: SELECT assurance_levels FROM sessions WHERE id = … → assurance_levels[] ⊇ aal:2 ✓
     OIDCAdapter--)FlowEngine: { code, redirect_uri }
     FlowEngine-->>Browser: 302 → https://app.acme.com/callback?code=…&state=…
 
     Browser->>RP: GET /callback?code=…
     RP->>OIDCAdapter: POST /token { code, … }
-    OIDCAdapter-)DB: SELECT acr FROM sessions WHERE id = …
-    DB--)OIDCAdapter: { acr: ["urn:zitadel:aal:1","urn:zitadel:aal:2"] }
-    OIDCAdapter-->>RP: { id_token (acr: "urn:zitadel:aal:2") }
+    OIDCAdapter-)DB: SELECT assurance_levels FROM sessions WHERE id = …
+    DB--)OIDCAdapter: { assurance_levels: ["urn:nist:aal:1","urn:nist:aal:2"] }
+    OIDCAdapter-->>RP: { id_token (acr: "urn:nist:aal:2") }
     RP-->>Browser: access granted
 ```
 

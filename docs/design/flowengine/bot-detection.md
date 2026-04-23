@@ -12,7 +12,7 @@ Bot detection is a **first-class, composable subsystem** — not an afterthought
 2. **Pluggable providers.** Admins can configure third-party captcha services (reCAPTCHA, hCaptcha, Cloudflare Turnstile) via `x-captcha.provider`. The captcha interface is provider-agnostic.
 3. **Composable signals.** Captcha is one of several signals. The risk evaluator fuses them into a single `RiskResult`.
 4. **Risk-based activation.** Captcha is not always-on. The policy engine decides when to require it.
-5. **Works in both paths.** Flow engine injects captcha steps dynamically. Session API includes `captcha` in `need[]` when risk evaluation demands it.
+5. **Works in both paths.** Flow engine injects captcha steps dynamically, and direct clients can request/verify captcha through `auth_attempts`.
 
 ## Signal Architecture
 
@@ -187,17 +187,17 @@ Three modes:
 
 3. **Invisible assessment** — a `policy_check` step evaluates risk. Low score → skip. High score → inject captcha.
 
-## Integration: Session API
+## Integration: Policy + auth_attempts
 
-When the risk evaluator flags a session, the policy engine adds `captcha` to the `need[]` array. The captcha factor does not affect the session's `acr` — it is a bot-detection gate, not an authentication factor.
+When risk is elevated, the policy engine requires captcha before flow completion. The captcha signal does not raise session `assurance_levels[]` — it is a bot-defense gate, not an assurance factor.
 
-The client:
-1. Sees `"captcha"` in `need[]`
-2. Requests a challenge: `POST /sessions/{id}/challenge { "type": "captcha" }`
-3. Solves the challenge client-side (widget or PoW depending on configured provider)
-4. Submits the proof: `PATCH /sessions/{id} { "captcha": { ... } }`
+The client path is:
+1. Policy/flow indicates captcha is required
+2. Client obtains captcha challenge through the current `auth_attempt`
+3. Client solves the challenge (widget or PoW depending on provider)
+4. Client submits captcha proof via the current `auth_attempt`
 
-Captcha is a standard factor — no special-case API.
+Sessions remain read-oriented; they are not directly mutated for captcha handling.
 
 ## Risk Evaluation Event
 
