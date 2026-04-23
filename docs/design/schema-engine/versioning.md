@@ -25,22 +25,22 @@ A feature which links to logic operations. E.g.: Captcha, Field validation,...
 
 ## Actors
 
-### ZITADEL
+### API
 
-Us.
+THe api which hosts the Engine
 
 ### CUSTOMER
 
 A customer of the zitadel product. This can be a user acting on behalf of a company or a home-lab user using the 
 self-hosting.
 
-### LOGIN
-
-A separate application created by CUSTOMER to use for login-client for Zitadel.
-
 ### USER
 
 The end user who will interact with the login/profile page.
+
+### UI
+
+A separate application created by CUSTOMER to use for representing data to the USER.
 
 ## Goal
 
@@ -48,26 +48,26 @@ The end user who will interact with the login/profile page.
 
 Let's assume following sequence of events:
 
-1. ZITADEL creates the Flow-engine inside Zitadel.
+1. API creates the Flow-engine inside Zitadel.
 2. CUSTOMER creates a schema for flows. Let's call it `registration_flow`.
-3. CUSTOMER implements flow Schema in their LOGIN client.
-4. LOGIN creates a flow Object from the flow Schema
+3. CUSTOMER implements flow Schema in their UI.
+4. UI creates a flow Object from the flow Schema
 5. USER registers a user using the flow Object.
 
-#### Case 1: ZITADEL adds new capability
+#### Case 1: API adds new capability
 
 This is no problem, nothing breaks, as long as the CUSTOMER does not use the new capability.
 
-#### Case 2: ZITADEL does a breaking change on a capability
+#### Case 2: API does a breaking change on a capability
 
-Let's assume we have a capability which requires an api call. ZITADEL needs to break the contract which is uses in the
+Let's assume we have a capability which requires an api call. The API needs to break the contract which is uses in the
 capability. This poses a first problem: how do we not break user-space. How do we let CUSTOMER know that there has been
 a breaking change and let them upgrade easily?
 
 #### Case 3: CUSTOMER uses a new capability inside `registration_flow`
 
 This again poses a problem on how to let this know downstream. If the CUSTOMER updates their flow Object, they should 
-also implement the functionality in the LOGIN. But we should be able to provide correct error handling in case they 
+also implement the functionality in the UI. But we should be able to provide correct error handling in case they 
 forgot about it.
 
 ### The problem
@@ -81,4 +81,60 @@ to use.
 To do proper versioning we need to make the Engine/Schema/Object immutable once a revision is created. For the engine 
 this is done automatically using git and semantic versioning. That is also the approach we take for the schema's. Once 
 the entity is created, a version is determined according to semantic versioning. The objects can then target those
-versions. But the entity itself cannot change afterward.c
+versions. But the entity itself cannot change afterward. The objects are the exception to that rule. Users for example
+need to be able to be modified from a domain perspective.
+
+## Versioning
+
+The Engine is versioned together with the Zitadel binary using semantic versioning: `Major.Minor.Patch` in which breaking changes are major upgrades, new
+features are minor upgrades and all others are patches. It could be versioned separately which would allow for a more
+fine-grained communication of what changed in the engine instead of the entire application. But that would add more
+complexity and confusion. (TODO: Not sure about this yet, separate versioning is still on the table)
+
+Since the CUSTOMER creates Schema's and UI, they also determine the version. How they manage their versions, is on them. But
+each version number needs to be unique. We can suggest using semantic versioning as well, but it is the CUSTOMER's
+responsibility in the end.
+
+Since objects are the result of the handshake between the UI and the Engine and should contain both versions as fields.
+They are not version though since they do not have any dependencies, a version would be redundant.
+
+## Migrations
+
+Once breaking changes are introduced, migrations are required. This is both applicable for the API and the schema's.
+
+The API is fully under our control. We can deprecate a Capability which will be removed in the future. The CUSTOMER
+needs to be notified of this deprecation. Initially this can be when updating a schema, other pushbased notifications
+can be implemented in the future.
+
+If a breaking change happens on a schema, a migration pattern should be provided by the CUSTOMER. A migration path can
+be: ask the user for the data. E.g.: When a CUSTOMER adds a required field to a user, users should be upgraded. As long
+as not all data is migrated, deactivation of the schema is not possible.
+
+TODO: Search for a solution on how to migrate data without asking a user **and check whether that is necessary**.
+
+## Schema lifecycle
+
+To make management of a Schema easier for the CUSTOMER we introduce multiple stages in its lifecycle.
+
+### Draft
+
+The Schema is not yet published and can still be edited. It is still under development or ready to be release in
+the future. This Schema can be targeted when creating an Object but will not be used by default.
+
+### Active
+
+The Schema is active and readonly. This Schema can be targeted when creating an Object but will not be used by 
+default.
+
+### Default
+
+The Schema is the default Schema to use when creating Objects.
+
+### Deprecated
+
+The Schema is deprecated. The Schema can still be used when creating Objects but the API returns a warning to indicate 
+that the schema should not be used anymore and suggest the default schema.
+
+### Removed
+
+The Schema still exists in the database but can no longer be used to create Objects.
