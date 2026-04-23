@@ -381,6 +381,12 @@ components:
           type: string
         step:
           $ref: "#/components/schemas/FlowStep"
+        branding:
+          $ref: "#/components/schemas/Branding"
+          description: |
+            Flow-level branding and layout configuration. Returned on every response
+            but does not change between steps. The orchestrator should cache this on
+            flow creation and reuse it for subsequent renders.
         redirect_uri:
           type: string
           format: uri
@@ -388,11 +394,12 @@ components:
 
     FlowStep:
       type: object
-      required: [name, type]
+      required: [name, type, fields, actions, gates]
       description: |
-        A step contains functional data: what to collect (fields) and what the
-        user can do (actions). Layout and styling are a separate concern.
-        See flow-engine-nodes.md for the response shape discussion.
+        A step contains unordered capability dictionaries: what to collect (fields),
+        what the user can do (actions), and what security gates must be satisfied (gates).
+        Layout and element ordering are controlled by the LiquidJS template in `branding.liquid_template`.
+        See flow-engine-nodes.md for the full response shape specification.
       properties:
         name:
           type: string
@@ -403,13 +410,8 @@ components:
           description: |
             Step type. Note: `policy_check` and `action` steps never render —
             the flow engine auto-transitions through them.
-        label:
-          type: string
-          description: Step heading / title
-        description:
-          type: string
-          description: Explanatory text for the step
-          nullable: true
+        texts:
+          $ref: "#/components/schemas/StepTexts"
         error:
           type: string
           description: Error message from a previous failed submission
@@ -420,42 +422,84 @@ components:
           description: |
             Only present on `complete` steps. Tells the frontend what to do:
             - redirect: navigate to redirect_uri immediately
-            - show: display the label as a success screen
+            - show: render the step via the Liquid template (success screen)
             - continue: call GET /flows/{session_id} for the next step (auto-pivot happened)
         redirect_url:
           type: string
           format: uri
           description: For `redirect` steps — URL to navigate to (e.g., SSO provider)
         fields:
-          type: array
-          description: Input fields to collect from the user. Uniform schema, no type discrimination needed.
-          items:
-            $ref: "#/components/schemas/Field"
-          default: []
-        actions:
-          type: array
+          type: object
           description: |
-            Ordered list of things the user can do. Each action has a `kind` discriminator.
-            Array order is the render order — the server controls positioning.
-          items:
+            Unordered dictionary of input fields to collect. Keyed by field name.
+            The LiquidJS template controls which fields appear and in what order.
+          additionalProperties:
+            $ref: "#/components/schemas/Field"
+          default: {}
+          example:
+            identifier:
+              type: email
+              required: true
+              text_key: identifier.field.email
+        actions:
+          type: object
+          description: |
+            Unordered dictionary of available user actions. Keyed by action name.
+            The LiquidJS template controls positioning and presentation.
+          additionalProperties:
             $ref: "#/components/schemas/StepAction"
+          default: {}
+          example:
+            submit:
+              primary: true
+              text_key: identifier.action.submit
+            register:
+              text_key: identifier.action.register
+        gates:
+          type: object
+          description: |
+            Security gates that must be satisfied before the step can be submitted.
+            The orchestrator appends any required but unrendered gates as a safety net.
+          additionalProperties:
+            $ref: "#/components/schemas/Gate"
+          default: {}
+        sso_providers:
+          type: array
+          description: Available SSO identity providers for this step.
+          items:
+            $ref: "#/components/schemas/SSOProvider"
           default: []
+
+    StepTexts:
+      type: object
+      description: |
+        Step-level localization keys. Resolved client-side via the `| t` LiquidJS filter.
+        The backend never sends display text — only semantic keys.
+      properties:
+        title_key:
+          type: string
+          description: Localization key for the step heading
+          example: identifier.title
+        description_key:
+          type: string
+          description: Localization key for explanatory text
+          nullable: true
+          example: identifier.description
 
     Field:
       type: object
-      required: [name, type]
-      description: An input to collect from the user.
+      required: [type, text_key]
+      description: |
+        A data input capability. Describes what the user must provide.
+        Does not contain display text — only a `text_key` resolved client-side.
       properties:
-        name:
-          type: string
-          description: Field identifier, used as the key in submit data
-          example: email
-        label:
-          type: string
-          example: Email address
         type:
           type: string
           enum: [text, email, password, tel, number, url, date, hidden]
+        text_key:
+          type: string
+          description: Localization key for the field label
+          example: identifier.field.email
         required:
           type: boolean
           default: false
@@ -475,38 +519,97 @@ components:
 
     StepAction:
       type: object
-      required: [kind, name, label]
+      required: [text_key]
       description: |
-        An interactive element in the actions list. The `kind` field determines
-        how the frontend renders it (button, SSO widget, passkey ceremony, etc.).
+        An action the user can take. Keyed by action name in the parent dictionary.
+        The action name is sent back in the submit request as `action`.
       properties:
-        kind:
+        text_key:
           type: string
-          enum: [submit, sso, passkey, captcha, link]
-          description: |
-            - submit: primary form submission button
-            - sso: SSO provider button (has `provider` field)
-            - passkey: WebAuthn ceremony trigger
-            - captcha: proof-of-work challenge (has `config` field)
-            - link: secondary navigation (register, forgot password, back)
-        name:
-          type: string
-          description: Action identifier, sent back in the submit request
-          example: submit
-        label:
-          type: string
-          example: Continue
+          description: Localization key for the action label
+          example: identifier.action.submit
         primary:
           type: boolean
           default: false
-          description: Whether this is the primary/default action (typically the first submit)
+          description: Whether this is the primary/default action
+
+    Gate:
+      type: object
+      required: [type]
+      description: |
+        A security gate that must be satisfied. The orchestrator appends any
+        required-but-unrendered gates automatically as a safety net.
+      properties:
+        type:
+          type: string
+          enum: [captcha, passkey]
+          description: Gate type
         provider:
           type: string
-          description: For `sso` kind — provider identifier (e.g., "google")
+          description: Provider identifier (e.g., "altcha", "turnstile")
+          example: altcha
+        required:
+          type: boolean
+          default: true
+        satisfied:
+          type: boolean
+          default: false
+          description: Whether this gate has already been satisfied in this flow
         config:
           type: object
-          description: For `captcha`/`passkey` kinds — challenge params, public key, etc.
+          description: Provider-specific challenge parameters
           additionalProperties: true
+
+    SSOProvider:
+      type: object
+      required: [id, name, template]
+      description: An available SSO identity provider.
+      properties:
+        id:
+          type: string
+          description: Provider instance identifier
+          example: google-1
+        name:
+          type: string
+          description: Display name for the provider
+          example: Google
+        template:
+          type: string
+          description: Template hint for rendering (logo, colors)
+          example: google
+
+    Branding:
+      type: object
+      description: |
+        Branding and layout configuration. The `liquid_template` contains the
+        LiquidJS template string that controls the entire visual structure.
+      properties:
+        layout:
+          type: string
+          enum: [centered, split]
+          description: |
+            Layout preset selector. The default.liquid master template uses this
+            to branch into layout variants. Customers who eject the template
+            can ignore this field entirely.
+          default: centered
+        liquid_template:
+          type: string
+          description: |
+            The LiquidJS template string for rendering this step. The orchestrator
+            parses this template, injects the capability dictionaries as context,
+            and renders the output HTML into its Shadow DOM.
+        logo_url:
+          type: string
+          format: uri
+          description: Organization logo URL
+        font_url:
+          type: string
+          format: uri
+          description: Custom font URL (e.g., Google Fonts CSS)
+        hero_url:
+          type: string
+          format: uri
+          description: Hero/background image URL (used by split layout)
 
     FlowSubmitRequest:
       type: object
