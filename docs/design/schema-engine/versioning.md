@@ -5,11 +5,11 @@ contents of those schemas.
 
 ## Terminology
 
-### Object (by lack of another term)
+### Object (for lack of another term)
 
 The result when making a concrete value from a schema.
 
-E.g.: User is created from the User-schema, Flow is created from the Flow-schema, ...
+E.g.: A user is created from the User-schema, and a flow is created from the Flow-schema.
 
 ### Schema
 
@@ -27,11 +27,11 @@ A feature which links to logic operations. E.g.: Captcha, Field validation,...
 
 ### API
 
-THe api which hosts the Engine
+The API which hosts the Engine.
 
 ### CUSTOMER
 
-A customer of the zitadel product. This can be a user acting on behalf of a company or a home-lab user using the 
+A customer of the ZITADEL product. This can be a user acting on behalf of a company or a home-lab user using 
 self-hosting.
 
 ### USER
@@ -46,12 +46,12 @@ A separate application created by CUSTOMER to use for representing data to the U
 
 ### Setting the stage
 
-Let's assume following sequence of events:
+Let's assume the following sequence of events:
 
 1. API creates the Flow-engine inside Zitadel.
 2. CUSTOMER creates a schema for flows. Let's call it `registration_flow`.
-3. CUSTOMER implements flow Schema in their UI.
-4. UI creates a flow Object from the flow Schema
+3. CUSTOMER implements the flow Schema in their UI.
+4. UI creates a flow Object from the flow Schema.
 5. USER registers a user using the flow Object.
 
 #### Case 1: API adds new capability
@@ -60,7 +60,7 @@ This is no problem, nothing breaks, as long as the CUSTOMER does not use the new
 
 #### Case 2: API does a breaking change on a capability
 
-Let's assume we have a capability which requires an api call. The API needs to break the contract which is uses in the
+Let's assume we have a capability which requires an API call. The API needs to break the contract which is used in the
 capability. This poses a first problem: how do we not break user-space. How do we let CUSTOMER know that there has been
 a breaking change and let them upgrade easily?
 
@@ -72,14 +72,14 @@ forgot about it.
 
 ### The problem
 
-In all of these cases, there is a need of versioning the different parts. If a version is specified for a given revision
-of Engine/Schema/Object we can communicate that version and the different actors can decide which version they want
-to use.
+In all of these cases, there is a need for versioning the different parts. If a version is specified for a given 
+revision of Engine/Schema/Object we can communicate that version and the different actors can decide which version they 
+want to use.
 
 ## Immutability
 
 To do proper versioning we need to make the Engine/Schema/Object immutable once a revision is created. For the engine 
-this is done automatically using git and semantic versioning. That is also the approach we take for the schema's. Once 
+this is done automatically using git and semantic versioning. That is also the approach we take for schemas. Once 
 the entity is created, a version is determined according to semantic versioning. The objects can then target those
 versions. But the entity itself cannot change afterward. The objects are the exception to that rule. Users for example
 need to be able to be modified from a domain perspective.
@@ -91,19 +91,20 @@ features are minor upgrades and all others are patches. It could be versioned se
 fine-grained communication of what changed in the engine instead of the entire application. But that would add more
 complexity and confusion. (TODO: Not sure about this yet, separate versioning is still on the table)
 
-Since the CUSTOMER creates Schema's and UI, they also determine the version. How they manage their versions, is on them. But
-each version number needs to be unique. We can suggest using semantic versioning as well, but it is the CUSTOMER's
+Since the CUSTOMER creates schemas and UI, they also determine the version. How they manage their versions is on them. 
+But each version number needs to be unique. We can suggest using semantic versioning as well, but it is the CUSTOMER's
 responsibility in the end.
 
-Since objects are the result of the handshake between the UI and the Engine and should contain both versions as fields.
-They are not version though since they do not have any dependencies, a version would be redundant.
+Since objects are the result of the handshake between the UI and the Engine, they should contain both versions as 
+fields. They are not versioned though, since they do not have any dependencies, and a dedicated object version would be 
+redundant.
 
 ## Migrations
 
-Once breaking changes are introduced, migrations are required. This is both applicable for the API and the schema's.
+Once breaking changes are introduced, migrations are required. This is applicable for both the API and the schemas.
 
 The API is fully under our control. We can deprecate a Capability which will be removed in the future. The CUSTOMER
-needs to be notified of this deprecation. Initially this can be when updating a schema, other pushbased notifications
+needs to be notified of this deprecation. Initially this can be when updating a schema; other push-based notifications
 can be implemented in the future.
 
 If a breaking change happens on a schema, a migration pattern should be provided by the CUSTOMER. A migration path can
@@ -118,22 +119,20 @@ To make management of a Schema easier for the CUSTOMER we introduce multiple sta
 
 ### Draft
 
-The Schema is not yet published and can still be edited. It is still under development or ready to be release in
+The Schema is not yet published and can still be edited. It is still under development or ready to be released in
 the future. This Schema can be targeted when creating an Object but will not be used by default.
 
 ### Active
 
-The Schema is active and readonly. This Schema can be targeted when creating an Object but will not be used by 
+The Schema is active and read-only. This Schema can be targeted when creating an Object but will not be used by 
 default.
 
-### Default
-
-The Schema is the default Schema to use when creating Objects.
+A schema can be flagged as default to make it the default Schema to use when creating Objects.
 
 ### Deprecated
 
-The Schema is deprecated. The Schema can still be used when creating Objects but the API returns a warning to indicate 
-that the schema should not be used anymore and suggest the default schema.
+The Schema is deprecated. The Schema can still be used when creating Objects, but the API returns a warning to indicate 
+that the schema should not be used anymore and suggests the default schema.
 
 ### Removed
 
