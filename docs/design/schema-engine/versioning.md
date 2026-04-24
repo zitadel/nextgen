@@ -33,7 +33,7 @@ The API which hosts the Engine.
 
 ### CUSTOMER
 
-A customer of the ZITADEL product. This can be a user acting on behalf of a company or a home-lab user using 
+A customer of the Zitadel product. This can be a user acting on behalf of a company or a home-lab user using 
 self-hosting.
 
 ### USER
@@ -80,11 +80,11 @@ want to use.
 
 ## Immutability
 
-To do proper versioning we need to make the Engine/Schema/Object immutable once a revision is created. For the engine 
-this is done automatically using git and semantic versioning. That is also the approach we take for schemas. Once 
-the entity is created, a version is determined according to semantic versioning. The objects can then target those
-versions. But the entity itself cannot change afterward. The objects are the exception to that rule. Users for example
-need to be able to be modified from a domain perspective.
+To do proper versioning we need to make the Engine/Schema immutable once a revision is created. For the engine this is 
+done automatically using git and semantic versioning. That is also the approach we take for schemas. Once the entity is 
+created, a version is determined according to semantic versioning. The objects can then target those versions. But the 
+entity itself cannot change afterward. The objects are the exception to that rule. Users for example need to be able to 
+be modified from a domain perspective.
 
 ## Versioning
 
