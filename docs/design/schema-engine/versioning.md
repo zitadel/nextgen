@@ -2,8 +2,8 @@
 
 > **Status:** Draft
 > **See also:** [Flow engine](../flowengine/flow-engine.md)
-This document describes **how versions of a schema can be defined and managed**. It does not describe anything about the
-contents of those schemas.
+> This document describes **how versions of a schema can be defined and managed**. It does not describe anything about
+> the contents of those schemas.
 
 ## Terminology
 
@@ -33,7 +33,7 @@ The API which hosts the Schema.
 
 ### CUSTOMER
 
-A customer of the Zitadel product. This can be a user acting on behalf of a company or a home-lab user using 
+A customer of the Zitadel product. This can be a user acting on behalf of a company or a home-lab user using
 self-hosting.
 
 ### USER
@@ -68,37 +68,38 @@ a breaking change and let them upgrade easily?
 
 #### Case 3: CUSTOMER uses a new capability inside `registration_flow`
 
-This again poses a problem on how to let this know downstream. If the CUSTOMER updates their flow Object, they should 
-also implement the functionality in the UI. But we should be able to provide correct error handling in case they 
+This again poses a problem on how to let this know downstream. If the CUSTOMER updates their flow Object, they should
+also implement the functionality in the UI. But we should be able to provide correct error handling in case they
 forgot about it.
 
 ### The problem
 
-In all of these cases, there is a need for versioning the different parts. If a version is specified for a given 
-revision of Schema/Definition/Object we can communicate that version and the different actors can decide which version they 
-want to use.
+In all of these cases, there is a need for versioning the different parts. If a version is specified for a given
+revision of Schema/Definition/Object we can communicate that version and the different actors can decide which version
+they want to use.
 
 ## Immutability
 
-To do proper versioning we need to make the Schema/Definition immutable once a revision is created. For the engine this is 
-done automatically using git and semantic versioning. That is also the approach we take for schemas. Once the entity is 
-created, a version is determined according to semantic versioning. The objects can then target those versions. But the 
-entity itself cannot change afterward. The objects are the exception to that rule. Users for example need to be able to 
-be modified from a domain perspective.
+To do proper versioning we need to make the Schema/Definition immutable once a revision is created. For the engine this
+is done automatically using git and semantic versioning. That is also the approach we take for schemas. Once the entity 
+is created, a version is determined according to semantic versioning. The objects can then target those versions. But 
+the entity itself cannot change afterward. The objects are the exception to that rule. Users for example need to be able 
+to be modified from a domain perspective.
 
 ## Versioning
 
-The Schema is versioned together with the Zitadel binary using semantic versioning: `Major.Minor.Patch` in which breaking changes are major upgrades, new
-features are minor upgrades and all others are patches. It could be versioned separately which would allow for a more
-fine-grained communication of what changed in the engine instead of the entire application. But that would add more
-complexity and confusion. (TODO: Not sure about this yet, separate versioning is still on the table)
+The Schema is versioned together with the Zitadel binary using semantic versioning: `Major.Minor.Patch` in which
+breaking changes are major upgrades, new features are minor upgrades and all others are patches. It could be versioned 
+separately which would allow for a more fine-grained communication of what changed in the engine instead of the entire 
+application. But that would add more complexity and confusion. 
+(TODO: Not sure about this yet, separate versioning is still on the table)
 
-Since the CUSTOMER creates schemas and UI, they also determine the version. How they manage their versions is on them. 
+Since the CUSTOMER creates schemas and UI, they also determine the version. How they manage their versions is on them.
 But each version number needs to be unique. We can suggest using semantic versioning as well, but it is the CUSTOMER's
 responsibility in the end.
 
-Since objects are the result of the handshake between the UI and the Schema, they should contain both versions as 
-fields. They are not versioned though, since they do not have any dependencies, and a dedicated object version would be 
+Since objects are the result of the handshake between the UI and the Schema, they should contain both versions as
+fields. They are not versioned though, since they do not have any dependencies, and a dedicated object version would be
 redundant.
 
 ## Migrations
@@ -126,15 +127,15 @@ the future. This Definition can be targeted when creating an Object but will not
 
 ### Active
 
-The Definition is active and read-only. This Definition can be targeted when creating an Object but will not be used by 
+The Definition is active and read-only. This Definition can be targeted when creating an Object but will not be used by
 default.
 
 A schema can be flagged as default to make it the default Definition to use when creating Objects.
 
 ### Deprecated
 
-The Definition is deprecated. The Definition can still be used when creating Objects, but the API returns a warning to indicate 
-that the schema should not be used anymore and suggests the default schema.
+The Definition is deprecated. The Definition can still be used when creating Objects, but the API returns a warning to
+indicate that the schema should not be used anymore and suggests the default schema.
 
 ### Removed
 
