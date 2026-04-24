@@ -5,7 +5,7 @@
 
 This document describes how the **flow engine and policy engine consume user schemas** — not how user schemas themselves are defined or managed. The User Schema API and its full specification are a separate concern.
 
-What matters here is the contract: which schema annotations exist, how the flow engine reads them to build BDUI forms, and how the policy engine reads them to narrow authentication requirements.
+What matters here is the contract: which schema annotations exist, how the flow engine reads them to build capability payloads (fields, actions, gates), and how the policy engine reads them to narrow authentication requirements.
 
 ## Annotations Consumed by Flow & Policy
 

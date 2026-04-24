@@ -3,7 +3,7 @@ package repository
 import (
 	"context"
 
-	"github.com/zitadel/nextgen/internal/api/domain"
+	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 

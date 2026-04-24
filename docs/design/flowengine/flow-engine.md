@@ -3,7 +3,7 @@
 > **Status:** Draft
 > **See also:** [Overview](README.md) · [Step Response Shape](flow-engine-nodes.md) · [Storage](flow-engine-storage.md) · [OpenAPI spec](api/flow-api.yaml) · [Glossary](../glossary.md) · [auth_attempts (primitives layer)](../api/authn-and-auth-flows.md)
 
-The flow engine is a **server-side state machine** that produces BDUI (Backend-Driven UI). It decides *which step renders when* — the UI-orchestration layer. It does **not** hold authentication primitives; those live in [`auth_attempts`](../api/authn-and-auth-flows.md). A flow step that says "collect password" internally calls the auth_attempt challenge/verify primitives, but `/flows/{session_id}` remains the flow engine's session-scoped UI handle rather than an alias for `auth_attempt_id`.
+The flow engine is a **server-side state machine** that produces **Capability payloads** (semantic descriptions of fields, actions, and gates) alongside a **LiquidJS template** for rendering. It does **not** hold authentication primitives; those live in [`auth_attempts`](../api/authn-and-auth-flows.md). A flow step that says "collect password" internally calls the auth_attempt challenge/verify primitives, but `/flows/{session_id}` remains the flow engine's session-scoped UI handle rather than an alias for `auth_attempt_id`.
 
 It is used by web/frontend clients that want a ready-made login and registration experience. Clients that want full control skip the flow engine entirely and drive the auth_attempt primitives (and the Session API) directly.
 
@@ -151,7 +151,7 @@ After registration completes with a pending `auth_request_id`, the flow auto-piv
 
 ## Step Response Shape
 
-See [Flow Engine — Step Response Shape](flow-engine-nodes.md) for options on how steps are structured. **This is an open decision** — the examples in this document use the `fields[]` + `actions[]` format (Option C) but the final shape is pending frontend feedback.
+See [Flow Engine — Step Response Shape](flow-engine-nodes.md) for the decided response structure. Steps emit **unordered capability dictionaries** (`fields`, `actions`, `gates`) — the LiquidJS template controls all visual ordering and layout.
 
 ## Storage
 
