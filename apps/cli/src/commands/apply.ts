@@ -83,6 +83,8 @@ export async function runApply(io: CliIO, opts: ApplyOptions): Promise<Record<st
   const client = createPlatformClient(opts.source, secret.project_secret);
   const response = await client.uploadConfig(secret.project_id, environment, {
     config,
+    resources: resourceBundle,
+    templates: templateFiles,
     hash,
     schema_version: schemaVersionFromConfig(config),
     sdk_version: CLI_VERSION,
@@ -281,7 +283,7 @@ function uniq<T>(value: T, index: number, array: T[]): boolean {
   return array.indexOf(value) === index;
 }
 
-function findEnvRefs(value: unknown): string[] {
+export function findEnvRefs(value: unknown): string[] {
   const refs = new Set<string>();
   const visit = (node: unknown): void => {
     if (typeof node === "string") {
@@ -291,7 +293,13 @@ function findEnvRefs(value: unknown): string[] {
     } else if (Array.isArray(node)) {
       node.forEach(visit);
     } else if (isObject(node)) {
-      Object.values(node).forEach(visit);
+      for (const [key, child] of Object.entries(node)) {
+        if (key.endsWith("_env") && typeof child === "string" && /^[A-Za-z_][A-Za-z0-9_]*$/.test(child)) {
+          refs.add(child);
+        } else {
+          visit(child);
+        }
+      }
     }
   };
   visit(value);

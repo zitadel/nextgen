@@ -90,4 +90,19 @@ export const styles = {
     color: "#57708f",
     fontSize: 13,
   },
+  error: {
+    width: "min(100%, 420px)",
+    border: "1px solid #e3a2a2",
+    borderRadius: 6,
+    padding: 16,
+    background: "#fdf1f1",
+    color: "#742828",
+    fontFamily:
+      'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  errorMessage: {
+    margin: "6px 0 0",
+    fontSize: 14,
+    lineHeight: 1.45,
+  },
 } satisfies Record<string, CSSProperties>;

@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, type ReactNode, useContext, useMemo } from "react";
+import { createContext, type FC, type ReactNode, useContext, useMemo } from "react";
 import {
   resolveZitadelRuntimeEnv,
   ZitadelRuntimeError,
@@ -10,6 +10,7 @@ import {
 
 import { ZitadelAuthMock } from "./mock";
 import { ZitadelAuthReal } from "./real";
+import { styles } from "./styles";
 
 export { resolveZitadelRuntimeEnv, ZitadelRuntimeError } from "@zitadel/sdk-core";
 export type { ZitadelEnvironment, ZitadelRuntime, ZitadelSecretKind } from "@zitadel/sdk-core";
@@ -39,19 +40,30 @@ function useZitadelRuntime(): ZitadelContextValue {
   return useContext(ZitadelContext);
 }
 
-export function ZitadelAuth({ mode, title }: { mode: ZitadelAuthMode; title?: string }) {
+type ZitadelAuthProps = { mode: ZitadelAuthMode; title?: string };
+
+function ZitadelAuthRuntimeError({ message }: { message: string }) {
+  return (
+    <div role="alert" style={styles.error}>
+      <strong>Zitadel runtime misconfigured</strong>
+      <p style={styles.errorMessage}>{message}</p>
+    </div>
+  );
+}
+
+function ZitadelAuthImpl({ mode, title }: ZitadelAuthProps) {
   const { runtime, runtimeError } = useZitadelRuntime();
-  if (!runtime) {
-    if (runtimeError && !(runtimeError instanceof ZitadelRuntimeError)) {
-      throw runtimeError;
-    }
-    return <ZitadelAuthMock mode={mode} title={title} />;
+  if (runtimeError) {
+    if (!(runtimeError instanceof ZitadelRuntimeError)) throw runtimeError;
+    return <ZitadelAuthRuntimeError message={runtimeError.message} />;
   }
-  if (runtime.environment === "development") {
+  if (!runtime || runtime.environment === "development") {
     return <ZitadelAuthMock mode={mode} title={title} />;
   }
   return <ZitadelAuthReal mode={mode} title={title} runtime={runtime} />;
 }
 
-ZitadelAuth.Mock = ZitadelAuthMock;
-ZitadelAuth.Real = ZitadelAuthReal;
+export const ZitadelAuth: FC<ZitadelAuthProps> & {
+  Mock: typeof ZitadelAuthMock;
+  Real: typeof ZitadelAuthReal;
+} = Object.assign(ZitadelAuthImpl, { Mock: ZitadelAuthMock, Real: ZitadelAuthReal });

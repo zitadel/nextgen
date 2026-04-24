@@ -373,7 +373,8 @@ Usage: `zitadel app add (--preset spa|web|native|machine | --protocol oidc|saml)
 | `--display-name` | `string` | Human-readable app name. |
 | `--protocol` | `string` | Protocol: oidc or saml. |
 | `--preset` | `string` | Preset: spa, web, native, machine. |
-| `--role` | `string` | client (default) or server (Zitadel-as-IdP for SAML). |
+| `--client-type` | `string` | OIDC client_type: web, spa, native, machine (default: spa). Use with --protocol oidc. |
+| `--role` | `string` | SAML role: client (default) or server (Zitadel-as-IdP). Rejected for OIDC — use --client-type. |
 | `--redirect-uri` | `string[]` | Redirect URI (repeatable). OIDC only. |
 | `--post-logout-redirect-uri` | `string[]` | Post-logout redirect URI (repeatable). OIDC only. |
 | `--metadata-url` | `string` | SAML metadata URL. |

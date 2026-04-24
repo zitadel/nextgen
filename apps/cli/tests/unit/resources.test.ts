@@ -102,6 +102,52 @@ describe("identity resources", () => {
     expect((contents.oidc as { redirect_uris: string[] }).redirect_uris).toContain("http://localhost:3000/callback");
   });
 
+  it("app add accepts --client-type for OIDC without a preset", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "zitadel-app-ct-"));
+    const result = await runCliForTest([
+      "app",
+      "add",
+      "--cwd",
+      cwd,
+      "--json",
+      "--non-interactive",
+      "--protocol",
+      "oidc",
+      "--slug",
+      "spa",
+      "--client-type",
+      "spa",
+      "--redirect-uri",
+      "http://localhost:3000/callback",
+    ]);
+    expect(result.exitCode).toBe(0);
+    const contents = JSON.parse(await readFile(join(cwd, ".zitadel/apps/spa.json"), "utf8")) as Record<string, unknown>;
+    expect((contents.oidc as { client_type: string }).client_type).toBe("spa");
+    expect((contents.oidc as { auth_methods: string[] }).auth_methods).toEqual(["none"]);
+  });
+
+  it("app add rejects --role with --protocol oidc", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "zitadel-app-role-"));
+    const result = await runCliForTest([
+      "app",
+      "add",
+      "--cwd",
+      cwd,
+      "--json",
+      "--non-interactive",
+      "--protocol",
+      "oidc",
+      "--slug",
+      "bad",
+      "--role",
+      "client",
+    ]);
+    expect(result.exitCode).toBe(3);
+    const envelope = parseJson(result.stdout) as { code: string; hint?: string };
+    expect(envelope.code).toBe("E_VALIDATION");
+    expect(envelope.hint ?? "").toContain("--client-type");
+  });
+
   it("app list is empty in a fresh cwd without .zitadel/apps", async () => {
     const cwd = await mkdtemp(join(tmpdir(), "zitadel-app-empty-"));
     const result = await runCliForTest(["app", "list", "--cwd", cwd, "--json"]);

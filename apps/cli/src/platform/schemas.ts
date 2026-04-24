@@ -43,6 +43,8 @@ export type GetProjectResponse = z.infer<typeof projectResponseSchema>;
 
 export const configUploadRequestSchema = z.object({
   config: z.record(z.unknown()),
+  resources: z.record(z.record(z.unknown())).optional(),
+  templates: z.record(z.string()).optional(),
   hash: z.string(),
   schema_version: z.string().optional(),
   sdk_version: z.string().optional(),

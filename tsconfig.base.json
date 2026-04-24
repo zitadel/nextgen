@@ -11,6 +11,7 @@
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "skipLibCheck": true,
+    "baseUrl": ".",
     "paths": {
       "@zitadel/sdk-core": ["./packages/sdk-core/src/index.ts"],
       "@zitadel/sdk-next": ["./packages/sdk-next/src/index.tsx"]

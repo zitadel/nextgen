@@ -9,6 +9,7 @@ export type AppAddOptions = GlobalOptions & {
   displayName?: string;
   protocol?: string;
   preset?: string;
+  clientType?: string;
   role?: string;
   redirectUri?: string | string[];
   postLogoutRedirectUri?: string | string[];
@@ -16,6 +17,9 @@ export type AppAddOptions = GlobalOptions & {
   entityId?: string;
   fromFile?: string;
 };
+
+const OIDC_CLIENT_TYPES = ["web", "spa", "native", "machine"] as const;
+type OidcClientType = (typeof OIDC_CLIENT_TYPES)[number];
 
 export type AppRemoveOptions = GlobalOptions & { slug?: string };
 
@@ -119,7 +123,22 @@ async function buildAppResource(opts: AppAddOptions): Promise<Record<string, unk
   const displayName = opts.displayName ?? slug;
 
   if (protocol === "oidc") {
-    const clientType = (opts.role === "server" ? "web" : (opts.role as "web" | "spa" | "native" | "machine" | undefined)) ?? "web";
+    if (opts.role !== undefined) {
+      throw new ZitadelError("E_VALIDATION", "--role is not valid for --protocol oidc", {
+        hint: "Use --client-type <web|spa|native|machine> instead. --role is SAML-only.",
+      });
+    }
+    const clientType = resolveOidcClientType(opts.clientType);
+    const authMethods =
+      clientType === "spa" || clientType === "native"
+        ? ["none"]
+        : clientType === "machine"
+          ? ["private_key_jwt"]
+          : ["client_secret_basic"];
+    const grantTypes =
+      clientType === "machine"
+        ? ["client_credentials", "urn:ietf:params:oauth:grant-type:token-exchange"]
+        : ["authorization_code", "refresh_token"];
     return {
       version: 1,
       kind: "app",
@@ -130,14 +149,14 @@ async function buildAppResource(opts: AppAddOptions): Promise<Record<string, unk
       enabled: true,
       oidc: {
         client_type: clientType,
-        auth_methods: clientType === "spa" || clientType === "native" ? ["none"] : ["client_secret_basic"],
-        grant_types: ["authorization_code", "refresh_token"],
+        auth_methods: authMethods,
+        grant_types: grantTypes,
         response_types: ["code"],
-        redirect_uris: redirectUris,
-        post_logout_redirect_uris: postLogoutRedirectUris,
+        redirect_uris: clientType === "machine" ? [] : redirectUris,
+        post_logout_redirect_uris: clientType === "machine" ? [] : postLogoutRedirectUris,
         access_token_type: "jwt",
-        id_token_claims: ["email", "given_name", "family_name"],
-        skip_consent: true,
+        id_token_claims: clientType === "machine" ? [] : ["email", "given_name", "family_name"],
+        skip_consent: clientType !== "native",
       },
     };
   }
@@ -160,6 +179,14 @@ async function buildAppResource(opts: AppAddOptions): Promise<Record<string, unk
 
 function isAppPreset(value: string): value is AppPreset {
   return (APP_PRESETS as string[]).includes(value);
+}
+
+function resolveOidcClientType(value: string | undefined): OidcClientType {
+  if (value === undefined) return "spa";
+  if ((OIDC_CLIENT_TYPES as readonly string[]).includes(value)) return value as OidcClientType;
+  throw new ZitadelError("E_VALIDATION", `Invalid --client-type "${value}"`, {
+    hint: `Use one of: ${OIDC_CLIENT_TYPES.join(", ")}.`,
+  });
 }
 
 function normalizeList(value: string | string[] | undefined): string[] {

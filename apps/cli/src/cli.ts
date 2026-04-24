@@ -182,6 +182,7 @@ async function dispatch(parsed: ParsedArgs, io: CliIO, global: GlobalOptions): P
           displayName: stringOpt(parsed, "displayName"),
           protocol: stringOpt(parsed, "protocol"),
           preset: stringOpt(parsed, "preset"),
+          clientType: stringOpt(parsed, "clientType"),
           role: stringOpt(parsed, "role"),
           redirectUri: multiOpt(parsed, "redirectUri"),
           postLogoutRedirectUri: multiOpt(parsed, "postLogoutRedirectUri"),
