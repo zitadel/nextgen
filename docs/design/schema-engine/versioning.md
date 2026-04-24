@@ -1,5 +1,7 @@
 # Schema versioning
 
+> **Status:** Draft
+> **See also:** [Flow engine](../flowengine/flow-engine.md)
 This document describes **how versions of a schema can be defined and managed**. It does not describe anything about the
 contents of those schemas.
 
@@ -13,7 +15,7 @@ E.g.: A user is created from the User-schema, and a flow is created from the Flo
 
 ### Schema
 
-The schema which defines how the instances should
+The schema which defines how the instances should be structured.
 
 ### Engine
 
