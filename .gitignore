@@ -42,3 +42,9 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+
+# TypeScript workspace
+apps/**/node_modules/
+apps/**/dist/
+packages/**/node_modules/
+packages/**/dist/
