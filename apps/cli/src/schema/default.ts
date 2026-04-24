@@ -86,6 +86,62 @@ export function fieldPreset(name: string): Record<string, unknown> {
   return { ...(FIELD_PRESETS[name] ?? genericField(name)) };
 }
 
+export type NamedPreset = {
+  name: string;
+  schema: Record<string, unknown>;
+  required: boolean;
+};
+
+const NAMED_PRESETS: Record<string, NamedPreset[]> = {
+  email: [{ name: "email", schema: { ...FIELD_PRESETS.email }, required: true }],
+  "phone-mfa-sms": [
+    {
+      name: "phone",
+      schema: {
+        ...FIELD_PRESETS.phone,
+        "x-mfa": "sms",
+      },
+      required: false,
+    },
+  ],
+  "phone-mfa-required": [
+    {
+      name: "phone",
+      schema: {
+        ...FIELD_PRESETS.phone,
+        "x-mfa": "sms",
+      },
+      required: true,
+    },
+  ],
+  "full-name": [
+    { name: "given_name", schema: { ...FIELD_PRESETS.given_name }, required: true },
+    { name: "family_name", schema: { ...FIELD_PRESETS.family_name }, required: true },
+  ],
+  "date-of-birth": [
+    {
+      name: "date_of_birth",
+      schema: {
+        type: "string",
+        format: "date",
+        title: "Date of birth",
+        "x-sensitive": true,
+        "x-editable": true,
+      },
+      required: false,
+    },
+  ],
+};
+
+export function listNamedPresets(): string[] {
+  return Object.keys(NAMED_PRESETS).sort();
+}
+
+export function resolveNamedPreset(name: string): NamedPreset[] | undefined {
+  const preset = NAMED_PRESETS[name];
+  return preset ? preset.map((entry) => ({ ...entry, schema: { ...entry.schema } })) : undefined;
+}
+
 function genericField(name: string): Record<string, unknown> {
   return {
     type: "string",

@@ -1,6 +1,15 @@
 import type { CliIO, GlobalOptions } from "../io/output";
 import { ok } from "../io/output";
 import { EXIT_CODES } from "../lib/errors";
+import {
+  KNOWN_FIELD_ANNOTATIONS,
+  KNOWN_MFA_VALUES,
+  KNOWN_UNIQUE_VALUES,
+  KNOWN_VERIFY_VALUES,
+} from "../schema/annotations";
+import { listNamedPresets } from "../schema/default";
+import { listRenderers } from "../renderers/registry";
+import { BANNED_ATTRIBUTE_PREFIX, BANNED_FILTERS, BANNED_TAGS } from "../templates/validate";
 import { COMMANDS } from "./registry";
 
 export const ENVELOPE_SCHEMA_VERSION = 1;
@@ -16,6 +25,8 @@ export async function runCapabilities(io: CliIO, opts: GlobalOptions): Promise<v
         summary: spec.summary,
         usage: spec.usage,
         agent_status: spec.agent_status,
+        agent: agentSupport(spec.agent_status),
+        mock_behavior: mockBehavior(spec.agent_status),
         notes: spec.notes,
         flags: spec.flags.map((flag) => ({
           name: flag.name,
@@ -33,7 +44,46 @@ export async function runCapabilities(io: CliIO, opts: GlobalOptions): Promise<v
         mock_sentinel: "mock",
         precedence: ["--server flag", "ZITADEL_API_BASE env", "zitadel.json#environments.<env>.server", "zitadel.json#server", "default"],
       },
+      resource_directories: [
+        { kind: "schema", dir: ".zitadel/schemas" },
+        { kind: "flow-definition", dir: ".zitadel/flows" },
+        { kind: "locale", dir: ".zitadel/locales" },
+        { kind: "template", dir: ".zitadel/templates" },
+        { kind: "idp", dir: ".zitadel/idps" },
+        { kind: "app", dir: ".zitadel/apps" },
+      ],
+      renderers: listRenderers(),
+      i18n: {
+        locale_directory: ".zitadel/locales",
+        default_locale: "en",
+        text_key_convention: "<step>.<scope>.<name>",
+      },
+      template_security: {
+        banned_filters: BANNED_FILTERS,
+        banned_tags: BANNED_TAGS,
+        banned_attribute_prefix: BANNED_ATTRIBUTE_PREFIX,
+      },
+      schema_vocabulary: {
+        field_annotations: KNOWN_FIELD_ANNOTATIONS,
+        x_verify_values: KNOWN_VERIFY_VALUES,
+        x_mfa_values: KNOWN_MFA_VALUES,
+        x_unique_values: KNOWN_UNIQUE_VALUES,
+        presets: listNamedPresets(),
+      },
     },
     opts,
   );
+}
+
+function agentSupport(status: string): "supported" | "handoff" | "unsupported" {
+  if (status === "handoff") return "handoff";
+  if (status.startsWith("supported")) return "supported";
+  return "unsupported";
+}
+
+function mockBehavior(status: string): "complete" | "partial" | "none" {
+  if (status === "supported-mock-default") return "partial";
+  if (status === "handoff") return "partial";
+  if (status === "supported") return "none";
+  return "none";
 }

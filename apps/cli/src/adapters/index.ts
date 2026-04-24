@@ -1,5 +1,6 @@
 import type { FrameworkDetection, FrameworkId } from "../detect/framework";
 import type { PackageManager } from "../detect/package-manager";
+import type { RendererSpec } from "../renderers/types";
 import type { ScaffoldPlan } from "../scaffolder/plan";
 
 export type ZitadelConfig = {
@@ -14,6 +15,7 @@ export type ProjectContext = {
   packageManager: PackageManager;
   framework: FrameworkDetection;
   config: ZitadelConfig;
+  renderer: RendererSpec;
   isInitialSetup: boolean;
 };
 
@@ -23,6 +25,6 @@ export interface FrameworkAdapter {
   planSetup(ctx: ProjectContext): Promise<ScaffoldPlan>;
   planAddLogin(ctx: ProjectContext): Promise<ScaffoldPlan>;
   planAddRegister(ctx: ProjectContext): Promise<ScaffoldPlan>;
-  sdkDependency(): { name: string; version: string };
+  sdkDependency(ctx: ProjectContext): { name: string; version: string };
   envKeys(): string[];
 }

@@ -34,10 +34,25 @@ Setup creates:
 - `zitadel.json` (project config, includes a `server` field — a URL or the literal `mock`)
 - `.zitadel/secret` with POSIX mode `0600`
 - `.zitadel/schemas/user.json`
-- `.zitadel/flows/login.json`, `.zitadel/flows/register.json`
+- `.zitadel/flows/default.json` (a `FlowDefinition` with unordered `fields` / `actions` / `gates` dicts and `text_key` labels)
+- `.zitadel/locales/en.json` (flat `text_key → string` map; pre-populated core keys)
 - `.zitadel/state.json` (framework, package manager, dev port, last apply)
+
+Setup also writes:
+
 - `.env.example`, `.env.local`
 - Next App Router files under `app/` or `src/app/`
+
+Resource directories scanned by `zitadel apply` (convention-based, no path map in `zitadel.json`):
+
+- `.zitadel/schemas/*.json`
+- `.zitadel/flows/*.json` (validated against the `FlowDefinition` zod schema)
+- `.zitadel/locales/*.json` (optional, managed by `zitadel locale scaffold`)
+- `.zitadel/templates/*.liquid` (optional; validated — banned: `| raw`, `<script>`, inline `on*=` handlers)
+- `.zitadel/idps/*.json` (optional — created by `zitadel idp add`)
+- `.zitadel/apps/*.json` (optional — created by `zitadel app add`)
+
+Secrets are referenced by env-var name inside resource files (e.g. `"client_secret_env": "ZITADEL_IDP_GOOGLE_SECRET"`). `zitadel apply` resolves them at send-time and never commits secret values to disk.
 
 `.zitadel/secret` and local env files must stay gitignored.
 
@@ -60,7 +75,17 @@ Envelope schema version: `1`. Every envelope carries `cli_version`, `command`, `
 | `zitadel deploy status` | Report deploy platform readiness. | supported |
 | `zitadel deploy connect` | Configure preview or production platform env vars. | supported |
 | `zitadel claim` | Begin the human handoff to claim the project. | handoff |
-| `zitadel add schema` | Add or remove fields on the user schema. | supported |
+| `zitadel schema add` | Add or remove fields on the user schema. | supported |
+| `zitadel idp add` | Add or update an identity provider (.zitadel/idps/<slug>.json). | supported |
+| `zitadel idp list` | List local IdP resources. | supported |
+| `zitadel idp show` | Show a single IdP resource by slug. | supported |
+| `zitadel idp remove` | Remove an IdP resource by slug. | supported |
+| `zitadel locale scaffold` | Add missing text_key entries to .zitadel/locales/<lang>.json (idempotent). | supported |
+| `zitadel locale list` | List local .zitadel/locales/*.json files with key counts. | supported |
+| `zitadel app add` | Add or update an app resource (.zitadel/apps/<slug>.json). Apps consume Zitadel's OIDC/SAML server. | supported |
+| `zitadel app list` | List local app resources. | supported |
+| `zitadel app show` | Show a single app resource by slug. | supported |
+| `zitadel app remove` | Remove an app resource by slug. | supported |
 | `zitadel capabilities` | Describe the CLI contract (commands, flags, exit codes). Agent introspection target. | supported |
 | `zitadel help` | Show help for the CLI or a specific command. | supported |
 | `zitadel status` | Summarize the local project state. | supported |
@@ -84,6 +109,7 @@ Usage: `zitadel setup [--framework next] [--user-fields ...] [--auth-methods ...
 | `--framework` | `string` | Framework to target (v1 supports "next"). |
 | `--user-fields` | `string` | Comma-separated list of user fields. |
 | `--auth-methods` | `string` | Comma-separated list of auth methods. |
+| `--renderer` | `string` | BDUI renderer: react (default) or lit (pending @zitadel/ui-lit). |
 | `--skip-deploy-platform` | `boolean` | Skip deploy platform detection and connect. |
 | `--platform` | `string` | Deploy platform override (vercel/netlify/cloudflare/none). |
 | `--manual` | `boolean` | Emit manual deploy steps instead of configuring the provider. |
@@ -197,11 +223,13 @@ Usage: `zitadel claim`
 | `--server` / `-s` | `string` | Override the resolved server URL (or "mock"). |
 | `--mock` | `boolean` | Alias for --server mock. |
 
-### `zitadel add schema`
+### `zitadel schema add`
 
 Add or remove fields on the user schema.
 
-Usage: `zitadel add schema [--add-field-json '{...}' | --add-field name:type:attrs] [--remove-field name]`
+> Aliased as `zitadel add schema`.
+
+Usage: `zitadel schema add [--preset name] [--add-field-json '{...}' | --add-field name:type:attrs] [--remove-field name]`
 
 | Flag | Type | Description |
 |---|---|---|
@@ -212,9 +240,193 @@ Usage: `zitadel add schema [--add-field-json '{...}' | --add-field name:type:att
 | `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
 | `--server` / `-s` | `string` | Override the resolved server URL (or "mock"). |
 | `--mock` | `boolean` | Alias for --server mock. |
+| `--preset` | `string[]` | Apply a named field preset (run `zitadel capabilities` for the list). |
 | `--add-field` | `string[]` | Add a field using the colon-DSL (name:type:key=value,...). |
 | `--add-field-json` | `string[]` | Add a field using a JSON object. Preferred for agents. |
 | `--remove-field` | `string[]` | Remove a field by name. |
+
+### `zitadel idp add`
+
+Add or update an identity provider (.zitadel/idps/<slug>.json).
+
+Usage: `zitadel idp add (--preset google|microsoft|github|okta-oidc | --protocol oidc|saml) [--slug] [--issuer] [--client-id] [--env-secret] [--metadata-url]`
+
+| Flag | Type | Description |
+|---|---|---|
+| `--cwd` / `-c` | `string` | Project directory to operate on. |
+| `--json` / `-j` | `boolean` | Emit the JSON envelope instead of pretty output. |
+| `--non-interactive` / `-n` | `boolean` | Disable prompts. Required when scripting or running as an agent. |
+| `--dry-run` | `boolean` | Preview the work without mutating files or hitting the platform. |
+| `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
+| `--server` / `-s` | `string` | Override the resolved server URL (or "mock"). |
+| `--mock` | `boolean` | Alias for --server mock. |
+| `--slug` | `string` | Local slug (filename). Defaults to preset id. |
+| `--display-name` | `string` | Human-readable IdP name. |
+| `--protocol` | `string` | Protocol: oidc or saml. |
+| `--preset` | `string` | Preset: google, microsoft, github, okta-oidc. |
+| `--issuer` | `string` | OIDC issuer URL (required with --protocol oidc or okta-oidc preset). |
+| `--client-id` | `string` | OIDC client ID. |
+| `--env-secret` | `string` | Name of env var holding the OIDC client secret (e.g. ZITADEL_IDP_GOOGLE_SECRET). |
+| `--metadata-url` | `string` | SAML metadata URL. |
+| `--scopes` | `string` | Comma-separated OIDC scopes. |
+| `--from-file` | `string` | Path to an existing IdP resource JSON file. |
+
+### `zitadel idp list`
+
+List local IdP resources.
+
+Usage: `zitadel idp list`
+
+| Flag | Type | Description |
+|---|---|---|
+| `--cwd` / `-c` | `string` | Project directory to operate on. |
+| `--json` / `-j` | `boolean` | Emit the JSON envelope instead of pretty output. |
+| `--non-interactive` / `-n` | `boolean` | Disable prompts. Required when scripting or running as an agent. |
+| `--dry-run` | `boolean` | Preview the work without mutating files or hitting the platform. |
+| `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
+| `--server` / `-s` | `string` | Override the resolved server URL (or "mock"). |
+| `--mock` | `boolean` | Alias for --server mock. |
+
+### `zitadel idp show`
+
+Show a single IdP resource by slug.
+
+Usage: `zitadel idp show <slug>`
+
+| Flag | Type | Description |
+|---|---|---|
+| `--cwd` / `-c` | `string` | Project directory to operate on. |
+| `--json` / `-j` | `boolean` | Emit the JSON envelope instead of pretty output. |
+| `--non-interactive` / `-n` | `boolean` | Disable prompts. Required when scripting or running as an agent. |
+| `--dry-run` | `boolean` | Preview the work without mutating files or hitting the platform. |
+| `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
+| `--server` / `-s` | `string` | Override the resolved server URL (or "mock"). |
+| `--mock` | `boolean` | Alias for --server mock. |
+
+### `zitadel idp remove`
+
+Remove an IdP resource by slug.
+
+Usage: `zitadel idp remove <slug>`
+
+| Flag | Type | Description |
+|---|---|---|
+| `--cwd` / `-c` | `string` | Project directory to operate on. |
+| `--json` / `-j` | `boolean` | Emit the JSON envelope instead of pretty output. |
+| `--non-interactive` / `-n` | `boolean` | Disable prompts. Required when scripting or running as an agent. |
+| `--dry-run` | `boolean` | Preview the work without mutating files or hitting the platform. |
+| `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
+| `--server` / `-s` | `string` | Override the resolved server URL (or "mock"). |
+| `--mock` | `boolean` | Alias for --server mock. |
+
+### `zitadel locale scaffold`
+
+Add missing text_key entries to .zitadel/locales/<lang>.json (idempotent).
+
+> Walks .zitadel/flows/*.json, extracts every text_key, adds missing keys with empty strings.
+
+Usage: `zitadel locale scaffold [--lang en]`
+
+| Flag | Type | Description |
+|---|---|---|
+| `--cwd` / `-c` | `string` | Project directory to operate on. |
+| `--json` / `-j` | `boolean` | Emit the JSON envelope instead of pretty output. |
+| `--non-interactive` / `-n` | `boolean` | Disable prompts. Required when scripting or running as an agent. |
+| `--dry-run` | `boolean` | Preview the work without mutating files or hitting the platform. |
+| `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
+| `--server` / `-s` | `string` | Override the resolved server URL (or "mock"). |
+| `--mock` | `boolean` | Alias for --server mock. |
+| `--lang` | `string` | Target locale code (default: en). |
+
+### `zitadel locale list`
+
+List local .zitadel/locales/*.json files with key counts.
+
+Usage: `zitadel locale list`
+
+| Flag | Type | Description |
+|---|---|---|
+| `--cwd` / `-c` | `string` | Project directory to operate on. |
+| `--json` / `-j` | `boolean` | Emit the JSON envelope instead of pretty output. |
+| `--non-interactive` / `-n` | `boolean` | Disable prompts. Required when scripting or running as an agent. |
+| `--dry-run` | `boolean` | Preview the work without mutating files or hitting the platform. |
+| `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
+| `--server` / `-s` | `string` | Override the resolved server URL (or "mock"). |
+| `--mock` | `boolean` | Alias for --server mock. |
+
+### `zitadel app add`
+
+Add or update an app resource (.zitadel/apps/<slug>.json). Apps consume Zitadel's OIDC/SAML server.
+
+Usage: `zitadel app add (--preset spa|web|native|machine | --protocol oidc|saml) --slug <slug> [--redirect-uri ...]`
+
+| Flag | Type | Description |
+|---|---|---|
+| `--cwd` / `-c` | `string` | Project directory to operate on. |
+| `--json` / `-j` | `boolean` | Emit the JSON envelope instead of pretty output. |
+| `--non-interactive` / `-n` | `boolean` | Disable prompts. Required when scripting or running as an agent. |
+| `--dry-run` | `boolean` | Preview the work without mutating files or hitting the platform. |
+| `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
+| `--server` / `-s` | `string` | Override the resolved server URL (or "mock"). |
+| `--mock` | `boolean` | Alias for --server mock. |
+| `--slug` | `string` | Local slug (filename). |
+| `--display-name` | `string` | Human-readable app name. |
+| `--protocol` | `string` | Protocol: oidc or saml. |
+| `--preset` | `string` | Preset: spa, web, native, machine. |
+| `--role` | `string` | client (default) or server (Zitadel-as-IdP for SAML). |
+| `--redirect-uri` | `string[]` | Redirect URI (repeatable). OIDC only. |
+| `--post-logout-redirect-uri` | `string[]` | Post-logout redirect URI (repeatable). OIDC only. |
+| `--metadata-url` | `string` | SAML metadata URL. |
+| `--entity-id` | `string` | SAML entity ID. |
+| `--from-file` | `string` | Path to an existing app resource JSON file. |
+
+### `zitadel app list`
+
+List local app resources.
+
+Usage: `zitadel app list`
+
+| Flag | Type | Description |
+|---|---|---|
+| `--cwd` / `-c` | `string` | Project directory to operate on. |
+| `--json` / `-j` | `boolean` | Emit the JSON envelope instead of pretty output. |
+| `--non-interactive` / `-n` | `boolean` | Disable prompts. Required when scripting or running as an agent. |
+| `--dry-run` | `boolean` | Preview the work without mutating files or hitting the platform. |
+| `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
+| `--server` / `-s` | `string` | Override the resolved server URL (or "mock"). |
+| `--mock` | `boolean` | Alias for --server mock. |
+
+### `zitadel app show`
+
+Show a single app resource by slug.
+
+Usage: `zitadel app show <slug>`
+
+| Flag | Type | Description |
+|---|---|---|
+| `--cwd` / `-c` | `string` | Project directory to operate on. |
+| `--json` / `-j` | `boolean` | Emit the JSON envelope instead of pretty output. |
+| `--non-interactive` / `-n` | `boolean` | Disable prompts. Required when scripting or running as an agent. |
+| `--dry-run` | `boolean` | Preview the work without mutating files or hitting the platform. |
+| `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
+| `--server` / `-s` | `string` | Override the resolved server URL (or "mock"). |
+| `--mock` | `boolean` | Alias for --server mock. |
+
+### `zitadel app remove`
+
+Remove an app resource by slug.
+
+Usage: `zitadel app remove <slug>`
+
+| Flag | Type | Description |
+|---|---|---|
+| `--cwd` / `-c` | `string` | Project directory to operate on. |
+| `--json` / `-j` | `boolean` | Emit the JSON envelope instead of pretty output. |
+| `--non-interactive` / `-n` | `boolean` | Disable prompts. Required when scripting or running as an agent. |
+| `--dry-run` | `boolean` | Preview the work without mutating files or hitting the platform. |
+| `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
+| `--server` / `-s` | `string` | Override the resolved server URL (or "mock"). |
+| `--mock` | `boolean` | Alias for --server mock. |
 
 ### `zitadel capabilities`
 

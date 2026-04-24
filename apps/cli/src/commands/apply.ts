@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { detectDeployTarget } from "../deploy";
@@ -8,8 +8,10 @@ import { ZitadelError } from "../lib/errors";
 import { sha256 } from "../lib/hash";
 import { createPlatformClient } from "../platform";
 import { environmentSchema, type ZitadelEnvironment } from "../platform/schemas";
+import { flowDefinitionSchema } from "../resources/flow";
 import { scaffold } from "../scaffolder";
 import { CLI_VERSION } from "../lib/version";
+import { validateLiquidTemplate } from "../templates/validate";
 import { readZitadelConfig, readZitadelSecret, schemaVersionFromConfig } from "./shared";
 
 export type ApplyOptions = GlobalOptions & {
@@ -23,9 +25,13 @@ export async function runApply(io: CliIO, opts: ApplyOptions): Promise<Record<st
   const environment = parseEnvironment(opts.environment);
   const config = await readZitadelConfig(opts.cwd);
   const secret = await readZitadelSecret(opts.cwd);
-  const hash = sha256(config);
   const filesRead = await assertReferencedFilesExist(opts.cwd, config);
-  const envRefs = findEnvRefs(config);
+  const resourceBundle = await readResourceBundle(opts.cwd, filesRead);
+  validateFlowDefinitions(resourceBundle);
+  const templateFiles = await readTemplates(opts.cwd);
+  validateTemplates(templateFiles);
+  const hash = sha256({ config, resources: resourceBundle, templates: templateFiles });
+  const envRefs = [...findEnvRefs(config), ...findEnvRefs(resourceBundle)].filter(uniq).sort();
   const missingEnv = envRefs.filter((name) => !io.env[name]);
   const deploy = await detectDeployTarget(opts.cwd, opts.platform);
   const blockers: string[] = [];
@@ -40,12 +46,14 @@ export async function runApply(io: CliIO, opts: ApplyOptions): Promise<Record<st
   const nextCommandsForBlockers = environment === "production" && !isClaimedSecret(secret) ? ["zitadel claim"] : undefined;
 
   const planning = opts.planOnly || opts.dryRun;
+  const resourceCounts = countResources(resourceBundle);
   const baseData = {
     project_id: secret.project_id,
     lifecycle: isClaimedSecret(secret) ? "claimed" : "pre-claim",
     environment,
     hash,
-    files_read: filesRead,
+    files_read: [...filesRead, ...Object.keys(templateFiles)].sort(),
+    resources: { ...resourceCounts, templates: Object.keys(templateFiles).length },
     env_refs: {
       resolved: envRefs.filter((name) => Boolean(io.env[name])),
       missing: missingEnv,
@@ -130,11 +138,30 @@ function parseEnvironment(value: string | undefined): ZitadelEnvironment {
   return result.data;
 }
 
-async function assertReferencedFilesExist(cwd: string, config: Record<string, unknown>): Promise<string[]> {
-  const paths = [
-    ...Object.values(isObject(config.flows) ? config.flows : {}),
-    ...Object.values(isObject(config.schemas) ? config.schemas : {}),
-  ].filter((value): value is string => typeof value === "string");
+async function assertReferencedFilesExist(cwd: string, _config: Record<string, unknown>): Promise<string[]> {
+  const directories: Array<{ dir: string; required: boolean }> = [
+    { dir: ".zitadel/schemas", required: true },
+    { dir: ".zitadel/flows", required: true },
+    { dir: ".zitadel/locales", required: false },
+    { dir: ".zitadel/idps", required: false },
+    { dir: ".zitadel/apps", required: false },
+  ];
+
+  const paths: string[] = [];
+  for (const { dir, required } of directories) {
+    const files = await listResourceFiles(join(cwd, dir));
+    if (files === undefined) {
+      if (required) {
+        throw new ZitadelError("E_VALIDATION", `Required resource directory ${dir} was not found`, {
+          details: { dir },
+        });
+      }
+      continue;
+    }
+    for (const file of files) {
+      paths.push(join(dir, file));
+    }
+  }
 
   for (const path of paths) {
     try {
@@ -150,6 +177,108 @@ async function assertReferencedFilesExist(cwd: string, config: Record<string, un
   }
 
   return ["zitadel.json", ...paths];
+}
+
+async function listResourceFiles(dir: string): Promise<string[] | undefined> {
+  try {
+    const entries = await readdir(dir);
+    return entries.filter((entry) => entry.endsWith(".json")).sort();
+  } catch (error) {
+    if (typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "ENOENT") {
+      return undefined;
+    }
+    throw error;
+  }
+}
+
+async function readResourceBundle(
+  cwd: string,
+  paths: string[],
+): Promise<Record<string, Record<string, unknown>>> {
+  const bundle: Record<string, Record<string, unknown>> = {};
+  for (const path of paths) {
+    if (path === "zitadel.json") continue;
+    try {
+      bundle[path] = JSON.parse(await readFile(join(cwd, path), "utf8")) as Record<string, unknown>;
+    } catch (error) {
+      throw new ZitadelError("E_VALIDATION", `Resource ${path} is not valid JSON`, {
+        details: { path, cause: error instanceof Error ? error.message : String(error) },
+      });
+    }
+  }
+  return bundle;
+}
+
+function countResources(bundle: Record<string, Record<string, unknown>>): {
+  schemas: number;
+  flows: number;
+  locales: number;
+  idps: number;
+  apps: number;
+} {
+  const out = { schemas: 0, flows: 0, locales: 0, idps: 0, apps: 0 };
+  for (const path of Object.keys(bundle)) {
+    if (path.startsWith(".zitadel/schemas/")) out.schemas += 1;
+    else if (path.startsWith(".zitadel/flows/")) out.flows += 1;
+    else if (path.startsWith(".zitadel/locales/")) out.locales += 1;
+    else if (path.startsWith(".zitadel/idps/")) out.idps += 1;
+    else if (path.startsWith(".zitadel/apps/")) out.apps += 1;
+  }
+  return out;
+}
+
+function validateFlowDefinitions(bundle: Record<string, Record<string, unknown>>): void {
+  const issues: Array<{ path: string; issues: unknown }> = [];
+  for (const [path, contents] of Object.entries(bundle)) {
+    if (!path.startsWith(".zitadel/flows/")) continue;
+    const parsed = flowDefinitionSchema.safeParse(contents);
+    if (!parsed.success) {
+      issues.push({ path, issues: parsed.error.issues });
+    }
+  }
+  if (issues.length > 0) {
+    throw new ZitadelError("E_VALIDATION", "One or more flow definitions are invalid", {
+      details: { issues },
+    });
+  }
+}
+
+async function readTemplates(cwd: string): Promise<Record<string, string>> {
+  const dir = join(cwd, ".zitadel/templates");
+  let entries: string[];
+  try {
+    entries = await readdir(dir);
+  } catch (error) {
+    if (typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "ENOENT") {
+      return {};
+    }
+    throw error;
+  }
+  const out: Record<string, string> = {};
+  for (const entry of entries.filter((name) => name.endsWith(".liquid")).sort()) {
+    out[`.zitadel/templates/${entry}`] = await readFile(join(dir, entry), "utf8");
+  }
+  return out;
+}
+
+function validateTemplates(templates: Record<string, string>): void {
+  const issues: Array<{ path: string; issues: unknown }> = [];
+  for (const [path, source] of Object.entries(templates)) {
+    const result = validateLiquidTemplate(source);
+    if (!result.valid) {
+      issues.push({ path, issues: result.issues });
+    }
+  }
+  if (issues.length > 0) {
+    throw new ZitadelError("E_VALIDATION", "One or more Liquid templates failed validation", {
+      hint: "Banned: | raw filter, <script> tags, inline event handlers (on*=).",
+      details: { issues },
+    });
+  }
+}
+
+function uniq<T>(value: T, index: number, array: T[]): boolean {
+  return array.indexOf(value) === index;
 }
 
 function findEnvRefs(value: unknown): string[] {

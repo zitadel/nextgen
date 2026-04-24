@@ -24,8 +24,8 @@ export async function runEject(io: CliIO, opts: EjectOptions): Promise<void> {
   const candidates = [
     "zitadel.json",
     ".zitadel/schemas/user.json",
-    ".zitadel/flows/login.json",
-    ".zitadel/flows/register.json",
+    ".zitadel/flows/default.json",
+    ".zitadel/locales/en.json",
     ".zitadel/state.json",
     ".zitadel/secret",
     "app/login/page.tsx",

@@ -7,12 +7,15 @@ import { toZitadelError, ZitadelError } from "./lib/errors";
 import { resolveServer, DEFAULT_SERVER } from "./platform/resolve-server";
 import { runAddSchema } from "./commands/add-schema";
 import { runApply } from "./commands/apply";
+import { runAppAdd, runAppList, runAppRemove, runAppShow } from "./commands/app";
 import { runCapabilities } from "./commands/capabilities";
 import { runClaim } from "./commands/claim";
 import { runDeployConnect, runDeployStatus } from "./commands/deploy";
 import { runDoctor } from "./commands/doctor";
 import { runEject } from "./commands/eject";
 import { runHelp } from "./commands/help";
+import { runIdpAdd, runIdpList, runIdpRemove, runIdpShow } from "./commands/idp";
+import { runLocaleList, runLocaleScaffold } from "./commands/locale";
 import { runSetup } from "./commands/setup";
 import { runStatus } from "./commands/status";
 
@@ -106,10 +109,102 @@ async function dispatch(parsed: ParsedArgs, io: CliIO, global: GlobalOptions): P
           addField: multiOpt(parsed, "addField"),
           addFieldJson: multiOpt(parsed, "addFieldJson"),
           removeField: multiOpt(parsed, "removeField"),
+          preset: multiOpt(parsed, "preset"),
         });
         return;
       }
       break;
+    case "schema":
+      if (subcommand === "add") {
+        await runAddSchema(io, {
+          ...withSubcommand(global, "schema add"),
+          addField: multiOpt(parsed, "addField"),
+          addFieldJson: multiOpt(parsed, "addFieldJson"),
+          removeField: multiOpt(parsed, "removeField"),
+          preset: multiOpt(parsed, "preset"),
+        });
+        return;
+      }
+      break;
+    case "idp": {
+      const idpGlobal = withSubcommand(global, `idp ${subcommand ?? ""}`.trim());
+      if (subcommand === "add") {
+        await runIdpAdd(io, {
+          ...idpGlobal,
+          slug: stringOpt(parsed, "slug"),
+          displayName: stringOpt(parsed, "displayName"),
+          protocol: stringOpt(parsed, "protocol"),
+          preset: stringOpt(parsed, "preset"),
+          issuer: stringOpt(parsed, "issuer"),
+          clientId: stringOpt(parsed, "clientId"),
+          clientSecretEnv: stringOpt(parsed, "envSecret") ?? stringOpt(parsed, "clientSecretEnv"),
+          metadataUrl: stringOpt(parsed, "metadataUrl"),
+          scopes: stringOpt(parsed, "scopes"),
+          fromFile: stringOpt(parsed, "fromFile"),
+        });
+        return;
+      }
+      if (subcommand === "list") {
+        await runIdpList(io, idpGlobal);
+        return;
+      }
+      if (subcommand === "show") {
+        await runIdpShow(io, idpGlobal, parsed.positionals[2]);
+        return;
+      }
+      if (subcommand === "remove") {
+        await runIdpRemove(io, idpGlobal, parsed.positionals[2]);
+        return;
+      }
+      break;
+    }
+    case "locale": {
+      const localeGlobal = withSubcommand(global, `locale ${subcommand ?? ""}`.trim());
+      if (subcommand === "scaffold") {
+        await runLocaleScaffold(io, {
+          ...localeGlobal,
+          lang: stringOpt(parsed, "lang"),
+        });
+        return;
+      }
+      if (subcommand === "list") {
+        await runLocaleList(io, localeGlobal);
+        return;
+      }
+      break;
+    }
+    case "app": {
+      const appGlobal = withSubcommand(global, `app ${subcommand ?? ""}`.trim());
+      if (subcommand === "add") {
+        await runAppAdd(io, {
+          ...appGlobal,
+          slug: stringOpt(parsed, "slug"),
+          displayName: stringOpt(parsed, "displayName"),
+          protocol: stringOpt(parsed, "protocol"),
+          preset: stringOpt(parsed, "preset"),
+          role: stringOpt(parsed, "role"),
+          redirectUri: multiOpt(parsed, "redirectUri"),
+          postLogoutRedirectUri: multiOpt(parsed, "postLogoutRedirectUri"),
+          metadataUrl: stringOpt(parsed, "metadataUrl"),
+          entityId: stringOpt(parsed, "entityId"),
+          fromFile: stringOpt(parsed, "fromFile"),
+        });
+        return;
+      }
+      if (subcommand === "list") {
+        await runAppList(io, appGlobal);
+        return;
+      }
+      if (subcommand === "show") {
+        await runAppShow(io, appGlobal, parsed.positionals[2]);
+        return;
+      }
+      if (subcommand === "remove") {
+        await runAppRemove(io, appGlobal, parsed.positionals[2]);
+        return;
+      }
+      break;
+    }
     case "capabilities":
       await runCapabilities(io, global);
       return;
@@ -169,6 +264,7 @@ function setupOptions(parsed: ParsedArgs, global: GlobalOptions) {
     framework: stringOpt(parsed, "framework"),
     userFields: stringOpt(parsed, "userFields"),
     authMethods: stringOpt(parsed, "authMethods"),
+    renderer: stringOpt(parsed, "renderer"),
     skipDeployPlatform: boolOpt(parsed, "skipDeployPlatform"),
     manualDeploy: boolOpt(parsed, "manual"),
     noApply: boolOpt(parsed, "noApply"),
@@ -227,6 +323,11 @@ function resolveCommandName(parsed: ParsedArgs): string {
   if (!head) return "(default)";
   if (head === "deploy" && (next === "connect" || next === "status")) return `deploy ${next}`;
   if (head === "add" && next === "schema") return "add schema";
+  if (head === "schema" && next === "add") return "schema add";
+  if ((head === "idp" || head === "app") && (next === "add" || next === "list" || next === "show" || next === "remove")) {
+    return `${head} ${next}`;
+  }
+  if (head === "locale" && (next === "scaffold" || next === "list")) return `locale ${next}`;
   if (head === "help") return "help";
   return head;
 }

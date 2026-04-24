@@ -11,6 +11,7 @@ import type { CliIO, GlobalOptions } from "../io/output";
 import { ok } from "../io/output";
 import { ZitadelError } from "../lib/errors";
 import { MANAGED_MARKER } from "../lib/paths";
+import { getRenderer } from "../renderers/registry";
 import { scaffold } from "../scaffolder";
 import type { ScaffoldPlan } from "../scaffolder/plan";
 import { validateJsonSchema } from "../schema/validate";
@@ -145,10 +146,13 @@ async function applyFixes(opts: DoctorOptions): Promise<void> {
   const packageManager = await detectPackageManager(opts.cwd);
   const adapter = getAdapter(framework.id);
   const issuer = await resolveIssuer(opts.cwd, config);
+  const rendererId = readRendererId(config);
+  const renderer = getRenderer(rendererId);
   const ctx: ProjectContext = {
     cwd: opts.cwd,
     packageManager,
     framework,
+    renderer,
     config: {
       project_id: secret.project_id,
       issuer,
@@ -233,6 +237,12 @@ function readIssuer(config: Record<string, unknown>): unknown {
   return isObject(config.environments) && isObject(config.environments.development)
     ? config.environments.development.issuer
     : undefined;
+}
+
+function readRendererId(config: Record<string, unknown>): string {
+  const branding = isObject(config.branding) ? config.branding : undefined;
+  const value = branding && typeof branding.renderer === "string" ? branding.renderer : "react";
+  return value === "default" ? "react" : value;
 }
 
 async function resolveIssuer(cwd: string, config: Record<string, unknown>): Promise<string> {

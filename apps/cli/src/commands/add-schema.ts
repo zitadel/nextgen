@@ -5,6 +5,8 @@ import type { CliIO, GlobalOptions } from "../io/output";
 import { ok } from "../io/output";
 import { ZitadelError } from "../lib/errors";
 import { parseJsonObject, stableStringify } from "../lib/json";
+import { validateFieldAnnotations } from "../schema/annotations";
+import { listNamedPresets, resolveNamedPreset } from "../schema/default";
 import { addFields, addFieldFromJson, parseAddFieldSpec, removeFields, type AddFieldSpec } from "../schema/merge";
 import { validateJsonSchema } from "../schema/validate";
 
@@ -12,12 +14,26 @@ export type AddSchemaOptions = GlobalOptions & {
   addField?: string | string[];
   addFieldJson?: string | string[];
   removeField?: string | string[];
+  preset?: string | string[];
 };
 
 export async function runAddSchema(io: CliIO, opts: AddSchemaOptions): Promise<void> {
   const path = join(opts.cwd, ".zitadel/schemas/user.json");
   const before = parseJsonObject(await readFile(path, "utf8"), ".zitadel/schemas/user.json");
+  const presetNames = normalizeArray(opts.preset);
+  const presetSpecs: AddFieldSpec[] = [];
+  for (const name of presetNames) {
+    const entries = resolveNamedPreset(name);
+    if (!entries) {
+      throw new ZitadelError("E_VALIDATION", `Unknown preset "${name}"`, {
+        hint: `Available presets: ${listNamedPresets().join(", ")}`,
+        details: { available: listNamedPresets() },
+      });
+    }
+    presetSpecs.push(...entries);
+  }
   const addSpecs: AddFieldSpec[] = [
+    ...presetSpecs,
     ...normalizeArray(opts.addField).map(parseAddFieldSpec),
     ...normalizeArray(opts.addFieldJson).map((raw, index) => {
       try {
@@ -40,6 +56,8 @@ export async function runAddSchema(io: CliIO, opts: AddSchemaOptions): Promise<v
   if (removeSpecs.length > 0) {
     next = removeFields(next, removeSpecs);
   }
+
+  const annotationWarnings = addSpecs.flatMap((spec) => validateFieldAnnotations(spec.name, spec.schema));
 
   const validation = validateJsonSchema(next);
   if (!validation.valid) {
@@ -64,10 +82,13 @@ export async function runAddSchema(io: CliIO, opts: AddSchemaOptions): Promise<v
       changed,
       added_fields: addSpecs.map((spec) => spec.name),
       removed_fields: removeSpecs,
+      presets_applied: presetNames,
+      annotation_warnings: annotationWarnings,
       dry_run: Boolean(opts.dryRun),
       next_commands: changed ? ["zitadel apply"] : [],
     },
     opts,
+    annotationWarnings.map((warning) => `${warning.field}: ${warning.message}`),
   );
 }
 

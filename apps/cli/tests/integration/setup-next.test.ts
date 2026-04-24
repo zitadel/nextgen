@@ -27,6 +27,11 @@ describe("Next setup integration", () => {
 
     expect(await readFile(join(cwd, "zitadel.json"), "utf8")).toContain("\"project\"");
     expect(await readFile(join(cwd, ".zitadel/schemas/user.json"), "utf8")).toContain("\"x-unique\": \"project\"");
+    const flowRaw = await readFile(join(cwd, ".zitadel/flows/default.json"), "utf8");
+    expect(flowRaw).toContain("\"template_name\": \"default\"");
+    expect(flowRaw).toContain("\"text_key\": \"identifier.field.email\"");
+    const localeRaw = await readFile(join(cwd, ".zitadel/locales/en.json"), "utf8");
+    expect(localeRaw).toContain("\"identifier.title\": \"Sign in\"");
     expect(await readFile(join(cwd, "app/login/page.tsx"), "utf8")).toContain("zitadel-cli: managed-file v1");
     expect(await readFile(join(cwd, ".env.local"), "utf8")).toContain("ZITADEL_ENVIRONMENT=development");
     expect((await stat(join(cwd, ".zitadel/secret"))).mode & 0o777).toBe(0o600);

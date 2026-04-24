@@ -19,6 +19,7 @@
   "dependencies": {
     "@clack/prompts": "^0.8.2",
     "ajv": "^8.17.1",
+    "liquidjs": "^10.25.7",
     "zod": "^3.24.1"
   },
   "devDependencies": {
