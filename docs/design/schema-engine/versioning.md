@@ -13,13 +13,13 @@ The result when making a concrete value from a schema.
 
 E.g.: A user is created from the User-schema, and a flow is created from the Flow-schema.
 
+### Definition
+
+Defines how the object should be structured.
+
 ### Schema
 
-The schema which defines how the instances should be structured.
-
-### Engine
-
-Defines the tools/features which can be used in a schema.
+Defines the capabilities which can be used in a definition.
 
 ### Capability
 
@@ -29,7 +29,7 @@ A feature which links to logic operations. E.g.: Captcha, Field validation,...
 
 ### API
 
-The API which hosts the Engine.
+The API which hosts the Schema.
 
 ### CUSTOMER
 
@@ -52,8 +52,8 @@ Let's assume the following sequence of events:
 
 1. API creates the Flow-engine inside Zitadel.
 2. CUSTOMER creates a schema for flows. Let's call it `registration_flow`.
-3. CUSTOMER implements the flow Schema in their UI.
-4. UI creates a flow Object from the flow Schema.
+3. CUSTOMER implements the flow Definition in their UI.
+4. UI creates a flow Object from the flow Definition.
 5. USER registers a user using the flow Object.
 
 #### Case 1: API adds new capability
@@ -75,12 +75,12 @@ forgot about it.
 ### The problem
 
 In all of these cases, there is a need for versioning the different parts. If a version is specified for a given 
-revision of Engine/Schema/Object we can communicate that version and the different actors can decide which version they 
+revision of Schema/Definition/Object we can communicate that version and the different actors can decide which version they 
 want to use.
 
 ## Immutability
 
-To do proper versioning we need to make the Engine/Schema immutable once a revision is created. For the engine this is 
+To do proper versioning we need to make the Schema/Definition immutable once a revision is created. For the engine this is 
 done automatically using git and semantic versioning. That is also the approach we take for schemas. Once the entity is 
 created, a version is determined according to semantic versioning. The objects can then target those versions. But the 
 entity itself cannot change afterward. The objects are the exception to that rule. Users for example need to be able to 
@@ -88,7 +88,7 @@ be modified from a domain perspective.
 
 ## Versioning
 
-The Engine is versioned together with the Zitadel binary using semantic versioning: `Major.Minor.Patch` in which breaking changes are major upgrades, new
+The Schema is versioned together with the Zitadel binary using semantic versioning: `Major.Minor.Patch` in which breaking changes are major upgrades, new
 features are minor upgrades and all others are patches. It could be versioned separately which would allow for a more
 fine-grained communication of what changed in the engine instead of the entire application. But that would add more
 complexity and confusion. (TODO: Not sure about this yet, separate versioning is still on the table)
@@ -97,7 +97,7 @@ Since the CUSTOMER creates schemas and UI, they also determine the version. How 
 But each version number needs to be unique. We can suggest using semantic versioning as well, but it is the CUSTOMER's
 responsibility in the end.
 
-Since objects are the result of the handshake between the UI and the Engine, they should contain both versions as 
+Since objects are the result of the handshake between the UI and the Schema, they should contain both versions as 
 fields. They are not versioned though, since they do not have any dependencies, and a dedicated object version would be 
 redundant.
 
@@ -115,27 +115,27 @@ as not all data is migrated, deactivation of the schema is not possible.
 
 TODO: Search for a solution on how to migrate data without asking a user **and check whether that is necessary**.
 
-## Schema lifecycle
+## Definition lifecycle
 
-To make management of a Schema easier for the CUSTOMER we introduce multiple stages in its lifecycle.
+To make management of a Definition easier for the CUSTOMER we introduce multiple stages in its lifecycle.
 
 ### Draft
 
-The Schema is not yet published and can still be edited. It is still under development or ready to be released in
-the future. This Schema can be targeted when creating an Object but will not be used by default.
+The Definition is not yet published and can still be edited. It is still under development or ready to be released in
+the future. This Definition can be targeted when creating an Object but will not be used by default.
 
 ### Active
 
-The Schema is active and read-only. This Schema can be targeted when creating an Object but will not be used by 
+The Definition is active and read-only. This Definition can be targeted when creating an Object but will not be used by 
 default.
 
-A schema can be flagged as default to make it the default Schema to use when creating Objects.
+A schema can be flagged as default to make it the default Definition to use when creating Objects.
 
 ### Deprecated
 
-The Schema is deprecated. The Schema can still be used when creating Objects, but the API returns a warning to indicate 
+The Definition is deprecated. The Definition can still be used when creating Objects, but the API returns a warning to indicate 
 that the schema should not be used anymore and suggests the default schema.
 
 ### Removed
 
-The Schema still exists in the database but can no longer be used to create Objects.
+The Definition still exists in the database but can no longer be used to create Objects.
