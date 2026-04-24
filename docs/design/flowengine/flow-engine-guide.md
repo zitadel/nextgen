@@ -1,9 +1,9 @@
 # Building Flows
 
 > **Status:** Draft
-> **Note:** Examples use `fields[]` + `actions[]` (Option C) — the step response shape is [pending feedback](flow-engine-nodes.md).
+> **Note:** The step response shape is [decided](flow-engine-nodes.md) — steps emit unordered capability dictionaries (`fields`, `actions`, `gates`) and a LiquidJS template controls layout.
 
-The flow engine is a **server-side state machine** that produces BDUI (Backend-Driven UI). It is used by web/frontend clients that want a ready-made login and registration experience. Clients that want full control skip it entirely and use the Session API directly.
+The flow engine is a **server-side state machine** that produces **Capability payloads** alongside a **LiquidJS template**. It is used by web/frontend clients that want a ready-made login and registration experience. Clients that want full control skip it entirely and use the Session API directly.
 
 This guide walks through how to build authentication flows from scratch. It starts with the simplest concepts and builds up to advanced patterns.
 
@@ -49,6 +49,7 @@ Every step the server returns has the same shape:
     "label": "Sign in",
     "description": "Enter your email to continue",
     "error": null,
+    "behavior": null,
     "fields": [ ... ],
     "actions": [ ... ]
   }
@@ -62,6 +63,7 @@ Every step the server returns has the same shape:
 | `label` | Heading to display |
 | `description` | Optional explanatory text |
 | `error` | Error message from a failed previous submission (null if none) |
+| `behavior` | Only on `complete` steps: `redirect`, `show`, or `continue` (null otherwise) |
 | `fields` | Input fields to render (email, password, OTP code, ...) |
 | `actions` | Things the user can do (submit, SSO, passkey, navigation links) |
 
@@ -80,29 +82,122 @@ Every step the server returns has the same shape:
 { "kind": "link",    "name": "register", "label": "Create account" }
 ```
 
-The **order of the actions array is the render order**. The server controls positioning — the frontend doesn't rearrange them.
+Actions are **unordered capabilities**. The LiquidJS template decides where and how to render them — the server never controls visual positioning.
 
 ---
 
-## The Frontend Loop
+## The Frontend Rendering Pipeline
 
-Every frontend that uses the flow engine follows the same loop:
+The `<zitadel-login>` orchestrator is a Lit Web Component that manages the entire rendering lifecycle. It does not contain hardcoded UI layouts. Instead, it delegates all visual rendering to a **LiquidJS template** that the backend provides alongside each step's capability payload.
+
+### Rendering lifecycle
 
 ```mermaid
-flowchart TD
-    A[Start flow] --> B[Render step]
-    B --> C{User interacts}
-    C --> D[Submit action + data]
-    D --> E{Step type?}
-    E -->|complete + redirect| F[Navigate to redirect_uri]
-    E -->|complete + show| G[Show success message]
-    E -->|complete + continue| H[GET current step]
-    H --> B
-    E -->|any other step| B
-    E -->|error| B
+sequenceDiagram
+    participant App as Customer App
+    participant ZL as <zitadel-login>
+    participant Liquid as LiquidJS Engine
+    participant Atoms as <zl-*> Atoms
+
+    App->>ZL: Mounts component
+    ZL->>ZL: POST /v1/flows → receives capabilities + template
+    ZL->>ZL: Loads locale dictionary (en.ts)
+    ZL->>Liquid: Parse template string + inject capabilities as context
+    Liquid->>Liquid: Resolve {{ field.text_key | t }} via translation filter
+    Liquid->>Liquid: Evaluate {% if %} / {% for %} control flow
+    Liquid-->>ZL: Returns rendered HTML string
+    ZL->>ZL: Inject HTML into Shadow DOM
+    ZL->>Atoms: Browser upgrades <zl-field>, <zl-submit>, etc.
+    Atoms-->>ZL: User interacts → dispatches CustomEvent
+    ZL->>ZL: POST /v1/flows/{id}/submit → receives next step
+    ZL->>Liquid: Re-render with new capabilities
 ```
 
-In pseudocode:
+### What the orchestrator does
+
+1. **Fetches capabilities** — calls the Flow API and receives the step payload (fields, actions, gates, branding).
+2. **Selects the template** — uses `branding.liquid_template` if provided, otherwise falls back to the built-in `default.liquid`.
+3. **Builds the Liquid context** — injects the capability dictionaries, identity info, and branding values as template variables.
+4. **Renders the template** — LiquidJS parses the template string, resolves all `{{ }}` expressions and `{% %}` control flow, and outputs an HTML string.
+5. **Mounts the HTML** — the orchestrator injects the rendered HTML into its Shadow DOM.
+6. **Listens for events** — the atomic `<zl-*>` components self-register and dispatch native `CustomEvent`s (`zl-submit`, `zl-action`) when the user interacts.
+7. **Submits and re-renders** — on user action, the orchestrator calls the Flow API with the collected data, receives the next step, and repeats from step 2.
+
+### The Liquid context
+
+The template receives the full step payload as its rendering context:
+
+```javascript
+// What the orchestrator passes to LiquidJS
+{
+  step: { name, type, texts },
+  fields: { identifier: { type, required, text_key } },
+  actions: { submit: { primary, text_key }, passkey: { text_key } },
+  gates: { captcha: { provider, config } },
+  sso_providers: [ { id, name, template } ],
+  identity: { display_name, avatar_url },
+  branding: { layout, font_url, logo_url },
+  loading: false,
+  errors: []
+}
+```
+
+### Atomic components (`<zl-*>`)
+
+Templates emit standard HTML containing Lit Web Components. These components are intentionally "dumb" — they handle rendering and user interaction only, with zero knowledge of the Flow API or backend structure.
+
+| Component | Renders | Events emitted |
+|---|---|---|
+| `<zl-field>` | Labeled input with validation | `zl-input` (value change) |
+| `<zl-submit>` | Primary button with loading spinner | `zl-submit` (click) |
+| `<zl-action>` | Secondary/ghost button | `zl-action` (click with action name) |
+| `<zl-sso-providers>` | Grid of branded SSO buttons | `zl-sso` (click with provider id) |
+| `<zl-passkey>` | Invisible WebAuthn ceremony handler | `zl-passkey-result` (ceremony result) |
+| `<zl-captcha>` | Proof-of-work / third-party challenge | `zl-captcha-solved` (solution token) |
+| `<zl-error>` | Inline error message | — |
+
+Because these are standard HTML Custom Elements, they work identically whether rendered by LiquidJS, written by hand, or generated by any other templating system.
+
+### The `| t` translation filter
+
+All human-readable text is resolved client-side. The backend sends `text_key` strings; the template pipes them through the `| t` filter:
+
+```liquid
+<!-- The filter looks up "identifier.field.email" in the active locale dictionary -->
+<zl-field
+  name="identifier"
+  label="{{ fields.identifier.text_key | t }}"
+  type="{{ fields.identifier.type }}"
+></zl-field>
+
+<!-- Interpolation: "Hi, {{displayName}}" becomes "Hi, Alice" -->
+<p>{{ step.texts.description_key | t: identity.display_name }}</p>
+```
+
+The filter falls back to the raw key if no translation is found, making custom schema fields work without requiring frontend changes.
+
+### The master template
+
+The backend ships a single `default.liquid` that handles all layout variants via conditional logic:
+
+```liquid
+{% if branding.layout == 'split' %}
+  <div class="layout-split">
+    <div class="image-half" style="background-image: url('{{ branding.hero_url }}')"></div>
+    <div class="form-half">
+      {% include 'auth_form' %}
+    </div>
+  </div>
+{% else %}
+  <div class="layout-centered">
+    {% include 'auth_form' %}
+  </div>
+{% endif %}
+```
+
+Customers who want full control "eject" this template — the Zitadel Console copies the master template into a custom text field, the customer modifies it, and the backend serves their version instead. This bridges zero-configuration convenience (selecting "Split" from a dropdown) with absolute structural control (editing raw Liquid).
+
+### The frontend loop (pseudocode)
 
 ```
 response = POST /v1/flows { purpose, auth_request_id }
@@ -110,19 +205,24 @@ response = POST /v1/flows { purpose, auth_request_id }
 loop:
   step = response.step
 
-  if step.type == "complete":
-    if step.behavior == "redirect":
-      navigate(response.redirect_uri)
-      return
-    if step.behavior == "show":
-      showSuccess(step.label)
-      return
-    if step.behavior == "continue":
-      response = GET /v1/flows/{session_id}
-      continue
+  if step.type == "complete" and step.behavior == "redirect":
+    navigate(response.redirect_uri)
+    return
 
-  render(step.fields, step.actions)
-  { action, data } = waitForUserInput()
+  if step.type == "complete" and step.behavior == "continue":
+    // Server already auto-pivoted (e.g. registration done → back to login).
+    // Fetch the next step from the already-advanced state machine.
+    response = GET /v1/flows/{session_id}
+    continue
+
+  // Render the step — including "complete" steps with behavior "show",
+  // which simply render a success screen via the Liquid template.
+  html = liquidEngine.render(step.branding.liquid_template, {
+    step, fields, actions, gates, sso_providers, identity, branding
+  })
+  shadowRoot.innerHTML = html
+
+  { action, data } = waitForCustomEvent()
 
   response = POST /v1/flows/{session_id}/submit {
     session_token: response.session_token,
@@ -131,7 +231,13 @@ loop:
   }
 ```
 
-That's it. The frontend never decides what step comes next. It never checks what authentication is required. It just renders and submits.
+The frontend never decides what step comes next. It never checks what authentication is required. It parses the template, mounts the atoms, and submits.
+
+---
+
+## Security
+
+See [Template Security Model](template-security.md) for XSS attack vectors, trust boundaries, and the defense-in-depth mitigation strategy for the LiquidJS + innerHTML rendering pipeline.
 
 ---
 
