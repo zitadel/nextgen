@@ -1,4 +1,4 @@
-# ADR: Standardize Server CLI on Cobra and Viper
+# ADR 001: Standardize Server CLI on Cobra and Viper
 
 > **Status:** Proposed
 > **Date:** 2026-04-24
