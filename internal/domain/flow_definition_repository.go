@@ -24,16 +24,18 @@ type FlowDefinitionRepository interface {
 }
 
 // FlowDefinitionListOption modifies a list query.
-type FlowDefinitionListOption func(*flowDefinitionListOpts)
+type FlowDefinitionListOption func(*FlowDefinitionListOpts)
 
-type flowDefinitionListOpts struct {
+// FlowDefinitionListOpts holds the resolved options for a list query.
+type FlowDefinitionListOpts struct {
 	Status *FlowDefinitionStatus
 	Limit  uint32
 	Offset uint32
 }
 
-func applyFlowDefinitionListOptions(opts []FlowDefinitionListOption) *flowDefinitionListOpts {
-	o := &flowDefinitionListOpts{}
+// ApplyFlowDefinitionListOptions resolves a slice of options into a struct.
+func ApplyFlowDefinitionListOptions(opts []FlowDefinitionListOption) *FlowDefinitionListOpts {
+	o := &FlowDefinitionListOpts{}
 	for _, opt := range opts {
 		opt(o)
 	}
@@ -42,21 +44,21 @@ func applyFlowDefinitionListOptions(opts []FlowDefinitionListOption) *flowDefini
 
 // WithFlowDefinitionStatus filters results to definitions with the given status.
 func WithFlowDefinitionStatus(status FlowDefinitionStatus) FlowDefinitionListOption {
-	return func(o *flowDefinitionListOpts) {
+	return func(o *FlowDefinitionListOpts) {
 		o.Status = &status
 	}
 }
 
 // WithFlowDefinitionLimit sets the maximum number of results to return.
 func WithFlowDefinitionLimit(limit uint32) FlowDefinitionListOption {
-	return func(o *flowDefinitionListOpts) {
+	return func(o *FlowDefinitionListOpts) {
 		o.Limit = limit
 	}
 }
 
 // WithFlowDefinitionOffset skips the first n results.
 func WithFlowDefinitionOffset(offset uint32) FlowDefinitionListOption {
-	return func(o *flowDefinitionListOpts) {
+	return func(o *FlowDefinitionListOpts) {
 		o.Offset = offset
 	}
 }
