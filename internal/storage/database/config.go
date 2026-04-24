@@ -57,6 +57,7 @@ func MustRegisterDialect(name string, decoder DialectDecoder) {
 //	database:
 //	  spanner: projects/my-project/instances/my-instance/databases/my-database
 //
+// We might need to document how or where the client gets the authentication credentials for spanner, but for now we can assume that the application is running in an environment where the default credentials work (e.g. GCE, GKE, Cloud Run, etc.).
 // It might be possible that we want to add more fields later, see https://pkg.go.dev/cloud.google.com/go/spanner@v1.91.0#ClientConfig.
 // In that case the config might look like this:
 //
