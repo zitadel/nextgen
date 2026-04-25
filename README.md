@@ -14,8 +14,9 @@ The `nextgen` binary embeds the React console SPA built by Vite at `apps/console
 # Local snapshot (no publish, no signing)
 goreleaser release --snapshot --clean --skip=publish,sign
 
-# Run a snapshot Docker image
-docker run --rm ghcr.io/zitadel/nextgen:<snapshot-tag>-amd64 server --help
+# Run a snapshot Docker image. The image's default CMD is `--help` while
+# the `server` subcommand is being wired up in cmd/server (PR #17).
+docker run --rm ghcr.io/zitadel/nextgen:<snapshot-tag>-amd64
 ```
 
 Tagged releases (`v*`) trigger `.github/workflows/release.yml`, which produces multi-arch tarballs and pushes a multi-arch image manifest to `ghcr.io/zitadel/nextgen`.

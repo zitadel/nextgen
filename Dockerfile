@@ -8,4 +8,6 @@ COPY nextgen /usr/local/bin/nextgen
 USER nonroot:nonroot
 EXPOSE 8080
 ENTRYPOINT ["/usr/local/bin/nextgen"]
-CMD ["server"]
+# Placeholder default until cmd/server lands (see PR #17).
+# Switches to ["server"] once the subcommand exists.
+CMD ["--help"]

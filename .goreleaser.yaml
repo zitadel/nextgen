@@ -50,7 +50,7 @@ dockers:
       - --label=org.opencontainers.image.version={{ .Version }}
       - --label=org.opencontainers.image.revision={{ .FullCommit }}
       - --label=org.opencontainers.image.created={{ .Date }}
-      - --label=org.opencontainers.image.licenses=Apache-2.0
+      - --label=org.opencontainers.image.licenses=AGPL-3.0-only
   - image_templates:
       - 'ghcr.io/zitadel/nextgen:{{ .Version }}-arm64'
     use: buildx
@@ -63,7 +63,7 @@ dockers:
       - --label=org.opencontainers.image.version={{ .Version }}
       - --label=org.opencontainers.image.revision={{ .FullCommit }}
       - --label=org.opencontainers.image.created={{ .Date }}
-      - --label=org.opencontainers.image.licenses=Apache-2.0
+      - --label=org.opencontainers.image.licenses=AGPL-3.0-only
 
 docker_manifests:
   - name_template: 'ghcr.io/zitadel/nextgen:{{ .Version }}'
