@@ -43,7 +43,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: pnpm
+          # cache: pnpm is intentionally omitted until pnpm-lock.yaml exists
+          # in the repo (lands with the frontend workspace).
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3

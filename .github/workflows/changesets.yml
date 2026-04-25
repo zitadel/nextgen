@@ -12,6 +12,10 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    # Skip until the npm workspace exists. Once pnpm-workspace.yaml lands
+    # (with the frontend / packages PRs), this workflow takes over the
+    # changesets PR + publish flow.
+    if: hashFiles('pnpm-workspace.yaml') != ''
     steps:
       - name: Checkout
         uses: actions/checkout@v4
