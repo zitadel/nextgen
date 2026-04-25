@@ -22,16 +22,37 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      # The repository tests boot fergusstrange/embedded-postgres, which downloads
-      # a ~70MB Postgres binary from Maven Central on first run. Cache the unpack
-      # dir so subsequent runs skip the download and avoid timing out.
+      # The repository tests boot fergusstrange/embedded-postgres, which fetches
+      # a ~70MB Postgres binary from Maven Central via http.Get() with no timeout.
+      # On a cold runner this hung indefinitely. We cache + pre-fetch with curl
+      # so we fail fast on network issues and amortize on warm runs.
       - name: Cache embedded-postgres binaries
+        id: pgcache
         uses: actions/cache@v4
         with:
           path: ~/.embedded-postgres-go
-          key: embedded-postgres-v16-${{ runner.os }}-${{ runner.arch }}
+          key: embedded-postgres-16.9.0-${{ runner.os }}-${{ runner.arch }}
+
+      - name: Pre-fetch embedded-postgres binary
+        if: steps.pgcache.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          ver=16.9.0
+          os=linux
+          [ "${RUNNER_OS}" = "macOS" ] && os=darwin
+          arch=amd64
+          [ "${RUNNER_ARCH}" = "ARM64" ] && arch=arm64v8
+          jar="embedded-postgres-binaries-${os}-${arch}-${ver}.jar"
+          txz="embedded-postgres-binaries-${os}-${arch}-${ver}.txz"
+          mkdir -p "$HOME/.embedded-postgres-go"
+          cd "$RUNNER_TEMP"
+          curl -fsSL --retry 3 --retry-all-errors --max-time 120 -o "$jar" \
+            "https://repo1.maven.org/maven2/io/zonky/test/postgres/embedded-postgres-binaries-${os}-${arch}/${ver}/${jar}"
+          unzip -p "$jar" '*.txz' > "$HOME/.embedded-postgres-go/${txz}"
+          ls -lh "$HOME/.embedded-postgres-go/"
+
       - run: go vet ./...
-      - run: go test -v -timeout=8m ./...
+      - run: go test -v -timeout=10m ./...
 
   goreleaser-snapshot:
     runs-on: ubuntu-latest
