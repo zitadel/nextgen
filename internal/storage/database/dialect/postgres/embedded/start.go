@@ -2,8 +2,10 @@
 package embedded
 
 import (
+	"fmt"
 	"net"
 	"os"
+	"time"
 
 	embeddedpostgres "github.com/fergusstrange/embedded-postgres"
 
@@ -21,19 +23,33 @@ func StartEmbedded() (connector database.Connector, stop func(), err error) {
 
 	port, close := getPort()
 
-	config := embeddedpostgres.DefaultConfig().Version(embeddedpostgres.V16).Port(uint32(port)).RuntimePath(path)
+	config := embeddedpostgres.DefaultConfig().
+		Version(embeddedpostgres.V16).
+		Port(uint32(port)).
+		RuntimePath(path).
+		// CI runners (GitHub Actions ubuntu) have throttled disk I/O; the
+		// default 15s start timeout is enough on a Mac SSD but blows out
+		// during initdb on cold runners. 60s gives plenty of headroom.
+		StartTimeout(60 * time.Second).
+		// Surface the postgres process's own stdout/stderr so a startup
+		// failure (e.g. missing libc symbol on a runner) is visible in
+		// the test log instead of silently hanging.
+		Logger(os.Stdout)
 	embedded := embeddedpostgres.NewDatabase(config)
 
 	close()
 	err = embedded.Start()
 	// logging.OnError(err).Fatal("unable to start db")
 
-	// Embedded postgres is local + ephemeral, so SSL is never needed.
-	// Without `sslmode=disable`, pgx defaults to `prefer` and probes SSL
-	// first; against the Linux build of the embedded postgres binary
-	// this probe hangs indefinitely on GitHub Actions runners (worked
-	// fine on macOS), so we skip it explicitly.
-	connector, err = postgres.DecodeConfig(config.GetConnectionURL() + "?sslmode=disable")
+	// Build the connection URL ourselves rather than calling
+	// config.GetConnectionURL():
+	//   - the library's URL hardcodes "localhost", which Go's resolver
+	//     expands to both 127.0.0.1 and [::1]; the embedded postgres
+	//     binary only listens on IPv4, so the [::1] attempt hangs.
+	//   - sslmode=disable skips pgx's SSL probe (which on the linux
+	//     embedded binary hangs the TLS handshake indefinitely).
+	url := fmt.Sprintf("postgresql://postgres:postgres@127.0.0.1:%d/postgres?sslmode=disable", port)
+	connector, err = postgres.DecodeConfig(url)
 	if err != nil {
 		return nil, nil, err
 	}
