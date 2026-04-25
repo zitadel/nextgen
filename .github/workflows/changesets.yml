@@ -1,8 +1,18 @@
 name: changesets
 
+# IMPORTANT: this workflow is intentionally `workflow_dispatch` only until
+# the npm workspace actually lands on main (PR #11 + #14). When `branches:
+# [main]` was used, GitHub kept firing the workflow on PR feature branches
+# (apparently because no workflows existed on main yet to compare filters
+# against), producing red empty-jobs runs on every push.
+#
+# When pnpm-workspace.yaml lands on main, swap the trigger to:
+#   on:
+#     push:
+#       branches: [main]
+#       paths: [pnpm-workspace.yaml, .changeset/**, packages/**, apps/cli/**]
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -12,14 +22,9 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
-    # Belt-and-suspenders gate: only fire on actual pushes to main with a
-    # workspace present. The `on.push.branches` filter at the top should
-    # already prevent non-main pushes, but an explicit ref check makes it
-    # impossible to accidentally fan out to PR branches.
-    if: |
-      github.event_name == 'push'
-      && github.ref == 'refs/heads/main'
-      && hashFiles('pnpm-workspace.yaml') != ''
+    # Defense in depth: even when the trigger is re-enabled, refuse to run
+    # without the npm workspace present.
+    if: hashFiles('pnpm-workspace.yaml') != ''
     steps:
       - name: Checkout
         uses: actions/checkout@v6
