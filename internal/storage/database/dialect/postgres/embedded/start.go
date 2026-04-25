@@ -28,7 +28,12 @@ func StartEmbedded() (connector database.Connector, stop func(), err error) {
 	err = embedded.Start()
 	// logging.OnError(err).Fatal("unable to start db")
 
-	connector, err = postgres.DecodeConfig(config.GetConnectionURL())
+	// Embedded postgres is local + ephemeral, so SSL is never needed.
+	// Without `sslmode=disable`, pgx defaults to `prefer` and probes SSL
+	// first; against the Linux build of the embedded postgres binary
+	// this probe hangs indefinitely on GitHub Actions runners (worked
+	// fine on macOS), so we skip it explicitly.
+	connector, err = postgres.DecodeConfig(config.GetConnectionURL() + "?sslmode=disable")
 	if err != nil {
 		return nil, nil, err
 	}
