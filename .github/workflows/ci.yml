@@ -22,6 +22,14 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+      # The linux/amd64 postgres binary shipped by embedded-postgres is
+      # dynamically linked against libicu (Postgres 16 uses ICU for
+      # collation by default). When the lib is missing on the runner the
+      # postmaster forks, the backend exits on dlopen failure, and the
+      # connection just hangs because the postmaster never sees the child
+      # crash in time to close the socket.
+      - name: Install postgres runtime deps
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq libicu-dev libssl-dev
       # The repository tests boot fergusstrange/embedded-postgres, which fetches
       # a ~70MB Postgres binary from Maven Central via http.Get() with no timeout.
       # On a cold runner this hung indefinitely. We cache + pre-fetch with curl
