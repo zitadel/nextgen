@@ -10,7 +10,7 @@ This default covers the Go server binary (`./`, `cmd/`, `internal/`) and the emb
 
 ## Path-specific overrides — MIT
 
-The following paths are licensed under the **MIT License** so that downstream applications can consume them without AGPL obligations:
+The following paths are licensed under the **MIT License** so that downstream applications can consume them without AGPL obligations and so third parties can implement against the published contracts:
 
 | Path | Purpose |
 |---|---|
@@ -19,20 +19,15 @@ The following paths are licensed under the **MIT License** so that downstream ap
 | `packages/sdk-core/` | Core TypeScript SDK |
 | `packages/sdk-next/` | Next.js SDK |
 | Future `packages/sdk-*/` | Additional language/framework SDKs |
+| `api/` | OpenAPI specifications and generated code |
+| `docs/` | Design documents, ADRs, and other written material |
 
-Each MIT-licensed package must:
+Each MIT-licensed npm package must:
 - declare `"license": "MIT"` in its `package.json`,
 - include a `LICENSE` file at the package root containing the MIT text,
 - carry an SPDX header in source files where reasonable.
 
-## Path-specific overrides — Apache-2.0
-
-The following paths are licensed under the **Apache License 2.0** so that the contracts they define can be implemented by third parties without copyleft obligations:
-
-| Path | Purpose |
-|---|---|
-| `api/` | OpenAPI specifications and generated code |
-| `docs/` | Design documents, ADRs, and other written material |
+For non-package paths under MIT (`api/`, `docs/`), an SPDX header in source files and a `README` note are sufficient — no separate `LICENSE` file required.
 
 ## Contributions
 
@@ -40,8 +35,7 @@ By contributing to this repository, you agree that your contributions are licens
 
 ## Why this split?
 
-- **Server (AGPL)**: ensures forks and modified deployments contribute changes back, in line with zitadel's broader commitment to open identity infrastructure.
-- **Clients / SDKs / CLI (MIT)**: integrators ship these inside proprietary applications. Permissive licensing avoids inadvertent AGPL contagion of their codebases.
-- **Specs / docs (Apache-2.0)**: contracts and prose benefit from broad reuse and patent-grant clarity.
+- **Server (AGPL-3.0-only)**: ensures forks and modified deployments contribute changes back, in line with zitadel's broader commitment to open identity infrastructure.
+- **Everything else (MIT)**: integrators ship clients, SDKs, CLI, components, and even API specifications inside proprietary applications. Permissive licensing avoids inadvertent AGPL contagion of their codebases. MIT is the npm ecosystem default and keeps the contributor mental model to two buckets instead of three.
 
 If you need clarity for a specific use case, consult legal counsel — this document describes the licensing scheme but does not constitute legal advice.
