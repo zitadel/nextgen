@@ -16,56 +16,35 @@ concurrency:
 jobs:
   go-test:
     runs-on: ubuntu-latest
+    # CI uses a Postgres service container; the repository tests' existing
+    # ZITADEL_TEST_POSTGRES_URL env-var hook routes them to it. Local dev
+    # still uses fergusstrange/embedded-postgres (works on macOS; the
+    # linux/amd64 binary has an unresolved hang on GHA runners that
+    # silently kills forked backends — investigated as a follow-up).
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      ZITADEL_TEST_POSTGRES_URL: postgres://postgres:postgres@127.0.0.1:5432/postgres?sslmode=disable
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
           cache: true
-      # The linux/amd64 postgres binary shipped by embedded-postgres is
-      # dynamically linked against libicu (Postgres 16 uses ICU for
-      # collation by default). When the lib is missing on the runner the
-      # postmaster forks, the backend exits on dlopen failure, and the
-      # connection just hangs because the postmaster never sees the child
-      # crash in time to close the socket.
-      - name: Install postgres runtime deps
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq libicu-dev libssl-dev
-      # The repository tests boot fergusstrange/embedded-postgres, which fetches
-      # a ~70MB Postgres binary from Maven Central via http.Get() with no timeout.
-      # On a cold runner this hung indefinitely. We cache + pre-fetch with curl
-      # so we fail fast on network issues and amortize on warm runs.
-      - name: Cache embedded-postgres binaries
-        id: pgcache
-        uses: actions/cache@v4
-        with:
-          path: ~/.embedded-postgres-go
-          key: embedded-postgres-16.9.0-${{ runner.os }}-${{ runner.arch }}
-
-      - name: Pre-fetch embedded-postgres binary
-        if: steps.pgcache.outputs.cache-hit != 'true'
-        run: |
-          set -euo pipefail
-          ver=16.9.0
-          os=linux
-          [ "${RUNNER_OS}" = "macOS" ] && os=darwin
-          arch=amd64
-          [ "${RUNNER_ARCH}" = "ARM64" ] && arch=arm64v8
-          jar="embedded-postgres-binaries-${os}-${arch}-${ver}.jar"
-          txz="embedded-postgres-binaries-${os}-${arch}-${ver}.txz"
-          mkdir -p "$HOME/.embedded-postgres-go"
-          cd "$RUNNER_TEMP"
-          curl -fsSL --retry 3 --retry-all-errors --max-time 120 -o "$jar" \
-            "https://repo1.maven.org/maven2/io/zonky/test/postgres/embedded-postgres-binaries-${os}-${arch}/${ver}/${jar}"
-          unzip -p "$jar" '*.txz' > "$HOME/.embedded-postgres-go/${txz}"
-          ls -lh "$HOME/.embedded-postgres-go/"
-
       - run: go vet ./...
-      # `-p 1` runs package tests sequentially. Only one package uses
-      # embedded postgres today, but if a future package adds its own
-      # embedded server they would otherwise collide on the global
-      # download mutex / extracted-binary path on a slow runner. Cheap
-      # insurance, no measurable impact on a small test suite.
-      - run: go test -v -p 1 -timeout=10m ./...
+      - run: go test -v -timeout=5m ./...
 
   goreleaser-snapshot:
     runs-on: ubuntu-latest
