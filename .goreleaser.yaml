@@ -1,0 +1,97 @@
+version: 2
+project_name: nextgen
+
+before:
+  hooks:
+    - sh -c 'if [ -f pnpm-workspace.yaml ]; then corepack pnpm install --frozen-lockfile; fi'
+    - sh -c 'if [ -f apps/console/package.json ]; then corepack pnpm --filter ./apps/console build; fi'
+    - go mod download
+
+builds:
+  - id: nextgen
+    main: .
+    binary: nextgen
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.ShortCommit}}
+      - -X main.date={{.CommitDate}}
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    ignore:
+      - goos: windows
+        goarch: arm64
+
+archives:
+  - id: nextgen
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
+    files:
+      - LICENSE
+      - README.md
+
+dockers:
+  - image_templates:
+      - 'ghcr.io/zitadel/nextgen:{{ .Version }}-amd64'
+    use: buildx
+    goos: linux
+    goarch: amd64
+    dockerfile: Dockerfile
+    build_flag_templates:
+      - --platform=linux/amd64
+      - --label=org.opencontainers.image.source=https://github.com/zitadel/nextgen
+      - --label=org.opencontainers.image.version={{ .Version }}
+      - --label=org.opencontainers.image.revision={{ .FullCommit }}
+      - --label=org.opencontainers.image.created={{ .Date }}
+      - --label=org.opencontainers.image.licenses=Apache-2.0
+  - image_templates:
+      - 'ghcr.io/zitadel/nextgen:{{ .Version }}-arm64'
+    use: buildx
+    goos: linux
+    goarch: arm64
+    dockerfile: Dockerfile
+    build_flag_templates:
+      - --platform=linux/arm64
+      - --label=org.opencontainers.image.source=https://github.com/zitadel/nextgen
+      - --label=org.opencontainers.image.version={{ .Version }}
+      - --label=org.opencontainers.image.revision={{ .FullCommit }}
+      - --label=org.opencontainers.image.created={{ .Date }}
+      - --label=org.opencontainers.image.licenses=Apache-2.0
+
+docker_manifests:
+  - name_template: 'ghcr.io/zitadel/nextgen:{{ .Version }}'
+    image_templates:
+      - 'ghcr.io/zitadel/nextgen:{{ .Version }}-amd64'
+      - 'ghcr.io/zitadel/nextgen:{{ .Version }}-arm64'
+  - name_template: 'ghcr.io/zitadel/nextgen:latest'
+    image_templates:
+      - 'ghcr.io/zitadel/nextgen:{{ .Version }}-amd64'
+      - 'ghcr.io/zitadel/nextgen:{{ .Version }}-arm64'
+
+checksum:
+  name_template: checksums.txt
+
+snapshot:
+  version_template: '{{ incpatch .Version }}-snapshot+{{ .ShortCommit }}'
+
+changelog:
+  use: github
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\(.+\))??!?:.+$'
+      order: 0
+    - title: Bug Fixes
+      regexp: '^.*?fix(\(.+\))??!?:.+$'
+      order: 1
+    - title: Other
+      order: 999
+
+release:
+  draft: true
