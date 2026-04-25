@@ -8,6 +8,11 @@ on:
 permissions:
   contents: read
 
+# Cancel an in-flight run when a newer commit is pushed to the same PR/branch.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   go-test:
     runs-on: ubuntu-latest
@@ -17,8 +22,16 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+      # The repository tests boot fergusstrange/embedded-postgres, which downloads
+      # a ~70MB Postgres binary from Maven Central on first run. Cache the unpack
+      # dir so subsequent runs skip the download and avoid timing out.
+      - name: Cache embedded-postgres binaries
+        uses: actions/cache@v4
+        with:
+          path: ~/.embedded-postgres-go
+          key: embedded-postgres-v16-${{ runner.os }}-${{ runner.arch }}
       - run: go vet ./...
-      - run: go test ./...
+      - run: go test -v -timeout=8m ./...
 
   goreleaser-snapshot:
     runs-on: ubuntu-latest

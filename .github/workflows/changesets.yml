@@ -12,10 +12,14 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
-    # Skip until the npm workspace exists. Once pnpm-workspace.yaml lands
-    # (with the frontend / packages PRs), this workflow takes over the
-    # changesets PR + publish flow.
-    if: hashFiles('pnpm-workspace.yaml') != ''
+    # Belt-and-suspenders gate: only fire on actual pushes to main with a
+    # workspace present. The `on.push.branches` filter at the top should
+    # already prevent non-main pushes, but an explicit ref check makes it
+    # impossible to accidentally fan out to PR branches.
+    if: |
+      github.event_name == 'push'
+      && github.ref == 'refs/heads/main'
+      && hashFiles('pnpm-workspace.yaml') != ''
     steps:
       - name: Checkout
         uses: actions/checkout@v6
