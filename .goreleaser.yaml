@@ -79,7 +79,9 @@ checksum:
   name_template: checksums.txt
 
 snapshot:
-  version_template: '{{ incpatch .Version }}-snapshot+{{ .ShortCommit }}'
+  # Use `-` instead of `+` for the build-metadata separator: SemVer allows `+`
+  # but Docker tags reject it ("invalid reference format").
+  version_template: '{{ incpatch .Version }}-snapshot-{{ .ShortCommit }}'
 
 changelog:
   use: github
