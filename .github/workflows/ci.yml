@@ -52,7 +52,12 @@ jobs:
           ls -lh "$HOME/.embedded-postgres-go/"
 
       - run: go vet ./...
-      - run: go test -v -timeout=10m ./...
+      # `-p 1` runs package tests sequentially. Only one package uses
+      # embedded postgres today, but if a future package adds its own
+      # embedded server they would otherwise collide on the global
+      # download mutex / extracted-binary path on a slow runner. Cheap
+      # insurance, no measurable impact on a small test suite.
+      - run: go test -v -p 1 -timeout=10m ./...
 
   goreleaser-snapshot:
     runs-on: ubuntu-latest
