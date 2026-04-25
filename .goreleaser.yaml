@@ -37,43 +37,25 @@ archives:
       - LICENSE
       - README.md
 
-dockers:
-  - image_templates:
-      - 'ghcr.io/zitadel/nextgen:{{ .Version }}-amd64'
-    use: buildx
-    goos: linux
-    goarch: amd64
+dockers_v2:
+  - id: nextgen
+    ids: [nextgen]
+    images:
+      - 'ghcr.io/zitadel/nextgen'
+    tags:
+      - '{{ .Version }}'
+      # Skip `latest` for snapshots so they don't clobber the published tag.
+      - '{{ if not .IsSnapshot }}latest{{ end }}'
+    platforms:
+      - linux/amd64
+      - linux/arm64
     dockerfile: Dockerfile
-    build_flag_templates:
-      - --platform=linux/amd64
-      - --label=org.opencontainers.image.source=https://github.com/zitadel/nextgen
-      - --label=org.opencontainers.image.version={{ .Version }}
-      - --label=org.opencontainers.image.revision={{ .FullCommit }}
-      - --label=org.opencontainers.image.created={{ .Date }}
-      - --label=org.opencontainers.image.licenses=AGPL-3.0-only
-  - image_templates:
-      - 'ghcr.io/zitadel/nextgen:{{ .Version }}-arm64'
-    use: buildx
-    goos: linux
-    goarch: arm64
-    dockerfile: Dockerfile
-    build_flag_templates:
-      - --platform=linux/arm64
-      - --label=org.opencontainers.image.source=https://github.com/zitadel/nextgen
-      - --label=org.opencontainers.image.version={{ .Version }}
-      - --label=org.opencontainers.image.revision={{ .FullCommit }}
-      - --label=org.opencontainers.image.created={{ .Date }}
-      - --label=org.opencontainers.image.licenses=AGPL-3.0-only
-
-docker_manifests:
-  - name_template: 'ghcr.io/zitadel/nextgen:{{ .Version }}'
-    image_templates:
-      - 'ghcr.io/zitadel/nextgen:{{ .Version }}-amd64'
-      - 'ghcr.io/zitadel/nextgen:{{ .Version }}-arm64'
-  - name_template: 'ghcr.io/zitadel/nextgen:latest'
-    image_templates:
-      - 'ghcr.io/zitadel/nextgen:{{ .Version }}-amd64'
-      - 'ghcr.io/zitadel/nextgen:{{ .Version }}-arm64'
+    labels:
+      org.opencontainers.image.source: 'https://github.com/zitadel/nextgen'
+      org.opencontainers.image.version: '{{ .Version }}'
+      org.opencontainers.image.revision: '{{ .FullCommit }}'
+      org.opencontainers.image.created: '{{ .Date }}'
+      org.opencontainers.image.licenses: 'AGPL-3.0-only'
 
 checksum:
   name_template: checksums.txt
