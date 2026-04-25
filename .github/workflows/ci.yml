@@ -16,35 +16,16 @@ concurrency:
 jobs:
   go-test:
     runs-on: ubuntu-latest
-    # CI uses a Postgres service container; the repository tests' existing
-    # ZITADEL_TEST_POSTGRES_URL env-var hook routes them to it. Local dev
-    # still uses fergusstrange/embedded-postgres (works on macOS; the
-    # linux/amd64 binary has an unresolved hang on GHA runners that
-    # silently kills forked backends — investigated as a follow-up).
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-    env:
-      ZITADEL_TEST_POSTGRES_URL: postgres://postgres:postgres@127.0.0.1:5432/postgres?sslmode=disable
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
           cache: true
+      - name: Install embedded-postgres runtime deps
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq libicu-dev libssl-dev
       - run: go vet ./...
-      - run: go test -v -timeout=5m ./...
+      - run: go test -v -timeout=10m ./...
 
   goreleaser-snapshot:
     runs-on: ubuntu-latest
