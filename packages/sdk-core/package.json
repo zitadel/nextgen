@@ -2,6 +2,16 @@
   "name": "@zitadel/sdk-core",
   "version": "0.0.0",
   "description": "Core types and mock runtime helpers for Zitadel",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zitadel/nextgen.git",
+    "directory": "packages/sdk-core"
+  },
+  "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-core#readme",
+  "bugs": {
+    "url": "https://github.com/zitadel/nextgen/issues"
+  },
   "type": "module",
   "exports": {
     ".": {
@@ -10,6 +20,9 @@
     }
   },
   "files": ["dist"],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsup src/index.ts --format esm --dts --clean",
     "typecheck": "tsc --noEmit",

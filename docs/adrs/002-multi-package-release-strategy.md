@@ -8,8 +8,8 @@
 
 Release the three artifact families produced by this monorepo with two complementary tools, on independent cadences:
 
-1. **Go server binary + embedded React console**: released by `goreleaser` on `v*` tags. Produces multi-arch archives (linux/darwin/windows × amd64/arm64, minus windows/arm64), per-arch Docker images, and a `ghcr.io/zitadel/nextgen` manifest list. The console SPA is built by Vite during goreleaser's `before.hooks` and embedded into the binary via `//go:embed`.
-2. **TypeScript packages** (`apps/cli/`, `packages/components/`, `packages/sdk-*/`): released by `changesets` + `pnpm publish -r`. Each PR adds a `.changeset/*.md` describing the bump; the `changesets` GitHub Action opens a "Version Packages" PR aggregating pending changes; merging it tags per-package versions and publishes to npm.
+1. **Go server binary + embedded React console**: released by `goreleaser` against an explicit release tag. While this repository is pre-release, the publish-capable workflow is `workflow_dispatch` only; automatic `v*` tag releases can be enabled when the server is ready. The release produces multi-arch archives (linux/darwin/windows × amd64/arm64, minus windows/arm64), per-arch Docker images, and a `ghcr.io/zitadel/nextgen` manifest list. The console SPA is built by Vite during goreleaser's `before.hooks` and embedded into the binary via `//go:embed`.
+2. **TypeScript packages** (`apps/cli/`, `packages/sdk-*/`): released by `changesets` + `pnpm publish -r`. Each PR adds a `.changeset/*.md` describing the bump. The `changesets` GitHub Action is not enabled yet; once npm ownership and tokens are ready, it should open a "Version Packages" PR aggregating pending changes, then tag per-package versions and publish to npm when that PR is merged.
 3. **The console SPA is intentionally not a separately versioned npm package.** It is the Go server's UI; it ships embedded in the server binary at the server's version. If a future use case calls for a standalone console library, it becomes a new entry under `packages/` managed by changesets, and the Go server pins a specific version.
 
 Cross-package coordination is handled via changeset notes and peer-dep ranges, not unified tags.
@@ -33,7 +33,7 @@ Positive:
 - Each tool is used for its strength. `goreleaser` is the de facto standard for Go binary + multi-arch Docker releases. `changesets` is what most pnpm-workspace projects (Astro, Remix, Vercel SDKs) converge on.
 - Release cadences stay independent. A bug fix in `@zitadel/cli` does not require a server release; a server patch does not bump CLI versions.
 - New contributors recognize both workflows from prior projects.
-- The `.changeset/*.md` files in PRs make user-visible changes self-documenting before release.
+- The `.changeset/*.md` files in PRs make user-visible changes self-documenting before release, even before npm publishing automation is enabled.
 
 Trade-offs:
 
@@ -56,6 +56,8 @@ Trade-offs:
 
 ## Follow-up
 
-- Claim the `@zitadel` npm scope (org admin precondition for changesets to publish).
+- Claim the `@zitadel` npm scope and configure npm publishing credentials (org admin preconditions for changesets to publish).
+- Enable the changesets publishing workflow after npm package ownership is confirmed.
+- Decide when to switch the Go release workflow from manual `workflow_dispatch` to automatic `v*` tag releases.
 - Draft a `CONTRIBUTING.md` section pointing contributors at `pnpm changeset` for npm changes and conventional commit prefixes for the goreleaser changelog.
 - Decide ADR 003 territory: should server config schemas or other stable contracts have their own release/versioning policy that crosses both tools?

@@ -74,7 +74,7 @@ describe("identity resources", () => {
     expect(listAfterEnv.data.idps).toHaveLength(0);
   });
 
-  it("app add writes a spa preset with redirect URIs", async () => {
+  it("app add/list/show/remove round-trips through .zitadel/apps", async () => {
     const cwd = await mkdtemp(join(tmpdir(), "zitadel-app-"));
     const result = await runCliForTest([
       "app",
@@ -100,6 +100,26 @@ describe("identity resources", () => {
     expect(contents.protocol).toBe("oidc");
     expect((contents.oidc as { client_type: string }).client_type).toBe("spa");
     expect((contents.oidc as { redirect_uris: string[] }).redirect_uris).toContain("http://localhost:3000/callback");
+
+    const list = await runCliForTest(["app", "list", "--cwd", cwd, "--json"]);
+    const listEnv = parseJson(list.stdout) as { data: { apps: Array<{ slug: string; protocol: string }> } };
+    expect(listEnv.data.apps).toHaveLength(1);
+    expect(listEnv.data.apps[0].slug).toBe("web");
+
+    const show = await runCliForTest(["app", "show", "web", "--cwd", cwd, "--json"]);
+    expect(show.exitCode).toBe(0);
+    const showEnv = parseJson(show.stdout) as { data: { app: { slug: string } } };
+    expect(showEnv.data.app.slug).toBe("web");
+
+    const remove = await runCliForTest(["app", "remove", "web", "--cwd", cwd, "--json"]);
+    expect(remove.exitCode).toBe(0);
+    const removeEnv = parseJson(remove.stdout) as { status: string; data: { slug: string } };
+    expect(removeEnv.status).toBe("ok");
+    expect(removeEnv.data.slug).toBe("web");
+
+    const listAfter = await runCliForTest(["app", "list", "--cwd", cwd, "--json"]);
+    const listAfterEnv = parseJson(listAfter.stdout) as { data: { apps: unknown[] } };
+    expect(listAfterEnv.data.apps).toHaveLength(0);
   });
 
   it("does not advertise GitHub as an OIDC IdP preset", async () => {
