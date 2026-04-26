@@ -14,7 +14,7 @@ WITH target AS (
     AND organization_id = COALESCE($2, '')
     AND key = $3
     AND value_hash = digest($4::text, 'md5')
-    LIMIT 2
+    LIMIT 2 -- Surface unique constraint bugs. 
 )
 SELECT 
     u.schema_url, u.id, u.organization_id, u.created_at, u.updated_at,

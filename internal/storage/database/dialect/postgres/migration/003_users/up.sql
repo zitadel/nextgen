@@ -37,7 +37,15 @@ CREATE TABLE zitadel_nextgen.user_attributes (
     , organization_id TEXT COLLATE "C" NOT NULL
     , user_id TEXT COLLATE "C" NOT NULL
     , key TEXT NOT NULL COLLATE "C" CHECK ( key <> '' )
-    , value JSONB NOT NULL --JSONB allows for dynamic typing
+    
+    --JSONB allows for dynamic typing
+    , value JSONB NOT NULL CHECK (
+        -- 1. Prevent 'null'::jsonb values.
+        jsonb_typeof(value) <> 'null' 
+        AND value <> '[]'::jsonb
+        AND value <> '{}'::jsonb
+        AND value <> '""'::jsonb
+    )
 
     , PRIMARY KEY (instance_id, user_id, key)
     , FOREIGN KEY (instance_id, user_id)
@@ -45,7 +53,7 @@ CREATE TABLE zitadel_nextgen.user_attributes (
         ON DELETE CASCADE
 ) PARTITION BY HASH (instance_id, user_id);
 
--- General Lookup Index: Only for scalar valuesI mean, w
+-- General Lookup Index: Only for scalar values
 CREATE INDEX idx_user_attributes_scalar
     ON zitadel_nextgen.user_attributes USING btree
     (instance_id, key, value, organization_id, user_id)

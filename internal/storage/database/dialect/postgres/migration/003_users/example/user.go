@@ -130,7 +130,7 @@ func buildAttributeTree(attributes []Attribute) (map[string]any, error) {
 
 		// empty keys are prevented in the DB schema,
 		// this is just a safety check to prevent panics in case of invalid data
-		if len(keyNodes) == 0 {
+		if keyNodes[0] == "" {
 			return nil, fmt.Errorf("illegal empty key for attribute at index %d", i)
 		}
 
