@@ -55,6 +55,10 @@ These exceptions cover code and contracts that are intended to be imported,
 generated from, embedded into, or otherwise used by downstream applications
 without imposing AGPL-3.0-only obligations on those applications.
 
+For `api/`, OpenAPI `info.license` metadata describes the exposed API
+contract/specification license. It does not describe or override the
+AGPL-3.0-only license of the ZITADEL server implementation.
+
 Each MIT-licensed npm package must:
 
 - declare `"license": "MIT"` in its `package.json`,
