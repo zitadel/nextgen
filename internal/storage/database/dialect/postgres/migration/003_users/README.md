@@ -1,9 +1,14 @@
+<!--
+    TODO(muhlemmer): this file provides usage documentation of the user EAV and partitioning.
+    The contents of this file should by migrated into the operator manual of Nextgen later.
+    (At the moment there's no documentation structure nor framework).
+-->
+
 # User table Scaling and Indexing Architecture
 
 Users are stored in a a "strongly typed" EAV (Entity-Attribute-Value) system on top of JSONB, which is the best way to handle the balance between flexibility and performance in a multi-tenant system like Zitadel.
 
-Attributes are available in a flat key space. However this results in 1-to-many rows for each user, potentially bloating the attribute table indexes. To counter this we use partioned tables.
-
+Attributes are available in a flat key space. However this results in 1-to-many rows for each user, potentially bloating the attribute table indexes. To counter this we use partitioned tables.
 
 ## Partitioning Strategy
 
