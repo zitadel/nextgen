@@ -132,6 +132,96 @@ describe("Next setup integration", () => {
     const productionAfterClaim = await runCliForTest(["apply", "--cwd", cwd, "--json", "--mock", "--environment", "production"]);
     expect(productionAfterClaim.exitCode).toBe(0);
   });
+
+  it("plans identity resource counts and fails apply clearly for missing env refs", async () => {
+    const cwd = await createNextProject();
+    await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--non-interactive",
+      "--json",
+      "--mock",
+      "--skip-deploy-platform",
+    ]);
+
+    const idp = await runCliForTest([
+      "idp",
+      "add",
+      "--cwd",
+      cwd,
+      "--json",
+      "--preset",
+      "google",
+      "--client-id",
+      "abc.apps.googleusercontent.com",
+      "--env-secret",
+      "ZITADEL_IDP_GOOGLE_SECRET",
+    ]);
+    expect(idp.exitCode).toBe(0);
+
+    const app = await runCliForTest([
+      "app",
+      "add",
+      "--cwd",
+      cwd,
+      "--json",
+      "--preset",
+      "spa",
+      "--slug",
+      "web",
+      "--redirect-uri",
+      "http://localhost:3000/callback",
+    ]);
+    expect(app.exitCode).toBe(0);
+
+    const plan = await runCliForTest(["plan", "--cwd", cwd, "--json", "--mock"], {
+      ZITADEL_IDP_GOOGLE_SECRET: "secret",
+    });
+    expect(plan.exitCode).toBe(0);
+    const planJson = parseJson(plan.stdout) as {
+      data: { resources: { idps: number; apps: number }; env_refs: { missing: string[] } };
+    };
+    expect(planJson.data.resources.idps).toBe(1);
+    expect(planJson.data.resources.apps).toBe(1);
+    expect(planJson.data.env_refs.missing).toEqual([]);
+
+    const apply = await runCliForTest(["apply", "--cwd", cwd, "--json", "--mock"]);
+    expect(apply.exitCode).toBe(3);
+    const applyJson = parseJson(apply.stdout) as {
+      code: string;
+      message: string;
+      details: { env_refs: { missing: string[] } };
+    };
+    expect(applyJson.code).toBe("E_VALIDATION");
+    expect(applyJson.message).toContain("Missing environment variables");
+    expect(applyJson.details.env_refs.missing).toEqual(["ZITADEL_IDP_GOOGLE_SECRET"]);
+  });
+
+  it("rejects invalid Liquid templates before recording apply state", async () => {
+    const cwd = await createNextProject();
+    await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--non-interactive",
+      "--json",
+      "--mock",
+      "--skip-deploy-platform",
+    ]);
+    const stateBefore = await readFile(join(cwd, ".zitadel/state.json"), "utf8");
+    await mkdir(join(cwd, ".zitadel/templates"), { recursive: true });
+    await writeFile(join(cwd, ".zitadel/templates/bad.liquid"), "<div>{{ value | raw }}</div>\n");
+
+    const apply = await runCliForTest(["apply", "--cwd", cwd, "--json", "--mock"]);
+
+    expect(apply.exitCode).toBe(3);
+    const envelope = parseJson(apply.stdout) as { code: string; message: string; hint?: string };
+    expect(envelope.code).toBe("E_VALIDATION");
+    expect(envelope.message).toContain("Liquid templates");
+    expect(envelope.hint).toContain("raw");
+    expect(await readFile(join(cwd, ".zitadel/state.json"), "utf8")).toBe(stateBefore);
+  });
 });
 
 async function createNextProject(): Promise<string> {

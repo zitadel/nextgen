@@ -27,8 +27,89 @@ jobs:
       - run: go vet ./...
       - run: go test -v -timeout=10m ./...
 
+  node-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.2
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: corepack pnpm -r typecheck
+
+      - name: Test
+        run: corepack pnpm -r test
+
+      - name: Build
+        run: corepack pnpm -r build
+
+  npm-pack-smoke:
+    runs-on: ubuntu-latest
+    needs: node-check
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.2
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Build packages
+        run: corepack pnpm -r build
+
+      - name: Smoke test built CLI
+        run: |
+          node apps/cli/dist/zitadel.js --version
+          node apps/cli/dist/zitadel.js capabilities --json
+
+      - name: Dry-run npm packs
+        run: |
+          for dir in apps/cli packages/sdk-core packages/sdk-next; do
+            (cd "$dir" && npm pack --dry-run)
+          done
+
+      - name: Create npm package artifacts
+        run: |
+          mkdir -p "$RUNNER_TEMP/zitadel-npm-packages"
+          for dir in apps/cli packages/sdk-core packages/sdk-next; do
+            (cd "$dir" && npm pack --pack-destination "$RUNNER_TEMP/zitadel-npm-packages")
+          done
+          ls -lh "$RUNNER_TEMP/zitadel-npm-packages"
+
+      - name: Upload npm package artifacts
+        uses: actions/upload-artifact@v5
+        with:
+          name: npm-packages
+          path: ${{ runner.temp }}/zitadel-npm-packages/*.tgz
+          if-no-files-found: error
+          retention-days: 7
+
   goreleaser-snapshot:
     runs-on: ubuntu-latest
+    needs: [go-test, node-check]
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -43,13 +124,15 @@ jobs:
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.2
+          run_install: false
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
-          # cache: pnpm is intentionally omitted until pnpm-lock.yaml exists
-          # in the repo (lands with the frontend workspace).
+          cache: pnpm
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
@@ -65,3 +148,11 @@ jobs:
           args: release --snapshot --clean --skip=publish,sign
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload GoReleaser snapshot artifacts
+        uses: actions/upload-artifact@v5
+        with:
+          name: goreleaser-snapshot
+          path: dist/**
+          if-no-files-found: error
+          retention-days: 7
