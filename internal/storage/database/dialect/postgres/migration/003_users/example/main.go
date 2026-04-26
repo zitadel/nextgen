@@ -67,38 +67,38 @@ func runCreateUser() {
 	defer cancel()
 
 	var err error
-	in := &IncommingUser{
+	in := &IncomingUser{
 		SchemaURL:      "./user.schema.json",
 		ID:             "test_99999999",
 		OrganizationID: "org_0001",
-		Attributes: []IncommingUserAttribute{
+		Attributes: []IncomingUserAttribute{
 			// Ignoring errors for brevity, in production code you should handle them properly
-			func() IncommingUserAttribute {
-				a, _ := NewIncommingUserAttribute("username", "johndoe", UserUniquenessGlobal)
+			func() IncomingUserAttribute {
+				a, _ := NewIncomingUserAttribute("username", "john_doe", UserUniquenessGlobal)
 				return a
 			}(),
-			func() IncommingUserAttribute {
-				a, attrErr := NewIncommingUserAttribute("email", "johndoe@example.com", UserUniquenessGlobal)
+			func() IncomingUserAttribute {
+				a, attrErr := NewIncomingUserAttribute("email", "johndoe@example.com", UserUniquenessGlobal)
 				err = errors.Join(err, attrErr)
 				return a
 			}(),
-			func() IncommingUserAttribute {
-				a, attrErr := NewIncommingUserAttribute("email_verified", false, UserUniquenessUnspecified)
+			func() IncomingUserAttribute {
+				a, attrErr := NewIncomingUserAttribute("email_verified", false, UserUniquenessUnspecified)
 				err = errors.Join(err, attrErr)
 				return a
 			}(),
-			func() IncommingUserAttribute {
-				a, attrErr := NewIncommingUserAttribute("nickname", "Johnny", UserUniquenessOrganization)
+			func() IncomingUserAttribute {
+				a, attrErr := NewIncomingUserAttribute("nickname", "Johnny", UserUniquenessOrganization)
 				err = errors.Join(err, attrErr)
 				return a
 			}(),
-			func() IncommingUserAttribute {
-				a, attrErr := NewIncommingUserAttribute("address.country", "USA", UserUniquenessUnspecified)
+			func() IncomingUserAttribute {
+				a, attrErr := NewIncomingUserAttribute("address.country", "USA", UserUniquenessUnspecified)
 				err = errors.Join(err, attrErr)
 				return a
 			}(),
-			func() IncommingUserAttribute {
-				a, attrErr := NewIncommingUserAttribute("address.city", "New York", UserUniquenessUnspecified)
+			func() IncomingUserAttribute {
+				a, attrErr := NewIncomingUserAttribute("address.city", "New York", UserUniquenessUnspecified)
 				err = errors.Join(err, attrErr)
 				return a
 			}(),

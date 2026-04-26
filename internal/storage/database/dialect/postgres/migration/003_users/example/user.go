@@ -66,20 +66,20 @@ const (
 	UserUniquenessGlobal
 )
 
-type IncommingUserAttribute interface {
+type IncomingUserAttribute interface {
 	isAttribute()
 }
 
-type incommingUserAttribute struct {
+type incomingUserAttribute struct {
 	Key         string         `json:"key"`
 	Value       any            `json:"value"`
 	ValueHash   []byte         `json:"value_hash"`
 	UniqueScope UserUniqueness `json:"unique_scope"`
 }
 
-func (*incommingUserAttribute) isAttribute() {}
+func (*incomingUserAttribute) isAttribute() {}
 
-func NewIncommingUserAttribute(key string, value any, unique UserUniqueness) (IncommingUserAttribute, error) {
+func NewIncomingUserAttribute(key string, value any, unique UserUniqueness) (IncomingUserAttribute, error) {
 	// Marshal the 'any' value into a JSON byte slice immediately
 	raw, err := json.Marshal(value)
 	if err != nil {
@@ -89,7 +89,7 @@ func NewIncommingUserAttribute(key string, value any, unique UserUniqueness) (In
 	// TODO(muhlemmer): use SHA-256 in prod code.
 	md5Hash := md5.Sum(raw)
 
-	return &incommingUserAttribute{
+	return &incomingUserAttribute{
 		Key:         key,
 		Value:       raw,
 		ValueHash:   md5Hash[:],
@@ -97,14 +97,14 @@ func NewIncommingUserAttribute(key string, value any, unique UserUniqueness) (In
 	}, nil
 }
 
-type IncommingUser struct {
+type IncomingUser struct {
 	SchemaURL      string
 	ID             string
 	OrganizationID string
-	Attributes     []IncommingUserAttribute
+	Attributes     []IncomingUserAttribute
 }
 
-func (u *IncommingUser) insertArgs(instanceID string) []any {
+func (u *IncomingUser) insertArgs(instanceID string) []any {
 	return []any{
 		instanceID,
 		u.SchemaURL,
@@ -114,7 +114,7 @@ func (u *IncommingUser) insertArgs(instanceID string) []any {
 	}
 }
 
-func CreateUser(ctx context.Context, instanceID string, u *IncommingUser) (*User, error) {
+func CreateUser(ctx context.Context, instanceID string, u *IncomingUser) (*User, error) {
 	rows, _ := conn.Query(ctx, insertUserStmt, u.insertArgs(instanceID)...)
 	user, err := pgx.CollectExactlyOneRow(rows, pgx.RowToAddrOfStructByPos[User])
 	if err != nil {
