@@ -1,0 +1,51 @@
+openapi: 3.1.0
+info: 
+  # TODO: set correct information
+  title: Zitadel NextGen
+  description: This is the next generation of the Zitadel identity platform.
+  version: 0.0.1
+  # This describes the exposed API contract/specification license, not the
+  # AGPL-3.0-only license of the Zitadel server implementation.
+  # See /LICENSING.md for the repository-level licensing policy.
+  license:
+    name: MIT
+    identifier: MIT
+
+servers: 
+  # TODO: put correct server here.
+  - url: https://acc.nextgen.zitadel.com 
+    
+paths:
+  /.well-known/openid-configuration:
+    $ref: endpoints/.well-known/openid-configuration/methods.yaml
+  /auth/authorize:
+    $ref: endpoints/oauth/authorize/methods.yaml
+  /auth/device-authorization:
+    $ref: endpoints/oauth/device-authorization/methods.yaml
+  /auth/end-session:
+    $ref: endpoints/oauth/end-session/methods.yaml
+  /auth/introspect:
+    $ref: endpoints/oauth/introspect/methods.yaml
+  /auth/keys:
+    $ref: endpoints/oauth/keys/methods.yaml
+  /auth/revoke:
+    $ref: endpoints/oauth/revoke/methods.yaml
+  /auth/token:
+    $ref: endpoints/oauth/token/methods.yaml
+  /auth/userinfo:
+    $ref: endpoints/oauth/userinfo/methods.yaml
+  /healthz:
+    $ref: endpoints/healthz/methods.yaml
+  /livez:
+    $ref: endpoints/livez/methods.yaml
+  /readyz:
+    $ref: endpoints/readyz/methods.yaml
+  /user:
+    $ref: endpoints/users/methods.yaml
+
+components:
+  securitySchemes: 
+    oauth2:
+      $ref: security/oauth2.yaml
+    usernamePassword:
+      $ref: security/username-password.yaml

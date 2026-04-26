@@ -1,0 +1,36 @@
+get:
+  operationId: listUsers
+  summary: List users
+  tags:
+    - User
+  parameters:
+    - $ref: ../../components/parameters/offset.yaml
+    - $ref: ../../components/parameters/limit.yaml
+  security:
+    - oauth2:
+        - openid
+  responses:
+    '200':
+      description: A list of users was returned
+      content:
+        application/json:
+          schema:
+            type: array
+    '400':
+      description: The provided input was not valid
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '500':
+      description: Something went wrong on the server. This was not your fault.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    default:
+      description: Unexpected error response.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml

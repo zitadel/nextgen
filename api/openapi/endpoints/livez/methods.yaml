@@ -1,0 +1,29 @@
+get:
+  operationId: getLive
+  summary: Check server liveness
+  description: Check whether the server is started
+  security: []
+  responses:
+    '200':
+      description: The server is started
+      content:
+        text/plain:
+          examples:
+            ok:
+              summary: Server is live
+              value: ok
+            fail:
+              summary: Server is not live
+              value: fail
+    '4XX':
+      description: The request was rejected by the server.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    default:
+      description: Unexpected error response.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml

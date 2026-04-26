@@ -1,0 +1,14 @@
+type: oauth2
+flows: 
+  authorizationCode: 
+    authorizationUrl: https://acc.nextgen.zitadel.com/oauth/authorize
+    tokenUrl: https://acc.nextgen.zitadel.com/oauth/token
+    scopes: 
+      openid: OpenID Connect scope
+      profile: Access to the user's profile information
+      email: Access to the user's email address
+  clientCredentials: 
+    tokenUrl: https://acc.nextgen.zitadel.com/oauth/token
+    scopes: 
+      openid: OpenID Connect scope
+    

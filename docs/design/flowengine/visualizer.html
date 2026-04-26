@@ -1,0 +1,1274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flow Engine Visualizer</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --border: #2a2d3a;
+    --text: #e1e4ed;
+    --muted: #8b8fa3;
+    --accent: #6c8cff;
+    --accent-dim: #3a4a7a;
+    --green: #4ade80;
+    --yellow: #fbbf24;
+    --red: #f87171;
+    --radius: 8px;
+
+    /* Syntax highlighting */
+    --syn-key: #6c8cff;
+    --syn-string: #4ade80;
+    --syn-number: #fbbf24;
+    --syn-bool: #c084fc;
+    --syn-null: #8b8fa3;
+    --syn-brace: #8b8fa3;
+
+    --editor-font: 'SF Mono', 'Fira Code', 'JetBrains Mono', 'Cascadia Code', monospace;
+    --editor-size: 13px;
+    --editor-lh: 20px;
+    --editor-pad: 16px;
+    --gutter-w: 48px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  header {
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+
+  header h1 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--muted);
+    letter-spacing: 0.5px;
+  }
+
+  header h1 span { color: var(--text); }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    height: calc(100vh - 48px);
+  }
+
+  /* ── Left panel: editor ── */
+  .editor-panel {
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .flow-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    overflow-x: auto;
+    flex-shrink: 0;
+  }
+
+  .flow-tab {
+    padding: 10px 16px;
+    font-size: 13px;
+    color: var(--muted);
+    cursor: pointer;
+    border: none;
+    background: none;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+    transition: all 0.15s;
+  }
+
+  .flow-tab:hover { color: var(--text); background: rgba(108, 140, 255, 0.05); }
+  .flow-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* Code editor with syntax highlighting overlay */
+  .editor-wrap {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .editor-scroll {
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    position: relative;
+  }
+
+  .editor-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    min-height: 100%;
+  }
+
+  /* Gutter (line numbers) */
+  .gutter {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: var(--gutter-w);
+    padding: var(--editor-pad) 0;
+    text-align: right;
+    font-family: var(--editor-font);
+    font-size: var(--editor-size);
+    line-height: var(--editor-lh);
+    color: #3a3d4a;
+    user-select: none;
+    pointer-events: none;
+    z-index: 3;
+  }
+
+  .gutter .ln {
+    display: block;
+    padding-right: 12px;
+    height: var(--editor-lh);
+  }
+
+  .gutter .ln.active-line {
+    color: var(--accent);
+  }
+
+  /* Highlight backdrop (step range highlight) */
+  .highlight-backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    min-height: 100%;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .line-highlight {
+    position: absolute;
+    left: var(--gutter-w);
+    right: 0;
+    height: var(--editor-lh);
+    background: rgba(108, 140, 255, 0.08);
+    border-left: 2px solid var(--accent);
+  }
+
+  .line-highlight.breakpoint-line {
+    background: rgba(108, 140, 255, 0.15);
+  }
+
+  /* Breakpoint arrow in gutter */
+  .gutter .ln.breakpoint::before {
+    content: "▶";
+    position: absolute;
+    left: 6px;
+    color: var(--accent);
+    font-size: 10px;
+  }
+
+  .gutter .ln {
+    position: relative;
+  }
+
+  /* Syntax highlight layer */
+  .highlight-pre {
+    position: absolute;
+    top: 0;
+    left: var(--gutter-w);
+    right: 0;
+    padding: var(--editor-pad);
+    padding-left: 12px;
+    margin: 0;
+    font-family: var(--editor-font);
+    font-size: var(--editor-size);
+    line-height: var(--editor-lh);
+    white-space: pre;
+    color: var(--text);
+    pointer-events: none;
+    z-index: 1;
+    overflow: visible;
+  }
+
+  .highlight-pre .key { color: var(--syn-key); }
+  .highlight-pre .str { color: var(--syn-string); }
+  .highlight-pre .num { color: var(--syn-number); }
+  .highlight-pre .bool { color: var(--syn-bool); }
+  .highlight-pre .null { color: var(--syn-null); font-style: italic; }
+  .highlight-pre .brace { color: var(--syn-brace); }
+
+  /* Invisible textarea on top */
+  textarea#editor {
+    position: absolute;
+    top: 0;
+    left: var(--gutter-w);
+    right: 0;
+    min-height: 100%;
+    padding: var(--editor-pad);
+    padding-left: 12px;
+    margin: 0;
+    background: transparent;
+    color: transparent;
+    caret-color: var(--text);
+    border: none;
+    font-family: var(--editor-font);
+    font-size: var(--editor-size);
+    line-height: var(--editor-lh);
+    white-space: pre;
+    resize: none;
+    outline: none;
+    tab-size: 2;
+    z-index: 2;
+    overflow: visible;
+    word-wrap: normal;
+    overflow-wrap: normal;
+  }
+
+  textarea#editor::selection {
+    background: rgba(108, 140, 255, 0.3);
+    color: transparent;
+  }
+
+  .editor-status {
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 12px;
+    font-size: 11px;
+    color: var(--muted);
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .editor-status .error { color: var(--red); }
+  .editor-status .ok { color: var(--green); }
+
+  /* ── Right panel ── */
+  .right-panel {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .right-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    flex-shrink: 0;
+  }
+
+  .right-tab {
+    padding: 10px 16px;
+    font-size: 13px;
+    color: var(--muted);
+    cursor: pointer;
+    border: none;
+    background: none;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+  }
+
+  .right-tab:hover { color: var(--text); background: rgba(108, 140, 255, 0.05); }
+  .right-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  .right-content {
+    flex: 1;
+    overflow: auto;
+    position: relative;
+  }
+
+  .view { display: none; height: 100%; }
+  .view.active { display: flex; flex-direction: column; }
+
+  /* Diagram view */
+  #diagram-view {
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    overflow: auto;
+  }
+
+  #diagram-view .mermaid-container {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+  }
+
+  #diagram-view .mermaid-container svg {
+    max-width: 100%;
+    height: auto;
+  }
+
+  /* Simulation view */
+  #sim-view {
+    padding: 24px;
+    align-items: center;
+  }
+
+  .sim-phone {
+    width: 375px;
+    min-height: 500px;
+    background: var(--surface);
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .sim-header {
+    padding: 20px 24px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sim-header h2 {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  .sim-header p {
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  .sim-body {
+    padding: 20px 24px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .sim-field label {
+    display: block;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 4px;
+    font-weight: 500;
+  }
+
+  .sim-field input {
+    width: 100%;
+    padding: 10px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  .sim-field input:focus { border-color: var(--accent); }
+  .sim-field input::placeholder { color: #4a4d5a; }
+
+  .sim-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .sim-btn {
+    width: 100%;
+    padding: 10px 16px;
+    border-radius: var(--radius);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    transition: all 0.15s;
+  }
+
+  .sim-btn.primary { background: var(--accent); color: white; border-color: var(--accent); }
+  .sim-btn.primary:hover { background: #5a7aee; }
+  .sim-btn.sso { background: var(--surface); color: var(--text); display: flex; align-items: center; gap: 8px; justify-content: center; }
+  .sim-btn.sso:hover { background: var(--bg); }
+  .sim-btn.link { background: none; border: none; color: var(--accent); font-size: 13px; padding: 6px 0; }
+  .sim-btn.link:hover { text-decoration: underline; }
+  .sim-btn.passkey { background: var(--surface); color: var(--text); }
+  .sim-btn.passkey:hover { background: var(--bg); }
+  .sim-btn.captcha { background: var(--surface); color: var(--text); }
+
+  .sim-error {
+    background: rgba(248, 113, 113, 0.1);
+    border: 1px solid rgba(248, 113, 113, 0.3);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+    font-size: 13px;
+    color: var(--red);
+  }
+
+  .sim-footer {
+    padding: 12px 24px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .sim-breadcrumb { font-size: 11px; color: var(--muted); }
+  .sim-breadcrumb span { color: var(--accent); }
+
+  .sim-reset {
+    font-size: 11px;
+    color: var(--muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+    text-decoration: underline;
+  }
+  .sim-reset:hover { color: var(--text); }
+
+  .sim-complete {
+    text-align: center;
+    padding: 40px 24px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+  }
+
+  .sim-complete .checkmark {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: rgba(74, 222, 128, 0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+  }
+
+  .sim-complete h3 { font-size: 18px; }
+  .sim-complete p { font-size: 13px; color: var(--muted); }
+
+  .pivot-badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: rgba(108, 140, 255, 0.15);
+    color: var(--accent);
+    margin-left: 8px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>FLOW ENGINE <span>Visualizer</span></h1>
+</header>
+
+<div class="layout">
+  <!-- Left: Editor -->
+  <div class="editor-panel">
+    <div class="flow-tabs" id="flow-tabs"></div>
+    <div class="editor-wrap">
+      <div class="editor-scroll" id="editor-scroll">
+        <div class="highlight-backdrop" id="highlight-backdrop"></div>
+        <div class="gutter" id="gutter"></div>
+        <pre class="highlight-pre" id="highlight-pre"></pre>
+        <textarea id="editor" spellcheck="false"></textarea>
+      </div>
+    </div>
+    <div class="editor-status">
+      <span id="parse-status" class="ok">Valid JSON</span>
+      <span id="step-count"></span>
+    </div>
+  </div>
+
+  <!-- Right: Diagram + Sim -->
+  <div class="right-panel">
+    <div class="right-tabs">
+      <button class="right-tab active" data-view="diagram-view">Diagram</button>
+      <button class="right-tab" data-view="sim-view">Simulate</button>
+    </div>
+    <div class="right-content">
+      <div id="diagram-view" class="view active">
+        <div class="mermaid-container" id="mermaid-target"></div>
+      </div>
+      <div id="sim-view" class="view">
+        <div class="sim-phone" id="sim-phone"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Flow Definitions ──────────────────────────────────────────────
+
+const FLOWS = {
+  "Login": {
+    name: "Default Login",
+    purposes: ["login"],
+    initial_steps: { login: "identifier" },
+    audience: {},
+    steps: [
+      {
+        name: "identifier",
+        type: "identifier",
+        label: "Sign in",
+        description: "Enter your email to continue",
+        config: { methods: ["email"], sso_providers: ["google"] },
+        fields: [
+          { name: "identifier", label: "Email", type: "email", required: true }
+        ],
+        actions: [
+          { kind: "submit", name: "submit", label: "Continue", primary: true },
+          { kind: "sso", name: "google", label: "Continue with Google", provider: "google" },
+          { kind: "passkey", name: "passkey", label: "Sign in with passkey" },
+          { kind: "link", name: "register", label: "Create account" }
+        ],
+        transitions: {
+          submit: "resolve_user",
+          google: "sso_redirect",
+          register: { pivot: "register" },
+          recover: { pivot: "recovery" }
+        }
+      },
+      {
+        name: "resolve_user",
+        type: "policy_check",
+        config: { check: "resolve_user" },
+        transitions: { found: "check_factors", not_found: "identifier" }
+      },
+      {
+        name: "sso_redirect",
+        type: "redirect",
+        label: "Redirecting to provider...",
+        transitions: { callback: "check_factors" }
+      },
+      {
+        name: "check_factors",
+        type: "policy_check",
+        config: { check: "required_factors" },
+        transitions: { password: "password", otp: "otp", acr_met: "done" }
+      },
+      {
+        name: "password",
+        type: "credential",
+        label: "Enter your password",
+        fields: [
+          { name: "password", label: "Password", type: "password", required: true }
+        ],
+        actions: [
+          { kind: "submit", name: "submit", label: "Sign in", primary: true },
+          { kind: "link", name: "recover", label: "Forgot password?" }
+        ],
+        transitions: { submit: "check_factors", recover: { pivot: "recovery" } }
+      },
+      {
+        name: "otp",
+        type: "credential",
+        label: "Two-factor authentication",
+        description: "Enter the code from your authenticator app",
+        fields: [
+          { name: "code", label: "Code", type: "text", validation: { pattern: "^[0-9]{6}$" } }
+        ],
+        actions: [
+          { kind: "submit", name: "submit", label: "Verify", primary: true }
+        ],
+        transitions: { submit: "check_factors" }
+      },
+      {
+        name: "done",
+        type: "complete",
+        label: "Login successful",
+        config: { behavior: "redirect" }
+      }
+    ]
+  },
+
+  "Registration": {
+    name: "Default Registration",
+    purposes: ["register"],
+    initial_steps: { register: "profile" },
+    audience: {},
+    steps: [
+      {
+        name: "profile",
+        type: "form",
+        label: "Create your account",
+        config: { schema: "human_user", fields: ["email", "given_name", "family_name"] },
+        fields: [
+          { name: "email", label: "Email", type: "email", required: true },
+          { name: "given_name", label: "First name", type: "text", required: true },
+          { name: "family_name", label: "Last name", type: "text", required: true }
+        ],
+        actions: [
+          { kind: "submit", name: "submit", label: "Continue", primary: true },
+          { kind: "link", name: "login", label: "Already have an account? Sign in" }
+        ],
+        transitions: { submit: "set_password", login: { pivot: "login" } }
+      },
+      {
+        name: "set_password",
+        type: "form",
+        label: "Choose a password",
+        config: { schema: "human_user", fields: ["password"] },
+        fields: [
+          { name: "password", label: "Password", type: "password", required: true, validation: { min_length: 8 } }
+        ],
+        actions: [
+          { kind: "submit", name: "submit", label: "Continue", primary: true }
+        ],
+        transitions: { submit: "verify_email" }
+      },
+      {
+        name: "verify_email",
+        type: "verification",
+        label: "Verify your email",
+        description: "We sent a code to your email",
+        config: { method: "email", field: "email" },
+        fields: [
+          { name: "code", label: "Verification code", type: "text" }
+        ],
+        actions: [
+          { kind: "submit", name: "submit", label: "Verify", primary: true },
+          { kind: "submit", name: "resend", label: "Resend code" }
+        ],
+        transitions: { submit: "create_user" }
+      },
+      {
+        name: "create_user",
+        type: "action",
+        config: { action: "create_user_and_session" },
+        transitions: { created: "done" }
+      },
+      {
+        name: "done",
+        type: "complete",
+        label: "Account created",
+        config: { behavior: "continue" }
+      }
+    ]
+  },
+
+  "Recovery": {
+    name: "Password Recovery",
+    purposes: ["recovery"],
+    initial_steps: { recovery: "recovery_email" },
+    audience: {},
+    steps: [
+      {
+        name: "recovery_email",
+        type: "verification",
+        label: "Reset your password",
+        description: "We'll send a code to your email",
+        fields: [
+          { name: "email", label: "Email", type: "email", required: true }
+        ],
+        actions: [
+          { kind: "submit", name: "submit", label: "Send code", primary: true },
+          { kind: "link", name: "back", label: "Back to sign in" }
+        ],
+        transitions: { submit: "verify_code", back: { pivot: "login" } }
+      },
+      {
+        name: "verify_code",
+        type: "verification",
+        label: "Enter your code",
+        description: "Check your inbox for a verification code",
+        fields: [
+          { name: "code", label: "Code", type: "text" }
+        ],
+        actions: [
+          { kind: "submit", name: "submit", label: "Verify", primary: true },
+          { kind: "submit", name: "resend", label: "Resend code" }
+        ],
+        transitions: { submit: "new_password" }
+      },
+      {
+        name: "new_password",
+        type: "form",
+        label: "Set a new password",
+        fields: [
+          { name: "password", label: "New password", type: "password", required: true, validation: { min_length: 8 } }
+        ],
+        actions: [
+          { kind: "submit", name: "submit", label: "Reset password", primary: true }
+        ],
+        transitions: { submit: "reset_action" }
+      },
+      {
+        name: "reset_action",
+        type: "action",
+        config: { action: "reset_password" },
+        transitions: { reset: "done" }
+      },
+      {
+        name: "done",
+        type: "complete",
+        label: "Password reset successful",
+        config: { behavior: "continue" }
+      }
+    ]
+  }
+};
+
+// ── State ─────────────────────────────────────────────────────────
+
+let currentFlowName = "Login";
+let currentFlow = structuredClone(FLOWS["Login"]);
+let simState = { stepName: null, history: [], pivotHistory: [], error: null };
+let renderTimeout = null;
+let highlightedLines = { start: -1, end: -1 }; // 0-indexed
+
+// ── DOM refs ──────────────────────────────────────────────────────
+
+const $editor = document.getElementById('editor');
+const $scroll = document.getElementById('editor-scroll');
+const $gutter = document.getElementById('gutter');
+const $highlightPre = document.getElementById('highlight-pre');
+const $backdrop = document.getElementById('highlight-backdrop');
+
+// ── Init ──────────────────────────────────────────────────────────
+
+mermaid.initialize({
+  startOnLoad: false,
+  theme: 'dark',
+  themeVariables: {
+    primaryColor: '#2a3a6a',
+    primaryTextColor: '#e1e4ed',
+    primaryBorderColor: '#6c8cff',
+    lineColor: '#4a5568',
+    secondaryColor: '#1a2744',
+    tertiaryColor: '#1a1d27',
+    edgeLabelBackground: '#1a1d27',
+    fontFamily: '-apple-system, BlinkMacSystemFont, system-ui, sans-serif',
+    fontSize: '13px',
+    nodeBorder: '#6c8cff',
+  },
+  flowchart: { curve: 'basis', padding: 16 }
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+  buildFlowTabs();
+  selectFlow("Login");
+  setupRightTabs();
+});
+
+// ── JSON Syntax Highlighting ──────────────────────────────────────
+
+function highlightJSON(text) {
+  // Escape HTML first
+  const esc = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+  // Tokenize with regex — order matters
+  return esc.replace(
+    /("(?:[^"\\]|\\.)*")\s*:/g,  // key: "..."  (followed by colon)
+    '<span class="key">$1</span>:'
+  ).replace(
+    /:\s*("(?:[^"\\]|\\.)*")/g,   // value string after colon
+    ': <span class="str">$1</span>'
+  ).replace(
+    // standalone strings (in arrays etc, not already wrapped)
+    /(?<=[\[,\n]\s*)("(?:[^"\\]|\\.)*")(?=\s*[,\]\n])/g,
+    '<span class="str">$1</span>'
+  ).replace(
+    /\b(\d+(?:\.\d+)?)\b/g,
+    '<span class="num">$1</span>'
+  ).replace(
+    /\b(true|false)\b/g,
+    '<span class="bool">$1</span>'
+  ).replace(
+    /\bnull\b/g,
+    '<span class="null">null</span>'
+  ).replace(
+    /([{}[\]])/g,
+    '<span class="brace">$1</span>'
+  );
+}
+
+// ── Gutter + Highlight Rendering ──────────────────────────────────
+
+function renderEditorLayers() {
+  const text = $editor.value;
+  const lines = text.split('\n');
+  const lineCount = lines.length;
+
+  // Gutter
+  let gutterHtml = '';
+  for (let i = 0; i < lineCount; i++) {
+    const isBreakpoint = i === highlightedLines.start;
+    const isActive = i >= highlightedLines.start && i <= highlightedLines.end && highlightedLines.start >= 0;
+    const cls = (isBreakpoint ? ' breakpoint' : '') + (isActive ? ' active-line' : '');
+    gutterHtml += `<span class="ln${cls}">${i + 1}</span>`;
+  }
+  $gutter.innerHTML = gutterHtml;
+
+  // Syntax highlight
+  $highlightPre.innerHTML = highlightJSON(text);
+
+  // Line highlight backdrop
+  let backdropHtml = '';
+  if (highlightedLines.start >= 0) {
+    const pad = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--editor-pad'));
+    const lh = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--editor-lh'));
+    for (let i = highlightedLines.start; i <= highlightedLines.end; i++) {
+      const top = pad + i * lh;
+      const cls = i === highlightedLines.start ? 'line-highlight breakpoint-line' : 'line-highlight';
+      backdropHtml += `<div class="${cls}" style="top:${top}px"></div>`;
+    }
+  }
+  $backdrop.innerHTML = backdropHtml;
+
+  // Size the textarea to content
+  const contentHeight = lineCount * 20 + 32; // lines * lh + padding
+  const minH = $scroll.parentElement.clientHeight;
+  const h = Math.max(contentHeight, minH);
+  $editor.style.height = h + 'px';
+  $highlightPre.style.height = h + 'px';
+  $gutter.style.height = h + 'px';
+  $backdrop.style.height = h + 'px';
+}
+
+// Sync scroll between textarea and other layers
+$editor.addEventListener('scroll', syncScroll);
+$scroll.addEventListener('scroll', syncScroll);
+
+function syncScroll() {
+  const top = $scroll.scrollTop;
+  const left = $scroll.scrollLeft;
+  // All layers are positioned inside the scroll container, so they move together.
+  // We just need the textarea to not scroll independently.
+  $editor.scrollTop = 0;
+  $editor.scrollLeft = 0;
+}
+
+// ── Find Step Line Range ──────────────────────────────────────────
+
+function findStepLineRange(text, stepName) {
+  if (!stepName) return { start: -1, end: -1 };
+  const lines = text.split('\n');
+
+  // Find the line that has `"name": "<stepName>"` — then walk outward to find the enclosing { }
+  let nameLineIdx = -1;
+  const namePattern = new RegExp(`"name"\\s*:\\s*"${escapeRegex(stepName)}"`);
+  for (let i = 0; i < lines.length; i++) {
+    if (namePattern.test(lines[i])) {
+      nameLineIdx = i;
+      break;
+    }
+  }
+  if (nameLineIdx < 0) return { start: -1, end: -1 };
+
+  // Walk up to find opening {
+  let start = nameLineIdx;
+  let depth = 0;
+  for (let i = nameLineIdx; i >= 0; i--) {
+    for (const ch of lines[i]) {
+      if (ch === '}' || ch === ']') depth++;
+      if (ch === '{' || ch === '[') depth--;
+    }
+    if (depth < 0) { start = i; break; }
+  }
+
+  // Walk down from start to find matching closing }
+  depth = 0;
+  let end = start;
+  for (let i = start; i < lines.length; i++) {
+    for (const ch of lines[i]) {
+      if (ch === '{' || ch === '[') depth++;
+      if (ch === '}' || ch === ']') depth--;
+    }
+    if (depth <= 0) { end = i; break; }
+  }
+
+  return { start, end };
+}
+
+function escapeRegex(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// ── Scroll to Highlighted Step ────────────────────────────────────
+
+function scrollEditorToStep(stepName) {
+  const text = $editor.value;
+  const range = findStepLineRange(text, stepName);
+  highlightedLines = range;
+  renderEditorLayers();
+
+  if (range.start < 0) return;
+
+  const lh = 20;
+  const pad = 16;
+  const targetTop = pad + range.start * lh;
+  const viewH = $scroll.clientHeight;
+  const rangeH = (range.end - range.start + 1) * lh;
+
+  // Center the step block in the viewport if it's out of view
+  const scrollTop = $scroll.scrollTop;
+  const scrollBot = scrollTop + viewH;
+  const blockTop = targetTop;
+  const blockBot = targetTop + rangeH;
+
+  if (blockTop < scrollTop + 40 || blockBot > scrollBot - 40) {
+    // Scroll so the step block starts ~1/4 from the top
+    $scroll.scrollTo({
+      top: Math.max(0, targetTop - viewH * 0.25),
+      behavior: 'smooth'
+    });
+  }
+}
+
+// ── Flow Tabs ─────────────────────────────────────────────────────
+
+function buildFlowTabs() {
+  const container = document.getElementById('flow-tabs');
+  container.innerHTML = '';
+  for (const name of Object.keys(FLOWS)) {
+    const btn = document.createElement('button');
+    btn.className = 'flow-tab' + (name === currentFlowName ? ' active' : '');
+    btn.textContent = name;
+    btn.onclick = () => selectFlow(name);
+    container.appendChild(btn);
+  }
+}
+
+function selectFlow(name) {
+  currentFlowName = name;
+  currentFlow = structuredClone(FLOWS[name]);
+  document.querySelectorAll('.flow-tab').forEach(t => t.classList.toggle('active', t.textContent === name));
+  $editor.value = JSON.stringify(currentFlow, null, 2);
+  highlightedLines = { start: -1, end: -1 };
+  updateFromEditor();
+  resetSim();
+}
+
+// ── Editor ────────────────────────────────────────────────────────
+
+$editor.addEventListener('input', () => {
+  clearTimeout(renderTimeout);
+  renderTimeout = setTimeout(updateFromEditor, 400);
+  renderEditorLayers();
+});
+
+$editor.addEventListener('keydown', (e) => {
+  // Tab inserts 2 spaces
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    const start = $editor.selectionStart;
+    const end = $editor.selectionEnd;
+    $editor.value = $editor.value.substring(0, start) + '  ' + $editor.value.substring(end);
+    $editor.selectionStart = $editor.selectionEnd = start + 2;
+    renderEditorLayers();
+  }
+});
+
+function updateFromEditor() {
+  const text = $editor.value;
+  const status = document.getElementById('parse-status');
+  const count = document.getElementById('step-count');
+
+  renderEditorLayers();
+
+  try {
+    const parsed = JSON.parse(text);
+    if (!parsed.steps || !Array.isArray(parsed.steps)) throw new Error('Missing steps array');
+    currentFlow = parsed;
+    status.className = 'ok';
+    status.textContent = 'Valid JSON';
+    count.textContent = `${parsed.steps.length} steps`;
+    renderDiagram();
+  } catch (e) {
+    status.className = 'error';
+    status.textContent = e.message;
+    count.textContent = '';
+  }
+}
+
+// ── Right Tabs ────────────────────────────────────────────────────
+
+function setupRightTabs() {
+  document.querySelectorAll('.right-tab').forEach(tab => {
+    tab.onclick = () => {
+      document.querySelectorAll('.right-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById(tab.dataset.view).classList.add('active');
+      if (tab.dataset.view === 'sim-view' && !simState.stepName) resetSim();
+    };
+  });
+}
+
+// ── Mermaid Diagram ───────────────────────────────────────────────
+
+let mermaidCounter = 0;
+
+async function renderDiagram() {
+  const target = document.getElementById('mermaid-target');
+  if (!currentFlow || !currentFlow.steps) { target.innerHTML = ''; return; }
+
+  const lines = ['graph TD'];
+  const steps = currentFlow.steps;
+  const pivotTargets = new Set();
+
+  // Node definitions — use safe IDs (prefix with n_ to avoid mermaid reserved words)
+  for (const step of steps) {
+    const id = 'n_' + step.name;
+    const typeLabel = step.type;
+    if (step.type === 'policy_check' || step.type === 'action') {
+      lines.push(`    ${id}{{"\`**${step.name}**\n${typeLabel}\`"}}`);
+    } else if (step.type === 'complete') {
+      lines.push(`    ${id}(["\`**${step.name}**\n${typeLabel}\`"])`);
+    } else {
+      lines.push(`    ${id}["\`**${step.name}**\n${typeLabel}\`"]`);
+    }
+  }
+
+  // Edges
+  for (const step of steps) {
+    if (!step.transitions) continue;
+    const srcId = 'n_' + step.name;
+    for (const [label, tgt] of Object.entries(step.transitions)) {
+      if (typeof tgt === 'string') {
+        lines.push(`    ${srcId} -->|${label}| n_${tgt}`);
+      } else if (tgt.pivot) {
+        const pivotId = 'pivot_' + tgt.pivot;
+        if (!pivotTargets.has(tgt.pivot)) {
+          pivotTargets.add(tgt.pivot);
+          lines.push(`    ${pivotId}["\`**${tgt.pivot}**\npivot\`"]:::pivot`);
+        }
+        lines.push(`    ${srcId} -.->|${label}| ${pivotId}`);
+      }
+    }
+  }
+
+  // Styles
+  for (const step of steps) {
+    const id = 'n_' + step.name;
+    if (step.type === 'policy_check' || step.type === 'action') {
+      lines.push(`    style ${id} fill:#1a2744,stroke:#4a5568,color:#8b8fa3`);
+    } else if (step.type === 'complete') {
+      lines.push(`    style ${id} fill:#1a3a2a,stroke:#4ade80,color:#4ade80`);
+    }
+  }
+
+  lines.push('    classDef pivot fill:#2a1a44,stroke:#a78bfa,color:#a78bfa');
+
+  if (simState.stepName) {
+    const exists = steps.find(s => s.name === simState.stepName);
+    if (exists) {
+      lines.push(`    style n_${simState.stepName} fill:#2a3a6a,stroke:#6c8cff,stroke-width:3px,color:#fff`);
+    }
+  }
+
+  const graphDef = lines.join('\n');
+
+  try {
+    // Use a unique ID each render to avoid mermaid ID collisions
+    const id = 'mermaid-g-' + (++mermaidCounter);
+    const { svg } = await mermaid.render(id, graphDef);
+    target.innerHTML = svg;
+  } catch (e) {
+    console.error('Mermaid render error:', e, '\nGraph:\n', graphDef);
+    target.innerHTML = '<p style="color: var(--muted); padding: 24px;">Could not render diagram — check console</p>';
+  }
+}
+
+// ── Simulation ────────────────────────────────────────────────────
+
+function resetSim() {
+  const purposes = currentFlow.purposes || ['login'];
+  const purpose = purposes[0];
+  const initial = currentFlow.initial_steps?.[purpose] || currentFlow.steps?.[0]?.name;
+  simState = { stepName: initial, history: [], pivotHistory: [], error: null };
+  advanceThroughInvisible();
+  onSimStepChanged();
+}
+
+function findStep(name) {
+  return currentFlow?.steps?.find(s => s.name === name);
+}
+
+function advanceThroughInvisible() {
+  let guard = 0;
+  while (guard++ < 20) {
+    const step = findStep(simState.stepName);
+    if (!step) break;
+    if (step.type === 'policy_check' || step.type === 'action') {
+      const transitions = step.transitions || {};
+      const keys = Object.keys(transitions);
+      // Pick the first transition that doesn't loop back to a step already in history.
+      // This simulates "forward progress" — e.g. check_factors picks password first,
+      // but after password is visited it picks otp, then acr_met.
+      const visited = new Set(simState.history);
+      let picked = null;
+      for (const k of keys) {
+        const t = transitions[k];
+        if (typeof t === 'string' && !visited.has(t)) {
+          picked = t;
+          break;
+        }
+      }
+      // Fallback: if all targets are visited, pick the last one (typically the "done" path)
+      if (!picked) {
+        for (let i = keys.length - 1; i >= 0; i--) {
+          const t = transitions[keys[i]];
+          if (typeof t === 'string') { picked = t; break; }
+        }
+      }
+      if (picked) {
+        simState.history.push(simState.stepName);
+        simState.stepName = picked;
+      } else {
+        break;
+      }
+    } else {
+      break;
+    }
+  }
+}
+
+function onSimStepChanged() {
+  renderSim();
+  renderDiagram();
+  scrollEditorToStep(simState.stepName);
+}
+
+function simAction(actionName) {
+  const step = findStep(simState.stepName);
+  if (!step || !step.transitions) return;
+
+  const target = step.transitions[actionName];
+  if (!target) {
+    simState.error = null;
+    renderSim();
+    return;
+  }
+
+  if (typeof target === 'object' && target.pivot) {
+    const pivotPurpose = target.pivot;
+    const pivotFlowName = Object.keys(FLOWS).find(k =>
+      FLOWS[k].purposes?.includes(pivotPurpose)
+    );
+    if (pivotFlowName) {
+      simState.pivotHistory.push(currentFlowName);
+      // selectFlow resets sim, so we just call it
+      selectFlow(pivotFlowName);
+      return;
+    }
+  }
+
+  simState.history.push(simState.stepName);
+  simState.stepName = target;
+  simState.error = null;
+  advanceThroughInvisible();
+  onSimStepChanged();
+}
+
+function renderSim() {
+  const phone = document.getElementById('sim-phone');
+  const step = findStep(simState.stepName);
+
+  if (!step) {
+    phone.innerHTML = '<div class="sim-complete"><div class="checkmark">?</div><h3>Step not found</h3><p>' + (simState.stepName || 'none') + '</p></div>';
+    return;
+  }
+
+  if (step.type === 'complete') {
+    const behavior = step.config?.behavior || 'redirect';
+    phone.innerHTML = `
+      <div class="sim-header"><h2>${step.label || 'Complete'}</h2></div>
+      <div class="sim-complete">
+        <div class="checkmark">&#10003;</div>
+        <h3>${step.label || 'Flow complete'}</h3>
+        <p>behavior: ${behavior}</p>
+        ${behavior === 'redirect' ? '<p style="color: var(--accent)">&#8594; redirect to application</p>' : ''}
+        ${behavior === 'continue' ? '<p style="color: var(--accent)">&#8594; auto-pivot back</p>' : ''}
+      </div>
+      <div class="sim-footer">
+        <span class="sim-breadcrumb">${renderBreadcrumb()}</span>
+        <button class="sim-reset" onclick="resetSim()">Reset</button>
+      </div>`;
+    return;
+  }
+
+  if (step.type === 'redirect') {
+    phone.innerHTML = `
+      <div class="sim-header"><h2>${step.label || 'Redirecting...'}</h2></div>
+      <div class="sim-body">
+        <p style="color: var(--muted); text-align: center; padding: 40px 0;">Redirecting to external provider...</p>
+        <div class="sim-actions">
+          <button class="sim-btn primary" onclick="simAction('callback')">Simulate callback</button>
+        </div>
+      </div>
+      <div class="sim-footer">
+        <span class="sim-breadcrumb">${renderBreadcrumb()}</span>
+        <button class="sim-reset" onclick="resetSim()">Reset</button>
+      </div>`;
+    return;
+  }
+
+  const fields = (step.fields || []).map(f => `
+    <div class="sim-field">
+      <label>${f.label}${f.required ? ' *' : ''}</label>
+      <input type="${f.type === 'password' ? 'password' : 'text'}" placeholder="${f.label}" />
+    </div>
+  `).join('');
+
+  const actions = (step.actions || []).map(a => {
+    const cls = a.primary ? 'primary' : a.kind === 'sso' ? 'sso' : a.kind === 'passkey' ? 'passkey' : a.kind === 'captcha' ? 'captcha' : 'link';
+    const icon = a.kind === 'sso' ? '&#9679; ' : a.kind === 'passkey' ? '&#128273; ' : '';
+    return `<button class="sim-btn ${cls}" onclick="simAction('${a.name}')">${icon}${a.label}</button>`;
+  }).join('');
+
+  const errorHtml = simState.error ? `<div class="sim-error">${simState.error}</div>` : '';
+
+  phone.innerHTML = `
+    <div class="sim-header">
+      <h2>${step.label || step.name}<span class="pivot-badge">${step.type}</span></h2>
+      ${step.description ? `<p>${step.description}</p>` : ''}
+    </div>
+    <div class="sim-body">
+      ${errorHtml}
+      ${fields}
+      <div class="sim-actions">${actions}</div>
+    </div>
+    <div class="sim-footer">
+      <span class="sim-breadcrumb">${renderBreadcrumb()}</span>
+      <button class="sim-reset" onclick="resetSim()">Reset</button>
+    </div>`;
+}
+
+function renderBreadcrumb() {
+  const parts = [...simState.history.slice(-3), simState.stepName];
+  return parts.map((p, i) =>
+    i === parts.length - 1 ? `<span>${p}</span>` : p
+  ).join(' &#8594; ');
+}
+</script>
+
+</body>
+</html>
