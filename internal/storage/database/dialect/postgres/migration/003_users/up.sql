@@ -85,8 +85,8 @@ CREATE TABLE zitadel_nextgen.user_attributes_part_3 PARTITION OF zitadel_nextgen
 -- the actual attributes.
 CREATE TABLE zitadel_nextgen.user_unique_attributes (
     instance_id TEXT NOT NULL COLLATE "C"
-    , user_id TEXT NOT NULL
-    , organization_id TEXT NOT NULL -- empty string if global
+    , user_id TEXT NOT NULL COLLATE "C"
+    , organization_id TEXT NOT NULL COLLATE "C" -- empty string if global
     , key TEXT NOT NULL COLLATE "C"
     , value_hash BYTEA NOT NULL -- raw binary SHA-256
     , PRIMARY KEY (instance_id, organization_id, key, value_hash)
