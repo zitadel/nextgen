@@ -34,24 +34,14 @@ go.work.sum
 # .idea/
 # .vscode/
 
-# Angular / frontend
+# JavaScript / TypeScript
 node_modules/
-.angular/
 dist/
-tmp/
-out-tsc/
 coverage/
 npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
 pnpm-debug.log*
 *.code-workspace
 
-# TypeScript workspace
-apps/**/node_modules/
-apps/**/dist/
-packages/**/node_modules/
-packages/**/dist/
 # Keep the embed placeholder so //go:embed all:dist works in clean checkouts.
 # `dist/` above ignores the directory entirely, so we have to un-ignore the
 # directory before re-ignoring its contents and re-allowing the placeholder.
