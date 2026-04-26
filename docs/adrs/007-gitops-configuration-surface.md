@@ -20,4 +20,3 @@ Agents work best when they can inspect and edit deterministic files. Humans work
 - Flow, schema, locale, and template files are reviewable.
 - Generated examples avoid fake providers or deprecated vocabulary.
 - Runtime data such as users, sessions, tokens, and audit events remains out of the repo.
-

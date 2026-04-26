@@ -20,6 +20,8 @@ export type AppAddOptions = GlobalOptions & {
 
 const OIDC_CLIENT_TYPES = ["web", "spa", "native", "machine"] as const;
 type OidcClientType = (typeof OIDC_CLIENT_TYPES)[number];
+const APP_PROTOCOLS = ["oidc", "saml"] as const;
+type AppProtocol = (typeof APP_PROTOCOLS)[number];
 
 export type AppRemoveOptions = GlobalOptions & { slug?: string };
 
@@ -119,7 +121,7 @@ async function buildAppResource(opts: AppAddOptions): Promise<Record<string, unk
     });
   }
 
-  const protocol = requireOpt(opts.protocol, "--protocol") as "oidc" | "saml";
+  const protocol = resolveAppProtocol(opts.protocol);
   const displayName = opts.displayName ?? slug;
 
   if (protocol === "oidc") {
@@ -186,6 +188,14 @@ function resolveOidcClientType(value: string | undefined): OidcClientType {
   if ((OIDC_CLIENT_TYPES as readonly string[]).includes(value)) return value as OidcClientType;
   throw new ZitadelError("E_VALIDATION", `Invalid --client-type "${value}"`, {
     hint: `Use one of: ${OIDC_CLIENT_TYPES.join(", ")}.`,
+  });
+}
+
+function resolveAppProtocol(value: string | undefined): AppProtocol {
+  const protocol = requireOpt(value, "--protocol");
+  if ((APP_PROTOCOLS as readonly string[]).includes(protocol)) return protocol as AppProtocol;
+  throw new ZitadelError("E_VALIDATION", `Invalid --protocol "${protocol}"`, {
+    hint: `Use one of: ${APP_PROTOCOLS.join(", ")}.`,
   });
 }
 

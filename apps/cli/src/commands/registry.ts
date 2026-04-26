@@ -201,7 +201,7 @@ export const COMMANDS: CommandSpec[] = [
   {
     name: "app add",
     summary: "Add or update an app resource (.zitadel/apps/<slug>.json). Apps consume Zitadel's OIDC/SAML server.",
-    usage: "zitadel app add (--preset spa|web|native|machine | --protocol oidc|saml) --slug <slug> [--redirect-uri ...]",
+    usage: "zitadel app add (--preset spa|web|native|machine | --protocol oidc|saml) [--slug <slug>] [--redirect-uri ...]",
     agent_status: "experimental",
     notes: "Experimental POC surface.",
     flags: [

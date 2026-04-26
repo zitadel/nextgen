@@ -15,10 +15,18 @@ export const reactRenderer: RendererSpec = {
         contents: `${MANAGED_MARKER}
 import { ZitadelFlow, type ZitadelEnvironment } from "@zitadel/sdk-next";
 
-const environment = (
+const rawEnvironment =
   process.env.ZITADEL_ENVIRONMENT ??
-  (process.env.NODE_ENV === "production" ? "production" : "development")
-) as ZitadelEnvironment;
+  (process.env.NODE_ENV === "production" ? "production" : "development");
+
+function parseZitadelEnvironment(value: string): ZitadelEnvironment {
+  if (value === "development" || value === "preview" || value === "production") {
+    return value;
+  }
+  throw new Error(\`Unsupported ZITADEL_ENVIRONMENT "\${value}". Use development, preview, or production.\`);
+}
+
+const environment = parseZitadelEnvironment(rawEnvironment);
 
 export default function ${componentName}() {
   return (

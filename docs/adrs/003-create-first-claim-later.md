@@ -20,4 +20,3 @@ Modern agent-driven setup breaks when the first step is a browser signup, email 
 - Pre-claim projects are suitable for local development only.
 - Production apply requires claimed local state.
 - Recovery before claim is best-effort; claim early when ownership matters.
-

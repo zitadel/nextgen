@@ -363,7 +363,7 @@ Add or update an app resource (.zitadel/apps/<slug>.json). Apps consume Zitadel'
 
 > Experimental POC surface.
 
-Usage: `zitadel app add (--preset spa|web|native|machine | --protocol oidc|saml) --slug <slug> [--redirect-uri ...]`
+Usage: `zitadel app add (--preset spa|web|native|machine | --protocol oidc|saml) [--slug <slug>] [--redirect-uri ...]`
 
 | Flag | Type | Description |
 |---|---|---|

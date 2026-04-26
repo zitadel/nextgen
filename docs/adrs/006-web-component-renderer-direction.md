@@ -23,4 +23,3 @@ Web components give Zitadel one framework-neutral renderer that agents can host 
 - The React SDK is a temporary host/shim, not the long-term abstraction.
 - Generated routes use `purpose`, not bespoke auth-mode vocabulary.
 - The CLI can later swap the renderer without changing the app-level concept.
-

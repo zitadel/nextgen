@@ -18,6 +18,8 @@ export type IdpAddOptions = GlobalOptions & {
 };
 
 export type IdpRemoveOptions = GlobalOptions & { slug?: string };
+const IDP_PROTOCOLS = ["oidc", "saml"] as const;
+type IdpProtocol = (typeof IDP_PROTOCOLS)[number];
 
 export async function runIdpAdd(io: CliIO, opts: IdpAddOptions): Promise<void> {
   const resource = await buildIdpResource(opts);
@@ -112,7 +114,7 @@ async function buildIdpResource(opts: IdpAddOptions): Promise<Record<string, unk
     });
   }
 
-  const protocol = requireOpt(opts.protocol, "--protocol") as "oidc" | "saml";
+  const protocol = resolveIdpProtocol(opts.protocol);
   const slug = requireOpt(opts.slug, "--slug");
   const displayName = opts.displayName ?? slug;
 
@@ -166,6 +168,14 @@ async function buildIdpResource(opts: IdpAddOptions): Promise<Record<string, unk
 
 function isIdpPreset(value: string): value is IdpPreset {
   return (IDP_PRESETS as string[]).includes(value);
+}
+
+function resolveIdpProtocol(value: string | undefined): IdpProtocol {
+  const protocol = requireOpt(value, "--protocol");
+  if ((IDP_PROTOCOLS as readonly string[]).includes(protocol)) return protocol as IdpProtocol;
+  throw new ZitadelError("E_VALIDATION", `Invalid --protocol "${protocol}"`, {
+    hint: `Use one of: ${IDP_PROTOCOLS.join(", ")}.`,
+  });
 }
 
 function requireOpt<T>(value: T | undefined, name: string): T {

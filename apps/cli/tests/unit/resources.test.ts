@@ -124,6 +124,29 @@ describe("identity resources", () => {
     expect(envelope.hint ?? "").not.toContain("github");
   });
 
+  it("idp add rejects invalid protocol values", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "zitadel-idp-protocol-"));
+    const result = await runCliForTest([
+      "idp",
+      "add",
+      "--cwd",
+      cwd,
+      "--json",
+      "--non-interactive",
+      "--protocol",
+      "oauth2",
+      "--slug",
+      "bad",
+      "--metadata-url",
+      "https://idp.example/metadata",
+    ]);
+    expect(result.exitCode).toBe(3);
+    const envelope = parseJson(result.stdout) as { code: string; message: string; hint?: string };
+    expect(envelope.code).toBe("E_VALIDATION");
+    expect(envelope.message).toContain("Invalid --protocol");
+    expect(envelope.hint).toContain("oidc, saml");
+  });
+
   it("app add accepts --client-type for OIDC without a preset", async () => {
     const cwd = await mkdtemp(join(tmpdir(), "zitadel-app-ct-"));
     const result = await runCliForTest([
@@ -146,6 +169,29 @@ describe("identity resources", () => {
     const contents = JSON.parse(await readFile(join(cwd, ".zitadel/apps/spa.json"), "utf8")) as Record<string, unknown>;
     expect((contents.oidc as { client_type: string }).client_type).toBe("spa");
     expect((contents.oidc as { auth_methods: string[] }).auth_methods).toEqual(["none"]);
+  });
+
+  it("app add rejects invalid protocol values", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "zitadel-app-protocol-"));
+    const result = await runCliForTest([
+      "app",
+      "add",
+      "--cwd",
+      cwd,
+      "--json",
+      "--non-interactive",
+      "--protocol",
+      "oauth2",
+      "--slug",
+      "bad",
+      "--entity-id",
+      "urn:bad",
+    ]);
+    expect(result.exitCode).toBe(3);
+    const envelope = parseJson(result.stdout) as { code: string; message: string; hint?: string };
+    expect(envelope.code).toBe("E_VALIDATION");
+    expect(envelope.message).toContain("Invalid --protocol");
+    expect(envelope.hint).toContain("oidc, saml");
   });
 
   it("app add rejects --role with --protocol oidc", async () => {

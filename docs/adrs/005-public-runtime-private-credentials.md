@@ -20,4 +20,3 @@ Next client components cannot safely depend on private environment variables. Pr
 - Development may render mock auth.
 - Preview and production must resolve runtime metadata or show a blocking error.
 - Secret-bearing operations stay in CLI/server boundaries.
-
