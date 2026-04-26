@@ -27,6 +27,9 @@ go.work.sum
 # env file
 .env
 
+# Local Codex/Claude workspace metadata
+.claude/
+
 # Editor/IDE
 # .idea/
 # .vscode/
@@ -49,3 +52,9 @@ apps/**/node_modules/
 apps/**/dist/
 packages/**/node_modules/
 packages/**/dist/
+# Keep the embed placeholder so //go:embed all:dist works in clean checkouts.
+# `dist/` above ignores the directory entirely, so we have to un-ignore the
+# directory before re-ignoring its contents and re-allowing the placeholder.
+!/apps/console/dist/
+/apps/console/dist/*
+!/apps/console/dist/.gitkeep
