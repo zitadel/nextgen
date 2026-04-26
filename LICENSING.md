@@ -1,6 +1,6 @@
 # Licensing Policy
 
-This repository uses a split licensing model. The ZITADEL product, including the
+This repository uses a split licensing model. The Zitadel product, including the
 server and embedded console, is licensed under the GNU Affero General Public
 License v3.0 only (AGPL-3.0-only). Client libraries, integration surfaces, API
 contracts, and documentation that are meant to be consumed by downstream
@@ -28,7 +28,7 @@ The Docker images published from this repository, including
 embedded console. The OCI label `org.opencontainers.image.licenses` must reflect
 that.
 
-ZITADEL is open-source software intended for community use. Determining your
+Zitadel is open-source software intended for community use. Determining your
 application's compliance with AGPL-3.0-only is your responsibility. We recommend
 consulting legal counsel or licensing specialists if you are unsure how the
 license applies to your usage. If your application triggers AGPL-3.0-only
@@ -57,7 +57,7 @@ without imposing AGPL-3.0-only obligations on those applications.
 
 For `api/`, OpenAPI `info.license` metadata describes the exposed API
 contract/specification license. It does not describe or override the
-AGPL-3.0-only license of the ZITADEL server implementation.
+AGPL-3.0-only license of the Zitadel server implementation.
 
 Each MIT-licensed npm package must:
 
@@ -70,17 +70,17 @@ metadata, or local README notes are sufficient when the format supports them.
 
 ## External contributions
 
-Contributions from ZITADEL employees are governed by their employment or
+Contributions from Zitadel employees are governed by their employment or
 contractual IP terms.
 
-All contributions from people who are not contributing as ZITADEL employees are
-accepted under the MIT License unless ZITADEL explicitly agrees otherwise in
+All contributions from people who are not contributing as Zitadel employees are
+accepted under the MIT License unless Zitadel explicitly agrees otherwise in
 writing before accepting the contribution. By submitting a pull request, patch,
 or other contribution, you represent that you have the right to license the
-contribution under MIT and you grant ZITADEL the right to use, modify,
+contribution under MIT and you grant Zitadel the right to use, modify,
 sublicense, and distribute that contribution under the MIT License.
 
-This inbound MIT grant lets ZITADEL include external contributions in
+This inbound MIT grant lets Zitadel include external contributions in
 AGPL-3.0-only product code or MIT-licensed exception paths without a separate
 Contributor License Agreement (CLA). It does not change the outbound license of
 repository files: AGPL-3.0-only remains the default for product code, and the

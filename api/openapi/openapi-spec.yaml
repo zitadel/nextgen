@@ -5,7 +5,7 @@ info:
   description: This is the next generation of the Zitadel identity platform.
   version: 0.0.1
   # This describes the exposed API contract/specification license, not the
-  # AGPL-3.0-only license of the ZITADEL server implementation.
+  # AGPL-3.0-only license of the Zitadel server implementation.
   # See /LICENSING.md for the repository-level licensing policy.
   license:
     name: MIT
