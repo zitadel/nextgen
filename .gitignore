@@ -31,8 +31,8 @@ go.work.sum
 .claude/
 
 # Editor/IDE
-# .idea/
-# .vscode/
+.idea/
+.vscode/
 
 # JavaScript / TypeScript
 node_modules/
