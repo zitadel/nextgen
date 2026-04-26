@@ -1,41 +1,83 @@
-# Licensing
+# Licensing Policy
 
-This repository uses a split licensing model that mirrors [zitadel/zitadel](https://github.com/zitadel/zitadel/blob/main/LICENSING.md): the identity server is **AGPL-3.0-only** so that modifications stay in the open, while client-side code that integrates into customer applications is permissively licensed so that consumers do not have to open-source their own apps.
+This repository uses a split licensing model. The ZITADEL product, including the
+server and embedded console, is licensed under the GNU Affero General Public
+License v3.0 only (AGPL-3.0-only). Client libraries, integration surfaces, API
+contracts, and documentation that are meant to be consumed by downstream
+applications are licensed under the MIT License.
 
-## Defaults
+We use SPDX license identifiers for standard license naming.
 
-Unless a path-specific override below applies, the contents of this repository are licensed under **GNU Affero General Public License v3.0 only (AGPL-3.0-only)**. The full text is in [LICENSE](LICENSE).
+## AGPL-3.0-only default
 
-This default covers the Go server binary (`./`, `cmd/`, `internal/`) and the embedded React console SPA at `apps/console/`. The Docker images published to `ghcr.io/zitadel/nextgen` are AGPL-3.0-only as a result; the OCI label `org.opencontainers.image.licenses` reflects this.
+Unless a path-specific MIT override below applies, the contents of this
+repository are licensed under AGPL-3.0-only. The full license text is in
+[LICENSE](LICENSE).
 
-## Path-specific overrides — MIT
+This default includes, without limitation:
 
-The following paths are licensed under the **MIT License** so that downstream applications can consume them without AGPL obligations and so third parties can implement against the published contracts:
+```text
+/
+cmd/
+internal/
+apps/console/
+```
 
-| Path | Purpose |
-|---|---|
-| `apps/cli/` | TypeScript developer CLI (`npx zitadel`) |
-| `packages/components/` | Web components consumed by customer apps |
-| `packages/sdk-core/` | Core TypeScript SDK |
-| `packages/sdk-next/` | Next.js SDK |
-| Future `packages/sdk-*/` | Additional language/framework SDKs |
-| `api/` | OpenAPI specifications and generated code |
-| `docs/` | Design documents, ADRs, and other written material |
+The Docker images published from this repository, including
+`ghcr.io/zitadel/nextgen`, are AGPL-3.0-only because they contain the server and
+embedded console. The OCI label `org.opencontainers.image.licenses` must reflect
+that.
+
+ZITADEL is open-source software intended for community use. Determining your
+application's compliance with AGPL-3.0-only is your responsibility. We recommend
+consulting legal counsel or licensing specialists if you are unsure how the
+license applies to your usage. If your application triggers AGPL-3.0-only
+obligations and you wish to avoid them, please
+[contact us](https://zitadel.com/contact) to discuss commercial licensing
+options.
+
+## MIT exceptions
+
+The following files and directories, including their subdirectories, are
+licensed under the MIT License:
+
+```text
+apps/cli/
+packages/components/
+packages/sdk-core/
+packages/sdk-next/
+packages/sdk-*/
+api/
+docs/
+```
+
+These exceptions cover code and contracts that are intended to be imported,
+generated from, embedded into, or otherwise used by downstream applications
+without imposing AGPL-3.0-only obligations on those applications.
 
 Each MIT-licensed npm package must:
+
 - declare `"license": "MIT"` in its `package.json`,
-- include a `LICENSE` file at the package root containing the MIT text,
+- include a `LICENSE` file at the package root containing the MIT license text,
 - carry an SPDX header in source files where reasonable.
 
-For non-package paths under MIT (`api/`, `docs/`), an SPDX header in source files and a `README` note are sufficient — no separate `LICENSE` file required.
+For non-package MIT paths such as `api/` and `docs/`, SPDX headers, generated
+metadata, or local README notes are sufficient when the format supports them.
 
-## Contributions
+## External contributions
 
-By contributing to this repository, you agree that your contributions are licensed under the same license as the file you are modifying. New code in unmarked locations is contributed under AGPL-3.0-only.
+Contributions from ZITADEL employees are governed by their employment or
+contractual IP terms.
 
-## Why this split?
+All contributions from people who are not contributing as ZITADEL employees are
+accepted under the MIT License unless ZITADEL explicitly agrees otherwise in
+writing before accepting the contribution. By submitting a pull request, patch,
+or other contribution, you represent that you have the right to license the
+contribution under MIT and you grant ZITADEL the right to use, modify,
+sublicense, and distribute that contribution under the MIT License.
 
-- **Server (AGPL-3.0-only)**: ensures forks and modified deployments contribute changes back, in line with zitadel's broader commitment to open identity infrastructure.
-- **Everything else (MIT)**: integrators ship clients, SDKs, CLI, components, and even API specifications inside proprietary applications. Permissive licensing avoids inadvertent AGPL contagion of their codebases. MIT is the npm ecosystem default and keeps the contributor mental model to two buckets instead of three.
-
-If you need clarity for a specific use case, consult legal counsel — this document describes the licensing scheme but does not constitute legal advice.
+This inbound MIT grant lets ZITADEL include external contributions in
+AGPL-3.0-only product code or MIT-licensed exception paths without a separate
+Contributor License Agreement (CLA). It does not change the outbound license of
+repository files: AGPL-3.0-only remains the default for product code, and the
+paths listed under "MIT exceptions" remain MIT-licensed.

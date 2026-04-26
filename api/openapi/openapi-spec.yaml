@@ -5,8 +5,8 @@ info:
   description: This is the next generation of the Zitadel identity platform.
   version: 0.0.1
   license:
-    name: AGPL-3.0
-    identifier: AGPL-3.0
+    name: MIT
+    identifier: MIT
 
 servers: 
   # TODO: put correct server here.
