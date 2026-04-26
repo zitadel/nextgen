@@ -32,8 +32,16 @@ describe("Next setup integration", () => {
     expect(flowRaw).toContain("\"text_key\": \"identifier.field.email\"");
     const localeRaw = await readFile(join(cwd, ".zitadel/locales/en.json"), "utf8");
     expect(localeRaw).toContain("\"identifier.title\": \"Sign in\"");
-    expect(await readFile(join(cwd, "app/login/page.tsx"), "utf8")).toContain("zitadel-cli: managed-file v1");
-    expect(await readFile(join(cwd, ".env.local"), "utf8")).toContain("ZITADEL_ENVIRONMENT=development");
+    const loginPage = await readFile(join(cwd, "app/login/page.tsx"), "utf8");
+    expect(loginPage).toContain("zitadel-cli: managed-file v1");
+    expect(loginPage).toContain("ZitadelFlow");
+    expect(loginPage).toContain('purpose="login"');
+    expect(loginPage).toContain("process.env.NODE_ENV");
+    expect(loginPage).not.toContain("ZitadelAuth");
+    const envLocal = await readFile(join(cwd, ".env.local"), "utf8");
+    expect(envLocal).toContain("ZITADEL_ENVIRONMENT=development");
+    expect(envLocal).not.toContain("ZITADEL_PROJECT_SECRET");
+    expect(envLocal).not.toContain("ZITADEL_PREVIEW_SECRET");
     expect((await stat(join(cwd, ".zitadel/secret"))).mode & 0o777).toBe(0o600);
 
     const doctor = await runCliForTest(["doctor", "--cwd", cwd, "--json"]);
@@ -84,10 +92,45 @@ describe("Next setup integration", () => {
 
     const claim = await runCliForTest(["claim", "--cwd", cwd, "--json", "--mock"]);
     expect(claim.exitCode).toBe(0);
-    const claimJson = parseJson(claim.stdout) as { status: string; data: { handoff: string; claim_url: string } };
+    const claimJson = parseJson(claim.stdout) as { status: string; data: { handoff: string; claim_url: string; challenge_id: string } };
     expect(claimJson.status).toBe("ok");
     expect(claimJson.data.handoff).toBe("human");
     expect(claimJson.data.claim_url).toContain("claim");
+
+    const pendingClaim = await runCliForTest([
+      "claim",
+      "status",
+      "--cwd",
+      cwd,
+      "--json",
+      "--mock",
+      "--challenge-id",
+      claimJson.data.challenge_id,
+    ]);
+    expect(pendingClaim.exitCode).toBe(0);
+    expect((parseJson(pendingClaim.stdout) as { data: { status: string } }).data.status).toBe("pending");
+
+    const completedClaim = await runCliForTest([
+      "claim",
+      "status",
+      "--cwd",
+      cwd,
+      "--json",
+      "--mock",
+      "--mock-complete-claim",
+      "--challenge-id",
+      claimJson.data.challenge_id,
+    ]);
+    expect(completedClaim.exitCode).toBe(0);
+    const completedJson = parseJson(completedClaim.stdout) as { data: { status: string; state_refreshed: boolean } };
+    expect(completedJson.data.status).toBe("claimed");
+    expect(completedJson.data.state_refreshed).toBe(true);
+    const secret = await readFile(join(cwd, ".zitadel/secret"), "utf8");
+    expect(secret).toContain("\"claimed_at\"");
+    expect(secret).toContain("\"team_id\": \"team_mock\"");
+
+    const productionAfterClaim = await runCliForTest(["apply", "--cwd", cwd, "--json", "--mock", "--environment", "production"]);
+    expect(productionAfterClaim.exitCode).toBe(0);
   });
 });
 

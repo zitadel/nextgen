@@ -102,6 +102,28 @@ describe("identity resources", () => {
     expect((contents.oidc as { redirect_uris: string[] }).redirect_uris).toContain("http://localhost:3000/callback");
   });
 
+  it("does not advertise GitHub as an OIDC IdP preset", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "zitadel-idp-github-"));
+    const result = await runCliForTest([
+      "idp",
+      "add",
+      "--cwd",
+      cwd,
+      "--json",
+      "--non-interactive",
+      "--preset",
+      "github",
+      "--client-id",
+      "github-client",
+      "--env-secret",
+      "ZITADEL_IDP_GITHUB_SECRET",
+    ]);
+    expect(result.exitCode).toBe(3);
+    const envelope = parseJson(result.stdout) as { code: string; hint?: string };
+    expect(envelope.code).toBe("E_VALIDATION");
+    expect(envelope.hint ?? "").not.toContain("github");
+  });
+
   it("app add accepts --client-type for OIDC without a preset", async () => {
     const cwd = await mkdtemp(join(tmpdir(), "zitadel-app-ct-"));
     const result = await runCliForTest([

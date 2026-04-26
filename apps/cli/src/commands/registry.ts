@@ -13,7 +13,7 @@ export type CommandSpec = {
   summary: string;
   usage: string;
   flags: FlagSpec[];
-  agent_status: "supported" | "supported-mock-default" | "handoff";
+  agent_status: "supported" | "supported-mock-default" | "handoff" | "experimental";
   notes?: string;
 };
 
@@ -38,7 +38,7 @@ export const COMMANDS: CommandSpec[] = [
       { name: "framework", type: "string", description: "Framework to target (v1 supports \"next\")." },
       { name: "user-fields", type: "string", description: "Comma-separated list of user fields." },
       { name: "auth-methods", type: "string", description: "Comma-separated list of auth methods." },
-      { name: "renderer", type: "string", description: "BDUI renderer: react (default) or lit (pending @zitadel/ui-lit)." },
+      { name: "renderer", type: "string", description: "Renderer: react (default) or web-component (planned <zitadel-flow>)." },
       { name: "skip-deploy-platform", type: "boolean", description: "Skip deploy platform detection and connect." },
       { name: "platform", type: "string", description: "Deploy platform override (vercel/netlify/cloudflare/none)." },
       { name: "manual", type: "boolean", description: "Emit manual deploy steps instead of configuring the provider." },
@@ -81,7 +81,8 @@ export const COMMANDS: CommandSpec[] = [
     name: "deploy status",
     summary: "Report deploy platform readiness.",
     usage: "zitadel deploy status [--platform vercel|netlify|cloudflare]",
-    agent_status: "supported",
+    agent_status: "experimental",
+    notes: "Experimental POC surface; agents should prefer setup, plan, apply, and claim for the golden path.",
     flags: [
       ...globalFlags,
       { name: "platform", type: "string", description: "Force a deploy platform adapter." },
@@ -92,7 +93,8 @@ export const COMMANDS: CommandSpec[] = [
     name: "deploy connect",
     summary: "Configure preview or production platform env vars.",
     usage: "zitadel deploy connect [--environment preview|production]",
-    agent_status: "supported",
+    agent_status: "experimental",
+    notes: "Experimental POC surface; agents should prefer setup, plan, apply, and claim for the golden path.",
     flags: [
       ...globalFlags,
       { name: "platform", type: "string", description: "Force a deploy platform adapter." },
@@ -107,6 +109,18 @@ export const COMMANDS: CommandSpec[] = [
     agent_status: "handoff",
     notes: "Agents must stop here and hand the claim URL to a human.",
     flags: globalFlags,
+  },
+  {
+    name: "claim status",
+    summary: "Check a human claim handoff and refresh local claimed state.",
+    usage: "zitadel claim status --challenge-id <id>",
+    agent_status: "supported-mock-default",
+    flags: [
+      ...globalFlags,
+      { name: "challenge-id", type: "string", description: "Claim challenge ID returned by `zitadel claim`." },
+      { name: "mock-complete-claim", type: "boolean", description: "Mock-only: complete the claim handoff and refresh local state." },
+      { name: "mock-advance-claim", type: "boolean", description: "Alias for --mock-complete-claim." },
+    ],
   },
   {
     name: "schema add",
@@ -125,14 +139,15 @@ export const COMMANDS: CommandSpec[] = [
   {
     name: "idp add",
     summary: "Add or update an identity provider (.zitadel/idps/<slug>.json).",
-    usage: "zitadel idp add (--preset google|microsoft|github|okta-oidc | --protocol oidc|saml) [--slug] [--issuer] [--client-id] [--env-secret] [--metadata-url]",
-    agent_status: "supported",
+    usage: "zitadel idp add (--preset google|microsoft|okta-oidc | --protocol oidc|saml) [--slug] [--issuer] [--client-id] [--env-secret] [--metadata-url]",
+    agent_status: "experimental",
+    notes: "Experimental POC surface; presets are limited to providers with an OIDC issuer.",
     flags: [
       ...globalFlags,
       { name: "slug", type: "string", description: "Local slug (filename). Defaults to preset id." },
       { name: "display-name", type: "string", description: "Human-readable IdP name." },
       { name: "protocol", type: "string", description: "Protocol: oidc or saml." },
-      { name: "preset", type: "string", description: "Preset: google, microsoft, github, okta-oidc." },
+      { name: "preset", type: "string", description: "Preset: google, microsoft, okta-oidc." },
       { name: "issuer", type: "string", description: "OIDC issuer URL (required with --protocol oidc or okta-oidc preset)." },
       { name: "client-id", type: "string", description: "OIDC client ID." },
       { name: "env-secret", type: "string", description: "Name of env var holding the OIDC client secret (e.g. ZITADEL_IDP_GOOGLE_SECRET)." },
@@ -145,21 +160,24 @@ export const COMMANDS: CommandSpec[] = [
     name: "idp list",
     summary: "List local IdP resources.",
     usage: "zitadel idp list",
-    agent_status: "supported",
+    agent_status: "experimental",
+    notes: "Experimental POC surface.",
     flags: globalFlags,
   },
   {
     name: "idp show",
     summary: "Show a single IdP resource by slug.",
     usage: "zitadel idp show <slug>",
-    agent_status: "supported",
+    agent_status: "experimental",
+    notes: "Experimental POC surface.",
     flags: globalFlags,
   },
   {
     name: "idp remove",
     summary: "Remove an IdP resource by slug.",
     usage: "zitadel idp remove <slug>",
-    agent_status: "supported",
+    agent_status: "experimental",
+    notes: "Experimental POC surface.",
     flags: globalFlags,
   },
   {
@@ -184,7 +202,8 @@ export const COMMANDS: CommandSpec[] = [
     name: "app add",
     summary: "Add or update an app resource (.zitadel/apps/<slug>.json). Apps consume Zitadel's OIDC/SAML server.",
     usage: "zitadel app add (--preset spa|web|native|machine | --protocol oidc|saml) --slug <slug> [--redirect-uri ...]",
-    agent_status: "supported",
+    agent_status: "experimental",
+    notes: "Experimental POC surface.",
     flags: [
       ...globalFlags,
       { name: "slug", type: "string", description: "Local slug (filename)." },
@@ -204,21 +223,24 @@ export const COMMANDS: CommandSpec[] = [
     name: "app list",
     summary: "List local app resources.",
     usage: "zitadel app list",
-    agent_status: "supported",
+    agent_status: "experimental",
+    notes: "Experimental POC surface.",
     flags: globalFlags,
   },
   {
     name: "app show",
     summary: "Show a single app resource by slug.",
     usage: "zitadel app show <slug>",
-    agent_status: "supported",
+    agent_status: "experimental",
+    notes: "Experimental POC surface.",
     flags: globalFlags,
   },
   {
     name: "app remove",
     summary: "Remove an app resource by slug.",
     usage: "zitadel app remove <slug>",
-    agent_status: "supported",
+    agent_status: "experimental",
+    notes: "Experimental POC surface.",
     flags: globalFlags,
   },
   {

@@ -92,8 +92,12 @@ export const initClaimResponseSchema = z.object({
 });
 export type InitClaimResponse = z.infer<typeof initClaimResponseSchema>;
 
+const claimStatusSchema = z.enum(["pending", "claimed", "completed", "expired"]).transform((value) => {
+  return value === "completed" ? "claimed" : value;
+});
+
 export const claimStatusResponseSchema = z.object({
-  status: z.enum(["pending", "completed"]),
+  status: claimStatusSchema,
   new_project_secret: z.string().optional(),
   team_id: z.string().optional(),
   claimed_at: z.string().optional(),

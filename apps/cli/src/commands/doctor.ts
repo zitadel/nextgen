@@ -77,9 +77,7 @@ async function collectChecks(cwd: string): Promise<DoctorCheck[]> {
     for (const key of [
       "ZITADEL_PROJECT_ID",
       "ZITADEL_ENVIRONMENT",
-      "ZITADEL_PROJECT_SECRET",
       "ZITADEL_ISSUER",
-      "ZITADEL_PREVIEW_SECRET",
     ]) {
       if (!contents.includes(`${key}=`)) {
         throw new Error(`missing ${key}`);
@@ -170,9 +168,7 @@ async function applyFixes(opts: DoctorOptions): Promise<void> {
         entries: {
           ZITADEL_PROJECT_ID: "",
           ZITADEL_ENVIRONMENT: "",
-          ZITADEL_PROJECT_SECRET: "",
           ZITADEL_ISSUER: "",
-          ZITADEL_PREVIEW_SECRET: "",
         },
       },
       {
@@ -181,7 +177,6 @@ async function applyFixes(opts: DoctorOptions): Promise<void> {
         entries: {
           ZITADEL_PROJECT_ID: secret.project_id,
           ZITADEL_ENVIRONMENT: "development",
-          ZITADEL_PROJECT_SECRET: secret.project_secret,
           ZITADEL_ISSUER: issuer,
         },
       },

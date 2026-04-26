@@ -1,8 +1,8 @@
 # Zitadel CLI Agent Contract
 
-Agents should run `zitadel <command> --non-interactive --json` and read the JSON envelope. The sections below marked generated are produced from the CLI registry at build time; do not edit them by hand.
+Agents should run `zitadel <command> --non-interactive --json` and read the JSON envelope. The sections below are generated from the CLI registry at build time; do not edit them by hand.
 
-## Required agent flags
+## Required Agent Flags
 
 ```sh
 npx zitadel@latest <command> --non-interactive --json
@@ -15,50 +15,21 @@ npx zitadel@latest capabilities --json
 npx zitadel@latest help <command> --json
 ```
 
-## JSON envelope
+Agents should prefer `next_commands` over free-text hints.
 
-Every envelope includes `status`, `cli_version`, `command`, and `source` at the top level.
+## Golden Path
 
-```json
-{ "status": "ok", "cli_version": "0.1.0", "command": "setup", "source": "https://api.zitadel.cloud", "data": {}, "warnings": [] }
-{ "status": "skipped", "cli_version": "0.1.0", "command": "setup", "source": "mock", "reason": "already-initialized" }
-{ "status": "error", "cli_version": "0.1.0", "command": "apply", "source": "mock", "code": "E_VALIDATION", "message": "...", "hint": "...", "next_commands": ["zitadel setup"] }
-```
+The supported POC path is Next.js App Router setup, local mock/dev auth, config plan/apply, human claim handoff, claim-status refresh, and production apply after claim.
 
-Agents should prefer `next_commands` (machine-actionable) over the free-text `hint`.
+Setup creates `zitadel.json`, `.zitadel/secret`, schema/flow/locale resources under `.zitadel/`, browser-safe env metadata, and framework routes that mount `ZitadelFlow`. Project and preview secrets stay out of browser runtime.
 
-## Files
+## Claim Boundary
 
-Setup creates:
+Agents do not claim projects. `zitadel claim` returns a human `claim_url`; after the human completes it, agents may run `zitadel claim status --challenge-id <id>` to refresh local claimed state.
 
-- `zitadel.json` (project config, includes a `server` field — a URL or the literal `mock`)
-- `.zitadel/secret` with POSIX mode `0600`
-- `.zitadel/schemas/user.json`
-- `.zitadel/flows/default.json` (a `FlowDefinition` with unordered `fields` / `actions` / `gates` dicts and `text_key` labels)
-- `.zitadel/locales/en.json` (flat `text_key → string` map; pre-populated core keys)
-- `.zitadel/state.json` (framework, package manager, dev port, last apply)
+## Renderer Direction
 
-Setup also writes:
-
-- `.env.example`, `.env.local`
-- Next App Router files under `app/` or `src/app/`
-
-Resource directories scanned by `zitadel apply` (convention-based, no path map in `zitadel.json`):
-
-- `.zitadel/schemas/*.json`
-- `.zitadel/flows/*.json` (validated against the `FlowDefinition` zod schema)
-- `.zitadel/locales/*.json` (optional, managed by `zitadel locale scaffold`)
-- `.zitadel/templates/*.liquid` (optional; validated — banned: `| raw`, `<script>`, inline `on*=` handlers)
-- `.zitadel/idps/*.json` (optional — created by `zitadel idp add`)
-- `.zitadel/apps/*.json` (optional — created by `zitadel app add`)
-
-Secrets are referenced by env-var name inside resource files (e.g. `"client_secret_env": "ZITADEL_IDP_GOOGLE_SECRET"`). `zitadel apply` resolves them at send-time and never commits secret values to disk.
-
-`.zitadel/secret` and local env files must stay gitignored.
-
-## Claim boundary
-
-Agents do not claim projects. Stop at `zitadel claim` and hand the claim URL to a human.
+Generated routes use `ZitadelFlow({ purpose, projectId, issuer, environment })` so the future `<zitadel-flow>` web component can replace the React shim without changing the app-level contract.
 
 <!-- generated:capabilities:begin -->
 
@@ -72,20 +43,21 @@ Envelope schema version: `1`. Every envelope carries `cli_version`, `command`, `
 | `zitadel plan` | Validate config and deploy readiness without mutation. | supported |
 | `zitadel apply` | Validate and upload repo config to the platform. | supported-mock-default |
 | `zitadel doctor` | Verify generated files and local state. | supported |
-| `zitadel deploy status` | Report deploy platform readiness. | supported |
-| `zitadel deploy connect` | Configure preview or production platform env vars. | supported |
+| `zitadel deploy status` | Report deploy platform readiness. | experimental |
+| `zitadel deploy connect` | Configure preview or production platform env vars. | experimental |
 | `zitadel claim` | Begin the human handoff to claim the project. | handoff |
+| `zitadel claim status` | Check a human claim handoff and refresh local claimed state. | supported-mock-default |
 | `zitadel schema add` | Add or remove fields on the user schema. | supported |
-| `zitadel idp add` | Add or update an identity provider (.zitadel/idps/<slug>.json). | supported |
-| `zitadel idp list` | List local IdP resources. | supported |
-| `zitadel idp show` | Show a single IdP resource by slug. | supported |
-| `zitadel idp remove` | Remove an IdP resource by slug. | supported |
+| `zitadel idp add` | Add or update an identity provider (.zitadel/idps/<slug>.json). | experimental |
+| `zitadel idp list` | List local IdP resources. | experimental |
+| `zitadel idp show` | Show a single IdP resource by slug. | experimental |
+| `zitadel idp remove` | Remove an IdP resource by slug. | experimental |
 | `zitadel locale scaffold` | Add missing text_key entries to .zitadel/locales/<lang>.json (idempotent). | supported |
 | `zitadel locale list` | List local .zitadel/locales/*.json files with key counts. | supported |
-| `zitadel app add` | Add or update an app resource (.zitadel/apps/<slug>.json). Apps consume Zitadel's OIDC/SAML server. | supported |
-| `zitadel app list` | List local app resources. | supported |
-| `zitadel app show` | Show a single app resource by slug. | supported |
-| `zitadel app remove` | Remove an app resource by slug. | supported |
+| `zitadel app add` | Add or update an app resource (.zitadel/apps/<slug>.json). Apps consume Zitadel's OIDC/SAML server. | experimental |
+| `zitadel app list` | List local app resources. | experimental |
+| `zitadel app show` | Show a single app resource by slug. | experimental |
+| `zitadel app remove` | Remove an app resource by slug. | experimental |
 | `zitadel capabilities` | Describe the CLI contract (commands, flags, exit codes). Agent introspection target. | supported |
 | `zitadel help` | Show help for the CLI or a specific command. | supported |
 | `zitadel status` | Summarize the local project state. | supported |
@@ -109,7 +81,7 @@ Usage: `zitadel setup [--framework next] [--user-fields ...] [--auth-methods ...
 | `--framework` | `string` | Framework to target (v1 supports "next"). |
 | `--user-fields` | `string` | Comma-separated list of user fields. |
 | `--auth-methods` | `string` | Comma-separated list of auth methods. |
-| `--renderer` | `string` | BDUI renderer: react (default) or lit (pending @zitadel/ui-lit). |
+| `--renderer` | `string` | Renderer: react (default) or web-component (planned <zitadel-flow>). |
 | `--skip-deploy-platform` | `boolean` | Skip deploy platform detection and connect. |
 | `--platform` | `string` | Deploy platform override (vercel/netlify/cloudflare/none). |
 | `--manual` | `boolean` | Emit manual deploy steps instead of configuring the provider. |
@@ -172,6 +144,8 @@ Usage: `zitadel doctor [--fix]`
 
 Report deploy platform readiness.
 
+> Experimental POC surface; agents should prefer setup, plan, apply, and claim for the golden path.
+
 Usage: `zitadel deploy status [--platform vercel|netlify|cloudflare]`
 
 | Flag | Type | Description |
@@ -189,6 +163,8 @@ Usage: `zitadel deploy status [--platform vercel|netlify|cloudflare]`
 ### `zitadel deploy connect`
 
 Configure preview or production platform env vars.
+
+> Experimental POC surface; agents should prefer setup, plan, apply, and claim for the golden path.
 
 Usage: `zitadel deploy connect [--environment preview|production]`
 
@@ -223,6 +199,25 @@ Usage: `zitadel claim`
 | `--server` / `-s` | `string` | Override the resolved server URL (or "mock"). |
 | `--mock` | `boolean` | Alias for --server mock. |
 
+### `zitadel claim status`
+
+Check a human claim handoff and refresh local claimed state.
+
+Usage: `zitadel claim status --challenge-id <id>`
+
+| Flag | Type | Description |
+|---|---|---|
+| `--cwd` / `-c` | `string` | Project directory to operate on. |
+| `--json` / `-j` | `boolean` | Emit the JSON envelope instead of pretty output. |
+| `--non-interactive` / `-n` | `boolean` | Disable prompts. Required when scripting or running as an agent. |
+| `--dry-run` | `boolean` | Preview the work without mutating files or hitting the platform. |
+| `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
+| `--server` / `-s` | `string` | Override the resolved server URL (or "mock"). |
+| `--mock` | `boolean` | Alias for --server mock. |
+| `--challenge-id` | `string` | Claim challenge ID returned by `zitadel claim`. |
+| `--mock-complete-claim` | `boolean` | Mock-only: complete the claim handoff and refresh local state. |
+| `--mock-advance-claim` | `boolean` | Alias for --mock-complete-claim. |
+
 ### `zitadel schema add`
 
 Add or remove fields on the user schema.
@@ -249,7 +244,9 @@ Usage: `zitadel schema add [--preset name] [--add-field-json '{...}' | --add-fie
 
 Add or update an identity provider (.zitadel/idps/<slug>.json).
 
-Usage: `zitadel idp add (--preset google|microsoft|github|okta-oidc | --protocol oidc|saml) [--slug] [--issuer] [--client-id] [--env-secret] [--metadata-url]`
+> Experimental POC surface; presets are limited to providers with an OIDC issuer.
+
+Usage: `zitadel idp add (--preset google|microsoft|okta-oidc | --protocol oidc|saml) [--slug] [--issuer] [--client-id] [--env-secret] [--metadata-url]`
 
 | Flag | Type | Description |
 |---|---|---|
@@ -263,7 +260,7 @@ Usage: `zitadel idp add (--preset google|microsoft|github|okta-oidc | --protocol
 | `--slug` | `string` | Local slug (filename). Defaults to preset id. |
 | `--display-name` | `string` | Human-readable IdP name. |
 | `--protocol` | `string` | Protocol: oidc or saml. |
-| `--preset` | `string` | Preset: google, microsoft, github, okta-oidc. |
+| `--preset` | `string` | Preset: google, microsoft, okta-oidc. |
 | `--issuer` | `string` | OIDC issuer URL (required with --protocol oidc or okta-oidc preset). |
 | `--client-id` | `string` | OIDC client ID. |
 | `--env-secret` | `string` | Name of env var holding the OIDC client secret (e.g. ZITADEL_IDP_GOOGLE_SECRET). |
@@ -274,6 +271,8 @@ Usage: `zitadel idp add (--preset google|microsoft|github|okta-oidc | --protocol
 ### `zitadel idp list`
 
 List local IdP resources.
+
+> Experimental POC surface.
 
 Usage: `zitadel idp list`
 
@@ -291,6 +290,8 @@ Usage: `zitadel idp list`
 
 Show a single IdP resource by slug.
 
+> Experimental POC surface.
+
 Usage: `zitadel idp show <slug>`
 
 | Flag | Type | Description |
@@ -306,6 +307,8 @@ Usage: `zitadel idp show <slug>`
 ### `zitadel idp remove`
 
 Remove an IdP resource by slug.
+
+> Experimental POC surface.
 
 Usage: `zitadel idp remove <slug>`
 
@@ -358,6 +361,8 @@ Usage: `zitadel locale list`
 
 Add or update an app resource (.zitadel/apps/<slug>.json). Apps consume Zitadel's OIDC/SAML server.
 
+> Experimental POC surface.
+
 Usage: `zitadel app add (--preset spa|web|native|machine | --protocol oidc|saml) --slug <slug> [--redirect-uri ...]`
 
 | Flag | Type | Description |
@@ -385,6 +390,8 @@ Usage: `zitadel app add (--preset spa|web|native|machine | --protocol oidc|saml)
 
 List local app resources.
 
+> Experimental POC surface.
+
 Usage: `zitadel app list`
 
 | Flag | Type | Description |
@@ -401,6 +408,8 @@ Usage: `zitadel app list`
 
 Show a single app resource by slug.
 
+> Experimental POC surface.
+
 Usage: `zitadel app show <slug>`
 
 | Flag | Type | Description |
@@ -416,6 +425,8 @@ Usage: `zitadel app show <slug>`
 ### `zitadel app remove`
 
 Remove an app resource by slug.
+
+> Experimental POC surface.
 
 Usage: `zitadel app remove <slug>`
 

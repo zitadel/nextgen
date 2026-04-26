@@ -33,8 +33,9 @@ export const appResourceSchema = z.object({
   enabled: z.boolean().default(true),
   audience: z
     .object({
-      scope: z.enum(["project", "org", "instance"]).default("project"),
+      scope: z.enum(["project", "team"]).default("project"),
       project_id: z.string().optional(),
+      team_id: z.string().optional(),
     })
     .optional(),
   oidc: oidcBlock.optional(),

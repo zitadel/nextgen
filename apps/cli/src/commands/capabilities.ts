@@ -75,8 +75,9 @@ export async function runCapabilities(io: CliIO, opts: GlobalOptions): Promise<v
   );
 }
 
-function agentSupport(status: string): "supported" | "handoff" | "unsupported" {
+function agentSupport(status: string): "supported" | "handoff" | "experimental" | "unsupported" {
   if (status === "handoff") return "handoff";
+  if (status === "experimental") return "experimental";
   if (status.startsWith("supported")) return "supported";
   return "unsupported";
 }

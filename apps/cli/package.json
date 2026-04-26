@@ -8,11 +8,11 @@
   },
   "files": [
     "dist",
-    "CLAUDE.md"
+    "AGENTS.md"
   ],
   "scripts": {
-    "build": "tsup && tsx scripts/gen-claude-md.ts",
-    "gen:claude-md": "tsx scripts/gen-claude-md.ts",
+    "build": "tsup && tsx scripts/gen-agents-md.ts",
+    "gen:agents-md": "tsx scripts/gen-agents-md.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },

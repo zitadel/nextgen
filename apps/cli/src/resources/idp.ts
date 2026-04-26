@@ -43,8 +43,8 @@ export const idpResourceSchema = z.object({
   enabled: z.boolean().default(true),
   audience: z
     .object({
-      scope: z.enum(["instance", "org", "project"]).default("instance"),
-      org_id: z.string().optional(),
+      scope: z.enum(["project", "team"]).default("project"),
+      team_id: z.string().optional(),
       project_id: z.string().optional(),
     })
     .optional(),
@@ -58,7 +58,7 @@ export const idpResourceSchema = z.object({
 
 export type IdpResource = z.infer<typeof idpResourceSchema>;
 
-export type IdpPreset = "google" | "microsoft" | "github" | "okta-oidc";
+export type IdpPreset = "google" | "microsoft" | "okta-oidc";
 
 export function buildIdpPreset(
   preset: IdpPreset,
@@ -80,16 +80,6 @@ export function buildIdpPreset(
         issuer: input.issuer ?? "https://login.microsoftonline.com/common/v2.0",
         client_id: input.client_id,
         client_secret_env: input.client_secret_env,
-      });
-    case "github":
-      return idpFromTemplate({
-        slug: input.slug ?? "github",
-        display_name: "GitHub",
-        issuer: input.issuer ?? "https://github.com/login/oauth",
-        client_id: input.client_id,
-        client_secret_env: input.client_secret_env,
-        scopes: ["read:user", "user:email"],
-        claim_mapping: { email: "email", given_name: "name", family_name: "" },
       });
     case "okta-oidc":
       if (!input.issuer) {
@@ -141,4 +131,4 @@ function idpFromTemplate(input: {
   };
 }
 
-export const IDP_PRESETS: IdpPreset[] = ["google", "microsoft", "github", "okta-oidc"];
+export const IDP_PRESETS: IdpPreset[] = ["google", "microsoft", "okta-oidc"];

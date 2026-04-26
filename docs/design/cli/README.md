@@ -30,4 +30,4 @@ The gap analysis against the product vision is tracked in [PLAN.md](PLAN.md). Or
 - [Template Security](../flowengine/template-security.md) — invariants the CLI validates on `apply`
 - [User Schema Integration](../flowengine/user-schema.md)
 - [CLI source](../../../apps/cli)
-- [CLI agent contract (generated)](../../../apps/cli/CLAUDE.md)
+- [CLI agent contract (generated)](../../../apps/cli/AGENTS.md)

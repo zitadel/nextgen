@@ -10,9 +10,9 @@ The product vision says "CLI figures out the framework and can later plug in the
 
 ```tsx
 // apps/cli/src/adapters/next/adapter.ts:69
-import { ZitadelAuth } from "@zitadel/sdk-next";
+import { ZitadelFlow } from "@zitadel/sdk-next";
 export default function LoginPage() {
-  return <ZitadelAuth mode="login" title="Sign in" />;
+  return <ZitadelFlow purpose="login" />;
 }
 ```
 
@@ -21,7 +21,7 @@ This framing is wrong in two ways, and reading the [flow engine](../flowengine/f
 1. **There is no "login component" that owns its own logic.** The flow engine produces [BDUI](../flowengine/flow-engine.md) — server-driven step trees. The frontend's only job is to render what the server sends, collect input, and post it back. A component that hardcodes "email → password → submit" is a lie; the server decides.
 2. **Lit isn't a framework. It's a renderer.** Lit ships web components. Web components work in React, Vue, Svelte, Angular, and vanilla HTML. The decision isn't "pick a framework"; it's "the renderer is a web component, and every framework adapter hosts it."
 
-Re-framing: **the CLI scaffolds framework-native routes; those routes mount a BDUI renderer; the renderer is a Lit web component.** React consumers wrap it with `@lit/react` or use it directly.
+Re-framing: **the CLI scaffolds framework-native routes; those routes mount a BDUI renderer; the target renderer is a web component.** React consumers use a temporary `ZitadelFlow` shim until the web component package ships.
 
 ## What the renderer actually does
 
@@ -108,7 +108,7 @@ The renderer choice is explicit in config, not inferred:
 {
   "$schema": "https://schemas.zitadel.com/v2/project.schema.json",
   "branding": {
-    "renderer": "lit",
+    "renderer": "web-component",
     "attribution": "visible",
     "theme": { "primary_color": "#0066cc", "border_radius": "8px" }
   }
@@ -119,9 +119,9 @@ The renderer choice is explicit in config, not inferred:
 
 | Value | Meaning | Ships when |
 |---|---|---|
-| `"lit"` | `<zitadel-flow>` web component | When Lit package is published |
-| `"react"` | React wrapper around the Lit component (same underlying rendering) | Same as `lit`; convenience for React-first teams |
-| `"default"` | CLI picks based on framework adapter preference | Always — today defaults to `react`, flips to `lit` when ready |
+| `"web-component"` | `<zitadel-flow>` web component | When the web-component package is published |
+| `"react"` | React shim using the same `ZitadelFlow` vocabulary | Today |
+| `"default"` | CLI picks based on framework adapter preference | Always — today defaults to `react`, flips to `web-component` when ready |
 | `"headless"` | No rendering; user implements their own UI against Session API | Out-of-scope until customers ask |
 
 **Per-renderer template selection** in the adapter:
@@ -133,7 +133,7 @@ apps/cli/src/adapters/next/
     ├── react/
     │   ├── login.tsx.tmpl
     │   └── register.tsx.tmpl
-    ├── lit/
+    ├── web-component/
     │   ├── login.tsx.tmpl
     │   └── register.tsx.tmpl
     └── headless/
@@ -197,8 +197,8 @@ Three layers, in precedence order:
 The CLI must expose the renderer choice as a flag *and* in capabilities:
 
 ```
-zitadel setup --renderer lit
-zitadel set renderer lit    # post-setup switch
+zitadel setup --renderer web-component
+zitadel set renderer web-component    # post-setup switch
 ```
 
 Capabilities output advertises available renderers per adapter so agents can match them:
@@ -207,7 +207,7 @@ Capabilities output advertises available renderers per adapter so agents can mat
 {
   "data": {
     "renderers": [
-      { "id": "lit", "frameworks": ["next", "vue", "svelte", "astro", "vanilla"], "status": "available" },
+      { "id": "web-component", "frameworks": ["next", "vue", "svelte", "astro", "vanilla"], "status": "not-implemented" },
       { "id": "react", "frameworks": ["next", "remix"], "status": "available" },
       { "id": "headless", "frameworks": ["*"], "status": "not-implemented" }
     ]
@@ -219,7 +219,7 @@ The CLI's `doctor` command verifies: (a) the renderer package is installed, (b) 
 
 ## What this means for the current POC
 
-- [`packages/sdk-next`](../../../packages/sdk-next) stays, but its real job becomes "host the Lit component with a React-ergonomic API." The current `ZitadelAuth` (mode-switching UI) is replaced by a single `ZitadelFlow` that delegates to the web component.
+- [`packages/sdk-next`](../../../packages/sdk-next) stays, but its real job becomes "host the web component with a React-ergonomic API." The current POC surface is a single `ZitadelFlow` that follows the future `<zitadel-flow>` contract.
 - [`apps/cli/src/adapters/next/adapter.ts`](../../../apps/cli/src/adapters/next/adapter.ts) splits into per-renderer templates.
 - `zitadel.json#branding.renderer` becomes a first-class field, not a placeholder.
 - A new package, `packages/ui-lit/`, is created as the home of `<zitadel-flow>`. Out-of-scope for this plan to build — just commit to the package name and the component contract so downstream work can start against the interface.

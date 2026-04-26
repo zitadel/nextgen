@@ -19,7 +19,7 @@ export const KNOWN_FIELD_ANNOTATIONS = [
 
 export const KNOWN_VERIFY_VALUES = ["email", "phone"] as const;
 export const KNOWN_MFA_VALUES = ["sms", "email", "push", "totp"] as const;
-export const KNOWN_UNIQUE_VALUES = ["project", "org", "instance"] as const;
+export const KNOWN_UNIQUE_VALUES = ["project", "team"] as const;
 
 export const schemaFieldAnnotationSchema = z.object({
   "x-identifier": z.boolean().optional(),

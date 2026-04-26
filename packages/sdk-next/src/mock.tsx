@@ -1,26 +1,26 @@
 "use client";
 
 import { type FormEvent, useState } from "react";
-import { createMockFlow, mockSubmit, type ZitadelAuthMode } from "@zitadel/sdk-core";
+import { createMockFlow, mockSubmit, type ZitadelFlowPurpose } from "@zitadel/sdk-core";
 import { styles } from "./styles";
 
-export function ZitadelAuthMock({ mode, title }: { mode: ZitadelAuthMode; title?: string }) {
-  const flow = createMockFlow(mode);
+export function ZitadelFlowMock({ purpose }: { purpose: ZitadelFlowPurpose }) {
+  const flow = createMockFlow(purpose);
   const [result, setResult] = useState<string | undefined>();
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const values = Object.fromEntries(new FormData(event.currentTarget).entries());
-    const response = mockSubmit(mode, values);
+    const response = mockSubmit(purpose, values);
     setResult(response.message);
   }
 
   return (
     <main style={styles.shell}>
-      <section style={styles.panel} data-zitadel-auth={mode} data-zitadel-source="mock">
+      <section style={styles.panel} data-zitadel-flow={purpose} data-zitadel-source="mock">
         <div style={styles.header}>
           <p style={styles.eyebrow}>Zitadel mock auth</p>
-          <h1 style={styles.title}>{title ?? flow.title}</h1>
+          <h1 style={styles.title}>{flow.title}</h1>
         </div>
         {result ? (
           <div role="status" style={styles.success}>

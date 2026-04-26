@@ -7,17 +7,13 @@ import { COMMANDS, type CommandSpec, type FlagSpec } from "../src/commands/regis
 import { ENVELOPE_SCHEMA_VERSION } from "../src/commands/capabilities";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const target = join(here, "..", "CLAUDE.md");
+const agentsTarget = join(here, "..", "AGENTS.md");
 const BEGIN = "<!-- generated:capabilities:begin -->";
 const END = "<!-- generated:capabilities:end -->";
 
 async function main() {
-  const existing = await readFile(target, "utf8").catch(() => "");
   const generated = renderGeneratedBlock();
-  const next = mergeGenerated(existing, generated);
-  if (next === existing) return;
-  await writeFile(target, next);
-  process.stderr.write(`Wrote ${target}\n`);
+  await writeContract(agentsTarget, generated, handwrittenHeader());
 }
 
 function renderGeneratedBlock(): string {
@@ -97,18 +93,56 @@ function escapePipe(value: string): string {
   return value.replace(/\|/g, "\\|");
 }
 
-function mergeGenerated(existing: string, generated: string): string {
-  if (!existing) return `${handwrittenHeader()}\n\n${generated}\n`;
+async function writeContract(target: string, generated: string, header: string): Promise<void> {
+  const existing = await readFile(target, "utf8").catch(() => "");
+  const next = mergeGenerated(existing, generated, header);
+  if (next === existing) return;
+  await writeFile(target, next);
+  process.stderr.write(`Wrote ${target}\n`);
+}
+
+function mergeGenerated(existing: string, generated: string, header: string): string {
+  if (!existing) return `${header}\n\n${generated}\n`;
   if (existing.includes(BEGIN) && existing.includes(END)) {
-    const before = existing.slice(0, existing.indexOf(BEGIN));
     const after = existing.slice(existing.indexOf(END) + END.length);
-    return `${before}${generated}${after}`.replace(/\n{3,}/g, "\n\n").trimEnd() + "\n";
+    return `${header}\n\n${generated}${after}`.replace(/\n{3,}/g, "\n\n").trimEnd() + "\n";
   }
-  return `${existing.trimEnd()}\n\n${generated}\n`;
+  return `${header}\n\n${generated}\n`;
 }
 
 function handwrittenHeader(): string {
-  return `# Zitadel CLI Agent Contract\n\nAgents should run \`zitadel <command> --non-interactive --json\` and read the JSON envelope. The sections below are generated from the CLI registry at build time; do not edit them by hand.`;
+  return `# Zitadel CLI Agent Contract
+
+Agents should run \`zitadel <command> --non-interactive --json\` and read the JSON envelope. The sections below are generated from the CLI registry at build time; do not edit them by hand.
+
+## Required Agent Flags
+
+\`\`\`sh
+npx zitadel@latest <command> --non-interactive --json
+\`\`\`
+
+Use \`--cwd <path>\` when acting outside the current working directory. Discover commands and flags with:
+
+\`\`\`sh
+npx zitadel@latest capabilities --json
+npx zitadel@latest help <command> --json
+\`\`\`
+
+Agents should prefer \`next_commands\` over free-text hints.
+
+## Golden Path
+
+The supported POC path is Next.js App Router setup, local mock/dev auth, config plan/apply, human claim handoff, claim-status refresh, and production apply after claim.
+
+Setup creates \`zitadel.json\`, \`.zitadel/secret\`, schema/flow/locale resources under \`.zitadel/\`, browser-safe env metadata, and framework routes that mount \`ZitadelFlow\`. Project and preview secrets stay out of browser runtime.
+
+## Claim Boundary
+
+Agents do not claim projects. \`zitadel claim\` returns a human \`claim_url\`; after the human completes it, agents may run \`zitadel claim status --challenge-id <id>\` to refresh local claimed state.
+
+## Renderer Direction
+
+Generated routes use \`ZitadelFlow({ purpose, projectId, issuer, environment })\` so the future \`<zitadel-flow>\` web component can replace the React shim without changing the app-level contract.`;
 }
 
 main().catch((error) => {

@@ -79,7 +79,7 @@ export const flowDefinitionSchema = z.object({
   initial_steps: z.record(z.string()),
   audience: z
     .object({
-      org_ids: z.array(z.string()).optional(),
+      team_ids: z.array(z.string()).optional(),
       app_ids: z.array(z.string()).optional(),
       schema_ids: z.array(z.string()).optional(),
     })

@@ -1,6 +1,6 @@
-export type RendererId = "react" | "lit";
+export type RendererId = "react" | "web-component";
 
-export const RENDERER_IDS: RendererId[] = ["react", "lit"];
+export const RENDERER_IDS: RendererId[] = ["react", "web-component"];
 
 export type RendererStatus = "available" | "not-implemented";
 

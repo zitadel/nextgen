@@ -63,6 +63,6 @@ export class NextAdapter implements FrameworkAdapter {
   }
 
   envKeys(): string[] {
-    return ["ZITADEL_PROJECT_ID", "ZITADEL_ENVIRONMENT", "ZITADEL_PROJECT_SECRET", "ZITADEL_ISSUER"];
+    return ["ZITADEL_PROJECT_ID", "ZITADEL_ENVIRONMENT", "ZITADEL_ISSUER"];
   }
 }

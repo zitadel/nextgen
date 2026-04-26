@@ -1,13 +1,16 @@
-export type ZitadelAuthMode = "login" | "register";
+export type ZitadelFlowPurpose = "login" | "register";
 export type ZitadelEnvironment = "development" | "preview" | "production";
-export type ZitadelSecretKind = "project" | "preview";
 
 export type ZitadelRuntime = {
   projectId: string;
   environment: ZitadelEnvironment;
   issuer?: string;
-  secret: string;
-  secretKind: ZitadelSecretKind;
+};
+
+export type ZitadelRuntimeInput = {
+  projectId?: string;
+  environment?: ZitadelEnvironment;
+  issuer?: string;
 };
 
 export class ZitadelRuntimeError extends Error {
@@ -28,16 +31,16 @@ export type MockFlowField = {
 };
 
 export type MockFlow = {
-  mode: ZitadelAuthMode;
+  purpose: ZitadelFlowPurpose;
   title: string;
   fields: MockFlowField[];
   actions: string[];
 };
 
-export function createMockFlow(mode: ZitadelAuthMode): MockFlow {
-  if (mode === "login") {
+export function createMockFlow(purpose: ZitadelFlowPurpose): MockFlow {
+  if (purpose === "login") {
     return {
-      mode,
+      purpose,
       title: "Sign in",
       fields: [{ name: "email", label: "Email address", type: "email", required: true }],
       actions: ["Continue with passkey", "Continue with password"],
@@ -45,7 +48,7 @@ export function createMockFlow(mode: ZitadelAuthMode): MockFlow {
   }
 
   return {
-    mode,
+    purpose,
     title: "Create account",
     fields: [
       { name: "email", label: "Email address", type: "email", required: true },
@@ -56,47 +59,44 @@ export function createMockFlow(mode: ZitadelAuthMode): MockFlow {
   };
 }
 
-export function mockSubmit(mode: ZitadelAuthMode, values: Record<string, FormDataEntryValue>): {
+export function mockSubmit(purpose: ZitadelFlowPurpose, values: Record<string, FormDataEntryValue>): {
   ok: true;
   message: string;
   user: Record<string, string>;
 } {
   return {
     ok: true,
-    message: mode === "login" ? "Mock session created." : "Mock user registered.",
+    message: purpose === "login" ? "Mock session created." : "Mock user registered.",
     user: Object.fromEntries(Object.entries(values).map(([key, value]) => [key, String(value)])),
   };
 }
 
 export function resolveZitadelRuntimeEnv(env: Record<string, string | undefined> = currentEnv()): ZitadelRuntime {
-  const projectId = requireEnv(env, "ZITADEL_PROJECT_ID");
-  const environment = parseEnvironment(env.ZITADEL_ENVIRONMENT);
-  const issuer = env.ZITADEL_ISSUER;
+  return resolveZitadelRuntime({
+    projectId: env.NEXT_PUBLIC_ZITADEL_PROJECT_ID ?? env.ZITADEL_PROJECT_ID,
+    environment: parseEnvironment(env.NEXT_PUBLIC_ZITADEL_ENVIRONMENT ?? env.ZITADEL_ENVIRONMENT),
+    issuer: env.NEXT_PUBLIC_ZITADEL_ISSUER ?? env.ZITADEL_ISSUER,
+  });
+}
 
-  if (environment === "preview") {
-    return {
-      projectId,
-      environment,
-      issuer,
-      secret: requireEnv(env, "ZITADEL_PREVIEW_SECRET"),
-      secretKind: "preview",
-    };
+export function resolveZitadelRuntime(input: ZitadelRuntimeInput): ZitadelRuntime {
+  const environment = input.environment ?? "development";
+  if (!input.projectId) {
+    throw new ZitadelRuntimeError(
+      "E_ZITADEL_CONFIG",
+      "ZITADEL_PROJECT_ID is required for Zitadel runtime.",
+    );
   }
-
-  const projectSecret = requireEnv(env, "ZITADEL_PROJECT_SECRET");
-  if (environment === "production" && !issuer) {
+  if (environment === "production" && !input.issuer) {
     throw new ZitadelRuntimeError(
       "E_ZITADEL_CONFIG",
       "ZITADEL_ISSUER is required in production. Run `npx zitadel@latest claim` before production deploys.",
     );
   }
-
   return {
-    projectId,
+    projectId: input.projectId,
     environment,
-    issuer,
-    secret: projectSecret,
-    secretKind: "project",
+    issuer: input.issuer,
   };
 }
 

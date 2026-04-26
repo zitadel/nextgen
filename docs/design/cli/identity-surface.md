@@ -30,7 +30,7 @@ A trust relationship with an external identity provider. Zitadel redirects the u
   "display_name": "Google",
   "protocol": "oidc",
   "enabled": true,
-  "audience": { "scope": "org", "org_id": "acme" },
+  "audience": { "scope": "team", "team_id": "acme" },
   "oidc": {
     "issuer": "https://accounts.google.com",
     "client_id": "1234.apps.googleusercontent.com",

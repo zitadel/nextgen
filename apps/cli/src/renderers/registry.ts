@@ -5,7 +5,7 @@ import { isRendererId, type RendererId, type RendererSpec } from "./types";
 
 export const RENDERERS: Record<RendererId, RendererSpec> = {
   react: reactRenderer,
-  lit: litRenderer,
+  "web-component": litRenderer,
 };
 
 export function getRenderer(id: string): RendererSpec {
@@ -17,7 +17,7 @@ export function getRenderer(id: string): RendererSpec {
   const renderer = RENDERERS[id];
   if (renderer.status === "not-implemented") {
     throw new ZitadelError("E_NOT_IMPLEMENTED", `Renderer "${id}" is declared but not yet published`, {
-      hint: "Use --renderer react for now; Lit ships with @zitadel/ui-lit (pending).",
+      hint: "Use --renderer react for now; the <zitadel-flow> web component ships in a later package.",
     });
   }
   return renderer;

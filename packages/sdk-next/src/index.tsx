@@ -1,48 +1,39 @@
 "use client";
 
-import { createContext, type FC, type ReactNode, useContext, useMemo } from "react";
+import { type FC, useMemo } from "react";
 import {
+  resolveZitadelRuntime,
   resolveZitadelRuntimeEnv,
   ZitadelRuntimeError,
-  type ZitadelAuthMode,
+  type ZitadelEnvironment,
+  type ZitadelFlowPurpose,
   type ZitadelRuntime,
 } from "@zitadel/sdk-core";
 
-import { ZitadelAuthMock } from "./mock";
-import { ZitadelAuthReal } from "./real";
+import { ZitadelFlowMock } from "./mock";
+import { ZitadelFlowReal } from "./real";
 import { styles } from "./styles";
 
-export { resolveZitadelRuntimeEnv, ZitadelRuntimeError } from "@zitadel/sdk-core";
-export type { ZitadelEnvironment, ZitadelRuntime, ZitadelSecretKind } from "@zitadel/sdk-core";
+export {
+  resolveZitadelRuntime,
+  resolveZitadelRuntimeEnv,
+  ZitadelRuntimeError,
+} from "@zitadel/sdk-core";
+export type { ZitadelEnvironment, ZitadelFlowPurpose, ZitadelRuntime } from "@zitadel/sdk-core";
 
-type ZitadelContextValue = {
-  runtime: ZitadelRuntime | undefined;
-  runtimeError: Error | undefined;
+export type ZitadelFlowProps = {
+  purpose: ZitadelFlowPurpose;
+  projectId?: string;
+  issuer?: string;
+  environment?: ZitadelEnvironment;
 };
 
-const ZitadelContext = createContext<ZitadelContextValue>({ runtime: undefined, runtimeError: undefined });
+type RuntimeResolution =
+  | { runtime: ZitadelRuntime; runtimeError?: undefined; useMock?: false }
+  | { runtime?: undefined; runtimeError: Error; useMock?: false }
+  | { runtime?: undefined; runtimeError?: undefined; useMock: true };
 
-export function ZitadelProvider({ children }: { children: ReactNode }) {
-  const value = useMemo<ZitadelContextValue>(() => {
-    try {
-      return { runtime: resolveZitadelRuntimeEnv(), runtimeError: undefined };
-    } catch (error) {
-      return {
-        runtime: undefined,
-        runtimeError: error instanceof Error ? error : new Error(String(error)),
-      };
-    }
-  }, []);
-  return <ZitadelContext.Provider value={value}>{children}</ZitadelContext.Provider>;
-}
-
-function useZitadelRuntime(): ZitadelContextValue {
-  return useContext(ZitadelContext);
-}
-
-type ZitadelAuthProps = { mode: ZitadelAuthMode; title?: string };
-
-function ZitadelAuthRuntimeError({ message }: { message: string }) {
+function ZitadelFlowRuntimeError({ message }: { message: string }) {
   return (
     <div role="alert" style={styles.error}>
       <strong>Zitadel runtime misconfigured</strong>
@@ -51,19 +42,44 @@ function ZitadelAuthRuntimeError({ message }: { message: string }) {
   );
 }
 
-function ZitadelAuthImpl({ mode, title }: ZitadelAuthProps) {
-  const { runtime, runtimeError } = useZitadelRuntime();
-  if (runtimeError) {
-    if (!(runtimeError instanceof ZitadelRuntimeError)) throw runtimeError;
-    return <ZitadelAuthRuntimeError message={runtimeError.message} />;
+function resolveRuntimeFromProps(props: ZitadelFlowProps): RuntimeResolution {
+  try {
+    if (props.projectId || props.environment || props.issuer) {
+      return {
+        runtime: resolveZitadelRuntime({
+          projectId: props.projectId,
+          environment: props.environment,
+          issuer: props.issuer,
+        }),
+      };
+    }
+    return { runtime: resolveZitadelRuntimeEnv() };
+  } catch (error) {
+    const runtimeError = error instanceof Error ? error : new Error(String(error));
+    if (props.environment === undefined && runtimeError instanceof ZitadelRuntimeError) {
+      return { useMock: true };
+    }
+    return { runtimeError };
   }
-  if (!runtime || runtime.environment === "development") {
-    return <ZitadelAuthMock mode={mode} title={title} />;
-  }
-  return <ZitadelAuthReal mode={mode} title={title} runtime={runtime} />;
 }
 
-export const ZitadelAuth: FC<ZitadelAuthProps> & {
-  Mock: typeof ZitadelAuthMock;
-  Real: typeof ZitadelAuthReal;
-} = Object.assign(ZitadelAuthImpl, { Mock: ZitadelAuthMock, Real: ZitadelAuthReal });
+function ZitadelFlowImpl(props: ZitadelFlowProps) {
+  const resolution = useMemo(() => resolveRuntimeFromProps(props), [
+    props.environment,
+    props.issuer,
+    props.projectId,
+  ]);
+  if (resolution.runtimeError) {
+    if (!(resolution.runtimeError instanceof ZitadelRuntimeError)) throw resolution.runtimeError;
+    return <ZitadelFlowRuntimeError message={resolution.runtimeError.message} />;
+  }
+  if (resolution.useMock || resolution.runtime.environment === "development") {
+    return <ZitadelFlowMock purpose={props.purpose} />;
+  }
+  return <ZitadelFlowReal purpose={props.purpose} runtime={resolution.runtime} />;
+}
+
+export const ZitadelFlow: FC<ZitadelFlowProps> & {
+  Mock: typeof ZitadelFlowMock;
+  Real: typeof ZitadelFlowReal;
+} = Object.assign(ZitadelFlowImpl, { Mock: ZitadelFlowMock, Real: ZitadelFlowReal });

@@ -205,9 +205,7 @@ function basePlan(input: {
         entries: {
           ZITADEL_PROJECT_ID: "",
           ZITADEL_ENVIRONMENT: "",
-          ZITADEL_PROJECT_SECRET: "",
           ZITADEL_ISSUER: "",
-          ZITADEL_PREVIEW_SECRET: "",
         },
       },
       {
@@ -216,7 +214,6 @@ function basePlan(input: {
         entries: {
           ZITADEL_PROJECT_ID: input.project.project_id,
           ZITADEL_ENVIRONMENT: "development",
-          ZITADEL_PROJECT_SECRET: input.project.project_secret,
           ZITADEL_ISSUER: input.issuer,
         },
       },

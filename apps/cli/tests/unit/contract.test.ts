@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -64,11 +64,21 @@ describe("envelope contract", () => {
   it("unknown command errors with meta and next_commands", async () => {
     const result = await runCliForTest(["bogus", "--json"]);
     expect(result.exitCode).toBe(EXIT_CODES.E_VALIDATION);
+    expect(result.stderr).toBe("");
+    expect(result.stdout.trim()).toMatch(/^\{[\s\S]*\}$/);
     const envelope = parseJson(result.stdout) as { status: string; code: string; next_commands: string[] } & Record<string, unknown>;
     assertEnvelopeMeta(envelope);
     expect(envelope.status).toBe("error");
     expect(envelope.code).toBe("E_VALIDATION");
     expect(envelope.next_commands).toContain("zitadel help");
+  });
+
+  it("AGENTS.md is the canonical generated contract", async () => {
+    const root = join(import.meta.dirname, "../..");
+    const agents = await readFile(join(root, "AGENTS.md"), "utf8");
+    expect(agents).toContain("Zitadel CLI Agent Contract");
+    expect(agents).toContain("zitadel claim status");
+    expect(agents).not.toContain("Compatibility note");
   });
 
   it("bare command in empty dir returns skipped, not error", async () => {

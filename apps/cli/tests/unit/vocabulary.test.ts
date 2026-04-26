@@ -19,7 +19,7 @@ describe("public vocabulary", () => {
     const root = join(import.meta.dirname, "../..");
     const files = [
       "README.md",
-      "CLAUDE.md",
+      "AGENTS.md",
       "src/platform/fixtures/createProject.ok.json",
       "src/platform/fixtures/uploadConfig.ok.json",
     ];

@@ -1,23 +1,22 @@
 "use client";
 
-import type { ZitadelAuthMode, ZitadelRuntime } from "@zitadel/sdk-core";
+import type { ZitadelFlowPurpose, ZitadelRuntime } from "@zitadel/sdk-core";
 import { styles } from "./styles";
 
-export function ZitadelAuthReal({
-  mode,
-  title,
+export function ZitadelFlowReal({
+  purpose,
   runtime,
 }: {
-  mode: ZitadelAuthMode;
-  title?: string;
+  purpose: ZitadelFlowPurpose;
   runtime: ZitadelRuntime;
 }) {
+  const title = purpose === "login" ? "Sign in" : "Create account";
   return (
     <main style={styles.shell}>
-      <section style={styles.panel} data-zitadel-auth={mode} data-zitadel-source="real">
+      <section style={styles.panel} data-zitadel-flow={purpose} data-zitadel-source="real">
         <div style={styles.header}>
           <p style={styles.eyebrow}>Zitadel</p>
-          <h1 style={styles.title}>{title ?? (mode === "login" ? "Sign in" : "Create account")}</h1>
+          <h1 style={styles.title}>{title}</h1>
         </div>
         <p style={styles.dim}>
           Redirecting to {runtime.issuer ?? "Zitadel"}…

@@ -8,29 +8,27 @@ export const reactRenderer: RendererSpec = {
   frameworks: ["next"],
   dependency: { name: "@zitadel/sdk-next", version: "latest" },
   templates: {
-    provider: {
-      filename: "zitadel-provider.tsx",
-      contents: `${MANAGED_MARKER}
-"use client";
-
-import { ZitadelProvider } from "@zitadel/sdk-next";
-import type { ReactNode } from "react";
-
-export function ZitadelAppProvider({ children }: { children: ReactNode }) {
-  return <ZitadelProvider>{children}</ZitadelProvider>;
-}
-`,
-    },
     authPage(mode) {
-      const title = mode === "login" ? "Sign in" : "Create account";
       const componentName = mode === "login" ? "LoginPage" : "RegisterPage";
       return {
         mode,
         contents: `${MANAGED_MARKER}
-import { ZitadelAuth } from "@zitadel/sdk-next";
+import { ZitadelFlow, type ZitadelEnvironment } from "@zitadel/sdk-next";
+
+const environment = (
+  process.env.ZITADEL_ENVIRONMENT ??
+  (process.env.NODE_ENV === "production" ? "production" : "development")
+) as ZitadelEnvironment;
 
 export default function ${componentName}() {
-  return <ZitadelAuth mode="${mode}" title="${title}" />;
+  return (
+    <ZitadelFlow
+      purpose="${mode}"
+      projectId={process.env.ZITADEL_PROJECT_ID}
+      issuer={process.env.ZITADEL_ISSUER}
+      environment={environment}
+    />
+  );
 }
 `,
       };
