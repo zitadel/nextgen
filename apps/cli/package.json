@@ -1,0 +1,29 @@
+{
+  "name": "zitadel",
+  "version": "0.0.0",
+  "description": "Agent-friendly Zitadel CLI",
+  "type": "module",
+  "bin": {
+    "zitadel": "dist/zitadel.js"
+  },
+  "files": [
+    "dist",
+    "AGENTS.md"
+  ],
+  "scripts": {
+    "build": "tsup && tsx scripts/gen-agents-md.ts",
+    "gen:agents-md": "tsx scripts/gen-agents-md.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@clack/prompts": "^0.8.2",
+    "ajv": "^8.17.1",
+    "liquidjs": "^10.25.7",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@zitadel/sdk-next": "workspace:*",
+    "tsx": "^4.19.2"
+  }
+}

@@ -34,16 +34,11 @@ go.work.sum
 # .idea/
 # .vscode/
 
-# Angular / frontend
+# JavaScript / TypeScript
 node_modules/
-.angular/
 dist/
-tmp/
-out-tsc/
 coverage/
 npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
 pnpm-debug.log*
 *.code-workspace
 
