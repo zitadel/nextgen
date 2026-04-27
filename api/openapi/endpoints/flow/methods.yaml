@@ -8,6 +8,11 @@ post:
 
     The response contains an `id` field — the flow handle. Use it as the path
     parameter for all subsequent `/flow/{id}/submit` and `/flow/{id}/event` calls.
+
+    The response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing
+    the flow's orchestration state (current step, collected data, history).
+    The server is stateless between requests — all flow state lives in this
+    cookie. The browser sends it automatically on subsequent requests.
   tags:
     - Flows
   requestBody:
@@ -19,6 +24,9 @@ post:
   responses:
     '201':
       description: Flow started, first step returned.
+      headers:
+        Set-Cookie:
+          $ref: ../../components/headers/set-cookie-flow.yaml
       content:
         application/json:
           schema:
