@@ -3,7 +3,13 @@
   "version": "0.0.0",
   "private": true,
   "license": "MIT",
-  "scripts": {},
+  "scripts": {
+    "build": "corepack pnpm -r build",
+    "typecheck": "corepack pnpm -r typecheck",
+    "test": "corepack pnpm -r test",
+    "zitadel": "node scripts/zitadel-dev.mjs"
+  },
+  "packageManager": "pnpm@10.33.2",
   "devDependencies": {
     "@nx/devkit": "catalog:",
     "@nx/eslint-plugin": "catalog:",
@@ -14,6 +20,13 @@
     "@typescript/native-preview": "catalog:",
     "nx": "catalog:",
     "oxfmt": "catalog:",
-    "oxlint": "catalog:"
+    "oxlint": "catalog:",
+    "sharp": "catalog:"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "sharp"
+    ]
   }
 }
