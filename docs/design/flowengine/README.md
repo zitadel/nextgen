@@ -31,7 +31,8 @@
 | [Template Security](template-security.md) | In Review | XSS attack vectors, trust boundaries, and defense-in-depth for LiquidJS + innerHTML rendering. |
 | **API specs** | | |
 | [Session API OpenAPI](api/session-api.yaml) | Preliminary | OpenAPI 3.1 spec for the Session API |
-| [Flow API OpenAPI](api/flow-api.yaml) | In Review | OpenAPI 3.1 spec for the Flow Engine API |
+| [Flow API OpenAPI](api/flow-api.yaml) | Draft | Design-phase sketch (flow runtime + definitions) |
+| [**Flow Runtime OpenAPI (canonical)**](../../../api/openapi/openapi-spec.yaml) | In Review | Canonical spec: `POST /flow`, `GET /flow/{id}`, `POST /flow/{id}/submit`, `POST /flow/{id}/event`. Schemas in [`api/openapi/components/flows/`](../../../api/openapi/components/flows/). |
 
 ## Core Concepts
 

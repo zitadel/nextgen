@@ -3,6 +3,12 @@ info:
   title: Zitadel Flow Engine API
   version: 1.0.0-draft
   description: |
+    DRAFT — this file is a design-phase sketch.
+    The canonical flow runtime OpenAPI spec lives at:
+      api/openapi/openapi-spec.yaml  (paths: /flow, /flow/{id}, /flow/{id}/submit, /flow/{id}/event)
+      api/openapi/endpoints/flow/    (per-endpoint method files)
+      api/openapi/components/flows/  (request/response schemas, flow definition JSON schema)
+
     Server-side state machine producing Capability payloads (fields, actions, gates)
     alongside LiquidJS templates. Used by web/frontend clients for ready-made login,
     registration, and recovery.
