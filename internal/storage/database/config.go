@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"maps"
 	"slices"
 	"sync"
@@ -20,6 +21,7 @@ type DialectDecoder func(value any) (Connector, error)
 var (
 	dialectRegistryMu sync.RWMutex
 	dialectRegistry   = make(map[string]DialectDecoder)
+	defaultConnector  Connector
 )
 
 // RegisterDialect registers a decoder under a dialect name.
@@ -43,6 +45,14 @@ func MustRegisterDialect(name string, decoder DialectDecoder) {
 	if err != nil {
 		panic(err)
 	}
+}
+
+// MustRegisterDefaultConnector registers a default connector that is used when no dialect is configured. It panics on error.
+func MustRegisterDefaultConnector(connector Connector) {
+	if connector == nil {
+		panic("database: default connector is nil")
+	}
+	defaultConnector = connector
 }
 
 // Config contains one configured database dialect.
@@ -79,6 +89,10 @@ func (c Config) Build() (Connector, error) {
 
 func (c Config) build(decoders map[string]DialectDecoder) (Connector, error) {
 	if len(c.Raw) == 0 {
+		if defaultConnector != nil {
+			log.Println("no database dialect configured, fallback to default connector")
+			return defaultConnector, nil
+		}
 		return nil, fmt.Errorf("database: no dialect configured")
 	}
 	if len(c.Raw) != 1 {

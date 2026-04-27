@@ -36,7 +36,7 @@ func (c *Config) Connect(ctx context.Context) (database.Pool, error) {
 	if err = pool.Ping(ctx); err != nil {
 		return nil, wrapError(err)
 	}
-	return &pgxPool{Pool: pool}, nil
+	return &Pool{Pool: pool}, nil
 }
 
 func NameMatcher(name string) bool {
