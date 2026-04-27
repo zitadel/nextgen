@@ -1,6 +1,6 @@
 DEALLOCATE ALL;
 PREPARE patch_user (
-    TEXT,   -- $1 instance_id
+    TEXT    -- $1 instance_id
     , TEXT  -- $2 user_id (users.id)
     , zitadel_nextgen.incoming_user_attribute[] -- $3 upsert attribute set (op: add, replace)
     ,TEXT[] -- $4 attributes to delete by key (op: remove)
@@ -66,3 +66,13 @@ SELECT
         ) final
     ) AS attributes
 FROM _header h;
+
+EXECUTE patch_user(
+    'inst_1' -- $1 instance_id
+    , 'usr_00101002' -- $2 user_id
+    , ARRAY[ -- $3 full sync payload (same shape as insert_user)
+        ROW('email'::TEXT, '"foobar@zitadel.com"'::JSONB, digest('"foobar@zitadel.com"'::text, 'md5'), 'global'::TEXT)::zitadel_nextgen.incoming_user_attribute
+        , ROW('email_verified'::TEXT, 'false'::JSONB, NULL::bytea, 'unspecified'::TEXT)::zitadel_nextgen.incoming_user_attribute
+    ]
+    , ARRAY['address.locality']
+);

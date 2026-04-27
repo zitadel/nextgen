@@ -5,7 +5,7 @@
 -- Final attributes are taken from _input_data (same shape as get_by_id / create).
 
 DEALLOCATE ALL;
-PREPARE patch_user_attributes (
+PREPARE put_user (
     TEXT, -- $1 instance_id
     TEXT, -- $2 user_id (users.id)
     zitadel_nextgen.incoming_user_attribute[] -- $3 full attribute set
@@ -133,10 +133,9 @@ SELECT
     ) AS attributes
 FROM _header h;
 
-/*
-EXECUTE patch_user_attributes(
+EXECUTE put_user(
     'inst_1' -- $1 instance_id
-    , 'usr_99999999' -- $2 user_id
+    , 'usr_00101002' -- $2 user_id
     , ARRAY[ -- $3 full sync payload (same shape as insert_user)
         ROW('username'::TEXT, '"tester_alpha"'::JSONB, digest('"tester_alpha"'::text, 'md5'), 'global'::TEXT)::zitadel_nextgen.incoming_user_attribute
         , ROW('email'::TEXT, '"tester@zitadel.com"'::JSONB, digest('"tester@zitadel.com"'::text, 'md5'), 'global'::TEXT)::zitadel_nextgen.incoming_user_attribute
@@ -146,4 +145,3 @@ EXECUTE patch_user_attributes(
         , ROW('address.locality'::TEXT, '"Amsterdam"'::JSONB, NULL::bytea, 'unspecified'::TEXT)::zitadel_nextgen.incoming_user_attribute
     ]
 );
-*/
