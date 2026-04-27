@@ -15,11 +15,5 @@ properties:
   redirect_uri:
     type: string
     format: uri
-  liquid_template:
-    type: string
-    description: |
-      Optional LiquidJS template override. If provided, this template is used
-      instead of the one inherited from the app → team → project hierarchy.
-      Enables per-flow layout customization without changing the team-level branding.
   hint:
     $ref: flow-hint.yaml
