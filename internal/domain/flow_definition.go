@@ -2,13 +2,14 @@ package domain
 
 import "time"
 
-type FlowDefinitionStatus string
+//go:generate enumer -type FlowDefinitionStatus -transform snake -trimprefix FlowDefinitionStatus -sql
+type FlowDefinitionStatus uint8
 
 const (
-	FlowDefinitionStatusDraft      FlowDefinitionStatus = "draft"
-	FlowDefinitionStatusActive     FlowDefinitionStatus = "active"
-	FlowDefinitionStatusDeprecated FlowDefinitionStatus = "deprecated"
-	FlowDefinitionStatusArchived   FlowDefinitionStatus = "archived"
+	FlowDefinitionStatusDraft FlowDefinitionStatus = iota
+	FlowDefinitionStatusActive
+	FlowDefinitionStatusDeprecated
+	FlowDefinitionStatusArchived
 )
 
 type FlowDefinitionPurpose string
