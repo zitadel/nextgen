@@ -15,7 +15,7 @@ import (
 
 func init() {
 	database.MustRegisterDefaultConnector(new(Pool))
-	database.MustRegisterDialect("embedded", DecodeConfig)
+	// database.MustRegisterDialect("embedded", DecodeConfig)
 }
 
 // StartEmbedded starts an embedded postgres v16 instance and returns a database connector and a stop function

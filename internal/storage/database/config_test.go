@@ -13,11 +13,35 @@ func (t *testConnector) Connect(_ context.Context) (Pool, error) {
 }
 
 func TestConfigBuild(t *testing.T) {
-	t.Run("no dialect configured", func(t *testing.T) {
+	t.Run("no dialect configured without default", func(t *testing.T) {
+		prevDefault := defaultConnector
+		defaultConnector = nil
+		t.Cleanup(func() {
+			defaultConnector = prevDefault
+		})
+
 		cfg := Config{}
 		_, err := cfg.build(nil)
 		if err == nil {
 			t.Fatal("expected error")
+		}
+	})
+
+	t.Run("no dialect configured uses default connector", func(t *testing.T) {
+		expected := &testConnector{}
+		prevDefault := defaultConnector
+		defaultConnector = expected
+		t.Cleanup(func() {
+			defaultConnector = prevDefault
+		})
+
+		cfg := Config{}
+		connector, err := cfg.build(nil)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if connector != expected {
+			t.Fatal("expected default connector")
 		}
 	})
 
