@@ -1,0 +1,31 @@
+post:
+  operationId: createFlow
+  summary: Start a new flow
+  description: |
+    Resolves a flow definition based on purpose + audience context and returns
+    the first capability step. Creates a new session implicitly unless
+    `session_id` is provided (for step-up / reauth on an existing session).
+
+    The response contains an `id` field — the flow handle. Use it as the path
+    parameter for all subsequent `/flow/{id}/submit` and `/flow/{id}/event` calls.
+  tags:
+    - Flows
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../../components/flows/create-flow-request.yaml
+  responses:
+    '201':
+      description: Flow started, first step returned.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/flows/flow-response.yaml
+    '400':
+      description: Invalid request (e.g., unknown purpose).
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml

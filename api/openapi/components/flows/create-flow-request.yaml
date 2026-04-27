@@ -1,0 +1,25 @@
+type: object
+required: [purpose]
+properties:
+  purpose:
+    type: string
+    enum: [login, register, recovery, profiling, reauth, link_account]
+  session_id:
+    type: string
+    description: |
+      Existing session to attach to (for step-up / reauth).
+      Omit to let the flow create a new session implicitly.
+  auth_request_id:
+    type: string
+    description: OIDC/SAML auth request ID (links flow to protocol request).
+  redirect_uri:
+    type: string
+    format: uri
+  liquid_template:
+    type: string
+    description: |
+      Optional LiquidJS template override. If provided, this template is used
+      instead of the one inherited from the app → team → project hierarchy.
+      Enables per-flow layout customization without changing the team-level branding.
+  hint:
+    $ref: flow-hint.yaml

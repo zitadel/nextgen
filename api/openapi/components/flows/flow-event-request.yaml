@@ -1,0 +1,12 @@
+type: object
+required: [session_token, type]
+properties:
+  session_token:
+    type: string
+  type:
+    type: string
+    enum: [fingerprint, telemetry]
+  payload:
+    type: object
+    description: Event payload (fingerprint hash, timing data, etc.).
+    additionalProperties: true

@@ -1,0 +1,27 @@
+type: object
+required: [id, session_id, session_token, step]
+properties:
+  id:
+    type: string
+    description: |
+      Flow handle. Use this as the path parameter for subsequent
+      submit/event calls. May change between responses when a
+      flow pivot or pop occurs.
+    example: flow_01H8Z
+  session_id:
+    type: string
+    description: Underlying session ID. Stable across all stacked flows.
+  session_token:
+    type: string
+    description: Rotated on every response. Required for the next request.
+  step:
+    $ref: flow-step.yaml
+  branding:
+    $ref: branding.yaml
+    description: |
+      Resolved branding inherited from the app → team → project hierarchy.
+      Determined at flow creation based on audience context. Does not change between steps.
+  redirect_uri:
+    type: string
+    format: uri
+    description: Present on the `complete` step when a redirect is needed.
