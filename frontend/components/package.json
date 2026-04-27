@@ -24,5 +24,8 @@
     "typescript": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:"
+  },
+  "nx": {
+    "implicitDependencies": ["oxlint"]
   }
 }

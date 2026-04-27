@@ -26,12 +26,12 @@
     "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "catalog:",
     "jsdom": "catalog:",
-    "oxlint": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:"
   },
   "nx": {
-    "projectType": "application"
+    "projectType": "application",
+    "implicitDependencies": ["oxlint"]
   }
 }

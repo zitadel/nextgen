@@ -6,5 +6,8 @@
     "@playwright/test": "catalog:",
     "@types/node": "catalog:",
     "eslint-plugin-playwright": "catalog:"
+  },
+  "nx": {
+    "implicitDependencies": ["oxlint"]
   }
 }
