@@ -20,6 +20,8 @@ Treating these as one noun conflates credentials, lifecycles, and UX. Treating t
 
 ### IdP — `.zitadel/idps/<slug>.json`
 
+> **Scope.** This is for your platform's default sign-in sources — Google, your corporate Okta, your default SAML IdP. For per-customer-org SSO (a B2B customer configuring their own Okta through your admin UI), use the runtime IdP API, not the CLI. Subordinate config (claim mapping, scopes) rides with the IdP itself: dev-owned IdPs carry it in the file; runtime-created IdPs carry it in the API call that creates them. See [What lives in `.zitadel/`](README.md) for the full ownership rule.
+
 A trust relationship with an external identity provider. Zitadel redirects the user there, receives claims, provisions or links a local user.
 
 ```json
@@ -70,11 +72,15 @@ zitadel idp test google   # dry-run discovery + token exchange (mockable)
 
 ### External factor provider — reserved (deferred)
 
+> **Scope (when this lands).** Same rule as IdPs: dev-owned default factor providers (your platform's default Duo or YubiKey integration) belong in `.zitadel/external-factors/`; customer-owned per-org factor providers go through the runtime API. See [What lives in `.zitadel/`](README.md) for the ownership rule.
+
 Placeholder. The upstream design for external MFA providers is currently unpublished: the prior research document was removed on `frontend-adr-001` pending consolidation of step types, protocol adapters, and ACR semantics. Until that design resurfaces, this CLI does not expose an external-factor resource directory, command, or schema. Built-in factors (password, passkey, captcha gates) remain available through flow steps and `gates`.
 
 When upstream is ready, the resurrected surface is expected to live at `.zitadel/external-factors/<slug>.json` with `zitadel external-factor add|list|show|remove` commands — but the concrete shape (protocol adapters, patterns, ACR properties) will track the upstream decision rather than the prior prototype.
 
 ### App — `.zitadel/apps/<slug>.json`
+
+> **Scope.** This is for your platform's first-party apps (your web frontend, your mobile app) and machine clients. For customer-managed apps and dynamic client registration — common in B2B platforms where each customer brings their own consumer of your APIs — use the runtime apps API, not the CLI. See [What lives in `.zitadel/`](README.md) for the ownership rule.
 
 A consumer of Zitadel's OIDC/SAML server. This is "the thing with a client_id that receives tokens." Also optionally the seat of Zitadel-as-IdP scenarios where the customer is running a SAML server for their own customers.
 
@@ -125,7 +131,7 @@ zitadel app metadata web-frontend   # emits metadata for the counterparty (SAML)
 { "kind": "app", "role": "server", "protocol": "saml", ... }
 ```
 
-…but this stretches what "app" means. Alternative is a separate `.zitadel/providers/` directory. Current leaning: keep it as `app` with `role` to avoid two near-identical resource types, and reassess if customer confusion surfaces.
+…but this stretches what "app" means. Alternative is a separate `.zitadel/providers/` directory. The ownership lens resolves this: if the dev owns the SAML-server config (one for their whole platform), it's a `.zitadel/apps/<slug>.json` with `role: "server"` — a small, deliberate, dev-owned resource. If the customer owns it (one per customer-org, configured via a B2B admin UI), it doesn't belong in `.zitadel/` at all and goes through the runtime API. Current leaning: keep `role: "server"` on `app` for the dev-owned case to avoid two near-identical resource types; per-customer SAML servers don't get a CLI surface.
 
 ## How they plug into flow definitions
 
