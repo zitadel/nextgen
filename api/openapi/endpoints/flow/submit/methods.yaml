@@ -6,6 +6,10 @@ post:
     processes (e.g., verifies a credential), advances the state machine
     through any invisible steps, and returns the next visible step.
 
+    The response sets an updated encrypted `HttpOnly` cookie (`_zflow`)
+    with the new flow state. The server is stateless — all orchestration
+    state is carried in this cookie between requests.
+
     **Important:** The `id` in the response may differ from the `id` used in
     the request. This happens when a flow pivots (pushes a new flow onto the
     stack) or when a stacked flow completes (auto-pops to the parent flow).
@@ -31,6 +35,7 @@ post:
     - sessionToken: []
   parameters:
     - $ref: ../../../components/parameters/flow-id.yaml
+    - $ref: ../../../components/parameters/flow-cookie.yaml
   requestBody:
     required: true
     content:
@@ -43,6 +48,9 @@ post:
         Advanced to next step. The `id` may have changed if a pivot
         or stack-pop occurred — always use the returned `id` for the
         next request.
+      headers:
+        Set-Cookie:
+          $ref: ../../../components/headers/set-cookie-flow.yaml
       content:
         application/json:
           schema:
@@ -50,7 +58,10 @@ post:
     '400':
       description: |
         Validation or proof verification failed. Returns the same step
-        with an `error` field. The session token is still rotated.
+        with an `error` field. The session token and cookie are still rotated.
+      headers:
+        Set-Cookie:
+          $ref: ../../../components/headers/set-cookie-flow.yaml
       content:
         application/json:
           schema:

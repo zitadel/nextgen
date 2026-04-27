@@ -10,6 +10,7 @@ get:
     - sessionToken: []
   parameters:
     - $ref: ../../../components/parameters/flow-id.yaml
+    - $ref: ../../../components/parameters/flow-cookie.yaml
   responses:
     '200':
       description: Current step.

@@ -10,6 +10,7 @@ post:
     - sessionToken: []
   parameters:
     - $ref: ../../../components/parameters/flow-id.yaml
+    - $ref: ../../../components/parameters/flow-cookie.yaml
   requestBody:
     required: true
     content:
