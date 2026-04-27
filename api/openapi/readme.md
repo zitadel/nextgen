@@ -24,14 +24,13 @@ Extensions:
 
 #### Install Ogen
 
-```shell
-go install -v github.com/ogen-go/ogen/cmd/ogen@1.20.3
-```
+Ogen is tracked as a [Go tool dependency](https://go.dev/blog/tools) in `go.mod`.
+It is installed automatically when running `go tool ogen` or `go generate`.
 
 #### Generate server
 
 ```shell
-ogen --target ../generated --clean openapi-spec.yaml
+go tool ogen --target ../generated --clean openapi-spec.yaml
 ```
 
 or using `go generate`
