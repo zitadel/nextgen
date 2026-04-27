@@ -83,6 +83,7 @@ func (c Config) build(decoders map[string]DialectDecoder) (Connector, error) {
 	}
 	if len(c.Raw) != 1 {
 		keys := slices.Collect(maps.Keys(c.Raw))
+		slices.Sort(keys)
 		return nil, fmt.Errorf("database: expected exactly one dialect, got %d (%v)", len(c.Raw), keys)
 	}
 

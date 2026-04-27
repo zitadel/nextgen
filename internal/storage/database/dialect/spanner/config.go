@@ -22,7 +22,7 @@ func init() {
 type Config struct {
 	Database string
 	// We start simple and only support the database path, but we can add more configuration options here in the future if needed.
-	// See [sp.ClientConfig] for possible options.
+	// See [spanner.ClientConfig] for possible options.
 }
 
 func DecodeConfig(input any) (database.Connector, error) {
@@ -42,9 +42,11 @@ func DecodeConfig(input any) (database.Connector, error) {
 
 // Connect implements [database.Connector].
 func (c *Config) Connect(ctx context.Context) (database.Pool, error) {
-	_, err := spanner.NewClient(ctx, c.Database)
+	client, err := spanner.NewClient(ctx, c.Database)
 	if err != nil {
 		return nil, fmt.Errorf("spanner: failed to create client: %w", err)
 	}
+	// TODO: implement spanner pool that satisfies [database.Pool] and return it here. For now we just create the client to verify that the configuration is correct and the connection can be established.
+	defer client.Close()
 	return nil, errors.New("spanner: not implemented")
 }

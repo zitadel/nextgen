@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 
+	"cloud.google.com/go/spanner"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 type pool struct {
+	client *spanner.Client
 }
 
 var errNotImplemented = errors.New("spanner: not implemented")
@@ -30,6 +32,7 @@ func (p *pool) Begin(_ context.Context, _ *database.TransactionOptions) (databas
 
 // Close implements [database.Pool].
 func (p *pool) Close(_ context.Context) error {
+	p.client.Close()
 	return nil
 }
 
