@@ -29,7 +29,10 @@ go.work.sum
 
 # Editor/IDE
 # .idea/
+
 .vscode/
+__debug_bin*
+
 # Local Codex/Claude workspace metadata
 .claude/
 
