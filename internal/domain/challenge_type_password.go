@@ -1,7 +1,7 @@
 package domain
 
 type ChallengeTypePassword struct {
-	// The value (mostly plaintext) provided by the user.
+	// The value (mostly plaintext) provided by the client.
 	Value string
 	// Hash read from the database, used to compare with the hash of the provided value.
 	Hash []byte

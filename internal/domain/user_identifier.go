@@ -1,9 +1,5 @@
 package domain
 
-type ChallengeTypeUser struct {
-	Identifier UserIdentifier
-}
-
 type UserIdentifier struct {
 	// Key of the identifier for example:
 	// - email
@@ -22,9 +18,10 @@ type UserIdentifier struct {
 	// - phone should be in E.164 format
 	// - idp should be in the format of "idp:{provider}:{id}"
 	Value string
+
+	// UniqueOnProject indicates whether the identifier must be unique across the entire project.
+	UniqueOnProject bool
+	// UniqueOnTeam indicates whether the identifier must be unique within the team.
+	// It can only be true if the user belongs to a team (i.e. TeamID is not nil).
+	UniqueOnTeam bool
 }
-
-// isChallengeType implements [ChallengeType].
-func (c *ChallengeTypeUser) isChallengeType() {}
-
-var _ ChallengeType = (*ChallengeTypeUser)(nil)
