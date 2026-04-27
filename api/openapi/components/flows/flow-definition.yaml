@@ -1,0 +1,58 @@
+type: object
+required: [slug, name, purposes, initial_steps, steps]
+description: |
+  A flow definition is the server-side configuration that describes a complete
+  authentication or identity flow. It is NOT sent to the frontend — the flow
+  engine evaluates it and produces FlowResponse payloads (steps with capability
+  dictionaries) for the client.
+
+  Flow definitions are created by administrators and stored in the project/team
+  configuration hierarchy. The engine selects the matching definition based on
+  the purpose + audience when a flow is created via POST /flow.
+properties:
+  slug:
+    type: string
+    pattern: '^[a-z][a-z0-9-]*$'
+    description: |
+      Stable identifier for this flow. Used in pivot/switch transitions to
+      reference other flows. Must be unique within the project. Renaming
+      the flow does not change the slug.
+    example: default-login
+
+  name:
+    type: string
+    description: Human-readable display name for this flow definition.
+    example: Default Login
+
+  purposes:
+    type: array
+    items:
+      type: string
+      enum: [login, register, recovery, profiling, reauth, link_account]
+    minItems: 1
+    description: |
+      Which flow purposes this definition handles. A definition can serve
+      multiple purposes (e.g. a combined login/register flow).
+
+  initial_steps:
+    type: object
+    description: |
+      Maps each purpose to the step name that starts the flow for that purpose.
+      Keys must be a subset of `purposes`.
+    additionalProperties:
+      type: string
+    example:
+      login: identifier
+      register: profile
+
+  audience:
+    $ref: flow-audience.yaml
+
+  steps:
+    type: array
+    items:
+      $ref: flow-definition-step.yaml
+    minItems: 1
+    description: |
+      Ordered list of steps in this flow. The order is for human readability —
+      actual step sequencing is determined by transitions.

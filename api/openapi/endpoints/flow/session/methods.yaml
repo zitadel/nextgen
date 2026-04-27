@@ -1,0 +1,31 @@
+get:
+  operationId: getFlowStep
+  summary: Get current step (re-render)
+  description: |
+    Returns the current capability step without advancing the state machine.
+    Useful for page reloads or re-rendering after a network error.
+  tags:
+    - Flows
+  security:
+    - sessionToken: []
+  parameters:
+    - $ref: ../../../components/parameters/flow-id.yaml
+  responses:
+    '200':
+      description: Current step.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/flows/flow-response.yaml
+    '404':
+      description: Flow not found.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '410':
+      description: Flow has already completed.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml

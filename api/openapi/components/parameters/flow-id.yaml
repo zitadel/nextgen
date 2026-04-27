@@ -1,0 +1,7 @@
+name: id
+in: path
+required: true
+description: Flow ID returned by POST /flow or the latest POST /flow/{id}/submit.
+schema:
+  type: string
+  example: flow_01H8Z
