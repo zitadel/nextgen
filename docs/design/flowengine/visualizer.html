@@ -467,15 +467,15 @@
   <!-- Right: Diagram + Sim + API -->
   <div class="right-panel">
     <div class="tab-bar">
-      <button class="tab-btn active" data-view="diagram-view">Diagram</button>
-      <button class="tab-btn" data-view="sim-view">Simulate</button>
+      <button class="tab-btn" data-view="diagram-view">Diagram</button>
+      <button class="tab-btn active" data-view="sim-view">Simulate</button>
       <button class="tab-btn" data-view="api-view">API Log</button>
     </div>
     <div class="right-content">
-      <div id="diagram-view" class="view active">
+      <div id="diagram-view" class="view">
         <div class="mermaid-container" id="mermaid-target"></div>
       </div>
-      <div id="sim-view" class="view">
+      <div id="sim-view" class="view active">
         <div class="sim-phone" id="sim-phone"></div>
       </div>
       <div id="api-view" class="view">
@@ -579,6 +579,57 @@ const T = {
   "passkey.action.authenticate": "Use passkey",
   "passkey.action.fallback": "Use password instead",
   "passkey.complete.title": "Signed in",
+  "stepup.password.title": "Confirm your identity",
+  "stepup.password.description": "Re-enter your password to continue",
+  "stepup.password.field.password": "Password",
+  "stepup.password.action.submit": "Confirm",
+  "stepup.mfa.title": "Additional verification",
+  "stepup.mfa.description": "Choose a second factor to verify your identity",
+  "stepup.mfa.action.otp": "Authenticator app",
+  "stepup.mfa.action.passkey": "Use passkey",
+  "stepup.otp.title": "Enter verification code",
+  "stepup.otp.description": "Enter the code from your authenticator app",
+  "stepup.otp.field.code": "Code",
+  "stepup.otp.action.submit": "Verify",
+  "stepup.otp.action.back": "Try another method",
+  "stepup.passkey.title": "Verify with passkey",
+  "stepup.passkey.description": "Use your passkey or security key",
+  "stepup.passkey.action.authenticate": "Use passkey",
+  "stepup.passkey.action.back": "Try another method",
+  "stepup.complete.title": "Identity confirmed",
+  "idfirst.identifier.title": "Welcome",
+  "idfirst.identifier.description": "Enter your email to sign in or create an account",
+  "idfirst.identifier.field.email": "Email",
+  "idfirst.identifier.action.submit": "Continue",
+  "idfirst.sso.title": "Redirecting to provider\u2026",
+  "idfirst.password.title": "Welcome back",
+  "idfirst.password.field.password": "Password",
+  "idfirst.password.action.submit": "Sign in",
+  "idfirst.password.action.recover": "Forgot password?",
+  "idfirst.otp.title": "Two-factor authentication",
+  "idfirst.otp.description": "Enter the code from your authenticator app",
+  "idfirst.otp.field.code": "Code",
+  "idfirst.otp.action.submit": "Verify",
+  "idfirst.login_done.title": "Signed in",
+  "idfirst.profile.title": "Create your account",
+  "idfirst.profile.description": "Looks like you're new here",
+  "idfirst.profile.field.email": "Email",
+  "idfirst.profile.field.given_name": "First name",
+  "idfirst.profile.field.family_name": "Last name",
+  "idfirst.profile.action.submit": "Continue",
+  "idfirst.set_password.title": "Choose a password",
+  "idfirst.set_password.field.password": "Password",
+  "idfirst.set_password.action.submit": "Continue",
+  "idfirst.verify.title": "Verify your email",
+  "idfirst.verify.description": "We sent a code to your email",
+  "idfirst.verify.field.code": "Verification code",
+  "idfirst.verify.action.submit": "Verify",
+  "idfirst.verify.action.resend": "Resend code",
+  "idfirst.sso_profile.title": "Complete your profile",
+  "idfirst.sso_profile.description": "Just a few more details",
+  "idfirst.sso_profile.field.display_name": "Display name",
+  "idfirst.sso_profile.action.submit": "Create account",
+  "idfirst.register_done.title": "Account created",
 };
 
 function t(key) { return T[key] || key; }
@@ -615,6 +666,7 @@ const DEFAULT_TEMPLATE = `<h2>{{ texts.title_key | t }}</h2>
 
 const FLOWS = {
   "Login": {
+    slug: "default-login",
     name: "Default Login",
     purposes: ["login"],
     initial_steps: { login: "identifier" },
@@ -639,8 +691,9 @@ const FLOWS = {
         transitions: {
           submit: "resolve_user",
           sso: "sso_redirect",
-          register: { switch: "register" },
-          recover: { pivot: "recovery" }
+          passkey: { switch: "passkey-login" },
+          register: { switch: "default-registration" },
+          recover: { pivot: "password-recovery" }
         }
       },
       {
@@ -659,7 +712,7 @@ const FLOWS = {
         name: "check_factors",
         type: "policy_check",
         config: { check: "required_factors" },
-        transitions: { password: "password", otp: "otp", acr_met: "done" }
+        transitions: { password: "password", otp: "otp", acr_met: "done", _default: "password" }
       },
       {
         name: "password",
@@ -673,7 +726,7 @@ const FLOWS = {
           recover: { text_key: "login.password.action.recover" }
         },
         gates: {},
-        transitions: { submit: "check_factors", recover: { pivot: "recovery" } }
+        transitions: { submit: "check_factors", recover: { pivot: "password-recovery" } }
       },
       {
         name: "otp",
@@ -698,6 +751,7 @@ const FLOWS = {
   },
 
   "Registration": {
+    slug: "default-registration",
     name: "Default Registration",
     purposes: ["register"],
     initial_steps: { register: "profile" },
@@ -717,7 +771,7 @@ const FLOWS = {
           login: { text_key: "register.profile.action.login" }
         },
         gates: {},
-        transitions: { submit: "set_password", login: { switch: "login" } }
+        transitions: { submit: "set_password", login: { switch: "default-login" } }
       },
       {
         name: "set_password",
@@ -750,7 +804,7 @@ const FLOWS = {
         name: "create_user",
         type: "action",
         config: { action: "create_user_and_session" },
-        transitions: { created: "done" }
+        transitions: { created: "done", _default: "profile" }
       },
       {
         name: "done",
@@ -762,6 +816,7 @@ const FLOWS = {
   },
 
   "Recovery": {
+    slug: "password-recovery",
     name: "Password Recovery",
     purposes: ["recovery"],
     initial_steps: { recovery: "recovery_email" },
@@ -779,7 +834,7 @@ const FLOWS = {
           back: { text_key: "recovery.email.action.back" }
         },
         gates: {},
-        transitions: { submit: "verify_code", back: { pivot: "login" } }
+        transitions: { submit: "verify_code", back: { pivot: "default-login" } }
       },
       {
         name: "verify_code",
@@ -824,6 +879,7 @@ const FLOWS = {
   },
 
   "Enterprise Login": {
+    slug: "enterprise-login",
     name: "Acme Corp SSO Login",
     purposes: ["login"],
     initial_steps: { login: "identifier" },
@@ -908,6 +964,7 @@ const FLOWS = {
   },
 
   "SaaS Login": {
+    slug: "saas-login",
     name: "SaaSApp Login",
     purposes: ["login"],
     initial_steps: { login: "identifier" },
@@ -934,7 +991,7 @@ const FLOWS = {
         transitions: {
           submit: "resolve_user",
           sso: "sso_redirect",
-          register: { switch: "SaaS Registration" }
+          register: { switch: "saas-registration" }
         }
       },
       {
@@ -961,7 +1018,7 @@ const FLOWS = {
           recover: { text_key: "saas.password.action.recover" }
         },
         gates: {},
-        transitions: { submit: "done", recover: { pivot: "recovery" } }
+        transitions: { submit: "done", recover: { pivot: "password-recovery" } }
       },
       {
         name: "done",
@@ -973,6 +1030,7 @@ const FLOWS = {
   },
 
   "SaaS Registration": {
+    slug: "saas-registration",
     name: "SaaSApp Registration",
     purposes: ["register"],
     initial_steps: { register: "profile" },
@@ -998,7 +1056,7 @@ const FLOWS = {
           { id: "google-1", name: "Google", template: "google" },
           { id: "github-1", name: "GitHub", template: "github" }
         ],
-        transitions: { submit: "terms", sso: "sso_link", login: { switch: "SaaS Login" } }
+        transitions: { submit: "terms", sso: "sso_link", login: { switch: "saas-login" } }
       },
       {
         name: "sso_link",
@@ -1048,6 +1106,7 @@ const FLOWS = {
   },
 
   "Passkey Login": {
+    slug: "passkey-login",
     name: "Passwordless Login",
     purposes: ["login"],
     initial_steps: { login: "passkey_prompt" },
@@ -1067,7 +1126,7 @@ const FLOWS = {
         },
         transitions: {
           authenticate: "verify_passkey",
-          fallback: { switch: "login" }
+          fallback: { switch: "default-login" }
         }
       },
       {
@@ -1081,6 +1140,259 @@ const FLOWS = {
         type: "complete",
         texts: { title_key: "passkey.complete.title" },
         behavior: "redirect"
+      }
+    ]
+  },
+
+  "Step-Up": {
+    slug: "step-up",
+    name: "Step-Up Authentication",
+    purposes: ["reauth"],
+    initial_steps: { reauth: "check_session_age" },
+    audience: {},
+    steps: [
+      {
+        name: "check_session_age",
+        type: "policy_check",
+        config: { check: "session_age_and_acr" },
+        transitions: { full_reauth: "password", mfa_needed: "mfa_chooser", password_needed: "password", fresh: "done", _default: "password" }
+      },
+      {
+        name: "password",
+        type: "credential",
+        texts: { title_key: "stepup.password.title", description_key: "stepup.password.description" },
+        fields: {
+          password: { type: "password", required: true, text_key: "stepup.password.field.password" }
+        },
+        actions: {
+          submit: { text_key: "stepup.password.action.submit", primary: true }
+        },
+        gates: {},
+        transitions: { submit: "verify_password" }
+      },
+      {
+        name: "verify_password",
+        type: "policy_check",
+        config: { check: "verify_password" },
+        transitions: { valid: "check_mfa", invalid: "password" }
+      },
+      {
+        name: "check_mfa",
+        type: "policy_check",
+        config: { check: "stepup_mfa_required" },
+        transitions: { required: "mfa_chooser", not_required: "done" }
+      },
+      {
+        name: "mfa_chooser",
+        type: "info",
+        texts: { title_key: "stepup.mfa.title", description_key: "stepup.mfa.description" },
+        fields: {},
+        actions: {
+          otp: { text_key: "stepup.mfa.action.otp", primary: true },
+          passkey: { text_key: "stepup.mfa.action.passkey" }
+        },
+        gates: {},
+        transitions: { otp: "otp", passkey: "passkey" }
+      },
+      {
+        name: "otp",
+        type: "credential",
+        texts: { title_key: "stepup.otp.title", description_key: "stepup.otp.description" },
+        fields: {
+          code: { type: "text", text_key: "stepup.otp.field.code", validation: { pattern: "^[0-9]{6}$" } }
+        },
+        actions: {
+          submit: { text_key: "stepup.otp.action.submit", primary: true },
+          back: { text_key: "stepup.otp.action.back" }
+        },
+        gates: {},
+        transitions: { submit: "verify_otp", back: "mfa_chooser" }
+      },
+      {
+        name: "verify_otp",
+        type: "policy_check",
+        config: { check: "verify_otp" },
+        transitions: { valid: "done", invalid: "otp" }
+      },
+      {
+        name: "passkey",
+        type: "credential",
+        texts: { title_key: "stepup.passkey.title", description_key: "stepup.passkey.description" },
+        fields: {},
+        actions: {
+          authenticate: { text_key: "stepup.passkey.action.authenticate", primary: true },
+          back: { text_key: "stepup.passkey.action.back" }
+        },
+        gates: {
+          passkey: { type: "passkey", required: true, satisfied: false }
+        },
+        transitions: { authenticate: "verify_passkey", back: "mfa_chooser" }
+      },
+      {
+        name: "verify_passkey",
+        type: "policy_check",
+        config: { check: "passkey_valid" },
+        transitions: { valid: "done", invalid: "passkey" }
+      },
+      {
+        name: "done",
+        type: "complete",
+        texts: { title_key: "stepup.complete.title" },
+        behavior: "redirect"
+      }
+    ]
+  },
+
+  "Identifier First": {
+    slug: "identifier-first",
+    name: "Adaptive Identifier First",
+    purposes: ["login", "register"],
+    initial_steps: { login: "identifier", register: "identifier" },
+    audience: {},
+    steps: [
+      {
+        name: "identifier",
+        type: "identifier",
+        texts: { title_key: "idfirst.identifier.title", description_key: "idfirst.identifier.description" },
+        fields: {
+          identifier: { type: "email", required: true, text_key: "idfirst.identifier.field.email" }
+        },
+        actions: {
+          submit: { text_key: "idfirst.identifier.action.submit", primary: true }
+        },
+        gates: {},
+        sso_providers: [
+          { id: "google-1", name: "Google", template: "google" },
+          { id: "github-1", name: "GitHub", template: "github" }
+        ],
+        transitions: {
+          submit: "resolve_user",
+          sso: "sso_redirect"
+        }
+      },
+      {
+        name: "resolve_user",
+        type: "policy_check",
+        config: { check: "resolve_user" },
+        transitions: { existing: "password", new: "profile" }
+      },
+      {
+        name: "sso_redirect",
+        type: "redirect",
+        texts: { title_key: "idfirst.sso.title" },
+        transitions: { callback: "sso_resolve" }
+      },
+      {
+        name: "sso_resolve",
+        type: "policy_check",
+        config: { check: "sso_account_exists" },
+        transitions: { existing: "check_factors", new: "sso_profile" }
+      },
+      {
+        name: "password",
+        type: "credential",
+        texts: { title_key: "idfirst.password.title" },
+        fields: {
+          password: { type: "password", required: true, text_key: "idfirst.password.field.password" }
+        },
+        actions: {
+          submit: { text_key: "idfirst.password.action.submit", primary: true },
+          recover: { text_key: "idfirst.password.action.recover" }
+        },
+        gates: {},
+        transitions: { submit: "check_factors", recover: { pivot: "password-recovery" } }
+      },
+      {
+        name: "check_factors",
+        type: "policy_check",
+        config: { check: "required_factors" },
+        transitions: { acr_met: "login_done", otp: "otp" }
+      },
+      {
+        name: "otp",
+        type: "credential",
+        texts: { title_key: "idfirst.otp.title", description_key: "idfirst.otp.description" },
+        fields: {
+          code: { type: "text", text_key: "idfirst.otp.field.code", validation: { pattern: "^[0-9]{6}$" } }
+        },
+        actions: {
+          submit: { text_key: "idfirst.otp.action.submit", primary: true }
+        },
+        gates: {},
+        transitions: { submit: "check_factors" }
+      },
+      {
+        name: "login_done",
+        type: "complete",
+        texts: { title_key: "idfirst.login_done.title" },
+        behavior: "redirect"
+      },
+      {
+        name: "profile",
+        type: "form",
+        texts: { title_key: "idfirst.profile.title", description_key: "idfirst.profile.description" },
+        fields: {
+          email: { type: "email", required: true, text_key: "idfirst.profile.field.email" },
+          given_name: { type: "text", required: true, text_key: "idfirst.profile.field.given_name" },
+          family_name: { type: "text", required: true, text_key: "idfirst.profile.field.family_name" }
+        },
+        actions: {
+          submit: { text_key: "idfirst.profile.action.submit", primary: true }
+        },
+        gates: {},
+        transitions: { submit: "set_password" }
+      },
+      {
+        name: "set_password",
+        type: "form",
+        texts: { title_key: "idfirst.set_password.title" },
+        fields: {
+          password: { type: "password", required: true, text_key: "idfirst.set_password.field.password", validation: { min_length: 8 } }
+        },
+        actions: {
+          submit: { text_key: "idfirst.set_password.action.submit", primary: true }
+        },
+        gates: {},
+        transitions: { submit: "verify_email" }
+      },
+      {
+        name: "verify_email",
+        type: "verification",
+        texts: { title_key: "idfirst.verify.title", description_key: "idfirst.verify.description" },
+        fields: {
+          code: { type: "text", text_key: "idfirst.verify.field.code" }
+        },
+        actions: {
+          submit: { text_key: "idfirst.verify.action.submit", primary: true },
+          resend: { text_key: "idfirst.verify.action.resend" }
+        },
+        gates: {},
+        transitions: { submit: "create_user" }
+      },
+      {
+        name: "create_user",
+        type: "action",
+        config: { action: "create_user_and_session" },
+        transitions: { created: "register_done" }
+      },
+      {
+        name: "sso_profile",
+        type: "form",
+        texts: { title_key: "idfirst.sso_profile.title", description_key: "idfirst.sso_profile.description" },
+        fields: {
+          display_name: { type: "text", required: true, text_key: "idfirst.sso_profile.field.display_name" }
+        },
+        actions: {
+          submit: { text_key: "idfirst.sso_profile.action.submit", primary: true }
+        },
+        gates: {},
+        transitions: { submit: "create_user" }
+      },
+      {
+        name: "register_done",
+        type: "complete",
+        texts: { title_key: "idfirst.register_done.title" },
+        behavior: "show"
       }
     ]
   }
@@ -1408,21 +1720,27 @@ async function renderDiagram() {
     }
   }
 
+  function safeId(s) { return s.replace(/[^a-zA-Z0-9_]/g, '_'); }
+
   for (const step of steps) {
     if (!step.transitions) continue;
     const srcId = 'n_' + step.name;
     for (const [label, tgt] of Object.entries(step.transitions)) {
       if (typeof tgt === 'string') {
-        lines.push(`    ${srcId} -->|${label}| n_${tgt}`);
+        if (label === '_default') {
+          lines.push(`    ${srcId} -.->|_default| n_${tgt}`);
+        } else {
+          lines.push(`    ${srcId} -->|${label}| n_${tgt}`);
+        }
       } else if (tgt.pivot) {
-        const extId = 'ext_pivot_' + tgt.pivot;
+        const extId = 'ext_pivot_' + safeId(tgt.pivot);
         if (!transitionTargets.has('pivot:' + tgt.pivot)) {
           transitionTargets.add('pivot:' + tgt.pivot);
           lines.push(`    ${extId}["\`**${tgt.pivot}**<br/>pivot (stack)\`"]:::pivot`);
         }
         lines.push(`    ${srcId} -.->|${label}| ${extId}`);
       } else if (tgt.switch) {
-        const extId = 'ext_switch_' + tgt.switch;
+        const extId = 'ext_switch_' + safeId(tgt.switch);
         if (!transitionTargets.has('switch:' + tgt.switch)) {
           transitionTargets.add('switch:' + tgt.switch);
           lines.push(`    ${extId}["\`**${tgt.switch}**<br/>switch (replace)\`"]:::switchFlow`);
@@ -1560,7 +1878,8 @@ function buildFlowResponse(step) {
       liquid_template: "(template omitted for brevity)"
     }
   };
-  if (step?.behavior === 'redirect') {
+  // redirect_uri is top-level per the spec, present on complete+redirect steps
+  if (step?.type === 'complete' && step?.behavior === 'redirect') {
     resp.redirect_uri = "https://app.example.com/callback";
   }
   return resp;
@@ -1568,18 +1887,19 @@ function buildFlowResponse(step) {
 
 function buildStepPayload(step) {
   if (!step) return null;
+  // API spec: name, type, fields, actions, gates are all required (defaults to {})
   const payload = {
     name: step.name,
     type: step.type,
+    fields: step.fields || {},
+    actions: step.actions || {},
+    gates: step.gates || {},
   };
   if (step.texts) payload.texts = step.texts;
-  if (step.fields) payload.fields = step.fields;
-  if (step.actions) payload.actions = step.actions;
-  if (step.gates && Object.keys(step.gates).length > 0) payload.gates = step.gates;
   if (step.sso_providers?.length > 0) payload.sso_providers = step.sso_providers;
   if (step.behavior) payload.behavior = step.behavior;
-  if (step.type === 'complete' && step.behavior === 'redirect') {
-    payload.redirect_url = "https://app.example.com/callback";
+  if (step.type === 'redirect') {
+    payload.redirect_url = "https://idp.example.com/authorize?state=xyz";
   }
   if (simState.error) payload.error = simState.error;
   return payload;
@@ -1592,18 +1912,25 @@ function advanceThroughInvisible() {
     if (!step) break;
     if (step.type === 'policy_check' || step.type === 'action') {
       const transitions = step.transitions || {};
-      const keys = Object.keys(transitions);
+      const keys = Object.keys(transitions).filter(k => k !== '_default');
       const visited = new Set(simState.history);
       let picked = null;
+      // Pick first unvisited outcome
       for (const k of keys) {
         const tgt = transitions[k];
         if (typeof tgt === 'string' && !visited.has(tgt)) { picked = tgt; break; }
       }
+      // Fallback: pick last outcome
       if (!picked) {
         for (let i = keys.length - 1; i >= 0; i--) {
           const tgt = transitions[keys[i]];
           if (typeof tgt === 'string') { picked = tgt; break; }
         }
+      }
+      // Final fallback: _default
+      if (!picked && transitions._default) {
+        const tgt = transitions._default;
+        if (typeof tgt === 'string') picked = tgt;
       }
       if (picked) {
         simState.history.push(simState.stepName);
@@ -1653,8 +1980,9 @@ function simAction(actionName, providerId) {
 
   // Handle pivot (stack)
   if (typeof target === 'object' && target.pivot) {
-    const pivotPurpose = target.pivot;
-    const pivotFlowName = Object.keys(FLOWS).find(k => FLOWS[k].purposes?.includes(pivotPurpose));
+    const pivotSlug = target.pivot;
+    // Resolve by slug
+    const pivotFlowName = Object.keys(FLOWS).find(k => FLOWS[k].slug === pivotSlug);
     if (pivotFlowName) {
       // Push current flow onto stack
       simState.flowStack.push({
@@ -1691,8 +2019,9 @@ function simAction(actionName, providerId) {
 
   // Handle switch (replace)
   if (typeof target === 'object' && target.switch) {
-    const switchPurpose = target.switch;
-    const switchFlowName = Object.keys(FLOWS).find(k => FLOWS[k].purposes?.includes(switchPurpose));
+    const switchSlug = target.switch;
+    // Resolve by slug
+    const switchFlowName = Object.keys(FLOWS).find(k => FLOWS[k].slug === switchSlug);
     if (switchFlowName) {
       const newFlowId = genId('flow');
       simState.flowId = newFlowId;

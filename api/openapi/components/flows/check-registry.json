@@ -1,0 +1,123 @@
+{
+  "$schema": "check-registry.schema.json",
+  "checks": {
+    "resolve_user": {
+      "description": "Look up user by submitted identifier (email, phone, username). Populates user context for subsequent steps.",
+      "outcomes": {
+        "found": "User exists and is active.",
+        "not_found": "No matching user. Flow can branch to registration or show error."
+      },
+      "requires": ["identifier"],
+      "sets": ["user"]
+    },
+    "required_factors": {
+      "description": "Evaluate the project's authentication policy against factors already satisfied in this session. Returns which factor is needed next, or signals that the ACR level is met.",
+      "outcomes": {
+        "acr_met": "All required factors are satisfied.",
+        "password": "Password factor is required next.",
+        "otp": "TOTP factor is required next.",
+        "passkey": "Passkey/WebAuthn factor is required next."
+      },
+      "requires": ["user"],
+      "sets": []
+    },
+    "domain_requires_sso": {
+      "description": "Check if the user's email domain has an enforced SSO policy.",
+      "outcomes": {
+        "sso_required": "Domain mandates SSO — must redirect to IdP.",
+        "sso_optional": "SSO available but not enforced — can fall back to password."
+      },
+      "requires": ["identifier"],
+      "sets": []
+    },
+    "consent_required": {
+      "description": "Check if the OIDC/SAML auth request includes scopes that require explicit user consent.",
+      "outcomes": {
+        "required": "Consent screen must be shown.",
+        "not_required": "All scopes previously consented or no consent needed."
+      },
+      "requires": ["user", "auth_request"],
+      "sets": []
+    },
+    "session_age_and_acr": {
+      "description": "Evaluate whether the current session is fresh enough and meets the ACR level required for a step-up request.",
+      "outcomes": {
+        "fresh": "Session is recent and ACR is sufficient — no re-authentication needed.",
+        "password_needed": "Session is stale — password re-entry required.",
+        "mfa_needed": "Password ACR is met but MFA is required.",
+        "full_reauth": "Session is too old — full re-authentication required."
+      },
+      "requires": ["session"],
+      "sets": []
+    },
+    "verify_password": {
+      "description": "Validate the submitted password against the user's stored credential.",
+      "outcomes": {
+        "valid": "Password matches.",
+        "invalid": "Password does not match. Flow can re-render the credential step with an error."
+      },
+      "requires": ["user", "password"],
+      "sets": ["auth_factor_password"]
+    },
+    "verify_otp": {
+      "description": "Validate the submitted TOTP code against the user's enrolled authenticator.",
+      "outcomes": {
+        "valid": "OTP code is correct.",
+        "invalid": "OTP code is incorrect or expired."
+      },
+      "requires": ["user", "otp_code"],
+      "sets": ["auth_factor_otp"]
+    },
+    "passkey_valid": {
+      "description": "Validate a WebAuthn assertion against the user's registered passkeys.",
+      "outcomes": {
+        "valid": "Passkey assertion verified.",
+        "invalid": "Assertion failed or key not recognized."
+      },
+      "requires": ["passkey_assertion"],
+      "sets": ["user", "auth_factor_passkey"]
+    },
+    "sso_account_exists": {
+      "description": "After SSO callback, check if the external identity maps to an existing user account.",
+      "outcomes": {
+        "existing": "SSO identity is linked to an existing user.",
+        "new": "No existing account — user needs to complete registration."
+      },
+      "requires": ["sso_identity"],
+      "sets": ["user"]
+    },
+    "stepup_mfa_required": {
+      "description": "After password re-verification in a step-up flow, check if an additional MFA factor is required to meet the requested ACR.",
+      "outcomes": {
+        "required": "MFA factor is needed.",
+        "not_required": "Password alone meets the required ACR."
+      },
+      "requires": ["session", "auth_factor_password"],
+      "sets": []
+    }
+  },
+  "actions": {
+    "create_user_and_session": {
+      "description": "Create a new user from the collected profile data and start an authenticated session.",
+      "outcomes": {
+        "created": "User and session created successfully.",
+        "email_taken": "A user with this email already exists.",
+        "rate_limited": "Too many account creation attempts."
+      },
+      "requires": ["identifier", "password"],
+      "sets": ["user", "session"],
+      "idempotent": false
+    },
+    "reset_password": {
+      "description": "Replace the user's password with the newly submitted one. Invalidates existing sessions.",
+      "outcomes": {
+        "reset": "Password updated successfully.",
+        "weak_password": "Password does not meet strength requirements.",
+        "token_expired": "Recovery token has expired."
+      },
+      "requires": ["user", "password", "recovery_token"],
+      "sets": [],
+      "idempotent": true
+    }
+  }
+}

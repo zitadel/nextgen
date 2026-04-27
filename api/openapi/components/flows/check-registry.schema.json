@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "check-registry.schema.json",
+  "title": "Flow Check & Action Registry",
+  "version": "1.0.0",
+  "description": "Declarative registry of policy checks and actions available to flow definitions. Used for flow validation at save time and by UI tooling.",
+  "type": "object",
+  "required": ["checks", "actions"],
+  "additionalProperties": false,
+  "properties": {
+    "checks": {
+      "type": "object",
+      "description": "Policy check definitions keyed by check name.",
+      "additionalProperties": {
+        "$ref": "#/$defs/check"
+      }
+    },
+    "actions": {
+      "type": "object",
+      "description": "Action definitions keyed by action name.",
+      "additionalProperties": {
+        "$ref": "#/$defs/action"
+      }
+    }
+  },
+  "$defs": {
+    "check": {
+      "type": "object",
+      "required": ["description", "outcomes"],
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "type": "string",
+          "description": "What this check evaluates."
+        },
+        "outcomes": {
+          "type": "object",
+          "minProperties": 2,
+          "additionalProperties": {
+            "type": "string",
+            "description": "Human-readable description of when this outcome is returned."
+          },
+          "description": "Possible outcome strings this check can return, with descriptions."
+        },
+        "requires": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Flow state fields that must be populated before this check runs (e.g. 'user', 'identifier')."
+        },
+        "sets": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Flow state fields this check populates on success (e.g. 'user', 'sso_identity')."
+        }
+      }
+    },
+    "action": {
+      "type": "object",
+      "required": ["description", "outcomes"],
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "type": "string",
+          "description": "What mutation this action performs."
+        },
+        "outcomes": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "string",
+            "description": "Human-readable description of when this outcome is returned."
+          },
+          "description": "Possible outcome strings this action can return, with descriptions."
+        },
+        "requires": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Flow state fields that must be populated before this action runs."
+        },
+        "sets": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Flow state fields this action populates on success."
+        },
+        "idempotent": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether this action is safe to retry."
+        }
+      }
+    }
+  }
+}

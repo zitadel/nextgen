@@ -126,8 +126,14 @@ properties:
       - An object with `pivot`: stack a different flow (returns after completion)
       - An object with `switch`: replace the current flow entirely (no return)
 
-      For `policy_check` steps, keys are outcome names (e.g. "found", "not_found").
-      For `action` steps, keys are result names (e.g. "created").
+      For `policy_check` steps, keys are outcome names from the check's
+      contract (see check-registry.json). The engine returns one outcome
+      string; if no matching key is found, `_default` is used. If there
+      is no `_default`, the flow errors.
+
+      For `action` steps, keys are result names from the action's contract.
+      Same `_default` fallback behavior applies.
+
       For rendered steps, keys match action names from the `actions` dict,
       plus "sso" and "callback" for SSO-related transitions.
     additionalProperties:

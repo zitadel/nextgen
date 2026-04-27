@@ -341,7 +341,7 @@
       "additionalProperties": {
         "$ref": "#/$defs/transition_target"
       },
-      "description": "Maps action/outcome names to the next step. Keys match action names, SSO events, or policy outcomes."
+      "description": "Maps action/outcome names to the next step. Keys match action names, SSO events, or policy outcomes. Use \"_default\" as a catch-all for unmatched outcomes."
     },
     "transition_target": {
       "oneOf": [
