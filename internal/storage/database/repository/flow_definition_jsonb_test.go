@@ -55,7 +55,7 @@ func TestFlowDefinitionJSONBRepository_CreateAndGet(t *testing.T) {
 	for _, tr := range identifier.Transitions {
 		transitionsByAction[tr.Action] = tr
 	}
-	assert.Equal(t, strPtr("resolve_user"), transitionsByAction["submit"].TargetStep)
+	assert.Equal(t, new("resolve_user"), transitionsByAction["submit"].TargetStep)
 	assert.Nil(t, transitionsByAction["submit"].PivotPurpose)
 
 	registerPivot := transitionsByAction["register"]
@@ -169,4 +169,51 @@ func TestFlowDefinitionJSONBRepository_InstanceIsolation(t *testing.T) {
 	listB, err := repo.ListFlowDefinitions(t.Context(), "inst-jB")
 	require.NoError(t, err)
 	assert.Len(t, listB, 1)
+}
+
+func sampleFlowDefinition(instanceID, id string) *domain.FlowDefinition {
+	pivot := domain.FlowDefinitionPurposeRegister
+	appID := "app-1"
+	return &domain.FlowDefinition{
+		InstanceID:    instanceID,
+		ID:            id,
+		Name:          "Default Login",
+		EngineVersion: "1.0.0",
+		SchemaVersion: "1.0.0",
+		Status:        domain.FlowDefinitionStatusDraft,
+		Purposes: []domain.FlowDefinitionPurposeEntry{
+			{Purpose: domain.FlowDefinitionPurposeLogin, InitialStep: "identifier"},
+		},
+		Audience: domain.FlowDefinitionAudience{
+			AppID:             &appID,
+			IsInstanceDefault: false,
+		},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name: "identifier",
+				Type: domain.FlowStepTypeIdentifier,
+				Config: map[string]any{
+					"methods": []any{"email"},
+				},
+				Transitions: []domain.FlowStepTransition{
+					{Action: "submit", TargetStep: new("resolve_user")},
+					{Action: "register", PivotPurpose: &pivot},
+				},
+			},
+			{
+				Name:   "resolve_user",
+				Type:   domain.FlowStepTypePolicyCheck,
+				Config: nil,
+				Transitions: []domain.FlowStepTransition{
+					{Action: "found", TargetStep: new("password")},
+				},
+			},
+			{
+				Name:        "password",
+				Type:        domain.FlowStepTypeCredential,
+				Config:      map[string]any{"factor": "password"},
+				Transitions: []domain.FlowStepTransition{},
+			},
+		},
+	}
 }
