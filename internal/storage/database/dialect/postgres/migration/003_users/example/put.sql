@@ -4,12 +4,14 @@
 -- then re-inserted so value_hash changes stay conflict-free against the registry PK.
 -- Final attributes are taken from _input_data (same shape as get_by_id / create).
 
+/*
 DEALLOCATE ALL;
 PREPARE put_user (
     TEXT, -- $1 instance_id
     TEXT, -- $2 user_id (users.id)
     zitadel_nextgen.incoming_user_attribute[] -- $3 full attribute set
 ) AS
+*/
 
 WITH _header AS (
     UPDATE zitadel_nextgen.users u
@@ -133,6 +135,7 @@ SELECT
     ) AS attributes
 FROM _header h;
 
+/*
 EXECUTE put_user(
     'inst_1' -- $1 instance_id
     , 'usr_00101002' -- $2 user_id
@@ -145,3 +148,4 @@ EXECUTE put_user(
         , ROW('address.locality'::TEXT, '"Amsterdam"'::JSONB, NULL::bytea, 'unspecified'::TEXT)::zitadel_nextgen.incoming_user_attribute
     ]
 );
+*/

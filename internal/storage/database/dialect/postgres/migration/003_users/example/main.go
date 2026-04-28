@@ -49,6 +49,10 @@ func main() {
 		runGetUserByID()
 	case "create-user":
 		runCreateUser()
+	case "put-user":
+		runPutUser()
+	case "patch-user":
+		runPatchUser()
 	default:
 		printUsageAndExit()
 	}
@@ -59,6 +63,8 @@ func printUsageAndExit() {
 	fmt.Fprintf(os.Stderr, "commands:\n")
 	fmt.Fprintf(os.Stderr, "  create-user\n")
 	fmt.Fprintf(os.Stderr, "  get-user-by-id\n")
+	fmt.Fprintf(os.Stderr, "  put-user\n")
+	fmt.Fprintf(os.Stderr, "  patch-user\n")
 	os.Exit(1)
 }
 
@@ -120,6 +126,84 @@ func runGetUserByID() {
 	defer cancel()
 
 	user, err := GetUserByID(ctx, "inst_5", "usr_00501017")
+	if err != nil {
+		panic(err)
+	}
+	printUser(user)
+}
+
+func runPutUser() {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	var err error
+	attributes := []IncomingUserAttribute{
+		func() IncomingUserAttribute {
+			a, attrErr := NewIncomingUserAttribute("username", "john_doe", UserUniquenessGlobal)
+			err = errors.Join(err, attrErr)
+			return a
+		}(),
+		func() IncomingUserAttribute {
+			a, attrErr := NewIncomingUserAttribute("email", "john-updated@example.com", UserUniquenessGlobal)
+			err = errors.Join(err, attrErr)
+			return a
+		}(),
+		func() IncomingUserAttribute {
+			a, attrErr := NewIncomingUserAttribute("email_verified", true, UserUniquenessUnspecified)
+			err = errors.Join(err, attrErr)
+			return a
+		}(),
+		func() IncomingUserAttribute {
+			a, attrErr := NewIncomingUserAttribute("nickname", "Johnny Put", UserUniquenessOrganization)
+			err = errors.Join(err, attrErr)
+			return a
+		}(),
+		func() IncomingUserAttribute {
+			a, attrErr := NewIncomingUserAttribute("address.country", "USA", UserUniquenessUnspecified)
+			err = errors.Join(err, attrErr)
+			return a
+		}(),
+	}
+	if err != nil {
+		panic(err)
+	}
+
+	user, err := PutUser(ctx, "inst_5", "usr_00501017", attributes)
+	if err != nil {
+		panic(err)
+	}
+	printUser(user)
+}
+
+func runPatchUser() {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	var err error
+	attributes := []IncomingUserAttribute{
+		func() IncomingUserAttribute {
+			a, attrErr := NewIncomingUserAttribute("email", "john-patched@example.com", UserUniquenessGlobal)
+			err = errors.Join(err, attrErr)
+			return a
+		}(),
+		func() IncomingUserAttribute {
+			a, attrErr := NewIncomingUserAttribute("email_verified", false, UserUniquenessUnspecified)
+			err = errors.Join(err, attrErr)
+			return a
+		}(),
+		func() IncomingUserAttribute {
+			a, attrErr := NewIncomingUserAttribute("nickname", "Johnny Patched", UserUniquenessOrganization)
+			err = errors.Join(err, attrErr)
+			return a
+		}(),
+	}
+	if err != nil {
+		panic(err)
+	}
+
+	deleteKeys := []string{"address.city"}
+
+	user, err := PatchUser(ctx, "inst_5", "usr_00501017", attributes, deleteKeys)
 	if err != nil {
 		panic(err)
 	}

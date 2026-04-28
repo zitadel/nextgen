@@ -1,3 +1,4 @@
+/*
 DEALLOCATE ALL;
 PREPARE patch_user (
     TEXT    -- $1 instance_id
@@ -5,6 +6,7 @@ PREPARE patch_user (
     , zitadel_nextgen.incoming_user_attribute[] -- $3 upsert attribute set (op: add, replace)
     ,TEXT[] -- $4 attributes to delete by key (op: remove)
 ) AS
+*/
 
 WITH _header AS (
     UPDATE zitadel_nextgen.users
@@ -67,6 +69,7 @@ SELECT
     ) AS attributes
 FROM _header h;
 
+/*
 EXECUTE patch_user(
     'inst_1' -- $1 instance_id
     , 'usr_00101002' -- $2 user_id
@@ -76,3 +79,4 @@ EXECUTE patch_user(
     ]
     , ARRAY['address.locality']
 );
+*/

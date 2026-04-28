@@ -17,6 +17,10 @@ var (
 	getUserByIdStmt string
 	//go:embed create.sql
 	insertUserStmt string
+	//go:embed put.sql
+	putUserStmt string
+	//go:embed patch.sql
+	patchUserStmt string
 )
 
 type Attribute struct {
@@ -119,6 +123,24 @@ func CreateUser(ctx context.Context, instanceID string, u *IncomingUser) (*User,
 	user, err := pgx.CollectExactlyOneRow(rows, pgx.RowToAddrOfStructByPos[User])
 	if err != nil {
 		return nil, fmt.Errorf("failed to create user: %w", err)
+	}
+	return user, nil
+}
+
+func PutUser(ctx context.Context, instanceID, userID string, attributes []IncomingUserAttribute) (*User, error) {
+	rows, _ := conn.Query(ctx, putUserStmt, instanceID, userID, attributes)
+	user, err := pgx.CollectExactlyOneRow(rows, pgx.RowToAddrOfStructByPos[User])
+	if err != nil {
+		return nil, fmt.Errorf("failed to put user: %w", err)
+	}
+	return user, nil
+}
+
+func PatchUser(ctx context.Context, instanceID, userID string, attributes []IncomingUserAttribute, deleteKeys []string) (*User, error) {
+	rows, _ := conn.Query(ctx, patchUserStmt, instanceID, userID, attributes, deleteKeys)
+	user, err := pgx.CollectExactlyOneRow(rows, pgx.RowToAddrOfStructByPos[User])
+	if err != nil {
+		return nil, fmt.Errorf("failed to patch user: %w", err)
 	}
 	return user, nil
 }
