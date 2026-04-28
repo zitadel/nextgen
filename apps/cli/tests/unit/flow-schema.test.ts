@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { collectTextKeys, flowDefinitionSchema } from "../../src/resources/flow";
-import { parseJson, runCliForTest } from "../helpers/run-cli";
+import { runCliForTest } from "../helpers/run-cli";
 
 describe("flow definition schema", () => {
   it("setup emits a FlowDefinition that parses against the zod schema", async () => {
@@ -51,10 +51,15 @@ describe("flow definition schema", () => {
     // fields/actions/gates are objects, not arrays
     expect(Array.isArray(identifier.fields)).toBe(false);
     expect(typeof identifier.fields).toBe("object");
-    expect(identifier.fields.email).toBeDefined();
-    expect(identifier.fields.email.text_key).toBe("identifier.field.email");
-    expect(identifier.actions.submit.primary).toBe(true);
-    expect(identifier.actions.submit.text_key).toBe("identifier.action.submit");
+    const emailField = identifier.fields.email;
+    expect(emailField).toBeDefined();
+    if (!emailField) return;
+    expect(emailField.text_key).toBe("identifier.field.email");
+    const submitAction = identifier.actions.submit;
+    expect(submitAction).toBeDefined();
+    if (!submitAction) return;
+    expect(submitAction.primary).toBe(true);
+    expect(submitAction.text_key).toBe("identifier.action.submit");
 
     // every field must have a text_key
     for (const step of flow.steps) {

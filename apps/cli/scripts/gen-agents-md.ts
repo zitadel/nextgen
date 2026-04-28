@@ -40,7 +40,7 @@ function renderGeneratedBlock(): string {
   lines.push("| Code | Error code(s) |");
   lines.push("|---:|---|");
   const reverse = new Map<number, string[]>();
-  for (const [errorCode, exit] of Object.entries(EXIT_CODES)) {
+  for (const [errorCode, exit] of Object.entries(EXIT_CODES) as Array<[string, number]>) {
     const list = reverse.get(exit) ?? [];
     list.push(errorCode);
     reverse.set(exit, list);

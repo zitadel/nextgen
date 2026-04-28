@@ -29,6 +29,7 @@ export default defineConfig(() => ({
   test: {
     name: "@zitadel-nextgen/console",
     watch: false,
+    passWithNoTests: true,
     globals: true,
     environment: "jsdom",
     setupFiles: ["./src/test-setup.ts"],

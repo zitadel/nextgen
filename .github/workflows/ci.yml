@@ -47,8 +47,8 @@ jobs:
       - name: Install dependencies
         run: corepack pnpm install --frozen-lockfile
 
-      - name: Typecheck
-        run: corepack pnpm nx run-many -t typecheck,build,test
+      - name: Node checks
+        run: corepack pnpm nx run-many -t lint,typecheck,build,test
 
   npm-pack-smoke:
     runs-on: ubuntu-latest
@@ -76,8 +76,8 @@ jobs:
 
       - name: Smoke test built CLI
         run: |
-          node apps/cli/dist/zitadel.js --version
-          node apps/cli/dist/zitadel.js capabilities --json
+          node apps/cli/dist/zitadel.mjs --version
+          node apps/cli/dist/zitadel.mjs capabilities --json
 
       - name: Dry-run npm packs
         run: |

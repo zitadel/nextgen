@@ -9,7 +9,7 @@ export type ZitadelServer = z.infer<typeof serverSchema>;
 export const createProjectRequestSchema = z.object({
   preview_origins: z.array(z.string()).default([]),
   slug_preference: z.string().optional(),
-  client_metadata: z.record(z.unknown()).optional(),
+  client_metadata: z.record(z.string(), z.unknown()).optional(),
 });
 export type CreateProjectRequest = z.infer<typeof createProjectRequestSchema>;
 
@@ -31,7 +31,7 @@ const lifecycleSchema = z.enum(["pre-claim", "claimed", "unclaimed"]).transform(
 export const projectResponseSchema = z.object({
   project_id: z.string(),
   lifecycle: lifecycleSchema,
-  declared_issuers: z.record(z.unknown()).optional(),
+  declared_issuers: z.record(z.string(), z.unknown()).optional(),
   preview_origins: z.array(z.string()).default([]),
   team_id: z.string().optional(),
   created_at: z.string().optional(),
@@ -42,9 +42,9 @@ export const projectResponseSchema = z.object({
 export type GetProjectResponse = z.infer<typeof projectResponseSchema>;
 
 export const configUploadRequestSchema = z.object({
-  config: z.record(z.unknown()),
-  resources: z.record(z.record(z.unknown())).optional(),
-  templates: z.record(z.string()).optional(),
+  config: z.record(z.string(), z.unknown()),
+  resources: z.record(z.string(), z.record(z.string(), z.unknown())).optional(),
+  templates: z.record(z.string(), z.string()).optional(),
   hash: z.string(),
   schema_version: z.string().optional(),
   sdk_version: z.string().optional(),
@@ -111,6 +111,6 @@ export type ClaimStatusResponse = z.infer<typeof claimStatusResponseSchema>;
 export const capabilitiesResponseSchema = z.object({
   mode: z.enum(["mock", "cloud", "server"]),
   version: z.string(),
-  features: z.record(z.boolean()),
+  features: z.record(z.string(), z.boolean()),
 });
 export type CapabilitiesResponse = z.infer<typeof capabilitiesResponseSchema>;

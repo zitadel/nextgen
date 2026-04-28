@@ -401,7 +401,7 @@ function parseArgs(argv: string[], _io: CliIO): ParsedArgs {
 
     const isLong = arg.startsWith("--");
     const raw = isLong ? arg.slice(2) : arg.slice(1);
-    const [rawKey, inlineValue] = raw.split("=", 2);
+    const [rawKey = "", inlineValue] = raw.split("=", 2);
     const canonical = isLong ? toCamel(rawKey) : toCamel(shortFlags[rawKey] ?? rawKey);
     const next = argv[index + 1];
     const value =

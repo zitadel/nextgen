@@ -311,7 +311,8 @@ export function findEnvRefs(value: unknown): string[] {
   const visit = (node: unknown): void => {
     if (typeof node === "string") {
       for (const match of node.matchAll(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g)) {
-        refs.add(match[1]);
+        const ref = match[1];
+        if (ref) refs.add(ref);
       }
     } else if (Array.isArray(node)) {
       node.forEach(visit);

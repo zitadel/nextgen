@@ -15,8 +15,9 @@ export default defineConfig(() => ({
     },
   },
   test: {
-    name: "@zitadel-nextgen/components",
+    name: "@zitadel-nextgen/sdk-next",
     watch: false,
+    passWithNoTests: true,
     globals: true,
     environment: "node",
     include: ["src/**/*.spec.ts"],
