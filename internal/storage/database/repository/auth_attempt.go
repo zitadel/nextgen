@@ -45,9 +45,9 @@ const authAttemptCompleteStmt = `UPDATE zitadel_nextgen.auth_attempts SET comple
 	` WHERE project_id = $1 AND id = $2 RETURNING completed_at`
 
 // Complete implements [domain.AuthAttemptRepository].
-func (a *AuthAttempt) Complete(ctx context.Context, client database.QueryExecutor, check *domain.AuthAttempt) error {
-	return client.QueryRow(ctx, authAttemptCompleteStmt, check.ProjectID, check.ID).
-		Scan(&check.CompletedAt)
+func (a *AuthAttempt) Complete(ctx context.Context, client database.QueryExecutor, attempt *domain.AuthAttempt) error {
+	return client.QueryRow(ctx, authAttemptCompleteStmt, attempt.ProjectID, attempt.ID).
+		Scan(&attempt.CompletedAt)
 }
 
 const authAttemptCreateStmt = `WITH inserted_attempt AS (` +
@@ -60,8 +60,7 @@ const authAttemptCreateStmt = `WITH inserted_attempt AS (` +
 	` FROM inserted_attempt ia` +
 	` JOIN LATERAL jsonb_to_recordset(COALESCE($5::JSONB, '[]'::JSONB)) AS checks(type SMALLINT, challenge_payload JSONB, factor_payload JSONB) ON TRUE` +
 	` RETURNING type, initiated_at` +
-	`)` +
-	` SELECT ia.created_at, ic.type, ic.initiated_at` +
+	`) SELECT ia.created_at, ic.type, ic.initiated_at` +
 	` FROM inserted_attempt ia` +
 	` LEFT JOIN inserted_checks ic ON TRUE`
 
@@ -147,7 +146,7 @@ func (a *AuthAttempt) Delete(ctx context.Context, client database.QueryExecutor,
 const authAttemptGetStmt = `SELECT aa.project_id, aa.id, aa.required_checks, aa.created_at, aa.completed_at , aac.type,` +
 	` aac.initiated_at, aac.verified_at, aac.last_failed_at, aac.failure_count , aac.challenge_payload, aac.factor_payload` +
 	` FROM zitadel_nextgen.auth_attempts aa` +
-	` JOIN zitadel_nextgen.auth_attempt_checks aac ON aa.project_id = aac.project_id AND aa.id = aac.auth_attempt_id` +
+	` LEFT JOIN zitadel_nextgen.auth_attempt_checks aac ON aa.project_id = aac.project_id AND aa.id = aac.auth_attempt_id` +
 	` WHERE aa.project_id = $1 AND aa.id = $2`
 
 // Get implements [domain.AuthAttemptRepository].
@@ -160,15 +159,29 @@ func (a *AuthAttempt) Get(ctx context.Context, client database.QueryExecutor, pr
 	defer rows.Close()
 	for rows.Next() {
 		var (
-			check             domain.AuthCheck
+			checkType         database.Null[domain.AuthCheckType]
+			initiatedAt       database.Null[time.Time]
 			verifiedAt        database.Null[time.Time]
 			lastFailedAt      database.Null[time.Time]
+			failureCount      database.Null[uint16]
 			challenge, factor json.RawMessage
 		)
-		err = rows.Scan(&attempt.ProjectID, &attempt.ID, &attempt.RequiredChecks, &attempt.CreatedAt, &attempt.CompletedAt, &check.Type,
-			&check.InitiatedAt, &verifiedAt, &lastFailedAt, &check.FailureCount, &challenge, &factor)
+		err = rows.Scan(&attempt.ProjectID, &attempt.ID, &attempt.RequiredChecks, &attempt.CreatedAt, &attempt.CompletedAt, &checkType,
+			&initiatedAt, &verifiedAt, &lastFailedAt, &failureCount, &challenge, &factor)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan auth attempt: %w", err)
+		}
+
+		if !checkType.Valid {
+			continue
+		}
+
+		check := domain.AuthCheck{Type: checkType.V}
+		if initiatedAt.Valid {
+			check.InitiatedAt = initiatedAt.V
+		}
+		if failureCount.Valid {
+			check.FailureCount = failureCount.V
 		}
 		if verifiedAt.Valid {
 			check.VerifiedAt = verifiedAt.V

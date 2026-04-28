@@ -21,9 +21,9 @@ type AuthAttempt struct {
 	Checks         []AuthChecker
 	RequiredChecks []AuthCheckType
 
-	// The time when the auth attempt was created, it must be set by the storage and is ready only.
+	// The time when the auth attempt was created, it must be set by the storage and is read only.
 	CreatedAt time.Time
-	// The time when the auth attempt was completed, it must be set by the storage and is ready only. An auth attempt is completed when all required checks are verified successfully.
+	// The time when the auth attempt was completed, it must be set by the storage and is read only. An auth attempt is completed when all required checks are verified successfully.
 	CompletedAt *time.Time
 
 	// TTL describes how long an auth attempt is valid, it should be set to a reasonable value (e.g. 5 minutes) to prevent abuse and to ensure that old auth attempts are cleaned up.

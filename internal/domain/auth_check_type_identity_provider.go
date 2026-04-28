@@ -1,12 +1,12 @@
 package domain
 
-type AuthAttemptCheckIdentityProvider struct {
+type IdentityProviderAuthCheck struct {
 	*AuthCheck
 }
 
 // Check implements [AuthChecker].
-func (a *AuthAttemptCheckIdentityProvider) Check() *AuthCheck {
+func (a *IdentityProviderAuthCheck) Check() *AuthCheck {
 	return a.AuthCheck
 }
 
-var _ AuthChecker = (*AuthAttemptCheckIdentityProvider)(nil)
+var _ AuthChecker = (*IdentityProviderAuthCheck)(nil)

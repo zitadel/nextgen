@@ -34,9 +34,7 @@ func TestAuthAttempt_Create(t *testing.T) {
 		assertStored  func(t *testing.T, stored *domain.AuthAttempt)
 	}{
 		{
-			// The attempt row is written but Get uses INNER JOIN with checks,
-			// so an attempt with no checks returns an empty result.
-			name: "no checks — created_at is set; Get returns empty due to inner join",
+			name: "no checks — Get returns the attempt with empty checks",
 			attempt: &domain.AuthAttempt{
 				ProjectID: "p",
 				ID:        "a",
@@ -45,7 +43,10 @@ func TestAuthAttempt_Create(t *testing.T) {
 				require.False(t, attempt.CreatedAt.IsZero())
 			},
 			assertStored: func(t *testing.T, stored *domain.AuthAttempt) {
-				require.Empty(t, stored.ID)
+				require.Equal(t, "p", stored.ProjectID)
+				require.Equal(t, "a", stored.ID)
+				require.Empty(t, stored.Checks)
+				require.False(t, stored.CreatedAt.IsZero())
 			},
 		},
 		{
@@ -195,6 +196,56 @@ func TestAuthAttempt_Create(t *testing.T) {
 		err := repo.Create(t.Context(), sp, &domain.AuthAttempt{ProjectID: "p-dup", ID: "a-dup"})
 		spRollback()
 		require.Error(t, err)
+	})
+}
+
+func TestAuthAttempt_Get(t *testing.T) {
+	repo := new(repository.AuthAttempt)
+
+	t.Run("returns attempt without checks", func(t *testing.T) {
+		tx, rollback := transactionForRollback(t)
+		defer rollback()
+
+		attempt := &domain.AuthAttempt{
+			ProjectID: "p-get-no-checks",
+			ID:        "a-get-no-checks",
+		}
+		require.NoError(t, repo.Create(t.Context(), tx, attempt))
+
+		stored, err := repo.Get(t.Context(), tx, attempt.ProjectID, attempt.ID)
+		require.NoError(t, err)
+		require.Equal(t, attempt.ProjectID, stored.ProjectID)
+		require.Equal(t, attempt.ID, stored.ID)
+		require.False(t, stored.CreatedAt.IsZero())
+		require.Empty(t, stored.Checks)
+	})
+
+	t.Run("returns attempt with checks", func(t *testing.T) {
+		tx, rollback := transactionForRollback(t)
+		defer rollback()
+
+		created, _ := newTestAttempt(t, repo, tx, "p-get-with-checks", "a-get-with-checks")
+
+		stored, err := repo.Get(t.Context(), tx, created.ProjectID, created.ID)
+		require.NoError(t, err)
+		require.Equal(t, created.ProjectID, stored.ProjectID)
+		require.Equal(t, created.ID, stored.ID)
+		require.Equal(t, created.RequiredChecks, stored.RequiredChecks)
+		require.Len(t, stored.Checks, 1)
+		storedCheck, ok := stored.CheckByType(domain.AuthCheckTypePassword)
+		require.True(t, ok)
+		require.False(t, storedCheck.Check().InitiatedAt.IsZero())
+	})
+
+	t.Run("missing attempt returns empty aggregate", func(t *testing.T) {
+		tx, rollback := transactionForRollback(t)
+		defer rollback()
+
+		stored, err := repo.Get(t.Context(), tx, "project-missing", "attempt-missing")
+		require.NoError(t, err)
+		require.Empty(t, stored.ID)
+		require.Empty(t, stored.ProjectID)
+		require.Empty(t, stored.Checks)
 	})
 }
 

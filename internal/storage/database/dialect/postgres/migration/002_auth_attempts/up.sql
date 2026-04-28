@@ -25,7 +25,7 @@ CREATE TABLE zitadel_nextgen.auth_attempt_checks (
     , verified_at TIMESTAMPTZ
     -- failure time, it is set when the challenge or factor is verified unsuccessfully
     , last_failed_at TIMESTAMPTZ
-    -- failure count, it is incremented when the challenge or factor is verified unsuccessfully, it is reset to 0 when the challenge or factor is verified successfully
+    -- failure count, it is incremented when the challenge or factor is verified unsuccessfully; successful verification does not reset it automatically
     , failure_count SMALLINT NOT NULL DEFAULT 0 CHECK (failure_count >= 0)
 
     -- payload field for the challenge, it can be used to store the necessary information for the challenge (e.g. the totp secret, hash of otp code, etc.)

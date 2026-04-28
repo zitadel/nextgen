@@ -7,8 +7,8 @@ type Session struct {
 	// ID is the unique identifier for the session within the project and user.
 	ID string
 
-	// UserID links to the [User] the session belongs to.
-	// A session always belongs to a user, but a user may have multiple sessions (e.g. from different devices or browsers).
+	// UserID links to the [User] the session belongs to once associated.
+	// A user may have multiple sessions (e.g. from different devices or browsers), and UserID may be nil during some lifecycle stages.
 	UserID *string
 
 	// AuthAttempts are deleted as soon as they are handed off to a session and are therefore not accessible on a session.
