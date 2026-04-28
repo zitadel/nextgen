@@ -6,8 +6,9 @@
       "default",
       "!{projectRoot}/**/*.spec.ts",
       "!{projectRoot}/**/*.spec.tsx",
+      "!{projectRoot}/**/*.test.ts",
       "!{projectRoot}/tsconfig.spec.json",
-      "!{projectRoot}/vitest.config.mts"
+      "!{projectRoot}/vitest.config.ts"
     ],
     "sharedGlobals": [
       "{workspaceRoot}/pnpm-lock.yaml",

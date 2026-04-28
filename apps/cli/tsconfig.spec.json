@@ -8,7 +8,7 @@
   },
   "include": [
     "vitest.config.ts",
-    "tsup.config.ts",
+    "tsdown.config.ts",
     "src/**/*.spec.ts",
     "scripts/**/*.ts",
     "tests/**/*.ts"

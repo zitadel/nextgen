@@ -43,8 +43,8 @@ catalog:
   sharp: ^0.34.5
   tailwindcss: ^4.2.4
   ts-lit-plugin: ^2.0.2
+  tsdown: ^0.21.10
   tslib: ^2.8.1
-  tsup: ^8.5.1
   tsx: ^4.21.0
   typescript: ^6.0.3
   vite: ^8.0.9

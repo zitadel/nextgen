@@ -19,7 +19,7 @@ export const createProjectResponseSchema = z.object({
   preview_secret: z.string(),
   preview_origins: z.array(z.string()),
   created_at: z.string(),
-  scratch_dashboard_url: z.string().url(),
+  scratch_dashboard_url: z.url(),
   schema_version: z.number().default(2),
 });
 export type CreateProjectResponse = z.infer<typeof createProjectResponseSchema>;

@@ -4,16 +4,16 @@ titleOnly: true
 # Allowed types — the PR title type must be one of these.
 # This list is the single source of truth referenced by AGENTS.md and CONTRIBUTING.md.
 types:
-  - feat      # new feature
-  - fix       # bug fix
-  - docs      # documentation only (no code change)
-  - refactor  # code restructuring without behaviour change
-  - perf      # performance improvement
-  - test      # adding or fixing tests
-  - build     # build system or tooling
-  - ci        # CI/CD pipeline
-  - chore     # maintenance (deps, config, etc.)
-  - revert    # reverts a previous commit
+  - feat # new feature
+  - fix # bug fix
+  - docs # documentation only (no code change)
+  - refactor # code restructuring without behaviour change
+  - perf # performance improvement
+  - test # adding or fixing tests
+  - build # build system or tooling
+  - ci # CI/CD pipeline
+  - chore # maintenance (deps, config, etc.)
+  - revert # reverts a previous commit
 
 # Allowed scopes — if a scope is provided it must match one of these.
 # Scopes are optional; omit rather than invent one not on this list.

@@ -13,7 +13,7 @@
     "directory": "apps/cli"
   },
   "bin": {
-    "zitadel": "dist/zitadel.js"
+    "zitadel": "dist/zitadel.mjs"
   },
   "files": [
     "dist",
@@ -21,7 +21,7 @@
   ],
   "type": "module",
   "scripts": {
-    "build": "tsup && tsx scripts/gen-agents-md.ts",
+    "build": "tsdown",
     "gen:agents-md": "tsx scripts/gen-agents-md.ts"
   },
   "dependencies": {
@@ -32,7 +32,34 @@
   },
   "devDependencies": {
     "@zitadel-nextgen/sdk-next": "workspace:*",
-    "tsup": "catalog:",
+    "tsdown": "^0.21.10",
     "tsx": "catalog:"
+  },
+  "nx": {
+    "targets": {
+      "build": {
+        "options": {
+          "cache": true
+        },
+        "inputs": [
+          "production",
+          "^production",
+          {
+            "externalDependencies": [
+              "tsdown"
+            ]
+          }
+        ],
+        "outputs": [
+          "{projectRoot}/dist/**/*.mjs",
+          "{projectRoot}/dist/**/*.mjs.map"
+        ],
+        "dependsOn": [
+          "^build",
+          "^typecheck",
+          "gen:agents-md"
+        ]
+      }
+    }
   }
 }
