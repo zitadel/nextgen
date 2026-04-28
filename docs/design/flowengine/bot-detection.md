@@ -12,7 +12,7 @@ Bot detection is a **first-class, composable subsystem** — not an afterthought
 2. **Pluggable providers.** Admins can configure third-party captcha services (reCAPTCHA, hCaptcha, Cloudflare Turnstile) via `x-captcha.provider`. The captcha interface is provider-agnostic.
 3. **Composable signals.** Captcha is one of several signals. The risk evaluator fuses them into a single `RiskResult`.
 4. **Risk-based activation.** Captcha is not always-on. The policy engine decides when to require it.
-5. **Works in both paths.** Flow engine injects captcha steps dynamically. Session API includes `captcha` in `need[]` when risk evaluation demands it.
+5. **Works in both paths.** Flow engine injects captcha steps dynamically, and direct clients can request/verify captcha through `auth_attempts`.
 
 ## Signal Architecture
 
@@ -87,7 +87,7 @@ Admins can configure external captcha services when they need ML-based detection
 | **hCaptcha** | `hcaptcha` | Same flow as reCAPTCHA, verified via hCaptcha API |
 | **Cloudflare Turnstile** | `turnstile` | Invisible or managed challenge → token submitted → server verifies via Cloudflare API |
 
-Third-party providers require configuration (site key, secret key) at the instance or organization level. The captcha step in the flow response includes provider-specific config so the frontend knows which widget to render:
+Third-party providers require configuration (site key, secret key) at the project or team level. The captcha step in the flow response includes provider-specific config so the frontend knows which widget to render:
 
 ```json
 {
@@ -145,7 +145,7 @@ Captcha is configured per flow via `x-captcha` in the flow definition or schema:
 Browser fingerprinting collects device signals for risk correlation. It does not block — it feeds the risk evaluator.
 
 - **Provider:** ThumbmarkJS (open-source, self-hosted) with fallback to a minimal built-in collector.
-- **Collection:** Flow engine emits a fingerprint collection action. Frontend submits via `POST /v1/flows/{session_id}/event`.
+- **Collection:** Flow engine emits a fingerprint collection action. Frontend submits via `POST /flows/{session_id}/event`.
 - **Persistence:** Fingerprint hash stored on the session. Repeat visitors with the same fingerprint on the same user are lower risk.
 
 ## Behavioral Telemetry
@@ -157,7 +157,7 @@ Browser fingerprinting collects device signals for risk correlation. It does not
 | Time on step | Step transition timestamps | Bots complete forms in <100ms |
 | Copy/paste of credentials | Event endpoint | Unusual for real users on password fields |
 
-Signals are submitted via `POST /v1/flows/{session_id}/event`. They are **observation-only** — never blocking on their own.
+Signals are submitted via `POST /flows/{session_id}/event`. They are **observation-only** — never blocking on their own.
 
 ## Rate Limiting
 
@@ -187,17 +187,17 @@ Three modes:
 
 3. **Invisible assessment** — a `policy_check` step evaluates risk. Low score → skip. High score → inject captcha.
 
-## Integration: Session API
+## Integration: Policy + auth_attempts
 
-When the risk evaluator flags a session, the policy engine adds `captcha` to the `need[]` array. The captcha factor does not affect the session's `acr` — it is a bot-detection gate, not an authentication factor.
+When risk is elevated, the policy engine requires captcha before flow completion. The captcha signal does not raise session `assurance_levels[]` — it is a bot-defense gate, not an assurance factor.
 
-The client:
-1. Sees `"captcha"` in `need[]`
-2. Requests a challenge: `POST /v1/sessions/{id}/challenge { "type": "captcha" }`
-3. Solves the challenge client-side (widget or PoW depending on configured provider)
-4. Submits the proof: `PATCH /v1/sessions/{id} { "captcha": { ... } }`
+The client path is:
+1. Policy/flow indicates captcha is required
+2. Client obtains captcha challenge through the current `auth_attempt`
+3. Client solves the challenge (widget or PoW depending on provider)
+4. Client submits captcha proof via the current `auth_attempt`
 
-Captcha is a standard factor — no special-case API.
+Sessions remain read-oriented; they are not directly mutated for captcha handling.
 
 ## Risk Evaluation Event
 

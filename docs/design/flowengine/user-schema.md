@@ -16,7 +16,7 @@ What matters here is the contract: which schema annotations exist, how the flow 
 | `x-mfa: "sms"` | Field | Policy Engine | Field can be used for OTP delivery |
 | `x-sensitive: true` | Field | Flow Engine | Value redacted in audit events |
 | `x-editable: true` | Field | Flow Engine | Field appears in profiling / self-service flows |
-| `x-unique: "instance"` | Field | Flow Engine | Server validates uniqueness on form submit |
+| `x-unique: "project"` | Field | Flow Engine | Server validates uniqueness on form submit (per-project scope) |
 | `x-claim: "claims.email"` | Field | Flow Engine | Maps to SSO/OIDC claim for auto-population |
 | `x-auth-methods` | Schema | Policy Engine | Which auth methods this user type supports (narrows what policy can require) |
 
@@ -30,11 +30,11 @@ Defines fields:                 References fields:                Reads schema a
          x-verify: email)          [email, given_name]               narrows available factors
   phone (x-mfa: sms)             form step: show
   given_name                       [password]                     Reads user context:
-  family_name                    form step: show                    user.roles, user.org →
-  password                         [phone] (skippable)              determines acr level
+  family_name                    form step: show                    user.roles, user.team →
+  password                         [phone] (skippable)              determines assurance level
   x-auth-methods:
     password: enabled            Builds UINodes from               Returns decision:
-    passkey: enabled               schema field metadata             acr, need[]
+    passkey: enabled               schema field metadata             assurance_levels decision
     sso: enabled
 ```
 
@@ -63,7 +63,7 @@ The following is an example user schema showing the annotations that the flow en
       "title": "Email address",
       "x-identifier": true,
       "x-verify": "email",
-      "x-unique": "instance",
+      "x-unique": "project",
       "x-claim": "claims.email",
       "x-editable": true
     },
