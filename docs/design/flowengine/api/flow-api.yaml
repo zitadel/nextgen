@@ -485,6 +485,24 @@ components:
           items:
             $ref: "#/components/schemas/SSOProvider"
           default: []
+        messages:
+          type: array
+          description: Informational messages for this step (e.g., "Check your email").
+          items:
+            $ref: "#/components/schemas/FlowMessage"
+          default: []
+        errors:
+          type: array
+          description: Step-level errors from a previous failed submission or server-side validation.
+          items:
+            $ref: "#/components/schemas/FlowError"
+          default: []
+        identity:
+          $ref: "#/components/schemas/FlowIdentity"
+          nullable: true
+          description: |
+            Partial identity context when the user has been identified but the flow
+            is not yet complete (e.g., display_name, avatar for the password step).
 
     StepTexts:
       type: object
@@ -521,6 +539,12 @@ components:
           default: false
         value:
           description: Pre-filled value (e.g., email carried over from a pivot)
+        autocomplete:
+          type: string
+          description: |
+            HTML autocomplete hint (e.g., "username", "current-password",
+            "username webauthn" for conditional passkey UI).
+          example: username
         validation:
           type: object
           properties:
@@ -593,6 +617,53 @@ components:
           type: string
           description: Template hint for rendering (logo, colors)
           example: google
+
+    FlowMessage:
+      type: object
+      required: [text_key, severity]
+      description: An informational message displayed on the step (e.g., "Check your email").
+      properties:
+        text_key:
+          type: string
+          description: Localization key for the message text
+          example: verification.message.check_email
+        severity:
+          type: string
+          enum: [info, success, warning]
+          default: info
+
+    FlowError:
+      type: object
+      required: [text_key]
+      description: A step-level error from validation or server-side processing.
+      properties:
+        text_key:
+          type: string
+          description: Localization key for the error message
+          example: identifier.error.user_not_found
+        field:
+          type: string
+          description: |
+            If the error is tied to a specific field, this matches the field's
+            dictionary key. Null for step-level errors.
+          nullable: true
+
+    FlowIdentity:
+      type: object
+      description: |
+        Partial identity context available after the user has been identified.
+        Used by templates to personalize subsequent steps (e.g., show avatar on password screen).
+      properties:
+        display_name:
+          type: string
+          example: Alice
+        login_name:
+          type: string
+          example: alice@acme.com
+        avatar_url:
+          type: string
+          format: uri
+          nullable: true
 
     Branding:
       type: object

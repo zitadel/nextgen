@@ -37,6 +37,10 @@ Agents do not claim projects. `zitadel claim` returns a human `claim_url`; after
 
 Generated routes use `ZitadelFlow({ purpose, projectId, issuer, environment })` so the future `<zitadel-flow>` web component can replace the React shim without changing the app-level contract.
 
+## CLI vs. Runtime API
+
+This CLI manages the dev-owned shape of a Zitadel deployment: default IdPs, app definitions, schemas, flows, locales, templates. For per-customer-org configuration (e.g. a B2B customer's own SSO), end-user CRUD, or any unbounded set, route to the runtime Admin/Org API instead — not `zitadel` commands or `.zitadel/` files. Subordinate config (claim mappings, redirect URIs, role bindings) lives wherever its parent resource lives. See `docs/design/cli/README.md` § *What lives in `.zitadel/`* for the ownership rule and the resource-by-resource split.
+
 <!-- generated:capabilities:begin -->
 
 Envelope schema version: `1`. Every envelope carries `cli_version`, `command`, `source` at the top level.
