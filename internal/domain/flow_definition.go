@@ -12,31 +12,33 @@ const (
 	FlowDefinitionStatusArchived
 )
 
-type FlowDefinitionPurpose string
+//go:generate enumer -type FlowDefinitionPurpose -transform snake -trimprefix FlowDefinitionPurpose -sql
+type FlowDefinitionPurpose uint8
 
 const (
-	FlowDefinitionPurposeLogin       FlowDefinitionPurpose = "login"
-	FlowDefinitionPurposeRegister    FlowDefinitionPurpose = "register"
-	FlowDefinitionPurposeRecovery    FlowDefinitionPurpose = "recovery"
-	FlowDefinitionPurposeProfiling   FlowDefinitionPurpose = "profiling"
-	FlowDefinitionPurposeReauth      FlowDefinitionPurpose = "reauth"
-	FlowDefinitionPurposeLinkAccount FlowDefinitionPurpose = "link_account"
+	FlowDefinitionPurposeLogin FlowDefinitionPurpose = iota
+	FlowDefinitionPurposeRegister
+	FlowDefinitionPurposeRecovery
+	FlowDefinitionPurposeProfiling
+	FlowDefinitionPurposeReauth
+	FlowDefinitionPurposeLinkAccount
 )
 
-type FlowStepType string
+//go:generate enumer -type FlowStepType -transform snake -trimprefix FlowStepType -sql
+type FlowStepType uint8
 
 const (
-	FlowStepTypeIdentifier   FlowStepType = "identifier"
-	FlowStepTypeCredential   FlowStepType = "credential"
-	FlowStepTypeForm         FlowStepType = "form"
-	FlowStepTypeVerification FlowStepType = "verification"
-	FlowStepTypePolicyCheck  FlowStepType = "policy_check"
-	FlowStepTypeAction       FlowStepType = "action"
-	FlowStepTypeConsent      FlowStepType = "consent"
-	FlowStepTypeCaptcha      FlowStepType = "captcha"
-	FlowStepTypeRedirect     FlowStepType = "redirect"
-	FlowStepTypeInfo         FlowStepType = "info"
-	FlowStepTypeComplete     FlowStepType = "complete"
+	FlowStepTypeIdentifier FlowStepType = iota
+	FlowStepTypeCredential
+	FlowStepTypeForm
+	FlowStepTypeVerification
+	FlowStepTypePolicyCheck
+	FlowStepTypeAction
+	FlowStepTypeConsent
+	FlowStepTypeCaptcha
+	FlowStepTypeRedirect
+	FlowStepTypeInfo
+	FlowStepTypeComplete
 )
 
 // FlowDefinition is a customer-configured directed graph of authentication steps.
