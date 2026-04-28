@@ -62,7 +62,7 @@ paths:
       description: Returns the current capability step without advancing the state machine.
       tags: [Flows]
       security:
-        - flowToken: []
+        - sessionToken: []
       responses:
         "200":
           description: Current step
@@ -337,10 +337,10 @@ components:
         example: flow_enterprise
 
   securitySchemes:
-    flowToken:
+    sessionToken:
       type: http
       scheme: bearer
-      description: Flow token returned on flow creation or last submit. Rotates on every response.
+      description: Session token returned on flow creation or last submit. Rotates on every response.
 
   schemas:
     # ── Flow runtime schemas ────────────────────────────────────
@@ -385,25 +385,17 @@ components:
 
     FlowResponse:
       type: object
-      required: [flow_id, flow_token, step]
+      required: [session_id, session_token, step]
       properties:
-        flow_id:
+        session_id:
           type: string
-          description: Flow instance ID. Used in the URL path for subsequent requests.
-          example: flow_abc
-        flow_token:
+          description: Session ID. Also used as the flow handle in URL paths.
+          example: sess_xyz
+        session_token:
           type: string
           description: |
             Short-lived token for the next request. Rotates on every response
             (anti-replay). Sent as `Authorization: Bearer` header.
-        session_id:
-          type: string
-          description: |
-            The underlying session being built by this flow. Available after
-            the user has been identified. Useful for session introspection
-            after flow completion.
-          nullable: true
-          example: sess_xyz
         step:
           $ref: "#/components/schemas/FlowStep"
         branding:

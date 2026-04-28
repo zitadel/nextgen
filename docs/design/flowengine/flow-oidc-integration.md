@@ -103,7 +103,7 @@ const flow = await auth.flow.create({ purpose: 'login', authRequestId });
 // flow.step.fields → { identifier: { type: 'email', ... } }
 
 // 4. Submit user input
-const next = await auth.flow.submit(flow.flowId, {
+const next = await auth.flow.submit(flow.sessionId, {
   action: 'submit',
   fields: { identifier: 'alice@acme.com' },
 });
@@ -247,14 +247,14 @@ if (step.type === 'complete' && step.behavior === 'redirect') {
 let step = await auth.flow.create({ purpose: 'login', authRequestId });
 // step.fields = { identifier: { type: 'email' } }
 
-step = await auth.flow.submit(step.flowId, {
+step = await auth.flow.submit(step.sessionId, {
   action: 'submit',
   fields: { identifier: 'alice@acme.com' },
 });
 
 // Step 2: Password
 // step.fields = { password: { type: 'password' } }
-step = await auth.flow.submit(step.flowId, {
+step = await auth.flow.submit(step.sessionId, {
   action: 'submit',
   fields: { password: 'correct-horse-battery-staple' },
 });
@@ -274,7 +274,7 @@ let step = await auth.flow.create({ purpose: 'login', authRequestId });
 // step.sso_providers = [{ id: 'google-1', name: 'Google', template: 'google' }]
 
 // User chooses SSO
-step = await auth.flow.submit(step.flowId, {
+step = await auth.flow.submit(step.sessionId, {
   action: 'sso',
   sso_provider_id: 'google-1',
 });
@@ -304,7 +304,7 @@ const assertion = await navigator.credentials.get({
 });
 
 // Submit with gate proof — skips identifier + password entirely
-step = await auth.flow.submit(step.flowId, {
+step = await auth.flow.submit(step.sessionId, {
   action: 'submit',
   fields: {},
   gate_proofs: { passkey: JSON.stringify(assertion) },
@@ -325,7 +325,7 @@ const assertion = await navigator.credentials.get({
   publicKey: step.gates.passkey.config,
 });
 
-step = await auth.flow.submit(step.flowId, {
+step = await auth.flow.submit(step.sessionId, {
   action: 'submit',
   fields: {},
   gate_proofs: { passkey: JSON.stringify(assertion) },
