@@ -1,8 +1,10 @@
-CREATE TABLE zitadel_nextgen.users(
-    instance_id TEXT NOT NULL
-    , id TEXT NOT NULL CHECK (id <> '')
-    , schema_url TEXT NOT NULL CHECK (schema <> '')
-    , data_blob JSONB
+CREATE SCHEMA IF NOT EXISTS zitadel_nextgen;
 
-    , PRIMARY KEY (instance_id, id)
-);
+-- CREATE TABLE zitadel_nextgen.users(
+--     instance_id TEXT NOT NULL
+--     , id TEXT NOT NULL CHECK (id <> '')
+--     , schema_url TEXT NOT NULL CHECK (schema <> '')
+--     , data_blob JSONB
+
+--     , PRIMARY KEY (instance_id, id)
+-- );

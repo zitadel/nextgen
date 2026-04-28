@@ -9,9 +9,7 @@ type Session struct {
 
 	// UserID links to the [User] the session belongs to.
 	// A session always belongs to a user, but a user may have multiple sessions (e.g. from different devices or browsers).
-	UserID string
+	UserID *string
 
-	// Multiple AuthAttempts can be handed off to a session, but a session can only be created after the first AuthAttempt is completed.
-	// This means that the first AuthAttempt is always the one that creates the session, and any subsequent AuthAttempts are handed off to the existing session.
-	AuthAttempts []*AuthAttempt
+	// AuthAttempts are deleted as soon as they are handed off to a session and are therefore not accessible on a session.
 }
