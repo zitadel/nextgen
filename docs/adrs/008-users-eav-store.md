@@ -1,6 +1,6 @@
 # ADR 008: Scalable EAV Storage for User Attributes
 
-> **Status:** Proposed
+> **Status:** Implemented
 > **Date:** 2026-04-26
 > **Context:** Local Zitadel project configuration
 
