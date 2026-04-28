@@ -51,6 +51,25 @@ func (u *User) MarshalJSON() ([]byte, error) {
 
 }
 
+type UpdateUserResult struct {
+	User
+	DeletedAttributes  int64
+	UpsertedAttributes int64
+}
+
+func (u *UpdateUserResult) MarshalJSON() ([]byte, error) {
+	userJSON, err := u.User.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	output := map[string]any{
+		"user":                json.RawMessage(userJSON),
+		"deleted_attributes":  u.DeletedAttributes,
+		"upserted_attributes": u.UpsertedAttributes,
+	}
+	return json.Marshal(output)
+}
+
 func GetUserByID(ctx context.Context, instanceID, id string) (*User, error) {
 	rows, _ := conn.Query(ctx, getUserByIdStmt, instanceID, id)
 	user, err := pgx.CollectExactlyOneRow(rows, pgx.RowToAddrOfStructByPos[User])
@@ -127,9 +146,9 @@ func CreateUser(ctx context.Context, instanceID string, u *IncomingUser) (*User,
 	return user, nil
 }
 
-func PutUser(ctx context.Context, instanceID, userID string, attributes []IncomingUserAttribute) (*User, error) {
+func PutUser(ctx context.Context, instanceID, userID string, attributes []IncomingUserAttribute) (*UpdateUserResult, error) {
 	rows, _ := conn.Query(ctx, putUserStmt, instanceID, userID, attributes)
-	user, err := pgx.CollectExactlyOneRow(rows, pgx.RowToAddrOfStructByPos[User])
+	user, err := pgx.CollectExactlyOneRow(rows, pgx.RowToAddrOfStructByPos[UpdateUserResult])
 	if err != nil {
 		return nil, fmt.Errorf("failed to put user: %w", err)
 	}

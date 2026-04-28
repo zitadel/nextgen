@@ -118,7 +118,7 @@ func runCreateUser() {
 	if err != nil {
 		panic(err)
 	}
-	printUser(user)
+	printResult(user)
 }
 
 func runGetUserByID() {
@@ -129,7 +129,7 @@ func runGetUserByID() {
 	if err != nil {
 		panic(err)
 	}
-	printUser(user)
+	printResult(user)
 }
 
 func runPutUser() {
@@ -168,11 +168,11 @@ func runPutUser() {
 		panic(err)
 	}
 
-	user, err := PutUser(ctx, "inst_5", "usr_00501017", attributes)
+	result, err := PutUser(ctx, "inst_5", "usr_00501017", attributes)
 	if err != nil {
 		panic(err)
 	}
-	printUser(user)
+	printResult(result)
 }
 
 func runPatchUser() {
@@ -207,11 +207,11 @@ func runPatchUser() {
 	if err != nil {
 		panic(err)
 	}
-	printUser(user)
+	printResult(user)
 }
 
-func printUser(user *User) {
+func printResult(result any) {
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
-	enc.Encode(user)
+	enc.Encode(result)
 }

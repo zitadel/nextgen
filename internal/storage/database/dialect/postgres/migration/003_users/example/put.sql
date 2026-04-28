@@ -101,6 +101,7 @@ WITH _header AS (
             FROM _input_data d
             WHERE d.key = ua.key
         )
+    RETURNING ua.key
 )
 , _ins_attrs AS (
     INSERT INTO zitadel_nextgen.user_attributes (
@@ -140,6 +141,15 @@ WITH _header AS (
         , organization_id = EXCLUDED.organization_id
     WHERE zitadel_nextgen.user_attributes.value IS DISTINCT FROM EXCLUDED.value
        OR zitadel_nextgen.user_attributes.organization_id IS DISTINCT FROM EXCLUDED.organization_id
+    RETURNING key
+)
+, _del_attrs_count AS (
+    SELECT count(*)::bigint AS deleted_attributes
+    FROM _del_attrs
+)
+, _upsert_attrs_count AS (
+    SELECT count(*)::bigint AS upserted_attributes
+    FROM _ins_attrs
 )
 SELECT
     h.schema_url
@@ -151,7 +161,11 @@ SELECT
         SELECT array_agg(ROW(d.key, d.value))
         FROM _input_data d
     ) AS attributes
-FROM _header h;
+    , dac.deleted_attributes
+    , uac.upserted_attributes
+FROM _header h
+CROSS JOIN _del_attrs_count dac
+CROSS JOIN _upsert_attrs_count uac;
 
 /*
 EXECUTE put_user(
