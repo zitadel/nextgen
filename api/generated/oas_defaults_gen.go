@@ -21,3 +21,23 @@ func (s *OpenidConfiguration) setDefaults() {
 		s.RequireRequestURIRegistration.SetTo(val)
 	}
 }
+
+// setDefaults set default value of fields.
+func (s *UserProperty) setDefaults() {
+	{
+		val := bool(false)
+		s.XMinusIdentifier.SetTo(val)
+	}
+	{
+		val := bool(true)
+		s.XMinusEditable.SetTo(val)
+	}
+	{
+		val := bool(false)
+		s.XMinusSensitive.SetTo(val)
+	}
+	{
+		val := bool(false)
+		s.XMinusMfa.SetTo(val)
+	}
+}

@@ -3,14 +3,44 @@
 package api
 
 import (
+	"bytes"
 	"net/http"
 	"strings"
 
 	"github.com/go-faster/errors"
+	"github.com/go-faster/jx"
 	"github.com/ogen-go/ogen/conv"
 	ht "github.com/ogen-go/ogen/http"
 	"github.com/ogen-go/ogen/uri"
 )
+
+func encodeCreateSchemaRequest(
+	req CreateSchemaReq,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeCreateSchemaRevisionRequest(
+	req CreateSchemaRevisionReq,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
 
 func encodeGetTokenRequest(
 	req *PostTokenRequest,
@@ -237,5 +267,19 @@ func encodeRevokeTokenRequest(
 	}
 	encoded := q.Values().Encode()
 	ht.SetBody(r, strings.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeUpdateSchemaReleaseStateRequest(
+	req SchemaReleaseState,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
 	return nil
 }

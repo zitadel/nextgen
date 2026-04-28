@@ -14,22 +14,38 @@ var (
 	rn3AllowedHeaders = map[string]string{
 		"GET": "Authorization",
 	}
-	rn4AllowedHeaders = map[string]string{
+	rn9AllowedHeaders = map[string]string{
 		"GET": "Authorization",
 	}
-	rn13AllowedHeaders = map[string]string{
+	rn20AllowedHeaders = map[string]string{
 		"POST": "Authorization,Content-Type",
 	}
-	rn15AllowedHeaders = map[string]string{
+	rn22AllowedHeaders = map[string]string{
 		"POST": "Authorization,Content-Type",
 	}
-	rn11AllowedHeaders = map[string]string{
+	rn18AllowedHeaders = map[string]string{
 		"POST": "Authorization,Content-Type",
 	}
-	rn12AllowedHeaders = map[string]string{
+	rn19AllowedHeaders = map[string]string{
 		"GET": "Authorization",
 	}
-	rn14AllowedHeaders = map[string]string{
+	rn5AllowedHeaders = map[string]string{
+		"POST": "Authorization,Content-Type",
+	}
+	rn7AllowedHeaders = map[string]string{
+		"GET": "Authorization",
+	}
+	rn8AllowedHeaders = map[string]string{
+		"POST": "Authorization,Content-Type",
+	}
+	rn16AllowedHeaders = map[string]string{
+		"GET": "Authorization",
+	}
+	rn17AllowedHeaders = map[string]string{
+		"GET": "Authorization",
+		"PUT": "Authorization,Content-Type",
+	}
+	rn21AllowedHeaders = map[string]string{
 		"GET": "Authorization",
 	}
 )
@@ -64,6 +80,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.notFound(w, r)
 		return
 	}
+	args := [2]string{}
 
 	// Static code generated router with unwrapped path search.
 	switch {
@@ -187,7 +204,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 						default:
 							s.notAllowed(w, r, notAllowedParams{
 								allowedMethods: "GET",
-								allowedHeaders: rn4AllowedHeaders,
+								allowedHeaders: rn9AllowedHeaders,
 								acceptPost:     "",
 								acceptPatch:    "",
 							})
@@ -212,7 +229,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 						default:
 							s.notAllowed(w, r, notAllowedParams{
 								allowedMethods: "POST",
-								allowedHeaders: rn13AllowedHeaders,
+								allowedHeaders: rn20AllowedHeaders,
 								acceptPost:     "application/x-www-form-urlencoded",
 								acceptPatch:    "",
 							})
@@ -262,7 +279,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 						default:
 							s.notAllowed(w, r, notAllowedParams{
 								allowedMethods: "POST",
-								allowedHeaders: rn15AllowedHeaders,
+								allowedHeaders: rn22AllowedHeaders,
 								acceptPost:     "application/x-www-form-urlencoded",
 								acceptPatch:    "",
 							})
@@ -287,7 +304,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 						default:
 							s.notAllowed(w, r, notAllowedParams{
 								allowedMethods: "POST",
-								allowedHeaders: rn11AllowedHeaders,
+								allowedHeaders: rn18AllowedHeaders,
 								acceptPost:     "application/x-www-form-urlencoded",
 								acceptPatch:    "",
 							})
@@ -312,7 +329,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 						default:
 							s.notAllowed(w, r, notAllowedParams{
 								allowedMethods: "GET",
-								allowedHeaders: rn12AllowedHeaders,
+								allowedHeaders: rn19AllowedHeaders,
 								acceptPost:     "",
 								acceptPatch:    "",
 							})
@@ -398,6 +415,168 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 
+			case 's': // Prefix: "schemas"
+
+				if l := len("schemas"); len(elem) >= l && elem[0:l] == "schemas" {
+					elem = elem[l:]
+				} else {
+					break
+				}
+
+				if len(elem) == 0 {
+					switch r.Method {
+					case "POST":
+						s.handleCreateSchemaRequest([0]string{}, elemIsEscaped, w, r)
+					default:
+						s.notAllowed(w, r, notAllowedParams{
+							allowedMethods: "POST",
+							allowedHeaders: rn5AllowedHeaders,
+							acceptPost:     "application/json",
+							acceptPatch:    "",
+						})
+					}
+
+					return
+				}
+				switch elem[0] {
+				case '/': // Prefix: "/"
+
+					if l := len("/"); len(elem) >= l && elem[0:l] == "/" {
+						elem = elem[l:]
+					} else {
+						break
+					}
+
+					// Param: "id"
+					// Match until "/"
+					idx := strings.IndexByte(elem, '/')
+					if idx < 0 {
+						idx = len(elem)
+					}
+					args[0] = elem[:idx]
+					elem = elem[idx:]
+
+					if len(elem) == 0 {
+						switch r.Method {
+						case "GET":
+							s.handleGetSchemaByIdRequest([1]string{
+								args[0],
+							}, elemIsEscaped, w, r)
+						default:
+							s.notAllowed(w, r, notAllowedParams{
+								allowedMethods: "GET",
+								allowedHeaders: rn7AllowedHeaders,
+								acceptPost:     "",
+								acceptPatch:    "",
+							})
+						}
+
+						return
+					}
+					switch elem[0] {
+					case '/': // Prefix: "/revisions"
+
+						if l := len("/revisions"); len(elem) >= l && elem[0:l] == "/revisions" {
+							elem = elem[l:]
+						} else {
+							break
+						}
+
+						if len(elem) == 0 {
+							switch r.Method {
+							case "POST":
+								s.handleCreateSchemaRevisionRequest([1]string{
+									args[0],
+								}, elemIsEscaped, w, r)
+							default:
+								s.notAllowed(w, r, notAllowedParams{
+									allowedMethods: "POST",
+									allowedHeaders: rn8AllowedHeaders,
+									acceptPost:     "application/json",
+									acceptPatch:    "",
+								})
+							}
+
+							return
+						}
+						switch elem[0] {
+						case '/': // Prefix: "/"
+
+							if l := len("/"); len(elem) >= l && elem[0:l] == "/" {
+								elem = elem[l:]
+							} else {
+								break
+							}
+
+							// Param: "revisionId"
+							// Match until "/"
+							idx := strings.IndexByte(elem, '/')
+							if idx < 0 {
+								idx = len(elem)
+							}
+							args[1] = elem[:idx]
+							elem = elem[idx:]
+
+							if len(elem) == 0 {
+								switch r.Method {
+								case "GET":
+									s.handleGetSchemaRevisionByIdRequest([2]string{
+										args[0],
+										args[1],
+									}, elemIsEscaped, w, r)
+								default:
+									s.notAllowed(w, r, notAllowedParams{
+										allowedMethods: "GET",
+										allowedHeaders: rn16AllowedHeaders,
+										acceptPost:     "",
+										acceptPatch:    "",
+									})
+								}
+
+								return
+							}
+							switch elem[0] {
+							case '/': // Prefix: "/release-state"
+
+								if l := len("/release-state"); len(elem) >= l && elem[0:l] == "/release-state" {
+									elem = elem[l:]
+								} else {
+									break
+								}
+
+								if len(elem) == 0 {
+									// Leaf node.
+									switch r.Method {
+									case "GET":
+										s.handleGetSchemaReleaseStateRequest([2]string{
+											args[0],
+											args[1],
+										}, elemIsEscaped, w, r)
+									case "PUT":
+										s.handleUpdateSchemaReleaseStateRequest([2]string{
+											args[0],
+											args[1],
+										}, elemIsEscaped, w, r)
+									default:
+										s.notAllowed(w, r, notAllowedParams{
+											allowedMethods: "GET,PUT",
+											allowedHeaders: rn17AllowedHeaders,
+											acceptPost:     "",
+											acceptPatch:    "",
+										})
+									}
+
+									return
+								}
+
+							}
+
+						}
+
+					}
+
+				}
+
 			case 'u': // Prefix: "user"
 
 				if l := len("user"); len(elem) >= l && elem[0:l] == "user" {
@@ -414,7 +593,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					default:
 						s.notAllowed(w, r, notAllowedParams{
 							allowedMethods: "GET",
-							allowedHeaders: rn14AllowedHeaders,
+							allowedHeaders: rn21AllowedHeaders,
 							acceptPost:     "",
 							acceptPatch:    "",
 						})
@@ -438,7 +617,7 @@ type Route struct {
 	operationGroup string
 	pathPattern    string
 	count          int
-	args           [0]string
+	args           [2]string
 }
 
 // Name returns ogen operation name.
@@ -835,6 +1014,162 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 					default:
 						return
 					}
+				}
+
+			case 's': // Prefix: "schemas"
+
+				if l := len("schemas"); len(elem) >= l && elem[0:l] == "schemas" {
+					elem = elem[l:]
+				} else {
+					break
+				}
+
+				if len(elem) == 0 {
+					switch method {
+					case "POST":
+						r.name = CreateSchemaOperation
+						r.summary = "Create new schema"
+						r.operationID = "createSchema"
+						r.operationGroup = ""
+						r.pathPattern = "/schemas"
+						r.args = args
+						r.count = 0
+						return r, true
+					default:
+						return
+					}
+				}
+				switch elem[0] {
+				case '/': // Prefix: "/"
+
+					if l := len("/"); len(elem) >= l && elem[0:l] == "/" {
+						elem = elem[l:]
+					} else {
+						break
+					}
+
+					// Param: "id"
+					// Match until "/"
+					idx := strings.IndexByte(elem, '/')
+					if idx < 0 {
+						idx = len(elem)
+					}
+					args[0] = elem[:idx]
+					elem = elem[idx:]
+
+					if len(elem) == 0 {
+						switch method {
+						case "GET":
+							r.name = GetSchemaByIdOperation
+							r.summary = "Get schema by ID"
+							r.operationID = "getSchemaById"
+							r.operationGroup = ""
+							r.pathPattern = "/schemas/{id}"
+							r.args = args
+							r.count = 1
+							return r, true
+						default:
+							return
+						}
+					}
+					switch elem[0] {
+					case '/': // Prefix: "/revisions"
+
+						if l := len("/revisions"); len(elem) >= l && elem[0:l] == "/revisions" {
+							elem = elem[l:]
+						} else {
+							break
+						}
+
+						if len(elem) == 0 {
+							switch method {
+							case "POST":
+								r.name = CreateSchemaRevisionOperation
+								r.summary = "Create new schema revision"
+								r.operationID = "createSchemaRevision"
+								r.operationGroup = ""
+								r.pathPattern = "/schemas/{id}/revisions"
+								r.args = args
+								r.count = 1
+								return r, true
+							default:
+								return
+							}
+						}
+						switch elem[0] {
+						case '/': // Prefix: "/"
+
+							if l := len("/"); len(elem) >= l && elem[0:l] == "/" {
+								elem = elem[l:]
+							} else {
+								break
+							}
+
+							// Param: "revisionId"
+							// Match until "/"
+							idx := strings.IndexByte(elem, '/')
+							if idx < 0 {
+								idx = len(elem)
+							}
+							args[1] = elem[:idx]
+							elem = elem[idx:]
+
+							if len(elem) == 0 {
+								switch method {
+								case "GET":
+									r.name = GetSchemaRevisionByIdOperation
+									r.summary = "Get schema revision by ID"
+									r.operationID = "getSchemaRevisionById"
+									r.operationGroup = ""
+									r.pathPattern = "/schemas/{id}/revisions/{revisionId}"
+									r.args = args
+									r.count = 2
+									return r, true
+								default:
+									return
+								}
+							}
+							switch elem[0] {
+							case '/': // Prefix: "/release-state"
+
+								if l := len("/release-state"); len(elem) >= l && elem[0:l] == "/release-state" {
+									elem = elem[l:]
+								} else {
+									break
+								}
+
+								if len(elem) == 0 {
+									// Leaf node.
+									switch method {
+									case "GET":
+										r.name = GetSchemaReleaseStateOperation
+										r.summary = "Get schema release state"
+										r.operationID = "getSchemaReleaseState"
+										r.operationGroup = ""
+										r.pathPattern = "/schemas/{id}/revisions/{revisionId}/release-state"
+										r.args = args
+										r.count = 2
+										return r, true
+									case "PUT":
+										r.name = UpdateSchemaReleaseStateOperation
+										r.summary = "Update schema release state"
+										r.operationID = "updateSchemaReleaseState"
+										r.operationGroup = ""
+										r.pathPattern = "/schemas/{id}/revisions/{revisionId}/release-state"
+										r.args = args
+										r.count = 2
+										return r, true
+									default:
+										return
+									}
+								}
+
+							}
+
+						}
+
+					}
+
 				}
 
 			case 'u': // Prefix: "user"

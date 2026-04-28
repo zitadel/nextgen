@@ -37,12 +37,30 @@ func findAuthorization(h http.Header, prefix string) (string, bool) {
 
 // oauth2ScopesOAuth2 is a private map storing OAuth2 scopes per operation.
 var oauth2ScopesOAuth2 = map[string][]string{
+	CreateSchemaOperation: []string{
+		"schema.write",
+	},
+	CreateSchemaRevisionOperation: []string{
+		"schema.write",
+	},
+	GetSchemaByIdOperation: []string{
+		"schema.read",
+	},
+	GetSchemaReleaseStateOperation: []string{
+		"schema.read",
+	},
+	GetSchemaRevisionByIdOperation: []string{
+		"schema.read",
+	},
 	GetUserInfoOperation: []string{},
 	IntrospectOperation:  []string{},
 	ListUsersOperation: []string{
 		"openid",
 	},
 	RevokeTokenOperation: []string{},
+	UpdateSchemaReleaseStateOperation: []string{
+		"schema.write",
+	},
 }
 
 // GetOAuth2ScopesForOAuth2 returns the required OAuth2 scopes for the given operation.

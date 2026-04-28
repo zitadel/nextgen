@@ -7,8 +7,10 @@ flows:
       openid: OpenID Connect scope
       profile: Access to the user's profile information
       email: Access to the user's email address
+      schema.write: Permission to create and manage schemas
   clientCredentials: 
     tokenUrl: https://acc.nextgen.zitadel.com/oauth/token
     scopes: 
       openid: OpenID Connect scope
+      schema.write: Permission to create and manage schemas
     

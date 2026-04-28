@@ -1,0 +1,81 @@
+get:
+  operationId: getSchemaReleaseState
+  summary: Get schema release state
+  description: Get the release state of a schema by its ID and revision ID.
+  tags:
+    - Schema
+  security:
+    - oauth2:
+        - schema.read
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+    - name: revisionId
+      in: path
+      required: true
+      schema:
+        type: string
+  responses:
+    '200':
+      description: The release state was retrieved successfully
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../schemas/schema-release-state.yaml
+    '400':
+      description: The provided input was not valid
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../../components/error-details.yaml
+    default:
+      description: Unexpected error response.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../../components/error-details.yaml
+            
+put:
+  operationId: updateSchemaReleaseState
+  summary: Update schema release state
+  description: Update the release state of a schema by its ID and revision ID.
+  tags:
+    - Schema
+  security:
+    - oauth2:
+        - schema.write
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+    - name: revisionId
+      in: path
+      required: true
+      schema:
+        type: string
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../../../../../schemas/schema-release-state.yaml
+  responses:
+    '200':
+      description: The release state was updated successfully
+    '400':
+      description: The provided input was not valid
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../../components/error-details.yaml
+    default:
+      description: Unexpected error response.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../../components/error-details.yaml

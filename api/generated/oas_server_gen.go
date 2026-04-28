@@ -20,6 +20,18 @@ type Handler interface {
 	//
 	// GET /auth/authorize
 	AuthorizeGet(ctx context.Context, params AuthorizeGetParams) (AuthorizeGetRes, error)
+	// CreateSchema implements createSchema operation.
+	//
+	// Create new schema.
+	//
+	// POST /schemas
+	CreateSchema(ctx context.Context, req CreateSchemaReq) (CreateSchemaRes, error)
+	// CreateSchemaRevision implements createSchemaRevision operation.
+	//
+	// Create new schema revision.
+	//
+	// POST /schemas/{id}/revisions
+	CreateSchemaRevision(ctx context.Context, req CreateSchemaRevisionReq, params CreateSchemaRevisionParams) (CreateSchemaRevisionRes, error)
 	// EndSession implements endSession operation.
 	//
 	// End a session.
@@ -56,6 +68,24 @@ type Handler interface {
 	//
 	// GET /readyz
 	GetReady(ctx context.Context) (GetReadyRes, error)
+	// GetSchemaById implements getSchemaById operation.
+	//
+	// Get a schema by its ID. This will return the default revision of the schema.
+	//
+	// GET /schemas/{id}
+	GetSchemaById(ctx context.Context, params GetSchemaByIdParams) (GetSchemaByIdRes, error)
+	// GetSchemaReleaseState implements getSchemaReleaseState operation.
+	//
+	// Get the release state of a schema by its ID and revision ID.
+	//
+	// GET /schemas/{id}/revisions/{revisionId}/release-state
+	GetSchemaReleaseState(ctx context.Context, params GetSchemaReleaseStateParams) (GetSchemaReleaseStateRes, error)
+	// GetSchemaRevisionById implements getSchemaRevisionById operation.
+	//
+	// Get a schema revision by its ID.
+	//
+	// GET /schemas/{id}/revisions/{revisionId}
+	GetSchemaRevisionById(ctx context.Context, params GetSchemaRevisionByIdParams) (GetSchemaRevisionByIdRes, error)
 	// GetToken implements getToken operation.
 	//
 	// Get accesstoken.
@@ -86,6 +116,12 @@ type Handler interface {
 	//
 	// POST /auth/revoke
 	RevokeToken(ctx context.Context, req *RevokeRequest) (RevokeTokenRes, error)
+	// UpdateSchemaReleaseState implements updateSchemaReleaseState operation.
+	//
+	// Update the release state of a schema by its ID and revision ID.
+	//
+	// PUT /schemas/{id}/revisions/{revisionId}/release-state
+	UpdateSchemaReleaseState(ctx context.Context, req SchemaReleaseState, params UpdateSchemaReleaseStateParams) (UpdateSchemaReleaseStateRes, error)
 	// NewError creates *ErrorDetailsStatusCode from error returned by handler.
 	//
 	// Used for common default response.

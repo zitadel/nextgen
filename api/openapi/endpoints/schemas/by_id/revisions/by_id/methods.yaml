@@ -1,0 +1,44 @@
+get:
+  operationId: getSchemaRevisionById
+  summary: Get schema revision by ID
+  description: Get a schema revision by its ID.
+  tags:
+    - Schema
+  security:
+    - oauth2:
+        - schema.read
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+    - name: revisionId
+      in: path
+      required: true
+      schema:
+        type: string
+  responses:
+    '200':
+      description: The schema was retrieved successfully
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - $ref: ../../../user-schema.yaml
+            discriminator:
+              propertyName: kind
+              mapping:
+                user-schema: ../../../user-schema.yaml
+    '400':
+      description: The provided input was not valid
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../components/error-details.yaml
+    default:
+      description: Unexpected error response.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../components/error-details.yaml

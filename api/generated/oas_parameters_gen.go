@@ -4,6 +4,7 @@ package api
 
 import (
 	"net/http"
+	"net/url"
 
 	"github.com/go-faster/errors"
 	"github.com/ogen-go/ogen/conv"
@@ -1005,6 +1006,71 @@ func decodeAuthorizeGetParams(args [0]string, argsEscaped bool, r *http.Request)
 	return params, nil
 }
 
+// CreateSchemaRevisionParams is parameters of createSchemaRevision operation.
+type CreateSchemaRevisionParams struct {
+	ID string
+}
+
+func unpackCreateSchemaRevisionParams(packed middleware.Parameters) (params CreateSchemaRevisionParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "id",
+			In:   "path",
+		}
+		params.ID = packed[key].(string)
+	}
+	return params
+}
+
+func decodeCreateSchemaRevisionParams(args [1]string, argsEscaped bool, r *http.Request) (params CreateSchemaRevisionParams, _ error) {
+	// Decode path: id.
+	if err := func() error {
+		param := args[0]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[0])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "id",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				val, err := d.DecodeValue()
+				if err != nil {
+					return err
+				}
+
+				c, err := conv.ToString(val)
+				if err != nil {
+					return err
+				}
+
+				params.ID = c
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "id",
+			In:   "path",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
 // EndSessionParams is parameters of endSession operation.
 type EndSessionParams struct {
 	// The client ID is the identifier for the client application that is making
@@ -1347,6 +1413,307 @@ func decodeEndSessionParams(args [0]string, argsEscaped bool, r *http.Request) (
 	return params, nil
 }
 
+// GetSchemaByIdParams is parameters of getSchemaById operation.
+type GetSchemaByIdParams struct {
+	ID string
+}
+
+func unpackGetSchemaByIdParams(packed middleware.Parameters) (params GetSchemaByIdParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "id",
+			In:   "path",
+		}
+		params.ID = packed[key].(string)
+	}
+	return params
+}
+
+func decodeGetSchemaByIdParams(args [1]string, argsEscaped bool, r *http.Request) (params GetSchemaByIdParams, _ error) {
+	// Decode path: id.
+	if err := func() error {
+		param := args[0]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[0])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "id",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				val, err := d.DecodeValue()
+				if err != nil {
+					return err
+				}
+
+				c, err := conv.ToString(val)
+				if err != nil {
+					return err
+				}
+
+				params.ID = c
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "id",
+			In:   "path",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
+// GetSchemaReleaseStateParams is parameters of getSchemaReleaseState operation.
+type GetSchemaReleaseStateParams struct {
+	ID         string
+	RevisionId string
+}
+
+func unpackGetSchemaReleaseStateParams(packed middleware.Parameters) (params GetSchemaReleaseStateParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "id",
+			In:   "path",
+		}
+		params.ID = packed[key].(string)
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "revisionId",
+			In:   "path",
+		}
+		params.RevisionId = packed[key].(string)
+	}
+	return params
+}
+
+func decodeGetSchemaReleaseStateParams(args [2]string, argsEscaped bool, r *http.Request) (params GetSchemaReleaseStateParams, _ error) {
+	// Decode path: id.
+	if err := func() error {
+		param := args[0]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[0])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "id",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				val, err := d.DecodeValue()
+				if err != nil {
+					return err
+				}
+
+				c, err := conv.ToString(val)
+				if err != nil {
+					return err
+				}
+
+				params.ID = c
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "id",
+			In:   "path",
+			Err:  err,
+		}
+	}
+	// Decode path: revisionId.
+	if err := func() error {
+		param := args[1]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[1])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "revisionId",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				val, err := d.DecodeValue()
+				if err != nil {
+					return err
+				}
+
+				c, err := conv.ToString(val)
+				if err != nil {
+					return err
+				}
+
+				params.RevisionId = c
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "revisionId",
+			In:   "path",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
+// GetSchemaRevisionByIdParams is parameters of getSchemaRevisionById operation.
+type GetSchemaRevisionByIdParams struct {
+	ID         string
+	RevisionId string
+}
+
+func unpackGetSchemaRevisionByIdParams(packed middleware.Parameters) (params GetSchemaRevisionByIdParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "id",
+			In:   "path",
+		}
+		params.ID = packed[key].(string)
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "revisionId",
+			In:   "path",
+		}
+		params.RevisionId = packed[key].(string)
+	}
+	return params
+}
+
+func decodeGetSchemaRevisionByIdParams(args [2]string, argsEscaped bool, r *http.Request) (params GetSchemaRevisionByIdParams, _ error) {
+	// Decode path: id.
+	if err := func() error {
+		param := args[0]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[0])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "id",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				val, err := d.DecodeValue()
+				if err != nil {
+					return err
+				}
+
+				c, err := conv.ToString(val)
+				if err != nil {
+					return err
+				}
+
+				params.ID = c
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "id",
+			In:   "path",
+			Err:  err,
+		}
+	}
+	// Decode path: revisionId.
+	if err := func() error {
+		param := args[1]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[1])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "revisionId",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				val, err := d.DecodeValue()
+				if err != nil {
+					return err
+				}
+
+				c, err := conv.ToString(val)
+				if err != nil {
+					return err
+				}
+
+				params.RevisionId = c
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "revisionId",
+			In:   "path",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
 // ListUsersParams is parameters of listUsers operation.
 type ListUsersParams struct {
 	// Number of items to skip before returning results.
@@ -1518,6 +1885,124 @@ func decodeListUsersParams(args [0]string, argsEscaped bool, r *http.Request) (p
 		return params, &ogenerrors.DecodeParamError{
 			Name: "limit",
 			In:   "query",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
+// UpdateSchemaReleaseStateParams is parameters of updateSchemaReleaseState operation.
+type UpdateSchemaReleaseStateParams struct {
+	ID         string
+	RevisionId string
+}
+
+func unpackUpdateSchemaReleaseStateParams(packed middleware.Parameters) (params UpdateSchemaReleaseStateParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "id",
+			In:   "path",
+		}
+		params.ID = packed[key].(string)
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "revisionId",
+			In:   "path",
+		}
+		params.RevisionId = packed[key].(string)
+	}
+	return params
+}
+
+func decodeUpdateSchemaReleaseStateParams(args [2]string, argsEscaped bool, r *http.Request) (params UpdateSchemaReleaseStateParams, _ error) {
+	// Decode path: id.
+	if err := func() error {
+		param := args[0]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[0])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "id",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				val, err := d.DecodeValue()
+				if err != nil {
+					return err
+				}
+
+				c, err := conv.ToString(val)
+				if err != nil {
+					return err
+				}
+
+				params.ID = c
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "id",
+			In:   "path",
+			Err:  err,
+		}
+	}
+	// Decode path: revisionId.
+	if err := func() error {
+		param := args[1]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[1])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "revisionId",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				val, err := d.DecodeValue()
+				if err != nil {
+					return err
+				}
+
+				c, err := conv.ToString(val)
+				if err != nil {
+					return err
+				}
+
+				params.RevisionId = c
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "revisionId",
+			In:   "path",
 			Err:  err,
 		}
 	}
