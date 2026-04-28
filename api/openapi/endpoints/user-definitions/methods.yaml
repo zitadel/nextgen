@@ -1,0 +1,68 @@
+post:
+  operationId: createUserDefinition
+  summary: Create new user definition
+  description: Create a new user definition in the system
+  tags:
+    - User Definitions
+  security: 
+    - oauth2: [user-definitions.write]
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: create-user-definition-request.yaml
+  responses:
+    '201':
+      description: The user definition was successfully created
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+                description: The ID of the created user definition
+    '4XX':
+      description: The request was rejected by the server.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    default:
+      description: Something went wrong on the server. This was not your fault.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+
+
+get:
+  operationId: listUserDefinitions
+  summary: List user definitions
+  description: Get a list of all default user definitions in the system
+  tags:
+    - User Definitions
+  security: 
+    - oauth2: [user-definitions.read]
+  responses:
+    '200':
+      description: The user definitions were successfully retrieved
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              $ref: list-user-definitions-response.yaml
+    '4XX':
+      description: The request was rejected by the server.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    default:
+      description: Something went wrong on the server. This was not your fault.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml

@@ -1,0 +1,34 @@
+type: object
+required:
+  - title
+properties:
+  title:
+    type: string
+    description: The title of the user definition
+  description:
+    type: string
+    description: A description of the user definition
+  x-auth-methods:
+    type: array
+    items:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+          description: Whether the authentication method is enabled or not
+        position:
+          type: integer
+          description: The position of the authentication method in the list of supported methods
+    description: A list of authentication methods supported by the user definition
+  requiredFields:
+    type: array
+    items:
+      type: string
+    description: A list of required fields for the user definition
+  properties:
+    type: object
+    description: |
+      A map of additional properties for the user definition, where the key
+      is the property name and the value is the property schema
+    additionalProperties:
+      $ref: user-property.yaml

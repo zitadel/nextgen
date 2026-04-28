@@ -42,6 +42,10 @@ paths:
     $ref: endpoints/readyz/methods.yaml
   /user:
     $ref: endpoints/users/methods.yaml
+  /user-definitions:
+    $ref: endpoints/user-definitions/methods.yaml
+  /user-definitions/{id}:
+    $ref: endpoints/user-definitions/by_id/methods.yaml
 
 components:
   securitySchemes: 

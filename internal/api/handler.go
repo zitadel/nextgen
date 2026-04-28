@@ -9,6 +9,21 @@ import (
 type Handler struct {
 }
 
+func (h Handler) CreateUserDefinition(ctx context.Context, req *api.CreateUserDefinitionRequest) (api.CreateUserDefinitionRes, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (h Handler) GetUserDefinitionById(ctx context.Context, params api.GetUserDefinitionByIdParams) (api.GetUserDefinitionByIdRes, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (h Handler) ListUserDefinitions(ctx context.Context) (api.ListUserDefinitionsRes, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
 func NewHandler() *Handler {
 	return &Handler{}
 }

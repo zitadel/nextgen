@@ -1,0 +1,33 @@
+get:
+  operationId: getUserDefinitionById
+  summary: Get user definition
+  description: Get the currently active user definition by its `UserDefinitionID`
+  tags:
+    - User Definitions
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+  security: 
+    - oauth2: [user-definitions.read]
+  responses:
+    '200':
+      description: The user definition was successfully retrieved
+      content:
+        application/json:
+          schema:
+            type: object
+    '4XX':
+      description: The request was rejected by the server.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    default:
+      description: Something went wrong on the server. This was not your fault.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml

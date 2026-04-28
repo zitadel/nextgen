@@ -20,6 +20,12 @@ type Handler interface {
 	//
 	// GET /auth/authorize
 	AuthorizeGet(ctx context.Context, params AuthorizeGetParams) (AuthorizeGetRes, error)
+	// CreateUserDefinition implements createUserDefinition operation.
+	//
+	// Create a new user definition in the system.
+	//
+	// POST /user-definitions
+	CreateUserDefinition(ctx context.Context, req *CreateUserDefinitionRequest) (CreateUserDefinitionRes, error)
 	// EndSession implements endSession operation.
 	//
 	// End a session.
@@ -62,6 +68,12 @@ type Handler interface {
 	//
 	// POST /auth/token
 	GetToken(ctx context.Context, req *PostTokenRequest) (GetTokenRes, error)
+	// GetUserDefinitionById implements getUserDefinitionById operation.
+	//
+	// Get the currently active user definition by its `UserDefinitionID`.
+	//
+	// GET /user-definitions/{id}
+	GetUserDefinitionById(ctx context.Context, params GetUserDefinitionByIdParams) (GetUserDefinitionByIdRes, error)
 	// GetUserInfo implements getUserInfo operation.
 	//
 	// Get user info.
@@ -74,6 +86,12 @@ type Handler interface {
 	//
 	// POST /auth/introspect
 	Introspect(ctx context.Context, req *IntrospectRequest) (IntrospectRes, error)
+	// ListUserDefinitions implements listUserDefinitions operation.
+	//
+	// Get a list of all default user definitions in the system.
+	//
+	// GET /user-definitions
+	ListUserDefinitions(ctx context.Context) (ListUserDefinitionsRes, error)
 	// ListUsers implements listUsers operation.
 	//
 	// List users.

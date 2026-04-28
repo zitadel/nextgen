@@ -20,6 +20,128 @@ type AuthorizeGetFound struct{}
 
 func (*AuthorizeGetFound) authorizeGetRes() {}
 
+type CreateUserDefinitionCreated struct {
+	// The ID of the created user definition.
+	ID OptString `json:"id"`
+}
+
+// GetID returns the value of ID.
+func (s *CreateUserDefinitionCreated) GetID() OptString {
+	return s.ID
+}
+
+// SetID sets the value of ID.
+func (s *CreateUserDefinitionCreated) SetID(val OptString) {
+	s.ID = val
+}
+
+func (*CreateUserDefinitionCreated) createUserDefinitionRes() {}
+
+// Ref: #
+type CreateUserDefinitionRequest struct {
+	// The title of the user definition.
+	Title string `json:"title"`
+	// A description of the user definition.
+	Description OptString `json:"description"`
+	// A list of authentication methods supported by the user definition.
+	XMinusAuthMinusMethods []CreateUserDefinitionRequestXMinusAuthMinusMethodsItem `json:"x-auth-methods"`
+	// A list of required fields for the user definition.
+	RequiredFields []string `json:"requiredFields"`
+	// A map of additional properties for the user definition, where the key
+	// is the property name and the value is the property schema.
+	Properties OptCreateUserDefinitionRequestProperties `json:"properties"`
+}
+
+// GetTitle returns the value of Title.
+func (s *CreateUserDefinitionRequest) GetTitle() string {
+	return s.Title
+}
+
+// GetDescription returns the value of Description.
+func (s *CreateUserDefinitionRequest) GetDescription() OptString {
+	return s.Description
+}
+
+// GetXMinusAuthMinusMethods returns the value of XMinusAuthMinusMethods.
+func (s *CreateUserDefinitionRequest) GetXMinusAuthMinusMethods() []CreateUserDefinitionRequestXMinusAuthMinusMethodsItem {
+	return s.XMinusAuthMinusMethods
+}
+
+// GetRequiredFields returns the value of RequiredFields.
+func (s *CreateUserDefinitionRequest) GetRequiredFields() []string {
+	return s.RequiredFields
+}
+
+// GetProperties returns the value of Properties.
+func (s *CreateUserDefinitionRequest) GetProperties() OptCreateUserDefinitionRequestProperties {
+	return s.Properties
+}
+
+// SetTitle sets the value of Title.
+func (s *CreateUserDefinitionRequest) SetTitle(val string) {
+	s.Title = val
+}
+
+// SetDescription sets the value of Description.
+func (s *CreateUserDefinitionRequest) SetDescription(val OptString) {
+	s.Description = val
+}
+
+// SetXMinusAuthMinusMethods sets the value of XMinusAuthMinusMethods.
+func (s *CreateUserDefinitionRequest) SetXMinusAuthMinusMethods(val []CreateUserDefinitionRequestXMinusAuthMinusMethodsItem) {
+	s.XMinusAuthMinusMethods = val
+}
+
+// SetRequiredFields sets the value of RequiredFields.
+func (s *CreateUserDefinitionRequest) SetRequiredFields(val []string) {
+	s.RequiredFields = val
+}
+
+// SetProperties sets the value of Properties.
+func (s *CreateUserDefinitionRequest) SetProperties(val OptCreateUserDefinitionRequestProperties) {
+	s.Properties = val
+}
+
+// A map of additional properties for the user definition, where the key
+// is the property name and the value is the property schema.
+type CreateUserDefinitionRequestProperties map[string]UserProperty
+
+func (s *CreateUserDefinitionRequestProperties) init() CreateUserDefinitionRequestProperties {
+	m := *s
+	if m == nil {
+		m = map[string]UserProperty{}
+		*s = m
+	}
+	return m
+}
+
+type CreateUserDefinitionRequestXMinusAuthMinusMethodsItem struct {
+	// Whether the authentication method is enabled or not.
+	Enabled OptBool `json:"enabled"`
+	// The position of the authentication method in the list of supported methods.
+	Position OptInt `json:"position"`
+}
+
+// GetEnabled returns the value of Enabled.
+func (s *CreateUserDefinitionRequestXMinusAuthMinusMethodsItem) GetEnabled() OptBool {
+	return s.Enabled
+}
+
+// GetPosition returns the value of Position.
+func (s *CreateUserDefinitionRequestXMinusAuthMinusMethodsItem) GetPosition() OptInt {
+	return s.Position
+}
+
+// SetEnabled sets the value of Enabled.
+func (s *CreateUserDefinitionRequestXMinusAuthMinusMethodsItem) SetEnabled(val OptBool) {
+	s.Enabled = val
+}
+
+// SetPosition sets the value of Position.
+func (s *CreateUserDefinitionRequestXMinusAuthMinusMethodsItem) SetPosition(val OptInt) {
+	s.Position = val
+}
+
 // Ref: #
 type DeviceAuthorizationResponse struct {
 	// The device code that the client will use to poll for authorization.
@@ -189,13 +311,16 @@ func (s *ErrorDetailsStatusCode) SetResponse(val ErrorDetails) {
 	s.Response = val
 }
 
+func (*ErrorDetailsStatusCode) createUserDefinitionRes()   {}
 func (*ErrorDetailsStatusCode) getHealthRes()              {}
 func (*ErrorDetailsStatusCode) getKeysRes()                {}
 func (*ErrorDetailsStatusCode) getLiveRes()                {}
 func (*ErrorDetailsStatusCode) getOpenIDConfigurationRes() {}
 func (*ErrorDetailsStatusCode) getReadyRes()               {}
 func (*ErrorDetailsStatusCode) getTokenRes()               {}
+func (*ErrorDetailsStatusCode) getUserDefinitionByIdRes()  {}
 func (*ErrorDetailsStatusCode) getUserInfoRes()            {}
+func (*ErrorDetailsStatusCode) listUserDefinitionsRes()    {}
 func (*ErrorDetailsStatusCode) revokeTokenRes()            {}
 
 type GetHealthOK struct {
@@ -245,6 +370,10 @@ func (s GetReadyOK) Read(p []byte) (n int, err error) {
 }
 
 func (*GetReadyOK) getReadyRes() {}
+
+type GetUserDefinitionByIdOK struct{}
+
+func (*GetUserDefinitionByIdOK) getUserDefinitionByIdRes() {}
 
 type GetUserInfoOK struct {
 	// The unique identifier for the user.
@@ -753,6 +882,62 @@ func (s *KeysResponseKeysItem) SetX5tS256(val OptString) {
 	s.X5tS256 = val
 }
 
+type ListUserDefinitionsOKApplicationJSON []ListUserDefinitionsResponse
+
+func (*ListUserDefinitionsOKApplicationJSON) listUserDefinitionsRes() {}
+
+// Ref: #
+type ListUserDefinitionsResponse struct {
+	// The ID of the user definition.
+	ID OptString `json:"id"`
+	// The title of the user definition.
+	Title string `json:"title"`
+	// A description of the user definition.
+	Description OptString `json:"description"`
+	// The revision number of the user definition.
+	RevisionNumber OptInt `json:"revisionNumber"`
+}
+
+// GetID returns the value of ID.
+func (s *ListUserDefinitionsResponse) GetID() OptString {
+	return s.ID
+}
+
+// GetTitle returns the value of Title.
+func (s *ListUserDefinitionsResponse) GetTitle() string {
+	return s.Title
+}
+
+// GetDescription returns the value of Description.
+func (s *ListUserDefinitionsResponse) GetDescription() OptString {
+	return s.Description
+}
+
+// GetRevisionNumber returns the value of RevisionNumber.
+func (s *ListUserDefinitionsResponse) GetRevisionNumber() OptInt {
+	return s.RevisionNumber
+}
+
+// SetID sets the value of ID.
+func (s *ListUserDefinitionsResponse) SetID(val OptString) {
+	s.ID = val
+}
+
+// SetTitle sets the value of Title.
+func (s *ListUserDefinitionsResponse) SetTitle(val string) {
+	s.Title = val
+}
+
+// SetDescription sets the value of Description.
+func (s *ListUserDefinitionsResponse) SetDescription(val OptString) {
+	s.Description = val
+}
+
+// SetRevisionNumber sets the value of RevisionNumber.
+func (s *ListUserDefinitionsResponse) SetRevisionNumber(val OptInt) {
+	s.RevisionNumber = val
+}
+
 type ListUsersBadRequest ErrorDetails
 
 func (*ListUsersBadRequest) listUsersRes() {}
@@ -764,6 +949,133 @@ func (*ListUsersInternalServerError) listUsersRes() {}
 type ListUsersOKApplicationJSON []jx.Raw
 
 func (*ListUsersOKApplicationJSON) listUsersRes() {}
+
+// Ref: #
+type NestedProperty struct {
+	// The title of the user definition.
+	Title OptString             `json:"title"`
+	Type  OptNestedPropertyType `json:"type"`
+	// A list of required fields for the user definition.
+	RequiredFields []string `json:"requiredFields"`
+	// A map of additional properties for the user definition, where the key
+	// is the property name and the value is the property schema.
+	Properties OptNestedPropertyProperties `json:"properties"`
+}
+
+// GetTitle returns the value of Title.
+func (s *NestedProperty) GetTitle() OptString {
+	return s.Title
+}
+
+// GetType returns the value of Type.
+func (s *NestedProperty) GetType() OptNestedPropertyType {
+	return s.Type
+}
+
+// GetRequiredFields returns the value of RequiredFields.
+func (s *NestedProperty) GetRequiredFields() []string {
+	return s.RequiredFields
+}
+
+// GetProperties returns the value of Properties.
+func (s *NestedProperty) GetProperties() OptNestedPropertyProperties {
+	return s.Properties
+}
+
+// SetTitle sets the value of Title.
+func (s *NestedProperty) SetTitle(val OptString) {
+	s.Title = val
+}
+
+// SetType sets the value of Type.
+func (s *NestedProperty) SetType(val OptNestedPropertyType) {
+	s.Type = val
+}
+
+// SetRequiredFields sets the value of RequiredFields.
+func (s *NestedProperty) SetRequiredFields(val []string) {
+	s.RequiredFields = val
+}
+
+// SetProperties sets the value of Properties.
+func (s *NestedProperty) SetProperties(val OptNestedPropertyProperties) {
+	s.Properties = val
+}
+
+// A map of additional properties for the user definition, where the key
+// is the property name and the value is the property schema.
+type NestedPropertyProperties map[string]NestedProperty
+
+func (s *NestedPropertyProperties) init() NestedPropertyProperties {
+	m := *s
+	if m == nil {
+		m = map[string]NestedProperty{}
+		*s = m
+	}
+	return m
+}
+
+type NestedPropertyType string
+
+const (
+	NestedPropertyTypeString  NestedPropertyType = "string"
+	NestedPropertyTypeNumber  NestedPropertyType = "number"
+	NestedPropertyTypeBoolean NestedPropertyType = "boolean"
+	NestedPropertyTypeObject  NestedPropertyType = "object"
+	NestedPropertyTypeArray   NestedPropertyType = "array"
+)
+
+// AllValues returns all NestedPropertyType values.
+func (NestedPropertyType) AllValues() []NestedPropertyType {
+	return []NestedPropertyType{
+		NestedPropertyTypeString,
+		NestedPropertyTypeNumber,
+		NestedPropertyTypeBoolean,
+		NestedPropertyTypeObject,
+		NestedPropertyTypeArray,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s NestedPropertyType) MarshalText() ([]byte, error) {
+	switch s {
+	case NestedPropertyTypeString:
+		return []byte(s), nil
+	case NestedPropertyTypeNumber:
+		return []byte(s), nil
+	case NestedPropertyTypeBoolean:
+		return []byte(s), nil
+	case NestedPropertyTypeObject:
+		return []byte(s), nil
+	case NestedPropertyTypeArray:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *NestedPropertyType) UnmarshalText(data []byte) error {
+	switch NestedPropertyType(data) {
+	case NestedPropertyTypeString:
+		*s = NestedPropertyTypeString
+		return nil
+	case NestedPropertyTypeNumber:
+		*s = NestedPropertyTypeNumber
+		return nil
+	case NestedPropertyTypeBoolean:
+		*s = NestedPropertyTypeBoolean
+		return nil
+	case NestedPropertyTypeObject:
+		*s = NestedPropertyTypeObject
+		return nil
+	case NestedPropertyTypeArray:
+		*s = NestedPropertyTypeArray
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
 
 type OAuth2 struct {
 	Token  string
@@ -1491,6 +1803,52 @@ func (o OptBool) Or(d bool) bool {
 	return d
 }
 
+// NewOptCreateUserDefinitionRequestProperties returns new OptCreateUserDefinitionRequestProperties with value set to v.
+func NewOptCreateUserDefinitionRequestProperties(v CreateUserDefinitionRequestProperties) OptCreateUserDefinitionRequestProperties {
+	return OptCreateUserDefinitionRequestProperties{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptCreateUserDefinitionRequestProperties is optional CreateUserDefinitionRequestProperties.
+type OptCreateUserDefinitionRequestProperties struct {
+	Value CreateUserDefinitionRequestProperties
+	Set   bool
+}
+
+// IsSet returns true if OptCreateUserDefinitionRequestProperties was set.
+func (o OptCreateUserDefinitionRequestProperties) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptCreateUserDefinitionRequestProperties) Reset() {
+	var v CreateUserDefinitionRequestProperties
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptCreateUserDefinitionRequestProperties) SetTo(v CreateUserDefinitionRequestProperties) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptCreateUserDefinitionRequestProperties) Get() (v CreateUserDefinitionRequestProperties, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptCreateUserDefinitionRequestProperties) Or(d CreateUserDefinitionRequestProperties) CreateUserDefinitionRequestProperties {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptErrorDetailsDetails returns new OptErrorDetailsDetails with value set to v.
 func NewOptErrorDetailsDetails(v ErrorDetailsDetails) OptErrorDetailsDetails {
 	return OptErrorDetailsDetails{
@@ -1577,6 +1935,350 @@ func (o OptInt) Get() (v int, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptInt) Or(d int) int {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNestedPropertyProperties returns new OptNestedPropertyProperties with value set to v.
+func NewOptNestedPropertyProperties(v NestedPropertyProperties) OptNestedPropertyProperties {
+	return OptNestedPropertyProperties{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNestedPropertyProperties is optional NestedPropertyProperties.
+type OptNestedPropertyProperties struct {
+	Value NestedPropertyProperties
+	Set   bool
+}
+
+// IsSet returns true if OptNestedPropertyProperties was set.
+func (o OptNestedPropertyProperties) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNestedPropertyProperties) Reset() {
+	var v NestedPropertyProperties
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptNestedPropertyProperties) SetTo(v NestedPropertyProperties) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNestedPropertyProperties) Get() (v NestedPropertyProperties, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNestedPropertyProperties) Or(d NestedPropertyProperties) NestedPropertyProperties {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNestedPropertyType returns new OptNestedPropertyType with value set to v.
+func NewOptNestedPropertyType(v NestedPropertyType) OptNestedPropertyType {
+	return OptNestedPropertyType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNestedPropertyType is optional NestedPropertyType.
+type OptNestedPropertyType struct {
+	Value NestedPropertyType
+	Set   bool
+}
+
+// IsSet returns true if OptNestedPropertyType was set.
+func (o OptNestedPropertyType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNestedPropertyType) Reset() {
+	var v NestedPropertyType
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptNestedPropertyType) SetTo(v NestedPropertyType) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNestedPropertyType) Get() (v NestedPropertyType, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNestedPropertyType) Or(d NestedPropertyType) NestedPropertyType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilInt returns new OptNilInt with value set to v.
+func NewOptNilInt(v int) OptNilInt {
+	return OptNilInt{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilInt is optional nullable int.
+type OptNilInt struct {
+	Value int
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilInt was set.
+func (o OptNilInt) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilInt) Reset() {
+	var v int
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilInt) SetTo(v int) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilInt) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilInt) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v int
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilInt) Get() (v int, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilInt) Or(d int) int {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilString returns new OptNilString with value set to v.
+func NewOptNilString(v string) OptNilString {
+	return OptNilString{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilString is optional nullable string.
+type OptNilString struct {
+	Value string
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilString was set.
+func (o OptNilString) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilString) Reset() {
+	var v string
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilString) SetTo(v string) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilString) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilString) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v string
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilString) Get() (v string, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilString) Or(d string) string {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilUserPropertyFormat returns new OptNilUserPropertyFormat with value set to v.
+func NewOptNilUserPropertyFormat(v UserPropertyFormat) OptNilUserPropertyFormat {
+	return OptNilUserPropertyFormat{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilUserPropertyFormat is optional nullable UserPropertyFormat.
+type OptNilUserPropertyFormat struct {
+	Value UserPropertyFormat
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilUserPropertyFormat was set.
+func (o OptNilUserPropertyFormat) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilUserPropertyFormat) Reset() {
+	var v UserPropertyFormat
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilUserPropertyFormat) SetTo(v UserPropertyFormat) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilUserPropertyFormat) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilUserPropertyFormat) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v UserPropertyFormat
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilUserPropertyFormat) Get() (v UserPropertyFormat, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilUserPropertyFormat) Or(d UserPropertyFormat) UserPropertyFormat {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilUserPropertyXMinusUnique returns new OptNilUserPropertyXMinusUnique with value set to v.
+func NewOptNilUserPropertyXMinusUnique(v UserPropertyXMinusUnique) OptNilUserPropertyXMinusUnique {
+	return OptNilUserPropertyXMinusUnique{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilUserPropertyXMinusUnique is optional nullable UserPropertyXMinusUnique.
+type OptNilUserPropertyXMinusUnique struct {
+	Value UserPropertyXMinusUnique
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilUserPropertyXMinusUnique was set.
+func (o OptNilUserPropertyXMinusUnique) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilUserPropertyXMinusUnique) Reset() {
+	var v UserPropertyXMinusUnique
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilUserPropertyXMinusUnique) SetTo(v UserPropertyXMinusUnique) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilUserPropertyXMinusUnique) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilUserPropertyXMinusUnique) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v UserPropertyXMinusUnique
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilUserPropertyXMinusUnique) Get() (v UserPropertyXMinusUnique, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilUserPropertyXMinusUnique) Or(d UserPropertyXMinusUnique) UserPropertyXMinusUnique {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -1715,6 +2417,52 @@ func (o OptURI) Get() (v url.URL, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptURI) Or(d url.URL) url.URL {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptUserPropertyProperties returns new OptUserPropertyProperties with value set to v.
+func NewOptUserPropertyProperties(v UserPropertyProperties) OptUserPropertyProperties {
+	return OptUserPropertyProperties{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptUserPropertyProperties is optional UserPropertyProperties.
+type OptUserPropertyProperties struct {
+	Value UserPropertyProperties
+	Set   bool
+}
+
+// IsSet returns true if OptUserPropertyProperties was set.
+func (o OptUserPropertyProperties) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptUserPropertyProperties) Reset() {
+	var v UserPropertyProperties
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptUserPropertyProperties) SetTo(v UserPropertyProperties) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptUserPropertyProperties) Get() (v UserPropertyProperties, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptUserPropertyProperties) Or(d UserPropertyProperties) UserPropertyProperties {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -1969,6 +2717,336 @@ func (s *TokenResponse) SetRefreshToken(val OptString) {
 }
 
 func (*TokenResponse) getTokenRes() {}
+
+// Ref: #
+type UserProperty struct {
+	Type   UserPropertyType         `json:"type"`
+	Format OptNilUserPropertyFormat `json:"format"`
+	// The title of the user property.
+	Title string `json:"title"`
+	// The minimum length of the property value, if applicable.
+	MinLength OptNilInt `json:"minLength"`
+	// The maximum length of the property value, if applicable.
+	MaxLength OptNilInt `json:"maxLength"`
+	// Whether this property is an identifier for the user or not.
+	XMinusIdentifier OptBool `json:"x-identifier"`
+	// The verification method for this property, if applicable.
+	XMinusVerify OptNilString `json:"x-verify"`
+	// The level of uniqueness for this property, if applicable.
+	XMinusUnique OptNilUserPropertyXMinusUnique `json:"x-unique"`
+	// The claim name for this property, if applicable.
+	XMinusClaim OptNilString `json:"x-claim"`
+	// Whether this property is editable by the user or not.
+	XMinusEditable OptBool `json:"x-editable"`
+	// Whether this property contains sensitive information or not.
+	XMinusSensitive OptBool `json:"x-sensitive"`
+	// Whether this property is used for multi-factor authentication or not.
+	XMinusMfa OptBool `json:"x-mfa"`
+	// A map of additional properties for the user definition, where the key
+	// is the property name and the value is the property schema.
+	Properties OptUserPropertyProperties `json:"properties"`
+}
+
+// GetType returns the value of Type.
+func (s *UserProperty) GetType() UserPropertyType {
+	return s.Type
+}
+
+// GetFormat returns the value of Format.
+func (s *UserProperty) GetFormat() OptNilUserPropertyFormat {
+	return s.Format
+}
+
+// GetTitle returns the value of Title.
+func (s *UserProperty) GetTitle() string {
+	return s.Title
+}
+
+// GetMinLength returns the value of MinLength.
+func (s *UserProperty) GetMinLength() OptNilInt {
+	return s.MinLength
+}
+
+// GetMaxLength returns the value of MaxLength.
+func (s *UserProperty) GetMaxLength() OptNilInt {
+	return s.MaxLength
+}
+
+// GetXMinusIdentifier returns the value of XMinusIdentifier.
+func (s *UserProperty) GetXMinusIdentifier() OptBool {
+	return s.XMinusIdentifier
+}
+
+// GetXMinusVerify returns the value of XMinusVerify.
+func (s *UserProperty) GetXMinusVerify() OptNilString {
+	return s.XMinusVerify
+}
+
+// GetXMinusUnique returns the value of XMinusUnique.
+func (s *UserProperty) GetXMinusUnique() OptNilUserPropertyXMinusUnique {
+	return s.XMinusUnique
+}
+
+// GetXMinusClaim returns the value of XMinusClaim.
+func (s *UserProperty) GetXMinusClaim() OptNilString {
+	return s.XMinusClaim
+}
+
+// GetXMinusEditable returns the value of XMinusEditable.
+func (s *UserProperty) GetXMinusEditable() OptBool {
+	return s.XMinusEditable
+}
+
+// GetXMinusSensitive returns the value of XMinusSensitive.
+func (s *UserProperty) GetXMinusSensitive() OptBool {
+	return s.XMinusSensitive
+}
+
+// GetXMinusMfa returns the value of XMinusMfa.
+func (s *UserProperty) GetXMinusMfa() OptBool {
+	return s.XMinusMfa
+}
+
+// GetProperties returns the value of Properties.
+func (s *UserProperty) GetProperties() OptUserPropertyProperties {
+	return s.Properties
+}
+
+// SetType sets the value of Type.
+func (s *UserProperty) SetType(val UserPropertyType) {
+	s.Type = val
+}
+
+// SetFormat sets the value of Format.
+func (s *UserProperty) SetFormat(val OptNilUserPropertyFormat) {
+	s.Format = val
+}
+
+// SetTitle sets the value of Title.
+func (s *UserProperty) SetTitle(val string) {
+	s.Title = val
+}
+
+// SetMinLength sets the value of MinLength.
+func (s *UserProperty) SetMinLength(val OptNilInt) {
+	s.MinLength = val
+}
+
+// SetMaxLength sets the value of MaxLength.
+func (s *UserProperty) SetMaxLength(val OptNilInt) {
+	s.MaxLength = val
+}
+
+// SetXMinusIdentifier sets the value of XMinusIdentifier.
+func (s *UserProperty) SetXMinusIdentifier(val OptBool) {
+	s.XMinusIdentifier = val
+}
+
+// SetXMinusVerify sets the value of XMinusVerify.
+func (s *UserProperty) SetXMinusVerify(val OptNilString) {
+	s.XMinusVerify = val
+}
+
+// SetXMinusUnique sets the value of XMinusUnique.
+func (s *UserProperty) SetXMinusUnique(val OptNilUserPropertyXMinusUnique) {
+	s.XMinusUnique = val
+}
+
+// SetXMinusClaim sets the value of XMinusClaim.
+func (s *UserProperty) SetXMinusClaim(val OptNilString) {
+	s.XMinusClaim = val
+}
+
+// SetXMinusEditable sets the value of XMinusEditable.
+func (s *UserProperty) SetXMinusEditable(val OptBool) {
+	s.XMinusEditable = val
+}
+
+// SetXMinusSensitive sets the value of XMinusSensitive.
+func (s *UserProperty) SetXMinusSensitive(val OptBool) {
+	s.XMinusSensitive = val
+}
+
+// SetXMinusMfa sets the value of XMinusMfa.
+func (s *UserProperty) SetXMinusMfa(val OptBool) {
+	s.XMinusMfa = val
+}
+
+// SetProperties sets the value of Properties.
+func (s *UserProperty) SetProperties(val OptUserPropertyProperties) {
+	s.Properties = val
+}
+
+type UserPropertyFormat string
+
+const (
+	UserPropertyFormatEmail    UserPropertyFormat = "email"
+	UserPropertyFormatDateTime UserPropertyFormat = "date-time"
+	UserPropertyFormatUUID     UserPropertyFormat = "uuid"
+	UserPropertyFormatURI      UserPropertyFormat = "uri"
+)
+
+// AllValues returns all UserPropertyFormat values.
+func (UserPropertyFormat) AllValues() []UserPropertyFormat {
+	return []UserPropertyFormat{
+		UserPropertyFormatEmail,
+		UserPropertyFormatDateTime,
+		UserPropertyFormatUUID,
+		UserPropertyFormatURI,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s UserPropertyFormat) MarshalText() ([]byte, error) {
+	switch s {
+	case UserPropertyFormatEmail:
+		return []byte(s), nil
+	case UserPropertyFormatDateTime:
+		return []byte(s), nil
+	case UserPropertyFormatUUID:
+		return []byte(s), nil
+	case UserPropertyFormatURI:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *UserPropertyFormat) UnmarshalText(data []byte) error {
+	switch UserPropertyFormat(data) {
+	case UserPropertyFormatEmail:
+		*s = UserPropertyFormatEmail
+		return nil
+	case UserPropertyFormatDateTime:
+		*s = UserPropertyFormatDateTime
+		return nil
+	case UserPropertyFormatUUID:
+		*s = UserPropertyFormatUUID
+		return nil
+	case UserPropertyFormatURI:
+		*s = UserPropertyFormatURI
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// A map of additional properties for the user definition, where the key
+// is the property name and the value is the property schema.
+type UserPropertyProperties map[string]NestedProperty
+
+func (s *UserPropertyProperties) init() UserPropertyProperties {
+	m := *s
+	if m == nil {
+		m = map[string]NestedProperty{}
+		*s = m
+	}
+	return m
+}
+
+type UserPropertyType string
+
+const (
+	UserPropertyTypeString  UserPropertyType = "string"
+	UserPropertyTypeNumber  UserPropertyType = "number"
+	UserPropertyTypeBoolean UserPropertyType = "boolean"
+	UserPropertyTypeObject  UserPropertyType = "object"
+	UserPropertyTypeArray   UserPropertyType = "array"
+)
+
+// AllValues returns all UserPropertyType values.
+func (UserPropertyType) AllValues() []UserPropertyType {
+	return []UserPropertyType{
+		UserPropertyTypeString,
+		UserPropertyTypeNumber,
+		UserPropertyTypeBoolean,
+		UserPropertyTypeObject,
+		UserPropertyTypeArray,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s UserPropertyType) MarshalText() ([]byte, error) {
+	switch s {
+	case UserPropertyTypeString:
+		return []byte(s), nil
+	case UserPropertyTypeNumber:
+		return []byte(s), nil
+	case UserPropertyTypeBoolean:
+		return []byte(s), nil
+	case UserPropertyTypeObject:
+		return []byte(s), nil
+	case UserPropertyTypeArray:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *UserPropertyType) UnmarshalText(data []byte) error {
+	switch UserPropertyType(data) {
+	case UserPropertyTypeString:
+		*s = UserPropertyTypeString
+		return nil
+	case UserPropertyTypeNumber:
+		*s = UserPropertyTypeNumber
+		return nil
+	case UserPropertyTypeBoolean:
+		*s = UserPropertyTypeBoolean
+		return nil
+	case UserPropertyTypeObject:
+		*s = UserPropertyTypeObject
+		return nil
+	case UserPropertyTypeArray:
+		*s = UserPropertyTypeArray
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+type UserPropertyXMinusUnique string
+
+const (
+	UserPropertyXMinusUniqueInstance     UserPropertyXMinusUnique = "instance"
+	UserPropertyXMinusUniqueOrganization UserPropertyXMinusUnique = "organization"
+)
+
+// AllValues returns all UserPropertyXMinusUnique values.
+func (UserPropertyXMinusUnique) AllValues() []UserPropertyXMinusUnique {
+	return []UserPropertyXMinusUnique{
+		UserPropertyXMinusUniqueInstance,
+		UserPropertyXMinusUniqueOrganization,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s UserPropertyXMinusUnique) MarshalText() ([]byte, error) {
+	switch s {
+	case UserPropertyXMinusUniqueInstance:
+		return []byte(s), nil
+	case UserPropertyXMinusUniqueOrganization:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *UserPropertyXMinusUnique) UnmarshalText(data []byte) error {
+	switch UserPropertyXMinusUnique(data) {
+	case UserPropertyXMinusUniqueInstance:
+		*s = UserPropertyXMinusUniqueInstance
+		return nil
+	case UserPropertyXMinusUniqueOrganization:
+		*s = UserPropertyXMinusUniqueOrganization
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
 
 type UsernamePassword struct {
 	Username string

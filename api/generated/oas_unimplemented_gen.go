@@ -31,6 +31,15 @@ func (UnimplementedHandler) AuthorizeGet(ctx context.Context, params AuthorizeGe
 	return r, ht.ErrNotImplemented
 }
 
+// CreateUserDefinition implements createUserDefinition operation.
+//
+// Create a new user definition in the system.
+//
+// POST /user-definitions
+func (UnimplementedHandler) CreateUserDefinition(ctx context.Context, req *CreateUserDefinitionRequest) (r CreateUserDefinitionRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // EndSession implements endSession operation.
 //
 // End a session.
@@ -94,6 +103,15 @@ func (UnimplementedHandler) GetToken(ctx context.Context, req *PostTokenRequest)
 	return r, ht.ErrNotImplemented
 }
 
+// GetUserDefinitionById implements getUserDefinitionById operation.
+//
+// Get the currently active user definition by its `UserDefinitionID`.
+//
+// GET /user-definitions/{id}
+func (UnimplementedHandler) GetUserDefinitionById(ctx context.Context, params GetUserDefinitionByIdParams) (r GetUserDefinitionByIdRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // GetUserInfo implements getUserInfo operation.
 //
 // Get user info.
@@ -109,6 +127,15 @@ func (UnimplementedHandler) GetUserInfo(ctx context.Context) (r GetUserInfoRes, 
 //
 // POST /auth/introspect
 func (UnimplementedHandler) Introspect(ctx context.Context, req *IntrospectRequest) (r IntrospectRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// ListUserDefinitions implements listUserDefinitions operation.
+//
+// Get a list of all default user definitions in the system.
+//
+// GET /user-definitions
+func (UnimplementedHandler) ListUserDefinitions(ctx context.Context) (r ListUserDefinitionsRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

@@ -1,0 +1,20 @@
+type: object
+properties:
+  title:
+    type: string
+    description: The title of the user definition
+  type:
+    type: string
+    enum: [string, number, boolean, object, array]
+  requiredFields:
+    type: array
+    items:
+      type: string
+    description: A list of required fields for the user definition
+  properties:
+    type: object
+    additionalProperties:
+      $ref: nested-property.yaml
+    description: |
+      A map of additional properties for the user definition, where the key
+      is the property name and the value is the property schema

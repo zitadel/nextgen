@@ -7,8 +7,12 @@ flows:
       openid: OpenID Connect scope
       profile: Access to the user's profile information
       email: Access to the user's email address
+      user-definitions.write: Permission to create and manage user definitions
+      user-definitions.read: Permission to read user definitions
   clientCredentials: 
     tokenUrl: https://acc.nextgen.zitadel.com/oauth/token
     scopes: 
       openid: OpenID Connect scope
+      user-definitions.write: Permission to create and manage user definitions
+      user-definitions.read: Permission to read user definitions
     

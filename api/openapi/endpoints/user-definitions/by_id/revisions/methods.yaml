@@ -1,0 +1,71 @@
+post:
+  operationId: createUserDefinitionRevision
+  summary: Create user definition revision
+  description: Create a new user definition revision in the system
+  tags:
+    - User Definitions
+  security: 
+    - oauth2: [user-definitions.write]
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: create-user-definition-revision-request.yaml
+  responses:
+    '201':
+      description: The user definition was successfully created
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+                description: The ID of the created user definition revision
+    '4XX':
+      description: The request was rejected by the server.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    default:
+      description: Something went wrong on the server. This was not your fault.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+
+get:
+  operationId: getUserDefinitionRevisionById
+  summary: Get user definition revision
+  description: Get a user definition revision by its ID.
+  tags:
+    - User Definitions
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+  security: 
+    - oauth2: [user-definitions.read]
+  responses:
+    '200':
+      description: The user definition revision was successfully retrieved
+      content:
+        application/json:
+          schema:
+            $ref: ../get-user-definition-response.yaml
+    '4XX':
+      description: The request was rejected by the server.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    default:
+      description: Something went wrong on the server. This was not your fault.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml

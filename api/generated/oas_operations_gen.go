@@ -8,6 +8,7 @@ type OperationName = string
 const (
 	AuthorizeDeviceOperation        OperationName = "AuthorizeDevice"
 	AuthorizeGetOperation           OperationName = "AuthorizeGet"
+	CreateUserDefinitionOperation   OperationName = "CreateUserDefinition"
 	EndSessionOperation             OperationName = "EndSession"
 	GetHealthOperation              OperationName = "GetHealth"
 	GetKeysOperation                OperationName = "GetKeys"
@@ -15,8 +16,10 @@ const (
 	GetOpenIDConfigurationOperation OperationName = "GetOpenIDConfiguration"
 	GetReadyOperation               OperationName = "GetReady"
 	GetTokenOperation               OperationName = "GetToken"
+	GetUserDefinitionByIdOperation  OperationName = "GetUserDefinitionById"
 	GetUserInfoOperation            OperationName = "GetUserInfo"
 	IntrospectOperation             OperationName = "Introspect"
+	ListUserDefinitionsOperation    OperationName = "ListUserDefinitions"
 	ListUsersOperation              OperationName = "ListUsers"
 	RevokeTokenOperation            OperationName = "RevokeToken"
 )

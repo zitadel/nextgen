@@ -1,0 +1,16 @@
+type: object
+required:
+  - title
+properties:
+  id:
+    type: string
+    description: The ID of the user definition
+  title:
+    type: string
+    description: The title of the user definition
+  description:
+    type: string
+    description: A description of the user definition
+  revisionNumber:
+    type: integer
+    description: The revision number of the user definition

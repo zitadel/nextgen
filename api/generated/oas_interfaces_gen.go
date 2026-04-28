@@ -9,6 +9,10 @@ type AuthorizeGetRes interface {
 	authorizeGetRes()
 }
 
+type CreateUserDefinitionRes interface {
+	createUserDefinitionRes()
+}
+
 type EndSessionRes interface {
 	endSessionRes()
 }
@@ -37,12 +41,20 @@ type GetTokenRes interface {
 	getTokenRes()
 }
 
+type GetUserDefinitionByIdRes interface {
+	getUserDefinitionByIdRes()
+}
+
 type GetUserInfoRes interface {
 	getUserInfoRes()
 }
 
 type IntrospectRes interface {
 	introspectRes()
+}
+
+type ListUserDefinitionsRes interface {
+	listUserDefinitionsRes()
 }
 
 type ListUsersRes interface {
