@@ -33,17 +33,17 @@ Out of scope for Liquid authors: colour/spacing tokens ([`tokens.md`](tokens.md)
 
 Every render has access to the capability dictionaries from [`../flowengine/flow-engine-nodes.md`](../flowengine/flow-engine-nodes.md):
 
-| Binding | Shape | Source |
-|---|---|---|
-| `step` | `{ name, type, texts: { title_key, description_key } }` | Flow payload |
-| `fields` | `Record<string, FlowField>` (keyed dict) | Flow payload |
-| `actions` | `Record<string, FlowAction>` (keyed dict, `primary: boolean` flag per entry) | Flow payload |
-| `gates` | `Record<string, Gate>` (keyed dict) | Flow payload |
-| `messages` | `FlowMessage[]` | Flow payload |
-| `identity` | `FlowIdentity \| null` | Flow payload |
-| `errors` | `FlowError[]` | Flow payload |
-| `branding` | Branding projection (see [`schema.md`](schema.md)) | Inline on flow response |
-| `loading` | `boolean` | Component state |
+| Binding    | Shape                                                                        | Source                  |
+| ---------- | ---------------------------------------------------------------------------- | ----------------------- |
+| `step`     | `{ name, type, texts: { title_key, description_key } }`                      | Flow payload            |
+| `fields`   | `Record<string, FlowField>` (keyed dict)                                     | Flow payload            |
+| `actions`  | `Record<string, FlowAction>` (keyed dict, `primary: boolean` flag per entry) | Flow payload            |
+| `gates`    | `Record<string, Gate>` (keyed dict)                                          | Flow payload            |
+| `messages` | `FlowMessage[]`                                                              | Flow payload            |
+| `identity` | `FlowIdentity \| null`                                                       | Flow payload            |
+| `errors`   | `FlowError[]`                                                                | Flow payload            |
+| `branding` | Branding projection (see [`schema.md`](schema.md))                           | Inline on flow response |
+| `loading`  | `boolean`                                                                    | Component state         |
 
 Templates iterate these bindings. They never mutate them.
 
@@ -109,10 +109,10 @@ Notes:
 
 Two built-in `layout` values ship with the component package in v1:
 
-| `layout` | Sketch |
-|---|---|
-| `centered` (default) | Card centred on page. Fields stacked, primary action full-width, SSO below a divider. |
-| `split` | Brand panel on the left (logo, `hero_url` background), form on the right. Maps to the legacy `side-by-side` layout. |
+| `layout`             | Sketch                                                                                                              |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `centered` (default) | Card centred on page. Fields stacked, primary action full-width, SSO below a divider.                               |
+| `split`              | Brand panel on the left (logo, `hero_url` background), form on the right. Maps to the legacy `side-by-side` layout. |
 
 ADR-033 described four presets (`centered`, `split`, `muted`, `minimal`). Whether `muted` and `minimal` graduate into the `layout` enum in a later revision is tracked as open question 2 in [`README.md`](README.md). For v1, the same chrome effect is reachable via `branding.liquid_template`.
 
@@ -141,11 +141,11 @@ Choice affects the branding object shape, editor UI, and what "change this one s
 
 Detail deferred to the stage rollout in [`README.md`](README.md). Summary:
 
-| Stage | What the editor produces | Validator feedback |
-|---|---|---|
-| 1 | Built-ins only | N/A |
-| 2 | Generated Liquid from a fixed block set | Generator enforces validity |
-| 3 | Hand-written Liquid | Full static validator inline |
+| Stage | What the editor produces                | Validator feedback           |
+| ----- | --------------------------------------- | ---------------------------- |
+| 1     | Built-ins only                          | N/A                          |
+| 2     | Generated Liquid from a fixed block set | Generator enforces validity  |
+| 3     | Hand-written Liquid                     | Full static validator inline |
 
 ## See also
 

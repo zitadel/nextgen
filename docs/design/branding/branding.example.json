@@ -49,9 +49,5 @@
         "border":     "#262626"
       }
     }
-  },
-
-  "advanced": {
-    "custom_css": null
   }
 }

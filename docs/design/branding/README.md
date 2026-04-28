@@ -16,17 +16,19 @@ graph LR
 
 ## Responsibility split
 
-1. **Step JSON** (`fields`, `actions`, `gates`, messages, errors): capability data, stable keys, labels via `text_key`. No UI chrome in this layer.
+1. **Step JSON** (`fields`, `actions`, `gates`, `messages`, `errors`, `identity`): capability data, stable keys, labels via `text_key`. No UI chrome in this layer.
 
-2. **`branding.liquid_template`:** which `<zl-*>` elements appear and in what order. Can set `:host { --zl-* }` ([`tokens.md`](tokens.md)).
+2. **`branding.liquid_template`:** which `<zl-*>` elements appear and in what order. Pure structure — no `<style>` blocks or `:host` rules.
 
-3. **`Branding` object:** layout preset, URLs, optional theme fields ([`schema.md`](schema.md)).
+3. **Orchestrator:** reads the `Branding` object and generates `--zl-*` CSS tokens via `adoptedStyleSheets`. Templates never touch theming ([`tokens.md`](tokens.md)).
 
-4. **`<zl-*>` atoms:** UI implementation; read CSS variables; overrides in [`override-ladder.md`](override-ladder.md).
+4. **`Branding` object:** layout preset, URLs, optional theme fields ([`schema.md`](schema.md)). Input to the orchestrator's token generation.
+
+5. **`<zl-*>` atoms:** UI implementation; read CSS variables; overrides in [`override-ladder.md`](override-ladder.md).
 
 ## Invariants
 
-Liquid output uses `<zl-*>` tags, not raw form controls. User-facing strings use `text_key` and `| t`. Liquid safety: [`../flowengine/template-security.md`](../flowengine/template-security.md). Required fields/gates: [`validator.md`](validator.md) plus `{% mandatory_gates %}`.
+Liquid output uses `<zl-*>` tags, not raw form controls. User-facing strings use `text_key` and `| t`. Templates must not emit `<style>` blocks — theming is orchestrator-owned. Liquid safety: [`../flowengine/template-security.md`](../flowengine/template-security.md). Required fields/gates: [`validator.md`](validator.md) plus `{% mandatory_gates %}`.
 
 ## Rollout sketch
 
@@ -34,7 +36,7 @@ Built-ins and tokens first, then a block editor that emits Liquid, then a free-t
 
 ## Open points
 
-How much theme state belongs in `Branding` vs only in Liquid; extra layout presets; how templates attach to flows; dark mode; optional untrusted CSS; i18n source; powered-by line.
+Extra layout presets; how templates attach to flows; dark mode; optional untrusted CSS; i18n source; powered-by line.
 
 ## Files
 

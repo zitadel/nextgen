@@ -18,9 +18,9 @@ Branding:
       default: centered
     liquid_template:
       type: string
-    logo_url:       { type: string, format: uri }
-    font_url:       { type: string, format: uri }
-    hero_url:       { type: string, format: uri }
+    logo_url: { type: string, format: uri }
+    font_url: { type: string, format: uri }
+    hero_url: { type: string, format: uri }
 ```
 
 **Read-only projection** at flow creation (app / org / instance merge, most specific wins). Widget must accept the five-field shape as-is.
@@ -52,34 +52,34 @@ Every field is optional; omitting a field falls back to the built-in default. A 
   "hero_url": null,
 
   "palette": {
-    "primary":     "#4A90D9",
-    "on_primary":  "#FFFFFF",
-    "background":  "#FFFFFF",
-    "surface":     "#FFFFFF",
-    "muted":       "#F1F5F9",
-    "border":      "#E2E8F0",
-    "text":        "#0F172A",
-    "text_muted":  "#64748B",
-    "link":        null,
-    "success":     "#10B981",
-    "warning":     "#F59E0B",
-    "error":       "#EF4444"
+    "primary": "#4A90D9",
+    "on_primary": "#FFFFFF",
+    "background": "#FFFFFF",
+    "surface": "#FFFFFF",
+    "muted": "#F1F5F9",
+    "border": "#E2E8F0",
+    "text": "#0F172A",
+    "text_muted": "#64748B",
+    "link": null,
+    "success": "#10B981",
+    "warning": "#F59E0B",
+    "error": "#EF4444"
   },
 
   "typography": {
-    "font_family":      "Arimo, ui-sans-serif, system-ui, sans-serif",
+    "font_family": "Arimo, ui-sans-serif, system-ui, sans-serif",
     "font_family_mono": "ui-monospace, SFMono-Regular, monospace",
-    "scale":            1.0
+    "scale": 1.0
   },
 
   "shape": {
-    "radius":  "md",
+    "radius": "md",
     "density": "regular"
   },
 
   "assets": {
-    "logo_dark":        "https://cdn.example.com/logo-dark.svg",
-    "favicon":          "https://cdn.example.com/favicon.ico",
+    "logo_dark": "https://cdn.example.com/logo-dark.svg",
+    "favicon": "https://cdn.example.com/favicon.ico",
     "background_image": null
   },
 
@@ -88,16 +88,12 @@ Every field is optional; omitting a field falls back to the built-in default. A 
     "dark": {
       "palette": {
         "background": "#0A0A0A",
-        "surface":    "#111111",
-        "text":       "#FAFAFA",
-        "border":     "#262626"
+        "surface": "#111111",
+        "text": "#FAFAFA",
+        "border": "#262626"
       }
     }
   },
-
-  "advanced": {
-    "custom_css": null
-  }
 }
 ```
 
@@ -147,11 +143,15 @@ Additional asset URLs alongside the baseline `logo_url` / `hero_url`. The consum
 - **`mode`**: `light` \| `dark` \| `auto` (`auto` uses `prefers-color-scheme`). Resolved value on root `data-theme`.
 - **`dark`**: optional `palette` overrides when dark; missing keys inherit light. Omit `theme` or set `mode: light` to disable.
 
-#### `advanced.custom_css` (string, escape hatch)
+#### ~~`advanced.custom_css`~~ (removed)
 
-Free-form CSS applied inside the widget root. Subject to a sandbox (see open question 5 in [`README.md`](README.md)). Likely product-plan-gated, but the component itself must refuse anything outside the sandbox regardless.
+Dropped. The override ladder covers all CSS customization needs:
+1. **Tokens** — orchestrator-owned from `Branding` (`adoptedStyleSheets`)
+2. **Inline styles** — `<zitadel-login style="--zl-*">` (host override)
+3. **`::part()`** — parent page styles atom internals
+4. **Eject** — full template ownership, put whatever you need
 
-Baseline already allows full control via `liquid_template` and `<style>`. `custom_css` is only if we want theme tweaks without forking Liquid. Skip this field if structured branding is dropped.
+No need for a separate `custom_css` escape hatch. Eliminates a security surface (sandboxing arbitrary CSS) and a schema field to maintain.
 
 ## Shape invariants enforced by the component
 
