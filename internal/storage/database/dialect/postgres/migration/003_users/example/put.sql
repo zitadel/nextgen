@@ -1,8 +1,9 @@
--- Full state sync: $3 is the complete desired attribute set. Keys omitted are removed
--- from user_attributes and from user_unique_attributes (or no longer registered when
--- unique_scope is unspecified). Registry rows for keys that stay unique are cleared
--- then re-inserted so value_hash changes stay conflict-free against the registry PK.
--- Final attributes are taken from _input_data (same shape as get_by_id / create).
+-- Full state sync: $3 is the complete desired attribute set.
+-- Registry reconciliation is diff-based: rows absent from desired unique state are
+-- deleted, while desired rows are UPSERTed with unchanged rows excluded from writes.
+-- Attribute reconciliation is also minimal-write: missing keys are deleted, inserts
+-- happen for new keys, and conflict updates run only when values actually changed.
+-- Final attributes are taken from _input_data (same model as get_by_id / create).
 
 /*
 DEALLOCATE ALL;
@@ -34,31 +35,36 @@ WITH _header AS (
         , unique_scope
     FROM unnest($3::zitadel_nextgen.incoming_user_attribute[])
 )
+, _desired_registry AS (
+    SELECT
+        h.instance_id
+        , h.id AS user_id
+        , CASE
+            WHEN d.unique_scope = 'global'::zitadel_nextgen.uniqueness_scope THEN ''::text
+            ELSE h.organization_id
+          END AS organization_id
+        , d.key
+        , d.value_hash
+    FROM _input_data d
+    CROSS JOIN _header h
+    WHERE d.unique_scope IN (
+            'organization'::zitadel_nextgen.uniqueness_scope
+            , 'global'::zitadel_nextgen.uniqueness_scope
+        )
+      AND d.value_hash IS NOT NULL
+)
 , _del_registry AS (
     DELETE FROM zitadel_nextgen.user_unique_attributes uua
     WHERE uua.instance_id = $1
       AND uua.user_id = $2
-      AND (
-            NOT EXISTS (
-                SELECT 1
-                FROM _input_data d
-                WHERE d.key = uua.key
-            )
-        OR EXISTS (
-                SELECT 1
-                FROM _input_data d
-                WHERE d.key = uua.key
-                  AND d.unique_scope = 'unspecified'::zitadel_nextgen.uniqueness_scope
-            )
-        OR EXISTS (
-                SELECT 1
-                FROM _input_data d
-                WHERE d.key = uua.key
-                  AND d.unique_scope IN (
-                        'organization'::zitadel_nextgen.uniqueness_scope
-                        , 'global'::zitadel_nextgen.uniqueness_scope
-                    )
-            )
+      AND NOT EXISTS (
+            SELECT 1
+            FROM _desired_registry dr
+            WHERE dr.instance_id = uua.instance_id
+              AND dr.user_id = uua.user_id
+              AND dr.organization_id = uua.organization_id
+              AND dr.key = uua.key
+              AND dr.value_hash = uua.value_hash
         )
 )
 , _ins_registry AS (
@@ -70,20 +76,21 @@ WITH _header AS (
         , value_hash
     )
     SELECT
-        $1
-        , $2
-        , CASE
-            WHEN d.unique_scope = 'global'::zitadel_nextgen.uniqueness_scope THEN ''::text
-            ELSE h.organization_id
-          END
-        , d.key
-        , d.value_hash
-    FROM _input_data d
-    CROSS JOIN _header h
-    WHERE d.unique_scope IN (
-            'organization'::zitadel_nextgen.uniqueness_scope
-            , 'global'::zitadel_nextgen.uniqueness_scope
-        )
+        dr.instance_id
+        , dr.user_id
+        , dr.organization_id
+        , dr.key
+        , dr.value_hash
+    FROM _desired_registry dr
+    WHERE NOT EXISTS (
+        SELECT 1
+        FROM zitadel_nextgen.user_unique_attributes uua
+        WHERE uua.instance_id = dr.instance_id
+            AND uua.user_id = dr.user_id
+            AND uua.organization_id = dr.organization_id
+            AND uua.key = dr.key
+            AND uua.value_hash = dr.value_hash
+    )
 )
 , _del_attrs AS (
     DELETE FROM zitadel_nextgen.user_attributes ua
@@ -119,9 +126,20 @@ WITH _header AS (
         FROM _input_data d
         CROSS JOIN _header h
     ) AS s
+    WHERE NOT EXISTS (
+            SELECT 1
+            FROM zitadel_nextgen.user_attributes ua
+            WHERE ua.instance_id = s.instance_id
+              AND ua.user_id = s.user_id
+              AND ua.key = s.key
+              AND ua.organization_id = s.organization_id
+              AND ua.value = s.value
+        )
     ON CONFLICT (instance_id, user_id, key) DO UPDATE
         SET value = EXCLUDED.value
         , organization_id = EXCLUDED.organization_id
+    WHERE zitadel_nextgen.user_attributes.value IS DISTINCT FROM EXCLUDED.value
+       OR zitadel_nextgen.user_attributes.organization_id IS DISTINCT FROM EXCLUDED.organization_id
 )
 SELECT
     h.schema_url

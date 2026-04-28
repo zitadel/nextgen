@@ -78,9 +78,9 @@ func runCreateUser() {
 		ID:             "test_99999999",
 		OrganizationID: "org_0001",
 		Attributes: []IncomingUserAttribute{
-			// Ignoring errors for brevity, in production code you should handle them properly
 			func() IncomingUserAttribute {
-				a, _ := NewIncomingUserAttribute("username", "john_doe", UserUniquenessGlobal)
+				a, attrErr := NewIncomingUserAttribute("username", "john_doe", UserUniquenessGlobal)
+				err = errors.Join(err, attrErr)
 				return a
 			}(),
 			func() IncomingUserAttribute {
