@@ -1,3 +1,3 @@
 package openapi
 
-//go:generate ogen --target generated --clean openapi/openapi-spec.yaml
+//go:generate go tool ogen --target generated --clean openapi/openapi-spec.yaml

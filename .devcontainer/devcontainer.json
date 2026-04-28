@@ -9,6 +9,15 @@
     }
   },
   "postCreateCommand": "go mod download",
+  "forwardPorts": [
+    5050
+  ],
+  "portsAttributes": {
+    "5050": {
+      "label": "pgAdmin",
+      "onAutoForward": "notify"
+    }
+  },
   "containerEnv": {
     "PGHOST": "postgres",
     "PGPORT": "5432",
@@ -22,7 +31,13 @@
       "extensions": [
         "golang.go",
         "dbaeumer.vscode-eslint",
-        "esbenp.prettier-vscode"
+        "esbenp.prettier-vscode",
+        "GitHub.vscode-pull-request-github",
+        "streetsidesoftware.code-spell-checker",
+        "ms-azuretools.vscode-docker",
+        "github.vscode-github-actions",
+        "inferrinizzard.prettier-sql-vscode",
+        "redhat.vscode-yaml"
       ]
     }
   },

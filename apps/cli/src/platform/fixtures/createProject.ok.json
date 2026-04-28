@@ -1,0 +1,9 @@
+{
+  "schema_version": 2,
+  "project_id": "river-8421",
+  "project_secret": "sk_proj_mock_river8421_full",
+  "preview_secret": "sk_proj_mock_river8421_preview",
+  "preview_origins": ["*.vercel.app"],
+  "created_at": "2026-04-21T14:03:11.000Z",
+  "scratch_dashboard_url": "https://zitadel.dev/scratch/river-8421"
+}
