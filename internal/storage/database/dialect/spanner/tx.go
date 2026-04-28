@@ -2,7 +2,6 @@ package spanner
 
 import (
 	"github.com/jackc/pgx/v5"
-
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/database/dialect/pgxcommon"
 )

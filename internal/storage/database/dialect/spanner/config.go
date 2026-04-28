@@ -43,13 +43,14 @@ func (c *Config) getPool(ctx context.Context) (*pgxpool.Pool, error) {
 // The database name must be a Spanner resource path, e.g.
 // projects/my-project/instances/my-instance/databases/my-db.
 func DecodeConfig(input any) (database.Connector, error) {
-	switch c := input.(type) {
-	case string:
-		config, err := pgxpool.ParseConfig(c)
-		if err != nil {
-			return nil, err
-		}
-		return &Config{Config: config}, nil
+	c, ok := input.(string)
+	if !ok {
+		return nil, errors.New("invalid configuration: expected connection URL string")
 	}
-	return nil, errors.New("invalid configuration: expected connection URL string")
+
+	config, err := pgxpool.ParseConfig(c)
+	if err != nil {
+		return nil, err
+	}
+	return &Config{Config: config}, nil
 }
