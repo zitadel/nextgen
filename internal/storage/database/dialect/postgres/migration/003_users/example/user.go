@@ -155,9 +155,9 @@ func PutUser(ctx context.Context, instanceID, userID string, attributes []Incomi
 	return user, nil
 }
 
-func PatchUser(ctx context.Context, instanceID, userID string, attributes []IncomingUserAttribute, deleteKeys []string) (*User, error) {
+func PatchUser(ctx context.Context, instanceID, userID string, attributes []IncomingUserAttribute, deleteKeys []string) (*UpdateUserResult, error) {
 	rows, _ := conn.Query(ctx, patchUserStmt, instanceID, userID, attributes, deleteKeys)
-	user, err := pgx.CollectExactlyOneRow(rows, pgx.RowToAddrOfStructByPos[User])
+	user, err := pgx.CollectExactlyOneRow(rows, pgx.RowToAddrOfStructByPos[UpdateUserResult])
 	if err != nil {
 		return nil, fmt.Errorf("failed to patch user: %w", err)
 	}

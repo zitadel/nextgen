@@ -41,6 +41,7 @@ _ins_registry AS (
 _del_attrs AS (
     DELETE FROM zitadel_nextgen.user_attributes
     WHERE instance_id = $1 AND user_id = $2 AND key = ANY($4)
+    RETURNING key
 ),
 _upsert_attrs AS (
     INSERT INTO zitadel_nextgen.user_attributes (instance_id, organization_id, user_id, key, value)
@@ -48,6 +49,15 @@ _upsert_attrs AS (
     FROM _input_upsert i, _header h
     ON CONFLICT (instance_id, user_id, key) DO UPDATE 
     SET value = EXCLUDED.value
+    RETURNING key
+),
+_del_attrs_count AS (
+    SELECT count(*)::bigint AS deleted_attributes
+    FROM _del_attrs
+),
+_upsert_attrs_count AS (
+    SELECT count(*)::bigint AS upserted_attributes
+    FROM _upsert_attrs
 )
 -- Final Full-State Return
 -- State changes in the CTEs are not yet applied to the tables.
@@ -66,8 +76,12 @@ SELECT
             -- Attributes that were newly added or updated
             SELECT key, value FROM _input_upsert
         ) final
-    ) AS attributes
-FROM _header h;
+    ) AS attributes,
+    dac.deleted_attributes,
+    uac.upserted_attributes
+FROM _header h
+CROSS JOIN _del_attrs_count dac
+CROSS JOIN _upsert_attrs_count uac;
 
 /*
 EXECUTE patch_user(
