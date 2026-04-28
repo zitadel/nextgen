@@ -6,7 +6,6 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
-
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/database/dialect/postgres/migration"
 )
@@ -44,12 +43,12 @@ func (p *Pool) Query(ctx context.Context, sql string, args ...any) (database.Row
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	return &Rows{rows}, nil
+	return newRows(rows), nil
 }
 
 // QueryRow implements [database.Pool].
 func (p *Pool) QueryRow(ctx context.Context, sql string, args ...any) database.Row {
-	return &Row{p.Pool.QueryRow(ctx, sql, args...)}
+	return newRow(p.Pool.QueryRow(ctx, sql, args...))
 }
 
 // Exec implements [database.Pool].
@@ -67,7 +66,7 @@ func (p *Pool) Begin(ctx context.Context, opts *database.TransactionOptions) (da
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	return &Transaction{tx}, nil
+	return PGxTx(tx), nil
 }
 
 // Close implements [database.Pool].

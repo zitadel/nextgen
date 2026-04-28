@@ -1,4 +1,4 @@
-package postgres
+package spanner
 
 import (
 	"github.com/jackc/pgx/v5"
@@ -7,13 +7,12 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database/dialect/pgxcommon"
 )
 
-// Transaction is a type alias so existing code that references postgres.Transaction still compiles.
+// Transaction is a type alias so that callers referencing spanner.Transaction still compile.
 type Transaction = pgxcommon.Transaction
 
 var _ database.Transaction = (*Transaction)(nil)
 
-// PGxTx wraps an existing pgx.Tx in a postgres-dialect transaction.
-func PGxTx(tx pgx.Tx) *Transaction {
+func newTransaction(tx pgx.Tx) *Transaction {
 	return pgxcommon.NewTransaction(tx, wrapError)
 }
 
