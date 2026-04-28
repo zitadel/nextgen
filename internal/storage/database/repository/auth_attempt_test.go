@@ -97,10 +97,7 @@ func TestAuthAttempt_Create(t *testing.T) {
 			},
 		},
 		{
-			// PasskeyAuthCheck does not implement AuthChallenger or AuthFactorer,
-			// so challenge_payload and factor_payload are not serialised even though
-			// the in-memory fields are populated.
-			name: "passkey check — stored without payload (AuthChallenger/AuthFactorer not implemented)",
+			name: "passkey check — challenge and factor payloads roundtrip via JSON",
 			attempt: &domain.AuthAttempt{
 				ProjectID:      "p",
 				ID:             "a",
@@ -122,8 +119,8 @@ func TestAuthAttempt_Create(t *testing.T) {
 				require.True(t, ok)
 				passkeyCheck, ok := storedCheckRaw.(*domain.PasskeyAuthCheck)
 				require.True(t, ok, "expected *PasskeyAuthCheck")
-				require.Empty(t, passkeyCheck.Challenge.Challenge, "challenge payload must not be persisted")
-				require.False(t, passkeyCheck.Factor.UserVerified, "factor payload must not be persisted")
+				require.Equal(t, "my-challenge", passkeyCheck.Challenge.Challenge)
+				require.True(t, passkeyCheck.Factor.UserVerified)
 			},
 		},
 		{
