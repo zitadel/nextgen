@@ -54,7 +54,23 @@ paths:
         own origins, declared per environment in `zitadel.json`.
 
         This endpoint is called by `npx @zitadel/setup` on first run.
+        Clients SHOULD send an `Idempotency-Key` header when creating a
+        project. Retries with the same key and the same request payload MUST
+        return the original successful result instead of creating a duplicate
+        project. Reusing an `Idempotency-Key` with a different request payload
+        MUST be rejected.
       tags: [Projects]
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          description: |
+            Opaque client-generated token used to make anonymous project
+            creation safe to retry. The same key with the same request body
+            returns the original create result; the same key with a different
+            request body is invalid.
+          schema:
+            type: string
       requestBody:
         required: true
         content:

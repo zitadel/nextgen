@@ -31,10 +31,10 @@ Defines fields:                 References fields:                Reads schema a
   phone (x-mfa: sms)             form step: show
   given_name                       [password]                     Reads user context:
   family_name                    form step: show                    user.roles, user.team →
-  password                         [phone] (skippable)              determines acr level
+  password                         [phone] (skippable)              determines assurance level
   x-auth-methods:
     password: enabled            Builds UINodes from               Returns decision:
-    passkey: enabled               schema field metadata             acr, need[]
+    passkey: enabled               schema field metadata             assurance decision
     sso: enabled
 ```
 

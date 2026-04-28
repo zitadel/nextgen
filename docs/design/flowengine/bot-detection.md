@@ -12,7 +12,7 @@ Bot detection is a **first-class, composable subsystem** — not an afterthought
 2. **Pluggable providers.** Admins can configure third-party captcha services (reCAPTCHA, hCaptcha, Cloudflare Turnstile) via `x-captcha.provider`. The captcha interface is provider-agnostic.
 3. **Composable signals.** Captcha is one of several signals. The risk evaluator fuses them into a single `RiskResult`.
 4. **Risk-based activation.** Captcha is not always-on. The policy engine decides when to require it.
-5. **Works in both paths.** Flow engine injects captcha steps dynamically. Session API includes `captcha` in `need[]` when risk evaluation demands it.
+5. **Works in both paths.** Flow engine injects captcha steps dynamically. Direct clients drive the same captcha challenge through `auth_attempts` when risk evaluation demands it.
 
 ## Signal Architecture
 
@@ -187,17 +187,19 @@ Three modes:
 
 3. **Invisible assessment** — a `policy_check` step evaluates risk. Low score → skip. High score → inject captcha.
 
-## Integration: Session API
+## Integration: Auth Attempts
 
-When the risk evaluator flags a session, the policy engine adds `captcha` to the `need[]` array. The captcha factor does not affect the session's `acr` — it is a bot-detection gate, not an authentication factor.
+When the risk evaluator flags an auth attempt, the policy engine requires a
+captcha challenge. The captcha proof does not affect the session's
+`assurance_levels[]` — it is a bot-detection gate, not an authentication factor.
 
 The client:
-1. Sees `"captcha"` in `need[]`
-2. Requests a challenge: `POST /sessions/{id}/challenge { "type": "captcha" }`
+1. Receives a flow step or policy response requiring `"captcha"`
+2. Requests a challenge: `POST /auth_attempts/{id}/challenges { "method": "captcha" }`
 3. Solves the challenge client-side (widget or PoW depending on configured provider)
-4. Submits the proof: `PATCH /sessions/{id} { "captcha": { ... } }`
+4. Submits the proof: `POST /auth_attempts/{id}/challenges/{cid}/verify { "captcha": { ... } }`
 
-Captcha is a standard factor — no special-case API.
+Captcha is a standard challenge type — no special-case API.
 
 ## Risk Evaluation Event
 

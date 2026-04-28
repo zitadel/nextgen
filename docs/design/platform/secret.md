@@ -20,6 +20,20 @@ Both secrets are **generated server-side** at `POST /projects`. The client does 
 
 The setup CLI sends the desired `preview_origins` patterns (inferred from detected deploy tooling — e.g. `["*.vercel.app"]` when it sees a `vercel.json`, `["*.netlify.app"]` for Netlify, `["*.pages.dev"]` for Cloudflare Pages). The server validates the patterns against an allowed list and rejects anything it doesn't recognize.
 
+Server response from `POST /projects`:
+
+```json
+{
+  "project_id": "river-8421",
+  "project_secret": "sk_proj_7kR2pXq9vN3wLmYhT4cB8A",
+  "preview_secret": "sk_proj_c3f7a8b2vL4nYwH6...",
+  "preview_origins": ["*.vercel.app", "*.netlify.app"],
+  "created_at": "2026-04-21T14:03:11Z"
+}
+```
+
+The setup CLI maps that response to `.zitadel/secret`:
+
 ```json
 {
   "project": "river-8421",

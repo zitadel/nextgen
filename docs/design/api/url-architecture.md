@@ -50,7 +50,7 @@ If the ID doesn't exist in the index, the request 404s before any auth check —
 
 We deliberately do not encode scope hints into IDs. That would leak hierarchy structure, prevent clean re-sharding, and bind us to a scope model for the lifetime of every ID we've ever issued. Opaque IDs + a dedicated index is the right trade.
 
-> **Note:** The resource-scope index is hot and load-bearing — read on every path-ID request. Needs aggressive caching (in-process LRU + Redis) and careful invalidation on resource deletion/transfer. Slow lookups here = slow everything.
+> **Note:** The resource-scope index is hot and load-bearing — read on every path-ID request. MVP starts with performant SQL lookups plus in-process LRU caching and careful invalidation on resource deletion/transfer. Distributed caching can be added later if measurements require it. Slow lookups here = slow everything.
 
 ## DAL-level tenant isolation
 
@@ -83,7 +83,7 @@ The colon form is unambiguous to parsers and prevents namespace collisions betwe
 
 ## The 404-not-403 rule
 
-Both "ID does not exist" and "authorization fails" return **404 Not Found**. Returning 403 for existing-but-forbidden resources leaks existence and enables ID-enumeration oracles. 404 everywhere keeps the surface opaque.
+Both "ID does not exist" and "authorization fails" return **404 Not Found**. Returning 403 for existing-but-forbidden resources leaks existence and enables ID-enumeration oracles. 404 everywhere keeps the surface opaque. The error message should still be useful without disclosing which case happened, for example: "resource not found or not permitted."
 
 Exception: calls on your own resources (e.g. `PATCH /me`) return 403 when the operation is disallowed, because existence is already disclosed by the call itself.
 

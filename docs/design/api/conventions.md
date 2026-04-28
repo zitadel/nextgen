@@ -6,7 +6,7 @@
 
 | Area | Convention |
 |---|---|
-| **IDs** | Prefixed, opaque, ULID-shaped. Prefix is part of the ID (e.g. `user_01H…`, `proj_01H…`). No scope hints encoded — the resource-scope index resolves them. |
+| **IDs** | Generally prefixed, opaque, ULID-shaped. Prefix is part of the ID (e.g. `user_01H…`). No scope hints encoded — the resource-scope index resolves them. **Exception:** `project_id` is a dictionary slug (for example `river-8421`) in the platform and claim/config surfaces that use that field. |
 | **Verbs** | `POST`, `GET`, `PATCH`, `DELETE`. Never `PUT`. |
 | **Timestamps** | RFC3339 UTC strings. Never epoch millis. |
 | **Response shape** | `{ object, id, … }` for single resources. `{ object: "list", data: […], pagination: {…} }` for lists. |
@@ -15,7 +15,7 @@
 | **Filtering** | `field=value`, set membership `field=a,b,c`, suffix operators `_contains` / `_gte` / `_lte` / `_before` / `_after`. Whitelisted per endpoint. |
 | **Expansion** | `expand=team,grants`, whitelisted per endpoint. Unknown values fail 400, never silently ignored. |
 | **Versioning** | Date-based, header-selected via `Zitadel-Version`. **No version segment in paths.** Pinned per API key at creation and per webhook endpoint independently. |
-| **Rate limits** | Per-credential, sliding window. `X-RateLimit-*` headers on every response. |
+| **Rate limits** | Enforced at the edge/API layer, per credential or source IP as appropriate. `X-RateLimit-*` headers on every response. |
 
 ## Idempotency
 
@@ -41,14 +41,14 @@ These have single-use underlying tokens but must survive network retries. `Idemp
 Applies to:
 
 ```
-POST /session_handoffs/{id}/exchange
+POST /sessions/exchange
 POST /auth_attempts/{id}/challenges/{challenge_id}/verify
 POST /sessions/{id}/refresh
 ```
 
 Documented explicitly per endpoint. No endpoint silently does "the other thing."
 
-> **Note:** 24h retention on idempotency keys for all POSTs adds up. Eviction strategy + probably a separate Redis cluster.
+> **Note:** 24h retention on idempotency keys for all POSTs adds up. The MVP assumes SQL-backed retention with bounded eviction; a distributed cache can be added later if measurements require it.
 
 ## Capabilities
 
@@ -84,7 +84,7 @@ Split response accordingly:
   "version": "2026-04-21",
   "features": { ... },
   "defaults": {
-    "project_id": "proj_self_01HXY…",
+    "project_id": "river-8421",
     "team_id": "team_default"
   },
   "limits": { "users_per_project": 100000, ... }

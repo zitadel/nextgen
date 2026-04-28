@@ -26,6 +26,9 @@ Projects carry an `environment` flag: `development`, `preview`, or `production`.
 
 Same as development, plus stricter rate limits and warning banners in the dashboard.
 
+Rate limits are enforced at the edge/API layer, before expensive auth, flow,
+and delivery work runs.
+
 ### `production`
 
 - Shared-hosting wildcards (`*.vercel.app` etc.) — **forbidden**, 400 on save.

@@ -260,7 +260,7 @@ The schema version corresponds to the installed `@zitadel/sdk` version. A develo
 
 ### Capabilities handshake
 
-On every `PUT /projects/{project_id}/config`, the server responds with:
+On every `PATCH /projects/{projectId}/config`, the server responds with:
 
 ```json
 {

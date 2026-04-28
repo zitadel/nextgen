@@ -1,20 +1,20 @@
 # Session API
 
 > **Status:** Preliminary — direction is set, details are open
-> **See also:** [Overview](README.md) · [OpenAPI spec](api/session-api.yaml) · [Glossary](../glossary.md) · [auth_attempts state machine](../api/authn-and-auth-flows.md)
+> **See also:** [Overview](README.md) · [API sketch](api/session-api.yaml) · [Glossary](../glossary.md) · [auth_attempts state machine](../api/authn-and-auth-flows.md)
 >
-> The session-as-factor-accumulator model and ACR-based assurance are the intended direction. The specifics — JSON Schema for ACR level definitions, `x-freshness` semantics, the `need[]` heuristic — are proposals, not decisions. The policy engine design (which consumes and evaluates ACR levels) is not yet written.
+> The session-as-factor-accumulator model and assurance-profile evaluation are the intended direction. The specifics — JSON Schema for assurance profile definitions and `x-freshness` semantics — are proposals, not decisions. The policy engine design (which consumes and evaluates assurance levels) is not yet written.
 
-Sessions are the durable, post-auth primitive. A session accumulates verified authentication factors and carries an assurance level (ACR). Any client can use it directly to build custom flows.
+Sessions are the durable, post-auth primitive. A session accumulates verified authentication factors and exposes `assurance_levels[]`, the set of assurance profiles its current factors satisfy. Sessions are read-only from the client's perspective: factors flow in through `auth_attempts`, and clients read or revoke the resulting session.
 
 ## Relation to `auth_attempts`
 
-A session is produced by a completed [auth_attempt](../api/authn-and-auth-flows.md). auth_attempts are the **ephemeral pre-auth state machine** — they expose the primitives (challenges, verify, complete, handoff, OIDC code minting) that drive a single authentication round. The session is the durable outcome: it survives the attempt and becomes the thing the customer's app holds on to.
+A session is produced by a completed [auth_attempt](../api/authn-and-auth-flows.md). auth_attempts are the **ephemeral pre-auth state machine** — they expose the primitives (challenges, verify, handoff token minting) that drive a single authentication round. The session is the durable outcome: it survives the attempt and becomes the thing the customer's app holds on to.
 
-- **auth_attempt**: ephemeral, 15-min TTL, one OAuth-code or handoff_token terminal.
-- **session**: durable, holds factors + ACR, can be stepped up via a new auth_attempt against the same session_id.
+- **auth_attempt**: ephemeral, 15-min TTL, one handoff_token terminal. Accepts proofs, issues challenges, verifies credentials.
+- **session**: durable, holds factors + `assurance_levels[]`, readable and revocable by the client. Never mutated directly by client proof submission.
 
-Step-up re-authentication creates a new auth_attempt against the same session, adds factors, and raises the assurance level.
+Step-up re-authentication creates a new auth_attempt against the same session, adds factors, and expands `assurance_levels[]`.
 
 ## Changes from the Current v2 Session API
 
@@ -23,19 +23,19 @@ The current v2 API (`CreateSession` / `SetSession` / `GetSession` / `DeleteSessi
 | | Current v2 | New Design |
 |---|---|---|
 | **Who decides what's needed** | The caller. No guidance from the server. | The policy engine. Evaluates factors against ACR level definitions. |
-| **How the client interacts** | Client pushes "checks" — telling the server _what_ to verify. Anti-pattern: the client owns verification logic. | Client submits _proofs_ (credentials, assertions). The server decides what they mean. |
+| **How the client interacts** | Client pushes "checks" — telling the server _what_ to verify. Anti-pattern: the client owns verification logic. | Client drives `auth_attempts`; session is a read model. |
 | **Session lifecycle** | Implicit — exists or doesn't. | Explicit: `building → active → expired | revoked`. |
-| **Assurance** | Not modeled. External logic decides "done." | `acr` computed from factors. Whether it's enough depends on the request context. |
-| **Client guidance** | None. | `acr` (current level) + `need[]` (what to submit to reach a target). |
-| **Step-up / re-auth** | Not modeled. Requires new session. | Same session — add factors to raise the assurance level. |
+| **Assurance** | Not modeled. External logic decides "done." | `assurance_levels[]` lists all levels the current factors satisfy. Whether any is enough depends on the request context. |
+| **Client guidance** | None. | Flow/policy layer decides what to ask for; the session itself does not prescribe next steps. |
+| **Step-up / re-auth** | Not modeled. Requires new session. | New auth_attempt against the same session — adds factors and expands `assurance_levels[]`. |
 | **Protocol** | gRPC + REST gateway | REST/JSON native |
-| **Factor types** | user, password, web_auth_n, idp_intent, totp, otp_sms, otp_email, recovery_code | Same set. Submitted as _proofs_, not _checks_. |
-| **Challenges** | `RequestChallenges` field inside `CreateSession`/`SetSession` | Separate endpoint: `POST /sessions/{id}/challenge` |
+| **Factor types** | user, password, web_auth_n, idp_intent, totp, otp_sms, otp_email, recovery_code | Same set. Submitted as proofs through `auth_attempts`, not as checks on the session. |
+| **Challenges** | `RequestChallenges` field inside `CreateSession`/`SetSession` | Issued by `POST /auth_attempts/{id}/challenges` |
 
 **Why this matters:**
-- **No "checks" anti-pattern.** The client submits proofs (a password value, an OTP code, a passkey assertion). The server verifies, updates factors, and re-evaluates the assurance level.
-- **No binary "sufficient".** A session at AAL2 satisfies one RP but not another requiring AAL3. The session reports its level; the request context determines if it's enough.
-- Step-up auth works naturally: the RP requests a higher ACR → the session adds factors → the level rises.
+- **No "checks" anti-pattern.** Proofs (a password value, an OTP code, a passkey assertion) go to `auth_attempts`. The session reflects the verified outcome.
+- **No binary "sufficient".** The session reports all assurance levels its factors satisfy; the request context determines if one of them is enough.
+- Step-up auth works naturally: the RP requests a higher assurance level → a new auth_attempt adds factors → `assurance_levels[]` expands.
 
 ## Assurance Levels and ACR
 
@@ -45,16 +45,16 @@ The session model is built around **Authentication Context Class Reference (ACR)
 
 | Concept | What it means |
 |---|---|
-| **ACR** (Authentication Context Class Reference) | A string representing the assurance level of an authentication event. Appears in OIDC ID tokens as the `acr` claim. |
+| **ACR** (Authentication Context Class Reference) | OIDC claim name for assurance context. Core sessions expose `assurance_levels[]`; the OIDC adapter maps one requested/eligible value to the token `acr` claim. |
 | **AMR** (Authentication Methods References) | List of method identifiers used during authentication (e.g., `["pwd", "otp", "mfa"]`). Appears in OIDC ID tokens as the `amr` claim. |
 | **AAL** (Authenticator Assurance Level) | NIST's classification: AAL1 (single factor), AAL2 (two factors), AAL3 (hardware + phishing-resistant). |
 
 ### How It Works
 
-1. The session **accumulates factors** — each with `verified_at` timestamp and authenticator properties.
-2. The policy engine **defines ACR levels as JSON Schema** — each level specifies which factors are required, their combination logic, and freshness constraints.
-3. The session's current `acr` is the **highest level whose schema the factors satisfy right now**.
-4. Whether that level is "enough" depends on the **request context** (`acr_values`, application policy, action sensitivity).
+1. The session **accumulates factors** — each with `verified_at` timestamp and authenticator properties. Factors are written by completing auth_attempts.
+2. The policy engine **defines assurance levels as JSON Schema** — each level specifies which factors are required, their combination logic, and freshness constraints.
+3. The session's `assurance_levels[]` is the **list of all levels whose schemas the current factors satisfy**. AAL levels are cumulative: a session satisfying AAL2 also satisfies AAL1.
+4. Whether any level is "enough" depends on the **request context** (`acr_values`, application policy, action sensitivity).
 
 ### ACR Level Definitions as JSON Schema
 
@@ -178,8 +178,8 @@ Each ACR level is defined by a JSON Schema that the session's `factors` object m
 
 This means:
 - A factor can satisfy AAL2 right after verification but stop satisfying it after the freshness window expires.
-- The session's `acr` **degrades over time** without the session itself expiring.
-- Step-up re-authentication refreshes the factor's `verified_at`, restoring the higher level.
+- The session's `assurance_levels[]` **shrinks over time** without the session itself expiring.
+- Step-up re-authentication creates a new auth_attempt against the same session and refreshes the factor's `verified_at`, restoring the higher level.
 
 ### Factor Freshness in Practice
 
@@ -194,14 +194,14 @@ Current time: 2026-04-17T14:00:00Z (6h later)
 AAL2 schema requires: totp.verified_at within 4h
 TOTP verified 6h ago → FAILS freshness check
 
-Current ACR: urn:zitadel:aal:1 (password still fresh within 24h)
+Current assurance_levels[]: ["urn:zitadel:aal:1"] (password still fresh within 24h)
 ```
 
-The session is still valid. An RP requesting AAL1 succeeds. An RP requesting AAL2 triggers step-up: "submit a fresh second factor."
+The session is still valid. An RP requiring AAL1 finds it in the list and succeeds. An RP requiring AAL2 does not find it and triggers step-up.
 
-### Custom ACR Levels
+### Custom Assurance Levels
 
-Teams can define custom ACR values with their own schemas:
+Teams can define custom assurance values with their own schemas:
 
 ```json
 {
@@ -227,25 +227,29 @@ Teams can define custom ACR values with their own schemas:
 ## Endpoints
 
 ```
-POST   /sessions                     Create session
-GET    /sessions/{id}                Get session state + factors + acr
-PATCH  /sessions/{id}                Submit factor proofs
+POST   /sessions                     Optional anonymous pre-auth shell
+GET    /sessions                     List sessions (admin / management)
+GET    /sessions/{id}                Get session state, factors, assurance_levels[]
 DELETE /sessions/{id}                Revoke session
 
-POST   /sessions/{id}/challenge      Request challenge (passkey, OTP, captcha)
-GET    /sessions                      List sessions
+POST   /auth_attempts                Start authentication, references session_id optionally
+POST   /auth_attempts/{id}/challenges
+POST   /auth_attempts/{id}/challenges/{cid}/verify
+POST   /auth_attempts/{id}/handoff
+POST   /sessions/exchange            Exchange handoff_token -> { session, session_token }
 ```
 
 ## Session Lifecycle
 
 ```
                   ┌──────────┐
-  CreateSession → │ building │ ← step-up adds factors
+  CreateSession → │ building │ ← step-up auth_attempt
                   └────┬─────┘
-                       │ has at least one auth factor
+                       │ auth_attempt completes,
+                       │ handoff exchanged
                        ▼
                   ┌──────────┐
-                  │  active  │ ← acr may degrade as factors age
+                  │  active  │ ← assurance_levels[] may shrink as factors age
                   └────┬─────┘
                   ┌────┴─────┐
                   ▼          ▼
@@ -254,61 +258,38 @@ GET    /sessions                      List sessions
             └─────────┘ └─────────┘
 ```
 
-A session transitions to `active` when it has at least one verified authentication factor (beyond just user identification). But `active` does not mean "enough for all purposes" — the session's `acr` determines what it can be used for in each context.
+A session transitions to `active` when it has at least one verified authentication factor (beyond just user identification). `active` does not mean "enough for all purposes" — the consumer checks whether its required assurance level appears in `assurance_levels[]`.
 
-## Submit Factor Proofs
+## Handoff Exchange
 
-The client submits **proofs** — raw credentials or assertions. The server verifies them and updates the session's factors. The client never tells the server _what_ to check.
+`POST /sessions/exchange` consumes a one-time `handoff_token` minted by
+`POST /auth_attempts/{id}/handoff`. The server resolves the originating
+auth_attempt from the token and then decides:
 
-Proof fields are top-level keys on the PATCH body, not nested under a wrapper. Multiple proofs can be submitted in a single request.
+| Originating auth_attempt | Session result |
+|---|---|
+| No `session_id` | New authenticated session is created. |
+| `session_id` points to an anonymous shell | Existing session is upgraded: user and factors are written in, TTL resets to the full session TTL. |
+| `session_id` points to an active session | Existing session is upgraded for step-up: new factors merge in, `assurance_levels[]` expands. |
 
-```http
-PATCH /sessions/sess_abc
-{
-  "session_token": "tok_xyz",
-  "user": { "login_name": "alice@acme.com" }
-}
-```
-
-```json
-{
-  "session_token": "tok_xyz2",
-  "state": "building",
-  "factors": {
-    "user": { "user_id": "u_123", "verified_at": "2026-04-17T10:00:00Z" }
-  },
-  "acr": null,
-  "amr": [],
-  "need": ["password", "passkey"]
-}
-```
-
-### After Password + OTP
-
-```http
-PATCH /sessions/sess_abc
-{
-  "session_token": "tok_xyz3",
-  "otp": { "code": "123456" }
-}
-```
+Example response:
 
 ```json
 {
-  "session_token": "tok_final",
-  "state": "active",
-  "factors": {
-    "user":     { "user_id": "u_123", "verified_at": "2026-04-17T10:00:00Z" },
-    "password": { "verified_at": "2026-04-17T10:01:00Z" },
-    "otp":      { "verified_at": "2026-04-17T10:02:00Z" }
+  "session": {
+    "session_id": "sess_abc",
+    "state": "active",
+    "factors": {
+      "user": { "user_id": "u_123", "verified_at": "2026-04-17T10:00:00Z" },
+      "password": { "verified_at": "2026-04-17T10:01:00Z" },
+      "otp": { "verified_at": "2026-04-17T10:02:00Z" }
+    },
+    "assurance_levels": ["urn:zitadel:aal:1", "urn:zitadel:aal:2"],
+    "amr": ["pwd", "otp", "mfa"]
   },
-  "acr": "urn:zitadel:aal:2",
-  "amr": ["pwd", "otp", "mfa"],
-  "need": []
+  "session_token": "tok_final"
 }
 ```
-
-The session is now at AAL2. An OIDC token exchange requesting `acr_values=urn:zitadel:aal:2` would succeed. A request requiring AAL3 would fail — the client would need to add a hardware-based factor.
 
 ### Step-Up Authentication
 
@@ -316,9 +297,9 @@ A user has an active session at AAL1 (password only). An RP requests AAL2:
 
 ```
 RP → /authorize?acr_values=urn:zitadel:aal:2
-IdP checks session: acr = urn:zitadel:aal:1
-IdP: "need a second factor" → prompts for TOTP/passkey
-User submits TOTP → session factors updated → acr = urn:zitadel:aal:2
+IdP checks session: assurance_levels[] = ["urn:zitadel:aal:1"]
+IdP: "need a second factor" → starts auth_attempt against same session
+User verifies TOTP through auth_attempt → assurance_levels[] includes urn:zitadel:aal:2
 IdP issues ID token with acr: "urn:zitadel:aal:2"
 ```
 
@@ -331,58 +312,30 @@ RP → /authorize?acr_values=urn:zitadel:aal:2&max_age=300
 IdP checks session:
   - password: verified 2h ago (within 24h limit → OK)
   - totp: verified 5h ago (exceeds 4h freshness → STALE)
-  - effective acr: urn:zitadel:aal:1
+  - assurance_levels[] = ["urn:zitadel:aal:1"]
 
 IdP: "TOTP is stale, need a fresh second factor"
-User submits fresh TOTP → totp.verified_at updated → acr = urn:zitadel:aal:2
+User verifies fresh TOTP through a new auth_attempt → assurance_levels[] includes urn:zitadel:aal:2
 ```
 
 ## Context-Specific Evaluation
 
-The session stores factors and exposes its current `acr`. But whether that `acr` is "enough" is determined by the **request context**:
+The session stores factors and exposes `assurance_levels[]`. Whether any of
+those levels is "enough" is determined by the **request context**:
 
 | Context | Who decides | How |
 |---|---|---|
-| OIDC auth request | RP via `acr_values` or `claims` parameter | IdP compares session `acr` against requested values |
+| OIDC auth request | RP via `acr_values` or `claims` parameter | OIDC adapter checks whether the requested value is in `assurance_levels[]` and maps it to the token `acr` claim. |
 | Resource server (step-up) | RS via `WWW-Authenticate` header (RFC 9470) | Client re-authorizes with `acr_values` |
-| Flow engine | Policy engine per step | `policy_check` step evaluates session `acr` against step requirements |
-| Admin console action | Policy per action sensitivity | "Delete team" requires AAL3; "view settings" requires AAL1 |
+| Flow engine | Policy engine per step | `policy_check` step checks whether the required level is in `assurance_levels[]`. |
+| Admin console action | Policy per action sensitivity | "Delete team" requires AAL3 in `assurance_levels[]`; "view settings" requires AAL1. |
 
-The session itself never says "I am sufficient." It says "I am at this level." The consumer decides if that level is enough.
-
-## The `need` Array
-
-For convenience, the session returns `need` — factor types that would raise the assurance level. This is always relative to the **next achievable level** above the current one, unless a specific target was requested.
-
-```json
-"acr": "urn:zitadel:aal:1",
-"need": ["totp", "passkey", "otp_sms"]
-```
-
-Meaning: "You're at AAL1. Any of these would get you to AAL2."
-
-When evaluated in the context of an OIDC request with a specific `acr_values`, `need` reflects what's needed to reach that specific target:
-
-```json
-"acr": "urn:zitadel:aal:1",
-"requested_acr": "urn:zitadel:aal:3",
-"need": ["passkey"]
-```
-
-Meaning: "AAL3 requires a phishing-resistant hardware authenticator. Submit a passkey assertion."
-
-When a factor has aged out, `need` can include factors the session already has — meaning "re-verify this factor":
-
-```json
-"acr": "urn:zitadel:aal:1",
-"requested_acr": "urn:zitadel:aal:2",
-"need": ["totp", "otp_sms"],
-"stale": ["totp"]
-```
+The session itself never says "I am sufficient." It says "these assurance
+levels are currently satisfied." The consumer decides if that set is enough.
 
 ## Supported Factor Types
 
-| Factor | Proof payload | Requires | AAL contribution |
+| Factor | Proof payload (sent through auth_attempts) | Requires | AAL contribution |
 |---|---|---|---|
 | `user` | `{ "login_name": "..." }` or `{ "user_id": "..." }` | — | Identifies the user (prerequisite, not a factor) |
 | `password` | `{ "password": "..." }` | Prior `user` factor | Knowledge factor → AAL1 |
@@ -404,9 +357,8 @@ CREATE TABLE sessions (
     state           TEXT        NOT NULL,       -- 'building', 'active', 'expired', 'revoked'
     user_id         TEXT,
     factors         JSONB       NOT NULL DEFAULT '{}', -- verified factor events with timestamps + properties
-    acr             TEXT,                        -- current assurance level (computed on every mutation)
+    assurance_levels TEXT[]     DEFAULT '{}',   -- all levels currently satisfied
     amr             TEXT[]      DEFAULT '{}',   -- authentication methods used
-    need            TEXT[]      DEFAULT '{}',   -- factor types that would raise acr
     metadata        JSONB       NOT NULL DEFAULT '{}',
     user_agent      JSONB,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),

@@ -28,9 +28,9 @@
 | [User Schema Integration](user-schema.md) | Preliminary | How the flow engine and policy engine consume user schema annotations. |
 | [Bot Detection](bot-detection.md) | Preliminary | Composable captcha, fingerprinting, and risk evaluation. Depends on policy engine. |
 | [Template Security](template-security.md) | In Review | XSS attack vectors, trust boundaries, and defense-in-depth for LiquidJS + innerHTML rendering. |
-| **API specs** | | |
-| [Session API OpenAPI](api/session-api.yaml) | Preliminary | OpenAPI 3.1 spec for the Session API |
-| [Flow API OpenAPI](api/flow-api.yaml) | In Review | OpenAPI 3.1 spec for the Flow Engine API |
+| **Design API sketches** | | |
+| [Session API sketch](api/session-api.yaml) | Preliminary | Design-facing OpenAPI sketch; implementation source of truth lives under `api/openapi/`. |
+| [Flow API sketch](api/flow-api.yaml) | In Review | Design-facing OpenAPI sketch; implementation source of truth lives under `api/openapi/`. |
 
 ## Core Concepts
 
@@ -54,11 +54,11 @@ POST /flows                         POST /auth_attempts
 POST /flows/{id}/submit             POST /auth_attempts/{id}/challenges
   → server advances state machine        + /challenges/{cid}/verify
   → renders next step                    → submit factor proofs
-  → manages registration, profiling      → server verifies, re-evaluates acr
+  → manages registration, profiling      → server verifies, re-evaluates assurance
   → handles SSO redirects
-  ...                                  Check acr against requested acr_values
+  ...                                  Check assurance against requested acr_values
 complete → redirect                      → build native UI, step-up if needed
-                                       acr meets request → exchange / handoff
+                                       request satisfied → exchange / handoff
 
 Flow orchestrates UI; primitives       Client orchestrates its own UI;
 below come from auth_attempts.         calls auth_attempts + Session API.
@@ -71,9 +71,9 @@ Both paths get the same policy enforcement — the policy engine evaluates sessi
 ```mermaid
 graph TD
     Schema["**User Schema**<br>fields, annotations,<br>auth methods"]
-    Policy["**Policy Engine**<br>acr level, need[]"]
+    Policy["**Policy Engine**<br>assurance policy"]
     Flow["**Flow Engine**<br>state machine, Capabilities"]
-    Session["**Session API**<br>factors, acr, amr, need[]"]
+    Session["**Session API**<br>factors, assurance_levels[]"]
 
     Schema -- "narrows available methods" --> Policy
     Schema -- "field metadata for rendering" --> Flow
@@ -86,9 +86,9 @@ graph TD
 | Which fields exist on a user? | **User Schema** | Field types, validation, annotations, auth method availability |
 | What does the login/registration page look like? | **Flow Definition** | Branding, step graph, which schema fields on which step |
 | Which fields to show during registration? | **Flow Definition** (`form` steps) | References schema fields by name; schema provides metadata |
-| What assurance level does this session have? | **Policy Engine** | Evaluates factors + freshness + authenticator properties → computes `acr` |
+| What assurance levels does this session satisfy? | **Policy Engine** | Evaluates factors + freshness + authenticator properties → computes `assurance_levels[]` |
 | What screen does the user see next? | **Flow Engine** | Combines policy decision + flow definition + schema → Capabilities + Liquid Template |
-| Is this session usable for token exchange? | **OIDC/SAML endpoint** | Compares session `acr` against requested `acr_values`; triggers step-up if insufficient |
+| Is this session usable for token exchange? | **OIDC/SAML endpoint** | Compares session `assurance_levels[]` against requested `acr_values`; triggers step-up if insufficient |
 | Is captcha/bot detection needed? | **Risk Evaluator → Policy Engine** | Composable signals (fingerprint, telemetry, rate limits) → risk score → policy decides |
 | Where is flow state stored? | **Encrypted cookie** | Client-held, server-stateless. Only factor changes touch the DB. |
 | Which flow definition to use? | **Flow resolution** | `purpose` + `audience` matching with specificity ranking |
