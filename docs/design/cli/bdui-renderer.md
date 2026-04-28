@@ -219,7 +219,7 @@ The CLI's `doctor` command verifies: (a) the renderer package is installed, (b) 
 
 ## What this means for the current POC
 
-- [`packages/sdk-next`](../../../packages/sdk-next2) stays, but its real job becomes "host the web component with a React-ergonomic API." The current POC surface is a single `ZitadelFlow` that follows the future `<zitadel-flow>` contract.
+- [`packages/sdk-next`](../../../packages/sdk-next) stays, but its real job becomes "host the web component with a React-ergonomic API." The current POC surface is a single `ZitadelFlow` that follows the future `<zitadel-flow>` contract.
 - [`apps/cli/src/adapters/next/adapter.ts`](../../../apps/cli/src/adapters/next/adapter.ts) splits into per-renderer templates.
 - `zitadel.json#branding.renderer` becomes a first-class field, not a placeholder.
 - A new package, `packages/ui-lit/`, is created as the home of `<zitadel-flow>`. Out-of-scope for this plan to build — just commit to the package name and the component contract so downstream work can start against the interface.
