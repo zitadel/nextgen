@@ -20,7 +20,7 @@ func init() {
 	// database.MustRegisterDialect("embedded", DecodeConfig)
 }
 
-// StartEmbedded starts an embedded postgres v16 instance and returns a database connector and a stop function
+// StartEmbedded starts an embedded postgres v18 instance and returns a database connector and a stop function
 // the database is started on a random port and data are stored in a temporary directory
 // its used for testing purposes only
 func StartEmbedded() (connector database.Connector, stop func(), err error) {
@@ -76,7 +76,7 @@ func StartEmbedded() (connector database.Connector, stop func(), err error) {
 	return connector, func() {
 		err := embedded.Stop()
 		if err != nil {
-			log.Println("unable to stop embedded postgres")
+			log.Printf("unable to stop embedded postgres: %v", err)
 		}
 		_ = os.RemoveAll(path)
 	}, nil
@@ -94,7 +94,7 @@ func getPort() (port uint16, close func() error, err error) {
 }
 
 func DecodeConfig(input any) (database.Connector, error) {
-	panic("unimplemented")
+	return nil, fmt.Errorf("embedded postgres config decoding is not implemented")
 }
 
 var _ database.Connector = (*Pool)(nil)

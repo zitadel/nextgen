@@ -35,6 +35,9 @@ func RegisterDialect(name string, decoder DialectDecoder) error {
 
 	dialectRegistryMu.Lock()
 	defer dialectRegistryMu.Unlock()
+	if _, exists := dialectRegistry[name]; exists {
+		return fmt.Errorf("database: dialect %q already registered", name)
+	}
 	dialectRegistry[name] = decoder
 	return nil
 }

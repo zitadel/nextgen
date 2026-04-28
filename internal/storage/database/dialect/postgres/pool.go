@@ -39,7 +39,6 @@ func (p *Pool) Acquire(ctx context.Context) (database.Connection, error) {
 }
 
 // Query implements [database.Pool].
-// Subtle: this method shadows the method (Pool).Query of pgxPool.Pool.
 func (p *Pool) Query(ctx context.Context, sql string, args ...any) (database.Rows, error) {
 	rows, err := p.Pool.Query(ctx, sql, args...)
 	if err != nil {
@@ -49,13 +48,11 @@ func (p *Pool) Query(ctx context.Context, sql string, args ...any) (database.Row
 }
 
 // QueryRow implements [database.Pool].
-// Subtle: this method shadows the method (Pool).QueryRow of pgxPool.Pool.
 func (p *Pool) QueryRow(ctx context.Context, sql string, args ...any) database.Row {
 	return &Row{p.Pool.QueryRow(ctx, sql, args...)}
 }
 
 // Exec implements [database.Pool].
-// Subtle: this method shadows the method (Pool).Exec of pgxPool.Pool.
 func (p *Pool) Exec(ctx context.Context, sql string, args ...any) (int64, error) {
 	res, err := p.Pool.Exec(ctx, sql, args...)
 	if err != nil {
