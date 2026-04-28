@@ -202,14 +202,9 @@ sequenceDiagram
     Browser->>FlowEngine: POST /flows/{id}/submit { totp: { code: "123456" } }
     FlowEngine->>AuthAttempts: POST /auth_attempts/{id}/challenges/{cid}/verify { totp: { code: "123456" } }
     AuthAttempts-->>FlowEngine: 200 OK — factor written, assurance_levels[] updated
-    FlowEngine-->>Browser: Set-Cookie: flow=<cleared> · 200 { step: "complete" }
-
-    Note over Browser,CustomerBackend: Terminal — modern embedded handoff
-
-    Browser->>FlowEngine: POST /flows/{id}/complete
     FlowEngine->>AuthAttempts: POST /auth_attempts/{id}/handoff
     AuthAttempts-->>FlowEngine: { handoff_token, expires_at }
-    FlowEngine-->>Browser: { handoff_token, expires_at }
+    FlowEngine-->>Browser: Set-Cookie: flow=<cleared> · 200 { step: "complete", handoff_token: "…", expires_at: "…" }
 
     Browser->>CustomerBackend: POST /auth/callback { handoff_token }
     CustomerBackend->>SessionDB: POST /sessions/exchange { handoff_token } (sk_proj_ auth)
@@ -316,9 +311,7 @@ sequenceDiagram
     Note right of Browser: … identifier → password → totp steps …
     FlowEngine-->>Browser: { step: "complete" }
 
-    Note over Browser,DB: Terminal — flow engine completes, OIDC Adapter exchanges handoff internally
-
-    Browser->>FlowEngine: POST /flows/{id}/complete
+    Note over Browser,DB: Terminal — final submit triggers handoff internally
     FlowEngine-)AuthService: mint_handoff(attempt_id) → handoff_token
     AuthService--)FlowEngine: { handoff_token }
     FlowEngine-)OIDCAdapter: exchange handoff_token (internal)
@@ -384,7 +377,6 @@ sequenceDiagram
     AuthService--)FlowEngine: OK
     FlowEngine-->>Browser: { step: "complete" }
 
-    Browser->>FlowEngine: POST /flows/{id}/complete
     FlowEngine-)AuthService: mint_handoff(attempt_id) → handoff_token
     AuthService--)FlowEngine: { handoff_token }
     FlowEngine-)OIDCAdapter: exchange handoff_token (internal)
