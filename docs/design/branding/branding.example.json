@@ -1,0 +1,53 @@
+{
+  "_comment": "Illustrative only. First five keys match flow-api.yaml Branding baseline; rest is proposed extension (schema.md).",
+
+  "layout": "centered",
+  "liquid_template": null,
+  "logo_url":  "https://cdn.example.com/logo.svg",
+  "font_url":  "https://fonts.googleapis.com/css2?family=Arimo:wght@400;500;700&display=swap",
+  "hero_url":  null,
+
+  "palette": {
+    "primary":     "#4A90D9",
+    "on_primary":  "#FFFFFF",
+    "background":  "#FFFFFF",
+    "surface":     "#FFFFFF",
+    "muted":       "#F1F5F9",
+    "border":      "#E2E8F0",
+    "text":        "#0F172A",
+    "text_muted":  "#64748B",
+    "link":        null,
+    "success":     "#10B981",
+    "warning":     "#F59E0B",
+    "error":       "#EF4444"
+  },
+
+  "typography": {
+    "font_family":      "Arimo, ui-sans-serif, system-ui, sans-serif",
+    "font_family_mono": "ui-monospace, SFMono-Regular, monospace",
+    "scale":            1.0
+  },
+
+  "shape": {
+    "radius":  "md",
+    "density": "regular"
+  },
+
+  "assets": {
+    "logo_dark":        "https://cdn.example.com/logo-dark.svg",
+    "favicon":          "https://cdn.example.com/favicon.ico",
+    "background_image": null
+  },
+
+  "theme": {
+    "mode": "auto",
+    "dark": {
+      "palette": {
+        "background": "#0A0A0A",
+        "surface":    "#111111",
+        "text":       "#FAFAFA",
+        "border":     "#262626"
+      }
+    }
+  }
+}
