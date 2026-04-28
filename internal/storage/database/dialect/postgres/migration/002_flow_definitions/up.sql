@@ -12,7 +12,7 @@ CREATE TYPE zitadel_nextgen.flow_definition_purposes AS ENUM (
     , 'profiling'
     , 'reauth'
     , 'link_account'
-)
+);
 
 CREATE TABLE zitadel_nextgen.flow_definitions (
     instance_id         TEXT NOT NULL
@@ -21,7 +21,7 @@ CREATE TABLE zitadel_nextgen.flow_definitions (
     , engine_version    TEXT NOT NULL CHECK (engine_version <> '')
     , schema_version    TEXT NOT NULL CHECK (schema_version <> '')
     , status            zitadel_nextgen.flow_definition_states NOT NULL DEFAULT 'draft'::zitadel_nextgen.flow_definition_states
-    , purpose           zitadel_nextgen.flow_definition_purposes NOT NULL
+    , purposes          zitadel_nextgen.flow_definition_purposes[] NOT NULL DEFAULT '{}'
     , definition        JSONB NOT NULL
     , created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
     , updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -32,5 +32,5 @@ CREATE TABLE zitadel_nextgen.flow_definitions (
 CREATE INDEX idx_flow_definitions_instance_status
     ON zitadel_nextgen.flow_definitions (instance_id, status);
 
-CREATE INDEX idx_flow_definitions_instance_purpose
-    ON zitadel_nextgen.flow_definitions (instance_id, purpose);
+CREATE INDEX idx_flow_definitions_instance_purposes
+    ON zitadel_nextgen.flow_definitions USING GIN (purposes);
