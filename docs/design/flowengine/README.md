@@ -4,9 +4,6 @@
 > **Date:** 2026-04-21
 > **Context:** Zitadel next-generation architecture design
 >
-> **What needs feedback:** Flow engine architecture (state machine, BDUI, encrypted cookie storage, pivots, completion semantics).
-> **What's early draft:** Step response shape (Options A/B/C — need frontend feedback), session API details (ACR model, `x-freshness`), policy engine design (TBD).
->
 > **See also:** [../glossary.md](../glossary.md) — canonical vocabulary · [../api/](../api/README.md) — API design guide · [../api/authn-and-auth-flows.md](../api/authn-and-auth-flows.md) — the auth_attempts primitives this engine runs on top of.
 
 ## Relevant POC ADRs
@@ -23,13 +20,14 @@
 
 | Document | Status | Description |
 |---|---|---|
-| [Flow Engine](flow-engine.md) | In Review | Server-side state machine producing BDUI. Step types, flow definitions, resolution. |
-| [Flow Engine — Step Response Shape](flow-engine-nodes.md) | In Review (frontend) | How steps are structured: grouped sections vs single array vs hybrid. |
+| [Flow Engine](flow-engine.md) | In Review | Server-side state machine producing Capability payloads. Step types, flow definitions, resolution. |
+| [Flow Engine — Step Response Shape](flow-engine-nodes.md) | In Review (frontend) | Capability mapping: Fields, Actions, Gates, and LiquidJS templates. |
 | [Flow Engine — Storage](flow-engine-storage.md) | In Review | Encrypted cookie model, session/flow separation, optimistic locking, DB I/O analysis. |
 | [Flow Engine — Developer Guide](flow-engine-guide.md) | In Review | Progressive walkthrough of building flows: steps, pivots, completion, sessions, error handling. |
 | [Session API](session-api.md) | Preliminary | Factor accumulation primitive. Assurance-level model is directional, not final. |
 | [User Schema Integration](user-schema.md) | Preliminary | How the flow engine and policy engine consume user schema annotations. |
 | [Bot Detection](bot-detection.md) | Preliminary | Composable captcha, fingerprinting, and risk evaluation. Depends on policy engine. |
+| [Template Security](template-security.md) | In Review | XSS attack vectors, trust boundaries, and defense-in-depth for LiquidJS + innerHTML rendering. |
 | **API specs** | | |
 | [Session API OpenAPI](api/session-api.yaml) | Preliminary | OpenAPI 3.1 spec for the Session API |
 | [Flow API OpenAPI](api/flow-api.yaml) | In Review | OpenAPI 3.1 spec for the Flow Engine API |
@@ -40,7 +38,7 @@ The architecture is built on four concepts:
 
 1. **auth_attempts** — ephemeral state machine for driving authentication. Issues challenges, verifies proofs, completes into a session or OIDC code. See [authn-and-auth-flows.md](../api/authn-and-auth-flows.md).
 2. **Session API** — durable read model. Reflects accumulated factors and current `assurance_levels[]`. Never mutated directly by a client — factors flow in through `auth_attempts`. Supports pre-auth anonymous shells via `POST /sessions`.
-3. **Flow Engine** — server-driven state machine producing BDUI. Used by web/frontend clients. Orchestrates UI on top of `auth_attempts` internally.
+3. **Flow Engine** — server-driven state machine producing Capabilities (Fields, Actions, Gates) alongside a LiquidJS template. Used by web/frontend clients. Operates on sessions internally.
 4. **Policy Engine** — the sole decision maker. Evaluates session state + context and determines what's required. **Design TBD** — not covered in these documents.
 5. **User Schema** — JSON Schema-based user definitions that drive registration forms, field validation, and claim mapping.
 
@@ -53,7 +51,7 @@ Web/frontend client                    Any other client (mobile, backend, CLI)
 ─────────────────────                  ─────────────────────────────────────────
 
 POST /flows                         POST /auth_attempts
-  → get BDUI steps                       → drive primitives directly
+  → get capabilities + template          → drive primitives directly
 POST /flows/{id}/submit             POST /auth_attempts/{id}/challenges
   → server advances state machine        + /challenges/{cid}/verify
   → renders next step                    → submit factor proofs
@@ -75,7 +73,7 @@ Both paths get the same policy enforcement — the policy engine evaluates sessi
 graph TD
     Schema["**User Schema**<br>fields, annotations,<br>auth methods"]
     Policy["**Policy Engine**<br>assurance level requirements"]
-    Flow["**Flow Engine**<br>state machine, BDUI"]
+    Flow["**Flow Engine**<br>state machine, Capabilities"]
     Attempts["**auth_attempts**<br>challenges, proofs,<br>complete, handoff"]
     Session["**Session API**<br>factors, assurance_levels<br>(read model)"]
 
@@ -92,7 +90,7 @@ graph TD
 | What does the login/registration page look like? | **Flow Definition** | Branding, step graph, which schema fields on which step |
 | Which fields to show during registration? | **Flow Definition** (`form` steps) | References schema fields by name; schema provides metadata |
 | What assurance level does this session have? | **Policy Engine** | Evaluates factors + freshness + authenticator properties → computes `assurance_levels[]` |
-| What screen does the user see next? | **Flow Engine** | Combines policy decision + flow definition + schema → BDUI |
+| What screen does the user see next? | **Flow Engine** | Combines policy decision + flow definition + schema → Capabilities + Liquid Template |
 | Is this session usable for token exchange? | **OIDC/SAML endpoint** | Compares session `assurance_levels[]` against requested `acr_values`; triggers step-up if insufficient |
 | Is captcha/bot detection needed? | **Risk Evaluator → Policy Engine** | Composable signals (fingerprint, telemetry, rate limits) → risk score → policy decides |
 | Where is flow state stored? | **Encrypted cookie** | Client-held, server-stateless. Only factor changes touch the DB. |
@@ -100,9 +98,9 @@ graph TD
 
 ## Design Principles
 
-1. **The frontend is stateless.** The frontend has no business logic. The server sends a step describing what to render (fields, buttons, labels). The frontend renders it, collects user input, and posts it back. It never decides what screen comes next, what authentication is required, or whether the session is "done."
+1. **The frontend is a dumb template renderer.** The frontend has no business logic. The server emits a semantic **Capability** payload (e.g. "Needs Email", "SSO available", "Passkey Gate Required") alongside a **LiquidJS Template**. The frontend securely parses the template, which explicitly binds the semantic capabilities to isolated HTML Atoms (Lit Web Components). It never decides what screen comes next or what authentication is required.
 
-2. **The flow engine never decides policy.** The flow engine's job is orchestration: render a step, collect input, delegate decisions. All questions about "what does the user need to do?" are answered by the policy engine. The flow engine just follows the answer.
+2. **The flow engine never decides policy.** The flow engine's job is orchestration: emit capabilities, serve layouts, collect input, delegate decisions. All questions about "what does the user need to do?" are answered by the policy engine. The flow engine just follows the answer.
 
 3. **auth_attempts are the mutation primitive.** A session accumulates verified factors, but never accepts direct mutations from a client. The flow engine drives `auth_attempts` internally; direct-API clients drive them explicitly. On completion, an `auth_attempt` writes factors into the session and updates the assurance level. The client then reads the session to observe the result.
 
