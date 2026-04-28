@@ -28,9 +28,10 @@ type FlowDefinitionListOption func(*FlowDefinitionListOpts)
 
 // FlowDefinitionListOpts holds the resolved options for a list query.
 type FlowDefinitionListOpts struct {
-	Status *FlowDefinitionStatus
-	Limit  uint32
-	Offset uint32
+	Status  *FlowDefinitionStatus
+	Purpose *FlowDefinitionPurpose
+	Limit   uint32
+	Offset  uint32
 }
 
 // ApplyFlowDefinitionListOptions resolves a slice of options into a struct.
@@ -46,6 +47,13 @@ func ApplyFlowDefinitionListOptions(opts []FlowDefinitionListOption) *FlowDefini
 func WithFlowDefinitionStatus(status FlowDefinitionStatus) FlowDefinitionListOption {
 	return func(o *FlowDefinitionListOpts) {
 		o.Status = &status
+	}
+}
+
+// WithFlowDefinitionPurpose filters results to definitions that serve the given purpose.
+func WithFlowDefinitionPurpose(purpose FlowDefinitionPurpose) FlowDefinitionListOption {
+	return func(o *FlowDefinitionListOpts) {
+		o.Purpose = &purpose
 	}
 }
 

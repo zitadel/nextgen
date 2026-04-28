@@ -3,29 +3,45 @@ package repository
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-const tableFlowDefinitionsJSONB = "zitadel_nextgen.flow_definitions_jsonb"
+const tableFlowDefinitions = "zitadel_nextgen.flow_definitions"
 
 var (
-	colFlowDefJSONBInstanceID = database.NewColumn(tableFlowDefinitionsJSONB, "instance_id")
-	colFlowDefJSONBID         = database.NewColumn(tableFlowDefinitionsJSONB, "id")
-	colFlowDefJSONBStatus     = database.NewColumn(tableFlowDefinitionsJSONB, "status")
-	colFlowDefJSONBUpdatedAt  = database.NewColumn(tableFlowDefinitionsJSONB, "updated_at")
+	colFlowDefInstanceID = database.NewColumn(tableFlowDefinitions, "instance_id")
+	colFlowDefID         = database.NewColumn(tableFlowDefinitions, "id")
+	colFlowDefStatus     = database.NewColumn(tableFlowDefinitions, "status")
+	colFlowDefUpdatedAt  = database.NewColumn(tableFlowDefinitions, "updated_at")
 )
 
-type flowDefinitions struct{}
+type flowDefinition struct{}
 
-func (flowDefinitions) PrimaryKeyColumns() []database.Column {
-	return []database.Column{colFlowDefJSONBInstanceID, colFlowDefJSONBID}
+func (flowDefinition) PrimaryKeyColumns() []database.Column {
+	return []database.Column{colFlowDefInstanceID, colFlowDefID}
 }
 
-func (flowDefinitions) UpdatedAtColumn() database.Column { return colFlowDefJSONBUpdatedAt }
+func (flowDefinition) UpdatedAtColumn() database.Column { return colFlowDefUpdatedAt }
 
-func (flowDefinitions) qualifiedTableName() string { return tableFlowDefinitionsJSONB }
+func (flowDefinition) qualifiedTableName() string { return tableFlowDefinitions }
+
+// flowDefinitionRow is a private scan target for queries against the flow_definitions table.
+// Nested data (purposes, audience, steps) lives in the JSONB definition column and is
+// decoded by rowToFlowDefinition after scanning.
+type flowDefinitionRow struct {
+	InstanceID    string                      `db:"instance_id"`
+	ID            string                      `db:"id"`
+	Name          string                      `db:"name"`
+	EngineVersion string                      `db:"engine_version"`
+	SchemaVersion string                      `db:"schema_version"`
+	Status        domain.FlowDefinitionStatus `db:"status"`
+	Definition    JSON[flowDefinitionContent] `db:"definition"`
+	CreatedAt     time.Time                   `db:"created_at"`
+	UpdatedAt     time.Time                   `db:"updated_at"`
+}
 
 // flowDefinitionContent is the structure stored inside the definition JSONB column.
 type flowDefinitionContent struct {
@@ -59,27 +75,38 @@ type flowStepTransitionJSON struct {
 	PivotPurpose *string `json:"pivot_purpose,omitempty"`
 }
 
-// FlowDefinitionJSONBRepository implements [domain.FlowDefinitionRepository]
+// FlowDefinitionRepository implements [domain.FlowDefinitionRepository]
 // using a single table where all nested data lives in a JSONB column.
 // It is optimised for the read-heavy, rarely-written access pattern of flow
 // definitions: each read is a single PK lookup with no joins or assembly.
-type FlowDefinitionJSONBRepository struct {
+type FlowDefinitionRepository struct {
 	Client database.QueryExecutor
 }
 
-var _ domain.FlowDefinitionRepository = (*FlowDefinitionJSONBRepository)(nil)
+var _ domain.FlowDefinitionRepository = (*FlowDefinitionRepository)(nil)
 
-func (r *FlowDefinitionJSONBRepository) CreateFlowDefinition(ctx context.Context, def *domain.FlowDefinition) error {
+func (r *FlowDefinitionRepository) CreateFlowDefinition(ctx context.Context, def *domain.FlowDefinition) error {
 	content, err := marshalFlowDefinitionContent(def)
 	if err != nil {
 		return err
 	}
 
+	purposes := make([]string, len(def.Purposes))
+	for i, p := range def.Purposes {
+		purposes[i] = p.Purpose.String()
+	}
+
 	b := database.NewStatementBuilder(
-		"INSERT INTO " + tableFlowDefinitionsJSONB +
-			" (instance_id, id, name, engine_version, schema_version, status, definition, created_at, updated_at)" +
+		"INSERT INTO " + tableFlowDefinitions +
+			" (instance_id, id, name, engine_version, schema_version, status, purposes, definition, created_at, updated_at)" +
 			" VALUES (")
-	b.WriteArgs(def.InstanceID, def.ID, def.Name, def.EngineVersion, def.SchemaVersion, string(def.Status), content)
+	b.WriteArgs(def.InstanceID, def.ID, def.Name, def.EngineVersion, def.SchemaVersion)
+	b.WriteString(", ")
+	b.WriteString(b.AppendArg(def.Status.String()) + "::zitadel_nextgen.flow_definition_states")
+	b.WriteString(", ")
+	b.WriteString(b.AppendArg(purposes) + "::zitadel_nextgen.flow_definition_purposes[]")
+	b.WriteString(", ")
+	b.WriteArg(content)
 	b.WriteString(", ")
 	b.WriteArg(database.NowInstruction)
 	b.WriteString(", ")
@@ -90,30 +117,39 @@ func (r *FlowDefinitionJSONBRepository) CreateFlowDefinition(ctx context.Context
 	return err
 }
 
-func (r *FlowDefinitionJSONBRepository) GetFlowDefinition(ctx context.Context, instanceID, id string) (*domain.FlowDefinition, error) {
+func (r *FlowDefinitionRepository) GetFlowDefinition(ctx context.Context, instanceID, id string) (*domain.FlowDefinition, error) {
 	b := database.NewStatementBuilder(
 		"SELECT instance_id, id, name, engine_version, schema_version, status, definition, created_at, updated_at" +
-			" FROM " + tableFlowDefinitionsJSONB +
+			" FROM " + tableFlowDefinitions +
 			" WHERE instance_id = ")
 	b.WriteArg(instanceID)
 	b.WriteString(" AND id = ")
 	b.WriteArg(id)
 
-	return getOne[domain.FlowDefinition](ctx, r.Client, b)
+	row, err := getOne[flowDefinitionRow](ctx, r.Client, b)
+	if err != nil {
+		return nil, err
+	}
+	return rowToFlowDefinition(*row)
 }
 
-func (r *FlowDefinitionJSONBRepository) ListFlowDefinitions(ctx context.Context, instanceID string, opts ...domain.FlowDefinitionListOption) ([]*domain.FlowDefinition, error) {
+func (r *FlowDefinitionRepository) ListFlowDefinitions(ctx context.Context, instanceID string, opts ...domain.FlowDefinitionListOption) ([]*domain.FlowDefinition, error) {
 	o := domain.ApplyFlowDefinitionListOptions(opts)
 
 	b := database.NewStatementBuilder(
-		"SELECT instance_id, id, name, engine_version, schema_version, status, purpose, definition, created_at, updated_at" +
-			" FROM " + tableFlowDefinitionsJSONB +
+		"SELECT instance_id, id, name, engine_version, schema_version, status, definition, created_at, updated_at" +
+			" FROM " + tableFlowDefinitions +
 			" WHERE instance_id = ")
 	b.WriteArg(instanceID)
 
 	if o.Status != nil {
 		b.WriteString(" AND status = ")
-		b.WriteArg(string(*o.Status))
+		b.WriteString(b.AppendArg(o.Status.String()) + "::zitadel_nextgen.flow_definition_states")
+	}
+	if o.Purpose != nil {
+		b.WriteString(" AND ")
+		b.WriteString(b.AppendArg(o.Purpose.String()) + "::zitadel_nextgen.flow_definition_purposes")
+		b.WriteString(" = ANY(purposes)")
 	}
 
 	b.WriteString(" ORDER BY created_at ASC")
@@ -127,27 +163,31 @@ func (r *FlowDefinitionJSONBRepository) ListFlowDefinitions(ctx context.Context,
 		b.WriteArg(o.Offset)
 	}
 
-	return getMany[domain.FlowDefinition](ctx, r.Client, b)
+	rows, err := getMany[flowDefinitionRow](ctx, r.Client, b)
+	if err != nil {
+		return nil, err
+	}
+	return rowsToFlowDefinitions(rows)
 }
 
-func (r *FlowDefinitionJSONBRepository) UpdateFlowDefinitionStatus(ctx context.Context, instanceID, id string, status domain.FlowDefinitionStatus) error {
+func (r *FlowDefinitionRepository) UpdateFlowDefinitionStatus(ctx context.Context, instanceID, id string, status domain.FlowDefinitionStatus) error {
 	condition := database.And(
-		database.NewTextCondition(colFlowDefJSONBInstanceID, database.TextOperationEqual, instanceID),
-		database.NewTextCondition(colFlowDefJSONBID, database.TextOperationEqual, id),
+		database.NewTextCondition(colFlowDefInstanceID, database.TextOperationEqual, instanceID),
+		database.NewTextCondition(colFlowDefID, database.TextOperationEqual, id),
 	)
-	_, err := updateOne(ctx, r.Client, flowDefinitions{}, condition,
-		database.NewChange(colFlowDefJSONBStatus, string(status)),
-		database.NewChange(colFlowDefJSONBUpdatedAt, database.NowInstruction),
+	_, err := updateOne(ctx, r.Client, flowDefinition{}, condition,
+		database.NewChange(colFlowDefStatus, status.String()),
+		database.NewChange(colFlowDefUpdatedAt, database.NowInstruction),
 	)
 	return err
 }
 
-func (r *FlowDefinitionJSONBRepository) DeleteFlowDefinition(ctx context.Context, instanceID, id string) error {
+func (r *FlowDefinitionRepository) DeleteFlowDefinition(ctx context.Context, instanceID, id string) error {
 	condition := database.And(
-		database.NewTextCondition(colFlowDefJSONBInstanceID, database.TextOperationEqual, instanceID),
-		database.NewTextCondition(colFlowDefJSONBID, database.TextOperationEqual, id),
+		database.NewTextCondition(colFlowDefInstanceID, database.TextOperationEqual, instanceID),
+		database.NewTextCondition(colFlowDefID, database.TextOperationEqual, id),
 	)
-	_, err := deleteOne(ctx, r.Client, flowDefinitions{}, condition)
+	_, err := deleteOne(ctx, r.Client, flowDefinition{}, condition)
 	return err
 }
 
@@ -157,7 +197,7 @@ func marshalFlowDefinitionContent(def *domain.FlowDefinition) ([]byte, error) {
 	purposes := make([]flowDefinitionPurposeJSON, len(def.Purposes))
 	for i, p := range def.Purposes {
 		purposes[i] = flowDefinitionPurposeJSON{
-			Purpose:     string(p.Purpose),
+			Purpose:     p.Purpose.String(),
 			InitialStep: p.InitialStep,
 		}
 	}
@@ -175,14 +215,14 @@ func marshalFlowDefinitionContent(def *domain.FlowDefinition) ([]byte, error) {
 		for j, t := range s.Transitions {
 			tr := flowStepTransitionJSON{Action: t.Action, TargetStep: t.TargetStep}
 			if t.PivotPurpose != nil {
-				p := string(*t.PivotPurpose)
+				p := t.PivotPurpose.String()
 				tr.PivotPurpose = &p
 			}
 			transitions[j] = tr
 		}
 		steps[i] = flowDefinitionStepJSON{
 			Name:        s.Name,
-			Type:        string(s.Type),
+			Type:        s.Type.String(),
 			Config:      s.Config,
 			Transitions: transitions,
 		}
@@ -193,4 +233,79 @@ func marshalFlowDefinitionContent(def *domain.FlowDefinition) ([]byte, error) {
 		Audience: audience,
 		Steps:    steps,
 	})
+}
+
+// rowToFlowDefinition converts a scanned flowDefinitionRow into the domain aggregate
+// by parsing the JSONB definition column.
+func rowToFlowDefinition(row flowDefinitionRow) (*domain.FlowDefinition, error) {
+	content := row.Definition.Value
+
+	purposes := make([]domain.FlowDefinitionPurposeEntry, len(content.Purposes))
+	for i, p := range content.Purposes {
+		purpose, err := domain.FlowDefinitionPurposeString(p.Purpose)
+		if err != nil {
+			return nil, err
+		}
+		purposes[i] = domain.FlowDefinitionPurposeEntry{
+			Purpose:     purpose,
+			InitialStep: p.InitialStep,
+		}
+	}
+
+	steps := make([]domain.FlowDefinitionStep, len(content.Steps))
+	for i, s := range content.Steps {
+		stepType, err := domain.FlowStepTypeString(s.Type)
+		if err != nil {
+			return nil, err
+		}
+		transitions := make([]domain.FlowStepTransition, len(s.Transitions))
+		for j, t := range s.Transitions {
+			tr := domain.FlowStepTransition{Action: t.Action, TargetStep: t.TargetStep}
+			if t.PivotPurpose != nil {
+				p, err := domain.FlowDefinitionPurposeString(*t.PivotPurpose)
+				if err != nil {
+					return nil, err
+				}
+				tr.PivotPurpose = &p
+			}
+			transitions[j] = tr
+		}
+		steps[i] = domain.FlowDefinitionStep{
+			Name:        s.Name,
+			Type:        stepType,
+			Config:      s.Config,
+			Transitions: transitions,
+		}
+	}
+
+	return &domain.FlowDefinition{
+		InstanceID:    row.InstanceID,
+		ID:            row.ID,
+		Name:          row.Name,
+		EngineVersion: row.EngineVersion,
+		SchemaVersion: row.SchemaVersion,
+		Status:        row.Status,
+		CreatedAt:     row.CreatedAt,
+		UpdatedAt:     row.UpdatedAt,
+		Purposes:      purposes,
+		Audience: domain.FlowDefinitionAudience{
+			AppID:             content.Audience.AppID,
+			OrgID:             content.Audience.OrgID,
+			SchemaID:          content.Audience.SchemaID,
+			IsInstanceDefault: content.Audience.IsInstanceDefault,
+		},
+		Steps: steps,
+	}, nil
+}
+
+func rowsToFlowDefinitions(rows []*flowDefinitionRow) ([]*domain.FlowDefinition, error) {
+	defs := make([]*domain.FlowDefinition, len(rows))
+	for i, row := range rows {
+		def, err := rowToFlowDefinition(*row)
+		if err != nil {
+			return nil, err
+		}
+		defs[i] = def
+	}
+	return defs, nil
 }

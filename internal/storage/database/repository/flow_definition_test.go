@@ -11,11 +11,11 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database/repository"
 )
 
-func TestFlowDefinitionJSONBRepository_CreateAndGet(t *testing.T) {
+func TestFlowDefinitionRepository_CreateAndGet(t *testing.T) {
 	tx, rollback := transactionForRollback(t)
 	defer rollback()
 
-	repo := &repository.FlowDefinitionJSONBRepository{Client: tx}
+	repo := &repository.FlowDefinitionRepository{Client: tx}
 	def := sampleFlowDefinition("inst-j1", "flow-j1")
 
 	err := repo.CreateFlowDefinition(t.Context(), def)
@@ -64,21 +64,21 @@ func TestFlowDefinitionJSONBRepository_CreateAndGet(t *testing.T) {
 	assert.Nil(t, registerPivot.TargetStep)
 }
 
-func TestFlowDefinitionJSONBRepository_GetNotFound(t *testing.T) {
+func TestFlowDefinitionRepository_GetNotFound(t *testing.T) {
 	tx, rollback := transactionForRollback(t)
 	defer rollback()
 
-	repo := &repository.FlowDefinitionJSONBRepository{Client: tx}
+	repo := &repository.FlowDefinitionRepository{Client: tx}
 
 	_, err := repo.GetFlowDefinition(t.Context(), "inst-j-missing", "flow-j-missing")
 	require.Error(t, err)
 }
 
-func TestFlowDefinitionJSONBRepository_List(t *testing.T) {
+func TestFlowDefinitionRepository_List(t *testing.T) {
 	tx, rollback := transactionForRollback(t)
 	defer rollback()
 
-	repo := &repository.FlowDefinitionJSONBRepository{Client: tx}
+	repo := &repository.FlowDefinitionRepository{Client: tx}
 
 	for _, id := range []string{"flow-ja", "flow-jb", "flow-jc"} {
 		def := sampleFlowDefinition("inst-jlist", id)
@@ -99,11 +99,41 @@ func TestFlowDefinitionJSONBRepository_List(t *testing.T) {
 	assert.Equal(t, "flow-jb", active[0].ID)
 }
 
-func TestFlowDefinitionJSONBRepository_ListPagination(t *testing.T) {
+func TestFlowDefinitionRepository_ListByPurpose(t *testing.T) {
 	tx, rollback := transactionForRollback(t)
 	defer rollback()
 
-	repo := &repository.FlowDefinitionJSONBRepository{Client: tx}
+	repo := &repository.FlowDefinitionRepository{Client: tx}
+
+	// flow-pa: serves login only (via sampleFlowDefinition)
+	defA := sampleFlowDefinition("inst-jpurp", "flow-pa")
+	require.NoError(t, repo.CreateFlowDefinition(t.Context(), defA))
+
+	// flow-pb: serves both login and register
+	defB := sampleFlowDefinition("inst-jpurp", "flow-pb")
+	defB.Purposes = append(defB.Purposes, domain.FlowDefinitionPurposeEntry{
+		Purpose:     domain.FlowDefinitionPurposeRegister,
+		InitialStep: "start",
+	})
+	require.NoError(t, repo.CreateFlowDefinition(t.Context(), defB))
+
+	loginOnly, err := repo.ListFlowDefinitions(t.Context(), "inst-jpurp",
+		domain.WithFlowDefinitionPurpose(domain.FlowDefinitionPurposeLogin))
+	require.NoError(t, err)
+	assert.Len(t, loginOnly, 2)
+
+	registerOnly, err := repo.ListFlowDefinitions(t.Context(), "inst-jpurp",
+		domain.WithFlowDefinitionPurpose(domain.FlowDefinitionPurposeRegister))
+	require.NoError(t, err)
+	require.Len(t, registerOnly, 1)
+	assert.Equal(t, "flow-pb", registerOnly[0].ID)
+}
+
+func TestFlowDefinitionRepository_ListPagination(t *testing.T) {
+	tx, rollback := transactionForRollback(t)
+	defer rollback()
+
+	repo := &repository.FlowDefinitionRepository{Client: tx}
 
 	for _, id := range []string{"flow-jp1", "flow-jp2", "flow-jp3", "flow-jp4"} {
 		require.NoError(t, repo.CreateFlowDefinition(t.Context(), sampleFlowDefinition("inst-jpage", id)))
@@ -123,11 +153,11 @@ func TestFlowDefinitionJSONBRepository_ListPagination(t *testing.T) {
 	assert.NotEqual(t, page1[0].ID, page2[0].ID)
 }
 
-func TestFlowDefinitionJSONBRepository_UpdateStatus(t *testing.T) {
+func TestFlowDefinitionRepository_UpdateStatus(t *testing.T) {
 	tx, rollback := transactionForRollback(t)
 	defer rollback()
 
-	repo := &repository.FlowDefinitionJSONBRepository{Client: tx}
+	repo := &repository.FlowDefinitionRepository{Client: tx}
 	def := sampleFlowDefinition("inst-jupd", "flow-jupd")
 	require.NoError(t, repo.CreateFlowDefinition(t.Context(), def))
 
@@ -139,11 +169,11 @@ func TestFlowDefinitionJSONBRepository_UpdateStatus(t *testing.T) {
 	assert.Equal(t, domain.FlowDefinitionStatusActive, got.Status)
 }
 
-func TestFlowDefinitionJSONBRepository_Delete(t *testing.T) {
+func TestFlowDefinitionRepository_Delete(t *testing.T) {
 	tx, rollback := transactionForRollback(t)
 	defer rollback()
 
-	repo := &repository.FlowDefinitionJSONBRepository{Client: tx}
+	repo := &repository.FlowDefinitionRepository{Client: tx}
 	def := sampleFlowDefinition("inst-jdel", "flow-jdel")
 	require.NoError(t, repo.CreateFlowDefinition(t.Context(), def))
 
@@ -154,11 +184,11 @@ func TestFlowDefinitionJSONBRepository_Delete(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestFlowDefinitionJSONBRepository_InstanceIsolation(t *testing.T) {
+func TestFlowDefinitionRepository_InstanceIsolation(t *testing.T) {
 	tx, rollback := transactionForRollback(t)
 	defer rollback()
 
-	repo := &repository.FlowDefinitionJSONBRepository{Client: tx}
+	repo := &repository.FlowDefinitionRepository{Client: tx}
 	require.NoError(t, repo.CreateFlowDefinition(t.Context(), sampleFlowDefinition("inst-jA", "flow-j1")))
 	require.NoError(t, repo.CreateFlowDefinition(t.Context(), sampleFlowDefinition("inst-jB", "flow-j1")))
 
