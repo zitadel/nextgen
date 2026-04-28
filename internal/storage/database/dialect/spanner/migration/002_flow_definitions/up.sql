@@ -17,3 +17,7 @@ CREATE TABLE zitadel_nextgen.flow_definitions (
 
 CREATE INDEX idx_flow_definitions_project_status
     ON zitadel_nextgen.flow_definitions (project_id, status);
+
+-- Spanner PostgreSQL dialect does not support GIN indexes (USING GIN is not valid DDL syntax).
+-- The purposes[] array filter (= ANY(purposes)) uses a sequential scan within the project_id
+-- partition, which is acceptable given each project has at most a few dozen flow definitions.

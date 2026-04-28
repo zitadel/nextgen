@@ -79,8 +79,29 @@ type flowStepTransitionJSON struct {
 // using a single table where all nested data lives in a JSONB column.
 // It is optimised for the read-heavy, rarely-written access pattern of flow
 // definitions: each read is a single PK lookup with no joins or assembly.
+//
+// Use [NewPostgresFlowDefinitionRepository] or [NewSpannerFlowDefinitionRepository]
+// to construct an instance with the correct dialect.
 type FlowDefinitionRepository struct {
-	Client database.QueryExecutor
+	Client      database.QueryExecutor
+	statusCast  string // SQL type-cast suffix for the status column, e.g. "::zitadel_nextgen.flow_definition_states"
+	purposeCast string // SQL type-cast suffix for a purpose value, e.g. "::zitadel_nextgen.flow_definition_purposes"
+}
+
+// NewPostgresFlowDefinitionRepository returns a repository configured for the
+// Postgres dialect, which uses ENUM types that require explicit SQL casts.
+func NewPostgresFlowDefinitionRepository(client database.QueryExecutor) *FlowDefinitionRepository {
+	return &FlowDefinitionRepository{
+		Client:      client,
+		statusCast:  "::zitadel_nextgen.flow_definition_states",
+		purposeCast: "::zitadel_nextgen.flow_definition_purposes",
+	}
+}
+
+// NewSpannerFlowDefinitionRepository returns a repository configured for the
+// Spanner PostgreSQL dialect, which uses plain TEXT columns with no casts.
+func NewSpannerFlowDefinitionRepository(client database.QueryExecutor) *FlowDefinitionRepository {
+	return &FlowDefinitionRepository{Client: client}
 }
 
 var _ domain.FlowDefinitionRepository = (*FlowDefinitionRepository)(nil)
@@ -102,9 +123,9 @@ func (r *FlowDefinitionRepository) CreateFlowDefinition(ctx context.Context, def
 			" VALUES (")
 	b.WriteArgs(def.ProjectID, def.ID, def.Name, def.EngineVersion, def.SchemaVersion)
 	b.WriteString(", ")
-	b.WriteString(b.AppendArg(def.Status.String()) + "::zitadel_nextgen.flow_definition_states")
+	b.WriteString(b.AppendArg(def.Status.String()) + r.statusCast)
 	b.WriteString(", ")
-	b.WriteString(b.AppendArg(purposes) + "::zitadel_nextgen.flow_definition_purposes[]")
+	b.WriteString(b.AppendArg(purposes) + r.purposeCast + "[]")
 	b.WriteString(", ")
 	b.WriteArg(content)
 	b.WriteString(", ")
@@ -144,11 +165,11 @@ func (r *FlowDefinitionRepository) ListFlowDefinitions(ctx context.Context, proj
 
 	if o.Status != nil {
 		b.WriteString(" AND status = ")
-		b.WriteString(b.AppendArg(o.Status.String()) + "::zitadel_nextgen.flow_definition_states")
+		b.WriteString(b.AppendArg(o.Status.String()) + r.statusCast)
 	}
 	if o.Purpose != nil {
 		b.WriteString(" AND ")
-		b.WriteString(b.AppendArg(o.Purpose.String()) + "::zitadel_nextgen.flow_definition_purposes")
+		b.WriteString(b.AppendArg(o.Purpose.String()) + r.purposeCast)
 		b.WriteString(" = ANY(purposes)")
 	}
 
