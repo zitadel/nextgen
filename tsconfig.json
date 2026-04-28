@@ -4,13 +4,25 @@
   "files": [],
   "references": [
     {
-      "path": "./frontend/console-e2e"
+      "path": "./apps/console"
     },
     {
-      "path": "./frontend/console"
+      "path": "./apps/console-e2e"
     },
     {
-      "path": "./frontend/components"
+      "path": "./packages/components"
+    },
+    {
+      "path": "./packages/lint"
+    },
+    {
+      "path": "./packages/sdk-core"
+    },
+    {
+      "path": "./packages/sdk-next"
+    },
+    {
+      "path": "./apps/cli"
     }
   ]
 }

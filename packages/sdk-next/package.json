@@ -1,5 +1,5 @@
 {
-  "name": "@zitadel/sdk-next",
+  "name": "@zitadel-nextgen/sdk-next",
   "version": "0.0.0",
   "description": "Next.js helpers and mock auth UI for Zitadel",
   "license": "MIT",
@@ -19,17 +19,14 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "publishConfig": {
     "access": "public"
   },
-  "scripts": {
-    "build": "tsup src/index.tsx --format esm --dts --clean",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests"
-  },
   "dependencies": {
-    "@zitadel/sdk-core": "workspace:*"
+    "@zitadel-nextgen/sdk-core": "workspace:*"
   },
   "peerDependencies": {
     "next": ">=14",
@@ -37,6 +34,6 @@
     "react-dom": ">=18"
   },
   "devDependencies": {
-    "@types/react": "^19.0.2"
+    "@types/react": "catalog:"
   }
 }

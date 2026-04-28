@@ -106,6 +106,8 @@ function parseEnvironment(value: string | undefined): ZitadelEnvironment {
   throw new ZitadelRuntimeError("E_ZITADEL_CONFIG", `Unsupported ZITADEL_ENVIRONMENT "${value}".`);
 }
 
+// @ts-expect-error will be used later
+// oxlint-disable-next-line no-unused-vars
 function requireEnv(env: Record<string, string | undefined>, key: string): string {
   const value = env[key];
   if (!value) {

@@ -1,7 +1,7 @@
 "use client";
 
-import type { ZitadelFlowPurpose, ZitadelRuntime } from "@zitadel/sdk-core";
-import { styles } from "./styles";
+import type { ZitadelFlowPurpose, ZitadelRuntime } from "@zitadel-nextgen/sdk-core";
+import { styles } from "./styles.js";
 
 export function ZitadelFlowReal({
   purpose,

@@ -1,5 +1,5 @@
 {
-  "$schema": "./node_modules/nx/dist/schemas/nx-schema.json",
+  "$schema": "./node_modules/nx/schemas/nx-schema.json",
   "namedInputs": {
     "default": ["{projectRoot}/**/*", "sharedGlobals"],
     "production": [
@@ -33,6 +33,9 @@
     },
     {
       "plugin": "@nx/vitest"
+    },
+    {
+      "plugin": "@zitadel-nextgen/lint"
     }
   ],
   "targetDefaults": {
@@ -43,6 +46,8 @@
       "outputs": [
         "{projectRoot}/dist/**/*.d.ts",
         "{projectRoot}/dist/**/*.d.ts.map",
+        "{projectRoot}/dist/**/*.d.mts",
+        "{projectRoot}/dist/**/*.d.mts.map",
         "{projectRoot}/dist/tsconfig.*.tsbuildinfo",
         "{projectRoot}/out-tsc/vitest/**/*.d.ts",
         "{projectRoot}/out-tsc/vitest/**/*.d.ts.map",
@@ -64,6 +69,5 @@
       ]
     }
   },
-  "nxCloudId": "69e8763623c9710313345f8a",
   "analytics": false
 }

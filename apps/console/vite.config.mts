@@ -7,7 +7,7 @@ import { defineConfig } from "vite";
 
 export default defineConfig(() => ({
   root: import.meta.dirname,
-  cacheDir: "../../node_modules/.vite/frontend/console",
+  cacheDir: "../../node_modules/.vite/apps/console",
   plugins: [
     tailwindcss(),
     devtools(),

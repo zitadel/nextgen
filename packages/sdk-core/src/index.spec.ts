@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveZitadelRuntime, resolveZitadelRuntimeEnv } from "./index";
+import { resolveZitadelRuntime, resolveZitadelRuntimeEnv } from "./index.js";
 
 describe("resolveZitadelRuntimeEnv", () => {
   it("uses public project metadata in development", () => {

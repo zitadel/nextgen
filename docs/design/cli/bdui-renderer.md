@@ -10,7 +10,7 @@ The product vision says "CLI figures out the framework and can later plug in the
 
 ```tsx
 // apps/cli/src/adapters/next/adapter.ts:69
-import { ZitadelFlow } from "@zitadel/sdk-next";
+import { ZitadelFlow } from "@zitadel-nextgen/sdk-next";
 export default function LoginPage() {
   return <ZitadelFlow purpose="login" />;
 }
@@ -144,10 +144,10 @@ Contract test: every (adapter × renderer) pair produces a valid scaffold that t
 
 ## The React shim
 
-Until Lit ships, React consumers get `@zitadel/sdk-next` with the *same* API surface the Lit component will have:
+Until Lit ships, React consumers get `@zitadel-nextgen/sdk-next` with the *same* API surface the Lit component will have:
 
 ```tsx
-import { ZitadelFlow } from "@zitadel/sdk-next";
+import { ZitadelFlow } from "@zitadel-nextgen/sdk-next";
 
 <ZitadelFlow purpose="login" issuer={...} clientId={...} />
 ```
@@ -219,7 +219,7 @@ The CLI's `doctor` command verifies: (a) the renderer package is installed, (b) 
 
 ## What this means for the current POC
 
-- [`packages/sdk-next`](../../../packages/sdk-next) stays, but its real job becomes "host the web component with a React-ergonomic API." The current POC surface is a single `ZitadelFlow` that follows the future `<zitadel-flow>` contract.
+- [`packages/sdk-next`](../../../packages/sdk-next2) stays, but its real job becomes "host the web component with a React-ergonomic API." The current POC surface is a single `ZitadelFlow` that follows the future `<zitadel-flow>` contract.
 - [`apps/cli/src/adapters/next/adapter.ts`](../../../apps/cli/src/adapters/next/adapter.ts) splits into per-renderer templates.
 - `zitadel.json#branding.renderer` becomes a first-class field, not a placeholder.
 - A new package, `packages/ui-lit/`, is created as the home of `<zitadel-flow>`. Out-of-scope for this plan to build — just commit to the package name and the component contract so downstream work can start against the interface.

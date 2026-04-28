@@ -1,14 +1,14 @@
 "use client";
 
-import { type FormEvent, useState } from "react";
-import { createMockFlow, mockSubmit, type ZitadelFlowPurpose } from "@zitadel/sdk-core";
-import { styles } from "./styles";
+import { type SubmitEvent, useState } from "react";
+import { createMockFlow, mockSubmit, type ZitadelFlowPurpose } from "@zitadel-nextgen/sdk-core";
+import { styles } from "./styles.js";
 
 export function ZitadelFlowMock({ purpose }: { purpose: ZitadelFlowPurpose }) {
   const flow = createMockFlow(purpose);
   const [result, setResult] = useState<string | undefined>();
 
-  function onSubmit(event: FormEvent<HTMLFormElement>) {
+  function onSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     const values = Object.fromEntries(new FormData(event.currentTarget).entries());
     const response = mockSubmit(purpose, values);

@@ -4,15 +4,16 @@ packages:
   - "packages/*"
 
 catalog:
+  '@clack/prompts': ^1.2.0
   "@lit/react": ^1.0.8
-  "@nx/devkit": ^22.6.5
-  "@nx/esbuild": ^22.6.5
-  "@nx/eslint-plugin": ^22.6.5
-  "@nx/js": ^22.6.5
-  "@nx/playwright": ^22.6.5
-  "@nx/react": ^22.6.5
-  "@nx/vite": ^22.6.5
-  "@nx/vitest": ^22.6.5
+  "@nx/devkit": ^22.7.0
+  "@nx/esbuild": ^22.7.0
+  "@nx/eslint-plugin": ^22.7.0
+  "@nx/js": ^22.7.0
+  "@nx/playwright": ^22.7.0
+  "@nx/react": ^22.7.0
+  "@nx/vite": ^22.7.0
+  "@nx/vitest": ^22.7.0
   "@playwright/test": ^1.59.1
   "@tailwindcss/vite": ^4.2.4
   "@tanstack/devtools-vite": ^0.6.0
@@ -29,10 +30,12 @@ catalog:
   "@types/react-dom": ^19.2.3
   "@typescript/native-preview": 7.0.0-dev.20260421.2
   "@vitejs/plugin-react": ^6.0.1
+  ajv: ^8.20.0
   eslint-plugin-playwright: ^2.10.2
   jsdom: ^29.0.2
+  liquidjs: ^10.25.7
   lit: ^3.3.2
-  nx: ^22.6.5
+  nx: ^22.7.0
   oxfmt: ^0.46.0
   oxlint: ^1.61.0
   react: ^19.2.5
@@ -41,8 +44,11 @@ catalog:
   tailwindcss: ^4.2.4
   ts-lit-plugin: ^2.0.2
   tslib: ^2.8.1
+  tsup: ^8.5.1
+  tsx: ^4.21.0
   typescript: ^6.0.3
   vite: ^8.0.9
   vitest: ^4.1.5
+  zod: ^4.3.6
 
 catalogMode: strict

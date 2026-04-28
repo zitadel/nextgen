@@ -17,11 +17,15 @@
     "@nx/playwright": "catalog:",
     "@nx/vite": "catalog:",
     "@nx/vitest": "catalog:",
+    "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
     "nx": "catalog:",
     "oxfmt": "catalog:",
     "oxlint": "catalog:",
-    "sharp": "catalog:"
+    "sharp": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

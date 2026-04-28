@@ -1,5 +1,5 @@
 {
-  "name": "zitadel",
+  "name": "@zitadel-nextgen/cli",
   "version": "0.0.0",
   "description": "Agent-friendly Zitadel CLI",
   "license": "MIT",
@@ -22,18 +22,17 @@
   ],
   "scripts": {
     "build": "tsup && tsx scripts/gen-agents-md.ts",
-    "gen:agents-md": "tsx scripts/gen-agents-md.ts",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "gen:agents-md": "tsx scripts/gen-agents-md.ts"
   },
   "dependencies": {
-    "@clack/prompts": "^0.8.2",
-    "ajv": "^8.17.1",
-    "liquidjs": "^10.25.7",
-    "zod": "^3.24.1"
+    "@clack/prompts": "catalog:",
+    "ajv": "catalog:",
+    "liquidjs": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
-    "@zitadel/sdk-next": "workspace:*",
-    "tsx": "^4.19.2"
+    "@zitadel-nextgen/sdk-next": "workspace:*",
+    "tsup": "catalog:",
+    "tsx": "catalog:"
   }
 }

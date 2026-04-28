@@ -5,7 +5,7 @@ import { defineConfig } from "vite";
 
 export default defineConfig(() => ({
   root: import.meta.dirname,
-  cacheDir: "../../node_modules/.vite/frontend/components",
+  cacheDir: "../../node_modules/.vite/packages/sdk-core",
   plugins: [nxViteTsPaths()],
   build: {
     lib: {
@@ -15,7 +15,7 @@ export default defineConfig(() => ({
     },
   },
   test: {
-    name: "@zitadel-nextgen/components",
+    name: "@zitadel-nextgen/sdk-core",
     watch: false,
     globals: true,
     environment: "node",

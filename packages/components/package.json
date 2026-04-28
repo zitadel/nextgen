@@ -17,15 +17,7 @@
     "lit": "catalog:"
   },
   "devDependencies": {
-    "@nx/vite": "catalog:",
-    "@types/node": "catalog:",
     "ts-lit-plugin": "catalog:",
-    "tslib": "catalog:",
-    "typescript": "catalog:",
-    "vite": "catalog:",
-    "vitest": "catalog:"
-  },
-  "nx": {
-    "implicitDependencies": ["oxlint"]
+    "tslib": "catalog:"
   }
 }

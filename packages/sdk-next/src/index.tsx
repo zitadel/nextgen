@@ -8,18 +8,18 @@ import {
   type ZitadelEnvironment,
   type ZitadelFlowPurpose,
   type ZitadelRuntime,
-} from "@zitadel/sdk-core";
+} from "@zitadel-nextgen/sdk-core";
 
-import { ZitadelFlowMock } from "./mock";
-import { ZitadelFlowReal } from "./real";
-import { styles } from "./styles";
+import { ZitadelFlowMock } from "./mock.js";
+import { ZitadelFlowReal } from "./real.js";
+import { styles } from "./styles.js";
 
 export {
   resolveZitadelRuntime,
   resolveZitadelRuntimeEnv,
   ZitadelRuntimeError,
-} from "@zitadel/sdk-core";
-export type { ZitadelEnvironment, ZitadelFlowPurpose, ZitadelRuntime } from "@zitadel/sdk-core";
+} from "@zitadel-nextgen/sdk-core";
+export type { ZitadelEnvironment, ZitadelFlowPurpose, ZitadelRuntime } from "@zitadel-nextgen/sdk-core";
 
 export type ZitadelFlowProps = {
   purpose: ZitadelFlowPurpose;
