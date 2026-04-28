@@ -383,7 +383,7 @@ func TestAuthAttempt_CheckFailed(t *testing.T) {
 
 				require.NoError(t, repo.CheckFailed(t.Context(), tx, "p", "a", check.AuthCheck))
 				require.NotNil(t, check.LastFailedAt, "LastFailedAt must be set after failure %d", i+1)
-				require.Equal(t, uint8(i+1), check.FailureCount)
+				require.Equal(t, uint16(i+1), check.FailureCount)
 				if prev != nil {
 					require.False(t, check.LastFailedAt.Before(*prev),
 						"LastFailedAt must not decrease between consecutive failures")
@@ -420,7 +420,7 @@ func TestAuthAttempt_CheckSucceeded(t *testing.T) {
 		_, check := newTestAttempt(t, repo, tx, "p", "a")
 		require.NoError(t, repo.CheckFailed(t.Context(), tx, "p", "a", check.AuthCheck))
 		require.NoError(t, repo.CheckFailed(t.Context(), tx, "p", "a", check.AuthCheck))
-		require.Equal(t, uint8(2), check.FailureCount)
+		require.Equal(t, uint16(2), check.FailureCount)
 
 		require.NoError(t, repo.CheckSucceeded(t.Context(), tx, "p", "a", check.AuthCheck))
 		require.False(t, check.VerifiedAt.IsZero())
@@ -431,7 +431,7 @@ func TestAuthAttempt_CheckSucceeded(t *testing.T) {
 		storedCheck, ok := stored.CheckByType(domain.AuthCheckTypePassword)
 		require.True(t, ok)
 		require.False(t, storedCheck.Check().VerifiedAt.IsZero())
-		require.Equal(t, uint8(2), storedCheck.Check().FailureCount)
+		require.Equal(t, uint16(2), storedCheck.Check().FailureCount)
 	})
 }
 
