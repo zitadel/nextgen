@@ -20,18 +20,23 @@ describe("Next setup integration", () => {
       "--skip-deploy-platform",
     ]);
     expect(setup.exitCode).toBe(0);
-    const setupJson = parseJson(setup.stdout) as { status: string; data: { project: { lifecycle: string }; apply?: unknown } };
+    const setupJson = parseJson(setup.stdout) as {
+      status: string;
+      data: { project: { lifecycle: string }; apply?: unknown };
+    };
     expect(setupJson.status).toBe("ok");
     expect(setupJson.data.project.lifecycle).toBe("pre-claim");
     expect(setupJson.data.apply).toBeDefined();
 
-    expect(await readFile(join(cwd, "zitadel.json"), "utf8")).toContain("\"project\"");
-    expect(await readFile(join(cwd, ".zitadel/schemas/user.json"), "utf8")).toContain("\"x-unique\": \"project\"");
+    expect(await readFile(join(cwd, "zitadel.json"), "utf8")).toContain('"project"');
+    expect(await readFile(join(cwd, ".zitadel/schemas/user.json"), "utf8")).toContain(
+      '"x-unique": "project"',
+    );
     const flowRaw = await readFile(join(cwd, ".zitadel/flows/default.json"), "utf8");
-    expect(flowRaw).toContain("\"template_name\": \"default\"");
-    expect(flowRaw).toContain("\"text_key\": \"identifier.field.email\"");
+    expect(flowRaw).toContain('"template_name": "default"');
+    expect(flowRaw).toContain('"text_key": "identifier.field.email"');
     const localeRaw = await readFile(join(cwd, ".zitadel/locales/en.json"), "utf8");
-    expect(localeRaw).toContain("\"identifier.title\": \"Sign in\"");
+    expect(localeRaw).toContain('"identifier.title": "Sign in"');
     const loginPage = await readFile(join(cwd, "app/login/page.tsx"), "utf8");
     expect(loginPage).toContain("zitadel-cli: managed-file v1");
     expect(loginPage).toContain("ZitadelFlow");
@@ -50,7 +55,10 @@ describe("Next setup integration", () => {
 
     const noArg = await runCliForTest(["--cwd", cwd, "--json"]);
     expect(noArg.exitCode).toBe(0);
-    const status = parseJson(noArg.stdout) as { status: string; data: { project: { lifecycle: string }; next_actions: string[] } };
+    const status = parseJson(noArg.stdout) as {
+      status: string;
+      data: { project: { lifecycle: string }; next_actions: string[] };
+    };
     expect(status.status).toBe("ok");
     expect(status.data.project.lifecycle).toBe("pre-claim");
     expect(status.data.next_actions.join(" ")).toContain("apply");
@@ -62,7 +70,10 @@ describe("Next setup integration", () => {
     const stateBeforePlan = await readFile(join(cwd, ".zitadel/state.json"), "utf8");
     const plan = await runCliForTest(["plan", "--cwd", cwd, "--json", "--mock"]);
     expect(plan.exitCode).toBe(0);
-    const planJson = parseJson(plan.stdout) as { status: string; data: { dry_run: boolean; uploaded: boolean } };
+    const planJson = parseJson(plan.stdout) as {
+      status: string;
+      data: { dry_run: boolean; uploaded: boolean };
+    };
     expect(planJson.status).toBe("ok");
     expect(planJson.data.dry_run).toBe(true);
     expect(planJson.data.uploaded).toBe(false);
@@ -78,21 +89,35 @@ describe("Next setup integration", () => {
       "phone:string:format=phone,x-mfa=sms",
     ]);
     expect(addSchema.exitCode).toBe(0);
-    expect(await readFile(join(cwd, ".zitadel/schemas/user.json"), "utf8")).toContain("\"phone\"");
+    expect(await readFile(join(cwd, ".zitadel/schemas/user.json"), "utf8")).toContain('"phone"');
 
     const apply = await runCliForTest(["apply", "--cwd", cwd, "--json", "--mock"]);
     expect(apply.exitCode).toBe(0);
-    const applyJson = parseJson(apply.stdout) as { status: string; data: { state_recorded: boolean } };
+    const applyJson = parseJson(apply.stdout) as {
+      status: string;
+      data: { state_recorded: boolean };
+    };
     expect(applyJson.status).toBe("ok");
     expect(applyJson.data.state_recorded).toBe(true);
 
-    const production = await runCliForTest(["apply", "--cwd", cwd, "--json", "--mock", "--environment", "production"]);
+    const production = await runCliForTest([
+      "apply",
+      "--cwd",
+      cwd,
+      "--json",
+      "--mock",
+      "--environment",
+      "production",
+    ]);
     expect(production.exitCode).toBe(3);
     expect((parseJson(production.stdout) as { code: string }).code).toBe("E_CLAIM_REQUIRED");
 
     const claim = await runCliForTest(["claim", "--cwd", cwd, "--json", "--mock"]);
     expect(claim.exitCode).toBe(0);
-    const claimJson = parseJson(claim.stdout) as { status: string; data: { handoff: string; claim_url: string; challenge_id: string } };
+    const claimJson = parseJson(claim.stdout) as {
+      status: string;
+      data: { handoff: string; claim_url: string; challenge_id: string };
+    };
     expect(claimJson.status).toBe("ok");
     expect(claimJson.data.handoff).toBe("human");
     expect(claimJson.data.claim_url).toContain("claim");
@@ -108,7 +133,9 @@ describe("Next setup integration", () => {
       claimJson.data.challenge_id,
     ]);
     expect(pendingClaim.exitCode).toBe(0);
-    expect((parseJson(pendingClaim.stdout) as { data: { status: string } }).data.status).toBe("pending");
+    expect((parseJson(pendingClaim.stdout) as { data: { status: string } }).data.status).toBe(
+      "pending",
+    );
 
     const completedClaim = await runCliForTest([
       "claim",
@@ -122,14 +149,24 @@ describe("Next setup integration", () => {
       claimJson.data.challenge_id,
     ]);
     expect(completedClaim.exitCode).toBe(0);
-    const completedJson = parseJson(completedClaim.stdout) as { data: { status: string; state_refreshed: boolean } };
+    const completedJson = parseJson(completedClaim.stdout) as {
+      data: { status: string; state_refreshed: boolean };
+    };
     expect(completedJson.data.status).toBe("claimed");
     expect(completedJson.data.state_refreshed).toBe(true);
     const secret = await readFile(join(cwd, ".zitadel/secret"), "utf8");
-    expect(secret).toContain("\"claimed_at\"");
-    expect(secret).toContain("\"team_id\": \"team_mock\"");
+    expect(secret).toContain('"claimed_at"');
+    expect(secret).toContain('"team_id": "team_mock"');
 
-    const productionAfterClaim = await runCliForTest(["apply", "--cwd", cwd, "--json", "--mock", "--environment", "production"]);
+    const productionAfterClaim = await runCliForTest([
+      "apply",
+      "--cwd",
+      cwd,
+      "--json",
+      "--mock",
+      "--environment",
+      "production",
+    ]);
     expect(productionAfterClaim.exitCode).toBe(0);
   });
 

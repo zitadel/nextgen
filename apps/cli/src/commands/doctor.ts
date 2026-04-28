@@ -1,12 +1,12 @@
 import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 
-import { getAdapter } from "../adapters/registry";
 import type { ProjectContext } from "../adapters";
+import { getAdapter } from "../adapters/registry";
+import { detectDeployTarget } from "../deploy";
 import { detectFramework } from "../detect/framework";
 import { detectPackageManager } from "../detect/package-manager";
 import { detectDevPort, issuerFromPort } from "../detect/port";
-import { detectDeployTarget } from "../deploy";
 import type { CliIO, GlobalOptions } from "../io/output";
 import { ok } from "../io/output";
 import { ZitadelError } from "../lib/errors";
@@ -53,70 +53,129 @@ export async function runDoctor(io: CliIO, opts: DoctorOptions): Promise<void> {
 
 async function collectChecks(cwd: string): Promise<DoctorCheck[]> {
   const checks: DoctorCheck[] = [];
-  const config = await check("config", "zitadel.json parses", "zitadel.json", async () => readZitadelConfig(cwd), checks);
-  const secret = await check("secret", ".zitadel/secret parses", ".zitadel/secret", async () => readZitadelSecret(cwd), checks);
+  const config = await check(
+    "config",
+    "zitadel.json parses",
+    "zitadel.json",
+    async () => readZitadelConfig(cwd),
+    checks,
+  );
+  const secret = await check(
+    "secret",
+    ".zitadel/secret parses",
+    ".zitadel/secret",
+    async () => readZitadelSecret(cwd),
+    checks,
+  );
 
-  await check("secret-permissions", ".zitadel/secret has 0600 permissions", ".zitadel/secret", async () => {
-    const mode = (await stat(join(cwd, ".zitadel/secret"))).mode & 0o777;
-    if (mode !== 0o600) {
-      throw new Error(`expected 0600, got ${mode.toString(8)}`);
-    }
-  }, checks);
-
-  await check("gitignore", ".gitignore protects local secret/env files", ".gitignore", async () => {
-    const contents = await readFile(join(cwd, ".gitignore"), "utf8");
-    for (const entry of [".zitadel/secret", ".env*", "!.env.example"]) {
-      if (!contents.split(/\r?\n/g).includes(entry)) {
-        throw new Error(`missing ${entry}`);
+  await check(
+    "secret-permissions",
+    ".zitadel/secret has 0600 permissions",
+    ".zitadel/secret",
+    async () => {
+      const mode = (await stat(join(cwd, ".zitadel/secret"))).mode & 0o777;
+      if (mode !== 0o600) {
+        throw new Error(`expected 0600, got ${mode.toString(8)}`);
       }
-    }
-  }, checks);
+    },
+    checks,
+  );
 
-  await check("env-example", ".env.example references required keys", ".env.example", async () => {
-    const contents = await readFile(join(cwd, ".env.example"), "utf8");
-    for (const key of [
-      "ZITADEL_PROJECT_ID",
-      "ZITADEL_ENVIRONMENT",
-      "ZITADEL_ISSUER",
-    ]) {
-      if (!contents.includes(`${key}=`)) {
-        throw new Error(`missing ${key}`);
+  await check(
+    "gitignore",
+    ".gitignore protects local secret/env files",
+    ".gitignore",
+    async () => {
+      const contents = await readFile(join(cwd, ".gitignore"), "utf8");
+      for (const entry of [".zitadel/secret", ".env*", "!.env.example"]) {
+        if (!contents.split(/\r?\n/g).includes(entry)) {
+          throw new Error(`missing ${entry}`);
+        }
       }
-    }
-  }, checks);
+    },
+    checks,
+  );
 
-  await check("framework", "Detected framework matches recorded framework", "zitadel.json", async () => {
-    const detected = await detectFramework(cwd, "next");
-    const recorded = isObject(config) && isObject(config.framework) ? config.framework.id : undefined;
-    if (recorded !== detected.id) {
-      throw new Error(`expected ${String(recorded)}, detected ${detected.id}`);
-    }
-  }, checks);
+  await check(
+    "env-example",
+    ".env.example references required keys",
+    ".env.example",
+    async () => {
+      const contents = await readFile(join(cwd, ".env.example"), "utf8");
+      for (const key of ["ZITADEL_PROJECT_ID", "ZITADEL_ENVIRONMENT", "ZITADEL_ISSUER"]) {
+        if (!contents.includes(`${key}=`)) {
+          throw new Error(`missing ${key}`);
+        }
+      }
+    },
+    checks,
+  );
 
-  await check("schema", "User schema is a valid JSON Schema", ".zitadel/schemas/user.json", async () => {
-    const schema = JSON.parse(await readFile(join(cwd, ".zitadel/schemas/user.json"), "utf8")) as unknown;
-    const result = validateJsonSchema(schema);
-    if (!result.valid) {
-      throw new Error(result.errors.join(", "));
-    }
-  }, checks);
+  await check(
+    "framework",
+    "Detected framework matches recorded framework",
+    "zitadel.json",
+    async () => {
+      const detected = await detectFramework(cwd, "next");
+      const recorded =
+        isObject(config) && isObject(config.framework) ? config.framework.id : undefined;
+      if (recorded !== detected.id) {
+        throw new Error(`expected ${String(recorded)}, detected ${detected.id}`);
+      }
+    },
+    checks,
+  );
 
-  await check("managed-login", "Login page contains Zitadel managed marker", "app/login/page.tsx", async () => {
-    await assertManagedFile(cwd, ["app/login/page.tsx", "src/app/login/page.tsx"]);
-  }, checks);
+  await check(
+    "schema",
+    "User schema is a valid JSON Schema",
+    ".zitadel/schemas/user.json",
+    async () => {
+      const schema = JSON.parse(
+        await readFile(join(cwd, ".zitadel/schemas/user.json"), "utf8"),
+      ) as unknown;
+      const result = validateJsonSchema(schema);
+      if (!result.valid) {
+        throw new Error(result.errors.join(", "));
+      }
+    },
+    checks,
+  );
 
-  await check("managed-register", "Register page contains Zitadel managed marker", "app/register/page.tsx", async () => {
-    await assertManagedFile(cwd, ["app/register/page.tsx", "src/app/register/page.tsx"]);
-  }, checks);
+  await check(
+    "managed-login",
+    "Login page contains Zitadel managed marker",
+    "app/login/page.tsx",
+    async () => {
+      await assertManagedFile(cwd, ["app/login/page.tsx", "src/app/login/page.tsx"]);
+    },
+    checks,
+  );
 
-  await check("deploy", "Deploy platform status resolved", "zitadel.json", async () => {
-    const adapter = await detectDeployTarget(cwd);
-    const status = await adapter.status(cwd);
-    if (status.state !== "ready" && status.state !== "not-detected") {
-      return `deploy platform ${status.platform} is ${status.state}`;
-    }
-    return status.state;
-  }, checks);
+  await check(
+    "managed-register",
+    "Register page contains Zitadel managed marker",
+    "app/register/page.tsx",
+    async () => {
+      await assertManagedFile(cwd, ["app/register/page.tsx", "src/app/register/page.tsx"]);
+    },
+    checks,
+  );
+
+  await check(
+    "deploy",
+    "Deploy platform status resolved",
+    "zitadel.json",
+    async () => {
+      const adapter = await detectDeployTarget(cwd);
+      const status = await adapter.status(cwd);
+      if (status.state !== "ready" && status.state !== "not-detected") {
+        return `deploy platform ${status.platform} is ${status.state}`;
+      }
+      return status.state;
+    },
+    checks,
+  );
 
   if (secret && config && secret.project_id !== config.project) {
     checks.push({
@@ -220,7 +279,14 @@ async function assertManagedFile(cwd: string, candidates: string[]): Promise<voi
       }
       return;
     } catch (error) {
-      if (!(typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "ENOENT")) {
+      if (
+        !(
+          typeof error === "object" &&
+          error !== null &&
+          "code" in error &&
+          (error as { code?: string }).code === "ENOENT"
+        )
+      ) {
         throw error;
       }
     }

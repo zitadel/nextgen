@@ -4,7 +4,7 @@ packages:
   - "packages/*"
 
 catalog:
-  '@clack/prompts': ^1.2.0
+  "@clack/prompts": ^1.2.0
   "@lit/react": ^1.0.8
   "@nx/devkit": ^22.7.0
   "@nx/esbuild": ^22.7.0

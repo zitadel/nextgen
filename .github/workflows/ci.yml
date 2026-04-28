@@ -48,13 +48,7 @@ jobs:
         run: corepack pnpm install --frozen-lockfile
 
       - name: Typecheck
-        run: corepack pnpm -r typecheck
-
-      - name: Test
-        run: corepack pnpm -r test
-
-      - name: Build
-        run: corepack pnpm -r build
+        run: corepack pnpm nx run-many -t typecheck,build,test
 
   npm-pack-smoke:
     runs-on: ubuntu-latest
@@ -144,7 +138,7 @@ jobs:
         uses: goreleaser/goreleaser-action@v7
         with:
           distribution: goreleaser
-          version: '~> v2'
+          version: "~> v2"
           args: release --snapshot --clean --skip=publish,sign
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

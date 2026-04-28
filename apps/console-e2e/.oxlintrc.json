@@ -1,9 +1,7 @@
 {
   "$schema": "../../node_modules/oxlint/configuration_schema.json",
   "plugins": [],
-  "jsPlugins": [
-    "eslint-plugin-playwright"
-  ],
+  "jsPlugins": ["eslint-plugin-playwright"],
   "categories": {
     "correctness": "off"
   },

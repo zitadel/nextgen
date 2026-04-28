@@ -6,11 +6,11 @@ import type { CliIO, GlobalOptions } from "../io/output";
 import { ok } from "../io/output";
 import { ZitadelError } from "../lib/errors";
 import { sha256 } from "../lib/hash";
+import { CLI_VERSION } from "../lib/version";
 import { createPlatformClient } from "../platform";
 import { environmentSchema, type ZitadelEnvironment } from "../platform/schemas";
 import { flowDefinitionSchema } from "../resources/flow";
 import { scaffold } from "../scaffolder";
-import { CLI_VERSION } from "../lib/version";
 import { validateLiquidTemplate } from "../templates/validate";
 import { readZitadelConfig, readZitadelSecret, schemaVersionFromConfig } from "./shared";
 
@@ -43,7 +43,8 @@ export async function runApply(io: CliIO, opts: ApplyOptions): Promise<Record<st
     blockers.push(`Missing environment variables: ${missingEnv.join(", ")}`);
   }
 
-  const nextCommandsForBlockers = environment === "production" && !isClaimedSecret(secret) ? ["zitadel claim"] : undefined;
+  const nextCommandsForBlockers =
+    environment === "production" && !isClaimedSecret(secret) ? ["zitadel claim"] : undefined;
 
   const planning = opts.planOnly || opts.dryRun;
   const resourceCounts = countResources(resourceBundle);
@@ -62,11 +63,15 @@ export async function runApply(io: CliIO, opts: ApplyOptions): Promise<Record<st
     blockers,
   };
 
-  if (blockers.length > 0 && !planning) {
-    throw new ZitadelError(environment === "production" ? "E_CLAIM_REQUIRED" : "E_VALIDATION", blockers[0], {
-      details: baseData,
-      nextCommands: nextCommandsForBlockers,
-    });
+  if (blockers[0] !== undefined && !planning) {
+    throw new ZitadelError(
+      environment === "production" ? "E_CLAIM_REQUIRED" : "E_VALIDATION",
+      blockers[0],
+      {
+        details: baseData,
+        nextCommands: nextCommandsForBlockers,
+      },
+    );
   }
 
   if (planning) {
@@ -140,7 +145,10 @@ function parseEnvironment(value: string | undefined): ZitadelEnvironment {
   return result.data;
 }
 
-async function assertReferencedFilesExist(cwd: string, _config: Record<string, unknown>): Promise<string[]> {
+async function assertReferencedFilesExist(
+  cwd: string,
+  _config: Record<string, unknown>,
+): Promise<string[]> {
   const directories: Array<{ dir: string; required: boolean }> = [
     { dir: ".zitadel/schemas", required: true },
     { dir: ".zitadel/flows", required: true },
@@ -169,7 +177,12 @@ async function assertReferencedFilesExist(cwd: string, _config: Record<string, u
     try {
       await readFile(join(cwd, path), "utf8");
     } catch (error) {
-      if (typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "ENOENT") {
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        "code" in error &&
+        (error as { code?: string }).code === "ENOENT"
+      ) {
         throw new ZitadelError("E_VALIDATION", `Referenced config file ${path} was not found`, {
           details: { path },
         });
@@ -186,7 +199,12 @@ async function listResourceFiles(dir: string): Promise<string[] | undefined> {
     const entries = await readdir(dir);
     return entries.filter((entry) => entry.endsWith(".json")).sort();
   } catch (error) {
-    if (typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "ENOENT") {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      (error as { code?: string }).code === "ENOENT"
+    ) {
       return undefined;
     }
     throw error;
@@ -251,7 +269,12 @@ async function readTemplates(cwd: string): Promise<Record<string, string>> {
   try {
     entries = await readdir(dir);
   } catch (error) {
-    if (typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "ENOENT") {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      (error as { code?: string }).code === "ENOENT"
+    ) {
       return {};
     }
     throw error;
@@ -294,7 +317,11 @@ export function findEnvRefs(value: unknown): string[] {
       node.forEach(visit);
     } else if (isObject(node)) {
       for (const [key, child] of Object.entries(node)) {
-        if (key.endsWith("_env") && typeof child === "string" && /^[A-Za-z_][A-Za-z0-9_]*$/.test(child)) {
+        if (
+          key.endsWith("_env") &&
+          typeof child === "string" &&
+          /^[A-Za-z_][A-Za-z0-9_]*$/.test(child)
+        ) {
           refs.add(child);
         } else {
           visit(child);

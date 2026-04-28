@@ -25,19 +25,30 @@ describe("identity resources", () => {
       "ZITADEL_IDP_GOOGLE_SECRET",
     ]);
     expect(add.exitCode).toBe(0);
-    const addEnv = parseJson(add.stdout) as { status: string; data: { slug: string; path: string; created: boolean } };
+    const addEnv = parseJson(add.stdout) as {
+      status: string;
+      data: { slug: string; path: string; created: boolean };
+    };
     expect(addEnv.status).toBe("ok");
     expect(addEnv.data.slug).toBe("google");
     expect(addEnv.data.created).toBe(true);
 
-    const contents = JSON.parse(await readFile(join(cwd, ".zitadel/idps/google.json"), "utf8")) as Record<string, unknown>;
+    const contents = JSON.parse(
+      await readFile(join(cwd, ".zitadel/idps/google.json"), "utf8"),
+    ) as Record<string, unknown>;
     expect(contents.kind).toBe("idp");
     expect(contents.protocol).toBe("oidc");
-    expect((contents.oidc as { client_id: string }).client_id).toBe("abc.apps.googleusercontent.com");
-    expect((contents.oidc as { client_secret_env: string }).client_secret_env).toBe("ZITADEL_IDP_GOOGLE_SECRET");
+    expect((contents.oidc as { client_id: string }).client_id).toBe(
+      "abc.apps.googleusercontent.com",
+    );
+    expect((contents.oidc as { client_secret_env: string }).client_secret_env).toBe(
+      "ZITADEL_IDP_GOOGLE_SECRET",
+    );
 
     const list = await runCliForTest(["idp", "list", "--cwd", cwd, "--json"]);
-    const listEnv = parseJson(list.stdout) as { data: { idps: Array<{ slug: string; protocol: string }> } };
+    const listEnv = parseJson(list.stdout) as {
+      data: { idps: Array<{ slug: string; protocol: string }> };
+    };
     expect(listEnv.data.idps).toHaveLength(1);
     expect(listEnv.data.idps[0].slug).toBe("google");
 
@@ -95,14 +106,20 @@ describe("identity resources", () => {
     expect(envelope.status).toBe("ok");
     expect(envelope.data.slug).toBe("web");
 
-    const contents = JSON.parse(await readFile(join(cwd, ".zitadel/apps/web.json"), "utf8")) as Record<string, unknown>;
+    const contents = JSON.parse(
+      await readFile(join(cwd, ".zitadel/apps/web.json"), "utf8"),
+    ) as Record<string, unknown>;
     expect(contents.kind).toBe("app");
     expect(contents.protocol).toBe("oidc");
     expect((contents.oidc as { client_type: string }).client_type).toBe("spa");
-    expect((contents.oidc as { redirect_uris: string[] }).redirect_uris).toContain("http://localhost:3000/callback");
+    expect((contents.oidc as { redirect_uris: string[] }).redirect_uris).toContain(
+      "http://localhost:3000/callback",
+    );
 
     const list = await runCliForTest(["app", "list", "--cwd", cwd, "--json"]);
-    const listEnv = parseJson(list.stdout) as { data: { apps: Array<{ slug: string; protocol: string }> } };
+    const listEnv = parseJson(list.stdout) as {
+      data: { apps: Array<{ slug: string; protocol: string }> };
+    };
     expect(listEnv.data.apps).toHaveLength(1);
     expect(listEnv.data.apps[0].slug).toBe("web");
 
@@ -186,7 +203,9 @@ describe("identity resources", () => {
       "http://localhost:3000/callback",
     ]);
     expect(result.exitCode).toBe(0);
-    const contents = JSON.parse(await readFile(join(cwd, ".zitadel/apps/spa.json"), "utf8")) as Record<string, unknown>;
+    const contents = JSON.parse(
+      await readFile(join(cwd, ".zitadel/apps/spa.json"), "utf8"),
+    ) as Record<string, unknown>;
     expect((contents.oidc as { client_type: string }).client_type).toBe("spa");
     expect((contents.oidc as { auth_methods: string[] }).auth_methods).toEqual(["none"]);
   });

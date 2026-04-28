@@ -1,6 +1,7 @@
 "use client";
 
 import type { ZitadelFlowPurpose, ZitadelRuntime } from "@zitadel-nextgen/sdk-core";
+
 import { styles } from "./styles.js";
 
 export function ZitadelFlowReal({
@@ -18,9 +19,7 @@ export function ZitadelFlowReal({
           <p style={styles.eyebrow}>Zitadel</p>
           <h1 style={styles.title}>{title}</h1>
         </div>
-        <p style={styles.dim}>
-          Redirecting to {runtime.issuer ?? "Zitadel"}…
-        </p>
+        <p style={styles.dim}>Redirecting to {runtime.issuer ?? "Zitadel"}…</p>
         <p style={styles.dim}>
           Environment: {runtime.environment} · Project: {runtime.projectId}
         </p>

@@ -72,9 +72,13 @@ export class HttpPlatformClient implements PlatformClient {
     });
 
     if (!response.ok) {
-      throw new ZitadelError(response.status >= 500 ? "E_NETWORK" : "E_VALIDATION", `Zitadel API returned ${response.status}`, {
-        details: await safeJson(response),
-      });
+      throw new ZitadelError(
+        response.status >= 500 ? "E_NETWORK" : "E_VALIDATION",
+        `Zitadel API returned ${response.status}`,
+        {
+          details: await safeJson(response),
+        },
+      );
     }
 
     return (await response.json()) as T;

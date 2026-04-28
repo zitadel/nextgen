@@ -2,16 +2,17 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "./out-tsc/vitest",
-    "types": [
-      "vitest/globals",
-      "vitest/importMeta",
-      "node",
-      "vitest",
-    ],
+    "types": ["vitest/globals", "vitest/importMeta", "node", "vitest"],
     "lib": ["es2022", "dom"],
     "jsx": "react-jsx"
   },
-  "include": ["vitest.config.ts", "tsup.config.ts", "src/**/*.spec.ts", "scripts/**/*.ts", "tests/**/*.ts"],
+  "include": [
+    "vitest.config.ts",
+    "tsup.config.ts",
+    "src/**/*.spec.ts",
+    "scripts/**/*.ts",
+    "tests/**/*.ts"
+  ],
   "references": [
     {
       "path": "./tsconfig.app.json"

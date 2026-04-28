@@ -27,7 +27,7 @@ async function createNodesInternal(configFile: string): Promise<CreateNodesResul
             executor: "nx:run-commands",
             options: {
               command: "pnpm oxlint",
-              cwd: "{projectRoot}"
+              cwd: "{projectRoot}",
             },
             cache: true,
             inputs: [

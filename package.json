@@ -9,7 +9,6 @@
     "test": "corepack pnpm -r test",
     "zitadel": "node scripts/zitadel-dev.mjs"
   },
-  "packageManager": "pnpm@10.33.2",
   "devDependencies": {
     "@nx/devkit": "catalog:",
     "@nx/eslint-plugin": "catalog:",
@@ -27,6 +26,7 @@
     "vite": "catalog:",
     "vitest": "catalog:"
   },
+  "packageManager": "pnpm@10.33.2",
   "pnpm": {
     "onlyBuiltDependencies": [
       "esbuild",

@@ -1,8 +1,7 @@
 import { cancel, confirm, intro, isCancel, multiselect, outro, select, text } from "@clack/prompts";
 
-import type { GlobalOptions } from "../io/output";
-import { DEFAULT_SERVER, MOCK_SENTINEL } from "../platform/resolve-server";
 import { ZitadelError } from "../lib/errors";
+import { DEFAULT_SERVER, MOCK_SENTINEL } from "../platform/resolve-server";
 
 export type InteractiveSetupAnswers = {
   userFields: string[];
@@ -32,7 +31,9 @@ const AUTH_METHOD_CHOICES = [
   { value: "totp", label: "totp" },
 ];
 
-export async function runInteractiveSetup(input: InteractiveSetupInput): Promise<InteractiveSetupAnswers> {
+export async function runInteractiveSetup(
+  input: InteractiveSetupInput,
+): Promise<InteractiveSetupAnswers> {
   intro("Zitadel setup");
 
   const frameworkAck = await confirm({
@@ -65,8 +66,16 @@ export async function runInteractiveSetup(input: InteractiveSetupInput): Promise
   const serverChoice = await select({
     message: "Which server should zitadel.json point to?",
     options: [
-      { value: DEFAULT_SERVER, label: "Zitadel Cloud (api.zitadel.cloud)", hint: "recommended for real projects" },
-      { value: MOCK_SENTINEL, label: "Mock (offline development)", hint: "no network, no real data" },
+      {
+        value: DEFAULT_SERVER,
+        label: "Zitadel Cloud (api.zitadel.cloud)",
+        hint: "recommended for real projects",
+      },
+      {
+        value: MOCK_SENTINEL,
+        label: "Mock (offline development)",
+        hint: "no network, no real data",
+      },
       { value: "__custom__", label: "Custom URL (self-hosted)" },
     ],
     initialValue: input.currentServer ?? DEFAULT_SERVER,
@@ -80,7 +89,7 @@ export async function runInteractiveSetup(input: InteractiveSetupInput): Promise
       placeholder: "https://zitadel.internal",
       validate: (value) => {
         try {
-          new URL(value);
+          new URL(value ?? "");
           return;
         } catch {
           return "Must be a valid URL";
@@ -96,7 +105,7 @@ export async function runInteractiveSetup(input: InteractiveSetupInput): Promise
     placeholder: String(input.detectedDevPort),
     initialValue: String(input.detectedDevPort),
     validate: (value) => {
-      const num = Number.parseInt(value, 10);
+      const num = Number.parseInt(value ?? "", 10);
       return Number.isFinite(num) && num > 0 && num < 65536 ? undefined : "Must be a port number";
     },
   });

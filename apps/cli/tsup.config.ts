@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { defineConfig } from "tsup";
 
 const here = dirname(fileURLToPath(import.meta.url));

@@ -1,6 +1,8 @@
 import { z } from "zod";
 
-const envRef = z.string().regex(/^[A-Z][A-Z0-9_]*$/, "must be an env var name like ZITADEL_IDP_X_SECRET");
+const envRef = z
+  .string()
+  .regex(/^[A-Z][A-Z0-9_]*$/, "must be an env var name like ZITADEL_IDP_X_SECRET");
 
 const claimMapping = z.record(z.string()).default({
   email: "email",
@@ -16,16 +18,17 @@ const oidcBlock = z.object({
   claim_mapping: claimMapping,
 });
 
-const samlBlock = z.object({
-  metadata_url: z.string().url().optional(),
-  metadata_xml: z.string().optional(),
-  binding: z.enum(["post", "redirect"]).default("post"),
-  signing_cert_env: envRef.optional(),
-  claim_mapping: claimMapping.optional(),
-}).refine(
-  (value) => Boolean(value.metadata_url || value.metadata_xml),
-  { message: "SAML IdP requires metadata_url or metadata_xml" },
-);
+const samlBlock = z
+  .object({
+    metadata_url: z.string().url().optional(),
+    metadata_xml: z.string().optional(),
+    binding: z.enum(["post", "redirect"]).default("post"),
+    signing_cert_env: envRef.optional(),
+    claim_mapping: claimMapping.optional(),
+  })
+  .refine((value) => Boolean(value.metadata_url || value.metadata_xml), {
+    message: "SAML IdP requires metadata_url or metadata_xml",
+  });
 
 const provisioning = z.object({
   mode: z.enum(["auto_link_by_email", "manual", "jit"]).default("auto_link_by_email"),
@@ -34,27 +37,28 @@ const provisioning = z.object({
   default_schema: z.string().default("user"),
 });
 
-export const idpResourceSchema = z.object({
-  version: z.literal(1),
-  kind: z.literal("idp"),
-  slug: z.string(),
-  display_name: z.string().min(1),
-  protocol: z.enum(["oidc", "saml"]),
-  enabled: z.boolean().default(true),
-  audience: z
-    .object({
-      scope: z.enum(["project", "team"]).default("project"),
-      team_id: z.string().optional(),
-      project_id: z.string().optional(),
-    })
-    .optional(),
-  oidc: oidcBlock.optional(),
-  saml: samlBlock.optional(),
-  provisioning: provisioning.default(provisioning.parse({})),
-}).refine(
-  (value) => (value.protocol === "oidc" ? Boolean(value.oidc) : Boolean(value.saml)),
-  { message: "OIDC IdP needs an `oidc` block; SAML IdP needs a `saml` block." },
-);
+export const idpResourceSchema = z
+  .object({
+    version: z.literal(1),
+    kind: z.literal("idp"),
+    slug: z.string(),
+    display_name: z.string().min(1),
+    protocol: z.enum(["oidc", "saml"]),
+    enabled: z.boolean().default(true),
+    audience: z
+      .object({
+        scope: z.enum(["project", "team"]).default("project"),
+        team_id: z.string().optional(),
+        project_id: z.string().optional(),
+      })
+      .optional(),
+    oidc: oidcBlock.optional(),
+    saml: samlBlock.optional(),
+    provisioning: provisioning.default(provisioning.parse({})),
+  })
+  .refine((value) => (value.protocol === "oidc" ? Boolean(value.oidc) : Boolean(value.saml)), {
+    message: "OIDC IdP needs an `oidc` block; SAML IdP needs a `saml` block.",
+  });
 
 export type IdpResource = z.infer<typeof idpResourceSchema>;
 

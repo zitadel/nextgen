@@ -74,7 +74,9 @@ export const flowDefinitionSchema = z.object({
   kind: z.literal("flow-definition"),
   slug: z.string().regex(/^[a-z][a-z0-9-]*$/),
   name: z.string().min(1),
-  purposes: z.array(z.enum(["login", "register", "recovery", "profiling", "reauth", "link_account"])).nonempty(),
+  purposes: z
+    .array(z.enum(["login", "register", "recovery", "profiling", "reauth", "link_account"]))
+    .nonempty(),
   template_name: z.string().default("default"),
   initial_steps: z.record(z.string()),
   audience: z

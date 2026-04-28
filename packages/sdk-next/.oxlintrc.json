@@ -51,9 +51,7 @@
         ],
         "typescript/no-namespace": "error"
       },
-      "plugins": [
-        "typescript"
-      ]
+      "plugins": ["typescript"]
     }
   ]
 }

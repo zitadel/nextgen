@@ -17,12 +17,7 @@
   ],
   "overrides": [
     {
-      "files": [
-        "**/*.ts",
-        "**/*.tsx",
-        "**/*.cts",
-        "**/*.mts"
-      ],
+      "files": ["**/*.ts", "**/*.tsx", "**/*.cts", "**/*.mts"],
       "rules": {
         "constructor-super": "off",
         "for-direction": "error",
@@ -114,20 +109,13 @@
         "typescript/no-inferrable-types": "error",
         "typescript/no-empty-interface": "error"
       },
-      "plugins": [
-        "typescript"
-      ],
+      "plugins": ["typescript"],
       "env": {
         "es2020": true
       }
     },
     {
-      "files": [
-        "**/*.js",
-        "**/*.jsx",
-        "**/*.cjs",
-        "**/*.mjs"
-      ],
+      "files": ["**/*.js", "**/*.jsx", "**/*.cjs", "**/*.mjs"],
       "rules": {
         "constructor-super": "off",
         "for-direction": "error",
@@ -220,9 +208,7 @@
         "typescript/no-inferrable-types": "error",
         "typescript/no-empty-interface": "error"
       },
-      "plugins": [
-        "typescript"
-      ],
+      "plugins": ["typescript"],
       "env": {
         "es2020": true,
         "commonjs": true
@@ -1365,34 +1351,23 @@
       }
     },
     {
-      "files": [
-        "**/*.ts",
-        "**/*.tsx",
-        "**/*.js",
-        "**/*.jsx"
-      ],
+      "files": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"],
       "rules": {
         "@nx/enforce-module-boundaries": [
           "error",
           {
             "enforceBuildableLibDependency": true,
-            "allow": [
-              "^.*/eslint(\\.base)?\\.config\\.[cm]?[jt]s$"
-            ],
+            "allow": ["^.*/eslint(\\.base)?\\.config\\.[cm]?[jt]s$"],
             "depConstraints": [
               {
                 "sourceTag": "*",
-                "onlyDependOnLibsWithTags": [
-                  "*"
-                ]
+                "onlyDependOnLibsWithTags": ["*"]
               }
             ]
           }
         ]
       },
-      "jsPlugins": [
-        "@nx/eslint-plugin"
-      ]
+      "jsPlugins": ["@nx/eslint-plugin"]
     }
   ]
 }

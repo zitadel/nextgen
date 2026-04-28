@@ -1,10 +1,10 @@
 import { readFile, writeFile } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-import { EXIT_CODES } from "../src/lib/errors";
-import { COMMANDS, type CommandSpec, type FlagSpec } from "../src/commands/registry";
 import { ENVELOPE_SCHEMA_VERSION } from "../src/commands/capabilities";
+import { COMMANDS, type CommandSpec, type FlagSpec } from "../src/commands/registry";
+import { EXIT_CODES } from "../src/lib/errors";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const agentsTarget = join(here, "..", "AGENTS.md");
@@ -19,7 +19,9 @@ async function main() {
 function renderGeneratedBlock(): string {
   const lines: string[] = [BEGIN];
   lines.push("");
-  lines.push(`Envelope schema version: \`${ENVELOPE_SCHEMA_VERSION}\`. Every envelope carries \`cli_version\`, \`command\`, \`source\` at the top level.`);
+  lines.push(
+    `Envelope schema version: \`${ENVELOPE_SCHEMA_VERSION}\`. Every envelope carries \`cli_version\`, \`command\`, \`source\` at the top level.`,
+  );
   lines.push("");
   lines.push("## Commands");
   lines.push("");

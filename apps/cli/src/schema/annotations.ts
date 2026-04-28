@@ -54,21 +54,33 @@ export function validateFieldAnnotations(
       });
       continue;
     }
-    if (key === "x-verify" && typeof value === "string" && !(KNOWN_VERIFY_VALUES as readonly string[]).includes(value)) {
+    if (
+      key === "x-verify" &&
+      typeof value === "string" &&
+      !(KNOWN_VERIFY_VALUES as readonly string[]).includes(value)
+    ) {
       warnings.push({
         field: fieldName,
         annotation: key,
         message: `Unknown "${key}" value "${value}". Known: ${KNOWN_VERIFY_VALUES.join(", ")}`,
       });
     }
-    if (key === "x-mfa" && typeof value === "string" && !(KNOWN_MFA_VALUES as readonly string[]).includes(value)) {
+    if (
+      key === "x-mfa" &&
+      typeof value === "string" &&
+      !(KNOWN_MFA_VALUES as readonly string[]).includes(value)
+    ) {
       warnings.push({
         field: fieldName,
         annotation: key,
         message: `Unknown "${key}" value "${value}". Known: ${KNOWN_MFA_VALUES.join(", ")}`,
       });
     }
-    if (key === "x-unique" && typeof value === "string" && !(KNOWN_UNIQUE_VALUES as readonly string[]).includes(value)) {
+    if (
+      key === "x-unique" &&
+      typeof value === "string" &&
+      !(KNOWN_UNIQUE_VALUES as readonly string[]).includes(value)
+    ) {
       warnings.push({
         field: fieldName,
         annotation: key,
