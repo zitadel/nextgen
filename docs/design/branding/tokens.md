@@ -80,7 +80,7 @@ Console validates each Branding axis independently on save and guarantees the em
 ```css
 /* inside zl-submit */
 button {
-  background: var(--zl-color-primary, #4A90D9);
+  background: var(--zl-color-primary, #4a90d9);
   color: var(--zl-color-on-primary, #fff);
   border-radius: var(--zl-radius-md, 0.5rem);
   font-family: var(--zl-font-family, inherit);
@@ -94,11 +94,13 @@ Every fallback is a sensible default so an atom used without a widget still look
 Consumers of the widget can always set tokens as inline styles on the host element, bypassing branding entirely:
 
 ```html
-<zitadel-login style="
+<zitadel-login
+  style="
   --zl-color-primary: #4A90D9;
   --zl-radius-md: 0.5rem;
   --zl-font-family: 'Arimo', ui-sans-serif, system-ui;
-"></zitadel-login>
+"
+></zitadel-login>
 ```
 
 Inline styles on the host beat `:host` rules by specificity (one-off host tweaks).
@@ -109,91 +111,91 @@ Names are **stable**. Once an atom consumes a token, renaming it is a breaking c
 
 ### Palette
 
-| Token | Purpose |
-|---|---|
-| `--zl-color-primary` | Primary action backgrounds, focus rings, active states |
-| `--zl-color-on-primary` | Text/icon on primary backgrounds |
-| `--zl-color-background` | Page background behind the card |
-| `--zl-color-surface` | Card and elevated surfaces |
-| `--zl-color-muted` | Subtle fills (dividers, secondary buttons, input backgrounds) |
-| `--zl-color-border` | Input borders, card borders, divider lines |
-| `--zl-color-text` | Default text |
-| `--zl-color-text-muted` | Secondary text, placeholders, helper copy |
-| `--zl-color-link` | Inline link colour; falls back to `--zl-color-primary` |
-| `--zl-color-success` | Success messages |
-| `--zl-color-warning` | Warning messages |
-| `--zl-color-error` | Error messages, destructive actions |
+| Token                   | Purpose                                                                   |
+| ----------------------- | ------------------------------------------------------------------------- |
+| `--zl-color-primary`    | Primary action backgrounds, focus rings, active states                    |
+| `--zl-color-on-primary` | Text/icon on primary backgrounds                                          |
+| `--zl-color-background` | Page background behind the card                                           |
+| `--zl-color-surface`    | Card and elevated surfaces                                                |
+| `--zl-color-muted`      | Subtle fills (dividers, secondary buttons, input backgrounds)             |
+| `--zl-color-border`     | Input borders, card borders, divider lines                                |
+| `--zl-color-text`       | Default text                                                              |
+| `--zl-color-text-muted` | Secondary text, placeholders, helper copy                                 |
+| `--zl-color-link`       | Inline link colour; falls back to `--zl-color-primary`                    |
+| `--zl-color-success`    | Success messages                                                          |
+| `--zl-color-warning`    | Warning messages                                                          |
+| `--zl-color-error`      | Error messages, destructive actions                                       |
 | `--zl-color-focus-ring` | Explicit focus ring colour; falls back to `--zl-color-primary` with alpha |
 
 ### Typography
 
-| Token | Purpose |
-|---|---|
-| `--zl-font-family` | Body and heading font stack |
-| `--zl-font-family-mono` | Monospace (OTP codes, copy-to-clipboard surfaces) |
-| `--zl-font-size-xs` | Helper text, captions |
-| `--zl-font-size-sm` | Form labels, body small |
-| `--zl-font-size-md` | Default body |
-| `--zl-font-size-lg` | Sub-headings |
-| `--zl-font-size-xl` | Card heading |
-| `--zl-font-weight-regular` | |
-| `--zl-font-weight-medium` | |
-| `--zl-font-weight-bold` | |
-| `--zl-line-height-tight` | |
-| `--zl-line-height-normal` | |
+| Token                      | Purpose                                           |
+| -------------------------- | ------------------------------------------------- |
+| `--zl-font-family`         | Body and heading font stack                       |
+| `--zl-font-family-mono`    | Monospace (OTP codes, copy-to-clipboard surfaces) |
+| `--zl-font-size-xs`        | Helper text, captions                             |
+| `--zl-font-size-sm`        | Form labels, body small                           |
+| `--zl-font-size-md`        | Default body                                      |
+| `--zl-font-size-lg`        | Sub-headings                                      |
+| `--zl-font-size-xl`        | Card heading                                      |
+| `--zl-font-weight-regular` |                                                   |
+| `--zl-font-weight-medium`  |                                                   |
+| `--zl-font-weight-bold`    |                                                   |
+| `--zl-line-height-tight`   |                                                   |
+| `--zl-line-height-normal`  |                                                   |
 
 ### Shape
 
-| Token | Purpose |
-|---|---|
-| `--zl-radius-sm` | Small controls (checkboxes, tags) |
-| `--zl-radius-md` | Inputs, buttons, cards by default |
-| `--zl-radius-lg` | Large surfaces |
-| `--zl-radius-full` | Circular (avatars, pill buttons) |
-| `--zl-border-width` | Default 1px |
+| Token                      | Purpose                           |
+| -------------------------- | --------------------------------- |
+| `--zl-radius-sm`           | Small controls (checkboxes, tags) |
+| `--zl-radius-md`           | Inputs, buttons, cards by default |
+| `--zl-radius-lg`           | Large surfaces                    |
+| `--zl-radius-full`         | Circular (avatars, pill buttons)  |
+| `--zl-border-width`        | Default 1px                       |
 | `--zl-border-width-strong` | Emphasised borders (focus, error) |
 
 ### Density / spacing
 
-| Token | Purpose |
-|---|---|
+| Token                                 | Purpose                                        |
+| ------------------------------------- | ---------------------------------------------- |
 | `--zl-space-1` through `--zl-space-8` | Spacing scale; used for margins, padding, gaps |
-| `--zl-control-height-sm` | Small buttons / inputs |
-| `--zl-control-height-md` | Default |
-| `--zl-control-height-lg` | Prominent CTAs |
-| `--zl-control-padding-x` | Horizontal padding inside buttons / inputs |
+| `--zl-control-height-sm`              | Small buttons / inputs                         |
+| `--zl-control-height-md`              | Default                                        |
+| `--zl-control-height-lg`              | Prominent CTAs                                 |
+| `--zl-control-padding-x`              | Horizontal padding inside buttons / inputs     |
 
 Density presets (`compact` / `regular` / `comfortable` on the branding object) resolve to different values of these tokens; atoms never branch on the preset name.
 
 ### Elevation
 
-| Token | Purpose |
-|---|---|
-| `--zl-shadow-none` | |
-| `--zl-shadow-sm` | Inputs, subtle lift |
-| `--zl-shadow-md` | Cards |
-| `--zl-shadow-lg` | Popovers, menus |
+| Token              | Purpose             |
+| ------------------ | ------------------- |
+| `--zl-shadow-none` |                     |
+| `--zl-shadow-sm`   | Inputs, subtle lift |
+| `--zl-shadow-md`   | Cards               |
+| `--zl-shadow-lg`   | Popovers, menus     |
 
 ### Motion
 
-| Token | Purpose |
-|---|---|
-| `--zl-duration-fast` | Hover, focus transitions |
-| `--zl-duration-normal` | Entrance, button-press |
-| `--zl-ease-default` | Timing function |
+| Token                  | Purpose                  |
+| ---------------------- | ------------------------ |
+| `--zl-duration-fast`   | Hover, focus transitions |
+| `--zl-duration-normal` | Entrance, button-press   |
+| `--zl-ease-default`    | Timing function          |
 
 ### Assets
 
 Asset URLs live on branding; the host loads them (img, link, background). They are not colour tokens.
 
-| Source | Applied as |
-|---|---|
-| `logo_url` (baseline) | `<img>` in the default template; `<zl-logo>` atom reads the attribute if bundled |
-| `hero_url` (baseline) | `background-image` on `:host` when the `split` layout is active |
-| `font_url` (baseline) | Injected by the orchestrator as `<link rel="stylesheet">` before the widget paints |
-| `assets.logo_dark` (proposed) | Swapped by `data-theme="dark"` |
-| `assets.favicon` (proposed) | Written to `<link rel="icon">` by the widget on mount |
-| `assets.background_image` (proposed) | Additional background slot not covered by `hero_url` |
+| Source                               | Applied as                                                                         |
+| ------------------------------------ | ---------------------------------------------------------------------------------- |
+| `logo_url` (baseline)                | `<img>` in the default template; `<zl-logo>` atom reads the attribute if bundled   |
+| `hero_url` (baseline)                | `background-image` on `:host` when the `split` layout is active                    |
+| `font_url` (baseline)                | Injected by the orchestrator as `<link rel="stylesheet">` before the widget paints |
+| `assets.logo_dark` (proposed)        | Swapped by `data-theme="dark"`                                                     |
+| `assets.favicon` (proposed)          | Written to `<link rel="icon">` by the widget on mount                              |
+| `assets.background_image` (proposed) | Additional background slot not covered by `hero_url`                               |
 
 ## Dark-mode pairing
 
@@ -229,7 +231,7 @@ Preset-to-token tables ship in the component package, not in tenant JSON, so `lg
 ## Open questions (token-specific)
 
 - Do we publish the preset-to-token mapping as JSON for third parties who want to render token values in design tools (Figma, Tokens Studio), or keep it internal to the component package?
-- Which tokens should be *customer-overridable* on the branding object vs *read-only* derivations? (Example: primary colour is an axis; focus-ring colour is likely a derivation.)
+- Which tokens should be _customer-overridable_ on the branding object vs _read-only_ derivations? (Example: primary colour is an axis; focus-ring colour is likely a derivation.)
 - Motion tokens: do we expose them at all, or bake durations into atom CSS and let customers override via `::part` if they really need to?
 
 See [`README.md`](README.md) for the full open-question list.
