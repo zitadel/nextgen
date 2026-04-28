@@ -17,7 +17,7 @@ A session is produced by a completed [auth_attempt](../api/authn-and-auth-flows.
 ```
 POST /auth_attempts                       →  drive verification (challenges, proofs)
 POST /auth_attempts/{id}/handoff          →  mint handoff_token
-POST /session_handoffs/{id}/exchange      →  receive { session, session_token }
+POST /sessions/exchange { handoff_token }  →  receive { session, session_token }
 
 GET    /sessions/{id}                     →  read state, factors, assurance_levels[]
 DELETE /sessions/{id}                     →  revoke (logout)
@@ -305,8 +305,52 @@ POST   /auth_attempts                               Start authentication (refere
 POST   /auth_attempts/{id}/challenges               Issue a factor challenge
 POST   /auth_attempts/{id}/challenges/{cid}/verify  Submit proof
 POST   /auth_attempts/{id}/handoff                  Mint handoff_token
-POST   /session_handoffs/{id}/exchange              Exchange handoff_token → { session, session_token }
+POST   /sessions/exchange                           Exchange handoff_token → { session, session_token }
 ```
+
+### `POST /sessions/exchange`
+
+Consumes a one-time `handoff_token` minted by `POST /auth_attempts/{id}/handoff`. The server resolves the originating `auth_attempt` from the token and then decides:
+
+| Situation | Outcome |
+|---|---|
+| `auth_attempt` had **no `session_id`** | New authenticated session is **created** |
+| `auth_attempt` had a `session_id` pointing to an **anonymous shell** | Existing session is **upgraded** — user and factors written in, TTL reset to full session TTL |
+| `auth_attempt` had a `session_id` pointing to an **active session** (step-up) | Existing session is **upgraded** — new factors merged, `assurance_levels[]` expanded |
+
+The caller does not need to know which case applies — the response shape is identical in all three.
+
+**Request**
+
+```http
+POST /sessions/exchange
+Authorization: Bearer sk_proj_…   ← project service key
+Content-Type: application/json
+
+{
+  "handoff_token": "htok_…"
+}
+```
+
+**Response**
+
+```json
+{
+  "session": {
+    "session_id":        "sess_…",
+    "state":             "active",
+    "user_id":           "usr_…",
+    "factors":           { "password": { "verified_at": "…" }, "totp": { "verified_at": "…" } },
+    "assurance_levels":  ["urn:nist:aal:1", "urn:nist:aal:2"],
+    "created_at":        "…",
+    "expires_at":        "…"
+  },
+  "session_token": "stok_…"
+}
+```
+
+- `session_token` supersedes any previously issued anonymous `session_token` for the same session. Clients must replace their stored token at this point.
+- The `handoff_token` is single-use; replaying it returns `410 Gone`.
 
 See [auth_attempts state machine](../api/authn-and-auth-flows.md) for the full endpoint reference.
 
@@ -351,8 +395,8 @@ The `session_token` is the bearer credential that authorises session-scoped oper
 
 | Event | Token |
 |---|---|
-| `POST /sessions` (anonymous) | Initial `session_token` issued |
-| `POST /session_handoffs/{id}/exchange` | Fresh `session_token` issued, supersedes the anonymous token |
+ `POST /sessions` (anonymous)  Initial `session_token` issued 
+ `POST /sessions/exchange`  Fresh `session_token` issued, supersedes the anonymous token 
 | `DELETE /sessions/{id}` | Token consumed (session revoked) |
 
 > **Important:** After a handoff exchange, clients must replace the anonymous `session_token` with the one returned from the exchange. The anonymous token is invalidated at that point.

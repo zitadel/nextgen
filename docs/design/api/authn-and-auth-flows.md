@@ -9,7 +9,7 @@
 - **flow engine** — orchestrates the *UI* around those primitives: which step renders when, which screen to show next, when to branch on policy. Does not hold primitives. See [`../flowengine/flow-engine.md`](../flowengine/flow-engine.md).
 - **sessions** — durable post-auth container produced by a completed auth_attempt. Carries accumulated factors and assurance level. Detail in [`../flowengine/session-api.md`](../flowengine/session-api.md).
 
-A flow runs on top of auth_attempt primitives without collapsing the resource model. A flow decides *what screen to draw*; an auth_attempt decides *what primitive to offer and what proof to accept*; a session is the durable post-auth outcome.
+A flow runs on top of auth_attempt primitives without collapsing the resource model. A flow decides *what screen to draw*; an auth_attempt validates *the requested primitive and proof*; a session is the durable post-auth outcome.
 
 ## Pre-session concepts
 
@@ -62,7 +62,7 @@ No OIDC context. The attempt does not know whether it is part of an OIDC flow, a
 
 `handoff` always yields a `handoff_token`. Who calls it determines what happens next:
 
-- **Direct client / flow engine** → calls `POST /auth_attempts/{id}/handoff` over HTTP → receives `{ handoff_token }` → exchanges via `POST /session_handoffs/{id}/exchange`.
+- **Direct client / flow engine** → calls `POST /auth_attempts/{id}/handoff` over HTTP → receives `{ handoff_token }` → exchanges via `POST /sessions/exchange`.
 - **OIDC Adapter** → calls `mint_handoff(attempt_id)` internally → receives `handoff_token` → immediately exchanges it for an OAuth `code` server-side → returns `code` + redirect URL to the browser. No external handoff exchange involved.
 
 ### TTL — LOCKED at 15 minutes
@@ -96,7 +96,7 @@ The embedded lit component completes auth in-browser and hands the customer's ba
 
 ```http
 POST /auth_attempts/{id}/handoff         → { handoff_token: "…", expires_at: "…" }
-POST /session_handoffs/{id}/exchange     → { session: {…}, session_token: "…" }
+POST /sessions/exchange                  → { session: {…}, session_token: "…" }
 ```
 
 Exchange requirements (also documented in [`credentials.md`](credentials.md#handoff-token-hardening)):
@@ -140,6 +140,8 @@ The attempt proceeds normally (challenges → verify → handoff). On handoff, t
 
 The flow engine is a separate concern from auth_attempts: it decides *which step renders* at each point. A flow step that says "collect password" internally calls `POST /auth_attempts/{id}/challenges` with `method: "password"` and presents the resulting challenge to the user; the submission calls `POST /auth_attempts/{id}/challenges/{cid}/verify`.
 
+`auth_attempts` does not return an "available factors" menu for orchestration. Step selection remains flow/policy-driven; auth_attempts enforces validity of requested methods and proofs.
+
 Integration details and the full state machine of the UI orchestration layer live in [`../flowengine/flow-engine.md`](../flowengine/flow-engine.md).
 
 ## Sequence Diagrams
@@ -174,22 +176,29 @@ sequenceDiagram
     Browser->>FlowEngine: POST /flows { project_id, challenge_nonce, session_id? }
     FlowEngine->>AuthAttempts: POST /auth_attempts { project_id, challenge_nonce, session_id? }
     AuthAttempts-->>FlowEngine: { attempt_id }
+    FlowEngine->>AuthAttempts: POST /auth_attempts/{id}/challenges { method: "identifier" }
+    AuthAttempts-->>FlowEngine: { challenge_id, method: "identifier" }
     FlowEngine-->>Browser: Set-Cookie: flow=<encrypted_state> · 200 { step: "identifier" }
 
     Note over Browser,CustomerBackend: Factor 1 — identifier + password
 
     Browser->>FlowEngine: POST /flows/{id}/submit { login_name: "alice@acme.com" }
+    FlowEngine->>AuthAttempts: POST /auth_attempts/{id}/challenges/{cid}/verify { login_name: "alice@acme.com" }
+    AuthAttempts-->>FlowEngine: 200 OK — identifier verified
     FlowEngine->>AuthAttempts: POST /auth_attempts/{id}/challenges { method: "password" }
     AuthAttempts-->>FlowEngine: { challenge_id, method: "password" }
     FlowEngine-->>Browser: Set-Cookie: flow=<encrypted_state> · 200 { step: "password" }
 
     Browser->>FlowEngine: POST /flows/{id}/submit { password: "…" }
     FlowEngine->>AuthAttempts: POST /auth_attempts/{id}/challenges/{cid}/verify { password: "…" }
-    AuthAttempts-->>FlowEngine: 200 OK — factor written to session
+    AuthAttempts-->>FlowEngine: 200 OK — factor written to auth_attempt
     FlowEngine-->>Browser: Set-Cookie: flow=<encrypted_state> · 200 { step: "totp" }
 
     Note over Browser,CustomerBackend: Factor 2 — TOTP (policy required MFA)
 
+    Browser->>FlowEngine: POST /flows/{id}/submit { method: "totp" }
+    FlowEngine->>AuthAttempts: POST /auth_attempts/{id}/challenges { method: "totp" }
+    AuthAttempts-->>FlowEngine: { challenge_id, method: "totp" }
     Browser->>FlowEngine: POST /flows/{id}/submit { totp: { code: "123456" } }
     FlowEngine->>AuthAttempts: POST /auth_attempts/{id}/challenges/{cid}/verify { totp: { code: "123456" } }
     AuthAttempts-->>FlowEngine: 200 OK — factor written, assurance_levels[] updated
@@ -203,7 +212,7 @@ sequenceDiagram
     FlowEngine-->>Browser: { handoff_token, expires_at }
 
     Browser->>CustomerBackend: POST /auth/callback { handoff_token }
-    CustomerBackend->>SessionDB: POST /session_handoffs/{handoff_token}/exchange (sk_proj_ auth)
+    CustomerBackend->>SessionDB: POST /sessions/exchange { handoff_token } (sk_proj_ auth)
     SessionDB-->>CustomerBackend: { session_id, session_token, assurance_levels: ["urn:nist:aal:1","urn:nist:aal:2"], factors: {…} }
     CustomerBackend-->>Browser: Set-Cookie: session=… · 302 redirect to app
 
@@ -238,8 +247,10 @@ sequenceDiagram
 
     Note over Client,SessionDB: Identify user
 
-    Client->>AuthAttempts: POST /auth_attempts/{id}/challenges { method: "identifier", login_name: "alice@acme.com" }
-    AuthAttempts-->>Client: { challenge_id, user_id, available_factors: ["password","passkey"] }
+    Client->>AuthAttempts: POST /auth_attempts/{id}/challenges { method: "identifier" }
+    AuthAttempts-->>Client: { challenge_id }
+    Client->>AuthAttempts: POST /auth_attempts/{id}/challenges/{cid}/verify { login_name: "alice@acme.com" }
+    AuthAttempts-->>Client: { user_id }
 
     Note over Client,SessionDB: Factor 1 — password
 
@@ -262,7 +273,7 @@ sequenceDiagram
     Client->>AuthAttempts: POST /auth_attempts/{id}/handoff
     AuthAttempts-->>Client: { handoff_token, expires_at }
 
-    Client->>SessionDB: POST /session_handoffs/{handoff_token}/exchange (sk_proj_ auth)
+    Client->>SessionDB: POST /sessions/exchange { handoff_token } (sk_proj_ auth)
     SessionDB-->>Client: { session_id, session_token, assurance_levels: ["urn:nist:aal:1","urn:nist:aal:2"], factors: {…} }
 
     Note over Client,SessionDB: Use session
@@ -363,8 +374,11 @@ sequenceDiagram
     Note right of FlowEngine: lookup auth_request via attempt_id → acr_values = aal:2<br/>policy_check: session has password, only totp missing
     FlowEngine-->>Browser: { step: "totp" }
 
+    Browser->>FlowEngine: POST /flows/{id}/submit { method: "totp" }
+    FlowEngine-)AuthService: issue_challenge(method: "totp")
+    AuthService--)FlowEngine: { challenge_id }
     Browser->>FlowEngine: POST /flows/{id}/submit { totp: { code: "123456" } }
-    FlowEngine-)AuthService: verify_challenge(totp: { code: "123456" })
+    FlowEngine-)AuthService: verify_challenge(challenge_id, totp: { code: "123456" })
     AuthService-)DB: write totp factor, recompute assurance_levels[]
     DB--)AuthService: assurance_levels: ["urn:nist:aal:1","urn:nist:aal:2"]
     AuthService--)FlowEngine: OK
