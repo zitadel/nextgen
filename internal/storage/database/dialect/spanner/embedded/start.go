@@ -9,7 +9,6 @@ import (
 
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
-
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/database/dialect/spanner"
 )
@@ -48,7 +47,7 @@ func StartEmbedded(ctx context.Context) (database.Connector, func(), error) {
 
 	// The pgadapter-emulator image pre-creates a Spanner database reachable at this path.
 	url := fmt.Sprintf(
-		"postgresql://user:secret@%s:%d/projects/test-project/instances/test-instance/databases/test-database?sslmode=disable",
+		"postgresql://user:secret@%s:%s/projects/test-project/instances/test-instance/databases/test-database?sslmode=disable",
 		host, port.Port(),
 	)
 	connector, err := spanner.DecodeConfig(url)

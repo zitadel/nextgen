@@ -83,18 +83,20 @@ type flowStepTransitionJSON struct {
 // Use [NewPostgresFlowDefinitionRepository] or [NewSpannerFlowDefinitionRepository]
 // to construct an instance with the correct dialect.
 type FlowDefinitionRepository struct {
-	Client      database.QueryExecutor
-	statusCast  string // SQL type-cast suffix for the status column, e.g. "::zitadel_nextgen.flow_definition_states"
-	purposeCast string // SQL type-cast suffix for a purpose value, e.g. "::zitadel_nextgen.flow_definition_purposes"
+	Client          database.QueryExecutor
+	statusCast      string // SQL cast suffix for a status value, e.g. "::zitadel_nextgen.flow_definition_states"
+	purposeElemCast string // SQL cast suffix for a single purpose value, e.g. "::zitadel_nextgen.flow_definition_purposes"
+	purposeArrCast  string // SQL cast suffix for a purposes array, e.g. "::zitadel_nextgen.flow_definition_purposes[]"
 }
 
 // NewPostgresFlowDefinitionRepository returns a repository configured for the
 // Postgres dialect, which uses ENUM types that require explicit SQL casts.
 func NewPostgresFlowDefinitionRepository(client database.QueryExecutor) *FlowDefinitionRepository {
 	return &FlowDefinitionRepository{
-		Client:      client,
-		statusCast:  "::zitadel_nextgen.flow_definition_states",
-		purposeCast: "::zitadel_nextgen.flow_definition_purposes",
+		Client:          client,
+		statusCast:      "::zitadel_nextgen.flow_definition_states",
+		purposeElemCast: "::zitadel_nextgen.flow_definition_purposes",
+		purposeArrCast:  "::zitadel_nextgen.flow_definition_purposes[]",
 	}
 }
 
@@ -125,7 +127,7 @@ func (r *FlowDefinitionRepository) CreateFlowDefinition(ctx context.Context, def
 	b.WriteString(", ")
 	b.WriteString(b.AppendArg(def.Status.String()) + r.statusCast)
 	b.WriteString(", ")
-	b.WriteString(b.AppendArg(purposes) + r.purposeCast + "[]")
+	b.WriteString(b.AppendArg(purposes) + r.purposeArrCast)
 	b.WriteString(", ")
 	b.WriteArg(content)
 	b.WriteString(", ")
@@ -169,7 +171,7 @@ func (r *FlowDefinitionRepository) ListFlowDefinitions(ctx context.Context, proj
 	}
 	if o.Purpose != nil {
 		b.WriteString(" AND ")
-		b.WriteString(b.AppendArg(o.Purpose.String()) + r.purposeCast)
+		b.WriteString(b.AppendArg(o.Purpose.String()) + r.purposeElemCast)
 		b.WriteString(" = ANY(purposes)")
 	}
 

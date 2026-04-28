@@ -7,8 +7,7 @@ CREATE TABLE zitadel_nextgen.flow_definitions (
     , engine_version TEXT NOT NULL
     , schema_version TEXT NOT NULL
     , status        TEXT NOT NULL DEFAULT 'draft'
-                        CHECK (status IN ('draft', 'active', 'deprecated', 'archived'))
-    , purposes      TEXT[] NOT NULL DEFAULT '{}'
+    , purposes      TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[]
     , definition    JSONB NOT NULL
     , created_at    TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
     , updated_at    TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
