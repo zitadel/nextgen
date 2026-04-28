@@ -15,7 +15,7 @@ CREATE TYPE zitadel_nextgen.flow_definition_purposes AS ENUM (
 );
 
 CREATE TABLE zitadel_nextgen.flow_definitions (
-    instance_id         TEXT NOT NULL
+    project_id          TEXT NOT NULL
     , id                TEXT NOT NULL CHECK (id <> '')
     , name              TEXT NOT NULL CHECK (name <> '')
     , engine_version    TEXT NOT NULL CHECK (engine_version <> '')
@@ -26,11 +26,11 @@ CREATE TABLE zitadel_nextgen.flow_definitions (
     , created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
     , updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 
-    , PRIMARY KEY (instance_id, id)
+    , PRIMARY KEY (project_id, id)
 );
 
-CREATE INDEX idx_flow_definitions_instance_status
-    ON zitadel_nextgen.flow_definitions (instance_id, status);
+CREATE INDEX idx_flow_definitions_project_status
+    ON zitadel_nextgen.flow_definitions (project_id, status);
 
-CREATE INDEX idx_flow_definitions_instance_purposes
+CREATE INDEX idx_flow_definitions_project_purposes
     ON zitadel_nextgen.flow_definitions USING GIN (purposes);

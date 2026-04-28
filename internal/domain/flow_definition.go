@@ -44,7 +44,7 @@ const (
 // FlowDefinition is a customer-configured directed graph of authentication steps.
 // It is immutable: modifications produce a new revision with a new SchemaVersion.
 type FlowDefinition struct {
-	InstanceID    string
+	ProjectID     string
 	ID            string
 	Name          string
 	EngineVersion string
@@ -64,12 +64,12 @@ type FlowDefinitionPurposeEntry struct {
 }
 
 // FlowDefinitionAudience describes which requests this definition should be selected for.
-// Fields are applied with specificity: AppID > OrgID > SchemaID > IsInstanceDefault.
+// Fields are applied with specificity: AppID > TeamID > SchemaID > IsProjectDefault.
 type FlowDefinitionAudience struct {
-	AppID             *string
-	OrgID             *string
-	SchemaID          *string
-	IsInstanceDefault bool
+	AppID           *string
+	TeamID          *string
+	SchemaID        *string
+	IsProjectDefault bool
 }
 
 // FlowDefinitionStep is a single node in the step graph.

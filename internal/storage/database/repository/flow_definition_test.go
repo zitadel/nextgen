@@ -16,12 +16,12 @@ func TestFlowDefinitionRepository_CreateAndGet(t *testing.T) {
 	defer rollback()
 
 	repo := &repository.FlowDefinitionRepository{Client: tx}
-	def := sampleFlowDefinition("inst-j1", "flow-j1")
+	def := sampleFlowDefinition("proj-j1", "flow-j1")
 
 	err := repo.CreateFlowDefinition(t.Context(), def)
 	require.NoError(t, err)
 
-	got, err := repo.GetFlowDefinition(t.Context(), "inst-j1", "flow-j1")
+	got, err := repo.GetFlowDefinition(t.Context(), "proj-j1", "flow-j1")
 	require.NoError(t, err)
 
 	assert.Equal(t, def.ID, got.ID)
@@ -37,8 +37,8 @@ func TestFlowDefinitionRepository_CreateAndGet(t *testing.T) {
 	assert.Equal(t, "identifier", got.Purposes[0].InitialStep)
 
 	assert.Equal(t, def.Audience.AppID, got.Audience.AppID)
-	assert.Nil(t, got.Audience.OrgID)
-	assert.False(t, got.Audience.IsInstanceDefault)
+	assert.Nil(t, got.Audience.TeamID)
+	assert.False(t, got.Audience.IsProjectDefault)
 
 	require.Len(t, got.Steps, 3)
 	stepsByName := make(map[string]domain.FlowDefinitionStep)
@@ -70,7 +70,7 @@ func TestFlowDefinitionRepository_GetNotFound(t *testing.T) {
 
 	repo := &repository.FlowDefinitionRepository{Client: tx}
 
-	_, err := repo.GetFlowDefinition(t.Context(), "inst-j-missing", "flow-j-missing")
+	_, err := repo.GetFlowDefinition(t.Context(), "proj-missing", "flow-missing")
 	require.Error(t, err)
 }
 
@@ -81,18 +81,18 @@ func TestFlowDefinitionRepository_List(t *testing.T) {
 	repo := &repository.FlowDefinitionRepository{Client: tx}
 
 	for _, id := range []string{"flow-ja", "flow-jb", "flow-jc"} {
-		def := sampleFlowDefinition("inst-jlist", id)
+		def := sampleFlowDefinition("proj-jlist", id)
 		if id == "flow-jb" {
 			def.Status = domain.FlowDefinitionStatusActive
 		}
 		require.NoError(t, repo.CreateFlowDefinition(t.Context(), def))
 	}
 
-	all, err := repo.ListFlowDefinitions(t.Context(), "inst-jlist")
+	all, err := repo.ListFlowDefinitions(t.Context(), "proj-jlist")
 	require.NoError(t, err)
 	assert.Len(t, all, 3)
 
-	active, err := repo.ListFlowDefinitions(t.Context(), "inst-jlist",
+	active, err := repo.ListFlowDefinitions(t.Context(), "proj-jlist",
 		domain.WithFlowDefinitionStatus(domain.FlowDefinitionStatusActive))
 	require.NoError(t, err)
 	require.Len(t, active, 1)
@@ -106,23 +106,23 @@ func TestFlowDefinitionRepository_ListByPurpose(t *testing.T) {
 	repo := &repository.FlowDefinitionRepository{Client: tx}
 
 	// flow-pa: serves login only (via sampleFlowDefinition)
-	defA := sampleFlowDefinition("inst-jpurp", "flow-pa")
+	defA := sampleFlowDefinition("proj-jpurp", "flow-pa")
 	require.NoError(t, repo.CreateFlowDefinition(t.Context(), defA))
 
 	// flow-pb: serves both login and register
-	defB := sampleFlowDefinition("inst-jpurp", "flow-pb")
+	defB := sampleFlowDefinition("proj-jpurp", "flow-pb")
 	defB.Purposes = append(defB.Purposes, domain.FlowDefinitionPurposeEntry{
 		Purpose:     domain.FlowDefinitionPurposeRegister,
 		InitialStep: "start",
 	})
 	require.NoError(t, repo.CreateFlowDefinition(t.Context(), defB))
 
-	loginOnly, err := repo.ListFlowDefinitions(t.Context(), "inst-jpurp",
+	loginOnly, err := repo.ListFlowDefinitions(t.Context(), "proj-jpurp",
 		domain.WithFlowDefinitionPurpose(domain.FlowDefinitionPurposeLogin))
 	require.NoError(t, err)
 	assert.Len(t, loginOnly, 2)
 
-	registerOnly, err := repo.ListFlowDefinitions(t.Context(), "inst-jpurp",
+	registerOnly, err := repo.ListFlowDefinitions(t.Context(), "proj-jpurp",
 		domain.WithFlowDefinitionPurpose(domain.FlowDefinitionPurposeRegister))
 	require.NoError(t, err)
 	require.Len(t, registerOnly, 1)
@@ -136,15 +136,15 @@ func TestFlowDefinitionRepository_ListPagination(t *testing.T) {
 	repo := &repository.FlowDefinitionRepository{Client: tx}
 
 	for _, id := range []string{"flow-jp1", "flow-jp2", "flow-jp3", "flow-jp4"} {
-		require.NoError(t, repo.CreateFlowDefinition(t.Context(), sampleFlowDefinition("inst-jpage", id)))
+		require.NoError(t, repo.CreateFlowDefinition(t.Context(), sampleFlowDefinition("proj-jpage", id)))
 	}
 
-	page1, err := repo.ListFlowDefinitions(t.Context(), "inst-jpage",
+	page1, err := repo.ListFlowDefinitions(t.Context(), "proj-jpage",
 		domain.WithFlowDefinitionLimit(2))
 	require.NoError(t, err)
 	assert.Len(t, page1, 2)
 
-	page2, err := repo.ListFlowDefinitions(t.Context(), "inst-jpage",
+	page2, err := repo.ListFlowDefinitions(t.Context(), "proj-jpage",
 		domain.WithFlowDefinitionLimit(2),
 		domain.WithFlowDefinitionOffset(2))
 	require.NoError(t, err)
@@ -158,13 +158,13 @@ func TestFlowDefinitionRepository_UpdateStatus(t *testing.T) {
 	defer rollback()
 
 	repo := &repository.FlowDefinitionRepository{Client: tx}
-	def := sampleFlowDefinition("inst-jupd", "flow-jupd")
+	def := sampleFlowDefinition("proj-jupd", "flow-jupd")
 	require.NoError(t, repo.CreateFlowDefinition(t.Context(), def))
 
-	err := repo.UpdateFlowDefinitionStatus(t.Context(), "inst-jupd", "flow-jupd", domain.FlowDefinitionStatusActive)
+	err := repo.UpdateFlowDefinitionStatus(t.Context(), "proj-jupd", "flow-jupd", domain.FlowDefinitionStatusActive)
 	require.NoError(t, err)
 
-	got, err := repo.GetFlowDefinition(t.Context(), "inst-jupd", "flow-jupd")
+	got, err := repo.GetFlowDefinition(t.Context(), "proj-jupd", "flow-jupd")
 	require.NoError(t, err)
 	assert.Equal(t, domain.FlowDefinitionStatusActive, got.Status)
 }
@@ -174,38 +174,38 @@ func TestFlowDefinitionRepository_Delete(t *testing.T) {
 	defer rollback()
 
 	repo := &repository.FlowDefinitionRepository{Client: tx}
-	def := sampleFlowDefinition("inst-jdel", "flow-jdel")
+	def := sampleFlowDefinition("proj-jdel", "flow-jdel")
 	require.NoError(t, repo.CreateFlowDefinition(t.Context(), def))
 
-	err := repo.DeleteFlowDefinition(t.Context(), "inst-jdel", "flow-jdel")
+	err := repo.DeleteFlowDefinition(t.Context(), "proj-jdel", "flow-jdel")
 	require.NoError(t, err)
 
-	_, err = repo.GetFlowDefinition(t.Context(), "inst-jdel", "flow-jdel")
+	_, err = repo.GetFlowDefinition(t.Context(), "proj-jdel", "flow-jdel")
 	require.Error(t, err)
 }
 
-func TestFlowDefinitionRepository_InstanceIsolation(t *testing.T) {
+func TestFlowDefinitionRepository_ProjectIsolation(t *testing.T) {
 	tx, rollback := transactionForRollback(t)
 	defer rollback()
 
 	repo := &repository.FlowDefinitionRepository{Client: tx}
-	require.NoError(t, repo.CreateFlowDefinition(t.Context(), sampleFlowDefinition("inst-jA", "flow-j1")))
-	require.NoError(t, repo.CreateFlowDefinition(t.Context(), sampleFlowDefinition("inst-jB", "flow-j1")))
+	require.NoError(t, repo.CreateFlowDefinition(t.Context(), sampleFlowDefinition("proj-jA", "flow-j1")))
+	require.NoError(t, repo.CreateFlowDefinition(t.Context(), sampleFlowDefinition("proj-jB", "flow-j1")))
 
-	listA, err := repo.ListFlowDefinitions(t.Context(), "inst-jA")
+	listA, err := repo.ListFlowDefinitions(t.Context(), "proj-jA")
 	require.NoError(t, err)
 	assert.Len(t, listA, 1)
 
-	listB, err := repo.ListFlowDefinitions(t.Context(), "inst-jB")
+	listB, err := repo.ListFlowDefinitions(t.Context(), "proj-jB")
 	require.NoError(t, err)
 	assert.Len(t, listB, 1)
 }
 
-func sampleFlowDefinition(instanceID, id string) *domain.FlowDefinition {
+func sampleFlowDefinition(projectID, id string) *domain.FlowDefinition {
 	pivot := domain.FlowDefinitionPurposeRegister
 	appID := "app-1"
 	return &domain.FlowDefinition{
-		InstanceID:    instanceID,
+		ProjectID:     projectID,
 		ID:            id,
 		Name:          "Default Login",
 		EngineVersion: "1.0.0",
@@ -215,8 +215,8 @@ func sampleFlowDefinition(instanceID, id string) *domain.FlowDefinition {
 			{Purpose: domain.FlowDefinitionPurposeLogin, InitialStep: "identifier"},
 		},
 		Audience: domain.FlowDefinitionAudience{
-			AppID:             &appID,
-			IsInstanceDefault: false,
+			AppID:            &appID,
+			IsProjectDefault: false,
 		},
 		Steps: []domain.FlowDefinitionStep{
 			{

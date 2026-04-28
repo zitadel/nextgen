@@ -10,17 +10,17 @@ type FlowDefinitionRepository interface {
 
 	// GetFlowDefinition retrieves the full aggregate for a single definition,
 	// including its purposes, audience, steps, and transitions.
-	GetFlowDefinition(ctx context.Context, instanceID, id string) (*FlowDefinition, error)
+	GetFlowDefinition(ctx context.Context, projectID, id string) (*FlowDefinition, error)
 
 	// ListFlowDefinitions returns the top-level metadata for all definitions
 	// belonging to the given instance. Child records are not populated.
-	ListFlowDefinitions(ctx context.Context, instanceID string, opts ...FlowDefinitionListOption) ([]*FlowDefinition, error)
+	ListFlowDefinitions(ctx context.Context, projectID string, opts ...FlowDefinitionListOption) ([]*FlowDefinition, error)
 
 	// UpdateFlowDefinitionStatus transitions a definition to the given status.
-	UpdateFlowDefinitionStatus(ctx context.Context, instanceID, id string, status FlowDefinitionStatus) error
+	UpdateFlowDefinitionStatus(ctx context.Context, projectID, id string, status FlowDefinitionStatus) error
 
 	// DeleteFlowDefinition removes a definition and all its child records.
-	DeleteFlowDefinition(ctx context.Context, instanceID, id string) error
+	DeleteFlowDefinition(ctx context.Context, projectID, id string) error
 }
 
 // FlowDefinitionListOption modifies a list query.
