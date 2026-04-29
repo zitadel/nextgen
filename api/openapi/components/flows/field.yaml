@@ -1,0 +1,29 @@
+type: object
+required: [type, text_key]
+description: |
+  A data input capability. Describes what the user must provide.
+  Does not contain display text — only a `text_key` resolved client-side.
+properties:
+  type:
+    type: string
+    enum: [text, email, password, tel, number, url, date, hidden]
+  text_key:
+    type: string
+    description: Localization key for the field label.
+    example: identifier.field.email
+  required:
+    type: boolean
+    default: false
+  value:
+    description: Pre-filled value (e.g., email carried over from a pivot).
+  validation:
+    type: object
+    properties:
+      format:
+        type: string
+      pattern:
+        type: string
+      min_length:
+        type: integer
+      max_length:
+        type: integer

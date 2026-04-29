@@ -1,0 +1,16 @@
+type: object
+required: [id, name, template]
+description: An available SSO identity provider.
+properties:
+  id:
+    type: string
+    description: Provider instance identifier.
+    example: google-1
+  name:
+    type: string
+    description: Display name for the provider.
+    example: Google
+  template:
+    type: string
+    description: Template hint for rendering (logo, colors).
+    example: google

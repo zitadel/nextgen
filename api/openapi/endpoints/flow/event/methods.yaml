@@ -1,0 +1,22 @@
+post:
+  operationId: submitFlowEvent
+  summary: Submit client-side event
+  description: |
+    Submits telemetry or fingerprint data from the frontend.
+    Does not advance the state machine. Used for risk evaluation.
+  tags:
+    - Flows
+  security:
+    - sessionToken: []
+  parameters:
+    - $ref: ../../../components/parameters/flow-id.yaml
+    - $ref: ../../../components/parameters/flow-cookie.yaml
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../../../components/flows/flow-event-request.yaml
+  responses:
+    '204':
+      description: Event recorded.

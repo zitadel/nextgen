@@ -1,7 +1,7 @@
 # Flow Engine — Storage
 
 > **Status:** Draft
-> **See also:** [Flow Engine](flow-engine.md) · [Session API](session-api.md)
+> **See also:** [Flow Engine](flow-engine.md) · [Session API](session-api.md) · [Canonical OpenAPI spec](../../../api/openapi/openapi-spec.yaml)
 
 ## Sessions vs Flows
 

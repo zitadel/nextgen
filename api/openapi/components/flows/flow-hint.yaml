@@ -1,0 +1,14 @@
+type: object
+properties:
+  login_name:
+    type: string
+    description: Auto-submits identifier step (maps to OIDC login_hint).
+  team_id:
+    type: string
+    description: Scopes flow resolution to a team.
+  schema_id:
+    type: string
+    description: Scopes to a specific user type.
+  app_id:
+    type: string
+    description: Scopes to a specific application.

@@ -1,0 +1,18 @@
+type: object
+description: |
+  Scopes which teams, apps, or projects this flow definition applies to.
+  When all fields are empty/omitted, the definition is a project-wide default.
+  The engine picks the most specific matching definition: app > team > project.
+properties:
+  team_ids:
+    type: array
+    items:
+      type: string
+    description: Restrict to specific teams (organizations).
+    example: ["team_acme"]
+  app_ids:
+    type: array
+    items:
+      type: string
+    description: Restrict to specific applications.
+    example: ["app_saas"]

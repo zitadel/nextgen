@@ -1,0 +1,164 @@
+type: object
+required: [name, type]
+description: |
+  A step in a flow definition. This is the admin-authored configuration,
+  not the runtime payload sent to the frontend.
+
+  Steps fall into two categories:
+
+  **Rendered steps** — sent to the frontend as a FlowStep response.
+  The engine strips `transitions` and `config` before sending.
+  Types: identifier, credential, form, verification, consent, info,
+  redirect, captcha, complete.
+
+  **Server-only steps** — never sent to the frontend. The engine
+  evaluates them and auto-transitions to the next step.
+  Types: policy_check, action.
+properties:
+  name:
+    type: string
+    description: |
+      Unique step identifier within this flow. Used as transition targets
+      and returned in the API response as `step.name`.
+    example: identifier
+
+  type:
+    type: string
+    enum:
+      # Rendered by frontend
+      - identifier
+      - credential
+      - form
+      - verification
+      - consent
+      - info
+      - redirect
+      - captcha
+      - complete
+      # Server-only (never sent to frontend)
+      - policy_check
+      - action
+    description: |
+      Step type. Determines engine behavior:
+
+      Rendered types (sent to frontend):
+      - identifier: collect login handle (email, phone, username)
+      - credential: collect secret (password, OTP, passkey proof)
+      - form: generic data collection (profile, address)
+      - verification: code entry (email, phone)
+      - consent: approve/deny (terms, scopes, permissions)
+      - info: read-only informational screen
+      - redirect: navigate to external URL (SSO provider) — no fields rendered
+      - captcha: dedicated captcha challenge
+      - complete: terminal step — see `behavior`
+
+      Server-only types (auto-transitioned, never reach frontend):
+      - policy_check: evaluate a condition, branch to next step
+      - action: execute a server-side mutation (create session, write auth attempt)
+
+  texts:
+    $ref: step-texts.yaml
+
+  fields:
+    type: object
+    description: |
+      Input fields to collect from the user. Keyed by field name.
+      Only relevant for rendered steps.
+    additionalProperties:
+      $ref: field.yaml
+    default: {}
+
+  actions:
+    type: object
+    description: |
+      Actions the user can take. Keyed by action name.
+      The action name is what the frontend sends back in the submit request.
+    additionalProperties:
+      $ref: step-action.yaml
+    default: {}
+
+  gates:
+    type: object
+    description: Security gates that must be satisfied before submission.
+    additionalProperties:
+      $ref: gate.yaml
+    default: {}
+
+  sso_providers:
+    type: array
+    description: Available SSO identity providers for this step.
+    items:
+      $ref: sso-provider.yaml
+    default: []
+
+  behavior:
+    type: string
+    enum: [redirect, show]
+    description: |
+      Only used on `complete` steps. Tells the frontend what to do:
+      - redirect: navigate to redirect_uri (OIDC/SAML callback done)
+      - show: render as a success/info screen
+
+  config:
+    type: object
+    description: |
+      Server-only configuration for `policy_check` and `action` steps.
+      Never sent to the frontend.
+    properties:
+      check:
+        type: string
+        description: |
+          Policy check identifier for `policy_check` steps.
+          The engine evaluates this and picks a transition branch.
+        example: required_factors
+      action:
+        type: string
+        description: |
+          Mutation identifier for `action` steps.
+          The engine executes this side effect and advances.
+        example: create_user_and_session
+
+  transitions:
+    type: object
+    description: |
+      Maps action/outcome names to the next step. Values can be:
+      - A string: name of the next step in this flow
+      - An object with `pivot`: stack a different flow (returns after completion)
+      - An object with `switch`: replace the current flow entirely (no return)
+
+      For `policy_check` steps, keys are outcome names (e.g. "found", "not_found").
+      For `action` steps, keys are result names (e.g. "created").
+      For rendered steps, keys match action names from the `actions` dict,
+      plus "sso" and "callback" for SSO-related transitions.
+    additionalProperties:
+      oneOf:
+        - type: string
+          description: Next step name within this flow.
+        - type: object
+          properties:
+            pivot:
+              type: string
+              pattern: '^[a-z][a-z0-9-]*$'
+              description: |
+                Slug of the flow to push onto the stack. The current flow is
+                paused and resumes when the pivoted flow completes (auto-pop).
+                Example: login → recovery → back to login.
+          required: [pivot]
+          additionalProperties: false
+        - type: object
+          properties:
+            switch:
+              type: string
+              pattern: '^[a-z][a-z0-9-]*$'
+              description: |
+                Slug of the flow to replace the current flow. No return —
+                the current flow is discarded.
+                Example: login ↔ register.
+          required: [switch]
+          additionalProperties: false
+    example:
+      submit: password
+      recover:
+        pivot: recovery
+      register:
+        switch: register

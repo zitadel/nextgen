@@ -1,0 +1,74 @@
+post:
+  operationId: submitFlowStep
+  summary: Submit step data and advance
+  description: |
+    Submits user input for the current step. The server validates,
+    processes (e.g., verifies a credential), advances the state machine
+    through any invisible steps, and returns the next visible step.
+
+    The response sets an updated encrypted `HttpOnly` cookie (`_zflow`)
+    with the new flow state. The server is stateless — all orchestration
+    state is carried in this cookie between requests.
+
+    **Important:** The `id` in the response may differ from the `id` used in
+    the request. This happens when a flow pivots (pushes a new flow onto the
+    stack) or when a stacked flow completes (auto-pops to the parent flow).
+    Always use the `id` from the latest response for the next request.
+
+    ## Flow completion
+
+    When `step.type` is `complete`, the flow is terminal. The `step.behavior`
+    field tells the frontend what to do:
+
+    | `behavior`   | Action                                                     |
+    |------------- |------------------------------------------------------------|
+    | `redirect`   | Navigate to `redirect_uri` (OIDC/SAML auth request done). |
+    | `show`       | Render the step as a success screen (e.g., registration).  |
+
+    A `complete` step is only returned when the **entire flow stack** is done.
+    If a stacked flow (e.g., recovery pivoted from login) finishes, the server
+    auto-pops to the parent flow and returns the parent's next step — the
+    frontend never sees a `complete` for intermediate flows.
+  tags:
+    - Flows
+  security:
+    - sessionToken: []
+  parameters:
+    - $ref: ../../../components/parameters/flow-id.yaml
+    - $ref: ../../../components/parameters/flow-cookie.yaml
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../../../components/flows/flow-submit-request.yaml
+  responses:
+    '200':
+      description: |
+        Advanced to next step. The `id` may have changed if a pivot
+        or stack-pop occurred — always use the returned `id` for the
+        next request.
+      headers:
+        Set-Cookie:
+          $ref: ../../../components/headers/set-cookie-flow.yaml
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/flows/flow-response.yaml
+    '400':
+      description: |
+        Validation or proof verification failed. Returns the same step
+        with an `error` field. The session token and cookie are still rotated.
+      headers:
+        Set-Cookie:
+          $ref: ../../../components/headers/set-cookie-flow.yaml
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/flows/flow-response.yaml
+    '409':
+      description: Version conflict — flow was advanced by another request.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml

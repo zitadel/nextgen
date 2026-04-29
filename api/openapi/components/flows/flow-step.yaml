@@ -1,0 +1,90 @@
+type: object
+required: [name, type, fields, actions, gates]
+description: |
+  A step contains unordered capability dictionaries: what to collect (fields),
+  what the user can do (actions), and what security gates must be satisfied (gates).
+  Layout and element ordering are controlled by the LiquidJS template in `branding.liquid_template`.
+properties:
+  name:
+    type: string
+    description: Step name from the flow definition.
+  type:
+    type: string
+    enum: [identifier, credential, form, verification, consent, info, redirect, captcha, complete]
+    description: |
+      Semantic step type. This is a hint, not a rendering instruction — the
+      LiquidJS template controls layout. The frontend does NOT switch on type
+      to decide what to render; it renders the capability dictionaries
+      (fields, actions, gates, sso_providers) using the template.
+
+      Type is useful for:
+      - Accessibility: screen readers can announce "credential step"
+      - Analytics: track drop-off rates per step type
+      - Special behavior: `redirect` and `complete` have hardcoded
+        frontend behavior (navigate away) that templates cannot override
+      - Gate auto-injection: backend uses type to enforce gates even if
+        the template omits them (e.g. `captcha` type always requires a
+        captcha gate)
+
+      The following types are rendered by the frontend:
+      - identifier: collect login handle (email, phone, username)
+      - credential: collect secret (password, OTP, passkey proof)
+      - form: generic data collection (profile, address)
+      - verification: email/phone code entry
+      - consent: terms, scopes, permissions (approve/deny)
+      - info: read-only screen (success message, warning)
+      - captcha: dedicated captcha challenge
+      - redirect: navigate to redirect_url immediately, no UI rendered
+      - complete: flow is done — check `behavior` field
+
+      The following types exist only in flow definitions and are never
+      sent to the frontend (the engine auto-transitions through them):
+      - policy_check: evaluate a policy condition, pick next step
+      - action: execute a server-side mutation (create session, etc.)
+  texts:
+    $ref: step-texts.yaml
+  error:
+    type: string
+    description: Error message from a previous failed submission.
+    nullable: true
+  behavior:
+    type: string
+    enum: [redirect, show]
+    description: |
+      Only present on `complete` steps. Tells the frontend what to do:
+      - redirect: navigate to redirect_uri immediately (OIDC/SAML done)
+      - show: render the step as a success screen (e.g., registration confirmed)
+  redirect_url:
+    type: string
+    format: uri
+    description: For `redirect` steps — URL to navigate to (e.g., SSO provider).
+  fields:
+    type: object
+    description: |
+      Unordered dictionary of input fields to collect. Keyed by field name.
+      The LiquidJS template controls which fields appear and in what order.
+    additionalProperties:
+      $ref: field.yaml
+    default: {}
+  actions:
+    type: object
+    description: |
+      Unordered dictionary of available user actions. Keyed by action name.
+      The LiquidJS template controls positioning and presentation.
+    additionalProperties:
+      $ref: step-action.yaml
+    default: {}
+  gates:
+    type: object
+    description: |
+      Security gates that must be satisfied before the step can be submitted.
+      The orchestrator appends any required but unrendered gates as a safety net.
+    additionalProperties:
+      $ref: gate.yaml
+    default: {}
+  sso_providers:
+    type: array
+    description: Available SSO identity providers for this step.
+    items:
+      $ref: sso-provider.yaml
+    default: []
