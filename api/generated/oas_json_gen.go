@@ -1998,10 +1998,10 @@ func (s *NestedUserProperty) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
-		if s.RequiredFields != nil {
-			e.FieldStart("requiredFields")
+		if s.Required != nil {
+			e.FieldStart("required")
 			e.ArrStart()
-			for _, elem := range s.RequiredFields {
+			for _, elem := range s.Required {
 				e.Str(elem)
 			}
 			e.ArrEnd()
@@ -2018,7 +2018,7 @@ func (s *NestedUserProperty) encodeFields(e *jx.Encoder) {
 var jsonFieldsNameOfNestedUserProperty = [4]string{
 	0: "title",
 	1: "type",
-	2: "requiredFields",
+	2: "required",
 	3: "properties",
 }
 
@@ -2050,9 +2050,9 @@ func (s *NestedUserProperty) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"type\"")
 			}
-		case "requiredFields":
+		case "required":
 			if err := func() error {
-				s.RequiredFields = make([]string, 0)
+				s.Required = make([]string, 0)
 				if err := d.Arr(func(d *jx.Decoder) error {
 					var elem string
 					v, err := d.Str()
@@ -2060,14 +2060,14 @@ func (s *NestedUserProperty) Decode(d *jx.Decoder) error {
 					if err != nil {
 						return err
 					}
-					s.RequiredFields = append(s.RequiredFields, elem)
+					s.Required = append(s.Required, elem)
 					return nil
 				}); err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"requiredFields\"")
+				return errors.Wrap(err, "decode field \"required\"")
 			}
 		case "properties":
 			if err := func() error {
@@ -4798,16 +4798,12 @@ func (s *UserSchemaXMinusAuthMinusMethodsItem) Encode(e *jx.Encoder) {
 // encodeFields encodes fields.
 func (s *UserSchemaXMinusAuthMinusMethodsItem) encodeFields(e *jx.Encoder) {
 	{
-		if s.Enabled.Set {
-			e.FieldStart("enabled")
-			s.Enabled.Encode(e)
-		}
+		e.FieldStart("enabled")
+		e.Bool(s.Enabled)
 	}
 	{
-		if s.Position.Set {
-			e.FieldStart("position")
-			s.Position.Encode(e)
-		}
+		e.FieldStart("position")
+		e.Int(s.Position)
 	}
 }
 
@@ -4821,13 +4817,16 @@ func (s *UserSchemaXMinusAuthMinusMethodsItem) Decode(d *jx.Decoder) error {
 	if s == nil {
 		return errors.New("invalid: unable to decode UserSchemaXMinusAuthMinusMethodsItem to nil")
 	}
+	var requiredBitSet [1]uint8
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
 		case "enabled":
+			requiredBitSet[0] |= 1 << 0
 			if err := func() error {
-				s.Enabled.Reset()
-				if err := s.Enabled.Decode(d); err != nil {
+				v, err := d.Bool()
+				s.Enabled = bool(v)
+				if err != nil {
 					return err
 				}
 				return nil
@@ -4835,9 +4834,11 @@ func (s *UserSchemaXMinusAuthMinusMethodsItem) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"enabled\"")
 			}
 		case "position":
+			requiredBitSet[0] |= 1 << 1
 			if err := func() error {
-				s.Position.Reset()
-				if err := s.Position.Decode(d); err != nil {
+				v, err := d.Int()
+				s.Position = int(v)
+				if err != nil {
 					return err
 				}
 				return nil
@@ -4850,6 +4851,38 @@ func (s *UserSchemaXMinusAuthMinusMethodsItem) Decode(d *jx.Decoder) error {
 		return nil
 	}); err != nil {
 		return errors.Wrap(err, "decode UserSchemaXMinusAuthMinusMethodsItem")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfUserSchemaXMinusAuthMinusMethodsItem) {
+					name = jsonFieldsNameOfUserSchemaXMinusAuthMinusMethodsItem[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
 	}
 
 	return nil

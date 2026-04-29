@@ -22,11 +22,9 @@ properties:
   releaseState:
     $ref: schema-release-state.yaml
   x-auth-methods:
-    type: object
-    description: |
-      A map of authentication methods supported by the user definition, keyed
-      by method name such as `password`, `passkey`, `magic_link`, or `sso`.
-    additionalProperties:
+    type: array
+    description: A list of authentication methods supported by the user definition
+    items:
       type: object
       required:
         - enabled

@@ -971,7 +971,7 @@ type NestedUserProperty struct {
 	Title OptString                 `json:"title"`
 	Type  OptNestedUserPropertyType `json:"type"`
 	// A list of required fields for the user definition.
-	RequiredFields []string `json:"requiredFields"`
+	Required []string `json:"required"`
 	// A map of additional properties for the user definition, where the key
 	// is the property name and the value is the property schema.
 	Properties OptNestedUserPropertyProperties `json:"properties"`
@@ -987,9 +987,9 @@ func (s *NestedUserProperty) GetType() OptNestedUserPropertyType {
 	return s.Type
 }
 
-// GetRequiredFields returns the value of RequiredFields.
-func (s *NestedUserProperty) GetRequiredFields() []string {
-	return s.RequiredFields
+// GetRequired returns the value of Required.
+func (s *NestedUserProperty) GetRequired() []string {
+	return s.Required
 }
 
 // GetProperties returns the value of Properties.
@@ -1007,9 +1007,9 @@ func (s *NestedUserProperty) SetType(val OptNestedUserPropertyType) {
 	s.Type = val
 }
 
-// SetRequiredFields sets the value of RequiredFields.
-func (s *NestedUserProperty) SetRequiredFields(val []string) {
-	s.RequiredFields = val
+// SetRequired sets the value of Required.
+func (s *NestedUserProperty) SetRequired(val []string) {
+	s.Required = val
 }
 
 // SetProperties sets the value of Properties.
@@ -3293,28 +3293,28 @@ func (s *UserSchemaProperties) init() UserSchemaProperties {
 
 type UserSchemaXMinusAuthMinusMethodsItem struct {
 	// Whether the authentication method is enabled or not.
-	Enabled OptBool `json:"enabled"`
+	Enabled bool `json:"enabled"`
 	// The position of the authentication method in the list of supported methods.
-	Position OptInt `json:"position"`
+	Position int `json:"position"`
 }
 
 // GetEnabled returns the value of Enabled.
-func (s *UserSchemaXMinusAuthMinusMethodsItem) GetEnabled() OptBool {
+func (s *UserSchemaXMinusAuthMinusMethodsItem) GetEnabled() bool {
 	return s.Enabled
 }
 
 // GetPosition returns the value of Position.
-func (s *UserSchemaXMinusAuthMinusMethodsItem) GetPosition() OptInt {
+func (s *UserSchemaXMinusAuthMinusMethodsItem) GetPosition() int {
 	return s.Position
 }
 
 // SetEnabled sets the value of Enabled.
-func (s *UserSchemaXMinusAuthMinusMethodsItem) SetEnabled(val OptBool) {
+func (s *UserSchemaXMinusAuthMinusMethodsItem) SetEnabled(val bool) {
 	s.Enabled = val
 }
 
 // SetPosition sets the value of Position.
-func (s *UserSchemaXMinusAuthMinusMethodsItem) SetPosition(val OptInt) {
+func (s *UserSchemaXMinusAuthMinusMethodsItem) SetPosition(val int) {
 	s.Position = val
 }
 
