@@ -1551,7 +1551,6 @@ function findStep(name) {
 
 function buildFlowResponse(step) {
   const resp = {
-    id: simState.flowId,
     session_id: simState.sessionId,
     session_token: simState.sessionToken,
     step: buildStepPayload(step),
