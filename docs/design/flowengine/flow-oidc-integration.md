@@ -114,28 +114,37 @@ const next = await auth.flow.submit(flow.sessionId, {
 
 ### Pillar B: Embedded widget
 
-The `<zitadel-login>` widget handles OIDC and Flow internally:
+The `<zitadel-login>` widget abstracts OIDC entirely. Developers configure it with ZITADEL concepts:
 
 ```html
+<!-- Cloud user — just project + app + callback -->
 <zitadel-login
-  issuer="https://my-instance.zitadel.cloud"
-  client-id="my-app"
-  redirect-uri="https://myapp.com/callback"
-  scope="openid profile email"
+  project-id="my-project"
+  app-id="12345"
+  callback="https://myapp.com/auth/callback"
   purpose="login"
+></zitadel-login>
+
+<!-- Self-hosted — override the API URL -->
+<zitadel-login
+  api-url="https://auth.mycompany.com"
+  project-id="my-project"
+  app-id="12345"
+  callback="https://myapp.com/auth/callback"
 ></zitadel-login>
 ```
 
 Internally, the widget:
-1. Calls PAR → gets `auth_request_id`
-2. Starts flow with the given `purpose` → renders steps via LiquidJS templates
-3. On complete → fires `zl-complete` event and/or navigates to callback
+1. Reads the app configuration from the API (scopes, redirect URIs, etc.)
+2. Builds a PAR request with the correct OIDC parameters
+3. Starts flow with the given `purpose` → renders steps via LiquidJS templates
+4. On complete → fires `zl-complete` event and/or navigates to callback
 
 ```javascript
 document.querySelector('zitadel-login')
   .addEventListener('zl-complete', (e) => {
-    // e.detail.redirectUri contains the callback with code
-    window.location.href = e.detail.redirectUri;
+    // e.detail.callbackUrl contains the callback with code
+    window.location.href = e.detail.callbackUrl;
   });
 ```
 
@@ -145,51 +154,66 @@ Standard OIDC. The app redirects to `/authorize`, the server redirects to the ho
 
 ## Widget public API
 
-The widget exposes **domain-language properties**, not OIDC parameters. OIDC is an implementation detail the developer never sees.
+The widget exposes **ZITADEL-native properties**, not OIDC parameters. OIDC is an implementation detail the developer never sees.
 
 ### Attributes
 
 | Attribute | Required | Description |
 |---|---|---|
-| `issuer` | Yes | ZITADEL instance URL |
-| `client-id` | Yes | Application client ID |
-| `redirect-uri` | Yes | Where to send the code after authentication |
-| `scope` | No | Space-separated OIDC scopes. Default: `openid` |
+| `project-id` | Yes | Project ID. Identifies the ZITADEL project (formerly "instance"). |
+| `app-id` | Yes | Application ID (configured in Console) |
+| `callback` | Yes | Where to return after authentication |
+| `api-url` | No | ZITADEL API URL. Default: `https://api.zitadel.com`. Self-hosters override this. |
 | `purpose` | No | Which flow to start. Default: `login` |
+
+No `issuer` or `scope` attributes — OIDC parameters are resolved from the app configuration on the server.
 
 ### The `purpose` attribute
 
-Controls which flow the widget starts. Maps to `CreateFlowRequest.purpose`. The widget translates it to the correct OIDC parameters internally.
+Controls which flow the widget starts. Maps to `CreateFlowRequest.purpose`.
 
-| `purpose` | Flow started | OIDC mapping (internal) |
-|---|---|---|
-| `login` (default) | Login flow | `prompt=login` |
-| `register` | Registration flow | `prompt=create` |
-| `recovery` | Password recovery flow | _(no OIDC equivalent — Flow API only)_ |
-| `reauth` | Re-authentication flow | `prompt=login, max_age=0` |
+| `purpose` | Flow started |
+|---|---|
+| `login` (default) | Login flow |
+| `register` | Registration flow |
+| `recovery` | Password recovery flow |
+| `reauth` | Re-authentication flow |
 
-The developer writes `purpose="register"`. The widget translates that to the correct PAR parameters and `CreateFlowRequest.purpose`. The developer never touches `prompt`, `max_age`, or any OIDC-specific parameter.
+The developer writes `purpose="register"`. The widget translates that to the correct internal parameters. The developer never touches `prompt`, `max_age`, `scope`, or any OIDC-specific parameter.
 
-### Design principle: no OIDC on the public surface
-
-The widget abstracts OIDC entirely. Developers interact with domain concepts:
+### Design principle: ZITADEL-native, not OIDC-native
 
 ```html
-<!-- ✅ Domain language — what the developer writes -->
+<!-- ✅ What the developer writes -->
 <zitadel-login
+  project-id="my-project"
+  app-id="12345"
+  callback="https://myapp.com/auth/callback"
   purpose="register"
-  scope="openid profile email"
 ></zitadel-login>
 
 <!-- ❌ OIDC internals — never exposed -->
 <zitadel-login
+  issuer="https://my-instance.zitadel.cloud"
+  client-id="12345@my-project"
+  redirect-uri="https://myapp.com/auth/callback"
+  scope="openid profile email"
   prompt="create"
   response-type="code"
   code-challenge-method="S256"
 ></zitadel-login>
 ```
 
-`scope` is the one exception — it's OIDC-native but universally understood. Everything else is mapped internally by the widget.
+### How the widget resolves OIDC parameters
+
+The widget needs `project-id` + `app-id`. It calls the API (default `api.zitadel.com`, or the `api-url` override) to resolve everything:
+
+1. **Discovery** — fetches `/.well-known/openid-configuration` from the API
+2. **App config** — reads the app's allowed scopes, redirect URIs, and OIDC settings
+3. **PAR** — builds the authorization request with the correct parameters (scopes from app config, PKCE, etc.)
+4. **Flow** — starts the flow with the resolved `auth_request_id`
+
+Scopes are configured once in Console, not scattered across every widget embed.
 
 ### Pivoting between purposes
 
