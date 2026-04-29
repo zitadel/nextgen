@@ -27,7 +27,8 @@ async function portFromEnvFile(cwd: string): Promise<number | undefined> {
     try {
       const contents = await readFile(join(cwd, candidate), "utf8");
       const match = contents.match(/^\s*PORT\s*=\s*(\d+)/m);
-      if (match) return Number.parseInt(match[1], 10);
+      const rawPort = match?.[1];
+      if (rawPort) return Number.parseInt(rawPort, 10);
     } catch {
       // ignore
     }
@@ -39,11 +40,13 @@ export function extractPort(script: string): number | undefined {
   const inline = script.match(/-p\s+(\d+)|--port[=\s]+(\d+)/);
   if (inline) {
     const raw = inline[1] ?? inline[2];
+    if (!raw) return undefined;
     const value = Number.parseInt(raw, 10);
     if (Number.isFinite(value) && value > 0) return value;
   }
   const env = script.match(/(?:^|\s)PORT=(\d+)/);
-  if (env) return Number.parseInt(env[1], 10);
+  const rawEnvPort = env?.[1];
+  if (rawEnvPort) return Number.parseInt(rawEnvPort, 10);
   return undefined;
 }
 

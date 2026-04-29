@@ -19,7 +19,7 @@ Agents should prefer `next_commands` over free-text hints.
 
 ## Maintainer Notes
 
-This file is packaged with the CLI and is generated from the command registry. When changing commands, flags, envelope fields, agent support status, server resolution, claim behavior, or renderer behavior, update the registry and tests first, then run `corepack pnpm --filter zitadel gen:agents-md`.
+This file is packaged with the CLI and is generated from the command registry. When changing commands, flags, envelope fields, agent support status, server resolution, claim behavior, or renderer behavior, update the registry and tests first, then run `corepack pnpm nx run @zitadel-nextgen/cli:gen:agents-md`.
 
 Do not edit the generated capabilities block in this file by hand. Keep `zitadel capabilities --json`, `zitadel help --json`, and this contract in sync.
 

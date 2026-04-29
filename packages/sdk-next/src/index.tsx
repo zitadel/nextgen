@@ -1,6 +1,5 @@
 "use client";
 
-import { type FC, useMemo } from "react";
 import {
   resolveZitadelRuntime,
   resolveZitadelRuntimeEnv,
@@ -8,18 +7,23 @@ import {
   type ZitadelEnvironment,
   type ZitadelFlowPurpose,
   type ZitadelRuntime,
-} from "@zitadel/sdk-core";
+} from "@zitadel-nextgen/sdk-core";
+import { type FC, useMemo } from "react";
 
-import { ZitadelFlowMock } from "./mock";
-import { ZitadelFlowReal } from "./real";
-import { styles } from "./styles";
+import { ZitadelFlowMock } from "./mock.js";
+import { ZitadelFlowReal } from "./real.js";
+import { styles } from "./styles.js";
 
 export {
   resolveZitadelRuntime,
   resolveZitadelRuntimeEnv,
   ZitadelRuntimeError,
-} from "@zitadel/sdk-core";
-export type { ZitadelEnvironment, ZitadelFlowPurpose, ZitadelRuntime } from "@zitadel/sdk-core";
+} from "@zitadel-nextgen/sdk-core";
+export type {
+  ZitadelEnvironment,
+  ZitadelFlowPurpose,
+  ZitadelRuntime,
+} from "@zitadel-nextgen/sdk-core";
 
 export type ZitadelFlowProps = {
   purpose: ZitadelFlowPurpose;
@@ -64,11 +68,10 @@ function resolveRuntimeFromProps(props: ZitadelFlowProps): RuntimeResolution {
 }
 
 function ZitadelFlowImpl(props: ZitadelFlowProps) {
-  const resolution = useMemo(() => resolveRuntimeFromProps(props), [
-    props.environment,
-    props.issuer,
-    props.projectId,
-  ]);
+  const resolution = useMemo(
+    () => resolveRuntimeFromProps(props),
+    [props.environment, props.issuer, props.projectId],
+  );
   if (resolution.runtimeError) {
     if (!(resolution.runtimeError instanceof ZitadelRuntimeError)) throw resolution.runtimeError;
     return <ZitadelFlowRuntimeError message={resolution.runtimeError.message} />;

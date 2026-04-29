@@ -3,8 +3,8 @@ import { join } from "node:path";
 
 import type { CliIO, GlobalOptions } from "../io/output";
 import { ok, skipped } from "../io/output";
-import { MANAGED_MARKER } from "../lib/paths";
 import { ZitadelError } from "../lib/errors";
+import { MANAGED_MARKER } from "../lib/paths";
 
 export type EjectOptions = GlobalOptions & {
   force?: boolean;
@@ -56,7 +56,7 @@ export async function runEject(io: CliIO, opts: EjectOptions): Promise<void> {
   }
 
   const envLocal = join(opts.cwd, ".env.local");
-  if (await pathExists(envLocal) && !opts.dryRun) {
+  if ((await pathExists(envLocal)) && !opts.dryRun) {
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
     const backup = join(opts.cwd, `.env.local.ejected-${stamp}`);
     await rename(envLocal, backup);
@@ -64,7 +64,7 @@ export async function runEject(io: CliIO, opts: EjectOptions): Promise<void> {
   }
 
   const zitadelDir = join(opts.cwd, ".zitadel");
-  if (await pathExists(zitadelDir) && !opts.dryRun) {
+  if ((await pathExists(zitadelDir)) && !opts.dryRun) {
     await rm(zitadelDir, { recursive: true, force: true });
   }
 

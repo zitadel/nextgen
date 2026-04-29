@@ -107,7 +107,13 @@ export function ok<T>(io: CliIO, data: T, opts: GlobalOptions, warnings: string[
   writePretty(io, formatData(data, warnings, opts));
 }
 
-export function skipped(io: CliIO, reason: string, opts: GlobalOptions, data?: unknown, nextCommands?: string[]): void {
+export function skipped(
+  io: CliIO,
+  reason: string,
+  opts: GlobalOptions,
+  data?: unknown,
+  nextCommands?: string[],
+): void {
   if (opts.json) {
     writeJson(io, {
       status: "skipped",
@@ -137,7 +143,10 @@ function formatData(data: unknown, warnings: string[], opts: GlobalOptions): str
   }
 
   const lines: string[] = [];
-  const titleLine = isObject(data) && typeof data.title === "string" ? String(data.title) : "Zitadel command completed.";
+  const titleLine =
+    isObject(data) && typeof data.title === "string"
+      ? String(data.title)
+      : "Zitadel command completed.";
   lines.push(titleLine);
   const suffix = sourceSuffix(opts);
   if (suffix) lines.push(suffix);
@@ -204,7 +213,8 @@ function renderKnownSections(lines: string[], data: Record<string, unknown>): vo
     if (typeof deploy.platform === "string") bits.push(deploy.platform);
     if (typeof deploy.environment === "string") bits.push(deploy.environment);
     if (typeof deploy.state === "string") bits.push(`state=${deploy.state}`);
-    if ("configured" in deploy) bits.push(`configured=${String((deploy as { configured: unknown }).configured)}`);
+    if ("configured" in deploy)
+      bits.push(`configured=${String((deploy as { configured: unknown }).configured)}`);
     if (bits.length > 0) lines.push(`Deploy: ${bits.join("  ")}`);
   }
 

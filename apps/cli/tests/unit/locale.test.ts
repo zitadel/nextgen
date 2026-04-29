@@ -34,7 +34,10 @@ async function scaffoldProject(): Promise<string> {
 describe("locale tooling", () => {
   it("setup seeds .zitadel/locales/en.json with populated core keys", async () => {
     const cwd = await scaffoldProject();
-    const raw = JSON.parse(await readFile(join(cwd, ".zitadel/locales/en.json"), "utf8")) as Record<string, string>;
+    const raw = JSON.parse(await readFile(join(cwd, ".zitadel/locales/en.json"), "utf8")) as Record<
+      string,
+      string
+    >;
     expect(raw["identifier.title"]).toBe("Sign in");
     expect(raw["identifier.action.submit"]).toBe("Continue");
     expect(raw["register_profile.action.submit"]).toBe("Create account");
@@ -46,7 +49,10 @@ describe("locale tooling", () => {
     // First run should be a no-op
     const first = await runCliForTest(["locale", "scaffold", "--cwd", cwd, "--json"]);
     expect(first.exitCode).toBe(0);
-    const firstEnv = parseJson(first.stdout) as { status: string; data: { changed: boolean; added_keys: string[] } };
+    const firstEnv = parseJson(first.stdout) as {
+      status: string;
+      data: { changed: boolean; added_keys: string[] };
+    };
     expect(firstEnv.status).toBe("ok");
     expect(firstEnv.data.changed).toBe(false);
     expect(firstEnv.data.added_keys).toEqual([]);
@@ -59,7 +65,9 @@ describe("locale tooling", () => {
 
     const second = await runCliForTest(["locale", "scaffold", "--cwd", cwd, "--json"]);
     expect(second.exitCode).toBe(0);
-    const secondEnv = parseJson(second.stdout) as { data: { changed: boolean; added_keys: string[] } };
+    const secondEnv = parseJson(second.stdout) as {
+      data: { changed: boolean; added_keys: string[] };
+    };
     expect(secondEnv.data.changed).toBe(true);
     expect(secondEnv.data.added_keys).toContain("identifier.title");
 
@@ -71,9 +79,20 @@ describe("locale tooling", () => {
 
   it("locale scaffold --lang de creates a new locale with empty values", async () => {
     const cwd = await scaffoldProject();
-    const result = await runCliForTest(["locale", "scaffold", "--cwd", cwd, "--json", "--lang", "de"]);
+    const result = await runCliForTest([
+      "locale",
+      "scaffold",
+      "--cwd",
+      cwd,
+      "--json",
+      "--lang",
+      "de",
+    ]);
     expect(result.exitCode).toBe(0);
-    const raw = JSON.parse(await readFile(join(cwd, ".zitadel/locales/de.json"), "utf8")) as Record<string, string>;
+    const raw = JSON.parse(await readFile(join(cwd, ".zitadel/locales/de.json"), "utf8")) as Record<
+      string,
+      string
+    >;
     expect(raw["identifier.title"]).toBe("");
     expect(raw["register_profile.action.submit"]).toBe("");
   });
@@ -83,7 +102,9 @@ describe("locale tooling", () => {
     await runCliForTest(["locale", "scaffold", "--cwd", cwd, "--json", "--lang", "de"]);
     const list = await runCliForTest(["locale", "list", "--cwd", cwd, "--json"]);
     expect(list.exitCode).toBe(0);
-    const env = parseJson(list.stdout) as { data: { locales: Array<{ lang: string; key_count: number }> } };
+    const env = parseJson(list.stdout) as {
+      data: { locales: Array<{ lang: string; key_count: number }> };
+    };
     expect(env.data.locales.map((l) => l.lang)).toEqual(expect.arrayContaining(["en", "de"]));
     const en = env.data.locales.find((l) => l.lang === "en");
     expect(en?.key_count).toBeGreaterThan(0);

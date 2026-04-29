@@ -19,11 +19,35 @@ export type CommandSpec = {
 
 const globalFlags: FlagSpec[] = [
   { name: "cwd", alias: "c", type: "string", description: "Project directory to operate on." },
-  { name: "json", alias: "j", type: "boolean", description: "Emit the JSON envelope instead of pretty output." },
-  { name: "non-interactive", alias: "n", type: "boolean", description: "Disable prompts. Required when scripting or running as an agent." },
-  { name: "dry-run", type: "boolean", description: "Preview the work without mutating files or hitting the platform." },
-  { name: "force", alias: "f", type: "boolean", description: "Overwrite protected files when conflicts are detected." },
-  { name: "server", alias: "s", type: "string", description: "Override the resolved server URL (or \"mock\")." },
+  {
+    name: "json",
+    alias: "j",
+    type: "boolean",
+    description: "Emit the JSON envelope instead of pretty output.",
+  },
+  {
+    name: "non-interactive",
+    alias: "n",
+    type: "boolean",
+    description: "Disable prompts. Required when scripting or running as an agent.",
+  },
+  {
+    name: "dry-run",
+    type: "boolean",
+    description: "Preview the work without mutating files or hitting the platform.",
+  },
+  {
+    name: "force",
+    alias: "f",
+    type: "boolean",
+    description: "Overwrite protected files when conflicts are detected.",
+  },
+  {
+    name: "server",
+    alias: "s",
+    type: "string",
+    description: 'Override the resolved server URL (or "mock").',
+  },
   { name: "mock", type: "boolean", description: "Alias for --server mock." },
 ];
 
@@ -35,14 +59,42 @@ export const COMMANDS: CommandSpec[] = [
     agent_status: "supported-mock-default",
     flags: [
       ...globalFlags,
-      { name: "framework", type: "string", description: "Framework to target (v1 supports \"next\")." },
+      {
+        name: "framework",
+        type: "string",
+        description: 'Framework to target (v1 supports "next").',
+      },
       { name: "user-fields", type: "string", description: "Comma-separated list of user fields." },
-      { name: "auth-methods", type: "string", description: "Comma-separated list of auth methods." },
-      { name: "renderer", type: "string", description: "Renderer: react (default) or web-component (planned <zitadel-flow>)." },
-      { name: "skip-deploy-platform", type: "boolean", description: "Skip deploy platform detection and connect." },
-      { name: "platform", type: "string", description: "Deploy platform override (vercel/netlify/cloudflare/none)." },
-      { name: "manual", type: "boolean", description: "Emit manual deploy steps instead of configuring the provider." },
-      { name: "no-apply", type: "boolean", description: "Skip the automatic apply at the end of setup." },
+      {
+        name: "auth-methods",
+        type: "string",
+        description: "Comma-separated list of auth methods.",
+      },
+      {
+        name: "renderer",
+        type: "string",
+        description: "Renderer: react (default) or web-component (planned <zitadel-flow>).",
+      },
+      {
+        name: "skip-deploy-platform",
+        type: "boolean",
+        description: "Skip deploy platform detection and connect.",
+      },
+      {
+        name: "platform",
+        type: "string",
+        description: "Deploy platform override (vercel/netlify/cloudflare/none).",
+      },
+      {
+        name: "manual",
+        type: "boolean",
+        description: "Emit manual deploy steps instead of configuring the provider.",
+      },
+      {
+        name: "no-apply",
+        type: "boolean",
+        description: "Skip the automatic apply at the end of setup.",
+      },
     ],
   },
   {
@@ -52,7 +104,12 @@ export const COMMANDS: CommandSpec[] = [
     agent_status: "supported",
     flags: [
       ...globalFlags,
-      { name: "environment", alias: "e", type: "string", description: "Target environment (default: development)." },
+      {
+        name: "environment",
+        alias: "e",
+        type: "string",
+        description: "Target environment (default: development).",
+      },
       { name: "platform", type: "string", description: "Deploy platform override." },
     ],
   },
@@ -63,7 +120,12 @@ export const COMMANDS: CommandSpec[] = [
     agent_status: "supported-mock-default",
     flags: [
       ...globalFlags,
-      { name: "environment", alias: "e", type: "string", description: "Target environment (default: development)." },
+      {
+        name: "environment",
+        alias: "e",
+        type: "string",
+        description: "Target environment (default: development).",
+      },
       { name: "platform", type: "string", description: "Deploy platform override." },
     ],
   },
@@ -82,11 +144,17 @@ export const COMMANDS: CommandSpec[] = [
     summary: "Report deploy platform readiness.",
     usage: "zitadel deploy status [--platform vercel|netlify|cloudflare]",
     agent_status: "experimental",
-    notes: "Experimental POC surface; agents should prefer setup, plan, apply, and claim for the golden path.",
+    notes:
+      "Experimental POC surface; agents should prefer setup, plan, apply, and claim for the golden path.",
     flags: [
       ...globalFlags,
       { name: "platform", type: "string", description: "Force a deploy platform adapter." },
-      { name: "environment", alias: "e", type: "string", description: "Target environment (default: preview)." },
+      {
+        name: "environment",
+        alias: "e",
+        type: "string",
+        description: "Target environment (default: preview).",
+      },
     ],
   },
   {
@@ -94,11 +162,17 @@ export const COMMANDS: CommandSpec[] = [
     summary: "Configure preview or production platform env vars.",
     usage: "zitadel deploy connect [--environment preview|production]",
     agent_status: "experimental",
-    notes: "Experimental POC surface; agents should prefer setup, plan, apply, and claim for the golden path.",
+    notes:
+      "Experimental POC surface; agents should prefer setup, plan, apply, and claim for the golden path.",
     flags: [
       ...globalFlags,
       { name: "platform", type: "string", description: "Force a deploy platform adapter." },
-      { name: "environment", alias: "e", type: "string", description: "Target environment (default: preview)." },
+      {
+        name: "environment",
+        alias: "e",
+        type: "string",
+        description: "Target environment (default: preview).",
+      },
       { name: "manual", type: "boolean", description: "Emit manual steps instead of configuring." },
     ],
   },
@@ -117,43 +191,86 @@ export const COMMANDS: CommandSpec[] = [
     agent_status: "supported-mock-default",
     flags: [
       ...globalFlags,
-      { name: "challenge-id", type: "string", description: "Claim challenge ID returned by `zitadel claim`." },
-      { name: "mock-complete-claim", type: "boolean", description: "Mock-only: complete the claim handoff and refresh local state." },
-      { name: "mock-advance-claim", type: "boolean", description: "Alias for --mock-complete-claim." },
+      {
+        name: "challenge-id",
+        type: "string",
+        description: "Claim challenge ID returned by `zitadel claim`.",
+      },
+      {
+        name: "mock-complete-claim",
+        type: "boolean",
+        description: "Mock-only: complete the claim handoff and refresh local state.",
+      },
+      {
+        name: "mock-advance-claim",
+        type: "boolean",
+        description: "Alias for --mock-complete-claim.",
+      },
     ],
   },
   {
     name: "schema add",
     summary: "Add or remove fields on the user schema.",
-    usage: "zitadel schema add [--preset name] [--add-field-json '{...}' | --add-field name:type:attrs] [--remove-field name]",
+    usage:
+      "zitadel schema add [--preset name] [--add-field-json '{...}' | --add-field name:type:attrs] [--remove-field name]",
     agent_status: "supported",
     notes: "Aliased as `zitadel add schema`.",
     flags: [
       ...globalFlags,
-      { name: "preset", type: "string[]", description: "Apply a named field preset (run `zitadel capabilities` for the list)." },
-      { name: "add-field", type: "string[]", description: "Add a field using the colon-DSL (name:type:key=value,...)." },
-      { name: "add-field-json", type: "string[]", description: "Add a field using a JSON object. Preferred for agents." },
+      {
+        name: "preset",
+        type: "string[]",
+        description: "Apply a named field preset (run `zitadel capabilities` for the list).",
+      },
+      {
+        name: "add-field",
+        type: "string[]",
+        description: "Add a field using the colon-DSL (name:type:key=value,...).",
+      },
+      {
+        name: "add-field-json",
+        type: "string[]",
+        description: "Add a field using a JSON object. Preferred for agents.",
+      },
       { name: "remove-field", type: "string[]", description: "Remove a field by name." },
     ],
   },
   {
     name: "idp add",
     summary: "Add or update an identity provider (.zitadel/idps/<slug>.json).",
-    usage: "zitadel idp add (--preset google|microsoft|okta-oidc | --protocol oidc|saml) [--slug] [--issuer] [--client-id] [--env-secret] [--metadata-url]",
+    usage:
+      "zitadel idp add (--preset google|microsoft|okta-oidc | --protocol oidc|saml) [--slug] [--issuer] [--client-id] [--env-secret] [--metadata-url]",
     agent_status: "experimental",
     notes: "Experimental POC surface; presets are limited to providers with an OIDC issuer.",
     flags: [
       ...globalFlags,
-      { name: "slug", type: "string", description: "Local slug (filename). Defaults to preset id." },
+      {
+        name: "slug",
+        type: "string",
+        description: "Local slug (filename). Defaults to preset id.",
+      },
       { name: "display-name", type: "string", description: "Human-readable IdP name." },
       { name: "protocol", type: "string", description: "Protocol: oidc or saml." },
       { name: "preset", type: "string", description: "Preset: google, microsoft, okta-oidc." },
-      { name: "issuer", type: "string", description: "OIDC issuer URL (required with --protocol oidc or okta-oidc preset)." },
+      {
+        name: "issuer",
+        type: "string",
+        description: "OIDC issuer URL (required with --protocol oidc or okta-oidc preset).",
+      },
       { name: "client-id", type: "string", description: "OIDC client ID." },
-      { name: "env-secret", type: "string", description: "Name of env var holding the OIDC client secret (e.g. ZITADEL_IDP_GOOGLE_SECRET)." },
+      {
+        name: "env-secret",
+        type: "string",
+        description:
+          "Name of env var holding the OIDC client secret (e.g. ZITADEL_IDP_GOOGLE_SECRET).",
+      },
       { name: "metadata-url", type: "string", description: "SAML metadata URL." },
       { name: "scopes", type: "string", description: "Comma-separated OIDC scopes." },
-      { name: "from-file", type: "string", description: "Path to an existing IdP resource JSON file." },
+      {
+        name: "from-file",
+        type: "string",
+        description: "Path to an existing IdP resource JSON file.",
+      },
     ],
   },
   {
@@ -185,7 +302,8 @@ export const COMMANDS: CommandSpec[] = [
     summary: "Add missing text_key entries to .zitadel/locales/<lang>.json (idempotent).",
     usage: "zitadel locale scaffold [--lang en]",
     agent_status: "supported",
-    notes: "Walks .zitadel/flows/*.json, extracts every text_key, adds missing keys with empty strings.",
+    notes:
+      "Walks .zitadel/flows/*.json, extracts every text_key, adds missing keys with empty strings.",
     flags: [
       ...globalFlags,
       { name: "lang", type: "string", description: "Target locale code (default: en)." },
@@ -200,8 +318,10 @@ export const COMMANDS: CommandSpec[] = [
   },
   {
     name: "app add",
-    summary: "Add or update an app resource (.zitadel/apps/<slug>.json). Apps consume Zitadel's OIDC/SAML server.",
-    usage: "zitadel app add (--preset spa|web|native|machine | --protocol oidc|saml) [--slug <slug>] [--redirect-uri ...]",
+    summary:
+      "Add or update an app resource (.zitadel/apps/<slug>.json). Apps consume Zitadel's OIDC/SAML server.",
+    usage:
+      "zitadel app add (--preset spa|web|native|machine | --protocol oidc|saml) [--slug <slug>] [--redirect-uri ...]",
     agent_status: "experimental",
     notes: "Experimental POC surface.",
     flags: [
@@ -210,13 +330,35 @@ export const COMMANDS: CommandSpec[] = [
       { name: "display-name", type: "string", description: "Human-readable app name." },
       { name: "protocol", type: "string", description: "Protocol: oidc or saml." },
       { name: "preset", type: "string", description: "Preset: spa, web, native, machine." },
-      { name: "client-type", type: "string", description: "OIDC client_type: web, spa, native, machine (default: spa). Use with --protocol oidc." },
-      { name: "role", type: "string", description: "SAML role: client (default) or server (Zitadel-as-IdP). Rejected for OIDC — use --client-type." },
-      { name: "redirect-uri", type: "string[]", description: "Redirect URI (repeatable). OIDC only." },
-      { name: "post-logout-redirect-uri", type: "string[]", description: "Post-logout redirect URI (repeatable). OIDC only." },
+      {
+        name: "client-type",
+        type: "string",
+        description:
+          "OIDC client_type: web, spa, native, machine (default: spa). Use with --protocol oidc.",
+      },
+      {
+        name: "role",
+        type: "string",
+        description:
+          "SAML role: client (default) or server (Zitadel-as-IdP). Rejected for OIDC — use --client-type.",
+      },
+      {
+        name: "redirect-uri",
+        type: "string[]",
+        description: "Redirect URI (repeatable). OIDC only.",
+      },
+      {
+        name: "post-logout-redirect-uri",
+        type: "string[]",
+        description: "Post-logout redirect URI (repeatable). OIDC only.",
+      },
       { name: "metadata-url", type: "string", description: "SAML metadata URL." },
       { name: "entity-id", type: "string", description: "SAML entity ID." },
-      { name: "from-file", type: "string", description: "Path to an existing app resource JSON file." },
+      {
+        name: "from-file",
+        type: "string",
+        description: "Path to an existing app resource JSON file.",
+      },
     ],
   },
   {
