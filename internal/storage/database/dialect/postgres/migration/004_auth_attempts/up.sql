@@ -8,7 +8,7 @@ CREATE TABLE zitadel_nextgen.auth_attempts (
     , time_to_live INTERVAL
 
     , PRIMARY KEY (project_id, id)
-    -- TODO:, FOREIGN KEY (project_id) REFERENCES zitadel_nextgen.projects(id)
+    , FOREIGN KEY (project_id) REFERENCES zitadel_nextgen.instances(id) -- TODO: rename instances to projects and update the foreign key reference accordingly
 );
 
 CREATE TABLE zitadel_nextgen.auth_attempt_checks (
