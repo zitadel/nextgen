@@ -7,7 +7,7 @@
 ## Introduction
 
 The new ZITADEL architecture allows for a flexible setup by allowing the customer to define the structure of their data.
-This is done using schema's. E.g.: a customer can define his own user schema which describes what properties a user has.
+This is done using schemas. E.g.: a customer can define his own user schema which describes what properties a user has.
 
 ## Terminology
 
@@ -45,7 +45,7 @@ E.g.:
 ### Transformer
 
 A function which transform an object so that the resulting object fits within a schema. These can be uses as a layer
-between schema's.
+between schemas.
 
 E.g.: When a user wants to add an Auth Provider. We need a given set of data for an OIDC provider: `issuer`, `clientId`,
 `redirectUri`, `scopes`, claim mapping. When using Entra-ID, it would be easier if the user could enter a `tenantId`
@@ -65,7 +65,7 @@ E.g.:
 
 ## Usage
 
-Let's describe how these schema's can be used. Bear with me, it is quiet abstract.
+Let's describe how these schemas can be used. Bear with me, it is quiet abstract.
 
 ### Single step hierarchy
 
