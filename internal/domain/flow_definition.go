@@ -47,7 +47,6 @@ type FlowDefinition struct {
 	ProjectID     string
 	ID            string
 	Name          string
-	EngineVersion string
 	SchemaVersion string
 	Status        FlowDefinitionStatus
 	CreatedAt     time.Time

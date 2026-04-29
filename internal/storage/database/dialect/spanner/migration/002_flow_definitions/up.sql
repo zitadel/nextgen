@@ -4,7 +4,6 @@ CREATE TABLE zitadel_nextgen.flow_definitions (
     project_id      TEXT NOT NULL
     , id            TEXT NOT NULL
     , name          TEXT NOT NULL
-    , engine_version TEXT NOT NULL
     , schema_version TEXT NOT NULL
     , status        TEXT NOT NULL DEFAULT 'draft'
     , purposes      TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[]

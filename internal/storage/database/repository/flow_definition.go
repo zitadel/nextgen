@@ -35,7 +35,6 @@ type flowDefinitionRow struct {
 	ProjectID     string                      `db:"project_id"`
 	ID            string                      `db:"id"`
 	Name          string                      `db:"name"`
-	EngineVersion string                      `db:"engine_version"`
 	SchemaVersion string                      `db:"schema_version"`
 	Status        domain.FlowDefinitionStatus `db:"status"`
 	Definition    JSON[flowDefinitionContent] `db:"definition"`
@@ -121,9 +120,9 @@ func (r *FlowDefinitionRepository) CreateFlowDefinition(ctx context.Context, def
 
 	b := database.NewStatementBuilder(
 		"INSERT INTO " + tableFlowDefinitions +
-			" (project_id, id, name, engine_version, schema_version, status, purposes, definition, created_at, updated_at)" +
+			" (project_id, id, name, schema_version, status, purposes, definition, created_at, updated_at)" +
 			" VALUES (")
-	b.WriteArgs(def.ProjectID, def.ID, def.Name, def.EngineVersion, def.SchemaVersion)
+	b.WriteArgs(def.ProjectID, def.ID, def.Name, def.SchemaVersion)
 	b.WriteString(", ")
 	b.WriteString(b.AppendArg(def.Status.String()) + r.statusCast)
 	b.WriteString(", ")
@@ -142,7 +141,7 @@ func (r *FlowDefinitionRepository) CreateFlowDefinition(ctx context.Context, def
 
 func (r *FlowDefinitionRepository) GetFlowDefinition(ctx context.Context, projectID, id string) (*domain.FlowDefinition, error) {
 	b := database.NewStatementBuilder(
-		"SELECT project_id, id, name, engine_version, schema_version, status, definition, created_at, updated_at" +
+		"SELECT project_id, id, name, schema_version, status, definition, created_at, updated_at" +
 			" FROM " + tableFlowDefinitions +
 			" WHERE project_id = ")
 	b.WriteArg(projectID)
@@ -160,7 +159,7 @@ func (r *FlowDefinitionRepository) ListFlowDefinitions(ctx context.Context, proj
 	o := domain.ApplyFlowDefinitionListOptions(opts)
 
 	b := database.NewStatementBuilder(
-		"SELECT project_id, id, name, engine_version, schema_version, status, definition, created_at, updated_at" +
+		"SELECT project_id, id, name, schema_version, status, definition, created_at, updated_at" +
 			" FROM " + tableFlowDefinitions +
 			" WHERE project_id = ")
 	b.WriteArg(projectID)
@@ -305,7 +304,6 @@ func rowToFlowDefinition(row flowDefinitionRow) (*domain.FlowDefinition, error) 
 		ProjectID:     row.ProjectID,
 		ID:            row.ID,
 		Name:          row.Name,
-		EngineVersion: row.EngineVersion,
 		SchemaVersion: row.SchemaVersion,
 		Status:        row.Status,
 		CreatedAt:     row.CreatedAt,

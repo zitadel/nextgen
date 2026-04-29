@@ -18,7 +18,6 @@ CREATE TABLE zitadel_nextgen.flow_definitions (
     project_id          TEXT NOT NULL
     , id                TEXT NOT NULL CHECK (id <> '')
     , name              TEXT NOT NULL CHECK (name <> '')
-    , engine_version    TEXT NOT NULL CHECK (engine_version <> '')
     , schema_version    TEXT NOT NULL CHECK (schema_version <> '')
     , status            zitadel_nextgen.flow_definition_states NOT NULL DEFAULT 'draft'::zitadel_nextgen.flow_definition_states
     , purposes          zitadel_nextgen.flow_definition_purposes[] NOT NULL DEFAULT '{}'

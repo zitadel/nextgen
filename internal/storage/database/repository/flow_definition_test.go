@@ -6,7 +6,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
@@ -25,7 +24,6 @@ func TestFlowDefinitionRepository_CreateAndGet(t *testing.T) {
 
 	assert.Equal(t, def.ID, got.ID)
 	assert.Equal(t, def.Name, got.Name)
-	assert.Equal(t, def.EngineVersion, got.EngineVersion)
 	assert.Equal(t, def.SchemaVersion, got.SchemaVersion)
 	assert.Equal(t, def.Status, got.Status)
 	assert.WithinDuration(t, time.Now(), got.CreatedAt, 5*time.Second)
@@ -207,7 +205,6 @@ func sampleFlowDefinition(projectID, id string) *domain.FlowDefinition {
 		ProjectID:     projectID,
 		ID:            id,
 		Name:          "Default Login",
-		EngineVersion: "1.0.0",
 		SchemaVersion: "1.0.0",
 		Status:        domain.FlowDefinitionStatusDraft,
 		Purposes: []domain.FlowDefinitionPurposeEntry{
