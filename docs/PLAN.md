@@ -95,6 +95,8 @@ machine-only index folder).
 - Expand `docs/design/README.md` with domain routing.
 - Normalize task tables in domain READMEs.
 - Expand ADR index table in `docs/adrs/README.md`.
+- Use `docs/README_TEMPLATES.md` as the source template for root and domain
+  README structure.
 
 ### Phase 2: Consistency pass
 - Normalize status/context sections across major design docs.
