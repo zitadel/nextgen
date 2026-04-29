@@ -8,6 +8,7 @@ require (
 	github.com/georgysavva/scany/v2 v2.1.4
 	github.com/go-faster/errors v0.7.1
 	github.com/go-faster/jx v1.2.0
+	github.com/ianlancetaylor/jsonschema v0.0.0-20251021232724-46ecbf32a0a5
 	github.com/jackc/pgx/v5 v5.9.1
 	github.com/jackc/tern/v2 v2.3.6
 	github.com/mitchellh/mapstructure v1.5.0
@@ -115,4 +116,5 @@ require (
 tool (
 	github.com/dmarkham/enumer
 	github.com/ogen-go/ogen/cmd/ogen
+	go.uber.org/mock/mockgen
 )

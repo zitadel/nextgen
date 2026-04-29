@@ -1,15 +1,18 @@
 CREATE TABLE zitadel_nextgen.users (
     instance_id TEXT COLLATE "C" NOT NULL
     , organization_id TEXT COLLATE "C" NOT NULL
+    , schema_url TEXT COLLATE "C" NOT NULL
     , id TEXT COLLATE "C" NOT NULL CHECK ( id <> '' )
     , created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     , updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-    , schema_url TEXT COLLATE "C" NOT NULL CHECK ( schema_url <> '' )
 
     , PRIMARY KEY (instance_id, id)
     , FOREIGN KEY (instance_id, organization_id)
         REFERENCES zitadel_nextgen.organizations(instance_id, id)
         ON DELETE CASCADE
+    , FOREIGN KEY (instance_id, schema_url)
+        REFERENCES zitadel_nextgen.json_schemas(instance_id, url)
+        ON DELETE RESTRICT
 ) PARTITION BY HASH (instance_id, id);
 
 -- Index for user cascade deletes.
