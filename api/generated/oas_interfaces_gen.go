@@ -9,8 +9,16 @@ type AuthorizeGetRes interface {
 	authorizeGetRes()
 }
 
+type CreateFlowRes interface {
+	createFlowRes()
+}
+
 type EndSessionRes interface {
 	endSessionRes()
+}
+
+type GetFlowStepRes interface {
+	getFlowStepRes()
 }
 
 type GetHealthRes interface {
@@ -51,4 +59,8 @@ type ListUsersRes interface {
 
 type RevokeTokenRes interface {
 	revokeTokenRes()
+}
+
+type SubmitFlowStepRes interface {
+	submitFlowStepRes()
 }

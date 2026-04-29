@@ -31,8 +31,6 @@ post:
     frontend never sees a `complete` for intermediate flows.
   tags:
     - Flows
-  security:
-    - sessionToken: []
   parameters:
     - $ref: ../../../components/parameters/flow-id.yaml
     - $ref: ../../../components/parameters/flow-cookie.yaml

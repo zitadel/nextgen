@@ -6,8 +6,6 @@ get:
     Useful for page reloads or re-rendering after a network error.
   tags:
     - Flows
-  security:
-    - sessionToken: []
   parameters:
     - $ref: ../../../components/parameters/flow-id.yaml
     - $ref: ../../../components/parameters/flow-cookie.yaml
