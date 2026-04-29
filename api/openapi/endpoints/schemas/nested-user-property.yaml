@@ -7,7 +7,7 @@ properties:
   type:
     type: string
     enum: [string, number, boolean, object, array]
-  requiredFields:
+  required:
     type: array
     items:
       type: string
