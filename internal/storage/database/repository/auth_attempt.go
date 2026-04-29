@@ -38,7 +38,7 @@ const authAttemptCheckSucceededStmt = `UPDATE zitadel_nextgen.auth_attempt_check
 // CheckSucceeded implements [domain.AuthAttemptRepository].
 func (a *AuthAttempt) CheckSucceeded(ctx context.Context, client database.QueryExecutor, projectID string, authAttemptID string, check *domain.AuthCheck) error {
 	return client.QueryRow(ctx, authAttemptCheckSucceededStmt, projectID, authAttemptID, check.Type).
-		Scan(&check.VerifiedAt)
+		Scan(&check.LastVerifiedAt)
 }
 
 const authAttemptCompleteStmt = `UPDATE zitadel_nextgen.auth_attempts SET completed_at = NOW()` +
@@ -184,7 +184,7 @@ func (a *AuthAttempt) Get(ctx context.Context, client database.QueryExecutor, pr
 			check.FailureCount = failureCount.V
 		}
 		if verifiedAt.Valid {
-			check.VerifiedAt = verifiedAt.V
+			check.LastVerifiedAt = verifiedAt.V
 		}
 		if lastFailedAt.Valid {
 			check.LastFailedAt = &lastFailedAt.V

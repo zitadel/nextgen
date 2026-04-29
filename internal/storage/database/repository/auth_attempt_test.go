@@ -401,16 +401,16 @@ func TestAuthAttempt_CheckSucceeded(t *testing.T) {
 		defer rollback()
 
 		_, check := newTestAttempt(t, repo, tx, "p", "a")
-		require.True(t, check.VerifiedAt.IsZero(), "VerifiedAt must be zero before success")
+		require.True(t, check.LastVerifiedAt.IsZero(), "VerifiedAt must be zero before success")
 
 		require.NoError(t, repo.CheckSucceeded(t.Context(), tx, "p", "a", check.AuthCheck))
-		require.False(t, check.VerifiedAt.IsZero())
+		require.False(t, check.LastVerifiedAt.IsZero())
 
 		stored, err := repo.Get(t.Context(), tx, "p", "a")
 		require.NoError(t, err)
 		storedCheck, ok := stored.CheckByType(domain.AuthCheckTypePassword)
 		require.True(t, ok)
-		require.Equal(t, check.VerifiedAt, storedCheck.Check().VerifiedAt)
+		require.Equal(t, check.LastVerifiedAt, storedCheck.Check().LastVerifiedAt)
 	})
 
 	t.Run("succeeds after previous failures; failure_count is not reset", func(t *testing.T) {
@@ -423,14 +423,14 @@ func TestAuthAttempt_CheckSucceeded(t *testing.T) {
 		require.Equal(t, uint8(2), check.FailureCount)
 
 		require.NoError(t, repo.CheckSucceeded(t.Context(), tx, "p", "a", check.AuthCheck))
-		require.False(t, check.VerifiedAt.IsZero())
+		require.False(t, check.LastVerifiedAt.IsZero())
 
 		// CheckSucceeded does not reset failure_count (current intended behaviour).
 		stored, err := repo.Get(t.Context(), tx, "p", "a")
 		require.NoError(t, err)
 		storedCheck, ok := stored.CheckByType(domain.AuthCheckTypePassword)
 		require.True(t, ok)
-		require.False(t, storedCheck.Check().VerifiedAt.IsZero())
+		require.False(t, storedCheck.Check().LastVerifiedAt.IsZero())
 		require.Equal(t, uint8(2), storedCheck.Check().FailureCount)
 	})
 }

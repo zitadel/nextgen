@@ -31,6 +31,16 @@ type AuthAttempt struct {
 	TimeToLive *time.Duration
 }
 
+func CheckAs[T AuthChecker](attempt *AuthAttempt, typ AuthCheckType) (T, bool) {
+	check, ok := attempt.CheckByType(typ)
+	if !ok {
+		var zero T
+		return zero, false
+	}
+	typedCheck, ok := check.(T)
+	return typedCheck, ok
+}
+
 func (a *AuthAttempt) IsExpired() bool {
 	if a.CreatedAt.IsZero() || a.TimeToLive == nil {
 		return false
@@ -42,7 +52,7 @@ func (a *AuthAttempt) IsCompleted() bool {
 	// An auth attempt is completed if all required checks are verified successfully.
 	for _, requiredCheck := range a.RequiredChecks {
 		check, ok := a.CheckByType(requiredCheck)
-		if !ok || check.Check().VerifiedAt.IsZero() {
+		if !ok || check.Check().LastVerifiedAt.IsZero() {
 			return false
 		}
 	}
@@ -60,22 +70,25 @@ func (a *AuthAttempt) CheckByType(typ AuthCheckType) (AuthChecker, bool) {
 }
 
 type AuthAttemptRepository interface {
+	AuthAttemptCheckRepository
+
+	// Get a single AuthAttempt by its ID and project ID.
 	Get(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string) (*AuthAttempt, error)
+	// Creates
 	Create(ctx context.Context, client database.QueryExecutor, authAttempt *AuthAttempt) error
 	Delete(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string) error
 
-	SetCheck(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string, checker AuthChecker) error
-	// CheckSucceeded sets a check to succeeded.
-	// The repository MUST set the [AuthCheck.VerifiedAt] field of the check to the current time and store the value accordingly.
-	// TODO(adlerhurst): do we need to set [AuthCheck.Factor] to the current value?
-	// TODO(adlerhurst): do we need to reset [AuthCheck.LastFailedAt] and [AuthCheck.FailureCount] when a check is set to succeeded?
-	CheckSucceeded(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string, check *AuthCheck) error
-	// CheckFailed sets a check to failed.
-	// The repository MUST set the [AuthCheck.LastFailedAt] field of the check to the current time and increment the [AuthCheck.FailureCount] field by 1, and store the values accordingly.
-	// TODO(adlerhurst): do we need to reset [AuthCheck.VerifiedAt] when a check is set to failed?
-	// TODO(adlerhurst): do we need to provide options to set [AuthCheck.VerifiedAt], [AuthCheck.LastFailedAt], and [AuthCheck.FailureCount]?
-	CheckFailed(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string, check *AuthCheck) error
-
 	Complete(ctx context.Context, client database.QueryExecutor, check *AuthAttempt) error
 	Handoff(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID, sessionID string) error
+}
+
+type AuthAttemptCheckRepository interface {
+	// payload (and sets challenged at to now, resets failure count and last failed at to now)
+	SetChallenge(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string, check AuthChallenger) error
+	// sets factor payload (and sets challenged at to now, resets failure count and last failed at to now)
+	// remove current challenge payload, but keep the challenged at time.
+	ChallengeSucceeded(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string, check *AuthCheck) error
+	// CheckFailed sets a check to failed.
+	// The repository MUST set the [AuthCheck.LastFailedAt] field of the check to the current time and increment the [AuthCheck.FailureCount] field by 1, and store the values accordingly.
+	ChallengeFailed(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string, check *AuthCheck) error
 }
