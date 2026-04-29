@@ -19,6 +19,12 @@ properties:
       When omitted, the latest version is used.
     pattern: '^\d+\.\d+\.\d+$'
     example: "1.0.0"
+  challenge_nonce:
+    type: string
+    description: |
+      Origin-bound nonce obtained from `POST /bootstrap/challenge`.
+      Binds the flow to the browser that requested it, preventing
+      cross-origin replay of flow cookies.
   session_id:
     type: string
     description: |
