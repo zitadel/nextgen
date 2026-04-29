@@ -100,7 +100,7 @@ sequenceDiagram
     participant Atoms as <zl-*> Atoms
 
     App->>ZL: Mounts component
-    ZL->>ZL: POST /v1/flows → receives capabilities + template
+    ZL->>ZL: POST /flows → receives capabilities + template
     ZL->>ZL: Loads locale dictionary (en.ts)
     ZL->>Liquid: Parse template string + inject capabilities as context
     Liquid->>Liquid: Resolve {{ field.text_key | t }} via translation filter
@@ -109,7 +109,7 @@ sequenceDiagram
     ZL->>ZL: Inject HTML into Shadow DOM
     ZL->>Atoms: Browser upgrades <zl-field>, <zl-submit>, etc.
     Atoms-->>ZL: User interacts → dispatches CustomEvent
-    ZL->>ZL: POST /v1/flows/{id}/submit → receives next step
+    ZL->>ZL: POST /flows/{id}/submit → receives next step
     ZL->>Liquid: Re-render with new capabilities
 ```
 
@@ -212,7 +212,7 @@ loop:
   if step.type == "complete" and step.behavior == "continue":
     // Server already auto-pivoted (e.g. registration done → back to login).
     // Fetch the next step from the already-advanced state machine.
-    response = GET /v1/flows/{session_id}
+    response = GET /flows/{session_id}
     continue
 
   // Render the step — including "complete" steps with behavior "show",
@@ -552,7 +552,7 @@ sequenceDiagram
     Note over User,DB: AUTO-PIVOT → Back to Login
     Frontend->>Server: GET /flows/{session_id}
     Note right of Server: Session has user + password
-    Note right of Server: Policy check: acr meets requested level
+    Note right of Server: Policy check: assurance_levels[] includes requested level
     Server-->>Frontend: complete (behavior: redirect)
     Frontend->>User: Redirect to app
 ```

@@ -34,7 +34,7 @@ Defines fields:                 References fields:                Reads schema a
   password                         [phone] (skippable)              determines assurance level
   x-auth-methods:
     password: enabled            Builds UINodes from               Returns decision:
-    passkey: enabled               schema field metadata             assurance_levels decision
+    passkey: enabled               schema field metadata             assurance decision
     sso: enabled
 ```
 

@@ -44,7 +44,7 @@ paths:
       - $ref: "#/components/parameters/projectId"
       - $ref: "#/components/parameters/environment"
 
-    put:
+    patch:
       operationId: uploadConfig
       summary: Upload resolved configuration for an environment
       description: |

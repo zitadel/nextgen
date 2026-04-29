@@ -52,12 +52,12 @@ Core nouns used across the API. Full endpoint map in [`api/resource-map.md`](api
 | **app_group** | A bundle of related apps that share a role/grant container. **LOCKED rename** from today's "project" (the authz container — not the tenant). |
 | **idp** | External identity provider the project federates **to**. Zitadel acts as OIDC/SAML client downstream. |
 | **user** | See §1. Identity inside a project. |
-| **session** | Durable post-auth container, carries verified factors and `assurance_levels[]` (all currently satisfied assurance levels). Produced by a completed auth_attempt. Detail in [`flowengine/session-api.md`](flowengine/session-api.md). |
+| **session** | Durable post-auth container, carries verified factors and every currently satisfied `assurance_levels[]` value. Produced by a completed auth_attempt. Detail in [`flowengine/session-api.md`](flowengine/session-api.md). |
 | **grant** | Explicit access record (user ↔ app, team ↔ project, member ↔ role). |
 | **role** | Named permission bundle inside an app_group. |
 | **team_membership** | First-class resource binding a user to a team with roles. The unified membership resource (there are no other membership kinds). |
 | **auth_attempt** | Ephemeral state machine driving a single authentication attempt. Exposes *auth primitives* (challenges, verify, handoff). OIDC context is owned by the OIDC adapter (`auth_requests`), not by auth_attempt. Long-form in [`api/authn-and-auth-flows.md`](api/authn-and-auth-flows.md). |
-| **session_handoff** | Short-lived, audience-bound exchange record produced by `POST /auth_attempts/{id}/handoff`, consumed by `POST /session_handoffs/{id}/exchange`. |
+| **handoff_token** | Short-lived, audience-bound token produced by `POST /auth_attempts/{id}/handoff`, consumed by `POST /sessions/exchange`. |
 | **challenge** | A single-factor challenge (password prompt, OTP, passkey, OIDC redirect) issued inside an auth_attempt. |
 | **bootstrap** | The `/bootstrap/*` endpoint family. Two distinct concepts share the prefix: *project bootstrap* (`POST /projects` for anonymous project creation — see [`platform/claim-flow.md`](platform/claim-flow.md)) and *challenge bootstrap* (`POST /bootstrap/challenge` for origin-bound browser nonces — see [`api/authn-and-auth-flows.md`](api/authn-and-auth-flows.md)). |
 | **claim** | The transaction that attaches a team (in the platform project) and an accountable human to a customer project. Free. Forced at first production deploy. See [`platform/claim-flow.md`](platform/claim-flow.md). |
@@ -113,7 +113,7 @@ Four independent axes the system moves on.
 | `sk_org_…` | **`sk_team_…`** | One team-scoped service token prefix. |
 | `zp_…` | **`sk_proj_…`** | Pre-claim anonymous secret is `sk_proj_` with `pre_claim: true`. |
 | `zpp_…` | **`sk_proj_…`** (origin-scoped) | Origin-scoped variant for preview deploys. |
-| `/v1/…` path prefix | **no version segment** | Versioning via header only. |
+| path version segment | **no version segment** | Versioning via header only. |
 
 ### "Instance" disambiguation
 

@@ -18,42 +18,25 @@ var (
 	isMigrated bool
 )
 
+func init() {
+	database.MustRegisterDialect(Name, DecodeConfig)
+	database.MustRegisterDialect("pg", DecodeConfig)
+}
+
 type Config struct {
 	*pgxpool.Config
-	*pgxpool.Pool
-
-	// Host               string
-	// Port               int32
-	// Database           string
-	// MaxOpenConns       uint32
-	// MaxIdleConns       uint32
-	// MaxConnLifetime    time.Duration
-	// MaxConnIdleTime    time.Duration
-	// User               User
-	// // Additional options to be appended as options=<Options>
-	// // The value will be taken as is. Multiple options are space separated.
-	// Options string
-
-	// configuredFields []string
 }
 
 // Connect implements [database.Connector].
 func (c *Config) Connect(ctx context.Context) (database.Pool, error) {
-	pool, err := c.getPool(ctx)
+	pool, err := pgxpool.NewWithConfig(ctx, c.Config)
 	if err != nil {
 		return nil, wrapError(err)
 	}
 	if err = pool.Ping(ctx); err != nil {
 		return nil, wrapError(err)
 	}
-	return &pgxPool{Pool: pool}, nil
-}
-
-func (c *Config) getPool(ctx context.Context) (*pgxpool.Pool, error) {
-	if c.Pool != nil {
-		return c.Pool, nil
-	}
-	return pgxpool.NewWithConfig(ctx, c.Config)
+	return &Pool{Pool: pool}, nil
 }
 
 func NameMatcher(name string) bool {

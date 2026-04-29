@@ -3,25 +3,10 @@ info:
   title: Zitadel Session API
   version: 1.0.0-draft
   description: |
-    Session read model and anonymous session pre-creation.
-
-    Sessions are assurance-aware: they accumulate verified factors and expose
-    the current assurance levels computed from those factors.
-
-    Default profile examples use NIST-referenced identifiers (`urn:nist:aal:*`).
-    Deployments may add other profile packs and custom assurance schemas.
-
-    **Sessions are never mutated directly by a client.** Factor proofs are
-    submitted via the `auth_attempts` state machine:
-      POST /auth_attempts
-      POST /auth_attempts/{id}/challenges
-      POST /auth_attempts/{id}/challenges/{cid}/verify
-      POST /auth_attempts/{id}/handoff
-      POST /session_handoffs/{id}/exchange  → returns session + session_token
-
-    `POST /sessions` creates an anonymous session shell (no user, no factors)
-    for cases where a session_id must be pre-allocated before auth begins.
-    See session-api.md for the full lifecycle.
+    Low-level session primitive for durable post-auth state.
+    Sessions are assurance-aware read models: auth_attempts write verified
+    factors, and sessions expose every currently satisfied assurance level
+    through assurance_levels[].
 
 servers:
   - url: https://{region}.zitadel.cloud
@@ -36,8 +21,8 @@ tags:
 paths:
   /sessions:
     post:
-      operationId: createAnonymousSession
-      summary: Create an anonymous session shell
+      operationId: createSession
+      summary: Create an optional anonymous pre-auth session shell
       description: |
         Pre-allocates a session_id before authentication begins. The session
         starts with no user and no factors (state: building). A subsequent
@@ -56,7 +41,7 @@ paths:
               $ref: "#/components/schemas/CreateSessionRequest"
       responses:
         "201":
-          description: Anonymous session created
+          description: Session created
           content:
             application/json:
               schema:
@@ -94,6 +79,46 @@ paths:
               schema:
                 $ref: "#/components/schemas/ListSessionsResponse"
 
+  /sessions/exchange:
+    post:
+      operationId: exchangeHandoff
+      summary: Exchange a handoff token for a session
+      description: |
+        Consumes a one-time handoff_token minted by
+        POST /auth_attempts/{id}/handoff. The exchange creates a new
+        authenticated session, upgrades an anonymous session shell, or performs
+        step-up on an existing session referenced by the auth_attempt.
+      tags: [Sessions]
+      security:
+        - secretAuth: []
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          description: |
+            Optional retry key for Category B idempotency. Retries within the
+            handoff exchange window return the cached session payload without
+            consuming the one-time handoff token again.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HandoffExchangeRequest"
+      responses:
+        "200":
+          description: Handoff exchanged for a session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionExchangeResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "410":
+          $ref: "#/components/responses/Gone"
+
   /sessions/{sessionId}:
     parameters:
       - $ref: "#/components/parameters/sessionId"
@@ -116,7 +141,7 @@ paths:
 
     delete:
       operationId: revokeSession
-      summary: Revoke a session (logout)
+      summary: Revoke a session
       tags: [Sessions]
       security:
         - sessionToken: []
@@ -140,10 +165,11 @@ components:
     sessionToken:
       type: http
       scheme: bearer
-      description: |
-        Session token. Issued on POST /sessions (anonymous) and refreshed on
-        POST /session_handoffs/{id}/exchange (authenticated). Use the most
-        recently received token.
+      description: Session token returned on creation or handoff exchange
+    secretAuth:
+      type: http
+      scheme: bearer
+      description: Project secret used by a backend to exchange handoff tokens
 
   schemas:
     CreateSessionRequest:
@@ -159,6 +185,25 @@ components:
         user_agent:
           $ref: "#/components/schemas/UserAgent"
 
+    HandoffExchangeRequest:
+      type: object
+      required: [handoff_token]
+      properties:
+        handoff_token:
+          type: string
+          example: htok_abc123
+
+    SessionExchangeResponse:
+      type: object
+      required: [session, session_token]
+      properties:
+        session:
+          $ref: "#/components/schemas/SessionResponse"
+        session_token:
+          type: string
+          description: Token for reading or revoking the returned session.
+          example: tok_xyz789
+
     SessionResponse:
       type: object
       required: [session_id, session_token, state, factors, assurance_levels]
@@ -166,13 +211,6 @@ components:
         session_id:
           type: string
           example: sess_abc123
-        session_token:
-          type: string
-          description: |
-            Bearer token for session-scoped operations (DELETE).
-            Issued on POST /sessions and refreshed on handoff exchange.
-            Replace this value whenever a newer token is received.
-          example: stok_xyz789
         state:
           type: string
           enum: [building, active, expired, revoked]
@@ -223,9 +261,6 @@ components:
         phishing_resistant:
           type: boolean
           description: Whether the authenticator provides verifier impersonation resistance
-        user_verified:
-          type: boolean
-          description: Whether the authenticator performed user verification (PIN, biometric)
 
     UserAgent:
       type: object
@@ -263,8 +298,14 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/Error"
-    ValidationError:
-      description: Request validation failed
+    Unauthorized:
+      description: Missing or invalid credential
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Gone:
+      description: Handoff token expired or already consumed
       content:
         application/json:
           schema:

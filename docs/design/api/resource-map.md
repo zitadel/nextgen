@@ -117,7 +117,7 @@ GET  /auth_attempts/{id}
 POST /auth_attempts/{id}/challenges
 POST /auth_attempts/{id}/challenges/{challenge_id}/verify
 POST /auth_attempts/{id}/handoff
-POST /session_handoffs/{id}/exchange
+POST /sessions/exchange
 ```
 
 ---
@@ -131,7 +131,9 @@ GET    /sessions/{id}
 DELETE /sessions/{id}                    # logout
 ```
 
-Sessions carry factors + ACR. Detail in [`../flowengine/session-api.md`](../flowengine/session-api.md).
+Sessions carry factors + `assurance_levels[]`. Clients read and revoke
+sessions; factor changes flow through `auth_attempts`. Detail in
+[`../flowengine/session-api.md`](../flowengine/session-api.md).
 
 ---
 
@@ -149,14 +151,14 @@ POST /flows/{session_id}/event
 Flow definition management (uploaded via `npx zitadel push`):
 
 ```http
-POST   /flow_definitions
-GET    /flow_definitions/{id}
-PATCH  /flow_definitions/{id}
-DELETE /flow_definitions/{id}
-POST   /flow_definitions/{id}/activate
-POST   /flow_definitions/{id}/archive
-POST   /flow_definitions/{id}/validate
-POST   /flow_definitions/{id}/simulate
+POST   /flow-definitions
+GET    /flow-definitions/{id}
+PATCH  /flow-definitions/{id}
+DELETE /flow-definitions/{id}
+POST   /flow-definitions/{id}/activate
+POST   /flow-definitions/{id}/archive
+POST   /flow-definitions/{id}/validate
+POST   /flow-definitions/{id}/simulate
 ```
 
 ---
@@ -253,9 +255,9 @@ Quick lookup for which project a given use case targets.
 
 ---
 
-## OpenAPI specs
+## Draft API specs
 
-The source of truth for request/response shapes:
+Draft request/response sketches for this design PR:
 
 - [`../platform/api/claim-api.yaml`](../platform/api/claim-api.yaml) — projects, claim, team domain-match.
 - [`../platform/api/config-api.yaml`](../platform/api/config-api.yaml) — `npx zitadel push` upload, capability manifest, drift.
@@ -263,6 +265,9 @@ The source of truth for request/response shapes:
 - [`../flowengine/api/session-api.yaml`](../flowengine/api/session-api.yaml) — sessions.
 
 auth_attempts, api_keys (flat), events, audit_events, imports, capabilities: **TODO — not yet specified.**
+
+Implementation OpenAPI source remains under `api/openapi/**`; generated Go code
+continues to come from that source, not from these design sketches.
 
 > **OPEN:** OpenAPI server variable. `{region}` matches claim-api.yaml but reads awkwardly for single-node self-hosted. `{host}` is a candidate.
 

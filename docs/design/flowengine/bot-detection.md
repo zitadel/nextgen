@@ -12,7 +12,7 @@ Bot detection is a **first-class, composable subsystem** — not an afterthought
 2. **Pluggable providers.** Admins can configure third-party captcha services (reCAPTCHA, hCaptcha, Cloudflare Turnstile) via `x-captcha.provider`. The captcha interface is provider-agnostic.
 3. **Composable signals.** Captcha is one of several signals. The risk evaluator fuses them into a single `RiskResult`.
 4. **Risk-based activation.** Captcha is not always-on. The policy engine decides when to require it.
-5. **Works in both paths.** Flow engine injects captcha steps dynamically, and direct clients can request/verify captcha through `auth_attempts`.
+5. **Works in both paths.** Flow engine injects captcha steps dynamically. Direct clients drive the same captcha challenge through `auth_attempts` when risk evaluation demands it.
 
 ## Signal Architecture
 
@@ -187,17 +187,19 @@ Three modes:
 
 3. **Invisible assessment** — a `policy_check` step evaluates risk. Low score → skip. High score → inject captcha.
 
-## Integration: Policy + auth_attempts
+## Integration: Auth Attempts
 
-When risk is elevated, the policy engine requires captcha before flow completion. The captcha signal does not raise session `assurance_levels[]` — it is a bot-defense gate, not an assurance factor.
+When the risk evaluator flags an auth attempt, the policy engine requires a
+captcha challenge. The captcha proof does not affect the session's
+`assurance_levels[]` — it is a bot-detection gate, not an authentication factor.
 
-The client path is:
-1. Policy/flow indicates captcha is required
-2. Client obtains captcha challenge through the current `auth_attempt`
-3. Client solves the challenge (widget or PoW depending on provider)
-4. Client submits captcha proof via the current `auth_attempt`
+The client:
+1. Receives a flow step or policy response requiring `"captcha"`
+2. Requests a challenge: `POST /auth_attempts/{id}/challenges { "method": "captcha" }`
+3. Solves the challenge client-side (widget or PoW depending on configured provider)
+4. Submits the proof: `POST /auth_attempts/{id}/challenges/{cid}/verify { "captcha": { ... } }`
 
-Sessions remain read-oriented; they are not directly mutated for captcha handling.
+Captcha is a standard challenge type — no special-case API.
 
 ## Risk Evaluation Event
 

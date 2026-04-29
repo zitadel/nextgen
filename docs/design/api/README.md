@@ -45,9 +45,10 @@ Individual decisions are marked inline in each doc:
 - **flowengine/** is the UI-orchestration layer that runs *on top of* the auth primitives in [`authn-and-auth-flows.md`](authn-and-auth-flows.md). Flows decide *which step renders when*; auth_attempts expose the primitives flows call into.
 - **platform/** is the customer-lifecycle layer: how a project comes into being anonymously, how it attaches to a Team at claim, how `zitadel.json` configures it from source control.
 
-## OpenAPI source of truth
+## Draft API specs
 
-The design docs describe intent and invariants. Request/response shapes live in:
+The design docs describe intent and invariants. Draft request/response sketches
+for this design PR live in:
 
 - [`../platform/api/claim-api.yaml`](../platform/api/claim-api.yaml)
 - [`../platform/api/config-api.yaml`](../platform/api/config-api.yaml)
@@ -55,3 +56,5 @@ The design docs describe intent and invariants. Request/response shapes live in:
 - [`../flowengine/api/session-api.yaml`](../flowengine/api/session-api.yaml)
 
 Specs for auth_attempts, flat api_keys, events, audit_events, imports, and capabilities are not yet written.
+Implementation OpenAPI source remains under `api/openapi/**`; generated Go code
+continues to come from that source, not from these design sketches.

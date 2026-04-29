@@ -1,7 +1,7 @@
 # Flow Engine
 
 > **Status:** Draft
-> **See also:** [Overview](README.md) · [Step Response Shape](flow-engine-nodes.md) · [Storage](flow-engine-storage.md) · [OpenAPI spec](api/flow-api.yaml) · [Glossary](../glossary.md) · [auth_attempts (primitives layer)](../api/authn-and-auth-flows.md)
+> **See also:** [Overview](README.md) · [Step Response Shape](flow-engine-nodes.md) · [Storage](flow-engine-storage.md) · [API sketch](api/flow-api.yaml) · [Glossary](../glossary.md) · [auth_attempts (primitives layer)](../api/authn-and-auth-flows.md)
 
 The flow engine is a **server-side state machine** that produces **Capability payloads** (semantic descriptions of fields, actions, and gates) alongside a **LiquidJS template** for rendering. It does **not** hold authentication primitives; those live in [`auth_attempts`](../api/authn-and-auth-flows.md). A flow step that says "collect password" internally calls the auth_attempt challenge/verify primitives, but `/flows/{session_id}` remains the flow engine's session-scoped UI handle rather than an alias for `auth_attempt_id`.
 
@@ -118,7 +118,7 @@ When `behavior` is `continue`, the frontend calls `GET /flows/{session_id}` to g
 
 | Purpose | Completion condition |
 |---|---|
-| `login` / `reauth` | `policy_check` confirms session `assurance_levels[]` meets the target (from `acr_values` or app default) |
+| `login` / `reauth` | `policy_check` confirms session `assurance_levels[]` includes the target (from `acr_values` or app default) |
 | `register` | `action` step creates user + session; `policy_check` confirms |
 | `recovery` | `action` step resets credential |
 | `profiling` | `policy_check` confirms user has required fields |

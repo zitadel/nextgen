@@ -110,7 +110,7 @@ Listing happens under the scope that owns them (`GET /projects/{id}/api_keys`, `
 
 For SSR embedding, the lit component completes auth in-browser and hands the customer's backend a short-lived `handoff_token` to exchange for a real session. Requirements:
 
-- **Single-use**, enforced via atomic DB/Redis operation (`GETDEL`-equivalent).
+- **Single-use**, enforced with an atomic SQL-backed consume operation. A distributed cache can be added later if measured traffic needs it.
 - **TTL ≤ 60 seconds.**
 - **Audience-bound.** The exchange call requires an `sk_proj_…` whose project ID cryptographically matches the handoff's minted project.
 - **Idempotency-safe for retries.** If the exchange burns the token but the response gets dropped in flight, the backend's retry with the same `Idempotency-Key` **must return the cached session payload**, not a "token already used" error. Otherwise packet loss = user locked out. The idempotency window here is ~5 minutes; outside that window, the normal "token burned" error returns. See [`conventions.md`](conventions.md#idempotency) for Category B semantics.
@@ -118,8 +118,8 @@ For SSR embedding, the lit component completes auth in-browser and hands the cus
 The endpoint pair:
 
 ```http
-POST /auth_attempts/{id}/handoff            # mints { handoff_token, exchange_url }
-POST /session_handoffs/{id}/exchange        # consumes handoff_token, returns { session, session_token }
+POST /auth_attempts/{id}/handoff            # mints a handoff_token
+POST /sessions/exchange                     # consumes it, returns a session
 ```
 
 Detail in [`authn-and-auth-flows.md`](authn-and-auth-flows.md).
