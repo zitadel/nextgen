@@ -1,27 +1,7 @@
 <template>
-  <main class="center">
-    <ClientOnly>
-      <nextgen-login proxy-base="/__nextgen" @nextgen-signin="onSignIn" />
-    </ClientOnly>
+  <main style="padding: 48px; max-width: 600px; margin: 0 auto">
+    <h1 style="font-size: 24px; font-weight: 700">Home</h1>
+    <p style="color: #6b7280">This page is public.</p>
+    <a href="/admin" style="color: #6366f1">Go to Admin</a>
   </main>
 </template>
-
-<script setup lang="ts">
-import "@nextgen/ui-lit";
-
-function onSignIn(e: Event) {
-  console.log("signed in", (e as CustomEvent).detail);
-  navigateTo("/dashboard");
-}
-</script>
-
-<style scoped>
-.center {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  background: #f3f4f6;
-}
-</style>

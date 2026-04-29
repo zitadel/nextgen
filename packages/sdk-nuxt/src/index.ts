@@ -1,3 +1,3 @@
 export { NextgenLogin } from "@nextgen/ui-lit";
-export { createNextgenProxyHandler, createNextgenAuthMiddleware } from "./server.js";
-export type { NextgenNuxtConfig } from "./server.js";
+export { createNextgenMiddleware, getAuth } from "./server.js";
+export type { NextgenModuleOptions, AuthResult } from "./runtime/types.js";

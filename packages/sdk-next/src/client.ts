@@ -1,3 +1,11 @@
-// Re-export the web component so Next.js apps can import it from one place.
-// Import this module inside a 'use client' boundary to register the custom element.
+/**
+ * Re-exports the `<nextgen-login>` Lit web component for use in Next.js apps.
+ *
+ * Import this inside a `"use client"` boundary to register the custom element:
+ *
+ * ```ts
+ * "use client";
+ * import "@zitadel/sdk-next/client";
+ * ```
+ */
 export { NextgenLogin } from "@nextgen/ui-lit";

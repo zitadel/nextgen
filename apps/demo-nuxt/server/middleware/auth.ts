@@ -1,10 +1,9 @@
-import { createNextgenAuthMiddleware } from "@nextgen/sdk-nuxt/server";
+import { createNextgenMiddleware } from "@nextgen/sdk-nuxt/server";
 
-const { nextgenBackendUrl, nextgenSecretKey } = useRuntimeConfig();
+const { nextgenIssuerUrl } = useRuntimeConfig();
 
-export default createNextgenAuthMiddleware({
-  backendUrl: nextgenBackendUrl as string,
-  secretKey: nextgenSecretKey as string,
-  protectedRoutes: ["/dashboard", "/dashboard/*"],
-  signInUrl: "/",
+export default createNextgenMiddleware({
+  issuerUrl: nextgenIssuerUrl as string,
+  protectedRoutes: ["/admin", "/admin/*"],
+  loginPath: "/login",
 });
