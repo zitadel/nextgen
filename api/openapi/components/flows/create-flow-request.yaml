@@ -4,6 +4,21 @@ properties:
   purpose:
     type: string
     enum: [login, register, recovery, profiling, reauth, link_account]
+  slug:
+    type: string
+    pattern: '^[a-z][a-z0-9-]*$'
+    description: |
+      Human-readable identifier of a specific flow definition to use.
+      When omitted, the engine selects the best-matching definition
+      based on purpose + audience context.
+    example: custom-login
+  schema_version:
+    type: string
+    description: |
+      Semver version of the flow definition JSON Schema to use.
+      When omitted, the latest version is used.
+    pattern: '^\d+\.\d+\.\d+$'
+    example: "1.0.0"
   session_id:
     type: string
     description: |
