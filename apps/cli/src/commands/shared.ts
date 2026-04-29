@@ -31,7 +31,10 @@ export async function readZitadelConfig(cwd: string): Promise<Record<string, unk
 
 export async function readZitadelSecret(cwd: string): Promise<ZitadelSecret> {
   try {
-    const secret = parseJsonObject(await readFile(join(cwd, ".zitadel/secret"), "utf8"), ".zitadel/secret");
+    const secret = parseJsonObject(
+      await readFile(join(cwd, ".zitadel/secret"), "utf8"),
+      ".zitadel/secret",
+    );
     if (
       typeof secret.project_id !== "string" ||
       typeof secret.project_secret !== "string" ||
@@ -68,5 +71,10 @@ export function schemaVersionFromConfig(config: Record<string, unknown>): string
 }
 
 function isNotFound(error: unknown): boolean {
-  return typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "ENOENT";
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: string }).code === "ENOENT"
+  );
 }

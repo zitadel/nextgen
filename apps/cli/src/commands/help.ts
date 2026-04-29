@@ -31,7 +31,10 @@ async function renderRootHelp(io: CliIO, opts: GlobalOptions): Promise<void> {
   }
 
   writePretty(io, `zitadel ${CLI_VERSION}`);
-  writePretty(io, "Agent-friendly Zitadel CLI. Ships JSON envelopes for agents and pretty output for humans.");
+  writePretty(
+    io,
+    "Agent-friendly Zitadel CLI. Ships JSON envelopes for agents and pretty output for humans.",
+  );
   writePretty(io, "");
   writePretty(io, "Usage: zitadel <command> [flags]");
   writePretty(io, "");
@@ -49,7 +52,11 @@ async function renderCommandHelp(io: CliIO, opts: GlobalOptions, target: string)
   const spec = findCommandSpec(target);
   if (!spec) {
     if (opts.json) {
-      ok(io, { title: "unknown-command", target, commands: COMMANDS.map((command) => command.name) }, opts);
+      ok(
+        io,
+        { title: "unknown-command", target, commands: COMMANDS.map((command) => command.name) },
+        opts,
+      );
       return;
     }
     writePretty(io, `Unknown command "${target}". Run \`zitadel help\`.`);

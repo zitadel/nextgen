@@ -9,16 +9,16 @@ type AuthorizeGetRes interface {
 	authorizeGetRes()
 }
 
-type CreateSchemaRes interface {
-	createSchemaRes()
-}
-
-type CreateSchemaRevisionRes interface {
-	createSchemaRevisionRes()
+type CreateFlowRes interface {
+	createFlowRes()
 }
 
 type EndSessionRes interface {
 	endSessionRes()
+}
+
+type GetFlowStepRes interface {
+	getFlowStepRes()
 }
 
 type GetHealthRes interface {
@@ -41,18 +41,6 @@ type GetReadyRes interface {
 	getReadyRes()
 }
 
-type GetSchemaByIdRes interface {
-	getSchemaByIdRes()
-}
-
-type GetSchemaReleaseStateRes interface {
-	getSchemaReleaseStateRes()
-}
-
-type GetSchemaRevisionByIdRes interface {
-	getSchemaRevisionByIdRes()
-}
-
 type GetTokenRes interface {
 	getTokenRes()
 }
@@ -73,6 +61,6 @@ type RevokeTokenRes interface {
 	revokeTokenRes()
 }
 
-type UpdateSchemaReleaseStateRes interface {
-	updateSchemaReleaseStateRes()
+type SubmitFlowStepRes interface {
+	submitFlowStepRes()
 }

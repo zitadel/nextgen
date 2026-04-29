@@ -1006,71 +1006,6 @@ func decodeAuthorizeGetParams(args [0]string, argsEscaped bool, r *http.Request)
 	return params, nil
 }
 
-// CreateSchemaRevisionParams is parameters of createSchemaRevision operation.
-type CreateSchemaRevisionParams struct {
-	ID string
-}
-
-func unpackCreateSchemaRevisionParams(packed middleware.Parameters) (params CreateSchemaRevisionParams) {
-	{
-		key := middleware.ParameterKey{
-			Name: "id",
-			In:   "path",
-		}
-		params.ID = packed[key].(string)
-	}
-	return params
-}
-
-func decodeCreateSchemaRevisionParams(args [1]string, argsEscaped bool, r *http.Request) (params CreateSchemaRevisionParams, _ error) {
-	// Decode path: id.
-	if err := func() error {
-		param := args[0]
-		if argsEscaped {
-			unescaped, err := url.PathUnescape(args[0])
-			if err != nil {
-				return errors.Wrap(err, "unescape path")
-			}
-			param = unescaped
-		}
-		if len(param) > 0 {
-			d := uri.NewPathDecoder(uri.PathDecoderConfig{
-				Param:   "id",
-				Value:   param,
-				Style:   uri.PathStyleSimple,
-				Explode: false,
-			})
-
-			if err := func() error {
-				val, err := d.DecodeValue()
-				if err != nil {
-					return err
-				}
-
-				c, err := conv.ToString(val)
-				if err != nil {
-					return err
-				}
-
-				params.ID = c
-				return nil
-			}(); err != nil {
-				return err
-			}
-		} else {
-			return validate.ErrFieldRequired
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "id",
-			In:   "path",
-			Err:  err,
-		}
-	}
-	return params, nil
-}
-
 // EndSessionParams is parameters of endSession operation.
 type EndSessionParams struct {
 	// The client ID is the identifier for the client application that is making
@@ -1413,12 +1348,24 @@ func decodeEndSessionParams(args [0]string, argsEscaped bool, r *http.Request) (
 	return params, nil
 }
 
-// GetSchemaByIdParams is parameters of getSchemaById operation.
-type GetSchemaByIdParams struct {
+// GetFlowStepParams is parameters of getFlowStep operation.
+type GetFlowStepParams struct {
+	// Flow ID returned by POST /flow or the latest POST /flow/{id}/submit.
+	// Used to look up the correct flow state from the encrypted cookie,
+	// which can hold multiple concurrent flows. May change between responses
+	// when a flow pivot or pop occurs — always use the `id` from the latest response.
 	ID string
+	// Encrypted flow state cookie set by `POST /flow` or the previous
+	// `POST /flow/{id}/submit`. The cookie holds a map of flow states keyed
+	// by flow ID, allowing multiple concurrent flows in the same browser
+	// (e.g. login in one tab, registration in another). The server uses the
+	// `{id}` path parameter to look up the correct flow state from the cookie.
+	// Browsers send this automatically; non-browser clients must capture the
+	// `Set-Cookie` header and resend it.
+	Zflow string
 }
 
-func unpackGetSchemaByIdParams(packed middleware.Parameters) (params GetSchemaByIdParams) {
+func unpackGetFlowStepParams(packed middleware.Parameters) (params GetFlowStepParams) {
 	{
 		key := middleware.ParameterKey{
 			Name: "id",
@@ -1426,10 +1373,18 @@ func unpackGetSchemaByIdParams(packed middleware.Parameters) (params GetSchemaBy
 		}
 		params.ID = packed[key].(string)
 	}
+	{
+		key := middleware.ParameterKey{
+			Name: "_zflow",
+			In:   "cookie",
+		}
+		params.Zflow = packed[key].(string)
+	}
 	return params
 }
 
-func decodeGetSchemaByIdParams(args [1]string, argsEscaped bool, r *http.Request) (params GetSchemaByIdParams, _ error) {
+func decodeGetFlowStepParams(args [1]string, argsEscaped bool, r *http.Request) (params GetFlowStepParams, _ error) {
+	c := uri.NewCookieDecoder(r)
 	// Decode path: id.
 	if err := func() error {
 		param := args[0]
@@ -1475,53 +1430,14 @@ func decodeGetSchemaByIdParams(args [1]string, argsEscaped bool, r *http.Request
 			Err:  err,
 		}
 	}
-	return params, nil
-}
-
-// GetSchemaReleaseStateParams is parameters of getSchemaReleaseState operation.
-type GetSchemaReleaseStateParams struct {
-	ID         string
-	RevisionId string
-}
-
-func unpackGetSchemaReleaseStateParams(packed middleware.Parameters) (params GetSchemaReleaseStateParams) {
-	{
-		key := middleware.ParameterKey{
-			Name: "id",
-			In:   "path",
-		}
-		params.ID = packed[key].(string)
-	}
-	{
-		key := middleware.ParameterKey{
-			Name: "revisionId",
-			In:   "path",
-		}
-		params.RevisionId = packed[key].(string)
-	}
-	return params
-}
-
-func decodeGetSchemaReleaseStateParams(args [2]string, argsEscaped bool, r *http.Request) (params GetSchemaReleaseStateParams, _ error) {
-	// Decode path: id.
+	// Decode cookie: _zflow.
 	if err := func() error {
-		param := args[0]
-		if argsEscaped {
-			unescaped, err := url.PathUnescape(args[0])
-			if err != nil {
-				return errors.Wrap(err, "unescape path")
-			}
-			param = unescaped
+		cfg := uri.CookieParameterDecodingConfig{
+			Name:    "_zflow",
+			Explode: true,
 		}
-		if len(param) > 0 {
-			d := uri.NewPathDecoder(uri.PathDecoderConfig{
-				Param:   "id",
-				Value:   param,
-				Style:   uri.PathStyleSimple,
-				Explode: false,
-			})
-
-			if err := func() error {
+		if err := c.HasParam(cfg); err == nil {
+			if err := c.DecodeParam(cfg, func(d uri.Decoder) error {
 				val, err := d.DecodeValue()
 				if err != nil {
 					return err
@@ -1532,182 +1448,19 @@ func decodeGetSchemaReleaseStateParams(args [2]string, argsEscaped bool, r *http
 					return err
 				}
 
-				params.ID = c
+				params.Zflow = c
 				return nil
-			}(); err != nil {
+			}); err != nil {
 				return err
 			}
 		} else {
-			return validate.ErrFieldRequired
+			return err
 		}
 		return nil
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
-			Name: "id",
-			In:   "path",
-			Err:  err,
-		}
-	}
-	// Decode path: revisionId.
-	if err := func() error {
-		param := args[1]
-		if argsEscaped {
-			unescaped, err := url.PathUnescape(args[1])
-			if err != nil {
-				return errors.Wrap(err, "unescape path")
-			}
-			param = unescaped
-		}
-		if len(param) > 0 {
-			d := uri.NewPathDecoder(uri.PathDecoderConfig{
-				Param:   "revisionId",
-				Value:   param,
-				Style:   uri.PathStyleSimple,
-				Explode: false,
-			})
-
-			if err := func() error {
-				val, err := d.DecodeValue()
-				if err != nil {
-					return err
-				}
-
-				c, err := conv.ToString(val)
-				if err != nil {
-					return err
-				}
-
-				params.RevisionId = c
-				return nil
-			}(); err != nil {
-				return err
-			}
-		} else {
-			return validate.ErrFieldRequired
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "revisionId",
-			In:   "path",
-			Err:  err,
-		}
-	}
-	return params, nil
-}
-
-// GetSchemaRevisionByIdParams is parameters of getSchemaRevisionById operation.
-type GetSchemaRevisionByIdParams struct {
-	ID         string
-	RevisionId string
-}
-
-func unpackGetSchemaRevisionByIdParams(packed middleware.Parameters) (params GetSchemaRevisionByIdParams) {
-	{
-		key := middleware.ParameterKey{
-			Name: "id",
-			In:   "path",
-		}
-		params.ID = packed[key].(string)
-	}
-	{
-		key := middleware.ParameterKey{
-			Name: "revisionId",
-			In:   "path",
-		}
-		params.RevisionId = packed[key].(string)
-	}
-	return params
-}
-
-func decodeGetSchemaRevisionByIdParams(args [2]string, argsEscaped bool, r *http.Request) (params GetSchemaRevisionByIdParams, _ error) {
-	// Decode path: id.
-	if err := func() error {
-		param := args[0]
-		if argsEscaped {
-			unescaped, err := url.PathUnescape(args[0])
-			if err != nil {
-				return errors.Wrap(err, "unescape path")
-			}
-			param = unescaped
-		}
-		if len(param) > 0 {
-			d := uri.NewPathDecoder(uri.PathDecoderConfig{
-				Param:   "id",
-				Value:   param,
-				Style:   uri.PathStyleSimple,
-				Explode: false,
-			})
-
-			if err := func() error {
-				val, err := d.DecodeValue()
-				if err != nil {
-					return err
-				}
-
-				c, err := conv.ToString(val)
-				if err != nil {
-					return err
-				}
-
-				params.ID = c
-				return nil
-			}(); err != nil {
-				return err
-			}
-		} else {
-			return validate.ErrFieldRequired
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "id",
-			In:   "path",
-			Err:  err,
-		}
-	}
-	// Decode path: revisionId.
-	if err := func() error {
-		param := args[1]
-		if argsEscaped {
-			unescaped, err := url.PathUnescape(args[1])
-			if err != nil {
-				return errors.Wrap(err, "unescape path")
-			}
-			param = unescaped
-		}
-		if len(param) > 0 {
-			d := uri.NewPathDecoder(uri.PathDecoderConfig{
-				Param:   "revisionId",
-				Value:   param,
-				Style:   uri.PathStyleSimple,
-				Explode: false,
-			})
-
-			if err := func() error {
-				val, err := d.DecodeValue()
-				if err != nil {
-					return err
-				}
-
-				c, err := conv.ToString(val)
-				if err != nil {
-					return err
-				}
-
-				params.RevisionId = c
-				return nil
-			}(); err != nil {
-				return err
-			}
-		} else {
-			return validate.ErrFieldRequired
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "revisionId",
-			In:   "path",
+			Name: "_zflow",
+			In:   "cookie",
 			Err:  err,
 		}
 	}
@@ -1891,13 +1644,24 @@ func decodeListUsersParams(args [0]string, argsEscaped bool, r *http.Request) (p
 	return params, nil
 }
 
-// UpdateSchemaReleaseStateParams is parameters of updateSchemaReleaseState operation.
-type UpdateSchemaReleaseStateParams struct {
-	ID         string
-	RevisionId string
+// SubmitFlowEventParams is parameters of submitFlowEvent operation.
+type SubmitFlowEventParams struct {
+	// Flow ID returned by POST /flow or the latest POST /flow/{id}/submit.
+	// Used to look up the correct flow state from the encrypted cookie,
+	// which can hold multiple concurrent flows. May change between responses
+	// when a flow pivot or pop occurs — always use the `id` from the latest response.
+	ID string
+	// Encrypted flow state cookie set by `POST /flow` or the previous
+	// `POST /flow/{id}/submit`. The cookie holds a map of flow states keyed
+	// by flow ID, allowing multiple concurrent flows in the same browser
+	// (e.g. login in one tab, registration in another). The server uses the
+	// `{id}` path parameter to look up the correct flow state from the cookie.
+	// Browsers send this automatically; non-browser clients must capture the
+	// `Set-Cookie` header and resend it.
+	Zflow string
 }
 
-func unpackUpdateSchemaReleaseStateParams(packed middleware.Parameters) (params UpdateSchemaReleaseStateParams) {
+func unpackSubmitFlowEventParams(packed middleware.Parameters) (params SubmitFlowEventParams) {
 	{
 		key := middleware.ParameterKey{
 			Name: "id",
@@ -1907,15 +1671,16 @@ func unpackUpdateSchemaReleaseStateParams(packed middleware.Parameters) (params 
 	}
 	{
 		key := middleware.ParameterKey{
-			Name: "revisionId",
-			In:   "path",
+			Name: "_zflow",
+			In:   "cookie",
 		}
-		params.RevisionId = packed[key].(string)
+		params.Zflow = packed[key].(string)
 	}
 	return params
 }
 
-func decodeUpdateSchemaReleaseStateParams(args [2]string, argsEscaped bool, r *http.Request) (params UpdateSchemaReleaseStateParams, _ error) {
+func decodeSubmitFlowEventParams(args [1]string, argsEscaped bool, r *http.Request) (params SubmitFlowEventParams, _ error) {
+	c := uri.NewCookieDecoder(r)
 	// Decode path: id.
 	if err := func() error {
 		param := args[0]
@@ -1961,11 +1726,85 @@ func decodeUpdateSchemaReleaseStateParams(args [2]string, argsEscaped bool, r *h
 			Err:  err,
 		}
 	}
-	// Decode path: revisionId.
+	// Decode cookie: _zflow.
 	if err := func() error {
-		param := args[1]
+		cfg := uri.CookieParameterDecodingConfig{
+			Name:    "_zflow",
+			Explode: true,
+		}
+		if err := c.HasParam(cfg); err == nil {
+			if err := c.DecodeParam(cfg, func(d uri.Decoder) error {
+				val, err := d.DecodeValue()
+				if err != nil {
+					return err
+				}
+
+				c, err := conv.ToString(val)
+				if err != nil {
+					return err
+				}
+
+				params.Zflow = c
+				return nil
+			}); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "_zflow",
+			In:   "cookie",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
+// SubmitFlowStepParams is parameters of submitFlowStep operation.
+type SubmitFlowStepParams struct {
+	// Flow ID returned by POST /flow or the latest POST /flow/{id}/submit.
+	// Used to look up the correct flow state from the encrypted cookie,
+	// which can hold multiple concurrent flows. May change between responses
+	// when a flow pivot or pop occurs — always use the `id` from the latest response.
+	ID string
+	// Encrypted flow state cookie set by `POST /flow` or the previous
+	// `POST /flow/{id}/submit`. The cookie holds a map of flow states keyed
+	// by flow ID, allowing multiple concurrent flows in the same browser
+	// (e.g. login in one tab, registration in another). The server uses the
+	// `{id}` path parameter to look up the correct flow state from the cookie.
+	// Browsers send this automatically; non-browser clients must capture the
+	// `Set-Cookie` header and resend it.
+	Zflow string
+}
+
+func unpackSubmitFlowStepParams(packed middleware.Parameters) (params SubmitFlowStepParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "id",
+			In:   "path",
+		}
+		params.ID = packed[key].(string)
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "_zflow",
+			In:   "cookie",
+		}
+		params.Zflow = packed[key].(string)
+	}
+	return params
+}
+
+func decodeSubmitFlowStepParams(args [1]string, argsEscaped bool, r *http.Request) (params SubmitFlowStepParams, _ error) {
+	c := uri.NewCookieDecoder(r)
+	// Decode path: id.
+	if err := func() error {
+		param := args[0]
 		if argsEscaped {
-			unescaped, err := url.PathUnescape(args[1])
+			unescaped, err := url.PathUnescape(args[0])
 			if err != nil {
 				return errors.Wrap(err, "unescape path")
 			}
@@ -1973,7 +1812,7 @@ func decodeUpdateSchemaReleaseStateParams(args [2]string, argsEscaped bool, r *h
 		}
 		if len(param) > 0 {
 			d := uri.NewPathDecoder(uri.PathDecoderConfig{
-				Param:   "revisionId",
+				Param:   "id",
 				Value:   param,
 				Style:   uri.PathStyleSimple,
 				Explode: false,
@@ -1990,7 +1829,7 @@ func decodeUpdateSchemaReleaseStateParams(args [2]string, argsEscaped bool, r *h
 					return err
 				}
 
-				params.RevisionId = c
+				params.ID = c
 				return nil
 			}(); err != nil {
 				return err
@@ -2001,8 +1840,42 @@ func decodeUpdateSchemaReleaseStateParams(args [2]string, argsEscaped bool, r *h
 		return nil
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
-			Name: "revisionId",
+			Name: "id",
 			In:   "path",
+			Err:  err,
+		}
+	}
+	// Decode cookie: _zflow.
+	if err := func() error {
+		cfg := uri.CookieParameterDecodingConfig{
+			Name:    "_zflow",
+			Explode: true,
+		}
+		if err := c.HasParam(cfg); err == nil {
+			if err := c.DecodeParam(cfg, func(d uri.Decoder) error {
+				val, err := d.DecodeValue()
+				if err != nil {
+					return err
+				}
+
+				c, err := conv.ToString(val)
+				if err != nil {
+					return err
+				}
+
+				params.Zflow = c
+				return nil
+			}); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "_zflow",
+			In:   "cookie",
 			Err:  err,
 		}
 	}

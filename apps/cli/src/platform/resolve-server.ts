@@ -71,14 +71,22 @@ async function readConfig(cwd: string): Promise<Record<string, unknown> | undefi
     const contents = await readFile(join(cwd, "zitadel.json"), "utf8");
     return parseJsonObject(contents, "zitadel.json");
   } catch (error) {
-    if (typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "ENOENT") {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      (error as { code?: string }).code === "ENOENT"
+    ) {
       return undefined;
     }
     throw error;
   }
 }
 
-function readEnvServer(config: Record<string, unknown>, environment: string | undefined): string | undefined {
+function readEnvServer(
+  config: Record<string, unknown>,
+  environment: string | undefined,
+): string | undefined {
   if (!environment) return undefined;
   const envs = config.environments;
   if (!isObject(envs)) return undefined;

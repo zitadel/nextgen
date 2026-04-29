@@ -20,24 +20,33 @@ type Handler interface {
 	//
 	// GET /auth/authorize
 	AuthorizeGet(ctx context.Context, params AuthorizeGetParams) (AuthorizeGetRes, error)
-	// CreateSchema implements createSchema operation.
+	// CreateFlow implements createFlow operation.
 	//
-	// Create new schema.
+	// Resolves a flow definition based on purpose + audience context and returns
+	// the first capability step. Creates a new session implicitly unless
+	// `session_id` is provided (for step-up / reauth on an existing session).
+	// The response contains an `id` field — the flow handle. Use it as the path
+	// parameter for all subsequent `/flow/{id}/submit` and `/flow/{id}/event` calls.
+	// The response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing
+	// the flow's orchestration state (current step, collected data, history).
+	// The server is stateless between requests — all flow state lives in this
+	// cookie. The browser sends it automatically on subsequent requests.
 	//
-	// POST /schemas
-	CreateSchema(ctx context.Context, req CreateSchemaReq) (CreateSchemaRes, error)
-	// CreateSchemaRevision implements createSchemaRevision operation.
-	//
-	// Create new schema revision.
-	//
-	// POST /schemas/{id}/revisions
-	CreateSchemaRevision(ctx context.Context, req CreateSchemaRevisionReq, params CreateSchemaRevisionParams) (CreateSchemaRevisionRes, error)
+	// POST /flow
+	CreateFlow(ctx context.Context, req *CreateFlowRequest) (CreateFlowRes, error)
 	// EndSession implements endSession operation.
 	//
 	// End a session.
 	//
 	// GET /auth/end-session
 	EndSession(ctx context.Context, params EndSessionParams) (EndSessionRes, error)
+	// GetFlowStep implements getFlowStep operation.
+	//
+	// Returns the current capability step without advancing the state machine.
+	// Useful for page reloads or re-rendering after a network error.
+	//
+	// GET /flow/{id}
+	GetFlowStep(ctx context.Context, params GetFlowStepParams) (GetFlowStepRes, error)
 	// GetHealth implements getHealth operation.
 	//
 	// Check whether the server is healthy.
@@ -68,24 +77,6 @@ type Handler interface {
 	//
 	// GET /readyz
 	GetReady(ctx context.Context) (GetReadyRes, error)
-	// GetSchemaById implements getSchemaById operation.
-	//
-	// Get a schema by its ID. This will return the default revision of the schema.
-	//
-	// GET /schemas/{id}
-	GetSchemaById(ctx context.Context, params GetSchemaByIdParams) (GetSchemaByIdRes, error)
-	// GetSchemaReleaseState implements getSchemaReleaseState operation.
-	//
-	// Get the release state of a schema by its ID and revision ID.
-	//
-	// GET /schemas/{id}/revisions/{revisionId}/release-state
-	GetSchemaReleaseState(ctx context.Context, params GetSchemaReleaseStateParams) (GetSchemaReleaseStateRes, error)
-	// GetSchemaRevisionById implements getSchemaRevisionById operation.
-	//
-	// Get a schema revision by its ID.
-	//
-	// GET /schemas/{id}/revisions/{revisionId}
-	GetSchemaRevisionById(ctx context.Context, params GetSchemaRevisionByIdParams) (GetSchemaRevisionByIdRes, error)
 	// GetToken implements getToken operation.
 	//
 	// Get accesstoken.
@@ -116,16 +107,39 @@ type Handler interface {
 	//
 	// POST /auth/revoke
 	RevokeToken(ctx context.Context, req *RevokeRequest) (RevokeTokenRes, error)
-	// UpdateSchemaReleaseState implements updateSchemaReleaseState operation.
+	// SubmitFlowEvent implements submitFlowEvent operation.
 	//
-	// Update the release state of a schema by its ID and revision ID.
+	// Submits telemetry or fingerprint data from the frontend.
+	// Does not advance the state machine. Used for risk evaluation.
 	//
-	// PUT /schemas/{id}/revisions/{revisionId}/release-state
-	UpdateSchemaReleaseState(ctx context.Context, req SchemaReleaseState, params UpdateSchemaReleaseStateParams) (UpdateSchemaReleaseStateRes, error)
-	// NewError creates *ErrorDetailsStatusCode from error returned by handler.
+	// POST /flow/{id}/event
+	SubmitFlowEvent(ctx context.Context, req *FlowEventRequest, params SubmitFlowEventParams) error
+	// SubmitFlowStep implements submitFlowStep operation.
 	//
-	// Used for common default response.
-	NewError(ctx context.Context, err error) *ErrorDetailsStatusCode
+	// Submits user input for the current step. The server validates,
+	// processes (e.g., verifies a credential), advances the state machine
+	// through any invisible steps, and returns the next visible step.
+	// The response sets an updated encrypted `HttpOnly` cookie (`_zflow`)
+	// with the new flow state. The server is stateless — all orchestration
+	// state is carried in this cookie between requests.
+	// **Important:** The `id` in the response may differ from the `id` used in
+	// the request. This happens when a flow pivots (pushes a new flow onto the
+	// stack) or when a stacked flow completes (auto-pops to the parent flow).
+	// Always use the `id` from the latest response for the next request.
+	// ## Flow completion
+	// When `step.type` is `complete`, the flow is terminal. The `step.behavior`
+	// field tells the frontend what to do:
+	// | `behavior`   | Action                                                     |
+	// |------------- |------------------------------------------------------------|
+	// | `redirect`   | Navigate to `redirect_uri` (OIDC/SAML auth request done). |
+	// | `show`       | Render the step as a success screen (e.g., registration).  |
+	// A `complete` step is only returned when the **entire flow stack** is done.
+	// If a stacked flow (e.g., recovery pivoted from login) finishes, the server
+	// auto-pops to the parent flow and returns the parent's next step — the
+	// frontend never sees a `complete` for intermediate flows.
+	//
+	// POST /flow/{id}/submit
+	SubmitFlowStep(ctx context.Context, req *FlowSubmitRequest, params SubmitFlowStepParams) (SubmitFlowStepRes, error)
 }
 
 // Server implements http server based on OpenAPI v3 specification and

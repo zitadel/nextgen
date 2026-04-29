@@ -6,14 +6,14 @@ export const reactRenderer: RendererSpec = {
   displayName: "React (sdk-next bridge)",
   status: "available",
   frameworks: ["next"],
-  dependency: { name: "@zitadel/sdk-next", version: "latest" },
+  dependency: { name: "@zitadel-nextgen/sdk-next", version: "latest" },
   templates: {
     authPage(mode) {
       const componentName = mode === "login" ? "LoginPage" : "RegisterPage";
       return {
         mode,
         contents: `${MANAGED_MARKER}
-import { ZitadelFlow, type ZitadelEnvironment } from "@zitadel/sdk-next";
+import { ZitadelFlow, type ZitadelEnvironment } from "@zitadel-nextgen/sdk-next";
 
 const rawEnvironment =
   process.env.ZITADEL_ENVIRONMENT ??

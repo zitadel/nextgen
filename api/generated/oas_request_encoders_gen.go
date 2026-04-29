@@ -14,22 +14,8 @@ import (
 	"github.com/ogen-go/ogen/uri"
 )
 
-func encodeCreateSchemaRequest(
-	req CreateSchemaReq,
-	r *http.Request,
-) error {
-	const contentType = "application/json"
-	e := new(jx.Encoder)
-	{
-		req.Encode(e)
-	}
-	encoded := e.Bytes()
-	ht.SetBody(r, bytes.NewReader(encoded), contentType)
-	return nil
-}
-
-func encodeCreateSchemaRevisionRequest(
-	req CreateSchemaRevisionReq,
+func encodeCreateFlowRequest(
+	req *CreateFlowRequest,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"
@@ -270,8 +256,22 @@ func encodeRevokeTokenRequest(
 	return nil
 }
 
-func encodeUpdateSchemaReleaseStateRequest(
-	req SchemaReleaseState,
+func encodeSubmitFlowEventRequest(
+	req *FlowEventRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeSubmitFlowStepRequest(
+	req *FlowSubmitRequest,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"

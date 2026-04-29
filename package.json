@@ -1,7 +1,8 @@
 {
-  "name": "zitadel-nextgen-workspace",
+  "name": "@zitadel-nextgen/source",
+  "version": "0.0.0",
   "private": true,
-  "packageManager": "pnpm@10.33.2",
+  "license": "MIT",
   "scripts": {
     "build": "corepack pnpm -r build",
     "typecheck": "corepack pnpm -r typecheck",
@@ -9,11 +10,23 @@
     "zitadel": "node scripts/zitadel-dev.mjs"
   },
   "devDependencies": {
-    "@types/node": "^22.10.5",
-    "tsup": "^8.3.5",
-    "typescript": "^5.7.3",
-    "vitest": "^2.1.8"
+    "@nx/devkit": "catalog:",
+    "@nx/eslint-plugin": "catalog:",
+    "@nx/js": "catalog:",
+    "@nx/playwright": "catalog:",
+    "@nx/vite": "catalog:",
+    "@nx/vitest": "catalog:",
+    "@types/node": "catalog:",
+    "@typescript/native-preview": "catalog:",
+    "nx": "catalog:",
+    "oxfmt": "catalog:",
+    "oxlint": "catalog:",
+    "sharp": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
   },
+  "packageManager": "pnpm@10.33.2",
   "pnpm": {
     "onlyBuiltDependencies": [
       "esbuild",

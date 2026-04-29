@@ -2,6 +2,8 @@
 
 > **Status:** Draft
 > **Note:** The step response shape is [decided](flow-engine-nodes.md) — steps emit unordered capability dictionaries (`fields`, `actions`, `gates`) and a LiquidJS template controls layout.
+>
+> **Canonical OpenAPI spec:** [`api/openapi/openapi-spec.yaml`](../../../api/openapi/openapi-spec.yaml) — endpoints under `/flow`. Schemas in [`api/openapi/components/flows/`](../../../api/openapi/components/flows/).
 
 The flow engine is a **server-side state machine** that produces **Capability payloads** alongside a **LiquidJS template**. It is used by web/frontend clients that want a ready-made login and registration experience. Clients that want full control skip it entirely and use the Session API directly.
 
@@ -473,7 +475,7 @@ Multi-step registration spreads fields across multiple form steps. The flow engi
 }
 ```
 
-**`required_factors`** — evaluates what the session needs to reach the target ACR:
+**`required_factors`** — evaluates what the session needs to reach the target assurance level:
 
 ```json
 {
@@ -632,7 +634,7 @@ A session and a flow are different things with different lifetimes:
 | **Lifetime** | Hours to days | Seconds to minutes |
 | **Storage** | Postgres (durable) | Encrypted cookie (ephemeral) |
 | **One or many?** | One session can have many flows over time | Each flow operates on one session |
-| **What it knows** | user, factors, assurance_levels[], amr | definition, step, history, collected data |
+| **What it knows** | user, factors, assurance_levels | definition, step, history, collected data |
 
 The session accumulates factors across flows. A login flow adds `user` + `password`. A step-up flow adds `totp`. A profiling flow doesn't add factors — it collects data. Each flow is independent, but they all contribute to the same session.
 

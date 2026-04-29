@@ -47,14 +47,8 @@ jobs:
       - name: Install dependencies
         run: corepack pnpm install --frozen-lockfile
 
-      - name: Typecheck
-        run: corepack pnpm -r typecheck
-
-      - name: Test
-        run: corepack pnpm -r test
-
-      - name: Build
-        run: corepack pnpm -r build
+      - name: Node checks
+        run: corepack pnpm nx run-many -t lint,typecheck,build,test
 
   npm-pack-smoke:
     runs-on: ubuntu-latest
@@ -82,8 +76,8 @@ jobs:
 
       - name: Smoke test built CLI
         run: |
-          node apps/cli/dist/zitadel.js --version
-          node apps/cli/dist/zitadel.js capabilities --json
+          node apps/cli/dist/zitadel.mjs --version
+          node apps/cli/dist/zitadel.mjs capabilities --json
 
       - name: Dry-run npm packs
         run: |
@@ -100,7 +94,7 @@ jobs:
           ls -lh "$RUNNER_TEMP/zitadel-npm-packages"
 
       - name: Upload npm package artifacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: npm-packages
           path: ${{ runner.temp }}/zitadel-npm-packages/*.tgz
@@ -144,13 +138,13 @@ jobs:
         uses: goreleaser/goreleaser-action@v7
         with:
           distribution: goreleaser
-          version: '~> v2'
+          version: "~> v2"
           args: release --snapshot --clean --skip=publish,sign
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload GoReleaser snapshot artifacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: goreleaser-snapshot
           path: dist/**

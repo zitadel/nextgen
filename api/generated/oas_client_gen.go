@@ -40,24 +40,33 @@ type Invoker interface {
 	//
 	// GET /auth/authorize
 	AuthorizeGet(ctx context.Context, params AuthorizeGetParams) (AuthorizeGetRes, error)
-	// CreateSchema invokes createSchema operation.
+	// CreateFlow invokes createFlow operation.
 	//
-	// Create new schema.
+	// Resolves a flow definition based on purpose + audience context and returns
+	// the first capability step. Creates a new session implicitly unless
+	// `session_id` is provided (for step-up / reauth on an existing session).
+	// The response contains an `id` field — the flow handle. Use it as the path
+	// parameter for all subsequent `/flow/{id}/submit` and `/flow/{id}/event` calls.
+	// The response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing
+	// the flow's orchestration state (current step, collected data, history).
+	// The server is stateless between requests — all flow state lives in this
+	// cookie. The browser sends it automatically on subsequent requests.
 	//
-	// POST /schemas
-	CreateSchema(ctx context.Context, request CreateSchemaReq) (CreateSchemaRes, error)
-	// CreateSchemaRevision invokes createSchemaRevision operation.
-	//
-	// Create new schema revision.
-	//
-	// POST /schemas/{id}/revisions
-	CreateSchemaRevision(ctx context.Context, request CreateSchemaRevisionReq, params CreateSchemaRevisionParams) (CreateSchemaRevisionRes, error)
+	// POST /flow
+	CreateFlow(ctx context.Context, request *CreateFlowRequest) (CreateFlowRes, error)
 	// EndSession invokes endSession operation.
 	//
 	// End a session.
 	//
 	// GET /auth/end-session
 	EndSession(ctx context.Context, params EndSessionParams) (EndSessionRes, error)
+	// GetFlowStep invokes getFlowStep operation.
+	//
+	// Returns the current capability step without advancing the state machine.
+	// Useful for page reloads or re-rendering after a network error.
+	//
+	// GET /flow/{id}
+	GetFlowStep(ctx context.Context, params GetFlowStepParams) (GetFlowStepRes, error)
 	// GetHealth invokes getHealth operation.
 	//
 	// Check whether the server is healthy.
@@ -88,24 +97,6 @@ type Invoker interface {
 	//
 	// GET /readyz
 	GetReady(ctx context.Context) (GetReadyRes, error)
-	// GetSchemaById invokes getSchemaById operation.
-	//
-	// Get a schema by its ID. This will return the default revision of the schema.
-	//
-	// GET /schemas/{id}
-	GetSchemaById(ctx context.Context, params GetSchemaByIdParams) (GetSchemaByIdRes, error)
-	// GetSchemaReleaseState invokes getSchemaReleaseState operation.
-	//
-	// Get the release state of a schema by its ID and revision ID.
-	//
-	// GET /schemas/{id}/revisions/{revisionId}/release-state
-	GetSchemaReleaseState(ctx context.Context, params GetSchemaReleaseStateParams) (GetSchemaReleaseStateRes, error)
-	// GetSchemaRevisionById invokes getSchemaRevisionById operation.
-	//
-	// Get a schema revision by its ID.
-	//
-	// GET /schemas/{id}/revisions/{revisionId}
-	GetSchemaRevisionById(ctx context.Context, params GetSchemaRevisionByIdParams) (GetSchemaRevisionByIdRes, error)
 	// GetToken invokes getToken operation.
 	//
 	// Get accesstoken.
@@ -136,12 +127,39 @@ type Invoker interface {
 	//
 	// POST /auth/revoke
 	RevokeToken(ctx context.Context, request *RevokeRequest) (RevokeTokenRes, error)
-	// UpdateSchemaReleaseState invokes updateSchemaReleaseState operation.
+	// SubmitFlowEvent invokes submitFlowEvent operation.
 	//
-	// Update the release state of a schema by its ID and revision ID.
+	// Submits telemetry or fingerprint data from the frontend.
+	// Does not advance the state machine. Used for risk evaluation.
 	//
-	// PUT /schemas/{id}/revisions/{revisionId}/release-state
-	UpdateSchemaReleaseState(ctx context.Context, request SchemaReleaseState, params UpdateSchemaReleaseStateParams) (UpdateSchemaReleaseStateRes, error)
+	// POST /flow/{id}/event
+	SubmitFlowEvent(ctx context.Context, request *FlowEventRequest, params SubmitFlowEventParams) error
+	// SubmitFlowStep invokes submitFlowStep operation.
+	//
+	// Submits user input for the current step. The server validates,
+	// processes (e.g., verifies a credential), advances the state machine
+	// through any invisible steps, and returns the next visible step.
+	// The response sets an updated encrypted `HttpOnly` cookie (`_zflow`)
+	// with the new flow state. The server is stateless — all orchestration
+	// state is carried in this cookie between requests.
+	// **Important:** The `id` in the response may differ from the `id` used in
+	// the request. This happens when a flow pivots (pushes a new flow onto the
+	// stack) or when a stacked flow completes (auto-pops to the parent flow).
+	// Always use the `id` from the latest response for the next request.
+	// ## Flow completion
+	// When `step.type` is `complete`, the flow is terminal. The `step.behavior`
+	// field tells the frontend what to do:
+	// | `behavior`   | Action                                                     |
+	// |------------- |------------------------------------------------------------|
+	// | `redirect`   | Navigate to `redirect_uri` (OIDC/SAML auth request done). |
+	// | `show`       | Render the step as a success screen (e.g., registration).  |
+	// A `complete` step is only returned when the **entire flow stack** is done.
+	// If a stacked flow (e.g., recovery pivoted from login) finishes, the server
+	// auto-pops to the parent flow and returns the parent's next step — the
+	// frontend never sees a `complete` for intermediate flows.
+	//
+	// POST /flow/{id}/submit
+	SubmitFlowStep(ctx context.Context, request *FlowSubmitRequest, params SubmitFlowStepParams) (SubmitFlowStepRes, error)
 }
 
 // Client implements OAS client.
@@ -671,17 +689,25 @@ func (c *Client) sendAuthorizeGet(ctx context.Context, params AuthorizeGetParams
 	return result, nil
 }
 
-// CreateSchema invokes createSchema operation.
+// CreateFlow invokes createFlow operation.
 //
-// Create new schema.
+// Resolves a flow definition based on purpose + audience context and returns
+// the first capability step. Creates a new session implicitly unless
+// `session_id` is provided (for step-up / reauth on an existing session).
+// The response contains an `id` field — the flow handle. Use it as the path
+// parameter for all subsequent `/flow/{id}/submit` and `/flow/{id}/event` calls.
+// The response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing
+// the flow's orchestration state (current step, collected data, history).
+// The server is stateless between requests — all flow state lives in this
+// cookie. The browser sends it automatically on subsequent requests.
 //
-// POST /schemas
-func (c *Client) CreateSchema(ctx context.Context, request CreateSchemaReq) (CreateSchemaRes, error) {
-	res, err := c.sendCreateSchema(ctx, request)
+// POST /flow
+func (c *Client) CreateFlow(ctx context.Context, request *CreateFlowRequest) (CreateFlowRes, error) {
+	res, err := c.sendCreateFlow(ctx, request)
 	return res, err
 }
 
-func (c *Client) sendCreateSchema(ctx context.Context, request CreateSchemaReq) (res CreateSchemaRes, err error) {
+func (c *Client) sendCreateFlow(ctx context.Context, request *CreateFlowRequest) (res CreateFlowRes, err error) {
 	// Validate request before sending.
 	if err := func() error {
 		if err := request.Validate(); err != nil {
@@ -692,9 +718,9 @@ func (c *Client) sendCreateSchema(ctx context.Context, request CreateSchemaReq) 
 		return res, errors.Wrap(err, "validate")
 	}
 	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("createSchema"),
+		otelogen.OperationID("createFlow"),
 		semconv.HTTPRequestMethodKey.String("POST"),
-		semconv.URLTemplateKey.String("/schemas"),
+		semconv.URLTemplateKey.String("/flow"),
 	}
 	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
 
@@ -710,7 +736,7 @@ func (c *Client) sendCreateSchema(ctx context.Context, request CreateSchemaReq) 
 	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
 
 	// Start a span for this request.
-	ctx, span := c.cfg.Tracer.Start(ctx, CreateSchemaOperation,
+	ctx, span := c.cfg.Tracer.Start(ctx, CreateFlowOperation,
 		trace.WithAttributes(otelAttrs...),
 		clientSpanKind,
 	)
@@ -728,7 +754,7 @@ func (c *Client) sendCreateSchema(ctx context.Context, request CreateSchemaReq) 
 	stage = "BuildURL"
 	u := uri.Clone(c.requestURL(ctx))
 	var pathParts [1]string
-	pathParts[0] = "/schemas"
+	pathParts[0] = "/flow"
 	uri.AddPathParts(u, pathParts[:]...)
 
 	stage = "EncodeRequest"
@@ -736,41 +762,8 @@ func (c *Client) sendCreateSchema(ctx context.Context, request CreateSchemaReq) 
 	if err != nil {
 		return res, errors.Wrap(err, "create request")
 	}
-	if err := encodeCreateSchemaRequest(request, r); err != nil {
+	if err := encodeCreateFlowRequest(request, r); err != nil {
 		return res, errors.Wrap(err, "encode request")
-	}
-
-	{
-		type bitset = [1]uint8
-		var satisfied bitset
-		{
-			stage = "Security:OAuth2"
-			switch err := c.securityOAuth2(ctx, CreateSchemaOperation, r); {
-			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
-			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
-				// Skip this security.
-			default:
-				return res, errors.Wrap(err, "security \"OAuth2\"")
-			}
-		}
-
-		if ok := func() bool {
-		nextRequirement:
-			for _, requirement := range []bitset{
-				{0b00000001},
-			} {
-				for i, mask := range requirement {
-					if satisfied[i]&mask != mask {
-						continue nextRequirement
-					}
-				}
-				return true
-			}
-			return false
-		}(); !ok {
-			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
-		}
 	}
 
 	stage = "SendRequest"
@@ -782,145 +775,7 @@ func (c *Client) sendCreateSchema(ctx context.Context, request CreateSchemaReq) 
 	defer body.Close()
 
 	stage = "DecodeResponse"
-	result, err := decodeCreateSchemaResponse(resp)
-	if err != nil {
-		return res, errors.Wrap(err, "decode response")
-	}
-
-	return result, nil
-}
-
-// CreateSchemaRevision invokes createSchemaRevision operation.
-//
-// Create new schema revision.
-//
-// POST /schemas/{id}/revisions
-func (c *Client) CreateSchemaRevision(ctx context.Context, request CreateSchemaRevisionReq, params CreateSchemaRevisionParams) (CreateSchemaRevisionRes, error) {
-	res, err := c.sendCreateSchemaRevision(ctx, request, params)
-	return res, err
-}
-
-func (c *Client) sendCreateSchemaRevision(ctx context.Context, request CreateSchemaRevisionReq, params CreateSchemaRevisionParams) (res CreateSchemaRevisionRes, err error) {
-	// Validate request before sending.
-	if err := func() error {
-		if err := request.Validate(); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return res, errors.Wrap(err, "validate")
-	}
-	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("createSchemaRevision"),
-		semconv.HTTPRequestMethodKey.String("POST"),
-		semconv.URLTemplateKey.String("/schemas/{id}/revisions"),
-	}
-	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
-
-	// Run stopwatch.
-	startTime := time.Now()
-	defer func() {
-		// Use floating point division here for higher precision (instead of Millisecond method).
-		elapsedDuration := time.Since(startTime)
-		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
-	}()
-
-	// Increment request counter.
-	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
-
-	// Start a span for this request.
-	ctx, span := c.cfg.Tracer.Start(ctx, CreateSchemaRevisionOperation,
-		trace.WithAttributes(otelAttrs...),
-		clientSpanKind,
-	)
-	// Track stage for error reporting.
-	var stage string
-	defer func() {
-		if err != nil {
-			span.RecordError(err)
-			span.SetStatus(codes.Error, stage)
-			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
-		}
-		span.End()
-	}()
-
-	stage = "BuildURL"
-	u := uri.Clone(c.requestURL(ctx))
-	var pathParts [3]string
-	pathParts[0] = "/schemas/"
-	{
-		// Encode "id" parameter.
-		e := uri.NewPathEncoder(uri.PathEncoderConfig{
-			Param:   "id",
-			Style:   uri.PathStyleSimple,
-			Explode: false,
-		})
-		if err := func() error {
-			return e.EncodeValue(conv.StringToString(params.ID))
-		}(); err != nil {
-			return res, errors.Wrap(err, "encode path")
-		}
-		encoded, err := e.Result()
-		if err != nil {
-			return res, errors.Wrap(err, "encode path")
-		}
-		pathParts[1] = encoded
-	}
-	pathParts[2] = "/revisions"
-	uri.AddPathParts(u, pathParts[:]...)
-
-	stage = "EncodeRequest"
-	r, err := ht.NewRequest(ctx, "POST", u)
-	if err != nil {
-		return res, errors.Wrap(err, "create request")
-	}
-	if err := encodeCreateSchemaRevisionRequest(request, r); err != nil {
-		return res, errors.Wrap(err, "encode request")
-	}
-
-	{
-		type bitset = [1]uint8
-		var satisfied bitset
-		{
-			stage = "Security:OAuth2"
-			switch err := c.securityOAuth2(ctx, CreateSchemaRevisionOperation, r); {
-			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
-			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
-				// Skip this security.
-			default:
-				return res, errors.Wrap(err, "security \"OAuth2\"")
-			}
-		}
-
-		if ok := func() bool {
-		nextRequirement:
-			for _, requirement := range []bitset{
-				{0b00000001},
-			} {
-				for i, mask := range requirement {
-					if satisfied[i]&mask != mask {
-						continue nextRequirement
-					}
-				}
-				return true
-			}
-			return false
-		}(); !ok {
-			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
-		}
-	}
-
-	stage = "SendRequest"
-	resp, err := c.cfg.Client.Do(r)
-	if err != nil {
-		return res, errors.Wrap(err, "do request")
-	}
-	body := resp.Body
-	defer body.Close()
-
-	stage = "DecodeResponse"
-	result, err := decodeCreateSchemaRevisionResponse(resp)
+	result, err := decodeCreateFlowResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}
@@ -1134,6 +989,115 @@ func (c *Client) sendEndSession(ctx context.Context, params EndSessionParams) (r
 
 	stage = "DecodeResponse"
 	result, err := decodeEndSessionResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// GetFlowStep invokes getFlowStep operation.
+//
+// Returns the current capability step without advancing the state machine.
+// Useful for page reloads or re-rendering after a network error.
+//
+// GET /flow/{id}
+func (c *Client) GetFlowStep(ctx context.Context, params GetFlowStepParams) (GetFlowStepRes, error) {
+	res, err := c.sendGetFlowStep(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendGetFlowStep(ctx context.Context, params GetFlowStepParams) (res GetFlowStepRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("getFlowStep"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.URLTemplateKey.String("/flow/{id}"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, GetFlowStepOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [2]string
+	pathParts[0] = "/flow/"
+	{
+		// Encode "id" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "id",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			return e.EncodeValue(conv.StringToString(params.ID))
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "GET", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	stage = "EncodeCookieParams"
+	cookie := uri.NewCookieEncoder(r)
+	{
+		// Encode "_zflow" parameter.
+		cfg := uri.CookieParameterEncodingConfig{
+			Name:    "_zflow",
+			Explode: true,
+		}
+
+		if err := cookie.EncodeParam(cfg, func(e uri.Encoder) error {
+			return e.EncodeValue(conv.StringToString(params.Zflow))
+		}); err != nil {
+			return res, errors.Wrap(err, "encode cookie")
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeGetFlowStepResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}
@@ -1504,420 +1468,6 @@ func (c *Client) sendGetReady(ctx context.Context) (res GetReadyRes, err error) 
 
 	stage = "DecodeResponse"
 	result, err := decodeGetReadyResponse(resp)
-	if err != nil {
-		return res, errors.Wrap(err, "decode response")
-	}
-
-	return result, nil
-}
-
-// GetSchemaById invokes getSchemaById operation.
-//
-// Get a schema by its ID. This will return the default revision of the schema.
-//
-// GET /schemas/{id}
-func (c *Client) GetSchemaById(ctx context.Context, params GetSchemaByIdParams) (GetSchemaByIdRes, error) {
-	res, err := c.sendGetSchemaById(ctx, params)
-	return res, err
-}
-
-func (c *Client) sendGetSchemaById(ctx context.Context, params GetSchemaByIdParams) (res GetSchemaByIdRes, err error) {
-	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("getSchemaById"),
-		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.URLTemplateKey.String("/schemas/{id}"),
-	}
-	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
-
-	// Run stopwatch.
-	startTime := time.Now()
-	defer func() {
-		// Use floating point division here for higher precision (instead of Millisecond method).
-		elapsedDuration := time.Since(startTime)
-		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
-	}()
-
-	// Increment request counter.
-	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
-
-	// Start a span for this request.
-	ctx, span := c.cfg.Tracer.Start(ctx, GetSchemaByIdOperation,
-		trace.WithAttributes(otelAttrs...),
-		clientSpanKind,
-	)
-	// Track stage for error reporting.
-	var stage string
-	defer func() {
-		if err != nil {
-			span.RecordError(err)
-			span.SetStatus(codes.Error, stage)
-			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
-		}
-		span.End()
-	}()
-
-	stage = "BuildURL"
-	u := uri.Clone(c.requestURL(ctx))
-	var pathParts [2]string
-	pathParts[0] = "/schemas/"
-	{
-		// Encode "id" parameter.
-		e := uri.NewPathEncoder(uri.PathEncoderConfig{
-			Param:   "id",
-			Style:   uri.PathStyleSimple,
-			Explode: false,
-		})
-		if err := func() error {
-			return e.EncodeValue(conv.StringToString(params.ID))
-		}(); err != nil {
-			return res, errors.Wrap(err, "encode path")
-		}
-		encoded, err := e.Result()
-		if err != nil {
-			return res, errors.Wrap(err, "encode path")
-		}
-		pathParts[1] = encoded
-	}
-	uri.AddPathParts(u, pathParts[:]...)
-
-	stage = "EncodeRequest"
-	r, err := ht.NewRequest(ctx, "GET", u)
-	if err != nil {
-		return res, errors.Wrap(err, "create request")
-	}
-
-	{
-		type bitset = [1]uint8
-		var satisfied bitset
-		{
-			stage = "Security:OAuth2"
-			switch err := c.securityOAuth2(ctx, GetSchemaByIdOperation, r); {
-			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
-			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
-				// Skip this security.
-			default:
-				return res, errors.Wrap(err, "security \"OAuth2\"")
-			}
-		}
-
-		if ok := func() bool {
-		nextRequirement:
-			for _, requirement := range []bitset{
-				{0b00000001},
-			} {
-				for i, mask := range requirement {
-					if satisfied[i]&mask != mask {
-						continue nextRequirement
-					}
-				}
-				return true
-			}
-			return false
-		}(); !ok {
-			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
-		}
-	}
-
-	stage = "SendRequest"
-	resp, err := c.cfg.Client.Do(r)
-	if err != nil {
-		return res, errors.Wrap(err, "do request")
-	}
-	body := resp.Body
-	defer body.Close()
-
-	stage = "DecodeResponse"
-	result, err := decodeGetSchemaByIdResponse(resp)
-	if err != nil {
-		return res, errors.Wrap(err, "decode response")
-	}
-
-	return result, nil
-}
-
-// GetSchemaReleaseState invokes getSchemaReleaseState operation.
-//
-// Get the release state of a schema by its ID and revision ID.
-//
-// GET /schemas/{id}/revisions/{revisionId}/release-state
-func (c *Client) GetSchemaReleaseState(ctx context.Context, params GetSchemaReleaseStateParams) (GetSchemaReleaseStateRes, error) {
-	res, err := c.sendGetSchemaReleaseState(ctx, params)
-	return res, err
-}
-
-func (c *Client) sendGetSchemaReleaseState(ctx context.Context, params GetSchemaReleaseStateParams) (res GetSchemaReleaseStateRes, err error) {
-	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("getSchemaReleaseState"),
-		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.URLTemplateKey.String("/schemas/{id}/revisions/{revisionId}/release-state"),
-	}
-	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
-
-	// Run stopwatch.
-	startTime := time.Now()
-	defer func() {
-		// Use floating point division here for higher precision (instead of Millisecond method).
-		elapsedDuration := time.Since(startTime)
-		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
-	}()
-
-	// Increment request counter.
-	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
-
-	// Start a span for this request.
-	ctx, span := c.cfg.Tracer.Start(ctx, GetSchemaReleaseStateOperation,
-		trace.WithAttributes(otelAttrs...),
-		clientSpanKind,
-	)
-	// Track stage for error reporting.
-	var stage string
-	defer func() {
-		if err != nil {
-			span.RecordError(err)
-			span.SetStatus(codes.Error, stage)
-			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
-		}
-		span.End()
-	}()
-
-	stage = "BuildURL"
-	u := uri.Clone(c.requestURL(ctx))
-	var pathParts [5]string
-	pathParts[0] = "/schemas/"
-	{
-		// Encode "id" parameter.
-		e := uri.NewPathEncoder(uri.PathEncoderConfig{
-			Param:   "id",
-			Style:   uri.PathStyleSimple,
-			Explode: false,
-		})
-		if err := func() error {
-			return e.EncodeValue(conv.StringToString(params.ID))
-		}(); err != nil {
-			return res, errors.Wrap(err, "encode path")
-		}
-		encoded, err := e.Result()
-		if err != nil {
-			return res, errors.Wrap(err, "encode path")
-		}
-		pathParts[1] = encoded
-	}
-	pathParts[2] = "/revisions/"
-	{
-		// Encode "revisionId" parameter.
-		e := uri.NewPathEncoder(uri.PathEncoderConfig{
-			Param:   "revisionId",
-			Style:   uri.PathStyleSimple,
-			Explode: false,
-		})
-		if err := func() error {
-			return e.EncodeValue(conv.StringToString(params.RevisionId))
-		}(); err != nil {
-			return res, errors.Wrap(err, "encode path")
-		}
-		encoded, err := e.Result()
-		if err != nil {
-			return res, errors.Wrap(err, "encode path")
-		}
-		pathParts[3] = encoded
-	}
-	pathParts[4] = "/release-state"
-	uri.AddPathParts(u, pathParts[:]...)
-
-	stage = "EncodeRequest"
-	r, err := ht.NewRequest(ctx, "GET", u)
-	if err != nil {
-		return res, errors.Wrap(err, "create request")
-	}
-
-	{
-		type bitset = [1]uint8
-		var satisfied bitset
-		{
-			stage = "Security:OAuth2"
-			switch err := c.securityOAuth2(ctx, GetSchemaReleaseStateOperation, r); {
-			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
-			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
-				// Skip this security.
-			default:
-				return res, errors.Wrap(err, "security \"OAuth2\"")
-			}
-		}
-
-		if ok := func() bool {
-		nextRequirement:
-			for _, requirement := range []bitset{
-				{0b00000001},
-			} {
-				for i, mask := range requirement {
-					if satisfied[i]&mask != mask {
-						continue nextRequirement
-					}
-				}
-				return true
-			}
-			return false
-		}(); !ok {
-			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
-		}
-	}
-
-	stage = "SendRequest"
-	resp, err := c.cfg.Client.Do(r)
-	if err != nil {
-		return res, errors.Wrap(err, "do request")
-	}
-	body := resp.Body
-	defer body.Close()
-
-	stage = "DecodeResponse"
-	result, err := decodeGetSchemaReleaseStateResponse(resp)
-	if err != nil {
-		return res, errors.Wrap(err, "decode response")
-	}
-
-	return result, nil
-}
-
-// GetSchemaRevisionById invokes getSchemaRevisionById operation.
-//
-// Get a schema revision by its ID.
-//
-// GET /schemas/{id}/revisions/{revisionId}
-func (c *Client) GetSchemaRevisionById(ctx context.Context, params GetSchemaRevisionByIdParams) (GetSchemaRevisionByIdRes, error) {
-	res, err := c.sendGetSchemaRevisionById(ctx, params)
-	return res, err
-}
-
-func (c *Client) sendGetSchemaRevisionById(ctx context.Context, params GetSchemaRevisionByIdParams) (res GetSchemaRevisionByIdRes, err error) {
-	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("getSchemaRevisionById"),
-		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.URLTemplateKey.String("/schemas/{id}/revisions/{revisionId}"),
-	}
-	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
-
-	// Run stopwatch.
-	startTime := time.Now()
-	defer func() {
-		// Use floating point division here for higher precision (instead of Millisecond method).
-		elapsedDuration := time.Since(startTime)
-		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
-	}()
-
-	// Increment request counter.
-	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
-
-	// Start a span for this request.
-	ctx, span := c.cfg.Tracer.Start(ctx, GetSchemaRevisionByIdOperation,
-		trace.WithAttributes(otelAttrs...),
-		clientSpanKind,
-	)
-	// Track stage for error reporting.
-	var stage string
-	defer func() {
-		if err != nil {
-			span.RecordError(err)
-			span.SetStatus(codes.Error, stage)
-			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
-		}
-		span.End()
-	}()
-
-	stage = "BuildURL"
-	u := uri.Clone(c.requestURL(ctx))
-	var pathParts [4]string
-	pathParts[0] = "/schemas/"
-	{
-		// Encode "id" parameter.
-		e := uri.NewPathEncoder(uri.PathEncoderConfig{
-			Param:   "id",
-			Style:   uri.PathStyleSimple,
-			Explode: false,
-		})
-		if err := func() error {
-			return e.EncodeValue(conv.StringToString(params.ID))
-		}(); err != nil {
-			return res, errors.Wrap(err, "encode path")
-		}
-		encoded, err := e.Result()
-		if err != nil {
-			return res, errors.Wrap(err, "encode path")
-		}
-		pathParts[1] = encoded
-	}
-	pathParts[2] = "/revisions/"
-	{
-		// Encode "revisionId" parameter.
-		e := uri.NewPathEncoder(uri.PathEncoderConfig{
-			Param:   "revisionId",
-			Style:   uri.PathStyleSimple,
-			Explode: false,
-		})
-		if err := func() error {
-			return e.EncodeValue(conv.StringToString(params.RevisionId))
-		}(); err != nil {
-			return res, errors.Wrap(err, "encode path")
-		}
-		encoded, err := e.Result()
-		if err != nil {
-			return res, errors.Wrap(err, "encode path")
-		}
-		pathParts[3] = encoded
-	}
-	uri.AddPathParts(u, pathParts[:]...)
-
-	stage = "EncodeRequest"
-	r, err := ht.NewRequest(ctx, "GET", u)
-	if err != nil {
-		return res, errors.Wrap(err, "create request")
-	}
-
-	{
-		type bitset = [1]uint8
-		var satisfied bitset
-		{
-			stage = "Security:OAuth2"
-			switch err := c.securityOAuth2(ctx, GetSchemaRevisionByIdOperation, r); {
-			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
-			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
-				// Skip this security.
-			default:
-				return res, errors.Wrap(err, "security \"OAuth2\"")
-			}
-		}
-
-		if ok := func() bool {
-		nextRequirement:
-			for _, requirement := range []bitset{
-				{0b00000001},
-			} {
-				for i, mask := range requirement {
-					if satisfied[i]&mask != mask {
-						continue nextRequirement
-					}
-				}
-				return true
-			}
-			return false
-		}(); !ok {
-			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
-		}
-	}
-
-	stage = "SendRequest"
-	resp, err := c.cfg.Client.Do(r)
-	if err != nil {
-		return res, errors.Wrap(err, "do request")
-	}
-	body := resp.Body
-	defer body.Close()
-
-	stage = "DecodeResponse"
-	result, err := decodeGetSchemaRevisionByIdResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}
@@ -2516,17 +2066,18 @@ func (c *Client) sendRevokeToken(ctx context.Context, request *RevokeRequest) (r
 	return result, nil
 }
 
-// UpdateSchemaReleaseState invokes updateSchemaReleaseState operation.
+// SubmitFlowEvent invokes submitFlowEvent operation.
 //
-// Update the release state of a schema by its ID and revision ID.
+// Submits telemetry or fingerprint data from the frontend.
+// Does not advance the state machine. Used for risk evaluation.
 //
-// PUT /schemas/{id}/revisions/{revisionId}/release-state
-func (c *Client) UpdateSchemaReleaseState(ctx context.Context, request SchemaReleaseState, params UpdateSchemaReleaseStateParams) (UpdateSchemaReleaseStateRes, error) {
-	res, err := c.sendUpdateSchemaReleaseState(ctx, request, params)
-	return res, err
+// POST /flow/{id}/event
+func (c *Client) SubmitFlowEvent(ctx context.Context, request *FlowEventRequest, params SubmitFlowEventParams) error {
+	_, err := c.sendSubmitFlowEvent(ctx, request, params)
+	return err
 }
 
-func (c *Client) sendUpdateSchemaReleaseState(ctx context.Context, request SchemaReleaseState, params UpdateSchemaReleaseStateParams) (res UpdateSchemaReleaseStateRes, err error) {
+func (c *Client) sendSubmitFlowEvent(ctx context.Context, request *FlowEventRequest, params SubmitFlowEventParams) (res *SubmitFlowEventNoContent, err error) {
 	// Validate request before sending.
 	if err := func() error {
 		if err := request.Validate(); err != nil {
@@ -2537,9 +2088,9 @@ func (c *Client) sendUpdateSchemaReleaseState(ctx context.Context, request Schem
 		return res, errors.Wrap(err, "validate")
 	}
 	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("updateSchemaReleaseState"),
-		semconv.HTTPRequestMethodKey.String("PUT"),
-		semconv.URLTemplateKey.String("/schemas/{id}/revisions/{revisionId}/release-state"),
+		otelogen.OperationID("submitFlowEvent"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.URLTemplateKey.String("/flow/{id}/event"),
 	}
 	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
 
@@ -2555,7 +2106,7 @@ func (c *Client) sendUpdateSchemaReleaseState(ctx context.Context, request Schem
 	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
 
 	// Start a span for this request.
-	ctx, span := c.cfg.Tracer.Start(ctx, UpdateSchemaReleaseStateOperation,
+	ctx, span := c.cfg.Tracer.Start(ctx, SubmitFlowEventOperation,
 		trace.WithAttributes(otelAttrs...),
 		clientSpanKind,
 	)
@@ -2572,8 +2123,8 @@ func (c *Client) sendUpdateSchemaReleaseState(ctx context.Context, request Schem
 
 	stage = "BuildURL"
 	u := uri.Clone(c.requestURL(ctx))
-	var pathParts [5]string
-	pathParts[0] = "/schemas/"
+	var pathParts [3]string
+	pathParts[0] = "/flow/"
 	{
 		// Encode "id" parameter.
 		e := uri.NewPathEncoder(uri.PathEncoderConfig{
@@ -2592,67 +2143,31 @@ func (c *Client) sendUpdateSchemaReleaseState(ctx context.Context, request Schem
 		}
 		pathParts[1] = encoded
 	}
-	pathParts[2] = "/revisions/"
-	{
-		// Encode "revisionId" parameter.
-		e := uri.NewPathEncoder(uri.PathEncoderConfig{
-			Param:   "revisionId",
-			Style:   uri.PathStyleSimple,
-			Explode: false,
-		})
-		if err := func() error {
-			return e.EncodeValue(conv.StringToString(params.RevisionId))
-		}(); err != nil {
-			return res, errors.Wrap(err, "encode path")
-		}
-		encoded, err := e.Result()
-		if err != nil {
-			return res, errors.Wrap(err, "encode path")
-		}
-		pathParts[3] = encoded
-	}
-	pathParts[4] = "/release-state"
+	pathParts[2] = "/event"
 	uri.AddPathParts(u, pathParts[:]...)
 
 	stage = "EncodeRequest"
-	r, err := ht.NewRequest(ctx, "PUT", u)
+	r, err := ht.NewRequest(ctx, "POST", u)
 	if err != nil {
 		return res, errors.Wrap(err, "create request")
 	}
-	if err := encodeUpdateSchemaReleaseStateRequest(request, r); err != nil {
+	if err := encodeSubmitFlowEventRequest(request, r); err != nil {
 		return res, errors.Wrap(err, "encode request")
 	}
 
+	stage = "EncodeCookieParams"
+	cookie := uri.NewCookieEncoder(r)
 	{
-		type bitset = [1]uint8
-		var satisfied bitset
-		{
-			stage = "Security:OAuth2"
-			switch err := c.securityOAuth2(ctx, UpdateSchemaReleaseStateOperation, r); {
-			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
-			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
-				// Skip this security.
-			default:
-				return res, errors.Wrap(err, "security \"OAuth2\"")
-			}
+		// Encode "_zflow" parameter.
+		cfg := uri.CookieParameterEncodingConfig{
+			Name:    "_zflow",
+			Explode: true,
 		}
 
-		if ok := func() bool {
-		nextRequirement:
-			for _, requirement := range []bitset{
-				{0b00000001},
-			} {
-				for i, mask := range requirement {
-					if satisfied[i]&mask != mask {
-						continue nextRequirement
-					}
-				}
-				return true
-			}
-			return false
-		}(); !ok {
-			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		if err := cookie.EncodeParam(cfg, func(e uri.Encoder) error {
+			return e.EncodeValue(conv.StringToString(params.Zflow))
+		}); err != nil {
+			return res, errors.Wrap(err, "encode cookie")
 		}
 	}
 
@@ -2665,7 +2180,139 @@ func (c *Client) sendUpdateSchemaReleaseState(ctx context.Context, request Schem
 	defer body.Close()
 
 	stage = "DecodeResponse"
-	result, err := decodeUpdateSchemaReleaseStateResponse(resp)
+	result, err := decodeSubmitFlowEventResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// SubmitFlowStep invokes submitFlowStep operation.
+//
+// Submits user input for the current step. The server validates,
+// processes (e.g., verifies a credential), advances the state machine
+// through any invisible steps, and returns the next visible step.
+// The response sets an updated encrypted `HttpOnly` cookie (`_zflow`)
+// with the new flow state. The server is stateless — all orchestration
+// state is carried in this cookie between requests.
+// **Important:** The `id` in the response may differ from the `id` used in
+// the request. This happens when a flow pivots (pushes a new flow onto the
+// stack) or when a stacked flow completes (auto-pops to the parent flow).
+// Always use the `id` from the latest response for the next request.
+// ## Flow completion
+// When `step.type` is `complete`, the flow is terminal. The `step.behavior`
+// field tells the frontend what to do:
+// | `behavior`   | Action                                                     |
+// |------------- |------------------------------------------------------------|
+// | `redirect`   | Navigate to `redirect_uri` (OIDC/SAML auth request done). |
+// | `show`       | Render the step as a success screen (e.g., registration).  |
+// A `complete` step is only returned when the **entire flow stack** is done.
+// If a stacked flow (e.g., recovery pivoted from login) finishes, the server
+// auto-pops to the parent flow and returns the parent's next step — the
+// frontend never sees a `complete` for intermediate flows.
+//
+// POST /flow/{id}/submit
+func (c *Client) SubmitFlowStep(ctx context.Context, request *FlowSubmitRequest, params SubmitFlowStepParams) (SubmitFlowStepRes, error) {
+	res, err := c.sendSubmitFlowStep(ctx, request, params)
+	return res, err
+}
+
+func (c *Client) sendSubmitFlowStep(ctx context.Context, request *FlowSubmitRequest, params SubmitFlowStepParams) (res SubmitFlowStepRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("submitFlowStep"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.URLTemplateKey.String("/flow/{id}/submit"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, SubmitFlowStepOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [3]string
+	pathParts[0] = "/flow/"
+	{
+		// Encode "id" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "id",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			return e.EncodeValue(conv.StringToString(params.ID))
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	pathParts[2] = "/submit"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "POST", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+	if err := encodeSubmitFlowStepRequest(request, r); err != nil {
+		return res, errors.Wrap(err, "encode request")
+	}
+
+	stage = "EncodeCookieParams"
+	cookie := uri.NewCookieEncoder(r)
+	{
+		// Encode "_zflow" parameter.
+		cfg := uri.CookieParameterEncodingConfig{
+			Name:    "_zflow",
+			Explode: true,
+		}
+
+		if err := cookie.EncodeParam(cfg, func(e uri.Encoder) error {
+			return e.EncodeValue(conv.StringToString(params.Zflow))
+		}); err != nil {
+			return res, errors.Wrap(err, "encode cookie")
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeSubmitFlowStepResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}

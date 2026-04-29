@@ -3,133 +3,304 @@
 package api
 
 import (
-	"fmt"
 	"io"
 	"net/url"
+	"time"
 
 	"github.com/go-faster/errors"
 	"github.com/go-faster/jx"
 )
-
-func (s *ErrorDetailsStatusCode) Error() string {
-	return fmt.Sprintf("code %d: %+v", s.StatusCode, s.Response)
-}
 
 // AuthorizeGetFound is response for AuthorizeGet operation.
 type AuthorizeGetFound struct{}
 
 func (*AuthorizeGetFound) authorizeGetRes() {}
 
-type CreateSchemaCreated struct {
-	// The ID of the created schema.
-	ID OptString `json:"id"`
+// Resolved branding configuration. Inherited from the app → team → project
+// hierarchy at flow creation time (most specific wins). Read-only projection —
+// branding is configured via the Team/App Branding API, not the Flow API.
+// Ref: #
+type Branding struct {
+	// Layout preset selector. The default.liquid master template uses this
+	// to branch into layout variants. Customers who eject the template
+	// can ignore this field entirely.
+	Layout OptBrandingLayout `json:"layout"`
+	// The LiquidJS template string for rendering this step. The orchestrator
+	// parses this template, injects the capability dictionaries as context,
+	// and renders the output HTML into its Shadow DOM.
+	LiquidTemplate OptString `json:"liquid_template"`
+	// Team logo URL.
+	LogoURL OptURI `json:"logo_url"`
+	// Custom font URL (e.g., Google Fonts CSS).
+	FontURL OptURI `json:"font_url"`
+	// Hero/background image URL (used by split layout).
+	HeroURL OptURI `json:"hero_url"`
 }
 
-// GetID returns the value of ID.
-func (s *CreateSchemaCreated) GetID() OptString {
-	return s.ID
+// GetLayout returns the value of Layout.
+func (s *Branding) GetLayout() OptBrandingLayout {
+	return s.Layout
 }
 
-// SetID sets the value of ID.
-func (s *CreateSchemaCreated) SetID(val OptString) {
-	s.ID = val
+// GetLiquidTemplate returns the value of LiquidTemplate.
+func (s *Branding) GetLiquidTemplate() OptString {
+	return s.LiquidTemplate
 }
 
-func (*CreateSchemaCreated) createSchemaRes() {}
-
-// CreateSchemaReq represents sum type.
-type CreateSchemaReq struct {
-	Type       CreateSchemaReqType // switch on this field
-	UserSchema UserSchema
+// GetLogoURL returns the value of LogoURL.
+func (s *Branding) GetLogoURL() OptURI {
+	return s.LogoURL
 }
 
-// CreateSchemaReqType is oneOf type of CreateSchemaReq.
-type CreateSchemaReqType string
+// GetFontURL returns the value of FontURL.
+func (s *Branding) GetFontURL() OptURI {
+	return s.FontURL
+}
 
-// Possible values for CreateSchemaReqType.
+// GetHeroURL returns the value of HeroURL.
+func (s *Branding) GetHeroURL() OptURI {
+	return s.HeroURL
+}
+
+// SetLayout sets the value of Layout.
+func (s *Branding) SetLayout(val OptBrandingLayout) {
+	s.Layout = val
+}
+
+// SetLiquidTemplate sets the value of LiquidTemplate.
+func (s *Branding) SetLiquidTemplate(val OptString) {
+	s.LiquidTemplate = val
+}
+
+// SetLogoURL sets the value of LogoURL.
+func (s *Branding) SetLogoURL(val OptURI) {
+	s.LogoURL = val
+}
+
+// SetFontURL sets the value of FontURL.
+func (s *Branding) SetFontURL(val OptURI) {
+	s.FontURL = val
+}
+
+// SetHeroURL sets the value of HeroURL.
+func (s *Branding) SetHeroURL(val OptURI) {
+	s.HeroURL = val
+}
+
+// Layout preset selector. The default.liquid master template uses this
+// to branch into layout variants. Customers who eject the template
+// can ignore this field entirely.
+type BrandingLayout string
+
 const (
-	UserSchemaCreateSchemaReq CreateSchemaReqType = "user-schema"
+	BrandingLayoutCentered BrandingLayout = "centered"
+	BrandingLayoutSplit    BrandingLayout = "split"
 )
 
-// IsUserSchema reports whether CreateSchemaReq is UserSchema.
-func (s CreateSchemaReq) IsUserSchema() bool { return s.Type == UserSchemaCreateSchemaReq }
-
-// SetUserSchema sets CreateSchemaReq to UserSchema.
-func (s *CreateSchemaReq) SetUserSchema(v UserSchema) {
-	s.Type = UserSchemaCreateSchemaReq
-	s.UserSchema = v
-}
-
-// GetUserSchema returns UserSchema and true boolean if CreateSchemaReq is UserSchema.
-func (s CreateSchemaReq) GetUserSchema() (v UserSchema, ok bool) {
-	if !s.IsUserSchema() {
-		return v, false
+// AllValues returns all BrandingLayout values.
+func (BrandingLayout) AllValues() []BrandingLayout {
+	return []BrandingLayout{
+		BrandingLayoutCentered,
+		BrandingLayoutSplit,
 	}
-	return s.UserSchema, true
 }
 
-// NewUserSchemaCreateSchemaReq returns new CreateSchemaReq from UserSchema.
-func NewUserSchemaCreateSchemaReq(v UserSchema) CreateSchemaReq {
-	var s CreateSchemaReq
-	s.SetUserSchema(v)
-	return s
+// MarshalText implements encoding.TextMarshaler.
+func (s BrandingLayout) MarshalText() ([]byte, error) {
+	switch s {
+	case BrandingLayoutCentered:
+		return []byte(s), nil
+	case BrandingLayoutSplit:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
 }
 
-type CreateSchemaRevisionCreated struct {
-	// The ID of the created schema revision.
-	ID OptInt `json:"id"`
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *BrandingLayout) UnmarshalText(data []byte) error {
+	switch BrandingLayout(data) {
+	case BrandingLayoutCentered:
+		*s = BrandingLayoutCentered
+		return nil
+	case BrandingLayoutSplit:
+		*s = BrandingLayoutSplit
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
 }
 
-// GetID returns the value of ID.
-func (s *CreateSchemaRevisionCreated) GetID() OptInt {
-	return s.ID
+// Ref: #
+type CreateFlowRequest struct {
+	Purpose CreateFlowRequestPurpose `json:"purpose"`
+	// Human-readable identifier of a specific flow definition to use.
+	// When omitted, the engine selects the best-matching definition
+	// based on purpose + audience context.
+	Slug OptString `json:"slug"`
+	// Semver version of the flow definition JSON Schema to use.
+	// When omitted, the latest version is used.
+	SchemaVersion OptString `json:"schema_version"`
+	// Origin-bound nonce obtained from `POST /bootstrap/challenge`.
+	// Binds the flow to the browser that requested it, preventing
+	// cross-origin replay of flow cookies.
+	ChallengeNonce OptString `json:"challenge_nonce"`
+	// Existing session to attach to (for step-up / reauth).
+	// Omit to let the flow create a new session implicitly.
+	SessionID OptString `json:"session_id"`
+	// OIDC/SAML auth request ID (links flow to protocol request).
+	AuthRequestID OptString   `json:"auth_request_id"`
+	RedirectURI   OptURI      `json:"redirect_uri"`
+	Hint          OptFlowHint `json:"hint"`
 }
 
-// SetID sets the value of ID.
-func (s *CreateSchemaRevisionCreated) SetID(val OptInt) {
-	s.ID = val
+// GetPurpose returns the value of Purpose.
+func (s *CreateFlowRequest) GetPurpose() CreateFlowRequestPurpose {
+	return s.Purpose
 }
 
-func (*CreateSchemaRevisionCreated) createSchemaRevisionRes() {}
-
-// CreateSchemaRevisionReq represents sum type.
-type CreateSchemaRevisionReq struct {
-	Type       CreateSchemaRevisionReqType // switch on this field
-	UserSchema UserSchema
+// GetSlug returns the value of Slug.
+func (s *CreateFlowRequest) GetSlug() OptString {
+	return s.Slug
 }
 
-// CreateSchemaRevisionReqType is oneOf type of CreateSchemaRevisionReq.
-type CreateSchemaRevisionReqType string
+// GetSchemaVersion returns the value of SchemaVersion.
+func (s *CreateFlowRequest) GetSchemaVersion() OptString {
+	return s.SchemaVersion
+}
 
-// Possible values for CreateSchemaRevisionReqType.
+// GetChallengeNonce returns the value of ChallengeNonce.
+func (s *CreateFlowRequest) GetChallengeNonce() OptString {
+	return s.ChallengeNonce
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *CreateFlowRequest) GetSessionID() OptString {
+	return s.SessionID
+}
+
+// GetAuthRequestID returns the value of AuthRequestID.
+func (s *CreateFlowRequest) GetAuthRequestID() OptString {
+	return s.AuthRequestID
+}
+
+// GetRedirectURI returns the value of RedirectURI.
+func (s *CreateFlowRequest) GetRedirectURI() OptURI {
+	return s.RedirectURI
+}
+
+// GetHint returns the value of Hint.
+func (s *CreateFlowRequest) GetHint() OptFlowHint {
+	return s.Hint
+}
+
+// SetPurpose sets the value of Purpose.
+func (s *CreateFlowRequest) SetPurpose(val CreateFlowRequestPurpose) {
+	s.Purpose = val
+}
+
+// SetSlug sets the value of Slug.
+func (s *CreateFlowRequest) SetSlug(val OptString) {
+	s.Slug = val
+}
+
+// SetSchemaVersion sets the value of SchemaVersion.
+func (s *CreateFlowRequest) SetSchemaVersion(val OptString) {
+	s.SchemaVersion = val
+}
+
+// SetChallengeNonce sets the value of ChallengeNonce.
+func (s *CreateFlowRequest) SetChallengeNonce(val OptString) {
+	s.ChallengeNonce = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *CreateFlowRequest) SetSessionID(val OptString) {
+	s.SessionID = val
+}
+
+// SetAuthRequestID sets the value of AuthRequestID.
+func (s *CreateFlowRequest) SetAuthRequestID(val OptString) {
+	s.AuthRequestID = val
+}
+
+// SetRedirectURI sets the value of RedirectURI.
+func (s *CreateFlowRequest) SetRedirectURI(val OptURI) {
+	s.RedirectURI = val
+}
+
+// SetHint sets the value of Hint.
+func (s *CreateFlowRequest) SetHint(val OptFlowHint) {
+	s.Hint = val
+}
+
+type CreateFlowRequestPurpose string
+
 const (
-	UserSchemaCreateSchemaRevisionReq CreateSchemaRevisionReqType = "user-schema"
+	CreateFlowRequestPurposeLogin       CreateFlowRequestPurpose = "login"
+	CreateFlowRequestPurposeRegister    CreateFlowRequestPurpose = "register"
+	CreateFlowRequestPurposeRecovery    CreateFlowRequestPurpose = "recovery"
+	CreateFlowRequestPurposeProfiling   CreateFlowRequestPurpose = "profiling"
+	CreateFlowRequestPurposeReauth      CreateFlowRequestPurpose = "reauth"
+	CreateFlowRequestPurposeLinkAccount CreateFlowRequestPurpose = "link_account"
 )
 
-// IsUserSchema reports whether CreateSchemaRevisionReq is UserSchema.
-func (s CreateSchemaRevisionReq) IsUserSchema() bool {
-	return s.Type == UserSchemaCreateSchemaRevisionReq
-}
-
-// SetUserSchema sets CreateSchemaRevisionReq to UserSchema.
-func (s *CreateSchemaRevisionReq) SetUserSchema(v UserSchema) {
-	s.Type = UserSchemaCreateSchemaRevisionReq
-	s.UserSchema = v
-}
-
-// GetUserSchema returns UserSchema and true boolean if CreateSchemaRevisionReq is UserSchema.
-func (s CreateSchemaRevisionReq) GetUserSchema() (v UserSchema, ok bool) {
-	if !s.IsUserSchema() {
-		return v, false
+// AllValues returns all CreateFlowRequestPurpose values.
+func (CreateFlowRequestPurpose) AllValues() []CreateFlowRequestPurpose {
+	return []CreateFlowRequestPurpose{
+		CreateFlowRequestPurposeLogin,
+		CreateFlowRequestPurposeRegister,
+		CreateFlowRequestPurposeRecovery,
+		CreateFlowRequestPurposeProfiling,
+		CreateFlowRequestPurposeReauth,
+		CreateFlowRequestPurposeLinkAccount,
 	}
-	return s.UserSchema, true
 }
 
-// NewUserSchemaCreateSchemaRevisionReq returns new CreateSchemaRevisionReq from UserSchema.
-func NewUserSchemaCreateSchemaRevisionReq(v UserSchema) CreateSchemaRevisionReq {
-	var s CreateSchemaRevisionReq
-	s.SetUserSchema(v)
-	return s
+// MarshalText implements encoding.TextMarshaler.
+func (s CreateFlowRequestPurpose) MarshalText() ([]byte, error) {
+	switch s {
+	case CreateFlowRequestPurposeLogin:
+		return []byte(s), nil
+	case CreateFlowRequestPurposeRegister:
+		return []byte(s), nil
+	case CreateFlowRequestPurposeRecovery:
+		return []byte(s), nil
+	case CreateFlowRequestPurposeProfiling:
+		return []byte(s), nil
+	case CreateFlowRequestPurposeReauth:
+		return []byte(s), nil
+	case CreateFlowRequestPurposeLinkAccount:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *CreateFlowRequestPurpose) UnmarshalText(data []byte) error {
+	switch CreateFlowRequestPurpose(data) {
+	case CreateFlowRequestPurposeLogin:
+		*s = CreateFlowRequestPurposeLogin
+		return nil
+	case CreateFlowRequestPurposeRegister:
+		*s = CreateFlowRequestPurposeRegister
+		return nil
+	case CreateFlowRequestPurposeRecovery:
+		*s = CreateFlowRequestPurposeRecovery
+		return nil
+	case CreateFlowRequestPurposeProfiling:
+		*s = CreateFlowRequestPurposeProfiling
+		return nil
+	case CreateFlowRequestPurposeReauth:
+		*s = CreateFlowRequestPurposeReauth
+		return nil
+	case CreateFlowRequestPurposeLinkAccount:
+		*s = CreateFlowRequestPurposeLinkAccount
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
 }
 
 // Ref: #
@@ -258,16 +429,12 @@ func (s *ErrorDetails) SetDetails(val OptErrorDetailsDetails) {
 	s.Details = val
 }
 
-func (*ErrorDetails) authorizeDeviceRes()          {}
-func (*ErrorDetails) authorizeGetRes()             {}
-func (*ErrorDetails) createSchemaRes()             {}
-func (*ErrorDetails) createSchemaRevisionRes()     {}
-func (*ErrorDetails) endSessionRes()               {}
-func (*ErrorDetails) getSchemaByIdRes()            {}
-func (*ErrorDetails) getSchemaReleaseStateRes()    {}
-func (*ErrorDetails) getSchemaRevisionByIdRes()    {}
-func (*ErrorDetails) introspectRes()               {}
-func (*ErrorDetails) updateSchemaReleaseStateRes() {}
+func (*ErrorDetails) authorizeDeviceRes() {}
+func (*ErrorDetails) authorizeGetRes()    {}
+func (*ErrorDetails) createFlowRes()      {}
+func (*ErrorDetails) endSessionRes()      {}
+func (*ErrorDetails) introspectRes()      {}
+func (*ErrorDetails) submitFlowStepRes()  {}
 
 // Additional error-specific context.
 type ErrorDetailsDetails map[string]jx.Raw
@@ -307,6 +474,9 @@ func (s *ErrorDetailsStatusCode) SetResponse(val ErrorDetails) {
 	s.Response = val
 }
 
+func (*ErrorDetailsStatusCode) authorizeDeviceRes()        {}
+func (*ErrorDetailsStatusCode) authorizeGetRes()           {}
+func (*ErrorDetailsStatusCode) endSessionRes()             {}
 func (*ErrorDetailsStatusCode) getHealthRes()              {}
 func (*ErrorDetailsStatusCode) getKeysRes()                {}
 func (*ErrorDetailsStatusCode) getLiveRes()                {}
@@ -314,7 +484,1054 @@ func (*ErrorDetailsStatusCode) getOpenIDConfigurationRes() {}
 func (*ErrorDetailsStatusCode) getReadyRes()               {}
 func (*ErrorDetailsStatusCode) getTokenRes()               {}
 func (*ErrorDetailsStatusCode) getUserInfoRes()            {}
+func (*ErrorDetailsStatusCode) introspectRes()             {}
+func (*ErrorDetailsStatusCode) listUsersRes()              {}
 func (*ErrorDetailsStatusCode) revokeTokenRes()            {}
+
+// A data input capability. Describes what the user must provide.
+// Does not contain display text — only a `text_key` resolved client-side.
+// Ref: #
+type Field struct {
+	Type FieldType `json:"type"`
+	// Localization key for the field label.
+	TextKey  string  `json:"text_key"`
+	Required OptBool `json:"required"`
+	// Pre-filled value (e.g., email carried over from a pivot).
+	Value      jx.Raw             `json:"value"`
+	Validation OptFieldValidation `json:"validation"`
+}
+
+// GetType returns the value of Type.
+func (s *Field) GetType() FieldType {
+	return s.Type
+}
+
+// GetTextKey returns the value of TextKey.
+func (s *Field) GetTextKey() string {
+	return s.TextKey
+}
+
+// GetRequired returns the value of Required.
+func (s *Field) GetRequired() OptBool {
+	return s.Required
+}
+
+// GetValue returns the value of Value.
+func (s *Field) GetValue() jx.Raw {
+	return s.Value
+}
+
+// GetValidation returns the value of Validation.
+func (s *Field) GetValidation() OptFieldValidation {
+	return s.Validation
+}
+
+// SetType sets the value of Type.
+func (s *Field) SetType(val FieldType) {
+	s.Type = val
+}
+
+// SetTextKey sets the value of TextKey.
+func (s *Field) SetTextKey(val string) {
+	s.TextKey = val
+}
+
+// SetRequired sets the value of Required.
+func (s *Field) SetRequired(val OptBool) {
+	s.Required = val
+}
+
+// SetValue sets the value of Value.
+func (s *Field) SetValue(val jx.Raw) {
+	s.Value = val
+}
+
+// SetValidation sets the value of Validation.
+func (s *Field) SetValidation(val OptFieldValidation) {
+	s.Validation = val
+}
+
+type FieldType string
+
+const (
+	FieldTypeText     FieldType = "text"
+	FieldTypeEmail    FieldType = "email"
+	FieldTypePassword FieldType = "password"
+	FieldTypeTel      FieldType = "tel"
+	FieldTypeNumber   FieldType = "number"
+	FieldTypeURL      FieldType = "url"
+	FieldTypeDate     FieldType = "date"
+	FieldTypeHidden   FieldType = "hidden"
+)
+
+// AllValues returns all FieldType values.
+func (FieldType) AllValues() []FieldType {
+	return []FieldType{
+		FieldTypeText,
+		FieldTypeEmail,
+		FieldTypePassword,
+		FieldTypeTel,
+		FieldTypeNumber,
+		FieldTypeURL,
+		FieldTypeDate,
+		FieldTypeHidden,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FieldType) MarshalText() ([]byte, error) {
+	switch s {
+	case FieldTypeText:
+		return []byte(s), nil
+	case FieldTypeEmail:
+		return []byte(s), nil
+	case FieldTypePassword:
+		return []byte(s), nil
+	case FieldTypeTel:
+		return []byte(s), nil
+	case FieldTypeNumber:
+		return []byte(s), nil
+	case FieldTypeURL:
+		return []byte(s), nil
+	case FieldTypeDate:
+		return []byte(s), nil
+	case FieldTypeHidden:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FieldType) UnmarshalText(data []byte) error {
+	switch FieldType(data) {
+	case FieldTypeText:
+		*s = FieldTypeText
+		return nil
+	case FieldTypeEmail:
+		*s = FieldTypeEmail
+		return nil
+	case FieldTypePassword:
+		*s = FieldTypePassword
+		return nil
+	case FieldTypeTel:
+		*s = FieldTypeTel
+		return nil
+	case FieldTypeNumber:
+		*s = FieldTypeNumber
+		return nil
+	case FieldTypeURL:
+		*s = FieldTypeURL
+		return nil
+	case FieldTypeDate:
+		*s = FieldTypeDate
+		return nil
+	case FieldTypeHidden:
+		*s = FieldTypeHidden
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+type FieldValidation struct {
+	Format    OptString `json:"format"`
+	Pattern   OptString `json:"pattern"`
+	MinLength OptInt    `json:"min_length"`
+	MaxLength OptInt    `json:"max_length"`
+}
+
+// GetFormat returns the value of Format.
+func (s *FieldValidation) GetFormat() OptString {
+	return s.Format
+}
+
+// GetPattern returns the value of Pattern.
+func (s *FieldValidation) GetPattern() OptString {
+	return s.Pattern
+}
+
+// GetMinLength returns the value of MinLength.
+func (s *FieldValidation) GetMinLength() OptInt {
+	return s.MinLength
+}
+
+// GetMaxLength returns the value of MaxLength.
+func (s *FieldValidation) GetMaxLength() OptInt {
+	return s.MaxLength
+}
+
+// SetFormat sets the value of Format.
+func (s *FieldValidation) SetFormat(val OptString) {
+	s.Format = val
+}
+
+// SetPattern sets the value of Pattern.
+func (s *FieldValidation) SetPattern(val OptString) {
+	s.Pattern = val
+}
+
+// SetMinLength sets the value of MinLength.
+func (s *FieldValidation) SetMinLength(val OptInt) {
+	s.MinLength = val
+}
+
+// SetMaxLength sets the value of MaxLength.
+func (s *FieldValidation) SetMaxLength(val OptInt) {
+	s.MaxLength = val
+}
+
+// Ref: #
+type FlowEventRequest struct {
+	SessionToken string               `json:"session_token"`
+	Type         FlowEventRequestType `json:"type"`
+	// Event payload (fingerprint hash, timing data, etc.).
+	Payload OptFlowEventRequestPayload `json:"payload"`
+}
+
+// GetSessionToken returns the value of SessionToken.
+func (s *FlowEventRequest) GetSessionToken() string {
+	return s.SessionToken
+}
+
+// GetType returns the value of Type.
+func (s *FlowEventRequest) GetType() FlowEventRequestType {
+	return s.Type
+}
+
+// GetPayload returns the value of Payload.
+func (s *FlowEventRequest) GetPayload() OptFlowEventRequestPayload {
+	return s.Payload
+}
+
+// SetSessionToken sets the value of SessionToken.
+func (s *FlowEventRequest) SetSessionToken(val string) {
+	s.SessionToken = val
+}
+
+// SetType sets the value of Type.
+func (s *FlowEventRequest) SetType(val FlowEventRequestType) {
+	s.Type = val
+}
+
+// SetPayload sets the value of Payload.
+func (s *FlowEventRequest) SetPayload(val OptFlowEventRequestPayload) {
+	s.Payload = val
+}
+
+// Event payload (fingerprint hash, timing data, etc.).
+type FlowEventRequestPayload map[string]jx.Raw
+
+func (s *FlowEventRequestPayload) init() FlowEventRequestPayload {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+type FlowEventRequestType string
+
+const (
+	FlowEventRequestTypeFingerprint FlowEventRequestType = "fingerprint"
+	FlowEventRequestTypeTelemetry   FlowEventRequestType = "telemetry"
+)
+
+// AllValues returns all FlowEventRequestType values.
+func (FlowEventRequestType) AllValues() []FlowEventRequestType {
+	return []FlowEventRequestType{
+		FlowEventRequestTypeFingerprint,
+		FlowEventRequestTypeTelemetry,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FlowEventRequestType) MarshalText() ([]byte, error) {
+	switch s {
+	case FlowEventRequestTypeFingerprint:
+		return []byte(s), nil
+	case FlowEventRequestTypeTelemetry:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FlowEventRequestType) UnmarshalText(data []byte) error {
+	switch FlowEventRequestType(data) {
+	case FlowEventRequestTypeFingerprint:
+		*s = FlowEventRequestTypeFingerprint
+		return nil
+	case FlowEventRequestTypeTelemetry:
+		*s = FlowEventRequestTypeTelemetry
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Ref: #
+type FlowHint struct {
+	// Auto-submits identifier step (maps to OIDC login_hint).
+	LoginName OptString `json:"login_name"`
+	// Scopes flow resolution to a team.
+	TeamID OptString `json:"team_id"`
+	// Scopes to a specific user type.
+	SchemaID OptString `json:"schema_id"`
+	// Scopes to a specific application.
+	AppID OptString `json:"app_id"`
+}
+
+// GetLoginName returns the value of LoginName.
+func (s *FlowHint) GetLoginName() OptString {
+	return s.LoginName
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *FlowHint) GetTeamID() OptString {
+	return s.TeamID
+}
+
+// GetSchemaID returns the value of SchemaID.
+func (s *FlowHint) GetSchemaID() OptString {
+	return s.SchemaID
+}
+
+// GetAppID returns the value of AppID.
+func (s *FlowHint) GetAppID() OptString {
+	return s.AppID
+}
+
+// SetLoginName sets the value of LoginName.
+func (s *FlowHint) SetLoginName(val OptString) {
+	s.LoginName = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *FlowHint) SetTeamID(val OptString) {
+	s.TeamID = val
+}
+
+// SetSchemaID sets the value of SchemaID.
+func (s *FlowHint) SetSchemaID(val OptString) {
+	s.SchemaID = val
+}
+
+// SetAppID sets the value of AppID.
+func (s *FlowHint) SetAppID(val OptString) {
+	s.AppID = val
+}
+
+// Ref: #
+type FlowResponse struct {
+	// Flow handle. Use this as the path parameter for subsequent
+	// submit/event calls. May change between responses when a
+	// flow pivot or pop occurs.
+	ID string `json:"id"`
+	// Underlying session ID. Stable across all stacked flows.
+	SessionID string `json:"session_id"`
+	// Rotated on every response. Required for the next request.
+	SessionToken string   `json:"session_token"`
+	Step         FlowStep `json:"step"`
+	// Resolved branding inherited from the app → team → project hierarchy.
+	// Determined at flow creation based on audience context. Does not change between steps.
+	Branding OptBranding `json:"branding"`
+	// Present on the `complete` step when a redirect is needed.
+	RedirectURI OptURI `json:"redirect_uri"`
+	// Short-lived, audience-bound token produced on flow completion.
+	// Exchange it for a session via `POST /sessions/exchange`.
+	// Only present when `step.type` is `complete`.
+	HandoffToken OptString `json:"handoff_token"`
+	// Expiry timestamp for `handoff_token`. Only present when
+	// `handoff_token` is set.
+	HandoffTokenExpiresAt OptDateTime `json:"handoff_token_expires_at"`
+}
+
+// GetID returns the value of ID.
+func (s *FlowResponse) GetID() string {
+	return s.ID
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *FlowResponse) GetSessionID() string {
+	return s.SessionID
+}
+
+// GetSessionToken returns the value of SessionToken.
+func (s *FlowResponse) GetSessionToken() string {
+	return s.SessionToken
+}
+
+// GetStep returns the value of Step.
+func (s *FlowResponse) GetStep() FlowStep {
+	return s.Step
+}
+
+// GetBranding returns the value of Branding.
+func (s *FlowResponse) GetBranding() OptBranding {
+	return s.Branding
+}
+
+// GetRedirectURI returns the value of RedirectURI.
+func (s *FlowResponse) GetRedirectURI() OptURI {
+	return s.RedirectURI
+}
+
+// GetHandoffToken returns the value of HandoffToken.
+func (s *FlowResponse) GetHandoffToken() OptString {
+	return s.HandoffToken
+}
+
+// GetHandoffTokenExpiresAt returns the value of HandoffTokenExpiresAt.
+func (s *FlowResponse) GetHandoffTokenExpiresAt() OptDateTime {
+	return s.HandoffTokenExpiresAt
+}
+
+// SetID sets the value of ID.
+func (s *FlowResponse) SetID(val string) {
+	s.ID = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *FlowResponse) SetSessionID(val string) {
+	s.SessionID = val
+}
+
+// SetSessionToken sets the value of SessionToken.
+func (s *FlowResponse) SetSessionToken(val string) {
+	s.SessionToken = val
+}
+
+// SetStep sets the value of Step.
+func (s *FlowResponse) SetStep(val FlowStep) {
+	s.Step = val
+}
+
+// SetBranding sets the value of Branding.
+func (s *FlowResponse) SetBranding(val OptBranding) {
+	s.Branding = val
+}
+
+// SetRedirectURI sets the value of RedirectURI.
+func (s *FlowResponse) SetRedirectURI(val OptURI) {
+	s.RedirectURI = val
+}
+
+// SetHandoffToken sets the value of HandoffToken.
+func (s *FlowResponse) SetHandoffToken(val OptString) {
+	s.HandoffToken = val
+}
+
+// SetHandoffTokenExpiresAt sets the value of HandoffTokenExpiresAt.
+func (s *FlowResponse) SetHandoffTokenExpiresAt(val OptDateTime) {
+	s.HandoffTokenExpiresAt = val
+}
+
+func (*FlowResponse) getFlowStepRes() {}
+
+// FlowResponseHeaders wraps FlowResponse with response headers.
+type FlowResponseHeaders struct {
+	SetCookie OptString
+	Response  FlowResponse
+}
+
+// GetSetCookie returns the value of SetCookie.
+func (s *FlowResponseHeaders) GetSetCookie() OptString {
+	return s.SetCookie
+}
+
+// GetResponse returns the value of Response.
+func (s *FlowResponseHeaders) GetResponse() FlowResponse {
+	return s.Response
+}
+
+// SetSetCookie sets the value of SetCookie.
+func (s *FlowResponseHeaders) SetSetCookie(val OptString) {
+	s.SetCookie = val
+}
+
+// SetResponse sets the value of Response.
+func (s *FlowResponseHeaders) SetResponse(val FlowResponse) {
+	s.Response = val
+}
+
+func (*FlowResponseHeaders) createFlowRes() {}
+
+// A step contains unordered capability dictionaries: what to collect (fields),
+// what the user can do (actions), and what security gates must be satisfied (gates).
+// Layout and element ordering are controlled by the LiquidJS template in `branding.liquid_template`.
+// Ref: #
+type FlowStep struct {
+	// Step name from the flow definition.
+	Name string `json:"name"`
+	// Semantic step type. This is a hint, not a rendering instruction — the
+	// LiquidJS template controls layout. The frontend does NOT switch on type
+	// to decide what to render; it renders the capability dictionaries
+	// (fields, actions, gates, sso_providers) using the template.
+	// Type is useful for:
+	// - Accessibility: screen readers can announce "credential step"
+	// - Analytics: track drop-off rates per step type
+	// - Special behavior: `redirect` and `complete` have hardcoded
+	// frontend behavior (navigate away) that templates cannot override
+	// - Gate auto-injection: backend uses type to enforce gates even if
+	// the template omits them (e.g. `captcha` type always requires a
+	// captcha gate)
+	// The following types are rendered by the frontend:
+	// - identifier: collect login handle (email, phone, username)
+	// - credential: collect secret (password, OTP, passkey proof)
+	// - form: generic data collection (profile, address)
+	// - verification: email/phone code entry
+	// - consent: terms, scopes, permissions (approve/deny)
+	// - info: read-only screen (success message, warning)
+	// - captcha: dedicated captcha challenge
+	// - redirect: navigate to redirect_url immediately, no UI rendered
+	// - complete: flow is done — check `behavior` field
+	// The following types exist only in flow definitions and are never
+	// sent to the frontend (the engine auto-transitions through them):
+	// - policy_check: evaluate a policy condition, pick next step
+	// - action: execute a server-side mutation (create session, etc.).
+	Type  FlowStepType `json:"type"`
+	Texts OptStepTexts `json:"texts"`
+	// Error message from a previous failed submission.
+	Error OptNilString `json:"error"`
+	// Only present on `complete` steps. Tells the frontend what to do:
+	// - redirect: navigate to redirect_uri immediately (OIDC/SAML done)
+	// - show: render the step as a success screen (e.g., registration confirmed).
+	Behavior OptFlowStepBehavior `json:"behavior"`
+	// For `redirect` steps — URL to navigate to (e.g., SSO provider).
+	RedirectURL OptURI `json:"redirect_url"`
+	// Unordered dictionary of input fields to collect. Keyed by field name.
+	// The LiquidJS template controls which fields appear and in what order.
+	Fields FlowStepFields `json:"fields"`
+	// Unordered dictionary of available user actions. Keyed by action name.
+	// The LiquidJS template controls positioning and presentation.
+	Actions FlowStepActions `json:"actions"`
+	// Security gates that must be satisfied before the step can be submitted.
+	// The orchestrator appends any required but unrendered gates as a safety net.
+	Gates FlowStepGates `json:"gates"`
+	// Available SSO identity providers for this step.
+	SSOProviders []SSOProvider `json:"sso_providers"`
+}
+
+// GetName returns the value of Name.
+func (s *FlowStep) GetName() string {
+	return s.Name
+}
+
+// GetType returns the value of Type.
+func (s *FlowStep) GetType() FlowStepType {
+	return s.Type
+}
+
+// GetTexts returns the value of Texts.
+func (s *FlowStep) GetTexts() OptStepTexts {
+	return s.Texts
+}
+
+// GetError returns the value of Error.
+func (s *FlowStep) GetError() OptNilString {
+	return s.Error
+}
+
+// GetBehavior returns the value of Behavior.
+func (s *FlowStep) GetBehavior() OptFlowStepBehavior {
+	return s.Behavior
+}
+
+// GetRedirectURL returns the value of RedirectURL.
+func (s *FlowStep) GetRedirectURL() OptURI {
+	return s.RedirectURL
+}
+
+// GetFields returns the value of Fields.
+func (s *FlowStep) GetFields() FlowStepFields {
+	return s.Fields
+}
+
+// GetActions returns the value of Actions.
+func (s *FlowStep) GetActions() FlowStepActions {
+	return s.Actions
+}
+
+// GetGates returns the value of Gates.
+func (s *FlowStep) GetGates() FlowStepGates {
+	return s.Gates
+}
+
+// GetSSOProviders returns the value of SSOProviders.
+func (s *FlowStep) GetSSOProviders() []SSOProvider {
+	return s.SSOProviders
+}
+
+// SetName sets the value of Name.
+func (s *FlowStep) SetName(val string) {
+	s.Name = val
+}
+
+// SetType sets the value of Type.
+func (s *FlowStep) SetType(val FlowStepType) {
+	s.Type = val
+}
+
+// SetTexts sets the value of Texts.
+func (s *FlowStep) SetTexts(val OptStepTexts) {
+	s.Texts = val
+}
+
+// SetError sets the value of Error.
+func (s *FlowStep) SetError(val OptNilString) {
+	s.Error = val
+}
+
+// SetBehavior sets the value of Behavior.
+func (s *FlowStep) SetBehavior(val OptFlowStepBehavior) {
+	s.Behavior = val
+}
+
+// SetRedirectURL sets the value of RedirectURL.
+func (s *FlowStep) SetRedirectURL(val OptURI) {
+	s.RedirectURL = val
+}
+
+// SetFields sets the value of Fields.
+func (s *FlowStep) SetFields(val FlowStepFields) {
+	s.Fields = val
+}
+
+// SetActions sets the value of Actions.
+func (s *FlowStep) SetActions(val FlowStepActions) {
+	s.Actions = val
+}
+
+// SetGates sets the value of Gates.
+func (s *FlowStep) SetGates(val FlowStepGates) {
+	s.Gates = val
+}
+
+// SetSSOProviders sets the value of SSOProviders.
+func (s *FlowStep) SetSSOProviders(val []SSOProvider) {
+	s.SSOProviders = val
+}
+
+// Unordered dictionary of available user actions. Keyed by action name.
+// The LiquidJS template controls positioning and presentation.
+type FlowStepActions map[string]StepAction
+
+func (s *FlowStepActions) init() FlowStepActions {
+	m := *s
+	if m == nil {
+		m = map[string]StepAction{}
+		*s = m
+	}
+	return m
+}
+
+// Only present on `complete` steps. Tells the frontend what to do:
+// - redirect: navigate to redirect_uri immediately (OIDC/SAML done)
+// - show: render the step as a success screen (e.g., registration confirmed).
+type FlowStepBehavior string
+
+const (
+	FlowStepBehaviorRedirect FlowStepBehavior = "redirect"
+	FlowStepBehaviorShow     FlowStepBehavior = "show"
+)
+
+// AllValues returns all FlowStepBehavior values.
+func (FlowStepBehavior) AllValues() []FlowStepBehavior {
+	return []FlowStepBehavior{
+		FlowStepBehaviorRedirect,
+		FlowStepBehaviorShow,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FlowStepBehavior) MarshalText() ([]byte, error) {
+	switch s {
+	case FlowStepBehaviorRedirect:
+		return []byte(s), nil
+	case FlowStepBehaviorShow:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FlowStepBehavior) UnmarshalText(data []byte) error {
+	switch FlowStepBehavior(data) {
+	case FlowStepBehaviorRedirect:
+		*s = FlowStepBehaviorRedirect
+		return nil
+	case FlowStepBehaviorShow:
+		*s = FlowStepBehaviorShow
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Unordered dictionary of input fields to collect. Keyed by field name.
+// The LiquidJS template controls which fields appear and in what order.
+type FlowStepFields map[string]Field
+
+func (s *FlowStepFields) init() FlowStepFields {
+	m := *s
+	if m == nil {
+		m = map[string]Field{}
+		*s = m
+	}
+	return m
+}
+
+// Security gates that must be satisfied before the step can be submitted.
+// The orchestrator appends any required but unrendered gates as a safety net.
+type FlowStepGates map[string]Gate
+
+func (s *FlowStepGates) init() FlowStepGates {
+	m := *s
+	if m == nil {
+		m = map[string]Gate{}
+		*s = m
+	}
+	return m
+}
+
+// Semantic step type. This is a hint, not a rendering instruction — the
+// LiquidJS template controls layout. The frontend does NOT switch on type
+// to decide what to render; it renders the capability dictionaries
+// (fields, actions, gates, sso_providers) using the template.
+// Type is useful for:
+// - Accessibility: screen readers can announce "credential step"
+// - Analytics: track drop-off rates per step type
+// - Special behavior: `redirect` and `complete` have hardcoded
+// frontend behavior (navigate away) that templates cannot override
+// - Gate auto-injection: backend uses type to enforce gates even if
+// the template omits them (e.g. `captcha` type always requires a
+// captcha gate)
+// The following types are rendered by the frontend:
+// - identifier: collect login handle (email, phone, username)
+// - credential: collect secret (password, OTP, passkey proof)
+// - form: generic data collection (profile, address)
+// - verification: email/phone code entry
+// - consent: terms, scopes, permissions (approve/deny)
+// - info: read-only screen (success message, warning)
+// - captcha: dedicated captcha challenge
+// - redirect: navigate to redirect_url immediately, no UI rendered
+// - complete: flow is done — check `behavior` field
+// The following types exist only in flow definitions and are never
+// sent to the frontend (the engine auto-transitions through them):
+// - policy_check: evaluate a policy condition, pick next step
+// - action: execute a server-side mutation (create session, etc.).
+type FlowStepType string
+
+const (
+	FlowStepTypeIdentifier   FlowStepType = "identifier"
+	FlowStepTypeCredential   FlowStepType = "credential"
+	FlowStepTypeForm         FlowStepType = "form"
+	FlowStepTypeVerification FlowStepType = "verification"
+	FlowStepTypeConsent      FlowStepType = "consent"
+	FlowStepTypeInfo         FlowStepType = "info"
+	FlowStepTypeRedirect     FlowStepType = "redirect"
+	FlowStepTypeCaptcha      FlowStepType = "captcha"
+	FlowStepTypeComplete     FlowStepType = "complete"
+)
+
+// AllValues returns all FlowStepType values.
+func (FlowStepType) AllValues() []FlowStepType {
+	return []FlowStepType{
+		FlowStepTypeIdentifier,
+		FlowStepTypeCredential,
+		FlowStepTypeForm,
+		FlowStepTypeVerification,
+		FlowStepTypeConsent,
+		FlowStepTypeInfo,
+		FlowStepTypeRedirect,
+		FlowStepTypeCaptcha,
+		FlowStepTypeComplete,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FlowStepType) MarshalText() ([]byte, error) {
+	switch s {
+	case FlowStepTypeIdentifier:
+		return []byte(s), nil
+	case FlowStepTypeCredential:
+		return []byte(s), nil
+	case FlowStepTypeForm:
+		return []byte(s), nil
+	case FlowStepTypeVerification:
+		return []byte(s), nil
+	case FlowStepTypeConsent:
+		return []byte(s), nil
+	case FlowStepTypeInfo:
+		return []byte(s), nil
+	case FlowStepTypeRedirect:
+		return []byte(s), nil
+	case FlowStepTypeCaptcha:
+		return []byte(s), nil
+	case FlowStepTypeComplete:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FlowStepType) UnmarshalText(data []byte) error {
+	switch FlowStepType(data) {
+	case FlowStepTypeIdentifier:
+		*s = FlowStepTypeIdentifier
+		return nil
+	case FlowStepTypeCredential:
+		*s = FlowStepTypeCredential
+		return nil
+	case FlowStepTypeForm:
+		*s = FlowStepTypeForm
+		return nil
+	case FlowStepTypeVerification:
+		*s = FlowStepTypeVerification
+		return nil
+	case FlowStepTypeConsent:
+		*s = FlowStepTypeConsent
+		return nil
+	case FlowStepTypeInfo:
+		*s = FlowStepTypeInfo
+		return nil
+	case FlowStepTypeRedirect:
+		*s = FlowStepTypeRedirect
+		return nil
+	case FlowStepTypeCaptcha:
+		*s = FlowStepTypeCaptcha
+		return nil
+	case FlowStepTypeComplete:
+		*s = FlowStepTypeComplete
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Ref: #
+type FlowSubmitRequest struct {
+	SessionToken string `json:"session_token"`
+	// Which action to take. Either:
+	// - A key from the step's `actions` dictionary (e.g., "submit", "register", "back")
+	// - The reserved value "sso" — triggers SSO redirect (requires `sso_provider_id`).
+	Action string `json:"action"`
+	// User input values. Keys match field names from the step's `fields` dictionary.
+	Fields OptFlowSubmitRequestFields `json:"fields"`
+	// Solutions for security gates. Keys match gate names from the step's `gates` dictionary.
+	// The orchestrator collects these from `<zl-captcha>` / `<zl-passkey>` component events.
+	GateProofs OptFlowSubmitRequestGateProofs `json:"gate_proofs"`
+	// ID of the selected SSO provider (from `sso_providers[].id`).
+	// Required when `action` is "sso".
+	SSOProviderID OptString `json:"sso_provider_id"`
+}
+
+// GetSessionToken returns the value of SessionToken.
+func (s *FlowSubmitRequest) GetSessionToken() string {
+	return s.SessionToken
+}
+
+// GetAction returns the value of Action.
+func (s *FlowSubmitRequest) GetAction() string {
+	return s.Action
+}
+
+// GetFields returns the value of Fields.
+func (s *FlowSubmitRequest) GetFields() OptFlowSubmitRequestFields {
+	return s.Fields
+}
+
+// GetGateProofs returns the value of GateProofs.
+func (s *FlowSubmitRequest) GetGateProofs() OptFlowSubmitRequestGateProofs {
+	return s.GateProofs
+}
+
+// GetSSOProviderID returns the value of SSOProviderID.
+func (s *FlowSubmitRequest) GetSSOProviderID() OptString {
+	return s.SSOProviderID
+}
+
+// SetSessionToken sets the value of SessionToken.
+func (s *FlowSubmitRequest) SetSessionToken(val string) {
+	s.SessionToken = val
+}
+
+// SetAction sets the value of Action.
+func (s *FlowSubmitRequest) SetAction(val string) {
+	s.Action = val
+}
+
+// SetFields sets the value of Fields.
+func (s *FlowSubmitRequest) SetFields(val OptFlowSubmitRequestFields) {
+	s.Fields = val
+}
+
+// SetGateProofs sets the value of GateProofs.
+func (s *FlowSubmitRequest) SetGateProofs(val OptFlowSubmitRequestGateProofs) {
+	s.GateProofs = val
+}
+
+// SetSSOProviderID sets the value of SSOProviderID.
+func (s *FlowSubmitRequest) SetSSOProviderID(val OptString) {
+	s.SSOProviderID = val
+}
+
+// User input values. Keys match field names from the step's `fields` dictionary.
+type FlowSubmitRequestFields map[string]jx.Raw
+
+func (s *FlowSubmitRequestFields) init() FlowSubmitRequestFields {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Solutions for security gates. Keys match gate names from the step's `gates` dictionary.
+// The orchestrator collects these from `<zl-captcha>` / `<zl-passkey>` component events.
+type FlowSubmitRequestGateProofs map[string]string
+
+func (s *FlowSubmitRequestGateProofs) init() FlowSubmitRequestGateProofs {
+	m := *s
+	if m == nil {
+		m = map[string]string{}
+		*s = m
+	}
+	return m
+}
+
+// A security gate that must be satisfied. The orchestrator appends any
+// required-but-unrendered gates automatically as a safety net.
+// Ref: #
+type Gate struct {
+	// Gate type.
+	Type GateType `json:"type"`
+	// Provider identifier (e.g., "altcha", "turnstile").
+	Provider OptString `json:"provider"`
+	Required OptBool   `json:"required"`
+	// Whether this gate has already been satisfied in this flow.
+	Satisfied OptBool `json:"satisfied"`
+	// Provider-specific challenge parameters.
+	Config OptGateConfig `json:"config"`
+}
+
+// GetType returns the value of Type.
+func (s *Gate) GetType() GateType {
+	return s.Type
+}
+
+// GetProvider returns the value of Provider.
+func (s *Gate) GetProvider() OptString {
+	return s.Provider
+}
+
+// GetRequired returns the value of Required.
+func (s *Gate) GetRequired() OptBool {
+	return s.Required
+}
+
+// GetSatisfied returns the value of Satisfied.
+func (s *Gate) GetSatisfied() OptBool {
+	return s.Satisfied
+}
+
+// GetConfig returns the value of Config.
+func (s *Gate) GetConfig() OptGateConfig {
+	return s.Config
+}
+
+// SetType sets the value of Type.
+func (s *Gate) SetType(val GateType) {
+	s.Type = val
+}
+
+// SetProvider sets the value of Provider.
+func (s *Gate) SetProvider(val OptString) {
+	s.Provider = val
+}
+
+// SetRequired sets the value of Required.
+func (s *Gate) SetRequired(val OptBool) {
+	s.Required = val
+}
+
+// SetSatisfied sets the value of Satisfied.
+func (s *Gate) SetSatisfied(val OptBool) {
+	s.Satisfied = val
+}
+
+// SetConfig sets the value of Config.
+func (s *Gate) SetConfig(val OptGateConfig) {
+	s.Config = val
+}
+
+// Provider-specific challenge parameters.
+type GateConfig map[string]jx.Raw
+
+func (s *GateConfig) init() GateConfig {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Gate type.
+type GateType string
+
+const (
+	GateTypeCaptcha GateType = "captcha"
+	GateTypePasskey GateType = "passkey"
+)
+
+// AllValues returns all GateType values.
+func (GateType) AllValues() []GateType {
+	return []GateType{
+		GateTypeCaptcha,
+		GateTypePasskey,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s GateType) MarshalText() ([]byte, error) {
+	switch s {
+	case GateTypeCaptcha:
+		return []byte(s), nil
+	case GateTypePasskey:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *GateType) UnmarshalText(data []byte) error {
+	switch GateType(data) {
+	case GateTypeCaptcha:
+		*s = GateTypeCaptcha
+		return nil
+	case GateTypePasskey:
+		*s = GateTypePasskey
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+type GetFlowStepGone ErrorDetails
+
+func (*GetFlowStepGone) getFlowStepRes() {}
+
+type GetFlowStepNotFound ErrorDetails
+
+func (*GetFlowStepNotFound) getFlowStepRes() {}
 
 type GetHealthOK struct {
 	Data io.Reader
@@ -363,88 +1580,6 @@ func (s GetReadyOK) Read(p []byte) (n int, err error) {
 }
 
 func (*GetReadyOK) getReadyRes() {}
-
-// GetSchemaByIdOK represents sum type.
-type GetSchemaByIdOK struct {
-	Type       GetSchemaByIdOKType // switch on this field
-	UserSchema UserSchema
-}
-
-// GetSchemaByIdOKType is oneOf type of GetSchemaByIdOK.
-type GetSchemaByIdOKType string
-
-// Possible values for GetSchemaByIdOKType.
-const (
-	UserSchemaGetSchemaByIdOK GetSchemaByIdOKType = "user-schema"
-)
-
-// IsUserSchema reports whether GetSchemaByIdOK is UserSchema.
-func (s GetSchemaByIdOK) IsUserSchema() bool { return s.Type == UserSchemaGetSchemaByIdOK }
-
-// SetUserSchema sets GetSchemaByIdOK to UserSchema.
-func (s *GetSchemaByIdOK) SetUserSchema(v UserSchema) {
-	s.Type = UserSchemaGetSchemaByIdOK
-	s.UserSchema = v
-}
-
-// GetUserSchema returns UserSchema and true boolean if GetSchemaByIdOK is UserSchema.
-func (s GetSchemaByIdOK) GetUserSchema() (v UserSchema, ok bool) {
-	if !s.IsUserSchema() {
-		return v, false
-	}
-	return s.UserSchema, true
-}
-
-// NewUserSchemaGetSchemaByIdOK returns new GetSchemaByIdOK from UserSchema.
-func NewUserSchemaGetSchemaByIdOK(v UserSchema) GetSchemaByIdOK {
-	var s GetSchemaByIdOK
-	s.SetUserSchema(v)
-	return s
-}
-
-func (*GetSchemaByIdOK) getSchemaByIdRes() {}
-
-// GetSchemaRevisionByIdOK represents sum type.
-type GetSchemaRevisionByIdOK struct {
-	Type       GetSchemaRevisionByIdOKType // switch on this field
-	UserSchema UserSchema
-}
-
-// GetSchemaRevisionByIdOKType is oneOf type of GetSchemaRevisionByIdOK.
-type GetSchemaRevisionByIdOKType string
-
-// Possible values for GetSchemaRevisionByIdOKType.
-const (
-	UserSchemaGetSchemaRevisionByIdOK GetSchemaRevisionByIdOKType = "user-schema"
-)
-
-// IsUserSchema reports whether GetSchemaRevisionByIdOK is UserSchema.
-func (s GetSchemaRevisionByIdOK) IsUserSchema() bool {
-	return s.Type == UserSchemaGetSchemaRevisionByIdOK
-}
-
-// SetUserSchema sets GetSchemaRevisionByIdOK to UserSchema.
-func (s *GetSchemaRevisionByIdOK) SetUserSchema(v UserSchema) {
-	s.Type = UserSchemaGetSchemaRevisionByIdOK
-	s.UserSchema = v
-}
-
-// GetUserSchema returns UserSchema and true boolean if GetSchemaRevisionByIdOK is UserSchema.
-func (s GetSchemaRevisionByIdOK) GetUserSchema() (v UserSchema, ok bool) {
-	if !s.IsUserSchema() {
-		return v, false
-	}
-	return s.UserSchema, true
-}
-
-// NewUserSchemaGetSchemaRevisionByIdOK returns new GetSchemaRevisionByIdOK from UserSchema.
-func NewUserSchemaGetSchemaRevisionByIdOK(v UserSchema) GetSchemaRevisionByIdOK {
-	var s GetSchemaRevisionByIdOK
-	s.SetUserSchema(v)
-	return s
-}
-
-func (*GetSchemaRevisionByIdOK) getSchemaRevisionByIdRes() {}
 
 type GetUserInfoOK struct {
 	// The unique identifier for the user.
@@ -964,133 +2099,6 @@ func (*ListUsersInternalServerError) listUsersRes() {}
 type ListUsersOKApplicationJSON []jx.Raw
 
 func (*ListUsersOKApplicationJSON) listUsersRes() {}
-
-// Ref: #
-type NestedUserProperty struct {
-	// The title of the user definition.
-	Title OptString                 `json:"title"`
-	Type  OptNestedUserPropertyType `json:"type"`
-	// A list of required fields for the user definition.
-	Required []string `json:"required"`
-	// A map of additional properties for the user definition, where the key
-	// is the property name and the value is the property schema.
-	Properties OptNestedUserPropertyProperties `json:"properties"`
-}
-
-// GetTitle returns the value of Title.
-func (s *NestedUserProperty) GetTitle() OptString {
-	return s.Title
-}
-
-// GetType returns the value of Type.
-func (s *NestedUserProperty) GetType() OptNestedUserPropertyType {
-	return s.Type
-}
-
-// GetRequired returns the value of Required.
-func (s *NestedUserProperty) GetRequired() []string {
-	return s.Required
-}
-
-// GetProperties returns the value of Properties.
-func (s *NestedUserProperty) GetProperties() OptNestedUserPropertyProperties {
-	return s.Properties
-}
-
-// SetTitle sets the value of Title.
-func (s *NestedUserProperty) SetTitle(val OptString) {
-	s.Title = val
-}
-
-// SetType sets the value of Type.
-func (s *NestedUserProperty) SetType(val OptNestedUserPropertyType) {
-	s.Type = val
-}
-
-// SetRequired sets the value of Required.
-func (s *NestedUserProperty) SetRequired(val []string) {
-	s.Required = val
-}
-
-// SetProperties sets the value of Properties.
-func (s *NestedUserProperty) SetProperties(val OptNestedUserPropertyProperties) {
-	s.Properties = val
-}
-
-// A map of additional properties for the user definition, where the key
-// is the property name and the value is the property schema.
-type NestedUserPropertyProperties map[string]NestedUserProperty
-
-func (s *NestedUserPropertyProperties) init() NestedUserPropertyProperties {
-	m := *s
-	if m == nil {
-		m = map[string]NestedUserProperty{}
-		*s = m
-	}
-	return m
-}
-
-type NestedUserPropertyType string
-
-const (
-	NestedUserPropertyTypeString  NestedUserPropertyType = "string"
-	NestedUserPropertyTypeNumber  NestedUserPropertyType = "number"
-	NestedUserPropertyTypeBoolean NestedUserPropertyType = "boolean"
-	NestedUserPropertyTypeObject  NestedUserPropertyType = "object"
-	NestedUserPropertyTypeArray   NestedUserPropertyType = "array"
-)
-
-// AllValues returns all NestedUserPropertyType values.
-func (NestedUserPropertyType) AllValues() []NestedUserPropertyType {
-	return []NestedUserPropertyType{
-		NestedUserPropertyTypeString,
-		NestedUserPropertyTypeNumber,
-		NestedUserPropertyTypeBoolean,
-		NestedUserPropertyTypeObject,
-		NestedUserPropertyTypeArray,
-	}
-}
-
-// MarshalText implements encoding.TextMarshaler.
-func (s NestedUserPropertyType) MarshalText() ([]byte, error) {
-	switch s {
-	case NestedUserPropertyTypeString:
-		return []byte(s), nil
-	case NestedUserPropertyTypeNumber:
-		return []byte(s), nil
-	case NestedUserPropertyTypeBoolean:
-		return []byte(s), nil
-	case NestedUserPropertyTypeObject:
-		return []byte(s), nil
-	case NestedUserPropertyTypeArray:
-		return []byte(s), nil
-	default:
-		return nil, errors.Errorf("invalid value: %q", s)
-	}
-}
-
-// UnmarshalText implements encoding.TextUnmarshaler.
-func (s *NestedUserPropertyType) UnmarshalText(data []byte) error {
-	switch NestedUserPropertyType(data) {
-	case NestedUserPropertyTypeString:
-		*s = NestedUserPropertyTypeString
-		return nil
-	case NestedUserPropertyTypeNumber:
-		*s = NestedUserPropertyTypeNumber
-		return nil
-	case NestedUserPropertyTypeBoolean:
-		*s = NestedUserPropertyTypeBoolean
-		return nil
-	case NestedUserPropertyTypeObject:
-		*s = NestedUserPropertyTypeObject
-		return nil
-	case NestedUserPropertyTypeArray:
-		*s = NestedUserPropertyTypeArray
-		return nil
-	default:
-		return errors.Errorf("invalid value: %q", data)
-	}
-}
 
 type OAuth2 struct {
 	Token  string
@@ -1818,6 +2826,144 @@ func (o OptBool) Or(d bool) bool {
 	return d
 }
 
+// NewOptBranding returns new OptBranding with value set to v.
+func NewOptBranding(v Branding) OptBranding {
+	return OptBranding{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptBranding is optional Branding.
+type OptBranding struct {
+	Value Branding
+	Set   bool
+}
+
+// IsSet returns true if OptBranding was set.
+func (o OptBranding) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptBranding) Reset() {
+	var v Branding
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptBranding) SetTo(v Branding) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptBranding) Get() (v Branding, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptBranding) Or(d Branding) Branding {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptBrandingLayout returns new OptBrandingLayout with value set to v.
+func NewOptBrandingLayout(v BrandingLayout) OptBrandingLayout {
+	return OptBrandingLayout{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptBrandingLayout is optional BrandingLayout.
+type OptBrandingLayout struct {
+	Value BrandingLayout
+	Set   bool
+}
+
+// IsSet returns true if OptBrandingLayout was set.
+func (o OptBrandingLayout) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptBrandingLayout) Reset() {
+	var v BrandingLayout
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptBrandingLayout) SetTo(v BrandingLayout) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptBrandingLayout) Get() (v BrandingLayout, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptBrandingLayout) Or(d BrandingLayout) BrandingLayout {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptDateTime returns new OptDateTime with value set to v.
+func NewOptDateTime(v time.Time) OptDateTime {
+	return OptDateTime{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptDateTime is optional time.Time.
+type OptDateTime struct {
+	Value time.Time
+	Set   bool
+}
+
+// IsSet returns true if OptDateTime was set.
+func (o OptDateTime) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptDateTime) Reset() {
+	var v time.Time
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptDateTime) SetTo(v time.Time) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptDateTime) Get() (v time.Time, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptDateTime) Or(d time.Time) time.Time {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptErrorDetailsDetails returns new OptErrorDetailsDetails with value set to v.
 func NewOptErrorDetailsDetails(v ErrorDetailsDetails) OptErrorDetailsDetails {
 	return OptErrorDetailsDetails{
@@ -1864,6 +3010,328 @@ func (o OptErrorDetailsDetails) Or(d ErrorDetailsDetails) ErrorDetailsDetails {
 	return d
 }
 
+// NewOptFieldValidation returns new OptFieldValidation with value set to v.
+func NewOptFieldValidation(v FieldValidation) OptFieldValidation {
+	return OptFieldValidation{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFieldValidation is optional FieldValidation.
+type OptFieldValidation struct {
+	Value FieldValidation
+	Set   bool
+}
+
+// IsSet returns true if OptFieldValidation was set.
+func (o OptFieldValidation) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFieldValidation) Reset() {
+	var v FieldValidation
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFieldValidation) SetTo(v FieldValidation) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFieldValidation) Get() (v FieldValidation, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFieldValidation) Or(d FieldValidation) FieldValidation {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptFlowEventRequestPayload returns new OptFlowEventRequestPayload with value set to v.
+func NewOptFlowEventRequestPayload(v FlowEventRequestPayload) OptFlowEventRequestPayload {
+	return OptFlowEventRequestPayload{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFlowEventRequestPayload is optional FlowEventRequestPayload.
+type OptFlowEventRequestPayload struct {
+	Value FlowEventRequestPayload
+	Set   bool
+}
+
+// IsSet returns true if OptFlowEventRequestPayload was set.
+func (o OptFlowEventRequestPayload) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFlowEventRequestPayload) Reset() {
+	var v FlowEventRequestPayload
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFlowEventRequestPayload) SetTo(v FlowEventRequestPayload) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFlowEventRequestPayload) Get() (v FlowEventRequestPayload, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFlowEventRequestPayload) Or(d FlowEventRequestPayload) FlowEventRequestPayload {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptFlowHint returns new OptFlowHint with value set to v.
+func NewOptFlowHint(v FlowHint) OptFlowHint {
+	return OptFlowHint{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFlowHint is optional FlowHint.
+type OptFlowHint struct {
+	Value FlowHint
+	Set   bool
+}
+
+// IsSet returns true if OptFlowHint was set.
+func (o OptFlowHint) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFlowHint) Reset() {
+	var v FlowHint
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFlowHint) SetTo(v FlowHint) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFlowHint) Get() (v FlowHint, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFlowHint) Or(d FlowHint) FlowHint {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptFlowStepBehavior returns new OptFlowStepBehavior with value set to v.
+func NewOptFlowStepBehavior(v FlowStepBehavior) OptFlowStepBehavior {
+	return OptFlowStepBehavior{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFlowStepBehavior is optional FlowStepBehavior.
+type OptFlowStepBehavior struct {
+	Value FlowStepBehavior
+	Set   bool
+}
+
+// IsSet returns true if OptFlowStepBehavior was set.
+func (o OptFlowStepBehavior) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFlowStepBehavior) Reset() {
+	var v FlowStepBehavior
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFlowStepBehavior) SetTo(v FlowStepBehavior) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFlowStepBehavior) Get() (v FlowStepBehavior, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFlowStepBehavior) Or(d FlowStepBehavior) FlowStepBehavior {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptFlowSubmitRequestFields returns new OptFlowSubmitRequestFields with value set to v.
+func NewOptFlowSubmitRequestFields(v FlowSubmitRequestFields) OptFlowSubmitRequestFields {
+	return OptFlowSubmitRequestFields{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFlowSubmitRequestFields is optional FlowSubmitRequestFields.
+type OptFlowSubmitRequestFields struct {
+	Value FlowSubmitRequestFields
+	Set   bool
+}
+
+// IsSet returns true if OptFlowSubmitRequestFields was set.
+func (o OptFlowSubmitRequestFields) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFlowSubmitRequestFields) Reset() {
+	var v FlowSubmitRequestFields
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFlowSubmitRequestFields) SetTo(v FlowSubmitRequestFields) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFlowSubmitRequestFields) Get() (v FlowSubmitRequestFields, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFlowSubmitRequestFields) Or(d FlowSubmitRequestFields) FlowSubmitRequestFields {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptFlowSubmitRequestGateProofs returns new OptFlowSubmitRequestGateProofs with value set to v.
+func NewOptFlowSubmitRequestGateProofs(v FlowSubmitRequestGateProofs) OptFlowSubmitRequestGateProofs {
+	return OptFlowSubmitRequestGateProofs{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFlowSubmitRequestGateProofs is optional FlowSubmitRequestGateProofs.
+type OptFlowSubmitRequestGateProofs struct {
+	Value FlowSubmitRequestGateProofs
+	Set   bool
+}
+
+// IsSet returns true if OptFlowSubmitRequestGateProofs was set.
+func (o OptFlowSubmitRequestGateProofs) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFlowSubmitRequestGateProofs) Reset() {
+	var v FlowSubmitRequestGateProofs
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFlowSubmitRequestGateProofs) SetTo(v FlowSubmitRequestGateProofs) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFlowSubmitRequestGateProofs) Get() (v FlowSubmitRequestGateProofs, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFlowSubmitRequestGateProofs) Or(d FlowSubmitRequestGateProofs) FlowSubmitRequestGateProofs {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptGateConfig returns new OptGateConfig with value set to v.
+func NewOptGateConfig(v GateConfig) OptGateConfig {
+	return OptGateConfig{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptGateConfig is optional GateConfig.
+type OptGateConfig struct {
+	Value GateConfig
+	Set   bool
+}
+
+// IsSet returns true if OptGateConfig was set.
+func (o OptGateConfig) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptGateConfig) Reset() {
+	var v GateConfig
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptGateConfig) SetTo(v GateConfig) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptGateConfig) Get() (v GateConfig, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptGateConfig) Or(d GateConfig) GateConfig {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptInt returns new OptInt with value set to v.
 func NewOptInt(v int) OptInt {
 	return OptInt{
@@ -1904,161 +3372,6 @@ func (o OptInt) Get() (v int, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptInt) Or(d int) int {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptNestedUserPropertyProperties returns new OptNestedUserPropertyProperties with value set to v.
-func NewOptNestedUserPropertyProperties(v NestedUserPropertyProperties) OptNestedUserPropertyProperties {
-	return OptNestedUserPropertyProperties{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptNestedUserPropertyProperties is optional NestedUserPropertyProperties.
-type OptNestedUserPropertyProperties struct {
-	Value NestedUserPropertyProperties
-	Set   bool
-}
-
-// IsSet returns true if OptNestedUserPropertyProperties was set.
-func (o OptNestedUserPropertyProperties) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptNestedUserPropertyProperties) Reset() {
-	var v NestedUserPropertyProperties
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptNestedUserPropertyProperties) SetTo(v NestedUserPropertyProperties) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptNestedUserPropertyProperties) Get() (v NestedUserPropertyProperties, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptNestedUserPropertyProperties) Or(d NestedUserPropertyProperties) NestedUserPropertyProperties {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptNestedUserPropertyType returns new OptNestedUserPropertyType with value set to v.
-func NewOptNestedUserPropertyType(v NestedUserPropertyType) OptNestedUserPropertyType {
-	return OptNestedUserPropertyType{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptNestedUserPropertyType is optional NestedUserPropertyType.
-type OptNestedUserPropertyType struct {
-	Value NestedUserPropertyType
-	Set   bool
-}
-
-// IsSet returns true if OptNestedUserPropertyType was set.
-func (o OptNestedUserPropertyType) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptNestedUserPropertyType) Reset() {
-	var v NestedUserPropertyType
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptNestedUserPropertyType) SetTo(v NestedUserPropertyType) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptNestedUserPropertyType) Get() (v NestedUserPropertyType, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptNestedUserPropertyType) Or(d NestedUserPropertyType) NestedUserPropertyType {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptNilInt returns new OptNilInt with value set to v.
-func NewOptNilInt(v int) OptNilInt {
-	return OptNilInt{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptNilInt is optional nullable int.
-type OptNilInt struct {
-	Value int
-	Set   bool
-	Null  bool
-}
-
-// IsSet returns true if OptNilInt was set.
-func (o OptNilInt) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptNilInt) Reset() {
-	var v int
-	o.Value = v
-	o.Set = false
-	o.Null = false
-}
-
-// SetTo sets value to v.
-func (o *OptNilInt) SetTo(v int) {
-	o.Set = true
-	o.Null = false
-	o.Value = v
-}
-
-// IsNull returns true if value is Null.
-func (o OptNilInt) IsNull() bool { return o.Null }
-
-// SetToNull sets value to null.
-func (o *OptNilInt) SetToNull() {
-	o.Set = true
-	o.Null = true
-	var v int
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptNilInt) Get() (v int, ok bool) {
-	if o.Null {
-		return v, false
-	}
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptNilInt) Or(d int) int {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -2128,132 +3441,6 @@ func (o OptNilString) Or(d string) string {
 	return d
 }
 
-// NewOptNilUserPropertyFormat returns new OptNilUserPropertyFormat with value set to v.
-func NewOptNilUserPropertyFormat(v UserPropertyFormat) OptNilUserPropertyFormat {
-	return OptNilUserPropertyFormat{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptNilUserPropertyFormat is optional nullable UserPropertyFormat.
-type OptNilUserPropertyFormat struct {
-	Value UserPropertyFormat
-	Set   bool
-	Null  bool
-}
-
-// IsSet returns true if OptNilUserPropertyFormat was set.
-func (o OptNilUserPropertyFormat) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptNilUserPropertyFormat) Reset() {
-	var v UserPropertyFormat
-	o.Value = v
-	o.Set = false
-	o.Null = false
-}
-
-// SetTo sets value to v.
-func (o *OptNilUserPropertyFormat) SetTo(v UserPropertyFormat) {
-	o.Set = true
-	o.Null = false
-	o.Value = v
-}
-
-// IsNull returns true if value is Null.
-func (o OptNilUserPropertyFormat) IsNull() bool { return o.Null }
-
-// SetToNull sets value to null.
-func (o *OptNilUserPropertyFormat) SetToNull() {
-	o.Set = true
-	o.Null = true
-	var v UserPropertyFormat
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptNilUserPropertyFormat) Get() (v UserPropertyFormat, ok bool) {
-	if o.Null {
-		return v, false
-	}
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptNilUserPropertyFormat) Or(d UserPropertyFormat) UserPropertyFormat {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptNilUserPropertyXMinusUnique returns new OptNilUserPropertyXMinusUnique with value set to v.
-func NewOptNilUserPropertyXMinusUnique(v UserPropertyXMinusUnique) OptNilUserPropertyXMinusUnique {
-	return OptNilUserPropertyXMinusUnique{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptNilUserPropertyXMinusUnique is optional nullable UserPropertyXMinusUnique.
-type OptNilUserPropertyXMinusUnique struct {
-	Value UserPropertyXMinusUnique
-	Set   bool
-	Null  bool
-}
-
-// IsSet returns true if OptNilUserPropertyXMinusUnique was set.
-func (o OptNilUserPropertyXMinusUnique) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptNilUserPropertyXMinusUnique) Reset() {
-	var v UserPropertyXMinusUnique
-	o.Value = v
-	o.Set = false
-	o.Null = false
-}
-
-// SetTo sets value to v.
-func (o *OptNilUserPropertyXMinusUnique) SetTo(v UserPropertyXMinusUnique) {
-	o.Set = true
-	o.Null = false
-	o.Value = v
-}
-
-// IsNull returns true if value is Null.
-func (o OptNilUserPropertyXMinusUnique) IsNull() bool { return o.Null }
-
-// SetToNull sets value to null.
-func (o *OptNilUserPropertyXMinusUnique) SetToNull() {
-	o.Set = true
-	o.Null = true
-	var v UserPropertyXMinusUnique
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptNilUserPropertyXMinusUnique) Get() (v UserPropertyXMinusUnique, ok bool) {
-	if o.Null {
-		return v, false
-	}
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptNilUserPropertyXMinusUnique) Or(d UserPropertyXMinusUnique) UserPropertyXMinusUnique {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptPostTokenRequestGrantType returns new OptPostTokenRequestGrantType with value set to v.
 func NewOptPostTokenRequestGrantType(v PostTokenRequestGrantType) OptPostTokenRequestGrantType {
 	return OptPostTokenRequestGrantType{
@@ -2300,38 +3487,38 @@ func (o OptPostTokenRequestGrantType) Or(d PostTokenRequestGrantType) PostTokenR
 	return d
 }
 
-// NewOptSchemaReleaseState returns new OptSchemaReleaseState with value set to v.
-func NewOptSchemaReleaseState(v SchemaReleaseState) OptSchemaReleaseState {
-	return OptSchemaReleaseState{
+// NewOptStepTexts returns new OptStepTexts with value set to v.
+func NewOptStepTexts(v StepTexts) OptStepTexts {
+	return OptStepTexts{
 		Value: v,
 		Set:   true,
 	}
 }
 
-// OptSchemaReleaseState is optional SchemaReleaseState.
-type OptSchemaReleaseState struct {
-	Value SchemaReleaseState
+// OptStepTexts is optional StepTexts.
+type OptStepTexts struct {
+	Value StepTexts
 	Set   bool
 }
 
-// IsSet returns true if OptSchemaReleaseState was set.
-func (o OptSchemaReleaseState) IsSet() bool { return o.Set }
+// IsSet returns true if OptStepTexts was set.
+func (o OptStepTexts) IsSet() bool { return o.Set }
 
 // Reset unsets value.
-func (o *OptSchemaReleaseState) Reset() {
-	var v SchemaReleaseState
+func (o *OptStepTexts) Reset() {
+	var v StepTexts
 	o.Value = v
 	o.Set = false
 }
 
 // SetTo sets value to v.
-func (o *OptSchemaReleaseState) SetTo(v SchemaReleaseState) {
+func (o *OptStepTexts) SetTo(v StepTexts) {
 	o.Set = true
 	o.Value = v
 }
 
 // Get returns value and boolean that denotes whether value was set.
-func (o OptSchemaReleaseState) Get() (v SchemaReleaseState, ok bool) {
+func (o OptStepTexts) Get() (v StepTexts, ok bool) {
 	if !o.Set {
 		return v, false
 	}
@@ -2339,7 +3526,7 @@ func (o OptSchemaReleaseState) Get() (v SchemaReleaseState, ok bool) {
 }
 
 // Or returns value if set, or given parameter if does not.
-func (o OptSchemaReleaseState) Or(d SchemaReleaseState) SchemaReleaseState {
+func (o OptStepTexts) Or(d StepTexts) StepTexts {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -2432,98 +3619,6 @@ func (o OptURI) Get() (v url.URL, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptURI) Or(d url.URL) url.URL {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptUserPropertyProperties returns new OptUserPropertyProperties with value set to v.
-func NewOptUserPropertyProperties(v UserPropertyProperties) OptUserPropertyProperties {
-	return OptUserPropertyProperties{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptUserPropertyProperties is optional UserPropertyProperties.
-type OptUserPropertyProperties struct {
-	Value UserPropertyProperties
-	Set   bool
-}
-
-// IsSet returns true if OptUserPropertyProperties was set.
-func (o OptUserPropertyProperties) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptUserPropertyProperties) Reset() {
-	var v UserPropertyProperties
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptUserPropertyProperties) SetTo(v UserPropertyProperties) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptUserPropertyProperties) Get() (v UserPropertyProperties, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptUserPropertyProperties) Or(d UserPropertyProperties) UserPropertyProperties {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptUserSchemaProperties returns new OptUserSchemaProperties with value set to v.
-func NewOptUserSchemaProperties(v UserSchemaProperties) OptUserSchemaProperties {
-	return OptUserSchemaProperties{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptUserSchemaProperties is optional UserSchemaProperties.
-type OptUserSchemaProperties struct {
-	Value UserSchemaProperties
-	Set   bool
-}
-
-// IsSet returns true if OptUserSchemaProperties was set.
-func (o OptUserSchemaProperties) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptUserSchemaProperties) Reset() {
-	var v UserSchemaProperties
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptUserSchemaProperties) SetTo(v UserSchemaProperties) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptUserSchemaProperties) Get() (v UserSchemaProperties, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptUserSchemaProperties) Or(d UserSchemaProperties) UserSchemaProperties {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -2725,81 +3820,117 @@ type RevokeTokenOK struct{}
 
 func (*RevokeTokenOK) revokeTokenRes() {}
 
-// The lifecycle state of a user schema revision.
-// - draft: Not yet published; still under development or staged for a future release.
-// Can be targeted when creating an Object but will not be used by default.
-// - active: Published and available for use. Will not be use by default for new
-// users.
-// - default: Published and available for use. Will be used for new users when no
-// other schema is specified.
-// - deprecated: No longer recommended. Can still be used for new users but will
-// not be selected by default.
-// - archived: Retired. Cannot be used for new users. A schema cannot be archived
-// while it is still in use by any user.
+// An available SSO identity provider.
 // Ref: #
-type SchemaReleaseState string
-
-const (
-	SchemaReleaseStateDraft      SchemaReleaseState = "draft"
-	SchemaReleaseStateActive     SchemaReleaseState = "active"
-	SchemaReleaseStateDefault    SchemaReleaseState = "default"
-	SchemaReleaseStateDeprecated SchemaReleaseState = "deprecated"
-	SchemaReleaseStateArchived   SchemaReleaseState = "archived"
-)
-
-// AllValues returns all SchemaReleaseState values.
-func (SchemaReleaseState) AllValues() []SchemaReleaseState {
-	return []SchemaReleaseState{
-		SchemaReleaseStateDraft,
-		SchemaReleaseStateActive,
-		SchemaReleaseStateDefault,
-		SchemaReleaseStateDeprecated,
-		SchemaReleaseStateArchived,
-	}
+type SSOProvider struct {
+	// Provider instance identifier.
+	ID string `json:"id"`
+	// Display name for the provider.
+	Name string `json:"name"`
+	// Template hint for rendering (logo, colors).
+	Template string `json:"template"`
 }
 
-// MarshalText implements encoding.TextMarshaler.
-func (s SchemaReleaseState) MarshalText() ([]byte, error) {
-	switch s {
-	case SchemaReleaseStateDraft:
-		return []byte(s), nil
-	case SchemaReleaseStateActive:
-		return []byte(s), nil
-	case SchemaReleaseStateDefault:
-		return []byte(s), nil
-	case SchemaReleaseStateDeprecated:
-		return []byte(s), nil
-	case SchemaReleaseStateArchived:
-		return []byte(s), nil
-	default:
-		return nil, errors.Errorf("invalid value: %q", s)
-	}
+// GetID returns the value of ID.
+func (s *SSOProvider) GetID() string {
+	return s.ID
 }
 
-// UnmarshalText implements encoding.TextUnmarshaler.
-func (s *SchemaReleaseState) UnmarshalText(data []byte) error {
-	switch SchemaReleaseState(data) {
-	case SchemaReleaseStateDraft:
-		*s = SchemaReleaseStateDraft
-		return nil
-	case SchemaReleaseStateActive:
-		*s = SchemaReleaseStateActive
-		return nil
-	case SchemaReleaseStateDefault:
-		*s = SchemaReleaseStateDefault
-		return nil
-	case SchemaReleaseStateDeprecated:
-		*s = SchemaReleaseStateDeprecated
-		return nil
-	case SchemaReleaseStateArchived:
-		*s = SchemaReleaseStateArchived
-		return nil
-	default:
-		return errors.Errorf("invalid value: %q", data)
-	}
+// GetName returns the value of Name.
+func (s *SSOProvider) GetName() string {
+	return s.Name
 }
 
-func (*SchemaReleaseState) getSchemaReleaseStateRes() {}
+// GetTemplate returns the value of Template.
+func (s *SSOProvider) GetTemplate() string {
+	return s.Template
+}
+
+// SetID sets the value of ID.
+func (s *SSOProvider) SetID(val string) {
+	s.ID = val
+}
+
+// SetName sets the value of Name.
+func (s *SSOProvider) SetName(val string) {
+	s.Name = val
+}
+
+// SetTemplate sets the value of Template.
+func (s *SSOProvider) SetTemplate(val string) {
+	s.Template = val
+}
+
+// An action the user can take. Keyed by action name in the parent dictionary.
+// The action name is sent back in the submit request as `action`.
+// Ref: #
+type StepAction struct {
+	// Localization key for the action label.
+	TextKey string `json:"text_key"`
+	// Whether this is the primary/default action.
+	Primary OptBool `json:"primary"`
+}
+
+// GetTextKey returns the value of TextKey.
+func (s *StepAction) GetTextKey() string {
+	return s.TextKey
+}
+
+// GetPrimary returns the value of Primary.
+func (s *StepAction) GetPrimary() OptBool {
+	return s.Primary
+}
+
+// SetTextKey sets the value of TextKey.
+func (s *StepAction) SetTextKey(val string) {
+	s.TextKey = val
+}
+
+// SetPrimary sets the value of Primary.
+func (s *StepAction) SetPrimary(val OptBool) {
+	s.Primary = val
+}
+
+// Step-level localization keys. Resolved client-side via the `| t` LiquidJS filter.
+// The backend never sends display text — only semantic keys.
+// Ref: #
+type StepTexts struct {
+	// Localization key for the step heading.
+	TitleKey OptString `json:"title_key"`
+	// Localization key for explanatory text.
+	DescriptionKey OptNilString `json:"description_key"`
+}
+
+// GetTitleKey returns the value of TitleKey.
+func (s *StepTexts) GetTitleKey() OptString {
+	return s.TitleKey
+}
+
+// GetDescriptionKey returns the value of DescriptionKey.
+func (s *StepTexts) GetDescriptionKey() OptNilString {
+	return s.DescriptionKey
+}
+
+// SetTitleKey sets the value of TitleKey.
+func (s *StepTexts) SetTitleKey(val OptString) {
+	s.TitleKey = val
+}
+
+// SetDescriptionKey sets the value of DescriptionKey.
+func (s *StepTexts) SetDescriptionKey(val OptNilString) {
+	s.DescriptionKey = val
+}
+
+// SubmitFlowEventNoContent is response for SubmitFlowEvent operation.
+type SubmitFlowEventNoContent struct{}
+
+type SubmitFlowStepBadRequest FlowResponseHeaders
+
+func (*SubmitFlowStepBadRequest) submitFlowStepRes() {}
+
+type SubmitFlowStepOK FlowResponseHeaders
+
+func (*SubmitFlowStepOK) submitFlowStepRes() {}
 
 // Ref: #
 type TokenResponse struct {
@@ -2854,469 +3985,6 @@ func (s *TokenResponse) SetRefreshToken(val OptString) {
 }
 
 func (*TokenResponse) getTokenRes() {}
-
-// UpdateSchemaReleaseStateOK is response for UpdateSchemaReleaseState operation.
-type UpdateSchemaReleaseStateOK struct{}
-
-func (*UpdateSchemaReleaseStateOK) updateSchemaReleaseStateRes() {}
-
-// Ref: #
-type UserProperty struct {
-	Type   UserPropertyType         `json:"type"`
-	Format OptNilUserPropertyFormat `json:"format"`
-	// The title of the user property.
-	Title string `json:"title"`
-	// The minimum length of the property value, if applicable.
-	MinLength OptNilInt `json:"minLength"`
-	// The maximum length of the property value, if applicable.
-	MaxLength OptNilInt `json:"maxLength"`
-	// Whether this property is an identifier for the user or not.
-	XMinusIdentifier OptBool `json:"x-identifier"`
-	// The verification method for this property, if applicable.
-	XMinusVerify OptNilString `json:"x-verify"`
-	// The level of uniqueness for this property, if applicable.
-	XMinusUnique OptNilUserPropertyXMinusUnique `json:"x-unique"`
-	// The claim name for this property, if applicable.
-	XMinusClaim OptNilString `json:"x-claim"`
-	// Whether this property is editable by the user or not.
-	XMinusEditable OptBool `json:"x-editable"`
-	// Whether this property contains sensitive information or not.
-	XMinusSensitive OptBool `json:"x-sensitive"`
-	// Whether this property is used for multi-factor authentication or not.
-	XMinusMfa OptBool `json:"x-mfa"`
-	// A map of additional properties for the user definition, where the key
-	// is the property name and the value is the property schema.
-	Properties OptUserPropertyProperties `json:"properties"`
-}
-
-// GetType returns the value of Type.
-func (s *UserProperty) GetType() UserPropertyType {
-	return s.Type
-}
-
-// GetFormat returns the value of Format.
-func (s *UserProperty) GetFormat() OptNilUserPropertyFormat {
-	return s.Format
-}
-
-// GetTitle returns the value of Title.
-func (s *UserProperty) GetTitle() string {
-	return s.Title
-}
-
-// GetMinLength returns the value of MinLength.
-func (s *UserProperty) GetMinLength() OptNilInt {
-	return s.MinLength
-}
-
-// GetMaxLength returns the value of MaxLength.
-func (s *UserProperty) GetMaxLength() OptNilInt {
-	return s.MaxLength
-}
-
-// GetXMinusIdentifier returns the value of XMinusIdentifier.
-func (s *UserProperty) GetXMinusIdentifier() OptBool {
-	return s.XMinusIdentifier
-}
-
-// GetXMinusVerify returns the value of XMinusVerify.
-func (s *UserProperty) GetXMinusVerify() OptNilString {
-	return s.XMinusVerify
-}
-
-// GetXMinusUnique returns the value of XMinusUnique.
-func (s *UserProperty) GetXMinusUnique() OptNilUserPropertyXMinusUnique {
-	return s.XMinusUnique
-}
-
-// GetXMinusClaim returns the value of XMinusClaim.
-func (s *UserProperty) GetXMinusClaim() OptNilString {
-	return s.XMinusClaim
-}
-
-// GetXMinusEditable returns the value of XMinusEditable.
-func (s *UserProperty) GetXMinusEditable() OptBool {
-	return s.XMinusEditable
-}
-
-// GetXMinusSensitive returns the value of XMinusSensitive.
-func (s *UserProperty) GetXMinusSensitive() OptBool {
-	return s.XMinusSensitive
-}
-
-// GetXMinusMfa returns the value of XMinusMfa.
-func (s *UserProperty) GetXMinusMfa() OptBool {
-	return s.XMinusMfa
-}
-
-// GetProperties returns the value of Properties.
-func (s *UserProperty) GetProperties() OptUserPropertyProperties {
-	return s.Properties
-}
-
-// SetType sets the value of Type.
-func (s *UserProperty) SetType(val UserPropertyType) {
-	s.Type = val
-}
-
-// SetFormat sets the value of Format.
-func (s *UserProperty) SetFormat(val OptNilUserPropertyFormat) {
-	s.Format = val
-}
-
-// SetTitle sets the value of Title.
-func (s *UserProperty) SetTitle(val string) {
-	s.Title = val
-}
-
-// SetMinLength sets the value of MinLength.
-func (s *UserProperty) SetMinLength(val OptNilInt) {
-	s.MinLength = val
-}
-
-// SetMaxLength sets the value of MaxLength.
-func (s *UserProperty) SetMaxLength(val OptNilInt) {
-	s.MaxLength = val
-}
-
-// SetXMinusIdentifier sets the value of XMinusIdentifier.
-func (s *UserProperty) SetXMinusIdentifier(val OptBool) {
-	s.XMinusIdentifier = val
-}
-
-// SetXMinusVerify sets the value of XMinusVerify.
-func (s *UserProperty) SetXMinusVerify(val OptNilString) {
-	s.XMinusVerify = val
-}
-
-// SetXMinusUnique sets the value of XMinusUnique.
-func (s *UserProperty) SetXMinusUnique(val OptNilUserPropertyXMinusUnique) {
-	s.XMinusUnique = val
-}
-
-// SetXMinusClaim sets the value of XMinusClaim.
-func (s *UserProperty) SetXMinusClaim(val OptNilString) {
-	s.XMinusClaim = val
-}
-
-// SetXMinusEditable sets the value of XMinusEditable.
-func (s *UserProperty) SetXMinusEditable(val OptBool) {
-	s.XMinusEditable = val
-}
-
-// SetXMinusSensitive sets the value of XMinusSensitive.
-func (s *UserProperty) SetXMinusSensitive(val OptBool) {
-	s.XMinusSensitive = val
-}
-
-// SetXMinusMfa sets the value of XMinusMfa.
-func (s *UserProperty) SetXMinusMfa(val OptBool) {
-	s.XMinusMfa = val
-}
-
-// SetProperties sets the value of Properties.
-func (s *UserProperty) SetProperties(val OptUserPropertyProperties) {
-	s.Properties = val
-}
-
-type UserPropertyFormat string
-
-const (
-	UserPropertyFormatEmail    UserPropertyFormat = "email"
-	UserPropertyFormatDateTime UserPropertyFormat = "date-time"
-	UserPropertyFormatUUID     UserPropertyFormat = "uuid"
-	UserPropertyFormatURI      UserPropertyFormat = "uri"
-)
-
-// AllValues returns all UserPropertyFormat values.
-func (UserPropertyFormat) AllValues() []UserPropertyFormat {
-	return []UserPropertyFormat{
-		UserPropertyFormatEmail,
-		UserPropertyFormatDateTime,
-		UserPropertyFormatUUID,
-		UserPropertyFormatURI,
-	}
-}
-
-// MarshalText implements encoding.TextMarshaler.
-func (s UserPropertyFormat) MarshalText() ([]byte, error) {
-	switch s {
-	case UserPropertyFormatEmail:
-		return []byte(s), nil
-	case UserPropertyFormatDateTime:
-		return []byte(s), nil
-	case UserPropertyFormatUUID:
-		return []byte(s), nil
-	case UserPropertyFormatURI:
-		return []byte(s), nil
-	default:
-		return nil, errors.Errorf("invalid value: %q", s)
-	}
-}
-
-// UnmarshalText implements encoding.TextUnmarshaler.
-func (s *UserPropertyFormat) UnmarshalText(data []byte) error {
-	switch UserPropertyFormat(data) {
-	case UserPropertyFormatEmail:
-		*s = UserPropertyFormatEmail
-		return nil
-	case UserPropertyFormatDateTime:
-		*s = UserPropertyFormatDateTime
-		return nil
-	case UserPropertyFormatUUID:
-		*s = UserPropertyFormatUUID
-		return nil
-	case UserPropertyFormatURI:
-		*s = UserPropertyFormatURI
-		return nil
-	default:
-		return errors.Errorf("invalid value: %q", data)
-	}
-}
-
-// A map of additional properties for the user definition, where the key
-// is the property name and the value is the property schema.
-type UserPropertyProperties map[string]NestedUserProperty
-
-func (s *UserPropertyProperties) init() UserPropertyProperties {
-	m := *s
-	if m == nil {
-		m = map[string]NestedUserProperty{}
-		*s = m
-	}
-	return m
-}
-
-type UserPropertyType string
-
-const (
-	UserPropertyTypeString  UserPropertyType = "string"
-	UserPropertyTypeNumber  UserPropertyType = "number"
-	UserPropertyTypeBoolean UserPropertyType = "boolean"
-	UserPropertyTypeObject  UserPropertyType = "object"
-	UserPropertyTypeArray   UserPropertyType = "array"
-)
-
-// AllValues returns all UserPropertyType values.
-func (UserPropertyType) AllValues() []UserPropertyType {
-	return []UserPropertyType{
-		UserPropertyTypeString,
-		UserPropertyTypeNumber,
-		UserPropertyTypeBoolean,
-		UserPropertyTypeObject,
-		UserPropertyTypeArray,
-	}
-}
-
-// MarshalText implements encoding.TextMarshaler.
-func (s UserPropertyType) MarshalText() ([]byte, error) {
-	switch s {
-	case UserPropertyTypeString:
-		return []byte(s), nil
-	case UserPropertyTypeNumber:
-		return []byte(s), nil
-	case UserPropertyTypeBoolean:
-		return []byte(s), nil
-	case UserPropertyTypeObject:
-		return []byte(s), nil
-	case UserPropertyTypeArray:
-		return []byte(s), nil
-	default:
-		return nil, errors.Errorf("invalid value: %q", s)
-	}
-}
-
-// UnmarshalText implements encoding.TextUnmarshaler.
-func (s *UserPropertyType) UnmarshalText(data []byte) error {
-	switch UserPropertyType(data) {
-	case UserPropertyTypeString:
-		*s = UserPropertyTypeString
-		return nil
-	case UserPropertyTypeNumber:
-		*s = UserPropertyTypeNumber
-		return nil
-	case UserPropertyTypeBoolean:
-		*s = UserPropertyTypeBoolean
-		return nil
-	case UserPropertyTypeObject:
-		*s = UserPropertyTypeObject
-		return nil
-	case UserPropertyTypeArray:
-		*s = UserPropertyTypeArray
-		return nil
-	default:
-		return errors.Errorf("invalid value: %q", data)
-	}
-}
-
-type UserPropertyXMinusUnique string
-
-const (
-	UserPropertyXMinusUniqueInstance     UserPropertyXMinusUnique = "instance"
-	UserPropertyXMinusUniqueOrganization UserPropertyXMinusUnique = "organization"
-)
-
-// AllValues returns all UserPropertyXMinusUnique values.
-func (UserPropertyXMinusUnique) AllValues() []UserPropertyXMinusUnique {
-	return []UserPropertyXMinusUnique{
-		UserPropertyXMinusUniqueInstance,
-		UserPropertyXMinusUniqueOrganization,
-	}
-}
-
-// MarshalText implements encoding.TextMarshaler.
-func (s UserPropertyXMinusUnique) MarshalText() ([]byte, error) {
-	switch s {
-	case UserPropertyXMinusUniqueInstance:
-		return []byte(s), nil
-	case UserPropertyXMinusUniqueOrganization:
-		return []byte(s), nil
-	default:
-		return nil, errors.Errorf("invalid value: %q", s)
-	}
-}
-
-// UnmarshalText implements encoding.TextUnmarshaler.
-func (s *UserPropertyXMinusUnique) UnmarshalText(data []byte) error {
-	switch UserPropertyXMinusUnique(data) {
-	case UserPropertyXMinusUniqueInstance:
-		*s = UserPropertyXMinusUniqueInstance
-		return nil
-	case UserPropertyXMinusUniqueOrganization:
-		*s = UserPropertyXMinusUniqueOrganization
-		return nil
-	default:
-		return errors.Errorf("invalid value: %q", data)
-	}
-}
-
-// Ref: #
-type UserSchema struct {
-	// Discriminator value for a user schema create request.
-	Kind string `json:"kind"`
-	// Human-readable name for this schema.
-	Title string `json:"title"`
-	// A description of this schema.
-	Description  OptString             `json:"description"`
-	ReleaseState OptSchemaReleaseState `json:"releaseState"`
-	// A list of authentication methods supported by the user definition.
-	XMinusAuthMinusMethods []UserSchemaXMinusAuthMinusMethodsItem `json:"x-auth-methods"`
-	// A list of required fields for the user definition.
-	Required []string `json:"required"`
-	// A map of additional properties for the user definition, where the key
-	// is the property name and the value is the property schema.
-	Properties OptUserSchemaProperties `json:"properties"`
-}
-
-// GetKind returns the value of Kind.
-func (s *UserSchema) GetKind() string {
-	return s.Kind
-}
-
-// GetTitle returns the value of Title.
-func (s *UserSchema) GetTitle() string {
-	return s.Title
-}
-
-// GetDescription returns the value of Description.
-func (s *UserSchema) GetDescription() OptString {
-	return s.Description
-}
-
-// GetReleaseState returns the value of ReleaseState.
-func (s *UserSchema) GetReleaseState() OptSchemaReleaseState {
-	return s.ReleaseState
-}
-
-// GetXMinusAuthMinusMethods returns the value of XMinusAuthMinusMethods.
-func (s *UserSchema) GetXMinusAuthMinusMethods() []UserSchemaXMinusAuthMinusMethodsItem {
-	return s.XMinusAuthMinusMethods
-}
-
-// GetRequired returns the value of Required.
-func (s *UserSchema) GetRequired() []string {
-	return s.Required
-}
-
-// GetProperties returns the value of Properties.
-func (s *UserSchema) GetProperties() OptUserSchemaProperties {
-	return s.Properties
-}
-
-// SetKind sets the value of Kind.
-func (s *UserSchema) SetKind(val string) {
-	s.Kind = val
-}
-
-// SetTitle sets the value of Title.
-func (s *UserSchema) SetTitle(val string) {
-	s.Title = val
-}
-
-// SetDescription sets the value of Description.
-func (s *UserSchema) SetDescription(val OptString) {
-	s.Description = val
-}
-
-// SetReleaseState sets the value of ReleaseState.
-func (s *UserSchema) SetReleaseState(val OptSchemaReleaseState) {
-	s.ReleaseState = val
-}
-
-// SetXMinusAuthMinusMethods sets the value of XMinusAuthMinusMethods.
-func (s *UserSchema) SetXMinusAuthMinusMethods(val []UserSchemaXMinusAuthMinusMethodsItem) {
-	s.XMinusAuthMinusMethods = val
-}
-
-// SetRequired sets the value of Required.
-func (s *UserSchema) SetRequired(val []string) {
-	s.Required = val
-}
-
-// SetProperties sets the value of Properties.
-func (s *UserSchema) SetProperties(val OptUserSchemaProperties) {
-	s.Properties = val
-}
-
-// A map of additional properties for the user definition, where the key
-// is the property name and the value is the property schema.
-type UserSchemaProperties map[string]UserProperty
-
-func (s *UserSchemaProperties) init() UserSchemaProperties {
-	m := *s
-	if m == nil {
-		m = map[string]UserProperty{}
-		*s = m
-	}
-	return m
-}
-
-type UserSchemaXMinusAuthMinusMethodsItem struct {
-	// Whether the authentication method is enabled or not.
-	Enabled bool `json:"enabled"`
-	// The position of the authentication method in the list of supported methods.
-	Position int `json:"position"`
-}
-
-// GetEnabled returns the value of Enabled.
-func (s *UserSchemaXMinusAuthMinusMethodsItem) GetEnabled() bool {
-	return s.Enabled
-}
-
-// GetPosition returns the value of Position.
-func (s *UserSchemaXMinusAuthMinusMethodsItem) GetPosition() int {
-	return s.Position
-}
-
-// SetEnabled sets the value of Enabled.
-func (s *UserSchemaXMinusAuthMinusMethodsItem) SetEnabled(val bool) {
-	s.Enabled = val
-}
-
-// SetPosition sets the value of Position.
-func (s *UserSchemaXMinusAuthMinusMethodsItem) SetPosition(val int) {
-	s.Position = val
-}
 
 type UsernamePassword struct {
 	Username string

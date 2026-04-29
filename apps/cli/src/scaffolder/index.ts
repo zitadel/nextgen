@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, stat, writeFile, chmod } from "node:fs/promises";
+import { chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import { ZitadelError } from "../lib/errors";
@@ -9,7 +9,12 @@ export async function scaffold(
   plan: ScaffoldPlan,
   opts: { cwd: string; dryRun: boolean; force: boolean },
 ): Promise<ScaffoldResult> {
-  const result: ScaffoldResult = { dryRun: opts.dryRun, filesWritten: [], filesSkipped: [], depsAdded: [] };
+  const result: ScaffoldResult = {
+    dryRun: opts.dryRun,
+    filesWritten: [],
+    filesSkipped: [],
+    depsAdded: [],
+  };
 
   for (const op of plan.ops) {
     await applyOp(op, opts, result);
@@ -28,7 +33,12 @@ async function applyOp(
       await ensureDir(abs(opts.cwd, op.path), op.mode, opts.dryRun, result);
       break;
     case "write":
-      await writeText(abs(opts.cwd, op.path), op.contents, { mode: op.mode, force: opts.force, dryRun: opts.dryRun }, result);
+      await writeText(
+        abs(opts.cwd, op.path),
+        op.contents,
+        { mode: op.mode, force: opts.force, dryRun: opts.dryRun },
+        result,
+      );
       break;
     case "append":
       await appendText(abs(opts.cwd, op.path), op.contents, op.ifMissing, opts.dryRun, result);
@@ -48,7 +58,12 @@ async function applyOp(
   }
 }
 
-async function ensureDir(path: string, mode: number | undefined, dryRun: boolean, result: ScaffoldResult): Promise<void> {
+async function ensureDir(
+  path: string,
+  mode: number | undefined,
+  dryRun: boolean,
+  result: ScaffoldResult,
+): Promise<void> {
   if (dryRun) {
     result.filesWritten.push(path);
     return;
@@ -122,7 +137,12 @@ async function appendText(
   result.filesWritten.push(path);
 }
 
-async function mergeEnv(path: string, entries: Record<string, string>, dryRun: boolean, result: ScaffoldResult): Promise<void> {
+async function mergeEnv(
+  path: string,
+  entries: Record<string, string>,
+  dryRun: boolean,
+  result: ScaffoldResult,
+): Promise<void> {
   const existing = (await readIfExists(path)) ?? "";
   const present = new Set(
     existing
@@ -147,7 +167,12 @@ async function mergeEnv(path: string, entries: Record<string, string>, dryRun: b
   result.filesWritten.push(path);
 }
 
-async function mergeJson(path: string, patch: Record<string, unknown>, dryRun: boolean, result: ScaffoldResult): Promise<void> {
+async function mergeJson(
+  path: string,
+  patch: Record<string, unknown>,
+  dryRun: boolean,
+  result: ScaffoldResult,
+): Promise<void> {
   const existing = await readIfExists(path);
   const current = existing ? parseJsonObject(existing, path) : {};
   const next = deepMerge(current, patch);
@@ -165,7 +190,12 @@ async function mergeJson(path: string, patch: Record<string, unknown>, dryRun: b
   result.filesWritten.push(path);
 }
 
-async function appendGitignore(path: string, entries: string[], dryRun: boolean, result: ScaffoldResult): Promise<void> {
+async function appendGitignore(
+  path: string,
+  entries: string[],
+  dryRun: boolean,
+  result: ScaffoldResult,
+): Promise<void> {
   const existing = (await readIfExists(path)) ?? "";
   const lines = new Set(existing.split(/\r?\n/g).map((line) => line.trim()));
   const missing = entries.filter((entry) => !lines.has(entry));
@@ -222,21 +252,14 @@ async function readIfExists(path: string): Promise<string | undefined> {
   }
 }
 
-async function exists(path: string): Promise<boolean> {
-  try {
-    await stat(path);
-    return true;
-  } catch (error) {
-    if (isNotFound(error)) return false;
-    throw error;
-  }
-}
-
 function abs(cwd: string, path: string): string {
   return join(cwd, path);
 }
 
-function deepMerge(target: Record<string, unknown>, patch: Record<string, unknown>): Record<string, unknown> {
+function deepMerge(
+  target: Record<string, unknown>,
+  patch: Record<string, unknown>,
+): Record<string, unknown> {
   const out = { ...target };
   for (const [key, value] of Object.entries(patch)) {
     if (isObject(value) && isObject(out[key])) {
@@ -253,5 +276,10 @@ function isObject(value: unknown): value is Record<string, unknown> {
 }
 
 function isNotFound(error: unknown): boolean {
-  return typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "ENOENT";
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: string }).code === "ENOENT"
+  );
 }

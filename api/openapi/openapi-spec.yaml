@@ -42,6 +42,14 @@ paths:
     $ref: endpoints/readyz/methods.yaml
   /user:
     $ref: endpoints/users/methods.yaml
+  /flow:
+    $ref: endpoints/flow/methods.yaml
+  /flow/{id}:
+    $ref: endpoints/flow/session/methods.yaml
+  /flow/{id}/submit:
+    $ref: endpoints/flow/submit/methods.yaml
+  /flow/{id}/event:
+    $ref: endpoints/flow/event/methods.yaml
   /schemas:
     $ref: endpoints/schemas/methods.yaml
   /schemas/{id}:
@@ -54,7 +62,7 @@ paths:
     $ref: endpoints/schemas/by_id/revisions/by_id/release-state/methods.yaml
 
 components:
-  securitySchemes: 
+  securitySchemes:
     oauth2:
       $ref: security/oauth2.yaml
     usernamePassword:
