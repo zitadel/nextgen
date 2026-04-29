@@ -2,7 +2,7 @@ package domain
 
 import "time"
 
-//go:generate enumer -type FlowDefinitionStatus -transform snake -trimprefix FlowDefinitionStatus -sql
+//go:generate go tool enumer -type FlowDefinitionStatus -transform snake -trimprefix FlowDefinitionStatus -sql
 type FlowDefinitionStatus uint8
 
 const (
@@ -12,7 +12,7 @@ const (
 	FlowDefinitionStatusArchived
 )
 
-//go:generate enumer -type FlowDefinitionPurpose -transform snake -trimprefix FlowDefinitionPurpose -sql
+//go:generate go tool enumer -type FlowDefinitionPurpose -transform snake -trimprefix FlowDefinitionPurpose -sql
 type FlowDefinitionPurpose uint8
 
 const (
@@ -24,7 +24,7 @@ const (
 	FlowDefinitionPurposeLinkAccount
 )
 
-//go:generate enumer -type FlowStepType -transform snake -trimprefix FlowStepType -sql
+//go:generate go tool enumer -type FlowStepType -transform snake -trimprefix FlowStepType -sql
 type FlowStepType uint8
 
 const (
@@ -66,9 +66,9 @@ type FlowDefinitionPurposeEntry struct {
 // FlowDefinitionAudience describes which requests this definition should be selected for.
 // Fields are applied with specificity: AppID > TeamID > SchemaID > IsProjectDefault.
 type FlowDefinitionAudience struct {
-	AppID           *string
-	TeamID          *string
-	SchemaID        *string
+	AppID            *string
+	TeamID           *string
+	SchemaID         *string
 	IsProjectDefault bool
 }
 
