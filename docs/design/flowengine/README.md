@@ -1,10 +1,10 @@
-# Authentication Architecture
-
-> **Status:** Draft proposal — sharing for feedback
-> **Date:** 2026-04-21
-> **Context:** Zitadel next-generation architecture design
->
-> **See also:** [../glossary.md](../glossary.md) — canonical vocabulary · [../api/](../api/README.md) — API design guide · [../api/authn-and-auth-flows.md](../api/authn-and-auth-flows.md) — the auth_attempts primitives this engine runs on top of.
+Flow orchestrates UI; primitives       Client orchestrates its own UI;
+below come from auth_attempts.         calls auth_attempts + Session API.
+  → manages registration, profiling      → server verifies, re-evaluates assurance
+  → handles SSO redirects
+  ...                                  Check assurance against requested acr_values
+complete → redirect                      → build native UI, step-up if needed
+                                       request satisfied → exchange / handoff
 
 ## Relevant POC ADRs
 
@@ -24,7 +24,7 @@
 | [Flow Engine — Step Response Shape](flow-engine-nodes.md) | In Review (frontend) | Capability mapping: Fields, Actions, Gates, and LiquidJS templates. |
 | [Flow Engine — Storage](flow-engine-storage.md) | In Review | Encrypted cookie model, session/flow separation, optimistic locking, DB I/O analysis. |
 | [Flow Engine — Developer Guide](flow-engine-guide.md) | In Review | Progressive walkthrough of building flows: steps, pivots, completion, sessions, error handling. |
-| [Session API](session-api.md) | Preliminary | Factor accumulation primitive. ACR/LoA model is directional, not final. |
+| [Session API](session-api.md) | Preliminary | Factor accumulation primitive. Assurance-level model is directional, not final. |
 | [User Schema Integration](user-schema.md) | Preliminary | How the flow engine and policy engine consume user schema annotations. |
 | [Bot Detection](bot-detection.md) | Preliminary | Composable captcha, fingerprinting, and risk evaluation. Depends on policy engine. |
 | [Template Security](template-security.md) | In Review | XSS attack vectors, trust boundaries, and defense-in-depth for LiquidJS + innerHTML rendering. |
@@ -36,10 +36,11 @@
 
 The architecture is built on four concepts:
 
-1. **Session API** — low-level primitive for factor accumulation. Any client can use it directly.
-2. **Flow Engine** — server-driven state machine producing Capabilities (Fields, Actions, Gates) alongside a LiquidJS template. Used by web/frontend clients. Operates on sessions internally.
-3. **Policy Engine** — the sole decision maker. Evaluates session state + context and determines what's required. **Design TBD** — not covered in these documents.
-4. **User Schema** — JSON Schema-based user definitions that drive registration forms, field validation, and claim mapping.
+1. **auth_attempts** — ephemeral state machine for driving authentication. Issues challenges, verifies proofs, completes into a session or OIDC code. See [authn-and-auth-flows.md](../api/authn-and-auth-flows.md).
+2. **Session API** — durable read model. Reflects accumulated factors and current `assurance_levels[]`. Never mutated directly by a client — factors flow in through `auth_attempts`. Supports pre-auth anonymous shells via `POST /sessions`.
+3. **Flow Engine** — server-driven state machine producing Capabilities (Fields, Actions, Gates) alongside a LiquidJS template. Used by web/frontend clients. Operates on sessions internally.
+4. **Policy Engine** — the sole decision maker. Evaluates session state + context and determines what's required. **Design TBD** — not covered in these documents.
+5. **User Schema** — JSON Schema-based user definitions that drive registration forms, field validation, and claim mapping.
 
 ## Two Paths to Authentication
 
@@ -53,15 +54,17 @@ POST /flows                         POST /auth_attempts
   → get capabilities + template          → drive primitives directly
 POST /flows/{id}/submit             POST /auth_attempts/{id}/challenges
   → server advances state machine        + /challenges/{cid}/verify
-  → renders next step                    → submit factor proofs
-  → manages registration, profiling      → server verifies, re-evaluates assurance
-  → handles SSO redirects
-  ...                                  Check assurance against requested acr_values
-complete → redirect                      → build native UI, step-up if needed
-                                       request satisfied → exchange / handoff
+  → internally invokes auth_attempt      → submit factor proofs
+    Go service layer (no HTTP)           → server verifies, re-evaluates assurance
+  → renders next step
+  → manages registration, profiling    Check assurance levels against requested acr_values
+  → handles SSO redirects                → build native UI, step-up if needed
+  ...                                  request satisfied → exchange / handoff
+complete → redirect
 
-Flow orchestrates UI; primitives       Client orchestrates its own UI;
-below come from auth_attempts.         calls auth_attempts + Session API.
+Flow orchestrates UI; it drives        Client orchestrates its own UI;
+auth_attempts via the internal         calls auth_attempts REST endpoints
+Go service layer, not HTTP.            + Session API over HTTP directly.
 ```
 
 Both paths get the same policy enforcement — the policy engine evaluates sessions regardless of how factors were submitted.
@@ -73,12 +76,14 @@ graph TD
     Schema["**User Schema**<br>fields, annotations,<br>auth methods"]
     Policy["**Policy Engine**<br>assurance policy"]
     Flow["**Flow Engine**<br>state machine, Capabilities"]
-    Session["**Session API**<br>factors, assurance_levels[]"]
+    Attempts["**auth_attempts**<br>challenges, proofs,<br>complete, handoff"]
+    Session["**Session API**<br>factors, assurance_levels<br>(read model)"]
 
     Schema -- "narrows available methods" --> Policy
     Schema -- "field metadata for rendering" --> Flow
     Policy -- "policy_check steps,<br>step injection" --> Flow
-    Flow -- "creates & drives<br>(internally)" --> Session
+    Flow -- "drives internally" --> Attempts
+    Attempts -- "writes factors on complete" --> Session
 ```
 
 | Concern | Owned By | Decides |
@@ -99,7 +104,7 @@ graph TD
 
 2. **The flow engine never decides policy.** The flow engine's job is orchestration: emit capabilities, serve layouts, collect input, delegate decisions. All questions about "what does the user need to do?" are answered by the policy engine. The flow engine just follows the answer.
 
-3. **Sessions are the primitive.** A session is a bag of verified authentication factors. The flow engine creates and drives sessions internally, but sessions also exist independently. Clients that want full control (mobile apps, backend services, CLIs) skip the flow engine entirely and talk to the Session API directly.
+3. **auth_attempts are the mutation primitive.** A session accumulates verified factors, but never accepts direct mutations from a client. The flow engine drives `auth_attempts` internally; direct-API clients drive them explicitly. On completion, an `auth_attempt` writes factors into the session and updates the assurance level. The client then reads the session to observe the result.
 
 4. **Flows are configurable per audience.** Flow definitions are API resources that describe step graphs. An admin can create different flows for different teams, applications, or user types. One team gets SSO-first login; another gets email + password. The flow engine resolves which definition to use based on the request context.
 

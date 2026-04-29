@@ -23,6 +23,15 @@ paths:
     post:
       operationId: createSession
       summary: Create an optional anonymous pre-auth session shell
+      description: |
+        Pre-allocates a session_id before authentication begins. The session
+        starts with no user and no factors (state: building). A subsequent
+        POST /auth_attempts with this session_id upgrades it.
+
+        Anonymous sessions expire in 10 minutes if no auth_attempt upgrades
+        them. The session_token returned here is superseded when a handoff
+        exchange completes — clients must replace it with the token from the
+        exchange response.
       tags: [Sessions]
       requestBody:
         required: true
@@ -36,7 +45,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SessionResponse"
+                $ref: "#/components/schemas/UpdateSessionResponse"
 
     get:
       operationId: listSessions
@@ -104,7 +113,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SessionExchangeResponse"
+                $ref: "#/components/schemas/UpdateSessionResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "410":
@@ -165,7 +174,14 @@ components:
   schemas:
     CreateSessionRequest:
       type: object
+      description: |
+        Creates an anonymous session shell. No user or factor data is accepted
+        here — those are established through auth_attempts.
       properties:
+        project_id:
+          type: string
+          description: The project this session belongs to.
+          example: proj_abc123
         user_agent:
           $ref: "#/components/schemas/UserAgent"
 
@@ -177,7 +193,7 @@ components:
           type: string
           example: htok_abc123
 
-    SessionExchangeResponse:
+    UpdateSessionResponse:
       type: object
       required: [session, session_token]
       properties:
@@ -190,7 +206,7 @@ components:
 
     SessionResponse:
       type: object
-      required: [session_id, state, factors, assurance_levels, amr]
+      required: [session_id, state, factors, assurance_levels, expires_at]
       properties:
         session_id:
           type: string
@@ -203,6 +219,8 @@ components:
           description: |
             Map of verified factors. Each key is a factor type, value contains
             verification metadata including timestamps and authenticator properties.
+            Factors are written exclusively by completing auth_attempts — never
+            pushed directly by a client.
           additionalProperties:
             $ref: "#/components/schemas/Factor"
           example:
@@ -214,18 +232,21 @@ components:
           items:
             type: string
           description: |
-            All assurance levels currently satisfied by the verified factors,
-            their properties, and freshness windows. The OIDC adapter maps one
-            requested or eligible value to the token `acr` claim.
-          example: ["urn:zitadel:aal:1", "urn:zitadel:aal:2"]
-        amr:
-          type: array
-          items:
-            type: string
+            All assurance levels the session's current factors satisfy, recomputed on
+            every auth_attempt completion. Empty for anonymous/building sessions
+            with no auth factors. AAL levels are cumulative: a session satisfying
+            AAL2 will always include AAL1 in this list.
+
+            OIDC adapters may map a value from this list to an ID token `acr`
+            claim when serving OIDC requests.
+          example: ["urn:nist:aal:1", "urn:nist:aal:2"]
+        expires_at:
+          type: string
+          format: date-time
           description: |
-            Authentication Methods References — list of method identifiers used
-            during authentication. Maps to the `amr` claim in OIDC ID tokens.
-          example: ["pwd", "otp", "mfa"]
+            When this session expires. Anonymous sessions use a short TTL (10 min).
+            Authenticated sessions use the project-configured session lifetime.
+
     Factor:
       type: object
       properties:

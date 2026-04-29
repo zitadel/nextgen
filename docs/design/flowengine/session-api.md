@@ -14,11 +14,66 @@ A session is produced by a completed [auth_attempt](../api/authn-and-auth-flows.
 - **auth_attempt**: ephemeral, 15-min TTL, one handoff_token terminal. Accepts proofs, issues challenges, verifies credentials.
 - **session**: durable, holds factors + `assurance_levels[]`, readable and revocable by the client. Never mutated directly by client proof submission.
 
-Step-up re-authentication creates a new auth_attempt against the same session, adds factors, and expands `assurance_levels[]`.
+```
+POST /auth_attempts                       →  drive verification (challenges, proofs)
+POST /auth_attempts/{id}/handoff          →  mint handoff_token
+POST /sessions/exchange { handoff_token }  →  receive { session, session_token }
+
+GET    /sessions/{id}                     →  read state, factors, assurance_levels[]
+DELETE /sessions/{id}                     →  revoke (logout)
+```
+
+Step-up re-authentication creates a **new auth_attempt against the same `session_id`**, adds factors, and expands the satisfied assurance level list. The session accumulates.
+
+## Anonymous Sessions
+
+`POST /sessions` creates an anonymous session shell — no user, no factors, `state: building`. This exists for two use cases:
+
+1. **Pre-allocating a `session_id`** before the user is known. Useful when embedding a login flow and you want to correlate device/telemetry data with the eventual authenticated session from the start.
+2. **Tracking anonymous state** (e.g. bot detection signals, device fingerprint) that should survive until the user authenticates.
+
+```http
+POST /sessions
+{
+  "project_id": "proj_…",
+  "user_agent": { "fingerprint": "…", "ip": "…" }
+}
+```
+
+```json
+{
+  "session_id": "sess_abc123",
+  "session_token": "stok_initial_…",
+  "state": "building",
+  "factors": {},
+  "assurance_levels": []
+}
+```
+
+The `session_token` returned here authorises the `DELETE` (revoke) call. It is **superseded** when an `auth_attempt` completes and the handoff is exchanged — the exchange returns a fresh `session_token` tied to the authenticated session. Clients should replace their stored token at that point.
+
+### Anonymous Session TTL
+
+Anonymous sessions (no verified factors) expire aggressively: **10 minutes**, reset when an `auth_attempt` upgrades them. An `auth_attempt` created with a `session_id` that references an anonymous session resets its expiry to the normal session TTL (hours/days) once the first factor is verified.
+
+> **Note:** The `expires_at` field in the DB schema (and the response) reflects the current TTL regime. A session transitions from the short anonymous TTL to the configured session TTL the moment the first auth factor is written by a completing `auth_attempt`.
+
+A subsequent `POST /auth_attempts` referencing the pre-allocated `session_id` upgrades it:
+
+```http
+POST /auth_attempts
+{
+  "project_id": "proj_…",
+  "challenge_nonce": "…",
+  "session_id": "sess_abc123"   ← links to the anonymous session
+}
+```
+
+The flow engine does this internally. Direct-API clients do it explicitly.
 
 ## Changes from the Current v2 Session API
 
-The current v2 API (`CreateSession` / `SetSession` / `GetSession` / `DeleteSession`) treats the session as a **dumb container** — the caller pushes checks into it and external logic (OIDC middleware, login UI) decides if the session is "done." The new design makes sessions **assurance-aware**.
+The current v2 API (`CreateSession` / `SetSession` / `GetSession` / `DeleteSession`) treats the session as a **dumb container** — the caller pushes checks into it and external logic (OIDC middleware, login UI) decides if the session is "done." The new design makes sessions **assurance-aware** and **read-only post-auth**.
 
 | | Current v2 | New Design |
 |---|---|---|
@@ -37,17 +92,17 @@ The current v2 API (`CreateSession` / `SetSession` / `GetSession` / `DeleteSessi
 - **No binary "sufficient".** The session reports all assurance levels its factors satisfy; the request context determines if one of them is enough.
 - Step-up auth works naturally: the RP requests a higher assurance level → a new auth_attempt adds factors → `assurance_levels[]` expands.
 
-## Assurance Levels and ACR
+## Assurance Levels (and OIDC ACR Mapping)
 
 The session model is built around **Authentication Context Class Reference (ACR)** from OpenID Connect and **Authenticator Assurance Levels (AAL)** from NIST SP 800-63.
 
 ### Core Concepts
 
-| Concept | What it means |
-|---|---|
-| **ACR** (Authentication Context Class Reference) | OIDC claim name for assurance context. Core sessions expose `assurance_levels[]`; the OIDC adapter maps one requested/eligible value to the token `acr` claim. |
-| **AMR** (Authentication Methods References) | List of method identifiers used during authentication (e.g., `["pwd", "otp", "mfa"]`). Appears in OIDC ID tokens as the `amr` claim. |
-| **AAL** (Authenticator Assurance Level) | NIST's classification: AAL1 (single factor), AAL2 (two factors), AAL3 (hardware + phishing-resistant). |
+| Concept | What it means                                                                                                                                                                |
+|---|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **ACR** (Authentication Context Class Reference) | OIDC claim name for assurance context. Core sessions expose `assurance_levels[]`; the OIDC adapter maps one requested/eligible value to the token `acr` claim.               |
+| **AMR** (Authentication Methods References) | List of method identifiers used during authentication (e.g., `["pwd", "otp", "mfa"]`). Appears in OIDC ID tokens as the `amr` claim. Not stored or exposed in core sessions. |
+| **AAL** (Authenticator Assurance Level) | NIST's classification: AAL1 (single factor), AAL2 (two factors), AAL3 (hardware + phishing-resistant).                                                                       |
 
 ### How It Works
 
@@ -58,13 +113,23 @@ The session model is built around **Authentication Context Class Reference (ACR)
 
 ### ACR Level Definitions as JSON Schema
 
-Each ACR level is defined by a JSON Schema that the session's `factors` object must satisfy. The schema can encode factor requirements, alternatives, and **freshness constraints**.
+Zitadel ships **default assurance profile packs** as starting points. The first default pack is expected to be **NIST-referenced** (SP 800-63 AAL1/AAL2/AAL3), using neutral ACR identifiers such as `urn:nist:aal:1`, `urn:nist:aal:2`, and `urn:nist:aal:3` in examples.
+
+The defaults are not exclusive. Teams can:
+
+- adopt additional profile packs (for other standards bodies),
+- define country- or sector-specific assurance schemas in their own deployment,
+- contribute reusable schema packs back to the ecosystem.
+
+Each deployment decides which profile packs are enabled and which identifiers are accepted for `acr_values`.
+
+Each assurance level is defined by a JSON Schema that the session's `factors` object must satisfy. The schema can encode factor requirements, alternatives, and **freshness constraints**.
 
 **AAL1 — single factor, verified within 24h:**
 
 ```json
 {
-  "acr": "urn:zitadel:aal:1",
+  "acr": "urn:nist:aal:1",
   "schema": {
     "type": "object",
     "required": ["user"],
@@ -100,7 +165,7 @@ Each ACR level is defined by a JSON Schema that the session's `factors` object m
 
 ```json
 {
-  "acr": "urn:zitadel:aal:2",
+  "acr": "urn:nist:aal:2",
   "schema": {
     "type": "object",
     "required": ["user"],
@@ -152,7 +217,7 @@ Each ACR level is defined by a JSON Schema that the session's `factors` object m
 
 ```json
 {
-  "acr": "urn:zitadel:aal:3",
+  "acr": "urn:nist:aal:3",
   "schema": {
     "type": "object",
     "required": ["user", "passkey"],
@@ -178,7 +243,7 @@ Each ACR level is defined by a JSON Schema that the session's `factors` object m
 
 This means:
 - A factor can satisfy AAL2 right after verification but stop satisfying it after the freshness window expires.
-- The session's `assurance_levels[]` **shrinks over time** without the session itself expiring.
+- The session's `assurance_levels[]` **shrinks over time** without the session itself expiring — AAL2 drops out while AAL1 remains.
 - Step-up re-authentication creates a new auth_attempt against the same session and refreshes the factor's `verified_at`, restoring the higher level.
 
 ### Factor Freshness in Practice
@@ -194,10 +259,10 @@ Current time: 2026-04-17T14:00:00Z (6h later)
 AAL2 schema requires: totp.verified_at within 4h
 TOTP verified 6h ago → FAILS freshness check
 
-Current assurance_levels[]: ["urn:zitadel:aal:1"] (password still fresh within 24h)
+Current assurance_levels[]: ["urn:nist:aal:1"]   (AAL2 dropped out; password still fresh within 24h)
 ```
 
-The session is still valid. An RP requiring AAL1 finds it in the list and succeeds. An RP requiring AAL2 does not find it and triggers step-up.
+The session is still valid. An RP requiring AAL1 finds it in the list and succeeds. An RP requiring AAL2 does not find it — the IdP triggers step-up: a new `auth_attempt` is created against this session, the user re-verifies TOTP, and AAL2 is restored to the list.
 
 ### Custom Assurance Levels
 
@@ -224,38 +289,104 @@ Teams can define custom assurance values with their own schemas:
 }
 ```
 
+Custom levels appear in `assurance_levels[]` alongside default NIST levels when their schemas are satisfied.
+
 ## Endpoints
 
 ```
-POST   /sessions                     Optional anonymous pre-auth shell
-GET    /sessions                     List sessions (admin / management)
+POST   /sessions                     Create anonymous session shell (pre-auth)
 GET    /sessions/{id}                Get session state, factors, assurance_levels[]
-DELETE /sessions/{id}                Revoke session
-
-POST   /auth_attempts                Start authentication, references session_id optionally
-POST   /auth_attempts/{id}/challenges
-POST   /auth_attempts/{id}/challenges/{cid}/verify
-POST   /auth_attempts/{id}/handoff
-POST   /sessions/exchange            Exchange handoff_token -> { session, session_token }
+DELETE /sessions/{id}                Revoke session (logout)
+GET    /sessions                     List sessions (admin / management)
 ```
+
+Factor proofs are **not submitted here**. They go to:
+
+```
+POST   /auth_attempts                               Start authentication (references session_id optionally)
+POST   /auth_attempts/{id}/challenges               Issue a factor challenge
+POST   /auth_attempts/{id}/challenges/{cid}/verify  Submit proof
+POST   /auth_attempts/{id}/handoff                  Mint handoff_token
+POST   /sessions/exchange                           Exchange handoff_token → { session, session_token }
+```
+
+### `POST /sessions/exchange`
+
+Consumes a one-time `handoff_token` minted by `POST /auth_attempts/{id}/handoff`. The server resolves the originating `auth_attempt` from the token and then decides:
+
+| Situation | Outcome |
+|---|---|
+| `auth_attempt` had **no `session_id`** | New authenticated session is **created** |
+| `auth_attempt` had a `session_id` pointing to an **anonymous shell** | Existing session is **upgraded** — user and factors written in, TTL reset to full session TTL |
+| `auth_attempt` had a `session_id` pointing to an **active session** (step-up) | Existing session is **upgraded** — new factors merged, `assurance_levels[]` expanded |
+
+The caller does not need to know which case applies — the response shape is identical in all three.
+
+**Request**
+
+```http
+POST /sessions/exchange
+Authorization: Bearer sk_proj_…   ← project service key
+Content-Type: application/json
+
+{
+  "handoff_token": "htok_…"
+}
+```
+
+**Response**
+
+```json
+{
+  "session": {
+    "session_id":        "sess_…",
+    "state":             "active",
+    "user_id":           "usr_…",
+    "factors":           { "password": { "verified_at": "…" }, "totp": { "verified_at": "…" } },
+    "assurance_levels":  ["urn:nist:aal:1", "urn:nist:aal:2"],
+    "created_at":        "…",
+    "expires_at":        "…"
+  },
+  "session_token": "stok_…"
+}
+```
+
+- `session_token` supersedes any previously issued anonymous `session_token` for the same session. Clients must replace their stored token at this point.
+- The `handoff_token` is single-use; replaying it returns `410 Gone`.
+
+See [auth_attempts state machine](../api/authn-and-auth-flows.md) for the full endpoint reference.
 
 ## Session Lifecycle
 
 ```
-                  ┌──────────┐
-  CreateSession → │ building │ ← step-up auth_attempt
-                  └────┬─────┘
-                       │ auth_attempt completes,
-                       │ handoff exchanged
-                       ▼
-                  ┌──────────┐
-                  │  active  │ ← assurance_levels[] may shrink as factors age
-                  └────┬─────┘
-                  ┌────┴─────┐
-                  ▼          ▼
-            ┌─────────┐ ┌─────────┐
-            │ expired │ │ revoked │
-            └─────────┘ └─────────┘
+                  ┌──────────────────────────────────────┐
+                  │                                      │
+  POST /sessions  │  anonymous (building, short TTL)     │
+  (optional)      │  no user, no factors                 │
+                  └───────────────┬──────────────────────┘
+                                  │ auth_attempt completes,
+                                  │ first factor written
+                                  ▼
+                  ┌──────────────────────────────────────┐
+                  │                                      │
+                  │  building                            │◄─── step-up auth_attempt
+                  │  has user factor, gathering more     │     adds more factors
+                  │                                      │
+                  └───────────────┬──────────────────────┘
+                                  │ has at least one
+                                  │ authentication factor
+                                  ▼
+                  ┌──────────────────────────────────────┐
+                   │                                      │
+                   │  active                              │◄─── step-up expands assurance_levels[]
+                   │  assurance_levels[] may shrink as factors age │
+                  │                                      │
+                  └──────────┬───────────────────────────┘
+                        ┌────┴────┐
+                        ▼         ▼
+                  ┌─────────┐ ┌─────────┐
+                  │ expired │ │ revoked │
+                  └─────────┘ └─────────┘
 ```
 
 A session transitions to `active` when it has at least one verified authentication factor (beyond just user identification). `active` does not mean "enough for all purposes" — the consumer checks whether its required assurance level appears in `assurance_levels[]`.
@@ -290,6 +421,7 @@ Example response:
   "session_token": "tok_final"
 }
 ```
+> **Important:** After a handoff exchange, clients must replace the anonymous `session_token` with the one returned from the exchange. The anonymous token is invalidated at that point.
 
 ### Step-Up Authentication
 
@@ -303,12 +435,12 @@ User verifies TOTP through auth_attempt → assurance_levels[] includes urn:zita
 IdP issues ID token with acr: "urn:zitadel:aal:2"
 ```
 
-The same session is used. No new session is created. The factors accumulate.
+The **same session** is used. No new session is created. Factors accumulate and `assurance_levels[]` grows.
 
 ### Factor Freshness Triggers Step-Up
 
 ```
-RP → /authorize?acr_values=urn:zitadel:aal:2&max_age=300
+RP → /authorize?acr_values=urn:nist:aal:2&max_age=300
 IdP checks session:
   - password: verified 2h ago (within 24h limit → OK)
   - totp: verified 5h ago (exceeds 4h freshness → STALE)
@@ -345,7 +477,7 @@ levels are currently satisfied." The consumer decides if that set is enough.
 | `otp_email` | `{ "code": "..." }` | Prior `user` factor + challenge | Possession factor → AAL2 (restricted by NIST) |
 | `idp` | `{ "intent_id": "...", "token": "..." }` | Prior `user` factor | Depends on IdP's own assurance level |
 | `recovery_code` | `{ "code": "..." }` | Prior `user` factor | Single-use, not counted toward assurance |
-| `captcha` | `{ "provider": "altcha", "salt": "...", "number": ... }` or `{ "provider": "recaptcha", "token": "..." }` | Challenge | Bot detection signal, not an authentication factor |
+| `captcha` | `{ "provider": "altcha", "salt": "...", "number": ... }` or `{ "provider": "recaptcha", "token": "..." }` | Challenge (from auth_attempt) | Bot detection signal, not an authentication factor |
 
 ## Database Schema
 
@@ -357,12 +489,11 @@ CREATE TABLE sessions (
     state           TEXT        NOT NULL,       -- 'building', 'active', 'expired', 'revoked'
     user_id         TEXT,
     factors         JSONB       NOT NULL DEFAULT '{}', -- verified factor events with timestamps + properties
-    assurance_levels TEXT[]     DEFAULT '{}',   -- all levels currently satisfied
-    amr             TEXT[]      DEFAULT '{}',   -- authentication methods used
+    assurance_levels TEXT[]     DEFAULT '{}',   -- all assurance levels currently satisfied (recomputed on auth_attempt completion)
     metadata        JSONB       NOT NULL DEFAULT '{}',
     user_agent      JSONB,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-    expires_at      TIMESTAMPTZ,
+    expires_at      TIMESTAMPTZ,                -- short TTL for anonymous sessions; reset on first factor write
 
     PRIMARY KEY (project_id, id)
 );
