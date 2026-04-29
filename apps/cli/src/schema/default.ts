@@ -47,10 +47,12 @@ const FIELD_PRESETS: Record<string, Record<string, unknown>> = {
   },
 };
 
-export function defaultUserSchema(opts: {
-  fields?: string[];
-  authMethods?: string[] | AuthMethods;
-} = {}): UserSchema {
+export function defaultUserSchema(
+  opts: {
+    fields?: string[];
+    authMethods?: string[] | AuthMethods;
+  } = {},
+): UserSchema {
   const fields = opts.fields?.length ? opts.fields : ["email", "given_name", "family_name"];
   const authMethods = normalizeAuthMethods(opts.authMethods);
   const properties: Record<string, Record<string, unknown>> = {};

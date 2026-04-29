@@ -1,0 +1,23 @@
+{
+  "name": "@zitadel-nextgen/components",
+  "version": "0.0.1",
+  "private": true,
+  "main": "./dist/index.mjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "default": "./dist/index.mjs"
+    }
+  },
+  "dependencies": {
+    "lit": "catalog:"
+  },
+  "devDependencies": {
+    "ts-lit-plugin": "catalog:",
+    "tslib": "catalog:"
+  }
+}

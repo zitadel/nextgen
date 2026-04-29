@@ -1,6 +1,11 @@
 export type DeployPlatformId = "vercel" | "netlify" | "cloudflare" | "none";
 export type DeployEnvironment = "preview" | "production";
-export type DeployState = "ready" | "missing-cli" | "not-authenticated" | "not-linked" | "not-detected";
+export type DeployState =
+  | "ready"
+  | "missing-cli"
+  | "not-authenticated"
+  | "not-linked"
+  | "not-detected";
 
 export type DeployEnvVars = Record<string, string>;
 
@@ -10,7 +15,11 @@ export type CommandResult = {
   stderr: string;
 };
 
-export type CommandRunner = (command: string, args: string[], opts?: { cwd?: string; input?: string }) => CommandResult;
+export type CommandRunner = (
+  command: string,
+  args: string[],
+  opts?: { cwd?: string; input?: string },
+) => CommandResult;
 
 export type DeployStatus = {
   platform: DeployPlatformId;
@@ -38,7 +47,15 @@ export interface DeployAdapter {
   readonly previewOrigins: string[];
   detect(cwd: string): Promise<boolean>;
   status(cwd: string): Promise<DeployStatus>;
-  configurePreviewEnv(cwd: string, vars: DeployEnvVars, opts?: { dryRun?: boolean }): Promise<DeployConfigureResult>;
-  configureProductionEnv(cwd: string, vars: DeployEnvVars, opts?: { dryRun?: boolean }): Promise<DeployConfigureResult>;
+  configurePreviewEnv(
+    cwd: string,
+    vars: DeployEnvVars,
+    opts?: { dryRun?: boolean },
+  ): Promise<DeployConfigureResult>;
+  configureProductionEnv(
+    cwd: string,
+    vars: DeployEnvVars,
+    opts?: { dryRun?: boolean },
+  ): Promise<DeployConfigureResult>;
   manualInstructions(environment: DeployEnvironment, vars: DeployEnvVars): string[];
 }

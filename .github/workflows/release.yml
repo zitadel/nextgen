@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: 'Git tag or ref to release, for example v0.1.0.'
+        description: "Git tag or ref to release, for example v0.1.0."
         required: true
         type: string
       snapshot:
-        description: 'Run a non-publishing snapshot instead of a real release.'
+        description: "Run a non-publishing snapshot instead of a real release."
         required: true
         default: true
         type: boolean
@@ -65,7 +65,7 @@ jobs:
         uses: goreleaser/goreleaser-action@v7
         with:
           distribution: goreleaser
-          version: '~> v2'
+          version: "~> v2"
           args: release --snapshot --clean --skip=publish,sign
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -75,7 +75,7 @@ jobs:
         uses: goreleaser/goreleaser-action@v7
         with:
           distribution: goreleaser
-          version: '~> v2'
+          version: "~> v2"
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

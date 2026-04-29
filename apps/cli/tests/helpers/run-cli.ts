@@ -1,5 +1,5 @@
-import type { CliIO } from "../../src/io/output";
 import { runCli } from "../../src/cli";
+import type { CliIO } from "../../src/io/output";
 
 export async function runCliForTest(argv: string[], env: NodeJS.ProcessEnv = {}) {
   let stdout = "";

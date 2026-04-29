@@ -7,7 +7,10 @@ export type AddFieldSpec = {
   required: boolean;
 };
 
-export function addFields(schema: Record<string, unknown>, specs: AddFieldSpec[]): Record<string, unknown> {
+export function addFields(
+  schema: Record<string, unknown>,
+  specs: AddFieldSpec[],
+): Record<string, unknown> {
   const next = clone(schema);
   const properties = ensureObject(next, "properties");
   const required = new Set(Array.isArray(next.required) ? next.required.map(String) : []);
@@ -27,13 +30,18 @@ export function addFields(schema: Record<string, unknown>, specs: AddFieldSpec[]
   return sortValue(next) as Record<string, unknown>;
 }
 
-export function removeFields(schema: Record<string, unknown>, names: string[]): Record<string, unknown> {
+export function removeFields(
+  schema: Record<string, unknown>,
+  names: string[],
+): Record<string, unknown> {
   const next = clone(schema);
   const properties = ensureObject(next, "properties");
   for (const name of names) {
     delete properties[name];
   }
-  next.required = (Array.isArray(next.required) ? next.required.map(String) : []).filter((name) => !names.includes(name)).sort();
+  next.required = (Array.isArray(next.required) ? next.required.map(String) : [])
+    .filter((name) => !names.includes(name))
+    .sort();
   return sortValue(next) as Record<string, unknown>;
 }
 
@@ -47,7 +55,7 @@ export function parseAddFieldSpec(raw: string): AddFieldSpec {
   let required = false;
 
   for (const attr of attrs.split(",").filter(Boolean)) {
-    const [key, value = "true"] = attr.split("=");
+    const [key = "", value = "true"] = attr.split("=");
     if (key === "required") {
       required = value !== "false";
     } else if (key === "format") {

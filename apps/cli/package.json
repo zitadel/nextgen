@@ -1,39 +1,65 @@
 {
-  "name": "zitadel",
+  "name": "@zitadel-nextgen/cli",
   "version": "0.0.0",
   "description": "Agent-friendly Zitadel CLI",
+  "homepage": "https://github.com/zitadel/nextgen/tree/main/apps/cli#readme",
+  "bugs": {
+    "url": "https://github.com/zitadel/nextgen/issues"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/zitadel/nextgen.git",
     "directory": "apps/cli"
   },
-  "homepage": "https://github.com/zitadel/nextgen/tree/main/apps/cli#readme",
-  "bugs": {
-    "url": "https://github.com/zitadel/nextgen/issues"
-  },
-  "type": "module",
   "bin": {
-    "zitadel": "dist/zitadel.js"
+    "zitadel": "dist/zitadel.mjs"
   },
   "files": [
     "dist",
     "AGENTS.md"
   ],
+  "type": "module",
   "scripts": {
-    "build": "tsup && tsx scripts/gen-agents-md.ts",
-    "gen:agents-md": "tsx scripts/gen-agents-md.ts",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "build": "tsdown",
+    "gen:agents-md": "tsx scripts/gen-agents-md.ts"
   },
   "dependencies": {
-    "@clack/prompts": "^0.8.2",
-    "ajv": "^8.17.1",
-    "liquidjs": "^10.25.7",
-    "zod": "^3.24.1"
+    "@clack/prompts": "catalog:",
+    "ajv": "catalog:",
+    "liquidjs": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
-    "@zitadel/sdk-next": "workspace:*",
-    "tsx": "^4.19.2"
+    "@zitadel-nextgen/sdk-next": "workspace:*",
+    "tsdown": "^0.21.10",
+    "tsx": "catalog:"
+  },
+  "nx": {
+    "targets": {
+      "build": {
+        "options": {
+          "cache": true
+        },
+        "inputs": [
+          "production",
+          "^production",
+          {
+            "externalDependencies": [
+              "tsdown"
+            ]
+          }
+        ],
+        "outputs": [
+          "{projectRoot}/dist/**/*.mjs",
+          "{projectRoot}/dist/**/*.mjs.map"
+        ],
+        "dependsOn": [
+          "^build",
+          "^typecheck",
+          "gen:agents-md"
+        ]
+      }
+    }
   }
 }

@@ -1,7 +1,14 @@
 import { createDeployAdapters, NoDeployAdapter } from "./adapters";
 import type { CommandRunner, DeployAdapter, DeployPlatformId } from "./types";
 
-export type { CommandRunner, DeployAdapter, DeployConfigureResult, DeployEnvVars, DeployPlatformId, DeployStatus } from "./types";
+export type {
+  CommandRunner,
+  DeployAdapter,
+  DeployConfigureResult,
+  DeployEnvVars,
+  DeployPlatformId,
+  DeployStatus,
+} from "./types";
 
 export async function detectDeployTarget(
   cwd: string,

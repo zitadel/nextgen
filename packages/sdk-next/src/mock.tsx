@@ -1,14 +1,15 @@
 "use client";
 
-import { type FormEvent, useState } from "react";
-import { createMockFlow, mockSubmit, type ZitadelFlowPurpose } from "@zitadel/sdk-core";
-import { styles } from "./styles";
+import { createMockFlow, mockSubmit, type ZitadelFlowPurpose } from "@zitadel-nextgen/sdk-core";
+import { type SubmitEvent, useState } from "react";
+
+import { styles } from "./styles.js";
 
 export function ZitadelFlowMock({ purpose }: { purpose: ZitadelFlowPurpose }) {
   const flow = createMockFlow(purpose);
   const [result, setResult] = useState<string | undefined>();
 
-  function onSubmit(event: FormEvent<HTMLFormElement>) {
+  function onSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     const values = Object.fromEntries(new FormData(event.currentTarget).entries());
     const response = mockSubmit(purpose, values);
@@ -31,12 +32,21 @@ export function ZitadelFlowMock({ purpose }: { purpose: ZitadelFlowPurpose }) {
             {flow.fields.map((field) => (
               <label key={field.name} style={styles.label}>
                 <span>{field.label}</span>
-                <input name={field.name} type={field.type} required={field.required} style={styles.input} />
+                <input
+                  name={field.name}
+                  type={field.type}
+                  required={field.required}
+                  style={styles.input}
+                />
               </label>
             ))}
             <div style={styles.actions}>
               {flow.actions.map((action, index) => (
-                <button key={action} type="submit" style={index === 0 ? styles.primaryButton : styles.secondaryButton}>
+                <button
+                  key={action}
+                  type="submit"
+                  style={index === 0 ? styles.primaryButton : styles.secondaryButton}
+                >
                   {action}
                 </button>
               ))}
