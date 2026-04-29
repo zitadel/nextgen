@@ -1,5 +1,4 @@
 import { LitElement, css, html } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
 
 type FlowState =
   | { name: "idle" }
@@ -8,16 +7,15 @@ type FlowState =
   | { name: "success"; message: string }
   | { name: "error"; message: string };
 
-@customElement("nextgen-login")
-export class NextgenLogin extends LitElement {
-  @property({ type: String, attribute: "proxy-base" })
-  proxyBase = "/__nextgen";
+class NextgenLogin extends LitElement {
+  static override properties = {
+    proxyBase: { type: String, attribute: "proxy-base" },
+    _flow: { state: true },
+    _email: { state: true },
+    _password: { state: true },
+  };
 
-  @state() private flow: FlowState = { name: "idle" };
-  @state() private email = "";
-  @state() private password = "";
-
-  static styles = css`
+  static override styles = css`
     :host {
       display: block;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
@@ -184,20 +182,17 @@ export class NextgenLogin extends LitElement {
     }
 
     .spinner {
-      width: 16px;
-      height: 16px;
-      border: 2px solid rgba(255, 255, 255, 0.4);
-      border-top-color: white;
+      width: 24px;
+      height: 24px;
+      border: 2px solid #e5e7eb;
+      border-top-color: #6366f1;
       border-radius: 50%;
       animation: spin 0.7s linear infinite;
-      display: inline-block;
-      vertical-align: middle;
+      margin: 0 auto 12px;
     }
 
     @keyframes spin {
-      to {
-        transform: rotate(360deg);
-      }
+      to { transform: rotate(360deg); }
     }
 
     .footer {
@@ -213,13 +208,26 @@ export class NextgenLogin extends LitElement {
     }
   `;
 
-  connectedCallback() {
+  declare proxyBase: string;
+  declare _flow: FlowState;
+  declare _email: string;
+  declare _password: string;
+
+  constructor() {
+    super();
+    this.proxyBase = "/__nextgen";
+    this._flow = { name: "idle" };
+    this._email = "";
+    this._password = "";
+  }
+
+  override connectedCallback() {
     super.connectedCallback();
     this._startFlow();
   }
 
   private async _startFlow() {
-    this.flow = { name: "loading" };
+    this._flow = { name: "loading" };
     try {
       const res = await fetch(`${this.proxyBase}/v1/flow`, {
         method: "POST",
@@ -229,21 +237,18 @@ export class NextgenLogin extends LitElement {
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      this.flow = {
-        name: "login",
-        csrf_token: data.csrf_token ?? "",
-      };
+      this._flow = { name: "login", csrf_token: data.csrf_token ?? "" };
     } catch {
-      this.flow = { name: "login", csrf_token: "" };
+      this._flow = { name: "login", csrf_token: "" };
     }
   }
 
   private async _handleSubmit(e: Event) {
     e.preventDefault();
-    if (this.flow.name !== "login") return;
+    if (this._flow.name !== "login") return;
 
-    const csrf = this.flow.csrf_token;
-    this.flow = { name: "loading" };
+    const csrf = this._flow.csrf_token;
+    this._flow = { name: "loading" };
 
     try {
       const res = await fetch(`${this.proxyBase}/v1/flow`, {
@@ -255,52 +260,50 @@ export class NextgenLogin extends LitElement {
         credentials: "include",
         body: JSON.stringify({
           action: "submit",
-          email: this.email,
-          password: this.password,
+          email: this._email,
+          password: this._password,
         }),
       });
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({ message: "Sign in failed" }));
-        this.flow = { name: "error", message: err.message ?? "Sign in failed" };
+        this._flow = { name: "error", message: err.message ?? "Sign in failed" };
         return;
       }
 
       const data = await res.json();
-
       if (data.name === "success" || data.status === "complete") {
-        this.flow = {
-          name: "success",
-          message: data.message ?? "You are signed in.",
-        };
+        this._flow = { name: "success", message: data.message ?? "You are signed in." };
         this.dispatchEvent(new CustomEvent("nextgen-signin", { bubbles: true, composed: true, detail: data }));
       } else {
-        this.flow = { name: "login", csrf_token: data.csrf_token ?? "" };
+        this._flow = { name: "login", csrf_token: data.csrf_token ?? "" };
       }
     } catch {
-      this.flow = { name: "error", message: "Network error. Please try again." };
+      this._flow = { name: "error", message: "Network error. Please try again." };
     }
   }
 
+  private _handleSso() {
+    this.dispatchEvent(new CustomEvent("nextgen-sso", { bubbles: true, composed: true }));
+  }
+
   private _renderBody() {
-    if (this.flow.name === "loading") {
+    if (this._flow.name === "loading") {
       return html`
         <div style="text-align:center;padding:32px 0;color:#6b7280;font-size:14px">
-          <div class="spinner" style="border-top-color:#6366f1;border-color:#e5e7eb;width:24px;height:24px;margin:0 auto 12px"></div>
+          <div class="spinner"></div>
           Loading…
         </div>
       `;
     }
 
-    if (this.flow.name === "success") {
-      return html`
-        <div class="message success">${this.flow.message}</div>
-      `;
+    if (this._flow.name === "success") {
+      return html`<div class="message success">${this._flow.message}</div>`;
     }
 
     return html`
-      ${this.flow.name === "error"
-        ? html`<div class="message error">${this.flow.message}</div>`
+      ${this._flow.name === "error"
+        ? html`<div class="message error">${this._flow.message}</div>`
         : ""}
 
       <form @submit=${this._handleSubmit}>
@@ -311,8 +314,8 @@ export class NextgenLogin extends LitElement {
             type="email"
             autocomplete="email"
             placeholder="you@example.com"
-            .value=${this.email}
-            @input=${(e: InputEvent) => (this.email = (e.target as HTMLInputElement).value)}
+            .value=${this._email}
+            @input=${(e: InputEvent) => { this._email = (e.target as HTMLInputElement).value; }}
             required
           />
         </div>
@@ -323,8 +326,8 @@ export class NextgenLogin extends LitElement {
             type="password"
             autocomplete="current-password"
             placeholder="••••••••"
-            .value=${this.password}
-            @input=${(e: InputEvent) => (this.password = (e.target as HTMLInputElement).value)}
+            .value=${this._password}
+            @input=${(e: InputEvent) => { this._password = (e.target as HTMLInputElement).value; }}
             required
           />
         </div>
@@ -347,11 +350,7 @@ export class NextgenLogin extends LitElement {
     `;
   }
 
-  private _handleSso() {
-    this.dispatchEvent(new CustomEvent("nextgen-sso", { bubbles: true, composed: true }));
-  }
-
-  render() {
+  override render() {
     return html`
       <div class="card">
         <div class="logo">
@@ -368,6 +367,10 @@ export class NextgenLogin extends LitElement {
     `;
   }
 }
+
+customElements.define("nextgen-login", NextgenLogin);
+
+export { NextgenLogin };
 
 declare global {
   interface HTMLElementTagNameMap {
