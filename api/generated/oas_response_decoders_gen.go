@@ -418,8 +418,8 @@ func decodeCreateSchemaResponse(resp *http.Response) (res CreateSchemaRes, _ err
 			return res, validate.InvalidContentType(ct)
 		}
 	}
-	// Convenient error response.
-	defRes, err := func() (res *ErrorDetailsStatusCode, err error) {
+	// Default response.
+	res, err := func() (res CreateSchemaRes, err error) {
 		ct, _, err := mime.ParseMediaType(resp.Header.Get("Content-Type"))
 		if err != nil {
 			return res, errors.Wrap(err, "parse media type")
@@ -460,7 +460,7 @@ func decodeCreateSchemaResponse(resp *http.Response) (res CreateSchemaRes, _ err
 	if err != nil {
 		return res, errors.Wrapf(err, "default (code %d)", resp.StatusCode)
 	}
-	return res, errors.Wrap(defRes, "error")
+	return res, nil
 }
 
 func decodeCreateSchemaRevisionResponse(resp *http.Response) (res CreateSchemaRevisionRes, _ error) {
@@ -536,8 +536,8 @@ func decodeCreateSchemaRevisionResponse(resp *http.Response) (res CreateSchemaRe
 			return res, validate.InvalidContentType(ct)
 		}
 	}
-	// Convenient error response.
-	defRes, err := func() (res *ErrorDetailsStatusCode, err error) {
+	// Default response.
+	res, err := func() (res CreateSchemaRevisionRes, err error) {
 		ct, _, err := mime.ParseMediaType(resp.Header.Get("Content-Type"))
 		if err != nil {
 			return res, errors.Wrap(err, "parse media type")
@@ -578,7 +578,7 @@ func decodeCreateSchemaRevisionResponse(resp *http.Response) (res CreateSchemaRe
 	if err != nil {
 		return res, errors.Wrapf(err, "default (code %d)", resp.StatusCode)
 	}
-	return res, errors.Wrap(defRes, "error")
+	return res, nil
 }
 
 func decodeEndSessionResponse(resp *http.Response) (res EndSessionRes, _ error) {
@@ -1475,8 +1475,8 @@ func decodeGetSchemaByIdResponse(resp *http.Response) (res GetSchemaByIdRes, _ e
 			return res, validate.InvalidContentType(ct)
 		}
 	}
-	// Convenient error response.
-	defRes, err := func() (res *ErrorDetailsStatusCode, err error) {
+	// Default response.
+	res, err := func() (res GetSchemaByIdRes, err error) {
 		ct, _, err := mime.ParseMediaType(resp.Header.Get("Content-Type"))
 		if err != nil {
 			return res, errors.Wrap(err, "parse media type")
@@ -1517,7 +1517,7 @@ func decodeGetSchemaByIdResponse(resp *http.Response) (res GetSchemaByIdRes, _ e
 	if err != nil {
 		return res, errors.Wrapf(err, "default (code %d)", resp.StatusCode)
 	}
-	return res, errors.Wrap(defRes, "error")
+	return res, nil
 }
 
 func decodeGetSchemaReleaseStateResponse(resp *http.Response) (res GetSchemaReleaseStateRes, _ error) {
@@ -1602,8 +1602,8 @@ func decodeGetSchemaReleaseStateResponse(resp *http.Response) (res GetSchemaRele
 			return res, validate.InvalidContentType(ct)
 		}
 	}
-	// Convenient error response.
-	defRes, err := func() (res *ErrorDetailsStatusCode, err error) {
+	// Default response.
+	res, err := func() (res GetSchemaReleaseStateRes, err error) {
 		ct, _, err := mime.ParseMediaType(resp.Header.Get("Content-Type"))
 		if err != nil {
 			return res, errors.Wrap(err, "parse media type")
@@ -1644,7 +1644,7 @@ func decodeGetSchemaReleaseStateResponse(resp *http.Response) (res GetSchemaRele
 	if err != nil {
 		return res, errors.Wrapf(err, "default (code %d)", resp.StatusCode)
 	}
-	return res, errors.Wrap(defRes, "error")
+	return res, nil
 }
 
 func decodeGetSchemaRevisionByIdResponse(resp *http.Response) (res GetSchemaRevisionByIdRes, _ error) {
@@ -1729,8 +1729,8 @@ func decodeGetSchemaRevisionByIdResponse(resp *http.Response) (res GetSchemaRevi
 			return res, validate.InvalidContentType(ct)
 		}
 	}
-	// Convenient error response.
-	defRes, err := func() (res *ErrorDetailsStatusCode, err error) {
+	// Default response.
+	res, err := func() (res GetSchemaRevisionByIdRes, err error) {
 		ct, _, err := mime.ParseMediaType(resp.Header.Get("Content-Type"))
 		if err != nil {
 			return res, errors.Wrap(err, "parse media type")
@@ -1771,7 +1771,7 @@ func decodeGetSchemaRevisionByIdResponse(resp *http.Response) (res GetSchemaRevi
 	if err != nil {
 		return res, errors.Wrapf(err, "default (code %d)", resp.StatusCode)
 	}
-	return res, errors.Wrap(defRes, "error")
+	return res, nil
 }
 
 func decodeGetTokenResponse(resp *http.Response) (res GetTokenRes, _ error) {
@@ -2677,8 +2677,8 @@ func decodeUpdateSchemaReleaseStateResponse(resp *http.Response) (res UpdateSche
 			return res, validate.InvalidContentType(ct)
 		}
 	}
-	// Convenient error response.
-	defRes, err := func() (res *ErrorDetailsStatusCode, err error) {
+	// Default response.
+	res, err := func() (res UpdateSchemaReleaseStateRes, err error) {
 		ct, _, err := mime.ParseMediaType(resp.Header.Get("Content-Type"))
 		if err != nil {
 			return res, errors.Wrap(err, "parse media type")
@@ -2719,5 +2719,5 @@ func decodeUpdateSchemaReleaseStateResponse(resp *http.Response) (res UpdateSche
 	if err != nil {
 		return res, errors.Wrapf(err, "default (code %d)", resp.StatusCode)
 	}
-	return res, errors.Wrap(defRes, "error")
+	return res, nil
 }
