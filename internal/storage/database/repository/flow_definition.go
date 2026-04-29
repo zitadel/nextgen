@@ -174,6 +174,11 @@ func (r *FlowDefinitionRepository) ListFlowDefinitions(ctx context.Context, proj
 		b.WriteString(" = ANY(purposes)")
 	}
 
+	if o.SchemaVersion != nil {
+		b.WriteString(" AND schema_version = ")
+		b.WriteString(b.AppendArg(o.SchemaVersion))
+	}
+
 	b.WriteString(" ORDER BY created_at ASC")
 
 	if o.Limit > 0 {

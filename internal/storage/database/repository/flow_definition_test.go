@@ -126,6 +126,27 @@ func TestFlowDefinitionRepository_ListByPurpose(t *testing.T) {
 	assert.Equal(t, "flow-pb", registerOnly[0].ID)
 }
 
+func TestFlowDefinitionRepository_ListBySchemaVersion(t *testing.T) {
+	tx, rollback := transactionForRollback(t)
+	defer rollback()
+
+	repo := newFlowDefRepo(tx)
+
+	defA := sampleFlowDefinition("proj-jpurp", "flow-pa")
+	require.NoError(t, repo.CreateFlowDefinition(t.Context(), defA))
+
+	defB := sampleFlowDefinition("proj-jpurp", "flow-pb")
+	defB.SchemaVersion = "1.2.3"
+	require.NoError(t, repo.CreateFlowDefinition(t.Context(), defB))
+
+	res, err := repo.ListFlowDefinitions(t.Context(), "proj-jpurp",
+		domain.WithSchemaVersion("1.2.3"))
+	require.NoError(t, err)
+	require.Len(t, res, 1)
+
+	assert.Equal(t, "flow-pb", res[0].ID)
+}
+
 func TestFlowDefinitionRepository_ListPagination(t *testing.T) {
 	tx, rollback := transactionForRollback(t)
 	defer rollback()
