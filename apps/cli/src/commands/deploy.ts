@@ -30,9 +30,13 @@ export async function runDeployConnect(io: CliIO, opts: DeployOptions) {
     });
   }
   if (environment === "production" && !readProductionIssuer(config)) {
-    throw new ZitadelError("E_VALIDATION", "Production deploys require environments.production.issuer in zitadel.json", {
-      hint: "Add a production issuer, then run `zitadel deploy connect --environment production`.",
-    });
+    throw new ZitadelError(
+      "E_VALIDATION",
+      "Production deploys require environments.production.issuer in zitadel.json",
+      {
+        hint: "Add a production issuer, then run `zitadel deploy connect --environment production`.",
+      },
+    );
   }
 
   const vars = environment === "preview" ? previewVars(secret) : productionVars(secret, config);
@@ -65,10 +69,7 @@ function parseDeployEnvironment(value: string | undefined): "preview" | "product
   });
 }
 
-function previewVars(secret: {
-  project_id: string;
-  preview_secret: string;
-}): DeployEnvVars {
+function previewVars(secret: { project_id: string; preview_secret: string }): DeployEnvVars {
   return {
     ZITADEL_PROJECT_ID: secret.project_id,
     ZITADEL_ENVIRONMENT: "preview",

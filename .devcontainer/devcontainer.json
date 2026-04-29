@@ -9,9 +9,7 @@
     }
   },
   "postCreateCommand": "go mod download",
-  "forwardPorts": [
-    5050
-  ],
+  "forwardPorts": [5050],
   "portsAttributes": {
     "5050": {
       "label": "pgAdmin",

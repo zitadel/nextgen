@@ -1,6 +1,6 @@
+import { hasZitadelSecret } from "../detect/state";
 import type { CliIO, GlobalOptions } from "../io/output";
 import { ok, skipped } from "../io/output";
-import { hasZitadelSecret } from "../detect/state";
 import { readZitadelConfig, readZitadelSecret } from "./shared";
 
 export async function runStatus(io: CliIO, opts: GlobalOptions): Promise<void> {

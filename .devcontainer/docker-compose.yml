@@ -14,7 +14,7 @@ services:
     image: postgres:latest
     restart: unless-stopped
     environment:
-      POSTGRES_USER: zitadel 
+      POSTGRES_USER: zitadel
       POSTGRES_PASSWORD: zitadel
       POSTGRES_DB: nextgen
     volumes:
