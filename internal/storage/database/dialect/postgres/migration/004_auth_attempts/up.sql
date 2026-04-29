@@ -18,11 +18,10 @@ CREATE TABLE zitadel_nextgen.auth_attempt_checks (
     -- , id TEXT NOT NULL --TODO: if there can be multiple checks of the same type, we need an id to distinguish them, otherwise we can use the type as the primary key
     , type SMALLINT NOT NULL CHECK(type > 0)
 
-    -- initiated time, it is set when the check gets created
-    -- it is only set if the check is a challenge, null otherwise
-    , initiated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    -- initiated time, it is set when the challenge is created and stored; it is not updated when the challenge is verified successfully or unsuccessfully
+    , last_challenged_at TIMESTAMPTZ
     -- verification time, it is set when the challenge or factor is verified successfully
-    , verified_at TIMESTAMPTZ
+    , last_verified_at TIMESTAMPTZ
     -- failure time, it is set when the challenge or factor is verified unsuccessfully
     , last_failed_at TIMESTAMPTZ
     -- failure count, it is incremented when the challenge or factor is verified unsuccessfully; successful verification does not reset it automatically
