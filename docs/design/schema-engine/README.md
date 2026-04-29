@@ -65,7 +65,7 @@ E.g.:
 
 ## Usage
 
-Let's describe how these schemas can be used. Bear with me, it is quiet abstract.
+Let's describe how these schema's can be used. Bear with me, it is quiet abstract.
 
 ### Single step hierarchy
 

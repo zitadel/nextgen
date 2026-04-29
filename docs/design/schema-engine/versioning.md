@@ -88,7 +88,6 @@ If a breaking change happens on a schema, a migration pattern should be provided
 be: ask the user for the data. E.g.: When a CUSTOMER adds a required field to a user, users should be upgraded. As long
 as not all data is migrated, deactivation of the schema is not possible.
 
-TODO: Search for a solution on how to migrate data without asking a user **and check whether that is necessary**.
 
 ## Definition lifecycle
 
