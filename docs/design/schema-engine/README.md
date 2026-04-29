@@ -25,7 +25,8 @@ E.g.:
 
 ### Schema
 
-A schema defined by the customer. These schemas must extend a Root Schema and will be used to validate Objects against.
+A schema defined by the customer. These schemas will be used to validate Objects against. A schema can extend or 
+implement a root schema, but this is not required. If it doesn't, it might need a transformer to fulfill a Root Schema.
 
 E.g.:
 
