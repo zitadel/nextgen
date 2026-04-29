@@ -10,7 +10,7 @@ type UserFactor struct {
 }
 
 // Check implements [AuthChecker].
-func (a UserAuthCheck) Check() *AuthCheck {
+func (a *UserAuthCheck) Check() *AuthCheck {
 	return a.AuthCheck
 }
 

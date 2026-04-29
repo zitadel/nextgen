@@ -8,7 +8,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-// AuthAttempt represents a the object defined [here](https://github.com/zitadel/nextgen/blob/15bd7f438d709fcd5205a163e24374f6f667b68f/docs/design/api/resource-map.md#auth-flows)
+// AuthAttempt represents the object defined [here](https://github.com/zitadel/nextgen/blob/15bd7f438d709fcd5205a163e24374f6f667b68f/docs/design/api/resource-map.md#auth-flows)
 // It is short lived and should therefore be stored near the client, do not store PII data in it.
 type AuthAttempt struct {
 	// ProjectID links to [Project].
