@@ -1,0 +1,46 @@
+post:
+  operationId: createAuthAttempt
+  summary: Create a new authentication attempt
+  description: |
+    Starts a new authentication attempt. This is the entry point for the auth_attempts state machine.
+    
+    An attempt is an ephemeral (15-minute TTL) state machine that drives a single authentication round.
+    It accepts factor challenges, verifies proofs, and completes into a session or handoff token.
+    
+    Accepts a project_id and challenge_nonce (from POST /bootstrap/challenge). For step-up re-auth,
+    also include session_id to add factors to an existing session.
+  tags:
+    - Authentication Attempts
+  security: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: create-auth-attempt-request.yaml
+  responses:
+    '201':
+      description: Authentication attempt created successfully
+      content:
+        application/json:
+          schema:
+            $ref: auth-attempt-response.yaml
+    '400':
+      description: Invalid request or invalid nonce
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '401':
+      description: Invalid credentials or nonce expired
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    default:
+      description: Unexpected error
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+

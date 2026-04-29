@@ -1,0 +1,62 @@
+post:
+  operationId: verifyChallengeProof
+  summary: Verify a factor proof
+  description: |
+    Submits a proof (credential, code, assertion) to verify a factor challenge.
+    
+    The proof format depends on the challenge method. For example:
+    - `password` method: { password: "…" }
+    - `totp` method: { totp: { code: "123456" } }
+    - `passkey` method: { passkey: { assertion: "…" } }
+    - `recovery_code` method: { recovery_code: "…" }
+    
+    On successful verification, the factor is written to the auth attempt.
+    The attempt moves to the next pending challenge or completes if all required factors are verified.
+  tags:
+    - Authentication Attempts
+  parameters:
+    - $ref: ../../../components/parameters/attempt-id.yaml
+    - $ref: ../../../components/parameters/challenge-id.yaml
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: verify-challenge-request.yaml
+  responses:
+    '200':
+      description: Proof verified successfully, factor written to session
+      content:
+        application/json:
+          schema:
+            $ref: ../auth-attempt-response.yaml
+    '400':
+      description: Invalid proof or request
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '401':
+      description: Proof rejected (invalid credential, wrong code, etc.)
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '404':
+      description: Attempt or challenge not found
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '429':
+      description: Too many failed attempts (rate limited)
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    default:
+      description: Unexpected error
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml

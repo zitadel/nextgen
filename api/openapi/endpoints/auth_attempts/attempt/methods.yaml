@@ -1,0 +1,35 @@
+get:
+  operationId: getAuthAttempt
+  summary: Get authentication attempt state
+  description: |
+    Polls the current state of an authentication attempt.
+    
+    Returns the attempt's state, available factors for the next challenge,
+    challenges issued so far, and any errors preventing progress.
+    
+    Use this for polling during long-running factor verifications (e.g., waiting for
+    a federated IdP callback or a device flow).
+  tags:
+    - Authentication Attempts
+  parameters:
+      - $ref: ../../../components/parameters/attempt-id.yaml
+  responses:
+    '200':
+      description: Current state of the authentication attempt
+      content:
+        application/json:
+          schema:
+            $ref: ../auth-attempt-response.yaml
+    '404':
+      description: Authentication attempt not found or expired
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    default:
+      description: Unexpected error
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+

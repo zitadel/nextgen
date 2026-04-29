@@ -34,6 +34,16 @@ paths:
     $ref: endpoints/oauth/token/methods.yaml
   /auth/userinfo:
     $ref: endpoints/oauth/userinfo/methods.yaml
+  /auth_attempts:
+    $ref: endpoints/auth_attempts/methods.yaml
+  /auth_attempts/{attempt_id}:
+    $ref: endpoints/auth_attempts/attempt/methods.yaml
+  /auth_attempts/{attempt_id}/challenges:
+    $ref: endpoints/auth_attempts/challenges/methods.yaml
+  /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify:
+    $ref: endpoints/auth_attempts/challenges/verify-methods.yaml
+  /auth_attempts/{attempt_id}/handoff:
+    $ref: endpoints/auth_attempts/handoff/methods.yaml
   /healthz:
     $ref: endpoints/healthz/methods.yaml
   /livez:
@@ -44,6 +54,9 @@ paths:
     $ref: endpoints/users/methods.yaml
 
 components:
+  schemas:
+    ProjectId:
+      $ref: components/schemas/project-id.yaml
   securitySchemes: 
     oauth2:
       $ref: security/oauth2.yaml

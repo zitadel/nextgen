@@ -39,6 +39,36 @@ or using `go generate`
 go generate ./...
 ```
 
+## Known Limitations
+
+### Nullable types
+
+OpenAPI 3.1 / JSON Schema 2020-12 expresses nullable fields using an array type:
+
+```yaml
+# Spec-correct OpenAPI 3.1
+session_id:
+  type: ["string", "null"]
+```
+
+However, ogen v1.20.3 parses the `type` field as a plain string and cannot unmarshal
+a YAML sequence, causing generation to fail with `cannot unmarshal !!seq into string`.
+This is tracked upstream at [ogen-go/ogen#1617](https://github.com/ogen-go/ogen/issues/1617).
+
+**Workaround:** Use `oneOf` with an explicit `null` type instead, which is still
+OpenAPI 3.1 / JSON Schema compliant and ogen handles correctly:
+
+```yaml
+# OpenAPI 3.1 compliant, ogen-compatible workaround
+session_id:
+  oneOf:
+    - type: string
+    - type: 'null'
+```
+
+Once ogen#1617 is resolved, all `oneOf` nullable patterns in this spec can be
+migrated to the more concise `type: ["string", "null"]` form.
+
 ### Spec merging: Redocly
 
 - Github: [](https://github.com/Redocly/redocly-cli)

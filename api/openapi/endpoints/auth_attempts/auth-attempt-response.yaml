@@ -1,0 +1,44 @@
+type: object
+description: |
+  The current state of an authentication attempt.
+
+  An attempt is an ephemeral state machine (15-minute TTL) that drives a single authentication round.
+  It accepts factor challenges, verifies proofs, and completes into a handoff token.
+  Clients drive the attempt by:
+  1. Issuing challenges: POST /auth_attempts/{id}/challenges
+  2. Verifying proofs: POST /auth_attempts/{id}/challenges/{cid}/verify
+  3. Completing: POST /auth_attempts/{id}/handoff
+required:
+  - attempt_id
+  - project_id
+  - expires_at
+  - created_at
+properties:
+  attempt_id:
+    $ref: ../../components/schemas/attempt-id.yaml
+  project_id:
+    $ref: ../../components/schemas/project-id.yaml
+  session_id:
+    description: |
+      The session being authenticated into. Either newly created or passed in on POST.
+      For step-up (re-auth), this is the existing session_id provided on creation.
+    oneOf:
+      - $ref: ../../components/schemas/session-id.yaml
+      - type: 'null'
+  user_id:
+    description: |
+      The user ID, if known at this point in the flow.
+      Null until an identifier challenge has been verified.
+    oneOf:
+      - $ref: ../../components/schemas/user-id.yaml
+      - type: 'null'
+  expires_at:
+    type: string
+    format: date-time
+    description: When this attempt expires (15-minute TTL from creation)
+    example: '2026-04-28T15:45:00Z'
+  created_at:
+    type: string
+    format: date-time
+    description: When this attempt was created
+    example: '2026-04-28T15:30:00Z'

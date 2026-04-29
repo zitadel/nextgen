@@ -1,0 +1,40 @@
+type: object
+description: Request to issue a factor challenge
+required:
+  - method
+properties:
+  method:
+    type: string
+    description: The authentication factor method to challenge.
+    enum:
+      - identifier
+      - password
+      - passkey
+      - totp
+      - otp_sms
+      - otp_email
+      - recovery_code
+      - idp
+      - captcha
+    example: password
+  passkey:
+    type: object
+    description: Optional options for the WebAuthn passkey ceremony. Only relevant when method is `passkey`.
+    properties:
+      userVerification:
+        type: string
+        description: The user verification requirement for the passkey challenge.
+        enum: [required, preferred, discouraged]
+        example: required
+    additionalProperties: false
+  idp_provider:
+    type: string
+    description: The federated identity provider to redirect to. Required when method is `idp`.
+    example: google
+if:
+  properties:
+    method:
+      const: idp
+then:
+  required:
+    - idp_provider
