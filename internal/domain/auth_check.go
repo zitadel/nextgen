@@ -7,7 +7,7 @@ type AuthCheck struct {
 	// When the check was verified successfully, it must be set by the storage and is read only.
 	LastVerifiedAt time.Time
 	// When the check was last challenged. It must be set by the storage and is read only.
-	LastChallengeAt time.Time
+	LastChallengedAt time.Time
 	// When the check last failed. It must be set by the storage and is read only.
 	// The repository MUST provide a method to set it to the current time, and to reset it to nil after a successful verification.
 	LastFailedAt *time.Time
@@ -42,11 +42,15 @@ type AuthChecker interface {
 }
 
 type AuthFactorer interface {
+	AuthChecker
+
 	IsFactor()
 	FactorPayload() any
 }
 
 type AuthChallenger interface {
+	AuthChecker
+
 	IsChallenge()
 	ChallengePayload() any
 }
