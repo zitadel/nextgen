@@ -2,6 +2,7 @@ package repository_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -238,6 +239,24 @@ func TestAuthAttempt_Get(t *testing.T) {
 		assert.Equal(t, attempt.ID, stored.ID)
 		assert.False(t, stored.CreatedAt.IsZero())
 		assert.Empty(t, stored.Checks)
+	})
+
+	t.Run("returns attempt with ttl", func(t *testing.T) {
+		tx, rollback := transactionForRollback(t)
+		defer rollback()
+
+		ttl := 5 * time.Minute
+		attempt := &domain.AuthAttempt{
+			ProjectID:  "p-get-ttl",
+			ID:         "a-get-ttl",
+			TimeToLive: &ttl,
+		}
+		require.NoError(t, repo.Create(t.Context(), tx, attempt))
+
+		stored, err := repo.Get(t.Context(), tx, attempt.ProjectID, attempt.ID)
+		require.NoError(t, err)
+		require.NotNil(t, stored.TimeToLive)
+		assert.Equal(t, ttl, *stored.TimeToLive)
 	})
 
 	t.Run("returns attempt with checks", func(t *testing.T) {

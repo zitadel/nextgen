@@ -13,7 +13,7 @@ import (
 
 type AuthAttempt struct{}
 
-const authAttemptGetStmt = `SELECT aa.project_id, aa.id, aa.required_checks, aa.created_at, aa.completed_at , aac.type,` +
+const authAttemptGetStmt = `SELECT aa.project_id, aa.id, aa.required_checks, aa.created_at, aa.completed_at , aac.type, aa.time_to_live,` +
 	` aac.last_challenged_at, aac.last_verified_at, aac.last_failed_at, aac.failure_count , aac.challenge_payload, aac.factor_payload` +
 	` FROM zitadel_nextgen.auth_attempts aa` +
 	` LEFT JOIN zitadel_nextgen.auth_attempt_checks aac ON aa.project_id = aac.project_id AND aa.id = aac.auth_attempt_id` +
@@ -36,7 +36,7 @@ func (a *AuthAttempt) Get(ctx context.Context, client database.QueryExecutor, pr
 			failureCount      database.Null[uint16]
 			challenge, factor json.RawMessage
 		)
-		err = rows.Scan(&attempt.ProjectID, &attempt.ID, &attempt.RequiredChecks, &attempt.CreatedAt, &attempt.CompletedAt, &checkType,
+		err = rows.Scan(&attempt.ProjectID, &attempt.ID, &attempt.RequiredChecks, &attempt.CreatedAt, &attempt.CompletedAt, &checkType, &attempt.TimeToLive,
 			&lastChallengedAt, &verifiedAt, &lastFailedAt, &failureCount, &challenge, &factor)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan auth attempt: %w", err)
