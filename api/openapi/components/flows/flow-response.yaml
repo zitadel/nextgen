@@ -25,3 +25,15 @@ properties:
     type: string
     format: uri
     description: Present on the `complete` step when a redirect is needed.
+  handoff_token:
+    type: string
+    description: |
+      Short-lived, audience-bound token produced on flow completion.
+      Exchange it for a session via `POST /sessions/exchange`.
+      Only present when `step.type` is `complete`.
+  handoff_token_expires_at:
+    type: string
+    format: date-time
+    description: |
+      Expiry timestamp for `handoff_token`. Only present when
+      `handoff_token` is set.
