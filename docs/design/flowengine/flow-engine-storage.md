@@ -146,7 +146,7 @@ The flow cookie contains `session_version`. On every submit that writes to the s
 UPDATE sessions
 SET factors = $new_factors,
     version = version + 1
-WHERE instance_id = $inst AND id = $sess AND version = $expected_version;
+WHERE project_id = $inst AND id = $sess AND version = $expected_version;
 -- 0 rows affected → 409 Conflict
 ```
 

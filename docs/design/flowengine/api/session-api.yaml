@@ -337,7 +337,7 @@ components:
       type: object
       description: |
         Proof of captcha completion. Shape depends on the provider configured
-        for this instance/organization.
+        for this project/team.
       oneOf:
         - title: AltchaProof
           description: Proof-of-work solution (self-hosted Altcha)

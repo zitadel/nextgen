@@ -26,7 +26,7 @@ POST /v1/flows
   "redirect_uri": "https://app.com/callback",
   "hint": {
     "login_name": "alice@acme.com",
-    "org_id": "org_acme"
+    "team_id": "team_acme"
   }
 }
 ```
@@ -37,7 +37,7 @@ POST /v1/flows
 | `auth_request_id` | Links to an OIDC/SAML auth request — determines target ACR and redirect |
 | `redirect_uri` | Where to send the user on completion (from the auth request or explicit) |
 | `hint.login_name` | Auto-submits identifier step (OIDC `login_hint`) |
-| `hint.org_id` | Scopes flow resolution to an organization |
+| `hint.team_id` | Scopes flow resolution to a team |
 | `hint.schema_id` | Scopes to a specific user type |
 | `hint.app_id` | Scopes to a specific application |
 
@@ -46,7 +46,7 @@ POST /v1/flows
 The server resolves which flow definition to use:
 
 1. Filter active definitions where `purposes[]` includes the requested purpose
-2. Filter by audience match (app > org > schema > instance default)
+2. Filter by audience match (app > team > schema > project default)
 3. Most specific wins; tie-break by priority
 4. Select `initial_steps[purpose]` from the matched definition
 5. Fallback: built-in default flow

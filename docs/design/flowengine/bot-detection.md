@@ -87,7 +87,7 @@ Admins can configure external captcha services when they need ML-based detection
 | **hCaptcha** | `hcaptcha` | Same flow as reCAPTCHA, verified via hCaptcha API |
 | **Cloudflare Turnstile** | `turnstile` | Invisible or managed challenge → token submitted → server verifies via Cloudflare API |
 
-Third-party providers require configuration (site key, secret key) at the instance or organization level. The captcha step in the flow response includes provider-specific config so the frontend knows which widget to render:
+Third-party providers require configuration (site key, secret key) at the project or team level. The captcha step in the flow response includes provider-specific config so the frontend knows which widget to render:
 
 ```json
 {

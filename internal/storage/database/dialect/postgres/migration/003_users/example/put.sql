@@ -169,7 +169,7 @@ CROSS JOIN _upsert_attrs_count uac;
 
 /*
 EXECUTE put_user(
-    'inst_1' -- $1 project_id
+    'proj_1' -- $1 project_id
     , 'usr_00101002' -- $2 user_id
     , ARRAY[ -- $3 full sync payload (same shape as insert_user)
         ROW('username'::TEXT, '"tester_alpha"'::JSONB, digest('"tester_alpha"'::text, 'md5'), 'global'::TEXT)::zitadel_nextgen.incoming_user_attribute

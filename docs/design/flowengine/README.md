@@ -99,7 +99,7 @@ graph TD
 
 3. **Sessions are the primitive.** A session is a bag of verified authentication factors. The flow engine creates and drives sessions internally, but sessions also exist independently. Clients that want full control (mobile apps, backend services, CLIs) skip the flow engine entirely and talk to the Session API directly.
 
-4. **Flows are configurable per audience.** Flow definitions are API resources that describe step graphs. An admin can create different flows for different organizations, applications, or user types. One org gets SSO-first login; another gets email + password. The flow engine resolves which definition to use based on the request context.
+4. **Flows are configurable per audience.** Flow definitions are API resources that describe step graphs. An admin can create different flows for different teams, applications, or user types. One team gets SSO-first login; another gets email + password. The flow engine resolves which definition to use based on the request context.
 
 5. **User schemas drive forms.** Registration fields, validation rules, and progressive profiling steps come from JSON Schema definitions — not hardcoded templates. When a schema adds a new field, every flow that references it picks it up automatically.
 

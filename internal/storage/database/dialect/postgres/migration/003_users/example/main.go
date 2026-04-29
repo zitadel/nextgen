@@ -74,9 +74,9 @@ func runCreateUser() {
 
 	var err error
 	in := &IncomingUser{
-		SchemaURL:      "./user.schema.json",
-		ID:             "test_99999999",
-		TeamID: "org_0001",
+		SchemaURL: "./user.schema.json",
+		ID:        "test_99999999",
+		TeamID:    "team_0001",
 		Attributes: []IncomingUserAttribute{
 			func() IncomingUserAttribute {
 				a, attrErr := NewIncomingUserAttribute("username", "john_doe", UserUniquenessGlobal)
@@ -114,7 +114,7 @@ func runCreateUser() {
 		panic(err)
 	}
 
-	user, err := CreateUser(ctx, "inst_1", in)
+	user, err := CreateUser(ctx, "proj_1", in)
 	if err != nil {
 		panic(err)
 	}
@@ -125,7 +125,7 @@ func runGetUserByID() {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	user, err := GetUserByID(ctx, "inst_5", "usr_00501017")
+	user, err := GetUserByID(ctx, "proj_5", "usr_00501017")
 	if err != nil {
 		panic(err)
 	}
@@ -168,7 +168,7 @@ func runPutUser() {
 		panic(err)
 	}
 
-	result, err := PutUser(ctx, "inst_5", "usr_00501017", attributes)
+	result, err := PutUser(ctx, "proj_5", "usr_00501017", attributes)
 	if err != nil {
 		panic(err)
 	}
@@ -203,7 +203,7 @@ func runPatchUser() {
 
 	deleteKeys := []string{"address.city"}
 
-	user, err := PatchUser(ctx, "inst_5", "usr_00501017", attributes, deleteKeys)
+	user, err := PatchUser(ctx, "proj_5", "usr_00501017", attributes, deleteKeys)
 	if err != nil {
 		panic(err)
 	}

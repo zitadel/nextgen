@@ -85,7 +85,7 @@ CROSS JOIN _upsert_attrs_count uac;
 
 /*
 EXECUTE patch_user(
-    'inst_1' -- $1 project_id
+    'proj_1' -- $1 project_id
     , 'usr_00101002' -- $2 user_id
     , ARRAY[ -- $3 full sync payload (same shape as insert_user)
         ROW('email'::TEXT, '"foobar@zitadel.com"'::JSONB, digest('"foobar@zitadel.com"'::text, 'md5'), 'global'::TEXT)::zitadel_nextgen.incoming_user_attribute

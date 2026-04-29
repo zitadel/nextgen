@@ -118,7 +118,7 @@ A.1 ── C.1 ── C.2 ── C.3    │
 ## Open questions
 
 - **App as both client and server.** A Zitadel customer may want to stand up a SAML server for their own customers. Is that one `apps/<slug>.json` resource with `role: "server"`, or a separate `.zitadel/providers/` directory? Leaning toward the former for config surface minimalism; flag the tension in [identity-surface.md](identity-surface.md).
-- **Flow definition scope.** The POC assumes "one flow per project." Real customers will want many. Should `.zitadel/flows/` support audience-scoped directories (`flows/org-acme/login.json`), or should the `audience` block inside each file be authoritative? Default to the latter — one flat directory, audience is metadata — with an `audience_selector` CLI flag to list/filter.
+- **Flow definition scope.** The POC assumes "one flow per project." Real customers will want many. Should `.zitadel/flows/` support audience-scoped directories (`flows/team-acme/login.json`), or should the `audience` block inside each file be authoritative? Default to the latter — one flat directory, audience is metadata — with an `audience_selector` CLI flag to list/filter.
 - **Renderer migration.** When Lit ships, we want existing React consumers to be able to opt in. Can the renderer abstraction handle both coexisting in one project, or is it one-per-project? Default to one-per-project; revisit if a real customer asks.
 
 ## Out of scope for this plan

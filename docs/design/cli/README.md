@@ -13,9 +13,9 @@ Two conceptual commitments before we write more code:
 
 ## What lives in `.zitadel/` (and what doesn't)
 
-**Ownership decides the surface.** The CLI is for resources the dev owns — bounded, deliberate, reproducible across environments. The runtime API is for resources someone else owns: end users, B2B customer-org admins, registration / SSO / SCIM, and any unbounded set the deployment produces over time. The split isn't architectural — every CLI `apply` ultimately hits the same API a runtime caller would — but ownership and cardinality decide which surface is the right entry point.
+**Ownership decides the surface.** The CLI is for resources the dev owns — bounded, deliberate, reproducible across environments. The runtime API is for resources someone else owns: end users, B2B customer-team admins, registration / SSO / SCIM, and any unbounded set the deployment produces over time. The split isn't architectural — every CLI `apply` ultimately hits the same API a runtime caller would — but ownership and cardinality decide which surface is the right entry point.
 
-A quick test: *"Would I want a PR for each one of these?"* If yes, it's a CLI resource. If no — if the count grows with traffic, with customer organizations, or with anyone-but-the-dev — it belongs on the runtime API.
+A quick test: *"Would I want a PR for each one of these?"* If yes, it's a CLI resource. If no — if the count grows with traffic, with customer teams, or with anyone-but-the-dev — it belongs on the runtime API.
 
 **Subordinate config follows its parent.** Claim mappings, redirect URIs, role bindings, and similar attached config live wherever the resource they belong to lives. A default Google IdP defined in `.zitadel/idps/google.json` carries its claim mapping in that file. A B2B customer's runtime-created Okta IdP carries its claim mapping in the API call that creates it. There is no separate "claim-mapping registry" per surface — the child config rides with the parent.
 
@@ -23,7 +23,7 @@ The six resource kinds the CLI manages, each with a runtime-API counterpart wher
 
 | Resource | `.zitadel/<dir>/` | Runtime-API counterpart |
 |---|---|---|
-| IdP | `idps/` — your default sign-in sources | per-customer-org SSO from your B2B admin UI |
+| IdP | `idps/` — your default sign-in sources | per-customer-team SSO from your B2B admin UI |
 | App | `apps/` — your first-party apps and machine clients | customer-managed apps, dynamic client registration |
 | User schema | `schemas/` — what a user looks like on your platform | dev-owned only |
 | Flow | `flows/` — login / register / recovery definitions | dev-owned only |
@@ -32,12 +32,12 @@ The six resource kinds the CLI manages, each with a runtime-API counterpart wher
 
 The canonical directory list is read at [apps/cli/src/commands/apply.ts:144-150](../../../apps/cli/src/commands/apply.ts) (templates are loaded separately as `.liquid` files, not `.json` resources).
 
-**Things that intentionally have no `.zitadel/` directory** — users, sessions, audit events, per-customer-org IdPs and apps. They're unbounded or owned by someone other than the dev. Bootstrapping a small set (e.g. a first admin user in staging) is the job of a *planned* one-shot imperative CLI surface that hits the API but doesn't get tracked in git. Concrete command names are deliberately absent here until the surface ships in the registry.
+**Things that intentionally have no `.zitadel/` directory** — users, sessions, audit events, per-customer-team IdPs and apps. They're unbounded or owned by someone other than the dev. Bootstrapping a small set (e.g. a first admin user in staging) is the job of a *planned* one-shot imperative CLI surface that hits the API but doesn't get tracked in git. Concrete command names are deliberately absent here until the surface ships in the registry.
 
 **Worked examples** matching the recurring B2B questions:
 
 - *"Default Google SSO for my login page."* → `.zitadel/idps/google.json`, applied via `zitadel apply`.
-- *"My B2B customers each wire up their own Okta."* → Your B2B admin UI calls the runtime IdP API per customer-org. Not the CLI.
+- *"My B2B customers each wire up their own Okta."* → Your B2B admin UI calls the runtime IdP API per customer-team. Not the CLI.
 - *"Bootstrap a couple of admin users in staging."* → Planned imperative bootstrap surface (not yet in the registry), not a file in `.zitadel/`.
 - *"Map `groups` from my customer's runtime-created IdP into a role claim."* → Subordinate config follows the parent: the IdP was created via API, so its claim mapping lives in that API call. Dev-side flow actions can transform claims after the fact, but they don't live in `.zitadel/idps/`.
 

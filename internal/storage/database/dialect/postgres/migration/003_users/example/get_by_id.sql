@@ -19,6 +19,6 @@ WHERE u.project_id = $1
   AND u.id = $2;
 
 /*
-EXECUTE get_user('inst_1', 'usr_00101002');
+EXECUTE get_user('proj_1', 'usr_00101002');
 */
 

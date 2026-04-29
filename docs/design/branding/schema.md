@@ -23,7 +23,7 @@ Branding:
     hero_url: { type: string, format: uri }
 ```
 
-**Read-only projection** at flow creation (app / org / instance merge, most specific wins). Widget must accept the five-field shape as-is.
+**Read-only projection** at flow creation (app / team / project merge, most specific wins). Widget must accept the five-field shape as-is.
 
 ```mermaid
 flowchart TB

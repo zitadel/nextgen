@@ -2,7 +2,7 @@ DEALLOCATE ALL;
 
 PREPARE get_user_by_unique_attribute (
     TEXT,    -- $1 project_id
-    TEXT,    -- $2 team_id (Pass NULL for global, or the ID for org-scoped)
+    TEXT,    -- $2 team_id (Pass NULL for global, or the ID for team-scoped)
     TEXT,    -- $3 key
     JSONB,   -- $4 value
     TEXT[]   -- $5 attributes to fetch
@@ -32,7 +32,7 @@ JOIN zitadel_nextgen.users u
 
 -- Globally Unique Attribute (email) without team context
 EXECUTE get_user_by_unique_attribute(
-    'inst_10', 
+    'proj_10', 
     null, 
     'email', 
     '"U_000017@nextgen.zitadel.com"', 
@@ -41,8 +41,8 @@ EXECUTE get_user_by_unique_attribute(
 
 -- Team Unique Attribute (nickname) with team context
 EXECUTE get_user_by_unique_attribute(
-    'inst_10', 
-    'org_0001', 
+    'proj_10', 
+    'team_0001', 
     'nickname', 
     '"N_0017"', 
     ARRAY['username', 'email', 'email_verified']

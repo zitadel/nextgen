@@ -60,7 +60,7 @@ Open question 6 in [`README.md`](README.md): after eject, do atoms keep reading 
 
 - Inline `style` on atom internals (use tokens / parts).
 - Styling via random DOM props (atoms use data attrs for behaviour, not theme).
-- Per-instance `className` on atoms.
+- Per-project `className` on atoms.
 - `advanced.custom_css` (project-level hatch; see [`schema.md`](schema.md)).
 - Replacing `branding.liquid_template` (structural edit; see [`templates.md`](templates.md)).
 

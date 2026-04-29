@@ -192,7 +192,7 @@ The session is still valid. An RP requesting AAL1 succeeds. An RP requesting AAL
 
 ### Custom ACR Levels
 
-Organizations can define custom ACR values with their own schemas:
+Teams can define custom ACR values with their own schemas:
 
 ```json
 {
@@ -390,7 +390,7 @@ When a factor has aged out, `need` can include factors the session already has â
 ```sql
 CREATE TABLE sessions (
     id              TEXT        NOT NULL,
-    instance_id     TEXT        NOT NULL,
+    project_id     TEXT        NOT NULL,
     version         INTEGER     NOT NULL DEFAULT 1,
     state           TEXT        NOT NULL,       -- 'building', 'active', 'expired', 'revoked'
     user_id         TEXT,
@@ -403,6 +403,6 @@ CREATE TABLE sessions (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     expires_at      TIMESTAMPTZ,
 
-    PRIMARY KEY (instance_id, id)
+    PRIMARY KEY (project_id, id)
 );
 ```

@@ -37,7 +37,7 @@ JOIN zitadel_nextgen.users u
     AND u.id = m.user_id;
 
 EXECUTE list_users(
-    'inst_1'
+    'proj_1'
     , null
     , ARRAY[
         ROW('address.country'::TEXT, '"Japan"'::JSONB)::RECORD

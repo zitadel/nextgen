@@ -11,10 +11,10 @@ info:
     and user mutations touch the database.
 
 servers:
-  - url: https://{instance}.zitadel.cloud/v1
+  - url: https://{project}.zitadel.cloud/v1
     variables:
-      instance:
-        default: my-instance
+      project:
+        default: my-project
 
 tags:
   - name: Flows
@@ -143,7 +143,7 @@ paths:
           schema:
             type: string
             enum: [login, register, recovery, profiling, reauth, link_account]
-        - name: org_id
+        - name: team_id
           in: query
           schema:
             type: string
@@ -356,8 +356,8 @@ components:
           type: string
           description: |
             Optional LiquidJS template override. If provided, this template is used
-            instead of the one inherited from the app → organization → instance hierarchy.
-            Enables per-flow layout customization without changing the org-level branding.
+            instead of the one inherited from the app → team → project hierarchy.
+            Enables per-flow layout customization without changing the team-level branding.
         hint:
           $ref: "#/components/schemas/FlowHint"
 
@@ -367,9 +367,9 @@ components:
         login_name:
           type: string
           description: Auto-submits identifier step (maps to OIDC login_hint)
-        org_id:
+        team_id:
           type: string
-          description: Scopes flow resolution to an organization
+          description: Scopes flow resolution to a specific team
         schema_id:
           type: string
           description: Scopes to a specific user type
@@ -390,7 +390,7 @@ components:
         branding:
           $ref: "#/components/schemas/Branding"
           description: |
-            Resolved branding inherited from the app → organization → instance hierarchy.
+            Resolved branding inherited from the app → team → project hierarchy.
             Determined at flow creation based on audience context. Does not change between steps.
         redirect_uri:
           type: string
@@ -657,9 +657,9 @@ components:
     Branding:
       type: object
       description: |
-        Resolved branding configuration. Inherited from the app → organization → instance
+        Resolved branding configuration. Inherited from the app → team → project
         hierarchy at flow creation time (most specific wins). This is a read-only projection —
-        branding is configured via the Organization/App Branding API, not the Flow API.
+        branding is configured via the Team/App Branding API, not the Flow API.
       properties:
         layout:
           type: string
@@ -678,7 +678,7 @@ components:
         logo_url:
           type: string
           format: uri
-          description: Organization logo URL
+          description: Team logo URL
         font_url:
           type: string
           format: uri
@@ -787,7 +787,7 @@ components:
     Audience:
       type: object
       properties:
-        org_ids:
+        team_ids:
           type: array
           items:
             type: string
@@ -844,7 +844,7 @@ components:
           type: array
           description: |
             SSO providers available on this step. Resolved at runtime from the
-            organization's configured identity providers.
+            team's configured identity providers.
           items:
             $ref: "#/components/schemas/SSOProvider"
           default: []
@@ -923,7 +923,7 @@ components:
       properties:
         purpose:
           type: string
-        org_id:
+        team_id:
           type: string
         app_id:
           type: string

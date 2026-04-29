@@ -47,10 +47,10 @@ FROM _user_header u;
 
 /*
 EXECUTE insert_user(
-    'inst_1'                               -- $1 project_id
+    'proj_1'                               -- $1 project_id
     , './user.schema.json'                 -- $2 schema_url
     , 'usr_99999999'                       -- $3 id
-    , 'org_0001'                           -- $4 team_id
+    , 'team_0001'                           -- $4 team_id
     , ARRAY[                               -- $5 Attributes array
         ROW('username'::TEXT,           '"tester_alpha"'::JSONB,        digest('"tester_alpha"'::text, 'md5'),          'global'::TEXT)::zitadel_nextgen.incoming_user_attribute
         , ROW('email'::TEXT,            '"tester@zitadel.com"'::JSONB,  digest('"tester@zitadel.com"'::text, 'md5'),    'global'::TEXT)::zitadel_nextgen.incoming_user_attribute

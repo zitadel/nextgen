@@ -1,6 +1,6 @@
 DELETE FROM zitadel_nextgen.projects
 WHERE id IN (
     SELECT 
-    'inst_' || i AS id
+    'proj_' || i AS id
     FROM generate_series(1, 10) s(i)
 );
