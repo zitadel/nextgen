@@ -45,7 +45,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SessionResponse"
+                $ref: "#/components/schemas/UpdateSessionResponse"
 
     get:
       operationId: listSessions
@@ -113,7 +113,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SessionExchangeResponse"
+                $ref: "#/components/schemas/UpdateSessionResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "410":
@@ -193,7 +193,7 @@ components:
           type: string
           example: htok_abc123
 
-    SessionExchangeResponse:
+    UpdateSessionResponse:
       type: object
       required: [session, session_token]
       properties:
@@ -206,7 +206,7 @@ components:
 
     SessionResponse:
       type: object
-      required: [session_id, session_token, state, factors, assurance_levels]
+      required: [session_id, state, factors, assurance_levels, expires_at]
       properties:
         session_id:
           type: string
