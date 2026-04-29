@@ -3,6 +3,7 @@ package repository_test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -40,17 +41,17 @@ func TestAuthAttempt_Create(t *testing.T) {
 				ID:        "a",
 			},
 			assertAttempt: func(t *testing.T, attempt *domain.AuthAttempt) {
-				require.False(t, attempt.CreatedAt.IsZero())
+				assert.False(t, attempt.CreatedAt.IsZero())
 			},
 			assertStored: func(t *testing.T, stored *domain.AuthAttempt) {
-				require.Equal(t, "p", stored.ProjectID)
-				require.Equal(t, "a", stored.ID)
-				require.Empty(t, stored.Checks)
-				require.False(t, stored.CreatedAt.IsZero())
+				assert.Equal(t, "p", stored.ProjectID)
+				assert.Equal(t, "a", stored.ID)
+				assert.Empty(t, stored.Checks)
+				assert.False(t, stored.CreatedAt.IsZero())
 			},
 		},
 		{
-			name: "password check — InitiatedAt set by storage and persisted",
+			name: "password check - create sets challenge timestamp but not verification timestamp",
 			attempt: &domain.AuthAttempt{
 				ProjectID:      "p",
 				ID:             "a",
@@ -60,20 +61,22 @@ func TestAuthAttempt_Create(t *testing.T) {
 				},
 			},
 			assertAttempt: func(t *testing.T, attempt *domain.AuthAttempt) {
-				require.False(t, attempt.CreatedAt.IsZero())
-				require.False(t, attempt.Checks[0].Check().InitiatedAt.IsZero())
+				assert.False(t, attempt.CreatedAt.IsZero())
+				check := attempt.Checks[0].Check()
+				assert.False(t, check.LastChallengedAt.IsZero())
+				assert.True(t, check.LastVerifiedAt.IsZero())
 			},
 			assertStored: func(t *testing.T, stored *domain.AuthAttempt) {
-				require.Equal(t, []domain.AuthCheckType{domain.AuthCheckTypePassword}, stored.RequiredChecks)
-				require.Len(t, stored.Checks, 1)
+				assert.Equal(t, []domain.AuthCheckType{domain.AuthCheckTypePassword}, stored.RequiredChecks)
+				require.Len(t, stored.Checks, 1) // gates index access below
 				_, ok := stored.Checks[0].(*domain.PasswordAuthCheck)
-				require.True(t, ok, "expected *PasswordAuthCheck")
-				require.False(t, stored.Checks[0].Check().InitiatedAt.IsZero())
+				assert.True(t, ok, "expected *PasswordAuthCheck")
+				assert.False(t, stored.Checks[0].Check().LastChallengedAt.IsZero())
+				assert.True(t, stored.Checks[0].Check().LastVerifiedAt.IsZero())
 			},
 		},
 		{
-			// UserAuthCheck implements AuthFactorer so its payload is serialised into factor_payload.
-			name: "user check — factor payload roundtrips via JSON",
+			name: "user check - factor payload roundtrips and create sets verified timestamp",
 			attempt: &domain.AuthAttempt{
 				ProjectID:      "p",
 				ID:             "a",
@@ -86,19 +89,21 @@ func TestAuthAttempt_Create(t *testing.T) {
 				},
 			},
 			assertAttempt: func(t *testing.T, attempt *domain.AuthAttempt) {
-				require.False(t, attempt.CreatedAt.IsZero())
-				require.False(t, attempt.Checks[0].Check().InitiatedAt.IsZero())
+				assert.False(t, attempt.CreatedAt.IsZero())
+				check := attempt.Checks[0].Check()
+				assert.True(t, check.LastChallengedAt.IsZero())
+				assert.False(t, check.LastVerifiedAt.IsZero())
 			},
 			assertStored: func(t *testing.T, stored *domain.AuthAttempt) {
 				storedCheckRaw, ok := stored.CheckByType(domain.AuthCheckTypeUser)
-				require.True(t, ok)
+				require.True(t, ok) // gates type assertion below
 				userCheck, ok := storedCheckRaw.(*domain.UserAuthCheck)
-				require.True(t, ok, "expected *UserAuthCheck")
-				require.Equal(t, "user-abc", userCheck.Factor.UserID)
+				require.True(t, ok, "expected *UserAuthCheck") // gates field access below
+				assert.Equal(t, "user-abc", userCheck.Factor.UserID)
 			},
 		},
 		{
-			name: "passkey check — challenge and factor payloads roundtrip via JSON",
+			name: "passkey check - challenge and factor payloads roundtrip and create sets challenge timestamp only",
 			attempt: &domain.AuthAttempt{
 				ProjectID:      "p",
 				ID:             "a",
@@ -112,20 +117,22 @@ func TestAuthAttempt_Create(t *testing.T) {
 				},
 			},
 			assertAttempt: func(t *testing.T, attempt *domain.AuthAttempt) {
-				require.False(t, attempt.CreatedAt.IsZero())
-				require.False(t, attempt.Checks[0].Check().InitiatedAt.IsZero())
+				assert.False(t, attempt.CreatedAt.IsZero())
+				check := attempt.Checks[0].Check()
+				assert.False(t, check.LastChallengedAt.IsZero())
+				assert.True(t, check.LastVerifiedAt.IsZero())
 			},
 			assertStored: func(t *testing.T, stored *domain.AuthAttempt) {
 				storedCheckRaw, ok := stored.CheckByType(domain.AuthCheckTypePasskey)
-				require.True(t, ok)
+				require.True(t, ok) // gates type assertion below
 				passkeyCheck, ok := storedCheckRaw.(*domain.PasskeyAuthCheck)
-				require.True(t, ok, "expected *PasskeyAuthCheck")
-				require.Equal(t, "my-challenge", passkeyCheck.Challenge.Challenge)
-				require.True(t, passkeyCheck.Factor.UserVerified)
+				require.True(t, ok, "expected *PasskeyAuthCheck") // gates field access below
+				assert.Equal(t, "my-challenge", passkeyCheck.Challenge.Challenge)
+				assert.True(t, passkeyCheck.Factor.UserVerified)
 			},
 		},
 		{
-			name: "all check types — each gets InitiatedAt; RequiredChecks and types preserved",
+			name: "all check types - challenge and verify timestamps are set per checker capabilities",
 			attempt: &domain.AuthAttempt{
 				ProjectID: "p",
 				ID:        "a",
@@ -144,29 +151,42 @@ func TestAuthAttempt_Create(t *testing.T) {
 					},
 					&domain.PasskeyAuthCheck{
 						AuthCheck: &domain.AuthCheck{Type: domain.AuthCheckTypePasskey},
+						Challenge: &domain.PasskeyAuthCheckChallenge{Challenge: "challenge"},
+						Factor:    &domain.PasskeyAuthCheckFactor{UserVerified: true},
 					},
 				},
 			},
 			assertAttempt: func(t *testing.T, attempt *domain.AuthAttempt) {
-				require.False(t, attempt.CreatedAt.IsZero())
-				for _, check := range attempt.Checks {
-					require.False(t, check.Check().InitiatedAt.IsZero(),
-						"InitiatedAt must be set for check type %d", check.Check().Type)
-				}
+				assert.False(t, attempt.CreatedAt.IsZero())
+
+				userCheckRaw, ok := attempt.CheckByType(domain.AuthCheckTypeUser)
+				require.True(t, ok) // gates .Check() call below
+				assert.True(t, userCheckRaw.Check().LastChallengedAt.IsZero())
+				assert.False(t, userCheckRaw.Check().LastVerifiedAt.IsZero())
+
+				passwordCheckRaw, ok := attempt.CheckByType(domain.AuthCheckTypePassword)
+				require.True(t, ok) // gates .Check() call below
+				assert.False(t, passwordCheckRaw.Check().LastChallengedAt.IsZero())
+				assert.True(t, passwordCheckRaw.Check().LastVerifiedAt.IsZero())
+
+				passkeyCheckRaw, ok := attempt.CheckByType(domain.AuthCheckTypePasskey)
+				require.True(t, ok) // gates .Check() call below
+				assert.False(t, passkeyCheckRaw.Check().LastChallengedAt.IsZero())
+				assert.True(t, passkeyCheckRaw.Check().LastVerifiedAt.IsZero())
 			},
 			assertStored: func(t *testing.T, stored *domain.AuthAttempt) {
-				require.ElementsMatch(t, []domain.AuthCheckType{
+				assert.ElementsMatch(t, []domain.AuthCheckType{
 					domain.AuthCheckTypeUser,
 					domain.AuthCheckTypePassword,
 					domain.AuthCheckTypePasskey,
 				}, stored.RequiredChecks)
-				require.Len(t, stored.Checks, 3)
+				assert.Len(t, stored.Checks, 3)
 				_, ok := stored.CheckByType(domain.AuthCheckTypeUser)
-				require.True(t, ok, "user check must be stored")
+				assert.True(t, ok, "user check must be stored")
 				_, ok = stored.CheckByType(domain.AuthCheckTypePassword)
-				require.True(t, ok, "password check must be stored")
+				assert.True(t, ok, "password check must be stored")
 				_, ok = stored.CheckByType(domain.AuthCheckTypePasskey)
-				require.True(t, ok, "passkey check must be stored")
+				assert.True(t, ok, "passkey check must be stored")
 			},
 		},
 	}
@@ -195,7 +215,7 @@ func TestAuthAttempt_Create(t *testing.T) {
 		sp, spRollback := savepointForRollback(t, tx)
 		err := repo.Create(t.Context(), sp, &domain.AuthAttempt{ProjectID: "p-dup", ID: "a-dup"})
 		spRollback()
-		require.Error(t, err)
+		assert.Error(t, err)
 	})
 }
 
@@ -214,10 +234,10 @@ func TestAuthAttempt_Get(t *testing.T) {
 
 		stored, err := repo.Get(t.Context(), tx, attempt.ProjectID, attempt.ID)
 		require.NoError(t, err)
-		require.Equal(t, attempt.ProjectID, stored.ProjectID)
-		require.Equal(t, attempt.ID, stored.ID)
-		require.False(t, stored.CreatedAt.IsZero())
-		require.Empty(t, stored.Checks)
+		assert.Equal(t, attempt.ProjectID, stored.ProjectID)
+		assert.Equal(t, attempt.ID, stored.ID)
+		assert.False(t, stored.CreatedAt.IsZero())
+		assert.Empty(t, stored.Checks)
 	})
 
 	t.Run("returns attempt with checks", func(t *testing.T) {
@@ -228,13 +248,12 @@ func TestAuthAttempt_Get(t *testing.T) {
 
 		stored, err := repo.Get(t.Context(), tx, created.ProjectID, created.ID)
 		require.NoError(t, err)
-		require.Equal(t, created.ProjectID, stored.ProjectID)
-		require.Equal(t, created.ID, stored.ID)
-		require.Equal(t, created.RequiredChecks, stored.RequiredChecks)
-		require.Len(t, stored.Checks, 1)
-		storedCheck, ok := stored.CheckByType(domain.AuthCheckTypePassword)
-		require.True(t, ok)
-		require.False(t, storedCheck.Check().InitiatedAt.IsZero())
+		assert.Equal(t, created.ProjectID, stored.ProjectID)
+		assert.Equal(t, created.ID, stored.ID)
+		assert.Equal(t, created.RequiredChecks, stored.RequiredChecks)
+		assert.Len(t, stored.Checks, 1)
+		_, ok := stored.CheckByType(domain.AuthCheckTypePassword)
+		assert.True(t, ok)
 	})
 
 	t.Run("missing attempt returns empty aggregate", func(t *testing.T) {
@@ -243,94 +262,63 @@ func TestAuthAttempt_Get(t *testing.T) {
 
 		stored, err := repo.Get(t.Context(), tx, "project-missing", "attempt-missing")
 		require.NoError(t, err)
-		require.Empty(t, stored.ID)
-		require.Empty(t, stored.ProjectID)
-		require.Empty(t, stored.Checks)
+		assert.Empty(t, stored.ID)
+		assert.Empty(t, stored.ProjectID)
+		assert.Empty(t, stored.Checks)
 	})
 }
 
-func TestAuthAttempt_SetCheck(t *testing.T) {
+func TestAuthAttempt_SetChallenge(t *testing.T) {
 	repo := new(repository.AuthAttempt)
 
-	tests := []struct {
-		name    string
-		checker domain.AuthChecker
-		assert  func(t *testing.T, stored *domain.AuthAttempt, checker domain.AuthChecker)
-	}{
-		{
-			name:    "password check — initiated_at set and persisted",
-			checker: &domain.PasswordAuthCheck{AuthCheck: &domain.AuthCheck{Type: domain.AuthCheckTypePassword}},
-			assert: func(t *testing.T, stored *domain.AuthAttempt, checker domain.AuthChecker) {
-				require.False(t, checker.Check().InitiatedAt.IsZero())
-				storedCheck, ok := stored.CheckByType(domain.AuthCheckTypePassword)
-				require.True(t, ok)
-				require.Equal(t, checker.Check().InitiatedAt, storedCheck.Check().InitiatedAt)
-			},
-		},
-		{
-			name: "user check — factor payload stored and retrieved",
-			checker: &domain.UserAuthCheck{
-				AuthCheck: &domain.AuthCheck{Type: domain.AuthCheckTypeUser},
-				Factor:    &domain.UserFactor{UserID: "set-user"},
-			},
-			assert: func(t *testing.T, stored *domain.AuthAttempt, checker domain.AuthChecker) {
-				require.False(t, checker.Check().InitiatedAt.IsZero())
-				storedCheckRaw, ok := stored.CheckByType(domain.AuthCheckTypeUser)
-				require.True(t, ok)
-				userCheck, ok := storedCheckRaw.(*domain.UserAuthCheck)
-				require.True(t, ok, "expected *UserAuthCheck")
-				require.Equal(t, "set-user", userCheck.Factor.UserID)
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tx, rollback := transactionForRollback(t)
-			defer rollback()
-
-			// Create with no checks so SetCheck inserts the first check row.
-			attempt := &domain.AuthAttempt{ProjectID: "p", ID: "a"}
-			require.NoError(t, repo.Create(t.Context(), tx, attempt))
-
-			require.NoError(t, repo.SetCheck(t.Context(), tx, attempt.ProjectID, attempt.ID, tt.checker))
-
-			stored, err := repo.Get(t.Context(), tx, attempt.ProjectID, attempt.ID)
-			require.NoError(t, err)
-			tt.assert(t, stored, tt.checker)
-		})
-	}
-
-	t.Run("upsert — initiated_at preserved, payload updated", func(t *testing.T) {
+	t.Run("sets last_challenged_at and persists challenge payload", func(t *testing.T) {
 		tx, rollback := transactionForRollback(t)
 		defer rollback()
 
 		attempt := &domain.AuthAttempt{ProjectID: "p", ID: "a"}
 		require.NoError(t, repo.Create(t.Context(), tx, attempt))
 
-		first := &domain.UserAuthCheck{
-			AuthCheck: &domain.AuthCheck{Type: domain.AuthCheckTypeUser},
-			Factor:    &domain.UserFactor{UserID: "original"},
+		checker := &domain.PasskeyAuthCheck{
+			AuthCheck: &domain.AuthCheck{Type: domain.AuthCheckTypePasskey},
+			Challenge: &domain.PasskeyAuthCheckChallenge{Challenge: "set-challenge"},
 		}
-		require.NoError(t, repo.SetCheck(t.Context(), tx, attempt.ProjectID, attempt.ID, first))
+		require.NoError(t, repo.SetChallenge(t.Context(), tx, attempt.ProjectID, attempt.ID, checker))
+		assert.False(t, checker.Check().LastChallengedAt.IsZero())
 
-		second := &domain.UserAuthCheck{
-			AuthCheck: &domain.AuthCheck{Type: domain.AuthCheckTypeUser},
-			Factor:    &domain.UserFactor{UserID: "updated"},
-		}
-		require.NoError(t, repo.SetCheck(t.Context(), tx, attempt.ProjectID, attempt.ID, second))
-
-		// initiated_at must not be reset on upsert.
-		require.Equal(t, first.Check().InitiatedAt, second.Check().InitiatedAt)
-
-		// Factor payload must reflect the most recent SetCheck call.
 		stored, err := repo.Get(t.Context(), tx, attempt.ProjectID, attempt.ID)
 		require.NoError(t, err)
-		storedCheckRaw, ok := stored.CheckByType(domain.AuthCheckTypeUser)
-		require.True(t, ok)
-		userCheck, ok := storedCheckRaw.(*domain.UserAuthCheck)
-		require.True(t, ok, "expected *UserAuthCheck")
-		require.Equal(t, "updated", userCheck.Factor.UserID)
+		storedCheckRaw, ok := stored.CheckByType(domain.AuthCheckTypePasskey)
+		require.True(t, ok) // gates type assertion below
+		storedCheck, ok := storedCheckRaw.(*domain.PasskeyAuthCheck)
+		require.True(t, ok) // gates field access below
+		assert.Equal(t, "set-challenge", storedCheck.Challenge.Challenge)
+	})
+
+	t.Run("resets failure metadata when challenge is set again", func(t *testing.T) {
+		tx, rollback := transactionForRollback(t)
+		defer rollback()
+
+		attempt := &domain.AuthAttempt{ProjectID: "p", ID: "a"}
+		require.NoError(t, repo.Create(t.Context(), tx, attempt))
+
+		checker := &domain.PasskeyAuthCheck{
+			AuthCheck: &domain.AuthCheck{Type: domain.AuthCheckTypePasskey},
+			Challenge: &domain.PasskeyAuthCheckChallenge{Challenge: "first"},
+		}
+		require.NoError(t, repo.ChallengeFailed(t.Context(), tx, attempt.ProjectID, attempt.ID, checker.AuthCheck))
+		require.NoError(t, repo.ChallengeFailed(t.Context(), tx, attempt.ProjectID, attempt.ID, checker.AuthCheck))
+		assert.Equal(t, uint16(2), checker.Check().FailureCount)
+		assert.NotNil(t, checker.Check().LastFailedAt)
+
+		checker.Challenge = &domain.PasskeyAuthCheckChallenge{Challenge: "second"}
+		require.NoError(t, repo.SetChallenge(t.Context(), tx, attempt.ProjectID, attempt.ID, checker))
+
+		stored, err := repo.Get(t.Context(), tx, attempt.ProjectID, attempt.ID)
+		require.NoError(t, err)
+		storedCheckRaw, ok := stored.CheckByType(domain.AuthCheckTypePasskey)
+		require.True(t, ok) // gates .Check() call below
+		assert.Equal(t, uint16(0), storedCheckRaw.Check().FailureCount)
+		assert.Nil(t, storedCheckRaw.Check().LastFailedAt)
 	})
 }
 
@@ -345,10 +333,9 @@ func TestAuthAttempt_Delete(t *testing.T) {
 
 		require.NoError(t, repo.Delete(t.Context(), tx, attempt.ProjectID, attempt.ID))
 
-		// Get uses INNER JOIN with checks; returns an empty result when the parent row is gone.
 		stored, err := repo.Get(t.Context(), tx, attempt.ProjectID, attempt.ID)
 		require.NoError(t, err)
-		require.Empty(t, stored.ID)
+		assert.Empty(t, stored.ID)
 	})
 
 	t.Run("non-existent attempt is a no-op", func(t *testing.T) {
@@ -356,11 +343,11 @@ func TestAuthAttempt_Delete(t *testing.T) {
 		defer rollback()
 
 		err := repo.Delete(t.Context(), tx, "project-ghost", "attempt-ghost")
-		require.NoError(t, err)
+		assert.NoError(t, err)
 	})
 }
 
-func TestAuthAttempt_CheckFailed(t *testing.T) {
+func TestAuthAttempt_ChallengeFailed(t *testing.T) {
 	repo := new(repository.AuthAttempt)
 
 	tests := []struct {
@@ -381,11 +368,11 @@ func TestAuthAttempt_CheckFailed(t *testing.T) {
 			for i := range tt.failureCount {
 				prev := check.LastFailedAt
 
-				require.NoError(t, repo.CheckFailed(t.Context(), tx, "p", "a", check.AuthCheck))
-				require.NotNil(t, check.LastFailedAt, "LastFailedAt must be set after failure %d", i+1)
-				require.Equal(t, uint8(i+1), check.FailureCount)
+				require.NoError(t, repo.ChallengeFailed(t.Context(), tx, "p", "a", check.AuthCheck))
+				require.NotNil(t, check.LastFailedAt, "LastFailedAt must be set after failure %d", i+1) // gates dereference below
+				assert.Equal(t, uint16(i+1), check.FailureCount)
 				if prev != nil {
-					require.False(t, check.LastFailedAt.Before(*prev),
+					assert.False(t, check.LastFailedAt.Before(*prev),
 						"LastFailedAt must not decrease between consecutive failures")
 				}
 			}
@@ -393,7 +380,7 @@ func TestAuthAttempt_CheckFailed(t *testing.T) {
 	}
 }
 
-func TestAuthAttempt_CheckSucceeded(t *testing.T) {
+func TestAuthAttempt_ChallengeSucceeded(t *testing.T) {
 	repo := new(repository.AuthAttempt)
 
 	t.Run("sets verified_at and persists it", func(t *testing.T) {
@@ -401,16 +388,17 @@ func TestAuthAttempt_CheckSucceeded(t *testing.T) {
 		defer rollback()
 
 		_, check := newTestAttempt(t, repo, tx, "p", "a")
-		require.True(t, check.LastVerifiedAt.IsZero(), "VerifiedAt must be zero before success")
+		previousVerifiedAt := check.LastVerifiedAt
 
-		require.NoError(t, repo.CheckSucceeded(t.Context(), tx, "p", "a", check.AuthCheck))
-		require.False(t, check.LastVerifiedAt.IsZero())
+		require.NoError(t, repo.ChallengeSucceeded(t.Context(), tx, "p", "a", check.AuthCheck))
+		assert.False(t, check.LastVerifiedAt.IsZero())
+		assert.True(t, check.LastVerifiedAt.After(previousVerifiedAt) || check.LastVerifiedAt.Equal(previousVerifiedAt))
 
 		stored, err := repo.Get(t.Context(), tx, "p", "a")
 		require.NoError(t, err)
 		storedCheck, ok := stored.CheckByType(domain.AuthCheckTypePassword)
-		require.True(t, ok)
-		require.Equal(t, check.LastVerifiedAt, storedCheck.Check().LastVerifiedAt)
+		require.True(t, ok) // gates .Check() call below
+		assert.Equal(t, check.LastVerifiedAt, storedCheck.Check().LastVerifiedAt)
 	})
 
 	t.Run("succeeds after previous failures; failure_count is not reset", func(t *testing.T) {
@@ -418,20 +406,42 @@ func TestAuthAttempt_CheckSucceeded(t *testing.T) {
 		defer rollback()
 
 		_, check := newTestAttempt(t, repo, tx, "p", "a")
-		require.NoError(t, repo.CheckFailed(t.Context(), tx, "p", "a", check.AuthCheck))
-		require.NoError(t, repo.CheckFailed(t.Context(), tx, "p", "a", check.AuthCheck))
-		require.Equal(t, uint8(2), check.FailureCount)
+		require.NoError(t, repo.ChallengeFailed(t.Context(), tx, "p", "a", check.AuthCheck))
+		require.NoError(t, repo.ChallengeFailed(t.Context(), tx, "p", "a", check.AuthCheck))
+		assert.Equal(t, uint16(2), check.FailureCount)
 
-		require.NoError(t, repo.CheckSucceeded(t.Context(), tx, "p", "a", check.AuthCheck))
-		require.False(t, check.LastVerifiedAt.IsZero())
+		require.NoError(t, repo.ChallengeSucceeded(t.Context(), tx, "p", "a", check.AuthCheck))
+		assert.False(t, check.LastVerifiedAt.IsZero())
 
-		// CheckSucceeded does not reset failure_count (current intended behaviour).
 		stored, err := repo.Get(t.Context(), tx, "p", "a")
 		require.NoError(t, err)
 		storedCheck, ok := stored.CheckByType(domain.AuthCheckTypePassword)
-		require.True(t, ok)
-		require.False(t, storedCheck.Check().LastVerifiedAt.IsZero())
-		require.Equal(t, uint8(2), storedCheck.Check().FailureCount)
+		require.True(t, ok) // gates .Check() call below
+		assert.False(t, storedCheck.Check().LastVerifiedAt.IsZero())
+		assert.Equal(t, uint16(2), storedCheck.Check().FailureCount)
+	})
+
+	t.Run("stores factor payload when checker implements AuthFactorer", func(t *testing.T) {
+		tx, rollback := transactionForRollback(t)
+		defer rollback()
+
+		attempt := &domain.AuthAttempt{ProjectID: "p", ID: "a"}
+		require.NoError(t, repo.Create(t.Context(), tx, attempt))
+
+		userCheck := &domain.UserAuthCheck{
+			AuthCheck: &domain.AuthCheck{Type: domain.AuthCheckTypeUser},
+			Factor:    &domain.UserFactor{UserID: "verified-user"},
+		}
+		require.NoError(t, repo.ChallengeSucceeded(t.Context(), tx, attempt.ProjectID, attempt.ID, userCheck))
+		assert.False(t, userCheck.Check().LastVerifiedAt.IsZero())
+
+		stored, err := repo.Get(t.Context(), tx, attempt.ProjectID, attempt.ID)
+		require.NoError(t, err)
+		storedCheckRaw, ok := stored.CheckByType(domain.AuthCheckTypeUser)
+		require.True(t, ok) // gates type assertion below
+		storedCheck, ok := storedCheckRaw.(*domain.UserAuthCheck)
+		require.True(t, ok) // gates field access below
+		assert.Equal(t, "verified-user", storedCheck.Factor.UserID)
 	})
 }
 
@@ -443,11 +453,11 @@ func TestAuthAttempt_Complete(t *testing.T) {
 		defer rollback()
 
 		attempt, _ := newTestAttempt(t, repo, tx, "p", "a")
-		require.Nil(t, attempt.CompletedAt, "CompletedAt must be nil before Complete is called")
+		assert.Nil(t, attempt.CompletedAt, "CompletedAt must be nil before Complete is called")
 
 		require.NoError(t, repo.Complete(t.Context(), tx, attempt))
-		require.NotNil(t, attempt.CompletedAt)
-		require.False(t, attempt.CompletedAt.IsZero())
+		require.NotNil(t, attempt.CompletedAt) // gates .IsZero() call below
+		assert.False(t, attempt.CompletedAt.IsZero())
 	})
 
 	t.Run("calling Complete twice updates completed_at", func(t *testing.T) {
@@ -459,8 +469,21 @@ func TestAuthAttempt_Complete(t *testing.T) {
 		first := *attempt.CompletedAt
 
 		require.NoError(t, repo.Complete(t.Context(), tx, attempt))
-		require.NotNil(t, attempt.CompletedAt)
-		require.False(t, attempt.CompletedAt.Before(first),
+		require.NotNil(t, attempt.CompletedAt) // gates .Before() call below
+		assert.False(t, attempt.CompletedAt.Before(first),
 			"second CompletedAt must not be before the first")
+	})
+}
+
+func TestAuthAttempt_Handoff(t *testing.T) {
+	repo := new(repository.AuthAttempt)
+
+	t.Run("panics as unimplemented", func(t *testing.T) {
+		tx, rollback := transactionForRollback(t)
+		defer rollback()
+
+		assert.PanicsWithValue(t, "unimplemented", func() {
+			_ = repo.Handoff(t.Context(), tx, "p", "a", "s")
+		})
 	})
 }
