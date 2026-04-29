@@ -32,8 +32,8 @@ post:
             type: object
             properties:
               id:
-                type: string
-                description: The ID of the created schema
+                type: integer
+                description: The ID of the created schema revision
     '400':
       description: The provided input was not valid
       content:

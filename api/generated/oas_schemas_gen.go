@@ -76,17 +76,17 @@ func NewUserSchemaCreateSchemaReq(v UserSchema) CreateSchemaReq {
 }
 
 type CreateSchemaRevisionCreated struct {
-	// The ID of the created schema.
-	ID OptString `json:"id"`
+	// The ID of the created schema revision.
+	ID OptInt `json:"id"`
 }
 
 // GetID returns the value of ID.
-func (s *CreateSchemaRevisionCreated) GetID() OptString {
+func (s *CreateSchemaRevisionCreated) GetID() OptInt {
 	return s.ID
 }
 
 // SetID sets the value of ID.
-func (s *CreateSchemaRevisionCreated) SetID(val OptString) {
+func (s *CreateSchemaRevisionCreated) SetID(val OptInt) {
 	s.ID = val
 }
 
