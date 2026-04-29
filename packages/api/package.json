@@ -2,19 +2,6 @@
   "name": "@zitadel-nextgen/api",
   "version": "0.0.0",
   "description": "Generated TypeScript API client for Zitadel NextGen",
-  "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/api#readme",
-  "bugs": {
-    "url": "https://github.com/zitadel/nextgen/issues"
-  },
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/zitadel/nextgen.git",
-    "directory": "packages/api"
-  },
-  "files": [
-    "dist"
-  ],
   "type": "module",
   "exports": {
     ".": {
@@ -22,26 +9,24 @@
       "import": "./dist/index.js"
     }
   },
-  "publishConfig": {
-    "access": "public"
+  "scripts": {
+    "generate": "orval --config orval.config.ts --clean"
   },
   "devDependencies": {
     "orval": "catalog:"
   },
+  "peerDependencies": {
+    "@tanstack/react-query": "catalog:"
+  },
   "nx": {
     "targets": {
       "generate": {
-        "executor": "nx:run-commands",
-        "options": {
-          "command": "pnpm exec orval --config orval.config.ts --clean",
-          "cwd": "{projectRoot}"
-        },
         "cache": true,
         "inputs": [
           "{workspaceRoot}/pnpm-lock.yaml",
           "{workspaceRoot}/api/openapi/**/*.yaml",
+          "{projectRoot}/package.json",
           "{projectRoot}/orval.config.ts",
-          "{projectRoot}/src/index.ts",
           "{projectRoot}/src/runtime/base-url.ts"
         ],
         "outputs": [

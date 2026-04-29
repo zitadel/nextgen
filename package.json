@@ -19,7 +19,6 @@
     "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
     "nx": "catalog:",
-    "orval": "catalog:",
     "oxfmt": "catalog:",
     "oxlint": "catalog:",
     "sharp": "catalog:",
