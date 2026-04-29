@@ -10,7 +10,7 @@ import (
 
 const _UserUniquenessName = "unspecifiedteamglobal"
 
-var _UserUniquenessIndex = [...]uint8{0, 11, 23, 29}
+var _UserUniquenessIndex = [...]uint8{0, 11, 15, 21}
 
 const _UserUniquenessLowerName = "unspecifiedteamglobal"
 
@@ -35,16 +35,16 @@ var _UserUniquenessValues = []UserUniqueness{UserUniquenessUnspecified, UserUniq
 var _UserUniquenessNameToValueMap = map[string]UserUniqueness{
 	_UserUniquenessName[0:11]:       UserUniquenessUnspecified,
 	_UserUniquenessLowerName[0:11]:  UserUniquenessUnspecified,
-	_UserUniquenessName[11:23]:      UserUniquenessTeam,
-	_UserUniquenessLowerName[11:23]: UserUniquenessTeam,
-	_UserUniquenessName[23:29]:      UserUniquenessGlobal,
-	_UserUniquenessLowerName[23:29]: UserUniquenessGlobal,
+	_UserUniquenessName[11:15]:      UserUniquenessTeam,
+	_UserUniquenessLowerName[11:15]: UserUniquenessTeam,
+	_UserUniquenessName[15:21]:      UserUniquenessGlobal,
+	_UserUniquenessLowerName[15:21]: UserUniquenessGlobal,
 }
 
 var _UserUniquenessNames = []string{
 	_UserUniquenessName[0:11],
-	_UserUniquenessName[11:23],
-	_UserUniquenessName[23:29],
+	_UserUniquenessName[11:15],
+	_UserUniquenessName[15:21],
 }
 
 // UserUniquenessString retrieves an enum value from the enum constants string name.
