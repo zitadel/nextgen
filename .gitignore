@@ -36,10 +36,18 @@ __debug_bin*
 # Local Codex/Claude workspace metadata
 .claude/
 
+# Mock server — local dev only, not for production
+packages/mockserver/
+
 # JavaScript / TypeScript
 node_modules/
 dist/
 coverage/
+
+# Build output
+.next/
+.nuxt/
+.output/
 npm-debug.log*
 pnpm-debug.log*
 *.code-workspace

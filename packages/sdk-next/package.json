@@ -17,6 +17,14 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "import": "./dist/server.js"
+    },
+    "./client": {
+      "types": "./dist/client.d.ts",
+      "import": "./dist/client.js"
     }
   },
   "files": ["dist"],
@@ -24,12 +32,14 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsup src/index.tsx --format esm --dts --clean",
+    "build": "tsup src/index.tsx src/server.ts src/client.ts --format esm --dts --clean",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@zitadel/sdk-core": "workspace:*"
+    "@nextgen/ui-lit": "workspace:*",
+    "@zitadel/sdk-core": "workspace:*",
+    "server-only": "^0.0.1"
   },
   "peerDependencies": {
     "next": ">=14",

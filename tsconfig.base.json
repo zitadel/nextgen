@@ -14,7 +14,12 @@
     "baseUrl": ".",
     "paths": {
       "@zitadel/sdk-core": ["./packages/sdk-core/src/index.ts"],
-      "@zitadel/sdk-next": ["./packages/sdk-next/src/index.tsx"]
+      "@zitadel/sdk-next": ["./packages/sdk-next/src/index.tsx"],
+      "@zitadel/sdk-next/server": ["./packages/sdk-next/src/server.ts"],
+      "@zitadel/sdk-next/client": ["./packages/sdk-next/src/client.ts"],
+      "@nextgen/ui-lit": ["./packages/ui-lit/src/index.ts"],
+      "@nextgen/sdk-nuxt": ["./packages/sdk-nuxt/src/index.ts"],
+      "@nextgen/sdk-nuxt/server": ["./packages/sdk-nuxt/src/server.ts"]
     },
     "forceConsistentCasingInFileNames": true
   }

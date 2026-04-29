@@ -1,0 +1,19 @@
+{
+  "name": "@nextgen/demo-nuxt",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "nuxt dev --port 3001",
+    "build": "nuxt build",
+    "start": "nuxt start",
+    "typecheck": "nuxt typecheck"
+  },
+  "dependencies": {
+    "@nextgen/sdk-nuxt": "workspace:*",
+    "@nextgen/ui-lit": "workspace:*",
+    "nuxt": "^4.4.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
+}
