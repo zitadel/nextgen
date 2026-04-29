@@ -17,7 +17,7 @@ get:
       in: path
       required: true
       schema:
-        type: string
+        type: integer
   responses:
     '200':
       description: The release state was retrieved successfully
