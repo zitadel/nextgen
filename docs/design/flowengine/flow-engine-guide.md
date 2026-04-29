@@ -22,7 +22,7 @@ sequenceDiagram
     participant Server
 
     User->>Frontend: Opens login page
-    Frontend->>Server: POST /v1/flows { purpose: "login" }
+    Frontend->>Server: POST /flows { purpose: "login" }
     Server-->>Frontend: Step: "Enter your email"
     User->>Frontend: Types email
     Frontend->>Server: submit { identifier: "alice@acme.com" }
@@ -102,7 +102,7 @@ sequenceDiagram
     participant Atoms as <zl-*> Atoms
 
     App->>ZL: Mounts component
-    ZL->>ZL: POST /v1/flows → receives capabilities + template
+    ZL->>ZL: POST /flows → receives capabilities + template
     ZL->>ZL: Loads locale dictionary (en.ts)
     ZL->>Liquid: Parse template string + inject capabilities as context
     Liquid->>Liquid: Resolve {{ field.text_key | t }} via translation filter
@@ -111,7 +111,7 @@ sequenceDiagram
     ZL->>ZL: Inject HTML into Shadow DOM
     ZL->>Atoms: Browser upgrades <zl-field>, <zl-submit>, etc.
     Atoms-->>ZL: User interacts → dispatches CustomEvent
-    ZL->>ZL: POST /v1/flows/{id}/submit → receives next step
+    ZL->>ZL: POST /flows/{id}/submit → receives next step
     ZL->>Liquid: Re-render with new capabilities
 ```
 
@@ -202,7 +202,7 @@ Customers who want full control "eject" this template — the Zitadel Console co
 ### The frontend loop (pseudocode)
 
 ```
-response = POST /v1/flows { purpose, auth_request_id }
+response = POST /flows { purpose, auth_request_id }
 
 loop:
   step = response.step
@@ -214,7 +214,7 @@ loop:
   if step.type == "complete" and step.behavior == "continue":
     // Server already auto-pivoted (e.g. registration done → back to login).
     // Fetch the next step from the already-advanced state machine.
-    response = GET /v1/flows/{session_id}
+    response = GET /flows/{session_id}
     continue
 
   // Render the step — including "complete" steps with behavior "show",
@@ -226,7 +226,7 @@ loop:
 
   { action, data } = waitForCustomEvent()
 
-  response = POST /v1/flows/{session_id}/submit {
+  response = POST /flows/{session_id}/submit {
     session_token: response.session_token,
     action: action,
     data: data
@@ -390,9 +390,9 @@ When a flow starts, the server resolves which definition to use:
 
 ```mermaid
 flowchart TD
-    req["Flow request:<br>purpose=login<br>org_id=acme<br>app_id=dashboard"]
+    req["Flow request:<br>purpose=login<br>team_id=acme<br>app_id=dashboard"]
     filter["Filter: active definitions<br>where purposes includes 'login'"]
-    match["Match audience:<br>app_id > org_id > schema_id > instance"]
+    match["Match audience:<br>app_id > team_id > schema_id > project"]
     pick["Pick most specific match<br>tie-break by priority"]
     fallback["No match → built-in default"]
 
@@ -406,16 +406,16 @@ A definition's **audience** scopes where it applies:
 ```json
 {
   "audience": {
-    "org_ids": ["org_acme"],
+    "team_ids": ["team_acme"],
     "app_ids": ["app_dashboard"],
     "schema_ids": ["human_user"]
   }
 }
 ```
 
-- `app_ids` is the most specific — a definition scoped to an app wins over one scoped to an org.
-- An empty audience means "instance default" — matches everything.
-- Multiple definitions can coexist: one for `org_acme`, another for `org_globex`, a default for everyone else.
+- `app_ids` is the most specific — a definition scoped to an app wins over one scoped to a team.
+- An empty audience means "project default" — matches everything inside the project.
+- Multiple definitions can coexist: one for `team_acme`, another for `team_globex`, a default for everyone else.
 
 ---
 
@@ -554,7 +554,7 @@ sequenceDiagram
     Note over User,DB: AUTO-PIVOT → Back to Login
     Frontend->>Server: GET /flows/{session_id}
     Note right of Server: Session has user + password
-    Note right of Server: Policy check: acr meets requested level
+    Note right of Server: Policy check: assurance_levels[] includes requested level
     Server-->>Frontend: complete (behavior: redirect)
     Frontend->>User: Redirect to app
 ```
@@ -634,7 +634,7 @@ A session and a flow are different things with different lifetimes:
 | **Lifetime** | Hours to days | Seconds to minutes |
 | **Storage** | Postgres (durable) | Encrypted cookie (ephemeral) |
 | **One or many?** | One session can have many flows over time | Each flow operates on one session |
-| **What it knows** | user, factors, acr, amr | definition, step, history, collected data |
+| **What it knows** | user, factors, assurance_levels[], amr | definition, step, history, collected data |
 
 The session accumulates factors across flows. A login flow adds `user` + `password`. A step-up flow adds `totp`. A profiling flow doesn't add factors — it collects data. Each flow is independent, but they all contribute to the same session.
 
