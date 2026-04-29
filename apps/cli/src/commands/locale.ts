@@ -5,7 +5,12 @@ import type { CliIO, GlobalOptions } from "../io/output";
 import { ok } from "../io/output";
 import { ZitadelError } from "../lib/errors";
 import { flowDefinitionSchema, collectTextKeys } from "../resources/flow";
-import { DEFAULT_LOCALE, listLocales as listLocaleFiles, readLocale, writeLocale } from "../resources/locale";
+import {
+  DEFAULT_LOCALE,
+  listLocales as listLocaleFiles,
+  readLocale,
+  writeLocale,
+} from "../resources/locale";
 
 export type LocaleScaffoldOptions = GlobalOptions & {
   lang?: string;
@@ -68,10 +73,19 @@ async function collectReferencedKeys(cwd: string): Promise<string[]> {
   try {
     entries = await readdir(flowsDir);
   } catch (error) {
-    if (typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "ENOENT") {
-      throw new ZitadelError("E_VALIDATION", "No .zitadel/flows directory — run `zitadel setup` first.", {
-        nextCommands: ["zitadel setup"],
-      });
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      (error as { code?: string }).code === "ENOENT"
+    ) {
+      throw new ZitadelError(
+        "E_VALIDATION",
+        "No .zitadel/flows directory — run `zitadel setup` first.",
+        {
+          nextCommands: ["zitadel setup"],
+        },
+      );
     }
     throw error;
   }

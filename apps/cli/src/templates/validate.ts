@@ -10,9 +10,7 @@ export type TemplateIssue = {
   line?: number;
 };
 
-export type TemplateValidation =
-  | { valid: true }
-  | { valid: false; issues: TemplateIssue[] };
+export type TemplateValidation = { valid: true } | { valid: false; issues: TemplateIssue[] };
 
 const liquid = new Liquid({ strictFilters: false, strictVariables: false });
 
@@ -59,7 +57,11 @@ function scanHtml(source: string, issues: TemplateIssue[]): void {
   lines.forEach((line, index) => {
     const lineNumber = index + 1;
     if (/<\s*script\b/i.test(line)) {
-      issues.push({ rule: "banned-tag", message: "Banned tag <script> found in template", line: lineNumber });
+      issues.push({
+        rule: "banned-tag",
+        message: "Banned tag <script> found in template",
+        line: lineNumber,
+      });
     }
     const attributeMatches = line.matchAll(/<[^>]*?\s(on[a-z]+)\s*=\s*["'][^"']*["'][^>]*>/gi);
     for (const match of attributeMatches) {

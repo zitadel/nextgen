@@ -59,15 +59,24 @@ export async function runAppList(io: CliIO, opts: GlobalOptions): Promise<void> 
   const items = resources.map((entry) => ({
     slug: entry.slug,
     path: entry.path,
-    display_name: typeof entry.contents.display_name === "string" ? entry.contents.display_name : entry.slug,
+    display_name:
+      typeof entry.contents.display_name === "string" ? entry.contents.display_name : entry.slug,
     protocol: typeof entry.contents.protocol === "string" ? entry.contents.protocol : "unknown",
     role: typeof entry.contents.role === "string" ? entry.contents.role : "client",
     enabled: entry.contents.enabled !== false,
   }));
-  ok(io, { title: `Found ${items.length} app${items.length === 1 ? "" : "s"}.`, apps: items }, opts);
+  ok(
+    io,
+    { title: `Found ${items.length} app${items.length === 1 ? "" : "s"}.`, apps: items },
+    opts,
+  );
 }
 
-export async function runAppShow(io: CliIO, opts: GlobalOptions, slug: string | undefined): Promise<void> {
+export async function runAppShow(
+  io: CliIO,
+  opts: GlobalOptions,
+  slug: string | undefined,
+): Promise<void> {
   if (!slug) {
     throw new ZitadelError("E_VALIDATION", "zitadel app show requires a slug", {
       nextCommands: ["zitadel app list"],
@@ -83,7 +92,11 @@ export async function runAppShow(io: CliIO, opts: GlobalOptions, slug: string | 
   ok(io, { title: `App "${slug}"`, path: entry.path, app: entry.contents }, opts);
 }
 
-export async function runAppRemove(io: CliIO, opts: AppRemoveOptions, slug: string | undefined): Promise<void> {
+export async function runAppRemove(
+  io: CliIO,
+  opts: AppRemoveOptions,
+  slug: string | undefined,
+): Promise<void> {
   if (!slug) {
     throw new ZitadelError("E_VALIDATION", "zitadel app remove requires a slug", {
       nextCommands: ["zitadel app list"],

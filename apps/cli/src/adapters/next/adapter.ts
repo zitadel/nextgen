@@ -1,7 +1,7 @@
 import { join } from "node:path";
 
-import type { FrameworkAdapter, ProjectContext } from "../index";
 import type { ScaffoldPlan } from "../../scaffolder/plan";
+import type { FrameworkAdapter, ProjectContext } from "../index";
 
 export class NextAdapter implements FrameworkAdapter {
   readonly id = "next" as const;
@@ -40,7 +40,9 @@ export class NextAdapter implements FrameworkAdapter {
           contents: page.contents,
         },
       ],
-      summary: [{ title: "Login route", detail: `Created ${ctx.framework.appDir}/login/page.tsx.` }],
+      summary: [
+        { title: "Login route", detail: `Created ${ctx.framework.appDir}/login/page.tsx.` },
+      ],
     };
   }
 
@@ -54,7 +56,9 @@ export class NextAdapter implements FrameworkAdapter {
           contents: page.contents,
         },
       ],
-      summary: [{ title: "Register route", detail: `Created ${ctx.framework.appDir}/register/page.tsx.` }],
+      summary: [
+        { title: "Register route", detail: `Created ${ctx.framework.appDir}/register/page.tsx.` },
+      ],
     };
   }
 

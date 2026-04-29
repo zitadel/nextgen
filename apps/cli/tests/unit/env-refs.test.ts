@@ -31,7 +31,12 @@ describe("findEnvRefs", () => {
       },
       server: "${ZITADEL_API_BASE}",
     };
-    expect(findEnvRefs(bundle)).toEqual(["GOOGLE_SECRET", "OKTA_ISSUER", "OKTA_SECRET", "ZITADEL_API_BASE"]);
+    expect(findEnvRefs(bundle)).toEqual([
+      "GOOGLE_SECRET",
+      "OKTA_ISSUER",
+      "OKTA_SECRET",
+      "ZITADEL_API_BASE",
+    ]);
   });
 
   it("ignores *_env keys whose value is not a plain env var name", () => {

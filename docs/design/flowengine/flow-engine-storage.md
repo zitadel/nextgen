@@ -7,7 +7,7 @@
 
 Sessions and flows have fundamentally different lifetimes and purposes:
 
-- A **session** is durable server-side state: factors, acr, user identity. It lives in Postgres and persists for hours or days.
+- A **session** is durable server-side state: factors, assurance_levels, user identity. It lives in Postgres and persists for hours or days.
 - A **flow** is ephemeral orchestration: which step the user is on, what data they've entered so far, where to redirect on completion. It lives only while the user is actively clicking through screens.
 
 A single session can have **many flows over its lifetime**:
@@ -28,7 +28,7 @@ sequenceDiagram
     Server->>DB: Write password factor
     Server-->>Browser: Set-Cookie: flow=enc_3
     Browser->>Server: submit OTP (Cookie: flow=enc_3)
-    Server->>DB: Write OTP factor, acr=aal:2
+    Server->>DB: Write OTP factor, assurance_levels += aal:2
     Server-->>Browser: complete (redirect) — cookie cleared
 
     Note over Browser,DB: Session active at AAL2. Time passes...
@@ -38,7 +38,7 @@ sequenceDiagram
     Note right of Server: Reads existing session from DB
     Server-->>Browser: session_id + Set-Cookie: flow=enc_a
     Browser->>Server: submit passkey (Cookie: flow=enc_a)
-    Server->>DB: Write passkey factor, acr=aal:3
+    Server->>DB: Write passkey factor, assurance_levels += aal:3
     Server-->>Browser: complete (redirect) — cookie cleared
 
     Note over Browser,DB: Session now at AAL3
@@ -72,16 +72,16 @@ Flow state is stored as an **encrypted, HttpOnly cookie** set by the server on e
 | **Replay / tampering** | Cookie is AES-GCM encrypted + authenticated. Includes `session_version` — server rejects if session has been modified since the cookie was issued. |
 | **Revocation** | Revoking or expiring the session invalidates any flow — the server checks session state on every submit. |
 | **Multiple flows** | Each flow is a separate cookie lifetime. A flow completes → cookie is cleared. A new flow starts → new cookie. |
-| **Stateless server** | Any replica handles any request. No shared state, no sticky sessions, no Redis. |
+| **Stateless server** | Any replica handles any request. No shared state, no sticky sessions, no external cache dependency. |
 | **Browser closes** | Cookie is gone. No orphaned state to clean up. |
 
 ### Cookie shape
 
 ```
-Set-Cookie: _zflow=<encrypted-payload>; HttpOnly; Secure; SameSite=Strict; Path=/v1/flows
+Set-Cookie: _zflow=<encrypted-payload>; HttpOnly; Secure; SameSite=Strict; Path=/flows
 ```
 
-The cookie is scoped to `/v1/flows` — it's never sent to Session API or other endpoints.
+The cookie is scoped to `/flows` — it's never sent to Session API or other endpoints.
 
 ## Cookie Contents
 
@@ -102,7 +102,7 @@ The encrypted payload, once decrypted server-side, contains:
   },
   "auth_request_id": "oidc-123",
   "redirect_uri": "https://app.com/callback",
-  "requested_acr": "urn:zitadel:aal:2"
+  "requested_acr": "urn:nist:aal:2"
 }
 ```
 
@@ -146,7 +146,7 @@ The flow cookie contains `session_version`. On every submit that writes to the s
 UPDATE sessions
 SET factors = $new_factors,
     version = version + 1
-WHERE instance_id = $inst AND id = $sess AND version = $expected_version;
+WHERE project_id = $proj AND id = $sess AND version = $expected_version;
 -- 0 rows affected → 409 Conflict
 ```
 

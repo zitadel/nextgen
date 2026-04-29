@@ -3,6 +3,7 @@ package embedded
 
 import (
 	"fmt"
+	"log"
 	"net"
 	"os"
 	"time"
@@ -14,7 +15,12 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database/dialect/postgres"
 )
 
-// StartEmbedded starts an embedded postgres v16 instance and returns a database connector and a stop function
+func init() {
+	database.MustRegisterDefaultConnector(new(Pool))
+	// database.MustRegisterDialect("embedded", DecodeConfig)
+}
+
+// StartEmbedded starts an embedded postgres v18 instance and returns a database connector and a stop function
 // the database is started on a random port and data are stored in a temporary directory
 // its used for testing purposes only
 func StartEmbedded() (connector database.Connector, stop func(), err error) {
@@ -30,7 +36,7 @@ func StartEmbedded() (connector database.Connector, stop func(), err error) {
 	}
 
 	config := embeddedpostgres.DefaultConfig().
-		Version(embeddedpostgres.V16).
+		Version(embeddedpostgres.V18).
 		Port(uint32(port)).
 		RuntimePath(path).
 		// CI runners (GitHub Actions ubuntu) have throttled disk I/O; the
@@ -68,7 +74,10 @@ func StartEmbedded() (connector database.Connector, stop func(), err error) {
 	}
 
 	return connector, func() {
-		_ = embedded.Stop()
+		err := embedded.Stop()
+		if err != nil {
+			log.Printf("unable to stop embedded postgres: %v", err)
+		}
 		_ = os.RemoveAll(path)
 	}, nil
 }
@@ -83,3 +92,9 @@ func getPort() (port uint16, close func() error, err error) {
 	// logging.WithFields("port", port).Info("Port is available")
 	return port, l.Close, nil
 }
+
+func DecodeConfig(input any) (database.Connector, error) {
+	return nil, fmt.Errorf("embedded postgres config decoding is not implemented")
+}
+
+var _ database.Connector = (*Pool)(nil)

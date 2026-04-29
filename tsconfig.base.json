@@ -1,21 +1,22 @@
 {
   "compilerOptions": {
-    "target": "ES2022",
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "strict": true,
-    "declaration": true,
+    "composite": true,
     "declarationMap": true,
-    "sourceMap": true,
-    "esModuleInterop": true,
-    "resolveJsonModule": true,
+    "emitDeclarationOnly": true,
+    "importHelpers": true,
+    "isolatedModules": true,
+    "lib": ["ES2022"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "noEmitOnError": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noUnusedLocals": true,
     "skipLibCheck": true,
-    "baseUrl": ".",
-    "paths": {
-      "@zitadel/sdk-core": ["./packages/sdk-core/src/index.ts"],
-      "@zitadel/sdk-next": ["./packages/sdk-next/src/index.tsx"]
-    },
-    "forceConsistentCasingInFileNames": true
+    "strict": true,
+    "target": "es2022",
+    "customConditions": ["@zitadel-nextgen/source"],
+    "noUncheckedIndexedAccess": true
   }
 }

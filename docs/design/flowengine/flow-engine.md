@@ -1,17 +1,19 @@
 # Flow Engine
 
 > **Status:** Draft
-> **See also:** [Overview](README.md) · [Step Response Shape](flow-engine-nodes.md) · [Storage](flow-engine-storage.md) · [OpenAPI spec](api/flow-api.yaml)
+> **See also:** [Overview](README.md) · [Step Response Shape](flow-engine-nodes.md) · [Storage](flow-engine-storage.md) · [API sketch](api/flow-api.yaml) · [Glossary](../glossary.md) · [auth_attempts (primitives layer)](../api/authn-and-auth-flows.md)
 
-The flow engine is a **server-side state machine** that produces **Capability payloads** (semantic descriptions of fields, actions, and gates) alongside a **LiquidJS template** for rendering. It is used by web/frontend clients that want a ready-made login and registration experience. Clients that want full control skip it entirely and use the Session API directly.
+The flow engine is a **server-side state machine** that produces **Capability payloads** (semantic descriptions of fields, actions, and gates) alongside a **LiquidJS template** for rendering. It does **not** hold authentication primitives; those live in [`auth_attempts`](../api/authn-and-auth-flows.md). A flow step that says "collect password" internally invokes the auth_attempt **Go service layer** (never via HTTP), but `/flows/{session_id}` remains the flow engine's session-scoped UI handle rather than an alias for `auth_attempt_id`.
+
+It is used by web/frontend clients that want a ready-made login and registration experience. Clients that want full control skip the flow engine entirely and drive the auth_attempt primitives (and the Session API) directly.
 
 ## Endpoints
 
 ```
-POST   /v1/flows                        Start a flow (creates a session internally)
-GET    /v1/flows/{session_id}           Get current step (re-render)
-POST   /v1/flows/{session_id}/submit    Submit step data, advance state machine
-POST   /v1/flows/{session_id}/event     Client-side event (fingerprint, telemetry)
+POST   /flows                        Start a flow (creates a session internally)
+GET    /flows/{session_id}           Get current step (re-render)
+POST   /flows/{session_id}/submit    Submit step data, advance state machine
+POST   /flows/{session_id}/event     Client-side event (fingerprint, telemetry)
 ```
 
 The `session_id` identifies which session the flow operates on. Flow state itself is stored in an encrypted cookie — see [Storage](flow-engine-storage.md).
@@ -19,14 +21,14 @@ The `session_id` identifies which session the flow operates on. Flow state itsel
 ## Starting a Flow
 
 ```http
-POST /v1/flows
+POST /flows
 {
   "purpose": "login",
   "auth_request_id": "oidc-123",
   "redirect_uri": "https://app.com/callback",
   "hint": {
     "login_name": "alice@acme.com",
-    "org_id": "org_acme"
+    "team_id": "team_acme"
   }
 }
 ```
@@ -37,7 +39,7 @@ POST /v1/flows
 | `auth_request_id` | Links to an OIDC/SAML auth request — determines target ACR and redirect |
 | `redirect_uri` | Where to send the user on completion (from the auth request or explicit) |
 | `hint.login_name` | Auto-submits identifier step (OIDC `login_hint`) |
-| `hint.org_id` | Scopes flow resolution to an organization |
+| `hint.team_id` | Scopes flow resolution to a team |
 | `hint.schema_id` | Scopes to a specific user type |
 | `hint.app_id` | Scopes to a specific application |
 
@@ -46,7 +48,7 @@ POST /v1/flows
 The server resolves which flow definition to use:
 
 1. Filter active definitions where `purposes[]` includes the requested purpose
-2. Filter by audience match (app > org > schema > instance default)
+2. Filter by audience match (app > team > schema > project default)
 3. Most specific wins; tie-break by priority
 4. Select `initial_steps[purpose]` from the matched definition
 5. Fallback: built-in default flow
@@ -56,16 +58,16 @@ The server resolves which flow definition to use:
 A flow definition is a directed graph of steps, managed as an API resource.
 
 ```
-POST   /v1/flow-definitions             Create
-GET    /v1/flow-definitions/{id}        Get
-PATCH  /v1/flow-definitions/{id}        Update
-DELETE /v1/flow-definitions/{id}        Delete
-GET    /v1/flow-definitions              List
+POST   /flow-definitions             Create
+GET    /flow-definitions/{id}        Get
+PATCH  /flow-definitions/{id}        Update
+DELETE /flow-definitions/{id}        Delete
+GET    /flow-definitions              List
 
-POST   /v1/flow-definitions/{id}/activate    Draft → Active
-POST   /v1/flow-definitions/{id}/archive     Active → Archived
-POST   /v1/flow-definitions/{id}/validate    Check for dead ends, missing transitions
-POST   /v1/flow-definitions/{id}/simulate    Dry-run with mock input
+POST   /flow-definitions/{id}/activate    Draft → Active
+POST   /flow-definitions/{id}/archive     Active → Archived
+POST   /flow-definitions/{id}/validate    Check for dead ends, missing transitions
+POST   /flow-definitions/{id}/simulate    Dry-run with mock input
 ```
 
 ## Step Types
@@ -110,13 +112,13 @@ The response includes a `behavior` field telling the frontend what to do:
 | `show` | Display the `label`/`description` as a success screen | Registration without auth request, recovery |
 | `continue` | Flow auto-pivots back to a pending purpose (e.g., back to login after registration) | Registration with pending `auth_request_id` |
 
-When `behavior` is `continue`, the frontend calls `GET /v1/flows/{session_id}` to get the next step (the flow has already auto-pivoted server-side).
+When `behavior` is `continue`, the frontend calls `GET /flows/{session_id}` to get the next step (the flow has already auto-pivoted server-side).
 
 ### What triggers completion
 
 | Purpose | Completion condition |
 |---|---|
-| `login` / `reauth` | `policy_check` confirms session `acr` meets the target (from `acr_values` or app default) |
+| `login` / `reauth` | `policy_check` confirms session `assurance_levels[]` includes the target (from `acr_values` or app default) |
 | `register` | `action` step creates user + session; `policy_check` confirms |
 | `recovery` | `action` step resets credential |
 | `profiling` | `policy_check` confirms user has required fields |
@@ -226,7 +228,7 @@ See [Flow Engine — Storage](flow-engine-storage.md) for the encrypted cookie m
 **Frontend interaction:**
 
 ```http
-POST /v1/flows
+POST /flows
 { "purpose": "login", "auth_request_id": "oidc-123", "redirect_uri": "https://app.com/cb" }
 ```
 ```json
@@ -250,7 +252,7 @@ POST /v1/flows
 ```
 
 ```http
-POST /v1/flows/sess_1/submit
+POST /flows/sess_1/submit
 { "session_token": "tok_1", "action": "submit", "data": { "identifier": "alice@acme.com" } }
 ```
 ```json
@@ -274,7 +276,7 @@ POST /v1/flows/sess_1/submit
 ```
 
 ```http
-POST /v1/flows/sess_1/submit
+POST /flows/sess_1/submit
 { "session_token": "tok_2", "action": "submit", "data": { "password": "correct-horse" } }
 ```
 ```json
@@ -300,7 +302,7 @@ POST /v1/flows/sess_1/submit
 Note: the `otp` step wasn't in the definition. The `check_factors` policy_check determined that TOTP is needed and the flow engine rendered a credential step for it. This is either a generic credential step or an injected step — the frontend doesn't need to know.
 
 ```http
-POST /v1/flows/sess_1/submit
+POST /flows/sess_1/submit
 { "session_token": "tok_3", "action": "submit", "data": { "code": "482916" } }
 ```
 ```json
@@ -375,7 +377,7 @@ Frontend navigates to `redirect_uri`. Done.
 User was on the login flow, clicked "Create account":
 
 ```http
-POST /v1/flows/sess_1/submit
+POST /flows/sess_1/submit
 { "session_token": "tok_1", "action": "register" }
 ```
 ```json
@@ -403,7 +405,7 @@ POST /v1/flows/sess_1/submit
 Note: `email` is pre-filled from the data collected during the login flow's identifier step.
 
 ```http
-POST /v1/flows/sess_1/submit
+POST /flows/sess_1/submit
 { "session_token": "tok_2", "action": "submit", "data": { "email": "alice@acme.com", "given_name": "Alice", "family_name": "Smith" } }
 ```
 ```json
@@ -427,7 +429,7 @@ POST /v1/flows/sess_1/submit
 ```
 
 ```http
-POST /v1/flows/sess_1/submit
+POST /flows/sess_1/submit
 { "session_token": "tok_3", "action": "submit", "data": { "password": "strong-pass-123!" } }
 ```
 ```json
@@ -452,7 +454,7 @@ POST /v1/flows/sess_1/submit
 ```
 
 ```http
-POST /v1/flows/sess_1/submit
+POST /flows/sess_1/submit
 { "session_token": "tok_4", "action": "submit", "data": { "code": "839201" } }
 ```
 ```json
@@ -472,7 +474,7 @@ POST /v1/flows/sess_1/submit
 Frontend sees `behavior: "continue"` — polls for the next step:
 
 ```http
-GET /v1/flows/sess_1
+GET /flows/sess_1
 ```
 ```json
 ← 200  (auto-pivoted back to login, policy_check found session already at AAL1 → complete)
@@ -516,7 +518,7 @@ The user registered and logged in without entering credentials twice.
 **Frontend interaction:**
 
 ```http
-POST /v1/flows
+POST /flows
 { "purpose": "login", "auth_request_id": "oidc-789" }
 ```
 ```json
@@ -544,7 +546,7 @@ POST /v1/flows
 User clicks "Continue with Google":
 
 ```http
-POST /v1/flows/sess_2/submit
+POST /flows/sess_2/submit
 { "session_token": "tok_1", "action": "google" }
 ```
 ```json
@@ -564,7 +566,7 @@ POST /v1/flows/sess_2/submit
 Frontend navigates to `redirect_url`. Google authenticates, redirects back to Zitadel callback. Zitadel processes the callback, updates the session with an `idp` factor, then evaluates policy:
 
 ```http
-GET /v1/flows/sess_2
+GET /flows/sess_2
 ```
 ```json
 ← 200  (SSO callback processed → policy_check: acr_met → complete)
@@ -588,7 +590,7 @@ GET /v1/flows/sess_2
 User already has an active session at AAL1. An RP requests AAL2.
 
 ```http
-POST /v1/flows
+POST /flows
 { "purpose": "reauth", "auth_request_id": "oidc-stepup" }
 ```
 ```json
@@ -614,7 +616,7 @@ POST /v1/flows
 The flow skipped identifier and password — the session already has those factors. It jumped straight to what's missing.
 
 ```http
-POST /v1/flows/sess_existing/submit
+POST /flows/sess_existing/submit
 { "session_token": "tok_1", "action": "submit", "data": { "code": "159263" } }
 ```
 ```json
@@ -637,7 +639,7 @@ POST /v1/flows/sess_existing/submit
 ### Example 5: Password Recovery
 
 ```http
-POST /v1/flows/sess_1/submit
+POST /flows/sess_1/submit
 { "session_token": "tok_2", "action": "recover" }
 ```
 ```json
@@ -662,7 +664,7 @@ POST /v1/flows/sess_1/submit
 ```
 
 ```http
-POST /v1/flows/sess_1/submit
+POST /flows/sess_1/submit
 { "session_token": "tok_3", "action": "submit", "data": { "email": "alice@acme.com" } }
 ```
 ```json
@@ -687,7 +689,7 @@ POST /v1/flows/sess_1/submit
 ```
 
 ```http
-POST /v1/flows/sess_1/submit
+POST /flows/sess_1/submit
 { "session_token": "tok_4", "action": "submit", "data": { "code": "482916" } }
 ```
 ```json
@@ -710,7 +712,7 @@ POST /v1/flows/sess_1/submit
 ```
 
 ```http
-POST /v1/flows/sess_1/submit
+POST /flows/sess_1/submit
 { "session_token": "tok_5", "action": "submit", "data": { "password": "new-strong-pass!" } }
 ```
 ```json
@@ -728,7 +730,7 @@ POST /v1/flows/sess_1/submit
 ```
 
 ```http
-GET /v1/flows/sess_1
+GET /flows/sess_1
 ```
 ```json
 ← 200  (back in login flow, password factor now fresh → may need to re-enter or policy_check passes)
@@ -756,7 +758,7 @@ GET /v1/flows/sess_1
 When a submission fails validation or proof verification, the flow does **not** advance. The same step is returned with an `error` field:
 
 ```http
-POST /v1/flows/sess_1/submit
+POST /flows/sess_1/submit
 { "session_token": "tok_2", "action": "submit", "data": { "password": "wrong" } }
 ```
 ```json

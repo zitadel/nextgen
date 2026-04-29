@@ -27,6 +27,12 @@ go.work.sum
 # env file
 .env
 
+# Editor/IDE
+# .idea/
+
+.vscode/
+__debug_bin*
+
 # Local Codex/Claude workspace metadata
 .claude/
 
@@ -34,13 +40,29 @@ go.work.sum
 .idea/
 .vscode/
 
-# JavaScript / TypeScript
-node_modules/
-dist/
-coverage/
-npm-debug.log*
+# System Files
+.DS_Store
+
+#Frontend
+## compiled output
+dist
+tmp
+out-tsc
+
+## dependencies
+node_modules
 pnpm-debug.log*
 *.code-workspace
+
+## vite
+vite.config.*.timestamp*
+vitest.config.*.timestamp*
+test-output
+coverage
+
+## nx
+.nx/cache
+.nx/workspace-data
 
 # Keep the embed placeholder so //go:embed all:dist works in clean checkouts.
 # `dist/` above ignores the directory entirely, so we have to un-ignore the

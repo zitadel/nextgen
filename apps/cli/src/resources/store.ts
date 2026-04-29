@@ -22,7 +22,11 @@ export async function listResources(
   for (const entry of entries.filter((name) => name.endsWith(".json")).sort()) {
     const abs = join(dir, entry);
     const contents = parseJsonObject(await readFile(abs, "utf8"), abs);
-    results.push({ slug: entry.replace(/\.json$/, ""), path: `${RESOURCE_DIRECTORIES[kind]}/${entry}`, contents });
+    results.push({
+      slug: entry.replace(/\.json$/, ""),
+      path: `${RESOURCE_DIRECTORIES[kind]}/${entry}`,
+      contents,
+    });
   }
   return results;
 }
@@ -58,7 +62,12 @@ export async function writeResource(
 
   if (existing !== undefined && !opts.force && existing !== nextText) {
     throw new ZitadelError("E_CONFLICT", `Resource ${rel} already exists`, {
-      hint: "Re-run with --force to overwrite, or remove it first with `zitadel " + kind + " remove " + slug + "`.",
+      hint:
+        "Re-run with --force to overwrite, or remove it first with `zitadel " +
+        kind +
+        " remove " +
+        slug +
+        "`.",
       details: { path: rel },
     });
   }
@@ -108,5 +117,10 @@ async function readTextIfExists(path: string): Promise<string | undefined> {
 }
 
 function isNotFound(error: unknown): boolean {
-  return typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "ENOENT";
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: string }).code === "ENOENT"
+  );
 }
