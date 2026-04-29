@@ -23,6 +23,9 @@
     },
     {
       "path": "./apps/cli"
+    },
+    {
+      "path": "./packages/api"
     }
   ]
 }
