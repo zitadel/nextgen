@@ -1,10 +1,10 @@
-# Authentication Architecture
-
-> **Status:** Draft proposal — sharing for feedback
-> **Date:** 2026-04-21
-> **Context:** Zitadel next-generation architecture design
->
-> **See also:** [../glossary.md](../glossary.md) — canonical vocabulary · [../api/](../api/README.md) — API design guide · [../api/authn-and-auth-flows.md](../api/authn-and-auth-flows.md) — the auth_attempts primitives this engine runs on top of.
+Flow orchestrates UI; primitives       Client orchestrates its own UI;
+below come from auth_attempts.         calls auth_attempts + Session API.
+  → manages registration, profiling      → server verifies, re-evaluates assurance
+  → handles SSO redirects
+  ...                                  Check assurance against requested acr_values
+complete → redirect                      → build native UI, step-up if needed
+                                       request satisfied → exchange / handoff
 
 ## Relevant POC ADRs
 
@@ -54,15 +54,17 @@ POST /flows                         POST /auth_attempts
   → get capabilities + template          → drive primitives directly
 POST /flows/{id}/submit             POST /auth_attempts/{id}/challenges
   → server advances state machine        + /challenges/{cid}/verify
-  → renders next step                    → submit factor proofs
-  → manages registration, profiling      → server verifies, re-evaluates assurance levels
-  → handles SSO redirects
-  ...                                  Check assurance levels against requested acr_values
-complete → redirect                      → build native UI, step-up if needed
-                                       request satisfied → exchange / handoff
+  → internally invokes auth_attempt      → submit factor proofs
+    Go service layer (no HTTP)           → server verifies, re-evaluates assurance
+  → renders next step
+  → manages registration, profiling    Check assurance levels against requested acr_values
+  → handles SSO redirects                → build native UI, step-up if needed
+  ...                                  request satisfied → exchange / handoff
+complete → redirect
 
-Flow orchestrates UI; primitives       Client orchestrates its own UI;
-below come from auth_attempts.         calls auth_attempts + Session API.
+Flow orchestrates UI; it drives        Client orchestrates its own UI;
+auth_attempts via the internal         calls auth_attempts REST endpoints
+Go service layer, not HTTP.            + Session API over HTTP directly.
 ```
 
 Both paths get the same policy enforcement — the policy engine evaluates sessions regardless of how factors were submitted.

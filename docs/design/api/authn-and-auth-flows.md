@@ -140,7 +140,7 @@ The attempt proceeds normally (challenges → verify → handoff). On handoff, t
 
 ## Flow engine integration
 
-The flow engine is a separate concern from auth_attempts: it decides *which step renders* at each point. A flow step that says "collect password" internally calls `POST /auth_attempts/{id}/challenges` with `method: "password"` and presents the resulting challenge to the user; the submission calls `POST /auth_attempts/{id}/challenges/{cid}/verify`.
+The flow engine is a separate concern from auth_attempts: it decides *which step renders* at each point. A flow step that says "collect password" internally invokes the auth_attempt **Go service layer** (the same code that backs the `POST /auth_attempts/{id}/challenges` HTTP endpoint) with `method: "password"` and presents the resulting challenge to the user. The submission invokes the service-layer equivalent of `POST /auth_attempts/{id}/challenges/{cid}/verify`. **The flow engine never makes HTTP round-trips to its own REST endpoints** — it calls the underlying Go service directly, the same pattern as the OIDC adapter.
 
 `auth_attempts` does not return an "available factors" menu for orchestration.
 Step selection remains flow/policy-driven; auth_attempts enforces validity of
@@ -160,15 +160,18 @@ The browser loads a Zitadel-hosted login component (or an embedded lit element).
 sequenceDiagram
     autonumber
     participant Browser
+    participant Bootstrap as Bootstrap handler
     participant FlowEngine as Flow Engine
-    participant AuthAttempts as auth_attempts
+    participant AuthAttempts as auth_attempts svc
     participant SessionDB as Sessions (DB)
     participant CustomerBackend as Customer Backend
 
+    Note over FlowEngine,AuthAttempts: All FlowEngine→AuthAttempts calls are internal Go service calls,<br/>not HTTP. The REST endpoints (POST /auth_attempts/…) are the<br/>public surface for direct-API clients only (Path 2).
+
     Note over Browser,CustomerBackend: Bootstrap
 
-    Browser->>FlowEngine: POST /bootstrap/challenge { project_id, client_type: "browser" }
-    FlowEngine-->>Browser: { challenge_nonce }
+    Browser->>Bootstrap: POST /bootstrap/challenge { project_id, client_type: "browser" }
+    Bootstrap-->>Browser: { challenge_nonce }
 
     Note over Browser,CustomerBackend: Optional — pre-allocate session before user is known
 
@@ -178,37 +181,42 @@ sequenceDiagram
     Note over Browser,CustomerBackend: Start auth attempt (flow engine path)
 
     Browser->>FlowEngine: POST /flows { project_id, challenge_nonce, session_id? }
-    FlowEngine->>AuthAttempts: POST /auth_attempts { project_id, challenge_nonce, session_id? }
+    FlowEngine->>AuthAttempts: svc.Create({ project_id, challenge_nonce, session_id? })
     AuthAttempts-->>FlowEngine: { attempt_id }
-    FlowEngine->>AuthAttempts: POST /auth_attempts/{id}/challenges { method: "identifier" }
+    FlowEngine->>AuthAttempts: svc.IssueChallenge(attempt_id, { method: "identifier" })
     AuthAttempts-->>FlowEngine: { challenge_id, method: "identifier" }
     FlowEngine-->>Browser: Set-Cookie: flow=<encrypted_state> · 200 { step: "identifier" }
 
     Note over Browser,CustomerBackend: Factor 1 — identifier + password
 
     Browser->>FlowEngine: POST /flows/{id}/submit { login_name: "alice@acme.com" }
-    FlowEngine->>AuthAttempts: POST /auth_attempts/{id}/challenges/{cid}/verify { login_name: "alice@acme.com" }
-    AuthAttempts-->>FlowEngine: 200 OK — identifier verified
-    FlowEngine->>AuthAttempts: POST /auth_attempts/{id}/challenges { method: "password" }
+    FlowEngine->>AuthAttempts: svc.VerifyChallenge(attempt_id, cid, { login_name: "alice@acme.com" })
+    AuthAttempts-->>FlowEngine: OK — identifier verified
+    FlowEngine->>AuthAttempts: svc.IssueChallenge(attempt_id, { method: "password" })
     AuthAttempts-->>FlowEngine: { challenge_id, method: "password" }
     FlowEngine-->>Browser: Set-Cookie: flow=<encrypted_state> · 200 { step: "password" }
 
     Browser->>FlowEngine: POST /flows/{id}/submit { password: "…" }
-    FlowEngine->>AuthAttempts: POST /auth_attempts/{id}/challenges/{cid}/verify { password: "…" }
-    AuthAttempts-->>FlowEngine: 200 OK — factor written to auth_attempt
+    FlowEngine->>AuthAttempts: svc.VerifyChallenge(attempt_id, cid, { password: "…" })
+    AuthAttempts-->>FlowEngine: OK — factor written to auth_attempt
     FlowEngine-->>Browser: Set-Cookie: flow=<encrypted_state> · 200 { step: "totp" }
 
     Note over Browser,CustomerBackend: Factor 2 — TOTP (policy required MFA)
 
     Browser->>FlowEngine: POST /flows/{id}/submit { method: "totp" }
-    FlowEngine->>AuthAttempts: POST /auth_attempts/{id}/challenges { method: "totp" }
+    FlowEngine->>AuthAttempts: svc.IssueChallenge(attempt_id, { method: "totp" })
     AuthAttempts-->>FlowEngine: { challenge_id, method: "totp" }
     Browser->>FlowEngine: POST /flows/{id}/submit { totp: { code: "123456" } }
-    FlowEngine->>AuthAttempts: POST /auth_attempts/{id}/challenges/{cid}/verify { totp: { code: "123456" } }
-    AuthAttempts-->>FlowEngine: 200 OK — factor written, assurance_levels[] updated
-    FlowEngine->>AuthAttempts: POST /auth_attempts/{id}/handoff
+    FlowEngine->>AuthAttempts: svc.VerifyChallenge(attempt_id, cid, { totp: { code: "123456" } })
+    AuthAttempts-->>FlowEngine: OK — factor written, assurance_levels[] updated
+    FlowEngine->>AuthAttempts: svc.Handoff(attempt_id)
     AuthAttempts-->>FlowEngine: { handoff_token, expires_at }
     FlowEngine-->>Browser: Set-Cookie: flow=<cleared> · 200 { step: "complete", handoff_token: "…", expires_at: "…" }
+
+    Browser->>CustomerBackend: POST /auth/callback { handoff_token }
+    CustomerBackend->>SessionDB: POST /sessions/exchange { handoff_token } (sk_proj_ auth)
+    SessionDB-->>CustomerBackend: { session_id, session_token, assurance_levels: ["urn:nist:aal:1","urn:nist:aal:2"], factors: {…} }
+
 
     Browser->>CustomerBackend: POST /auth/callback { handoff_token }
     CustomerBackend->>SessionDB: POST /sessions/exchange { handoff_token } (sk_proj_ auth)
@@ -231,13 +239,14 @@ The client owns all UI. It drives `auth_attempts` directly without a flow engine
 sequenceDiagram
     autonumber
     participant Client
+    participant Bootstrap as Bootstrap handler
     participant AuthAttempts as auth_attempts
     participant SessionDB as Sessions (DB)
 
     Note over Client,SessionDB: Bootstrap
 
-    Client->>AuthAttempts: POST /bootstrap/challenge { project_id, client_type: "native_ios" }
-    AuthAttempts-->>Client: { challenge_nonce }
+    Client->>Bootstrap: POST /bootstrap/challenge { project_id, client_type: "native_ios" }
+    Bootstrap-->>Client: { challenge_nonce }
 
     Note over Client,SessionDB: Start attempt
 
