@@ -110,6 +110,6 @@ A Schema can be flagged as default to make it the default Schema to use when cre
 The Schema is deprecated. The Schema can still be used when creating Objects, but the API returns a warning to indicate 
 that the schema should not be used anymore and suggests the default schema.
 
-### Removed
+### Archived
 
 The Schema still exists in the database but can no longer be used to create Objects.
