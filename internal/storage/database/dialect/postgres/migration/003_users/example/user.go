@@ -29,12 +29,12 @@ type Attribute struct {
 }
 
 type User struct {
-	SchemaURL      string
-	ID             string
-	OrganizationID string
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
-	Attributes     []Attribute
+	SchemaURL  string
+	ID         string
+	TeamID     string
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+	Attributes []Attribute
 }
 
 func (u *User) MarshalJSON() ([]byte, error) {
@@ -44,7 +44,7 @@ func (u *User) MarshalJSON() ([]byte, error) {
 	}
 	tree["$schema"] = u.SchemaURL
 	tree["$id"] = u.ID
-	tree["organization_id"] = u.OrganizationID
+	tree["team_id"] = u.TeamID
 	tree["created_at"] = u.CreatedAt
 	tree["updated_at"] = u.UpdatedAt
 	return json.Marshal(tree)
@@ -70,8 +70,8 @@ func (u *UpdateUserResult) MarshalJSON() ([]byte, error) {
 	return json.Marshal(output)
 }
 
-func GetUserByID(ctx context.Context, instanceID, id string) (*User, error) {
-	rows, _ := conn.Query(ctx, getUserByIdStmt, instanceID, id)
+func GetUserByID(ctx context.Context, projectID, id string) (*User, error) {
+	rows, _ := conn.Query(ctx, getUserByIdStmt, projectID, id)
 	user, err := pgx.CollectExactlyOneRow(rows, pgx.RowToAddrOfStructByPos[User])
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user: %w", err)
@@ -85,7 +85,7 @@ type UserUniqueness int
 
 const (
 	UserUniquenessUnspecified UserUniqueness = iota
-	UserUniquenessOrganization
+	UserUniquenessTeam
 	UserUniquenessGlobal
 )
 
@@ -121,24 +121,24 @@ func NewIncomingUserAttribute(key string, value any, unique UserUniqueness) (Inc
 }
 
 type IncomingUser struct {
-	SchemaURL      string
-	ID             string
-	OrganizationID string
-	Attributes     []IncomingUserAttribute
+	SchemaURL  string
+	ID         string
+	TeamID     string
+	Attributes []IncomingUserAttribute
 }
 
-func (u *IncomingUser) insertArgs(instanceID string) []any {
+func (u *IncomingUser) insertArgs(projectID string) []any {
 	return []any{
-		instanceID,
+		projectID,
 		u.SchemaURL,
 		u.ID,
-		u.OrganizationID,
+		u.TeamID,
 		u.Attributes,
 	}
 }
 
-func CreateUser(ctx context.Context, instanceID string, u *IncomingUser) (*User, error) {
-	rows, _ := conn.Query(ctx, insertUserStmt, u.insertArgs(instanceID)...)
+func CreateUser(ctx context.Context, projectID string, u *IncomingUser) (*User, error) {
+	rows, _ := conn.Query(ctx, insertUserStmt, u.insertArgs(projectID)...)
 	user, err := pgx.CollectExactlyOneRow(rows, pgx.RowToAddrOfStructByPos[User])
 	if err != nil {
 		return nil, fmt.Errorf("failed to create user: %w", err)
@@ -146,8 +146,8 @@ func CreateUser(ctx context.Context, instanceID string, u *IncomingUser) (*User,
 	return user, nil
 }
 
-func PutUser(ctx context.Context, instanceID, userID string, attributes []IncomingUserAttribute) (*UpdateUserResult, error) {
-	rows, _ := conn.Query(ctx, putUserStmt, instanceID, userID, attributes)
+func PutUser(ctx context.Context, projectID, userID string, attributes []IncomingUserAttribute) (*UpdateUserResult, error) {
+	rows, _ := conn.Query(ctx, putUserStmt, projectID, userID, attributes)
 	user, err := pgx.CollectExactlyOneRow(rows, pgx.RowToAddrOfStructByPos[UpdateUserResult])
 	if err != nil {
 		return nil, fmt.Errorf("failed to put user: %w", err)
@@ -155,8 +155,8 @@ func PutUser(ctx context.Context, instanceID, userID string, attributes []Incomi
 	return user, nil
 }
 
-func PatchUser(ctx context.Context, instanceID, userID string, attributes []IncomingUserAttribute, deleteKeys []string) (*UpdateUserResult, error) {
-	rows, _ := conn.Query(ctx, patchUserStmt, instanceID, userID, attributes, deleteKeys)
+func PatchUser(ctx context.Context, projectID, userID string, attributes []IncomingUserAttribute, deleteKeys []string) (*UpdateUserResult, error) {
+	rows, _ := conn.Query(ctx, patchUserStmt, projectID, userID, attributes, deleteKeys)
 	user, err := pgx.CollectExactlyOneRow(rows, pgx.RowToAddrOfStructByPos[UpdateUserResult])
 	if err != nil {
 		return nil, fmt.Errorf("failed to patch user: %w", err)

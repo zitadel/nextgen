@@ -8,11 +8,11 @@ import (
 	"strings"
 )
 
-const _UserUniquenessName = "unspecifiedorganizationglobal"
+const _UserUniquenessName = "unspecifiedteamglobal"
 
 var _UserUniquenessIndex = [...]uint8{0, 11, 23, 29}
 
-const _UserUniquenessLowerName = "unspecifiedorganizationglobal"
+const _UserUniquenessLowerName = "unspecifiedteamglobal"
 
 func (i UserUniqueness) String() string {
 	if i < 0 || i >= UserUniqueness(len(_UserUniquenessIndex)-1) {
@@ -26,17 +26,17 @@ func (i UserUniqueness) String() string {
 func _UserUniquenessNoOp() {
 	var x [1]struct{}
 	_ = x[UserUniquenessUnspecified-(0)]
-	_ = x[UserUniquenessOrganization-(1)]
+	_ = x[UserUniquenessTeam-(1)]
 	_ = x[UserUniquenessGlobal-(2)]
 }
 
-var _UserUniquenessValues = []UserUniqueness{UserUniquenessUnspecified, UserUniquenessOrganization, UserUniquenessGlobal}
+var _UserUniquenessValues = []UserUniqueness{UserUniquenessUnspecified, UserUniquenessTeam, UserUniquenessGlobal}
 
 var _UserUniquenessNameToValueMap = map[string]UserUniqueness{
 	_UserUniquenessName[0:11]:       UserUniquenessUnspecified,
 	_UserUniquenessLowerName[0:11]:  UserUniquenessUnspecified,
-	_UserUniquenessName[11:23]:      UserUniquenessOrganization,
-	_UserUniquenessLowerName[11:23]: UserUniquenessOrganization,
+	_UserUniquenessName[11:23]:      UserUniquenessTeam,
+	_UserUniquenessLowerName[11:23]: UserUniquenessTeam,
 	_UserUniquenessName[23:29]:      UserUniquenessGlobal,
 	_UserUniquenessLowerName[23:29]: UserUniquenessGlobal,
 }

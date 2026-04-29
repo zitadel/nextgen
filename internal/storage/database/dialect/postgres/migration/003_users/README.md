@@ -12,7 +12,7 @@ Attributes are available in a flat key space. However this results in 1-to-many 
 
 ## Partitioning Strategy
 
-We use **Hash Partitioning** on the instance_id column to ensure multi-tenant data locality and horizontal scalability.
+We use **Hash Partitioning** on the project_id column to ensure multi-tenant data locality and horizontal scalability.
 
 ### When to Partition
 
@@ -70,13 +70,13 @@ We use a hybrid indexing approach to balance flexibility with the performance of
 Standard lookups for strings, numbers, and booleans are handled by B-Tree indexes.
 
 - **Partial Indexing:** These indexes exclusively include scalar types (string, number, boolean).
-- **Uniqueness:** Unique constraints (Organization or Global) are strictly limited to scalar values. Storing unique objects or arrays is disallowed as it is computationally expensive and rarely a valid requirement for identity attributes.
+- **Uniqueness:** Unique constraints (Team or Global) are strictly limited to scalar values. Storing unique objects or arrays is disallowed as it is computationally expensive and rarely a valid requirement for identity attributes.
 
 ### Array Attributes (GIN)
 
 For attributes storing arrays (e.g., roles, tags, or group memberships), we utilize the btree_gin extension.
 
-- **Composite GIN:** These indexes lead with instance_id and key followed by the value. This allows the database to narrow down the search to a specific tenant/key before performing array containment searches.
+- **Composite GIN:** These indexes lead with project_id and key followed by the value. This allows the database to narrow down the search to a specific tenant/key before performing array containment searches.
 - **Partial Indexing:** This index exclusively includes rows where the data type is 'array'.
 
 ### Objects (Unindexed)
@@ -88,5 +88,5 @@ JSON objects are permitted for storage but are **excluded from all indexes**. Th
 This architecture provides three primary operational advantages:
 
 1. **Parallel Vacuuming:** PostgreSQL can trigger autovacuum workers on multiple partitions simultaneously, preventing bloat issues on high-traffic tenants.
-2. **Index Locality:** By leading indexes with instance_id and partitioning by the same, the active indexes for a tenant are much more likely to remain in RAM.
+2. **Index Locality:** By leading indexes with project_id and partitioning by the same, the active indexes for a tenant are much more likely to remain in RAM.
 3. **Efficient Deletes:** Cascade operations are confined to smaller partition files, making the reclaiming of disk space faster and less resource-intensive.

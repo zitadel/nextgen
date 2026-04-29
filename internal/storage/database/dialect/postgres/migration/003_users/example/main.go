@@ -76,7 +76,7 @@ func runCreateUser() {
 	in := &IncomingUser{
 		SchemaURL:      "./user.schema.json",
 		ID:             "test_99999999",
-		OrganizationID: "org_0001",
+		TeamID: "org_0001",
 		Attributes: []IncomingUserAttribute{
 			func() IncomingUserAttribute {
 				a, attrErr := NewIncomingUserAttribute("username", "john_doe", UserUniquenessGlobal)
@@ -94,7 +94,7 @@ func runCreateUser() {
 				return a
 			}(),
 			func() IncomingUserAttribute {
-				a, attrErr := NewIncomingUserAttribute("nickname", "Johnny", UserUniquenessOrganization)
+				a, attrErr := NewIncomingUserAttribute("nickname", "Johnny", UserUniquenessTeam)
 				err = errors.Join(err, attrErr)
 				return a
 			}(),
@@ -154,7 +154,7 @@ func runPutUser() {
 			return a
 		}(),
 		func() IncomingUserAttribute {
-			a, attrErr := NewIncomingUserAttribute("nickname", "Johnny Put", UserUniquenessOrganization)
+			a, attrErr := NewIncomingUserAttribute("nickname", "Johnny Put", UserUniquenessTeam)
 			err = errors.Join(err, attrErr)
 			return a
 		}(),
@@ -192,7 +192,7 @@ func runPatchUser() {
 			return a
 		}(),
 		func() IncomingUserAttribute {
-			a, attrErr := NewIncomingUserAttribute("nickname", "Johnny Patched", UserUniquenessOrganization)
+			a, attrErr := NewIncomingUserAttribute("nickname", "Johnny Patched", UserUniquenessTeam)
 			err = errors.Join(err, attrErr)
 			return a
 		}(),

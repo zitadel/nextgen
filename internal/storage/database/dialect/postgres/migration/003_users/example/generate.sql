@@ -1,26 +1,26 @@
 -- This SQL script populates the zitadel_nextgen schema.
 -- It reflects the new architecture:
--- 1. users: partitioned by HASH (instance_id, id)
--- 2. user_attributes: partitioned by HASH (instance_id, user_id)
--- 3. user_unique_attributes: partitioned by HASH (instance_id, key)
+-- 1. users: partitioned by HASH (project_id, id)
+-- 2. user_attributes: partitioned by HASH (project_id, user_id)
+-- 3. user_unique_attributes: partitioned by HASH (project_id, key)
 
 BEGIN;
 
--- 1. Populate Instances
-INSERT INTO zitadel_nextgen.instances (id)
+-- 1. Populate Projects
+INSERT INTO zitadel_nextgen.projects (id)
 SELECT 'inst_' || i AS id
 FROM generate_series(1, 10) s(i);
 
--- 2. Populate Organizations
-INSERT INTO zitadel_nextgen.organizations (instance_id, id)
+-- 2. Populate Teams
+INSERT INTO zitadel_nextgen.teams (project_id, id)
 SELECT 
-    'inst_' || inst_id AS instance_id
+    'inst_' || inst_id AS project_id
     , 'org_' || lpad(org_id::text, 4, '0') AS id
 FROM generate_series(1, 10) inst_id
 CROSS JOIN generate_series(1, 100) org_id;
 
 -- 3. Populate Users
-INSERT INTO zitadel_nextgen.users (instance_id, organization_id, id, schema_url)
+INSERT INTO zitadel_nextgen.users (project_id, team_id, id, schema_url)
 SELECT 
     'inst_' || inst_id
     , 'org_' || lpad(org_id::text, 4, '0')
@@ -63,12 +63,12 @@ expanded_attributes AS (
 )
 -- 4. Insert into the main Attribute Data table (partitioned for co-location)
 , insert_data AS (
-    INSERT INTO zitadel_nextgen.user_attributes (instance_id, organization_id, user_id, key, value)
+    INSERT INTO zitadel_nextgen.user_attributes (project_id, team_id, user_id, key, value)
     SELECT i_id, o_id, u_id, k, v FROM expanded_attributes
 )
 -- 5. Insert into the Uniqueness Registry (partitioned for constraint enforcement)
 INSERT INTO zitadel_nextgen.user_unique_attributes 
-    (instance_id, organization_id, key, value_hash, user_id)
+    (project_id, team_id, key, value_hash, user_id)
 SELECT 
     i_id, 
     CASE WHEN is_global THEN '' ELSE o_id END, -- empty string for global, actual org for org-scoped
