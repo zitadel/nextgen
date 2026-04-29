@@ -203,7 +203,7 @@ Legacy / interop protocols. The REST API above is the primary surface; these sit
 ```http
 # OIDC
 /.well-known/openid-configuration
-/authorize                               # redirects into auth_attempts with oidc_context
+/authorize                               # OIDC Adapter stores auth_request, drives auth_attempts internally
 /token
 /userinfo
 /end_session

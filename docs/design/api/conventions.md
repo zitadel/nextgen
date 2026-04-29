@@ -43,7 +43,7 @@ Applies to:
 ```
 POST /sessions/exchange
 POST /auth_attempts/{id}/challenges/{challenge_id}/verify
-POST /sessions/{id}/refresh
+POST /auth_attempts/{id}/handoff
 ```
 
 Documented explicitly per endpoint. No endpoint silently does "the other thing."
