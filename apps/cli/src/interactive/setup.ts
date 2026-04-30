@@ -1,8 +1,7 @@
 import { cancel, confirm, intro, isCancel, multiselect, outro, select, text } from "@clack/prompts";
 
-import type { GlobalOptions } from "../io/output";
-import { DEFAULT_SERVER, MOCK_SENTINEL } from "../platform/resolve-server";
 import { ZitadelError } from "../lib/errors";
+import { DEFAULT_SERVER, MOCK_SENTINEL } from "../platform/resolve-server";
 
 export type InteractiveSetupAnswers = {
   userFields: string[];
@@ -90,7 +89,7 @@ export async function runInteractiveSetup(
       placeholder: "https://zitadel.internal",
       validate: (value) => {
         try {
-          new URL(value);
+          new URL(value ?? "");
           return;
         } catch {
           return "Must be a valid URL";
@@ -106,7 +105,7 @@ export async function runInteractiveSetup(
     placeholder: String(input.detectedDevPort),
     initialValue: String(input.detectedDevPort),
     validate: (value) => {
-      const num = Number.parseInt(value, 10);
+      const num = Number.parseInt(value ?? "", 10);
       return Number.isFinite(num) && num > 0 && num < 65536 ? undefined : "Must be a port number";
     },
   });

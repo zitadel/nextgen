@@ -1,12 +1,12 @@
 import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 
-import { getAdapter } from "../adapters/registry";
 import type { ProjectContext } from "../adapters";
+import { getAdapter } from "../adapters/registry";
+import { detectDeployTarget } from "../deploy";
 import { detectFramework } from "../detect/framework";
 import { detectPackageManager } from "../detect/package-manager";
 import { detectDevPort, issuerFromPort } from "../detect/port";
-import { detectDeployTarget } from "../deploy";
 import type { CliIO, GlobalOptions } from "../io/output";
 import { ok } from "../io/output";
 import { ZitadelError } from "../lib/errors";

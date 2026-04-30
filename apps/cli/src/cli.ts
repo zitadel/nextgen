@@ -1,13 +1,6 @@
-import { hasZitadelConfig } from "./detect/state";
-import type { CliIO, GlobalOptions } from "./io/output";
-import { defaultIO, ok, skipped, writeError } from "./io/output";
-import { CLI_VERSION } from "./lib/version";
-import { resolveCwd } from "./lib/paths";
-import { toZitadelError, ZitadelError } from "./lib/errors";
-import { resolveServer, DEFAULT_SERVER } from "./platform/resolve-server";
 import { runAddSchema } from "./commands/add-schema";
-import { runApply } from "./commands/apply";
 import { runAppAdd, runAppList, runAppRemove, runAppShow } from "./commands/app";
+import { runApply } from "./commands/apply";
 import { runCapabilities } from "./commands/capabilities";
 import { runClaim, runClaimStatus } from "./commands/claim";
 import { runDeployConnect, runDeployStatus } from "./commands/deploy";
@@ -18,6 +11,13 @@ import { runIdpAdd, runIdpList, runIdpRemove, runIdpShow } from "./commands/idp"
 import { runLocaleList, runLocaleScaffold } from "./commands/locale";
 import { runSetup } from "./commands/setup";
 import { runStatus } from "./commands/status";
+import { hasZitadelConfig } from "./detect/state";
+import type { CliIO, GlobalOptions } from "./io/output";
+import { defaultIO, skipped, writeError } from "./io/output";
+import { toZitadelError, ZitadelError } from "./lib/errors";
+import { resolveCwd } from "./lib/paths";
+import { CLI_VERSION } from "./lib/version";
+import { resolveServer, DEFAULT_SERVER } from "./platform/resolve-server";
 
 export async function runCli(argv = process.argv.slice(2), io: CliIO = defaultIO): Promise<number> {
   const parsed = parseArgs(argv, io);
@@ -385,6 +385,11 @@ function parseArgs(argv: string[], _io: CliIO): ParsedArgs {
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
+
+    if (!arg) {
+      break;
+    }
+
     if (arg === "--") {
       positionals.push(...argv.slice(index + 1));
       break;
@@ -396,7 +401,7 @@ function parseArgs(argv: string[], _io: CliIO): ParsedArgs {
 
     const isLong = arg.startsWith("--");
     const raw = isLong ? arg.slice(2) : arg.slice(1);
-    const [rawKey, inlineValue] = raw.split("=", 2);
+    const [rawKey = "", inlineValue] = raw.split("=", 2);
     const canonical = isLong ? toCamel(rawKey) : toCamel(shortFlags[rawKey] ?? rawKey);
     const next = argv[index + 1];
     const value =

@@ -1,11 +1,12 @@
-import { getAdapter } from "../adapters/registry";
 import type { ProjectContext } from "../adapters";
+import { getAdapter } from "../adapters/registry";
+import { detectDeployTarget } from "../deploy";
 import { detectFramework } from "../detect/framework";
+import { readPackageJson } from "../detect/package-json";
 import { detectPackageManager } from "../detect/package-manager";
 import { detectDevPort, issuerFromPort } from "../detect/port";
-import { readPackageJson } from "../detect/package-json";
 import { hasZitadelConfig, hasZitadelSecret } from "../detect/state";
-import { detectDeployTarget } from "../deploy";
+import { runInteractiveSetup } from "../interactive/setup";
 import type { CliIO, GlobalOptions } from "../io/output";
 import { ok, skipped } from "../io/output";
 import { ZitadelError } from "../lib/errors";
@@ -19,7 +20,6 @@ import { scaffold } from "../scaffolder";
 import type { ScaffoldPlan } from "../scaffolder/plan";
 import { defaultUserSchema } from "../schema/default";
 import { validateJsonSchema } from "../schema/validate";
-import { runInteractiveSetup } from "../interactive/setup";
 import { runApply } from "./apply";
 import { runDeployConnect } from "./deploy";
 

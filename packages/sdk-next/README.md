@@ -1,4 +1,4 @@
-# @zitadel/sdk-next
+# @zitadel-nextgen/sdk-next
 
 Next.js middleware and helpers for Nextgen Auth.
 

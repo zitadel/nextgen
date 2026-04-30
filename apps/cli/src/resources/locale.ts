@@ -9,7 +9,7 @@ import { parseJsonObject, stableStringify } from "../lib/json";
 export const LOCALES_DIR = ".zitadel/locales";
 export const DEFAULT_LOCALE = "en";
 
-export const localeSchema = z.record(z.string());
+export const localeSchema = z.record(z.string(), z.string());
 export type Locale = z.infer<typeof localeSchema>;
 
 export function isValidLang(value: string): boolean {

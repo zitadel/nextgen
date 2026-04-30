@@ -1,6 +1,7 @@
 import type { CliIO, GlobalOptions } from "../io/output";
 import { ok } from "../io/output";
 import { EXIT_CODES } from "../lib/errors";
+import { listRenderers } from "../renderers/registry";
 import {
   KNOWN_FIELD_ANNOTATIONS,
   KNOWN_MFA_VALUES,
@@ -8,7 +9,6 @@ import {
   KNOWN_VERIFY_VALUES,
 } from "../schema/annotations";
 import { listNamedPresets } from "../schema/default";
-import { listRenderers } from "../renderers/registry";
 import { BANNED_ATTRIBUTE_PREFIX, BANNED_FILTERS, BANNED_TAGS } from "../templates/validate";
 import { COMMANDS } from "./registry";
 

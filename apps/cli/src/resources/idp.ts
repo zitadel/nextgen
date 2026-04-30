@@ -4,7 +4,7 @@ const envRef = z
   .string()
   .regex(/^[A-Z][A-Z0-9_]*$/, "must be an env var name like ZITADEL_IDP_X_SECRET");
 
-const claimMapping = z.record(z.string()).default({
+const claimMapping = z.record(z.string(), z.string()).default({
   email: "email",
   given_name: "given_name",
   family_name: "family_name",

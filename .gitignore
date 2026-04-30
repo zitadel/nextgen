@@ -36,21 +36,33 @@ __debug_bin*
 # Local Codex/Claude workspace metadata
 .claude/
 
-# Mock server — local dev only, not for production
-packages/mockserver/
+# Editor/IDE
+.idea/
+.vscode/
 
-# JavaScript / TypeScript
-node_modules/
-dist/
-coverage/
+# System Files
+.DS_Store
 
-# Build output
-.next/
-.nuxt/
-.output/
-npm-debug.log*
+#Frontend
+## compiled output
+dist
+tmp
+out-tsc
+
+## dependencies
+node_modules
 pnpm-debug.log*
 *.code-workspace
+
+## vite
+vite.config.*.timestamp*
+vitest.config.*.timestamp*
+test-output
+coverage
+
+## nx
+.nx/cache
+.nx/workspace-data
 
 # Keep the embed placeholder so //go:embed all:dist works in clean checkouts.
 # `dist/` above ignores the directory entirely, so we have to un-ignore the

@@ -40,12 +40,33 @@ type Invoker interface {
 	//
 	// GET /auth/authorize
 	AuthorizeGet(ctx context.Context, params AuthorizeGetParams) (AuthorizeGetRes, error)
+	// CreateFlow invokes createFlow operation.
+	//
+	// Resolves a flow definition based on purpose + audience context and returns
+	// the first capability step. Creates a new session implicitly unless
+	// `session_id` is provided (for step-up / reauth on an existing session).
+	// The response contains an `id` field — the flow handle. Use it as the path
+	// parameter for all subsequent `/flow/{id}/submit` and `/flow/{id}/event` calls.
+	// The response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing
+	// the flow's orchestration state (current step, collected data, history).
+	// The server is stateless between requests — all flow state lives in this
+	// cookie. The browser sends it automatically on subsequent requests.
+	//
+	// POST /flow
+	CreateFlow(ctx context.Context, request *CreateFlowRequest) (CreateFlowRes, error)
 	// EndSession invokes endSession operation.
 	//
 	// End a session.
 	//
 	// GET /auth/end-session
 	EndSession(ctx context.Context, params EndSessionParams) (EndSessionRes, error)
+	// GetFlowStep invokes getFlowStep operation.
+	//
+	// Returns the current capability step without advancing the state machine.
+	// Useful for page reloads or re-rendering after a network error.
+	//
+	// GET /flow/{id}
+	GetFlowStep(ctx context.Context, params GetFlowStepParams) (GetFlowStepRes, error)
 	// GetHealth invokes getHealth operation.
 	//
 	// Check whether the server is healthy.
@@ -106,6 +127,39 @@ type Invoker interface {
 	//
 	// POST /auth/revoke
 	RevokeToken(ctx context.Context, request *RevokeRequest) (RevokeTokenRes, error)
+	// SubmitFlowEvent invokes submitFlowEvent operation.
+	//
+	// Submits telemetry or fingerprint data from the frontend.
+	// Does not advance the state machine. Used for risk evaluation.
+	//
+	// POST /flow/{id}/event
+	SubmitFlowEvent(ctx context.Context, request *FlowEventRequest, params SubmitFlowEventParams) error
+	// SubmitFlowStep invokes submitFlowStep operation.
+	//
+	// Submits user input for the current step. The server validates,
+	// processes (e.g., verifies a credential), advances the state machine
+	// through any invisible steps, and returns the next visible step.
+	// The response sets an updated encrypted `HttpOnly` cookie (`_zflow`)
+	// with the new flow state. The server is stateless — all orchestration
+	// state is carried in this cookie between requests.
+	// **Important:** The `id` in the response may differ from the `id` used in
+	// the request. This happens when a flow pivots (pushes a new flow onto the
+	// stack) or when a stacked flow completes (auto-pops to the parent flow).
+	// Always use the `id` from the latest response for the next request.
+	// ## Flow completion
+	// When `step.type` is `complete`, the flow is terminal. The `step.behavior`
+	// field tells the frontend what to do:
+	// | `behavior`   | Action                                                     |
+	// |------------- |------------------------------------------------------------|
+	// | `redirect`   | Navigate to `redirect_uri` (OIDC/SAML auth request done). |
+	// | `show`       | Render the step as a success screen (e.g., registration).  |
+	// A `complete` step is only returned when the **entire flow stack** is done.
+	// If a stacked flow (e.g., recovery pivoted from login) finishes, the server
+	// auto-pops to the parent flow and returns the parent's next step — the
+	// frontend never sees a `complete` for intermediate flows.
+	//
+	// POST /flow/{id}/submit
+	SubmitFlowStep(ctx context.Context, request *FlowSubmitRequest, params SubmitFlowStepParams) (SubmitFlowStepRes, error)
 }
 
 // Client implements OAS client.
@@ -635,6 +689,100 @@ func (c *Client) sendAuthorizeGet(ctx context.Context, params AuthorizeGetParams
 	return result, nil
 }
 
+// CreateFlow invokes createFlow operation.
+//
+// Resolves a flow definition based on purpose + audience context and returns
+// the first capability step. Creates a new session implicitly unless
+// `session_id` is provided (for step-up / reauth on an existing session).
+// The response contains an `id` field — the flow handle. Use it as the path
+// parameter for all subsequent `/flow/{id}/submit` and `/flow/{id}/event` calls.
+// The response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing
+// the flow's orchestration state (current step, collected data, history).
+// The server is stateless between requests — all flow state lives in this
+// cookie. The browser sends it automatically on subsequent requests.
+//
+// POST /flow
+func (c *Client) CreateFlow(ctx context.Context, request *CreateFlowRequest) (CreateFlowRes, error) {
+	res, err := c.sendCreateFlow(ctx, request)
+	return res, err
+}
+
+func (c *Client) sendCreateFlow(ctx context.Context, request *CreateFlowRequest) (res CreateFlowRes, err error) {
+	// Validate request before sending.
+	if err := func() error {
+		if err := request.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return res, errors.Wrap(err, "validate")
+	}
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("createFlow"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.URLTemplateKey.String("/flow"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, CreateFlowOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [1]string
+	pathParts[0] = "/flow"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "POST", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+	if err := encodeCreateFlowRequest(request, r); err != nil {
+		return res, errors.Wrap(err, "encode request")
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeCreateFlowResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
 // EndSession invokes endSession operation.
 //
 // End a session.
@@ -841,6 +989,115 @@ func (c *Client) sendEndSession(ctx context.Context, params EndSessionParams) (r
 
 	stage = "DecodeResponse"
 	result, err := decodeEndSessionResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// GetFlowStep invokes getFlowStep operation.
+//
+// Returns the current capability step without advancing the state machine.
+// Useful for page reloads or re-rendering after a network error.
+//
+// GET /flow/{id}
+func (c *Client) GetFlowStep(ctx context.Context, params GetFlowStepParams) (GetFlowStepRes, error) {
+	res, err := c.sendGetFlowStep(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendGetFlowStep(ctx context.Context, params GetFlowStepParams) (res GetFlowStepRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("getFlowStep"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.URLTemplateKey.String("/flow/{id}"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, GetFlowStepOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [2]string
+	pathParts[0] = "/flow/"
+	{
+		// Encode "id" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "id",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			return e.EncodeValue(conv.StringToString(params.ID))
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "GET", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	stage = "EncodeCookieParams"
+	cookie := uri.NewCookieEncoder(r)
+	{
+		// Encode "_zflow" parameter.
+		cfg := uri.CookieParameterEncodingConfig{
+			Name:    "_zflow",
+			Explode: true,
+		}
+
+		if err := cookie.EncodeParam(cfg, func(e uri.Encoder) error {
+			return e.EncodeValue(conv.StringToString(params.Zflow))
+		}); err != nil {
+			return res, errors.Wrap(err, "encode cookie")
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeGetFlowStepResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}
@@ -1802,6 +2059,260 @@ func (c *Client) sendRevokeToken(ctx context.Context, request *RevokeRequest) (r
 
 	stage = "DecodeResponse"
 	result, err := decodeRevokeTokenResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// SubmitFlowEvent invokes submitFlowEvent operation.
+//
+// Submits telemetry or fingerprint data from the frontend.
+// Does not advance the state machine. Used for risk evaluation.
+//
+// POST /flow/{id}/event
+func (c *Client) SubmitFlowEvent(ctx context.Context, request *FlowEventRequest, params SubmitFlowEventParams) error {
+	_, err := c.sendSubmitFlowEvent(ctx, request, params)
+	return err
+}
+
+func (c *Client) sendSubmitFlowEvent(ctx context.Context, request *FlowEventRequest, params SubmitFlowEventParams) (res *SubmitFlowEventNoContent, err error) {
+	// Validate request before sending.
+	if err := func() error {
+		if err := request.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return res, errors.Wrap(err, "validate")
+	}
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("submitFlowEvent"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.URLTemplateKey.String("/flow/{id}/event"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, SubmitFlowEventOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [3]string
+	pathParts[0] = "/flow/"
+	{
+		// Encode "id" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "id",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			return e.EncodeValue(conv.StringToString(params.ID))
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	pathParts[2] = "/event"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "POST", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+	if err := encodeSubmitFlowEventRequest(request, r); err != nil {
+		return res, errors.Wrap(err, "encode request")
+	}
+
+	stage = "EncodeCookieParams"
+	cookie := uri.NewCookieEncoder(r)
+	{
+		// Encode "_zflow" parameter.
+		cfg := uri.CookieParameterEncodingConfig{
+			Name:    "_zflow",
+			Explode: true,
+		}
+
+		if err := cookie.EncodeParam(cfg, func(e uri.Encoder) error {
+			return e.EncodeValue(conv.StringToString(params.Zflow))
+		}); err != nil {
+			return res, errors.Wrap(err, "encode cookie")
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeSubmitFlowEventResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// SubmitFlowStep invokes submitFlowStep operation.
+//
+// Submits user input for the current step. The server validates,
+// processes (e.g., verifies a credential), advances the state machine
+// through any invisible steps, and returns the next visible step.
+// The response sets an updated encrypted `HttpOnly` cookie (`_zflow`)
+// with the new flow state. The server is stateless — all orchestration
+// state is carried in this cookie between requests.
+// **Important:** The `id` in the response may differ from the `id` used in
+// the request. This happens when a flow pivots (pushes a new flow onto the
+// stack) or when a stacked flow completes (auto-pops to the parent flow).
+// Always use the `id` from the latest response for the next request.
+// ## Flow completion
+// When `step.type` is `complete`, the flow is terminal. The `step.behavior`
+// field tells the frontend what to do:
+// | `behavior`   | Action                                                     |
+// |------------- |------------------------------------------------------------|
+// | `redirect`   | Navigate to `redirect_uri` (OIDC/SAML auth request done). |
+// | `show`       | Render the step as a success screen (e.g., registration).  |
+// A `complete` step is only returned when the **entire flow stack** is done.
+// If a stacked flow (e.g., recovery pivoted from login) finishes, the server
+// auto-pops to the parent flow and returns the parent's next step — the
+// frontend never sees a `complete` for intermediate flows.
+//
+// POST /flow/{id}/submit
+func (c *Client) SubmitFlowStep(ctx context.Context, request *FlowSubmitRequest, params SubmitFlowStepParams) (SubmitFlowStepRes, error) {
+	res, err := c.sendSubmitFlowStep(ctx, request, params)
+	return res, err
+}
+
+func (c *Client) sendSubmitFlowStep(ctx context.Context, request *FlowSubmitRequest, params SubmitFlowStepParams) (res SubmitFlowStepRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("submitFlowStep"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.URLTemplateKey.String("/flow/{id}/submit"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, SubmitFlowStepOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [3]string
+	pathParts[0] = "/flow/"
+	{
+		// Encode "id" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "id",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			return e.EncodeValue(conv.StringToString(params.ID))
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	pathParts[2] = "/submit"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "POST", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+	if err := encodeSubmitFlowStepRequest(request, r); err != nil {
+		return res, errors.Wrap(err, "encode request")
+	}
+
+	stage = "EncodeCookieParams"
+	cookie := uri.NewCookieEncoder(r)
+	{
+		// Encode "_zflow" parameter.
+		cfg := uri.CookieParameterEncodingConfig{
+			Name:    "_zflow",
+			Explode: true,
+		}
+
+		if err := cookie.EncodeParam(cfg, func(e uri.Encoder) error {
+			return e.EncodeValue(conv.StringToString(params.Zflow))
+		}); err != nil {
+			return res, errors.Wrap(err, "encode cookie")
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeSubmitFlowStepResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}

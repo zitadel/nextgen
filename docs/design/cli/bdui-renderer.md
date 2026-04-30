@@ -10,7 +10,7 @@ The product vision says "CLI figures out the framework and can later plug in the
 
 ```tsx
 // apps/cli/src/adapters/next/adapter.ts:69
-import { ZitadelFlow } from "@zitadel/sdk-next";
+import { ZitadelFlow } from "@zitadel-nextgen/sdk-next";
 export default function LoginPage() {
   return <ZitadelFlow purpose="login" />;
 }
@@ -144,10 +144,10 @@ Contract test: every (adapter × renderer) pair produces a valid scaffold that t
 
 ## The React shim
 
-Until Lit ships, React consumers get `@zitadel/sdk-next` with the *same* API surface the Lit component will have:
+Until Lit ships, React consumers get `@zitadel-nextgen/sdk-next` with the *same* API surface the Lit component will have:
 
 ```tsx
-import { ZitadelFlow } from "@zitadel/sdk-next";
+import { ZitadelFlow } from "@zitadel-nextgen/sdk-next";
 
 <ZitadelFlow purpose="login" issuer={...} clientId={...} />
 ```

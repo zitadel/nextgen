@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, stat, writeFile, chmod } from "node:fs/promises";
+import { chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import { ZitadelError } from "../lib/errors";
@@ -248,16 +248,6 @@ async function readIfExists(path: string): Promise<string | undefined> {
     if (isNotFound(error)) {
       return undefined;
     }
-    throw error;
-  }
-}
-
-async function exists(path: string): Promise<boolean> {
-  try {
-    await stat(path);
-    return true;
-  } catch (error) {
-    if (isNotFound(error)) return false;
     throw error;
   }
 }

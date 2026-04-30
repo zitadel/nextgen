@@ -6,11 +6,11 @@ import type { CliIO, GlobalOptions } from "../io/output";
 import { ok } from "../io/output";
 import { ZitadelError } from "../lib/errors";
 import { sha256 } from "../lib/hash";
+import { CLI_VERSION } from "../lib/version";
 import { createPlatformClient } from "../platform";
 import { environmentSchema, type ZitadelEnvironment } from "../platform/schemas";
 import { flowDefinitionSchema } from "../resources/flow";
 import { scaffold } from "../scaffolder";
-import { CLI_VERSION } from "../lib/version";
 import { validateLiquidTemplate } from "../templates/validate";
 import { readZitadelConfig, readZitadelSecret, schemaVersionFromConfig } from "./shared";
 
@@ -63,7 +63,7 @@ export async function runApply(io: CliIO, opts: ApplyOptions): Promise<Record<st
     blockers,
   };
 
-  if (blockers.length > 0 && !planning) {
+  if (blockers[0] !== undefined && !planning) {
     throw new ZitadelError(
       environment === "production" ? "E_CLAIM_REQUIRED" : "E_VALIDATION",
       blockers[0],
@@ -311,7 +311,8 @@ export function findEnvRefs(value: unknown): string[] {
   const visit = (node: unknown): void => {
     if (typeof node === "string") {
       for (const match of node.matchAll(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g)) {
-        refs.add(match[1]);
+        const ref = match[1];
+        if (ref) refs.add(ref);
       }
     } else if (Array.isArray(node)) {
       node.forEach(visit);

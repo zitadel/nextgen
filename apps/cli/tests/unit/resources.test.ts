@@ -50,7 +50,7 @@ describe("identity resources", () => {
       data: { idps: Array<{ slug: string; protocol: string }> };
     };
     expect(listEnv.data.idps).toHaveLength(1);
-    expect(listEnv.data.idps[0].slug).toBe("google");
+    expect(listEnv.data.idps[0]?.slug).toBe("google");
 
     const show = await runCliForTest(["idp", "show", "google", "--cwd", cwd, "--json"]);
     expect(show.exitCode).toBe(0);
@@ -121,7 +121,7 @@ describe("identity resources", () => {
       data: { apps: Array<{ slug: string; protocol: string }> };
     };
     expect(listEnv.data.apps).toHaveLength(1);
-    expect(listEnv.data.apps[0].slug).toBe("web");
+    expect(listEnv.data.apps[0]?.slug).toBe("web");
 
     const show = await runCliForTest(["app", "show", "web", "--cwd", cwd, "--json"]);
     expect(show.exitCode).toBe(0);

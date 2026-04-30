@@ -7,6 +7,9 @@ import (
 )
 
 type Handler struct {
+	// UnimplementedHandler is embedded to provide default "not implemented"
+	// responses for all endpoints, so only implemented methods need to be defined.
+	api.UnimplementedHandler
 }
 
 func NewHandler() *Handler {

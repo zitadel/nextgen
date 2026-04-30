@@ -1,7 +1,7 @@
 import { join } from "node:path";
 
-import type { FrameworkAdapter, ProjectContext } from "../index";
 import type { ScaffoldPlan } from "../../scaffolder/plan";
+import type { FrameworkAdapter, ProjectContext } from "../index";
 
 export class NextAdapter implements FrameworkAdapter {
   readonly id = "next" as const;

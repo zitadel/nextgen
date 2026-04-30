@@ -3,6 +3,34 @@
 package api
 
 // setDefaults set default value of fields.
+func (s *Branding) setDefaults() {
+	{
+		val := BrandingLayout("centered")
+		s.Layout.SetTo(val)
+	}
+}
+
+// setDefaults set default value of fields.
+func (s *Field) setDefaults() {
+	{
+		val := bool(false)
+		s.Required.SetTo(val)
+	}
+}
+
+// setDefaults set default value of fields.
+func (s *Gate) setDefaults() {
+	{
+		val := bool(true)
+		s.Required.SetTo(val)
+	}
+	{
+		val := bool(false)
+		s.Satisfied.SetTo(val)
+	}
+}
+
+// setDefaults set default value of fields.
 func (s *OpenidConfiguration) setDefaults() {
 	{
 		val := bool(false)
@@ -19,5 +47,13 @@ func (s *OpenidConfiguration) setDefaults() {
 	{
 		val := bool(false)
 		s.RequireRequestURIRegistration.SetTo(val)
+	}
+}
+
+// setDefaults set default value of fields.
+func (s *StepAction) setDefaults() {
+	{
+		val := bool(false)
+		s.Primary.SetTo(val)
 	}
 }

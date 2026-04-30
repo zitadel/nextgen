@@ -2,8 +2,8 @@ import type { CliIO, GlobalOptions } from "../io/output";
 import { ok, skipped } from "../io/output";
 import { ZitadelError } from "../lib/errors";
 import { createPlatformClient } from "../platform";
-import type { ClaimStatusResponse } from "../platform/schemas";
 import { MOCK_SENTINEL } from "../platform/resolve-server";
+import type { ClaimStatusResponse } from "../platform/schemas";
 import { scaffold } from "../scaffolder";
 import { readZitadelSecret, writeZitadelSecret, type ZitadelSecret } from "./shared";
 

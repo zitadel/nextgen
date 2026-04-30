@@ -55,7 +55,7 @@ export function parseAddFieldSpec(raw: string): AddFieldSpec {
   let required = false;
 
   for (const attr of attrs.split(",").filter(Boolean)) {
-    const [key, value = "true"] = attr.split("=");
+    const [key = "", value = "true"] = attr.split("=");
     if (key === "required") {
       required = value !== "false";
     } else if (key === "format") {

@@ -4,8 +4,8 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { EXIT_CODES } from "../../src/lib/errors";
 import { COMMANDS } from "../../src/commands/registry";
+import { EXIT_CODES } from "../../src/lib/errors";
 import { parseJson, runCliForTest } from "../helpers/run-cli";
 
 async function scaffoldNextProject(): Promise<string> {

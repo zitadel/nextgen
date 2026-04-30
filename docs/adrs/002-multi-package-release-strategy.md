@@ -50,7 +50,7 @@ Trade-offs:
 
 ## Open questions
 
-- Whether to put `@zitadel/sdk-core` and `@zitadel/sdk-next` into a `linked` group in `.changeset/config.json` once the SDK packages mature and want lockstep versioning.
+- Whether to put `@zitadel-nextgen/sdk-core` and `@zitadel-nextgen/sdk-next` into a `linked` group in `.changeset/config.json` once the SDK packages mature and want lockstep versioning.
 - When to layer image signing (`cosign`) and SLSA provenance attestations onto the goreleaser pipeline. Out of scope for the initial setup, but the `release.yml` workflow already requests `id-token: write` so the keyless flow is available when needed.
 - Whether to publish the console SPA as a documentation/preview artifact (e.g., to a CDN bucket) for design reviews, separate from the embedded Go server release.
 

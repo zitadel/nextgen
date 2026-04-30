@@ -5,7 +5,7 @@ export const authMethodSchema = z.object({
   position: z.number().int().nonnegative(),
 });
 
-export const authMethodsSchema = z.record(authMethodSchema);
+export const authMethodsSchema = z.record(z.string(), authMethodSchema);
 
 export const KNOWN_FIELD_ANNOTATIONS = [
   "x-identifier",

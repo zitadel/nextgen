@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+
+import { describe, expect, it } from "vitest";
 
 import { MockPlatformClient } from "../../src/platform/mock-client";
 import {

@@ -3,8 +3,8 @@ import { join } from "node:path";
 
 import type { CliIO, GlobalOptions } from "../io/output";
 import { ok, skipped } from "../io/output";
-import { MANAGED_MARKER } from "../lib/paths";
 import { ZitadelError } from "../lib/errors";
+import { MANAGED_MARKER } from "../lib/paths";
 
 export type EjectOptions = GlobalOptions & {
   force?: boolean;
