@@ -142,6 +142,14 @@ describe("decodeJwt", () => {
     const { payload } = decodeJwt(tampered);
     expect(payload.sub).toBe("u1");
   });
+
+  it("throws TypeError for a token with only two segments", () => {
+    expect(() => decodeJwt("one.two")).toThrow(TypeError);
+  });
+
+  it("throws TypeError for an empty string", () => {
+    expect(() => decodeJwt("")).toThrow(TypeError);
+  });
 });
 
 // ─── verifyJwt ────────────────────────────────────────────────────────────────

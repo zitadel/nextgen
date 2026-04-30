@@ -1,13 +1,7 @@
 import { headers } from "next/headers";
 import type { AuthResult } from "./types";
-import { base64UrlDecode } from "./lib/jwt";
-
-interface JwtPayload {
-  sub?: string;
-  email?: string;
-  name?: string;
-  [key: string]: unknown;
-}
+import { decodeJwt } from "./lib/jwt";
+import type { JwtPayload } from "./lib/jwt";
 
 /**
  * Reads the auth state in a React Server Component or Next.js Route Handler.
@@ -38,12 +32,7 @@ export async function auth(): Promise<AuthResult> {
       return { isAuthenticated: false, session: null };
     }
 
-    const parts = token.split(".");
-    if (parts.length < 3) {
-      return { isAuthenticated: false, session: null };
-    }
-
-    const payload = JSON.parse(new TextDecoder().decode(base64UrlDecode(parts[1]))) as JwtPayload;
+    const { payload } = decodeJwt(token) as { payload: JwtPayload };
 
     return {
       isAuthenticated: true,

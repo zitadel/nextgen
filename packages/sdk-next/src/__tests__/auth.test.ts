@@ -30,27 +30,26 @@ describe("auth()", () => {
     vi.resetModules();
   });
 
-  it("returns unauthenticated when x-nextgen-auth-status header is absent", async () => {
+  it("returns unauthenticated when x-nextgen-auth-token header is absent", async () => {
     const { auth } = await import("../auth");
     const result = await auth();
     expect(result).toEqual({ isAuthenticated: false, session: null });
   });
 
-  it("returns unauthenticated when x-nextgen-auth-status is signed-out", async () => {
-    mockHeadersMap.set("x-nextgen-auth-status", "signed-out");
+  it("returns unauthenticated when x-nextgen-auth-token is an empty string", async () => {
+    mockHeadersMap.set("x-nextgen-auth-token", "");
     const { auth } = await import("../auth");
     const result = await auth();
     expect(result).toEqual({ isAuthenticated: false, session: null });
   });
 
-  it("returns authenticated session for signed-in status with valid payload", async () => {
+  it("returns authenticated session when a valid token is present", async () => {
     const token = makeFakeJwt({
       sub: "user-abc",
       email: "alice@example.com",
       name: "Alice",
       exp: Math.floor(Date.now() / 1000) + 3600,
     });
-    mockHeadersMap.set("x-nextgen-auth-status", "signed-in");
     mockHeadersMap.set("x-nextgen-auth-token", token);
     const { auth } = await import("../auth");
     const result = await auth();
@@ -66,7 +65,6 @@ describe("auth()", () => {
   });
 
   it("returns unauthenticated when token is malformed", async () => {
-    mockHeadersMap.set("x-nextgen-auth-status", "signed-in");
     mockHeadersMap.set("x-nextgen-auth-token", "not.a.valid.jwt.at.all.extra");
     const { auth } = await import("../auth");
     const result = await auth();
@@ -78,7 +76,6 @@ describe("auth()", () => {
       sub: "user-xyz",
       exp: Math.floor(Date.now() / 1000) + 3600,
     });
-    mockHeadersMap.set("x-nextgen-auth-status", "signed-in");
     mockHeadersMap.set("x-nextgen-auth-token", token);
     const { auth } = await import("../auth");
     const result = await auth();

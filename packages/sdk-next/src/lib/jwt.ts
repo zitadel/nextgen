@@ -462,9 +462,12 @@ export async function verifyJwt(
     }
 
     if (audience !== undefined) {
-      const audList = Array.isArray(payload.aud)
-        ? (payload.aud as readonly string[])
-        : [payload.aud as string | undefined];
+      const audList =
+        payload.aud === undefined
+          ? []
+          : Array.isArray(payload.aud)
+            ? (payload.aud as readonly string[])
+            : [payload.aud];
       const expectedList = Array.isArray(audience) ? audience : [audience];
       if (!expectedList.some((a) => audList.includes(a))) {
         return null;

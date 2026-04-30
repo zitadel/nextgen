@@ -27,23 +27,34 @@ function makeRequest(url: string, cookie?: string, authorization?: string): Next
 const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
 const privateKeyPem = privateKey.export({ type: "pkcs8", format: "pem" }).toString();
 const publicKeyJwk = publicKey.export({ type: "spki", format: "jwk" }) as Record<string, unknown>;
-const testKid = "test-key-1";
 
-const jwksResponse = {
-  keys: [{ ...publicKeyJwk, kid: testKid, alg: "RS256", use: "sig" }],
-};
+/**
+ * Monotonically increasing key-ID counter. Each test that exercises JWKS
+ * lookup receives a unique `kid`, which maps to a unique cache entry in the
+ * module-level JWKS cache inside `lib/jwt.ts`. This keeps tests hermetically
+ * isolated without requiring a cache-reset export.
+ */
+let kidCounter = 0;
+function nextKid(): string {
+  return `next-test-key-${++kidCounter}`;
+}
+
+/**
+ * Builds a minimal JWKS response containing only the shared public key,
+ * tagged with the given `kid`. Using a per-test `kid` prevents the JWKS
+ * cache from serving a stale entry imported by a previous test run.
+ */
+function mockJwks(kid: string): ReturnType<typeof vi.fn> {
+  const jwks = { keys: [{ ...publicKeyJwk, kid, alg: "RS256", use: "sig" }] };
+  return vi.fn().mockResolvedValue(new Response(JSON.stringify(jwks), { status: 200 }));
+}
 
 describe("nextgenMiddleware", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
 
-  it("public route with no token passes through without x-nextgen-auth-token", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue(new Response(JSON.stringify(jwksResponse), { status: 200 })),
-    );
-
+  it("public route with no token passes through with empty x-nextgen-auth-token", async () => {
     const req = makeRequest("http://localhost:3000/");
     const res = await nextgenMiddleware(req, {
       issuerUrl: "http://localhost:4000",
@@ -58,11 +69,6 @@ describe("nextgenMiddleware", () => {
   });
 
   it("protected route with no token redirects to /login?next=/admin", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue(new Response(JSON.stringify(jwksResponse), { status: 200 })),
-    );
-
     const req = makeRequest("http://localhost:3000/admin");
     const res = await nextgenMiddleware(req, {
       issuerUrl: "http://localhost:4000",
@@ -77,17 +83,11 @@ describe("nextgenMiddleware", () => {
   });
 
   it("protected route with valid cookie passes through with token tunnelled", async () => {
+    const kid = nextKid();
     const exp = Math.floor(Date.now() / 1000) + 3600;
-    const token = makeJwt(
-      { sub: "user-123", email: "user@example.com", exp },
-      privateKeyPem,
-      testKid,
-    );
+    const token = makeJwt({ sub: "user-123", email: "user@example.com", exp }, privateKeyPem, kid);
 
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue(new Response(JSON.stringify(jwksResponse), { status: 200 })),
-    );
+    vi.stubGlobal("fetch", mockJwks(kid));
 
     const req = makeRequest("http://localhost:3000/admin", `__nextgen_session=${token}`);
     const res = await nextgenMiddleware(req, {
@@ -102,17 +102,11 @@ describe("nextgenMiddleware", () => {
   });
 
   it("protected route with valid Bearer token passes through", async () => {
+    const kid = nextKid();
     const exp = Math.floor(Date.now() / 1000) + 3600;
-    const token = makeJwt(
-      { sub: "user-123", email: "user@example.com", exp },
-      privateKeyPem,
-      testKid,
-    );
+    const token = makeJwt({ sub: "user-123", email: "user@example.com", exp }, privateKeyPem, kid);
 
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue(new Response(JSON.stringify(jwksResponse), { status: 200 })),
-    );
+    vi.stubGlobal("fetch", mockJwks(kid));
 
     const req = makeRequest("http://localhost:3000/admin", undefined, `Bearer ${token}`);
     const res = await nextgenMiddleware(req, {
@@ -127,19 +121,17 @@ describe("nextgenMiddleware", () => {
   });
 
   it("protected route with invalid token clears cookie and redirects", async () => {
+    const kid = nextKid();
     const exp = Math.floor(Date.now() / 1000) + 3600;
     const validToken = makeJwt(
       { sub: "user-123", email: "user@example.com", exp },
       privateKeyPem,
-      testKid,
+      kid,
     );
     const parts = validToken.split(".");
     const tamperedToken = `${parts[0]}.${parts[1]}.invalidsignatureXXX`;
 
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue(new Response(JSON.stringify(jwksResponse), { status: 200 })),
-    );
+    vi.stubGlobal("fetch", mockJwks(kid));
 
     const req = makeRequest("http://localhost:3000/admin", `__nextgen_session=${tamperedToken}`);
     const res = await nextgenMiddleware(req, {
