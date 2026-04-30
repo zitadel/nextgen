@@ -15,14 +15,15 @@ flowchart TD
 
     start@{shape: start} --> isSchemaLocal
 
-    isSchemaLocal -- Yes --> needsTransformer
+    isSchemaLocal -- Yes --> validateObject
     isSchemaLocal -- No  --> isSchemaCached
 
     isSchemaCached -- Yes --> needsTransformer
     isSchemaCached -- No  --> pullSchema --> doesSchemaHaveMetaSchema
     
     doesSchemaHaveMetaSchema -- Yes --> recurse --> cacheSchema
-    doesSchemaHaveMetaSchema -- No --> cacheSchema
+    doesSchemaHaveMetaSchema -- No --> cacheSchema 
 
-    cacheSchema --> validateObject --> ok
+    cacheSchema --> validateObject
+    validateObject --> ok
 ```
