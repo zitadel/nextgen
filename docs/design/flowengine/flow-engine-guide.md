@@ -331,26 +331,25 @@ Steps can declare server-side behavior directly as properties:
 
 When the engine reaches this step, it sends a verification code to the user's email (from collected data). The step renders a code input field. On successful verification, the engine follows the `submit` transition.
 
-### `action` — server-side mutation
+### `on_success` — server-side mutation
 
 ```json
 {
   "name": "verify_email",
   "verify": "email",
-  "action": "create_user",
+  "on_success": "create_user",
   "transitions": {
     "submit": { "target": "done" }
   }
 }
 ```
 
-The `action` runs **after** the step succeeds (fields validated, verification passed) and **before** the transition fires. Common actions:
+The `on_success` mutation runs **after** the step succeeds (fields validated, verification passed) and **before** the transition fires. Possible values:
 
 | Action | What it does |
 |---|---|
 | `create_user` | Creates the user from accumulated schema data |
 | `reset_credential` | Resets the password or other credential |
-| `link_account` | Links an external IdP identity to the user |
 
 ### `complete` — terminal step
 
@@ -367,7 +366,7 @@ A step with `complete` set is the terminal state. No fields, no actions, no tran
 The engine evaluates assurance policy **after every submit** — no explicit policy check nodes in the definition.
 
 After the user submits a step:
-1. Engine validates fields and runs any `verify`/`action` logic
+1. Engine validates fields and runs any `verify`/`on_success` logic
 2. Engine checks: does the session's `assurance_levels[]` meet the target ACR?
 3. **If yes** → skip to `complete` (regardless of what the transition says)
 4. **If no** → follow the defined transition, or inject a step dynamically if additional factors are needed
@@ -646,7 +645,7 @@ graph TD
     subgraph "Registration Flow (default-register)"
         profile["profile<br>(email, given_name, family_name)"]
         set_pwd["set_password<br>(password)"]
-        verify["verify_email<br>(verify: email, action: create_user)"]
+        verify["verify_email<br>(verify: email, on_success: create_user)"]
         reg_done["done (show)"]
 
         profile -->|submit| set_pwd

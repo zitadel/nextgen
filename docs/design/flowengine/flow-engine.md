@@ -114,8 +114,8 @@ When the flow completes after a pivot (e.g., registration with a pending `auth_r
 | Purpose | Completion condition |
 |---|---|
 | `login` / `reauth` | Session `assurance_levels[]` includes the target ACR (implicit policy evaluation) |
-| `register` | `action: "create_user"` creates user + session; implicit policy check passes |
-| `recovery` | `action: "reset_credential"` resets the credential |
+| `register` | `on_success: "create_user"` creates user + session; implicit policy check passes |
+| `recovery` | `on_success: "reset_credential"` resets the credential |
 | `profiling` | User has required schema fields filled |
 
 ## Flow Pivot (Cross-Flow Navigation)
@@ -270,7 +270,7 @@ If the policy requires MFA, the engine would instead respond with a dynamically 
     {
       "name": "verify_email",
       "verify": "email",
-      "action": "create_user",
+      "on_success": "create_user",
       "transitions": {
         "submit": { "target": "done" }
       }
@@ -425,7 +425,7 @@ A single flow that handles both login and registration using implicit outcomes f
     {
       "name": "verify_email",
       "verify": "email",
-      "action": "create_user",
+      "on_success": "create_user",
       "transitions": {
         "submit": { "target": "done" }
       }
@@ -577,7 +577,7 @@ GET /flows/sess_2
     {
       "name": "verify_email",
       "verify": "email",
-      "action": "create_user",
+      "on_success": "create_user",
       "transitions": {
         "submit": { "target": "done" }
       }

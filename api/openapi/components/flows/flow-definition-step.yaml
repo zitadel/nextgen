@@ -66,12 +66,16 @@ properties:
       The step auto-transitions on successful verification.
     example: email
 
-  action:
+  on_success:
     type: string
+    enum: [create_user, reset_credential]
     description: |
       Server-side mutation to execute when this step completes successfully.
       Runs after field validation and verification (if any) pass, before
       the transition fires.
+
+      - create_user: creates the user record (registration flows)
+      - reset_credential: replaces a stored credential (recovery flows)
     example: create_user
 
   complete:

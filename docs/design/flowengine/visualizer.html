@@ -883,7 +883,7 @@ const FLOWS = {
       {
         name: "verify_email",
         verify: "email",
-        action: "create_user",
+        on_success: "create_user",
         transitions: { submit: { target: "done" } }
       },
       { name: "done", complete: "show" }
@@ -912,7 +912,7 @@ const FLOWS = {
       },
       {
         name: "new_password",
-        action: "reset_credential",
+        on_success: "reset_credential",
         fields: ["password"],
         transitions: { submit: { target: "done" } }
       },
@@ -1005,7 +1005,7 @@ const FLOWS = {
       {
         name: "verify_email",
         verify: "email",
-        action: "create_user",
+        on_success: "create_user",
         transitions: { submit: { target: "done" } }
       },
       { name: "done", complete: "redirect" }
@@ -1055,7 +1055,7 @@ const FLOWS = {
       {
         name: "verify_email",
         verify: "email",
-        action: "create_user",
+        on_success: "create_user",
         transitions: { submit: { target: "done" } }
       },
       { name: "done", complete: "show" }
@@ -1423,7 +1423,7 @@ async function renderDiagram() {
     }
 
     if (step.verify) label += `<br/>verify: ${step.verify}`;
-    if (step.action) label += `<br/>action: ${step.action}`;
+    if (step.on_success) label += `<br/>on_success: ${step.on_success}`;
     // Detect callback-only steps (SSO redirect, etc.)
     const isCallbackStep = step.transitions && 'callback' in step.transitions &&
       (!step.fields || (Array.isArray(step.fields) ? step.fields.length === 0 : Object.keys(step.fields).length === 0)) &&
@@ -1649,7 +1649,7 @@ function buildStepPayload(step) {
 
   if (step.sso_providers?.length > 0) payload.sso_providers = step.sso_providers;
   if (step.verify) payload.verify = step.verify;
-  if (step.action) payload.action = step.action;
+  if (step.on_success) payload.on_success = step.on_success;
   if (simState.error) payload.error = simState.error;
   return payload;
 }
@@ -2003,11 +2003,11 @@ Renders code input. Validates on submit.</div>
   }
 
   let actionHtml = '';
-  if (step.action) {
+  if (step.on_success) {
     actionHtml = `
       <div class="sim-resolved-section">
-        <div class="sim-resolved-label">Action (post-submit)</div>
-        <div class="sim-resolved-json">Engine executes <span class="str">"${step.action}"</span> after validation/verification passes, before transition fires.</div>
+        <div class="sim-resolved-label">on_success (post-submit)</div>
+        <div class="sim-resolved-json">Engine executes <span class="str">"${step.on_success}"</span> after validation/verification passes, before transition fires.</div>
       </div>`;
   }
 
