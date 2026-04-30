@@ -104,7 +104,11 @@ function isErrnoException(error: unknown): error is NodeJS.ErrnoException {
 
 function isNetworkError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
-  if (error.name === "TypeError" && /fetch failed|network|ECONNREFUSED|ENOTFOUND/i.test(error.message)) return true;
+  if (
+    error.name === "TypeError" &&
+    /fetch failed|network|ECONNREFUSED|ENOTFOUND/i.test(error.message)
+  )
+    return true;
   const cause = (error as { cause?: unknown }).cause;
   if (cause && typeof cause === "object" && "code" in cause) {
     const code = String((cause as { code: unknown }).code);

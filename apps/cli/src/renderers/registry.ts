@@ -16,14 +16,23 @@ export function getRenderer(id: string): RendererSpec {
   }
   const renderer = RENDERERS[id];
   if (renderer.status === "not-implemented") {
-    throw new ZitadelError("E_NOT_IMPLEMENTED", `Renderer "${id}" is declared but not yet published`, {
-      hint: "Use --renderer react for now; the <zitadel-flow> web component ships in a later package.",
-    });
+    throw new ZitadelError(
+      "E_NOT_IMPLEMENTED",
+      `Renderer "${id}" is declared but not yet published`,
+      {
+        hint: "Use --renderer react for now; the <zitadel-flow> web component ships in a later package.",
+      },
+    );
   }
   return renderer;
 }
 
-export function listRenderers(): Array<{ id: RendererId; status: string; frameworks: string[]; displayName: string }> {
+export function listRenderers(): Array<{
+  id: RendererId;
+  status: string;
+  frameworks: string[];
+  displayName: string;
+}> {
   return Object.values(RENDERERS).map((renderer) => ({
     id: renderer.id,
     status: renderer.status,

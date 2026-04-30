@@ -1,0 +1,28 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compileOnSave": false,
+  "files": [],
+  "references": [
+    {
+      "path": "./apps/console"
+    },
+    {
+      "path": "./apps/console-e2e"
+    },
+    {
+      "path": "./packages/components"
+    },
+    {
+      "path": "./packages/lint"
+    },
+    {
+      "path": "./packages/sdk-core"
+    },
+    {
+      "path": "./packages/sdk-next"
+    },
+    {
+      "path": "./apps/cli"
+    }
+  ]
+}

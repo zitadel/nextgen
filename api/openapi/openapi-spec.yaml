@@ -42,10 +42,19 @@ paths:
     $ref: endpoints/readyz/methods.yaml
   /user:
     $ref: endpoints/users/methods.yaml
+  /flow:
+    $ref: endpoints/flow/methods.yaml
+  /flow/{id}:
+    $ref: endpoints/flow/session/methods.yaml
+  /flow/{id}/submit:
+    $ref: endpoints/flow/submit/methods.yaml
+  /flow/{id}/event:
+    $ref: endpoints/flow/event/methods.yaml
 
 components:
-  securitySchemes: 
+  securitySchemes:
     oauth2:
       $ref: security/oauth2.yaml
     usernamePassword:
       $ref: security/username-password.yaml
+

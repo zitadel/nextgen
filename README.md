@@ -5,10 +5,10 @@ Next iteration of the Zitadel identity platform.
 ## Current status
 
 This repository is pre-release. The Go server release path is wired through
-GoReleaser, but `main.go` is still a placeholder and the embedded console
-directory contains only `apps/console/dist/.gitkeep` in clean checkouts. The
-CLI and SDK packages are also pre-release; CI produces installable snapshots for
-review, not official releases.
+GoReleaser, but `main.go` is still a placeholder. The frontend workspace is now
+managed by Nx and includes a Vite React console shell, shared components, SDKs,
+and the agent-facing CLI. CI produces installable snapshots for review, not
+official releases.
 
 ## Local checks
 
@@ -18,9 +18,7 @@ Use Node.js from [.nvmrc](.nvmrc) and the pinned pnpm 10 workspace manager from
 ```sh
 corepack pnpm --version
 corepack pnpm install --frozen-lockfile
-corepack pnpm -r typecheck
-corepack pnpm -r test
-corepack pnpm -r build
+corepack pnpm nx run-many -t lint,typecheck,build,test
 
 go vet ./...
 go test ./...
@@ -29,8 +27,8 @@ go test ./...
 Package smoke checks:
 
 ```sh
-node apps/cli/dist/zitadel.js --version
-node apps/cli/dist/zitadel.js capabilities --json
+node apps/cli/dist/zitadel.mjs --version
+node apps/cli/dist/zitadel.mjs capabilities --json
 
 (cd apps/cli && npm pack --dry-run)
 (cd packages/sdk-core && npm pack --dry-run)
@@ -42,7 +40,7 @@ node apps/cli/dist/zitadel.js capabilities --json
 Pull requests and pushes to `main` run:
 
 - Go vet and tests.
-- pnpm install, typecheck, tests, and builds.
+- pnpm install and Nx lint/typecheck/build/test targets.
 - Built CLI smoke checks.
 - npm package dry-run/pack checks.
 - A non-publishing GoReleaser snapshot.
@@ -53,11 +51,17 @@ release artifacts.
 
 ## Build & release
 
-This monorepo ships three artifact families on independent cadences. The full rationale lives in [docs/adrs/002-multi-package-release-strategy.md](docs/adrs/002-multi-package-release-strategy.md).
+This monorepo separates Go release artifacts, console build output, and npm
+package artifacts. The full rationale lives in
+[docs/adrs/002-multi-package-release-strategy.md](docs/adrs/002-multi-package-release-strategy.md).
 
-### Go server binary + embedded console (`goreleaser`)
+### Go server binary + console build (`goreleaser`)
 
-The `nextgen` binary embeds the React console SPA built by Vite at `apps/console/dist/`. In clean checkouts the embed dir holds only `.gitkeep`; build the SPA first to ship a real UI.
+GoReleaser builds the React console SPA through Nx before packaging snapshots:
+`corepack pnpm nx build @zitadel-nextgen/console`. Server-side console serving
+and Go `//go:embed` wiring are still follow-up work, so snapshot builds verify
+that the console can be produced but do not yet expose it from the placeholder
+server.
 
 ```sh
 # Local snapshot (no publish, no signing)

@@ -1,0 +1,14 @@
+name: _zflow
+in: cookie
+required: true
+description: |
+  Encrypted flow state cookie set by `POST /flow` or the previous
+  `POST /flow/{id}/submit`. The cookie holds a map of flow states keyed
+  by flow ID, allowing multiple concurrent flows in the same browser
+  (e.g. login in one tab, registration in another). The server uses the
+  `{id}` path parameter to look up the correct flow state from the cookie.
+
+  Browsers send this automatically; non-browser clients must capture the
+  `Set-Cookie` header and resend it.
+schema:
+  type: string

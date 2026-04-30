@@ -23,14 +23,27 @@ abstract class BaseDeployAdapter implements DeployAdapter {
 
   abstract detect(cwd: string): Promise<boolean>;
   abstract projectLinked(cwd: string): Promise<boolean>;
-  abstract configurePreviewEnv(cwd: string, vars: DeployEnvVars, opts?: { dryRun?: boolean }): Promise<DeployConfigureResult>;
-  abstract configureProductionEnv(cwd: string, vars: DeployEnvVars, opts?: { dryRun?: boolean }): Promise<DeployConfigureResult>;
+  abstract configurePreviewEnv(
+    cwd: string,
+    vars: DeployEnvVars,
+    opts?: { dryRun?: boolean },
+  ): Promise<DeployConfigureResult>;
+  abstract configureProductionEnv(
+    cwd: string,
+    vars: DeployEnvVars,
+    opts?: { dryRun?: boolean },
+  ): Promise<DeployConfigureResult>;
 
   async status(cwd: string): Promise<DeployStatus> {
     const detected = await this.detect(cwd);
     const cli = this.hasCli() ? "available" : "missing";
-    const auth = cli === "available" ? (this.isAuthenticated(cwd) ? "authenticated" : "missing") : "unknown";
-    const project = detected ? ((await this.projectLinked(cwd)) ? "linked" : "unlinked") : "unknown";
+    const auth =
+      cli === "available" ? (this.isAuthenticated(cwd) ? "authenticated" : "missing") : "unknown";
+    const project = detected
+      ? (await this.projectLinked(cwd))
+        ? "linked"
+        : "unlinked"
+      : "unknown";
     const state = stateFrom({ detected, cli, auth, project });
     return {
       platform: this.id,
@@ -40,7 +53,8 @@ abstract class BaseDeployAdapter implements DeployAdapter {
       project,
       state,
       preview_origins: this.previewOrigins,
-      manual_steps: state === "ready" ? [] : this.manualInstructions("preview", placeholderPreviewVars()),
+      manual_steps:
+        state === "ready" ? [] : this.manualInstructions("preview", placeholderPreviewVars()),
     };
   }
 
@@ -69,7 +83,9 @@ export class VercelDeployAdapter extends BaseDeployAdapter {
   readonly command = "vercel";
 
   async detect(cwd: string): Promise<boolean> {
-    return (await exists(join(cwd, "vercel.json"))) || (await exists(join(cwd, ".vercel/project.json")));
+    return (
+      (await exists(join(cwd, "vercel.json"))) || (await exists(join(cwd, ".vercel/project.json")))
+    );
   }
 
   async projectLinked(cwd: string): Promise<boolean> {
@@ -92,17 +108,39 @@ export class VercelDeployAdapter extends BaseDeployAdapter {
     return `vercel env add ${key} ${environment}`;
   }
 
-  private async configure(cwd: string, environment: DeployEnvironment, vars: DeployEnvVars, opts: { dryRun?: boolean }) {
+  private async configure(
+    cwd: string,
+    environment: DeployEnvironment,
+    vars: DeployEnvVars,
+    opts: { dryRun?: boolean },
+  ) {
     const status = await this.status(cwd);
     if (opts.dryRun || status.state !== "ready") {
-      return configureResult(this.id, environment, false, status.state, status.state === "ready" ? [] : this.manualInstructions(environment, vars), vars);
+      return configureResult(
+        this.id,
+        environment,
+        false,
+        status.state,
+        status.state === "ready" ? [] : this.manualInstructions(environment, vars),
+        vars,
+      );
     }
 
     for (const [key, value] of Object.entries(vars)) {
       this.runner(this.command, ["env", "rm", key, environment, "--yes"], { cwd });
-      const result = this.runner(this.command, ["env", "add", key, environment], { cwd, input: `${value}\n` });
+      const result = this.runner(this.command, ["env", "add", key, environment], {
+        cwd,
+        input: `${value}\n`,
+      });
       if (result.status !== 0) {
-        return configureResult(this.id, environment, false, "not-linked", this.manualInstructions(environment, vars), vars);
+        return configureResult(
+          this.id,
+          environment,
+          false,
+          "not-linked",
+          this.manualInstructions(environment, vars),
+          vars,
+        );
       }
     }
 
@@ -117,7 +155,9 @@ export class NetlifyDeployAdapter extends BaseDeployAdapter {
   readonly command = "netlify";
 
   async detect(cwd: string): Promise<boolean> {
-    return (await exists(join(cwd, "netlify.toml"))) || (await exists(join(cwd, ".netlify/state.json")));
+    return (
+      (await exists(join(cwd, "netlify.toml"))) || (await exists(join(cwd, ".netlify/state.json")))
+    );
   }
 
   async projectLinked(cwd: string): Promise<boolean> {
@@ -141,17 +181,38 @@ export class NetlifyDeployAdapter extends BaseDeployAdapter {
     return `netlify env:set ${key} <value> --context ${context}`;
   }
 
-  private async configure(cwd: string, environment: DeployEnvironment, vars: DeployEnvVars, opts: { dryRun?: boolean }) {
+  private async configure(
+    cwd: string,
+    environment: DeployEnvironment,
+    vars: DeployEnvVars,
+    opts: { dryRun?: boolean },
+  ) {
     const status = await this.status(cwd);
     if (opts.dryRun || status.state !== "ready") {
-      return configureResult(this.id, environment, false, status.state, status.state === "ready" ? [] : this.manualInstructions(environment, vars), vars);
+      return configureResult(
+        this.id,
+        environment,
+        false,
+        status.state,
+        status.state === "ready" ? [] : this.manualInstructions(environment, vars),
+        vars,
+      );
     }
 
     const context = environment === "preview" ? "deploy-preview" : "production";
     for (const [key, value] of Object.entries(vars)) {
-      const result = this.runner(this.command, ["env:set", key, value, "--context", context], { cwd });
+      const result = this.runner(this.command, ["env:set", key, value, "--context", context], {
+        cwd,
+      });
       if (result.status !== 0) {
-        return configureResult(this.id, environment, false, "not-linked", this.manualInstructions(environment, vars), vars);
+        return configureResult(
+          this.id,
+          environment,
+          false,
+          "not-linked",
+          this.manualInstructions(environment, vars),
+          vars,
+        );
       }
     }
 
@@ -189,16 +250,38 @@ export class CloudflareDeployAdapter extends BaseDeployAdapter {
     return `wrangler pages secret put ${key}`;
   }
 
-  private async configure(cwd: string, environment: DeployEnvironment, vars: DeployEnvVars, opts: { dryRun?: boolean }) {
+  private async configure(
+    cwd: string,
+    environment: DeployEnvironment,
+    vars: DeployEnvVars,
+    opts: { dryRun?: boolean },
+  ) {
     const status = await this.status(cwd);
     if (opts.dryRun || status.state !== "ready") {
-      return configureResult(this.id, environment, false, status.state, status.state === "ready" ? [] : this.manualInstructions(environment, vars), vars);
+      return configureResult(
+        this.id,
+        environment,
+        false,
+        status.state,
+        status.state === "ready" ? [] : this.manualInstructions(environment, vars),
+        vars,
+      );
     }
 
     for (const [key, value] of Object.entries(vars)) {
-      const result = this.runner(this.command, ["pages", "secret", "put", key], { cwd, input: `${value}\n` });
+      const result = this.runner(this.command, ["pages", "secret", "put", key], {
+        cwd,
+        input: `${value}\n`,
+      });
       if (result.status !== 0) {
-        return configureResult(this.id, environment, false, "not-linked", this.manualInstructions(environment, vars), vars);
+        return configureResult(
+          this.id,
+          environment,
+          false,
+          "not-linked",
+          this.manualInstructions(environment, vars),
+          vars,
+        );
       }
     }
 
@@ -241,8 +324,14 @@ export class NoDeployAdapter implements DeployAdapter {
   }
 }
 
-export function createDeployAdapters(runner: CommandRunner = defaultCommandRunner): DeployAdapter[] {
-  return [new VercelDeployAdapter(runner), new NetlifyDeployAdapter(runner), new CloudflareDeployAdapter(runner)];
+export function createDeployAdapters(
+  runner: CommandRunner = defaultCommandRunner,
+): DeployAdapter[] {
+  return [
+    new VercelDeployAdapter(runner),
+    new NetlifyDeployAdapter(runner),
+    new CloudflareDeployAdapter(runner),
+  ];
 }
 
 function stateFrom(input: {
@@ -289,7 +378,12 @@ async function exists(path: string): Promise<boolean> {
     await stat(path);
     return true;
   } catch (error) {
-    if (typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "ENOENT") {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      (error as { code?: string }).code === "ENOENT"
+    ) {
       return false;
     }
     throw error;

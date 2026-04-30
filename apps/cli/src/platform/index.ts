@@ -1,6 +1,6 @@
+import type { PlatformClient } from "./client";
 import { HttpPlatformClient } from "./http-client";
 import { MockPlatformClient } from "./mock-client";
-import type { PlatformClient } from "./client";
 import { MOCK_SENTINEL } from "./resolve-server";
 
 export { DEFAULT_SERVER, MOCK_SENTINEL, resolveServer } from "./resolve-server";

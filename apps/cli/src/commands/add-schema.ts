@@ -7,7 +7,13 @@ import { ZitadelError } from "../lib/errors";
 import { parseJsonObject, stableStringify } from "../lib/json";
 import { validateFieldAnnotations } from "../schema/annotations";
 import { listNamedPresets, resolveNamedPreset } from "../schema/default";
-import { addFields, addFieldFromJson, parseAddFieldSpec, removeFields, type AddFieldSpec } from "../schema/merge";
+import {
+  addFields,
+  addFieldFromJson,
+  parseAddFieldSpec,
+  removeFields,
+  type AddFieldSpec,
+} from "../schema/merge";
 import { validateJsonSchema } from "../schema/validate";
 
 export type AddSchemaOptions = GlobalOptions & {
@@ -42,7 +48,9 @@ export async function runAddSchema(io: CliIO, opts: AddSchemaOptions): Promise<v
         throw new ZitadelError(
           "E_VALIDATION",
           `--add-field-json #${index + 1} is not valid JSON: ${error instanceof Error ? error.message : String(error)}`,
-          { hint: "Pass a JSON object, e.g. --add-field-json '{\"name\":\"phone\",\"type\":\"string\"}'" },
+          {
+            hint: 'Pass a JSON object, e.g. --add-field-json \'{"name":"phone","type":"string"}\'',
+          },
         );
       }
     }),
@@ -57,13 +65,19 @@ export async function runAddSchema(io: CliIO, opts: AddSchemaOptions): Promise<v
     next = removeFields(next, removeSpecs);
   }
 
-  const annotationWarnings = addSpecs.flatMap((spec) => validateFieldAnnotations(spec.name, spec.schema));
+  const annotationWarnings = addSpecs.flatMap((spec) =>
+    validateFieldAnnotations(spec.name, spec.schema),
+  );
 
   const validation = validateJsonSchema(next);
   if (!validation.valid) {
-    throw new ZitadelError("E_VALIDATION", `Updated user schema is invalid: ${validation.errors.join(", ")}`, {
-      details: { errors: validation.errors },
-    });
+    throw new ZitadelError(
+      "E_VALIDATION",
+      `Updated user schema is invalid: ${validation.errors.join(", ")}`,
+      {
+        details: { errors: validation.errors },
+      },
+    );
   }
 
   const beforeText = `${stableStringify(before)}\n`;
