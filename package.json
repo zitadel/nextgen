@@ -6,10 +6,12 @@
     "build": "corepack pnpm -r build",
     "typecheck": "corepack pnpm -r typecheck",
     "test": "corepack pnpm -r test",
+    "format": "prettier --write \"**/*.{ts,tsx,vue,json}\"",
     "zitadel": "node scripts/zitadel-dev.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",
+    "prettier": "^3.8.3",
     "tsup": "^8.3.5",
     "typescript": "^5.7.3",
     "vitest": "^2.1.8"

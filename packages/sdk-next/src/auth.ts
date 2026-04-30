@@ -43,9 +43,7 @@ export async function auth(): Promise<AuthResult> {
       return { isAuthenticated: false, session: null };
     }
 
-    const payload = JSON.parse(
-      new TextDecoder().decode(base64UrlDecode(parts[1])),
-    ) as JwtPayload;
+    const payload = JSON.parse(new TextDecoder().decode(base64UrlDecode(parts[1]))) as JwtPayload;
 
     return {
       isAuthenticated: true,

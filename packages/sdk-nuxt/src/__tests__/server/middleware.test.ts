@@ -7,11 +7,7 @@ function base64url(buf: Buffer): string {
   return buf.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-function makeJwt(
-  payload: Record<string, unknown>,
-  privateKeyPem: string,
-  kid: string,
-): string {
+function makeJwt(payload: Record<string, unknown>, privateKeyPem: string, kid: string): string {
   const header = base64url(Buffer.from(JSON.stringify({ alg: "RS256", typ: "JWT", kid })));
   const body = base64url(Buffer.from(JSON.stringify(payload)));
   const signing = `${header}.${body}`;
@@ -42,7 +38,10 @@ describe("createNextgenMiddleware (H3)", () => {
   });
 
   it("public route with no cookie sets nextgenAuth to unauthenticated", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(jwksResponse), { status: 200 })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response(JSON.stringify(jwksResponse), { status: 200 })),
+    );
 
     const app = createApp();
     app.use(
@@ -66,7 +65,10 @@ describe("createNextgenMiddleware (H3)", () => {
   });
 
   it("protected route with no cookie redirects to /login?next=/admin", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(jwksResponse), { status: 200 })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response(JSON.stringify(jwksResponse), { status: 200 })),
+    );
 
     const app = createApp();
     app.use(
@@ -96,9 +98,7 @@ describe("createNextgenMiddleware (H3)", () => {
 
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(
-        new Response(JSON.stringify(jwksResponse), { status: 200 }),
-      ),
+      vi.fn().mockResolvedValue(new Response(JSON.stringify(jwksResponse), { status: 200 })),
     );
 
     const app = createApp();
@@ -117,7 +117,9 @@ describe("createNextgenMiddleware (H3)", () => {
     });
 
     const handler = toWebHandler(app);
-    const res = await handler(makeWebRequest("http://localhost:3000/admin", `__nextgen_session=${token}`));
+    const res = await handler(
+      makeWebRequest("http://localhost:3000/admin", `__nextgen_session=${token}`),
+    );
     expect(res.status).not.toBe(302);
     expect((capturedAuth as { isAuthenticated: boolean }).isAuthenticated).toBe(true);
   });
@@ -134,9 +136,7 @@ describe("createNextgenMiddleware (H3)", () => {
 
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(
-        new Response(JSON.stringify(jwksResponse), { status: 200 }),
-      ),
+      vi.fn().mockResolvedValue(new Response(JSON.stringify(jwksResponse), { status: 200 })),
     );
 
     const app = createApp();
@@ -150,7 +150,9 @@ describe("createNextgenMiddleware (H3)", () => {
     app.use("/admin", () => ({ ok: true }));
 
     const handler = toWebHandler(app);
-    const res = await handler(makeWebRequest("http://localhost:3000/admin", `__nextgen_session=${tamperedToken}`));
+    const res = await handler(
+      makeWebRequest("http://localhost:3000/admin", `__nextgen_session=${tamperedToken}`),
+    );
     expect(res.status).toBe(302);
     const location = res.headers.get("location") ?? "";
     expect(location).toContain("/login");

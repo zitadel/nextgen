@@ -1,4 +1,10 @@
-import { defineNuxtModule, addPlugin, addServerHandler, addImportsDir, createResolver } from "@nuxt/kit";
+import {
+  defineNuxtModule,
+  addPlugin,
+  addServerHandler,
+  addImportsDir,
+  createResolver,
+} from "@nuxt/kit";
 import type { NextgenModuleOptions } from "./runtime/types";
 
 export default defineNuxtModule<NextgenModuleOptions>({

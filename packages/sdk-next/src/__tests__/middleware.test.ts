@@ -7,11 +7,7 @@ function base64url(buf: Buffer): string {
   return buf.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-function makeJwt(
-  payload: Record<string, unknown>,
-  privateKeyPem: string,
-  kid: string,
-): string {
+function makeJwt(payload: Record<string, unknown>, privateKeyPem: string, kid: string): string {
   const header = base64url(Buffer.from(JSON.stringify({ alg: "RS256", typ: "JWT", kid })));
   const body = base64url(Buffer.from(JSON.stringify(payload)));
   const signing = `${header}.${body}`;
@@ -43,7 +39,10 @@ describe("nextgenMiddleware", () => {
   });
 
   it("public route with no token passes through without x-nextgen-auth-token", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(jwksResponse), { status: 200 })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response(JSON.stringify(jwksResponse), { status: 200 })),
+    );
 
     const req = makeRequest("http://localhost:3000/");
     const res = await nextgenMiddleware(req, {
@@ -59,7 +58,10 @@ describe("nextgenMiddleware", () => {
   });
 
   it("protected route with no token redirects to /login?next=/admin", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(jwksResponse), { status: 200 })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response(JSON.stringify(jwksResponse), { status: 200 })),
+    );
 
     const req = makeRequest("http://localhost:3000/admin");
     const res = await nextgenMiddleware(req, {
@@ -82,7 +84,10 @@ describe("nextgenMiddleware", () => {
       testKid,
     );
 
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(jwksResponse), { status: 200 })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response(JSON.stringify(jwksResponse), { status: 200 })),
+    );
 
     const req = makeRequest("http://localhost:3000/admin", `__nextgen_session=${token}`);
     const res = await nextgenMiddleware(req, {
@@ -104,7 +109,10 @@ describe("nextgenMiddleware", () => {
       testKid,
     );
 
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(jwksResponse), { status: 200 })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response(JSON.stringify(jwksResponse), { status: 200 })),
+    );
 
     const req = makeRequest("http://localhost:3000/admin", undefined, `Bearer ${token}`);
     const res = await nextgenMiddleware(req, {
@@ -128,7 +136,10 @@ describe("nextgenMiddleware", () => {
     const parts = validToken.split(".");
     const tamperedToken = `${parts[0]}.${parts[1]}.invalidsignatureXXX`;
 
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(jwksResponse), { status: 200 })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response(JSON.stringify(jwksResponse), { status: 200 })),
+    );
 
     const req = makeRequest("http://localhost:3000/admin", `__nextgen_session=${tamperedToken}`);
     const res = await nextgenMiddleware(req, {

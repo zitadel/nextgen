@@ -23,11 +23,7 @@ export function NextgenProvider({
     value = { isAuthenticated: true, session: session as NextgenSession };
   }
 
-  return (
-    <NextgenAuthContext.Provider value={value}>
-      {children}
-    </NextgenAuthContext.Provider>
-  );
+  return <NextgenAuthContext.Provider value={value}>{children}</NextgenAuthContext.Provider>;
 }
 
 export function useAuthContext(): AuthResult {

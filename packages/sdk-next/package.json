@@ -31,7 +31,9 @@
       "import": "./dist/middleware.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "publishConfig": {
     "access": "public"
   },
