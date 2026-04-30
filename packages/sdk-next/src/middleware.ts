@@ -159,6 +159,31 @@ async function proxyRequest(
     }
   }
 
+  // X-Forwarded-For: append the direct client IP to preserve the hop chain.
+  // Next.js / Vercel sets `req.ip` at runtime but it is not in the public
+  // TypeScript types, so we cast to reach it. Fall back to X-Real-IP (nginx).
+  const clientIp =
+    (req as unknown as { ip?: string }).ip ?? req.headers.get("x-real-ip");
+  if (clientIp) {
+    const existing = upstreamHeaders.get("x-forwarded-for");
+    upstreamHeaders.set(
+      "x-forwarded-for",
+      existing ? `${existing}, ${clientIp}` : clientIp,
+    );
+  }
+
+  // X-Forwarded-Host: tell the upstream which host the client originally
+  // requested. Only set when not already present — a CDN may have set it first.
+  if (!upstreamHeaders.has("x-forwarded-host")) {
+    upstreamHeaders.set("x-forwarded-host", new URL(req.url).host);
+  }
+
+  // X-Forwarded-Proto: tell the upstream whether the client used http or https.
+  // Strip the trailing colon from `URL.protocol` ("https:" -> "https").
+  if (!upstreamHeaders.has("x-forwarded-proto")) {
+    upstreamHeaders.set("x-forwarded-proto", new URL(req.url).protocol.replace(":", ""));
+  }
+
   const hasBody = !["GET", "HEAD"].includes(req.method);
 
   const upstream = await fetch(target, {
