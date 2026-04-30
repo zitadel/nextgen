@@ -31,6 +31,19 @@ func (UnimplementedHandler) AuthorizeGet(ctx context.Context, params AuthorizeGe
 	return r, ht.ErrNotImplemented
 }
 
+// CreateAuthAttempt implements createAuthAttempt operation.
+//
+// Starts a new authentication attempt. This is the entry point for the auth_attempts state machine.
+// An attempt is an ephemeral (15-minute TTL) state machine that drives a single authentication round.
+// It accepts factor challenges, verifies proofs, and completes into a session or handoff token.
+// Accepts a project_id and challenge_nonce (from POST /bootstrap/challenge). For step-up re-auth,
+// also include session_id to add factors to an existing session.
+//
+// POST /auth_attempts
+func (UnimplementedHandler) CreateAuthAttempt(ctx context.Context, req *CreateAuthAttemptRequest) (r CreateAuthAttemptRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // CreateFlow implements createFlow operation.
 //
 // Resolves a flow definition based on purpose + audience context and returns
@@ -48,12 +61,81 @@ func (UnimplementedHandler) CreateFlow(ctx context.Context, req *CreateFlowReque
 	return r, ht.ErrNotImplemented
 }
 
+// CreateHandoff implements createHandoff operation.
+//
+// Completes the authentication attempt and mints a `handoff_token`.
+// Call this after all required factors have been verified and the attempt is in `completed` state.
+// The handoff token is short-lived (≤60 seconds) and must be exchanged at
+// POST /session_handoffs/{id}/exchange to receive the final session and session_token.
+// The handoff token is:
+// - Single-use (atomic exchange, no retry)
+// - Audience-bound (requires matching project key for exchange)
+// - Idempotency-safe within a 5-minute window (see conventions).
+//
+// POST /auth_attempts/{attempt_id}/handoff
+func (UnimplementedHandler) CreateHandoff(ctx context.Context, params CreateHandoffParams) (r CreateHandoffRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// CreateSession implements createSession operation.
+//
+// Creates an anonymous session shell with no user and no factors (`state: building`).
+// This is optional — an `auth_attempt` will create a session implicitly if none is provided.
+// Use this explicitly when you want to:
+// - Pre-allocate a `session_id` before the user is known, so device/telemetry signals
+// can be correlated with the eventual authenticated session from the start.
+// - Track anonymous state (bot detection, device fingerprint) that survives until authentication.
+// The returned `session_token` authorises GET and DELETE on this session.
+// It is superseded when a handoff exchange completes — clients must replace it at that point.
+// Anonymous sessions expire aggressively (10-minute TTL). The TTL resets to the configured
+// full session TTL when the first authentication factor is written via a completing `auth_attempt`.
+//
+// POST /sessions
+func (UnimplementedHandler) CreateSession(ctx context.Context, req *CreateSessionRequest) (r CreateSessionRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // EndSession implements endSession operation.
 //
 // End a session.
 //
 // GET /auth/end-session
 func (UnimplementedHandler) EndSession(ctx context.Context, params EndSessionParams) (r EndSessionRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// ExchangeHandoff implements exchangeHandoff operation.
+//
+// Consumes a one-time `handoff_token` minted by `POST /auth_attempts/{id}/handoff`
+// and returns the resulting session and a `session_token`.
+// The server resolves the originating `auth_attempt` from the token and then:
+// | Originating auth_attempt | Outcome |
+// |---|---|
+// | No `session_id` | A new authenticated session is **created**. |
+// | `session_id` points to an anonymous shell | Existing session is **upgraded** — user and
+// factors written in, TTL reset to full session TTL. |
+// | `session_id` points to an active session (step-up) | Existing session is **upgraded** — new
+// factors merged, `assurance_levels[]` expanded. |
+// The response shape is identical in all three cases.
+// The `session_token` supersedes any previously issued `session_token` for the same session.
+// Clients must replace their stored token at this point.
+// Requires a project service key (OAuth2 client credentials).
+//
+// POST /sessions/exchange
+func (UnimplementedHandler) ExchangeHandoff(ctx context.Context, req *ExchangeRequest, params ExchangeHandoffParams) (r ExchangeHandoffRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// GetAuthAttempt implements getAuthAttempt operation.
+//
+// Polls the current state of an authentication attempt.
+// Returns the attempt's state, available factors for the next challenge,
+// challenges issued so far, and any errors preventing progress.
+// Use this for polling during long-running factor verifications (e.g., waiting for
+// a federated IdP callback or a device flow).
+//
+// GET /auth_attempts/{attempt_id}
+func (UnimplementedHandler) GetAuthAttempt(ctx context.Context, params GetAuthAttemptParams) (r GetAuthAttemptRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -112,6 +194,19 @@ func (UnimplementedHandler) GetReady(ctx context.Context) (r GetReadyRes, _ erro
 	return r, ht.ErrNotImplemented
 }
 
+// GetSession implements getSession operation.
+//
+// Returns the current state of a session including its factors and all currently
+// satisfied assurance levels.
+// `assurance_levels[]` may shrink over time as factor freshness windows expire,
+// without the session itself expiring. Use step-up authentication (a new `auth_attempt`
+// against the same `session_id`) to restore a dropped assurance level.
+//
+// GET /sessions/{session_id}
+func (UnimplementedHandler) GetSession(ctx context.Context, params GetSessionParams) (r GetSessionRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // GetToken implements getToken operation.
 //
 // Get accesstoken.
@@ -139,12 +234,46 @@ func (UnimplementedHandler) Introspect(ctx context.Context, req *IntrospectReque
 	return r, ht.ErrNotImplemented
 }
 
+// IssueChallenge implements issueChallenge operation.
+//
+// Issues a single-factor verification challenge within an auth attempt.
+// This advances the authentication state machine by requesting a specific factor method
+// (password, passkey, TOTP, OTP via SMS, etc.). The server responds with challenge details
+// including method, metadata, and any UI hints. The client then verifies the proof
+// by calling POST /auth_attempts/{id}/challenges/{cid}/verify.
+//
+// POST /auth_attempts/{attempt_id}/challenges
+func (UnimplementedHandler) IssueChallenge(ctx context.Context, req *IssueChallengeRequest, params IssueChallengeParams) (r IssueChallengeRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// ListSessions implements listSessions operation.
+//
+// Returns a paginated list of sessions for a project.
+// Requires a project service key (OAuth2 client credentials).
+//
+// GET /sessions
+func (UnimplementedHandler) ListSessions(ctx context.Context, params ListSessionsParams) (r ListSessionsRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // ListUsers implements listUsers operation.
 //
 // List users.
 //
 // GET /user
 func (UnimplementedHandler) ListUsers(ctx context.Context, params ListUsersParams) (r ListUsersRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// RevokeSession implements revokeSession operation.
+//
+// Revokes the session immediately (`state: revoked`). This is the logout operation.
+// The session_token issued at creation (or superseded by a handoff exchange) is required.
+// After revocation, any tokens derived from this session are invalidated.
+//
+// DELETE /sessions/{session_id}
+func (UnimplementedHandler) RevokeSession(ctx context.Context, params RevokeSessionParams) (r RevokeSessionRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -193,5 +322,21 @@ func (UnimplementedHandler) SubmitFlowEvent(ctx context.Context, req *FlowEventR
 //
 // POST /flow/{id}/submit
 func (UnimplementedHandler) SubmitFlowStep(ctx context.Context, req *FlowSubmitRequest, params SubmitFlowStepParams) (r SubmitFlowStepRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// VerifyChallengeProof implements verifyChallengeProof operation.
+//
+// Submits a proof (credential, code, assertion) to verify a factor challenge.
+// The proof format depends on the challenge method. For example:
+// - `password` method: { password: "…" }
+// - `totp` method: { totp: { code: "123456" } }
+// - `passkey` method: { passkey: { assertion: "…" } }
+// - `recovery_code` method: { recovery_code: "…" }
+// On successful verification, the factor is written to the auth attempt.
+// The attempt moves to the next pending challenge or completes if all required factors are verified.
+//
+// POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify
+func (UnimplementedHandler) VerifyChallengeProof(ctx context.Context, req *VerifyChallengeRequest, params VerifyChallengeProofParams) (r VerifyChallengeProofRes, _ error) {
 	return r, ht.ErrNotImplemented
 }

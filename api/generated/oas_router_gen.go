@@ -14,31 +14,51 @@ var (
 	rn3AllowedHeaders = map[string]string{
 		"GET": "Authorization",
 	}
-	rn6AllowedHeaders = map[string]string{
+	rn12AllowedHeaders = map[string]string{
 		"GET": "Authorization",
 	}
-	rn16AllowedHeaders = map[string]string{
+	rn25AllowedHeaders = map[string]string{
 		"POST": "Authorization,Content-Type",
 	}
-	rn18AllowedHeaders = map[string]string{
+	rn29AllowedHeaders = map[string]string{
 		"POST": "Authorization,Content-Type",
 	}
-	rn14AllowedHeaders = map[string]string{
+	rn23AllowedHeaders = map[string]string{
 		"POST": "Authorization,Content-Type",
 	}
-	rn15AllowedHeaders = map[string]string{
+	rn24AllowedHeaders = map[string]string{
 		"GET": "Authorization",
 	}
 	rn5AllowedHeaders = map[string]string{
 		"POST": "Content-Type",
 	}
-	rn19AllowedHeaders = map[string]string{
+	rn27AllowedHeaders = map[string]string{
 		"POST": "Content-Type",
 	}
-	rn21AllowedHeaders = map[string]string{
+	rn35AllowedHeaders = map[string]string{
 		"POST": "Content-Type",
 	}
-	rn17AllowedHeaders = map[string]string{
+	rn7AllowedHeaders = map[string]string{
+		"POST": "Content-Type",
+	}
+	rn30AllowedHeaders = map[string]string{
+		"POST": "Content-Type",
+	}
+	rn32AllowedHeaders = map[string]string{
+		"POST": "Content-Type",
+	}
+	rn11AllowedHeaders = map[string]string{
+		"GET":  "Authorization",
+		"POST": "Content-Type",
+	}
+	rn13AllowedHeaders = map[string]string{
+		"POST": "Authorization,Content-Type,Idempotency-Key",
+	}
+	rn22AllowedHeaders = map[string]string{
+		"DELETE": "Authorization",
+		"GET":    "Authorization",
+	}
+	rn28AllowedHeaders = map[string]string{
 		"GET": "Authorization",
 	}
 )
@@ -73,7 +93,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.notFound(w, r)
 		return
 	}
-	args := [1]string{}
+	args := [2]string{}
 
 	// Static code generated router with unwrapped path search.
 	switch {
@@ -119,9 +139,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 
-			case 'a': // Prefix: "auth/"
+			case 'a': // Prefix: "auth"
 
-				if l := len("auth/"); len(elem) >= l && elem[0:l] == "auth/" {
+				if l := len("auth"); len(elem) >= l && elem[0:l] == "auth" {
 					elem = elem[l:]
 				} else {
 					break
@@ -131,204 +151,401 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					break
 				}
 				switch elem[0] {
-				case 'a': // Prefix: "authorize"
+				case '/': // Prefix: "/"
 
-					if l := len("authorize"); len(elem) >= l && elem[0:l] == "authorize" {
+					if l := len("/"); len(elem) >= l && elem[0:l] == "/" {
 						elem = elem[l:]
 					} else {
 						break
 					}
 
 					if len(elem) == 0 {
-						// Leaf node.
-						switch r.Method {
-						case "GET":
-							s.handleAuthorizeGetRequest([0]string{}, elemIsEscaped, w, r)
-						default:
-							s.notAllowed(w, r, notAllowedParams{
-								allowedMethods: "GET",
-								allowedHeaders: rn3AllowedHeaders,
-								acceptPost:     "",
-								acceptPatch:    "",
-							})
+						break
+					}
+					switch elem[0] {
+					case 'a': // Prefix: "authorize"
+
+						if l := len("authorize"); len(elem) >= l && elem[0:l] == "authorize" {
+							elem = elem[l:]
+						} else {
+							break
 						}
 
-						return
-					}
+						if len(elem) == 0 {
+							// Leaf node.
+							switch r.Method {
+							case "GET":
+								s.handleAuthorizeGetRequest([0]string{}, elemIsEscaped, w, r)
+							default:
+								s.notAllowed(w, r, notAllowedParams{
+									allowedMethods: "GET",
+									allowedHeaders: rn3AllowedHeaders,
+									acceptPost:     "",
+									acceptPatch:    "",
+								})
+							}
 
-				case 'd': // Prefix: "device-authorization"
-
-					if l := len("device-authorization"); len(elem) >= l && elem[0:l] == "device-authorization" {
-						elem = elem[l:]
-					} else {
-						break
-					}
-
-					if len(elem) == 0 {
-						// Leaf node.
-						switch r.Method {
-						case "GET":
-							s.handleAuthorizeDeviceRequest([0]string{}, elemIsEscaped, w, r)
-						default:
-							s.notAllowed(w, r, notAllowedParams{
-								allowedMethods: "GET",
-								allowedHeaders: nil,
-								acceptPost:     "",
-								acceptPatch:    "",
-							})
+							return
 						}
 
-						return
-					}
+					case 'd': // Prefix: "device-authorization"
 
-				case 'e': // Prefix: "end-session"
-
-					if l := len("end-session"); len(elem) >= l && elem[0:l] == "end-session" {
-						elem = elem[l:]
-					} else {
-						break
-					}
-
-					if len(elem) == 0 {
-						// Leaf node.
-						switch r.Method {
-						case "GET":
-							s.handleEndSessionRequest([0]string{}, elemIsEscaped, w, r)
-						default:
-							s.notAllowed(w, r, notAllowedParams{
-								allowedMethods: "GET",
-								allowedHeaders: rn6AllowedHeaders,
-								acceptPost:     "",
-								acceptPatch:    "",
-							})
+						if l := len("device-authorization"); len(elem) >= l && elem[0:l] == "device-authorization" {
+							elem = elem[l:]
+						} else {
+							break
 						}
 
-						return
+						if len(elem) == 0 {
+							// Leaf node.
+							switch r.Method {
+							case "GET":
+								s.handleAuthorizeDeviceRequest([0]string{}, elemIsEscaped, w, r)
+							default:
+								s.notAllowed(w, r, notAllowedParams{
+									allowedMethods: "GET",
+									allowedHeaders: nil,
+									acceptPost:     "",
+									acceptPatch:    "",
+								})
+							}
+
+							return
+						}
+
+					case 'e': // Prefix: "end-session"
+
+						if l := len("end-session"); len(elem) >= l && elem[0:l] == "end-session" {
+							elem = elem[l:]
+						} else {
+							break
+						}
+
+						if len(elem) == 0 {
+							// Leaf node.
+							switch r.Method {
+							case "GET":
+								s.handleEndSessionRequest([0]string{}, elemIsEscaped, w, r)
+							default:
+								s.notAllowed(w, r, notAllowedParams{
+									allowedMethods: "GET",
+									allowedHeaders: rn12AllowedHeaders,
+									acceptPost:     "",
+									acceptPatch:    "",
+								})
+							}
+
+							return
+						}
+
+					case 'i': // Prefix: "introspect"
+
+						if l := len("introspect"); len(elem) >= l && elem[0:l] == "introspect" {
+							elem = elem[l:]
+						} else {
+							break
+						}
+
+						if len(elem) == 0 {
+							// Leaf node.
+							switch r.Method {
+							case "POST":
+								s.handleIntrospectRequest([0]string{}, elemIsEscaped, w, r)
+							default:
+								s.notAllowed(w, r, notAllowedParams{
+									allowedMethods: "POST",
+									allowedHeaders: rn25AllowedHeaders,
+									acceptPost:     "application/x-www-form-urlencoded",
+									acceptPatch:    "",
+								})
+							}
+
+							return
+						}
+
+					case 'k': // Prefix: "keys"
+
+						if l := len("keys"); len(elem) >= l && elem[0:l] == "keys" {
+							elem = elem[l:]
+						} else {
+							break
+						}
+
+						if len(elem) == 0 {
+							// Leaf node.
+							switch r.Method {
+							case "GET":
+								s.handleGetKeysRequest([0]string{}, elemIsEscaped, w, r)
+							default:
+								s.notAllowed(w, r, notAllowedParams{
+									allowedMethods: "GET",
+									allowedHeaders: nil,
+									acceptPost:     "",
+									acceptPatch:    "",
+								})
+							}
+
+							return
+						}
+
+					case 'r': // Prefix: "revoke"
+
+						if l := len("revoke"); len(elem) >= l && elem[0:l] == "revoke" {
+							elem = elem[l:]
+						} else {
+							break
+						}
+
+						if len(elem) == 0 {
+							// Leaf node.
+							switch r.Method {
+							case "POST":
+								s.handleRevokeTokenRequest([0]string{}, elemIsEscaped, w, r)
+							default:
+								s.notAllowed(w, r, notAllowedParams{
+									allowedMethods: "POST",
+									allowedHeaders: rn29AllowedHeaders,
+									acceptPost:     "application/x-www-form-urlencoded",
+									acceptPatch:    "",
+								})
+							}
+
+							return
+						}
+
+					case 't': // Prefix: "token"
+
+						if l := len("token"); len(elem) >= l && elem[0:l] == "token" {
+							elem = elem[l:]
+						} else {
+							break
+						}
+
+						if len(elem) == 0 {
+							// Leaf node.
+							switch r.Method {
+							case "POST":
+								s.handleGetTokenRequest([0]string{}, elemIsEscaped, w, r)
+							default:
+								s.notAllowed(w, r, notAllowedParams{
+									allowedMethods: "POST",
+									allowedHeaders: rn23AllowedHeaders,
+									acceptPost:     "application/x-www-form-urlencoded",
+									acceptPatch:    "",
+								})
+							}
+
+							return
+						}
+
+					case 'u': // Prefix: "userinfo"
+
+						if l := len("userinfo"); len(elem) >= l && elem[0:l] == "userinfo" {
+							elem = elem[l:]
+						} else {
+							break
+						}
+
+						if len(elem) == 0 {
+							// Leaf node.
+							switch r.Method {
+							case "GET":
+								s.handleGetUserInfoRequest([0]string{}, elemIsEscaped, w, r)
+							default:
+								s.notAllowed(w, r, notAllowedParams{
+									allowedMethods: "GET",
+									allowedHeaders: rn24AllowedHeaders,
+									acceptPost:     "",
+									acceptPatch:    "",
+								})
+							}
+
+							return
+						}
+
 					}
 
-				case 'i': // Prefix: "introspect"
+				case '_': // Prefix: "_attempts"
 
-					if l := len("introspect"); len(elem) >= l && elem[0:l] == "introspect" {
+					if l := len("_attempts"); len(elem) >= l && elem[0:l] == "_attempts" {
 						elem = elem[l:]
 					} else {
 						break
 					}
 
 					if len(elem) == 0 {
-						// Leaf node.
 						switch r.Method {
 						case "POST":
-							s.handleIntrospectRequest([0]string{}, elemIsEscaped, w, r)
+							s.handleCreateAuthAttemptRequest([0]string{}, elemIsEscaped, w, r)
 						default:
 							s.notAllowed(w, r, notAllowedParams{
 								allowedMethods: "POST",
-								allowedHeaders: rn16AllowedHeaders,
-								acceptPost:     "application/x-www-form-urlencoded",
+								allowedHeaders: rn5AllowedHeaders,
+								acceptPost:     "application/json",
 								acceptPatch:    "",
 							})
 						}
 
 						return
 					}
+					switch elem[0] {
+					case '/': // Prefix: "/"
 
-				case 'k': // Prefix: "keys"
-
-					if l := len("keys"); len(elem) >= l && elem[0:l] == "keys" {
-						elem = elem[l:]
-					} else {
-						break
-					}
-
-					if len(elem) == 0 {
-						// Leaf node.
-						switch r.Method {
-						case "GET":
-							s.handleGetKeysRequest([0]string{}, elemIsEscaped, w, r)
-						default:
-							s.notAllowed(w, r, notAllowedParams{
-								allowedMethods: "GET",
-								allowedHeaders: nil,
-								acceptPost:     "",
-								acceptPatch:    "",
-							})
+						if l := len("/"); len(elem) >= l && elem[0:l] == "/" {
+							elem = elem[l:]
+						} else {
+							break
 						}
 
-						return
-					}
+						// Param: "attempt_id"
+						// Match until "/"
+						idx := strings.IndexByte(elem, '/')
+						if idx < 0 {
+							idx = len(elem)
+						}
+						args[0] = elem[:idx]
+						elem = elem[idx:]
 
-				case 'r': // Prefix: "revoke"
+						if len(elem) == 0 {
+							switch r.Method {
+							case "GET":
+								s.handleGetAuthAttemptRequest([1]string{
+									args[0],
+								}, elemIsEscaped, w, r)
+							default:
+								s.notAllowed(w, r, notAllowedParams{
+									allowedMethods: "GET",
+									allowedHeaders: nil,
+									acceptPost:     "",
+									acceptPatch:    "",
+								})
+							}
 
-					if l := len("revoke"); len(elem) >= l && elem[0:l] == "revoke" {
-						elem = elem[l:]
-					} else {
-						break
-					}
+							return
+						}
+						switch elem[0] {
+						case '/': // Prefix: "/"
 
-					if len(elem) == 0 {
-						// Leaf node.
-						switch r.Method {
-						case "POST":
-							s.handleRevokeTokenRequest([0]string{}, elemIsEscaped, w, r)
-						default:
-							s.notAllowed(w, r, notAllowedParams{
-								allowedMethods: "POST",
-								allowedHeaders: rn18AllowedHeaders,
-								acceptPost:     "application/x-www-form-urlencoded",
-								acceptPatch:    "",
-							})
+							if l := len("/"); len(elem) >= l && elem[0:l] == "/" {
+								elem = elem[l:]
+							} else {
+								break
+							}
+
+							if len(elem) == 0 {
+								break
+							}
+							switch elem[0] {
+							case 'c': // Prefix: "challenges"
+
+								if l := len("challenges"); len(elem) >= l && elem[0:l] == "challenges" {
+									elem = elem[l:]
+								} else {
+									break
+								}
+
+								if len(elem) == 0 {
+									switch r.Method {
+									case "POST":
+										s.handleIssueChallengeRequest([1]string{
+											args[0],
+										}, elemIsEscaped, w, r)
+									default:
+										s.notAllowed(w, r, notAllowedParams{
+											allowedMethods: "POST",
+											allowedHeaders: rn27AllowedHeaders,
+											acceptPost:     "application/json",
+											acceptPatch:    "",
+										})
+									}
+
+									return
+								}
+								switch elem[0] {
+								case '/': // Prefix: "/"
+
+									if l := len("/"); len(elem) >= l && elem[0:l] == "/" {
+										elem = elem[l:]
+									} else {
+										break
+									}
+
+									// Param: "challenge_id"
+									// Match until "/"
+									idx := strings.IndexByte(elem, '/')
+									if idx < 0 {
+										idx = len(elem)
+									}
+									args[1] = elem[:idx]
+									elem = elem[idx:]
+
+									if len(elem) == 0 {
+										break
+									}
+									switch elem[0] {
+									case '/': // Prefix: "/verify"
+
+										if l := len("/verify"); len(elem) >= l && elem[0:l] == "/verify" {
+											elem = elem[l:]
+										} else {
+											break
+										}
+
+										if len(elem) == 0 {
+											// Leaf node.
+											switch r.Method {
+											case "POST":
+												s.handleVerifyChallengeProofRequest([2]string{
+													args[0],
+													args[1],
+												}, elemIsEscaped, w, r)
+											default:
+												s.notAllowed(w, r, notAllowedParams{
+													allowedMethods: "POST",
+													allowedHeaders: rn35AllowedHeaders,
+													acceptPost:     "application/json",
+													acceptPatch:    "",
+												})
+											}
+
+											return
+										}
+
+									}
+
+								}
+
+							case 'h': // Prefix: "handoff"
+
+								if l := len("handoff"); len(elem) >= l && elem[0:l] == "handoff" {
+									elem = elem[l:]
+								} else {
+									break
+								}
+
+								if len(elem) == 0 {
+									// Leaf node.
+									switch r.Method {
+									case "POST":
+										s.handleCreateHandoffRequest([1]string{
+											args[0],
+										}, elemIsEscaped, w, r)
+									default:
+										s.notAllowed(w, r, notAllowedParams{
+											allowedMethods: "POST",
+											allowedHeaders: nil,
+											acceptPost:     "",
+											acceptPatch:    "",
+										})
+									}
+
+									return
+								}
+
+							}
+
 						}
 
-						return
-					}
-
-				case 't': // Prefix: "token"
-
-					if l := len("token"); len(elem) >= l && elem[0:l] == "token" {
-						elem = elem[l:]
-					} else {
-						break
-					}
-
-					if len(elem) == 0 {
-						// Leaf node.
-						switch r.Method {
-						case "POST":
-							s.handleGetTokenRequest([0]string{}, elemIsEscaped, w, r)
-						default:
-							s.notAllowed(w, r, notAllowedParams{
-								allowedMethods: "POST",
-								allowedHeaders: rn14AllowedHeaders,
-								acceptPost:     "application/x-www-form-urlencoded",
-								acceptPatch:    "",
-							})
-						}
-
-						return
-					}
-
-				case 'u': // Prefix: "userinfo"
-
-					if l := len("userinfo"); len(elem) >= l && elem[0:l] == "userinfo" {
-						elem = elem[l:]
-					} else {
-						break
-					}
-
-					if len(elem) == 0 {
-						// Leaf node.
-						switch r.Method {
-						case "GET":
-							s.handleGetUserInfoRequest([0]string{}, elemIsEscaped, w, r)
-						default:
-							s.notAllowed(w, r, notAllowedParams{
-								allowedMethods: "GET",
-								allowedHeaders: rn15AllowedHeaders,
-								acceptPost:     "",
-								acceptPatch:    "",
-							})
-						}
-
-						return
 					}
 
 				}
@@ -348,7 +565,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					default:
 						s.notAllowed(w, r, notAllowedParams{
 							allowedMethods: "POST",
-							allowedHeaders: rn5AllowedHeaders,
+							allowedHeaders: rn7AllowedHeaders,
 							acceptPost:     "application/json",
 							acceptPatch:    "",
 						})
@@ -422,7 +639,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 								default:
 									s.notAllowed(w, r, notAllowedParams{
 										allowedMethods: "POST",
-										allowedHeaders: rn19AllowedHeaders,
+										allowedHeaders: rn30AllowedHeaders,
 										acceptPost:     "application/json",
 										acceptPatch:    "",
 									})
@@ -449,7 +666,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 								default:
 									s.notAllowed(w, r, notAllowedParams{
 										allowedMethods: "POST",
-										allowedHeaders: rn21AllowedHeaders,
+										allowedHeaders: rn32AllowedHeaders,
 										acceptPost:     "application/json",
 										acceptPatch:    "",
 									})
@@ -539,6 +756,105 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 
+			case 's': // Prefix: "sessions"
+
+				if l := len("sessions"); len(elem) >= l && elem[0:l] == "sessions" {
+					elem = elem[l:]
+				} else {
+					break
+				}
+
+				if len(elem) == 0 {
+					switch r.Method {
+					case "GET":
+						s.handleListSessionsRequest([0]string{}, elemIsEscaped, w, r)
+					case "POST":
+						s.handleCreateSessionRequest([0]string{}, elemIsEscaped, w, r)
+					default:
+						s.notAllowed(w, r, notAllowedParams{
+							allowedMethods: "GET,POST",
+							allowedHeaders: rn11AllowedHeaders,
+							acceptPost:     "application/json",
+							acceptPatch:    "",
+						})
+					}
+
+					return
+				}
+				switch elem[0] {
+				case '/': // Prefix: "/"
+
+					if l := len("/"); len(elem) >= l && elem[0:l] == "/" {
+						elem = elem[l:]
+					} else {
+						break
+					}
+
+					if len(elem) == 0 {
+						break
+					}
+					switch elem[0] {
+					case 'e': // Prefix: "exchange"
+						origElem := elem
+						if l := len("exchange"); len(elem) >= l && elem[0:l] == "exchange" {
+							elem = elem[l:]
+						} else {
+							break
+						}
+
+						if len(elem) == 0 {
+							// Leaf node.
+							switch r.Method {
+							case "POST":
+								s.handleExchangeHandoffRequest([0]string{}, elemIsEscaped, w, r)
+							default:
+								s.notAllowed(w, r, notAllowedParams{
+									allowedMethods: "POST",
+									allowedHeaders: rn13AllowedHeaders,
+									acceptPost:     "application/json",
+									acceptPatch:    "",
+								})
+							}
+
+							return
+						}
+
+						elem = origElem
+					}
+					// Param: "session_id"
+					// Leaf parameter, slashes are prohibited
+					idx := strings.IndexByte(elem, '/')
+					if idx >= 0 {
+						break
+					}
+					args[0] = elem
+					elem = ""
+
+					if len(elem) == 0 {
+						// Leaf node.
+						switch r.Method {
+						case "DELETE":
+							s.handleRevokeSessionRequest([1]string{
+								args[0],
+							}, elemIsEscaped, w, r)
+						case "GET":
+							s.handleGetSessionRequest([1]string{
+								args[0],
+							}, elemIsEscaped, w, r)
+						default:
+							s.notAllowed(w, r, notAllowedParams{
+								allowedMethods: "DELETE,GET",
+								allowedHeaders: rn22AllowedHeaders,
+								acceptPost:     "",
+								acceptPatch:    "",
+							})
+						}
+
+						return
+					}
+
+				}
+
 			case 'u': // Prefix: "user"
 
 				if l := len("user"); len(elem) >= l && elem[0:l] == "user" {
@@ -555,7 +871,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					default:
 						s.notAllowed(w, r, notAllowedParams{
 							allowedMethods: "GET",
-							allowedHeaders: rn17AllowedHeaders,
+							allowedHeaders: rn28AllowedHeaders,
 							acceptPost:     "",
 							acceptPatch:    "",
 						})
@@ -579,7 +895,7 @@ type Route struct {
 	operationGroup string
 	pathPattern    string
 	count          int
-	args           [1]string
+	args           [2]string
 }
 
 // Name returns ogen operation name.
@@ -689,9 +1005,9 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 					}
 				}
 
-			case 'a': // Prefix: "auth/"
+			case 'a': // Prefix: "auth"
 
-				if l := len("auth/"); len(elem) >= l && elem[0:l] == "auth/" {
+				if l := len("auth"); len(elem) >= l && elem[0:l] == "auth" {
 					elem = elem[l:]
 				} else {
 					break
@@ -701,98 +1017,236 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 					break
 				}
 				switch elem[0] {
-				case 'a': // Prefix: "authorize"
+				case '/': // Prefix: "/"
 
-					if l := len("authorize"); len(elem) >= l && elem[0:l] == "authorize" {
+					if l := len("/"); len(elem) >= l && elem[0:l] == "/" {
 						elem = elem[l:]
 					} else {
 						break
 					}
 
 					if len(elem) == 0 {
-						// Leaf node.
-						switch method {
-						case "GET":
-							r.name = AuthorizeGetOperation
-							r.summary = "Authorize a user"
-							r.operationID = "authorizeGet"
-							r.operationGroup = ""
-							r.pathPattern = "/auth/authorize"
-							r.args = args
-							r.count = 0
-							return r, true
-						default:
-							return
+						break
+					}
+					switch elem[0] {
+					case 'a': // Prefix: "authorize"
+
+						if l := len("authorize"); len(elem) >= l && elem[0:l] == "authorize" {
+							elem = elem[l:]
+						} else {
+							break
 						}
-					}
 
-				case 'd': // Prefix: "device-authorization"
-
-					if l := len("device-authorization"); len(elem) >= l && elem[0:l] == "device-authorization" {
-						elem = elem[l:]
-					} else {
-						break
-					}
-
-					if len(elem) == 0 {
-						// Leaf node.
-						switch method {
-						case "GET":
-							r.name = AuthorizeDeviceOperation
-							r.summary = "Authorize a device"
-							r.operationID = "authorizeDevice"
-							r.operationGroup = ""
-							r.pathPattern = "/auth/device-authorization"
-							r.args = args
-							r.count = 0
-							return r, true
-						default:
-							return
+						if len(elem) == 0 {
+							// Leaf node.
+							switch method {
+							case "GET":
+								r.name = AuthorizeGetOperation
+								r.summary = "Authorize a user"
+								r.operationID = "authorizeGet"
+								r.operationGroup = ""
+								r.pathPattern = "/auth/authorize"
+								r.args = args
+								r.count = 0
+								return r, true
+							default:
+								return
+							}
 						}
-					}
 
-				case 'e': // Prefix: "end-session"
+					case 'd': // Prefix: "device-authorization"
 
-					if l := len("end-session"); len(elem) >= l && elem[0:l] == "end-session" {
-						elem = elem[l:]
-					} else {
-						break
-					}
-
-					if len(elem) == 0 {
-						// Leaf node.
-						switch method {
-						case "GET":
-							r.name = EndSessionOperation
-							r.summary = "End a session"
-							r.operationID = "endSession"
-							r.operationGroup = ""
-							r.pathPattern = "/auth/end-session"
-							r.args = args
-							r.count = 0
-							return r, true
-						default:
-							return
+						if l := len("device-authorization"); len(elem) >= l && elem[0:l] == "device-authorization" {
+							elem = elem[l:]
+						} else {
+							break
 						}
+
+						if len(elem) == 0 {
+							// Leaf node.
+							switch method {
+							case "GET":
+								r.name = AuthorizeDeviceOperation
+								r.summary = "Authorize a device"
+								r.operationID = "authorizeDevice"
+								r.operationGroup = ""
+								r.pathPattern = "/auth/device-authorization"
+								r.args = args
+								r.count = 0
+								return r, true
+							default:
+								return
+							}
+						}
+
+					case 'e': // Prefix: "end-session"
+
+						if l := len("end-session"); len(elem) >= l && elem[0:l] == "end-session" {
+							elem = elem[l:]
+						} else {
+							break
+						}
+
+						if len(elem) == 0 {
+							// Leaf node.
+							switch method {
+							case "GET":
+								r.name = EndSessionOperation
+								r.summary = "End a session"
+								r.operationID = "endSession"
+								r.operationGroup = ""
+								r.pathPattern = "/auth/end-session"
+								r.args = args
+								r.count = 0
+								return r, true
+							default:
+								return
+							}
+						}
+
+					case 'i': // Prefix: "introspect"
+
+						if l := len("introspect"); len(elem) >= l && elem[0:l] == "introspect" {
+							elem = elem[l:]
+						} else {
+							break
+						}
+
+						if len(elem) == 0 {
+							// Leaf node.
+							switch method {
+							case "POST":
+								r.name = IntrospectOperation
+								r.summary = "Introspect a token"
+								r.operationID = "introspect"
+								r.operationGroup = ""
+								r.pathPattern = "/auth/introspect"
+								r.args = args
+								r.count = 0
+								return r, true
+							default:
+								return
+							}
+						}
+
+					case 'k': // Prefix: "keys"
+
+						if l := len("keys"); len(elem) >= l && elem[0:l] == "keys" {
+							elem = elem[l:]
+						} else {
+							break
+						}
+
+						if len(elem) == 0 {
+							// Leaf node.
+							switch method {
+							case "GET":
+								r.name = GetKeysOperation
+								r.summary = "Get public keys"
+								r.operationID = "getKeys"
+								r.operationGroup = ""
+								r.pathPattern = "/auth/keys"
+								r.args = args
+								r.count = 0
+								return r, true
+							default:
+								return
+							}
+						}
+
+					case 'r': // Prefix: "revoke"
+
+						if l := len("revoke"); len(elem) >= l && elem[0:l] == "revoke" {
+							elem = elem[l:]
+						} else {
+							break
+						}
+
+						if len(elem) == 0 {
+							// Leaf node.
+							switch method {
+							case "POST":
+								r.name = RevokeTokenOperation
+								r.summary = "Revoke an access token or refresh token"
+								r.operationID = "revokeToken"
+								r.operationGroup = ""
+								r.pathPattern = "/auth/revoke"
+								r.args = args
+								r.count = 0
+								return r, true
+							default:
+								return
+							}
+						}
+
+					case 't': // Prefix: "token"
+
+						if l := len("token"); len(elem) >= l && elem[0:l] == "token" {
+							elem = elem[l:]
+						} else {
+							break
+						}
+
+						if len(elem) == 0 {
+							// Leaf node.
+							switch method {
+							case "POST":
+								r.name = GetTokenOperation
+								r.summary = "Get accesstoken"
+								r.operationID = "getToken"
+								r.operationGroup = ""
+								r.pathPattern = "/auth/token"
+								r.args = args
+								r.count = 0
+								return r, true
+							default:
+								return
+							}
+						}
+
+					case 'u': // Prefix: "userinfo"
+
+						if l := len("userinfo"); len(elem) >= l && elem[0:l] == "userinfo" {
+							elem = elem[l:]
+						} else {
+							break
+						}
+
+						if len(elem) == 0 {
+							// Leaf node.
+							switch method {
+							case "GET":
+								r.name = GetUserInfoOperation
+								r.summary = "Get user info"
+								r.operationID = "getUserInfo"
+								r.operationGroup = ""
+								r.pathPattern = "/auth/userinfo"
+								r.args = args
+								r.count = 0
+								return r, true
+							default:
+								return
+							}
+						}
+
 					}
 
-				case 'i': // Prefix: "introspect"
+				case '_': // Prefix: "_attempts"
 
-					if l := len("introspect"); len(elem) >= l && elem[0:l] == "introspect" {
+					if l := len("_attempts"); len(elem) >= l && elem[0:l] == "_attempts" {
 						elem = elem[l:]
 					} else {
 						break
 					}
 
 					if len(elem) == 0 {
-						// Leaf node.
 						switch method {
 						case "POST":
-							r.name = IntrospectOperation
-							r.summary = "Introspect a token"
-							r.operationID = "introspect"
+							r.name = CreateAuthAttemptOperation
+							r.summary = "Create a new authentication attempt"
+							r.operationID = "createAuthAttempt"
 							r.operationGroup = ""
-							r.pathPattern = "/auth/introspect"
+							r.pathPattern = "/auth_attempts"
 							r.args = args
 							r.count = 0
 							return r, true
@@ -800,105 +1254,155 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 							return
 						}
 					}
+					switch elem[0] {
+					case '/': // Prefix: "/"
 
-				case 'k': // Prefix: "keys"
-
-					if l := len("keys"); len(elem) >= l && elem[0:l] == "keys" {
-						elem = elem[l:]
-					} else {
-						break
-					}
-
-					if len(elem) == 0 {
-						// Leaf node.
-						switch method {
-						case "GET":
-							r.name = GetKeysOperation
-							r.summary = "Get public keys"
-							r.operationID = "getKeys"
-							r.operationGroup = ""
-							r.pathPattern = "/auth/keys"
-							r.args = args
-							r.count = 0
-							return r, true
-						default:
-							return
+						if l := len("/"); len(elem) >= l && elem[0:l] == "/" {
+							elem = elem[l:]
+						} else {
+							break
 						}
-					}
 
-				case 'r': // Prefix: "revoke"
-
-					if l := len("revoke"); len(elem) >= l && elem[0:l] == "revoke" {
-						elem = elem[l:]
-					} else {
-						break
-					}
-
-					if len(elem) == 0 {
-						// Leaf node.
-						switch method {
-						case "POST":
-							r.name = RevokeTokenOperation
-							r.summary = "Revoke an access token or refresh token"
-							r.operationID = "revokeToken"
-							r.operationGroup = ""
-							r.pathPattern = "/auth/revoke"
-							r.args = args
-							r.count = 0
-							return r, true
-						default:
-							return
+						// Param: "attempt_id"
+						// Match until "/"
+						idx := strings.IndexByte(elem, '/')
+						if idx < 0 {
+							idx = len(elem)
 						}
-					}
+						args[0] = elem[:idx]
+						elem = elem[idx:]
 
-				case 't': // Prefix: "token"
-
-					if l := len("token"); len(elem) >= l && elem[0:l] == "token" {
-						elem = elem[l:]
-					} else {
-						break
-					}
-
-					if len(elem) == 0 {
-						// Leaf node.
-						switch method {
-						case "POST":
-							r.name = GetTokenOperation
-							r.summary = "Get accesstoken"
-							r.operationID = "getToken"
-							r.operationGroup = ""
-							r.pathPattern = "/auth/token"
-							r.args = args
-							r.count = 0
-							return r, true
-						default:
-							return
+						if len(elem) == 0 {
+							switch method {
+							case "GET":
+								r.name = GetAuthAttemptOperation
+								r.summary = "Get authentication attempt state"
+								r.operationID = "getAuthAttempt"
+								r.operationGroup = ""
+								r.pathPattern = "/auth_attempts/{attempt_id}"
+								r.args = args
+								r.count = 1
+								return r, true
+							default:
+								return
+							}
 						}
-					}
+						switch elem[0] {
+						case '/': // Prefix: "/"
 
-				case 'u': // Prefix: "userinfo"
+							if l := len("/"); len(elem) >= l && elem[0:l] == "/" {
+								elem = elem[l:]
+							} else {
+								break
+							}
 
-					if l := len("userinfo"); len(elem) >= l && elem[0:l] == "userinfo" {
-						elem = elem[l:]
-					} else {
-						break
-					}
+							if len(elem) == 0 {
+								break
+							}
+							switch elem[0] {
+							case 'c': // Prefix: "challenges"
 
-					if len(elem) == 0 {
-						// Leaf node.
-						switch method {
-						case "GET":
-							r.name = GetUserInfoOperation
-							r.summary = "Get user info"
-							r.operationID = "getUserInfo"
-							r.operationGroup = ""
-							r.pathPattern = "/auth/userinfo"
-							r.args = args
-							r.count = 0
-							return r, true
-						default:
-							return
+								if l := len("challenges"); len(elem) >= l && elem[0:l] == "challenges" {
+									elem = elem[l:]
+								} else {
+									break
+								}
+
+								if len(elem) == 0 {
+									switch method {
+									case "POST":
+										r.name = IssueChallengeOperation
+										r.summary = "Issue a factor challenge"
+										r.operationID = "issueChallenge"
+										r.operationGroup = ""
+										r.pathPattern = "/auth_attempts/{attempt_id}/challenges"
+										r.args = args
+										r.count = 1
+										return r, true
+									default:
+										return
+									}
+								}
+								switch elem[0] {
+								case '/': // Prefix: "/"
+
+									if l := len("/"); len(elem) >= l && elem[0:l] == "/" {
+										elem = elem[l:]
+									} else {
+										break
+									}
+
+									// Param: "challenge_id"
+									// Match until "/"
+									idx := strings.IndexByte(elem, '/')
+									if idx < 0 {
+										idx = len(elem)
+									}
+									args[1] = elem[:idx]
+									elem = elem[idx:]
+
+									if len(elem) == 0 {
+										break
+									}
+									switch elem[0] {
+									case '/': // Prefix: "/verify"
+
+										if l := len("/verify"); len(elem) >= l && elem[0:l] == "/verify" {
+											elem = elem[l:]
+										} else {
+											break
+										}
+
+										if len(elem) == 0 {
+											// Leaf node.
+											switch method {
+											case "POST":
+												r.name = VerifyChallengeProofOperation
+												r.summary = "Verify a factor proof"
+												r.operationID = "verifyChallengeProof"
+												r.operationGroup = ""
+												r.pathPattern = "/auth_attempts/{attempt_id}/challenges/{challenge_id}/verify"
+												r.args = args
+												r.count = 2
+												return r, true
+											default:
+												return
+											}
+										}
+
+									}
+
+								}
+
+							case 'h': // Prefix: "handoff"
+
+								if l := len("handoff"); len(elem) >= l && elem[0:l] == "handoff" {
+									elem = elem[l:]
+								} else {
+									break
+								}
+
+								if len(elem) == 0 {
+									// Leaf node.
+									switch method {
+									case "POST":
+										r.name = CreateHandoffOperation
+										r.summary = "Complete authentication and create handoff token"
+										r.operationID = "createHandoff"
+										r.operationGroup = ""
+										r.pathPattern = "/auth_attempts/{attempt_id}/handoff"
+										r.args = args
+										r.count = 1
+										return r, true
+									default:
+										return
+									}
+								}
+
+							}
+
 						}
+
 					}
 
 				}
@@ -1101,6 +1605,115 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 					default:
 						return
 					}
+				}
+
+			case 's': // Prefix: "sessions"
+
+				if l := len("sessions"); len(elem) >= l && elem[0:l] == "sessions" {
+					elem = elem[l:]
+				} else {
+					break
+				}
+
+				if len(elem) == 0 {
+					switch method {
+					case "GET":
+						r.name = ListSessionsOperation
+						r.summary = "List sessions"
+						r.operationID = "listSessions"
+						r.operationGroup = ""
+						r.pathPattern = "/sessions"
+						r.args = args
+						r.count = 0
+						return r, true
+					case "POST":
+						r.name = CreateSessionOperation
+						r.summary = "Create an anonymous session shell"
+						r.operationID = "createSession"
+						r.operationGroup = ""
+						r.pathPattern = "/sessions"
+						r.args = args
+						r.count = 0
+						return r, true
+					default:
+						return
+					}
+				}
+				switch elem[0] {
+				case '/': // Prefix: "/"
+
+					if l := len("/"); len(elem) >= l && elem[0:l] == "/" {
+						elem = elem[l:]
+					} else {
+						break
+					}
+
+					if len(elem) == 0 {
+						break
+					}
+					switch elem[0] {
+					case 'e': // Prefix: "exchange"
+						origElem := elem
+						if l := len("exchange"); len(elem) >= l && elem[0:l] == "exchange" {
+							elem = elem[l:]
+						} else {
+							break
+						}
+
+						if len(elem) == 0 {
+							// Leaf node.
+							switch method {
+							case "POST":
+								r.name = ExchangeHandoffOperation
+								r.summary = "Exchange handoff token for a session"
+								r.operationID = "exchangeHandoff"
+								r.operationGroup = ""
+								r.pathPattern = "/sessions/exchange"
+								r.args = args
+								r.count = 0
+								return r, true
+							default:
+								return
+							}
+						}
+
+						elem = origElem
+					}
+					// Param: "session_id"
+					// Leaf parameter, slashes are prohibited
+					idx := strings.IndexByte(elem, '/')
+					if idx >= 0 {
+						break
+					}
+					args[0] = elem
+					elem = ""
+
+					if len(elem) == 0 {
+						// Leaf node.
+						switch method {
+						case "DELETE":
+							r.name = RevokeSessionOperation
+							r.summary = "Revoke session"
+							r.operationID = "revokeSession"
+							r.operationGroup = ""
+							r.pathPattern = "/sessions/{session_id}"
+							r.args = args
+							r.count = 1
+							return r, true
+						case "GET":
+							r.name = GetSessionOperation
+							r.summary = "Get session state"
+							r.operationID = "getSession"
+							r.operationGroup = ""
+							r.pathPattern = "/sessions/{session_id}"
+							r.args = args
+							r.count = 1
+							return r, true
+						default:
+							return
+						}
+					}
+
 				}
 
 			case 'u': // Prefix: "user"

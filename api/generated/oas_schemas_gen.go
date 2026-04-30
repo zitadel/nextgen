@@ -11,6 +11,95 @@ import (
 	"github.com/go-faster/jx"
 )
 
+type AttemptID string
+
+// The current state of an authentication attempt.
+// An attempt is an ephemeral state machine (15-minute TTL) that drives a single authentication round.
+// It accepts factor challenges, verifies proofs, and completes into a handoff token.
+// Clients drive the attempt by:
+// 1. Issuing challenges: POST /auth_attempts/{id}/challenges
+// 2. Verifying proofs: POST /auth_attempts/{id}/challenges/{cid}/verify
+// 3. Completing: POST /auth_attempts/{id}/handoff.
+// Ref: #
+type AuthAttemptResponse struct {
+	AttemptID AttemptID `json:"attempt_id"`
+	ProjectID ProjectID `json:"project_id"`
+	// The session being authenticated into. Either newly created or passed in on POST.
+	// For step-up (re-auth), this is the existing session_id provided on creation.
+	SessionID OptNilSessionID `json:"session_id"`
+	// The user ID, if known at this point in the flow.
+	// Null until an identifier challenge has been verified.
+	UserID OptNilUserID `json:"user_id"`
+	// When this attempt expires (15-minute TTL from creation).
+	ExpiresAt time.Time `json:"expires_at"`
+	// When this attempt was created.
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// GetAttemptID returns the value of AttemptID.
+func (s *AuthAttemptResponse) GetAttemptID() AttemptID {
+	return s.AttemptID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *AuthAttemptResponse) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *AuthAttemptResponse) GetSessionID() OptNilSessionID {
+	return s.SessionID
+}
+
+// GetUserID returns the value of UserID.
+func (s *AuthAttemptResponse) GetUserID() OptNilUserID {
+	return s.UserID
+}
+
+// GetExpiresAt returns the value of ExpiresAt.
+func (s *AuthAttemptResponse) GetExpiresAt() time.Time {
+	return s.ExpiresAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *AuthAttemptResponse) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// SetAttemptID sets the value of AttemptID.
+func (s *AuthAttemptResponse) SetAttemptID(val AttemptID) {
+	s.AttemptID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *AuthAttemptResponse) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *AuthAttemptResponse) SetSessionID(val OptNilSessionID) {
+	s.SessionID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *AuthAttemptResponse) SetUserID(val OptNilUserID) {
+	s.UserID = val
+}
+
+// SetExpiresAt sets the value of ExpiresAt.
+func (s *AuthAttemptResponse) SetExpiresAt(val time.Time) {
+	s.ExpiresAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *AuthAttemptResponse) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+func (*AuthAttemptResponse) createAuthAttemptRes()    {}
+func (*AuthAttemptResponse) getAuthAttemptRes()       {}
+func (*AuthAttemptResponse) verifyChallengeProofRes() {}
+
 // AuthorizeGetFound is response for AuthorizeGet operation.
 type AuthorizeGetFound struct{}
 
@@ -130,6 +219,284 @@ func (s *BrandingLayout) UnmarshalText(data []byte) error {
 		return errors.Errorf("invalid value: %q", data)
 	}
 }
+
+type ChallengeID string
+
+// A factor challenge issued within an authentication attempt.
+// A challenge presents a single-factor verification prompt (password entry, TOTP code, passkey
+// assertion, etc.).
+// The client verifies the proof by POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify.
+// Ref: #
+type ChallengeResponse struct {
+	ChallengeID ChallengeID `json:"challenge_id"`
+	// The authentication method this challenge represents.
+	// Determines which proof is expected in verify.
+	Method ChallengeResponseMethod `json:"method"`
+	// Current state of this challenge:
+	// - `pending`: awaiting proof submission
+	// - `verified`: proof accepted, factor written to session
+	// - `failed`: proof rejected (invalid credential, wrong code, etc.)
+	// - `expired`: challenge TTL exceeded without verification.
+	State ChallengeResponseState `json:"state"`
+	// When this challenge was issued.
+	CreatedAt time.Time `json:"created_at"`
+	// When this challenge expires.
+	ExpiresAt OptNilDateTime `json:"expires_at"`
+}
+
+// GetChallengeID returns the value of ChallengeID.
+func (s *ChallengeResponse) GetChallengeID() ChallengeID {
+	return s.ChallengeID
+}
+
+// GetMethod returns the value of Method.
+func (s *ChallengeResponse) GetMethod() ChallengeResponseMethod {
+	return s.Method
+}
+
+// GetState returns the value of State.
+func (s *ChallengeResponse) GetState() ChallengeResponseState {
+	return s.State
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *ChallengeResponse) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetExpiresAt returns the value of ExpiresAt.
+func (s *ChallengeResponse) GetExpiresAt() OptNilDateTime {
+	return s.ExpiresAt
+}
+
+// SetChallengeID sets the value of ChallengeID.
+func (s *ChallengeResponse) SetChallengeID(val ChallengeID) {
+	s.ChallengeID = val
+}
+
+// SetMethod sets the value of Method.
+func (s *ChallengeResponse) SetMethod(val ChallengeResponseMethod) {
+	s.Method = val
+}
+
+// SetState sets the value of State.
+func (s *ChallengeResponse) SetState(val ChallengeResponseState) {
+	s.State = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *ChallengeResponse) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetExpiresAt sets the value of ExpiresAt.
+func (s *ChallengeResponse) SetExpiresAt(val OptNilDateTime) {
+	s.ExpiresAt = val
+}
+
+func (*ChallengeResponse) issueChallengeRes() {}
+
+// The authentication method this challenge represents.
+// Determines which proof is expected in verify.
+type ChallengeResponseMethod string
+
+const (
+	ChallengeResponseMethodIdentifier   ChallengeResponseMethod = "identifier"
+	ChallengeResponseMethodPassword     ChallengeResponseMethod = "password"
+	ChallengeResponseMethodPasskey      ChallengeResponseMethod = "passkey"
+	ChallengeResponseMethodTotp         ChallengeResponseMethod = "totp"
+	ChallengeResponseMethodOtpSMS       ChallengeResponseMethod = "otp_sms"
+	ChallengeResponseMethodOtpEmail     ChallengeResponseMethod = "otp_email"
+	ChallengeResponseMethodRecoveryCode ChallengeResponseMethod = "recovery_code"
+	ChallengeResponseMethodIdp          ChallengeResponseMethod = "idp"
+	ChallengeResponseMethodCaptcha      ChallengeResponseMethod = "captcha"
+)
+
+// AllValues returns all ChallengeResponseMethod values.
+func (ChallengeResponseMethod) AllValues() []ChallengeResponseMethod {
+	return []ChallengeResponseMethod{
+		ChallengeResponseMethodIdentifier,
+		ChallengeResponseMethodPassword,
+		ChallengeResponseMethodPasskey,
+		ChallengeResponseMethodTotp,
+		ChallengeResponseMethodOtpSMS,
+		ChallengeResponseMethodOtpEmail,
+		ChallengeResponseMethodRecoveryCode,
+		ChallengeResponseMethodIdp,
+		ChallengeResponseMethodCaptcha,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ChallengeResponseMethod) MarshalText() ([]byte, error) {
+	switch s {
+	case ChallengeResponseMethodIdentifier:
+		return []byte(s), nil
+	case ChallengeResponseMethodPassword:
+		return []byte(s), nil
+	case ChallengeResponseMethodPasskey:
+		return []byte(s), nil
+	case ChallengeResponseMethodTotp:
+		return []byte(s), nil
+	case ChallengeResponseMethodOtpSMS:
+		return []byte(s), nil
+	case ChallengeResponseMethodOtpEmail:
+		return []byte(s), nil
+	case ChallengeResponseMethodRecoveryCode:
+		return []byte(s), nil
+	case ChallengeResponseMethodIdp:
+		return []byte(s), nil
+	case ChallengeResponseMethodCaptcha:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ChallengeResponseMethod) UnmarshalText(data []byte) error {
+	switch ChallengeResponseMethod(data) {
+	case ChallengeResponseMethodIdentifier:
+		*s = ChallengeResponseMethodIdentifier
+		return nil
+	case ChallengeResponseMethodPassword:
+		*s = ChallengeResponseMethodPassword
+		return nil
+	case ChallengeResponseMethodPasskey:
+		*s = ChallengeResponseMethodPasskey
+		return nil
+	case ChallengeResponseMethodTotp:
+		*s = ChallengeResponseMethodTotp
+		return nil
+	case ChallengeResponseMethodOtpSMS:
+		*s = ChallengeResponseMethodOtpSMS
+		return nil
+	case ChallengeResponseMethodOtpEmail:
+		*s = ChallengeResponseMethodOtpEmail
+		return nil
+	case ChallengeResponseMethodRecoveryCode:
+		*s = ChallengeResponseMethodRecoveryCode
+		return nil
+	case ChallengeResponseMethodIdp:
+		*s = ChallengeResponseMethodIdp
+		return nil
+	case ChallengeResponseMethodCaptcha:
+		*s = ChallengeResponseMethodCaptcha
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Current state of this challenge:
+// - `pending`: awaiting proof submission
+// - `verified`: proof accepted, factor written to session
+// - `failed`: proof rejected (invalid credential, wrong code, etc.)
+// - `expired`: challenge TTL exceeded without verification.
+type ChallengeResponseState string
+
+const (
+	ChallengeResponseStatePending  ChallengeResponseState = "pending"
+	ChallengeResponseStateVerified ChallengeResponseState = "verified"
+	ChallengeResponseStateFailed   ChallengeResponseState = "failed"
+	ChallengeResponseStateExpired  ChallengeResponseState = "expired"
+)
+
+// AllValues returns all ChallengeResponseState values.
+func (ChallengeResponseState) AllValues() []ChallengeResponseState {
+	return []ChallengeResponseState{
+		ChallengeResponseStatePending,
+		ChallengeResponseStateVerified,
+		ChallengeResponseStateFailed,
+		ChallengeResponseStateExpired,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ChallengeResponseState) MarshalText() ([]byte, error) {
+	switch s {
+	case ChallengeResponseStatePending:
+		return []byte(s), nil
+	case ChallengeResponseStateVerified:
+		return []byte(s), nil
+	case ChallengeResponseStateFailed:
+		return []byte(s), nil
+	case ChallengeResponseStateExpired:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ChallengeResponseState) UnmarshalText(data []byte) error {
+	switch ChallengeResponseState(data) {
+	case ChallengeResponseStatePending:
+		*s = ChallengeResponseStatePending
+		return nil
+	case ChallengeResponseStateVerified:
+		*s = ChallengeResponseStateVerified
+		return nil
+	case ChallengeResponseStateFailed:
+		*s = ChallengeResponseStateFailed
+		return nil
+	case ChallengeResponseStateExpired:
+		*s = ChallengeResponseStateExpired
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+type CreateAuthAttemptBadRequest ErrorDetails
+
+func (*CreateAuthAttemptBadRequest) createAuthAttemptRes() {}
+
+// Request to create a new authentication attempt.
+// Ref: #
+type CreateAuthAttemptRequest struct {
+	ProjectID ProjectID `json:"project_id"`
+	// Optional. The challenge nonce from POST /bootstrap/challenge.
+	// This nonce is origin-bound (for browser clients) and single-use.
+	ChallengeNonce OptString `json:"challenge_nonce"`
+	// Optional. If provided, this attempt adds factors to an existing session (step-up auth).
+	// If omitted, a new session is created implicitly on successful handoff.
+	SessionID OptNilSessionID `json:"session_id"`
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *CreateAuthAttemptRequest) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetChallengeNonce returns the value of ChallengeNonce.
+func (s *CreateAuthAttemptRequest) GetChallengeNonce() OptString {
+	return s.ChallengeNonce
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *CreateAuthAttemptRequest) GetSessionID() OptNilSessionID {
+	return s.SessionID
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *CreateAuthAttemptRequest) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetChallengeNonce sets the value of ChallengeNonce.
+func (s *CreateAuthAttemptRequest) SetChallengeNonce(val OptString) {
+	s.ChallengeNonce = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *CreateAuthAttemptRequest) SetSessionID(val OptNilSessionID) {
+	s.SessionID = val
+}
+
+type CreateAuthAttemptUnauthorized ErrorDetails
+
+func (*CreateAuthAttemptUnauthorized) createAuthAttemptRes() {}
 
 // Ref: #
 type CreateFlowRequest struct {
@@ -303,6 +670,100 @@ func (s *CreateFlowRequestPurpose) UnmarshalText(data []byte) error {
 	}
 }
 
+type CreateHandoffBadRequest ErrorDetails
+
+func (*CreateHandoffBadRequest) createHandoffRes() {}
+
+type CreateHandoffConflict ErrorDetails
+
+func (*CreateHandoffConflict) createHandoffRes() {}
+
+type CreateHandoffNotFound ErrorDetails
+
+func (*CreateHandoffNotFound) createHandoffRes() {}
+
+// Request to create an anonymous session shell.
+// Ref: #
+type CreateSessionRequest struct {
+	ProjectID ProjectID `json:"project_id"`
+	// Optional user agent / device context to attach to the session.
+	// Useful for correlating telemetry and device signals with the eventual
+	// authenticated session from the start.
+	UserAgent OptCreateSessionRequestUserAgent `json:"user_agent"`
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *CreateSessionRequest) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetUserAgent returns the value of UserAgent.
+func (s *CreateSessionRequest) GetUserAgent() OptCreateSessionRequestUserAgent {
+	return s.UserAgent
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *CreateSessionRequest) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetUserAgent sets the value of UserAgent.
+func (s *CreateSessionRequest) SetUserAgent(val OptCreateSessionRequestUserAgent) {
+	s.UserAgent = val
+}
+
+// Optional user agent / device context to attach to the session.
+// Useful for correlating telemetry and device signals with the eventual
+// authenticated session from the start.
+type CreateSessionRequestUserAgent struct {
+	// Client-supplied device fingerprint.
+	Fingerprint OptString `json:"fingerprint"`
+	// IP address of the client.
+	IP              OptString `json:"ip"`
+	AdditionalProps CreateSessionRequestUserAgentAdditional
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *CreateSessionRequestUserAgent) GetFingerprint() OptString {
+	return s.Fingerprint
+}
+
+// GetIP returns the value of IP.
+func (s *CreateSessionRequestUserAgent) GetIP() OptString {
+	return s.IP
+}
+
+// GetAdditionalProps returns the value of AdditionalProps.
+func (s *CreateSessionRequestUserAgent) GetAdditionalProps() CreateSessionRequestUserAgentAdditional {
+	return s.AdditionalProps
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *CreateSessionRequestUserAgent) SetFingerprint(val OptString) {
+	s.Fingerprint = val
+}
+
+// SetIP sets the value of IP.
+func (s *CreateSessionRequestUserAgent) SetIP(val OptString) {
+	s.IP = val
+}
+
+// SetAdditionalProps sets the value of AdditionalProps.
+func (s *CreateSessionRequestUserAgent) SetAdditionalProps(val CreateSessionRequestUserAgentAdditional) {
+	s.AdditionalProps = val
+}
+
+type CreateSessionRequestUserAgentAdditional map[string]jx.Raw
+
+func (s *CreateSessionRequestUserAgentAdditional) init() CreateSessionRequestUserAgentAdditional {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
 // Ref: #
 type DeviceAuthorizationResponse struct {
 	// The device code that the client will use to poll for authorization.
@@ -432,7 +893,9 @@ func (s *ErrorDetails) SetDetails(val OptErrorDetailsDetails) {
 func (*ErrorDetails) authorizeDeviceRes() {}
 func (*ErrorDetails) authorizeGetRes()    {}
 func (*ErrorDetails) createFlowRes()      {}
+func (*ErrorDetails) createSessionRes()   {}
 func (*ErrorDetails) endSessionRes()      {}
+func (*ErrorDetails) getAuthAttemptRes()  {}
 func (*ErrorDetails) introspectRes()      {}
 func (*ErrorDetails) submitFlowStepRes()  {}
 
@@ -476,17 +939,57 @@ func (s *ErrorDetailsStatusCode) SetResponse(val ErrorDetails) {
 
 func (*ErrorDetailsStatusCode) authorizeDeviceRes()        {}
 func (*ErrorDetailsStatusCode) authorizeGetRes()           {}
+func (*ErrorDetailsStatusCode) createAuthAttemptRes()      {}
+func (*ErrorDetailsStatusCode) createHandoffRes()          {}
+func (*ErrorDetailsStatusCode) createSessionRes()          {}
 func (*ErrorDetailsStatusCode) endSessionRes()             {}
+func (*ErrorDetailsStatusCode) exchangeHandoffRes()        {}
+func (*ErrorDetailsStatusCode) getAuthAttemptRes()         {}
 func (*ErrorDetailsStatusCode) getHealthRes()              {}
 func (*ErrorDetailsStatusCode) getKeysRes()                {}
 func (*ErrorDetailsStatusCode) getLiveRes()                {}
 func (*ErrorDetailsStatusCode) getOpenIDConfigurationRes() {}
 func (*ErrorDetailsStatusCode) getReadyRes()               {}
+func (*ErrorDetailsStatusCode) getSessionRes()             {}
 func (*ErrorDetailsStatusCode) getTokenRes()               {}
 func (*ErrorDetailsStatusCode) getUserInfoRes()            {}
 func (*ErrorDetailsStatusCode) introspectRes()             {}
+func (*ErrorDetailsStatusCode) issueChallengeRes()         {}
+func (*ErrorDetailsStatusCode) listSessionsRes()           {}
 func (*ErrorDetailsStatusCode) listUsersRes()              {}
+func (*ErrorDetailsStatusCode) revokeSessionRes()          {}
 func (*ErrorDetailsStatusCode) revokeTokenRes()            {}
+func (*ErrorDetailsStatusCode) verifyChallengeProofRes()   {}
+
+type ExchangeHandoffBadRequest ErrorDetails
+
+func (*ExchangeHandoffBadRequest) exchangeHandoffRes() {}
+
+type ExchangeHandoffGone ErrorDetails
+
+func (*ExchangeHandoffGone) exchangeHandoffRes() {}
+
+type ExchangeHandoffUnauthorized ErrorDetails
+
+func (*ExchangeHandoffUnauthorized) exchangeHandoffRes() {}
+
+// Request to exchange a handoff token for a session and session_token.
+// Ref: #
+type ExchangeRequest struct {
+	// The one-time handoff token minted by `POST /auth_attempts/{id}/handoff`.
+	// Single-use — replaying it after a successful exchange returns `410 Gone`.
+	HandoffToken string `json:"handoff_token"`
+}
+
+// GetHandoffToken returns the value of HandoffToken.
+func (s *ExchangeRequest) GetHandoffToken() string {
+	return s.HandoffToken
+}
+
+// SetHandoffToken sets the value of HandoffToken.
+func (s *ExchangeRequest) SetHandoffToken(val string) {
+	s.HandoffToken = val
+}
 
 // A data input capability. Describes what the user must provide.
 // Does not contain display text — only a `text_key` resolved client-side.
@@ -1581,6 +2084,14 @@ func (s GetReadyOK) Read(p []byte) (n int, err error) {
 
 func (*GetReadyOK) getReadyRes() {}
 
+type GetSessionNotFound ErrorDetails
+
+func (*GetSessionNotFound) getSessionRes() {}
+
+type GetSessionUnauthorized ErrorDetails
+
+func (*GetSessionUnauthorized) getSessionRes() {}
+
 type GetUserInfoOK struct {
 	// The unique identifier for the user.
 	Sub OptString `json:"sub"`
@@ -1669,6 +2180,46 @@ func (s *GetUserInfoOK) SetFamilyName(val OptString) {
 }
 
 func (*GetUserInfoOK) getUserInfoRes() {}
+
+// The handoff token and metadata for session exchange.
+// This is a short-lived credential (TTL ≤ 60 seconds) that the client must exchange
+// at POST /session_handoffs/{id}/exchange to receive the final session and session_token.
+// The handoff token is single-use and audience-bound to the project.
+// Ref: #
+type HandoffResponse struct {
+	// The short-lived handoff token for session exchange.
+	// Exchange at: POST /session_handoffs/{id}/exchange
+	// Requirements:
+	// - Single-use (atomic GETDEL on exchange)
+	// - TTL ≤ 60 seconds
+	// - Audience-bound to project (exchange requires sk_proj_… for matching project)
+	// - Idempotency-safe (Category B, 5-minute window).
+	HandoffToken string `json:"handoff_token"`
+	// When this handoff token expires.
+	ExpiresAt time.Time `json:"expires_at"`
+}
+
+// GetHandoffToken returns the value of HandoffToken.
+func (s *HandoffResponse) GetHandoffToken() string {
+	return s.HandoffToken
+}
+
+// GetExpiresAt returns the value of ExpiresAt.
+func (s *HandoffResponse) GetExpiresAt() time.Time {
+	return s.ExpiresAt
+}
+
+// SetHandoffToken sets the value of HandoffToken.
+func (s *HandoffResponse) SetHandoffToken(val string) {
+	s.HandoffToken = val
+}
+
+// SetExpiresAt sets the value of ExpiresAt.
+func (s *HandoffResponse) SetExpiresAt(val time.Time) {
+	s.ExpiresAt = val
+}
+
+func (*HandoffResponse) createHandoffRes() {}
 
 // Ref: #
 type IntrospectRequest struct {
@@ -1847,6 +2398,215 @@ func (s *IntrospectResponse) SetUsername(val OptString) {
 }
 
 func (*IntrospectResponse) introspectRes() {}
+
+type IssueChallengeBadRequest ErrorDetails
+
+func (*IssueChallengeBadRequest) issueChallengeRes() {}
+
+type IssueChallengeConflict ErrorDetails
+
+func (*IssueChallengeConflict) issueChallengeRes() {}
+
+type IssueChallengeNotFound ErrorDetails
+
+func (*IssueChallengeNotFound) issueChallengeRes() {}
+
+// Request to issue a factor challenge.
+// Ref: #
+type IssueChallengeRequest struct {
+	// The authentication factor method to challenge.
+	Method IssueChallengeRequestMethod `json:"method"`
+	// Optional options for the WebAuthn passkey ceremony. Only relevant when method is `passkey`.
+	Passkey OptIssueChallengeRequestPasskey `json:"passkey"`
+	// The federated identity provider to redirect to. Required when method is `idp`.
+	IdpProvider OptString `json:"idp_provider"`
+}
+
+// GetMethod returns the value of Method.
+func (s *IssueChallengeRequest) GetMethod() IssueChallengeRequestMethod {
+	return s.Method
+}
+
+// GetPasskey returns the value of Passkey.
+func (s *IssueChallengeRequest) GetPasskey() OptIssueChallengeRequestPasskey {
+	return s.Passkey
+}
+
+// GetIdpProvider returns the value of IdpProvider.
+func (s *IssueChallengeRequest) GetIdpProvider() OptString {
+	return s.IdpProvider
+}
+
+// SetMethod sets the value of Method.
+func (s *IssueChallengeRequest) SetMethod(val IssueChallengeRequestMethod) {
+	s.Method = val
+}
+
+// SetPasskey sets the value of Passkey.
+func (s *IssueChallengeRequest) SetPasskey(val OptIssueChallengeRequestPasskey) {
+	s.Passkey = val
+}
+
+// SetIdpProvider sets the value of IdpProvider.
+func (s *IssueChallengeRequest) SetIdpProvider(val OptString) {
+	s.IdpProvider = val
+}
+
+// The authentication factor method to challenge.
+type IssueChallengeRequestMethod string
+
+const (
+	IssueChallengeRequestMethodIdentifier   IssueChallengeRequestMethod = "identifier"
+	IssueChallengeRequestMethodPassword     IssueChallengeRequestMethod = "password"
+	IssueChallengeRequestMethodPasskey      IssueChallengeRequestMethod = "passkey"
+	IssueChallengeRequestMethodTotp         IssueChallengeRequestMethod = "totp"
+	IssueChallengeRequestMethodOtpSMS       IssueChallengeRequestMethod = "otp_sms"
+	IssueChallengeRequestMethodOtpEmail     IssueChallengeRequestMethod = "otp_email"
+	IssueChallengeRequestMethodRecoveryCode IssueChallengeRequestMethod = "recovery_code"
+	IssueChallengeRequestMethodIdp          IssueChallengeRequestMethod = "idp"
+	IssueChallengeRequestMethodCaptcha      IssueChallengeRequestMethod = "captcha"
+)
+
+// AllValues returns all IssueChallengeRequestMethod values.
+func (IssueChallengeRequestMethod) AllValues() []IssueChallengeRequestMethod {
+	return []IssueChallengeRequestMethod{
+		IssueChallengeRequestMethodIdentifier,
+		IssueChallengeRequestMethodPassword,
+		IssueChallengeRequestMethodPasskey,
+		IssueChallengeRequestMethodTotp,
+		IssueChallengeRequestMethodOtpSMS,
+		IssueChallengeRequestMethodOtpEmail,
+		IssueChallengeRequestMethodRecoveryCode,
+		IssueChallengeRequestMethodIdp,
+		IssueChallengeRequestMethodCaptcha,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s IssueChallengeRequestMethod) MarshalText() ([]byte, error) {
+	switch s {
+	case IssueChallengeRequestMethodIdentifier:
+		return []byte(s), nil
+	case IssueChallengeRequestMethodPassword:
+		return []byte(s), nil
+	case IssueChallengeRequestMethodPasskey:
+		return []byte(s), nil
+	case IssueChallengeRequestMethodTotp:
+		return []byte(s), nil
+	case IssueChallengeRequestMethodOtpSMS:
+		return []byte(s), nil
+	case IssueChallengeRequestMethodOtpEmail:
+		return []byte(s), nil
+	case IssueChallengeRequestMethodRecoveryCode:
+		return []byte(s), nil
+	case IssueChallengeRequestMethodIdp:
+		return []byte(s), nil
+	case IssueChallengeRequestMethodCaptcha:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *IssueChallengeRequestMethod) UnmarshalText(data []byte) error {
+	switch IssueChallengeRequestMethod(data) {
+	case IssueChallengeRequestMethodIdentifier:
+		*s = IssueChallengeRequestMethodIdentifier
+		return nil
+	case IssueChallengeRequestMethodPassword:
+		*s = IssueChallengeRequestMethodPassword
+		return nil
+	case IssueChallengeRequestMethodPasskey:
+		*s = IssueChallengeRequestMethodPasskey
+		return nil
+	case IssueChallengeRequestMethodTotp:
+		*s = IssueChallengeRequestMethodTotp
+		return nil
+	case IssueChallengeRequestMethodOtpSMS:
+		*s = IssueChallengeRequestMethodOtpSMS
+		return nil
+	case IssueChallengeRequestMethodOtpEmail:
+		*s = IssueChallengeRequestMethodOtpEmail
+		return nil
+	case IssueChallengeRequestMethodRecoveryCode:
+		*s = IssueChallengeRequestMethodRecoveryCode
+		return nil
+	case IssueChallengeRequestMethodIdp:
+		*s = IssueChallengeRequestMethodIdp
+		return nil
+	case IssueChallengeRequestMethodCaptcha:
+		*s = IssueChallengeRequestMethodCaptcha
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Optional options for the WebAuthn passkey ceremony. Only relevant when method is `passkey`.
+type IssueChallengeRequestPasskey struct {
+	// The user verification requirement for the passkey challenge.
+	UserVerification OptIssueChallengeRequestPasskeyUserVerification `json:"userVerification"`
+}
+
+// GetUserVerification returns the value of UserVerification.
+func (s *IssueChallengeRequestPasskey) GetUserVerification() OptIssueChallengeRequestPasskeyUserVerification {
+	return s.UserVerification
+}
+
+// SetUserVerification sets the value of UserVerification.
+func (s *IssueChallengeRequestPasskey) SetUserVerification(val OptIssueChallengeRequestPasskeyUserVerification) {
+	s.UserVerification = val
+}
+
+// The user verification requirement for the passkey challenge.
+type IssueChallengeRequestPasskeyUserVerification string
+
+const (
+	IssueChallengeRequestPasskeyUserVerificationRequired    IssueChallengeRequestPasskeyUserVerification = "required"
+	IssueChallengeRequestPasskeyUserVerificationPreferred   IssueChallengeRequestPasskeyUserVerification = "preferred"
+	IssueChallengeRequestPasskeyUserVerificationDiscouraged IssueChallengeRequestPasskeyUserVerification = "discouraged"
+)
+
+// AllValues returns all IssueChallengeRequestPasskeyUserVerification values.
+func (IssueChallengeRequestPasskeyUserVerification) AllValues() []IssueChallengeRequestPasskeyUserVerification {
+	return []IssueChallengeRequestPasskeyUserVerification{
+		IssueChallengeRequestPasskeyUserVerificationRequired,
+		IssueChallengeRequestPasskeyUserVerificationPreferred,
+		IssueChallengeRequestPasskeyUserVerificationDiscouraged,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s IssueChallengeRequestPasskeyUserVerification) MarshalText() ([]byte, error) {
+	switch s {
+	case IssueChallengeRequestPasskeyUserVerificationRequired:
+		return []byte(s), nil
+	case IssueChallengeRequestPasskeyUserVerificationPreferred:
+		return []byte(s), nil
+	case IssueChallengeRequestPasskeyUserVerificationDiscouraged:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *IssueChallengeRequestPasskeyUserVerification) UnmarshalText(data []byte) error {
+	switch IssueChallengeRequestPasskeyUserVerification(data) {
+	case IssueChallengeRequestPasskeyUserVerificationRequired:
+		*s = IssueChallengeRequestPasskeyUserVerificationRequired
+		return nil
+	case IssueChallengeRequestPasskeyUserVerificationPreferred:
+		*s = IssueChallengeRequestPasskeyUserVerificationPreferred
+		return nil
+	case IssueChallengeRequestPasskeyUserVerificationDiscouraged:
+		*s = IssueChallengeRequestPasskeyUserVerificationDiscouraged
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
 
 // Ref: #
 type KeysResponse struct {
@@ -2087,6 +2847,73 @@ func (s *KeysResponseKeysItem) SetX5t(val OptString) {
 func (s *KeysResponseKeysItem) SetX5tS256(val OptString) {
 	s.X5tS256 = val
 }
+
+type ListSessionsBadRequest ErrorDetails
+
+func (*ListSessionsBadRequest) listSessionsRes() {}
+
+type ListSessionsForbidden ErrorDetails
+
+func (*ListSessionsForbidden) listSessionsRes() {}
+
+type ListSessionsState string
+
+const (
+	ListSessionsStateBuilding ListSessionsState = "building"
+	ListSessionsStateActive   ListSessionsState = "active"
+	ListSessionsStateExpired  ListSessionsState = "expired"
+	ListSessionsStateRevoked  ListSessionsState = "revoked"
+)
+
+// AllValues returns all ListSessionsState values.
+func (ListSessionsState) AllValues() []ListSessionsState {
+	return []ListSessionsState{
+		ListSessionsStateBuilding,
+		ListSessionsStateActive,
+		ListSessionsStateExpired,
+		ListSessionsStateRevoked,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ListSessionsState) MarshalText() ([]byte, error) {
+	switch s {
+	case ListSessionsStateBuilding:
+		return []byte(s), nil
+	case ListSessionsStateActive:
+		return []byte(s), nil
+	case ListSessionsStateExpired:
+		return []byte(s), nil
+	case ListSessionsStateRevoked:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ListSessionsState) UnmarshalText(data []byte) error {
+	switch ListSessionsState(data) {
+	case ListSessionsStateBuilding:
+		*s = ListSessionsStateBuilding
+		return nil
+	case ListSessionsStateActive:
+		*s = ListSessionsStateActive
+		return nil
+	case ListSessionsStateExpired:
+		*s = ListSessionsStateExpired
+		return nil
+	case ListSessionsStateRevoked:
+		*s = ListSessionsStateRevoked
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+type ListSessionsUnauthorized ErrorDetails
+
+func (*ListSessionsUnauthorized) listSessionsRes() {}
 
 type ListUsersBadRequest ErrorDetails
 
@@ -2918,6 +3745,52 @@ func (o OptBrandingLayout) Or(d BrandingLayout) BrandingLayout {
 	return d
 }
 
+// NewOptCreateSessionRequestUserAgent returns new OptCreateSessionRequestUserAgent with value set to v.
+func NewOptCreateSessionRequestUserAgent(v CreateSessionRequestUserAgent) OptCreateSessionRequestUserAgent {
+	return OptCreateSessionRequestUserAgent{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptCreateSessionRequestUserAgent is optional CreateSessionRequestUserAgent.
+type OptCreateSessionRequestUserAgent struct {
+	Value CreateSessionRequestUserAgent
+	Set   bool
+}
+
+// IsSet returns true if OptCreateSessionRequestUserAgent was set.
+func (o OptCreateSessionRequestUserAgent) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptCreateSessionRequestUserAgent) Reset() {
+	var v CreateSessionRequestUserAgent
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptCreateSessionRequestUserAgent) SetTo(v CreateSessionRequestUserAgent) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptCreateSessionRequestUserAgent) Get() (v CreateSessionRequestUserAgent, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptCreateSessionRequestUserAgent) Or(d CreateSessionRequestUserAgent) CreateSessionRequestUserAgent {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptDateTime returns new OptDateTime with value set to v.
 func NewOptDateTime(v time.Time) OptDateTime {
 	return OptDateTime{
@@ -3378,6 +4251,459 @@ func (o OptInt) Or(d int) int {
 	return d
 }
 
+// NewOptIssueChallengeRequestPasskey returns new OptIssueChallengeRequestPasskey with value set to v.
+func NewOptIssueChallengeRequestPasskey(v IssueChallengeRequestPasskey) OptIssueChallengeRequestPasskey {
+	return OptIssueChallengeRequestPasskey{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptIssueChallengeRequestPasskey is optional IssueChallengeRequestPasskey.
+type OptIssueChallengeRequestPasskey struct {
+	Value IssueChallengeRequestPasskey
+	Set   bool
+}
+
+// IsSet returns true if OptIssueChallengeRequestPasskey was set.
+func (o OptIssueChallengeRequestPasskey) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptIssueChallengeRequestPasskey) Reset() {
+	var v IssueChallengeRequestPasskey
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptIssueChallengeRequestPasskey) SetTo(v IssueChallengeRequestPasskey) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptIssueChallengeRequestPasskey) Get() (v IssueChallengeRequestPasskey, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptIssueChallengeRequestPasskey) Or(d IssueChallengeRequestPasskey) IssueChallengeRequestPasskey {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptIssueChallengeRequestPasskeyUserVerification returns new OptIssueChallengeRequestPasskeyUserVerification with value set to v.
+func NewOptIssueChallengeRequestPasskeyUserVerification(v IssueChallengeRequestPasskeyUserVerification) OptIssueChallengeRequestPasskeyUserVerification {
+	return OptIssueChallengeRequestPasskeyUserVerification{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptIssueChallengeRequestPasskeyUserVerification is optional IssueChallengeRequestPasskeyUserVerification.
+type OptIssueChallengeRequestPasskeyUserVerification struct {
+	Value IssueChallengeRequestPasskeyUserVerification
+	Set   bool
+}
+
+// IsSet returns true if OptIssueChallengeRequestPasskeyUserVerification was set.
+func (o OptIssueChallengeRequestPasskeyUserVerification) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptIssueChallengeRequestPasskeyUserVerification) Reset() {
+	var v IssueChallengeRequestPasskeyUserVerification
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptIssueChallengeRequestPasskeyUserVerification) SetTo(v IssueChallengeRequestPasskeyUserVerification) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptIssueChallengeRequestPasskeyUserVerification) Get() (v IssueChallengeRequestPasskeyUserVerification, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptIssueChallengeRequestPasskeyUserVerification) Or(d IssueChallengeRequestPasskeyUserVerification) IssueChallengeRequestPasskeyUserVerification {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptListSessionsState returns new OptListSessionsState with value set to v.
+func NewOptListSessionsState(v ListSessionsState) OptListSessionsState {
+	return OptListSessionsState{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptListSessionsState is optional ListSessionsState.
+type OptListSessionsState struct {
+	Value ListSessionsState
+	Set   bool
+}
+
+// IsSet returns true if OptListSessionsState was set.
+func (o OptListSessionsState) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptListSessionsState) Reset() {
+	var v ListSessionsState
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptListSessionsState) SetTo(v ListSessionsState) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptListSessionsState) Get() (v ListSessionsState, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptListSessionsState) Or(d ListSessionsState) ListSessionsState {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilDateTime returns new OptNilDateTime with value set to v.
+func NewOptNilDateTime(v time.Time) OptNilDateTime {
+	return OptNilDateTime{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilDateTime is optional nullable time.Time.
+type OptNilDateTime struct {
+	Value time.Time
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilDateTime was set.
+func (o OptNilDateTime) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilDateTime) Reset() {
+	var v time.Time
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilDateTime) SetTo(v time.Time) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilDateTime) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilDateTime) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v time.Time
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilDateTime) Get() (v time.Time, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilDateTime) Or(d time.Time) time.Time {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilPageToken returns new OptNilPageToken with value set to v.
+func NewOptNilPageToken(v PageToken) OptNilPageToken {
+	return OptNilPageToken{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilPageToken is optional nullable PageToken.
+type OptNilPageToken struct {
+	Value PageToken
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilPageToken was set.
+func (o OptNilPageToken) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilPageToken) Reset() {
+	var v PageToken
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilPageToken) SetTo(v PageToken) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilPageToken) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilPageToken) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v PageToken
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilPageToken) Get() (v PageToken, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilPageToken) Or(d PageToken) PageToken {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilSessionID returns new OptNilSessionID with value set to v.
+func NewOptNilSessionID(v SessionID) OptNilSessionID {
+	return OptNilSessionID{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilSessionID is optional nullable SessionID.
+type OptNilSessionID struct {
+	Value SessionID
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilSessionID was set.
+func (o OptNilSessionID) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilSessionID) Reset() {
+	var v SessionID
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilSessionID) SetTo(v SessionID) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilSessionID) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilSessionID) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v SessionID
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilSessionID) Get() (v SessionID, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilSessionID) Or(d SessionID) SessionID {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilSessionResponseMetadata returns new OptNilSessionResponseMetadata with value set to v.
+func NewOptNilSessionResponseMetadata(v SessionResponseMetadata) OptNilSessionResponseMetadata {
+	return OptNilSessionResponseMetadata{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilSessionResponseMetadata is optional nullable SessionResponseMetadata.
+type OptNilSessionResponseMetadata struct {
+	Value SessionResponseMetadata
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilSessionResponseMetadata was set.
+func (o OptNilSessionResponseMetadata) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilSessionResponseMetadata) Reset() {
+	var v SessionResponseMetadata
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilSessionResponseMetadata) SetTo(v SessionResponseMetadata) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilSessionResponseMetadata) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilSessionResponseMetadata) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v SessionResponseMetadata
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilSessionResponseMetadata) Get() (v SessionResponseMetadata, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilSessionResponseMetadata) Or(d SessionResponseMetadata) SessionResponseMetadata {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilSessionResponseUserAgent returns new OptNilSessionResponseUserAgent with value set to v.
+func NewOptNilSessionResponseUserAgent(v SessionResponseUserAgent) OptNilSessionResponseUserAgent {
+	return OptNilSessionResponseUserAgent{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilSessionResponseUserAgent is optional nullable SessionResponseUserAgent.
+type OptNilSessionResponseUserAgent struct {
+	Value SessionResponseUserAgent
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilSessionResponseUserAgent was set.
+func (o OptNilSessionResponseUserAgent) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilSessionResponseUserAgent) Reset() {
+	var v SessionResponseUserAgent
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilSessionResponseUserAgent) SetTo(v SessionResponseUserAgent) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilSessionResponseUserAgent) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilSessionResponseUserAgent) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v SessionResponseUserAgent
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilSessionResponseUserAgent) Get() (v SessionResponseUserAgent, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilSessionResponseUserAgent) Or(d SessionResponseUserAgent) SessionResponseUserAgent {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptNilString returns new OptNilString with value set to v.
 func NewOptNilString(v string) OptNilString {
 	return OptNilString{
@@ -3435,6 +4761,69 @@ func (o OptNilString) Get() (v string, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptNilString) Or(d string) string {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilUserID returns new OptNilUserID with value set to v.
+func NewOptNilUserID(v UserID) OptNilUserID {
+	return OptNilUserID{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilUserID is optional nullable UserID.
+type OptNilUserID struct {
+	Value UserID
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilUserID was set.
+func (o OptNilUserID) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilUserID) Reset() {
+	var v UserID
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilUserID) SetTo(v UserID) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilUserID) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilUserID) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v UserID
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilUserID) Get() (v UserID, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilUserID) Or(d UserID) UserID {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -3625,6 +5014,54 @@ func (o OptURI) Or(d url.URL) url.URL {
 	return d
 }
 
+// NewOptUserID returns new OptUserID with value set to v.
+func NewOptUserID(v UserID) OptUserID {
+	return OptUserID{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptUserID is optional UserID.
+type OptUserID struct {
+	Value UserID
+	Set   bool
+}
+
+// IsSet returns true if OptUserID was set.
+func (o OptUserID) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptUserID) Reset() {
+	var v UserID
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptUserID) SetTo(v UserID) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptUserID) Get() (v UserID, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptUserID) Or(d UserID) UserID {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+type PageToken string
+
 // Ref: #
 type PostTokenRequest struct {
 	// The authorization code received from the authorization server. Required
@@ -3787,6 +5224,8 @@ func (s *PostTokenRequestGrantType) UnmarshalText(data []byte) error {
 	}
 }
 
+type ProjectID string
+
 // Ref: #
 type RevokeRequest struct {
 	// The token to revoke (access token or refresh token).
@@ -3814,6 +5253,23 @@ func (s *RevokeRequest) SetToken(val OptString) {
 func (s *RevokeRequest) SetTokenTypeHint(val OptString) {
 	s.TokenTypeHint = val
 }
+
+type RevokeSessionConflict ErrorDetails
+
+func (*RevokeSessionConflict) revokeSessionRes() {}
+
+// RevokeSessionNoContent is response for RevokeSession operation.
+type RevokeSessionNoContent struct{}
+
+func (*RevokeSessionNoContent) revokeSessionRes() {}
+
+type RevokeSessionNotFound ErrorDetails
+
+func (*RevokeSessionNotFound) revokeSessionRes() {}
+
+type RevokeSessionUnauthorized ErrorDetails
+
+func (*RevokeSessionUnauthorized) revokeSessionRes() {}
 
 // RevokeTokenOK is response for RevokeToken operation.
 type RevokeTokenOK struct{}
@@ -3860,6 +5316,351 @@ func (s *SSOProvider) SetName(val string) {
 func (s *SSOProvider) SetTemplate(val string) {
 	s.Template = val
 }
+
+type SessionID string
+
+// Paginated list of sessions.
+// Ref: #
+type SessionListResponse struct {
+	Sessions []SessionResponse `json:"sessions"`
+	// Token to pass as `page_token` in the next request to fetch the following page.
+	// Absent when there are no more results.
+	NextPageToken OptNilPageToken `json:"next_page_token"`
+}
+
+// GetSessions returns the value of Sessions.
+func (s *SessionListResponse) GetSessions() []SessionResponse {
+	return s.Sessions
+}
+
+// GetNextPageToken returns the value of NextPageToken.
+func (s *SessionListResponse) GetNextPageToken() OptNilPageToken {
+	return s.NextPageToken
+}
+
+// SetSessions sets the value of Sessions.
+func (s *SessionListResponse) SetSessions(val []SessionResponse) {
+	s.Sessions = val
+}
+
+// SetNextPageToken sets the value of NextPageToken.
+func (s *SessionListResponse) SetNextPageToken(val OptNilPageToken) {
+	s.NextPageToken = val
+}
+
+func (*SessionListResponse) listSessionsRes() {}
+
+// The current state of a session.
+// A session is the durable post-auth primitive. It accumulates verified authentication
+// factors and exposes `assurance_levels[]` — the set of assurance profiles its current
+// factors satisfy. Sessions are read-only from the client's perspective: factors flow
+// in through `auth_attempts`.
+// Ref: #
+type SessionResponse struct {
+	SessionID SessionID `json:"session_id"`
+	ProjectID ProjectID `json:"project_id"`
+	// Current lifecycle state of the session:
+	// - `building`: has a user factor but is still gathering authentication factors
+	// - `active`: has at least one verified authentication factor; `assurance_levels[]` may shrink as
+	// factors age
+	// - `expired`: TTL elapsed
+	// - `revoked`: explicitly revoked via DELETE.
+	State SessionResponseState `json:"state"`
+	// The authenticated user. Null for anonymous sessions and until the `user`
+	// factor has been verified through an `auth_attempt`.
+	UserID OptNilUserID `json:"user_id"`
+	// Verified authentication factors accumulated by this session.
+	// Each key is a factor type (e.g. `password`, `totp`, `passkey`).
+	// Each value is a factor event object with at least `verified_at` and
+	// method-specific properties (e.g. `user_verified`, `hardware` for passkeys).
+	Factors SessionResponseFactors `json:"factors"`
+	// All assurance levels whose schemas the current session factors satisfy.
+	// This list shrinks as factor freshness windows expire and grows when step-up
+	// auth_attempts add or refresh factors.
+	// Whether any level is "enough" is determined by the request context, not the session.
+	AssuranceLevels []string `json:"assurance_levels"`
+	// Arbitrary key/value metadata attached to the session.
+	Metadata OptNilSessionResponseMetadata `json:"metadata"`
+	// User agent information captured at session creation.
+	UserAgent OptNilSessionResponseUserAgent `json:"user_agent"`
+	// When this session was created.
+	CreatedAt time.Time `json:"created_at"`
+	// When this session expires. Short TTL (10 min) for anonymous sessions;
+	// reset to the full configured session TTL once the first authentication factor is written.
+	ExpiresAt time.Time `json:"expires_at"`
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *SessionResponse) GetSessionID() SessionID {
+	return s.SessionID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *SessionResponse) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetState returns the value of State.
+func (s *SessionResponse) GetState() SessionResponseState {
+	return s.State
+}
+
+// GetUserID returns the value of UserID.
+func (s *SessionResponse) GetUserID() OptNilUserID {
+	return s.UserID
+}
+
+// GetFactors returns the value of Factors.
+func (s *SessionResponse) GetFactors() SessionResponseFactors {
+	return s.Factors
+}
+
+// GetAssuranceLevels returns the value of AssuranceLevels.
+func (s *SessionResponse) GetAssuranceLevels() []string {
+	return s.AssuranceLevels
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *SessionResponse) GetMetadata() OptNilSessionResponseMetadata {
+	return s.Metadata
+}
+
+// GetUserAgent returns the value of UserAgent.
+func (s *SessionResponse) GetUserAgent() OptNilSessionResponseUserAgent {
+	return s.UserAgent
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *SessionResponse) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetExpiresAt returns the value of ExpiresAt.
+func (s *SessionResponse) GetExpiresAt() time.Time {
+	return s.ExpiresAt
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *SessionResponse) SetSessionID(val SessionID) {
+	s.SessionID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *SessionResponse) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetState sets the value of State.
+func (s *SessionResponse) SetState(val SessionResponseState) {
+	s.State = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *SessionResponse) SetUserID(val OptNilUserID) {
+	s.UserID = val
+}
+
+// SetFactors sets the value of Factors.
+func (s *SessionResponse) SetFactors(val SessionResponseFactors) {
+	s.Factors = val
+}
+
+// SetAssuranceLevels sets the value of AssuranceLevels.
+func (s *SessionResponse) SetAssuranceLevels(val []string) {
+	s.AssuranceLevels = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *SessionResponse) SetMetadata(val OptNilSessionResponseMetadata) {
+	s.Metadata = val
+}
+
+// SetUserAgent sets the value of UserAgent.
+func (s *SessionResponse) SetUserAgent(val OptNilSessionResponseUserAgent) {
+	s.UserAgent = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *SessionResponse) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetExpiresAt sets the value of ExpiresAt.
+func (s *SessionResponse) SetExpiresAt(val time.Time) {
+	s.ExpiresAt = val
+}
+
+func (*SessionResponse) getSessionRes() {}
+
+// Verified authentication factors accumulated by this session.
+// Each key is a factor type (e.g. `password`, `totp`, `passkey`).
+// Each value is a factor event object with at least `verified_at` and
+// method-specific properties (e.g. `user_verified`, `hardware` for passkeys).
+type SessionResponseFactors map[string]jx.Raw
+
+func (s *SessionResponseFactors) init() SessionResponseFactors {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+type SessionResponseMetadata map[string]jx.Raw
+
+func (s *SessionResponseMetadata) init() SessionResponseMetadata {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Current lifecycle state of the session:
+// - `building`: has a user factor but is still gathering authentication factors
+// - `active`: has at least one verified authentication factor; `assurance_levels[]` may shrink as
+// factors age
+// - `expired`: TTL elapsed
+// - `revoked`: explicitly revoked via DELETE.
+type SessionResponseState string
+
+const (
+	SessionResponseStateBuilding SessionResponseState = "building"
+	SessionResponseStateActive   SessionResponseState = "active"
+	SessionResponseStateExpired  SessionResponseState = "expired"
+	SessionResponseStateRevoked  SessionResponseState = "revoked"
+)
+
+// AllValues returns all SessionResponseState values.
+func (SessionResponseState) AllValues() []SessionResponseState {
+	return []SessionResponseState{
+		SessionResponseStateBuilding,
+		SessionResponseStateActive,
+		SessionResponseStateExpired,
+		SessionResponseStateRevoked,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s SessionResponseState) MarshalText() ([]byte, error) {
+	switch s {
+	case SessionResponseStateBuilding:
+		return []byte(s), nil
+	case SessionResponseStateActive:
+		return []byte(s), nil
+	case SessionResponseStateExpired:
+		return []byte(s), nil
+	case SessionResponseStateRevoked:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *SessionResponseState) UnmarshalText(data []byte) error {
+	switch SessionResponseState(data) {
+	case SessionResponseStateBuilding:
+		*s = SessionResponseStateBuilding
+		return nil
+	case SessionResponseStateActive:
+		*s = SessionResponseStateActive
+		return nil
+	case SessionResponseStateExpired:
+		*s = SessionResponseStateExpired
+		return nil
+	case SessionResponseStateRevoked:
+		*s = SessionResponseStateRevoked
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+type SessionResponseUserAgent struct {
+	// Client-supplied device fingerprint.
+	Fingerprint OptString `json:"fingerprint"`
+	// IP address of the client at session creation.
+	IP              OptString `json:"ip"`
+	AdditionalProps SessionResponseUserAgentAdditional
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *SessionResponseUserAgent) GetFingerprint() OptString {
+	return s.Fingerprint
+}
+
+// GetIP returns the value of IP.
+func (s *SessionResponseUserAgent) GetIP() OptString {
+	return s.IP
+}
+
+// GetAdditionalProps returns the value of AdditionalProps.
+func (s *SessionResponseUserAgent) GetAdditionalProps() SessionResponseUserAgentAdditional {
+	return s.AdditionalProps
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *SessionResponseUserAgent) SetFingerprint(val OptString) {
+	s.Fingerprint = val
+}
+
+// SetIP sets the value of IP.
+func (s *SessionResponseUserAgent) SetIP(val OptString) {
+	s.IP = val
+}
+
+// SetAdditionalProps sets the value of AdditionalProps.
+func (s *SessionResponseUserAgent) SetAdditionalProps(val SessionResponseUserAgentAdditional) {
+	s.AdditionalProps = val
+}
+
+type SessionResponseUserAgentAdditional map[string]jx.Raw
+
+func (s *SessionResponseUserAgentAdditional) init() SessionResponseUserAgentAdditional {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Response for session creation and handoff exchange.
+// Includes the session state and the session_token required to manage it.
+// Ref: #
+type SessionWithTokenResponse struct {
+	Session SessionResponse `json:"session"`
+	// Bearer token authorising management of this session (GET and DELETE).
+	// For anonymous sessions this token is superseded when a handoff exchange completes —
+	// clients must replace their stored token at that point.
+	SessionToken string `json:"session_token"`
+}
+
+// GetSession returns the value of Session.
+func (s *SessionWithTokenResponse) GetSession() SessionResponse {
+	return s.Session
+}
+
+// GetSessionToken returns the value of SessionToken.
+func (s *SessionWithTokenResponse) GetSessionToken() string {
+	return s.SessionToken
+}
+
+// SetSession sets the value of Session.
+func (s *SessionWithTokenResponse) SetSession(val SessionResponse) {
+	s.Session = val
+}
+
+// SetSessionToken sets the value of SessionToken.
+func (s *SessionWithTokenResponse) SetSessionToken(val string) {
+	s.SessionToken = val
+}
+
+func (*SessionWithTokenResponse) createSessionRes()   {}
+func (*SessionWithTokenResponse) exchangeHandoffRes() {}
 
 // An action the user can take. Keyed by action name in the parent dictionary.
 // The action name is sent back in the submit request as `action`.
@@ -3986,6 +5787,8 @@ func (s *TokenResponse) SetRefreshToken(val OptString) {
 
 func (*TokenResponse) getTokenRes() {}
 
+type UserID string
+
 type UsernamePassword struct {
 	Username string
 	Password string
@@ -4020,4 +5823,554 @@ func (s *UsernamePassword) SetPassword(val string) {
 // SetRoles sets the value of Roles.
 func (s *UsernamePassword) SetRoles(val []string) {
 	s.Roles = val
+}
+
+type VerifyChallengeProofBadRequest ErrorDetails
+
+func (*VerifyChallengeProofBadRequest) verifyChallengeProofRes() {}
+
+type VerifyChallengeProofNotFound ErrorDetails
+
+func (*VerifyChallengeProofNotFound) verifyChallengeProofRes() {}
+
+type VerifyChallengeProofTooManyRequests ErrorDetails
+
+func (*VerifyChallengeProofTooManyRequests) verifyChallengeProofRes() {}
+
+type VerifyChallengeProofUnauthorized ErrorDetails
+
+func (*VerifyChallengeProofUnauthorized) verifyChallengeProofRes() {}
+
+// Proof for verifying a factor challenge.
+// The exact format depends on the challenge method. The proof object should contain
+// only the credential/code/assertion relevant to the challenge method being verified.
+// Ref: #
+type VerifyChallengeRequest struct {
+	OneOf VerifyChallengeRequestSum
+}
+
+// GetOneOf returns the value of OneOf.
+func (s *VerifyChallengeRequest) GetOneOf() VerifyChallengeRequestSum {
+	return s.OneOf
+}
+
+// SetOneOf sets the value of OneOf.
+func (s *VerifyChallengeRequest) SetOneOf(val VerifyChallengeRequestSum) {
+	s.OneOf = val
+}
+
+// VerifyChallengeRequestSum represents sum type.
+type VerifyChallengeRequestSum struct {
+	Type                       VerifyChallengeRequestSumType // switch on this field
+	VerifyChallengeRequestSum0 VerifyChallengeRequestSum0
+	VerifyChallengeRequestSum1 VerifyChallengeRequestSum1
+	VerifyChallengeRequestSum2 VerifyChallengeRequestSum2
+	VerifyChallengeRequestSum3 VerifyChallengeRequestSum3
+	VerifyChallengeRequestSum4 VerifyChallengeRequestSum4
+	VerifyChallengeRequestSum5 VerifyChallengeRequestSum5
+	VerifyChallengeRequestSum6 VerifyChallengeRequestSum6
+	VerifyChallengeRequestSum7 VerifyChallengeRequestSum7
+	VerifyChallengeRequestSum8 VerifyChallengeRequestSum8
+}
+
+// VerifyChallengeRequestSumType is oneOf type of VerifyChallengeRequestSum.
+type VerifyChallengeRequestSumType string
+
+// Possible values for VerifyChallengeRequestSumType.
+const (
+	VerifyChallengeRequestSum0VerifyChallengeRequestSum VerifyChallengeRequestSumType = "VerifyChallengeRequestSum0"
+	VerifyChallengeRequestSum1VerifyChallengeRequestSum VerifyChallengeRequestSumType = "VerifyChallengeRequestSum1"
+	VerifyChallengeRequestSum2VerifyChallengeRequestSum VerifyChallengeRequestSumType = "VerifyChallengeRequestSum2"
+	VerifyChallengeRequestSum3VerifyChallengeRequestSum VerifyChallengeRequestSumType = "VerifyChallengeRequestSum3"
+	VerifyChallengeRequestSum4VerifyChallengeRequestSum VerifyChallengeRequestSumType = "VerifyChallengeRequestSum4"
+	VerifyChallengeRequestSum5VerifyChallengeRequestSum VerifyChallengeRequestSumType = "VerifyChallengeRequestSum5"
+	VerifyChallengeRequestSum6VerifyChallengeRequestSum VerifyChallengeRequestSumType = "VerifyChallengeRequestSum6"
+	VerifyChallengeRequestSum7VerifyChallengeRequestSum VerifyChallengeRequestSumType = "VerifyChallengeRequestSum7"
+	VerifyChallengeRequestSum8VerifyChallengeRequestSum VerifyChallengeRequestSumType = "VerifyChallengeRequestSum8"
+)
+
+// IsVerifyChallengeRequestSum0 reports whether VerifyChallengeRequestSum is VerifyChallengeRequestSum0.
+func (s VerifyChallengeRequestSum) IsVerifyChallengeRequestSum0() bool {
+	return s.Type == VerifyChallengeRequestSum0VerifyChallengeRequestSum
+}
+
+// IsVerifyChallengeRequestSum1 reports whether VerifyChallengeRequestSum is VerifyChallengeRequestSum1.
+func (s VerifyChallengeRequestSum) IsVerifyChallengeRequestSum1() bool {
+	return s.Type == VerifyChallengeRequestSum1VerifyChallengeRequestSum
+}
+
+// IsVerifyChallengeRequestSum2 reports whether VerifyChallengeRequestSum is VerifyChallengeRequestSum2.
+func (s VerifyChallengeRequestSum) IsVerifyChallengeRequestSum2() bool {
+	return s.Type == VerifyChallengeRequestSum2VerifyChallengeRequestSum
+}
+
+// IsVerifyChallengeRequestSum3 reports whether VerifyChallengeRequestSum is VerifyChallengeRequestSum3.
+func (s VerifyChallengeRequestSum) IsVerifyChallengeRequestSum3() bool {
+	return s.Type == VerifyChallengeRequestSum3VerifyChallengeRequestSum
+}
+
+// IsVerifyChallengeRequestSum4 reports whether VerifyChallengeRequestSum is VerifyChallengeRequestSum4.
+func (s VerifyChallengeRequestSum) IsVerifyChallengeRequestSum4() bool {
+	return s.Type == VerifyChallengeRequestSum4VerifyChallengeRequestSum
+}
+
+// IsVerifyChallengeRequestSum5 reports whether VerifyChallengeRequestSum is VerifyChallengeRequestSum5.
+func (s VerifyChallengeRequestSum) IsVerifyChallengeRequestSum5() bool {
+	return s.Type == VerifyChallengeRequestSum5VerifyChallengeRequestSum
+}
+
+// IsVerifyChallengeRequestSum6 reports whether VerifyChallengeRequestSum is VerifyChallengeRequestSum6.
+func (s VerifyChallengeRequestSum) IsVerifyChallengeRequestSum6() bool {
+	return s.Type == VerifyChallengeRequestSum6VerifyChallengeRequestSum
+}
+
+// IsVerifyChallengeRequestSum7 reports whether VerifyChallengeRequestSum is VerifyChallengeRequestSum7.
+func (s VerifyChallengeRequestSum) IsVerifyChallengeRequestSum7() bool {
+	return s.Type == VerifyChallengeRequestSum7VerifyChallengeRequestSum
+}
+
+// IsVerifyChallengeRequestSum8 reports whether VerifyChallengeRequestSum is VerifyChallengeRequestSum8.
+func (s VerifyChallengeRequestSum) IsVerifyChallengeRequestSum8() bool {
+	return s.Type == VerifyChallengeRequestSum8VerifyChallengeRequestSum
+}
+
+// SetVerifyChallengeRequestSum0 sets VerifyChallengeRequestSum to VerifyChallengeRequestSum0.
+func (s *VerifyChallengeRequestSum) SetVerifyChallengeRequestSum0(v VerifyChallengeRequestSum0) {
+	s.Type = VerifyChallengeRequestSum0VerifyChallengeRequestSum
+	s.VerifyChallengeRequestSum0 = v
+}
+
+// GetVerifyChallengeRequestSum0 returns VerifyChallengeRequestSum0 and true boolean if VerifyChallengeRequestSum is VerifyChallengeRequestSum0.
+func (s VerifyChallengeRequestSum) GetVerifyChallengeRequestSum0() (v VerifyChallengeRequestSum0, ok bool) {
+	if !s.IsVerifyChallengeRequestSum0() {
+		return v, false
+	}
+	return s.VerifyChallengeRequestSum0, true
+}
+
+// NewVerifyChallengeRequestSum0VerifyChallengeRequestSum returns new VerifyChallengeRequestSum from VerifyChallengeRequestSum0.
+func NewVerifyChallengeRequestSum0VerifyChallengeRequestSum(v VerifyChallengeRequestSum0) VerifyChallengeRequestSum {
+	var s VerifyChallengeRequestSum
+	s.SetVerifyChallengeRequestSum0(v)
+	return s
+}
+
+// SetVerifyChallengeRequestSum1 sets VerifyChallengeRequestSum to VerifyChallengeRequestSum1.
+func (s *VerifyChallengeRequestSum) SetVerifyChallengeRequestSum1(v VerifyChallengeRequestSum1) {
+	s.Type = VerifyChallengeRequestSum1VerifyChallengeRequestSum
+	s.VerifyChallengeRequestSum1 = v
+}
+
+// GetVerifyChallengeRequestSum1 returns VerifyChallengeRequestSum1 and true boolean if VerifyChallengeRequestSum is VerifyChallengeRequestSum1.
+func (s VerifyChallengeRequestSum) GetVerifyChallengeRequestSum1() (v VerifyChallengeRequestSum1, ok bool) {
+	if !s.IsVerifyChallengeRequestSum1() {
+		return v, false
+	}
+	return s.VerifyChallengeRequestSum1, true
+}
+
+// NewVerifyChallengeRequestSum1VerifyChallengeRequestSum returns new VerifyChallengeRequestSum from VerifyChallengeRequestSum1.
+func NewVerifyChallengeRequestSum1VerifyChallengeRequestSum(v VerifyChallengeRequestSum1) VerifyChallengeRequestSum {
+	var s VerifyChallengeRequestSum
+	s.SetVerifyChallengeRequestSum1(v)
+	return s
+}
+
+// SetVerifyChallengeRequestSum2 sets VerifyChallengeRequestSum to VerifyChallengeRequestSum2.
+func (s *VerifyChallengeRequestSum) SetVerifyChallengeRequestSum2(v VerifyChallengeRequestSum2) {
+	s.Type = VerifyChallengeRequestSum2VerifyChallengeRequestSum
+	s.VerifyChallengeRequestSum2 = v
+}
+
+// GetVerifyChallengeRequestSum2 returns VerifyChallengeRequestSum2 and true boolean if VerifyChallengeRequestSum is VerifyChallengeRequestSum2.
+func (s VerifyChallengeRequestSum) GetVerifyChallengeRequestSum2() (v VerifyChallengeRequestSum2, ok bool) {
+	if !s.IsVerifyChallengeRequestSum2() {
+		return v, false
+	}
+	return s.VerifyChallengeRequestSum2, true
+}
+
+// NewVerifyChallengeRequestSum2VerifyChallengeRequestSum returns new VerifyChallengeRequestSum from VerifyChallengeRequestSum2.
+func NewVerifyChallengeRequestSum2VerifyChallengeRequestSum(v VerifyChallengeRequestSum2) VerifyChallengeRequestSum {
+	var s VerifyChallengeRequestSum
+	s.SetVerifyChallengeRequestSum2(v)
+	return s
+}
+
+// SetVerifyChallengeRequestSum3 sets VerifyChallengeRequestSum to VerifyChallengeRequestSum3.
+func (s *VerifyChallengeRequestSum) SetVerifyChallengeRequestSum3(v VerifyChallengeRequestSum3) {
+	s.Type = VerifyChallengeRequestSum3VerifyChallengeRequestSum
+	s.VerifyChallengeRequestSum3 = v
+}
+
+// GetVerifyChallengeRequestSum3 returns VerifyChallengeRequestSum3 and true boolean if VerifyChallengeRequestSum is VerifyChallengeRequestSum3.
+func (s VerifyChallengeRequestSum) GetVerifyChallengeRequestSum3() (v VerifyChallengeRequestSum3, ok bool) {
+	if !s.IsVerifyChallengeRequestSum3() {
+		return v, false
+	}
+	return s.VerifyChallengeRequestSum3, true
+}
+
+// NewVerifyChallengeRequestSum3VerifyChallengeRequestSum returns new VerifyChallengeRequestSum from VerifyChallengeRequestSum3.
+func NewVerifyChallengeRequestSum3VerifyChallengeRequestSum(v VerifyChallengeRequestSum3) VerifyChallengeRequestSum {
+	var s VerifyChallengeRequestSum
+	s.SetVerifyChallengeRequestSum3(v)
+	return s
+}
+
+// SetVerifyChallengeRequestSum4 sets VerifyChallengeRequestSum to VerifyChallengeRequestSum4.
+func (s *VerifyChallengeRequestSum) SetVerifyChallengeRequestSum4(v VerifyChallengeRequestSum4) {
+	s.Type = VerifyChallengeRequestSum4VerifyChallengeRequestSum
+	s.VerifyChallengeRequestSum4 = v
+}
+
+// GetVerifyChallengeRequestSum4 returns VerifyChallengeRequestSum4 and true boolean if VerifyChallengeRequestSum is VerifyChallengeRequestSum4.
+func (s VerifyChallengeRequestSum) GetVerifyChallengeRequestSum4() (v VerifyChallengeRequestSum4, ok bool) {
+	if !s.IsVerifyChallengeRequestSum4() {
+		return v, false
+	}
+	return s.VerifyChallengeRequestSum4, true
+}
+
+// NewVerifyChallengeRequestSum4VerifyChallengeRequestSum returns new VerifyChallengeRequestSum from VerifyChallengeRequestSum4.
+func NewVerifyChallengeRequestSum4VerifyChallengeRequestSum(v VerifyChallengeRequestSum4) VerifyChallengeRequestSum {
+	var s VerifyChallengeRequestSum
+	s.SetVerifyChallengeRequestSum4(v)
+	return s
+}
+
+// SetVerifyChallengeRequestSum5 sets VerifyChallengeRequestSum to VerifyChallengeRequestSum5.
+func (s *VerifyChallengeRequestSum) SetVerifyChallengeRequestSum5(v VerifyChallengeRequestSum5) {
+	s.Type = VerifyChallengeRequestSum5VerifyChallengeRequestSum
+	s.VerifyChallengeRequestSum5 = v
+}
+
+// GetVerifyChallengeRequestSum5 returns VerifyChallengeRequestSum5 and true boolean if VerifyChallengeRequestSum is VerifyChallengeRequestSum5.
+func (s VerifyChallengeRequestSum) GetVerifyChallengeRequestSum5() (v VerifyChallengeRequestSum5, ok bool) {
+	if !s.IsVerifyChallengeRequestSum5() {
+		return v, false
+	}
+	return s.VerifyChallengeRequestSum5, true
+}
+
+// NewVerifyChallengeRequestSum5VerifyChallengeRequestSum returns new VerifyChallengeRequestSum from VerifyChallengeRequestSum5.
+func NewVerifyChallengeRequestSum5VerifyChallengeRequestSum(v VerifyChallengeRequestSum5) VerifyChallengeRequestSum {
+	var s VerifyChallengeRequestSum
+	s.SetVerifyChallengeRequestSum5(v)
+	return s
+}
+
+// SetVerifyChallengeRequestSum6 sets VerifyChallengeRequestSum to VerifyChallengeRequestSum6.
+func (s *VerifyChallengeRequestSum) SetVerifyChallengeRequestSum6(v VerifyChallengeRequestSum6) {
+	s.Type = VerifyChallengeRequestSum6VerifyChallengeRequestSum
+	s.VerifyChallengeRequestSum6 = v
+}
+
+// GetVerifyChallengeRequestSum6 returns VerifyChallengeRequestSum6 and true boolean if VerifyChallengeRequestSum is VerifyChallengeRequestSum6.
+func (s VerifyChallengeRequestSum) GetVerifyChallengeRequestSum6() (v VerifyChallengeRequestSum6, ok bool) {
+	if !s.IsVerifyChallengeRequestSum6() {
+		return v, false
+	}
+	return s.VerifyChallengeRequestSum6, true
+}
+
+// NewVerifyChallengeRequestSum6VerifyChallengeRequestSum returns new VerifyChallengeRequestSum from VerifyChallengeRequestSum6.
+func NewVerifyChallengeRequestSum6VerifyChallengeRequestSum(v VerifyChallengeRequestSum6) VerifyChallengeRequestSum {
+	var s VerifyChallengeRequestSum
+	s.SetVerifyChallengeRequestSum6(v)
+	return s
+}
+
+// SetVerifyChallengeRequestSum7 sets VerifyChallengeRequestSum to VerifyChallengeRequestSum7.
+func (s *VerifyChallengeRequestSum) SetVerifyChallengeRequestSum7(v VerifyChallengeRequestSum7) {
+	s.Type = VerifyChallengeRequestSum7VerifyChallengeRequestSum
+	s.VerifyChallengeRequestSum7 = v
+}
+
+// GetVerifyChallengeRequestSum7 returns VerifyChallengeRequestSum7 and true boolean if VerifyChallengeRequestSum is VerifyChallengeRequestSum7.
+func (s VerifyChallengeRequestSum) GetVerifyChallengeRequestSum7() (v VerifyChallengeRequestSum7, ok bool) {
+	if !s.IsVerifyChallengeRequestSum7() {
+		return v, false
+	}
+	return s.VerifyChallengeRequestSum7, true
+}
+
+// NewVerifyChallengeRequestSum7VerifyChallengeRequestSum returns new VerifyChallengeRequestSum from VerifyChallengeRequestSum7.
+func NewVerifyChallengeRequestSum7VerifyChallengeRequestSum(v VerifyChallengeRequestSum7) VerifyChallengeRequestSum {
+	var s VerifyChallengeRequestSum
+	s.SetVerifyChallengeRequestSum7(v)
+	return s
+}
+
+// SetVerifyChallengeRequestSum8 sets VerifyChallengeRequestSum to VerifyChallengeRequestSum8.
+func (s *VerifyChallengeRequestSum) SetVerifyChallengeRequestSum8(v VerifyChallengeRequestSum8) {
+	s.Type = VerifyChallengeRequestSum8VerifyChallengeRequestSum
+	s.VerifyChallengeRequestSum8 = v
+}
+
+// GetVerifyChallengeRequestSum8 returns VerifyChallengeRequestSum8 and true boolean if VerifyChallengeRequestSum is VerifyChallengeRequestSum8.
+func (s VerifyChallengeRequestSum) GetVerifyChallengeRequestSum8() (v VerifyChallengeRequestSum8, ok bool) {
+	if !s.IsVerifyChallengeRequestSum8() {
+		return v, false
+	}
+	return s.VerifyChallengeRequestSum8, true
+}
+
+// NewVerifyChallengeRequestSum8VerifyChallengeRequestSum returns new VerifyChallengeRequestSum from VerifyChallengeRequestSum8.
+func NewVerifyChallengeRequestSum8VerifyChallengeRequestSum(v VerifyChallengeRequestSum8) VerifyChallengeRequestSum {
+	var s VerifyChallengeRequestSum
+	s.SetVerifyChallengeRequestSum8(v)
+	return s
+}
+
+// Proof for `identifier` method.
+type VerifyChallengeRequestSum0 struct {
+	// The login name or email being identified.
+	LoginName string `json:"login_name"`
+}
+
+// GetLoginName returns the value of LoginName.
+func (s *VerifyChallengeRequestSum0) GetLoginName() string {
+	return s.LoginName
+}
+
+// SetLoginName sets the value of LoginName.
+func (s *VerifyChallengeRequestSum0) SetLoginName(val string) {
+	s.LoginName = val
+}
+
+// Proof for `password` method.
+type VerifyChallengeRequestSum1 struct {
+	// The password being verified.
+	Password string `json:"password"`
+}
+
+// GetPassword returns the value of Password.
+func (s *VerifyChallengeRequestSum1) GetPassword() string {
+	return s.Password
+}
+
+// SetPassword sets the value of Password.
+func (s *VerifyChallengeRequestSum1) SetPassword(val string) {
+	s.Password = val
+}
+
+// Proof for `totp` method.
+type VerifyChallengeRequestSum2 struct {
+	// TOTP (time-based one-time password) credentials.
+	Totp VerifyChallengeRequestSum2Totp `json:"totp"`
+}
+
+// GetTotp returns the value of Totp.
+func (s *VerifyChallengeRequestSum2) GetTotp() VerifyChallengeRequestSum2Totp {
+	return s.Totp
+}
+
+// SetTotp sets the value of Totp.
+func (s *VerifyChallengeRequestSum2) SetTotp(val VerifyChallengeRequestSum2Totp) {
+	s.Totp = val
+}
+
+// TOTP (time-based one-time password) credentials.
+type VerifyChallengeRequestSum2Totp struct {
+	// The 6-8 digit TOTP code.
+	Code string `json:"code"`
+}
+
+// GetCode returns the value of Code.
+func (s *VerifyChallengeRequestSum2Totp) GetCode() string {
+	return s.Code
+}
+
+// SetCode sets the value of Code.
+func (s *VerifyChallengeRequestSum2Totp) SetCode(val string) {
+	s.Code = val
+}
+
+// Proof for `otp_sms` method.
+type VerifyChallengeRequestSum3 struct {
+	// One-time code sent via SMS.
+	OtpSMS VerifyChallengeRequestSum3OtpSMS `json:"otp_sms"`
+}
+
+// GetOtpSMS returns the value of OtpSMS.
+func (s *VerifyChallengeRequestSum3) GetOtpSMS() VerifyChallengeRequestSum3OtpSMS {
+	return s.OtpSMS
+}
+
+// SetOtpSMS sets the value of OtpSMS.
+func (s *VerifyChallengeRequestSum3) SetOtpSMS(val VerifyChallengeRequestSum3OtpSMS) {
+	s.OtpSMS = val
+}
+
+// One-time code sent via SMS.
+type VerifyChallengeRequestSum3OtpSMS struct {
+	// The code received via SMS.
+	Code string `json:"code"`
+}
+
+// GetCode returns the value of Code.
+func (s *VerifyChallengeRequestSum3OtpSMS) GetCode() string {
+	return s.Code
+}
+
+// SetCode sets the value of Code.
+func (s *VerifyChallengeRequestSum3OtpSMS) SetCode(val string) {
+	s.Code = val
+}
+
+// Proof for `otp_email` method.
+type VerifyChallengeRequestSum4 struct {
+	// One-time code sent via email.
+	OtpEmail VerifyChallengeRequestSum4OtpEmail `json:"otp_email"`
+}
+
+// GetOtpEmail returns the value of OtpEmail.
+func (s *VerifyChallengeRequestSum4) GetOtpEmail() VerifyChallengeRequestSum4OtpEmail {
+	return s.OtpEmail
+}
+
+// SetOtpEmail sets the value of OtpEmail.
+func (s *VerifyChallengeRequestSum4) SetOtpEmail(val VerifyChallengeRequestSum4OtpEmail) {
+	s.OtpEmail = val
+}
+
+// One-time code sent via email.
+type VerifyChallengeRequestSum4OtpEmail struct {
+	// The code received via email.
+	Code string `json:"code"`
+}
+
+// GetCode returns the value of Code.
+func (s *VerifyChallengeRequestSum4OtpEmail) GetCode() string {
+	return s.Code
+}
+
+// SetCode sets the value of Code.
+func (s *VerifyChallengeRequestSum4OtpEmail) SetCode(val string) {
+	s.Code = val
+}
+
+// Proof for `recovery_code` method.
+type VerifyChallengeRequestSum5 struct {
+	// A recovery code.
+	RecoveryCode string `json:"recovery_code"`
+}
+
+// GetRecoveryCode returns the value of RecoveryCode.
+func (s *VerifyChallengeRequestSum5) GetRecoveryCode() string {
+	return s.RecoveryCode
+}
+
+// SetRecoveryCode sets the value of RecoveryCode.
+func (s *VerifyChallengeRequestSum5) SetRecoveryCode(val string) {
+	s.RecoveryCode = val
+}
+
+// Proof for `passkey` method.
+type VerifyChallengeRequestSum6 struct {
+	// WebAuthn passkey assertion.
+	Passkey VerifyChallengeRequestSum6Passkey `json:"passkey"`
+}
+
+// GetPasskey returns the value of Passkey.
+func (s *VerifyChallengeRequestSum6) GetPasskey() VerifyChallengeRequestSum6Passkey {
+	return s.Passkey
+}
+
+// SetPasskey sets the value of Passkey.
+func (s *VerifyChallengeRequestSum6) SetPasskey(val VerifyChallengeRequestSum6Passkey) {
+	s.Passkey = val
+}
+
+// WebAuthn passkey assertion.
+type VerifyChallengeRequestSum6Passkey struct {
+	// The base64-encoded WebAuthn AssertionResponse JSON.
+	Assertion string `json:"assertion"`
+}
+
+// GetAssertion returns the value of Assertion.
+func (s *VerifyChallengeRequestSum6Passkey) GetAssertion() string {
+	return s.Assertion
+}
+
+// SetAssertion sets the value of Assertion.
+func (s *VerifyChallengeRequestSum6Passkey) SetAssertion(val string) {
+	s.Assertion = val
+}
+
+// Proof for `idp` method (federated login).
+type VerifyChallengeRequestSum7 struct {
+	// Federated identity provider assertion.
+	IdpAssertion VerifyChallengeRequestSum7IdpAssertion `json:"idp_assertion"`
+}
+
+// GetIdpAssertion returns the value of IdpAssertion.
+func (s *VerifyChallengeRequestSum7) GetIdpAssertion() VerifyChallengeRequestSum7IdpAssertion {
+	return s.IdpAssertion
+}
+
+// SetIdpAssertion sets the value of IdpAssertion.
+func (s *VerifyChallengeRequestSum7) SetIdpAssertion(val VerifyChallengeRequestSum7IdpAssertion) {
+	s.IdpAssertion = val
+}
+
+// Federated identity provider assertion.
+type VerifyChallengeRequestSum7IdpAssertion struct {
+	// The authorization code from the identity provider.
+	Code string `json:"code"`
+	// The state parameter originally provided by the server.
+	State OptString `json:"state"`
+}
+
+// GetCode returns the value of Code.
+func (s *VerifyChallengeRequestSum7IdpAssertion) GetCode() string {
+	return s.Code
+}
+
+// GetState returns the value of State.
+func (s *VerifyChallengeRequestSum7IdpAssertion) GetState() OptString {
+	return s.State
+}
+
+// SetCode sets the value of Code.
+func (s *VerifyChallengeRequestSum7IdpAssertion) SetCode(val string) {
+	s.Code = val
+}
+
+// SetState sets the value of State.
+func (s *VerifyChallengeRequestSum7IdpAssertion) SetState(val OptString) {
+	s.State = val
+}
+
+// Proof for `captcha` method.
+type VerifyChallengeRequestSum8 struct {
+	// CAPTCHA verification proof.
+	Captcha VerifyChallengeRequestSum8Captcha `json:"captcha"`
+}
+
+// GetCaptcha returns the value of Captcha.
+func (s *VerifyChallengeRequestSum8) GetCaptcha() VerifyChallengeRequestSum8Captcha {
+	return s.Captcha
+}
+
+// SetCaptcha sets the value of Captcha.
+func (s *VerifyChallengeRequestSum8) SetCaptcha(val VerifyChallengeRequestSum8Captcha) {
+	s.Captcha = val
+}
+
+// CAPTCHA verification proof.
+type VerifyChallengeRequestSum8Captcha struct {
+	// The CAPTCHA token or solution.
+	Token string `json:"token"`
+}
+
+// GetToken returns the value of Token.
+func (s *VerifyChallengeRequestSum8Captcha) GetToken() string {
+	return s.Token
+}
+
+// SetToken sets the value of Token.
+func (s *VerifyChallengeRequestSum8Captcha) SetToken(val string) {
+	s.Token = val
 }
