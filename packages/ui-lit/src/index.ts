@@ -1,4 +1,4 @@
-export { NextgenLogout } from "./logout.js";
+export { NextgenLogout } from "./logout";
 
 import { LitElement, css, html } from "lit";
 
