@@ -484,11 +484,7 @@ export async function verifyJwt(
     if (!alg) {
       return null;
     }
-    if (
-      allowedAlgorithms &&
-      allowedAlgorithms.length > 0 &&
-      !allowedAlgorithms.includes(alg)
-    ) {
+    if (allowedAlgorithms?.length && !allowedAlgorithms.includes(alg)) {
       return null;
     }
 

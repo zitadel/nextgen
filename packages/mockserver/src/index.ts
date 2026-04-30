@@ -12,7 +12,7 @@ const { privateKey, publicKey } = generateKeyPairSync('rsa', {
 });
 const KEY_ID = 'mock-key-1';
 const jwk = {
-  ...(publicKey.export({ format: 'jwk' }) as object),
+  ...(publicKey.export({ format: 'jwk' }) as JsonWebKey),
   kid: KEY_ID,
   use: 'sig',
   alg: 'RS256',
@@ -49,10 +49,11 @@ function buildJwt(sub: string, privateKey: KeyObject): string {
 }
 
 function readBody(req: IncomingMessage): Promise<string> {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     req.on('data', (chunk: Buffer) => chunks.push(chunk));
     req.on('end', () => resolve(Buffer.concat(chunks).toString()));
+    req.on('error', reject);
   });
 }
 

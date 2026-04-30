@@ -22,4 +22,7 @@ import type { AuthResult } from '../types';
  * @returns The current {@link AuthResult}.
  */
 export const useAuth = (): AuthResult =>
-  useState<AuthResult>('nextgen-auth').value;
+  useState<AuthResult>('nextgen-auth', () => ({
+    isAuthenticated: false,
+    session: null,
+  })).value;
