@@ -3,6 +3,10 @@ import { generateKeyPairSync, createSign } from "node:crypto";
 import { NextRequest } from "next/server";
 import { nextgenMiddleware } from "../middleware";
 
+const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+const privateKeyPem = privateKey.export({ type: "pkcs8", format: "pem" }).toString();
+const publicKeyJwk = publicKey.export({ type: "spki", format: "jwk" }) as Record<string, unknown>;
+
 function base64url(buf: Buffer): string {
   return buf.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
@@ -23,10 +27,6 @@ function makeRequest(url: string, cookie?: string, authorization?: string): Next
   if (authorization) headers["authorization"] = authorization;
   return new NextRequest(url, { headers });
 }
-
-const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
-const privateKeyPem = privateKey.export({ type: "pkcs8", format: "pem" }).toString();
-const publicKeyJwk = publicKey.export({ type: "spki", format: "jwk" }) as Record<string, unknown>;
 
 /**
  * Monotonically increasing key-ID counter. Each test that exercises JWKS

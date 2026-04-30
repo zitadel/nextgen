@@ -76,7 +76,7 @@ describe("createNextgenMiddleware (H3)", () => {
     expect(capturedAuth).toEqual({ isAuthenticated: false, session: null });
   });
 
-  it("protected route with no cookie redirects to /login?next=/admin", async () => {
+  it("protected route with no token redirects to /login?next=/admin", async () => {
     const app = createApp();
     app.use(
       createNextgenMiddleware({

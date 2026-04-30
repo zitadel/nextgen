@@ -40,7 +40,8 @@
   "scripts": {
     "build": "tsup src/middleware.ts src/auth.ts src/context.tsx src/useAuth.ts src/types.ts src/index.ts src/server.ts src/client.ts --format esm --dts --clean",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@nextgen/ui-lit": "workspace:*",
@@ -53,10 +54,25 @@
     "react-dom": ">=18"
   },
   "devDependencies": {
-    "@types/react": "^19.0.2",
+    "@eslint/js": "^10.0.0",
+    "@eslint/json": "^0.11.0",
+    "@eslint/markdown": "^6.0.0",
     "@testing-library/react": "^16.0.0",
     "@testing-library/user-event": "^14.0.0",
+    "@types/react": "^19.0.2",
+    "eslint": "^10.0.0",
+    "eslint-config-prettier": "^10.0.0",
+    "eslint-import-resolver-typescript": "^3.7.0",
+    "eslint-plugin-import": "^2.31.0",
+    "eslint-plugin-jsx-a11y": "^6.10.0",
+    "eslint-plugin-perfectionist": "^4.0.0",
+    "eslint-plugin-prettier": "^5.0.0",
+    "eslint-plugin-react": "^7.37.0",
+    "eslint-plugin-react-hooks": "^5.0.0",
+    "eslint-plugin-testing-library": "^7.0.0",
     "jsdom": "^26.0.0",
+    "prettier": "^3.0.0",
+    "typescript-eslint": "^8.0.0",
     "vitest": "^3.0.0"
   }
 }

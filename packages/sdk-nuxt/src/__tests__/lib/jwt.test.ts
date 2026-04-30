@@ -216,8 +216,8 @@ describe("verifyJwt", () => {
 
     it("returns null for a malformed (non-JWT) token string", async () => {
       vi.stubGlobal("fetch", vi.fn());
-      expect(await verifyJwt("not.a.jwt.at.all", baseOpts("any"))).toBeNull();
-      expect(await verifyJwt("", baseOpts("any"))).toBeNull();
+      expect(await verifyJwt("not.a.jwt.at.all", baseOpts())).toBeNull();
+      expect(await verifyJwt("", baseOpts())).toBeNull();
     });
   });
 
