@@ -11,17 +11,14 @@ This is done using schemas. E.g.: a customer can define his own user schema whic
 
 ## Terminology
 
-### Root Schema
+### Meta Schema
 
 A schema defined by us. This schema can be extended by a customer by defining a custom schema and referencing that from
 within their schema.
 
 E.g.:
 
-- Root User Schema (actually a meta schema from which a user schema should be derived, from which in turn users can be
-  created)
-- Flow Schema
-- Auth Provider Schema
+- Meta User Schema
 
 ### Schema
 
@@ -32,30 +29,17 @@ E.g.:
 
 - User Schema
 
-### Object
+### Instance
 
 The artifact which is created from a Schema. These objects represent concrete things.
 
 E.g.:
 
 - User
-- Flow
-- Auth Provider
-
-### Transformer
-
-A function which transform an object so that the resulting object fits within a schema. These can be uses as a layer
-between schemas.
-
-E.g.: When a user wants to add an Auth Provider. We need a given set of data for an OIDC provider: `issuer`, `clientId`,
-`redirectUri`, `scopes`, claim mapping. When using Entra-ID, it would be easier if the user could enter a `tenantId`
-instead of the issuer since it is easier to come by in the Entry-ID config. The `issuer` can be calculated once the
-`tenantId` is known. In this case, the schema does not change, but a transformation is needed which transforms the
-`tenantId` to an `issuer`.
 
 ### Capability
 
-A piece of functionality which is defined by a keyword/multiple keywords in a root-schema.
+A piece of functionality which is defined by a keyword/multiple keywords in a meta-schema.
 
 E.g.:
 
@@ -69,16 +53,16 @@ Let's describe how these schema's can be used. Bear with me, it is quiet abstrac
 
 ### Single step hierarchy
 
-1. ZITADEL creates a Root Schema. Let's call it `Foo`-root-schema.
-2. Customer creates Objects which implement to the `Foo`-root-schema.
+1. ZITADEL creates a Schema. Let's call it `Foo`-schema.
+2. Customer creates Instances which implement to the `Foo`-schema.
 
 This is the simplest use-case for a schema. 
 
 ### Root meta-schema
 
-1. ZITADEL creates a Root Schema. Let's call it `Foo`-root-schema.
-2. Customer creates a Schema which implements to the `Foo`-root-schema. Let's call it `Bar`-schema.
-3. Customer creates Objects which implement to the `Bar`-schema
+1. ZITADEL creates a Meta Schema. Let's call it `Foo`-meta-schema.
+2. Customer creates a Schema which implements to the `Foo`-meta-schema. Let's call it `Bar`-schema.
+3. Customer creates Instances which implement to the `Bar`-schema
 
 ### Transformer
 
@@ -90,3 +74,19 @@ This is the simplest use-case for a schema.
    implements the `Foo`-root-schema. Let's call it the `Baz`-transformer.
 4. That tenant then creates Objects which adhere to the `Bar`-schema. Because the `Baz`-transformer is configured to 
    sit between the `Bar`-schema and `Foo`-root-schema, the created Object indirectly implements the `Foo`-root-schema.
+
+## Out of scope
+
+### Transformers
+
+Discussions came up on whether a customer can create a schema which resolves to an instance which does not implement a 
+schema created by ZITADEL. It would then use a 'transformer' to transform the instance so that the resulting instance
+would implement the schema created by ZITADEL.
+
+E.g.: An OIDC-auth provider schema would require `issuer`, `redirectUri`, `scope`, `clientId`,... When a customer would
+want to implement an EntryID auth provider, they might want to create a schema which does not contain an `issuer` but 
+a `tenantId`. This `tenantID` could then be transformed to an `issuer`.
+
+This would be make the schema engine highly extensible. But, this would mean that customer-created schemas don't have to
+extend/implement any schemas created by ZITADEL. Because this is not yet requirement, it is left out of scope and will
+be implemented once there requests for this feature.

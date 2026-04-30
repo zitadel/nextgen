@@ -10,10 +10,7 @@ flowchart TD
     cacheSchema@{               shape: process,    label: "Cache schema" }
     doesSchemaHaveMetaSchema@{  shape: decision,   label: "Does schema have\nmeta schema?" }
     recurse@{                   shape: subprocess, label: "recurse"}
-    needsTransformer@{          shape: decision,   label: "Is transformation\nneeded?" }
-    transformObject@{           shape: process,    label: "Transform" }
     validateObject@{            shape: process,    label: "Validate\nagainst Schema" }
-    validateTransformedObject@{ shape: process,    label: "Validate transformed \nagainst Schema" }
     ok@{                        shape: stop }
 
     start@{shape: start} --> isSchemaLocal
@@ -27,8 +24,5 @@ flowchart TD
     doesSchemaHaveMetaSchema -- Yes --> recurse --> cacheSchema
     doesSchemaHaveMetaSchema -- No --> cacheSchema
 
-    cacheSchema --> needsTransformer
-
-    needsTransformer -- Yes --> transformObject --> validateTransformedObject --> ok
-    needsTransformer -- No  --> validateObject --> ok
+    cacheSchema --> validateObject --> ok
 ```

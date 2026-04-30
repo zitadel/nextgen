@@ -9,7 +9,7 @@
 
 ### API
 
-The API which hosts the Root-Schema.
+The API which hosts the Schema.
 
 ### CUSTOMER
 
@@ -30,10 +30,9 @@ A separate application created by CUSTOMER to use for representing data to the U
 
 Let's assume the following sequence of events:
 
-1. API creates the `Flow`-Root-Schema inside Zitadel.
-2. CUSTOMER creates a schema for flows. Let's call it `registration_flow`.
-3. CUSTOMER implements the flow Definition (object) in their UI.
-4. USER registers a user using the flow Object.
+1. API creates the `User`-Meta-Schema inside Zitadel.
+2. CUSTOMER creates a schema for user. Let's call it `human_user_schema`.
+3. USER registers a user.
 
 #### Case 1: API adds new capability
 
@@ -45,27 +44,27 @@ Let's assume we have a capability which requires an API call. The API needs to b
 capability. This poses a first problem: how do we not break user-space. How do we let CUSTOMER know that there has been
 a breaking change and let them upgrade easily?
 
-#### Case 3: CUSTOMER uses a new capability inside `registration_flow`
+#### Case 3: CUSTOMER uses a new capability inside `human_user_schema`
 
-This again poses a problem on how to let this know downstream. If the CUSTOMER updates their flow Object, they should
+This again poses a problem on how to let this know downstream. If the CUSTOMER updates their user Instances, they should
 also implement the functionality in the UI. But we should be able to provide correct error handling in case they
 forgot about it.
 
 ### The problem
 
 In all of these cases, there is a need for versioning the different parts. If a version is specified for a given
-revision of Root-Schema/Schema/Object we can communicate that version and the different actors can decide which version
-they want to use.
+revision of Meta-Schema/Schema/Instance we can communicate that version and the different actors can decide which 
+version they want to use.
 
 ## Immutability
 
-To do proper versioning we need to make the Root-Schema/Schema immutable once a revision is created. For the Root-Schema
-this is done automatically using git and semantic versioning.
+To do proper versioning we need to make all schemas immutable once a revision is created. For the Schemas created by
+ZITADEL this is done automatically using git and semantic versioning.
 
 ## Versioning
 
-The Root-Schema is versioned using semantic versioning: `Major.Minor.Patch` in which breaking changes are major
-upgrades, new features are minor upgrades and all others are patches. By versioning the Root-Schema separately from the
+The Meta-Schema is versioned using semantic versioning: `Major.Minor.Patch` in which breaking changes are major
+upgrades, new features are minor upgrades and all others are patches. By versioning the Meta-Schema separately from the
 binary allows for a more fine-grained communication of what changed in the engine instead of the entire application.
 
 Schemas created by the CUSTOMER which are stored in ZITADEL are versioned using an auto-incrementing revision number.
@@ -73,15 +72,15 @@ For Schemas which are not stored in ZITADEL, this is not possible. We assume the
 by only using a URL for a single version of the schema. E.g.: https://example.com/my-schema/v1/schema.json. However,
 as a safetymeasure we use E-tags to cache a given schema.
 
-Since objects are the result of a schema, they should contain the version from which they were created. They are not
-versioned though, since they do not have any dependencies, a dedicated object version would be redundant.
+Since instances are the result of a schema, they should contain the version from which they were created. They are not
+versioned themselves though, since they do not have any dependencies, a dedicated object version would be redundant.
 
 ## Migrations
 
 Once breaking changes are introduced, migrations are required. This is applicable for both the API and the schemas.
 
 The API is fully under our control. We can deprecate a Capability which will be removed in the future. The CUSTOMER
-needs to be notified of this deprecation. Initially this can be when updating a Root-Schema; other push-based 
+needs to be notified of this deprecation. Initially this can be when updating a Meta-Schema; other push-based 
 notifications can be implemented in the future.
 
 If a breaking change happens on a schema, a migration pattern should be provided by the CUSTOMER. A migration path can
@@ -96,19 +95,19 @@ To make management of a Definition easier for the CUSTOMER we introduce multiple
 ### Draft
 
 The Definition is not yet published and can still be edited. It is still under development or ready to be released in
-the future. This Schema can be targeted when creating an Object but will not be used by default.
+the future. This Schema can be targeted when creating an Instance but will not be used by default.
 
 ### Active
 
-The Schema is active and read-only. This Schema can be targeted when creating an Object but will not be used by default.
+The Schema is active and read-only. This Schema can be targeted when creating an Instance but will not be used by default.
 
-A Schema can be flagged as default to make it the default Schema to use when creating Objects.
+A Schema can be flagged as default to make it the default Schema to use when creating Instances.
 
 ### Deprecated
 
-The Schema is deprecated. The Schema can still be used when creating Objects, but the API returns a warning to indicate 
+The Schema is deprecated. The Schema can still be used when creating Instances, but the API returns a warning to indicate 
 that the schema should not be used anymore and suggests the default schema.
 
 ### Archived
 
-The Schema still exists in the database but can no longer be used to create Objects.
+The Schema still exists in the database but can no longer be used to create Instances.
