@@ -54,7 +54,7 @@ describe("createNextgenMiddleware (H3)", () => {
     vi.restoreAllMocks();
   });
 
-  it("public route with no cookie sets nextgenAuth to unauthenticated", async () => {
+  it("public route with no token sets nextgenAuth to unauthenticated", async () => {
     const app = createApp();
     app.use(
       createNextgenMiddleware({

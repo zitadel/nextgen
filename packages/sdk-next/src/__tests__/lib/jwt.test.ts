@@ -68,7 +68,7 @@ function mockJwks(kid: string): ReturnType<typeof vi.fn> {
 }
 
 /** Base options suitable for most tests; override per test as needed. */
-function baseOpts(kid: string, overrides: Partial<VerifyJwtOptions> = {}): VerifyJwtOptions {
+function baseOpts(overrides: Partial<VerifyJwtOptions> = {}): VerifyJwtOptions {
   return {
     issuerUrl: "http://localhost:4000",
     clockSkewMs: 0,
@@ -167,7 +167,7 @@ describe("verifyJwt", () => {
       const token = makeJwt({ sub: "user-42", email: "u@example.com", exp: ts(3600) }, kid);
       vi.stubGlobal("fetch", mockJwks(kid));
 
-      const payload = await verifyJwt(token, baseOpts(kid));
+      const payload = await verifyJwt(token, baseOpts());
       expect(payload).not.toBeNull();
       expect(payload?.sub).toBe("user-42");
       expect(payload?.email).toBe("u@example.com");
@@ -180,7 +180,7 @@ describe("verifyJwt", () => {
       const tampered = `${h}.${p}.AAAAAAAAAAAAAAAA`;
       vi.stubGlobal("fetch", mockJwks(kid));
 
-      expect(await verifyJwt(tampered, baseOpts(kid))).toBeNull();
+      expect(await verifyJwt(tampered, baseOpts())).toBeNull();
     });
 
     it("returns null when the payload is tampered", async () => {
@@ -191,7 +191,7 @@ describe("verifyJwt", () => {
       const tampered = `${h}.${evilPayload}.${sig}`;
       vi.stubGlobal("fetch", mockJwks(kid));
 
-      expect(await verifyJwt(tampered, baseOpts(kid))).toBeNull();
+      expect(await verifyJwt(tampered, baseOpts())).toBeNull();
     });
 
     it("returns null when JWKS fetch returns a non-OK status", async () => {
@@ -202,7 +202,7 @@ describe("verifyJwt", () => {
         vi.fn().mockResolvedValue(new Response("", { status: 500 })),
       );
 
-      expect(await verifyJwt(token, baseOpts(kid))).toBeNull();
+      expect(await verifyJwt(token, baseOpts())).toBeNull();
     });
 
     it("returns null when the kid is not present in the JWKS", async () => {
@@ -211,7 +211,7 @@ describe("verifyJwt", () => {
       const wrongKid = nextKid();
       vi.stubGlobal("fetch", mockJwks(wrongKid)); // JWKS has a different kid
 
-      expect(await verifyJwt(token, baseOpts(kid))).toBeNull();
+      expect(await verifyJwt(token, baseOpts())).toBeNull();
     });
 
     it("returns null for a malformed (non-JWT) token string", async () => {
@@ -230,9 +230,9 @@ describe("verifyJwt", () => {
       const fetchMock = mockJwks(kid);
       vi.stubGlobal("fetch", fetchMock);
 
-      await verifyJwt(token, baseOpts(kid));
-      await verifyJwt(token, baseOpts(kid));
-      await verifyJwt(token, baseOpts(kid));
+      await verifyJwt(token, baseOpts());
+      await verifyJwt(token, baseOpts());
+      await verifyJwt(token, baseOpts());
 
       // JWKS endpoint must have been called exactly once
       expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -244,12 +244,12 @@ describe("verifyJwt", () => {
       const fetchMock = mockJwks(kid);
       vi.stubGlobal("fetch", fetchMock);
 
-      await verifyJwt(token, baseOpts(kid));
+      await verifyJwt(token, baseOpts());
 
       // Advance time past the cache TTL
       vi.spyOn(Date, "now").mockReturnValue(Date.now() + JWKS_TTL_MS + 1);
 
-      await verifyJwt(token, baseOpts(kid));
+      await verifyJwt(token, baseOpts());
 
       expect(fetchMock).toHaveBeenCalledTimes(2);
     });
@@ -263,7 +263,7 @@ describe("verifyJwt", () => {
       const token = makeJwt({ sub: "u", exp: ts(3600) }, kid, "RS256");
       vi.stubGlobal("fetch", mockJwks(kid));
 
-      const payload = await verifyJwt(token, baseOpts(kid, { allowedAlgorithms: ["RS256"] }));
+      const payload = await verifyJwt(token, baseOpts({ allowedAlgorithms: ["RS256"] }));
       expect(payload).not.toBeNull();
     });
 
@@ -272,7 +272,7 @@ describe("verifyJwt", () => {
       const token = makeJwt({ sub: "u", exp: ts(3600) }, kid, "RS256");
       vi.stubGlobal("fetch", vi.fn()); // fetch must not be called
 
-      const payload = await verifyJwt(token, baseOpts(kid, { allowedAlgorithms: ["ES256"] }));
+      const payload = await verifyJwt(token, baseOpts({ allowedAlgorithms: ["ES256"] }));
       expect(payload).toBeNull();
       expect(vi.mocked(fetch)).not.toHaveBeenCalled();
     });
@@ -282,7 +282,7 @@ describe("verifyJwt", () => {
       const token = makeJwt({ sub: "u", exp: ts(3600) }, kid, "RS256");
       vi.stubGlobal("fetch", mockJwks(kid));
 
-      const payload = await verifyJwt(token, baseOpts(kid, { allowedAlgorithms: undefined }));
+      const payload = await verifyJwt(token, baseOpts({ allowedAlgorithms: undefined }));
       expect(payload).not.toBeNull();
     });
   });
@@ -295,7 +295,7 @@ describe("verifyJwt", () => {
       const token = makeJwt({ sub: "u", exp: ts(3600) }, kid, "RS256", "JWT");
       vi.stubGlobal("fetch", mockJwks(kid));
 
-      expect(await verifyJwt(token, baseOpts(kid, { allowedTokenTypes: ["JWT", "at+JWT"] }))).not.toBeNull();
+      expect(await verifyJwt(token, baseOpts({ allowedTokenTypes: ["JWT", "at+JWT"] }))).not.toBeNull();
     });
 
     it('accepts a token with typ "at+JWT"', async () => {
@@ -303,7 +303,7 @@ describe("verifyJwt", () => {
       const token = makeJwt({ sub: "u", exp: ts(3600) }, kid, "RS256", "at+JWT");
       vi.stubGlobal("fetch", mockJwks(kid));
 
-      expect(await verifyJwt(token, baseOpts(kid, { allowedTokenTypes: ["JWT", "at+JWT"] }))).not.toBeNull();
+      expect(await verifyJwt(token, baseOpts({ allowedTokenTypes: ["JWT", "at+JWT"] }))).not.toBeNull();
     });
 
     it("is case-insensitive", async () => {
@@ -311,7 +311,7 @@ describe("verifyJwt", () => {
       const token = makeJwt({ sub: "u", exp: ts(3600) }, kid, "RS256", "jwt");
       vi.stubGlobal("fetch", mockJwks(kid));
 
-      expect(await verifyJwt(token, baseOpts(kid, { allowedTokenTypes: ["JWT"] }))).not.toBeNull();
+      expect(await verifyJwt(token, baseOpts({ allowedTokenTypes: ["JWT"] }))).not.toBeNull();
     });
 
     it("rejects a token with an unknown typ", async () => {
@@ -319,7 +319,7 @@ describe("verifyJwt", () => {
       const token = makeJwt({ sub: "u", exp: ts(3600) }, kid, "RS256", "refresh+JWT");
       vi.stubGlobal("fetch", vi.fn());
 
-      expect(await verifyJwt(token, baseOpts(kid, { allowedTokenTypes: ["JWT", "at+JWT"] }))).toBeNull();
+      expect(await verifyJwt(token, baseOpts({ allowedTokenTypes: ["JWT", "at+JWT"] }))).toBeNull();
       expect(vi.mocked(fetch)).not.toHaveBeenCalled();
     });
 
@@ -328,7 +328,7 @@ describe("verifyJwt", () => {
       const token = makeJwt({ sub: "u", exp: ts(3600) }, kid, "RS256", "anything");
       vi.stubGlobal("fetch", mockJwks(kid));
 
-      expect(await verifyJwt(token, baseOpts(kid, { allowedTokenTypes: [] }))).not.toBeNull();
+      expect(await verifyJwt(token, baseOpts({ allowedTokenTypes: [] }))).not.toBeNull();
     });
   });
 
@@ -340,7 +340,7 @@ describe("verifyJwt", () => {
       const token = makeJwt({ sub: "u", iss: "http://localhost:4000", exp: ts(3600) }, kid);
       vi.stubGlobal("fetch", mockJwks(kid));
 
-      expect(await verifyJwt(token, baseOpts(kid))).not.toBeNull();
+      expect(await verifyJwt(token, baseOpts())).not.toBeNull();
     });
 
     it("rejects a token whose iss does not match issuerUrl", async () => {
@@ -348,7 +348,7 @@ describe("verifyJwt", () => {
       const token = makeJwt({ sub: "u", iss: "http://evil.example.com", exp: ts(3600) }, kid);
       vi.stubGlobal("fetch", mockJwks(kid));
 
-      expect(await verifyJwt(token, baseOpts(kid))).toBeNull();
+      expect(await verifyJwt(token, baseOpts())).toBeNull();
     });
 
     it("accepts a token with no iss claim (iss is optional)", async () => {
@@ -356,7 +356,7 @@ describe("verifyJwt", () => {
       const token = makeJwt({ sub: "u", exp: ts(3600) }, kid); // no iss
       vi.stubGlobal("fetch", mockJwks(kid));
 
-      expect(await verifyJwt(token, baseOpts(kid))).not.toBeNull();
+      expect(await verifyJwt(token, baseOpts())).not.toBeNull();
     });
   });
 
@@ -368,7 +368,7 @@ describe("verifyJwt", () => {
       const token = makeJwt({ sub: "u", aud: "my-app", exp: ts(3600) }, kid);
       vi.stubGlobal("fetch", mockJwks(kid));
 
-      expect(await verifyJwt(token, baseOpts(kid, { audience: "my-app" }))).not.toBeNull();
+      expect(await verifyJwt(token, baseOpts({ audience: "my-app" }))).not.toBeNull();
     });
 
     it("accepts when aud array contains the configured audience", async () => {
@@ -376,7 +376,7 @@ describe("verifyJwt", () => {
       const token = makeJwt({ sub: "u", aud: ["my-app", "other-app"], exp: ts(3600) }, kid);
       vi.stubGlobal("fetch", mockJwks(kid));
 
-      expect(await verifyJwt(token, baseOpts(kid, { audience: "my-app" }))).not.toBeNull();
+      expect(await verifyJwt(token, baseOpts({ audience: "my-app" }))).not.toBeNull();
     });
 
     it("accepts when audience option is an array and one value matches", async () => {
@@ -384,7 +384,7 @@ describe("verifyJwt", () => {
       const token = makeJwt({ sub: "u", aud: "my-app", exp: ts(3600) }, kid);
       vi.stubGlobal("fetch", mockJwks(kid));
 
-      expect(await verifyJwt(token, baseOpts(kid, { audience: ["my-app", "other-app"] }))).not.toBeNull();
+      expect(await verifyJwt(token, baseOpts({ audience: ["my-app", "other-app"] }))).not.toBeNull();
     });
 
     it("rejects when aud does not match the configured audience", async () => {
@@ -392,7 +392,7 @@ describe("verifyJwt", () => {
       const token = makeJwt({ sub: "u", aud: "wrong-app", exp: ts(3600) }, kid);
       vi.stubGlobal("fetch", mockJwks(kid));
 
-      expect(await verifyJwt(token, baseOpts(kid, { audience: "my-app" }))).toBeNull();
+      expect(await verifyJwt(token, baseOpts({ audience: "my-app" }))).toBeNull();
     });
 
     it("skips aud check when audience option is not set", async () => {
@@ -401,7 +401,7 @@ describe("verifyJwt", () => {
       const token = makeJwt({ sub: "u", aud: "some-app", exp: ts(3600) }, kid);
       vi.stubGlobal("fetch", mockJwks(kid));
 
-      expect(await verifyJwt(token, baseOpts(kid, { audience: undefined }))).not.toBeNull();
+      expect(await verifyJwt(token, baseOpts({ audience: undefined }))).not.toBeNull();
     });
   });
 
@@ -413,7 +413,7 @@ describe("verifyJwt", () => {
       const token = makeJwt({ sub: "u", exp: ts(3600) }, kid);
       vi.stubGlobal("fetch", mockJwks(kid));
 
-      expect(await verifyJwt(token, baseOpts(kid))).not.toBeNull();
+      expect(await verifyJwt(token, baseOpts())).not.toBeNull();
     });
 
     it("rejects an expired token", async () => {
@@ -421,7 +421,7 @@ describe("verifyJwt", () => {
       const token = makeJwt({ sub: "u", exp: ts(-10) }, kid); // expired 10 s ago
       vi.stubGlobal("fetch", mockJwks(kid));
 
-      expect(await verifyJwt(token, baseOpts(kid))).toBeNull();
+      expect(await verifyJwt(token, baseOpts())).toBeNull();
     });
 
     it("accepts a just-expired token within clock skew", async () => {
@@ -430,7 +430,7 @@ describe("verifyJwt", () => {
       vi.stubGlobal("fetch", mockJwks(kid));
 
       // 5 s clock skew should cover the 3 s expiry
-      expect(await verifyJwt(token, baseOpts(kid, { clockSkewMs: 5000 }))).not.toBeNull();
+      expect(await verifyJwt(token, baseOpts({ clockSkewMs: 5000 }))).not.toBeNull();
     });
 
     it("accepts a token with no exp claim", async () => {
@@ -438,7 +438,7 @@ describe("verifyJwt", () => {
       const token = makeJwt({ sub: "u" }, kid); // no exp
       vi.stubGlobal("fetch", mockJwks(kid));
 
-      expect(await verifyJwt(token, baseOpts(kid))).not.toBeNull();
+      expect(await verifyJwt(token, baseOpts())).not.toBeNull();
     });
   });
 
@@ -450,7 +450,7 @@ describe("verifyJwt", () => {
       const token = makeJwt({ sub: "u", nbf: ts(-60), exp: ts(3600) }, kid);
       vi.stubGlobal("fetch", mockJwks(kid));
 
-      expect(await verifyJwt(token, baseOpts(kid))).not.toBeNull();
+      expect(await verifyJwt(token, baseOpts())).not.toBeNull();
     });
 
     it("rejects a token whose nbf is in the future", async () => {
@@ -458,7 +458,7 @@ describe("verifyJwt", () => {
       const token = makeJwt({ sub: "u", nbf: ts(60), exp: ts(3600) }, kid);
       vi.stubGlobal("fetch", mockJwks(kid));
 
-      expect(await verifyJwt(token, baseOpts(kid))).toBeNull();
+      expect(await verifyJwt(token, baseOpts())).toBeNull();
     });
 
     it("accepts a token whose nbf is just in the future but within clock skew", async () => {
@@ -466,7 +466,7 @@ describe("verifyJwt", () => {
       const token = makeJwt({ sub: "u", nbf: ts(3), exp: ts(3600) }, kid); // nbf 3 s ahead
       vi.stubGlobal("fetch", mockJwks(kid));
 
-      expect(await verifyJwt(token, baseOpts(kid, { clockSkewMs: 5000 }))).not.toBeNull();
+      expect(await verifyJwt(token, baseOpts({ clockSkewMs: 5000 }))).not.toBeNull();
     });
   });
 
@@ -478,7 +478,7 @@ describe("verifyJwt", () => {
       const token = makeJwt({ sub: "u", iat: ts(-60), exp: ts(3600) }, kid);
       vi.stubGlobal("fetch", mockJwks(kid));
 
-      expect(await verifyJwt(token, baseOpts(kid))).not.toBeNull();
+      expect(await verifyJwt(token, baseOpts())).not.toBeNull();
     });
 
     it("rejects a token with iat in the future", async () => {
@@ -486,7 +486,7 @@ describe("verifyJwt", () => {
       const token = makeJwt({ sub: "u", iat: ts(60), exp: ts(3600) }, kid);
       vi.stubGlobal("fetch", mockJwks(kid));
 
-      expect(await verifyJwt(token, baseOpts(kid))).toBeNull();
+      expect(await verifyJwt(token, baseOpts())).toBeNull();
     });
 
     it("accepts a token whose iat is just in the future but within clock skew", async () => {
@@ -494,7 +494,7 @@ describe("verifyJwt", () => {
       const token = makeJwt({ sub: "u", iat: ts(3), exp: ts(3600) }, kid);
       vi.stubGlobal("fetch", mockJwks(kid));
 
-      expect(await verifyJwt(token, baseOpts(kid, { clockSkewMs: 5000 }))).not.toBeNull();
+      expect(await verifyJwt(token, baseOpts({ clockSkewMs: 5000 }))).not.toBeNull();
     });
   });
 });

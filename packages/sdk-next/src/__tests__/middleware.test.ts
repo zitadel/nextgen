@@ -7,7 +7,7 @@ function base64url(buf: Buffer): string {
   return buf.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-function makeJwt(payload: Record<string, unknown>, privateKeyPem: string, kid: string): string {
+function makeJwt(payload: Record<string, unknown>, kid: string): string {
   const header = base64url(Buffer.from(JSON.stringify({ alg: "RS256", typ: "JWT", kid })));
   const body = base64url(Buffer.from(JSON.stringify(payload)));
   const signing = `${header}.${body}`;
@@ -85,7 +85,7 @@ describe("nextgenMiddleware", () => {
   it("protected route with valid cookie passes through with token tunnelled", async () => {
     const kid = nextKid();
     const exp = Math.floor(Date.now() / 1000) + 3600;
-    const token = makeJwt({ sub: "user-123", email: "user@example.com", exp }, privateKeyPem, kid);
+    const token = makeJwt({ sub: "user-123", email: "user@example.com", exp }, kid);
 
     vi.stubGlobal("fetch", mockJwks(kid));
 
@@ -104,7 +104,7 @@ describe("nextgenMiddleware", () => {
   it("protected route with valid Bearer token passes through", async () => {
     const kid = nextKid();
     const exp = Math.floor(Date.now() / 1000) + 3600;
-    const token = makeJwt({ sub: "user-123", email: "user@example.com", exp }, privateKeyPem, kid);
+    const token = makeJwt({ sub: "user-123", email: "user@example.com", exp }, kid);
 
     vi.stubGlobal("fetch", mockJwks(kid));
 
@@ -125,7 +125,6 @@ describe("nextgenMiddleware", () => {
     const exp = Math.floor(Date.now() / 1000) + 3600;
     const validToken = makeJwt(
       { sub: "user-123", email: "user@example.com", exp },
-      privateKeyPem,
       kid,
     );
     const parts = validToken.split(".");
