@@ -65,7 +65,8 @@ type JSONSchemaResolver struct {
 	repository JSONSchemaRepository
 	// cache of fully resolved JSON schemas,
 	// keyed by instanceID and schemaURL
-	cache *lru.TwoQueueCache[jsonSchemaCacheKey, *jsonschema.Schema]
+	cache      *lru.TwoQueueCache[jsonSchemaCacheKey, *jsonschema.Schema]
+	metaSchema *jsonschema.Schema
 }
 
 type jsonSchemaCacheKey struct {
@@ -75,7 +76,7 @@ type jsonSchemaCacheKey struct {
 
 // NewJSONSchemaResolver creates a new JSONSchemaResolver with the given repository and cache size.
 // The cache size is the maximum number of fully resolved schemas that will be cached in application memory.
-func NewJSONSchemaResolver(repository JSONSchemaRepository, cacheSize int) (*JSONSchemaResolver, error) {
+func NewJSONSchemaResolver(repository JSONSchemaRepository, cacheSize int, metaSchema *jsonschema.Schema) (*JSONSchemaResolver, error) {
 	cache, err := lru.New2Q[jsonSchemaCacheKey, *jsonschema.Schema](cacheSize)
 	if err != nil {
 		return nil, err
@@ -83,6 +84,7 @@ func NewJSONSchemaResolver(repository JSONSchemaRepository, cacheSize int) (*JSO
 	return &JSONSchemaResolver{
 		repository: repository,
 		cache:      cache,
+		metaSchema: metaSchema,
 	}, nil
 }
 
@@ -185,6 +187,11 @@ func (r *JSONSchemaResolver) resolveFromURL(ctx context.Context, url string, opt
 	err := httputil.GetJSON(ctx, url, opts.HTTPClient, &dst)
 	if err != nil {
 		return nil, err
+	}
+	if r.metaSchema != nil {
+		if err = r.metaSchema.Validate(dst); err != nil {
+			return nil, fmt.Errorf("schema at %q does not conform to meta-schema: %w", url, err)
+		}
 	}
 	schema, err := jsonschema.SchemaFromJSON(url, nil, dst)
 	if err != nil {
