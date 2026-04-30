@@ -1,23 +1,75 @@
 {
   "name": "@zitadel-nextgen/components",
   "version": "0.0.1",
-  "private": true,
+  "description": "Lit-based atomic web components and the <zitadel-login> orchestrator for the Zitadel auth UI.",
+  "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/components#readme",
+  "bugs": {
+    "url": "https://github.com/zitadel/nextgen/issues"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zitadel/nextgen.git",
+    "directory": "packages/components"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
   "main": "./dist/index.mjs",
   "module": "./dist/index.mjs",
-  "types": "./dist/index.d.ts",
+  "types": "./dist/index.d.mts",
   "exports": {
     "./package.json": "./package.json",
     ".": {
-      "types": "./dist/index.d.ts",
+      "types": "./dist/index.d.mts",
       "import": "./dist/index.mjs",
       "default": "./dist/index.mjs"
+    },
+    "./atoms": {
+      "types": "./dist/atoms/index.d.mts",
+      "import": "./dist/atoms/index.mjs"
+    },
+    "./manifests": {
+      "types": "./dist/manifests.d.mts",
+      "import": "./dist/manifests.mjs"
+    },
+    "./tokens": {
+      "types": "./dist/tokens/index.d.mts",
+      "import": "./dist/tokens/index.mjs"
+    },
+    "./orchestrator": {
+      "types": "./dist/orchestrator/index.d.mts",
+      "import": "./dist/orchestrator/index.mjs"
+    },
+    "./orchestrator/transport": {
+      "types": "./dist/orchestrator/transport.d.mts",
+      "import": "./dist/orchestrator/transport.mjs"
     }
   },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsdown",
+    "test": "vitest run --project unit",
+    "test:browser": "vitest run --project browser",
+    "test:all": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.lib.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "dependencies": {
+    "dompurify": "catalog:",
+    "liquidjs": "catalog:",
     "lit": "catalog:"
   },
   "devDependencies": {
+    "@vitest/browser": "catalog:",
+    "@vitest/browser-playwright": "catalog:",
+    "jsdom": "catalog:",
+    "playwright": "catalog:",
     "ts-lit-plugin": "catalog:",
+    "tsdown": "catalog:",
     "tslib": "catalog:"
   }
 }
