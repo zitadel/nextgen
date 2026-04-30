@@ -1,4 +1,4 @@
-import { auth } from "@zitadel/sdk-next/server";
+import { auth } from "@zitadel-nextgen/sdk-next/server";
 import { redirect } from "next/navigation";
 import { LoginWidget } from "./widget";
 

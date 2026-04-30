@@ -1,4 +1,4 @@
-import { nextgenMiddleware } from "@zitadel/sdk-next/middleware";
+import { nextgenMiddleware } from "@zitadel-nextgen/sdk-next/middleware";
 import type { NextRequest } from "next/server";
 
 export function proxy(req: NextRequest) {

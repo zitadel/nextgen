@@ -64,6 +64,17 @@ coverage
 .nx/cache
 .nx/workspace-data
 
+## Next.js / Nuxt build outputs
+.next/
+.nuxt/
+.output/
+
+## Go build cache
+.go/
+
+## Local runtime config
+nextgen.yaml
+
 # Keep the embed placeholder so //go:embed all:dist works in clean checkouts.
 # `dist/` above ignores the directory entirely, so we have to un-ignore the
 # directory before re-ignoring its contents and re-allowing the placeholder.

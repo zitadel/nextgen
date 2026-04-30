@@ -154,7 +154,7 @@ export function createNextgenMiddleware(
       return proxyRequest(event, issuerUrl, proxyPath, url);
     }
 
-    await handleAuth(event, {
+    return handleAuth(event, {
       issuerUrl,
       protectedRoutes,
       loginPath,

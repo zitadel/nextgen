@@ -298,7 +298,7 @@ class NextgenLogout extends LitElement {
     }
 
     try {
-      const data = JSON.parse(atob(match[1])) as DisplayData;
+      const data = JSON.parse(atob(match[1] ?? '')) as DisplayData;
       this._name = data.name ?? '';
       this._email = data.email ?? '';
     } catch {
