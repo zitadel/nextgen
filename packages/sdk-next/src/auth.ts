@@ -1,6 +1,6 @@
 import { headers } from "next/headers";
 import type { AuthResult } from "./types";
-import { base64UrlDecode } from "./middleware";
+import { base64UrlDecode } from "./lib/jwt";
 
 interface JwtPayload {
   sub?: string;
