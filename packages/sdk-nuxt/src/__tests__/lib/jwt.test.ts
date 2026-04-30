@@ -35,7 +35,7 @@ const PRIVATE_KEY_PEM = privateKey
 const PUBLIC_KEY_JWK = publicKey.export({
   type: 'spki',
   format: 'jwk',
-}) as Record<string, unknown>;
+}) as JsonWebKey;
 
 
 /** Monotonically increasing kid counter — ensures each test gets a fresh cache slot. */

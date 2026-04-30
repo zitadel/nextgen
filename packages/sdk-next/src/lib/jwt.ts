@@ -405,9 +405,10 @@ async function fetchAndCacheJwks(
     return null;
   }
 
-  const json = (await res.json()) as {
+  interface JwksDocument {
     keys: (JsonWebKey & { kid?: string; alg?: string })[];
-  };
+  }
+  const json = (await res.json()) as JwksDocument;
   const jwk = kid ? json.keys.find((k) => k.kid === kid) : json.keys[0];
   if (!jwk) {
     return null;
@@ -417,7 +418,7 @@ async function fetchAndCacheJwks(
   // for RSA; kty/crv/x/y for EC) determines the key type. Fall back to RS256
   // when absent. The actual algorithm enforcement happens in verifyJwt via the
   // JWT header's 'alg' claim, not here.
-  const alg = (jwk.alg as string | undefined) ?? 'RS256';
+  const alg = jwk.alg ?? 'RS256';
   const cryptoKey = await crypto.subtle.importKey(
     'jwk',
     jwk,
