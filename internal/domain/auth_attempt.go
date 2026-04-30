@@ -83,6 +83,11 @@ type AuthAttemptRepository interface {
 	GetByHandoffToken(ctx context.Context, client database.QueryExecutor, projectID, handoffToken string) (*AuthAttempt, error)
 	// Creates an auth attempt including all defined fields (except read-only fields).
 	// The repository MUST set the [AuthAttempt.CreatedAt] field to the current time.
+	// The repsoitory MUST store [AuthAttempts.Checks] following this recipe:
+	//  - If the check does NOT implement [AuthFactorer] AND [AuthChallenger] if MUST NOT SET `LastVerifiedAt` and `LastChallengedAt`.
+	//  - If the check does implement [AuthFactorer] but NOT [AuthChallenger] it MUST set `LastVerifiedAt` but NOT `LastChallengedAt`.
+	//  - If the check does NOT implement [AuthFactorer] but [AuthChallenger] it MUST NOT set `LastVerifiedAt` but `LastChallengedAt`.
+	//  - If the check does implement [AuthFactorer] AND [AuthChallenger] it MUST NOT set `LastVerifiedAt` but `LastChallengedAt`.
 	Create(ctx context.Context, client database.QueryExecutor, authAttempt *AuthAttempt) error
 	// Delete an auth attempt by its ID and project ID.
 	Delete(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string) error
