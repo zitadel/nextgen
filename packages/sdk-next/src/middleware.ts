@@ -276,8 +276,7 @@ async function handleAuth(
   } = opts;
 
   const authHeader = req.headers.get('authorization');
-  const bearerToken =
-    authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
   const cookieToken = req.cookies.get('__nextgen_session')?.value ?? null;
   const token = bearerToken ?? cookieToken;
 

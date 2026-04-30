@@ -274,8 +274,7 @@ async function handleAuth(
   } = opts;
 
   const authHeader = getRequestHeader(event, 'authorization');
-  const bearerToken =
-    authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
   const cookieToken = getCookie(event, '__nextgen_session') ?? null;
   const token = bearerToken ?? cookieToken;
 
@@ -289,11 +288,11 @@ async function handleAuth(
       })
     : null;
 
-  if (payload && token) {
+  if (payload && token && payload.sub) {
     event.context.nextgenAuth = {
       isAuthenticated: true,
       session: {
-        userId: payload.sub ?? '',
+        userId: payload.sub,
         email: payload.email ?? null,
         name: payload.name ?? null,
         token,

@@ -228,6 +228,9 @@ export interface VerifyJwtOptions {
  */
 const jwksCache = new Map<string, JwksCacheEntry>();
 
+const DECODER = new TextDecoder();
+const ENCODER = new TextEncoder();
+
 // ─── Base64URL ────────────────────────────────────────────────────────────────
 
 /**
@@ -246,11 +249,7 @@ export function base64UrlDecode(input: string): Uint8Array<ArrayBuffer> {
     '=',
   );
   const binary = atob(padded);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  return bytes;
+  return Uint8Array.from(binary, (c) => c.charCodeAt(0));
 }
 
 // ─── JWT splitting ────────────────────────────────────────────────────────────
@@ -297,85 +296,62 @@ export function decodeJwt(token: string): DecodedJwt {
     );
   }
   const [h, p] = segments;
-  const decoder = new TextDecoder();
   return {
-    header: JSON.parse(decoder.decode(base64UrlDecode(h))) as Record<
+    header: JSON.parse(DECODER.decode(base64UrlDecode(h))) as Record<
       string,
       unknown
     >,
-    payload: JSON.parse(decoder.decode(base64UrlDecode(p))) as JwtPayload,
+    payload: JSON.parse(DECODER.decode(base64UrlDecode(p))) as JwtPayload,
   };
 }
 
 // ─── Algorithm helpers ────────────────────────────────────────────────────────
 
-const SUPPORTED_ALGORITHMS = [
-  'RS256',
-  'RS384',
-  'RS512',
-  'ES256',
-  'ES384',
-  'ES512',
-] as const;
+/**
+ * Web Crypto parameters for importing a public key from JWKS, keyed by JWT
+ * `alg` header value. The keys of this object are the only supported algorithms;
+ * anything not present throws {@link TypeError}.
+ */
+const IMPORT_PARAMS = {
+  RS256: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+  RS384: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-384' },
+  RS512: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-512' },
+  ES256: { name: 'ECDSA', namedCurve: 'P-256' },
+  ES384: { name: 'ECDSA', namedCurve: 'P-384' },
+  ES512: { name: 'ECDSA', namedCurve: 'P-521' },
+} satisfies Record<string, RsaHashedImportParams | EcKeyImportParams>;
 
 /**
- * Maps a JWT `alg` value to the Web Crypto `AlgorithmIdentifier` used when
- * **importing** a public key from the JWKS (`crypto.subtle.importKey`).
- *
- * Supported algorithms: RS256, RS384, RS512, ES256, ES384, ES512.
- *
- * @param alg - JWT algorithm string (e.g. `"RS256"`, `"ES256"`).
- * @throws {TypeError} When `alg` is not one of the supported algorithms.
+ * Web Crypto parameters for verifying a JWT signature, keyed by JWT `alg`
+ * header value.
  */
-function resolveImportAlgorithm(
-  alg: string,
-): RsaHashedImportParams | EcKeyImportParams {
-  switch (alg) {
-    case 'RS256':
-      return { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' };
-    case 'RS384':
-      return { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-384' };
-    case 'RS512':
-      return { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-512' };
-    case 'ES256':
-      return { name: 'ECDSA', namedCurve: 'P-256' };
-    case 'ES384':
-      return { name: 'ECDSA', namedCurve: 'P-384' };
-    case 'ES512':
-      return { name: 'ECDSA', namedCurve: 'P-521' };
-    default:
-      throw new TypeError(
-        `Unsupported JWT algorithm: "${alg}". Supported algorithms are ${SUPPORTED_ALGORITHMS.join(', ')}.`,
-      );
+const VERIFY_PARAMS = {
+  RS256: { name: 'RSASSA-PKCS1-v1_5' },
+  RS384: { name: 'RSASSA-PKCS1-v1_5' },
+  RS512: { name: 'RSASSA-PKCS1-v1_5' },
+  ES256: { name: 'ECDSA', hash: 'SHA-256' },
+  ES384: { name: 'ECDSA', hash: 'SHA-384' },
+  ES512: { name: 'ECDSA', hash: 'SHA-512' },
+} satisfies Record<string, EcdsaParams | Algorithm>;
+
+function assertSupportedAlgorithm(alg: string): void {
+  if (!Object.hasOwn(IMPORT_PARAMS, alg)) {
+    throw new TypeError(
+      `Unsupported JWT algorithm: "${alg}". Supported algorithms are ${Object.keys(IMPORT_PARAMS).join(', ')}.`,
+    );
   }
 }
 
-/**
- * Maps a JWT `alg` value to the Web Crypto `AlgorithmIdentifier` used when
- * **verifying** a signature (`crypto.subtle.verify`).
- *
- * Supported algorithms: RS256, RS384, RS512, ES256, ES384, ES512.
- *
- * @param alg - JWT algorithm string (e.g. `"RS256"`, `"ES256"`).
- * @throws {TypeError} When `alg` is not one of the supported algorithms.
- */
+function resolveImportAlgorithm(
+  alg: string,
+): RsaHashedImportParams | EcKeyImportParams {
+  assertSupportedAlgorithm(alg);
+  return IMPORT_PARAMS[alg as keyof typeof IMPORT_PARAMS];
+}
+
 function resolveVerifyAlgorithm(alg: string): EcdsaParams | Algorithm {
-  switch (alg) {
-    case 'RS256':
-    case 'RS384':
-    case 'RS512':
-      return { name: 'RSASSA-PKCS1-v1_5' };
-    case 'ES256':
-      return { name: 'ECDSA', hash: 'SHA-256' };
-    case 'ES384':
-      return { name: 'ECDSA', hash: 'SHA-384' };
-    case 'ES512':
-      return { name: 'ECDSA', hash: 'SHA-512' };
-    default:
-      throw new TypeError(
-        `Unsupported JWT algorithm: "${alg}". Supported algorithms are ${SUPPORTED_ALGORITHMS.join(', ')}.`,
-      );
-  }
+  assertSupportedAlgorithm(alg);
+  return VERIFY_PARAMS[alg as keyof typeof VERIFY_PARAMS];
 }
 
 // ─── JWKS fetch ───────────────────────────────────────────────────────────────
@@ -480,12 +456,11 @@ export async function verifyJwt(
     }
     const [rawHeader, rawPayload, rawSig] = segments;
 
-    const decoder = new TextDecoder();
     const header = JSON.parse(
-      decoder.decode(base64UrlDecode(rawHeader)),
+      DECODER.decode(base64UrlDecode(rawHeader)),
     ) as Record<string, unknown>;
     const payload = JSON.parse(
-      decoder.decode(base64UrlDecode(rawPayload)),
+      DECODER.decode(base64UrlDecode(rawPayload)),
     ) as JwtPayload;
 
     const alg = (header.alg as string | undefined) ?? 'RS256';
@@ -519,7 +494,7 @@ export async function verifyJwt(
       resolveVerifyAlgorithm(alg),
       cryptoKey,
       base64UrlDecode(rawSig),
-      new TextEncoder().encode(`${rawHeader}.${rawPayload}`),
+      ENCODER.encode(`${rawHeader}.${rawPayload}`),
     );
     if (!valid) {
       return null;
@@ -530,13 +505,8 @@ export async function verifyJwt(
     }
 
     if (audience !== undefined) {
-      const audList =
-        payload.aud === undefined
-          ? []
-          : Array.isArray(payload.aud)
-            ? (payload.aud as readonly string[])
-            : [payload.aud];
-      const expectedList = Array.isArray(audience) ? audience : [audience];
+      const audList = payload.aud !== undefined ? [payload.aud].flat() : [];
+      const expectedList = [audience].flat();
       if (!expectedList.some((a) => audList.includes(a))) {
         return null;
       }
