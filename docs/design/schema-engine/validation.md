@@ -18,7 +18,7 @@ flowchart TD
     isSchemaLocal -- Yes --> validateObject
     isSchemaLocal -- No  --> isSchemaCached
 
-    isSchemaCached -- Yes --> needsTransformer
+    isSchemaCached -- Yes --> validateObject
     isSchemaCached -- No  --> pullSchema --> doesSchemaHaveMetaSchema
     
     doesSchemaHaveMetaSchema -- Yes --> recurse --> cacheSchema
