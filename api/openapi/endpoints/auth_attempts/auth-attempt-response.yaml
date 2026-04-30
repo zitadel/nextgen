@@ -5,9 +5,9 @@ description: |
   An attempt is an ephemeral state machine (15-minute TTL) that drives a single authentication round.
   It accepts factor challenges, verifies proofs, and completes into a handoff token.
   Clients drive the attempt by:
-  1. Issuing challenges: POST /auth_attempts/{id}/challenges
-  2. Verifying proofs: POST /auth_attempts/{id}/challenges/{cid}/verify
-  3. Completing: POST /auth_attempts/{id}/handoff
+  1. Issuing challenges: POST /auth_attempts/{attempt_id}/challenges
+  2. Verifying proofs: POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify
+  3. Completing: POST /auth_attempts/{attempt_id}/handoff
 required:
   - attempt_id
   - project_id

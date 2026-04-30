@@ -25,7 +25,7 @@ post:
           $ref: verify-challenge-request.yaml
   responses:
     '200':
-      description: Proof verified successfully, factor written to session
+      description: Proof verified successfully, factor  recorded on the auth attempt; it is materialized into a session only when the auth flow is completed
       content:
         application/json:
           schema:

@@ -7,7 +7,7 @@ post:
     This advances the authentication state machine by requesting a specific factor method
     (password, passkey, TOTP, OTP via SMS, etc.). The server responds with challenge details
     including method, metadata, and any UI hints. The client then verifies the proof
-    by calling POST /auth_attempts/{id}/challenges/{cid}/verify.
+    by calling POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify.
   tags:
     - Authentication Attempts
   parameters:

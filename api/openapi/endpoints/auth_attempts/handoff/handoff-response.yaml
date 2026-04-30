@@ -3,7 +3,7 @@ description: |
   The handoff token and metadata for session exchange.
   
   This is a short-lived credential (TTL ≤ 60 seconds) that the client must exchange
-  at POST /session_handoffs/{id}/exchange to receive the final session and session_token.
+  at POST /sessions/exchange to receive the final session and session_token.
   The handoff token is single-use and audience-bound to the project.
 required:
   - handoff_token
@@ -14,7 +14,7 @@ properties:
     description: |
       The short-lived handoff token for session exchange.
       
-      Exchange at: POST /session_handoffs/{id}/exchange
+      Exchange at: POST /sessions/exchange
       
       Requirements:
       - Single-use (atomic GETDEL on exchange)

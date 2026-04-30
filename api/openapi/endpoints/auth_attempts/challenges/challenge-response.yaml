@@ -38,7 +38,7 @@ properties:
     description: |
       Current state of this challenge:
       - `pending`: awaiting proof submission
-      - `verified`: proof accepted, factor written to session
+      - `verified`: proof accepted, factor  recorded on the auth attempt; it is materialized into a session only when the auth flow is completed
       - `failed`: proof rejected (invalid credential, wrong code, etc.)
       - `expired`: challenge TTL exceeded without verification
   created_at:

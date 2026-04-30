@@ -6,7 +6,7 @@ post:
     
     Call this after all required factors have been verified and the attempt is in `completed` state.
     The handoff token is short-lived (≤60 seconds) and must be exchanged at
-    POST /session_handoffs/{id}/exchange to receive the final session and session_token.
+    POST /sessions/exchange to receive the final session and session_token.
     
     The handoff token is:
     - Single-use (atomic exchange, no retry)
