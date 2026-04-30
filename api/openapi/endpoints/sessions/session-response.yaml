@@ -1,0 +1,104 @@
+type: object
+description: |
+  The current state of a session.
+
+  A session is the durable post-auth primitive. It accumulates verified authentication
+  factors and exposes `assurance_levels[]` — the set of assurance profiles its current
+  factors satisfy. Sessions are read-only from the client's perspective: factors flow
+  in through `auth_attempts`.
+required:
+  - session_id
+  - project_id
+  - state
+  - factors
+  - assurance_levels
+  - created_at
+  - expires_at
+properties:
+  session_id:
+    $ref: ../../components/schemas/session-id.yaml
+  project_id:
+    $ref: ../../components/schemas/project-id.yaml
+  state:
+    type: string
+    description: |
+      Current lifecycle state of the session:
+      - `building`: has a user factor but is still gathering authentication factors
+      - `active`: has at least one verified authentication factor; `assurance_levels[]` may shrink as factors age
+      - `expired`: TTL elapsed
+      - `revoked`: explicitly revoked via DELETE
+    enum:
+      - building
+      - active
+      - expired
+      - revoked
+    example: active
+  user_id:
+    description: |
+      The authenticated user. Null for anonymous sessions and until the `user`
+      factor has been verified through an `auth_attempt`.
+    oneOf:
+      - $ref: ../../components/schemas/user-id.yaml
+      - type: 'null'
+  factors:
+    type: object
+    description: |
+      Verified authentication factors accumulated by this session.
+      Each key is a factor type (e.g. `password`, `totp`, `passkey`).
+      Each value is a factor event object with at least `verified_at` and
+      method-specific properties (e.g. `user_verified`, `hardware` for passkeys).
+    additionalProperties: true
+    example:
+      user:
+        user_id: usr_abc123
+        verified_at: '2026-04-29T10:00:00Z'
+      password:
+        verified_at: '2026-04-29T10:01:00Z'
+      totp:
+        verified_at: '2026-04-29T10:02:00Z'
+  assurance_levels:
+    type: array
+    description: |
+      All assurance levels whose schemas the current session factors satisfy.
+      This list shrinks as factor freshness windows expire and grows when step-up
+      auth_attempts add or refresh factors.
+      Whether any level is "enough" is determined by the request context, not the session.
+    items:
+      type: string
+    example:
+      - 'urn:nist:aal:1'
+      - 'urn:nist:aal:2'
+  metadata:
+    description: Arbitrary key/value metadata attached to the session.
+    oneOf:
+      - type: object
+        additionalProperties: true
+      - type: 'null'
+  user_agent:
+    description: User agent information captured at session creation.
+    oneOf:
+      - type: object
+        properties:
+          fingerprint:
+            type: string
+            description: Client-supplied device fingerprint.
+            example: fp_abc123
+          ip:
+            type: string
+            description: IP address of the client at session creation.
+            example: 203.0.113.42
+        additionalProperties: true
+      - type: 'null'
+  created_at:
+    type: string
+    format: date-time
+    description: When this session was created.
+    example: '2026-04-29T10:00:00Z'
+  expires_at:
+    type: string
+    format: date-time
+    description: |
+      When this session expires. Short TTL (10 min) for anonymous sessions;
+      reset to the full configured session TTL once the first authentication factor is written.
+    example: '2026-04-30T10:00:00Z'
+

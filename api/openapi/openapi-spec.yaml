@@ -44,6 +44,12 @@ paths:
     $ref: endpoints/auth_attempts/challenges/verify-methods.yaml
   /auth_attempts/{attempt_id}/handoff:
     $ref: endpoints/auth_attempts/handoff/methods.yaml
+  /sessions:
+    $ref: endpoints/sessions/methods.yaml
+  /sessions/exchange:
+    $ref: endpoints/sessions/exchange/methods.yaml
+  /sessions/{session_id}:
+    $ref: endpoints/sessions/session/methods.yaml
   /healthz:
     $ref: endpoints/healthz/methods.yaml
   /livez:

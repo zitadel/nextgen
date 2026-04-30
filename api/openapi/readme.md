@@ -39,7 +39,19 @@ or using `go generate`
 go generate ./...
 ```
 
-## Known Limitations
+## API Design Conventions
+
+### Pagination
+
+This API uses **cursor-based pagination** (`page_token` / `next_page_token`), not offset-based.
+
+- Request the next page by passing `next_page_token` from the previous response back as `page_token`.
+- Omit `page_token` to start from the beginning.
+- Treat `page_token` as opaque — do not attempt to decode or construct it.
+
+> **Note:** Some endpoints (e.g. `GET /users`) currently still use `offset`/`limit`.
+> These are marked with a `TODO` comment and will be migrated to `page_token` / `next_page_token`.
+> New list endpoints must use cursor-based pagination — see `GET /sessions` as the reference implementation.
 
 ### Nullable types
 

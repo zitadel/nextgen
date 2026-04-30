@@ -1,0 +1,75 @@
+post:
+  operationId: exchangeHandoff
+  summary: Exchange handoff token for a session
+  description: |
+    Consumes a one-time `handoff_token` minted by `POST /auth_attempts/{id}/handoff`
+    and returns the resulting session and a `session_token`.
+
+    The server resolves the originating `auth_attempt` from the token and then:
+
+    | Originating auth_attempt | Outcome |
+    |---|---|
+    | No `session_id` | A new authenticated session is **created**. |
+    | `session_id` points to an anonymous shell | Existing session is **upgraded** — user and factors written in, TTL reset to full session TTL. |
+    | `session_id` points to an active session (step-up) | Existing session is **upgraded** — new factors merged, `assurance_levels[]` expanded. |
+
+    The response shape is identical in all three cases.
+
+    The `session_token` supersedes any previously issued `session_token` for the same session.
+    Clients must replace their stored token at this point.
+
+    Requires a project service key (OAuth2 client credentials).
+  tags:
+    - Sessions
+  security:
+    - oauth2:
+        - openid
+  parameters:
+    - name: Idempotency-Key
+      in: header
+      required: false
+      description: |
+        Optional retry key for safe retries of the handoff exchange (Category B idempotency).
+        Retries carrying the same key within the exchange window return the cached session
+        payload without consuming the one-time handoff token again.
+      schema:
+        type: string
+        example: 01HXYZ123ABC
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: exchange-request.yaml
+  responses:
+    '200':
+      description: Handoff exchanged successfully. Returns the session and new session_token.
+      content:
+        application/json:
+          schema:
+            $ref: ../session-with-token-response.yaml
+    '400':
+      description: Invalid request.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '401':
+      description: Missing or invalid project credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '410':
+      description: Handoff token already consumed or expired.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    default:
+      description: Unexpected error.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+
