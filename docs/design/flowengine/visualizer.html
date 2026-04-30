@@ -637,29 +637,29 @@ const FLOWS = {
           { id: "google-1", name: "Google", template: "google" }
         ],
         transitions: {
-          submit: "resolve_user",
-          sso: "sso_redirect",
-          register: { switch: "register" },
-          recover: { pivot: "recovery" }
+          submit: { target: "resolve_user" },
+          sso: { target: "sso_redirect" },
+          register: { target: "register", action: "switch" },
+          recover: { target: "recovery", action: "pivot" }
         }
       },
       {
         name: "resolve_user",
         type: "policy_check",
         config: { check: "resolve_user" },
-        transitions: { found: "check_factors", not_found: "identifier" }
+        transitions: { found: { target: "check_factors" }, not_found: { target: "identifier" } }
       },
       {
         name: "sso_redirect",
         type: "redirect",
         texts: { title_key: "login.sso.title" },
-        transitions: { callback: "check_factors" }
+        transitions: { callback: { target: "check_factors" } }
       },
       {
         name: "check_factors",
         type: "policy_check",
         config: { check: "required_factors" },
-        transitions: { password: "password", otp: "otp", acr_met: "done" }
+        transitions: { password: { target: "password" }, otp: { target: "otp" }, acr_met: { target: "done" } }
       },
       {
         name: "password",
@@ -673,7 +673,7 @@ const FLOWS = {
           recover: { text_key: "login.password.action.recover" }
         },
         gates: {},
-        transitions: { submit: "check_factors", recover: { pivot: "recovery" } }
+        transitions: { submit: { target: "check_factors" }, recover: { target: "recovery", action: "pivot" } }
       },
       {
         name: "otp",
@@ -686,7 +686,7 @@ const FLOWS = {
           submit: { text_key: "login.otp.action.submit", primary: true }
         },
         gates: {},
-        transitions: { submit: "check_factors" }
+        transitions: { submit: { target: "check_factors" } }
       },
       {
         name: "done",
@@ -717,7 +717,7 @@ const FLOWS = {
           login: { text_key: "register.profile.action.login" }
         },
         gates: {},
-        transitions: { submit: "set_password", login: { switch: "login" } }
+        transitions: { submit: { target: "set_password" }, login: { target: "login", action: "switch" } }
       },
       {
         name: "set_password",
@@ -730,7 +730,7 @@ const FLOWS = {
           submit: { text_key: "register.password.action.submit", primary: true }
         },
         gates: {},
-        transitions: { submit: "verify_email" }
+        transitions: { submit: { target: "verify_email" } }
       },
       {
         name: "verify_email",
@@ -744,13 +744,13 @@ const FLOWS = {
           resend: { text_key: "register.verify.action.resend" }
         },
         gates: {},
-        transitions: { submit: "create_user" }
+        transitions: { submit: { target: "create_user" } }
       },
       {
         name: "create_user",
         type: "action",
         config: { action: "create_user_and_session" },
-        transitions: { created: "done" }
+        transitions: { created: { target: "done" } }
       },
       {
         name: "done",
@@ -779,7 +779,7 @@ const FLOWS = {
           back: { text_key: "recovery.email.action.back" }
         },
         gates: {},
-        transitions: { submit: "verify_code", back: { pivot: "login" } }
+        transitions: { submit: { target: "verify_code" }, back: { target: "login", action: "pivot" } }
       },
       {
         name: "verify_code",
@@ -793,7 +793,7 @@ const FLOWS = {
           resend: { text_key: "recovery.code.action.resend" }
         },
         gates: {},
-        transitions: { submit: "new_password" }
+        transitions: { submit: { target: "new_password" } }
       },
       {
         name: "new_password",
@@ -806,13 +806,13 @@ const FLOWS = {
           submit: { text_key: "recovery.password.action.submit", primary: true }
         },
         gates: {},
-        transitions: { submit: "reset_action" }
+        transitions: { submit: { target: "reset_action" } }
       },
       {
         name: "reset_action",
         type: "action",
         config: { action: "reset_password" },
-        transitions: { reset: "done" }
+        transitions: { reset: { target: "done" } }
       },
       {
         name: "done",
@@ -845,21 +845,21 @@ const FLOWS = {
           { id: "azure-acme", name: "Acme Azure AD", template: "microsoft" }
         ],
         transitions: {
-          submit: "force_sso",
-          sso: "sso_redirect"
+          submit: { target: "force_sso" },
+          sso: { target: "sso_redirect" }
         }
       },
       {
         name: "force_sso",
         type: "policy_check",
         config: { check: "domain_requires_sso" },
-        transitions: { sso_required: "sso_redirect", sso_optional: "password" }
+        transitions: { sso_required: { target: "sso_redirect" }, sso_optional: { target: "password" } }
       },
       {
         name: "sso_redirect",
         type: "redirect",
         texts: { title_key: "enterprise.identifier.title" },
-        transitions: { callback: "check_consent" }
+        transitions: { callback: { target: "check_consent" } }
       },
       {
         name: "password",
@@ -872,13 +872,13 @@ const FLOWS = {
           submit: { text_key: "saas.password.action.submit", primary: true }
         },
         gates: {},
-        transitions: { submit: "check_consent" }
+        transitions: { submit: { target: "check_consent" } }
       },
       {
         name: "check_consent",
         type: "policy_check",
         config: { check: "consent_required" },
-        transitions: { required: "consent", not_required: "done" }
+        transitions: { required: { target: "consent" }, not_required: { target: "done" } }
       },
       {
         name: "consent",
@@ -890,7 +890,7 @@ const FLOWS = {
           deny: { text_key: "enterprise.consent.action.deny" }
         },
         gates: {},
-        transitions: { accept: "done", deny: "denied" }
+        transitions: { accept: { target: "done" }, deny: { target: "denied" } }
       },
       {
         name: "denied",
@@ -932,22 +932,22 @@ const FLOWS = {
           { id: "github-1", name: "GitHub", template: "github" }
         ],
         transitions: {
-          submit: "resolve_user",
-          sso: "sso_redirect",
-          register: { switch: "SaaS Registration" }
+          submit: { target: "resolve_user" },
+          sso: { target: "sso_redirect" },
+          register: { target: "SaaS Registration", action: "switch" }
         }
       },
       {
         name: "resolve_user",
         type: "policy_check",
         config: { check: "resolve_user" },
-        transitions: { found: "password", not_found: "identifier" }
+        transitions: { found: { target: "password" }, not_found: { target: "identifier" } }
       },
       {
         name: "sso_redirect",
         type: "redirect",
         texts: { title_key: "saas.identifier.title" },
-        transitions: { callback: "done" }
+        transitions: { callback: { target: "done" } }
       },
       {
         name: "password",
@@ -961,7 +961,7 @@ const FLOWS = {
           recover: { text_key: "saas.password.action.recover" }
         },
         gates: {},
-        transitions: { submit: "done", recover: { pivot: "recovery" } }
+        transitions: { submit: { target: "done" }, recover: { target: "recovery", action: "pivot" } }
       },
       {
         name: "done",
@@ -998,13 +998,13 @@ const FLOWS = {
           { id: "google-1", name: "Google", template: "google" },
           { id: "github-1", name: "GitHub", template: "github" }
         ],
-        transitions: { submit: "terms", sso: "sso_link", login: { switch: "SaaS Login" } }
+        transitions: { submit: { target: "terms" }, sso: { target: "sso_link" }, login: { target: "SaaS Login", action: "switch" } }
       },
       {
         name: "sso_link",
         type: "redirect",
         texts: { title_key: "saas.profile.title" },
-        transitions: { callback: "terms" }
+        transitions: { callback: { target: "terms" } }
       },
       {
         name: "terms",
@@ -1016,7 +1016,7 @@ const FLOWS = {
           decline: { text_key: "saas.terms.action.decline" }
         },
         gates: {},
-        transitions: { accept: "verify_email", decline: "profile" }
+        transitions: { accept: { target: "verify_email" }, decline: { target: "profile" } }
       },
       {
         name: "verify_email",
@@ -1030,13 +1030,13 @@ const FLOWS = {
           resend: { text_key: "saas.verify.action.resend" }
         },
         gates: {},
-        transitions: { submit: "create_user" }
+        transitions: { submit: { target: "create_user" } }
       },
       {
         name: "create_user",
         type: "action",
         config: { action: "create_user_and_session" },
-        transitions: { created: "done" }
+        transitions: { created: { target: "done" } }
       },
       {
         name: "done",
@@ -1066,15 +1066,15 @@ const FLOWS = {
           passkey: { type: "passkey", required: true, satisfied: false }
         },
         transitions: {
-          authenticate: "verify_passkey",
-          fallback: { switch: "login" }
+          authenticate: { target: "verify_passkey" },
+          fallback: { target: "login", action: "switch" }
         }
       },
       {
         name: "verify_passkey",
         type: "policy_check",
         config: { check: "passkey_valid" },
-        transitions: { valid: "done", invalid: "passkey_prompt" }
+        transitions: { valid: { target: "done" }, invalid: { target: "passkey_prompt" } }
       },
       {
         name: "done",
@@ -1412,20 +1412,20 @@ async function renderDiagram() {
     if (!step.transitions) continue;
     const srcId = 'n_' + step.name;
     for (const [label, tgt] of Object.entries(step.transitions)) {
-      if (typeof tgt === 'string') {
-        lines.push(`    ${srcId} -->|${label}| n_${tgt}`);
-      } else if (tgt.pivot) {
-        const extId = 'ext_pivot_' + tgt.pivot;
-        if (!transitionTargets.has('pivot:' + tgt.pivot)) {
-          transitionTargets.add('pivot:' + tgt.pivot);
-          lines.push(`    ${extId}["\`**${tgt.pivot}**<br/>pivot (stack)\`"]:::pivot`);
+      if (!tgt.action) {
+        lines.push(`    ${srcId} -->|${label}| n_${tgt.target}`);
+      } else if (tgt.action === 'pivot') {
+        const extId = 'ext_pivot_' + tgt.target;
+        if (!transitionTargets.has('pivot:' + tgt.target)) {
+          transitionTargets.add('pivot:' + tgt.target);
+          lines.push(`    ${extId}["\`**${tgt.target}**<br/>pivot (stack)\`"]:::pivot`);
         }
         lines.push(`    ${srcId} -.->|${label}| ${extId}`);
-      } else if (tgt.switch) {
-        const extId = 'ext_switch_' + tgt.switch;
-        if (!transitionTargets.has('switch:' + tgt.switch)) {
-          transitionTargets.add('switch:' + tgt.switch);
-          lines.push(`    ${extId}["\`**${tgt.switch}**<br/>switch (replace)\`"]:::switchFlow`);
+      } else if (tgt.action === 'switch') {
+        const extId = 'ext_switch_' + tgt.target;
+        if (!transitionTargets.has('switch:' + tgt.target)) {
+          transitionTargets.add('switch:' + tgt.target);
+          lines.push(`    ${extId}["\`**${tgt.target}**<br/>switch (replace)\`"]:::switchFlow`);
         }
         lines.push(`    ${srcId} -.->|${label}| ${extId}`);
       }
@@ -1596,12 +1596,12 @@ function advanceThroughInvisible() {
       let picked = null;
       for (const k of keys) {
         const tgt = transitions[k];
-        if (typeof tgt === 'string' && !visited.has(tgt)) { picked = tgt; break; }
+        if (!tgt.action && !visited.has(tgt.target)) { picked = tgt.target; break; }
       }
       if (!picked) {
         for (let i = keys.length - 1; i >= 0; i--) {
           const tgt = transitions[keys[i]];
-          if (typeof tgt === 'string') { picked = tgt; break; }
+          if (!tgt.action) { picked = tgt.target; break; }
         }
       }
       if (picked) {
@@ -1651,8 +1651,8 @@ function simAction(actionName, providerId) {
   const oldFlowId = simState.flowId;
 
   // Handle pivot (stack)
-  if (typeof target === 'object' && target.pivot) {
-    const pivotPurpose = target.pivot;
+  if (target.action === 'pivot') {
+    const pivotPurpose = target.target;
     const pivotFlowName = Object.keys(FLOWS).find(k => FLOWS[k].purposes?.includes(pivotPurpose));
     if (pivotFlowName) {
       // Push current flow onto stack
@@ -1689,8 +1689,8 @@ function simAction(actionName, providerId) {
   }
 
   // Handle switch (replace)
-  if (typeof target === 'object' && target.switch) {
-    const switchPurpose = target.switch;
+  if (target.action === 'switch') {
+    const switchPurpose = target.target;
     const switchFlowName = Object.keys(FLOWS).find(k => FLOWS[k].purposes?.includes(switchPurpose));
     if (switchFlowName) {
       const newFlowId = genId('flow');
@@ -1720,7 +1720,7 @@ function simAction(actionName, providerId) {
 
   // Normal transition
   simState.history.push(simState.stepName);
-  simState.stepName = target;
+  simState.stepName = target.target;
   simState.error = null;
   simState.sessionToken = genToken();
   advanceThroughInvisible();

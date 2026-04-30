@@ -179,7 +179,7 @@ Three modes:
      "name": "bot_check",
      "type": "captcha",
      "config": { "provider": "altcha", "difficulty": 3 },
-     "transitions": { "verified": "register_profile" }
+     "transitions": { "verified": { "target": "register_profile" } }
    }
    ```
 
