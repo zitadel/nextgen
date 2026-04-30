@@ -16,6 +16,13 @@ type AuthAttempt struct {
 	// ID is the unique identifier for the auth attempt within the project.
 	ID string
 
+	HandoffToken *string
+	HandedOffAt  *time.Time
+
+	// Used to link an auth attempt to a session. Use case is step up auth.
+	// In this case we need to copy the factors from the session back to the auth attempt.
+	SessionID *string
+
 	// Links to the [AuthChecker]s that belong to the auth attempt.
 	// An auth attempt can have multiple checks (e.g. for multi-factor authentication), but a check can only belong to one auth attempt.
 	Checks         []AuthChecker
@@ -70,16 +77,20 @@ func (a *AuthAttempt) CheckByType(typ AuthCheckType) (AuthChecker, bool) {
 }
 
 type AuthAttemptRepository interface {
-	// Get a single AuthAttempt by its ID and project ID.
-	Get(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string) (*AuthAttempt, error)
+	// GetByID retrieves a single AuthAttempt by its ID and project ID.
+	GetByID(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string) (*AuthAttempt, error)
+	// GetByHandoffToken retrieves a single AuthAttempt by its handoff token and project ID.
+	GetByHandoffToken(ctx context.Context, client database.QueryExecutor, projectID, handoffToken string) (*AuthAttempt, error)
 	// Creates an auth attempt including all defined fields (except read-only fields).
 	// The repository MUST set the [AuthAttempt.CreatedAt] field to the current time.
 	Create(ctx context.Context, client database.QueryExecutor, authAttempt *AuthAttempt) error
 	// Delete an auth attempt by its ID and project ID.
 	Delete(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string) error
 
-	Complete(ctx context.Context, client database.QueryExecutor, check *AuthAttempt) error
-	Handoff(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID, sessionID string) error
+	// Sets the [AuthAttempt.CompletedAt] field to the current time and stores it accordingly.
+	Complete(ctx context.Context, client database.QueryExecutor, attempt *AuthAttempt) error
+	// Stores the handoff token for an auth attempt and sets the handoff time to the current time.
+	Handoff(ctx context.Context, client database.QueryExecutor, attempt *AuthAttempt) error
 
 	// SetChallenge sets a check to challenged and sets the challenge payload.
 	// If the check is not stored yet the method creates a new check with the given type and challenge payload, otherwise it updates the existing check with the new challenge payload.

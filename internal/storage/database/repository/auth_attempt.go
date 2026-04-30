@@ -13,22 +13,39 @@ import (
 
 type AuthAttempt struct{}
 
-const authAttemptGetStmt = `SELECT aa.project_id, aa.id, aa.required_checks, aa.created_at, aa.completed_at , aac.type, aa.time_to_live,` +
+const authAttemptGetSelect = `SELECT aa.project_id, aa.id, aa.handoff_token, aa.handed_off_at, aa.session_id, aa.required_checks, aa.created_at, aa.completed_at , aac.type, aa.time_to_live,` +
 	` aac.last_challenged_at, aac.last_verified_at, aac.last_failed_at, aac.failure_count , aac.challenge_payload, aac.factor_payload` +
 	` FROM zitadel_nextgen.auth_attempts aa` +
-	` LEFT JOIN zitadel_nextgen.auth_attempt_checks aac ON aa.project_id = aac.project_id AND aa.id = aac.auth_attempt_id` +
+	` LEFT JOIN zitadel_nextgen.auth_attempt_checks aac ON aa.project_id = aac.project_id AND aa.id = aac.auth_attempt_id`
+
+const authAttemptGetByIDStmt = authAttemptGetSelect +
 	` WHERE aa.project_id = $1 AND aa.id = $2`
 
-// Get implements [domain.AuthAttemptRepository].
-func (a *AuthAttempt) Get(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string) (*domain.AuthAttempt, error) {
+const authAttemptGetByHandoffTokenStmt = authAttemptGetSelect +
+	` WHERE aa.project_id = $1 AND aa.handoff_token = $2`
+
+// GetByID implements [domain.AuthAttemptRepository].
+func (a *AuthAttempt) GetByID(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string) (*domain.AuthAttempt, error) {
+	return a.get(ctx, client, authAttemptGetByIDStmt, projectID, authAttemptID)
+}
+
+// GetByHandoffToken implements [domain.AuthAttemptRepository].
+func (a *AuthAttempt) GetByHandoffToken(ctx context.Context, client database.QueryExecutor, projectID, handoffToken string) (*domain.AuthAttempt, error) {
+	return a.get(ctx, client, authAttemptGetByHandoffTokenStmt, projectID, handoffToken)
+}
+
+func (a *AuthAttempt) get(ctx context.Context, client database.QueryExecutor, query, projectID, matcher string) (*domain.AuthAttempt, error) {
 	attempt := new(domain.AuthAttempt)
-	rows, err := client.Query(ctx, authAttemptGetStmt, projectID, authAttemptID)
+	rows, err := client.Query(ctx, query, projectID, matcher)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query auth attempt: %w", err)
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var (
+			handoffToken      database.Null[string]
+			handedOffAt       database.Null[time.Time]
+			sessionID         database.Null[string]
 			checkType         database.Null[domain.AuthCheckType]
 			lastChallengedAt  database.Null[time.Time]
 			verifiedAt        database.Null[time.Time]
@@ -36,10 +53,19 @@ func (a *AuthAttempt) Get(ctx context.Context, client database.QueryExecutor, pr
 			failureCount      database.Null[uint16]
 			challenge, factor json.RawMessage
 		)
-		err = rows.Scan(&attempt.ProjectID, &attempt.ID, &attempt.RequiredChecks, &attempt.CreatedAt, &attempt.CompletedAt, &checkType, &attempt.TimeToLive,
+		err = rows.Scan(&attempt.ProjectID, &attempt.ID, &handoffToken, &handedOffAt, &sessionID, &attempt.RequiredChecks, &attempt.CreatedAt, &attempt.CompletedAt, &checkType, &attempt.TimeToLive,
 			&lastChallengedAt, &verifiedAt, &lastFailedAt, &failureCount, &challenge, &factor)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan auth attempt: %w", err)
+		}
+		if handoffToken.Valid {
+			attempt.HandoffToken = &handoffToken.V
+		}
+		if handedOffAt.Valid {
+			attempt.HandedOffAt = &handedOffAt.V
+		}
+		if sessionID.Valid {
+			attempt.SessionID = &sessionID.V
 		}
 
 		if !checkType.Valid {
@@ -72,8 +98,8 @@ func (a *AuthAttempt) Get(ctx context.Context, client database.QueryExecutor, pr
 }
 
 const authAttemptCreateStmt = `WITH inserted_attempt AS (` +
-	` INSERT INTO zitadel_nextgen.auth_attempts (project_id, id, required_checks, time_to_live)` +
-	` VALUES ($1, $2, $3::SMALLINT[], $4::INTERVAL)` +
+	` INSERT INTO zitadel_nextgen.auth_attempts (project_id, id, required_checks, time_to_live, session_id)` +
+	` VALUES ($1, $2, $3::SMALLINT[], $4::INTERVAL, $5)` +
 	` RETURNING project_id, id, created_at` +
 	`), inserted_checks AS (` +
 	` INSERT INTO zitadel_nextgen.auth_attempt_checks (project_id, auth_attempt_id, type, challenge_payload, factor_payload, last_challenged_at, last_verified_at)` +
@@ -81,7 +107,7 @@ const authAttemptCreateStmt = `WITH inserted_attempt AS (` +
 	` CASE WHEN checks.is_challenger THEN NOW() ELSE NULL END,` +
 	` CASE WHEN checks.is_factorer AND NOT checks.is_challenger THEN NOW() ELSE NULL END` +
 	` FROM inserted_attempt ia` +
-	` JOIN LATERAL jsonb_to_recordset(COALESCE($5::JSONB, '[]'::JSONB)) AS checks(type SMALLINT, challenge_payload JSONB, factor_payload JSONB, is_challenger BOOLEAN, is_factorer BOOLEAN) ON TRUE` +
+	` JOIN LATERAL jsonb_to_recordset(COALESCE($6::JSONB, '[]'::JSONB)) AS checks(type SMALLINT, challenge_payload JSONB, factor_payload JSONB, is_challenger BOOLEAN, is_factorer BOOLEAN) ON TRUE` +
 	` RETURNING type, last_challenged_at, last_verified_at` +
 	`) SELECT ia.created_at, ic.type, ic.last_challenged_at, ic.last_verified_at` +
 	` FROM inserted_attempt ia` +
@@ -118,7 +144,7 @@ func (a *AuthAttempt) Create(ctx context.Context, client database.QueryExecutor,
 	}
 
 	rows, err := client.Query(ctx, authAttemptCreateStmt,
-		authAttempt.ProjectID, authAttempt.ID, authAttempt.RequiredChecks, authAttempt.TimeToLive, checkRowsJSON)
+		authAttempt.ProjectID, authAttempt.ID, authAttempt.RequiredChecks, authAttempt.TimeToLive, authAttempt.SessionID, checkRowsJSON)
 	if err != nil {
 		return fmt.Errorf("failed to create auth attempt: %w", err)
 	}
@@ -192,9 +218,22 @@ func (a *AuthAttempt) Complete(ctx context.Context, client database.QueryExecuto
 		Scan(&attempt.CompletedAt)
 }
 
+const authAttemptHandoffStmt = `UPDATE zitadel_nextgen.auth_attempts SET handoff_token = $3, handed_off_at = NOW()` +
+	` WHERE project_id = $1 AND id = $2 RETURNING handed_off_at`
+
 // Handoff implements [domain.AuthAttemptRepository].
-func (a *AuthAttempt) Handoff(ctx context.Context, client database.QueryExecutor, projectID string, authAttemptID string, sessionID string) error {
-	panic("unimplemented")
+func (a *AuthAttempt) Handoff(ctx context.Context, client database.QueryExecutor, attempt *domain.AuthAttempt) error {
+	if attempt.HandoffToken == nil {
+		return fmt.Errorf("failed to handoff auth attempt: handoff token is required")
+	}
+	var handedOffAt time.Time
+	err := client.QueryRow(ctx, authAttemptHandoffStmt, attempt.ProjectID, attempt.ID, *attempt.HandoffToken).
+		Scan(&handedOffAt)
+	if err != nil {
+		return fmt.Errorf("failed to handoff auth attempt: %w", err)
+	}
+	attempt.HandedOffAt = &handedOffAt
+	return nil
 }
 
 const authAttemptSetChallengeStmt = `INSERT INTO zitadel_nextgen.auth_attempt_checks` +
