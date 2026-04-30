@@ -10,7 +10,7 @@
     "
   >
     <ClientOnly>
-      <nextgen-login proxy-base="/__nextgen" @nextgen-signin="onSignIn" />
+      <nextgen-login proxy-base="/__nextgen" post-sign-in-url="/admin" />
     </ClientOnly>
   </main>
 </template>
@@ -21,9 +21,5 @@ import "@nextgen/ui-lit";
 const auth = useState("nextgen-auth");
 if (auth.value?.isAuthenticated) {
   await navigateTo("/admin");
-}
-
-function onSignIn() {
-  navigateTo("/admin");
 }
 </script>
