@@ -49,7 +49,7 @@ sequenceDiagram
     Client->>API: Create user with $schema v1
     API->>DB: Register user, attributes, validate v1
     API-->>Client: 201
-    Note over Client,DB: v2 schema row added; no user points to v2
+    Note over Client,DB: v2 schema registered, no users reference it yet
     Client->>API: PUT/PATCH with $schema v2 and full delta
     API->>DB: Begin transaction
     API->>DB: Apply attributes, set schema_url v2
