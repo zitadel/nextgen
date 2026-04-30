@@ -2,7 +2,12 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import type { NextgenMiddlewareOptions } from "./types";
 
-const HOP_BY_HOP = new Set([
+/**
+ * Headers that must never be forwarded to an upstream service.
+ * These are connection-level headers that are meaningful only between
+ * two directly connected peers and become invalid when proxied.
+ */
+const HOP_BY_HOP: ReadonlySet<string> = new Set([
   "connection",
   "keep-alive",
   "proxy-authenticate",
@@ -13,75 +18,135 @@ const HOP_BY_HOP = new Set([
   "upgrade",
 ]);
 
-const jwksCache = new Map<string, { key: CryptoKey; fetchedAt: number }>();
+/**
+ * In-memory JWKS key cache, keyed by `kid`.
+ * Each entry holds the imported `CryptoKey` and the timestamp it was fetched.
+ */
+const jwksCache = new Map<string, { readonly key: CryptoKey; readonly fetchedAt: number }>();
+
+/** How long a cached JWKS key is considered fresh before re-fetching. */
 const JWKS_TTL_MS = 5 * 60 * 1000;
 
 /**
- * Decodes a Base64URL-encoded string into a byte array.
+ * The subset of JWT claims this middleware reads after verification.
+ * Additional claims are preserved under the index signature.
+ */
+interface JwtPayload {
+  readonly sub?: string;
+  readonly exp?: number;
+  readonly nbf?: number;
+  readonly iat?: number;
+  readonly email?: string;
+  readonly name?: string;
+  readonly [key: string]: unknown;
+}
+
+/**
+ * The decoded parts of a compact-serialized JWT.
+ */
+interface DecodedJwt {
+  readonly header: Record<string, unknown>;
+  readonly payload: JwtPayload;
+}
+
+/**
+ * Decodes a Base64URL-encoded string into a `Uint8Array`.
  *
- * @param input - A Base64URL-encoded string.
- * @returns The decoded bytes.
+ * The Edge runtime has no `Buffer`, so this uses `atob` after converting
+ * Base64URL characters to standard Base64 and re-padding to a multiple of four.
+ *
+ * @param input - A Base64URL-encoded string (no padding required).
+ * @returns The decoded bytes as a `Uint8Array`.
  */
 export function base64UrlDecode(input: string): Uint8Array<ArrayBuffer> {
   const base64 = input.replace(/-/g, "+").replace(/_/g, "/");
   const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), "=");
   const binary = atob(padded);
-  const buf = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) buf[i] = binary.charCodeAt(i);
-  return buf;
-}
-
-interface JwtPayload {
-  sub?: string;
-  exp?: number;
-  nbf?: number;
-  iat?: number;
-  email?: string;
-  name?: string;
-  [key: string]: unknown;
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
 }
 
 /**
- * Decodes a JWT into its header and payload without verifying the signature.
+ * Decodes a compact-serialized JWT into its header and payload objects
+ * without verifying the signature.
  *
- * @param token - A compact-serialized JWT string.
- * @returns The decoded header and payload objects.
+ * @param token - A compact JWT string in `header.payload.signature` form.
+ * @returns The decoded {@link DecodedJwt}.
  */
-export function decodeJwt(token: string): {
-  header: Record<string, unknown>;
-  payload: JwtPayload;
-} {
+export function decodeJwt(token: string): DecodedJwt {
   const [h, p] = token.split(".");
+  const decoder = new TextDecoder();
   return {
-    header: JSON.parse(new TextDecoder().decode(base64UrlDecode(h))) as Record<string, unknown>,
-    payload: JSON.parse(new TextDecoder().decode(base64UrlDecode(p))) as JwtPayload,
+    header: JSON.parse(decoder.decode(base64UrlDecode(h))) as Record<string, unknown>,
+    payload: JSON.parse(decoder.decode(base64UrlDecode(p))) as JwtPayload,
   };
 }
 
-async function fetchAndCacheJwks(jwksUri: string, kid: string | undefined): Promise<CryptoKey | null> {
+/**
+ * Resolves the Web Crypto `AlgorithmIdentifier` for a given JWT `alg` value.
+ *
+ * @param alg - The JWT algorithm string (e.g. `"RS256"`, `"ES256"`).
+ * @returns The corresponding Web Crypto algorithm descriptor.
+ */
+function resolveAlgorithm(alg: string): RsaHashedImportParams | EcKeyImportParams {
+  if (alg === "ES256") {
+    return { name: "ECDSA", namedCurve: "P-256" };
+  }
+  return { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" };
+}
+
+/**
+ * Resolves the Web Crypto `AlgorithmIdentifier` used for `crypto.subtle.verify`
+ * for a given JWT `alg` value.
+ *
+ * @param alg - The JWT algorithm string (e.g. `"RS256"`, `"ES256"`).
+ * @returns The algorithm descriptor accepted by `crypto.subtle.verify`.
+ */
+function resolveVerifyAlgorithm(alg: string): EcdsaParams | Algorithm {
+  if (alg === "ES256") {
+    return { name: "ECDSA", hash: "SHA-256" };
+  }
+  return { name: "RSASSA-PKCS1-v1_5" };
+}
+
+/**
+ * Fetches the JWKS from `jwksUri`, imports the key that matches `kid`,
+ * and caches it for {@link JWKS_TTL_MS} milliseconds.
+ *
+ * If `kid` is absent the first key in the JWKS is used. Returns `null` when
+ * no matching key is found or the fetch fails.
+ *
+ * @param jwksUri - The full URL of the JWKS endpoint.
+ * @param kid     - The `kid` claim from the JWT header, or `undefined`.
+ * @returns The imported `CryptoKey`, or `null` if unavailable.
+ */
+async function fetchAndCacheJwks(
+  jwksUri: string,
+  kid: string | undefined,
+): Promise<CryptoKey | null> {
   if (kid) {
     const cached = jwksCache.get(kid);
-    if (cached && Date.now() - cached.fetchedAt < JWKS_TTL_MS) return cached.key;
+    if (cached && Date.now() - cached.fetchedAt < JWKS_TTL_MS) {
+      return cached.key;
+    }
   }
 
   const res = await fetch(jwksUri);
-  const { keys } = (await res.json()) as { keys: (JsonWebKey & { kid?: string; alg?: string })[] };
+  const json = (await res.json()) as { keys: (JsonWebKey & { kid?: string; alg?: string })[] };
 
-  let jwk: (JsonWebKey & { kid?: string; alg?: string }) | undefined;
-  if (kid) {
-    jwk = keys.find((k) => k.kid === kid);
-  } else {
-    jwk = keys[0];
+  const jwk = kid ? json.keys.find((k) => k.kid === kid) : json.keys[0];
+
+  if (!jwk) {
+    return null;
   }
-  if (!jwk) return null;
 
   const alg = (jwk.alg as string | undefined) ?? "RS256";
-  const algorithm =
-    alg === "ES256"
-      ? { name: "ECDSA", namedCurve: "P-256" }
-      : { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" };
-
-  const cryptoKey = await crypto.subtle.importKey("jwk", jwk, algorithm, false, ["verify"]);
+  const cryptoKey = await crypto.subtle.importKey("jwk", jwk, resolveAlgorithm(alg), false, [
+    "verify",
+  ]);
 
   const cacheKey = kid ?? "__default__";
   jwksCache.set(cacheKey, { key: cryptoKey, fetchedAt: Date.now() });
@@ -89,29 +154,73 @@ async function fetchAndCacheJwks(jwksUri: string, kid: string | undefined): Prom
   return cryptoKey;
 }
 
-async function verifyJwt(token: string, issuerUrl: string, allowedAlgorithms?: string[], clockSkewMs = 5000): Promise<JwtPayload | null> {
+/**
+ * Verifies a JWT against the JWKS published at `{issuerUrl}/oauth/v2/keys`.
+ *
+ * Verification order:
+ * 1. Decode header and payload (no trust yet).
+ * 2. Reject if `alg` is not in `allowedAlgorithms` (when configured).
+ * 3. Fetch and cache the matching public key from JWKS.
+ * 4. Verify the cryptographic signature.
+ * 5. Validate `exp`, `nbf`, and `iat` with clock-skew tolerance.
+ *
+ * Returns `null` on any failure rather than throwing.
+ *
+ * @param token             - The raw compact-serialized JWT.
+ * @param issuerUrl         - Base URL of the auth backend.
+ * @param allowedAlgorithms - Optional allowlist of accepted `alg` values.
+ * @param clockSkewMs       - Tolerance in ms for time-based claim checks.
+ * @returns The verified {@link JwtPayload}, or `null` if verification fails.
+ */
+async function verifyJwt(
+  token: string,
+  issuerUrl: string,
+  allowedAlgorithms: readonly string[] | undefined,
+  clockSkewMs: number,
+): Promise<JwtPayload | null> {
   try {
     const { header, payload } = decodeJwt(token);
 
-    const alg = (header.alg as string) ?? "RS256";
-    if (allowedAlgorithms && allowedAlgorithms.length > 0 && !allowedAlgorithms.includes(alg)) return null;
+    const alg = (header.alg as string | undefined) ?? "RS256";
+
+    if (allowedAlgorithms && allowedAlgorithms.length > 0 && !allowedAlgorithms.includes(alg)) {
+      return null;
+    }
 
     const kid = header.kid as string | undefined;
     const jwksUri = `${issuerUrl}/oauth/v2/keys`;
-
     const cryptoKey = await fetchAndCacheJwks(jwksUri, kid);
-    if (!cryptoKey) return null;
+
+    if (!cryptoKey) {
+      return null;
+    }
 
     const [h, p, sig] = token.split(".");
-    const verifyAlg = alg === "ES256" ? { name: "ECDSA", hash: "SHA-256" } : { name: "RSASSA-PKCS1-v1_5" };
     const data = new TextEncoder().encode(`${h}.${p}`);
-    const valid = await crypto.subtle.verify(verifyAlg, cryptoKey, base64UrlDecode(sig), data);
-    if (!valid) return null;
+    const valid = await crypto.subtle.verify(
+      resolveVerifyAlgorithm(alg),
+      cryptoKey,
+      base64UrlDecode(sig),
+      data,
+    );
+
+    if (!valid) {
+      return null;
+    }
 
     const now = Date.now();
-    if (payload.exp !== undefined && payload.exp * 1000 < now - clockSkewMs) return null;
-    if (payload.nbf !== undefined && payload.nbf * 1000 > now + clockSkewMs) return null;
-    if (payload.iat !== undefined && payload.iat * 1000 > now + clockSkewMs) return null;
+
+    if (payload.exp !== undefined && payload.exp * 1000 < now - clockSkewMs) {
+      return null;
+    }
+
+    if (payload.nbf !== undefined && payload.nbf * 1000 > now + clockSkewMs) {
+      return null;
+    }
+
+    if (payload.iat !== undefined && payload.iat * 1000 > now + clockSkewMs) {
+      return null;
+    }
 
     return payload;
   } catch {
@@ -119,25 +228,53 @@ async function verifyJwt(token: string, issuerUrl: string, allowedAlgorithms?: s
   }
 }
 
-function matchesRoutes(pathname: string, routes: string[]): boolean {
-  if (!routes || routes.length === 0) return false;
-  return routes.some((p) =>
-    p.endsWith("*") ? pathname.startsWith(p.slice(0, -1)) : pathname === p,
-  );
+/**
+ * Returns `true` when `pathname` matches at least one entry in `routes`.
+ *
+ * An entry ending with `*` matches any path that starts with the prefix
+ * before the `*`. All other entries require an exact match.
+ *
+ * @param pathname - The URL pathname to test.
+ * @param routes   - The list of route patterns to match against.
+ * @returns `true` if at least one pattern matches.
+ */
+function matchesRoutes(pathname: string, routes: readonly string[]): boolean {
+  if (routes.length === 0) {
+    return false;
+  }
+
+  return routes.some((pattern) => {
+    if (pattern.endsWith("*")) {
+      return pathname.startsWith(pattern.slice(0, -1));
+    }
+    return pathname === pattern;
+  });
 }
 
-function tunnelHeaders(req: NextRequest, extra: Record<string, string>): Headers {
+/**
+ * Clones the incoming request headers, injects `extra` key/value pairs,
+ * and registers them with the Next.js header-tunnelling mechanism so that
+ * server components can read them via `headers()`.
+ *
+ * @param req   - The incoming edge request.
+ * @param extra - Additional headers to inject (e.g. `x-nextgen-auth-token`).
+ * @returns A new `Headers` instance with the injected values registered.
+ */
+function tunnelHeaders(req: NextRequest, extra: Readonly<Record<string, string>>): Headers {
   const headers = new Headers(req.headers);
-  const overrideNames: string[] = [];
+  const injectedNames: string[] = [];
+
   for (const [name, value] of Object.entries(extra)) {
     headers.set(name, value);
     headers.set(`x-middleware-request-${name}`, value);
-    overrideNames.push(name);
+    injectedNames.push(name);
   }
+
   const existing = headers.get("x-middleware-override-headers") ?? "";
   const combined = existing
-    ? `${existing},${overrideNames.join(",")}`
-    : overrideNames.join(",");
+    ? `${existing},${injectedNames.join(",")}`
+    : injectedNames.join(",");
+
   headers.set("x-middleware-override-headers", combined);
   return headers;
 }
@@ -149,7 +286,7 @@ function tunnelHeaders(req: NextRequest, extra: Record<string, string>): Headers
  * Place this in your `proxy.ts` file and export it as `proxy`:
  *
  * ```ts
- * import { nextgenMiddleware } from "@zitadel/sdk-next";
+ * import { nextgenMiddleware } from "@zitadel/sdk-next/middleware";
  * import type { NextRequest } from "next/server";
  *
  * export function proxy(req: NextRequest) {
@@ -165,7 +302,7 @@ function tunnelHeaders(req: NextRequest, extra: Record<string, string>): Headers
  * };
  * ```
  *
- * @param req - The incoming Next.js edge request.
+ * @param req     - The incoming Next.js edge request.
  * @param options - Middleware configuration options.
  * @returns A `NextResponse` or `Response` to continue, redirect, or proxy.
  */
@@ -190,38 +327,107 @@ export async function nextgenMiddleware(
   }
 
   if (pathname.startsWith(proxyPath)) {
-    const suffix = pathname.slice(proxyPath.length);
-    const upstreamUrl = new URL(req.url);
-    const target = `${issuerUrl}${suffix}${upstreamUrl.search}`;
-
-    const upstreamHeaders = new Headers();
-    for (const [k, v] of req.headers.entries()) {
-      if (!HOP_BY_HOP.has(k.toLowerCase())) {
-        upstreamHeaders.set(k, v);
-      }
-    }
-
-    const hasBody = !["GET", "HEAD"].includes(req.method);
-    const upstream = await fetch(target, {
-      method: req.method,
-      headers: upstreamHeaders,
-      body: hasBody ? req.body : undefined,
-      redirect: "manual",
-      ...(hasBody ? { duplex: "half" } : {}),
-    } as RequestInit);
-
-    return new Response(upstream.body, {
-      status: upstream.status,
-      headers: new Headers(upstream.headers),
-    });
+    return proxyRequest(req, issuerUrl, proxyPath);
   }
 
+  return handleAuth(req, {
+    issuerUrl,
+    protectedRoutes,
+    loginPath,
+    allowedAlgorithms,
+    clockSkewMs,
+    pathname,
+  });
+}
+
+/**
+ * Forwards a `/__nextgen/*` request to the upstream auth backend and streams
+ * the response back verbatim, stripping hop-by-hop headers in both directions.
+ *
+ * @param req        - The incoming edge request.
+ * @param issuerUrl  - Base URL of the auth backend.
+ * @param proxyPath  - The path prefix being proxied (e.g. `"/__nextgen"`).
+ * @returns The proxied upstream `Response`.
+ */
+async function proxyRequest(
+  req: NextRequest,
+  issuerUrl: string,
+  proxyPath: string,
+): Promise<Response> {
+  const { pathname, search } = new URL(req.url);
+  const suffix = pathname.slice(proxyPath.length);
+  const target = `${issuerUrl}${suffix}${search}`;
+
+  const upstreamHeaders = new Headers();
+  for (const [key, value] of req.headers.entries()) {
+    if (!HOP_BY_HOP.has(key.toLowerCase())) {
+      upstreamHeaders.set(key, value);
+    }
+  }
+
+  const hasBody = !["GET", "HEAD"].includes(req.method);
+
+  const upstream = await fetch(target, {
+    method: req.method,
+    headers: upstreamHeaders,
+    body: hasBody ? req.body : undefined,
+    redirect: "manual",
+    ...(hasBody ? { duplex: "half" } : {}),
+  } as RequestInit);
+
+  const responseHeaders = new Headers();
+
+  for (const [key, value] of upstream.headers.entries()) {
+    if (!HOP_BY_HOP.has(key.toLowerCase()) && key.toLowerCase() !== "set-cookie") {
+      responseHeaders.set(key, value);
+    }
+  }
+
+  const setCookies = upstream.headers.getSetCookie?.() ?? [];
+  for (const cookie of setCookies) {
+    responseHeaders.append("set-cookie", cookie);
+  }
+
+  return new Response(upstream.body, {
+    status: upstream.status,
+    headers: responseHeaders,
+  });
+}
+
+/**
+ * Options passed internally to {@link handleAuth} after destructuring the
+ * public-facing {@link NextgenMiddlewareOptions}.
+ */
+interface AuthHandlerOptions {
+  readonly issuerUrl: string;
+  readonly protectedRoutes: readonly string[];
+  readonly loginPath: string;
+  readonly allowedAlgorithms: readonly string[] | undefined;
+  readonly clockSkewMs: number;
+  readonly pathname: string;
+}
+
+/**
+ * Verifies the session token and tunnels the result to server components via
+ * a request header. Redirects to the login page when the token is absent or
+ * invalid on a protected route.
+ *
+ * @param req  - The incoming edge request.
+ * @param opts - Auth handler options.
+ * @returns A `NextResponse` to continue or redirect.
+ */
+async function handleAuth(req: NextRequest, opts: AuthHandlerOptions): Promise<NextResponse> {
+  const { issuerUrl, protectedRoutes, loginPath, allowedAlgorithms, clockSkewMs, pathname } = opts;
+
   const authHeader = req.headers.get("authorization");
-  const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
-  const cookieToken = req.cookies.get("__nextgen_session")?.value;
+  const bearerToken =
+    authHeader && authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  const cookieToken = req.cookies.get("__nextgen_session")?.value ?? null;
   const token = bearerToken ?? cookieToken;
 
-  const payload = token ? await verifyJwt(token, issuerUrl, allowedAlgorithms, clockSkewMs) : null;
+  const payload = token
+    ? await verifyJwt(token, issuerUrl, allowedAlgorithms, clockSkewMs)
+    : null;
 
   if (payload && token) {
     const tunnelled = tunnelHeaders(req, { "x-nextgen-auth-token": token });

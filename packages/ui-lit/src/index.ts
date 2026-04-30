@@ -1,3 +1,5 @@
+export { NextgenLogout } from "./logout.js";
+
 import { LitElement, css, html } from "lit";
 
 type FlowState =
@@ -10,6 +12,7 @@ type FlowState =
 class NextgenLogin extends LitElement {
   static override properties = {
     proxyBase: { type: String, attribute: "proxy-base" },
+    postSignInUrl: { type: String, attribute: "post-sign-in-url" },
     _flow: { state: true },
     _email: { state: true },
     _password: { state: true },
@@ -18,8 +21,7 @@ class NextgenLogin extends LitElement {
   static override styles = css`
     :host {
       display: block;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-        sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
 
     .card {
@@ -92,7 +94,9 @@ class NextgenLogin extends LitElement {
       background: #f9fafb;
       box-sizing: border-box;
       outline: none;
-      transition: border-color 0.15s, background 0.15s;
+      transition:
+        border-color 0.15s,
+        background 0.15s;
     }
 
     input:focus {
@@ -192,7 +196,9 @@ class NextgenLogin extends LitElement {
     }
 
     @keyframes spin {
-      to { transform: rotate(360deg); }
+      to {
+        transform: rotate(360deg);
+      }
     }
 
     .footer {
@@ -209,6 +215,7 @@ class NextgenLogin extends LitElement {
   `;
 
   declare proxyBase: string;
+  declare postSignInUrl: string;
   declare _flow: FlowState;
   declare _email: string;
   declare _password: string;
@@ -216,6 +223,7 @@ class NextgenLogin extends LitElement {
   constructor() {
     super();
     this.proxyBase = "/__nextgen";
+    this.postSignInUrl = "";
     this._flow = { name: "idle" };
     this._email = "";
     this._password = "";
@@ -274,7 +282,12 @@ class NextgenLogin extends LitElement {
       const data = await res.json();
       if (data.name === "success" || data.status === "complete") {
         this._flow = { name: "success", message: data.message ?? "You are signed in." };
-        this.dispatchEvent(new CustomEvent("nextgen-signin", { bubbles: true, composed: true, detail: data }));
+        this.dispatchEvent(
+          new CustomEvent("nextgen-signin", { bubbles: true, composed: true, detail: data }),
+        );
+        if (this.postSignInUrl) {
+          window.location.href = this.postSignInUrl;
+        }
       } else {
         this._flow = { name: "login", csrf_token: data.csrf_token ?? "" };
       }
@@ -315,7 +328,9 @@ class NextgenLogin extends LitElement {
             autocomplete="email"
             placeholder="you@example.com"
             .value=${this._email}
-            @input=${(e: InputEvent) => { this._email = (e.target as HTMLInputElement).value; }}
+            @input=${(e: InputEvent) => {
+              this._email = (e.target as HTMLInputElement).value;
+            }}
             required
           />
         </div>
@@ -327,7 +342,9 @@ class NextgenLogin extends LitElement {
             autocomplete="current-password"
             placeholder="••••••••"
             .value=${this._password}
-            @input=${(e: InputEvent) => { this._password = (e.target as HTMLInputElement).value; }}
+            @input=${(e: InputEvent) => {
+              this._password = (e.target as HTMLInputElement).value;
+            }}
             required
           />
         </div>
@@ -341,9 +358,16 @@ class NextgenLogin extends LitElement {
       </div>
 
       <button class="sso-button" type="button" @click=${this._handleSso}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+          <path d="M7 11V7a5 5 0 0 1 10 0v4" />
         </svg>
         Single sign-on (SSO)
       </button>
@@ -360,9 +384,7 @@ class NextgenLogin extends LitElement {
         <h2>Welcome back</h2>
         <p class="subtitle">Sign in to your account to continue</p>
         ${this._renderBody()}
-        <div class="footer">
-          Protected by <a href="#">Nextgen Auth</a>
-        </div>
+        <div class="footer">Protected by <a href="#">Nextgen Auth</a></div>
       </div>
     `;
   }
