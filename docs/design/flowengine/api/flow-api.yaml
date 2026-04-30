@@ -3,6 +3,12 @@ info:
   title: Zitadel Flow Engine API
   version: 1.0.0-draft
   description: |
+    DRAFT — this file is a design-phase sketch.
+    The canonical flow runtime OpenAPI spec lives at:
+      api/openapi/openapi-spec.yaml  (paths: /flow, /flow/{id}, /flow/{id}/submit, /flow/{id}/event)
+      api/openapi/endpoints/flow/    (per-endpoint method files)
+      api/openapi/components/flows/  (request/response schemas, flow definition JSON schema)
+
     Server-side state machine producing Capability payloads (fields, actions, gates)
     alongside LiquidJS templates. Used by web/frontend clients for ready-made login,
     registration, and recovery.
@@ -47,9 +53,9 @@ paths:
               schema:
                 $ref: "#/components/schemas/FlowResponse"
 
-  /flows/{sessionId}:
+  /flows/{flowId}:
     parameters:
-      - $ref: "#/components/parameters/sessionId"
+      - $ref: "#/components/parameters/flowId"
     get:
       operationId: getFlowStep
       summary: Get current step (re-render)
@@ -69,9 +75,9 @@ paths:
         "410":
           $ref: "#/components/responses/FlowCompleted"
 
-  /flows/{sessionId}/submit:
+  /flows/{flowId}/submit:
     parameters:
-      - $ref: "#/components/parameters/sessionId"
+      - $ref: "#/components/parameters/flowId"
     post:
       operationId: submitFlowStep
       summary: Submit step data and advance
@@ -105,9 +111,9 @@ paths:
         "409":
           $ref: "#/components/responses/Conflict"
 
-  /flows/{sessionId}/event:
+  /flows/{flowId}/event:
     parameters:
-      - $ref: "#/components/parameters/sessionId"
+      - $ref: "#/components/parameters/flowId"
     post:
       operationId: submitFlowEvent
       summary: Submit client-side event
@@ -313,14 +319,14 @@ paths:
 
 components:
   parameters:
-    sessionId:
-      name: sessionId
+    flowId:
+      name: flowId
       in: path
       required: true
-      description: Session ID (also serves as the flow handle)
+      description: Flow instance ID returned on flow creation
       schema:
         type: string
-        example: sess_xyz
+        example: flow_abc
 
     definitionId:
       name: definitionId
@@ -334,7 +340,7 @@ components:
     sessionToken:
       type: http
       scheme: bearer
-      description: Session token returned on flow creation or last submit
+      description: Session token returned on flow creation or last submit. Rotates on every response.
 
   schemas:
     # ── Flow runtime schemas ────────────────────────────────────
@@ -383,8 +389,13 @@ components:
       properties:
         session_id:
           type: string
+          description: Session ID. Also used as the flow handle in URL paths.
+          example: sess_xyz
         session_token:
           type: string
+          description: |
+            Short-lived token for the next request. Rotates on every response
+            (anti-replay). Sent as `Authorization: Bearer` header.
         step:
           $ref: "#/components/schemas/FlowStep"
         branding:
@@ -428,7 +439,7 @@ components:
             Only present on `complete` steps. Tells the frontend what to do:
             - redirect: navigate to redirect_uri immediately
             - show: render the step via the Liquid template (success screen)
-            - continue: call GET /flows/{session_id} for the next step (auto-pivot happened)
+            - continue: call GET /flows/{flow_id} for the next step (auto-pivot happened)
         redirect_url:
           type: string
           format: uri

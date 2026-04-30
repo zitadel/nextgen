@@ -1,7 +1,9 @@
 # Flow Engine
 
 > **Status:** Draft
-> **See also:** [Overview](README.md) · [Step Response Shape](flow-engine-nodes.md) · [Storage](flow-engine-storage.md) · [API sketch](api/flow-api.yaml) · [Glossary](../glossary.md) · [auth_attempts (primitives layer)](../api/authn-and-auth-flows.md)
+> **See also:** [Overview](README.md) · [Step Response Shape](flow-engine-nodes.md) · [Storage](flow-engine-storage.md) · [OpenAPI spec (draft)](api/flow-api.yaml)
+>
+> **Canonical OpenAPI spec:** [`api/openapi/openapi-spec.yaml`](../../../api/openapi/openapi-spec.yaml) — endpoints under `/flow`. Schemas in [`api/openapi/components/flows/`](../../../api/openapi/components/flows/).
 
 The flow engine is a **server-side state machine** that produces **Capability payloads** (semantic descriptions of fields, actions, and gates) alongside a **LiquidJS template** for rendering. It does **not** hold authentication primitives; those live in [`auth_attempts`](../api/authn-and-auth-flows.md). A flow step that says "collect password" internally invokes the auth_attempt **Go service layer** (never via HTTP), but `/flows/{session_id}` remains the flow engine's session-scoped UI handle rather than an alias for `auth_attempt_id`.
 
@@ -10,13 +12,13 @@ It is used by web/frontend clients that want a ready-made login and registration
 ## Endpoints
 
 ```
-POST   /flows                        Start a flow (creates a session internally)
-GET    /flows/{session_id}           Get current step (re-render)
-POST   /flows/{session_id}/submit    Submit step data, advance state machine
-POST   /flows/{session_id}/event     Client-side event (fingerprint, telemetry)
+POST   /flow              Start a flow (creates a session internally)
+GET    /flow/{id}          Get current step (re-render)
+POST   /flow/{id}/submit   Submit step data, advance state machine
+POST   /flow/{id}/event    Client-side event (fingerprint, telemetry)
 ```
 
-The `session_id` identifies which session the flow operates on. Flow state itself is stored in an encrypted cookie — see [Storage](flow-engine-storage.md).
+The `{id}` is a flow handle returned by `POST /flow` or the latest `POST /flow/{id}/submit`. It may change between responses on pivot or pop — the frontend must always use the `id` from the latest response. The underlying `session_id` remains stable across stacked flows. Flow state itself is stored in an encrypted cookie — see [Storage](flow-engine-storage.md).
 
 ## Starting a Flow
 

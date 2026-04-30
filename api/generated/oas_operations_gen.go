@@ -8,7 +8,9 @@ type OperationName = string
 const (
 	AuthorizeDeviceOperation        OperationName = "AuthorizeDevice"
 	AuthorizeGetOperation           OperationName = "AuthorizeGet"
+	CreateFlowOperation             OperationName = "CreateFlow"
 	EndSessionOperation             OperationName = "EndSession"
+	GetFlowStepOperation            OperationName = "GetFlowStep"
 	GetHealthOperation              OperationName = "GetHealth"
 	GetKeysOperation                OperationName = "GetKeys"
 	GetLiveOperation                OperationName = "GetLive"
@@ -19,4 +21,6 @@ const (
 	IntrospectOperation             OperationName = "Introspect"
 	ListUsersOperation              OperationName = "ListUsers"
 	RevokeTokenOperation            OperationName = "RevokeToken"
+	SubmitFlowEventOperation        OperationName = "SubmitFlowEvent"
+	SubmitFlowStepOperation         OperationName = "SubmitFlowStep"
 )

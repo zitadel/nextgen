@@ -1,0 +1,32 @@
+type: object
+description: |
+  Resolved branding configuration. Inherited from the app → team → project
+  hierarchy at flow creation time (most specific wins). Read-only projection —
+  branding is configured via the Team/App Branding API, not the Flow API.
+properties:
+  layout:
+    type: string
+    enum: [centered, split]
+    description: |
+      Layout preset selector. The default.liquid master template uses this
+      to branch into layout variants. Customers who eject the template
+      can ignore this field entirely.
+    default: centered
+  liquid_template:
+    type: string
+    description: |
+      The LiquidJS template string for rendering this step. The orchestrator
+      parses this template, injects the capability dictionaries as context,
+      and renders the output HTML into its Shadow DOM.
+  logo_url:
+    type: string
+    format: uri
+    description: Team logo URL.
+  font_url:
+    type: string
+    format: uri
+    description: Custom font URL (e.g., Google Fonts CSS).
+  hero_url:
+    type: string
+    format: uri
+    description: Hero/background image URL (used by split layout).

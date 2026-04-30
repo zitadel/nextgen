@@ -1,0 +1,14 @@
+type: object
+description: |
+  Step-level localization keys. Resolved client-side via the `| t` LiquidJS filter.
+  The backend never sends display text — only semantic keys.
+properties:
+  title_key:
+    type: string
+    description: Localization key for the step heading.
+    example: identifier.title
+  description_key:
+    type: string
+    description: Localization key for explanatory text.
+    nullable: true
+    example: identifier.description

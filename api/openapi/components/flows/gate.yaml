@@ -1,0 +1,25 @@
+type: object
+required: [type]
+description: |
+  A security gate that must be satisfied. The orchestrator appends any
+  required-but-unrendered gates automatically as a safety net.
+properties:
+  type:
+    type: string
+    enum: [captcha, passkey]
+    description: Gate type.
+  provider:
+    type: string
+    description: Provider identifier (e.g., "altcha", "turnstile").
+    example: altcha
+  required:
+    type: boolean
+    default: true
+  satisfied:
+    type: boolean
+    default: false
+    description: Whether this gate has already been satisfied in this flow.
+  config:
+    type: object
+    description: Provider-specific challenge parameters.
+    additionalProperties: true

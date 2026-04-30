@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Flow Engine Visualizer</title>
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/liquidjs@10/dist/liquid.browser.min.js"></script>
 <style>
   :root {
     --bg: #0f1117;
@@ -17,9 +18,9 @@
     --green: #4ade80;
     --yellow: #fbbf24;
     --red: #f87171;
+    --purple: #a78bfa;
     --radius: 8px;
 
-    /* Syntax highlighting */
     --syn-key: #6c8cff;
     --syn-string: #4ade80;
     --syn-number: #fbbf24;
@@ -54,13 +55,7 @@
     background: var(--surface);
   }
 
-  header h1 {
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--muted);
-    letter-spacing: 0.5px;
-  }
-
+  header h1 { font-size: 14px; font-weight: 600; color: var(--muted); letter-spacing: 0.5px; }
   header h1 span { color: var(--text); }
 
   .layout {
@@ -69,15 +64,8 @@
     height: calc(100vh - 48px);
   }
 
-  /* ── Left panel: editor ── */
-  .editor-panel {
-    border-right: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-
-  .flow-tabs {
+  /* ── Tabs (shared) ── */
+  .tab-bar {
     display: flex;
     gap: 0;
     border-bottom: 1px solid var(--border);
@@ -86,7 +74,7 @@
     flex-shrink: 0;
   }
 
-  .flow-tab {
+  .tab-btn {
     padding: 10px 16px;
     font-size: 13px;
     color: var(--muted);
@@ -98,10 +86,20 @@
     transition: all 0.15s;
   }
 
-  .flow-tab:hover { color: var(--text); background: rgba(108, 140, 255, 0.05); }
-  .flow-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab-btn:hover { color: var(--text); background: rgba(108, 140, 255, 0.05); }
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
 
-  /* Code editor with syntax highlighting overlay */
+  .tab-btn.flow-select { font-weight: 600; }
+  .tab-btn.editor-mode { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+  /* ── Left panel: editor ── */
+  .editor-panel {
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
   .editor-wrap {
     flex: 1;
     overflow: hidden;
@@ -115,19 +113,9 @@
     position: relative;
   }
 
-  .editor-layer {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    min-height: 100%;
-  }
-
-  /* Gutter (line numbers) */
   .gutter {
     position: absolute;
-    top: 0;
-    left: 0;
+    top: 0; left: 0;
     width: var(--gutter-w);
     padding: var(--editor-pad) 0;
     text-align: right;
@@ -140,22 +128,13 @@
     z-index: 3;
   }
 
-  .gutter .ln {
-    display: block;
-    padding-right: 12px;
-    height: var(--editor-lh);
-  }
+  .gutter .ln { display: block; padding-right: 12px; height: var(--editor-lh); position: relative; }
+  .gutter .ln.active-line { color: var(--accent); }
+  .gutter .ln.breakpoint::before { content: "\25B6"; position: absolute; left: 6px; color: var(--accent); font-size: 10px; }
 
-  .gutter .ln.active-line {
-    color: var(--accent);
-  }
-
-  /* Highlight backdrop (step range highlight) */
   .highlight-backdrop {
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
+    top: 0; left: 0; right: 0;
     min-height: 100%;
     pointer-events: none;
     z-index: 0;
@@ -163,31 +142,13 @@
 
   .line-highlight {
     position: absolute;
-    left: var(--gutter-w);
-    right: 0;
+    left: var(--gutter-w); right: 0;
     height: var(--editor-lh);
     background: rgba(108, 140, 255, 0.08);
     border-left: 2px solid var(--accent);
   }
+  .line-highlight.breakpoint-line { background: rgba(108, 140, 255, 0.15); }
 
-  .line-highlight.breakpoint-line {
-    background: rgba(108, 140, 255, 0.15);
-  }
-
-  /* Breakpoint arrow in gutter */
-  .gutter .ln.breakpoint::before {
-    content: "▶";
-    position: absolute;
-    left: 6px;
-    color: var(--accent);
-    font-size: 10px;
-  }
-
-  .gutter .ln {
-    position: relative;
-  }
-
-  /* Syntax highlight layer */
   .highlight-pre {
     position: absolute;
     top: 0;
@@ -213,8 +174,7 @@
   .highlight-pre .null { color: var(--syn-null); font-style: italic; }
   .highlight-pre .brace { color: var(--syn-brace); }
 
-  /* Invisible textarea on top */
-  textarea#editor {
+  textarea.code-editor {
     position: absolute;
     top: 0;
     left: var(--gutter-w);
@@ -240,9 +200,24 @@
     overflow-wrap: normal;
   }
 
-  textarea#editor::selection {
-    background: rgba(108, 140, 255, 0.3);
-    color: transparent;
+  textarea.code-editor::selection { background: rgba(108, 140, 255, 0.3); color: transparent; }
+
+  /* Template editor (plain text, no overlay) */
+  textarea.template-editor {
+    width: 100%;
+    height: 100%;
+    padding: var(--editor-pad);
+    background: var(--bg);
+    color: var(--text);
+    caret-color: var(--text);
+    border: none;
+    font-family: var(--editor-font);
+    font-size: var(--editor-size);
+    line-height: var(--editor-lh);
+    white-space: pre;
+    resize: none;
+    outline: none;
+    tab-size: 2;
   }
 
   .editor-status {
@@ -261,34 +236,15 @@
   .editor-status .error { color: var(--red); }
   .editor-status .ok { color: var(--green); }
 
+  .editor-pane { display: none; width: 100%; flex: 1; overflow: hidden; }
+  .editor-pane.active { display: flex; flex-direction: column; }
+
   /* ── Right panel ── */
   .right-panel {
     display: flex;
     flex-direction: column;
     overflow: hidden;
   }
-
-  .right-tabs {
-    display: flex;
-    gap: 0;
-    border-bottom: 1px solid var(--border);
-    background: var(--surface);
-    flex-shrink: 0;
-  }
-
-  .right-tab {
-    padding: 10px 16px;
-    font-size: 13px;
-    color: var(--muted);
-    cursor: pointer;
-    border: none;
-    background: none;
-    border-bottom: 2px solid transparent;
-    transition: all 0.15s;
-  }
-
-  .right-tab:hover { color: var(--text); background: rgba(108, 140, 255, 0.05); }
-  .right-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
 
   .right-content {
     flex: 1;
@@ -299,30 +255,13 @@
   .view { display: none; height: 100%; }
   .view.active { display: flex; flex-direction: column; }
 
-  /* Diagram view */
-  #diagram-view {
-    align-items: center;
-    justify-content: center;
-    padding: 24px;
-    overflow: auto;
-  }
+  /* Diagram */
+  #diagram-view { align-items: center; justify-content: center; padding: 24px; overflow: auto; }
+  #diagram-view .mermaid-container { width: 100%; display: flex; justify-content: center; }
+  #diagram-view .mermaid-container svg { max-width: 100%; height: auto; }
 
-  #diagram-view .mermaid-container {
-    width: 100%;
-    display: flex;
-    justify-content: center;
-  }
-
-  #diagram-view .mermaid-container svg {
-    max-width: 100%;
-    height: auto;
-  }
-
-  /* Simulation view */
-  #sim-view {
-    padding: 24px;
-    align-items: center;
-  }
+  /* Simulation */
+  #sim-view { padding: 24px; align-items: center; overflow: auto; }
 
   .sim-phone {
     width: 375px;
@@ -335,71 +274,28 @@
     flex-direction: column;
   }
 
-  .sim-header {
-    padding: 20px 24px 12px;
-    border-bottom: 1px solid var(--border);
-  }
+  .sim-header { padding: 20px 24px 12px; border-bottom: 1px solid var(--border); }
+  .sim-header h2 { font-size: 20px; font-weight: 600; margin-bottom: 4px; }
+  .sim-header p { font-size: 13px; color: var(--muted); }
 
-  .sim-header h2 {
-    font-size: 20px;
-    font-weight: 600;
-    margin-bottom: 4px;
-  }
+  .sim-body { padding: 20px 24px; flex: 1; display: flex; flex-direction: column; gap: 12px; }
 
-  .sim-header p {
-    font-size: 13px;
-    color: var(--muted);
-  }
-
-  .sim-body {
-    padding: 20px 24px;
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .sim-field label {
-    display: block;
-    font-size: 12px;
-    color: var(--muted);
-    margin-bottom: 4px;
-    font-weight: 500;
-  }
-
+  .sim-field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; font-weight: 500; }
   .sim-field input {
-    width: 100%;
-    padding: 10px 12px;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    color: var(--text);
-    font-size: 14px;
-    outline: none;
-    transition: border-color 0.15s;
+    width: 100%; padding: 10px 12px; background: var(--bg);
+    border: 1px solid var(--border); border-radius: var(--radius);
+    color: var(--text); font-size: 14px; outline: none; transition: border-color 0.15s;
   }
-
   .sim-field input:focus { border-color: var(--accent); }
   .sim-field input::placeholder { color: #4a4d5a; }
 
-  .sim-actions {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    margin-top: 8px;
-  }
+  .sim-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
 
   .sim-btn {
-    width: 100%;
-    padding: 10px 16px;
-    border-radius: var(--radius);
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-    border: 1px solid var(--border);
-    transition: all 0.15s;
+    width: 100%; padding: 10px 16px; border-radius: var(--radius);
+    font-size: 14px; font-weight: 500; cursor: pointer;
+    border: 1px solid var(--border); transition: all 0.15s;
   }
-
   .sim-btn.primary { background: var(--accent); color: white; border-color: var(--accent); }
   .sim-btn.primary:hover { background: #5a7aee; }
   .sim-btn.sso { background: var(--surface); color: var(--text); display: flex; align-items: center; gap: 8px; justify-content: center; }
@@ -408,15 +304,12 @@
   .sim-btn.link:hover { text-decoration: underline; }
   .sim-btn.passkey { background: var(--surface); color: var(--text); }
   .sim-btn.passkey:hover { background: var(--bg); }
-  .sim-btn.captcha { background: var(--surface); color: var(--text); }
 
   .sim-error {
     background: rgba(248, 113, 113, 0.1);
     border: 1px solid rgba(248, 113, 113, 0.3);
     border-radius: var(--radius);
-    padding: 10px 12px;
-    font-size: 13px;
-    color: var(--red);
+    padding: 10px 12px; font-size: 13px; color: var(--red);
   }
 
   .sim-footer {
@@ -430,52 +323,108 @@
   .sim-breadcrumb { font-size: 11px; color: var(--muted); }
   .sim-breadcrumb span { color: var(--accent); }
 
-  .sim-reset {
-    font-size: 11px;
-    color: var(--muted);
-    background: none;
-    border: none;
-    cursor: pointer;
-    text-decoration: underline;
-  }
+  .sim-reset { font-size: 11px; color: var(--muted); background: none; border: none; cursor: pointer; text-decoration: underline; }
   .sim-reset:hover { color: var(--text); }
 
   .sim-complete {
-    text-align: center;
-    padding: 40px 24px;
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
+    text-align: center; padding: 40px 24px; flex: 1;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
   }
-
   .sim-complete .checkmark {
-    width: 48px;
-    height: 48px;
-    border-radius: 50%;
+    width: 48px; height: 48px; border-radius: 50%;
     background: rgba(74, 222, 128, 0.15);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 24px;
+    display: flex; align-items: center; justify-content: center; font-size: 24px;
   }
-
   .sim-complete h3 { font-size: 18px; }
   .sim-complete p { font-size: 13px; color: var(--muted); }
 
-  .pivot-badge {
-    display: inline-block;
-    font-size: 10px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    padding: 2px 8px;
-    border-radius: 10px;
-    background: rgba(108, 140, 255, 0.15);
-    color: var(--accent);
-    margin-left: 8px;
+  .step-badge {
+    display: inline-block; font-size: 10px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.5px; padding: 2px 8px; border-radius: 10px;
+    background: rgba(108, 140, 255, 0.15); color: var(--accent); margin-left: 8px;
+  }
+
+  .sim-ids {
+    padding: 8px 24px;
+    font-size: 11px;
+    color: var(--muted);
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    font-family: var(--editor-font);
+    display: flex;
+    gap: 16px;
+  }
+  .sim-ids code { color: var(--accent); }
+
+  /* ── API Log ── */
+  #api-view { padding: 0; overflow: auto; }
+
+  .api-toolbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 16px; background: var(--surface);
+    border-bottom: 1px solid var(--border); flex-shrink: 0;
+  }
+  .api-toolbar span { font-size: 12px; color: var(--muted); }
+  .api-clear { font-size: 11px; color: var(--muted); background: none; border: none; cursor: pointer; text-decoration: underline; }
+  .api-clear:hover { color: var(--text); }
+
+  .api-log { flex: 1; overflow: auto; padding: 0; }
+
+  .api-entry {
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+  }
+
+  .api-entry-header {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 16px;
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+  .api-entry-header:hover { background: rgba(108, 140, 255, 0.04); }
+
+  .api-method {
+    font-family: var(--editor-font);
+    font-size: 11px; font-weight: 700;
+    padding: 2px 6px; border-radius: 4px;
+    background: rgba(108, 140, 255, 0.15); color: var(--accent);
+  }
+
+  .api-url { font-family: var(--editor-font); color: var(--text); font-size: 12px; }
+
+  .api-status {
+    margin-left: auto;
+    font-family: var(--editor-font);
+    font-size: 11px; font-weight: 600;
+  }
+  .api-status.s2xx { color: var(--green); }
+  .api-status.s4xx { color: var(--red); }
+
+  .api-chevron {
+    color: var(--muted); font-size: 10px;
+    transition: transform 0.15s;
+  }
+  .api-entry.expanded .api-chevron { transform: rotate(90deg); }
+
+  .api-detail { display: none; padding: 0 16px 12px; }
+  .api-entry.expanded .api-detail { display: block; }
+
+  .api-section { margin-bottom: 8px; }
+  .api-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); margin-bottom: 4px; }
+
+  .api-json {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+    font-family: var(--editor-font);
+    font-size: 11px;
+    line-height: 18px;
+    white-space: pre-wrap;
+    word-break: break-all;
+    color: var(--text);
+    max-height: 300px;
+    overflow: auto;
   }
 </style>
 </head>
@@ -488,14 +437,26 @@
 <div class="layout">
   <!-- Left: Editor -->
   <div class="editor-panel">
-    <div class="flow-tabs" id="flow-tabs"></div>
-    <div class="editor-wrap">
-      <div class="editor-scroll" id="editor-scroll">
-        <div class="highlight-backdrop" id="highlight-backdrop"></div>
-        <div class="gutter" id="gutter"></div>
-        <pre class="highlight-pre" id="highlight-pre"></pre>
-        <textarea id="editor" spellcheck="false"></textarea>
+    <div class="tab-bar" id="left-tabs-flows">
+      <!-- flow select tabs injected by JS -->
+    </div>
+    <div class="tab-bar" id="left-tabs-editor" style="border-bottom-color: var(--border);">
+      <!-- editor mode tabs injected by JS -->
+    </div>
+    <!-- JSON editor pane -->
+    <div class="editor-pane active" id="json-pane">
+      <div class="editor-wrap">
+        <div class="editor-scroll" id="editor-scroll">
+          <div class="highlight-backdrop" id="highlight-backdrop"></div>
+          <div class="gutter" id="gutter"></div>
+          <pre class="highlight-pre" id="highlight-pre"></pre>
+          <textarea id="editor" class="code-editor" spellcheck="false"></textarea>
+        </div>
       </div>
+    </div>
+    <!-- Liquid template pane -->
+    <div class="editor-pane" id="template-pane">
+      <textarea id="template-editor" class="template-editor" spellcheck="false"></textarea>
     </div>
     <div class="editor-status">
       <span id="parse-status" class="ok">Valid JSON</span>
@@ -503,11 +464,12 @@
     </div>
   </div>
 
-  <!-- Right: Diagram + Sim -->
+  <!-- Right: Diagram + Sim + API -->
   <div class="right-panel">
-    <div class="right-tabs">
-      <button class="right-tab active" data-view="diagram-view">Diagram</button>
-      <button class="right-tab" data-view="sim-view">Simulate</button>
+    <div class="tab-bar">
+      <button class="tab-btn active" data-view="diagram-view">Diagram</button>
+      <button class="tab-btn" data-view="sim-view">Simulate</button>
+      <button class="tab-btn" data-view="api-view">API Log</button>
     </div>
     <div class="right-content">
       <div id="diagram-view" class="view active">
@@ -516,12 +478,140 @@
       <div id="sim-view" class="view">
         <div class="sim-phone" id="sim-phone"></div>
       </div>
+      <div id="api-view" class="view">
+        <div class="api-toolbar">
+          <span>Request / Response Log</span>
+          <button class="api-clear" onclick="clearApiLog()">Clear</button>
+        </div>
+        <div class="api-log" id="api-log"></div>
+      </div>
     </div>
   </div>
 </div>
 
 <script>
-// ── Flow Definitions ──────────────────────────────────────────────
+// ── Translations (simulates client-side i18n dictionary) ─────────
+
+const T = {
+  "login.identifier.title": "Sign in",
+  "login.identifier.description": "Enter your email to continue",
+  "login.identifier.field.email": "Email",
+  "login.identifier.action.submit": "Continue",
+  "login.identifier.action.passkey": "Sign in with passkey",
+  "login.identifier.action.register": "Create account",
+  "login.sso.title": "Redirecting to provider\u2026",
+  "login.password.title": "Enter your password",
+  "login.password.field.password": "Password",
+  "login.password.action.submit": "Sign in",
+  "login.password.action.recover": "Forgot password?",
+  "login.otp.title": "Two-factor authentication",
+  "login.otp.description": "Enter the code from your authenticator app",
+  "login.otp.field.code": "Code",
+  "login.otp.action.submit": "Verify",
+  "login.complete.title": "Login successful",
+  "register.profile.title": "Create your account",
+  "register.profile.field.email": "Email",
+  "register.profile.field.given_name": "First name",
+  "register.profile.field.family_name": "Last name",
+  "register.profile.action.submit": "Continue",
+  "register.profile.action.login": "Already have an account? Sign in",
+  "register.password.title": "Choose a password",
+  "register.password.field.password": "Password",
+  "register.password.action.submit": "Continue",
+  "register.verify.title": "Verify your email",
+  "register.verify.description": "We sent a code to your email",
+  "register.verify.field.code": "Verification code",
+  "register.verify.action.submit": "Verify",
+  "register.verify.action.resend": "Resend code",
+  "register.complete.title": "Account created",
+  "recovery.email.title": "Reset your password",
+  "recovery.email.description": "We'll send a code to your email",
+  "recovery.email.field.email": "Email",
+  "recovery.email.action.submit": "Send code",
+  "recovery.email.action.back": "Back to sign in",
+  "recovery.code.title": "Enter your code",
+  "recovery.code.description": "Check your inbox for a verification code",
+  "recovery.code.field.code": "Code",
+  "recovery.code.action.submit": "Verify",
+  "recovery.code.action.resend": "Resend code",
+  "recovery.password.title": "Set a new password",
+  "recovery.password.field.password": "New password",
+  "recovery.password.action.submit": "Reset password",
+  "recovery.complete.title": "Password reset successful",
+  "enterprise.identifier.title": "Sign in to Acme Corp",
+  "enterprise.identifier.description": "Use your corporate email",
+  "enterprise.identifier.field.email": "Corporate email",
+  "enterprise.identifier.action.submit": "Continue with SSO",
+  "enterprise.consent.title": "Authorize access",
+  "enterprise.consent.description": "Acme Dashboard wants to access your account",
+  "enterprise.consent.action.accept": "Allow",
+  "enterprise.consent.action.deny": "Deny",
+  "enterprise.complete.title": "Signed in",
+  "saas.identifier.title": "Welcome to SaaSApp",
+  "saas.identifier.description": "Sign in or create an account",
+  "saas.identifier.field.email": "Email",
+  "saas.identifier.action.submit": "Continue",
+  "saas.identifier.action.register": "Create account",
+  "saas.password.title": "Enter your password",
+  "saas.password.field.password": "Password",
+  "saas.password.action.submit": "Sign in",
+  "saas.password.action.recover": "Forgot password?",
+  "saas.complete.title": "Welcome back!",
+  "saas.profile.title": "Complete your profile",
+  "saas.profile.description": "Tell us a bit about yourself",
+  "saas.profile.field.email": "Email",
+  "saas.profile.field.display_name": "Display name",
+  "saas.profile.field.company": "Company (optional)",
+  "saas.profile.action.submit": "Create account",
+  "saas.profile.action.login": "Already have an account?",
+  "saas.terms.title": "Terms of Service",
+  "saas.terms.description": "Please review and accept our terms",
+  "saas.terms.action.accept": "I accept",
+  "saas.terms.action.decline": "Decline",
+  "saas.verify.title": "Verify your email",
+  "saas.verify.description": "We sent a 6-digit code to your inbox",
+  "saas.verify.field.code": "Verification code",
+  "saas.verify.action.submit": "Verify",
+  "saas.verify.action.resend": "Resend code",
+  "saas.reg_complete.title": "You're all set!",
+  "passkey.title": "Passwordless sign in",
+  "passkey.description": "Use your passkey or security key to sign in",
+  "passkey.action.authenticate": "Use passkey",
+  "passkey.action.fallback": "Use password instead",
+  "passkey.complete.title": "Signed in",
+};
+
+function t(key) { return T[key] || key; }
+
+// ── Default Liquid Template ──────────────────────────────────────
+
+const DEFAULT_TEMPLATE = `<h2>{{ texts.title_key | t }}</h2>
+{% if texts.description_key %}<p class="desc">{{ texts.description_key | t }}</p>{% endif %}
+
+{% if error %}<div class="error">{{ error }}</div>{% endif %}
+
+{% for field in fields_list %}
+<div class="field">
+  <label>{{ field.text_key | t }}{% if field.required %} *{% endif %}</label>
+  <input type="{{ field.type }}" name="{{ field.name }}" placeholder="{{ field.text_key | t }}" />
+</div>
+{% endfor %}
+
+{% for provider in sso_providers %}
+<button class="sso" data-action="sso" data-provider-id="{{ provider.id }}">
+  Continue with {{ provider.name }}
+</button>
+{% endfor %}
+
+{% for action in actions_list %}
+{% if action.primary %}
+<button class="primary" data-action="{{ action.name }}">{{ action.text_key | t }}</button>
+{% else %}
+<button class="link" data-action="{{ action.name }}">{{ action.text_key | t }}</button>
+{% endif %}
+{% endfor %}`;
+
+// ── Flow Definitions (API-aligned data model) ────────────────────
 
 const FLOWS = {
   "Login": {
@@ -533,22 +623,23 @@ const FLOWS = {
       {
         name: "identifier",
         type: "identifier",
-        label: "Sign in",
-        description: "Enter your email to continue",
-        config: { methods: ["email"], sso_providers: ["google"] },
-        fields: [
-          { name: "identifier", label: "Email", type: "email", required: true }
-        ],
-        actions: [
-          { kind: "submit", name: "submit", label: "Continue", primary: true },
-          { kind: "sso", name: "google", label: "Continue with Google", provider: "google" },
-          { kind: "passkey", name: "passkey", label: "Sign in with passkey" },
-          { kind: "link", name: "register", label: "Create account" }
+        texts: { title_key: "login.identifier.title", description_key: "login.identifier.description" },
+        fields: {
+          identifier: { type: "email", required: true, text_key: "login.identifier.field.email" }
+        },
+        actions: {
+          submit: { text_key: "login.identifier.action.submit", primary: true },
+          passkey: { text_key: "login.identifier.action.passkey" },
+          register: { text_key: "login.identifier.action.register" }
+        },
+        gates: {},
+        sso_providers: [
+          { id: "google-1", name: "Google", template: "google" }
         ],
         transitions: {
           submit: "resolve_user",
-          google: "sso_redirect",
-          register: { pivot: "register" },
+          sso: "sso_redirect",
+          register: { switch: "register" },
           recover: { pivot: "recovery" }
         }
       },
@@ -561,7 +652,7 @@ const FLOWS = {
       {
         name: "sso_redirect",
         type: "redirect",
-        label: "Redirecting to provider...",
+        texts: { title_key: "login.sso.title" },
         transitions: { callback: "check_factors" }
       },
       {
@@ -573,34 +664,35 @@ const FLOWS = {
       {
         name: "password",
         type: "credential",
-        label: "Enter your password",
-        fields: [
-          { name: "password", label: "Password", type: "password", required: true }
-        ],
-        actions: [
-          { kind: "submit", name: "submit", label: "Sign in", primary: true },
-          { kind: "link", name: "recover", label: "Forgot password?" }
-        ],
+        texts: { title_key: "login.password.title" },
+        fields: {
+          password: { type: "password", required: true, text_key: "login.password.field.password" }
+        },
+        actions: {
+          submit: { text_key: "login.password.action.submit", primary: true },
+          recover: { text_key: "login.password.action.recover" }
+        },
+        gates: {},
         transitions: { submit: "check_factors", recover: { pivot: "recovery" } }
       },
       {
         name: "otp",
         type: "credential",
-        label: "Two-factor authentication",
-        description: "Enter the code from your authenticator app",
-        fields: [
-          { name: "code", label: "Code", type: "text", validation: { pattern: "^[0-9]{6}$" } }
-        ],
-        actions: [
-          { kind: "submit", name: "submit", label: "Verify", primary: true }
-        ],
+        texts: { title_key: "login.otp.title", description_key: "login.otp.description" },
+        fields: {
+          code: { type: "text", text_key: "login.otp.field.code", validation: { pattern: "^[0-9]{6}$" } }
+        },
+        actions: {
+          submit: { text_key: "login.otp.action.submit", primary: true }
+        },
+        gates: {},
         transitions: { submit: "check_factors" }
       },
       {
         name: "done",
         type: "complete",
-        label: "Login successful",
-        config: { behavior: "redirect" }
+        texts: { title_key: "login.complete.title" },
+        behavior: "redirect"
       }
     ]
   },
@@ -614,45 +706,44 @@ const FLOWS = {
       {
         name: "profile",
         type: "form",
-        label: "Create your account",
-        config: { schema: "human_user", fields: ["email", "given_name", "family_name"] },
-        fields: [
-          { name: "email", label: "Email", type: "email", required: true },
-          { name: "given_name", label: "First name", type: "text", required: true },
-          { name: "family_name", label: "Last name", type: "text", required: true }
-        ],
-        actions: [
-          { kind: "submit", name: "submit", label: "Continue", primary: true },
-          { kind: "link", name: "login", label: "Already have an account? Sign in" }
-        ],
-        transitions: { submit: "set_password", login: { pivot: "login" } }
+        texts: { title_key: "register.profile.title" },
+        fields: {
+          email: { type: "email", required: true, text_key: "register.profile.field.email" },
+          given_name: { type: "text", required: true, text_key: "register.profile.field.given_name" },
+          family_name: { type: "text", required: true, text_key: "register.profile.field.family_name" }
+        },
+        actions: {
+          submit: { text_key: "register.profile.action.submit", primary: true },
+          login: { text_key: "register.profile.action.login" }
+        },
+        gates: {},
+        transitions: { submit: "set_password", login: { switch: "login" } }
       },
       {
         name: "set_password",
         type: "form",
-        label: "Choose a password",
-        config: { schema: "human_user", fields: ["password"] },
-        fields: [
-          { name: "password", label: "Password", type: "password", required: true, validation: { min_length: 8 } }
-        ],
-        actions: [
-          { kind: "submit", name: "submit", label: "Continue", primary: true }
-        ],
+        texts: { title_key: "register.password.title" },
+        fields: {
+          password: { type: "password", required: true, text_key: "register.password.field.password", validation: { min_length: 8 } }
+        },
+        actions: {
+          submit: { text_key: "register.password.action.submit", primary: true }
+        },
+        gates: {},
         transitions: { submit: "verify_email" }
       },
       {
         name: "verify_email",
         type: "verification",
-        label: "Verify your email",
-        description: "We sent a code to your email",
-        config: { method: "email", field: "email" },
-        fields: [
-          { name: "code", label: "Verification code", type: "text" }
-        ],
-        actions: [
-          { kind: "submit", name: "submit", label: "Verify", primary: true },
-          { kind: "submit", name: "resend", label: "Resend code" }
-        ],
+        texts: { title_key: "register.verify.title", description_key: "register.verify.description" },
+        fields: {
+          code: { type: "text", text_key: "register.verify.field.code" }
+        },
+        actions: {
+          submit: { text_key: "register.verify.action.submit", primary: true },
+          resend: { text_key: "register.verify.action.resend" }
+        },
+        gates: {},
         transitions: { submit: "create_user" }
       },
       {
@@ -664,8 +755,8 @@ const FLOWS = {
       {
         name: "done",
         type: "complete",
-        label: "Account created",
-        config: { behavior: "continue" }
+        texts: { title_key: "register.complete.title" },
+        behavior: "show"
       }
     ]
   },
@@ -679,41 +770,42 @@ const FLOWS = {
       {
         name: "recovery_email",
         type: "verification",
-        label: "Reset your password",
-        description: "We'll send a code to your email",
-        fields: [
-          { name: "email", label: "Email", type: "email", required: true }
-        ],
-        actions: [
-          { kind: "submit", name: "submit", label: "Send code", primary: true },
-          { kind: "link", name: "back", label: "Back to sign in" }
-        ],
+        texts: { title_key: "recovery.email.title", description_key: "recovery.email.description" },
+        fields: {
+          email: { type: "email", required: true, text_key: "recovery.email.field.email" }
+        },
+        actions: {
+          submit: { text_key: "recovery.email.action.submit", primary: true },
+          back: { text_key: "recovery.email.action.back" }
+        },
+        gates: {},
         transitions: { submit: "verify_code", back: { pivot: "login" } }
       },
       {
         name: "verify_code",
         type: "verification",
-        label: "Enter your code",
-        description: "Check your inbox for a verification code",
-        fields: [
-          { name: "code", label: "Code", type: "text" }
-        ],
-        actions: [
-          { kind: "submit", name: "submit", label: "Verify", primary: true },
-          { kind: "submit", name: "resend", label: "Resend code" }
-        ],
+        texts: { title_key: "recovery.code.title", description_key: "recovery.code.description" },
+        fields: {
+          code: { type: "text", text_key: "recovery.code.field.code" }
+        },
+        actions: {
+          submit: { text_key: "recovery.code.action.submit", primary: true },
+          resend: { text_key: "recovery.code.action.resend" }
+        },
+        gates: {},
         transitions: { submit: "new_password" }
       },
       {
         name: "new_password",
         type: "form",
-        label: "Set a new password",
-        fields: [
-          { name: "password", label: "New password", type: "password", required: true, validation: { min_length: 8 } }
-        ],
-        actions: [
-          { kind: "submit", name: "submit", label: "Reset password", primary: true }
-        ],
+        texts: { title_key: "recovery.password.title" },
+        fields: {
+          password: { type: "password", required: true, text_key: "recovery.password.field.password", validation: { min_length: 8 } }
+        },
+        actions: {
+          submit: { text_key: "recovery.password.action.submit", primary: true }
+        },
+        gates: {},
         transitions: { submit: "reset_action" }
       },
       {
@@ -725,8 +817,270 @@ const FLOWS = {
       {
         name: "done",
         type: "complete",
-        label: "Password reset successful",
-        config: { behavior: "continue" }
+        texts: { title_key: "recovery.complete.title" },
+        behavior: "show"
+      }
+    ]
+  },
+
+  "Enterprise Login": {
+    name: "Acme Corp SSO Login",
+    purposes: ["login"],
+    initial_steps: { login: "identifier" },
+    audience: { team_ids: ["team_acme"], app_ids: ["app_dashboard"] },
+    steps: [
+      {
+        name: "identifier",
+        type: "identifier",
+        texts: { title_key: "enterprise.identifier.title", description_key: "enterprise.identifier.description" },
+        fields: {
+          identifier: { type: "email", required: true, text_key: "enterprise.identifier.field.email" }
+        },
+        actions: {
+          submit: { text_key: "enterprise.identifier.action.submit", primary: true }
+        },
+        gates: {},
+        sso_providers: [
+          { id: "okta-acme", name: "Acme Okta", template: "okta" },
+          { id: "azure-acme", name: "Acme Azure AD", template: "microsoft" }
+        ],
+        transitions: {
+          submit: "force_sso",
+          sso: "sso_redirect"
+        }
+      },
+      {
+        name: "force_sso",
+        type: "policy_check",
+        config: { check: "domain_requires_sso" },
+        transitions: { sso_required: "sso_redirect", sso_optional: "password" }
+      },
+      {
+        name: "sso_redirect",
+        type: "redirect",
+        texts: { title_key: "enterprise.identifier.title" },
+        transitions: { callback: "check_consent" }
+      },
+      {
+        name: "password",
+        type: "credential",
+        texts: { title_key: "enterprise.identifier.title" },
+        fields: {
+          password: { type: "password", required: true, text_key: "saas.password.field.password" }
+        },
+        actions: {
+          submit: { text_key: "saas.password.action.submit", primary: true }
+        },
+        gates: {},
+        transitions: { submit: "check_consent" }
+      },
+      {
+        name: "check_consent",
+        type: "policy_check",
+        config: { check: "consent_required" },
+        transitions: { required: "consent", not_required: "done" }
+      },
+      {
+        name: "consent",
+        type: "consent",
+        texts: { title_key: "enterprise.consent.title", description_key: "enterprise.consent.description" },
+        fields: {},
+        actions: {
+          accept: { text_key: "enterprise.consent.action.accept", primary: true },
+          deny: { text_key: "enterprise.consent.action.deny" }
+        },
+        gates: {},
+        transitions: { accept: "done", deny: "denied" }
+      },
+      {
+        name: "denied",
+        type: "complete",
+        texts: { title_key: "enterprise.consent.action.deny" },
+        behavior: "show"
+      },
+      {
+        name: "done",
+        type: "complete",
+        texts: { title_key: "enterprise.complete.title" },
+        behavior: "redirect"
+      }
+    ]
+  },
+
+  "SaaS Login": {
+    name: "SaaSApp Login",
+    purposes: ["login"],
+    initial_steps: { login: "identifier" },
+    audience: { app_ids: ["app_saas"] },
+    steps: [
+      {
+        name: "identifier",
+        type: "identifier",
+        texts: { title_key: "saas.identifier.title", description_key: "saas.identifier.description" },
+        fields: {
+          identifier: { type: "email", required: true, text_key: "saas.identifier.field.email" }
+        },
+        actions: {
+          submit: { text_key: "saas.identifier.action.submit", primary: true },
+          register: { text_key: "saas.identifier.action.register" }
+        },
+        gates: {
+          captcha: { type: "captcha", provider: "altcha", required: true, satisfied: false, config: { algorithm: "SHA-256" } }
+        },
+        sso_providers: [
+          { id: "google-1", name: "Google", template: "google" },
+          { id: "github-1", name: "GitHub", template: "github" }
+        ],
+        transitions: {
+          submit: "resolve_user",
+          sso: "sso_redirect",
+          register: { switch: "SaaS Registration" }
+        }
+      },
+      {
+        name: "resolve_user",
+        type: "policy_check",
+        config: { check: "resolve_user" },
+        transitions: { found: "password", not_found: "identifier" }
+      },
+      {
+        name: "sso_redirect",
+        type: "redirect",
+        texts: { title_key: "saas.identifier.title" },
+        transitions: { callback: "done" }
+      },
+      {
+        name: "password",
+        type: "credential",
+        texts: { title_key: "saas.password.title" },
+        fields: {
+          password: { type: "password", required: true, text_key: "saas.password.field.password" }
+        },
+        actions: {
+          submit: { text_key: "saas.password.action.submit", primary: true },
+          recover: { text_key: "saas.password.action.recover" }
+        },
+        gates: {},
+        transitions: { submit: "done", recover: { pivot: "recovery" } }
+      },
+      {
+        name: "done",
+        type: "complete",
+        texts: { title_key: "saas.complete.title" },
+        behavior: "redirect"
+      }
+    ]
+  },
+
+  "SaaS Registration": {
+    name: "SaaSApp Registration",
+    purposes: ["register"],
+    initial_steps: { register: "profile" },
+    audience: { app_ids: ["app_saas"] },
+    steps: [
+      {
+        name: "profile",
+        type: "form",
+        texts: { title_key: "saas.profile.title", description_key: "saas.profile.description" },
+        fields: {
+          email: { type: "email", required: true, text_key: "saas.profile.field.email" },
+          display_name: { type: "text", required: true, text_key: "saas.profile.field.display_name" },
+          company: { type: "text", required: false, text_key: "saas.profile.field.company" }
+        },
+        actions: {
+          submit: { text_key: "saas.profile.action.submit", primary: true },
+          login: { text_key: "saas.profile.action.login" }
+        },
+        gates: {
+          captcha: { type: "captcha", provider: "altcha", required: true, satisfied: false, config: { algorithm: "SHA-256" } }
+        },
+        sso_providers: [
+          { id: "google-1", name: "Google", template: "google" },
+          { id: "github-1", name: "GitHub", template: "github" }
+        ],
+        transitions: { submit: "terms", sso: "sso_link", login: { switch: "SaaS Login" } }
+      },
+      {
+        name: "sso_link",
+        type: "redirect",
+        texts: { title_key: "saas.profile.title" },
+        transitions: { callback: "terms" }
+      },
+      {
+        name: "terms",
+        type: "consent",
+        texts: { title_key: "saas.terms.title", description_key: "saas.terms.description" },
+        fields: {},
+        actions: {
+          accept: { text_key: "saas.terms.action.accept", primary: true },
+          decline: { text_key: "saas.terms.action.decline" }
+        },
+        gates: {},
+        transitions: { accept: "verify_email", decline: "profile" }
+      },
+      {
+        name: "verify_email",
+        type: "verification",
+        texts: { title_key: "saas.verify.title", description_key: "saas.verify.description" },
+        fields: {
+          code: { type: "text", text_key: "saas.verify.field.code" }
+        },
+        actions: {
+          submit: { text_key: "saas.verify.action.submit", primary: true },
+          resend: { text_key: "saas.verify.action.resend" }
+        },
+        gates: {},
+        transitions: { submit: "create_user" }
+      },
+      {
+        name: "create_user",
+        type: "action",
+        config: { action: "create_user_and_session" },
+        transitions: { created: "done" }
+      },
+      {
+        name: "done",
+        type: "complete",
+        texts: { title_key: "saas.reg_complete.title" },
+        behavior: "show"
+      }
+    ]
+  },
+
+  "Passkey Login": {
+    name: "Passwordless Login",
+    purposes: ["login"],
+    initial_steps: { login: "passkey_prompt" },
+    audience: {},
+    steps: [
+      {
+        name: "passkey_prompt",
+        type: "credential",
+        texts: { title_key: "passkey.title", description_key: "passkey.description" },
+        fields: {},
+        actions: {
+          authenticate: { text_key: "passkey.action.authenticate", primary: true },
+          fallback: { text_key: "passkey.action.fallback" }
+        },
+        gates: {
+          passkey: { type: "passkey", required: true, satisfied: false }
+        },
+        transitions: {
+          authenticate: "verify_passkey",
+          fallback: { switch: "login" }
+        }
+      },
+      {
+        name: "verify_passkey",
+        type: "policy_check",
+        config: { check: "passkey_valid" },
+        transitions: { valid: "done", invalid: "passkey_prompt" }
+      },
+      {
+        name: "done",
+        type: "complete",
+        texts: { title_key: "passkey.complete.title" },
+        behavior: "redirect"
       }
     ]
   }
@@ -736,9 +1090,31 @@ const FLOWS = {
 
 let currentFlowName = "Login";
 let currentFlow = structuredClone(FLOWS["Login"]);
-let simState = { stepName: null, history: [], pivotHistory: [], error: null };
+let currentTemplate = DEFAULT_TEMPLATE;
+let editorMode = "definition"; // "definition" | "template"
+
+let simState = null;
+let apiLog = [];
 let renderTimeout = null;
-let highlightedLines = { start: -1, end: -1 }; // 0-indexed
+let highlightedLines = { start: -1, end: -1 };
+
+function genId(prefix) {
+  return prefix + '_' + Math.random().toString(36).substr(2, 8);
+}
+
+function genToken() {
+  return 'st_' + Math.random().toString(36).substr(2, 24);
+}
+
+// ── LiquidJS Engine ──────────────────────────────────────────────
+
+let liquidEngine = null;
+try {
+  liquidEngine = new liquidjs.Liquid();
+  liquidEngine.registerFilter('t', (key) => T[key] || key);
+} catch (e) {
+  console.warn('LiquidJS not loaded, using fallback rendering');
+}
 
 // ── DOM refs ──────────────────────────────────────────────────────
 
@@ -747,6 +1123,7 @@ const $scroll = document.getElementById('editor-scroll');
 const $gutter = document.getElementById('gutter');
 const $highlightPre = document.getElementById('highlight-pre');
 const $backdrop = document.getElementById('highlight-backdrop');
+const $templateEditor = document.getElementById('template-editor');
 
 // ── Init ──────────────────────────────────────────────────────────
 
@@ -769,43 +1146,45 @@ mermaid.initialize({
 });
 
 document.addEventListener('DOMContentLoaded', () => {
-  buildFlowTabs();
+  buildLeftTabs();
   selectFlow("Login");
   setupRightTabs();
+  $templateEditor.value = DEFAULT_TEMPLATE;
+
+  $templateEditor.addEventListener('input', () => {
+    currentTemplate = $templateEditor.value;
+    renderSim();
+  });
+
+  $templateEditor.addEventListener('keydown', (e) => {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const s = $templateEditor.selectionStart;
+      const end = $templateEditor.selectionEnd;
+      $templateEditor.value = $templateEditor.value.substring(0, s) + '  ' + $templateEditor.value.substring(end);
+      $templateEditor.selectionStart = $templateEditor.selectionEnd = s + 2;
+    }
+  });
 });
 
 // ── JSON Syntax Highlighting ──────────────────────────────────────
 
 function highlightJSON(text) {
-  // Escape HTML first
-  const esc = text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-
-  // Tokenize with regex — order matters
+  const esc = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   return esc.replace(
-    /("(?:[^"\\]|\\.)*")\s*:/g,  // key: "..."  (followed by colon)
-    '<span class="key">$1</span>:'
+    /("(?:[^"\\]|\\.)*")\s*:/g, '<span class="key">$1</span>:'
   ).replace(
-    /:\s*("(?:[^"\\]|\\.)*")/g,   // value string after colon
-    ': <span class="str">$1</span>'
+    /:\s*("(?:[^"\\]|\\.)*")/g, ': <span class="str">$1</span>'
   ).replace(
-    // standalone strings (in arrays etc, not already wrapped)
-    /(?<=[\[,\n]\s*)("(?:[^"\\]|\\.)*")(?=\s*[,\]\n])/g,
-    '<span class="str">$1</span>'
+    /(?<=[\[,\n]\s*)("(?:[^"\\]|\\.)*")(?=\s*[,\]\n])/g, '<span class="str">$1</span>'
   ).replace(
-    /\b(\d+(?:\.\d+)?)\b/g,
-    '<span class="num">$1</span>'
+    /\b(\d+(?:\.\d+)?)\b/g, '<span class="num">$1</span>'
   ).replace(
-    /\b(true|false)\b/g,
-    '<span class="bool">$1</span>'
+    /\b(true|false)\b/g, '<span class="bool">$1</span>'
   ).replace(
-    /\bnull\b/g,
-    '<span class="null">null</span>'
+    /\bnull\b/g, '<span class="null">null</span>'
   ).replace(
-    /([{}[\]])/g,
-    '<span class="brace">$1</span>'
+    /([{}[\]])/g, '<span class="brace">$1</span>'
   );
 }
 
@@ -816,7 +1195,6 @@ function renderEditorLayers() {
   const lines = text.split('\n');
   const lineCount = lines.length;
 
-  // Gutter
   let gutterHtml = '';
   for (let i = 0; i < lineCount; i++) {
     const isBreakpoint = i === highlightedLines.start;
@@ -825,11 +1203,8 @@ function renderEditorLayers() {
     gutterHtml += `<span class="ln${cls}">${i + 1}</span>`;
   }
   $gutter.innerHTML = gutterHtml;
-
-  // Syntax highlight
   $highlightPre.innerHTML = highlightJSON(text);
 
-  // Line highlight backdrop
   let backdropHtml = '';
   if (highlightedLines.start >= 0) {
     const pad = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--editor-pad'));
@@ -842,8 +1217,7 @@ function renderEditorLayers() {
   }
   $backdrop.innerHTML = backdropHtml;
 
-  // Size the textarea to content
-  const contentHeight = lineCount * 20 + 32; // lines * lh + padding
+  const contentHeight = lineCount * 20 + 32;
   const minH = $scroll.parentElement.clientHeight;
   const h = Math.max(contentHeight, minH);
   $editor.style.height = h + 'px';
@@ -852,39 +1226,23 @@ function renderEditorLayers() {
   $backdrop.style.height = h + 'px';
 }
 
-// Sync scroll between textarea and other layers
 $editor.addEventListener('scroll', syncScroll);
 $scroll.addEventListener('scroll', syncScroll);
-
-function syncScroll() {
-  const top = $scroll.scrollTop;
-  const left = $scroll.scrollLeft;
-  // All layers are positioned inside the scroll container, so they move together.
-  // We just need the textarea to not scroll independently.
-  $editor.scrollTop = 0;
-  $editor.scrollLeft = 0;
-}
+function syncScroll() { $editor.scrollTop = 0; $editor.scrollLeft = 0; }
 
 // ── Find Step Line Range ──────────────────────────────────────────
 
 function findStepLineRange(text, stepName) {
   if (!stepName) return { start: -1, end: -1 };
   const lines = text.split('\n');
-
-  // Find the line that has `"name": "<stepName>"` — then walk outward to find the enclosing { }
   let nameLineIdx = -1;
   const namePattern = new RegExp(`"name"\\s*:\\s*"${escapeRegex(stepName)}"`);
   for (let i = 0; i < lines.length; i++) {
-    if (namePattern.test(lines[i])) {
-      nameLineIdx = i;
-      break;
-    }
+    if (namePattern.test(lines[i])) { nameLineIdx = i; break; }
   }
   if (nameLineIdx < 0) return { start: -1, end: -1 };
 
-  // Walk up to find opening {
-  let start = nameLineIdx;
-  let depth = 0;
+  let start = nameLineIdx, depth = 0;
   for (let i = nameLineIdx; i >= 0; i--) {
     for (const ch of lines[i]) {
       if (ch === '}' || ch === ']') depth++;
@@ -893,7 +1251,6 @@ function findStepLineRange(text, stepName) {
     if (depth < 0) { start = i; break; }
   }
 
-  // Walk down from start to find matching closing }
   depth = 0;
   let end = start;
   for (let i = start; i < lines.length; i++) {
@@ -903,63 +1260,70 @@ function findStepLineRange(text, stepName) {
     }
     if (depth <= 0) { end = i; break; }
   }
-
   return { start, end };
 }
 
-function escapeRegex(s) {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-// ── Scroll to Highlighted Step ────────────────────────────────────
+function escapeRegex(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 
 function scrollEditorToStep(stepName) {
   const text = $editor.value;
   const range = findStepLineRange(text, stepName);
   highlightedLines = range;
   renderEditorLayers();
-
   if (range.start < 0) return;
-
-  const lh = 20;
-  const pad = 16;
+  const lh = 20, pad = 16;
   const targetTop = pad + range.start * lh;
   const viewH = $scroll.clientHeight;
   const rangeH = (range.end - range.start + 1) * lh;
-
-  // Center the step block in the viewport if it's out of view
   const scrollTop = $scroll.scrollTop;
   const scrollBot = scrollTop + viewH;
   const blockTop = targetTop;
   const blockBot = targetTop + rangeH;
-
   if (blockTop < scrollTop + 40 || blockBot > scrollBot - 40) {
-    // Scroll so the step block starts ~1/4 from the top
-    $scroll.scrollTo({
-      top: Math.max(0, targetTop - viewH * 0.25),
-      behavior: 'smooth'
-    });
+    $scroll.scrollTo({ top: Math.max(0, targetTop - viewH * 0.25), behavior: 'smooth' });
   }
 }
 
-// ── Flow Tabs ─────────────────────────────────────────────────────
+// ── Left Tabs ─────────────────────────────────────────────────────
 
-function buildFlowTabs() {
-  const container = document.getElementById('flow-tabs');
-  container.innerHTML = '';
+function buildLeftTabs() {
+  const flowContainer = document.getElementById('left-tabs-flows');
+  flowContainer.innerHTML = '';
+
+  // Flow select tabs
   for (const name of Object.keys(FLOWS)) {
     const btn = document.createElement('button');
-    btn.className = 'flow-tab' + (name === currentFlowName ? ' active' : '');
+    btn.className = 'tab-btn flow-select' + (name === currentFlowName ? ' active' : '');
     btn.textContent = name;
+    btn.dataset.flow = name;
     btn.onclick = () => selectFlow(name);
-    container.appendChild(btn);
+    flowContainer.appendChild(btn);
   }
+
+  // Editor mode tabs
+  const editorContainer = document.getElementById('left-tabs-editor');
+  editorContainer.innerHTML = '';
+  for (const [mode, label] of [['definition', 'Definition'], ['template', 'Template']]) {
+    const btn = document.createElement('button');
+    btn.className = 'tab-btn editor-mode' + (mode === editorMode ? ' active' : '');
+    btn.textContent = label;
+    btn.dataset.mode = mode;
+    btn.onclick = () => switchEditorMode(mode);
+    editorContainer.appendChild(btn);
+  }
+}
+
+function switchEditorMode(mode) {
+  editorMode = mode;
+  document.querySelectorAll('.tab-btn.editor-mode').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+  document.getElementById('json-pane').classList.toggle('active', mode === 'definition');
+  document.getElementById('template-pane').classList.toggle('active', mode === 'template');
 }
 
 function selectFlow(name) {
   currentFlowName = name;
   currentFlow = structuredClone(FLOWS[name]);
-  document.querySelectorAll('.flow-tab').forEach(t => t.classList.toggle('active', t.textContent === name));
+  document.querySelectorAll('.tab-btn.flow-select').forEach(b => b.classList.toggle('active', b.dataset.flow === name));
   $editor.value = JSON.stringify(currentFlow, null, 2);
   highlightedLines = { start: -1, end: -1 };
   updateFromEditor();
@@ -975,7 +1339,6 @@ $editor.addEventListener('input', () => {
 });
 
 $editor.addEventListener('keydown', (e) => {
-  // Tab inserts 2 spaces
   if (e.key === 'Tab') {
     e.preventDefault();
     const start = $editor.selectionStart;
@@ -990,7 +1353,6 @@ function updateFromEditor() {
   const text = $editor.value;
   const status = document.getElementById('parse-status');
   const count = document.getElementById('step-count');
-
   renderEditorLayers();
 
   try {
@@ -1011,13 +1373,13 @@ function updateFromEditor() {
 // ── Right Tabs ────────────────────────────────────────────────────
 
 function setupRightTabs() {
-  document.querySelectorAll('.right-tab').forEach(tab => {
+  document.querySelectorAll('.right-panel .tab-btn').forEach(tab => {
     tab.onclick = () => {
-      document.querySelectorAll('.right-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.right-panel .tab-btn').forEach(t => t.classList.remove('active'));
       document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
       tab.classList.add('active');
       document.getElementById(tab.dataset.view).classList.add('active');
-      if (tab.dataset.view === 'sim-view' && !simState.stepName) resetSim();
+      if (tab.dataset.view === 'sim-view' && !simState) resetSim();
     };
   });
 }
@@ -1032,22 +1394,20 @@ async function renderDiagram() {
 
   const lines = ['graph TD'];
   const steps = currentFlow.steps;
-  const pivotTargets = new Set();
+  const transitionTargets = new Set(); // pivot + switch external targets
 
-  // Node definitions — use safe IDs (prefix with n_ to avoid mermaid reserved words)
   for (const step of steps) {
     const id = 'n_' + step.name;
     const typeLabel = step.type;
     if (step.type === 'policy_check' || step.type === 'action') {
-      lines.push(`    ${id}{{"\`**${step.name}**\n${typeLabel}\`"}}`);
+      lines.push(`    ${id}{{"\`**${step.name}**<br/>${typeLabel}\`"}}`);
     } else if (step.type === 'complete') {
-      lines.push(`    ${id}(["\`**${step.name}**\n${typeLabel}\`"])`);
+      lines.push(`    ${id}(["\`**${step.name}**<br/>${typeLabel}\`"])`);
     } else {
-      lines.push(`    ${id}["\`**${step.name}**\n${typeLabel}\`"]`);
+      lines.push(`    ${id}["\`**${step.name}**<br/>${typeLabel}\`"]`);
     }
   }
 
-  // Edges
   for (const step of steps) {
     if (!step.transitions) continue;
     const srcId = 'n_' + step.name;
@@ -1055,17 +1415,23 @@ async function renderDiagram() {
       if (typeof tgt === 'string') {
         lines.push(`    ${srcId} -->|${label}| n_${tgt}`);
       } else if (tgt.pivot) {
-        const pivotId = 'pivot_' + tgt.pivot;
-        if (!pivotTargets.has(tgt.pivot)) {
-          pivotTargets.add(tgt.pivot);
-          lines.push(`    ${pivotId}["\`**${tgt.pivot}**\npivot\`"]:::pivot`);
+        const extId = 'ext_pivot_' + tgt.pivot;
+        if (!transitionTargets.has('pivot:' + tgt.pivot)) {
+          transitionTargets.add('pivot:' + tgt.pivot);
+          lines.push(`    ${extId}["\`**${tgt.pivot}**<br/>pivot (stack)\`"]:::pivot`);
         }
-        lines.push(`    ${srcId} -.->|${label}| ${pivotId}`);
+        lines.push(`    ${srcId} -.->|${label}| ${extId}`);
+      } else if (tgt.switch) {
+        const extId = 'ext_switch_' + tgt.switch;
+        if (!transitionTargets.has('switch:' + tgt.switch)) {
+          transitionTargets.add('switch:' + tgt.switch);
+          lines.push(`    ${extId}["\`**${tgt.switch}**<br/>switch (replace)\`"]:::switchFlow`);
+        }
+        lines.push(`    ${srcId} -.->|${label}| ${extId}`);
       }
     }
   }
 
-  // Styles
   for (const step of steps) {
     const id = 'n_' + step.name;
     if (step.type === 'policy_check' || step.type === 'action') {
@@ -1076,8 +1442,9 @@ async function renderDiagram() {
   }
 
   lines.push('    classDef pivot fill:#2a1a44,stroke:#a78bfa,color:#a78bfa');
+  lines.push('    classDef switchFlow fill:#1a2a44,stroke:#60a5fa,color:#60a5fa');
 
-  if (simState.stepName) {
+  if (simState?.stepName) {
     const exists = steps.find(s => s.name === simState.stepName);
     if (exists) {
       lines.push(`    style n_${simState.stepName} fill:#2a3a6a,stroke:#6c8cff,stroke-width:3px,color:#fff`);
@@ -1085,16 +1452,69 @@ async function renderDiagram() {
   }
 
   const graphDef = lines.join('\n');
-
   try {
-    // Use a unique ID each render to avoid mermaid ID collisions
     const id = 'mermaid-g-' + (++mermaidCounter);
     const { svg } = await mermaid.render(id, graphDef);
     target.innerHTML = svg;
   } catch (e) {
-    console.error('Mermaid render error:', e, '\nGraph:\n', graphDef);
-    target.innerHTML = '<p style="color: var(--muted); padding: 24px;">Could not render diagram — check console</p>';
+    console.error('Mermaid render error:', e);
+    target.innerHTML = '<p style="color: var(--muted); padding: 24px;">Could not render diagram \u2014 check console</p>';
   }
+}
+
+// ── API Log ──────────────────────────────────────────────────────
+
+function logApi(method, url, request, status, response) {
+  apiLog.push({ method, url, request, status, response });
+  renderApiLog();
+}
+
+function clearApiLog() {
+  apiLog = [];
+  renderApiLog();
+}
+
+function renderApiLog() {
+  const container = document.getElementById('api-log');
+  if (apiLog.length === 0) {
+    container.innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted);font-size:13px;">Interact with the simulator to see API requests here.</div>';
+    return;
+  }
+
+  container.innerHTML = apiLog.map((entry, i) => {
+    const statusClass = entry.status < 400 ? 's2xx' : 's4xx';
+    const expanded = i === apiLog.length - 1 ? ' expanded' : '';
+    return `
+      <div class="api-entry${expanded}" onclick="this.classList.toggle('expanded')">
+        <div class="api-entry-header">
+          <span class="api-chevron">\u25B6</span>
+          <span class="api-method">${entry.method}</span>
+          <span class="api-url">${entry.url}</span>
+          <span class="api-status ${statusClass}">${entry.status}</span>
+        </div>
+        <div class="api-detail">
+          <div class="api-section">
+            <div class="api-label">Request</div>
+            <div class="api-json">${syntaxHighlightJson(entry.request)}</div>
+          </div>
+          <div class="api-section">
+            <div class="api-label">Response</div>
+            <div class="api-json">${syntaxHighlightJson(entry.response)}</div>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function syntaxHighlightJson(obj) {
+  const json = JSON.stringify(obj, null, 2);
+  return json
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/("(?:[^"\\]|\\.)*")\s*:/g, '<span style="color:var(--syn-key)">$1</span>:')
+    .replace(/:\s*("(?:[^"\\]|\\.)*")/g, ': <span style="color:var(--syn-string)">$1</span>')
+    .replace(/\b(true|false)\b/g, '<span style="color:var(--syn-bool)">$1</span>')
+    .replace(/\bnull\b/g, '<span style="color:var(--syn-null)">null</span>')
+    .replace(/\b(\d+)\b/g, '<span style="color:var(--syn-number)">$1</span>');
 }
 
 // ── Simulation ────────────────────────────────────────────────────
@@ -1103,13 +1523,65 @@ function resetSim() {
   const purposes = currentFlow.purposes || ['login'];
   const purpose = purposes[0];
   const initial = currentFlow.initial_steps?.[purpose] || currentFlow.steps?.[0]?.name;
-  simState = { stepName: initial, history: [], pivotHistory: [], error: null };
+
+  simState = {
+    flowId: genId('flow'),
+    sessionId: genId('sess'),
+    sessionToken: genToken(),
+    stepName: initial,
+    history: [],
+    flowStack: [], // { flowName, flowId, stepName, history }
+    error: null
+  };
+
   advanceThroughInvisible();
+
+  // Log POST /flow
+  const step = findStep(simState.stepName);
+  const request = { purpose };
+  const response = buildFlowResponse(step);
+  logApi('POST', '/flow', request, 201, response);
+
   onSimStepChanged();
 }
 
 function findStep(name) {
   return currentFlow?.steps?.find(s => s.name === name);
+}
+
+function buildFlowResponse(step) {
+  const resp = {
+    session_id: simState.sessionId,
+    session_token: simState.sessionToken,
+    step: buildStepPayload(step),
+    branding: {
+      layout: "centered",
+      liquid_template: "(template omitted for brevity)"
+    }
+  };
+  if (step?.behavior === 'redirect') {
+    resp.redirect_uri = "https://app.example.com/callback";
+  }
+  return resp;
+}
+
+function buildStepPayload(step) {
+  if (!step) return null;
+  const payload = {
+    name: step.name,
+    type: step.type,
+  };
+  if (step.texts) payload.texts = step.texts;
+  if (step.fields) payload.fields = step.fields;
+  if (step.actions) payload.actions = step.actions;
+  if (step.gates && Object.keys(step.gates).length > 0) payload.gates = step.gates;
+  if (step.sso_providers?.length > 0) payload.sso_providers = step.sso_providers;
+  if (step.behavior) payload.behavior = step.behavior;
+  if (step.type === 'complete' && step.behavior === 'redirect') {
+    payload.redirect_url = "https://app.example.com/callback";
+  }
+  if (simState.error) payload.error = simState.error;
+  return payload;
 }
 
 function advanceThroughInvisible() {
@@ -1120,23 +1592,16 @@ function advanceThroughInvisible() {
     if (step.type === 'policy_check' || step.type === 'action') {
       const transitions = step.transitions || {};
       const keys = Object.keys(transitions);
-      // Pick the first transition that doesn't loop back to a step already in history.
-      // This simulates "forward progress" — e.g. check_factors picks password first,
-      // but after password is visited it picks otp, then acr_met.
       const visited = new Set(simState.history);
       let picked = null;
       for (const k of keys) {
-        const t = transitions[k];
-        if (typeof t === 'string' && !visited.has(t)) {
-          picked = t;
-          break;
-        }
+        const tgt = transitions[k];
+        if (typeof tgt === 'string' && !visited.has(tgt)) { picked = tgt; break; }
       }
-      // Fallback: if all targets are visited, pick the last one (typically the "done" path)
       if (!picked) {
         for (let i = keys.length - 1; i >= 0; i--) {
-          const t = transitions[keys[i]];
-          if (typeof t === 'string') { picked = t; break; }
+          const tgt = transitions[keys[i]];
+          if (typeof tgt === 'string') { picked = tgt; break; }
         }
       }
       if (picked) {
@@ -1154,12 +1619,19 @@ function advanceThroughInvisible() {
 function onSimStepChanged() {
   renderSim();
   renderDiagram();
-  scrollEditorToStep(simState.stepName);
+  if (editorMode === 'definition') scrollEditorToStep(simState.stepName);
 }
 
-function simAction(actionName) {
+function simAction(actionName, providerId) {
   const step = findStep(simState.stepName);
   if (!step || !step.transitions) return;
+
+  // Collect field values for the API log
+  const phone = document.getElementById('sim-phone');
+  const fieldValues = {};
+  phone.querySelectorAll('input[name]').forEach(input => {
+    if (input.value) fieldValues[input.name] = input.value;
+  });
 
   const target = step.transitions[actionName];
   if (!target) {
@@ -1168,45 +1640,150 @@ function simAction(actionName) {
     return;
   }
 
+  // Build submit request
+  const submitRequest = {
+    session_token: simState.sessionToken,
+    action: actionName,
+  };
+  if (Object.keys(fieldValues).length > 0) submitRequest.fields = fieldValues;
+  if (providerId) submitRequest.sso_provider_id = providerId;
+
+  const oldFlowId = simState.flowId;
+
+  // Handle pivot (stack)
   if (typeof target === 'object' && target.pivot) {
     const pivotPurpose = target.pivot;
-    const pivotFlowName = Object.keys(FLOWS).find(k =>
-      FLOWS[k].purposes?.includes(pivotPurpose)
-    );
+    const pivotFlowName = Object.keys(FLOWS).find(k => FLOWS[k].purposes?.includes(pivotPurpose));
     if (pivotFlowName) {
-      simState.pivotHistory.push(currentFlowName);
-      // selectFlow resets sim, so we just call it
-      selectFlow(pivotFlowName);
+      // Push current flow onto stack
+      simState.flowStack.push({
+        flowName: currentFlowName,
+        flowId: simState.flowId,
+        stepName: simState.stepName,
+        history: [...simState.history]
+      });
+
+      // Switch to pivot flow
+      const newFlowId = genId('flow');
+      simState.flowId = newFlowId;
+      simState.sessionToken = genToken();
+
+      currentFlowName = pivotFlowName;
+      currentFlow = structuredClone(FLOWS[pivotFlowName]);
+      document.querySelectorAll('.tab-btn.flow-select').forEach(b => b.classList.toggle('active', b.dataset.flow === pivotFlowName));
+      $editor.value = JSON.stringify(currentFlow, null, 2);
+
+      const purpose = currentFlow.purposes[0];
+      simState.stepName = currentFlow.initial_steps?.[purpose] || currentFlow.steps?.[0]?.name;
+      simState.history = [];
+      simState.error = null;
+      advanceThroughInvisible();
+
+      const newStep = findStep(simState.stepName);
+      logApi('POST', `/flow/${oldFlowId}/submit`, submitRequest, 200, buildFlowResponse(newStep));
+      highlightedLines = { start: -1, end: -1 };
+      updateFromEditor();
+      onSimStepChanged();
       return;
     }
   }
 
+  // Handle switch (replace)
+  if (typeof target === 'object' && target.switch) {
+    const switchPurpose = target.switch;
+    const switchFlowName = Object.keys(FLOWS).find(k => FLOWS[k].purposes?.includes(switchPurpose));
+    if (switchFlowName) {
+      const newFlowId = genId('flow');
+      simState.flowId = newFlowId;
+      simState.sessionToken = genToken();
+      simState.flowStack = []; // clear stack on switch
+
+      currentFlowName = switchFlowName;
+      currentFlow = structuredClone(FLOWS[switchFlowName]);
+      document.querySelectorAll('.tab-btn.flow-select').forEach(b => b.classList.toggle('active', b.dataset.flow === switchFlowName));
+      $editor.value = JSON.stringify(currentFlow, null, 2);
+
+      const purpose = currentFlow.purposes[0];
+      simState.stepName = currentFlow.initial_steps?.[purpose] || currentFlow.steps?.[0]?.name;
+      simState.history = [];
+      simState.error = null;
+      advanceThroughInvisible();
+
+      const newStep = findStep(simState.stepName);
+      logApi('POST', `/flow/${oldFlowId}/submit`, submitRequest, 200, buildFlowResponse(newStep));
+      highlightedLines = { start: -1, end: -1 };
+      updateFromEditor();
+      onSimStepChanged();
+      return;
+    }
+  }
+
+  // Normal transition
   simState.history.push(simState.stepName);
   simState.stepName = target;
   simState.error = null;
+  simState.sessionToken = genToken();
   advanceThroughInvisible();
+
+  const newStep = findStep(simState.stepName);
+
+  // Auto-pop: if complete step and there's a parent flow on the stack
+  if (newStep?.type === 'complete' && simState.flowStack.length > 0) {
+    const parent = simState.flowStack.pop();
+    simState.flowId = parent.flowId;
+    simState.sessionToken = genToken();
+
+    currentFlowName = parent.flowName;
+    currentFlow = structuredClone(FLOWS[parent.flowName]);
+    document.querySelectorAll('.tab-btn.flow-select').forEach(b => b.classList.toggle('active', b.dataset.flow === parent.flowName));
+    $editor.value = JSON.stringify(currentFlow, null, 2);
+
+    simState.stepName = parent.stepName;
+    simState.history = parent.history;
+    simState.error = null;
+
+    // The parent resumes at its current step (re-render)
+    const parentStep = findStep(simState.stepName);
+    logApi('POST', `/flow/${oldFlowId}/submit`, submitRequest, 200, buildFlowResponse(parentStep));
+    highlightedLines = { start: -1, end: -1 };
+    updateFromEditor();
+    onSimStepChanged();
+    return;
+  }
+
+  logApi('POST', `/flow/${simState.flowId}/submit`, submitRequest, newStep ? 200 : 404, buildFlowResponse(newStep));
   onSimStepChanged();
 }
 
-function renderSim() {
+// ── Sim Rendering ────────────────────────────────────────────────
+
+async function renderSim() {
   const phone = document.getElementById('sim-phone');
+  if (!simState) { phone.innerHTML = ''; return; }
   const step = findStep(simState.stepName);
 
+  const idsHtml = `<div class="sim-ids">
+    flow: <code>${simState.flowId}</code>
+    session: <code>${simState.sessionId}</code>
+    ${simState.flowStack.length > 0 ? `<span style="color:var(--purple)">stack: ${simState.flowStack.length}</span>` : ''}
+  </div>`;
+
   if (!step) {
-    phone.innerHTML = '<div class="sim-complete"><div class="checkmark">?</div><h3>Step not found</h3><p>' + (simState.stepName || 'none') + '</p></div>';
+    phone.innerHTML = idsHtml + '<div class="sim-complete"><div class="checkmark">?</div><h3>Step not found</h3><p>' + (simState.stepName || 'none') + '</p></div>';
     return;
   }
 
   if (step.type === 'complete') {
-    const behavior = step.config?.behavior || 'redirect';
-    phone.innerHTML = `
-      <div class="sim-header"><h2>${step.label || 'Complete'}</h2></div>
+    const behavior = step.behavior || 'redirect';
+    const title = t(step.texts?.title_key) || 'Complete';
+    phone.innerHTML = `${idsHtml}
+      <div class="sim-header"><h2>${title}</h2></div>
       <div class="sim-complete">
         <div class="checkmark">&#10003;</div>
-        <h3>${step.label || 'Flow complete'}</h3>
+        <h3>${title}</h3>
         <p>behavior: ${behavior}</p>
         ${behavior === 'redirect' ? '<p style="color: var(--accent)">&#8594; redirect to application</p>' : ''}
-        ${behavior === 'continue' ? '<p style="color: var(--accent)">&#8594; auto-pivot back</p>' : ''}
+        ${behavior === 'show' ? '<p style="color: var(--green)">&#10003; displayed to user</p>' : ''}
       </div>
       <div class="sim-footer">
         <span class="sim-breadcrumb">${renderBreadcrumb()}</span>
@@ -1216,10 +1793,11 @@ function renderSim() {
   }
 
   if (step.type === 'redirect') {
-    phone.innerHTML = `
-      <div class="sim-header"><h2>${step.label || 'Redirecting...'}</h2></div>
+    const title = t(step.texts?.title_key) || 'Redirecting\u2026';
+    phone.innerHTML = `${idsHtml}
+      <div class="sim-header"><h2>${title}</h2></div>
       <div class="sim-body">
-        <p style="color: var(--muted); text-align: center; padding: 40px 0;">Redirecting to external provider...</p>
+        <p style="color: var(--muted); text-align: center; padding: 40px 0;">Redirecting to external provider\u2026</p>
         <div class="sim-actions">
           <button class="sim-btn primary" onclick="simAction('callback')">Simulate callback</button>
         </div>
@@ -1231,39 +1809,84 @@ function renderSim() {
     return;
   }
 
-  const fields = (step.fields || []).map(f => `
-    <div class="sim-field">
-      <label>${f.label}${f.required ? ' *' : ''}</label>
-      <input type="${f.type === 'password' ? 'password' : 'text'}" placeholder="${f.label}" />
-    </div>
-  `).join('');
+  // Try LiquidJS rendering
+  const title = t(step.texts?.title_key) || step.name;
+  const desc = step.texts?.description_key ? t(step.texts.description_key) : '';
 
-  const actions = (step.actions || []).map(a => {
-    const cls = a.primary ? 'primary' : a.kind === 'sso' ? 'sso' : a.kind === 'passkey' ? 'passkey' : a.kind === 'captcha' ? 'captcha' : 'link';
-    const icon = a.kind === 'sso' ? '&#9679; ' : a.kind === 'passkey' ? '&#128273; ' : '';
-    return `<button class="sim-btn ${cls}" onclick="simAction('${a.name}')">${icon}${a.label}</button>`;
-  }).join('');
+  let bodyHtml = '';
+  if (liquidEngine) {
+    try {
+      // Convert dicts to arrays for easier liquid iteration
+      const context = {
+        texts: step.texts || {},
+        fields_list: Object.entries(step.fields || {}).map(([name, f]) => ({ name, ...f })),
+        actions_list: Object.entries(step.actions || {}).map(([name, a]) => ({ name, ...a })),
+        sso_providers: step.sso_providers || [],
+        gates: step.gates || {},
+        error: simState.error
+      };
+      bodyHtml = await liquidEngine.parseAndRender(currentTemplate, context);
+    } catch (e) {
+      console.warn('Liquid render error:', e);
+      bodyHtml = renderStepFallback(step);
+    }
+  } else {
+    bodyHtml = renderStepFallback(step);
+  }
 
-  const errorHtml = simState.error ? `<div class="sim-error">${simState.error}</div>` : '';
-
-  phone.innerHTML = `
-    <div class="sim-header">
-      <h2>${step.label || step.name}<span class="pivot-badge">${step.type}</span></h2>
-      ${step.description ? `<p>${step.description}</p>` : ''}
-    </div>
-    <div class="sim-body">
-      ${errorHtml}
-      ${fields}
-      <div class="sim-actions">${actions}</div>
-    </div>
+  phone.innerHTML = `${idsHtml}
+    <div class="sim-body" id="sim-rendered-body">${bodyHtml}</div>
     <div class="sim-footer">
       <span class="sim-breadcrumb">${renderBreadcrumb()}</span>
       <button class="sim-reset" onclick="resetSim()">Reset</button>
     </div>`;
+
+  // Attach event delegation for rendered buttons
+  const body = document.getElementById('sim-rendered-body');
+  if (body) {
+    body.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-action]');
+      if (btn) {
+        e.stopPropagation();
+        simAction(btn.dataset.action, btn.dataset.providerId);
+      }
+    });
+  }
+}
+
+function renderStepFallback(step) {
+  const title = t(step.texts?.title_key) || step.name;
+  const desc = step.texts?.description_key ? t(step.texts.description_key) : '';
+  const errorHtml = simState.error ? `<div class="sim-error">${simState.error}</div>` : '';
+
+  const fieldsHtml = Object.entries(step.fields || {}).map(([name, f]) => `
+    <div class="sim-field">
+      <label>${t(f.text_key)}${f.required ? ' *' : ''}</label>
+      <input type="${f.type === 'password' ? 'password' : 'text'}" name="${name}" placeholder="${t(f.text_key)}" />
+    </div>`).join('');
+
+  const ssoHtml = (step.sso_providers || []).map(p =>
+    `<button class="sim-btn sso" data-action="sso" data-provider-id="${p.id}">&#9679; Continue with ${p.name}</button>`
+  ).join('');
+
+  const actionsHtml = Object.entries(step.actions || {}).map(([name, a]) => {
+    const cls = a.primary ? 'primary' : 'link';
+    return `<button class="sim-btn ${cls}" data-action="${name}">${t(a.text_key)}</button>`;
+  }).join('');
+
+  return `
+    <h2 style="font-size:20px;font-weight:600;margin-bottom:4px;">${title}<span class="step-badge">${step.type}</span></h2>
+    ${desc ? `<p style="font-size:13px;color:var(--muted);margin-bottom:12px;">${desc}</p>` : ''}
+    ${errorHtml}
+    ${fieldsHtml}
+    <div class="sim-actions">${ssoHtml}${actionsHtml}</div>`;
 }
 
 function renderBreadcrumb() {
-  const parts = [...simState.history.slice(-3), simState.stepName];
+  const parts = [...simState.history.filter(h => {
+    const s = findStep(h);
+    return s && s.type !== 'policy_check' && s.type !== 'action';
+  }).slice(-3), simState.stepName];
   return parts.map((p, i) =>
     i === parts.length - 1 ? `<span>${p}</span>` : p
   ).join(' &#8594; ');
