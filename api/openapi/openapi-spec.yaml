@@ -34,6 +34,22 @@ paths:
     $ref: endpoints/oauth/token/methods.yaml
   /auth/userinfo:
     $ref: endpoints/oauth/userinfo/methods.yaml
+  /healthz:
+    $ref: endpoints/healthz/methods.yaml
+  /livez:
+    $ref: endpoints/livez/methods.yaml
+  /readyz:
+    $ref: endpoints/readyz/methods.yaml
+  /user:
+    $ref: endpoints/users/methods.yaml
+  /flow:
+    $ref: endpoints/flow/methods.yaml
+  /flow/{id}:
+    $ref: endpoints/flow/session/methods.yaml
+  /flow/{id}/submit:
+    $ref: endpoints/flow/submit/methods.yaml
+  /flow/{id}/event:
+    $ref: endpoints/flow/event/methods.yaml
   /auth_attempts:
     $ref: endpoints/auth_attempts/methods.yaml
   /auth_attempts/{attempt_id}:
@@ -50,21 +66,11 @@ paths:
     $ref: endpoints/sessions/exchange/methods.yaml
   /sessions/{session_id}:
     $ref: endpoints/sessions/session/methods.yaml
-  /healthz:
-    $ref: endpoints/healthz/methods.yaml
-  /livez:
-    $ref: endpoints/livez/methods.yaml
-  /readyz:
-    $ref: endpoints/readyz/methods.yaml
-  /user:
-    $ref: endpoints/users/methods.yaml
 
 components:
-  schemas:
-    ProjectId:
-      $ref: components/schemas/project-id.yaml
-  securitySchemes: 
+  securitySchemes:
     oauth2:
       $ref: security/oauth2.yaml
     usernamePassword:
       $ref: security/username-password.yaml
+

@@ -31,12 +31,39 @@ func (UnimplementedHandler) AuthorizeGet(ctx context.Context, params AuthorizeGe
 	return r, ht.ErrNotImplemented
 }
 
+// CreateFlow implements createFlow operation.
+//
+// Resolves a flow definition based on purpose + audience context and returns
+// the first capability step. Creates a new session implicitly unless
+// `session_id` is provided (for step-up / reauth on an existing session).
+// The response contains an `id` field — the flow handle. Use it as the path
+// parameter for all subsequent `/flow/{id}/submit` and `/flow/{id}/event` calls.
+// The response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing
+// the flow's orchestration state (current step, collected data, history).
+// The server is stateless between requests — all flow state lives in this
+// cookie. The browser sends it automatically on subsequent requests.
+//
+// POST /flow
+func (UnimplementedHandler) CreateFlow(ctx context.Context, req *CreateFlowRequest) (r CreateFlowRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // EndSession implements endSession operation.
 //
 // End a session.
 //
 // GET /auth/end-session
 func (UnimplementedHandler) EndSession(ctx context.Context, params EndSessionParams) (r EndSessionRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// GetFlowStep implements getFlowStep operation.
+//
+// Returns the current capability step without advancing the state machine.
+// Useful for page reloads or re-rendering after a network error.
+//
+// GET /flow/{id}
+func (UnimplementedHandler) GetFlowStep(ctx context.Context, params GetFlowStepParams) (r GetFlowStepRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -130,10 +157,41 @@ func (UnimplementedHandler) RevokeToken(ctx context.Context, req *RevokeRequest)
 	return r, ht.ErrNotImplemented
 }
 
-// NewError creates *ErrorDetailsStatusCode from error returned by handler.
+// SubmitFlowEvent implements submitFlowEvent operation.
 //
-// Used for common default response.
-func (UnimplementedHandler) NewError(ctx context.Context, err error) (r *ErrorDetailsStatusCode) {
-	r = new(ErrorDetailsStatusCode)
-	return r
+// Submits telemetry or fingerprint data from the frontend.
+// Does not advance the state machine. Used for risk evaluation.
+//
+// POST /flow/{id}/event
+func (UnimplementedHandler) SubmitFlowEvent(ctx context.Context, req *FlowEventRequest, params SubmitFlowEventParams) error {
+	return ht.ErrNotImplemented
+}
+
+// SubmitFlowStep implements submitFlowStep operation.
+//
+// Submits user input for the current step. The server validates,
+// processes (e.g., verifies a credential), advances the state machine
+// through any invisible steps, and returns the next visible step.
+// The response sets an updated encrypted `HttpOnly` cookie (`_zflow`)
+// with the new flow state. The server is stateless — all orchestration
+// state is carried in this cookie between requests.
+// **Important:** The `id` in the response may differ from the `id` used in
+// the request. This happens when a flow pivots (pushes a new flow onto the
+// stack) or when a stacked flow completes (auto-pops to the parent flow).
+// Always use the `id` from the latest response for the next request.
+// ## Flow completion
+// When `step.type` is `complete`, the flow is terminal. The `step.behavior`
+// field tells the frontend what to do:
+// | `behavior`   | Action                                                     |
+// |------------- |------------------------------------------------------------|
+// | `redirect`   | Navigate to `redirect_uri` (OIDC/SAML auth request done). |
+// | `show`       | Render the step as a success screen (e.g., registration).  |
+// A `complete` step is only returned when the **entire flow stack** is done.
+// If a stacked flow (e.g., recovery pivoted from login) finishes, the server
+// auto-pops to the parent flow and returns the parent's next step — the
+// frontend never sees a `complete` for intermediate flows.
+//
+// POST /flow/{id}/submit
+func (UnimplementedHandler) SubmitFlowStep(ctx context.Context, req *FlowSubmitRequest, params SubmitFlowStepParams) (r SubmitFlowStepRes, _ error) {
+	return r, ht.ErrNotImplemented
 }

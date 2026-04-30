@@ -1,0 +1,8 @@
+description: |
+  Encrypted flow state cookie. Holds a map of flow states keyed by
+  flow ID, supporting multiple concurrent flows in the same browser.
+  HttpOnly, Secure, SameSite=Strict, scoped to `/flow`. Rotated on
+  every response, including validation failures.
+schema:
+  type: string
+  example: _zflow=<encrypted-payload>; HttpOnly; Secure; SameSite=Strict; Path=/flow

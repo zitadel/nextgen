@@ -1,0 +1,11 @@
+name: id
+in: path
+required: true
+description: |
+  Flow ID returned by POST /flow or the latest POST /flow/{id}/submit.
+  Used to look up the correct flow state from the encrypted cookie,
+  which can hold multiple concurrent flows. May change between responses
+  when a flow pivot or pop occurs — always use the `id` from the latest response.
+schema:
+  type: string
+  example: flow_01H8Z

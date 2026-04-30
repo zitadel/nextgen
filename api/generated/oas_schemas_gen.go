@@ -3,22 +3,305 @@
 package api
 
 import (
-	"fmt"
 	"io"
 	"net/url"
+	"time"
 
 	"github.com/go-faster/errors"
 	"github.com/go-faster/jx"
 )
 
-func (s *ErrorDetailsStatusCode) Error() string {
-	return fmt.Sprintf("code %d: %+v", s.StatusCode, s.Response)
-}
-
 // AuthorizeGetFound is response for AuthorizeGet operation.
 type AuthorizeGetFound struct{}
 
 func (*AuthorizeGetFound) authorizeGetRes() {}
+
+// Resolved branding configuration. Inherited from the app → team → project
+// hierarchy at flow creation time (most specific wins). Read-only projection —
+// branding is configured via the Team/App Branding API, not the Flow API.
+// Ref: #
+type Branding struct {
+	// Layout preset selector. The default.liquid master template uses this
+	// to branch into layout variants. Customers who eject the template
+	// can ignore this field entirely.
+	Layout OptBrandingLayout `json:"layout"`
+	// The LiquidJS template string for rendering this step. The orchestrator
+	// parses this template, injects the capability dictionaries as context,
+	// and renders the output HTML into its Shadow DOM.
+	LiquidTemplate OptString `json:"liquid_template"`
+	// Team logo URL.
+	LogoURL OptURI `json:"logo_url"`
+	// Custom font URL (e.g., Google Fonts CSS).
+	FontURL OptURI `json:"font_url"`
+	// Hero/background image URL (used by split layout).
+	HeroURL OptURI `json:"hero_url"`
+}
+
+// GetLayout returns the value of Layout.
+func (s *Branding) GetLayout() OptBrandingLayout {
+	return s.Layout
+}
+
+// GetLiquidTemplate returns the value of LiquidTemplate.
+func (s *Branding) GetLiquidTemplate() OptString {
+	return s.LiquidTemplate
+}
+
+// GetLogoURL returns the value of LogoURL.
+func (s *Branding) GetLogoURL() OptURI {
+	return s.LogoURL
+}
+
+// GetFontURL returns the value of FontURL.
+func (s *Branding) GetFontURL() OptURI {
+	return s.FontURL
+}
+
+// GetHeroURL returns the value of HeroURL.
+func (s *Branding) GetHeroURL() OptURI {
+	return s.HeroURL
+}
+
+// SetLayout sets the value of Layout.
+func (s *Branding) SetLayout(val OptBrandingLayout) {
+	s.Layout = val
+}
+
+// SetLiquidTemplate sets the value of LiquidTemplate.
+func (s *Branding) SetLiquidTemplate(val OptString) {
+	s.LiquidTemplate = val
+}
+
+// SetLogoURL sets the value of LogoURL.
+func (s *Branding) SetLogoURL(val OptURI) {
+	s.LogoURL = val
+}
+
+// SetFontURL sets the value of FontURL.
+func (s *Branding) SetFontURL(val OptURI) {
+	s.FontURL = val
+}
+
+// SetHeroURL sets the value of HeroURL.
+func (s *Branding) SetHeroURL(val OptURI) {
+	s.HeroURL = val
+}
+
+// Layout preset selector. The default.liquid master template uses this
+// to branch into layout variants. Customers who eject the template
+// can ignore this field entirely.
+type BrandingLayout string
+
+const (
+	BrandingLayoutCentered BrandingLayout = "centered"
+	BrandingLayoutSplit    BrandingLayout = "split"
+)
+
+// AllValues returns all BrandingLayout values.
+func (BrandingLayout) AllValues() []BrandingLayout {
+	return []BrandingLayout{
+		BrandingLayoutCentered,
+		BrandingLayoutSplit,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s BrandingLayout) MarshalText() ([]byte, error) {
+	switch s {
+	case BrandingLayoutCentered:
+		return []byte(s), nil
+	case BrandingLayoutSplit:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *BrandingLayout) UnmarshalText(data []byte) error {
+	switch BrandingLayout(data) {
+	case BrandingLayoutCentered:
+		*s = BrandingLayoutCentered
+		return nil
+	case BrandingLayoutSplit:
+		*s = BrandingLayoutSplit
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Ref: #
+type CreateFlowRequest struct {
+	Purpose CreateFlowRequestPurpose `json:"purpose"`
+	// Human-readable identifier of a specific flow definition to use.
+	// When omitted, the engine selects the best-matching definition
+	// based on purpose + audience context.
+	Slug OptString `json:"slug"`
+	// Semver version of the flow definition JSON Schema to use.
+	// When omitted, the latest version is used.
+	SchemaVersion OptString `json:"schema_version"`
+	// Origin-bound nonce obtained from `POST /bootstrap/challenge`.
+	// Binds the flow to the browser that requested it, preventing
+	// cross-origin replay of flow cookies.
+	ChallengeNonce OptString `json:"challenge_nonce"`
+	// Existing session to attach to (for step-up / reauth).
+	// Omit to let the flow create a new session implicitly.
+	SessionID OptString `json:"session_id"`
+	// OIDC/SAML auth request ID (links flow to protocol request).
+	AuthRequestID OptString   `json:"auth_request_id"`
+	RedirectURI   OptURI      `json:"redirect_uri"`
+	Hint          OptFlowHint `json:"hint"`
+}
+
+// GetPurpose returns the value of Purpose.
+func (s *CreateFlowRequest) GetPurpose() CreateFlowRequestPurpose {
+	return s.Purpose
+}
+
+// GetSlug returns the value of Slug.
+func (s *CreateFlowRequest) GetSlug() OptString {
+	return s.Slug
+}
+
+// GetSchemaVersion returns the value of SchemaVersion.
+func (s *CreateFlowRequest) GetSchemaVersion() OptString {
+	return s.SchemaVersion
+}
+
+// GetChallengeNonce returns the value of ChallengeNonce.
+func (s *CreateFlowRequest) GetChallengeNonce() OptString {
+	return s.ChallengeNonce
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *CreateFlowRequest) GetSessionID() OptString {
+	return s.SessionID
+}
+
+// GetAuthRequestID returns the value of AuthRequestID.
+func (s *CreateFlowRequest) GetAuthRequestID() OptString {
+	return s.AuthRequestID
+}
+
+// GetRedirectURI returns the value of RedirectURI.
+func (s *CreateFlowRequest) GetRedirectURI() OptURI {
+	return s.RedirectURI
+}
+
+// GetHint returns the value of Hint.
+func (s *CreateFlowRequest) GetHint() OptFlowHint {
+	return s.Hint
+}
+
+// SetPurpose sets the value of Purpose.
+func (s *CreateFlowRequest) SetPurpose(val CreateFlowRequestPurpose) {
+	s.Purpose = val
+}
+
+// SetSlug sets the value of Slug.
+func (s *CreateFlowRequest) SetSlug(val OptString) {
+	s.Slug = val
+}
+
+// SetSchemaVersion sets the value of SchemaVersion.
+func (s *CreateFlowRequest) SetSchemaVersion(val OptString) {
+	s.SchemaVersion = val
+}
+
+// SetChallengeNonce sets the value of ChallengeNonce.
+func (s *CreateFlowRequest) SetChallengeNonce(val OptString) {
+	s.ChallengeNonce = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *CreateFlowRequest) SetSessionID(val OptString) {
+	s.SessionID = val
+}
+
+// SetAuthRequestID sets the value of AuthRequestID.
+func (s *CreateFlowRequest) SetAuthRequestID(val OptString) {
+	s.AuthRequestID = val
+}
+
+// SetRedirectURI sets the value of RedirectURI.
+func (s *CreateFlowRequest) SetRedirectURI(val OptURI) {
+	s.RedirectURI = val
+}
+
+// SetHint sets the value of Hint.
+func (s *CreateFlowRequest) SetHint(val OptFlowHint) {
+	s.Hint = val
+}
+
+type CreateFlowRequestPurpose string
+
+const (
+	CreateFlowRequestPurposeLogin       CreateFlowRequestPurpose = "login"
+	CreateFlowRequestPurposeRegister    CreateFlowRequestPurpose = "register"
+	CreateFlowRequestPurposeRecovery    CreateFlowRequestPurpose = "recovery"
+	CreateFlowRequestPurposeProfiling   CreateFlowRequestPurpose = "profiling"
+	CreateFlowRequestPurposeReauth      CreateFlowRequestPurpose = "reauth"
+	CreateFlowRequestPurposeLinkAccount CreateFlowRequestPurpose = "link_account"
+)
+
+// AllValues returns all CreateFlowRequestPurpose values.
+func (CreateFlowRequestPurpose) AllValues() []CreateFlowRequestPurpose {
+	return []CreateFlowRequestPurpose{
+		CreateFlowRequestPurposeLogin,
+		CreateFlowRequestPurposeRegister,
+		CreateFlowRequestPurposeRecovery,
+		CreateFlowRequestPurposeProfiling,
+		CreateFlowRequestPurposeReauth,
+		CreateFlowRequestPurposeLinkAccount,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s CreateFlowRequestPurpose) MarshalText() ([]byte, error) {
+	switch s {
+	case CreateFlowRequestPurposeLogin:
+		return []byte(s), nil
+	case CreateFlowRequestPurposeRegister:
+		return []byte(s), nil
+	case CreateFlowRequestPurposeRecovery:
+		return []byte(s), nil
+	case CreateFlowRequestPurposeProfiling:
+		return []byte(s), nil
+	case CreateFlowRequestPurposeReauth:
+		return []byte(s), nil
+	case CreateFlowRequestPurposeLinkAccount:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *CreateFlowRequestPurpose) UnmarshalText(data []byte) error {
+	switch CreateFlowRequestPurpose(data) {
+	case CreateFlowRequestPurposeLogin:
+		*s = CreateFlowRequestPurposeLogin
+		return nil
+	case CreateFlowRequestPurposeRegister:
+		*s = CreateFlowRequestPurposeRegister
+		return nil
+	case CreateFlowRequestPurposeRecovery:
+		*s = CreateFlowRequestPurposeRecovery
+		return nil
+	case CreateFlowRequestPurposeProfiling:
+		*s = CreateFlowRequestPurposeProfiling
+		return nil
+	case CreateFlowRequestPurposeReauth:
+		*s = CreateFlowRequestPurposeReauth
+		return nil
+	case CreateFlowRequestPurposeLinkAccount:
+		*s = CreateFlowRequestPurposeLinkAccount
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
 
 // Ref: #
 type DeviceAuthorizationResponse struct {
@@ -148,8 +431,10 @@ func (s *ErrorDetails) SetDetails(val OptErrorDetailsDetails) {
 
 func (*ErrorDetails) authorizeDeviceRes() {}
 func (*ErrorDetails) authorizeGetRes()    {}
+func (*ErrorDetails) createFlowRes()      {}
 func (*ErrorDetails) endSessionRes()      {}
 func (*ErrorDetails) introspectRes()      {}
+func (*ErrorDetails) submitFlowStepRes()  {}
 
 // Additional error-specific context.
 type ErrorDetailsDetails map[string]jx.Raw
@@ -189,6 +474,9 @@ func (s *ErrorDetailsStatusCode) SetResponse(val ErrorDetails) {
 	s.Response = val
 }
 
+func (*ErrorDetailsStatusCode) authorizeDeviceRes()        {}
+func (*ErrorDetailsStatusCode) authorizeGetRes()           {}
+func (*ErrorDetailsStatusCode) endSessionRes()             {}
 func (*ErrorDetailsStatusCode) getHealthRes()              {}
 func (*ErrorDetailsStatusCode) getKeysRes()                {}
 func (*ErrorDetailsStatusCode) getLiveRes()                {}
@@ -196,7 +484,1054 @@ func (*ErrorDetailsStatusCode) getOpenIDConfigurationRes() {}
 func (*ErrorDetailsStatusCode) getReadyRes()               {}
 func (*ErrorDetailsStatusCode) getTokenRes()               {}
 func (*ErrorDetailsStatusCode) getUserInfoRes()            {}
+func (*ErrorDetailsStatusCode) introspectRes()             {}
+func (*ErrorDetailsStatusCode) listUsersRes()              {}
 func (*ErrorDetailsStatusCode) revokeTokenRes()            {}
+
+// A data input capability. Describes what the user must provide.
+// Does not contain display text — only a `text_key` resolved client-side.
+// Ref: #
+type Field struct {
+	Type FieldType `json:"type"`
+	// Localization key for the field label.
+	TextKey  string  `json:"text_key"`
+	Required OptBool `json:"required"`
+	// Pre-filled value (e.g., email carried over from a pivot).
+	Value      jx.Raw             `json:"value"`
+	Validation OptFieldValidation `json:"validation"`
+}
+
+// GetType returns the value of Type.
+func (s *Field) GetType() FieldType {
+	return s.Type
+}
+
+// GetTextKey returns the value of TextKey.
+func (s *Field) GetTextKey() string {
+	return s.TextKey
+}
+
+// GetRequired returns the value of Required.
+func (s *Field) GetRequired() OptBool {
+	return s.Required
+}
+
+// GetValue returns the value of Value.
+func (s *Field) GetValue() jx.Raw {
+	return s.Value
+}
+
+// GetValidation returns the value of Validation.
+func (s *Field) GetValidation() OptFieldValidation {
+	return s.Validation
+}
+
+// SetType sets the value of Type.
+func (s *Field) SetType(val FieldType) {
+	s.Type = val
+}
+
+// SetTextKey sets the value of TextKey.
+func (s *Field) SetTextKey(val string) {
+	s.TextKey = val
+}
+
+// SetRequired sets the value of Required.
+func (s *Field) SetRequired(val OptBool) {
+	s.Required = val
+}
+
+// SetValue sets the value of Value.
+func (s *Field) SetValue(val jx.Raw) {
+	s.Value = val
+}
+
+// SetValidation sets the value of Validation.
+func (s *Field) SetValidation(val OptFieldValidation) {
+	s.Validation = val
+}
+
+type FieldType string
+
+const (
+	FieldTypeText     FieldType = "text"
+	FieldTypeEmail    FieldType = "email"
+	FieldTypePassword FieldType = "password"
+	FieldTypeTel      FieldType = "tel"
+	FieldTypeNumber   FieldType = "number"
+	FieldTypeURL      FieldType = "url"
+	FieldTypeDate     FieldType = "date"
+	FieldTypeHidden   FieldType = "hidden"
+)
+
+// AllValues returns all FieldType values.
+func (FieldType) AllValues() []FieldType {
+	return []FieldType{
+		FieldTypeText,
+		FieldTypeEmail,
+		FieldTypePassword,
+		FieldTypeTel,
+		FieldTypeNumber,
+		FieldTypeURL,
+		FieldTypeDate,
+		FieldTypeHidden,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FieldType) MarshalText() ([]byte, error) {
+	switch s {
+	case FieldTypeText:
+		return []byte(s), nil
+	case FieldTypeEmail:
+		return []byte(s), nil
+	case FieldTypePassword:
+		return []byte(s), nil
+	case FieldTypeTel:
+		return []byte(s), nil
+	case FieldTypeNumber:
+		return []byte(s), nil
+	case FieldTypeURL:
+		return []byte(s), nil
+	case FieldTypeDate:
+		return []byte(s), nil
+	case FieldTypeHidden:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FieldType) UnmarshalText(data []byte) error {
+	switch FieldType(data) {
+	case FieldTypeText:
+		*s = FieldTypeText
+		return nil
+	case FieldTypeEmail:
+		*s = FieldTypeEmail
+		return nil
+	case FieldTypePassword:
+		*s = FieldTypePassword
+		return nil
+	case FieldTypeTel:
+		*s = FieldTypeTel
+		return nil
+	case FieldTypeNumber:
+		*s = FieldTypeNumber
+		return nil
+	case FieldTypeURL:
+		*s = FieldTypeURL
+		return nil
+	case FieldTypeDate:
+		*s = FieldTypeDate
+		return nil
+	case FieldTypeHidden:
+		*s = FieldTypeHidden
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+type FieldValidation struct {
+	Format    OptString `json:"format"`
+	Pattern   OptString `json:"pattern"`
+	MinLength OptInt    `json:"min_length"`
+	MaxLength OptInt    `json:"max_length"`
+}
+
+// GetFormat returns the value of Format.
+func (s *FieldValidation) GetFormat() OptString {
+	return s.Format
+}
+
+// GetPattern returns the value of Pattern.
+func (s *FieldValidation) GetPattern() OptString {
+	return s.Pattern
+}
+
+// GetMinLength returns the value of MinLength.
+func (s *FieldValidation) GetMinLength() OptInt {
+	return s.MinLength
+}
+
+// GetMaxLength returns the value of MaxLength.
+func (s *FieldValidation) GetMaxLength() OptInt {
+	return s.MaxLength
+}
+
+// SetFormat sets the value of Format.
+func (s *FieldValidation) SetFormat(val OptString) {
+	s.Format = val
+}
+
+// SetPattern sets the value of Pattern.
+func (s *FieldValidation) SetPattern(val OptString) {
+	s.Pattern = val
+}
+
+// SetMinLength sets the value of MinLength.
+func (s *FieldValidation) SetMinLength(val OptInt) {
+	s.MinLength = val
+}
+
+// SetMaxLength sets the value of MaxLength.
+func (s *FieldValidation) SetMaxLength(val OptInt) {
+	s.MaxLength = val
+}
+
+// Ref: #
+type FlowEventRequest struct {
+	SessionToken string               `json:"session_token"`
+	Type         FlowEventRequestType `json:"type"`
+	// Event payload (fingerprint hash, timing data, etc.).
+	Payload OptFlowEventRequestPayload `json:"payload"`
+}
+
+// GetSessionToken returns the value of SessionToken.
+func (s *FlowEventRequest) GetSessionToken() string {
+	return s.SessionToken
+}
+
+// GetType returns the value of Type.
+func (s *FlowEventRequest) GetType() FlowEventRequestType {
+	return s.Type
+}
+
+// GetPayload returns the value of Payload.
+func (s *FlowEventRequest) GetPayload() OptFlowEventRequestPayload {
+	return s.Payload
+}
+
+// SetSessionToken sets the value of SessionToken.
+func (s *FlowEventRequest) SetSessionToken(val string) {
+	s.SessionToken = val
+}
+
+// SetType sets the value of Type.
+func (s *FlowEventRequest) SetType(val FlowEventRequestType) {
+	s.Type = val
+}
+
+// SetPayload sets the value of Payload.
+func (s *FlowEventRequest) SetPayload(val OptFlowEventRequestPayload) {
+	s.Payload = val
+}
+
+// Event payload (fingerprint hash, timing data, etc.).
+type FlowEventRequestPayload map[string]jx.Raw
+
+func (s *FlowEventRequestPayload) init() FlowEventRequestPayload {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+type FlowEventRequestType string
+
+const (
+	FlowEventRequestTypeFingerprint FlowEventRequestType = "fingerprint"
+	FlowEventRequestTypeTelemetry   FlowEventRequestType = "telemetry"
+)
+
+// AllValues returns all FlowEventRequestType values.
+func (FlowEventRequestType) AllValues() []FlowEventRequestType {
+	return []FlowEventRequestType{
+		FlowEventRequestTypeFingerprint,
+		FlowEventRequestTypeTelemetry,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FlowEventRequestType) MarshalText() ([]byte, error) {
+	switch s {
+	case FlowEventRequestTypeFingerprint:
+		return []byte(s), nil
+	case FlowEventRequestTypeTelemetry:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FlowEventRequestType) UnmarshalText(data []byte) error {
+	switch FlowEventRequestType(data) {
+	case FlowEventRequestTypeFingerprint:
+		*s = FlowEventRequestTypeFingerprint
+		return nil
+	case FlowEventRequestTypeTelemetry:
+		*s = FlowEventRequestTypeTelemetry
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Ref: #
+type FlowHint struct {
+	// Auto-submits identifier step (maps to OIDC login_hint).
+	LoginName OptString `json:"login_name"`
+	// Scopes flow resolution to a team.
+	TeamID OptString `json:"team_id"`
+	// Scopes to a specific user type.
+	SchemaID OptString `json:"schema_id"`
+	// Scopes to a specific application.
+	AppID OptString `json:"app_id"`
+}
+
+// GetLoginName returns the value of LoginName.
+func (s *FlowHint) GetLoginName() OptString {
+	return s.LoginName
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *FlowHint) GetTeamID() OptString {
+	return s.TeamID
+}
+
+// GetSchemaID returns the value of SchemaID.
+func (s *FlowHint) GetSchemaID() OptString {
+	return s.SchemaID
+}
+
+// GetAppID returns the value of AppID.
+func (s *FlowHint) GetAppID() OptString {
+	return s.AppID
+}
+
+// SetLoginName sets the value of LoginName.
+func (s *FlowHint) SetLoginName(val OptString) {
+	s.LoginName = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *FlowHint) SetTeamID(val OptString) {
+	s.TeamID = val
+}
+
+// SetSchemaID sets the value of SchemaID.
+func (s *FlowHint) SetSchemaID(val OptString) {
+	s.SchemaID = val
+}
+
+// SetAppID sets the value of AppID.
+func (s *FlowHint) SetAppID(val OptString) {
+	s.AppID = val
+}
+
+// Ref: #
+type FlowResponse struct {
+	// Flow handle. Use this as the path parameter for subsequent
+	// submit/event calls. May change between responses when a
+	// flow pivot or pop occurs.
+	ID string `json:"id"`
+	// Underlying session ID. Stable across all stacked flows.
+	SessionID string `json:"session_id"`
+	// Rotated on every response. Required for the next request.
+	SessionToken string   `json:"session_token"`
+	Step         FlowStep `json:"step"`
+	// Resolved branding inherited from the app → team → project hierarchy.
+	// Determined at flow creation based on audience context. Does not change between steps.
+	Branding OptBranding `json:"branding"`
+	// Present on the `complete` step when a redirect is needed.
+	RedirectURI OptURI `json:"redirect_uri"`
+	// Short-lived, audience-bound token produced on flow completion.
+	// Exchange it for a session via `POST /sessions/exchange`.
+	// Only present when `step.type` is `complete`.
+	HandoffToken OptString `json:"handoff_token"`
+	// Expiry timestamp for `handoff_token`. Only present when
+	// `handoff_token` is set.
+	HandoffTokenExpiresAt OptDateTime `json:"handoff_token_expires_at"`
+}
+
+// GetID returns the value of ID.
+func (s *FlowResponse) GetID() string {
+	return s.ID
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *FlowResponse) GetSessionID() string {
+	return s.SessionID
+}
+
+// GetSessionToken returns the value of SessionToken.
+func (s *FlowResponse) GetSessionToken() string {
+	return s.SessionToken
+}
+
+// GetStep returns the value of Step.
+func (s *FlowResponse) GetStep() FlowStep {
+	return s.Step
+}
+
+// GetBranding returns the value of Branding.
+func (s *FlowResponse) GetBranding() OptBranding {
+	return s.Branding
+}
+
+// GetRedirectURI returns the value of RedirectURI.
+func (s *FlowResponse) GetRedirectURI() OptURI {
+	return s.RedirectURI
+}
+
+// GetHandoffToken returns the value of HandoffToken.
+func (s *FlowResponse) GetHandoffToken() OptString {
+	return s.HandoffToken
+}
+
+// GetHandoffTokenExpiresAt returns the value of HandoffTokenExpiresAt.
+func (s *FlowResponse) GetHandoffTokenExpiresAt() OptDateTime {
+	return s.HandoffTokenExpiresAt
+}
+
+// SetID sets the value of ID.
+func (s *FlowResponse) SetID(val string) {
+	s.ID = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *FlowResponse) SetSessionID(val string) {
+	s.SessionID = val
+}
+
+// SetSessionToken sets the value of SessionToken.
+func (s *FlowResponse) SetSessionToken(val string) {
+	s.SessionToken = val
+}
+
+// SetStep sets the value of Step.
+func (s *FlowResponse) SetStep(val FlowStep) {
+	s.Step = val
+}
+
+// SetBranding sets the value of Branding.
+func (s *FlowResponse) SetBranding(val OptBranding) {
+	s.Branding = val
+}
+
+// SetRedirectURI sets the value of RedirectURI.
+func (s *FlowResponse) SetRedirectURI(val OptURI) {
+	s.RedirectURI = val
+}
+
+// SetHandoffToken sets the value of HandoffToken.
+func (s *FlowResponse) SetHandoffToken(val OptString) {
+	s.HandoffToken = val
+}
+
+// SetHandoffTokenExpiresAt sets the value of HandoffTokenExpiresAt.
+func (s *FlowResponse) SetHandoffTokenExpiresAt(val OptDateTime) {
+	s.HandoffTokenExpiresAt = val
+}
+
+func (*FlowResponse) getFlowStepRes() {}
+
+// FlowResponseHeaders wraps FlowResponse with response headers.
+type FlowResponseHeaders struct {
+	SetCookie OptString
+	Response  FlowResponse
+}
+
+// GetSetCookie returns the value of SetCookie.
+func (s *FlowResponseHeaders) GetSetCookie() OptString {
+	return s.SetCookie
+}
+
+// GetResponse returns the value of Response.
+func (s *FlowResponseHeaders) GetResponse() FlowResponse {
+	return s.Response
+}
+
+// SetSetCookie sets the value of SetCookie.
+func (s *FlowResponseHeaders) SetSetCookie(val OptString) {
+	s.SetCookie = val
+}
+
+// SetResponse sets the value of Response.
+func (s *FlowResponseHeaders) SetResponse(val FlowResponse) {
+	s.Response = val
+}
+
+func (*FlowResponseHeaders) createFlowRes() {}
+
+// A step contains unordered capability dictionaries: what to collect (fields),
+// what the user can do (actions), and what security gates must be satisfied (gates).
+// Layout and element ordering are controlled by the LiquidJS template in `branding.liquid_template`.
+// Ref: #
+type FlowStep struct {
+	// Step name from the flow definition.
+	Name string `json:"name"`
+	// Semantic step type. This is a hint, not a rendering instruction — the
+	// LiquidJS template controls layout. The frontend does NOT switch on type
+	// to decide what to render; it renders the capability dictionaries
+	// (fields, actions, gates, sso_providers) using the template.
+	// Type is useful for:
+	// - Accessibility: screen readers can announce "credential step"
+	// - Analytics: track drop-off rates per step type
+	// - Special behavior: `redirect` and `complete` have hardcoded
+	// frontend behavior (navigate away) that templates cannot override
+	// - Gate auto-injection: backend uses type to enforce gates even if
+	// the template omits them (e.g. `captcha` type always requires a
+	// captcha gate)
+	// The following types are rendered by the frontend:
+	// - identifier: collect login handle (email, phone, username)
+	// - credential: collect secret (password, OTP, passkey proof)
+	// - form: generic data collection (profile, address)
+	// - verification: email/phone code entry
+	// - consent: terms, scopes, permissions (approve/deny)
+	// - info: read-only screen (success message, warning)
+	// - captcha: dedicated captcha challenge
+	// - redirect: navigate to redirect_url immediately, no UI rendered
+	// - complete: flow is done — check `behavior` field
+	// The following types exist only in flow definitions and are never
+	// sent to the frontend (the engine auto-transitions through them):
+	// - policy_check: evaluate a policy condition, pick next step
+	// - action: execute a server-side mutation (create session, etc.).
+	Type  FlowStepType `json:"type"`
+	Texts OptStepTexts `json:"texts"`
+	// Error message from a previous failed submission.
+	Error OptNilString `json:"error"`
+	// Only present on `complete` steps. Tells the frontend what to do:
+	// - redirect: navigate to redirect_uri immediately (OIDC/SAML done)
+	// - show: render the step as a success screen (e.g., registration confirmed).
+	Behavior OptFlowStepBehavior `json:"behavior"`
+	// For `redirect` steps — URL to navigate to (e.g., SSO provider).
+	RedirectURL OptURI `json:"redirect_url"`
+	// Unordered dictionary of input fields to collect. Keyed by field name.
+	// The LiquidJS template controls which fields appear and in what order.
+	Fields FlowStepFields `json:"fields"`
+	// Unordered dictionary of available user actions. Keyed by action name.
+	// The LiquidJS template controls positioning and presentation.
+	Actions FlowStepActions `json:"actions"`
+	// Security gates that must be satisfied before the step can be submitted.
+	// The orchestrator appends any required but unrendered gates as a safety net.
+	Gates FlowStepGates `json:"gates"`
+	// Available SSO identity providers for this step.
+	SSOProviders []SSOProvider `json:"sso_providers"`
+}
+
+// GetName returns the value of Name.
+func (s *FlowStep) GetName() string {
+	return s.Name
+}
+
+// GetType returns the value of Type.
+func (s *FlowStep) GetType() FlowStepType {
+	return s.Type
+}
+
+// GetTexts returns the value of Texts.
+func (s *FlowStep) GetTexts() OptStepTexts {
+	return s.Texts
+}
+
+// GetError returns the value of Error.
+func (s *FlowStep) GetError() OptNilString {
+	return s.Error
+}
+
+// GetBehavior returns the value of Behavior.
+func (s *FlowStep) GetBehavior() OptFlowStepBehavior {
+	return s.Behavior
+}
+
+// GetRedirectURL returns the value of RedirectURL.
+func (s *FlowStep) GetRedirectURL() OptURI {
+	return s.RedirectURL
+}
+
+// GetFields returns the value of Fields.
+func (s *FlowStep) GetFields() FlowStepFields {
+	return s.Fields
+}
+
+// GetActions returns the value of Actions.
+func (s *FlowStep) GetActions() FlowStepActions {
+	return s.Actions
+}
+
+// GetGates returns the value of Gates.
+func (s *FlowStep) GetGates() FlowStepGates {
+	return s.Gates
+}
+
+// GetSSOProviders returns the value of SSOProviders.
+func (s *FlowStep) GetSSOProviders() []SSOProvider {
+	return s.SSOProviders
+}
+
+// SetName sets the value of Name.
+func (s *FlowStep) SetName(val string) {
+	s.Name = val
+}
+
+// SetType sets the value of Type.
+func (s *FlowStep) SetType(val FlowStepType) {
+	s.Type = val
+}
+
+// SetTexts sets the value of Texts.
+func (s *FlowStep) SetTexts(val OptStepTexts) {
+	s.Texts = val
+}
+
+// SetError sets the value of Error.
+func (s *FlowStep) SetError(val OptNilString) {
+	s.Error = val
+}
+
+// SetBehavior sets the value of Behavior.
+func (s *FlowStep) SetBehavior(val OptFlowStepBehavior) {
+	s.Behavior = val
+}
+
+// SetRedirectURL sets the value of RedirectURL.
+func (s *FlowStep) SetRedirectURL(val OptURI) {
+	s.RedirectURL = val
+}
+
+// SetFields sets the value of Fields.
+func (s *FlowStep) SetFields(val FlowStepFields) {
+	s.Fields = val
+}
+
+// SetActions sets the value of Actions.
+func (s *FlowStep) SetActions(val FlowStepActions) {
+	s.Actions = val
+}
+
+// SetGates sets the value of Gates.
+func (s *FlowStep) SetGates(val FlowStepGates) {
+	s.Gates = val
+}
+
+// SetSSOProviders sets the value of SSOProviders.
+func (s *FlowStep) SetSSOProviders(val []SSOProvider) {
+	s.SSOProviders = val
+}
+
+// Unordered dictionary of available user actions. Keyed by action name.
+// The LiquidJS template controls positioning and presentation.
+type FlowStepActions map[string]StepAction
+
+func (s *FlowStepActions) init() FlowStepActions {
+	m := *s
+	if m == nil {
+		m = map[string]StepAction{}
+		*s = m
+	}
+	return m
+}
+
+// Only present on `complete` steps. Tells the frontend what to do:
+// - redirect: navigate to redirect_uri immediately (OIDC/SAML done)
+// - show: render the step as a success screen (e.g., registration confirmed).
+type FlowStepBehavior string
+
+const (
+	FlowStepBehaviorRedirect FlowStepBehavior = "redirect"
+	FlowStepBehaviorShow     FlowStepBehavior = "show"
+)
+
+// AllValues returns all FlowStepBehavior values.
+func (FlowStepBehavior) AllValues() []FlowStepBehavior {
+	return []FlowStepBehavior{
+		FlowStepBehaviorRedirect,
+		FlowStepBehaviorShow,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FlowStepBehavior) MarshalText() ([]byte, error) {
+	switch s {
+	case FlowStepBehaviorRedirect:
+		return []byte(s), nil
+	case FlowStepBehaviorShow:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FlowStepBehavior) UnmarshalText(data []byte) error {
+	switch FlowStepBehavior(data) {
+	case FlowStepBehaviorRedirect:
+		*s = FlowStepBehaviorRedirect
+		return nil
+	case FlowStepBehaviorShow:
+		*s = FlowStepBehaviorShow
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Unordered dictionary of input fields to collect. Keyed by field name.
+// The LiquidJS template controls which fields appear and in what order.
+type FlowStepFields map[string]Field
+
+func (s *FlowStepFields) init() FlowStepFields {
+	m := *s
+	if m == nil {
+		m = map[string]Field{}
+		*s = m
+	}
+	return m
+}
+
+// Security gates that must be satisfied before the step can be submitted.
+// The orchestrator appends any required but unrendered gates as a safety net.
+type FlowStepGates map[string]Gate
+
+func (s *FlowStepGates) init() FlowStepGates {
+	m := *s
+	if m == nil {
+		m = map[string]Gate{}
+		*s = m
+	}
+	return m
+}
+
+// Semantic step type. This is a hint, not a rendering instruction — the
+// LiquidJS template controls layout. The frontend does NOT switch on type
+// to decide what to render; it renders the capability dictionaries
+// (fields, actions, gates, sso_providers) using the template.
+// Type is useful for:
+// - Accessibility: screen readers can announce "credential step"
+// - Analytics: track drop-off rates per step type
+// - Special behavior: `redirect` and `complete` have hardcoded
+// frontend behavior (navigate away) that templates cannot override
+// - Gate auto-injection: backend uses type to enforce gates even if
+// the template omits them (e.g. `captcha` type always requires a
+// captcha gate)
+// The following types are rendered by the frontend:
+// - identifier: collect login handle (email, phone, username)
+// - credential: collect secret (password, OTP, passkey proof)
+// - form: generic data collection (profile, address)
+// - verification: email/phone code entry
+// - consent: terms, scopes, permissions (approve/deny)
+// - info: read-only screen (success message, warning)
+// - captcha: dedicated captcha challenge
+// - redirect: navigate to redirect_url immediately, no UI rendered
+// - complete: flow is done — check `behavior` field
+// The following types exist only in flow definitions and are never
+// sent to the frontend (the engine auto-transitions through them):
+// - policy_check: evaluate a policy condition, pick next step
+// - action: execute a server-side mutation (create session, etc.).
+type FlowStepType string
+
+const (
+	FlowStepTypeIdentifier   FlowStepType = "identifier"
+	FlowStepTypeCredential   FlowStepType = "credential"
+	FlowStepTypeForm         FlowStepType = "form"
+	FlowStepTypeVerification FlowStepType = "verification"
+	FlowStepTypeConsent      FlowStepType = "consent"
+	FlowStepTypeInfo         FlowStepType = "info"
+	FlowStepTypeRedirect     FlowStepType = "redirect"
+	FlowStepTypeCaptcha      FlowStepType = "captcha"
+	FlowStepTypeComplete     FlowStepType = "complete"
+)
+
+// AllValues returns all FlowStepType values.
+func (FlowStepType) AllValues() []FlowStepType {
+	return []FlowStepType{
+		FlowStepTypeIdentifier,
+		FlowStepTypeCredential,
+		FlowStepTypeForm,
+		FlowStepTypeVerification,
+		FlowStepTypeConsent,
+		FlowStepTypeInfo,
+		FlowStepTypeRedirect,
+		FlowStepTypeCaptcha,
+		FlowStepTypeComplete,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FlowStepType) MarshalText() ([]byte, error) {
+	switch s {
+	case FlowStepTypeIdentifier:
+		return []byte(s), nil
+	case FlowStepTypeCredential:
+		return []byte(s), nil
+	case FlowStepTypeForm:
+		return []byte(s), nil
+	case FlowStepTypeVerification:
+		return []byte(s), nil
+	case FlowStepTypeConsent:
+		return []byte(s), nil
+	case FlowStepTypeInfo:
+		return []byte(s), nil
+	case FlowStepTypeRedirect:
+		return []byte(s), nil
+	case FlowStepTypeCaptcha:
+		return []byte(s), nil
+	case FlowStepTypeComplete:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FlowStepType) UnmarshalText(data []byte) error {
+	switch FlowStepType(data) {
+	case FlowStepTypeIdentifier:
+		*s = FlowStepTypeIdentifier
+		return nil
+	case FlowStepTypeCredential:
+		*s = FlowStepTypeCredential
+		return nil
+	case FlowStepTypeForm:
+		*s = FlowStepTypeForm
+		return nil
+	case FlowStepTypeVerification:
+		*s = FlowStepTypeVerification
+		return nil
+	case FlowStepTypeConsent:
+		*s = FlowStepTypeConsent
+		return nil
+	case FlowStepTypeInfo:
+		*s = FlowStepTypeInfo
+		return nil
+	case FlowStepTypeRedirect:
+		*s = FlowStepTypeRedirect
+		return nil
+	case FlowStepTypeCaptcha:
+		*s = FlowStepTypeCaptcha
+		return nil
+	case FlowStepTypeComplete:
+		*s = FlowStepTypeComplete
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Ref: #
+type FlowSubmitRequest struct {
+	SessionToken string `json:"session_token"`
+	// Which action to take. Either:
+	// - A key from the step's `actions` dictionary (e.g., "submit", "register", "back")
+	// - The reserved value "sso" — triggers SSO redirect (requires `sso_provider_id`).
+	Action string `json:"action"`
+	// User input values. Keys match field names from the step's `fields` dictionary.
+	Fields OptFlowSubmitRequestFields `json:"fields"`
+	// Solutions for security gates. Keys match gate names from the step's `gates` dictionary.
+	// The orchestrator collects these from `<zl-captcha>` / `<zl-passkey>` component events.
+	GateProofs OptFlowSubmitRequestGateProofs `json:"gate_proofs"`
+	// ID of the selected SSO provider (from `sso_providers[].id`).
+	// Required when `action` is "sso".
+	SSOProviderID OptString `json:"sso_provider_id"`
+}
+
+// GetSessionToken returns the value of SessionToken.
+func (s *FlowSubmitRequest) GetSessionToken() string {
+	return s.SessionToken
+}
+
+// GetAction returns the value of Action.
+func (s *FlowSubmitRequest) GetAction() string {
+	return s.Action
+}
+
+// GetFields returns the value of Fields.
+func (s *FlowSubmitRequest) GetFields() OptFlowSubmitRequestFields {
+	return s.Fields
+}
+
+// GetGateProofs returns the value of GateProofs.
+func (s *FlowSubmitRequest) GetGateProofs() OptFlowSubmitRequestGateProofs {
+	return s.GateProofs
+}
+
+// GetSSOProviderID returns the value of SSOProviderID.
+func (s *FlowSubmitRequest) GetSSOProviderID() OptString {
+	return s.SSOProviderID
+}
+
+// SetSessionToken sets the value of SessionToken.
+func (s *FlowSubmitRequest) SetSessionToken(val string) {
+	s.SessionToken = val
+}
+
+// SetAction sets the value of Action.
+func (s *FlowSubmitRequest) SetAction(val string) {
+	s.Action = val
+}
+
+// SetFields sets the value of Fields.
+func (s *FlowSubmitRequest) SetFields(val OptFlowSubmitRequestFields) {
+	s.Fields = val
+}
+
+// SetGateProofs sets the value of GateProofs.
+func (s *FlowSubmitRequest) SetGateProofs(val OptFlowSubmitRequestGateProofs) {
+	s.GateProofs = val
+}
+
+// SetSSOProviderID sets the value of SSOProviderID.
+func (s *FlowSubmitRequest) SetSSOProviderID(val OptString) {
+	s.SSOProviderID = val
+}
+
+// User input values. Keys match field names from the step's `fields` dictionary.
+type FlowSubmitRequestFields map[string]jx.Raw
+
+func (s *FlowSubmitRequestFields) init() FlowSubmitRequestFields {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Solutions for security gates. Keys match gate names from the step's `gates` dictionary.
+// The orchestrator collects these from `<zl-captcha>` / `<zl-passkey>` component events.
+type FlowSubmitRequestGateProofs map[string]string
+
+func (s *FlowSubmitRequestGateProofs) init() FlowSubmitRequestGateProofs {
+	m := *s
+	if m == nil {
+		m = map[string]string{}
+		*s = m
+	}
+	return m
+}
+
+// A security gate that must be satisfied. The orchestrator appends any
+// required-but-unrendered gates automatically as a safety net.
+// Ref: #
+type Gate struct {
+	// Gate type.
+	Type GateType `json:"type"`
+	// Provider identifier (e.g., "altcha", "turnstile").
+	Provider OptString `json:"provider"`
+	Required OptBool   `json:"required"`
+	// Whether this gate has already been satisfied in this flow.
+	Satisfied OptBool `json:"satisfied"`
+	// Provider-specific challenge parameters.
+	Config OptGateConfig `json:"config"`
+}
+
+// GetType returns the value of Type.
+func (s *Gate) GetType() GateType {
+	return s.Type
+}
+
+// GetProvider returns the value of Provider.
+func (s *Gate) GetProvider() OptString {
+	return s.Provider
+}
+
+// GetRequired returns the value of Required.
+func (s *Gate) GetRequired() OptBool {
+	return s.Required
+}
+
+// GetSatisfied returns the value of Satisfied.
+func (s *Gate) GetSatisfied() OptBool {
+	return s.Satisfied
+}
+
+// GetConfig returns the value of Config.
+func (s *Gate) GetConfig() OptGateConfig {
+	return s.Config
+}
+
+// SetType sets the value of Type.
+func (s *Gate) SetType(val GateType) {
+	s.Type = val
+}
+
+// SetProvider sets the value of Provider.
+func (s *Gate) SetProvider(val OptString) {
+	s.Provider = val
+}
+
+// SetRequired sets the value of Required.
+func (s *Gate) SetRequired(val OptBool) {
+	s.Required = val
+}
+
+// SetSatisfied sets the value of Satisfied.
+func (s *Gate) SetSatisfied(val OptBool) {
+	s.Satisfied = val
+}
+
+// SetConfig sets the value of Config.
+func (s *Gate) SetConfig(val OptGateConfig) {
+	s.Config = val
+}
+
+// Provider-specific challenge parameters.
+type GateConfig map[string]jx.Raw
+
+func (s *GateConfig) init() GateConfig {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Gate type.
+type GateType string
+
+const (
+	GateTypeCaptcha GateType = "captcha"
+	GateTypePasskey GateType = "passkey"
+)
+
+// AllValues returns all GateType values.
+func (GateType) AllValues() []GateType {
+	return []GateType{
+		GateTypeCaptcha,
+		GateTypePasskey,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s GateType) MarshalText() ([]byte, error) {
+	switch s {
+	case GateTypeCaptcha:
+		return []byte(s), nil
+	case GateTypePasskey:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *GateType) UnmarshalText(data []byte) error {
+	switch GateType(data) {
+	case GateTypeCaptcha:
+		*s = GateTypeCaptcha
+		return nil
+	case GateTypePasskey:
+		*s = GateTypePasskey
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+type GetFlowStepGone ErrorDetails
+
+func (*GetFlowStepGone) getFlowStepRes() {}
+
+type GetFlowStepNotFound ErrorDetails
+
+func (*GetFlowStepNotFound) getFlowStepRes() {}
 
 type GetHealthOK struct {
 	Data io.Reader
@@ -1491,6 +2826,144 @@ func (o OptBool) Or(d bool) bool {
 	return d
 }
 
+// NewOptBranding returns new OptBranding with value set to v.
+func NewOptBranding(v Branding) OptBranding {
+	return OptBranding{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptBranding is optional Branding.
+type OptBranding struct {
+	Value Branding
+	Set   bool
+}
+
+// IsSet returns true if OptBranding was set.
+func (o OptBranding) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptBranding) Reset() {
+	var v Branding
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptBranding) SetTo(v Branding) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptBranding) Get() (v Branding, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptBranding) Or(d Branding) Branding {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptBrandingLayout returns new OptBrandingLayout with value set to v.
+func NewOptBrandingLayout(v BrandingLayout) OptBrandingLayout {
+	return OptBrandingLayout{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptBrandingLayout is optional BrandingLayout.
+type OptBrandingLayout struct {
+	Value BrandingLayout
+	Set   bool
+}
+
+// IsSet returns true if OptBrandingLayout was set.
+func (o OptBrandingLayout) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptBrandingLayout) Reset() {
+	var v BrandingLayout
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptBrandingLayout) SetTo(v BrandingLayout) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptBrandingLayout) Get() (v BrandingLayout, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptBrandingLayout) Or(d BrandingLayout) BrandingLayout {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptDateTime returns new OptDateTime with value set to v.
+func NewOptDateTime(v time.Time) OptDateTime {
+	return OptDateTime{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptDateTime is optional time.Time.
+type OptDateTime struct {
+	Value time.Time
+	Set   bool
+}
+
+// IsSet returns true if OptDateTime was set.
+func (o OptDateTime) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptDateTime) Reset() {
+	var v time.Time
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptDateTime) SetTo(v time.Time) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptDateTime) Get() (v time.Time, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptDateTime) Or(d time.Time) time.Time {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptErrorDetailsDetails returns new OptErrorDetailsDetails with value set to v.
 func NewOptErrorDetailsDetails(v ErrorDetailsDetails) OptErrorDetailsDetails {
 	return OptErrorDetailsDetails{
@@ -1531,6 +3004,328 @@ func (o OptErrorDetailsDetails) Get() (v ErrorDetailsDetails, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptErrorDetailsDetails) Or(d ErrorDetailsDetails) ErrorDetailsDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptFieldValidation returns new OptFieldValidation with value set to v.
+func NewOptFieldValidation(v FieldValidation) OptFieldValidation {
+	return OptFieldValidation{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFieldValidation is optional FieldValidation.
+type OptFieldValidation struct {
+	Value FieldValidation
+	Set   bool
+}
+
+// IsSet returns true if OptFieldValidation was set.
+func (o OptFieldValidation) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFieldValidation) Reset() {
+	var v FieldValidation
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFieldValidation) SetTo(v FieldValidation) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFieldValidation) Get() (v FieldValidation, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFieldValidation) Or(d FieldValidation) FieldValidation {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptFlowEventRequestPayload returns new OptFlowEventRequestPayload with value set to v.
+func NewOptFlowEventRequestPayload(v FlowEventRequestPayload) OptFlowEventRequestPayload {
+	return OptFlowEventRequestPayload{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFlowEventRequestPayload is optional FlowEventRequestPayload.
+type OptFlowEventRequestPayload struct {
+	Value FlowEventRequestPayload
+	Set   bool
+}
+
+// IsSet returns true if OptFlowEventRequestPayload was set.
+func (o OptFlowEventRequestPayload) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFlowEventRequestPayload) Reset() {
+	var v FlowEventRequestPayload
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFlowEventRequestPayload) SetTo(v FlowEventRequestPayload) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFlowEventRequestPayload) Get() (v FlowEventRequestPayload, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFlowEventRequestPayload) Or(d FlowEventRequestPayload) FlowEventRequestPayload {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptFlowHint returns new OptFlowHint with value set to v.
+func NewOptFlowHint(v FlowHint) OptFlowHint {
+	return OptFlowHint{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFlowHint is optional FlowHint.
+type OptFlowHint struct {
+	Value FlowHint
+	Set   bool
+}
+
+// IsSet returns true if OptFlowHint was set.
+func (o OptFlowHint) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFlowHint) Reset() {
+	var v FlowHint
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFlowHint) SetTo(v FlowHint) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFlowHint) Get() (v FlowHint, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFlowHint) Or(d FlowHint) FlowHint {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptFlowStepBehavior returns new OptFlowStepBehavior with value set to v.
+func NewOptFlowStepBehavior(v FlowStepBehavior) OptFlowStepBehavior {
+	return OptFlowStepBehavior{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFlowStepBehavior is optional FlowStepBehavior.
+type OptFlowStepBehavior struct {
+	Value FlowStepBehavior
+	Set   bool
+}
+
+// IsSet returns true if OptFlowStepBehavior was set.
+func (o OptFlowStepBehavior) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFlowStepBehavior) Reset() {
+	var v FlowStepBehavior
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFlowStepBehavior) SetTo(v FlowStepBehavior) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFlowStepBehavior) Get() (v FlowStepBehavior, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFlowStepBehavior) Or(d FlowStepBehavior) FlowStepBehavior {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptFlowSubmitRequestFields returns new OptFlowSubmitRequestFields with value set to v.
+func NewOptFlowSubmitRequestFields(v FlowSubmitRequestFields) OptFlowSubmitRequestFields {
+	return OptFlowSubmitRequestFields{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFlowSubmitRequestFields is optional FlowSubmitRequestFields.
+type OptFlowSubmitRequestFields struct {
+	Value FlowSubmitRequestFields
+	Set   bool
+}
+
+// IsSet returns true if OptFlowSubmitRequestFields was set.
+func (o OptFlowSubmitRequestFields) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFlowSubmitRequestFields) Reset() {
+	var v FlowSubmitRequestFields
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFlowSubmitRequestFields) SetTo(v FlowSubmitRequestFields) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFlowSubmitRequestFields) Get() (v FlowSubmitRequestFields, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFlowSubmitRequestFields) Or(d FlowSubmitRequestFields) FlowSubmitRequestFields {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptFlowSubmitRequestGateProofs returns new OptFlowSubmitRequestGateProofs with value set to v.
+func NewOptFlowSubmitRequestGateProofs(v FlowSubmitRequestGateProofs) OptFlowSubmitRequestGateProofs {
+	return OptFlowSubmitRequestGateProofs{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFlowSubmitRequestGateProofs is optional FlowSubmitRequestGateProofs.
+type OptFlowSubmitRequestGateProofs struct {
+	Value FlowSubmitRequestGateProofs
+	Set   bool
+}
+
+// IsSet returns true if OptFlowSubmitRequestGateProofs was set.
+func (o OptFlowSubmitRequestGateProofs) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFlowSubmitRequestGateProofs) Reset() {
+	var v FlowSubmitRequestGateProofs
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFlowSubmitRequestGateProofs) SetTo(v FlowSubmitRequestGateProofs) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFlowSubmitRequestGateProofs) Get() (v FlowSubmitRequestGateProofs, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFlowSubmitRequestGateProofs) Or(d FlowSubmitRequestGateProofs) FlowSubmitRequestGateProofs {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptGateConfig returns new OptGateConfig with value set to v.
+func NewOptGateConfig(v GateConfig) OptGateConfig {
+	return OptGateConfig{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptGateConfig is optional GateConfig.
+type OptGateConfig struct {
+	Value GateConfig
+	Set   bool
+}
+
+// IsSet returns true if OptGateConfig was set.
+func (o OptGateConfig) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptGateConfig) Reset() {
+	var v GateConfig
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptGateConfig) SetTo(v GateConfig) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptGateConfig) Get() (v GateConfig, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptGateConfig) Or(d GateConfig) GateConfig {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -1583,6 +3378,69 @@ func (o OptInt) Or(d int) int {
 	return d
 }
 
+// NewOptNilString returns new OptNilString with value set to v.
+func NewOptNilString(v string) OptNilString {
+	return OptNilString{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilString is optional nullable string.
+type OptNilString struct {
+	Value string
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilString was set.
+func (o OptNilString) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilString) Reset() {
+	var v string
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilString) SetTo(v string) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilString) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilString) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v string
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilString) Get() (v string, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilString) Or(d string) string {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptPostTokenRequestGrantType returns new OptPostTokenRequestGrantType with value set to v.
 func NewOptPostTokenRequestGrantType(v PostTokenRequestGrantType) OptPostTokenRequestGrantType {
 	return OptPostTokenRequestGrantType{
@@ -1623,6 +3481,52 @@ func (o OptPostTokenRequestGrantType) Get() (v PostTokenRequestGrantType, ok boo
 
 // Or returns value if set, or given parameter if does not.
 func (o OptPostTokenRequestGrantType) Or(d PostTokenRequestGrantType) PostTokenRequestGrantType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptStepTexts returns new OptStepTexts with value set to v.
+func NewOptStepTexts(v StepTexts) OptStepTexts {
+	return OptStepTexts{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptStepTexts is optional StepTexts.
+type OptStepTexts struct {
+	Value StepTexts
+	Set   bool
+}
+
+// IsSet returns true if OptStepTexts was set.
+func (o OptStepTexts) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptStepTexts) Reset() {
+	var v StepTexts
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptStepTexts) SetTo(v StepTexts) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptStepTexts) Get() (v StepTexts, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptStepTexts) Or(d StepTexts) StepTexts {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -1915,6 +3819,118 @@ func (s *RevokeRequest) SetTokenTypeHint(val OptString) {
 type RevokeTokenOK struct{}
 
 func (*RevokeTokenOK) revokeTokenRes() {}
+
+// An available SSO identity provider.
+// Ref: #
+type SSOProvider struct {
+	// Provider instance identifier.
+	ID string `json:"id"`
+	// Display name for the provider.
+	Name string `json:"name"`
+	// Template hint for rendering (logo, colors).
+	Template string `json:"template"`
+}
+
+// GetID returns the value of ID.
+func (s *SSOProvider) GetID() string {
+	return s.ID
+}
+
+// GetName returns the value of Name.
+func (s *SSOProvider) GetName() string {
+	return s.Name
+}
+
+// GetTemplate returns the value of Template.
+func (s *SSOProvider) GetTemplate() string {
+	return s.Template
+}
+
+// SetID sets the value of ID.
+func (s *SSOProvider) SetID(val string) {
+	s.ID = val
+}
+
+// SetName sets the value of Name.
+func (s *SSOProvider) SetName(val string) {
+	s.Name = val
+}
+
+// SetTemplate sets the value of Template.
+func (s *SSOProvider) SetTemplate(val string) {
+	s.Template = val
+}
+
+// An action the user can take. Keyed by action name in the parent dictionary.
+// The action name is sent back in the submit request as `action`.
+// Ref: #
+type StepAction struct {
+	// Localization key for the action label.
+	TextKey string `json:"text_key"`
+	// Whether this is the primary/default action.
+	Primary OptBool `json:"primary"`
+}
+
+// GetTextKey returns the value of TextKey.
+func (s *StepAction) GetTextKey() string {
+	return s.TextKey
+}
+
+// GetPrimary returns the value of Primary.
+func (s *StepAction) GetPrimary() OptBool {
+	return s.Primary
+}
+
+// SetTextKey sets the value of TextKey.
+func (s *StepAction) SetTextKey(val string) {
+	s.TextKey = val
+}
+
+// SetPrimary sets the value of Primary.
+func (s *StepAction) SetPrimary(val OptBool) {
+	s.Primary = val
+}
+
+// Step-level localization keys. Resolved client-side via the `| t` LiquidJS filter.
+// The backend never sends display text — only semantic keys.
+// Ref: #
+type StepTexts struct {
+	// Localization key for the step heading.
+	TitleKey OptString `json:"title_key"`
+	// Localization key for explanatory text.
+	DescriptionKey OptNilString `json:"description_key"`
+}
+
+// GetTitleKey returns the value of TitleKey.
+func (s *StepTexts) GetTitleKey() OptString {
+	return s.TitleKey
+}
+
+// GetDescriptionKey returns the value of DescriptionKey.
+func (s *StepTexts) GetDescriptionKey() OptNilString {
+	return s.DescriptionKey
+}
+
+// SetTitleKey sets the value of TitleKey.
+func (s *StepTexts) SetTitleKey(val OptString) {
+	s.TitleKey = val
+}
+
+// SetDescriptionKey sets the value of DescriptionKey.
+func (s *StepTexts) SetDescriptionKey(val OptNilString) {
+	s.DescriptionKey = val
+}
+
+// SubmitFlowEventNoContent is response for SubmitFlowEvent operation.
+type SubmitFlowEventNoContent struct{}
+
+type SubmitFlowStepBadRequest FlowResponseHeaders
+
+func (*SubmitFlowStepBadRequest) submitFlowStepRes() {}
+
+type SubmitFlowStepOK FlowResponseHeaders
+
+func (*SubmitFlowStepOK) submitFlowStepRes() {}
 
 // Ref: #
 type TokenResponse struct {

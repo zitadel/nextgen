@@ -1,0 +1,31 @@
+type: object
+required: [session_token, action]
+properties:
+  session_token:
+    type: string
+  action:
+    type: string
+    description: |
+      Which action to take. Either:
+      - A key from the step's `actions` dictionary (e.g., "submit", "register", "back")
+      - The reserved value "sso" — triggers SSO redirect (requires `sso_provider_id`)
+  fields:
+    type: object
+    description: |
+      User input values. Keys match field names from the step's `fields` dictionary.
+    additionalProperties: true
+    example:
+      identifier: "alice@acme.com"
+  gate_proofs:
+    type: object
+    description: |
+      Solutions for security gates. Keys match gate names from the step's `gates` dictionary.
+      The orchestrator collects these from `<zl-captcha>` / `<zl-passkey>` component events.
+    additionalProperties:
+      type: string
+  sso_provider_id:
+    type: string
+    description: |
+      ID of the selected SSO provider (from `sso_providers[].id`).
+      Required when `action` is "sso".
+    example: google-1

@@ -1,0 +1,14 @@
+type: object
+required: [text_key]
+description: |
+  An action the user can take. Keyed by action name in the parent dictionary.
+  The action name is sent back in the submit request as `action`.
+properties:
+  text_key:
+    type: string
+    description: Localization key for the action label.
+    example: identifier.action.submit
+  primary:
+    type: boolean
+    default: false
+    description: Whether this is the primary/default action.
