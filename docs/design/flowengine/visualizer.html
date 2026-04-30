@@ -239,6 +239,89 @@
   .editor-pane { display: none; width: 100%; flex: 1; overflow: hidden; }
   .editor-pane.active { display: flex; flex-direction: column; }
 
+  /* Schema editor (read-only) */
+  .schema-editor {
+    width: 100%;
+    height: 100%;
+    padding: var(--editor-pad);
+    background: var(--bg);
+    color: var(--text);
+    border: none;
+    font-family: var(--editor-font);
+    font-size: var(--editor-size);
+    line-height: var(--editor-lh);
+    white-space: pre;
+    resize: none;
+    outline: none;
+    tab-size: 2;
+    overflow: auto;
+  }
+
+  /* Resolved payload panel */
+  .sim-resolved {
+    width: 375px;
+    margin-top: 12px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    overflow: hidden;
+  }
+  .sim-resolved-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    transition: background 0.1s;
+  }
+  .sim-resolved-header:hover { background: rgba(108, 140, 255, 0.04); }
+  .sim-resolved-header .chevron { font-size: 10px; transition: transform 0.15s; }
+  .sim-resolved.expanded .chevron { transform: rotate(90deg); }
+  .sim-resolved-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    max-height: 400px;
+    overflow: auto;
+  }
+  .sim-resolved.expanded .sim-resolved-body { display: block; }
+  .sim-resolved-section {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .sim-resolved-section:last-child { border-bottom: none; }
+  .sim-resolved-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .sim-resolved-arrow {
+    font-size: 11px;
+    color: var(--accent);
+    margin: 6px 0;
+    font-family: var(--editor-font);
+  }
+  .sim-resolved-json {
+    font-family: var(--editor-font);
+    font-size: 11px;
+    line-height: 18px;
+    white-space: pre-wrap;
+    word-break: break-all;
+    color: var(--text);
+    background: var(--bg);
+    padding: 8px 10px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+  .sim-resolved-json .key { color: var(--syn-key); }
+  .sim-resolved-json .str { color: var(--syn-string); }
+  .sim-resolved-json .bool { color: var(--syn-bool); }
+
   /* ── Right panel ── */
   .right-panel {
     display: flex;
@@ -458,6 +541,10 @@
     <div class="editor-pane" id="template-pane">
       <textarea id="template-editor" class="template-editor" spellcheck="false"></textarea>
     </div>
+    <!-- User schema pane -->
+    <div class="editor-pane" id="schema-pane">
+      <textarea id="schema-editor" class="schema-editor" spellcheck="false" readonly></textarea>
+    </div>
     <div class="editor-status">
       <span id="parse-status" class="ok">Valid JSON</span>
       <span id="step-count"></span>
@@ -477,6 +564,7 @@
       </div>
       <div id="sim-view" class="view">
         <div class="sim-phone" id="sim-phone"></div>
+        <div class="sim-resolved" id="sim-resolved"></div>
       </div>
       <div id="api-view" class="view">
         <div class="api-toolbar">
@@ -529,19 +617,6 @@ const T = {
   "new_password.field.password": "New password",
   "new_password.action.submit": "Reset password",
 
-  // Enterprise login
-  "enterprise.login.title": "Sign in to Acme Corp",
-  "enterprise.login.description": "Use your corporate email",
-  "enterprise.login.field.email": "Corporate email",
-  "enterprise.login.action.submit": "Continue with SSO",
-  "enterprise.signin.title": "Enter your password",
-  "enterprise.signin.field.password": "Password",
-  "enterprise.signin.action.submit": "Sign in",
-  "enterprise.consent.title": "Authorize access",
-  "enterprise.consent.description": "Acme Dashboard wants to access your account",
-  "enterprise.consent.action.accept": "Allow",
-  "enterprise.consent.action.deny": "Deny",
-
   // Combined auth
   "identify.title": "Welcome",
   "identify.field.email": "Email",
@@ -551,29 +626,28 @@ const T = {
   "signin.action.submit": "Sign in",
   "signin.action.recover": "Forgot password?",
 
-  // SaaS registration
-  "saas.profile.title": "Complete your profile",
-  "saas.profile.description": "Tell us a bit about yourself",
-  "saas.profile.field.email": "Email",
-  "saas.profile.field.display_name": "Display name",
-  "saas.profile.field.company": "Company (optional)",
-  "saas.profile.action.submit": "Create account",
-  "saas.profile.action.login": "Already have an account?",
-  "saas.terms.title": "Terms of Service",
-  "saas.terms.description": "Please review and accept our terms",
-  "saas.terms.action.accept": "I accept",
-  "saas.terms.action.decline": "Decline",
-  "saas.verify.title": "Verify your email",
-  "saas.verify.description": "We sent a 6-digit code to your inbox",
-  "saas.verify.field.code": "Verification code",
-  "saas.verify.action.submit": "Verify",
-  "saas.verify.action.resend": "Resend code",
+  // Consent / deny
+  "consent.title": "Authorize access",
+  "consent.description": "Acme Dashboard wants to access your account",
+  "consent.action.accept": "Allow",
+  "consent.action.deny": "Deny",
+  "denied.title": "Access Denied",
+
+  // Terms
+  "terms.title": "Terms of Service",
+  "terms.description": "Please review and accept our terms",
+  "terms.action.accept": "I accept",
+  "terms.action.decline": "Decline",
 
   // Passkey
-  "passkey.title": "Passwordless sign in",
-  "passkey.description": "Use your passkey or security key to sign in",
-  "passkey.action.authenticate": "Use passkey",
-  "passkey.action.fallback": "Use password instead",
+  "passkey_prompt.title": "Passwordless sign in",
+  "passkey_prompt.description": "Use your passkey or security key to sign in",
+  "passkey_prompt.action.authenticate": "Use passkey",
+  "passkey_prompt.action.fallback": "Use password instead",
+
+  // Additional field labels (resolved from schema title, but t() fallback covers them)
+  "profile.field.display_name": "Display name",
+  "profile.field.company": "Company",
 };
 
 function t(key) { return T[key] || key; }
@@ -606,6 +680,146 @@ const DEFAULT_TEMPLATE = `<h2>{{ texts.title_key | t }}</h2>
 {% endif %}
 {% endfor %}`;
 
+// ── User Schemas ──────────────────────────────────────────────────
+
+const USER_SCHEMAS = {
+  "human_user": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "title": "Human User",
+    "x-auth-methods": {
+      "password": { "enabled": true },
+      "passkey": { "enabled": true },
+      "sso": { "enabled": true }
+    },
+    "required": ["email", "given_name", "family_name"],
+    "properties": {
+      "email": {
+        "type": "string",
+        "format": "email",
+        "title": "Email address",
+        "x-identifier": true,
+        "x-verify": "email",
+        "x-unique": "project",
+        "x-editable": true
+      },
+      "phone": {
+        "type": "string",
+        "title": "Phone number",
+        "x-mfa": "sms",
+        "x-sensitive": true,
+        "x-editable": true
+      },
+      "given_name": {
+        "type": "string",
+        "title": "First name",
+        "minLength": 1,
+        "maxLength": 200,
+        "x-editable": true
+      },
+      "family_name": {
+        "type": "string",
+        "title": "Last name",
+        "minLength": 1,
+        "maxLength": 200,
+        "x-editable": true
+      },
+      "password": {
+        "type": "string",
+        "title": "Password",
+        "x-credential": "password",
+        "minLength": 8
+      }
+    }
+  },
+  "saas_user": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "title": "SaaS User",
+    "x-auth-methods": {
+      "password": { "enabled": true },
+      "sso": { "enabled": true }
+    },
+    "required": ["email", "display_name"],
+    "properties": {
+      "email": {
+        "type": "string",
+        "format": "email",
+        "title": "Email address",
+        "x-identifier": true,
+        "x-verify": "email",
+        "x-unique": "project",
+        "x-editable": true
+      },
+      "display_name": {
+        "type": "string",
+        "title": "Display name",
+        "minLength": 1,
+        "maxLength": 100,
+        "x-editable": true
+      },
+      "company": {
+        "type": "string",
+        "title": "Company",
+        "x-editable": true
+      },
+      "password": {
+        "type": "string",
+        "title": "Password",
+        "x-credential": "password",
+        "minLength": 8
+      }
+    }
+  }
+};
+
+// Resolve a schema field name to a runtime field descriptor
+function resolveField(schemaName, fieldName, stepName) {
+  const schema = USER_SCHEMAS[schemaName];
+  if (!schema) return { type: "text", text_key: `${stepName}.field.${fieldName}`, required: false };
+  const prop = schema.properties?.[fieldName];
+  if (!prop) return { type: "text", text_key: `${stepName}.field.${fieldName}`, required: false };
+
+  const field = {
+    type: mapSchemaType(prop),
+    text_key: `${stepName}.field.${fieldName}`,
+    required: (schema.required || []).includes(fieldName)
+  };
+  if (prop.minLength) field.validation = { ...(field.validation || {}), min_length: prop.minLength };
+  if (prop.maxLength) field.validation = { ...(field.validation || {}), max_length: prop.maxLength };
+  if (prop.pattern) field.validation = { ...(field.validation || {}), pattern: prop.pattern };
+  return field;
+}
+
+function mapSchemaType(prop) {
+  if (prop["x-credential"]) return "password";
+  if (prop.format === "email") return "email";
+  if (prop.format === "tel") return "tel";
+  if (prop.format === "uri") return "url";
+  if (prop.format === "date") return "date";
+  if (prop.type === "number" || prop.type === "integer") return "number";
+  return "text";
+}
+
+// Get annotations for a field
+function getAnnotations(schemaName, fieldName) {
+  const schema = USER_SCHEMAS[schemaName];
+  if (!schema) return {};
+  const prop = schema.properties?.[fieldName];
+  if (!prop) return {};
+  const annots = {};
+  for (const [k, v] of Object.entries(prop)) {
+    if (k.startsWith('x-')) annots[k] = v;
+  }
+  return annots;
+}
+
+// Get the schema for the current flow
+function getCurrentSchema() {
+  const schemaName = currentFlow?.user_schema;
+  return schemaName ? USER_SCHEMAS[schemaName] : null;
+}
+
 // ── Flow Definitions (API-aligned data model) ────────────────────
 
 const FLOWS = {
@@ -618,17 +832,12 @@ const FLOWS = {
     steps: [
       {
         name: "login",
-        texts: { title_key: "login.title", description_key: "login.description" },
-        fields: {
-          email: { type: "email", required: true, text_key: "login.field.email" },
-          password: { type: "password", required: true, text_key: "login.field.password" }
-        },
+        fields: ["email", "password"],
         actions: {
-          submit: { text_key: "login.action.submit", primary: true },
-          register: { text_key: "login.action.register" },
-          recover: { text_key: "login.action.recover" }
+          submit: { primary: true },
+          register: {},
+          recover: {}
         },
-        gates: {},
         sso_providers: [
           { id: "google-1", name: "Google", template: "google" }
         ],
@@ -641,14 +850,9 @@ const FLOWS = {
       },
       {
         name: "sso_redirect",
-        texts: { title_key: "login.sso.title" },
-        redirect_url: "https://accounts.google.com/o/oauth2/auth?...",
         transitions: { callback: { target: "done" } }
       },
-      {
-        name: "done",
-        complete: "redirect"
-      }
+      { name: "done", complete: "redirect" }
     ]
   },
 
@@ -661,17 +865,11 @@ const FLOWS = {
     steps: [
       {
         name: "profile",
-        texts: { title_key: "profile.title" },
-        fields: {
-          email: { type: "email", required: true, text_key: "profile.field.email" },
-          given_name: { type: "text", required: true, text_key: "profile.field.given_name" },
-          family_name: { type: "text", required: true, text_key: "profile.field.family_name" }
-        },
+        fields: ["email", "given_name", "family_name"],
         actions: {
-          submit: { text_key: "profile.action.submit", primary: true },
-          login: { text_key: "profile.action.login" }
+          submit: { primary: true },
+          login: {}
         },
-        gates: {},
         transitions: {
           submit: { target: "set_password" },
           login: { target: "default-login", action: "switch" }
@@ -679,35 +877,16 @@ const FLOWS = {
       },
       {
         name: "set_password",
-        texts: { title_key: "set_password.title" },
-        fields: {
-          password: { type: "password", required: true, text_key: "set_password.field.password", validation: { min_length: 8 } }
-        },
-        actions: {
-          submit: { text_key: "set_password.action.submit", primary: true }
-        },
-        gates: {},
+        fields: ["password"],
         transitions: { submit: { target: "verify_email" } }
       },
       {
         name: "verify_email",
         verify: "email",
         action: "create_user",
-        texts: { title_key: "verify_email.title", description_key: "verify_email.description" },
-        fields: {
-          code: { type: "text", text_key: "verify_email.field.code" }
-        },
-        actions: {
-          submit: { text_key: "verify_email.action.submit", primary: true },
-          resend: { text_key: "verify_email.action.resend" }
-        },
-        gates: {},
         transitions: { submit: { target: "done" } }
       },
-      {
-        name: "done",
-        complete: "show"
-      }
+      { name: "done", complete: "show" }
     ]
   },
 
@@ -721,15 +900,11 @@ const FLOWS = {
       {
         name: "recovery_email",
         verify: "email",
-        texts: { title_key: "recovery_email.title", description_key: "recovery_email.description" },
-        fields: {
-          email: { type: "email", required: true, text_key: "recovery_email.field.email" }
-        },
+        fields: ["email"],
         actions: {
-          submit: { text_key: "recovery_email.action.submit", primary: true },
-          back: { text_key: "recovery_email.action.back" }
+          submit: { primary: true },
+          back: {}
         },
-        gates: {},
         transitions: {
           submit: { target: "new_password" },
           back: { target: "default-login", action: "pivot" }
@@ -738,20 +913,10 @@ const FLOWS = {
       {
         name: "new_password",
         action: "reset_credential",
-        texts: { title_key: "new_password.title" },
-        fields: {
-          password: { type: "password", required: true, text_key: "new_password.field.password", validation: { min_length: 8 } }
-        },
-        actions: {
-          submit: { text_key: "new_password.action.submit", primary: true }
-        },
-        gates: {},
+        fields: ["password"],
         transitions: { submit: { target: "done" } }
       },
-      {
-        name: "done",
-        complete: "show"
-      }
+      { name: "done", complete: "show" }
     ]
   },
 
@@ -764,14 +929,8 @@ const FLOWS = {
     steps: [
       {
         name: "login",
-        texts: { title_key: "enterprise.login.title", description_key: "enterprise.login.description" },
-        fields: {
-          email: { type: "email", required: true, text_key: "enterprise.login.field.email" }
-        },
-        actions: {
-          submit: { text_key: "enterprise.login.action.submit", primary: true }
-        },
-        gates: {},
+        fields: ["email"],
+        actions: { submit: { primary: true } },
         sso_providers: [
           { id: "okta-acme", name: "Acme Okta", template: "okta" },
           { id: "azure-acme", name: "Acme Azure AD", template: "microsoft" }
@@ -783,44 +942,26 @@ const FLOWS = {
       },
       {
         name: "sso_redirect",
-        texts: { title_key: "enterprise.login.title" },
-        redirect_url: "https://acme.okta.com/oauth2/...",
         transitions: { callback: { target: "consent" } }
       },
       {
         name: "signin",
-        texts: { title_key: "enterprise.signin.title" },
-        fields: {
-          password: { type: "password", required: true, text_key: "enterprise.signin.field.password" }
-        },
-        actions: {
-          submit: { text_key: "enterprise.signin.action.submit", primary: true }
-        },
-        gates: {},
+        fields: ["password"],
         transitions: { submit: { target: "consent" } }
       },
       {
         name: "consent",
-        texts: { title_key: "enterprise.consent.title", description_key: "enterprise.consent.description" },
-        fields: {},
         actions: {
-          accept: { text_key: "enterprise.consent.action.accept", primary: true },
-          deny: { text_key: "enterprise.consent.action.deny" }
+          accept: { primary: true },
+          deny: {}
         },
-        gates: {},
         transitions: {
           accept: { target: "done" },
           deny: { target: "denied" }
         }
       },
-      {
-        name: "denied",
-        complete: "show"
-      },
-      {
-        name: "done",
-        complete: "redirect"
-      }
+      { name: "denied", complete: "show" },
+      { name: "done", complete: "redirect" }
     ]
   },
 
@@ -833,14 +974,7 @@ const FLOWS = {
     steps: [
       {
         name: "identify",
-        texts: { title_key: "identify.title" },
-        fields: {
-          email: { type: "email", required: true, text_key: "identify.field.email" }
-        },
-        actions: {
-          submit: { text_key: "identify.action.submit", primary: true }
-        },
-        gates: {},
+        fields: ["email"],
         transitions: {
           submit: { target: "signin" },
           user_not_found: { target: "profile" }
@@ -848,15 +982,11 @@ const FLOWS = {
       },
       {
         name: "signin",
-        texts: { title_key: "signin.title" },
-        fields: {
-          password: { type: "password", required: true, text_key: "signin.field.password" }
-        },
+        fields: ["password"],
         actions: {
-          submit: { text_key: "signin.action.submit", primary: true },
-          recover: { text_key: "signin.action.recover" }
+          submit: { primary: true },
+          recover: {}
         },
-        gates: {},
         transitions: {
           submit: { target: "done" },
           recover: { target: "default-recovery", action: "pivot" }
@@ -864,48 +994,21 @@ const FLOWS = {
       },
       {
         name: "profile",
-        texts: { title_key: "profile.title" },
-        fields: {
-          given_name: { type: "text", required: true, text_key: "profile.field.given_name" },
-          family_name: { type: "text", required: true, text_key: "profile.field.family_name" }
-        },
-        actions: {
-          submit: { text_key: "profile.action.submit", primary: true }
-        },
-        gates: {},
+        fields: ["given_name", "family_name"],
         transitions: { submit: { target: "set_password" } }
       },
       {
         name: "set_password",
-        texts: { title_key: "set_password.title" },
-        fields: {
-          password: { type: "password", required: true, text_key: "set_password.field.password", validation: { min_length: 8 } }
-        },
-        actions: {
-          submit: { text_key: "set_password.action.submit", primary: true }
-        },
-        gates: {},
+        fields: ["password"],
         transitions: { submit: { target: "verify_email" } }
       },
       {
         name: "verify_email",
         verify: "email",
         action: "create_user",
-        texts: { title_key: "verify_email.title", description_key: "verify_email.description" },
-        fields: {
-          code: { type: "text", text_key: "verify_email.field.code" }
-        },
-        actions: {
-          submit: { text_key: "verify_email.action.submit", primary: true },
-          resend: { text_key: "verify_email.action.resend" }
-        },
-        gates: {},
         transitions: { submit: { target: "done" } }
       },
-      {
-        name: "done",
-        complete: "redirect"
-      }
+      { name: "done", complete: "redirect" }
     ]
   },
 
@@ -918,19 +1021,12 @@ const FLOWS = {
     steps: [
       {
         name: "profile",
-        texts: { title_key: "saas.profile.title", description_key: "saas.profile.description" },
-        fields: {
-          email: { type: "email", required: true, text_key: "saas.profile.field.email" },
-          display_name: { type: "text", required: true, text_key: "saas.profile.field.display_name" },
-          company: { type: "text", required: false, text_key: "saas.profile.field.company" }
-        },
+        fields: ["email", "display_name", "company"],
         actions: {
-          submit: { text_key: "saas.profile.action.submit", primary: true },
-          login: { text_key: "saas.profile.action.login" }
+          submit: { primary: true },
+          login: {}
         },
-        gates: {
-          captcha: { type: "captcha", provider: "altcha", required: true, satisfied: false, config: { algorithm: "SHA-256" } }
-        },
+        gates: ["captcha"],
         sso_providers: [
           { id: "google-1", name: "Google", template: "google" },
           { id: "github-1", name: "GitHub", template: "github" }
@@ -943,19 +1039,14 @@ const FLOWS = {
       },
       {
         name: "sso_link",
-        texts: { title_key: "saas.profile.title" },
-        redirect_url: "https://accounts.google.com/o/oauth2/auth?...",
         transitions: { callback: { target: "terms" } }
       },
       {
         name: "terms",
-        texts: { title_key: "saas.terms.title", description_key: "saas.terms.description" },
-        fields: {},
         actions: {
-          accept: { text_key: "saas.terms.action.accept", primary: true },
-          decline: { text_key: "saas.terms.action.decline" }
+          accept: { primary: true },
+          decline: {}
         },
-        gates: {},
         transitions: {
           accept: { target: "verify_email" },
           decline: { target: "profile" }
@@ -965,21 +1056,9 @@ const FLOWS = {
         name: "verify_email",
         verify: "email",
         action: "create_user",
-        texts: { title_key: "saas.verify.title", description_key: "saas.verify.description" },
-        fields: {
-          code: { type: "text", text_key: "saas.verify.field.code" }
-        },
-        actions: {
-          submit: { text_key: "saas.verify.action.submit", primary: true },
-          resend: { text_key: "saas.verify.action.resend" }
-        },
-        gates: {},
         transitions: { submit: { target: "done" } }
       },
-      {
-        name: "done",
-        complete: "show"
-      }
+      { name: "done", complete: "show" }
     ]
   },
 
@@ -992,24 +1071,17 @@ const FLOWS = {
     steps: [
       {
         name: "passkey_prompt",
-        texts: { title_key: "passkey.title", description_key: "passkey.description" },
-        fields: {},
         actions: {
-          authenticate: { text_key: "passkey.action.authenticate", primary: true },
-          fallback: { text_key: "passkey.action.fallback" }
+          authenticate: { primary: true },
+          fallback: {}
         },
-        gates: {
-          passkey: { type: "passkey", required: true, satisfied: false }
-        },
+        gates: ["passkey"],
         transitions: {
           authenticate: { target: "done" },
           fallback: { target: "default-login", action: "switch" }
         }
       },
-      {
-        name: "done",
-        complete: "redirect"
-      }
+      { name: "done", complete: "redirect" }
     ]
   }
 };
@@ -1078,6 +1150,7 @@ document.addEventListener('DOMContentLoaded', () => {
   selectFlow("Login");
   setupRightTabs();
   $templateEditor.value = DEFAULT_TEMPLATE;
+  updateSchemaEditor();
 
   $templateEditor.addEventListener('input', () => {
     currentTemplate = $templateEditor.value;
@@ -1231,7 +1304,7 @@ function buildLeftTabs() {
   // Editor mode tabs
   const editorContainer = document.getElementById('left-tabs-editor');
   editorContainer.innerHTML = '';
-  for (const [mode, label] of [['definition', 'Definition'], ['template', 'Template']]) {
+  for (const [mode, label] of [['definition', 'Definition'], ['schema', 'User Schema'], ['template', 'Template']]) {
     const btn = document.createElement('button');
     btn.className = 'tab-btn editor-mode' + (mode === editorMode ? ' active' : '');
     btn.textContent = label;
@@ -1246,6 +1319,7 @@ function switchEditorMode(mode) {
   document.querySelectorAll('.tab-btn.editor-mode').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
   document.getElementById('json-pane').classList.toggle('active', mode === 'definition');
   document.getElementById('template-pane').classList.toggle('active', mode === 'template');
+  document.getElementById('schema-pane').classList.toggle('active', mode === 'schema');
 }
 
 function selectFlow(name) {
@@ -1254,8 +1328,15 @@ function selectFlow(name) {
   document.querySelectorAll('.tab-btn.flow-select').forEach(b => b.classList.toggle('active', b.dataset.flow === name));
   $editor.value = JSON.stringify(currentFlow, null, 2);
   highlightedLines = { start: -1, end: -1 };
+  updateSchemaEditor();
   updateFromEditor();
   resetSim();
+}
+
+function updateSchemaEditor() {
+  const schemaEditor = document.getElementById('schema-editor');
+  const schema = getCurrentSchema();
+  schemaEditor.value = schema ? JSON.stringify(schema, null, 2) : '// No user_schema defined for this flow';
 }
 
 // ── Editor ────────────────────────────────────────────────────────
@@ -1327,14 +1408,33 @@ async function renderDiagram() {
   for (const step of steps) {
     const id = 'n_' + step.name;
     let label = step.name;
+
+    // Show field names with annotation hints
+    const fieldNames = Array.isArray(step.fields) ? step.fields : Object.keys(step.fields || {});
+    if (fieldNames.length > 0) {
+      const schemaName = currentFlow?.user_schema;
+      const fieldLabels = fieldNames.map(f => {
+        const annots = getAnnotations(schemaName, f);
+        if (annots['x-identifier']) return f + ' (id)';
+        if (annots['x-credential']) return f + ' (cred)';
+        return f;
+      });
+      label += `<br/><em>${fieldLabels.join(', ')}</em>`;
+    }
+
     if (step.verify) label += `<br/>verify: ${step.verify}`;
     if (step.action) label += `<br/>action: ${step.action}`;
+    // Detect callback-only steps (SSO redirect, etc.)
+    const isCallbackStep = step.transitions && 'callback' in step.transitions &&
+      (!step.fields || (Array.isArray(step.fields) ? step.fields.length === 0 : Object.keys(step.fields).length === 0)) &&
+      (!step.actions || Object.keys(step.actions).length === 0);
+
     if (step.complete) {
-      lines.push(`    ${id}(["\`**${label}**<br/>complete: ${step.complete}\`"])`);
-    } else if (step.redirect_url) {
-      lines.push(`    ${id}["\`**${label}**<br/>redirect\`"]`);
+      lines.push(`    ${id}(["\`**${step.name}**<br/>complete: ${step.complete}\`"])`);
+    } else if (isCallbackStep) {
+      lines.push(`    ${id}["\`**${step.name}**<br/>redirect\`"]`);
     } else {
-      lines.push(`    ${id}["\`**${label}**\`"]`);
+      lines.push(`    ${id}["\`${label}\`"]`);
     }
   }
 
@@ -1368,9 +1468,12 @@ async function renderDiagram() {
 
   for (const step of steps) {
     const id = 'n_' + step.name;
+    const isCallback = step.transitions && 'callback' in step.transitions &&
+      (!step.fields || (Array.isArray(step.fields) ? step.fields.length === 0 : Object.keys(step.fields).length === 0)) &&
+      (!step.actions || Object.keys(step.actions).length === 0);
     if (step.complete) {
       lines.push(`    style ${id} fill:#1a3a2a,stroke:#4ade80,color:#4ade80`);
-    } else if (step.redirect_url) {
+    } else if (isCallback) {
       lines.push(`    style ${id} fill:#1a2744,stroke:#4a5568,color:#8b8fa3`);
     }
   }
@@ -1502,13 +1605,49 @@ function buildFlowResponse(step) {
 function buildStepPayload(step) {
   if (!step) return null;
   const payload = { name: step.name };
-  if (step.texts) payload.texts = step.texts;
+
+  // Auto-generate texts from step name convention
+  payload.texts = {
+    title_key: `${step.name}.title`,
+    description_key: `${step.name}.description`
+  };
+
   if (step.complete) payload.complete = step.complete;
-  if (step.fields && Object.keys(step.fields).length > 0) payload.fields = step.fields;
-  if (step.actions && Object.keys(step.actions).length > 0) payload.actions = step.actions;
-  if (step.gates && Object.keys(step.gates).length > 0) payload.gates = step.gates;
+
+  // Resolve fields from array of names to dict of field descriptors
+  if (Array.isArray(step.fields) && step.fields.length > 0) {
+    const schemaName = currentFlow?.user_schema;
+    const resolved = {};
+    for (const fieldName of step.fields) {
+      resolved[fieldName] = resolveField(schemaName, fieldName, step.name);
+    }
+    payload.fields = resolved;
+  }
+
+  // Resolve actions: auto-generate text_keys, add implicit submit if step has fields but no actions
+  const stepActions = step.actions || {};
+  const hasExplicitActions = Object.keys(stepActions).length > 0;
+  if (hasExplicitActions) {
+    const resolved = {};
+    for (const [name, a] of Object.entries(stepActions)) {
+      resolved[name] = { ...a, text_key: `${step.name}.action.${name}` };
+    }
+    payload.actions = resolved;
+  } else if (Array.isArray(step.fields) && step.fields.length > 0) {
+    // Implicit submit action for steps with fields but no explicit actions
+    payload.actions = { submit: { primary: true, text_key: `${step.name}.action.submit` } };
+  }
+
+  // Resolve gates from string array to dict
+  if (Array.isArray(step.gates) && step.gates.length > 0) {
+    const resolved = {};
+    for (const gate of step.gates) {
+      resolved[gate] = { type: gate };
+    }
+    payload.gates = resolved;
+  }
+
   if (step.sso_providers?.length > 0) payload.sso_providers = step.sso_providers;
-  if (step.redirect_url) payload.redirect_url = step.redirect_url;
   if (step.verify) payload.verify = step.verify;
   if (step.action) payload.action = step.action;
   if (simState.error) payload.error = simState.error;
@@ -1522,6 +1661,7 @@ function advanceThroughInvisible() {
 
 function onSimStepChanged() {
   renderSim();
+  renderResolvedPayload();
   renderDiagram();
   if (editorMode === 'definition') scrollEditorToStep(simState.stepName);
 }
@@ -1681,7 +1821,7 @@ async function renderSim() {
   }
 
   if (step.complete) {
-    const title = t(step.texts?.title_key) || 'Complete';
+    const title = t(`${step.name}.title`) || 'Complete';
     phone.innerHTML = `${idsHtml}
       <div class="sim-header"><h2>${title}</h2></div>
       <div class="sim-complete">
@@ -1698,8 +1838,12 @@ async function renderSim() {
     return;
   }
 
-  if (step.redirect_url && !step.fields) {
-    const title = t(step.texts?.title_key) || 'Redirecting\u2026';
+  // Detect redirect/callback steps: no fields, no actions, has a callback transition
+  const hasCallback = step.transitions && 'callback' in step.transitions;
+  const hasNoFields = !step.fields || (Array.isArray(step.fields) ? step.fields.length === 0 : Object.keys(step.fields).length === 0);
+  const hasNoActions = !step.actions || Object.keys(step.actions).length === 0;
+  if (hasCallback && hasNoFields && hasNoActions) {
+    const title = t(`${step.name}.title`) || 'Redirecting\u2026';
     phone.innerHTML = `${idsHtml}
       <div class="sim-header"><h2>${title}</h2></div>
       <div class="sim-body">
@@ -1715,29 +1859,28 @@ async function renderSim() {
     return;
   }
 
-  // Try LiquidJS rendering
-  const title = t(step.texts?.title_key) || step.name;
-  const desc = step.texts?.description_key ? t(step.texts.description_key) : '';
+  // Build resolved payload for rendering
+  const resolved = buildStepPayload(step);
 
   let bodyHtml = '';
   if (liquidEngine) {
     try {
       // Convert dicts to arrays for easier liquid iteration
       const context = {
-        texts: step.texts || {},
-        fields_list: Object.entries(step.fields || {}).map(([name, f]) => ({ name, ...f })),
-        actions_list: Object.entries(step.actions || {}).map(([name, a]) => ({ name, ...a })),
-        sso_providers: step.sso_providers || [],
-        gates: step.gates || {},
+        texts: resolved.texts || {},
+        fields_list: Object.entries(resolved.fields || {}).map(([name, f]) => ({ name, ...f })),
+        actions_list: Object.entries(resolved.actions || {}).map(([name, a]) => ({ name, ...a })),
+        sso_providers: resolved.sso_providers || [],
+        gates: resolved.gates || {},
         error: simState.error
       };
       bodyHtml = await liquidEngine.parseAndRender(currentTemplate, context);
     } catch (e) {
       console.warn('Liquid render error:', e);
-      bodyHtml = renderStepFallback(step);
+      bodyHtml = renderStepFallback(step, resolved);
     }
   } else {
-    bodyHtml = renderStepFallback(step);
+    bodyHtml = renderStepFallback(step, resolved);
   }
 
   phone.innerHTML = `${idsHtml}
@@ -1760,22 +1903,23 @@ async function renderSim() {
   }
 }
 
-function renderStepFallback(step) {
-  const title = t(step.texts?.title_key) || step.name;
-  const desc = step.texts?.description_key ? t(step.texts.description_key) : '';
+function renderStepFallback(step, resolved) {
+  if (!resolved) resolved = buildStepPayload(step);
+  const title = t(resolved.texts?.title_key) || step.name;
+  const desc = resolved.texts?.description_key ? t(resolved.texts.description_key) : '';
   const errorHtml = simState.error ? `<div class="sim-error">${simState.error}</div>` : '';
 
-  const fieldsHtml = Object.entries(step.fields || {}).map(([name, f]) => `
+  const fieldsHtml = Object.entries(resolved.fields || {}).map(([name, f]) => `
     <div class="sim-field">
       <label>${t(f.text_key)}${f.required ? ' *' : ''}</label>
       <input type="${f.type === 'password' ? 'password' : 'text'}" name="${name}" placeholder="${t(f.text_key)}" />
     </div>`).join('');
 
-  const ssoHtml = (step.sso_providers || []).map(p =>
+  const ssoHtml = (resolved.sso_providers || []).map(p =>
     `<button class="sim-btn sso" data-action="sso" data-provider-id="${p.id}">&#9679; Continue with ${p.name}</button>`
   ).join('');
 
-  const actionsHtml = Object.entries(step.actions || {}).map(([name, a]) => {
+  const actionsHtml = Object.entries(resolved.actions || {}).map(([name, a]) => {
     const cls = a.primary ? 'primary' : 'link';
     return `<button class="sim-btn ${cls}" data-action="${name}">${t(a.text_key)}</button>`;
   }).join('');
@@ -1793,6 +1937,109 @@ function renderBreadcrumb() {
   return parts.map((p, i) =>
     i === parts.length - 1 ? `<span>${p}</span>` : p
   ).join(' &#8594; ');
+}
+
+// ── Resolved Payload ──────────────────────────────────────────────
+
+function renderResolvedPayload() {
+  const container = document.getElementById('sim-resolved');
+  if (!simState) { container.innerHTML = ''; return; }
+  const step = findStep(simState.stepName);
+  if (!step || step.complete) { container.innerHTML = ''; return; }
+
+  const schemaName = currentFlow?.user_schema;
+  const fieldNames = Array.isArray(step.fields) ? step.fields : Object.keys(step.fields || {});
+  if (!schemaName || fieldNames.length === 0) {
+    container.innerHTML = '';
+    return;
+  }
+  const resolvedFields = {};
+  const annotations = {};
+  for (const name of fieldNames) {
+    resolvedFields[name] = resolveField(schemaName, name, step.name);
+    const annots = getAnnotations(schemaName, name);
+    if (Object.keys(annots).length > 0) annotations[name] = annots;
+  }
+
+  // Build implied outcomes from annotations
+  const impliedOutcomes = [];
+  for (const [name, annots] of Object.entries(annotations)) {
+    if (annots['x-identifier']) impliedOutcomes.push({ field: name, outcome: 'user_not_found', reason: 'x-identifier: true' });
+    if (annots['x-credential']) impliedOutcomes.push({ field: name, outcome: 'invalid_credential', reason: `x-credential: "${annots['x-credential']}"` });
+    if (annots['x-unique']) impliedOutcomes.push({ field: name, outcome: 'already_exists', reason: `x-unique: "${annots['x-unique']}"` });
+  }
+
+  const definitionJson = highlightInline(JSON.stringify(fieldNames, null, 2));
+  const resolvedJson = highlightInline(JSON.stringify(resolvedFields, null, 2));
+
+  let annotationsHtml = '';
+  if (Object.keys(annotations).length > 0) {
+    annotationsHtml = `
+      <div class="sim-resolved-section">
+        <div class="sim-resolved-label">Schema Annotations</div>
+        <div class="sim-resolved-json">${highlightInline(JSON.stringify(annotations, null, 2))}</div>
+      </div>`;
+  }
+
+  let outcomesHtml = '';
+  if (impliedOutcomes.length > 0) {
+    outcomesHtml = `
+      <div class="sim-resolved-section">
+        <div class="sim-resolved-label">Implied Transition Outcomes</div>
+        <div class="sim-resolved-json">${impliedOutcomes.map(o =>
+          `<span class="key">"${o.field}"</span>: ${o.reason} <span style="color:var(--yellow)">→ ${o.outcome}</span>`
+        ).join('\n')}</div>
+      </div>`;
+  }
+
+  let verifyHtml = '';
+  if (step.verify) {
+    verifyHtml = `
+      <div class="sim-resolved-section">
+        <div class="sim-resolved-label">Verify</div>
+        <div class="sim-resolved-json">Engine sends verification code to <span class="str">"${step.verify}"</span> field value.
+Renders code input. Validates on submit.</div>
+      </div>`;
+  }
+
+  let actionHtml = '';
+  if (step.action) {
+    actionHtml = `
+      <div class="sim-resolved-section">
+        <div class="sim-resolved-label">Action (post-submit)</div>
+        <div class="sim-resolved-json">Engine executes <span class="str">"${step.action}"</span> after validation/verification passes, before transition fires.</div>
+      </div>`;
+  }
+
+  const wasExpanded = container.classList.contains('expanded');
+  container.innerHTML = `
+    <div class="sim-resolved-header" onclick="this.parentElement.classList.toggle('expanded')">
+      <span>Schema Resolution: ${schemaName}</span>
+      <span class="chevron">&#9654;</span>
+    </div>
+    <div class="sim-resolved-body">
+      <div class="sim-resolved-section">
+        <div class="sim-resolved-label">Definition (fields array)</div>
+        <div class="sim-resolved-json">${definitionJson}</div>
+        <div class="sim-resolved-arrow">&#8595; resolved via ${schemaName} schema</div>
+        <div class="sim-resolved-label">Runtime Payload (fields dict)</div>
+        <div class="sim-resolved-json">${resolvedJson}</div>
+      </div>
+      ${annotationsHtml}
+      ${outcomesHtml}
+      ${verifyHtml}
+      ${actionHtml}
+    </div>`;
+  if (wasExpanded) container.classList.add('expanded');
+}
+
+function highlightInline(json) {
+  return json
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/("(?:[^"\\]|\\.)*")\s*:/g, '<span class="key">$1</span>:')
+    .replace(/:\s*("(?:[^"\\]|\\.)*")/g, ': <span class="str">$1</span>')
+    .replace(/(?<=[\[,\n]\s*)("(?:[^"\\]|\\.)*")(?=\s*[,\]\n])/g, '<span class="str">$1</span>')
+    .replace(/\b(true|false)\b/g, '<span class="bool">$1</span>');
 }
 </script>
 

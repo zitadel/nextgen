@@ -1679,10 +1679,6 @@ func (s *FlowStep) encodeFields(e *jx.Encoder) {
 		e.Str(s.Name)
 	}
 	{
-		e.FieldStart("type")
-		s.Type.Encode(e)
-	}
-	{
 		if s.Texts.Set {
 			e.FieldStart("texts")
 			s.Texts.Encode(e)
@@ -1695,9 +1691,9 @@ func (s *FlowStep) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
-		if s.Behavior.Set {
-			e.FieldStart("behavior")
-			s.Behavior.Encode(e)
+		if s.Complete.Set {
+			e.FieldStart("complete")
+			s.Complete.Encode(e)
 		}
 	}
 	{
@@ -1730,17 +1726,16 @@ func (s *FlowStep) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfFlowStep = [10]string{
+var jsonFieldsNameOfFlowStep = [9]string{
 	0: "name",
-	1: "type",
-	2: "texts",
-	3: "error",
-	4: "behavior",
-	5: "redirect_url",
-	6: "fields",
-	7: "actions",
-	8: "gates",
-	9: "sso_providers",
+	1: "texts",
+	2: "error",
+	3: "complete",
+	4: "redirect_url",
+	5: "fields",
+	6: "actions",
+	7: "gates",
+	8: "sso_providers",
 }
 
 // Decode decodes FlowStep from json.
@@ -1764,16 +1759,6 @@ func (s *FlowStep) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"name\"")
 			}
-		case "type":
-			requiredBitSet[0] |= 1 << 1
-			if err := func() error {
-				if err := s.Type.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"type\"")
-			}
 		case "texts":
 			if err := func() error {
 				s.Texts.Reset()
@@ -1794,15 +1779,15 @@ func (s *FlowStep) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"error\"")
 			}
-		case "behavior":
+		case "complete":
 			if err := func() error {
-				s.Behavior.Reset()
-				if err := s.Behavior.Decode(d); err != nil {
+				s.Complete.Reset()
+				if err := s.Complete.Decode(d); err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"behavior\"")
+				return errors.Wrap(err, "decode field \"complete\"")
 			}
 		case "redirect_url":
 			if err := func() error {
@@ -1815,7 +1800,7 @@ func (s *FlowStep) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"redirect_url\"")
 			}
 		case "fields":
-			requiredBitSet[0] |= 1 << 6
+			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
 				if err := s.Fields.Decode(d); err != nil {
 					return err
@@ -1825,7 +1810,7 @@ func (s *FlowStep) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"fields\"")
 			}
 		case "actions":
-			requiredBitSet[0] |= 1 << 7
+			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
 				if err := s.Actions.Decode(d); err != nil {
 					return err
@@ -1835,7 +1820,7 @@ func (s *FlowStep) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"actions\"")
 			}
 		case "gates":
-			requiredBitSet[1] |= 1 << 0
+			requiredBitSet[0] |= 1 << 7
 			if err := func() error {
 				if err := s.Gates.Decode(d); err != nil {
 					return err
@@ -1871,8 +1856,8 @@ func (s *FlowStep) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [2]uint8{
-		0b11000011,
-		0b00000001,
+		0b11100001,
+		0b00000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -1972,42 +1957,42 @@ func (s *FlowStepActions) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes FlowStepBehavior as json.
-func (s FlowStepBehavior) Encode(e *jx.Encoder) {
+// Encode encodes FlowStepComplete as json.
+func (s FlowStepComplete) Encode(e *jx.Encoder) {
 	e.Str(string(s))
 }
 
-// Decode decodes FlowStepBehavior from json.
-func (s *FlowStepBehavior) Decode(d *jx.Decoder) error {
+// Decode decodes FlowStepComplete from json.
+func (s *FlowStepComplete) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode FlowStepBehavior to nil")
+		return errors.New("invalid: unable to decode FlowStepComplete to nil")
 	}
 	v, err := d.StrBytes()
 	if err != nil {
 		return err
 	}
 	// Try to use constant string.
-	switch FlowStepBehavior(v) {
-	case FlowStepBehaviorRedirect:
-		*s = FlowStepBehaviorRedirect
-	case FlowStepBehaviorShow:
-		*s = FlowStepBehaviorShow
+	switch FlowStepComplete(v) {
+	case FlowStepCompleteRedirect:
+		*s = FlowStepCompleteRedirect
+	case FlowStepCompleteShow:
+		*s = FlowStepCompleteShow
 	default:
-		*s = FlowStepBehavior(v)
+		*s = FlowStepComplete(v)
 	}
 
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s FlowStepBehavior) MarshalJSON() ([]byte, error) {
+func (s FlowStepComplete) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *FlowStepBehavior) UnmarshalJSON(data []byte) error {
+func (s *FlowStepComplete) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -2116,60 +2101,6 @@ func (s FlowStepGates) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *FlowStepGates) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes FlowStepType as json.
-func (s FlowStepType) Encode(e *jx.Encoder) {
-	e.Str(string(s))
-}
-
-// Decode decodes FlowStepType from json.
-func (s *FlowStepType) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode FlowStepType to nil")
-	}
-	v, err := d.StrBytes()
-	if err != nil {
-		return err
-	}
-	// Try to use constant string.
-	switch FlowStepType(v) {
-	case FlowStepTypeIdentifier:
-		*s = FlowStepTypeIdentifier
-	case FlowStepTypeCredential:
-		*s = FlowStepTypeCredential
-	case FlowStepTypeForm:
-		*s = FlowStepTypeForm
-	case FlowStepTypeVerification:
-		*s = FlowStepTypeVerification
-	case FlowStepTypeConsent:
-		*s = FlowStepTypeConsent
-	case FlowStepTypeInfo:
-		*s = FlowStepTypeInfo
-	case FlowStepTypeRedirect:
-		*s = FlowStepTypeRedirect
-	case FlowStepTypeCaptcha:
-		*s = FlowStepTypeCaptcha
-	case FlowStepTypeComplete:
-		*s = FlowStepTypeComplete
-	default:
-		*s = FlowStepType(v)
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s FlowStepType) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *FlowStepType) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -5201,18 +5132,18 @@ func (s *OptFlowHint) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes FlowStepBehavior as json.
-func (o OptFlowStepBehavior) Encode(e *jx.Encoder) {
+// Encode encodes FlowStepComplete as json.
+func (o OptFlowStepComplete) Encode(e *jx.Encoder) {
 	if !o.Set {
 		return
 	}
 	e.Str(string(o.Value))
 }
 
-// Decode decodes FlowStepBehavior from json.
-func (o *OptFlowStepBehavior) Decode(d *jx.Decoder) error {
+// Decode decodes FlowStepComplete from json.
+func (o *OptFlowStepComplete) Decode(d *jx.Decoder) error {
 	if o == nil {
-		return errors.New("invalid: unable to decode OptFlowStepBehavior to nil")
+		return errors.New("invalid: unable to decode OptFlowStepComplete to nil")
 	}
 	o.Set = true
 	if err := o.Value.Decode(d); err != nil {
@@ -5222,14 +5153,14 @@ func (o *OptFlowStepBehavior) Decode(d *jx.Decoder) error {
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s OptFlowStepBehavior) MarshalJSON() ([]byte, error) {
+func (s OptFlowStepComplete) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *OptFlowStepBehavior) UnmarshalJSON(data []byte) error {
+func (s *OptFlowStepComplete) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
