@@ -18,7 +18,7 @@ export type AuthState = { isAuthenticated: true; session: NextgenSession };
 /** Auth state when the user is not signed in. */
 export type UnauthState = { isAuthenticated: false; session: null };
 
-/** Union of all possible auth states returned by {@link useAuth}. */
+/** Union of all possible auth states returned by {@link useAuth} and {@link getAuth}. */
 export type AuthResult = AuthState | UnauthState;
 
 /**

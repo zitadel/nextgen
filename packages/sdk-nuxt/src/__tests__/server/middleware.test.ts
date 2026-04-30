@@ -42,9 +42,10 @@ function makeJwt(payload: Record<string, unknown>, kid: string): string {
   return `${signing}.${base64url(sig)}`;
 }
 
-function makeWebRequest(url: string, cookie?: string): Request {
+function makeWebRequest(url: string, cookie?: string, authorization?: string): Request {
   const headers: Record<string, string> = {};
   if (cookie) headers["cookie"] = cookie;
+  if (authorization) headers["authorization"] = authorization;
   return new Request(url, { headers });
 }
 
@@ -119,6 +120,36 @@ describe("createNextgenMiddleware (H3)", () => {
     const handler = toWebHandler(app);
     const res = await handler(
       makeWebRequest("http://localhost:3000/admin", `__nextgen_session=${token}`),
+    );
+    expect(res.status).not.toBe(302);
+    expect((capturedAuth as { isAuthenticated: boolean }).isAuthenticated).toBe(true);
+  });
+
+  it("protected route with valid Bearer token sets nextgenAuth to authenticated", async () => {
+    const kid = nextKid();
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    const token = makeJwt({ sub: "user-nuxt", email: "nuxt@example.com", exp }, kid);
+
+    vi.stubGlobal("fetch", mockJwks(kid));
+
+    const app = createApp();
+    app.use(
+      createNextgenMiddleware({
+        issuerUrl: "http://localhost:4000",
+        protectedRoutes: ["/admin"],
+        loginPath: "/login",
+      }),
+    );
+
+    let capturedAuth: unknown = undefined;
+    app.use("/admin", (event) => {
+      capturedAuth = event.context.nextgenAuth;
+      return { ok: true };
+    });
+
+    const handler = toWebHandler(app);
+    const res = await handler(
+      makeWebRequest("http://localhost:3000/admin", undefined, `Bearer ${token}`),
     );
     expect(res.status).not.toBe(302);
     expect((capturedAuth as { isAuthenticated: boolean }).isAuthenticated).toBe(true);

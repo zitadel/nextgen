@@ -96,9 +96,9 @@ describe("nextgenMiddleware", () => {
       loginPath: "/login",
     });
 
-    expect(res.status).not.toBe(307);
-    const overrideHeaders = res.headers.get("x-middleware-override-headers") ?? "";
-    expect(overrideHeaders).toContain("x-nextgen-auth-token");
+    expect(res.status).not.toBe(302);
+    const tunnelledToken = res.headers.get("x-middleware-request-x-nextgen-auth-token");
+    expect(tunnelledToken).toBe(token);
   });
 
   it("protected route with valid Bearer token passes through", async () => {
@@ -115,9 +115,9 @@ describe("nextgenMiddleware", () => {
       loginPath: "/login",
     });
 
-    expect(res.status).not.toBe(307);
-    const overrideHeaders = res.headers.get("x-middleware-override-headers") ?? "";
-    expect(overrideHeaders).toContain("x-nextgen-auth-token");
+    expect(res.status).not.toBe(302);
+    const tunnelledToken = res.headers.get("x-middleware-request-x-nextgen-auth-token");
+    expect(tunnelledToken).toBe(token);
   });
 
   it("protected route with invalid token clears cookie and redirects", async () => {

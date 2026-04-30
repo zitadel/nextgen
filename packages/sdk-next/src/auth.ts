@@ -1,7 +1,6 @@
 import { headers } from "next/headers";
 import type { AuthResult } from "./types";
 import { decodeJwt } from "./lib/jwt";
-import type { JwtPayload } from "./lib/jwt";
 
 /**
  * Reads the auth state in a React Server Component or Next.js Route Handler.
@@ -32,7 +31,7 @@ export async function auth(): Promise<AuthResult> {
       return { isAuthenticated: false, session: null };
     }
 
-    const { payload } = decodeJwt(token) as { payload: JwtPayload };
+    const { payload } = decodeJwt(token);
 
     return {
       isAuthenticated: true,
