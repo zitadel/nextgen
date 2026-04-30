@@ -25,7 +25,6 @@ import {
   JWKS_TTL_MS,
 } from '../../runtime/lib/jwt';
 
-// ─── Shared RSA key pair ──────────────────────────────────────────────────────
 
 const { privateKey, publicKey } = generateKeyPairSync('rsa', {
   modulusLength: 2048,
@@ -38,7 +37,6 @@ const PUBLIC_KEY_JWK = publicKey.export({
   format: 'jwk',
 }) as Record<string, unknown>;
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /** Monotonically increasing kid counter — ensures each test gets a fresh cache slot. */
 let kidCounter = 0;
@@ -82,9 +80,12 @@ function makeJwt(
  */
 function mockJwks(kid: string): ReturnType<typeof vi.fn> {
   const jwks = { keys: [{ ...PUBLIC_KEY_JWK, kid, alg: 'RS256', use: 'sig' }] };
+  const body = JSON.stringify(jwks);
   return vi
     .fn()
-    .mockResolvedValue(new Response(JSON.stringify(jwks), { status: 200 }));
+    .mockImplementation(() =>
+      Promise.resolve(new Response(body, { status: 200 })),
+    );
 }
 
 /** Base options suitable for most tests; override per test as needed. */
@@ -102,7 +103,6 @@ function ts(offsetSeconds: number): number {
   return Math.floor(Date.now() / 1000) + offsetSeconds;
 }
 
-// ─── base64UrlDecode ──────────────────────────────────────────────────────────
 
 describe('base64UrlDecode', () => {
   it('decodes a plain ASCII string', () => {
@@ -138,7 +138,6 @@ describe('base64UrlDecode', () => {
   });
 });
 
-// ─── decodeJwt ────────────────────────────────────────────────────────────────
 
 describe('decodeJwt', () => {
   it('extracts the header alg and kid fields', () => {
@@ -179,14 +178,12 @@ describe('decodeJwt', () => {
   });
 });
 
-// ─── verifyJwt ────────────────────────────────────────────────────────────────
 
 describe('verifyJwt', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
 
-  // ── Signature ──────────────────────────────────────────────────────────────
 
   describe('signature verification', () => {
     it('returns the payload for a valid token', async () => {
@@ -253,7 +250,6 @@ describe('verifyJwt', () => {
     });
   });
 
-  // ── JWKS caching ──────────────────────────────────────────────────────────
 
   describe('JWKS caching', () => {
     it('fetches the JWKS only once for repeated calls with the same kid', async () => {
@@ -287,7 +283,6 @@ describe('verifyJwt', () => {
     });
   });
 
-  // ── alg ───────────────────────────────────────────────────────────────────
 
   describe('alg validation', () => {
     it('accepts a token whose alg is in allowedAlgorithms', async () => {
@@ -328,7 +323,6 @@ describe('verifyJwt', () => {
     });
   });
 
-  // ── typ ───────────────────────────────────────────────────────────────────
 
   describe('typ validation', () => {
     it('accepts a token with typ "JWT"', async () => {
@@ -407,7 +401,6 @@ describe('verifyJwt', () => {
     });
   });
 
-  // ── iss ───────────────────────────────────────────────────────────────────
 
   describe('iss validation', () => {
     it('accepts a token whose iss matches issuerUrl', async () => {
@@ -441,7 +434,6 @@ describe('verifyJwt', () => {
     });
   });
 
-  // ── aud ───────────────────────────────────────────────────────────────────
 
   describe('aud validation', () => {
     it('accepts when aud matches the configured audience string', async () => {
@@ -499,7 +491,6 @@ describe('verifyJwt', () => {
     });
   });
 
-  // ── exp ───────────────────────────────────────────────────────────────────
 
   describe('exp validation', () => {
     it('accepts a token that has not yet expired', async () => {
@@ -538,7 +529,6 @@ describe('verifyJwt', () => {
     });
   });
 
-  // ── nbf ───────────────────────────────────────────────────────────────────
 
   describe('nbf validation', () => {
     it('accepts a token whose nbf is in the past', async () => {
@@ -568,7 +558,6 @@ describe('verifyJwt', () => {
     });
   });
 
-  // ── iat ───────────────────────────────────────────────────────────────────
 
   describe('iat validation', () => {
     it('accepts a token with iat in the past', async () => {
@@ -595,6 +584,27 @@ describe('verifyJwt', () => {
       expect(
         await verifyJwt(token, baseOpts({ clockSkewMs: 5000 })),
       ).not.toBeNull();
+    });
+  });
+
+  describe('algorithm support', () => {
+    it('throws TypeError for unsupported algorithm in token header', async () => {
+      const kid = nextKid();
+      const token = makeJwt({ sub: 'u', exp: ts(3600) }, kid, 'PS256');
+      vi.stubGlobal('fetch', mockJwks(kid));
+
+      await expect(verifyJwt(token, baseOpts())).rejects.toThrow(TypeError);
+      await expect(verifyJwt(token, baseOpts())).rejects.toThrow(
+        /unsupported.*algorithm/i,
+      );
+    });
+
+    it('throws TypeError for HS256 (symmetric — no public key support)', async () => {
+      const kid = nextKid();
+      const token = makeJwt({ sub: 'u', exp: ts(3600) }, kid, 'HS256');
+      vi.stubGlobal('fetch', mockJwks(kid));
+
+      await expect(verifyJwt(token, baseOpts())).rejects.toThrow(TypeError);
     });
   });
 });

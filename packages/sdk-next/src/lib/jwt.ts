@@ -309,32 +309,73 @@ export function decodeJwt(token: string): DecodedJwt {
 
 // ─── Algorithm helpers ────────────────────────────────────────────────────────
 
+const SUPPORTED_ALGORITHMS = [
+  'RS256',
+  'RS384',
+  'RS512',
+  'ES256',
+  'ES384',
+  'ES512',
+] as const;
+
 /**
  * Maps a JWT `alg` value to the Web Crypto `AlgorithmIdentifier` used when
  * **importing** a public key from the JWKS (`crypto.subtle.importKey`).
  *
+ * Supported algorithms: RS256, RS384, RS512, ES256, ES384, ES512.
+ *
  * @param alg - JWT algorithm string (e.g. `"RS256"`, `"ES256"`).
+ * @throws {TypeError} When `alg` is not one of the supported algorithms.
  */
 function resolveImportAlgorithm(
   alg: string,
 ): RsaHashedImportParams | EcKeyImportParams {
-  if (alg === 'ES256') {
-    return { name: 'ECDSA', namedCurve: 'P-256' };
+  switch (alg) {
+    case 'RS256':
+      return { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' };
+    case 'RS384':
+      return { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-384' };
+    case 'RS512':
+      return { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-512' };
+    case 'ES256':
+      return { name: 'ECDSA', namedCurve: 'P-256' };
+    case 'ES384':
+      return { name: 'ECDSA', namedCurve: 'P-384' };
+    case 'ES512':
+      return { name: 'ECDSA', namedCurve: 'P-521' };
+    default:
+      throw new TypeError(
+        `Unsupported JWT algorithm: "${alg}". Supported algorithms are ${SUPPORTED_ALGORITHMS.join(', ')}.`,
+      );
   }
-  return { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' };
 }
 
 /**
  * Maps a JWT `alg` value to the Web Crypto `AlgorithmIdentifier` used when
  * **verifying** a signature (`crypto.subtle.verify`).
  *
+ * Supported algorithms: RS256, RS384, RS512, ES256, ES384, ES512.
+ *
  * @param alg - JWT algorithm string (e.g. `"RS256"`, `"ES256"`).
+ * @throws {TypeError} When `alg` is not one of the supported algorithms.
  */
 function resolveVerifyAlgorithm(alg: string): EcdsaParams | Algorithm {
-  if (alg === 'ES256') {
-    return { name: 'ECDSA', hash: 'SHA-256' };
+  switch (alg) {
+    case 'RS256':
+    case 'RS384':
+    case 'RS512':
+      return { name: 'RSASSA-PKCS1-v1_5' };
+    case 'ES256':
+      return { name: 'ECDSA', hash: 'SHA-256' };
+    case 'ES384':
+      return { name: 'ECDSA', hash: 'SHA-384' };
+    case 'ES512':
+      return { name: 'ECDSA', hash: 'SHA-512' };
+    default:
+      throw new TypeError(
+        `Unsupported JWT algorithm: "${alg}". Supported algorithms are ${SUPPORTED_ALGORITHMS.join(', ')}.`,
+      );
   }
-  return { name: 'RSASSA-PKCS1-v1_5' };
 }
 
 // ─── JWKS fetch ───────────────────────────────────────────────────────────────
@@ -513,7 +554,8 @@ export async function verifyJwt(
     }
 
     return payload;
-  } catch {
+  } catch (err) {
+    if (err instanceof TypeError) throw err;
     return null;
   }
 }
