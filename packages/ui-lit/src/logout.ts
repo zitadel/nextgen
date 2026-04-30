@@ -240,18 +240,24 @@ class NextgenLogout extends LitElement {
 
   declare proxyBase: string;
   declare postSignOutUrl: string;
+  declare _name: string;
+  declare _email: string;
+  declare _open: boolean;
+  declare _loading: boolean;
+  declare _error: string;
 
-  private _name: string = "";
-  private _email: string = "";
-  private _open: boolean = false;
-  private _loading: boolean = false;
-  private _error: string = "";
+  // Not reactive — set once in connectedCallback, never changes.
   private _templateMode: boolean = false;
 
   constructor() {
     super();
     this.proxyBase = "/__nextgen";
     this.postSignOutUrl = "";
+    this._name = "";
+    this._email = "";
+    this._open = false;
+    this._loading = false;
+    this._error = "";
   }
 
   // ── Lifecycle ────────────────────────────────────────────────────────────
