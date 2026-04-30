@@ -138,6 +138,13 @@ export async function nextgenMiddleware(
  * Forwards a `/__nextgen/*` request to the upstream auth backend and streams
  * the response back verbatim, stripping hop-by-hop headers in both directions.
  *
+ * All non-hop-by-hop headers from the incoming request are forwarded, including
+ * any `X-Forwarded-For` chain already set by an upstream CDN or load balancer.
+ * When `X-Forwarded-For` is absent (direct connection with no upstream proxy),
+ * it is initialised from the runtime-provided client IP so the auth server
+ * always receives origin information. `X-Forwarded-Host` and `X-Forwarded-Proto`
+ * are set only when absent, preserving values injected by an upstream CDN.
+ *
  * @param req        - The incoming edge request.
  * @param issuerUrl  - Base URL of the auth backend.
  * @param proxyPath  - The path prefix being proxied (e.g. `"/__nextgen"`).
@@ -148,9 +155,9 @@ async function proxyRequest(
   issuerUrl: string,
   proxyPath: string,
 ): Promise<Response> {
-  const { pathname, search } = new URL(req.url);
-  const suffix = pathname.slice(proxyPath.length);
-  const target = `${issuerUrl}${suffix}${search}`;
+  const url = new URL(req.url);
+  const suffix = url.pathname.slice(proxyPath.length);
+  const target = `${issuerUrl}${suffix}${url.search}`;
 
   const upstreamHeaders = new Headers();
   for (const [key, value] of req.headers.entries()) {
@@ -159,29 +166,20 @@ async function proxyRequest(
     }
   }
 
-  // X-Forwarded-For: append the direct client IP to preserve the hop chain.
-  // Next.js / Vercel sets `req.ip` at runtime but it is not in the public
-  // TypeScript types, so we cast to reach it. Fall back to X-Real-IP (nginx).
-  const clientIp =
-    (req as unknown as { ip?: string }).ip ?? req.headers.get("x-real-ip");
-  if (clientIp) {
-    const existing = upstreamHeaders.get("x-forwarded-for");
-    upstreamHeaders.set(
-      "x-forwarded-for",
-      existing ? `${existing}, ${clientIp}` : clientIp,
-    );
+  if (!upstreamHeaders.has("x-forwarded-for")) {
+    const directIp =
+      (req as unknown as { ip?: string }).ip ?? req.headers.get("x-real-ip");
+    if (directIp) {
+      upstreamHeaders.set("x-forwarded-for", directIp);
+    }
   }
 
-  // X-Forwarded-Host: tell the upstream which host the client originally
-  // requested. Only set when not already present — a CDN may have set it first.
   if (!upstreamHeaders.has("x-forwarded-host")) {
-    upstreamHeaders.set("x-forwarded-host", new URL(req.url).host);
+    upstreamHeaders.set("x-forwarded-host", url.host);
   }
 
-  // X-Forwarded-Proto: tell the upstream whether the client used http or https.
-  // Strip the trailing colon from `URL.protocol` ("https:" -> "https").
   if (!upstreamHeaders.has("x-forwarded-proto")) {
-    upstreamHeaders.set("x-forwarded-proto", new URL(req.url).protocol.replace(":", ""));
+    upstreamHeaders.set("x-forwarded-proto", url.protocol.replace(":", ""));
   }
 
   const hasBody = !["GET", "HEAD"].includes(req.method);
@@ -220,10 +218,27 @@ interface AuthHandlerOptions {
   readonly issuerUrl: string;
   readonly protectedRoutes: readonly string[];
   readonly loginPath: string;
+  /**
+   * Forwarded from {@link NextgenMiddlewareOptions.allowedAlgorithms}.
+   * Declared as `readonly string[]` to match the {@link VerifyJwtOptions}
+   * contract and prevent accidental mutation between option destructuring
+   * and JWT verification.
+   */
   readonly allowedAlgorithms: readonly string[] | undefined;
   readonly clockSkewMs: number;
-  readonly audience: string | string[] | undefined;
-  readonly allowedTokenTypes: string[];
+  /**
+   * Forwarded from {@link NextgenMiddlewareOptions.audience}.
+   * Declared as `readonly string[]` to match the {@link VerifyJwtOptions}
+   * contract.
+   */
+  readonly audience: string | readonly string[] | undefined;
+  /**
+   * Forwarded from {@link NextgenMiddlewareOptions.allowedTokenTypes}.
+   * Declared as `readonly string[]` to match the {@link VerifyJwtOptions}
+   * contract and prevent accidental mutation between option destructuring
+   * and JWT verification.
+   */
+  readonly allowedTokenTypes: readonly string[];
   readonly pathname: string;
 }
 

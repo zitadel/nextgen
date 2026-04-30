@@ -82,8 +82,13 @@
  * ## JWKS caching
  *
  * Public keys are expensive to fetch and import. They are cached in-process,
- * keyed by `kid` (or `"__default__"` when `kid` is absent), for
- * {@link JWKS_TTL_MS} milliseconds (default 5 minutes).
+ * keyed by `"${jwksUri}:${kid}"` (or `"${jwksUri}:__default__"` when `kid` is
+ * absent), for {@link JWKS_TTL_MS} milliseconds (default 5 minutes).
+ *
+ * Including the full JWKS URI in the cache key prevents a key imported for one
+ * issuer from being mistakenly served when a different issuer happens to use the
+ * same `kid` string — a scenario that can arise in multi-tenant deployments or
+ * during key-rotation incidents where two servers briefly share a key identifier.
  *
  * A cache miss — on first use or after TTL expiry — triggers a fresh fetch
  * from `{issuerUrl}/oauth/v2/keys`.
@@ -211,11 +216,16 @@ export interface VerifyJwtOptions {
 // ─── JWKS cache ───────────────────────────────────────────────────────────────
 
 /**
- * In-memory JWKS key cache, keyed by `kid`
- * (or the sentinel `"__default__"` when `kid` is absent).
+ * In-memory JWKS key cache.
+ *
+ * Keys are of the form `"${jwksUri}:${kid}"`, or `"${jwksUri}:__default__"`
+ * when the JWT carries no `kid`. Including the full JWKS URI prevents a cached
+ * key from one issuer being returned for a request targeting a different issuer
+ * that happens to share the same `kid` string — a scenario that can arise in
+ * multi-tenant deployments or during key-rotation incidents.
  *
  * Cache entries are immutable once written; the cache itself grows up to one
- * entry per distinct `kid` seen in the lifetime of the process.
+ * entry per distinct `(jwksUri, kid)` pair seen in the lifetime of the process.
  */
 const jwksCache = new Map<string, JwksCacheEntry>();
 
@@ -234,6 +244,28 @@ export function base64UrlDecode(input: string): Uint8Array<ArrayBuffer> {
   return new Uint8Array(Buffer.from(input, "base64url"));
 }
 
+// ─── JWT splitting ────────────────────────────────────────────────────────────
+
+/**
+ * Splits a compact JWT string into its three raw Base64URL segments without
+ * decoding or verifying any of them.
+ *
+ * Tokens with more than three segments (e.g. nested JWTs) are accepted; only
+ * the first three parts are returned. Tokens with fewer than three segments are
+ * structurally invalid compact JWTs and cannot be verified.
+ *
+ * @param token - The compact JWT string.
+ * @returns A `[header, payload, signature]` tuple, or `null` when the token
+ *   has fewer than three dot-separated segments.
+ */
+function splitToken(token: string): readonly [string, string, string] | null {
+  const parts = token.split(".");
+  if (parts.length < 3) {
+    return null;
+  }
+  return [parts[0], parts[1], parts[2]] as const;
+}
+
 // ─── JWT decode ───────────────────────────────────────────────────────────────
 
 /**
@@ -246,9 +278,16 @@ export function base64UrlDecode(input: string): Uint8Array<ArrayBuffer> {
  *
  * @param token - A compact JWT string (`header.payload.signature`).
  * @returns The decoded {@link DecodedJwt}.
+ * @throws {TypeError} When `token` has fewer than three dot-separated segments.
  */
 export function decodeJwt(token: string): DecodedJwt {
-  const [h, p] = token.split(".");
+  const segments = splitToken(token);
+  if (!segments) {
+    throw new TypeError(
+      `Invalid JWT: expected at least three dot-separated segments, received ${token.split(".").length}.`,
+    );
+  }
+  const [h, p] = segments;
   const decoder = new TextDecoder();
   return {
     header: JSON.parse(decoder.decode(base64UrlDecode(h))) as Record<string, unknown>,
@@ -290,11 +329,15 @@ function resolveVerifyAlgorithm(alg: string): EcdsaParams | Algorithm {
  * Fetches the JWKS from `jwksUri`, imports the key matching `kid`, and caches
  * it for {@link JWKS_TTL_MS} milliseconds.
  *
+ * The cache key is `"${jwksUri}:${kid ?? '__default__'}"`. Scoping the key to
+ * the full endpoint URL ensures that two issuers that happen to publish keys
+ * under the same `kid` string are never confused with one another.
+ *
  * Behaviour:
- * - When the cached entry for `kid` is still within TTL, it is returned
- *   immediately with no network request.
+ * - When the cached entry for the `(jwksUri, kid)` pair is still within TTL,
+ *   it is returned immediately with no network request.
  * - When `kid` is absent, the first key in the JWKS is used and cached under
- *   the sentinel key `"__default__"`.
+ *   the `"__default__"` sentinel combined with the endpoint URI.
  * - Returns `null` when the JWKS endpoint returns a non-OK status, no matching
  *   key is found, or key import fails.
  *
@@ -305,7 +348,7 @@ async function fetchAndCacheJwks(
   jwksUri: string,
   kid: string | undefined,
 ): Promise<CryptoKey | null> {
-  const cacheKey = kid ?? "__default__";
+  const cacheKey = `${jwksUri}:${kid ?? "__default__"}`;
   const cached = jwksCache.get(cacheKey);
   if (cached && Date.now() - cached.fetchedAt < JWKS_TTL_MS) {
     return cached.key;
@@ -342,7 +385,8 @@ async function fetchAndCacheJwks(
  *
  * ## Verification steps (in order)
  *
- * 1. Decode header and payload — no trust is established at this point.
+ * 1. Split the token — returns `null` immediately when fewer than three
+ *    dot-separated segments are present.
  * 2. Reject if `alg` is not in {@link VerifyJwtOptions.allowedAlgorithms} (when set).
  * 3. Reject if `typ` is not in {@link VerifyJwtOptions.allowedTokenTypes} (when non-empty).
  * 4. Fetch (or retrieve from cache) the matching public key from the JWKS endpoint.
@@ -366,15 +410,24 @@ export async function verifyJwt(
 ): Promise<JwtPayload | null> {
   try {
     const { issuerUrl, allowedAlgorithms, clockSkewMs, audience, allowedTokenTypes } = opts;
-    const { header, payload } = decodeJwt(token);
 
-    // ── Step 2: algorithm check ──────────────────────────────────────────────
+    const segments = splitToken(token);
+    if (!segments) {
+      return null;
+    }
+    const [rawHeader, rawPayload, rawSig] = segments;
+
+    const decoder = new TextDecoder();
+    const header = JSON.parse(
+      decoder.decode(base64UrlDecode(rawHeader)),
+    ) as Record<string, unknown>;
+    const payload = JSON.parse(decoder.decode(base64UrlDecode(rawPayload))) as JwtPayload;
+
     const alg = (header.alg as string | undefined) ?? "RS256";
     if (allowedAlgorithms && allowedAlgorithms.length > 0 && !allowedAlgorithms.includes(alg)) {
       return null;
     }
 
-    // ── Step 3: token type check ─────────────────────────────────────────────
     if (allowedTokenTypes.length > 0) {
       const typ = (header.typ as string | undefined) ?? "";
       if (!allowedTokenTypes.some((t) => t.toLowerCase() === typ.toLowerCase())) {
@@ -382,31 +435,26 @@ export async function verifyJwt(
       }
     }
 
-    // ── Step 4: JWKS key fetch ───────────────────────────────────────────────
     const kid = header.kid as string | undefined;
     const cryptoKey = await fetchAndCacheJwks(`${issuerUrl}/oauth/v2/keys`, kid);
     if (!cryptoKey) {
       return null;
     }
 
-    // ── Step 5: signature verification ──────────────────────────────────────
-    const [h, p, sig] = token.split(".");
     const valid = await crypto.subtle.verify(
       resolveVerifyAlgorithm(alg),
       cryptoKey,
-      base64UrlDecode(sig),
-      new TextEncoder().encode(`${h}.${p}`),
+      base64UrlDecode(rawSig),
+      new TextEncoder().encode(`${rawHeader}.${rawPayload}`),
     );
     if (!valid) {
       return null;
     }
 
-    // ── Step 6: issuer check ─────────────────────────────────────────────────
     if (payload.iss !== undefined && payload.iss !== issuerUrl) {
       return null;
     }
 
-    // ── Step 7: audience check ───────────────────────────────────────────────
     if (audience !== undefined) {
       const audList = Array.isArray(payload.aud)
         ? (payload.aud as readonly string[])
@@ -417,7 +465,6 @@ export async function verifyJwt(
       }
     }
 
-    // ── Steps 8–10: time-based claim checks ──────────────────────────────────
     const now = Date.now();
     if (payload.exp !== undefined && payload.exp * 1000 < now - clockSkewMs) {
       return null;

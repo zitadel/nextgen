@@ -1,4 +1,4 @@
-import type { H3Event } from "h3";
+import type { EventHandler, H3Event } from "h3";
 import {
   defineEventHandler,
   getCookie,
@@ -58,8 +58,15 @@ function matchesRoutes(pathname: string, routes: readonly string[]): boolean {
 
 /**
  * Builds the set of upstream request headers by copying all incoming headers,
- * dropping hop-by-hop headers, and appending X-Forwarded-* headers so the
+ * dropping hop-by-hop headers, and setting `X-Forwarded-*` headers so the
  * upstream auth server can see the real client origin.
+ *
+ * All non-hop-by-hop headers from the incoming request are forwarded as-is,
+ * including any `X-Forwarded-For` chain already set by an upstream CDN or load
+ * balancer. When `X-Forwarded-For` is absent (direct connection with no upstream
+ * proxy), it is initialised from the raw socket address so the auth server always
+ * receives origin information. `X-Forwarded-Host` and `X-Forwarded-Proto` are set
+ * only when absent, preserving values injected by an upstream CDN.
  *
  * Node.js header values may be a string or an array of strings; arrays are
  * joined with `", "` to produce a single header value.
@@ -78,31 +85,18 @@ function buildUpstreamHeaders(event: H3Event): Headers {
 
   const url = getRequestURL(event);
 
-  // X-Forwarded-For: append the direct socket IP to preserve the hop chain.
-  // Prefer CDN-injected headers (Cloudflare, nginx) over the raw socket address
-  // since the socket peer may be a load balancer rather than the real client.
-  const rawCfIp = event.node.req.headers["cf-connecting-ip"];
-  const rawRealIp = event.node.req.headers["x-real-ip"];
-  const socketIp = (event.node.req.socket as { remoteAddress?: string } | undefined)
-    ?.remoteAddress;
-  const clientIp =
-    (typeof rawCfIp === "string" ? rawCfIp : (rawCfIp as string[] | undefined)?.[0]) ??
-    (typeof rawRealIp === "string" ? rawRealIp : (rawRealIp as string[] | undefined)?.[0]) ??
-    socketIp;
-
-  if (clientIp) {
-    const existing = headers.get("x-forwarded-for");
-    headers.set("x-forwarded-for", existing ? `${existing}, ${clientIp}` : clientIp);
+  if (!headers.has("x-forwarded-for")) {
+    const socketIp = (event.node.req.socket as { remoteAddress?: string } | undefined)
+      ?.remoteAddress;
+    if (socketIp) {
+      headers.set("x-forwarded-for", socketIp);
+    }
   }
 
-  // X-Forwarded-Host: tell the upstream which host the client originally
-  // requested. Only set when not already present — a CDN may have set it first.
   if (!headers.has("x-forwarded-host")) {
     headers.set("x-forwarded-host", url.host);
   }
 
-  // X-Forwarded-Proto: tell the upstream whether the client used http or https.
-  // Strip the trailing colon from `URL.protocol` ("https:" -> "https").
   if (!headers.has("x-forwarded-proto")) {
     headers.set("x-forwarded-proto", url.protocol.replace(":", ""));
   }
@@ -129,7 +123,7 @@ function buildUpstreamHeaders(event: H3Event): Headers {
  * @param options - Middleware configuration options.
  * @returns An H3 event handler suitable for use as a global server middleware.
  */
-export function createNextgenMiddleware(options: NextgenModuleOptions = {}) {
+export function createNextgenMiddleware(options: NextgenModuleOptions = {}): EventHandler {
   const {
     issuerUrl = process.env.NEXTGEN_ISSUER_URL ?? "http://localhost:4000",
     proxyPath = "/__nextgen",
@@ -223,10 +217,27 @@ interface AuthHandlerOptions {
   readonly issuerUrl: string;
   readonly protectedRoutes: readonly string[];
   readonly loginPath: string;
+  /**
+   * Forwarded from {@link NextgenModuleOptions.allowedAlgorithms}.
+   * Declared as `readonly string[]` to match the {@link VerifyJwtOptions}
+   * contract and prevent accidental mutation between option destructuring
+   * and JWT verification.
+   */
   readonly allowedAlgorithms: readonly string[] | undefined;
   readonly clockSkewMs: number;
-  readonly audience: string | string[] | undefined;
-  readonly allowedTokenTypes: string[];
+  /**
+   * Forwarded from {@link NextgenModuleOptions.audience}.
+   * Declared as `readonly string[]` to match the {@link VerifyJwtOptions}
+   * contract.
+   */
+  readonly audience: string | readonly string[] | undefined;
+  /**
+   * Forwarded from {@link NextgenModuleOptions.allowedTokenTypes}.
+   * Declared as `readonly string[]` to match the {@link VerifyJwtOptions}
+   * contract and prevent accidental mutation between option destructuring
+   * and JWT verification.
+   */
+  readonly allowedTokenTypes: readonly string[];
   readonly pathname: string;
 }
 

@@ -1,13 +1,38 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { generateKeyPairSync, createSign } from "node:crypto";
-import { createApp, toWebHandler, getCookie } from "h3";
+import { createApp, toWebHandler } from "h3";
 import { createNextgenMiddleware } from "../../runtime/server/middleware";
 
 function base64url(buf: Buffer): string {
   return buf.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-function makeJwt(payload: Record<string, unknown>, privateKeyPem: string, kid: string): string {
+const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+const privateKeyPem = privateKey.export({ type: "pkcs8", format: "pem" }).toString();
+const publicKeyJwk = publicKey.export({ type: "spki", format: "jwk" }) as Record<string, unknown>;
+
+/**
+ * Monotonically increasing key-ID counter. Each test that exercises JWKS
+ * lookup receives a unique `kid`, which maps to a unique cache entry in the
+ * module-level JWKS cache inside `lib/jwt.ts`. This keeps tests hermetically
+ * isolated without requiring a cache-reset export.
+ */
+let kidCounter = 0;
+function nextKid(): string {
+  return `nuxt-test-key-${++kidCounter}`;
+}
+
+/**
+ * Builds a minimal JWKS response containing only the shared public key,
+ * tagged with the given `kid`. Using a per-test `kid` prevents the JWKS
+ * cache from serving a stale entry imported by a previous test run.
+ */
+function mockJwks(kid: string): ReturnType<typeof vi.fn> {
+  const jwks = { keys: [{ ...publicKeyJwk, kid, alg: "RS256", use: "sig" }] };
+  return vi.fn().mockResolvedValue(new Response(JSON.stringify(jwks), { status: 200 }));
+}
+
+function makeJwt(payload: Record<string, unknown>, kid: string): string {
   const header = base64url(Buffer.from(JSON.stringify({ alg: "RS256", typ: "JWT", kid })));
   const body = base64url(Buffer.from(JSON.stringify(payload)));
   const signing = `${header}.${body}`;
@@ -16,15 +41,6 @@ function makeJwt(payload: Record<string, unknown>, privateKeyPem: string, kid: s
   const sig = sign.sign(privateKeyPem);
   return `${signing}.${base64url(sig)}`;
 }
-
-const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
-const privateKeyPem = privateKey.export({ type: "pkcs8", format: "pem" }).toString();
-const publicKeyJwk = publicKey.export({ type: "spki", format: "jwk" }) as Record<string, unknown>;
-const testKid = "nuxt-test-key-1";
-
-const jwksResponse = {
-  keys: [{ ...publicKeyJwk, kid: testKid, alg: "RS256", use: "sig" }],
-};
 
 function makeWebRequest(url: string, cookie?: string): Request {
   const headers: Record<string, string> = {};
@@ -38,11 +54,6 @@ describe("createNextgenMiddleware (H3)", () => {
   });
 
   it("public route with no cookie sets nextgenAuth to unauthenticated", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue(new Response(JSON.stringify(jwksResponse), { status: 200 })),
-    );
-
     const app = createApp();
     app.use(
       createNextgenMiddleware({
@@ -65,11 +76,6 @@ describe("createNextgenMiddleware (H3)", () => {
   });
 
   it("protected route with no cookie redirects to /login?next=/admin", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue(new Response(JSON.stringify(jwksResponse), { status: 200 })),
-    );
-
     const app = createApp();
     app.use(
       createNextgenMiddleware({
@@ -89,17 +95,11 @@ describe("createNextgenMiddleware (H3)", () => {
   });
 
   it("protected route with valid token sets nextgenAuth to authenticated", async () => {
+    const kid = nextKid();
     const exp = Math.floor(Date.now() / 1000) + 3600;
-    const token = makeJwt(
-      { sub: "user-nuxt", email: "nuxt@example.com", exp },
-      privateKeyPem,
-      testKid,
-    );
+    const token = makeJwt({ sub: "user-nuxt", email: "nuxt@example.com", exp }, kid);
 
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue(new Response(JSON.stringify(jwksResponse), { status: 200 })),
-    );
+    vi.stubGlobal("fetch", mockJwks(kid));
 
     const app = createApp();
     app.use(
@@ -125,19 +125,13 @@ describe("createNextgenMiddleware (H3)", () => {
   });
 
   it("protected route with invalid token clears cookie and redirects", async () => {
+    const kid = nextKid();
     const exp = Math.floor(Date.now() / 1000) + 3600;
-    const validToken = makeJwt(
-      { sub: "user-nuxt", email: "nuxt@example.com", exp },
-      privateKeyPem,
-      testKid,
-    );
+    const validToken = makeJwt({ sub: "user-nuxt", email: "nuxt@example.com", exp }, kid);
     const parts = validToken.split(".");
     const tamperedToken = `${parts[0]}.${parts[1]}.invalidsig`;
 
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue(new Response(JSON.stringify(jwksResponse), { status: 200 })),
-    );
+    vi.stubGlobal("fetch", mockJwks(kid));
 
     const app = createApp();
     app.use(
