@@ -15,19 +15,19 @@ pnpm add @zitadel/sdk-next
 Create `src/proxy.ts` at the root of your Next.js app:
 
 ```ts
-import { nextgenMiddleware } from "@zitadel/sdk-next/middleware";
-import type { NextRequest } from "next/server";
+import { nextgenMiddleware } from '@zitadel/sdk-next/middleware';
+import type { NextRequest } from 'next/server';
 
 export function proxy(req: NextRequest) {
   return nextgenMiddleware(req, {
     issuerUrl: process.env.NEXTGEN_ISSUER_URL,
-    protectedRoutes: ["/admin", "/dashboard*"],
-    loginPath: "/login",
+    protectedRoutes: ['/admin', '/dashboard*'],
+    loginPath: '/login',
   });
 }
 
 export const config = {
-  matcher: ["/__nextgen/:path*", "/admin", "/login"],
+  matcher: ['/__nextgen/:path*', '/admin', '/login'],
 };
 ```
 
@@ -54,7 +54,7 @@ export default async function Page() {
 Wrap your app in `NextgenProvider` (e.g. in your root layout):
 
 ```tsx
-import { NextgenProvider } from "@zitadel/sdk-next";
+import { NextgenProvider } from '@zitadel/sdk-next';
 
 export default async function RootLayout({ children }) {
   const session = await auth();
@@ -71,12 +71,12 @@ export default async function RootLayout({ children }) {
 Then in any client component:
 
 ```tsx
-"use client";
-import { useAuth } from "@zitadel/sdk-next";
+'use client';
+import { useAuth } from '@zitadel/sdk-next';
 
 export function UserBadge() {
   const auth = useAuth();
-  return <span>{auth.isAuthenticated ? auth.session.email : "Guest"}</span>;
+  return <span>{auth.isAuthenticated ? auth.session.email : 'Guest'}</span>;
 }
 ```
 
@@ -86,30 +86,32 @@ The `<nextgen-login>` web component must be rendered client-side only. Split it 
 
 ```tsx
 // app/login/page.tsx (server)
-import { auth } from "@zitadel/sdk-next";
-import { redirect } from "next/navigation";
-import { LoginWidget } from "./widget";
+import { auth } from '@zitadel/sdk-next';
+import { redirect } from 'next/navigation';
+import { LoginWidget } from './widget';
 
 export default async function LoginPage() {
   const session = await auth();
-  if (session.isAuthenticated) redirect("/admin");
+  if (session.isAuthenticated) redirect('/admin');
   return <LoginWidget />;
 }
 ```
 
 ```tsx
 // app/login/widget.tsx (client)
-"use client";
-import dynamic from "next/dynamic";
+'use client';
+import dynamic from 'next/dynamic';
 
 const NextgenLogin = dynamic(
   async () => {
-    await import("@nextgen/ui-lit");
+    await import('@nextgen/ui-lit');
     return function NextgenLoginElement() {
       return (
         <nextgen-login
           proxy-base="/__nextgen"
-          onNextgen-signin={() => { window.location.href = "/admin"; }}
+          onNextgen-signin={() => {
+            window.location.href = '/admin';
+          }}
         />
       );
     };
@@ -124,15 +126,15 @@ export function LoginWidget() {
 
 ## Middleware options
 
-| Option | Type | Default | Description |
-|---|---|---|---|
-| `issuerUrl` | `string` | `NEXTGEN_ISSUER_URL` env | Full URL of the Nextgen auth backend |
-| `proxyPath` | `string` | `"/__nextgen"` | Path prefix proxied to the auth backend |
-| `protectedRoutes` | `string[]` | `[]` | Paths requiring a valid session. Trailing `*` matches sub-paths |
-| `ignoredRoutes` | `string[]` | `[]` | Paths skipped entirely — no JWT check, no tunnelling. Useful for webhooks or health checks. Trailing `*` matches sub-paths |
-| `loginPath` | `string` | `"/login"` | Where to redirect unauthenticated users |
-| `allowedAlgorithms` | `string[]` | all accepted | JWT `alg` values to accept (e.g. `["RS256"]`) |
-| `clockSkewMs` | `number` | `5000` | Clock skew tolerance in ms for `exp`, `nbf`, `iat` |
+| Option              | Type       | Default                  | Description                                                                                                                |
+| ------------------- | ---------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| `issuerUrl`         | `string`   | `NEXTGEN_ISSUER_URL` env | Full URL of the Nextgen auth backend                                                                                       |
+| `proxyPath`         | `string`   | `"/__nextgen"`           | Path prefix proxied to the auth backend                                                                                    |
+| `protectedRoutes`   | `string[]` | `[]`                     | Paths requiring a valid session. Trailing `*` matches sub-paths                                                            |
+| `ignoredRoutes`     | `string[]` | `[]`                     | Paths skipped entirely — no JWT check, no tunnelling. Useful for webhooks or health checks. Trailing `*` matches sub-paths |
+| `loginPath`         | `string`   | `"/login"`               | Where to redirect unauthenticated users                                                                                    |
+| `allowedAlgorithms` | `string[]` | all accepted             | JWT `alg` values to accept (e.g. `["RS256"]`)                                                                              |
+| `clockSkewMs`       | `number`   | `5000`                   | Clock skew tolerance in ms for `exp`, `nbf`, `iat`                                                                         |
 
 ## How JWT verification works
 

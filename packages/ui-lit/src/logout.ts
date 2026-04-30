@@ -1,4 +1,4 @@
-import { LitElement, css, html } from "lit";
+import { LitElement, css, html } from 'lit';
 
 /**
  * Internal shape of the decoded `__nextgen_display` cookie.
@@ -40,8 +40,8 @@ interface DisplayData {
  */
 class NextgenLogout extends LitElement {
   static override properties = {
-    proxyBase: { type: String, attribute: "proxy-base" },
-    postSignOutUrl: { type: String, attribute: "post-sign-out-url" },
+    proxyBase: { type: String, attribute: 'proxy-base' },
+    postSignOutUrl: { type: String, attribute: 'post-sign-out-url' },
     _name: { state: true },
     _email: { state: true },
     _open: { state: true },
@@ -53,7 +53,8 @@ class NextgenLogout extends LitElement {
     :host {
       display: inline-block;
       position: relative;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-family:
+        -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     }
 
     /* ── Trigger ─────────────────────────────────────────────────────────── */
@@ -74,7 +75,9 @@ class NextgenLogout extends LitElement {
       padding: 0;
       letter-spacing: 0.02em;
       user-select: none;
-      transition: box-shadow 0.15s, border-color 0.15s;
+      transition:
+        box-shadow 0.15s,
+        border-color 0.15s;
       outline: none;
     }
 
@@ -86,7 +89,7 @@ class NextgenLogout extends LitElement {
       box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.4);
     }
 
-    .trigger[aria-expanded="true"] {
+    .trigger[aria-expanded='true'] {
       border-color: #6366f1;
       box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
     }
@@ -251,13 +254,13 @@ class NextgenLogout extends LitElement {
 
   constructor() {
     super();
-    this.proxyBase = "/__nextgen";
-    this.postSignOutUrl = "";
-    this._name = "";
-    this._email = "";
+    this.proxyBase = '/__nextgen';
+    this.postSignOutUrl = '';
+    this._name = '';
+    this._email = '';
     this._open = false;
     this._loading = false;
-    this._error = "";
+    this._error = '';
   }
 
   // ── Lifecycle ────────────────────────────────────────────────────────────
@@ -266,20 +269,20 @@ class NextgenLogout extends LitElement {
     super.connectedCallback();
     this._readDisplayCookie();
 
-    const tmpl = this.querySelector("template") as HTMLTemplateElement | null;
+    const tmpl = this.querySelector('template') as HTMLTemplateElement | null;
     if (tmpl) {
       this._templateMode = true;
       this._renderTemplate(tmpl);
     }
 
-    document.addEventListener("click", this._onDocumentClick);
-    document.addEventListener("keydown", this._onDocumentKeydown);
+    document.addEventListener('click', this._onDocumentClick);
+    document.addEventListener('keydown', this._onDocumentKeydown);
   }
 
   override disconnectedCallback() {
     super.disconnectedCallback();
-    document.removeEventListener("click", this._onDocumentClick);
-    document.removeEventListener("keydown", this._onDocumentKeydown);
+    document.removeEventListener('click', this._onDocumentClick);
+    document.removeEventListener('keydown', this._onDocumentKeydown);
   }
 
   // ── Cookie ───────────────────────────────────────────────────────────────
@@ -296,8 +299,8 @@ class NextgenLogout extends LitElement {
 
     try {
       const data = JSON.parse(atob(match[1])) as DisplayData;
-      this._name = data.name ?? "";
-      this._email = data.email ?? "";
+      this._name = data.name ?? '';
+      this._email = data.email ?? '';
     } catch {
       // Cookie present but malformed — render with empty values.
     }
@@ -309,7 +312,7 @@ class NextgenLogout extends LitElement {
    */
   private get _initial(): string {
     const source = this._name || this._email;
-    return source ? source.charAt(0).toUpperCase() : "?";
+    return source ? source.charAt(0).toUpperCase() : '?';
   }
 
   // ── Template mode ────────────────────────────────────────────────────────
@@ -322,13 +325,15 @@ class NextgenLogout extends LitElement {
     const clone = tmpl.content.cloneNode(true) as DocumentFragment;
     this._fillTokens(clone);
 
-    const container = document.createElement("span");
+    const container = document.createElement('span');
     container.appendChild(clone);
     this.appendChild(container);
 
-    const targets = container.querySelectorAll<HTMLElement>("[data-action='logout']");
+    const targets = container.querySelectorAll<HTMLElement>(
+      "[data-action='logout']",
+    );
     targets.forEach((el) => {
-      el.addEventListener("click", (e) => {
+      el.addEventListener('click', (e) => {
         e.preventDefault();
         void this._doLogout();
       });
@@ -366,9 +371,9 @@ class NextgenLogout extends LitElement {
   };
 
   private readonly _onDocumentKeydown = (event: KeyboardEvent): void => {
-    if (this._open && event.key === "Escape") {
+    if (this._open && event.key === 'Escape') {
       this._open = false;
-      this.shadowRoot?.querySelector<HTMLButtonElement>(".trigger")?.focus();
+      this.shadowRoot?.querySelector<HTMLButtonElement>('.trigger')?.focus();
     }
   };
 
@@ -376,7 +381,7 @@ class NextgenLogout extends LitElement {
 
   private _toggleOpen(): void {
     this._open = !this._open;
-    this._error = "";
+    this._error = '';
   }
 
   /**
@@ -386,23 +391,25 @@ class NextgenLogout extends LitElement {
    */
   private async _doLogout(): Promise<void> {
     this._loading = true;
-    this._error = "";
+    this._error = '';
 
     try {
       const res = await fetch(`${this.proxyBase}/v1/logout`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
       });
 
       if (!res.ok) {
-        const body = await res.json().catch(() => ({})) as { message?: string };
+        const body = (await res.json().catch(() => ({}))) as {
+          message?: string;
+        };
         this._error = body.message ?? `Logout failed (${res.status})`;
         this._loading = false;
         return;
       }
     } catch {
-      this._error = "Network error. Please try again.";
+      this._error = 'Network error. Please try again.';
       this._loading = false;
       return;
     }
@@ -411,7 +418,7 @@ class NextgenLogout extends LitElement {
     this._loading = false;
 
     this.dispatchEvent(
-      new CustomEvent("nextgen-signout", {
+      new CustomEvent('nextgen-signout', {
         bubbles: true,
         composed: true,
         detail: { name: this._name, email: this._email },
@@ -438,7 +445,7 @@ class NextgenLogout extends LitElement {
     return html`
       <button
         class="trigger"
-        aria-label="${this._open ? "Close user menu" : "Open user menu"}"
+        aria-label="${this._open ? 'Close user menu' : 'Open user menu'}"
         aria-expanded="${this._open}"
         aria-haspopup="dialog"
         @click=${this._toggleOpen}
@@ -450,7 +457,9 @@ class NextgenLogout extends LitElement {
         ? html`
             <div class="dropdown" role="dialog" aria-label="User menu">
               <div class="preview">
-                <div class="preview-avatar" aria-hidden="true">${this._initial}</div>
+                <div class="preview-avatar" aria-hidden="true">
+                  ${this._initial}
+                </div>
                 <div class="preview-info">
                   <div class="preview-name">${this._name || this._email}</div>
                   ${this._name
@@ -484,7 +493,7 @@ class NextgenLogout extends LitElement {
                           <line x1="21" y1="12" x2="9" y2="12" />
                         </svg>
                       `}
-                  ${this._loading ? "Signing out…" : "Sign out"}
+                  ${this._loading ? 'Signing out…' : 'Sign out'}
                 </button>
               </div>
 
@@ -498,12 +507,12 @@ class NextgenLogout extends LitElement {
   }
 }
 
-customElements.define("nextgen-logout", NextgenLogout);
+customElements.define('nextgen-logout', NextgenLogout);
 
 export { NextgenLogout };
 
 declare global {
   interface HTMLElementTagNameMap {
-    "nextgen-logout": NextgenLogout;
+    'nextgen-logout': NextgenLogout;
   }
 }

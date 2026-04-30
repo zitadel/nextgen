@@ -1,18 +1,18 @@
-export { NextgenLogout } from "./logout";
+export { NextgenLogout } from './logout';
 
-import { LitElement, css, html } from "lit";
+import { LitElement, css, html } from 'lit';
 
 type FlowState =
-  | { name: "idle" }
-  | { name: "loading" }
-  | { name: "login"; csrf_token: string }
-  | { name: "success"; message: string }
-  | { name: "error"; message: string };
+  | { name: 'idle' }
+  | { name: 'loading' }
+  | { name: 'login'; csrf_token: string }
+  | { name: 'success'; message: string }
+  | { name: 'error'; message: string };
 
 class NextgenLogin extends LitElement {
   static override properties = {
-    proxyBase: { type: String, attribute: "proxy-base" },
-    postSignInUrl: { type: String, attribute: "post-sign-in-url" },
+    proxyBase: { type: String, attribute: 'proxy-base' },
+    postSignInUrl: { type: String, attribute: 'post-sign-in-url' },
     _flow: { state: true },
     _email: { state: true },
     _password: { state: true },
@@ -21,7 +21,8 @@ class NextgenLogin extends LitElement {
   static override styles = css`
     :host {
       display: block;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-family:
+        -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     }
 
     .card {
@@ -104,7 +105,7 @@ class NextgenLogin extends LitElement {
       background: #ffffff;
     }
 
-    button[type="submit"] {
+    button[type='submit'] {
       width: 100%;
       padding: 11px;
       background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
@@ -118,11 +119,11 @@ class NextgenLogin extends LitElement {
       transition: opacity 0.15s;
     }
 
-    button[type="submit"]:hover:not(:disabled) {
+    button[type='submit']:hover:not(:disabled) {
       opacity: 0.9;
     }
 
-    button[type="submit"]:disabled {
+    button[type='submit']:disabled {
       opacity: 0.6;
       cursor: not-allowed;
     }
@@ -222,11 +223,11 @@ class NextgenLogin extends LitElement {
 
   constructor() {
     super();
-    this.proxyBase = "/__nextgen";
-    this.postSignInUrl = "";
-    this._flow = { name: "idle" };
-    this._email = "";
-    this._password = "";
+    this.proxyBase = '/__nextgen';
+    this.postSignInUrl = '';
+    this._flow = { name: 'idle' };
+    this._email = '';
+    this._password = '';
   }
 
   override connectedCallback() {
@@ -235,89 +236,108 @@ class NextgenLogin extends LitElement {
   }
 
   private async _startFlow() {
-    this._flow = { name: "loading" };
+    this._flow = { name: 'loading' };
     try {
       const res = await fetch(`${this.proxyBase}/v1/flow`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "init" }),
-        credentials: "include",
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'init' }),
+        credentials: 'include',
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      this._flow = { name: "login", csrf_token: data.csrf_token ?? "" };
+      this._flow = { name: 'login', csrf_token: data.csrf_token ?? '' };
     } catch {
-      this._flow = { name: "login", csrf_token: "" };
+      this._flow = { name: 'login', csrf_token: '' };
     }
   }
 
   private async _handleSubmit(e: Event) {
     e.preventDefault();
-    if (this._flow.name !== "login") return;
+    if (this._flow.name !== 'login') return;
 
     const csrf = this._flow.csrf_token;
-    this._flow = { name: "loading" };
+    this._flow = { name: 'loading' };
 
     try {
       const res = await fetch(`${this.proxyBase}/v1/flow`, {
-        method: "POST",
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
-          ...(csrf ? { "X-CSRF-Token": csrf } : {}),
+          'Content-Type': 'application/json',
+          ...(csrf ? { 'X-CSRF-Token': csrf } : {}),
         },
-        credentials: "include",
+        credentials: 'include',
         body: JSON.stringify({
-          action: "submit",
+          action: 'submit',
           email: this._email,
           password: this._password,
         }),
       });
 
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ message: "Sign in failed" }));
-        this._flow = { name: "error", message: err.message ?? "Sign in failed" };
+        const err = await res
+          .json()
+          .catch(() => ({ message: 'Sign in failed' }));
+        this._flow = {
+          name: 'error',
+          message: err.message ?? 'Sign in failed',
+        };
         return;
       }
 
       const data = await res.json();
-      if (data.name === "success" || data.status === "complete") {
-        this._flow = { name: "success", message: data.message ?? "You are signed in." };
+      if (data.name === 'success' || data.status === 'complete') {
+        this._flow = {
+          name: 'success',
+          message: data.message ?? 'You are signed in.',
+        };
         this.dispatchEvent(
-          new CustomEvent("nextgen-signin", { bubbles: true, composed: true, detail: data }),
+          new CustomEvent('nextgen-signin', {
+            bubbles: true,
+            composed: true,
+            detail: data,
+          }),
         );
         if (this.postSignInUrl) {
           window.location.href = this.postSignInUrl;
         }
       } else {
-        this._flow = { name: "login", csrf_token: data.csrf_token ?? "" };
+        this._flow = { name: 'login', csrf_token: data.csrf_token ?? '' };
       }
     } catch {
-      this._flow = { name: "error", message: "Network error. Please try again." };
+      this._flow = {
+        name: 'error',
+        message: 'Network error. Please try again.',
+      };
     }
   }
 
   private _handleSso() {
-    this.dispatchEvent(new CustomEvent("nextgen-sso", { bubbles: true, composed: true }));
+    this.dispatchEvent(
+      new CustomEvent('nextgen-sso', { bubbles: true, composed: true }),
+    );
   }
 
   private _renderBody() {
-    if (this._flow.name === "loading") {
+    if (this._flow.name === 'loading') {
       return html`
-        <div style="text-align:center;padding:32px 0;color:#6b7280;font-size:14px">
+        <div
+          style="text-align:center;padding:32px 0;color:#6b7280;font-size:14px"
+        >
           <div class="spinner"></div>
           Loading…
         </div>
       `;
     }
 
-    if (this._flow.name === "success") {
+    if (this._flow.name === 'success') {
       return html`<div class="message success">${this._flow.message}</div>`;
     }
 
     return html`
-      ${this._flow.name === "error"
+      ${this._flow.name === 'error'
         ? html`<div class="message error">${this._flow.message}</div>`
-        : ""}
+        : ''}
 
       <form @submit=${this._handleSubmit}>
         <div class="field">
@@ -390,12 +410,12 @@ class NextgenLogin extends LitElement {
   }
 }
 
-customElements.define("nextgen-login", NextgenLogin);
+customElements.define('nextgen-login', NextgenLogin);
 
 export { NextgenLogin };
 
 declare global {
   interface HTMLElementTagNameMap {
-    "nextgen-login": NextgenLogin;
+    'nextgen-login': NextgenLogin;
   }
 }

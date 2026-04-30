@@ -15,14 +15,14 @@ pnpm add @nextgen/sdk-nuxt
 Create `server/middleware/auth.ts`:
 
 ```ts
-import { createNextgenMiddleware } from "@nextgen/sdk-nuxt/server";
+import { createNextgenMiddleware } from '@nextgen/sdk-nuxt/server';
 
 const { nextgenIssuerUrl } = useRuntimeConfig();
 
 export default createNextgenMiddleware({
   issuerUrl: nextgenIssuerUrl as string,
-  protectedRoutes: ["/admin", "/dashboard*"],
-  loginPath: "/login",
+  protectedRoutes: ['/admin', '/dashboard*'],
+  loginPath: '/login',
 });
 ```
 
@@ -37,7 +37,7 @@ Add the issuer URL to `nuxt.config.ts`:
 ```ts
 export default defineNuxtConfig({
   runtimeConfig: {
-    nextgenIssuerUrl: process.env.NEXTGEN_ISSUER_URL ?? "http://localhost:4000",
+    nextgenIssuerUrl: process.env.NEXTGEN_ISSUER_URL ?? 'http://localhost:4000',
   },
 });
 ```
@@ -47,12 +47,15 @@ export default defineNuxtConfig({
 Create `plugins/auth.server.ts` to make auth state available in pages:
 
 ```ts
-import { defineNuxtPlugin, useRequestEvent, useState } from "#imports";
+import { defineNuxtPlugin, useRequestEvent, useState } from '#imports';
 
 export default defineNuxtPlugin(() => {
   const event = useRequestEvent();
-  const auth = event?.context.nextgenAuth ?? { isAuthenticated: false as const, session: null };
-  useState("nextgen-auth", () => auth);
+  const auth = event?.context.nextgenAuth ?? {
+    isAuthenticated: false as const,
+    session: null,
+  };
+  useState('nextgen-auth', () => auth);
 });
 ```
 
@@ -60,14 +63,14 @@ export default defineNuxtPlugin(() => {
 
 ```vue
 <script setup lang="ts">
-const auth = useState("nextgen-auth");
+const auth = useState('nextgen-auth');
 if (auth.value?.isAuthenticated) {
-  await navigateTo("/admin");
+  await navigateTo('/admin');
 }
 </script>
 
 <template>
-  <p>{{ auth.isAuthenticated ? auth.session.email : "Not signed in" }}</p>
+  <p>{{ auth.isAuthenticated ? auth.session.email : 'Not signed in' }}</p>
 </template>
 ```
 
@@ -85,10 +88,10 @@ The `<nextgen-login>` web component must be rendered client-side only. Use `<Cli
 </template>
 
 <script setup lang="ts">
-import "@nextgen/ui-lit";
+import '@nextgen/ui-lit';
 
 function onSignIn() {
-  navigateTo("/admin");
+  navigateTo('/admin');
 }
 </script>
 ```
@@ -96,7 +99,7 @@ function onSignIn() {
 ### 5. Reading auth in a server route
 
 ```ts
-import { getAuth } from "@nextgen/sdk-nuxt/server";
+import { getAuth } from '@nextgen/sdk-nuxt/server';
 
 export default defineEventHandler((event) => {
   const auth = getAuth(event);
@@ -107,15 +110,15 @@ export default defineEventHandler((event) => {
 
 ## Middleware options
 
-| Option | Type | Default | Description |
-|---|---|---|---|
-| `issuerUrl` | `string` | `NEXTGEN_ISSUER_URL` env | Full URL of the Nextgen auth backend |
-| `proxyPath` | `string` | `"/__nextgen"` | Path prefix proxied to the auth backend |
-| `protectedRoutes` | `string[]` | `[]` | Paths requiring a valid session. Trailing `*` matches sub-paths |
-| `ignoredRoutes` | `string[]` | `[]` | Paths skipped entirely — no JWT check, no tunnelling. Useful for webhooks or health checks. Trailing `*` matches sub-paths |
-| `loginPath` | `string` | `"/login"` | Where to redirect unauthenticated users |
-| `allowedAlgorithms` | `string[]` | all accepted | JWT `alg` values to accept (e.g. `["RS256"]`) |
-| `clockSkewMs` | `number` | `5000` | Clock skew tolerance in ms for `exp`, `nbf`, `iat` |
+| Option              | Type       | Default                  | Description                                                                                                                |
+| ------------------- | ---------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| `issuerUrl`         | `string`   | `NEXTGEN_ISSUER_URL` env | Full URL of the Nextgen auth backend                                                                                       |
+| `proxyPath`         | `string`   | `"/__nextgen"`           | Path prefix proxied to the auth backend                                                                                    |
+| `protectedRoutes`   | `string[]` | `[]`                     | Paths requiring a valid session. Trailing `*` matches sub-paths                                                            |
+| `ignoredRoutes`     | `string[]` | `[]`                     | Paths skipped entirely — no JWT check, no tunnelling. Useful for webhooks or health checks. Trailing `*` matches sub-paths |
+| `loginPath`         | `string`   | `"/login"`               | Where to redirect unauthenticated users                                                                                    |
+| `allowedAlgorithms` | `string[]` | all accepted             | JWT `alg` values to accept (e.g. `["RS256"]`)                                                                              |
+| `clockSkewMs`       | `number`   | `5000`                   | Clock skew tolerance in ms for `exp`, `nbf`, `iat`                                                                         |
 
 ## How JWT verification works
 

@@ -8,4 +8,4 @@
  * import "@zitadel/sdk-next/client";
  * ```
  */
-export { NextgenLogin } from "@nextgen/ui-lit";
+export { NextgenLogin } from '@nextgen/ui-lit';

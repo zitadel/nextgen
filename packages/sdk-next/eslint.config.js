@@ -1,39 +1,47 @@
 // @ts-check
 import eslint from '@eslint/js';
-import tseslint from 'typescript-eslint';
 import json from '@eslint/json';
 import markdown from '@eslint/markdown';
 import prettierConfig from 'eslint-config-prettier';
-import prettierPlugin from 'eslint-plugin-prettier';
 import importPlugin from 'eslint-plugin-import';
+import jsxA11yPlugin from 'eslint-plugin-jsx-a11y';
 import perfectionistPlugin from 'eslint-plugin-perfectionist';
+import prettierPlugin from 'eslint-plugin-prettier';
 import reactPlugin from 'eslint-plugin-react';
 import reactHooksPlugin from 'eslint-plugin-react-hooks';
-import jsxA11yPlugin from 'eslint-plugin-jsx-a11y';
 import testingLibraryPlugin from 'eslint-plugin-testing-library';
+import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   { ignores: ['dist/**', 'node_modules/**'] },
-
-  // ── JavaScript + TypeScript ─────────────────────────────────────────────────
-  eslint.configs.recommended,
+  {
+    ...eslint.configs.recommended,
+    files: ['**/*.{ts,tsx,js,jsx,mjs,cjs}'],
+  },
   tseslint.configs.recommended,
-
-  // ── React ───────────────────────────────────────────────────────────────────
-  reactPlugin.configs.flat.recommended,
-  reactPlugin.configs.flat['jsx-runtime'],
-  reactHooksPlugin.configs['recommended-latest'],
-  jsxA11yPlugin.flatConfigs.recommended,
-
-  // ── Imports ─────────────────────────────────────────────────────────────────
+  {
+    ...reactPlugin.configs.flat.recommended,
+    files: ['**/*.{ts,tsx,js,jsx}'],
+  },
+  {
+    ...reactPlugin.configs.flat['jsx-runtime'],
+    files: ['**/*.{ts,tsx,js,jsx}'],
+  },
+  {
+    ...reactHooksPlugin.configs['recommended-latest'],
+    files: ['**/*.{ts,tsx,js,jsx}'],
+  },
+  {
+    ...jsxA11yPlugin.flatConfigs.recommended,
+    files: ['**/*.{tsx,jsx}'],
+  },
   importPlugin.flatConfigs.recommended,
   importPlugin.flatConfigs.typescript,
-
-  // ── Shared rules ────────────────────────────────────────────────────────────
   {
+    files: ['**/*.{ts,tsx,js,jsx,mjs,cjs}'],
     plugins: {
-      prettier: prettierPlugin,
       perfectionist: perfectionistPlugin,
+      prettier: prettierPlugin,
     },
     settings: {
       react: { version: 'detect' },
@@ -43,11 +51,10 @@ export default tseslint.config(
       },
     },
     rules: {
-      'prettier/prettier': 'error',
-      /** Replaced by perfectionist/sort-imports for consistent cross-file ordering. */
+      'import/no-named-as-default-member': 'off',
       'import/order': 'off',
-      /** Enforces natural alphabetical import grouping. */
       'perfectionist/sort-imports': ['error', { type: 'natural' }],
+      'prettier/prettier': 'error',
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/no-unused-vars': [
         'error',
@@ -55,17 +62,11 @@ export default tseslint.config(
       ],
     },
   },
-
-  // ── Testing Library (test files only) ───────────────────────────────────────
   {
     files: ['**/*.test.{ts,tsx}', '**/__tests__/**/*.{ts,tsx}'],
     ...testingLibraryPlugin.configs['flat/react'],
   },
-
-  // ── Prettier (must be last to disable conflicting formatting rules) ──────────
   prettierConfig,
-
-  // ── JSON ────────────────────────────────────────────────────────────────────
   {
     files: ['**/*.json'],
     ignores: ['**/tsconfig*.json'],
@@ -77,11 +78,5 @@ export default tseslint.config(
     language: 'json/jsonc',
     ...json.configs.recommended,
   },
-
-  // ── Markdown ────────────────────────────────────────────────────────────────
-  {
-    files: ['**/*.md'],
-    language: 'markdown/gfm',
-    ...markdown.configs.recommended,
-  },
+  markdown.configs.recommended,
 );

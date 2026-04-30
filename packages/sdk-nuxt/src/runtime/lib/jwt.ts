@@ -241,7 +241,7 @@ const jwksCache = new Map<string, JwksCacheEntry>();
  * @returns The decoded bytes.
  */
 export function base64UrlDecode(input: string): Uint8Array<ArrayBuffer> {
-  return new Uint8Array(Buffer.from(input, "base64url"));
+  return new Uint8Array(Buffer.from(input, 'base64url'));
 }
 
 // ─── JWT splitting ────────────────────────────────────────────────────────────
@@ -259,7 +259,7 @@ export function base64UrlDecode(input: string): Uint8Array<ArrayBuffer> {
  *   has fewer than three dot-separated segments.
  */
 function splitToken(token: string): readonly [string, string, string] | null {
-  const parts = token.split(".");
+  const parts = token.split('.');
   if (parts.length < 3) {
     return null;
   }
@@ -284,13 +284,16 @@ export function decodeJwt(token: string): DecodedJwt {
   const segments = splitToken(token);
   if (!segments) {
     throw new TypeError(
-      `Invalid JWT: expected at least three dot-separated segments, received ${token.split(".").length}.`,
+      `Invalid JWT: expected at least three dot-separated segments, received ${token.split('.').length}.`,
     );
   }
   const [h, p] = segments;
   const decoder = new TextDecoder();
   return {
-    header: JSON.parse(decoder.decode(base64UrlDecode(h))) as Record<string, unknown>,
+    header: JSON.parse(decoder.decode(base64UrlDecode(h))) as Record<
+      string,
+      unknown
+    >,
     payload: JSON.parse(decoder.decode(base64UrlDecode(p))) as JwtPayload,
   };
 }
@@ -303,11 +306,13 @@ export function decodeJwt(token: string): DecodedJwt {
  *
  * @param alg - JWT algorithm string (e.g. `"RS256"`, `"ES256"`).
  */
-function resolveImportAlgorithm(alg: string): RsaHashedImportParams | EcKeyImportParams {
-  if (alg === "ES256") {
-    return { name: "ECDSA", namedCurve: "P-256" };
+function resolveImportAlgorithm(
+  alg: string,
+): RsaHashedImportParams | EcKeyImportParams {
+  if (alg === 'ES256') {
+    return { name: 'ECDSA', namedCurve: 'P-256' };
   }
-  return { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" };
+  return { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' };
 }
 
 /**
@@ -317,10 +322,10 @@ function resolveImportAlgorithm(alg: string): RsaHashedImportParams | EcKeyImpor
  * @param alg - JWT algorithm string (e.g. `"RS256"`, `"ES256"`).
  */
 function resolveVerifyAlgorithm(alg: string): EcdsaParams | Algorithm {
-  if (alg === "ES256") {
-    return { name: "ECDSA", hash: "SHA-256" };
+  if (alg === 'ES256') {
+    return { name: 'ECDSA', hash: 'SHA-256' };
   }
-  return { name: "RSASSA-PKCS1-v1_5" };
+  return { name: 'RSASSA-PKCS1-v1_5' };
 }
 
 // ─── JWKS fetch ───────────────────────────────────────────────────────────────
@@ -348,7 +353,7 @@ async function fetchAndCacheJwks(
   jwksUri: string,
   kid: string | undefined,
 ): Promise<CryptoKey | null> {
-  const cacheKey = `${jwksUri}:${kid ?? "__default__"}`;
+  const cacheKey = `${jwksUri}:${kid ?? '__default__'}`;
   const cached = jwksCache.get(cacheKey);
   if (cached && Date.now() - cached.fetchedAt < JWKS_TTL_MS) {
     return cached.key;
@@ -359,19 +364,21 @@ async function fetchAndCacheJwks(
     return null;
   }
 
-  const json = (await res.json()) as { keys: (JsonWebKey & { kid?: string; alg?: string })[] };
+  const json = (await res.json()) as {
+    keys: (JsonWebKey & { kid?: string; alg?: string })[];
+  };
   const jwk = kid ? json.keys.find((k) => k.kid === kid) : json.keys[0];
   if (!jwk) {
     return null;
   }
 
-  const alg = (jwk.alg as string | undefined) ?? "RS256";
+  const alg = (jwk.alg as string | undefined) ?? 'RS256';
   const cryptoKey = await crypto.subtle.importKey(
-    "jwk",
+    'jwk',
     jwk,
     resolveImportAlgorithm(alg),
     false,
-    ["verify"],
+    ['verify'],
   );
 
   jwksCache.set(cacheKey, { key: cryptoKey, fetchedAt: Date.now() });
@@ -409,7 +416,13 @@ export async function verifyJwt(
   opts: VerifyJwtOptions,
 ): Promise<JwtPayload | null> {
   try {
-    const { issuerUrl, allowedAlgorithms, clockSkewMs, audience, allowedTokenTypes } = opts;
+    const {
+      issuerUrl,
+      allowedAlgorithms,
+      clockSkewMs,
+      audience,
+      allowedTokenTypes,
+    } = opts;
 
     const segments = splitToken(token);
     if (!segments) {
@@ -421,22 +434,33 @@ export async function verifyJwt(
     const header = JSON.parse(
       decoder.decode(base64UrlDecode(rawHeader)),
     ) as Record<string, unknown>;
-    const payload = JSON.parse(decoder.decode(base64UrlDecode(rawPayload))) as JwtPayload;
+    const payload = JSON.parse(
+      decoder.decode(base64UrlDecode(rawPayload)),
+    ) as JwtPayload;
 
-    const alg = (header.alg as string | undefined) ?? "RS256";
-    if (allowedAlgorithms && allowedAlgorithms.length > 0 && !allowedAlgorithms.includes(alg)) {
+    const alg = (header.alg as string | undefined) ?? 'RS256';
+    if (
+      allowedAlgorithms &&
+      allowedAlgorithms.length > 0 &&
+      !allowedAlgorithms.includes(alg)
+    ) {
       return null;
     }
 
     if (allowedTokenTypes.length > 0) {
-      const typ = (header.typ as string | undefined) ?? "";
-      if (!allowedTokenTypes.some((t) => t.toLowerCase() === typ.toLowerCase())) {
+      const typ = (header.typ as string | undefined) ?? '';
+      if (
+        !allowedTokenTypes.some((t) => t.toLowerCase() === typ.toLowerCase())
+      ) {
         return null;
       }
     }
 
     const kid = header.kid as string | undefined;
-    const cryptoKey = await fetchAndCacheJwks(`${issuerUrl}/oauth/v2/keys`, kid);
+    const cryptoKey = await fetchAndCacheJwks(
+      `${issuerUrl}/oauth/v2/keys`,
+      kid,
+    );
     if (!cryptoKey) {
       return null;
     }

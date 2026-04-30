@@ -1,4 +1,5 @@
-import type { EventHandler, H3Event } from "h3";
+import type { EventHandler, H3Event } from 'h3';
+
 import {
   defineEventHandler,
   getCookie,
@@ -8,11 +9,13 @@ import {
   getRequestURL,
   getRequestHeader,
   readRawBody,
-} from "h3";
-import type { AuthResult, NextgenModuleOptions } from "../types";
-import { verifyJwt } from "../lib/jwt";
+} from 'h3';
 
-declare module "h3" {
+import type { AuthResult, NextgenModuleOptions } from '../types';
+
+import { verifyJwt } from '../lib/jwt';
+
+declare module 'h3' {
   interface H3EventContext {
     nextgenAuth: AuthResult;
   }
@@ -24,14 +27,14 @@ declare module "h3" {
  * two directly connected peers and become invalid when proxied.
  */
 const HOP_BY_HOP: ReadonlySet<string> = new Set([
-  "connection",
-  "keep-alive",
-  "proxy-authenticate",
-  "proxy-authorization",
-  "te",
-  "trailer",
-  "transfer-encoding",
-  "upgrade",
+  'connection',
+  'keep-alive',
+  'proxy-authenticate',
+  'proxy-authorization',
+  'te',
+  'trailer',
+  'transfer-encoding',
+  'upgrade',
 ]);
 
 /**
@@ -49,7 +52,7 @@ function matchesRoutes(pathname: string, routes: readonly string[]): boolean {
     return false;
   }
   return routes.some((pattern) => {
-    if (pattern.endsWith("*")) {
+    if (pattern.endsWith('*')) {
       return pathname.startsWith(pattern.slice(0, -1));
     }
     return pathname === pattern;
@@ -80,25 +83,26 @@ function buildUpstreamHeaders(event: H3Event): Headers {
     if (!value || HOP_BY_HOP.has(key.toLowerCase())) {
       continue;
     }
-    headers.set(key, Array.isArray(value) ? value.join(", ") : value);
+    headers.set(key, Array.isArray(value) ? value.join(', ') : value);
   }
 
   const url = getRequestURL(event);
 
-  if (!headers.has("x-forwarded-for")) {
-    const socketIp = (event.node.req.socket as { remoteAddress?: string } | undefined)
-      ?.remoteAddress;
+  if (!headers.has('x-forwarded-for')) {
+    const socketIp = (
+      event.node.req.socket as { remoteAddress?: string } | undefined
+    )?.remoteAddress;
     if (socketIp) {
-      headers.set("x-forwarded-for", socketIp);
+      headers.set('x-forwarded-for', socketIp);
     }
   }
 
-  if (!headers.has("x-forwarded-host")) {
-    headers.set("x-forwarded-host", url.host);
+  if (!headers.has('x-forwarded-host')) {
+    headers.set('x-forwarded-host', url.host);
   }
 
-  if (!headers.has("x-forwarded-proto")) {
-    headers.set("x-forwarded-proto", url.protocol.replace(":", ""));
+  if (!headers.has('x-forwarded-proto')) {
+    headers.set('x-forwarded-proto', url.protocol.replace(':', ''));
   }
 
   return headers;
@@ -123,17 +127,19 @@ function buildUpstreamHeaders(event: H3Event): Headers {
  * @param options - Middleware configuration options.
  * @returns An H3 event handler suitable for use as a global server middleware.
  */
-export function createNextgenMiddleware(options: NextgenModuleOptions = {}): EventHandler {
+export function createNextgenMiddleware(
+  options: NextgenModuleOptions = {},
+): EventHandler {
   const {
-    issuerUrl = process.env.NEXTGEN_ISSUER_URL ?? "http://localhost:4000",
-    proxyPath = "/__nextgen",
+    issuerUrl = process.env.NEXTGEN_ISSUER_URL ?? 'http://localhost:4000',
+    proxyPath = '/__nextgen',
     protectedRoutes = [],
     ignoredRoutes = [],
-    loginPath = "/login",
+    loginPath = '/login',
     allowedAlgorithms,
     clockSkewMs = 5000,
     audience,
-    allowedTokenTypes = ["JWT", "at+JWT"],
+    allowedTokenTypes = ['JWT', 'at+JWT'],
   } = options;
 
   return defineEventHandler(async (event: H3Event) => {
@@ -181,8 +187,8 @@ async function proxyRequest(
   const suffix = url.pathname.slice(proxyPath.length);
   const target = `${issuerUrl}${suffix}${url.search}`;
 
-  const method = event.node.req.method ?? "GET";
-  const hasBody = !["GET", "HEAD"].includes(method);
+  const method = event.node.req.method ?? 'GET';
+  const hasBody = !['GET', 'HEAD'].includes(method);
   const rawBody = hasBody ? await readRawBody(event, false) : undefined;
   const body = rawBody != null ? new Uint8Array(rawBody) : undefined;
 
@@ -190,20 +196,23 @@ async function proxyRequest(
     method,
     headers: buildUpstreamHeaders(event),
     body,
-    redirect: "manual",
+    redirect: 'manual',
   });
 
   event.node.res.statusCode = upstream.status;
 
   for (const [key, value] of upstream.headers.entries()) {
-    if (!HOP_BY_HOP.has(key.toLowerCase()) && key.toLowerCase() !== "set-cookie") {
+    if (
+      !HOP_BY_HOP.has(key.toLowerCase()) &&
+      key.toLowerCase() !== 'set-cookie'
+    ) {
       event.node.res.setHeader(key, value);
     }
   }
 
   const setCookieHeaders = upstream.headers.getSetCookie?.() ?? [];
   for (const cookie of setCookieHeaders) {
-    event.node.res.appendHeader("set-cookie", cookie);
+    event.node.res.appendHeader('set-cookie', cookie);
   }
 
   return upstream.body;
@@ -249,7 +258,10 @@ interface AuthHandlerOptions {
  * @param event - The current H3 event.
  * @param opts  - Auth handler options.
  */
-async function handleAuth(event: H3Event, opts: AuthHandlerOptions): Promise<void> {
+async function handleAuth(
+  event: H3Event,
+  opts: AuthHandlerOptions,
+): Promise<void> {
   const {
     issuerUrl,
     protectedRoutes,
@@ -261,10 +273,10 @@ async function handleAuth(event: H3Event, opts: AuthHandlerOptions): Promise<voi
     pathname,
   } = opts;
 
-  const authHeader = getRequestHeader(event, "authorization");
+  const authHeader = getRequestHeader(event, 'authorization');
   const bearerToken =
-    authHeader && authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
-  const cookieToken = getCookie(event, "__nextgen_session") ?? null;
+    authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  const cookieToken = getCookie(event, '__nextgen_session') ?? null;
   const token = bearerToken ?? cookieToken;
 
   const payload = token
@@ -281,7 +293,7 @@ async function handleAuth(event: H3Event, opts: AuthHandlerOptions): Promise<voi
     event.context.nextgenAuth = {
       isAuthenticated: true,
       session: {
-        userId: payload.sub ?? "",
+        userId: payload.sub ?? '',
         email: payload.email ?? null,
         name: payload.name ?? null,
         token,
@@ -293,13 +305,17 @@ async function handleAuth(event: H3Event, opts: AuthHandlerOptions): Promise<voi
   event.context.nextgenAuth = { isAuthenticated: false, session: null };
 
   for (const name of Object.keys(parseCookies(event))) {
-    if (name.startsWith("__nextgen")) {
+    if (name.startsWith('__nextgen')) {
       deleteCookie(event, name);
     }
   }
 
   if (matchesRoutes(pathname, protectedRoutes)) {
-    await sendRedirect(event, `${loginPath}?next=${encodeURIComponent(pathname)}`, 302);
+    await sendRedirect(
+      event,
+      `${loginPath}?next=${encodeURIComponent(pathname)}`,
+      302,
+    );
   }
 }
 

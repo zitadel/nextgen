@@ -1,7 +1,10 @@
-import type { NextRequest } from "next/server";
-import { NextResponse } from "next/server";
-import type { NextgenMiddlewareOptions } from "./types";
-import { verifyJwt } from "./lib/jwt";
+import type { NextRequest } from 'next/server';
+
+import { NextResponse } from 'next/server';
+
+import type { NextgenMiddlewareOptions } from './types';
+
+import { verifyJwt } from './lib/jwt';
 
 /**
  * Headers that must never be forwarded to an upstream service.
@@ -9,14 +12,14 @@ import { verifyJwt } from "./lib/jwt";
  * two directly connected peers and become invalid when proxied.
  */
 const HOP_BY_HOP: ReadonlySet<string> = new Set([
-  "connection",
-  "keep-alive",
-  "proxy-authenticate",
-  "proxy-authorization",
-  "te",
-  "trailer",
-  "transfer-encoding",
-  "upgrade",
+  'connection',
+  'keep-alive',
+  'proxy-authenticate',
+  'proxy-authorization',
+  'te',
+  'trailer',
+  'transfer-encoding',
+  'upgrade',
 ]);
 
 /**
@@ -34,7 +37,7 @@ function matchesRoutes(pathname: string, routes: readonly string[]): boolean {
     return false;
   }
   return routes.some((pattern) => {
-    if (pattern.endsWith("*")) {
+    if (pattern.endsWith('*')) {
       return pathname.startsWith(pattern.slice(0, -1));
     }
     return pathname === pattern;
@@ -50,7 +53,10 @@ function matchesRoutes(pathname: string, routes: readonly string[]): boolean {
  * @param extra - Additional headers to inject (e.g. `x-nextgen-auth-token`).
  * @returns A new `Headers` instance with the injected values registered.
  */
-function tunnelHeaders(req: NextRequest, extra: Readonly<Record<string, string>>): Headers {
+function tunnelHeaders(
+  req: NextRequest,
+  extra: Readonly<Record<string, string>>,
+): Headers {
   const headers = new Headers(req.headers);
   const injectedNames: string[] = [];
 
@@ -60,12 +66,12 @@ function tunnelHeaders(req: NextRequest, extra: Readonly<Record<string, string>>
     injectedNames.push(name);
   }
 
-  const existing = headers.get("x-middleware-override-headers") ?? "";
+  const existing = headers.get('x-middleware-override-headers') ?? '';
   const combined = existing
-    ? `${existing},${injectedNames.join(",")}`
-    : injectedNames.join(",");
+    ? `${existing},${injectedNames.join(',')}`
+    : injectedNames.join(',');
 
-  headers.set("x-middleware-override-headers", combined);
+  headers.set('x-middleware-override-headers', combined);
   return headers;
 }
 
@@ -101,15 +107,15 @@ export async function nextgenMiddleware(
   options: NextgenMiddlewareOptions = {},
 ): Promise<NextResponse | Response> {
   const {
-    issuerUrl = process.env.NEXTGEN_ISSUER_URL ?? "http://localhost:4000",
-    proxyPath = "/__nextgen",
+    issuerUrl = process.env.NEXTGEN_ISSUER_URL ?? 'http://localhost:4000',
+    proxyPath = '/__nextgen',
     protectedRoutes = [],
     ignoredRoutes = [],
-    loginPath = "/login",
+    loginPath = '/login',
     allowedAlgorithms,
     clockSkewMs = 5000,
     audience,
-    allowedTokenTypes = ["JWT", "at+JWT"],
+    allowedTokenTypes = ['JWT', 'at+JWT'],
   } = options;
 
   const { pathname } = new URL(req.url);
@@ -166,42 +172,45 @@ async function proxyRequest(
     }
   }
 
-  if (!upstreamHeaders.has("x-forwarded-for")) {
+  if (!upstreamHeaders.has('x-forwarded-for')) {
     const directIp =
-      (req as unknown as { ip?: string }).ip ?? req.headers.get("x-real-ip");
+      (req as unknown as { ip?: string }).ip ?? req.headers.get('x-real-ip');
     if (directIp) {
-      upstreamHeaders.set("x-forwarded-for", directIp);
+      upstreamHeaders.set('x-forwarded-for', directIp);
     }
   }
 
-  if (!upstreamHeaders.has("x-forwarded-host")) {
-    upstreamHeaders.set("x-forwarded-host", url.host);
+  if (!upstreamHeaders.has('x-forwarded-host')) {
+    upstreamHeaders.set('x-forwarded-host', url.host);
   }
 
-  if (!upstreamHeaders.has("x-forwarded-proto")) {
-    upstreamHeaders.set("x-forwarded-proto", url.protocol.replace(":", ""));
+  if (!upstreamHeaders.has('x-forwarded-proto')) {
+    upstreamHeaders.set('x-forwarded-proto', url.protocol.replace(':', ''));
   }
 
-  const hasBody = !["GET", "HEAD"].includes(req.method);
+  const hasBody = !['GET', 'HEAD'].includes(req.method);
 
   const upstream = await fetch(target, {
     method: req.method,
     headers: upstreamHeaders,
     body: hasBody ? req.body : undefined,
-    redirect: "manual",
-    ...(hasBody ? { duplex: "half" } : {}),
+    redirect: 'manual',
+    ...(hasBody ? { duplex: 'half' } : {}),
   } as RequestInit);
 
   const responseHeaders = new Headers();
   for (const [key, value] of upstream.headers.entries()) {
-    if (!HOP_BY_HOP.has(key.toLowerCase()) && key.toLowerCase() !== "set-cookie") {
+    if (
+      !HOP_BY_HOP.has(key.toLowerCase()) &&
+      key.toLowerCase() !== 'set-cookie'
+    ) {
       responseHeaders.set(key, value);
     }
   }
 
   const setCookies = upstream.headers.getSetCookie?.() ?? [];
   for (const cookie of setCookies) {
-    responseHeaders.append("set-cookie", cookie);
+    responseHeaders.append('set-cookie', cookie);
   }
 
   return new Response(upstream.body, {
@@ -251,7 +260,10 @@ interface AuthHandlerOptions {
  * @param opts - Auth handler options.
  * @returns A `NextResponse` to continue or redirect.
  */
-async function handleAuth(req: NextRequest, opts: AuthHandlerOptions): Promise<NextResponse> {
+async function handleAuth(
+  req: NextRequest,
+  opts: AuthHandlerOptions,
+): Promise<NextResponse> {
   const {
     issuerUrl,
     protectedRoutes,
@@ -263,10 +275,10 @@ async function handleAuth(req: NextRequest, opts: AuthHandlerOptions): Promise<N
     pathname,
   } = opts;
 
-  const authHeader = req.headers.get("authorization");
+  const authHeader = req.headers.get('authorization');
   const bearerToken =
-    authHeader && authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
-  const cookieToken = req.cookies.get("__nextgen_session")?.value ?? null;
+    authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  const cookieToken = req.cookies.get('__nextgen_session')?.value ?? null;
   const token = bearerToken ?? cookieToken;
 
   const payload = token
@@ -280,22 +292,22 @@ async function handleAuth(req: NextRequest, opts: AuthHandlerOptions): Promise<N
     : null;
 
   if (payload && token) {
-    const tunnelled = tunnelHeaders(req, { "x-nextgen-auth-token": token });
+    const tunnelled = tunnelHeaders(req, { 'x-nextgen-auth-token': token });
     return NextResponse.next({ request: { headers: tunnelled } });
   }
 
-  const tunnelled = tunnelHeaders(req, { "x-nextgen-auth-token": "" });
+  const tunnelled = tunnelHeaders(req, { 'x-nextgen-auth-token': '' });
   const response = NextResponse.next({ request: { headers: tunnelled } });
 
   for (const cookie of req.cookies.getAll()) {
-    if (cookie.name.startsWith("__nextgen")) {
+    if (cookie.name.startsWith('__nextgen')) {
       response.cookies.delete(cookie.name);
     }
   }
 
   if (matchesRoutes(pathname, protectedRoutes)) {
     const loginUrl = new URL(loginPath, req.url);
-    loginUrl.searchParams.set("next", pathname);
+    loginUrl.searchParams.set('next', pathname);
     return NextResponse.redirect(loginUrl, { status: 302 });
   }
 
