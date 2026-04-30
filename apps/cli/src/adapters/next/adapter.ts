@@ -40,7 +40,9 @@ export class NextAdapter implements FrameworkAdapter {
           contents: page.contents,
         },
       ],
-      summary: [{ title: "Login route", detail: `Created ${ctx.framework.appDir}/login/page.tsx.` }],
+      summary: [
+        { title: "Login route", detail: `Created ${ctx.framework.appDir}/login/page.tsx.` },
+      ],
     };
   }
 
@@ -54,7 +56,9 @@ export class NextAdapter implements FrameworkAdapter {
           contents: page.contents,
         },
       ],
-      summary: [{ title: "Register route", detail: `Created ${ctx.framework.appDir}/register/page.tsx.` }],
+      summary: [
+        { title: "Register route", detail: `Created ${ctx.framework.appDir}/register/page.tsx.` },
+      ],
     };
   }
 

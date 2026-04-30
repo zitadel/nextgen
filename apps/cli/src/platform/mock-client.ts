@@ -80,7 +80,15 @@ export class MockPlatformClient implements PlatformClient {
       server_capabilities: {
         schema_version: "2.0",
         flow_protocol_version: "1.0",
-        step_types: ["identifier", "credential", "form", "verification", "redirect", "info", "complete"],
+        step_types: [
+          "identifier",
+          "credential",
+          "form",
+          "verification",
+          "redirect",
+          "info",
+          "complete",
+        ],
         idp_types: ["oidc"],
         delivery_modes: ["dev_inbox"],
         renderer_modes: ["default"],

@@ -32,7 +32,9 @@ const AUTH_METHOD_CHOICES = [
   { value: "totp", label: "totp" },
 ];
 
-export async function runInteractiveSetup(input: InteractiveSetupInput): Promise<InteractiveSetupAnswers> {
+export async function runInteractiveSetup(
+  input: InteractiveSetupInput,
+): Promise<InteractiveSetupAnswers> {
   intro("Zitadel setup");
 
   const frameworkAck = await confirm({
@@ -65,8 +67,16 @@ export async function runInteractiveSetup(input: InteractiveSetupInput): Promise
   const serverChoice = await select({
     message: "Which server should zitadel.json point to?",
     options: [
-      { value: DEFAULT_SERVER, label: "Zitadel Cloud (api.zitadel.cloud)", hint: "recommended for real projects" },
-      { value: MOCK_SENTINEL, label: "Mock (offline development)", hint: "no network, no real data" },
+      {
+        value: DEFAULT_SERVER,
+        label: "Zitadel Cloud (api.zitadel.cloud)",
+        hint: "recommended for real projects",
+      },
+      {
+        value: MOCK_SENTINEL,
+        label: "Mock (offline development)",
+        hint: "no network, no real data",
+      },
       { value: "__custom__", label: "Custom URL (self-hosted)" },
     ],
     initialValue: input.currentServer ?? DEFAULT_SERVER,

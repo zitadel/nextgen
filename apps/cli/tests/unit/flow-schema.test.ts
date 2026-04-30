@@ -59,7 +59,9 @@ describe("flow definition schema", () => {
     // every field must have a text_key
     for (const step of flow.steps) {
       for (const [name, field] of Object.entries(step.fields)) {
-        expect(field.text_key, `field ${step.name}.${name} missing text_key`).toMatch(/^[a-z][a-z0-9_.]+$/);
+        expect(field.text_key, `field ${step.name}.${name} missing text_key`).toMatch(
+          /^[a-z][a-z0-9_.]+$/,
+        );
       }
     }
 

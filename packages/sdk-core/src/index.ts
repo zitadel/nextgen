@@ -59,7 +59,10 @@ export function createMockFlow(purpose: ZitadelFlowPurpose): MockFlow {
   };
 }
 
-export function mockSubmit(purpose: ZitadelFlowPurpose, values: Record<string, FormDataEntryValue>): {
+export function mockSubmit(
+  purpose: ZitadelFlowPurpose,
+  values: Record<string, FormDataEntryValue>,
+): {
   ok: true;
   message: string;
   user: Record<string, string>;
@@ -71,7 +74,9 @@ export function mockSubmit(purpose: ZitadelFlowPurpose, values: Record<string, F
   };
 }
 
-export function resolveZitadelRuntimeEnv(env: Record<string, string | undefined> = currentEnv()): ZitadelRuntime {
+export function resolveZitadelRuntimeEnv(
+  env: Record<string, string | undefined> = currentEnv(),
+): ZitadelRuntime {
   return resolveZitadelRuntime({
     projectId: env.NEXT_PUBLIC_ZITADEL_PROJECT_ID ?? env.ZITADEL_PROJECT_ID,
     environment: parseEnvironment(env.NEXT_PUBLIC_ZITADEL_ENVIRONMENT ?? env.ZITADEL_ENVIRONMENT),

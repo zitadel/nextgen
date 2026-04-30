@@ -48,7 +48,9 @@ export async function runSetup(io: CliIO, opts: SetupOptions): Promise<void> {
 
   const framework = await detectFramework(opts.cwd, opts.framework);
   const packageManager = await detectPackageManager(opts.cwd);
-  let deployTarget = opts.skipDeployPlatform ? undefined : await detectDeployTarget(opts.cwd, opts.platform);
+  let deployTarget = opts.skipDeployPlatform
+    ? undefined
+    : await detectDeployTarget(opts.cwd, opts.platform);
   const pkg = await readPackageJson(opts.cwd);
   let detectedPort = await detectDevPort(opts.cwd);
   let effectiveServer = opts.source;
@@ -59,7 +61,11 @@ export async function runSetup(io: CliIO, opts: SetupOptions): Promise<void> {
   if (!opts.nonInteractive && !opts.dryRun) {
     const answers = await runInteractiveSetup({
       detectedFramework: framework.id,
-      detectedDeployPlatform: (deployTarget?.id ?? "none") as "vercel" | "netlify" | "cloudflare" | "none",
+      detectedDeployPlatform: (deployTarget?.id ?? "none") as
+        | "vercel"
+        | "netlify"
+        | "cloudflare"
+        | "none",
       detectedDevPort: detectedPort,
       currentServer: opts.source,
     });
@@ -80,7 +86,9 @@ export async function runSetup(io: CliIO, opts: SetupOptions): Promise<void> {
   const userSchema = defaultUserSchema({ fields: userFields, authMethods });
   const schemaValidation = validateJsonSchema(userSchema);
   if (!schemaValidation.valid) {
-    throw new ZitadelError("E_VALIDATION", "Generated user schema is invalid", { details: schemaValidation.errors });
+    throw new ZitadelError("E_VALIDATION", "Generated user schema is invalid", {
+      details: schemaValidation.errors,
+    });
   }
 
   const project = opts.dryRun
@@ -115,14 +123,27 @@ export async function runSetup(io: CliIO, opts: SetupOptions): Promise<void> {
     isInitialSetup: true,
   };
   const plan = mergePlans(
-    basePlan({ project, config, userSchema, flow, locale, packageManager, framework: framework.id, issuer, devPort }),
+    basePlan({
+      project,
+      config,
+      userSchema,
+      flow,
+      locale,
+      packageManager,
+      framework: framework.id,
+      issuer,
+      devPort,
+    }),
     await adapter.planSetup(ctx),
   );
   const result = await scaffold(plan, opts);
   const warnings: string[] = [];
 
   const setupOpts = { ...opts, source: effectiveServer };
-  const apply = opts.noApply || opts.dryRun ? undefined : await runApply(io, { ...setupOpts, json: true, silent: true });
+  const apply =
+    opts.noApply || opts.dryRun
+      ? undefined
+      : await runApply(io, { ...setupOpts, json: true, silent: true });
   const deploy =
     !deployTarget || deployTarget.id === "none" || opts.skipDeployPlatform || opts.dryRun
       ? undefined
@@ -156,7 +177,10 @@ export async function runSetup(io: CliIO, opts: SetupOptions): Promise<void> {
       files_skipped: result.filesSkipped.map((file) => relativeDisplay(opts.cwd, file)),
       apply,
       deploy,
-      next_actions: ["Run `zitadel doctor` to verify setup.", "Run `zitadel claim` before production."],
+      next_actions: [
+        "Run `zitadel doctor` to verify setup.",
+        "Run `zitadel claim` before production.",
+      ],
       next_commands: ["zitadel doctor", "zitadel claim"],
     },
     setupOpts,
@@ -196,9 +220,21 @@ function basePlan(input: {
         })}\n`,
       },
       { kind: "write", path: "zitadel.json", contents: `${stableStringify(input.config)}\n` },
-      { kind: "write", path: ".zitadel/schemas/user.json", contents: `${stableStringify(input.userSchema)}\n` },
-      { kind: "write", path: ".zitadel/flows/default.json", contents: `${stableStringify(input.flow)}\n` },
-      { kind: "write", path: ".zitadel/locales/en.json", contents: `${stableStringify(input.locale)}\n` },
+      {
+        kind: "write",
+        path: ".zitadel/schemas/user.json",
+        contents: `${stableStringify(input.userSchema)}\n`,
+      },
+      {
+        kind: "write",
+        path: ".zitadel/flows/default.json",
+        contents: `${stableStringify(input.flow)}\n`,
+      },
+      {
+        kind: "write",
+        path: ".zitadel/locales/en.json",
+        contents: `${stableStringify(input.locale)}\n`,
+      },
       {
         kind: "merge-env",
         path: ".env.example",
@@ -229,7 +265,12 @@ function basePlan(input: {
         })}\n`,
       },
     ],
-    summary: [{ title: "Zitadel config", detail: "Created local config, schema, flows, env, and secret files." }],
+    summary: [
+      {
+        title: "Zitadel config",
+        detail: "Created local config, schema, flows, env, and secret files.",
+      },
+    ],
   };
 }
 
@@ -244,7 +285,9 @@ function projectConfig(
     development: { issuer },
   };
   if (project.preview_origins.length > 0) {
-    environments.preview = { issuer_pattern: project.preview_origins.map((origin) => `https://${origin}`) };
+    environments.preview = {
+      issuer_pattern: project.preview_origins.map((origin) => `https://${origin}`),
+    };
   }
 
   return {

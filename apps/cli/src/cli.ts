@@ -226,7 +226,10 @@ async function dispatch(parsed: ParsedArgs, io: CliIO, global: GlobalOptions): P
       return;
     case "eject":
     case "uninstall":
-      await runEject(io, { ...withSubcommand(global, "eject"), force: boolOpt(parsed, "force") ?? global.force });
+      await runEject(io, {
+        ...withSubcommand(global, "eject"),
+        force: boolOpt(parsed, "force") ?? global.force,
+      });
       return;
   }
 
@@ -249,10 +252,7 @@ async function setupOrSkipped(parsed: ParsedArgs, io: CliIO, global: GlobalOptio
       cwd: global.cwd,
       detected: null,
     },
-    [
-      "zitadel help setup",
-      "zitadel setup --framework next --cwd <path>",
-    ],
+    ["zitadel help setup", "zitadel setup --framework next --cwd <path>"],
   );
 }
 
@@ -261,8 +261,14 @@ async function hasPackageJsonWithNext(cwd: string): Promise<boolean> {
   const { join } = await import("node:path");
   try {
     const contents = await readFile(join(cwd, "package.json"), "utf8");
-    const pkg = JSON.parse(contents) as { dependencies?: Record<string, unknown>; devDependencies?: Record<string, unknown> };
-    return Boolean((pkg.dependencies && "next" in pkg.dependencies) || (pkg.devDependencies && "next" in pkg.devDependencies));
+    const pkg = JSON.parse(contents) as {
+      dependencies?: Record<string, unknown>;
+      devDependencies?: Record<string, unknown>;
+    };
+    return Boolean(
+      (pkg.dependencies && "next" in pkg.dependencies) ||
+      (pkg.devDependencies && "next" in pkg.devDependencies),
+    );
   } catch {
     return false;
   }
@@ -304,7 +310,8 @@ async function buildGlobalOptions(parsed: ParsedArgs, io: CliIO): Promise<Global
   return {
     cwd,
     json: Boolean(parsed.options.json),
-    nonInteractive: Boolean(parsed.options.nonInteractive) || !io.isTTY || Boolean(parsed.options.json),
+    nonInteractive:
+      Boolean(parsed.options.nonInteractive) || !io.isTTY || Boolean(parsed.options.json),
     dryRun: Boolean(parsed.options.dryRun),
     force: Boolean(parsed.options.force),
     command,
@@ -319,7 +326,8 @@ function fallbackMeta(parsed: ParsedArgs, io: CliIO): GlobalOptions {
   return {
     cwd,
     json: Boolean(parsed.options.json),
-    nonInteractive: Boolean(parsed.options.nonInteractive) || !io.isTTY || Boolean(parsed.options.json),
+    nonInteractive:
+      Boolean(parsed.options.nonInteractive) || !io.isTTY || Boolean(parsed.options.json),
     dryRun: Boolean(parsed.options.dryRun),
     force: Boolean(parsed.options.force),
     command: resolveCommandName(parsed),
@@ -335,7 +343,10 @@ function resolveCommandName(parsed: ParsedArgs): string {
   if (head === "claim" && next === "status") return "claim status";
   if (head === "add" && next === "schema") return "add schema";
   if (head === "schema" && next === "add") return "schema add";
-  if ((head === "idp" || head === "app") && (next === "add" || next === "list" || next === "show" || next === "remove")) {
+  if (
+    (head === "idp" || head === "app") &&
+    (next === "add" || next === "list" || next === "show" || next === "remove")
+  ) {
     return `${head} ${next}`;
   }
   if (head === "locale" && (next === "scaffold" || next === "list")) return `locale ${next}`;
@@ -392,7 +403,7 @@ function parseArgs(argv: string[], _io: CliIO): ParsedArgs {
       inlineValue !== undefined
         ? inlineValue
         : next && !next.startsWith("-")
-          ? (index += 1, next)
+          ? ((index += 1), next)
           : true;
     setOption(options, canonical, value);
   }
@@ -400,7 +411,11 @@ function parseArgs(argv: string[], _io: CliIO): ParsedArgs {
   return { positionals, options };
 }
 
-function setOption(options: Record<string, string | boolean | string[]>, key: string, value: string | boolean): void {
+function setOption(
+  options: Record<string, string | boolean | string[]>,
+  key: string,
+  value: string | boolean,
+): void {
   const existing = options[key];
   if (existing === undefined) {
     options[key] = value;

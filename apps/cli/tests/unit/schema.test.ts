@@ -13,7 +13,9 @@ describe("user schema", () => {
   it("adds and removes fields with stable output", () => {
     const schema = defaultUserSchema();
     const withPhone = addFields(schema, [parseAddFieldSpec("phone:string:format=phone,x-mfa=sms")]);
-    expect((withPhone.properties as Record<string, Record<string, unknown>>).phone["x-mfa"]).toBe("sms");
+    expect((withPhone.properties as Record<string, Record<string, unknown>>).phone["x-mfa"]).toBe(
+      "sms",
+    );
     const removed = removeFields(withPhone, ["family_name"]);
     expect((removed.properties as Record<string, unknown>).family_name).toBeUndefined();
     expect(removed.required).not.toContain("family_name");

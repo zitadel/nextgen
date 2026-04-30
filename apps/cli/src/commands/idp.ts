@@ -54,14 +54,23 @@ export async function runIdpList(io: CliIO, opts: GlobalOptions): Promise<void> 
   const items = resources.map((entry) => ({
     slug: entry.slug,
     path: entry.path,
-    display_name: typeof entry.contents.display_name === "string" ? entry.contents.display_name : entry.slug,
+    display_name:
+      typeof entry.contents.display_name === "string" ? entry.contents.display_name : entry.slug,
     protocol: typeof entry.contents.protocol === "string" ? entry.contents.protocol : "unknown",
     enabled: entry.contents.enabled !== false,
   }));
-  ok(io, { title: `Found ${items.length} IdP${items.length === 1 ? "" : "s"}.`, idps: items }, opts);
+  ok(
+    io,
+    { title: `Found ${items.length} IdP${items.length === 1 ? "" : "s"}.`, idps: items },
+    opts,
+  );
 }
 
-export async function runIdpShow(io: CliIO, opts: GlobalOptions, slug: string | undefined): Promise<void> {
+export async function runIdpShow(
+  io: CliIO,
+  opts: GlobalOptions,
+  slug: string | undefined,
+): Promise<void> {
   if (!slug) {
     throw new ZitadelError("E_VALIDATION", "zitadel idp show requires a slug", {
       nextCommands: ["zitadel idp list"],
@@ -77,7 +86,11 @@ export async function runIdpShow(io: CliIO, opts: GlobalOptions, slug: string | 
   ok(io, { title: `IdP "${slug}"`, path: entry.path, idp: entry.contents }, opts);
 }
 
-export async function runIdpRemove(io: CliIO, opts: IdpRemoveOptions, slug: string | undefined): Promise<void> {
+export async function runIdpRemove(
+  io: CliIO,
+  opts: IdpRemoveOptions,
+  slug: string | undefined,
+): Promise<void> {
   if (!slug) {
     throw new ZitadelError("E_VALIDATION", "zitadel idp remove requires a slug", {
       nextCommands: ["zitadel idp list"],
@@ -130,7 +143,12 @@ async function buildIdpResource(opts: IdpAddOptions): Promise<Record<string, unk
         issuer: requireOpt(opts.issuer, "--issuer"),
         client_id: requireOpt(opts.clientId, "--client-id"),
         client_secret_env: requireOpt(opts.clientSecretEnv, "--env-secret"),
-        scopes: opts.scopes ? opts.scopes.split(",").map((s) => s.trim()).filter(Boolean) : ["openid", "email", "profile"],
+        scopes: opts.scopes
+          ? opts.scopes
+              .split(",")
+              .map((s) => s.trim())
+              .filter(Boolean)
+          : ["openid", "email", "profile"],
         claim_mapping: {
           email: "email",
           given_name: "given_name",

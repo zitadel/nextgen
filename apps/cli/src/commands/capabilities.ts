@@ -42,7 +42,13 @@ export async function runCapabilities(io: CliIO, opts: GlobalOptions): Promise<v
       server_defaults: {
         default_server: "https://api.zitadel.cloud",
         mock_sentinel: "mock",
-        precedence: ["--server flag", "ZITADEL_API_BASE env", "zitadel.json#environments.<env>.server", "zitadel.json#server", "default"],
+        precedence: [
+          "--server flag",
+          "ZITADEL_API_BASE env",
+          "zitadel.json#environments.<env>.server",
+          "zitadel.json#server",
+          "default",
+        ],
       },
       resource_directories: [
         { kind: "schema", dir: ".zitadel/schemas" },

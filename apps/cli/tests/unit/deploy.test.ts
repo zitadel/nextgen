@@ -4,7 +4,11 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { CloudflareDeployAdapter, NetlifyDeployAdapter, VercelDeployAdapter } from "../../src/deploy/adapters";
+import {
+  CloudflareDeployAdapter,
+  NetlifyDeployAdapter,
+  VercelDeployAdapter,
+} from "../../src/deploy/adapters";
 import type { CommandRunner } from "../../src/deploy";
 
 describe("deploy adapters", () => {
@@ -25,7 +29,11 @@ describe("deploy adapters", () => {
     });
 
     expect(result.configured).toBe(true);
-    expect(result.variables).toEqual(["ZITADEL_PROJECT_ID", "ZITADEL_ENVIRONMENT", "ZITADEL_PREVIEW_SECRET"]);
+    expect(result.variables).toEqual([
+      "ZITADEL_PROJECT_ID",
+      "ZITADEL_ENVIRONMENT",
+      "ZITADEL_PREVIEW_SECRET",
+    ]);
     expect(calls.join("\n")).not.toContain("sk_proj_hidden_preview");
   });
 
@@ -33,7 +41,8 @@ describe("deploy adapters", () => {
     const cwd = await tmpProject();
     await writeFile(join(cwd, "netlify.toml"), "[build]\n");
     const runner: CommandRunner = (command, args) => {
-      if (command === "netlify" && args[0] === "--version") return { status: 0, stdout: "", stderr: "" };
+      if (command === "netlify" && args[0] === "--version")
+        return { status: 0, stdout: "", stderr: "" };
       return { status: 1, stdout: "", stderr: "" };
     };
 
@@ -51,7 +60,7 @@ describe("deploy adapters", () => {
 
   it("reports Cloudflare Pages project status", async () => {
     const cwd = await tmpProject();
-    await writeFile(join(cwd, "wrangler.toml"), "name = \"demo\"\n");
+    await writeFile(join(cwd, "wrangler.toml"), 'name = "demo"\n');
     const runner: CommandRunner = (command) => {
       return { status: command === "wrangler" ? 0 : 1, stdout: "", stderr: "" };
     };

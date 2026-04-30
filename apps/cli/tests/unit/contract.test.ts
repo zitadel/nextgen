@@ -56,7 +56,10 @@ describe("envelope contract", () => {
   it("help for a specific command emits meta and command details", async () => {
     const result = await runCliForTest(["help", "setup", "--json"]);
     expect(result.exitCode).toBe(0);
-    const envelope = parseJson(result.stdout) as { data: { command: { name: string } } } & Record<string, unknown>;
+    const envelope = parseJson(result.stdout) as { data: { command: { name: string } } } & Record<
+      string,
+      unknown
+    >;
     assertEnvelopeMeta(envelope);
     expect(envelope.data.command.name).toBe("setup");
   });
@@ -66,7 +69,11 @@ describe("envelope contract", () => {
     expect(result.exitCode).toBe(EXIT_CODES.E_VALIDATION);
     expect(result.stderr).toBe("");
     expect(result.stdout.trim()).toMatch(/^\{[\s\S]*\}$/);
-    const envelope = parseJson(result.stdout) as { status: string; code: string; next_commands: string[] } & Record<string, unknown>;
+    const envelope = parseJson(result.stdout) as {
+      status: string;
+      code: string;
+      next_commands: string[];
+    } & Record<string, unknown>;
     assertEnvelopeMeta(envelope);
     expect(envelope.status).toBe("error");
     expect(envelope.code).toBe("E_VALIDATION");
@@ -85,7 +92,11 @@ describe("envelope contract", () => {
     const cwd = await mkdtemp(join(tmpdir(), "zitadel-contract-empty-"));
     const result = await runCliForTest(["--cwd", cwd, "--json"]);
     expect(result.exitCode).toBe(0);
-    const envelope = parseJson(result.stdout) as { status: string; reason: string; next_commands: string[] } & Record<string, unknown>;
+    const envelope = parseJson(result.stdout) as {
+      status: string;
+      reason: string;
+      next_commands: string[];
+    } & Record<string, unknown>;
     assertEnvelopeMeta(envelope);
     expect(envelope.status).toBe("skipped");
     expect(envelope.reason).toBe("no-framework-detected");
@@ -110,7 +121,15 @@ describe("envelope contract", () => {
     const cwd = await scaffoldNextProject();
     await writeFile(
       join(cwd, "zitadel.json"),
-      JSON.stringify({ $schema: "https://schemas.zitadel.com/v2/project.schema.json", project: "existing", server: "https://self.example" }, null, 2),
+      JSON.stringify(
+        {
+          $schema: "https://schemas.zitadel.com/v2/project.schema.json",
+          project: "existing",
+          server: "https://self.example",
+        },
+        null,
+        2,
+      ),
     );
     const result = await runCliForTest(["help", "--json", "--cwd", cwd]);
     const envelope = parseJson(result.stdout) as Record<string, unknown>;
@@ -121,11 +140,22 @@ describe("envelope contract", () => {
     const cwd = await scaffoldNextProject();
     await writeFile(
       join(cwd, "zitadel.json"),
-      JSON.stringify({ $schema: "https://schemas.zitadel.com/v2/project.schema.json", project: "orphan", server: "mock" }, null, 2),
+      JSON.stringify(
+        {
+          $schema: "https://schemas.zitadel.com/v2/project.schema.json",
+          project: "orphan",
+          server: "mock",
+        },
+        null,
+        2,
+      ),
     );
     const result = await runCliForTest(["status", "--cwd", cwd, "--json"]);
     expect(result.exitCode).toBe(0);
-    const envelope = parseJson(result.stdout) as { status: string; reason: string } & Record<string, unknown>;
+    const envelope = parseJson(result.stdout) as { status: string; reason: string } & Record<
+      string,
+      unknown
+    >;
     assertEnvelopeMeta(envelope);
     expect(envelope.status).toBe("skipped");
     expect(envelope.reason).toBe("orphaned-config");

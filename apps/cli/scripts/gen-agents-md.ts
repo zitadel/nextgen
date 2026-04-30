@@ -19,7 +19,9 @@ async function main() {
 function renderGeneratedBlock(): string {
   const lines: string[] = [BEGIN];
   lines.push("");
-  lines.push(`Envelope schema version: \`${ENVELOPE_SCHEMA_VERSION}\`. Every envelope carries \`cli_version\`, \`command\`, \`source\` at the top level.`);
+  lines.push(
+    `Envelope schema version: \`${ENVELOPE_SCHEMA_VERSION}\`. Every envelope carries \`cli_version\`, \`command\`, \`source\` at the top level.`,
+  );
   lines.push("");
   lines.push("## Commands");
   lines.push("");

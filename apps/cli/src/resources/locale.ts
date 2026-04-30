@@ -16,7 +16,10 @@ export function isValidLang(value: string): boolean {
   return /^[a-z]{2,3}(-[A-Z]{2})?$/.test(value);
 }
 
-export async function readLocale(cwd: string, lang: string): Promise<{ path: string; contents: Locale } | undefined> {
+export async function readLocale(
+  cwd: string,
+  lang: string,
+): Promise<{ path: string; contents: Locale } | undefined> {
   assertValidLang(lang);
   const rel = `${LOCALES_DIR}/${lang}.json`;
   const abs = join(cwd, rel);
@@ -52,7 +55,9 @@ export async function writeLocale(
   return { path: rel };
 }
 
-export async function listLocales(cwd: string): Promise<Array<{ lang: string; path: string; key_count: number }>> {
+export async function listLocales(
+  cwd: string,
+): Promise<Array<{ lang: string; path: string; key_count: number }>> {
   const dir = join(cwd, LOCALES_DIR);
   let entries: string[];
   try {
@@ -81,5 +86,10 @@ function assertValidLang(lang: string): void {
 }
 
 function isNotFound(error: unknown): boolean {
-  return typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "ENOENT";
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: string }).code === "ENOENT"
+  );
 }

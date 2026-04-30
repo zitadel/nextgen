@@ -30,7 +30,10 @@ export async function runClaim(io: CliIO, opts: ClaimOptions): Promise<void> {
     return;
   }
 
-  const claim = await createPlatformClient(opts.source, secret.project_secret).initClaim(secret.project_id, {});
+  const claim = await createPlatformClient(opts.source, secret.project_secret).initClaim(
+    secret.project_id,
+    {},
+  );
   await scaffold(
     {
       ops: [
@@ -62,7 +65,9 @@ export async function runClaim(io: CliIO, opts: ClaimOptions): Promise<void> {
       expires_at: claim.expires_at,
       next_actions: [
         "Open the claim URL in a browser and complete the human handoff.",
-        "After claim completes, run `zitadel claim status --challenge-id " + claim.challenge_id + "`.",
+        "After claim completes, run `zitadel claim status --challenge-id " +
+          claim.challenge_id +
+          "`.",
       ],
       next_commands: [`zitadel claim status --challenge-id ${claim.challenge_id}`],
     },
@@ -99,7 +104,10 @@ export async function runClaimStatus(io: CliIO, opts: ClaimOptions): Promise<voi
   const response = normalizeClaimStatus(
     opts.source === MOCK_SENTINEL && (opts.mockCompleteClaim || opts.mockAdvanceClaim)
       ? mockCompletedClaim(secret)
-      : await createPlatformClient(opts.source, secret.project_secret).getClaimStatus(secret.project_id, challengeId),
+      : await createPlatformClient(opts.source, secret.project_secret).getClaimStatus(
+          secret.project_id,
+          challengeId,
+        ),
   );
 
   if (response.status === "claimed") {
@@ -133,12 +141,18 @@ export async function runClaimStatus(io: CliIO, opts: ClaimOptions): Promise<voi
   ok(
     io,
     {
-      title: response.status === "expired" ? "Zitadel claim handoff expired." : "Zitadel claim is pending.",
+      title:
+        response.status === "expired"
+          ? "Zitadel claim handoff expired."
+          : "Zitadel claim is pending.",
       project_id: secret.project_id,
       lifecycle: "pre-claim",
       status: response.status,
       challenge_id: challengeId,
-      next_commands: response.status === "expired" ? ["zitadel claim"] : [`zitadel claim status --challenge-id ${challengeId}`],
+      next_commands:
+        response.status === "expired"
+          ? ["zitadel claim"]
+          : [`zitadel claim status --challenge-id ${challengeId}`],
     },
     opts,
   );
