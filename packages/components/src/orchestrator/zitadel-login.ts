@@ -109,8 +109,19 @@ export class ZitadelLogin extends LitElement {
     return root;
   }
 
-  override connectedCallback(): void {
-    super.connectedCallback();
+  /**
+   * Start the flow after the first render rather than in `connectedCallback`.
+   * Frameworks that wrap web components (e.g. `@lit/react` in the console)
+   * attach the element first and then assign object properties (`transport`,
+   * `branding`, `locale`) via setters. `connectedCallback` runs synchronously
+   * on attach — before any setters from a wrapper's effects/refs — so a flow
+   * kicked off there would always see `transport === null` and throw
+   * "requires either a `transport` property or a `base-url` attribute".
+   * `firstUpdated` runs after Lit's first render, by which time setters from
+   * the wrapping framework have fired, so `resolveTransport()` finds the
+   * value the consumer assigned.
+   */
+  protected override firstUpdated(): void {
     void this.startFlow();
   }
 

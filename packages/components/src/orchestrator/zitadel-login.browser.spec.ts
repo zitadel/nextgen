@@ -127,4 +127,18 @@ describe("<zitadel-login> form + focus (chromium)", () => {
     const innerInput = passwordField.shadowRoot?.querySelector("input");
     expect(passwordField.shadowRoot?.activeElement).toBe(innerInput);
   });
+
+  // Regression: frameworks like @lit/react attach the element first and assign
+  // object properties (`transport`, `branding`, `locale`) afterwards. The
+  // orchestrator must defer flow-start until properties have been applied.
+  it("starts the flow when transport is set after attach (React-style)", async () => {
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.purpose = "login";
+    host.appendChild(element);
+    // Property assigned after the element is in the DOM, simulating @lit/react.
+    element.transport = new WalkingFixtureTransport({ flow });
+    await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
+    const field = element.shadowRoot?.querySelector("zl-field");
+    expect(field?.getAttribute("name")).toBe("email");
+  });
 });

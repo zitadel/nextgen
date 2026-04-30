@@ -116,35 +116,75 @@ function Home() {
       </header>
 
       <section className="space-y-4">
-        <h2 className="text-xl font-semibold">Atoms</h2>
-        <div className="grid gap-6 rounded-lg border border-zinc-200 bg-white p-6 sm:grid-cols-2">
-          <ZlFieldEl
-            name="email"
-            label="Email"
-            type="email"
-            autocomplete="username"
-            placeholder="you@example.com"
-            required
-          />
-          <ZlFieldEl
-            name="password"
-            label="Password"
-            type="password"
-            autocomplete="current-password"
-            required
-          />
-          <ZlSubmitEl action="submit" label="Continue" />
-          <ZlActionEl action="register" label="Create account" ghost />
-          <div className="sm:col-span-2">
-            <ZlErrorEl message="Those credentials don't match. Try again." />
-          </div>
+        <header>
+          <h2 className="text-xl font-semibold">Atoms</h2>
+          <p className="text-sm text-zinc-600">
+            Standalone samples — these are individual primitives, not a working
+            form. The composed form lives in <code>&lt;zitadel-login&gt;</code>{" "}
+            below.
+          </p>
+        </header>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <AtomCard
+            tag="<zl-field>"
+            description="Form-associated text input. Email variant with placeholder."
+          >
+            <ZlFieldEl
+              name="email-sample"
+              label="Email"
+              type="email"
+              autocomplete="username"
+              placeholder="you@example.com"
+            />
+          </AtomCard>
+
+          <AtomCard
+            tag="<zl-field>"
+            description="Required password variant. Shows the asterisk + native validity."
+          >
+            <ZlFieldEl
+              name="password-sample"
+              label="Password"
+              type="password"
+              autocomplete="current-password"
+              required
+            />
+          </AtomCard>
+
+          <AtomCard
+            tag="<zl-submit>"
+            description="Primary submit. Wired to the surrounding form's submit cycle."
+          >
+            <ZlSubmitEl action="submit-sample" label="Continue" />
+          </AtomCard>
+
+          <AtomCard
+            tag="<zl-action>"
+            description="Secondary action. Ghost variant for low-emphasis links."
+          >
+            <ZlActionEl action="register-sample" label="Create account" ghost />
+          </AtomCard>
+
+          <AtomCard
+            tag="<zl-error>"
+            description="Step-level error region. Hidden when message is empty."
+            full
+          >
+            <ZlErrorEl message="Sample error message — would appear after a failed submit." />
+          </AtomCard>
         </div>
       </section>
 
       <section className="space-y-4">
-        <h2 className="text-xl font-semibold">
-          <code>&lt;zitadel-login&gt;</code>
-        </h2>
+        <header>
+          <h2 className="text-xl font-semibold">
+            <code>&lt;zitadel-login&gt;</code>
+          </h2>
+          <p className="text-sm text-zinc-600">
+            The composed orchestrator. Drives the flow API end-to-end through a
+            fixture transport.
+          </p>
+        </header>
         <div className="rounded-lg border border-zinc-200 bg-white p-6 shadow-sm">
           <ZitadelLoginEl
             purpose="login"
@@ -153,6 +193,32 @@ function Home() {
           />
         </div>
       </section>
+    </div>
+  );
+}
+
+function AtomCard({
+  tag,
+  description,
+  full,
+  children,
+}: {
+  tag: string;
+  description: string;
+  full?: boolean;
+  children: react.ReactNode;
+}) {
+  return (
+    <div
+      className={`rounded-lg border border-zinc-200 bg-white p-4 shadow-sm ${
+        full ? "sm:col-span-2" : ""
+      }`}
+    >
+      <div className="mb-3">
+        <code className="text-sm font-semibold text-zinc-900">{tag}</code>
+        <p className="mt-1 text-xs text-zinc-500">{description}</p>
+      </div>
+      {children}
     </div>
   );
 }
