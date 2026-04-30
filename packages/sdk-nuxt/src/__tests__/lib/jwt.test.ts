@@ -321,6 +321,25 @@ describe('verifyJwt', () => {
       );
       expect(payload).not.toBeNull();
     });
+
+    it('rejects a token with no alg in the header', async () => {
+      const kid = nextKid();
+      // Build a properly-signed RS256 token whose header omits 'alg'.
+      // Without the fix, this defaults to RS256 and passes verification.
+      // With the fix, the missing 'alg' is rejected immediately.
+      const rawHeader = b64url(Buffer.from(JSON.stringify({ typ: 'JWT', kid })));
+      const rawPayload = b64url(
+        Buffer.from(JSON.stringify({ sub: 'u', exp: ts(3600) })),
+      );
+      const signing = `${rawHeader}.${rawPayload}`;
+      const sig = b64url(
+        createSign('SHA256').update(signing).sign(PRIVATE_KEY_PEM),
+      );
+      const token = `${signing}.${sig}`;
+      vi.stubGlobal('fetch', mockJwks(kid));
+
+      expect(await verifyJwt(token, baseOpts())).toBeNull();
+    });
   });
 
 

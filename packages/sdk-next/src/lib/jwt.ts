@@ -145,6 +145,22 @@ export interface JwtPayload {
 }
 
 /**
+ * The typed representation of a JWT header.
+ *
+ * The three fields below are the only ones this library reads. Additional
+ * header parameters are preserved under the index signature.
+ */
+export interface JwtHeader {
+  /** Signing algorithm (`alg`) — e.g. `"RS256"`, `"ES256"`. */
+  readonly alg?: string;
+  /** Token type (`typ`) — e.g. `"JWT"`, `"at+JWT"`. */
+  readonly typ?: string;
+  /** Key ID (`kid`) — selects the matching public key from the JWKS. */
+  readonly kid?: string;
+  readonly [key: string]: unknown;
+}
+
+/**
  * The decoded, unverified parts of a compact-serialised JWT.
  *
  * **Do not act on these values before signature verification.**
@@ -152,7 +168,7 @@ export interface JwtPayload {
  * raw data into the next step.
  */
 export interface DecodedJwt {
-  readonly header: Readonly<Record<string, unknown>>;
+  readonly header: JwtHeader;
   readonly payload: JwtPayload;
 }
 
@@ -297,10 +313,7 @@ export function decodeJwt(token: string): DecodedJwt {
   }
   const [h, p] = segments;
   return {
-    header: JSON.parse(DECODER.decode(base64UrlDecode(h))) as Record<
-      string,
-      unknown
-    >,
+    header: JSON.parse(DECODER.decode(base64UrlDecode(h))) as JwtHeader,
     payload: JSON.parse(DECODER.decode(base64UrlDecode(p))) as JwtPayload,
   };
 }
@@ -334,7 +347,9 @@ const VERIFY_PARAMS = {
   ES512: { name: 'ECDSA', hash: 'SHA-512' },
 } satisfies Record<string, EcdsaParams | Algorithm>;
 
-function assertSupportedAlgorithm(alg: string): void {
+function assertSupportedAlgorithm(
+  alg: string,
+): asserts alg is keyof typeof IMPORT_PARAMS {
   if (!Object.hasOwn(IMPORT_PARAMS, alg)) {
     throw new TypeError(
       `Unsupported JWT algorithm: "${alg}". Supported algorithms are ${Object.keys(IMPORT_PARAMS).join(', ')}.`,
@@ -346,12 +361,12 @@ function resolveImportAlgorithm(
   alg: string,
 ): RsaHashedImportParams | EcKeyImportParams {
   assertSupportedAlgorithm(alg);
-  return IMPORT_PARAMS[alg as keyof typeof IMPORT_PARAMS];
+  return IMPORT_PARAMS[alg];
 }
 
 function resolveVerifyAlgorithm(alg: string): EcdsaParams | Algorithm {
   assertSupportedAlgorithm(alg);
-  return VERIFY_PARAMS[alg as keyof typeof VERIFY_PARAMS];
+  return VERIFY_PARAMS[alg];
 }
 
 // ─── JWKS fetch ───────────────────────────────────────────────────────────────
@@ -398,6 +413,10 @@ async function fetchAndCacheJwks(
     return null;
   }
 
+  // RFC 7517 §4.4 makes 'alg' optional in a JWK — the key material (kty, n/e
+  // for RSA; kty/crv/x/y for EC) determines the key type. Fall back to RS256
+  // when absent. The actual algorithm enforcement happens in verifyJwt via the
+  // JWT header's 'alg' claim, not here.
   const alg = (jwk.alg as string | undefined) ?? 'RS256';
   const cryptoKey = await crypto.subtle.importKey(
     'jwk',
@@ -458,12 +477,17 @@ export async function verifyJwt(
 
     const header = JSON.parse(
       DECODER.decode(base64UrlDecode(rawHeader)),
-    ) as Record<string, unknown>;
+    ) as JwtHeader;
     const payload = JSON.parse(
       DECODER.decode(base64UrlDecode(rawPayload)),
     ) as JwtPayload;
 
-    const alg = (header.alg as string | undefined) ?? 'RS256';
+    // RFC 7515 §4.1.1 requires 'alg' in the JWT header. A token that omits it
+    // is structurally invalid — we reject it rather than guessing an algorithm.
+    const alg = header.alg;
+    if (!alg) {
+      return null;
+    }
     if (
       allowedAlgorithms &&
       allowedAlgorithms.length > 0 &&
@@ -473,7 +497,7 @@ export async function verifyJwt(
     }
 
     if (allowedTokenTypes.length > 0) {
-      const typ = (header.typ as string | undefined) ?? '';
+      const typ = header.typ ?? '';
       if (
         !allowedTokenTypes.some((t) => t.toLowerCase() === typ.toLowerCase())
       ) {
@@ -481,7 +505,7 @@ export async function verifyJwt(
       }
     }
 
-    const kid = header.kid as string | undefined;
+    const kid = header.kid;
     const cryptoKey = await fetchAndCacheJwks(
       `${issuerUrl}/oauth/v2/keys`,
       kid,
