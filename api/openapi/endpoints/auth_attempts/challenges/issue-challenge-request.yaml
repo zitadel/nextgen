@@ -2,8 +2,7 @@ description: |
   Request to issue a factor challenge.
 
   Use the `method` field as the discriminator. Each method variant enforces its
-  own required fields at the schema level so that generators (including ogen) can
-  emit correct validation code without relying on `if/then` semantics.
+  own required fields at the schema level.
 discriminator:
   propertyName: method
 oneOf:
@@ -93,7 +92,7 @@ oneOf:
         type: string
         description: The federated identity provider to redirect to.
         example: google
-  - title: IssueChallengeByCaptha
+  - title: IssueChallengeByCaptcha
     type: object
     required: [method]
     additionalProperties: false
