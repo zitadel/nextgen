@@ -1,40 +1,104 @@
-type: object
-description: Request to issue a factor challenge
-required:
-  - method
-properties:
-  method:
-    type: string
-    description: The authentication factor method to challenge.
-    enum:
-      - identifier
-      - password
-      - passkey
-      - totp
-      - otp_sms
-      - otp_email
-      - recovery_code
-      - idp
-      - captcha
-    example: password
-  passkey:
+description: |
+  Request to issue a factor challenge.
+
+  Use the `method` field as the discriminator. Each method variant enforces its
+  own required fields at the schema level so that generators (including ogen) can
+  emit correct validation code without relying on `if/then` semantics.
+discriminator:
+  propertyName: method
+oneOf:
+  - title: IssueChallengeByIdentifier
     type: object
-    description: Optional options for the WebAuthn passkey ceremony. Only relevant when method is `passkey`.
-    properties:
-      userVerification:
-        type: string
-        description: The user verification requirement for the passkey challenge.
-        enum: [required, preferred, discouraged]
-        example: required
+    required: [method]
     additionalProperties: false
-  idp_provider:
-    type: string
-    description: The federated identity provider to redirect to. Required when method is `idp`.
-    example: google
-if:
-  properties:
-    method:
-      const: idp
-then:
-  required:
-    - idp_provider
+    properties:
+      method:
+        type: string
+        const: identifier
+        example: identifier
+  - title: IssueChallengeByPassword
+    type: object
+    required: [method]
+    additionalProperties: false
+    properties:
+      method:
+        type: string
+        const: password
+        example: password
+  - title: IssueChallengeByPasskey
+    type: object
+    required: [method]
+    additionalProperties: false
+    properties:
+      method:
+        type: string
+        const: passkey
+        example: passkey
+      options:
+        type: object
+        description: Optional options for the WebAuthn passkey ceremony.
+        additionalProperties: false
+        properties:
+          userVerification:
+            type: string
+            description: The user verification requirement for the passkey challenge.
+            enum: [required, preferred, discouraged]
+            example: required
+  - title: IssueChallengeByTotp
+    type: object
+    required: [method]
+    additionalProperties: false
+    properties:
+      method:
+        type: string
+        const: totp
+        example: totp
+  - title: IssueChallengeByOtpSms
+    type: object
+    required: [method]
+    additionalProperties: false
+    properties:
+      method:
+        type: string
+        const: otp_sms
+        example: otp_sms
+  - title: IssueChallengeByOtpEmail
+    type: object
+    required: [method]
+    additionalProperties: false
+    properties:
+      method:
+        type: string
+        const: otp_email
+        example: otp_email
+  - title: IssueChallengeByRecoveryCode
+    type: object
+    required: [method]
+    additionalProperties: false
+    properties:
+      method:
+        type: string
+        const: recovery_code
+        example: recovery_code
+  - title: IssueChallengeByIdp
+    type: object
+    required: [method, idp_provider]
+    additionalProperties: false
+    properties:
+      method:
+        type: string
+        const: idp
+        example: idp
+      idp_provider:
+        type: string
+        description: The federated identity provider to redirect to.
+        example: google
+  - title: IssueChallengeByCaptha
+    type: object
+    required: [method]
+    additionalProperties: false
+    properties:
+      method:
+        type: string
+        const: captcha
+        example: captcha

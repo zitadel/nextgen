@@ -49,7 +49,7 @@ type Handler interface {
 	// Completes the authentication attempt and mints a `handoff_token`.
 	// Call this after all required factors have been verified and the attempt is in `completed` state.
 	// The handoff token is short-lived (≤60 seconds) and must be exchanged at
-	// POST /session_handoffs/{id}/exchange to receive the final session and session_token.
+	// POST /sessions/exchange to receive the final session and session_token.
 	// The handoff token is:
 	// - Single-use (atomic exchange, no retry)
 	// - Audience-bound (requires matching project key for exchange)
@@ -172,16 +172,6 @@ type Handler interface {
 	//
 	// POST /auth/introspect
 	Introspect(ctx context.Context, req *IntrospectRequest) (IntrospectRes, error)
-	// IssueChallenge implements issueChallenge operation.
-	//
-	// Issues a single-factor verification challenge within an auth attempt.
-	// This advances the authentication state machine by requesting a specific factor method
-	// (password, passkey, TOTP, OTP via SMS, etc.). The server responds with challenge details
-	// including method, metadata, and any UI hints. The client then verifies the proof
-	// by calling POST /auth_attempts/{id}/challenges/{cid}/verify.
-	//
-	// POST /auth_attempts/{attempt_id}/challenges
-	IssueChallenge(ctx context.Context, req *IssueChallengeRequest, params IssueChallengeParams) (IssueChallengeRes, error)
 	// ListSessions implements listSessions operation.
 	//
 	// Returns a paginated list of sessions for a project.

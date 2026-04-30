@@ -66,7 +66,7 @@ func (UnimplementedHandler) CreateFlow(ctx context.Context, req *CreateFlowReque
 // Completes the authentication attempt and mints a `handoff_token`.
 // Call this after all required factors have been verified and the attempt is in `completed` state.
 // The handoff token is short-lived (≤60 seconds) and must be exchanged at
-// POST /session_handoffs/{id}/exchange to receive the final session and session_token.
+// POST /sessions/exchange to receive the final session and session_token.
 // The handoff token is:
 // - Single-use (atomic exchange, no retry)
 // - Audience-bound (requires matching project key for exchange)
@@ -231,19 +231,6 @@ func (UnimplementedHandler) GetUserInfo(ctx context.Context) (r GetUserInfoRes, 
 //
 // POST /auth/introspect
 func (UnimplementedHandler) Introspect(ctx context.Context, req *IntrospectRequest) (r IntrospectRes, _ error) {
-	return r, ht.ErrNotImplemented
-}
-
-// IssueChallenge implements issueChallenge operation.
-//
-// Issues a single-factor verification challenge within an auth attempt.
-// This advances the authentication state machine by requesting a specific factor method
-// (password, passkey, TOTP, OTP via SMS, etc.). The server responds with challenge details
-// including method, metadata, and any UI hints. The client then verifies the proof
-// by calling POST /auth_attempts/{id}/challenges/{cid}/verify.
-//
-// POST /auth_attempts/{attempt_id}/challenges
-func (UnimplementedHandler) IssueChallenge(ctx context.Context, req *IssueChallengeRequest, params IssueChallengeParams) (r IssueChallengeRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
