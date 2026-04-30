@@ -24,12 +24,28 @@ type AttemptID string
 type AuthAttemptResponse struct {
 	AttemptID AttemptID `json:"attempt_id"`
 	ProjectID ProjectID `json:"project_id"`
+	// Overall state of the authentication attempt:
+	// - `in_progress`: factors are still being collected; continue issuing challenges.
+	// - `completed`: all required factors have been verified; the attempt is ready for handoff.
+	// - `failed`: the attempt has failed (e.g. too many failed proofs) and cannot be continued.
+	// - `expired`: the 15-minute TTL has been exceeded.
+	State AuthAttemptResponseState `json:"state"`
 	// The session being authenticated into. Either newly created or passed in on POST.
 	// For step-up (re-auth), this is the existing session_id provided on creation.
 	SessionID OptNilSessionID `json:"session_id"`
 	// The user ID, if known at this point in the flow.
 	// Null until an identifier challenge has been verified.
 	UserID OptNilUserID `json:"user_id"`
+	// The authentication factor methods that the project policy requires in order
+	// to complete this attempt. Computed by the server from the project's auth policy.
+	// Clients should use this to determine which challenges still need to be issued.
+	RequiredFactors []FactorMethod `json:"required_factors"`
+	// The factor methods that have been successfully verified in this attempt so far.
+	// A factor appears here once its challenge reaches `verified` state.
+	CompletedFactors []FactorMethod `json:"completed_factors"`
+	// All challenges issued within this attempt, in creation order.
+	// Use this to track the state of each factor challenge (pending, verified, failed, expired).
+	Challenges []ChallengeResponse `json:"challenges"`
 	// When this attempt expires (15-minute TTL from creation).
 	ExpiresAt time.Time `json:"expires_at"`
 	// When this attempt was created.
@@ -46,6 +62,11 @@ func (s *AuthAttemptResponse) GetProjectID() ProjectID {
 	return s.ProjectID
 }
 
+// GetState returns the value of State.
+func (s *AuthAttemptResponse) GetState() AuthAttemptResponseState {
+	return s.State
+}
+
 // GetSessionID returns the value of SessionID.
 func (s *AuthAttemptResponse) GetSessionID() OptNilSessionID {
 	return s.SessionID
@@ -54,6 +75,21 @@ func (s *AuthAttemptResponse) GetSessionID() OptNilSessionID {
 // GetUserID returns the value of UserID.
 func (s *AuthAttemptResponse) GetUserID() OptNilUserID {
 	return s.UserID
+}
+
+// GetRequiredFactors returns the value of RequiredFactors.
+func (s *AuthAttemptResponse) GetRequiredFactors() []FactorMethod {
+	return s.RequiredFactors
+}
+
+// GetCompletedFactors returns the value of CompletedFactors.
+func (s *AuthAttemptResponse) GetCompletedFactors() []FactorMethod {
+	return s.CompletedFactors
+}
+
+// GetChallenges returns the value of Challenges.
+func (s *AuthAttemptResponse) GetChallenges() []ChallengeResponse {
+	return s.Challenges
 }
 
 // GetExpiresAt returns the value of ExpiresAt.
@@ -76,6 +112,11 @@ func (s *AuthAttemptResponse) SetProjectID(val ProjectID) {
 	s.ProjectID = val
 }
 
+// SetState sets the value of State.
+func (s *AuthAttemptResponse) SetState(val AuthAttemptResponseState) {
+	s.State = val
+}
+
 // SetSessionID sets the value of SessionID.
 func (s *AuthAttemptResponse) SetSessionID(val OptNilSessionID) {
 	s.SessionID = val
@@ -84,6 +125,21 @@ func (s *AuthAttemptResponse) SetSessionID(val OptNilSessionID) {
 // SetUserID sets the value of UserID.
 func (s *AuthAttemptResponse) SetUserID(val OptNilUserID) {
 	s.UserID = val
+}
+
+// SetRequiredFactors sets the value of RequiredFactors.
+func (s *AuthAttemptResponse) SetRequiredFactors(val []FactorMethod) {
+	s.RequiredFactors = val
+}
+
+// SetCompletedFactors sets the value of CompletedFactors.
+func (s *AuthAttemptResponse) SetCompletedFactors(val []FactorMethod) {
+	s.CompletedFactors = val
+}
+
+// SetChallenges sets the value of Challenges.
+func (s *AuthAttemptResponse) SetChallenges(val []ChallengeResponse) {
+	s.Challenges = val
 }
 
 // SetExpiresAt sets the value of ExpiresAt.
@@ -99,6 +155,66 @@ func (s *AuthAttemptResponse) SetCreatedAt(val time.Time) {
 func (*AuthAttemptResponse) createAuthAttemptRes()    {}
 func (*AuthAttemptResponse) getAuthAttemptRes()       {}
 func (*AuthAttemptResponse) verifyChallengeProofRes() {}
+
+// Overall state of the authentication attempt:
+// - `in_progress`: factors are still being collected; continue issuing challenges.
+// - `completed`: all required factors have been verified; the attempt is ready for handoff.
+// - `failed`: the attempt has failed (e.g. too many failed proofs) and cannot be continued.
+// - `expired`: the 15-minute TTL has been exceeded.
+type AuthAttemptResponseState string
+
+const (
+	AuthAttemptResponseStateInProgress AuthAttemptResponseState = "in_progress"
+	AuthAttemptResponseStateCompleted  AuthAttemptResponseState = "completed"
+	AuthAttemptResponseStateFailed     AuthAttemptResponseState = "failed"
+	AuthAttemptResponseStateExpired    AuthAttemptResponseState = "expired"
+)
+
+// AllValues returns all AuthAttemptResponseState values.
+func (AuthAttemptResponseState) AllValues() []AuthAttemptResponseState {
+	return []AuthAttemptResponseState{
+		AuthAttemptResponseStateInProgress,
+		AuthAttemptResponseStateCompleted,
+		AuthAttemptResponseStateFailed,
+		AuthAttemptResponseStateExpired,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s AuthAttemptResponseState) MarshalText() ([]byte, error) {
+	switch s {
+	case AuthAttemptResponseStateInProgress:
+		return []byte(s), nil
+	case AuthAttemptResponseStateCompleted:
+		return []byte(s), nil
+	case AuthAttemptResponseStateFailed:
+		return []byte(s), nil
+	case AuthAttemptResponseStateExpired:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *AuthAttemptResponseState) UnmarshalText(data []byte) error {
+	switch AuthAttemptResponseState(data) {
+	case AuthAttemptResponseStateInProgress:
+		*s = AuthAttemptResponseStateInProgress
+		return nil
+	case AuthAttemptResponseStateCompleted:
+		*s = AuthAttemptResponseStateCompleted
+		return nil
+	case AuthAttemptResponseStateFailed:
+		*s = AuthAttemptResponseStateFailed
+		return nil
+	case AuthAttemptResponseStateExpired:
+		*s = AuthAttemptResponseStateExpired
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
 
 // AuthorizeGetFound is response for AuthorizeGet operation.
 type AuthorizeGetFound struct{}
@@ -221,6 +337,142 @@ func (s *BrandingLayout) UnmarshalText(data []byte) error {
 }
 
 type ChallengeID string
+
+// A factor challenge issued within an authentication attempt.
+// A challenge presents a single-factor verification prompt (password entry, TOTP code, passkey
+// assertion, etc.).
+// The client verifies the proof by POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify.
+// Ref: #
+type ChallengeResponse struct {
+	ChallengeID ChallengeID `json:"challenge_id"`
+	// The authentication method this challenge represents.
+	// Determines which proof is expected in verify.
+	Method FactorMethod `json:"method"`
+	// Current state of this challenge:
+	// - `pending`: awaiting proof submission
+	// - `verified`: proof accepted, factor  recorded on the auth attempt; it is materialized into a
+	// session only when the auth flow is completed
+	// - `failed`: proof rejected (invalid credential, wrong code, etc.)
+	// - `expired`: challenge TTL exceeded without verification.
+	State ChallengeResponseState `json:"state"`
+	// When this challenge was issued.
+	CreatedAt time.Time `json:"created_at"`
+	// When this challenge expires.
+	ExpiresAt OptNilDateTime `json:"expires_at"`
+}
+
+// GetChallengeID returns the value of ChallengeID.
+func (s *ChallengeResponse) GetChallengeID() ChallengeID {
+	return s.ChallengeID
+}
+
+// GetMethod returns the value of Method.
+func (s *ChallengeResponse) GetMethod() FactorMethod {
+	return s.Method
+}
+
+// GetState returns the value of State.
+func (s *ChallengeResponse) GetState() ChallengeResponseState {
+	return s.State
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *ChallengeResponse) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetExpiresAt returns the value of ExpiresAt.
+func (s *ChallengeResponse) GetExpiresAt() OptNilDateTime {
+	return s.ExpiresAt
+}
+
+// SetChallengeID sets the value of ChallengeID.
+func (s *ChallengeResponse) SetChallengeID(val ChallengeID) {
+	s.ChallengeID = val
+}
+
+// SetMethod sets the value of Method.
+func (s *ChallengeResponse) SetMethod(val FactorMethod) {
+	s.Method = val
+}
+
+// SetState sets the value of State.
+func (s *ChallengeResponse) SetState(val ChallengeResponseState) {
+	s.State = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *ChallengeResponse) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetExpiresAt sets the value of ExpiresAt.
+func (s *ChallengeResponse) SetExpiresAt(val OptNilDateTime) {
+	s.ExpiresAt = val
+}
+
+func (*ChallengeResponse) issueChallengeRes() {}
+
+// Current state of this challenge:
+// - `pending`: awaiting proof submission
+// - `verified`: proof accepted, factor  recorded on the auth attempt; it is materialized into a
+// session only when the auth flow is completed
+// - `failed`: proof rejected (invalid credential, wrong code, etc.)
+// - `expired`: challenge TTL exceeded without verification.
+type ChallengeResponseState string
+
+const (
+	ChallengeResponseStatePending  ChallengeResponseState = "pending"
+	ChallengeResponseStateVerified ChallengeResponseState = "verified"
+	ChallengeResponseStateFailed   ChallengeResponseState = "failed"
+	ChallengeResponseStateExpired  ChallengeResponseState = "expired"
+)
+
+// AllValues returns all ChallengeResponseState values.
+func (ChallengeResponseState) AllValues() []ChallengeResponseState {
+	return []ChallengeResponseState{
+		ChallengeResponseStatePending,
+		ChallengeResponseStateVerified,
+		ChallengeResponseStateFailed,
+		ChallengeResponseStateExpired,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ChallengeResponseState) MarshalText() ([]byte, error) {
+	switch s {
+	case ChallengeResponseStatePending:
+		return []byte(s), nil
+	case ChallengeResponseStateVerified:
+		return []byte(s), nil
+	case ChallengeResponseStateFailed:
+		return []byte(s), nil
+	case ChallengeResponseStateExpired:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ChallengeResponseState) UnmarshalText(data []byte) error {
+	switch ChallengeResponseState(data) {
+	case ChallengeResponseStatePending:
+		*s = ChallengeResponseStatePending
+		return nil
+	case ChallengeResponseStateVerified:
+		*s = ChallengeResponseStateVerified
+		return nil
+	case ChallengeResponseStateFailed:
+		*s = ChallengeResponseStateFailed
+		return nil
+	case ChallengeResponseStateExpired:
+		*s = ChallengeResponseStateExpired
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
 
 type CreateAuthAttemptBadRequest ErrorDetails
 
@@ -728,6 +980,7 @@ func (*ErrorDetailsStatusCode) getSessionRes()             {}
 func (*ErrorDetailsStatusCode) getTokenRes()               {}
 func (*ErrorDetailsStatusCode) getUserInfoRes()            {}
 func (*ErrorDetailsStatusCode) introspectRes()             {}
+func (*ErrorDetailsStatusCode) issueChallengeRes()         {}
 func (*ErrorDetailsStatusCode) listSessionsRes()           {}
 func (*ErrorDetailsStatusCode) listUsersRes()              {}
 func (*ErrorDetailsStatusCode) revokeSessionRes()          {}
@@ -762,6 +1015,98 @@ func (s *ExchangeRequest) GetHandoffToken() string {
 // SetHandoffToken sets the value of HandoffToken.
 func (s *ExchangeRequest) SetHandoffToken(val string) {
 	s.HandoffToken = val
+}
+
+// An authentication factor method.
+// Ref: #
+type FactorMethod string
+
+const (
+	FactorMethodIdentifier   FactorMethod = "identifier"
+	FactorMethodPassword     FactorMethod = "password"
+	FactorMethodPasskey      FactorMethod = "passkey"
+	FactorMethodTotp         FactorMethod = "totp"
+	FactorMethodOtpSMS       FactorMethod = "otp_sms"
+	FactorMethodOtpEmail     FactorMethod = "otp_email"
+	FactorMethodRecoveryCode FactorMethod = "recovery_code"
+	FactorMethodIdp          FactorMethod = "idp"
+	FactorMethodCaptcha      FactorMethod = "captcha"
+)
+
+// AllValues returns all FactorMethod values.
+func (FactorMethod) AllValues() []FactorMethod {
+	return []FactorMethod{
+		FactorMethodIdentifier,
+		FactorMethodPassword,
+		FactorMethodPasskey,
+		FactorMethodTotp,
+		FactorMethodOtpSMS,
+		FactorMethodOtpEmail,
+		FactorMethodRecoveryCode,
+		FactorMethodIdp,
+		FactorMethodCaptcha,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FactorMethod) MarshalText() ([]byte, error) {
+	switch s {
+	case FactorMethodIdentifier:
+		return []byte(s), nil
+	case FactorMethodPassword:
+		return []byte(s), nil
+	case FactorMethodPasskey:
+		return []byte(s), nil
+	case FactorMethodTotp:
+		return []byte(s), nil
+	case FactorMethodOtpSMS:
+		return []byte(s), nil
+	case FactorMethodOtpEmail:
+		return []byte(s), nil
+	case FactorMethodRecoveryCode:
+		return []byte(s), nil
+	case FactorMethodIdp:
+		return []byte(s), nil
+	case FactorMethodCaptcha:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FactorMethod) UnmarshalText(data []byte) error {
+	switch FactorMethod(data) {
+	case FactorMethodIdentifier:
+		*s = FactorMethodIdentifier
+		return nil
+	case FactorMethodPassword:
+		*s = FactorMethodPassword
+		return nil
+	case FactorMethodPasskey:
+		*s = FactorMethodPasskey
+		return nil
+	case FactorMethodTotp:
+		*s = FactorMethodTotp
+		return nil
+	case FactorMethodOtpSMS:
+		*s = FactorMethodOtpSMS
+		return nil
+	case FactorMethodOtpEmail:
+		*s = FactorMethodOtpEmail
+		return nil
+	case FactorMethodRecoveryCode:
+		*s = FactorMethodRecoveryCode
+		return nil
+	case FactorMethodIdp:
+		*s = FactorMethodIdp
+		return nil
+	case FactorMethodCaptcha:
+		*s = FactorMethodCaptcha
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
 }
 
 // A data input capability. Describes what the user must provide.
@@ -2171,6 +2516,127 @@ func (s *IntrospectResponse) SetUsername(val OptString) {
 }
 
 func (*IntrospectResponse) introspectRes() {}
+
+type IssueChallengeBadRequest ErrorDetails
+
+func (*IssueChallengeBadRequest) issueChallengeRes() {}
+
+type IssueChallengeConflict ErrorDetails
+
+func (*IssueChallengeConflict) issueChallengeRes() {}
+
+type IssueChallengeNotFound ErrorDetails
+
+func (*IssueChallengeNotFound) issueChallengeRes() {}
+
+// Request to issue a factor challenge.
+// The `method` field selects which factor to challenge. Additional fields are
+// only relevant for specific methods:
+// - `passkey_options` is optional and only used when `method` is `passkey`.
+// - `idp_provider` is required when `method` is `idp` and must be omitted otherwise.
+// This conditional requirement is enforced server-side.
+// Ref: #
+type IssueChallengeRequest struct {
+	// The authentication factor method to challenge.
+	Method FactorMethod `json:"method"`
+	// Optional WebAuthn ceremony options. Only relevant when `method` is `passkey`.
+	PasskeyOptions OptIssueChallengeRequestPasskeyOptions `json:"passkey_options"`
+	// The federated identity provider to redirect to. Required when `method` is `idp`.
+	IdpProvider OptString `json:"idp_provider"`
+}
+
+// GetMethod returns the value of Method.
+func (s *IssueChallengeRequest) GetMethod() FactorMethod {
+	return s.Method
+}
+
+// GetPasskeyOptions returns the value of PasskeyOptions.
+func (s *IssueChallengeRequest) GetPasskeyOptions() OptIssueChallengeRequestPasskeyOptions {
+	return s.PasskeyOptions
+}
+
+// GetIdpProvider returns the value of IdpProvider.
+func (s *IssueChallengeRequest) GetIdpProvider() OptString {
+	return s.IdpProvider
+}
+
+// SetMethod sets the value of Method.
+func (s *IssueChallengeRequest) SetMethod(val FactorMethod) {
+	s.Method = val
+}
+
+// SetPasskeyOptions sets the value of PasskeyOptions.
+func (s *IssueChallengeRequest) SetPasskeyOptions(val OptIssueChallengeRequestPasskeyOptions) {
+	s.PasskeyOptions = val
+}
+
+// SetIdpProvider sets the value of IdpProvider.
+func (s *IssueChallengeRequest) SetIdpProvider(val OptString) {
+	s.IdpProvider = val
+}
+
+// Optional WebAuthn ceremony options. Only relevant when `method` is `passkey`.
+type IssueChallengeRequestPasskeyOptions struct {
+	UserVerification OptIssueChallengeRequestPasskeyOptionsUserVerification `json:"userVerification"`
+}
+
+// GetUserVerification returns the value of UserVerification.
+func (s *IssueChallengeRequestPasskeyOptions) GetUserVerification() OptIssueChallengeRequestPasskeyOptionsUserVerification {
+	return s.UserVerification
+}
+
+// SetUserVerification sets the value of UserVerification.
+func (s *IssueChallengeRequestPasskeyOptions) SetUserVerification(val OptIssueChallengeRequestPasskeyOptionsUserVerification) {
+	s.UserVerification = val
+}
+
+type IssueChallengeRequestPasskeyOptionsUserVerification string
+
+const (
+	IssueChallengeRequestPasskeyOptionsUserVerificationRequired    IssueChallengeRequestPasskeyOptionsUserVerification = "required"
+	IssueChallengeRequestPasskeyOptionsUserVerificationPreferred   IssueChallengeRequestPasskeyOptionsUserVerification = "preferred"
+	IssueChallengeRequestPasskeyOptionsUserVerificationDiscouraged IssueChallengeRequestPasskeyOptionsUserVerification = "discouraged"
+)
+
+// AllValues returns all IssueChallengeRequestPasskeyOptionsUserVerification values.
+func (IssueChallengeRequestPasskeyOptionsUserVerification) AllValues() []IssueChallengeRequestPasskeyOptionsUserVerification {
+	return []IssueChallengeRequestPasskeyOptionsUserVerification{
+		IssueChallengeRequestPasskeyOptionsUserVerificationRequired,
+		IssueChallengeRequestPasskeyOptionsUserVerificationPreferred,
+		IssueChallengeRequestPasskeyOptionsUserVerificationDiscouraged,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s IssueChallengeRequestPasskeyOptionsUserVerification) MarshalText() ([]byte, error) {
+	switch s {
+	case IssueChallengeRequestPasskeyOptionsUserVerificationRequired:
+		return []byte(s), nil
+	case IssueChallengeRequestPasskeyOptionsUserVerificationPreferred:
+		return []byte(s), nil
+	case IssueChallengeRequestPasskeyOptionsUserVerificationDiscouraged:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *IssueChallengeRequestPasskeyOptionsUserVerification) UnmarshalText(data []byte) error {
+	switch IssueChallengeRequestPasskeyOptionsUserVerification(data) {
+	case IssueChallengeRequestPasskeyOptionsUserVerificationRequired:
+		*s = IssueChallengeRequestPasskeyOptionsUserVerificationRequired
+		return nil
+	case IssueChallengeRequestPasskeyOptionsUserVerificationPreferred:
+		*s = IssueChallengeRequestPasskeyOptionsUserVerificationPreferred
+		return nil
+	case IssueChallengeRequestPasskeyOptionsUserVerificationDiscouraged:
+		*s = IssueChallengeRequestPasskeyOptionsUserVerificationDiscouraged
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
 
 // Ref: #
 type KeysResponse struct {
@@ -3815,6 +4281,98 @@ func (o OptInt) Or(d int) int {
 	return d
 }
 
+// NewOptIssueChallengeRequestPasskeyOptions returns new OptIssueChallengeRequestPasskeyOptions with value set to v.
+func NewOptIssueChallengeRequestPasskeyOptions(v IssueChallengeRequestPasskeyOptions) OptIssueChallengeRequestPasskeyOptions {
+	return OptIssueChallengeRequestPasskeyOptions{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptIssueChallengeRequestPasskeyOptions is optional IssueChallengeRequestPasskeyOptions.
+type OptIssueChallengeRequestPasskeyOptions struct {
+	Value IssueChallengeRequestPasskeyOptions
+	Set   bool
+}
+
+// IsSet returns true if OptIssueChallengeRequestPasskeyOptions was set.
+func (o OptIssueChallengeRequestPasskeyOptions) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptIssueChallengeRequestPasskeyOptions) Reset() {
+	var v IssueChallengeRequestPasskeyOptions
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptIssueChallengeRequestPasskeyOptions) SetTo(v IssueChallengeRequestPasskeyOptions) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptIssueChallengeRequestPasskeyOptions) Get() (v IssueChallengeRequestPasskeyOptions, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptIssueChallengeRequestPasskeyOptions) Or(d IssueChallengeRequestPasskeyOptions) IssueChallengeRequestPasskeyOptions {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptIssueChallengeRequestPasskeyOptionsUserVerification returns new OptIssueChallengeRequestPasskeyOptionsUserVerification with value set to v.
+func NewOptIssueChallengeRequestPasskeyOptionsUserVerification(v IssueChallengeRequestPasskeyOptionsUserVerification) OptIssueChallengeRequestPasskeyOptionsUserVerification {
+	return OptIssueChallengeRequestPasskeyOptionsUserVerification{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptIssueChallengeRequestPasskeyOptionsUserVerification is optional IssueChallengeRequestPasskeyOptionsUserVerification.
+type OptIssueChallengeRequestPasskeyOptionsUserVerification struct {
+	Value IssueChallengeRequestPasskeyOptionsUserVerification
+	Set   bool
+}
+
+// IsSet returns true if OptIssueChallengeRequestPasskeyOptionsUserVerification was set.
+func (o OptIssueChallengeRequestPasskeyOptionsUserVerification) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptIssueChallengeRequestPasskeyOptionsUserVerification) Reset() {
+	var v IssueChallengeRequestPasskeyOptionsUserVerification
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptIssueChallengeRequestPasskeyOptionsUserVerification) SetTo(v IssueChallengeRequestPasskeyOptionsUserVerification) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptIssueChallengeRequestPasskeyOptionsUserVerification) Get() (v IssueChallengeRequestPasskeyOptionsUserVerification, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptIssueChallengeRequestPasskeyOptionsUserVerification) Or(d IssueChallengeRequestPasskeyOptionsUserVerification) IssueChallengeRequestPasskeyOptionsUserVerification {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptListSessionsState returns new OptListSessionsState with value set to v.
 func NewOptListSessionsState(v ListSessionsState) OptListSessionsState {
 	return OptListSessionsState{
@@ -3855,6 +4413,69 @@ func (o OptListSessionsState) Get() (v ListSessionsState, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptListSessionsState) Or(d ListSessionsState) ListSessionsState {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilDateTime returns new OptNilDateTime with value set to v.
+func NewOptNilDateTime(v time.Time) OptNilDateTime {
+	return OptNilDateTime{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilDateTime is optional nullable time.Time.
+type OptNilDateTime struct {
+	Value time.Time
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilDateTime was set.
+func (o OptNilDateTime) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilDateTime) Reset() {
+	var v time.Time
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilDateTime) SetTo(v time.Time) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilDateTime) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilDateTime) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v time.Time
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilDateTime) Get() (v time.Time, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilDateTime) Or(d time.Time) time.Time {
 	if v, ok := o.Get(); ok {
 		return v
 	}

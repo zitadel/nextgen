@@ -172,6 +172,16 @@ type Handler interface {
 	//
 	// POST /auth/introspect
 	Introspect(ctx context.Context, req *IntrospectRequest) (IntrospectRes, error)
+	// IssueChallenge implements issueChallenge operation.
+	//
+	// Issues a single-factor verification challenge within an auth attempt.
+	// This advances the authentication state machine by requesting a specific factor method
+	// (password, passkey, TOTP, OTP via SMS, etc.). The server responds with challenge details
+	// including method, metadata, and any UI hints. The client then verifies the proof
+	// by calling POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify.
+	//
+	// POST /auth_attempts/{attempt_id}/challenges
+	IssueChallenge(ctx context.Context, req *IssueChallengeRequest, params IssueChallengeParams) (IssueChallengeRes, error)
 	// ListSessions implements listSessions operation.
 	//
 	// Returns a paginated list of sessions for a project.

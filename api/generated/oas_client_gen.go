@@ -192,6 +192,16 @@ type Invoker interface {
 	//
 	// POST /auth/introspect
 	Introspect(ctx context.Context, request *IntrospectRequest) (IntrospectRes, error)
+	// IssueChallenge invokes issueChallenge operation.
+	//
+	// Issues a single-factor verification challenge within an auth attempt.
+	// This advances the authentication state machine by requesting a specific factor method
+	// (password, passkey, TOTP, OTP via SMS, etc.). The server responds with challenge details
+	// including method, metadata, and any UI hints. The client then verifies the proof
+	// by calling POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify.
+	//
+	// POST /auth_attempts/{attempt_id}/challenges
+	IssueChallenge(ctx context.Context, request *IssueChallengeRequest, params IssueChallengeParams) (IssueChallengeRes, error)
 	// ListSessions invokes listSessions operation.
 	//
 	// Returns a paginated list of sessions for a project.
@@ -2568,6 +2578,118 @@ func (c *Client) sendIntrospect(ctx context.Context, request *IntrospectRequest)
 
 	stage = "DecodeResponse"
 	result, err := decodeIntrospectResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// IssueChallenge invokes issueChallenge operation.
+//
+// Issues a single-factor verification challenge within an auth attempt.
+// This advances the authentication state machine by requesting a specific factor method
+// (password, passkey, TOTP, OTP via SMS, etc.). The server responds with challenge details
+// including method, metadata, and any UI hints. The client then verifies the proof
+// by calling POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify.
+//
+// POST /auth_attempts/{attempt_id}/challenges
+func (c *Client) IssueChallenge(ctx context.Context, request *IssueChallengeRequest, params IssueChallengeParams) (IssueChallengeRes, error) {
+	res, err := c.sendIssueChallenge(ctx, request, params)
+	return res, err
+}
+
+func (c *Client) sendIssueChallenge(ctx context.Context, request *IssueChallengeRequest, params IssueChallengeParams) (res IssueChallengeRes, err error) {
+	// Validate request before sending.
+	if err := func() error {
+		if err := request.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return res, errors.Wrap(err, "validate")
+	}
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("issueChallenge"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.URLTemplateKey.String("/auth_attempts/{attempt_id}/challenges"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, IssueChallengeOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [3]string
+	pathParts[0] = "/auth_attempts/"
+	{
+		// Encode "attempt_id" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "attempt_id",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			if unwrapped := string(params.AttemptID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	pathParts[2] = "/challenges"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "POST", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+	if err := encodeIssueChallengeRequest(request, r); err != nil {
+		return res, errors.Wrap(err, "encode request")
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeIssueChallengeResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}

@@ -25,6 +25,7 @@ const (
 	GetTokenOperation               OperationName = "GetToken"
 	GetUserInfoOperation            OperationName = "GetUserInfo"
 	IntrospectOperation             OperationName = "Introspect"
+	IssueChallengeOperation         OperationName = "IssueChallenge"
 	ListSessionsOperation           OperationName = "ListSessions"
 	ListUsersOperation              OperationName = "ListUsers"
 	RevokeSessionOperation          OperationName = "RevokeSession"

@@ -77,6 +77,10 @@ type IntrospectRes interface {
 	introspectRes()
 }
 
+type IssueChallengeRes interface {
+	issueChallengeRes()
+}
+
 type ListSessionsRes interface {
 	listSessionsRes()
 }

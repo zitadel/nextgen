@@ -11,6 +11,10 @@ description: |
 required:
   - attempt_id
   - project_id
+  - state
+  - required_factors
+  - completed_factors
+  - challenges
   - expires_at
   - created_at
 properties:
@@ -18,6 +22,20 @@ properties:
     $ref: ../../components/schemas/attempt-id.yaml
   project_id:
     $ref: ../../components/schemas/project-id.yaml
+  state:
+    type: string
+    description: |
+      Overall state of the authentication attempt:
+      - `in_progress`: factors are still being collected; continue issuing challenges.
+      - `completed`: all required factors have been verified; the attempt is ready for handoff.
+      - `failed`: the attempt has failed (e.g. too many failed proofs) and cannot be continued.
+      - `expired`: the 15-minute TTL has been exceeded.
+    enum:
+      - in_progress
+      - completed
+      - failed
+      - expired
+    example: in_progress
   session_id:
     description: |
       The session being authenticated into. Either newly created or passed in on POST.
@@ -32,6 +50,30 @@ properties:
     oneOf:
       - $ref: ../../components/schemas/user-id.yaml
       - type: 'null'
+  required_factors:
+    type: array
+    description: |
+      The authentication factor methods that the project policy requires in order
+      to complete this attempt. Computed by the server from the project's auth policy.
+      Clients should use this to determine which challenges still need to be issued.
+    items:
+      $ref: ../../components/schemas/factor-method.yaml
+    example: [identifier, password]
+  completed_factors:
+    type: array
+    description: |
+      The factor methods that have been successfully verified in this attempt so far.
+      A factor appears here once its challenge reaches `verified` state.
+    items:
+      $ref: ../../components/schemas/factor-method.yaml
+    example: [identifier]
+  challenges:
+    type: array
+    description: |
+      All challenges issued within this attempt, in creation order.
+      Use this to track the state of each factor challenge (pending, verified, failed, expired).
+    items:
+      $ref: challenges/challenge-response.yaml
   expires_at:
     type: string
     format: date-time

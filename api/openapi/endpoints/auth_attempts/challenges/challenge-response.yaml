@@ -13,21 +13,10 @@ properties:
   challenge_id:
     $ref: ../../../components/schemas/challenge-id.yaml
   method:
-    type: string
+    $ref: ../../../components/schemas/factor-method.yaml
     description: |
       The authentication method this challenge represents.
       Determines which proof is expected in verify.
-    enum:
-      - identifier
-      - password
-      - passkey
-      - totp
-      - otp_sms
-      - otp_email
-      - recovery_code
-      - idp
-      - captcha
-    example: password
   state:
     type: string
     enum:

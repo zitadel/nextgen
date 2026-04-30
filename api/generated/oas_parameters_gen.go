@@ -1775,6 +1775,87 @@ func decodeGetSessionParams(args [1]string, argsEscaped bool, r *http.Request) (
 	return params, nil
 }
 
+// IssueChallengeParams is parameters of issueChallenge operation.
+type IssueChallengeParams struct {
+	// The unique identifier of the authentication attempt.
+	AttemptID AttemptID
+}
+
+func unpackIssueChallengeParams(packed middleware.Parameters) (params IssueChallengeParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "attempt_id",
+			In:   "path",
+		}
+		params.AttemptID = packed[key].(AttemptID)
+	}
+	return params
+}
+
+func decodeIssueChallengeParams(args [1]string, argsEscaped bool, r *http.Request) (params IssueChallengeParams, _ error) {
+	// Decode path: attempt_id.
+	if err := func() error {
+		param := args[0]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[0])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "attempt_id",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				var paramsDotAttemptIDVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotAttemptIDVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.AttemptID = AttemptID(paramsDotAttemptIDVal)
+				return nil
+			}(); err != nil {
+				return err
+			}
+			if err := func() error {
+				if err := params.AttemptID.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "attempt_id",
+			In:   "path",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
 // ListSessionsParams is parameters of listSessions operation.
 type ListSessionsParams struct {
 	// Maximum number of items to return.
