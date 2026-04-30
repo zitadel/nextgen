@@ -12,7 +12,7 @@ get:
   tags:
     - Authentication Attempts
   parameters:
-      - $ref: ../../../components/parameters/attempt-id.yaml
+    - $ref: ../../../components/parameters/attempt-id.yaml
   responses:
     '200':
       description: Current state of the authentication attempt
