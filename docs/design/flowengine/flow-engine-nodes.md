@@ -18,31 +18,30 @@ Every step response contains three capability dictionaries and step-level metada
 ```json
 {
   "step": {
-    "name": "identifier",
-    "type": "identifier",
+    "name": "login",
     "texts": {
-      "title_key": "identifier.title",
-      "description_key": "identifier.description"
+      "title_key": "login.title",
+      "description_key": "login.description"
     },
 
     "fields": {
-      "identifier": {
+      "email": {
         "type": "email",
         "required": true,
-        "text_key": "identifier.field.email"
+        "text_key": "login.field.email"
       }
     },
 
     "actions": {
       "submit": {
         "primary": true,
-        "text_key": "identifier.action.submit"
+        "text_key": "login.action.submit"
       },
       "register": {
-        "text_key": "identifier.action.register"
+        "text_key": "login.action.register"
       },
       "passkey": {
-        "text_key": "identifier.action.passkey"
+        "text_key": "login.action.passkey"
       }
     },
 
@@ -78,11 +77,12 @@ Every step response contains three capability dictionaries and step-level metada
 
 | Property | Type | Purpose |
 |---|---|---|
-| `fields` | `Record<string, FlowField>` | Data the user must provide. Keyed by field name. Unordered. |
+| `fields` | `Record<string, FlowField>` | Data the user must provide. Keyed by field name. Unordered. Resolved from user schema at runtime. |
 | `actions` | `Record<string, FlowAction>` | Available user actions. Keyed by action name. Unordered. |
 | `gates` | `Record<string, FlowGate>` | Security gates (captcha, passkey ceremony). Keyed by gate type. Unordered. |
 | `sso_providers` | `SSOProvider[]` | Available SSO identity providers. |
 | `texts` | `Record<string, string>` | Step-level text keys for localization (resolved client-side via `| t` filter). |
+| `complete` | `string \| null` | Terminal step indicator: `"redirect"` or `"show"`. Null for non-terminal steps. |
 | `branding` | `FlowBranding` | Layout selection, custom CSS, and the Liquid template string. |
 
 ## How Ordering Works
@@ -134,19 +134,18 @@ Registration steps use the same structure. Schema fields are emitted as capabili
 ```json
 {
   "step": {
-    "name": "register_profile",
-    "type": "form",
+    "name": "profile",
     "texts": {
-      "title_key": "register.title"
+      "title_key": "profile.title"
     },
     "fields": {
-      "email": { "type": "email", "required": true, "text_key": "register.field.email" },
-      "given_name": { "type": "text", "required": true, "text_key": "register.field.given_name" },
-      "family_name": { "type": "text", "required": true, "text_key": "register.field.family_name" }
+      "email": { "type": "email", "required": true, "text_key": "profile.field.email" },
+      "given_name": { "type": "text", "required": true, "text_key": "profile.field.given_name" },
+      "family_name": { "type": "text", "required": true, "text_key": "profile.field.family_name" }
     },
     "actions": {
-      "submit": { "primary": true, "text_key": "register.action.submit" },
-      "login": { "text_key": "register.action.login" }
+      "submit": { "primary": true, "text_key": "profile.action.submit" },
+      "login": { "text_key": "profile.action.login" }
     },
     "gates": {}
   }
@@ -190,23 +189,21 @@ Keys follow a strict `step.scope.name` convention:
 
 ```json
 {
-  "identifier.title": "Welcome back",
-  "identifier.description": "Sign in to continue",
-  "identifier.field.email": "Email address",
-  "identifier.action.submit": "Continue",
-  "identifier.action.passkey": "Sign in with passkey",
+  "login.title": "Welcome back",
+  "login.description": "Sign in to continue",
+  "login.field.email": "Email address",
+  "login.field.password": "Password",
+  "login.action.submit": "Continue",
+  "login.action.passkey": "Sign in with passkey",
+  "login.action.register": "Create account",
+  "login.action.recover": "Forgot password?",
 
-  "password.title": "Enter your password",
-  "password.description": "Hi, {{displayName}}",
-  "password.field.password": "Password",
-  "password.action.submit": "Sign in",
-  "password.action.back": "Change account",
-
-  "register.title": "Create your account",
-  "register.field.email": "Email",
-  "register.field.given_name": "First name",
-  "register.field.family_name": "Last name",
-  "register.action.submit": "Create account"
+  "profile.title": "Create your account",
+  "profile.field.email": "Email",
+  "profile.field.given_name": "First name",
+  "profile.field.family_name": "Last name",
+  "profile.action.submit": "Continue",
+  "profile.action.login": "Already have an account?"
 }
 ```
 
@@ -226,10 +223,10 @@ The backend emits `text_key` on every element that has human-readable text:
 
 | Element | Property | Example key |
 |---|---|---|
-| Step title | `step.texts.title_key` | `identifier.title` |
-| Step description | `step.texts.description_key` | `identifier.description` |
-| Field label | `field.text_key` | `identifier.field.email` |
-| Action label | `action.text_key` | `identifier.action.submit` |
+| Step title | `step.texts.title_key` | `login.title` |
+| Step description | `step.texts.description_key` | `login.description` |
+| Field label | `field.text_key` | `login.field.email` |
+| Action label | `action.text_key` | `login.action.submit` |
 
 This design ensures:
 - **The backend never hardcodes display text.** It emits keys; the frontend resolves them.

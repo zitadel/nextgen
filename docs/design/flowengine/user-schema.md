@@ -25,16 +25,16 @@ What matters here is the contract: which schema annotations exist, how the flow 
 ```
 User Schema                     Flow Definition                   Policy Engine
 ─────────────                   ───────────────                   ─────────────
-Defines fields:                 References fields:                Reads schema annotations:
-  email (x-identifier,           form step: show                   x-auth-methods →
-         x-verify: email)          [email, given_name]               narrows available factors
-  phone (x-mfa: sms)             form step: show
-  given_name                       [password]                     Reads user context:
-  family_name                    form step: show                    user.roles, user.team →
-  password                         [phone] (skippable)              determines assurance level
-  x-auth-methods:
-    password: enabled            Builds UINodes from               Returns decision:
-    passkey: enabled               schema field metadata             assurance decision
+Defines fields:                 References schema fields:         Reads schema annotations:
+  email (x-identifier,           step fields: [email, password]    x-auth-methods →
+         x-verify: email)        step fields: [given_name, ...]     narrows available factors
+  phone (x-mfa: sms)
+  given_name                    user_schema: "human_user"         Reads user context:
+  family_name                                                       user.roles, user.team →
+  password                      Engine resolves field metadata      determines assurance level
+  x-auth-methods:                 from schema annotations
+    password: enabled            (type, validation, implicit       Returns decision:
+    passkey: enabled              outcomes like user_not_found)      assurance decision
     sso: enabled
 ```
 
@@ -106,7 +106,7 @@ The following is an example user schema showing the annotations that the flow en
 
 ## Schema → Field Mapping
 
-When a `form` step references schema fields, the flow engine maps them to `fields` entries in the step response:
+When a step references schema fields (via the `fields` array), the flow engine maps them to `fields` entries in the step response:
 
 ```
 Schema property:                 Step field:
@@ -133,7 +133,7 @@ The schema is the **single source of truth** for field metadata. The flow defini
 Schemas enable progressive profiling by marking some fields as optional and deferring them to later flows:
 
 1. **Registration flow:** collects `required` fields only (`email`, `given_name`, `family_name`, `password`)
-2. **Post-login profiling flow:** a `policy_check` step evaluates "does this user have a phone number?" — if not, injects a `form` step for `["phone"]`
+2. **Post-login profiling flow:** the engine evaluates "does this user have a phone number?" — if not, injects a step with `fields: ["phone"]`
 3. **Self-service flow:** user can edit any field with `x-editable: true`
 
-The flow definition's `form` steps select which fields to show. The schema defines what's possible. The policy engine decides when profiling is needed.
+Each step's `fields` array selects which schema properties to show. The schema defines what's possible. The policy engine decides when profiling is needed.

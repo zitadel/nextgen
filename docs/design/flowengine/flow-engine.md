@@ -57,7 +57,7 @@ The server resolves which flow definition to use:
 
 ## Flow Definitions
 
-A flow definition is a directed graph of steps, managed as an API resource.
+A flow definition is a directed graph of steps, managed as an API resource. Each definition references a **user schema** via `user_schema` — step fields are property names from that schema, and the engine resolves field metadata (type, validation, implicit outcomes) from schema annotations at runtime.
 
 ```
 POST   /flow-definitions             Create
@@ -72,27 +72,23 @@ POST   /flow-definitions/{id}/validate    Check for dead ends, missing transitio
 POST   /flow-definitions/{id}/simulate    Dry-run with mock input
 ```
 
-## Step Types
+## Schema-Driven Steps
 
-| Type | Renders UI? | What it does |
-|---|---|---|
-| `identifier` | Yes | Collect user identifier (email/phone/username) + offer SSO/passkey |
-| `credential` | Yes | Verify an auth factor (password, OTP, passkey) |
-| `form` | Yes | Collect fields from user schema (registration, profiling) |
-| `verification` | Yes | Verify email/phone via code |
-| `policy_check` | No | Invisible decision point — evaluates policy, picks a transition |
-| `action` | No | Execute server-side logic (create user, link account, reset credential) |
-| `consent` | Yes | Show terms/consent, accept/decline |
-| `captcha` | Yes | Proof-of-work challenge |
-| `redirect` | Briefly | External redirect (SSO provider) |
-| `info` | Yes | Display information |
-| `complete` | Yes | Terminal — flow is done |
+Steps do not have a `type`. Instead, the engine derives behavior from the step's properties:
+
+- **`fields`** — array of schema property names. The engine resolves each field's type, validation, and implicit outcomes from the user schema's `x-*` annotations. For example, a field with `x-identifier: true` implies a `user_not_found` outcome in transitions.
+- **`verify`** — names a schema field to verify (e.g. `"email"`). The engine sends a verification code and renders a code input.
+- **`action`** — server-side mutation to run after the step succeeds (e.g. `"create_user"`). Executes before the transition fires.
+- **`complete`** — marks the step as terminal (`"redirect"` or `"show"`).
+- **`gates`** — array of gate types (`"captcha"`, `"passkey"`) required before submission. The engine may also inject gates dynamically based on policy.
+
+### Implicit Post-Submit Policy Evaluation
+
+After every submit, the engine evaluates assurance policy automatically. If the session's `assurance_levels[]` satisfies the target ACR, the engine transitions to the `complete` step — no explicit policy check nodes needed. If additional factors are required, the engine follows the defined transitions or injects steps dynamically.
 
 ## Flow Completion
 
-The `complete` step is the terminal state. The frontend knows the flow is done because `step.type == "complete"`.
-
-The response includes a `behavior` field telling the frontend what to do:
+A step with `complete` set is the terminal state. The frontend knows the flow is done because `step.complete` is present.
 
 ```json
 {
@@ -100,56 +96,52 @@ The response includes a `behavior` field telling the frontend what to do:
   "session_token": "tok_final",
   "step": {
     "name": "done",
-    "type": "complete",
-    "label": "Login successful",
-    "behavior": "redirect"
+    "complete": "redirect"
   },
   "redirect_uri": "https://app.com/callback?code=auth_xyz&state=abc"
 }
 ```
 
-| `behavior` | Meaning | When |
+| `complete` | Meaning | When |
 |---|---|---|
 | `redirect` | Frontend should navigate to `redirect_uri` immediately | Login/reauth with OIDC auth request |
-| `show` | Display the `label`/`description` as a success screen | Registration without auth request, recovery |
-| `continue` | Flow auto-pivots back to a pending purpose (e.g., back to login after registration) | Registration with pending `auth_request_id` |
+| `show` | Display as a success screen | Registration without auth request, recovery |
 
-When `behavior` is `continue`, the frontend calls `GET /flows/{session_id}` to get the next step (the flow has already auto-pivoted server-side).
+When the flow completes after a pivot (e.g., registration with a pending `auth_request_id`), the engine auto-pops back to the parent flow. If the session now meets the target ACR, it transitions straight to `complete`.
 
 ### What triggers completion
 
 | Purpose | Completion condition |
 |---|---|
-| `login` / `reauth` | `policy_check` confirms session `assurance_levels[]` includes the target (from `acr_values` or app default) |
-| `register` | `action` step creates user + session; `policy_check` confirms |
-| `recovery` | `action` step resets credential |
-| `profiling` | `policy_check` confirms user has required fields |
+| `login` / `reauth` | Session `assurance_levels[]` includes the target ACR (implicit policy evaluation) |
+| `register` | `action: "create_user"` creates user + session; implicit policy check passes |
+| `recovery` | `action: "reset_credential"` resets the credential |
+| `profiling` | User has required schema fields filled |
 
-## Flow Pivot (Cross-Purpose Navigation)
+## Flow Pivot (Cross-Flow Navigation)
 
-Users navigate between purposes (login ↔ register ↔ recovery) without losing context. The session persists.
+Users navigate between flows (login ↔ register ↔ recovery) without losing context. The session persists.
 
-When the frontend submits an action that maps to a **pivot transition**, the flow engine:
-1. Resolves a flow definition for the target purpose (same audience context)
-2. Updates flow state: new definition, new current step, purpose changes
-3. Preserves: session, device context, collected data, `auth_request_id`, verified factors
-4. Returns the first step of the new purpose
-
-Pivot transitions are declared in the definition:
+Transitions with `"action": "pivot"` push a new flow onto the stack. Transitions with `"action": "switch"` replace the current flow entirely.
 
 ```json
 {
-  "name": "identifier",
-  "type": "identifier",
+  "name": "login",
+  "fields": ["email", "password"],
+  "actions": {
+    "submit": { "primary": true },
+    "register": {},
+    "recover": {}
+  },
   "transitions": {
-    "submit": "check_user",
-    "register": { "pivot": "register" },
-    "recover": { "pivot": "recovery" }
+    "submit": { "target": "done" },
+    "register": { "target": "default-register", "action": "switch" },
+    "recover": { "target": "default-recovery", "action": "pivot" }
   }
 }
 ```
 
-After registration completes with a pending `auth_request_id`, the flow auto-pivots back to login. Since the session now has factors, `policy_check` may transition straight to `complete`.
+After a pivoted flow completes, the engine auto-pops back to the parent. Since the session now has additional factors, implicit policy evaluation may skip straight to `complete`.
 
 ## Step Response Shape
 
@@ -163,66 +155,33 @@ See [Flow Engine — Storage](flow-engine-storage.md) for the encrypted cookie m
 
 ## End-to-End Examples
 
-### Example 1: Login with MFA (password + TOTP)
+### Example 1: Simple Login (email + password)
 
 **Flow Definition:**
 
 ```json
 {
-  "id": "flow_default_login",
+  "slug": "default-login",
   "name": "Default Login",
+  "user_schema": "human_user",
   "purposes": ["login"],
-  "initial_steps": { "login": "identifier" },
-  "audience": {},
+  "initial_steps": { "login": "login" },
   "steps": [
     {
-      "name": "identifier",
-      "type": "identifier",
-      "config": { "methods": ["email"] },
+      "name": "login",
+      "fields": ["email", "password"],
+      "actions": {
+        "submit": { "primary": true },
+        "register": {},
+        "recover": {}
+      },
       "transitions": {
-        "submit": "resolve_user",
-        "register": { "pivot": "register" }
+        "submit": { "target": "done" },
+        "register": { "target": "default-register", "action": "switch" },
+        "recover": { "target": "default-recovery", "action": "pivot" }
       }
     },
-    {
-      "name": "resolve_user",
-      "type": "policy_check",
-      "config": { "check": "resolve_user" },
-      "transitions": {
-        "found": "check_factors",
-        "not_found": "identifier"
-      }
-    },
-    {
-      "name": "check_factors",
-      "type": "policy_check",
-      "config": { "check": "required_factors" },
-      "transitions": {
-        "password": "password",
-        "passkey": "passkey",
-        "acr_met": "done"
-      }
-    },
-    {
-      "name": "password",
-      "type": "credential",
-      "config": { "factor": "password" },
-      "transitions": {
-        "submit": "check_factors",
-        "recover": { "pivot": "recovery" }
-      }
-    },
-    {
-      "name": "passkey",
-      "type": "credential",
-      "config": { "factor": "passkey" },
-      "transitions": { "submit": "check_factors" }
-    },
-    {
-      "name": "done",
-      "type": "complete",
-      "config": { "behavior": "redirect" }
-    }
+    { "name": "done", "complete": "redirect" }
   ]
 }
 ```
@@ -239,90 +198,41 @@ POST /flows
   "session_id": "sess_1",
   "session_token": "tok_1",
   "step": {
-    "name": "identifier",
-    "type": "identifier",
-    "label": "Sign in",
-    "fields": [
-      { "name": "identifier", "label": "Email", "type": "email" }
-    ],
-    "actions": [
-      { "kind": "submit", "name": "submit", "label": "Continue", "primary": true },
-      { "kind": "link",   "name": "register", "label": "Create account" }
-    ]
+    "name": "login",
+    "fields": {
+      "email": { "type": "email", "text_key": "login.field.email", "required": true },
+      "password": { "type": "password", "text_key": "login.field.password", "required": true }
+    },
+    "actions": {
+      "submit": { "text_key": "login.action.submit", "primary": true },
+      "register": { "text_key": "login.action.register" },
+      "recover": { "text_key": "login.action.recover" }
+    },
+    "gates": {}
   }
 }
 ```
 
 ```http
 POST /flows/sess_1/submit
-{ "session_token": "tok_1", "action": "submit", "data": { "identifier": "alice@acme.com" } }
+{ "session_token": "tok_1", "action": "submit", "data": { "email": "alice@acme.com", "password": "correct-horse" } }
 ```
 ```json
-← 200  (resolve_user: found → check_factors: needs password)
+← 200  (implicit policy check: session has password factor, ACR met → complete)
 {
   "session_id": "sess_1",
   "session_token": "tok_2",
   "step": {
-    "name": "password",
-    "type": "credential",
-    "label": "Enter your password",
-    "fields": [
-      { "name": "password", "type": "password", "label": "Password" }
-    ],
-    "actions": [
-      { "kind": "submit", "name": "submit", "label": "Sign in", "primary": true },
-      { "kind": "link",   "name": "recover", "label": "Forgot password?" }
-    ]
-  }
-}
-```
-
-```http
-POST /flows/sess_1/submit
-{ "session_token": "tok_2", "action": "submit", "data": { "password": "correct-horse" } }
-```
-```json
-← 200  (check_factors: password verified, but policy requires AAL2 → needs OTP)
-{
-  "session_id": "sess_1",
-  "session_token": "tok_3",
-  "step": {
-    "name": "otp",
-    "type": "credential",
-    "label": "Two-factor authentication",
-    "description": "Enter the code from your authenticator app",
-    "fields": [
-      { "name": "code", "type": "text", "label": "Code", "validation": { "pattern": "^[0-9]{6}$" } }
-    ],
-    "actions": [
-      { "kind": "submit", "name": "submit", "label": "Verify", "primary": true }
-    ]
-  }
-}
-```
-
-Note: the `otp` step wasn't in the definition. The `check_factors` policy_check determined that TOTP is needed and the flow engine rendered a credential step for it. This is either a generic credential step or an injected step — the frontend doesn't need to know.
-
-```http
-POST /flows/sess_1/submit
-{ "session_token": "tok_3", "action": "submit", "data": { "code": "482916" } }
-```
-```json
-← 200  (check_factors: acr_met → complete)
-{
-  "session_id": "sess_1",
-  "session_token": "tok_4",
-  "step": {
     "name": "done",
-    "type": "complete",
-    "label": "Login successful",
-    "behavior": "redirect"
+    "complete": "redirect"
   },
   "redirect_uri": "https://app.com/cb?code=authz_xyz&state=abc"
 }
 ```
 
 Frontend navigates to `redirect_uri`. Done.
+
+If the policy requires MFA, the engine would instead respond with a dynamically injected step requesting the second factor before reaching `complete`.
 
 ---
 
@@ -332,49 +242,45 @@ Frontend navigates to `redirect_uri`. Done.
 
 ```json
 {
-  "id": "flow_default_register",
+  "slug": "default-register",
   "name": "Default Registration",
+  "user_schema": "human_user",
   "purposes": ["register"],
   "initial_steps": { "register": "profile" },
-  "audience": {},
   "steps": [
     {
       "name": "profile",
-      "type": "form",
-      "config": { "schema": "human_user", "fields": ["email", "given_name", "family_name"] },
+      "fields": ["email", "given_name", "family_name"],
+      "actions": {
+        "submit": { "primary": true },
+        "login": {}
+      },
       "transitions": {
-        "submit": "set_password",
-        "login": { "pivot": "login" }
+        "submit": { "target": "set_password" },
+        "login": { "target": "default-login", "action": "switch" }
       }
     },
     {
       "name": "set_password",
-      "type": "form",
-      "config": { "schema": "human_user", "fields": ["password"] },
-      "transitions": { "submit": "verify_email" }
+      "fields": ["password"],
+      "transitions": {
+        "submit": { "target": "verify_email" }
+      }
     },
     {
       "name": "verify_email",
-      "type": "verification",
-      "config": { "method": "email", "field": "email" },
-      "transitions": { "verified": "create_user" }
+      "verify": "email",
+      "action": "create_user",
+      "transitions": {
+        "submit": { "target": "done" }
+      }
     },
-    {
-      "name": "create_user",
-      "type": "action",
-      "config": { "action": "create_user_and_session" },
-      "transitions": { "created": "done" }
-    },
-    {
-      "name": "done",
-      "type": "complete",
-      "config": { "behavior": "continue" }
-    }
+    { "name": "done", "complete": "show" }
   ]
 }
 ```
 
-**Frontend interaction (started from login via pivot):**
+**Frontend interaction (started from login via switch):**
 
 User was on the login flow, clicked "Create account":
 
@@ -383,28 +289,25 @@ POST /flows/sess_1/submit
 { "session_token": "tok_1", "action": "register" }
 ```
 ```json
-← 200  (pivoted to registration flow, email carried over from identifier step)
+← 200  (switched to registration flow, email carried over)
 {
   "session_id": "sess_1",
   "session_token": "tok_2",
   "step": {
     "name": "profile",
-    "type": "form",
-    "label": "Create your account",
-    "fields": [
-      { "name": "email",       "label": "Email",      "type": "email", "required": true, "value": "alice@acme.com" },
-      { "name": "given_name",  "label": "First name", "type": "text",  "required": true },
-      { "name": "family_name", "label": "Last name",  "type": "text",  "required": true }
-    ],
-    "actions": [
-      { "kind": "submit", "name": "submit", "label": "Continue", "primary": true },
-      { "kind": "link",   "name": "login",  "label": "Already have an account? Sign in" }
-    ]
+    "fields": {
+      "email": { "type": "email", "text_key": "profile.field.email", "required": true, "value": "alice@acme.com" },
+      "given_name": { "type": "text", "text_key": "profile.field.given_name", "required": true },
+      "family_name": { "type": "text", "text_key": "profile.field.family_name", "required": true }
+    },
+    "actions": {
+      "submit": { "text_key": "profile.action.submit", "primary": true },
+      "login": { "text_key": "profile.action.login" }
+    },
+    "gates": {}
   }
 }
 ```
-
-Note: `email` is pre-filled from the data collected during the login flow's identifier step.
 
 ```http
 POST /flows/sess_1/submit
@@ -417,15 +320,13 @@ POST /flows/sess_1/submit
   "session_token": "tok_3",
   "step": {
     "name": "set_password",
-    "type": "form",
-    "label": "Choose a password",
-    "fields": [
-      { "name": "password", "label": "Password", "type": "password", "required": true,
-        "validation": { "min_length": 8 } }
-    ],
-    "actions": [
-      { "kind": "submit", "name": "submit", "label": "Continue", "primary": true }
-    ]
+    "fields": {
+      "password": { "type": "password", "text_key": "set_password.field.password", "required": true, "validation": { "min_length": 8 } }
+    },
+    "actions": {
+      "submit": { "text_key": "set_password.action.submit", "primary": true }
+    },
+    "gates": {}
   }
 }
 ```
@@ -435,22 +336,20 @@ POST /flows/sess_1/submit
 { "session_token": "tok_3", "action": "submit", "data": { "password": "strong-pass-123!" } }
 ```
 ```json
-← 200
+← 200  (verify step: engine sends code to alice@acme.com, renders code input)
 {
   "session_id": "sess_1",
   "session_token": "tok_4",
   "step": {
     "name": "verify_email",
-    "type": "verification",
-    "label": "Verify your email",
-    "description": "We sent a code to alice@acme.com",
-    "fields": [
-      { "name": "code", "label": "Verification code", "type": "text" }
-    ],
-    "actions": [
-      { "kind": "submit", "name": "submit", "label": "Verify", "primary": true },
-      { "kind": "submit", "name": "resend", "label": "Resend code" }
-    ]
+    "fields": {
+      "code": { "type": "text", "text_key": "verify_email.field.code", "required": true }
+    },
+    "actions": {
+      "submit": { "text_key": "verify_email.action.submit", "primary": true },
+      "resend": { "text_key": "verify_email.action.resend" }
+    },
+    "gates": {}
   }
 }
 ```
@@ -460,60 +359,125 @@ POST /flows/sess_1/submit
 { "session_token": "tok_4", "action": "submit", "data": { "code": "839201" } }
 ```
 ```json
-← 200  (verified → create_user action runs → done with behavior: continue)
+← 200  (verified → create_user action runs → done)
 {
   "session_id": "sess_1",
   "session_token": "tok_5",
   "step": {
     "name": "done",
-    "type": "complete",
-    "label": "Account created",
-    "behavior": "continue"
+    "complete": "show"
   }
 }
 ```
 
-Frontend sees `behavior: "continue"` — polls for the next step:
-
-```http
-GET /flows/sess_1
-```
-```json
-← 200  (auto-pivoted back to login, policy_check found session already at AAL1 → complete)
-{
-  "session_id": "sess_1",
-  "session_token": "tok_6",
-  "step": {
-    "name": "done",
-    "type": "complete",
-    "label": "Login successful",
-    "behavior": "redirect"
-  },
-  "redirect_uri": "https://app.com/cb?code=authz_abc&state=xyz"
-}
-```
-
-The user registered and logged in without entering credentials twice.
+If the registration was triggered during an OIDC auth request, the engine auto-pops back to the login flow. The session already has factors from registration, so implicit policy evaluation transitions straight to `complete` with `redirect`.
 
 ---
 
-### Example 3: SSO Login (Google)
+### Example 3: Combined Login + Registration (Single Flow)
 
-**Flow Definition** (same login flow, identifier step has SSO configured):
+A single flow that handles both login and registration using implicit outcomes from schema annotations.
+
+**Flow Definition:**
 
 ```json
 {
-  "name": "identifier",
-  "type": "identifier",
-  "config": {
-    "methods": ["email"],
-    "sso_providers": ["google", "entra"]
-  },
-  "transitions": {
-    "submit": "resolve_user",
-    "sso": "sso_redirect",
-    "register": { "pivot": "register" }
-  }
+  "slug": "combined-auth",
+  "name": "Combined Auth",
+  "user_schema": "human_user",
+  "purposes": ["login", "register"],
+  "initial_steps": { "login": "identify", "register": "identify" },
+  "steps": [
+    {
+      "name": "identify",
+      "fields": ["email"],
+      "transitions": {
+        "submit": { "target": "signin" },
+        "user_not_found": { "target": "profile" }
+      }
+    },
+    {
+      "name": "signin",
+      "fields": ["password"],
+      "actions": {
+        "submit": { "primary": true },
+        "recover": {}
+      },
+      "transitions": {
+        "submit": { "target": "done" },
+        "recover": { "target": "default-recovery", "action": "pivot" }
+      }
+    },
+    {
+      "name": "profile",
+      "fields": ["given_name", "family_name"],
+      "transitions": {
+        "submit": { "target": "set_password" }
+      }
+    },
+    {
+      "name": "set_password",
+      "fields": ["password"],
+      "transitions": {
+        "submit": { "target": "verify_email" }
+      }
+    },
+    {
+      "name": "verify_email",
+      "verify": "email",
+      "action": "create_user",
+      "transitions": {
+        "submit": { "target": "done" }
+      }
+    },
+    { "name": "done", "complete": "redirect" }
+  ]
+}
+```
+
+The `email` field has `x-identifier: true` in the user schema. When the user submits their email, the engine looks up the user. If found, it follows the `submit` transition to `signin`. If not found, it follows the `user_not_found` transition to `profile` (registration path).
+
+---
+
+### Example 4: SSO Login (Google)
+
+**Flow Definition:**
+
+```json
+{
+  "slug": "sso-login",
+  "name": "SSO Login",
+  "user_schema": "human_user",
+  "purposes": ["login"],
+  "initial_steps": { "login": "login" },
+  "steps": [
+    {
+      "name": "login",
+      "fields": ["email"],
+      "sso_providers": [
+        { "id": "google", "name": "Google" },
+        { "id": "entra", "name": "Microsoft" }
+      ],
+      "transitions": {
+        "submit": { "target": "signin" },
+        "user_not_found": { "target": "login" },
+        "sso": { "target": "sso_redirect" },
+        "callback": { "target": "done" }
+      }
+    },
+    {
+      "name": "signin",
+      "fields": ["password"],
+      "transitions": {
+        "submit": { "target": "done" }
+      }
+    },
+    {
+      "name": "sso_redirect",
+      "transitions": {}
+    },
+    { "name": "done", "complete": "redirect" }
+  ]
 }
 ```
 
@@ -529,17 +493,17 @@ POST /flows
   "session_id": "sess_2",
   "session_token": "tok_1",
   "step": {
-    "name": "identifier",
-    "type": "identifier",
-    "label": "Sign in",
-    "fields": [
-      { "name": "identifier", "label": "Email", "type": "email" }
-    ],
-    "actions": [
-      { "kind": "submit",  "name": "submit",  "label": "Continue", "primary": true },
-      { "kind": "sso",     "name": "google",  "label": "Continue with Google", "provider": "google" },
-      { "kind": "sso",     "name": "entra",   "label": "Continue with Microsoft", "provider": "entra" },
-      { "kind": "link",    "name": "register", "label": "Create account" }
+    "name": "login",
+    "fields": {
+      "email": { "type": "email", "text_key": "login.field.email", "required": true }
+    },
+    "actions": {
+      "submit": { "text_key": "login.action.submit", "primary": true }
+    },
+    "gates": {},
+    "sso_providers": [
+      { "id": "google", "name": "Google" },
+      { "id": "entra", "name": "Microsoft" }
     ]
   }
 }
@@ -558,28 +522,24 @@ POST /flows/sess_2/submit
   "session_token": "tok_2",
   "step": {
     "name": "sso_redirect",
-    "type": "redirect",
-    "label": "Redirecting to Google...",
     "redirect_url": "https://accounts.google.com/o/oauth2/auth?client_id=...&state=sess_2_google"
   }
 }
 ```
 
-Frontend navigates to `redirect_url`. Google authenticates, redirects back to Zitadel callback. Zitadel processes the callback, updates the session with an `idp` factor, then evaluates policy:
+Frontend navigates to `redirect_url`. After Google callback, the engine processes it and evaluates policy:
 
 ```http
 GET /flows/sess_2
 ```
 ```json
-← 200  (SSO callback processed → policy_check: acr_met → complete)
+← 200  (SSO callback processed → implicit policy: ACR met → complete)
 {
   "session_id": "sess_2",
   "session_token": "tok_3",
   "step": {
     "name": "done",
-    "type": "complete",
-    "label": "Login successful",
-    "behavior": "redirect"
+    "complete": "redirect"
   },
   "redirect_uri": "https://app.com/cb?code=authz_sso&state=def"
 }
@@ -587,171 +547,47 @@ GET /flows/sess_2
 
 ---
 
-### Example 4: Step-Up (Active Session, Higher ACR Requested)
+### Example 5: Registration with Captcha
 
-User already has an active session at AAL1. An RP requests AAL2.
+**Flow Definition:**
 
-```http
-POST /flows
-{ "purpose": "reauth", "auth_request_id": "oidc-stepup" }
-```
 ```json
-← 201  (session already has user + password, but stale. Policy needs fresh second factor.)
 {
-  "session_id": "sess_existing",
-  "session_token": "tok_1",
-  "step": {
-    "name": "otp",
-    "type": "credential",
-    "label": "Verify your identity",
-    "description": "This action requires additional verification",
-    "fields": [
-      { "name": "code", "type": "text", "label": "Authenticator code", "validation": { "pattern": "^[0-9]{6}$" } }
-    ],
-    "actions": [
-      { "kind": "submit", "name": "submit", "label": "Verify", "primary": true }
-    ]
-  }
+  "slug": "protected-register",
+  "name": "Protected Registration",
+  "user_schema": "human_user",
+  "purposes": ["register"],
+  "initial_steps": { "register": "profile" },
+  "steps": [
+    {
+      "name": "profile",
+      "fields": ["email", "given_name", "family_name"],
+      "gates": ["captcha"],
+      "transitions": {
+        "submit": { "target": "set_password" }
+      }
+    },
+    {
+      "name": "set_password",
+      "fields": ["password"],
+      "transitions": {
+        "submit": { "target": "verify_email" }
+      }
+    },
+    {
+      "name": "verify_email",
+      "verify": "email",
+      "action": "create_user",
+      "transitions": {
+        "submit": { "target": "done" }
+      }
+    },
+    { "name": "done", "complete": "show" }
+  ]
 }
 ```
 
-The flow skipped identifier and password — the session already has those factors. It jumped straight to what's missing.
-
-```http
-POST /flows/sess_existing/submit
-{ "session_token": "tok_1", "action": "submit", "data": { "code": "159263" } }
-```
-```json
-← 200
-{
-  "session_id": "sess_existing",
-  "session_token": "tok_2",
-  "step": {
-    "name": "done",
-    "type": "complete",
-    "label": "Verification complete",
-    "behavior": "redirect"
-  },
-  "redirect_uri": "https://app.com/sensitive-action?code=authz_step&state=ghi"
-}
-```
-
----
-
-### Example 5: Password Recovery
-
-```http
-POST /flows/sess_1/submit
-{ "session_token": "tok_2", "action": "recover" }
-```
-```json
-← 200  (pivoted to recovery flow)
-{
-  "session_id": "sess_1",
-  "session_token": "tok_3",
-  "step": {
-    "name": "recovery_email",
-    "type": "verification",
-    "label": "Reset your password",
-    "description": "We'll send a code to your email address",
-    "fields": [
-      { "name": "email", "label": "Email", "type": "email", "value": "alice@acme.com" }
-    ],
-    "actions": [
-      { "kind": "submit", "name": "submit", "label": "Send code", "primary": true },
-      { "kind": "link",   "name": "back",   "label": "Back to sign in" }
-    ]
-  }
-}
-```
-
-```http
-POST /flows/sess_1/submit
-{ "session_token": "tok_3", "action": "submit", "data": { "email": "alice@acme.com" } }
-```
-```json
-← 200
-{
-  "session_id": "sess_1",
-  "session_token": "tok_4",
-  "step": {
-    "name": "verify_code",
-    "type": "verification",
-    "label": "Enter your code",
-    "description": "Check your inbox for a verification code",
-    "fields": [
-      { "name": "code", "label": "Code", "type": "text" }
-    ],
-    "actions": [
-      { "kind": "submit", "name": "submit", "label": "Verify", "primary": true },
-      { "kind": "submit", "name": "resend", "label": "Resend code" }
-    ]
-  }
-}
-```
-
-```http
-POST /flows/sess_1/submit
-{ "session_token": "tok_4", "action": "submit", "data": { "code": "482916" } }
-```
-```json
-← 200
-{
-  "session_id": "sess_1",
-  "session_token": "tok_5",
-  "step": {
-    "name": "new_password",
-    "type": "form",
-    "label": "Set a new password",
-    "fields": [
-      { "name": "password", "label": "New password", "type": "password", "required": true, "validation": { "min_length": 8 } }
-    ],
-    "actions": [
-      { "kind": "submit", "name": "submit", "label": "Reset password", "primary": true }
-    ]
-  }
-}
-```
-
-```http
-POST /flows/sess_1/submit
-{ "session_token": "tok_5", "action": "submit", "data": { "password": "new-strong-pass!" } }
-```
-```json
-← 200  (action resets password → pivots back to login since auth_request_id pending)
-{
-  "session_id": "sess_1",
-  "session_token": "tok_6",
-  "step": {
-    "name": "done",
-    "type": "complete",
-    "label": "Password reset successful",
-    "behavior": "continue"
-  }
-}
-```
-
-```http
-GET /flows/sess_1
-```
-```json
-← 200  (back in login flow, password factor now fresh → may need to re-enter or policy_check passes)
-{
-  "session_id": "sess_1",
-  "session_token": "tok_7",
-  "step": {
-    "name": "password",
-    "type": "credential",
-    "label": "Sign in with your new password",
-    "fields": [
-      { "name": "password", "type": "password", "label": "Password" }
-    ],
-    "actions": [
-      { "kind": "submit", "name": "submit", "label": "Sign in", "primary": true }
-    ]
-  }
-}
-```
+The `gates: ["captcha"]` on the profile step means the frontend must solve a captcha before submission. The engine can also inject gates dynamically based on policy (e.g., risk score triggers captcha even if not declared in the definition).
 
 ---
 
@@ -769,17 +605,16 @@ POST /flows/sess_1/submit
   "session_id": "sess_1",
   "session_token": "tok_2b",
   "step": {
-    "name": "password",
-    "type": "credential",
-    "label": "Enter your password",
+    "name": "signin",
     "error": "Invalid password. 2 attempts remaining.",
-    "fields": [
-      { "name": "password", "type": "password", "label": "Password" }
-    ],
-    "actions": [
-      { "kind": "submit", "name": "submit", "label": "Sign in", "primary": true },
-      { "kind": "link",   "name": "recover", "label": "Forgot password?" }
-    ]
+    "fields": {
+      "password": { "type": "password", "text_key": "signin.field.password", "required": true }
+    },
+    "actions": {
+      "submit": { "text_key": "signin.action.submit", "primary": true },
+      "recover": { "text_key": "signin.action.recover" }
+    },
+    "gates": {}
   }
 }
 ```

@@ -493,70 +493,65 @@
 // ── Translations (simulates client-side i18n dictionary) ─────────
 
 const T = {
-  "login.identifier.title": "Sign in",
-  "login.identifier.description": "Enter your email to continue",
-  "login.identifier.field.email": "Email",
-  "login.identifier.action.submit": "Continue",
-  "login.identifier.action.passkey": "Sign in with passkey",
-  "login.identifier.action.register": "Create account",
+  // Login flow
+  "login.title": "Sign in",
+  "login.description": "Enter your email and password to continue",
+  "login.field.email": "Email",
+  "login.field.password": "Password",
+  "login.action.submit": "Sign in",
+  "login.action.register": "Create account",
+  "login.action.recover": "Forgot password?",
   "login.sso.title": "Redirecting to provider\u2026",
-  "login.password.title": "Enter your password",
-  "login.password.field.password": "Password",
-  "login.password.action.submit": "Sign in",
-  "login.password.action.recover": "Forgot password?",
-  "login.otp.title": "Two-factor authentication",
-  "login.otp.description": "Enter the code from your authenticator app",
-  "login.otp.field.code": "Code",
-  "login.otp.action.submit": "Verify",
-  "login.complete.title": "Login successful",
-  "register.profile.title": "Create your account",
-  "register.profile.field.email": "Email",
-  "register.profile.field.given_name": "First name",
-  "register.profile.field.family_name": "Last name",
-  "register.profile.action.submit": "Continue",
-  "register.profile.action.login": "Already have an account? Sign in",
-  "register.password.title": "Choose a password",
-  "register.password.field.password": "Password",
-  "register.password.action.submit": "Continue",
-  "register.verify.title": "Verify your email",
-  "register.verify.description": "We sent a code to your email",
-  "register.verify.field.code": "Verification code",
-  "register.verify.action.submit": "Verify",
-  "register.verify.action.resend": "Resend code",
-  "register.complete.title": "Account created",
-  "recovery.email.title": "Reset your password",
-  "recovery.email.description": "We'll send a code to your email",
-  "recovery.email.field.email": "Email",
-  "recovery.email.action.submit": "Send code",
-  "recovery.email.action.back": "Back to sign in",
-  "recovery.code.title": "Enter your code",
-  "recovery.code.description": "Check your inbox for a verification code",
-  "recovery.code.field.code": "Code",
-  "recovery.code.action.submit": "Verify",
-  "recovery.code.action.resend": "Resend code",
-  "recovery.password.title": "Set a new password",
-  "recovery.password.field.password": "New password",
-  "recovery.password.action.submit": "Reset password",
-  "recovery.complete.title": "Password reset successful",
-  "enterprise.identifier.title": "Sign in to Acme Corp",
-  "enterprise.identifier.description": "Use your corporate email",
-  "enterprise.identifier.field.email": "Corporate email",
-  "enterprise.identifier.action.submit": "Continue with SSO",
+
+  // Registration flow
+  "profile.title": "Create your account",
+  "profile.field.email": "Email",
+  "profile.field.given_name": "First name",
+  "profile.field.family_name": "Last name",
+  "profile.action.submit": "Continue",
+  "profile.action.login": "Already have an account? Sign in",
+  "set_password.title": "Choose a password",
+  "set_password.field.password": "Password",
+  "set_password.action.submit": "Continue",
+  "verify_email.title": "Verify your email",
+  "verify_email.description": "We sent a code to your email",
+  "verify_email.field.code": "Verification code",
+  "verify_email.action.submit": "Verify",
+  "verify_email.action.resend": "Resend code",
+
+  // Recovery flow
+  "recovery_email.title": "Reset your password",
+  "recovery_email.description": "We'll send a code to your email",
+  "recovery_email.field.email": "Email",
+  "recovery_email.action.submit": "Send code",
+  "recovery_email.action.back": "Back to sign in",
+  "new_password.title": "Set a new password",
+  "new_password.field.password": "New password",
+  "new_password.action.submit": "Reset password",
+
+  // Enterprise login
+  "enterprise.login.title": "Sign in to Acme Corp",
+  "enterprise.login.description": "Use your corporate email",
+  "enterprise.login.field.email": "Corporate email",
+  "enterprise.login.action.submit": "Continue with SSO",
+  "enterprise.signin.title": "Enter your password",
+  "enterprise.signin.field.password": "Password",
+  "enterprise.signin.action.submit": "Sign in",
   "enterprise.consent.title": "Authorize access",
   "enterprise.consent.description": "Acme Dashboard wants to access your account",
   "enterprise.consent.action.accept": "Allow",
   "enterprise.consent.action.deny": "Deny",
-  "enterprise.complete.title": "Signed in",
-  "saas.identifier.title": "Welcome to SaaSApp",
-  "saas.identifier.description": "Sign in or create an account",
-  "saas.identifier.field.email": "Email",
-  "saas.identifier.action.submit": "Continue",
-  "saas.identifier.action.register": "Create account",
-  "saas.password.title": "Enter your password",
-  "saas.password.field.password": "Password",
-  "saas.password.action.submit": "Sign in",
-  "saas.password.action.recover": "Forgot password?",
-  "saas.complete.title": "Welcome back!",
+
+  // Combined auth
+  "identify.title": "Welcome",
+  "identify.field.email": "Email",
+  "identify.action.submit": "Continue",
+  "signin.title": "Enter your password",
+  "signin.field.password": "Password",
+  "signin.action.submit": "Sign in",
+  "signin.action.recover": "Forgot password?",
+
+  // SaaS registration
   "saas.profile.title": "Complete your profile",
   "saas.profile.description": "Tell us a bit about yourself",
   "saas.profile.field.email": "Email",
@@ -573,12 +568,12 @@ const T = {
   "saas.verify.field.code": "Verification code",
   "saas.verify.action.submit": "Verify",
   "saas.verify.action.resend": "Resend code",
-  "saas.reg_complete.title": "You're all set!",
+
+  // Passkey
   "passkey.title": "Passwordless sign in",
   "passkey.description": "Use your passkey or security key to sign in",
   "passkey.action.authenticate": "Use passkey",
   "passkey.action.fallback": "Use password instead",
-  "passkey.complete.title": "Signed in",
 };
 
 function t(key) { return T[key] || key; }
@@ -616,228 +611,165 @@ const DEFAULT_TEMPLATE = `<h2>{{ texts.title_key | t }}</h2>
 const FLOWS = {
   "Login": {
     name: "Default Login",
+    user_schema: "human_user",
     purposes: ["login"],
-    initial_steps: { login: "identifier" },
+    initial_steps: { login: "login" },
     audience: {},
     steps: [
       {
-        name: "identifier",
-        type: "identifier",
-        texts: { title_key: "login.identifier.title", description_key: "login.identifier.description" },
+        name: "login",
+        texts: { title_key: "login.title", description_key: "login.description" },
         fields: {
-          identifier: { type: "email", required: true, text_key: "login.identifier.field.email" }
+          email: { type: "email", required: true, text_key: "login.field.email" },
+          password: { type: "password", required: true, text_key: "login.field.password" }
         },
         actions: {
-          submit: { text_key: "login.identifier.action.submit", primary: true },
-          passkey: { text_key: "login.identifier.action.passkey" },
-          register: { text_key: "login.identifier.action.register" }
+          submit: { text_key: "login.action.submit", primary: true },
+          register: { text_key: "login.action.register" },
+          recover: { text_key: "login.action.recover" }
         },
         gates: {},
         sso_providers: [
           { id: "google-1", name: "Google", template: "google" }
         ],
         transitions: {
-          submit: "resolve_user",
-          sso: "sso_redirect",
-          register: { switch: "register" },
-          recover: { pivot: "recovery" }
+          submit: { target: "done" },
+          sso: { target: "sso_redirect" },
+          register: { target: "default-register", action: "switch" },
+          recover: { target: "default-recovery", action: "pivot" }
         }
       },
       {
-        name: "resolve_user",
-        type: "policy_check",
-        config: { check: "resolve_user" },
-        transitions: { found: "check_factors", not_found: "identifier" }
-      },
-      {
         name: "sso_redirect",
-        type: "redirect",
         texts: { title_key: "login.sso.title" },
-        transitions: { callback: "check_factors" }
-      },
-      {
-        name: "check_factors",
-        type: "policy_check",
-        config: { check: "required_factors" },
-        transitions: { password: "password", otp: "otp", acr_met: "done" }
-      },
-      {
-        name: "password",
-        type: "credential",
-        texts: { title_key: "login.password.title" },
-        fields: {
-          password: { type: "password", required: true, text_key: "login.password.field.password" }
-        },
-        actions: {
-          submit: { text_key: "login.password.action.submit", primary: true },
-          recover: { text_key: "login.password.action.recover" }
-        },
-        gates: {},
-        transitions: { submit: "check_factors", recover: { pivot: "recovery" } }
-      },
-      {
-        name: "otp",
-        type: "credential",
-        texts: { title_key: "login.otp.title", description_key: "login.otp.description" },
-        fields: {
-          code: { type: "text", text_key: "login.otp.field.code", validation: { pattern: "^[0-9]{6}$" } }
-        },
-        actions: {
-          submit: { text_key: "login.otp.action.submit", primary: true }
-        },
-        gates: {},
-        transitions: { submit: "check_factors" }
+        redirect_url: "https://accounts.google.com/o/oauth2/auth?...",
+        transitions: { callback: { target: "done" } }
       },
       {
         name: "done",
-        type: "complete",
-        texts: { title_key: "login.complete.title" },
-        behavior: "redirect"
+        complete: "redirect"
       }
     ]
   },
 
   "Registration": {
     name: "Default Registration",
+    user_schema: "human_user",
     purposes: ["register"],
     initial_steps: { register: "profile" },
     audience: {},
     steps: [
       {
         name: "profile",
-        type: "form",
-        texts: { title_key: "register.profile.title" },
+        texts: { title_key: "profile.title" },
         fields: {
-          email: { type: "email", required: true, text_key: "register.profile.field.email" },
-          given_name: { type: "text", required: true, text_key: "register.profile.field.given_name" },
-          family_name: { type: "text", required: true, text_key: "register.profile.field.family_name" }
+          email: { type: "email", required: true, text_key: "profile.field.email" },
+          given_name: { type: "text", required: true, text_key: "profile.field.given_name" },
+          family_name: { type: "text", required: true, text_key: "profile.field.family_name" }
         },
         actions: {
-          submit: { text_key: "register.profile.action.submit", primary: true },
-          login: { text_key: "register.profile.action.login" }
+          submit: { text_key: "profile.action.submit", primary: true },
+          login: { text_key: "profile.action.login" }
         },
         gates: {},
-        transitions: { submit: "set_password", login: { switch: "login" } }
+        transitions: {
+          submit: { target: "set_password" },
+          login: { target: "default-login", action: "switch" }
+        }
       },
       {
         name: "set_password",
-        type: "form",
-        texts: { title_key: "register.password.title" },
+        texts: { title_key: "set_password.title" },
         fields: {
-          password: { type: "password", required: true, text_key: "register.password.field.password", validation: { min_length: 8 } }
+          password: { type: "password", required: true, text_key: "set_password.field.password", validation: { min_length: 8 } }
         },
         actions: {
-          submit: { text_key: "register.password.action.submit", primary: true }
+          submit: { text_key: "set_password.action.submit", primary: true }
         },
         gates: {},
-        transitions: { submit: "verify_email" }
+        transitions: { submit: { target: "verify_email" } }
       },
       {
         name: "verify_email",
-        type: "verification",
-        texts: { title_key: "register.verify.title", description_key: "register.verify.description" },
+        verify: "email",
+        action: "create_user",
+        texts: { title_key: "verify_email.title", description_key: "verify_email.description" },
         fields: {
-          code: { type: "text", text_key: "register.verify.field.code" }
+          code: { type: "text", text_key: "verify_email.field.code" }
         },
         actions: {
-          submit: { text_key: "register.verify.action.submit", primary: true },
-          resend: { text_key: "register.verify.action.resend" }
+          submit: { text_key: "verify_email.action.submit", primary: true },
+          resend: { text_key: "verify_email.action.resend" }
         },
         gates: {},
-        transitions: { submit: "create_user" }
-      },
-      {
-        name: "create_user",
-        type: "action",
-        config: { action: "create_user_and_session" },
-        transitions: { created: "done" }
+        transitions: { submit: { target: "done" } }
       },
       {
         name: "done",
-        type: "complete",
-        texts: { title_key: "register.complete.title" },
-        behavior: "show"
+        complete: "show"
       }
     ]
   },
 
   "Recovery": {
     name: "Password Recovery",
+    user_schema: "human_user",
     purposes: ["recovery"],
     initial_steps: { recovery: "recovery_email" },
     audience: {},
     steps: [
       {
         name: "recovery_email",
-        type: "verification",
-        texts: { title_key: "recovery.email.title", description_key: "recovery.email.description" },
+        verify: "email",
+        texts: { title_key: "recovery_email.title", description_key: "recovery_email.description" },
         fields: {
-          email: { type: "email", required: true, text_key: "recovery.email.field.email" }
+          email: { type: "email", required: true, text_key: "recovery_email.field.email" }
         },
         actions: {
-          submit: { text_key: "recovery.email.action.submit", primary: true },
-          back: { text_key: "recovery.email.action.back" }
+          submit: { text_key: "recovery_email.action.submit", primary: true },
+          back: { text_key: "recovery_email.action.back" }
         },
         gates: {},
-        transitions: { submit: "verify_code", back: { pivot: "login" } }
-      },
-      {
-        name: "verify_code",
-        type: "verification",
-        texts: { title_key: "recovery.code.title", description_key: "recovery.code.description" },
-        fields: {
-          code: { type: "text", text_key: "recovery.code.field.code" }
-        },
-        actions: {
-          submit: { text_key: "recovery.code.action.submit", primary: true },
-          resend: { text_key: "recovery.code.action.resend" }
-        },
-        gates: {},
-        transitions: { submit: "new_password" }
+        transitions: {
+          submit: { target: "new_password" },
+          back: { target: "default-login", action: "pivot" }
+        }
       },
       {
         name: "new_password",
-        type: "form",
-        texts: { title_key: "recovery.password.title" },
+        action: "reset_credential",
+        texts: { title_key: "new_password.title" },
         fields: {
-          password: { type: "password", required: true, text_key: "recovery.password.field.password", validation: { min_length: 8 } }
+          password: { type: "password", required: true, text_key: "new_password.field.password", validation: { min_length: 8 } }
         },
         actions: {
-          submit: { text_key: "recovery.password.action.submit", primary: true }
+          submit: { text_key: "new_password.action.submit", primary: true }
         },
         gates: {},
-        transitions: { submit: "reset_action" }
-      },
-      {
-        name: "reset_action",
-        type: "action",
-        config: { action: "reset_password" },
-        transitions: { reset: "done" }
+        transitions: { submit: { target: "done" } }
       },
       {
         name: "done",
-        type: "complete",
-        texts: { title_key: "recovery.complete.title" },
-        behavior: "show"
+        complete: "show"
       }
     ]
   },
 
   "Enterprise Login": {
     name: "Acme Corp SSO Login",
+    user_schema: "human_user",
     purposes: ["login"],
-    initial_steps: { login: "identifier" },
+    initial_steps: { login: "login" },
     audience: { team_ids: ["team_acme"], app_ids: ["app_dashboard"] },
     steps: [
       {
-        name: "identifier",
-        type: "identifier",
-        texts: { title_key: "enterprise.identifier.title", description_key: "enterprise.identifier.description" },
+        name: "login",
+        texts: { title_key: "enterprise.login.title", description_key: "enterprise.login.description" },
         fields: {
-          identifier: { type: "email", required: true, text_key: "enterprise.identifier.field.email" }
+          email: { type: "email", required: true, text_key: "enterprise.login.field.email" }
         },
         actions: {
-          submit: { text_key: "enterprise.identifier.action.submit", primary: true }
+          submit: { text_key: "enterprise.login.action.submit", primary: true }
         },
         gates: {},
         sso_providers: [
@@ -845,44 +777,30 @@ const FLOWS = {
           { id: "azure-acme", name: "Acme Azure AD", template: "microsoft" }
         ],
         transitions: {
-          submit: "force_sso",
-          sso: "sso_redirect"
+          submit: { target: "signin" },
+          sso: { target: "sso_redirect" }
         }
       },
       {
-        name: "force_sso",
-        type: "policy_check",
-        config: { check: "domain_requires_sso" },
-        transitions: { sso_required: "sso_redirect", sso_optional: "password" }
-      },
-      {
         name: "sso_redirect",
-        type: "redirect",
-        texts: { title_key: "enterprise.identifier.title" },
-        transitions: { callback: "check_consent" }
+        texts: { title_key: "enterprise.login.title" },
+        redirect_url: "https://acme.okta.com/oauth2/...",
+        transitions: { callback: { target: "consent" } }
       },
       {
-        name: "password",
-        type: "credential",
-        texts: { title_key: "enterprise.identifier.title" },
+        name: "signin",
+        texts: { title_key: "enterprise.signin.title" },
         fields: {
-          password: { type: "password", required: true, text_key: "saas.password.field.password" }
+          password: { type: "password", required: true, text_key: "enterprise.signin.field.password" }
         },
         actions: {
-          submit: { text_key: "saas.password.action.submit", primary: true }
+          submit: { text_key: "enterprise.signin.action.submit", primary: true }
         },
         gates: {},
-        transitions: { submit: "check_consent" }
-      },
-      {
-        name: "check_consent",
-        type: "policy_check",
-        config: { check: "consent_required" },
-        transitions: { required: "consent", not_required: "done" }
+        transitions: { submit: { target: "consent" } }
       },
       {
         name: "consent",
-        type: "consent",
         texts: { title_key: "enterprise.consent.title", description_key: "enterprise.consent.description" },
         fields: {},
         actions: {
@@ -890,97 +808,116 @@ const FLOWS = {
           deny: { text_key: "enterprise.consent.action.deny" }
         },
         gates: {},
-        transitions: { accept: "done", deny: "denied" }
+        transitions: {
+          accept: { target: "done" },
+          deny: { target: "denied" }
+        }
       },
       {
         name: "denied",
-        type: "complete",
-        texts: { title_key: "enterprise.consent.action.deny" },
-        behavior: "show"
+        complete: "show"
       },
       {
         name: "done",
-        type: "complete",
-        texts: { title_key: "enterprise.complete.title" },
-        behavior: "redirect"
+        complete: "redirect"
       }
     ]
   },
 
-  "SaaS Login": {
-    name: "SaaSApp Login",
-    purposes: ["login"],
-    initial_steps: { login: "identifier" },
-    audience: { app_ids: ["app_saas"] },
+  "Combined Auth": {
+    name: "Combined Login + Registration",
+    user_schema: "human_user",
+    purposes: ["login", "register"],
+    initial_steps: { login: "identify", register: "identify" },
+    audience: {},
     steps: [
       {
-        name: "identifier",
-        type: "identifier",
-        texts: { title_key: "saas.identifier.title", description_key: "saas.identifier.description" },
+        name: "identify",
+        texts: { title_key: "identify.title" },
         fields: {
-          identifier: { type: "email", required: true, text_key: "saas.identifier.field.email" }
+          email: { type: "email", required: true, text_key: "identify.field.email" }
         },
         actions: {
-          submit: { text_key: "saas.identifier.action.submit", primary: true },
-          register: { text_key: "saas.identifier.action.register" }
+          submit: { text_key: "identify.action.submit", primary: true }
         },
-        gates: {
-          captcha: { type: "captcha", provider: "altcha", required: true, satisfied: false, config: { algorithm: "SHA-256" } }
-        },
-        sso_providers: [
-          { id: "google-1", name: "Google", template: "google" },
-          { id: "github-1", name: "GitHub", template: "github" }
-        ],
+        gates: {},
         transitions: {
-          submit: "resolve_user",
-          sso: "sso_redirect",
-          register: { switch: "SaaS Registration" }
+          submit: { target: "signin" },
+          user_not_found: { target: "profile" }
         }
       },
       {
-        name: "resolve_user",
-        type: "policy_check",
-        config: { check: "resolve_user" },
-        transitions: { found: "password", not_found: "identifier" }
-      },
-      {
-        name: "sso_redirect",
-        type: "redirect",
-        texts: { title_key: "saas.identifier.title" },
-        transitions: { callback: "done" }
-      },
-      {
-        name: "password",
-        type: "credential",
-        texts: { title_key: "saas.password.title" },
+        name: "signin",
+        texts: { title_key: "signin.title" },
         fields: {
-          password: { type: "password", required: true, text_key: "saas.password.field.password" }
+          password: { type: "password", required: true, text_key: "signin.field.password" }
         },
         actions: {
-          submit: { text_key: "saas.password.action.submit", primary: true },
-          recover: { text_key: "saas.password.action.recover" }
+          submit: { text_key: "signin.action.submit", primary: true },
+          recover: { text_key: "signin.action.recover" }
         },
         gates: {},
-        transitions: { submit: "done", recover: { pivot: "recovery" } }
+        transitions: {
+          submit: { target: "done" },
+          recover: { target: "default-recovery", action: "pivot" }
+        }
+      },
+      {
+        name: "profile",
+        texts: { title_key: "profile.title" },
+        fields: {
+          given_name: { type: "text", required: true, text_key: "profile.field.given_name" },
+          family_name: { type: "text", required: true, text_key: "profile.field.family_name" }
+        },
+        actions: {
+          submit: { text_key: "profile.action.submit", primary: true }
+        },
+        gates: {},
+        transitions: { submit: { target: "set_password" } }
+      },
+      {
+        name: "set_password",
+        texts: { title_key: "set_password.title" },
+        fields: {
+          password: { type: "password", required: true, text_key: "set_password.field.password", validation: { min_length: 8 } }
+        },
+        actions: {
+          submit: { text_key: "set_password.action.submit", primary: true }
+        },
+        gates: {},
+        transitions: { submit: { target: "verify_email" } }
+      },
+      {
+        name: "verify_email",
+        verify: "email",
+        action: "create_user",
+        texts: { title_key: "verify_email.title", description_key: "verify_email.description" },
+        fields: {
+          code: { type: "text", text_key: "verify_email.field.code" }
+        },
+        actions: {
+          submit: { text_key: "verify_email.action.submit", primary: true },
+          resend: { text_key: "verify_email.action.resend" }
+        },
+        gates: {},
+        transitions: { submit: { target: "done" } }
       },
       {
         name: "done",
-        type: "complete",
-        texts: { title_key: "saas.complete.title" },
-        behavior: "redirect"
+        complete: "redirect"
       }
     ]
   },
 
   "SaaS Registration": {
     name: "SaaSApp Registration",
+    user_schema: "saas_user",
     purposes: ["register"],
     initial_steps: { register: "profile" },
     audience: { app_ids: ["app_saas"] },
     steps: [
       {
         name: "profile",
-        type: "form",
         texts: { title_key: "saas.profile.title", description_key: "saas.profile.description" },
         fields: {
           email: { type: "email", required: true, text_key: "saas.profile.field.email" },
@@ -998,17 +935,20 @@ const FLOWS = {
           { id: "google-1", name: "Google", template: "google" },
           { id: "github-1", name: "GitHub", template: "github" }
         ],
-        transitions: { submit: "terms", sso: "sso_link", login: { switch: "SaaS Login" } }
+        transitions: {
+          submit: { target: "terms" },
+          sso: { target: "sso_link" },
+          login: { target: "default-login", action: "switch" }
+        }
       },
       {
         name: "sso_link",
-        type: "redirect",
         texts: { title_key: "saas.profile.title" },
-        transitions: { callback: "terms" }
+        redirect_url: "https://accounts.google.com/o/oauth2/auth?...",
+        transitions: { callback: { target: "terms" } }
       },
       {
         name: "terms",
-        type: "consent",
         texts: { title_key: "saas.terms.title", description_key: "saas.terms.description" },
         fields: {},
         actions: {
@@ -1016,11 +956,15 @@ const FLOWS = {
           decline: { text_key: "saas.terms.action.decline" }
         },
         gates: {},
-        transitions: { accept: "verify_email", decline: "profile" }
+        transitions: {
+          accept: { target: "verify_email" },
+          decline: { target: "profile" }
+        }
       },
       {
         name: "verify_email",
-        type: "verification",
+        verify: "email",
+        action: "create_user",
         texts: { title_key: "saas.verify.title", description_key: "saas.verify.description" },
         fields: {
           code: { type: "text", text_key: "saas.verify.field.code" }
@@ -1030,32 +974,24 @@ const FLOWS = {
           resend: { text_key: "saas.verify.action.resend" }
         },
         gates: {},
-        transitions: { submit: "create_user" }
-      },
-      {
-        name: "create_user",
-        type: "action",
-        config: { action: "create_user_and_session" },
-        transitions: { created: "done" }
+        transitions: { submit: { target: "done" } }
       },
       {
         name: "done",
-        type: "complete",
-        texts: { title_key: "saas.reg_complete.title" },
-        behavior: "show"
+        complete: "show"
       }
     ]
   },
 
   "Passkey Login": {
     name: "Passwordless Login",
+    user_schema: "human_user",
     purposes: ["login"],
     initial_steps: { login: "passkey_prompt" },
     audience: {},
     steps: [
       {
         name: "passkey_prompt",
-        type: "credential",
         texts: { title_key: "passkey.title", description_key: "passkey.description" },
         fields: {},
         actions: {
@@ -1066,21 +1002,13 @@ const FLOWS = {
           passkey: { type: "passkey", required: true, satisfied: false }
         },
         transitions: {
-          authenticate: "verify_passkey",
-          fallback: { switch: "login" }
+          authenticate: { target: "done" },
+          fallback: { target: "default-login", action: "switch" }
         }
       },
       {
-        name: "verify_passkey",
-        type: "policy_check",
-        config: { check: "passkey_valid" },
-        transitions: { valid: "done", invalid: "passkey_prompt" }
-      },
-      {
         name: "done",
-        type: "complete",
-        texts: { title_key: "passkey.complete.title" },
-        behavior: "redirect"
+        complete: "redirect"
       }
     ]
   }
@@ -1398,13 +1326,15 @@ async function renderDiagram() {
 
   for (const step of steps) {
     const id = 'n_' + step.name;
-    const typeLabel = step.type;
-    if (step.type === 'policy_check' || step.type === 'action') {
-      lines.push(`    ${id}{{"\`**${step.name}**<br/>${typeLabel}\`"}}`);
-    } else if (step.type === 'complete') {
-      lines.push(`    ${id}(["\`**${step.name}**<br/>${typeLabel}\`"])`);
+    let label = step.name;
+    if (step.verify) label += `<br/>verify: ${step.verify}`;
+    if (step.action) label += `<br/>action: ${step.action}`;
+    if (step.complete) {
+      lines.push(`    ${id}(["\`**${label}**<br/>complete: ${step.complete}\`"])`);
+    } else if (step.redirect_url) {
+      lines.push(`    ${id}["\`**${label}**<br/>redirect\`"]`);
     } else {
-      lines.push(`    ${id}["\`**${step.name}**<br/>${typeLabel}\`"]`);
+      lines.push(`    ${id}["\`**${label}**\`"]`);
     }
   }
 
@@ -1412,32 +1342,36 @@ async function renderDiagram() {
     if (!step.transitions) continue;
     const srcId = 'n_' + step.name;
     for (const [label, tgt] of Object.entries(step.transitions)) {
-      if (typeof tgt === 'string') {
-        lines.push(`    ${srcId} -->|${label}| n_${tgt}`);
-      } else if (tgt.pivot) {
-        const extId = 'ext_pivot_' + tgt.pivot;
-        if (!transitionTargets.has('pivot:' + tgt.pivot)) {
-          transitionTargets.add('pivot:' + tgt.pivot);
-          lines.push(`    ${extId}["\`**${tgt.pivot}**<br/>pivot (stack)\`"]:::pivot`);
+      const target = typeof tgt === 'string' ? tgt : tgt.target;
+      const action = typeof tgt === 'object' ? tgt.action : null;
+
+      if (action === 'pivot') {
+        const extId = 'ext_pivot_' + target;
+        if (!transitionTargets.has('pivot:' + target)) {
+          transitionTargets.add('pivot:' + target);
+          lines.push(`    ${extId}["\`**${target}**<br/>pivot (stack)\`"]:::pivot`);
         }
         lines.push(`    ${srcId} -.->|${label}| ${extId}`);
-      } else if (tgt.switch) {
-        const extId = 'ext_switch_' + tgt.switch;
-        if (!transitionTargets.has('switch:' + tgt.switch)) {
-          transitionTargets.add('switch:' + tgt.switch);
-          lines.push(`    ${extId}["\`**${tgt.switch}**<br/>switch (replace)\`"]:::switchFlow`);
+      } else if (action === 'switch') {
+        const extId = 'ext_switch_' + target;
+        if (!transitionTargets.has('switch:' + target)) {
+          transitionTargets.add('switch:' + target);
+          lines.push(`    ${extId}["\`**${target}**<br/>switch (replace)\`"]:::switchFlow`);
         }
         lines.push(`    ${srcId} -.->|${label}| ${extId}`);
+      } else {
+        // Same-flow transition
+        lines.push(`    ${srcId} -->|${label}| n_${target}`);
       }
     }
   }
 
   for (const step of steps) {
     const id = 'n_' + step.name;
-    if (step.type === 'policy_check' || step.type === 'action') {
-      lines.push(`    style ${id} fill:#1a2744,stroke:#4a5568,color:#8b8fa3`);
-    } else if (step.type === 'complete') {
+    if (step.complete) {
       lines.push(`    style ${id} fill:#1a3a2a,stroke:#4ade80,color:#4ade80`);
+    } else if (step.redirect_url) {
+      lines.push(`    style ${id} fill:#1a2744,stroke:#4a5568,color:#8b8fa3`);
     }
   }
 
@@ -1559,7 +1493,7 @@ function buildFlowResponse(step) {
       liquid_template: "(template omitted for brevity)"
     }
   };
-  if (step?.behavior === 'redirect') {
+  if (step?.complete === 'redirect') {
     resp.redirect_uri = "https://app.example.com/callback";
   }
   return resp;
@@ -1567,53 +1501,23 @@ function buildFlowResponse(step) {
 
 function buildStepPayload(step) {
   if (!step) return null;
-  const payload = {
-    name: step.name,
-    type: step.type,
-  };
+  const payload = { name: step.name };
   if (step.texts) payload.texts = step.texts;
-  if (step.fields) payload.fields = step.fields;
-  if (step.actions) payload.actions = step.actions;
+  if (step.complete) payload.complete = step.complete;
+  if (step.fields && Object.keys(step.fields).length > 0) payload.fields = step.fields;
+  if (step.actions && Object.keys(step.actions).length > 0) payload.actions = step.actions;
   if (step.gates && Object.keys(step.gates).length > 0) payload.gates = step.gates;
   if (step.sso_providers?.length > 0) payload.sso_providers = step.sso_providers;
-  if (step.behavior) payload.behavior = step.behavior;
-  if (step.type === 'complete' && step.behavior === 'redirect') {
-    payload.redirect_url = "https://app.example.com/callback";
-  }
+  if (step.redirect_url) payload.redirect_url = step.redirect_url;
+  if (step.verify) payload.verify = step.verify;
+  if (step.action) payload.action = step.action;
   if (simState.error) payload.error = simState.error;
   return payload;
 }
 
 function advanceThroughInvisible() {
-  let guard = 0;
-  while (guard++ < 20) {
-    const step = findStep(simState.stepName);
-    if (!step) break;
-    if (step.type === 'policy_check' || step.type === 'action') {
-      const transitions = step.transitions || {};
-      const keys = Object.keys(transitions);
-      const visited = new Set(simState.history);
-      let picked = null;
-      for (const k of keys) {
-        const tgt = transitions[k];
-        if (typeof tgt === 'string' && !visited.has(tgt)) { picked = tgt; break; }
-      }
-      if (!picked) {
-        for (let i = keys.length - 1; i >= 0; i--) {
-          const tgt = transitions[keys[i]];
-          if (typeof tgt === 'string') { picked = tgt; break; }
-        }
-      }
-      if (picked) {
-        simState.history.push(simState.stepName);
-        simState.stepName = picked;
-      } else {
-        break;
-      }
-    } else {
-      break;
-    }
-  }
+  // No invisible steps in the simplified model.
+  // This function is kept for compatibility but is a no-op.
 }
 
 function onSimStepChanged() {
@@ -1633,12 +1537,16 @@ function simAction(actionName, providerId) {
     if (input.value) fieldValues[input.name] = input.value;
   });
 
-  const target = step.transitions[actionName];
-  if (!target) {
+  const transition = step.transitions[actionName];
+  if (!transition) {
     simState.error = null;
     renderSim();
     return;
   }
+
+  // Normalize transition: string shorthand or {target, action} object
+  const target = typeof transition === 'string' ? transition : transition.target;
+  const transAction = typeof transition === 'object' ? transition.action : null;
 
   // Build submit request
   const submitRequest = {
@@ -1651,11 +1559,12 @@ function simAction(actionName, providerId) {
   const oldFlowId = simState.flowId;
 
   // Handle pivot (stack)
-  if (typeof target === 'object' && target.pivot) {
-    const pivotPurpose = target.pivot;
-    const pivotFlowName = Object.keys(FLOWS).find(k => FLOWS[k].purposes?.includes(pivotPurpose));
+  if (transAction === 'pivot') {
+    const pivotFlowName = Object.keys(FLOWS).find(k => {
+      const f = FLOWS[k];
+      return f.name === target || k === target || f.purposes?.includes(target);
+    });
     if (pivotFlowName) {
-      // Push current flow onto stack
       simState.flowStack.push({
         flowName: currentFlowName,
         flowId: simState.flowId,
@@ -1663,7 +1572,6 @@ function simAction(actionName, providerId) {
         history: [...simState.history]
       });
 
-      // Switch to pivot flow
       const newFlowId = genId('flow');
       simState.flowId = newFlowId;
       simState.sessionToken = genToken();
@@ -1677,7 +1585,6 @@ function simAction(actionName, providerId) {
       simState.stepName = currentFlow.initial_steps?.[purpose] || currentFlow.steps?.[0]?.name;
       simState.history = [];
       simState.error = null;
-      advanceThroughInvisible();
 
       const newStep = findStep(simState.stepName);
       logApi('POST', `/flow/${oldFlowId}/submit`, submitRequest, 200, buildFlowResponse(newStep));
@@ -1689,14 +1596,16 @@ function simAction(actionName, providerId) {
   }
 
   // Handle switch (replace)
-  if (typeof target === 'object' && target.switch) {
-    const switchPurpose = target.switch;
-    const switchFlowName = Object.keys(FLOWS).find(k => FLOWS[k].purposes?.includes(switchPurpose));
+  if (transAction === 'switch') {
+    const switchFlowName = Object.keys(FLOWS).find(k => {
+      const f = FLOWS[k];
+      return f.name === target || k === target || f.purposes?.includes(target);
+    });
     if (switchFlowName) {
       const newFlowId = genId('flow');
       simState.flowId = newFlowId;
       simState.sessionToken = genToken();
-      simState.flowStack = []; // clear stack on switch
+      simState.flowStack = [];
 
       currentFlowName = switchFlowName;
       currentFlow = structuredClone(FLOWS[switchFlowName]);
@@ -1707,7 +1616,6 @@ function simAction(actionName, providerId) {
       simState.stepName = currentFlow.initial_steps?.[purpose] || currentFlow.steps?.[0]?.name;
       simState.history = [];
       simState.error = null;
-      advanceThroughInvisible();
 
       const newStep = findStep(simState.stepName);
       logApi('POST', `/flow/${oldFlowId}/submit`, submitRequest, 200, buildFlowResponse(newStep));
@@ -1718,17 +1626,16 @@ function simAction(actionName, providerId) {
     }
   }
 
-  // Normal transition
+  // Normal same-flow transition
   simState.history.push(simState.stepName);
   simState.stepName = target;
   simState.error = null;
   simState.sessionToken = genToken();
-  advanceThroughInvisible();
 
   const newStep = findStep(simState.stepName);
 
   // Auto-pop: if complete step and there's a parent flow on the stack
-  if (newStep?.type === 'complete' && simState.flowStack.length > 0) {
+  if (newStep?.complete && simState.flowStack.length > 0) {
     const parent = simState.flowStack.pop();
     simState.flowId = parent.flowId;
     simState.sessionToken = genToken();
@@ -1773,17 +1680,16 @@ async function renderSim() {
     return;
   }
 
-  if (step.type === 'complete') {
-    const behavior = step.behavior || 'redirect';
+  if (step.complete) {
     const title = t(step.texts?.title_key) || 'Complete';
     phone.innerHTML = `${idsHtml}
       <div class="sim-header"><h2>${title}</h2></div>
       <div class="sim-complete">
         <div class="checkmark">&#10003;</div>
         <h3>${title}</h3>
-        <p>behavior: ${behavior}</p>
-        ${behavior === 'redirect' ? '<p style="color: var(--accent)">&#8594; redirect to application</p>' : ''}
-        ${behavior === 'show' ? '<p style="color: var(--green)">&#10003; displayed to user</p>' : ''}
+        <p>complete: ${step.complete}</p>
+        ${step.complete === 'redirect' ? '<p style="color: var(--accent)">&#8594; redirect to application</p>' : ''}
+        ${step.complete === 'show' ? '<p style="color: var(--green)">&#10003; displayed to user</p>' : ''}
       </div>
       <div class="sim-footer">
         <span class="sim-breadcrumb">${renderBreadcrumb()}</span>
@@ -1792,7 +1698,7 @@ async function renderSim() {
     return;
   }
 
-  if (step.type === 'redirect') {
+  if (step.redirect_url && !step.fields) {
     const title = t(step.texts?.title_key) || 'Redirecting\u2026';
     phone.innerHTML = `${idsHtml}
       <div class="sim-header"><h2>${title}</h2></div>
@@ -1875,7 +1781,7 @@ function renderStepFallback(step) {
   }).join('');
 
   return `
-    <h2 style="font-size:20px;font-weight:600;margin-bottom:4px;">${title}<span class="step-badge">${step.type}</span></h2>
+    <h2 style="font-size:20px;font-weight:600;margin-bottom:4px;">${title}<span class="step-badge">${step.name}</span></h2>
     ${desc ? `<p style="font-size:13px;color:var(--muted);margin-bottom:12px;">${desc}</p>` : ''}
     ${errorHtml}
     ${fieldsHtml}
@@ -1883,10 +1789,7 @@ function renderStepFallback(step) {
 }
 
 function renderBreadcrumb() {
-  const parts = [...simState.history.filter(h => {
-    const s = findStep(h);
-    return s && s.type !== 'policy_check' && s.type !== 'action';
-  }).slice(-3), simState.stepName];
+  const parts = [...simState.history.slice(-3), simState.stepName];
   return parts.map((p, i) =>
     i === parts.length - 1 ? `<span>${p}</span>` : p
   ).join(' &#8594; ');
