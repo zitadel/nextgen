@@ -41,15 +41,15 @@ properties:
     default: {}
 
   gates:
-    type: array
+    type: object
     description: |
-      Security gates that must be satisfied before submission.
-      Each entry is a gate type string (e.g. "captcha", "passkey").
-      The engine may also inject gates dynamically based on policy.
-    items:
-      type: string
-      enum: [captcha, passkey]
-    default: []
+      Security gates that must be satisfied before submission. Keyed by gate
+      name. Each gate selects a type (e.g. "captcha") and provider-specific
+      configuration. The engine may also inject gates dynamically based on
+      policy.
+    additionalProperties:
+      $ref: gate.yaml
+    default: {}
 
   sso_providers:
     type: array

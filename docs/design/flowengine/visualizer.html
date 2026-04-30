@@ -1026,7 +1026,7 @@ const FLOWS = {
           submit: { primary: true },
           login: {}
         },
-        gates: ["captcha"],
+        gates: { captcha: { type: "captcha", provider: "altcha" } },
         sso_providers: [
           { id: "google-1", name: "Google", template: "google" },
           { id: "github-1", name: "GitHub", template: "github" }
@@ -1075,7 +1075,7 @@ const FLOWS = {
           authenticate: { primary: true },
           fallback: {}
         },
-        gates: ["passkey"],
+        gates: { passkey: { type: "passkey" } },
         transitions: {
           authenticate: { target: "done" },
           fallback: { target: "default-login", action: "switch" }
@@ -1638,14 +1638,7 @@ function buildStepPayload(step) {
     payload.actions = { submit: { primary: true, text_key: `${step.name}.action.submit` } };
   }
 
-  // Resolve gates from string array to dict
-  if (Array.isArray(step.gates) && step.gates.length > 0) {
-    const resolved = {};
-    for (const gate of step.gates) {
-      resolved[gate] = { type: gate };
-    }
-    payload.gates = resolved;
-  }
+  if (step.gates && Object.keys(step.gates).length > 0) payload.gates = step.gates;
 
   if (step.sso_providers?.length > 0) payload.sso_providers = step.sso_providers;
   if (step.verify) payload.verify = step.verify;

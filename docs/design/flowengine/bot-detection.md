@@ -178,13 +178,15 @@ Three modes:
    {
      "name": "profile",
      "fields": ["email", "given_name", "family_name"],
-     "gates": ["captcha"],
+     "gates": {
+       "captcha": { "type": "captcha", "provider": "altcha" }
+     },
      "transitions": {
        "submit": { "target": "set_password" }
      }
    }
    ```
-   The `gates: ["captcha"]` declaration means the frontend must solve a captcha before submission is accepted.
+   The `gates.captcha` declaration means the frontend must solve a captcha (using the configured provider) before submission is accepted.
 
 2. **Dynamic injection** — policy evaluates risk and injects a captcha gate on any step dynamically, even if the definition doesn't declare it.
 

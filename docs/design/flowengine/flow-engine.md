@@ -562,7 +562,7 @@ GET /flows/sess_2
     {
       "name": "profile",
       "fields": ["email", "given_name", "family_name"],
-      "gates": ["captcha"],
+      "gates": { "captcha": { "type": "captcha", "provider": "altcha" } },
       "transitions": {
         "submit": { "target": "set_password" }
       }
@@ -587,7 +587,7 @@ GET /flows/sess_2
 }
 ```
 
-The `gates: ["captcha"]` on the profile step means the frontend must solve a captcha before submission. The engine can also inject gates dynamically based on policy (e.g., risk score triggers captcha even if not declared in the definition).
+The `gates.captcha` on the profile step means the frontend must solve a captcha before submission, using the configured provider. The engine can also inject gates dynamically based on policy (e.g., risk score triggers captcha even if not declared in the definition).
 
 ---
 

@@ -465,7 +465,9 @@ Gates are security challenges that must be satisfied before a step can be submit
 {
   "name": "profile",
   "fields": ["email", "given_name", "family_name"],
-  "gates": ["captcha"],
+  "gates": {
+    "captcha": { "type": "captcha", "provider": "altcha" }
+  },
   "transitions": {
     "submit": { "target": "set_password" }
   }
