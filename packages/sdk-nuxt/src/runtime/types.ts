@@ -80,4 +80,19 @@ export type NextgenModuleOptions = {
    * @default 5000
    */
   clockSkewMs?: number;
+
+  /**
+   * Expected value(s) of the `aud` claim. When omitted, audience is not
+   * validated. Pass a single string or an array when a token may carry
+   * multiple audiences.
+   */
+  audience?: string | string[];
+
+  /**
+   * Accepted values for the JWT header `typ` claim (case-insensitive).
+   * Tokens whose `typ` is not in this list are rejected.
+   * Set to `[]` to disable token-type checking entirely.
+   * @default ["JWT", "at+JWT"]
+   */
+  allowedTokenTypes?: string[];
 };

@@ -160,9 +160,12 @@ async function fetchAndCacheJwks(
  * Verification order:
  * 1. Decode header and payload (no trust yet).
  * 2. Reject if `alg` is not in `allowedAlgorithms` (when configured).
- * 3. Fetch and cache the matching public key from JWKS.
- * 4. Verify the cryptographic signature.
- * 5. Validate `exp`, `nbf`, and `iat` with clock-skew tolerance.
+ * 3. Reject if `typ` header is not in `allowedTokenTypes` (when non-empty).
+ * 4. Fetch and cache the matching public key from JWKS.
+ * 5. Verify the cryptographic signature.
+ * 6. Validate `iss` against `issuerUrl` (when present in token).
+ * 7. Validate `aud` against `audience` (when `audience` option is set).
+ * 8. Validate `exp`, `nbf`, and `iat` with clock-skew tolerance.
  *
  * Returns `null` on any failure rather than throwing.
  *
@@ -170,6 +173,8 @@ async function fetchAndCacheJwks(
  * @param issuerUrl         - Base URL of the auth backend.
  * @param allowedAlgorithms - Optional allowlist of accepted `alg` values.
  * @param clockSkewMs       - Tolerance in ms for time-based claim checks.
+ * @param audience          - Expected `aud` claim value(s). Skipped when `undefined`.
+ * @param allowedTokenTypes - Accepted `typ` header values (case-insensitive). Pass `[]` to skip.
  * @returns The verified {@link JwtPayload}, or `null` if verification fails.
  */
 async function verifyJwt(
@@ -177,6 +182,8 @@ async function verifyJwt(
   issuerUrl: string,
   allowedAlgorithms: readonly string[] | undefined,
   clockSkewMs: number,
+  audience: string | string[] | undefined,
+  allowedTokenTypes: string[],
 ): Promise<JwtPayload | null> {
   try {
     const { header, payload } = decodeJwt(token);
@@ -185,6 +192,13 @@ async function verifyJwt(
 
     if (allowedAlgorithms && allowedAlgorithms.length > 0 && !allowedAlgorithms.includes(alg)) {
       return null;
+    }
+
+    if (allowedTokenTypes.length > 0) {
+      const typ = (header.typ as string | undefined) ?? "";
+      if (!allowedTokenTypes.some((t) => t.toLowerCase() === typ.toLowerCase())) {
+        return null;
+      }
     }
 
     const kid = header.kid as string | undefined;
@@ -206,6 +220,20 @@ async function verifyJwt(
 
     if (!valid) {
       return null;
+    }
+
+    if (payload.iss !== undefined && payload.iss !== issuerUrl) {
+      return null;
+    }
+
+    if (audience !== undefined) {
+      const audList = Array.isArray(payload.aud)
+        ? (payload.aud as string[])
+        : [payload.aud as string | undefined];
+      const expectedList = Array.isArray(audience) ? audience : [audience];
+      if (!expectedList.some((a) => audList.includes(a))) {
+        return null;
+      }
     }
 
     const now = Date.now();
@@ -318,6 +346,8 @@ export async function nextgenMiddleware(
     loginPath = "/login",
     allowedAlgorithms,
     clockSkewMs = 5000,
+    audience,
+    allowedTokenTypes = ["JWT", "at+JWT"],
   } = options;
 
   const { pathname } = new URL(req.url);
@@ -336,6 +366,8 @@ export async function nextgenMiddleware(
     loginPath,
     allowedAlgorithms,
     clockSkewMs,
+    audience,
+    allowedTokenTypes,
     pathname,
   });
 }
@@ -404,6 +436,8 @@ interface AuthHandlerOptions {
   readonly loginPath: string;
   readonly allowedAlgorithms: readonly string[] | undefined;
   readonly clockSkewMs: number;
+  readonly audience: string | string[] | undefined;
+  readonly allowedTokenTypes: string[];
   readonly pathname: string;
 }
 
@@ -417,7 +451,7 @@ interface AuthHandlerOptions {
  * @returns A `NextResponse` to continue or redirect.
  */
 async function handleAuth(req: NextRequest, opts: AuthHandlerOptions): Promise<NextResponse> {
-  const { issuerUrl, protectedRoutes, loginPath, allowedAlgorithms, clockSkewMs, pathname } = opts;
+  const { issuerUrl, protectedRoutes, loginPath, allowedAlgorithms, clockSkewMs, audience, allowedTokenTypes, pathname } = opts;
 
   const authHeader = req.headers.get("authorization");
   const bearerToken =
@@ -426,7 +460,7 @@ async function handleAuth(req: NextRequest, opts: AuthHandlerOptions): Promise<N
   const token = bearerToken ?? cookieToken;
 
   const payload = token
-    ? await verifyJwt(token, issuerUrl, allowedAlgorithms, clockSkewMs)
+    ? await verifyJwt(token, issuerUrl, allowedAlgorithms, clockSkewMs, audience, allowedTokenTypes)
     : null;
 
   if (payload && token) {
@@ -437,8 +471,10 @@ async function handleAuth(req: NextRequest, opts: AuthHandlerOptions): Promise<N
   const tunnelled = tunnelHeaders(req, { "x-nextgen-auth-token": "" });
   const response = NextResponse.next({ request: { headers: tunnelled } });
 
-  if (cookieToken) {
-    response.cookies.delete("__nextgen_session");
+  for (const cookie of req.cookies.getAll()) {
+    if (cookie.name.startsWith("__nextgen")) {
+      response.cookies.delete(cookie.name);
+    }
   }
 
   if (matchesRoutes(pathname, protectedRoutes)) {
