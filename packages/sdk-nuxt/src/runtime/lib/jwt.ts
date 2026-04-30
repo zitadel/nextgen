@@ -36,9 +36,9 @@
  *
  * | Field | Purpose | Verified |
  * |-------|---------|---------|
- * | `alg` | Signing algorithm (`RS256`, `ES256`, …) | ✅ Checked against {@link VerifyJwtOptions.allowedAlgorithms} before JWKS is fetched |
- * | `kid` | Key ID — selects the matching public key from the JWKS | ✅ Used for key lookup; falls back to the first JWKS key when absent |
- * | `typ` | Token type (`JWT`, `at+JWT`, …) | ✅ Checked against {@link VerifyJwtOptions.allowedTokenTypes} (case-insensitive) |
+ * | `alg` | Signing algorithm (`RS256`, `ES256`, …) | Checked against {@link VerifyJwtOptions.allowedAlgorithms} before JWKS is fetched |
+ * | `kid` | Key ID — selects the matching public key from the JWKS | Used for key lookup; falls back to the first JWKS key when absent |
+ * | `typ` | Token type (`JWT`, `at+JWT`, …) | Checked against {@link VerifyJwtOptions.allowedTokenTypes} (case-insensitive) |
  * | ~~`enc`~~ | ~~Encryption algorithm — present in JWE (encrypted) tokens only~~ | ~~Not applicable — we verify JWS (signed) tokens, not JWE (encrypted)~~ |
  * | ~~`cty`~~ | ~~Content type — describes the secured content media type~~ | ~~Not applicable — not set by standard OIDC/OAuth auth servers~~ |
  *
@@ -48,7 +48,7 @@
  *
  * The payload is a JSON object Base64URL-encoded into the second segment.
  *
- * ### ✅ Validated claims
+ * ### Validated claims
  *
  * | Claim | Purpose | How |
  * |-------|---------|-----|
@@ -58,7 +58,7 @@
  * | `iat` | Issued at — Unix timestamp when the token was created | Must not be in the future beyond {@link VerifyJwtOptions.clockSkewMs} |
  * | `aud` | Audience — the intended recipient(s) of the token | Checked against {@link VerifyJwtOptions.audience} when that option is provided |
  *
- * ### 📖 Read-only claims (extracted into the session, not further validated)
+ * ### Read-only claims (extracted into the session, not further validated)
  *
  * | Claim | Purpose |
  * |-------|---------|
@@ -66,7 +66,7 @@
  * | `email` | User's email address |
  * | `name` | User's display name |
  *
- * ### ❌ Not validated
+ * ### Not validated
  *
  * | Claim | Purpose | Why skipped |
  * |-------|---------|-------------|
