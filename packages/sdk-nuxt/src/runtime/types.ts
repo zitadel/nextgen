@@ -24,7 +24,7 @@ export type AuthResult = AuthState | UnauthState;
 /**
  * Options passed to {@link createNextgenMiddleware} or the Nuxt module config.
  */
-export type NextgenModuleOptions = {
+export type NextgenMiddlewareOptions = {
   /**
    * Full URL of the Nextgen auth backend.
    * @default process.env.NEXTGEN_ISSUER_URL ?? "http://localhost:4000"

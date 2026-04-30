@@ -11,7 +11,7 @@ import {
   readRawBody,
 } from 'h3';
 
-import type { AuthResult, NextgenModuleOptions } from '../types';
+import type { AuthResult, NextgenMiddlewareOptions } from '../types';
 
 import { verifyJwt } from '../lib/jwt';
 
@@ -128,7 +128,7 @@ function buildUpstreamHeaders(event: H3Event): Headers {
  * @returns An H3 event handler suitable for use as a global server middleware.
  */
 export function createNextgenMiddleware(
-  options: NextgenModuleOptions = {},
+  options: NextgenMiddlewareOptions = {},
 ): EventHandler {
   const {
     issuerUrl = process.env.NEXTGEN_ISSUER_URL ?? 'http://localhost:4000',
@@ -220,14 +220,14 @@ async function proxyRequest(
 
 /**
  * Options passed internally to {@link handleAuth} after destructuring the
- * public-facing {@link NextgenModuleOptions}.
+ * public-facing {@link NextgenMiddlewareOptions}.
  */
 interface AuthHandlerOptions {
   readonly issuerUrl: string;
   readonly protectedRoutes: readonly string[];
   readonly loginPath: string;
   /**
-   * Forwarded from {@link NextgenModuleOptions.allowedAlgorithms}.
+   * Forwarded from {@link NextgenMiddlewareOptions.allowedAlgorithms}.
    * Declared as `readonly string[]` to match the {@link VerifyJwtOptions}
    * contract and prevent accidental mutation between option destructuring
    * and JWT verification.
@@ -235,13 +235,13 @@ interface AuthHandlerOptions {
   readonly allowedAlgorithms: readonly string[] | undefined;
   readonly clockSkewMs: number;
   /**
-   * Forwarded from {@link NextgenModuleOptions.audience}.
+   * Forwarded from {@link NextgenMiddlewareOptions.audience}.
    * Declared as `readonly string[]` to match the {@link VerifyJwtOptions}
    * contract.
    */
   readonly audience: string | readonly string[] | undefined;
   /**
-   * Forwarded from {@link NextgenModuleOptions.allowedTokenTypes}.
+   * Forwarded from {@link NextgenMiddlewareOptions.allowedTokenTypes}.
    * Declared as `readonly string[]` to match the {@link VerifyJwtOptions}
    * contract and prevent accidental mutation between option destructuring
    * and JWT verification.
@@ -311,11 +311,9 @@ async function handleAuth(
   }
 
   if (matchesRoutes(pathname, protectedRoutes)) {
-    await sendRedirect(
-      event,
-      `${loginPath}?next=${encodeURIComponent(pathname)}`,
-      302,
-    );
+    const loginUrl = new URL(loginPath, getRequestURL(event));
+    loginUrl.searchParams.set('next', pathname);
+    await sendRedirect(event, loginUrl.toString(), 302);
   }
 }
 

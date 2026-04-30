@@ -6,9 +6,9 @@ import {
   createResolver,
 } from '@nuxt/kit';
 
-import type { NextgenModuleOptions } from './runtime/types';
+import type { NextgenMiddlewareOptions } from './runtime/types';
 
-export default defineNuxtModule<NextgenModuleOptions>({
+export default defineNuxtModule<NextgenMiddlewareOptions>({
   meta: {
     name: '@nextgen/sdk-nuxt',
     configKey: 'nextgen',

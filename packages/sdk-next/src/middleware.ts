@@ -297,19 +297,23 @@ async function handleAuth(
   }
 
   const tunnelled = tunnelHeaders(req, { 'x-nextgen-auth-token': '' });
-  const response = NextResponse.next({ request: { headers: tunnelled } });
-
-  for (const cookie of req.cookies.getAll()) {
-    if (cookie.name.startsWith('__nextgen')) {
-      response.cookies.delete(cookie.name);
-    }
-  }
+  const staleNextgenCookies = req.cookies
+    .getAll()
+    .filter((c) => c.name.startsWith('__nextgen'));
 
   if (matchesRoutes(pathname, protectedRoutes)) {
     const loginUrl = new URL(loginPath, req.url);
     loginUrl.searchParams.set('next', pathname);
-    return NextResponse.redirect(loginUrl, { status: 302 });
+    const redirect = NextResponse.redirect(loginUrl, { status: 302 });
+    for (const cookie of staleNextgenCookies) {
+      redirect.cookies.delete(cookie.name);
+    }
+    return redirect;
   }
 
+  const response = NextResponse.next({ request: { headers: tunnelled } });
+  for (const cookie of staleNextgenCookies) {
+    response.cookies.delete(cookie.name);
+  }
   return response;
 }

@@ -46,9 +46,13 @@ function mockJwks(kid: string): ReturnType<typeof vi.fn> {
     .mockResolvedValue(new Response(JSON.stringify(jwks), { status: 200 }));
 }
 
-function makeJwt(payload: Record<string, unknown>, kid: string): string {
+function makeJwt(
+  payload: Record<string, unknown>,
+  kid: string,
+  typ = 'JWT',
+): string {
   const header = base64url(
-    Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT', kid })),
+    Buffer.from(JSON.stringify({ alg: 'RS256', typ, kid })),
   );
   const body = base64url(Buffer.from(JSON.stringify(payload)));
   const signing = `${header}.${body}`;
@@ -148,9 +152,15 @@ describe('createNextgenMiddleware (H3)', () => {
       ),
     );
     expect(res.status).not.toBe(302);
-    expect((capturedAuth as { isAuthenticated: boolean }).isAuthenticated).toBe(
-      true,
-    );
+    expect(capturedAuth).toEqual({
+      isAuthenticated: true,
+      session: {
+        userId: 'user-nuxt',
+        email: 'nuxt@example.com',
+        name: null,
+        token,
+      },
+    });
   });
 
   it('protected route with valid Bearer token sets nextgenAuth to authenticated', async () => {
@@ -187,9 +197,96 @@ describe('createNextgenMiddleware (H3)', () => {
       ),
     );
     expect(res.status).not.toBe(302);
-    expect((capturedAuth as { isAuthenticated: boolean }).isAuthenticated).toBe(
-      true,
+    expect(capturedAuth).toEqual({
+      isAuthenticated: true,
+      session: {
+        userId: 'user-nuxt',
+        email: 'nuxt@example.com',
+        name: null,
+        token,
+      },
+    });
+  });
+
+  it('token with disallowed typ is rejected on protected route', async () => {
+    const kid = nextKid();
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    const token = makeJwt(
+      { sub: 'user-nuxt', email: 'nuxt@example.com', exp },
+      kid,
+      'refresh_token',
     );
+
+    vi.stubGlobal('fetch', mockJwks(kid));
+
+    const app = createApp();
+    app.use(
+      createNextgenMiddleware({
+        issuerUrl: 'http://localhost:4000',
+        protectedRoutes: ['/admin'],
+        allowedTokenTypes: ['JWT', 'at+JWT'],
+      }),
+    );
+    app.use('/admin', () => ({ ok: true }));
+
+    const handler = toWebHandler(app);
+    const res = await handler(
+      makeWebRequest(
+        'http://localhost:3000/admin',
+        `__nextgen_session=${token}`,
+      ),
+    );
+    expect(res.status).toBe(302);
+  });
+
+  it('token with disallowed algorithm is rejected on protected route', async () => {
+    const kid = nextKid();
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    const token = makeJwt(
+      { sub: 'user-nuxt', email: 'nuxt@example.com', exp },
+      kid,
+    );
+
+    vi.stubGlobal('fetch', mockJwks(kid));
+
+    const app = createApp();
+    app.use(
+      createNextgenMiddleware({
+        issuerUrl: 'http://localhost:4000',
+        protectedRoutes: ['/admin'],
+        allowedAlgorithms: ['ES256'],
+      }),
+    );
+    app.use('/admin', () => ({ ok: true }));
+
+    const handler = toWebHandler(app);
+    const res = await handler(
+      makeWebRequest(
+        'http://localhost:3000/admin',
+        `__nextgen_session=${token}`,
+      ),
+    );
+    expect(res.status).toBe(302);
+  });
+
+  it('redirect preserves existing query params in loginPath', async () => {
+    const app = createApp();
+    app.use(
+      createNextgenMiddleware({
+        issuerUrl: 'http://localhost:4000',
+        protectedRoutes: ['/admin'],
+        loginPath: '/login?tab=sso',
+      }),
+    );
+    app.use('/admin', () => ({ ok: true }));
+
+    const handler = toWebHandler(app);
+    const res = await handler(makeWebRequest('http://localhost:3000/admin'));
+    expect(res.status).toBe(302);
+    const location = res.headers.get('location') ?? '';
+    const parsed = new URL(location, 'http://localhost:3000');
+    expect(parsed.searchParams.get('tab')).toBe('sso');
+    expect(parsed.searchParams.get('next')).toBe('/admin');
   });
 
   it('protected route with invalid token clears cookie and redirects', async () => {

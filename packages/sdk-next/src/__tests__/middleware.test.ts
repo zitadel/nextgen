@@ -23,9 +23,13 @@ function base64url(buf: Buffer): string {
     .replace(/=+$/, '');
 }
 
-function makeJwt(payload: Record<string, unknown>, kid: string): string {
+function makeJwt(
+  payload: Record<string, unknown>,
+  kid: string,
+  typ = 'JWT',
+): string {
   const header = base64url(
-    Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT', kid })),
+    Buffer.from(JSON.stringify({ alg: 'RS256', typ, kid })),
   );
   const body = base64url(Buffer.from(JSON.stringify(payload)));
   const signing = `${header}.${body}`;
@@ -155,6 +159,81 @@ describe('nextgenMiddleware', () => {
       'x-middleware-request-x-nextgen-auth-token',
     );
     expect(tunnelledToken).toBe(token);
+  });
+
+  it('redirect response includes Set-Cookie to clear stale session cookie', async () => {
+    const kid = nextKid();
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    const validToken = makeJwt(
+      { sub: 'user-123', email: 'user@example.com', exp },
+      kid,
+    );
+    const parts = validToken.split('.');
+    const tamperedToken = `${parts[0]}.${parts[1]}.invalidsignatureXXX`;
+
+    vi.stubGlobal('fetch', mockJwks(kid));
+
+    const req = makeRequest(
+      'http://localhost:3000/admin',
+      `__nextgen_session=${tamperedToken}`,
+    );
+    const res = await nextgenMiddleware(req, {
+      issuerUrl: 'http://localhost:4000',
+      protectedRoutes: ['/admin'],
+      loginPath: '/login',
+    });
+
+    expect(res.status).toBe(302);
+    const setCookie = res.headers.get('set-cookie') ?? '';
+    expect(setCookie).toMatch(/__nextgen_session=/);
+    expect(setCookie).toMatch(/Max-Age=0|expires=.*1970/i);
+  });
+
+  it('token with disallowed typ is rejected on protected route', async () => {
+    const kid = nextKid();
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    const token = makeJwt(
+      { sub: 'user-123', email: 'user@example.com', exp },
+      kid,
+      'refresh_token',
+    );
+
+    vi.stubGlobal('fetch', mockJwks(kid));
+
+    const req = makeRequest(
+      'http://localhost:3000/admin',
+      `__nextgen_session=${token}`,
+    );
+    const res = await nextgenMiddleware(req, {
+      issuerUrl: 'http://localhost:4000',
+      protectedRoutes: ['/admin'],
+      allowedTokenTypes: ['JWT', 'at+JWT'],
+    });
+
+    expect(res.status).toBe(302);
+  });
+
+  it('token with disallowed algorithm is rejected on protected route', async () => {
+    const kid = nextKid();
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    const token = makeJwt(
+      { sub: 'user-123', email: 'user@example.com', exp },
+      kid,
+    );
+
+    vi.stubGlobal('fetch', mockJwks(kid));
+
+    const req = makeRequest(
+      'http://localhost:3000/admin',
+      `__nextgen_session=${token}`,
+    );
+    const res = await nextgenMiddleware(req, {
+      issuerUrl: 'http://localhost:4000',
+      protectedRoutes: ['/admin'],
+      allowedAlgorithms: ['ES256'],
+    });
+
+    expect(res.status).toBe(302);
   });
 
   it('protected route with invalid token clears cookie and redirects', async () => {
