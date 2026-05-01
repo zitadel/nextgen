@@ -14,8 +14,11 @@ post:
     - Idempotency-safe within a 5-minute window (see conventions)
   tags:
     - Authentication Attempts
+  security:
+    - oauth2:
+        - auth_attempts.write
   parameters:
-    - $ref: ../../../components/parameters/attempt-id.yaml
+    - $ref: ../../../../components/parameters/attempt-id.yaml
   responses:
     '200':
       description: Handoff token created successfully
@@ -28,23 +31,23 @@ post:
       content:
         application/json:
           schema:
-            $ref: ../../../components/error-details.yaml
+            $ref: ../../../../components/error-details.yaml
     '404':
       description: Attempt not found
       content:
         application/json:
           schema:
-            $ref: ../../../components/error-details.yaml
+            $ref: ../../../../components/error-details.yaml
     '409':
       description: Attempt not in completed state (missing required factors)
       content:
         application/json:
           schema:
-            $ref: ../../../components/error-details.yaml
+            $ref: ../../../../components/error-details.yaml
     default:
       description: Unexpected error
       content:
         application/json:
           schema:
-            $ref: ../../../components/error-details.yaml
+            $ref: ../../../../components/error-details.yaml
 

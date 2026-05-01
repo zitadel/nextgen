@@ -12,9 +12,6 @@ required:
   - attempt_id
   - project_id
   - state
-  - required_factors
-  - completed_factors
-  - challenges
   - expires_at
   - created_at
 properties:
@@ -73,7 +70,7 @@ properties:
       All challenges issued within this attempt, in creation order.
       Use this to track the state of each factor challenge (pending, verified, failed, expired).
     items:
-      $ref: challenges/challenge-response.yaml
+      $ref: by_id/challenges/challenge-response.yaml
   expires_at:
     type: string
     format: date-time

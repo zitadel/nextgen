@@ -7,5 +7,4 @@ description: |
   Omit to start from the beginning.
   Its format is opaque and may change between releases.
 schema:
-  type: string
-  example: v1.dGhpcyBpcyBvcGFxdWU.SflKxwRJSMeKKF2QT4fw
+  $ref: '../schemas/page-token.yaml'

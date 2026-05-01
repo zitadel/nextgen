@@ -106,9 +106,6 @@ func (s *AuthAttemptResponse) Validate() error {
 		})
 	}
 	if err := func() error {
-		if s.RequiredFactors == nil {
-			return errors.New("nil is invalid value")
-		}
 		var failures []validate.FieldError
 		for i, elem := range s.RequiredFactors {
 			if err := func() error {
@@ -134,9 +131,6 @@ func (s *AuthAttemptResponse) Validate() error {
 		})
 	}
 	if err := func() error {
-		if s.CompletedFactors == nil {
-			return errors.New("nil is invalid value")
-		}
 		var failures []validate.FieldError
 		for i, elem := range s.CompletedFactors {
 			if err := func() error {
@@ -162,9 +156,6 @@ func (s *AuthAttemptResponse) Validate() error {
 		})
 	}
 	if err := func() error {
-		if s.Challenges == nil {
-			return errors.New("nil is invalid value")
-		}
 		var failures []validate.FieldError
 		for i, elem := range s.Challenges {
 			if err := func() error {
@@ -1183,6 +1174,64 @@ func (s OpenidConfigurationTokenEndpointAuthMethodsSupportedItem) Validate() err
 	}
 }
 
+func (s *OtpSMSProof) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.OtpSMS.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "otp_sms",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *OtpSMSProofOtpSMS) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     0,
+			MinLengthSet:  false,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         regexMap["^\\d{4,8}$"],
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Code)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "code",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s *PostTokenRequest) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -1436,6 +1485,64 @@ func (s *SubmitFlowStepOK) Validate() error {
 	return nil
 }
 
+func (s *TotpProof) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Totp.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "totp",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *TotpProofTotp) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     0,
+			MinLengthSet:  false,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         regexMap["^\\d{6,8}$"],
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Code)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "code",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s UserID) Validate() error {
 	alias := (string)(s)
 	if err := (validate.String{
@@ -1481,147 +1588,31 @@ func (s *VerifyChallengeRequest) Validate() error {
 
 func (s VerifyChallengeRequestSum) Validate() error {
 	switch s.Type {
-	case VerifyChallengeRequestSum0VerifyChallengeRequestSum:
+	case IdentifierProofVerifyChallengeRequestSum:
 		return nil // no validation needed
-	case VerifyChallengeRequestSum1VerifyChallengeRequestSum:
+	case PasswordProofVerifyChallengeRequestSum:
 		return nil // no validation needed
-	case VerifyChallengeRequestSum2VerifyChallengeRequestSum:
-		if err := s.VerifyChallengeRequestSum2.Validate(); err != nil {
+	case TotpProofVerifyChallengeRequestSum:
+		if err := s.TotpProof.Validate(); err != nil {
 			return err
 		}
 		return nil
-	case VerifyChallengeRequestSum3VerifyChallengeRequestSum:
-		if err := s.VerifyChallengeRequestSum3.Validate(); err != nil {
+	case OtpSMSProofVerifyChallengeRequestSum:
+		if err := s.OtpSMSProof.Validate(); err != nil {
 			return err
 		}
 		return nil
-	case VerifyChallengeRequestSum4VerifyChallengeRequestSum:
+	case OtpEmailProofVerifyChallengeRequestSum:
 		return nil // no validation needed
-	case VerifyChallengeRequestSum5VerifyChallengeRequestSum:
+	case RecoveryCodeProofVerifyChallengeRequestSum:
 		return nil // no validation needed
-	case VerifyChallengeRequestSum6VerifyChallengeRequestSum:
+	case PasskeyProofVerifyChallengeRequestSum:
 		return nil // no validation needed
-	case VerifyChallengeRequestSum7VerifyChallengeRequestSum:
+	case IdpProofVerifyChallengeRequestSum:
 		return nil // no validation needed
-	case VerifyChallengeRequestSum8VerifyChallengeRequestSum:
+	case CaptchaProofVerifyChallengeRequestSum:
 		return nil // no validation needed
 	default:
 		return errors.Errorf("invalid type %q", s.Type)
 	}
-}
-
-func (s *VerifyChallengeRequestSum2) Validate() error {
-	if s == nil {
-		return validate.ErrNilPointer
-	}
-
-	var failures []validate.FieldError
-	if err := func() error {
-		if err := s.Totp.Validate(); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "totp",
-			Error: err,
-		})
-	}
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
-	}
-	return nil
-}
-
-func (s *VerifyChallengeRequestSum2Totp) Validate() error {
-	if s == nil {
-		return validate.ErrNilPointer
-	}
-
-	var failures []validate.FieldError
-	if err := func() error {
-		if err := (validate.String{
-			MinLength:     0,
-			MinLengthSet:  false,
-			MaxLength:     0,
-			MaxLengthSet:  false,
-			Email:         false,
-			Hostname:      false,
-			Regex:         regexMap["^\\d{6,8}$"],
-			MinNumeric:    0,
-			MinNumericSet: false,
-			MaxNumeric:    0,
-			MaxNumericSet: false,
-		}).Validate(string(s.Code)); err != nil {
-			return errors.Wrap(err, "string")
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "code",
-			Error: err,
-		})
-	}
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
-	}
-	return nil
-}
-
-func (s *VerifyChallengeRequestSum3) Validate() error {
-	if s == nil {
-		return validate.ErrNilPointer
-	}
-
-	var failures []validate.FieldError
-	if err := func() error {
-		if err := s.OtpSMS.Validate(); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "otp_sms",
-			Error: err,
-		})
-	}
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
-	}
-	return nil
-}
-
-func (s *VerifyChallengeRequestSum3OtpSMS) Validate() error {
-	if s == nil {
-		return validate.ErrNilPointer
-	}
-
-	var failures []validate.FieldError
-	if err := func() error {
-		if err := (validate.String{
-			MinLength:     0,
-			MinLengthSet:  false,
-			MaxLength:     0,
-			MaxLengthSet:  false,
-			Email:         false,
-			Hostname:      false,
-			Regex:         regexMap["^\\d{4,8}$"],
-			MinNumeric:    0,
-			MinNumericSet: false,
-			MaxNumeric:    0,
-			MaxNumericSet: false,
-		}).Validate(string(s.Code)); err != nil {
-			return errors.Wrap(err, "string")
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "code",
-			Error: err,
-		})
-	}
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
-	}
-	return nil
 }

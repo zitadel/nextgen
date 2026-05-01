@@ -14,9 +14,12 @@ post:
     The attempt moves to the next pending challenge or completes if all required factors are verified.
   tags:
     - Authentication Attempts
+  security:
+    - oauth2:
+        - auth_attempts.write
   parameters:
-    - $ref: ../../../components/parameters/attempt-id.yaml
-    - $ref: ../../../components/parameters/challenge-id.yaml
+    - $ref: ../../../../../components/parameters/attempt-id.yaml
+    - $ref: ../../../../../components/parameters/challenge-id.yaml
   requestBody:
     required: true
     content:
@@ -29,34 +32,34 @@ post:
       content:
         application/json:
           schema:
-            $ref: ../auth-attempt-response.yaml
+            $ref: ../../../auth-attempt-response.yaml
     '400':
       description: Invalid proof or request
       content:
         application/json:
           schema:
-            $ref: ../../../components/error-details.yaml
+            $ref: ../../../../../components/error-details.yaml
     '401':
       description: Proof rejected (invalid credential, wrong code, etc.)
       content:
         application/json:
           schema:
-            $ref: ../../../components/error-details.yaml
+            $ref: ../../../../../components/error-details.yaml
     '404':
       description: Attempt or challenge not found
       content:
         application/json:
           schema:
-            $ref: ../../../components/error-details.yaml
+            $ref: ../../../../../components/error-details.yaml
     '429':
       description: Too many failed attempts (rate limited)
       content:
         application/json:
           schema:
-            $ref: ../../../components/error-details.yaml
+            $ref: ../../../../../components/error-details.yaml
     default:
       description: Unexpected error
       content:
         application/json:
           schema:
-            $ref: ../../../components/error-details.yaml
+            $ref: ../../../../../components/error-details.yaml

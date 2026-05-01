@@ -10,8 +10,11 @@ post:
     by calling POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify.
   tags:
     - Authentication Attempts
+  security:
+    - oauth2:
+        - auth_attempts.write
   parameters:
-    - $ref: ../../../components/parameters/attempt-id.yaml
+    - $ref: ../../../../components/parameters/attempt-id.yaml
   requestBody:
     required: true
     content:
@@ -30,23 +33,23 @@ post:
       content:
         application/json:
           schema:
-            $ref: ../../../components/error-details.yaml
+            $ref: ../../../../components/error-details.yaml
     '404':
       description: Attempt not found
       content:
         application/json:
           schema:
-            $ref: ../../../components/error-details.yaml
+            $ref: ../../../../components/error-details.yaml
     '409':
       description: Attempt in invalid state for issuing challenges (e.g., already completed)
       content:
         application/json:
           schema:
-            $ref: ../../../components/error-details.yaml
+            $ref: ../../../../components/error-details.yaml
     default:
       description: Unexpected error
       content:
         application/json:
           schema:
-            $ref: ../../../components/error-details.yaml
+            $ref: ../../../../components/error-details.yaml
 

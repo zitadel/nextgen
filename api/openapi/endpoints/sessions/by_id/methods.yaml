@@ -14,7 +14,7 @@ get:
     - $ref: ../../../components/parameters/session-id.yaml
   security:
     - oauth2:
-        - openid
+        - session.read
   responses:
     '200':
       description: Session state.
@@ -55,7 +55,7 @@ delete:
     - $ref: ../../../components/parameters/session-id.yaml
   security:
     - oauth2:
-        - openid
+        - session.delete
   responses:
     '204':
       description: Session revoked successfully.

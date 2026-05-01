@@ -336,6 +336,39 @@ func (s *BrandingLayout) UnmarshalText(data []byte) error {
 	}
 }
 
+// Proof for `captcha` method.
+// Ref: #
+type CaptchaProof struct {
+	// CAPTCHA verification proof.
+	Captcha CaptchaProofCaptcha `json:"captcha"`
+}
+
+// GetCaptcha returns the value of Captcha.
+func (s *CaptchaProof) GetCaptcha() CaptchaProofCaptcha {
+	return s.Captcha
+}
+
+// SetCaptcha sets the value of Captcha.
+func (s *CaptchaProof) SetCaptcha(val CaptchaProofCaptcha) {
+	s.Captcha = val
+}
+
+// CAPTCHA verification proof.
+type CaptchaProofCaptcha struct {
+	// The CAPTCHA token or solution.
+	Token string `json:"token"`
+}
+
+// GetToken returns the value of Token.
+func (s *CaptchaProofCaptcha) GetToken() string {
+	return s.Token
+}
+
+// SetToken sets the value of Token.
+func (s *CaptchaProofCaptcha) SetToken(val string) {
+	s.Token = val
+}
+
 type ChallengeID string
 
 // A factor challenge issued within an authentication attempt.
@@ -2338,6 +2371,68 @@ func (s *HandoffResponse) SetExpiresAt(val time.Time) {
 }
 
 func (*HandoffResponse) createHandoffRes() {}
+
+// Proof for `identifier` method.
+// Ref: #
+type IdentifierProof struct {
+	// The login name or email being identified.
+	LoginName string `json:"login_name"`
+}
+
+// GetLoginName returns the value of LoginName.
+func (s *IdentifierProof) GetLoginName() string {
+	return s.LoginName
+}
+
+// SetLoginName sets the value of LoginName.
+func (s *IdentifierProof) SetLoginName(val string) {
+	s.LoginName = val
+}
+
+// Proof for `idp` method (federated login).
+// Ref: #
+type IdpProof struct {
+	// Federated identity provider assertion.
+	IdpAssertion IdpProofIdpAssertion `json:"idp_assertion"`
+}
+
+// GetIdpAssertion returns the value of IdpAssertion.
+func (s *IdpProof) GetIdpAssertion() IdpProofIdpAssertion {
+	return s.IdpAssertion
+}
+
+// SetIdpAssertion sets the value of IdpAssertion.
+func (s *IdpProof) SetIdpAssertion(val IdpProofIdpAssertion) {
+	s.IdpAssertion = val
+}
+
+// Federated identity provider assertion.
+type IdpProofIdpAssertion struct {
+	// The authorization code from the identity provider.
+	Code string `json:"code"`
+	// The state parameter originally provided by the server.
+	State OptString `json:"state"`
+}
+
+// GetCode returns the value of Code.
+func (s *IdpProofIdpAssertion) GetCode() string {
+	return s.Code
+}
+
+// GetState returns the value of State.
+func (s *IdpProofIdpAssertion) GetState() OptString {
+	return s.State
+}
+
+// SetCode sets the value of Code.
+func (s *IdpProofIdpAssertion) SetCode(val string) {
+	s.Code = val
+}
+
+// SetState sets the value of State.
+func (s *IdpProofIdpAssertion) SetState(val OptString) {
+	s.State = val
+}
 
 // Ref: #
 type IntrospectRequest struct {
@@ -4860,6 +4955,52 @@ func (o OptNilUserID) Or(d UserID) UserID {
 	return d
 }
 
+// NewOptPageToken returns new OptPageToken with value set to v.
+func NewOptPageToken(v PageToken) OptPageToken {
+	return OptPageToken{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptPageToken is optional PageToken.
+type OptPageToken struct {
+	Value PageToken
+	Set   bool
+}
+
+// IsSet returns true if OptPageToken was set.
+func (o OptPageToken) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptPageToken) Reset() {
+	var v PageToken
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptPageToken) SetTo(v PageToken) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptPageToken) Get() (v PageToken, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptPageToken) Or(d PageToken) PageToken {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptPostTokenRequestGrantType returns new OptPostTokenRequestGrantType with value set to v.
 func NewOptPostTokenRequestGrantType(v PostTokenRequestGrantType) OptPostTokenRequestGrantType {
 	return OptPostTokenRequestGrantType{
@@ -4900,6 +5041,52 @@ func (o OptPostTokenRequestGrantType) Get() (v PostTokenRequestGrantType, ok boo
 
 // Or returns value if set, or given parameter if does not.
 func (o OptPostTokenRequestGrantType) Or(d PostTokenRequestGrantType) PostTokenRequestGrantType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptProjectID returns new OptProjectID with value set to v.
+func NewOptProjectID(v ProjectID) OptProjectID {
+	return OptProjectID{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptProjectID is optional ProjectID.
+type OptProjectID struct {
+	Value ProjectID
+	Set   bool
+}
+
+// IsSet returns true if OptProjectID was set.
+func (o OptProjectID) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptProjectID) Reset() {
+	var v ProjectID
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptProjectID) SetTo(v ProjectID) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptProjectID) Get() (v ProjectID, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptProjectID) Or(d ProjectID) ProjectID {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -5090,7 +5277,123 @@ func (o OptUserID) Or(d UserID) UserID {
 	return d
 }
 
+// Proof for `otp_email` method.
+// Ref: #
+type OtpEmailProof struct {
+	// One-time code sent via email.
+	OtpEmail OtpEmailProofOtpEmail `json:"otp_email"`
+}
+
+// GetOtpEmail returns the value of OtpEmail.
+func (s *OtpEmailProof) GetOtpEmail() OtpEmailProofOtpEmail {
+	return s.OtpEmail
+}
+
+// SetOtpEmail sets the value of OtpEmail.
+func (s *OtpEmailProof) SetOtpEmail(val OtpEmailProofOtpEmail) {
+	s.OtpEmail = val
+}
+
+// One-time code sent via email.
+type OtpEmailProofOtpEmail struct {
+	// The code received via email.
+	Code string `json:"code"`
+}
+
+// GetCode returns the value of Code.
+func (s *OtpEmailProofOtpEmail) GetCode() string {
+	return s.Code
+}
+
+// SetCode sets the value of Code.
+func (s *OtpEmailProofOtpEmail) SetCode(val string) {
+	s.Code = val
+}
+
+// Proof for `otp_sms` method.
+// Ref: #
+type OtpSMSProof struct {
+	// One-time code sent via SMS.
+	OtpSMS OtpSMSProofOtpSMS `json:"otp_sms"`
+}
+
+// GetOtpSMS returns the value of OtpSMS.
+func (s *OtpSMSProof) GetOtpSMS() OtpSMSProofOtpSMS {
+	return s.OtpSMS
+}
+
+// SetOtpSMS sets the value of OtpSMS.
+func (s *OtpSMSProof) SetOtpSMS(val OtpSMSProofOtpSMS) {
+	s.OtpSMS = val
+}
+
+// One-time code sent via SMS.
+type OtpSMSProofOtpSMS struct {
+	// The code received via SMS.
+	Code string `json:"code"`
+}
+
+// GetCode returns the value of Code.
+func (s *OtpSMSProofOtpSMS) GetCode() string {
+	return s.Code
+}
+
+// SetCode sets the value of Code.
+func (s *OtpSMSProofOtpSMS) SetCode(val string) {
+	s.Code = val
+}
+
 type PageToken string
+
+// Proof for `passkey` method.
+// Ref: #
+type PasskeyProof struct {
+	// WebAuthn passkey assertion.
+	Passkey PasskeyProofPasskey `json:"passkey"`
+}
+
+// GetPasskey returns the value of Passkey.
+func (s *PasskeyProof) GetPasskey() PasskeyProofPasskey {
+	return s.Passkey
+}
+
+// SetPasskey sets the value of Passkey.
+func (s *PasskeyProof) SetPasskey(val PasskeyProofPasskey) {
+	s.Passkey = val
+}
+
+// WebAuthn passkey assertion.
+type PasskeyProofPasskey struct {
+	// The base64-encoded WebAuthn AssertionResponse JSON.
+	Assertion string `json:"assertion"`
+}
+
+// GetAssertion returns the value of Assertion.
+func (s *PasskeyProofPasskey) GetAssertion() string {
+	return s.Assertion
+}
+
+// SetAssertion sets the value of Assertion.
+func (s *PasskeyProofPasskey) SetAssertion(val string) {
+	s.Assertion = val
+}
+
+// Proof for `password` method.
+// Ref: #
+type PasswordProof struct {
+	// The password being verified.
+	Password string `json:"password"`
+}
+
+// GetPassword returns the value of Password.
+func (s *PasswordProof) GetPassword() string {
+	return s.Password
+}
+
+// SetPassword sets the value of Password.
+func (s *PasswordProof) SetPassword(val string) {
+	s.Password = val
+}
 
 // Ref: #
 type PostTokenRequest struct {
@@ -5255,6 +5558,23 @@ func (s *PostTokenRequestGrantType) UnmarshalText(data []byte) error {
 }
 
 type ProjectID string
+
+// Proof for `recovery_code` method.
+// Ref: #
+type RecoveryCodeProof struct {
+	// A recovery code.
+	RecoveryCode string `json:"recovery_code"`
+}
+
+// GetRecoveryCode returns the value of RecoveryCode.
+func (s *RecoveryCodeProof) GetRecoveryCode() string {
+	return s.RecoveryCode
+}
+
+// SetRecoveryCode sets the value of RecoveryCode.
+func (s *RecoveryCodeProof) SetRecoveryCode(val string) {
+	s.RecoveryCode = val
+}
 
 // Ref: #
 type RevokeRequest struct {
@@ -5817,6 +6137,39 @@ func (s *TokenResponse) SetRefreshToken(val OptString) {
 
 func (*TokenResponse) getTokenRes() {}
 
+// Proof for `totp` method.
+// Ref: #
+type TotpProof struct {
+	// TOTP (time-based one-time password) credentials.
+	Totp TotpProofTotp `json:"totp"`
+}
+
+// GetTotp returns the value of Totp.
+func (s *TotpProof) GetTotp() TotpProofTotp {
+	return s.Totp
+}
+
+// SetTotp sets the value of Totp.
+func (s *TotpProof) SetTotp(val TotpProofTotp) {
+	s.Totp = val
+}
+
+// TOTP (time-based one-time password) credentials.
+type TotpProofTotp struct {
+	// The 6-8 digit TOTP code.
+	Code string `json:"code"`
+}
+
+// GetCode returns the value of Code.
+func (s *TotpProofTotp) GetCode() string {
+	return s.Code
+}
+
+// SetCode sets the value of Code.
+func (s *TotpProofTotp) SetCode(val string) {
+	s.Code = val
+}
+
 type UserID string
 
 type UsernamePassword struct {
@@ -5891,16 +6244,16 @@ func (s *VerifyChallengeRequest) SetOneOf(val VerifyChallengeRequestSum) {
 
 // VerifyChallengeRequestSum represents sum type.
 type VerifyChallengeRequestSum struct {
-	Type                       VerifyChallengeRequestSumType // switch on this field
-	VerifyChallengeRequestSum0 VerifyChallengeRequestSum0
-	VerifyChallengeRequestSum1 VerifyChallengeRequestSum1
-	VerifyChallengeRequestSum2 VerifyChallengeRequestSum2
-	VerifyChallengeRequestSum3 VerifyChallengeRequestSum3
-	VerifyChallengeRequestSum4 VerifyChallengeRequestSum4
-	VerifyChallengeRequestSum5 VerifyChallengeRequestSum5
-	VerifyChallengeRequestSum6 VerifyChallengeRequestSum6
-	VerifyChallengeRequestSum7 VerifyChallengeRequestSum7
-	VerifyChallengeRequestSum8 VerifyChallengeRequestSum8
+	Type              VerifyChallengeRequestSumType // switch on this field
+	IdentifierProof   IdentifierProof
+	PasswordProof     PasswordProof
+	TotpProof         TotpProof
+	OtpSMSProof       OtpSMSProof
+	OtpEmailProof     OtpEmailProof
+	RecoveryCodeProof RecoveryCodeProof
+	PasskeyProof      PasskeyProof
+	IdpProof          IdpProof
+	CaptchaProof      CaptchaProof
 }
 
 // VerifyChallengeRequestSumType is oneOf type of VerifyChallengeRequestSum.
@@ -5908,499 +6261,247 @@ type VerifyChallengeRequestSumType string
 
 // Possible values for VerifyChallengeRequestSumType.
 const (
-	VerifyChallengeRequestSum0VerifyChallengeRequestSum VerifyChallengeRequestSumType = "VerifyChallengeRequestSum0"
-	VerifyChallengeRequestSum1VerifyChallengeRequestSum VerifyChallengeRequestSumType = "VerifyChallengeRequestSum1"
-	VerifyChallengeRequestSum2VerifyChallengeRequestSum VerifyChallengeRequestSumType = "VerifyChallengeRequestSum2"
-	VerifyChallengeRequestSum3VerifyChallengeRequestSum VerifyChallengeRequestSumType = "VerifyChallengeRequestSum3"
-	VerifyChallengeRequestSum4VerifyChallengeRequestSum VerifyChallengeRequestSumType = "VerifyChallengeRequestSum4"
-	VerifyChallengeRequestSum5VerifyChallengeRequestSum VerifyChallengeRequestSumType = "VerifyChallengeRequestSum5"
-	VerifyChallengeRequestSum6VerifyChallengeRequestSum VerifyChallengeRequestSumType = "VerifyChallengeRequestSum6"
-	VerifyChallengeRequestSum7VerifyChallengeRequestSum VerifyChallengeRequestSumType = "VerifyChallengeRequestSum7"
-	VerifyChallengeRequestSum8VerifyChallengeRequestSum VerifyChallengeRequestSumType = "VerifyChallengeRequestSum8"
+	IdentifierProofVerifyChallengeRequestSum   VerifyChallengeRequestSumType = "IdentifierProof"
+	PasswordProofVerifyChallengeRequestSum     VerifyChallengeRequestSumType = "PasswordProof"
+	TotpProofVerifyChallengeRequestSum         VerifyChallengeRequestSumType = "TotpProof"
+	OtpSMSProofVerifyChallengeRequestSum       VerifyChallengeRequestSumType = "OtpSMSProof"
+	OtpEmailProofVerifyChallengeRequestSum     VerifyChallengeRequestSumType = "OtpEmailProof"
+	RecoveryCodeProofVerifyChallengeRequestSum VerifyChallengeRequestSumType = "RecoveryCodeProof"
+	PasskeyProofVerifyChallengeRequestSum      VerifyChallengeRequestSumType = "PasskeyProof"
+	IdpProofVerifyChallengeRequestSum          VerifyChallengeRequestSumType = "IdpProof"
+	CaptchaProofVerifyChallengeRequestSum      VerifyChallengeRequestSumType = "CaptchaProof"
 )
 
-// IsVerifyChallengeRequestSum0 reports whether VerifyChallengeRequestSum is VerifyChallengeRequestSum0.
-func (s VerifyChallengeRequestSum) IsVerifyChallengeRequestSum0() bool {
-	return s.Type == VerifyChallengeRequestSum0VerifyChallengeRequestSum
+// IsIdentifierProof reports whether VerifyChallengeRequestSum is IdentifierProof.
+func (s VerifyChallengeRequestSum) IsIdentifierProof() bool {
+	return s.Type == IdentifierProofVerifyChallengeRequestSum
 }
 
-// IsVerifyChallengeRequestSum1 reports whether VerifyChallengeRequestSum is VerifyChallengeRequestSum1.
-func (s VerifyChallengeRequestSum) IsVerifyChallengeRequestSum1() bool {
-	return s.Type == VerifyChallengeRequestSum1VerifyChallengeRequestSum
+// IsPasswordProof reports whether VerifyChallengeRequestSum is PasswordProof.
+func (s VerifyChallengeRequestSum) IsPasswordProof() bool {
+	return s.Type == PasswordProofVerifyChallengeRequestSum
 }
 
-// IsVerifyChallengeRequestSum2 reports whether VerifyChallengeRequestSum is VerifyChallengeRequestSum2.
-func (s VerifyChallengeRequestSum) IsVerifyChallengeRequestSum2() bool {
-	return s.Type == VerifyChallengeRequestSum2VerifyChallengeRequestSum
+// IsTotpProof reports whether VerifyChallengeRequestSum is TotpProof.
+func (s VerifyChallengeRequestSum) IsTotpProof() bool {
+	return s.Type == TotpProofVerifyChallengeRequestSum
 }
 
-// IsVerifyChallengeRequestSum3 reports whether VerifyChallengeRequestSum is VerifyChallengeRequestSum3.
-func (s VerifyChallengeRequestSum) IsVerifyChallengeRequestSum3() bool {
-	return s.Type == VerifyChallengeRequestSum3VerifyChallengeRequestSum
+// IsOtpSMSProof reports whether VerifyChallengeRequestSum is OtpSMSProof.
+func (s VerifyChallengeRequestSum) IsOtpSMSProof() bool {
+	return s.Type == OtpSMSProofVerifyChallengeRequestSum
 }
 
-// IsVerifyChallengeRequestSum4 reports whether VerifyChallengeRequestSum is VerifyChallengeRequestSum4.
-func (s VerifyChallengeRequestSum) IsVerifyChallengeRequestSum4() bool {
-	return s.Type == VerifyChallengeRequestSum4VerifyChallengeRequestSum
+// IsOtpEmailProof reports whether VerifyChallengeRequestSum is OtpEmailProof.
+func (s VerifyChallengeRequestSum) IsOtpEmailProof() bool {
+	return s.Type == OtpEmailProofVerifyChallengeRequestSum
 }
 
-// IsVerifyChallengeRequestSum5 reports whether VerifyChallengeRequestSum is VerifyChallengeRequestSum5.
-func (s VerifyChallengeRequestSum) IsVerifyChallengeRequestSum5() bool {
-	return s.Type == VerifyChallengeRequestSum5VerifyChallengeRequestSum
+// IsRecoveryCodeProof reports whether VerifyChallengeRequestSum is RecoveryCodeProof.
+func (s VerifyChallengeRequestSum) IsRecoveryCodeProof() bool {
+	return s.Type == RecoveryCodeProofVerifyChallengeRequestSum
 }
 
-// IsVerifyChallengeRequestSum6 reports whether VerifyChallengeRequestSum is VerifyChallengeRequestSum6.
-func (s VerifyChallengeRequestSum) IsVerifyChallengeRequestSum6() bool {
-	return s.Type == VerifyChallengeRequestSum6VerifyChallengeRequestSum
+// IsPasskeyProof reports whether VerifyChallengeRequestSum is PasskeyProof.
+func (s VerifyChallengeRequestSum) IsPasskeyProof() bool {
+	return s.Type == PasskeyProofVerifyChallengeRequestSum
 }
 
-// IsVerifyChallengeRequestSum7 reports whether VerifyChallengeRequestSum is VerifyChallengeRequestSum7.
-func (s VerifyChallengeRequestSum) IsVerifyChallengeRequestSum7() bool {
-	return s.Type == VerifyChallengeRequestSum7VerifyChallengeRequestSum
+// IsIdpProof reports whether VerifyChallengeRequestSum is IdpProof.
+func (s VerifyChallengeRequestSum) IsIdpProof() bool {
+	return s.Type == IdpProofVerifyChallengeRequestSum
 }
 
-// IsVerifyChallengeRequestSum8 reports whether VerifyChallengeRequestSum is VerifyChallengeRequestSum8.
-func (s VerifyChallengeRequestSum) IsVerifyChallengeRequestSum8() bool {
-	return s.Type == VerifyChallengeRequestSum8VerifyChallengeRequestSum
+// IsCaptchaProof reports whether VerifyChallengeRequestSum is CaptchaProof.
+func (s VerifyChallengeRequestSum) IsCaptchaProof() bool {
+	return s.Type == CaptchaProofVerifyChallengeRequestSum
 }
 
-// SetVerifyChallengeRequestSum0 sets VerifyChallengeRequestSum to VerifyChallengeRequestSum0.
-func (s *VerifyChallengeRequestSum) SetVerifyChallengeRequestSum0(v VerifyChallengeRequestSum0) {
-	s.Type = VerifyChallengeRequestSum0VerifyChallengeRequestSum
-	s.VerifyChallengeRequestSum0 = v
+// SetIdentifierProof sets VerifyChallengeRequestSum to IdentifierProof.
+func (s *VerifyChallengeRequestSum) SetIdentifierProof(v IdentifierProof) {
+	s.Type = IdentifierProofVerifyChallengeRequestSum
+	s.IdentifierProof = v
 }
 
-// GetVerifyChallengeRequestSum0 returns VerifyChallengeRequestSum0 and true boolean if VerifyChallengeRequestSum is VerifyChallengeRequestSum0.
-func (s VerifyChallengeRequestSum) GetVerifyChallengeRequestSum0() (v VerifyChallengeRequestSum0, ok bool) {
-	if !s.IsVerifyChallengeRequestSum0() {
+// GetIdentifierProof returns IdentifierProof and true boolean if VerifyChallengeRequestSum is IdentifierProof.
+func (s VerifyChallengeRequestSum) GetIdentifierProof() (v IdentifierProof, ok bool) {
+	if !s.IsIdentifierProof() {
 		return v, false
 	}
-	return s.VerifyChallengeRequestSum0, true
+	return s.IdentifierProof, true
 }
 
-// NewVerifyChallengeRequestSum0VerifyChallengeRequestSum returns new VerifyChallengeRequestSum from VerifyChallengeRequestSum0.
-func NewVerifyChallengeRequestSum0VerifyChallengeRequestSum(v VerifyChallengeRequestSum0) VerifyChallengeRequestSum {
+// NewIdentifierProofVerifyChallengeRequestSum returns new VerifyChallengeRequestSum from IdentifierProof.
+func NewIdentifierProofVerifyChallengeRequestSum(v IdentifierProof) VerifyChallengeRequestSum {
 	var s VerifyChallengeRequestSum
-	s.SetVerifyChallengeRequestSum0(v)
+	s.SetIdentifierProof(v)
 	return s
 }
 
-// SetVerifyChallengeRequestSum1 sets VerifyChallengeRequestSum to VerifyChallengeRequestSum1.
-func (s *VerifyChallengeRequestSum) SetVerifyChallengeRequestSum1(v VerifyChallengeRequestSum1) {
-	s.Type = VerifyChallengeRequestSum1VerifyChallengeRequestSum
-	s.VerifyChallengeRequestSum1 = v
+// SetPasswordProof sets VerifyChallengeRequestSum to PasswordProof.
+func (s *VerifyChallengeRequestSum) SetPasswordProof(v PasswordProof) {
+	s.Type = PasswordProofVerifyChallengeRequestSum
+	s.PasswordProof = v
 }
 
-// GetVerifyChallengeRequestSum1 returns VerifyChallengeRequestSum1 and true boolean if VerifyChallengeRequestSum is VerifyChallengeRequestSum1.
-func (s VerifyChallengeRequestSum) GetVerifyChallengeRequestSum1() (v VerifyChallengeRequestSum1, ok bool) {
-	if !s.IsVerifyChallengeRequestSum1() {
+// GetPasswordProof returns PasswordProof and true boolean if VerifyChallengeRequestSum is PasswordProof.
+func (s VerifyChallengeRequestSum) GetPasswordProof() (v PasswordProof, ok bool) {
+	if !s.IsPasswordProof() {
 		return v, false
 	}
-	return s.VerifyChallengeRequestSum1, true
+	return s.PasswordProof, true
 }
 
-// NewVerifyChallengeRequestSum1VerifyChallengeRequestSum returns new VerifyChallengeRequestSum from VerifyChallengeRequestSum1.
-func NewVerifyChallengeRequestSum1VerifyChallengeRequestSum(v VerifyChallengeRequestSum1) VerifyChallengeRequestSum {
+// NewPasswordProofVerifyChallengeRequestSum returns new VerifyChallengeRequestSum from PasswordProof.
+func NewPasswordProofVerifyChallengeRequestSum(v PasswordProof) VerifyChallengeRequestSum {
 	var s VerifyChallengeRequestSum
-	s.SetVerifyChallengeRequestSum1(v)
+	s.SetPasswordProof(v)
 	return s
 }
 
-// SetVerifyChallengeRequestSum2 sets VerifyChallengeRequestSum to VerifyChallengeRequestSum2.
-func (s *VerifyChallengeRequestSum) SetVerifyChallengeRequestSum2(v VerifyChallengeRequestSum2) {
-	s.Type = VerifyChallengeRequestSum2VerifyChallengeRequestSum
-	s.VerifyChallengeRequestSum2 = v
+// SetTotpProof sets VerifyChallengeRequestSum to TotpProof.
+func (s *VerifyChallengeRequestSum) SetTotpProof(v TotpProof) {
+	s.Type = TotpProofVerifyChallengeRequestSum
+	s.TotpProof = v
 }
 
-// GetVerifyChallengeRequestSum2 returns VerifyChallengeRequestSum2 and true boolean if VerifyChallengeRequestSum is VerifyChallengeRequestSum2.
-func (s VerifyChallengeRequestSum) GetVerifyChallengeRequestSum2() (v VerifyChallengeRequestSum2, ok bool) {
-	if !s.IsVerifyChallengeRequestSum2() {
+// GetTotpProof returns TotpProof and true boolean if VerifyChallengeRequestSum is TotpProof.
+func (s VerifyChallengeRequestSum) GetTotpProof() (v TotpProof, ok bool) {
+	if !s.IsTotpProof() {
 		return v, false
 	}
-	return s.VerifyChallengeRequestSum2, true
+	return s.TotpProof, true
 }
 
-// NewVerifyChallengeRequestSum2VerifyChallengeRequestSum returns new VerifyChallengeRequestSum from VerifyChallengeRequestSum2.
-func NewVerifyChallengeRequestSum2VerifyChallengeRequestSum(v VerifyChallengeRequestSum2) VerifyChallengeRequestSum {
+// NewTotpProofVerifyChallengeRequestSum returns new VerifyChallengeRequestSum from TotpProof.
+func NewTotpProofVerifyChallengeRequestSum(v TotpProof) VerifyChallengeRequestSum {
 	var s VerifyChallengeRequestSum
-	s.SetVerifyChallengeRequestSum2(v)
+	s.SetTotpProof(v)
 	return s
 }
 
-// SetVerifyChallengeRequestSum3 sets VerifyChallengeRequestSum to VerifyChallengeRequestSum3.
-func (s *VerifyChallengeRequestSum) SetVerifyChallengeRequestSum3(v VerifyChallengeRequestSum3) {
-	s.Type = VerifyChallengeRequestSum3VerifyChallengeRequestSum
-	s.VerifyChallengeRequestSum3 = v
+// SetOtpSMSProof sets VerifyChallengeRequestSum to OtpSMSProof.
+func (s *VerifyChallengeRequestSum) SetOtpSMSProof(v OtpSMSProof) {
+	s.Type = OtpSMSProofVerifyChallengeRequestSum
+	s.OtpSMSProof = v
 }
 
-// GetVerifyChallengeRequestSum3 returns VerifyChallengeRequestSum3 and true boolean if VerifyChallengeRequestSum is VerifyChallengeRequestSum3.
-func (s VerifyChallengeRequestSum) GetVerifyChallengeRequestSum3() (v VerifyChallengeRequestSum3, ok bool) {
-	if !s.IsVerifyChallengeRequestSum3() {
+// GetOtpSMSProof returns OtpSMSProof and true boolean if VerifyChallengeRequestSum is OtpSMSProof.
+func (s VerifyChallengeRequestSum) GetOtpSMSProof() (v OtpSMSProof, ok bool) {
+	if !s.IsOtpSMSProof() {
 		return v, false
 	}
-	return s.VerifyChallengeRequestSum3, true
+	return s.OtpSMSProof, true
 }
 
-// NewVerifyChallengeRequestSum3VerifyChallengeRequestSum returns new VerifyChallengeRequestSum from VerifyChallengeRequestSum3.
-func NewVerifyChallengeRequestSum3VerifyChallengeRequestSum(v VerifyChallengeRequestSum3) VerifyChallengeRequestSum {
+// NewOtpSMSProofVerifyChallengeRequestSum returns new VerifyChallengeRequestSum from OtpSMSProof.
+func NewOtpSMSProofVerifyChallengeRequestSum(v OtpSMSProof) VerifyChallengeRequestSum {
 	var s VerifyChallengeRequestSum
-	s.SetVerifyChallengeRequestSum3(v)
+	s.SetOtpSMSProof(v)
 	return s
 }
 
-// SetVerifyChallengeRequestSum4 sets VerifyChallengeRequestSum to VerifyChallengeRequestSum4.
-func (s *VerifyChallengeRequestSum) SetVerifyChallengeRequestSum4(v VerifyChallengeRequestSum4) {
-	s.Type = VerifyChallengeRequestSum4VerifyChallengeRequestSum
-	s.VerifyChallengeRequestSum4 = v
+// SetOtpEmailProof sets VerifyChallengeRequestSum to OtpEmailProof.
+func (s *VerifyChallengeRequestSum) SetOtpEmailProof(v OtpEmailProof) {
+	s.Type = OtpEmailProofVerifyChallengeRequestSum
+	s.OtpEmailProof = v
 }
 
-// GetVerifyChallengeRequestSum4 returns VerifyChallengeRequestSum4 and true boolean if VerifyChallengeRequestSum is VerifyChallengeRequestSum4.
-func (s VerifyChallengeRequestSum) GetVerifyChallengeRequestSum4() (v VerifyChallengeRequestSum4, ok bool) {
-	if !s.IsVerifyChallengeRequestSum4() {
+// GetOtpEmailProof returns OtpEmailProof and true boolean if VerifyChallengeRequestSum is OtpEmailProof.
+func (s VerifyChallengeRequestSum) GetOtpEmailProof() (v OtpEmailProof, ok bool) {
+	if !s.IsOtpEmailProof() {
 		return v, false
 	}
-	return s.VerifyChallengeRequestSum4, true
+	return s.OtpEmailProof, true
 }
 
-// NewVerifyChallengeRequestSum4VerifyChallengeRequestSum returns new VerifyChallengeRequestSum from VerifyChallengeRequestSum4.
-func NewVerifyChallengeRequestSum4VerifyChallengeRequestSum(v VerifyChallengeRequestSum4) VerifyChallengeRequestSum {
+// NewOtpEmailProofVerifyChallengeRequestSum returns new VerifyChallengeRequestSum from OtpEmailProof.
+func NewOtpEmailProofVerifyChallengeRequestSum(v OtpEmailProof) VerifyChallengeRequestSum {
 	var s VerifyChallengeRequestSum
-	s.SetVerifyChallengeRequestSum4(v)
+	s.SetOtpEmailProof(v)
 	return s
 }
 
-// SetVerifyChallengeRequestSum5 sets VerifyChallengeRequestSum to VerifyChallengeRequestSum5.
-func (s *VerifyChallengeRequestSum) SetVerifyChallengeRequestSum5(v VerifyChallengeRequestSum5) {
-	s.Type = VerifyChallengeRequestSum5VerifyChallengeRequestSum
-	s.VerifyChallengeRequestSum5 = v
+// SetRecoveryCodeProof sets VerifyChallengeRequestSum to RecoveryCodeProof.
+func (s *VerifyChallengeRequestSum) SetRecoveryCodeProof(v RecoveryCodeProof) {
+	s.Type = RecoveryCodeProofVerifyChallengeRequestSum
+	s.RecoveryCodeProof = v
 }
 
-// GetVerifyChallengeRequestSum5 returns VerifyChallengeRequestSum5 and true boolean if VerifyChallengeRequestSum is VerifyChallengeRequestSum5.
-func (s VerifyChallengeRequestSum) GetVerifyChallengeRequestSum5() (v VerifyChallengeRequestSum5, ok bool) {
-	if !s.IsVerifyChallengeRequestSum5() {
+// GetRecoveryCodeProof returns RecoveryCodeProof and true boolean if VerifyChallengeRequestSum is RecoveryCodeProof.
+func (s VerifyChallengeRequestSum) GetRecoveryCodeProof() (v RecoveryCodeProof, ok bool) {
+	if !s.IsRecoveryCodeProof() {
 		return v, false
 	}
-	return s.VerifyChallengeRequestSum5, true
+	return s.RecoveryCodeProof, true
 }
 
-// NewVerifyChallengeRequestSum5VerifyChallengeRequestSum returns new VerifyChallengeRequestSum from VerifyChallengeRequestSum5.
-func NewVerifyChallengeRequestSum5VerifyChallengeRequestSum(v VerifyChallengeRequestSum5) VerifyChallengeRequestSum {
+// NewRecoveryCodeProofVerifyChallengeRequestSum returns new VerifyChallengeRequestSum from RecoveryCodeProof.
+func NewRecoveryCodeProofVerifyChallengeRequestSum(v RecoveryCodeProof) VerifyChallengeRequestSum {
 	var s VerifyChallengeRequestSum
-	s.SetVerifyChallengeRequestSum5(v)
+	s.SetRecoveryCodeProof(v)
 	return s
 }
 
-// SetVerifyChallengeRequestSum6 sets VerifyChallengeRequestSum to VerifyChallengeRequestSum6.
-func (s *VerifyChallengeRequestSum) SetVerifyChallengeRequestSum6(v VerifyChallengeRequestSum6) {
-	s.Type = VerifyChallengeRequestSum6VerifyChallengeRequestSum
-	s.VerifyChallengeRequestSum6 = v
+// SetPasskeyProof sets VerifyChallengeRequestSum to PasskeyProof.
+func (s *VerifyChallengeRequestSum) SetPasskeyProof(v PasskeyProof) {
+	s.Type = PasskeyProofVerifyChallengeRequestSum
+	s.PasskeyProof = v
 }
 
-// GetVerifyChallengeRequestSum6 returns VerifyChallengeRequestSum6 and true boolean if VerifyChallengeRequestSum is VerifyChallengeRequestSum6.
-func (s VerifyChallengeRequestSum) GetVerifyChallengeRequestSum6() (v VerifyChallengeRequestSum6, ok bool) {
-	if !s.IsVerifyChallengeRequestSum6() {
+// GetPasskeyProof returns PasskeyProof and true boolean if VerifyChallengeRequestSum is PasskeyProof.
+func (s VerifyChallengeRequestSum) GetPasskeyProof() (v PasskeyProof, ok bool) {
+	if !s.IsPasskeyProof() {
 		return v, false
 	}
-	return s.VerifyChallengeRequestSum6, true
+	return s.PasskeyProof, true
 }
 
-// NewVerifyChallengeRequestSum6VerifyChallengeRequestSum returns new VerifyChallengeRequestSum from VerifyChallengeRequestSum6.
-func NewVerifyChallengeRequestSum6VerifyChallengeRequestSum(v VerifyChallengeRequestSum6) VerifyChallengeRequestSum {
+// NewPasskeyProofVerifyChallengeRequestSum returns new VerifyChallengeRequestSum from PasskeyProof.
+func NewPasskeyProofVerifyChallengeRequestSum(v PasskeyProof) VerifyChallengeRequestSum {
 	var s VerifyChallengeRequestSum
-	s.SetVerifyChallengeRequestSum6(v)
+	s.SetPasskeyProof(v)
 	return s
 }
 
-// SetVerifyChallengeRequestSum7 sets VerifyChallengeRequestSum to VerifyChallengeRequestSum7.
-func (s *VerifyChallengeRequestSum) SetVerifyChallengeRequestSum7(v VerifyChallengeRequestSum7) {
-	s.Type = VerifyChallengeRequestSum7VerifyChallengeRequestSum
-	s.VerifyChallengeRequestSum7 = v
+// SetIdpProof sets VerifyChallengeRequestSum to IdpProof.
+func (s *VerifyChallengeRequestSum) SetIdpProof(v IdpProof) {
+	s.Type = IdpProofVerifyChallengeRequestSum
+	s.IdpProof = v
 }
 
-// GetVerifyChallengeRequestSum7 returns VerifyChallengeRequestSum7 and true boolean if VerifyChallengeRequestSum is VerifyChallengeRequestSum7.
-func (s VerifyChallengeRequestSum) GetVerifyChallengeRequestSum7() (v VerifyChallengeRequestSum7, ok bool) {
-	if !s.IsVerifyChallengeRequestSum7() {
+// GetIdpProof returns IdpProof and true boolean if VerifyChallengeRequestSum is IdpProof.
+func (s VerifyChallengeRequestSum) GetIdpProof() (v IdpProof, ok bool) {
+	if !s.IsIdpProof() {
 		return v, false
 	}
-	return s.VerifyChallengeRequestSum7, true
+	return s.IdpProof, true
 }
 
-// NewVerifyChallengeRequestSum7VerifyChallengeRequestSum returns new VerifyChallengeRequestSum from VerifyChallengeRequestSum7.
-func NewVerifyChallengeRequestSum7VerifyChallengeRequestSum(v VerifyChallengeRequestSum7) VerifyChallengeRequestSum {
+// NewIdpProofVerifyChallengeRequestSum returns new VerifyChallengeRequestSum from IdpProof.
+func NewIdpProofVerifyChallengeRequestSum(v IdpProof) VerifyChallengeRequestSum {
 	var s VerifyChallengeRequestSum
-	s.SetVerifyChallengeRequestSum7(v)
+	s.SetIdpProof(v)
 	return s
 }
 
-// SetVerifyChallengeRequestSum8 sets VerifyChallengeRequestSum to VerifyChallengeRequestSum8.
-func (s *VerifyChallengeRequestSum) SetVerifyChallengeRequestSum8(v VerifyChallengeRequestSum8) {
-	s.Type = VerifyChallengeRequestSum8VerifyChallengeRequestSum
-	s.VerifyChallengeRequestSum8 = v
+// SetCaptchaProof sets VerifyChallengeRequestSum to CaptchaProof.
+func (s *VerifyChallengeRequestSum) SetCaptchaProof(v CaptchaProof) {
+	s.Type = CaptchaProofVerifyChallengeRequestSum
+	s.CaptchaProof = v
 }
 
-// GetVerifyChallengeRequestSum8 returns VerifyChallengeRequestSum8 and true boolean if VerifyChallengeRequestSum is VerifyChallengeRequestSum8.
-func (s VerifyChallengeRequestSum) GetVerifyChallengeRequestSum8() (v VerifyChallengeRequestSum8, ok bool) {
-	if !s.IsVerifyChallengeRequestSum8() {
+// GetCaptchaProof returns CaptchaProof and true boolean if VerifyChallengeRequestSum is CaptchaProof.
+func (s VerifyChallengeRequestSum) GetCaptchaProof() (v CaptchaProof, ok bool) {
+	if !s.IsCaptchaProof() {
 		return v, false
 	}
-	return s.VerifyChallengeRequestSum8, true
+	return s.CaptchaProof, true
 }
 
-// NewVerifyChallengeRequestSum8VerifyChallengeRequestSum returns new VerifyChallengeRequestSum from VerifyChallengeRequestSum8.
-func NewVerifyChallengeRequestSum8VerifyChallengeRequestSum(v VerifyChallengeRequestSum8) VerifyChallengeRequestSum {
+// NewCaptchaProofVerifyChallengeRequestSum returns new VerifyChallengeRequestSum from CaptchaProof.
+func NewCaptchaProofVerifyChallengeRequestSum(v CaptchaProof) VerifyChallengeRequestSum {
 	var s VerifyChallengeRequestSum
-	s.SetVerifyChallengeRequestSum8(v)
+	s.SetCaptchaProof(v)
 	return s
-}
-
-// Proof for `identifier` method.
-type VerifyChallengeRequestSum0 struct {
-	// The login name or email being identified.
-	LoginName string `json:"login_name"`
-}
-
-// GetLoginName returns the value of LoginName.
-func (s *VerifyChallengeRequestSum0) GetLoginName() string {
-	return s.LoginName
-}
-
-// SetLoginName sets the value of LoginName.
-func (s *VerifyChallengeRequestSum0) SetLoginName(val string) {
-	s.LoginName = val
-}
-
-// Proof for `password` method.
-type VerifyChallengeRequestSum1 struct {
-	// The password being verified.
-	Password string `json:"password"`
-}
-
-// GetPassword returns the value of Password.
-func (s *VerifyChallengeRequestSum1) GetPassword() string {
-	return s.Password
-}
-
-// SetPassword sets the value of Password.
-func (s *VerifyChallengeRequestSum1) SetPassword(val string) {
-	s.Password = val
-}
-
-// Proof for `totp` method.
-type VerifyChallengeRequestSum2 struct {
-	// TOTP (time-based one-time password) credentials.
-	Totp VerifyChallengeRequestSum2Totp `json:"totp"`
-}
-
-// GetTotp returns the value of Totp.
-func (s *VerifyChallengeRequestSum2) GetTotp() VerifyChallengeRequestSum2Totp {
-	return s.Totp
-}
-
-// SetTotp sets the value of Totp.
-func (s *VerifyChallengeRequestSum2) SetTotp(val VerifyChallengeRequestSum2Totp) {
-	s.Totp = val
-}
-
-// TOTP (time-based one-time password) credentials.
-type VerifyChallengeRequestSum2Totp struct {
-	// The 6-8 digit TOTP code.
-	Code string `json:"code"`
-}
-
-// GetCode returns the value of Code.
-func (s *VerifyChallengeRequestSum2Totp) GetCode() string {
-	return s.Code
-}
-
-// SetCode sets the value of Code.
-func (s *VerifyChallengeRequestSum2Totp) SetCode(val string) {
-	s.Code = val
-}
-
-// Proof for `otp_sms` method.
-type VerifyChallengeRequestSum3 struct {
-	// One-time code sent via SMS.
-	OtpSMS VerifyChallengeRequestSum3OtpSMS `json:"otp_sms"`
-}
-
-// GetOtpSMS returns the value of OtpSMS.
-func (s *VerifyChallengeRequestSum3) GetOtpSMS() VerifyChallengeRequestSum3OtpSMS {
-	return s.OtpSMS
-}
-
-// SetOtpSMS sets the value of OtpSMS.
-func (s *VerifyChallengeRequestSum3) SetOtpSMS(val VerifyChallengeRequestSum3OtpSMS) {
-	s.OtpSMS = val
-}
-
-// One-time code sent via SMS.
-type VerifyChallengeRequestSum3OtpSMS struct {
-	// The code received via SMS.
-	Code string `json:"code"`
-}
-
-// GetCode returns the value of Code.
-func (s *VerifyChallengeRequestSum3OtpSMS) GetCode() string {
-	return s.Code
-}
-
-// SetCode sets the value of Code.
-func (s *VerifyChallengeRequestSum3OtpSMS) SetCode(val string) {
-	s.Code = val
-}
-
-// Proof for `otp_email` method.
-type VerifyChallengeRequestSum4 struct {
-	// One-time code sent via email.
-	OtpEmail VerifyChallengeRequestSum4OtpEmail `json:"otp_email"`
-}
-
-// GetOtpEmail returns the value of OtpEmail.
-func (s *VerifyChallengeRequestSum4) GetOtpEmail() VerifyChallengeRequestSum4OtpEmail {
-	return s.OtpEmail
-}
-
-// SetOtpEmail sets the value of OtpEmail.
-func (s *VerifyChallengeRequestSum4) SetOtpEmail(val VerifyChallengeRequestSum4OtpEmail) {
-	s.OtpEmail = val
-}
-
-// One-time code sent via email.
-type VerifyChallengeRequestSum4OtpEmail struct {
-	// The code received via email.
-	Code string `json:"code"`
-}
-
-// GetCode returns the value of Code.
-func (s *VerifyChallengeRequestSum4OtpEmail) GetCode() string {
-	return s.Code
-}
-
-// SetCode sets the value of Code.
-func (s *VerifyChallengeRequestSum4OtpEmail) SetCode(val string) {
-	s.Code = val
-}
-
-// Proof for `recovery_code` method.
-type VerifyChallengeRequestSum5 struct {
-	// A recovery code.
-	RecoveryCode string `json:"recovery_code"`
-}
-
-// GetRecoveryCode returns the value of RecoveryCode.
-func (s *VerifyChallengeRequestSum5) GetRecoveryCode() string {
-	return s.RecoveryCode
-}
-
-// SetRecoveryCode sets the value of RecoveryCode.
-func (s *VerifyChallengeRequestSum5) SetRecoveryCode(val string) {
-	s.RecoveryCode = val
-}
-
-// Proof for `passkey` method.
-type VerifyChallengeRequestSum6 struct {
-	// WebAuthn passkey assertion.
-	Passkey VerifyChallengeRequestSum6Passkey `json:"passkey"`
-}
-
-// GetPasskey returns the value of Passkey.
-func (s *VerifyChallengeRequestSum6) GetPasskey() VerifyChallengeRequestSum6Passkey {
-	return s.Passkey
-}
-
-// SetPasskey sets the value of Passkey.
-func (s *VerifyChallengeRequestSum6) SetPasskey(val VerifyChallengeRequestSum6Passkey) {
-	s.Passkey = val
-}
-
-// WebAuthn passkey assertion.
-type VerifyChallengeRequestSum6Passkey struct {
-	// The base64-encoded WebAuthn AssertionResponse JSON.
-	Assertion string `json:"assertion"`
-}
-
-// GetAssertion returns the value of Assertion.
-func (s *VerifyChallengeRequestSum6Passkey) GetAssertion() string {
-	return s.Assertion
-}
-
-// SetAssertion sets the value of Assertion.
-func (s *VerifyChallengeRequestSum6Passkey) SetAssertion(val string) {
-	s.Assertion = val
-}
-
-// Proof for `idp` method (federated login).
-type VerifyChallengeRequestSum7 struct {
-	// Federated identity provider assertion.
-	IdpAssertion VerifyChallengeRequestSum7IdpAssertion `json:"idp_assertion"`
-}
-
-// GetIdpAssertion returns the value of IdpAssertion.
-func (s *VerifyChallengeRequestSum7) GetIdpAssertion() VerifyChallengeRequestSum7IdpAssertion {
-	return s.IdpAssertion
-}
-
-// SetIdpAssertion sets the value of IdpAssertion.
-func (s *VerifyChallengeRequestSum7) SetIdpAssertion(val VerifyChallengeRequestSum7IdpAssertion) {
-	s.IdpAssertion = val
-}
-
-// Federated identity provider assertion.
-type VerifyChallengeRequestSum7IdpAssertion struct {
-	// The authorization code from the identity provider.
-	Code string `json:"code"`
-	// The state parameter originally provided by the server.
-	State OptString `json:"state"`
-}
-
-// GetCode returns the value of Code.
-func (s *VerifyChallengeRequestSum7IdpAssertion) GetCode() string {
-	return s.Code
-}
-
-// GetState returns the value of State.
-func (s *VerifyChallengeRequestSum7IdpAssertion) GetState() OptString {
-	return s.State
-}
-
-// SetCode sets the value of Code.
-func (s *VerifyChallengeRequestSum7IdpAssertion) SetCode(val string) {
-	s.Code = val
-}
-
-// SetState sets the value of State.
-func (s *VerifyChallengeRequestSum7IdpAssertion) SetState(val OptString) {
-	s.State = val
-}
-
-// Proof for `captcha` method.
-type VerifyChallengeRequestSum8 struct {
-	// CAPTCHA verification proof.
-	Captcha VerifyChallengeRequestSum8Captcha `json:"captcha"`
-}
-
-// GetCaptcha returns the value of Captcha.
-func (s *VerifyChallengeRequestSum8) GetCaptcha() VerifyChallengeRequestSum8Captcha {
-	return s.Captcha
-}
-
-// SetCaptcha sets the value of Captcha.
-func (s *VerifyChallengeRequestSum8) SetCaptcha(val VerifyChallengeRequestSum8Captcha) {
-	s.Captcha = val
-}
-
-// CAPTCHA verification proof.
-type VerifyChallengeRequestSum8Captcha struct {
-	// The CAPTCHA token or solution.
-	Token string `json:"token"`
-}
-
-// GetToken returns the value of Token.
-func (s *VerifyChallengeRequestSum8Captcha) GetToken() string {
-	return s.Token
-}
-
-// SetToken sets the value of Token.
-func (s *VerifyChallengeRequestSum8Captcha) SetToken(val string) {
-	s.Token = val
 }

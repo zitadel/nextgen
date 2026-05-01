@@ -23,18 +23,13 @@ post:
     - Sessions
   security:
     - oauth2:
-        - openid
+        - sessions.write
   parameters:
-    - name: Idempotency-Key
-      in: header
-      required: false
+    - $ref: ../../../components/parameters/idempotency-key.yaml
       description: |
         Optional retry key for safe retries of the handoff exchange (Category B idempotency).
         Retries carrying the same key within the exchange window return the cached session
         payload without consuming the one-time handoff token again.
-      schema:
-        type: string
-        example: 01HXYZ123ABC
   requestBody:
     required: true
     content:

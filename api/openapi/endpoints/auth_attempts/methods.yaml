@@ -11,7 +11,9 @@ post:
     also include session_id to add factors to an existing session.
   tags:
     - Authentication Attempts
-  security: []
+  security:
+    - oauth2:
+        - auth_attempts.write
   requestBody:
     required: true
     content:

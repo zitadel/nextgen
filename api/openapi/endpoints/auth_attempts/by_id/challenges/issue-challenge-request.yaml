@@ -12,7 +12,7 @@ required:
 additionalProperties: false
 properties:
   method:
-    $ref: ../../../components/schemas/factor-method.yaml
+    $ref: ../../../../components/schemas/factor-method.yaml
     description: The authentication factor method to challenge.
   passkey_options:
     type: object

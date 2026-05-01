@@ -17,7 +17,9 @@ post:
     full session TTL when the first authentication factor is written via a completing `auth_attempt`.
   tags:
     - Sessions
-  security: []
+  security:
+    - oauth2:
+        - sessions.write
   requestBody:
     required: true
     content:
@@ -54,16 +56,12 @@ get:
     - Sessions
   security:
     - oauth2:
-        - openid
+        - sessions.read
   parameters:
     - $ref: ../../components/parameters/limit.yaml
     - $ref: ../../components/parameters/page-token.yaml
-    - name: project_id
-      in: query
-      required: true
+    - $ref: ../../components/parameters/project-id.yaml
       description: Filter sessions by project.
-      schema:
-        $ref: ../../components/schemas/project-id.yaml
     - name: state
       in: query
       required: false

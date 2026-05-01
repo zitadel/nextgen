@@ -11,6 +11,9 @@ get:
     a federated IdP callback or a device flow).
   tags:
     - Authentication Attempts
+  security:
+    - oauth2:
+        - auth_attempts.read
   parameters:
     - $ref: ../../../components/parameters/attempt-id.yaml
   responses:

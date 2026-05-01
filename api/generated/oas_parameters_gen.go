@@ -1431,9 +1431,9 @@ func decodeEndSessionParams(args [0]string, argsEscaped bool, r *http.Request) (
 
 // ExchangeHandoffParams is parameters of exchangeHandoff operation.
 type ExchangeHandoffParams struct {
-	// Optional retry key for safe retries of the handoff exchange (Category B idempotency).
-	// Retries carrying the same key within the exchange window return the cached session
-	// payload without consuming the one-time handoff token again.
+	// Optional retry key for safe retries of the call.
+	// Retries carrying the same key within the call window return the cached
+	// payload without creating a new resource. See details in the endpoint description.
 	IdempotencyKey OptString `json:",omitempty,omitzero"`
 }
 
@@ -1864,9 +1864,9 @@ type ListSessionsParams struct {
 	// Obtain this value from `next_page_token` in the previous response.
 	// Omit to start from the beginning.
 	// Its format is opaque and may change between releases.
-	PageToken OptString `json:",omitempty,omitzero"`
-	// Filter sessions by project.
-	ProjectID ProjectID
+	PageToken OptPageToken `json:",omitempty,omitzero"`
+	// The unique identifier of the project.
+	ProjectID OptProjectID `json:",omitempty,omitzero"`
 	// Filter sessions by lifecycle state.
 	State OptListSessionsState `json:",omitempty,omitzero"`
 	// Filter sessions by user.
@@ -1889,7 +1889,7 @@ func unpackListSessionsParams(packed middleware.Parameters) (params ListSessions
 			In:   "query",
 		}
 		if v, ok := packed[key]; ok {
-			params.PageToken = v.(OptString)
+			params.PageToken = v.(OptPageToken)
 		}
 	}
 	{
@@ -1897,7 +1897,9 @@ func unpackListSessionsParams(packed middleware.Parameters) (params ListSessions
 			Name: "project_id",
 			In:   "query",
 		}
-		params.ProjectID = packed[key].(ProjectID)
+		if v, ok := packed[key]; ok {
+			params.ProjectID = v.(OptProjectID)
+		}
 	}
 	{
 		key := middleware.ParameterKey{
@@ -2003,19 +2005,26 @@ func decodeListSessionsParams(args [0]string, argsEscaped bool, r *http.Request)
 
 		if err := q.HasParam(cfg); err == nil {
 			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
-				var paramsDotPageTokenVal string
+				var paramsDotPageTokenVal PageToken
 				if err := func() error {
-					val, err := d.DecodeValue()
-					if err != nil {
+					var paramsDotPageTokenValVal string
+					if err := func() error {
+						val, err := d.DecodeValue()
+						if err != nil {
+							return err
+						}
+
+						c, err := conv.ToString(val)
+						if err != nil {
+							return err
+						}
+
+						paramsDotPageTokenValVal = c
+						return nil
+					}(); err != nil {
 						return err
 					}
-
-					c, err := conv.ToString(val)
-					if err != nil {
-						return err
-					}
-
-					paramsDotPageTokenVal = c
+					paramsDotPageTokenVal = PageToken(paramsDotPageTokenValVal)
 					return nil
 				}(); err != nil {
 					return err
@@ -2044,38 +2053,50 @@ func decodeListSessionsParams(args [0]string, argsEscaped bool, r *http.Request)
 
 		if err := q.HasParam(cfg); err == nil {
 			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
-				var paramsDotProjectIDVal string
+				var paramsDotProjectIDVal ProjectID
 				if err := func() error {
-					val, err := d.DecodeValue()
-					if err != nil {
+					var paramsDotProjectIDValVal string
+					if err := func() error {
+						val, err := d.DecodeValue()
+						if err != nil {
+							return err
+						}
+
+						c, err := conv.ToString(val)
+						if err != nil {
+							return err
+						}
+
+						paramsDotProjectIDValVal = c
+						return nil
+					}(); err != nil {
 						return err
 					}
-
-					c, err := conv.ToString(val)
-					if err != nil {
-						return err
-					}
-
-					paramsDotProjectIDVal = c
+					paramsDotProjectIDVal = ProjectID(paramsDotProjectIDValVal)
 					return nil
 				}(); err != nil {
 					return err
 				}
-				params.ProjectID = ProjectID(paramsDotProjectIDVal)
+				params.ProjectID.SetTo(paramsDotProjectIDVal)
 				return nil
 			}); err != nil {
 				return err
 			}
 			if err := func() error {
-				if err := params.ProjectID.Validate(); err != nil {
-					return err
+				if value, ok := params.ProjectID.Get(); ok {
+					if err := func() error {
+						if err := value.Validate(); err != nil {
+							return err
+						}
+						return nil
+					}(); err != nil {
+						return err
+					}
 				}
 				return nil
 			}(); err != nil {
 				return err
 			}
-		} else {
-			return err
 		}
 		return nil
 	}(); err != nil {
