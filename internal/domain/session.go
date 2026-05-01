@@ -14,8 +14,11 @@ type Session struct {
 	// ID is the unique identifier for the session within the project and user.
 	ID string
 
+	// CreatedAt is the time when the session was created, it must be set by the storage and is read only.
 	CreatedAt time.Time
+	// UpdatedAt is the time when the session was last updated, it must be set by the storage and is read only.
 	UpdatedAt time.Time
+	// ExpiresAt is the time when the session expires. Is used for garbage collection.
 	ExpiresAt time.Time
 
 	// Token is the opaque string that changes on every update.
@@ -34,14 +37,13 @@ type Session struct {
 	AssuranceLevels []string
 
 	Factors []*SessionFactor
-	// AuthAttempts are deleted as soon as they are handed off to a session and are therefore not accessible on a session.
 }
 
 type SessionFactor struct {
 	Type       AuthCheckType
 	VerifiedAt time.Time
 	// Stored as jsonb
-	Payload any
+	Factor any
 }
 
 type SessionState uint8
@@ -51,15 +53,38 @@ const (
 	SessionStateBuilding
 	SessionStateActive
 	SessionStateExpired
-	SessionStateRevoked
 )
 
 type SessionRepository interface {
-	// Create persists a new session.
+	// Create persists a new session (including all the fields which are set in the struct). The storage must set the read only fields (CreatedAt, UpdatedAt) and return an error if any of the required fields are missing.
+	// The token must be unique across all sessions and is used for authentication, so it should be generated securely (e.g. using a cryptographically secure random generator) and should not be guessable.
 	Create(ctx context.Context, client database.QueryExecutor, session *Session) error
 
-	// Get retrieves a session by its project and session ID.
-	Get(ctx context.Context, client database.QueryExecutor, projectID, sessionID string) (*Session, error)
+	// GetByID retrieves a session by its project and session ID.
+	GetByID(ctx context.Context, client database.QueryExecutor, projectID, sessionID string) (*Session, error)
+	// GetByToken retrieves a session by its project and token.
+	GetByToken(ctx context.Context, client database.QueryExecutor, projectID, token string) (*Session, error)
 
-	Exchange(ctx context.Context, client database.QueryExecutor, session *Session, attempt *AuthAttempt) error
+	// Update applies the given changes to the session and returns the updated session. The token is rotated on every update.
+	// The storage must update the [Session.UpdatedAt] field and return an error if the session does not exist or if any of the required fields are missing after applying the changes.
+	Update(ctx context.Context, client database.QueryExecutor, projectID, sessionID, token string, changes ...database.Change) (*Session, error)
+
+	// Deletes a session by its project and session ID.
+	// It does NOT return an error if the session does not exist.
+	Delete(ctx context.Context, client database.QueryExecutor, projectID, sessionID string) error
+
+	SessionChanges
+}
+
+type SessionChanges interface {
+	// Sets the [Session.UserID] field in the database.
+	SetUserID(userID string) database.Change
+	// Sets the [Session.UserAgent] field in the database.
+	// The operation overwrites the whole user agent, so the caller must ensure to include all relevant information (e.g. device and browser details) in the map.
+	SetUserAgent(userAgent map[string]any) database.Change
+	// Adds or updates a session factor in the [Session.Factors] array in the database.
+	// The factor is identified by its type, so adding a factor with an existing type will overwrite the previous one.
+	SetFactors(factors ...*SessionFactor) database.Change
+	// Sets the [Session.ExpiresAt] field in the database.
+	SetExpiresAt(expiresAt time.Time) database.Change
 }
