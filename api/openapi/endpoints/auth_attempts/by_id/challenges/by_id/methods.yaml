@@ -20,6 +20,12 @@ post:
   parameters:
     - $ref: ../../../../../components/parameters/attempt-id.yaml
     - $ref: ../../../../../components/parameters/challenge-id.yaml
+    - $ref: ../../../../../components/parameters/idempotency-key.yaml
+      description: |
+        Optional retry key for safe retries of the verification request.
+        If a request with the same key has already been processed,
+        the original response is returned.
+        This prevents duplicate processing of the same proof in case of network issues or client retries.
   requestBody:
     required: true
     content:

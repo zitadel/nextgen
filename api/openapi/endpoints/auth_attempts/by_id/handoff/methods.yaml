@@ -19,6 +19,11 @@ post:
         - auth_attempts.write
   parameters:
     - $ref: ../../../../components/parameters/attempt-id.yaml
+    - $ref: ../../../../components/parameters/idempotency-key.yaml
+      description: |
+        Optional retry key for safe retries of the handoff creation (Category B idempotency).
+        Retries carrying the same key within the exchange window return the same handoff token
+        without re-completing the attempt or minting a new token.
   responses:
     '200':
       description: Handoff token created successfully

@@ -39,10 +39,10 @@ var (
 		"POST": "Authorization,Content-Type",
 	}
 	rn35AllowedHeaders = map[string]string{
-		"POST": "Authorization,Content-Type",
+		"POST": "Authorization,Content-Type,Idempotency-Key",
 	}
 	rn10AllowedHeaders = map[string]string{
-		"POST": "Authorization",
+		"POST": "Authorization,Idempotency-Key",
 	}
 	rn7AllowedHeaders = map[string]string{
 		"POST": "Content-Type",

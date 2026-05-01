@@ -1010,6 +1010,10 @@ func decodeAuthorizeGetParams(args [0]string, argsEscaped bool, r *http.Request)
 type CreateHandoffParams struct {
 	// The unique identifier of the authentication attempt.
 	AttemptID AttemptID
+	// Optional retry key for safe retries of the call.
+	// Retries carrying the same key within the call window return the cached
+	// payload without creating a new resource. See details in the endpoint description.
+	IdempotencyKey OptString `json:",omitempty,omitzero"`
 }
 
 func unpackCreateHandoffParams(packed middleware.Parameters) (params CreateHandoffParams) {
@@ -1020,10 +1024,20 @@ func unpackCreateHandoffParams(packed middleware.Parameters) (params CreateHando
 		}
 		params.AttemptID = packed[key].(AttemptID)
 	}
+	{
+		key := middleware.ParameterKey{
+			Name: "Idempotency-Key",
+			In:   "header",
+		}
+		if v, ok := packed[key]; ok {
+			params.IdempotencyKey = v.(OptString)
+		}
+	}
 	return params
 }
 
 func decodeCreateHandoffParams(args [1]string, argsEscaped bool, r *http.Request) (params CreateHandoffParams, _ error) {
+	h := uri.NewHeaderDecoder(r.Header)
 	// Decode path: attempt_id.
 	if err := func() error {
 		param := args[0]
@@ -1081,6 +1095,45 @@ func decodeCreateHandoffParams(args [1]string, argsEscaped bool, r *http.Request
 		return params, &ogenerrors.DecodeParamError{
 			Name: "attempt_id",
 			In:   "path",
+			Err:  err,
+		}
+	}
+	// Decode header: Idempotency-Key.
+	if err := func() error {
+		cfg := uri.HeaderParameterDecodingConfig{
+			Name:    "Idempotency-Key",
+			Explode: false,
+		}
+		if err := h.HasParam(cfg); err == nil {
+			if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotIdempotencyKeyVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotIdempotencyKeyVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.IdempotencyKey.SetTo(paramsDotIdempotencyKeyVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "Idempotency-Key",
+			In:   "header",
 			Err:  err,
 		}
 	}
@@ -2730,6 +2783,10 @@ type VerifyChallengeProofParams struct {
 	AttemptID AttemptID
 	// The unique identifier of this challenge.
 	ChallengeID ChallengeID
+	// Optional retry key for safe retries of the call.
+	// Retries carrying the same key within the call window return the cached
+	// payload without creating a new resource. See details in the endpoint description.
+	IdempotencyKey OptString `json:",omitempty,omitzero"`
 }
 
 func unpackVerifyChallengeProofParams(packed middleware.Parameters) (params VerifyChallengeProofParams) {
@@ -2747,10 +2804,20 @@ func unpackVerifyChallengeProofParams(packed middleware.Parameters) (params Veri
 		}
 		params.ChallengeID = packed[key].(ChallengeID)
 	}
+	{
+		key := middleware.ParameterKey{
+			Name: "Idempotency-Key",
+			In:   "header",
+		}
+		if v, ok := packed[key]; ok {
+			params.IdempotencyKey = v.(OptString)
+		}
+	}
 	return params
 }
 
 func decodeVerifyChallengeProofParams(args [2]string, argsEscaped bool, r *http.Request) (params VerifyChallengeProofParams, _ error) {
+	h := uri.NewHeaderDecoder(r.Header)
 	// Decode path: attempt_id.
 	if err := func() error {
 		param := args[0]
@@ -2868,6 +2935,45 @@ func decodeVerifyChallengeProofParams(args [2]string, argsEscaped bool, r *http.
 		return params, &ogenerrors.DecodeParamError{
 			Name: "challenge_id",
 			In:   "path",
+			Err:  err,
+		}
+	}
+	// Decode header: Idempotency-Key.
+	if err := func() error {
+		cfg := uri.HeaderParameterDecodingConfig{
+			Name:    "Idempotency-Key",
+			Explode: false,
+		}
+		if err := h.HasParam(cfg); err == nil {
+			if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotIdempotencyKeyVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotIdempotencyKeyVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.IdempotencyKey.SetTo(paramsDotIdempotencyKeyVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "Idempotency-Key",
+			In:   "header",
 			Err:  err,
 		}
 	}

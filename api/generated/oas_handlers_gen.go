@@ -923,6 +923,10 @@ func (s *Server) handleCreateHandoffRequest(args [1]string, argsEscaped bool, w 
 					Name: "attempt_id",
 					In:   "path",
 				}: params.AttemptID,
+				{
+					Name: "Idempotency-Key",
+					In:   "header",
+				}: params.IdempotencyKey,
 			},
 			Raw: r,
 		}
@@ -4772,6 +4776,10 @@ func (s *Server) handleVerifyChallengeProofRequest(args [2]string, argsEscaped b
 					Name: "challenge_id",
 					In:   "path",
 				}: params.ChallengeID,
+				{
+					Name: "Idempotency-Key",
+					In:   "header",
+				}: params.IdempotencyKey,
 			},
 			Raw: r,
 		}
