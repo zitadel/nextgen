@@ -3,6 +3,28 @@
 These instructions apply to the whole repository. A nearer `AGENTS.md` may add
 more specific rules for a subtree.
 
+## Instruction Scope And Precedence
+
+Use `AGENTS.md` as the primary and tool-agnostic instruction source.
+
+Always resolve instructions in this order:
+1. Root `AGENTS.md` (this file)
+2. The nearest scoped `AGENTS.md` for the files you read or change
+
+If instructions conflict, the nearest scoped `AGENTS.md` for the touched path
+takes precedence over broader scope files.
+
+## ADR Context
+
+Before changing behavior, review relevant ADRs in `docs/adrs/` and align
+proposals and implementations with recorded decisions.
+
+- `docs/adrs/004-agent-contract-and-agents-md.md` defines how external agents
+  should consume the Zitadel CLI contract; treat it as product-surface context,
+  not as the primary implementation contract for developing this repository.
+- `docs/adrs/` contains product and architectural decisions that should be
+  treated as implementation context, not optional references.
+
 ## Project Shape
 
 This repo is the pre-release next generation of Zitadel. The Go server ships

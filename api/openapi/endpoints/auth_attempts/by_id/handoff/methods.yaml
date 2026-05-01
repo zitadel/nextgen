@@ -1,0 +1,58 @@
+post:
+  operationId: createHandoff
+  summary: Complete authentication and create handoff token
+  description: |
+    Completes the authentication attempt and mints a `handoff_token`.
+    
+    Call this after all required factors have been verified and the attempt is in `completed` state.
+    The handoff token is short-lived (≤60 seconds) and must be exchanged at
+    POST /sessions/exchange to receive the final session and session_token.
+    
+    The handoff token is:
+    - Single-use (atomic exchange, no retry)
+    - Audience-bound (requires matching project key for exchange)
+    - Idempotency-safe within a 5-minute window (see conventions)
+  tags:
+    - Authentication Attempts
+  security:
+    - oauth2:
+        - auth_attempts.write
+  parameters:
+    - $ref: ../../../../components/parameters/attempt-id.yaml
+    - $ref: ../../../../components/parameters/idempotency-key.yaml
+      description: |
+        Optional retry key for safe retries of the handoff creation (Category B idempotency).
+        Retries carrying the same key within the exchange window return the same handoff token
+        without re-completing the attempt or minting a new token.
+  responses:
+    '200':
+      description: Handoff token created successfully
+      content:
+        application/json:
+          schema:
+            $ref: handoff-response.yaml
+    '400':
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
+    '404':
+      description: Attempt not found
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
+    '409':
+      description: Attempt not in completed state (missing required factors)
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
+    default:
+      description: Unexpected error
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
+

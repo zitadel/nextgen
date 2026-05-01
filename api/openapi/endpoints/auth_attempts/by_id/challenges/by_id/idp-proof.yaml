@@ -1,0 +1,22 @@
+title: IdpProof
+type: object
+description: Proof for `idp` method (federated login)
+required:
+  - idp_assertion
+additionalProperties: false
+properties:
+  idp_assertion:
+    type: object
+    description: Federated identity provider assertion
+    required:
+      - code
+    properties:
+      code:
+        type: string
+        description: The authorization code from the identity provider
+        example: 'auth_code_from_idp'
+      state:
+        type: string
+        description: The state parameter originally provided by the server
+        example: 'state_value_for_csrf'
+
