@@ -1,0 +1,18 @@
+title: CaptchaProof
+type: object
+description: Proof for `captcha` method
+required:
+  - captcha
+additionalProperties: false
+properties:
+  captcha:
+    type: object
+    description: CAPTCHA verification proof
+    required:
+      - token
+    properties:
+      token:
+        type: string
+        description: The CAPTCHA token or solution
+        example: 'captcha_token_value'
+

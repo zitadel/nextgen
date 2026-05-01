@@ -1,0 +1,18 @@
+title: PasskeyProof
+type: object
+description: Proof for `passkey` method
+required:
+  - passkey
+additionalProperties: false
+properties:
+  passkey:
+    type: object
+    description: WebAuthn passkey assertion
+    required:
+      - assertion
+    properties:
+      assertion:
+        type: string
+        description: The base64-encoded WebAuthn AssertionResponse JSON
+        example: 'eyJ0eXBlIjoid2ViYXV0aG4uZ2V0IiwiY2hhbGxlbmdlIjoiLi4uIn0='
+
