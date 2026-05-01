@@ -41,7 +41,9 @@ func (a *AuthAttempt) get(ctx context.Context, client database.QueryExecutor, qu
 		return nil, fmt.Errorf("failed to query auth attempt: %w", err)
 	}
 	defer rows.Close()
+	var found bool
 	for rows.Next() {
+		found = true
 		var (
 			handoffToken      database.Null[string]
 			handedOffAt       database.Null[time.Time]
@@ -93,6 +95,9 @@ func (a *AuthAttempt) get(ctx context.Context, client database.QueryExecutor, qu
 	}
 	if err = rows.Err(); err != nil {
 		return nil, fmt.Errorf("failed to read auth attempt rows: %w", err)
+	}
+	if !found {
+		return nil, domain.ErrAuthAttemptNotFound()
 	}
 	return attempt, nil
 }

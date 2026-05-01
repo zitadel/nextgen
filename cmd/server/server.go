@@ -1,12 +1,16 @@
 package server
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/zitadel/nextgen/api/generated"
+	internal_api "github.com/zitadel/nextgen/internal/api"
 	_ "github.com/zitadel/nextgen/internal/storage/database/dialect/all"
 )
 
@@ -22,7 +26,25 @@ func NewCommand() *cobra.Command {
 				return err
 			}
 
-			_, err = cfg.Database.Build()
+			connector, err := cfg.Database.Build()
+			if err != nil {
+				return err
+			}
+			ctx := context.Background()
+			pool, err := connector.Connect(ctx)
+			if err != nil {
+				return err
+			}
+			err = pool.Migrate(ctx)
+			if err != nil {
+				return err
+			}
+
+			server, err := api.NewServer(internal_api.NewHandler(pool), internal_api.NewSecurityHandler())
+			if err != nil {
+				return err
+			}
+			err = http.ListenAndServe(":8080", server)
 			if err != nil {
 				return err
 			}

@@ -12,7 +12,6 @@ required:
   - attempt_id
   - project_id
   - state
-  - expires_at
   - created_at
 properties:
   attempt_id:
@@ -76,6 +75,7 @@ properties:
     format: date-time
     description: When this attempt expires (15-minute TTL from creation)
     example: '2026-04-28T15:45:00Z'
+    nullable: true
   created_at:
     type: string
     format: date-time

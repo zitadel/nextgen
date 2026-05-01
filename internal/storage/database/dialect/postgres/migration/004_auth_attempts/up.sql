@@ -12,7 +12,7 @@ CREATE TABLE zitadel_nextgen.auth_attempts (
 
     , PRIMARY KEY (project_id, id)
     , UNIQUE (project_id, handoff_token)
-    , FOREIGN KEY (project_id) REFERENCES zitadel_nextgen.instances(id) -- TODO: rename instances to projects and update the foreign key reference accordingly
+--     , FOREIGN KEY (project_id) REFERENCES zitadel_nextgen.instances(id) -- TODO: rename instances to projects and update the foreign key reference accordingly
 );
 
 CREATE TABLE zitadel_nextgen.auth_attempt_checks (
@@ -36,5 +36,5 @@ CREATE TABLE zitadel_nextgen.auth_attempt_checks (
     , factor_payload JSONB -- the payload of the factor (e.g. the user id, etc.)
 
     , PRIMARY KEY (project_id, auth_attempt_id, type)
-    , FOREIGN KEY (project_id, auth_attempt_id) REFERENCES zitadel_nextgen.auth_attempts(project_id, id) ON DELETE CASCADE
+--     , FOREIGN KEY (project_id, auth_attempt_id) REFERENCES zitadel_nextgen.auth_attempts(project_id, id) ON DELETE CASCADE
 );
