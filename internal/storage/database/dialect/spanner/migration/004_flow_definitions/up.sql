@@ -1,15 +1,16 @@
 CREATE SCHEMA IF NOT EXISTS zitadel_nextgen;
 
 CREATE TABLE zitadel_nextgen.flow_definitions (
-    project_id      TEXT NOT NULL
-    , id            TEXT NOT NULL
-    , name          TEXT NOT NULL
-    , schema_version TEXT NOT NULL
-    , status        TEXT NOT NULL DEFAULT 'draft'
-    , purposes      TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[]
-    , definition    JSONB NOT NULL
-    , created_at    TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-    , updated_at    TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    project_id          TEXT NOT NULL
+    , id                TEXT NOT NULL
+    , name              TEXT NOT NULL
+    , schema_version    TEXT NOT NULL
+    , status            TEXT NOT NULL DEFAULT 'draft'
+    , purposes          TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[]
+    , definition        JSONB NOT NULL
+    , created_at        TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    , updated_at        TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+
     , PRIMARY KEY (project_id, id)
 );
 
