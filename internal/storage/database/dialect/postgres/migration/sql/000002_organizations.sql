@@ -1,3 +1,4 @@
+-- +goose Up
 CREATE TABLE zitadel_nextgen.organizations(
     instance_id TEXT NOT NULL
     REFERENCES zitadel_nextgen.instances (id)
@@ -10,3 +11,6 @@ CREATE TABLE zitadel_nextgen.organizations(
 
     , PRIMARY KEY (instance_id, id)
 );
+
+-- +goose Down
+DROP TABLE zitadel_nextgen.organizations;

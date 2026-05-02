@@ -1,3 +1,4 @@
+-- +goose Up
 CREATE TYPE zitadel_nextgen.flow_definition_states AS ENUM (
     'draft'
     , 'active'
@@ -33,3 +34,10 @@ CREATE INDEX idx_flow_definitions_project_status
 
 CREATE INDEX idx_flow_definitions_project_purposes
     ON zitadel_nextgen.flow_definitions USING GIN (purposes);
+
+-- +goose Down
+DROP INDEX IF EXISTS zitadel_nextgen.idx_flow_definitions_project_purposes;
+DROP INDEX IF EXISTS zitadel_nextgen.idx_flow_definitions_project_status;
+DROP TABLE IF EXISTS zitadel_nextgen.flow_definitions;
+DROP TYPE IF EXISTS zitadel_nextgen.flow_definition_purposes;
+DROP TYPE IF EXISTS zitadel_nextgen.flow_definition_states;
