@@ -112,26 +112,15 @@ func (r *FlowDefinitionRepository) CreateFlowDefinition(ctx context.Context, def
 		return err
 	}
 
-	purposes := make([]string, len(def.Purposes))
+	purposes := make(StringArray, len(def.Purposes))
 	for i, p := range def.Purposes {
 		purposes[i] = p.Purpose.String()
 	}
 
-	b := database.NewStatementBuilder(
-		"INSERT INTO " + tableFlowDefinitions +
-			" (project_id, id, name, schema_version, status, purposes, definition, created_at, updated_at)" +
-			" VALUES (")
-	b.WriteArgs(def.ProjectID, def.ID, def.Name, def.SchemaVersion)
-	b.WriteString(", ")
-	b.WriteString(b.AppendArg(def.Status.String()) + r.statusCast)
-	b.WriteString(", ")
-	b.WriteString(b.AppendArg(purposes) + r.purposeArrCast)
-	b.WriteString(", ")
-	b.WriteArg(content)
-	b.WriteString(", ")
-	b.WriteArg(database.NowInstruction)
-	b.WriteString(", ")
-	b.WriteArg(database.NowInstruction)
+	b := database.NewStatementBuilder("INSERT INTO ")
+	b.WriteString(tableFlowDefinitions)
+	b.WriteString(" (project_id, id, name, schema_version, status, purposes, definition, created_at, updated_at) VALUES (")
+	b.WriteArgs(def.ProjectID, def.ID, def.Name, def.SchemaVersion, def.Status.String()+r.statusCast, purposes.String()+r.purposeArrCast, content, database.NowInstruction, database.NowInstruction)
 	b.WriteString(")")
 
 	_, err = r.Client.Exec(ctx, b.String(), b.Args()...)
@@ -140,9 +129,9 @@ func (r *FlowDefinitionRepository) CreateFlowDefinition(ctx context.Context, def
 
 func (r *FlowDefinitionRepository) GetFlowDefinition(ctx context.Context, projectID, id string) (*domain.FlowDefinition, error) {
 	b := database.NewStatementBuilder(
-		"SELECT project_id, id, name, schema_version, status, definition, created_at, updated_at" +
-			" FROM " + tableFlowDefinitions +
-			" WHERE project_id = ")
+		"SELECT project_id, id, name, schema_version, status, definition, created_at, updated_at FROM ")
+	b.WriteString(tableFlowDefinitions)
+	b.WriteString(" WHERE project_id = ")
 	b.WriteArg(projectID)
 	b.WriteString(" AND id = ")
 	b.WriteArg(id)
@@ -158,9 +147,9 @@ func (r *FlowDefinitionRepository) ListFlowDefinitions(ctx context.Context, proj
 	o := domain.ApplyFlowDefinitionListOptions(opts)
 
 	b := database.NewStatementBuilder(
-		"SELECT project_id, id, name, schema_version, status, definition, created_at, updated_at" +
-			" FROM " + tableFlowDefinitions +
-			" WHERE project_id = ")
+		"SELECT project_id, id, name, schema_version, status, definition, created_at, updated_at FROM ")
+	b.WriteString(tableFlowDefinitions)
+	b.WriteString(" WHERE project_id = ")
 	b.WriteArg(projectID)
 
 	if o.Status != nil {
@@ -188,7 +177,6 @@ func (r *FlowDefinitionRepository) ListFlowDefinitions(ctx context.Context, proj
 		b.WriteString(" OFFSET ")
 		b.WriteArg(o.Offset)
 	}
-
 	rows, err := getMany[flowDefinitionRow](ctx, r.Client, b)
 	if err != nil {
 		return nil, err

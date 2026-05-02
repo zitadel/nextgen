@@ -6,6 +6,7 @@ package embedded
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
@@ -55,5 +56,6 @@ func StartEmbedded(ctx context.Context) (database.Connector, func(), error) {
 		stop()
 		return nil, nil, fmt.Errorf("unable to decode Spanner config: %w", err)
 	}
+	slog.Info("Test DB available at", "url", url)
 	return connector, stop, nil
 }
