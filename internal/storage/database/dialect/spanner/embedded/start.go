@@ -19,6 +19,8 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 	spannerdb "github.com/zitadel/nextgen/internal/storage/database/dialect/spanner"
 	"google.golang.org/api/option"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 const (
@@ -88,6 +90,7 @@ func createInstanceAndDatabase(ctx context.Context, emulatorHost string) error {
 	opts := []option.ClientOption{
 		option.WithEndpoint(emulatorHost),
 		option.WithoutAuthentication(),
+		option.WithGRPCDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),
 	}
 
 	// Create instance
