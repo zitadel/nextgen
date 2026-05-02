@@ -48,17 +48,20 @@ func TestFlowDefinitionRepository_CreateAndGet(t *testing.T) {
 	assert.Equal(t, []any{"email"}, identifier.Config["methods"])
 	require.Len(t, identifier.Transitions, 2)
 
-	transitionsByAction := make(map[string]domain.FlowStepTransition)
+	var currentFlowTr, crossFlowTr domain.FlowStepTransition
 	for _, tr := range identifier.Transitions {
-		transitionsByAction[tr.Action] = tr
+		if tr.Action == nil {
+			currentFlowTr = tr
+		} else {
+			crossFlowTr = tr
+		}
 	}
-	assert.Equal(t, new("resolve_user"), transitionsByAction["submit"].TargetStep)
-	assert.Nil(t, transitionsByAction["submit"].PivotPurpose)
+	assert.Equal(t, "resolve_user", currentFlowTr.Target)
+	assert.True(t, currentFlowTr.IsCurrentFlow())
 
-	registerPivot := transitionsByAction["register"]
-	require.NotNil(t, registerPivot.PivotPurpose)
-	assert.Equal(t, domain.FlowDefinitionPurposeRegister, *registerPivot.PivotPurpose)
-	assert.Nil(t, registerPivot.TargetStep)
+	require.NotNil(t, crossFlowTr.Action)
+	assert.Equal(t, domain.Pivot, *crossFlowTr.Action)
+	assert.Equal(t, "register-flow", crossFlowTr.Target)
 }
 
 func TestFlowDefinitionRepository_GetNotFound(t *testing.T) {
@@ -220,7 +223,7 @@ func TestFlowDefinitionRepository_ProjectIsolation(t *testing.T) {
 }
 
 func sampleFlowDefinition(projectID, id string) *domain.FlowDefinition {
-	pivot := domain.FlowDefinitionPurposeRegister
+	pivotAction := domain.Pivot
 	appID := "app-1"
 	return &domain.FlowDefinition{
 		ProjectID:     projectID,
@@ -243,8 +246,8 @@ func sampleFlowDefinition(projectID, id string) *domain.FlowDefinition {
 					"methods": []any{"email"},
 				},
 				Transitions: []domain.FlowStepTransition{
-					{Action: "submit", TargetStep: new("resolve_user")},
-					{Action: "register", PivotPurpose: &pivot},
+					{Target: "resolve_user"},
+					{Action: &pivotAction, Target: "register-flow"},
 				},
 			},
 			{
@@ -252,7 +255,7 @@ func sampleFlowDefinition(projectID, id string) *domain.FlowDefinition {
 				Type:   domain.FlowStepTypePolicyCheck,
 				Config: nil,
 				Transitions: []domain.FlowStepTransition{
-					{Action: "found", TargetStep: new("password")},
+					{Target: "password"},
 				},
 			},
 			{

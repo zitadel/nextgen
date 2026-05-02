@@ -69,9 +69,8 @@ type flowDefinitionStepJSON struct {
 }
 
 type flowStepTransitionJSON struct {
-	Action       string  `json:"action"`
-	TargetStep   *string `json:"target_step,omitempty"`
-	PivotPurpose *string `json:"pivot_purpose,omitempty"`
+	Action *string `json:"action"`
+	Target string  `json:"target,omitempty"`
 }
 
 // FlowDefinitionRepository implements [domain.FlowDefinitionRepository]
@@ -240,10 +239,9 @@ func marshalFlowDefinitionContent(def *domain.FlowDefinition) ([]byte, error) {
 	for i, s := range def.Steps {
 		transitions := make([]flowStepTransitionJSON, len(s.Transitions))
 		for j, t := range s.Transitions {
-			tr := flowStepTransitionJSON{Action: t.Action, TargetStep: t.TargetStep}
-			if t.PivotPurpose != nil {
-				p := t.PivotPurpose.String()
-				tr.PivotPurpose = &p
+			tr := flowStepTransitionJSON{Target: t.Target}
+			if t.Action != nil {
+				tr.Action = new(t.Action.String())
 			}
 			transitions[j] = tr
 		}
@@ -287,13 +285,13 @@ func rowToFlowDefinition(row flowDefinitionRow) (*domain.FlowDefinition, error) 
 		}
 		transitions := make([]domain.FlowStepTransition, len(s.Transitions))
 		for j, t := range s.Transitions {
-			tr := domain.FlowStepTransition{Action: t.Action, TargetStep: t.TargetStep}
-			if t.PivotPurpose != nil {
-				p, err := domain.FlowDefinitionPurposeString(*t.PivotPurpose)
+			tr := domain.FlowStepTransition{Target: t.Target}
+			if t.Action != nil {
+				action, err := domain.FlowDefinitionTransitionActionString(*t.Action)
 				if err != nil {
 					return nil, err
 				}
-				tr.PivotPurpose = &p
+				tr.Action = &action
 			}
 			transitions[j] = tr
 		}

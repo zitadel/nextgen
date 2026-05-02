@@ -41,6 +41,16 @@ const (
 	FlowStepTypeComplete
 )
 
+//go:generate go tool enumer -type FlowDefinitionTransitionAction -transform snake -trimprefix FlowDefinitionTransitionAction -sql
+type FlowDefinitionTransitionAction uint8
+
+const (
+	// Switch means switching to a new flow. Redirect the user to a new flow
+	Switch FlowDefinitionTransitionAction = iota
+	// Pivot means switching temporarily to a new flow, then comes back to current flow once done
+	Pivot
+)
+
 // FlowDefinition is a customer-configured directed graph of authentication steps.
 // It is immutable: modifications produce a new revision with a new SchemaVersion.
 type FlowDefinition struct {
@@ -81,7 +91,13 @@ type FlowDefinitionStep struct {
 
 // FlowStepTransition maps an action name to either a target step (regular) or a pivot purpose.
 type FlowStepTransition struct {
-	Action       string
-	TargetStep   *string
-	PivotPurpose *FlowDefinitionPurpose
+	Action *FlowDefinitionTransitionAction
+	// Target is either a step in the current flow OR a new flow.
+	// When Action == nil, Target refers to a step in the current flow
+	// When Action != nil, Target refers to another flow.
+	Target string
+}
+
+func (fst FlowStepTransition) IsCurrentFlow() bool {
+	return fst.Action == nil
 }
