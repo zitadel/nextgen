@@ -2,60 +2,68 @@ package spanner
 
 import (
 	"context"
+	"database/sql"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/database/dialect/spanner/migration"
 )
 
-type pgxConn struct {
-	*pgxpool.Conn
+type spannerConn struct {
+	conn *sql.Conn
+	db   *sql.DB // used for Migrate
 }
 
-var _ database.Connection = (*pgxConn)(nil)
+var _ database.Connection = (*spannerConn)(nil)
 
-func (c *pgxConn) Release(_ context.Context) error {
-	c.Conn.Release()
-	return nil
+// Release implements [database.Connection].
+func (c *spannerConn) Release(_ context.Context) error {
+	return wrapError(c.conn.Close())
 }
 
-func (c *pgxConn) Begin(ctx context.Context, opts *database.TransactionOptions) (database.Transaction, error) {
-	tx, err := c.BeginTx(ctx, transactionOptionsToPgx(opts))
+// Begin implements [database.Connection].
+func (c *spannerConn) Begin(ctx context.Context, opts *database.TransactionOptions) (database.Transaction, error) {
+	tx, err := c.conn.BeginTx(ctx, transactionOptions(opts))
 	if err != nil {
 		return nil, wrapError(err)
 	}
 	return newTransaction(tx), nil
 }
 
-func (c *pgxConn) Query(ctx context.Context, sql string, args ...any) (database.Rows, error) {
-	rows, err := c.Conn.Query(ctx, sql, args...)
+// Query implements [database.Connection].
+func (c *spannerConn) Query(ctx context.Context, query string, args ...any) (database.Rows, error) {
+	rows, err := c.conn.QueryContext(ctx, convertPlaceholders(query), args...)
 	if err != nil {
 		return nil, wrapError(err)
 	}
 	return newRows(rows), nil
 }
 
-func (c *pgxConn) QueryRow(ctx context.Context, sql string, args ...any) database.Row {
-	return newRow(c.Conn.QueryRow(ctx, sql, args...))
+// QueryRow implements [database.Connection].
+func (c *spannerConn) QueryRow(ctx context.Context, query string, args ...any) database.Row {
+	return newRow(c.conn.QueryRowContext(ctx, convertPlaceholders(query), args...))
 }
 
-func (c *pgxConn) Exec(ctx context.Context, sql string, args ...any) (int64, error) {
-	res, err := c.Conn.Exec(ctx, sql, args...)
+// Exec implements [database.Connection].
+func (c *spannerConn) Exec(ctx context.Context, query string, args ...any) (int64, error) {
+	res, err := c.conn.ExecContext(ctx, convertPlaceholders(query), args...)
 	if err != nil {
 		return 0, wrapError(err)
 	}
-	return res.RowsAffected(), nil
+	n, err := res.RowsAffected()
+	return n, wrapError(err)
 }
 
-func (c *pgxConn) Ping(ctx context.Context) error {
-	return wrapError(c.Conn.Ping(ctx))
+// Ping implements [database.Connection].
+func (c *spannerConn) Ping(ctx context.Context) error {
+	return wrapError(c.conn.PingContext(ctx))
 }
 
-func (c *pgxConn) Migrate(ctx context.Context) error {
+// Migrate implements [database.Migrator].
+func (c *spannerConn) Migrate(ctx context.Context) error {
 	if isMigrated {
 		return nil
 	}
-	err := migration.Migrate(ctx, c.Conn.Conn())
+	err := migration.Migrate(ctx, c.db)
 	isMigrated = err == nil
 	return wrapError(err)
 }

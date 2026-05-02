@@ -11,24 +11,8 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database/dialect/spanner"
 )
 
-const tableFlowDefinitions = "zitadel_nextgen.flow_definitions"
-
-var (
-	colFlowDefProjectID = database.NewColumn(tableFlowDefinitions, "project_id")
-	colFlowDefID        = database.NewColumn(tableFlowDefinitions, "id")
-	colFlowDefStatus    = database.NewColumn(tableFlowDefinitions, "status")
-	colFlowDefUpdatedAt = database.NewColumn(tableFlowDefinitions, "updated_at")
-)
-
-type flowDefinition struct{}
-
-func (flowDefinition) PrimaryKeyColumns() []database.Column {
-	return []database.Column{colFlowDefProjectID, colFlowDefID}
-}
-
-func (flowDefinition) UpdatedAtColumn() database.Column { return colFlowDefUpdatedAt }
-
-func (flowDefinition) qualifiedTableName() string { return tableFlowDefinitions }
+const pgTableFlowDefinitions = "zitadel_nextgen.flow_definitions"
+const spannerTableFlowDefinitions = "flow_definitions"
 
 // flowDefinitionRow is a private scan target for queries against the flow_definitions table.
 // Nested data (purposes, audience, steps) lives in the JSONB definition column and is
@@ -75,32 +59,52 @@ type flowStepTransitionJSON struct {
 	Target string  `json:"target,omitempty"`
 }
 
+type flowDefinitionMeta struct {
+	tableName string
+}
+
+func (m flowDefinitionMeta) PrimaryKeyColumns() []database.Column {
+	return []database.Column{
+		database.NewColumn(m.tableName, "project_id"),
+		database.NewColumn(m.tableName, "id"),
+	}
+}
+
+func (m flowDefinitionMeta) UpdatedAtColumn() database.Column {
+	return database.NewColumn(m.tableName, "updated_at")
+}
+
+func (m flowDefinitionMeta) qualifiedTableName() string { return m.tableName }
+
 // FlowDefinitionRepository implements [domain.FlowDefinitionRepository]
-// using a single table where all nested data lives in a JSONB column.
-// It is optimised for the read-heavy, rarely-written access pattern of flow
-// definitions: each read is a single PK lookup with no joins or assembly.
-//
-// Use [NewPostgresFlowDefinitionRepository] or [NewSpannerFlowDefinitionRepository]
-// to construct an instance with the correct dialect.
+// using a single table where all nested data lives in a JSON/JSONB column.
 type FlowDefinitionRepository struct {
 	Client          database.QueryExecutor
-	statusCast      string // SQL cast suffix for a status value, e.g. "::zitadel_nextgen.flow_definition_states"
-	purposeElemCast string // SQL cast suffix for a single purpose value, e.g. "::zitadel_nextgen.flow_definition_purposes"
-	purposeArrCast  string // SQL cast suffix for a purposes array, e.g. "::zitadel_nextgen.flow_definition_purposes[]"
+	meta            flowDefinitionMeta
+	statusCast      string             // SQL cast suffix, e.g. "::zitadel_nextgen.flow_definition_states" (empty for Spanner)
+	purposeElemCast string             // SQL cast suffix for a single element, e.g. "::zitadel_nextgen.flow_definition_purposes"
+	purposeArrCast  string             // SQL cast suffix for an array, e.g. "::zitadel_nextgen.flow_definition_purposes[]"
+	encodePurposes  func([]string) any // returns []string for Spanner, StringArray for Postgres
 }
 
 // NewFlowDefinitionRepository returns a repository configured for either Spanner or Postgres
-// based on the client being passed.
+// based on the client type.
 func NewFlowDefinitionRepository(client database.QueryExecutor) *FlowDefinitionRepository {
 	switch client.(type) {
 	case spanner.SpannerPooler:
-		return &FlowDefinitionRepository{Client: client}
+		return &FlowDefinitionRepository{
+			Client:         client,
+			meta:           flowDefinitionMeta{tableName: spannerTableFlowDefinitions},
+			encodePurposes: func(s []string) any { return s },
+		}
 	case postgres.PostgresPooler:
 		return &FlowDefinitionRepository{
 			Client:          client,
+			meta:            flowDefinitionMeta{tableName: pgTableFlowDefinitions},
 			statusCast:      "::zitadel_nextgen.flow_definition_states",
 			purposeElemCast: "::zitadel_nextgen.flow_definition_purposes",
 			purposeArrCast:  "::zitadel_nextgen.flow_definition_purposes[]",
+			encodePurposes:  func(s []string) any { return StringArray(s) },
 		}
 	}
 	return nil
@@ -114,19 +118,19 @@ func (r *FlowDefinitionRepository) CreateFlowDefinition(ctx context.Context, def
 		return err
 	}
 
-	purposes := make(StringArray, len(def.Purposes))
+	purposeStrs := make([]string, len(def.Purposes))
 	for i, p := range def.Purposes {
-		purposes[i] = p.Purpose.String()
+		purposeStrs[i] = p.Purpose.String()
 	}
 
 	b := database.NewStatementBuilder("INSERT INTO ")
-	b.WriteString(tableFlowDefinitions)
+	b.WriteString(r.meta.tableName)
 	b.WriteString(" (project_id, id, name, schema_version, status, purposes, definition, created_at, updated_at) VALUES (")
 	b.WriteArgs(def.ProjectID, def.ID, def.Name, def.SchemaVersion)
 	b.WriteString(", ")
 	b.WriteString(b.AppendArg(def.Status.String()) + r.statusCast)
 	b.WriteString(", ")
-	b.WriteString(b.AppendArg(purposes.String()) + r.purposeArrCast)
+	b.WriteString(b.AppendArg(r.encodePurposes(purposeStrs)) + r.purposeArrCast)
 	b.WriteString(", ")
 	b.WriteArgs(content, database.NowInstruction, database.NowInstruction)
 	b.WriteString(")")
@@ -138,7 +142,7 @@ func (r *FlowDefinitionRepository) CreateFlowDefinition(ctx context.Context, def
 func (r *FlowDefinitionRepository) GetFlowDefinition(ctx context.Context, projectID, id string) (*domain.FlowDefinition, error) {
 	b := database.NewStatementBuilder(
 		"SELECT project_id, id, name, schema_version, status, definition, created_at, updated_at FROM ")
-	b.WriteString(tableFlowDefinitions)
+	b.WriteString(r.meta.tableName)
 	b.WriteString(" WHERE project_id = ")
 	b.WriteArg(projectID)
 	b.WriteString(" AND id = ")
@@ -156,7 +160,7 @@ func (r *FlowDefinitionRepository) ListFlowDefinitions(ctx context.Context, proj
 
 	b := database.NewStatementBuilder(
 		"SELECT project_id, id, name, schema_version, status, definition, created_at, updated_at FROM ")
-	b.WriteString(tableFlowDefinitions)
+	b.WriteString(r.meta.tableName)
 	b.WriteString(" WHERE project_id = ")
 	b.WriteArg(projectID)
 
@@ -193,23 +197,25 @@ func (r *FlowDefinitionRepository) ListFlowDefinitions(ctx context.Context, proj
 }
 
 func (r *FlowDefinitionRepository) UpdateFlowDefinitionStatus(ctx context.Context, projectID, id string, status domain.FlowDefinitionStatus) error {
+	t := r.meta.tableName
 	condition := database.And(
-		database.NewTextCondition(colFlowDefProjectID, database.TextOperationEqual, projectID),
-		database.NewTextCondition(colFlowDefID, database.TextOperationEqual, id),
+		database.NewTextCondition(database.NewColumn(t, "project_id"), database.TextOperationEqual, projectID),
+		database.NewTextCondition(database.NewColumn(t, "id"), database.TextOperationEqual, id),
 	)
-	_, err := updateOne(ctx, r.Client, flowDefinition{}, condition,
-		database.NewChange(colFlowDefStatus, status.String()),
-		database.NewChange(colFlowDefUpdatedAt, database.NowInstruction),
+	_, err := updateOne(ctx, r.Client, r.meta, condition,
+		database.NewChange(database.NewColumn(t, "status"), status.String()),
+		database.NewChange(database.NewColumn(t, "updated_at"), database.NowInstruction),
 	)
 	return err
 }
 
 func (r *FlowDefinitionRepository) DeleteFlowDefinition(ctx context.Context, projectID, id string) error {
+	t := r.meta.tableName
 	condition := database.And(
-		database.NewTextCondition(colFlowDefProjectID, database.TextOperationEqual, projectID),
-		database.NewTextCondition(colFlowDefID, database.TextOperationEqual, id),
+		database.NewTextCondition(database.NewColumn(t, "project_id"), database.TextOperationEqual, projectID),
+		database.NewTextCondition(database.NewColumn(t, "id"), database.TextOperationEqual, id),
 	)
-	_, err := deleteOne(ctx, r.Client, flowDefinition{}, condition)
+	_, err := deleteOne(ctx, r.Client, r.meta, condition)
 	return err
 }
 
