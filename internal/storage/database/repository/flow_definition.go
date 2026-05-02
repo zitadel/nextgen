@@ -7,6 +7,8 @@ import (
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/database/dialect/postgres"
+	"github.com/zitadel/nextgen/internal/storage/database/dialect/spanner"
 )
 
 const tableFlowDefinitions = "zitadel_nextgen.flow_definitions"
@@ -87,21 +89,21 @@ type FlowDefinitionRepository struct {
 	purposeArrCast  string // SQL cast suffix for a purposes array, e.g. "::zitadel_nextgen.flow_definition_purposes[]"
 }
 
-// NewPostgresFlowDefinitionRepository returns a repository configured for the
-// Postgres dialect, which uses ENUM types that require explicit SQL casts.
-func NewPostgresFlowDefinitionRepository(client database.QueryExecutor) *FlowDefinitionRepository {
-	return &FlowDefinitionRepository{
-		Client:          client,
-		statusCast:      "::zitadel_nextgen.flow_definition_states",
-		purposeElemCast: "::zitadel_nextgen.flow_definition_purposes",
-		purposeArrCast:  "::zitadel_nextgen.flow_definition_purposes[]",
+// NewFlowDefinitionRepository returns a repository configured for either Spanner or Postgres
+// based on the client being passed.
+func NewFlowDefinitionRepository(client database.QueryExecutor) *FlowDefinitionRepository {
+	switch client.(type) {
+	case spanner.SpannerPooler:
+		return &FlowDefinitionRepository{Client: client}
+	case postgres.PostgresPooler:
+		return &FlowDefinitionRepository{
+			Client:          client,
+			statusCast:      "::zitadel_nextgen.flow_definition_states",
+			purposeElemCast: "::zitadel_nextgen.flow_definition_purposes",
+			purposeArrCast:  "::zitadel_nextgen.flow_definition_purposes[]",
+		}
 	}
-}
-
-// NewSpannerFlowDefinitionRepository returns a repository configured for the
-// Spanner PostgreSQL dialect, which uses plain TEXT columns with no casts.
-func NewSpannerFlowDefinitionRepository(client database.QueryExecutor) *FlowDefinitionRepository {
-	return &FlowDefinitionRepository{Client: client}
+	return nil
 }
 
 var _ domain.FlowDefinitionRepository = (*FlowDefinitionRepository)(nil)

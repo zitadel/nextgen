@@ -14,6 +14,10 @@ type Pool struct {
 	*pgxpool.Pool
 }
 
+type PostgresPooler interface {
+	isPostgres()
+}
+
 // RawDB implements [database.PoolTest].
 func (p *Pool) RawDB() *sql.DB {
 	return stdlib.OpenDBFromPool(p.Pool)
@@ -21,6 +25,9 @@ func (p *Pool) RawDB() *sql.DB {
 
 var _ database.Pool = (*Pool)(nil)
 var _ database.PoolTest = (*Pool)(nil)
+var _ PostgresPooler = (*Pool)(nil)
+
+func (p *Pool) isPostgres() {}
 
 func PGxPool(pool *pgxpool.Pool) *Pool {
 	return &Pool{

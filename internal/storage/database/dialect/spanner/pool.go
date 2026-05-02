@@ -14,8 +14,15 @@ type pgxPool struct {
 	*pgxpool.Pool
 }
 
+type SpannerPooler interface {
+	isSpanner()
+}
+
 var _ database.Pool = (*pgxPool)(nil)
 var _ database.PoolTest = (*pgxPool)(nil)
+var _ SpannerPooler = (*pgxPool)(nil)
+
+func (p *pgxPool) isSpanner() {}
 
 func (p *pgxPool) RawDB() *sql.DB {
 	return stdlib.OpenDBFromPool(p.Pool)

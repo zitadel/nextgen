@@ -12,7 +12,6 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database/dialect/postgres"
 	"github.com/zitadel/nextgen/internal/storage/database/dialect/postgres/embedded"
 	spannerDialect "github.com/zitadel/nextgen/internal/storage/database/dialect/spanner"
-	"github.com/zitadel/nextgen/internal/storage/database/repository"
 )
 
 func TestMain(m *testing.M) {
@@ -52,14 +51,6 @@ func runTests(m *testing.M) int {
 	}()
 
 	return m.Run()
-}
-
-// newFlowDefRepo constructs a FlowDefinitionRepository with the correct dialect for the running pool.
-func newFlowDefRepo(client database.QueryExecutor) *repository.FlowDefinitionRepository {
-	if isSpannerDB {
-		return repository.NewSpannerFlowDefinitionRepository(client)
-	}
-	return repository.NewPostgresFlowDefinitionRepository(client)
 }
 
 func newSpannerURLDB(ctx context.Context, url string) (database.PoolTest, func(), error) {
