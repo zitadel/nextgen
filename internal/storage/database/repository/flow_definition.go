@@ -116,7 +116,7 @@ func NewFlowDefinitionRepository(client database.QueryExecutor) *FlowDefinitionR
 			arrayContains:    func(val, col string) string { return val + " = ANY(" + col + ")" },
 		}
 	}
-	return nil
+	panic("NewFlowDefinitionRepository: unsupported client type")
 }
 
 var _ domain.FlowDefinitionRepository = (*FlowDefinitionRepository)(nil)

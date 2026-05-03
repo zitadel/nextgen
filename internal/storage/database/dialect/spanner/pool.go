@@ -9,7 +9,8 @@ import (
 )
 
 type spannerPool struct {
-	db *sql.DB
+	db         *sql.DB
+	isMigrated bool
 }
 
 type SpannerPooler interface {
@@ -31,7 +32,7 @@ func (p *spannerPool) Acquire(ctx context.Context) (database.Connection, error) 
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	return &spannerConn{conn: conn, db: p.db}, nil
+	return &spannerConn{conn: conn, pool: p}, nil
 }
 
 // Query implements [database.Pool].
@@ -79,17 +80,17 @@ func (p *spannerPool) Ping(ctx context.Context) error {
 
 // Migrate implements [database.Migrator].
 func (p *spannerPool) Migrate(ctx context.Context) error {
-	if isMigrated {
+	if p.isMigrated {
 		return nil
 	}
 	err := migration.Migrate(ctx, p.db)
-	isMigrated = err == nil
+	p.isMigrated = err == nil
 	return wrapError(err)
 }
 
 // MigrateTest implements [database.PoolTest].
 func (p *spannerPool) MigrateTest(ctx context.Context) error {
 	err := migration.Migrate(ctx, p.db)
-	isMigrated = err == nil
+	p.isMigrated = err == nil
 	return err
 }

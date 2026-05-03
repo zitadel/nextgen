@@ -5,12 +5,11 @@ import (
 	"database/sql"
 
 	"github.com/zitadel/nextgen/internal/storage/database"
-	"github.com/zitadel/nextgen/internal/storage/database/dialect/spanner/migration"
 )
 
 type spannerConn struct {
 	conn *sql.Conn
-	db   *sql.DB // used for Migrate
+	pool *spannerPool // used for Migrate
 }
 
 var _ database.Connection = (*spannerConn)(nil)
@@ -60,10 +59,5 @@ func (c *spannerConn) Ping(ctx context.Context) error {
 
 // Migrate implements [database.Migrator].
 func (c *spannerConn) Migrate(ctx context.Context) error {
-	if isMigrated {
-		return nil
-	}
-	err := migration.Migrate(ctx, c.db)
-	isMigrated = err == nil
-	return wrapError(err)
+	return c.pool.Migrate(ctx)
 }

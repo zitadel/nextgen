@@ -9,9 +9,8 @@ import (
 )
 
 var (
-	_          database.Connector = (*Config)(nil)
-	Name                          = "spanner"
-	isMigrated bool
+	_    database.Connector = (*Config)(nil)
+	Name                    = "spanner"
 )
 
 // Config holds connection settings for a Spanner database accessed via the
