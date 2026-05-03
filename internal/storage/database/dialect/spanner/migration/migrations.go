@@ -17,7 +17,8 @@ func Migrate(ctx context.Context, db *sql.DB) error {
 	if err != nil {
 		return err
 	}
-	p, err := goose.NewProvider(goose.DialectSpanner, db, sqlFS)
+	// WithIsolateDDL runs DDL statements outside transactions, which Spanner requires.
+	p, err := goose.NewProvider(goose.DialectSpanner, db, sqlFS, goose.WithIsolateDDL(true))
 	if err != nil {
 		return err
 	}

@@ -1,13 +1,20 @@
 -- +goose NO TRANSACTION
 -- +goose Up
-CREATE TABLE zitadel_nextgen.organizations (
+-- +goose StatementBegin
+CREATE TABLE organizations (
     instance_id STRING(MAX) NOT NULL,
     id          STRING(MAX) NOT NULL,
     created_at  TIMESTAMP   NOT NULL DEFAULT (CURRENT_TIMESTAMP()),
     updated_at  TIMESTAMP   NOT NULL DEFAULT (CURRENT_TIMESTAMP()),
-) PRIMARY KEY (instance_id, id),
-  INTERLEAVE IN PARENT zitadel_nextgen.instances ON DELETE CASCADE;
+    CONSTRAINT fk_organizations_instance
+        FOREIGN KEY (instance_id)
+        REFERENCES instances (id)
+        ON DELETE CASCADE,
+) PRIMARY KEY (instance_id, id)
+-- +goose StatementEnd
 
 -- +goose Down
 -- +goose NO TRANSACTION
-DROP TABLE IF EXISTS zitadel_nextgen.organizations;
+-- +goose StatementBegin
+DROP TABLE IF EXISTS organizations
+-- +goose StatementEnd

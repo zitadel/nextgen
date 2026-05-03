@@ -79,12 +79,15 @@ func (m flowDefinitionMeta) qualifiedTableName() string { return m.tableName }
 // FlowDefinitionRepository implements [domain.FlowDefinitionRepository]
 // using a single table where all nested data lives in a JSON/JSONB column.
 type FlowDefinitionRepository struct {
-	Client          database.QueryExecutor
-	meta            flowDefinitionMeta
-	statusCast      string             // SQL cast suffix, e.g. "::zitadel_nextgen.flow_definition_states" (empty for Spanner)
-	purposeElemCast string             // SQL cast suffix for a single element, e.g. "::zitadel_nextgen.flow_definition_purposes"
-	purposeArrCast  string             // SQL cast suffix for an array, e.g. "::zitadel_nextgen.flow_definition_purposes[]"
-	encodePurposes  func([]string) any // returns []string for Spanner, StringArray for Postgres
+	Client           database.QueryExecutor
+	meta             flowDefinitionMeta
+	statusCast       string                       // SQL cast suffix, e.g. "::zitadel_nextgen.flow_definition_states" (empty for Spanner)
+	purposeElemCast  string                       // SQL cast suffix for a single element, e.g. "::zitadel_nextgen.flow_definition_purposes"
+	purposeArrCast   string                       // SQL cast suffix for an array, e.g. "::zitadel_nextgen.flow_definition_purposes[]"
+	encodePurposes   func([]string) any           // returns []string for Spanner, StringArray for Postgres
+	encodeDefinition func([]byte) any             // returns string for Spanner (JSON column), []byte for Postgres (JSONB)
+	now              database.Instruction         // NOW() for Postgres, CURRENT_TIMESTAMP() for Spanner
+	arrayContains    func(val, col string) string // produces "val = ANY(col)" or "val IN UNNEST(col)"
 }
 
 // NewFlowDefinitionRepository returns a repository configured for either Spanner or Postgres
@@ -93,18 +96,24 @@ func NewFlowDefinitionRepository(client database.QueryExecutor) *FlowDefinitionR
 	switch client.(type) {
 	case spanner.SpannerPooler:
 		return &FlowDefinitionRepository{
-			Client:         client,
-			meta:           flowDefinitionMeta{tableName: spannerTableFlowDefinitions},
-			encodePurposes: func(s []string) any { return s },
+			Client:           client,
+			meta:             flowDefinitionMeta{tableName: spannerTableFlowDefinitions},
+			encodePurposes:   func(s []string) any { return s },
+			encodeDefinition: func(b []byte) any { return string(b) },
+			now:              database.CurrentTimestampInstruction,
+			arrayContains:    func(val, col string) string { return val + " IN UNNEST(" + col + ")" },
 		}
 	case postgres.PostgresPooler:
 		return &FlowDefinitionRepository{
-			Client:          client,
-			meta:            flowDefinitionMeta{tableName: pgTableFlowDefinitions},
-			statusCast:      "::zitadel_nextgen.flow_definition_states",
-			purposeElemCast: "::zitadel_nextgen.flow_definition_purposes",
-			purposeArrCast:  "::zitadel_nextgen.flow_definition_purposes[]",
-			encodePurposes:  func(s []string) any { return StringArray(s) },
+			Client:           client,
+			meta:             flowDefinitionMeta{tableName: pgTableFlowDefinitions},
+			statusCast:       "::zitadel_nextgen.flow_definition_states",
+			purposeElemCast:  "::zitadel_nextgen.flow_definition_purposes",
+			purposeArrCast:   "::zitadel_nextgen.flow_definition_purposes[]",
+			encodePurposes:   func(s []string) any { return StringArray(s) },
+			encodeDefinition: func(b []byte) any { return b },
+			now:              database.NowInstruction,
+			arrayContains:    func(val, col string) string { return val + " = ANY(" + col + ")" },
 		}
 	}
 	return nil
@@ -132,7 +141,7 @@ func (r *FlowDefinitionRepository) CreateFlowDefinition(ctx context.Context, def
 	b.WriteString(", ")
 	b.WriteString(b.AppendArg(r.encodePurposes(purposeStrs)) + r.purposeArrCast)
 	b.WriteString(", ")
-	b.WriteArgs(content, database.NowInstruction, database.NowInstruction)
+	b.WriteArgs(r.encodeDefinition(content), r.now, r.now)
 	b.WriteString(")")
 
 	_, err = r.Client.Exec(ctx, b.String(), b.Args()...)
@@ -170,8 +179,8 @@ func (r *FlowDefinitionRepository) ListFlowDefinitions(ctx context.Context, proj
 	}
 	if o.Purpose != nil {
 		b.WriteString(" AND ")
-		b.WriteString(b.AppendArg(o.Purpose.String()) + r.purposeElemCast)
-		b.WriteString(" = ANY(purposes)")
+		placeholder := b.AppendArg(o.Purpose.String()) + r.purposeElemCast
+		b.WriteString(r.arrayContains(placeholder, "purposes"))
 	}
 
 	if o.SchemaVersion != nil {
@@ -204,7 +213,7 @@ func (r *FlowDefinitionRepository) UpdateFlowDefinitionStatus(ctx context.Contex
 	)
 	_, err := updateOne(ctx, r.Client, r.meta, condition,
 		database.NewChange(database.NewColumn(t, "status"), status.String()),
-		database.NewChange(database.NewColumn(t, "updated_at"), database.NowInstruction),
+		database.NewChange(database.NewColumn(t, "updated_at"), r.now),
 	)
 	return err
 }

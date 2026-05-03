@@ -20,7 +20,15 @@ func (j *JSON[T]) Scan(src any) (err error) {
 	case nil:
 		return nil
 	default:
-		return ErrScanSource
+		// go-sql-spanner returns JSON columns as spanner.NullJSON which implements json.Marshaler.
+		if m, ok := src.(json.Marshaler); ok {
+			rawJSON, err = m.MarshalJSON()
+			if err != nil {
+				return database.NewScanError(err)
+			}
+		} else {
+			return ErrScanSource
+		}
 	}
 	if err = j.UnmarshalJSON(rawJSON); err != nil {
 		return database.NewScanError(err)
