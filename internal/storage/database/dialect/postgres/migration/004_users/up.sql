@@ -102,6 +102,100 @@ CREATE TABLE zitadel_nextgen.user_unique_attributes (
 CREATE TABLE zitadel_nextgen.user_unique_attributes_part_0 PARTITION OF zitadel_nextgen.user_unique_attributes FOR VALUES WITH (MODULUS 2, REMAINDER 0);
 CREATE TABLE zitadel_nextgen.user_unique_attributes_part_1 PARTITION OF zitadel_nextgen.user_unique_attributes FOR VALUES WITH (MODULUS 2, REMAINDER 1);
 
+-- Dedicated credential tables (not part of the EAV user_attributes store).
+
+CREATE TABLE zitadel_nextgen.user_passwords (
+    instance_id TEXT COLLATE "C" NOT NULL
+    , user_id TEXT COLLATE "C" NOT NULL
+    , encoded_hash TEXT NOT NULL CHECK (encoded_hash <> '')
+    , change_required BOOLEAN NOT NULL DEFAULT FALSE
+    , changed_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    , verification_id TEXT
+    , last_successful_check TIMESTAMPTZ
+    , failed_attempts SMALLINT NOT NULL DEFAULT 0 CHECK (failed_attempts >= 0)
+    , created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    , updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+
+    , PRIMARY KEY (instance_id, user_id)
+    , FOREIGN KEY (instance_id, user_id)
+        REFERENCES zitadel_nextgen.users(instance_id, id)
+        ON DELETE CASCADE
+);
+
+CREATE TABLE zitadel_nextgen.user_totp (
+    instance_id TEXT COLLATE "C" NOT NULL
+    , user_id TEXT COLLATE "C" NOT NULL
+    , secret BYTEA NOT NULL
+    , verified_at TIMESTAMPTZ
+    , last_successful_check TIMESTAMPTZ
+    , failed_attempts SMALLINT NOT NULL DEFAULT 0 CHECK (failed_attempts >= 0)
+    , created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    , updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+
+    , PRIMARY KEY (instance_id, user_id)
+    , FOREIGN KEY (instance_id, user_id)
+        REFERENCES zitadel_nextgen.users(instance_id, id)
+        ON DELETE CASCADE
+);
+
+CREATE TABLE zitadel_nextgen.user_recovery_codes (
+    instance_id TEXT COLLATE "C" NOT NULL
+    , user_id TEXT COLLATE "C" NOT NULL
+    , code_hashes BYTEA[] NOT NULL CHECK (cardinality(code_hashes) > 0)
+    , last_successful_check TIMESTAMPTZ
+    , failed_attempts SMALLINT NOT NULL DEFAULT 0 CHECK (failed_attempts >= 0)
+    , created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    , updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+
+    , PRIMARY KEY (instance_id, user_id)
+    , FOREIGN KEY (instance_id, user_id)
+        REFERENCES zitadel_nextgen.users(instance_id, id)
+        ON DELETE CASCADE
+);
+
+CREATE TABLE zitadel_nextgen.user_pats (
+    instance_id TEXT COLLATE "C" NOT NULL
+    , token_id TEXT COLLATE "C" NOT NULL CHECK (token_id <> '')
+    , user_id TEXT COLLATE "C" NOT NULL
+    , name TEXT
+    , scopes TEXT[] NOT NULL DEFAULT '{}'
+    , expires_at TIMESTAMPTZ
+    , last_used_at TIMESTAMPTZ
+    , created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    , updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+
+    , PRIMARY KEY (instance_id, token_id)
+    , FOREIGN KEY (instance_id, user_id)
+        REFERENCES zitadel_nextgen.users(instance_id, id)
+        ON DELETE CASCADE
+);
+
+CREATE INDEX idx_user_pats_user_id
+    ON zitadel_nextgen.user_pats(instance_id, user_id);
+
+CREATE TABLE zitadel_nextgen.user_passkeys (
+    instance_id TEXT COLLATE "C" NOT NULL
+    , user_id TEXT COLLATE "C" NOT NULL
+    , credential_id BYTEA NOT NULL
+    , public_key BYTEA NOT NULL
+    , aaguid BYTEA
+    , attestation_type TEXT
+    , transports TEXT[] NOT NULL DEFAULT '{}'
+    , sign_count BIGINT NOT NULL DEFAULT 0 CHECK (sign_count >= 0)
+    , backup_eligible BOOLEAN NOT NULL DEFAULT FALSE
+    , backup_state BOOLEAN NOT NULL DEFAULT FALSE
+    , name TEXT
+    , verified_at TIMESTAMPTZ
+    , last_used_at TIMESTAMPTZ
+    , created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    , updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+
+    , PRIMARY KEY (instance_id, user_id, credential_id)
+    , FOREIGN KEY (instance_id, user_id)
+        REFERENCES zitadel_nextgen.users(instance_id, id)
+        ON DELETE CASCADE
+);
+
 --
 -- Data types for user creation (used by example)
 --
