@@ -19,6 +19,18 @@ post:
   responses:
     '204':
       description: Event recorded.
+    '400':
+      description: Invalid request.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '404':
+      description: Flow not found.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
     default:
       description: Unexpected error response.
       content:
