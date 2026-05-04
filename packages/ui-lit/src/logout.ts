@@ -250,7 +250,7 @@ class NextgenLogout extends LitElement {
   declare _error: string;
 
   // Not reactive — set once in connectedCallback, never changes.
-  private _templateMode: boolean = false;
+  private _templateMode = false;
 
   constructor() {
     super();
