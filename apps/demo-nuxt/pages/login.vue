@@ -17,8 +17,9 @@
 
 <script setup lang="ts">
 import "@nextgen/ui-lit";
+import type { AuthResult } from "@nextgen/sdk-nuxt";
 
-const auth = useState("nextgen-auth");
+const auth = useState<AuthResult>("nextgen-auth");
 if (auth.value?.isAuthenticated) {
   await navigateTo("/admin");
 }

@@ -4,7 +4,6 @@ export default defineNuxtConfig({
   runtimeConfig: {
     nextgenIssuerUrl: process.env.NEXTGEN_ISSUER_URL ?? "http://localhost:4000",
   },
-  transpile: ["@nextgen/ui-lit"],
   vite: {
     optimizeDeps: {
       include: ["lit"],
@@ -12,7 +11,7 @@ export default defineNuxtConfig({
   },
   nitro: {
     routeRules: {
-      "/__nextgen/**": { proxy: false },
+      "/__nextgen/**": {},
     },
   },
 });
