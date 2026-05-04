@@ -2,7 +2,16 @@
   "name": "@nextgen/ui-lit",
   "version": "0.0.0",
   "description": "Nextgen authentication web components",
+  "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/ui-lit#readme",
+  "bugs": {
+    "url": "https://github.com/zitadel/nextgen/issues"
+  },
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zitadel/nextgen.git",
+    "directory": "packages/ui-lit"
+  },
   "type": "module",
   "exports": {
     ".": {

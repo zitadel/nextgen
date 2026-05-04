@@ -2,7 +2,16 @@
   "name": "@nextgen/mockserver",
   "version": "0.0.0",
   "description": "Mock ZITADEL backend for local development",
+  "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/mockserver#readme",
+  "bugs": {
+    "url": "https://github.com/zitadel/nextgen/issues"
+  },
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zitadel/nextgen.git",
+    "directory": "packages/mockserver"
+  },
   "private": true,
   "type": "module",
   "scripts": {

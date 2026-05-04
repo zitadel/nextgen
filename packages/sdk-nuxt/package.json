@@ -2,7 +2,16 @@
   "name": "@nextgen/sdk-nuxt",
   "version": "0.0.0",
   "description": "Nuxt proxy middleware and helpers for Nextgen Auth",
+  "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-nuxt#readme",
+  "bugs": {
+    "url": "https://github.com/zitadel/nextgen/issues"
+  },
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zitadel/nextgen.git",
+    "directory": "packages/sdk-nuxt"
+  },
   "type": "module",
   "exports": {
     ".": {
