@@ -283,11 +283,11 @@ export function base64UrlDecode(input: string): Uint8Array<ArrayBuffer> {
  *   has fewer than three dot-separated segments.
  */
 function splitToken(token: string): readonly [string, string, string] | null {
-  const parts = token.split('.');
-  if (parts.length < 3) {
+  const [h, p, s] = token.split('.');
+  if (!h || !p || !s) {
     return null;
   }
-  return [parts[0], parts[1], parts[2]] as const;
+  return [h, p, s] as const;
 }
 
 // ─── JWT decode ───────────────────────────────────────────────────────────────

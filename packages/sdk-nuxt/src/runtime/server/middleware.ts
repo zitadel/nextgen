@@ -274,7 +274,9 @@ async function handleAuth(
   } = opts;
 
   const authHeader = getRequestHeader(event, 'authorization');
-  const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  const bearerToken = authHeader?.startsWith('Bearer ')
+    ? authHeader.slice(7)
+    : null;
   const cookieToken = getCookie(event, '__nextgen_session') ?? null;
   const token = bearerToken ?? cookieToken;
 

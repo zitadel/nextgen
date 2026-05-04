@@ -64,6 +64,17 @@ describe('auth()', () => {
     });
   });
 
+  it('returns unauthenticated when token has no sub claim', async () => {
+    const token = makeFakeJwt({
+      email: 'alice@example.com',
+      exp: Math.floor(Date.now() / 1000) + 3600,
+    });
+    mockHeadersMap.set('x-nextgen-auth-token', token);
+    const { auth } = await import('../auth');
+    const result = await auth();
+    expect(result).toEqual({ isAuthenticated: false, session: null });
+  });
+
   it('returns unauthenticated when token is malformed', async () => {
     mockHeadersMap.set('x-nextgen-auth-token', 'not.a.valid.jwt.at.all.extra');
     const { auth } = await import('../auth');

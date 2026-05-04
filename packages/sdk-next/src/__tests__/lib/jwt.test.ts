@@ -25,7 +25,6 @@ import {
   JWKS_TTL_MS,
 } from '../../lib/jwt';
 
-
 const { privateKey, publicKey } = generateKeyPairSync('rsa', {
   modulusLength: 2048,
 });
@@ -36,7 +35,6 @@ const PUBLIC_KEY_JWK = publicKey.export({
   type: 'spki',
   format: 'jwk',
 }) as JsonWebKey;
-
 
 /** Monotonically increasing kid counter — ensures each test gets a fresh cache slot. */
 let kidCounter = 0;
@@ -103,7 +101,6 @@ function ts(offsetSeconds: number): number {
   return Math.floor(Date.now() / 1000) + offsetSeconds;
 }
 
-
 describe('base64UrlDecode', () => {
   it('decodes a plain ASCII string', () => {
     const encoded = b64url(Buffer.from('hello'));
@@ -137,7 +134,6 @@ describe('base64UrlDecode', () => {
     expect(Buffer.from(decoded)).toEqual(original);
   });
 });
-
 
 describe('decodeJwt', () => {
   it('extracts the header alg and kid fields', () => {
@@ -178,12 +174,10 @@ describe('decodeJwt', () => {
   });
 });
 
-
 describe('verifyJwt', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
-
 
   describe('signature verification', () => {
     it('returns the payload for a valid token', async () => {
@@ -250,7 +244,6 @@ describe('verifyJwt', () => {
     });
   });
 
-
   describe('JWKS caching', () => {
     it('fetches the JWKS only once for repeated calls with the same kid', async () => {
       const kid = nextKid();
@@ -282,7 +275,6 @@ describe('verifyJwt', () => {
       expect(fetchMock).toHaveBeenCalledTimes(2);
     });
   });
-
 
   describe('alg validation', () => {
     it('accepts a token whose alg is in allowedAlgorithms', async () => {
@@ -327,7 +319,9 @@ describe('verifyJwt', () => {
       // Build a properly-signed RS256 token whose header omits 'alg'.
       // Without the fix, this defaults to RS256 and passes verification.
       // With the fix, the missing 'alg' is rejected immediately.
-      const rawHeader = b64url(Buffer.from(JSON.stringify({ typ: 'JWT', kid })));
+      const rawHeader = b64url(
+        Buffer.from(JSON.stringify({ typ: 'JWT', kid })),
+      );
       const rawPayload = b64url(
         Buffer.from(JSON.stringify({ sub: 'u', exp: ts(3600) })),
       );
@@ -341,7 +335,6 @@ describe('verifyJwt', () => {
       expect(await verifyJwt(token, baseOpts())).toBeNull();
     });
   });
-
 
   describe('typ validation', () => {
     it('accepts a token with typ "JWT"', async () => {
@@ -420,7 +413,6 @@ describe('verifyJwt', () => {
     });
   });
 
-
   describe('iss validation', () => {
     it('accepts a token whose iss matches issuerUrl', async () => {
       const kid = nextKid();
@@ -452,7 +444,6 @@ describe('verifyJwt', () => {
       expect(await verifyJwt(token, baseOpts())).not.toBeNull();
     });
   });
-
 
   describe('aud validation', () => {
     it('accepts when aud matches the configured audience string', async () => {
@@ -510,7 +501,6 @@ describe('verifyJwt', () => {
     });
   });
 
-
   describe('exp validation', () => {
     it('accepts a token that has not yet expired', async () => {
       const kid = nextKid();
@@ -548,7 +538,6 @@ describe('verifyJwt', () => {
     });
   });
 
-
   describe('nbf validation', () => {
     it('accepts a token whose nbf is in the past', async () => {
       const kid = nextKid();
@@ -576,7 +565,6 @@ describe('verifyJwt', () => {
       ).not.toBeNull();
     });
   });
-
 
   describe('iat validation', () => {
     it('accepts a token with iat in the past', async () => {

@@ -35,10 +35,14 @@ export async function auth(): Promise<AuthResult> {
 
     const { payload } = decodeJwt(token);
 
+    if (!payload.sub) {
+      return { isAuthenticated: false, session: null };
+    }
+
     return {
       isAuthenticated: true,
       session: {
-        userId: payload.sub ?? '',
+        userId: payload.sub,
         email: payload.email ?? null,
         name: payload.name ?? null,
         token,

@@ -208,6 +208,39 @@ describe('createNextgenMiddleware (H3)', () => {
     });
   });
 
+  it('token with no sub claim is treated as unauthenticated', async () => {
+    const kid = nextKid();
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    const token = makeJwt({ email: 'nuxt@example.com', exp }, kid);
+
+    vi.stubGlobal('fetch', mockJwks(kid));
+
+    const app = createApp();
+    app.use(
+      createNextgenMiddleware({
+        issuerUrl: 'http://localhost:4000',
+        protectedRoutes: ['/admin'],
+        loginPath: '/login',
+      }),
+    );
+
+    let capturedAuth: unknown = undefined;
+    app.use('/admin', (event) => {
+      capturedAuth = event.context.nextgenAuth;
+      return { ok: true };
+    });
+
+    const handler = toWebHandler(app);
+    const res = await handler(
+      makeWebRequest(
+        'http://localhost:3000/admin',
+        `__nextgen_session=${token}`,
+      ),
+    );
+    expect(res.status).toBe(302);
+    expect(capturedAuth).toBeUndefined();
+  });
+
   it('token with disallowed typ is rejected on protected route', async () => {
     const kid = nextKid();
     const exp = Math.floor(Date.now() / 1000) + 3600;

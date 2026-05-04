@@ -22,13 +22,10 @@ export default defineNuxtModule<NextgenMiddlewareOptions>({
   setup(options, nuxt) {
     const { resolve } = createResolver(import.meta.url);
 
-    nuxt.options.runtimeConfig.public.nextgen = {
+    nuxt.options.runtimeConfig.nextgen = {
       issuerUrl: options.issuerUrl ?? 'http://localhost:4000',
       loginPath: options.loginPath ?? '/login',
       protectedRoutes: options.protectedRoutes ?? [],
-    };
-
-    nuxt.options.runtimeConfig.nextgen = {
       jwtKey: options.jwtKey,
     };
 
