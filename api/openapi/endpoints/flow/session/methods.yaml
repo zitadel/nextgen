@@ -6,6 +6,7 @@ get:
     Useful for page reloads or re-rendering after a network error.
   tags:
     - Flows
+  security: []
   parameters:
     - $ref: ../../../components/parameters/flow-id.yaml
     - $ref: ../../../components/parameters/flow-cookie.yaml
@@ -24,6 +25,12 @@ get:
             $ref: ../../../components/error-details.yaml
     '410':
       description: Flow has already completed.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    default:
+      description: Unexpected error response.
       content:
         application/json:
           schema:
