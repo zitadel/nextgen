@@ -50,10 +50,9 @@ function makeJwt(
   payload: Record<string, unknown>,
   kid: string,
   typ = 'JWT',
+  alg = 'RS256',
 ): string {
-  const header = base64url(
-    Buffer.from(JSON.stringify({ alg: 'RS256', typ, kid })),
-  );
+  const header = base64url(Buffer.from(JSON.stringify({ alg, typ, kid })));
   const body = base64url(Buffer.from(JSON.stringify(payload)));
   const signing = `${header}.${body}`;
   const sign = createSign('SHA256');
@@ -364,5 +363,43 @@ describe('createNextgenMiddleware (H3)', () => {
     expect(res.status).toBe(302);
     const location = res.headers.get('location') ?? '';
     expect(location).toContain('/login');
+  });
+
+  it('token with alg "none" is rejected on a protected route', async () => {
+    const kid = nextKid();
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    const token = makeJwt(
+      {
+        sub: 'user-nuxt',
+        email: 'nuxt@example.com',
+        iss: 'http://localhost:4000',
+        exp,
+      },
+      kid,
+      'JWT',
+      'none',
+    );
+
+    vi.stubGlobal('fetch', vi.fn());
+
+    const app = createApp();
+    app.use(
+      createNextgenMiddleware({
+        issuerUrl: 'http://localhost:4000',
+        protectedRoutes: ['/admin'],
+        loginPath: '/login',
+      }),
+    );
+    app.use('/admin', () => ({ ok: true }));
+
+    const handler = toWebHandler(app);
+    const res = await handler(
+      makeWebRequest(
+        'http://localhost:3000/admin',
+        `__nextgen_session=${token}`,
+      ),
+    );
+    expect(res.status).toBe(302);
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
   });
 });

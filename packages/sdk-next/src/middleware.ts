@@ -305,7 +305,7 @@ async function handleAuth(
       })
     : null;
 
-  if (payload && token) {
+  if (payload && token && payload.sub) {
     const tunnelled = tunnelHeaders(req, { 'x-nextgen-auth-token': token });
     return NextResponse.next({ request: { headers: tunnelled } });
   }

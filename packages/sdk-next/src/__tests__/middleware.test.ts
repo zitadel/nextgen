@@ -27,10 +27,9 @@ function makeJwt(
   payload: Record<string, unknown>,
   kid: string,
   typ = 'JWT',
+  alg = 'RS256',
 ): string {
-  const header = base64url(
-    Buffer.from(JSON.stringify({ alg: 'RS256', typ, kid })),
-  );
+  const header = base64url(Buffer.from(JSON.stringify({ alg, typ, kid })));
   const body = base64url(Buffer.from(JSON.stringify(payload)));
   const signing = `${header}.${body}`;
   const sign = createSign('SHA256');
@@ -327,5 +326,96 @@ describe('nextgenMiddleware', () => {
     expect(res.status).toBe(302);
     const location = res.headers.get('location') ?? '';
     expect(location).toContain('/login');
+  });
+
+  it('token with alg "none" is rejected on a protected route', async () => {
+    const kid = nextKid();
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    const token = makeJwt(
+      {
+        sub: 'user-123',
+        email: 'user@example.com',
+        iss: 'http://localhost:4000',
+        exp,
+      },
+      kid,
+      'JWT',
+      'none',
+    );
+
+    vi.stubGlobal('fetch', vi.fn());
+
+    const req = makeRequest(
+      'http://localhost:3000/admin',
+      `__nextgen_session=${token}`,
+    );
+    const res = await nextgenMiddleware(req, {
+      issuerUrl: 'http://localhost:4000',
+      protectedRoutes: ['/admin'],
+      loginPath: '/login',
+    });
+
+    expect(res.status).toBe(302);
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+  });
+
+  it('token without sub claim is rejected on a protected route', async () => {
+    const kid = nextKid();
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    const token = makeJwt(
+      {
+        email: 'user@example.com',
+        iss: 'http://localhost:4000',
+        exp,
+      },
+      kid,
+    );
+
+    vi.stubGlobal('fetch', mockJwks(kid));
+
+    const req = makeRequest(
+      'http://localhost:3000/admin',
+      `__nextgen_session=${token}`,
+    );
+    const res = await nextgenMiddleware(req, {
+      issuerUrl: 'http://localhost:4000',
+      protectedRoutes: ['/admin'],
+      loginPath: '/login',
+    });
+
+    expect(res.status).toBe(302);
+    const location = res.headers.get('location') ?? '';
+    expect(location).toContain('/login');
+  });
+
+  it('token without sub on public route passes through as unauthenticated', async () => {
+    const kid = nextKid();
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    const token = makeJwt(
+      {
+        email: 'user@example.com',
+        iss: 'http://localhost:4000',
+        exp,
+      },
+      kid,
+    );
+
+    vi.stubGlobal('fetch', mockJwks(kid));
+
+    const req = makeRequest(
+      'http://localhost:3000/',
+      `__nextgen_session=${token}`,
+    );
+    const res = await nextgenMiddleware(req, {
+      issuerUrl: 'http://localhost:4000',
+      protectedRoutes: ['/admin'],
+      loginPath: '/login',
+    });
+
+    expect(res.status).not.toBe(302);
+    const authToken =
+      res.headers.get('x-nextgen-auth-token') ??
+      res.headers.get('x-middleware-request-x-nextgen-auth-token');
+    expect(authToken).toBe('');
   });
 });

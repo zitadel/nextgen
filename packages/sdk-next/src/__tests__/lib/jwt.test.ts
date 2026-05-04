@@ -386,6 +386,54 @@ describe('verifyJwt', () => {
 
       expect(await verifyJwt(token, baseOpts())).toBeNull();
     });
+
+    it('rejects alg "none" when allowedAlgorithms is not configured', async () => {
+      const kid = nextKid();
+      const token = makeJwt(
+        { sub: 'u', iss: 'http://localhost:4000', exp: ts(3600) },
+        kid,
+        'none',
+      );
+      vi.stubGlobal('fetch', vi.fn());
+
+      expect(
+        await verifyJwt(token, baseOpts({ allowedAlgorithms: undefined })),
+      ).toBeNull();
+      expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+    });
+
+    it('rejects alg "none" when allowedAlgorithms is an empty array', async () => {
+      const kid = nextKid();
+      const token = makeJwt(
+        { sub: 'u', iss: 'http://localhost:4000', exp: ts(3600) },
+        kid,
+        'none',
+      );
+      vi.stubGlobal('fetch', vi.fn());
+
+      expect(
+        await verifyJwt(token, baseOpts({ allowedAlgorithms: [] })),
+      ).toBeNull();
+      expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+    });
+
+    it('rejects alg "none" even when "none" is in the allowedAlgorithms list', async () => {
+      const kid = nextKid();
+      const token = makeJwt(
+        { sub: 'u', iss: 'http://localhost:4000', exp: ts(3600) },
+        kid,
+        'none',
+      );
+      vi.stubGlobal('fetch', vi.fn());
+
+      expect(
+        await verifyJwt(
+          token,
+          baseOpts({ allowedAlgorithms: ['none', 'RS256'] }),
+        ),
+      ).toBeNull();
+      expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+    });
   });
 
   describe('typ validation', () => {

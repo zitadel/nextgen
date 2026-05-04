@@ -500,6 +500,12 @@ export async function verifyJwt(
     if (!alg) {
       return null;
     }
+    // Unconditionally reject the 'none' algorithm regardless of the allowlist.
+    // 'none' means the token is unsigned; accepting it would allow anyone to
+    // forge arbitrary claims without a key.
+    if (alg === 'none') {
+      return null;
+    }
     if (allowedAlgorithms?.length && !allowedAlgorithms.includes(alg)) {
       return null;
     }
