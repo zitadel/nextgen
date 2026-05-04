@@ -37,22 +37,33 @@ post:
         application/json:
           schema:
             $ref: ../../../../components/error-details.yaml
+          example:
+            code: att.invalid_request
+            message: invalid request
     '404':
       description: Attempt not found
       content:
         application/json:
           schema:
             $ref: ../../../../components/error-details.yaml
+          example:
+            code: att.not_found
+            message: auth attempt not found
     '409':
       description: Attempt not in completed state (missing required factors)
       content:
         application/json:
           schema:
             $ref: ../../../../components/error-details.yaml
+          example:
+            code: att.not_completed
+            message: attempt not in completed state
     default:
       description: Unexpected error
       content:
         application/json:
           schema:
             $ref: ../../../../components/error-details.yaml
-
+          example:
+            code: internal
+            message: an unexpected error occurred

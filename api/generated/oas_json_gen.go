@@ -1973,6 +1973,64 @@ func (s *DeviceAuthorizationResponse) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes ErrorCode as json.
+func (s ErrorCode) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes ErrorCode from json.
+func (s *ErrorCode) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ErrorCode to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch ErrorCode(v) {
+	case ErrorCodeAttAlreadyCompleted:
+		*s = ErrorCodeAttAlreadyCompleted
+	case ErrorCodeAttInvalidProof:
+		*s = ErrorCodeAttInvalidProof
+	case ErrorCodeAttInvalidRequest:
+		*s = ErrorCodeAttInvalidRequest
+	case ErrorCodeAttInvalidState:
+		*s = ErrorCodeAttInvalidState
+	case ErrorCodeAttNotCompleted:
+		*s = ErrorCodeAttNotCompleted
+	case ErrorCodeAttNotFound:
+		*s = ErrorCodeAttNotFound
+	case ErrorCodeAttProofRejected:
+		*s = ErrorCodeAttProofRejected
+	case ErrorCodeAuthRateLimited:
+		*s = ErrorCodeAuthRateLimited
+	case ErrorCodeAuthUnauthorized:
+		*s = ErrorCodeAuthUnauthorized
+	case ErrorCodeInternal:
+		*s = ErrorCodeInternal
+	case ErrorCodeReqInvalid:
+		*s = ErrorCodeReqInvalid
+	default:
+		*s = ErrorCode(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s ErrorCode) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ErrorCode) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode implements json.Marshaler.
 func (s *ErrorDetails) Encode(e *jx.Encoder) {
 	e.ObjStart()
@@ -1984,7 +2042,7 @@ func (s *ErrorDetails) Encode(e *jx.Encoder) {
 func (s *ErrorDetails) encodeFields(e *jx.Encoder) {
 	{
 		e.FieldStart("code")
-		e.Str(s.Code)
+		s.Code.Encode(e)
 	}
 	{
 		e.FieldStart("message")
@@ -2016,9 +2074,7 @@ func (s *ErrorDetails) Decode(d *jx.Decoder) error {
 		case "code":
 			requiredBitSet[0] |= 1 << 0
 			if err := func() error {
-				v, err := d.Str()
-				s.Code = string(v)
-				if err != nil {
+				if err := s.Code.Decode(d); err != nil {
 					return err
 				}
 				return nil
@@ -11166,6 +11222,44 @@ func (s *VerifyChallengeProofBadRequest) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes VerifyChallengeProofConflict as json.
+func (s *VerifyChallengeProofConflict) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes VerifyChallengeProofConflict from json.
+func (s *VerifyChallengeProofConflict) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode VerifyChallengeProofConflict to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = VerifyChallengeProofConflict(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *VerifyChallengeProofConflict) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *VerifyChallengeProofConflict) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes VerifyChallengeProofNotFound as json.
 func (s *VerifyChallengeProofNotFound) Encode(e *jx.Encoder) {
 	unwrapped := (*ErrorDetails)(s)
@@ -11238,44 +11332,6 @@ func (s *VerifyChallengeProofTooManyRequests) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *VerifyChallengeProofTooManyRequests) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes VerifyChallengeProofUnauthorized as json.
-func (s *VerifyChallengeProofUnauthorized) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorDetails)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes VerifyChallengeProofUnauthorized from json.
-func (s *VerifyChallengeProofUnauthorized) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode VerifyChallengeProofUnauthorized to nil")
-	}
-	var unwrapped ErrorDetails
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = VerifyChallengeProofUnauthorized(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *VerifyChallengeProofUnauthorized) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *VerifyChallengeProofUnauthorized) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }

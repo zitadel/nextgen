@@ -29,10 +29,15 @@ get:
         application/json:
           schema:
             $ref: ../../../components/error-details.yaml
+          example:
+            code: att.not_found
+            message: auth attempt not found
     default:
       description: Unexpected error
       content:
         application/json:
           schema:
             $ref: ../../../components/error-details.yaml
-
+          example:
+            code: internal
+            message: an unexpected error occurred

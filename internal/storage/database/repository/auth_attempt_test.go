@@ -308,15 +308,12 @@ func TestAuthAttempt_GetByID(t *testing.T) {
 		assert.True(t, ok)
 	})
 
-	t.Run("missing attempt returns empty aggregate", func(t *testing.T) {
+	t.Run("missing attempt returns not found error", func(t *testing.T) {
 		tx, rollback := transactionForRollback(t)
 		defer rollback()
 
-		stored, err := repo.GetByID(t.Context(), tx, "project-missing", "attempt-missing")
-		require.NoError(t, err)
-		assert.Empty(t, stored.ID)
-		assert.Empty(t, stored.ProjectID)
-		assert.Empty(t, stored.Checks)
+		_, err := repo.GetByID(t.Context(), tx, "project-missing", "attempt-missing")
+		assert.ErrorIs(t, err, domain.ErrAuthAttemptNotFound())
 	})
 }
 
@@ -387,9 +384,8 @@ func TestAuthAttempt_Delete(t *testing.T) {
 
 		require.NoError(t, repo.Delete(t.Context(), tx, attempt.ProjectID, attempt.ID))
 
-		stored, err := repo.GetByID(t.Context(), tx, attempt.ProjectID, attempt.ID)
-		require.NoError(t, err)
-		assert.Empty(t, stored.ID)
+		_, err := repo.GetByID(t.Context(), tx, attempt.ProjectID, attempt.ID)
+		assert.ErrorIs(t, err, domain.ErrAuthAttemptNotFound())
 	})
 
 	t.Run("non-existent attempt is a no-op", func(t *testing.T) {

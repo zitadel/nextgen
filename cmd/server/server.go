@@ -40,7 +40,11 @@ func NewCommand() *cobra.Command {
 				return err
 			}
 
-			server, err := api.NewServer(internal_api.NewHandler(pool), internal_api.NewSecurityHandler())
+			server, err := api.NewServer(
+				internal_api.NewHandler(pool),
+				internal_api.NewSecurityHandler(),
+				api.WithErrorHandler(internal_api.OgenErrorHandler),
+			)
 			if err != nil {
 				return err
 			}

@@ -322,6 +322,14 @@ func (s ChallengeResponseState) Validate() error {
 	}
 }
 
+func (s *CreateAuthAttemptBadRequest) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s *CreateAuthAttemptRequest) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -359,6 +367,14 @@ func (s *CreateAuthAttemptRequest) Validate() error {
 	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *CreateAuthAttemptUnauthorized) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
 	}
 	return nil
 }
@@ -465,6 +481,30 @@ func (s CreateFlowRequestPurpose) Validate() error {
 	}
 }
 
+func (s *CreateHandoffBadRequest) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *CreateHandoffConflict) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *CreateHandoffNotFound) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s *CreateSessionRequest) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -484,6 +524,105 @@ func (s *CreateSessionRequest) Validate() error {
 	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s ErrorCode) Validate() error {
+	switch s {
+	case "att.already_completed":
+		return nil
+	case "att.invalid_proof":
+		return nil
+	case "att.invalid_request":
+		return nil
+	case "att.invalid_state":
+		return nil
+	case "att.not_completed":
+		return nil
+	case "att.not_found":
+		return nil
+	case "att.proof_rejected":
+		return nil
+	case "auth.rate_limited":
+		return nil
+	case "auth.unauthorized":
+		return nil
+	case "internal":
+		return nil
+	case "req.invalid":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
+func (s *ErrorDetails) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Code.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "code",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *ErrorDetailsStatusCode) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *ExchangeHandoffBadRequest) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *ExchangeHandoffGone) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *ExchangeHandoffUnauthorized) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
 	}
 	return nil
 }
@@ -834,6 +973,38 @@ func (s GateType) Validate() error {
 	}
 }
 
+func (s *GetFlowStepGone) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *GetFlowStepNotFound) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *GetSessionNotFound) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *GetSessionUnauthorized) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s *GetUserInfoOK) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -872,6 +1043,30 @@ func (s *GetUserInfoOK) Validate() error {
 	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *IssueChallengeBadRequest) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *IssueChallengeConflict) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *IssueChallengeNotFound) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
 	}
 	return nil
 }
@@ -960,6 +1155,22 @@ func (s IssueChallengeRequestPasskeyOptionsUserVerification) Validate() error {
 	}
 }
 
+func (s *ListSessionsBadRequest) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *ListSessionsForbidden) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s ListSessionsState) Validate() error {
 	switch s {
 	case "building":
@@ -973,6 +1184,30 @@ func (s ListSessionsState) Validate() error {
 	default:
 		return errors.Errorf("invalid value: %v", s)
 	}
+}
+
+func (s *ListSessionsUnauthorized) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *ListUsersBadRequest) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *ListUsersInternalServerError) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (s ListUsersOKApplicationJSON) Validate() error {
@@ -1297,6 +1532,30 @@ func (s ProjectID) Validate() error {
 	return nil
 }
 
+func (s *RevokeSessionConflict) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *RevokeSessionNotFound) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *RevokeSessionUnauthorized) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s SessionID) Validate() error {
 	alias := (string)(s)
 	if err := (validate.String{
@@ -1559,6 +1818,38 @@ func (s UserID) Validate() error {
 		MaxNumericSet: false,
 	}).Validate(string(alias)); err != nil {
 		return errors.Wrap(err, "string")
+	}
+	return nil
+}
+
+func (s *VerifyChallengeProofBadRequest) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *VerifyChallengeProofConflict) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *VerifyChallengeProofNotFound) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *VerifyChallengeProofTooManyRequests) Validate() error {
+	alias := (*ErrorDetails)(s)
+	if err := alias.Validate(); err != nil {
+		return err
 	}
 	return nil
 }

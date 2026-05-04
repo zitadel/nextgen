@@ -8,9 +8,33 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-var (
-	ErrAuthAttemptNotFound = newError("att.not_found", "auth attempt not found", nil, nil)
-)
+func ErrAuthAttemptNotFound() Error {
+	return newError("att.not_found", "auth attempt not found", nil, nil)
+}
+
+func ErrAuthAttemptInvalidRequest() Error {
+	return newError("att.invalid_request", "invalid request", nil, nil)
+}
+
+func ErrAuthAttemptInvalidState() Error {
+	return newError("att.invalid_state", "invalid attempt state", nil, nil)
+}
+
+func ErrAuthAttemptAlreadyCompleted() Error {
+	return newError("att.already_completed", "attempt already completed", nil, nil)
+}
+
+func ErrAuthAttemptNotCompleted() Error {
+	return newError("att.not_completed", "attempt not in completed state", nil, nil)
+}
+
+func ErrAuthAttemptInvalidProof() Error {
+	return newError("att.invalid_proof", "invalid proof or request", nil, nil)
+}
+
+func ErrAuthAttemptProofRejected() Error {
+	return newError("att.proof_rejected", "proof rejected", nil, nil)
+}
 
 // AuthAttempt represents the object defined [here](https://github.com/zitadel/nextgen/blob/15bd7f438d709fcd5205a163e24374f6f667b68f/docs/design/api/resource-map.md#auth-flows)
 // It is short lived and should therefore be stored near the client, do not store PII data in it.

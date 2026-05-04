@@ -34,22 +34,33 @@ post:
         application/json:
           schema:
             $ref: ../../../../components/error-details.yaml
+          example:
+            code: att.invalid_state
+            message: invalid attempt state
     '404':
       description: Attempt not found
       content:
         application/json:
           schema:
             $ref: ../../../../components/error-details.yaml
+          example:
+            code: att.not_found
+            message: auth attempt not found
     '409':
       description: Attempt in invalid state for issuing challenges (e.g., already completed)
       content:
         application/json:
           schema:
             $ref: ../../../../components/error-details.yaml
+          example:
+            code: att.already_completed
+            message: attempt already completed
     default:
       description: Unexpected error
       content:
         application/json:
           schema:
             $ref: ../../../../components/error-details.yaml
-
+          example:
+            code: internal
+            message: an unexpected error occurred

@@ -1,5 +1,7 @@
 package domain
 
+//go:generate go run ./cmd/gen_error_codes ../../api/openapi/components/schemas/error-code.yaml
+
 import (
 	"errors"
 	"fmt"
@@ -16,6 +18,9 @@ type Error struct {
 }
 
 func (e Error) Error() string {
+	if e.Parent != nil {
+		return e.Message + ": " + e.Parent.Error()
+	}
 	return e.Message
 }
 
@@ -45,4 +50,9 @@ func newError(code string, message string, details any, parent error) Error {
 		Parent:   parent,
 		Location: fmt.Sprintf("%s:%d", filepath.Base(file), line),
 	}
+}
+
+// ErrInternal is the catch-all for unexpected errors that have no specific domain code.
+func ErrInternal() Error {
+	return newError("internal", "an unexpected error occurred", nil, nil)
 }

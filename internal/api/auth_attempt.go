@@ -34,16 +34,10 @@ func (h *Handler) GetAuthAttempt(ctx context.Context, params api.GetAuthAttemptP
 	scopeCtx, _ := GetScopeContext(ctx)
 	attempt, err := repo.GetByID(ctx, h.pool, scopeCtx.ProjectID, string(params.AttemptID))
 	if err != nil {
-		if errors.Is(err, domain.ErrAuthAttemptNotFound) {
-			return &api.ErrorDetailsStatusCode{
-				StatusCode: http.StatusNotFound,
-				Response: api.ErrorDetails{
-					Code:    err.Error(),
-					Message: err.Error(),
-				},
-			}, nil
+		if errors.Is(err, domain.ErrAuthAttemptNotFound()) {
+			return errorResponse(http.StatusNotFound, err), nil
 		}
-		return nil, err
+		return internalErrorResponse(err), nil
 	}
 	return authAttemptToAPI(attempt), nil
 }

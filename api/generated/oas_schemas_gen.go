@@ -913,11 +913,116 @@ type EndSessionNoContent struct{}
 
 func (*EndSessionNoContent) endSessionRes() {}
 
+// Stable machine-readable error code.
+// Ref: #
+type ErrorCode string
+
+const (
+	ErrorCodeAttAlreadyCompleted ErrorCode = "att.already_completed"
+	ErrorCodeAttInvalidProof     ErrorCode = "att.invalid_proof"
+	ErrorCodeAttInvalidRequest   ErrorCode = "att.invalid_request"
+	ErrorCodeAttInvalidState     ErrorCode = "att.invalid_state"
+	ErrorCodeAttNotCompleted     ErrorCode = "att.not_completed"
+	ErrorCodeAttNotFound         ErrorCode = "att.not_found"
+	ErrorCodeAttProofRejected    ErrorCode = "att.proof_rejected"
+	ErrorCodeAuthRateLimited     ErrorCode = "auth.rate_limited"
+	ErrorCodeAuthUnauthorized    ErrorCode = "auth.unauthorized"
+	ErrorCodeInternal            ErrorCode = "internal"
+	ErrorCodeReqInvalid          ErrorCode = "req.invalid"
+)
+
+// AllValues returns all ErrorCode values.
+func (ErrorCode) AllValues() []ErrorCode {
+	return []ErrorCode{
+		ErrorCodeAttAlreadyCompleted,
+		ErrorCodeAttInvalidProof,
+		ErrorCodeAttInvalidRequest,
+		ErrorCodeAttInvalidState,
+		ErrorCodeAttNotCompleted,
+		ErrorCodeAttNotFound,
+		ErrorCodeAttProofRejected,
+		ErrorCodeAuthRateLimited,
+		ErrorCodeAuthUnauthorized,
+		ErrorCodeInternal,
+		ErrorCodeReqInvalid,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ErrorCode) MarshalText() ([]byte, error) {
+	switch s {
+	case ErrorCodeAttAlreadyCompleted:
+		return []byte(s), nil
+	case ErrorCodeAttInvalidProof:
+		return []byte(s), nil
+	case ErrorCodeAttInvalidRequest:
+		return []byte(s), nil
+	case ErrorCodeAttInvalidState:
+		return []byte(s), nil
+	case ErrorCodeAttNotCompleted:
+		return []byte(s), nil
+	case ErrorCodeAttNotFound:
+		return []byte(s), nil
+	case ErrorCodeAttProofRejected:
+		return []byte(s), nil
+	case ErrorCodeAuthRateLimited:
+		return []byte(s), nil
+	case ErrorCodeAuthUnauthorized:
+		return []byte(s), nil
+	case ErrorCodeInternal:
+		return []byte(s), nil
+	case ErrorCodeReqInvalid:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ErrorCode) UnmarshalText(data []byte) error {
+	switch ErrorCode(data) {
+	case ErrorCodeAttAlreadyCompleted:
+		*s = ErrorCodeAttAlreadyCompleted
+		return nil
+	case ErrorCodeAttInvalidProof:
+		*s = ErrorCodeAttInvalidProof
+		return nil
+	case ErrorCodeAttInvalidRequest:
+		*s = ErrorCodeAttInvalidRequest
+		return nil
+	case ErrorCodeAttInvalidState:
+		*s = ErrorCodeAttInvalidState
+		return nil
+	case ErrorCodeAttNotCompleted:
+		*s = ErrorCodeAttNotCompleted
+		return nil
+	case ErrorCodeAttNotFound:
+		*s = ErrorCodeAttNotFound
+		return nil
+	case ErrorCodeAttProofRejected:
+		*s = ErrorCodeAttProofRejected
+		return nil
+	case ErrorCodeAuthRateLimited:
+		*s = ErrorCodeAuthRateLimited
+		return nil
+	case ErrorCodeAuthUnauthorized:
+		*s = ErrorCodeAuthUnauthorized
+		return nil
+	case ErrorCodeInternal:
+		*s = ErrorCodeInternal
+		return nil
+	case ErrorCodeReqInvalid:
+		*s = ErrorCodeReqInvalid
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 // Standard error payload returned for failed API requests.
 // Ref: #
 type ErrorDetails struct {
-	// Stable machine-readable error code.
-	Code string `json:"code"`
+	Code ErrorCode `json:"code"`
 	// Human-readable explanation of the error.
 	Message string `json:"message"`
 	// Additional error-specific context.
@@ -925,7 +1030,7 @@ type ErrorDetails struct {
 }
 
 // GetCode returns the value of Code.
-func (s *ErrorDetails) GetCode() string {
+func (s *ErrorDetails) GetCode() ErrorCode {
 	return s.Code
 }
 
@@ -940,7 +1045,7 @@ func (s *ErrorDetails) GetDetails() OptErrorDetailsDetails {
 }
 
 // SetCode sets the value of Code.
-func (s *ErrorDetails) SetCode(val string) {
+func (s *ErrorDetails) SetCode(val ErrorCode) {
 	s.Code = val
 }
 
@@ -6212,6 +6317,10 @@ type VerifyChallengeProofBadRequest ErrorDetails
 
 func (*VerifyChallengeProofBadRequest) verifyChallengeProofRes() {}
 
+type VerifyChallengeProofConflict ErrorDetails
+
+func (*VerifyChallengeProofConflict) verifyChallengeProofRes() {}
+
 type VerifyChallengeProofNotFound ErrorDetails
 
 func (*VerifyChallengeProofNotFound) verifyChallengeProofRes() {}
@@ -6219,10 +6328,6 @@ func (*VerifyChallengeProofNotFound) verifyChallengeProofRes() {}
 type VerifyChallengeProofTooManyRequests ErrorDetails
 
 func (*VerifyChallengeProofTooManyRequests) verifyChallengeProofRes() {}
-
-type VerifyChallengeProofUnauthorized ErrorDetails
-
-func (*VerifyChallengeProofUnauthorized) verifyChallengeProofRes() {}
 
 // Proof for verifying a factor challenge.
 // The exact format depends on the challenge method. The proof object should contain
