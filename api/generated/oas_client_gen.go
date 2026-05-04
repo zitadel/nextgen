@@ -235,7 +235,7 @@ type Invoker interface {
 	// Does not advance the state machine. Used for risk evaluation.
 	//
 	// POST /flow/{id}/event
-	SubmitFlowEvent(ctx context.Context, request *FlowEventRequest, params SubmitFlowEventParams) error
+	SubmitFlowEvent(ctx context.Context, request *FlowEventRequest, params SubmitFlowEventParams) (SubmitFlowEventRes, error)
 	// SubmitFlowStep invokes submitFlowStep operation.
 	//
 	// Submits user input for the current step. The server validates,
@@ -3476,12 +3476,12 @@ func (c *Client) sendRevokeToken(ctx context.Context, request *RevokeRequest) (r
 // Does not advance the state machine. Used for risk evaluation.
 //
 // POST /flow/{id}/event
-func (c *Client) SubmitFlowEvent(ctx context.Context, request *FlowEventRequest, params SubmitFlowEventParams) error {
-	_, err := c.sendSubmitFlowEvent(ctx, request, params)
-	return err
+func (c *Client) SubmitFlowEvent(ctx context.Context, request *FlowEventRequest, params SubmitFlowEventParams) (SubmitFlowEventRes, error) {
+	res, err := c.sendSubmitFlowEvent(ctx, request, params)
+	return res, err
 }
 
-func (c *Client) sendSubmitFlowEvent(ctx context.Context, request *FlowEventRequest, params SubmitFlowEventParams) (res *SubmitFlowEventNoContent, err error) {
+func (c *Client) sendSubmitFlowEvent(ctx context.Context, request *FlowEventRequest, params SubmitFlowEventParams) (res SubmitFlowEventRes, err error) {
 	// Validate request before sending.
 	if err := func() error {
 		if err := request.Validate(); err != nil {

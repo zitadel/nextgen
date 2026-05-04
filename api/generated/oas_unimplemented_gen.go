@@ -292,8 +292,8 @@ func (UnimplementedHandler) RevokeToken(ctx context.Context, req *RevokeRequest)
 // Does not advance the state machine. Used for risk evaluation.
 //
 // POST /flow/{id}/event
-func (UnimplementedHandler) SubmitFlowEvent(ctx context.Context, req *FlowEventRequest, params SubmitFlowEventParams) error {
-	return ht.ErrNotImplemented
+func (UnimplementedHandler) SubmitFlowEvent(ctx context.Context, req *FlowEventRequest, params SubmitFlowEventParams) (r SubmitFlowEventRes, _ error) {
+	return r, ht.ErrNotImplemented
 }
 
 // SubmitFlowStep implements submitFlowStep operation.
@@ -339,4 +339,12 @@ func (UnimplementedHandler) SubmitFlowStep(ctx context.Context, req *FlowSubmitR
 // POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify
 func (UnimplementedHandler) VerifyChallengeProof(ctx context.Context, req *VerifyChallengeRequest, params VerifyChallengeProofParams) (r VerifyChallengeProofRes, _ error) {
 	return r, ht.ErrNotImplemented
+}
+
+// NewError creates *ErrorDetailsStatusCode from error returned by handler.
+//
+// Used for common default response.
+func (UnimplementedHandler) NewError(ctx context.Context, err error) (r *ErrorDetailsStatusCode) {
+	r = new(ErrorDetailsStatusCode)
+	return r
 }
