@@ -42,9 +42,7 @@ const HOP_BY_HOP: ReadonlySet<string> = new Set([
  * These headers carry session data between the middleware and server components;
  * forwarding them upstream would expose internal state and allow header injection.
  */
-const INTERNAL_HEADERS: ReadonlySet<string> = new Set([
-  'x-nextgen-auth-token',
-]);
+const INTERNAL_HEADERS: ReadonlySet<string> = new Set(['x-nextgen-auth-token']);
 
 /**
  * Returns `true` when `pathname` matches at least one entry in `routes`.

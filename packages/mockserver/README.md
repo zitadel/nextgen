@@ -18,7 +18,7 @@ PORT=5000 pnpm --filter @nextgen/mockserver start
 
 Configure the SDK middleware to point at it:
 
-```
+```bash
 NEXTGEN_ISSUER_URL=http://localhost:4000
 ```
 
