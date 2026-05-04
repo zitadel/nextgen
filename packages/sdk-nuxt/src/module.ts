@@ -32,7 +32,7 @@ export default defineNuxtModule<NextgenMiddlewareOptions>({
     addPlugin(resolve('./runtime/plugin'));
     addServerHandler({
       middleware: true,
-      handler: resolve('./runtime/server/middleware'),
+      handler: resolve('./runtime/server/handler'),
     });
     addImportsDir(resolve('./runtime/composables'));
   },

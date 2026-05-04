@@ -1,6 +1,6 @@
 import { useState } from '#imports';
 
-import type { AuthResult } from '../types';
+import type { ClientAuthResult } from '../types';
 
 /**
  * Returns the current auth state in a Nuxt page or component.
@@ -8,6 +8,10 @@ import type { AuthResult } from '../types';
  * The state is seeded server-side by the Nextgen plugin and hydrated on the
  * client automatically. No additional setup is required beyond registering
  * the middleware.
+ *
+ * The returned {@link ClientAuthResult} intentionally omits the raw JWT —
+ * use {@link getAuth} in a server route or middleware when the token is
+ * needed to call upstream APIs.
  *
  * ```vue
  * <script setup lang="ts">
@@ -19,10 +23,10 @@ import type { AuthResult } from '../types';
  * </template>
  * ```
  *
- * @returns The current {@link AuthResult}.
+ * @returns The current {@link ClientAuthResult}.
  */
-export const useAuth = (): AuthResult =>
-  useState<AuthResult>('nextgen-auth', () => ({
+export const useAuth = (): ClientAuthResult =>
+  useState<ClientAuthResult>('nextgen-auth', () => ({
     isAuthenticated: false,
     session: null,
   })).value;

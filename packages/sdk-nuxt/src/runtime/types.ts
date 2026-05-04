@@ -1,5 +1,8 @@
 /**
  * The authenticated session for a signed-in user.
+ * Returned by {@link getAuth} in server-side code (e.g. API routes, server
+ * middleware). Includes the raw JWT so server components can forward it to
+ * upstream services. Never serialised into the Nuxt SSR payload.
  */
 export type NextgenSession = {
   /** The user's unique identifier (`sub` claim). */
@@ -8,7 +11,7 @@ export type NextgenSession = {
   email: string | null;
   /** The user's display name, or `null` if not present in the token. */
   name: string | null;
-  /** The raw verified JWT. */
+  /** The raw verified JWT. Server-side only — not sent to the browser. */
   token: string;
 };
 
@@ -18,8 +21,33 @@ export type AuthState = { isAuthenticated: true; session: NextgenSession };
 /** Auth state when the user is not signed in. */
 export type UnauthState = { isAuthenticated: false; session: null };
 
-/** Union of all possible auth states returned by {@link useAuth} and {@link getAuth}. */
+/** Union of all possible auth states returned by {@link getAuth}. */
 export type AuthResult = AuthState | UnauthState;
+
+/**
+ * The client-safe session exposed to Vue components via {@link useAuth}.
+ * Identical to {@link NextgenSession} but omits `token` — the raw JWT must
+ * not be serialised into the Nuxt SSR payload where third-party scripts can
+ * read it.
+ */
+export type ClientSession = {
+  /** The user's unique identifier (`sub` claim). */
+  userId: string;
+  /** The user's email address, or `null` if not present in the token. */
+  email: string | null;
+  /** The user's display name, or `null` if not present in the token. */
+  name: string | null;
+};
+
+/** Client-safe auth state when the user is signed in. */
+export type ClientAuthState = { isAuthenticated: true; session: ClientSession };
+
+/**
+ * Union of all possible auth states returned by {@link useAuth}.
+ * Token is intentionally absent — use {@link getAuth} server-side when the
+ * raw JWT is needed.
+ */
+export type ClientAuthResult = ClientAuthState | UnauthState;
 
 /**
  * Options passed to {@link createNextgenMiddleware} or the Nuxt module config.

@@ -14,7 +14,7 @@
 
 <script setup lang="ts">
 import "@nextgen/ui-lit";
-import type { AuthResult } from "@nextgen/sdk-nuxt";
+import type { ClientAuthResult } from "@nextgen/sdk-nuxt";
 
-const auth = useState<AuthResult>("nextgen-auth");
+const auth = useState<ClientAuthResult>("nextgen-auth");
 </script>

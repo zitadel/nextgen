@@ -1,7 +1,25 @@
 import { defineNuxtPlugin, useRequestEvent, useState } from "#imports";
+import type { ClientAuthResult } from "@nextgen/sdk-nuxt";
 
 export default defineNuxtPlugin(() => {
   const event = useRequestEvent();
-  const auth = event?.context.nextgenAuth ?? { isAuthenticated: false as const, session: null };
-  useState("nextgen-auth", () => auth);
+  const auth = event?.context.nextgenAuth ?? {
+    isAuthenticated: false as const,
+    session: null,
+  };
+
+  // Strip the raw JWT before seeding useState — it must not appear in the
+  // Nuxt SSR payload where client-side scripts could read it.
+  const clientAuth: ClientAuthResult = auth.isAuthenticated
+    ? {
+        isAuthenticated: true,
+        session: {
+          userId: auth.session.userId,
+          email: auth.session.email,
+          name: auth.session.name,
+        },
+      }
+    : { isAuthenticated: false, session: null };
+
+  useState<ClientAuthResult>("nextgen-auth", () => clientAuth);
 });
