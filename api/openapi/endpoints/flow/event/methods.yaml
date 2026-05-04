@@ -18,3 +18,9 @@ post:
   responses:
     '204':
       description: Event recorded.
+    default:
+      description: Unexpected error response.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
