@@ -384,9 +384,8 @@ describe('createNextgenMiddleware (H3)', () => {
     );
 
     expect(res.status).not.toBe(302);
-    expect(
-      (capturedAuth as { isAuthenticated: boolean }).isAuthenticated,
-    ).toBe(true);
+    const auth = capturedAuth as { isAuthenticated: boolean };
+    expect(auth.isAuthenticated).toBe(true);
   });
 
   it('redirect preserves existing query params in loginPath', async () => {
