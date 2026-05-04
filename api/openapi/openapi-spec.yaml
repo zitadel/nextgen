@@ -66,6 +66,10 @@ paths:
     $ref: endpoints/sessions/exchange/methods.yaml
   /sessions/{session_id}:
     $ref: endpoints/sessions/by_id/methods.yaml
+  /users:
+    $ref: endpoints/users/methods.yaml
+  /users/{user_id}:
+    $ref: endpoints/users/by_id/methods.yaml
 
 components:
   securitySchemes:

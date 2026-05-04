@@ -1,0 +1,104 @@
+put:
+  operationId: updateUser
+  summary: Update user
+  tags:
+    - User
+  parameters:
+    - $ref: ../../../components/parameters/user-id.yaml
+  security:
+    - oauth2:
+        - users.write
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          # TODO: create an actual schema for this request once the user-schema endpoints are done.
+          type: object
+          description: |
+            Request to update a user. The content of this request is determined 
+            by the configured schema for users.
+  responses:
+    '200':
+      description: The user was updated successfully
+    '400':
+      description: The provided input was not valid
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '403':
+      description: You do not have permission to update this user.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '404':
+      description: No user exists with the provided ID.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    default:
+      description: Unexpected error response.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+
+get:
+  operationId: getUser
+  summary: Get user details
+  tags:
+    - User
+  parameters:
+    - $ref: ../../../components/parameters/user-id.yaml
+  security:
+    - oauth2:
+        - users.read
+  responses:
+    '200':
+      description: |
+        The user was found and returned. The content of this response is 
+        determined by the configured schema for users.
+      content:
+        application/json:
+          schema:
+            # TODO: create an actual schema for this request once the user-schema endpoints are done.
+            type: object
+    '400':
+      description: The provided input was not valid
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '403':
+      description: You do not have permission to view this user.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '404':
+      description: No user exists with the provided ID.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    default:
+      description: Unexpected error response.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml

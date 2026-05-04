@@ -1,32 +1,80 @@
 get:
   operationId: listUsers
   summary: List users
-  # TODO: migrate pagination from offset/limit to cursor-based (page_token / next_page_token)
-  #       following the pattern used in GET /sessions. offset.yaml should be removed
-  #       and replaced with components/parameters/page-token.yaml.
   tags:
     - User
   parameters:
-    - $ref: ../../components/parameters/offset.yaml
     - $ref: ../../components/parameters/limit.yaml
+    - $ref: ../../components/parameters/page-token.yaml
   security:
     - oauth2:
-        - openid
+        - users.read
   responses:
     '200':
-      description: A list of users was returned
+      description: |
+        A list of users was returned. The content of this response is 
+        determined by the configured schema for users.
       content:
         application/json:
           schema:
-            type: array
+            $ref: user-list-response.yaml
     '400':
       description: The provided input was not valid
       content:
         application/json:
           schema:
             $ref: ../../components/error-details.yaml
-    '500':
-      description: Something went wrong on the server. This was not your fault.
+    default:
+      description: Unexpected error response.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+
+post:
+  operationId: createUser
+  summary: Create user
+  tags:
+    - User
+  security:
+    - oauth2:
+        - openid
+        - users.write
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          # TODO: create an actual schema for this request once the user-schema endpoints are done.
+          description: |
+            Request to create a user. The content of this request is determined 
+            by the configured schema for users.
+  responses:
+    '201':
+      description: The user was created successfully
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+            description: |
+              The content of this response is determined by the configured 
+              schema for users.
+    '400':
+      description: The provided input was not valid
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '403':
+      description: You do not have permission to create a user.
       content:
         application/json:
           schema:
