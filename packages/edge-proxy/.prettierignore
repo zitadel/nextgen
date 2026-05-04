@@ -1,0 +1,16 @@
+node_modules
+/dist
+/build
+/out
+.git
+.devbox
+*.log
+/public
+/assets
+*.min.*
+*.map
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg

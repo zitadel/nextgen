@@ -1,0 +1,7 @@
+[build]
+  # Point at your SPA build output directory.
+  publish = "dist"
+
+[[edge_functions]]
+  function = "nextgen"
+  path = "/__nextgen/*"
