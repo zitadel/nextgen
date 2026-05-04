@@ -30,6 +30,30 @@ const HOP_BY_HOP: ReadonlySet<string> = new Set([
 const INTERNAL_HEADERS: ReadonlySet<string> = new Set(['x-nextgen-auth-token']);
 
 /**
+ * Adds the `Secure` flag to any cookie whose name starts with `__nextgen`.
+ *
+ * The edge proxy may terminate TLS — the upstream auth server cannot know
+ * whether the browser-facing connection is HTTPS. By adding `Secure` here we
+ * ensure that `__nextgen*` session cookies are never sent over plain HTTP,
+ * regardless of whether the upstream set the flag.
+ *
+ * Non-`__nextgen*` cookies are returned unchanged. We trust the upstream for
+ * `HttpOnly` and `SameSite`, which are set correctly by the auth server and
+ * do not depend on whether TLS is terminated at the edge.
+ */
+function upgradeSessionCookie(cookie: string): string {
+  const name = cookie.split('=')[0]?.trim() ?? '';
+  if (!name.startsWith('__nextgen')) {
+    return cookie;
+  }
+  // Case-insensitive check to avoid doubling an existing Secure flag.
+  if (/;\s*Secure\b/i.test(cookie)) {
+    return cookie;
+  }
+  return `${cookie}; Secure`;
+}
+
+/**
  * Returns `true` when `pathname` matches at least one entry in `routes`.
  *
  * An entry ending with `*` matches any path that starts with the prefix
@@ -65,6 +89,14 @@ function tunnelHeaders(
   extra: Readonly<Record<string, string>>,
 ): Headers {
   const headers = new Headers(req.headers);
+
+  // Security: strip any x-middleware-override-headers the client may have sent.
+  // Preserving the client value would allow an attacker to inject arbitrary
+  // header names into the Next.js override list, potentially bypassing the
+  // internal header-tunnelling safety checks. We always build this header from
+  // scratch using only the names we inject ourselves.
+  headers.delete('x-middleware-override-headers');
+
   const injectedNames = [];
 
   for (const [name, value] of Object.entries(extra)) {
@@ -73,12 +105,7 @@ function tunnelHeaders(
     injectedNames.push(name);
   }
 
-  const existing = headers.get('x-middleware-override-headers') ?? '';
-  const combined = existing
-    ? `${existing},${injectedNames.join(',')}`
-    : injectedNames.join(',');
-
-  headers.set('x-middleware-override-headers', combined);
+  headers.set('x-middleware-override-headers', injectedNames.join(','));
   return headers;
 }
 
@@ -125,6 +152,17 @@ export async function nextgenMiddleware(
     allowedTokenTypes = ['JWT', 'at+JWT'],
     jwksTimeoutMs,
   } = options;
+
+  // Guard against open-redirect: loginPath must be a relative path. An absolute
+  // URL (e.g. "https://evil.com/phish") or a protocol-relative URL
+  // (e.g. "//evil.com") would redirect the browser to an external host.
+  if (!loginPath.startsWith('/') || loginPath.startsWith('//')) {
+    throw new Error(
+      `[nextgen] loginPath must be a relative path starting with a single "/". ` +
+        `Received: "${loginPath}". Using an absolute or protocol-relative URL ` +
+        `would allow open-redirect attacks.`,
+    );
+  }
 
   const { pathname } = new URL(req.url);
 
@@ -182,12 +220,18 @@ async function proxyRequest(
     }
   }
 
-  if (!upstreamHeaders.has('x-forwarded-for')) {
-    const directIp =
-      (req as unknown as { ip?: string }).ip ?? req.headers.get('x-real-ip');
-    if (directIp) {
-      upstreamHeaders.set('x-forwarded-for', directIp);
-    }
+  // Always append the direct client IP to the X-Forwarded-For chain so the
+  // upstream auth server sees the full proxy path. We never skip this even when
+  // a chain is already present — a CDN or load balancer may have set XFF before
+  // the request reached this edge node, and our hop must still be recorded.
+  const directIp =
+    (req as unknown as { ip?: string }).ip ?? req.headers.get('x-real-ip');
+  if (directIp) {
+    const existingXff = upstreamHeaders.get('x-forwarded-for');
+    upstreamHeaders.set(
+      'x-forwarded-for',
+      existingXff ? `${existingXff}, ${directIp}` : directIp,
+    );
   }
 
   if (!upstreamHeaders.has('x-forwarded-host')) {
@@ -220,7 +264,7 @@ async function proxyRequest(
 
   const setCookies = upstream.headers.getSetCookie?.() ?? [];
   for (const cookie of setCookies) {
-    responseHeaders.append('set-cookie', cookie);
+    responseHeaders.append('set-cookie', upgradeSessionCookie(cookie));
   }
 
   return new Response(upstream.body, {

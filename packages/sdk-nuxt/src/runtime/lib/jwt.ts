@@ -251,6 +251,13 @@ export interface VerifyJwtOptions {
  *
  * Cache entries are immutable once written; the cache itself grows up to one
  * entry per distinct `(jwksUri, kid)` pair seen in the lifetime of the process.
+ *
+ * The cache is intentionally unbounded. In practice the number of distinct
+ * (jwksUri, kid) pairs is bounded by the number of key rotations during the
+ * process lifetime — typically a handful. A bounded LRU eviction policy could
+ * be added if memory growth becomes a concern for very long-lived processes
+ * with frequent key rotations, but is omitted here to keep the implementation
+ * dependency-free.
  */
 const jwksCache = new Map<string, JwksCacheEntry>();
 
@@ -534,6 +541,10 @@ export async function verifyJwt(
       return null;
     }
 
+    // Strict equality is intentional: the issuer URL must match exactly as
+    // configured. We deliberately do not normalise trailing slashes, case, or
+    // surrounding whitespace — any difference is either a misconfiguration or
+    // a token issued by a different server and must be rejected.
     if (payload.iss !== issuerUrl) {
       return null;
     }
@@ -558,8 +569,12 @@ export async function verifyJwt(
     }
 
     return payload;
-  } catch (err) {
-    if (err instanceof TypeError) throw err;
+  } catch {
+    // Any unexpected error (network failure, malformed JWKS, Web Crypto
+    // exception for an unsupported algorithm, …) is treated as a failed
+    // verification: return null rather than propagate. Callers never need to
+    // handle errors from verifyJwt — only null (invalid/missing token) or a
+    // non-null payload (verified token).
     return null;
   }
 }

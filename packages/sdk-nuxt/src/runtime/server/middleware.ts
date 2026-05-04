@@ -45,6 +45,30 @@ const HOP_BY_HOP: ReadonlySet<string> = new Set([
 const INTERNAL_HEADERS: ReadonlySet<string> = new Set(['x-nextgen-auth-token']);
 
 /**
+ * Adds the `Secure` flag to any cookie whose name starts with `__nextgen`.
+ *
+ * The proxy may terminate TLS — the upstream auth server cannot know whether
+ * the browser-facing connection is HTTPS. By adding `Secure` here we ensure
+ * that `__nextgen*` session cookies are never sent over plain HTTP, regardless
+ * of whether the upstream set the flag.
+ *
+ * Non-`__nextgen*` cookies are returned unchanged. We trust the upstream for
+ * `HttpOnly` and `SameSite`, which are set correctly by the auth server and
+ * do not depend on whether TLS is terminated at the edge.
+ */
+function upgradeSessionCookie(cookie: string): string {
+  const name = cookie.split('=')[0]?.trim() ?? '';
+  if (!name.startsWith('__nextgen')) {
+    return cookie;
+  }
+  // Case-insensitive check to avoid doubling an existing Secure flag.
+  if (/;\s*Secure\b/i.test(cookie)) {
+    return cookie;
+  }
+  return `${cookie}; Secure`;
+}
+
+/**
  * Returns `true` when `pathname` matches at least one entry in `routes`.
  *
  * An entry ending with `*` matches any path that starts with the prefix
@@ -96,13 +120,19 @@ function buildUpstreamHeaders(event: H3Event): Headers {
 
   const url = getRequestURL(event);
 
-  if (!headers.has('x-forwarded-for')) {
-    const socketIp = (
-      event.node.req.socket as { remoteAddress?: string } | undefined
-    )?.remoteAddress;
-    if (socketIp) {
-      headers.set('x-forwarded-for', socketIp);
-    }
+  // Always append the direct socket IP to the X-Forwarded-For chain so the
+  // upstream auth server sees the full proxy path. We never skip this even when
+  // a chain is already present — a load balancer may have set XFF before the
+  // request reached this Nitro server, and our hop must still be recorded.
+  const socketIp = (
+    event.node.req.socket as { remoteAddress?: string } | undefined
+  )?.remoteAddress;
+  if (socketIp) {
+    const existingXff = headers.get('x-forwarded-for');
+    headers.set(
+      'x-forwarded-for',
+      existingXff ? `${existingXff}, ${socketIp}` : socketIp,
+    );
   }
 
   if (!headers.has('x-forwarded-host')) {
@@ -150,6 +180,17 @@ export function createNextgenMiddleware(
     allowedTokenTypes = ['JWT', 'at+JWT'],
     jwksTimeoutMs,
   } = options;
+
+  // Guard against open-redirect: loginPath must be a relative path. An absolute
+  // URL (e.g. "https://evil.com/phish") or a protocol-relative URL
+  // (e.g. "//evil.com") would redirect the browser to an external host.
+  if (!loginPath.startsWith('/') || loginPath.startsWith('//')) {
+    throw new Error(
+      `[nextgen] loginPath must be a relative path starting with a single "/". ` +
+        `Received: "${loginPath}". Using an absolute or protocol-relative URL ` +
+        `would allow open-redirect attacks.`,
+    );
+  }
 
   return defineEventHandler(async (event: H3Event) => {
     const url = getRequestURL(event);
@@ -222,7 +263,7 @@ async function proxyRequest(
 
   const setCookieHeaders = upstream.headers.getSetCookie?.() ?? [];
   for (const cookie of setCookieHeaders) {
-    event.node.res.appendHeader('set-cookie', cookie);
+    event.node.res.appendHeader('set-cookie', upgradeSessionCookie(cookie));
   }
 
   return upstream.body;

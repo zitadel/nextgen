@@ -752,23 +752,25 @@ describe('verifyJwt', () => {
   });
 
   describe('algorithm support', () => {
-    it('throws TypeError for unsupported algorithm in token header', async () => {
+    it('returns null for unsupported algorithm in token header', async () => {
+      // PS256 is not in IMPORT_PARAMS/VERIFY_PARAMS; the TypeError thrown by
+      // assertSupportedAlgorithm is caught inside verifyJwt and returned as null
+      // so callers never need to handle errors — only null or a valid payload.
       const kid = nextKid();
       const token = makeJwt({ sub: 'u', exp: ts(3600) }, kid, 'PS256');
       vi.stubGlobal('fetch', mockJwks(kid));
 
-      await expect(verifyJwt(token, baseOpts())).rejects.toThrow(TypeError);
-      await expect(verifyJwt(token, baseOpts())).rejects.toThrow(
-        /unsupported.*algorithm/i,
-      );
+      expect(await verifyJwt(token, baseOpts())).toBeNull();
     });
 
-    it('throws TypeError for HS256 (symmetric — no public key support)', async () => {
+    it('returns null for HS256 (symmetric — no public key support)', async () => {
+      // HS256 is not in IMPORT_PARAMS/VERIFY_PARAMS; same catch-and-return-null
+      // path as for any other unsupported algorithm.
       const kid = nextKid();
       const token = makeJwt({ sub: 'u', exp: ts(3600) }, kid, 'HS256');
       vi.stubGlobal('fetch', mockJwks(kid));
 
-      await expect(verifyJwt(token, baseOpts())).rejects.toThrow(TypeError);
+      expect(await verifyJwt(token, baseOpts())).toBeNull();
     });
   });
 });

@@ -402,4 +402,215 @@ describe('createNextgenMiddleware (H3)', () => {
     expect(res.status).toBe(302);
     expect(vi.mocked(fetch)).not.toHaveBeenCalled();
   });
+
+  describe('proxy: Cookie Secure upgrade (C-3)', () => {
+    it('adds Secure flag to __nextgen* cookies from upstream', async () => {
+      const upstreamHeaders = new Headers();
+      upstreamHeaders.set('content-type', 'application/json');
+      upstreamHeaders.append(
+        'set-cookie',
+        '__nextgen_session=abc; HttpOnly; SameSite=Lax',
+      );
+      vi.stubGlobal(
+        'fetch',
+        vi
+          .fn()
+          .mockResolvedValue(
+            new Response('{}', { status: 200, headers: upstreamHeaders }),
+          ),
+      );
+
+      const app = createApp();
+      app.use(createNextgenMiddleware({ issuerUrl: 'http://localhost:4000' }));
+
+      const handler = toWebHandler(app);
+      const res = await handler(
+        makeWebRequest('http://localhost:3000/__nextgen/v1/flow'),
+      );
+
+      const setCookie = res.headers.get('set-cookie') ?? '';
+      expect(setCookie).toContain('__nextgen_session=abc');
+      expect(setCookie).toMatch(/;\s*Secure\b/i);
+    });
+
+    it('does not add Secure to non-__nextgen cookies from upstream', async () => {
+      const upstreamHeaders = new Headers();
+      upstreamHeaders.append('set-cookie', 'vendor_session=xyz; HttpOnly');
+      vi.stubGlobal(
+        'fetch',
+        vi
+          .fn()
+          .mockResolvedValue(
+            new Response('{}', { status: 200, headers: upstreamHeaders }),
+          ),
+      );
+
+      const app = createApp();
+      app.use(createNextgenMiddleware({ issuerUrl: 'http://localhost:4000' }));
+
+      const handler = toWebHandler(app);
+      const res = await handler(
+        makeWebRequest('http://localhost:3000/__nextgen/v1/flow'),
+      );
+
+      const setCookie = res.headers.get('set-cookie') ?? '';
+      expect(setCookie).toContain('vendor_session=xyz');
+      expect(setCookie).not.toMatch(/;\s*Secure\b/i);
+    });
+
+    it('does not duplicate Secure when upstream already sets it on __nextgen* cookies', async () => {
+      const upstreamHeaders = new Headers();
+      upstreamHeaders.append(
+        'set-cookie',
+        '__nextgen_session=abc; HttpOnly; Secure; SameSite=Lax',
+      );
+      vi.stubGlobal(
+        'fetch',
+        vi
+          .fn()
+          .mockResolvedValue(
+            new Response('{}', { status: 200, headers: upstreamHeaders }),
+          ),
+      );
+
+      const app = createApp();
+      app.use(createNextgenMiddleware({ issuerUrl: 'http://localhost:4000' }));
+
+      const handler = toWebHandler(app);
+      const res = await handler(
+        makeWebRequest('http://localhost:3000/__nextgen/v1/flow'),
+      );
+
+      const setCookie = res.headers.get('set-cookie') ?? '';
+      expect(setCookie).toContain('__nextgen_session=abc');
+      const secureCount = (setCookie.match(/;\s*Secure\b/gi) ?? []).length;
+      expect(secureCount).toBe(1);
+    });
+  });
+
+  describe('loginPath validation (P-3)', () => {
+    it('throws synchronously when loginPath is an absolute URL', () => {
+      expect(() =>
+        createNextgenMiddleware({
+          issuerUrl: 'http://localhost:4000',
+          protectedRoutes: ['/admin'],
+          loginPath: 'https://evil.example.com/phish',
+        }),
+      ).toThrow(/loginPath must be a relative path/i);
+    });
+
+    it('throws synchronously when loginPath is a protocol-relative URL', () => {
+      expect(() =>
+        createNextgenMiddleware({
+          issuerUrl: 'http://localhost:4000',
+          protectedRoutes: ['/admin'],
+          loginPath: '//evil.example.com/phish',
+        }),
+      ).toThrow(/loginPath must be a relative path/i);
+    });
+
+    it('accepts a relative loginPath and redirects correctly', async () => {
+      const app = createApp();
+      app.use(
+        createNextgenMiddleware({
+          issuerUrl: 'http://localhost:4000',
+          protectedRoutes: ['/admin'],
+          loginPath: '/custom-login',
+        }),
+      );
+      app.use('/admin', () => ({ ok: true }));
+
+      const handler = toWebHandler(app);
+      const res = await handler(makeWebRequest('http://localhost:3000/admin'));
+      expect(res.status).toBe(302);
+      expect(res.headers.get('location')).toContain('/custom-login');
+    });
+  });
+
+  describe('proxy: X-Forwarded-For append (P-4)', () => {
+    it('appends socket IP to an existing X-Forwarded-For chain', async () => {
+      let capturedHeaders: Headers | undefined;
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockImplementation((_url: string, init: RequestInit) => {
+          capturedHeaders = init.headers as Headers;
+          return Promise.resolve(new Response('{}', { status: 200 }));
+        }),
+      );
+
+      const app = createApp();
+      // Inject a fake socket IP before the middleware runs so the handler can
+      // read it as the direct client address (event.node.req.socket.remoteAddress).
+      app.use((event) => {
+        (
+          event.node.req as unknown as { socket: { remoteAddress?: string } }
+        ).socket = {
+          remoteAddress: '10.0.0.2',
+        };
+      });
+      app.use(createNextgenMiddleware({ issuerUrl: 'http://localhost:4000' }));
+
+      const handler = toWebHandler(app);
+      await handler(
+        new Request('http://localhost:3000/__nextgen/v1/flow', {
+          headers: { 'x-forwarded-for': '10.0.0.1' },
+        }),
+      );
+
+      expect(capturedHeaders).toBeDefined();
+      const xff = (capturedHeaders as Headers).get('x-forwarded-for') ?? '';
+      // Both the CDN-set chain and the socket hop must appear
+      expect(xff).toContain('10.0.0.1');
+      expect(xff).toContain('10.0.0.2');
+    });
+
+    it('sets X-Forwarded-For from socket IP when no chain exists', async () => {
+      let capturedHeaders: Headers | undefined;
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockImplementation((_url: string, init: RequestInit) => {
+          capturedHeaders = init.headers as Headers;
+          return Promise.resolve(new Response('{}', { status: 200 }));
+        }),
+      );
+
+      const app = createApp();
+      app.use((event) => {
+        (
+          event.node.req as unknown as { socket: { remoteAddress?: string } }
+        ).socket = {
+          remoteAddress: '10.0.0.2',
+        };
+      });
+      app.use(createNextgenMiddleware({ issuerUrl: 'http://localhost:4000' }));
+
+      const handler = toWebHandler(app);
+      await handler(makeWebRequest('http://localhost:3000/__nextgen/v1/flow'));
+
+      expect((capturedHeaders as Headers).get('x-forwarded-for')).toBe(
+        '10.0.0.2',
+      );
+    });
+
+    it('omits X-Forwarded-For when no socket IP is available', async () => {
+      let capturedHeaders: Headers | undefined;
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockImplementation((_url: string, init: RequestInit) => {
+          capturedHeaders = init.headers as Headers;
+          return Promise.resolve(new Response('{}', { status: 200 }));
+        }),
+      );
+
+      const app = createApp();
+      // No socket-patching middleware — socket.remoteAddress will be undefined
+      app.use(createNextgenMiddleware({ issuerUrl: 'http://localhost:4000' }));
+
+      const handler = toWebHandler(app);
+      await handler(makeWebRequest('http://localhost:3000/__nextgen/v1/flow'));
+
+      // Without a socket IP there is nothing to append
+      expect((capturedHeaders as Headers).has('x-forwarded-for')).toBe(false);
+    });
+  });
 });
