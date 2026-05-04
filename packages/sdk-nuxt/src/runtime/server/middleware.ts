@@ -200,7 +200,7 @@ export function createNextgenMiddleware(
       return;
     }
 
-    if (pathname.startsWith(proxyPath)) {
+    if (pathname === proxyPath || pathname.startsWith(`${proxyPath}/`)) {
       return proxyRequest(event, issuerUrl, proxyPath, url);
     }
 
@@ -325,6 +325,16 @@ async function handleAuth(
     jwksTimeoutMs,
     pathname,
   } = opts;
+
+  // Strip any client-supplied x-nextgen-auth-token from the inbound request so
+  // route handlers cannot observe an attacker-controlled value by reading the
+  // raw request headers. The canonical auth state is event.context.nextgenAuth;
+  // handlers should call getAuth(event) rather than reading this header directly.
+  // In sdk-next the equivalent protection is provided by tunnelHeaders, which
+  // always overwrites the header value via Next.js's header-override mechanism.
+  delete (
+    event.node.req.headers as Record<string, string | string[] | undefined>
+  )['x-nextgen-auth-token'];
 
   const authHeader = getRequestHeader(event, 'authorization');
   const bearerToken = authHeader?.startsWith('Bearer ')

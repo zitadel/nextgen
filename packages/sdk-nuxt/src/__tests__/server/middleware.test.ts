@@ -1,4 +1,4 @@
-import { createApp, toWebHandler } from 'h3';
+import { createApp, toWebHandler, getRequestHeader } from 'h3';
 import { generateKeyPairSync, createSign } from 'node:crypto';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -250,6 +250,40 @@ describe('createNextgenMiddleware (H3)', () => {
     expect(capturedAuth).toBeUndefined();
   });
 
+  it('token without sub on public route sets nextgenAuth to unauthenticated', async () => {
+    const kid = nextKid();
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    const token = makeJwt(
+      { email: 'nuxt@example.com', iss: 'http://localhost:4000', exp },
+      kid,
+    );
+
+    vi.stubGlobal('fetch', mockJwks(kid));
+
+    const app = createApp();
+    app.use(
+      createNextgenMiddleware({
+        issuerUrl: 'http://localhost:4000',
+        protectedRoutes: ['/admin'],
+        loginPath: '/login',
+      }),
+    );
+
+    let capturedAuth: unknown = undefined;
+    app.use('/', (event) => {
+      capturedAuth = event.context.nextgenAuth;
+      return { ok: true };
+    });
+
+    const handler = toWebHandler(app);
+    const res = await handler(
+      makeWebRequest('http://localhost:3000/', `__nextgen_session=${token}`),
+    );
+
+    expect(res.status).not.toBe(302);
+    expect(capturedAuth).toEqual({ isAuthenticated: false, session: null });
+  });
+
   it('token with disallowed typ is rejected on protected route', async () => {
     const kid = nextKid();
     const exp = Math.floor(Date.now() / 1000) + 3600;
@@ -311,6 +345,50 @@ describe('createNextgenMiddleware (H3)', () => {
     expect(res.status).toBe(302);
   });
 
+  it('accepts RS256 tokens by default (allowedAlgorithms defaults to RS256/ES256)', async () => {
+    const kid = nextKid();
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    const token = makeJwt(
+      {
+        sub: 'user-nuxt',
+        email: 'nuxt@example.com',
+        iss: 'http://localhost:4000',
+        exp,
+      },
+      kid,
+    );
+
+    vi.stubGlobal('fetch', mockJwks(kid));
+
+    const app = createApp();
+    // No allowedAlgorithms specified — defaults to ['RS256', 'ES256']
+    app.use(
+      createNextgenMiddleware({
+        issuerUrl: 'http://localhost:4000',
+        protectedRoutes: ['/admin'],
+      }),
+    );
+
+    let capturedAuth: unknown = undefined;
+    app.use('/admin', (event) => {
+      capturedAuth = event.context.nextgenAuth;
+      return { ok: true };
+    });
+
+    const handler = toWebHandler(app);
+    const res = await handler(
+      makeWebRequest(
+        'http://localhost:3000/admin',
+        `__nextgen_session=${token}`,
+      ),
+    );
+
+    expect(res.status).not.toBe(302);
+    expect(
+      (capturedAuth as { isAuthenticated: boolean }).isAuthenticated,
+    ).toBe(true);
+  });
+
   it('redirect preserves existing query params in loginPath', async () => {
     const app = createApp();
     app.use(
@@ -365,6 +443,42 @@ describe('createNextgenMiddleware (H3)', () => {
     expect(location).toContain('/login');
   });
 
+  it('redirect response includes Set-Cookie to clear stale session cookie', async () => {
+    const kid = nextKid();
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    const validToken = makeJwt(
+      { sub: 'user-nuxt', email: 'nuxt@example.com', exp },
+      kid,
+    );
+    const parts = validToken.split('.');
+    const tamperedToken = `${parts[0]}.${parts[1]}.invalidsig`;
+
+    vi.stubGlobal('fetch', mockJwks(kid));
+
+    const app = createApp();
+    app.use(
+      createNextgenMiddleware({
+        issuerUrl: 'http://localhost:4000',
+        protectedRoutes: ['/admin'],
+        loginPath: '/login',
+      }),
+    );
+    app.use('/admin', () => ({ ok: true }));
+
+    const handler = toWebHandler(app);
+    const res = await handler(
+      makeWebRequest(
+        'http://localhost:3000/admin',
+        `__nextgen_session=${tamperedToken}`,
+      ),
+    );
+
+    expect(res.status).toBe(302);
+    const setCookie = res.headers.get('set-cookie') ?? '';
+    expect(setCookie).toMatch(/__nextgen_session=/);
+    expect(setCookie).toMatch(/Max-Age=0|expires=.*1970/i);
+  });
+
   it('token with alg "none" is rejected on a protected route', async () => {
     const kid = nextKid();
     const exp = Math.floor(Date.now() / 1000) + 3600;
@@ -401,6 +515,39 @@ describe('createNextgenMiddleware (H3)', () => {
     );
     expect(res.status).toBe(302);
     expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+  });
+
+  it('strips x-nextgen-auth-token from proxied requests', async () => {
+    let capturedHeaders: Headers | undefined;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((_url: string, init: RequestInit) => {
+        capturedHeaders = init.headers as Headers;
+        return Promise.resolve(new Response('{}', { status: 200 }));
+      }),
+    );
+
+    const app = createApp();
+    app.use(createNextgenMiddleware({ issuerUrl: 'http://localhost:4000' }));
+
+    const handler = toWebHandler(app);
+    await handler(
+      new Request('http://localhost:3000/__nextgen/v1/flow', {
+        method: 'GET',
+        headers: {
+          'x-nextgen-auth-token': 'secret-session-token',
+          'content-type': 'application/json',
+        },
+      }),
+    );
+
+    expect(capturedHeaders).toBeDefined();
+    expect((capturedHeaders as Headers).has('x-nextgen-auth-token')).toBe(
+      false,
+    );
+    expect((capturedHeaders as Headers).get('content-type')).toBe(
+      'application/json',
+    );
   });
 
   describe('proxy: Cookie Secure upgrade (C-3)', () => {
@@ -611,6 +758,133 @@ describe('createNextgenMiddleware (H3)', () => {
 
       // Without a socket IP there is nothing to append
       expect((capturedHeaders as Headers).has('x-forwarded-for')).toBe(false);
+    });
+  });
+
+  describe('proxy: path-separator guard (W-2)', () => {
+    it('does not proxy a path that only shares the proxyPath prefix without a separator', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(new Response('{}', { status: 200 })),
+      );
+
+      // "/__nextgen-evil" starts with "/__nextgen" but the next char is "-", not "/"
+      const app = createApp();
+      app.use(createNextgenMiddleware({ issuerUrl: 'http://localhost:4000' }));
+
+      const handler = toWebHandler(app);
+      await handler(
+        makeWebRequest('http://localhost:3000/__nextgen-evil/resource'),
+      );
+
+      // With no token on a public route, fetch is never called (not proxied, no JWKS)
+      expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+    });
+
+    it('proxies an exact match of proxyPath', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(new Response('{}', { status: 200 })),
+      );
+
+      const app = createApp();
+      app.use(createNextgenMiddleware({ issuerUrl: 'http://localhost:4000' }));
+
+      const handler = toWebHandler(app);
+      const res = await handler(
+        makeWebRequest('http://localhost:3000/__nextgen'),
+      );
+
+      expect(vi.mocked(fetch)).toHaveBeenCalledOnce();
+      expect(res.status).toBe(200);
+    });
+
+    it('proxies paths under proxyPath', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(new Response('{}', { status: 200 })),
+      );
+
+      const app = createApp();
+      app.use(createNextgenMiddleware({ issuerUrl: 'http://localhost:4000' }));
+
+      const handler = toWebHandler(app);
+      const res = await handler(
+        makeWebRequest('http://localhost:3000/__nextgen/v1/flow'),
+      );
+
+      expect(vi.mocked(fetch)).toHaveBeenCalledOnce();
+      expect(res.status).toBe(200);
+    });
+  });
+
+  describe('inbound header stripping: x-nextgen-auth-token (T-1)', () => {
+    it('strips client-supplied x-nextgen-auth-token so route handlers cannot read it', async () => {
+      const app = createApp();
+      app.use(
+        createNextgenMiddleware({
+          issuerUrl: 'http://localhost:4000',
+          protectedRoutes: [],
+        }),
+      );
+
+      let capturedToken: string | undefined;
+      app.use('/', (event) => {
+        capturedToken = getRequestHeader(event, 'x-nextgen-auth-token');
+        return { ok: true };
+      });
+
+      const handler = toWebHandler(app);
+      await handler(
+        new Request('http://localhost:3000/', {
+          headers: { 'x-nextgen-auth-token': 'forged-session-token' },
+        }),
+      );
+
+      // The client-supplied value must not be visible to downstream handlers
+      expect(capturedToken).toBeUndefined();
+    });
+
+    it('strips the header regardless of whether a valid session token is present', async () => {
+      const kid = nextKid();
+      const exp = Math.floor(Date.now() / 1000) + 3600;
+      const token = makeJwt(
+        {
+          sub: 'user-nuxt',
+          email: 'nuxt@example.com',
+          iss: 'http://localhost:4000',
+          exp,
+        },
+        kid,
+      );
+      vi.stubGlobal('fetch', mockJwks(kid));
+
+      const app = createApp();
+      app.use(
+        createNextgenMiddleware({
+          issuerUrl: 'http://localhost:4000',
+          protectedRoutes: [],
+        }),
+      );
+
+      let capturedToken: string | undefined;
+      app.use('/', (event) => {
+        capturedToken = getRequestHeader(event, 'x-nextgen-auth-token');
+        return { ok: true };
+      });
+
+      const handler = toWebHandler(app);
+      await handler(
+        new Request('http://localhost:3000/', {
+          headers: {
+            cookie: `__nextgen_session=${token}`,
+            'x-nextgen-auth-token': 'forged-session-token',
+          },
+        }),
+      );
+
+      // Even with a valid session cookie, the attacker-supplied header is gone
+      expect(capturedToken).toBeUndefined();
     });
   });
 });

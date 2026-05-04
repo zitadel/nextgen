@@ -284,6 +284,26 @@ describe('verifyJwt', () => {
       ).toBeNull();
     });
 
+    it('logs to console.error when an unexpected error occurs (W-5)', async () => {
+      const kid = nextKid();
+      const token = makeJwt(
+        { sub: 'u', iss: 'http://localhost:4000', exp: ts(3600) },
+        kid,
+      );
+      const networkError = new TypeError('fetch failed');
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(networkError));
+      const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const result = await verifyJwt(token, baseOpts());
+
+      expect(result).toBeNull();
+      expect(spy).toHaveBeenCalledOnce();
+      expect(spy).toHaveBeenCalledWith(
+        '[nextgen] verifyJwt unexpected error:',
+        networkError,
+      );
+    });
+
     it('uses the default 5-second timeout when jwksTimeoutMs is not set', async () => {
       const kid = nextKid();
       const token = makeJwt(
@@ -432,6 +452,32 @@ describe('verifyJwt', () => {
           baseOpts({ allowedAlgorithms: ['none', 'RS256'] }),
         ),
       ).toBeNull();
+      expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+    });
+
+    it('rejects alg "None" (mixed-case) without calling JWKS (W-3)', async () => {
+      const kid = nextKid();
+      const token = makeJwt(
+        { sub: 'u', iss: 'http://localhost:4000', exp: ts(3600) },
+        kid,
+        'None',
+      );
+      vi.stubGlobal('fetch', vi.fn());
+
+      expect(await verifyJwt(token, baseOpts())).toBeNull();
+      expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+    });
+
+    it('rejects alg "NONE" (upper-case) without calling JWKS (W-3)', async () => {
+      const kid = nextKid();
+      const token = makeJwt(
+        { sub: 'u', iss: 'http://localhost:4000', exp: ts(3600) },
+        kid,
+        'NONE',
+      );
+      vi.stubGlobal('fetch', vi.fn());
+
+      expect(await verifyJwt(token, baseOpts())).toBeNull();
       expect(vi.mocked(fetch)).not.toHaveBeenCalled();
     });
   });

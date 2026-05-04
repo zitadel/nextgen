@@ -105,6 +105,21 @@ describe('nextgenMiddleware', () => {
     expect(location).toContain('next=%2Fadmin');
   });
 
+  it('redirect preserves existing query params in loginPath', async () => {
+    const req = makeRequest('http://localhost:3000/admin');
+    const res = await nextgenMiddleware(req, {
+      issuerUrl: 'http://localhost:4000',
+      protectedRoutes: ['/admin'],
+      loginPath: '/login?tab=sso',
+    });
+
+    expect(res.status).toBe(302);
+    const location = res.headers.get('location') ?? '';
+    const parsed = new URL(location, 'http://localhost:3000');
+    expect(parsed.searchParams.get('tab')).toBe('sso');
+    expect(parsed.searchParams.get('next')).toBe('/admin');
+  });
+
   it('protected route with valid cookie passes through with token tunnelled', async () => {
     const kid = nextKid();
     const exp = Math.floor(Date.now() / 1000) + 3600;
@@ -615,6 +630,115 @@ describe('nextgenMiddleware', () => {
       await nextgenMiddleware(req, { issuerUrl: 'http://localhost:4000' });
 
       expect((capturedHeaders as Headers).has('x-forwarded-for')).toBe(false);
+    });
+  });
+
+  describe('proxy: path-separator guard (W-2)', () => {
+    it('does not proxy a path that only shares the proxyPath prefix without a separator', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(new Response('{}', { status: 200 })),
+      );
+
+      // "/__nextgen-evil" starts with "/__nextgen" but the next char is "-", not "/"
+      const req = new NextRequest(
+        'http://localhost:3000/__nextgen-evil/resource',
+      );
+      await nextgenMiddleware(req, { issuerUrl: 'http://localhost:4000' });
+
+      // With no token on a public route, fetch is never called (not proxied, no JWKS)
+      expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+    });
+
+    it('proxies an exact match of proxyPath', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(new Response('{}', { status: 200 })),
+      );
+
+      const req = new NextRequest('http://localhost:3000/__nextgen');
+      const res = await nextgenMiddleware(req, {
+        issuerUrl: 'http://localhost:4000',
+      });
+
+      expect(vi.mocked(fetch)).toHaveBeenCalledOnce();
+      expect(res.status).toBe(200);
+    });
+
+    it('proxies paths under proxyPath', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(new Response('{}', { status: 200 })),
+      );
+
+      const req = new NextRequest('http://localhost:3000/__nextgen/v1/flow');
+      const res = await nextgenMiddleware(req, {
+        issuerUrl: 'http://localhost:4000',
+      });
+
+      expect(vi.mocked(fetch)).toHaveBeenCalledOnce();
+      expect(res.status).toBe(200);
+    });
+  });
+
+  describe('inbound header override: x-nextgen-auth-token (T-1)', () => {
+    it('overwrites client-supplied x-nextgen-auth-token with the verified value (empty for unauthenticated)', async () => {
+      const req = new NextRequest('http://localhost:3000/', {
+        headers: { 'x-nextgen-auth-token': 'forged-session-token' },
+      });
+      const res = await nextgenMiddleware(req, {
+        issuerUrl: 'http://localhost:4000',
+        protectedRoutes: ['/admin'],
+      });
+
+      // tunnelHeaders always overwrites x-nextgen-auth-token with the
+      // middleware-determined value (empty string when unauthenticated).
+      // The client's forged value must not survive into server components.
+      const tunnelled =
+        res.headers.get('x-nextgen-auth-token') ??
+        res.headers.get('x-middleware-request-x-nextgen-auth-token');
+      expect(tunnelled).toBe('');
+      expect(tunnelled).not.toBe('forged-session-token');
+    });
+
+    it('overwrites client-supplied x-nextgen-auth-token with the real token when authenticated', async () => {
+      const kid = nextKid();
+      const exp = Math.floor(Date.now() / 1000) + 3600;
+      const token = makeJwt(
+        {
+          sub: 'user-123',
+          email: 'user@example.com',
+          iss: 'http://localhost:4000',
+          exp,
+        },
+        kid,
+      );
+      vi.stubGlobal('fetch', mockJwks(kid));
+
+      const req = makeRequest(
+        'http://localhost:3000/admin',
+        `__nextgen_session=${token}`,
+      );
+      // Inject a fake x-nextgen-auth-token alongside the real cookie
+      Object.defineProperty(req, 'headers', {
+        value: new Headers({
+          cookie: `__nextgen_session=${token}`,
+          'x-nextgen-auth-token': 'forged-session-token',
+        }),
+        writable: false,
+      });
+
+      const res = await nextgenMiddleware(req, {
+        issuerUrl: 'http://localhost:4000',
+        protectedRoutes: ['/admin'],
+      });
+
+      // The tunnelled value must be the real verified token, not the forged one
+      const tunnelled =
+        res.headers.get('x-nextgen-auth-token') ??
+        res.headers.get('x-middleware-request-x-nextgen-auth-token');
+      expect(tunnelled).toBe(token);
+      expect(tunnelled).not.toBe('forged-session-token');
     });
   });
 });

@@ -504,8 +504,9 @@ export async function verifyJwt(
     }
     // Unconditionally reject the 'none' algorithm regardless of the allowlist.
     // 'none' means the token is unsigned; accepting it would allow anyone to
-    // forge arbitrary claims without a key.
-    if (alg === 'none') {
+    // forge arbitrary claims without a key. The comparison is case-insensitive
+    // so that "None", "NONE", or any other casing variant is also rejected.
+    if (alg.toLowerCase() === 'none') {
       return null;
     }
     if (allowedAlgorithms?.length && !allowedAlgorithms.includes(alg)) {
@@ -569,12 +570,15 @@ export async function verifyJwt(
     }
 
     return payload;
-  } catch {
+  } catch (err) {
     // Any unexpected error (network failure, malformed JWKS, Web Crypto
     // exception for an unsupported algorithm, …) is treated as a failed
     // verification: return null rather than propagate. Callers never need to
     // handle errors from verifyJwt — only null (invalid/missing token) or a
     // non-null payload (verified token).
+    // Log so operators can distinguish transient infrastructure failures
+    // (JWKS fetch timeout, Web Crypto error) from genuine bad tokens.
+    console.error('[nextgen] verifyJwt unexpected error:', err);
     return null;
   }
 }

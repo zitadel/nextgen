@@ -170,7 +170,7 @@ export async function nextgenMiddleware(
     return NextResponse.next();
   }
 
-  if (pathname.startsWith(proxyPath)) {
+  if (pathname === proxyPath || pathname.startsWith(`${proxyPath}/`)) {
     return proxyRequest(req, issuerUrl, proxyPath);
   }
 
