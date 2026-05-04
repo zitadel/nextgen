@@ -31,14 +31,14 @@ describe('auth()', () => {
   });
 
   it('returns unauthenticated when x-nextgen-auth-token header is absent', async () => {
-    const { auth } = await import('../auth');
+    const { auth } = await import('../auth.js');
     const result = await auth();
     expect(result).toEqual({ isAuthenticated: false, session: null });
   });
 
   it('returns unauthenticated when x-nextgen-auth-token is an empty string', async () => {
     mockHeadersMap.set('x-nextgen-auth-token', '');
-    const { auth } = await import('../auth');
+    const { auth } = await import('../auth.js');
     const result = await auth();
     expect(result).toEqual({ isAuthenticated: false, session: null });
   });
@@ -51,7 +51,7 @@ describe('auth()', () => {
       exp: Math.floor(Date.now() / 1000) + 3600,
     });
     mockHeadersMap.set('x-nextgen-auth-token', token);
-    const { auth } = await import('../auth');
+    const { auth } = await import('../auth.js');
     const result = await auth();
     expect(result).toEqual({
       isAuthenticated: true,
@@ -70,14 +70,14 @@ describe('auth()', () => {
       exp: Math.floor(Date.now() / 1000) + 3600,
     });
     mockHeadersMap.set('x-nextgen-auth-token', token);
-    const { auth } = await import('../auth');
+    const { auth } = await import('../auth.js');
     const result = await auth();
     expect(result).toEqual({ isAuthenticated: false, session: null });
   });
 
   it('returns unauthenticated when token is malformed', async () => {
     mockHeadersMap.set('x-nextgen-auth-token', 'not.a.valid.jwt.at.all.extra');
-    const { auth } = await import('../auth');
+    const { auth } = await import('../auth.js');
     const result = await auth();
     expect(result).toEqual({ isAuthenticated: false, session: null });
   });
@@ -88,7 +88,7 @@ describe('auth()', () => {
       exp: Math.floor(Date.now() / 1000) + 3600,
     });
     mockHeadersMap.set('x-nextgen-auth-token', token);
-    const { auth } = await import('../auth');
+    const { auth } = await import('../auth.js');
     const result = await auth();
     expect(result.isAuthenticated).toBe(true);
     if (result.isAuthenticated) {

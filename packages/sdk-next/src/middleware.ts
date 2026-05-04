@@ -58,7 +58,7 @@ function tunnelHeaders(
   extra: Readonly<Record<string, string>>,
 ): Headers {
   const headers = new Headers(req.headers);
-  const injectedNames: string[] = [];
+  const injectedNames = [];
 
   for (const [name, value] of Object.entries(extra)) {
     headers.set(name, value);
