@@ -292,7 +292,7 @@ describe('verifyJwt', () => {
       );
       const networkError = new TypeError('fetch failed');
       vi.stubGlobal('fetch', vi.fn().mockRejectedValue(networkError));
-      const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
       const result = await verifyJwt(token, baseOpts());
 
