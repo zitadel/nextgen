@@ -3,7 +3,7 @@
 // The project_id is explicitly excluded from this package — it uses a dictionary slug strategy.
 package idgen
 
-//go:generate go run go.uber.org/mock/mockgen@latest -typed -package idgenmock -destination ./idgenmock/idgen.mock.go github.com/zitadel/nextgen/internal/domain/idgen Generator
+//go:generate mockgen -typed -package idgenmock -destination ./idgenmock/idgen.mock.go github.com/zitadel/nextgen/internal/domain/idgen Generator
 
 // Generator generates unique, prefixed resource IDs.
 // Implementations must be safe for concurrent use.
