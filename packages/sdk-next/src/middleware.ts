@@ -30,20 +30,27 @@ const HOP_BY_HOP: ReadonlySet<string> = new Set([
 const INTERNAL_HEADERS: ReadonlySet<string> = new Set(['x-nextgen-auth-token']);
 
 /**
- * Adds the `Secure` flag to any cookie whose name starts with `__nextgen`.
+ * Conditionally adds the `Secure` flag to any cookie whose name starts with
+ * `__nextgen`, but only when the client-facing connection is HTTPS.
  *
  * The edge proxy may terminate TLS — the upstream auth server cannot know
- * whether the browser-facing connection is HTTPS. By adding `Secure` here we
- * ensure that `__nextgen*` session cookies are never sent over plain HTTP,
- * regardless of whether the upstream set the flag.
+ * whether the browser-facing connection is HTTPS. When `secure` is `true`
+ * (i.e. the original request arrived over HTTPS), `Secure` is added so that
+ * `__nextgen*` session cookies are never sent over plain HTTP on subsequent
+ * requests. When `secure` is `false` (plain HTTP), the flag is intentionally
+ * omitted: browsers refuse to store cookies with `Secure` on non-TLS
+ * connections, which would break the auth flow entirely.
  *
  * Non-`__nextgen*` cookies are returned unchanged. We trust the upstream for
  * `HttpOnly` and `SameSite`, which are set correctly by the auth server and
  * do not depend on whether TLS is terminated at the edge.
+ *
+ * @param cookie - The raw `Set-Cookie` header value.
+ * @param secure - `true` when the client-facing connection is HTTPS.
  */
-function upgradeSessionCookie(cookie: string): string {
+function upgradeSessionCookie(cookie: string, secure: boolean): string {
   const name = cookie.split('=')[0]?.trim() ?? '';
-  if (!name.startsWith('__nextgen')) {
+  if (!name.startsWith('__nextgen') || !secure) {
     return cookie;
   }
   // Case-insensitive check to avoid doubling an existing Secure flag.
@@ -266,9 +273,15 @@ async function proxyRequest(
     }
   }
 
+  const isSecure =
+    url.protocol === 'https:' ||
+    req.headers.get('x-forwarded-proto') === 'https';
   const setCookies = upstream.headers.getSetCookie?.() ?? [];
   for (const cookie of setCookies) {
-    responseHeaders.append('set-cookie', upgradeSessionCookie(cookie));
+    responseHeaders.append(
+      'set-cookie',
+      upgradeSessionCookie(cookie, isSecure),
+    );
   }
 
   return new Response(upstream.body, {
