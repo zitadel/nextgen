@@ -114,7 +114,7 @@ CREATE TABLE zitadel_nextgen.user_passwords (
     , last_successful_check TIMESTAMPTZ
     , failed_attempts SMALLINT NOT NULL DEFAULT 0 CHECK (failed_attempts >= 0)
     , created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-    , updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    , updated_at TIMESTAMPTZ NOT NULL DEFAULT now() -- TODO: trigger on update
 
     , PRIMARY KEY (instance_id, user_id)
     , FOREIGN KEY (instance_id, user_id)
@@ -141,7 +141,7 @@ CREATE TABLE zitadel_nextgen.user_totp (
 CREATE TABLE zitadel_nextgen.user_recovery_codes (
     instance_id TEXT COLLATE "C" NOT NULL
     , user_id TEXT COLLATE "C" NOT NULL
-    , code_hashes BYTEA[] NOT NULL CHECK (cardinality(code_hashes) > 0)
+    , recovery_codes TEXT[] NOT NULL CHECK (cardinality(code_hashes) > 0)
     , last_successful_check TIMESTAMPTZ
     , failed_attempts SMALLINT NOT NULL DEFAULT 0 CHECK (failed_attempts >= 0)
     , created_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -162,7 +162,6 @@ CREATE TABLE zitadel_nextgen.user_pats (
     , expires_at TIMESTAMPTZ
     , last_used_at TIMESTAMPTZ
     , created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-    , updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 
     , PRIMARY KEY (instance_id, token_id)
     , FOREIGN KEY (instance_id, user_id)
