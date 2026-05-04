@@ -110,18 +110,18 @@ export default defineEventHandler((event) => {
 
 ## Middleware options
 
-| Option              | Type                    | Default                   | Description                                                                                                                |
-| ------------------- | ----------------------- | ------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `issuerUrl`         | `string`                | `NEXTGEN_ISSUER_URL` env  | Full URL of the Nextgen auth backend                                                                                       |
-| `proxyPath`         | `string`                | `"/__nextgen"`            | Path prefix proxied to the auth backend                                                                                    |
-| `protectedRoutes`   | `string[]`              | `[]`                      | Paths requiring a valid session. Trailing `*` matches sub-paths                                                            |
-| `ignoredRoutes`     | `string[]`              | `[]`                      | Paths skipped entirely — no JWT check, no tunnelling. Useful for webhooks or health checks. Trailing `*` matches sub-paths |
-| `loginPath`         | `string`                | `"/login"`                | Where to redirect unauthenticated users                                                                                    |
-| `allowedAlgorithms` | `string[]`              | `["RS256", "ES256"]`      | JWT `alg` values to accept. Tokens with any other algorithm are rejected before JWKS is fetched                            |
-| `allowedTokenTypes` | `string[]`              | `["JWT", "at+JWT"]`       | Accepted `typ` header values (case-insensitive). Set to `[]` to disable this check                                         |
-| `clockSkewMs`       | `number`                | `5000`                    | Clock skew tolerance in ms for `exp`, `nbf`, `iat`                                                                         |
-| `jwksTimeoutMs`     | `number`                | `5000`                    | Timeout in ms for JWKS endpoint requests. Token is rejected if the fetch exceeds this window                               |
-| `audience`          | `string \| string[]`    | not validated             | Expected `aud` claim value(s). When omitted, audience is not checked                                                       |
+| Option              | Type                 | Default                  | Description                                                                                                                |
+| ------------------- | -------------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| `issuerUrl`         | `string`             | `NEXTGEN_ISSUER_URL` env | Full URL of the Nextgen auth backend                                                                                       |
+| `proxyPath`         | `string`             | `"/__nextgen"`           | Path prefix proxied to the auth backend                                                                                    |
+| `protectedRoutes`   | `string[]`           | `[]`                     | Paths requiring a valid session. Trailing `*` matches sub-paths                                                            |
+| `ignoredRoutes`     | `string[]`           | `[]`                     | Paths skipped entirely — no JWT check, no tunnelling. Useful for webhooks or health checks. Trailing `*` matches sub-paths |
+| `loginPath`         | `string`             | `"/login"`               | Where to redirect unauthenticated users                                                                                    |
+| `allowedAlgorithms` | `string[]`           | `["RS256", "ES256"]`     | JWT `alg` values to accept. Tokens with any other algorithm are rejected before JWKS is fetched                            |
+| `allowedTokenTypes` | `string[]`           | `["JWT", "at+JWT"]`      | Accepted `typ` header values (case-insensitive). Set to `[]` to disable this check                                         |
+| `clockSkewMs`       | `number`             | `5000`                   | Clock skew tolerance in ms for `exp`, `nbf`, `iat`                                                                         |
+| `jwksTimeoutMs`     | `number`             | `5000`                   | Timeout in ms for JWKS endpoint requests. Token is rejected if the fetch exceeds this window                               |
+| `audience`          | `string \| string[]` | not validated            | Expected `aud` claim value(s). When omitted, audience is not checked                                                       |
 
 ## How JWT verification works
 

@@ -185,6 +185,48 @@ describe('nextgenMiddleware', () => {
     expect(tunnelledToken).toBe(token);
   });
 
+  it('Bearer token takes precedence over session cookie when both are present (R-1)', async () => {
+    const kid = nextKid();
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    const bearerToken = makeJwt(
+      {
+        sub: 'bearer-user',
+        email: 'bearer@example.com',
+        iss: 'http://localhost:4000',
+        exp,
+      },
+      kid,
+    );
+    const cookieToken = makeJwt(
+      {
+        sub: 'cookie-user',
+        email: 'cookie@example.com',
+        iss: 'http://localhost:4000',
+        exp,
+      },
+      kid,
+    );
+
+    vi.stubGlobal('fetch', mockJwks(kid));
+
+    const req = new NextRequest('http://localhost:3000/admin', {
+      headers: {
+        authorization: `Bearer ${bearerToken}`,
+        cookie: `__nextgen_session=${cookieToken}`,
+      },
+    });
+    const res = await nextgenMiddleware(req, {
+      issuerUrl: 'http://localhost:4000',
+      protectedRoutes: ['/admin'],
+    });
+
+    const tunnelled =
+      res.headers.get('x-nextgen-auth-token') ??
+      res.headers.get('x-middleware-request-x-nextgen-auth-token');
+    expect(tunnelled).toBe(bearerToken);
+    expect(tunnelled).not.toBe(cookieToken);
+  });
+
   it('redirect response includes Set-Cookie to clear stale session cookie', async () => {
     const kid = nextKid();
     const exp = Math.floor(Date.now() / 1000) + 3600;
@@ -738,6 +780,22 @@ describe('nextgenMiddleware', () => {
         res.headers.get('x-nextgen-auth-token') ??
         res.headers.get('x-middleware-request-x-nextgen-auth-token');
       expect(tunnelled).toBe(token);
+      expect(tunnelled).not.toBe('forged-session-token');
+    });
+
+    it('neutralises client-supplied x-nextgen-auth-token on ignored routes (R-3)', async () => {
+      const req = new NextRequest('http://localhost:3000/health', {
+        headers: { 'x-nextgen-auth-token': 'forged-session-token' },
+      });
+      const res = await nextgenMiddleware(req, {
+        issuerUrl: 'http://localhost:4000',
+        ignoredRoutes: ['/health'],
+      });
+
+      const tunnelled =
+        res.headers.get('x-nextgen-auth-token') ??
+        res.headers.get('x-middleware-request-x-nextgen-auth-token');
+      expect(tunnelled).toBe('');
       expect(tunnelled).not.toBe('forged-session-token');
     });
   });

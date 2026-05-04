@@ -217,6 +217,62 @@ describe('createNextgenMiddleware (H3)', () => {
     });
   });
 
+  it('Bearer token takes precedence over session cookie when both are present (R-1)', async () => {
+    const kid = nextKid();
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    const bearerToken = makeJwt(
+      {
+        sub: 'bearer-user',
+        email: 'bearer@example.com',
+        iss: 'http://localhost:4000',
+        exp,
+      },
+      kid,
+    );
+    const cookieToken = makeJwt(
+      {
+        sub: 'cookie-user',
+        email: 'cookie@example.com',
+        iss: 'http://localhost:4000',
+        exp,
+      },
+      kid,
+    );
+
+    vi.stubGlobal('fetch', mockJwks(kid));
+
+    const app = createApp();
+    app.use(
+      createNextgenMiddleware({
+        issuerUrl: 'http://localhost:4000',
+        protectedRoutes: [],
+      }),
+    );
+
+    let capturedAuth: unknown = undefined;
+    app.use('/', (event) => {
+      capturedAuth = event.context.nextgenAuth;
+      return { ok: true };
+    });
+
+    const handler = toWebHandler(app);
+    await handler(
+      makeWebRequest(
+        'http://localhost:3000/',
+        `__nextgen_session=${cookieToken}`,
+        `Bearer ${bearerToken}`,
+      ),
+    );
+
+    const auth = capturedAuth as {
+      isAuthenticated: boolean;
+      session: { token: string };
+    };
+    expect(auth.isAuthenticated).toBe(true);
+    expect(auth.session.token).toBe(bearerToken);
+    expect(auth.session.token).not.toBe(cookieToken);
+  });
+
   it('token with no sub claim is treated as unauthenticated', async () => {
     const kid = nextKid();
     const exp = Math.floor(Date.now() / 1000) + 3600;
@@ -883,6 +939,31 @@ describe('createNextgenMiddleware (H3)', () => {
       );
 
       // Even with a valid session cookie, the attacker-supplied header is gone
+      expect(capturedToken).toBeUndefined();
+    });
+
+    it('strips client-supplied x-nextgen-auth-token on ignored routes (R-3)', async () => {
+      const app = createApp();
+      app.use(
+        createNextgenMiddleware({
+          issuerUrl: 'http://localhost:4000',
+          ignoredRoutes: ['/health'],
+        }),
+      );
+
+      let capturedToken: string | undefined;
+      app.use('/health', (event) => {
+        capturedToken = getRequestHeader(event, 'x-nextgen-auth-token');
+        return { ok: true };
+      });
+
+      const handler = toWebHandler(app);
+      await handler(
+        new Request('http://localhost:3000/health', {
+          headers: { 'x-nextgen-auth-token': 'forged-session-token' },
+        }),
+      );
+
       expect(capturedToken).toBeUndefined();
     });
   });

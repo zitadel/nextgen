@@ -167,7 +167,11 @@ export async function nextgenMiddleware(
   const { pathname } = new URL(req.url);
 
   if (matchesRoutes(pathname, ignoredRoutes)) {
-    return NextResponse.next();
+    // Neutralise any client-supplied x-nextgen-auth-token on ignored routes.
+    // handleAuth is skipped for ignored routes, so we must strip the header
+    // here to prevent a forged value from reaching server components.
+    const headers = tunnelHeaders(req, { 'x-nextgen-auth-token': '' });
+    return NextResponse.next({ request: { headers } });
   }
 
   if (pathname === proxyPath || pathname.startsWith(`${proxyPath}/`)) {
@@ -336,6 +340,9 @@ async function handleAuth(
     ? authHeader.slice(7)
     : null;
   const cookieToken = req.cookies.get('__nextgen_session')?.value ?? null;
+  // Bearer token takes explicit precedence over the session cookie. API clients
+  // (e.g. mobile apps, CLIs) use Authorization headers while browsers use
+  // cookies; when both are present the caller clearly intended the Bearer token.
   const token = bearerToken ?? cookieToken;
 
   const payload = token
