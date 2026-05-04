@@ -1,9 +1,9 @@
 {
   "$schema": "https://raw.githubusercontent.com/jetify-com/devbox/0.10.7/.schema/devbox.schema.json",
   "env": {
-    "GOMODCACHE": "$PWD/.go",
+    "GOMODCACHE":  "$PWD/.go",
     "GOTOOLCHAIN": "local",
-    "GOROOT": null
+    "GOROOT":      null
   },
   "packages": ["go@1.26", "nodejs@24", "nodePackages.pnpm@latest"]
 }
