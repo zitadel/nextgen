@@ -52,8 +52,8 @@
  *
  * | Claim | Purpose | How |
  * |-------|---------|-----|
- * | `iss` | Issuer — the URL of the auth server that issued the token | Must equal {@link VerifyJwtOptions.issuerUrl} when present in the token |
- * | `exp` | Expiration time — Unix timestamp after which the token is invalid | Must be in the future, allowing {@link VerifyJwtOptions.clockSkewMs} tolerance |
+ * | `iss` | Issuer — the URL of the auth server that issued the token | Must be present and must equal {@link VerifyJwtOptions.issuerUrl} |
+ * | `exp` | Expiration time — Unix timestamp after which the token is invalid | Must be present and in the future, allowing {@link VerifyJwtOptions.clockSkewMs} tolerance |
  * | `nbf` | Not before — Unix timestamp before which the token must not be accepted | Must be in the past, allowing {@link VerifyJwtOptions.clockSkewMs} tolerance |
  * | `iat` | Issued at — Unix timestamp when the token was created | Must not be in the future beyond {@link VerifyJwtOptions.clockSkewMs} |
  * | `aud` | Audience — the intended recipient(s) of the token | Checked against {@link VerifyJwtOptions.audience} when that option is provided |
@@ -201,7 +201,8 @@ export interface VerifyJwtOptions {
   /**
    * Restrict accepted `alg` header values. Tokens whose algorithm is not in
    * this list are rejected before the JWKS is fetched.
-   * When `undefined`, all algorithms are accepted (not recommended for production).
+   * When `undefined`, all algorithms are accepted (the middleware layer
+   * defaults to `["RS256", "ES256"]` before passing options here).
    */
   readonly allowedAlgorithms?: readonly string[];
 
@@ -227,6 +228,14 @@ export interface VerifyJwtOptions {
    * @default ["JWT", "at+JWT"]
    */
   readonly allowedTokenTypes: readonly string[];
+
+  /**
+   * Timeout in milliseconds for JWKS endpoint requests.
+   * Requests that do not complete within this window are aborted and the
+   * token is rejected (function returns `null`).
+   * @default 5000
+   */
+  readonly jwksTimeoutMs?: number;
 }
 
 // ─── JWKS cache ───────────────────────────────────────────────────────────────
@@ -388,6 +397,7 @@ function resolveVerifyAlgorithm(alg: string): EcdsaParams | Algorithm {
 async function fetchAndCacheJwks(
   jwksUri: string,
   kid: string | undefined,
+  timeoutMs: number,
 ): Promise<CryptoKey | null> {
   const cacheKey = `${jwksUri}:${kid ?? '__default__'}`;
   const cached = jwksCache.get(cacheKey);
@@ -395,7 +405,7 @@ async function fetchAndCacheJwks(
     return cached.key;
   }
 
-  const res = await fetch(jwksUri);
+  const res = await fetch(jwksUri, { signal: AbortSignal.timeout(timeoutMs) });
   if (!res.ok) {
     return null;
   }
@@ -439,9 +449,9 @@ async function fetchAndCacheJwks(
  * 3. Reject if `typ` is not in {@link VerifyJwtOptions.allowedTokenTypes} (when non-empty).
  * 4. Fetch (or retrieve from cache) the matching public key from the JWKS endpoint.
  * 5. Verify the cryptographic signature over `header.payload`.
- * 6. Reject if `iss` is present and does not equal {@link VerifyJwtOptions.issuerUrl}.
+ * 6. Reject if `iss` is absent or does not equal {@link VerifyJwtOptions.issuerUrl}.
  * 7. Reject if {@link VerifyJwtOptions.audience} is set and `aud` does not contain it.
- * 8. Reject if `exp` is in the past (minus clock-skew tolerance).
+ * 8. Reject if `exp` is absent or is in the past (minus clock-skew tolerance).
  * 9. Reject if `nbf` is in the future (plus clock-skew tolerance).
  * 10. Reject if `iat` is in the future (plus clock-skew tolerance).
  *
@@ -463,6 +473,7 @@ export async function verifyJwt(
       clockSkewMs,
       audience,
       allowedTokenTypes,
+      jwksTimeoutMs = 5000,
     } = opts;
 
     const segments = splitToken(token);
@@ -501,6 +512,7 @@ export async function verifyJwt(
     const cryptoKey = await fetchAndCacheJwks(
       `${issuerUrl}/oauth/v2/keys`,
       kid,
+      jwksTimeoutMs,
     );
     if (!cryptoKey) {
       return null;
@@ -516,7 +528,7 @@ export async function verifyJwt(
       return null;
     }
 
-    if (payload.iss !== undefined && payload.iss !== issuerUrl) {
+    if (payload.iss !== issuerUrl) {
       return null;
     }
 
@@ -529,7 +541,7 @@ export async function verifyJwt(
     }
 
     const now = Date.now();
-    if (payload.exp !== undefined && payload.exp * 1000 < now - clockSkewMs) {
+    if (payload.exp === undefined || payload.exp * 1000 < now - clockSkewMs) {
       return null;
     }
     if (payload.nbf !== undefined && payload.nbf * 1000 > now + clockSkewMs) {

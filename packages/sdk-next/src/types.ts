@@ -68,9 +68,9 @@ export type NextgenMiddlewareOptions = {
   jwtKey?: string;
 
   /**
-   * Restrict accepted JWT `alg` header values. When set, any token whose
-   * algorithm is not in this list is rejected before JWKS is fetched.
-   * When omitted, all algorithms are accepted.
+   * Restrict accepted JWT `alg` header values. Tokens whose algorithm is not
+   * in this list are rejected before JWKS is fetched.
+   * @default ["RS256", "ES256"]
    */
   allowedAlgorithms?: string[];
 
@@ -95,4 +95,12 @@ export type NextgenMiddlewareOptions = {
    * @default ["JWT", "at+JWT"]
    */
   allowedTokenTypes?: string[];
+
+  /**
+   * Timeout in milliseconds for JWKS endpoint requests.
+   * Requests that do not complete within this window are aborted and the
+   * token is rejected, treating the request as unauthenticated.
+   * @default 5000
+   */
+  jwksTimeoutMs?: number;
 };

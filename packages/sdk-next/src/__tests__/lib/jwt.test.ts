@@ -183,7 +183,7 @@ describe('verifyJwt', () => {
     it('returns the payload for a valid token', async () => {
       const kid = nextKid();
       const token = makeJwt(
-        { sub: 'user-42', email: 'u@example.com', exp: ts(3600) },
+        { sub: 'user-42', email: 'u@example.com', iss: 'http://localhost:4000', exp: ts(3600) },
         kid,
       );
       vi.stubGlobal('fetch', mockJwks(kid));
@@ -247,7 +247,7 @@ describe('verifyJwt', () => {
   describe('JWKS caching', () => {
     it('fetches the JWKS only once for repeated calls with the same kid', async () => {
       const kid = nextKid();
-      const token = makeJwt({ sub: 'u', exp: ts(3600) }, kid);
+      const token = makeJwt({ sub: 'u', iss: 'http://localhost:4000', exp: ts(3600) }, kid);
       const fetchMock = mockJwks(kid);
       vi.stubGlobal('fetch', fetchMock);
 
@@ -259,9 +259,34 @@ describe('verifyJwt', () => {
       expect(fetchMock).toHaveBeenCalledTimes(1);
     });
 
+    it('returns null when the JWKS fetch times out', async () => {
+      const kid = nextKid();
+      const token = makeJwt({ sub: 'u', iss: 'http://localhost:4000', exp: ts(3600) }, kid);
+      const timeoutError = new DOMException(
+        'The operation was aborted due to timeout',
+        'TimeoutError',
+      );
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(timeoutError));
+
+      expect(await verifyJwt(token, baseOpts({ jwksTimeoutMs: 100 }))).toBeNull();
+    });
+
+    it('uses the default 5-second timeout when jwksTimeoutMs is not set', async () => {
+      const kid = nextKid();
+      const token = makeJwt({ sub: 'u', iss: 'http://localhost:4000', exp: ts(3600) }, kid);
+      const fetchMock = mockJwks(kid);
+      vi.stubGlobal('fetch', fetchMock);
+
+      await verifyJwt(token, baseOpts());
+
+      // Verify fetch was called with an AbortSignal (the timeout signal)
+      const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(init?.signal).toBeDefined();
+    });
+
     it('re-fetches after the TTL window elapses', async () => {
       const kid = nextKid();
-      const token = makeJwt({ sub: 'u', exp: ts(3600) }, kid);
+      const token = makeJwt({ sub: 'u', iss: 'http://localhost:4000', exp: ts(3600) }, kid);
       const fetchMock = mockJwks(kid);
       vi.stubGlobal('fetch', fetchMock);
 
@@ -279,7 +304,7 @@ describe('verifyJwt', () => {
   describe('alg validation', () => {
     it('accepts a token whose alg is in allowedAlgorithms', async () => {
       const kid = nextKid();
-      const token = makeJwt({ sub: 'u', exp: ts(3600) }, kid, 'RS256');
+      const token = makeJwt({ sub: 'u', iss: 'http://localhost:4000', exp: ts(3600) }, kid, 'RS256');
       vi.stubGlobal('fetch', mockJwks(kid));
 
       const payload = await verifyJwt(
@@ -304,7 +329,7 @@ describe('verifyJwt', () => {
 
     it('accepts any alg when allowedAlgorithms is undefined', async () => {
       const kid = nextKid();
-      const token = makeJwt({ sub: 'u', exp: ts(3600) }, kid, 'RS256');
+      const token = makeJwt({ sub: 'u', iss: 'http://localhost:4000', exp: ts(3600) }, kid, 'RS256');
       vi.stubGlobal('fetch', mockJwks(kid));
 
       const payload = await verifyJwt(
@@ -339,7 +364,7 @@ describe('verifyJwt', () => {
   describe('typ validation', () => {
     it('accepts a token with typ "JWT"', async () => {
       const kid = nextKid();
-      const token = makeJwt({ sub: 'u', exp: ts(3600) }, kid, 'RS256', 'JWT');
+      const token = makeJwt({ sub: 'u', iss: 'http://localhost:4000', exp: ts(3600) }, kid, 'RS256', 'JWT');
       vi.stubGlobal('fetch', mockJwks(kid));
 
       expect(
@@ -353,7 +378,7 @@ describe('verifyJwt', () => {
     it('accepts a token with typ "at+JWT"', async () => {
       const kid = nextKid();
       const token = makeJwt(
-        { sub: 'u', exp: ts(3600) },
+        { sub: 'u', iss: 'http://localhost:4000', exp: ts(3600) },
         kid,
         'RS256',
         'at+JWT',
@@ -370,7 +395,7 @@ describe('verifyJwt', () => {
 
     it('is case-insensitive', async () => {
       const kid = nextKid();
-      const token = makeJwt({ sub: 'u', exp: ts(3600) }, kid, 'RS256', 'jwt');
+      const token = makeJwt({ sub: 'u', iss: 'http://localhost:4000', exp: ts(3600) }, kid, 'RS256', 'jwt');
       vi.stubGlobal('fetch', mockJwks(kid));
 
       expect(
@@ -400,7 +425,7 @@ describe('verifyJwt', () => {
     it('skips typ check when allowedTokenTypes is empty', async () => {
       const kid = nextKid();
       const token = makeJwt(
-        { sub: 'u', exp: ts(3600) },
+        { sub: 'u', iss: 'http://localhost:4000', exp: ts(3600) },
         kid,
         'RS256',
         'anything',
@@ -436,19 +461,19 @@ describe('verifyJwt', () => {
       expect(await verifyJwt(token, baseOpts())).toBeNull();
     });
 
-    it('accepts a token with no iss claim (iss is optional)', async () => {
+    it('rejects a token with no iss claim (iss is required)', async () => {
       const kid = nextKid();
       const token = makeJwt({ sub: 'u', exp: ts(3600) }, kid); // no iss
       vi.stubGlobal('fetch', mockJwks(kid));
 
-      expect(await verifyJwt(token, baseOpts())).not.toBeNull();
+      expect(await verifyJwt(token, baseOpts())).toBeNull();
     });
   });
 
   describe('aud validation', () => {
     it('accepts when aud matches the configured audience string', async () => {
       const kid = nextKid();
-      const token = makeJwt({ sub: 'u', aud: 'my-app', exp: ts(3600) }, kid);
+      const token = makeJwt({ sub: 'u', iss: 'http://localhost:4000', aud: 'my-app', exp: ts(3600) }, kid);
       vi.stubGlobal('fetch', mockJwks(kid));
 
       expect(
@@ -459,7 +484,7 @@ describe('verifyJwt', () => {
     it('accepts when aud array contains the configured audience', async () => {
       const kid = nextKid();
       const token = makeJwt(
-        { sub: 'u', aud: ['my-app', 'other-app'], exp: ts(3600) },
+        { sub: 'u', iss: 'http://localhost:4000', aud: ['my-app', 'other-app'], exp: ts(3600) },
         kid,
       );
       vi.stubGlobal('fetch', mockJwks(kid));
@@ -471,7 +496,7 @@ describe('verifyJwt', () => {
 
     it('accepts when audience option is an array and one value matches', async () => {
       const kid = nextKid();
-      const token = makeJwt({ sub: 'u', aud: 'my-app', exp: ts(3600) }, kid);
+      const token = makeJwt({ sub: 'u', iss: 'http://localhost:4000', aud: 'my-app', exp: ts(3600) }, kid);
       vi.stubGlobal('fetch', mockJwks(kid));
 
       expect(
@@ -492,7 +517,7 @@ describe('verifyJwt', () => {
     it('skips aud check when audience option is not set', async () => {
       const kid = nextKid();
       // Token has aud claim but no audience option configured
-      const token = makeJwt({ sub: 'u', aud: 'some-app', exp: ts(3600) }, kid);
+      const token = makeJwt({ sub: 'u', iss: 'http://localhost:4000', aud: 'some-app', exp: ts(3600) }, kid);
       vi.stubGlobal('fetch', mockJwks(kid));
 
       expect(
@@ -504,7 +529,7 @@ describe('verifyJwt', () => {
   describe('exp validation', () => {
     it('accepts a token that has not yet expired', async () => {
       const kid = nextKid();
-      const token = makeJwt({ sub: 'u', exp: ts(3600) }, kid);
+      const token = makeJwt({ sub: 'u', iss: 'http://localhost:4000', exp: ts(3600) }, kid);
       vi.stubGlobal('fetch', mockJwks(kid));
 
       expect(await verifyJwt(token, baseOpts())).not.toBeNull();
@@ -520,7 +545,7 @@ describe('verifyJwt', () => {
 
     it('accepts a just-expired token within clock skew', async () => {
       const kid = nextKid();
-      const token = makeJwt({ sub: 'u', exp: ts(-3) }, kid); // expired 3 s ago
+      const token = makeJwt({ sub: 'u', iss: 'http://localhost:4000', exp: ts(-3) }, kid); // expired 3 s ago
       vi.stubGlobal('fetch', mockJwks(kid));
 
       // 5 s clock skew should cover the 3 s expiry
@@ -529,19 +554,19 @@ describe('verifyJwt', () => {
       ).not.toBeNull();
     });
 
-    it('accepts a token with no exp claim', async () => {
+    it('rejects a token with no exp claim (exp is required)', async () => {
       const kid = nextKid();
-      const token = makeJwt({ sub: 'u' }, kid); // no exp
+      const token = makeJwt({ sub: 'u', iss: 'http://localhost:4000' }, kid); // no exp
       vi.stubGlobal('fetch', mockJwks(kid));
 
-      expect(await verifyJwt(token, baseOpts())).not.toBeNull();
+      expect(await verifyJwt(token, baseOpts())).toBeNull();
     });
   });
 
   describe('nbf validation', () => {
     it('accepts a token whose nbf is in the past', async () => {
       const kid = nextKid();
-      const token = makeJwt({ sub: 'u', nbf: ts(-60), exp: ts(3600) }, kid);
+      const token = makeJwt({ sub: 'u', iss: 'http://localhost:4000', nbf: ts(-60), exp: ts(3600) }, kid);
       vi.stubGlobal('fetch', mockJwks(kid));
 
       expect(await verifyJwt(token, baseOpts())).not.toBeNull();
@@ -557,7 +582,7 @@ describe('verifyJwt', () => {
 
     it('accepts a token whose nbf is just in the future but within clock skew', async () => {
       const kid = nextKid();
-      const token = makeJwt({ sub: 'u', nbf: ts(3), exp: ts(3600) }, kid); // nbf 3 s ahead
+      const token = makeJwt({ sub: 'u', iss: 'http://localhost:4000', nbf: ts(3), exp: ts(3600) }, kid); // nbf 3 s ahead
       vi.stubGlobal('fetch', mockJwks(kid));
 
       expect(
@@ -569,7 +594,7 @@ describe('verifyJwt', () => {
   describe('iat validation', () => {
     it('accepts a token with iat in the past', async () => {
       const kid = nextKid();
-      const token = makeJwt({ sub: 'u', iat: ts(-60), exp: ts(3600) }, kid);
+      const token = makeJwt({ sub: 'u', iss: 'http://localhost:4000', iat: ts(-60), exp: ts(3600) }, kid);
       vi.stubGlobal('fetch', mockJwks(kid));
 
       expect(await verifyJwt(token, baseOpts())).not.toBeNull();
@@ -585,7 +610,7 @@ describe('verifyJwt', () => {
 
     it('accepts a token whose iat is just in the future but within clock skew', async () => {
       const kid = nextKid();
-      const token = makeJwt({ sub: 'u', iat: ts(3), exp: ts(3600) }, kid);
+      const token = makeJwt({ sub: 'u', iss: 'http://localhost:4000', iat: ts(3), exp: ts(3600) }, kid);
       vi.stubGlobal('fetch', mockJwks(kid));
 
       expect(

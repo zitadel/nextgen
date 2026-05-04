@@ -110,7 +110,7 @@ describe('nextgenMiddleware', () => {
     const kid = nextKid();
     const exp = Math.floor(Date.now() / 1000) + 3600;
     const token = makeJwt(
-      { sub: 'user-123', email: 'user@example.com', exp },
+      { sub: 'user-123', email: 'user@example.com', iss: 'http://localhost:4000', exp },
       kid,
     );
 
@@ -137,7 +137,7 @@ describe('nextgenMiddleware', () => {
     const kid = nextKid();
     const exp = Math.floor(Date.now() / 1000) + 3600;
     const token = makeJwt(
-      { sub: 'user-123', email: 'user@example.com', exp },
+      { sub: 'user-123', email: 'user@example.com', iss: 'http://localhost:4000', exp },
       kid,
     );
 
@@ -234,6 +234,55 @@ describe('nextgenMiddleware', () => {
     });
 
     expect(res.status).toBe(302);
+  });
+
+  it('strips x-nextgen-auth-token from proxied requests', async () => {
+    let capturedHeaders: Headers | undefined;
+    const upstreamFetch = vi.fn().mockImplementation((url: string, init: RequestInit) => {
+      capturedHeaders = init.headers as Headers;
+      return Promise.resolve(new Response('{}', { status: 200 }));
+    });
+    vi.stubGlobal('fetch', upstreamFetch);
+
+    const req = new NextRequest('http://localhost:3000/__nextgen/v1/flow', {
+      method: 'GET',
+      headers: {
+        'x-nextgen-auth-token': 'secret-session-token',
+        'content-type': 'application/json',
+      },
+    });
+    await nextgenMiddleware(req, { issuerUrl: 'http://localhost:4000' });
+
+    expect(capturedHeaders).toBeDefined();
+    expect(
+      (capturedHeaders as Headers).has('x-nextgen-auth-token'),
+    ).toBe(false);
+    expect(
+      (capturedHeaders as Headers).get('content-type'),
+    ).toBe('application/json');
+  });
+
+  it('accepts RS256 tokens by default (allowedAlgorithms defaults to RS256/ES256)', async () => {
+    const kid = nextKid();
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    const token = makeJwt(
+      { sub: 'user-123', email: 'user@example.com', iss: 'http://localhost:4000', exp },
+      kid,
+    );
+
+    vi.stubGlobal('fetch', mockJwks(kid));
+
+    const req = makeRequest(
+      'http://localhost:3000/admin',
+      `__nextgen_session=${token}`,
+    );
+    // No allowedAlgorithms specified — defaults to ['RS256', 'ES256']
+    const res = await nextgenMiddleware(req, {
+      issuerUrl: 'http://localhost:4000',
+      protectedRoutes: ['/admin'],
+    });
+
+    expect(res.status).not.toBe(302);
   });
 
   it('protected route with invalid token clears cookie and redirects', async () => {

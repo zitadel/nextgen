@@ -23,6 +23,15 @@ const HOP_BY_HOP: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * SDK-internal headers that must never be forwarded to the upstream backend.
+ * These headers carry session data between the middleware and server components;
+ * forwarding them upstream would expose internal state and allow header injection.
+ */
+const INTERNAL_HEADERS: ReadonlySet<string> = new Set([
+  'x-nextgen-auth-token',
+]);
+
+/**
  * Returns `true` when `pathname` matches at least one entry in `routes`.
  *
  * An entry ending with `*` matches any path that starts with the prefix
@@ -112,10 +121,11 @@ export async function nextgenMiddleware(
     protectedRoutes = [],
     ignoredRoutes = [],
     loginPath = '/login',
-    allowedAlgorithms,
+    allowedAlgorithms = ['RS256', 'ES256'] as const,
     clockSkewMs = 5000,
     audience,
     allowedTokenTypes = ['JWT', 'at+JWT'],
+    jwksTimeoutMs,
   } = options;
 
   const { pathname } = new URL(req.url);
@@ -136,6 +146,7 @@ export async function nextgenMiddleware(
     clockSkewMs,
     audience,
     allowedTokenTypes,
+    jwksTimeoutMs,
     pathname,
   });
 }
@@ -167,7 +178,8 @@ async function proxyRequest(
 
   const upstreamHeaders = new Headers();
   for (const [key, value] of req.headers.entries()) {
-    if (!HOP_BY_HOP.has(key.toLowerCase())) {
+    const lower = key.toLowerCase();
+    if (!HOP_BY_HOP.has(lower) && !INTERNAL_HEADERS.has(lower)) {
       upstreamHeaders.set(key, value);
     }
   }
@@ -248,6 +260,7 @@ interface AuthHandlerOptions {
    * and JWT verification.
    */
   readonly allowedTokenTypes: readonly string[];
+  readonly jwksTimeoutMs: number | undefined;
   readonly pathname: string;
 }
 
@@ -272,6 +285,7 @@ async function handleAuth(
     clockSkewMs,
     audience,
     allowedTokenTypes,
+    jwksTimeoutMs,
     pathname,
   } = opts;
 
@@ -289,6 +303,7 @@ async function handleAuth(
         clockSkewMs,
         audience,
         allowedTokenTypes,
+        jwksTimeoutMs,
       })
     : null;
 

@@ -57,12 +57,36 @@ function readBody(req: IncomingMessage): Promise<string> {
   });
 }
 
-function json(res: ServerResponse, status: number, body: unknown) {
+/**
+ * Returns CORS headers appropriate for the incoming request's Origin.
+ *
+ * When an Origin header is present, it is reflected back so that credentialed
+ * requests (cookies) work correctly — browsers reject responses that combine
+ * `credentials: 'include'` with `Access-Control-Allow-Origin: *`.
+ * When no Origin is present (server-to-server), a wildcard is returned.
+ */
+function corsHeaders(req: IncomingMessage): Record<string, string> {
+  const origin = req.headers.origin;
+  if (origin) {
+    return {
+      'Access-Control-Allow-Origin': origin,
+      'Access-Control-Allow-Credentials': 'true',
+    };
+  }
+  return { 'Access-Control-Allow-Origin': '*' };
+}
+
+function json(
+  res: ServerResponse,
+  req: IncomingMessage,
+  status: number,
+  body: unknown,
+) {
   const data = JSON.stringify(body);
   res.writeHead(status, {
     'Content-Type': 'application/json',
     'Content-Length': Buffer.byteLength(data),
-    'Access-Control-Allow-Origin': '*',
+    ...corsHeaders(req),
   });
   res.end(data);
 }
@@ -72,7 +96,7 @@ const JWKS_PATHS = new Set(['/.well-known/jwks.json', '/oauth/v2/keys']);
 const server = createServer(async (req, res) => {
   if (req.method === 'OPTIONS') {
     res.writeHead(204, {
-      'Access-Control-Allow-Origin': '*',
+      ...corsHeaders(req),
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       'Access-Control-Allow-Headers':
         'Content-Type, X-CSRF-Token, Nextgen-Proxy-Url, Nextgen-Secret-Key',
@@ -86,12 +110,12 @@ const server = createServer(async (req, res) => {
   console.log(`  --> ${req.method} ${url.pathname}`);
 
   if (JWKS_PATHS.has(url.pathname)) {
-    return json(res, 200, { keys: [jwk] });
+    return json(res, req, 200, { keys: [jwk] });
   }
 
   if (url.pathname === '/v1/logout') {
     if (req.method !== 'POST') {
-      return json(res, 405, { error: 'method_not_allowed' });
+      return json(res, req, 405, { error: 'method_not_allowed' });
     }
     console.log(`  <-- 200 logout`);
     res.writeHead(200, {
@@ -100,18 +124,18 @@ const server = createServer(async (req, res) => {
         `__nextgen_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`,
         `__nextgen_display=; Path=/; SameSite=Lax; Max-Age=0`,
       ],
-      'Access-Control-Allow-Origin': '*',
+      ...corsHeaders(req),
     });
     res.end(JSON.stringify({ status: 'ok' }));
     return;
   }
 
   if (url.pathname !== '/v1/flow') {
-    return json(res, 404, { error: 'not_found' });
+    return json(res, req, 404, { error: 'not_found' });
   }
 
   if (req.method !== 'POST') {
-    return json(res, 405, { error: 'method_not_allowed' });
+    return json(res, req, 405, { error: 'method_not_allowed' });
   }
 
   let body: { action?: string; email?: string; password?: string } = {};
@@ -123,7 +147,7 @@ const server = createServer(async (req, res) => {
 
   if (body.action === 'init' || !body.action) {
     console.log(`  <-- 200 login state`);
-    return json(res, 200, {
+    return json(res, req, 200, {
       name: 'login',
       status: 'pending',
       csrf_token: 'mock-csrf-' + Date.now(),
@@ -144,7 +168,7 @@ const server = createServer(async (req, res) => {
         `__nextgen_session=${token}; Path=/; HttpOnly; SameSite=Lax`,
         `__nextgen_display=${displayCookie}; Path=/; SameSite=Lax`,
       ],
-      'Access-Control-Allow-Origin': '*',
+      ...corsHeaders(req),
     });
     res.end(
       JSON.stringify({
@@ -157,7 +181,7 @@ const server = createServer(async (req, res) => {
   }
 
   console.log(`  <-- 400 unknown action: ${body.action}`);
-  return json(res, 400, { error: 'unknown_action' });
+  return json(res, req, 400, { error: 'unknown_action' });
 });
 
 server.listen(PORT, () => {

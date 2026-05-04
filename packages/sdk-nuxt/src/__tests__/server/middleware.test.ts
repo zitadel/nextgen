@@ -123,7 +123,7 @@ describe('createNextgenMiddleware (H3)', () => {
     const kid = nextKid();
     const exp = Math.floor(Date.now() / 1000) + 3600;
     const token = makeJwt(
-      { sub: 'user-nuxt', email: 'nuxt@example.com', exp },
+      { sub: 'user-nuxt', email: 'nuxt@example.com', iss: 'http://localhost:4000', exp },
       kid,
     );
 
@@ -167,7 +167,7 @@ describe('createNextgenMiddleware (H3)', () => {
     const kid = nextKid();
     const exp = Math.floor(Date.now() / 1000) + 3600;
     const token = makeJwt(
-      { sub: 'user-nuxt', email: 'nuxt@example.com', exp },
+      { sub: 'user-nuxt', email: 'nuxt@example.com', iss: 'http://localhost:4000', exp },
       kid,
     );
 

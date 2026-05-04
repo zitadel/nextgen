@@ -38,6 +38,15 @@ const HOP_BY_HOP: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * SDK-internal headers that must never be forwarded to the upstream backend.
+ * These headers carry session data between the middleware and server components;
+ * forwarding them upstream would expose internal state and allow header injection.
+ */
+const INTERNAL_HEADERS: ReadonlySet<string> = new Set([
+  'x-nextgen-auth-token',
+]);
+
+/**
  * Returns `true` when `pathname` matches at least one entry in `routes`.
  *
  * An entry ending with `*` matches any path that starts with the prefix
@@ -80,7 +89,8 @@ function matchesRoutes(pathname: string, routes: readonly string[]): boolean {
 function buildUpstreamHeaders(event: H3Event): Headers {
   const headers = new Headers();
   for (const [key, value] of Object.entries(event.node.req.headers)) {
-    if (!value || HOP_BY_HOP.has(key.toLowerCase())) {
+    const lower = key.toLowerCase();
+    if (!value || HOP_BY_HOP.has(lower) || INTERNAL_HEADERS.has(lower)) {
       continue;
     }
     headers.set(key, Array.isArray(value) ? value.join(', ') : value);
@@ -136,10 +146,11 @@ export function createNextgenMiddleware(
     protectedRoutes = [],
     ignoredRoutes = [],
     loginPath = '/login',
-    allowedAlgorithms,
+    allowedAlgorithms = ['RS256', 'ES256'] as const,
     clockSkewMs = 5000,
     audience,
     allowedTokenTypes = ['JWT', 'at+JWT'],
+    jwksTimeoutMs,
   } = options;
 
   return defineEventHandler(async (event: H3Event) => {
@@ -162,6 +173,7 @@ export function createNextgenMiddleware(
       clockSkewMs,
       audience,
       allowedTokenTypes,
+      jwksTimeoutMs,
       pathname,
     });
   });
@@ -247,6 +259,7 @@ interface AuthHandlerOptions {
    * and JWT verification.
    */
   readonly allowedTokenTypes: readonly string[];
+  readonly jwksTimeoutMs: number | undefined;
   readonly pathname: string;
 }
 
@@ -270,6 +283,7 @@ async function handleAuth(
     clockSkewMs,
     audience,
     allowedTokenTypes,
+    jwksTimeoutMs,
     pathname,
   } = opts;
 
@@ -287,6 +301,7 @@ async function handleAuth(
         clockSkewMs,
         audience,
         allowedTokenTypes,
+        jwksTimeoutMs,
       })
     : null;
 

@@ -110,20 +110,28 @@ export default defineEventHandler((event) => {
 
 ## Middleware options
 
-| Option              | Type       | Default                  | Description                                                                                                                |
-| ------------------- | ---------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
-| `issuerUrl`         | `string`   | `NEXTGEN_ISSUER_URL` env | Full URL of the Nextgen auth backend                                                                                       |
-| `proxyPath`         | `string`   | `"/__nextgen"`           | Path prefix proxied to the auth backend                                                                                    |
-| `protectedRoutes`   | `string[]` | `[]`                     | Paths requiring a valid session. Trailing `*` matches sub-paths                                                            |
-| `ignoredRoutes`     | `string[]` | `[]`                     | Paths skipped entirely — no JWT check, no tunnelling. Useful for webhooks or health checks. Trailing `*` matches sub-paths |
-| `loginPath`         | `string`   | `"/login"`               | Where to redirect unauthenticated users                                                                                    |
-| `allowedAlgorithms` | `string[]` | all accepted             | JWT `alg` values to accept (e.g. `["RS256"]`)                                                                              |
-| `clockSkewMs`       | `number`   | `5000`                   | Clock skew tolerance in ms for `exp`, `nbf`, `iat`                                                                         |
+| Option              | Type                    | Default                   | Description                                                                                                                |
+| ------------------- | ----------------------- | ------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `issuerUrl`         | `string`                | `NEXTGEN_ISSUER_URL` env  | Full URL of the Nextgen auth backend                                                                                       |
+| `proxyPath`         | `string`                | `"/__nextgen"`            | Path prefix proxied to the auth backend                                                                                    |
+| `protectedRoutes`   | `string[]`              | `[]`                      | Paths requiring a valid session. Trailing `*` matches sub-paths                                                            |
+| `ignoredRoutes`     | `string[]`              | `[]`                      | Paths skipped entirely — no JWT check, no tunnelling. Useful for webhooks or health checks. Trailing `*` matches sub-paths |
+| `loginPath`         | `string`                | `"/login"`                | Where to redirect unauthenticated users                                                                                    |
+| `allowedAlgorithms` | `string[]`              | `["RS256", "ES256"]`      | JWT `alg` values to accept. Tokens with any other algorithm are rejected before JWKS is fetched                            |
+| `allowedTokenTypes` | `string[]`              | `["JWT", "at+JWT"]`       | Accepted `typ` header values (case-insensitive). Set to `[]` to disable this check                                         |
+| `clockSkewMs`       | `number`                | `5000`                    | Clock skew tolerance in ms for `exp`, `nbf`, `iat`                                                                         |
+| `jwksTimeoutMs`     | `number`                | `5000`                    | Timeout in ms for JWKS endpoint requests. Token is rejected if the fetch exceeds this window                               |
+| `audience`          | `string \| string[]`    | not validated             | Expected `aud` claim value(s). When omitted, audience is not checked                                                       |
 
 ## How JWT verification works
 
 1. Bearer token from `Authorization` header is checked first; `__nextgen_session` cookie is the fallback
 2. The JWT header is decoded to extract `kid` and `alg`
-3. The public key is fetched from `{issuerUrl}/oauth/v2/keys` (JWKS) using the Web Crypto API and cached for 5 minutes per `kid`
-4. The signature is verified **before** any claim checks
-5. `exp`, `nbf`, and `iat` are validated with the configured clock skew tolerance
+3. Tokens with an `alg` not in `allowedAlgorithms` (`RS256`, `ES256` by default) are rejected immediately — no JWKS fetch
+4. Tokens with a `typ` not in `allowedTokenTypes` are rejected immediately
+5. The public key is fetched from `{issuerUrl}/oauth/v2/keys` (JWKS) using the Web Crypto API, with a 5 s timeout, and cached for 5 minutes per `kid`
+6. The signature is verified **before** any claim checks
+7. `iss` must be present and must equal `issuerUrl` — tokens without an issuer are rejected
+8. `exp` must be present and must be in the future (with `clockSkewMs` tolerance) — tokens without an expiry are rejected
+9. `nbf` and `iat` are validated with `clockSkewMs` tolerance when present
+10. The `x-nextgen-auth-token` header is stripped from all proxied requests to prevent internal state leakage
