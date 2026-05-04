@@ -1,0 +1,113 @@
+post:
+  operationId: createSession
+  summary: Create an anonymous session shell
+  description: |
+    Creates an anonymous session shell with no user and no factors (`state: building`).
+
+    This is optional — an `auth_attempt` will create a session implicitly if none is provided.
+    Use this explicitly when you want to:
+    - Pre-allocate a `session_id` before the user is known, so device/telemetry signals
+      can be correlated with the eventual authenticated session from the start.
+    - Track anonymous state (bot detection, device fingerprint) that survives until authentication.
+
+    The returned `session_token` authorises GET and DELETE on this session.
+    It is superseded when a handoff exchange completes — clients must replace it at that point.
+
+    Anonymous sessions expire aggressively (10-minute TTL). The TTL resets to the configured
+    full session TTL when the first authentication factor is written via a completing `auth_attempt`.
+  tags:
+    - Sessions
+  security:
+    - oauth2:
+        - sessions.write
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: create-session-request.yaml
+  responses:
+    '201':
+      description: Anonymous session created successfully.
+      content:
+        application/json:
+          schema:
+            $ref: session-with-token-response.yaml
+    '400':
+      description: Invalid request.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    default:
+      description: Unexpected error.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+
+get:
+  operationId: listSessions
+  summary: List sessions
+  description: |
+    Returns a paginated list of sessions for a project.
+    Requires a project service key (OAuth2 client credentials).
+  tags:
+    - Sessions
+  security:
+    - oauth2:
+        - sessions.read
+  parameters:
+    - $ref: ../../components/parameters/limit.yaml
+    - $ref: ../../components/parameters/page-token.yaml
+    - $ref: ../../components/parameters/project-id.yaml
+      description: Filter sessions by project.
+    - name: state
+      in: query
+      required: false
+      description: Filter sessions by lifecycle state.
+      schema:
+        type: string
+        enum:
+          - building
+          - active
+          - expired
+          - revoked
+    - name: user_id
+      in: query
+      required: false
+      description: Filter sessions by user.
+      schema:
+        $ref: ../../components/schemas/user-id.yaml
+  responses:
+    '200':
+      description: List of sessions.
+      content:
+        application/json:
+          schema:
+            $ref: session-list-response.yaml
+    '400':
+      description: Invalid request.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '403':
+      description: Insufficient permissions.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    default:
+      description: Unexpected error.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+
