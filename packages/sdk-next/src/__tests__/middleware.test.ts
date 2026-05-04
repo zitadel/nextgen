@@ -110,7 +110,12 @@ describe('nextgenMiddleware', () => {
     const kid = nextKid();
     const exp = Math.floor(Date.now() / 1000) + 3600;
     const token = makeJwt(
-      { sub: 'user-123', email: 'user@example.com', iss: 'http://localhost:4000', exp },
+      {
+        sub: 'user-123',
+        email: 'user@example.com',
+        iss: 'http://localhost:4000',
+        exp,
+      },
       kid,
     );
 
@@ -137,7 +142,12 @@ describe('nextgenMiddleware', () => {
     const kid = nextKid();
     const exp = Math.floor(Date.now() / 1000) + 3600;
     const token = makeJwt(
-      { sub: 'user-123', email: 'user@example.com', iss: 'http://localhost:4000', exp },
+      {
+        sub: 'user-123',
+        email: 'user@example.com',
+        iss: 'http://localhost:4000',
+        exp,
+      },
       kid,
     );
 
@@ -238,10 +248,12 @@ describe('nextgenMiddleware', () => {
 
   it('strips x-nextgen-auth-token from proxied requests', async () => {
     let capturedHeaders: Headers | undefined;
-    const upstreamFetch = vi.fn().mockImplementation((url: string, init: RequestInit) => {
-      capturedHeaders = init.headers as Headers;
-      return Promise.resolve(new Response('{}', { status: 200 }));
-    });
+    const upstreamFetch = vi
+      .fn()
+      .mockImplementation((url: string, init: RequestInit) => {
+        capturedHeaders = init.headers as Headers;
+        return Promise.resolve(new Response('{}', { status: 200 }));
+      });
     vi.stubGlobal('fetch', upstreamFetch);
 
     const req = new NextRequest('http://localhost:3000/__nextgen/v1/flow', {
@@ -254,19 +266,24 @@ describe('nextgenMiddleware', () => {
     await nextgenMiddleware(req, { issuerUrl: 'http://localhost:4000' });
 
     expect(capturedHeaders).toBeDefined();
-    expect(
-      (capturedHeaders as Headers).has('x-nextgen-auth-token'),
-    ).toBe(false);
-    expect(
-      (capturedHeaders as Headers).get('content-type'),
-    ).toBe('application/json');
+    expect((capturedHeaders as Headers).has('x-nextgen-auth-token')).toBe(
+      false,
+    );
+    expect((capturedHeaders as Headers).get('content-type')).toBe(
+      'application/json',
+    );
   });
 
   it('accepts RS256 tokens by default (allowedAlgorithms defaults to RS256/ES256)', async () => {
     const kid = nextKid();
     const exp = Math.floor(Date.now() / 1000) + 3600;
     const token = makeJwt(
-      { sub: 'user-123', email: 'user@example.com', iss: 'http://localhost:4000', exp },
+      {
+        sub: 'user-123',
+        email: 'user@example.com',
+        iss: 'http://localhost:4000',
+        exp,
+      },
       kid,
     );
 
