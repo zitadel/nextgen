@@ -15,6 +15,7 @@ post:
     cookie. The browser sends it automatically on subsequent requests.
   tags:
     - Flows
+  security: []
   requestBody:
     required: true
     content:

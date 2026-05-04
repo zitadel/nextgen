@@ -6,6 +6,7 @@ post:
     Does not advance the state machine. Used for risk evaluation.
   tags:
     - Flows
+  security: []
   parameters:
     - $ref: ../../../components/parameters/flow-id.yaml
     - $ref: ../../../components/parameters/flow-cookie.yaml
