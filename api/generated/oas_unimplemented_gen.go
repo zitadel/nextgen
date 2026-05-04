@@ -292,8 +292,8 @@ func (UnimplementedHandler) RevokeToken(ctx context.Context, req *RevokeRequest)
 // Does not advance the state machine. Used for risk evaluation.
 //
 // POST /flow/{id}/event
-func (UnimplementedHandler) SubmitFlowEvent(ctx context.Context, req *FlowEventRequest, params SubmitFlowEventParams) error {
-	return ht.ErrNotImplemented
+func (UnimplementedHandler) SubmitFlowEvent(ctx context.Context, req *FlowEventRequest, params SubmitFlowEventParams) (r SubmitFlowEventRes, _ error) {
+	return r, ht.ErrNotImplemented
 }
 
 // SubmitFlowStep implements submitFlowStep operation.

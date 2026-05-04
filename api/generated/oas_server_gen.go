@@ -215,7 +215,7 @@ type Handler interface {
 	// Does not advance the state machine. Used for risk evaluation.
 	//
 	// POST /flow/{id}/event
-	SubmitFlowEvent(ctx context.Context, req *FlowEventRequest, params SubmitFlowEventParams) error
+	SubmitFlowEvent(ctx context.Context, req *FlowEventRequest, params SubmitFlowEventParams) (SubmitFlowEventRes, error)
 	// SubmitFlowStep implements submitFlowStep operation.
 	//
 	// Submits user input for the current step. The server validates,

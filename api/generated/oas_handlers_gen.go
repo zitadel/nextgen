@@ -4659,7 +4659,7 @@ func (s *Server) handleSubmitFlowEventRequest(args [1]string, argsEscaped bool, 
 		}
 	}()
 
-	var response *SubmitFlowEventNoContent
+	var response SubmitFlowEventRes
 	if m := s.cfg.Middleware; m != nil {
 		mreq := middleware.Request{
 			Context:          ctx,
@@ -4684,7 +4684,7 @@ func (s *Server) handleSubmitFlowEventRequest(args [1]string, argsEscaped bool, 
 		type (
 			Request  = *FlowEventRequest
 			Params   = SubmitFlowEventParams
-			Response = *SubmitFlowEventNoContent
+			Response = SubmitFlowEventRes
 		)
 		response, err = middleware.HookMiddleware[
 			Request,
@@ -4695,12 +4695,12 @@ func (s *Server) handleSubmitFlowEventRequest(args [1]string, argsEscaped bool, 
 			mreq,
 			unpackSubmitFlowEventParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				err = s.h.SubmitFlowEvent(ctx, request, params)
+				response, err = s.h.SubmitFlowEvent(ctx, request, params)
 				return response, err
 			},
 		)
 	} else {
-		err = s.h.SubmitFlowEvent(ctx, request, params)
+		response, err = s.h.SubmitFlowEvent(ctx, request, params)
 	}
 	if err != nil {
 		if errRes, ok := errors.Into[*ErrorDetailsStatusCode](err); ok {

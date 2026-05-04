@@ -6062,8 +6062,18 @@ func (s *StepTexts) SetDescriptionKey(val OptNilString) {
 	s.DescriptionKey = val
 }
 
+type SubmitFlowEventBadRequest ErrorDetails
+
+func (*SubmitFlowEventBadRequest) submitFlowEventRes() {}
+
 // SubmitFlowEventNoContent is response for SubmitFlowEvent operation.
 type SubmitFlowEventNoContent struct{}
+
+func (*SubmitFlowEventNoContent) submitFlowEventRes() {}
+
+type SubmitFlowEventNotFound ErrorDetails
+
+func (*SubmitFlowEventNotFound) submitFlowEventRes() {}
 
 type SubmitFlowStepBadRequest FlowResponseHeaders
 

@@ -1179,11 +1179,43 @@ func encodeRevokeTokenResponse(response RevokeTokenRes, w http.ResponseWriter, s
 	}
 }
 
-func encodeSubmitFlowEventResponse(response *SubmitFlowEventNoContent, w http.ResponseWriter, span trace.Span) error {
-	w.WriteHeader(204)
-	span.SetStatus(codes.Ok, http.StatusText(204))
+func encodeSubmitFlowEventResponse(response SubmitFlowEventRes, w http.ResponseWriter, span trace.Span) error {
+	switch response := response.(type) {
+	case *SubmitFlowEventNoContent:
+		w.WriteHeader(204)
+		span.SetStatus(codes.Ok, http.StatusText(204))
 
-	return nil
+		return nil
+
+	case *SubmitFlowEventBadRequest:
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.WriteHeader(400)
+		span.SetStatus(codes.Error, http.StatusText(400))
+
+		e := new(jx.Encoder)
+		response.Encode(e)
+		if _, err := e.WriteTo(w); err != nil {
+			return errors.Wrap(err, "write")
+		}
+
+		return nil
+
+	case *SubmitFlowEventNotFound:
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.WriteHeader(404)
+		span.SetStatus(codes.Error, http.StatusText(404))
+
+		e := new(jx.Encoder)
+		response.Encode(e)
+		if _, err := e.WriteTo(w); err != nil {
+			return errors.Wrap(err, "write")
+		}
+
+		return nil
+
+	default:
+		return errors.Errorf("unexpected response type: %T", response)
+	}
 }
 
 func encodeSubmitFlowStepResponse(response SubmitFlowStepRes, w http.ResponseWriter, span trace.Span) error {
