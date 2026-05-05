@@ -482,4 +482,22 @@ describe('resolveConfig + handleProxy integration', () => {
     const [url] = (mock.mock.calls[0] as [string]) ?? [];
     expect(url).toBe('http://api.example.com/v2/users');
   });
+
+  it('defaults proxyTimeoutMs to 5000', () => {
+    const cfg = resolveConfig({ apiUrl: UPSTREAM });
+    expect(cfg.proxyTimeoutMs).toBe(5000);
+  });
+
+  it('respects custom proxyTimeoutMs', () => {
+    const cfg = resolveConfig({ apiUrl: UPSTREAM, proxyTimeoutMs: 10000 });
+    expect(cfg.proxyTimeoutMs).toBe(10000);
+  });
+
+  it('passes AbortSignal.timeout to fetch', async () => {
+    const mock = vi.mocked(fetch);
+    const cfg = resolveConfig({ apiUrl: UPSTREAM, proxyTimeoutMs: 3000 });
+    await handleProxy(new Request('http://edge.local/__nextgen/ping'), cfg);
+    const [, init] = (mock.mock.calls[0] as [string, RequestInit]) ?? [];
+    expect(init!.signal).toBeInstanceOf(AbortSignal);
+  });
 });

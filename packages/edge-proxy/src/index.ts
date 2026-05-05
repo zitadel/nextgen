@@ -67,6 +67,13 @@ export interface EdgeProxyConfig {
    * so these can override any forwarded header.
    */
   additionalHeaders?: Record<string, string> | undefined;
+  /**
+   * Timeout in milliseconds for upstream proxy requests.
+   * Requests that do not complete within this window are aborted with a
+   * network error. Defaults to 5 000 ms.
+   * @default 5000
+   */
+  proxyTimeoutMs?: number | undefined;
 }
 
 /** Resolved, normalised configuration with all defaults applied. */
@@ -75,6 +82,7 @@ export interface ResolvedConfig {
   readonly pathPrefix: string;
   readonly stripPrefix: boolean;
   readonly additionalHeaders: Record<string, string>;
+  readonly proxyTimeoutMs: number;
 }
 
 // ─── Config resolution ────────────────────────────────────────────────────────
@@ -115,6 +123,7 @@ export function resolveConfig(config: EdgeProxyConfig): ResolvedConfig {
     pathPrefix,
     stripPrefix: config.stripPrefix ?? true,
     additionalHeaders: config.additionalHeaders ?? {},
+    proxyTimeoutMs: config.proxyTimeoutMs ?? 5000,
   };
 }
 
@@ -220,6 +229,7 @@ export async function handleProxy(
     headers,
     body: hasBody ? req.body : undefined,
     redirect: 'manual',
+    signal: AbortSignal.timeout(config.proxyTimeoutMs),
     // duplex is required by the Fetch spec for streaming request bodies but is
     // not yet present in TypeScript's RequestInit. Cast suppresses the error.
     ...(hasBody ? { duplex: 'half' } : {}),
