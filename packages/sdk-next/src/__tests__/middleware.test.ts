@@ -604,6 +604,33 @@ describe('nextgenMiddleware', () => {
     });
   });
 
+  describe('proxy: Location header stripping (S-1)', () => {
+    it('strips location header from upstream response to prevent internal URL leakage', async () => {
+      const upstreamHeaders = new Headers();
+      upstreamHeaders.set('content-type', 'application/json');
+      upstreamHeaders.set(
+        'location',
+        'http://internal-auth.corp:4000/callback',
+      );
+      vi.stubGlobal(
+        'fetch',
+        vi
+          .fn()
+          .mockResolvedValue(
+            new Response('{}', { status: 302, headers: upstreamHeaders }),
+          ),
+      );
+
+      const req = new NextRequest('http://localhost:3000/__nextgen/v1/flow');
+      const res = await nextgenMiddleware(req, {
+        issuerUrl: 'http://localhost:4000',
+      });
+
+      expect(res.headers.get('location')).toBeNull();
+      expect(res.headers.get('content-type')).toBe('application/json');
+    });
+  });
+
   describe('tunnel: client header injection prevention (P-1)', () => {
     it('does not preserve client-injected x-middleware-override-headers', async () => {
       const req = new NextRequest('http://localhost:3000/', {
