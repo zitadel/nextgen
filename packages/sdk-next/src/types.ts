@@ -103,4 +103,12 @@ export type NextgenMiddlewareOptions = {
    * @default 5000
    */
   jwksTimeoutMs?: number;
+
+  /**
+   * Timeout in milliseconds for upstream proxy requests.
+   * Requests that do not complete within this window are aborted with a
+   * network error. Defaults to 5 000 ms.
+   * @default 5000
+   */
+  proxyTimeoutMs?: number;
 };

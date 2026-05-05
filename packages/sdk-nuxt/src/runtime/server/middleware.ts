@@ -186,6 +186,7 @@ export function createNextgenMiddleware(
     audience,
     allowedTokenTypes = ['JWT', 'at+JWT'],
     jwksTimeoutMs,
+    proxyTimeoutMs = 5000,
   } = options;
 
   // Guard against open-redirect: loginPath must be a relative path. An absolute
@@ -214,7 +215,7 @@ export function createNextgenMiddleware(
     }
 
     if (pathname === proxyPath || pathname.startsWith(`${proxyPath}/`)) {
-      return proxyRequest(event, issuerUrl, proxyPath, url);
+      return proxyRequest(event, issuerUrl, proxyPath, url, proxyTimeoutMs);
     }
 
     return handleAuth(event, {
@@ -247,6 +248,7 @@ async function proxyRequest(
   issuerUrl: string,
   proxyPath: string,
   url: URL,
+  proxyTimeoutMs: number,
 ): Promise<ReadableStream<Uint8Array> | null> {
   const suffix = url.pathname.slice(proxyPath.length);
   const target = `${issuerUrl}${suffix}${url.search}`;
@@ -261,6 +263,7 @@ async function proxyRequest(
     headers: buildUpstreamHeaders(event),
     body,
     redirect: 'manual',
+    signal: AbortSignal.timeout(proxyTimeoutMs),
   });
 
   event.node.res.statusCode = upstream.status;
