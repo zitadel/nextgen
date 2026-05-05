@@ -18,12 +18,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+      # lint openapi
+      - name: Set up node
+        uses: actions/setup-node@v4
+      - name: Install Redocly CLI
+        run: npm install -g @redocly/cli@latest
+      - name: Run linting
+        run: redocly lint api/openapi/openapi-spec.yaml --format=github-actions
+        
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
           cache: true
       - name: Install embedded-postgres runtime deps
         run: sudo apt-get update -qq && sudo apt-get install -y -qq libicu-dev libssl-dev
+      - run: go generate ./...
       - run: go vet ./...
       - run: go test -v -timeout=10m ./...
 
