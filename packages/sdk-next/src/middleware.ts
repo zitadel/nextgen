@@ -158,6 +158,7 @@ export async function nextgenMiddleware(
     audience,
     allowedTokenTypes = ['JWT', 'at+JWT'],
     jwksTimeoutMs,
+    proxyTimeoutMs = 5000,
   } = options;
 
   // Guard against open-redirect: loginPath must be a relative path. An absolute
@@ -182,7 +183,7 @@ export async function nextgenMiddleware(
   }
 
   if (pathname === proxyPath || pathname.startsWith(`${proxyPath}/`)) {
-    return proxyRequest(req, issuerUrl, proxyPath);
+    return proxyRequest(req, issuerUrl, proxyPath, proxyTimeoutMs);
   }
 
   return handleAuth(req, {
@@ -218,6 +219,7 @@ async function proxyRequest(
   req: NextRequest,
   issuerUrl: string,
   proxyPath: string,
+  proxyTimeoutMs: number,
 ): Promise<Response> {
   const url = new URL(req.url);
   const suffix = url.pathname.slice(proxyPath.length);
@@ -260,6 +262,7 @@ async function proxyRequest(
     headers: upstreamHeaders,
     body: hasBody ? req.body : undefined,
     redirect: 'manual',
+    signal: AbortSignal.timeout(proxyTimeoutMs),
     ...(hasBody ? { duplex: 'half' } : {}),
   } as RequestInit);
 
