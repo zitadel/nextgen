@@ -178,6 +178,7 @@ describe('handleProxy', () => {
     const req = new Request('http://edge.local/__nextgen/hello', {
       headers: {
         connection: 'keep-alive',
+        host: 'edge.local',
         'keep-alive': 'timeout=5',
         'transfer-encoding': 'chunked',
         te: 'trailers',
@@ -192,6 +193,9 @@ describe('handleProxy', () => {
     const [, init] = mock.mock.calls[0] ?? [];
     const forwarded = init!.headers as Headers;
     expect(forwarded.has('connection')).toBe(false);
+    // host is stripped so the upstream fetch sets the correct Host header
+    // from the target URL rather than forwarding the client's hostname.
+    expect(forwarded.has('host')).toBe(false);
     expect(forwarded.has('keep-alive')).toBe(false);
     expect(forwarded.has('transfer-encoding')).toBe(false);
     expect(forwarded.has('te')).toBe(false);
