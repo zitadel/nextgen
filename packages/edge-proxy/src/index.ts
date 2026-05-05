@@ -241,7 +241,13 @@ export async function handleProxy(
 
   const responseHeaders = new Headers();
   for (const [k, v] of upstreamRes.headers.entries()) {
-    if (!HOP_BY_HOP.has(k.toLowerCase()) && k.toLowerCase() !== 'set-cookie') {
+    if (
+      !HOP_BY_HOP.has(k.toLowerCase()) &&
+      k.toLowerCase() !== 'set-cookie' &&
+      // location is stripped to prevent leaking internal upstream URLs to the
+      // browser — this proxy is a pure API proxy and never issues redirects.
+      k.toLowerCase() !== 'location'
+    ) {
       responseHeaders.set(k, v);
     }
   }

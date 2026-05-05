@@ -442,6 +442,21 @@ describe('handleProxy', () => {
     expect(res?.headers.get('content-type')).toBe('application/json');
   });
 
+  it('strips location header from upstream response to prevent internal URL leakage', async () => {
+    const upstreamHeaders = new Headers({
+      'content-type': 'application/json',
+      location: 'http://internal-auth.corp:4000/callback',
+    });
+    stubFetch(new Response('{}', { status: 302, headers: upstreamHeaders }));
+    const cfg = makeConfig();
+    const res = await handleProxy(
+      new Request('http://edge.local/__nextgen/ping'),
+      cfg,
+    );
+    expect(res?.headers.has('location')).toBe(false);
+    expect(res?.headers.get('content-type')).toBe('application/json');
+  });
+
   it('preserves multiple Set-Cookie headers individually', async () => {
     stubFetch(
       mockResponse('{}', {
