@@ -116,5 +116,5 @@ require (
 tool (
 	github.com/dmarkham/enumer
 	github.com/ogen-go/ogen/cmd/ogen
-	go.uber.org/mock/mockgen@latest
+	go.uber.org/mock/mockgen
 )
