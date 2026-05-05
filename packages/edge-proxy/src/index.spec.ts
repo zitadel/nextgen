@@ -190,7 +190,7 @@ describe('handleProxy', () => {
     });
     await handleProxy(req, cfg);
     const [, init] = mock.mock.calls[0] ?? [];
-    const forwarded = init?.headers as Headers;
+    const forwarded = init!.headers as Headers;
     expect(forwarded.has('connection')).toBe(false);
     expect(forwarded.has('keep-alive')).toBe(false);
     expect(forwarded.has('transfer-encoding')).toBe(false);
@@ -209,7 +209,7 @@ describe('handleProxy', () => {
     const cfg = makeConfig();
     await handleProxy(new Request('http://edge.local/__nextgen/ping'), cfg);
     const [, init] = mock.mock.calls[0] ?? [];
-    expect((init?.headers as Headers).get('x-forwarded-host')).toBe(
+    expect((init!.headers as Headers).get('x-forwarded-host')).toBe(
       'edge.local',
     );
   });
@@ -219,7 +219,7 @@ describe('handleProxy', () => {
     const cfg = makeConfig();
     await handleProxy(new Request('https://edge.local/__nextgen/ping'), cfg);
     const [, init] = mock.mock.calls[0] ?? [];
-    expect((init?.headers as Headers).get('x-forwarded-proto')).toBe('https');
+    expect((init!.headers as Headers).get('x-forwarded-proto')).toBe('https');
   });
 
   it('preserves x-forwarded-host when already present', async () => {
@@ -230,7 +230,7 @@ describe('handleProxy', () => {
     });
     await handleProxy(req, cfg);
     const [, init] = mock.mock.calls[0] ?? [];
-    expect((init?.headers as Headers).get('x-forwarded-host')).toBe(
+    expect((init!.headers as Headers).get('x-forwarded-host')).toBe(
       'cdn.example.com',
     );
   });
@@ -243,7 +243,7 @@ describe('handleProxy', () => {
     });
     await handleProxy(req, cfg);
     const [, init] = mock.mock.calls[0] ?? [];
-    expect((init?.headers as Headers).get('x-forwarded-proto')).toBe('https');
+    expect((init!.headers as Headers).get('x-forwarded-proto')).toBe('https');
   });
 
   it('preserves x-forwarded-for when already present', async () => {
@@ -254,7 +254,7 @@ describe('handleProxy', () => {
     });
     await handleProxy(req, cfg);
     const [, init] = mock.mock.calls[0] ?? [];
-    expect((init?.headers as Headers).get('x-forwarded-for')).toBe('1.2.3.4');
+    expect((init!.headers as Headers).get('x-forwarded-for')).toBe('1.2.3.4');
   });
 
   it('sets x-forwarded-for from cf-connecting-ip when absent', async () => {
@@ -265,7 +265,7 @@ describe('handleProxy', () => {
     });
     await handleProxy(req, cfg);
     const [, init] = mock.mock.calls[0] ?? [];
-    expect((init?.headers as Headers).get('x-forwarded-for')).toBe('5.6.7.8');
+    expect((init!.headers as Headers).get('x-forwarded-for')).toBe('5.6.7.8');
   });
 
   it('falls back to x-real-ip for x-forwarded-for when cf-connecting-ip absent', async () => {
@@ -276,7 +276,7 @@ describe('handleProxy', () => {
     });
     await handleProxy(req, cfg);
     const [, init] = mock.mock.calls[0] ?? [];
-    expect((init?.headers as Headers).get('x-forwarded-for')).toBe(
+    expect((init!.headers as Headers).get('x-forwarded-for')).toBe(
       '9.10.11.12',
     );
   });
@@ -286,7 +286,7 @@ describe('handleProxy', () => {
     const cfg = makeConfig();
     await handleProxy(new Request('http://edge.local/__nextgen/ping'), cfg);
     const [, init] = mock.mock.calls[0] ?? [];
-    expect((init?.headers as Headers).has('x-forwarded-for')).toBe(false);
+    expect((init!.headers as Headers).has('x-forwarded-for')).toBe(false);
   });
 
   // ── additionalHeaders ─────────────────────────────────────────────────────
@@ -299,7 +299,7 @@ describe('handleProxy', () => {
     });
     await handleProxy(new Request('http://edge.local/__nextgen/ping'), cfg);
     const [, init] = mock.mock.calls[0] ?? [];
-    const h = init?.headers as Headers;
+    const h = init!.headers as Headers;
     expect(h.get('x-tenant-id')).toBe('acme');
     expect(h.get('x-version')).toBe('2');
   });
@@ -313,7 +313,7 @@ describe('handleProxy', () => {
     const req = new Request('http://edge.local/__nextgen/ping');
     await handleProxy(req, cfg);
     const [, init] = mock.mock.calls[0] ?? [];
-    expect((init?.headers as Headers).get('x-forwarded-proto')).toBe('https');
+    expect((init!.headers as Headers).get('x-forwarded-proto')).toBe('https');
   });
 
   // ── Request body ──────────────────────────────────────────────────────────
