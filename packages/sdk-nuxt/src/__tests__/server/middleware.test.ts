@@ -754,6 +754,36 @@ describe('createNextgenMiddleware (H3)', () => {
     });
   });
 
+  describe('proxy: Location header stripping (S-1)', () => {
+    it('strips location header from upstream response to prevent internal URL leakage', async () => {
+      const upstreamHeaders = new Headers();
+      upstreamHeaders.set('content-type', 'application/json');
+      upstreamHeaders.set(
+        'location',
+        'http://internal-auth.corp:4000/callback',
+      );
+      vi.stubGlobal(
+        'fetch',
+        vi
+          .fn()
+          .mockResolvedValue(
+            new Response('{}', { status: 302, headers: upstreamHeaders }),
+          ),
+      );
+
+      const app = createApp();
+      app.use(createNextgenMiddleware({ issuerUrl: 'http://localhost:4000' }));
+
+      const handler = toWebHandler(app);
+      const res = await handler(
+        new Request('http://localhost:3000/__nextgen/v1/flow'),
+      );
+
+      expect(res.headers.get('location')).toBeNull();
+      expect(res.headers.get('content-type')).toBe('application/json');
+    });
+  });
+
   describe('loginPath validation (P-3)', () => {
     it('throws synchronously when loginPath is an absolute URL', () => {
       expect(() =>

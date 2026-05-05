@@ -275,7 +275,10 @@ async function proxyRequest(
   for (const [key, value] of upstream.headers.entries()) {
     if (
       !HOP_BY_HOP.has(key.toLowerCase()) &&
-      key.toLowerCase() !== 'set-cookie'
+      key.toLowerCase() !== 'set-cookie' &&
+      // location is stripped to prevent leaking internal upstream URLs to the
+      // browser — this proxy is a pure API proxy and never issues redirects.
+      key.toLowerCase() !== 'location'
     ) {
       event.node.res.setHeader(key, value);
     }
