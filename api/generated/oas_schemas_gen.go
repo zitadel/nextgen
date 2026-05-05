@@ -3,6 +3,7 @@
 package api
 
 import (
+	"fmt"
 	"io"
 	"net/url"
 	"time"
@@ -10,6 +11,10 @@ import (
 	"github.com/go-faster/errors"
 	"github.com/go-faster/jx"
 )
+
+func (s *ErrorDetailsStatusCode) Error() string {
+	return fmt.Sprintf("code %d: %+v", s.StatusCode, s.Response)
+}
 
 type AttemptID string
 
@@ -996,29 +1001,14 @@ func (s *ErrorDetailsStatusCode) SetResponse(val ErrorDetails) {
 	s.Response = val
 }
 
-func (*ErrorDetailsStatusCode) authorizeDeviceRes()        {}
-func (*ErrorDetailsStatusCode) authorizeGetRes()           {}
-func (*ErrorDetailsStatusCode) createAuthAttemptRes()      {}
-func (*ErrorDetailsStatusCode) createHandoffRes()          {}
-func (*ErrorDetailsStatusCode) createSessionRes()          {}
-func (*ErrorDetailsStatusCode) endSessionRes()             {}
-func (*ErrorDetailsStatusCode) exchangeHandoffRes()        {}
-func (*ErrorDetailsStatusCode) getAuthAttemptRes()         {}
 func (*ErrorDetailsStatusCode) getHealthRes()              {}
 func (*ErrorDetailsStatusCode) getKeysRes()                {}
 func (*ErrorDetailsStatusCode) getLiveRes()                {}
 func (*ErrorDetailsStatusCode) getOpenIDConfigurationRes() {}
 func (*ErrorDetailsStatusCode) getReadyRes()               {}
-func (*ErrorDetailsStatusCode) getSessionRes()             {}
 func (*ErrorDetailsStatusCode) getTokenRes()               {}
 func (*ErrorDetailsStatusCode) getUserInfoRes()            {}
-func (*ErrorDetailsStatusCode) introspectRes()             {}
-func (*ErrorDetailsStatusCode) issueChallengeRes()         {}
-func (*ErrorDetailsStatusCode) listSessionsRes()           {}
-func (*ErrorDetailsStatusCode) listUsersRes()              {}
-func (*ErrorDetailsStatusCode) revokeSessionRes()          {}
 func (*ErrorDetailsStatusCode) revokeTokenRes()            {}
-func (*ErrorDetailsStatusCode) verifyChallengeProofRes()   {}
 
 type ExchangeHandoffBadRequest ErrorDetails
 
@@ -6072,8 +6062,18 @@ func (s *StepTexts) SetDescriptionKey(val OptNilString) {
 	s.DescriptionKey = val
 }
 
+type SubmitFlowEventBadRequest ErrorDetails
+
+func (*SubmitFlowEventBadRequest) submitFlowEventRes() {}
+
 // SubmitFlowEventNoContent is response for SubmitFlowEvent operation.
 type SubmitFlowEventNoContent struct{}
+
+func (*SubmitFlowEventNoContent) submitFlowEventRes() {}
+
+type SubmitFlowEventNotFound ErrorDetails
+
+func (*SubmitFlowEventNotFound) submitFlowEventRes() {}
 
 type SubmitFlowStepBadRequest FlowResponseHeaders
 

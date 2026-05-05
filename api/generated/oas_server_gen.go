@@ -215,7 +215,7 @@ type Handler interface {
 	// Does not advance the state machine. Used for risk evaluation.
 	//
 	// POST /flow/{id}/event
-	SubmitFlowEvent(ctx context.Context, req *FlowEventRequest, params SubmitFlowEventParams) error
+	SubmitFlowEvent(ctx context.Context, req *FlowEventRequest, params SubmitFlowEventParams) (SubmitFlowEventRes, error)
 	// SubmitFlowStep implements submitFlowStep operation.
 	//
 	// Submits user input for the current step. The server validates,
@@ -255,6 +255,10 @@ type Handler interface {
 	//
 	// POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify
 	VerifyChallengeProof(ctx context.Context, req *VerifyChallengeRequest, params VerifyChallengeProofParams) (VerifyChallengeProofRes, error)
+	// NewError creates *ErrorDetailsStatusCode from error returned by handler.
+	//
+	// Used for common default response.
+	NewError(ctx context.Context, err error) *ErrorDetailsStatusCode
 }
 
 // Server implements http server based on OpenAPI v3 specification and
