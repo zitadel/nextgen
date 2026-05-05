@@ -49,19 +49,21 @@ The worker uses `env.ASSETS.fetch(req)` for all non-`/__nextgen` requests, so yo
 
 1. Copy `etc/vercel/nextgen.ts` to `api/__nextgen/[...path].ts` in your project.
 
-2. Set your backend URL in the Vercel dashboard or via CLI:
+2. Copy `etc/vercel/vercel.json` to your project root (or merge with an existing one). The rewrite routes `/__nextgen/*` browser requests to the edge function — without it, the function only handles `/api/__nextgen/*` and the proxy will not intercept requests.
+
+3. Set your backend URL in the Vercel dashboard or via CLI:
 
    ```bash
    vercel env add NEXTGEN_API_URL
    ```
 
-3. Deploy:
+4. Deploy:
 
    ```bash
    vercel deploy
    ```
 
-Vercel routes `/__nextgen/*` to the edge function and serves everything else from your SPA build output.
+Vercel routes `/__nextgen/*` to the edge function via the rewrite and serves everything else from your SPA build output.
 
 ---
 

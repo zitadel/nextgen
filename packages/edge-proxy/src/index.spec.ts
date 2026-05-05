@@ -479,8 +479,7 @@ describe('resolveConfig + handleProxy integration', () => {
     const mock = vi.mocked(fetch);
     const cfg = resolveConfig({ apiUrl: 'http://api.example.com/v2' });
     await handleProxy(new Request('http://edge.local/__nextgen/users'), cfg);
-    // The upstream URL uses the host from apiUrl; pathname comes from the request
     const [url] = (mock.mock.calls[0] as [string]) ?? [];
-    expect(url).toContain('api.example.com');
+    expect(url).toBe('http://api.example.com/v2/users');
   });
 });

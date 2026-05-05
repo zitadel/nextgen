@@ -205,9 +205,12 @@ export async function handleProxy(
   const upstream = new URL(req.url);
   upstream.protocol = base.protocol;
   upstream.host = base.host;
+  // Preserve any base path embedded in apiUrl (e.g. https://api.example.com/v2).
+  // Trailing slash on base path is stripped to avoid double-slash when joining.
+  const basePath = base.pathname.replace(/\/$/, '');
   upstream.pathname = config.stripPrefix
-    ? url.pathname.slice(config.pathPrefix.length) || '/'
-    : url.pathname;
+    ? basePath + (url.pathname.slice(config.pathPrefix.length) || '/')
+    : basePath + url.pathname;
 
   const headers = buildUpstreamHeaders(req, url, config);
   const hasBody = !['GET', 'HEAD'].includes(req.method);
