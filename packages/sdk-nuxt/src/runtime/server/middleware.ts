@@ -28,6 +28,10 @@ declare module 'h3' {
  */
 const HOP_BY_HOP: ReadonlySet<string> = new Set([
   'connection',
+  // host is not a hop-by-hop header per RFC 7230, but it must be stripped so
+  // the fetch implementation derives the correct Host from the upstream URL
+  // rather than forwarding the client's Host and causing SNI/vhost mismatches.
+  'host',
   'keep-alive',
   'proxy-authenticate',
   'proxy-authorization',
