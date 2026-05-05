@@ -1,14 +1,29 @@
+# Dependency directories
 node_modules
+
+# Build output
 /dist
 /build
 /out
+
+# Version control directories
 .git
 .devbox
+
+# Logs
 *.log
+
+# Other common directories to ignore
 /public
 /assets
+
+# Minified files
 *.min.*
+
+# Source maps
 *.map
+
+# Image files
 *.png
 *.jpg
 *.jpeg
