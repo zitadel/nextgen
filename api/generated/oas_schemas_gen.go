@@ -828,6 +828,39 @@ func (s *CreateSessionRequestUserAgentAdditional) init() CreateSessionRequestUse
 	return m
 }
 
+type CreateUserBadRequest ErrorDetails
+
+func (*CreateUserBadRequest) createUserRes() {}
+
+type CreateUserForbidden ErrorDetails
+
+func (*CreateUserForbidden) createUserRes() {}
+
+// Request to create a user. The content of this request is determined
+// by the configured schema for users.
+// Ref: #
+type CreateUserRequest struct{}
+
+// The content of this response is determined by the configured
+// schema for users.
+// Ref: #
+type CreateUserResponse map[string]jx.Raw
+
+func (s *CreateUserResponse) init() CreateUserResponse {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+func (*CreateUserResponse) createUserRes() {}
+
+type CreateUserUnauthorized ErrorDetails
+
+func (*CreateUserUnauthorized) createUserRes() {}
+
 // Ref: #
 type DeviceAuthorizationResponse struct {
 	// The device code that the client will use to poll for authorization.
@@ -961,6 +994,7 @@ func (*ErrorDetails) createSessionRes()   {}
 func (*ErrorDetails) endSessionRes()      {}
 func (*ErrorDetails) getAuthAttemptRes()  {}
 func (*ErrorDetails) introspectRes()      {}
+func (*ErrorDetails) listUsersRes()       {}
 func (*ErrorDetails) submitFlowStepRes()  {}
 
 // Additional error-specific context.
@@ -3029,18 +3063,6 @@ func (s *ListSessionsState) UnmarshalText(data []byte) error {
 type ListSessionsUnauthorized ErrorDetails
 
 func (*ListSessionsUnauthorized) listSessionsRes() {}
-
-type ListUsersBadRequest ErrorDetails
-
-func (*ListUsersBadRequest) listUsersRes() {}
-
-type ListUsersInternalServerError ErrorDetails
-
-func (*ListUsersInternalServerError) listUsersRes() {}
-
-type ListUsersOKApplicationJSON []jx.Raw
-
-func (*ListUsersOKApplicationJSON) listUsersRes() {}
 
 type OAuth2 struct {
 	Token  string
@@ -6171,6 +6193,37 @@ func (s *TotpProofTotp) SetCode(val string) {
 }
 
 type UserID string
+
+// Paginated list of users.
+// Ref: #
+type UserListResponse struct {
+	Users []jx.Raw `json:"users"`
+	// Token to pass as `page_token` in the next request to fetch the following page.
+	// Absent when there are no more results.
+	NextPageToken OptNilPageToken `json:"next_page_token"`
+}
+
+// GetUsers returns the value of Users.
+func (s *UserListResponse) GetUsers() []jx.Raw {
+	return s.Users
+}
+
+// GetNextPageToken returns the value of NextPageToken.
+func (s *UserListResponse) GetNextPageToken() OptNilPageToken {
+	return s.NextPageToken
+}
+
+// SetUsers sets the value of Users.
+func (s *UserListResponse) SetUsers(val []jx.Raw) {
+	s.Users = val
+}
+
+// SetNextPageToken sets the value of NextPageToken.
+func (s *UserListResponse) SetNextPageToken(val OptNilPageToken) {
+	s.NextPageToken = val
+}
+
+func (*UserListResponse) listUsersRes() {}
 
 type UsernamePassword struct {
 	Username string

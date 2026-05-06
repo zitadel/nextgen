@@ -289,6 +289,65 @@ func encodeCreateSessionResponse(response CreateSessionRes, w http.ResponseWrite
 	}
 }
 
+func encodeCreateUserResponse(response CreateUserRes, w http.ResponseWriter, span trace.Span) error {
+	switch response := response.(type) {
+	case *CreateUserResponse:
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.WriteHeader(201)
+		span.SetStatus(codes.Ok, http.StatusText(201))
+
+		e := new(jx.Encoder)
+		response.Encode(e)
+		if _, err := e.WriteTo(w); err != nil {
+			return errors.Wrap(err, "write")
+		}
+
+		return nil
+
+	case *CreateUserBadRequest:
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.WriteHeader(400)
+		span.SetStatus(codes.Error, http.StatusText(400))
+
+		e := new(jx.Encoder)
+		response.Encode(e)
+		if _, err := e.WriteTo(w); err != nil {
+			return errors.Wrap(err, "write")
+		}
+
+		return nil
+
+	case *CreateUserUnauthorized:
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.WriteHeader(401)
+		span.SetStatus(codes.Error, http.StatusText(401))
+
+		e := new(jx.Encoder)
+		response.Encode(e)
+		if _, err := e.WriteTo(w); err != nil {
+			return errors.Wrap(err, "write")
+		}
+
+		return nil
+
+	case *CreateUserForbidden:
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.WriteHeader(403)
+		span.SetStatus(codes.Error, http.StatusText(403))
+
+		e := new(jx.Encoder)
+		response.Encode(e)
+		if _, err := e.WriteTo(w); err != nil {
+			return errors.Wrap(err, "write")
+		}
+
+		return nil
+
+	default:
+		return errors.Errorf("unexpected response type: %T", response)
+	}
+}
+
 func encodeEndSessionResponse(response EndSessionRes, w http.ResponseWriter, span trace.Span) error {
 	switch response := response.(type) {
 	case *EndSessionNoContent:
@@ -1037,7 +1096,7 @@ func encodeListSessionsResponse(response ListSessionsRes, w http.ResponseWriter,
 
 func encodeListUsersResponse(response ListUsersRes, w http.ResponseWriter, span trace.Span) error {
 	switch response := response.(type) {
-	case *ListUsersOKApplicationJSON:
+	case *UserListResponse:
 		if err := func() error {
 			if err := response.Validate(); err != nil {
 				return err
@@ -1058,23 +1117,10 @@ func encodeListUsersResponse(response ListUsersRes, w http.ResponseWriter, span 
 
 		return nil
 
-	case *ListUsersBadRequest:
+	case *ErrorDetails:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
 		span.SetStatus(codes.Error, http.StatusText(400))
-
-		e := new(jx.Encoder)
-		response.Encode(e)
-		if _, err := e.WriteTo(w); err != nil {
-			return errors.Wrap(err, "write")
-		}
-
-		return nil
-
-	case *ListUsersInternalServerError:
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		w.WriteHeader(500)
-		span.SetStatus(codes.Error, http.StatusText(500))
 
 		e := new(jx.Encoder)
 		response.Encode(e)

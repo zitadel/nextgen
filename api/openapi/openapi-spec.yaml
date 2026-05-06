@@ -40,8 +40,6 @@ paths:
     $ref: endpoints/livez/methods.yaml
   /readyz:
     $ref: endpoints/readyz/methods.yaml
-  /user:
-    $ref: endpoints/users/methods.yaml
   /flow:
     $ref: endpoints/flow/methods.yaml
   /flow/{id}:
@@ -68,8 +66,8 @@ paths:
     $ref: endpoints/sessions/by_id/methods.yaml
   /users:
     $ref: endpoints/users/methods.yaml
-  /users/{user_id}:
-    $ref: endpoints/users/by_id/methods.yaml
+#  /users/{user_id}:
+#    $ref: endpoints/users/by_id/methods.yaml
 
 components:
   securitySchemes:

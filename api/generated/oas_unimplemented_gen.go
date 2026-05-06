@@ -95,6 +95,15 @@ func (UnimplementedHandler) CreateSession(ctx context.Context, req *CreateSessio
 	return r, ht.ErrNotImplemented
 }
 
+// CreateUser implements createUser operation.
+//
+// Create user.
+//
+// POST /users
+func (UnimplementedHandler) CreateUser(ctx context.Context, req *CreateUserRequest) (r CreateUserRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // EndSession implements endSession operation.
 //
 // End a session.
@@ -261,7 +270,7 @@ func (UnimplementedHandler) ListSessions(ctx context.Context, params ListSession
 //
 // List users.
 //
-// GET /user
+// GET /users
 func (UnimplementedHandler) ListUsers(ctx context.Context, params ListUsersParams) (r ListUsersRes, _ error) {
 	return r, ht.ErrNotImplemented
 }

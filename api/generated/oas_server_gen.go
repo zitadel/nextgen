@@ -72,6 +72,12 @@ type Handler interface {
 	//
 	// POST /sessions
 	CreateSession(ctx context.Context, req *CreateSessionRequest) (CreateSessionRes, error)
+	// CreateUser implements createUser operation.
+	//
+	// Create user.
+	//
+	// POST /users
+	CreateUser(ctx context.Context, req *CreateUserRequest) (CreateUserRes, error)
 	// EndSession implements endSession operation.
 	//
 	// End a session.
@@ -193,7 +199,7 @@ type Handler interface {
 	//
 	// List users.
 	//
-	// GET /user
+	// GET /users
 	ListUsers(ctx context.Context, params ListUsersParams) (ListUsersRes, error)
 	// RevokeSession implements revokeSession operation.
 	//

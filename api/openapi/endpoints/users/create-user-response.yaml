@@ -1,0 +1,6 @@
+title: CreateUserResponse
+type: object
+additionalProperties: true
+description: |
+  The content of this response is determined by the configured 
+  schema for users.

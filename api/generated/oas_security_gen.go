@@ -46,6 +46,10 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	CreateSessionOperation: []string{
 		"sessions.write",
 	},
+	CreateUserOperation: []string{
+		"openid",
+		"users.write",
+	},
 	ExchangeHandoffOperation: []string{
 		"sessions.write",
 	},
@@ -64,7 +68,7 @@ var oauth2ScopesOAuth2 = map[string][]string{
 		"sessions.read",
 	},
 	ListUsersOperation: []string{
-		"openid",
+		"users.read",
 	},
 	RevokeSessionOperation: []string{
 		"session.delete",

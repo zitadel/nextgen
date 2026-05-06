@@ -1,0 +1,6 @@
+title: CreateUserRequest
+type: object
+# TODO: create an actual schema for this request once the user-schema endpoints are done.
+description: |
+  Request to create a user. The content of this request is determined 
+  by the configured schema for users.

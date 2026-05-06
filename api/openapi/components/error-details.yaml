@@ -1,3 +1,4 @@
+title: ErrorDetails
 type: object
 description: Standard error payload returned for failed API requests.
 required:

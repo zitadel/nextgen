@@ -25,6 +25,10 @@ type CreateSessionRes interface {
 	createSessionRes()
 }
 
+type CreateUserRes interface {
+	createUserRes()
+}
+
 type EndSessionRes interface {
 	endSessionRes()
 }

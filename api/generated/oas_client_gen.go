@@ -92,6 +92,12 @@ type Invoker interface {
 	//
 	// POST /sessions
 	CreateSession(ctx context.Context, request *CreateSessionRequest) (CreateSessionRes, error)
+	// CreateUser invokes createUser operation.
+	//
+	// Create user.
+	//
+	// POST /users
+	CreateUser(ctx context.Context, request *CreateUserRequest) (CreateUserRes, error)
 	// EndSession invokes endSession operation.
 	//
 	// End a session.
@@ -213,7 +219,7 @@ type Invoker interface {
 	//
 	// List users.
 	//
-	// GET /user
+	// GET /users
 	ListUsers(ctx context.Context, params ListUsersParams) (ListUsersRes, error)
 	// RevokeSession invokes revokeSession operation.
 	//
@@ -1295,6 +1301,116 @@ func (c *Client) sendCreateSession(ctx context.Context, request *CreateSessionRe
 
 	stage = "DecodeResponse"
 	result, err := decodeCreateSessionResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// CreateUser invokes createUser operation.
+//
+// Create user.
+//
+// POST /users
+func (c *Client) CreateUser(ctx context.Context, request *CreateUserRequest) (CreateUserRes, error) {
+	res, err := c.sendCreateUser(ctx, request)
+	return res, err
+}
+
+func (c *Client) sendCreateUser(ctx context.Context, request *CreateUserRequest) (res CreateUserRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("createUser"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.URLTemplateKey.String("/users"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, CreateUserOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [1]string
+	pathParts[0] = "/users"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "POST", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+	if err := encodeCreateUserRequest(request, r); err != nil {
+		return res, errors.Wrap(err, "encode request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, CreateUserOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeCreateUserResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}
@@ -3089,7 +3205,7 @@ func (c *Client) sendListSessions(ctx context.Context, params ListSessionsParams
 //
 // List users.
 //
-// GET /user
+// GET /users
 func (c *Client) ListUsers(ctx context.Context, params ListUsersParams) (ListUsersRes, error) {
 	res, err := c.sendListUsers(ctx, params)
 	return res, err
@@ -3099,7 +3215,7 @@ func (c *Client) sendListUsers(ctx context.Context, params ListUsersParams) (res
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("listUsers"),
 		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.URLTemplateKey.String("/user"),
+		semconv.URLTemplateKey.String("/users"),
 	}
 	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
 
@@ -3133,28 +3249,11 @@ func (c *Client) sendListUsers(ctx context.Context, params ListUsersParams) (res
 	stage = "BuildURL"
 	u := uri.Clone(c.requestURL(ctx))
 	var pathParts [1]string
-	pathParts[0] = "/user"
+	pathParts[0] = "/users"
 	uri.AddPathParts(u, pathParts[:]...)
 
 	stage = "EncodeQueryParams"
 	q := uri.NewQueryEncoder()
-	{
-		// Encode "offset" parameter.
-		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "offset",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if val, ok := params.Offset.Get(); ok {
-				return e.EncodeValue(conv.IntToString(val))
-			}
-			return nil
-		}); err != nil {
-			return res, errors.Wrap(err, "encode query")
-		}
-	}
 	{
 		// Encode "limit" parameter.
 		cfg := uri.QueryParameterEncodingConfig{
@@ -3166,6 +3265,26 @@ func (c *Client) sendListUsers(ctx context.Context, params ListUsersParams) (res
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
 			if val, ok := params.Limit.Get(); ok {
 				return e.EncodeValue(conv.IntToString(val))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "page_token" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "page_token",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.PageToken.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
 			}
 			return nil
 		}); err != nil {

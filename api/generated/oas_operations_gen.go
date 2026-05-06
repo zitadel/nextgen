@@ -12,6 +12,7 @@ const (
 	CreateFlowOperation             OperationName = "CreateFlow"
 	CreateHandoffOperation          OperationName = "CreateHandoff"
 	CreateSessionOperation          OperationName = "CreateSession"
+	CreateUserOperation             OperationName = "CreateUser"
 	EndSessionOperation             OperationName = "EndSession"
 	ExchangeHandoffOperation        OperationName = "ExchangeHandoff"
 	GetAuthAttemptOperation         OperationName = "GetAuthAttempt"

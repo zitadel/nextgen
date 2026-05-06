@@ -45,22 +45,14 @@ post:
     content:
       application/json:
         schema:
-          type: object
-          # TODO: create an actual schema for this request once the user-schema endpoints are done.
-          description: |
-            Request to create a user. The content of this request is determined 
-            by the configured schema for users.
+          $ref: create-user-request.yaml
   responses:
     '201':
       description: The user was created successfully
       content:
         application/json:
           schema:
-            type: object
-            additionalProperties: true
-            description: |
-              The content of this response is determined by the configured 
-              schema for users.
+            $ref: create-user-response.yaml
     '400':
       description: The provided input was not valid
       content:

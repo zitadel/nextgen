@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/go-faster/errors"
-	"github.com/go-faster/jx"
 	"github.com/ogen-go/ogen/validate"
 )
 
@@ -975,14 +974,6 @@ func (s ListSessionsState) Validate() error {
 	}
 }
 
-func (s ListUsersOKApplicationJSON) Validate() error {
-	alias := ([]jx.Raw)(s)
-	if alias == nil {
-		return errors.New("nil is invalid value")
-	}
-	return nil
-}
-
 func (s *OpenidConfiguration) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -1559,6 +1550,29 @@ func (s UserID) Validate() error {
 		MaxNumericSet: false,
 	}).Validate(string(alias)); err != nil {
 		return errors.Wrap(err, "string")
+	}
+	return nil
+}
+
+func (s *UserListResponse) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if s.Users == nil {
+			return errors.New("nil is invalid value")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "users",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
 	}
 	return nil
 }
