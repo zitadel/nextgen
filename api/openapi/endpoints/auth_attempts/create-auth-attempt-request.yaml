@@ -1,0 +1,21 @@
+type: object
+description: Request to create a new authentication attempt
+required:
+  - project_id
+properties:
+  project_id:
+    $ref: "../../components/schemas/project-id.yaml"
+  challenge_nonce:
+    type: string
+    description: |
+      Optional. The challenge nonce from POST /bootstrap/challenge.
+      This nonce is origin-bound (for browser clients) and single-use.
+    example: nonce_abc123def456
+  session_id:
+    description: |
+      Optional. If provided, this attempt adds factors to an existing session (step-up auth).
+      If omitted, a new session is created implicitly on successful handoff.
+    oneOf:
+      - $ref: "../../components/schemas/session-id.yaml"
+      - type: 'null'
+

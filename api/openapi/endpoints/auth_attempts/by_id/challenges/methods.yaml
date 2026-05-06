@@ -1,0 +1,55 @@
+post:
+  operationId: issueChallenge
+  summary: Issue a factor challenge
+  description: |
+    Issues a single-factor verification challenge within an auth attempt.
+    
+    This advances the authentication state machine by requesting a specific factor method
+    (password, passkey, TOTP, OTP via SMS, etc.). The server responds with challenge details
+    including method, metadata, and any UI hints. The client then verifies the proof
+    by calling POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify.
+  tags:
+    - Authentication Attempts
+  security:
+    - oauth2:
+        - auth_attempts.write
+  parameters:
+    - $ref: ../../../../components/parameters/attempt-id.yaml
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: issue-challenge-request.yaml
+  responses:
+    '201':
+      description: Challenge issued successfully
+      content:
+        application/json:
+          schema:
+            $ref: challenge-response.yaml
+    '400':
+      description: Invalid request or invalid attempt state
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
+    '404':
+      description: Attempt not found
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
+    '409':
+      description: Attempt in invalid state for issuing challenges (e.g., already completed)
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
+    default:
+      description: Unexpected error
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
+
