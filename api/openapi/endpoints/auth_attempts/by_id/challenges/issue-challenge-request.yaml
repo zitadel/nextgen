@@ -1,0 +1,39 @@
+type: object
+description: |
+  Request to issue a factor challenge.
+
+  The `method` field selects which factor to challenge. Additional fields are
+  only relevant for specific methods:
+  - `passkey_options` is optional and only used when `method` is `passkey`.
+  - `idp_provider` is required when `method` is `idp` and must be omitted otherwise.
+    This conditional requirement is enforced server-side.
+required:
+  - method
+additionalProperties: false
+properties:
+  method:
+    $ref: ../../../../components/schemas/factor-method.yaml
+    description: The authentication factor method to challenge.
+  passkey_options:
+    type: object
+    description: Optional WebAuthn ceremony options. Only relevant when `method` is `passkey`.
+    additionalProperties: false
+    properties:
+      userVerification:
+        type: string
+        enum: [required, preferred, discouraged]
+        example: required
+  idp_provider:
+    type: string
+    description: The federated identity provider to redirect to. Required when `method` is `idp`.
+    example: google
+if:
+  properties:
+    method:
+      const: idp
+then:
+  properties:
+    idp_provider:
+      type: string
+  required:
+    - idp_provider

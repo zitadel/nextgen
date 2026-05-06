@@ -8,7 +8,8 @@ properties:
     description: Localization key for the step heading.
     example: identifier.title
   description_key:
-    type: string
+    oneOf:
+      - type: string
+      - type: 'null'
     description: Localization key for explanatory text.
-    nullable: true
     example: identifier.description

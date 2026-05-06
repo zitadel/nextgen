@@ -1,0 +1,18 @@
+type: object
+description: |
+  Response for session creation and handoff exchange.
+  Includes the session state and the session_token required to manage it.
+required:
+  - session
+  - session_token
+properties:
+  session:
+    $ref: session-response.yaml
+  session_token:
+    type: string
+    description: |
+      Bearer token authorising management of this session (GET and DELETE).
+      For anonymous sessions this token is superseded when a handoff exchange completes —
+      clients must replace their stored token at that point.
+    example: stok_abc123def456
+

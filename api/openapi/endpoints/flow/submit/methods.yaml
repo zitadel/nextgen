@@ -31,6 +31,7 @@ post:
     frontend never sees a `complete` for intermediate flows.
   tags:
     - Flows
+  security: []
   parameters:
     - $ref: ../../../components/parameters/flow-id.yaml
     - $ref: ../../../components/parameters/flow-cookie.yaml
@@ -66,6 +67,12 @@ post:
             $ref: ../../../components/flows/flow-response.yaml
     '409':
       description: Version conflict — flow was advanced by another request.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    default:
+      description: Unexpected error response.
       content:
         application/json:
           schema:

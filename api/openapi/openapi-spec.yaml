@@ -50,6 +50,22 @@ paths:
     $ref: endpoints/flow/submit/methods.yaml
   /flow/{id}/event:
     $ref: endpoints/flow/event/methods.yaml
+  /auth_attempts:
+    $ref: endpoints/auth_attempts/methods.yaml
+  /auth_attempts/{attempt_id}:
+    $ref: endpoints/auth_attempts/by_id/methods.yaml
+  /auth_attempts/{attempt_id}/challenges:
+    $ref: endpoints/auth_attempts/by_id/challenges/methods.yaml
+  /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify:
+    $ref: endpoints/auth_attempts/by_id/challenges/by_id/methods.yaml
+  /auth_attempts/{attempt_id}/handoff:
+    $ref: endpoints/auth_attempts/by_id/handoff/methods.yaml
+  /sessions:
+    $ref: endpoints/sessions/methods.yaml
+  /sessions/exchange:
+    $ref: endpoints/sessions/exchange/methods.yaml
+  /sessions/{session_id}:
+    $ref: endpoints/sessions/by_id/methods.yaml
   /schemas:
     $ref: endpoints/schemas/methods.yaml
   /schemas/{id}:
