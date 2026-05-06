@@ -29,7 +29,7 @@ type CreateAttribute struct {
 	ValueHash   [sha256.Size]byte   `json:"value_hash"`
 }
 
-func NewIncomingAttribute(key string, value any, unique AttributeUniqueness) (*CreateAttribute, error) {
+func NewCreateAttribute(key string, value any, unique AttributeUniqueness) (*CreateAttribute, error) {
 	raw, err := json.Marshal(value)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal attribute value: %w", err)
