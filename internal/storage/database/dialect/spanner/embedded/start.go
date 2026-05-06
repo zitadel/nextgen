@@ -7,7 +7,9 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 
+	_ "github.com/jackc/pgx/v5/stdlib" // registers "pgx" driver for wait.ForSQL
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -23,7 +25,14 @@ func StartEmbedded(ctx context.Context) (database.Connector, func(), error) {
 	req := testcontainers.ContainerRequest{
 		Image:        "gcr.io/cloud-spanner-pg-adapter/pgadapter-emulator:latest",
 		ExposedPorts: []string{"5432/tcp"},
-		WaitingFor:   wait.ForListeningPort("5432/tcp"),
+		WaitingFor: wait.ForSQL("5432/tcp", "pgx", func(host, port string) string {
+			// port is "NNNN/tcp" — strip the protocol suffix before building the URL
+			port, _, _ = strings.Cut(port, "/")
+			return fmt.Sprintf(
+				"postgresql://user:secret@%s:%s/projects/test-project/instances/test-instance/databases/test-database?sslmode=disable",
+				host, port,
+			)
+		}),
 	}
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: req,
