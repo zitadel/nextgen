@@ -2,8 +2,8 @@
 
 > **Status:** Draft
 > **See also:** [Flow engine](../flowengine/flow-engine.md), [Schema engine readme](./README.md)
-> This document describes **how versions of a schema can be defined and managed**. It does not describe anything about
-> the contents of those schemas.
+> This document describes **how versions of a schema can be defined and managed**.
+> It does not describe anything about the contents of those schemas.
 
 ## Actors
 
@@ -13,8 +13,8 @@ The API which hosts the Schema.
 
 ### CUSTOMER
 
-A customer of the Zitadel product. This can be a user acting on behalf of a company or a home-lab user using
-self-hosting.
+A customer of the Zitadel product. This can be a user acting on behalf of a
+company or a home-lab user using self-hosting.
 
 ### USER
 
@@ -22,7 +22,8 @@ The end user who will interact with the login/profile page.
 
 ### UI
 
-A separate application created by CUSTOMER to use for representing data to the USER.
+A separate application created by CUSTOMER to use for representing data to the
+USER.
 
 ## Goal
 
@@ -36,78 +37,48 @@ Let's assume the following sequence of events:
 
 #### Case 1: API adds new capability
 
-This is no problem, nothing breaks, as long as the CUSTOMER does not use the new capability.
+This is no problem, nothing breaks, as long as the CUSTOMER does not use the
+new capability.
 
 #### Case 2: API does a breaking change on a capability
 
-Let's assume we have a capability which requires an API call. The API needs to break the contract which is used in the
-capability. This poses a first problem: how do we not break user-space. How do we let CUSTOMER know that there has been
+Let's assume we have a capability which requires an API call. The API needs to
+break the contract which is used in the capability. This poses a first problem:
+how do we not break user-space. How do we let CUSTOMER know that there has been
 a breaking change and let them upgrade easily?
 
 #### Case 3: CUSTOMER uses a new capability inside `human_user_schema`
 
-This again poses a problem on how to let this know downstream. If the CUSTOMER updates their user Instances, they should
-also implement the functionality in the UI. But we should be able to provide correct error handling in case they
+This again poses a problem on how to let this know downstream. If the CUSTOMER
+updates their user Instances, they should also implement the functionality in
+the UI. But we should be able to provide correct error handling in case they
 forgot about it.
 
 ### The problem
 
-In all of these cases, there is a need for versioning the different parts. If a version is specified for a given
-revision of Meta-Schema/Schema/Instance we can communicate that version and the different actors can decide which 
-version they want to use.
+In all of these cases, there is a need for versioning the different parts. If a
+version is specified for a given revision of Meta-Schema/Schema/Instance we can
+communicate that version and the different actors can decide which version they
+want to use.
 
 ## Immutability
 
-To do proper versioning we need to make all schemas immutable once a revision is created. For the Schemas created by
-ZITADEL this is done automatically using git and semantic versioning.
+To do proper versioning we need to make all schemas immutable once a revision
+is created. For the Schemas created by ZITADEL this is done automatically
+using git and semantic versioning.
 
 ## Versioning
 
-The Meta-Schema is versioned using semantic versioning: `Major.Minor.Patch` in which breaking changes are major
-upgrades, new features are minor upgrades and all others are patches. By versioning the Meta-Schema separately from the
-binary allows for a more fine-grained communication of what changed in the engine instead of the entire application.
+The Meta-Schema is versioned using semantic versioning: `Major.Minor.Patch` in
+which breaking changes are major upgrades, new features are minor upgrades and
+all others are patches. By versioning the Meta-Schema separately from the binary
+allows for a more fine-grained communication of what changed in the engine
+instead of the entire application.
 
-Schemas created by the CUSTOMER which are stored in ZITADEL are versioned using an auto-incrementing revision number.
-For Schemas which are not stored in ZITADEL, this is not possible. We assume the customer handles versioning properly
-by only using a URL for a single version of the schema. E.g.: https://example.com/my-schema/v1/schema.json. However,
-as a safetymeasure we use E-tags to cache a given schema.
+Schemas created by the CUSTOMER which are stored in ZITADEL are not versioned.
+It is assumed that each schema is immutable. If a CUSTOMER wants to create a
+new version they can submit a brand new schema.
 
-Since instances are the result of a schema, they should contain the version from which they were created. They are not
-versioned themselves though, since they do not have any dependencies, a dedicated object version would be redundant.
-
-## Migrations
-
-Once breaking changes are introduced, migrations are required. This is applicable for both the API and the schemas.
-
-The API is fully under our control. We can deprecate a Capability which will be removed in the future. The CUSTOMER
-needs to be notified of this deprecation. Initially this can be when updating a Meta-Schema; other push-based 
-notifications can be implemented in the future.
-
-If a breaking change happens on a schema, a migration pattern should be provided by the CUSTOMER. A migration path can
-be: ask the user for the data. E.g.: When a CUSTOMER adds a required field to a user, users should be upgraded. As long
-as not all data is migrated, deactivation of the schema is not possible.
-
-
-## Definition lifecycle
-
-To make management of a Definition easier for the CUSTOMER we introduce multiple stages in its lifecycle.
-
-### Draft
-
-The Definition is not yet published and can still be edited. It is still under development or ready to be released in
-the future. This Schema can be targeted when creating an Instance but will not be used by default.
-
-### Active
-
-The Schema is active and read-only. This Schema can be targeted when creating an Instance but will not be used by default.
-
-A Schema can be flagged as default to make it the default Schema to use when creating Instances.
-
-### Deprecated
-
-The Schema is deprecated. The Schema can still be used when creating Instances, but the API returns a warning to indicate 
-that the schema should not be used anymore and suggests the default schema.
-
-### Archived
-
-The Schema still exists in the database but can no longer be used to create Instances.
+Since instances are the result of a schema, they should contain the version from
+which they were created. They are not versioned themselves though, since they do
+not have any dependencies, a dedicated object version would be redundant.

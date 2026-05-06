@@ -281,39 +281,6 @@ func encodeCreateSchemaResponse(response CreateSchemaRes, w http.ResponseWriter,
 	}
 }
 
-func encodeCreateSchemaRevisionResponse(response CreateSchemaRevisionRes, w http.ResponseWriter, span trace.Span) error {
-	switch response := response.(type) {
-	case *CreateSchemaRevisionCreated:
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		w.WriteHeader(201)
-		span.SetStatus(codes.Ok, http.StatusText(201))
-
-		e := new(jx.Encoder)
-		response.Encode(e)
-		if _, err := e.WriteTo(w); err != nil {
-			return errors.Wrap(err, "write")
-		}
-
-		return nil
-
-	case *ErrorDetails:
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
-
-		e := new(jx.Encoder)
-		response.Encode(e)
-		if _, err := e.WriteTo(w); err != nil {
-			return errors.Wrap(err, "write")
-		}
-
-		return nil
-
-	default:
-		return errors.Errorf("unexpected response type: %T", response)
-	}
-}
-
 func encodeCreateSessionResponse(response CreateSessionRes, w http.ResponseWriter, span trace.Span) error {
 	switch response := response.(type) {
 	case *SessionWithTokenResponse:
@@ -785,88 +752,6 @@ func encodeGetReadyResponse(response GetReadyRes, w http.ResponseWriter, span tr
 func encodeGetSchemaByIdResponse(response GetSchemaByIdRes, w http.ResponseWriter, span trace.Span) error {
 	switch response := response.(type) {
 	case *GetSchemaByIdOK:
-		if err := func() error {
-			if err := response.Validate(); err != nil {
-				return err
-			}
-			return nil
-		}(); err != nil {
-			return errors.Wrap(err, "validate")
-		}
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
-
-		e := new(jx.Encoder)
-		response.Encode(e)
-		if _, err := e.WriteTo(w); err != nil {
-			return errors.Wrap(err, "write")
-		}
-
-		return nil
-
-	case *ErrorDetails:
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
-
-		e := new(jx.Encoder)
-		response.Encode(e)
-		if _, err := e.WriteTo(w); err != nil {
-			return errors.Wrap(err, "write")
-		}
-
-		return nil
-
-	default:
-		return errors.Errorf("unexpected response type: %T", response)
-	}
-}
-
-func encodeGetSchemaReleaseStateResponse(response GetSchemaReleaseStateRes, w http.ResponseWriter, span trace.Span) error {
-	switch response := response.(type) {
-	case *SchemaReleaseState:
-		if err := func() error {
-			if err := response.Validate(); err != nil {
-				return err
-			}
-			return nil
-		}(); err != nil {
-			return errors.Wrap(err, "validate")
-		}
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
-
-		e := new(jx.Encoder)
-		response.Encode(e)
-		if _, err := e.WriteTo(w); err != nil {
-			return errors.Wrap(err, "write")
-		}
-
-		return nil
-
-	case *ErrorDetails:
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
-
-		e := new(jx.Encoder)
-		response.Encode(e)
-		if _, err := e.WriteTo(w); err != nil {
-			return errors.Wrap(err, "write")
-		}
-
-		return nil
-
-	default:
-		return errors.Errorf("unexpected response type: %T", response)
-	}
-}
-
-func encodeGetSchemaRevisionByIdResponse(response GetSchemaRevisionByIdRes, w http.ResponseWriter, span trace.Span) error {
-	switch response := response.(type) {
-	case *GetSchemaRevisionByIdOK:
 		if err := func() error {
 			if err := response.Validate(); err != nil {
 				return err
@@ -1495,32 +1380,6 @@ func encodeSubmitFlowStepResponse(response SubmitFlowStepRes, w http.ResponseWri
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(409)
 		span.SetStatus(codes.Error, http.StatusText(409))
-
-		e := new(jx.Encoder)
-		response.Encode(e)
-		if _, err := e.WriteTo(w); err != nil {
-			return errors.Wrap(err, "write")
-		}
-
-		return nil
-
-	default:
-		return errors.Errorf("unexpected response type: %T", response)
-	}
-}
-
-func encodeUpdateSchemaReleaseStateResponse(response UpdateSchemaReleaseStateRes, w http.ResponseWriter, span trace.Span) error {
-	switch response := response.(type) {
-	case *UpdateSchemaReleaseStateOK:
-		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
-
-		return nil
-
-	case *ErrorDetails:
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
 
 		e := new(jx.Encoder)
 		response.Encode(e)

@@ -1,29 +1,8 @@
 # Schema validation
 
-For validating objects or schemas against a schema/meta schema, we can conclude to following flowchart:
+Schema's are validated when they are submitted through the POST endpoint. If
+the body of the request is an url, the schema is fetched and validated.
 
-```mermaid
-flowchart TD
-    isSchemaLocal@{             shape: decision,   label: "Is schema\nlocal?" }
-    isSchemaCached@{            shape: decision,   label: "Is schema cached\n(`ETag`)" }
-    pullSchema@{                shape: process,    label: "Pull schema" }    
-    cacheSchema@{               shape: process,    label: "Cache schema" }
-    doesSchemaHaveMetaSchema@{  shape: decision,   label: "Does schema have\nmeta schema?" }
-    recurse@{                   shape: subprocess, label: "recurse"}
-    validateObject@{            shape: process,    label: "Validate\nagainst Schema" }
-    ok@{                        shape: stop }
-
-    start@{shape: start} --> isSchemaLocal
-
-    isSchemaLocal -- Yes --> validateObject
-    isSchemaLocal -- No  --> isSchemaCached
-
-    isSchemaCached -- Yes --> validateObject
-    isSchemaCached -- No  --> pullSchema --> doesSchemaHaveMetaSchema
-    
-    doesSchemaHaveMetaSchema -- Yes --> recurse --> cacheSchema
-    doesSchemaHaveMetaSchema -- No --> cacheSchema 
-
-    cacheSchema --> validateObject
-    validateObject --> ok
-```
+Once the schema is validated, it is stored in the database. When an instance
+is later created, the instance is validated against the schema stored in the
+database.

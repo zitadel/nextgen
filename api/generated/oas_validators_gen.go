@@ -472,18 +472,8 @@ func (s CreateSchemaReq) Validate() error {
 			return err
 		}
 		return nil
-	default:
-		return errors.Errorf("invalid type %q", s.Type)
-	}
-}
-
-func (s CreateSchemaRevisionReq) Validate() error {
-	switch s.Type {
-	case UserSchemaCreateSchemaRevisionReq:
-		if err := s.UserSchema.Validate(); err != nil {
-			return err
-		}
-		return nil
+	case SchemaURLCreateSchemaReq:
+		return nil // no validation needed
 	default:
 		return errors.Errorf("invalid type %q", s.Type)
 	}
@@ -861,18 +851,6 @@ func (s GateType) Validate() error {
 func (s GetSchemaByIdOK) Validate() error {
 	switch s.Type {
 	case UserSchemaGetSchemaByIdOK:
-		if err := s.UserSchema.Validate(); err != nil {
-			return err
-		}
-		return nil
-	default:
-		return errors.Errorf("invalid type %q", s.Type)
-	}
-}
-
-func (s GetSchemaRevisionByIdOK) Validate() error {
-	switch s.Type {
-	case UserSchemaGetSchemaRevisionByIdOK:
 		if err := s.UserSchema.Validate(); err != nil {
 			return err
 		}
@@ -1432,23 +1410,6 @@ func (s ProjectID) Validate() error {
 	return nil
 }
 
-func (s SchemaReleaseState) Validate() error {
-	switch s {
-	case "draft":
-		return nil
-	case "active":
-		return nil
-	case "default":
-		return nil
-	case "deprecated":
-		return nil
-	case "archived":
-		return nil
-	default:
-		return errors.Errorf("invalid value: %v", s)
-	}
-}
-
 func (s SessionID) Validate() error {
 	alias := (string)(s)
 	if err := (validate.String{
@@ -1913,24 +1874,6 @@ func (s *UserSchema) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "description",
-			Error: err,
-		})
-	}
-	if err := func() error {
-		if value, ok := s.ReleaseState.Get(); ok {
-			if err := func() error {
-				if err := value.Validate(); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "releaseState",
 			Error: err,
 		})
 	}

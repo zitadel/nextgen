@@ -13,6 +13,7 @@ post:
         schema:
           oneOf:
             - $ref: user-schema.yaml
+            - $ref: schema-url.yaml
           discriminator:
             propertyName: kind
             mapping:

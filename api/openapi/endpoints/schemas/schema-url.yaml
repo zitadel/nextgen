@@ -1,0 +1,17 @@
+title: UserSchemaUrl
+$schema: "https://json-schema.org/draft/2020-12/schema"
+type: object
+required:
+  - kind
+  - url
+properties:
+  kind:
+    type: string
+    const: schema-url
+    description: Discriminator value for a user schema create request.
+  url:
+    type: string
+    format: uri
+    description: |
+      URL to the user schema definition. The schema definition must conform 
+      to the meta schema it is based on.

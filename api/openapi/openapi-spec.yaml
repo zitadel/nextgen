@@ -70,12 +70,6 @@ paths:
     $ref: endpoints/schemas/methods.yaml
   /schemas/{id}:
     $ref: endpoints/schemas/by_id/methods.yaml
-  /schemas/{id}/revisions:
-    $ref: endpoints/schemas/by_id/revisions/methods.yaml
-  /schemas/{id}/revisions/{revisionId}:
-    $ref: endpoints/schemas/by_id/revisions/by_id/methods.yaml
-  /schemas/{id}/revisions/{revisionId}/release-state:
-    $ref: endpoints/schemas/by_id/revisions/by_id/release-state/methods.yaml
 
 components:
   securitySchemes:

@@ -25,10 +25,6 @@ type CreateSchemaRes interface {
 	createSchemaRes()
 }
 
-type CreateSchemaRevisionRes interface {
-	createSchemaRevisionRes()
-}
-
 type CreateSessionRes interface {
 	createSessionRes()
 }
@@ -73,14 +69,6 @@ type GetSchemaByIdRes interface {
 	getSchemaByIdRes()
 }
 
-type GetSchemaReleaseStateRes interface {
-	getSchemaReleaseStateRes()
-}
-
-type GetSchemaRevisionByIdRes interface {
-	getSchemaRevisionByIdRes()
-}
-
 type GetSessionRes interface {
 	getSessionRes()
 }
@@ -123,10 +111,6 @@ type SubmitFlowEventRes interface {
 
 type SubmitFlowStepRes interface {
 	submitFlowStepRes()
-}
-
-type UpdateSchemaReleaseStateRes interface {
-	updateSchemaReleaseStateRes()
 }
 
 type VerifyChallengeProofRes interface {

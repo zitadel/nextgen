@@ -19,8 +19,6 @@ properties:
     type: string
     maxLength: 1024
     description: A description of this schema.
-  releaseState:
-    $ref: schema-release-state.yaml
   x-auth-methods:
     type: array
     description: A list of authentication methods supported by the user definition

@@ -86,15 +86,6 @@ func (UnimplementedHandler) CreateSchema(ctx context.Context, req CreateSchemaRe
 	return r, ht.ErrNotImplemented
 }
 
-// CreateSchemaRevision implements createSchemaRevision operation.
-//
-// Create new schema revision.
-//
-// POST /schemas/{id}/revisions
-func (UnimplementedHandler) CreateSchemaRevision(ctx context.Context, req CreateSchemaRevisionReq, params CreateSchemaRevisionParams) (r CreateSchemaRevisionRes, _ error) {
-	return r, ht.ErrNotImplemented
-}
-
 // CreateSession implements createSession operation.
 //
 // Creates an anonymous session shell with no user and no factors (`state: building`).
@@ -218,24 +209,6 @@ func (UnimplementedHandler) GetReady(ctx context.Context) (r GetReadyRes, _ erro
 //
 // GET /schemas/{id}
 func (UnimplementedHandler) GetSchemaById(ctx context.Context, params GetSchemaByIdParams) (r GetSchemaByIdRes, _ error) {
-	return r, ht.ErrNotImplemented
-}
-
-// GetSchemaReleaseState implements getSchemaReleaseState operation.
-//
-// Get the release state of a schema by its ID and revision ID.
-//
-// GET /schemas/{id}/revisions/{revisionId}/release-state
-func (UnimplementedHandler) GetSchemaReleaseState(ctx context.Context, params GetSchemaReleaseStateParams) (r GetSchemaReleaseStateRes, _ error) {
-	return r, ht.ErrNotImplemented
-}
-
-// GetSchemaRevisionById implements getSchemaRevisionById operation.
-//
-// Get a schema revision by its ID.
-//
-// GET /schemas/{id}/revisions/{revisionId}
-func (UnimplementedHandler) GetSchemaRevisionById(ctx context.Context, params GetSchemaRevisionByIdParams) (r GetSchemaRevisionByIdRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -367,15 +340,6 @@ func (UnimplementedHandler) SubmitFlowEvent(ctx context.Context, req *FlowEventR
 //
 // POST /flow/{id}/submit
 func (UnimplementedHandler) SubmitFlowStep(ctx context.Context, req *FlowSubmitRequest, params SubmitFlowStepParams) (r SubmitFlowStepRes, _ error) {
-	return r, ht.ErrNotImplemented
-}
-
-// UpdateSchemaReleaseState implements updateSchemaReleaseState operation.
-//
-// Update the release state of a schema by its ID and revision ID.
-//
-// PUT /schemas/{id}/revisions/{revisionId}/release-state
-func (UnimplementedHandler) UpdateSchemaReleaseState(ctx context.Context, req SchemaReleaseState, params UpdateSchemaReleaseStateParams) (r UpdateSchemaReleaseStateRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

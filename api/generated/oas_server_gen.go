@@ -63,12 +63,6 @@ type Handler interface {
 	//
 	// POST /schemas
 	CreateSchema(ctx context.Context, req CreateSchemaReq) (CreateSchemaRes, error)
-	// CreateSchemaRevision implements createSchemaRevision operation.
-	//
-	// Create new schema revision.
-	//
-	// POST /schemas/{id}/revisions
-	CreateSchemaRevision(ctx context.Context, req CreateSchemaRevisionReq, params CreateSchemaRevisionParams) (CreateSchemaRevisionRes, error)
 	// CreateSession implements createSession operation.
 	//
 	// Creates an anonymous session shell with no user and no factors (`state: building`).
@@ -162,18 +156,6 @@ type Handler interface {
 	//
 	// GET /schemas/{id}
 	GetSchemaById(ctx context.Context, params GetSchemaByIdParams) (GetSchemaByIdRes, error)
-	// GetSchemaReleaseState implements getSchemaReleaseState operation.
-	//
-	// Get the release state of a schema by its ID and revision ID.
-	//
-	// GET /schemas/{id}/revisions/{revisionId}/release-state
-	GetSchemaReleaseState(ctx context.Context, params GetSchemaReleaseStateParams) (GetSchemaReleaseStateRes, error)
-	// GetSchemaRevisionById implements getSchemaRevisionById operation.
-	//
-	// Get a schema revision by its ID.
-	//
-	// GET /schemas/{id}/revisions/{revisionId}
-	GetSchemaRevisionById(ctx context.Context, params GetSchemaRevisionByIdParams) (GetSchemaRevisionByIdRes, error)
 	// GetSession implements getSession operation.
 	//
 	// Returns the current state of a session including its factors and all currently
@@ -272,12 +254,6 @@ type Handler interface {
 	//
 	// POST /flow/{id}/submit
 	SubmitFlowStep(ctx context.Context, req *FlowSubmitRequest, params SubmitFlowStepParams) (SubmitFlowStepRes, error)
-	// UpdateSchemaReleaseState implements updateSchemaReleaseState operation.
-	//
-	// Update the release state of a schema by its ID and revision ID.
-	//
-	// PUT /schemas/{id}/revisions/{revisionId}/release-state
-	UpdateSchemaReleaseState(ctx context.Context, req SchemaReleaseState, params UpdateSchemaReleaseStateParams) (UpdateSchemaReleaseStateRes, error)
 	// VerifyChallengeProof implements verifyChallengeProof operation.
 	//
 	// Submits a proof (credential, code, assertion) to verify a factor challenge.

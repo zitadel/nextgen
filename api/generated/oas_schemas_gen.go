@@ -767,6 +767,7 @@ func (*CreateSchemaCreated) createSchemaRes() {}
 type CreateSchemaReq struct {
 	Type       CreateSchemaReqType // switch on this field
 	UserSchema UserSchema
+	SchemaURL  SchemaURL
 }
 
 // CreateSchemaReqType is oneOf type of CreateSchemaReq.
@@ -775,10 +776,14 @@ type CreateSchemaReqType string
 // Possible values for CreateSchemaReqType.
 const (
 	UserSchemaCreateSchemaReq CreateSchemaReqType = "user-schema"
+	SchemaURLCreateSchemaReq  CreateSchemaReqType = "SchemaURL"
 )
 
 // IsUserSchema reports whether CreateSchemaReq is UserSchema.
 func (s CreateSchemaReq) IsUserSchema() bool { return s.Type == UserSchemaCreateSchemaReq }
+
+// IsSchemaURL reports whether CreateSchemaReq is SchemaURL.
+func (s CreateSchemaReq) IsSchemaURL() bool { return s.Type == SchemaURLCreateSchemaReq }
 
 // SetUserSchema sets CreateSchemaReq to UserSchema.
 func (s *CreateSchemaReq) SetUserSchema(v UserSchema) {
@@ -801,60 +806,24 @@ func NewUserSchemaCreateSchemaReq(v UserSchema) CreateSchemaReq {
 	return s
 }
 
-type CreateSchemaRevisionCreated struct {
-	// The ID of the created schema revision.
-	ID OptInt `json:"id"`
+// SetSchemaURL sets CreateSchemaReq to SchemaURL.
+func (s *CreateSchemaReq) SetSchemaURL(v SchemaURL) {
+	s.Type = SchemaURLCreateSchemaReq
+	s.SchemaURL = v
 }
 
-// GetID returns the value of ID.
-func (s *CreateSchemaRevisionCreated) GetID() OptInt {
-	return s.ID
-}
-
-// SetID sets the value of ID.
-func (s *CreateSchemaRevisionCreated) SetID(val OptInt) {
-	s.ID = val
-}
-
-func (*CreateSchemaRevisionCreated) createSchemaRevisionRes() {}
-
-// CreateSchemaRevisionReq represents sum type.
-type CreateSchemaRevisionReq struct {
-	Type       CreateSchemaRevisionReqType // switch on this field
-	UserSchema UserSchema
-}
-
-// CreateSchemaRevisionReqType is oneOf type of CreateSchemaRevisionReq.
-type CreateSchemaRevisionReqType string
-
-// Possible values for CreateSchemaRevisionReqType.
-const (
-	UserSchemaCreateSchemaRevisionReq CreateSchemaRevisionReqType = "user-schema"
-)
-
-// IsUserSchema reports whether CreateSchemaRevisionReq is UserSchema.
-func (s CreateSchemaRevisionReq) IsUserSchema() bool {
-	return s.Type == UserSchemaCreateSchemaRevisionReq
-}
-
-// SetUserSchema sets CreateSchemaRevisionReq to UserSchema.
-func (s *CreateSchemaRevisionReq) SetUserSchema(v UserSchema) {
-	s.Type = UserSchemaCreateSchemaRevisionReq
-	s.UserSchema = v
-}
-
-// GetUserSchema returns UserSchema and true boolean if CreateSchemaRevisionReq is UserSchema.
-func (s CreateSchemaRevisionReq) GetUserSchema() (v UserSchema, ok bool) {
-	if !s.IsUserSchema() {
+// GetSchemaURL returns SchemaURL and true boolean if CreateSchemaReq is SchemaURL.
+func (s CreateSchemaReq) GetSchemaURL() (v SchemaURL, ok bool) {
+	if !s.IsSchemaURL() {
 		return v, false
 	}
-	return s.UserSchema, true
+	return s.SchemaURL, true
 }
 
-// NewUserSchemaCreateSchemaRevisionReq returns new CreateSchemaRevisionReq from UserSchema.
-func NewUserSchemaCreateSchemaRevisionReq(v UserSchema) CreateSchemaRevisionReq {
-	var s CreateSchemaRevisionReq
-	s.SetUserSchema(v)
+// NewSchemaURLCreateSchemaReq returns new CreateSchemaReq from SchemaURL.
+func NewSchemaURLCreateSchemaReq(v SchemaURL) CreateSchemaReq {
+	var s CreateSchemaReq
+	s.SetSchemaURL(v)
 	return s
 }
 
@@ -1066,20 +1035,16 @@ func (s *ErrorDetails) SetDetails(val OptErrorDetailsDetails) {
 	s.Details = val
 }
 
-func (*ErrorDetails) authorizeDeviceRes()          {}
-func (*ErrorDetails) authorizeGetRes()             {}
-func (*ErrorDetails) createFlowRes()               {}
-func (*ErrorDetails) createSchemaRes()             {}
-func (*ErrorDetails) createSchemaRevisionRes()     {}
-func (*ErrorDetails) createSessionRes()            {}
-func (*ErrorDetails) endSessionRes()               {}
-func (*ErrorDetails) getAuthAttemptRes()           {}
-func (*ErrorDetails) getSchemaByIdRes()            {}
-func (*ErrorDetails) getSchemaReleaseStateRes()    {}
-func (*ErrorDetails) getSchemaRevisionByIdRes()    {}
-func (*ErrorDetails) introspectRes()               {}
-func (*ErrorDetails) submitFlowStepRes()           {}
-func (*ErrorDetails) updateSchemaReleaseStateRes() {}
+func (*ErrorDetails) authorizeDeviceRes() {}
+func (*ErrorDetails) authorizeGetRes()    {}
+func (*ErrorDetails) createFlowRes()      {}
+func (*ErrorDetails) createSchemaRes()    {}
+func (*ErrorDetails) createSessionRes()   {}
+func (*ErrorDetails) endSessionRes()      {}
+func (*ErrorDetails) getAuthAttemptRes()  {}
+func (*ErrorDetails) getSchemaByIdRes()   {}
+func (*ErrorDetails) introspectRes()      {}
+func (*ErrorDetails) submitFlowStepRes()  {}
 
 // Additional error-specific context.
 type ErrorDetailsDetails map[string]jx.Raw
@@ -2382,48 +2347,6 @@ func NewUserSchemaGetSchemaByIdOK(v UserSchema) GetSchemaByIdOK {
 }
 
 func (*GetSchemaByIdOK) getSchemaByIdRes() {}
-
-// GetSchemaRevisionByIdOK represents sum type.
-type GetSchemaRevisionByIdOK struct {
-	Type       GetSchemaRevisionByIdOKType // switch on this field
-	UserSchema UserSchema
-}
-
-// GetSchemaRevisionByIdOKType is oneOf type of GetSchemaRevisionByIdOK.
-type GetSchemaRevisionByIdOKType string
-
-// Possible values for GetSchemaRevisionByIdOKType.
-const (
-	UserSchemaGetSchemaRevisionByIdOK GetSchemaRevisionByIdOKType = "user-schema"
-)
-
-// IsUserSchema reports whether GetSchemaRevisionByIdOK is UserSchema.
-func (s GetSchemaRevisionByIdOK) IsUserSchema() bool {
-	return s.Type == UserSchemaGetSchemaRevisionByIdOK
-}
-
-// SetUserSchema sets GetSchemaRevisionByIdOK to UserSchema.
-func (s *GetSchemaRevisionByIdOK) SetUserSchema(v UserSchema) {
-	s.Type = UserSchemaGetSchemaRevisionByIdOK
-	s.UserSchema = v
-}
-
-// GetUserSchema returns UserSchema and true boolean if GetSchemaRevisionByIdOK is UserSchema.
-func (s GetSchemaRevisionByIdOK) GetUserSchema() (v UserSchema, ok bool) {
-	if !s.IsUserSchema() {
-		return v, false
-	}
-	return s.UserSchema, true
-}
-
-// NewUserSchemaGetSchemaRevisionByIdOK returns new GetSchemaRevisionByIdOK from UserSchema.
-func NewUserSchemaGetSchemaRevisionByIdOK(v UserSchema) GetSchemaRevisionByIdOK {
-	var s GetSchemaRevisionByIdOK
-	s.SetUserSchema(v)
-	return s
-}
-
-func (*GetSchemaRevisionByIdOK) getSchemaRevisionByIdRes() {}
 
 type GetSessionNotFound ErrorDetails
 
@@ -5691,52 +5614,6 @@ func (o OptProjectID) Or(d ProjectID) ProjectID {
 	return d
 }
 
-// NewOptSchemaReleaseState returns new OptSchemaReleaseState with value set to v.
-func NewOptSchemaReleaseState(v SchemaReleaseState) OptSchemaReleaseState {
-	return OptSchemaReleaseState{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptSchemaReleaseState is optional SchemaReleaseState.
-type OptSchemaReleaseState struct {
-	Value SchemaReleaseState
-	Set   bool
-}
-
-// IsSet returns true if OptSchemaReleaseState was set.
-func (o OptSchemaReleaseState) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptSchemaReleaseState) Reset() {
-	var v SchemaReleaseState
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptSchemaReleaseState) SetTo(v SchemaReleaseState) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptSchemaReleaseState) Get() (v SchemaReleaseState, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptSchemaReleaseState) Or(d SchemaReleaseState) SchemaReleaseState {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptStepTexts returns new OptStepTexts with value set to v.
 func NewOptStepTexts(v StepTexts) OptStepTexts {
 	return OptStepTexts{
@@ -6403,81 +6280,34 @@ func (s *SSOProvider) SetTemplate(val string) {
 	s.Template = val
 }
 
-// The lifecycle state of a user schema revision.
-// - draft: Not yet published; still under development or staged for a future release.
-// Can be targeted when creating an Object but will not be used by default.
-// - active: Published and available for use. Will not be use by default for new
-// users.
-// - default: Published and available for use. Will be used for new users when no
-// other schema is specified.
-// - deprecated: No longer recommended. Can still be used for new users but will
-// not be selected by default.
-// - archived: Retired. Cannot be used for new users. A schema cannot be archived
-// while it is still in use by any user.
 // Ref: #
-type SchemaReleaseState string
-
-const (
-	SchemaReleaseStateDraft      SchemaReleaseState = "draft"
-	SchemaReleaseStateActive     SchemaReleaseState = "active"
-	SchemaReleaseStateDefault    SchemaReleaseState = "default"
-	SchemaReleaseStateDeprecated SchemaReleaseState = "deprecated"
-	SchemaReleaseStateArchived   SchemaReleaseState = "archived"
-)
-
-// AllValues returns all SchemaReleaseState values.
-func (SchemaReleaseState) AllValues() []SchemaReleaseState {
-	return []SchemaReleaseState{
-		SchemaReleaseStateDraft,
-		SchemaReleaseStateActive,
-		SchemaReleaseStateDefault,
-		SchemaReleaseStateDeprecated,
-		SchemaReleaseStateArchived,
-	}
+type SchemaURL struct {
+	// Discriminator value for a user schema create request.
+	Kind string `json:"kind"`
+	// URL to the user schema definition. The schema definition must conform
+	// to the meta schema it is based on.
+	URL url.URL `json:"url"`
 }
 
-// MarshalText implements encoding.TextMarshaler.
-func (s SchemaReleaseState) MarshalText() ([]byte, error) {
-	switch s {
-	case SchemaReleaseStateDraft:
-		return []byte(s), nil
-	case SchemaReleaseStateActive:
-		return []byte(s), nil
-	case SchemaReleaseStateDefault:
-		return []byte(s), nil
-	case SchemaReleaseStateDeprecated:
-		return []byte(s), nil
-	case SchemaReleaseStateArchived:
-		return []byte(s), nil
-	default:
-		return nil, errors.Errorf("invalid value: %q", s)
-	}
+// GetKind returns the value of Kind.
+func (s *SchemaURL) GetKind() string {
+	return s.Kind
 }
 
-// UnmarshalText implements encoding.TextUnmarshaler.
-func (s *SchemaReleaseState) UnmarshalText(data []byte) error {
-	switch SchemaReleaseState(data) {
-	case SchemaReleaseStateDraft:
-		*s = SchemaReleaseStateDraft
-		return nil
-	case SchemaReleaseStateActive:
-		*s = SchemaReleaseStateActive
-		return nil
-	case SchemaReleaseStateDefault:
-		*s = SchemaReleaseStateDefault
-		return nil
-	case SchemaReleaseStateDeprecated:
-		*s = SchemaReleaseStateDeprecated
-		return nil
-	case SchemaReleaseStateArchived:
-		*s = SchemaReleaseStateArchived
-		return nil
-	default:
-		return errors.Errorf("invalid value: %q", data)
-	}
+// GetURL returns the value of URL.
+func (s *SchemaURL) GetURL() url.URL {
+	return s.URL
 }
 
-func (*SchemaReleaseState) getSchemaReleaseStateRes() {}
+// SetKind sets the value of Kind.
+func (s *SchemaURL) SetKind(val string) {
+	s.Kind = val
+}
+
+// SetURL sets the value of URL.
+func (s *SchemaURL) SetURL(val url.URL) {
+	s.URL = val
+}
 
 type SessionID string
 
@@ -6992,11 +6822,6 @@ func (s *TotpProofTotp) SetCode(val string) {
 	s.Code = val
 }
 
-// UpdateSchemaReleaseStateOK is response for UpdateSchemaReleaseState operation.
-type UpdateSchemaReleaseStateOK struct{}
-
-func (*UpdateSchemaReleaseStateOK) updateSchemaReleaseStateRes() {}
-
 type UserID string
 
 // Ref: #
@@ -7336,8 +7161,7 @@ type UserSchema struct {
 	// Human-readable name for this schema.
 	Title string `json:"title"`
 	// A description of this schema.
-	Description  OptString             `json:"description"`
-	ReleaseState OptSchemaReleaseState `json:"releaseState"`
+	Description OptString `json:"description"`
 	// A list of authentication methods supported by the user definition.
 	XMinusAuthMinusMethods []UserSchemaXMinusAuthMinusMethodsItem `json:"x-auth-methods"`
 	// A list of required fields for the user definition.
@@ -7360,11 +7184,6 @@ func (s *UserSchema) GetTitle() string {
 // GetDescription returns the value of Description.
 func (s *UserSchema) GetDescription() OptString {
 	return s.Description
-}
-
-// GetReleaseState returns the value of ReleaseState.
-func (s *UserSchema) GetReleaseState() OptSchemaReleaseState {
-	return s.ReleaseState
 }
 
 // GetXMinusAuthMinusMethods returns the value of XMinusAuthMinusMethods.
@@ -7395,11 +7214,6 @@ func (s *UserSchema) SetTitle(val string) {
 // SetDescription sets the value of Description.
 func (s *UserSchema) SetDescription(val OptString) {
 	s.Description = val
-}
-
-// SetReleaseState sets the value of ReleaseState.
-func (s *UserSchema) SetReleaseState(val OptSchemaReleaseState) {
-	s.ReleaseState = val
 }
 
 // SetXMinusAuthMinusMethods sets the value of XMinusAuthMinusMethods.

@@ -1645,12 +1645,6 @@ func (s CreateSchemaReq) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
-				if s.ReleaseState.Set {
-					e.FieldStart("releaseState")
-					s.ReleaseState.Encode(e)
-				}
-			}
-			{
 				e.FieldStart("x-auth-methods")
 				e.ArrStart()
 				for _, elem := range s.XMinusAuthMinusMethods {
@@ -1673,6 +1667,16 @@ func (s CreateSchemaReq) encodeFields(e *jx.Encoder) {
 					e.FieldStart("properties")
 					s.Properties.Encode(e)
 				}
+			}
+		}
+	case SchemaURLCreateSchemaReq:
+		e.FieldStart("kind")
+		e.Str("SchemaURL")
+		{
+			s := s.SchemaURL
+			{
+				e.FieldStart("url")
+				json.EncodeURI(e, s.URL)
 			}
 		}
 	}
@@ -1704,6 +1708,9 @@ func (s *CreateSchemaReq) Decode(d *jx.Decoder) error {
 				case "user-schema":
 					s.Type = UserSchemaCreateSchemaReq
 					found = true
+				case "SchemaURL":
+					s.Type = SchemaURLCreateSchemaReq
+					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
 				}
@@ -1722,6 +1729,10 @@ func (s *CreateSchemaReq) Decode(d *jx.Decoder) error {
 		if err := s.UserSchema.Decode(d); err != nil {
 			return err
 		}
+	case SchemaURLCreateSchemaReq:
+		if err := s.SchemaURL.Decode(d); err != nil {
+			return err
+		}
 	default:
 		return errors.Errorf("inferred invalid type: %s", s.Type)
 	}
@@ -1737,190 +1748,6 @@ func (s CreateSchemaReq) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *CreateSchemaReq) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode implements json.Marshaler.
-func (s *CreateSchemaRevisionCreated) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-// encodeFields encodes fields.
-func (s *CreateSchemaRevisionCreated) encodeFields(e *jx.Encoder) {
-	{
-		if s.ID.Set {
-			e.FieldStart("id")
-			s.ID.Encode(e)
-		}
-	}
-}
-
-var jsonFieldsNameOfCreateSchemaRevisionCreated = [1]string{
-	0: "id",
-}
-
-// Decode decodes CreateSchemaRevisionCreated from json.
-func (s *CreateSchemaRevisionCreated) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode CreateSchemaRevisionCreated to nil")
-	}
-
-	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		switch string(k) {
-		case "id":
-			if err := func() error {
-				s.ID.Reset()
-				if err := s.ID.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"id\"")
-			}
-		default:
-			return d.Skip()
-		}
-		return nil
-	}); err != nil {
-		return errors.Wrap(err, "decode CreateSchemaRevisionCreated")
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *CreateSchemaRevisionCreated) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *CreateSchemaRevisionCreated) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes CreateSchemaRevisionReq as json.
-func (s CreateSchemaRevisionReq) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-func (s CreateSchemaRevisionReq) encodeFields(e *jx.Encoder) {
-	switch s.Type {
-	case UserSchemaCreateSchemaRevisionReq:
-		e.FieldStart("kind")
-		e.Str("user-schema")
-		{
-			s := s.UserSchema
-			{
-				e.FieldStart("title")
-				e.Str(s.Title)
-			}
-			{
-				if s.Description.Set {
-					e.FieldStart("description")
-					s.Description.Encode(e)
-				}
-			}
-			{
-				if s.ReleaseState.Set {
-					e.FieldStart("releaseState")
-					s.ReleaseState.Encode(e)
-				}
-			}
-			{
-				e.FieldStart("x-auth-methods")
-				e.ArrStart()
-				for _, elem := range s.XMinusAuthMinusMethods {
-					elem.Encode(e)
-				}
-				e.ArrEnd()
-			}
-			{
-				if s.Required != nil {
-					e.FieldStart("required")
-					e.ArrStart()
-					for _, elem := range s.Required {
-						e.Str(elem)
-					}
-					e.ArrEnd()
-				}
-			}
-			{
-				if s.Properties.Set {
-					e.FieldStart("properties")
-					s.Properties.Encode(e)
-				}
-			}
-		}
-	}
-}
-
-// Decode decodes CreateSchemaRevisionReq from json.
-func (s *CreateSchemaRevisionReq) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode CreateSchemaRevisionReq to nil")
-	}
-	// Sum type discriminator.
-	if typ := d.Next(); typ != jx.Object {
-		return errors.Errorf("unexpected json type %q", typ)
-	}
-
-	var found bool
-	if err := d.Capture(func(d *jx.Decoder) error {
-		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
-			if found {
-				return d.Skip()
-			}
-			switch string(key) {
-			case "kind":
-				typ, err := d.Str()
-				if err != nil {
-					return err
-				}
-				switch typ {
-				case "user-schema":
-					s.Type = UserSchemaCreateSchemaRevisionReq
-					found = true
-				default:
-					return errors.Errorf("unknown type %s", typ)
-				}
-				return nil
-			}
-			return d.Skip()
-		})
-	}); err != nil {
-		return errors.Wrap(err, "capture")
-	}
-	if !found {
-		return errors.New("unable to detect sum type variant")
-	}
-	switch s.Type {
-	case UserSchemaCreateSchemaRevisionReq:
-		if err := s.UserSchema.Decode(d); err != nil {
-			return err
-		}
-	default:
-		return errors.Errorf("inferred invalid type: %s", s.Type)
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s CreateSchemaRevisionReq) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *CreateSchemaRevisionReq) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -4825,12 +4652,6 @@ func (s GetSchemaByIdOK) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
-				if s.ReleaseState.Set {
-					e.FieldStart("releaseState")
-					s.ReleaseState.Encode(e)
-				}
-			}
-			{
 				e.FieldStart("x-auth-methods")
 				e.ArrStart()
 				for _, elem := range s.XMinusAuthMinusMethods {
@@ -4917,127 +4738,6 @@ func (s GetSchemaByIdOK) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *GetSchemaByIdOK) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes GetSchemaRevisionByIdOK as json.
-func (s GetSchemaRevisionByIdOK) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-func (s GetSchemaRevisionByIdOK) encodeFields(e *jx.Encoder) {
-	switch s.Type {
-	case UserSchemaGetSchemaRevisionByIdOK:
-		e.FieldStart("kind")
-		e.Str("user-schema")
-		{
-			s := s.UserSchema
-			{
-				e.FieldStart("title")
-				e.Str(s.Title)
-			}
-			{
-				if s.Description.Set {
-					e.FieldStart("description")
-					s.Description.Encode(e)
-				}
-			}
-			{
-				if s.ReleaseState.Set {
-					e.FieldStart("releaseState")
-					s.ReleaseState.Encode(e)
-				}
-			}
-			{
-				e.FieldStart("x-auth-methods")
-				e.ArrStart()
-				for _, elem := range s.XMinusAuthMinusMethods {
-					elem.Encode(e)
-				}
-				e.ArrEnd()
-			}
-			{
-				if s.Required != nil {
-					e.FieldStart("required")
-					e.ArrStart()
-					for _, elem := range s.Required {
-						e.Str(elem)
-					}
-					e.ArrEnd()
-				}
-			}
-			{
-				if s.Properties.Set {
-					e.FieldStart("properties")
-					s.Properties.Encode(e)
-				}
-			}
-		}
-	}
-}
-
-// Decode decodes GetSchemaRevisionByIdOK from json.
-func (s *GetSchemaRevisionByIdOK) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode GetSchemaRevisionByIdOK to nil")
-	}
-	// Sum type discriminator.
-	if typ := d.Next(); typ != jx.Object {
-		return errors.Errorf("unexpected json type %q", typ)
-	}
-
-	var found bool
-	if err := d.Capture(func(d *jx.Decoder) error {
-		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
-			if found {
-				return d.Skip()
-			}
-			switch string(key) {
-			case "kind":
-				typ, err := d.Str()
-				if err != nil {
-					return err
-				}
-				switch typ {
-				case "user-schema":
-					s.Type = UserSchemaGetSchemaRevisionByIdOK
-					found = true
-				default:
-					return errors.Errorf("unknown type %s", typ)
-				}
-				return nil
-			}
-			return d.Skip()
-		})
-	}); err != nil {
-		return errors.Wrap(err, "capture")
-	}
-	if !found {
-		return errors.New("unable to detect sum type variant")
-	}
-	switch s.Type {
-	case UserSchemaGetSchemaRevisionByIdOK:
-		if err := s.UserSchema.Decode(d); err != nil {
-			return err
-		}
-	default:
-		return errors.Errorf("inferred invalid type: %s", s.Type)
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s GetSchemaRevisionByIdOK) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *GetSchemaRevisionByIdOK) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -9500,39 +9200,6 @@ func (s *OptProjectID) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes SchemaReleaseState as json.
-func (o OptSchemaReleaseState) Encode(e *jx.Encoder) {
-	if !o.Set {
-		return
-	}
-	e.Str(string(o.Value))
-}
-
-// Decode decodes SchemaReleaseState from json.
-func (o *OptSchemaReleaseState) Decode(d *jx.Decoder) error {
-	if o == nil {
-		return errors.New("invalid: unable to decode OptSchemaReleaseState to nil")
-	}
-	o.Set = true
-	if err := o.Value.Decode(d); err != nil {
-		return err
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s OptSchemaReleaseState) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *OptSchemaReleaseState) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
 // Encode encodes StepTexts as json.
 func (o OptStepTexts) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -10823,48 +10490,115 @@ func (s *SSOProvider) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes SchemaReleaseState as json.
-func (s SchemaReleaseState) Encode(e *jx.Encoder) {
-	e.Str(string(s))
+// Encode implements json.Marshaler.
+func (s *SchemaURL) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
 }
 
-// Decode decodes SchemaReleaseState from json.
-func (s *SchemaReleaseState) Decode(d *jx.Decoder) error {
+// encodeFields encodes fields.
+func (s *SchemaURL) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("kind")
+		e.Str("schema-url")
+	}
+	{
+		e.FieldStart("url")
+		json.EncodeURI(e, s.URL)
+	}
+}
+
+var jsonFieldsNameOfSchemaURL = [2]string{
+	0: "kind",
+	1: "url",
+}
+
+// Decode decodes SchemaURL from json.
+func (s *SchemaURL) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode SchemaReleaseState to nil")
+		return errors.New("invalid: unable to decode SchemaURL to nil")
 	}
-	v, err := d.StrBytes()
-	if err != nil {
-		return err
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "kind":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.Kind = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"kind\"")
+			}
+		case "url":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := json.DecodeURI(d)
+				s.URL = v
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"url\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode SchemaURL")
 	}
-	// Try to use constant string.
-	switch SchemaReleaseState(v) {
-	case SchemaReleaseStateDraft:
-		*s = SchemaReleaseStateDraft
-	case SchemaReleaseStateActive:
-		*s = SchemaReleaseStateActive
-	case SchemaReleaseStateDefault:
-		*s = SchemaReleaseStateDefault
-	case SchemaReleaseStateDeprecated:
-		*s = SchemaReleaseStateDeprecated
-	case SchemaReleaseStateArchived:
-		*s = SchemaReleaseStateArchived
-	default:
-		*s = SchemaReleaseState(v)
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfSchemaURL) {
+					name = jsonFieldsNameOfSchemaURL[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
 	}
 
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s SchemaReleaseState) MarshalJSON() ([]byte, error) {
+func (s *SchemaURL) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *SchemaReleaseState) UnmarshalJSON(data []byte) error {
+func (s *SchemaURL) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -12836,12 +12570,6 @@ func (s *UserSchema) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
-		if s.ReleaseState.Set {
-			e.FieldStart("releaseState")
-			s.ReleaseState.Encode(e)
-		}
-	}
-	{
 		e.FieldStart("x-auth-methods")
 		e.ArrStart()
 		for _, elem := range s.XMinusAuthMinusMethods {
@@ -12867,14 +12595,13 @@ func (s *UserSchema) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfUserSchema = [7]string{
+var jsonFieldsNameOfUserSchema = [6]string{
 	0: "kind",
 	1: "title",
 	2: "description",
-	3: "releaseState",
-	4: "x-auth-methods",
-	5: "required",
-	6: "properties",
+	3: "x-auth-methods",
+	4: "required",
+	5: "properties",
 }
 
 // Decode decodes UserSchema from json.
@@ -12920,18 +12647,8 @@ func (s *UserSchema) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"description\"")
 			}
-		case "releaseState":
-			if err := func() error {
-				s.ReleaseState.Reset()
-				if err := s.ReleaseState.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"releaseState\"")
-			}
 		case "x-auth-methods":
-			requiredBitSet[0] |= 1 << 4
+			requiredBitSet[0] |= 1 << 3
 			if err := func() error {
 				s.XMinusAuthMinusMethods = make([]UserSchemaXMinusAuthMinusMethodsItem, 0)
 				if err := d.Arr(func(d *jx.Decoder) error {
@@ -12987,7 +12704,7 @@ func (s *UserSchema) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [1]uint8{
-		0b00010011,
+		0b00001011,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.

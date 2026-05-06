@@ -46,9 +46,6 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	CreateSchemaOperation: []string{
 		"schema.write",
 	},
-	CreateSchemaRevisionOperation: []string{
-		"schema.write",
-	},
 	CreateSessionOperation: []string{
 		"sessions.write",
 	},
@@ -59,12 +56,6 @@ var oauth2ScopesOAuth2 = map[string][]string{
 		"auth_attempts.read",
 	},
 	GetSchemaByIdOperation: []string{
-		"schema.read",
-	},
-	GetSchemaReleaseStateOperation: []string{
-		"schema.read",
-	},
-	GetSchemaRevisionByIdOperation: []string{
 		"schema.read",
 	},
 	GetSessionOperation: []string{
@@ -85,9 +76,6 @@ var oauth2ScopesOAuth2 = map[string][]string{
 		"session.delete",
 	},
 	RevokeTokenOperation: []string{},
-	UpdateSchemaReleaseStateOperation: []string{
-		"schema.write",
-	},
 	VerifyChallengeProofOperation: []string{
 		"auth_attempts.write",
 	},
