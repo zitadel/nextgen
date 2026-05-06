@@ -32,5 +32,8 @@ if:
     method:
       const: idp
 then:
+  properties:
+    idp_provider:
+      type: string
   required:
     - idp_provider
