@@ -97,6 +97,10 @@ type RevokeTokenRes interface {
 	revokeTokenRes()
 }
 
+type SubmitFlowEventRes interface {
+	submitFlowEventRes()
+}
+
 type SubmitFlowStepRes interface {
 	submitFlowStepRes()
 }
