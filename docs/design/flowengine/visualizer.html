@@ -5,7 +5,32 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Flow Engine Visualizer</title>
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/liquidjs@10/dist/liquid.browser.min.js"></script>
+<!--
+  Import map resolves the bare specifiers in @zitadel-nextgen/components' built bundle
+  (it intentionally externalises lit/liquidjs/dompurify so npm consumers dedupe). The
+  visualizer doesn't go through a bundler, so we point bare imports at esm.sh. Keep
+  versions in sync with pnpm-workspace.yaml.
+-->
+<script type="importmap">
+{
+  "imports": {
+    "lit": "https://esm.sh/lit@3.3.2",
+    "lit/": "https://esm.sh/lit@3.3.2/",
+    "liquidjs": "https://esm.sh/liquidjs@10.25.7",
+    "dompurify": "https://esm.sh/dompurify@3.2.6"
+  }
+}
+</script>
+<!--
+  Reuse the import-mapped liquidjs for the in-page Simulate render so we don't ship
+  two copies of the library (UMD bundle + ESM via esm.sh). Module scripts are
+  deferred, so the classic visualizer script below is also `defer`-loaded to keep
+  the ordering safe.
+-->
+<script type="module">
+  import { Liquid } from 'liquidjs';
+  window.liquidjs = { Liquid };
+</script>
 <style>
   :root {
     --bg: #0f1117;
@@ -219,6 +244,20 @@
     outline: none;
     tab-size: 2;
   }
+  textarea.template-editor[data-locked="true"] {
+    color: var(--muted);
+    caret-color: transparent;
+    cursor: not-allowed;
+  }
+  .template-locked-banner {
+    display: none;
+    padding: 6px 10px;
+    background: rgba(108, 140, 255, 0.08);
+    border-bottom: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 12px;
+  }
+  body[data-template-locked="true"] .template-locked-banner { display: block; }
 
   .editor-status {
     height: 28px;
@@ -426,6 +465,36 @@
     max-height: 300px;
     overflow: auto;
   }
+
+  /* ── Real Components view ── */
+  #real-view { padding: 0; }
+  .real-toolbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 16px; background: var(--surface);
+    border-bottom: 1px solid var(--border); flex-shrink: 0;
+    font-size: 12px; color: var(--muted);
+  }
+  .real-toolbar code { color: var(--accent); font-family: var(--editor-font); }
+  .real-restart {
+    font-size: 11px; color: var(--muted); background: rgba(108, 140, 255, 0.08);
+    border: 1px solid var(--border); border-radius: 6px;
+    padding: 4px 8px; cursor: pointer;
+  }
+  .real-restart:hover { background: rgba(108, 140, 255, 0.18); color: var(--text); }
+  .real-frame {
+    flex: 1 1 auto; overflow: auto; background: #f8fafc;
+    display: flex; align-items: stretch; justify-content: center;
+  }
+  .real-frame zitadel-login { display: block; width: 100%; min-height: 100%; }
+  .real-frame .real-error {
+    margin: 24px; padding: 16px; border: 1px solid var(--border);
+    border-radius: var(--radius); background: var(--surface); color: var(--text);
+    font-size: 13px; line-height: 1.5;
+  }
+  .real-frame .real-error code {
+    font-family: var(--editor-font); background: var(--bg); padding: 2px 6px;
+    border-radius: 4px; color: var(--accent);
+  }
 </style>
 </head>
 <body>
@@ -456,6 +525,13 @@
     </div>
     <!-- Liquid template pane -->
     <div class="editor-pane" id="template-pane">
+      <div class="template-locked-banner">
+        Read-only: this is the bundled <code>auth_form.liquid</code> the
+        <code>&lt;zitadel-login&gt;</code> element is rendering. Editing is
+        disabled here because the orchestrator does not yet expose a
+        <code>template</code> override. Switch back to <strong>Diagram</strong>
+        or <strong>Simulate</strong> to edit your draft.
+      </div>
       <textarea id="template-editor" class="template-editor" spellcheck="false"></textarea>
     </div>
     <div class="editor-status">
@@ -469,6 +545,7 @@
     <div class="tab-bar">
       <button class="tab-btn active" data-view="diagram-view">Diagram</button>
       <button class="tab-btn" data-view="sim-view">Simulate</button>
+      <button class="tab-btn" data-view="real-view">Real components</button>
       <button class="tab-btn" data-view="api-view">API Log</button>
     </div>
     <div class="right-content">
@@ -477,6 +554,13 @@
       </div>
       <div id="sim-view" class="view">
         <div class="sim-phone" id="sim-phone"></div>
+      </div>
+      <div id="real-view" class="view">
+        <div class="real-toolbar" id="real-toolbar">
+          <span>Walks <code>step.transitions</code> in the editor &middot; <code>&lt;zitadel-login&gt;</code> + <code>WalkingFixtureTransport</code></span>
+          <button class="real-restart" id="real-restart" type="button">Restart flow</button>
+        </div>
+        <div class="real-frame" id="real-frame"></div>
       </div>
       <div id="api-view" class="view">
         <div class="api-toolbar">
@@ -1108,12 +1192,16 @@ function genToken() {
 
 // ── LiquidJS Engine ──────────────────────────────────────────────
 
+// Constructed lazily on first use because the LiquidJS module shim above
+// (`<script type="module">`) is deferred until after this classic script runs,
+// so `window.liquidjs` is not yet defined at script-evaluation time.
 let liquidEngine = null;
-try {
+function getLiquidEngine() {
+  if (liquidEngine) return liquidEngine;
+  if (typeof liquidjs === 'undefined' || !liquidjs?.Liquid) return null;
   liquidEngine = new liquidjs.Liquid();
   liquidEngine.registerFilter('t', (key) => T[key] || key);
-} catch (e) {
-  console.warn('LiquidJS not loaded, using fallback rendering');
+  return liquidEngine;
 }
 
 // ── DOM refs ──────────────────────────────────────────────────────
@@ -1814,7 +1902,8 @@ async function renderSim() {
   const desc = step.texts?.description_key ? t(step.texts.description_key) : '';
 
   let bodyHtml = '';
-  if (liquidEngine) {
+  const engine = getLiquidEngine();
+  if (engine) {
     try {
       // Convert dicts to arrays for easier liquid iteration
       const context = {
@@ -1825,7 +1914,7 @@ async function renderSim() {
         gates: step.gates || {},
         error: simState.error
       };
-      bodyHtml = await liquidEngine.parseAndRender(currentTemplate, context);
+      bodyHtml = await engine.parseAndRender(currentTemplate, context);
     } catch (e) {
       console.warn('Liquid render error:', e);
       bodyHtml = renderStepFallback(step);
@@ -1891,6 +1980,174 @@ function renderBreadcrumb() {
     i === parts.length - 1 ? `<span>${p}</span>` : p
   ).join(' &#8594; ');
 }
+
+// ── Real <zitadel-login> mount ────────────────────────────────────
+//
+// Loads the components package via the Vite dev server (`packages/components`)
+// and mounts the real orchestrator inside an isolated frame. Drives it with
+// the package's `WalkingFixtureTransport` so the Real-components tab walks the
+// same flow definition the simulator above is editing.
+//
+// The placeholder below is substituted by the `zitadel:serve-visualizer`
+// plugin in `packages/components/vite.config.mts` with a `/@fs/...` URL that
+// points at `packages/components/src/index.ts`. Vite's TS pipeline transforms
+// the source on the fly — no build step, hot reload included.
+
+const COMPONENT_BUNDLE_PATH = '__COMPONENTS_BUNDLE__';
+const REAL_BRANDING = {
+  layout: 'centered',
+  palette: {
+    primary: '#4A90D9',
+    on_primary: '#FFFFFF',
+    background: '#FFFFFF',
+    surface: '#FFFFFF',
+    muted: '#F1F5F9',
+    border: '#E2E8F0',
+    text: '#0F172A',
+    text_muted: '#64748B',
+  },
+};
+let componentsModule = null;
+let realMountFlowName = null;
+
+async function ensureComponentsLoaded() {
+  if (componentsModule) return componentsModule;
+  componentsModule = await import(COMPONENT_BUNDLE_PATH);
+  return componentsModule;
+}
+
+async function renderRealView() {
+  const frame = document.getElementById('real-frame');
+  if (!frame) return;
+  frame.innerHTML = '';
+  if (!currentFlow) {
+    frame.innerHTML = '<div class="real-error">No flow loaded.</div>';
+    return;
+  }
+  let mod;
+  try {
+    mod = await ensureComponentsLoaded();
+  } catch (error) {
+    console.error(error);
+    const placeholderUntouched = COMPONENT_BUNDLE_PATH === '__' + 'COMPONENTS_BUNDLE__';
+    const reason = placeholderUntouched
+      ? `This page is being served outside the components dev server, so the bundle path placeholder was never substituted.`
+      : `Couldn't import <code>${COMPONENT_BUNDLE_PATH}</code>. See the browser console for the underlying error.`;
+    frame.innerHTML = `<div class="real-error">
+      <strong>Real-components view needs the components dev server.</strong>
+      <p style="margin: 8px 0;">${reason}</p>
+      <pre style="margin-top:8px;">corepack pnpm --filter @zitadel-nextgen/components dev
+# then open http://localhost:5174/visualizer.html</pre>
+      <p style="margin-top:8px;font-size:12px;color:var(--muted);">
+        Bundle path: <code>${COMPONENT_BUNDLE_PATH}</code>.
+      </p>
+    </div>`;
+    return;
+  }
+
+  realMountFlowName = currentFlowName;
+  const purpose = (currentFlow.purposes || ['login'])[0];
+  // Project visualizer step shape onto the orchestrator's expected payload.
+  const flow = {
+    name: currentFlow.name,
+    purposes: currentFlow.purposes,
+    initial_steps: currentFlow.initial_steps,
+    steps: (currentFlow.steps || []).map(buildStepPayload),
+  };
+  // Re-attach `transitions` (stripped by buildStepPayload to mirror the API).
+  flow.steps.forEach((step, index) => {
+    const source = currentFlow.steps[index];
+    if (source?.transitions) step.transitions = source.transitions;
+    if (source?.behavior) step.behavior = source.behavior;
+  });
+
+  const element = document.createElement('zitadel-login');
+  element.transport = new mod.WalkingFixtureTransport({
+    flow,
+    purpose,
+    branding: REAL_BRANDING,
+    decorate: (step, ctx) => {
+      if (step.name === 'password' || step.type === 'credential') {
+        const values = (ctx.payload && ctx.payload.values) || {};
+        const ident = values.identifier || values.email;
+        if (ident) return { ...step, identity: { display_name: ident } };
+      }
+      return step;
+    },
+  });
+  element.purpose = purpose;
+  // Give the orchestrator the visualizer's `T` dictionary so `text_key` / `title_key`
+  // values resolve through Liquid's `| t` filter instead of rendering as raw keys.
+  element.locale = T;
+  frame.appendChild(element);
+}
+
+function setupRealRestart() {
+  const button = document.getElementById('real-restart');
+  if (!button) return;
+  button.addEventListener('click', () => { renderRealView(); });
+}
+
+// When the Real components tab is active the Template editor is dormant — the
+// orchestrator uses its bundled `auth_form.liquid`. Swap the editor into a
+// read-only view of that bundled source so the UI matches reality, and
+// restore the user's draft when they leave the tab.
+let templateDraft = null;
+function applyRealTemplateLock(mod) {
+  if (templateDraft === null) templateDraft = $templateEditor.value;
+  const bundled = (mod && (mod.authFormTemplate || mod.defaultTemplate)) || '';
+  $templateEditor.value = bundled.trim();
+  $templateEditor.readOnly = true;
+  $templateEditor.dataset.locked = 'true';
+  $templateEditor.title = 'Read-only: this is the template <zitadel-login> is rendering. Override is not yet exposed on the element.';
+  document.body.dataset.templateLocked = 'true';
+}
+function releaseRealTemplateLock() {
+  if (!$templateEditor.dataset.locked) return;
+  $templateEditor.readOnly = false;
+  delete $templateEditor.dataset.locked;
+  delete document.body.dataset.templateLocked;
+  $templateEditor.title = '';
+  if (templateDraft !== null) {
+    $templateEditor.value = templateDraft;
+    currentTemplate = templateDraft;
+    templateDraft = null;
+  }
+}
+
+const _originalSetupRightTabs = setupRightTabs;
+setupRightTabs = function setupRightTabsWithReal() {
+  _originalSetupRightTabs();
+  document.querySelectorAll('.right-panel .tab-btn').forEach(tab => {
+    const original = tab.onclick;
+    tab.onclick = async (event) => {
+      original?.call(tab, event);
+      if (tab.dataset.view === 'real-view') {
+        try {
+          const mod = await ensureComponentsLoaded();
+          applyRealTemplateLock(mod);
+        } catch {
+          // load failure already surfaces in renderRealView; leave editor as-is.
+        }
+        renderRealView();
+      } else {
+        releaseRealTemplateLock();
+      }
+    };
+  });
+  setupRealRestart();
+};
+
+const _originalOnSimStepChanged = onSimStepChanged;
+onSimStepChanged = function onSimStepChangedWithReal() {
+  _originalOnSimStepChanged();
+  const realView = document.getElementById('real-view');
+  if (realView?.classList.contains('active') || realMountFlowName !== currentFlowName) {
+    if (realView?.classList.contains('active')) {
+      renderRealView();
+    }
+  }
+};
 </script>
 
 </body>

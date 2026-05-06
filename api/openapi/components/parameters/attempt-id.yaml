@@ -1,0 +1,6 @@
+name: attempt_id
+in: path
+required: true
+description: The unique identifier of the authentication attempt
+schema:
+  $ref: '../schemas/attempt-id.yaml'
