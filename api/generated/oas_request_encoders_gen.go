@@ -14,6 +14,20 @@ import (
 	"github.com/ogen-go/ogen/uri"
 )
 
+func encodeCreateAuthAttemptRequest(
+	req *CreateAuthAttemptRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
 func encodeCreateFlowRequest(
 	req *CreateFlowRequest,
 	r *http.Request,
@@ -44,6 +58,34 @@ func encodeCreateSchemaRequest(
 
 func encodeCreateSchemaRevisionRequest(
 	req CreateSchemaRevisionReq,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeCreateSessionRequest(
+	req *CreateSessionRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeExchangeHandoffRequest(
+	req *ExchangeRequest,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"
@@ -239,6 +281,20 @@ func encodeIntrospectRequest(
 	return nil
 }
 
+func encodeIssueChallengeRequest(
+	req *IssueChallengeRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
 func encodeRevokeTokenRequest(
 	req *RevokeRequest,
 	r *http.Request,
@@ -314,6 +370,20 @@ func encodeSubmitFlowStepRequest(
 
 func encodeUpdateSchemaReleaseStateRequest(
 	req SchemaReleaseState,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeVerifyChallengeProofRequest(
+	req *VerifyChallengeRequest,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"

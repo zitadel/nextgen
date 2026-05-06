@@ -9,8 +9,16 @@ type AuthorizeGetRes interface {
 	authorizeGetRes()
 }
 
+type CreateAuthAttemptRes interface {
+	createAuthAttemptRes()
+}
+
 type CreateFlowRes interface {
 	createFlowRes()
+}
+
+type CreateHandoffRes interface {
+	createHandoffRes()
 }
 
 type CreateSchemaRes interface {
@@ -21,8 +29,20 @@ type CreateSchemaRevisionRes interface {
 	createSchemaRevisionRes()
 }
 
+type CreateSessionRes interface {
+	createSessionRes()
+}
+
 type EndSessionRes interface {
 	endSessionRes()
+}
+
+type ExchangeHandoffRes interface {
+	exchangeHandoffRes()
+}
+
+type GetAuthAttemptRes interface {
+	getAuthAttemptRes()
 }
 
 type GetFlowStepRes interface {
@@ -61,6 +81,10 @@ type GetSchemaRevisionByIdRes interface {
 	getSchemaRevisionByIdRes()
 }
 
+type GetSessionRes interface {
+	getSessionRes()
+}
+
 type GetTokenRes interface {
 	getTokenRes()
 }
@@ -73,12 +97,28 @@ type IntrospectRes interface {
 	introspectRes()
 }
 
+type IssueChallengeRes interface {
+	issueChallengeRes()
+}
+
+type ListSessionsRes interface {
+	listSessionsRes()
+}
+
 type ListUsersRes interface {
 	listUsersRes()
 }
 
+type RevokeSessionRes interface {
+	revokeSessionRes()
+}
+
 type RevokeTokenRes interface {
 	revokeTokenRes()
+}
+
+type SubmitFlowEventRes interface {
+	submitFlowEventRes()
 }
 
 type SubmitFlowStepRes interface {
@@ -87,4 +127,8 @@ type SubmitFlowStepRes interface {
 
 type UpdateSchemaReleaseStateRes interface {
 	updateSchemaReleaseStateRes()
+}
+
+type VerifyChallengeProofRes interface {
+	verifyChallengeProofRes()
 }
