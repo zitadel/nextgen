@@ -40,7 +40,7 @@ Extra layout presets; how templates attach to flows; dark mode; optional untrust
 
 ## Files
 
-[`schema.md`](schema.md), [`tokens.md`](tokens.md), [`templates.md`](templates.md), [`override-ladder.md`](override-ladder.md), [`validator.md`](validator.md), [`form-participation.md`](form-participation.md), [`branding.example.json`](branding.example.json)
+[`schema.md`](schema.md), [`tokens.md`](tokens.md), [`templates.md`](templates.md), [`component-capability-map.md`](component-capability-map.md), [`override-ladder.md`](override-ladder.md), [`validator.md`](validator.md), [`form-participation.md`](form-participation.md), [`branding.example.json`](branding.example.json)
 
 ## Related
 
