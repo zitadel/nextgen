@@ -121,44 +121,42 @@ properties:
   transitions:
     type: object
     description: |
-      Maps action/outcome names to the next step. Values can be:
-      - A string: name of the next step in this flow
-      - An object with `pivot`: stack a different flow (returns after completion)
-      - An object with `switch`: replace the current flow entirely (no return)
+      Maps action/outcome names to their transition descriptor.
 
       For `policy_check` steps, keys are outcome names (e.g. "found", "not_found").
       For `action` steps, keys are result names (e.g. "created").
       For rendered steps, keys match action names from the `actions` dict,
       plus "sso" and "callback" for SSO-related transitions.
     additionalProperties:
-      oneOf:
-        - type: string
-          description: Next step name within this flow.
-        - type: object
-          properties:
-            pivot:
-              type: string
-              pattern: '^[a-z][a-z0-9-]*$'
-              description: |
-                Slug of the flow to push onto the stack. The current flow is
-                paused and resumes when the pivoted flow completes (auto-pop).
-                Example: login → recovery → back to login.
-          required: [pivot]
-          additionalProperties: false
-        - type: object
-          properties:
-            switch:
-              type: string
-              pattern: '^[a-z][a-z0-9-]*$'
-              description: |
-                Slug of the flow to replace the current flow. No return —
-                the current flow is discarded.
-                Example: login ↔ register.
-          required: [switch]
-          additionalProperties: false
+      type: object
+      required: [target]
+      properties:
+        target:
+          type: string
+          description: |
+            Step name within this flow (when `action` is null), or the slug
+            of another flow (when `action` is `switch` or `pivot`).
+          example: password
+        action:
+          type: string
+          enum: [switch, pivot]
+          nullable: true
+          description: |
+            How to interpret `target`:
+            - null (omitted): transition to a step in the current flow.
+            - switch: replace the current flow with the target flow.
+              No return — the current flow is discarded.
+              Example: login ↔ register.
+            - pivot: push the target flow onto the stack. The current flow
+              is paused and resumes when the target flow completes (auto-pop).
+              Example: login → recovery → back to login.
+      additionalProperties: false
     example:
-      submit: password
+      submit:
+        target: password
       recover:
-        pivot: recovery
+        target: recovery
+        action: pivot
       register:
-        switch: register
+        target: register
+        action: switch
