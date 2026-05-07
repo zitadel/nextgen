@@ -1391,7 +1391,7 @@ func (s *Server) handleCreateUserRequest(args [0]string, argsEscaped bool, w htt
 		}
 
 		type (
-			Request  = *CreateUserRequest
+			Request  = *User
 			Params   = struct{}
 			Response = CreateUserRes
 		)

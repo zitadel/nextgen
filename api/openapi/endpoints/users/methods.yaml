@@ -57,7 +57,7 @@ post:
     content:
       application/json:
         schema:
-          $ref: create-user-request.yaml
+          $ref: user.yaml
   responses:
     '201':
       description: The user was created successfully

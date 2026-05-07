@@ -13,11 +13,7 @@ patch:
     content:
       application/json:
         schema:
-          # TODO: create an actual schema for this request once the user-schema endpoints are done.
-          type: object
-          description: |
-            Request to update a user. The content of this request is determined 
-            by the configured schema for users.
+          $ref: ../user.yaml
   responses:
     '200':
       description: The user was updated successfully
@@ -70,8 +66,7 @@ get:
       content:
         application/json:
           schema:
-            # TODO: create an actual schema for this request once the user-schema endpoints are done.
-            type: object
+            $ref: user.yaml
     '400':
       description: The provided input was not valid
       content:

@@ -57,7 +57,7 @@ func encodeCreateSessionRequest(
 }
 
 func encodeCreateUserRequest(
-	req *CreateUserRequest,
+	req *User,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"

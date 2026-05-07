@@ -836,11 +836,6 @@ type CreateUserForbidden ErrorDetails
 
 func (*CreateUserForbidden) createUserRes() {}
 
-// Request to create a user. The content of this request is determined
-// by the configured schema for users.
-// Ref: #
-type CreateUserRequest struct{}
-
 // The content of this response is determined by the configured
 // schema for users.
 // Ref: #
@@ -6203,19 +6198,26 @@ func (s *TotpProofTotp) SetCode(val string) {
 	s.Code = val
 }
 
+// A user represents an individual identity in the system. It can be used to
+// represent a human user, but also a service account or any other type of
+// identity. The content of a user is determined by the configured schema for
+// users, this is only a base schema.
+// Ref: #
+type User struct{}
+
 type UserID string
 
 // Paginated list of users.
 // Ref: #
 type UserListResponse struct {
-	Users []UserListResponseUsersItem `json:"users"`
+	Users []User `json:"users"`
 	// Token to pass as `page_token` in the next request to fetch the following page.
 	// Absent when there are no more results.
 	NextPageToken OptNilPageToken `json:"next_page_token"`
 }
 
 // GetUsers returns the value of Users.
-func (s *UserListResponse) GetUsers() []UserListResponseUsersItem {
+func (s *UserListResponse) GetUsers() []User {
 	return s.Users
 }
 
@@ -6225,7 +6227,7 @@ func (s *UserListResponse) GetNextPageToken() OptNilPageToken {
 }
 
 // SetUsers sets the value of Users.
-func (s *UserListResponse) SetUsers(val []UserListResponseUsersItem) {
+func (s *UserListResponse) SetUsers(val []User) {
 	s.Users = val
 }
 
@@ -6235,10 +6237,6 @@ func (s *UserListResponse) SetNextPageToken(val OptNilPageToken) {
 }
 
 func (*UserListResponse) listUsersRes() {}
-
-// A user in the list of users. The content of this object is determined
-// by the configured schema for users.
-type UserListResponseUsersItem struct{}
 
 type UsernamePassword struct {
 	Username string

@@ -97,7 +97,7 @@ type Invoker interface {
 	// Create user.
 	//
 	// POST /users
-	CreateUser(ctx context.Context, request *CreateUserRequest) (CreateUserRes, error)
+	CreateUser(ctx context.Context, request *User) (CreateUserRes, error)
 	// EndSession invokes endSession operation.
 	//
 	// End a session.
@@ -1313,12 +1313,12 @@ func (c *Client) sendCreateSession(ctx context.Context, request *CreateSessionRe
 // Create user.
 //
 // POST /users
-func (c *Client) CreateUser(ctx context.Context, request *CreateUserRequest) (CreateUserRes, error) {
+func (c *Client) CreateUser(ctx context.Context, request *User) (CreateUserRes, error) {
 	res, err := c.sendCreateUser(ctx, request)
 	return res, err
 }
 
-func (c *Client) sendCreateUser(ctx context.Context, request *CreateUserRequest) (res CreateUserRes, err error) {
+func (c *Client) sendCreateUser(ctx context.Context, request *User) (res CreateUserRes, err error) {
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("createUser"),
 		semconv.HTTPRequestMethodKey.String("POST"),
