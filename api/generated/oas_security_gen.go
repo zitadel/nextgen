@@ -59,6 +59,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	GetSessionOperation: []string{
 		"session.read",
 	},
+	GetUserOperation: []string{
+		"users.read",
+	},
 	GetUserInfoOperation: []string{},
 	IntrospectOperation:  []string{},
 	IssueChallengeOperation: []string{
@@ -74,6 +77,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 		"session.delete",
 	},
 	RevokeTokenOperation: []string{},
+	UpdateUserOperation: []string{
+		"users.write",
+	},
 	VerifyChallengeProofOperation: []string{
 		"auth_attempts.write",
 	},

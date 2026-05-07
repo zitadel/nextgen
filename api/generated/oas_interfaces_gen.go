@@ -77,6 +77,10 @@ type GetUserInfoRes interface {
 	getUserInfoRes()
 }
 
+type GetUserRes interface {
+	getUserRes()
+}
+
 type IntrospectRes interface {
 	introspectRes()
 }
@@ -107,6 +111,10 @@ type SubmitFlowEventRes interface {
 
 type SubmitFlowStepRes interface {
 	submitFlowStepRes()
+}
+
+type UpdateUserRes interface {
+	updateUserRes()
 }
 
 type VerifyChallengeProofRes interface {

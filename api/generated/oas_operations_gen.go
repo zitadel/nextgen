@@ -24,6 +24,7 @@ const (
 	GetReadyOperation               OperationName = "GetReady"
 	GetSessionOperation             OperationName = "GetSession"
 	GetTokenOperation               OperationName = "GetToken"
+	GetUserOperation                OperationName = "GetUser"
 	GetUserInfoOperation            OperationName = "GetUserInfo"
 	IntrospectOperation             OperationName = "Introspect"
 	IssueChallengeOperation         OperationName = "IssueChallenge"
@@ -33,5 +34,6 @@ const (
 	RevokeTokenOperation            OperationName = "RevokeToken"
 	SubmitFlowEventOperation        OperationName = "SubmitFlowEvent"
 	SubmitFlowStepOperation         OperationName = "SubmitFlowStep"
+	UpdateUserOperation             OperationName = "UpdateUser"
 	VerifyChallengeProofOperation   OperationName = "VerifyChallengeProof"
 )

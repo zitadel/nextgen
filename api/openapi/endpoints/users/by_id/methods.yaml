@@ -66,7 +66,7 @@ get:
       content:
         application/json:
           schema:
-            $ref: user.yaml
+            $ref: ../user.yaml
     '400':
       description: The provided input was not valid
       content:

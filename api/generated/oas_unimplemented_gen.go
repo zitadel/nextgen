@@ -225,6 +225,15 @@ func (UnimplementedHandler) GetToken(ctx context.Context, req *PostTokenRequest)
 	return r, ht.ErrNotImplemented
 }
 
+// GetUser implements getUser operation.
+//
+// Get user details.
+//
+// GET /users/{user_id}
+func (UnimplementedHandler) GetUser(ctx context.Context, params GetUserParams) (r GetUserRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // GetUserInfo implements getUserInfo operation.
 //
 // Get user info.
@@ -331,6 +340,15 @@ func (UnimplementedHandler) SubmitFlowEvent(ctx context.Context, req *FlowEventR
 //
 // POST /flow/{id}/submit
 func (UnimplementedHandler) SubmitFlowStep(ctx context.Context, req *FlowSubmitRequest, params SubmitFlowStepParams) (r SubmitFlowStepRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// UpdateUser implements updateUser operation.
+//
+// Update user.
+//
+// PATCH /users/{user_id}
+func (UnimplementedHandler) UpdateUser(ctx context.Context, req *User, params UpdateUserParams) (r UpdateUserRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

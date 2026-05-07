@@ -166,6 +166,12 @@ type Handler interface {
 	//
 	// POST /auth/token
 	GetToken(ctx context.Context, req *PostTokenRequest) (GetTokenRes, error)
+	// GetUser implements getUser operation.
+	//
+	// Get user details.
+	//
+	// GET /users/{user_id}
+	GetUser(ctx context.Context, params GetUserParams) (GetUserRes, error)
 	// GetUserInfo implements getUserInfo operation.
 	//
 	// Get user info.
@@ -248,6 +254,12 @@ type Handler interface {
 	//
 	// POST /flow/{id}/submit
 	SubmitFlowStep(ctx context.Context, req *FlowSubmitRequest, params SubmitFlowStepParams) (SubmitFlowStepRes, error)
+	// UpdateUser implements updateUser operation.
+	//
+	// Update user.
+	//
+	// PATCH /users/{user_id}
+	UpdateUser(ctx context.Context, req *User, params UpdateUserParams) (UpdateUserRes, error)
 	// VerifyChallengeProof implements verifyChallengeProof operation.
 	//
 	// Submits a proof (credential, code, assertion) to verify a factor challenge.

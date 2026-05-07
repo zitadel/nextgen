@@ -2261,6 +2261,14 @@ type GetSessionUnauthorized ErrorDetails
 
 func (*GetSessionUnauthorized) getSessionRes() {}
 
+type GetUserBadRequest ErrorDetails
+
+func (*GetUserBadRequest) getUserRes() {}
+
+type GetUserForbidden ErrorDetails
+
+func (*GetUserForbidden) getUserRes() {}
+
 type GetUserInfoOK struct {
 	// The unique identifier for the user.
 	Sub OptString `json:"sub"`
@@ -2349,6 +2357,14 @@ func (s *GetUserInfoOK) SetFamilyName(val OptString) {
 }
 
 func (*GetUserInfoOK) getUserInfoRes() {}
+
+type GetUserNotFound ErrorDetails
+
+func (*GetUserNotFound) getUserRes() {}
+
+type GetUserUnauthorized ErrorDetails
+
+func (*GetUserUnauthorized) getUserRes() {}
 
 // The handoff token and metadata for session exchange.
 // This is a short-lived credential (TTL ≤ 60 seconds) that the client must exchange
@@ -6198,12 +6214,35 @@ func (s *TotpProofTotp) SetCode(val string) {
 	s.Code = val
 }
 
+type UpdateUserBadRequest ErrorDetails
+
+func (*UpdateUserBadRequest) updateUserRes() {}
+
+type UpdateUserForbidden ErrorDetails
+
+func (*UpdateUserForbidden) updateUserRes() {}
+
+type UpdateUserNotFound ErrorDetails
+
+func (*UpdateUserNotFound) updateUserRes() {}
+
+// UpdateUserOK is response for UpdateUser operation.
+type UpdateUserOK struct{}
+
+func (*UpdateUserOK) updateUserRes() {}
+
+type UpdateUserUnauthorized ErrorDetails
+
+func (*UpdateUserUnauthorized) updateUserRes() {}
+
 // A user represents an individual identity in the system. It can be used to
 // represent a human user, but also a service account or any other type of
 // identity. The content of a user is determined by the configured schema for
 // users, this is only a base schema.
 // Ref: #
 type User struct{}
+
+func (*User) getUserRes() {}
 
 type UserID string
 
