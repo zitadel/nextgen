@@ -16,7 +16,7 @@ func NewHandler() *Handler {
 	return &Handler{}
 }
 
-func (h Handler) NewError(ctx context.Context, err error) *api.ErrorDetailsStatusCode {
+func (h *Handler) NewError(ctx context.Context, err error) *api.ErrorDetailsStatusCode {
 	return &api.ErrorDetailsStatusCode{
 		StatusCode: 401,
 		Response: api.ErrorDetails{

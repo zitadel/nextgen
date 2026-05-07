@@ -7,8 +7,24 @@ flows:
       openid: OpenID Connect scope
       profile: Access to the user's profile information
       email: Access to the user's email address
+      auth_attempts.read: Read authentication attempt state
+      auth_attempts.write: Create and update authentication attempts and challenges
+      sessions.read: List sessions
+      sessions.write: Create sessions and exchange handoff tokens
+      session.read: Read an individual session
+      session.delete: Revoke an individual session
+      users.read: Read users
+      users.write: Create and update users
   clientCredentials: 
     tokenUrl: https://acc.nextgen.zitadel.com/oauth/token
     scopes: 
       openid: OpenID Connect scope
+      auth_attempts.read: Read authentication attempt state
+      auth_attempts.write: Create and update authentication attempts and challenges
+      sessions.read: List sessions
+      sessions.write: Create sessions and exchange handoff tokens
+      session.read: Read an individual session
+      session.delete: Revoke an individual session
+      users.read: Read users
+      users.write: Create and update users
     
