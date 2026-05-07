@@ -1,6 +1,7 @@
 title: ExampleUserSchema
 $schema: https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.yaml
 $id: https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml
+kind: user-schema
 type: object
 description: This is an example of a user schema definition.
 x-auth-methods:

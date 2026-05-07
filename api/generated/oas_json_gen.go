@@ -1689,10 +1689,8 @@ func (s CreateSchemaReq) encodeFields(e *jx.Encoder) {
 				e.Str("https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.yaml")
 			}
 			{
-				if s.ID.Set {
-					e.FieldStart("$id")
-					s.ID.Encode(e)
-				}
+				e.FieldStart("$id")
+				json.EncodeURI(e, s.ID)
 			}
 			{
 				e.FieldStart("title")
@@ -4771,10 +4769,8 @@ func (s GetSchemaByIdOK) encodeFields(e *jx.Encoder) {
 				e.Str("https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.yaml")
 			}
 			{
-				if s.ID.Set {
-					e.FieldStart("$id")
-					s.ID.Encode(e)
-				}
+				e.FieldStart("$id")
+				json.EncodeURI(e, s.ID)
 			}
 			{
 				e.FieldStart("title")
@@ -13145,10 +13141,8 @@ func (s *UserSchema) encodeFields(e *jx.Encoder) {
 		e.Str("https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.yaml")
 	}
 	{
-		if s.ID.Set {
-			e.FieldStart("$id")
-			s.ID.Encode(e)
-		}
+		e.FieldStart("$id")
+		json.EncodeURI(e, s.ID)
 	}
 	{
 		e.FieldStart("kind")
@@ -13214,9 +13208,11 @@ func (s *UserSchema) Decode(d *jx.Decoder) error {
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
 		case "$schema":
+			requiredBitSet[0] |= 1 << 0
 			if err := func() error {
-				s.Schema.Reset()
-				if err := s.Schema.Decode(d); err != nil {
+				v, err := d.Str()
+				s.Schema = string(v)
+				if err != nil {
 					return err
 				}
 				return nil
@@ -13224,9 +13220,11 @@ func (s *UserSchema) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"$schema\"")
 			}
 		case "$id":
+			requiredBitSet[0] |= 1 << 1
 			if err := func() error {
-				s.ID.Reset()
-				if err := s.ID.Decode(d); err != nil {
+				v, err := json.DecodeURI(d)
+				s.ID = v
+				if err != nil {
 					return err
 				}
 				return nil
@@ -13326,7 +13324,7 @@ func (s *UserSchema) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [2]uint8{
-		0b00101100,
+		0b00101111,
 		0b00000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {

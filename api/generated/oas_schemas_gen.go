@@ -7739,9 +7739,9 @@ func (s *UserPropertyXMinusUnique) UnmarshalText(data []byte) error {
 // Ref: #
 type UserSchema struct {
 	// The JSON Schema version used for this schema.
-	Schema OptString `json:"$schema"`
+	Schema string `json:"$schema"`
 	// The unique identifier for this schema, which is also the URL where this schema can be accessed.
-	ID OptURI `json:"$id"`
+	ID url.URL `json:"$id"`
 	// Discriminator value for a user schema create request.
 	Kind string `json:"kind"`
 	// Human-readable name for this schema.
@@ -7759,12 +7759,12 @@ type UserSchema struct {
 }
 
 // GetSchema returns the value of Schema.
-func (s *UserSchema) GetSchema() OptString {
+func (s *UserSchema) GetSchema() string {
 	return s.Schema
 }
 
 // GetID returns the value of ID.
-func (s *UserSchema) GetID() OptURI {
+func (s *UserSchema) GetID() url.URL {
 	return s.ID
 }
 
@@ -7804,12 +7804,12 @@ func (s *UserSchema) GetExample() OptUserSchemaExample {
 }
 
 // SetSchema sets the value of Schema.
-func (s *UserSchema) SetSchema(val OptString) {
+func (s *UserSchema) SetSchema(val string) {
 	s.Schema = val
 }
 
 // SetID sets the value of ID.
-func (s *UserSchema) SetID(val OptURI) {
+func (s *UserSchema) SetID(val url.URL) {
 	s.ID = val
 }
 
