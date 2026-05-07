@@ -24,6 +24,18 @@ get:
         application/json:
           schema:
             $ref: ../../components/error-details.yaml
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '403':
+      description: You do not have permission to list users.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
     default:
       description: Unexpected error response.
       content:
