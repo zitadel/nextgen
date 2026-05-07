@@ -18,12 +18,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+      # lint openapi
+      - name: Set up node
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+      - name: Run OpenAPI linting
+        run: npx --yes @redocly/cli@1.34.5 lint api/openapi/openapi-spec.yaml --format=github-actions
+
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
           cache: true
       - name: Install embedded-postgres runtime deps
         run: sudo apt-get update -qq && sudo apt-get install -y -qq libicu-dev libssl-dev
+      - run: go generate ./...
+      - name: Verify generated code is up to date
+        run: |
+          git diff --stat --exit-code -- .
+          test -z "$(git status --porcelain)"
       - run: go vet ./...
       - run: go test -v -timeout=10m ./...
 

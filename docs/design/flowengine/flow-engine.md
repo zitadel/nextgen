@@ -142,9 +142,9 @@ Pivot transitions are declared in the definition:
   "name": "identifier",
   "type": "identifier",
   "transitions": {
-    "submit": "check_user",
-    "register": { "pivot": "register" },
-    "recover": { "pivot": "recovery" }
+    "submit": { "target": "check_user" },
+    "register": { "target": "register", "action": "pivot" },
+    "recover": { "target": "recovery", "action": "pivot" }
   }
 }
 ```
@@ -180,8 +180,8 @@ See [Flow Engine — Storage](flow-engine-storage.md) for the encrypted cookie m
       "type": "identifier",
       "config": { "methods": ["email"] },
       "transitions": {
-        "submit": "resolve_user",
-        "register": { "pivot": "register" }
+        "submit": { "target": "resolve_user" },
+        "register": { "target": "register", "action": "pivot" }
       }
     },
     {
@@ -189,8 +189,8 @@ See [Flow Engine — Storage](flow-engine-storage.md) for the encrypted cookie m
       "type": "policy_check",
       "config": { "check": "resolve_user" },
       "transitions": {
-        "found": "check_factors",
-        "not_found": "identifier"
+        "found": { "target": "check_factors" },
+        "not_found": { "target": "identifier" }
       }
     },
     {
@@ -198,9 +198,9 @@ See [Flow Engine — Storage](flow-engine-storage.md) for the encrypted cookie m
       "type": "policy_check",
       "config": { "check": "required_factors" },
       "transitions": {
-        "password": "password",
-        "passkey": "passkey",
-        "acr_met": "done"
+        "password": { "target": "password" },
+        "passkey": { "target": "passkey" },
+        "acr_met": { "target": "done" }
       }
     },
     {
@@ -208,15 +208,15 @@ See [Flow Engine — Storage](flow-engine-storage.md) for the encrypted cookie m
       "type": "credential",
       "config": { "factor": "password" },
       "transitions": {
-        "submit": "check_factors",
-        "recover": { "pivot": "recovery" }
+        "submit": { "target": "check_factors" },
+        "recover": { "target": "recovery", "action": "pivot" }
       }
     },
     {
       "name": "passkey",
       "type": "credential",
       "config": { "factor": "passkey" },
-      "transitions": { "submit": "check_factors" }
+      "transitions": { "submit": { "target": "check_factors" } }
     },
     {
       "name": "done",
@@ -343,27 +343,27 @@ Frontend navigates to `redirect_uri`. Done.
       "type": "form",
       "config": { "schema": "human_user", "fields": ["email", "given_name", "family_name"] },
       "transitions": {
-        "submit": "set_password",
-        "login": { "pivot": "login" }
+        "submit": { "target": "set_password" },
+        "login": { "target": "login", "action": "pivot" }
       }
     },
     {
       "name": "set_password",
       "type": "form",
       "config": { "schema": "human_user", "fields": ["password"] },
-      "transitions": { "submit": "verify_email" }
+      "transitions": { "submit": { "target": "verify_email" } }
     },
     {
       "name": "verify_email",
       "type": "verification",
       "config": { "method": "email", "field": "email" },
-      "transitions": { "verified": "create_user" }
+      "transitions": { "verified": { "target": "create_user" } }
     },
     {
       "name": "create_user",
       "type": "action",
       "config": { "action": "create_user_and_session" },
-      "transitions": { "created": "done" }
+      "transitions": { "created": { "target": "done" } }
     },
     {
       "name": "done",
@@ -510,9 +510,9 @@ The user registered and logged in without entering credentials twice.
     "sso_providers": ["google", "entra"]
   },
   "transitions": {
-    "submit": "resolve_user",
-    "sso": "sso_redirect",
-    "register": { "pivot": "register" }
+    "submit": { "target": "resolve_user" },
+    "sso": { "target": "sso_redirect" },
+    "register": { "target": "register", "action": "pivot" }
   }
 }
 ```

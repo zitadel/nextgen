@@ -276,25 +276,25 @@ As a definition:
     {
       "name": "identifier",
       "type": "identifier",
-      "transitions": { "submit": "resolve_user" }
+      "transitions": { "submit": { "target": "resolve_user" } }
     },
     {
       "name": "resolve_user",
       "type": "policy_check",
       "config": { "check": "resolve_user" },
-      "transitions": { "found": "check_factors", "not_found": "identifier" }
+      "transitions": { "found": { "target": "check_factors" }, "not_found": { "target": "identifier" } }
     },
     {
       "name": "check_factors",
       "type": "policy_check",
       "config": { "check": "required_factors" },
-      "transitions": { "password": "password", "acr_met": "done" }
+      "transitions": { "password": { "target": "password" }, "acr_met": { "target": "done" } }
     },
     {
       "name": "password",
       "type": "credential",
       "config": { "factor": "password" },
-      "transitions": { "submit": "check_factors" }
+      "transitions": { "submit": { "target": "check_factors" } }
     },
     {
       "name": "done",
@@ -431,7 +431,7 @@ A definition's **audience** scopes where it applies:
     "schema": "human_user",
     "fields": ["email", "given_name", "family_name"]
   },
-  "transitions": { "submit": "set_password" }
+  "transitions": { "submit": { "target": "set_password" } }
 }
 ```
 
@@ -469,8 +469,8 @@ Multi-step registration spreads fields across multiple form steps. The flow engi
   "type": "policy_check",
   "config": { "check": "resolve_user" },
   "transitions": {
-    "found": "check_factors",
-    "not_found": "identifier"
+    "found": { "target": "check_factors" },
+    "not_found": { "target": "identifier" }
   }
 }
 ```
@@ -483,10 +483,10 @@ Multi-step registration spreads fields across multiple form steps. The flow engi
   "type": "policy_check",
   "config": { "check": "required_factors" },
   "transitions": {
-    "password": "password",
-    "passkey": "passkey",
-    "otp": "otp",
-    "acr_met": "done"
+    "password": { "target": "password" },
+    "passkey": { "target": "passkey" },
+    "otp": { "target": "otp" },
+    "acr_met": { "target": "done" }
   }
 }
 ```
@@ -561,21 +561,21 @@ sequenceDiagram
 
 ### How to enable pivots
 
-Pivots are declared in transitions using the `pivot` keyword:
+Pivots are declared in transitions using `"action": "pivot"`:
 
 ```json
 {
   "name": "identifier",
   "type": "identifier",
   "transitions": {
-    "submit": "resolve_user",
-    "register": { "pivot": "register" },
-    "recover": { "pivot": "recovery" }
+    "submit": { "target": "resolve_user" },
+    "register": { "target": "register", "action": "pivot" },
+    "recover": { "target": "recovery", "action": "pivot" }
   }
 }
 ```
 
-A `{ "pivot": "register" }` transition tells the flow engine: "resolve a new flow definition for purpose `register`, using the same audience context."
+A `{ "target": "register", "action": "pivot" }` transition tells the flow engine: "stack a new flow for `register`, using the same audience context, and return to the current flow when it completes."
 
 ### What carries over
 
