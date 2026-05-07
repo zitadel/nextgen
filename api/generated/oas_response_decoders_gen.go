@@ -753,7 +753,7 @@ func decodeCreateSchemaResponse(resp *http.Response) (res CreateSchemaRes, _ err
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response CreateSchemaCreated
+			var response CreateSchemaResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err

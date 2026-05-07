@@ -201,6 +201,39 @@ func (s AuthAttemptResponseState) Validate() error {
 	}
 }
 
+func (s *AuthMethod) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.Int{
+			MinSet:        true,
+			Min:           0,
+			MaxSet:        false,
+			Max:           0,
+			MinExclusive:  false,
+			MaxExclusive:  false,
+			MultipleOfSet: false,
+			MultipleOf:    0,
+			Pattern:       nil,
+		}).Validate(int64(s.Position)); err != nil {
+			return errors.Wrap(err, "int")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "position",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s *Branding) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -1051,10 +1084,53 @@ func (s *NestedUserProperty) Validate() error {
 			Error: err,
 		})
 	}
+	if err := func() error {
+		if value, ok := s.Example.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "example",
+			Error: err,
+		})
+	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
 	}
 	return nil
+}
+
+func (s NestedUserPropertyExample) Validate() error {
+	switch s.Type {
+	case StringNestedUserPropertyExample:
+		return nil // no validation needed
+	case Float64NestedUserPropertyExample:
+		if err := (validate.Float{}).Validate(float64(s.Float64)); err != nil {
+			return errors.Wrap(err, "float")
+		}
+		return nil
+	case BoolNestedUserPropertyExample:
+		return nil // no validation needed
+	case NestedUserPropertyExample3NestedUserPropertyExample:
+		return nil // no validation needed
+	case AnyArrayNestedUserPropertyExample:
+		if s.AnyArray == nil {
+			return errors.New("nil is invalid value")
+		}
+		return nil
+	case NullNestedUserPropertyExample:
+		return nil // no validation needed
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
 }
 
 func (s NestedUserPropertyProperties) Validate() error {
@@ -1747,10 +1823,53 @@ func (s *UserProperty) Validate() error {
 			Error: err,
 		})
 	}
+	if err := func() error {
+		if value, ok := s.Example.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "example",
+			Error: err,
+		})
+	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
 	}
 	return nil
+}
+
+func (s UserPropertyExample) Validate() error {
+	switch s.Type {
+	case StringUserPropertyExample:
+		return nil // no validation needed
+	case Float64UserPropertyExample:
+		if err := (validate.Float{}).Validate(float64(s.Float64)); err != nil {
+			return errors.Wrap(err, "float")
+		}
+		return nil
+	case BoolUserPropertyExample:
+		return nil // no validation needed
+	case UserPropertyExample3UserPropertyExample:
+		return nil // no validation needed
+	case AnyArrayUserPropertyExample:
+		if s.AnyArray == nil {
+			return errors.New("nil is invalid value")
+		}
+		return nil
+	case NullUserPropertyExample:
+		return nil // no validation needed
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
 }
 
 func (s UserPropertyFormat) Validate() error {
@@ -1878,25 +1997,26 @@ func (s *UserSchema) Validate() error {
 		})
 	}
 	if err := func() error {
-		if s.XMinusAuthMinusMethods == nil {
-			return errors.New("nil is invalid value")
-		}
-		var failures []validate.FieldError
-		for i, elem := range s.XMinusAuthMinusMethods {
+		if value, ok := s.Example.Get(); ok {
 			if err := func() error {
-				if err := elem.Validate(); err != nil {
+				if err := value.Validate(); err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				failures = append(failures, validate.FieldError{
-					Name:  fmt.Sprintf("[%d]", i),
-					Error: err,
-				})
+				return err
 			}
 		}
-		if len(failures) > 0 {
-			return &validate.Error{Fields: failures}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "example",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := s.XMinusAuthMinusMethods.Validate(); err != nil {
+			return err
 		}
 		return nil
 	}(); err != nil {
@@ -1929,6 +2049,31 @@ func (s *UserSchema) Validate() error {
 	return nil
 }
 
+func (s UserSchemaExample) Validate() error {
+	switch s.Type {
+	case StringUserSchemaExample:
+		return nil // no validation needed
+	case Float64UserSchemaExample:
+		if err := (validate.Float{}).Validate(float64(s.Float64)); err != nil {
+			return errors.Wrap(err, "float")
+		}
+		return nil
+	case BoolUserSchemaExample:
+		return nil // no validation needed
+	case UserSchemaExample3UserSchemaExample:
+		return nil // no validation needed
+	case AnyArrayUserSchemaExample:
+		if s.AnyArray == nil {
+			return errors.New("nil is invalid value")
+		}
+		return nil
+	case NullUserSchemaExample:
+		return nil // no validation needed
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
 func (s UserSchemaProperties) Validate() error {
 	var failures []validate.FieldError
 	for key, elem := range s {
@@ -1951,33 +2096,22 @@ func (s UserSchemaProperties) Validate() error {
 	return nil
 }
 
-func (s *UserSchemaXMinusAuthMinusMethodsItem) Validate() error {
-	if s == nil {
-		return validate.ErrNilPointer
+func (s UserSchemaXMinusAuthMinusMethods) Validate() error {
+	var failures []validate.FieldError
+	for key, elem := range s {
+		if err := func() error {
+			if err := elem.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			failures = append(failures, validate.FieldError{
+				Name:  key,
+				Error: err,
+			})
+		}
 	}
 
-	var failures []validate.FieldError
-	if err := func() error {
-		if err := (validate.Int{
-			MinSet:        true,
-			Min:           0,
-			MaxSet:        false,
-			Max:           0,
-			MinExclusive:  false,
-			MaxExclusive:  false,
-			MultipleOfSet: false,
-			MultipleOf:    0,
-			Pattern:       nil,
-		}).Validate(int64(s.Position)); err != nil {
-			return errors.Wrap(err, "int")
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "position",
-			Error: err,
-		})
-	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
 	}

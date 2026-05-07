@@ -375,6 +375,119 @@ func (s *AuthAttemptResponseState) UnmarshalJSON(data []byte) error {
 }
 
 // Encode implements json.Marshaler.
+func (s *AuthMethod) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *AuthMethod) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("enabled")
+		e.Bool(s.Enabled)
+	}
+	{
+		e.FieldStart("position")
+		e.Int(s.Position)
+	}
+}
+
+var jsonFieldsNameOfAuthMethod = [2]string{
+	0: "enabled",
+	1: "position",
+}
+
+// Decode decodes AuthMethod from json.
+func (s *AuthMethod) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AuthMethod to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "enabled":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Bool()
+				s.Enabled = bool(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"enabled\"")
+			}
+		case "position":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Int()
+				s.Position = int(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"position\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode AuthMethod")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfAuthMethod) {
+					name = jsonFieldsNameOfAuthMethod[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *AuthMethod) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AuthMethod) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
 func (s *Branding) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
@@ -1557,69 +1670,6 @@ func (s *CreateHandoffNotFound) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode implements json.Marshaler.
-func (s *CreateSchemaCreated) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-// encodeFields encodes fields.
-func (s *CreateSchemaCreated) encodeFields(e *jx.Encoder) {
-	{
-		if s.ID.Set {
-			e.FieldStart("id")
-			s.ID.Encode(e)
-		}
-	}
-}
-
-var jsonFieldsNameOfCreateSchemaCreated = [1]string{
-	0: "id",
-}
-
-// Decode decodes CreateSchemaCreated from json.
-func (s *CreateSchemaCreated) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode CreateSchemaCreated to nil")
-	}
-
-	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		switch string(k) {
-		case "id":
-			if err := func() error {
-				s.ID.Reset()
-				if err := s.ID.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"id\"")
-			}
-		default:
-			return d.Skip()
-		}
-		return nil
-	}); err != nil {
-		return errors.Wrap(err, "decode CreateSchemaCreated")
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *CreateSchemaCreated) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *CreateSchemaCreated) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
 // Encode encodes CreateSchemaReq as json.
 func (s CreateSchemaReq) Encode(e *jx.Encoder) {
 	e.ObjStart()
@@ -1645,12 +1695,14 @@ func (s CreateSchemaReq) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
-				e.FieldStart("x-auth-methods")
-				e.ArrStart()
-				for _, elem := range s.XMinusAuthMinusMethods {
-					elem.Encode(e)
+				if s.Example.Set {
+					e.FieldStart("example")
+					s.Example.Encode(e)
 				}
-				e.ArrEnd()
+			}
+			{
+				e.FieldStart("x-auth-methods")
+				s.XMinusAuthMinusMethods.Encode(e)
 			}
 			{
 				if s.Required != nil {
@@ -1748,6 +1800,69 @@ func (s CreateSchemaReq) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *CreateSchemaReq) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *CreateSchemaResponse) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *CreateSchemaResponse) encodeFields(e *jx.Encoder) {
+	{
+		if s.ID.Set {
+			e.FieldStart("id")
+			s.ID.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfCreateSchemaResponse = [1]string{
+	0: "id",
+}
+
+// Decode decodes CreateSchemaResponse from json.
+func (s *CreateSchemaResponse) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode CreateSchemaResponse to nil")
+	}
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "id":
+			if err := func() error {
+				s.ID.Reset()
+				if err := s.ID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"id\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode CreateSchemaResponse")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *CreateSchemaResponse) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *CreateSchemaResponse) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -4652,12 +4767,14 @@ func (s GetSchemaByIdOK) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
-				e.FieldStart("x-auth-methods")
-				e.ArrStart()
-				for _, elem := range s.XMinusAuthMinusMethods {
-					elem.Encode(e)
+				if s.Example.Set {
+					e.FieldStart("example")
+					s.Example.Encode(e)
 				}
-				e.ArrEnd()
+			}
+			{
+				e.FieldStart("x-auth-methods")
+				s.XMinusAuthMinusMethods.Encode(e)
 			}
 			{
 				if s.Required != nil {
@@ -6750,13 +6867,20 @@ func (s *NestedUserProperty) encodeFields(e *jx.Encoder) {
 			s.Properties.Encode(e)
 		}
 	}
+	{
+		if s.Example.Set {
+			e.FieldStart("example")
+			s.Example.Encode(e)
+		}
+	}
 }
 
-var jsonFieldsNameOfNestedUserProperty = [4]string{
+var jsonFieldsNameOfNestedUserProperty = [5]string{
 	0: "title",
 	1: "type",
 	2: "required",
 	3: "properties",
+	4: "example",
 }
 
 // Decode decodes NestedUserProperty from json.
@@ -6816,6 +6940,16 @@ func (s *NestedUserProperty) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"properties\"")
 			}
+		case "example":
+			if err := func() error {
+				s.Example.Reset()
+				if err := s.Example.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"example\"")
+			}
 		default:
 			return d.Skip()
 		}
@@ -6836,6 +6970,147 @@ func (s *NestedUserProperty) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *NestedUserProperty) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes NestedUserPropertyExample as json.
+func (s NestedUserPropertyExample) Encode(e *jx.Encoder) {
+	switch s.Type {
+	case StringNestedUserPropertyExample:
+		e.Str(s.String)
+	case Float64NestedUserPropertyExample:
+		e.Float64(s.Float64)
+	case BoolNestedUserPropertyExample:
+		e.Bool(s.Bool)
+	case NestedUserPropertyExample3NestedUserPropertyExample:
+		s.NestedUserPropertyExample3.Encode(e)
+	case AnyArrayNestedUserPropertyExample:
+		e.ArrStart()
+		for _, elem := range s.AnyArray {
+			if len(elem) != 0 {
+				e.Raw(elem)
+			}
+		}
+		e.ArrEnd()
+	case NullNestedUserPropertyExample:
+		_ = s.Null
+		e.Null()
+	}
+}
+
+// Decode decodes NestedUserPropertyExample from json.
+func (s *NestedUserPropertyExample) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode NestedUserPropertyExample to nil")
+	}
+	// Sum type type_discriminator.
+	switch t := d.Next(); t {
+	case jx.Array:
+		s.AnyArray = make([]jx.Raw, 0)
+		if err := d.Arr(func(d *jx.Decoder) error {
+			var elem jx.Raw
+			v, err := d.RawAppend(nil)
+			elem = jx.Raw(v)
+			if err != nil {
+				return err
+			}
+			s.AnyArray = append(s.AnyArray, elem)
+			return nil
+		}); err != nil {
+			return err
+		}
+		s.Type = AnyArrayNestedUserPropertyExample
+	case jx.Bool:
+		v, err := d.Bool()
+		s.Bool = bool(v)
+		if err != nil {
+			return err
+		}
+		s.Type = BoolNestedUserPropertyExample
+	case jx.Null:
+		if err := d.Null(); err != nil {
+			return err
+		}
+		s.Type = NullNestedUserPropertyExample
+	case jx.Number:
+		v, err := d.Float64()
+		s.Float64 = float64(v)
+		if err != nil {
+			return err
+		}
+		s.Type = Float64NestedUserPropertyExample
+	case jx.Object:
+		if err := s.NestedUserPropertyExample3.Decode(d); err != nil {
+			return err
+		}
+		s.Type = NestedUserPropertyExample3NestedUserPropertyExample
+	case jx.String:
+		v, err := d.Str()
+		s.String = string(v)
+		if err != nil {
+			return err
+		}
+		s.Type = StringNestedUserPropertyExample
+	default:
+		return errors.Errorf("unexpected json type %q", t)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s NestedUserPropertyExample) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *NestedUserPropertyExample) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *NestedUserPropertyExample3) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *NestedUserPropertyExample3) encodeFields(e *jx.Encoder) {
+}
+
+var jsonFieldsNameOfNestedUserPropertyExample3 = [0]string{}
+
+// Decode decodes NestedUserPropertyExample3 from json.
+func (s *NestedUserPropertyExample3) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode NestedUserPropertyExample3 to nil")
+	}
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		default:
+			return d.Skip()
+		}
+	}); err != nil {
+		return errors.Wrap(err, "decode NestedUserPropertyExample3")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *NestedUserPropertyExample3) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *NestedUserPropertyExample3) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -8603,6 +8878,39 @@ func (s *OptIssueChallengeRequestPasskeyOptionsUserVerification) UnmarshalJSON(d
 	return s.Decode(d)
 }
 
+// Encode encodes NestedUserPropertyExample as json.
+func (o OptNestedUserPropertyExample) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes NestedUserPropertyExample from json.
+func (o *OptNestedUserPropertyExample) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptNestedUserPropertyExample to nil")
+	}
+	o.Set = true
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptNestedUserPropertyExample) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptNestedUserPropertyExample) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes NestedUserPropertyProperties as json.
 func (o OptNestedUserPropertyProperties) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -9336,6 +9644,39 @@ func (s *OptUserID) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes UserPropertyExample as json.
+func (o OptUserPropertyExample) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes UserPropertyExample from json.
+func (o *OptUserPropertyExample) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptUserPropertyExample to nil")
+	}
+	o.Set = true
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptUserPropertyExample) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptUserPropertyExample) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes UserPropertyProperties as json.
 func (o OptUserPropertyProperties) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -9366,6 +9707,39 @@ func (s OptUserPropertyProperties) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *OptUserPropertyProperties) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes UserSchemaExample as json.
+func (o OptUserSchemaExample) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes UserSchemaExample from json.
+func (o *OptUserSchemaExample) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptUserSchemaExample to nil")
+	}
+	o.Set = true
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptUserSchemaExample) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptUserSchemaExample) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -12145,9 +12519,15 @@ func (s *UserProperty) encodeFields(e *jx.Encoder) {
 			s.Properties.Encode(e)
 		}
 	}
+	{
+		if s.Example.Set {
+			e.FieldStart("example")
+			s.Example.Encode(e)
+		}
+	}
 }
 
-var jsonFieldsNameOfUserProperty = [13]string{
+var jsonFieldsNameOfUserProperty = [14]string{
 	0:  "type",
 	1:  "format",
 	2:  "title",
@@ -12161,6 +12541,7 @@ var jsonFieldsNameOfUserProperty = [13]string{
 	10: "x-sensitive",
 	11: "x-mfa",
 	12: "properties",
+	13: "example",
 }
 
 // Decode decodes UserProperty from json.
@@ -12305,6 +12686,16 @@ func (s *UserProperty) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"properties\"")
 			}
+		case "example":
+			if err := func() error {
+				s.Example.Reset()
+				if err := s.Example.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"example\"")
+			}
 		default:
 			return d.Skip()
 		}
@@ -12358,6 +12749,147 @@ func (s *UserProperty) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *UserProperty) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes UserPropertyExample as json.
+func (s UserPropertyExample) Encode(e *jx.Encoder) {
+	switch s.Type {
+	case StringUserPropertyExample:
+		e.Str(s.String)
+	case Float64UserPropertyExample:
+		e.Float64(s.Float64)
+	case BoolUserPropertyExample:
+		e.Bool(s.Bool)
+	case UserPropertyExample3UserPropertyExample:
+		s.UserPropertyExample3.Encode(e)
+	case AnyArrayUserPropertyExample:
+		e.ArrStart()
+		for _, elem := range s.AnyArray {
+			if len(elem) != 0 {
+				e.Raw(elem)
+			}
+		}
+		e.ArrEnd()
+	case NullUserPropertyExample:
+		_ = s.Null
+		e.Null()
+	}
+}
+
+// Decode decodes UserPropertyExample from json.
+func (s *UserPropertyExample) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode UserPropertyExample to nil")
+	}
+	// Sum type type_discriminator.
+	switch t := d.Next(); t {
+	case jx.Array:
+		s.AnyArray = make([]jx.Raw, 0)
+		if err := d.Arr(func(d *jx.Decoder) error {
+			var elem jx.Raw
+			v, err := d.RawAppend(nil)
+			elem = jx.Raw(v)
+			if err != nil {
+				return err
+			}
+			s.AnyArray = append(s.AnyArray, elem)
+			return nil
+		}); err != nil {
+			return err
+		}
+		s.Type = AnyArrayUserPropertyExample
+	case jx.Bool:
+		v, err := d.Bool()
+		s.Bool = bool(v)
+		if err != nil {
+			return err
+		}
+		s.Type = BoolUserPropertyExample
+	case jx.Null:
+		if err := d.Null(); err != nil {
+			return err
+		}
+		s.Type = NullUserPropertyExample
+	case jx.Number:
+		v, err := d.Float64()
+		s.Float64 = float64(v)
+		if err != nil {
+			return err
+		}
+		s.Type = Float64UserPropertyExample
+	case jx.Object:
+		if err := s.UserPropertyExample3.Decode(d); err != nil {
+			return err
+		}
+		s.Type = UserPropertyExample3UserPropertyExample
+	case jx.String:
+		v, err := d.Str()
+		s.String = string(v)
+		if err != nil {
+			return err
+		}
+		s.Type = StringUserPropertyExample
+	default:
+		return errors.Errorf("unexpected json type %q", t)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s UserPropertyExample) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *UserPropertyExample) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *UserPropertyExample3) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *UserPropertyExample3) encodeFields(e *jx.Encoder) {
+}
+
+var jsonFieldsNameOfUserPropertyExample3 = [0]string{}
+
+// Decode decodes UserPropertyExample3 from json.
+func (s *UserPropertyExample3) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode UserPropertyExample3 to nil")
+	}
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		default:
+			return d.Skip()
+		}
+	}); err != nil {
+		return errors.Wrap(err, "decode UserPropertyExample3")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *UserPropertyExample3) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *UserPropertyExample3) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -12570,12 +13102,14 @@ func (s *UserSchema) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
-		e.FieldStart("x-auth-methods")
-		e.ArrStart()
-		for _, elem := range s.XMinusAuthMinusMethods {
-			elem.Encode(e)
+		if s.Example.Set {
+			e.FieldStart("example")
+			s.Example.Encode(e)
 		}
-		e.ArrEnd()
+	}
+	{
+		e.FieldStart("x-auth-methods")
+		s.XMinusAuthMinusMethods.Encode(e)
 	}
 	{
 		if s.Required != nil {
@@ -12595,13 +13129,14 @@ func (s *UserSchema) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfUserSchema = [6]string{
+var jsonFieldsNameOfUserSchema = [7]string{
 	0: "kind",
 	1: "title",
 	2: "description",
-	3: "x-auth-methods",
-	4: "required",
-	5: "properties",
+	3: "example",
+	4: "x-auth-methods",
+	5: "required",
+	6: "properties",
 }
 
 // Decode decodes UserSchema from json.
@@ -12647,18 +13182,20 @@ func (s *UserSchema) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"description\"")
 			}
-		case "x-auth-methods":
-			requiredBitSet[0] |= 1 << 3
+		case "example":
 			if err := func() error {
-				s.XMinusAuthMinusMethods = make([]UserSchemaXMinusAuthMinusMethodsItem, 0)
-				if err := d.Arr(func(d *jx.Decoder) error {
-					var elem UserSchemaXMinusAuthMinusMethodsItem
-					if err := elem.Decode(d); err != nil {
-						return err
-					}
-					s.XMinusAuthMinusMethods = append(s.XMinusAuthMinusMethods, elem)
-					return nil
-				}); err != nil {
+				s.Example.Reset()
+				if err := s.Example.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"example\"")
+			}
+		case "x-auth-methods":
+			requiredBitSet[0] |= 1 << 4
+			if err := func() error {
+				if err := s.XMinusAuthMinusMethods.Decode(d); err != nil {
 					return err
 				}
 				return nil
@@ -12704,7 +13241,7 @@ func (s *UserSchema) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [1]uint8{
-		0b00001011,
+		0b00010011,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -12746,6 +13283,147 @@ func (s *UserSchema) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *UserSchema) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes UserSchemaExample as json.
+func (s UserSchemaExample) Encode(e *jx.Encoder) {
+	switch s.Type {
+	case StringUserSchemaExample:
+		e.Str(s.String)
+	case Float64UserSchemaExample:
+		e.Float64(s.Float64)
+	case BoolUserSchemaExample:
+		e.Bool(s.Bool)
+	case UserSchemaExample3UserSchemaExample:
+		s.UserSchemaExample3.Encode(e)
+	case AnyArrayUserSchemaExample:
+		e.ArrStart()
+		for _, elem := range s.AnyArray {
+			if len(elem) != 0 {
+				e.Raw(elem)
+			}
+		}
+		e.ArrEnd()
+	case NullUserSchemaExample:
+		_ = s.Null
+		e.Null()
+	}
+}
+
+// Decode decodes UserSchemaExample from json.
+func (s *UserSchemaExample) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode UserSchemaExample to nil")
+	}
+	// Sum type type_discriminator.
+	switch t := d.Next(); t {
+	case jx.Array:
+		s.AnyArray = make([]jx.Raw, 0)
+		if err := d.Arr(func(d *jx.Decoder) error {
+			var elem jx.Raw
+			v, err := d.RawAppend(nil)
+			elem = jx.Raw(v)
+			if err != nil {
+				return err
+			}
+			s.AnyArray = append(s.AnyArray, elem)
+			return nil
+		}); err != nil {
+			return err
+		}
+		s.Type = AnyArrayUserSchemaExample
+	case jx.Bool:
+		v, err := d.Bool()
+		s.Bool = bool(v)
+		if err != nil {
+			return err
+		}
+		s.Type = BoolUserSchemaExample
+	case jx.Null:
+		if err := d.Null(); err != nil {
+			return err
+		}
+		s.Type = NullUserSchemaExample
+	case jx.Number:
+		v, err := d.Float64()
+		s.Float64 = float64(v)
+		if err != nil {
+			return err
+		}
+		s.Type = Float64UserSchemaExample
+	case jx.Object:
+		if err := s.UserSchemaExample3.Decode(d); err != nil {
+			return err
+		}
+		s.Type = UserSchemaExample3UserSchemaExample
+	case jx.String:
+		v, err := d.Str()
+		s.String = string(v)
+		if err != nil {
+			return err
+		}
+		s.Type = StringUserSchemaExample
+	default:
+		return errors.Errorf("unexpected json type %q", t)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s UserSchemaExample) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *UserSchemaExample) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *UserSchemaExample3) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *UserSchemaExample3) encodeFields(e *jx.Encoder) {
+}
+
+var jsonFieldsNameOfUserSchemaExample3 = [0]string{}
+
+// Decode decodes UserSchemaExample3 from json.
+func (s *UserSchemaExample3) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode UserSchemaExample3 to nil")
+	}
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		default:
+			return d.Skip()
+		}
+	}); err != nil {
+		return errors.Wrap(err, "decode UserSchemaExample3")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *UserSchemaExample3) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *UserSchemaExample3) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -12805,114 +13483,55 @@ func (s *UserSchemaProperties) UnmarshalJSON(data []byte) error {
 }
 
 // Encode implements json.Marshaler.
-func (s *UserSchemaXMinusAuthMinusMethodsItem) Encode(e *jx.Encoder) {
+func (s UserSchemaXMinusAuthMinusMethods) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
 	e.ObjEnd()
 }
 
-// encodeFields encodes fields.
-func (s *UserSchemaXMinusAuthMinusMethodsItem) encodeFields(e *jx.Encoder) {
-	{
-		e.FieldStart("enabled")
-		e.Bool(s.Enabled)
-	}
-	{
-		e.FieldStart("position")
-		e.Int(s.Position)
+// encodeFields implements json.Marshaler.
+func (s UserSchemaXMinusAuthMinusMethods) encodeFields(e *jx.Encoder) {
+	for k, elem := range s {
+		e.FieldStart(k)
+
+		elem.Encode(e)
 	}
 }
 
-var jsonFieldsNameOfUserSchemaXMinusAuthMinusMethodsItem = [2]string{
-	0: "enabled",
-	1: "position",
-}
-
-// Decode decodes UserSchemaXMinusAuthMinusMethodsItem from json.
-func (s *UserSchemaXMinusAuthMinusMethodsItem) Decode(d *jx.Decoder) error {
+// Decode decodes UserSchemaXMinusAuthMinusMethods from json.
+func (s *UserSchemaXMinusAuthMinusMethods) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode UserSchemaXMinusAuthMinusMethodsItem to nil")
+		return errors.New("invalid: unable to decode UserSchemaXMinusAuthMinusMethods to nil")
 	}
-	var requiredBitSet [1]uint8
-
+	m := s.init()
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		switch string(k) {
-		case "enabled":
-			requiredBitSet[0] |= 1 << 0
-			if err := func() error {
-				v, err := d.Bool()
-				s.Enabled = bool(v)
-				if err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"enabled\"")
+		var elem AuthMethod
+		if err := func() error {
+			if err := elem.Decode(d); err != nil {
+				return err
 			}
-		case "position":
-			requiredBitSet[0] |= 1 << 1
-			if err := func() error {
-				v, err := d.Int()
-				s.Position = int(v)
-				if err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"position\"")
-			}
-		default:
-			return d.Skip()
+			return nil
+		}(); err != nil {
+			return errors.Wrapf(err, "decode field %q", k)
 		}
+		m[string(k)] = elem
 		return nil
 	}); err != nil {
-		return errors.Wrap(err, "decode UserSchemaXMinusAuthMinusMethodsItem")
-	}
-	// Validate required fields.
-	var failures []validate.FieldError
-	for i, mask := range [1]uint8{
-		0b00000011,
-	} {
-		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
-			// Mask only required fields and check equality to mask using XOR.
-			//
-			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
-			// Bits of fields which would be set are actually bits of missed fields.
-			missed := bits.OnesCount8(result)
-			for bitN := 0; bitN < missed; bitN++ {
-				bitIdx := bits.TrailingZeros8(result)
-				fieldIdx := i*8 + bitIdx
-				var name string
-				if fieldIdx < len(jsonFieldsNameOfUserSchemaXMinusAuthMinusMethodsItem) {
-					name = jsonFieldsNameOfUserSchemaXMinusAuthMinusMethodsItem[fieldIdx]
-				} else {
-					name = strconv.Itoa(fieldIdx)
-				}
-				failures = append(failures, validate.FieldError{
-					Name:  name,
-					Error: validate.ErrFieldRequired,
-				})
-				// Reset bit.
-				result &^= 1 << bitIdx
-			}
-		}
-	}
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
+		return errors.Wrap(err, "decode UserSchemaXMinusAuthMinusMethods")
 	}
 
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *UserSchemaXMinusAuthMinusMethodsItem) MarshalJSON() ([]byte, error) {
+func (s UserSchemaXMinusAuthMinusMethods) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *UserSchemaXMinusAuthMinusMethodsItem) UnmarshalJSON(data []byte) error {
+func (s *UserSchemaXMinusAuthMinusMethods) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }

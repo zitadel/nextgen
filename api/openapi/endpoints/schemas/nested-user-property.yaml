@@ -9,13 +9,21 @@ properties:
     enum: [string, number, boolean, object, array]
   required:
     type: array
+    description: A list of required fields for the user definition
     items:
       type: string
-    description: A list of required fields for the user definition
   properties:
     type: object
-    additionalProperties:
-      $ref: nested-user-property.yaml
     description: |
       A map of additional properties for the user definition, where the key
       is the property name and the value is the property schema
+    additionalProperties:
+      $ref: nested-user-property.yaml
+  example:
+    oneOf:
+      - type: string
+      - type: number
+      - type: boolean
+      - type: object
+      - type: array
+      - type: "null"

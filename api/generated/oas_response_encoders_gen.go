@@ -250,7 +250,7 @@ func encodeCreateHandoffResponse(response CreateHandoffRes, w http.ResponseWrite
 
 func encodeCreateSchemaResponse(response CreateSchemaRes, w http.ResponseWriter, span trace.Span) error {
 	switch response := response.(type) {
-	case *CreateSchemaCreated:
+	case *CreateSchemaResponse:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(201)
 		span.SetStatus(codes.Ok, http.StatusText(201))

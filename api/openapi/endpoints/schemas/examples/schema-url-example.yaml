@@ -1,0 +1,3 @@
+$schema: https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/schema-url.yaml
+kind: schema-url
+url: https://example.com/schemas/user-schema.json

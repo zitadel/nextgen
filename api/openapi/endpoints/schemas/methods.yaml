@@ -18,17 +18,24 @@ post:
             propertyName: kind
             mapping:
               user-schema: user-schema.yaml
+        examples:
+          userSchema:
+            summary: An example of a schema definition for a user.
+            externalValue: examples/user-schema-example.yaml
+          schemaURL:
+            summary: An example of a schema definition that references an external schema URL.
+            externalValue: examples/schema-url-example.yaml
   responses:
     '201':
       description: The schema was created successfully
       content:
         application/json:
           schema:
-            type: object
-            properties:
-              id:
-                type: string
-                description: The ID of the created schema
+            $ref: create-schema-response.yaml
+          examples:
+            userSchemaResponse:
+              summary: An example of a successful response for creating a user schema.
+              externalValue: examples/create-user-schema-response-example.yaml
     '400':
       description: The provided input was not valid
       content:

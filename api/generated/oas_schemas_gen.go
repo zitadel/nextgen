@@ -221,6 +221,34 @@ func (s *AuthAttemptResponseState) UnmarshalText(data []byte) error {
 	}
 }
 
+// Ref: #
+type AuthMethod struct {
+	// Whether the authentication method is enabled or not.
+	Enabled bool `json:"enabled"`
+	// The position of the authentication method in the list of supported methods.
+	Position int `json:"position"`
+}
+
+// GetEnabled returns the value of Enabled.
+func (s *AuthMethod) GetEnabled() bool {
+	return s.Enabled
+}
+
+// GetPosition returns the value of Position.
+func (s *AuthMethod) GetPosition() int {
+	return s.Position
+}
+
+// SetEnabled sets the value of Enabled.
+func (s *AuthMethod) SetEnabled(val bool) {
+	s.Enabled = val
+}
+
+// SetPosition sets the value of Position.
+func (s *AuthMethod) SetPosition(val int) {
+	s.Position = val
+}
+
 // AuthorizeGetFound is response for AuthorizeGet operation.
 type AuthorizeGetFound struct{}
 
@@ -746,23 +774,6 @@ type CreateHandoffNotFound ErrorDetails
 
 func (*CreateHandoffNotFound) createHandoffRes() {}
 
-type CreateSchemaCreated struct {
-	// The ID of the created schema.
-	ID OptString `json:"id"`
-}
-
-// GetID returns the value of ID.
-func (s *CreateSchemaCreated) GetID() OptString {
-	return s.ID
-}
-
-// SetID sets the value of ID.
-func (s *CreateSchemaCreated) SetID(val OptString) {
-	s.ID = val
-}
-
-func (*CreateSchemaCreated) createSchemaRes() {}
-
 // CreateSchemaReq represents sum type.
 type CreateSchemaReq struct {
 	Type       CreateSchemaReqType // switch on this field
@@ -826,6 +837,24 @@ func NewSchemaURLCreateSchemaReq(v SchemaURL) CreateSchemaReq {
 	s.SetSchemaURL(v)
 	return s
 }
+
+// Ref: #
+type CreateSchemaResponse struct {
+	// The ID of the created schema.
+	ID OptString `json:"id"`
+}
+
+// GetID returns the value of ID.
+func (s *CreateSchemaResponse) GetID() OptString {
+	return s.ID
+}
+
+// SetID sets the value of ID.
+func (s *CreateSchemaResponse) SetID(val OptString) {
+	s.ID = val
+}
+
+func (*CreateSchemaResponse) createSchemaRes() {}
 
 // Request to create an anonymous session shell.
 // Ref: #
@@ -3175,6 +3204,7 @@ type NestedUserProperty struct {
 	// A map of additional properties for the user definition, where the key
 	// is the property name and the value is the property schema.
 	Properties OptNestedUserPropertyProperties `json:"properties"`
+	Example    OptNestedUserPropertyExample    `json:"example"`
 }
 
 // GetTitle returns the value of Title.
@@ -3197,6 +3227,11 @@ func (s *NestedUserProperty) GetProperties() OptNestedUserPropertyProperties {
 	return s.Properties
 }
 
+// GetExample returns the value of Example.
+func (s *NestedUserProperty) GetExample() OptNestedUserPropertyExample {
+	return s.Example
+}
+
 // SetTitle sets the value of Title.
 func (s *NestedUserProperty) SetTitle(val OptString) {
 	s.Title = val
@@ -3216,6 +3251,187 @@ func (s *NestedUserProperty) SetRequired(val []string) {
 func (s *NestedUserProperty) SetProperties(val OptNestedUserPropertyProperties) {
 	s.Properties = val
 }
+
+// SetExample sets the value of Example.
+func (s *NestedUserProperty) SetExample(val OptNestedUserPropertyExample) {
+	s.Example = val
+}
+
+// NestedUserPropertyExample represents sum type.
+type NestedUserPropertyExample struct {
+	Type                       NestedUserPropertyExampleType // switch on this field
+	String                     string
+	Float64                    float64
+	Bool                       bool
+	NestedUserPropertyExample3 NestedUserPropertyExample3
+	AnyArray                   []jx.Raw
+	Null                       struct{}
+}
+
+// NestedUserPropertyExampleType is oneOf type of NestedUserPropertyExample.
+type NestedUserPropertyExampleType string
+
+// Possible values for NestedUserPropertyExampleType.
+const (
+	StringNestedUserPropertyExample                     NestedUserPropertyExampleType = "string"
+	Float64NestedUserPropertyExample                    NestedUserPropertyExampleType = "float64"
+	BoolNestedUserPropertyExample                       NestedUserPropertyExampleType = "bool"
+	NestedUserPropertyExample3NestedUserPropertyExample NestedUserPropertyExampleType = "NestedUserPropertyExample3"
+	AnyArrayNestedUserPropertyExample                   NestedUserPropertyExampleType = "[]jx.Raw"
+	NullNestedUserPropertyExample                       NestedUserPropertyExampleType = "struct{}"
+)
+
+// IsString reports whether NestedUserPropertyExample is string.
+func (s NestedUserPropertyExample) IsString() bool { return s.Type == StringNestedUserPropertyExample }
+
+// IsFloat64 reports whether NestedUserPropertyExample is float64.
+func (s NestedUserPropertyExample) IsFloat64() bool {
+	return s.Type == Float64NestedUserPropertyExample
+}
+
+// IsBool reports whether NestedUserPropertyExample is bool.
+func (s NestedUserPropertyExample) IsBool() bool { return s.Type == BoolNestedUserPropertyExample }
+
+// IsNestedUserPropertyExample3 reports whether NestedUserPropertyExample is NestedUserPropertyExample3.
+func (s NestedUserPropertyExample) IsNestedUserPropertyExample3() bool {
+	return s.Type == NestedUserPropertyExample3NestedUserPropertyExample
+}
+
+// IsAnyArray reports whether NestedUserPropertyExample is []jx.Raw.
+func (s NestedUserPropertyExample) IsAnyArray() bool {
+	return s.Type == AnyArrayNestedUserPropertyExample
+}
+
+// IsNull reports whether NestedUserPropertyExample is struct{}.
+func (s NestedUserPropertyExample) IsNull() bool { return s.Type == NullNestedUserPropertyExample }
+
+// SetString sets NestedUserPropertyExample to string.
+func (s *NestedUserPropertyExample) SetString(v string) {
+	s.Type = StringNestedUserPropertyExample
+	s.String = v
+}
+
+// GetString returns string and true boolean if NestedUserPropertyExample is string.
+func (s NestedUserPropertyExample) GetString() (v string, ok bool) {
+	if !s.IsString() {
+		return v, false
+	}
+	return s.String, true
+}
+
+// NewStringNestedUserPropertyExample returns new NestedUserPropertyExample from string.
+func NewStringNestedUserPropertyExample(v string) NestedUserPropertyExample {
+	var s NestedUserPropertyExample
+	s.SetString(v)
+	return s
+}
+
+// SetFloat64 sets NestedUserPropertyExample to float64.
+func (s *NestedUserPropertyExample) SetFloat64(v float64) {
+	s.Type = Float64NestedUserPropertyExample
+	s.Float64 = v
+}
+
+// GetFloat64 returns float64 and true boolean if NestedUserPropertyExample is float64.
+func (s NestedUserPropertyExample) GetFloat64() (v float64, ok bool) {
+	if !s.IsFloat64() {
+		return v, false
+	}
+	return s.Float64, true
+}
+
+// NewFloat64NestedUserPropertyExample returns new NestedUserPropertyExample from float64.
+func NewFloat64NestedUserPropertyExample(v float64) NestedUserPropertyExample {
+	var s NestedUserPropertyExample
+	s.SetFloat64(v)
+	return s
+}
+
+// SetBool sets NestedUserPropertyExample to bool.
+func (s *NestedUserPropertyExample) SetBool(v bool) {
+	s.Type = BoolNestedUserPropertyExample
+	s.Bool = v
+}
+
+// GetBool returns bool and true boolean if NestedUserPropertyExample is bool.
+func (s NestedUserPropertyExample) GetBool() (v bool, ok bool) {
+	if !s.IsBool() {
+		return v, false
+	}
+	return s.Bool, true
+}
+
+// NewBoolNestedUserPropertyExample returns new NestedUserPropertyExample from bool.
+func NewBoolNestedUserPropertyExample(v bool) NestedUserPropertyExample {
+	var s NestedUserPropertyExample
+	s.SetBool(v)
+	return s
+}
+
+// SetNestedUserPropertyExample3 sets NestedUserPropertyExample to NestedUserPropertyExample3.
+func (s *NestedUserPropertyExample) SetNestedUserPropertyExample3(v NestedUserPropertyExample3) {
+	s.Type = NestedUserPropertyExample3NestedUserPropertyExample
+	s.NestedUserPropertyExample3 = v
+}
+
+// GetNestedUserPropertyExample3 returns NestedUserPropertyExample3 and true boolean if NestedUserPropertyExample is NestedUserPropertyExample3.
+func (s NestedUserPropertyExample) GetNestedUserPropertyExample3() (v NestedUserPropertyExample3, ok bool) {
+	if !s.IsNestedUserPropertyExample3() {
+		return v, false
+	}
+	return s.NestedUserPropertyExample3, true
+}
+
+// NewNestedUserPropertyExample3NestedUserPropertyExample returns new NestedUserPropertyExample from NestedUserPropertyExample3.
+func NewNestedUserPropertyExample3NestedUserPropertyExample(v NestedUserPropertyExample3) NestedUserPropertyExample {
+	var s NestedUserPropertyExample
+	s.SetNestedUserPropertyExample3(v)
+	return s
+}
+
+// SetAnyArray sets NestedUserPropertyExample to []jx.Raw.
+func (s *NestedUserPropertyExample) SetAnyArray(v []jx.Raw) {
+	s.Type = AnyArrayNestedUserPropertyExample
+	s.AnyArray = v
+}
+
+// GetAnyArray returns []jx.Raw and true boolean if NestedUserPropertyExample is []jx.Raw.
+func (s NestedUserPropertyExample) GetAnyArray() (v []jx.Raw, ok bool) {
+	if !s.IsAnyArray() {
+		return v, false
+	}
+	return s.AnyArray, true
+}
+
+// NewAnyArrayNestedUserPropertyExample returns new NestedUserPropertyExample from []jx.Raw.
+func NewAnyArrayNestedUserPropertyExample(v []jx.Raw) NestedUserPropertyExample {
+	var s NestedUserPropertyExample
+	s.SetAnyArray(v)
+	return s
+}
+
+// SetNull sets NestedUserPropertyExample to struct{}.
+func (s *NestedUserPropertyExample) SetNull(v struct{}) {
+	s.Type = NullNestedUserPropertyExample
+	s.Null = v
+}
+
+// GetNull returns struct{} and true boolean if NestedUserPropertyExample is struct{}.
+func (s NestedUserPropertyExample) GetNull() (v struct{}, ok bool) {
+	if !s.IsNull() {
+		return v, false
+	}
+	return s.Null, true
+}
+
+// NewNullNestedUserPropertyExample returns new NestedUserPropertyExample from struct{}.
+func NewNullNestedUserPropertyExample(v struct{}) NestedUserPropertyExample {
+	var s NestedUserPropertyExample
+	s.SetNull(v)
+	return s
+}
+
+type NestedUserPropertyExample3 struct{}
 
 // A map of additional properties for the user definition, where the key
 // is the property name and the value is the property schema.
@@ -4754,6 +4970,52 @@ func (o OptListSessionsState) Or(d ListSessionsState) ListSessionsState {
 	return d
 }
 
+// NewOptNestedUserPropertyExample returns new OptNestedUserPropertyExample with value set to v.
+func NewOptNestedUserPropertyExample(v NestedUserPropertyExample) OptNestedUserPropertyExample {
+	return OptNestedUserPropertyExample{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNestedUserPropertyExample is optional NestedUserPropertyExample.
+type OptNestedUserPropertyExample struct {
+	Value NestedUserPropertyExample
+	Set   bool
+}
+
+// IsSet returns true if OptNestedUserPropertyExample was set.
+func (o OptNestedUserPropertyExample) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNestedUserPropertyExample) Reset() {
+	var v NestedUserPropertyExample
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptNestedUserPropertyExample) SetTo(v NestedUserPropertyExample) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNestedUserPropertyExample) Get() (v NestedUserPropertyExample, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNestedUserPropertyExample) Or(d NestedUserPropertyExample) NestedUserPropertyExample {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptNestedUserPropertyProperties returns new OptNestedUserPropertyProperties with value set to v.
 func NewOptNestedUserPropertyProperties(v NestedUserPropertyProperties) OptNestedUserPropertyProperties {
 	return OptNestedUserPropertyProperties{
@@ -5798,6 +6060,52 @@ func (o OptUserID) Or(d UserID) UserID {
 	return d
 }
 
+// NewOptUserPropertyExample returns new OptUserPropertyExample with value set to v.
+func NewOptUserPropertyExample(v UserPropertyExample) OptUserPropertyExample {
+	return OptUserPropertyExample{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptUserPropertyExample is optional UserPropertyExample.
+type OptUserPropertyExample struct {
+	Value UserPropertyExample
+	Set   bool
+}
+
+// IsSet returns true if OptUserPropertyExample was set.
+func (o OptUserPropertyExample) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptUserPropertyExample) Reset() {
+	var v UserPropertyExample
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptUserPropertyExample) SetTo(v UserPropertyExample) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptUserPropertyExample) Get() (v UserPropertyExample, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptUserPropertyExample) Or(d UserPropertyExample) UserPropertyExample {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptUserPropertyProperties returns new OptUserPropertyProperties with value set to v.
 func NewOptUserPropertyProperties(v UserPropertyProperties) OptUserPropertyProperties {
 	return OptUserPropertyProperties{
@@ -5838,6 +6146,52 @@ func (o OptUserPropertyProperties) Get() (v UserPropertyProperties, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptUserPropertyProperties) Or(d UserPropertyProperties) UserPropertyProperties {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptUserSchemaExample returns new OptUserSchemaExample with value set to v.
+func NewOptUserSchemaExample(v UserSchemaExample) OptUserSchemaExample {
+	return OptUserSchemaExample{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptUserSchemaExample is optional UserSchemaExample.
+type OptUserSchemaExample struct {
+	Value UserSchemaExample
+	Set   bool
+}
+
+// IsSet returns true if OptUserSchemaExample was set.
+func (o OptUserSchemaExample) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptUserSchemaExample) Reset() {
+	var v UserSchemaExample
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptUserSchemaExample) SetTo(v UserSchemaExample) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptUserSchemaExample) Get() (v UserSchemaExample, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptUserSchemaExample) Or(d UserSchemaExample) UserSchemaExample {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -6284,8 +6638,7 @@ func (s *SSOProvider) SetTemplate(val string) {
 type SchemaURL struct {
 	// Discriminator value for a user schema create request.
 	Kind string `json:"kind"`
-	// URL to the user schema definition. The schema definition must conform
-	// to the meta schema it is based on.
+	// URL to the schema definition.
 	URL url.URL `json:"url"`
 }
 
@@ -6851,6 +7204,7 @@ type UserProperty struct {
 	// A map of additional properties for the user definition, where the key
 	// is the property name and the value is the property schema.
 	Properties OptUserPropertyProperties `json:"properties"`
+	Example    OptUserPropertyExample    `json:"example"`
 }
 
 // GetType returns the value of Type.
@@ -6918,6 +7272,11 @@ func (s *UserProperty) GetProperties() OptUserPropertyProperties {
 	return s.Properties
 }
 
+// GetExample returns the value of Example.
+func (s *UserProperty) GetExample() OptUserPropertyExample {
+	return s.Example
+}
+
 // SetType sets the value of Type.
 func (s *UserProperty) SetType(val UserPropertyType) {
 	s.Type = val
@@ -6982,6 +7341,183 @@ func (s *UserProperty) SetXMinusMfa(val OptBool) {
 func (s *UserProperty) SetProperties(val OptUserPropertyProperties) {
 	s.Properties = val
 }
+
+// SetExample sets the value of Example.
+func (s *UserProperty) SetExample(val OptUserPropertyExample) {
+	s.Example = val
+}
+
+// UserPropertyExample represents sum type.
+type UserPropertyExample struct {
+	Type                 UserPropertyExampleType // switch on this field
+	String               string
+	Float64              float64
+	Bool                 bool
+	UserPropertyExample3 UserPropertyExample3
+	AnyArray             []jx.Raw
+	Null                 struct{}
+}
+
+// UserPropertyExampleType is oneOf type of UserPropertyExample.
+type UserPropertyExampleType string
+
+// Possible values for UserPropertyExampleType.
+const (
+	StringUserPropertyExample               UserPropertyExampleType = "string"
+	Float64UserPropertyExample              UserPropertyExampleType = "float64"
+	BoolUserPropertyExample                 UserPropertyExampleType = "bool"
+	UserPropertyExample3UserPropertyExample UserPropertyExampleType = "UserPropertyExample3"
+	AnyArrayUserPropertyExample             UserPropertyExampleType = "[]jx.Raw"
+	NullUserPropertyExample                 UserPropertyExampleType = "struct{}"
+)
+
+// IsString reports whether UserPropertyExample is string.
+func (s UserPropertyExample) IsString() bool { return s.Type == StringUserPropertyExample }
+
+// IsFloat64 reports whether UserPropertyExample is float64.
+func (s UserPropertyExample) IsFloat64() bool { return s.Type == Float64UserPropertyExample }
+
+// IsBool reports whether UserPropertyExample is bool.
+func (s UserPropertyExample) IsBool() bool { return s.Type == BoolUserPropertyExample }
+
+// IsUserPropertyExample3 reports whether UserPropertyExample is UserPropertyExample3.
+func (s UserPropertyExample) IsUserPropertyExample3() bool {
+	return s.Type == UserPropertyExample3UserPropertyExample
+}
+
+// IsAnyArray reports whether UserPropertyExample is []jx.Raw.
+func (s UserPropertyExample) IsAnyArray() bool { return s.Type == AnyArrayUserPropertyExample }
+
+// IsNull reports whether UserPropertyExample is struct{}.
+func (s UserPropertyExample) IsNull() bool { return s.Type == NullUserPropertyExample }
+
+// SetString sets UserPropertyExample to string.
+func (s *UserPropertyExample) SetString(v string) {
+	s.Type = StringUserPropertyExample
+	s.String = v
+}
+
+// GetString returns string and true boolean if UserPropertyExample is string.
+func (s UserPropertyExample) GetString() (v string, ok bool) {
+	if !s.IsString() {
+		return v, false
+	}
+	return s.String, true
+}
+
+// NewStringUserPropertyExample returns new UserPropertyExample from string.
+func NewStringUserPropertyExample(v string) UserPropertyExample {
+	var s UserPropertyExample
+	s.SetString(v)
+	return s
+}
+
+// SetFloat64 sets UserPropertyExample to float64.
+func (s *UserPropertyExample) SetFloat64(v float64) {
+	s.Type = Float64UserPropertyExample
+	s.Float64 = v
+}
+
+// GetFloat64 returns float64 and true boolean if UserPropertyExample is float64.
+func (s UserPropertyExample) GetFloat64() (v float64, ok bool) {
+	if !s.IsFloat64() {
+		return v, false
+	}
+	return s.Float64, true
+}
+
+// NewFloat64UserPropertyExample returns new UserPropertyExample from float64.
+func NewFloat64UserPropertyExample(v float64) UserPropertyExample {
+	var s UserPropertyExample
+	s.SetFloat64(v)
+	return s
+}
+
+// SetBool sets UserPropertyExample to bool.
+func (s *UserPropertyExample) SetBool(v bool) {
+	s.Type = BoolUserPropertyExample
+	s.Bool = v
+}
+
+// GetBool returns bool and true boolean if UserPropertyExample is bool.
+func (s UserPropertyExample) GetBool() (v bool, ok bool) {
+	if !s.IsBool() {
+		return v, false
+	}
+	return s.Bool, true
+}
+
+// NewBoolUserPropertyExample returns new UserPropertyExample from bool.
+func NewBoolUserPropertyExample(v bool) UserPropertyExample {
+	var s UserPropertyExample
+	s.SetBool(v)
+	return s
+}
+
+// SetUserPropertyExample3 sets UserPropertyExample to UserPropertyExample3.
+func (s *UserPropertyExample) SetUserPropertyExample3(v UserPropertyExample3) {
+	s.Type = UserPropertyExample3UserPropertyExample
+	s.UserPropertyExample3 = v
+}
+
+// GetUserPropertyExample3 returns UserPropertyExample3 and true boolean if UserPropertyExample is UserPropertyExample3.
+func (s UserPropertyExample) GetUserPropertyExample3() (v UserPropertyExample3, ok bool) {
+	if !s.IsUserPropertyExample3() {
+		return v, false
+	}
+	return s.UserPropertyExample3, true
+}
+
+// NewUserPropertyExample3UserPropertyExample returns new UserPropertyExample from UserPropertyExample3.
+func NewUserPropertyExample3UserPropertyExample(v UserPropertyExample3) UserPropertyExample {
+	var s UserPropertyExample
+	s.SetUserPropertyExample3(v)
+	return s
+}
+
+// SetAnyArray sets UserPropertyExample to []jx.Raw.
+func (s *UserPropertyExample) SetAnyArray(v []jx.Raw) {
+	s.Type = AnyArrayUserPropertyExample
+	s.AnyArray = v
+}
+
+// GetAnyArray returns []jx.Raw and true boolean if UserPropertyExample is []jx.Raw.
+func (s UserPropertyExample) GetAnyArray() (v []jx.Raw, ok bool) {
+	if !s.IsAnyArray() {
+		return v, false
+	}
+	return s.AnyArray, true
+}
+
+// NewAnyArrayUserPropertyExample returns new UserPropertyExample from []jx.Raw.
+func NewAnyArrayUserPropertyExample(v []jx.Raw) UserPropertyExample {
+	var s UserPropertyExample
+	s.SetAnyArray(v)
+	return s
+}
+
+// SetNull sets UserPropertyExample to struct{}.
+func (s *UserPropertyExample) SetNull(v struct{}) {
+	s.Type = NullUserPropertyExample
+	s.Null = v
+}
+
+// GetNull returns struct{} and true boolean if UserPropertyExample is struct{}.
+func (s UserPropertyExample) GetNull() (v struct{}, ok bool) {
+	if !s.IsNull() {
+		return v, false
+	}
+	return s.Null, true
+}
+
+// NewNullUserPropertyExample returns new UserPropertyExample from struct{}.
+func NewNullUserPropertyExample(v struct{}) UserPropertyExample {
+	var s UserPropertyExample
+	s.SetNull(v)
+	return s
+}
+
+type UserPropertyExample3 struct{}
 
 type UserPropertyFormat string
 
@@ -7161,9 +7697,10 @@ type UserSchema struct {
 	// Human-readable name for this schema.
 	Title string `json:"title"`
 	// A description of this schema.
-	Description OptString `json:"description"`
+	Description OptString            `json:"description"`
+	Example     OptUserSchemaExample `json:"example"`
 	// A list of authentication methods supported by the user definition.
-	XMinusAuthMinusMethods []UserSchemaXMinusAuthMinusMethodsItem `json:"x-auth-methods"`
+	XMinusAuthMinusMethods UserSchemaXMinusAuthMinusMethods `json:"x-auth-methods"`
 	// A list of required fields for the user definition.
 	Required []string `json:"required"`
 	// A map of additional properties for the user definition, where the key
@@ -7186,8 +7723,13 @@ func (s *UserSchema) GetDescription() OptString {
 	return s.Description
 }
 
+// GetExample returns the value of Example.
+func (s *UserSchema) GetExample() OptUserSchemaExample {
+	return s.Example
+}
+
 // GetXMinusAuthMinusMethods returns the value of XMinusAuthMinusMethods.
-func (s *UserSchema) GetXMinusAuthMinusMethods() []UserSchemaXMinusAuthMinusMethodsItem {
+func (s *UserSchema) GetXMinusAuthMinusMethods() UserSchemaXMinusAuthMinusMethods {
 	return s.XMinusAuthMinusMethods
 }
 
@@ -7216,8 +7758,13 @@ func (s *UserSchema) SetDescription(val OptString) {
 	s.Description = val
 }
 
+// SetExample sets the value of Example.
+func (s *UserSchema) SetExample(val OptUserSchemaExample) {
+	s.Example = val
+}
+
 // SetXMinusAuthMinusMethods sets the value of XMinusAuthMinusMethods.
-func (s *UserSchema) SetXMinusAuthMinusMethods(val []UserSchemaXMinusAuthMinusMethodsItem) {
+func (s *UserSchema) SetXMinusAuthMinusMethods(val UserSchemaXMinusAuthMinusMethods) {
 	s.XMinusAuthMinusMethods = val
 }
 
@@ -7230,6 +7777,178 @@ func (s *UserSchema) SetRequired(val []string) {
 func (s *UserSchema) SetProperties(val OptUserSchemaProperties) {
 	s.Properties = val
 }
+
+// UserSchemaExample represents sum type.
+type UserSchemaExample struct {
+	Type               UserSchemaExampleType // switch on this field
+	String             string
+	Float64            float64
+	Bool               bool
+	UserSchemaExample3 UserSchemaExample3
+	AnyArray           []jx.Raw
+	Null               struct{}
+}
+
+// UserSchemaExampleType is oneOf type of UserSchemaExample.
+type UserSchemaExampleType string
+
+// Possible values for UserSchemaExampleType.
+const (
+	StringUserSchemaExample             UserSchemaExampleType = "string"
+	Float64UserSchemaExample            UserSchemaExampleType = "float64"
+	BoolUserSchemaExample               UserSchemaExampleType = "bool"
+	UserSchemaExample3UserSchemaExample UserSchemaExampleType = "UserSchemaExample3"
+	AnyArrayUserSchemaExample           UserSchemaExampleType = "[]jx.Raw"
+	NullUserSchemaExample               UserSchemaExampleType = "struct{}"
+)
+
+// IsString reports whether UserSchemaExample is string.
+func (s UserSchemaExample) IsString() bool { return s.Type == StringUserSchemaExample }
+
+// IsFloat64 reports whether UserSchemaExample is float64.
+func (s UserSchemaExample) IsFloat64() bool { return s.Type == Float64UserSchemaExample }
+
+// IsBool reports whether UserSchemaExample is bool.
+func (s UserSchemaExample) IsBool() bool { return s.Type == BoolUserSchemaExample }
+
+// IsUserSchemaExample3 reports whether UserSchemaExample is UserSchemaExample3.
+func (s UserSchemaExample) IsUserSchemaExample3() bool {
+	return s.Type == UserSchemaExample3UserSchemaExample
+}
+
+// IsAnyArray reports whether UserSchemaExample is []jx.Raw.
+func (s UserSchemaExample) IsAnyArray() bool { return s.Type == AnyArrayUserSchemaExample }
+
+// IsNull reports whether UserSchemaExample is struct{}.
+func (s UserSchemaExample) IsNull() bool { return s.Type == NullUserSchemaExample }
+
+// SetString sets UserSchemaExample to string.
+func (s *UserSchemaExample) SetString(v string) {
+	s.Type = StringUserSchemaExample
+	s.String = v
+}
+
+// GetString returns string and true boolean if UserSchemaExample is string.
+func (s UserSchemaExample) GetString() (v string, ok bool) {
+	if !s.IsString() {
+		return v, false
+	}
+	return s.String, true
+}
+
+// NewStringUserSchemaExample returns new UserSchemaExample from string.
+func NewStringUserSchemaExample(v string) UserSchemaExample {
+	var s UserSchemaExample
+	s.SetString(v)
+	return s
+}
+
+// SetFloat64 sets UserSchemaExample to float64.
+func (s *UserSchemaExample) SetFloat64(v float64) {
+	s.Type = Float64UserSchemaExample
+	s.Float64 = v
+}
+
+// GetFloat64 returns float64 and true boolean if UserSchemaExample is float64.
+func (s UserSchemaExample) GetFloat64() (v float64, ok bool) {
+	if !s.IsFloat64() {
+		return v, false
+	}
+	return s.Float64, true
+}
+
+// NewFloat64UserSchemaExample returns new UserSchemaExample from float64.
+func NewFloat64UserSchemaExample(v float64) UserSchemaExample {
+	var s UserSchemaExample
+	s.SetFloat64(v)
+	return s
+}
+
+// SetBool sets UserSchemaExample to bool.
+func (s *UserSchemaExample) SetBool(v bool) {
+	s.Type = BoolUserSchemaExample
+	s.Bool = v
+}
+
+// GetBool returns bool and true boolean if UserSchemaExample is bool.
+func (s UserSchemaExample) GetBool() (v bool, ok bool) {
+	if !s.IsBool() {
+		return v, false
+	}
+	return s.Bool, true
+}
+
+// NewBoolUserSchemaExample returns new UserSchemaExample from bool.
+func NewBoolUserSchemaExample(v bool) UserSchemaExample {
+	var s UserSchemaExample
+	s.SetBool(v)
+	return s
+}
+
+// SetUserSchemaExample3 sets UserSchemaExample to UserSchemaExample3.
+func (s *UserSchemaExample) SetUserSchemaExample3(v UserSchemaExample3) {
+	s.Type = UserSchemaExample3UserSchemaExample
+	s.UserSchemaExample3 = v
+}
+
+// GetUserSchemaExample3 returns UserSchemaExample3 and true boolean if UserSchemaExample is UserSchemaExample3.
+func (s UserSchemaExample) GetUserSchemaExample3() (v UserSchemaExample3, ok bool) {
+	if !s.IsUserSchemaExample3() {
+		return v, false
+	}
+	return s.UserSchemaExample3, true
+}
+
+// NewUserSchemaExample3UserSchemaExample returns new UserSchemaExample from UserSchemaExample3.
+func NewUserSchemaExample3UserSchemaExample(v UserSchemaExample3) UserSchemaExample {
+	var s UserSchemaExample
+	s.SetUserSchemaExample3(v)
+	return s
+}
+
+// SetAnyArray sets UserSchemaExample to []jx.Raw.
+func (s *UserSchemaExample) SetAnyArray(v []jx.Raw) {
+	s.Type = AnyArrayUserSchemaExample
+	s.AnyArray = v
+}
+
+// GetAnyArray returns []jx.Raw and true boolean if UserSchemaExample is []jx.Raw.
+func (s UserSchemaExample) GetAnyArray() (v []jx.Raw, ok bool) {
+	if !s.IsAnyArray() {
+		return v, false
+	}
+	return s.AnyArray, true
+}
+
+// NewAnyArrayUserSchemaExample returns new UserSchemaExample from []jx.Raw.
+func NewAnyArrayUserSchemaExample(v []jx.Raw) UserSchemaExample {
+	var s UserSchemaExample
+	s.SetAnyArray(v)
+	return s
+}
+
+// SetNull sets UserSchemaExample to struct{}.
+func (s *UserSchemaExample) SetNull(v struct{}) {
+	s.Type = NullUserSchemaExample
+	s.Null = v
+}
+
+// GetNull returns struct{} and true boolean if UserSchemaExample is struct{}.
+func (s UserSchemaExample) GetNull() (v struct{}, ok bool) {
+	if !s.IsNull() {
+		return v, false
+	}
+	return s.Null, true
+}
+
+// NewNullUserSchemaExample returns new UserSchemaExample from struct{}.
+func NewNullUserSchemaExample(v struct{}) UserSchemaExample {
+	var s UserSchemaExample
+	s.SetNull(v)
+	return s
+}
+
+type UserSchemaExample3 struct{}
 
 // A map of additional properties for the user definition, where the key
 // is the property name and the value is the property schema.
@@ -7244,31 +7963,16 @@ func (s *UserSchemaProperties) init() UserSchemaProperties {
 	return m
 }
 
-type UserSchemaXMinusAuthMinusMethodsItem struct {
-	// Whether the authentication method is enabled or not.
-	Enabled bool `json:"enabled"`
-	// The position of the authentication method in the list of supported methods.
-	Position int `json:"position"`
-}
+// A list of authentication methods supported by the user definition.
+type UserSchemaXMinusAuthMinusMethods map[string]AuthMethod
 
-// GetEnabled returns the value of Enabled.
-func (s *UserSchemaXMinusAuthMinusMethodsItem) GetEnabled() bool {
-	return s.Enabled
-}
-
-// GetPosition returns the value of Position.
-func (s *UserSchemaXMinusAuthMinusMethodsItem) GetPosition() int {
-	return s.Position
-}
-
-// SetEnabled sets the value of Enabled.
-func (s *UserSchemaXMinusAuthMinusMethodsItem) SetEnabled(val bool) {
-	s.Enabled = val
-}
-
-// SetPosition sets the value of Position.
-func (s *UserSchemaXMinusAuthMinusMethodsItem) SetPosition(val int) {
-	s.Position = val
+func (s *UserSchemaXMinusAuthMinusMethods) init() UserSchemaXMinusAuthMinusMethods {
+	m := *s
+	if m == nil {
+		m = map[string]AuthMethod{}
+		*s = m
+	}
+	return m
 }
 
 type UsernamePassword struct {

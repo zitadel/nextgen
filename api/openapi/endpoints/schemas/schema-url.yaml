@@ -12,6 +12,4 @@ properties:
   url:
     type: string
     format: uri
-    description: |
-      URL to the user schema definition. The schema definition must conform 
-      to the meta schema it is based on.
+    description: URL to the schema definition.
