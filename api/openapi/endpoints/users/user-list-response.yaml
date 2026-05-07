@@ -6,6 +6,11 @@ properties:
   users:
     # TODO: create an actual schema for this request once the user-schema endpoints are done.
     type: array
+    items:
+      type: object
+      description: |
+        A user in the list of users. The content of this object is determined 
+        by the configured schema for users.
   next_page_token:
     description: |
       Token to pass as `page_token` in the next request to fetch the following page.

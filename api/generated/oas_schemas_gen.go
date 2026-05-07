@@ -994,7 +994,6 @@ func (*ErrorDetails) createSessionRes()   {}
 func (*ErrorDetails) endSessionRes()      {}
 func (*ErrorDetails) getAuthAttemptRes()  {}
 func (*ErrorDetails) introspectRes()      {}
-func (*ErrorDetails) listUsersRes()       {}
 func (*ErrorDetails) submitFlowStepRes()  {}
 
 // Additional error-specific context.
@@ -3063,6 +3062,18 @@ func (s *ListSessionsState) UnmarshalText(data []byte) error {
 type ListSessionsUnauthorized ErrorDetails
 
 func (*ListSessionsUnauthorized) listSessionsRes() {}
+
+type ListUsersBadRequest ErrorDetails
+
+func (*ListUsersBadRequest) listUsersRes() {}
+
+type ListUsersForbidden ErrorDetails
+
+func (*ListUsersForbidden) listUsersRes() {}
+
+type ListUsersUnauthorized ErrorDetails
+
+func (*ListUsersUnauthorized) listUsersRes() {}
 
 type OAuth2 struct {
 	Token  string
@@ -6197,14 +6208,14 @@ type UserID string
 // Paginated list of users.
 // Ref: #
 type UserListResponse struct {
-	Users []jx.Raw `json:"users"`
+	Users []UserListResponseUsersItem `json:"users"`
 	// Token to pass as `page_token` in the next request to fetch the following page.
 	// Absent when there are no more results.
 	NextPageToken OptNilPageToken `json:"next_page_token"`
 }
 
 // GetUsers returns the value of Users.
-func (s *UserListResponse) GetUsers() []jx.Raw {
+func (s *UserListResponse) GetUsers() []UserListResponseUsersItem {
 	return s.Users
 }
 
@@ -6214,7 +6225,7 @@ func (s *UserListResponse) GetNextPageToken() OptNilPageToken {
 }
 
 // SetUsers sets the value of Users.
-func (s *UserListResponse) SetUsers(val []jx.Raw) {
+func (s *UserListResponse) SetUsers(val []UserListResponseUsersItem) {
 	s.Users = val
 }
 
@@ -6224,6 +6235,10 @@ func (s *UserListResponse) SetNextPageToken(val OptNilPageToken) {
 }
 
 func (*UserListResponse) listUsersRes() {}
+
+// A user in the list of users. The content of this object is determined
+// by the configured schema for users.
+type UserListResponseUsersItem struct{}
 
 type UsernamePassword struct {
 	Username string
