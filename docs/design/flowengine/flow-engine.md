@@ -77,7 +77,6 @@ POST   /flow-definitions/{id}/simulate    Dry-run with mock input
 Steps do not have a `type`. Instead, the engine derives behavior from the step's properties:
 
 - **`fields`** — array of schema property names. The engine resolves each field's type, validation, and implicit outcomes from the user schema's `x-*` annotations. For example, a field with `x-identifier: true` implies a `user_not_found` outcome in transitions.
-- **`verify`** — names a schema field to verify (e.g. `"email"`). The engine sends a verification code and renders a code input.
 - **`action`** — server-side mutation to run after the step succeeds (e.g. `"create_user"`). Executes before the transition fires.
 - **`complete`** — marks the step as terminal (`"redirect"` or `"show"`).
 - **`gates`** — array of gate types (`"captcha"`, `"passkey"`) required before submission. The engine may also inject gates dynamically based on policy.
@@ -263,13 +262,6 @@ If the policy requires MFA, the engine would instead respond with a dynamically 
     {
       "name": "set_password",
       "fields": ["password"],
-      "transitions": {
-        "submit": { "target": "verify_email" }
-      }
-    },
-    {
-      "name": "verify_email",
-      "verify": "email",
       "on_success": "create_user",
       "transitions": {
         "submit": { "target": "done" }
@@ -336,33 +328,10 @@ POST /flows/sess_1/submit
 { "session_token": "tok_3", "action": "submit", "data": { "password": "strong-pass-123!" } }
 ```
 ```json
-← 200  (verify step: engine sends code to alice@acme.com, renders code input)
+← 200  (create_user action runs → done)
 {
   "session_id": "sess_1",
   "session_token": "tok_4",
-  "step": {
-    "name": "verify_email",
-    "fields": {
-      "code": { "type": "text", "text_key": "verify_email.field.code", "required": true }
-    },
-    "actions": {
-      "submit": { "text_key": "verify_email.action.submit", "primary": true },
-      "resend": { "text_key": "verify_email.action.resend" }
-    },
-    "gates": {}
-  }
-}
-```
-
-```http
-POST /flows/sess_1/submit
-{ "session_token": "tok_4", "action": "submit", "data": { "code": "839201" } }
-```
-```json
-← 200  (verified → create_user action runs → done)
-{
-  "session_id": "sess_1",
-  "session_token": "tok_5",
   "step": {
     "name": "done",
     "complete": "show"
@@ -418,13 +387,6 @@ A single flow that handles both login and registration using implicit outcomes f
     {
       "name": "set_password",
       "fields": ["password"],
-      "transitions": {
-        "submit": { "target": "verify_email" }
-      }
-    },
-    {
-      "name": "verify_email",
-      "verify": "email",
       "on_success": "create_user",
       "transitions": {
         "submit": { "target": "done" }
@@ -570,13 +532,6 @@ GET /flows/sess_2
     {
       "name": "set_password",
       "fields": ["password"],
-      "transitions": {
-        "submit": { "target": "verify_email" }
-      }
-    },
-    {
-      "name": "verify_email",
-      "verify": "email",
       "on_success": "create_user",
       "transitions": {
         "submit": { "target": "done" }

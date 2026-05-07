@@ -588,7 +588,6 @@ const T = {
   "login.field.password": "Password",
   "login.action.submit": "Sign in",
   "login.action.register": "Create account",
-  "login.action.recover": "Forgot password?",
   "login.sso.title": "Redirecting to provider\u2026",
 
   // Registration flow
@@ -601,21 +600,6 @@ const T = {
   "set_password.title": "Choose a password",
   "set_password.field.password": "Password",
   "set_password.action.submit": "Continue",
-  "verify_email.title": "Verify your email",
-  "verify_email.description": "We sent a code to your email",
-  "verify_email.field.code": "Verification code",
-  "verify_email.action.submit": "Verify",
-  "verify_email.action.resend": "Resend code",
-
-  // Recovery flow
-  "recovery_email.title": "Reset your password",
-  "recovery_email.description": "We'll send a code to your email",
-  "recovery_email.field.email": "Email",
-  "recovery_email.action.submit": "Send code",
-  "recovery_email.action.back": "Back to sign in",
-  "new_password.title": "Set a new password",
-  "new_password.field.password": "New password",
-  "new_password.action.submit": "Reset password",
 
   // Combined auth
   "identify.title": "Welcome",
@@ -624,7 +608,6 @@ const T = {
   "signin.title": "Enter your password",
   "signin.field.password": "Password",
   "signin.action.submit": "Sign in",
-  "signin.action.recover": "Forgot password?",
 
   // Consent / deny
   "consent.title": "Authorize access",
@@ -699,7 +682,6 @@ const USER_SCHEMAS = {
         "format": "email",
         "title": "Email address",
         "x-identifier": true,
-        "x-verify": "email",
         "x-unique": "project",
         "x-editable": true
       },
@@ -747,7 +729,6 @@ const USER_SCHEMAS = {
         "format": "email",
         "title": "Email address",
         "x-identifier": true,
-        "x-verify": "email",
         "x-unique": "project",
         "x-editable": true
       },
@@ -835,8 +816,7 @@ const FLOWS = {
         fields: ["email", "password"],
         actions: {
           submit: { primary: true },
-          register: {},
-          recover: {}
+          register: {}
         },
         sso_providers: [
           { id: "google-1", name: "Google", template: "google" }
@@ -844,8 +824,7 @@ const FLOWS = {
         transitions: {
           submit: { target: "done" },
           sso: { target: "sso_redirect" },
-          register: { target: "default-register", action: "switch" },
-          recover: { target: "default-recovery", action: "pivot" }
+          register: { target: "default-register", action: "switch" }
         }
       },
       {
@@ -878,42 +857,7 @@ const FLOWS = {
       {
         name: "set_password",
         fields: ["password"],
-        transitions: { submit: { target: "verify_email" } }
-      },
-      {
-        name: "verify_email",
-        verify: "email",
         on_success: "create_user",
-        transitions: { submit: { target: "done" } }
-      },
-      { name: "done", complete: "show" }
-    ]
-  },
-
-  "Recovery": {
-    name: "Password Recovery",
-    user_schema: "human_user",
-    purposes: ["recovery"],
-    initial_steps: { recovery: "recovery_email" },
-    audience: {},
-    steps: [
-      {
-        name: "recovery_email",
-        verify: "email",
-        fields: ["email"],
-        actions: {
-          submit: { primary: true },
-          back: {}
-        },
-        transitions: {
-          submit: { target: "new_password" },
-          back: { target: "default-login", action: "pivot" }
-        }
-      },
-      {
-        name: "new_password",
-        on_success: "reset_credential",
-        fields: ["password"],
         transitions: { submit: { target: "done" } }
       },
       { name: "done", complete: "show" }
@@ -984,12 +928,10 @@ const FLOWS = {
         name: "signin",
         fields: ["password"],
         actions: {
-          submit: { primary: true },
-          recover: {}
+          submit: { primary: true }
         },
         transitions: {
-          submit: { target: "done" },
-          recover: { target: "default-recovery", action: "pivot" }
+          submit: { target: "done" }
         }
       },
       {
@@ -1000,11 +942,6 @@ const FLOWS = {
       {
         name: "set_password",
         fields: ["password"],
-        transitions: { submit: { target: "verify_email" } }
-      },
-      {
-        name: "verify_email",
-        verify: "email",
         on_success: "create_user",
         transitions: { submit: { target: "done" } }
       },
@@ -1043,20 +980,15 @@ const FLOWS = {
       },
       {
         name: "terms",
+        on_success: "create_user",
         actions: {
           accept: { primary: true },
           decline: {}
         },
         transitions: {
-          accept: { target: "verify_email" },
+          accept: { target: "done" },
           decline: { target: "profile" }
         }
-      },
-      {
-        name: "verify_email",
-        verify: "email",
-        on_success: "create_user",
-        transitions: { submit: { target: "done" } }
       },
       { name: "done", complete: "show" }
     ]
@@ -1422,7 +1354,6 @@ async function renderDiagram() {
       label += `<br/><em>${fieldLabels.join(', ')}</em>`;
     }
 
-    if (step.verify) label += `<br/>verify: ${step.verify}`;
     if (step.on_success) label += `<br/>on_success: ${step.on_success}`;
     // Detect callback-only steps (SSO redirect, etc.)
     const isCallbackStep = step.transitions && 'callback' in step.transitions &&
@@ -1641,7 +1572,6 @@ function buildStepPayload(step) {
   if (step.gates && Object.keys(step.gates).length > 0) payload.gates = step.gates;
 
   if (step.sso_providers?.length > 0) payload.sso_providers = step.sso_providers;
-  if (step.verify) payload.verify = step.verify;
   if (step.on_success) payload.on_success = step.on_success;
   if (simState.error) payload.error = simState.error;
   return payload;
@@ -1985,22 +1915,12 @@ function renderResolvedPayload() {
       </div>`;
   }
 
-  let verifyHtml = '';
-  if (step.verify) {
-    verifyHtml = `
-      <div class="sim-resolved-section">
-        <div class="sim-resolved-label">Verify</div>
-        <div class="sim-resolved-json">Engine sends verification code to <span class="str">"${step.verify}"</span> field value.
-Renders code input. Validates on submit.</div>
-      </div>`;
-  }
-
   let actionHtml = '';
   if (step.on_success) {
     actionHtml = `
       <div class="sim-resolved-section">
         <div class="sim-resolved-label">on_success (post-submit)</div>
-        <div class="sim-resolved-json">Engine executes <span class="str">"${step.on_success}"</span> after validation/verification passes, before transition fires.</div>
+        <div class="sim-resolved-json">Engine executes <span class="str">"${step.on_success}"</span> after validation passes, before transition fires.</div>
       </div>`;
   }
 
@@ -2020,7 +1940,6 @@ Renders code input. Validates on submit.</div>
       </div>
       ${annotationsHtml}
       ${outcomesHtml}
-      ${verifyHtml}
       ${actionHtml}
     </div>`;
   if (wasExpanded) container.classList.add('expanded');

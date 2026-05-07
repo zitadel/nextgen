@@ -422,7 +422,7 @@ components:
           description: Step name from the flow definition
         type:
           type: string
-          enum: [identifier, credential, form, verification, consent, info, redirect, captcha, complete]
+          enum: [identifier, credential, form, consent, info, redirect, captcha, complete]
           description: |
             Step type. Note: `policy_check` and `action` steps never render —
             the flow engine auto-transitions through them.
@@ -621,12 +621,12 @@ components:
     FlowMessage:
       type: object
       required: [text_key, severity]
-      description: An informational message displayed on the step (e.g., "Check your email").
+      description: An informational message displayed on the step (e.g., "Account created successfully.").
       properties:
         text_key:
           type: string
           description: Localization key for the message text
-          example: verification.message.check_email
+          example: register.message.account_created
         severity:
           type: string
           enum: [info, success, warning]
@@ -821,7 +821,7 @@ components:
           example: identifier
         type:
           type: string
-          enum: [identifier, credential, form, verification, policy_check, consent, action, info, redirect, captcha, complete]
+          enum: [identifier, credential, form, policy_check, consent, action, info, redirect, captcha, complete]
         texts:
           $ref: "#/components/schemas/StepTexts"
           description: |
@@ -861,7 +861,7 @@ components:
           default: []
         config:
           type: object
-          description: Step-type-specific configuration (e.g., credential type, verification method)
+          description: Step-type-specific configuration (e.g., credential type)
           additionalProperties: true
         transitions:
           type: object

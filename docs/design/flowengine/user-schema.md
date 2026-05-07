@@ -12,7 +12,6 @@ What matters here is the contract: which schema annotations exist, how the flow 
 | Annotation | Scope | Consumer | Purpose |
 |---|---|---|---|
 | `x-identifier: true` | Field | Flow Engine | Field used for user resolution in the identifier step |
-| `x-verify: "email"` | Field | Flow Engine | Flow engine can inject a verification step after collection |
 | `x-mfa: "sms"` | Field | Policy Engine | Field can be used for OTP delivery |
 | `x-sensitive: true` | Field | Flow Engine | Value redacted in audit events |
 | `x-editable: true` | Field | Flow Engine | Field appears in profiling / self-service flows |
@@ -26,8 +25,8 @@ What matters here is the contract: which schema annotations exist, how the flow 
 User Schema                     Flow Definition                   Policy Engine
 ─────────────                   ───────────────                   ─────────────
 Defines fields:                 References schema fields:         Reads schema annotations:
-  email (x-identifier,           step fields: [email, password]    x-auth-methods →
-         x-verify: email)        step fields: [given_name, ...]     narrows available factors
+  email (x-identifier)           step fields: [email, password]    x-auth-methods →
+                                 step fields: [given_name, ...]     narrows available factors
   phone (x-mfa: sms)
   given_name                    user_schema: "human_user"         Reads user context:
   family_name                                                       user.roles, user.team →
@@ -62,7 +61,6 @@ The following is an example user schema showing the annotations that the flow en
       "format": "email",
       "title": "Email address",
       "x-identifier": true,
-      "x-verify": "email",
       "x-unique": "project",
       "x-claim": "claims.email",
       "x-editable": true
