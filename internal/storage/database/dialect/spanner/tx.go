@@ -1,4 +1,4 @@
-package postgres
+package spanner
 
 import (
 	"github.com/jackc/pgx/v5"
@@ -11,12 +11,11 @@ type Transaction struct {
 }
 
 var _ database.Transaction = (*Transaction)(nil)
-var _ PostgresPooler = (*Transaction)(nil)
+var _ SpannerPooler = (*Transaction)(nil)
 
-func (p *Transaction) isPostgres() {}
+func (p *Transaction) isSpanner() {}
 
-// PGxTx wraps an existing pgx.Tx in a postgres-dialect transaction.
-func PGxTx(tx pgx.Tx) *Transaction {
+func newTransaction(tx pgx.Tx) *Transaction {
 	return &Transaction{pgxcommon.NewTransaction(tx, wrapError)}
 }
 
