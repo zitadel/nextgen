@@ -50,7 +50,6 @@ post:
     - User
   security:
     - oauth2:
-        - openid
         - users.write
   requestBody:
     required: true
