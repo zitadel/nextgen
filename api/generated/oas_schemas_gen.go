@@ -774,6 +774,14 @@ type CreateHandoffNotFound ErrorDetails
 
 func (*CreateHandoffNotFound) createHandoffRes() {}
 
+type CreateSchemaBadRequest ErrorDetails
+
+func (*CreateSchemaBadRequest) createSchemaRes() {}
+
+type CreateSchemaConflict ErrorDetails
+
+func (*CreateSchemaConflict) createSchemaRes() {}
+
 // CreateSchemaReq represents sum type.
 type CreateSchemaReq struct {
 	Type       CreateSchemaReqType // switch on this field
@@ -1067,7 +1075,6 @@ func (s *ErrorDetails) SetDetails(val OptErrorDetailsDetails) {
 func (*ErrorDetails) authorizeDeviceRes() {}
 func (*ErrorDetails) authorizeGetRes()    {}
 func (*ErrorDetails) createFlowRes()      {}
-func (*ErrorDetails) createSchemaRes()    {}
 func (*ErrorDetails) createSessionRes()   {}
 func (*ErrorDetails) endSessionRes()      {}
 func (*ErrorDetails) getAuthAttemptRes()  {}
@@ -6680,6 +6687,8 @@ func (s *SSOProvider) SetTemplate(val string) {
 	s.Template = val
 }
 
+// A schema definition that references an external schema via a URL. It is
+// on creation, validated against its metaschema and cached in the database.
 // Ref: #
 type SchemaURL struct {
 	// Discriminator value for a user schema create request.

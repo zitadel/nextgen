@@ -59,7 +59,12 @@ type Handler interface {
 	CreateHandoff(ctx context.Context, params CreateHandoffParams) (CreateHandoffRes, error)
 	// CreateSchema implements createSchema operation.
 	//
-	// Create new schema.
+	// Create a new schema. The schema definition must include a unique $id field,
+	// which will be used to identify the schema in future requests. The $id must
+	// be a valid URI and should ideally point to the location where the schema
+	// can be accessed.
+	// The schema can either be a concrete schema, e.g. a user schema, or a
+	// schema-url which will be resolved by the server.
 	//
 	// POST /schemas
 	CreateSchema(ctx context.Context, req CreateSchemaReq) (CreateSchemaRes, error)

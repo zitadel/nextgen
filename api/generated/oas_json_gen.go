@@ -1670,6 +1670,82 @@ func (s *CreateHandoffNotFound) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes CreateSchemaBadRequest as json.
+func (s *CreateSchemaBadRequest) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes CreateSchemaBadRequest from json.
+func (s *CreateSchemaBadRequest) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode CreateSchemaBadRequest to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = CreateSchemaBadRequest(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *CreateSchemaBadRequest) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *CreateSchemaBadRequest) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes CreateSchemaConflict as json.
+func (s *CreateSchemaConflict) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes CreateSchemaConflict from json.
+func (s *CreateSchemaConflict) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode CreateSchemaConflict to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = CreateSchemaConflict(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *CreateSchemaConflict) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *CreateSchemaConflict) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes CreateSchemaReq as json.
 func (s CreateSchemaReq) Encode(e *jx.Encoder) {
 	e.ObjStart()

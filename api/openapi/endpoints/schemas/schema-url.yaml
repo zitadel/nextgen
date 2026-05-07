@@ -1,5 +1,8 @@
 title: UserSchemaUrl
 type: object
+description: |
+  A schema definition that references an external schema via a URL. It is 
+  on creation, validated against its metaschema and cached in the database.
 required:
   - kind
   - url

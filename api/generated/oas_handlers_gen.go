@@ -1030,7 +1030,12 @@ func (s *Server) handleCreateHandoffRequest(args [1]string, argsEscaped bool, w 
 
 // handleCreateSchemaRequest handles createSchema operation.
 //
-// Create new schema.
+// Create a new schema. The schema definition must include a unique $id field,
+// which will be used to identify the schema in future requests. The $id must
+// be a valid URI and should ideally point to the location where the schema
+// can be accessed.
+// The schema can either be a concrete schema, e.g. a user schema, or a
+// schema-url which will be resolved by the server.
 //
 // POST /schemas
 func (s *Server) handleCreateSchemaRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
