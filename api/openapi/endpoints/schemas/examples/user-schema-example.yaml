@@ -3,9 +3,11 @@ kind: user-schema
 title: Example User Schema
 description: This is an example of a user schema definition.
 x-auth-methods:
-  - enabled: true
+  password:
+    enabled: false
     position: 0
-  - enabled: false
+  passkey:
+    enabled: true
     position: 1
 required:
   - email

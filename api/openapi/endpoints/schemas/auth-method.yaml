@@ -1,3 +1,4 @@
+title: AuthMethod
 type: object
 required:
   - enabled

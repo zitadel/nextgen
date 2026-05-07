@@ -23,8 +23,17 @@ properties:
     type: object
     description: |
       A list of authentication methods supported by the user definition.
-    additionalProperties:
-      $ref: auth-method.yaml
+    properties:
+      password:
+        $ref: auth-method.yaml
+      passkey:
+        $ref: auth-method.yaml
+      magic_link:
+        $ref: auth-method.yaml
+      sso:
+        $ref: auth-method.yaml
+      otp:
+        $ref: auth-method.yaml
   required:
     type: array
     description: A list of required fields for the user definition

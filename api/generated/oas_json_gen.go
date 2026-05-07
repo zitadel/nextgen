@@ -8339,6 +8339,39 @@ func (s *OpenidConfigurationTokenEndpointAuthMethodsSupportedItem) UnmarshalJSON
 	return s.Decode(d)
 }
 
+// Encode encodes AuthMethod as json.
+func (o OptAuthMethod) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes AuthMethod from json.
+func (o *OptAuthMethod) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptAuthMethod to nil")
+	}
+	o.Set = true
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptAuthMethod) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptAuthMethod) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes bool as json.
 func (o OptBool) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -13483,19 +13516,52 @@ func (s *UserSchemaProperties) UnmarshalJSON(data []byte) error {
 }
 
 // Encode implements json.Marshaler.
-func (s UserSchemaXMinusAuthMinusMethods) Encode(e *jx.Encoder) {
+func (s *UserSchemaXMinusAuthMinusMethods) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
 	e.ObjEnd()
 }
 
-// encodeFields implements json.Marshaler.
-func (s UserSchemaXMinusAuthMinusMethods) encodeFields(e *jx.Encoder) {
-	for k, elem := range s {
-		e.FieldStart(k)
-
-		elem.Encode(e)
+// encodeFields encodes fields.
+func (s *UserSchemaXMinusAuthMinusMethods) encodeFields(e *jx.Encoder) {
+	{
+		if s.Password.Set {
+			e.FieldStart("password")
+			s.Password.Encode(e)
+		}
 	}
+	{
+		if s.Passkey.Set {
+			e.FieldStart("passkey")
+			s.Passkey.Encode(e)
+		}
+	}
+	{
+		if s.MagicLink.Set {
+			e.FieldStart("magic_link")
+			s.MagicLink.Encode(e)
+		}
+	}
+	{
+		if s.SSO.Set {
+			e.FieldStart("sso")
+			s.SSO.Encode(e)
+		}
+	}
+	{
+		if s.Otp.Set {
+			e.FieldStart("otp")
+			s.Otp.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfUserSchemaXMinusAuthMinusMethods = [5]string{
+	0: "password",
+	1: "passkey",
+	2: "magic_link",
+	3: "sso",
+	4: "otp",
 }
 
 // Decode decodes UserSchemaXMinusAuthMinusMethods from json.
@@ -13503,18 +13569,62 @@ func (s *UserSchemaXMinusAuthMinusMethods) Decode(d *jx.Decoder) error {
 	if s == nil {
 		return errors.New("invalid: unable to decode UserSchemaXMinusAuthMinusMethods to nil")
 	}
-	m := s.init()
+
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		var elem AuthMethod
-		if err := func() error {
-			if err := elem.Decode(d); err != nil {
-				return err
+		switch string(k) {
+		case "password":
+			if err := func() error {
+				s.Password.Reset()
+				if err := s.Password.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"password\"")
 			}
-			return nil
-		}(); err != nil {
-			return errors.Wrapf(err, "decode field %q", k)
+		case "passkey":
+			if err := func() error {
+				s.Passkey.Reset()
+				if err := s.Passkey.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"passkey\"")
+			}
+		case "magic_link":
+			if err := func() error {
+				s.MagicLink.Reset()
+				if err := s.MagicLink.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"magic_link\"")
+			}
+		case "sso":
+			if err := func() error {
+				s.SSO.Reset()
+				if err := s.SSO.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"sso\"")
+			}
+		case "otp":
+			if err := func() error {
+				s.Otp.Reset()
+				if err := s.Otp.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"otp\"")
+			}
+		default:
+			return d.Skip()
 		}
-		m[string(k)] = elem
 		return nil
 	}); err != nil {
 		return errors.Wrap(err, "decode UserSchemaXMinusAuthMinusMethods")
@@ -13524,7 +13634,7 @@ func (s *UserSchemaXMinusAuthMinusMethods) Decode(d *jx.Decoder) error {
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s UserSchemaXMinusAuthMinusMethods) MarshalJSON() ([]byte, error) {
+func (s *UserSchemaXMinusAuthMinusMethods) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
