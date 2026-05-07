@@ -35,7 +35,10 @@ type Session struct {
 	State SessionState
 	// AssuranceLevels are computed at runtime and therefore not stored in the database.
 	AssuranceLevels []string
-
+	// Factors contains the authentication factors that were used to verify the session.
+	// There is one factor per [AuthCheckType].
+	// The factors must be verified using [AuthAttempt]s before being added to the session, and the VerifiedAt field must be set to the time of verification.
+	// The factors are stored in the database.
 	Factors []*SessionFactor
 }
 
@@ -44,6 +47,15 @@ type SessionFactor struct {
 	VerifiedAt time.Time
 	// Stored as jsonb
 	Factor any
+}
+
+func (s *Session) GetFactor(typ AuthCheckType) *SessionFactor {
+	for _, factor := range s.Factors {
+		if factor.Type == typ {
+			return factor
+		}
+	}
+	return nil
 }
 
 type SessionState uint8
@@ -65,6 +77,9 @@ type SessionRepository interface {
 	// GetByToken retrieves a session by its project and token.
 	GetByToken(ctx context.Context, client database.QueryExecutor, projectID, token string) (*Session, error)
 
+	// List returns a list of sessions based on the given condition.
+	List(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) ([]*Session, error)
+
 	// Update applies the given changes to the session and returns the updated session. The token is rotated on every update.
 	// The storage must update the [Session.UpdatedAt] field and return an error if the session does not exist or if any of the required fields are missing after applying the changes.
 	Update(ctx context.Context, client database.QueryExecutor, projectID, sessionID, token string, changes ...database.Change) (*Session, error)
@@ -74,6 +89,8 @@ type SessionRepository interface {
 	Delete(ctx context.Context, client database.QueryExecutor, projectID, sessionID string) error
 
 	SessionChanges
+	SessionConditions
+	SessionColumns
 }
 
 type SessionChanges interface {
@@ -87,4 +104,28 @@ type SessionChanges interface {
 	SetFactors(factors ...*SessionFactor) database.Change
 	// Sets the [Session.ExpiresAt] field in the database.
 	SetExpiresAt(expiresAt time.Time) database.Change
+}
+
+// Conditions to list sessions, used for filtering in [SessionRepository.List].
+type SessionConditions interface {
+	ProjectIDCondition(projectID string) database.Condition
+	IDCondition(sessionID string) database.Condition
+	IsExpiredCondition() database.Condition
+	UserIDCondition(userID string) database.Condition
+	StateCondition(state SessionState) database.Condition
+}
+
+// Columns for the session table, used for ordering.
+type SessionColumns interface {
+	ProjectIDColumn() string
+	IDColumn() string
+	CreatedAtColumn() string
+	UpdatedAtColumn() string
+	ExpiresAtColumn() string
+	TokenColumn() string
+	UserIDColumn() string
+	UserAgentColumn() string
+	StateColumn() string
+	AssuranceLevelsColumn() string
+	FactorsColumn() string
 }
