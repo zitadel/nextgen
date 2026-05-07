@@ -787,7 +787,7 @@ type CreateSchemaReqType string
 // Possible values for CreateSchemaReqType.
 const (
 	UserSchemaCreateSchemaReq CreateSchemaReqType = "user-schema"
-	SchemaURLCreateSchemaReq  CreateSchemaReqType = "SchemaURL"
+	SchemaURLCreateSchemaReq  CreateSchemaReqType = "schema-url"
 )
 
 // IsUserSchema reports whether CreateSchemaReq is UserSchema.
@@ -7738,6 +7738,10 @@ func (s *UserPropertyXMinusUnique) UnmarshalText(data []byte) error {
 
 // Ref: #
 type UserSchema struct {
+	// The JSON Schema version used for this schema.
+	Schema OptString `json:"$schema"`
+	// The unique identifier for this schema, which is also the URL where this schema can be accessed.
+	ID OptURI `json:"$id"`
 	// Discriminator value for a user schema create request.
 	Kind string `json:"kind"`
 	// Human-readable name for this schema.
@@ -7752,6 +7756,16 @@ type UserSchema struct {
 	// is the property name and the value is the property schema.
 	Properties OptUserSchemaProperties `json:"properties"`
 	Example    OptUserSchemaExample    `json:"example"`
+}
+
+// GetSchema returns the value of Schema.
+func (s *UserSchema) GetSchema() OptString {
+	return s.Schema
+}
+
+// GetID returns the value of ID.
+func (s *UserSchema) GetID() OptURI {
+	return s.ID
 }
 
 // GetKind returns the value of Kind.
@@ -7787,6 +7801,16 @@ func (s *UserSchema) GetProperties() OptUserSchemaProperties {
 // GetExample returns the value of Example.
 func (s *UserSchema) GetExample() OptUserSchemaExample {
 	return s.Example
+}
+
+// SetSchema sets the value of Schema.
+func (s *UserSchema) SetSchema(val OptString) {
+	s.Schema = val
+}
+
+// SetID sets the value of ID.
+func (s *UserSchema) SetID(val OptURI) {
+	s.ID = val
 }
 
 // SetKind sets the value of Kind.

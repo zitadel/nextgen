@@ -1,11 +1,22 @@
 title: UserSchema
 $schema: "https://json-schema.org/draft/2020-12/schema"
+$id: https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.yaml
 type: object
 required:
+  - $schema
+  - $id
   - kind
   - title
   - x-auth-methods
 properties:
+  $schema:
+    type: string
+    const: https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.yaml
+    description: The JSON Schema version used for this schema.
+  $id:
+    type: string
+    format: uri
+    description: The unique identifier for this schema, which is also the URL where this schema can be accessed.
   kind:
     type: string
     const: user-schema

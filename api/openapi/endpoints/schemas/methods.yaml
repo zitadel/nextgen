@@ -18,6 +18,7 @@ post:
             propertyName: kind
             mapping:
               user-schema: user-schema.yaml
+              schema-url:  schema-url.yaml
         examples:
           userSchema:
             summary: An example of a schema definition for a user.
