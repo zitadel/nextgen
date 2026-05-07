@@ -7697,8 +7697,7 @@ type UserSchema struct {
 	// Human-readable name for this schema.
 	Title string `json:"title"`
 	// A description of this schema.
-	Description OptString            `json:"description"`
-	Example     OptUserSchemaExample `json:"example"`
+	Description OptString `json:"description"`
 	// A list of authentication methods supported by the user definition.
 	XMinusAuthMinusMethods UserSchemaXMinusAuthMinusMethods `json:"x-auth-methods"`
 	// A list of required fields for the user definition.
@@ -7706,6 +7705,7 @@ type UserSchema struct {
 	// A map of additional properties for the user definition, where the key
 	// is the property name and the value is the property schema.
 	Properties OptUserSchemaProperties `json:"properties"`
+	Example    OptUserSchemaExample    `json:"example"`
 }
 
 // GetKind returns the value of Kind.
@@ -7723,11 +7723,6 @@ func (s *UserSchema) GetDescription() OptString {
 	return s.Description
 }
 
-// GetExample returns the value of Example.
-func (s *UserSchema) GetExample() OptUserSchemaExample {
-	return s.Example
-}
-
 // GetXMinusAuthMinusMethods returns the value of XMinusAuthMinusMethods.
 func (s *UserSchema) GetXMinusAuthMinusMethods() UserSchemaXMinusAuthMinusMethods {
 	return s.XMinusAuthMinusMethods
@@ -7741,6 +7736,11 @@ func (s *UserSchema) GetRequired() []string {
 // GetProperties returns the value of Properties.
 func (s *UserSchema) GetProperties() OptUserSchemaProperties {
 	return s.Properties
+}
+
+// GetExample returns the value of Example.
+func (s *UserSchema) GetExample() OptUserSchemaExample {
+	return s.Example
 }
 
 // SetKind sets the value of Kind.
@@ -7758,11 +7758,6 @@ func (s *UserSchema) SetDescription(val OptString) {
 	s.Description = val
 }
 
-// SetExample sets the value of Example.
-func (s *UserSchema) SetExample(val OptUserSchemaExample) {
-	s.Example = val
-}
-
 // SetXMinusAuthMinusMethods sets the value of XMinusAuthMinusMethods.
 func (s *UserSchema) SetXMinusAuthMinusMethods(val UserSchemaXMinusAuthMinusMethods) {
 	s.XMinusAuthMinusMethods = val
@@ -7776,6 +7771,11 @@ func (s *UserSchema) SetRequired(val []string) {
 // SetProperties sets the value of Properties.
 func (s *UserSchema) SetProperties(val OptUserSchemaProperties) {
 	s.Properties = val
+}
+
+// SetExample sets the value of Example.
+func (s *UserSchema) SetExample(val OptUserSchemaExample) {
+	s.Example = val
 }
 
 // UserSchemaExample represents sum type.

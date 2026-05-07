@@ -1695,12 +1695,6 @@ func (s CreateSchemaReq) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
-				if s.Example.Set {
-					e.FieldStart("example")
-					s.Example.Encode(e)
-				}
-			}
-			{
 				e.FieldStart("x-auth-methods")
 				s.XMinusAuthMinusMethods.Encode(e)
 			}
@@ -1718,6 +1712,12 @@ func (s CreateSchemaReq) encodeFields(e *jx.Encoder) {
 				if s.Properties.Set {
 					e.FieldStart("properties")
 					s.Properties.Encode(e)
+				}
+			}
+			{
+				if s.Example.Set {
+					e.FieldStart("example")
+					s.Example.Encode(e)
 				}
 			}
 		}
@@ -4767,12 +4767,6 @@ func (s GetSchemaByIdOK) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
-				if s.Example.Set {
-					e.FieldStart("example")
-					s.Example.Encode(e)
-				}
-			}
-			{
 				e.FieldStart("x-auth-methods")
 				s.XMinusAuthMinusMethods.Encode(e)
 			}
@@ -4790,6 +4784,12 @@ func (s GetSchemaByIdOK) encodeFields(e *jx.Encoder) {
 				if s.Properties.Set {
 					e.FieldStart("properties")
 					s.Properties.Encode(e)
+				}
+			}
+			{
+				if s.Example.Set {
+					e.FieldStart("example")
+					s.Example.Encode(e)
 				}
 			}
 		}
@@ -13102,12 +13102,6 @@ func (s *UserSchema) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
-		if s.Example.Set {
-			e.FieldStart("example")
-			s.Example.Encode(e)
-		}
-	}
-	{
 		e.FieldStart("x-auth-methods")
 		s.XMinusAuthMinusMethods.Encode(e)
 	}
@@ -13127,16 +13121,22 @@ func (s *UserSchema) encodeFields(e *jx.Encoder) {
 			s.Properties.Encode(e)
 		}
 	}
+	{
+		if s.Example.Set {
+			e.FieldStart("example")
+			s.Example.Encode(e)
+		}
+	}
 }
 
 var jsonFieldsNameOfUserSchema = [7]string{
 	0: "kind",
 	1: "title",
 	2: "description",
-	3: "example",
-	4: "x-auth-methods",
-	5: "required",
-	6: "properties",
+	3: "x-auth-methods",
+	4: "required",
+	5: "properties",
+	6: "example",
 }
 
 // Decode decodes UserSchema from json.
@@ -13182,18 +13182,8 @@ func (s *UserSchema) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"description\"")
 			}
-		case "example":
-			if err := func() error {
-				s.Example.Reset()
-				if err := s.Example.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"example\"")
-			}
 		case "x-auth-methods":
-			requiredBitSet[0] |= 1 << 4
+			requiredBitSet[0] |= 1 << 3
 			if err := func() error {
 				if err := s.XMinusAuthMinusMethods.Decode(d); err != nil {
 					return err
@@ -13231,6 +13221,16 @@ func (s *UserSchema) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"properties\"")
 			}
+		case "example":
+			if err := func() error {
+				s.Example.Reset()
+				if err := s.Example.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"example\"")
+			}
 		default:
 			return d.Skip()
 		}
@@ -13241,7 +13241,7 @@ func (s *UserSchema) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [1]uint8{
-		0b00010011,
+		0b00001011,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
