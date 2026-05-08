@@ -215,8 +215,27 @@ func (s *authAttemptService) Create(ctx context.Context, input CreateAuthAttempt
 		return nil, err
 	}
 
-	if err := s.attempts.Create(ctx, s.pool, attempt); err != nil {
+	tx, err := s.pool.Begin(ctx, nil)
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to start transaction")
+	}
+	defer func() {
+		// dont shadow errors already returned to the user
+		if err != nil {
+			_ = tx.Rollback(ctx)
+		}
+	}()
+
+	if err := s.attempts.Create(ctx, tx, attempt); err != nil {
 		return nil, err //TODO: error handling
+	}
+	if attempt.IsCompleted() {
+		if err := s.attempts.Complete(ctx, tx, attempt); err != nil {
+			return nil, err
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to commit transaction")
 	}
 	return attempt, nil
 }
@@ -329,16 +348,31 @@ func (s *authAttemptService) VerifyProof(ctx context.Context, input VerifyProofI
 		return nil, err
 	}
 
-	if err := s.attempts.ChallengeSucceeded(ctx, s.pool, input.ProjectID, input.AttemptID, factor, check.GetID()); err != nil {
+	tx, err := s.pool.Begin(ctx, nil)
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to start transaction")
+	}
+	defer func() {
+		// dont shadow errors already returned to the user
+		if err != nil {
+			_ = tx.Rollback(ctx)
+		}
+	}()
+
+	if err := s.attempts.ChallengeSucceeded(ctx, tx, input.ProjectID, input.AttemptID, factor, check.GetID()); err != nil {
 		return nil, err
 	}
 	attempt.SetCheck(factor) // Update the attempt with the successful factor for accurate state in the response
 
 	// Pure domain check — no I/O
 	if attempt.IsCompleted() {
-		if err := s.attempts.Complete(ctx, s.pool, attempt); err != nil {
+		if err := s.attempts.Complete(ctx, tx, attempt); err != nil {
 			return nil, err
 		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to commit transaction")
 	}
 
 	return attempt, nil
@@ -407,7 +441,7 @@ func (s *authAttemptService) Handoff(ctx context.Context, input HandoffInput) (*
 		return nil, domain.ErrAuthAttemptNotCompleted()
 	}
 	if attempt.HandoffToken != nil {
-		if gu.Value(input.IdempotencyKey) == gu.Value(attempt.HandoffIdempotencyKey) { // TODO: proper validation
+		if input.IdempotencyKey != nil && gu.Value(input.IdempotencyKey) == gu.Value(attempt.HandoffIdempotencyKey) {
 			return attempt, nil
 		}
 		return nil, domain.ErrAuthAttemptAlreadyHandedOff()

@@ -210,8 +210,10 @@ func (a *AuthAttempt) PrepareUserChallenge() error {
 		}
 		return nil
 	}
-	if len(a.Checks) > 2 {
-		return ErrAuthAttemptInvalidRequest().WithMessage("The user must not be changed after it was authenticated.")
+	for _, check := range a.Checks {
+		if _, ok := check.(AuthFactor); ok && check.Type() != AuthCheckTypeUser {
+			return ErrAuthAttemptInvalidRequest().WithMessage("The user must not be changed after it was authenticated.")
+		}
 	}
 	return nil
 }
@@ -292,6 +294,10 @@ func (a *AuthAttempt) CreateHandoffToken() (string, error) { //TODO: should we e
 	if !a.IsCompleted() {
 		return "", ErrAuthAttemptNotCompleted()
 	}
+	if a.HandoffToken != nil {
+		return "", ErrAuthAttemptAlreadyHandedOff()
+	}
+
 	token, err := newID(PrefixHandoffToken)
 	if err != nil {
 		return "", err
