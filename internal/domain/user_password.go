@@ -64,6 +64,6 @@ type userPasswordChanges interface {
 	SetChangedAt(time.Time) database.Change
 	SetVerificationID(string) database.Change
 	SetLastSuccessfulCheck(time.Time) database.Change
-	IncrementFailedAttempts(diff int16) database.Change
+	IncrementFailedAttempts() database.Change
 	ResetFailedAttempts() database.Change
 }

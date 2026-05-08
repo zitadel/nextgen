@@ -52,6 +52,6 @@ type userRecoveryCodesConditions interface {
 type userRecoveryCodesChanges interface {
 	SetRecoveryCodes([]string) database.Change
 	SetLastSuccessfulCheck(*time.Time) database.Change
-	IncrementFailedAttempts(delta int16) database.Change
+	IncrementFailedAttempts() database.Change
 	ResetFailedAttempts() database.Change
 }

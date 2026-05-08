@@ -21,6 +21,15 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
+type AuthMethod int
+
+const (
+	AuthMethodPassword AuthMethod = iota
+	AuthMethodPasskey
+	AuthMethodTOTP
+	AuthMethodRecoveryCodes
+)
+
 type User struct {
 	SchemaURL      string
 	ID             string
@@ -30,12 +39,8 @@ type User struct {
 
 	// Following fields are only populated if relevant
 	// [userJoins] are set in the query.
-	Attributes    []Attribute
-	Passkeys      []*UserPasskey
-	PATs          []*UserPAT
-	RecoveryCodes []*UserRecoveryCodes
-	UserPassword
-	UserTOTP
+	Attributes           []Attribute
+	AvailableAuthMethods []AuthMethod
 }
 
 /*
@@ -57,7 +62,7 @@ type CreateUser struct {
 	SchemaURL      string
 	ID             string
 	OrganizationID string
-	Attributes     []CreateAttribute
+	Attributes     []*CreateAttribute
 }
 
 type UserRepository interface {
@@ -99,9 +104,5 @@ type userChanges interface {
 
 type userJoins interface {
 	WithAttributes(filterKeys ...string) database.QueryOption
-	WithPassword() database.QueryOption
-	WithTOTP() database.QueryOption
-	WithRecoveryCodes() database.QueryOption
-	WithPATs() database.QueryOption
-	WithPasskeys() database.QueryOption
+	WithAvailableAuthMethods() database.QueryOption
 }
