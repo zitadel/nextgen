@@ -889,6 +889,7 @@ function getCurrentSchema() {
 
 const FLOWS = {
   "Login": {
+    slug: "default-login",
     name: "Default Login",
     user_schema: "human_user",
     purposes: ["login"],
@@ -920,6 +921,7 @@ const FLOWS = {
   },
 
   "Registration": {
+    slug: "default-register",
     name: "Default Registration",
     user_schema: "human_user",
     purposes: ["register"],
@@ -949,6 +951,7 @@ const FLOWS = {
   },
 
   "Enterprise Login": {
+    slug: "acme-sso-login",
     name: "Acme Corp SSO Login",
     user_schema: "human_user",
     purposes: ["login"],
@@ -994,6 +997,7 @@ const FLOWS = {
   },
 
   "Combined Auth": {
+    slug: "combined-auth",
     name: "Combined Login + Registration",
     user_schema: "human_user",
     purposes: ["login", "register"],
@@ -1034,6 +1038,7 @@ const FLOWS = {
   },
 
   "SaaS Registration": {
+    slug: "saas-register",
     name: "SaaSApp Registration",
     user_schema: "saas_user",
     purposes: ["register"],
@@ -1079,6 +1084,7 @@ const FLOWS = {
   },
 
   "Passkey Login": {
+    slug: "passwordless-login",
     name: "Passwordless Login",
     user_schema: "human_user",
     purposes: ["login"],
@@ -1713,7 +1719,7 @@ function simAction(actionName, providerId) {
   if (transAction === 'pivot') {
     const pivotFlowName = Object.keys(FLOWS).find(k => {
       const f = FLOWS[k];
-      return f.name === target || k === target || f.purposes?.includes(target);
+      return f.slug === target || f.name === target || k === target || f.purposes?.includes(target);
     });
     if (pivotFlowName) {
       simState.flowStack.push({
@@ -1750,7 +1756,7 @@ function simAction(actionName, providerId) {
   if (transAction === 'switch') {
     const switchFlowName = Object.keys(FLOWS).find(k => {
       const f = FLOWS[k];
-      return f.name === target || k === target || f.purposes?.includes(target);
+      return f.slug === target || f.name === target || k === target || f.purposes?.includes(target);
     });
     if (switchFlowName) {
       const newFlowId = genId('flow');
@@ -1779,7 +1785,7 @@ function simAction(actionName, providerId) {
 
   // Normal same-flow transition
   simState.history.push(simState.stepName);
-  simState.stepName = target.target;
+  simState.stepName = target;
   simState.error = null;
   simState.sessionToken = genToken();
 
