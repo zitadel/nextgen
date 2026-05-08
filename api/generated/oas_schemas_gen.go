@@ -849,16 +849,16 @@ func NewSchemaURLCreateSchemaReq(v SchemaURL) CreateSchemaReq {
 // Ref: #
 type CreateSchemaResponse struct {
 	// The ID of the created schema.
-	ID OptString `json:"id"`
+	ID url.URL `json:"id"`
 }
 
 // GetID returns the value of ID.
-func (s *CreateSchemaResponse) GetID() OptString {
+func (s *CreateSchemaResponse) GetID() url.URL {
 	return s.ID
 }
 
 // SetID sets the value of ID.
-func (s *CreateSchemaResponse) SetID(val OptString) {
+func (s *CreateSchemaResponse) SetID(val url.URL) {
 	s.ID = val
 }
 
@@ -1078,7 +1078,6 @@ func (*ErrorDetails) createFlowRes()      {}
 func (*ErrorDetails) createSessionRes()   {}
 func (*ErrorDetails) endSessionRes()      {}
 func (*ErrorDetails) getAuthAttemptRes()  {}
-func (*ErrorDetails) getSchemaByIdRes()   {}
 func (*ErrorDetails) introspectRes()      {}
 func (*ErrorDetails) submitFlowStepRes()  {}
 
@@ -2343,6 +2342,14 @@ func (s GetReadyOK) Read(p []byte) (n int, err error) {
 }
 
 func (*GetReadyOK) getReadyRes() {}
+
+type GetSchemaByIdBadRequest ErrorDetails
+
+func (*GetSchemaByIdBadRequest) getSchemaByIdRes() {}
+
+type GetSchemaByIdNotFound ErrorDetails
+
+func (*GetSchemaByIdNotFound) getSchemaByIdRes() {}
 
 // GetSchemaByIdOK represents sum type.
 type GetSchemaByIdOK struct {

@@ -4,19 +4,25 @@ import (
 	"context"
 
 	api "github.com/zitadel/nextgen/api/generated"
+	"github.com/zitadel/nextgen/internal/service"
 )
 
 type Handler struct {
 	// UnimplementedHandler is embedded to provide default "not implemented"
 	// responses for all endpoints, so only implemented methods need to be defined.
 	api.UnimplementedHandler
+	schemaService service.SchemaService
 }
 
-func NewHandler() *Handler {
-	return &Handler{}
+func NewHandler(
+	schemaService service.SchemaService,
+) *Handler {
+	return &Handler{
+		schemaService: schemaService,
+	}
 }
 
-func (h Handler) NewError(ctx context.Context, err error) *api.ErrorDetailsStatusCode {
+func (h *Handler) NewError(ctx context.Context, err error) *api.ErrorDetailsStatusCode {
 	return &api.ErrorDetailsStatusCode{
 		StatusCode: 401,
 		Response: api.ErrorDetails{

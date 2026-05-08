@@ -31,6 +31,12 @@ get:
         application/json:
           schema:
             $ref: ../../../components/error-details.yaml
+    '404':
+      description: No schema was found with the given id
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
     default:
       description: Unexpected error response.
       content:
