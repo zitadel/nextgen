@@ -80,13 +80,7 @@ properties:
   transitions:
     type: object
     description: |
-      Maps action/outcome names to transition targets. Each value is an
-      object with `target` (required) and optional `action`.
-
-      - `target`: name of the next step in this flow, or a flow slug for
-        cross-flow transitions.
-      - `action`: "switch" (replace current flow) or "pivot" (stack flow,
-        return on completion). Omit for same-flow transitions.
+      Maps action/outcome names to their transition descriptor.
 
       Keys match action names from the `actions` dict. Additional keys
       come from implicit outcomes based on schema annotations
@@ -98,21 +92,30 @@ properties:
       properties:
         target:
           type: string
-          description: Next step name or flow slug.
+          description: |
+            Step name within this flow (when `action` is null), or the slug
+            of another flow (when `action` is `switch` or `pivot`).
+          example: password
         action:
           type: string
           enum: [switch, pivot]
+          nullable: true
           description: |
-            Cross-flow transition type:
-            - switch: replace the current flow entirely (no return)
-            - pivot: push flow onto stack (returns after completion)
+            How to interpret `target`:
+            - null (omitted): transition to a step in the current flow.
+            - switch: replace the current flow with the target flow.
+              No return — the current flow is discarded.
+              Example: login ↔ register.
+            - pivot: push the target flow onto the stack. The current flow
+              is paused and resumes when the target flow completes (auto-pop).
+              Example: login → recovery → back to login.
       additionalProperties: false
     example:
       submit:
-        target: done
+        target: password
       recover:
-        target: default-recovery
+        target: recovery
         action: pivot
       register:
-        target: default-register
+        target: register
         action: switch

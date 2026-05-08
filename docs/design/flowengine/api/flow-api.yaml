@@ -866,23 +866,28 @@ components:
         transitions:
           type: object
           description: |
-            Map of transition name → target. Target is either a step name (string)
-            for in-graph transitions, or a pivot object for cross-purpose navigation.
+            Map of transition name → transition descriptor.
           additionalProperties:
-            oneOf:
-              - type: string
-                description: Step name within this definition
-              - type: object
-                required: [pivot]
-                properties:
-                  pivot:
-                    type: string
-                    enum: [login, register, recovery, profiling, reauth, link_account]
-                    description: Target purpose — flow engine resolves a new definition
+            type: object
+            required: [target]
+            properties:
+              target:
+                type: string
+                description: |
+                  Step name within this flow (when action is null), or
+                  slug of another flow (when action is switch or pivot).
+              action:
+                type: string
+                enum: [switch, pivot]
+                nullable: true
+                description: |
+                  null: transition within the same flow.
+                  switch: replace the current flow (no return).
+                  pivot: stack the target flow; return on completion.
           example:
-            submit: check_user
-            register: { pivot: register }
-            recover: { pivot: recovery }
+            submit: { target: check_user }
+            register: { target: register, action: pivot }
+            recover: { target: recovery, action: pivot }
 
     ValidationResult:
       type: object

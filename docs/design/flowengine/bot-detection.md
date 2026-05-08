@@ -174,7 +174,8 @@ Exceeding soft limits elevates risk (triggering captcha). Exceeding hard limits 
 Three modes:
 
 1. **Step-level gate** — for flows that always want captcha (e.g., public registration):
-   ```json
+
+```json
    {
      "name": "profile",
      "fields": ["email", "given_name", "family_name"],
@@ -185,8 +186,9 @@ Three modes:
        "submit": { "target": "set_password" }
      }
    }
-   ```
-   The `gates.captcha` declaration means the frontend must solve a captcha (using the configured provider) before submission is accepted.
+```
+   
+The `gates.captcha` declaration means the frontend must solve a captcha (using the configured provider) before submission is accepted.
 
 2. **Dynamic injection** — policy evaluates risk and injects a captcha gate on any step dynamically, even if the definition doesn't declare it.
 

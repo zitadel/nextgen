@@ -1,0 +1,12 @@
+type: object
+description: Request to exchange a handoff token for a session and session_token.
+required:
+  - handoff_token
+properties:
+  handoff_token:
+    type: string
+    description: |
+      The one-time handoff token minted by `POST /auth_attempts/{id}/handoff`.
+      Single-use — replaying it after a successful exchange returns `410 Gone`.
+    example: handoff_abc123def456xyz
+

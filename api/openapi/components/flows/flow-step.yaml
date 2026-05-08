@@ -11,6 +11,9 @@ properties:
   texts:
     $ref: step-texts.yaml
   error:
+    oneOf:
+      - type: string
+      - type: 'null'
     type: string
     description: Error message from a previous failed submission.
     nullable: true

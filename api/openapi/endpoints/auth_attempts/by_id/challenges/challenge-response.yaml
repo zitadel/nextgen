@@ -1,0 +1,45 @@
+type: object
+description: |
+  A factor challenge issued within an authentication attempt.
+  
+  A challenge presents a single-factor verification prompt (password entry, TOTP code, passkey assertion, etc.).
+  The client verifies the proof by POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify.
+required:
+  - challenge_id
+  - method
+  - state
+  - created_at
+properties:
+  challenge_id:
+    $ref: ../../../../components/schemas/challenge-id.yaml
+  method:
+    $ref: ../../../../components/schemas/factor-method.yaml
+    description: |
+      The authentication method this challenge represents.
+      Determines which proof is expected in verify.
+  state:
+    type: string
+    enum:
+      - pending
+      - verified
+      - failed
+      - expired
+    description: |
+      Current state of this challenge:
+      - `pending`: awaiting proof submission
+      - `verified`: proof accepted, factor  recorded on the auth attempt; it is materialized into a session only when the auth flow is completed
+      - `failed`: proof rejected (invalid credential, wrong code, etc.)
+      - `expired`: challenge TTL exceeded without verification
+  created_at:
+    type: string
+    format: date-time
+    description: When this challenge was issued
+    example: '2026-04-28T15:31:00Z'
+  expires_at:
+    description: When this challenge expires
+    oneOf:
+      - type: string
+        format: date-time
+        example: '2026-04-28T15:41:00Z'
+      - type: 'null'
+
