@@ -1,19 +1,17 @@
 package domain
 
-import "time"
+import (
+	"time"
+)
 
-type AuthCheck struct {
-	Type AuthCheckType
-	// When the check was verified successfully, it must be set by the storage and is read only.
-	LastVerifiedAt time.Time
-	// When the check was last challenged. It must be set by the storage and is read only.
-	LastChallengedAt time.Time
-	// When the check last failed. It must be set by the storage and is read only.
-	// The repository MUST provide a method to set it to the current time, and to reset it to nil after a successful verification.
-	LastFailedAt *time.Time
-	// Times the check failed.
-	// The value is read only. Use increment and reset functions of the repository to modify it.
-	FailureCount uint16
+func newChallenge() (authChallenge, error) {
+	id, err := newID(PrefixChallenge)
+	if err != nil {
+		return authChallenge{}, err
+	}
+	return authChallenge{
+		ID: id,
+	}, nil
 }
 
 type AuthCheckType uint8
@@ -26,31 +24,71 @@ const (
 	AuthCheckIdentityProvider
 )
 
-func (a AuthCheck) IsType(typ AuthCheckType) bool {
-	return a.Type == typ
+type AuthCheck interface {
+	Type() AuthCheckType
+	Payload() any
 }
 
-// Check implements [AuthChecker].
-func (a *AuthCheck) Check() *AuthCheck {
-	return a
+type AuthFactor interface {
+	AuthCheck
+	GetLastVerifiedAt() time.Time
+	SetLastVerifiedAt(lastVerifiedAt time.Time)
 }
 
-var _ AuthChecker = (*AuthCheck)(nil)
-
-type AuthChecker interface {
-	Check() *AuthCheck
+type AuthChallenge interface {
+	AuthCheck
+	GetID() string
+	GetLastChallengedAt() time.Time
+	SetLastChallengedAt(lastChallengedAt time.Time)
+	GetLastFailedAt() time.Time
+	SetLastFailedAt(lastFailedAt time.Time)
+	GetFailureCount() uint16
+	SetFailureCount(failureCount uint16)
 }
 
-type AuthFactorer interface {
-	AuthChecker
-
-	IsFactor()
-	FactorPayload() any
+type authChallenge struct {
+	ID               string
+	LastChallengedAt time.Time
+	LastFailedAt     time.Time
+	FailureCount     uint16
 }
 
-type AuthChallenger interface {
-	AuthChecker
+func (a *authChallenge) GetID() string {
+	return a.ID
+}
 
-	IsChallenge()
-	ChallengePayload() any
+func (a *authChallenge) GetLastChallengedAt() time.Time {
+	return a.LastChallengedAt
+}
+
+func (a *authChallenge) SetLastChallengedAt(lastChallengedAt time.Time) {
+	a.LastChallengedAt = lastChallengedAt
+}
+
+func (a *authChallenge) GetLastFailedAt() time.Time {
+	return a.LastFailedAt
+}
+
+func (a *authChallenge) SetLastFailedAt(lastFailedAt time.Time) {
+	a.LastFailedAt = lastFailedAt
+}
+
+func (a *authChallenge) GetFailureCount() uint16 {
+	return a.FailureCount
+}
+
+func (a *authChallenge) SetFailureCount(failureCount uint16) {
+	a.FailureCount = failureCount
+}
+
+type authFactor struct {
+	LastVerifiedAt time.Time
+}
+
+func (a *authFactor) GetLastVerifiedAt() time.Time {
+	return a.LastVerifiedAt
+}
+
+func (a *authFactor) SetLastVerifiedAt(lastVerifiedAt time.Time) {
+	a.LastVerifiedAt = lastVerifiedAt
 }

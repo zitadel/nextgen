@@ -1,0 +1,14 @@
+# Code generated; DO NOT EDIT.
+description: |
+  Proof rejected
+  
+  Error code: att.proof_rejected
+allOf:
+  - $ref: ../../error-details.yaml
+  - type: object
+    properties:
+      code:
+        type: string
+        const: att.proof_rejected
+    required:
+      - code

@@ -255,10 +255,6 @@ type Handler interface {
 	//
 	// POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify
 	VerifyChallengeProof(ctx context.Context, req *VerifyChallengeRequest, params VerifyChallengeProofParams) (VerifyChallengeProofRes, error)
-	// NewError creates *ErrorDetailsStatusCode from error returned by handler.
-	//
-	// Used for common default response.
-	NewError(ctx context.Context, err error) *ErrorDetailsStatusCode
 }
 
 // Server implements http server based on OpenAPI v3 specification and

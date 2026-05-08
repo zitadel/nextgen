@@ -1,0 +1,14 @@
+# Code generated; DO NOT EDIT.
+description: |
+  Attempt not in completed state
+  
+  Error code: att.not_completed
+allOf:
+  - $ref: ../../error-details.yaml
+  - type: object
+    properties:
+      code:
+        type: string
+        const: att.not_completed
+    required:
+      - code

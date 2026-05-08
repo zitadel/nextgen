@@ -4,30 +4,28 @@ import (
 	"context"
 
 	api "github.com/zitadel/nextgen/api/generated"
-	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/service"
 )
 
 type Handler struct {
 	// UnimplementedHandler is embedded to provide default "not implemented"
 	// responses for all endpoints, so only implemented methods need to be defined.
 	api.UnimplementedHandler
-	pool database.Pool
+	authAttempts service.AuthAttemptService
 }
 
-func NewHandler(pool database.Pool) *Handler {
+func NewHandler(authAttempts service.AuthAttemptService) *Handler {
 	return &Handler{
-		pool: pool,
+		authAttempts: authAttempts,
 	}
 }
 
+// NewError implements the api.Handler interface and is used by ogen to convert any error
+// returned by an endpoint handler into a well-formed error response.
+// By centralizing this logic here, we can ensure that all errors are handled
+// consistently regardless of where they originate.
 func (h *Handler) NewError(ctx context.Context, err error) *api.ErrorDetailsStatusCode {
-	return &api.ErrorDetailsStatusCode{
-		StatusCode: 401,
-		Response: api.ErrorDetails{
-			Code:    "auth error",
-			Message: err.Error(),
-		},
-	}
+	return errorResponse(err)
 }
 
 var _ api.Handler = (*Handler)(nil)

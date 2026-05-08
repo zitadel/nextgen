@@ -1,0 +1,14 @@
+# Code generated; DO NOT EDIT.
+description: |
+  Session was not found
+  
+  Error code: sess.not_found
+allOf:
+  - $ref: ../../error-details.yaml
+  - type: object
+    properties:
+      code:
+        type: string
+        const: sess.not_found
+    required:
+      - code

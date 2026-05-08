@@ -39,48 +39,5 @@ post:
         application/json:
           schema:
             $ref: ../../../auth-attempt-response.yaml
-    '400':
-      description: Malformed request or proof (missing fields, wrong format)
-      content:
-        application/json:
-          schema:
-            $ref: ../../../../../components/error-details.yaml
-          example:
-            code: att.invalid_proof
-            message: invalid proof or request
-    '409':
-      description: Proof was well-formed but rejected by domain logic (wrong credential, expired code, etc.)
-      content:
-        application/json:
-          schema:
-            $ref: ../../../../../components/error-details.yaml
-          example:
-            code: att.proof_rejected
-            message: proof rejected
-    '404':
-      description: Attempt or challenge not found
-      content:
-        application/json:
-          schema:
-            $ref: ../../../../../components/error-details.yaml
-          example:
-            code: att.not_found
-            message: auth attempt not found
-    '429':
-      description: Too many failed attempts (rate limited)
-      content:
-        application/json:
-          schema:
-            $ref: ../../../../../components/error-details.yaml
-          example:
-            code: auth.rate_limited
-            message: too many failed attempts
     default:
-      description: Unexpected error
-      content:
-        application/json:
-          schema:
-            $ref: ../../../../../components/error-details.yaml
-          example:
-            code: internal
-            message: an unexpected error occurred
+      $ref: verifyChallengeProof-error-response.yaml

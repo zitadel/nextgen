@@ -8,52 +8,68 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
+const (
+	PrefixAuthAttempt  ResourcePrefix = "att"
+	PrefixChallenge    ResourcePrefix = "ch"
+	PrefixHandoffToken ResourcePrefix = "handoff"
+)
+
 func ErrAuthAttemptNotFound() Error {
-	return newError("att.not_found", "auth attempt not found", nil, nil)
+	return newError(PrefixAuthAttempt.ErrorCodePrefix("not_found"), "auth attempt not found", nil, nil)
 }
 
 func ErrAuthAttemptInvalidRequest() Error {
-	return newError("att.invalid_request", "invalid request", nil, nil)
+	return newError(PrefixAuthAttempt.ErrorCodePrefix("invalid_request"), "invalid request", nil, nil)
 }
 
 func ErrAuthAttemptInvalidState() Error {
-	return newError("att.invalid_state", "invalid attempt state", nil, nil)
+	return newError(PrefixAuthAttempt.ErrorCodePrefix("invalid_state"), "invalid attempt state", nil, nil)
 }
 
 func ErrAuthAttemptAlreadyCompleted() Error {
-	return newError("att.already_completed", "attempt already completed", nil, nil)
+	return newError(PrefixAuthAttempt.ErrorCodePrefix("already_completed"), "The auth attempt is already completed and can no longer be changed.", nil, nil)
 }
 
 func ErrAuthAttemptNotCompleted() Error {
-	return newError("att.not_completed", "attempt not in completed state", nil, nil)
+	return newError(PrefixAuthAttempt.ErrorCodePrefix("not_completed"), "attempt not in completed state", nil, nil)
+}
+
+func ErrAuthAttemptAlreadyHandedOff() Error {
+	return newError(PrefixAuthAttempt.ErrorCodePrefix("already_handed_off"), "The auth attempt was already handed off. "+
+		"No new handoff can be created and the previous token will only be returned if the same Idempotency-Key header is provided.", nil, nil)
 }
 
 func ErrAuthAttemptInvalidProof() Error {
-	return newError("att.invalid_proof", "invalid proof or request", nil, nil)
+	return newError(PrefixAuthAttempt.ErrorCodePrefix("invalid_proof"), "invalid proof or request", nil, nil)
 }
 
 func ErrAuthAttemptProofRejected() Error {
-	return newError("att.proof_rejected", "proof rejected", nil, nil)
+	return newError(PrefixAuthAttempt.ErrorCodePrefix("proof_rejected"), "proof rejected", nil, nil)
+}
+
+func ErrAuthAttemptStaleChallenge() Error {
+	return newError(PrefixAuthAttempt.ErrorCodePrefix("stale_challenge"), "challenge is stale or was re-issued", nil, nil)
 }
 
 // AuthAttempt represents the object defined [here](https://github.com/zitadel/nextgen/blob/15bd7f438d709fcd5205a163e24374f6f667b68f/docs/design/api/resource-map.md#auth-flows)
-// It is short lived and should therefore be stored near the client, do not store PII data in it.
+// It is short-lived and should therefore be stored near the client, do not store PII data in it.
 type AuthAttempt struct {
 	// ProjectID links to [Project].
 	ProjectID string
 	// ID is the unique identifier for the auth attempt within the project.
 	ID string
 
-	HandoffToken *string
-	HandedOffAt  *time.Time
+	HandoffToken          *string
+	HandedOffAt           *time.Time
+	HandoffIdempotencyKey *string
 
 	// Used to link an auth attempt to a session. Use case is step up auth.
 	// In this case we need to copy the factors from the session back to the auth attempt.
 	SessionID *string
 
-	// Links to the [AuthChecker]s that belong to the auth attempt.
+	// Links to the [AuthCheck]s that belong to the auth attempt.
 	// An auth attempt can have multiple checks (e.g. for multi-factor authentication), but a check can only belong to one auth attempt.
-	Checks         []AuthChecker
+	Checks         []AuthCheck
 	RequiredChecks []AuthCheckType
 
 	// The time when the auth attempt was created, it must be set by the storage and is read only.
@@ -66,8 +82,39 @@ type AuthAttempt struct {
 	TimeToLive *time.Duration
 }
 
-func CheckAs[T AuthChecker](attempt *AuthAttempt, typ AuthCheckType) (T, bool) {
-	check, ok := attempt.CheckByType(typ)
+const AuthAttemptTTL = 15 * time.Minute
+
+type AuthAttemptOption func(*AuthAttempt)
+
+func WithSession(sessionID *string, checks ...AuthCheck) AuthAttemptOption {
+	return func(a *AuthAttempt) {
+		a.SessionID = sessionID
+		a.Checks = checks
+	}
+}
+
+func NewAuthAttempt(projectID string, requiredChecks []AuthCheckType, opts ...AuthAttemptOption) (*AuthAttempt, error) {
+	id, err := newID(PrefixAuthAttempt)
+	if err != nil {
+		return nil, err
+	}
+
+	attempt := &AuthAttempt{
+		ProjectID:      projectID,
+		ID:             id,
+		RequiredChecks: requiredChecks,
+		TimeToLive:     new(AuthAttemptTTL),
+	}
+
+	for _, opt := range opts {
+		opt(attempt)
+	}
+
+	return attempt, nil
+}
+
+func CheckAs[T AuthFactor](attempt *AuthAttempt, typ AuthCheckType) (T, bool) {
+	check, ok := attempt.FactorByType(typ)
 	if !ok {
 		var zero T
 		return zero, false
@@ -93,22 +140,189 @@ func (a *AuthAttempt) ExpiresAt() time.Time {
 func (a *AuthAttempt) IsCompleted() bool {
 	// An auth attempt is completed if all required checks are verified successfully.
 	for _, requiredCheck := range a.RequiredChecks {
-		check, ok := a.CheckByType(requiredCheck)
-		if !ok || check.Check().LastVerifiedAt.IsZero() {
+		_, ok := a.FactorByType(requiredCheck)
+		if !ok {
 			return false
 		}
 	}
 	return true
 }
 
-func (a *AuthAttempt) CheckByType(typ AuthCheckType) (AuthChecker, bool) {
-	index := slices.IndexFunc(a.Checks, func(check AuthChecker) bool {
-		return check.Check().IsType(typ)
-	})
-	if index == -1 {
-		return nil, false
+func (a *AuthAttempt) FactorByType(typ AuthCheckType) (AuthFactor, bool) {
+	for _, check := range a.Checks {
+		challenge, ok := check.(AuthFactor)
+		if ok && challenge.Type() == typ {
+			return challenge, true
+		}
 	}
-	return a.Checks[index], true
+	return nil, false
+}
+
+func (a *AuthAttempt) ChallengeByType(typ AuthCheckType) (AuthChallenge, bool) {
+	for _, check := range a.Checks {
+		challenge, ok := check.(AuthChallenge)
+		if ok && challenge.Type() == typ {
+			return challenge, true
+		}
+	}
+	return nil, false
+}
+
+// ChallengeByID returns the check with the given challenge ID.
+// Used to validate that a client's challenge ID is current before accepting a proof.
+func (a *AuthAttempt) ChallengeByID(id string) (AuthChallenge, bool) {
+	for _, check := range a.Checks {
+		challenge, ok := check.(AuthChallenge)
+		if ok && challenge.GetID() == id {
+			return challenge, true
+		}
+	}
+	return nil, false
+}
+
+// PrepareChallenge validates that a challenge can be issued for the given check type.
+func (a *AuthAttempt) PrepareChallenge(typ AuthCheckType) error {
+	if a.IsExpired() {
+		return ErrAuthAttemptInvalidState()
+	}
+	if a.IsCompleted() {
+		return ErrAuthAttemptAlreadyCompleted()
+	}
+	found := slices.Contains(a.RequiredChecks, typ)
+	if !found {
+		return ErrAuthAttemptInvalidRequest()
+	}
+	return nil
+}
+
+// PrepareUserChallenge validates that a user challenge can be issued.
+// It's prohibited it the auth attempt is linked to a session with a verified user as this could lead to security issues.
+// Also, as soon as there are more factors verified than the user (e.g. password) we'll not allow to change the user anymore.
+// We'll probably change the latter in the future and reset all factors as soon as the new user challenge succeeded.
+func (a *AuthAttempt) PrepareUserChallenge() error {
+	if err := a.PrepareChallenge(AuthCheckTypeUser); err != nil {
+		return err
+	}
+	if a.SessionID != nil {
+		_, ok := CheckAs[*AuthFactorUser](a, AuthCheckTypeUser)
+		if ok {
+			return ErrAuthAttemptInvalidRequest().WithMessage("The user was already authenticated.")
+		}
+		return nil
+	}
+	if len(a.Checks) > 2 {
+		return ErrAuthAttemptInvalidRequest().WithMessage("The user must not be changed after it was authenticated.")
+	}
+	return nil
+}
+
+// PreparePasswordChallenge validates that a password challenge can be issued.
+func (a *AuthAttempt) PreparePasswordChallenge() error {
+	if err := a.PrepareChallenge(AuthCheckTypePassword); err != nil {
+		return err
+	}
+	_, ok := CheckAs[*AuthFactorUser](a, AuthCheckTypeUser)
+	if !ok {
+		return ErrAuthAttemptInvalidRequest().WithMessage("password challenge requires user verification first")
+	}
+	return nil
+}
+
+// PreparePasskeyChallenge validates that a passkey challenge can be issued
+// and returns the user ID needed to build the WebAuthn challenge payload.
+func (a *AuthAttempt) PreparePasskeyChallenge() (*AuthFactorUser, error) {
+	if err := a.PrepareChallenge(AuthCheckTypePasskey); err != nil {
+		return nil, err
+	}
+	userCheck, ok := CheckAs[*AuthFactorUser](a, AuthCheckTypeUser)
+	if !ok {
+		return nil, ErrAuthAttemptInvalidRequest().WithMessage("passkey challenge requires user verification first")
+	}
+	return userCheck, nil
+}
+
+// PrepareUserVerification validates that the attempt is in a state where
+// a user (identifier) proof can be submitted.
+func (a *AuthAttempt) PrepareUserVerification() error {
+	if a.IsExpired() {
+		return ErrAuthAttemptInvalidState()
+	}
+	if a.IsCompleted() {
+		return ErrAuthAttemptAlreadyCompleted()
+	}
+	return nil
+}
+
+// PreparePasswordVerification validates that a password proof can be submitted
+// and returns the user ID to verify against.
+func (a *AuthAttempt) PreparePasswordVerification() (*AuthFactorUser, error) {
+	if a.IsExpired() {
+		return nil, ErrAuthAttemptInvalidState()
+	}
+	if a.IsCompleted() {
+		return nil, ErrAuthAttemptAlreadyCompleted()
+	}
+	userCheck, ok := CheckAs[*AuthFactorUser](a, AuthCheckTypeUser)
+	if !ok {
+		return nil, ErrAuthAttemptInvalidRequest()
+	}
+	return userCheck, nil
+}
+
+// PreparePasskeyVerification validates that a passkey proof can be submitted
+// and returns the user ID to verify against.
+func (a *AuthAttempt) PreparePasskeyVerification() (*AuthFactorUser, error) {
+	if a.IsExpired() {
+		return nil, ErrAuthAttemptInvalidState()
+	}
+	if a.IsCompleted() {
+		return nil, ErrAuthAttemptAlreadyCompleted()
+	}
+	userCheck, ok := CheckAs[*AuthFactorUser](a, AuthCheckTypeUser)
+	if !ok {
+		return nil, ErrAuthAttemptInvalidRequest()
+	}
+	return userCheck, nil
+}
+
+func (a *AuthAttempt) CreateHandoffToken() (string, error) { //TODO: should we encrypt here and return plain additionally?
+	if a.IsExpired() {
+		return "", ErrAuthAttemptInvalidState()
+	}
+	if !a.IsCompleted() {
+		return "", ErrAuthAttemptNotCompleted()
+	}
+	token, err := newID(PrefixHandoffToken)
+	if err != nil {
+		return "", err
+	}
+	return token, nil
+}
+
+func (a *AuthAttempt) SetCheck(check AuthCheck) {
+	for i, c := range a.Checks {
+		if c.Type() != check.Type() {
+			continue
+		}
+		if _, ok := check.(AuthChallenge); ok {
+			if _, ok := c.(AuthChallenge); ok {
+				a.Checks[i] = check
+				return
+			}
+		}
+		if _, ok := check.(AuthFactor); ok {
+			a.Checks[i] = check
+			a.Checks = slices.DeleteFunc(a.Checks, func(c AuthCheck) bool {
+				if c.Type() != check.Type() {
+					return false
+				}
+				_, ok := c.(AuthChallenge)
+				return ok
+			})
+			return
+		}
+	}
+	a.Checks = append(a.Checks, check)
 }
 
 type AuthAttemptRepository interface {
@@ -130,18 +344,18 @@ type AuthAttemptRepository interface {
 	// Sets the [AuthAttempt.CompletedAt] field to the current time and stores it accordingly.
 	Complete(ctx context.Context, client database.QueryExecutor, attempt *AuthAttempt) error
 	// Stores the handoff token for an auth attempt and sets the handoff time to the current time.
-	Handoff(ctx context.Context, client database.QueryExecutor, attempt *AuthAttempt) error
+	Handoff(ctx context.Context, client database.QueryExecutor, attempt *AuthAttempt, idempotencyKey string) error
 
 	// SetChallenge sets a check to challenged and sets the challenge payload.
 	// If the check is not stored yet the method creates a new check with the given type and challenge payload, otherwise it updates the existing check with the new challenge payload.
 	// The repository MUST set the [AuthCheck.LastChallengeAt] field of the check to the current time, reset the [AuthCheck.LastFailedAt] field to nil and reset the [AuthCheck.FailureCount] field to 0, and store the values accordingly.
-	SetChallenge(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string, challenger AuthChallenger) error
+	SetChallenge(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string, challenger AuthChallenge) error
 	// ChallengeSucceeded sets the [AuthCheck.LastVerifiedAt] field of the check to the current time and stores it accordingly, and removes the challenge payload from the storage.
 	// If the check is not stored yet, the method creates a new check with the given type and sets the [AuthCheck.LastVerifiedAt] field to the current time, and stores it accordingly.
 	// If the check implements [AuthFactorer], the repository MUST also set the factor payload to the value returned by the [AuthFactorer.FactorPayload] method, and store it accordingly.
-	ChallengeSucceeded(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string, checker AuthChecker) error
+	ChallengeSucceeded(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string, checker AuthFactor, challengeID string) error
 	// ChallengeFailed sets a check to failed.
 	// If the check is not stored yet, the method creates a new check with the given type and sets the [AuthCheck.LastFailedAt] field to the current time and the [AuthCheck.FailureCount] field to 1, and stores it accordingly.
 	// The repository MUST set the [AuthCheck.LastFailedAt] field of the check to the current time and increment the [AuthCheck.FailureCount] field by 1, and store the values accordingly.
-	ChallengeFailed(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string, checker AuthChecker) error
+	ChallengeFailed(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string, checker AuthChallenge) error
 }

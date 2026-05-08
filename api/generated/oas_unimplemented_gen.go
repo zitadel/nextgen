@@ -340,11 +340,3 @@ func (UnimplementedHandler) SubmitFlowStep(ctx context.Context, req *FlowSubmitR
 func (UnimplementedHandler) VerifyChallengeProof(ctx context.Context, req *VerifyChallengeRequest, params VerifyChallengeProofParams) (r VerifyChallengeProofRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
-
-// NewError creates *ErrorDetailsStatusCode from error returned by handler.
-//
-// Used for common default response.
-func (UnimplementedHandler) NewError(ctx context.Context, err error) (r *ErrorDetailsStatusCode) {
-	r = new(ErrorDetailsStatusCode)
-	return r
-}

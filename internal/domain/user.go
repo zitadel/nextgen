@@ -1,5 +1,11 @@
 package domain
 
+import (
+	"context"
+
+	"github.com/zitadel/nextgen/internal/storage/database"
+)
+
 // User represents the object defined [here](https://github.com/zitadel/nextgen/blob/15bd7f438d709fcd5205a163e24374f6f667b68f/docs/design/api/resource-map.md#users)
 // The user might contain PII data and should be stored in a specific region.
 type User struct {
@@ -10,4 +16,8 @@ type User struct {
 	TeamID *string
 	// ID is the unique identifier for the user within the project and team.
 	ID string
+}
+
+type UserRepository interface {
+	Get(ctx context.Context, q database.QueryExecutor, projectID, username string) (*User, error)
 }

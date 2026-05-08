@@ -2,42 +2,64 @@ package domain
 
 import "time"
 
-type PasskeyAuthCheck struct {
-	*AuthCheck
-	Challenge *PasskeyAuthCheckChallenge
-	Factor    *PasskeyAuthCheckFactor
+func NewPasskeyAuthCheckChallenge(passkeyChallenge *PasskeyChallenge) (*AuthChallengePasskey, error) {
+	challenge, err := newChallenge()
+	if err != nil {
+		return nil, err
+	}
+	// TODO: ?
+	return &AuthChallengePasskey{
+		PasskeyChallenge: passkeyChallenge,
+		authChallenge:    challenge,
+	}, nil
 }
 
-type PasskeyAuthCheckChallenge struct {
-	LastChallengedAt     time.Time
-	Challenge            string
-	AllowedCredentialIDs [][]byte
-	UserVerification     uint8 // domain.UserVerificationRequirement
-	RPID                 string
-}
-
-type PasskeyAuthCheckFactor struct {
+type AuthFactorPasskey struct {
 	UserVerified bool
+	*authFactor
 }
 
-// FactorPayload implements [AuthFactorer].
-func (p *PasskeyAuthCheck) FactorPayload() any {
-	return p.Factor
+func NewAuthFactorPasskey(lastVerifiedAt time.Time) *AuthFactorPasskey {
+	return &AuthFactorPasskey{
+		authFactor: &authFactor{
+			LastVerifiedAt: lastVerifiedAt,
+		},
+	}
 }
 
-// IsFactor implements [AuthFactorer].
-func (p *PasskeyAuthCheck) IsFactor() {}
-
-// ChallengePayload implements [AuthChallenger].
-func (p *PasskeyAuthCheck) ChallengePayload() any {
-	return p.Challenge
+func (a *AuthFactorPasskey) Type() AuthCheckType {
+	return AuthCheckTypePasskey
 }
 
-// IsChallenge implements [AuthChallenger].
-func (p *PasskeyAuthCheck) IsChallenge() {}
+func (a *AuthFactorPasskey) Payload() any {
+	return a
+}
+
+type AuthChallengePasskey struct {
+	*PasskeyChallenge
+	authChallenge
+}
+
+func NewAuthChallengePasskey(id string, lastChallengedAt, lastFailedAt time.Time, failureCount uint16) *AuthChallengePasskey {
+	return &AuthChallengePasskey{
+		authChallenge: authChallenge{
+			ID:               id,
+			LastChallengedAt: lastChallengedAt,
+			LastFailedAt:     lastFailedAt,
+			FailureCount:     failureCount,
+		},
+	}
+}
+
+func (a *AuthChallengePasskey) Type() AuthCheckType {
+	return AuthCheckTypePasskey
+}
+
+func (a *AuthChallengePasskey) Payload() any {
+	return a
+}
 
 var (
-	_ AuthChecker    = (*PasskeyAuthCheck)(nil)
-	_ AuthChallenger = (*PasskeyAuthCheck)(nil)
-	_ AuthFactorer   = (*PasskeyAuthCheck)(nil)
+	_ AuthChallenge = (*AuthChallengePasskey)(nil)
+	_ AuthFactor    = (*AuthFactorPasskey)(nil)
 )

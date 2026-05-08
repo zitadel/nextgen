@@ -1,0 +1,16 @@
+title: IdpChallengePayload
+type: object
+description: Identity provider-specific challenge data
+required:
+  - authorization_url
+  - provider_id
+properties:
+  authorization_url:
+    type: string
+    format: uri
+    description: URL to redirect user to for identity provider authentication
+    example: 'https://idp.example.com/oauth/authorize?state=...'
+  provider_id:
+    type: string
+    description: Identity provider identifier
+    example: 'google'

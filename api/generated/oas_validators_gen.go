@@ -301,10 +301,46 @@ func (s *ChallengeResponse) Validate() error {
 			Error: err,
 		})
 	}
+	if err := func() error {
+		if value, ok := s.Payload.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "payload",
+			Error: err,
+		})
+	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
 	}
 	return nil
+}
+
+func (s ChallengeResponsePayload) Validate() error {
+	switch s.Type {
+	case IdentifierChallengePayloadChallengeResponsePayload:
+		return nil // no validation needed
+	case PasswordChallengePayloadChallengeResponsePayload:
+		return nil // no validation needed
+	case PasskeyChallengePayloadChallengeResponsePayload:
+		if err := s.PasskeyChallengePayload.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case IdpChallengePayloadChallengeResponsePayload:
+		return nil // no validation needed
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
 }
 
 func (s ChallengeResponseState) Validate() error {
@@ -322,12 +358,69 @@ func (s ChallengeResponseState) Validate() error {
 	}
 }
 
-func (s *CreateAuthAttemptBadRequest) Validate() error {
-	alias := (*ErrorDetails)(s)
-	if err := alias.Validate(); err != nil {
-		return err
+func (s *CompletedFactor) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Method.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "method",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if value, ok := s.Payload.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "payload",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
 	}
 	return nil
+}
+
+func (s CompletedFactorPayload) Validate() error {
+	switch s.Type {
+	case IdentifierFactorPayloadCompletedFactorPayload:
+		if err := s.IdentifierFactorPayload.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case PasswordFactorPayloadCompletedFactorPayload:
+		return nil // no validation needed
+	case PasskeyFactorPayloadCompletedFactorPayload:
+		if err := s.PasskeyFactorPayload.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case IdpFactorPayloadCompletedFactorPayload:
+		if err := s.IdpFactorPayload.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
 }
 
 func (s *CreateAuthAttemptRequest) Validate() error {
@@ -367,14 +460,6 @@ func (s *CreateAuthAttemptRequest) Validate() error {
 	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
-	}
-	return nil
-}
-
-func (s *CreateAuthAttemptUnauthorized) Validate() error {
-	alias := (*ErrorDetails)(s)
-	if err := alias.Validate(); err != nil {
-		return err
 	}
 	return nil
 }
@@ -481,30 +566,6 @@ func (s CreateFlowRequestPurpose) Validate() error {
 	}
 }
 
-func (s *CreateHandoffBadRequest) Validate() error {
-	alias := (*ErrorDetails)(s)
-	if err := alias.Validate(); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (s *CreateHandoffConflict) Validate() error {
-	alias := (*ErrorDetails)(s)
-	if err := alias.Validate(); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (s *CreateHandoffNotFound) Validate() error {
-	alias := (*ErrorDetails)(s)
-	if err := alias.Validate(); err != nil {
-		return err
-	}
-	return nil
-}
-
 func (s *CreateSessionRequest) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -528,105 +589,6 @@ func (s *CreateSessionRequest) Validate() error {
 	return nil
 }
 
-func (s ErrorCode) Validate() error {
-	switch s {
-	case "att.already_completed":
-		return nil
-	case "att.invalid_proof":
-		return nil
-	case "att.invalid_request":
-		return nil
-	case "att.invalid_state":
-		return nil
-	case "att.not_completed":
-		return nil
-	case "att.not_found":
-		return nil
-	case "att.proof_rejected":
-		return nil
-	case "auth.rate_limited":
-		return nil
-	case "auth.unauthorized":
-		return nil
-	case "internal":
-		return nil
-	case "req.invalid":
-		return nil
-	default:
-		return errors.Errorf("invalid value: %v", s)
-	}
-}
-
-func (s *ErrorDetails) Validate() error {
-	if s == nil {
-		return validate.ErrNilPointer
-	}
-
-	var failures []validate.FieldError
-	if err := func() error {
-		if err := s.Code.Validate(); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "code",
-			Error: err,
-		})
-	}
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
-	}
-	return nil
-}
-
-func (s *ErrorDetailsStatusCode) Validate() error {
-	if s == nil {
-		return validate.ErrNilPointer
-	}
-
-	var failures []validate.FieldError
-	if err := func() error {
-		if err := s.Response.Validate(); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "Response",
-			Error: err,
-		})
-	}
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
-	}
-	return nil
-}
-
-func (s *ExchangeHandoffBadRequest) Validate() error {
-	alias := (*ErrorDetails)(s)
-	if err := alias.Validate(); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (s *ExchangeHandoffGone) Validate() error {
-	alias := (*ErrorDetails)(s)
-	if err := alias.Validate(); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (s *ExchangeHandoffUnauthorized) Validate() error {
-	alias := (*ErrorDetails)(s)
-	if err := alias.Validate(); err != nil {
-		return err
-	}
-	return nil
-}
-
 func (s FactorMethod) Validate() error {
 	switch s {
 	case "identifier":
@@ -635,17 +597,7 @@ func (s FactorMethod) Validate() error {
 		return nil
 	case "passkey":
 		return nil
-	case "totp":
-		return nil
-	case "otp_sms":
-		return nil
-	case "otp_email":
-		return nil
-	case "recovery_code":
-		return nil
 	case "idp":
-		return nil
-	case "captcha":
 		return nil
 	default:
 		return errors.Errorf("invalid value: %v", s)
@@ -973,38 +925,6 @@ func (s GateType) Validate() error {
 	}
 }
 
-func (s *GetFlowStepGone) Validate() error {
-	alias := (*ErrorDetails)(s)
-	if err := alias.Validate(); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (s *GetFlowStepNotFound) Validate() error {
-	alias := (*ErrorDetails)(s)
-	if err := alias.Validate(); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (s *GetSessionNotFound) Validate() error {
-	alias := (*ErrorDetails)(s)
-	if err := alias.Validate(); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (s *GetSessionUnauthorized) Validate() error {
-	alias := (*ErrorDetails)(s)
-	if err := alias.Validate(); err != nil {
-		return err
-	}
-	return nil
-}
-
 func (s *GetUserInfoOK) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -1047,26 +967,67 @@ func (s *GetUserInfoOK) Validate() error {
 	return nil
 }
 
-func (s *IssueChallengeBadRequest) Validate() error {
-	alias := (*ErrorDetails)(s)
-	if err := alias.Validate(); err != nil {
-		return err
+func (s *IdentifierFactorPayload) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.UserID.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "user_id",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
 	}
 	return nil
 }
 
-func (s *IssueChallengeConflict) Validate() error {
-	alias := (*ErrorDetails)(s)
-	if err := alias.Validate(); err != nil {
-		return err
+func (s *IdpFactorPayload) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
 	}
-	return nil
-}
 
-func (s *IssueChallengeNotFound) Validate() error {
-	alias := (*ErrorDetails)(s)
-	if err := alias.Validate(); err != nil {
-		return err
+	var failures []validate.FieldError
+	if err := func() error {
+		if value, ok := s.Email.Get(); ok {
+			if err := func() error {
+				if err := (validate.String{
+					MinLength:     0,
+					MinLengthSet:  false,
+					MaxLength:     0,
+					MaxLengthSet:  false,
+					Email:         true,
+					Hostname:      false,
+					Regex:         nil,
+					MinNumeric:    0,
+					MinNumericSet: false,
+					MaxNumeric:    0,
+					MaxNumericSet: false,
+				}).Validate(string(value)); err != nil {
+					return errors.Wrap(err, "string")
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "email",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
 	}
 	return nil
 }
@@ -1155,22 +1116,6 @@ func (s IssueChallengeRequestPasskeyOptionsUserVerification) Validate() error {
 	}
 }
 
-func (s *ListSessionsBadRequest) Validate() error {
-	alias := (*ErrorDetails)(s)
-	if err := alias.Validate(); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (s *ListSessionsForbidden) Validate() error {
-	alias := (*ErrorDetails)(s)
-	if err := alias.Validate(); err != nil {
-		return err
-	}
-	return nil
-}
-
 func (s ListSessionsState) Validate() error {
 	switch s {
 	case "building":
@@ -1184,30 +1129,6 @@ func (s ListSessionsState) Validate() error {
 	default:
 		return errors.Errorf("invalid value: %v", s)
 	}
-}
-
-func (s *ListSessionsUnauthorized) Validate() error {
-	alias := (*ErrorDetails)(s)
-	if err := alias.Validate(); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (s *ListUsersBadRequest) Validate() error {
-	alias := (*ErrorDetails)(s)
-	if err := alias.Validate(); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (s *ListUsersInternalServerError) Validate() error {
-	alias := (*ErrorDetails)(s)
-	if err := alias.Validate(); err != nil {
-		return err
-	}
-	return nil
 }
 
 func (s ListUsersOKApplicationJSON) Validate() error {
@@ -1409,20 +1330,52 @@ func (s OpenidConfigurationTokenEndpointAuthMethodsSupportedItem) Validate() err
 	}
 }
 
-func (s *OtpSMSProof) Validate() error {
+func (s *PasskeyChallengePayload) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
 	}
 
 	var failures []validate.FieldError
 	if err := func() error {
-		if err := s.OtpSMS.Validate(); err != nil {
-			return err
+		var failures []validate.FieldError
+		for i, elem := range s.AllowedCredentials {
+			if err := func() error {
+				if err := elem.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				failures = append(failures, validate.FieldError{
+					Name:  fmt.Sprintf("[%d]", i),
+					Error: err,
+				})
+			}
+		}
+		if len(failures) > 0 {
+			return &validate.Error{Fields: failures}
 		}
 		return nil
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
-			Name:  "otp_sms",
+			Name:  "allowed_credentials",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if value, ok := s.UserVerification.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "user_verification",
 			Error: err,
 		})
 	}
@@ -1432,32 +1385,20 @@ func (s *OtpSMSProof) Validate() error {
 	return nil
 }
 
-func (s *OtpSMSProofOtpSMS) Validate() error {
+func (s *PasskeyChallengePayloadAllowedCredentialsItem) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
 	}
 
 	var failures []validate.FieldError
 	if err := func() error {
-		if err := (validate.String{
-			MinLength:     0,
-			MinLengthSet:  false,
-			MaxLength:     0,
-			MaxLengthSet:  false,
-			Email:         false,
-			Hostname:      false,
-			Regex:         regexMap["^\\d{4,8}$"],
-			MinNumeric:    0,
-			MinNumericSet: false,
-			MaxNumeric:    0,
-			MaxNumericSet: false,
-		}).Validate(string(s.Code)); err != nil {
-			return errors.Wrap(err, "string")
+		if err := s.Type.Validate(); err != nil {
+			return err
 		}
 		return nil
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
-			Name:  "code",
+			Name:  "type",
 			Error: err,
 		})
 	}
@@ -1465,6 +1406,69 @@ func (s *OtpSMSProofOtpSMS) Validate() error {
 		return &validate.Error{Fields: failures}
 	}
 	return nil
+}
+
+func (s PasskeyChallengePayloadAllowedCredentialsItemType) Validate() error {
+	switch s {
+	case "public-key":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
+func (s PasskeyChallengePayloadUserVerification) Validate() error {
+	switch s {
+	case "required":
+		return nil
+	case "preferred":
+		return nil
+	case "discouraged":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
+func (s *PasskeyFactorPayload) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if value, ok := s.AuthenticatorAttachment.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "authenticator_attachment",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s PasskeyFactorPayloadAuthenticatorAttachment) Validate() error {
+	switch s {
+	case "platform":
+		return nil
+	case "cross-platform":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
 }
 
 func (s *PostTokenRequest) Validate() error {
@@ -1528,30 +1532,6 @@ func (s ProjectID) Validate() error {
 		MaxNumericSet: false,
 	}).Validate(string(alias)); err != nil {
 		return errors.Wrap(err, "string")
-	}
-	return nil
-}
-
-func (s *RevokeSessionConflict) Validate() error {
-	alias := (*ErrorDetails)(s)
-	if err := alias.Validate(); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (s *RevokeSessionNotFound) Validate() error {
-	alias := (*ErrorDetails)(s)
-	if err := alias.Validate(); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (s *RevokeSessionUnauthorized) Validate() error {
-	alias := (*ErrorDetails)(s)
-	if err := alias.Validate(); err != nil {
-		return err
 	}
 	return nil
 }
@@ -1744,64 +1724,6 @@ func (s *SubmitFlowStepOK) Validate() error {
 	return nil
 }
 
-func (s *TotpProof) Validate() error {
-	if s == nil {
-		return validate.ErrNilPointer
-	}
-
-	var failures []validate.FieldError
-	if err := func() error {
-		if err := s.Totp.Validate(); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "totp",
-			Error: err,
-		})
-	}
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
-	}
-	return nil
-}
-
-func (s *TotpProofTotp) Validate() error {
-	if s == nil {
-		return validate.ErrNilPointer
-	}
-
-	var failures []validate.FieldError
-	if err := func() error {
-		if err := (validate.String{
-			MinLength:     0,
-			MinLengthSet:  false,
-			MaxLength:     0,
-			MaxLengthSet:  false,
-			Email:         false,
-			Hostname:      false,
-			Regex:         regexMap["^\\d{6,8}$"],
-			MinNumeric:    0,
-			MinNumericSet: false,
-			MaxNumeric:    0,
-			MaxNumericSet: false,
-		}).Validate(string(s.Code)); err != nil {
-			return errors.Wrap(err, "string")
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "code",
-			Error: err,
-		})
-	}
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
-	}
-	return nil
-}
-
 func (s UserID) Validate() error {
 	alias := (string)(s)
 	if err := (validate.String{
@@ -1820,90 +1742,4 @@ func (s UserID) Validate() error {
 		return errors.Wrap(err, "string")
 	}
 	return nil
-}
-
-func (s *VerifyChallengeProofBadRequest) Validate() error {
-	alias := (*ErrorDetails)(s)
-	if err := alias.Validate(); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (s *VerifyChallengeProofConflict) Validate() error {
-	alias := (*ErrorDetails)(s)
-	if err := alias.Validate(); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (s *VerifyChallengeProofNotFound) Validate() error {
-	alias := (*ErrorDetails)(s)
-	if err := alias.Validate(); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (s *VerifyChallengeProofTooManyRequests) Validate() error {
-	alias := (*ErrorDetails)(s)
-	if err := alias.Validate(); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (s *VerifyChallengeRequest) Validate() error {
-	if s == nil {
-		return validate.ErrNilPointer
-	}
-
-	var failures []validate.FieldError
-	if err := func() error {
-		if err := s.OneOf.Validate(); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "OneOf",
-			Error: err,
-		})
-	}
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
-	}
-	return nil
-}
-
-func (s VerifyChallengeRequestSum) Validate() error {
-	switch s.Type {
-	case IdentifierProofVerifyChallengeRequestSum:
-		return nil // no validation needed
-	case PasswordProofVerifyChallengeRequestSum:
-		return nil // no validation needed
-	case TotpProofVerifyChallengeRequestSum:
-		if err := s.TotpProof.Validate(); err != nil {
-			return err
-		}
-		return nil
-	case OtpSMSProofVerifyChallengeRequestSum:
-		if err := s.OtpSMSProof.Validate(); err != nil {
-			return err
-		}
-		return nil
-	case OtpEmailProofVerifyChallengeRequestSum:
-		return nil // no validation needed
-	case RecoveryCodeProofVerifyChallengeRequestSum:
-		return nil // no validation needed
-	case PasskeyProofVerifyChallengeRequestSum:
-		return nil // no validation needed
-	case IdpProofVerifyChallengeRequestSum:
-		return nil // no validation needed
-	case CaptchaProofVerifyChallengeRequestSum:
-		return nil // no validation needed
-	default:
-		return errors.Errorf("invalid type %q", s.Type)
-	}
 }

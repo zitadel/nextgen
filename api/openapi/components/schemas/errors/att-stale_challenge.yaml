@@ -1,0 +1,14 @@
+# Code generated; DO NOT EDIT.
+description: |
+  Challenge is stale or was re-issued
+  
+  Error code: att.stale_challenge
+allOf:
+  - $ref: ../../error-details.yaml
+  - type: object
+    properties:
+      code:
+        type: string
+        const: att.stale_challenge
+    required:
+      - code

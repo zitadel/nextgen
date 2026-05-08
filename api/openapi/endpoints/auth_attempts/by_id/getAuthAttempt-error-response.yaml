@@ -1,0 +1,23 @@
+description: Error response
+content:
+  application/json:
+    schema:
+      oneOf:
+        - $ref: '../../../components/schemas/errors/att-not_found.yaml'
+        - $ref: '../../../components/schemas/errors/internal.yaml'
+      discriminator:
+        propertyName: code
+        mapping:
+          att.not_found: '../../../components/schemas/errors/att-not_found.yaml'
+          internal: '../../../components/schemas/errors/internal.yaml'
+    examples:
+      att.not_found:
+        summary: att.not_found
+        value:
+          code: att.not_found
+          message: auth attempt not found
+      internal:
+        summary: internal
+        value:
+          code: internal
+          message: an unexpected error occurred

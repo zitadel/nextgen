@@ -1,7 +1,5 @@
 package domain
 
-//go:generate go run ./cmd/gen_error_codes ../../api/openapi/components/schemas/error-code.yaml
-
 import (
 	"errors"
 	"fmt"
@@ -41,6 +39,27 @@ func (e Error) As(target any) bool {
 	return true
 }
 
+// WithMessage returns a copy with the message overridden.
+// Code is unchanged so errors.Is still matches the original sentinel.
+func (e Error) WithMessage(msg string) Error {
+	e.Message = msg
+	return e
+}
+
+// WithDetails returns a copy with additional context attached.
+// Code is unchanged so errors.Is still matches the original sentinel.
+func (e Error) WithDetails(details any) Error {
+	e.Details = details
+	return e
+}
+
+// WithParent returns a copy wrapping a lower-level cause.
+// Code is unchanged so errors.Is still matches the original sentinel.
+func (e Error) WithParent(parent error) Error {
+	e.Parent = parent
+	return e
+}
+
 func newError(code string, message string, details any, parent error) Error {
 	_, file, line, _ := runtime.Caller(2) // Skip 2: newErr + the Wrapper function
 	return Error{
@@ -53,6 +72,6 @@ func newError(code string, message string, details any, parent error) Error {
 }
 
 // ErrInternal is the catch-all for unexpected errors that have no specific domain code.
-func ErrInternal() Error {
-	return newError("internal", "an unexpected error occurred", nil, nil)
+func ErrInternal(err error) Error {
+	return newError("internal", "an unexpected error occurred", nil, err)
 }

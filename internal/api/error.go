@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/go-faster/errors"
 	api "github.com/zitadel/nextgen/api/generated"
@@ -14,7 +15,7 @@ import (
 func domainErrorDetails(err error) api.ErrorDetails {
 	var domErr domain.Error
 	if !errors.As(err, &domErr) {
-		domErr = domain.ErrInternal()
+		domErr = domain.ErrInternal(err)
 	}
 	return api.ErrorDetails{
 		Code:    api.ErrorCode(domErr.Code),
@@ -22,9 +23,22 @@ func domainErrorDetails(err error) api.ErrorDetails {
 	}
 }
 
+func errorResponse(err error) *api.ErrorDetailsStatusCode {
+	var e domain.Error
+	if !errors.As(err, &e) {
+		return internalErrorResponse(err)
+	}
+	switch {
+	case strings.HasPrefix(e.Code, domain.PrefixAuthAttempt.ErrorCodePrefix("")):
+		return authAttemptErrorResponse(e)
+	default:
+		return internalErrorResponse(err)
+	}
+}
+
 // errorResponse is a convenience helper for the common case where the caller
 // knows exactly which HTTP status to use for this operation.
-func errorResponse(status int, err error) *api.ErrorDetailsStatusCode {
+func errorResponseWithStatusCode(status int, err error) *api.ErrorDetailsStatusCode {
 	return &api.ErrorDetailsStatusCode{
 		StatusCode: status,
 		Response:   domainErrorDetails(err),
@@ -33,5 +47,5 @@ func errorResponse(status int, err error) *api.ErrorDetailsStatusCode {
 
 // internalErrorResponse returns a 500 for unexpected errors.
 func internalErrorResponse(err error) *api.ErrorDetailsStatusCode {
-	return errorResponse(http.StatusInternalServerError, err)
+	return errorResponseWithStatusCode(http.StatusInternalServerError, err)
 }

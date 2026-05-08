@@ -1,5 +1,15 @@
 package domain
 
+import (
+	"context"
+
+	"github.com/zitadel/nextgen/internal/storage/database"
+)
+
+func ErrSessionNotFound() error {
+	return newError("sess.not_found", "session was not found", nil, nil)
+}
+
 // Session represents the object defined [here](https://github.com/zitadel/nextgen/blob/15bd7f438d709fcd5205a163e24374f6f667b68f/docs/design/api/resource-map.md#sessions-durable-post-auth-only)
 type Session struct {
 	// ProjectID links to [Project].
@@ -12,4 +22,9 @@ type Session struct {
 	UserID *string
 
 	// AuthAttempts are deleted as soon as they are handed off to a session and are therefore not accessible on a session.
+	Factors []AuthCheck
+}
+
+type SessionRepository interface {
+	GetByID(ctx context.Context, q database.QueryExecutor, projectID, sessionID string) (*Session, error)
 }

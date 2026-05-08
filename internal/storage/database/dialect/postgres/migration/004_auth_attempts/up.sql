@@ -3,6 +3,7 @@ CREATE TABLE zitadel_nextgen.auth_attempts (
     , id TEXT NOT NULL CHECK (id <> '')
     , handoff_token TEXT
     , handed_off_at TIMESTAMPTZ
+    , handoff_idempotency_key TEXT
     , session_id TEXT
 
     , required_checks SMALLINT[]
@@ -19,7 +20,7 @@ CREATE TABLE zitadel_nextgen.auth_attempt_checks (
     project_id TEXT NOT NULL
     , auth_attempt_id TEXT NOT NULL
 
-    -- , id TEXT NOT NULL --TODO: if there can be multiple checks of the same type, we need an id to distinguish them, otherwise we can use the type as the primary key
+    , challenge_id TEXT
     , type SMALLINT NOT NULL CHECK(type > 0)
 
     -- initiated time, it is set when the challenge is created and stored; it is not updated when the challenge is verified successfully or unsuccessfully

@@ -27,7 +27,6 @@ properties:
     description: |
       Current state of this challenge:
       - `pending`: awaiting proof submission
-      - `verified`: proof accepted, factor  recorded on the auth attempt; it is materialized into a session only when the auth flow is completed
       - `failed`: proof rejected (invalid credential, wrong code, etc.)
       - `expired`: challenge TTL exceeded without verification
   created_at:
@@ -42,4 +41,21 @@ properties:
         format: date-time
         example: '2026-04-28T15:41:00Z'
       - type: 'null'
-
+  payload:
+    description: |
+      Method-specific challenge data. Structure depends on the `method` field.
+      - `identifier`, `password`: null (no additional data needed)
+      - `passkey`: WebAuthn challenge and credential options
+      - `idp`: Authorization URL and provider information
+    oneOf:
+      - $ref: ./identifier-challenge-payload.yaml
+      - $ref: ./password-challenge-payload.yaml
+      - $ref: ./passkey-challenge-payload.yaml
+      - $ref: ./idp-challenge-payload.yaml
+    discriminator:
+      propertyName: method
+      mapping:
+        identifier: ./identifier-challenge-payload.yaml
+        password: ./password-challenge-payload.yaml
+        passkey: ./passkey-challenge-payload.yaml
+        idp: ./idp-challenge-payload.yaml

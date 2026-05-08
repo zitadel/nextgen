@@ -4,11 +4,6 @@ enum:
   - identifier
   - password
   - passkey
-  - totp
-  - otp_sms
-  - otp_email
-  - recovery_code
   - idp
-  - captcha
 example: password
 

@@ -166,19 +166,8 @@ func (s *Server) handleAuthorizeDeviceRequest(args [0]string, argsEscaped bool, 
 		response, err = s.h.AuthorizeDevice(ctx, params)
 	}
 	if err != nil {
-		if errRes, ok := errors.Into[*ErrorDetailsStatusCode](err); ok {
-			if err := encodeErrorResponse(errRes, w, span); err != nil {
-				defer recordError("Internal", err)
-			}
-			return
-		}
-		if errors.Is(err, ht.ErrNotImplemented) {
-			s.cfg.ErrorHandler(ctx, w, r, err)
-			return
-		}
-		if err := encodeErrorResponse(s.h.NewError(ctx, err), w, span); err != nil {
-			defer recordError("Internal", err)
-		}
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
 		return
 	}
 
@@ -278,9 +267,8 @@ func (s *Server) handleAuthorizeGetRequest(args [0]string, argsEscaped bool, w h
 					Security:         "UsernamePassword",
 					Err:              err,
 				}
-				if encodeErr := encodeErrorResponse(s.h.NewError(ctx, err), w, span); encodeErr != nil {
-					defer recordError("Security:UsernamePassword", err)
-				}
+				defer recordError("Security:UsernamePassword", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
 			if ok {
@@ -307,9 +295,8 @@ func (s *Server) handleAuthorizeGetRequest(args [0]string, argsEscaped bool, w h
 				OperationContext: opErrContext,
 				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
 			}
-			if encodeErr := encodeErrorResponse(s.h.NewError(ctx, err), w, span); encodeErr != nil {
-				defer recordError("Security", err)
-			}
+			defer recordError("Security", err)
+			s.cfg.ErrorHandler(ctx, w, r, err)
 			return
 		}
 	}
@@ -426,19 +413,8 @@ func (s *Server) handleAuthorizeGetRequest(args [0]string, argsEscaped bool, w h
 		response, err = s.h.AuthorizeGet(ctx, params)
 	}
 	if err != nil {
-		if errRes, ok := errors.Into[*ErrorDetailsStatusCode](err); ok {
-			if err := encodeErrorResponse(errRes, w, span); err != nil {
-				defer recordError("Internal", err)
-			}
-			return
-		}
-		if errors.Is(err, ht.ErrNotImplemented) {
-			s.cfg.ErrorHandler(ctx, w, r, err)
-			return
-		}
-		if err := encodeErrorResponse(s.h.NewError(ctx, err), w, span); err != nil {
-			defer recordError("Internal", err)
-		}
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
 		return
 	}
 
@@ -542,9 +518,8 @@ func (s *Server) handleCreateAuthAttemptRequest(args [0]string, argsEscaped bool
 					Security:         "OAuth2",
 					Err:              err,
 				}
-				if encodeErr := encodeErrorResponse(s.h.NewError(ctx, err), w, span); encodeErr != nil {
-					defer recordError("Security:OAuth2", err)
-				}
+				defer recordError("Security:OAuth2", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
 			if ok {
@@ -571,9 +546,8 @@ func (s *Server) handleCreateAuthAttemptRequest(args [0]string, argsEscaped bool
 				OperationContext: opErrContext,
 				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
 			}
-			if encodeErr := encodeErrorResponse(s.h.NewError(ctx, err), w, span); encodeErr != nil {
-				defer recordError("Security", err)
-			}
+			defer recordError("Security", err)
+			s.cfg.ErrorHandler(ctx, w, r, err)
 			return
 		}
 	}
@@ -630,19 +604,8 @@ func (s *Server) handleCreateAuthAttemptRequest(args [0]string, argsEscaped bool
 		response, err = s.h.CreateAuthAttempt(ctx, request)
 	}
 	if err != nil {
-		if errRes, ok := errors.Into[*ErrorDetailsStatusCode](err); ok {
-			if err := encodeErrorResponse(errRes, w, span); err != nil {
-				defer recordError("Internal", err)
-			}
-			return
-		}
-		if errors.Is(err, ht.ErrNotImplemented) {
-			s.cfg.ErrorHandler(ctx, w, r, err)
-			return
-		}
-		if err := encodeErrorResponse(s.h.NewError(ctx, err), w, span); err != nil {
-			defer recordError("Internal", err)
-		}
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
 		return
 	}
 
@@ -792,19 +755,8 @@ func (s *Server) handleCreateFlowRequest(args [0]string, argsEscaped bool, w htt
 		response, err = s.h.CreateFlow(ctx, request)
 	}
 	if err != nil {
-		if errRes, ok := errors.Into[*ErrorDetailsStatusCode](err); ok {
-			if err := encodeErrorResponse(errRes, w, span); err != nil {
-				defer recordError("Internal", err)
-			}
-			return
-		}
-		if errors.Is(err, ht.ErrNotImplemented) {
-			s.cfg.ErrorHandler(ctx, w, r, err)
-			return
-		}
-		if err := encodeErrorResponse(s.h.NewError(ctx, err), w, span); err != nil {
-			defer recordError("Internal", err)
-		}
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
 		return
 	}
 
@@ -911,9 +863,8 @@ func (s *Server) handleCreateHandoffRequest(args [1]string, argsEscaped bool, w 
 					Security:         "OAuth2",
 					Err:              err,
 				}
-				if encodeErr := encodeErrorResponse(s.h.NewError(ctx, err), w, span); encodeErr != nil {
-					defer recordError("Security:OAuth2", err)
-				}
+				defer recordError("Security:OAuth2", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
 			if ok {
@@ -940,9 +891,8 @@ func (s *Server) handleCreateHandoffRequest(args [1]string, argsEscaped bool, w 
 				OperationContext: opErrContext,
 				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
 			}
-			if encodeErr := encodeErrorResponse(s.h.NewError(ctx, err), w, span); encodeErr != nil {
-				defer recordError("Security", err)
-			}
+			defer recordError("Security", err)
+			s.cfg.ErrorHandler(ctx, w, r, err)
 			return
 		}
 	}
@@ -1003,19 +953,8 @@ func (s *Server) handleCreateHandoffRequest(args [1]string, argsEscaped bool, w 
 		response, err = s.h.CreateHandoff(ctx, params)
 	}
 	if err != nil {
-		if errRes, ok := errors.Into[*ErrorDetailsStatusCode](err); ok {
-			if err := encodeErrorResponse(errRes, w, span); err != nil {
-				defer recordError("Internal", err)
-			}
-			return
-		}
-		if errors.Is(err, ht.ErrNotImplemented) {
-			s.cfg.ErrorHandler(ctx, w, r, err)
-			return
-		}
-		if err := encodeErrorResponse(s.h.NewError(ctx, err), w, span); err != nil {
-			defer recordError("Internal", err)
-		}
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
 		return
 	}
 
@@ -1124,9 +1063,8 @@ func (s *Server) handleCreateSessionRequest(args [0]string, argsEscaped bool, w 
 					Security:         "OAuth2",
 					Err:              err,
 				}
-				if encodeErr := encodeErrorResponse(s.h.NewError(ctx, err), w, span); encodeErr != nil {
-					defer recordError("Security:OAuth2", err)
-				}
+				defer recordError("Security:OAuth2", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
 			if ok {
@@ -1153,9 +1091,8 @@ func (s *Server) handleCreateSessionRequest(args [0]string, argsEscaped bool, w 
 				OperationContext: opErrContext,
 				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
 			}
-			if encodeErr := encodeErrorResponse(s.h.NewError(ctx, err), w, span); encodeErr != nil {
-				defer recordError("Security", err)
-			}
+			defer recordError("Security", err)
+			s.cfg.ErrorHandler(ctx, w, r, err)
 			return
 		}
 	}
@@ -1212,19 +1149,8 @@ func (s *Server) handleCreateSessionRequest(args [0]string, argsEscaped bool, w 
 		response, err = s.h.CreateSession(ctx, request)
 	}
 	if err != nil {
-		if errRes, ok := errors.Into[*ErrorDetailsStatusCode](err); ok {
-			if err := encodeErrorResponse(errRes, w, span); err != nil {
-				defer recordError("Internal", err)
-			}
-			return
-		}
-		if errors.Is(err, ht.ErrNotImplemented) {
-			s.cfg.ErrorHandler(ctx, w, r, err)
-			return
-		}
-		if err := encodeErrorResponse(s.h.NewError(ctx, err), w, span); err != nil {
-			defer recordError("Internal", err)
-		}
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
 		return
 	}
 
@@ -1324,9 +1250,8 @@ func (s *Server) handleEndSessionRequest(args [0]string, argsEscaped bool, w htt
 					Security:         "UsernamePassword",
 					Err:              err,
 				}
-				if encodeErr := encodeErrorResponse(s.h.NewError(ctx, err), w, span); encodeErr != nil {
-					defer recordError("Security:UsernamePassword", err)
-				}
+				defer recordError("Security:UsernamePassword", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
 			if ok {
@@ -1353,9 +1278,8 @@ func (s *Server) handleEndSessionRequest(args [0]string, argsEscaped bool, w htt
 				OperationContext: opErrContext,
 				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
 			}
-			if encodeErr := encodeErrorResponse(s.h.NewError(ctx, err), w, span); encodeErr != nil {
-				defer recordError("Security", err)
-			}
+			defer recordError("Security", err)
+			s.cfg.ErrorHandler(ctx, w, r, err)
 			return
 		}
 	}
@@ -1432,19 +1356,8 @@ func (s *Server) handleEndSessionRequest(args [0]string, argsEscaped bool, w htt
 		response, err = s.h.EndSession(ctx, params)
 	}
 	if err != nil {
-		if errRes, ok := errors.Into[*ErrorDetailsStatusCode](err); ok {
-			if err := encodeErrorResponse(errRes, w, span); err != nil {
-				defer recordError("Internal", err)
-			}
-			return
-		}
-		if errors.Is(err, ht.ErrNotImplemented) {
-			s.cfg.ErrorHandler(ctx, w, r, err)
-			return
-		}
-		if err := encodeErrorResponse(s.h.NewError(ctx, err), w, span); err != nil {
-			defer recordError("Internal", err)
-		}
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
 		return
 	}
 
@@ -1557,9 +1470,8 @@ func (s *Server) handleExchangeHandoffRequest(args [0]string, argsEscaped bool, 
 					Security:         "OAuth2",
 					Err:              err,
 				}
-				if encodeErr := encodeErrorResponse(s.h.NewError(ctx, err), w, span); encodeErr != nil {
-					defer recordError("Security:OAuth2", err)
-				}
+				defer recordError("Security:OAuth2", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
 			if ok {
@@ -1586,9 +1498,8 @@ func (s *Server) handleExchangeHandoffRequest(args [0]string, argsEscaped bool, 
 				OperationContext: opErrContext,
 				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
 			}
-			if encodeErr := encodeErrorResponse(s.h.NewError(ctx, err), w, span); encodeErr != nil {
-				defer recordError("Security", err)
-			}
+			defer recordError("Security", err)
+			s.cfg.ErrorHandler(ctx, w, r, err)
 			return
 		}
 	}
@@ -1660,19 +1571,8 @@ func (s *Server) handleExchangeHandoffRequest(args [0]string, argsEscaped bool, 
 		response, err = s.h.ExchangeHandoff(ctx, request, params)
 	}
 	if err != nil {
-		if errRes, ok := errors.Into[*ErrorDetailsStatusCode](err); ok {
-			if err := encodeErrorResponse(errRes, w, span); err != nil {
-				defer recordError("Internal", err)
-			}
-			return
-		}
-		if errors.Is(err, ht.ErrNotImplemented) {
-			s.cfg.ErrorHandler(ctx, w, r, err)
-			return
-		}
-		if err := encodeErrorResponse(s.h.NewError(ctx, err), w, span); err != nil {
-			defer recordError("Internal", err)
-		}
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
 		return
 	}
 
@@ -1776,9 +1676,8 @@ func (s *Server) handleGetAuthAttemptRequest(args [1]string, argsEscaped bool, w
 					Security:         "OAuth2",
 					Err:              err,
 				}
-				if encodeErr := encodeErrorResponse(s.h.NewError(ctx, err), w, span); encodeErr != nil {
-					defer recordError("Security:OAuth2", err)
-				}
+				defer recordError("Security:OAuth2", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
 			if ok {
@@ -1805,9 +1704,8 @@ func (s *Server) handleGetAuthAttemptRequest(args [1]string, argsEscaped bool, w
 				OperationContext: opErrContext,
 				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
 			}
-			if encodeErr := encodeErrorResponse(s.h.NewError(ctx, err), w, span); encodeErr != nil {
-				defer recordError("Security", err)
-			}
+			defer recordError("Security", err)
+			s.cfg.ErrorHandler(ctx, w, r, err)
 			return
 		}
 	}
@@ -1864,19 +1762,8 @@ func (s *Server) handleGetAuthAttemptRequest(args [1]string, argsEscaped bool, w
 		response, err = s.h.GetAuthAttempt(ctx, params)
 	}
 	if err != nil {
-		if errRes, ok := errors.Into[*ErrorDetailsStatusCode](err); ok {
-			if err := encodeErrorResponse(errRes, w, span); err != nil {
-				defer recordError("Internal", err)
-			}
-			return
-		}
-		if errors.Is(err, ht.ErrNotImplemented) {
-			s.cfg.ErrorHandler(ctx, w, r, err)
-			return
-		}
-		if err := encodeErrorResponse(s.h.NewError(ctx, err), w, span); err != nil {
-			defer recordError("Internal", err)
-		}
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
 		return
 	}
 
@@ -2023,19 +1910,8 @@ func (s *Server) handleGetFlowStepRequest(args [1]string, argsEscaped bool, w ht
 		response, err = s.h.GetFlowStep(ctx, params)
 	}
 	if err != nil {
-		if errRes, ok := errors.Into[*ErrorDetailsStatusCode](err); ok {
-			if err := encodeErrorResponse(errRes, w, span); err != nil {
-				defer recordError("Internal", err)
-			}
-			return
-		}
-		if errors.Is(err, ht.ErrNotImplemented) {
-			s.cfg.ErrorHandler(ctx, w, r, err)
-			return
-		}
-		if err := encodeErrorResponse(s.h.NewError(ctx, err), w, span); err != nil {
-			defer recordError("Internal", err)
-		}
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
 		return
 	}
 
@@ -2158,19 +2034,8 @@ func (s *Server) handleGetHealthRequest(args [0]string, argsEscaped bool, w http
 		response, err = s.h.GetHealth(ctx)
 	}
 	if err != nil {
-		if errRes, ok := errors.Into[*ErrorDetailsStatusCode](err); ok {
-			if err := encodeErrorResponse(errRes, w, span); err != nil {
-				defer recordError("Internal", err)
-			}
-			return
-		}
-		if errors.Is(err, ht.ErrNotImplemented) {
-			s.cfg.ErrorHandler(ctx, w, r, err)
-			return
-		}
-		if err := encodeErrorResponse(s.h.NewError(ctx, err), w, span); err != nil {
-			defer recordError("Internal", err)
-		}
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
 		return
 	}
 
@@ -2293,19 +2158,8 @@ func (s *Server) handleGetKeysRequest(args [0]string, argsEscaped bool, w http.R
 		response, err = s.h.GetKeys(ctx)
 	}
 	if err != nil {
-		if errRes, ok := errors.Into[*ErrorDetailsStatusCode](err); ok {
-			if err := encodeErrorResponse(errRes, w, span); err != nil {
-				defer recordError("Internal", err)
-			}
-			return
-		}
-		if errors.Is(err, ht.ErrNotImplemented) {
-			s.cfg.ErrorHandler(ctx, w, r, err)
-			return
-		}
-		if err := encodeErrorResponse(s.h.NewError(ctx, err), w, span); err != nil {
-			defer recordError("Internal", err)
-		}
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
 		return
 	}
 
@@ -2428,19 +2282,8 @@ func (s *Server) handleGetLiveRequest(args [0]string, argsEscaped bool, w http.R
 		response, err = s.h.GetLive(ctx)
 	}
 	if err != nil {
-		if errRes, ok := errors.Into[*ErrorDetailsStatusCode](err); ok {
-			if err := encodeErrorResponse(errRes, w, span); err != nil {
-				defer recordError("Internal", err)
-			}
-			return
-		}
-		if errors.Is(err, ht.ErrNotImplemented) {
-			s.cfg.ErrorHandler(ctx, w, r, err)
-			return
-		}
-		if err := encodeErrorResponse(s.h.NewError(ctx, err), w, span); err != nil {
-			defer recordError("Internal", err)
-		}
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
 		return
 	}
 
@@ -2563,19 +2406,8 @@ func (s *Server) handleGetOpenIDConfigurationRequest(args [0]string, argsEscaped
 		response, err = s.h.GetOpenIDConfiguration(ctx)
 	}
 	if err != nil {
-		if errRes, ok := errors.Into[*ErrorDetailsStatusCode](err); ok {
-			if err := encodeErrorResponse(errRes, w, span); err != nil {
-				defer recordError("Internal", err)
-			}
-			return
-		}
-		if errors.Is(err, ht.ErrNotImplemented) {
-			s.cfg.ErrorHandler(ctx, w, r, err)
-			return
-		}
-		if err := encodeErrorResponse(s.h.NewError(ctx, err), w, span); err != nil {
-			defer recordError("Internal", err)
-		}
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
 		return
 	}
 
@@ -2698,19 +2530,8 @@ func (s *Server) handleGetReadyRequest(args [0]string, argsEscaped bool, w http.
 		response, err = s.h.GetReady(ctx)
 	}
 	if err != nil {
-		if errRes, ok := errors.Into[*ErrorDetailsStatusCode](err); ok {
-			if err := encodeErrorResponse(errRes, w, span); err != nil {
-				defer recordError("Internal", err)
-			}
-			return
-		}
-		if errors.Is(err, ht.ErrNotImplemented) {
-			s.cfg.ErrorHandler(ctx, w, r, err)
-			return
-		}
-		if err := encodeErrorResponse(s.h.NewError(ctx, err), w, span); err != nil {
-			defer recordError("Internal", err)
-		}
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
 		return
 	}
 
@@ -2814,9 +2635,8 @@ func (s *Server) handleGetSessionRequest(args [1]string, argsEscaped bool, w htt
 					Security:         "OAuth2",
 					Err:              err,
 				}
-				if encodeErr := encodeErrorResponse(s.h.NewError(ctx, err), w, span); encodeErr != nil {
-					defer recordError("Security:OAuth2", err)
-				}
+				defer recordError("Security:OAuth2", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
 			if ok {
@@ -2843,9 +2663,8 @@ func (s *Server) handleGetSessionRequest(args [1]string, argsEscaped bool, w htt
 				OperationContext: opErrContext,
 				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
 			}
-			if encodeErr := encodeErrorResponse(s.h.NewError(ctx, err), w, span); encodeErr != nil {
-				defer recordError("Security", err)
-			}
+			defer recordError("Security", err)
+			s.cfg.ErrorHandler(ctx, w, r, err)
 			return
 		}
 	}
@@ -2902,19 +2721,8 @@ func (s *Server) handleGetSessionRequest(args [1]string, argsEscaped bool, w htt
 		response, err = s.h.GetSession(ctx, params)
 	}
 	if err != nil {
-		if errRes, ok := errors.Into[*ErrorDetailsStatusCode](err); ok {
-			if err := encodeErrorResponse(errRes, w, span); err != nil {
-				defer recordError("Internal", err)
-			}
-			return
-		}
-		if errors.Is(err, ht.ErrNotImplemented) {
-			s.cfg.ErrorHandler(ctx, w, r, err)
-			return
-		}
-		if err := encodeErrorResponse(s.h.NewError(ctx, err), w, span); err != nil {
-			defer recordError("Internal", err)
-		}
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
 		return
 	}
 
@@ -3014,9 +2822,8 @@ func (s *Server) handleGetTokenRequest(args [0]string, argsEscaped bool, w http.
 					Security:         "UsernamePassword",
 					Err:              err,
 				}
-				if encodeErr := encodeErrorResponse(s.h.NewError(ctx, err), w, span); encodeErr != nil {
-					defer recordError("Security:UsernamePassword", err)
-				}
+				defer recordError("Security:UsernamePassword", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
 			if ok {
@@ -3043,9 +2850,8 @@ func (s *Server) handleGetTokenRequest(args [0]string, argsEscaped bool, w http.
 				OperationContext: opErrContext,
 				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
 			}
-			if encodeErr := encodeErrorResponse(s.h.NewError(ctx, err), w, span); encodeErr != nil {
-				defer recordError("Security", err)
-			}
+			defer recordError("Security", err)
+			s.cfg.ErrorHandler(ctx, w, r, err)
 			return
 		}
 	}
@@ -3102,19 +2908,8 @@ func (s *Server) handleGetTokenRequest(args [0]string, argsEscaped bool, w http.
 		response, err = s.h.GetToken(ctx, request)
 	}
 	if err != nil {
-		if errRes, ok := errors.Into[*ErrorDetailsStatusCode](err); ok {
-			if err := encodeErrorResponse(errRes, w, span); err != nil {
-				defer recordError("Internal", err)
-			}
-			return
-		}
-		if errors.Is(err, ht.ErrNotImplemented) {
-			s.cfg.ErrorHandler(ctx, w, r, err)
-			return
-		}
-		if err := encodeErrorResponse(s.h.NewError(ctx, err), w, span); err != nil {
-			defer recordError("Internal", err)
-		}
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
 		return
 	}
 
@@ -3214,9 +3009,8 @@ func (s *Server) handleGetUserInfoRequest(args [0]string, argsEscaped bool, w ht
 					Security:         "OAuth2",
 					Err:              err,
 				}
-				if encodeErr := encodeErrorResponse(s.h.NewError(ctx, err), w, span); encodeErr != nil {
-					defer recordError("Security:OAuth2", err)
-				}
+				defer recordError("Security:OAuth2", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
 			if ok {
@@ -3243,9 +3037,8 @@ func (s *Server) handleGetUserInfoRequest(args [0]string, argsEscaped bool, w ht
 				OperationContext: opErrContext,
 				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
 			}
-			if encodeErr := encodeErrorResponse(s.h.NewError(ctx, err), w, span); encodeErr != nil {
-				defer recordError("Security", err)
-			}
+			defer recordError("Security", err)
+			s.cfg.ErrorHandler(ctx, w, r, err)
 			return
 		}
 	}
@@ -3287,19 +3080,8 @@ func (s *Server) handleGetUserInfoRequest(args [0]string, argsEscaped bool, w ht
 		response, err = s.h.GetUserInfo(ctx)
 	}
 	if err != nil {
-		if errRes, ok := errors.Into[*ErrorDetailsStatusCode](err); ok {
-			if err := encodeErrorResponse(errRes, w, span); err != nil {
-				defer recordError("Internal", err)
-			}
-			return
-		}
-		if errors.Is(err, ht.ErrNotImplemented) {
-			s.cfg.ErrorHandler(ctx, w, r, err)
-			return
-		}
-		if err := encodeErrorResponse(s.h.NewError(ctx, err), w, span); err != nil {
-			defer recordError("Internal", err)
-		}
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
 		return
 	}
 
@@ -3399,9 +3181,8 @@ func (s *Server) handleIntrospectRequest(args [0]string, argsEscaped bool, w htt
 					Security:         "OAuth2",
 					Err:              err,
 				}
-				if encodeErr := encodeErrorResponse(s.h.NewError(ctx, err), w, span); encodeErr != nil {
-					defer recordError("Security:OAuth2", err)
-				}
+				defer recordError("Security:OAuth2", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
 			if ok {
@@ -3428,9 +3209,8 @@ func (s *Server) handleIntrospectRequest(args [0]string, argsEscaped bool, w htt
 				OperationContext: opErrContext,
 				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
 			}
-			if encodeErr := encodeErrorResponse(s.h.NewError(ctx, err), w, span); encodeErr != nil {
-				defer recordError("Security", err)
-			}
+			defer recordError("Security", err)
+			s.cfg.ErrorHandler(ctx, w, r, err)
 			return
 		}
 	}
@@ -3487,19 +3267,8 @@ func (s *Server) handleIntrospectRequest(args [0]string, argsEscaped bool, w htt
 		response, err = s.h.Introspect(ctx, request)
 	}
 	if err != nil {
-		if errRes, ok := errors.Into[*ErrorDetailsStatusCode](err); ok {
-			if err := encodeErrorResponse(errRes, w, span); err != nil {
-				defer recordError("Internal", err)
-			}
-			return
-		}
-		if errors.Is(err, ht.ErrNotImplemented) {
-			s.cfg.ErrorHandler(ctx, w, r, err)
-			return
-		}
-		if err := encodeErrorResponse(s.h.NewError(ctx, err), w, span); err != nil {
-			defer recordError("Internal", err)
-		}
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
 		return
 	}
 
@@ -3603,9 +3372,8 @@ func (s *Server) handleIssueChallengeRequest(args [1]string, argsEscaped bool, w
 					Security:         "OAuth2",
 					Err:              err,
 				}
-				if encodeErr := encodeErrorResponse(s.h.NewError(ctx, err), w, span); encodeErr != nil {
-					defer recordError("Security:OAuth2", err)
-				}
+				defer recordError("Security:OAuth2", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
 			if ok {
@@ -3632,9 +3400,8 @@ func (s *Server) handleIssueChallengeRequest(args [1]string, argsEscaped bool, w
 				OperationContext: opErrContext,
 				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
 			}
-			if encodeErr := encodeErrorResponse(s.h.NewError(ctx, err), w, span); encodeErr != nil {
-				defer recordError("Security", err)
-			}
+			defer recordError("Security", err)
+			s.cfg.ErrorHandler(ctx, w, r, err)
 			return
 		}
 	}
@@ -3706,19 +3473,8 @@ func (s *Server) handleIssueChallengeRequest(args [1]string, argsEscaped bool, w
 		response, err = s.h.IssueChallenge(ctx, request, params)
 	}
 	if err != nil {
-		if errRes, ok := errors.Into[*ErrorDetailsStatusCode](err); ok {
-			if err := encodeErrorResponse(errRes, w, span); err != nil {
-				defer recordError("Internal", err)
-			}
-			return
-		}
-		if errors.Is(err, ht.ErrNotImplemented) {
-			s.cfg.ErrorHandler(ctx, w, r, err)
-			return
-		}
-		if err := encodeErrorResponse(s.h.NewError(ctx, err), w, span); err != nil {
-			defer recordError("Internal", err)
-		}
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
 		return
 	}
 
@@ -3819,9 +3575,8 @@ func (s *Server) handleListSessionsRequest(args [0]string, argsEscaped bool, w h
 					Security:         "OAuth2",
 					Err:              err,
 				}
-				if encodeErr := encodeErrorResponse(s.h.NewError(ctx, err), w, span); encodeErr != nil {
-					defer recordError("Security:OAuth2", err)
-				}
+				defer recordError("Security:OAuth2", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
 			if ok {
@@ -3848,9 +3603,8 @@ func (s *Server) handleListSessionsRequest(args [0]string, argsEscaped bool, w h
 				OperationContext: opErrContext,
 				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
 			}
-			if encodeErr := encodeErrorResponse(s.h.NewError(ctx, err), w, span); encodeErr != nil {
-				defer recordError("Security", err)
-			}
+			defer recordError("Security", err)
+			s.cfg.ErrorHandler(ctx, w, r, err)
 			return
 		}
 	}
@@ -3923,19 +3677,8 @@ func (s *Server) handleListSessionsRequest(args [0]string, argsEscaped bool, w h
 		response, err = s.h.ListSessions(ctx, params)
 	}
 	if err != nil {
-		if errRes, ok := errors.Into[*ErrorDetailsStatusCode](err); ok {
-			if err := encodeErrorResponse(errRes, w, span); err != nil {
-				defer recordError("Internal", err)
-			}
-			return
-		}
-		if errors.Is(err, ht.ErrNotImplemented) {
-			s.cfg.ErrorHandler(ctx, w, r, err)
-			return
-		}
-		if err := encodeErrorResponse(s.h.NewError(ctx, err), w, span); err != nil {
-			defer recordError("Internal", err)
-		}
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
 		return
 	}
 
@@ -4035,9 +3778,8 @@ func (s *Server) handleListUsersRequest(args [0]string, argsEscaped bool, w http
 					Security:         "OAuth2",
 					Err:              err,
 				}
-				if encodeErr := encodeErrorResponse(s.h.NewError(ctx, err), w, span); encodeErr != nil {
-					defer recordError("Security:OAuth2", err)
-				}
+				defer recordError("Security:OAuth2", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
 			if ok {
@@ -4064,9 +3806,8 @@ func (s *Server) handleListUsersRequest(args [0]string, argsEscaped bool, w http
 				OperationContext: opErrContext,
 				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
 			}
-			if encodeErr := encodeErrorResponse(s.h.NewError(ctx, err), w, span); encodeErr != nil {
-				defer recordError("Security", err)
-			}
+			defer recordError("Security", err)
+			s.cfg.ErrorHandler(ctx, w, r, err)
 			return
 		}
 	}
@@ -4127,19 +3868,8 @@ func (s *Server) handleListUsersRequest(args [0]string, argsEscaped bool, w http
 		response, err = s.h.ListUsers(ctx, params)
 	}
 	if err != nil {
-		if errRes, ok := errors.Into[*ErrorDetailsStatusCode](err); ok {
-			if err := encodeErrorResponse(errRes, w, span); err != nil {
-				defer recordError("Internal", err)
-			}
-			return
-		}
-		if errors.Is(err, ht.ErrNotImplemented) {
-			s.cfg.ErrorHandler(ctx, w, r, err)
-			return
-		}
-		if err := encodeErrorResponse(s.h.NewError(ctx, err), w, span); err != nil {
-			defer recordError("Internal", err)
-		}
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
 		return
 	}
 
@@ -4241,9 +3971,8 @@ func (s *Server) handleRevokeSessionRequest(args [1]string, argsEscaped bool, w 
 					Security:         "OAuth2",
 					Err:              err,
 				}
-				if encodeErr := encodeErrorResponse(s.h.NewError(ctx, err), w, span); encodeErr != nil {
-					defer recordError("Security:OAuth2", err)
-				}
+				defer recordError("Security:OAuth2", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
 			if ok {
@@ -4270,9 +3999,8 @@ func (s *Server) handleRevokeSessionRequest(args [1]string, argsEscaped bool, w 
 				OperationContext: opErrContext,
 				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
 			}
-			if encodeErr := encodeErrorResponse(s.h.NewError(ctx, err), w, span); encodeErr != nil {
-				defer recordError("Security", err)
-			}
+			defer recordError("Security", err)
+			s.cfg.ErrorHandler(ctx, w, r, err)
 			return
 		}
 	}
@@ -4329,19 +4057,8 @@ func (s *Server) handleRevokeSessionRequest(args [1]string, argsEscaped bool, w 
 		response, err = s.h.RevokeSession(ctx, params)
 	}
 	if err != nil {
-		if errRes, ok := errors.Into[*ErrorDetailsStatusCode](err); ok {
-			if err := encodeErrorResponse(errRes, w, span); err != nil {
-				defer recordError("Internal", err)
-			}
-			return
-		}
-		if errors.Is(err, ht.ErrNotImplemented) {
-			s.cfg.ErrorHandler(ctx, w, r, err)
-			return
-		}
-		if err := encodeErrorResponse(s.h.NewError(ctx, err), w, span); err != nil {
-			defer recordError("Internal", err)
-		}
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
 		return
 	}
 
@@ -4441,9 +4158,8 @@ func (s *Server) handleRevokeTokenRequest(args [0]string, argsEscaped bool, w ht
 					Security:         "OAuth2",
 					Err:              err,
 				}
-				if encodeErr := encodeErrorResponse(s.h.NewError(ctx, err), w, span); encodeErr != nil {
-					defer recordError("Security:OAuth2", err)
-				}
+				defer recordError("Security:OAuth2", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
 			if ok {
@@ -4470,9 +4186,8 @@ func (s *Server) handleRevokeTokenRequest(args [0]string, argsEscaped bool, w ht
 				OperationContext: opErrContext,
 				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
 			}
-			if encodeErr := encodeErrorResponse(s.h.NewError(ctx, err), w, span); encodeErr != nil {
-				defer recordError("Security", err)
-			}
+			defer recordError("Security", err)
+			s.cfg.ErrorHandler(ctx, w, r, err)
 			return
 		}
 	}
@@ -4529,19 +4244,8 @@ func (s *Server) handleRevokeTokenRequest(args [0]string, argsEscaped bool, w ht
 		response, err = s.h.RevokeToken(ctx, request)
 	}
 	if err != nil {
-		if errRes, ok := errors.Into[*ErrorDetailsStatusCode](err); ok {
-			if err := encodeErrorResponse(errRes, w, span); err != nil {
-				defer recordError("Internal", err)
-			}
-			return
-		}
-		if errors.Is(err, ht.ErrNotImplemented) {
-			s.cfg.ErrorHandler(ctx, w, r, err)
-			return
-		}
-		if err := encodeErrorResponse(s.h.NewError(ctx, err), w, span); err != nil {
-			defer recordError("Internal", err)
-		}
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
 		return
 	}
 
@@ -4703,19 +4407,8 @@ func (s *Server) handleSubmitFlowEventRequest(args [1]string, argsEscaped bool, 
 		response, err = s.h.SubmitFlowEvent(ctx, request, params)
 	}
 	if err != nil {
-		if errRes, ok := errors.Into[*ErrorDetailsStatusCode](err); ok {
-			if err := encodeErrorResponse(errRes, w, span); err != nil {
-				defer recordError("Internal", err)
-			}
-			return
-		}
-		if errors.Is(err, ht.ErrNotImplemented) {
-			s.cfg.ErrorHandler(ctx, w, r, err)
-			return
-		}
-		if err := encodeErrorResponse(s.h.NewError(ctx, err), w, span); err != nil {
-			defer recordError("Internal", err)
-		}
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
 		return
 	}
 
@@ -4896,19 +4589,8 @@ func (s *Server) handleSubmitFlowStepRequest(args [1]string, argsEscaped bool, w
 		response, err = s.h.SubmitFlowStep(ctx, request, params)
 	}
 	if err != nil {
-		if errRes, ok := errors.Into[*ErrorDetailsStatusCode](err); ok {
-			if err := encodeErrorResponse(errRes, w, span); err != nil {
-				defer recordError("Internal", err)
-			}
-			return
-		}
-		if errors.Is(err, ht.ErrNotImplemented) {
-			s.cfg.ErrorHandler(ctx, w, r, err)
-			return
-		}
-		if err := encodeErrorResponse(s.h.NewError(ctx, err), w, span); err != nil {
-			defer recordError("Internal", err)
-		}
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
 		return
 	}
 
@@ -5015,9 +4697,8 @@ func (s *Server) handleVerifyChallengeProofRequest(args [2]string, argsEscaped b
 					Security:         "OAuth2",
 					Err:              err,
 				}
-				if encodeErr := encodeErrorResponse(s.h.NewError(ctx, err), w, span); encodeErr != nil {
-					defer recordError("Security:OAuth2", err)
-				}
+				defer recordError("Security:OAuth2", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
 			if ok {
@@ -5044,9 +4725,8 @@ func (s *Server) handleVerifyChallengeProofRequest(args [2]string, argsEscaped b
 				OperationContext: opErrContext,
 				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
 			}
-			if encodeErr := encodeErrorResponse(s.h.NewError(ctx, err), w, span); encodeErr != nil {
-				defer recordError("Security", err)
-			}
+			defer recordError("Security", err)
+			s.cfg.ErrorHandler(ctx, w, r, err)
 			return
 		}
 	}
@@ -5126,19 +4806,8 @@ func (s *Server) handleVerifyChallengeProofRequest(args [2]string, argsEscaped b
 		response, err = s.h.VerifyChallengeProof(ctx, request, params)
 	}
 	if err != nil {
-		if errRes, ok := errors.Into[*ErrorDetailsStatusCode](err); ok {
-			if err := encodeErrorResponse(errRes, w, span); err != nil {
-				defer recordError("Internal", err)
-			}
-			return
-		}
-		if errors.Is(err, ht.ErrNotImplemented) {
-			s.cfg.ErrorHandler(ctx, w, r, err)
-			return
-		}
-		if err := encodeErrorResponse(s.h.NewError(ctx, err), w, span); err != nil {
-			defer recordError("Internal", err)
-		}
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
 		return
 	}
 

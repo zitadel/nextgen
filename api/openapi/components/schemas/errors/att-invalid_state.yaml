@@ -1,0 +1,14 @@
+# Code generated; DO NOT EDIT.
+description: |
+  Invalid attempt state
+  
+  Error code: att.invalid_state
+allOf:
+  - $ref: ../../error-details.yaml
+  - type: object
+    properties:
+      code:
+        type: string
+        const: att.invalid_state
+    required:
+      - code

@@ -1,0 +1,14 @@
+# Code generated; DO NOT EDIT.
+description: |
+  The auth attempt is already completed and can no longer be changed.
+  
+  Error code: att.already_completed
+allOf:
+  - $ref: ../../error-details.yaml
+  - type: object
+    properties:
+      code:
+        type: string
+        const: att.already_completed
+    required:
+      - code

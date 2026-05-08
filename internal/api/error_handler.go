@@ -33,8 +33,9 @@ func OgenErrorHandler(_ context.Context, w http.ResponseWriter, _ *http.Request,
 		details = d
 
 	default:
-		status = http.StatusInternalServerError
-		details = domainErrorDetails(domain.ErrInternal())
+		resp := errorResponse(err)
+		status = resp.StatusCode
+		details = resp.Response
 	}
 
 	w.Header().Set("Content-Type", "application/json")

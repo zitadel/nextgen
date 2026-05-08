@@ -13,8 +13,8 @@ import (
 
 type AuthAttempt struct{}
 
-const authAttemptGetSelect = `SELECT aa.project_id, aa.id, aa.handoff_token, aa.handed_off_at, aa.session_id, aa.required_checks, aa.created_at, aa.completed_at , aac.type, aa.time_to_live,` +
-	` aac.last_challenged_at, aac.last_verified_at, aac.last_failed_at, aac.failure_count , aac.challenge_payload, aac.factor_payload` +
+const authAttemptGetSelect = `SELECT aa.project_id, aa.id, aa.handoff_token, aa.handed_off_at, aa.handoff_idempotency_key, aa.session_id, aa.required_checks, aa.created_at, aa.completed_at, aac.type, aa.time_to_live,` +
+	` aac.last_challenged_at, aac.last_verified_at, aac.last_failed_at, aac.failure_count, aac.challenge_payload, aac.factor_payload, aac.challenge_id` +
 	` FROM zitadel_nextgen.auth_attempts aa` +
 	` LEFT JOIN zitadel_nextgen.auth_attempt_checks aac ON aa.project_id = aac.project_id AND aa.id = aac.auth_attempt_id`
 
@@ -45,18 +45,20 @@ func (a *AuthAttempt) get(ctx context.Context, client database.QueryExecutor, qu
 	for rows.Next() {
 		found = true
 		var (
-			handoffToken      database.Null[string]
-			handedOffAt       database.Null[time.Time]
-			sessionID         database.Null[string]
-			checkType         database.Null[domain.AuthCheckType]
-			lastChallengedAt  database.Null[time.Time]
-			verifiedAt        database.Null[time.Time]
-			lastFailedAt      database.Null[time.Time]
-			failureCount      database.Null[uint16]
-			challenge, factor json.RawMessage
+			handoffToken          database.Null[string]
+			handedOffAt           database.Null[time.Time]
+			handoffIdempotencyKey database.Null[string]
+			sessionID             database.Null[string]
+			checkType             database.Null[domain.AuthCheckType]
+			lastChallengedAt      database.Null[time.Time]
+			verifiedAt            database.Null[time.Time]
+			lastFailedAt          database.Null[time.Time]
+			failureCount          database.Null[uint16]
+			challenge, factor     json.RawMessage
+			challengeID           database.Null[string]
 		)
-		err = rows.Scan(&attempt.ProjectID, &attempt.ID, &handoffToken, &handedOffAt, &sessionID, &attempt.RequiredChecks, &attempt.CreatedAt, &attempt.CompletedAt, &checkType, &attempt.TimeToLive,
-			&lastChallengedAt, &verifiedAt, &lastFailedAt, &failureCount, &challenge, &factor)
+		err = rows.Scan(&attempt.ProjectID, &attempt.ID, &handoffToken, &handedOffAt, &handoffIdempotencyKey, &sessionID, &attempt.RequiredChecks, &attempt.CreatedAt, &attempt.CompletedAt, &checkType, &attempt.TimeToLive,
+			&lastChallengedAt, &verifiedAt, &lastFailedAt, &failureCount, &challenge, &factor, &challengeID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan auth attempt: %w", err)
 		}
@@ -66,6 +68,9 @@ func (a *AuthAttempt) get(ctx context.Context, client database.QueryExecutor, qu
 		if handedOffAt.Valid {
 			attempt.HandedOffAt = &handedOffAt.V
 		}
+		if handoffIdempotencyKey.Valid {
+			attempt.HandoffIdempotencyKey = &handoffIdempotencyKey.V
+		}
 		if sessionID.Valid {
 			attempt.SessionID = &sessionID.V
 		}
@@ -74,24 +79,28 @@ func (a *AuthAttempt) get(ctx context.Context, client database.QueryExecutor, qu
 			continue
 		}
 
-		check := domain.AuthCheck{Type: checkType.V}
-		if lastChallengedAt.Valid {
-			check.LastChallengedAt = lastChallengedAt.V
-		}
-		if failureCount.Valid {
-			check.FailureCount = failureCount.V
-		}
-		if verifiedAt.Valid {
-			check.LastVerifiedAt = verifiedAt.V
-		}
-		if lastFailedAt.Valid {
-			check.LastFailedAt = &lastFailedAt.V
-		}
-		checker, err := newAuthCheck(&check, challenge, factor)
+		//check := domain.AuthCheck{Type: checkType.V}
+		//if challengeID.Valid {
+		//	check.ID = challengeID.V
+		//}
+		//if lastChallengedAt.Valid {
+		//	check.LastChallengedAt = lastChallengedAt.V
+		//}
+		//if failureCount.Valid {
+		//	check.FailureCount = failureCount.V
+		//}
+		//if verifiedAt.Valid {
+		//	check.LastVerifiedAt = verifiedAt.V
+		//}
+		//if lastFailedAt.Valid {
+		//	check.LastFailedAt = &lastFailedAt.V
+		//}
+
+		checker, err := newAuthCheck(checkType.V, challengeID.V, lastChallengedAt.V, lastFailedAt.V, verifiedAt.V, failureCount.V, challenge, factor)
 		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal auth check: %w", err)
 		}
-		attempt.Checks = append(attempt.Checks, checker)
+		attempt.SetCheck(checker)
 	}
 	if err = rows.Err(); err != nil {
 		return nil, fmt.Errorf("failed to read auth attempt rows: %w", err)
@@ -121,21 +130,21 @@ const authAttemptCreateStmt = `WITH inserted_attempt AS (` +
 // Create implements [domain.AuthAttemptRepository].
 func (a *AuthAttempt) Create(ctx context.Context, client database.QueryExecutor, authAttempt *domain.AuthAttempt) (err error) {
 	checkRows := make([]authAttemptCheckCreate, 0, len(authAttempt.Checks))
+
 	for _, checker := range authAttempt.Checks {
-		check := checker.Check()
 		checkRow := authAttemptCheckCreate{
-			Type: uint8(check.Type),
+			Type: uint8(checker.Type()),
 		}
-		if challenge, ok := checker.(domain.AuthChallenger); ok {
+		if challenge, ok := checker.(domain.AuthChallenge); ok {
 			checkRow.IsChallenger = true
-			checkRow.ChallengePayload, err = json.Marshal(challenge.ChallengePayload())
+			checkRow.ChallengePayload, err = json.Marshal(challenge.Payload())
 			if err != nil {
 				return fmt.Errorf("failed to marshal challenge payload: %w", err)
 			}
 		}
-		if factor, ok := checker.(domain.AuthFactorer); ok {
+		if factor, ok := checker.(domain.AuthFactor); ok {
 			checkRow.IsFactorer = true
-			checkRow.FactorPayload, err = json.Marshal(factor.FactorPayload())
+			checkRow.FactorPayload, err = json.Marshal(factor.Payload())
 			if err != nil {
 				return fmt.Errorf("failed to marshal factor payload: %w", err)
 			}
@@ -187,12 +196,15 @@ func (a *AuthAttempt) Create(ctx context.Context, client database.QueryExecutor,
 	}
 
 	for _, checker := range authAttempt.Checks {
-		check := checker.Check()
-		if lastChallengedAt, ok := lastChallengedAtByType[check.Type]; ok {
-			check.LastChallengedAt = lastChallengedAt
+		if lastChallengedAt, ok := lastChallengedAtByType[checker.Type()]; ok {
+			if challenge, ok := checker.(domain.AuthChallenge); ok {
+				challenge.SetLastChallengedAt(lastChallengedAt)
+			}
 		}
-		if lastVerifiedAt, ok := lastVerifiedAtByType[check.Type]; ok {
-			check.LastVerifiedAt = lastVerifiedAt
+		if lastVerifiedAt, ok := lastVerifiedAtByType[checker.Type()]; ok {
+			if factor, ok := checker.(domain.AuthFactor); ok {
+				factor.SetLastVerifiedAt(lastVerifiedAt)
+			}
 		}
 	}
 	return nil
@@ -223,16 +235,16 @@ func (a *AuthAttempt) Complete(ctx context.Context, client database.QueryExecuto
 		Scan(&attempt.CompletedAt)
 }
 
-const authAttemptHandoffStmt = `UPDATE zitadel_nextgen.auth_attempts SET handoff_token = $3, handed_off_at = NOW()` +
+const authAttemptHandoffStmt = `UPDATE zitadel_nextgen.auth_attempts SET handoff_token = $3, handed_off_at = NOW(), handoff_idempotency_key = $4` +
 	` WHERE project_id = $1 AND id = $2 RETURNING handed_off_at`
 
 // Handoff implements [domain.AuthAttemptRepository].
-func (a *AuthAttempt) Handoff(ctx context.Context, client database.QueryExecutor, attempt *domain.AuthAttempt) error {
+func (a *AuthAttempt) Handoff(ctx context.Context, client database.QueryExecutor, attempt *domain.AuthAttempt, idempotencyKey string) error {
 	if attempt.HandoffToken == nil {
 		return fmt.Errorf("failed to handoff auth attempt: handoff token is required")
 	}
 	var handedOffAt time.Time
-	err := client.QueryRow(ctx, authAttemptHandoffStmt, attempt.ProjectID, attempt.ID, *attempt.HandoffToken).
+	err := client.QueryRow(ctx, authAttemptHandoffStmt, attempt.ProjectID, attempt.ID, *attempt.HandoffToken, idempotencyKey).
 		Scan(&handedOffAt)
 	if err != nil {
 		return fmt.Errorf("failed to handoff auth attempt: %w", err)
@@ -242,99 +254,117 @@ func (a *AuthAttempt) Handoff(ctx context.Context, client database.QueryExecutor
 }
 
 const authAttemptSetChallengeStmt = `INSERT INTO zitadel_nextgen.auth_attempt_checks` +
-	` (project_id, auth_attempt_id, type, last_challenged_at, challenge_payload)` +
-	` VALUES ($1, $2, $3, NOW(), $4::JSONB)` +
+	` (project_id, auth_attempt_id, type, last_challenged_at, challenge_payload, challenge_id)` +
+	` VALUES ($1, $2, $3, NOW(), $4::JSONB, $5)` +
 	` ON CONFLICT (project_id, auth_attempt_id, type) DO UPDATE SET` +
-	` last_challenged_at = NOW(), challenge_payload = EXCLUDED.challenge_payload, failure_count = 0, last_failed_at = NULL` +
+	` last_challenged_at = NOW(), challenge_payload = EXCLUDED.challenge_payload, challenge_id = EXCLUDED.challenge_id, failure_count = 0, last_failed_at = NULL` +
 	` RETURNING last_challenged_at`
 
 // SetChallenge implements [domain.AuthAttemptRepository].
-func (a *AuthAttempt) SetChallenge(ctx context.Context, client database.QueryExecutor, projectID string, authAttemptID string, challenger domain.AuthChallenger) (err error) {
+func (a *AuthAttempt) SetChallenge(ctx context.Context, client database.QueryExecutor, projectID string, authAttemptID string, challenger domain.AuthChallenge) (err error) {
 	var payload json.RawMessage
-	if challenger.ChallengePayload() != nil {
-		payload, err = json.Marshal(challenger.ChallengePayload())
+	if challenger.Payload() != nil {
+		payload, err = json.Marshal(challenger.Payload())
 		if err != nil {
 			return fmt.Errorf("failed to marshal challenge payload: %w", err)
 		}
 	}
-	return client.QueryRow(ctx, authAttemptSetChallengeStmt, projectID, authAttemptID, challenger.Check().Type, payload).
-		Scan(&challenger.Check().LastChallengedAt)
+	var lastChallengedAt time.Time
+	err = client.QueryRow(ctx, authAttemptSetChallengeStmt, projectID, authAttemptID, challenger.Type(), payload, challenger.GetID()).
+		Scan(&lastChallengedAt)
+	if err != nil {
+		return err
+	}
+	challenger.SetLastChallengedAt(lastChallengedAt)
+	return nil
 }
 
-const authAttemptChallengeSucceededStmt = `INSERT INTO zitadel_nextgen.auth_attempt_checks` +
-	` (project_id, auth_attempt_id, type, last_verified_at, factor_payload, challenge_payload)` +
-	` VALUES ($1, $2, $3, NOW(), $4::JSONB, NULL)` +
-	` ON CONFLICT (project_id, auth_attempt_id, type) DO UPDATE SET` +
-	` last_verified_at = NOW(), factor_payload = EXCLUDED.factor_payload, challenge_payload = NULL` +
+const authAttemptChallengeSucceededStmt = `UPDATE zitadel_nextgen.auth_attempt_checks` +
+	` SET last_verified_at = NOW(), factor_payload = $4::JSONB, challenge_payload = NULL, challenge_id = NULL` +
+	` WHERE project_id = $1 AND auth_attempt_id = $2 AND type = $3 AND challenge_id = $5` +
 	` RETURNING last_verified_at`
 
 // ChallengeSucceeded implements [domain.AuthAttemptRepository].
-func (a *AuthAttempt) ChallengeSucceeded(ctx context.Context, client database.QueryExecutor, projectID string, authAttemptID string, check domain.AuthChecker) (err error) {
+func (a *AuthAttempt) ChallengeSucceeded(ctx context.Context, client database.QueryExecutor, projectID string, authAttemptID string, check domain.AuthFactor, id string) (err error) {
 	var factorPayload json.RawMessage
-	if factorer, ok := check.(domain.AuthFactorer); ok && factorer.FactorPayload() != nil {
-		factorPayload, err = json.Marshal(factorer.FactorPayload())
+	if check.Payload() != nil {
+		factorPayload, err = json.Marshal(check.Payload())
 		if err != nil {
 			return fmt.Errorf("failed to marshal factor payload: %w", err)
 		}
 	}
-	return client.QueryRow(ctx, authAttemptChallengeSucceededStmt, projectID, authAttemptID, check.Check().Type, factorPayload).
-		Scan(&check.Check().LastVerifiedAt)
+	var lastVerifiedAt time.Time
+	err = client.QueryRow(ctx, authAttemptChallengeSucceededStmt, projectID, authAttemptID, check.Type(), factorPayload, id).
+		Scan(&lastVerifiedAt)
+	if err != nil {
+		// No rows mean the challenge_id didn't match — it was re-issued or already consumed
+		return domain.ErrAuthAttemptStaleChallenge()
+	}
+	check.(domain.AuthFactor).SetLastVerifiedAt(lastVerifiedAt)
+	return nil
 }
 
-const authAttemptChallengeFailedStmt = `INSERT INTO zitadel_nextgen.auth_attempt_checks` +
-	` (project_id, auth_attempt_id, type, last_failed_at, failure_count)` +
-	` VALUES ($1, $2, $3, NOW(), 1)` +
-	` ON CONFLICT (project_id, auth_attempt_id, type) DO UPDATE SET` +
-	` last_failed_at = NOW(), failure_count = zitadel_nextgen.auth_attempt_checks.failure_count + 1` +
+const authAttemptChallengeFailedStmt = `UPDATE zitadel_nextgen.auth_attempt_checks` +
+	` SET last_failed_at = NOW(), failure_count = failure_count + 1` +
+	` WHERE project_id = $1 AND auth_attempt_id = $2 AND type = $3 AND challenge_id = $4` +
 	` RETURNING last_failed_at, failure_count`
 
 // ChallengeFailed implements [domain.AuthAttemptRepository].
-func (a *AuthAttempt) ChallengeFailed(ctx context.Context, client database.QueryExecutor, projectID string, authAttemptID string, challenger domain.AuthChecker) error {
-	return client.QueryRow(ctx, authAttemptChallengeFailedStmt, projectID, authAttemptID, challenger.Check().Type).
-		Scan(&challenger.Check().LastFailedAt, &challenger.Check().FailureCount)
+func (a *AuthAttempt) ChallengeFailed(ctx context.Context, client database.QueryExecutor, projectID string, authAttemptID string, challenger domain.AuthChallenge) error {
+	var lastFailedAt time.Time
+	var failureCount uint16
+	err := client.QueryRow(ctx, authAttemptChallengeFailedStmt, projectID, authAttemptID, challenger.Type(), challenger.GetID()).
+		Scan(&lastFailedAt, &failureCount)
+	if err != nil {
+		return err
+	}
+	challenger.SetLastFailedAt(lastFailedAt)
+	challenger.SetFailureCount(failureCount)
+	return nil
 }
 
 var _ domain.AuthAttemptRepository = (*AuthAttempt)(nil)
 
-func newAuthCheck(check *domain.AuthCheck, challenge, factor json.RawMessage) (_ domain.AuthChecker, err error) {
-	switch check.Type {
+func newAuthCheck(
+	checkType domain.AuthCheckType,
+	id string,
+	lastChallengedAt, lastFailedAt, verifiedAt time.Time,
+	failureCount uint16,
+	challenge, factor json.RawMessage,
+) (_ domain.AuthCheck, err error) {
+	switch checkType {
 	case domain.AuthCheckTypeUser:
-		userCheck := &domain.UserAuthCheck{
-			AuthCheck: check,
-			Factor:    new(domain.UserFactor),
-		}
 		if len(factor) > 0 {
-			err = json.Unmarshal(factor, userCheck.Factor)
+			userFactor := domain.NewAuthFactorUser("", verifiedAt)
+			err = json.Unmarshal(factor, &userFactor)
 			if err != nil {
 				return nil, fmt.Errorf("failed to unmarshal user auth check factor payload: %w", err)
 			}
+			return userFactor, nil
 		}
-		return userCheck, nil
+		return domain.NewAuthChallengeUser(id, lastChallengedAt, lastFailedAt, failureCount), nil
 	case domain.AuthCheckTypePassword:
-		return &domain.PasswordAuthCheck{
-			AuthCheck: check,
-		}, nil
-	case domain.AuthCheckTypePasskey:
-		passkeyCheck := &domain.PasskeyAuthCheck{
-			AuthCheck: check,
-			Challenge: new(domain.PasskeyAuthCheckChallenge),
-			Factor:    new(domain.PasskeyAuthCheckFactor),
+		if verifiedAt.IsZero() {
+			return domain.NewAuthChallengePassword(id, lastChallengedAt, lastFailedAt, failureCount), nil
 		}
-		if len(challenge) > 0 {
-			err = json.Unmarshal(challenge, passkeyCheck.Challenge)
+		return domain.NewAuthFactorPassword(verifiedAt), nil
+	case domain.AuthCheckTypePasskey:
+		if verifiedAt.IsZero() {
+			passkeyCheck := domain.NewAuthChallengePasskey(id, lastChallengedAt, lastFailedAt, failureCount)
+			err = json.Unmarshal(challenge, passkeyCheck)
 			if err != nil {
 				return nil, fmt.Errorf("failed to unmarshal passkey auth check challenge payload: %w", err)
 			}
+			return passkeyCheck, nil
 		}
-		if len(factor) > 0 {
-			err = json.Unmarshal(factor, passkeyCheck.Factor)
-			if err != nil {
-				return nil, fmt.Errorf("failed to unmarshal passkey auth check factor payload: %w", err)
-			}
+		passkeyFactor := domain.NewAuthFactorPasskey(verifiedAt)
+		err = json.Unmarshal(factor, passkeyFactor)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal passkey auth check factor payload: %w", err)
 		}
-		return passkeyCheck, nil
+		return passkeyFactor, nil
 	default:
-		log.Println("unsupported auth check type:", check.Type)
-		return check, nil
+		log.Println("unsupported auth check type:", checkType)
+		return nil, nil // TODO: err?
 	}
 }

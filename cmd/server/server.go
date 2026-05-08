@@ -11,7 +11,9 @@ import (
 	"github.com/spf13/viper"
 	"github.com/zitadel/nextgen/api/generated"
 	internal_api "github.com/zitadel/nextgen/internal/api"
+	"github.com/zitadel/nextgen/internal/service"
 	_ "github.com/zitadel/nextgen/internal/storage/database/dialect/all"
+	"github.com/zitadel/nextgen/internal/storage/database/repository"
 )
 
 func NewCommand() *cobra.Command {
@@ -26,11 +28,13 @@ func NewCommand() *cobra.Command {
 				return err
 			}
 
+			ctx := context.Background()
+
+			// ── Database ─────────────────────
 			connector, err := cfg.Database.Build()
 			if err != nil {
 				return err
 			}
-			ctx := context.Background()
 			pool, err := connector.Connect(ctx)
 			if err != nil {
 				return err
@@ -40,8 +44,30 @@ func NewCommand() *cobra.Command {
 				return err
 			}
 
+			// ── Repositories ─────────────────
+			projectRepo := &repository.Project{}
+			userRepo := &repository.User{}
+			userPasswordRepo := &repository.UserPasswordRepository{}
+			userPasskeyRepo := &repository.UserPasskeyRepository{}
+			sessionRepo := &repository.Session{}
+			attemptRepo := &repository.AuthAttempt{}
+
+			// ── Services ─────────────────────
+			authAttemptSvc := service.NewAuthAttemptService(
+				pool,
+				attemptRepo,
+				sessionRepo,
+				projectRepo,
+				userRepo,
+				userPasswordRepo,
+				userPasskeyRepo,
+			)
+
+			// ── HTTP handlers ─────────────────
+			handler := internal_api.NewHandler(authAttemptSvc)
+
 			server, err := api.NewServer(
-				internal_api.NewHandler(pool),
+				handler,
 				internal_api.NewSecurityHandler(),
 				api.WithErrorHandler(internal_api.OgenErrorHandler),
 			)

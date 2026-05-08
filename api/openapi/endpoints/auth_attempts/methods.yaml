@@ -27,30 +27,5 @@ post:
         application/json:
           schema:
             $ref: auth-attempt-response.yaml
-    '400':
-      description: Invalid request or invalid nonce
-      content:
-        application/json:
-          schema:
-            $ref: ../../components/error-details.yaml
-          example:
-            code: att.invalid_request
-            message: invalid request
-    '401':
-      description: Invalid credentials or nonce expired
-      content:
-        application/json:
-          schema:
-            $ref: ../../components/error-details.yaml
-          example:
-            code: auth.unauthorized
-            message: unauthorized
     default:
-      description: Unexpected error
-      content:
-        application/json:
-          schema:
-            $ref: ../../components/error-details.yaml
-          example:
-            code: internal
-            message: an unexpected error occurred
+      $ref: createAuthAttempt-error-response.yaml
