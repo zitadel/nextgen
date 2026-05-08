@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/ianlancetaylor/jsonschema"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
@@ -134,7 +133,7 @@ func (r *JSONSchemaRepository) Create(ctx context.Context, client database.Query
 		schema.InstanceID,
 		schema.URL,
 		database.NowInstruction,
-		JSON[*jsonschema.Schema]{Value: schema.Schema},
+		schema.Schema,
 	)
 	builder.WriteString(")")
 	_, err := client.Exec(ctx, builder.String(), builder.Args()...)
@@ -147,10 +146,10 @@ func (r *JSONSchemaRepository) Delete(ctx context.Context, client database.Query
 }
 
 type jsonSchemaRow struct {
-	InstanceID string                   `db:"instance_id"`
-	URL        string                   `db:"url"`
-	CreatedAt  time.Time                `db:"created_at"`
-	Payload    JSON[*jsonschema.Schema] `db:"payload"`
+	InstanceID string    `db:"instance_id"`
+	URL        string    `db:"url"`
+	CreatedAt  time.Time `db:"created_at"`
+	Payload    []byte    `db:"payload"`
 }
 
 func (r *jsonSchemaRow) toDomain() *domain.JSONSchema {
@@ -158,7 +157,7 @@ func (r *jsonSchemaRow) toDomain() *domain.JSONSchema {
 		InstanceID: r.InstanceID,
 		URL:        r.URL,
 		CreatedAt:  r.CreatedAt,
-		Schema:     r.Payload.Value,
+		Schema:     r.Payload,
 	}
 }
 

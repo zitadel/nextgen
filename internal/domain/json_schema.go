@@ -2,6 +2,7 @@ package domain
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -19,7 +20,7 @@ type JSONSchema struct {
 	InstanceID string
 	URL        string
 	CreatedAt  time.Time
-	Schema     *jsonschema.Schema
+	Schema     []byte
 }
 
 //go:generate go tool mockgen -typed -package domainmock -destination ./mock/json_schema.mock.go . JSONSchemaRepository
@@ -155,7 +156,7 @@ func (r *JSONSchemaResolver) resolveFromDatabase(ctx context.Context, client dat
 		r.repository.PrimaryKeyCondition(instanceID, schemaURL),
 	))
 	if err == nil {
-		return dbSchema.Schema, nil
+		return unmarshalJSONSchema(schemaURL, dbSchema.Schema)
 	}
 	var noRowFoundError *database.NoRowFoundError
 	if !errors.As(err, &noRowFoundError) {
@@ -165,14 +166,14 @@ func (r *JSONSchemaResolver) resolveFromDatabase(ctx context.Context, client dat
 		return nil, fmt.Errorf("schema not found in database: %w", err)
 	}
 
-	schema, err := r.resolveFromURL(ctx, schemaURL, opts)
+	schema, data, err := r.resolveFromURL(ctx, schemaURL, opts)
 	if err != nil {
 		return nil, err
 	}
 	dbSchema = &JSONSchema{
 		InstanceID: instanceID,
 		URL:        schemaURL,
-		Schema:     schema,
+		Schema:     data,
 	}
 	if err := r.repository.Create(ctx, client, dbSchema); err != nil {
 		return nil, err
@@ -180,15 +181,22 @@ func (r *JSONSchemaResolver) resolveFromDatabase(ctx context.Context, client dat
 	return schema, nil
 }
 
-func (r *JSONSchemaResolver) resolveFromURL(ctx context.Context, url string, opts *JSONSchemaResolverOptions) (*jsonschema.Schema, error) {
+func (r *JSONSchemaResolver) resolveFromURL(ctx context.Context, url string, opts *JSONSchemaResolverOptions) (*jsonschema.Schema, []byte, error) {
+	data, err := httputil.Get(ctx, url, opts.HTTPClient, "application/json")
+	if err != nil {
+		return nil, nil, err
+	}
+	schema, err := unmarshalJSONSchema(url, data)
+	if err != nil {
+		return nil, nil, err
+	}
+	return schema, data, err
+}
+
+func unmarshalJSONSchema(schemaURL string, data []byte) (*jsonschema.Schema, error) {
 	var dst any
-	err := httputil.GetJSON(ctx, url, opts.HTTPClient, &dst)
-	if err != nil {
+	if err := json.Unmarshal(data, &dst); err != nil {
 		return nil, err
 	}
-	schema, err := jsonschema.SchemaFromJSON(url, nil, dst)
-	if err != nil {
-		return nil, err
-	}
-	return schema, nil
+	return jsonschema.SchemaFromJSON(schemaURL, nil, dst)
 }

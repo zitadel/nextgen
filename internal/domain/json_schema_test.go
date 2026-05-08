@@ -2,14 +2,11 @@ package domain_test
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/ianlancetaylor/jsonschema"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -31,29 +28,6 @@ func (stubCondition) Write(*database.StatementBuilder) {}
 func (stubCondition) IsRestrictingColumn(database.Column) bool { return false }
 
 var pkCond stubCondition
-
-// draft2020Meta is included in JSON bodies so [jsonschema.SchemaFromJSON] and
-// unmarshaling into [jsonschema.Schema] do not treat the fetch URL as a schema version.
-const draft2020Meta = `"$schema":"https://json-schema.org/draft/2020-12/schema"`
-
-func mustJSONSchema(t *testing.T, raw string) *jsonschema.Schema {
-	t.Helper()
-	var s jsonschema.Schema
-	err := json.Unmarshal([]byte(raw), &s)
-	require.NoError(t, err)
-	return &s
-}
-
-// mustSchemaFromJSON builds a schema without running [jsonschema.Schema.UnmarshalJSON],
-// which eagerly resolves $ref and would reject remote URIs without a loader.
-func mustSchemaFromJSON(t *testing.T, raw string) *jsonschema.Schema {
-	t.Helper()
-	var v any
-	require.NoError(t, json.Unmarshal([]byte(raw), &v))
-	s, err := jsonschema.SchemaFromJSON("", nil, v)
-	require.NoError(t, err)
-	return s
-}
 
 func TestNewJSONSchemaResolver(t *testing.T) {
 	mockRepo := domainmock.NewMockJSONSchemaRepository(gomock.NewController(t))
@@ -100,10 +74,11 @@ func TestNewJSONSchemaResolver(t *testing.T) {
 
 func TestJSONSchemaResolver_Resolve(t *testing.T) {
 	ctx := context.Background()
-	const instanceID = "inst-1"
-	const simpleURL = "https://example.test/schemas/simple.json"
-
-	simpleSchema := mustJSONSchema(t, `{"type":"object"}`)
+	const (
+		instanceID   = "inst-1"
+		simpleURL    = "https://example.test/schemas/simple.json"
+		simpleSchema = `{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object"}`
+	)
 
 	tests := []struct {
 		name string
@@ -115,7 +90,7 @@ func TestJSONSchemaResolver_Resolve(t *testing.T) {
 				mockRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
 				mockRepo.EXPECT().PrimaryKeyCondition(instanceID, simpleURL).Return(pkCond).Times(1)
 				mockRepo.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(&domain.JSONSchema{
-					Schema: simpleSchema,
+					Schema: []byte(simpleSchema),
 				}, nil).Times(1)
 
 				resolver, err := domain.NewJSONSchemaResolver(mockRepo, 128)
@@ -138,7 +113,7 @@ func TestJSONSchemaResolver_Resolve(t *testing.T) {
 				mockRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
 				mockRepo.EXPECT().PrimaryKeyCondition(instanceID, simpleURL).Return(pkCond)
 				mockRepo.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(&domain.JSONSchema{
-					Schema: simpleSchema,
+					Schema: []byte(simpleSchema),
 				}, nil)
 
 				resolver, err := domain.NewJSONSchemaResolver(mockRepo, 128)
@@ -170,7 +145,7 @@ func TestJSONSchemaResolver_Resolve(t *testing.T) {
 				srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(http.StatusOK)
-					_, _ = w.Write([]byte(fmt.Sprintf(`{%s,"type":"object"}`, draft2020Meta)))
+					_, _ = w.Write([]byte(simpleSchema))
 				}))
 				t.Cleanup(srv.Close)
 
@@ -213,11 +188,12 @@ func TestJSONSchemaResolver_Resolve(t *testing.T) {
 		{
 			name: "max resolve depth",
 			run: func(t *testing.T, ctrl *gomock.Controller) {
-				const urlA = "https://example.test/a.json"
-				const urlB = "https://example.test/b.json"
-
-				schemaA := mustSchemaFromJSON(t, `{"$schema":"https://json-schema.org/draft/2020-12/schema","$ref":"https://example.test/b.json"}`)
-				schemaB := mustSchemaFromJSON(t, `{"$schema":"https://json-schema.org/draft/2020-12/schema","$ref":"https://example.test/c.json"}`)
+				const (
+					urlA    = "https://example.test/a.json"
+					urlB    = "https://example.test/b.json"
+					schemaA = `{"$schema":"https://json-schema.org/draft/2020-12/schema","$ref":"https://example.test/b.json"}`
+					schemaB = `{"$schema":"https://json-schema.org/draft/2020-12/schema","$ref":"https://example.test/c.json"}`
+				)
 
 				mockRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
 				mockRepo.EXPECT().PrimaryKeyCondition(gomock.Any(), gomock.Any()).Return(pkCond).AnyTimes()
@@ -228,9 +204,9 @@ func TestJSONSchemaResolver_Resolve(t *testing.T) {
 						getCalls++
 						switch getCalls {
 						case 1:
-							return &domain.JSONSchema{Schema: schemaA}, nil
+							return &domain.JSONSchema{Schema: []byte(schemaA)}, nil
 						case 2:
-							return &domain.JSONSchema{Schema: schemaB}, nil
+							return &domain.JSONSchema{Schema: []byte(schemaB)}, nil
 						default:
 							t.Fatalf("unexpected Get call %d", getCalls)
 							return nil, errors.New("unexpected")
@@ -256,7 +232,7 @@ func TestJSONSchemaResolver_Resolve(t *testing.T) {
 				srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(http.StatusOK)
-					_, _ = w.Write([]byte(fmt.Sprintf(`{%s,"type":"object"}`, draft2020Meta)))
+					_, _ = w.Write([]byte(simpleSchema))
 				}))
 				t.Cleanup(srv.Close)
 

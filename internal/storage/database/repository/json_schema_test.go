@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/ianlancetaylor/jsonschema"
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -23,7 +22,7 @@ func TestJSONSchemaRepository_CRUD(t *testing.T) {
 	schema := &domain.JSONSchema{
 		InstanceID: instanceID,
 		URL:        "https://example.com/schemas/user.v1.json",
-		Schema:     testJSONSchema(t),
+		Schema:     []byte(`{"type":"object","properties":{"name":{"type":"string"}}}`),
 	}
 	err = repo.Create(t.Context(), tx, schema)
 	require.NoError(t, err)
@@ -57,12 +56,4 @@ func TestJSONSchemaRepository_DeleteRequiresPK(t *testing.T) {
 
 	err := repo.Delete(t.Context(), tx, repo.InstanceIDCondition("only-instance"))
 	require.ErrorIs(t, err, new(database.MissingConditionError))
-}
-
-func testJSONSchema(t *testing.T) *jsonschema.Schema {
-	t.Helper()
-	var schema jsonschema.Schema
-	err := json.Unmarshal([]byte(`{"type":"object","properties":{"name":{"type":"string"}}}`), &schema)
-	require.NoError(t, err)
-	return &schema
 }
