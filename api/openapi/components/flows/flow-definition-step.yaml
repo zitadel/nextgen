@@ -97,9 +97,10 @@ properties:
             of another flow (when `action` is `switch` or `pivot`).
           example: password
         action:
-          type: string
-          enum: [switch, pivot]
-          nullable: true
+          oneOf:
+            - type: string
+              enum: [switch, pivot]
+            - type: 'null'
           description: |
             How to interpret `target`:
             - null (omitted): transition to a step in the current flow.

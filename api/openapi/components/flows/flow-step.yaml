@@ -14,9 +14,7 @@ properties:
     oneOf:
       - type: string
       - type: 'null'
-    type: string
     description: Error message from a previous failed submission.
-    nullable: true
   complete:
     type: string
     enum: [redirect, show]
