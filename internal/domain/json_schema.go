@@ -114,13 +114,20 @@ func (o *JSONSchemaResolverOptions) defaults() {
 // It first tried to find the fully resolved schema in the cache.
 // If not found in the cache, it looks for the schema and all its references by URL from the database.
 // If opts contains an HTTP client, it will also try to resolve the schema from the URL and store it in the database.
-func (r *JSONSchemaResolver) Resolve(ctx context.Context, client database.QueryExecutor, instanceID, schemaURL string, opts JSONSchemaResolverOptions) (*jsonschema.Schema, error) {
+func (r *JSONSchemaResolver) Resolve(
+	ctx context.Context,
+	client database.QueryExecutor,
+	instanceID string,
+	schemaURL string,
+	rootSchema []byte,
+	opts JSONSchemaResolverOptions,
+) (*jsonschema.Schema, error) {
 	cacheKey := jsonSchemaCacheKey{instanceID, schemaURL}
 	if schema, ok := r.cache.Get(cacheKey); ok {
 		return schema, nil
 	}
 	opts.defaults()
-	schema, err := r.resolveRecursively(ctx, client, instanceID, schemaURL, 0, &opts)
+	schema, err := r.resolveRecursively(ctx, client, instanceID, schemaURL, 0, rootSchema, &opts)
 	if err != nil {
 		return nil, err
 	}
@@ -128,17 +135,31 @@ func (r *JSONSchemaResolver) Resolve(ctx context.Context, client database.QueryE
 	return schema, nil
 }
 
-func (r *JSONSchemaResolver) resolveRecursively(ctx context.Context, client database.QueryExecutor, instanceID, schemaURL string, depth int, opts *JSONSchemaResolverOptions) (*jsonschema.Schema, error) {
+func (r *JSONSchemaResolver) resolveRecursively(
+	ctx context.Context,
+	client database.QueryExecutor,
+	instanceID string,
+	schemaURL string,
+	depth int,
+	schemaData []byte,
+	opts *JSONSchemaResolverOptions,
+) (_ *jsonschema.Schema, err error) {
 	if depth > opts.MaxResolveDepth {
 		return nil, fmt.Errorf("max resolve depth reached")
 	}
-	schema, err := r.resolveFromDatabase(ctx, client, instanceID, schemaURL, opts)
+	if len(schemaData) == 0 {
+		schemaData, err = r.getFromDatabase(ctx, client, instanceID, schemaURL, opts)
+		if err != nil {
+			return nil, err
+		}
+	}
+	schema, err := unmarshalJSONSchema(schemaURL, schemaData)
 	if err != nil {
 		return nil, err
 	}
 	err = schema.Resolve(&jsonschema.ResolveOpts{
 		Loader: func(schemaID string, uri *url.URL) (*jsonschema.Schema, error) {
-			next, err := r.resolveRecursively(ctx, client, instanceID, uri.String(), depth+1, opts)
+			next, err := r.resolveRecursively(ctx, client, instanceID, uri.String(), depth+1, nil, opts)
 			if err != nil {
 				return nil, err
 			}
@@ -151,12 +172,12 @@ func (r *JSONSchemaResolver) resolveRecursively(ctx context.Context, client data
 	return schema, nil
 }
 
-func (r *JSONSchemaResolver) resolveFromDatabase(ctx context.Context, client database.QueryExecutor, instanceID, schemaURL string, opts *JSONSchemaResolverOptions) (*jsonschema.Schema, error) {
+func (r *JSONSchemaResolver) getFromDatabase(ctx context.Context, client database.QueryExecutor, instanceID, schemaURL string, opts *JSONSchemaResolverOptions) ([]byte, error) {
 	dbSchema, err := r.repository.Get(ctx, client, database.WithCondition(
 		r.repository.PrimaryKeyCondition(instanceID, schemaURL),
 	))
 	if err == nil {
-		return unmarshalJSONSchema(schemaURL, dbSchema.Schema)
+		return dbSchema.Schema, nil
 	}
 	var noRowFoundError *database.NoRowFoundError
 	if !errors.As(err, &noRowFoundError) {
@@ -166,7 +187,7 @@ func (r *JSONSchemaResolver) resolveFromDatabase(ctx context.Context, client dat
 		return nil, fmt.Errorf("schema not found in database: %w", err)
 	}
 
-	schema, data, err := r.resolveFromURL(ctx, schemaURL, opts)
+	data, err := r.resolveFromURL(ctx, schemaURL, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -178,19 +199,15 @@ func (r *JSONSchemaResolver) resolveFromDatabase(ctx context.Context, client dat
 	if err := r.repository.Create(ctx, client, dbSchema); err != nil {
 		return nil, err
 	}
-	return schema, nil
+	return data, nil
 }
 
-func (r *JSONSchemaResolver) resolveFromURL(ctx context.Context, url string, opts *JSONSchemaResolverOptions) (*jsonschema.Schema, []byte, error) {
+func (r *JSONSchemaResolver) resolveFromURL(ctx context.Context, url string, opts *JSONSchemaResolverOptions) ([]byte, error) {
 	data, err := httputil.Get(ctx, url, opts.HTTPClient, "application/json")
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	schema, err := unmarshalJSONSchema(url, data)
-	if err != nil {
-		return nil, nil, err
-	}
-	return schema, data, err
+	return data, err
 }
 
 func unmarshalJSONSchema(schemaURL string, data []byte) (*jsonschema.Schema, error) {
