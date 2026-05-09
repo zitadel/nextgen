@@ -1,6 +1,10 @@
 package domain_test
 
 import (
+	"context"
+	"errors"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -68,7 +72,6 @@ func TestNewJSONSchemaResolver(t *testing.T) {
 	}
 }
 
-/*
 func TestJSONSchemaResolver_Resolve(t *testing.T) {
 	ctx := context.Background()
 	const (
@@ -94,11 +97,11 @@ func TestJSONSchemaResolver_Resolve(t *testing.T) {
 				require.NoError(t, err)
 
 				opts := domain.JSONSchemaResolverOptions{}
-				got1, err := resolver.Resolve(ctx, nil, instanceID, simpleURL, opts)
+				got1, err := resolver.Resolve(ctx, nil, instanceID, simpleURL, nil, opts)
 				require.NoError(t, err)
 				require.NotNil(t, got1)
 
-				got2, err := resolver.Resolve(ctx, nil, instanceID, simpleURL, opts)
+				got2, err := resolver.Resolve(ctx, nil, instanceID, simpleURL, nil, opts)
 				require.NoError(t, err)
 				require.NotNil(t, got2)
 				assert.Same(t, got1, got2)
@@ -116,7 +119,7 @@ func TestJSONSchemaResolver_Resolve(t *testing.T) {
 				resolver, err := domain.NewJSONSchemaResolver(mockRepo, 128)
 				require.NoError(t, err)
 
-				got, err := resolver.Resolve(ctx, nil, instanceID, simpleURL, domain.JSONSchemaResolverOptions{})
+				got, err := resolver.Resolve(ctx, nil, instanceID, simpleURL, nil, domain.JSONSchemaResolverOptions{})
 				require.NoError(t, err)
 				require.NotNil(t, got)
 			},
@@ -131,7 +134,7 @@ func TestJSONSchemaResolver_Resolve(t *testing.T) {
 				resolver, err := domain.NewJSONSchemaResolver(mockRepo, 128)
 				require.NoError(t, err)
 
-				_, err = resolver.Resolve(ctx, nil, instanceID, simpleURL, domain.JSONSchemaResolverOptions{})
+				_, err = resolver.Resolve(ctx, nil, instanceID, simpleURL, nil, domain.JSONSchemaResolverOptions{})
 				require.Error(t, err)
 				assert.ErrorContains(t, err, "schema not found")
 			},
@@ -160,7 +163,7 @@ func TestJSONSchemaResolver_Resolve(t *testing.T) {
 				resolver, err := domain.NewJSONSchemaResolver(mockRepo, 128)
 				require.NoError(t, err)
 
-				_, err = resolver.Resolve(ctx, nil, instanceID, srv.URL, domain.JSONSchemaResolverOptions{
+				_, err = resolver.Resolve(ctx, nil, instanceID, srv.URL, nil, domain.JSONSchemaResolverOptions{
 					HTTPClient: srv.Client(),
 				})
 				require.NoError(t, err)
@@ -177,7 +180,7 @@ func TestJSONSchemaResolver_Resolve(t *testing.T) {
 				resolver, err := domain.NewJSONSchemaResolver(mockRepo, 128)
 				require.NoError(t, err)
 
-				_, err = resolver.Resolve(ctx, nil, instanceID, simpleURL, domain.JSONSchemaResolverOptions{})
+				_, err = resolver.Resolve(ctx, nil, instanceID, simpleURL, nil, domain.JSONSchemaResolverOptions{})
 				require.Error(t, err)
 				assert.Equal(t, dbErr, err)
 			},
@@ -214,7 +217,7 @@ func TestJSONSchemaResolver_Resolve(t *testing.T) {
 				resolver, err := domain.NewJSONSchemaResolver(mockRepo, 128)
 				require.NoError(t, err)
 
-				_, err = resolver.Resolve(ctx, nil, instanceID, urlA, domain.JSONSchemaResolverOptions{
+				_, err = resolver.Resolve(ctx, nil, instanceID, urlA, nil, domain.JSONSchemaResolverOptions{
 					MaxResolveDepth: 1,
 				})
 				require.Error(t, err)
@@ -241,7 +244,7 @@ func TestJSONSchemaResolver_Resolve(t *testing.T) {
 				resolver, err := domain.NewJSONSchemaResolver(mockRepo, 128)
 				require.NoError(t, err)
 
-				_, err = resolver.Resolve(ctx, nil, instanceID, srv.URL, domain.JSONSchemaResolverOptions{
+				_, err = resolver.Resolve(ctx, nil, instanceID, srv.URL, nil, domain.JSONSchemaResolverOptions{
 					HTTPClient: srv.Client(),
 				})
 				require.Error(t, err)
@@ -262,14 +265,62 @@ func TestJSONSchemaResolver_Resolve(t *testing.T) {
 				mockRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
 				mockRepo.EXPECT().PrimaryKeyCondition(instanceID, srv.URL).Return(pkCond)
 				mockRepo.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, database.NewNoRowFoundError(nil))
+				mockRepo.EXPECT().Create(gomock.Any(), gomock.Any(), gomock.AssignableToTypeOf(&domain.JSONSchema{})).Return(nil)
 
 				resolver, err := domain.NewJSONSchemaResolver(mockRepo, 128)
 				require.NoError(t, err)
 
-				_, err = resolver.Resolve(ctx, nil, instanceID, srv.URL, domain.JSONSchemaResolverOptions{
+				_, err = resolver.Resolve(ctx, nil, instanceID, srv.URL, nil, domain.JSONSchemaResolverOptions{
 					HTTPClient: srv.Client(),
 				})
 				require.Error(t, err)
+			},
+		},
+		{
+			name: "root schema bypasses initial repository lookup",
+			run: func(t *testing.T, ctrl *gomock.Controller) {
+				mockRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
+				resolver, err := domain.NewJSONSchemaResolver(mockRepo, 128)
+				require.NoError(t, err)
+
+				got, err := resolver.Resolve(ctx, nil, instanceID, simpleURL, []byte(simpleSchema), domain.JSONSchemaResolverOptions{})
+				require.NoError(t, err)
+				require.NotNil(t, got)
+			},
+		},
+		{
+			name: "invalid root schema payload returns error",
+			run: func(t *testing.T, ctrl *gomock.Controller) {
+				mockRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
+				resolver, err := domain.NewJSONSchemaResolver(mockRepo, 128)
+				require.NoError(t, err)
+
+				_, err = resolver.Resolve(ctx, nil, instanceID, simpleURL, []byte(`{"type":`), domain.JSONSchemaResolverOptions{})
+				require.Error(t, err)
+			},
+		},
+		{
+			name: "root schema with ref still resolves dependencies",
+			run: func(t *testing.T, ctrl *gomock.Controller) {
+				const (
+					rootURL   = "https://example.test/root.json"
+					refURL    = "https://example.test/ref.json"
+					rootSchema = `{"$schema":"https://json-schema.org/draft/2020-12/schema","$ref":"https://example.test/ref.json"}`
+					refSchema  = `{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object"}`
+				)
+
+				mockRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
+				mockRepo.EXPECT().PrimaryKeyCondition(instanceID, refURL).Return(pkCond).Times(1)
+				mockRepo.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(&domain.JSONSchema{
+					Schema: []byte(refSchema),
+				}, nil).Times(1)
+
+				resolver, err := domain.NewJSONSchemaResolver(mockRepo, 128)
+				require.NoError(t, err)
+
+				got, err := resolver.Resolve(ctx, nil, instanceID, rootURL, []byte(rootSchema), domain.JSONSchemaResolverOptions{})
+				require.NoError(t, err)
+				require.NotNil(t, got)
 			},
 		},
 	}
@@ -281,4 +332,3 @@ func TestJSONSchemaResolver_Resolve(t *testing.T) {
 		})
 	}
 }
-*/
