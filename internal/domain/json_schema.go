@@ -57,7 +57,16 @@ type jsonSchemaConditions interface {
 const (
 	DefaultMaxJSONSchemaResolveDepth = 10
 	DefaultMaxJSONSchemaSize         = 1 << 20 // 1 MB
+
+	// jsonSchemaResolverCacheKeySep separates instance ID and schema URL in [JSONSchemaResolverCacheKey].
+	// Instance IDs must not contain this rune (true for typical IDs).
+	jsonSchemaResolverCacheKeySep = "\x00"
 )
+
+// jsonSchemaResolverCacheKey is the string used as an LRU key for a resolved schema for this instance and URL.
+func jsonSchemaResolverCacheKey(instanceID, schemaURL string) string {
+	return instanceID + jsonSchemaResolverCacheKeySep + schemaURL
+}
 
 // JSONSchemaResolver retrieves JSON schemas by their URL recursively,
 // starting from the given schema URL and following all references in the schema.
@@ -66,68 +75,55 @@ type JSONSchemaResolver struct {
 	repository JSONSchemaRepository
 	// cache of fully resolved JSON schemas,
 	// keyed by instanceID and schemaURL
-	cache *lru.TwoQueueCache[jsonSchemaCacheKey, *jsonschema.Schema]
+	cache           *lru.TwoQueueCache[string, *jsonschema.Schema]
+	maxResolveDepth int
+	maxSize         int
+	httpClient      *http.Client
 }
 
-type jsonSchemaCacheKey struct {
-	instanceID string
-	schemaURL  string
-}
-
-// NewJSONSchemaResolver creates a new JSONSchemaResolver with the given repository and cache size.
-// The cache size is the maximum number of fully resolved schemas that will be cached in application memory.
-func NewJSONSchemaResolver(repository JSONSchemaRepository, cacheSize int) (*JSONSchemaResolver, error) {
-	cache, err := lru.New2Q[jsonSchemaCacheKey, *jsonschema.Schema](cacheSize)
-	if err != nil {
-		return nil, err
+// NewJSONSchemaResolver wires a resolver with shared repository, LRU cache, resolve limits, and an optional HTTP client for ingestion.
+func NewJSONSchemaResolver(
+	repository JSONSchemaRepository,
+	cache *lru.TwoQueueCache[string, *jsonschema.Schema],
+	maxResolveDepth int,
+	maxSize int,
+	httpClient *http.Client,
+) *JSONSchemaResolver {
+	if cache == nil {
+		panic("cache is required")
+	}
+	if maxResolveDepth == 0 {
+		maxResolveDepth = DefaultMaxJSONSchemaResolveDepth
+	}
+	if maxSize == 0 {
+		maxSize = DefaultMaxJSONSchemaSize
 	}
 	return &JSONSchemaResolver{
-		repository: repository,
-		cache:      cache,
-	}, nil
-}
-
-// JSONSchemaResolverOptions are the options for [JSONSchemaResolver.Resolve]
-type JSONSchemaResolverOptions struct {
-	// Maximum depth of schema resolution, defaults to [DefaultMaxJSONSchemaResolveDepth] if unset.
-	MaxResolveDepth int
-	// Maximum payload size of a retrieved schema in bytes, defaults to [DefaultMaxJSONSchemaSize] if unset.
-	MaxSize int
-	// HTTP client to use for resolving schemas.
-	// If unset, schemas will not be resolved from remote URLs (just the database will be used).
-	// Set it when importing schemas, so the database can be populated when the schema is first referenced.
-	// DO NOT set it when validating data, only schemas defined in the database are trusted.
-	HTTPClient *http.Client
-}
-
-func (o *JSONSchemaResolverOptions) defaults() {
-	if o.MaxResolveDepth == 0 {
-		o.MaxResolveDepth = DefaultMaxJSONSchemaResolveDepth
-	}
-	if o.MaxSize == 0 {
-		o.MaxSize = DefaultMaxJSONSchemaSize
+		repository:      repository,
+		cache:           cache,
+		maxResolveDepth: maxResolveDepth,
+		maxSize:         maxSize,
+		httpClient:      httpClient,
 	}
 }
 
 // Resolve retrieves a JSON schema by its URL recursively,
 // starting from the given schema URL and following all references in the schema.
-// It first tried to find the fully resolved schema in the cache.
+// It first tries to find the fully resolved schema in the cache.
 // If not found in the cache, it looks for the schema and all its references by URL from the database.
-// If opts contains an HTTP client, it will also try to resolve the schema from the URL and store it in the database.
+// When the resolver has an HTTP client, it can fetch a missing schema from its URL and persist it.
 func (r *JSONSchemaResolver) Resolve(
 	ctx context.Context,
 	client database.QueryExecutor,
 	instanceID string,
 	schemaURL string,
 	rootSchema []byte,
-	opts JSONSchemaResolverOptions,
 ) (*jsonschema.Schema, error) {
-	cacheKey := jsonSchemaCacheKey{instanceID, schemaURL}
+	cacheKey := jsonSchemaResolverCacheKey(instanceID, schemaURL)
 	if schema, ok := r.cache.Get(cacheKey); ok {
 		return schema, nil
 	}
-	opts.defaults()
-	schema, err := r.resolveRecursively(ctx, client, instanceID, schemaURL, 0, rootSchema, &opts)
+	schema, err := r.resolveRecursively(ctx, client, instanceID, schemaURL, 0, rootSchema)
 	if err != nil {
 		return nil, err
 	}
@@ -142,13 +138,12 @@ func (r *JSONSchemaResolver) resolveRecursively(
 	schemaURL string,
 	depth int,
 	schemaData []byte,
-	opts *JSONSchemaResolverOptions,
 ) (_ *jsonschema.Schema, err error) {
-	if depth > opts.MaxResolveDepth {
+	if depth > r.maxResolveDepth {
 		return nil, fmt.Errorf("max resolve depth reached")
 	}
 	if len(schemaData) == 0 {
-		schemaData, err = r.getFromDatabase(ctx, client, instanceID, schemaURL, opts)
+		schemaData, err = r.getFromDatabase(ctx, client, instanceID, schemaURL)
 		if err != nil {
 			return nil, err
 		}
@@ -159,7 +154,7 @@ func (r *JSONSchemaResolver) resolveRecursively(
 	}
 	err = schema.Resolve(&jsonschema.ResolveOpts{
 		Loader: func(schemaID string, uri *url.URL) (*jsonschema.Schema, error) {
-			next, err := r.resolveRecursively(ctx, client, instanceID, uri.String(), depth+1, nil, opts)
+			next, err := r.resolveRecursively(ctx, client, instanceID, uri.String(), depth+1, nil)
 			if err != nil {
 				return nil, err
 			}
@@ -172,7 +167,7 @@ func (r *JSONSchemaResolver) resolveRecursively(
 	return schema, nil
 }
 
-func (r *JSONSchemaResolver) getFromDatabase(ctx context.Context, client database.QueryExecutor, instanceID, schemaURL string, opts *JSONSchemaResolverOptions) ([]byte, error) {
+func (r *JSONSchemaResolver) getFromDatabase(ctx context.Context, client database.QueryExecutor, instanceID, schemaURL string) ([]byte, error) {
 	dbSchema, err := r.repository.Get(ctx, client, database.WithCondition(
 		r.repository.PrimaryKeyCondition(instanceID, schemaURL),
 	))
@@ -183,11 +178,11 @@ func (r *JSONSchemaResolver) getFromDatabase(ctx context.Context, client databas
 	if !errors.As(err, &noRowFoundError) {
 		return nil, err
 	}
-	if opts.HTTPClient == nil {
+	if r.httpClient == nil {
 		return nil, fmt.Errorf("schema not found in database: %w", err)
 	}
 
-	data, err := r.resolveFromURL(ctx, schemaURL, opts)
+	data, err := r.resolveFromURL(ctx, schemaURL)
 	if err != nil {
 		return nil, err
 	}
@@ -202,8 +197,8 @@ func (r *JSONSchemaResolver) getFromDatabase(ctx context.Context, client databas
 	return data, nil
 }
 
-func (r *JSONSchemaResolver) resolveFromURL(ctx context.Context, url string, opts *JSONSchemaResolverOptions) ([]byte, error) {
-	data, err := httputil.Get(ctx, url, opts.HTTPClient, "application/json")
+func (r *JSONSchemaResolver) resolveFromURL(ctx context.Context, url string) ([]byte, error) {
+	data, err := httputil.Get(ctx, url, r.httpClient, "application/json")
 	if err != nil {
 		return nil, err
 	}
