@@ -8,7 +8,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-// AuthAttempt represents the object defined [here](https://github.com/zitadel/nextgen/blob/15bd7f438d709fcd5205a163e24374f6f667b68f/docs/design/api/resource-map.md#auth-flows)
+// AuthAttempt represents the object defined [here](https://github.com/zitadel/nextgen/blob/main/docs/design/api/resource-map.md#auth-flows)
 // It is short lived and should therefore be stored near the client, do not store PII data in it.
 type AuthAttempt struct {
 	// ProjectID links to [Project].
@@ -83,6 +83,11 @@ type AuthAttemptRepository interface {
 	GetByHandoffToken(ctx context.Context, client database.QueryExecutor, projectID, handoffToken string) (*AuthAttempt, error)
 	// Creates an auth attempt including all defined fields (except read-only fields).
 	// The repository MUST set the [AuthAttempt.CreatedAt] field to the current time.
+	// The repsoitory MUST store [AuthAttempts.Checks] following this recipe:
+	//  - If the check does NOT implement [AuthFactorer] AND [AuthChallenger] if MUST NOT SET `LastVerifiedAt` and `LastChallengedAt`.
+	//  - If the check does implement [AuthFactorer] but NOT [AuthChallenger] it MUST set `LastVerifiedAt` but NOT `LastChallengedAt`.
+	//  - If the check does NOT implement [AuthFactorer] but [AuthChallenger] it MUST NOT set `LastVerifiedAt` but `LastChallengedAt`.
+	//  - If the check does implement [AuthFactorer] AND [AuthChallenger] it MUST NOT set `LastVerifiedAt` but `LastChallengedAt`.
 	Create(ctx context.Context, client database.QueryExecutor, authAttempt *AuthAttempt) error
 	// Delete an auth attempt by its ID and project ID.
 	Delete(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string) error

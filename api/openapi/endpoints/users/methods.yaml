@@ -1,6 +1,9 @@
 get:
   operationId: listUsers
   summary: List users
+  # TODO: migrate pagination from offset/limit to cursor-based (page_token / next_page_token)
+  #       following the pattern used in GET /sessions. offset.yaml should be removed
+  #       and replaced with components/parameters/page-token.yaml.
   tags:
     - User
   parameters:

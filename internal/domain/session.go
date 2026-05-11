@@ -7,7 +7,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-// Session represents the object defined [here](https://github.com/zitadel/nextgen/blob/15bd7f438d709fcd5205a163e24374f6f667b68f/docs/design/api/resource-map.md#sessions-durable-post-auth-only)
+// Session represents the object defined [here](https://github.com/zitadel/nextgen/blob/main/docs/design/api/resource-map.md#sessions-durable-post-auth-only)
 type Session struct {
 	// ProjectID links to [Project].
 	ProjectID string

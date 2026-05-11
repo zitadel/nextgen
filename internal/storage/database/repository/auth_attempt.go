@@ -328,6 +328,11 @@ func newAuthCheck(check *domain.AuthCheck, challenge, factor json.RawMessage) (_
 			}
 		}
 		return passkeyCheck, nil
+	case domain.AuthCheckTypeIdentityProvider:
+		identityProviderCheck := &domain.IdentityProviderAuthCheck{
+			AuthCheck: check,
+		}
+		return identityProviderCheck, nil
 	default:
 		log.Println("unsupported auth check type:", check.Type)
 		return check, nil

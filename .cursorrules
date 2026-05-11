@@ -1,0 +1,11 @@
+Tool-specific rules in this file are a bootstrap only.
+
+Authoritative instructions live in scoped `AGENTS.md` files.
+
+Always read in this order:
+1. Root `AGENTS.md`
+2. The nearest scoped `AGENTS.md` for the files you read or change
+
+Start with:
+- [AGENTS.md](AGENTS.md)
+- [internal/storage/AGENTS.md](internal/storage/AGENTS.md)

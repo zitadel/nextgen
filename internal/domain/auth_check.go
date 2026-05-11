@@ -23,7 +23,7 @@ const (
 	AuthCheckTypeUser
 	AuthCheckTypePassword
 	AuthCheckTypePasskey
-	AuthCheckIdentityProvider
+	AuthCheckTypeIdentityProvider
 )
 
 func (a AuthCheck) IsType(typ AuthCheckType) bool {
