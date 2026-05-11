@@ -1482,11 +1482,11 @@ type FlowResponse struct {
 	// Resolved branding inherited from the app → team → project hierarchy.
 	// Determined at flow creation based on audience context. Does not change between steps.
 	Branding OptBranding `json:"branding"`
-	// Present on the `complete` step when a redirect is needed.
+	// Present when `step.complete` is `redirect`.
 	RedirectURI OptURI `json:"redirect_uri"`
 	// Short-lived, audience-bound token produced on flow completion.
 	// Exchange it for a session via `POST /sessions/exchange`.
-	// Only present when `step.type` is `complete`.
+	// Only present when `step.complete` is set.
 	HandoffToken OptString `json:"handoff_token"`
 	// Expiry timestamp for `handoff_token`. Only present when
 	// `handoff_token` is set.
@@ -1609,51 +1609,27 @@ func (*FlowResponseHeaders) createFlowRes() {}
 // Ref: #
 type FlowStep struct {
 	// Step name from the flow definition.
-	Name string `json:"name"`
-	// Semantic step type. This is a hint, not a rendering instruction — the
-	// LiquidJS template controls layout. The frontend does NOT switch on type
-	// to decide what to render; it renders the capability dictionaries
-	// (fields, actions, gates, sso_providers) using the template.
-	// Type is useful for:
-	// - Accessibility: screen readers can announce "credential step"
-	// - Analytics: track drop-off rates per step type
-	// - Special behavior: `redirect` and `complete` have hardcoded
-	// frontend behavior (navigate away) that templates cannot override
-	// - Gate auto-injection: backend uses type to enforce gates even if
-	// the template omits them (e.g. `captcha` type always requires a
-	// captcha gate)
-	// The following types are rendered by the frontend:
-	// - identifier: collect login handle (email, phone, username)
-	// - credential: collect secret (password, OTP, passkey proof)
-	// - form: generic data collection (profile, address)
-	// - verification: email/phone code entry
-	// - consent: terms, scopes, permissions (approve/deny)
-	// - info: read-only screen (success message, warning)
-	// - captcha: dedicated captcha challenge
-	// - redirect: navigate to redirect_url immediately, no UI rendered
-	// - complete: flow is done — check `behavior` field
-	// The following types exist only in flow definitions and are never
-	// sent to the frontend (the engine auto-transitions through them):
-	// - policy_check: evaluate a policy condition, pick next step
-	// - action: execute a server-side mutation (create session, etc.).
-	Type  FlowStepType `json:"type"`
+	Name  string       `json:"name"`
 	Texts OptStepTexts `json:"texts"`
 	// Error message from a previous failed submission.
 	Error OptNilString `json:"error"`
-	// Only present on `complete` steps. Tells the frontend what to do:
+	// Present only on terminal steps. Tells the frontend what to do:
 	// - redirect: navigate to redirect_uri immediately (OIDC/SAML done)
 	// - show: render the step as a success screen (e.g., registration confirmed).
-	Behavior OptFlowStepBehavior `json:"behavior"`
-	// For `redirect` steps — URL to navigate to (e.g., SSO provider).
+	Complete OptFlowStepComplete `json:"complete"`
+	// URL to navigate to (e.g., SSO provider redirect).
 	RedirectURL OptURI `json:"redirect_url"`
 	// Unordered dictionary of input fields to collect. Keyed by field name.
 	// The LiquidJS template controls which fields appear and in what order.
+	// Field metadata (type, validation) is resolved by the engine from the
+	// flow's user schema.
 	Fields FlowStepFields `json:"fields"`
 	// Unordered dictionary of available user actions. Keyed by action name.
 	// The LiquidJS template controls positioning and presentation.
 	Actions FlowStepActions `json:"actions"`
 	// Security gates that must be satisfied before the step can be submitted.
-	// The orchestrator appends any required but unrendered gates as a safety net.
+	// The engine injects gates dynamically based on policy, even if they
+	// are not declared in the flow definition.
 	Gates FlowStepGates `json:"gates"`
 	// Available SSO identity providers for this step.
 	SSOProviders []SSOProvider `json:"sso_providers"`
@@ -1662,11 +1638,6 @@ type FlowStep struct {
 // GetName returns the value of Name.
 func (s *FlowStep) GetName() string {
 	return s.Name
-}
-
-// GetType returns the value of Type.
-func (s *FlowStep) GetType() FlowStepType {
-	return s.Type
 }
 
 // GetTexts returns the value of Texts.
@@ -1679,9 +1650,9 @@ func (s *FlowStep) GetError() OptNilString {
 	return s.Error
 }
 
-// GetBehavior returns the value of Behavior.
-func (s *FlowStep) GetBehavior() OptFlowStepBehavior {
-	return s.Behavior
+// GetComplete returns the value of Complete.
+func (s *FlowStep) GetComplete() OptFlowStepComplete {
+	return s.Complete
 }
 
 // GetRedirectURL returns the value of RedirectURL.
@@ -1714,11 +1685,6 @@ func (s *FlowStep) SetName(val string) {
 	s.Name = val
 }
 
-// SetType sets the value of Type.
-func (s *FlowStep) SetType(val FlowStepType) {
-	s.Type = val
-}
-
 // SetTexts sets the value of Texts.
 func (s *FlowStep) SetTexts(val OptStepTexts) {
 	s.Texts = val
@@ -1729,9 +1695,9 @@ func (s *FlowStep) SetError(val OptNilString) {
 	s.Error = val
 }
 
-// SetBehavior sets the value of Behavior.
-func (s *FlowStep) SetBehavior(val OptFlowStepBehavior) {
-	s.Behavior = val
+// SetComplete sets the value of Complete.
+func (s *FlowStep) SetComplete(val OptFlowStepComplete) {
+	s.Complete = val
 }
 
 // SetRedirectURL sets the value of RedirectURL.
@@ -1772,30 +1738,30 @@ func (s *FlowStepActions) init() FlowStepActions {
 	return m
 }
 
-// Only present on `complete` steps. Tells the frontend what to do:
+// Present only on terminal steps. Tells the frontend what to do:
 // - redirect: navigate to redirect_uri immediately (OIDC/SAML done)
 // - show: render the step as a success screen (e.g., registration confirmed).
-type FlowStepBehavior string
+type FlowStepComplete string
 
 const (
-	FlowStepBehaviorRedirect FlowStepBehavior = "redirect"
-	FlowStepBehaviorShow     FlowStepBehavior = "show"
+	FlowStepCompleteRedirect FlowStepComplete = "redirect"
+	FlowStepCompleteShow     FlowStepComplete = "show"
 )
 
-// AllValues returns all FlowStepBehavior values.
-func (FlowStepBehavior) AllValues() []FlowStepBehavior {
-	return []FlowStepBehavior{
-		FlowStepBehaviorRedirect,
-		FlowStepBehaviorShow,
+// AllValues returns all FlowStepComplete values.
+func (FlowStepComplete) AllValues() []FlowStepComplete {
+	return []FlowStepComplete{
+		FlowStepCompleteRedirect,
+		FlowStepCompleteShow,
 	}
 }
 
 // MarshalText implements encoding.TextMarshaler.
-func (s FlowStepBehavior) MarshalText() ([]byte, error) {
+func (s FlowStepComplete) MarshalText() ([]byte, error) {
 	switch s {
-	case FlowStepBehaviorRedirect:
+	case FlowStepCompleteRedirect:
 		return []byte(s), nil
-	case FlowStepBehaviorShow:
+	case FlowStepCompleteShow:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -1803,13 +1769,13 @@ func (s FlowStepBehavior) MarshalText() ([]byte, error) {
 }
 
 // UnmarshalText implements encoding.TextUnmarshaler.
-func (s *FlowStepBehavior) UnmarshalText(data []byte) error {
-	switch FlowStepBehavior(data) {
-	case FlowStepBehaviorRedirect:
-		*s = FlowStepBehaviorRedirect
+func (s *FlowStepComplete) UnmarshalText(data []byte) error {
+	switch FlowStepComplete(data) {
+	case FlowStepCompleteRedirect:
+		*s = FlowStepCompleteRedirect
 		return nil
-	case FlowStepBehaviorShow:
-		*s = FlowStepBehaviorShow
+	case FlowStepCompleteShow:
+		*s = FlowStepCompleteShow
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
@@ -1818,6 +1784,8 @@ func (s *FlowStepBehavior) UnmarshalText(data []byte) error {
 
 // Unordered dictionary of input fields to collect. Keyed by field name.
 // The LiquidJS template controls which fields appear and in what order.
+// Field metadata (type, validation) is resolved by the engine from the
+// flow's user schema.
 type FlowStepFields map[string]Field
 
 func (s *FlowStepFields) init() FlowStepFields {
@@ -1830,7 +1798,8 @@ func (s *FlowStepFields) init() FlowStepFields {
 }
 
 // Security gates that must be satisfied before the step can be submitted.
-// The orchestrator appends any required but unrendered gates as a safety net.
+// The engine injects gates dynamically based on policy, even if they
+// are not declared in the flow definition.
 type FlowStepGates map[string]Gate
 
 func (s *FlowStepGates) init() FlowStepGates {
@@ -1840,122 +1809,6 @@ func (s *FlowStepGates) init() FlowStepGates {
 		*s = m
 	}
 	return m
-}
-
-// Semantic step type. This is a hint, not a rendering instruction — the
-// LiquidJS template controls layout. The frontend does NOT switch on type
-// to decide what to render; it renders the capability dictionaries
-// (fields, actions, gates, sso_providers) using the template.
-// Type is useful for:
-// - Accessibility: screen readers can announce "credential step"
-// - Analytics: track drop-off rates per step type
-// - Special behavior: `redirect` and `complete` have hardcoded
-// frontend behavior (navigate away) that templates cannot override
-// - Gate auto-injection: backend uses type to enforce gates even if
-// the template omits them (e.g. `captcha` type always requires a
-// captcha gate)
-// The following types are rendered by the frontend:
-// - identifier: collect login handle (email, phone, username)
-// - credential: collect secret (password, OTP, passkey proof)
-// - form: generic data collection (profile, address)
-// - verification: email/phone code entry
-// - consent: terms, scopes, permissions (approve/deny)
-// - info: read-only screen (success message, warning)
-// - captcha: dedicated captcha challenge
-// - redirect: navigate to redirect_url immediately, no UI rendered
-// - complete: flow is done — check `behavior` field
-// The following types exist only in flow definitions and are never
-// sent to the frontend (the engine auto-transitions through them):
-// - policy_check: evaluate a policy condition, pick next step
-// - action: execute a server-side mutation (create session, etc.).
-type FlowStepType string
-
-const (
-	FlowStepTypeIdentifier   FlowStepType = "identifier"
-	FlowStepTypeCredential   FlowStepType = "credential"
-	FlowStepTypeForm         FlowStepType = "form"
-	FlowStepTypeVerification FlowStepType = "verification"
-	FlowStepTypeConsent      FlowStepType = "consent"
-	FlowStepTypeInfo         FlowStepType = "info"
-	FlowStepTypeRedirect     FlowStepType = "redirect"
-	FlowStepTypeCaptcha      FlowStepType = "captcha"
-	FlowStepTypeComplete     FlowStepType = "complete"
-)
-
-// AllValues returns all FlowStepType values.
-func (FlowStepType) AllValues() []FlowStepType {
-	return []FlowStepType{
-		FlowStepTypeIdentifier,
-		FlowStepTypeCredential,
-		FlowStepTypeForm,
-		FlowStepTypeVerification,
-		FlowStepTypeConsent,
-		FlowStepTypeInfo,
-		FlowStepTypeRedirect,
-		FlowStepTypeCaptcha,
-		FlowStepTypeComplete,
-	}
-}
-
-// MarshalText implements encoding.TextMarshaler.
-func (s FlowStepType) MarshalText() ([]byte, error) {
-	switch s {
-	case FlowStepTypeIdentifier:
-		return []byte(s), nil
-	case FlowStepTypeCredential:
-		return []byte(s), nil
-	case FlowStepTypeForm:
-		return []byte(s), nil
-	case FlowStepTypeVerification:
-		return []byte(s), nil
-	case FlowStepTypeConsent:
-		return []byte(s), nil
-	case FlowStepTypeInfo:
-		return []byte(s), nil
-	case FlowStepTypeRedirect:
-		return []byte(s), nil
-	case FlowStepTypeCaptcha:
-		return []byte(s), nil
-	case FlowStepTypeComplete:
-		return []byte(s), nil
-	default:
-		return nil, errors.Errorf("invalid value: %q", s)
-	}
-}
-
-// UnmarshalText implements encoding.TextUnmarshaler.
-func (s *FlowStepType) UnmarshalText(data []byte) error {
-	switch FlowStepType(data) {
-	case FlowStepTypeIdentifier:
-		*s = FlowStepTypeIdentifier
-		return nil
-	case FlowStepTypeCredential:
-		*s = FlowStepTypeCredential
-		return nil
-	case FlowStepTypeForm:
-		*s = FlowStepTypeForm
-		return nil
-	case FlowStepTypeVerification:
-		*s = FlowStepTypeVerification
-		return nil
-	case FlowStepTypeConsent:
-		*s = FlowStepTypeConsent
-		return nil
-	case FlowStepTypeInfo:
-		*s = FlowStepTypeInfo
-		return nil
-	case FlowStepTypeRedirect:
-		*s = FlowStepTypeRedirect
-		return nil
-	case FlowStepTypeCaptcha:
-		*s = FlowStepTypeCaptcha
-		return nil
-	case FlowStepTypeComplete:
-		*s = FlowStepTypeComplete
-		return nil
-	default:
-		return errors.Errorf("invalid value: %q", data)
-	}
 }
 
 // Ref: #
@@ -4136,38 +3989,38 @@ func (o OptFlowHint) Or(d FlowHint) FlowHint {
 	return d
 }
 
-// NewOptFlowStepBehavior returns new OptFlowStepBehavior with value set to v.
-func NewOptFlowStepBehavior(v FlowStepBehavior) OptFlowStepBehavior {
-	return OptFlowStepBehavior{
+// NewOptFlowStepComplete returns new OptFlowStepComplete with value set to v.
+func NewOptFlowStepComplete(v FlowStepComplete) OptFlowStepComplete {
+	return OptFlowStepComplete{
 		Value: v,
 		Set:   true,
 	}
 }
 
-// OptFlowStepBehavior is optional FlowStepBehavior.
-type OptFlowStepBehavior struct {
-	Value FlowStepBehavior
+// OptFlowStepComplete is optional FlowStepComplete.
+type OptFlowStepComplete struct {
+	Value FlowStepComplete
 	Set   bool
 }
 
-// IsSet returns true if OptFlowStepBehavior was set.
-func (o OptFlowStepBehavior) IsSet() bool { return o.Set }
+// IsSet returns true if OptFlowStepComplete was set.
+func (o OptFlowStepComplete) IsSet() bool { return o.Set }
 
 // Reset unsets value.
-func (o *OptFlowStepBehavior) Reset() {
-	var v FlowStepBehavior
+func (o *OptFlowStepComplete) Reset() {
+	var v FlowStepComplete
 	o.Value = v
 	o.Set = false
 }
 
 // SetTo sets value to v.
-func (o *OptFlowStepBehavior) SetTo(v FlowStepBehavior) {
+func (o *OptFlowStepComplete) SetTo(v FlowStepComplete) {
 	o.Set = true
 	o.Value = v
 }
 
 // Get returns value and boolean that denotes whether value was set.
-func (o OptFlowStepBehavior) Get() (v FlowStepBehavior, ok bool) {
+func (o OptFlowStepComplete) Get() (v FlowStepComplete, ok bool) {
 	if !o.Set {
 		return v, false
 	}
@@ -4175,7 +4028,7 @@ func (o OptFlowStepBehavior) Get() (v FlowStepBehavior, ok bool) {
 }
 
 // Or returns value if set, or given parameter if does not.
-func (o OptFlowStepBehavior) Or(d FlowStepBehavior) FlowStepBehavior {
+func (o OptFlowStepComplete) Or(d FlowStepComplete) FlowStepComplete {
 	if v, ok := o.Get(); ok {
 		return v
 	}
