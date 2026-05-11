@@ -183,8 +183,11 @@ $defs:
           $ref: '#/$defs/SSOProvider'
         description: |
           Identity providers available on this step. When non-empty, the
-          step must define a `transitions.sso` entry — that transition is
-          followed when the client invokes the reserved `sso` action.
+          step must define a `transitions.callback` entry — the engine
+          handles the reserved `sso` action transparently (redirect to
+          the IdP, code exchange, user resolution) and fires `callback`
+          on this step when the IdP returns. The flow author never
+          writes a `transitions.sso`.
 
       on_success:
         type: string
@@ -219,9 +222,8 @@ $defs:
           - a reserved outcome the engine produces:
             - `user_not_found` — emitted when a field with
               `x-identifier: true` does not match an existing user.
-            - `sso` — emitted when the client invokes an SSO provider.
             - `callback` — emitted when an external system returns control
-              to the flow (e.g. SSO callback, device authorization poll).
+              to the flow (SSO callback, device authorization poll, etc.).
           A transition's `action` field controls whether the target is
           interpreted as a step in this definition (default) or as the
           name of another definition to switch or pivot into.

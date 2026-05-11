@@ -5,7 +5,7 @@
 # identifier doesn't match a user, and a pivot to recovery.
 #
 # Demonstrates: multi-step graph, schema-driven fields, gates,
-# sso_providers, reserved outcomes (user_not_found, sso, callback),
+# sso_providers, reserved outcomes (user_not_found, callback),
 # switch vs pivot transitions, and a terminal step.
 
 name: standard-login
@@ -37,7 +37,7 @@ steps:
       submit: { target: authenticate }
       user_not_found: { target: register, action: switch }
       forgot_password: { target: recovery, action: pivot }
-      sso: { target: sso-callback }
+      callback: { target: done }
 
   - name: authenticate
     fields: [password]
@@ -46,10 +46,6 @@ steps:
         primary: true
     transitions:
       submit: { target: done }
-
-  - name: sso-callback
-    transitions:
-      callback: { target: done }
 
   - name: done
     complete: redirect
