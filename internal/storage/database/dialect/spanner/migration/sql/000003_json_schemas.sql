@@ -2,15 +2,15 @@
 -- +goose Up
 -- +goose StatementBegin
 CREATE TABLE json_schemas (
-    instance_id STRING(MAX) NOT NULL,
+    project_id  STRING(MAX) NOT NULL,
     url         STRING(MAX) NOT NULL,
     created_at  TIMESTAMP   NOT NULL DEFAULT (CURRENT_TIMESTAMP()),
     payload     JSON        NOT NULL,
-    CONSTRAINT fk_json_schemas_instance
-        FOREIGN KEY (instance_id)
-        REFERENCES instances (id)
+    CONSTRAINT fk_json_schemas_project
+        FOREIGN KEY (project_id)
+        REFERENCES projects (id)
         ON DELETE CASCADE,
-) PRIMARY KEY (instance_id, url)
+) PRIMARY KEY (project_id, url)
 -- +goose StatementEnd
 
 -- +goose Down

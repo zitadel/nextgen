@@ -1,20 +1,20 @@
 -- +goose NO TRANSACTION
 -- +goose Up
 -- +goose StatementBegin
-CREATE TABLE organizations (
-    instance_id STRING(MAX) NOT NULL,
+CREATE TABLE teams (
+    project_id  STRING(MAX) NOT NULL,
     id          STRING(MAX) NOT NULL,
     created_at  TIMESTAMP   NOT NULL DEFAULT (CURRENT_TIMESTAMP()),
     updated_at  TIMESTAMP   NOT NULL DEFAULT (CURRENT_TIMESTAMP()),
-    CONSTRAINT fk_organizations_instance
-        FOREIGN KEY (instance_id)
-        REFERENCES instances (id)
+    CONSTRAINT fk_teams_project
+        FOREIGN KEY (project_id)
+        REFERENCES projects (id)
         ON DELETE CASCADE,
-) PRIMARY KEY (instance_id, id)
+) PRIMARY KEY (project_id, id)
 -- +goose StatementEnd
 
 -- +goose Down
 -- +goose NO TRANSACTION
 -- +goose StatementBegin
-DROP TABLE IF EXISTS organizations
+DROP TABLE IF EXISTS teams
 -- +goose StatementEnd

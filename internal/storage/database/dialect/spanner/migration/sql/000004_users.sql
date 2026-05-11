@@ -2,56 +2,56 @@
 -- +goose Up
 -- +goose StatementBegin
 CREATE TABLE users (
-    instance_id     STRING(MAX) NOT NULL,
-    organization_id STRING(MAX) NOT NULL,
-    id              STRING(MAX) NOT NULL,
-    created_at      TIMESTAMP   NOT NULL DEFAULT (CURRENT_TIMESTAMP()),
-    updated_at      TIMESTAMP   NOT NULL DEFAULT (CURRENT_TIMESTAMP()),
-    schema_url      STRING(MAX) NOT NULL,
-    CONSTRAINT fk_users_organization
-        FOREIGN KEY (instance_id, organization_id)
-        REFERENCES organizations (instance_id, id)
+    project_id  STRING(MAX) NOT NULL,
+    team_id     STRING(MAX) NOT NULL,
+    id          STRING(MAX) NOT NULL,
+    created_at  TIMESTAMP   NOT NULL DEFAULT (CURRENT_TIMESTAMP()),
+    updated_at  TIMESTAMP   NOT NULL DEFAULT (CURRENT_TIMESTAMP()),
+    schema_url  STRING(MAX) NOT NULL,
+    CONSTRAINT fk_users_team
+        FOREIGN KEY (project_id, team_id)
+        REFERENCES teams (project_id, id)
         ON DELETE CASCADE,
-) PRIMARY KEY (instance_id, id)
+) PRIMARY KEY (project_id, id)
 -- +goose StatementEnd
 -- +goose StatementBegin
-CREATE INDEX idx_users_organization_id
-    ON users (organization_id)
+CREATE INDEX idx_users_team_id
+    ON users (team_id)
 -- +goose StatementEnd
 -- +goose StatementBegin
 CREATE TABLE user_attributes (
-    instance_id     STRING(MAX) NOT NULL,
-    organization_id STRING(MAX) NOT NULL,
-    user_id         STRING(MAX) NOT NULL,
-    key             STRING(MAX) NOT NULL,
-    value           JSON        NOT NULL,
+    project_id  STRING(MAX) NOT NULL,
+    team_id     STRING(MAX) NOT NULL,
+    user_id     STRING(MAX) NOT NULL,
+    key         STRING(MAX) NOT NULL,
+    value       JSON        NOT NULL,
     CONSTRAINT fk_user_attributes_user
-        FOREIGN KEY (instance_id, user_id)
-        REFERENCES users (instance_id, id)
+        FOREIGN KEY (project_id, user_id)
+        REFERENCES users (project_id, id)
         ON DELETE CASCADE,
-) PRIMARY KEY (instance_id, user_id, key)
+) PRIMARY KEY (project_id, user_id, key)
 -- +goose StatementEnd
 -- +goose StatementBegin
 CREATE INDEX idx_user_attributes_scalar
-    ON user_attributes (key, organization_id)
+    ON user_attributes (key, team_id)
     STORING (value)
 -- +goose StatementEnd
 -- +goose StatementBegin
-CREATE INDEX idx_user_attributes_organization_id
-    ON user_attributes (organization_id)
+CREATE INDEX idx_user_attributes_team_id
+    ON user_attributes (team_id)
 -- +goose StatementEnd
 -- +goose StatementBegin
 CREATE TABLE user_unique_attributes (
-    instance_id     STRING(MAX) NOT NULL,
-    user_id         STRING(MAX) NOT NULL,
-    organization_id STRING(MAX) NOT NULL,
-    key             STRING(MAX) NOT NULL,
-    value_hash      BYTES(32)   NOT NULL,
+    project_id  STRING(MAX) NOT NULL,
+    user_id     STRING(MAX) NOT NULL,
+    team_id     STRING(MAX) NOT NULL,
+    key         STRING(MAX) NOT NULL,
+    value_hash  BYTES(32)   NOT NULL,
     CONSTRAINT fk_user_unique_attributes_user
-        FOREIGN KEY (instance_id, user_id)
-        REFERENCES users (instance_id, id)
+        FOREIGN KEY (project_id, user_id)
+        REFERENCES users (project_id, id)
         ON DELETE CASCADE,
-) PRIMARY KEY (instance_id, organization_id, key, value_hash)
+) PRIMARY KEY (project_id, team_id, key, value_hash)
 -- +goose StatementEnd
 
 -- +goose Down

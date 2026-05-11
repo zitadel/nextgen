@@ -1,7 +1,7 @@
 -- +goose Up
-CREATE TABLE zitadel_nextgen.organizations(
-    instance_id TEXT NOT NULL
-    REFERENCES zitadel_nextgen.instances (id)
+CREATE TABLE zitadel_nextgen.teams(
+    project_id TEXT NOT NULL
+    REFERENCES zitadel_nextgen.projects (id)
     ON DELETE CASCADE
     , id TEXT NOT NULL
     , created_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -9,8 +9,8 @@ CREATE TABLE zitadel_nextgen.organizations(
 
     /* TODO: add more columns here */
 
-    , PRIMARY KEY (instance_id, id)
+    , PRIMARY KEY (project_id, id)
 );
 
 -- +goose Down
-DROP TABLE zitadel_nextgen.organizations;
+DROP TABLE zitadel_nextgen.teams;

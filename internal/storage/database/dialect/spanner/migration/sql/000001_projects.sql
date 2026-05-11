@@ -1,7 +1,7 @@
 -- +goose NO TRANSACTION
 -- +goose Up
 -- +goose StatementBegin
-CREATE TABLE instances (
+CREATE TABLE projects (
     id          STRING(MAX) NOT NULL,
     created_at  TIMESTAMP   NOT NULL DEFAULT (CURRENT_TIMESTAMP()),
     updated_at  TIMESTAMP   NOT NULL DEFAULT (CURRENT_TIMESTAMP()),
@@ -11,5 +11,5 @@ CREATE TABLE instances (
 -- +goose Down
 -- +goose NO TRANSACTION
 -- +goose StatementBegin
-DROP TABLE IF EXISTS instances
+DROP TABLE IF EXISTS projects
 -- +goose StatementEnd
