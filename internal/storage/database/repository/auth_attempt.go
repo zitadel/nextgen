@@ -7,91 +7,54 @@ import (
 	"time"
 
 	googspanner "cloud.google.com/go/spanner"
-
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/database/dialect/postgres"
 	"github.com/zitadel/nextgen/internal/storage/database/dialect/spanner"
 )
 
-// isSpannerClient returns true when the executor is backed by the Spanner dialect.
-// Uses spanner.SpannerPooler (exported interface) to avoid unexported-method scoping issues.
-func isSpannerClient(client database.QueryExecutor) bool {
-	_, ok := client.(spanner.SpannerPooler)
-	return ok
-}
-
-type AuthAttempt struct{}
-
-var _ domain.AuthAttemptRepository = (*AuthAttempt)(nil)
-
-// ── table name helpers ────────────────────────────────────────────────────────
-
-func (a *AuthAttempt) tableAA(client database.QueryExecutor) string {
-	if isSpannerClient(client) {
-		return "auth_attempts"
+// NewAuthAttemptRepository returns a dialect-specific implementation of [domain.AuthAttemptRepository].
+func NewAuthAttemptRepository(pool database.QueryExecutor) domain.AuthAttemptRepository {
+	switch pool.(type) {
+	case spanner.SpannerPooler:
+		return &spannerAuthAttempt{}
+	case postgres.PostgresPooler:
+		return &pgAuthAttempt{}
 	}
-	return "zitadel_nextgen.auth_attempts"
+	panic("NewAuthAttemptRepository: unsupported pool type")
 }
 
-func (a *AuthAttempt) tableAC(client database.QueryExecutor) string {
-	if isSpannerClient(client) {
-		return "auth_attempt_checks"
-	}
-	return "zitadel_nextgen.auth_attempt_checks"
-}
+// ── Postgres implementation ───────────────────────────────────────────────────
 
-func (a *AuthAttempt) now(client database.QueryExecutor) string {
-	if isSpannerClient(client) {
-		return "CURRENT_TIMESTAMP()"
-	}
-	return "NOW()"
-}
+type pgAuthAttempt struct{}
 
-// ── Get ───────────────────────────────────────────────────────────────────────
+var _ domain.AuthAttemptRepository = (*pgAuthAttempt)(nil)
 
-const authAttemptGetSelectPG = `SELECT aa.project_id, aa.id, aa.handoff_token, aa.handed_off_at, aa.session_id,` +
+const pgAuthAttemptGetSelect = `SELECT aa.project_id, aa.id, aa.handoff_token, aa.handed_off_at, aa.session_id,` +
 	` aa.required_checks, aa.created_at, aa.completed_at, aac.type, aa.time_to_live,` +
 	` aac.last_challenged_at, aac.last_verified_at, aac.last_failed_at, aac.failure_count, aac.challenge_payload, aac.factor_payload` +
 	` FROM zitadel_nextgen.auth_attempts aa` +
 	` LEFT JOIN zitadel_nextgen.auth_attempt_checks aac ON aa.project_id = aac.project_id AND aa.id = aac.auth_attempt_id`
 
-const authAttemptGetSelectSpanner = `SELECT aa.project_id, aa.id, aa.handoff_token, aa.handed_off_at, aa.session_id,` +
-	` aa.required_checks, aa.created_at, aa.completed_at, aac.type, aa.time_to_live,` +
-	` aac.last_challenged_at, aac.last_verified_at, aac.last_failed_at, aac.failure_count, aac.challenge_payload, aac.factor_payload` +
-	` FROM auth_attempts aa` +
-	` LEFT JOIN auth_attempt_checks aac ON aa.project_id = aac.project_id AND aa.id = aac.auth_attempt_id`
-
-// GetByID implements [domain.AuthAttemptRepository].
-func (a *AuthAttempt) GetByID(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string) (*domain.AuthAttempt, error) {
-	if isSpannerClient(client) {
-		return a.get(ctx, client, authAttemptGetSelectSpanner+` WHERE aa.project_id = $1 AND aa.id = $2`, projectID, authAttemptID)
-	}
-	return a.get(ctx, client, authAttemptGetSelectPG+` WHERE aa.project_id = $1 AND aa.id = $2`, projectID, authAttemptID)
+func (a *pgAuthAttempt) GetByID(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string) (*domain.AuthAttempt, error) {
+	return a.get(ctx, client, pgAuthAttemptGetSelect+` WHERE aa.project_id = $1 AND aa.id = $2`, projectID, authAttemptID)
 }
 
-// GetByHandoffToken implements [domain.AuthAttemptRepository].
-func (a *AuthAttempt) GetByHandoffToken(ctx context.Context, client database.QueryExecutor, projectID, handoffToken string) (*domain.AuthAttempt, error) {
-	if isSpannerClient(client) {
-		return a.get(ctx, client, authAttemptGetSelectSpanner+` WHERE aa.project_id = $1 AND aa.handoff_token = $2`, projectID, handoffToken)
-	}
-	return a.get(ctx, client, authAttemptGetSelectPG+` WHERE aa.project_id = $1 AND aa.handoff_token = $2`, projectID, handoffToken)
+func (a *pgAuthAttempt) GetByHandoffToken(ctx context.Context, client database.QueryExecutor, projectID, handoffToken string) (*domain.AuthAttempt, error) {
+	return a.get(ctx, client, pgAuthAttemptGetSelect+` WHERE aa.project_id = $1 AND aa.handoff_token = $2`, projectID, handoffToken)
 }
 
-func (a *AuthAttempt) get(ctx context.Context, client database.QueryExecutor, query, projectID, matcher string) (*domain.AuthAttempt, error) {
+func (a *pgAuthAttempt) get(ctx context.Context, client database.QueryExecutor, query, projectID, matcher string) (*domain.AuthAttempt, error) {
 	attempt := new(domain.AuthAttempt)
 	rows, err := client.Query(ctx, query, projectID, matcher)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query auth attempt: %w", err)
 	}
 	defer rows.Close()
-
-	if isSpannerClient(client) {
-		return attempt, a.scanSpanner(rows, attempt)
-	}
-	return attempt, a.scanPG(rows, attempt)
+	return attempt, a.scan(rows, attempt)
 }
 
-func (a *AuthAttempt) scanPG(rows database.Rows, attempt *domain.AuthAttempt) error {
+func (a *pgAuthAttempt) scan(rows database.Rows, attempt *domain.AuthAttempt) error {
 	for rows.Next() {
 		var (
 			handoffToken     database.Null[string]
@@ -159,114 +122,7 @@ func (a *AuthAttempt) scanPG(rows database.Rows, attempt *domain.AuthAttempt) er
 	return rows.Err()
 }
 
-func (a *AuthAttempt) scanSpanner(rows database.Rows, attempt *domain.AuthAttempt) error {
-	for rows.Next() {
-		var (
-			handoffToken     database.Null[string]
-			handedOffAt      database.Null[time.Time]
-			sessionID        database.Null[string]
-			requiredChecks   []googspanner.NullInt64
-			completedAt      database.Null[time.Time]
-			checkType        database.Null[int64]
-			timeToLiveNanos  database.Null[int64]
-			lastChallengedAt database.Null[time.Time]
-			verifiedAt       database.Null[time.Time]
-			lastFailedAt     database.Null[time.Time]
-			failureCount     database.Null[int64]
-			challenge        jsonPayloadScanner
-			factor           jsonPayloadScanner
-		)
-		err := rows.Scan(
-			&attempt.ProjectID, &attempt.ID, &handoffToken, &handedOffAt, &sessionID,
-			&requiredChecks, &attempt.CreatedAt, &completedAt, &checkType, &timeToLiveNanos,
-			&lastChallengedAt, &verifiedAt, &lastFailedAt, &failureCount, &challenge, &factor)
-		if err != nil {
-			return fmt.Errorf("failed to scan auth attempt: %w", err)
-		}
-
-		attempt.RequiredChecks = make([]domain.AuthCheckType, len(requiredChecks))
-		for i, c := range requiredChecks {
-			attempt.RequiredChecks[i] = domain.AuthCheckType(c.Int64)
-		}
-		if handoffToken.Valid {
-			attempt.HandoffToken = &handoffToken.V
-		}
-		if handedOffAt.Valid {
-			attempt.HandedOffAt = &handedOffAt.V
-		}
-		if sessionID.Valid {
-			attempt.SessionID = &sessionID.V
-		}
-		if completedAt.Valid {
-			attempt.CompletedAt = &completedAt.V
-		}
-		if timeToLiveNanos.Valid {
-			d := time.Duration(timeToLiveNanos.V)
-			attempt.TimeToLive = &d
-		}
-
-		if !checkType.Valid {
-			continue
-		}
-		check := domain.AuthCheck{Type: domain.AuthCheckType(checkType.V)}
-		if lastChallengedAt.Valid {
-			check.LastChallengedAt = lastChallengedAt.V
-		}
-		if failureCount.Valid {
-			check.FailureCount = uint16(failureCount.V)
-		}
-		if verifiedAt.Valid {
-			check.LastVerifiedAt = verifiedAt.V
-		}
-		if lastFailedAt.Valid {
-			check.LastFailedAt = &lastFailedAt.V
-		}
-		checker, err := newAuthCheck(&check, challenge.v, factor.v)
-		if err != nil {
-			return fmt.Errorf("failed to unmarshal auth check: %w", err)
-		}
-		attempt.Checks = append(attempt.Checks, checker)
-	}
-	return rows.Err()
-}
-
-// jsonPayloadScanner handles JSONB (Postgres, returns []byte) and JSON
-// (Spanner, returns spanner.NullJSON which implements json.Marshaler).
-type jsonPayloadScanner struct {
-	v json.RawMessage
-}
-
-func (s *jsonPayloadScanner) Scan(src any) error {
-	if src == nil {
-		s.v = nil
-		return nil
-	}
-	switch v := src.(type) {
-	case []byte:
-		s.v = json.RawMessage(v)
-	case string:
-		s.v = json.RawMessage(v)
-	default:
-		if m, ok := src.(json.Marshaler); ok {
-			data, err := m.MarshalJSON()
-			if err != nil {
-				return err
-			}
-			if string(data) == "null" {
-				s.v = nil
-				return nil
-			}
-			s.v = json.RawMessage(data)
-		} else {
-			return fmt.Errorf("jsonPayloadScanner: unsupported type %T", src)
-		}
-	}
-	return nil
-}
-
-// ── Create ────────────────────────────────────────────────────────────────────
-
-const authAttemptCreateStmt = `WITH inserted_attempt AS (` +
+const pgAuthAttemptCreateStmt = `WITH inserted_attempt AS (` +
 	` INSERT INTO zitadel_nextgen.auth_attempts (project_id, id, required_checks, time_to_live, session_id)` +
 	` VALUES ($1, $2, $3::SMALLINT[], $4::INTERVAL, $5)` +
 	` RETURNING project_id, id, created_at` +
@@ -282,49 +138,18 @@ const authAttemptCreateStmt = `WITH inserted_attempt AS (` +
 	` FROM inserted_attempt ia` +
 	` LEFT JOIN inserted_checks ic ON TRUE`
 
-// Create implements [domain.AuthAttemptRepository].
-func (a *AuthAttempt) Create(ctx context.Context, client database.QueryExecutor, authAttempt *domain.AuthAttempt) error {
-	if isSpannerClient(client) {
-		return a.createSpanner(ctx, client, authAttempt)
-	}
-
-	checkRows := make([]authAttemptCheckCreate, 0, len(authAttempt.Checks))
-	for _, checker := range authAttempt.Checks {
-		check := checker.Check()
-		checkRow := authAttemptCheckCreate{
-			Type: uint8(check.Type),
-		}
-		if challenge, ok := checker.(domain.AuthChallenger); ok {
-			checkRow.IsChallenger = true
-			var err error
-			checkRow.ChallengePayload, err = json.Marshal(challenge.ChallengePayload())
-			if err != nil {
-				return fmt.Errorf("failed to marshal challenge payload: %w", err)
-			}
-		}
-		if factor, ok := checker.(domain.AuthFactorer); ok {
-			checkRow.IsFactorer = true
-			var err error
-			checkRow.FactorPayload, err = json.Marshal(factor.FactorPayload())
-			if err != nil {
-				return fmt.Errorf("failed to marshal factor payload: %w", err)
-			}
-		}
-		checkRows = append(checkRows, checkRow)
-	}
-
-	checkRowsJSON, err := json.Marshal(checkRows)
+func (a *pgAuthAttempt) Create(ctx context.Context, client database.QueryExecutor, authAttempt *domain.AuthAttempt) error {
+	checkRowsJSON, err := a.checksToJSON(authAttempt.Checks)
 	if err != nil {
-		return fmt.Errorf("failed to marshal auth attempt checks: %w", err)
+		return err
 	}
 
-	// Convert required_checks to []int16 so pgx encodes it as SMALLINT[].
 	requiredChecks := make([]int16, len(authAttempt.RequiredChecks))
 	for i, c := range authAttempt.RequiredChecks {
 		requiredChecks[i] = int16(c)
 	}
 
-	rows, err := client.Query(ctx, authAttemptCreateStmt,
+	rows, err := client.Query(ctx, pgAuthAttemptCreateStmt,
 		authAttempt.ProjectID, authAttempt.ID, requiredChecks, authAttempt.TimeToLive, authAttempt.SessionID, checkRowsJSON)
 	if err != nil {
 		return fmt.Errorf("failed to create auth attempt: %w", err)
@@ -374,7 +199,217 @@ func (a *AuthAttempt) Create(ctx context.Context, client database.QueryExecutor,
 	return nil
 }
 
-func (a *AuthAttempt) createSpanner(ctx context.Context, client database.QueryExecutor, attempt *domain.AuthAttempt) error {
+func (*pgAuthAttempt) checksToJSON(checks []domain.AuthChecker) ([]byte, error) {
+	checkRows := make([]authAttemptCheckCreate, 0, len(checks))
+	for _, checker := range checks {
+		check := checker.Check()
+		checkRow := authAttemptCheckCreate{Type: uint8(check.Type)}
+		if challenge, ok := checker.(domain.AuthChallenger); ok {
+			checkRow.IsChallenger = true
+			var err error
+			checkRow.ChallengePayload, err = json.Marshal(challenge.ChallengePayload())
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal challenge payload: %w", err)
+			}
+		}
+		if factor, ok := checker.(domain.AuthFactorer); ok {
+			checkRow.IsFactorer = true
+			var err error
+			checkRow.FactorPayload, err = json.Marshal(factor.FactorPayload())
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal factor payload: %w", err)
+			}
+		}
+		checkRows = append(checkRows, checkRow)
+	}
+
+	checkRowsJSON, err := json.Marshal(checkRows)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal auth attempt checks: %w", err)
+	}
+	return checkRowsJSON, nil
+}
+
+func (a *pgAuthAttempt) Delete(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string) error {
+	_, err := client.Exec(ctx,
+		`DELETE FROM zitadel_nextgen.auth_attempts WHERE project_id = $1 AND id = $2`,
+		projectID, authAttemptID)
+	return err
+}
+
+func (a *pgAuthAttempt) Complete(ctx context.Context, client database.QueryExecutor, attempt *domain.AuthAttempt) error {
+	return client.QueryRow(ctx,
+		`UPDATE zitadel_nextgen.auth_attempts SET completed_at = NOW() WHERE project_id = $1 AND id = $2 RETURNING completed_at`,
+		attempt.ProjectID, attempt.ID).Scan(&attempt.CompletedAt)
+}
+
+func (a *pgAuthAttempt) Handoff(ctx context.Context, client database.QueryExecutor, attempt *domain.AuthAttempt) error {
+	if attempt.HandoffToken == nil {
+		return fmt.Errorf("failed to handoff auth attempt: handoff token is required")
+	}
+	var handedOffAt time.Time
+	err := client.QueryRow(ctx,
+		`UPDATE zitadel_nextgen.auth_attempts SET handoff_token = $3, handed_off_at = NOW() WHERE project_id = $1 AND id = $2 RETURNING handed_off_at`,
+		attempt.ProjectID, attempt.ID, *attempt.HandoffToken).Scan(&handedOffAt)
+	if err != nil {
+		return fmt.Errorf("failed to handoff auth attempt: %w", err)
+	}
+	attempt.HandedOffAt = &handedOffAt
+	return nil
+}
+
+func (a *pgAuthAttempt) SetChallenge(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string, challenger domain.AuthChallenger) (err error) {
+	var payload json.RawMessage
+	if challenger.ChallengePayload() != nil {
+		payload, err = json.Marshal(challenger.ChallengePayload())
+		if err != nil {
+			return fmt.Errorf("failed to marshal challenge payload: %w", err)
+		}
+	}
+	return client.QueryRow(ctx,
+		`INSERT INTO zitadel_nextgen.auth_attempt_checks`+
+			` (project_id, auth_attempt_id, type, last_challenged_at, challenge_payload)`+
+			` VALUES ($1, $2, $3, NOW(), $4::JSONB)`+
+			` ON CONFLICT (project_id, auth_attempt_id, type) DO UPDATE SET`+
+			` last_challenged_at = NOW(), challenge_payload = EXCLUDED.challenge_payload, failure_count = 0, last_failed_at = NULL`+
+			` RETURNING last_challenged_at`,
+		projectID, authAttemptID, challenger.Check().Type, payload).
+		Scan(&challenger.Check().LastChallengedAt)
+}
+
+func (a *pgAuthAttempt) ChallengeSucceeded(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string, check domain.AuthChecker) (err error) {
+	var factorPayload json.RawMessage
+	if factorer, ok := check.(domain.AuthFactorer); ok && factorer.FactorPayload() != nil {
+		factorPayload, err = json.Marshal(factorer.FactorPayload())
+		if err != nil {
+			return fmt.Errorf("failed to marshal factor payload: %w", err)
+		}
+	}
+	return client.QueryRow(ctx,
+		`INSERT INTO zitadel_nextgen.auth_attempt_checks`+
+			` (project_id, auth_attempt_id, type, last_verified_at, factor_payload, challenge_payload)`+
+			` VALUES ($1, $2, $3, NOW(), $4::JSONB, NULL)`+
+			` ON CONFLICT (project_id, auth_attempt_id, type) DO UPDATE SET`+
+			` last_verified_at = NOW(), factor_payload = EXCLUDED.factor_payload, challenge_payload = NULL`+
+			` RETURNING last_verified_at`,
+		projectID, authAttemptID, check.Check().Type, factorPayload).
+		Scan(&check.Check().LastVerifiedAt)
+}
+
+func (a *pgAuthAttempt) ChallengeFailed(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string, challenger domain.AuthChecker) error {
+	return client.QueryRow(ctx,
+		`INSERT INTO zitadel_nextgen.auth_attempt_checks`+
+			` (project_id, auth_attempt_id, type, last_failed_at, failure_count)`+
+			` VALUES ($1, $2, $3, NOW(), 1)`+
+			` ON CONFLICT (project_id, auth_attempt_id, type) DO UPDATE SET`+
+			` last_failed_at = NOW(), failure_count = zitadel_nextgen.auth_attempt_checks.failure_count + 1`+
+			` RETURNING last_failed_at, failure_count`,
+		projectID, authAttemptID, challenger.Check().Type).
+		Scan(&challenger.Check().LastFailedAt, &challenger.Check().FailureCount)
+}
+
+// ── Spanner implementation ────────────────────────────────────────────────────
+
+type spannerAuthAttempt struct{}
+
+var _ domain.AuthAttemptRepository = (*spannerAuthAttempt)(nil)
+
+const spannerAuthAttemptGetSelect = `SELECT aa.project_id, aa.id, aa.handoff_token, aa.handed_off_at, aa.session_id,` +
+	` aa.required_checks, aa.created_at, aa.completed_at, aac.type, aa.time_to_live,` +
+	` aac.last_challenged_at, aac.last_verified_at, aac.last_failed_at, aac.failure_count, aac.challenge_payload, aac.factor_payload` +
+	` FROM auth_attempts aa` +
+	` LEFT JOIN auth_attempt_checks aac ON aa.project_id = aac.project_id AND aa.id = aac.auth_attempt_id`
+
+func (a *spannerAuthAttempt) GetByID(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string) (*domain.AuthAttempt, error) {
+	return a.get(ctx, client, spannerAuthAttemptGetSelect+` WHERE aa.project_id = $1 AND aa.id = $2`, projectID, authAttemptID)
+}
+
+func (a *spannerAuthAttempt) GetByHandoffToken(ctx context.Context, client database.QueryExecutor, projectID, handoffToken string) (*domain.AuthAttempt, error) {
+	return a.get(ctx, client, spannerAuthAttemptGetSelect+` WHERE aa.project_id = $1 AND aa.handoff_token = $2`, projectID, handoffToken)
+}
+
+func (a *spannerAuthAttempt) get(ctx context.Context, client database.QueryExecutor, query, projectID, matcher string) (*domain.AuthAttempt, error) {
+	attempt := new(domain.AuthAttempt)
+	rows, err := client.Query(ctx, query, projectID, matcher)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query auth attempt: %w", err)
+	}
+	defer rows.Close()
+	return attempt, a.scan(rows, attempt)
+}
+
+func (a *spannerAuthAttempt) scan(rows database.Rows, attempt *domain.AuthAttempt) error {
+	for rows.Next() {
+		var (
+			handoffToken     database.Null[string]
+			handedOffAt      database.Null[time.Time]
+			sessionID        database.Null[string]
+			requiredChecks   []googspanner.NullInt64
+			completedAt      database.Null[time.Time]
+			checkType        database.Null[int64]
+			timeToLiveNanos  database.Null[int64]
+			lastChallengedAt database.Null[time.Time]
+			verifiedAt       database.Null[time.Time]
+			lastFailedAt     database.Null[time.Time]
+			failureCount     database.Null[int64]
+			challenge        JSON[json.RawMessage]
+			factor           JSON[json.RawMessage]
+		)
+		err := rows.Scan(
+			&attempt.ProjectID, &attempt.ID, &handoffToken, &handedOffAt, &sessionID,
+			&requiredChecks, &attempt.CreatedAt, &completedAt, &checkType, &timeToLiveNanos,
+			&lastChallengedAt, &verifiedAt, &lastFailedAt, &failureCount, &challenge, &factor)
+		if err != nil {
+			return fmt.Errorf("failed to scan auth attempt: %w", err)
+		}
+
+		attempt.RequiredChecks = make([]domain.AuthCheckType, len(requiredChecks))
+		for i, c := range requiredChecks {
+			attempt.RequiredChecks[i] = domain.AuthCheckType(c.Int64)
+		}
+		if handoffToken.Valid {
+			attempt.HandoffToken = &handoffToken.V
+		}
+		if handedOffAt.Valid {
+			attempt.HandedOffAt = &handedOffAt.V
+		}
+		if sessionID.Valid {
+			attempt.SessionID = &sessionID.V
+		}
+		if completedAt.Valid {
+			attempt.CompletedAt = &completedAt.V
+		}
+		if timeToLiveNanos.Valid {
+			d := time.Duration(timeToLiveNanos.V)
+			attempt.TimeToLive = &d
+		}
+
+		if !checkType.Valid {
+			continue
+		}
+		check := domain.AuthCheck{Type: domain.AuthCheckType(checkType.V)}
+		if lastChallengedAt.Valid {
+			check.LastChallengedAt = lastChallengedAt.V
+		}
+		if failureCount.Valid {
+			check.FailureCount = uint16(failureCount.V)
+		}
+		if verifiedAt.Valid {
+			check.LastVerifiedAt = verifiedAt.V
+		}
+		if lastFailedAt.Valid {
+			check.LastFailedAt = &lastFailedAt.V
+		}
+		checker, err := newAuthCheck(&check, challenge.Value, factor.Value)
+		if err != nil {
+			return fmt.Errorf("failed to unmarshal auth check: %w", err)
+		}
+		attempt.Checks = append(attempt.Checks, checker)
+	}
+	return rows.Err()
+}
+
+func (a *spannerAuthAttempt) Create(ctx context.Context, client database.QueryExecutor, attempt *domain.AuthAttempt) error {
 	now := time.Now().UTC()
 	attempt.CreatedAt = now
 
@@ -397,8 +432,8 @@ func (a *AuthAttempt) createSpanner(ctx context.Context, client database.QueryEx
 
 	for _, checker := range attempt.Checks {
 		check := checker.Check()
-		_, isChallenger := checker.(domain.AuthChallenger)
-		_, isFactorer := checker.(domain.AuthFactorer)
+		challenge, isChallenger := checker.(domain.AuthChallenger)
+		factor, isFactorer := checker.(domain.AuthFactorer)
 
 		var challengedAt, verifiedAt *time.Time
 		var challengePayload, factorPayload *string
@@ -407,8 +442,8 @@ func (a *AuthAttempt) createSpanner(ctx context.Context, client database.QueryEx
 			t := now
 			challengedAt = &t
 			check.LastChallengedAt = now
-			if ch, ok := checker.(domain.AuthChallenger); ok && ch.ChallengePayload() != nil {
-				b, err := json.Marshal(ch.ChallengePayload())
+			if cp := challenge.ChallengePayload(); cp != nil {
+				b, err := json.Marshal(cp)
 				if err != nil {
 					return fmt.Errorf("failed to marshal challenge payload: %w", err)
 				}
@@ -422,8 +457,8 @@ func (a *AuthAttempt) createSpanner(ctx context.Context, client database.QueryEx
 				verifiedAt = &t
 				check.LastVerifiedAt = now
 			}
-			if f, ok := checker.(domain.AuthFactorer); ok && f.FactorPayload() != nil {
-				b, err := json.Marshal(f.FactorPayload())
+			if fp := factor.FactorPayload(); fp != nil {
+				b, err := json.Marshal(fp)
 				if err != nil {
 					return fmt.Errorf("failed to marshal factor payload: %w", err)
 				}
@@ -442,37 +477,14 @@ func (a *AuthAttempt) createSpanner(ctx context.Context, client database.QueryEx
 	return nil
 }
 
-type authAttemptCheckCreate struct {
-	Type             uint8           `json:"type"`
-	ChallengePayload json.RawMessage `json:"challenge_payload,omitempty"`
-	FactorPayload    json.RawMessage `json:"factor_payload,omitempty"`
-	IsChallenger     bool            `json:"is_challenger"`
-	IsFactorer       bool            `json:"is_factorer"`
-}
-
-// ── Delete ────────────────────────────────────────────────────────────────────
-
-// Delete implements [domain.AuthAttemptRepository].
-func (a *AuthAttempt) Delete(ctx context.Context, client database.QueryExecutor, projectID string, authAttemptID string) error {
+func (a *spannerAuthAttempt) Delete(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string) error {
 	_, err := client.Exec(ctx,
-		`DELETE FROM `+a.tableAA(client)+` WHERE project_id = $1 AND id = $2`,
+		`DELETE FROM auth_attempts WHERE project_id = $1 AND id = $2`,
 		projectID, authAttemptID)
 	return err
 }
 
-// ── Complete ──────────────────────────────────────────────────────────────────
-
-// Complete implements [domain.AuthAttemptRepository].
-func (a *AuthAttempt) Complete(ctx context.Context, client database.QueryExecutor, attempt *domain.AuthAttempt) error {
-	if isSpannerClient(client) {
-		return a.completeSpanner(ctx, client, attempt)
-	}
-	return client.QueryRow(ctx,
-		`UPDATE zitadel_nextgen.auth_attempts SET completed_at = NOW() WHERE project_id = $1 AND id = $2 RETURNING completed_at`,
-		attempt.ProjectID, attempt.ID).Scan(&attempt.CompletedAt)
-}
-
-func (a *AuthAttempt) completeSpanner(ctx context.Context, client database.QueryExecutor, attempt *domain.AuthAttempt) error {
+func (a *spannerAuthAttempt) Complete(ctx context.Context, client database.QueryExecutor, attempt *domain.AuthAttempt) error {
 	now := time.Now().UTC()
 	n, err := client.Exec(ctx,
 		`UPDATE auth_attempts SET completed_at = $1 WHERE project_id = $2 AND id = $3`,
@@ -487,28 +499,10 @@ func (a *AuthAttempt) completeSpanner(ctx context.Context, client database.Query
 	return nil
 }
 
-// ── Handoff ───────────────────────────────────────────────────────────────────
-
-// Handoff implements [domain.AuthAttemptRepository].
-func (a *AuthAttempt) Handoff(ctx context.Context, client database.QueryExecutor, attempt *domain.AuthAttempt) error {
+func (a *spannerAuthAttempt) Handoff(ctx context.Context, client database.QueryExecutor, attempt *domain.AuthAttempt) error {
 	if attempt.HandoffToken == nil {
 		return fmt.Errorf("failed to handoff auth attempt: handoff token is required")
 	}
-	if isSpannerClient(client) {
-		return a.handoffSpanner(ctx, client, attempt)
-	}
-	var handedOffAt time.Time
-	err := client.QueryRow(ctx,
-		`UPDATE zitadel_nextgen.auth_attempts SET handoff_token = $3, handed_off_at = NOW() WHERE project_id = $1 AND id = $2 RETURNING handed_off_at`,
-		attempt.ProjectID, attempt.ID, *attempt.HandoffToken).Scan(&handedOffAt)
-	if err != nil {
-		return fmt.Errorf("failed to handoff auth attempt: %w", err)
-	}
-	attempt.HandedOffAt = &handedOffAt
-	return nil
-}
-
-func (a *AuthAttempt) handoffSpanner(ctx context.Context, client database.QueryExecutor, attempt *domain.AuthAttempt) error {
 	now := time.Now().UTC()
 	_, err := client.Exec(ctx,
 		`UPDATE auth_attempts SET handoff_token = $1, handed_off_at = $2 WHERE project_id = $3 AND id = $4`,
@@ -520,32 +514,7 @@ func (a *AuthAttempt) handoffSpanner(ctx context.Context, client database.QueryE
 	return nil
 }
 
-// ── SetChallenge ──────────────────────────────────────────────────────────────
-
-// SetChallenge implements [domain.AuthAttemptRepository].
-func (a *AuthAttempt) SetChallenge(ctx context.Context, client database.QueryExecutor, projectID string, authAttemptID string, challenger domain.AuthChallenger) (err error) {
-	if isSpannerClient(client) {
-		return a.setChallengeSpanner(ctx, client, projectID, authAttemptID, challenger)
-	}
-	var payload json.RawMessage
-	if challenger.ChallengePayload() != nil {
-		payload, err = json.Marshal(challenger.ChallengePayload())
-		if err != nil {
-			return fmt.Errorf("failed to marshal challenge payload: %w", err)
-		}
-	}
-	return client.QueryRow(ctx,
-		`INSERT INTO zitadel_nextgen.auth_attempt_checks`+
-			` (project_id, auth_attempt_id, type, last_challenged_at, challenge_payload)`+
-			` VALUES ($1, $2, $3, NOW(), $4::JSONB)`+
-			` ON CONFLICT (project_id, auth_attempt_id, type) DO UPDATE SET`+
-			` last_challenged_at = NOW(), challenge_payload = EXCLUDED.challenge_payload, failure_count = 0, last_failed_at = NULL`+
-			` RETURNING last_challenged_at`,
-		projectID, authAttemptID, challenger.Check().Type, payload).
-		Scan(&challenger.Check().LastChallengedAt)
-}
-
-func (a *AuthAttempt) setChallengeSpanner(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string, challenger domain.AuthChallenger) (err error) {
+func (a *spannerAuthAttempt) SetChallenge(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string, challenger domain.AuthChallenger) (err error) {
 	now := time.Now().UTC()
 	var payloadStr *string
 	if challenger.ChallengePayload() != nil {
@@ -576,32 +545,7 @@ func (a *AuthAttempt) setChallengeSpanner(ctx context.Context, client database.Q
 	return nil
 }
 
-// ── ChallengeSucceeded ────────────────────────────────────────────────────────
-
-// ChallengeSucceeded implements [domain.AuthAttemptRepository].
-func (a *AuthAttempt) ChallengeSucceeded(ctx context.Context, client database.QueryExecutor, projectID string, authAttemptID string, check domain.AuthChecker) (err error) {
-	if isSpannerClient(client) {
-		return a.challengeSucceededSpanner(ctx, client, projectID, authAttemptID, check)
-	}
-	var factorPayload json.RawMessage
-	if factorer, ok := check.(domain.AuthFactorer); ok && factorer.FactorPayload() != nil {
-		factorPayload, err = json.Marshal(factorer.FactorPayload())
-		if err != nil {
-			return fmt.Errorf("failed to marshal factor payload: %w", err)
-		}
-	}
-	return client.QueryRow(ctx,
-		`INSERT INTO zitadel_nextgen.auth_attempt_checks`+
-			` (project_id, auth_attempt_id, type, last_verified_at, factor_payload, challenge_payload)`+
-			` VALUES ($1, $2, $3, NOW(), $4::JSONB, NULL)`+
-			` ON CONFLICT (project_id, auth_attempt_id, type) DO UPDATE SET`+
-			` last_verified_at = NOW(), factor_payload = EXCLUDED.factor_payload, challenge_payload = NULL`+
-			` RETURNING last_verified_at`,
-		projectID, authAttemptID, check.Check().Type, factorPayload).
-		Scan(&check.Check().LastVerifiedAt)
-}
-
-func (a *AuthAttempt) challengeSucceededSpanner(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string, check domain.AuthChecker) (err error) {
+func (a *spannerAuthAttempt) ChallengeSucceeded(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string, check domain.AuthChecker) (err error) {
 	now := time.Now().UTC()
 	var factorStr *string
 	if factorer, ok := check.(domain.AuthFactorer); ok && factorer.FactorPayload() != nil {
@@ -632,27 +576,8 @@ func (a *AuthAttempt) challengeSucceededSpanner(ctx context.Context, client data
 	return nil
 }
 
-// ── ChallengeFailed ───────────────────────────────────────────────────────────
-
-// ChallengeFailed implements [domain.AuthAttemptRepository].
-func (a *AuthAttempt) ChallengeFailed(ctx context.Context, client database.QueryExecutor, projectID string, authAttemptID string, challenger domain.AuthChecker) error {
-	if isSpannerClient(client) {
-		return a.challengeFailedSpanner(ctx, client, projectID, authAttemptID, challenger)
-	}
-	return client.QueryRow(ctx,
-		`INSERT INTO zitadel_nextgen.auth_attempt_checks`+
-			` (project_id, auth_attempt_id, type, last_failed_at, failure_count)`+
-			` VALUES ($1, $2, $3, NOW(), 1)`+
-			` ON CONFLICT (project_id, auth_attempt_id, type) DO UPDATE SET`+
-			` last_failed_at = NOW(), failure_count = zitadel_nextgen.auth_attempt_checks.failure_count + 1`+
-			` RETURNING last_failed_at, failure_count`,
-		projectID, authAttemptID, challenger.Check().Type).
-		Scan(&challenger.Check().LastFailedAt, &challenger.Check().FailureCount)
-}
-
-func (a *AuthAttempt) challengeFailedSpanner(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string, challenger domain.AuthChecker) error {
+func (a *spannerAuthAttempt) ChallengeFailed(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string, challenger domain.AuthChecker) error {
 	now := time.Now().UTC()
-	// Try UPDATE first (row exists).
 	n, err := client.Exec(ctx,
 		`UPDATE auth_attempt_checks SET last_failed_at = $1, failure_count = failure_count + 1`+
 			` WHERE project_id = $2 AND auth_attempt_id = $3 AND type = $4`,
@@ -661,7 +586,6 @@ func (a *AuthAttempt) challengeFailedSpanner(ctx context.Context, client databas
 		return fmt.Errorf("failed to update challenge failed: %w", err)
 	}
 	if n == 0 {
-		// Row does not exist — insert with count 1.
 		_, err = client.Exec(ctx,
 			`INSERT INTO auth_attempt_checks (project_id, auth_attempt_id, type, last_failed_at, failure_count) VALUES ($1, $2, $3, $4, 1)`,
 			projectID, authAttemptID, int64(challenger.Check().Type), now)
@@ -673,7 +597,6 @@ func (a *AuthAttempt) challengeFailedSpanner(ctx context.Context, client databas
 		return nil
 	}
 
-	// SELECT the current values so the caller sees the real counts.
 	var failureCount int64
 	var lastFailedAt time.Time
 	err = client.QueryRow(ctx,
@@ -688,7 +611,7 @@ func (a *AuthAttempt) challengeFailedSpanner(ctx context.Context, client databas
 	return nil
 }
 
-// ── helpers ───────────────────────────────────────────────────────────────────
+// ── Shared helpers ────────────────────────────────────────────────────────────
 
 func newAuthCheck(check *domain.AuthCheck, challenge, factor json.RawMessage) (_ domain.AuthChecker, err error) {
 	switch check.Type {
@@ -734,4 +657,12 @@ func newAuthCheck(check *domain.AuthCheck, challenge, factor json.RawMessage) (_
 	default:
 		return check, nil
 	}
+}
+
+type authAttemptCheckCreate struct {
+	Type             uint8           `json:"type"`
+	ChallengePayload json.RawMessage `json:"challenge_payload,omitempty"`
+	FactorPayload    json.RawMessage `json:"factor_payload,omitempty"`
+	IsChallenger     bool            `json:"is_challenger"`
+	IsFactorer       bool            `json:"is_factorer"`
 }

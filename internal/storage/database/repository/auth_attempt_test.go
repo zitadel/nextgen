@@ -30,7 +30,7 @@ func ensureProject(t *testing.T, client database.QueryExecutor, projectID string
 
 // newTestAttempt inserts an auth attempt with one password check into the given executor.
 // It returns the attempt and the pre-created check so callers can reference the same objects.
-func newTestAttempt(t *testing.T, repo *repository.AuthAttempt, client database.QueryExecutor, projectID, attemptID string) (*domain.AuthAttempt, *domain.PasswordAuthCheck) {
+func newTestAttempt(t *testing.T, repo domain.AuthAttemptRepository, client database.QueryExecutor, projectID, attemptID string) (*domain.AuthAttempt, *domain.PasswordAuthCheck) {
 	t.Helper()
 	ensureProject(t, client, projectID)
 	check := &domain.PasswordAuthCheck{AuthCheck: &domain.AuthCheck{Type: domain.AuthCheckTypePassword}}
@@ -45,7 +45,7 @@ func newTestAttempt(t *testing.T, repo *repository.AuthAttempt, client database.
 }
 
 func TestAuthAttempt_Create(t *testing.T) {
-	repo := new(repository.AuthAttempt)
+	repo := repository.NewAuthAttemptRepository(pool)
 
 	tests := []struct {
 		name          string
@@ -247,7 +247,7 @@ func TestAuthAttempt_Create(t *testing.T) {
 }
 
 func TestAuthAttempt_GetByID(t *testing.T) {
-	repo := new(repository.AuthAttempt)
+	repo := repository.NewAuthAttemptRepository(pool)
 
 	t.Run("returns attempt without checks", func(t *testing.T) {
 		tx, rollback := transactionForRollback(t)
@@ -335,7 +335,7 @@ func TestAuthAttempt_GetByID(t *testing.T) {
 }
 
 func TestAuthAttempt_SetChallenge(t *testing.T) {
-	repo := new(repository.AuthAttempt)
+	repo := repository.NewAuthAttemptRepository(pool)
 
 	t.Run("sets last_challenged_at and persists challenge payload", func(t *testing.T) {
 		tx, rollback := transactionForRollback(t)
@@ -391,7 +391,7 @@ func TestAuthAttempt_SetChallenge(t *testing.T) {
 }
 
 func TestAuthAttempt_Delete(t *testing.T) {
-	repo := new(repository.AuthAttempt)
+	repo := repository.NewAuthAttemptRepository(pool)
 
 	t.Run("cascades check deletion", func(t *testing.T) {
 		tx, rollback := transactionForRollback(t)
@@ -416,7 +416,7 @@ func TestAuthAttempt_Delete(t *testing.T) {
 }
 
 func TestAuthAttempt_ChallengeFailed(t *testing.T) {
-	repo := new(repository.AuthAttempt)
+	repo := repository.NewAuthAttemptRepository(pool)
 
 	tests := []struct {
 		name         string
@@ -449,7 +449,7 @@ func TestAuthAttempt_ChallengeFailed(t *testing.T) {
 }
 
 func TestAuthAttempt_ChallengeSucceeded(t *testing.T) {
-	repo := new(repository.AuthAttempt)
+	repo := repository.NewAuthAttemptRepository(pool)
 
 	t.Run("sets verified_at and persists it", func(t *testing.T) {
 		tx, rollback := transactionForRollback(t)
@@ -515,7 +515,7 @@ func TestAuthAttempt_ChallengeSucceeded(t *testing.T) {
 }
 
 func TestAuthAttempt_Complete(t *testing.T) {
-	repo := new(repository.AuthAttempt)
+	repo := repository.NewAuthAttemptRepository(pool)
 
 	t.Run("non existing attempt", func(t *testing.T) {
 		tx, rollback := transactionForRollback(t)
@@ -559,7 +559,7 @@ func TestAuthAttempt_Complete(t *testing.T) {
 }
 
 func TestAuthAttempt_Handoff(t *testing.T) {
-	repo := new(repository.AuthAttempt)
+	repo := repository.NewAuthAttemptRepository(pool)
 
 	t.Run("stores handoff token and handed off timestamp", func(t *testing.T) {
 		tx, rollback := transactionForRollback(t)
