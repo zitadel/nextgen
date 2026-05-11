@@ -66,6 +66,10 @@ paths:
     $ref: endpoints/sessions/exchange/methods.yaml
   /sessions/{session_id}:
     $ref: endpoints/sessions/by_id/methods.yaml
+  /flow_definitions:
+    $ref: endpoints/flow_definitions/methods.yaml
+  /flow_definitions/{id}:
+    $ref: endpoints/flow_definitions/by_id/methods.yaml
 
 components:
   securitySchemes:

@@ -1,0 +1,8 @@
+name: id
+in: path
+required: true
+description: |
+  The id returned by the POST /flow-definitions endpoint.
+schema:
+  type: string
+  example: fd_123abc456def
