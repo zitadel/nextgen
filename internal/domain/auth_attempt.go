@@ -5,6 +5,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/muhlemmer/gu"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -287,22 +288,29 @@ func (a *AuthAttempt) PreparePasskeyVerification() (*AuthFactorUser, error) {
 	return userCheck, nil
 }
 
-func (a *AuthAttempt) CreateHandoffToken() (string, error) { //TODO: should we encrypt here and return plain additionally?
+func (a *AuthAttempt) PrepareHandoff(idempotencyKey *string) error { //TODO: should we encrypt here and return plain additionally?
 	if a.IsExpired() {
-		return "", ErrAuthAttemptInvalidState()
+		return ErrAuthAttemptInvalidState()
 	}
 	if !a.IsCompleted() {
-		return "", ErrAuthAttemptNotCompleted()
+		return ErrAuthAttemptNotCompleted()
 	}
+
 	if a.HandoffToken != nil {
-		return "", ErrAuthAttemptAlreadyHandedOff()
+		if idempotencyKey != nil && gu.Value(idempotencyKey) == gu.Value(a.HandoffIdempotencyKey) {
+			return nil
+		}
+		return ErrAuthAttemptAlreadyHandedOff()
 	}
 
 	token, err := newID(PrefixHandoffToken)
 	if err != nil {
-		return "", err
+		return err
 	}
-	return token, nil
+
+	a.HandoffToken = &token
+	a.HandoffIdempotencyKey = idempotencyKey
+	return nil
 }
 
 func (a *AuthAttempt) SetCheck(check AuthCheck) {

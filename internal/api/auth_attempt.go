@@ -53,7 +53,7 @@ func (h *Handler) IssueChallenge(ctx context.Context, req *api.IssueChallengeReq
 	// Return only the newly issued challenge for the requested check type
 	check, ok := attempt.ChallengeByType(checkType)
 	if !ok {
-		return nil, err
+		return nil, domain.ErrInternal(nil).WithMessage("challenge not found after issue")
 	}
 	return checkToChallenge(check), nil
 }

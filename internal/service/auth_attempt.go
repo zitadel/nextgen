@@ -188,7 +188,7 @@ func NewAuthAttemptService(
 // Create creates a new auth attempt.
 // If input.SessionID is set, the existing session's verified checks are copied
 // into the attempt for step-up auth — no new session is created.
-func (s *authAttemptService) Create(ctx context.Context, input CreateAuthAttemptInput) (*domain.AuthAttempt, error) {
+func (s *authAttemptService) Create(ctx context.Context, input CreateAuthAttemptInput) (res *domain.AuthAttempt, err error) {
 	requiredChecks := input.RequiredChecks
 	if requiredChecks == nil {
 		cfg, err := s.projects.GetConfig(ctx, s.pool, input.ProjectID)
@@ -226,15 +226,15 @@ func (s *authAttemptService) Create(ctx context.Context, input CreateAuthAttempt
 		}
 	}()
 
-	if err := s.attempts.Create(ctx, tx, attempt); err != nil {
+	if err = s.attempts.Create(ctx, tx, attempt); err != nil {
 		return nil, err //TODO: error handling
 	}
 	if attempt.IsCompleted() {
-		if err := s.attempts.Complete(ctx, tx, attempt); err != nil {
+		if err = s.attempts.Complete(ctx, tx, attempt); err != nil {
 			return nil, err
 		}
 	}
-	if err := tx.Commit(ctx); err != nil {
+	if err = tx.Commit(ctx); err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to commit transaction")
 	}
 	return attempt, nil
@@ -324,7 +324,7 @@ func (s *authAttemptService) buildChallenger(ctx context.Context, attempt *domai
 // On success, it persists the verification and marks the attempt complete if all
 // required checks are now satisfied.
 // On failure, it records the failed attempt for rate-limiting purposes.
-func (s *authAttemptService) VerifyProof(ctx context.Context, input VerifyProofInput) (*domain.AuthAttempt, error) {
+func (s *authAttemptService) VerifyProof(ctx context.Context, input VerifyProofInput) (res *domain.AuthAttempt, err error) {
 	attempt, err := s.attempts.GetByID(ctx, s.pool, input.ProjectID, input.AttemptID)
 	if err != nil {
 		return nil, err
@@ -359,19 +359,19 @@ func (s *authAttemptService) VerifyProof(ctx context.Context, input VerifyProofI
 		}
 	}()
 
-	if err := s.attempts.ChallengeSucceeded(ctx, tx, input.ProjectID, input.AttemptID, factor, check.GetID()); err != nil {
+	if err = s.attempts.ChallengeSucceeded(ctx, tx, input.ProjectID, input.AttemptID, factor, check.GetID()); err != nil {
 		return nil, err
 	}
 	attempt.SetCheck(factor) // Update the attempt with the successful factor for accurate state in the response
 
 	// Pure domain check — no I/O
 	if attempt.IsCompleted() {
-		if err := s.attempts.Complete(ctx, tx, attempt); err != nil {
+		if err = s.attempts.Complete(ctx, tx, attempt); err != nil {
 			return nil, err
 		}
 	}
 
-	if err := tx.Commit(ctx); err != nil {
+	if err = tx.Commit(ctx); err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to commit transaction")
 	}
 
@@ -434,24 +434,9 @@ func (s *authAttemptService) Handoff(ctx context.Context, input HandoffInput) (*
 		return nil, err
 	}
 
-	if attempt.IsExpired() {
-		return nil, domain.ErrAuthAttemptInvalidState()
+	if err := attempt.PrepareHandoff(input.IdempotencyKey); err != nil {
+		return nil, err
 	}
-	if !attempt.IsCompleted() {
-		return nil, domain.ErrAuthAttemptNotCompleted()
-	}
-	if attempt.HandoffToken != nil {
-		if input.IdempotencyKey != nil && gu.Value(input.IdempotencyKey) == gu.Value(attempt.HandoffIdempotencyKey) {
-			return attempt, nil
-		}
-		return nil, domain.ErrAuthAttemptAlreadyHandedOff()
-	}
-
-	token, err := attempt.CreateHandoffToken()
-	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to create handoff token")
-	}
-	attempt.HandoffToken = &token
 
 	if err := s.attempts.Handoff(ctx, s.pool, attempt, gu.Value(input.IdempotencyKey)); err != nil {
 		return nil, err

@@ -96,11 +96,13 @@ func (a *AuthAttempt) get(ctx context.Context, client database.QueryExecutor, qu
 		//	check.LastFailedAt = &lastFailedAt.V
 		//}
 
-		checker, err := newAuthCheck(checkType.V, challengeID.V, lastChallengedAt.V, lastFailedAt.V, verifiedAt.V, failureCount.V, challenge, factor)
+		checkers, err := newAuthChecks(checkType.V, challengeID.V, lastChallengedAt.V, lastFailedAt.V, verifiedAt.V, failureCount.V, challenge, factor)
 		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal auth check: %w", err)
 		}
-		attempt.SetCheck(checker)
+		for _, checker := range checkers {
+			attempt.SetCheck(checker)
+		}
 	}
 	if err = rows.Err(); err != nil {
 		return nil, fmt.Errorf("failed to read auth attempt rows: %w", err)
@@ -325,46 +327,58 @@ func (a *AuthAttempt) ChallengeFailed(ctx context.Context, client database.Query
 
 var _ domain.AuthAttemptRepository = (*AuthAttempt)(nil)
 
-func newAuthCheck(
+func newAuthChecks(
 	checkType domain.AuthCheckType,
 	id string,
 	lastChallengedAt, lastFailedAt, verifiedAt time.Time,
 	failureCount uint16,
 	challenge, factor json.RawMessage,
-) (_ domain.AuthCheck, err error) {
+) (checks []domain.AuthCheck, err error) {
 	switch checkType {
 	case domain.AuthCheckTypeUser:
-		if len(factor) > 0 {
+		if !verifiedAt.IsZero() {
 			userFactor := domain.NewAuthFactorUser("", verifiedAt)
-			err = json.Unmarshal(factor, &userFactor)
-			if err != nil {
-				return nil, fmt.Errorf("failed to unmarshal user auth check factor payload: %w", err)
+			if len(factor) > 0 {
+				err = json.Unmarshal(factor, &userFactor)
+				if err != nil {
+					return nil, fmt.Errorf("failed to unmarshal user auth check factor payload: %w", err)
+				}
 			}
-			return userFactor, nil
+			checks = append(checks, userFactor)
 		}
-		return domain.NewAuthChallengeUser(id, lastChallengedAt, lastFailedAt, failureCount), nil
+		if !lastChallengedAt.IsZero() {
+			checks = append(checks, domain.NewAuthChallengeUser(id, lastChallengedAt, lastFailedAt, failureCount))
+		}
 	case domain.AuthCheckTypePassword:
-		if verifiedAt.IsZero() {
-			return domain.NewAuthChallengePassword(id, lastChallengedAt, lastFailedAt, failureCount), nil
+		if !verifiedAt.IsZero() {
+			checks = append(checks, domain.NewAuthFactorPassword(verifiedAt))
 		}
-		return domain.NewAuthFactorPassword(verifiedAt), nil
+		if !lastChallengedAt.IsZero() {
+			checks = append(checks, domain.NewAuthChallengePassword(id, lastChallengedAt, lastFailedAt, failureCount))
+		}
 	case domain.AuthCheckTypePasskey:
-		if verifiedAt.IsZero() {
-			passkeyCheck := domain.NewAuthChallengePasskey(id, lastChallengedAt, lastFailedAt, failureCount)
-			err = json.Unmarshal(challenge, passkeyCheck)
-			if err != nil {
-				return nil, fmt.Errorf("failed to unmarshal passkey auth check challenge payload: %w", err)
+		if !verifiedAt.IsZero() {
+			passkeyFactor := domain.NewAuthFactorPasskey(verifiedAt)
+			if len(factor) > 0 {
+				err = json.Unmarshal(factor, passkeyFactor)
+				if err != nil {
+					return nil, fmt.Errorf("failed to unmarshal passkey auth check factor payload: %w", err)
+				}
 			}
-			return passkeyCheck, nil
+			checks = append(checks, passkeyFactor)
 		}
-		passkeyFactor := domain.NewAuthFactorPasskey(verifiedAt)
-		err = json.Unmarshal(factor, passkeyFactor)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal passkey auth check factor payload: %w", err)
+		if !lastChallengedAt.IsZero() {
+			passkeyCheck := domain.NewAuthChallengePasskey(id, lastChallengedAt, lastFailedAt, failureCount)
+			if len(challenge) > 0 {
+				err = json.Unmarshal(challenge, passkeyCheck)
+				if err != nil {
+					return nil, fmt.Errorf("failed to unmarshal passkey auth check challenge payload: %w", err)
+				}
+			}
+			checks = append(checks, passkeyCheck)
 		}
-		return passkeyFactor, nil
 	default:
 		log.Println("unsupported auth check type:", checkType)
-		return nil, nil // TODO: err?
 	}
+	return checks, nil
 }
