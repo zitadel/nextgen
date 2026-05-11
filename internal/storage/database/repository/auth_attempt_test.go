@@ -503,6 +503,20 @@ func TestAuthAttempt_ChallengeSucceeded(t *testing.T) {
 func TestAuthAttempt_Complete(t *testing.T) {
 	repo := new(repository.AuthAttempt)
 
+	t.Run("non existing attempt", func(t *testing.T) {
+		tx, rollback := transactionForRollback(t)
+		defer rollback()
+
+		attempt := &domain.AuthAttempt{
+			ProjectID: "p",
+			ID:        "non-existing",
+		}
+
+		err := repo.Complete(t.Context(), tx, attempt)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+		assert.Nil(t, attempt.CompletedAt)
+	})
+
 	t.Run("sets completed_at on the attempt", func(t *testing.T) {
 		tx, rollback := transactionForRollback(t)
 		defer rollback()
