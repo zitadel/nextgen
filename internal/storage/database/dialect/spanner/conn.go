@@ -13,6 +13,9 @@ type spannerConn struct {
 }
 
 var _ database.Connection = (*spannerConn)(nil)
+var _ SpannerPooler = (*spannerConn)(nil)
+
+func (c *spannerConn) isSpanner() {}
 
 // Release implements [database.Connection].
 func (c *spannerConn) Release(_ context.Context) error {
