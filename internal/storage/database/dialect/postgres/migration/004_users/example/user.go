@@ -80,7 +80,7 @@ func GetUserByID(ctx context.Context, instanceID, id string) (*User, error) {
 
 }
 
-//go:generate go run github.com/dmarkham/enumer -type=UserUniqueness -trimprefix=UserUniqueness -transform=lower -sql
+//go:generate go tool enumer -type=UserUniqueness -trimprefix=UserUniqueness -transform=lower -sql
 type UserUniqueness int
 
 const (
