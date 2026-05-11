@@ -23,12 +23,9 @@ sequenceDiagram
 
     User->>Frontend: Opens login page
     Frontend->>Server: POST /flows { purpose: "login" }
-    Server-->>Frontend: Step: "Enter your email"
-    User->>Frontend: Types email
-    Frontend->>Server: submit { identifier: "alice@acme.com" }
-    Server-->>Frontend: Step: "Enter your password"
-    User->>Frontend: Types password
-    Frontend->>Server: submit { password: "..." }
+    Server-->>Frontend: Step: fields=[email, password]
+    User->>Frontend: Types email + password
+    Frontend->>Server: submit { email: "alice@acme.com", password: "..." }
     Server-->>Frontend: Step: complete → redirect
     Frontend->>User: Redirects to app
 ```
@@ -46,14 +43,13 @@ Every step the server returns has the same shape:
   "session_id": "sess_1",
   "session_token": "tok_1",
   "step": {
-    "name": "identifier",
-    "type": "identifier",
-    "label": "Sign in",
-    "description": "Enter your email to continue",
+    "name": "login",
+    "texts": { "title_key": "login.title", "description_key": "login.description" },
     "error": null,
-    "behavior": null,
-    "fields": [ ... ],
-    "actions": [ ... ]
+    "complete": null,
+    "fields": { ... },
+    "actions": { ... },
+    "gates": { ... }
   }
 }
 ```
@@ -61,27 +57,27 @@ Every step the server returns has the same shape:
 | Field | What it is |
 |---|---|
 | `name` | Unique step identifier (from the flow definition) |
-| `type` | What kind of step (identifier, credential, form, complete, ...) |
-| `label` | Heading to display |
-| `description` | Optional explanatory text |
+| `texts` | Localization keys for title and description |
 | `error` | Error message from a failed previous submission (null if none) |
-| `behavior` | Only on `complete` steps: `redirect`, `show`, or `continue` (null otherwise) |
-| `fields` | Input fields to render (email, password, OTP code, ...) |
-| `actions` | Things the user can do (submit, SSO, passkey, navigation links) |
+| `complete` | Only on terminal steps: `redirect` or `show` (null otherwise) |
+| `fields` | Input fields to render — keyed by field name |
+| `actions` | Things the user can do — keyed by action name |
+| `gates` | Security gates that must be satisfied before submission |
 
-**Fields** are always uniform — the frontend renders them as form inputs:
+**Fields** are resolved by the engine from the user schema:
 
 ```json
-{ "name": "email", "label": "Email", "type": "email", "required": true }
+{ "type": "email", "text_key": "login.field.email", "required": true }
 ```
 
-**Actions** have a `kind` that tells the frontend how to render them:
+**Actions** are keyed by name in an unordered dictionary:
 
 ```json
-{ "kind": "submit",  "name": "submit",   "label": "Continue", "primary": true }
-{ "kind": "sso",     "name": "google",   "label": "Continue with Google", "provider": "google" }
-{ "kind": "passkey", "name": "passkey",  "label": "Sign in with passkey" }
-{ "kind": "link",    "name": "register", "label": "Create account" }
+{
+  "submit": { "text_key": "login.action.submit", "primary": true },
+  "register": { "text_key": "login.action.register" },
+  "recover": { "text_key": "login.action.recover" }
+}
 ```
 
 Actions are **unordered capabilities**. The LiquidJS template decides where and how to render them — the server never controls visual positioning.
@@ -132,9 +128,9 @@ The template receives the full step payload as its rendering context:
 ```javascript
 // What the orchestrator passes to LiquidJS
 {
-  step: { name, type, texts },
-  fields: { identifier: { type, required, text_key } },
-  actions: { submit: { primary, text_key }, passkey: { text_key } },
+  step: { name, texts, complete },
+  fields: { email: { type, required, text_key } },
+  actions: { submit: { primary, text_key }, recover: { text_key } },
   gates: { captcha: { provider, config } },
   sso_providers: [ { id, name, template } ],
   identity: { display_name, avatar_url },
@@ -165,11 +161,11 @@ Because these are standard HTML Custom Elements, they work identically whether r
 All human-readable text is resolved client-side. The backend sends `text_key` strings; the template pipes them through the `| t` filter:
 
 ```liquid
-<!-- The filter looks up "identifier.field.email" in the active locale dictionary -->
+<!-- The filter looks up "login.field.email" in the active locale dictionary -->
 <zl-field
-  name="identifier"
-  label="{{ fields.identifier.text_key | t }}"
-  type="{{ fields.identifier.type }}"
+  name="email"
+  label="{{ fields.email.text_key | t }}"
+  type="{{ fields.email.type }}"
 ></zl-field>
 
 <!-- Interpolation: "Hi, {{displayName}}" becomes "Hi, Alice" -->
@@ -207,18 +203,17 @@ response = POST /flows { purpose, auth_request_id }
 loop:
   step = response.step
 
-  if step.type == "complete" and step.behavior == "redirect":
+  if step.complete == "redirect":
     navigate(response.redirect_uri)
     return
 
-  if step.type == "complete" and step.behavior == "continue":
-    // Server already auto-pivoted (e.g. registration done → back to login).
-    // Fetch the next step from the already-advanced state machine.
-    response = GET /flows/{session_id}
-    continue
+  if step.complete == "show":
+    // Render the step as a success screen via the Liquid template.
+    // No further interaction needed.
+    render(step)
+    return
 
-  // Render the step — including "complete" steps with behavior "show",
-  // which simply render a success screen via the Liquid template.
+  // Render the step
   html = liquidEngine.render(step.branding.liquid_template, {
     step, fields, actions, gates, sso_providers, identity, branding
   })
@@ -245,111 +240,138 @@ See [Template Security Model](template-security.md) for XSS attack vectors, trus
 
 ## Flow Definitions
 
-A flow definition is a **directed graph of steps**. You create it via the API and it becomes a reusable template.
+A flow definition is a **directed graph of steps** backed by a **user schema**. You create it via the API and it becomes a reusable template.
 
 ### Simplest Possible Flow: Password Login
 
 ```mermaid
 graph LR
-    identifier["identifier<br>(collect email)"]
-    resolve["resolve_user<br>(policy_check)"]
-    password["password<br>(credential)"]
-    check["check_factors<br>(policy_check)"]
+    login["login<br>(email + password)"]
     done["done<br>(complete)"]
 
-    identifier -->|submit| resolve
-    resolve -->|found| check
-    resolve -->|not_found| identifier
-    check -->|password| password
-    check -->|acr_met| done
-    password -->|submit| check
+    login -->|submit| done
 ```
 
 As a definition:
 
 ```json
 {
+  "slug": "simple-login",
   "name": "Simple Login",
+  "user_schema": "human_user",
   "purposes": ["login"],
-  "initial_steps": { "login": "identifier" },
+  "initial_steps": { "login": "login" },
   "steps": [
     {
-      "name": "identifier",
-      "type": "identifier",
-      "transitions": { "submit": { "target": "resolve_user" } }
+      "name": "login",
+      "fields": ["email", "password"],
+      "transitions": {
+        "submit": { "target": "done" }
+      }
     },
-    {
-      "name": "resolve_user",
-      "type": "policy_check",
-      "config": { "check": "resolve_user" },
-      "transitions": { "found": { "target": "check_factors" }, "not_found": { "target": "identifier" } }
-    },
-    {
-      "name": "check_factors",
-      "type": "policy_check",
-      "config": { "check": "required_factors" },
-      "transitions": { "password": { "target": "password" }, "acr_met": { "target": "done" } }
-    },
-    {
-      "name": "password",
-      "type": "credential",
-      "config": { "factor": "password" },
-      "transitions": { "submit": { "target": "check_factors" } }
-    },
-    {
-      "name": "done",
-      "type": "complete",
-      "config": { "behavior": "redirect" }
-    }
+    { "name": "done", "complete": "redirect" }
   ]
 }
 ```
 
 Key points:
-- **Steps** define what the user sees (or what the server does invisibly).
-- **Transitions** define the edges of the graph — which step follows which action.
-- **`policy_check`** steps are invisible. The server evaluates a condition and follows one of the transitions automatically. The frontend never sees them.
+- **`fields`** reference properties from the `human_user` schema. The engine resolves type, validation, and text keys at runtime.
+- **`transitions`** define the edges of the graph — each maps an action name to a target step.
+- The engine **implicitly evaluates assurance policy** after every submit. If the session meets the target ACR, it transitions to `complete`. If not, it follows the defined transition or injects additional steps dynamically.
 
 ---
 
-## Step Types
+## Schema-Driven Fields
 
-Steps fall into two categories: **visible** (the user sees them) and **invisible** (the server handles them automatically).
+Steps reference fields by name from the flow's user schema. The engine resolves all metadata at runtime:
 
-### Visible Steps (user sees these)
+```mermaid
+flowchart LR
+    schema["User Schema<br>(human_user)"]
+    definition["Flow Definition<br>fields: [email, given_name]"]
+    engine["Flow Engine"]
+    response["Step Response<br>fields with types, text_keys, validation"]
 
-| Type | Purpose |
+    schema --> engine
+    definition --> engine
+    engine --> response
+```
+
+The schema is the **single source of truth** for field metadata. Changing a field's label or validation in the schema automatically updates every flow that references it.
+
+### Schema annotations drive engine behavior
+
+Schema fields can have `x-*` annotations that tell the engine how to handle them:
+
+| Annotation | Effect |
 |---|---|
-| `identifier` | Collect email, phone, or username |
-| `credential` | Verify password, OTP, passkey |
-| `form` | Collect profile fields from user schema |
-| `verification` | Verify email or phone via code |
-| `consent` | Show terms, accept/decline |
-| `captcha` | Proof-of-work or third-party challenge |
-| `info` | Display information |
-| `complete` | Terminal — flow is done |
+| `x-identifier: true` | Engine looks up the user on submit. Implies `user_not_found` outcome in transitions. |
+| `x-credential: "password"` | Engine verifies the credential via auth_attempt. |
+| `x-unique: true` | Engine checks uniqueness before proceeding. |
 
-### Invisible Steps (server auto-transitions)
+This means the flow definition stays simple — field names only — while the engine derives all the complex behavior from the schema.
 
-| Type | Purpose |
+---
+
+## Action Properties
+
+Steps can declare server-side behavior directly as properties:
+
+### `on_success` — server-side mutation
+
+```json
+{
+  "name": "set_password",
+  "fields": ["password"],
+  "on_success": "create_user",
+  "transitions": {
+    "submit": { "target": "done" }
+  }
+}
+```
+
+The `on_success` mutation runs **after** the step succeeds (fields validated) and **before** the transition fires. Possible values:
+
+| Action | What it does |
 |---|---|
-| `policy_check` | Evaluate a condition and pick a transition |
-| `action` | Create user, link account, reset password |
+| `create_user` | Creates the user from accumulated schema data |
+| `reset_credential` | Resets the password or other credential |
 
-The frontend never renders invisible steps. When the server hits a `policy_check`, it evaluates the condition and follows the appropriate transition immediately. The response the frontend receives is always the next **visible** step.
+### `complete` — terminal step
 
-This means a single submit can skip through multiple invisible steps:
+```json
+{ "name": "done", "complete": "redirect" }
+```
+
+A step with `complete` set is the terminal state. No fields, no actions, no transitions. The frontend checks `step.complete` to know the flow is done.
+
+---
+
+## Implicit Policy Evaluation
+
+The engine evaluates assurance policy **after every submit** — no explicit policy check nodes in the definition.
+
+After the user submits a step:
+1. Engine validates fields and runs any `on_success` logic
+2. Engine checks: does the session's `assurance_levels[]` meet the target ACR?
+3. **If yes** → skip to `complete` (regardless of what the transition says)
+4. **If no** → follow the defined transition, or inject a step dynamically if additional factors are needed
+
+This means a simple two-step login (`login` → `done`) works for both single-factor and MFA — the engine handles the complexity invisibly.
 
 ```mermaid
 sequenceDiagram
     participant Frontend
-    participant Server
+    participant Engine
 
-    Frontend->>Server: submit password
-    Note right of Server: password step → verify password ✓
-    Note right of Server: check_factors (policy_check) → acr_met
-    Note right of Server: done (complete)
-    Server-->>Frontend: complete step + redirect_uri
+    Frontend->>Engine: submit { email, password }
+    Note right of Engine: Validate fields ✓
+    Note right of Engine: Check policy: needs OTP?
+    alt ACR met
+        Engine-->>Frontend: complete → redirect
+    else needs more factors
+        Engine-->>Frontend: injected OTP step
+    end
 ```
 
 ---
@@ -360,21 +382,23 @@ Every flow starts with a **purpose** — what the user is trying to accomplish.
 
 | Purpose | When | Typical starting step |
 |---|---|---|
-| `login` | OIDC auth request, direct login | `identifier` |
-| `register` | Self-service signup | `form` (profile fields) |
-| `recovery` | "Forgot password" link | `identifier` or `verification` |
-| `profiling` | Policy requires additional data | `form` (missing fields) |
-| `reauth` | Step-up auth needed | `credential` |
-| `link_account` | Link external IdP to existing account | `identifier` |
+| `login` | OIDC auth request, direct login | identifier or combined |
+| `register` | Self-service signup | profile fields |
+| `recovery` | "Forgot password" link | identifier |
+| `profiling` | Policy requires additional data | missing fields |
+| `reauth` | Step-up auth needed | credential |
+| `link_account` | Link external IdP to existing account | identifier |
 
 A single flow definition can serve **multiple purposes** by declaring different entry points:
 
 ```json
 {
+  "slug": "combined-auth",
+  "user_schema": "human_user",
   "purposes": ["login", "register"],
   "initial_steps": {
-    "login": "identifier",
-    "register": "profile"
+    "login": "identify",
+    "register": "identify"
   },
   "steps": [ ... ]
 }
@@ -419,163 +443,67 @@ A definition's **audience** scopes where it applies:
 
 ---
 
-## Form Steps and User Schemas
+## Gates
 
-`form` steps collect structured data from the user. Instead of hardcoding fields, they reference a **user schema**:
+Gates are security challenges that must be satisfied before a step can be submitted. Declare them on any step:
 
 ```json
 {
   "name": "profile",
-  "type": "form",
-  "config": {
-    "schema": "human_user",
-    "fields": ["email", "given_name", "family_name"]
+  "fields": ["email", "given_name", "family_name"],
+  "gates": {
+    "captcha": { "type": "captcha", "provider": "altcha" }
   },
-  "transitions": { "submit": { "target": "set_password" } }
+  "transitions": {
+    "submit": { "target": "set_password" }
+  }
 }
 ```
 
-At runtime, the flow engine reads the schema, looks up each field's type, title, validation rules, and annotations, and generates the step response:
+The engine resolves gate details (provider, config) at runtime. The frontend receives:
 
-```mermaid
-flowchart LR
-    schema["User Schema<br>(human_user)"]
-    definition["Flow Definition<br>form step: fields=[email, given_name]"]
-    engine["Flow Engine"]
-    response["Step Response<br>fields with labels, types, validation"]
-
-    schema --> engine
-    definition --> engine
-    engine --> response
+```json
+{
+  "gates": {
+    "captcha": { "type": "captcha", "provider": "altcha", "config": { ... } }
+  }
+}
 ```
 
-The schema is the **single source of truth** for field metadata. Changing a field's label or validation in the schema automatically updates every flow that references it.
-
-Multi-step registration spreads fields across multiple form steps. The flow engine accumulates values in the encrypted cookie. On the final `action` step, it merges everything and creates the user.
+The engine can also **inject gates dynamically** based on policy (e.g., risk score triggers captcha even if the definition doesn't declare it).
 
 ---
 
-## Policy Checks
+## Cross-Flow Navigation (Pivot and Switch)
 
-`policy_check` steps are the **decision points** of the graph. They evaluate a condition and follow one of their transitions.
+Users don't always follow a straight path. They might start logging in, click "Create account", register, then come back to complete login.
 
-### Common policy checks
+Transitions support two cross-flow actions:
 
-**`resolve_user`** — looks up the user by identifier:
+| Action | Behavior |
+|---|---|
+| `pivot` | Push a new flow onto the stack. The current flow pauses and resumes when the new flow completes. |
+| `switch` | Replace the current flow entirely. No return. |
 
 ```json
 {
-  "name": "resolve_user",
-  "type": "policy_check",
-  "config": { "check": "resolve_user" },
+  "name": "login",
+  "fields": ["email", "password"],
+  "actions": {
+    "submit": { "primary": true },
+    "register": {},
+    "recover": {}
+  },
   "transitions": {
-    "found": { "target": "check_factors" },
-    "not_found": { "target": "identifier" }
+    "submit": { "target": "done" },
+    "register": { "target": "default-register", "action": "switch" },
+    "recover": { "target": "default-recovery", "action": "pivot" }
   }
 }
 ```
 
-**`required_factors`** — evaluates what the session needs to reach the target assurance level:
-
-```json
-{
-  "name": "check_factors",
-  "type": "policy_check",
-  "config": { "check": "required_factors" },
-  "transitions": {
-    "password": { "target": "password" },
-    "passkey": { "target": "passkey" },
-    "otp": { "target": "otp" },
-    "acr_met": { "target": "done" }
-  }
-}
-```
-
-The policy engine decides which transition to follow. If the session already has `password` but needs a second factor, it might follow `otp`. If the session has `passkey` (which satisfies AAL2 on its own), it follows `acr_met`.
-
-### Step injection
-
-The policy engine can also **inject steps** that aren't in the definition. For example, if a suspicious request triggers captcha:
-
-```mermaid
-flowchart LR
-    check["check_factors<br>(policy_check)"]
-    captcha["_injected_captcha<br>(captcha)"]
-    password["password<br>(credential)"]
-    done["done<br>(complete)"]
-
-    check -->|"password (normal)"| password
-    check -->|"password (high risk)"| captcha
-    captcha -->|verified| password
-    password -->|submit| check
-    check -->|acr_met| done
-
-    style captcha fill:#ff9,stroke:#cc0
-```
-
-The injected captcha step doesn't exist in the flow definition. It appears dynamically when policy demands it, then transitions back into the normal graph.
-
----
-
-## Flow Pivot
-
-Users don't always follow a straight path. They might start logging in, click "Create account", register, then come back to complete login. This is a **pivot** — the flow switches purpose while keeping the same session.
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant Frontend
-    participant Server
-    participant DB
-
-    Note over User,DB: Login Flow
-    User->>Frontend: Opens login page
-    Frontend->>Server: POST /flows { purpose: login, auth_request_id: oidc-123 }
-    Server->>DB: Create session
-    Server-->>Frontend: identifier step
-    User->>Frontend: Types alice@acme.com
-    Frontend->>Server: submit { identifier: alice@acme.com }
-    Server-->>Frontend: identifier step (user not found)
-    User->>Frontend: Clicks "Create account"
-
-    Note over User,DB: PIVOT → Registration Flow
-    Frontend->>Server: submit { action: register }
-    Note right of Server: Resolve registration flow definition
-    Note right of Server: Carry over: session, email, auth_request_id
-    Server-->>Frontend: profile step (email pre-filled)
-    User->>Frontend: Fills in name, submits
-    Frontend->>Server: submit profile data
-    Server-->>Frontend: set_password step
-    User->>Frontend: Sets password
-    Frontend->>Server: submit password
-    Server->>DB: Create user + write password factor
-    Server-->>Frontend: complete (behavior: continue)
-
-    Note over User,DB: AUTO-PIVOT → Back to Login
-    Frontend->>Server: GET /flows/{session_id}
-    Note right of Server: Session has user + password
-    Note right of Server: Policy check: assurance_levels[] includes requested level
-    Server-->>Frontend: complete (behavior: redirect)
-    Frontend->>User: Redirect to app
-```
-
-### How to enable pivots
-
-Pivots are declared in transitions using `"action": "pivot"`:
-
-```json
-{
-  "name": "identifier",
-  "type": "identifier",
-  "transitions": {
-    "submit": { "target": "resolve_user" },
-    "register": { "target": "register", "action": "pivot" },
-    "recover": { "target": "recovery", "action": "pivot" }
-  }
-}
-```
-
-A `{ "target": "register", "action": "pivot" }` transition tells the flow engine: "stack a new flow for `register`, using the same audience context, and return to the current flow when it completes."
+- **`switch`** is for peer flows (login ↔ register). The user is choosing a different path.
+- **`pivot`** is for supplementary flows (login → recovery → back to login). The user will return.
 
 ### What carries over
 
@@ -587,39 +515,28 @@ A `{ "target": "register", "action": "pivot" }` transition tells the flow engine
 | `auth_request_id` | Yes | After registration, the original OIDC request is still pending |
 | Device fingerprint | Yes | Same browser, same risk profile |
 
-### What resets
-
-| Data | Resets? | Why |
-|---|---|---|
-| Flow definition | New one resolved | Different purpose may use a different definition |
-| Current step | New initial step | Starts at `initial_steps[new_purpose]` |
-| Step history | Appended | Previous history preserved for "back" navigation |
-
 ---
 
 ## Flow Completion
 
-A flow ends when it reaches a `complete` step. The `behavior` field tells the frontend what to do:
+A flow ends when it reaches a step with `complete` set:
 
 ```mermaid
 flowchart TD
-    complete["complete step"]
-    redirect["behavior: redirect<br>Navigate to redirect_uri"]
-    show["behavior: show<br>Display success message"]
-    continue["behavior: continue<br>GET /flows/{session_id}<br>(auto-pivot happened)"]
+    complete["step with complete"]
+    redirect["complete: redirect<br>Navigate to redirect_uri"]
+    show["complete: show<br>Display success message"]
 
     complete --> redirect
     complete --> show
-    complete --> continue
 ```
 
-| `behavior` | When | Frontend action |
+| `complete` | When | Frontend action |
 |---|---|---|
 | `redirect` | Login/reauth with OIDC auth request | Navigate to `redirect_uri` |
-| `show` | Standalone registration, recovery | Display `label` as success screen |
-| `continue` | Registration with pending auth request | Call `GET /flows/{session_id}` for next step |
+| `show` | Standalone registration, recovery | Display success screen |
 
-`continue` means the server already auto-pivoted back to a pending purpose (e.g., back to login after registration). The frontend just needs to fetch the next step.
+After a pivoted flow completes, the engine auto-pops back to the parent. If the session now meets the target ACR, it transitions straight to `complete` with `redirect`.
 
 ---
 
@@ -661,12 +578,16 @@ The session token still rotates on error (prevents replay). The step doesn't adv
 ```json
 {
   "step": {
-    "name": "password",
-    "type": "credential",
-    "label": "Enter your password",
+    "name": "signin",
     "error": "Invalid password. 2 attempts remaining.",
-    "fields": [ ... ],
-    "actions": [ ... ]
+    "fields": {
+      "password": { "type": "password", "text_key": "signin.field.password", "required": true }
+    },
+    "actions": {
+      "submit": { "text_key": "signin.action.submit", "primary": true },
+      "recover": { "text_key": "signin.action.recover" }
+    },
+    "gates": {}
   }
 }
 ```
@@ -675,69 +596,31 @@ The session token still rotates on error (prevents replay). The step doesn't adv
 
 ## Putting It All Together
 
-Here's a complete flow definition that handles login, registration, and recovery — using pivots to connect them:
+Here's how two separate flow definitions connect via a cross-flow switch:
 
 ```mermaid
 graph TD
-    subgraph "Login Flow"
-        id["identifier"]
-        resolve["resolve_user<br>(policy_check)"]
-        check["check_factors<br>(policy_check)"]
-        pwd["password"]
-        otp["otp"]
-        pk["passkey"]
+    subgraph "Login Flow (default-login)"
+        login["login<br>(email + password)"]
         login_done["done (redirect)"]
 
-        id -->|submit| resolve
-        resolve -->|found| check
-        resolve -->|not_found| id
-        check -->|password| pwd
-        check -->|passkey| pk
-        check -->|otp| otp
-        check -->|acr_met| login_done
-        pwd -->|submit| check
-        otp -->|submit| check
-        pk -->|submit| check
+        login -->|submit| login_done
     end
 
-    subgraph "Registration Flow"
-        profile["profile (form)"]
-        set_pwd["set_password (form)"]
-        verify["verify_email"]
-        create["create_user<br>(action)"]
-        reg_done["done (continue)"]
+    subgraph "Registration Flow (default-register)"
+        profile["profile<br>(email, given_name, family_name)"]
+        set_pwd["set_password<br>(password, on_success: create_user)"]
+        reg_done["done (show)"]
 
         profile -->|submit| set_pwd
-        set_pwd -->|submit| verify
-        verify -->|verified| create
-        create -->|created| reg_done
+        set_pwd -->|submit| reg_done
     end
 
-    subgraph "Recovery Flow"
-        rec_email["recovery_email<br>(verification)"]
-        rec_code["verify_code<br>(verification)"]
-        new_pwd["new_password<br>(form)"]
-        reset["reset_password<br>(action)"]
-        rec_done["done (continue)"]
-
-        rec_email -->|submit| rec_code
-        rec_code -->|verified| new_pwd
-        new_pwd -->|submit| reset
-        reset -->|reset| rec_done
-    end
-
-    id -.->|"register (pivot)"| profile
-    profile -.->|"login (pivot)"| id
-    pwd -.->|"recover (pivot)"| rec_email
-    rec_email -.->|"back (pivot)"| id
-
-    style resolve fill:#eee,stroke:#999
-    style check fill:#eee,stroke:#999
-    style create fill:#eee,stroke:#999
-    style reset fill:#eee,stroke:#999
+    login -.->|"register (switch)"| profile
+    profile -.->|"login (switch)"| login
 ```
 
-Three separate flow definitions, connected by pivots. The user can navigate freely between them. The session persists throughout, accumulating factors and collected data.
+Two separate flow definitions, connected by a switch transition. The user can navigate between them. The session persists throughout, accumulating factors and collected data. The engine handles policy evaluation implicitly after every submit.
 
 ---
 
