@@ -1,0 +1,51 @@
+version: 3
+allow:
+  depOnAnyVendor: true # TODO: maybe restrict in the future
+
+components:
+  main:
+    in:
+      - "/"
+      - "cmd/**"
+  domain:
+    in: "internal/domain/**"
+  service:
+    in: "internal/service/**"
+  api:
+    in: "internal/api"
+  stubs:
+    in: "api/**"
+  storage:
+    in: "internal/storage/database/**"
+
+deps:
+  main:
+    mayDependOn:
+      - main
+      - stubs
+      - api
+      - service
+      - storage
+  domain:
+    mayDependOn:
+      - domain
+      - storage # TODO: remove
+  service:
+    mayDependOn:
+      - domain
+      - storage
+  storage:
+    mayDependOn:
+     - domain
+     - storage
+  api:
+    mayDependOn:
+      - stubs
+      - service
+      - domain
+
+exclude:
+  - "**/mock_*.go" # Ignore generated mocks
+  - "**/gen_*.go" # Ignore generators
+  - "**/generate.go" # Ignore generators
+  - "**/*_test.go" # Allow tests more flexibility (e.g., using storage in service tests)
