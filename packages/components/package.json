@@ -47,6 +47,9 @@
       "import": "./dist/orchestrator/transport.mjs"
     }
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsdown",
@@ -55,10 +58,8 @@
     "test:all": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.lib.json"
   },
-  "publishConfig": {
-    "access": "public"
-  },
   "dependencies": {
+    "@zitadel-nextgen/api": "workspace:*",
     "dompurify": "catalog:",
     "liquidjs": "catalog:",
     "lit": "catalog:"

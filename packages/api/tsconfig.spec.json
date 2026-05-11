@@ -6,7 +6,7 @@
     "module": "esnext",
     "moduleResolution": "bundler"
   },
-  "include": ["vite.config.mts", "src/**/*.spec.ts", "src/**/*.d.ts"],
+  "include": ["vitest.config.ts", "src/**/*.spec.ts"],
   "references": [
     {
       "path": "./tsconfig.lib.json"

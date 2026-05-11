@@ -5,14 +5,16 @@
   "type": "module",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "types": "./src/index.ts",
+      "import": "./src/index.ts"
     }
   },
   "scripts": {
     "generate": "orval --config orval.config.ts --clean"
   },
   "devDependencies": {
+    "@faker-js/faker": "catalog:",
+    "msw": "catalog:",
     "orval": "catalog:"
   },
   "peerDependencies": {
@@ -34,6 +36,7 @@
         ]
       },
       "build": {
+        "executor": "nx:noop",
         "dependsOn": [
           "generate"
         ]

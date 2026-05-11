@@ -10,6 +10,7 @@ export default defineConfig({
       schemas: "./src/generated/model",
       client: "fetch",
       mode: "split",
+      mock: true,
       baseUrl: {
         runtime: "getApiBaseUrl()",
         imports: [{ name: "getApiBaseUrl", importPath: "../../runtime/base-url" }],
