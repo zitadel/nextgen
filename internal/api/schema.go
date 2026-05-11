@@ -14,9 +14,13 @@ import (
 func (h *Handler) CreateSchema(ctx context.Context, req api.CreateSchemaReq) (api.CreateSchemaRes, error) {
 	var err error
 	var id *url.URL
+
 	switch req.Type {
 	case api.UserSchemaCreateSchemaReq:
-		sch := convert.UserSchemaToJsonschema(req.UserSchema)
+		sch, err := convert.UserSchemaToJsonschema(req.UserSchema)
+		if err != nil {
+			return nil, err
+		}
 		id, err = h.schemaService.CreateSchema(ctx, sch)
 	case api.SchemaURLCreateSchemaReq:
 		id = &req.SchemaURL.URL
@@ -27,6 +31,9 @@ func (h *Handler) CreateSchema(ctx context.Context, req api.CreateSchemaReq) (ap
 
 	if err != nil {
 		return h.createSchemaError(err)
+	}
+	if id == nil {
+		return nil, nil
 	}
 
 	return &api.CreateSchemaResponse{ID: *id}, nil
@@ -59,7 +66,15 @@ func (h *Handler) GetSchemaById(ctx context.Context, params api.GetSchemaByIdPar
 		return h.getSchemaByIdError(err)
 	}
 
-	return convert.JsonschemaToGetApiSchemaByIdResponse(schema), nil
+	apiSchema, err := convert.JsonschemaToUserSchema(schema)
+	if err != nil {
+		return nil, err
+	}
+
+	return &api.GetSchemaByIdOK{
+		Type:       api.UserSchemaGetSchemaByIdOK,
+		UserSchema: *apiSchema,
+	}, nil
 }
 
 func (h *Handler) getSchemaByIdError(err error) (api.GetSchemaByIdRes, error) {

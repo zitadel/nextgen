@@ -1,0 +1,14 @@
+type: object
+description: |
+  A list of authentication methods supported by the user definition.
+properties:
+  password:
+    $ref: auth-method.yaml
+  passkey:
+    $ref: auth-method.yaml
+  magic_link:
+    $ref: auth-method.yaml
+  sso:
+    $ref: auth-method.yaml
+  otp:
+    $ref: auth-method.yaml

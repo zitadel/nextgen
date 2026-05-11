@@ -4,11 +4,11 @@ import (
 	"context"
 	"net/url"
 
+	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/pkg/errors"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/domain/idgen"
 )
-import "github.com/ianlancetaylor/jsonschema"
 
 type SchemaFetcher interface {
 	Get(ctx context.Context, uri url.URL) (schema *jsonschema.Schema, err error)

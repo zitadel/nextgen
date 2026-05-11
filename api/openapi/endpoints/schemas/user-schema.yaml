@@ -11,6 +11,7 @@ required:
 properties:
   $schema:
     type: string
+    format: uri
     const: https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.yaml
     description: The JSON Schema version used for this schema.
   $id:
@@ -31,20 +32,7 @@ properties:
     maxLength: 1024
     description: A description of this schema.
   x-auth-methods:
-    type: object
-    description: |
-      A list of authentication methods supported by the user definition.
-    properties:
-      password:
-        $ref: auth-method.yaml
-      passkey:
-        $ref: auth-method.yaml
-      magic_link:
-        $ref: auth-method.yaml
-      sso:
-        $ref: auth-method.yaml
-      otp:
-        $ref: auth-method.yaml
+    $ref: auth-methods.yaml
   required:
     type: array
     description: A list of required fields for the user definition
@@ -56,12 +44,4 @@ properties:
       A map of additional properties for the user definition, where the key
       is the property name and the value is the property schema
     additionalProperties:
-      $ref: user-property.yaml
-  example:
-    oneOf:
-      - type: string
-      - type: number
-      - type: boolean
-      - type: object
-      - type: array
-      - type: "null"
+      $schema: https://json-schema.org/draft/2020-12/schema
