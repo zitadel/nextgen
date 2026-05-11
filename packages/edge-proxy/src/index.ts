@@ -150,10 +150,20 @@ function buildUpstreamHeaders(
   url: URL,
   config: ResolvedConfig,
 ): Headers {
+  // RFC 7230 §6.1: the Connection header may name additional headers that are
+  // hop-by-hop for this specific connection and must also be stripped.
+  const connectionValue = req.headers.get('connection') ?? '';
+  const dynamicHopByHop = new Set(
+    connectionValue
+      .split(',')
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean),
+  );
+
   const headers = new Headers();
 
   for (const [k, v] of req.headers.entries()) {
-    if (!HOP_BY_HOP.has(k.toLowerCase())) {
+    if (!HOP_BY_HOP.has(k.toLowerCase()) && !dynamicHopByHop.has(k.toLowerCase())) {
       headers.set(k, v);
     }
   }

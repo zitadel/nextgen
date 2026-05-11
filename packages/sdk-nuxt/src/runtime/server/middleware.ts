@@ -120,10 +120,28 @@ function matchesRoutes(pathname: string, routes: readonly string[]): boolean {
  * @returns A `Headers` instance safe to forward to the upstream service.
  */
 function buildUpstreamHeaders(event: H3Event): Headers {
+  // RFC 7230 §6.1: the Connection header may name additional headers that are
+  // hop-by-hop for this specific connection and must also be stripped.
+  const rawConnection = event.node.req.headers['connection'];
+  const connectionValue = Array.isArray(rawConnection)
+    ? rawConnection.join(', ')
+    : (rawConnection ?? '');
+  const dynamicHopByHop = new Set(
+    connectionValue
+      .split(',')
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean),
+  );
+
   const headers = new Headers();
   for (const [key, value] of Object.entries(event.node.req.headers)) {
     const lower = key.toLowerCase();
-    if (!value || HOP_BY_HOP.has(lower) || INTERNAL_HEADERS.has(lower)) {
+    if (
+      !value ||
+      HOP_BY_HOP.has(lower) ||
+      INTERNAL_HEADERS.has(lower) ||
+      dynamicHopByHop.has(lower)
+    ) {
       continue;
     }
     headers.set(key, Array.isArray(value) ? value.join(', ') : value);

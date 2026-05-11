@@ -802,6 +802,66 @@ describe('nextgenMiddleware', () => {
     });
   });
 
+  describe('proxy: RFC 7230 §6.1 dynamic hop-by-hop stripping (H-2)', () => {
+    it('strips a header named in the Connection header value', async () => {
+      let capturedHeaders: Headers | undefined;
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockImplementation((_url: string, init: RequestInit) => {
+          capturedHeaders = init.headers as Headers;
+          return Promise.resolve(new Response('{}', { status: 200 }));
+        }),
+      );
+
+      const req = new NextRequest('http://localhost:3000/__nextgen/v1/flow', {
+        method: 'GET',
+        headers: {
+          connection: 'keep-alive, X-Custom-Foo',
+          'x-custom-foo': 'secret-value',
+          'content-type': 'application/json',
+        },
+      });
+      await nextgenMiddleware(req, { issuerUrl: 'http://localhost:4000' });
+
+      expect(capturedHeaders).toBeDefined();
+      // X-Custom-Foo is listed in Connection, so RFC 7230 §6.1 requires it stripped
+      expect((capturedHeaders as Headers).has('x-custom-foo')).toBe(false);
+      // Normal headers must still be forwarded
+      expect((capturedHeaders as Headers).get('content-type')).toBe(
+        'application/json',
+      );
+    });
+
+    it('strips multiple headers named in the Connection header value', async () => {
+      let capturedHeaders: Headers | undefined;
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockImplementation((_url: string, init: RequestInit) => {
+          capturedHeaders = init.headers as Headers;
+          return Promise.resolve(new Response('{}', { status: 200 }));
+        }),
+      );
+
+      const req = new NextRequest('http://localhost:3000/__nextgen/v1/flow', {
+        method: 'GET',
+        headers: {
+          connection: 'keep-alive, X-Foo, X-Bar',
+          'x-foo': 'foo-value',
+          'x-bar': 'bar-value',
+          'content-type': 'application/json',
+        },
+      });
+      await nextgenMiddleware(req, { issuerUrl: 'http://localhost:4000' });
+
+      expect(capturedHeaders).toBeDefined();
+      expect((capturedHeaders as Headers).has('x-foo')).toBe(false);
+      expect((capturedHeaders as Headers).has('x-bar')).toBe(false);
+      expect((capturedHeaders as Headers).get('content-type')).toBe(
+        'application/json',
+      );
+    });
+  });
+
   describe('inbound header override: x-nextgen-auth-token (T-1)', () => {
     it('overwrites client-supplied x-nextgen-auth-token with the verified value (empty for unauthenticated)', async () => {
       const req = new NextRequest('http://localhost:3000/', {

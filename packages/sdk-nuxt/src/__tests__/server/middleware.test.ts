@@ -967,6 +967,76 @@ describe('createNextgenMiddleware (H3)', () => {
     });
   });
 
+  describe('proxy: RFC 7230 §6.1 dynamic hop-by-hop stripping (H-2)', () => {
+    it('strips a header named in the Connection header value', async () => {
+      let capturedHeaders: Headers | undefined;
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockImplementation((_url: string, init: RequestInit) => {
+          capturedHeaders = init.headers as Headers;
+          return Promise.resolve(new Response('{}', { status: 200 }));
+        }),
+      );
+
+      const app = createApp();
+      app.use(createNextgenMiddleware({ issuerUrl: 'http://localhost:4000' }));
+
+      const handler = toWebHandler(app);
+      await handler(
+        new Request('http://localhost:3000/__nextgen/v1/flow', {
+          method: 'GET',
+          headers: {
+            connection: 'keep-alive, X-Custom-Foo',
+            'x-custom-foo': 'secret-value',
+            'content-type': 'application/json',
+          },
+        }),
+      );
+
+      expect(capturedHeaders).toBeDefined();
+      // X-Custom-Foo is listed in Connection, so RFC 7230 §6.1 requires it stripped
+      expect((capturedHeaders as Headers).has('x-custom-foo')).toBe(false);
+      // Normal headers must still be forwarded
+      expect((capturedHeaders as Headers).get('content-type')).toBe(
+        'application/json',
+      );
+    });
+
+    it('strips multiple headers named in the Connection header value', async () => {
+      let capturedHeaders: Headers | undefined;
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockImplementation((_url: string, init: RequestInit) => {
+          capturedHeaders = init.headers as Headers;
+          return Promise.resolve(new Response('{}', { status: 200 }));
+        }),
+      );
+
+      const app = createApp();
+      app.use(createNextgenMiddleware({ issuerUrl: 'http://localhost:4000' }));
+
+      const handler = toWebHandler(app);
+      await handler(
+        new Request('http://localhost:3000/__nextgen/v1/flow', {
+          method: 'GET',
+          headers: {
+            connection: 'keep-alive, X-Foo, X-Bar',
+            'x-foo': 'foo-value',
+            'x-bar': 'bar-value',
+            'content-type': 'application/json',
+          },
+        }),
+      );
+
+      expect(capturedHeaders).toBeDefined();
+      expect((capturedHeaders as Headers).has('x-foo')).toBe(false);
+      expect((capturedHeaders as Headers).has('x-bar')).toBe(false);
+      expect((capturedHeaders as Headers).get('content-type')).toBe(
+        'application/json',
+      );
+    });
+  });
+
   describe('inbound header stripping: x-nextgen-auth-token (T-1)', () => {
     it('strips client-supplied x-nextgen-auth-token so route handlers cannot read it', async () => {
       const app = createApp();

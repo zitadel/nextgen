@@ -229,10 +229,24 @@ async function proxyRequest(
   const suffix = url.pathname.slice(proxyPath.length);
   const target = `${issuerUrl}${suffix}${url.search}`;
 
+  // RFC 7230 §6.1: the Connection header may name additional headers that are
+  // hop-by-hop for this specific connection and must also be stripped.
+  const connectionValue = req.headers.get('connection') ?? '';
+  const dynamicHopByHop = new Set(
+    connectionValue
+      .split(',')
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean),
+  );
+
   const upstreamHeaders = new Headers();
   for (const [key, value] of req.headers.entries()) {
     const lower = key.toLowerCase();
-    if (!HOP_BY_HOP.has(lower) && !INTERNAL_HEADERS.has(lower)) {
+    if (
+      !HOP_BY_HOP.has(lower) &&
+      !INTERNAL_HEADERS.has(lower) &&
+      !dynamicHopByHop.has(lower)
+    ) {
       upstreamHeaders.set(key, value);
     }
   }

@@ -206,6 +206,44 @@ describe('handleProxy', () => {
     expect(forwarded.get('x-custom')).toBe('kept');
   });
 
+  // ── RFC 7230 §6.1 dynamic hop-by-hop stripping (H-2) ────────────────────
+
+  it('strips a header named in the Connection value', async () => {
+    const mock = stubFetch(mockResponse());
+    const cfg = makeConfig();
+    const req = new Request('http://edge.local/__nextgen/hello', {
+      headers: {
+        connection: 'keep-alive, X-Custom-Foo',
+        'x-custom-foo': 'should-be-stripped',
+        'x-other': 'kept',
+      },
+    });
+    await handleProxy(req, cfg);
+    const [, init] = mock.mock.calls[0] ?? [];
+    const h = init!.headers as Headers;
+    expect(h.has('x-custom-foo')).toBe(false);
+    expect(h.get('x-other')).toBe('kept');
+  });
+
+  it('strips multiple headers named in the Connection value', async () => {
+    const mock = stubFetch(mockResponse());
+    const cfg = makeConfig();
+    const req = new Request('http://edge.local/__nextgen/hello', {
+      headers: {
+        connection: 'keep-alive, X-Foo, X-Bar',
+        'x-foo': 'gone',
+        'x-bar': 'also-gone',
+        'x-baz': 'kept',
+      },
+    });
+    await handleProxy(req, cfg);
+    const [, init] = mock.mock.calls[0] ?? [];
+    const h = init!.headers as Headers;
+    expect(h.has('x-foo')).toBe(false);
+    expect(h.has('x-bar')).toBe(false);
+    expect(h.get('x-baz')).toBe('kept');
+  });
+
   // ── X-Forwarded-* injection ───────────────────────────────────────────────
 
   it('injects x-forwarded-host when absent', async () => {
