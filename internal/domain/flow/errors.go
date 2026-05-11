@@ -46,20 +46,6 @@ var (
 	ErrInvalidCookie = errors.New("flow: cookie integrity check failed")
 )
 
-// Auth-attempt service errors.
-var (
-	// ErrInvalidProof signals a verification failure on a credential
-	// challenge. The state machine surfaces it as a step-level error.
-	ErrInvalidProof = errors.New("flow: credential proof invalid")
-
-	// ErrUserNotFound drives the reserved `user_not_found` transition.
-	ErrUserNotFound = errors.New("flow: user not found")
-
-	// ErrRateLimited signals that the attempt is being throttled. The
-	// state machine surfaces it without advancing.
-	ErrRateLimited = errors.New("flow: rate limited")
-)
-
 // Gate errors.
 var (
 	// ErrUnknownGate is returned by [GateRegistry] when no implementation
