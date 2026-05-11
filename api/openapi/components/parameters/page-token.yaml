@@ -1,0 +1,10 @@
+name: page_token
+in: query
+required: false
+description: |
+  Token for fetching the next page of results.
+  Obtain this value from `next_page_token` in the previous response.
+  Omit to start from the beginning.
+  Its format is opaque and may change between releases.
+schema:
+  $ref: '../schemas/page-token.yaml'

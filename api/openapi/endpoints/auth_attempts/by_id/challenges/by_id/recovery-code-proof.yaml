@@ -1,0 +1,12 @@
+title: RecoveryCodeProof
+type: object
+description: Proof for `recovery_code` method
+required:
+  - recovery_code
+additionalProperties: false
+properties:
+  recovery_code:
+    type: string
+    description: A recovery code
+    example: 'AAAA-BBBB-CCCC-DDDD'
+

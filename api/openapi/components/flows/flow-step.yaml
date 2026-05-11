@@ -1,68 +1,78 @@
 type: object
-required: [name, type, fields, actions, gates]
+required: [name, fields, actions, gates]
 description: |
   A step contains unordered capability dictionaries: what to collect (fields),
   what the user can do (actions), and what security gates must be satisfied (gates).
   Layout and element ordering are controlled by the LiquidJS template in `branding.liquid_template`.
+example:
+  name: login
+  texts:
+    title_key: login.title
+    description_key: login.description
+  fields:
+    email:
+      type: email
+      text_key: login.field.email
+      required: true
+    password:
+      type: password
+      text_key: login.field.password
+      required: true
+  actions:
+    submit:
+      text_key: login.action.submit
+      primary: true
+    register:
+      text_key: login.action.register
+    recover:
+      text_key: login.action.recover
+  gates:
+    captcha:
+      type: captcha
+      provider: altcha
+      required: true
+      satisfied: false
+      config:
+        algorithm: SHA-256
+        challenge: abc123
+        salt: xyz789
+        max_number: 100000
+  sso_providers:
+    - id: google-1
+      name: Google
+      template: google
+    - id: entra-1
+      name: Microsoft
+      template: entraid
 properties:
   name:
     type: string
     description: Step name from the flow definition.
-  type:
-    type: string
-    enum: [identifier, credential, form, verification, consent, info, redirect, captcha, complete]
-    description: |
-      Semantic step type. This is a hint, not a rendering instruction — the
-      LiquidJS template controls layout. The frontend does NOT switch on type
-      to decide what to render; it renders the capability dictionaries
-      (fields, actions, gates, sso_providers) using the template.
-
-      Type is useful for:
-      - Accessibility: screen readers can announce "credential step"
-      - Analytics: track drop-off rates per step type
-      - Special behavior: `redirect` and `complete` have hardcoded
-        frontend behavior (navigate away) that templates cannot override
-      - Gate auto-injection: backend uses type to enforce gates even if
-        the template omits them (e.g. `captcha` type always requires a
-        captcha gate)
-
-      The following types are rendered by the frontend:
-      - identifier: collect login handle (email, phone, username)
-      - credential: collect secret (password, OTP, passkey proof)
-      - form: generic data collection (profile, address)
-      - verification: email/phone code entry
-      - consent: terms, scopes, permissions (approve/deny)
-      - info: read-only screen (success message, warning)
-      - captcha: dedicated captcha challenge
-      - redirect: navigate to redirect_url immediately, no UI rendered
-      - complete: flow is done — check `behavior` field
-
-      The following types exist only in flow definitions and are never
-      sent to the frontend (the engine auto-transitions through them):
-      - policy_check: evaluate a policy condition, pick next step
-      - action: execute a server-side mutation (create session, etc.)
   texts:
     $ref: step-texts.yaml
   error:
-    type: string
+    oneOf:
+      - type: string
+      - type: 'null'
     description: Error message from a previous failed submission.
-    nullable: true
-  behavior:
+  complete:
     type: string
     enum: [redirect, show]
     description: |
-      Only present on `complete` steps. Tells the frontend what to do:
+      Present only on terminal steps. Tells the frontend what to do:
       - redirect: navigate to redirect_uri immediately (OIDC/SAML done)
       - show: render the step as a success screen (e.g., registration confirmed)
   redirect_url:
     type: string
     format: uri
-    description: For `redirect` steps — URL to navigate to (e.g., SSO provider).
+    description: URL to navigate to (e.g., SSO provider redirect).
   fields:
     type: object
     description: |
       Unordered dictionary of input fields to collect. Keyed by field name.
       The LiquidJS template controls which fields appear and in what order.
+      Field metadata (type, validation) is resolved by the engine from the
+      flow's user schema.
     additionalProperties:
       $ref: field.yaml
     default: {}
@@ -78,7 +88,8 @@ properties:
     type: object
     description: |
       Security gates that must be satisfied before the step can be submitted.
-      The orchestrator appends any required but unrendered gates as a safety net.
+      The engine injects gates dynamically based on policy, even if they
+      are not declared in the flow definition.
     additionalProperties:
       $ref: gate.yaml
     default: {}

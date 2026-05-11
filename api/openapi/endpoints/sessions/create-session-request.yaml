@@ -1,0 +1,24 @@
+type: object
+description: Request to create an anonymous session shell.
+required:
+  - project_id
+properties:
+  project_id:
+    $ref: ../../components/schemas/project-id.yaml
+  user_agent:
+    type: object
+    description: |
+      Optional user agent / device context to attach to the session.
+      Useful for correlating telemetry and device signals with the eventual
+      authenticated session from the start.
+    properties:
+      fingerprint:
+        type: string
+        description: Client-supplied device fingerprint.
+        example: fp_abc123
+      ip:
+        type: string
+        description: IP address of the client.
+        example: 203.0.113.42
+    additionalProperties: true
+

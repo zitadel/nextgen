@@ -1,0 +1,12 @@
+title: IdentifierProof
+type: object
+description: Proof for `identifier` method
+required:
+  - login_name
+additionalProperties: false
+properties:
+  login_name:
+    type: string
+    description: The login name or email being identified
+    example: alice@acme.com
+

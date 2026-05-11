@@ -173,19 +173,26 @@ Exceeding soft limits elevates risk (triggering captcha). Exceeding hard limits 
 
 Three modes:
 
-1. **Explicit step** — for flows that always want captcha (e.g., public registration):
-   ```json
+1. **Step-level gate** — for flows that always want captcha (e.g., public registration):
+
+```json
    {
-     "name": "bot_check",
-     "type": "captcha",
-     "config": { "provider": "altcha", "difficulty": 3 },
-     "transitions": { "verified": "register_profile" }
+     "name": "profile",
+     "fields": ["email", "given_name", "family_name"],
+     "gates": {
+       "captcha": { "type": "captcha", "provider": "altcha" }
+     },
+     "transitions": {
+       "submit": { "target": "set_password" }
+     }
    }
-   ```
+```
+   
+The `gates.captcha` declaration means the frontend must solve a captcha (using the configured provider) before submission is accepted.
 
-2. **Dynamic injection** — policy evaluates risk and injects captcha via the step injection mechanism.
+2. **Dynamic injection** — policy evaluates risk and injects a captcha gate on any step dynamically, even if the definition doesn't declare it.
 
-3. **Invisible assessment** — a `policy_check` step evaluates risk. Low score → skip. High score → inject captcha.
+3. **Risk-based activation** — the engine evaluates risk after every submit. Low score → proceed. High score → inject captcha gate on the current or next step.
 
 ## Integration: Auth Attempts
 
