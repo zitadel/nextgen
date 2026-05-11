@@ -13,10 +13,18 @@ import (
 
 func ensureProject(t *testing.T, client database.QueryExecutor, projectID string) {
 	t.Helper()
-	_, err := client.Exec(t.Context(),
-		`INSERT INTO zitadel_nextgen.instances (id) VALUES ($1) ON CONFLICT (id) DO NOTHING`,
-		projectID,
-	)
+	var err error
+	if isSpannerDB {
+		_, err = client.Exec(t.Context(),
+			`INSERT OR IGNORE INTO instances (id, created_at, updated_at) VALUES ($1, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP())`,
+			projectID,
+		)
+	} else {
+		_, err = client.Exec(t.Context(),
+			`INSERT INTO zitadel_nextgen.instances (id) VALUES ($1) ON CONFLICT (id) DO NOTHING`,
+			projectID,
+		)
+	}
 	require.NoError(t, err)
 }
 
@@ -224,10 +232,16 @@ func TestAuthAttempt_Create(t *testing.T) {
 		ensureProject(t, tx, "p-dup")
 		require.NoError(t, repo.Create(t.Context(), tx, &domain.AuthAttempt{ProjectID: "p-dup", ID: "a-dup"}))
 
-		// Use a savepoint so the expected PK error does not abort the outer transaction.
-		sp, spRollback := savepointForRollback(t, tx)
-		err := repo.Create(t.Context(), sp, &domain.AuthAttempt{ProjectID: "p-dup", ID: "a-dup"})
-		spRollback()
+		var err error
+		if isSpannerDB {
+			// Spanner DML errors don't abort the transaction, so no savepoint needed.
+			err = repo.Create(t.Context(), tx, &domain.AuthAttempt{ProjectID: "p-dup", ID: "a-dup"})
+		} else {
+			// Use a savepoint so the expected PK error does not abort the outer transaction.
+			sp, spRollback := savepointForRollback(t, tx)
+			err = repo.Create(t.Context(), sp, &domain.AuthAttempt{ProjectID: "p-dup", ID: "a-dup"})
+			spRollback()
+		}
 		assert.Error(t, err)
 	})
 }
