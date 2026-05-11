@@ -1,7 +1,6 @@
 package repository_test
 
 import (
-	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -11,20 +10,19 @@ import (
 )
 
 func TestJSONSchemaRepository_CRUD(t *testing.T) {
-	repo := repository.NewJSONSchemaRepository()
 	tx, rollback := transactionForRollback(t)
+	repo := repository.NewJSONSchemaRepository(tx)
 	defer rollback()
 
 	instanceID := "inst-crud"
-	_, err := tx.Exec(t.Context(), "INSERT INTO zitadel_nextgen.instances (id) VALUES ($1)", instanceID)
-	require.NoError(t, err)
+	ensureProject(t, tx, instanceID)
 
 	schema := &domain.JSONSchema{
 		InstanceID: instanceID,
 		URL:        "https://example.com/schemas/user.v1.json",
 		Schema:     []byte(`{"type":"object","properties":{"name":{"type":"string"}}}`),
 	}
-	err = repo.Create(t.Context(), tx, schema)
+	err := repo.Create(t.Context(), tx, schema)
 	require.NoError(t, err)
 
 	got, err := repo.Get(t.Context(), tx, database.WithCondition(repo.PrimaryKeyCondition(instanceID, schema.URL)))
@@ -33,9 +31,7 @@ func TestJSONSchemaRepository_CRUD(t *testing.T) {
 	require.Equal(t, schema.URL, got.URL)
 	require.NotZero(t, got.CreatedAt)
 	require.NotNil(t, got.Schema)
-	gotSchemaRaw, err := json.Marshal(got.Schema)
-	require.NoError(t, err)
-	require.Contains(t, string(gotSchemaRaw), `"type":"object"`)
+	require.Contains(t, string(got.Schema), `"type":"object"`)
 
 	list, err := repo.List(t.Context(), tx, database.WithCondition(repo.InstanceIDCondition(instanceID)))
 	require.NoError(t, err)
@@ -50,8 +46,8 @@ func TestJSONSchemaRepository_CRUD(t *testing.T) {
 }
 
 func TestJSONSchemaRepository_DeleteRequiresPK(t *testing.T) {
-	repo := repository.NewJSONSchemaRepository()
 	tx, rollback := transactionForRollback(t)
+	repo := repository.NewJSONSchemaRepository(tx)
 	defer rollback()
 
 	err := repo.Delete(t.Context(), tx, repo.InstanceIDCondition("only-instance"))
