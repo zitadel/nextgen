@@ -1,10 +1,13 @@
 package domain_test
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -40,12 +43,19 @@ func mustJSONSchemaCache(t *testing.T, size int) *lru.TwoQueueCache[string, *jso
 
 func newTestResolver(t *testing.T, repo domain.JSONSchemaRepository, httpClient *http.Client) *domain.JSONSchemaResolver {
 	t.Helper()
-	return domain.NewJSONSchemaResolver(repo, mustJSONSchemaCache(t, 128), 0, 0, httpClient)
+	return domain.NewJSONSchemaResolver(repo, mustJSONSchemaCache(t, 128), 0, 0, httpClient, nil)
 }
 
 func newTestResolverWithDepth(t *testing.T, repo domain.JSONSchemaRepository, maxResolveDepth int, httpClient *http.Client) *domain.JSONSchemaResolver {
 	t.Helper()
-	return domain.NewJSONSchemaResolver(repo, mustJSONSchemaCache(t, 128), maxResolveDepth, 0, httpClient)
+	return domain.NewJSONSchemaResolver(repo, mustJSONSchemaCache(t, 128), maxResolveDepth, 0, httpClient, nil)
+}
+
+func mustParseURL(t *testing.T, raw string) *url.URL {
+	t.Helper()
+	u, err := url.Parse(raw)
+	require.NoError(t, err)
+	return u
 }
 
 func TestNewJSONSchemaResolver(t *testing.T) {
@@ -53,13 +63,13 @@ func TestNewJSONSchemaResolver(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 		cache := mustJSONSchemaCache(t, 128)
-		r := domain.NewJSONSchemaResolver(mockRepo, cache, 0, 0, nil)
+		r := domain.NewJSONSchemaResolver(mockRepo, cache, 0, 0, nil, nil)
 		require.NotNil(t, r)
 	})
 
 	t.Run("nil cache panics", func(t *testing.T) {
 		assert.Panics(t, func() {
-			domain.NewJSONSchemaResolver(mockRepo, nil, 0, 0, nil)
+			domain.NewJSONSchemaResolver(mockRepo, nil, 0, 0, nil, nil)
 		})
 	})
 }
@@ -303,4 +313,48 @@ func TestJSONSchemaResolver_Resolve(t *testing.T) {
 			tt.run(t, ctrl)
 		})
 	}
+}
+
+func TestWriteBuiltinJSONSchema(t *testing.T) {
+	t.Run("writes valid JSON", func(t *testing.T) {
+		var buf bytes.Buffer
+		canonical := "https://example.test/app/schemas/user/v1/user.schema.json"
+		require.NoError(t, domain.WriteBuiltinJSONSchema(&buf, "user/v1/user.schema.json", canonical))
+		assert.True(t, json.Valid(buf.Bytes()))
+		assert.Contains(t, buf.String(), canonical)
+	})
+	t.Run("unknown schema path", func(t *testing.T) {
+		var buf bytes.Buffer
+		err := domain.WriteBuiltinJSONSchema(&buf, "nope/not-there.json", "https://example.test/x")
+		require.Error(t, err)
+	})
+}
+
+func TestJSONSchemaResolver_BuiltinEmbedded(t *testing.T) {
+	ctx := context.Background()
+	base := mustParseURL(t, "https://example.test/app/schemas")
+	full := "https://example.test/app/schemas/user/v1/user.schema.json"
+
+	t.Run("resolve skips repository", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		mockRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
+		r := domain.NewJSONSchemaResolver(mockRepo, mustJSONSchemaCache(t, 128), 0, 0, nil, base)
+		schema, err := r.Resolve(ctx, nil, "inst-1", full, nil)
+		require.NoError(t, err)
+		require.NotNil(t, schema)
+	})
+	t.Run("URL under base but unknown path errors without repository access", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		mockRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
+		r := domain.NewJSONSchemaResolver(mockRepo, mustJSONSchemaCache(t, 128), 0, 0, nil, base)
+		_, err := r.Resolve(ctx, nil, "inst-1", "https://example.test/app/schemas/unknown/v.json", nil)
+		require.Error(t, err)
+	})
+	t.Run("schema URL equals base only errors", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		mockRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
+		r := domain.NewJSONSchemaResolver(mockRepo, mustJSONSchemaCache(t, 128), 0, 0, nil, base)
+		_, err := r.Resolve(ctx, nil, "inst-1", base.String(), nil)
+		require.Error(t, err)
+	})
 }
