@@ -89,8 +89,8 @@ func StartEmbedded(ctx context.Context) (database.Connector, func(), error) {
 func createInstanceAndDatabase(ctx context.Context, emulatorHost string) error {
 	opts := []option.ClientOption{
 		option.WithEndpoint(emulatorHost),
-		option.WithoutAuthentication(),
-		option.WithGRPCDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),
+		option.WithoutAuthentication(), // TODO(IAM-Marco): In prod should use authentication, maybe read from env vars
+		option.WithGRPCDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())), // TODO(IAM-Marco): For prod, should use authentication
 	}
 
 	// Create instance
@@ -124,6 +124,7 @@ func createInstanceAndDatabase(ctx context.Context, emulatorHost string) error {
 	defer dbClient.Close()
 
 	dbOp, err := dbClient.CreateDatabase(ctx, &databasepb.CreateDatabaseRequest{
+		// TODO(IAM-Marco): This should be read from config
 		Parent:          "projects/" + testProject + "/instances/" + testInstance,
 		CreateStatement: "CREATE DATABASE `" + testDatabase + "`",
 	})

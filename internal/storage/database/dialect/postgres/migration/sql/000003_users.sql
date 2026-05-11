@@ -112,6 +112,9 @@ CREATE TYPE zitadel_nextgen.incoming_user_attribute AS (
 );
 
 -- +goose StatementBegin
+-- This optimizes joining of tables that have matching partition columns.
+-- However, there is a small price to pay for the query planner overall.
+-- Heads up: this cannot be run in an transaction, probably needs to be moved into it's own setup job later.
 DO $$
 BEGIN
     EXECUTE format('ALTER DATABASE %I SET enable_partitionwise_join = on', current_database());
