@@ -21,7 +21,7 @@ const (
 	AuthCheckTypeUser
 	AuthCheckTypePassword
 	AuthCheckTypePasskey
-	AuthCheckIdentityProvider
+	AuthCheckTypeIdentityProvider
 )
 
 type AuthCheck interface {

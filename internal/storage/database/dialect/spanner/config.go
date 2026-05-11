@@ -3,50 +3,54 @@ package spanner
 import (
 	"context"
 	"errors"
-	"fmt"
-	"strings"
 
-	"cloud.google.com/go/spanner"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 var (
-	_    database.Connector = (*Config)(nil)
-	Name                    = "spanner"
+	_          database.Connector = (*Config)(nil)
+	Name                          = "spanner"
+	isMigrated bool
 )
 
-func init() {
-	database.MustRegisterDialect(Name, DecodeConfig)
-}
-
+// Config holds connection settings for a Spanner database accessed via PGAdapter,
+// which exposes the Spanner PostgreSQL dialect over the PostgreSQL wire protocol.
 type Config struct {
-	Database string
-	// We start simple and only support the database path, but we can add more configuration options here in the future if needed.
-	// See [spanner.ClientConfig] for possible options.
+	*pgxpool.Config
+	*pgxpool.Pool
 }
 
-func DecodeConfig(input any) (database.Connector, error) {
-	dsn, ok := input.(string)
-	if !ok {
-		return nil, errors.New("invalid configuration")
-	}
-	dsn = strings.TrimSpace(dsn)
-	if dsn == "" {
-		return nil, errors.New("invalid configuration")
-	}
-	if !strings.HasPrefix(dsn, "projects/") {
-		return nil, fmt.Errorf("invalid spanner database path %q", dsn)
-	}
-	return &Config{Database: dsn}, nil
-}
-
-// Connect implements [database.Connector].
 func (c *Config) Connect(ctx context.Context) (database.Pool, error) {
-	client, err := spanner.NewClient(ctx, c.Database)
+	pool, err := c.getPool(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("spanner: failed to create client: %w", err)
+		return nil, wrapError(err)
 	}
-	// TODO: implement spanner pool that satisfies [database.Pool] and return it here. For now we just create the client to verify that the configuration is correct and the connection can be established.
-	defer client.Close()
-	return nil, errors.New("spanner: not implemented")
+	if err = pool.Ping(ctx); err != nil {
+		return nil, wrapError(err)
+	}
+	return &pgxPool{Pool: pool}, nil
+}
+
+func (c *Config) getPool(ctx context.Context) (*pgxpool.Pool, error) {
+	if c.Pool != nil {
+		return c.Pool, nil
+	}
+	return pgxpool.NewWithConfig(ctx, c.Config)
+}
+
+// DecodeConfig parses a PostgreSQL connection URL for a PGAdapter endpoint.
+// The database name must be a Spanner resource path, e.g.
+// projects/my-project/instances/my-instance/databases/my-db.
+func DecodeConfig(input any) (database.Connector, error) {
+	c, ok := input.(string)
+	if !ok {
+		return nil, errors.New("invalid configuration: expected connection URL string")
+	}
+
+	config, err := pgxpool.ParseConfig(c)
+	if err != nil {
+		return nil, err
+	}
+	return &Config{Config: config}, nil
 }

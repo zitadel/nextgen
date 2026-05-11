@@ -19,7 +19,7 @@ type AuthAttemptService interface {
 	// If input.SessionID is set, the existing session's verified checks are copied
 	// into the attempt for step-up authentication against an existing session.
 	//
-	// If input.RequiredChecks is nil, the project's default required checks are used.
+	// If input.RequiredChecks are nil, the project's default required checks are used.
 	//
 	// errors: domain.ErrAuthAttemptInvalidRequest, domain.ErrInternal
 	Create(ctx context.Context, input CreateAuthAttemptInput) (*domain.AuthAttempt, error)
@@ -32,7 +32,7 @@ type AuthAttemptService interface {
 	// IssueChallenge creates and returns a new challenge for the given check type.
 	// An existing challenge of the same type will be overwritten.
 	//
-	// For passkey challenges, the user check must already be verified so the user ID is known
+	// For passkey challenges, the user check must already be verified, so the user ID is known
 	// for retrieving registered credentials.
 	//
 	// errors: domain.ErrAuthAttemptNotFound, domain.ErrAuthAttemptInvalidRequest, domain.ErrAuthAttemptInvalidState, domain.ErrAuthAttemptAlreadyCompleted, domain.ErrInternal
@@ -56,7 +56,7 @@ type AuthAttemptService interface {
 	// The token is exchanged by the client at POST /sessions/exchange to create
 	// a new session or add factors to an existing session.
 	//
-	// The attempt must be in completed state and not expired.
+	// The attempt must be in a completed state and not expired.
 	//
 	// errors: domain.ErrAuthAttemptNotFound, domain.ErrAuthAttemptInvalidState, domain.ErrAuthAttemptNotCompleted, domain.ErrInternal
 	Handoff(ctx context.Context, input HandoffInput) (*domain.AuthAttempt, error)
@@ -130,7 +130,7 @@ type IdPProof struct {
 	State string
 }
 
-func (IdPProof) proofCheckType() domain.AuthCheckType { return domain.AuthCheckIdentityProvider }
+func (IdPProof) proofCheckType() domain.AuthCheckType { return domain.AuthCheckTypeIdentityProvider }
 
 // ---- Implementation ----------------------------------------------------------
 
@@ -272,7 +272,6 @@ func (s *authAttemptService) buildChallenger(ctx context.Context, attempt *domai
 		if err := attempt.PrepareChallenge(typ); err != nil {
 			return nil, err
 		}
-		// User challenge has no payload — SetChallenge just marks it as challenged
 		userChallenge, err := domain.NewUserAuthCheck()
 		if err != nil {
 			return nil, err
@@ -281,11 +280,9 @@ func (s *authAttemptService) buildChallenger(ctx context.Context, attempt *domai
 		return userChallenge, nil
 
 	case domain.AuthCheckTypePassword:
-		// Pure domain validation
 		if err := attempt.PreparePasswordChallenge(); err != nil {
 			return nil, err
 		}
-		// Password challenge has no payload — SetChallenge just marks it as challenged
 		passwordChallenge, err := domain.NewPasswordAuthCheck()
 		if err != nil {
 			return nil, err
@@ -294,7 +291,6 @@ func (s *authAttemptService) buildChallenger(ctx context.Context, attempt *domai
 		return passwordChallenge, nil
 
 	case domain.AuthCheckTypePasskey:
-		// Pure domain validation — also returns the user ID needed for the I/O call below
 		userFactor, err := attempt.PreparePasskeyChallenge()
 		if err != nil {
 			return nil, err
@@ -314,6 +310,8 @@ func (s *authAttemptService) buildChallenger(ctx context.Context, attempt *domai
 
 		attempt.SetCheck(passkeyChallenge)
 		return passkeyChallenge, nil
+
+		// TODO: idp
 
 	default:
 		return nil, domain.ErrAuthAttemptInvalidRequest()
@@ -353,7 +351,7 @@ func (s *authAttemptService) VerifyProof(ctx context.Context, input VerifyProofI
 		return nil, domain.ErrInternal(err).WithMessage("failed to start transaction")
 	}
 	defer func() {
-		// dont shadow errors already returned to the user
+		// don't shadow errors already returned to the user
 		if err != nil {
 			_ = tx.Rollback(ctx)
 		}
@@ -420,6 +418,8 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 			return nil, domain.ErrAuthAttemptProofRejected().WithParent(err)
 		}
 		return &domain.AuthFactorPasskey{UserVerified: userVerified}, nil
+
+		// TODO: idp
 
 	default:
 		return nil, domain.ErrAuthAttemptInvalidRequest().WithDetails("unsupported proof type")

@@ -79,23 +79,6 @@ func (a *AuthAttempt) get(ctx context.Context, client database.QueryExecutor, qu
 			continue
 		}
 
-		//check := domain.AuthCheck{Type: checkType.V}
-		//if challengeID.Valid {
-		//	check.ID = challengeID.V
-		//}
-		//if lastChallengedAt.Valid {
-		//	check.LastChallengedAt = lastChallengedAt.V
-		//}
-		//if failureCount.Valid {
-		//	check.FailureCount = failureCount.V
-		//}
-		//if verifiedAt.Valid {
-		//	check.LastVerifiedAt = verifiedAt.V
-		//}
-		//if lastFailedAt.Valid {
-		//	check.LastFailedAt = &lastFailedAt.V
-		//}
-
 		checkers, err := newAuthChecks(checkType.V, challengeID.V, lastChallengedAt.V, lastFailedAt.V, verifiedAt.V, failureCount.V, challenge, factor)
 		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal auth check: %w", err)
@@ -376,6 +359,27 @@ func newAuthChecks(
 				}
 			}
 			checks = append(checks, passkeyCheck)
+		}
+	case domain.AuthCheckTypeIdentityProvider:
+		if !verifiedAt.IsZero() {
+			identityProviderFactor := domain.NewAuthFactorIdentityProvider(verifiedAt)
+			if len(factor) > 0 {
+				err = json.Unmarshal(factor, identityProviderFactor)
+				if err != nil {
+					return nil, fmt.Errorf("failed to unmarshal identity provider auth check factor payload: %w", err)
+				}
+			}
+			checks = append(checks, identityProviderFactor)
+		}
+		if !lastChallengedAt.IsZero() {
+			identityProviderChallenge := domain.NewAuthChallengeIdentityProvider(id, lastChallengedAt, lastFailedAt, failureCount)
+			if len(challenge) > 0 {
+				err = json.Unmarshal(challenge, identityProviderChallenge)
+				if err != nil {
+					return nil, fmt.Errorf("failed to unmarshal identity provider auth check challenge payload: %w", err)
+				}
+			}
+			checks = append(checks, identityProviderChallenge)
 		}
 	default:
 		log.Println("unsupported auth check type:", checkType)

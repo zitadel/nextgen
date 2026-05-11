@@ -22,6 +22,7 @@ complete → redirect                      → build native UI, step-up if neede
 |---|---|---|
 | [Flow Engine](flow-engine.md) | In Review | Server-side state machine producing Capability payloads. Step types, flow definitions, resolution. |
 | [Flow Engine — Step Response Shape](flow-engine-nodes.md) | In Review (frontend) | Capability mapping: Fields, Actions, Gates, and LiquidJS templates. |
+| [Component Capability Map](../branding/component-capability-map.md) | Design reference | Maps schema fields, actions, gates, and supporting capabilities to reusable UI components. |
 | [Flow Engine — Storage](flow-engine-storage.md) | In Review | Encrypted cookie model, session/flow separation, optimistic locking, DB I/O analysis. |
 | [Flow Engine — Developer Guide](flow-engine-guide.md) | In Review | Progressive walkthrough of building flows: steps, pivots, completion, sessions, error handling. |
 | [Session API](session-api.md) | Preliminary | Factor accumulation primitive. Assurance-level model is directional, not final. |
@@ -83,7 +84,7 @@ graph TD
 
     Schema -- "narrows available methods" --> Policy
     Schema -- "field metadata for rendering" --> Flow
-    Policy -- "policy_check steps,<br>step injection" --> Flow
+    Policy -- "implicit evaluation,<br>step injection" --> Flow
     Flow -- "drives internally" --> Attempts
     Attempts -- "writes factors on complete" --> Session
 ```
@@ -92,7 +93,7 @@ graph TD
 |---|---|---|
 | Which fields exist on a user? | **User Schema** | Field types, validation, annotations, auth method availability |
 | What does the login/registration page look like? | **Flow Definition** | Branding, step graph, which schema fields on which step |
-| Which fields to show during registration? | **Flow Definition** (`form` steps) | References schema fields by name; schema provides metadata |
+| Which fields to show during registration? | **Flow Definition** (step `fields`) | References schema properties by name; schema provides metadata |
 | What assurance levels does this session satisfy? | **Policy Engine** | Evaluates factors + freshness + authenticator properties → computes `assurance_levels[]` |
 | What screen does the user see next? | **Flow Engine** | Combines policy decision + flow definition + schema → Capabilities + Liquid Template |
 | Is this session usable for token exchange? | **OIDC/SAML endpoint** | Compares session `assurance_levels[]` against requested `acr_values`; triggers step-up if insufficient |
