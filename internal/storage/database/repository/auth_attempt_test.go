@@ -16,12 +16,12 @@ func ensureProject(t *testing.T, client database.QueryExecutor, projectID string
 	var err error
 	if isSpannerDB {
 		_, err = client.Exec(t.Context(),
-			`INSERT OR IGNORE INTO instances (id, created_at, updated_at) VALUES ($1, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP())`,
+			`INSERT OR IGNORE INTO projects (id, created_at, updated_at) VALUES ($1, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP())`,
 			projectID,
 		)
 	} else {
 		_, err = client.Exec(t.Context(),
-			`INSERT INTO zitadel_nextgen.instances (id) VALUES ($1) ON CONFLICT (id) DO NOTHING`,
+			`INSERT INTO zitadel_nextgen.projects (id) VALUES ($1) ON CONFLICT (id) DO NOTHING`,
 			projectID,
 		)
 	}

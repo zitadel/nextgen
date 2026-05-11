@@ -14,34 +14,34 @@ func TestJSONSchemaRepository_CRUD(t *testing.T) {
 	repo := repository.NewJSONSchemaRepository(tx)
 	defer rollback()
 
-	instanceID := "inst-crud"
-	ensureProject(t, tx, instanceID)
+	projectID := "proj-crud"
+	ensureProject(t, tx, projectID)
 
 	schema := &domain.JSONSchema{
-		InstanceID: instanceID,
+		ProjectID: projectID,
 		URL:        "https://example.com/schemas/user.v1.json",
 		Schema:     []byte(`{"type":"object","properties":{"name":{"type":"string"}}}`),
 	}
 	err := repo.Create(t.Context(), tx, schema)
 	require.NoError(t, err)
 
-	got, err := repo.Get(t.Context(), tx, database.WithCondition(repo.PrimaryKeyCondition(instanceID, schema.URL)))
+	got, err := repo.Get(t.Context(), tx, database.WithCondition(repo.PrimaryKeyCondition(projectID, schema.URL)))
 	require.NoError(t, err)
-	require.Equal(t, instanceID, got.InstanceID)
+	require.Equal(t, projectID, got.ProjectID)
 	require.Equal(t, schema.URL, got.URL)
 	require.NotZero(t, got.CreatedAt)
 	require.NotNil(t, got.Schema)
 	require.Contains(t, string(got.Schema), `"type":"object"`)
 
-	list, err := repo.List(t.Context(), tx, database.WithCondition(repo.InstanceIDCondition(instanceID)))
+	list, err := repo.List(t.Context(), tx, database.WithCondition(repo.ProjectIDCondition(projectID)))
 	require.NoError(t, err)
 	require.Len(t, list, 1)
 	require.Equal(t, schema.URL, list[0].URL)
 
-	err = repo.Delete(t.Context(), tx, repo.PrimaryKeyCondition(instanceID, schema.URL))
+	err = repo.Delete(t.Context(), tx, repo.PrimaryKeyCondition(projectID, schema.URL))
 	require.NoError(t, err)
 
-	_, err = repo.Get(t.Context(), tx, database.WithCondition(repo.PrimaryKeyCondition(instanceID, schema.URL)))
+	_, err = repo.Get(t.Context(), tx, database.WithCondition(repo.PrimaryKeyCondition(projectID, schema.URL)))
 	require.ErrorIs(t, err, new(database.NoRowFoundError))
 }
 
@@ -50,6 +50,6 @@ func TestJSONSchemaRepository_DeleteRequiresPK(t *testing.T) {
 	repo := repository.NewJSONSchemaRepository(tx)
 	defer rollback()
 
-	err := repo.Delete(t.Context(), tx, repo.InstanceIDCondition("only-instance"))
+	err := repo.Delete(t.Context(), tx, repo.ProjectIDCondition("only-project"))
 	require.ErrorIs(t, err, new(database.MissingConditionError))
 }
