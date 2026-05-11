@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"time"
 
 	database_admin "cloud.google.com/go/spanner/admin/database/apiv1"
 	"cloud.google.com/go/spanner/admin/database/apiv1/databasepb"
@@ -93,6 +94,26 @@ func createInstanceAndDatabase(ctx context.Context, emulatorHost string) error {
 		option.WithGRPCDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())), // TODO(IAM-Marco): For prod, should use authentication
 	}
 
+	// The TCP port becomes reachable before the gRPC server finishes initializing.
+	// Retry with backoff until the instance admin call succeeds.
+	var lastErr error
+	for attempt := range 10 {
+		lastErr = tryCreateInstanceAndDatabase(ctx, opts)
+		if lastErr == nil {
+			return nil
+		}
+		delay := time.Duration(attempt+1) * 200 * time.Millisecond
+		slog.Info("Spanner emulator not ready, retrying", "attempt", attempt+1, "delay", delay, "err", lastErr)
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(delay):
+		}
+	}
+	return lastErr
+}
+
+func tryCreateInstanceAndDatabase(ctx context.Context, opts []option.ClientOption) error {
 	// Create instance
 	instClient, err := instance_admin.NewInstanceAdminClient(ctx, opts...)
 	if err != nil {
