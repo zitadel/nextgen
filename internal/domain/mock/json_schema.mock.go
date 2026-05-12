@@ -200,82 +200,6 @@ func (c *MockJSONSchemaRepositoryGetCall) DoAndReturn(f func(context.Context, da
 	return c
 }
 
-// InstanceID mocks base method.
-func (m *MockJSONSchemaRepository) InstanceID() database.Column {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "InstanceID")
-	ret0, _ := ret[0].(database.Column)
-	return ret0
-}
-
-// InstanceID indicates an expected call of InstanceID.
-func (mr *MockJSONSchemaRepositoryMockRecorder) InstanceID() *MockJSONSchemaRepositoryInstanceIDCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InstanceID", reflect.TypeOf((*MockJSONSchemaRepository)(nil).InstanceID))
-	return &MockJSONSchemaRepositoryInstanceIDCall{Call: call}
-}
-
-// MockJSONSchemaRepositoryInstanceIDCall wrap *gomock.Call
-type MockJSONSchemaRepositoryInstanceIDCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockJSONSchemaRepositoryInstanceIDCall) Return(arg0 database.Column) *MockJSONSchemaRepositoryInstanceIDCall {
-	c.Call = c.Call.Return(arg0)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockJSONSchemaRepositoryInstanceIDCall) Do(f func() database.Column) *MockJSONSchemaRepositoryInstanceIDCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockJSONSchemaRepositoryInstanceIDCall) DoAndReturn(f func() database.Column) *MockJSONSchemaRepositoryInstanceIDCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// InstanceIDCondition mocks base method.
-func (m *MockJSONSchemaRepository) InstanceIDCondition(instanceID string) database.Condition {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "InstanceIDCondition", instanceID)
-	ret0, _ := ret[0].(database.Condition)
-	return ret0
-}
-
-// InstanceIDCondition indicates an expected call of InstanceIDCondition.
-func (mr *MockJSONSchemaRepositoryMockRecorder) InstanceIDCondition(instanceID any) *MockJSONSchemaRepositoryInstanceIDConditionCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InstanceIDCondition", reflect.TypeOf((*MockJSONSchemaRepository)(nil).InstanceIDCondition), instanceID)
-	return &MockJSONSchemaRepositoryInstanceIDConditionCall{Call: call}
-}
-
-// MockJSONSchemaRepositoryInstanceIDConditionCall wrap *gomock.Call
-type MockJSONSchemaRepositoryInstanceIDConditionCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockJSONSchemaRepositoryInstanceIDConditionCall) Return(arg0 database.Condition) *MockJSONSchemaRepositoryInstanceIDConditionCall {
-	c.Call = c.Call.Return(arg0)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockJSONSchemaRepositoryInstanceIDConditionCall) Do(f func(string) database.Condition) *MockJSONSchemaRepositoryInstanceIDConditionCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockJSONSchemaRepositoryInstanceIDConditionCall) DoAndReturn(f func(string) database.Condition) *MockJSONSchemaRepositoryInstanceIDConditionCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
 // List mocks base method.
 func (m *MockJSONSchemaRepository) List(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) ([]*domain.JSONSchema, error) {
 	m.ctrl.T.Helper()
@@ -397,17 +321,17 @@ func (c *MockJSONSchemaRepositoryPrimaryKeyColumnsCall) DoAndReturn(f func() []d
 }
 
 // PrimaryKeyCondition mocks base method.
-func (m *MockJSONSchemaRepository) PrimaryKeyCondition(instanceID, url string) database.Condition {
+func (m *MockJSONSchemaRepository) PrimaryKeyCondition(projectID, url string) database.Condition {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PrimaryKeyCondition", instanceID, url)
+	ret := m.ctrl.Call(m, "PrimaryKeyCondition", projectID, url)
 	ret0, _ := ret[0].(database.Condition)
 	return ret0
 }
 
 // PrimaryKeyCondition indicates an expected call of PrimaryKeyCondition.
-func (mr *MockJSONSchemaRepositoryMockRecorder) PrimaryKeyCondition(instanceID, url any) *MockJSONSchemaRepositoryPrimaryKeyConditionCall {
+func (mr *MockJSONSchemaRepositoryMockRecorder) PrimaryKeyCondition(projectID, url any) *MockJSONSchemaRepositoryPrimaryKeyConditionCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PrimaryKeyCondition", reflect.TypeOf((*MockJSONSchemaRepository)(nil).PrimaryKeyCondition), instanceID, url)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PrimaryKeyCondition", reflect.TypeOf((*MockJSONSchemaRepository)(nil).PrimaryKeyCondition), projectID, url)
 	return &MockJSONSchemaRepositoryPrimaryKeyConditionCall{Call: call}
 }
 
@@ -430,6 +354,82 @@ func (c *MockJSONSchemaRepositoryPrimaryKeyConditionCall) Do(f func(string, stri
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockJSONSchemaRepositoryPrimaryKeyConditionCall) DoAndReturn(f func(string, string) database.Condition) *MockJSONSchemaRepositoryPrimaryKeyConditionCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// ProjectID mocks base method.
+func (m *MockJSONSchemaRepository) ProjectID() database.Column {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ProjectID")
+	ret0, _ := ret[0].(database.Column)
+	return ret0
+}
+
+// ProjectID indicates an expected call of ProjectID.
+func (mr *MockJSONSchemaRepositoryMockRecorder) ProjectID() *MockJSONSchemaRepositoryProjectIDCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProjectID", reflect.TypeOf((*MockJSONSchemaRepository)(nil).ProjectID))
+	return &MockJSONSchemaRepositoryProjectIDCall{Call: call}
+}
+
+// MockJSONSchemaRepositoryProjectIDCall wrap *gomock.Call
+type MockJSONSchemaRepositoryProjectIDCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockJSONSchemaRepositoryProjectIDCall) Return(arg0 database.Column) *MockJSONSchemaRepositoryProjectIDCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockJSONSchemaRepositoryProjectIDCall) Do(f func() database.Column) *MockJSONSchemaRepositoryProjectIDCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockJSONSchemaRepositoryProjectIDCall) DoAndReturn(f func() database.Column) *MockJSONSchemaRepositoryProjectIDCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// ProjectIDCondition mocks base method.
+func (m *MockJSONSchemaRepository) ProjectIDCondition(projectID string) database.Condition {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ProjectIDCondition", projectID)
+	ret0, _ := ret[0].(database.Condition)
+	return ret0
+}
+
+// ProjectIDCondition indicates an expected call of ProjectIDCondition.
+func (mr *MockJSONSchemaRepositoryMockRecorder) ProjectIDCondition(projectID any) *MockJSONSchemaRepositoryProjectIDConditionCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProjectIDCondition", reflect.TypeOf((*MockJSONSchemaRepository)(nil).ProjectIDCondition), projectID)
+	return &MockJSONSchemaRepositoryProjectIDConditionCall{Call: call}
+}
+
+// MockJSONSchemaRepositoryProjectIDConditionCall wrap *gomock.Call
+type MockJSONSchemaRepositoryProjectIDConditionCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockJSONSchemaRepositoryProjectIDConditionCall) Return(arg0 database.Condition) *MockJSONSchemaRepositoryProjectIDConditionCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockJSONSchemaRepositoryProjectIDConditionCall) Do(f func(string) database.Condition) *MockJSONSchemaRepositoryProjectIDConditionCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockJSONSchemaRepositoryProjectIDConditionCall) DoAndReturn(f func(string) database.Condition) *MockJSONSchemaRepositoryProjectIDConditionCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

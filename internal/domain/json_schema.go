@@ -23,10 +23,10 @@ import (
 
 // JSONSchema represent a JSON schema which can be used to validate JSON data.
 type JSONSchema struct {
-	InstanceID string
-	URL        string
-	CreatedAt  time.Time
-	Schema     []byte
+	ProjectID string
+	URL       string
+	CreatedAt time.Time
+	Schema    []byte
 }
 
 //go:generate go tool mockgen -typed -package domainmock -destination ./mock/json_schema.mock.go . JSONSchemaRepository
@@ -48,15 +48,15 @@ type JSONSchemaRepository interface {
 }
 
 type jsonSchemaColumns interface {
-	InstanceID() database.Column
+	ProjectID() database.Column
 	URL() database.Column
 	CreatedAt() database.Column
 	Payload() database.Column
 }
 
 type jsonSchemaConditions interface {
-	PrimaryKeyCondition(instanceID, url string) database.Condition
-	InstanceIDCondition(instanceID string) database.Condition
+	PrimaryKeyCondition(projectID, url string) database.Condition
+	ProjectIDCondition(projectID string) database.Condition
 	URLCondition(url string) database.Condition
 }
 
@@ -64,8 +64,8 @@ const (
 	DefaultMaxJSONSchemaResolveDepth = 10
 	DefaultMaxJSONSchemaSize         = 1 << 20 // 1 MB
 
-	// jsonSchemaResolverCacheKeySep separates instance ID and schema URL in [JSONSchemaResolverCacheKey].
-	// Instance IDs must not contain this rune (true for typical IDs).
+	// jsonSchemaResolverCacheKeySep separates project ID and schema URL in [JSONSchemaResolverCacheKey].
+	// Project IDs must not contain this rune (true for typical IDs).
 	jsonSchemaResolverCacheKeySep = "\x00"
 )
 
@@ -118,9 +118,9 @@ func init() {
 	builtinTemplates = m
 }
 
-// jsonSchemaResolverCacheKey is the string used as an LRU key for a resolved schema for this instance and URL.
-func jsonSchemaResolverCacheKey(instanceID, schemaURL string) string {
-	return instanceID + jsonSchemaResolverCacheKeySep + schemaURL
+// jsonSchemaResolverCacheKey is the string used as an LRU key for a resolved schema for this project and URL.
+func jsonSchemaResolverCacheKey(projectID, schemaURL string) string {
+	return projectID + jsonSchemaResolverCacheKeySep + schemaURL
 }
 
 // JSONSchemaResolver retrieves JSON schemas by their URL recursively,
@@ -129,7 +129,7 @@ func jsonSchemaResolverCacheKey(instanceID, schemaURL string) string {
 type JSONSchemaResolver struct {
 	repository JSONSchemaRepository
 	// cache of fully resolved JSON schemas,
-	// keyed by instanceID and schemaURL
+	// keyed by projectID and schemaURL
 	cache           *lru.TwoQueueCache[string, *jsonschema.Schema]
 	maxResolveDepth int
 	maxSize         int
@@ -182,15 +182,15 @@ func NewJSONSchemaResolver(
 func (r *JSONSchemaResolver) Resolve(
 	ctx context.Context,
 	client database.QueryExecutor,
-	instanceID string,
+	projectID string,
 	schemaURL string,
 	rootSchema []byte,
 ) (*jsonschema.Schema, error) {
-	cacheKey := jsonSchemaResolverCacheKey(instanceID, schemaURL)
+	cacheKey := jsonSchemaResolverCacheKey(projectID, schemaURL)
 	if schema, ok := r.cache.Get(cacheKey); ok {
 		return schema, nil
 	}
-	schema, err := r.resolveRecursively(ctx, client, instanceID, schemaURL, 0, rootSchema)
+	schema, err := r.resolveRecursively(ctx, client, projectID, schemaURL, 0, rootSchema)
 	if err != nil {
 		return nil, err
 	}
@@ -201,7 +201,7 @@ func (r *JSONSchemaResolver) Resolve(
 func (r *JSONSchemaResolver) resolveRecursively(
 	ctx context.Context,
 	client database.QueryExecutor,
-	instanceID string,
+	projectID string,
 	schemaURL string,
 	depth int,
 	schemaData []byte,
@@ -210,7 +210,7 @@ func (r *JSONSchemaResolver) resolveRecursively(
 		return nil, fmt.Errorf("max resolve depth reached")
 	}
 	if len(schemaData) == 0 {
-		schemaData, err = r.loadSchemaPayload(ctx, client, instanceID, schemaURL)
+		schemaData, err = r.loadSchemaPayload(ctx, client, projectID, schemaURL)
 		if err != nil {
 			return nil, err
 		}
@@ -221,7 +221,7 @@ func (r *JSONSchemaResolver) resolveRecursively(
 	}
 	err = schema.Resolve(&jsonschema.ResolveOpts{
 		Loader: func(schemaID string, uri *url.URL) (*jsonschema.Schema, error) {
-			next, err := r.resolveRecursively(ctx, client, instanceID, uri.String(), depth+1, nil)
+			next, err := r.resolveRecursively(ctx, client, projectID, uri.String(), depth+1, nil)
 			if err != nil {
 				return nil, err
 			}
@@ -234,14 +234,14 @@ func (r *JSONSchemaResolver) resolveRecursively(
 	return schema, nil
 }
 
-func (r *JSONSchemaResolver) loadSchemaPayload(ctx context.Context, client database.QueryExecutor, instanceID, schemaURL string) ([]byte, error) {
+func (r *JSONSchemaResolver) loadSchemaPayload(ctx context.Context, client database.QueryExecutor, projectID, schemaURL string) ([]byte, error) {
 	if r.builtinPublicBase != "" {
 		relPath, ok := builtinSchemaURLPathAfterBase(r.builtinPublicBase, schemaURL)
 		if ok {
 			return loadBuiltinSchemaBytes(relPath, schemaURL)
 		}
 	}
-	return r.getFromDatabase(ctx, client, instanceID, schemaURL)
+	return r.getFromDatabase(ctx, client, projectID, schemaURL)
 }
 
 // builtinSchemaURLPathAfterBase reports whether schemaURL is under base and returns the path
@@ -285,9 +285,9 @@ func writeBuiltinJSONSchema(w io.Writer, schemaPath string, canonicalDocumentURL
 	return tmpl.Execute(w, data)
 }
 
-func (r *JSONSchemaResolver) getFromDatabase(ctx context.Context, client database.QueryExecutor, instanceID, schemaURL string) ([]byte, error) {
+func (r *JSONSchemaResolver) getFromDatabase(ctx context.Context, client database.QueryExecutor, projectID, schemaURL string) ([]byte, error) {
 	dbSchema, err := r.repository.Get(ctx, client, database.WithCondition(
-		r.repository.PrimaryKeyCondition(instanceID, schemaURL),
+		r.repository.PrimaryKeyCondition(projectID, schemaURL),
 	))
 	if err == nil {
 		return dbSchema.Schema, nil
@@ -305,9 +305,9 @@ func (r *JSONSchemaResolver) getFromDatabase(ctx context.Context, client databas
 		return nil, err
 	}
 	dbSchema = &JSONSchema{
-		InstanceID: instanceID,
-		URL:        schemaURL,
-		Schema:     data,
+		ProjectID: projectID,
+		URL:       schemaURL,
+		Schema:    data,
 	}
 	if err := r.repository.Create(ctx, client, dbSchema); err != nil {
 		return nil, err
