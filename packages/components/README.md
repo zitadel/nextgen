@@ -214,10 +214,9 @@ packages/components/
 # install once at the repo root
 corepack pnpm install
 
-# run the playground (atoms + login demo + visualizer)
+# run the playground (atoms + login demo)
 corepack pnpm --filter @zitadel-nextgen/components dev
 # → http://localhost:5174/             playground
-# → http://localhost:5174/visualizer.html flow visualizer (real components)
 
 # unit tests (jsdom)
 corepack pnpm --filter @zitadel-nextgen/components test
@@ -250,18 +249,6 @@ Tests are split across two Vitest projects:
 
 Files ending in `.browser.spec.ts` run only in the browser project; everything
 else runs in jsdom.
-
-## Visualizer
-
-`docs/design/flowengine/visualizer.html` is a static visualizer for the flow
-API. The dev server aliases `/visualizer.html` to it and substitutes the
-component bundle path with a `/@fs/` URL pointing at `src/index.ts`, so the
-"Real components" tab mounts the live source — no build required.
-
-```sh
-corepack pnpm --filter @zitadel-nextgen/components dev
-# open http://localhost:5174/visualizer.html
-```
 
 ## Related design docs
 
