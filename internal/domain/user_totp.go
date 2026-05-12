@@ -8,6 +8,7 @@ import (
 )
 
 type UserTOTP struct {
+	ProjectID           string
 	UserID              string
 	Secret              []byte
 	VerifiedAt          time.Time
@@ -18,6 +19,7 @@ type UserTOTP struct {
 }
 
 type CreateUserTOTP struct {
+	ProjectID      string
 	UserID         string
 	Secret         []byte
 	VerificationID *string
@@ -37,7 +39,7 @@ type UserTOTPRepository interface {
 }
 
 type userTOTPColumns interface {
-	InstanceID() database.Column
+	ProjectID() database.Column
 	UserID() database.Column
 	Secret() database.Column
 	VerifiedAt() database.Column
@@ -48,9 +50,9 @@ type userTOTPColumns interface {
 }
 
 type userTOTPConditions interface {
-	InstanceIDCondition(instanceID string) database.Condition
+	ProjectIDCondition(projectID string) database.Condition
 	UserIDCondition(userID string) database.Condition
-	PrimaryKeyCondition(instanceID, userID string) database.Condition
+	PrimaryKeyCondition(projectID, userID string) database.Condition
 }
 
 type userTOTPChanges interface {

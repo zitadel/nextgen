@@ -1,19 +1,5 @@
 package domain
 
-/*
-// User represents the object defined [here](https://github.com/zitadel/nextgen/blob/main/docs/design/api/resource-map.md#users)
-// The user might contain PII data and should be stored in a specific region.
-type User struct {
-	// ProjectID links to [Project].
-	ProjectID string
-	// TeamID links to [Team]. A user may belong to a team, but it's not required.
-	// If TeamID is nil, the user belongs to the project but not to any team.
-	TeamID *string
-	// ID is the unique identifier for the user within the project and team.
-	ID string
-}
-*/
-
 import (
 	"context"
 	"time"
@@ -30,39 +16,26 @@ const (
 	AuthMethodRecoveryCodes
 )
 
+// User is a hydrated user projection (header + optional EAV joins).
 type User struct {
-	SchemaURL      string
-	ID             string
-	OrganizationID string
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	ProjectID string
+	SchemaURL string
+	ID        string
+	TeamID    *string
+	CreatedAt time.Time
+	UpdatedAt time.Time
 
-	// Following fields are only populated if relevant
-	// [userJoins] are set in the query.
+	// The following fields are only populated when corresponding query options are set.
 	Attributes           []Attribute
 	AvailableAuthMethods []AuthMethod
 }
 
-/*
-func (u *User) MarshalJSON() ([]byte, error) {
-	tree, err := buildAttributeTree(u.Attributes)
-	if err != nil {
-		return nil, err
-	}
-	tree["$schema"] = u.SchemaURL
-	tree["$id"] = u.ID
-	tree["organization_id"] = u.OrganizationID
-	tree["created_at"] = u.CreatedAt
-	tree["updated_at"] = u.UpdatedAt
-	return json.Marshal(tree)
-}
-*/
-
 type CreateUser struct {
-	SchemaURL      string
-	ID             string
-	OrganizationID string
-	Attributes     []*CreateAttribute
+	ProjectID  string
+	SchemaURL  string
+	ID         string
+	TeamID     *string
+	Attributes []*CreateAttribute
 }
 
 type UserRepository interface {
@@ -80,24 +53,25 @@ type UserRepository interface {
 }
 
 type userColumns interface {
-	InstanceID() database.Column
+	ProjectID() database.Column
 	ID() database.Column
-	OrganizationID() database.Column
+	TeamID() database.Column
+	SchemaURL() database.Column
 	CreatedAt() database.Column
 	UpdatedAt() database.Column
 	Attributes() database.Column
 }
 
 type userConditions interface {
-	InstanceIDCondition(instanceID string) database.Condition
+	ProjectIDCondition(projectID string) database.Condition
 	IDCondition(id string) database.Condition
-	PrimaryKeyCondition(instanceID, id string) database.Condition
-	OrganizationIDCondition(organizationID string) database.Condition
+	PrimaryKeyCondition(projectID, id string) database.Condition
+	TeamIDCondition(teamID string) database.Condition
 	AttributesCondition(attributes []Attribute) database.Condition
 }
 
 type userChanges interface {
-	SetOrganization(orgID string) database.Change
+	SetTeam(teamID *string) database.Change
 	SetAttribute(a CreateAttribute) database.Change
 	DeleteAttribute(key string) database.Condition
 }

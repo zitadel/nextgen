@@ -18,7 +18,7 @@ type AttributeUniqueness int
 
 const (
 	AttributeUniquenessUnspecified AttributeUniqueness = iota
-	AttributeUniquenessOrganization
+	AttributeUniquenessTeam
 	AttributeUniquenessGlobal
 )
 

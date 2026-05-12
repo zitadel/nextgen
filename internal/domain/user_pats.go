@@ -8,6 +8,7 @@ import (
 )
 
 type UserPAT struct {
+	ProjectID  string
 	TokenID    string
 	UserID     string
 	Name       *string
@@ -18,6 +19,7 @@ type UserPAT struct {
 }
 
 type CreateUserPAT struct {
+	ProjectID string
 	TokenID   string
 	UserID    string
 	Name      *string
@@ -39,22 +41,22 @@ type UserPATRepository interface {
 }
 
 type userPATColumns interface {
-	InstanceID() database.Column
+	ProjectID() database.Column
 	TokenID() database.Column
 	UserID() database.Column
 	Name() database.Column
 	Scopes() database.Column
-	ExpiredAt() database.Column
+	ExpiresAt() database.Column
 	LastUsedAt() database.Column
 	CreatedAt() database.Column
 }
 
 type userPATConditions interface {
-	InstanceIDCondition(instanceID string) database.Condition
+	ProjectIDCondition(projectID string) database.Condition
 	TokenIDCondition(tokenID string) database.Condition
-	PrimaryKeyCondition(instanceID, tokenID string) database.Condition
+	PrimaryKeyCondition(projectID, tokenID string) database.Condition
 	UserIDCondition(userID string) database.Condition
-	ExpiredAtCondition(after, before time.Time) database.Condition
+	ExpiresAtCondition(after, before time.Time) database.Condition
 }
 
 type userPATChanges interface {

@@ -347,7 +347,7 @@ func (e existsCondition) Write(builder *StatementBuilder) {
 
 // IsRestrictingColumn implements [Condition].
 func (e existsCondition) IsRestrictingColumn(col Column) bool {
-	// Forward to the inner condition so safety checks (like instance_id presence) can still work.
+	// Forward to the inner condition so safety checks (like project_id presence) can still work.
 	return e.condition.IsRestrictingColumn(col)
 }
 

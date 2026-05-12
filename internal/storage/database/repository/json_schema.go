@@ -13,19 +13,19 @@ const jsonSchemaTable = "zitadel_nextgen.json_schemas"
 type JSONSchemaRepository struct {
 	table string
 
-	columnInstanceID database.Column
-	columnURL        database.Column
-	columnCreatedAt  database.Column
-	columnPayload    database.Column
+	columnProjectID database.Column
+	columnURL       database.Column
+	columnCreatedAt database.Column
+	columnPayload   database.Column
 }
 
 func NewJSONSchemaRepository() *JSONSchemaRepository {
 	return &JSONSchemaRepository{
-		table:            jsonSchemaTable,
-		columnInstanceID: database.NewColumn(jsonSchemaTable, "instance_id"),
-		columnURL:        database.NewColumn(jsonSchemaTable, "url"),
-		columnCreatedAt:  database.NewColumn(jsonSchemaTable, "created_at"),
-		columnPayload:    database.NewColumn(jsonSchemaTable, "payload"),
+		table:           jsonSchemaTable,
+		columnProjectID: database.NewColumn(jsonSchemaTable, "project_id"),
+		columnURL:       database.NewColumn(jsonSchemaTable, "url"),
+		columnCreatedAt: database.NewColumn(jsonSchemaTable, "created_at"),
+		columnPayload:   database.NewColumn(jsonSchemaTable, "payload"),
 	}
 }
 
@@ -34,11 +34,11 @@ func (r *JSONSchemaRepository) qualifiedTableName() string {
 }
 
 func (r *JSONSchemaRepository) PrimaryKeyColumns() []database.Column {
-	return []database.Column{r.InstanceID(), r.URL()}
+	return []database.Column{r.ProjectID(), r.URL()}
 }
 
-func (r *JSONSchemaRepository) InstanceID() database.Column {
-	return r.columnInstanceID
+func (r *JSONSchemaRepository) ProjectID() database.Column {
+	return r.columnProjectID
 }
 
 func (r *JSONSchemaRepository) URL() database.Column {
@@ -53,15 +53,15 @@ func (r *JSONSchemaRepository) Payload() database.Column {
 	return r.columnPayload
 }
 
-func (r *JSONSchemaRepository) PrimaryKeyCondition(instanceID, url string) database.Condition {
+func (r *JSONSchemaRepository) PrimaryKeyCondition(projectID, url string) database.Condition {
 	return database.And(
-		r.InstanceIDCondition(instanceID),
+		r.ProjectIDCondition(projectID),
 		r.URLCondition(url),
 	)
 }
 
-func (r *JSONSchemaRepository) InstanceIDCondition(instanceID string) database.Condition {
-	return database.NewTextCondition(r.InstanceID(), database.TextOperationEqual, instanceID)
+func (r *JSONSchemaRepository) ProjectIDCondition(projectID string) database.Condition {
+	return database.NewTextCondition(r.ProjectID(), database.TextOperationEqual, projectID)
 }
 
 func (r *JSONSchemaRepository) URLCondition(url string) database.Condition {
@@ -71,7 +71,7 @@ func (r *JSONSchemaRepository) URLCondition(url string) database.Condition {
 func (r *JSONSchemaRepository) Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*domain.JSONSchema, error) {
 	builder := database.NewStatementBuilder("SELECT ")
 	database.Columns{
-		r.InstanceID(),
+		r.ProjectID(),
 		r.URL(),
 		r.CreatedAt(),
 		r.Payload(),
@@ -94,7 +94,7 @@ func (r *JSONSchemaRepository) Get(ctx context.Context, client database.QueryExe
 func (r *JSONSchemaRepository) List(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) ([]*domain.JSONSchema, error) {
 	builder := database.NewStatementBuilder("SELECT ")
 	database.Columns{
-		r.InstanceID(),
+		r.ProjectID(),
 		r.URL(),
 		r.CreatedAt(),
 		r.Payload(),
@@ -123,14 +123,14 @@ func (r *JSONSchemaRepository) Create(ctx context.Context, client database.Query
 	builder.WriteString(r.qualifiedTableName())
 	builder.WriteString(" (")
 	database.Columns{
-		r.InstanceID(),
+		r.ProjectID(),
 		r.URL(),
 		r.CreatedAt(),
 		r.Payload(),
 	}.WriteUnqualified(builder)
 	builder.WriteString(") VALUES (")
 	builder.WriteArgs(
-		schema.InstanceID,
+		schema.ProjectID,
 		schema.URL,
 		database.NowInstruction,
 		schema.Schema,
@@ -146,18 +146,18 @@ func (r *JSONSchemaRepository) Delete(ctx context.Context, client database.Query
 }
 
 type jsonSchemaRow struct {
-	InstanceID string    `db:"instance_id"`
-	URL        string    `db:"url"`
-	CreatedAt  time.Time `db:"created_at"`
-	Payload    []byte    `db:"payload"`
+	ProjectID string    `db:"project_id"`
+	URL       string    `db:"url"`
+	CreatedAt time.Time `db:"created_at"`
+	Payload   []byte    `db:"payload"`
 }
 
 func (r *jsonSchemaRow) toDomain() *domain.JSONSchema {
 	return &domain.JSONSchema{
-		InstanceID: r.InstanceID,
-		URL:        r.URL,
-		CreatedAt:  r.CreatedAt,
-		Schema:     r.Payload,
+		ProjectID: r.ProjectID,
+		URL:       r.URL,
+		CreatedAt: r.CreatedAt,
+		Schema:    r.Payload,
 	}
 }
 

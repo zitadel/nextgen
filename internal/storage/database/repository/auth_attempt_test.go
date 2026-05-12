@@ -14,7 +14,7 @@ import (
 func ensureProject(t *testing.T, client database.QueryExecutor, projectID string) {
 	t.Helper()
 	_, err := client.Exec(t.Context(),
-		`INSERT INTO zitadel_nextgen.instances (id) VALUES ($1) ON CONFLICT (id) DO NOTHING`,
+		`INSERT INTO zitadel_nextgen.projects (id) VALUES ($1) ON CONFLICT (id) DO NOTHING`,
 		projectID,
 	)
 	require.NoError(t, err)

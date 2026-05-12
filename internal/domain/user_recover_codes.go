@@ -8,14 +8,17 @@ import (
 )
 
 type UserRecoveryCodes struct {
+	ProjectID           string
 	UserID              string
 	RecoveryCodes       []string
 	LastSuccessfulCheck *time.Time
+	FailedAttempts      int16
 	CreatedAt           time.Time
 	UpdatedAt           time.Time
 }
 
 type CreateRecoveryCodes struct {
+	ProjectID     string
 	UserID        string
 	RecoveryCodes []string
 }
@@ -34,7 +37,7 @@ type UserRecoveryCodesRepository interface {
 }
 
 type userRecoveryCodesColumns interface {
-	InstanceID() database.Column
+	ProjectID() database.Column
 	UserID() database.Column
 	RecoveryCodes() database.Column
 	LastSuccessfulCheck() database.Column
@@ -44,9 +47,9 @@ type userRecoveryCodesColumns interface {
 }
 
 type userRecoveryCodesConditions interface {
-	InstanceIDCondition(instanceID string) database.Condition
+	ProjectIDCondition(projectID string) database.Condition
 	UserIDCondition(userID string) database.Condition
-	PrimaryKeyCondition(instanceID, userID string) database.Condition
+	PrimaryKeyCondition(projectID, userID string) database.Condition
 }
 
 type userRecoveryCodesChanges interface {

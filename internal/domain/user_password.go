@@ -8,6 +8,7 @@ import (
 )
 
 type UserPassword struct {
+	ProjectID           string
 	UserID              string
 	EncodedHash         string
 	ChangeRequired      bool
@@ -20,6 +21,7 @@ type UserPassword struct {
 }
 
 type CreateUserPassword struct {
+	ProjectID      string
 	UserID         string
 	EncodedHash    string
 	ChangeRequired bool
@@ -40,7 +42,7 @@ type UserPasswordRepository interface {
 }
 
 type userPasswordColumns interface {
-	InstanceID() database.Column
+	ProjectID() database.Column
 	UserID() database.Column
 	EncodedHash() database.Column
 	ChangeRequired() database.Column
@@ -53,9 +55,9 @@ type userPasswordColumns interface {
 }
 
 type userPasswordConditions interface {
-	InstanceIDCondition(instanceID string) database.Condition
+	ProjectIDCondition(projectID string) database.Condition
 	UserIDCondition(userID string) database.Condition
-	PrimaryKeyCondition(instanceID, userID string) database.Condition
+	PrimaryKeyCondition(projectID, userID string) database.Condition
 }
 
 type userPasswordChanges interface {

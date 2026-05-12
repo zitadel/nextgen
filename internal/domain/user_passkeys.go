@@ -8,6 +8,7 @@ import (
 )
 
 type UserPasskey struct {
+	ProjectID       string
 	UserID          string
 	CredentialID    string
 	PublicKey       []byte
@@ -25,6 +26,7 @@ type UserPasskey struct {
 }
 
 type CreateUserPasskey struct {
+	ProjectID       string
 	UserID          string
 	CredentialID    string
 	PublicKey       []byte
@@ -52,6 +54,7 @@ type UserPasskeyRepository interface {
 }
 
 type userPasskeyColumns interface {
+	ProjectID() database.Column
 	UserID() database.Column
 	CredentialID() database.Column
 	PublicKey() database.Column
@@ -69,10 +72,10 @@ type userPasskeyColumns interface {
 }
 
 type userPasskeyConditions interface {
-	InstanceIDCondition(instanceID string) database.Condition
+	ProjectIDCondition(projectID string) database.Condition
 	UserIDCondition(userID string) database.Condition
 	CredentialIDCondition(credentialID string) database.Condition
-	PrimaryKeyCondition(instanceID, userID, credentialID string) database.Condition
+	PrimaryKeyCondition(projectID, userID, credentialID string) database.Condition
 }
 
 type userPasskeyChanges interface {
