@@ -61,6 +61,19 @@ func (UnimplementedHandler) CreateFlow(ctx context.Context, req *CreateFlowReque
 	return r, ht.ErrNotImplemented
 }
 
+// CreateFlowDefinition implements createFlowDefinition operation.
+//
+// Creates a new flow definition.
+// Flow definitions are templates that define the sequence of steps (capabilities)
+// for a particular user journey (e.g., registration, login, password reset).
+// Flow definitions are created based on the flow meta schema, which includes the flow's purpose,
+// audience, and the steps involved.
+//
+// POST /flow_definitions
+func (UnimplementedHandler) CreateFlowDefinition(ctx context.Context, req *FlowDefinition) (r CreateFlowDefinitionRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // CreateHandoff implements createHandoff operation.
 //
 // Completes the authentication attempt and mints a `handoff_token`.
@@ -109,6 +122,15 @@ func (UnimplementedHandler) CreateSession(ctx context.Context, req *CreateSessio
 	return r, ht.ErrNotImplemented
 }
 
+// DeleteFlowDefinition implements deleteFlowDefinition operation.
+//
+// Delete a flow definition by id.
+//
+// DELETE /flow_definitions/{id}
+func (UnimplementedHandler) DeleteFlowDefinition(ctx context.Context, params DeleteFlowDefinitionParams) error {
+	return ht.ErrNotImplemented
+}
+
 // EndSession implements endSession operation.
 //
 // End a session.
@@ -150,6 +172,15 @@ func (UnimplementedHandler) ExchangeHandoff(ctx context.Context, req *ExchangeRe
 //
 // GET /auth_attempts/{attempt_id}
 func (UnimplementedHandler) GetAuthAttempt(ctx context.Context, params GetAuthAttemptParams) (r GetAuthAttemptRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// GetFlowDefinition implements getFlowDefinition operation.
+//
+// Get a flow definition by id.
+//
+// GET /flow_definitions/{id}
+func (UnimplementedHandler) GetFlowDefinition(ctx context.Context, params GetFlowDefinitionParams) (r GetFlowDefinitionRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -270,6 +301,16 @@ func (UnimplementedHandler) IssueChallenge(ctx context.Context, req *IssueChalle
 	return r, ht.ErrNotImplemented
 }
 
+// ListFlowDefinitions implements listFlowDefinitions operation.
+//
+// Retrieves a list of all flow definitions.
+// This endpoint can be used to view existing flow definitions and their configurations.
+//
+// GET /flow_definitions
+func (UnimplementedHandler) ListFlowDefinitions(ctx context.Context, params ListFlowDefinitionsParams) (r ListFlowDefinitionsRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // ListSessions implements listSessions operation.
 //
 // Returns a paginated list of sessions for a project.
@@ -345,6 +386,15 @@ func (UnimplementedHandler) SubmitFlowEvent(ctx context.Context, req *FlowEventR
 //
 // POST /flow/{id}/submit
 func (UnimplementedHandler) SubmitFlowStep(ctx context.Context, req *FlowSubmitRequest, params SubmitFlowStepParams) (r SubmitFlowStepRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// UpdateFlowDefinition implements updateFlowDefinition operation.
+//
+// Update a flow definition by id.
+//
+// PATCH /flow_definitions/{id}
+func (UnimplementedHandler) UpdateFlowDefinition(ctx context.Context, req *FlowDefinition, params UpdateFlowDefinitionParams) (r UpdateFlowDefinitionRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
