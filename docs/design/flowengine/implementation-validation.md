@@ -69,8 +69,8 @@ else.
 - Every cycle of steps has at least one exit transition to a terminal step
   or another flow (`switch` / `pivot`). Prevents infinite loops. Pragmatic
   check; full liveness is undecidable.
-- A step with an `x-identifier` field defines a `user_not_found` transition,
-  unless its `submit` target handles "found and not found" identically.
+- A step with an `x-identifier` field might define a `user_not_found` transition,
+  otherwise an error will be return for "not found".
 
 ## Open questions
 
