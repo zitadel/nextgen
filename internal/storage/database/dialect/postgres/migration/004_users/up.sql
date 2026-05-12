@@ -142,25 +142,6 @@ CREATE TABLE zitadel_nextgen.user_recovery_codes (
         ON DELETE CASCADE
 );
 
-CREATE TABLE zitadel_nextgen.user_pats (
-    project_id TEXT COLLATE "C" NOT NULL
-    , token_id TEXT COLLATE "C" NOT NULL CHECK (token_id <> '')
-    , user_id TEXT COLLATE "C" NOT NULL
-    , name TEXT
-    , scopes TEXT[] NOT NULL DEFAULT '{}'
-    , expires_at TIMESTAMPTZ
-    , last_used_at TIMESTAMPTZ
-    , created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-
-    , PRIMARY KEY (project_id, token_id)
-    , FOREIGN KEY (project_id, user_id)
-        REFERENCES zitadel_nextgen.users(project_id, id)
-        ON DELETE CASCADE
-);
-
-CREATE INDEX idx_user_pats_user_id
-    ON zitadel_nextgen.user_pats(project_id, user_id);
-
 CREATE TABLE zitadel_nextgen.user_passkeys (
     project_id TEXT COLLATE "C" NOT NULL
     , user_id TEXT COLLATE "C" NOT NULL

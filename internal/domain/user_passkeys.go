@@ -43,7 +43,6 @@ type CreateUserPasskey struct {
 type UserPasskeyRepository interface {
 	Repository
 
-	userPasskeyColumns
 	userPasskeyConditions
 	userPasskeyChanges
 
@@ -51,24 +50,6 @@ type UserPasskeyRepository interface {
 	List(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) ([]*UserPasskey, error)
 	Create(ctx context.Context, client database.QueryExecutor, passkey *CreateUserPasskey) error
 	Delete(ctx context.Context, client database.QueryExecutor, condition database.Condition) error
-}
-
-type userPasskeyColumns interface {
-	ProjectID() database.Column
-	UserID() database.Column
-	CredentialID() database.Column
-	PublicKey() database.Column
-	AAGUID() database.Column
-	AttestationType() database.Column
-	Transports() database.Column
-	SignCount() database.Column
-	BackupEligible() database.Column
-	BackupState() database.Column
-	Name() database.Column
-	VerifiedAt() database.Column
-	LastUsedAt() database.Column
-	CreatedAt() database.Column
-	UpdatedAt() database.Column
 }
 
 type userPasskeyConditions interface {

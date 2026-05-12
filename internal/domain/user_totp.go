@@ -28,7 +28,6 @@ type CreateUserTOTP struct {
 type UserTOTPRepository interface {
 	Repository
 
-	userTOTPColumns
 	userTOTPConditions
 	userTOTPChanges
 
@@ -36,17 +35,6 @@ type UserTOTPRepository interface {
 	List(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) ([]*UserTOTP, error)
 	Create(ctx context.Context, client database.QueryExecutor, totp *CreateUserTOTP) error
 	Delete(ctx context.Context, client database.QueryExecutor, condition database.Condition) error
-}
-
-type userTOTPColumns interface {
-	ProjectID() database.Column
-	UserID() database.Column
-	Secret() database.Column
-	VerifiedAt() database.Column
-	LastSuccessfulCheck() database.Column
-	FailedAttempts() database.Column
-	CreatedAt() database.Column
-	UpdatedAt() database.Column
 }
 
 type userTOTPConditions interface {

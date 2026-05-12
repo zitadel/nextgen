@@ -17,59 +17,45 @@ const (
 	userAttributesTable = "zitadel_nextgen.user_attributes"
 )
 
+var (
+	colUserProjectID    = database.NewColumn(userTable, "project_id")
+	colUserID           = database.NewColumn(userTable, "id")
+	colUserTeamID       = database.NewColumn(userTable, "team_id")
+	colUserSchemaURL    = database.NewColumn(userTable, "schema_url")
+	colUserCreatedAt    = database.NewColumn(userTable, "created_at")
+	colUserUpdatedAt    = database.NewColumn(userTable, "updated_at")
+	colUserAttributeKey = database.NewColumn(userAttributesTable, "key")
+)
+
 // UserRepository implements [domain.UserRepository] backed by project-scoped tables and user EAV.
-type UserRepository struct {
-	columnProjectID  database.Column
-	columnID         database.Column
-	columnTeamID     database.Column
-	columnSchemaURL  database.Column
-	columnCreatedAt  database.Column
-	columnUpdatedAt  database.Column
-	columnAttrKeyRef database.Column
-}
+type UserRepository struct{}
 
 func NewUserRepository() *UserRepository {
-	return &UserRepository{
-		columnProjectID:  database.NewColumn(userTable, "project_id"),
-		columnID:         database.NewColumn(userTable, "id"),
-		columnTeamID:     database.NewColumn(userTable, "team_id"),
-		columnSchemaURL:  database.NewColumn(userTable, "schema_url"),
-		columnCreatedAt:  database.NewColumn(userTable, "created_at"),
-		columnUpdatedAt:  database.NewColumn(userTable, "updated_at"),
-		columnAttrKeyRef: database.NewColumn(userAttributesTable, "key"),
-	}
+	return &UserRepository{}
 }
 
 func (r *UserRepository) qualifiedTableName() string { return userTable }
 
 func (r *UserRepository) PrimaryKeyColumns() []database.Column {
-	return []database.Column{r.ProjectID(), r.ID()}
+	return []database.Column{colUserProjectID, colUserID}
 }
 
-func (r *UserRepository) UpdatedAtColumn() database.Column { return r.UpdatedAt() }
-
-func (r *UserRepository) ProjectID() database.Column  { return r.columnProjectID }
-func (r *UserRepository) ID() database.Column         { return r.columnID }
-func (r *UserRepository) TeamID() database.Column     { return r.columnTeamID }
-func (r *UserRepository) SchemaURL() database.Column  { return r.columnSchemaURL }
-func (r *UserRepository) CreatedAt() database.Column  { return r.columnCreatedAt }
-func (r *UserRepository) UpdatedAt() database.Column  { return r.columnUpdatedAt }
-func (r *UserRepository) Attributes() database.Column { return r.columnAttrKeyRef }
+func (r *UserRepository) UpdatedAtColumn() database.Column { return colUserUpdatedAt }
 
 func (r *UserRepository) PrimaryKeyCondition(projectID, id string) database.Condition {
 	return database.And(r.ProjectIDCondition(projectID), r.IDCondition(id))
 }
 
 func (r *UserRepository) ProjectIDCondition(projectID string) database.Condition {
-	return database.NewTextCondition(r.ProjectID(), database.TextOperationEqual, projectID)
+	return database.NewTextCondition(colUserProjectID, database.TextOperationEqual, projectID)
 }
 
 func (r *UserRepository) IDCondition(id string) database.Condition {
-	return database.NewTextCondition(r.ID(), database.TextOperationEqual, id)
+	return database.NewTextCondition(colUserID, database.TextOperationEqual, id)
 }
 
 func (r *UserRepository) TeamIDCondition(teamID string) database.Condition {
-	return database.NewTextCondition(r.TeamID(), database.TextOperationEqual, teamID)
+	return database.NewTextCondition(colUserTeamID, database.TextOperationEqual, teamID)
 }
 
 func (r *UserRepository) AttributesCondition(_ []domain.Attribute) database.Condition {
@@ -77,12 +63,12 @@ func (r *UserRepository) AttributesCondition(_ []domain.Attribute) database.Cond
 }
 
 func (r *UserRepository) SetTeam(teamID *string) database.Change {
-	return database.NewChangePtr(r.TeamID(), teamID)
+	return database.NewChangePtr(colUserTeamID, teamID)
 }
 
 func (r *UserRepository) SetAttribute(a domain.CreateAttribute) database.Change {
 	return userUnsupportedChange{
-		column: r.Attributes(),
+		column: colUserAttributeKey,
 		err:    fmt.Errorf("SetAttribute(%q) is not supported; use dedicated PUT/PATCH EAV sync SQL", a.Key),
 	}
 }
@@ -201,21 +187,30 @@ func (r *UserRepository) Create(ctx context.Context, client database.QueryExecut
 	return err
 }
 
-func userHydrationExpressions(rowQualifier, attrPlaceholder, authPlaceholder string) string {
-	return fmt.Sprintf(`
+func userHydrationExpressions(rowQualifier, attrKeysPlaceholder, authPlaceholder string) string {
+	keyPred := "(cardinality(" + attrKeysPlaceholder + "::text[]) = 0 OR a.key = ANY (" + attrKeysPlaceholder + "::text[]))"
+	subWhere := "a.project_id = " + rowQualifier + ".project_id AND a.user_id = " + rowQualifier + ".id AND " + keyPred
+	return `
     (
-      SELECT COALESCE(json_agg(json_build_object('key', a.key, 'value', to_jsonb(a.value))), '[]'::json)::text
+      SELECT COALESCE(array_agg(s.k ORDER BY s.k), ARRAY[]::text[])
+      FROM (
+        SELECT a.key AS k
         FROM zitadel_nextgen.user_attributes a
-       WHERE a.project_id = %[1]s.project_id
-         AND a.user_id = %[1]s.id
-         AND (cardinality(%[2]s::text[]) = 0 OR a.key = ANY (%[2]s::text[]))
-    ) AS attrs,
-    CASE WHEN %[3]s THEN EXISTS(SELECT 1 FROM zitadel_nextgen.user_passwords p WHERE p.project_id = %[1]s.project_id AND p.user_id = %[1]s.id) ELSE FALSE END AS has_pw,
-    CASE WHEN %[3]s THEN EXISTS(SELECT 1 FROM zitadel_nextgen.user_totp p WHERE p.project_id = %[1]s.project_id AND p.user_id = %[1]s.id) ELSE FALSE END AS has_totp,
-    CASE WHEN %[3]s THEN EXISTS(SELECT 1 FROM zitadel_nextgen.user_recovery_codes p WHERE p.project_id = %[1]s.project_id AND p.user_id = %[1]s.id) ELSE FALSE END AS has_rc,
-    CASE WHEN %[3]s THEN EXISTS(SELECT 1 FROM zitadel_nextgen.user_passkeys p WHERE p.project_id = %[1]s.project_id AND p.user_id = %[1]s.id) ELSE FALSE END AS has_pk,
-    CASE WHEN %[3]s THEN EXISTS(SELECT 1 FROM zitadel_nextgen.user_pats p WHERE p.project_id = %[1]s.project_id AND p.user_id = %[1]s.id) ELSE FALSE END AS has_pat`,
-		rowQualifier, attrPlaceholder, authPlaceholder)
+        WHERE ` + subWhere + `
+      ) s
+    ) AS attr_keys,
+    (
+      SELECT COALESCE(array_agg(s.v ORDER BY s.k), ARRAY[]::jsonb[])
+      FROM (
+        SELECT a.key AS k, a.value AS v
+        FROM zitadel_nextgen.user_attributes a
+        WHERE ` + subWhere + `
+      ) s
+    ) AS attr_vals,
+    CASE WHEN ` + authPlaceholder + ` THEN EXISTS(SELECT 1 FROM zitadel_nextgen.user_passwords p WHERE p.project_id = ` + rowQualifier + `.project_id AND p.user_id = ` + rowQualifier + `.id) ELSE FALSE END AS has_pw,
+    CASE WHEN ` + authPlaceholder + ` THEN EXISTS(SELECT 1 FROM zitadel_nextgen.user_totp p WHERE p.project_id = ` + rowQualifier + `.project_id AND p.user_id = ` + rowQualifier + `.id) ELSE FALSE END AS has_totp,
+    CASE WHEN ` + authPlaceholder + ` THEN EXISTS(SELECT 1 FROM zitadel_nextgen.user_recovery_codes p WHERE p.project_id = ` + rowQualifier + `.project_id AND p.user_id = ` + rowQualifier + `.id) ELSE FALSE END AS has_rc,
+    CASE WHEN ` + authPlaceholder + ` THEN EXISTS(SELECT 1 FROM zitadel_nextgen.user_passkeys p WHERE p.project_id = ` + rowQualifier + `.project_id AND p.user_id = ` + rowQualifier + `.id) ELSE FALSE END AS has_pk`
 }
 
 func (r *UserRepository) Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*domain.User, error) {

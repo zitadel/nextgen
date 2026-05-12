@@ -65,7 +65,6 @@ type userAuthPresence struct {
 	hasTOTP     bool
 	hasRC       bool
 	hasPasskeys bool
-	hasPATs     bool
 }
 
 func scanUserHydrationRowParts(rows database.Rows) (*domain.User, userAuthPresence, error) {
@@ -76,7 +75,8 @@ func scanUserHydrationRowParts(rows database.Rows) (*domain.User, userAuthPresen
 		team      database.Null[string]
 		createdAt time.Time
 		updatedAt time.Time
-		attrJSON  []byte
+		attrKeys  []string
+		attrVals  [][]byte
 		flags     userAuthPresence
 	)
 	if err := rows.Scan(
@@ -86,12 +86,12 @@ func scanUserHydrationRowParts(rows database.Rows) (*domain.User, userAuthPresen
 		&team,
 		&createdAt,
 		&updatedAt,
-		&attrJSON,
+		&attrKeys,
+		&attrVals,
 		&flags.hasPassword,
 		&flags.hasTOTP,
 		&flags.hasRC,
 		&flags.hasPasskeys,
-		&flags.hasPATs,
 	); err != nil {
 		return nil, flags, err
 	}
@@ -108,24 +108,15 @@ func scanUserHydrationRowParts(rows database.Rows) (*domain.User, userAuthPresen
 		u.TeamID = &copy
 	}
 
-	raw := attrJSON
-	if len(raw) == 0 {
-		raw = []byte(`[]`)
+	if len(attrKeys) != len(attrVals) {
+		return nil, flags, fmt.Errorf("attribute key/value length mismatch: %d keys, %d values", len(attrKeys), len(attrVals))
 	}
-	type kv struct {
-		Key   string          `json:"key"`
-		Value json.RawMessage `json:"value"`
-	}
-	var kvs []kv
-	if err := json.Unmarshal(raw, &kvs); err != nil {
-		return nil, flags, fmt.Errorf("decode attributes json: %w", err)
-	}
-	for _, row := range kvs {
+	for i, k := range attrKeys {
 		var val any
-		if err := json.Unmarshal(row.Value, &val); err != nil {
-			return nil, flags, fmt.Errorf("decode attribute value for %q: %w", row.Key, err)
+		if err := json.Unmarshal(attrVals[i], &val); err != nil {
+			return nil, flags, fmt.Errorf("decode attribute value for %q: %w", k, err)
 		}
-		u.Attributes = append(u.Attributes, domain.Attribute{Key: row.Key, Value: val})
+		u.Attributes = append(u.Attributes, domain.Attribute{Key: k, Value: val})
 	}
 	return u, flags, nil
 }
@@ -140,7 +131,7 @@ func applyAuthMethods(u *domain.User, withAuth bool, flags userAuthPresence) *do
 }
 
 func authMethodsFromFlags(f userAuthPresence) []domain.AuthMethod {
-	out := make([]domain.AuthMethod, 0, 5)
+	out := make([]domain.AuthMethod, 0, 4)
 	if f.hasPassword {
 		out = append(out, domain.AuthMethodPassword)
 	}
@@ -153,6 +144,5 @@ func authMethodsFromFlags(f userAuthPresence) []domain.AuthMethod {
 	if f.hasRC {
 		out = append(out, domain.AuthMethodRecoveryCodes)
 	}
-	_ = f.hasPATs // PATs are not part of [domain.AuthMethod] today.
 	return out
 }

@@ -12,80 +12,54 @@ import (
 
 const userPasskeyTable = "zitadel_nextgen.user_passkeys"
 
-type UserPasskeyRepository struct {
-	colProject database.Column
-	colUser    database.Column
-	colCred    database.Column
-	colPub     database.Column
-	colAagu    database.Column
-	colAtt     database.Column
-	colTrans   database.Column
-	colSign    database.Column
-	colBElig   database.Column
-	colBState  database.Column
-	colName    database.Column
-	colVerif   database.Column
-	colLU      database.Column
-	colCre     database.Column
-	colUpd     database.Column
-}
+var (
+	colPasskeyProjectID       = database.NewColumn(userPasskeyTable, "project_id")
+	colPasskeyUserID          = database.NewColumn(userPasskeyTable, "user_id")
+	colPasskeyCredentialID    = database.NewColumn(userPasskeyTable, "credential_id")
+	colPasskeyPublicKey       = database.NewColumn(userPasskeyTable, "public_key")
+	colPasskeyAAGUID          = database.NewColumn(userPasskeyTable, "aaguid")
+	colPasskeyAttestationType = database.NewColumn(userPasskeyTable, "attestation_type")
+	colPasskeyTransports      = database.NewColumn(userPasskeyTable, "transports")
+	colPasskeySignCount       = database.NewColumn(userPasskeyTable, "sign_count")
+	colPasskeyBackupEligible  = database.NewColumn(userPasskeyTable, "backup_eligible")
+	colPasskeyBackupState     = database.NewColumn(userPasskeyTable, "backup_state")
+	colPasskeyName            = database.NewColumn(userPasskeyTable, "name")
+	colPasskeyVerifiedAt      = database.NewColumn(userPasskeyTable, "verified_at")
+	colPasskeyLastUsedAt      = database.NewColumn(userPasskeyTable, "last_used_at")
+	colPasskeyCreatedAt       = database.NewColumn(userPasskeyTable, "created_at")
+	colPasskeyUpdatedAt       = database.NewColumn(userPasskeyTable, "updated_at")
+)
+
+type UserPasskeyRepository struct{}
 
 func NewUserPasskeyRepository() *UserPasskeyRepository {
-	t := userPasskeyTable
-	return &UserPasskeyRepository{
-		colProject: database.NewColumn(t, "project_id"),
-		colUser:    database.NewColumn(t, "user_id"),
-		colCred:    database.NewColumn(t, "credential_id"),
-		colPub:     database.NewColumn(t, "public_key"),
-		colAagu:    database.NewColumn(t, "aaguid"),
-		colAtt:     database.NewColumn(t, "attestation_type"),
-		colTrans:   database.NewColumn(t, "transports"),
-		colSign:    database.NewColumn(t, "sign_count"),
-		colBElig:   database.NewColumn(t, "backup_eligible"),
-		colBState:  database.NewColumn(t, "backup_state"),
-		colName:    database.NewColumn(t, "name"),
-		colVerif:   database.NewColumn(t, "verified_at"),
-		colLU:      database.NewColumn(t, "last_used_at"),
-		colCre:     database.NewColumn(t, "created_at"),
-		colUpd:     database.NewColumn(t, "updated_at"),
-	}
+	return &UserPasskeyRepository{}
 }
 
 func (r *UserPasskeyRepository) qualifiedTableName() string { return userPasskeyTable }
-func (r *UserPasskeyRepository) PrimaryKeyColumns() []database.Column {
-	return []database.Column{r.ProjectID(), r.UserID(), r.CredentialID()}
-}
-func (r *UserPasskeyRepository) UpdatedAtColumn() database.Column { return r.UpdatedAt() }
 
-func (r *UserPasskeyRepository) ProjectID() database.Column       { return r.colProject }
-func (r *UserPasskeyRepository) UserID() database.Column          { return r.colUser }
-func (r *UserPasskeyRepository) CredentialID() database.Column    { return r.colCred }
-func (r *UserPasskeyRepository) PublicKey() database.Column       { return r.colPub }
-func (r *UserPasskeyRepository) AAGUID() database.Column          { return r.colAagu }
-func (r *UserPasskeyRepository) AttestationType() database.Column { return r.colAtt }
-func (r *UserPasskeyRepository) Transports() database.Column      { return r.colTrans }
-func (r *UserPasskeyRepository) SignCount() database.Column       { return r.colSign }
-func (r *UserPasskeyRepository) BackupEligible() database.Column  { return r.colBElig }
-func (r *UserPasskeyRepository) BackupState() database.Column     { return r.colBState }
-func (r *UserPasskeyRepository) Name() database.Column            { return r.colName }
-func (r *UserPasskeyRepository) VerifiedAt() database.Column      { return r.colVerif }
-func (r *UserPasskeyRepository) LastUsedAt() database.Column      { return r.colLU }
-func (r *UserPasskeyRepository) CreatedAt() database.Column       { return r.colCre }
-func (r *UserPasskeyRepository) UpdatedAt() database.Column       { return r.colUpd }
+func (r *UserPasskeyRepository) PrimaryKeyColumns() []database.Column {
+	return []database.Column{colPasskeyProjectID, colPasskeyUserID, colPasskeyCredentialID}
+}
+
+func (r *UserPasskeyRepository) UpdatedAtColumn() database.Column { return colPasskeyUpdatedAt }
 
 func (r *UserPasskeyRepository) ProjectIDCondition(pid string) database.Condition {
-	return database.NewTextCondition(r.ProjectID(), database.TextOperationEqual, pid)
+	return database.NewTextCondition(colPasskeyProjectID, database.TextOperationEqual, pid)
 }
+
 func (r *UserPasskeyRepository) UserIDCondition(uid string) database.Condition {
-	return database.NewTextCondition(r.UserID(), database.TextOperationEqual, uid)
+	return database.NewTextCondition(colPasskeyUserID, database.TextOperationEqual, uid)
 }
+
 func (r *UserPasskeyRepository) CredentialIDCondition(cid string) database.Condition {
 	cred, err := base64.RawURLEncoding.DecodeString(cid)
 	if err != nil {
 		return malformedPasskeyCredCondition{}
 	}
-	return database.NewBytesCondition[[]byte](r.CredentialID(), database.BytesOperationEqual, cred)
+	return database.NewBytesCondition[[]byte](colPasskeyCredentialID, database.BytesOperationEqual, cred)
 }
+
 func (r *UserPasskeyRepository) PrimaryKeyCondition(pid, uid, cid string) database.Condition {
 	return database.And(
 		r.ProjectIDCondition(pid),
@@ -95,38 +69,44 @@ func (r *UserPasskeyRepository) PrimaryKeyCondition(pid, uid, cid string) databa
 }
 
 func (r *UserPasskeyRepository) SetAttestationType(s string) database.Change {
-	return database.NewChange(r.AttestationType(), s)
+	return database.NewChange(colPasskeyAttestationType, s)
 }
+
 func (r *UserPasskeyRepository) SetTransports(v []string) database.Change {
-	return database.NewChange(r.Transports(), v)
+	return database.NewChange(colPasskeyTransports, v)
 }
+
 func (r *UserPasskeyRepository) IncrementSignCount(diff int64) database.Change {
-	return database.NewChangeToStatement(r.SignCount(), func(b *database.StatementBuilder) {
-		r.SignCount().WriteQualified(b)
+	return database.NewChangeToStatement(colPasskeySignCount, func(b *database.StatementBuilder) {
+		colPasskeySignCount.WriteQualified(b)
 		b.WriteString(" + ")
 		b.WriteArg(diff)
 	})
 }
+
 func (r *UserPasskeyRepository) SetBackupEligible(v bool) database.Change {
-	return database.NewChange(r.BackupEligible(), v)
+	return database.NewChange(colPasskeyBackupEligible, v)
 }
+
 func (r *UserPasskeyRepository) SetBackupState(v bool) database.Change {
-	return database.NewChange(r.BackupState(), v)
+	return database.NewChange(colPasskeyBackupState, v)
 }
+
 func (r *UserPasskeyRepository) SetVerifiedAt(t time.Time) database.Change {
-	return database.NewChange(r.VerifiedAt(), t)
+	return database.NewChange(colPasskeyVerifiedAt, t)
 }
+
 func (r *UserPasskeyRepository) SetLastUsedAt(t time.Time) database.Change {
-	return database.NewChange(r.LastUsedAt(), t)
+	return database.NewChange(colPasskeyLastUsedAt, t)
 }
 
 func (r *UserPasskeyRepository) Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*domain.UserPasskey, error) {
 	b := database.NewStatementBuilder("SELECT ")
 	database.Columns{
-		r.ProjectID(), r.UserID(), r.CredentialID(), r.PublicKey(),
-		r.AAGUID(), r.AttestationType(), r.Transports(), r.SignCount(),
-		r.BackupEligible(), r.BackupState(), r.Name(), r.VerifiedAt(), r.LastUsedAt(),
-		r.CreatedAt(), r.UpdatedAt(),
+		colPasskeyProjectID, colPasskeyUserID, colPasskeyCredentialID, colPasskeyPublicKey,
+		colPasskeyAAGUID, colPasskeyAttestationType, colPasskeyTransports, colPasskeySignCount,
+		colPasskeyBackupEligible, colPasskeyBackupState, colPasskeyName, colPasskeyVerifiedAt, colPasskeyLastUsedAt,
+		colPasskeyCreatedAt, colPasskeyUpdatedAt,
 	}.WriteQualified(b)
 	b.WriteString(" FROM ")
 	b.WriteString(r.qualifiedTableName())
@@ -145,10 +125,10 @@ func (r *UserPasskeyRepository) Get(ctx context.Context, client database.QueryEx
 func (r *UserPasskeyRepository) List(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) ([]*domain.UserPasskey, error) {
 	b := database.NewStatementBuilder("SELECT ")
 	database.Columns{
-		r.ProjectID(), r.UserID(), r.CredentialID(), r.PublicKey(),
-		r.AAGUID(), r.AttestationType(), r.Transports(), r.SignCount(),
-		r.BackupEligible(), r.BackupState(), r.Name(), r.VerifiedAt(), r.LastUsedAt(),
-		r.CreatedAt(), r.UpdatedAt(),
+		colPasskeyProjectID, colPasskeyUserID, colPasskeyCredentialID, colPasskeyPublicKey,
+		colPasskeyAAGUID, colPasskeyAttestationType, colPasskeyTransports, colPasskeySignCount,
+		colPasskeyBackupEligible, colPasskeyBackupState, colPasskeyName, colPasskeyVerifiedAt, colPasskeyLastUsedAt,
+		colPasskeyCreatedAt, colPasskeyUpdatedAt,
 	}.WriteQualified(b)
 	b.WriteString(" FROM ")
 	b.WriteString(r.qualifiedTableName())

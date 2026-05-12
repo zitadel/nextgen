@@ -41,7 +41,6 @@ type CreateUser struct {
 type UserRepository interface {
 	Repository
 
-	userColumns
 	userConditions
 	userChanges
 	userJoins
@@ -50,16 +49,6 @@ type UserRepository interface {
 	List(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) ([]*User, error)
 	Create(ctx context.Context, client database.QueryExecutor, user *CreateUser) error
 	Delete(ctx context.Context, client database.QueryExecutor, condition database.Condition) error
-}
-
-type userColumns interface {
-	ProjectID() database.Column
-	ID() database.Column
-	TeamID() database.Column
-	SchemaURL() database.Column
-	CreatedAt() database.Column
-	UpdatedAt() database.Column
-	Attributes() database.Column
 }
 
 type userConditions interface {

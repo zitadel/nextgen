@@ -10,59 +10,39 @@ import (
 
 const userPasswordTable = "zitadel_nextgen.user_passwords"
 
-type UserPasswordRepository struct {
-	columnProjectID      database.Column
-	columnUserID         database.Column
-	columnEncodedHash    database.Column
-	columnChangeRequired database.Column
-	columnChangedAt      database.Column
-	columnVerificationID database.Column
-	columnLastSuccessful database.Column
-	columnFailedAttempts database.Column
-	columnCreatedAt      database.Column
-	columnUpdatedAt      database.Column
-}
+var (
+	colPasswordProjectID      = database.NewColumn(userPasswordTable, "project_id")
+	colPasswordUserID         = database.NewColumn(userPasswordTable, "user_id")
+	colPasswordEncodedHash    = database.NewColumn(userPasswordTable, "encoded_hash")
+	colPasswordChangeRequired = database.NewColumn(userPasswordTable, "change_required")
+	colPasswordChangedAt      = database.NewColumn(userPasswordTable, "changed_at")
+	colPasswordVerificationID = database.NewColumn(userPasswordTable, "verification_id")
+	colPasswordLastSuccessful = database.NewColumn(userPasswordTable, "last_successful_check")
+	colPasswordFailedAttempts = database.NewColumn(userPasswordTable, "failed_attempts")
+	colPasswordCreatedAt      = database.NewColumn(userPasswordTable, "created_at")
+	colPasswordUpdatedAt      = database.NewColumn(userPasswordTable, "updated_at")
+)
+
+type UserPasswordRepository struct{}
 
 func NewUserPasswordRepository() *UserPasswordRepository {
-	return &UserPasswordRepository{
-		columnProjectID:      database.NewColumn(userPasswordTable, "project_id"),
-		columnUserID:         database.NewColumn(userPasswordTable, "user_id"),
-		columnEncodedHash:    database.NewColumn(userPasswordTable, "encoded_hash"),
-		columnChangeRequired: database.NewColumn(userPasswordTable, "change_required"),
-		columnChangedAt:      database.NewColumn(userPasswordTable, "changed_at"),
-		columnVerificationID: database.NewColumn(userPasswordTable, "verification_id"),
-		columnLastSuccessful: database.NewColumn(userPasswordTable, "last_successful_check"),
-		columnFailedAttempts: database.NewColumn(userPasswordTable, "failed_attempts"),
-		columnCreatedAt:      database.NewColumn(userPasswordTable, "created_at"),
-		columnUpdatedAt:      database.NewColumn(userPasswordTable, "updated_at"),
-	}
+	return &UserPasswordRepository{}
 }
 
 func (r *UserPasswordRepository) qualifiedTableName() string { return userPasswordTable }
 
 func (r *UserPasswordRepository) PrimaryKeyColumns() []database.Column {
-	return []database.Column{r.ProjectID(), r.UserID()}
+	return []database.Column{colPasswordProjectID, colPasswordUserID}
 }
 
-func (r *UserPasswordRepository) UpdatedAtColumn() database.Column { return r.UpdatedAt() }
-
-func (r *UserPasswordRepository) ProjectID() database.Column           { return r.columnProjectID }
-func (r *UserPasswordRepository) UserID() database.Column              { return r.columnUserID }
-func (r *UserPasswordRepository) EncodedHash() database.Column         { return r.columnEncodedHash }
-func (r *UserPasswordRepository) ChangeRequired() database.Column      { return r.columnChangeRequired }
-func (r *UserPasswordRepository) ChangedAt() database.Column           { return r.columnChangedAt }
-func (r *UserPasswordRepository) VerificationID() database.Column      { return r.columnVerificationID }
-func (r *UserPasswordRepository) LastSuccessfulCheck() database.Column { return r.columnLastSuccessful }
-func (r *UserPasswordRepository) FailedAttempts() database.Column      { return r.columnFailedAttempts }
-func (r *UserPasswordRepository) CreatedAt() database.Column           { return r.columnCreatedAt }
-func (r *UserPasswordRepository) UpdatedAt() database.Column           { return r.columnUpdatedAt }
+func (r *UserPasswordRepository) UpdatedAtColumn() database.Column { return colPasswordUpdatedAt }
 
 func (r *UserPasswordRepository) ProjectIDCondition(pid string) database.Condition {
-	return database.NewTextCondition(r.ProjectID(), database.TextOperationEqual, pid)
+	return database.NewTextCondition(colPasswordProjectID, database.TextOperationEqual, pid)
 }
 
 func (r *UserPasswordRepository) UserIDCondition(uid string) database.Condition {
-	return database.NewTextCondition(r.UserID(), database.TextOperationEqual, uid)
+	return database.NewTextCondition(colPasswordUserID, database.TextOperationEqual, uid)
 }
 
 func (r *UserPasswordRepository) PrimaryKeyCondition(pid, uid string) database.Condition {
@@ -70,49 +50,49 @@ func (r *UserPasswordRepository) PrimaryKeyCondition(pid, uid string) database.C
 }
 
 func (r *UserPasswordRepository) SetEncodedHash(hash string) database.Change {
-	return database.NewChange(r.EncodedHash(), hash)
+	return database.NewChange(colPasswordEncodedHash, hash)
 }
 
 func (r *UserPasswordRepository) SetChangeRequired(v bool) database.Change {
-	return database.NewChange(r.ChangeRequired(), v)
+	return database.NewChange(colPasswordChangeRequired, v)
 }
 
 func (r *UserPasswordRepository) SetChangedAt(t time.Time) database.Change {
-	return database.NewChange(r.ChangedAt(), t)
+	return database.NewChange(colPasswordChangedAt, t)
 }
 
 func (r *UserPasswordRepository) SetVerificationID(id string) database.Change {
-	return database.NewChange(r.VerificationID(), id)
+	return database.NewChange(colPasswordVerificationID, id)
 }
 
 func (r *UserPasswordRepository) SetLastSuccessfulCheck(t time.Time) database.Change {
-	return database.NewChange(r.LastSuccessfulCheck(), t)
+	return database.NewChange(colPasswordLastSuccessful, t)
 }
 
 func (r *UserPasswordRepository) IncrementFailedAttempts() database.Change {
-	return database.NewChangeToStatement(r.FailedAttempts(), func(b *database.StatementBuilder) {
-		r.FailedAttempts().WriteQualified(b)
+	return database.NewChangeToStatement(colPasswordFailedAttempts, func(b *database.StatementBuilder) {
+		colPasswordFailedAttempts.WriteQualified(b)
 		b.WriteString(" + 1")
 	})
 }
 
 func (r *UserPasswordRepository) ResetFailedAttempts() database.Change {
-	return database.NewChange(r.FailedAttempts(), int16(0))
+	return database.NewChange(colPasswordFailedAttempts, int16(0))
 }
 
 func (r *UserPasswordRepository) Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*domain.UserPassword, error) {
 	builder := database.NewStatementBuilder("SELECT ")
 	database.Columns{
-		r.ProjectID(),
-		r.UserID(),
-		r.EncodedHash(),
-		r.ChangeRequired(),
-		r.ChangedAt(),
-		r.VerificationID(),
-		r.LastSuccessfulCheck(),
-		r.FailedAttempts(),
-		r.CreatedAt(),
-		r.UpdatedAt(),
+		colPasswordProjectID,
+		colPasswordUserID,
+		colPasswordEncodedHash,
+		colPasswordChangeRequired,
+		colPasswordChangedAt,
+		colPasswordVerificationID,
+		colPasswordLastSuccessful,
+		colPasswordFailedAttempts,
+		colPasswordCreatedAt,
+		colPasswordUpdatedAt,
 	}.WriteQualified(builder)
 	builder.WriteString(" FROM ")
 	builder.WriteString(r.qualifiedTableName())
@@ -131,16 +111,16 @@ func (r *UserPasswordRepository) Get(ctx context.Context, client database.QueryE
 func (r *UserPasswordRepository) List(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) ([]*domain.UserPassword, error) {
 	builder := database.NewStatementBuilder("SELECT ")
 	database.Columns{
-		r.ProjectID(),
-		r.UserID(),
-		r.EncodedHash(),
-		r.ChangeRequired(),
-		r.ChangedAt(),
-		r.VerificationID(),
-		r.LastSuccessfulCheck(),
-		r.FailedAttempts(),
-		r.CreatedAt(),
-		r.UpdatedAt(),
+		colPasswordProjectID,
+		colPasswordUserID,
+		colPasswordEncodedHash,
+		colPasswordChangeRequired,
+		colPasswordChangedAt,
+		colPasswordVerificationID,
+		colPasswordLastSuccessful,
+		colPasswordFailedAttempts,
+		colPasswordCreatedAt,
+		colPasswordUpdatedAt,
 	}.WriteQualified(builder)
 	builder.WriteString(" FROM ")
 	builder.WriteString(r.qualifiedTableName())
@@ -165,11 +145,11 @@ func (r *UserPasswordRepository) Create(ctx context.Context, client database.Que
 	builder.WriteString(r.qualifiedTableName())
 	builder.WriteString(" (")
 	database.Columns{
-		r.ProjectID(),
-		r.UserID(),
-		r.EncodedHash(),
-		r.ChangeRequired(),
-		r.VerificationID(),
+		colPasswordProjectID,
+		colPasswordUserID,
+		colPasswordEncodedHash,
+		colPasswordChangeRequired,
+		colPasswordVerificationID,
 	}.WriteUnqualified(builder)
 	builder.WriteString(") VALUES (")
 	builder.WriteArgs(pw.ProjectID, pw.UserID, pw.EncodedHash, pw.ChangeRequired, pw.VerificationID)

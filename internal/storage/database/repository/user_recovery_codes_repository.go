@@ -10,48 +10,36 @@ import (
 
 const userRecoveryTable = "zitadel_nextgen.user_recovery_codes"
 
-type UserRecoveryCodesRepository struct {
-	colProject database.Column
-	colUser    database.Column
-	colCodes   database.Column
-	colLastOk  database.Column
-	colFails   database.Column
-	colCre     database.Column
-	colUpd     database.Column
-}
+var (
+	colRecoveryProjectID      = database.NewColumn(userRecoveryTable, "project_id")
+	colRecoveryUserID         = database.NewColumn(userRecoveryTable, "user_id")
+	colRecoveryCodes          = database.NewColumn(userRecoveryTable, "recovery_codes")
+	colRecoveryLastSuccessful = database.NewColumn(userRecoveryTable, "last_successful_check")
+	colRecoveryFailedAttempts = database.NewColumn(userRecoveryTable, "failed_attempts")
+	colRecoveryCreatedAt      = database.NewColumn(userRecoveryTable, "created_at")
+	colRecoveryUpdatedAt      = database.NewColumn(userRecoveryTable, "updated_at")
+)
+
+type UserRecoveryCodesRepository struct{}
 
 func NewUserRecoveryCodesRepository() *UserRecoveryCodesRepository {
-	t := userRecoveryTable
-	return &UserRecoveryCodesRepository{
-		colProject: database.NewColumn(t, "project_id"),
-		colUser:    database.NewColumn(t, "user_id"),
-		colCodes:   database.NewColumn(t, "recovery_codes"),
-		colLastOk:  database.NewColumn(t, "last_successful_check"),
-		colFails:   database.NewColumn(t, "failed_attempts"),
-		colCre:     database.NewColumn(t, "created_at"),
-		colUpd:     database.NewColumn(t, "updated_at"),
-	}
+	return &UserRecoveryCodesRepository{}
 }
 
 func (r *UserRecoveryCodesRepository) qualifiedTableName() string { return userRecoveryTable }
+
 func (r *UserRecoveryCodesRepository) PrimaryKeyColumns() []database.Column {
-	return []database.Column{r.ProjectID(), r.UserID()}
+	return []database.Column{colRecoveryProjectID, colRecoveryUserID}
 }
-func (r *UserRecoveryCodesRepository) UpdatedAtColumn() database.Column     { return r.UpdatedAt() }
-func (r *UserRecoveryCodesRepository) ProjectID() database.Column           { return r.colProject }
-func (r *UserRecoveryCodesRepository) UserID() database.Column              { return r.colUser }
-func (r *UserRecoveryCodesRepository) RecoveryCodes() database.Column       { return r.colCodes }
-func (r *UserRecoveryCodesRepository) LastSuccessfulCheck() database.Column { return r.colLastOk }
-func (r *UserRecoveryCodesRepository) FailedAttempts() database.Column      { return r.colFails }
-func (r *UserRecoveryCodesRepository) CreatedAt() database.Column           { return r.colCre }
-func (r *UserRecoveryCodesRepository) UpdatedAt() database.Column           { return r.colUpd }
+
+func (r *UserRecoveryCodesRepository) UpdatedAtColumn() database.Column { return colRecoveryUpdatedAt }
 
 func (r *UserRecoveryCodesRepository) ProjectIDCondition(pid string) database.Condition {
-	return database.NewTextCondition(r.ProjectID(), database.TextOperationEqual, pid)
+	return database.NewTextCondition(colRecoveryProjectID, database.TextOperationEqual, pid)
 }
 
 func (r *UserRecoveryCodesRepository) UserIDCondition(uid string) database.Condition {
-	return database.NewTextCondition(r.UserID(), database.TextOperationEqual, uid)
+	return database.NewTextCondition(colRecoveryUserID, database.TextOperationEqual, uid)
 }
 
 func (r *UserRecoveryCodesRepository) PrimaryKeyCondition(pid, uid string) database.Condition {
@@ -59,29 +47,29 @@ func (r *UserRecoveryCodesRepository) PrimaryKeyCondition(pid, uid string) datab
 }
 
 func (r *UserRecoveryCodesRepository) SetRecoveryCodes(codes []string) database.Change {
-	return database.NewChange(r.RecoveryCodes(), codes)
+	return database.NewChange(colRecoveryCodes, codes)
 }
 
 func (r *UserRecoveryCodesRepository) SetLastSuccessfulCheck(t *time.Time) database.Change {
-	return database.NewChangePtr(r.LastSuccessfulCheck(), t)
+	return database.NewChangePtr(colRecoveryLastSuccessful, t)
 }
 
 func (r *UserRecoveryCodesRepository) IncrementFailedAttempts() database.Change {
-	return database.NewChangeToStatement(r.FailedAttempts(), func(b *database.StatementBuilder) {
-		r.FailedAttempts().WriteQualified(b)
+	return database.NewChangeToStatement(colRecoveryFailedAttempts, func(b *database.StatementBuilder) {
+		colRecoveryFailedAttempts.WriteQualified(b)
 		b.WriteString(" + 1")
 	})
 }
 
 func (r *UserRecoveryCodesRepository) ResetFailedAttempts() database.Change {
-	return database.NewChange(r.FailedAttempts(), int16(0))
+	return database.NewChange(colRecoveryFailedAttempts, int16(0))
 }
 
 func (r *UserRecoveryCodesRepository) Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*domain.UserRecoveryCodes, error) {
 	b := database.NewStatementBuilder("SELECT ")
 	database.Columns{
-		r.ProjectID(), r.UserID(), r.RecoveryCodes(),
-		r.LastSuccessfulCheck(), r.FailedAttempts(), r.CreatedAt(), r.UpdatedAt(),
+		colRecoveryProjectID, colRecoveryUserID, colRecoveryCodes,
+		colRecoveryLastSuccessful, colRecoveryFailedAttempts, colRecoveryCreatedAt, colRecoveryUpdatedAt,
 	}.WriteQualified(b)
 	b.WriteString(" FROM ")
 	b.WriteString(r.qualifiedTableName())
@@ -100,8 +88,8 @@ func (r *UserRecoveryCodesRepository) Get(ctx context.Context, client database.Q
 func (r *UserRecoveryCodesRepository) List(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) ([]*domain.UserRecoveryCodes, error) {
 	b := database.NewStatementBuilder("SELECT ")
 	database.Columns{
-		r.ProjectID(), r.UserID(), r.RecoveryCodes(),
-		r.LastSuccessfulCheck(), r.FailedAttempts(), r.CreatedAt(), r.UpdatedAt(),
+		colRecoveryProjectID, colRecoveryUserID, colRecoveryCodes,
+		colRecoveryLastSuccessful, colRecoveryFailedAttempts, colRecoveryCreatedAt, colRecoveryUpdatedAt,
 	}.WriteQualified(b)
 	b.WriteString(" FROM ")
 	b.WriteString(r.qualifiedTableName())

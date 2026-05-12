@@ -10,51 +10,37 @@ import (
 
 const userTotpTable = "zitadel_nextgen.user_totp"
 
-type UserTOTPRepository struct {
-	colProject database.Column
-	colUser    database.Column
-	colSecret  database.Column
-	colVer     database.Column
-	colLastOk  database.Column
-	colFails   database.Column
-	colCre     database.Column
-	colUpd     database.Column
-}
+var (
+	colTotpProjectID      = database.NewColumn(userTotpTable, "project_id")
+	colTotpUserID         = database.NewColumn(userTotpTable, "user_id")
+	colTotpSecret         = database.NewColumn(userTotpTable, "secret")
+	colTotpVerifiedAt     = database.NewColumn(userTotpTable, "verified_at")
+	colTotpLastSuccessful = database.NewColumn(userTotpTable, "last_successful_check")
+	colTotpFailedAttempts = database.NewColumn(userTotpTable, "failed_attempts")
+	colTotpCreatedAt      = database.NewColumn(userTotpTable, "created_at")
+	colTotpUpdatedAt      = database.NewColumn(userTotpTable, "updated_at")
+)
+
+type UserTOTPRepository struct{}
 
 func NewUserTOTPRepository() *UserTOTPRepository {
-	t := userTotpTable
-	return &UserTOTPRepository{
-		colProject: database.NewColumn(t, "project_id"),
-		colUser:    database.NewColumn(t, "user_id"),
-		colSecret:  database.NewColumn(t, "secret"),
-		colVer:     database.NewColumn(t, "verified_at"),
-		colLastOk:  database.NewColumn(t, "last_successful_check"),
-		colFails:   database.NewColumn(t, "failed_attempts"),
-		colCre:     database.NewColumn(t, "created_at"),
-		colUpd:     database.NewColumn(t, "updated_at"),
-	}
+	return &UserTOTPRepository{}
 }
 
 func (r *UserTOTPRepository) qualifiedTableName() string { return userTotpTable }
+
 func (r *UserTOTPRepository) PrimaryKeyColumns() []database.Column {
-	return []database.Column{r.ProjectID(), r.UserID()}
+	return []database.Column{colTotpProjectID, colTotpUserID}
 }
-func (r *UserTOTPRepository) UpdatedAtColumn() database.Column     { return r.UpdatedAt() }
-func (r *UserTOTPRepository) ProjectID() database.Column           { return r.colProject }
-func (r *UserTOTPRepository) UserID() database.Column              { return r.colUser }
-func (r *UserTOTPRepository) Secret() database.Column              { return r.colSecret }
-func (r *UserTOTPRepository) VerifiedAt() database.Column          { return r.colVer }
-func (r *UserTOTPRepository) LastSuccessfulCheck() database.Column { return r.colLastOk }
-func (r *UserTOTPRepository) FailedAttempts() database.Column      { return r.colFails }
-func (r *UserTOTPRepository) CreatedAt() database.Column           { return r.colCre }
-func (r *UserTOTPRepository) UpdatedAt() database.Column           { return r.colUpd }
+
+func (r *UserTOTPRepository) UpdatedAtColumn() database.Column { return colTotpUpdatedAt }
 
 func (r *UserTOTPRepository) ProjectIDCondition(pid string) database.Condition {
-	return database.NewTextCondition(r.ProjectID(), database.TextOperationEqual, pid)
+	return database.NewTextCondition(colTotpProjectID, database.TextOperationEqual, pid)
 }
 
 func (r *UserTOTPRepository) UserIDCondition(uid string) database.Condition {
-	return database.NewTextCondition(r.UserID(), database.TextOperationEqual, uid)
+	return database.NewTextCondition(colTotpUserID, database.TextOperationEqual, uid)
 }
 
 func (r *UserTOTPRepository) PrimaryKeyCondition(pid, uid string) database.Condition {
@@ -62,33 +48,33 @@ func (r *UserTOTPRepository) PrimaryKeyCondition(pid, uid string) database.Condi
 }
 
 func (r *UserTOTPRepository) SetSecret(secret []byte) database.Change {
-	return database.NewChange(r.Secret(), secret)
+	return database.NewChange(colTotpSecret, secret)
 }
 
 func (r *UserTOTPRepository) SetVerifiedAt(t time.Time) database.Change {
-	return database.NewChange(r.VerifiedAt(), t)
+	return database.NewChange(colTotpVerifiedAt, t)
 }
 
 func (r *UserTOTPRepository) SetLastSuccessfulCheck(t time.Time) database.Change {
-	return database.NewChange(r.LastSuccessfulCheck(), t)
+	return database.NewChange(colTotpLastSuccessful, t)
 }
 
 func (r *UserTOTPRepository) IncrementFailedAttempts() database.Change {
-	return database.NewChangeToStatement(r.FailedAttempts(), func(b *database.StatementBuilder) {
-		r.FailedAttempts().WriteQualified(b)
+	return database.NewChangeToStatement(colTotpFailedAttempts, func(b *database.StatementBuilder) {
+		colTotpFailedAttempts.WriteQualified(b)
 		b.WriteString(" + 1")
 	})
 }
 
 func (r *UserTOTPRepository) ResetFailedAttempts() database.Change {
-	return database.NewChange(r.FailedAttempts(), int16(0))
+	return database.NewChange(colTotpFailedAttempts, int16(0))
 }
 
 func (r *UserTOTPRepository) Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*domain.UserTOTP, error) {
 	builder := database.NewStatementBuilder("SELECT ")
 	database.Columns{
-		r.ProjectID(), r.UserID(), r.Secret(), r.VerifiedAt(), r.LastSuccessfulCheck(),
-		r.FailedAttempts(), r.CreatedAt(), r.UpdatedAt(),
+		colTotpProjectID, colTotpUserID, colTotpSecret, colTotpVerifiedAt, colTotpLastSuccessful,
+		colTotpFailedAttempts, colTotpCreatedAt, colTotpUpdatedAt,
 	}.WriteQualified(builder)
 	builder.WriteString(" FROM ")
 	builder.WriteString(r.qualifiedTableName())
@@ -107,8 +93,8 @@ func (r *UserTOTPRepository) Get(ctx context.Context, client database.QueryExecu
 func (r *UserTOTPRepository) List(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) ([]*domain.UserTOTP, error) {
 	builder := database.NewStatementBuilder("SELECT ")
 	database.Columns{
-		r.ProjectID(), r.UserID(), r.Secret(), r.VerifiedAt(), r.LastSuccessfulCheck(),
-		r.FailedAttempts(), r.CreatedAt(), r.UpdatedAt(),
+		colTotpProjectID, colTotpUserID, colTotpSecret, colTotpVerifiedAt, colTotpLastSuccessful,
+		colTotpFailedAttempts, colTotpCreatedAt, colTotpUpdatedAt,
 	}.WriteQualified(builder)
 	builder.WriteString(" FROM ")
 	builder.WriteString(r.qualifiedTableName())

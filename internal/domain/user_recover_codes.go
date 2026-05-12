@@ -26,7 +26,6 @@ type CreateRecoveryCodes struct {
 type UserRecoveryCodesRepository interface {
 	Repository
 
-	userRecoveryCodesColumns
 	userRecoveryCodesConditions
 	userRecoveryCodesChanges
 
@@ -34,16 +33,6 @@ type UserRecoveryCodesRepository interface {
 	List(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) ([]*UserRecoveryCodes, error)
 	Create(ctx context.Context, client database.QueryExecutor, codes *CreateRecoveryCodes) error
 	Delete(ctx context.Context, client database.QueryExecutor, condition database.Condition) error
-}
-
-type userRecoveryCodesColumns interface {
-	ProjectID() database.Column
-	UserID() database.Column
-	RecoveryCodes() database.Column
-	LastSuccessfulCheck() database.Column
-	FailedAttempts() database.Column
-	CreatedAt() database.Column
-	UpdatedAt() database.Column
 }
 
 type userRecoveryCodesConditions interface {

@@ -31,7 +31,6 @@ type CreateUserPassword struct {
 type UserPasswordRepository interface {
 	Repository
 
-	userPasswordColumns
 	userPasswordConditions
 	userPasswordChanges
 
@@ -39,19 +38,6 @@ type UserPasswordRepository interface {
 	List(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) ([]*UserPassword, error)
 	Create(ctx context.Context, client database.QueryExecutor, user *CreateUserPassword) error
 	Delete(ctx context.Context, client database.QueryExecutor, condition database.Condition) error
-}
-
-type userPasswordColumns interface {
-	ProjectID() database.Column
-	UserID() database.Column
-	EncodedHash() database.Column
-	ChangeRequired() database.Column
-	ChangedAt() database.Column
-	VerificationID() database.Column
-	LastSuccessfulCheck() database.Column
-	FailedAttempts() database.Column
-	CreatedAt() database.Column
-	UpdatedAt() database.Column
 }
 
 type userPasswordConditions interface {
