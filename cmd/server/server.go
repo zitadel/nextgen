@@ -1,12 +1,20 @@
 package server
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"log"
+	"net/http"
+	"os/signal"
 	"strings"
+	"syscall"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	oasapi "github.com/zitadel/nextgen/api/generated"
+	"github.com/zitadel/nextgen/internal/api"
 	_ "github.com/zitadel/nextgen/internal/storage/database/dialect/all"
 )
 
@@ -16,7 +24,7 @@ func NewCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "server",
 		Short: "Run the server",
-		RunE: func(_ *cobra.Command, _ []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			cfg, err := loadConfig(configPath)
 			if err != nil {
 				return err
@@ -26,7 +34,8 @@ func NewCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return nil
+
+			return run(cmd.Context(), cfg)
 		},
 	}
 
@@ -35,11 +44,50 @@ func NewCommand() *cobra.Command {
 	return cmd
 }
 
+func run(ctx context.Context, cfg Config) error {
+	ctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	oasServer, err := oasapi.NewServer(api.NewHandler(), api.NewSecurityHandler())
+	if err != nil {
+		return fmt.Errorf("build api server: %w", err)
+	}
+
+	httpServer := &http.Server{
+		Addr:              cfg.Server.Address,
+		Handler:           oasServer,
+		ReadHeaderTimeout: 10 * time.Second,
+	}
+
+	serverErr := make(chan error, 1)
+	go func() {
+		log.Printf("server listening on %s", httpServer.Addr)
+		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			serverErr <- err
+		}
+		close(serverErr)
+	}()
+
+	select {
+	case <-ctx.Done():
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		if err := httpServer.Shutdown(shutdownCtx); err != nil {
+			return fmt.Errorf("shutdown server: %w", err)
+		}
+		return nil
+	case err := <-serverErr:
+		return err
+	}
+}
+
 func loadConfig(configPath string) (Config, error) {
 	v := viper.New()
 	v.SetEnvPrefix("NEXTGEN")
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	v.AutomaticEnv()
+
+	v.SetDefault("server.address", ":8080")
 
 	if configPath != "" {
 		v.SetConfigFile(configPath)
