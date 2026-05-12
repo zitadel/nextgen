@@ -100,6 +100,8 @@ describe("<zitadel-logout> open/close (chromium)", () => {
     await element.updateComplete;
     shadowQuery<HTMLButtonElement>(element, ".signout-btn").click();
     await waitFor(() => (fetchMock.mock.calls.length > 0 ? fetchMock : null));
-    expect(fetchMock.mock.calls[0]?.[0]).toBe("/__nextgen/v1/logout");
+    expect((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[0]).toBe(
+      "/__nextgen/v1/logout",
+    );
   });
 });

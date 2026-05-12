@@ -131,7 +131,7 @@ describe("<zitadel-logout>", () => {
     await element.updateComplete;
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe("/__nextgen/v1/logout");
     expect(init.method).toBe("POST");
     expect(init.credentials).toBe("include");
@@ -155,7 +155,9 @@ describe("<zitadel-logout>", () => {
     shadowQuery<HTMLButtonElement>(element, ".signout-btn").click();
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    expect((fetchMock.mock.calls[0] as [string, RequestInit])[0]).toBe("/__nextgen/v1/logout");
+    expect((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[0]).toBe(
+      "/__nextgen/v1/logout",
+    );
   });
 
   it("surfaces a server error message in the dropdown without redirecting", async () => {

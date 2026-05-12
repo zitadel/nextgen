@@ -30,7 +30,7 @@ describe("ProxyTransport", () => {
     });
     expect(response.step.actions?.submit?.primary).toBe(true);
 
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe("/__nextgen/v1/flow");
     expect(init.method).toBe("POST");
     expect(init.credentials).toBe("include");
@@ -44,7 +44,9 @@ describe("ProxyTransport", () => {
       fetchImpl: fetchMock as unknown as typeof fetch,
     });
     await transport.start({ purpose: "login" });
-    expect((fetchMock.mock.calls[0] as [string, RequestInit])[0]).toBe("/__nextgen/v1/flow");
+    expect((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[0]).toBe(
+      "/__nextgen/v1/flow",
+    );
   });
 
   it("forwards the cached CSRF token on submit", async () => {
@@ -69,7 +71,7 @@ describe("ProxyTransport", () => {
     });
 
     expect(response.step.type).toBe("complete");
-    const [, submitInit] = fetchMock.mock.calls[1] as [string, RequestInit];
+    const [, submitInit] = fetchMock.mock.calls[1] as unknown as [string, RequestInit];
     const headers = submitInit.headers as Record<string, string>;
     expect(headers["X-CSRF-Token"]).toBe("csrf-1");
     expect(JSON.parse(submitInit.body as string)).toEqual({
