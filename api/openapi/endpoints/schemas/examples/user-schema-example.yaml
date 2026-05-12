@@ -10,7 +10,7 @@ x-auth-methods:
     position: 1
   passkey:
     enabled: true
-    position: 1
+    position: 2
 required:
   - email
   - password

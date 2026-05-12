@@ -1,4 +1,4 @@
-title: UserSchemaUrl
+title: SchemaUrl
 type: object
 description: |
   A schema definition that references an external schema via a URL. It is 
