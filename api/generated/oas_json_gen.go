@@ -2947,8 +2947,10 @@ func (s *FlowDefinition) Encode(e *jx.Encoder) {
 // encodeFields encodes fields.
 func (s *FlowDefinition) encodeFields(e *jx.Encoder) {
 	{
-		e.FieldStart("schema_uri")
-		json.EncodeURI(e, s.SchemaURI)
+		if s.SchemaURI.Set {
+			e.FieldStart("schema_uri")
+			s.SchemaURI.Encode(e)
+		}
 	}
 	{
 		e.FieldStart("name")
@@ -3006,11 +3008,9 @@ func (s *FlowDefinition) Decode(d *jx.Decoder) error {
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
 		case "schema_uri":
-			requiredBitSet[0] |= 1 << 0
 			if err := func() error {
-				v, err := json.DecodeURI(d)
-				s.SchemaURI = v
-				if err != nil {
+				s.SchemaURI.Reset()
+				if err := s.SchemaURI.Decode(d); err != nil {
 					return err
 				}
 				return nil
@@ -3107,7 +3107,7 @@ func (s *FlowDefinition) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [1]uint8{
-		0b01011111,
+		0b01011110,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -3163,8 +3163,10 @@ func (s *FlowDefinitionDetailResponse) Encode(e *jx.Encoder) {
 // encodeFields encodes fields.
 func (s *FlowDefinitionDetailResponse) encodeFields(e *jx.Encoder) {
 	{
-		e.FieldStart("schema_uri")
-		json.EncodeURI(e, s.SchemaURI)
+		if s.SchemaURI.Set {
+			e.FieldStart("schema_uri")
+			s.SchemaURI.Encode(e)
+		}
 	}
 	{
 		e.FieldStart("name")
@@ -3247,11 +3249,9 @@ func (s *FlowDefinitionDetailResponse) Decode(d *jx.Decoder) error {
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
 		case "schema_uri":
-			requiredBitSet[0] |= 1 << 0
 			if err := func() error {
-				v, err := json.DecodeURI(d)
-				s.SchemaURI = v
-				if err != nil {
+				s.SchemaURI.Reset()
+				if err := s.SchemaURI.Decode(d); err != nil {
 					return err
 				}
 				return nil
@@ -3408,7 +3408,7 @@ func (s *FlowDefinitionDetailResponse) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [2]uint8{
-		0b11011111,
+		0b11011110,
 		0b00001111,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {

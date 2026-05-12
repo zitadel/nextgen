@@ -1142,7 +1142,7 @@ func decodeCreateHandoffParams(args [1]string, argsEscaped bool, r *http.Request
 
 // DeleteFlowDefinitionParams is parameters of deleteFlowDefinition operation.
 type DeleteFlowDefinitionParams struct {
-	// The id returned by the POST /flow-definitions endpoint.
+	// The id returned by the POST /flow_definitions endpoint.
 	ID string
 }
 
@@ -1696,7 +1696,7 @@ func decodeGetAuthAttemptParams(args [1]string, argsEscaped bool, r *http.Reques
 
 // GetFlowDefinitionParams is parameters of getFlowDefinition operation.
 type GetFlowDefinitionParams struct {
-	// The id returned by the POST /flow-definitions endpoint.
+	// The id returned by the POST /flow_definitions endpoint.
 	ID string
 }
 
@@ -3209,7 +3209,7 @@ func decodeSubmitFlowStepParams(args [1]string, argsEscaped bool, r *http.Reques
 
 // UpdateFlowDefinitionParams is parameters of updateFlowDefinition operation.
 type UpdateFlowDefinitionParams struct {
-	// The id returned by the POST /flow-definitions endpoint.
+	// The id returned by the POST /flow_definitions endpoint.
 	ID string
 }
 

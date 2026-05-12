@@ -3,7 +3,9 @@ get:
   description: Get a flow definition by id
   tags:
     - Flow Definitions
-  security: []
+  security:
+    - oauth2:
+      - flow_definitions.read
   parameters:
   - $ref: ../../../components/parameters/flow-definition-id.yaml
   responses:
@@ -31,7 +33,9 @@ patch:
   description: Update a flow definition by id
   tags:
     - Flow Definitions
-  security: []
+  security:
+    - oauth2:
+      - flow_definitions.write
   parameters:
     - $ref: ../../../components/parameters/flow-definition-id.yaml
   requestBody:
@@ -46,7 +50,7 @@ patch:
       content:
         application/json:
           schema:
-            $ref: ../../../components/flows/flow-definition-response.yaml # todo: or the detailed response?
+            $ref: ../../../components/flows/flow-definition-detail-response.yaml
     '400':
       description: Invalid request body.
       content:
@@ -71,7 +75,9 @@ delete:
   description: Delete a flow definition by id
   tags:
     - Flow Definitions
-  security: []
+  security:
+    - oauth2:
+      - flow_definitions.delete
   parameters:
     - $ref: ../../../components/parameters/flow-definition-id.yaml
   responses:

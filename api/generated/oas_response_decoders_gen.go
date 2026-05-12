@@ -4253,7 +4253,7 @@ func decodeUpdateFlowDefinitionResponse(resp *http.Response) (res UpdateFlowDefi
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response FlowDefinitionResponse
+			var response FlowDefinitionDetailResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err

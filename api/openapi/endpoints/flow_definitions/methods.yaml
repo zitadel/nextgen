@@ -9,7 +9,9 @@ post:
     Flow definitions are created based on the flow meta schema, which includes the flow's purpose, audience, and the steps involved.
   tags:
     - Flow Definitions
-  security: [] # todo: review permissions
+  security:
+    - oauth2:
+      - flow_definitions.write
   requestBody:
     required: true
     content:
@@ -50,12 +52,13 @@ get:
     This endpoint can be used to view existing flow definitions and their configurations.
   tags:
     - Flow Definitions
-  security: []
+  security:
+    - oauth2:
+      - flow_definitions.read
   parameters:
     - $ref: ../../components/parameters/limit.yaml
     - $ref: ../../components/parameters/page-token.yaml
     - $ref: ../../components/parameters/project-id.yaml
-      description: Filter flow definitions by project.
     - name: purpose
       in: query
       required: false

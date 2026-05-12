@@ -1380,7 +1380,7 @@ func (s *FlowAudience) SetAppIds(val []string) {
 type FlowDefinition struct {
 	// URI of the server-published flow definition schema this definition was
 	// authored against. The server uses this to select the correct validator.
-	SchemaURI url.URL `json:"schema_uri"`
+	SchemaURI OptURI `json:"schema_uri"`
 	// Stable identifier for this flow, used as the target of cross-flow
 	// `switch` and `pivot` transitions. Renaming is not supported — the
 	// `name` is part of the public contract another definition may
@@ -1403,7 +1403,7 @@ type FlowDefinition struct {
 }
 
 // GetSchemaURI returns the value of SchemaURI.
-func (s *FlowDefinition) GetSchemaURI() url.URL {
+func (s *FlowDefinition) GetSchemaURI() OptURI {
 	return s.SchemaURI
 }
 
@@ -1438,7 +1438,7 @@ func (s *FlowDefinition) GetSteps() []FlowDefinitionStep {
 }
 
 // SetSchemaURI sets the value of SchemaURI.
-func (s *FlowDefinition) SetSchemaURI(val url.URL) {
+func (s *FlowDefinition) SetSchemaURI(val OptURI) {
 	s.SchemaURI = val
 }
 
@@ -1477,7 +1477,7 @@ func (s *FlowDefinition) SetSteps(val []FlowDefinitionStep) {
 type FlowDefinitionDetailResponse struct {
 	// URI of the server-published flow definition schema this definition was
 	// authored against. The server uses this to select the correct validator.
-	SchemaURI url.URL `json:"schema_uri"`
+	SchemaURI OptURI `json:"schema_uri"`
 	// Stable identifier for this flow, used as the target of cross-flow
 	// `switch` and `pivot` transitions. Renaming is not supported — the
 	// `name` is part of the public contract another definition may
@@ -1508,7 +1508,7 @@ type FlowDefinitionDetailResponse struct {
 }
 
 // GetSchemaURI returns the value of SchemaURI.
-func (s *FlowDefinitionDetailResponse) GetSchemaURI() url.URL {
+func (s *FlowDefinitionDetailResponse) GetSchemaURI() OptURI {
 	return s.SchemaURI
 }
 
@@ -1568,7 +1568,7 @@ func (s *FlowDefinitionDetailResponse) GetUpdatedAt() time.Time {
 }
 
 // SetSchemaURI sets the value of SchemaURI.
-func (s *FlowDefinitionDetailResponse) SetSchemaURI(val url.URL) {
+func (s *FlowDefinitionDetailResponse) SetSchemaURI(val OptURI) {
 	s.SchemaURI = val
 }
 
@@ -1627,7 +1627,8 @@ func (s *FlowDefinitionDetailResponse) SetUpdatedAt(val time.Time) {
 	s.UpdatedAt = val
 }
 
-func (*FlowDefinitionDetailResponse) getFlowDefinitionRes() {}
+func (*FlowDefinitionDetailResponse) getFlowDefinitionRes()    {}
+func (*FlowDefinitionDetailResponse) updateFlowDefinitionRes() {}
 
 // Maps each purpose to the step name that starts the flow for that purpose.
 // Keys must be a subset of `purposes`.
@@ -1831,7 +1832,9 @@ type FlowDefinitionResponse struct {
 	Name string `json:"name"`
 	// Identifier of the project this flow definition belongs to.
 	ProjectID string `json:"project_id"`
-	// URI of the flow definition schema this definition was authored against (echoed from the request).
+	// URI of the flow definition schema this definition was authored against.
+	// If the schema_uri was not provided in the request, the flow definition is validated against the
+	// latest version of the schema, and the response includes the schema_uri of the latest version.
 	SchemaURI url.URL `json:"schema_uri"`
 	// Status of the flow definition.
 	Status string `json:"status"`
@@ -1912,7 +1915,6 @@ func (s *FlowDefinitionResponse) SetUpdatedAt(val time.Time) {
 }
 
 func (*FlowDefinitionResponse) createFlowDefinitionRes() {}
-func (*FlowDefinitionResponse) updateFlowDefinitionRes() {}
 
 // A step in a flow definition. This is the admin-authored configuration,
 // not the runtime payload sent to the frontend.
