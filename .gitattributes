@@ -1,1 +1,2 @@
 api/generated/** linguist-generated=true
+internal/domain/mock/** linguist-generated=true

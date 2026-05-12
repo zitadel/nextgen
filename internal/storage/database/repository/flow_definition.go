@@ -170,6 +170,11 @@ func (r *FlowDefinitionRepository) ListFlowDefinitions(ctx context.Context, clie
 	b.WriteString(" WHERE project_id = ")
 	b.WriteArg(projectID)
 
+	if o.Name != nil {
+		b.WriteString(" AND name = ")
+		b.WriteArg(*o.Name)
+	}
+
 	if o.Status != nil {
 		b.WriteString(" AND status = ")
 		b.WriteString(b.AppendArg(o.Status.String()) + r.statusCast)
