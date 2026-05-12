@@ -8,9 +8,10 @@ import (
 
 func UserSchemaToJsonschema(in api.UserSchema) (out *jsonschema.Schema, err error) {
 	out = &jsonschema.Schema{
-		ID:          in.ID.String(),
-		Schema:      in.Schema.String(),
+		ID:          in.ID,
+		Schema:      in.Schema,
 		Title:       in.Title,
+		Type:        in.Type.Value,
 		Required:    in.Required[:],
 		Description: in.Description.Value,
 		Properties:  make(map[string]*jsonschema.Schema, len(in.Properties.Value)),
@@ -28,13 +29,25 @@ func UserSchemaToJsonschema(in api.UserSchema) (out *jsonschema.Schema, err erro
 }
 
 func authMethodsToMap(in api.AuthMethods) map[string]any {
-	return map[string]any{
-		"password":   optAuthMethodToMap(in.Password),
-		"passkey":    optAuthMethodToMap(in.Passkey),
-		"magic_link": optAuthMethodToMap(in.MagicLink),
-		"sso":        optAuthMethodToMap(in.SSO),
-		"otp":        optAuthMethodToMap(in.Otp),
+	out := make(map[string]any, 5)
+
+	if in.Password.Set {
+		out["password"] = optAuthMethodToMap(in.Password)
 	}
+	if in.Passkey.Set {
+		out["passkey"] = optAuthMethodToMap(in.Passkey)
+	}
+	if in.MagicLink.Set {
+		out["magic_link"] = optAuthMethodToMap(in.MagicLink)
+	}
+	if in.SSO.Set {
+		out["sso"] = optAuthMethodToMap(in.SSO)
+	}
+	if in.Otp.Set {
+		out["otp"] = optAuthMethodToMap(in.Otp)
+	}
+
+	return out
 }
 
 func optAuthMethodToMap(in api.OptAuthMethod) map[string]any {
@@ -42,7 +55,7 @@ func optAuthMethodToMap(in api.OptAuthMethod) map[string]any {
 		return nil
 	}
 	return map[string]any{
-		"enabled":  in.Value.Enabled,
+		"enable":   in.Value.Enabled,
 		"position": in.Value.Position,
 	}
 }

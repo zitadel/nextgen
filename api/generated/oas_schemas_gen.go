@@ -6523,11 +6523,13 @@ type UserID string
 // Ref: #
 type UserSchema struct {
 	// The JSON Schema version used for this schema.
-	Schema url.URL `json:"$schema"`
+	Schema string `json:"$schema"`
 	// The unique identifier for this schema, which is also the URL where this schema can be accessed.
-	ID url.URL `json:"$id"`
+	ID string `json:"$id"`
 	// Discriminator value for a user schema create request.
 	Kind string `json:"kind"`
+	// The type of a user must alwasy be an object.
+	Type OptString `json:"type"`
 	// Human-readable name for this schema.
 	Title string `json:"title"`
 	// A description of this schema.
@@ -6541,18 +6543,23 @@ type UserSchema struct {
 }
 
 // GetSchema returns the value of Schema.
-func (s *UserSchema) GetSchema() url.URL {
+func (s *UserSchema) GetSchema() string {
 	return s.Schema
 }
 
 // GetID returns the value of ID.
-func (s *UserSchema) GetID() url.URL {
+func (s *UserSchema) GetID() string {
 	return s.ID
 }
 
 // GetKind returns the value of Kind.
 func (s *UserSchema) GetKind() string {
 	return s.Kind
+}
+
+// GetType returns the value of Type.
+func (s *UserSchema) GetType() OptString {
+	return s.Type
 }
 
 // GetTitle returns the value of Title.
@@ -6581,18 +6588,23 @@ func (s *UserSchema) GetProperties() OptUserSchemaProperties {
 }
 
 // SetSchema sets the value of Schema.
-func (s *UserSchema) SetSchema(val url.URL) {
+func (s *UserSchema) SetSchema(val string) {
 	s.Schema = val
 }
 
 // SetID sets the value of ID.
-func (s *UserSchema) SetID(val url.URL) {
+func (s *UserSchema) SetID(val string) {
 	s.ID = val
 }
 
 // SetKind sets the value of Kind.
 func (s *UserSchema) SetKind(val string) {
 	s.Kind = val
+}
+
+// SetType sets the value of Type.
+func (s *UserSchema) SetType(val OptString) {
+	s.Type = val
 }
 
 // SetTitle sets the value of Title.

@@ -12,22 +12,20 @@ import (
 
 func JsonschemaToUserSchema(in *jsonschema.Schema) (out *api.UserSchema, err error) {
 	out = &api.UserSchema{
+		ID:       in.ID,
+		Schema:   in.Schema,
 		Title:    in.Title,
 		Required: in.Required[:],
 	}
-
-	id, err := url.Parse(in.ID)
-	if id == nil {
-		return nil, err
-	}
-	out.ID = *id
 
 	schema, err := url.Parse(in.Schema)
 	if schema == nil {
 		return nil, err
 	}
-	out.Schema = *schema
 
+	if in.Type != "" {
+		out.Type.SetTo(in.Type)
+	}
 	if in.Description != "" {
 		out.Description.SetTo(in.Description)
 	}

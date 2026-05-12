@@ -7,7 +7,7 @@ description: This is an example of a user schema definition.
 x-auth-methods:
   password:
     enabled: false
-    position: 0
+    position: 1
   passkey:
     enabled: true
     position: 1

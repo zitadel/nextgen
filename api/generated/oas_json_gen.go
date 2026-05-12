@@ -1893,11 +1893,15 @@ func (s CreateSchemaReq) encodeFields(e *jx.Encoder) {
 			s := s.UserSchema
 			{
 				e.FieldStart("$schema")
-				json.EncodeURI(e, "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.yaml")
+				e.Str("https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.yaml")
 			}
 			{
 				e.FieldStart("$id")
-				json.EncodeURI(e, s.ID)
+				e.Str(s.ID)
+			}
+			{
+				e.FieldStart("type")
+				e.Str("object")
 			}
 			{
 				e.FieldStart("title")
@@ -5076,11 +5080,15 @@ func (s GetSchemaByIdOK) encodeFields(e *jx.Encoder) {
 			s := s.UserSchema
 			{
 				e.FieldStart("$schema")
-				json.EncodeURI(e, "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.yaml")
+				e.Str("https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.yaml")
 			}
 			{
 				e.FieldStart("$id")
-				json.EncodeURI(e, s.ID)
+				e.Str(s.ID)
+			}
+			{
+				e.FieldStart("type")
+				e.Str("object")
 			}
 			{
 				e.FieldStart("title")
@@ -12066,15 +12074,19 @@ func (s *UserSchema) Encode(e *jx.Encoder) {
 func (s *UserSchema) encodeFields(e *jx.Encoder) {
 	{
 		e.FieldStart("$schema")
-		json.EncodeURI(e, "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.yaml")
+		e.Str("https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.yaml")
 	}
 	{
 		e.FieldStart("$id")
-		json.EncodeURI(e, s.ID)
+		e.Str(s.ID)
 	}
 	{
 		e.FieldStart("kind")
 		e.Str("user-schema")
+	}
+	{
+		e.FieldStart("type")
+		e.Str("object")
 	}
 	{
 		e.FieldStart("title")
@@ -12108,15 +12120,16 @@ func (s *UserSchema) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfUserSchema = [8]string{
+var jsonFieldsNameOfUserSchema = [9]string{
 	0: "$schema",
 	1: "$id",
 	2: "kind",
-	3: "title",
-	4: "description",
-	5: "x-auth-methods",
-	6: "required",
-	7: "properties",
+	3: "type",
+	4: "title",
+	5: "description",
+	6: "x-auth-methods",
+	7: "required",
+	8: "properties",
 }
 
 // Decode decodes UserSchema from json.
@@ -12124,15 +12137,15 @@ func (s *UserSchema) Decode(d *jx.Decoder) error {
 	if s == nil {
 		return errors.New("invalid: unable to decode UserSchema to nil")
 	}
-	var requiredBitSet [1]uint8
+	var requiredBitSet [2]uint8
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
 		case "$schema":
 			requiredBitSet[0] |= 1 << 0
 			if err := func() error {
-				v, err := json.DecodeURI(d)
-				s.Schema = v
+				v, err := d.Str()
+				s.Schema = string(v)
 				if err != nil {
 					return err
 				}
@@ -12143,8 +12156,8 @@ func (s *UserSchema) Decode(d *jx.Decoder) error {
 		case "$id":
 			requiredBitSet[0] |= 1 << 1
 			if err := func() error {
-				v, err := json.DecodeURI(d)
-				s.ID = v
+				v, err := d.Str()
+				s.ID = string(v)
 				if err != nil {
 					return err
 				}
@@ -12164,8 +12177,18 @@ func (s *UserSchema) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"kind\"")
 			}
+		case "type":
+			if err := func() error {
+				s.Type.Reset()
+				if err := s.Type.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"type\"")
+			}
 		case "title":
-			requiredBitSet[0] |= 1 << 3
+			requiredBitSet[0] |= 1 << 4
 			if err := func() error {
 				v, err := d.Str()
 				s.Title = string(v)
@@ -12187,7 +12210,7 @@ func (s *UserSchema) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"description\"")
 			}
 		case "x-auth-methods":
-			requiredBitSet[0] |= 1 << 5
+			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
 				if err := s.XMinusAuthMinusMethods.Decode(d); err != nil {
 					return err
@@ -12234,8 +12257,9 @@ func (s *UserSchema) Decode(d *jx.Decoder) error {
 	}
 	// Validate required fields.
 	var failures []validate.FieldError
-	for i, mask := range [1]uint8{
-		0b00101111,
+	for i, mask := range [2]uint8{
+		0b01010111,
+		0b00000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
