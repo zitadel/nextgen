@@ -3,6 +3,8 @@ package repository
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	"strings"
 
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
@@ -34,4 +36,14 @@ func (a *JSONArray[T]) Scan(src any) (err error) {
 		return database.NewScanError(err)
 	}
 	return nil
+}
+
+type StringArray []string
+
+func (sa StringArray) String() string {
+	if len(sa) == 0 {
+		return "{}"
+	}
+
+	return fmt.Sprintf(`{%s}`, strings.Join(sa, ","))
 }

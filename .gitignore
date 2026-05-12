@@ -28,13 +28,19 @@ go.work.sum
 .env
 
 # Editor/IDE
-# .idea/
-
+.idea/
 .vscode/
+
 __debug_bin*
 
 # Local Codex/Claude workspace metadata
 .claude/
+
+# OSX
+.DS_Store
+
+# OSX
+.DS_Store
 
 # Editor/IDE
 .idea/
@@ -48,9 +54,11 @@ __debug_bin*
 dist
 tmp
 out-tsc
+coverage/
 
 ## dependencies
 node_modules
+npm-debug.log*
 pnpm-debug.log*
 *.code-workspace
 

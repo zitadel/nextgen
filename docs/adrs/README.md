@@ -6,4 +6,12 @@ This directory contains architecture decision records (ADRs) for nextgen.
 
 | ID | Title | Summary |
 |---|---|---|
-| [001](001-server-cli-cobra-viper.md) | Standardize Server CLI on Cobra and Viper | Proposes Cobra and Viper as the standard server CLI/configuration stack and captures the open question around presenting backend-specific options like `database.spanner` vs `database.postgres`. |
+| [001](001-server-cli-cobra-viper.md) | Standardize Server CLI on Cobra and Viper | Proposes Cobra and Viper as the standard server CLI/configuration stack; captures open questions around backend-specific option presentation. |
+| [002](002-multi-package-release-strategy.md) | Multi-package Release Strategy | GoReleaser for the server binary and embedded console; changesets for npm packages; console ships with the server version, not as a standalone npm package. |
+| [003](003-create-first-claim-later.md) | Create First, Claim Later | Pre-claim local setup for agents and developers; human completes claim; agents do not finish account ownership. |
+| [004](004-agent-contract-and-agents-md.md) | Agent Contract and AGENTS.md | `apps/cli/AGENTS.md` is the generated agent contract; agents use `--non-interactive --json` and parse the stable envelope. |
+| [005](005-public-runtime-private-credentials.md) | Public Runtime and Private Credentials | Browser UI receives only public runtime metadata; secrets stay in CLI, server, or secret stores. |
+| [006](006-web-component-renderer-direction.md) | Web Component Renderer Direction | Target auth UI is a `<zitadel-flow>` web component; React shim prepares the contract until the package ships. |
+| [007](007-gitops-configuration-surface.md) | GitOps Configuration Surface | Repo files describe config; `plan`/`apply` validate and upload bundles; local secrets excluded from VCS. |
+| [008](008-users-eav-store.md) | Scalable EAV Storage for User Attributes | Partitioned header/EAV/registry model for user attributes at scale with uniqueness enforcement. |
+| [009](009-user-json-schema-validation.md) | User JSON Schema Validation | Users validated with instance-stored JSON Schemas; `$schema` URL versioning; no automatic cross-schema migration; upgrades via transactional PUT/PATCH with validation before commit. |

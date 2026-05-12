@@ -24,6 +24,14 @@ properties:
     description: Human-readable display name for this flow definition.
     example: Default Login
 
+  user_schema:
+    type: string
+    description: |
+      User schema this flow operates on. Step `fields` reference properties
+      defined in this schema. The engine resolves field types, validation,
+      and implicit outcomes from schema annotations at runtime.
+    example: human_user
+
   purposes:
     type: array
     items:

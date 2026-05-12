@@ -77,6 +77,20 @@ func (UnimplementedHandler) CreateHandoff(ctx context.Context, params CreateHand
 	return r, ht.ErrNotImplemented
 }
 
+// CreateSchema implements createSchema operation.
+//
+// Create a new schema. The schema definition must include a unique $id field,
+// which will be used to identify the schema in future requests. The $id must
+// be a valid URI and should ideally point to the location where the schema
+// can be accessed.
+// The schema can either be a concrete schema, e.g. a user schema, or a
+// schema-url which will be resolved by the server.
+//
+// POST /schemas
+func (UnimplementedHandler) CreateSchema(ctx context.Context, req CreateSchemaReq) (r CreateSchemaRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // CreateSession implements createSession operation.
 //
 // Creates an anonymous session shell with no user and no factors (`state: building`).
@@ -191,6 +205,15 @@ func (UnimplementedHandler) GetOpenIDConfiguration(ctx context.Context) (r GetOp
 //
 // GET /readyz
 func (UnimplementedHandler) GetReady(ctx context.Context) (r GetReadyRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// GetSchemaById implements getSchemaById operation.
+//
+// Get a schema by its ID. This will return the default revision of the schema.
+//
+// GET /schemas/{id}
+func (UnimplementedHandler) GetSchemaById(ctx context.Context, params GetSchemaByIdParams) (r GetSchemaByIdRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
