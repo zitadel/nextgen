@@ -136,8 +136,7 @@ form-associated inputs.
 
 The "Custom template" surface is not yet exposed on `<zitadel-login>`; the
 orchestrator currently uses the bundled `auth_form.liquid`. Tracked as a
-follow-up; the visualizer's Template tab is read-only when on the Real
-components view to reflect this honestly.
+follow-up.
 
 ## Element APIs
 
@@ -189,11 +188,11 @@ See [`src/atoms/`](src/atoms) for full TypeScript types and JSDoc.
 
 ```
 packages/components/
-├── dev/                   Vite playground (atoms + login routes; serves visualizer)
+├── dev/                   Vite playground (atoms + login routes)
 │   ├── index.html
 │   ├── main.ts
 │   ├── pages/             atom playground + <zitadel-login> demo
-│   └── fixtures/          login flow fixture for the demo & visualizer
+│   └── fixtures/          login flow fixture for the dev demo
 ├── src/
 │   ├── atoms/             zl-field, zl-submit, zl-action, zl-error + tests
 │   ├── orchestrator/      <zitadel-login>, transport, liquid, sanitiser, branding
@@ -204,7 +203,7 @@ packages/components/
 │   ├── manifests.ts       per-atom attribute / part / event manifests
 │   └── index.ts           barrel
 ├── tsdown.config.ts       library build (externalises lit/liquidjs/dompurify)
-├── vite.config.mts        dev server + visualizer alias
+├── vite.config.mts        dev server
 └── vitest.config.ts       jsdom (unit) + chromium (browser) projects
 ```
 
