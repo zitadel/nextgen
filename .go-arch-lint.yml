@@ -12,11 +12,13 @@ components:
   service:
     in: "internal/service/**"
   api:
-    in: "internal/api"
+    in: "internal/api/**"
   stubs:
     in: "api/**"
   storage:
     in: "internal/storage/database/**"
+  httputil:
+    in: "internal/httputil/**"
 
 deps:
   main:
@@ -29,6 +31,7 @@ deps:
   domain:
     mayDependOn:
       - domain
+      - httputil
       - storage # TODO: remove
   service:
     mayDependOn:
