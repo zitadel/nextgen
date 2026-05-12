@@ -59,7 +59,7 @@ jobs:
           go-version-file: go.mod
           cache: true
       - name: install go-arch-lint
-        run: go install github.com/looztra/go-arch-lint@latest
+        run: go install github.com/fe3dback/go-arch-lint@latest
       - name: Run architecture linting
         run: go-arch-lint check
 
