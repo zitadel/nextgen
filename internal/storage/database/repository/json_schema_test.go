@@ -31,6 +31,7 @@ func TestJSONSchemaRepository_CRUD(t *testing.T) {
 	require.Equal(t, schema.URL, got.URL)
 	require.NotZero(t, got.CreatedAt)
 	require.NotNil(t, got.Schema)
+	require.NoError(t, err)
 	require.Contains(t, string(got.Schema), `"type":"object"`)
 
 	list, err := repo.List(t.Context(), tx, database.WithCondition(repo.ProjectIDCondition(projectID)))
