@@ -21,6 +21,10 @@ type CreateHandoffRes interface {
 	createHandoffRes()
 }
 
+type CreateSchemaRes interface {
+	createSchemaRes()
+}
+
 type CreateSessionRes interface {
 	createSessionRes()
 }
@@ -59,6 +63,10 @@ type GetOpenIDConfigurationRes interface {
 
 type GetReadyRes interface {
 	getReadyRes()
+}
+
+type GetSchemaByIdRes interface {
+	getSchemaByIdRes()
 }
 
 type GetSessionRes interface {
