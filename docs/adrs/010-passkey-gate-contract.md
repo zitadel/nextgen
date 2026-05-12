@@ -6,129 +6,138 @@
 
 ## Decision
 
-Passkey (WebAuthn) registration and authentication integrate into the flow API
-as **actions** and **dedicated steps** — not as gates.
+Passkey (WebAuthn) integrates into the flow API as a **plain action** that
+transitions to a **challenge step**. The WebAuthn options are delivered in the
+step response _after_ the user selects the passkey action — not embedded in
+the action itself.
 
 ### Why not gates?
 
-Gates are pre-submit barriers (like captcha) with three properties that
-conflict with passkey behavior:
+Gates are pre-submit barriers (captcha). Passkey doesn't fit:
 
-1. **Auto-append safety net.** The orchestrator appends required-but-unrendered
-   gates as a fallback. This works for captcha (append a widget). It doesn't
-   work for passkey — conditional UI binds to the email field's autofill, and
-   modal UI triggers a browser dialog. Neither can be "appended."
+1. **Auto-append safety net** breaks — passkey can't be appended as a widget.
+2. **Gates are pre-submit; passkey IS the submission** — there's nothing left
+   to submit after authenticating.
+3. **Conditional UI requires field coordination** — gates are independent of
+   fields.
 
-2. **Gates are pre-submit; passkey IS the submission.** A captcha gate works
-   as: solve → fill fields → submit. The gate proof rides with the form data.
-   Passkey authentication replaces the form — when the user authenticates,
-   there's nothing left to submit. The orchestrator would need "gate satisfied
-   → auto-submit" logic that gates weren't designed for.
+### Why not ceremony-on-action?
 
-3. **Conditional UI requires field coordination.** The passkey ceremony in
-   autofill mode binds to the email `<input>`. Gates are supposed to be
-   independent of fields.
+Embedding WebAuthn options directly on the action (a `ceremony` property) was
+considered and rejected:
 
-### Passkey as action
+1. **Stale challenges.** Options pre-generated in the step response may expire
+   if the user takes time to decide.
+2. **Wasted work.** If the user picks email+password, the challenge was
+   generated for nothing.
+3. **User must be identified first.** The server needs to know _which user_ to
+   generate `allowCredentials` for. This requires a prior user factor, which
+   only exists after the identifier step submits.
+4. **Breaks action simplicity.** Actions are meant to be plain capabilities
+   (text_key + primary). Adding protocol-specific config creates a second
+   class of action.
 
-Actions are the right model because they represent **things the user can do**
-on a step. "Sign in with passkey" is an action — an alternative to "submit
-email + password."
+### The two-submit model
 
-The action schema gains an optional `ceremony` property that carries
-client-side ceremony configuration. When present, the orchestrator knows to
-trigger a browser ceremony before submitting:
+Passkey authentication is a **two-submit round-trip** through the standard
+flow step progression:
+
+```
+Step 1 (login):
+  actions: { submit, passkey }    ← passkey is a plain action, no options
+  User clicks "Sign in with passkey"
+  → POST /flow/{id}/submit { action: "passkey" }
+
+Step 2 (passkey challenge):
+  challenge: { type: "passkey", challenge_id: "ch_123", options: {...} }
+  actions: { submit }
+  <zl-passkey> reads step.challenge.options → triggers navigator.credentials.get()
+  → POST /flow/{id}/submit { action: "submit", challenge_response: { challenge_id, passkey: {...} } }
+
+Step 3 (done):
+  complete: "redirect"
+```
+
+The flow engine internally calls `svc.IssueChallenge(method: "passkey")` when
+processing the passkey action — no HTTP round-trip from the client to
+`auth_attempts`. The client only talks to `/flow/{id}/submit`.
+
+### Key design choices
+
+1. **Plain actions.** Passkey is a regular action — same shape as submit or
+   register. No embedded WebAuthn config. The template renders it as
+   `<zl-passkey>` (invisible) or as a button via `<zl-action>`.
+
+2. **Challenge on the step.** After the user submits the passkey action, the
+   server responds with a new step containing `step.challenge` — the WebAuthn
+   options generated on-demand by the auth_attempts service.
+
+3. **`<zl-passkey>` component.** An invisible Lit web component mounted by the
+   Liquid template. When `step.challenge.type === "passkey"`, it reads the
+   options, triggers the browser's credential API, and auto-submits the proof.
+
+4. **`challenge_response` on submit.** The proof goes in a `challenge_response`
+   field on the submit request, alongside `challenge_id` and `method`. This
+   mirrors the auth_attempts challenge/verify contract.
+
+5. **Attestation `none` by default.** Privacy-preserving. Enterprise can opt
+   into `direct` via policy.
+
+6. **Structured JSON proof.** The `passkey` proof in `challenge_response` is a
+   JSON object matching the WebAuthn JSON serialization spec — debuggable,
+   schema-validatable, compatible with go-webauthn.
+
+### User schema integration
+
+Passkey availability is declared via `x-auth-methods` on the user schema:
 
 ```json
-"actions": {
-  "submit": { "primary": true, "text_key": "login.action.submit" },
-  "passkey": {
-    "text_key": "login.action.passkey",
-    "ceremony": {
-      "type": "passkey",
-      "mediation": "conditional",
-      "options": { "challenge": "...", "rpId": "...", "allowCredentials": [] }
-    }
-  }
+"x-auth-methods": {
+  "password": { "enabled": true, "position": 1 },
+  "passkey":  { "enabled": true, "position": 0 }
 }
 ```
 
-The orchestrator:
-1. Sees `actions.passkey.ceremony.type === "passkey"`
-2. Triggers `navigator.credentials.get()` (or `.create()` for registration)
-3. On success, submits with `action: "passkey"` and `ceremony_proof: { ... }`
-
-### Core design choices
-
-1. **Actions, not gates.** Passkey is "sign in with passkey" (an action) —
-   not "solve this before you can submit" (a gate). Gate stays captcha-only.
-
-2. **`ceremony` on actions.** An optional property that tells the orchestrator
-   "this action requires a client-side ceremony." Extensible to future ceremony
-   types (external MFA redirects, etc.).
-
-3. **Dedicated steps for MFA and registration.** For MFA, a `verify_passkey`
-   step where the submit action has a `ceremony`. For registration, a
-   `setup_passkey` step. Clean transitions — no mixed fields + ceremony.
-
-4. **Structured JSON proof.** `ceremony_proof` on the submit request carries
-   the serialized `PublicKeyCredential` response. Debuggable, schema-
-   validatable, consistent with the WebAuthn ecosystem.
-
-5. **Conditional UI via `mediation`.** `"conditional"` binds to email autofill.
-   The `<zl-field>` component auto-adds `autocomplete="username webauthn"` when
-   it detects a conditional passkey action on the same step.
-
-6. **Attestation `none` by default.** Privacy-preserving. Enterprise can opt
-   into `direct` via policy.
-
-### Two authentication modes
-
-| Mode | `allowCredentials` | User identified first? | UX |
-|---|---|---|---|
-| **Discoverable (conditional UI)** | `[]` | No — `userHandle` in assertion identifies user | Passkeys in email autofill dropdown |
-| **Server-side** | `[{ id, transports }]` | Yes — after identifier step | Browser prompts for specific credentials |
-
-### Conditional UI `autocomplete` (orchestrator responsibility)
-
-The email `<input>` needs `autocomplete="username webauthn"` for conditional UI.
-This is **not** a server field property — the orchestrator detects a passkey
-action with `mediation: "conditional"` and applies it to the email field
-automatically.
+- Policy engine uses this to determine if passkey can be required.
+- Flow engine uses `position` for action ordering hints.
+- The credential itself is stored off-schema, registered via auth_attempts.
 
 ## Context
 
-The flow engine's gate model was designed for security barriers (captcha, rate
-limits). Passkey doesn't fit: it has its own ceremony lifecycle, replaces form
-submission rather than gating it, and requires field coordination for
-conditional UI.
+The flow engine's gate model was designed for security barriers (captcha).
+Passkey doesn't fit. The existing step response already modeled passkey as a
+plain action:
 
-The existing step response already modeled passkey as an action:
 ```json
 "actions": { "passkey": { "text_key": "login.action.passkey" } }
 ```
 
-This ADR formalizes that model and extends it with `ceremony` configuration.
+The auth_attempts service already has a challenge/verify model for passkey:
+- Issue: `POST /auth_attempts/{id}/challenges { method: "passkey" }`
+- Verify: `POST /auth_attempts/{id}/challenges/{cid}/verify { passkey: {...} }`
 
-See: [flow-engine.md], [flow-engine-nodes.md], [session-api.md],
-[external-auth-factors.md]
+This ADR formalizes the flow API contract that connects these pieces: the flow
+engine drives auth_attempts internally, and the challenge/proof travel through
+the step response and submit request.
 
 ## Consequences
 
-- **`step-action.yaml`** gains an optional `ceremony` property.
-- **`flow-submit-request.yaml`** gains a `ceremony_proof` field (alongside
-  `fields` and `gate_proofs`).
-- **`gate.yaml`** stays unchanged — `passkey` is removed from the enum.
-  Gates remain captcha-only.
-- **New schema files:** `passkey-config.yaml`, `passkey-proof.yaml`,
-  `passkey-credential-descriptor.yaml`, `ceremony.yaml` in `components/flows/`.
+- **`flow-step.yaml`** gains a `challenge` property (type, challenge_id,
+  options).
+- **`flow-submit-request.yaml`** gains a `challenge_response` field
+  (challenge_id, method, passkey proof).
+- **`gate.yaml`** — `passkey` removed from enum. Gates are captcha-only.
+- **`step-action.yaml`** — unchanged. Actions stay plain.
+- **New schema file:** `passkey-proof.yaml` (serialized PublicKeyCredential).
 - **Session factor:** `passkey` factor carries `user_verified`, `hardware`,
-  `phishing_resistant`, `backup_eligible`, `backup_state` — feeding into
-  assurance level schemas (AAL2/AAL3).
-- **Credential management** (`/users/{id}/passkeys`) is a separate API
-  surface, out of scope.
+  `phishing_resistant`, `backup_eligible`, `backup_state`.
+- **Credential management** (`/users/{id}/passkeys`) is out of scope.
+- **Conditional UI (autofill)** is deferred — requires challenge on page load,
+  which conflicts with the two-submit model. Future work may add a pre-loaded
+  challenge mechanism for this.
 
 [flow-engine.md]: ../design/flowengine/flow-engine.md
 [flow-engine-nodes.md]: ../design/flowengine/flow-engine-nodes.md
 [session-api.md]: ../design/flowengine/session-api.md
-[external-auth-factors.md]: ../design/flowengine/flow-engine-external-auth-factors.md
+[ext-factors]: ../design/flowengine/flow-engine-external-auth-factors.md
+[user-schema.md]: ../design/flowengine/user-schema.md

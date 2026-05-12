@@ -8,7 +8,6 @@ properties:
     description: |
       Which action to take. Must be a key from the step's `actions` dictionary:
       - A regular action (e.g., "submit", "register", "back")
-      - An action with a `ceremony` (e.g., "passkey") — requires `ceremony_proof`
       - The reserved value "sso" — triggers SSO redirect (requires `sso_provider_id`)
   fields:
     type: object
@@ -24,14 +23,24 @@ properties:
       The orchestrator collects these from `<zl-captcha>` component events.
     additionalProperties:
       type: string
-  ceremony_proof:
+  challenge_response:
+    type: object
     description: |
-      Result of a client-side ceremony triggered by the action.
-      Required when the selected action has a `ceremony` property.
-      The shape depends on the ceremony type:
-      - `passkey`: a `PasskeyProof` object (serialized PublicKeyCredential).
-        See `passkey-proof.yaml`.
-    $ref: passkey-proof.yaml
+      Response to a pending challenge on the step. Required when the step has a
+      `challenge` property (e.g., after submitting a passkey action).
+      The `<zl-passkey>` component populates this after the WebAuthn ceremony.
+    properties:
+      challenge_id:
+        type: string
+        description: |
+          The challenge identifier from `step.challenge.challenge_id`.
+          Matches the server-side challenge for verification.
+      method:
+        type: string
+        enum: [passkey]
+        description: Which auth method this response is for.
+      passkey:
+        $ref: passkey-proof.yaml
   sso_provider_id:
     type: string
     description: |

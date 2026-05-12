@@ -99,3 +99,31 @@ properties:
     items:
       $ref: sso-provider.yaml
     default: []
+  challenge:
+    type: object
+    description: |
+      A pending authentication challenge issued by the server. Present when the
+      flow engine has issued a challenge via auth_attempts (e.g., after the user
+      submits `action: "passkey"`). The `<zl-passkey>` component reads this and
+      triggers the appropriate WebAuthn ceremony.
+
+      The challenge is NOT present on the initial step — it appears only after
+      the user explicitly selects a ceremony-based action.
+    properties:
+      type:
+        type: string
+        enum: [passkey]
+        description: Challenge type. Determines which component handles the ceremony.
+      challenge_id:
+        type: string
+        description: |
+          Server-side challenge identifier. Included in the proof submission
+          so the server can match the response to the original challenge.
+      options:
+        type: object
+        description: |
+          Protocol-specific challenge options. For passkey, this is the
+          `PublicKeyCredentialRequestOptions` (authenticate) or
+          `PublicKeyCredentialCreationOptions` (register). Passed directly
+          to the browser's `navigator.credentials` API.
+        additionalProperties: true
