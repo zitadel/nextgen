@@ -55,8 +55,7 @@ else.
 - When `sso_providers` is non-empty, `transitions.callback` is defined.
   The `sso` action itself is engine-handled and never appears in
   `transitions`.
-- Every entry in `fields` resolves to a property in the referenced
-  `user_schema`. Requires the schema to be live-fetched.
+- Every entry in `fields` resolves to a property in the referenced `user_schema` which should have been pre-registered via the schemas API.
 
 ### Graph
 
