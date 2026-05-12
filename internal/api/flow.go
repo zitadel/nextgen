@@ -59,8 +59,8 @@ func buildSelectorHint(opt api.OptFlowHint) serviceflow.SelectorHint {
 	if v, ok := h.TeamID.Get(); ok {
 		out.TeamID = &v
 	}
-	if v, ok := h.SchemaID.Get(); ok {
-		out.SchemaID = &v
+	if v, ok := h.UserSchemaID.Get(); ok {
+		out.UserSchemaID = &v
 	}
 	return out
 }

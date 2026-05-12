@@ -21,7 +21,7 @@ import (
 //     exact match for MVP; latest active when nil. Caret/tilde ranges
 //     are deferred until an upgrade story exists.
 //  4. Rank by audience specificity: AppID (3) > TeamID (2) >
-//     SchemaID (1) > project default (0).
+//     UserSchemaID (1) > project default (0).
 //  5. Tie-break by created_at DESC.
 //  6. Fall back to the built-in project default when no row matches.
 type Selector interface {
@@ -51,7 +51,7 @@ type SelectorRequest struct {
 // request or the auth-request that initiated it. Empty fields are
 // ignored during matching.
 type SelectorHint struct {
-	AppID    *string
-	TeamID   *string
-	SchemaID *string
+	AppID        *string
+	TeamID       *string
+	UserSchemaID *string
 }

@@ -109,7 +109,7 @@ type audienceCandidate struct {
 }
 
 // audienceScore reports how specifically the audience targets the hint.
-// AppID (3) > TeamID (2) > SchemaID (1) > IsProjectDefault (0).
+// AppID (3) > TeamID (2) > UserSchemaID (1) > IsProjectDefault (0).
 // A definition with no targeting field set and IsProjectDefault == false is
 // never a candidate. A definition whose targeting field does not match the
 // corresponding hint is also discarded.
@@ -126,8 +126,8 @@ func audienceScore(a domain.FlowDefinitionAudience, hint SelectorHint) (int, boo
 		}
 		return 2, true
 	}
-	if a.SchemaID != nil {
-		if hint.SchemaID == nil || *a.SchemaID != *hint.SchemaID {
+	if a.UserSchemaID != nil {
+		if hint.UserSchemaID == nil || *a.UserSchemaID != *hint.UserSchemaID {
 			return 0, false
 		}
 		return 1, true

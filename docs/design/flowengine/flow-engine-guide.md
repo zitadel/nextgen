@@ -416,7 +416,7 @@ When a flow starts, the server resolves which definition to use:
 flowchart TD
     req["Flow request:<br>purpose=login<br>team_id=acme<br>app_id=dashboard"]
     filter["Filter: active definitions<br>where purposes includes 'login'"]
-    match["Match audience:<br>app_id > team_id > schema_id > project"]
+    match["Match audience:<br>app_id > team_id > user_schema_id > project"]
     pick["Pick most specific match<br>tie-break by priority"]
     fallback["No match → built-in default"]
 
@@ -432,7 +432,7 @@ A definition's **audience** scopes where it applies:
   "audience": {
     "team_ids": ["team_acme"],
     "app_ids": ["app_dashboard"],
-    "schema_ids": ["human_user"]
+    "user_schema_ids": ["human_user"]
   }
 }
 ```

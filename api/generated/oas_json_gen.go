@@ -3453,9 +3453,9 @@ func (s *FlowHint) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
-		if s.SchemaID.Set {
-			e.FieldStart("schema_id")
-			s.SchemaID.Encode(e)
+		if s.UserSchemaID.Set {
+			e.FieldStart("user_schema_id")
+			s.UserSchemaID.Encode(e)
 		}
 	}
 	{
@@ -3469,7 +3469,7 @@ func (s *FlowHint) encodeFields(e *jx.Encoder) {
 var jsonFieldsNameOfFlowHint = [4]string{
 	0: "login_name",
 	1: "team_id",
-	2: "schema_id",
+	2: "user_schema_id",
 	3: "app_id",
 }
 
@@ -3501,15 +3501,15 @@ func (s *FlowHint) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"team_id\"")
 			}
-		case "schema_id":
+		case "user_schema_id":
 			if err := func() error {
-				s.SchemaID.Reset()
-				if err := s.SchemaID.Decode(d); err != nil {
+				s.UserSchemaID.Reset()
+				if err := s.UserSchemaID.Decode(d); err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"schema_id\"")
+				return errors.Wrap(err, "decode field \"user_schema_id\"")
 			}
 		case "app_id":
 			if err := func() error {
