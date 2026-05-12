@@ -8,7 +8,7 @@ import (
 
 func UserSchemaToJsonschema(in api.UserSchema) (out *jsonschema.Schema, err error) {
 	out = &jsonschema.Schema{
-		ID:          in.ID,
+		ID:          in.ID.String(),
 		Schema:      in.Schema,
 		Title:       in.Title,
 		Type:        in.Type.Value,

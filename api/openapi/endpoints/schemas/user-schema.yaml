@@ -15,6 +15,7 @@ properties:
     description: The JSON Schema version used for this schema.
   $id:
     type: string
+    format: uri
     description: The unique identifier for this schema, which is also the URL where this schema can be accessed.
   kind:
     type: string
