@@ -6,8 +6,8 @@ import "errors"
 // lands in internal/domain. The api layer needs a public code +
 // description to map domain errors to HTTP/SCIM/SAML statuses.
 
-// Selector errors returned by use cases that resolve a flow definition
-// for an incoming request.
+// Flow service errors returned when resolving a flow definition for an
+// incoming request.
 var (
 	// ErrFlowDefinitionNotFound is returned when a direct lookup by name
 	// does not match any definition for the project.

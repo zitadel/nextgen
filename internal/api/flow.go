@@ -19,27 +19,27 @@ func (h Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest) (ap
 		}, nil
 	}
 
-	selReq := serviceflow.SelectorRequest{
+	resolveReq := serviceflow.ResolveRequest{
 		ProjectID: string(req.ProjectID),
 		Purpose:   purpose,
-		Hint:      buildSelectorHint(req.Hint),
+		Hint:      buildResolveHint(req.Hint),
 	}
 	if slug, ok := req.Slug.Get(); ok {
-		selReq.Name = &slug
+		resolveReq.Name = &slug
 	}
 	if v, ok := req.SchemaVersion.Get(); ok {
-		selReq.SchemaVersion = &v
+		resolveReq.SchemaVersion = &v
 	}
 	if id, ok := req.AuthRequestID.Get(); ok {
-		selReq.AuthRequestID = &id
+		resolveReq.AuthRequestID = &id
 	}
 
-	def, err := h.flowSelector.Resolve(ctx, selReq)
+	def, err := h.flowService.Resolve(ctx, resolveReq)
 	if err != nil {
-		return mapSelectorError(err), nil
+		return mapResolveError(err), nil
 	}
 
-	// Execution is intentionally stopped here. The selector resolved a
+	// Execution is intentionally stopped here. The service resolved a
 	// definition; emitting steps + cookies is the next slice of work.
 	return &api.ErrorDetails{
 		Code:    "flow_execution_not_implemented",
@@ -47,12 +47,12 @@ func (h Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest) (ap
 	}, nil
 }
 
-func buildSelectorHint(opt api.OptFlowHint) serviceflow.SelectorHint {
+func buildResolveHint(opt api.OptFlowHint) serviceflow.ResolveHint {
 	h, ok := opt.Get()
 	if !ok {
-		return serviceflow.SelectorHint{}
+		return serviceflow.ResolveHint{}
 	}
-	out := serviceflow.SelectorHint{}
+	out := serviceflow.ResolveHint{}
 	if v, ok := h.AppID.Get(); ok {
 		out.AppID = &v
 	}
@@ -65,7 +65,7 @@ func buildSelectorHint(opt api.OptFlowHint) serviceflow.SelectorHint {
 	return out
 }
 
-func mapSelectorError(err error) *api.ErrorDetails {
+func mapResolveError(err error) *api.ErrorDetails {
 	switch {
 	case errors.Is(err, domain.ErrFlowDefinitionNotFound):
 		return &api.ErrorDetails{

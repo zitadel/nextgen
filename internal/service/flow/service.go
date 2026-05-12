@@ -8,21 +8,74 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-// NewSelector returns a [Selector] backed by the given
-// [domain.FlowDefinitionRepository]. The pool is used as the
-// [database.QueryExecutor] for every read.
-func NewSelector(pool database.Pool, flowDefs domain.FlowDefinitionRepository) Selector {
-	return &selectorService{pool: pool, flowDefs: flowDefs}
+// Service is the flow engine's use-case surface. For now only [Service.Resolve]
+// is wired; step emission, submission, and session handling will land as
+// additional methods so the API handler keeps a single dependency.
+type Service interface {
+	// Resolve returns the [domain.FlowDefinition] to run for an incoming
+	// flow request. Read-only — never touches sessions or cookies.
+	//
+	// Resolution algorithm:
+	//
+	//  1. If [ResolveRequest.Name] is set, look up by
+	//     (ProjectID, Name, SchemaVersion?). Return
+	//     [domain.ErrFlowDefinitionNotFound] or
+	//     [domain.ErrFlowDefinitionPurposeMismatch] on miss.
+	//  2. Otherwise list active definitions whose purposes include
+	//     [ResolveRequest.Purpose].
+	//  3. Apply semver resolution on [ResolveRequest.SchemaVersion]:
+	//     exact match for MVP; latest active when nil. Caret/tilde ranges
+	//     are deferred until an upgrade story exists.
+	//  4. Rank by audience specificity: AppID (3) > TeamID (2) >
+	//     UserSchemaID (1) > project default (0).
+	//  5. Tie-break by created_at DESC.
+	//  6. Fall back to the built-in project default when no row matches.
+	Resolve(ctx context.Context, req ResolveRequest) (*domain.FlowDefinition, error)
 }
 
-type selectorService struct {
+// ResolveRequest is the input to [Service.Resolve].
+type ResolveRequest struct {
+	ProjectID string
+	Purpose   domain.FlowDefinitionPurpose
+
+	// Name, when set, switches to direct lookup. It acts as a slug.
+	Name *string
+
+	// SchemaVersion is a semver string. Nil means "latest active".
+	SchemaVersion *string
+
+	// AuthRequestID carries the OIDC/SAML request ID when the flow was
+	// initiated by a downstream protocol handler.
+	AuthRequestID *string
+
+	// Hint narrows audience matching when no direct lookup is in play.
+	Hint ResolveHint
+}
+
+// ResolveHint carries the audience-narrowing context derived from the
+// request or the auth-request that initiated it. Empty fields are
+// ignored during matching.
+type ResolveHint struct {
+	AppID        *string
+	TeamID       *string
+	UserSchemaID *string
+}
+
+// NewService returns a [Service] backed by the given
+// [domain.FlowDefinitionRepository]. The pool is used as the
+// [database.QueryExecutor] for every read.
+func NewService(pool database.Pool, flowDefs domain.FlowDefinitionRepository) Service {
+	return &service{pool: pool, flowDefs: flowDefs}
+}
+
+type service struct {
 	pool     database.Pool
 	flowDefs domain.FlowDefinitionRepository
 }
 
-var _ Selector = (*selectorService)(nil)
+var _ Service = (*service)(nil)
 
-func (s *selectorService) Resolve(ctx context.Context, req SelectorRequest) (*domain.FlowDefinition, error) {
+func (s *service) Resolve(ctx context.Context, req ResolveRequest) (*domain.FlowDefinition, error) {
 	if req.Name != nil {
 		return s.resolveByName(ctx, req)
 	}
@@ -32,7 +85,7 @@ func (s *selectorService) Resolve(ctx context.Context, req SelectorRequest) (*do
 // resolveByName implements the direct-lookup branch: list active definitions
 // matching (ProjectID, Name, SchemaVersion?), pick the latest version, then
 // confirm the requested purpose is served.
-func (s *selectorService) resolveByName(ctx context.Context, req SelectorRequest) (*domain.FlowDefinition, error) {
+func (s *service) resolveByName(ctx context.Context, req ResolveRequest) (*domain.FlowDefinition, error) {
 	opts := []domain.FlowDefinitionListOption{
 		domain.WithFlowDefinitionName(*req.Name),
 		domain.WithFlowDefinitionStatus(domain.FlowDefinitionStatusActive),
@@ -59,7 +112,7 @@ func (s *selectorService) resolveByName(ctx context.Context, req SelectorRequest
 // resolveByAudience implements the audience-match branch: list active
 // definitions serving the requested purpose, filter on the optional
 // SchemaVersion, then pick the one best matching the audience hint.
-func (s *selectorService) resolveByAudience(ctx context.Context, req SelectorRequest) (*domain.FlowDefinition, error) {
+func (s *service) resolveByAudience(ctx context.Context, req ResolveRequest) (*domain.FlowDefinition, error) {
 	opts := []domain.FlowDefinitionListOption{
 		domain.WithFlowDefinitionStatus(domain.FlowDefinitionStatusActive),
 		domain.WithFlowDefinitionPurpose(req.Purpose),
@@ -110,7 +163,7 @@ type audienceCandidate struct {
 // AppID (3) > TeamID (2) > UserSchemaID (1) > IsProjectDefault (0).
 // Returns ok=false when the audience targets a field the hint did not
 // match, or when no targeting field and no project-default is set.
-func audienceScore(a domain.FlowDefinitionAudience, hint SelectorHint) (int, bool) {
+func audienceScore(a domain.FlowDefinitionAudience, hint ResolveHint) (int, bool) {
 	switch {
 	case a.AppID != nil:
 		return 3, hint.AppID != nil && *a.AppID == *hint.AppID

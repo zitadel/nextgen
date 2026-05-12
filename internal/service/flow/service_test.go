@@ -16,12 +16,12 @@ import (
 
 // stubPool returns nil typed as database.Pool. The mock repository does not
 // invoke any methods on it, so the value is opaque — it only satisfies the
-// selector's constructor signature.
+// service constructor signature.
 func stubPool() database.Pool { return nil }
 
 // stubListFlowDefinitions wires the mock's ListFlowDefinitions to filter the
 // given slice in-memory the same way the storage layer does. Tests stay focused
-// on the selector's algorithm without re-stating expected filter sets.
+// on the Resolve algorithm without re-stating expected filter sets.
 // Returns the mock so the caller can attach additional expectations.
 func stubListFlowDefinitions(t *testing.T, defs []*domain.FlowDefinition) *domainmock.MockFlowDefinitionRepository {
 	t.Helper()
@@ -80,12 +80,12 @@ func newDef(name, version string, audience domain.FlowDefinitionAudience, purpos
 	}
 }
 
-func TestSelector_ResolveByName_ExactVersion(t *testing.T) {
+func TestResolve_ResolveByName_ExactVersion(t *testing.T) {
 	want := newDef("login", "1.2.3", domain.FlowDefinitionAudience{IsProjectDefault: true}, domain.FlowDefinitionPurposeLogin)
 	other := newDef("login", "1.0.0", domain.FlowDefinitionAudience{IsProjectDefault: true}, domain.FlowDefinitionPurposeLogin)
 	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{other, want})
 
-	got, err := serviceflow.NewSelector(stubPool(), repo).Resolve(t.Context(), serviceflow.SelectorRequest{
+	got, err := serviceflow.NewService(stubPool(), repo).Resolve(t.Context(), serviceflow.ResolveRequest{
 		ProjectID:     "proj",
 		Purpose:       domain.FlowDefinitionPurposeLogin,
 		Name:          ptr("login"),
@@ -99,7 +99,7 @@ func TestSelector_ResolveByName_ExactVersion(t *testing.T) {
 	}
 }
 
-func TestSelector_ResolveByName_FiltersWithRequestedOptions(t *testing.T) {
+func TestResolve_ResolveByName_FiltersWithRequestedOptions(t *testing.T) {
 	def := newDef("login", "1.2.3", domain.FlowDefinitionAudience{IsProjectDefault: true}, domain.FlowDefinitionPurposeLogin)
 
 	ctrl := gomock.NewController(t)
@@ -120,7 +120,7 @@ func TestSelector_ResolveByName_FiltersWithRequestedOptions(t *testing.T) {
 			return []*domain.FlowDefinition{def}, nil
 		})
 
-	_, err := serviceflow.NewSelector(stubPool(), repo).Resolve(t.Context(), serviceflow.SelectorRequest{
+	_, err := serviceflow.NewService(stubPool(), repo).Resolve(t.Context(), serviceflow.ResolveRequest{
 		ProjectID:     "proj",
 		Purpose:       domain.FlowDefinitionPurposeLogin,
 		Name:          ptr("login"),
@@ -131,13 +131,13 @@ func TestSelector_ResolveByName_FiltersWithRequestedOptions(t *testing.T) {
 	}
 }
 
-func TestSelector_ResolveByName_LatestActiveWhenVersionNil(t *testing.T) {
+func TestResolve_ResolveByName_LatestActiveWhenVersionNil(t *testing.T) {
 	v1 := newDef("login", "1.0.0", domain.FlowDefinitionAudience{IsProjectDefault: true}, domain.FlowDefinitionPurposeLogin)
 	v2 := newDef("login", "2.4.1", domain.FlowDefinitionAudience{IsProjectDefault: true}, domain.FlowDefinitionPurposeLogin)
 	v15 := newDef("login", "1.5.0", domain.FlowDefinitionAudience{IsProjectDefault: true}, domain.FlowDefinitionPurposeLogin)
 	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{v1, v2, v15})
 
-	got, err := serviceflow.NewSelector(stubPool(), repo).Resolve(t.Context(), serviceflow.SelectorRequest{
+	got, err := serviceflow.NewService(stubPool(), repo).Resolve(t.Context(), serviceflow.ResolveRequest{
 		ProjectID: "proj",
 		Purpose:   domain.FlowDefinitionPurposeLogin,
 		Name:      ptr("login"),
@@ -150,10 +150,10 @@ func TestSelector_ResolveByName_LatestActiveWhenVersionNil(t *testing.T) {
 	}
 }
 
-func TestSelector_ResolveByName_NotFound(t *testing.T) {
+func TestResolve_ResolveByName_NotFound(t *testing.T) {
 	repo := stubListFlowDefinitions(t, nil)
 
-	_, err := serviceflow.NewSelector(stubPool(), repo).Resolve(t.Context(), serviceflow.SelectorRequest{
+	_, err := serviceflow.NewService(stubPool(), repo).Resolve(t.Context(), serviceflow.ResolveRequest{
 		ProjectID: "proj",
 		Purpose:   domain.FlowDefinitionPurposeLogin,
 		Name:      ptr("missing"),
@@ -163,11 +163,11 @@ func TestSelector_ResolveByName_NotFound(t *testing.T) {
 	}
 }
 
-func TestSelector_ResolveByName_PurposeMismatch(t *testing.T) {
+func TestResolve_ResolveByName_PurposeMismatch(t *testing.T) {
 	def := newDef("login", "1.0.0", domain.FlowDefinitionAudience{IsProjectDefault: true}, domain.FlowDefinitionPurposeLogin)
 	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{def})
 
-	_, err := serviceflow.NewSelector(stubPool(), repo).Resolve(t.Context(), serviceflow.SelectorRequest{
+	_, err := serviceflow.NewService(stubPool(), repo).Resolve(t.Context(), serviceflow.ResolveRequest{
 		ProjectID: "proj",
 		Purpose:   domain.FlowDefinitionPurposeRegister,
 		Name:      ptr("login"),
@@ -177,16 +177,16 @@ func TestSelector_ResolveByName_PurposeMismatch(t *testing.T) {
 	}
 }
 
-func TestSelector_ResolveByAudience_PrefersAppOverTeamOverDefault(t *testing.T) {
+func TestResolve_ResolveByAudience_PrefersAppOverTeamOverDefault(t *testing.T) {
 	app := newDef("login", "1.0.0", domain.FlowDefinitionAudience{AppID: ptr("app-1")}, domain.FlowDefinitionPurposeLogin)
 	team := newDef("login", "1.0.0", domain.FlowDefinitionAudience{TeamID: ptr("team-1")}, domain.FlowDefinitionPurposeLogin)
 	def := newDef("login", "1.0.0", domain.FlowDefinitionAudience{IsProjectDefault: true}, domain.FlowDefinitionPurposeLogin)
 	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{def, team, app})
 
-	got, err := serviceflow.NewSelector(stubPool(), repo).Resolve(t.Context(), serviceflow.SelectorRequest{
+	got, err := serviceflow.NewService(stubPool(), repo).Resolve(t.Context(), serviceflow.ResolveRequest{
 		ProjectID: "proj",
 		Purpose:   domain.FlowDefinitionPurposeLogin,
-		Hint: serviceflow.SelectorHint{
+		Hint: serviceflow.ResolveHint{
 			AppID:  ptr("app-1"),
 			TeamID: ptr("team-1"),
 		},
@@ -199,15 +199,15 @@ func TestSelector_ResolveByAudience_PrefersAppOverTeamOverDefault(t *testing.T) 
 	}
 }
 
-func TestSelector_ResolveByAudience_SkipsAudienceWithoutMatchingHint(t *testing.T) {
+func TestResolve_ResolveByAudience_SkipsAudienceWithoutMatchingHint(t *testing.T) {
 	app := newDef("login", "1.0.0", domain.FlowDefinitionAudience{AppID: ptr("app-1")}, domain.FlowDefinitionPurposeLogin)
 	def := newDef("login", "1.0.0", domain.FlowDefinitionAudience{IsProjectDefault: true}, domain.FlowDefinitionPurposeLogin)
 	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{app, def})
 
-	got, err := serviceflow.NewSelector(stubPool(), repo).Resolve(t.Context(), serviceflow.SelectorRequest{
+	got, err := serviceflow.NewService(stubPool(), repo).Resolve(t.Context(), serviceflow.ResolveRequest{
 		ProjectID: "proj",
 		Purpose:   domain.FlowDefinitionPurposeLogin,
-		Hint:      serviceflow.SelectorHint{AppID: ptr("other-app")},
+		Hint:      serviceflow.ResolveHint{AppID: ptr("other-app")},
 	})
 	if err != nil {
 		t.Fatalf("Resolve returned error: %v", err)
@@ -217,14 +217,14 @@ func TestSelector_ResolveByAudience_SkipsAudienceWithoutMatchingHint(t *testing.
 	}
 }
 
-func TestSelector_ResolveByAudience_TiebreakByCreatedAtDesc(t *testing.T) {
+func TestResolve_ResolveByAudience_TiebreakByCreatedAtDesc(t *testing.T) {
 	older := newDef("login", "1.0.0", domain.FlowDefinitionAudience{IsProjectDefault: true}, domain.FlowDefinitionPurposeLogin)
 	older.CreatedAt = time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 	newer := newDef("alt", "1.0.0", domain.FlowDefinitionAudience{IsProjectDefault: true}, domain.FlowDefinitionPurposeLogin)
 	newer.CreatedAt = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{older, newer})
 
-	got, err := serviceflow.NewSelector(stubPool(), repo).Resolve(t.Context(), serviceflow.SelectorRequest{
+	got, err := serviceflow.NewService(stubPool(), repo).Resolve(t.Context(), serviceflow.ResolveRequest{
 		ProjectID: "proj",
 		Purpose:   domain.FlowDefinitionPurposeLogin,
 	})
@@ -236,12 +236,12 @@ func TestSelector_ResolveByAudience_TiebreakByCreatedAtDesc(t *testing.T) {
 	}
 }
 
-func TestSelector_ResolveByAudience_KeepsLatestVersionWhenUnpinned(t *testing.T) {
+func TestResolve_ResolveByAudience_KeepsLatestVersionWhenUnpinned(t *testing.T) {
 	v1 := newDef("login", "1.0.0", domain.FlowDefinitionAudience{IsProjectDefault: true}, domain.FlowDefinitionPurposeLogin)
 	v2 := newDef("login", "2.0.0", domain.FlowDefinitionAudience{IsProjectDefault: true}, domain.FlowDefinitionPurposeLogin)
 	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{v1, v2})
 
-	got, err := serviceflow.NewSelector(stubPool(), repo).Resolve(t.Context(), serviceflow.SelectorRequest{
+	got, err := serviceflow.NewService(stubPool(), repo).Resolve(t.Context(), serviceflow.ResolveRequest{
 		ProjectID: "proj",
 		Purpose:   domain.FlowDefinitionPurposeLogin,
 	})
@@ -253,12 +253,12 @@ func TestSelector_ResolveByAudience_KeepsLatestVersionWhenUnpinned(t *testing.T)
 	}
 }
 
-func TestSelector_ResolveByAudience_ExactVersionFiltersOlder(t *testing.T) {
+func TestResolve_ResolveByAudience_ExactVersionFiltersOlder(t *testing.T) {
 	v1 := newDef("login", "1.0.0", domain.FlowDefinitionAudience{IsProjectDefault: true}, domain.FlowDefinitionPurposeLogin)
 	v2 := newDef("login", "2.0.0", domain.FlowDefinitionAudience{IsProjectDefault: true}, domain.FlowDefinitionPurposeLogin)
 	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{v1, v2})
 
-	got, err := serviceflow.NewSelector(stubPool(), repo).Resolve(t.Context(), serviceflow.SelectorRequest{
+	got, err := serviceflow.NewService(stubPool(), repo).Resolve(t.Context(), serviceflow.ResolveRequest{
 		ProjectID:     "proj",
 		Purpose:       domain.FlowDefinitionPurposeLogin,
 		SchemaVersion: ptr("1.0.0"),
@@ -271,11 +271,11 @@ func TestSelector_ResolveByAudience_ExactVersionFiltersOlder(t *testing.T) {
 	}
 }
 
-func TestSelector_ResolveByAudience_NoMatch(t *testing.T) {
+func TestResolve_ResolveByAudience_NoMatch(t *testing.T) {
 	def := newDef("login", "1.0.0", domain.FlowDefinitionAudience{AppID: ptr("app-1")}, domain.FlowDefinitionPurposeLogin)
 	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{def})
 
-	_, err := serviceflow.NewSelector(stubPool(), repo).Resolve(t.Context(), serviceflow.SelectorRequest{
+	_, err := serviceflow.NewService(stubPool(), repo).Resolve(t.Context(), serviceflow.ResolveRequest{
 		ProjectID: "proj",
 		Purpose:   domain.FlowDefinitionPurposeLogin,
 	})
@@ -284,7 +284,7 @@ func TestSelector_ResolveByAudience_NoMatch(t *testing.T) {
 	}
 }
 
-func TestSelector_ResolveByAudience_RepoErrorPropagates(t *testing.T) {
+func TestResolve_ResolveByAudience_RepoErrorPropagates(t *testing.T) {
 	sentinel := errors.New("boom")
 	ctrl := gomock.NewController(t)
 	repo := domainmock.NewMockFlowDefinitionRepository(ctrl)
@@ -292,7 +292,7 @@ func TestSelector_ResolveByAudience_RepoErrorPropagates(t *testing.T) {
 		ListFlowDefinitions(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(nil, sentinel)
 
-	_, err := serviceflow.NewSelector(stubPool(), repo).Resolve(t.Context(), serviceflow.SelectorRequest{
+	_, err := serviceflow.NewService(stubPool(), repo).Resolve(t.Context(), serviceflow.ResolveRequest{
 		ProjectID: "proj",
 		Purpose:   domain.FlowDefinitionPurposeLogin,
 	})

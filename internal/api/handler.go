@@ -12,11 +12,11 @@ type Handler struct {
 	// responses for all endpoints, so only implemented methods need to be defined.
 	api.UnimplementedHandler
 
-	flowSelector serviceflow.Selector
+	flowService serviceflow.Service
 }
 
-func NewHandler(flowSelector serviceflow.Selector) *Handler {
-	return &Handler{flowSelector: flowSelector}
+func NewHandler(flowService serviceflow.Service) *Handler {
+	return &Handler{flowService: flowService}
 }
 
 func (h Handler) NewError(ctx context.Context, err error) *api.ErrorDetailsStatusCode {

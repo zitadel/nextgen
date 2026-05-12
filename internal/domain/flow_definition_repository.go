@@ -55,9 +55,9 @@ func ApplyFlowDefinitionListOptions(opts []FlowDefinitionListOption) *FlowDefini
 // Names act as project-scoped slugs.
 //
 // TODO: enforce uniqueness of (project_id, name, schema_version) at the
-// storage layer. The selector currently assumes at most one row per name +
-// version; without a DB constraint two concurrent admin writes could break
-// that assumption.
+// storage layer. The flow service currently assumes at most one row per
+// name + version; without a DB constraint two concurrent admin writes could
+// break that assumption.
 func WithFlowDefinitionName(name string) FlowDefinitionListOption {
 	return func(o *FlowDefinitionListOpts) {
 		o.Name = &name
