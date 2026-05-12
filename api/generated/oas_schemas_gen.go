@@ -5555,52 +5555,6 @@ func (o OptChallengeNonce) Or(d ChallengeNonce) ChallengeNonce {
 	return d
 }
 
-// NewOptCreateProjectRequest returns new OptCreateProjectRequest with value set to v.
-func NewOptCreateProjectRequest(v CreateProjectRequest) OptCreateProjectRequest {
-	return OptCreateProjectRequest{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptCreateProjectRequest is optional CreateProjectRequest.
-type OptCreateProjectRequest struct {
-	Value CreateProjectRequest
-	Set   bool
-}
-
-// IsSet returns true if OptCreateProjectRequest was set.
-func (o OptCreateProjectRequest) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptCreateProjectRequest) Reset() {
-	var v CreateProjectRequest
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptCreateProjectRequest) SetTo(v CreateProjectRequest) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptCreateProjectRequest) Get() (v CreateProjectRequest, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptCreateProjectRequest) Or(d CreateProjectRequest) CreateProjectRequest {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptCreateSessionRequestUserAgent returns new OptCreateSessionRequestUserAgent with value set to v.
 func NewOptCreateSessionRequestUserAgent(v CreateSessionRequestUserAgent) OptCreateSessionRequestUserAgent {
 	return OptCreateSessionRequestUserAgent{

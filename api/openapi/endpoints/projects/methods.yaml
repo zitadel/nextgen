@@ -5,6 +5,7 @@ post:
     - Project
   security: []
   requestBody:
+    required: true
     content:
       application/json:
         schema:
@@ -16,8 +17,10 @@ post:
         application/json:
           schema:
             $ref: create-project-response.yaml
-    '400':
-      description: The provided input was not valid
+    '429':
+      description: |
+        Too many requests, the client has sent too many requests in a given
+        amount of time.
       content:
         application/json:
           schema:

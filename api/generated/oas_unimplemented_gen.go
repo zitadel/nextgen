@@ -95,7 +95,7 @@ func (UnimplementedHandler) CreateHandoff(ctx context.Context, params CreateHand
 // Create project.
 //
 // POST /projects
-func (UnimplementedHandler) CreateProject(ctx context.Context, req OptCreateProjectRequest) (r CreateProjectRes, _ error) {
+func (UnimplementedHandler) CreateProject(ctx context.Context, req *CreateProjectRequest) (r CreateProjectRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

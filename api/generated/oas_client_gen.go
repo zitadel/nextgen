@@ -92,7 +92,7 @@ type Invoker interface {
 	// Create project.
 	//
 	// POST /projects
-	CreateProject(ctx context.Context, request OptCreateProjectRequest) (CreateProjectRes, error)
+	CreateProject(ctx context.Context, request *CreateProjectRequest) (CreateProjectRes, error)
 	// CreateSchema invokes createSchema operation.
 	//
 	// Create a new schema. The schema definition must include a unique $id field,
@@ -1360,12 +1360,12 @@ func (c *Client) sendCreateHandoff(ctx context.Context, params CreateHandoffPara
 // Create project.
 //
 // POST /projects
-func (c *Client) CreateProject(ctx context.Context, request OptCreateProjectRequest) (CreateProjectRes, error) {
+func (c *Client) CreateProject(ctx context.Context, request *CreateProjectRequest) (CreateProjectRes, error) {
 	res, err := c.sendCreateProject(ctx, request)
 	return res, err
 }
 
-func (c *Client) sendCreateProject(ctx context.Context, request OptCreateProjectRequest) (res CreateProjectRes, err error) {
+func (c *Client) sendCreateProject(ctx context.Context, request *CreateProjectRequest) (res CreateProjectRes, err error) {
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("createProject"),
 		semconv.HTTPRequestMethodKey.String("POST"),

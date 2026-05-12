@@ -1340,7 +1340,7 @@ func (s *Server) handleCreateProjectRequest(args [0]string, argsEscaped bool, w 
 		}
 
 		type (
-			Request  = OptCreateProjectRequest
+			Request  = *CreateProjectRequest
 			Params   = struct{}
 			Response = CreateProjectRes
 		)

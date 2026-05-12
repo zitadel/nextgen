@@ -327,8 +327,8 @@ func encodeCreateProjectResponse(response CreateProjectRes, w http.ResponseWrite
 
 	case *ErrorDetails:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
+		w.WriteHeader(429)
+		span.SetStatus(codes.Error, http.StatusText(429))
 
 		e := new(jx.Encoder)
 		response.Encode(e)

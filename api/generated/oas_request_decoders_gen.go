@@ -256,7 +256,7 @@ func (s *Server) decodeCreateFlowDefinitionRequest(r *http.Request) (
 }
 
 func (s *Server) decodeCreateProjectRequest(r *http.Request) (
-	req OptCreateProjectRequest,
+	req *CreateProjectRequest,
 	rawBody []byte,
 	close func() error,
 	rerr error,
@@ -276,9 +276,6 @@ func (s *Server) decodeCreateProjectRequest(r *http.Request) (
 			rerr = errors.Join(rerr, close())
 		}
 	}()
-	if _, ok := r.Header["Content-Type"]; !ok && r.ContentLength == 0 {
-		return req, rawBody, close, nil
-	}
 	ct, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
 	if err != nil {
 		return req, rawBody, close, errors.Wrap(err, "parse media type")
@@ -286,7 +283,7 @@ func (s *Server) decodeCreateProjectRequest(r *http.Request) (
 	switch {
 	case ct == "application/json":
 		if r.ContentLength == 0 {
-			return req, rawBody, close, nil
+			return req, rawBody, close, validate.ErrBodyRequired
 		}
 		buf, err := io.ReadAll(r.Body)
 		defer func() {
@@ -300,15 +297,14 @@ func (s *Server) decodeCreateProjectRequest(r *http.Request) (
 		r.Body = io.NopCloser(bytes.NewBuffer(buf))
 
 		if len(buf) == 0 {
-			return req, rawBody, close, nil
+			return req, rawBody, close, validate.ErrBodyRequired
 		}
 
 		rawBody = append(rawBody, buf...)
 		d := jx.DecodeBytes(buf)
 
-		var request OptCreateProjectRequest
+		var request CreateProjectRequest
 		if err := func() error {
-			request.Reset()
 			if err := request.Decode(d); err != nil {
 				return err
 			}
@@ -324,7 +320,7 @@ func (s *Server) decodeCreateProjectRequest(r *http.Request) (
 			}
 			return req, rawBody, close, err
 		}
-		return request, rawBody, close, nil
+		return &request, rawBody, close, nil
 	default:
 		return req, rawBody, close, validate.InvalidContentType(ct)
 	}
