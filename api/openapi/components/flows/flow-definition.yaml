@@ -1,5 +1,5 @@
 type: object
-required: [slug, name, purposes, initial_steps, steps]
+required: [name, user_schema, purposes, initial_steps, steps]
 description: |
   A flow definition is the server-side configuration that describes a complete
   authentication or identity flow. It is NOT sent to the frontend — the flow
@@ -10,19 +10,24 @@ description: |
   configuration hierarchy. The engine selects the matching definition based on
   the purpose + audience when a flow is created via POST /flow.
 properties:
-  slug:
-    type: string
-    pattern: '^[a-z][a-z0-9-]*$'
-    description: |
-      Stable identifier for this flow. Used in pivot/switch transitions to
-      reference other flows. Must be unique within the project. Renaming
-      the flow does not change the slug.
-    example: default-login
-
   name:
     type: string
-    description: Human-readable display name for this flow definition.
-    example: Default Login
+    pattern: '^[a-z][a-z0-9-]*$'
+    examples: [ standard-login, combined-auth ]
+    description: |
+      Stable identifier for this flow, used as the target of cross-flow
+      `switch` and `pivot` transitions. Renaming is not supported — the
+      `name` is part of the public contract another definition may
+      reference. Acts as the human display label as well; no separate slug.
+
+  schema_uri:
+    type: string
+    format: uri
+    description: |
+      URI of the server-published flow definition schema this definition was
+      authored against. The server uses this to validate the definition.
+      If not provided, the engine will use the latest schema version for validation.
+    example: https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/flow-definition.yaml
 
   user_schema:
     type: string
@@ -30,7 +35,7 @@ properties:
       User schema this flow operates on. Step `fields` reference properties
       defined in this schema. The engine resolves field types, validation,
       and implicit outcomes from schema annotations at runtime.
-    example: human_user
+    example: https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/human-user.yaml
 
   purposes:
     type: array

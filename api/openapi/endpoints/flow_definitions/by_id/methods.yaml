@@ -1,0 +1,91 @@
+get:
+  operationId: getFlowDefinition
+  description: Get a flow definition by id
+  tags:
+    - Flow Definitions
+  security:
+    - oauth2:
+        - flow_definitions.read
+  parameters:
+    - $ref: ../../../components/parameters/flow-definition-id.yaml
+  responses:
+    '200':
+      description: Flow definition found.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/flows/flow-definition-detail-response.yaml
+    '404':
+      description: Flow definition not found.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    default:
+      description: Unexpected error.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+
+patch:
+  operationId: updateFlowDefinition
+  description: Update a flow definition by id
+  tags:
+    - Flow Definitions
+  security:
+    - oauth2:
+        - flow_definitions.write
+  parameters:
+    - $ref: ../../../components/parameters/flow-definition-id.yaml
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../../../components/flows/flow-definition.yaml
+  responses:
+    '200':
+      description: Flow definition updated successfully.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/flows/flow-definition-detail-response.yaml
+    '400':
+      description: Invalid request body.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '404':
+      description: Flow definition not found.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    default:
+      description: Unexpected error.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+
+delete:
+  operationId: deleteFlowDefinition
+  description: Delete a flow definition by id
+  tags:
+    - Flow Definitions
+  security:
+    - oauth2:
+        - flow_definitions.delete
+  parameters:
+    - $ref: ../../../components/parameters/flow-definition-id.yaml
+  responses:
+    '204':
+      description: Flow definition deleted successfully.
+    default:
+      description: Unexpected error.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml

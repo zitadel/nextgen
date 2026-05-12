@@ -1,0 +1,87 @@
+post:
+  operationId: createFlowDefinition
+  summary: Create a new flow definition
+  description: |
+    Creates a new flow definition. 
+    Flow definitions are templates that define the sequence of steps (capabilities) 
+    for a particular user journey (e.g., registration, login, password reset). 
+    
+    Flow definitions are created based on the flow meta schema, which includes the flow's purpose, audience, and the steps involved.
+  tags:
+    - Flow Definitions
+  security:
+    - oauth2:
+        - flow_definitions.write
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../../components/flows/flow-definition.yaml
+  responses:
+    '201':
+      description: Flow definition created successfully.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/flows/flow-definition-response.yaml
+    '400':
+      description: Invalid request (e.g., missing required fields, invalid step configuration).
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '409':
+      description: Conflict (e.g., flow definition with the same name already exists in the project).
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    default:
+      description: Unexpected error response.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+
+get:
+  operationId: listFlowDefinitions
+  summary: List flow definitions
+  description: |
+    Retrieves a list of all flow definitions. 
+    This endpoint can be used to view existing flow definitions and their configurations.
+  tags:
+    - Flow Definitions
+  security:
+    - oauth2:
+        - flow_definitions.read
+  parameters:
+    - $ref: ../../components/parameters/limit.yaml
+    - $ref: ../../components/parameters/page-token.yaml
+    - $ref: ../../components/parameters/project-id.yaml
+    - name: purpose
+      in: query
+      required: false
+      description: Filter flow definitions by purpose (e.g., registration, login).
+      schema:
+        type: string
+        enum: [login, register, recovery, profiling, reauth, link_account]
+  responses:
+    '200':
+      description: A list of flow definitions.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/flows/flow-definition-list-response.yaml
+    '400':
+      description: Invalid request (e.g., invalid query parameters).
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    default:
+      description: Unexpected error response.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
