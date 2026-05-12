@@ -4,7 +4,7 @@ required:
   - project_id
 properties:
   project_id:
-    $ref: "../../components/schemas/project-id.yaml"
+    $ref: ../../components/schemas/project-id.yaml
   challenge_nonce:
     type: string
     description: |
@@ -16,6 +16,6 @@ properties:
       Optional. If provided, this attempt adds factors to an existing session (step-up auth).
       If omitted, a new session is created implicitly on successful handoff.
     oneOf:
-      - $ref: "../../components/schemas/session-id.yaml"
+      - $ref: ../../components/schemas/session-id.yaml
       - type: 'null'
 

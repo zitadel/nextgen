@@ -2,6 +2,8 @@ get:
   operationId: getLive
   summary: Check server liveness
   description: Check whether the server is started
+  tags:
+    - Health
   security: []
   responses:
     '200':

@@ -2,6 +2,8 @@ get:
   operationId: getHealth
   summary: Check server health
   description: Check whether the server is healthy
+  tags:
+    - Health
   security: []
   responses:
     '200':

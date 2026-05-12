@@ -1,0 +1,78 @@
+---
+title: Authentication
+description: Learn about authentication flows in ZITADEL NextGen.
+---
+
+# Authentication
+
+ZITADEL NextGen supports standard OAuth 2.0 and OpenID Connect authentication flows.
+
+## OAuth 2.0 Flows
+
+### Authorization Code with PKCE
+
+The recommended flow for browser-based applications:
+
+```bash
+# Step 1: Redirect the user to the authorization endpoint
+curl -X GET "https://your-instance.zitadel.cloud/auth/authorize?\
+  response_type=code&\
+  client_id=YOUR_CLIENT_ID&\
+  redirect_uri=http://localhost:3000/callback&\
+  scope=openid%20profile&\
+  code_challenge=CHALLENGE&\
+  code_challenge_method=S256"
+```
+
+```bash
+# Step 2: Exchange the authorization code for tokens
+curl -X POST "https://your-instance.zitadel.cloud/auth/token" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=authorization_code&\
+      code=AUTH_CODE&\
+      redirect_uri=http://localhost:3000/callback&\
+      client_id=YOUR_CLIENT_ID&\
+      code_verifier=VERIFIER"
+```
+
+### Client Credentials
+
+For server-to-server communication:
+
+```bash
+curl -X POST "https://your-instance.zitadel.cloud/auth/token" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=client_credentials&\
+      client_id=YOUR_CLIENT_ID&\
+      client_secret=YOUR_CLIENT_SECRET&\
+      scope=openid"
+```
+
+### Using the TypeScript SDK
+
+```typescript
+import { postAuthToken } from "@zitadel-nextgen/api";
+
+const tokenResponse = await postAuthToken({
+  grant_type: "client_credentials",
+  client_id: "YOUR_CLIENT_ID",
+  client_secret: "YOUR_CLIENT_SECRET",
+  scope: "openid",
+});
+```
+
+## Token Introspection
+
+Validate an access token:
+
+```bash
+curl -X POST "https://your-instance.zitadel.cloud/auth/introspect" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -H "Authorization: Bearer $SERVICE_TOKEN" \
+  -d "token=USER_ACCESS_TOKEN"
+```
+
+## Next Steps
+
+- View the full [OAuth endpoints](/api) in the API Reference
+- Learn about [Session Management](/docs/sessions)

@@ -1,0 +1,62 @@
+---
+title: Getting Started
+description: Get up and running with the ZITADEL NextGen API.
+---
+
+# Getting Started
+
+Welcome to the ZITADEL NextGen documentation. This guide will help you get started with the identity platform.
+
+## Overview
+
+ZITADEL NextGen is the next generation of the ZITADEL identity platform, providing:
+
+- **OAuth 2.0 / OIDC** compliant authentication
+- **Session management** with fine-grained control
+- **Auth attempts** for multi-factor authentication flows
+- **RESTful API** with OpenAPI 3.1 specification
+
+## Quick Start
+
+### 1. Get your API credentials
+
+First, you'll need a project with API credentials configured in your ZITADEL instance.
+
+### 2. Install the SDK
+
+```bash
+npm install @zitadel-nextgen/api
+```
+
+### 3. Configure the client
+
+```typescript
+import { setApiBaseUrl } from "@zitadel-nextgen/api";
+
+setApiBaseUrl("https://your-instance.zitadel.cloud");
+```
+
+### 4. Make your first API call
+
+```typescript
+import { listSessions } from "@zitadel-nextgen/api";
+
+const sessions = await listSessions();
+console.log(sessions);
+```
+
+## Using curl
+
+You can also interact with the API directly using curl:
+
+```bash
+curl -X GET "https://your-instance.zitadel.cloud/sessions" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json"
+```
+
+## Next Steps
+
+- Browse the [API Reference](/api) for detailed endpoint documentation
+- Learn about [Authentication](/docs/authentication) flows
+- Explore [Session Management](/docs/sessions)

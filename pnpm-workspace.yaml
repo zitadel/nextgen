@@ -16,6 +16,7 @@ catalog:
   "@nx/vite": ^22.7.0
   "@nx/vitest": ^22.7.0
   "@playwright/test": ^1.59.1
+  "@tailwindcss/postcss": ^4.2.4
   "@tailwindcss/vite": ^4.2.4
   "@tanstack/devtools-vite": ^0.6.0
   "@tanstack/eslint-plugin-router": ^1.161.6

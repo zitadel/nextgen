@@ -12,8 +12,22 @@ info:
     identifier: MIT
 
 servers: 
-  # TODO: put correct server here.
-  - url: https://acc.nextgen.zitadel.com 
+  - url: https://acc.nextgen.zitadel.com
+    description: ZITADEL NextGen API server
+
+tags:
+  - name: Authorization
+    description: OAuth 2.0 and OpenID Connect endpoints for authentication and token management.
+  - name: Flows
+    description: UI-driven authentication flows with step-by-step orchestration.
+  - name: Authentication Attempts
+    description: Multi-factor authentication attempts with challenge/verify lifecycle.
+  - name: Sessions
+    description: Session creation, listing, exchange, and revocation.
+  - name: User
+    description: User management operations.
+  - name: Health
+    description: Server health, liveness, and readiness probes.
     
 paths:
   /.well-known/openid-configuration:
@@ -68,6 +82,21 @@ paths:
     $ref: endpoints/sessions/by_id/methods.yaml
 
 components:
+  schemas:
+    ProjectId:
+      $ref: components/schemas/project-id.yaml
+    SessionId:
+      $ref: components/schemas/session-id.yaml
+    AttemptId:
+      $ref: components/schemas/attempt-id.yaml
+    ChallengeId:
+      $ref: components/schemas/challenge-id.yaml
+    UserId:
+      $ref: components/schemas/user-id.yaml
+    FactorMethod:
+      $ref: components/schemas/factor-method.yaml
+    PageToken:
+      $ref: components/schemas/page-token.yaml
   securitySchemes:
     oauth2:
       $ref: security/oauth2.yaml

@@ -2,6 +2,8 @@ get:
   operationId: getOpenIDConfiguration
   summary: Get OpenID Connect configuration
   description: Retrieve the OpenID Connect configuration
+  tags:
+    - Authorization
   security: []
   responses:
     '200':

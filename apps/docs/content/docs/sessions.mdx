@@ -1,0 +1,93 @@
+---
+title: Sessions
+description: Manage user sessions with the ZITADEL NextGen API.
+---
+
+# Session Management
+
+Sessions track authenticated users across requests. ZITADEL NextGen provides fine-grained session control with support for anonymous session shells, multi-factor authentication, and session lifecycle management.
+
+## Session Lifecycle
+
+Sessions go through the following states:
+
+1. **`building`** — Anonymous shell, pre-authentication
+2. **`active`** — User authenticated, session valid
+3. **`expired`** — Session TTL exceeded
+4. **`revoked`** — Explicitly terminated
+
+## Creating a Session
+
+Create an anonymous session shell before the user is known:
+
+```bash
+curl -X POST "https://your-instance.zitadel.cloud/sessions" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "metadata": {
+      "device_id": "abc-123",
+      "user_agent": "Mozilla/5.0..."
+    }
+  }'
+```
+
+Using the TypeScript SDK:
+
+```typescript
+import { createSession } from "@zitadel-nextgen/api";
+
+const session = await createSession({
+  metadata: {
+    device_id: "abc-123",
+    user_agent: navigator.userAgent,
+  },
+});
+
+console.log(session.session_id);
+console.log(session.session_token);
+```
+
+## Listing Sessions
+
+```bash
+curl -X GET "https://your-instance.zitadel.cloud/sessions?\
+  state=active&\
+  limit=20" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+```typescript
+import { listSessions } from "@zitadel-nextgen/api";
+
+const sessions = await listSessions({
+  state: "active",
+  limit: 20,
+});
+```
+
+## Revoking a Session
+
+```bash
+curl -X DELETE "https://your-instance.zitadel.cloud/sessions/SESSION_ID" \
+  -H "Authorization: Bearer $SESSION_TOKEN"
+```
+
+## Session Exchange (Handoff)
+
+Exchange an auth attempt result for a fully authenticated session:
+
+```bash
+curl -X POST "https://your-instance.zitadel.cloud/sessions/exchange" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "session_id": "...",
+    "attempt_id": "..."
+  }'
+```
+
+## Next Steps
+
+- View the full [Sessions API](/api) reference
+- Learn about [Auth Attempts](/docs/auth-attempts) for multi-factor flows

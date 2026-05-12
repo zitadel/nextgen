@@ -1,6 +1,8 @@
 get:
   operationId: getKeys
   summary: Get public keys
+  tags:
+    - Authorization
   security: []
   responses:
     '200':

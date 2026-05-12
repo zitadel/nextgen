@@ -1,3 +1,4 @@
+title: FactorMethod
 type: string
 description: An authentication factor method.
 enum:

@@ -1,6 +1,8 @@
 post:
   operationId: revokeToken
   summary: Revoke an access token or refresh token
+  tags:
+    - Authorization
   security:
     - oauth2: []
   requestBody:

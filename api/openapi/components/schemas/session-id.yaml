@@ -1,3 +1,4 @@
+title: SessionId
 type: string
 pattern: '^sess_[a-zA-Z0-9_-]+$'
 example: sess_existing_session_123

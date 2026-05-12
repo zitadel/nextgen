@@ -1,0 +1,45 @@
+{
+  "name": "@zitadel-nextgen/docs",
+  "version": "0.0.0",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "scripts": {
+    "dev": "next dev --port 3002",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@zitadel-nextgen/api": "workspace:*",
+    "fumadocs-core": "^16.8.10",
+    "fumadocs-mdx": "^15.0.3",
+    "fumadocs-openapi": "^10.8.2",
+    "fumadocs-ui": "^16.8.10",
+    "next": "^16.2.6",
+    "react": "catalog:",
+    "react-dom": "catalog:"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "catalog:",
+    "@types/mdx": "^2.0.13",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "tailwindcss": "catalog:",
+    "typescript": "catalog:"
+  },
+  "nx": {
+    "targets": {
+      "dev": {
+        "dependsOn": ["^build"]
+      },
+      "build": {
+        "dependsOn": ["^build"]
+      },
+      "typecheck": {
+        "dependsOn": ["^build"]
+      }
+    }
+  }
+}

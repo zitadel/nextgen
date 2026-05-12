@@ -1,3 +1,4 @@
+title: AttemptId
 type: string
 pattern: '^att_[a-zA-Z0-9_-]+$'
 example: att_abc123def456

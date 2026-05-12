@@ -1,3 +1,4 @@
+title: UserId
 type: string
 pattern: '^user_[a-zA-Z0-9_-]+$'
 example: user_id_12345

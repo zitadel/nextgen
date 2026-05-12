@@ -1,0 +1,79 @@
+---
+title: Auth Attempts
+description: Multi-factor authentication flows using auth attempts.
+---
+
+# Auth Attempts
+
+Auth attempts represent an in-progress authentication flow. They support multi-factor authentication by tracking which challenges have been completed.
+
+## Flow Overview
+
+1. **Create an auth attempt** — specify the authentication requirements
+2. **Receive challenges** — the server responds with available challenges
+3. **Verify challenges** — submit proof for each factor (password, TOTP, etc.)
+4. **Handoff** — exchange the completed attempt for a session
+
+## Creating an Auth Attempt
+
+```bash
+curl -X POST "https://your-instance.zitadel.cloud/auth_attempts" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "session_id": "optional-pre-allocated-session"
+  }'
+```
+
+```typescript
+import { createAuthAttempt } from "@zitadel-nextgen/api";
+
+const attempt = await createAuthAttempt({
+  session_id: "optional-pre-allocated-session",
+});
+
+console.log(attempt.attempt_id);
+console.log(attempt.challenges); // Available challenges
+```
+
+## Listing Challenges
+
+```bash
+curl -X GET "https://your-instance.zitadel.cloud/auth_attempts/ATTEMPT_ID/challenges" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+## Verifying a Challenge
+
+```bash
+curl -X POST "https://your-instance.zitadel.cloud/auth_attempts/ATTEMPT_ID/challenges/CHALLENGE_ID/verify" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "proof": "user-submitted-value"
+  }'
+```
+
+```typescript
+import { verifyChallenge } from "@zitadel-nextgen/api";
+
+await verifyChallenge({
+  attempt_id: "...",
+  challenge_id: "...",
+  proof: "user-submitted-value",
+});
+```
+
+## Completing the Flow (Handoff)
+
+Once all required challenges are verified:
+
+```bash
+curl -X POST "https://your-instance.zitadel.cloud/auth_attempts/ATTEMPT_ID/handoff" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+This returns a fully authenticated session token.
+
+## Next Steps
+
+- View the full [Auth Attempts API](/api) reference
+- Learn about [Session Management](/docs/sessions)

@@ -2,6 +2,8 @@ get:
   operationId: getReady
   summary: Check server readiness
   description: Check whether the server is ready to accept requests
+  tags:
+    - Health
   security: []
   responses:
     '200':
