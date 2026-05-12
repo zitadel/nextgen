@@ -22,6 +22,7 @@
   "type": "module",
   "scripts": {
     "build": "tsdown",
+    "typecheck": "tsc --noEmit",
     "gen:agents-md": "tsx scripts/gen-agents-md.ts"
   },
   "dependencies": {
