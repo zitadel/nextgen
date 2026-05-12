@@ -36,7 +36,7 @@ func (h Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest) (ap
 
 	def, err := h.flowService.Resolve(ctx, resolveReq)
 	if err != nil {
-		return mapResolveError(err), nil
+		return nil, mapResolveError(err)
 	}
 
 	// Execution is intentionally stopped here. The service resolved a
@@ -65,22 +65,36 @@ func buildResolveHint(opt api.OptFlowHint) service.ResolveFlowHint {
 	return out
 }
 
-func mapResolveError(err error) *api.ErrorDetails {
+// mapResolveError translates a Resolve error into an HTTP status code.
+// The ogen-generated handler unwraps *api.ErrorDetailsStatusCode from the
+// error return path and writes its StatusCode + Response verbatim; the
+// success-path *api.ErrorDetails fallback would otherwise force every
+// failure to HTTP 400.
+func mapResolveError(err error) error {
 	switch {
 	case errors.Is(err, domain.ErrFlowDefinitionNotFound):
-		return &api.ErrorDetails{
-			Code:    "flow_not_found",
-			Message: err.Error(),
+		return &api.ErrorDetailsStatusCode{
+			StatusCode: 404,
+			Response: api.ErrorDetails{
+				Code:    "flow_not_found",
+				Message: err.Error(),
+			},
 		}
 	case errors.Is(err, domain.ErrFlowDefinitionPurposeMismatch):
-		return &api.ErrorDetails{
-			Code:    "purpose_mismatch",
-			Message: err.Error(),
+		return &api.ErrorDetailsStatusCode{
+			StatusCode: 400,
+			Response: api.ErrorDetails{
+				Code:    "purpose_mismatch",
+				Message: err.Error(),
+			},
 		}
 	default:
-		return &api.ErrorDetails{
-			Code:    "internal_error",
-			Message: err.Error(),
+		return &api.ErrorDetailsStatusCode{
+			StatusCode: 500,
+			Response: api.ErrorDetails{
+				Code:    "internal_error",
+				Message: err.Error(),
+			},
 		}
 	}
 }
