@@ -813,18 +813,7 @@ func (s *FlowStep) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
-		if err := s.Type.Validate(); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "type",
-			Error: err,
-		})
-	}
-	if err := func() error {
-		if value, ok := s.Behavior.Get(); ok {
+		if value, ok := s.Complete.Get(); ok {
 			if err := func() error {
 				if err := value.Validate(); err != nil {
 					return err
@@ -837,7 +826,7 @@ func (s *FlowStep) Validate() error {
 		return nil
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
-			Name:  "behavior",
+			Name:  "complete",
 			Error: err,
 		})
 	}
@@ -869,7 +858,7 @@ func (s *FlowStep) Validate() error {
 	return nil
 }
 
-func (s FlowStepBehavior) Validate() error {
+func (s FlowStepComplete) Validate() error {
 	switch s {
 	case "redirect":
 		return nil
@@ -922,31 +911,6 @@ func (s FlowStepGates) Validate() error {
 		return &validate.Error{Fields: failures}
 	}
 	return nil
-}
-
-func (s FlowStepType) Validate() error {
-	switch s {
-	case "identifier":
-		return nil
-	case "credential":
-		return nil
-	case "form":
-		return nil
-	case "verification":
-		return nil
-	case "consent":
-		return nil
-	case "info":
-		return nil
-	case "redirect":
-		return nil
-	case "captcha":
-		return nil
-	case "complete":
-		return nil
-	default:
-		return errors.Errorf("invalid value: %v", s)
-	}
 }
 
 func (s *Gate) Validate() error {
