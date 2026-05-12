@@ -50,6 +50,19 @@ jobs:
           cache: true
       - run: go test -v -tags spanner_integration -timeout=10m ./internal/storage/database/repository/...
 
+  go-arch-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: install go-arch-lint
+        run: go install github.com/looztra/go-arch-lint@latest
+      - name: Run architecture linting
+        run: go-arch-lint check
+
   node-check:
     runs-on: ubuntu-latest
     steps:
