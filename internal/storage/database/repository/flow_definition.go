@@ -11,24 +11,8 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database/dialect/spanner"
 )
 
-const tableFlowDefinitions = "zitadel_nextgen.flow_definitions"
-
-var (
-	colFlowDefProjectID = database.NewColumn(tableFlowDefinitions, "project_id")
-	colFlowDefID        = database.NewColumn(tableFlowDefinitions, "id")
-	colFlowDefStatus    = database.NewColumn(tableFlowDefinitions, "status")
-	colFlowDefUpdatedAt = database.NewColumn(tableFlowDefinitions, "updated_at")
-)
-
-type flowDefinition struct{}
-
-func (flowDefinition) PrimaryKeyColumns() []database.Column {
-	return []database.Column{colFlowDefProjectID, colFlowDefID}
-}
-
-func (flowDefinition) UpdatedAtColumn() database.Column { return colFlowDefUpdatedAt }
-
-func (flowDefinition) qualifiedTableName() string { return tableFlowDefinitions }
+const pgTableFlowDefinitions = "zitadel_nextgen.flow_definitions"
+const spannerTableFlowDefinitions = "flow_definitions"
 
 // flowDefinitionRow is a private scan target for queries against the flow_definitions table.
 // Nested data (purposes, audience, steps) lives in the JSONB definition column and is
@@ -75,88 +59,114 @@ type flowStepTransitionJSON struct {
 	Target string  `json:"target,omitempty"`
 }
 
+type flowDefinitionMeta struct {
+	tableName string
+}
+
+func (m flowDefinitionMeta) PrimaryKeyColumns() []database.Column {
+	return []database.Column{
+		database.NewColumn(m.tableName, "project_id"),
+		database.NewColumn(m.tableName, "id"),
+	}
+}
+
+func (m flowDefinitionMeta) UpdatedAtColumn() database.Column {
+	return database.NewColumn(m.tableName, "updated_at")
+}
+
+func (m flowDefinitionMeta) qualifiedTableName() string { return m.tableName }
+
 // FlowDefinitionRepository implements [domain.FlowDefinitionRepository]
-// using a single table where all nested data lives in a JSONB column.
-// It is optimised for the read-heavy, rarely-written access pattern of flow
-// definitions: each read is a single PK lookup with no joins or assembly.
-//
-// Use [NewPostgresFlowDefinitionRepository] or [NewSpannerFlowDefinitionRepository]
-// to construct an instance with the correct dialect.
+// using a single table where all nested data lives in a JSON/JSONB column.
 type FlowDefinitionRepository struct {
-	Client          database.QueryExecutor
-	statusCast      string // SQL cast suffix for a status value, e.g. "::zitadel_nextgen.flow_definition_states"
-	purposeElemCast string // SQL cast suffix for a single purpose value, e.g. "::zitadel_nextgen.flow_definition_purposes"
-	purposeArrCast  string // SQL cast suffix for a purposes array, e.g. "::zitadel_nextgen.flow_definition_purposes[]"
+	meta             flowDefinitionMeta
+	statusCast       string                       // SQL cast suffix, e.g. "::zitadel_nextgen.flow_definition_states" (empty for Spanner)
+	purposeElemCast  string                       // SQL cast suffix for a single element, e.g. "::zitadel_nextgen.flow_definition_purposes"
+	purposeArrCast   string                       // SQL cast suffix for an array, e.g. "::zitadel_nextgen.flow_definition_purposes[]"
+	encodePurposes   func([]string) any           // returns []string for Spanner, StringArray for Postgres
+	encodeDefinition func([]byte) any             // returns string for Spanner (JSON column), []byte for Postgres (JSONB)
+	now              database.Instruction         // NOW() for Postgres, CURRENT_TIMESTAMP() for Spanner
+	arrayContains    func(val, col string) string // produces "val = ANY(col)" or "val IN UNNEST(col)"
 }
 
 // NewFlowDefinitionRepository returns a repository configured for either Spanner or Postgres
-// based on the client being passed.
+// based on the client type.
 func NewFlowDefinitionRepository(client database.QueryExecutor) *FlowDefinitionRepository {
 	switch client.(type) {
 	case spanner.SpannerPooler:
-		return &FlowDefinitionRepository{Client: client}
+		return &FlowDefinitionRepository{
+			meta:             flowDefinitionMeta{tableName: spannerTableFlowDefinitions},
+			encodePurposes:   func(s []string) any { return s },
+			encodeDefinition: func(b []byte) any { return string(b) },
+			now:              database.CurrentTimestampInstruction,
+			arrayContains:    func(val, col string) string { return val + " IN UNNEST(" + col + ")" },
+		}
 	case postgres.PostgresPooler:
 		return &FlowDefinitionRepository{
-			Client:          client,
-			statusCast:      "::zitadel_nextgen.flow_definition_states",
-			purposeElemCast: "::zitadel_nextgen.flow_definition_purposes",
-			purposeArrCast:  "::zitadel_nextgen.flow_definition_purposes[]",
+			meta:             flowDefinitionMeta{tableName: pgTableFlowDefinitions},
+			statusCast:       "::zitadel_nextgen.flow_definition_states",
+			purposeElemCast:  "::zitadel_nextgen.flow_definition_purposes",
+			purposeArrCast:   "::zitadel_nextgen.flow_definition_purposes[]",
+			encodePurposes:   func(s []string) any { return StringArray(s) },
+			encodeDefinition: func(b []byte) any { return b },
+			now:              database.NowInstruction,
+			arrayContains:    func(val, col string) string { return val + " = ANY(" + col + ")" },
 		}
 	}
-	return nil
+	panic("NewFlowDefinitionRepository: unsupported client type")
 }
 
 var _ domain.FlowDefinitionRepository = (*FlowDefinitionRepository)(nil)
 
-func (r *FlowDefinitionRepository) CreateFlowDefinition(ctx context.Context, def *domain.FlowDefinition) error {
+func (r *FlowDefinitionRepository) CreateFlowDefinition(ctx context.Context, client database.QueryExecutor, def *domain.FlowDefinition) error {
 	content, err := marshalFlowDefinitionContent(def)
 	if err != nil {
 		return err
 	}
 
-	purposes := make(StringArray, len(def.Purposes))
+	purposeStrs := make([]string, len(def.Purposes))
 	for i, p := range def.Purposes {
-		purposes[i] = p.Purpose.String()
+		purposeStrs[i] = p.Purpose.String()
 	}
 
 	b := database.NewStatementBuilder("INSERT INTO ")
-	b.WriteString(tableFlowDefinitions)
+	b.WriteString(r.meta.tableName)
 	b.WriteString(" (project_id, id, name, schema_version, status, purposes, definition, created_at, updated_at) VALUES (")
 	b.WriteArgs(def.ProjectID, def.ID, def.Name, def.SchemaVersion)
 	b.WriteString(", ")
 	b.WriteString(b.AppendArg(def.Status.String()) + r.statusCast)
 	b.WriteString(", ")
-	b.WriteString(b.AppendArg(purposes.String()) + r.purposeArrCast)
+	b.WriteString(b.AppendArg(r.encodePurposes(purposeStrs)) + r.purposeArrCast)
 	b.WriteString(", ")
-	b.WriteArgs(content, database.NowInstruction, database.NowInstruction)
+	b.WriteArgs(r.encodeDefinition(content), r.now, r.now)
 	b.WriteString(")")
 
-	_, err = r.Client.Exec(ctx, b.String(), b.Args()...)
+	_, err = client.Exec(ctx, b.String(), b.Args()...)
 	return err
 }
 
-func (r *FlowDefinitionRepository) GetFlowDefinition(ctx context.Context, projectID, id string) (*domain.FlowDefinition, error) {
+func (r *FlowDefinitionRepository) GetFlowDefinition(ctx context.Context, client database.QueryExecutor, projectID, id string) (*domain.FlowDefinition, error) {
 	b := database.NewStatementBuilder(
 		"SELECT project_id, id, name, schema_version, status, definition, created_at, updated_at FROM ")
-	b.WriteString(tableFlowDefinitions)
+	b.WriteString(r.meta.tableName)
 	b.WriteString(" WHERE project_id = ")
 	b.WriteArg(projectID)
 	b.WriteString(" AND id = ")
 	b.WriteArg(id)
 
-	row, err := getOne[flowDefinitionRow](ctx, r.Client, b)
+	row, err := getOne[flowDefinitionRow](ctx, client, b)
 	if err != nil {
 		return nil, err
 	}
 	return rowToFlowDefinition(*row)
 }
 
-func (r *FlowDefinitionRepository) ListFlowDefinitions(ctx context.Context, projectID string, opts ...domain.FlowDefinitionListOption) ([]*domain.FlowDefinition, error) {
+func (r *FlowDefinitionRepository) ListFlowDefinitions(ctx context.Context, client database.QueryExecutor, projectID string, opts ...domain.FlowDefinitionListOption) ([]*domain.FlowDefinition, error) {
 	o := domain.ApplyFlowDefinitionListOptions(opts)
 
 	b := database.NewStatementBuilder(
 		"SELECT project_id, id, name, schema_version, status, definition, created_at, updated_at FROM ")
-	b.WriteString(tableFlowDefinitions)
+	b.WriteString(r.meta.tableName)
 	b.WriteString(" WHERE project_id = ")
 	b.WriteArg(projectID)
 
@@ -166,8 +176,8 @@ func (r *FlowDefinitionRepository) ListFlowDefinitions(ctx context.Context, proj
 	}
 	if o.Purpose != nil {
 		b.WriteString(" AND ")
-		b.WriteString(b.AppendArg(o.Purpose.String()) + r.purposeElemCast)
-		b.WriteString(" = ANY(purposes)")
+		placeholder := b.AppendArg(o.Purpose.String()) + r.purposeElemCast
+		b.WriteString(r.arrayContains(placeholder, "purposes"))
 	}
 
 	if o.SchemaVersion != nil {
@@ -185,31 +195,33 @@ func (r *FlowDefinitionRepository) ListFlowDefinitions(ctx context.Context, proj
 		b.WriteString(" OFFSET ")
 		b.WriteArg(o.Offset)
 	}
-	rows, err := getMany[flowDefinitionRow](ctx, r.Client, b)
+	rows, err := getMany[flowDefinitionRow](ctx, client, b)
 	if err != nil {
 		return nil, err
 	}
 	return rowsToFlowDefinitions(rows)
 }
 
-func (r *FlowDefinitionRepository) UpdateFlowDefinitionStatus(ctx context.Context, projectID, id string, status domain.FlowDefinitionStatus) error {
+func (r *FlowDefinitionRepository) UpdateFlowDefinitionStatus(ctx context.Context, client database.QueryExecutor, projectID, id string, status domain.FlowDefinitionStatus) error {
+	t := r.meta.tableName
 	condition := database.And(
-		database.NewTextCondition(colFlowDefProjectID, database.TextOperationEqual, projectID),
-		database.NewTextCondition(colFlowDefID, database.TextOperationEqual, id),
+		database.NewTextCondition(database.NewColumn(t, "project_id"), database.TextOperationEqual, projectID),
+		database.NewTextCondition(database.NewColumn(t, "id"), database.TextOperationEqual, id),
 	)
-	_, err := updateOne(ctx, r.Client, flowDefinition{}, condition,
-		database.NewChange(colFlowDefStatus, status.String()),
-		database.NewChange(colFlowDefUpdatedAt, database.NowInstruction),
+	_, err := updateOne(ctx, client, r.meta, condition,
+		database.NewChange(database.NewColumn(t, "status"), status.String()),
+		database.NewChange(database.NewColumn(t, "updated_at"), r.now),
 	)
 	return err
 }
 
-func (r *FlowDefinitionRepository) DeleteFlowDefinition(ctx context.Context, projectID, id string) error {
+func (r *FlowDefinitionRepository) DeleteFlowDefinition(ctx context.Context, client database.QueryExecutor, projectID, id string) error {
+	t := r.meta.tableName
 	condition := database.And(
-		database.NewTextCondition(colFlowDefProjectID, database.TextOperationEqual, projectID),
-		database.NewTextCondition(colFlowDefID, database.TextOperationEqual, id),
+		database.NewTextCondition(database.NewColumn(t, "project_id"), database.TextOperationEqual, projectID),
+		database.NewTextCondition(database.NewColumn(t, "id"), database.TextOperationEqual, id),
 	)
-	_, err := deleteOne(ctx, r.Client, flowDefinition{}, condition)
+	_, err := deleteOne(ctx, client, r.meta, condition)
 	return err
 }
 

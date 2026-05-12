@@ -1,11 +1,13 @@
 package spanner
 
 import (
+	"database/sql"
 	"errors"
 	"strings"
 
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -13,19 +15,23 @@ func wrapError(err error) error {
 	if err == nil {
 		return nil
 	}
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return database.NewNoRowFoundError(err)
 	}
-	if errors.Is(err, pgx.ErrTooManyRows) {
-		return database.NewMultipleRowsFoundError(err)
+
+	if s, ok := status.FromError(err); ok && s.Code() != codes.OK {
+		switch s.Code() {
+		case codes.NotFound:
+			return database.NewNoRowFoundError(err)
+		case codes.AlreadyExists:
+			return database.NewUniqueError("", "", err)
+		case codes.FailedPrecondition, codes.InvalidArgument:
+			return database.NewCheckError("", "", err)
+		default:
+			return database.NewUnknownError(err)
+		}
 	}
 
-	var pgxErr *pgconn.PgError
-	if errors.As(err, &pgxErr) {
-		return wrapPgError(pgxErr)
-	}
-
-	// scany only exports its errors as strings
 	if strings.HasPrefix(err.Error(), "scany: expected 1 row, got: ") {
 		return database.NewMultipleRowsFoundError(err)
 	}
@@ -34,21 +40,4 @@ func wrapError(err error) error {
 	}
 
 	return database.NewUnknownError(err)
-}
-
-func wrapPgError(err *pgconn.PgError) error {
-	switch err.Code {
-	case "23514":
-		return database.NewCheckError(err.TableName, err.ConstraintName, err)
-	case "23505":
-		return database.NewUniqueError(err.TableName, err.ConstraintName, err)
-	case "23503":
-		return database.NewForeignKeyError(err.TableName, err.ConstraintName, err)
-	case "23502":
-		return database.NewNotNullError(err.TableName, err.ConstraintName, err)
-	case "22P02":
-		return database.NewCheckError(err.TableName, err.ConstraintName, err)
-	default:
-		return database.NewUnknownError(err)
-	}
 }

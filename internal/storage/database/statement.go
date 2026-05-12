@@ -8,10 +8,11 @@ import (
 type Instruction string
 
 const (
-	DefaultInstruction       Instruction = "DEFAULT"
-	NowInstruction           Instruction = "NOW()"
-	NullInstruction          Instruction = "NULL"
-	GenRandomUUIDInstruction Instruction = "gen_random_uuid()"
+	DefaultInstruction          Instruction = "DEFAULT"
+	NowInstruction              Instruction = "NOW()"
+	CurrentTimestampInstruction Instruction = "CURRENT_TIMESTAMP()"
+	NullInstruction             Instruction = "NULL"
+	GenRandomUUIDInstruction    Instruction = "gen_random_uuid()"
 )
 
 // StatementBuilder is a helper to build SQL statement.

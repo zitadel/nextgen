@@ -13,16 +13,24 @@ import (
 
 func ensureProject(t *testing.T, client database.QueryExecutor, projectID string) {
 	t.Helper()
-	_, err := client.Exec(t.Context(),
-		`INSERT INTO zitadel_nextgen.instances (id) VALUES ($1) ON CONFLICT (id) DO NOTHING`,
-		projectID,
-	)
+	var err error
+	if isSpannerDB {
+		_, err = client.Exec(t.Context(),
+			`INSERT OR IGNORE INTO projects (id, created_at, updated_at) VALUES ($1, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP())`,
+			projectID,
+		)
+	} else {
+		_, err = client.Exec(t.Context(),
+			`INSERT INTO zitadel_nextgen.projects (id) VALUES ($1) ON CONFLICT (id) DO NOTHING`,
+			projectID,
+		)
+	}
 	require.NoError(t, err)
 }
 
 // newTestAttempt inserts an auth attempt with one password check into the given executor.
 // It returns the attempt and the pre-created check so callers can reference the same objects.
-func newTestAttempt(t *testing.T, repo *repository.AuthAttempt, client database.QueryExecutor, projectID, attemptID string) (*domain.AuthAttempt, *domain.PasswordAuthCheck) {
+func newTestAttempt(t *testing.T, repo domain.AuthAttemptRepository, client database.QueryExecutor, projectID, attemptID string) (*domain.AuthAttempt, *domain.PasswordAuthCheck) {
 	t.Helper()
 	ensureProject(t, client, projectID)
 	check := &domain.PasswordAuthCheck{AuthCheck: &domain.AuthCheck{Type: domain.AuthCheckTypePassword}}
@@ -37,7 +45,7 @@ func newTestAttempt(t *testing.T, repo *repository.AuthAttempt, client database.
 }
 
 func TestAuthAttempt_Create(t *testing.T) {
-	repo := new(repository.AuthAttempt)
+	repo := repository.NewAuthAttemptRepository(pool)
 
 	tests := []struct {
 		name          string
@@ -224,16 +232,22 @@ func TestAuthAttempt_Create(t *testing.T) {
 		ensureProject(t, tx, "p-dup")
 		require.NoError(t, repo.Create(t.Context(), tx, &domain.AuthAttempt{ProjectID: "p-dup", ID: "a-dup"}))
 
-		// Use a savepoint so the expected PK error does not abort the outer transaction.
-		sp, spRollback := savepointForRollback(t, tx)
-		err := repo.Create(t.Context(), sp, &domain.AuthAttempt{ProjectID: "p-dup", ID: "a-dup"})
-		spRollback()
+		var err error
+		if isSpannerDB {
+			// Spanner DML errors don't abort the transaction, so no savepoint needed.
+			err = repo.Create(t.Context(), tx, &domain.AuthAttempt{ProjectID: "p-dup", ID: "a-dup"})
+		} else {
+			// Use a savepoint so the expected PK error does not abort the outer transaction.
+			sp, spRollback := savepointForRollback(t, tx)
+			err = repo.Create(t.Context(), sp, &domain.AuthAttempt{ProjectID: "p-dup", ID: "a-dup"})
+			spRollback()
+		}
 		assert.Error(t, err)
 	})
 }
 
 func TestAuthAttempt_GetByID(t *testing.T) {
-	repo := new(repository.AuthAttempt)
+	repo := repository.NewAuthAttemptRepository(pool)
 
 	t.Run("returns attempt without checks", func(t *testing.T) {
 		tx, rollback := transactionForRollback(t)
@@ -321,7 +335,7 @@ func TestAuthAttempt_GetByID(t *testing.T) {
 }
 
 func TestAuthAttempt_SetChallenge(t *testing.T) {
-	repo := new(repository.AuthAttempt)
+	repo := repository.NewAuthAttemptRepository(pool)
 
 	t.Run("sets last_challenged_at and persists challenge payload", func(t *testing.T) {
 		tx, rollback := transactionForRollback(t)
@@ -377,7 +391,7 @@ func TestAuthAttempt_SetChallenge(t *testing.T) {
 }
 
 func TestAuthAttempt_Delete(t *testing.T) {
-	repo := new(repository.AuthAttempt)
+	repo := repository.NewAuthAttemptRepository(pool)
 
 	t.Run("cascades check deletion", func(t *testing.T) {
 		tx, rollback := transactionForRollback(t)
@@ -402,7 +416,7 @@ func TestAuthAttempt_Delete(t *testing.T) {
 }
 
 func TestAuthAttempt_ChallengeFailed(t *testing.T) {
-	repo := new(repository.AuthAttempt)
+	repo := repository.NewAuthAttemptRepository(pool)
 
 	tests := []struct {
 		name         string
@@ -435,7 +449,7 @@ func TestAuthAttempt_ChallengeFailed(t *testing.T) {
 }
 
 func TestAuthAttempt_ChallengeSucceeded(t *testing.T) {
-	repo := new(repository.AuthAttempt)
+	repo := repository.NewAuthAttemptRepository(pool)
 
 	t.Run("sets verified_at and persists it", func(t *testing.T) {
 		tx, rollback := transactionForRollback(t)
@@ -501,7 +515,7 @@ func TestAuthAttempt_ChallengeSucceeded(t *testing.T) {
 }
 
 func TestAuthAttempt_Complete(t *testing.T) {
-	repo := new(repository.AuthAttempt)
+	repo := repository.NewAuthAttemptRepository(pool)
 
 	t.Run("non existing attempt", func(t *testing.T) {
 		tx, rollback := transactionForRollback(t)
@@ -545,7 +559,7 @@ func TestAuthAttempt_Complete(t *testing.T) {
 }
 
 func TestAuthAttempt_Handoff(t *testing.T) {
-	repo := new(repository.AuthAttempt)
+	repo := repository.NewAuthAttemptRepository(pool)
 
 	t.Run("stores handoff token and handed off timestamp", func(t *testing.T) {
 		tx, rollback := transactionForRollback(t)

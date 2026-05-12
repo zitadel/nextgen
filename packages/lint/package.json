@@ -2,7 +2,7 @@
   "name": "@zitadel-nextgen/lint",
   "version": "0.0.1",
   "private": true,
-  "main": "./src/index.mts",
+  "main": "./src/index.ts",
   "devDependencies": {
     "@nx/devkit": "catalog:"
   }

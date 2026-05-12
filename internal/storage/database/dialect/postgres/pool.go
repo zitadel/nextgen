@@ -41,7 +41,7 @@ func (p *Pool) Acquire(ctx context.Context) (database.Connection, error) {
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	return &pgxConn{Conn: conn}, nil
+	return &pgxConn{Conn: conn, pool: p}, nil
 }
 
 // Query implements [database.Pool].
@@ -92,27 +92,18 @@ func (p *Pool) Migrate(ctx context.Context) error {
 	if isMigrated {
 		return nil
 	}
-
-	client, err := p.Pool.Acquire(ctx)
-	if err != nil {
-		return err
-	}
-	defer client.Release()
-
-	err = migration.Migrate(ctx, client.Conn())
+	db := stdlib.OpenDBFromPool(p.Pool)
+	defer db.Close()
+	err := migration.Migrate(ctx, db)
 	isMigrated = err == nil
 	return wrapError(err)
 }
 
-// Migrate implements [database.PoolTest].
+// MigrateTest implements [database.PoolTest].
 func (p *Pool) MigrateTest(ctx context.Context) error {
-	client, err := p.Pool.Acquire(ctx)
-	if err != nil {
-		return err
-	}
-	defer client.Release()
-
-	err = migration.Migrate(ctx, client.Conn())
+	db := stdlib.OpenDBFromPool(p.Pool)
+	defer db.Close()
+	err := migration.Migrate(ctx, db)
 	isMigrated = err == nil
 	return err
 }
