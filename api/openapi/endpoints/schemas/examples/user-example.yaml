@@ -1,0 +1,33 @@
+email:
+  type: string
+  format: email
+  description: The user's email address.
+password:
+  type: string
+  minLength: 8
+  description: The user's password, which must be at least 8 characters long.
+firstName:
+  type: string
+  description: The user's first name.
+lastName:
+  type: string
+  description: The user's last name.
+address:
+  type: object
+  description: The user's address information.
+  properties:
+    street:
+      type: string
+      description: The street address.
+    houseNumber:
+      type: string
+      description: The house number of the address.
+    city:
+      type: string
+      description: The city of the address.
+    postalCode:
+      type: string
+      description: The postal code of the address.
+    country:
+      type: string
+      description: The country of the address.
