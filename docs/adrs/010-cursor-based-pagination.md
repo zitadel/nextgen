@@ -1,4 +1,4 @@
-# ADR 009: Cursor-Based Pagination
+# ADR 010: Cursor-Based Pagination
 
 > **Status:** Proposed
 > **Date:** 2026-04-30

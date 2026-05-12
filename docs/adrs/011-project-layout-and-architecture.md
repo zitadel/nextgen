@@ -1,9 +1,8 @@
-# ADR 010: Project Layout and Responsibilities
+# ADR 011: Project Layout and Responsibilities
 
 > **Status:** Proposed
 > **Date:** 2026-05-11
 > **Context:** System architecture and package organization
-> **Agreed:** Internal engineering team — pending final review
 
 ## Decision
 
@@ -27,19 +26,19 @@ As we scale to support multiple identity and provisioning protocols (**REST, SCI
 
 ### Layer Responsibility Table
 
-| Layer | Logical Role | Responsibility | Allowed Imports |
-| :--- | :--- | :--- | :--- |
-| **api** | Adapters | Translates JSON/XML into Service calls; handles HTTP/SAML statuses. | `service`, `domain` |
-| **service** | Orchestration | Manages business workflows and transaction boundaries. | `domain` |
-| **domain** | Core | Owns entities, business invariants, and repository interfaces. | None |
-| **storage** | Infrastructure | Implements repository interfaces and handles data reconstitution. | `domain`, `storage/database` |
+| Layer       | Logical Role   | Responsibility                                                      | Allowed Imports              |
+|:------------|:---------------|:--------------------------------------------------------------------|:-----------------------------|
+| **api**     | Adapters       | Translates JSON/XML into Service calls; handles HTTP/SAML statuses. | `service`, `domain`          |
+| **service** | Orchestration  | Manages business workflows and transaction boundaries.              | `domain`                     |
+| **domain**  | Core           | Owns entities, business invariants, and repository interfaces.      | None                         |
+| **storage** | Infrastructure | Implements repository interfaces and handles data reconstitution.   | `domain`, `storage/database` |
 
 ## Consequences
 
 - **Strict Encapsulation:** The `api` layer is strictly forbidden from importing `storage`. All data access must be mediated by a `service` to ensure business invariants are enforced.
 - **Infrastructure Ignorance:** Interfaces defined in `internal/domain` must not import packages from `internal/storage`. Infrastructure-specific types (e.g., `database.QueryExecutor` or `database.Change`) must not appear in Domain method signatures.
 - **Transaction Management:** Transactions are managed at the **Service** level. To maintain architectural purity, SQL executors/transactions are propagated via `context.Context` rather than being passed explicitly through Domain interfaces.
-- **Error Mapping:** Errors are defined in `domain` as `CodedError` types owning a public `code` and `description`. The `api` layer translates these into protocol-specific statuses (HTTP, SCIM types, or SAML StatusCodes).
+- **Error Mapping:** Errors are defined in `domain` as `Error` types owning a public `code` and `description`. The `api` layer translates these into protocol-specific statuses (HTTP, SCIM types, or SAML StatusCodes).
 - **Persistence Ignorance:** IDs are generated in the `domain` (prefixed ULIDs) and entities are "reconstituted" from rows within `storage`, ensuring the `service` remains unaware of database implementation details.
 - **Automated Enforcement:** We use `go-arch-lint` to prevent dependency violations. The linter will fail builds if `domain` imports any other internal package.
 - **Reference Implementation:** See `internal/service/auth_attempt.go` for the reference on service-to-domain interaction and `.go-arch-lint.yml` for the dependency rules.
