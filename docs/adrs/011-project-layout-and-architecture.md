@@ -30,7 +30,7 @@ As we scale to support multiple identity and provisioning protocols (**REST, SCI
 |:------------|:---------------|:--------------------------------------------------------------------|:-----------------------------|
 | **api**     | Adapters       | Translates JSON/XML into Service calls; handles HTTP/SAML statuses. | `service`, `domain`          |
 | **service** | Orchestration  | Manages business workflows and transaction boundaries.              | `domain`                     |
-| **domain**  | Core           | Owns entities, business invariants, and repository interfaces.      | None                         |
+| **domain**  | Core           | Owns entities, business invariants, and repository interfaces.      | utilities                    |
 | **storage** | Infrastructure | Implements repository interfaces and handles data reconstitution.   | `domain`, `storage/database` |
 
 ## Consequences
@@ -40,5 +40,5 @@ As we scale to support multiple identity and provisioning protocols (**REST, SCI
 - **Transaction Management:** Transactions are managed at the **Service** level. To maintain architectural purity, SQL executors/transactions are propagated via `context.Context` rather than being passed explicitly through Domain interfaces.
 - **Error Mapping:** Errors are defined in `domain` as `Error` types owning a public `code` and `description`. The `api` layer translates these into protocol-specific statuses (HTTP, SCIM types, or SAML StatusCodes).
 - **Persistence Ignorance:** IDs are generated in the `domain` (prefixed ULIDs) and entities are "reconstituted" from rows within `storage`, ensuring the `service` remains unaware of database implementation details.
-- **Automated Enforcement:** We use `go-arch-lint` to prevent dependency violations. The linter will fail builds if `domain` imports any other internal package.
+- **Automated Enforcement:** We use `go-arch-lint` to prevent dependency violations. The linter will fail builds if `domain` imports `api`, `service` or any other not-allowed package.
 - **Reference Implementation:** See `internal/service/auth_attempt.go` for the reference on service-to-domain interaction and `.go-arch-lint.yml` for the dependency rules.
