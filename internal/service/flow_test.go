@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"testing"
-	"time"
 
 	"go.uber.org/mock/gomock"
 
@@ -177,79 +176,33 @@ func TestResolve_ResolveByName_PurposeMismatch(t *testing.T) {
 	}
 }
 
-func TestResolve_ResolveByAudience_PrefersAppOverTeamOverDefault(t *testing.T) {
-	app := newDef("login", "1.0.0", domain.FlowDefinitionAudience{AppID: ptr("app-1")}, domain.FlowDefinitionPurposeLogin)
-	team := newDef("login", "1.0.0", domain.FlowDefinitionAudience{TeamID: ptr("team-1")}, domain.FlowDefinitionPurposeLogin)
+func TestResolve_ResolveByAudience_ReturnsFirstMatchingPurpose(t *testing.T) {
+	first := newDef("login", "1.0.0", domain.FlowDefinitionAudience{IsProjectDefault: true}, domain.FlowDefinitionPurposeLogin)
+	second := newDef("alt", "1.0.0", domain.FlowDefinitionAudience{AppID: ptr("app-1")}, domain.FlowDefinitionPurposeLogin)
+	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{first, second})
+
+	got, err := service.NewFlowService(stubPool(), repo).Resolve(t.Context(), service.ResolveFlowRequest{
+		ProjectID: "proj",
+		Purpose:   domain.FlowDefinitionPurposeLogin,
+	})
+	if err != nil {
+		t.Fatalf("Resolve returned error: %v", err)
+	}
+	if got != first {
+		t.Fatalf("Resolve = %v, want first definition", got)
+	}
+}
+
+func TestResolve_ResolveByAudience_NoMatch(t *testing.T) {
 	def := newDef("login", "1.0.0", domain.FlowDefinitionAudience{IsProjectDefault: true}, domain.FlowDefinitionPurposeLogin)
-	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{def, team, app})
+	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{def})
 
-	got, err := service.NewFlowService(stubPool(), repo).Resolve(t.Context(), service.ResolveFlowRequest{
+	_, err := service.NewFlowService(stubPool(), repo).Resolve(t.Context(), service.ResolveFlowRequest{
 		ProjectID: "proj",
-		Purpose:   domain.FlowDefinitionPurposeLogin,
-		Hint: service.ResolveFlowHint{
-			AppID:  ptr("app-1"),
-			TeamID: ptr("team-1"),
-		},
+		Purpose:   domain.FlowDefinitionPurposeRegister,
 	})
-	if err != nil {
-		t.Fatalf("Resolve returned error: %v", err)
-	}
-	if got != app {
-		t.Fatalf("Resolve = %v, want app definition", got)
-	}
-}
-
-func TestResolve_ResolveByAudience_SkipsAudienceWithoutMatchingHint(t *testing.T) {
-	app := newDef("login", "1.0.0", domain.FlowDefinitionAudience{AppID: ptr("app-1")}, domain.FlowDefinitionPurposeLogin)
-	def := newDef("login", "1.0.0", domain.FlowDefinitionAudience{IsProjectDefault: true}, domain.FlowDefinitionPurposeLogin)
-	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{app, def})
-
-	got, err := service.NewFlowService(stubPool(), repo).Resolve(t.Context(), service.ResolveFlowRequest{
-		ProjectID: "proj",
-		Purpose:   domain.FlowDefinitionPurposeLogin,
-		Hint:      service.ResolveFlowHint{AppID: ptr("other-app")},
-	})
-	if err != nil {
-		t.Fatalf("Resolve returned error: %v", err)
-	}
-	if got != def {
-		t.Fatalf("Resolve = %v, want default", got)
-	}
-}
-
-func TestResolve_ResolveByAudience_TiebreakByCreatedAtDesc(t *testing.T) {
-	older := newDef("login", "1.0.0", domain.FlowDefinitionAudience{IsProjectDefault: true}, domain.FlowDefinitionPurposeLogin)
-	older.CreatedAt = time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
-	newer := newDef("alt", "1.0.0", domain.FlowDefinitionAudience{IsProjectDefault: true}, domain.FlowDefinitionPurposeLogin)
-	newer.CreatedAt = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{older, newer})
-
-	got, err := service.NewFlowService(stubPool(), repo).Resolve(t.Context(), service.ResolveFlowRequest{
-		ProjectID: "proj",
-		Purpose:   domain.FlowDefinitionPurposeLogin,
-	})
-	if err != nil {
-		t.Fatalf("Resolve returned error: %v", err)
-	}
-	if got != newer {
-		t.Fatalf("Resolve = %v, want newer", got)
-	}
-}
-
-func TestResolve_ResolveByAudience_KeepsLatestVersionWhenUnpinned(t *testing.T) {
-	v1 := newDef("login", "1.0.0", domain.FlowDefinitionAudience{IsProjectDefault: true}, domain.FlowDefinitionPurposeLogin)
-	v2 := newDef("login", "2.0.0", domain.FlowDefinitionAudience{IsProjectDefault: true}, domain.FlowDefinitionPurposeLogin)
-	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{v1, v2})
-
-	got, err := service.NewFlowService(stubPool(), repo).Resolve(t.Context(), service.ResolveFlowRequest{
-		ProjectID: "proj",
-		Purpose:   domain.FlowDefinitionPurposeLogin,
-	})
-	if err != nil {
-		t.Fatalf("Resolve returned error: %v", err)
-	}
-	if got != v2 {
-		t.Fatalf("Resolve = %v, want v2", got)
+	if !errors.Is(err, domain.ErrFlowDefinitionNotFound) {
+		t.Fatalf("Resolve err = %v, want ErrFlowNotFound", err)
 	}
 }
 
@@ -268,19 +221,6 @@ func TestResolve_ResolveByAudience_ExactVersionFiltersOlder(t *testing.T) {
 	}
 	if got != v1 {
 		t.Fatalf("Resolve = %v, want v1 (exact match)", got)
-	}
-}
-
-func TestResolve_ResolveByAudience_NoMatch(t *testing.T) {
-	def := newDef("login", "1.0.0", domain.FlowDefinitionAudience{AppID: ptr("app-1")}, domain.FlowDefinitionPurposeLogin)
-	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{def})
-
-	_, err := service.NewFlowService(stubPool(), repo).Resolve(t.Context(), service.ResolveFlowRequest{
-		ProjectID: "proj",
-		Purpose:   domain.FlowDefinitionPurposeLogin,
-	})
-	if !errors.Is(err, domain.ErrFlowDefinitionNotFound) {
-		t.Fatalf("Resolve err = %v, want ErrFlowNotFound", err)
 	}
 }
 

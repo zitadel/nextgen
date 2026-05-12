@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"slices"
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -19,18 +18,15 @@ type FlowService interface {
 	// Resolution algorithm:
 	//
 	//  1. If [ResolveFlowRequest.Name] is set, look up by
-	//     (ProjectID, Name, SchemaVersion?). Return
+	//     (ProjectID, Name, SchemaVersion?), pick the highest version,
+	//     and confirm the requested purpose is served. Return
 	//     [domain.ErrFlowDefinitionNotFound] or
 	//     [domain.ErrFlowDefinitionPurposeMismatch] on miss.
-	//  2. Otherwise list active definitions whose purposes include
-	//     [ResolveFlowRequest.Purpose].
-	//  3. Apply semver resolution on [ResolveFlowRequest.SchemaVersion]:
-	//     exact match for MVP; latest active when nil. Caret/tilde ranges
-	//     are deferred until an upgrade story exists.
-	//  4. Rank by audience specificity: AppID (3) > TeamID (2) >
-	//     UserSchemaID (1) > project default (0).
-	//  5. Tie-break by created_at DESC.
-	//  6. Fall back to the built-in project default when no row matches.
+	//  2. Otherwise return the first active definition whose purposes
+	//     include [ResolveFlowRequest.Purpose] (optionally pinned to
+	//     [ResolveFlowRequest.SchemaVersion]). [ResolveFlowRequest.Hint]
+	//     is plumbed through but not yet honored — see TODO on
+	//     resolveByAudience.
 	Resolve(ctx context.Context, req ResolveFlowRequest) (*domain.FlowDefinition, error)
 }
 
@@ -50,6 +46,7 @@ type ResolveFlowRequest struct {
 	AuthRequestID *string
 
 	// Hint narrows audience matching when no direct lookup is in play.
+	// Currently ignored — see TODO on resolveByAudience.
 	Hint ResolveFlowHint
 }
 
@@ -110,9 +107,13 @@ func (s *flowService) resolveByName(ctx context.Context, req ResolveFlowRequest)
 	return def, nil
 }
 
-// resolveByAudience implements the audience-match branch: list active
-// definitions serving the requested purpose, filter on the optional
-// SchemaVersion, then pick the one best matching the audience hint.
+// resolveByAudience picks the first active definition serving the requested
+// purpose (with an optional SchemaVersion pin).
+//
+// TODO: honor [ResolveFlowRequest.Hint]. The MVP returns whichever row the
+// repository yields first; once admin UX produces multiple audience-targeted
+// definitions per purpose, score candidates by AppID > TeamID > UserSchemaID
+// > IsProjectDefault and tie-break by created_at DESC.
 func (s *flowService) resolveByAudience(ctx context.Context, req ResolveFlowRequest) (*domain.FlowDefinition, error) {
 	opts := []domain.FlowDefinitionListOption{
 		domain.WithFlowDefinitionStatus(domain.FlowDefinitionStatusActive),
@@ -129,54 +130,7 @@ func (s *flowService) resolveByAudience(ctx context.Context, req ResolveFlowRequ
 	if len(defs) == 0 {
 		return nil, domain.ErrFlowDefinitionNotFound
 	}
-
-	if req.SchemaVersion == nil {
-		defs = keepLatestFlowVersion(defs)
-	}
-
-	candidates := make([]flowAudienceCandidate, 0, len(defs))
-	for _, def := range defs {
-		score, ok := flowAudienceScore(def.Audience, req.Hint)
-		if !ok {
-			continue
-		}
-		candidates = append(candidates, flowAudienceCandidate{def: def, score: score})
-	}
-	if len(candidates) == 0 {
-		return nil, domain.ErrFlowDefinitionNotFound
-	}
-
-	slices.SortStableFunc(candidates, func(a, b flowAudienceCandidate) int {
-		if a.score != b.score {
-			return b.score - a.score
-		}
-		return b.def.CreatedAt.Compare(a.def.CreatedAt)
-	})
-	return candidates[0].def, nil
-}
-
-type flowAudienceCandidate struct {
-	def   *domain.FlowDefinition
-	score int
-}
-
-// flowAudienceScore reports how specifically the audience targets the hint.
-// AppID (3) > TeamID (2) > UserSchemaID (1) > IsProjectDefault (0).
-// Returns ok=false when the audience targets a field the hint did not
-// match, or when no targeting field and no project-default is set.
-func flowAudienceScore(a domain.FlowDefinitionAudience, hint ResolveFlowHint) (int, bool) {
-	switch {
-	case a.AppID != nil:
-		return 3, hint.AppID != nil && *a.AppID == *hint.AppID
-	case a.TeamID != nil:
-		return 2, hint.TeamID != nil && *a.TeamID == *hint.TeamID
-	case a.UserSchemaID != nil:
-		return 1, hint.UserSchemaID != nil && *a.UserSchemaID == *hint.UserSchemaID
-	case a.IsProjectDefault:
-		return 0, true
-	default:
-		return 0, false
-	}
+	return defs[0], nil
 }
 
 func flowServesPurpose(def *domain.FlowDefinition, purpose domain.FlowDefinitionPurpose) bool {
@@ -200,21 +154,4 @@ func pickLatestFlowVersion(defs []*domain.FlowDefinition) *domain.FlowDefinition
 		}
 	}
 	return winner
-}
-
-// keepLatestFlowVersion reduces defs to the rows sharing the highest
-// SchemaVersion, preserving order. Same lex-compare caveat as
-// [pickLatestFlowVersion].
-func keepLatestFlowVersion(defs []*domain.FlowDefinition) []*domain.FlowDefinition {
-	if len(defs) == 0 {
-		return defs
-	}
-	max := pickLatestFlowVersion(defs).SchemaVersion
-	out := defs[:0]
-	for _, def := range defs {
-		if def.SchemaVersion == max {
-			out = append(out, def)
-		}
-	}
-	return out
 }
