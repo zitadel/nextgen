@@ -21,22 +21,6 @@ Gates are pre-submit barriers (captcha). Passkey doesn't fit:
 3. **Conditional UI requires field coordination** — gates are independent of
    fields.
 
-### Why not ceremony-on-action?
-
-Embedding WebAuthn options directly on the action (a `ceremony` property) was
-considered and rejected:
-
-1. **Stale challenges.** Options pre-generated in the step response may expire
-   if the user takes time to decide.
-2. **Wasted work.** If the user picks email+password, the challenge was
-   generated for nothing.
-3. **User must be identified first.** The server needs to know _which user_ to
-   generate `allowCredentials` for. This requires a prior user factor, which
-   only exists after the identifier step submits.
-4. **Breaks action simplicity.** Actions are meant to be plain capabilities
-   (text_key + primary). Adding protocol-specific config creates a second
-   class of action.
-
 ### The two-submit model
 
 Passkey authentication is a **two-submit round-trip** through the standard
@@ -132,9 +116,53 @@ the step response and submit request.
 - **Session factor:** `passkey` factor carries `user_verified`, `hardware`,
   `phishing_resistant`, `backup_eligible`, `backup_state`.
 - **Credential management** (`/users/{id}/passkeys`) is out of scope.
-- **Conditional UI (autofill)** is deferred — requires challenge on page load,
-  which conflicts with the two-submit model. Future work may add a pre-loaded
-  challenge mechanism for this.
+
+## Future Work: Conditional UI (Autofill)
+
+The two-submit model delivers the WebAuthn challenge _after_ the user clicks
+the passkey button. Conditional UI requires the challenge _on page load_ so
+the browser can show passkeys in the email field's autofill dropdown.
+
+These are compatible. The `step.challenge` property can be **pre-loaded** on
+the initial step when the instance policy allows discoverable credentials:
+
+```json
+{
+  "step": {
+    "name": "login",
+    "fields": { "email": { "type": "email", "required": true } },
+    "actions": {
+      "submit": { "primary": true },
+      "passkey": { "text_key": "login.action.passkey" }
+    },
+    "challenge": {
+      "type": "passkey",
+      "mediation": "conditional",
+      "challenge_id": "ch_pre_123",
+      "options": {
+        "challenge": "...", "rpId": "login.acme.com",
+        "userVerification": "preferred"
+      }
+    }
+  }
+}
+```
+
+`mediation: "conditional"` tells the `<zl-passkey>` component to bind to the
+email field's autofill (`autocomplete="username webauthn"`) instead of
+triggering a modal. Three user paths coexist on the same step:
+
+1. **Pick passkey from autofill** → submit with pre-loaded `challenge_response`
+2. **Click passkey button** → two-submit model (fresh server-side challenge)
+3. **Type email** → normal `action: "submit"` → password step
+
+Pre-loading requires no user identification — `allowCredentials` is empty and
+the assertion's `response.userHandle` identifies the user. The server decides
+whether to pre-load based on the rpId policy for discoverable credentials.
+
+This requires adding `mediation` to the `step.challenge` schema and teaching
+the `<zl-passkey>` component to handle the conditional credential request
+lifecycle (abort on email input focus, etc.).
 
 [flow-engine.md]: ../design/flowengine/flow-engine.md
 [flow-engine-nodes.md]: ../design/flowengine/flow-engine-nodes.md
