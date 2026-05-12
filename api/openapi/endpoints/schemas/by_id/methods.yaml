@@ -13,6 +13,7 @@ get:
       required: true
       schema:
         type: string
+    - $ref: ../../../components/parameters/project-id.yaml
   responses:
     '200':
       description: The schema was retrieved successfully

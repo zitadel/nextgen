@@ -2,4 +2,6 @@ name: project_id
 in: query
 description: The unique identifier of the project
 schema:
-  $ref: '../schemas/project-id.yaml'
+  type: string
+  pattern: '^[a-zA-Z0-9_-]+$'
+  example: river-8421

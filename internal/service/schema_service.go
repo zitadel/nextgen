@@ -11,10 +11,10 @@ import (
 )
 
 type SchemaFetcher interface {
-	Get(ctx context.Context, uri url.URL) (schema *jsonschema.Schema, err error)
+	Get(ctx context.Context, projectID string, uri url.URL) (schema *jsonschema.Schema, err error)
 }
 type SchemaSaver interface {
-	Save(ctx context.Context, uri url.URL, schema *jsonschema.Schema) error
+	Save(ctx context.Context, projectID string, uri url.URL, schema *jsonschema.Schema) error
 }
 type SchemaValidator interface {
 	Validate(ctx context.Context, schema *jsonschema.Schema) error
@@ -44,7 +44,7 @@ func NewSchemaService(
 	}
 }
 
-func (s *SchemaService) CreateSchema(ctx context.Context, schema *jsonschema.Schema) (*url.URL, error) {
+func (s *SchemaService) CreateSchema(ctx context.Context, projectID string, schema *jsonschema.Schema) (*url.URL, error) {
 	id, err := s.idGenerator.New("sch")
 	if err != nil {
 		return nil, &FailedToGenerateSchemaIdError{err}
@@ -60,7 +60,7 @@ func (s *SchemaService) CreateSchema(ctx context.Context, schema *jsonschema.Sch
 		return nil, &InvalidJsonSchemaError{err}
 	}
 
-	err = s.databaseSchemaSaver.Save(ctx, *uri, schema)
+	err = s.databaseSchemaSaver.Save(ctx, projectID, *uri, schema)
 	if err != nil {
 		return nil, &FailedToSaveSchema{err}
 	}
@@ -68,8 +68,8 @@ func (s *SchemaService) CreateSchema(ctx context.Context, schema *jsonschema.Sch
 	return uri, nil
 }
 
-func (s *SchemaService) CreateSchemaByUrl(ctx context.Context, uri url.URL) error {
-	existing, err := s.databaseSchemaFetcher.Get(ctx, uri)
+func (s *SchemaService) CreateSchemaByUrl(ctx context.Context, projectID string, uri url.URL) error {
+	existing, err := s.databaseSchemaFetcher.Get(ctx, projectID, uri)
 	if existing != nil {
 		return SchemaAlreadyExistsError
 	}
@@ -78,7 +78,7 @@ func (s *SchemaService) CreateSchemaByUrl(ctx context.Context, uri url.URL) erro
 		return &FailedToGetSchemaError{cause: err}
 	}
 
-	schema, err := s.remoteSchemaFetcher.Get(ctx, uri)
+	schema, err := s.remoteSchemaFetcher.Get(ctx, projectID, uri)
 	if err != nil {
 		return &FailedToFetchSchemaError{err}
 	}
@@ -88,7 +88,7 @@ func (s *SchemaService) CreateSchemaByUrl(ctx context.Context, uri url.URL) erro
 		return &InvalidJsonSchemaError{err}
 	}
 
-	err = s.databaseSchemaSaver.Save(ctx, uri, schema)
+	err = s.databaseSchemaSaver.Save(ctx, projectID, uri, schema)
 	if err != nil {
 		return &FailedToSaveSchema{err}
 	}
@@ -96,8 +96,8 @@ func (s *SchemaService) CreateSchemaByUrl(ctx context.Context, uri url.URL) erro
 	return nil
 }
 
-func (s *SchemaService) GetSchema(ctx context.Context, uri url.URL) (*jsonschema.Schema, error) {
-	schema, err := s.databaseSchemaFetcher.Get(ctx, uri)
+func (s *SchemaService) GetSchema(ctx context.Context, projectID string, uri url.URL) (*jsonschema.Schema, error) {
+	schema, err := s.databaseSchemaFetcher.Get(ctx, projectID, uri)
 	if err != nil {
 		if errors.Is(err, RepositoryErrorNotFound) {
 			return nil, SchemaNotFoundError

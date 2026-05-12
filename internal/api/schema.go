@@ -11,7 +11,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 )
 
-func (h *Handler) CreateSchema(ctx context.Context, req api.CreateSchemaReq) (api.CreateSchemaRes, error) {
+func (h *Handler) CreateSchema(ctx context.Context, req api.CreateSchemaReq, params api.CreateSchemaParams) (api.CreateSchemaRes, error) {
 	var err error
 	var id *url.URL
 
@@ -21,10 +21,10 @@ func (h *Handler) CreateSchema(ctx context.Context, req api.CreateSchemaReq) (ap
 		if err != nil {
 			return nil, err
 		}
-		id, err = h.schemaService.CreateSchema(ctx, sch)
+		id, err = h.schemaService.CreateSchema(ctx, params.ProjectID.Value, sch)
 	case api.SchemaURLCreateSchemaReq:
 		id = &req.SchemaURL.URL
-		err = h.schemaService.CreateSchemaByUrl(ctx, req.SchemaURL.URL)
+		err = h.schemaService.CreateSchemaByUrl(ctx, params.ProjectID.Value, req.SchemaURL.URL)
 	default:
 		return nil, UnknownSchemaKindError
 	}
@@ -61,7 +61,7 @@ func (h *Handler) GetSchemaById(ctx context.Context, params api.GetSchemaByIdPar
 		return nil, err
 	}
 
-	schema, err := h.schemaService.GetSchema(ctx, *uri)
+	schema, err := h.schemaService.GetSchema(ctx, params.ProjectID.Value, *uri)
 	if err != nil {
 		return h.getSchemaByIdError(err)
 	}
