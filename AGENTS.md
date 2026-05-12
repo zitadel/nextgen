@@ -88,3 +88,43 @@ human `claim_url`; only a human completes claim, after which agents may run
 - Server and console application paths are AGPL-3.0-only by default.
 - Keep local secrets, private keys, tokens, and `.zitadel/secret`-style files out
   of source control and browser-safe runtime metadata.
+
+## Cursor Cloud specific instructions
+
+### Environment prerequisites
+
+- **Node.js 24** (from `.nvmrc`) via nvm; **Go 1.26** installed to `/usr/local/go`.
+- pnpm is managed through corepack (`packageManager` field in root `package.json`).
+- Go must be on `PATH`: `export PATH="/usr/local/go/bin:$HOME/go/bin:$PATH"`.
+
+### Running services
+
+| Service | Command | Default URL |
+|---------|---------|-------------|
+| Console (Vite dev) | `corepack pnpm nx dev @zitadel-nextgen/console` | `http://localhost:5173` |
+| Go server (placeholder) | `go build -o /tmp/nextgen . && /tmp/nextgen --help` | N/A (server subcommand still being wired) |
+| CLI smoke check | `node apps/cli/dist/zitadel.mjs --version` | N/A |
+
+### Lint / typecheck / build / test
+
+All standard commands are in the `README.md` "Local checks" section and the
+`AGENTS.md` "Local Checks" section. Summary:
+
+```sh
+corepack pnpm nx run-many -t lint,typecheck,build,test   # TS workspace
+go vet ./...                                              # Go lint
+go test ./...                                             # Go tests
+```
+
+### Known caveats
+
+- `pnpm install` may warn about ignored build scripts for `@swc/core` and `nx`.
+  These do not affect normal operation; `pnpm.onlyBuiltDependencies` in the root
+  `package.json` controls which packages are allowed to run install scripts.
+- Go tests use `embedded-postgres` and spin up a temporary Postgres instance
+  automatically; no external database is needed for `go test ./...`.
+- The Go server binary (`main.go`) is a placeholder; `--help` works but the
+  `server` subcommand is still being wired up.
+- Console E2E tests (`apps/console-e2e/`) use Playwright and require a running
+  console preview server; they are not part of the standard `go test` / `nx test`
+  targets.
