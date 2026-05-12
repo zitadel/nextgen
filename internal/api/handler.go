@@ -4,7 +4,7 @@ import (
 	"context"
 
 	api "github.com/zitadel/nextgen/api/generated"
-	serviceflow "github.com/zitadel/nextgen/internal/service/flow"
+	"github.com/zitadel/nextgen/internal/service"
 )
 
 type Handler struct {
@@ -12,10 +12,10 @@ type Handler struct {
 	// responses for all endpoints, so only implemented methods need to be defined.
 	api.UnimplementedHandler
 
-	flowService serviceflow.Service
+	flowService service.FlowService
 }
 
-func NewHandler(flowService serviceflow.Service) *Handler {
+func NewHandler(flowService service.FlowService) *Handler {
 	return &Handler{flowService: flowService}
 }
 

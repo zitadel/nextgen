@@ -7,7 +7,7 @@ import (
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
-	serviceflow "github.com/zitadel/nextgen/internal/service/flow"
+	"github.com/zitadel/nextgen/internal/service"
 )
 
 func (h Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest) (api.CreateFlowRes, error) {
@@ -19,7 +19,7 @@ func (h Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest) (ap
 		}, nil
 	}
 
-	resolveReq := serviceflow.ResolveRequest{
+	resolveReq := service.ResolveFlowRequest{
 		ProjectID: string(req.ProjectID),
 		Purpose:   purpose,
 		Hint:      buildResolveHint(req.Hint),
@@ -47,12 +47,12 @@ func (h Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest) (ap
 	}, nil
 }
 
-func buildResolveHint(opt api.OptFlowHint) serviceflow.ResolveHint {
+func buildResolveHint(opt api.OptFlowHint) service.ResolveFlowHint {
 	h, ok := opt.Get()
 	if !ok {
-		return serviceflow.ResolveHint{}
+		return service.ResolveFlowHint{}
 	}
-	out := serviceflow.ResolveHint{}
+	out := service.ResolveFlowHint{}
 	if v, ok := h.AppID.Get(); ok {
 		out.AppID = &v
 	}
