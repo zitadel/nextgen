@@ -256,7 +256,7 @@ func (s *Server) decodeCreateFlowDefinitionRequest(r *http.Request) (
 }
 
 func (s *Server) decodeCreateProjectRequest(r *http.Request) (
-	req *CreateProjectRequest,
+	req OptCreateProjectRequest,
 	rawBody []byte,
 	close func() error,
 	rerr error,
@@ -306,14 +306,12 @@ func (s *Server) decodeCreateProjectRequest(r *http.Request) (
 		rawBody = append(rawBody, buf...)
 		d := jx.DecodeBytes(buf)
 
-		var request *CreateProjectRequest
+		var request OptCreateProjectRequest
 		if err := func() error {
-			request = nil
-			var elem CreateProjectRequest
-			if err := elem.Decode(d); err != nil {
+			request.Reset()
+			if err := request.Decode(d); err != nil {
 				return err
 			}
-			request = &elem
 			if err := d.Skip(); err != io.EOF {
 				return errors.New("unexpected trailing data")
 			}

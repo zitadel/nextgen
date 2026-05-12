@@ -1812,9 +1812,21 @@ func (s *CreateProjectRequest) Encode(e *jx.Encoder) {
 
 // encodeFields encodes fields.
 func (s *CreateProjectRequest) encodeFields(e *jx.Encoder) {
+	{
+		if s.PreviewOrigins != nil {
+			e.FieldStart("previewOrigins")
+			e.ArrStart()
+			for _, elem := range s.PreviewOrigins {
+				e.Str(elem)
+			}
+			e.ArrEnd()
+		}
+	}
 }
 
-var jsonFieldsNameOfCreateProjectRequest = [0]string{}
+var jsonFieldsNameOfCreateProjectRequest = [1]string{
+	0: "previewOrigins",
+}
 
 // Decode decodes CreateProjectRequest from json.
 func (s *CreateProjectRequest) Decode(d *jx.Decoder) error {
@@ -1824,9 +1836,29 @@ func (s *CreateProjectRequest) Decode(d *jx.Decoder) error {
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
+		case "previewOrigins":
+			if err := func() error {
+				s.PreviewOrigins = make([]string, 0)
+				if err := d.Arr(func(d *jx.Decoder) error {
+					var elem string
+					v, err := d.Str()
+					elem = string(v)
+					if err != nil {
+						return err
+					}
+					s.PreviewOrigins = append(s.PreviewOrigins, elem)
+					return nil
+				}); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"previewOrigins\"")
+			}
 		default:
 			return d.Skip()
 		}
+		return nil
 	}); err != nil {
 		return errors.Wrap(err, "decode CreateProjectRequest")
 	}
@@ -1860,10 +1892,34 @@ func (s *CreateProjectResponse) encodeFields(e *jx.Encoder) {
 		e.FieldStart("id")
 		e.Str(s.ID)
 	}
+	{
+		e.FieldStart("projectSecret")
+		e.Str(s.ProjectSecret)
+	}
+	{
+		e.FieldStart("previewSecret")
+		e.Str(s.PreviewSecret)
+	}
+	{
+		e.FieldStart("previewOrigins")
+		e.ArrStart()
+		for _, elem := range s.PreviewOrigins {
+			e.Str(elem)
+		}
+		e.ArrEnd()
+	}
+	{
+		e.FieldStart("createdAt")
+		json.EncodeDateTime(e, s.CreatedAt)
+	}
 }
 
-var jsonFieldsNameOfCreateProjectResponse = [1]string{
+var jsonFieldsNameOfCreateProjectResponse = [5]string{
 	0: "id",
+	1: "projectSecret",
+	2: "previewSecret",
+	3: "previewOrigins",
+	4: "createdAt",
 }
 
 // Decode decodes CreateProjectResponse from json.
@@ -1887,6 +1943,62 @@ func (s *CreateProjectResponse) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"id\"")
 			}
+		case "projectSecret":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.ProjectSecret = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"projectSecret\"")
+			}
+		case "previewSecret":
+			requiredBitSet[0] |= 1 << 2
+			if err := func() error {
+				v, err := d.Str()
+				s.PreviewSecret = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"previewSecret\"")
+			}
+		case "previewOrigins":
+			requiredBitSet[0] |= 1 << 3
+			if err := func() error {
+				s.PreviewOrigins = make([]string, 0)
+				if err := d.Arr(func(d *jx.Decoder) error {
+					var elem string
+					v, err := d.Str()
+					elem = string(v)
+					if err != nil {
+						return err
+					}
+					s.PreviewOrigins = append(s.PreviewOrigins, elem)
+					return nil
+				}); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"previewOrigins\"")
+			}
+		case "createdAt":
+			requiredBitSet[0] |= 1 << 4
+			if err := func() error {
+				v, err := json.DecodeDateTime(d)
+				s.CreatedAt = v
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"createdAt\"")
+			}
 		default:
 			return d.Skip()
 		}
@@ -1897,7 +2009,7 @@ func (s *CreateProjectResponse) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [1]uint8{
-		0b00000001,
+		0b00011111,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -11038,6 +11150,39 @@ func (s OptChallengeNonce) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *OptChallengeNonce) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes CreateProjectRequest as json.
+func (o OptCreateProjectRequest) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes CreateProjectRequest from json.
+func (o *OptCreateProjectRequest) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptCreateProjectRequest to nil")
+	}
+	o.Set = true
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptCreateProjectRequest) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptCreateProjectRequest) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }

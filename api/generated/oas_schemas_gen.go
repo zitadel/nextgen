@@ -791,12 +791,33 @@ type CreateHandoffNotFound ErrorDetails
 func (*CreateHandoffNotFound) createHandoffRes() {}
 
 // Ref: #
-type CreateProjectRequest struct{}
+type CreateProjectRequest struct {
+	// Origins which are allowed for previewing and testing the project.
+	PreviewOrigins []string `json:"previewOrigins"`
+}
+
+// GetPreviewOrigins returns the value of PreviewOrigins.
+func (s *CreateProjectRequest) GetPreviewOrigins() []string {
+	return s.PreviewOrigins
+}
+
+// SetPreviewOrigins sets the value of PreviewOrigins.
+func (s *CreateProjectRequest) SetPreviewOrigins(val []string) {
+	s.PreviewOrigins = val
+}
 
 // Ref: #
 type CreateProjectResponse struct {
 	// The unique identifier of the project.
 	ID string `json:"id"`
+	// Secret which can be used for authentication when modifying the project.
+	ProjectSecret string `json:"projectSecret"`
+	// Secret which can be used for previewing and testing the project.
+	PreviewSecret string `json:"previewSecret"`
+	// Origins which are allowed for previewing and testing the project.
+	PreviewOrigins []string `json:"previewOrigins"`
+	// The time when the project was created.
+	CreatedAt time.Time `json:"createdAt"`
 }
 
 // GetID returns the value of ID.
@@ -804,9 +825,49 @@ func (s *CreateProjectResponse) GetID() string {
 	return s.ID
 }
 
+// GetProjectSecret returns the value of ProjectSecret.
+func (s *CreateProjectResponse) GetProjectSecret() string {
+	return s.ProjectSecret
+}
+
+// GetPreviewSecret returns the value of PreviewSecret.
+func (s *CreateProjectResponse) GetPreviewSecret() string {
+	return s.PreviewSecret
+}
+
+// GetPreviewOrigins returns the value of PreviewOrigins.
+func (s *CreateProjectResponse) GetPreviewOrigins() []string {
+	return s.PreviewOrigins
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *CreateProjectResponse) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
 // SetID sets the value of ID.
 func (s *CreateProjectResponse) SetID(val string) {
 	s.ID = val
+}
+
+// SetProjectSecret sets the value of ProjectSecret.
+func (s *CreateProjectResponse) SetProjectSecret(val string) {
+	s.ProjectSecret = val
+}
+
+// SetPreviewSecret sets the value of PreviewSecret.
+func (s *CreateProjectResponse) SetPreviewSecret(val string) {
+	s.PreviewSecret = val
+}
+
+// SetPreviewOrigins sets the value of PreviewOrigins.
+func (s *CreateProjectResponse) SetPreviewOrigins(val []string) {
+	s.PreviewOrigins = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *CreateProjectResponse) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
 }
 
 func (*CreateProjectResponse) createProjectRes() {}
@@ -5488,6 +5549,52 @@ func (o OptChallengeNonce) Get() (v ChallengeNonce, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptChallengeNonce) Or(d ChallengeNonce) ChallengeNonce {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptCreateProjectRequest returns new OptCreateProjectRequest with value set to v.
+func NewOptCreateProjectRequest(v CreateProjectRequest) OptCreateProjectRequest {
+	return OptCreateProjectRequest{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptCreateProjectRequest is optional CreateProjectRequest.
+type OptCreateProjectRequest struct {
+	Value CreateProjectRequest
+	Set   bool
+}
+
+// IsSet returns true if OptCreateProjectRequest was set.
+func (o OptCreateProjectRequest) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptCreateProjectRequest) Reset() {
+	var v CreateProjectRequest
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptCreateProjectRequest) SetTo(v CreateProjectRequest) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptCreateProjectRequest) Get() (v CreateProjectRequest, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptCreateProjectRequest) Or(d CreateProjectRequest) CreateProjectRequest {
 	if v, ok := o.Get(); ok {
 		return v
 	}

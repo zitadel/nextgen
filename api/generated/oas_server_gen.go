@@ -72,7 +72,7 @@ type Handler interface {
 	// Create project.
 	//
 	// POST /projects
-	CreateProject(ctx context.Context, req *CreateProjectRequest) (CreateProjectRes, error)
+	CreateProject(ctx context.Context, req OptCreateProjectRequest) (CreateProjectRes, error)
 	// CreateSchema implements createSchema operation.
 	//
 	// Create a new schema. The schema definition must include a unique $id field,
