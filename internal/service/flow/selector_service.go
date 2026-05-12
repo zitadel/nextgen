@@ -3,8 +3,6 @@ package flow
 import (
 	"context"
 	"slices"
-	"strconv"
-	"strings"
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -110,32 +108,21 @@ type audienceCandidate struct {
 
 // audienceScore reports how specifically the audience targets the hint.
 // AppID (3) > TeamID (2) > UserSchemaID (1) > IsProjectDefault (0).
-// A definition with no targeting field set and IsProjectDefault == false is
-// never a candidate. A definition whose targeting field does not match the
-// corresponding hint is also discarded.
+// Returns ok=false when the audience targets a field the hint did not
+// match, or when no targeting field and no project-default is set.
 func audienceScore(a domain.FlowDefinitionAudience, hint SelectorHint) (int, bool) {
-	if a.AppID != nil {
-		if hint.AppID == nil || *a.AppID != *hint.AppID {
-			return 0, false
-		}
-		return 3, true
-	}
-	if a.TeamID != nil {
-		if hint.TeamID == nil || *a.TeamID != *hint.TeamID {
-			return 0, false
-		}
-		return 2, true
-	}
-	if a.UserSchemaID != nil {
-		if hint.UserSchemaID == nil || *a.UserSchemaID != *hint.UserSchemaID {
-			return 0, false
-		}
-		return 1, true
-	}
-	if a.IsProjectDefault {
+	switch {
+	case a.AppID != nil:
+		return 3, hint.AppID != nil && *a.AppID == *hint.AppID
+	case a.TeamID != nil:
+		return 2, hint.TeamID != nil && *a.TeamID == *hint.TeamID
+	case a.UserSchemaID != nil:
+		return 1, hint.UserSchemaID != nil && *a.UserSchemaID == *hint.UserSchemaID
+	case a.IsProjectDefault:
 		return 0, true
+	default:
+		return 0, false
 	}
-	return 0, false
 }
 
 func servesPurpose(def *domain.FlowDefinition, purpose domain.FlowDefinitionPurpose) bool {
@@ -147,76 +134,33 @@ func servesPurpose(def *domain.FlowDefinition, purpose domain.FlowDefinitionPurp
 	return false
 }
 
-// pickLatestVersion returns the definition with the highest semver among the
-// given slice. The caller must ensure defs is non-empty.
+// pickLatestVersion returns the definition with the highest SchemaVersion
+// among defs. Uses lexicographic compare — sufficient while versions stay
+// zero-padded single-digit MAJOR.MINOR.PATCH (MVP scope). Caller must
+// ensure defs is non-empty.
 func pickLatestVersion(defs []*domain.FlowDefinition) *domain.FlowDefinition {
 	winner := defs[0]
 	for _, def := range defs[1:] {
-		if compareSemver(def.SchemaVersion, winner.SchemaVersion) > 0 {
+		if def.SchemaVersion > winner.SchemaVersion {
 			winner = def
 		}
 	}
 	return winner
 }
 
-// keepLatestVersion reduces the set to the highest semver value, preserving
-// all rows that share it. Used in the audience branch where multiple
-// audiences may publish the same version.
+// keepLatestVersion reduces defs to the rows sharing the highest
+// SchemaVersion, preserving order. Same lex-compare caveat as
+// [pickLatestVersion].
 func keepLatestVersion(defs []*domain.FlowDefinition) []*domain.FlowDefinition {
 	if len(defs) == 0 {
 		return defs
 	}
-	max := defs[0].SchemaVersion
-	for _, def := range defs[1:] {
-		if compareSemver(def.SchemaVersion, max) > 0 {
-			max = def.SchemaVersion
-		}
-	}
+	max := pickLatestVersion(defs).SchemaVersion
 	out := defs[:0]
 	for _, def := range defs {
-		if compareSemver(def.SchemaVersion, max) == 0 {
+		if def.SchemaVersion == max {
 			out = append(out, def)
 		}
 	}
 	return out
-}
-
-// compareSemver does a numeric compare of MAJOR.MINOR.PATCH segments. Missing
-// segments are treated as zero. Pre-release suffixes are ignored; caret/tilde
-// ranges are out of scope per ADR / spec. Falls back to lexicographic compare
-// on unparseable input so the function is total.
-func compareSemver(a, b string) int {
-	if a == b {
-		return 0
-	}
-	as, aTail := splitSemver(a)
-	bs, bTail := splitSemver(b)
-	for i := 0; i < 3; i++ {
-		ai, aok := parseSegment(as, i)
-		bi, bok := parseSegment(bs, i)
-		if !aok || !bok {
-			return strings.Compare(a, b)
-		}
-		if ai != bi {
-			return ai - bi
-		}
-	}
-	return strings.Compare(aTail, bTail)
-}
-
-func splitSemver(v string) ([]string, string) {
-	v = strings.TrimPrefix(v, "v")
-	core, tail, _ := strings.Cut(v, "-")
-	return strings.Split(core, "."), tail
-}
-
-func parseSegment(segments []string, i int) (int, bool) {
-	if i >= len(segments) {
-		return 0, true
-	}
-	n, err := strconv.Atoi(segments[i])
-	if err != nil {
-		return 0, false
-	}
-	return n, true
 }
