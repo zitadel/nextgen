@@ -1,12 +1,13 @@
 type: object
 required: [type]
 description: |
-  A security gate that must be satisfied. The orchestrator appends any
-  required-but-unrendered gates automatically as a safety net.
+  A security gate that must be satisfied before the step can be submitted.
+  The orchestrator appends any required-but-unrendered gates automatically
+  as a safety net.
 properties:
   type:
     type: string
-    enum: [captcha, passkey]
+    enum: [captcha]
     description: Gate type.
   provider:
     type: string

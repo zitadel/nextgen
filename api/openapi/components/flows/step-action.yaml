@@ -12,3 +12,5 @@ properties:
     type: boolean
     default: false
     description: Whether this is the primary/default action.
+  ceremony:
+    $ref: ceremony.yaml

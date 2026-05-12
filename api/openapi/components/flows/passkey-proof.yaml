@@ -1,0 +1,67 @@
+type: object
+required: [id, rawId, type, response]
+description: |
+  Serialized `PublicKeyCredential` returned by the browser's
+  `navigator.credentials.create()` (registration) or
+  `navigator.credentials.get()` (authentication).
+
+  Follows the WebAuthn JSON serialization spec:
+  https://www.w3.org/TR/webauthn-3/#dictdef-authenticationresponsejson
+
+  All binary fields are Base64URL-encoded.
+properties:
+  id:
+    type: string
+    description: Base64URL credential ID (URL-safe string form).
+  rawId:
+    type: string
+    description: Base64URL raw credential ID bytes.
+  type:
+    type: string
+    const: public-key
+  response:
+    type: object
+    required: [clientDataJSON]
+    description: |
+      `AuthenticatorAttestationResponse` (register) or
+      `AuthenticatorAssertionResponse` (authenticate).
+      The server determines which ceremony this is from the gate's
+      `config.ceremony` value — not from the proof itself.
+    properties:
+      clientDataJSON:
+        type: string
+        description: |
+          Base64URL-encoded CollectedClientData. Contains the challenge,
+          origin, and type ("webauthn.create" or "webauthn.get").
+
+      # ── Registration (attestation) ──
+      attestationObject:
+        type: string
+        description: |
+          Base64URL-encoded attestation object. Contains the authenticator
+          data and attestation statement. Present only for `ceremony: register`.
+
+      # ── Authentication (assertion) ──
+      authenticatorData:
+        type: string
+        description: |
+          Base64URL-encoded authenticator data. Contains RP ID hash, flags,
+          and sign count. Present only for `ceremony: authenticate`.
+      signature:
+        type: string
+        description: |
+          Base64URL-encoded assertion signature. Verified against the stored
+          public key. Present only for `ceremony: authenticate`.
+      userHandle:
+        type: string
+        description: |
+          Base64URL-encoded user handle set during registration (`options.user.id`).
+          Present in authentication responses for discoverable credentials.
+          The server uses this to identify the user when `allowCredentials`
+          was empty (passwordless login).
+  authenticatorAttachment:
+    type: string
+    enum: [platform, cross-platform]
+    description: |
+      How the authenticator was attached during this ceremony. Informational —
+      not used for verification, but useful for display ("Signed in with Touch ID").

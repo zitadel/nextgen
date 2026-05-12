@@ -6,8 +6,9 @@ properties:
   action:
     type: string
     description: |
-      Which action to take. Either:
-      - A key from the step's `actions` dictionary (e.g., "submit", "register", "back")
+      Which action to take. Must be a key from the step's `actions` dictionary:
+      - A regular action (e.g., "submit", "register", "back")
+      - An action with a `ceremony` (e.g., "passkey") — requires `ceremony_proof`
       - The reserved value "sso" — triggers SSO redirect (requires `sso_provider_id`)
   fields:
     type: object
@@ -20,9 +21,17 @@ properties:
     type: object
     description: |
       Solutions for security gates. Keys match gate names from the step's `gates` dictionary.
-      The orchestrator collects these from `<zl-captcha>` / `<zl-passkey>` component events.
+      The orchestrator collects these from `<zl-captcha>` component events.
     additionalProperties:
       type: string
+  ceremony_proof:
+    description: |
+      Result of a client-side ceremony triggered by the action.
+      Required when the selected action has a `ceremony` property.
+      The shape depends on the ceremony type:
+      - `passkey`: a `PasskeyProof` object (serialized PublicKeyCredential).
+        See `passkey-proof.yaml`.
+    $ref: passkey-proof.yaml
   sso_provider_id:
     type: string
     description: |

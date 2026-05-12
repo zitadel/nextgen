@@ -1,0 +1,119 @@
+type: object
+description: |
+  WebAuthn options passed directly to the browser's credential API.
+  Binary fields (challenge, user.id, credential IDs) are Base64URL-encoded.
+
+  The ceremony type (register vs authenticate) is inferred from the
+  presence of `rp`+`user` (register) or `allowCredentials` (authenticate).
+  When `allowCredentials` is empty or absent, discoverable credential
+  mode is used — the assertion's `response.userHandle` identifies the user.
+properties:
+  # ── Shared ──
+  challenge:
+    type: string
+    description: Base64URL-encoded random challenge bytes.
+  rpId:
+    type: string
+    description: Relying Party identifier (must match the current domain or a registrable suffix).
+    example: "login.acme.com"
+  timeout:
+    type: integer
+    default: 60000
+    description: Timeout in milliseconds.
+  userVerification:
+    type: string
+    enum: [required, preferred, discouraged]
+    default: preferred
+    description: |
+      Whether the authenticator must verify the user (biometric/PIN).
+      `required` is needed for AAL2+ passkey usage.
+
+  # ── Registration only ──
+  rp:
+    type: object
+    description: Relying Party information (registration only).
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+  user:
+    type: object
+    description: |
+      User information for registration. `id` is an opaque handle
+      (not the login name) — used to identify the user in future
+      discoverable credential assertions via `response.userHandle`.
+    properties:
+      id:
+        type: string
+        description: Base64URL-encoded opaque user handle.
+      name:
+        type: string
+        description: Human-readable account identifier (e.g. email).
+      displayName:
+        type: string
+        description: Human-readable display name.
+  pubKeyCredParams:
+    type: array
+    description: Acceptable public key algorithms, ordered by preference.
+    items:
+      type: object
+      required: [type, alg]
+      properties:
+        type:
+          type: string
+          const: public-key
+        alg:
+          type: integer
+          description: "COSE algorithm identifier. -7 = ES256, -257 = RS256."
+  excludeCredentials:
+    type: array
+    description: |
+      Credential IDs already registered for this user. Prevents
+      duplicate registration — the authenticator rejects creation
+      if any of these IDs match.
+    items:
+      $ref: passkey-credential-descriptor.yaml
+  authenticatorSelection:
+    type: object
+    description: Constraints on the authenticator type and capabilities.
+    properties:
+      authenticatorAttachment:
+        type: string
+        enum: [platform, cross-platform]
+        description: |
+          `platform`: built-in authenticator (Touch ID, Windows Hello).
+          `cross-platform`: roaming authenticator (YubiKey, phone via hybrid).
+      residentKey:
+        type: string
+        enum: [required, preferred, discouraged]
+        default: preferred
+        description: |
+          Whether a discoverable (resident) credential is needed.
+          `required` or `preferred` enables passwordless login via
+          conditional UI / autofill.
+      userVerification:
+        type: string
+        enum: [required, preferred, discouraged]
+        default: preferred
+  attestation:
+    type: string
+    enum: [none, indirect, direct, enterprise]
+    default: none
+    description: |
+      Attestation conveyance preference.
+      `none` (default): privacy-preserving — authenticator model not revealed.
+      `direct`: enterprise — server verifies authenticator model against FIDO MDS.
+
+  # ── Authentication only ──
+  allowCredentials:
+    type: array
+    description: |
+      Credential IDs the user has registered. Determines the authentication mode:
+      - Absent or empty `[]`: discoverable credential mode — browser shows its
+        native passkey picker. The assertion's `response.userHandle` identifies
+        the user. No prior identification step needed.
+      - Populated: server-side mode — browser prompts only for matching credentials.
+        Requires the user to be identified first (email/identifier step).
+    items:
+      $ref: passkey-credential-descriptor.yaml
