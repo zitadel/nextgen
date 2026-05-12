@@ -1,0 +1,46 @@
+-- +goose NO TRANSACTION
+-- +goose Up
+-- +goose StatementBegin
+CREATE TABLE auth_attempts (
+    project_id      STRING(MAX) NOT NULL,
+    id              STRING(MAX) NOT NULL,
+    handoff_token   STRING(MAX),
+    handed_off_at   TIMESTAMP,
+    session_id      STRING(MAX),
+    required_checks ARRAY<INT64>,
+    created_at      TIMESTAMP   NOT NULL DEFAULT (CURRENT_TIMESTAMP()),
+    completed_at    TIMESTAMP,
+    time_to_live    INT64,
+    FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE,
+) PRIMARY KEY (project_id, id)
+-- +goose StatementEnd
+-- +goose StatementBegin
+CREATE UNIQUE NULL_FILTERED INDEX idx_auth_attempts_handoff_token
+    ON auth_attempts (project_id, handoff_token)
+-- +goose StatementEnd
+-- +goose StatementBegin
+CREATE TABLE auth_attempt_checks (
+    project_id          STRING(MAX) NOT NULL,
+    auth_attempt_id     STRING(MAX) NOT NULL,
+    type                INT64       NOT NULL,
+    last_challenged_at  TIMESTAMP,
+    last_verified_at    TIMESTAMP,
+    last_failed_at      TIMESTAMP,
+    failure_count       INT64       NOT NULL DEFAULT (0),
+    challenge_payload   JSON,
+    factor_payload      JSON,
+    FOREIGN KEY (project_id, auth_attempt_id) REFERENCES auth_attempts (project_id, id) ON DELETE CASCADE,
+) PRIMARY KEY (project_id, auth_attempt_id, type)
+-- +goose StatementEnd
+
+-- +goose Down
+-- +goose NO TRANSACTION
+-- +goose StatementBegin
+DROP TABLE IF EXISTS auth_attempt_checks
+-- +goose StatementEnd
+-- +goose StatementBegin
+DROP INDEX IF EXISTS idx_auth_attempts_handoff_token
+-- +goose StatementEnd
+-- +goose StatementBegin
+DROP TABLE IF EXISTS auth_attempts
+-- +goose StatementEnd

@@ -2,55 +2,43 @@ package spanner
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 var (
-	_          database.Connector = (*Config)(nil)
-	Name                          = "spanner"
-	isMigrated bool
+	_    database.Connector = (*Config)(nil)
+	Name                    = "spanner"
 )
 
-// Config holds connection settings for a Spanner database accessed via PGAdapter,
-// which exposes the Spanner PostgreSQL dialect over the PostgreSQL wire protocol.
+// Config holds connection settings for a Spanner database accessed via the
+// go-sql-spanner driver (GoogleSQL dialect).
+// DSN format: projects/<project>/instances/<instance>/databases/<database>
 type Config struct {
-	*pgxpool.Config
-	*pgxpool.Pool
+	DSN string
 }
 
 func (c *Config) Connect(ctx context.Context) (database.Pool, error) {
-	pool, err := c.getPool(ctx)
+	db, err := sql.Open("spanner", c.DSN)
 	if err != nil {
 		return nil, wrapError(err)
 	}
+	pool := &spannerPool{db: db}
 	if err = pool.Ping(ctx); err != nil {
-		return nil, wrapError(err)
-	}
-	return &pgxPool{Pool: pool}, nil
-}
-
-func (c *Config) getPool(ctx context.Context) (*pgxpool.Pool, error) {
-	if c.Pool != nil {
-		return c.Pool, nil
-	}
-	return pgxpool.NewWithConfig(ctx, c.Config)
-}
-
-// DecodeConfig parses a PostgreSQL connection URL for a PGAdapter endpoint.
-// The database name must be a Spanner resource path, e.g.
-// projects/my-project/instances/my-instance/databases/my-db.
-func DecodeConfig(input any) (database.Connector, error) {
-	c, ok := input.(string)
-	if !ok {
-		return nil, errors.New("invalid configuration: expected connection URL string")
-	}
-
-	config, err := pgxpool.ParseConfig(c)
-	if err != nil {
+		_ = db.Close()
 		return nil, err
 	}
-	return &Config{Config: config}, nil
+	return pool, nil
+}
+
+// DecodeConfig parses a Spanner DSN string.
+// Expected format: projects/<project>/instances/<instance>/databases/<database>
+func DecodeConfig(input any) (database.Connector, error) {
+	dsn, ok := input.(string)
+	if !ok {
+		return nil, errors.New("invalid configuration: expected DSN string")
+	}
+	return &Config{DSN: dsn}, nil
 }
