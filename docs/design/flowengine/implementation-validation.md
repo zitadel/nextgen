@@ -30,7 +30,7 @@ else.
 | no uniqueness on `name` | `UNIQUE (project_id, name, schema_version)` | DDL |
 
 > **Future optimization.** Audience filtering currently scans every row's
-> JSONB. When the flow service outgrows in-memory filtering, promote
+> JSONB. When the selector outgrows in-memory filtering, promote
 > `team_ids` / `app_ids` / `user_schema` to top-level columns with indexes —
 > `purposes` is the existing precedent.
 

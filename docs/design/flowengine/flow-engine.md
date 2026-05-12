@@ -42,7 +42,7 @@ POST /flows
 | `redirect_uri` | Where to send the user on completion (from the auth request or explicit) |
 | `hint.login_name` | Auto-submits identifier step (OIDC `login_hint`) |
 | `hint.team_id` | Scopes flow resolution to a team |
-| `hint.user_schema_id` | Scopes to a specific user type |
+| `hint.schema_id` | Scopes to a specific user type |
 | `hint.app_id` | Scopes to a specific application |
 
 ### Flow Resolution
