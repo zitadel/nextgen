@@ -6,11 +6,7 @@ properties:
   project_id:
     $ref: "../../components/schemas/project-id.yaml"
   challenge_nonce:
-    type: string
-    description: |
-      Optional. The challenge nonce from POST /bootstrap/challenge.
-      This nonce is origin-bound (for browser clients) and single-use.
-    example: nonce_abc123def456
+    $ref: "../../components/schemas/challenge-nonce.yaml"
   session_id:
     description: |
       Optional. If provided, this attempt adds factors to an existing session (step-up auth).
