@@ -1,7 +1,7 @@
 # ADR 010: Session, Auth Attempt, and Check Persistence
 
-> **Status:** Proposed  
-> **Date:** 2026-05-12  
+> **Status:** Proposed
+> **Date:** 2026-05-12
 > **Context:** Interactive authentication persistence for nextgen
 
 ## Context
@@ -36,14 +36,15 @@ Relationships:
 
 * A **SESSION** belongs to exactly one **USER** and one **USER_AGENT**.
 * An **AUTH_ATTEMPT** has many **CHECK** rows; a **SESSION** has many **CHECK** rows after handoff.
-* **AUTH_ATTEMPT** optionally references **SESSION** (`session_id` null for first login until handoff; set for step-up / re-auth on an existing session).
-* Each **CHECK** references one **AUTHENTICATOR**; each **AUTHENTICATOR** belongs to one **USER**.
+* An **AUTH_ATTEMPT** optionally references **SESSION** (`session_id` null for first login until handoff; set for step-up / re-auth on an existing session).
+* A **CHECK** references one **AUTHENTICATOR** and may reference zero or one **AUTH_ATTEMPT** and zero or one **SESSION**, depending on lifecycle: before handoff `session_id` may be null; after handoff `auth_attempt_id` may be cleared.
+* Each **AUTHENTICATOR** belongs to one **USER**.
 * **CHECK** may reference another **CHECK** via **`supersedes`**: the newer row points at the older row it replaces (abandoned or retried flow). Queries for “current” checks exclude superseded rows or use time ordering, depending on the read path.
 
 ```mermaid
 erDiagram
-    sessions ||--o{ checks : asserts
-    auth_attempts ||--o{ checks : challenges
+    sessions o|--o{ checks : asserts
+    auth_attempts o|--o{ checks : challenges
     auth_attempts }o--o| sessions : step_up
     sessions }o--|| user_agents : authenticated_on
     sessions }o--|| users : belongs_to
