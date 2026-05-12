@@ -27,8 +27,10 @@ properties:
   schema_uri:
     type: string
     format: uri
-    description: URI of the flow definition schema this definition was authored against (echoed from the request).
-    example:  https://raw.githubusercontent.com/zitadel/nextgen/refs/tags/schema/v1.0.0/api/openapi/endpoints/schemas/flow-definition.yaml
+    description: |
+      URI of the flow definition schema this definition was authored against.
+      If the schema_uri was not provided in the request, the flow definition is validated against the latest version of the schema, and the response includes the schema_uri of the latest version.
+    example: https://raw.githubusercontent.com/zitadel/nextgen/refs/tags/schema/v1.0.0/api/openapi/endpoints/schemas/flow-definition.yaml
   status:
     type: string
     description: Status of the flow definition.
