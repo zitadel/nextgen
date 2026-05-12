@@ -4,13 +4,7 @@
   "title": "Example User",
   "type": "object",
   "additionalProperties": true,
-  "required": [
-    "$id",
-    "username",
-    "email",
-    "email_verified",
-    "nickname"
-  ],
+  "required": ["$id", "username", "email", "email_verified", "nickname"],
   "properties": {
     "$id": {
       "type": "string",
