@@ -130,7 +130,6 @@ type JSONSchemaResolver struct {
 	repository JSONSchemaRepository
 	// cache of fully resolved JSON schemas,
 	// keyed by projectID and schemaURL
-
 	cache           *lru.TwoQueueCache[string, *jsonschema.Schema]
 	maxResolveDepth int
 	maxSize         int
@@ -307,8 +306,8 @@ func (r *JSONSchemaResolver) getFromDatabase(ctx context.Context, client databas
 	}
 	dbSchema = &JSONSchema{
 		ProjectID: projectID,
-		URL:        schemaURL,
-		Schema:     data,
+		URL:       schemaURL,
+		Schema:    data,
 	}
 	if err := r.repository.Create(ctx, client, dbSchema); err != nil {
 		return nil, err

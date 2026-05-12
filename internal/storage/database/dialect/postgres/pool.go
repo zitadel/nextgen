@@ -41,7 +41,7 @@ func (p *Pool) Acquire(ctx context.Context) (database.Connection, error) {
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	return &pgxConn{Conn: conn, pool: p.Pool}, nil
+	return &pgxConn{Conn: conn, pool: p}, nil
 }
 
 // Query implements [database.Pool].
