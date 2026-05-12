@@ -975,7 +975,7 @@ func (s *Server) handleCreateFlowDefinitionRequest(args [0]string, argsEscaped b
 		}
 
 		type (
-			Request  = *FlowDefinition
+			Request  = *FlowDefinitionCreateRequest
 			Params   = struct{}
 			Response = CreateFlowDefinitionRes
 		)
@@ -6312,7 +6312,7 @@ func (s *Server) handleUpdateFlowDefinitionRequest(args [1]string, argsEscaped b
 		}
 
 		type (
-			Request  = *FlowDefinition
+			Request  = *FlowDefinitionUpdateRequest
 			Params   = UpdateFlowDefinitionParams
 			Response = UpdateFlowDefinitionRes
 		)

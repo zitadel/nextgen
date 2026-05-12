@@ -53,7 +53,7 @@ type Handler interface {
 	// audience, and the steps involved.
 	//
 	// POST /flow_definitions
-	CreateFlowDefinition(ctx context.Context, req *FlowDefinition) (CreateFlowDefinitionRes, error)
+	CreateFlowDefinition(ctx context.Context, req *FlowDefinitionCreateRequest) (CreateFlowDefinitionRes, error)
 	// CreateHandoff implements createHandoff operation.
 	//
 	// Completes the authentication attempt and mints a `handoff_token`.
@@ -293,7 +293,7 @@ type Handler interface {
 	// Update a flow definition by id.
 	//
 	// PATCH /flow_definitions/{id}
-	UpdateFlowDefinition(ctx context.Context, req *FlowDefinition, params UpdateFlowDefinitionParams) (UpdateFlowDefinitionRes, error)
+	UpdateFlowDefinition(ctx context.Context, req *FlowDefinitionUpdateRequest, params UpdateFlowDefinitionParams) (UpdateFlowDefinitionRes, error)
 	// VerifyChallengeProof implements verifyChallengeProof operation.
 	//
 	// Submits a proof (credential, code, assertion) to verify a factor challenge.

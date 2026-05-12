@@ -601,10 +601,10 @@ func (*CreateFlowDefinitionConflict) createFlowDefinitionRes() {}
 // Ref: #
 type CreateFlowRequest struct {
 	Purpose CreateFlowRequestPurpose `json:"purpose"`
-	// Human-readable identifier of a specific flow definition to use.
+	// Name of a specific flow definition to use.
 	// When omitted, the engine selects the best-matching definition
 	// based on purpose + audience context.
-	Slug OptString `json:"slug"`
+	FlowDefinitionName OptString `json:"flow_definition_name"`
 	// Semver version of the flow definition JSON Schema to use.
 	// When omitted, the latest version is used.
 	SchemaVersion OptString `json:"schema_version"`
@@ -626,9 +626,9 @@ func (s *CreateFlowRequest) GetPurpose() CreateFlowRequestPurpose {
 	return s.Purpose
 }
 
-// GetSlug returns the value of Slug.
-func (s *CreateFlowRequest) GetSlug() OptString {
-	return s.Slug
+// GetFlowDefinitionName returns the value of FlowDefinitionName.
+func (s *CreateFlowRequest) GetFlowDefinitionName() OptString {
+	return s.FlowDefinitionName
 }
 
 // GetSchemaVersion returns the value of SchemaVersion.
@@ -666,9 +666,9 @@ func (s *CreateFlowRequest) SetPurpose(val CreateFlowRequestPurpose) {
 	s.Purpose = val
 }
 
-// SetSlug sets the value of Slug.
-func (s *CreateFlowRequest) SetSlug(val OptString) {
-	s.Slug = val
+// SetFlowDefinitionName sets the value of FlowDefinitionName.
+func (s *CreateFlowRequest) SetFlowDefinitionName(val OptString) {
+	s.FlowDefinitionName = val
 }
 
 // SetSchemaVersion sets the value of SchemaVersion.
@@ -1488,15 +1488,9 @@ func (s *FlowAudience) SetAppIds(val []string) {
 	s.AppIds = val
 }
 
-// A flow definition is the server-side configuration that describes a complete
-// authentication or identity flow. It is NOT sent to the frontend — the flow
-// engine evaluates it and produces FlowResponse payloads (steps with capability
-// dictionaries) for the client.
-// Flow definitions are created by administrators and stored in the project/team
-// configuration hierarchy. The engine selects the matching definition based on
-// the purpose + audience when a flow is created via POST /flow.
+// Merged schema.
 // Ref: #
-type FlowDefinition struct {
+type FlowDefinitionCreateRequest struct {
 	// Stable identifier for this flow, used as the target of cross-flow
 	// `switch` and `pivot` transitions. Renaming is not supported — the
 	// `name` is part of the public contract another definition may
@@ -1509,87 +1503,180 @@ type FlowDefinition struct {
 	// User schema this flow operates on. Step `fields` reference properties
 	// defined in this schema. The engine resolves field types, validation,
 	// and implicit outcomes from schema annotations at runtime.
-	UserSchema string `json:"user_schema"`
+	UserSchema url.URL `json:"user_schema"`
 	// Which flow purposes this definition handles. A definition can serve
 	// multiple purposes (e.g. a combined login/register flow).
-	Purposes []FlowDefinitionPurposesItem `json:"purposes"`
+	Purposes []FlowDefinitionCreateRequestPurposesItem `json:"purposes"`
 	// Maps each purpose to the step name that starts the flow for that purpose.
 	// Keys must be a subset of `purposes`.
-	InitialSteps FlowDefinitionInitialSteps `json:"initial_steps"`
-	Audience     OptFlowAudience            `json:"audience"`
+	InitialSteps FlowDefinitionCreateRequestInitialSteps `json:"initial_steps"`
+	Audience     OptFlowAudience                         `json:"audience"`
 	// Ordered list of steps in this flow. The order is for human readability —
 	// actual step sequencing is determined by transitions.
-	Steps []FlowDefinitionStep `json:"steps"`
+	Steps     []FlowDefinitionStep `json:"steps"`
+	ProjectID ProjectID            `json:"project_id"`
 }
 
 // GetName returns the value of Name.
-func (s *FlowDefinition) GetName() string {
+func (s *FlowDefinitionCreateRequest) GetName() string {
 	return s.Name
 }
 
 // GetSchemaURI returns the value of SchemaURI.
-func (s *FlowDefinition) GetSchemaURI() OptURI {
+func (s *FlowDefinitionCreateRequest) GetSchemaURI() OptURI {
 	return s.SchemaURI
 }
 
 // GetUserSchema returns the value of UserSchema.
-func (s *FlowDefinition) GetUserSchema() string {
+func (s *FlowDefinitionCreateRequest) GetUserSchema() url.URL {
 	return s.UserSchema
 }
 
 // GetPurposes returns the value of Purposes.
-func (s *FlowDefinition) GetPurposes() []FlowDefinitionPurposesItem {
+func (s *FlowDefinitionCreateRequest) GetPurposes() []FlowDefinitionCreateRequestPurposesItem {
 	return s.Purposes
 }
 
 // GetInitialSteps returns the value of InitialSteps.
-func (s *FlowDefinition) GetInitialSteps() FlowDefinitionInitialSteps {
+func (s *FlowDefinitionCreateRequest) GetInitialSteps() FlowDefinitionCreateRequestInitialSteps {
 	return s.InitialSteps
 }
 
 // GetAudience returns the value of Audience.
-func (s *FlowDefinition) GetAudience() OptFlowAudience {
+func (s *FlowDefinitionCreateRequest) GetAudience() OptFlowAudience {
 	return s.Audience
 }
 
 // GetSteps returns the value of Steps.
-func (s *FlowDefinition) GetSteps() []FlowDefinitionStep {
+func (s *FlowDefinitionCreateRequest) GetSteps() []FlowDefinitionStep {
 	return s.Steps
 }
 
+// GetProjectID returns the value of ProjectID.
+func (s *FlowDefinitionCreateRequest) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
 // SetName sets the value of Name.
-func (s *FlowDefinition) SetName(val string) {
+func (s *FlowDefinitionCreateRequest) SetName(val string) {
 	s.Name = val
 }
 
 // SetSchemaURI sets the value of SchemaURI.
-func (s *FlowDefinition) SetSchemaURI(val OptURI) {
+func (s *FlowDefinitionCreateRequest) SetSchemaURI(val OptURI) {
 	s.SchemaURI = val
 }
 
 // SetUserSchema sets the value of UserSchema.
-func (s *FlowDefinition) SetUserSchema(val string) {
+func (s *FlowDefinitionCreateRequest) SetUserSchema(val url.URL) {
 	s.UserSchema = val
 }
 
 // SetPurposes sets the value of Purposes.
-func (s *FlowDefinition) SetPurposes(val []FlowDefinitionPurposesItem) {
+func (s *FlowDefinitionCreateRequest) SetPurposes(val []FlowDefinitionCreateRequestPurposesItem) {
 	s.Purposes = val
 }
 
 // SetInitialSteps sets the value of InitialSteps.
-func (s *FlowDefinition) SetInitialSteps(val FlowDefinitionInitialSteps) {
+func (s *FlowDefinitionCreateRequest) SetInitialSteps(val FlowDefinitionCreateRequestInitialSteps) {
 	s.InitialSteps = val
 }
 
 // SetAudience sets the value of Audience.
-func (s *FlowDefinition) SetAudience(val OptFlowAudience) {
+func (s *FlowDefinitionCreateRequest) SetAudience(val OptFlowAudience) {
 	s.Audience = val
 }
 
 // SetSteps sets the value of Steps.
-func (s *FlowDefinition) SetSteps(val []FlowDefinitionStep) {
+func (s *FlowDefinitionCreateRequest) SetSteps(val []FlowDefinitionStep) {
 	s.Steps = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *FlowDefinitionCreateRequest) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// Maps each purpose to the step name that starts the flow for that purpose.
+// Keys must be a subset of `purposes`.
+type FlowDefinitionCreateRequestInitialSteps map[string]string
+
+func (s *FlowDefinitionCreateRequestInitialSteps) init() FlowDefinitionCreateRequestInitialSteps {
+	m := *s
+	if m == nil {
+		m = map[string]string{}
+		*s = m
+	}
+	return m
+}
+
+type FlowDefinitionCreateRequestPurposesItem string
+
+const (
+	FlowDefinitionCreateRequestPurposesItemLogin       FlowDefinitionCreateRequestPurposesItem = "login"
+	FlowDefinitionCreateRequestPurposesItemRegister    FlowDefinitionCreateRequestPurposesItem = "register"
+	FlowDefinitionCreateRequestPurposesItemRecovery    FlowDefinitionCreateRequestPurposesItem = "recovery"
+	FlowDefinitionCreateRequestPurposesItemProfiling   FlowDefinitionCreateRequestPurposesItem = "profiling"
+	FlowDefinitionCreateRequestPurposesItemReauth      FlowDefinitionCreateRequestPurposesItem = "reauth"
+	FlowDefinitionCreateRequestPurposesItemLinkAccount FlowDefinitionCreateRequestPurposesItem = "link_account"
+)
+
+// AllValues returns all FlowDefinitionCreateRequestPurposesItem values.
+func (FlowDefinitionCreateRequestPurposesItem) AllValues() []FlowDefinitionCreateRequestPurposesItem {
+	return []FlowDefinitionCreateRequestPurposesItem{
+		FlowDefinitionCreateRequestPurposesItemLogin,
+		FlowDefinitionCreateRequestPurposesItemRegister,
+		FlowDefinitionCreateRequestPurposesItemRecovery,
+		FlowDefinitionCreateRequestPurposesItemProfiling,
+		FlowDefinitionCreateRequestPurposesItemReauth,
+		FlowDefinitionCreateRequestPurposesItemLinkAccount,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FlowDefinitionCreateRequestPurposesItem) MarshalText() ([]byte, error) {
+	switch s {
+	case FlowDefinitionCreateRequestPurposesItemLogin:
+		return []byte(s), nil
+	case FlowDefinitionCreateRequestPurposesItemRegister:
+		return []byte(s), nil
+	case FlowDefinitionCreateRequestPurposesItemRecovery:
+		return []byte(s), nil
+	case FlowDefinitionCreateRequestPurposesItemProfiling:
+		return []byte(s), nil
+	case FlowDefinitionCreateRequestPurposesItemReauth:
+		return []byte(s), nil
+	case FlowDefinitionCreateRequestPurposesItemLinkAccount:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FlowDefinitionCreateRequestPurposesItem) UnmarshalText(data []byte) error {
+	switch FlowDefinitionCreateRequestPurposesItem(data) {
+	case FlowDefinitionCreateRequestPurposesItemLogin:
+		*s = FlowDefinitionCreateRequestPurposesItemLogin
+		return nil
+	case FlowDefinitionCreateRequestPurposesItemRegister:
+		*s = FlowDefinitionCreateRequestPurposesItemRegister
+		return nil
+	case FlowDefinitionCreateRequestPurposesItemRecovery:
+		*s = FlowDefinitionCreateRequestPurposesItemRecovery
+		return nil
+	case FlowDefinitionCreateRequestPurposesItemProfiling:
+		*s = FlowDefinitionCreateRequestPurposesItemProfiling
+		return nil
+	case FlowDefinitionCreateRequestPurposesItemReauth:
+		*s = FlowDefinitionCreateRequestPurposesItemReauth
+		return nil
+	case FlowDefinitionCreateRequestPurposesItemLinkAccount:
+		*s = FlowDefinitionCreateRequestPurposesItemLinkAccount
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
 }
 
 // Merged schema.
@@ -1607,7 +1694,7 @@ type FlowDefinitionDetailResponse struct {
 	// User schema this flow operates on. Step `fields` reference properties
 	// defined in this schema. The engine resolves field types, validation,
 	// and implicit outcomes from schema annotations at runtime.
-	UserSchema string `json:"user_schema"`
+	UserSchema url.URL `json:"user_schema"`
 	// Which flow purposes this definition handles. A definition can serve
 	// multiple purposes (e.g. a combined login/register flow).
 	Purposes []FlowDefinitionDetailResponsePurposesItem `json:"purposes"`
@@ -1639,7 +1726,7 @@ func (s *FlowDefinitionDetailResponse) GetSchemaURI() OptURI {
 }
 
 // GetUserSchema returns the value of UserSchema.
-func (s *FlowDefinitionDetailResponse) GetUserSchema() string {
+func (s *FlowDefinitionDetailResponse) GetUserSchema() url.URL {
 	return s.UserSchema
 }
 
@@ -1699,7 +1786,7 @@ func (s *FlowDefinitionDetailResponse) SetSchemaURI(val OptURI) {
 }
 
 // SetUserSchema sets the value of UserSchema.
-func (s *FlowDefinitionDetailResponse) SetUserSchema(val string) {
+func (s *FlowDefinitionDetailResponse) SetUserSchema(val url.URL) {
 	s.UserSchema = val
 }
 
@@ -1833,19 +1920,6 @@ func (s *FlowDefinitionDetailResponsePurposesItem) UnmarshalText(data []byte) er
 	}
 }
 
-// Maps each purpose to the step name that starts the flow for that purpose.
-// Keys must be a subset of `purposes`.
-type FlowDefinitionInitialSteps map[string]string
-
-func (s *FlowDefinitionInitialSteps) init() FlowDefinitionInitialSteps {
-	m := *s
-	if m == nil {
-		m = map[string]string{}
-		*s = m
-	}
-	return m
-}
-
 // Ref: #
 type FlowDefinitionListResponse struct {
 	FlowDefinitions []FlowDefinitionResponse `json:"flow_definitions"`
@@ -1874,75 +1948,6 @@ func (s *FlowDefinitionListResponse) SetNextPageToken(val OptNilPageToken) {
 }
 
 func (*FlowDefinitionListResponse) listFlowDefinitionsRes() {}
-
-type FlowDefinitionPurposesItem string
-
-const (
-	FlowDefinitionPurposesItemLogin       FlowDefinitionPurposesItem = "login"
-	FlowDefinitionPurposesItemRegister    FlowDefinitionPurposesItem = "register"
-	FlowDefinitionPurposesItemRecovery    FlowDefinitionPurposesItem = "recovery"
-	FlowDefinitionPurposesItemProfiling   FlowDefinitionPurposesItem = "profiling"
-	FlowDefinitionPurposesItemReauth      FlowDefinitionPurposesItem = "reauth"
-	FlowDefinitionPurposesItemLinkAccount FlowDefinitionPurposesItem = "link_account"
-)
-
-// AllValues returns all FlowDefinitionPurposesItem values.
-func (FlowDefinitionPurposesItem) AllValues() []FlowDefinitionPurposesItem {
-	return []FlowDefinitionPurposesItem{
-		FlowDefinitionPurposesItemLogin,
-		FlowDefinitionPurposesItemRegister,
-		FlowDefinitionPurposesItemRecovery,
-		FlowDefinitionPurposesItemProfiling,
-		FlowDefinitionPurposesItemReauth,
-		FlowDefinitionPurposesItemLinkAccount,
-	}
-}
-
-// MarshalText implements encoding.TextMarshaler.
-func (s FlowDefinitionPurposesItem) MarshalText() ([]byte, error) {
-	switch s {
-	case FlowDefinitionPurposesItemLogin:
-		return []byte(s), nil
-	case FlowDefinitionPurposesItemRegister:
-		return []byte(s), nil
-	case FlowDefinitionPurposesItemRecovery:
-		return []byte(s), nil
-	case FlowDefinitionPurposesItemProfiling:
-		return []byte(s), nil
-	case FlowDefinitionPurposesItemReauth:
-		return []byte(s), nil
-	case FlowDefinitionPurposesItemLinkAccount:
-		return []byte(s), nil
-	default:
-		return nil, errors.Errorf("invalid value: %q", s)
-	}
-}
-
-// UnmarshalText implements encoding.TextUnmarshaler.
-func (s *FlowDefinitionPurposesItem) UnmarshalText(data []byte) error {
-	switch FlowDefinitionPurposesItem(data) {
-	case FlowDefinitionPurposesItemLogin:
-		*s = FlowDefinitionPurposesItemLogin
-		return nil
-	case FlowDefinitionPurposesItemRegister:
-		*s = FlowDefinitionPurposesItemRegister
-		return nil
-	case FlowDefinitionPurposesItemRecovery:
-		*s = FlowDefinitionPurposesItemRecovery
-		return nil
-	case FlowDefinitionPurposesItemProfiling:
-		*s = FlowDefinitionPurposesItemProfiling
-		return nil
-	case FlowDefinitionPurposesItemReauth:
-		*s = FlowDefinitionPurposesItemReauth
-		return nil
-	case FlowDefinitionPurposesItemLinkAccount:
-		*s = FlowDefinitionPurposesItemLinkAccount
-		return nil
-	default:
-		return errors.Errorf("invalid value: %q", data)
-	}
-}
 
 // Response object for a flow definition after creation.
 // Ref: #
@@ -2297,7 +2302,7 @@ func (s *FlowDefinitionStepTransitions) init() FlowDefinitionStepTransitions {
 }
 
 type FlowDefinitionStepTransitionsItem struct {
-	// Step name within this flow (when `action` is null), or the slug
+	// Step name within this flow (when `action` is null), or the name
 	// of another flow (when `action` is `switch` or `pivot`).
 	Target string `json:"target"`
 	// How to interpret `target`:
@@ -2366,6 +2371,159 @@ func (s *FlowDefinitionStepTransitionsItemAction) UnmarshalText(data []byte) err
 		return nil
 	case FlowDefinitionStepTransitionsItemActionPivot:
 		*s = FlowDefinitionStepTransitionsItemActionPivot
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Partial update for a flow definition. Only provided fields are replaced;
+// omitted fields retain their current server-side values.
+// Array fields (`steps`, `purposes`, `initial_steps`) are treated atomically:
+// if provided, the entire array/object is replaced. If omitted, the current
+// value is preserved unchanged.
+// `name` is a stable identifier and cannot be changed after creation.
+// Ref: #
+type FlowDefinitionUpdateRequest struct {
+	// User schema this flow operates on. Replaces the current value if provided.
+	UserSchema OptURI `json:"user_schema"`
+	// Replaces the full list of purposes this definition handles if provided.
+	Purposes []FlowDefinitionUpdateRequestPurposesItem `json:"purposes"`
+	// Replaces the full map of purpose-to-initial-step if provided.
+	// Keys must be a subset of `purposes`.
+	InitialSteps OptFlowDefinitionUpdateRequestInitialSteps `json:"initial_steps"`
+	Audience     OptFlowAudience                            `json:"audience"`
+	// Replaces the full steps array if provided. Partial step lists are not
+	// supported — supply all steps when updating this field.
+	Steps []FlowDefinitionStep `json:"steps"`
+}
+
+// GetUserSchema returns the value of UserSchema.
+func (s *FlowDefinitionUpdateRequest) GetUserSchema() OptURI {
+	return s.UserSchema
+}
+
+// GetPurposes returns the value of Purposes.
+func (s *FlowDefinitionUpdateRequest) GetPurposes() []FlowDefinitionUpdateRequestPurposesItem {
+	return s.Purposes
+}
+
+// GetInitialSteps returns the value of InitialSteps.
+func (s *FlowDefinitionUpdateRequest) GetInitialSteps() OptFlowDefinitionUpdateRequestInitialSteps {
+	return s.InitialSteps
+}
+
+// GetAudience returns the value of Audience.
+func (s *FlowDefinitionUpdateRequest) GetAudience() OptFlowAudience {
+	return s.Audience
+}
+
+// GetSteps returns the value of Steps.
+func (s *FlowDefinitionUpdateRequest) GetSteps() []FlowDefinitionStep {
+	return s.Steps
+}
+
+// SetUserSchema sets the value of UserSchema.
+func (s *FlowDefinitionUpdateRequest) SetUserSchema(val OptURI) {
+	s.UserSchema = val
+}
+
+// SetPurposes sets the value of Purposes.
+func (s *FlowDefinitionUpdateRequest) SetPurposes(val []FlowDefinitionUpdateRequestPurposesItem) {
+	s.Purposes = val
+}
+
+// SetInitialSteps sets the value of InitialSteps.
+func (s *FlowDefinitionUpdateRequest) SetInitialSteps(val OptFlowDefinitionUpdateRequestInitialSteps) {
+	s.InitialSteps = val
+}
+
+// SetAudience sets the value of Audience.
+func (s *FlowDefinitionUpdateRequest) SetAudience(val OptFlowAudience) {
+	s.Audience = val
+}
+
+// SetSteps sets the value of Steps.
+func (s *FlowDefinitionUpdateRequest) SetSteps(val []FlowDefinitionStep) {
+	s.Steps = val
+}
+
+// Replaces the full map of purpose-to-initial-step if provided.
+// Keys must be a subset of `purposes`.
+type FlowDefinitionUpdateRequestInitialSteps map[string]string
+
+func (s *FlowDefinitionUpdateRequestInitialSteps) init() FlowDefinitionUpdateRequestInitialSteps {
+	m := *s
+	if m == nil {
+		m = map[string]string{}
+		*s = m
+	}
+	return m
+}
+
+type FlowDefinitionUpdateRequestPurposesItem string
+
+const (
+	FlowDefinitionUpdateRequestPurposesItemLogin       FlowDefinitionUpdateRequestPurposesItem = "login"
+	FlowDefinitionUpdateRequestPurposesItemRegister    FlowDefinitionUpdateRequestPurposesItem = "register"
+	FlowDefinitionUpdateRequestPurposesItemRecovery    FlowDefinitionUpdateRequestPurposesItem = "recovery"
+	FlowDefinitionUpdateRequestPurposesItemProfiling   FlowDefinitionUpdateRequestPurposesItem = "profiling"
+	FlowDefinitionUpdateRequestPurposesItemReauth      FlowDefinitionUpdateRequestPurposesItem = "reauth"
+	FlowDefinitionUpdateRequestPurposesItemLinkAccount FlowDefinitionUpdateRequestPurposesItem = "link_account"
+)
+
+// AllValues returns all FlowDefinitionUpdateRequestPurposesItem values.
+func (FlowDefinitionUpdateRequestPurposesItem) AllValues() []FlowDefinitionUpdateRequestPurposesItem {
+	return []FlowDefinitionUpdateRequestPurposesItem{
+		FlowDefinitionUpdateRequestPurposesItemLogin,
+		FlowDefinitionUpdateRequestPurposesItemRegister,
+		FlowDefinitionUpdateRequestPurposesItemRecovery,
+		FlowDefinitionUpdateRequestPurposesItemProfiling,
+		FlowDefinitionUpdateRequestPurposesItemReauth,
+		FlowDefinitionUpdateRequestPurposesItemLinkAccount,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FlowDefinitionUpdateRequestPurposesItem) MarshalText() ([]byte, error) {
+	switch s {
+	case FlowDefinitionUpdateRequestPurposesItemLogin:
+		return []byte(s), nil
+	case FlowDefinitionUpdateRequestPurposesItemRegister:
+		return []byte(s), nil
+	case FlowDefinitionUpdateRequestPurposesItemRecovery:
+		return []byte(s), nil
+	case FlowDefinitionUpdateRequestPurposesItemProfiling:
+		return []byte(s), nil
+	case FlowDefinitionUpdateRequestPurposesItemReauth:
+		return []byte(s), nil
+	case FlowDefinitionUpdateRequestPurposesItemLinkAccount:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FlowDefinitionUpdateRequestPurposesItem) UnmarshalText(data []byte) error {
+	switch FlowDefinitionUpdateRequestPurposesItem(data) {
+	case FlowDefinitionUpdateRequestPurposesItemLogin:
+		*s = FlowDefinitionUpdateRequestPurposesItemLogin
+		return nil
+	case FlowDefinitionUpdateRequestPurposesItemRegister:
+		*s = FlowDefinitionUpdateRequestPurposesItemRegister
+		return nil
+	case FlowDefinitionUpdateRequestPurposesItemRecovery:
+		*s = FlowDefinitionUpdateRequestPurposesItemRecovery
+		return nil
+	case FlowDefinitionUpdateRequestPurposesItemProfiling:
+		*s = FlowDefinitionUpdateRequestPurposesItemProfiling
+		return nil
+	case FlowDefinitionUpdateRequestPurposesItemReauth:
+		*s = FlowDefinitionUpdateRequestPurposesItemReauth
+		return nil
+	case FlowDefinitionUpdateRequestPurposesItemLinkAccount:
+		*s = FlowDefinitionUpdateRequestPurposesItemLinkAccount
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
@@ -5683,6 +5841,52 @@ func (o OptFlowDefinitionStepTransitions) Get() (v FlowDefinitionStepTransitions
 
 // Or returns value if set, or given parameter if does not.
 func (o OptFlowDefinitionStepTransitions) Or(d FlowDefinitionStepTransitions) FlowDefinitionStepTransitions {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptFlowDefinitionUpdateRequestInitialSteps returns new OptFlowDefinitionUpdateRequestInitialSteps with value set to v.
+func NewOptFlowDefinitionUpdateRequestInitialSteps(v FlowDefinitionUpdateRequestInitialSteps) OptFlowDefinitionUpdateRequestInitialSteps {
+	return OptFlowDefinitionUpdateRequestInitialSteps{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFlowDefinitionUpdateRequestInitialSteps is optional FlowDefinitionUpdateRequestInitialSteps.
+type OptFlowDefinitionUpdateRequestInitialSteps struct {
+	Value FlowDefinitionUpdateRequestInitialSteps
+	Set   bool
+}
+
+// IsSet returns true if OptFlowDefinitionUpdateRequestInitialSteps was set.
+func (o OptFlowDefinitionUpdateRequestInitialSteps) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFlowDefinitionUpdateRequestInitialSteps) Reset() {
+	var v FlowDefinitionUpdateRequestInitialSteps
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFlowDefinitionUpdateRequestInitialSteps) SetTo(v FlowDefinitionUpdateRequestInitialSteps) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFlowDefinitionUpdateRequestInitialSteps) Get() (v FlowDefinitionUpdateRequestInitialSteps, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFlowDefinitionUpdateRequestInitialSteps) Or(d FlowDefinitionUpdateRequestInitialSteps) FlowDefinitionUpdateRequestInitialSteps {
 	if v, ok := o.Get(); ok {
 		return v
 	}

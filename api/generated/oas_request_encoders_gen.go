@@ -43,7 +43,7 @@ func encodeCreateFlowRequest(
 }
 
 func encodeCreateFlowDefinitionRequest(
-	req *FlowDefinition,
+	req *FlowDefinitionCreateRequest,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"
@@ -369,7 +369,7 @@ func encodeSubmitFlowStepRequest(
 }
 
 func encodeUpdateFlowDefinitionRequest(
-	req *FlowDefinition,
+	req *FlowDefinitionUpdateRequest,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"

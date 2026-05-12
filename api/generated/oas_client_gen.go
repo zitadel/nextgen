@@ -73,7 +73,7 @@ type Invoker interface {
 	// audience, and the steps involved.
 	//
 	// POST /flow_definitions
-	CreateFlowDefinition(ctx context.Context, request *FlowDefinition) (CreateFlowDefinitionRes, error)
+	CreateFlowDefinition(ctx context.Context, request *FlowDefinitionCreateRequest) (CreateFlowDefinitionRes, error)
 	// CreateHandoff invokes createHandoff operation.
 	//
 	// Completes the authentication attempt and mints a `handoff_token`.
@@ -313,7 +313,7 @@ type Invoker interface {
 	// Update a flow definition by id.
 	//
 	// PATCH /flow_definitions/{id}
-	UpdateFlowDefinition(ctx context.Context, request *FlowDefinition, params UpdateFlowDefinitionParams) (UpdateFlowDefinitionRes, error)
+	UpdateFlowDefinition(ctx context.Context, request *FlowDefinitionUpdateRequest, params UpdateFlowDefinitionParams) (UpdateFlowDefinitionRes, error)
 	// VerifyChallengeProof invokes verifyChallengeProof operation.
 	//
 	// Submits a proof (credential, code, assertion) to verify a factor challenge.
@@ -1082,12 +1082,12 @@ func (c *Client) sendCreateFlow(ctx context.Context, request *CreateFlowRequest)
 // audience, and the steps involved.
 //
 // POST /flow_definitions
-func (c *Client) CreateFlowDefinition(ctx context.Context, request *FlowDefinition) (CreateFlowDefinitionRes, error) {
+func (c *Client) CreateFlowDefinition(ctx context.Context, request *FlowDefinitionCreateRequest) (CreateFlowDefinitionRes, error) {
 	res, err := c.sendCreateFlowDefinition(ctx, request)
 	return res, err
 }
 
-func (c *Client) sendCreateFlowDefinition(ctx context.Context, request *FlowDefinition) (res CreateFlowDefinitionRes, err error) {
+func (c *Client) sendCreateFlowDefinition(ctx context.Context, request *FlowDefinitionCreateRequest) (res CreateFlowDefinitionRes, err error) {
 	// Validate request before sending.
 	if err := func() error {
 		if err := request.Validate(); err != nil {
@@ -4589,12 +4589,12 @@ func (c *Client) sendSubmitFlowStep(ctx context.Context, request *FlowSubmitRequ
 // Update a flow definition by id.
 //
 // PATCH /flow_definitions/{id}
-func (c *Client) UpdateFlowDefinition(ctx context.Context, request *FlowDefinition, params UpdateFlowDefinitionParams) (UpdateFlowDefinitionRes, error) {
+func (c *Client) UpdateFlowDefinition(ctx context.Context, request *FlowDefinitionUpdateRequest, params UpdateFlowDefinitionParams) (UpdateFlowDefinitionRes, error) {
 	res, err := c.sendUpdateFlowDefinition(ctx, request, params)
 	return res, err
 }
 
-func (c *Client) sendUpdateFlowDefinition(ctx context.Context, request *FlowDefinition, params UpdateFlowDefinitionParams) (res UpdateFlowDefinitionRes, err error) {
+func (c *Client) sendUpdateFlowDefinition(ctx context.Context, request *FlowDefinitionUpdateRequest, params UpdateFlowDefinitionParams) (res UpdateFlowDefinitionRes, err error) {
 	// Validate request before sending.
 	if err := func() error {
 		if err := request.Validate(); err != nil {

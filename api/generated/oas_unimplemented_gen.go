@@ -70,7 +70,7 @@ func (UnimplementedHandler) CreateFlow(ctx context.Context, req *CreateFlowReque
 // audience, and the steps involved.
 //
 // POST /flow_definitions
-func (UnimplementedHandler) CreateFlowDefinition(ctx context.Context, req *FlowDefinition) (r CreateFlowDefinitionRes, _ error) {
+func (UnimplementedHandler) CreateFlowDefinition(ctx context.Context, req *FlowDefinitionCreateRequest) (r CreateFlowDefinitionRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -394,7 +394,7 @@ func (UnimplementedHandler) SubmitFlowStep(ctx context.Context, req *FlowSubmitR
 // Update a flow definition by id.
 //
 // PATCH /flow_definitions/{id}
-func (UnimplementedHandler) UpdateFlowDefinition(ctx context.Context, req *FlowDefinition, params UpdateFlowDefinitionParams) (r UpdateFlowDefinitionRes, _ error) {
+func (UnimplementedHandler) UpdateFlowDefinition(ctx context.Context, req *FlowDefinitionUpdateRequest, params UpdateFlowDefinitionParams) (r UpdateFlowDefinitionRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
