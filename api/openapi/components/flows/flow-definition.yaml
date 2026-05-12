@@ -31,6 +31,7 @@ properties:
 
   user_schema:
     type: string
+    format: uri
     description: |
       User schema this flow operates on. Step `fields` reference properties
       defined in this schema. The engine resolves field types, validation,
@@ -43,6 +44,7 @@ properties:
       type: string
       enum: [login, register, recovery, profiling, reauth, link_account]
     minItems: 1
+    uniqueItems: true
     description: |
       Which flow purposes this definition handles. A definition can serve
       multiple purposes (e.g. a combined login/register flow).
@@ -52,6 +54,10 @@ properties:
     description: |
       Maps each purpose to the step name that starts the flow for that purpose.
       Keys must be a subset of `purposes`.
+    minProperties: 1
+    propertyNames:
+      type: string
+      enum: [login, register, recovery, profiling, reauth, link_account]
     additionalProperties:
       type: string
     example:

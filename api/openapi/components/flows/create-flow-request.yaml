@@ -4,11 +4,11 @@ properties:
   purpose:
     type: string
     enum: [login, register, recovery, profiling, reauth, link_account]
-  slug:
+  flow_definition_name:
     type: string
     pattern: '^[a-z][a-z0-9-]*$'
     description: |
-      Human-readable identifier of a specific flow definition to use.
+      Name of a specific flow definition to use.
       When omitted, the engine selects the best-matching definition
       based on purpose + audience context.
     example: custom-login
