@@ -25,6 +25,10 @@ type CreateHandoffRes interface {
 	createHandoffRes()
 }
 
+type CreateProjectRes interface {
+	createProjectRes()
+}
+
 type CreateSchemaRes interface {
 	createSchemaRes()
 }

@@ -67,6 +67,12 @@ type Handler interface {
 	//
 	// POST /auth_attempts/{attempt_id}/handoff
 	CreateHandoff(ctx context.Context, params CreateHandoffParams) (CreateHandoffRes, error)
+	// CreateProject implements createProject operation.
+	//
+	// Create project.
+	//
+	// POST /projects
+	CreateProject(ctx context.Context, req *CreateProjectRequest) (CreateProjectRes, error)
 	// CreateSchema implements createSchema operation.
 	//
 	// Create a new schema. The schema definition must include a unique $id field,

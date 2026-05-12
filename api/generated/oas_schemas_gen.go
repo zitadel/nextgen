@@ -790,6 +790,27 @@ type CreateHandoffNotFound ErrorDetails
 
 func (*CreateHandoffNotFound) createHandoffRes() {}
 
+// Ref: #
+type CreateProjectRequest struct{}
+
+// Ref: #
+type CreateProjectResponse struct {
+	// The unique identifier of the project.
+	ID string `json:"id"`
+}
+
+// GetID returns the value of ID.
+func (s *CreateProjectResponse) GetID() string {
+	return s.ID
+}
+
+// SetID sets the value of ID.
+func (s *CreateProjectResponse) SetID(val string) {
+	s.ID = val
+}
+
+func (*CreateProjectResponse) createProjectRes() {}
+
 type CreateSchemaBadRequest ErrorDetails
 
 func (*CreateSchemaBadRequest) createSchemaRes() {}
@@ -1096,6 +1117,7 @@ func (s *ErrorDetails) SetDetails(val OptErrorDetailsDetails) {
 func (*ErrorDetails) authorizeDeviceRes()      {}
 func (*ErrorDetails) authorizeGetRes()         {}
 func (*ErrorDetails) createFlowRes()           {}
+func (*ErrorDetails) createProjectRes()        {}
 func (*ErrorDetails) createSessionRes()        {}
 func (*ErrorDetails) deleteFlowDefinitionRes() {}
 func (*ErrorDetails) endSessionRes()           {}

@@ -90,6 +90,15 @@ func (UnimplementedHandler) CreateHandoff(ctx context.Context, params CreateHand
 	return r, ht.ErrNotImplemented
 }
 
+// CreateProject implements createProject operation.
+//
+// Create project.
+//
+// POST /projects
+func (UnimplementedHandler) CreateProject(ctx context.Context, req *CreateProjectRequest) (r CreateProjectRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // CreateSchema implements createSchema operation.
 //
 // Create a new schema. The schema definition must include a unique $id field,
