@@ -9,7 +9,6 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	domainflow "github.com/zitadel/nextgen/internal/domain/flow"
 	domainmock "github.com/zitadel/nextgen/internal/domain/mock"
 	serviceflow "github.com/zitadel/nextgen/internal/service/flow"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -159,7 +158,7 @@ func TestSelector_ResolveByName_NotFound(t *testing.T) {
 		Purpose:   domain.FlowDefinitionPurposeLogin,
 		Name:      ptr("missing"),
 	})
-	if !errors.Is(err, domainflow.ErrFlowNotFound) {
+	if !errors.Is(err, domain.ErrFlowDefinitionNotFound) {
 		t.Fatalf("Resolve err = %v, want ErrFlowNotFound", err)
 	}
 }
@@ -173,7 +172,7 @@ func TestSelector_ResolveByName_PurposeMismatch(t *testing.T) {
 		Purpose:   domain.FlowDefinitionPurposeRegister,
 		Name:      ptr("login"),
 	})
-	if !errors.Is(err, domainflow.ErrPurposeMismatch) {
+	if !errors.Is(err, domain.ErrFlowDefinitionPurposeMismatch) {
 		t.Fatalf("Resolve err = %v, want ErrPurposeMismatch", err)
 	}
 }
@@ -280,7 +279,7 @@ func TestSelector_ResolveByAudience_NoMatch(t *testing.T) {
 		ProjectID: "proj",
 		Purpose:   domain.FlowDefinitionPurposeLogin,
 	})
-	if !errors.Is(err, domainflow.ErrFlowNotFound) {
+	if !errors.Is(err, domain.ErrFlowDefinitionNotFound) {
 		t.Fatalf("Resolve err = %v, want ErrFlowNotFound", err)
 	}
 }

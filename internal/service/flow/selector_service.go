@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	domainflow "github.com/zitadel/nextgen/internal/domain/flow"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -49,12 +48,12 @@ func (s *selectorService) resolveByName(ctx context.Context, req SelectorRequest
 		return nil, err
 	}
 	if len(defs) == 0 {
-		return nil, domainflow.ErrFlowNotFound
+		return nil, domain.ErrFlowDefinitionNotFound
 	}
 
 	def := pickLatestVersion(defs)
 	if !servesPurpose(def, req.Purpose) {
-		return nil, domainflow.ErrPurposeMismatch
+		return nil, domain.ErrFlowDefinitionPurposeMismatch
 	}
 	return def, nil
 }
@@ -76,7 +75,7 @@ func (s *selectorService) resolveByAudience(ctx context.Context, req SelectorReq
 		return nil, err
 	}
 	if len(defs) == 0 {
-		return nil, domainflow.ErrFlowNotFound
+		return nil, domain.ErrFlowDefinitionNotFound
 	}
 
 	if req.SchemaVersion == nil {
@@ -92,7 +91,7 @@ func (s *selectorService) resolveByAudience(ctx context.Context, req SelectorReq
 		candidates = append(candidates, audienceCandidate{def: def, score: score})
 	}
 	if len(candidates) == 0 {
-		return nil, domainflow.ErrFlowNotFound
+		return nil, domain.ErrFlowDefinitionNotFound
 	}
 
 	slices.SortStableFunc(candidates, func(a, b audienceCandidate) int {

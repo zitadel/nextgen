@@ -7,14 +7,9 @@ import (
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
-	domainflow "github.com/zitadel/nextgen/internal/domain/flow"
 	serviceflow "github.com/zitadel/nextgen/internal/service/flow"
 )
 
-// TODO: replace the explicit project_id body field with edge tenant
-// resolution (host/path → project) once that infrastructure lands.
-// Carrying project_id on the request leaks a tenant identifier into the
-// browser-facing surface.
 func (h Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest) (api.CreateFlowRes, error) {
 	purpose, err := domain.FlowDefinitionPurposeString(string(req.Purpose))
 	if err != nil {
@@ -72,12 +67,12 @@ func buildSelectorHint(opt api.OptFlowHint) serviceflow.SelectorHint {
 
 func mapSelectorError(err error) *api.ErrorDetails {
 	switch {
-	case errors.Is(err, domainflow.ErrFlowNotFound):
+	case errors.Is(err, domain.ErrFlowDefinitionNotFound):
 		return &api.ErrorDetails{
 			Code:    "flow_not_found",
 			Message: err.Error(),
 		}
-	case errors.Is(err, domainflow.ErrPurposeMismatch):
+	case errors.Is(err, domain.ErrFlowDefinitionPurposeMismatch):
 		return &api.ErrorDetails{
 			Code:    "purpose_mismatch",
 			Message: err.Error(),

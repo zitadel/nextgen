@@ -13,7 +13,8 @@ import (
 //
 //  1. If [SelectorRequest.Name] is set, look up by
 //     (ProjectID, Name, SchemaVersion?). Return
-//     [flow.ErrFlowNotFound] or [flow.ErrPurposeMismatch] on miss.
+//     [domain.ErrFlowDefinitionNotFound] or
+//     [domain.ErrFlowDefinitionPurposeMismatch] on miss.
 //  2. Otherwise list active definitions whose purposes include
 //     [SelectorRequest.Purpose].
 //  3. Apply semver resolution on [SelectorRequest.SchemaVersion]:
