@@ -1,0 +1,6 @@
+type: string
+description: |
+  Origin-bound, single-use nonce obtained from `POST /bootstrap/challenge`.
+  Binds the request to the browser that initiated the flow, preventing
+  cross-origin replay.
+example: nonce_abc123def456
