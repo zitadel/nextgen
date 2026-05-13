@@ -63,37 +63,24 @@ func TestCatalogFieldResolver_Resolve_IdentifierImpliesUserNotFound(t *testing.T
 	if len(got.ImplicitOutcomes["password"]) != 0 {
 		t.Errorf("Resolve password ImplicitOutcomes = %v, want empty", got.ImplicitOutcomes["password"])
 	}
-}
-
-func TestCatalogFieldResolver_Resolve_CredentialAnnotationSurfaces(t *testing.T) {
-	resolver := flow.NewCatalogFieldResolver()
-
-	got, err := resolver.Resolve(t.Context(), "", []string{"password"})
-	if err != nil {
-		t.Fatalf("Resolve returned error: %v", err)
-	}
-
-	if got.Behaviors["password"].Credential != "password" {
-		t.Errorf("Resolve password Credential = %q, want %q", got.Behaviors["password"].Credential, "password")
-	}
 	if got.Behaviors["password"].IsIdentifier {
 		t.Error("Resolve password IsIdentifier = true, want false")
 	}
-	if got.Behaviors["password"].Unique {
-		t.Error("Resolve password Unique = true, want false")
-	}
 }
 
-func TestCatalogFieldResolver_Resolve_UniqueAnnotationSurfaces(t *testing.T) {
+func TestCatalogFieldResolver_Resolve_UniqueScopeSurfaces(t *testing.T) {
 	resolver := flow.NewCatalogFieldResolver()
 
-	got, err := resolver.Resolve(t.Context(), "", []string{"email"})
+	got, err := resolver.Resolve(t.Context(), "", []string{"email", "password"})
 	if err != nil {
 		t.Fatalf("Resolve returned error: %v", err)
 	}
 
-	if !got.Behaviors["email"].Unique {
-		t.Error("Resolve email Unique = false, want true")
+	if got.Behaviors["email"].Unique != domain.FlowFieldUniqueScopeOrganization {
+		t.Errorf("Resolve email Unique = %q, want %q", got.Behaviors["email"].Unique, domain.FlowFieldUniqueScopeOrganization)
+	}
+	if got.Behaviors["password"].Unique != domain.FlowFieldUniqueScopeNone {
+		t.Errorf("Resolve password Unique = %q, want %q", got.Behaviors["password"].Unique, domain.FlowFieldUniqueScopeNone)
 	}
 }
 

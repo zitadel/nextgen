@@ -12,9 +12,13 @@ import (
 // `user_not_found` outcome), and validates submitted values against the
 // schema-derived rules.
 //
-// MVP ships an in-package catalog implementation backed by a small,
-// hardcoded set of fields. A schema-driven implementation lands behind
-// the same interface once the user-schema library is established —
+// The contract is shaped to the user meta-schema at
+// api/openapi/endpoints/schemas/user-schema.yaml — customers author
+// schemas conforming to that meta-schema, and every trait the resolver
+// surfaces ([FlowFieldBehavior], [FlowFieldValidation]) must be
+// derivable from one of its keywords. MVP ships an in-package catalog
+// implementation; the schema-driven implementation lands behind the
+// same interface once the user-schema library is established —
 // callers do not move.
 type FlowFieldResolver interface {
 	// Resolve returns the per-field metadata for fieldNames. The
@@ -32,8 +36,8 @@ type FlowFieldResolver interface {
 // FlowResolvedFields is the output of [FlowFieldResolver.Resolve]. It
 // carries the per-render field payloads (Fields), the implicit
 // transition outcomes the resolver derived from schema annotations
-// (ImplicitOutcomes), and the boolean traits the state machine uses to
-// route credential / identifier handling (Behaviors).
+// (ImplicitOutcomes), and the per-field traits the state machine uses
+// to route identifier handling and uniqueness enforcement (Behaviors).
 type FlowResolvedFields struct {
 	// Fields is the per-render shape emitted under step.fields[name].
 	// Keys match the property names passed to Resolve.
@@ -45,46 +49,88 @@ type FlowResolvedFields struct {
 	ImplicitOutcomes map[string][]string
 
 	// Behaviors carries the resolver-derived traits for each field. The
-	// state machine consults it to know which field is the identifier,
-	// which one is a credential (and of what kind), and which ones
-	// require uniqueness checks on submit.
+	// state machine consults it to know which fields drive identifier
+	// resolution and which require uniqueness checks on submit.
 	Behaviors map[string]FlowFieldBehavior
 }
 
 // FlowFieldBehavior carries the resolver-derived traits for a field.
-// Values are derived from schema annotations (`x-identifier`,
-// `x-credential`, `x-unique`).
+// Values are derived from the user meta-schema's `x-*` annotations on
+// the property (see api/openapi/endpoints/schemas/user-property.yaml).
+//
+// Annotations the meta-schema defines but the MVP state machine does
+// not yet consume (`x-claim`, `x-editable`, `x-sensitive`, `x-mfa`,
+// `x-verify`) are not surfaced here — they will be added as the
+// consumers that need them land.
 type FlowFieldBehavior struct {
-	// IsIdentifier reports whether the field is the user identifier
-	// (`x-identifier`). The state machine uses it to drive identifier
-	// resolution and the `user_not_found` implicit outcome.
+	// IsIdentifier reflects `x-identifier` on the property. The state
+	// machine uses it to drive identifier resolution and the
+	// `user_not_found` implicit outcome.
 	IsIdentifier bool
 
-	// Credential names the credential kind the field carries when
-	// non-empty (e.g. "password"). Empty for non-credential fields.
-	Credential string
-
-	// Unique reports whether the field's value must be unique within
-	// its schema scope (`x-unique`).
-	Unique bool
+	// Unique reflects `x-unique` on the property: the scope at which
+	// the value must be unique, or [FlowFieldUniqueScopeNone] when the
+	// annotation is absent.
+	Unique FlowFieldUniqueScope
 }
+
+// FlowFieldUniqueScope mirrors the `x-unique` enum in the user
+// meta-schema (api/openapi/endpoints/schemas/user-property.yaml).
+type FlowFieldUniqueScope string
+
+const (
+	// FlowFieldUniqueScopeNone means the property has no `x-unique`
+	// annotation; no uniqueness check is enforced.
+	FlowFieldUniqueScopeNone FlowFieldUniqueScope = ""
+
+	// FlowFieldUniqueScopeInstance enforces uniqueness across the
+	// entire deployment.
+	FlowFieldUniqueScopeInstance FlowFieldUniqueScope = "instance"
+
+	// FlowFieldUniqueScopeOrganization enforces uniqueness within the
+	// owning organization.
+	FlowFieldUniqueScopeOrganization FlowFieldUniqueScope = "organization"
+)
 
 // FlowField is the per-render shape emitted under step.fields[name] in
 // a flow step response. It mirrors the OpenAPI flow-field component.
 type FlowField struct {
-	Type       FlowFieldType
-	TextKey    string
-	Required   bool
-	Value      *string
+	// Type is the UI input kind the client should render. It is
+	// derived from the property's JSON `type` and `format` in the user
+	// meta-schema, with the property name acting as a tiebreaker (e.g.
+	// a property named `password` renders as a password input even
+	// though the meta-schema only sees `type: string`).
+	Type FlowFieldType
+
+	// TextKey is a localization key for the field label (e.g.
+	// `field.email`). Resolved client-side via the `| t` filter.
+	TextKey string
+
+	// Required reflects membership in the schema's top-level `required`
+	// array.
+	Required bool
+
+	// Value is an optional pre-fill (e.g. an identifier carried over
+	// from a pivot). Nil when no pre-fill applies.
+	Value *string
+
+	// Validation carries the schema-derived validation rules. Nil when
+	// the property has no rules beyond its JSON type.
 	Validation *FlowFieldValidation
 }
 
 // FlowFieldValidation carries the validation rules the resolver
-// surfaces to the client and enforces on submit. Zero values mean "no
-// rule".
+// surfaces to the client and enforces on submit. Each field maps to a
+// user meta-schema keyword on [user-property.yaml]:
+//
+//   - Format    ↔ `format` (enum: email, date-time, uuid, uri)
+//   - MinLength ↔ `minLength`
+//   - MaxLength ↔ `maxLength`
+//
+// Zero values mean "no rule". JSON Schema's `pattern` keyword is not
+// part of the user meta-schema and is intentionally not surfaced.
 type FlowFieldValidation struct {
 	Format    string
-	Pattern   string
 	MinLength int
 	MaxLength int
 }
@@ -113,7 +159,6 @@ const (
 	FlowFieldValidationRuleFormat    FlowFieldValidationRule = "format"
 	FlowFieldValidationRuleMinLength FlowFieldValidationRule = "min_length"
 	FlowFieldValidationRuleMaxLength FlowFieldValidationRule = "max_length"
-	FlowFieldValidationRulePattern   FlowFieldValidationRule = "pattern"
 	FlowFieldValidationRuleUnknown   FlowFieldValidationRule = "unknown_field"
 )
 

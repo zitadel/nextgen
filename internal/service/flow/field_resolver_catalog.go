@@ -11,10 +11,11 @@ import (
 // CatalogFieldResolver is the MVP stub of [domain.FlowFieldResolver].
 // It is backed by an in-package catalog covering the fields the default
 // flows use (email, username, password, given_name, family_name). Each
-// entry carries the same shape a schema-driven resolver eventually will
-// — type, validation rules, x-identifier / x-credential / x-unique —
-// so call sites in the state machine don't move when the schema-backed
-// implementation replaces it.
+// entry mirrors what a schema-driven resolver would read from a
+// customer schema conforming to the user meta-schema at
+// api/openapi/endpoints/schemas/user-schema.yaml — JSON `type` +
+// `format`, `minLength` / `maxLength`, top-level `required`, and the
+// `x-identifier` / `x-unique` property annotations.
 //
 // The `userSchemaURL` argument on both methods is accepted for forward
 // compatibility and ignored.
@@ -30,9 +31,10 @@ func NewCatalogFieldResolver() *CatalogFieldResolver {
 
 var _ domain.FlowFieldResolver = (*CatalogFieldResolver)(nil)
 
-// catalogEntry is the per-field shape the stub catalog stores. It
-// mirrors the slice of the user schema a real resolver would read:
-// type, validation rules, and x-* annotations.
+// catalogEntry stores the per-field shape the stub catalog returns. It
+// is the in-package analogue of a property in the customer's user
+// schema: type / format / length rules, x-identifier, x-unique, and
+// whether the schema-level `required` array names the field.
 type catalogEntry struct {
 	Type       domain.FlowFieldType
 	TextKey    string
@@ -47,21 +49,20 @@ var defaultCatalog = map[string]catalogEntry{
 		TextKey:    "field.email",
 		Required:   true,
 		Validation: &domain.FlowFieldValidation{Format: "email", MaxLength: 320},
-		Behavior:   domain.FlowFieldBehavior{IsIdentifier: true, Unique: true},
+		Behavior:   domain.FlowFieldBehavior{IsIdentifier: true, Unique: domain.FlowFieldUniqueScopeOrganization},
 	},
 	"username": {
 		Type:       domain.FlowFieldTypeText,
 		TextKey:    "field.username",
 		Required:   true,
 		Validation: &domain.FlowFieldValidation{MinLength: 3, MaxLength: 64},
-		Behavior:   domain.FlowFieldBehavior{IsIdentifier: true, Unique: true},
+		Behavior:   domain.FlowFieldBehavior{IsIdentifier: true, Unique: domain.FlowFieldUniqueScopeOrganization},
 	},
 	"password": {
 		Type:       domain.FlowFieldTypePassword,
 		TextKey:    "field.password",
 		Required:   true,
 		Validation: &domain.FlowFieldValidation{MinLength: 8},
-		Behavior:   domain.FlowFieldBehavior{Credential: "password"},
 	},
 	"given_name": {
 		Type:       domain.FlowFieldTypeText,
