@@ -63,4 +63,5 @@ properties:
       - type: boolean
       - type: object
       - type: array
+        items: {}
       - type: "null"

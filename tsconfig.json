@@ -26,6 +26,12 @@
     },
     {
       "path": "./packages/api"
+    },
+    {
+      "path": "./packages/mockserver"
+    },
+    {
+      "path": "./apps/demo-next"
     }
   ]
 }
