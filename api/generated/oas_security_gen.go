@@ -64,6 +64,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	GetAuthAttemptOperation: []string{
 		"auth_attempts.read",
 	},
+	GetFlowDefinitionOperation: []string{
+		"flow_definitions.read",
+	},
 	GetProjectOperation: []string{
 		"projects.read",
 	},
