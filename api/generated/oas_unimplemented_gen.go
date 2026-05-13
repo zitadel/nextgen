@@ -61,6 +61,19 @@ func (UnimplementedHandler) CreateFlow(ctx context.Context, req *CreateFlowReque
 	return r, ht.ErrNotImplemented
 }
 
+// CreateFlowDefinition implements createFlowDefinition operation.
+//
+// Creates a new flow definition.
+// Flow definitions are templates that define the sequence of steps (capabilities)
+// for a particular user journey (e.g., registration, login, password reset).
+// Flow definitions are created based on the flow meta schema, which includes the flow's purpose,
+// audience, and the steps involved.
+//
+// POST /flow_definitions
+func (UnimplementedHandler) CreateFlowDefinition(ctx context.Context, req *FlowDefinitionCreateRequest) (r CreateFlowDefinitionRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // CreateHandoff implements createHandoff operation.
 //
 // Completes the authentication attempt and mints a `handoff_token`.
@@ -74,6 +87,20 @@ func (UnimplementedHandler) CreateFlow(ctx context.Context, req *CreateFlowReque
 //
 // POST /auth_attempts/{attempt_id}/handoff
 func (UnimplementedHandler) CreateHandoff(ctx context.Context, params CreateHandoffParams) (r CreateHandoffRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// CreateSchema implements createSchema operation.
+//
+// Create a new schema. The schema definition must include a unique $id field,
+// which will be used to identify the schema in future requests. The $id must
+// be a valid URI and should ideally point to the location where the schema
+// can be accessed.
+// The schema can either be a concrete schema, e.g. a user schema, or a
+// schema-url which will be resolved by the server.
+//
+// POST /schemas
+func (UnimplementedHandler) CreateSchema(ctx context.Context, req CreateSchemaReq) (r CreateSchemaRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -92,6 +119,15 @@ func (UnimplementedHandler) CreateHandoff(ctx context.Context, params CreateHand
 //
 // POST /sessions
 func (UnimplementedHandler) CreateSession(ctx context.Context, req *CreateSessionRequest) (r CreateSessionRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// DeleteFlowDefinition implements deleteFlowDefinition operation.
+//
+// Delete a flow definition by id.
+//
+// DELETE /flow_definitions/{id}
+func (UnimplementedHandler) DeleteFlowDefinition(ctx context.Context, params DeleteFlowDefinitionParams) (r DeleteFlowDefinitionRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -136,6 +172,15 @@ func (UnimplementedHandler) ExchangeHandoff(ctx context.Context, req *ExchangeRe
 //
 // GET /auth_attempts/{attempt_id}
 func (UnimplementedHandler) GetAuthAttempt(ctx context.Context, params GetAuthAttemptParams) (r GetAuthAttemptRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// GetFlowDefinition implements getFlowDefinition operation.
+//
+// Get a flow definition by id.
+//
+// GET /flow_definitions/{id}
+func (UnimplementedHandler) GetFlowDefinition(ctx context.Context, params GetFlowDefinitionParams) (r GetFlowDefinitionRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -194,6 +239,15 @@ func (UnimplementedHandler) GetReady(ctx context.Context) (r GetReadyRes, _ erro
 	return r, ht.ErrNotImplemented
 }
 
+// GetSchemaById implements getSchemaById operation.
+//
+// Get a schema by its ID. This will return the default revision of the schema.
+//
+// GET /schemas/{id}
+func (UnimplementedHandler) GetSchemaById(ctx context.Context, params GetSchemaByIdParams) (r GetSchemaByIdRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // GetSession implements getSession operation.
 //
 // Returns the current state of a session including its factors and all currently
@@ -244,6 +298,16 @@ func (UnimplementedHandler) Introspect(ctx context.Context, req *IntrospectReque
 //
 // POST /auth_attempts/{attempt_id}/challenges
 func (UnimplementedHandler) IssueChallenge(ctx context.Context, req *IssueChallengeRequest, params IssueChallengeParams) (r IssueChallengeRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// ListFlowDefinitions implements listFlowDefinitions operation.
+//
+// Retrieves a list of all flow definitions.
+// This endpoint can be used to view existing flow definitions and their configurations.
+//
+// GET /flow_definitions
+func (UnimplementedHandler) ListFlowDefinitions(ctx context.Context, params ListFlowDefinitionsParams) (r ListFlowDefinitionsRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -322,6 +386,15 @@ func (UnimplementedHandler) SubmitFlowEvent(ctx context.Context, req *FlowEventR
 //
 // POST /flow/{id}/submit
 func (UnimplementedHandler) SubmitFlowStep(ctx context.Context, req *FlowSubmitRequest, params SubmitFlowStepParams) (r SubmitFlowStepRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// UpdateFlowDefinition implements updateFlowDefinition operation.
+//
+// Update a flow definition by id.
+//
+// PATCH /flow_definitions/{id}
+func (UnimplementedHandler) UpdateFlowDefinition(ctx context.Context, req *FlowDefinitionUpdateRequest, params UpdateFlowDefinitionParams) (r UpdateFlowDefinitionRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

@@ -4,13 +4,12 @@ import (
 	"context"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-
 	"github.com/zitadel/nextgen/internal/storage/database"
-	"github.com/zitadel/nextgen/internal/storage/database/dialect/postgres/migration"
 )
 
 type pgxConn struct {
 	*pgxpool.Conn
+	pool *Pool
 }
 
 var _ database.Connection = (*pgxConn)(nil)
@@ -66,7 +65,7 @@ func (c *pgxConn) Migrate(ctx context.Context) error {
 	if isMigrated {
 		return nil
 	}
-	err := migration.Migrate(ctx, c.Conn.Conn())
+	err := c.pool.Migrate(ctx)
 	isMigrated = err == nil
 	return wrapError(err)
 }

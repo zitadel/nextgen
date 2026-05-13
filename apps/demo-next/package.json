@@ -1,0 +1,35 @@
+{
+  "name": "@nextgen/demo-next",
+  "version": "0.0.0",
+  "description": "Next.js demo app for Nextgen Auth",
+  "homepage": "https://github.com/zitadel/nextgen/tree/main/apps/demo-next#readme",
+  "bugs": {
+    "url": "https://github.com/zitadel/nextgen/issues"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zitadel/nextgen.git",
+    "directory": "apps/demo-next"
+  },
+  "private": true,
+  "scripts": {
+    "dev": "next dev --port 3002",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@nextgen/ui-lit": "workspace:*",
+    "@zitadel-nextgen/sdk-next": "workspace:*",
+    "next": "^16.2.4",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.7.3"
+  }
+}

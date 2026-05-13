@@ -13,6 +13,10 @@ type CreateAuthAttemptRes interface {
 	createAuthAttemptRes()
 }
 
+type CreateFlowDefinitionRes interface {
+	createFlowDefinitionRes()
+}
+
 type CreateFlowRes interface {
 	createFlowRes()
 }
@@ -21,8 +25,16 @@ type CreateHandoffRes interface {
 	createHandoffRes()
 }
 
+type CreateSchemaRes interface {
+	createSchemaRes()
+}
+
 type CreateSessionRes interface {
 	createSessionRes()
+}
+
+type DeleteFlowDefinitionRes interface {
+	deleteFlowDefinitionRes()
 }
 
 type EndSessionRes interface {
@@ -35,6 +47,10 @@ type ExchangeHandoffRes interface {
 
 type GetAuthAttemptRes interface {
 	getAuthAttemptRes()
+}
+
+type GetFlowDefinitionRes interface {
+	getFlowDefinitionRes()
 }
 
 type GetFlowStepRes interface {
@@ -61,6 +77,10 @@ type GetReadyRes interface {
 	getReadyRes()
 }
 
+type GetSchemaByIdRes interface {
+	getSchemaByIdRes()
+}
+
 type GetSessionRes interface {
 	getSessionRes()
 }
@@ -79,6 +99,10 @@ type IntrospectRes interface {
 
 type IssueChallengeRes interface {
 	issueChallengeRes()
+}
+
+type ListFlowDefinitionsRes interface {
+	listFlowDefinitionsRes()
 }
 
 type ListSessionsRes interface {
@@ -103,6 +127,10 @@ type SubmitFlowEventRes interface {
 
 type SubmitFlowStepRes interface {
 	submitFlowStepRes()
+}
+
+type UpdateFlowDefinitionRes interface {
+	updateFlowDefinitionRes()
 }
 
 type VerifyChallengeProofRes interface {
