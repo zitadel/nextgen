@@ -4,8 +4,7 @@ import "time"
 
 // FlowState is the runtime state of a single in-flight flow. The handler
 // JSON-encodes it as the payload of the sealed `_zflow` cookie on every
-// response and decodes it back on every incoming request. Issued-at
-// metadata is the sealer's concern, not part of FlowState.
+// response and decodes it back on every incoming request.
 //
 // FlowState embeds FlowProgress: the active progress (definition, step,
 // history, collected data) sits at the root, and any paused parents
@@ -17,6 +16,12 @@ type FlowState struct {
 	// far. Promoted to the top level so callers read e.g.
 	// state.CurrentStep directly.
 	FlowProgress
+
+	// IssuedAt is when this state was last sealed into the cookie. The
+	// handler refuses to open a state older than the configured max-age,
+	// bounding how long a stolen cookie remains replayable. Refreshed on
+	// every advance.
+	IssuedAt time.Time
 
 	// SessionID is the stable identifier of the user session backing this
 	// flow. It survives pivots — child and parent flows share it.

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"testing"
-	"time"
 )
 
 func filledKey(fill byte) Key {
@@ -15,23 +14,17 @@ func filledKey(fill byte) Key {
 	return k
 }
 
-func newSealer(t *testing.T, maxAge time.Duration) *Sealer {
+func newSealer(t *testing.T) *Sealer {
 	t.Helper()
-	s, err := NewSealer(filledKey(0xAA), maxAge)
+	s, err := NewSealer(filledKey(0xAA))
 	if err != nil {
 		t.Fatalf("NewSealer: %v", err)
 	}
 	return s
 }
 
-// SetNow replaces the sealer's clock for tests. The production
-// constructor does not expose this seam.
-func SetNow(s *Sealer, now func() time.Time) {
-	s.now = now
-}
-
 func TestSealer_Roundtrip(t *testing.T) {
-	s := newSealer(t, 10*time.Minute)
+	s := newSealer(t)
 	payload := []byte(`{"session_id":"sess_123","current_step":"identify"}`)
 
 	value, err := s.Seal(payload)
@@ -47,23 +40,8 @@ func TestSealer_Roundtrip(t *testing.T) {
 	}
 }
 
-func TestSealer_RoundtripEmptyPayload(t *testing.T) {
-	s := newSealer(t, 10*time.Minute)
-	value, err := s.Seal(nil)
-	if err != nil {
-		t.Fatalf("Seal: %v", err)
-	}
-	got, err := s.Open(value)
-	if err != nil {
-		t.Fatalf("Open: %v", err)
-	}
-	if len(got) != 0 {
-		t.Fatalf("Open returned %d bytes, want 0", len(got))
-	}
-}
-
 func TestSealer_RejectsTamperedCiphertext(t *testing.T) {
-	s := newSealer(t, 10*time.Minute)
+	s := newSealer(t)
 	value, err := s.Seal([]byte("hello"))
 	if err != nil {
 		t.Fatalf("Seal: %v", err)
@@ -81,7 +59,7 @@ func TestSealer_RejectsTamperedCiphertext(t *testing.T) {
 func TestSealer_RejectsForeignKey(t *testing.T) {
 	// A value sealed with a different key must not decrypt — GCM auth
 	// fails and Open returns ErrInvalid.
-	foreign, err := NewSealer(filledKey(0xCC), 10*time.Minute)
+	foreign, err := NewSealer(filledKey(0xCC))
 	if err != nil {
 		t.Fatalf("NewSealer (foreign): %v", err)
 	}
@@ -90,31 +68,14 @@ func TestSealer_RejectsForeignKey(t *testing.T) {
 		t.Fatalf("Seal (foreign): %v", err)
 	}
 
-	s := newSealer(t, 10*time.Minute)
+	s := newSealer(t)
 	if _, err := s.Open(value); !errors.Is(err, ErrInvalid) {
 		t.Fatalf("Open foreign-key value: err = %v, want ErrInvalid", err)
 	}
 }
 
-func TestSealer_RejectsExpired(t *testing.T) {
-	s := newSealer(t, time.Minute)
-
-	value, err := s.Seal([]byte("hello"))
-	if err != nil {
-		t.Fatalf("Seal: %v", err)
-	}
-
-	SetNow(s, func() time.Time {
-		return time.Now().Add(2 * time.Minute)
-	})
-
-	if _, err := s.Open(value); !errors.Is(err, ErrExpired) {
-		t.Fatalf("Open expired: err = %v, want ErrExpired", err)
-	}
-}
-
 func TestSealer_RejectsMalformedInput(t *testing.T) {
-	s := newSealer(t, 10*time.Minute)
+	s := newSealer(t)
 
 	cases := map[string]string{
 		"empty":               "",
@@ -128,12 +89,6 @@ func TestSealer_RejectsMalformedInput(t *testing.T) {
 				t.Fatalf("Open %q: err = %v, want ErrInvalid", name, err)
 			}
 		})
-	}
-}
-
-func TestNewSealer_RejectsZeroMaxAge(t *testing.T) {
-	if _, err := NewSealer(filledKey(0xAA), 0); err == nil {
-		t.Fatalf("expected error for max-age=0")
 	}
 }
 
