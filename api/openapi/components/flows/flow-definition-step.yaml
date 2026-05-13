@@ -93,7 +93,7 @@ properties:
         target:
           type: string
           description: |
-            Step name within this flow (when `action` is null), or the slug
+            Step name within this flow (when `action` is null), or the name
             of another flow (when `action` is `switch` or `pivot`).
           example: password
         action:
