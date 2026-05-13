@@ -68,6 +68,22 @@ func TestCatalogFieldResolver_Resolve_IdentifierImpliesUserNotFound(t *testing.T
 	}
 }
 
+func TestCatalogFieldResolver_Resolve_CredentialSurfaces(t *testing.T) {
+	resolver := flow.NewCatalogFieldResolver()
+
+	got, err := resolver.Resolve(t.Context(), "", []string{"email", "password"})
+	if err != nil {
+		t.Fatalf("Resolve returned error: %v", err)
+	}
+
+	if got.Fields["password"].Credential != domain.FlowFieldCredentialPassword {
+		t.Errorf("Resolve password Credential = %q, want %q", got.Fields["password"].Credential, domain.FlowFieldCredentialPassword)
+	}
+	if got.Fields["email"].Credential != domain.FlowFieldCredentialNone {
+		t.Errorf("Resolve email Credential = %q, want %q", got.Fields["email"].Credential, domain.FlowFieldCredentialNone)
+	}
+}
+
 func TestCatalogFieldResolver_Resolve_UniqueScopeSurfaces(t *testing.T) {
 	resolver := flow.NewCatalogFieldResolver()
 

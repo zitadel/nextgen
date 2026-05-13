@@ -15,7 +15,11 @@ import (
 // customer schema conforming to the user meta-schema at
 // api/openapi/endpoints/schemas/user-schema.yaml — JSON `type` +
 // `format`, `minLength` / `maxLength`, top-level `required`, and the
-// `x-identifier` / `x-unique` property annotations.
+// `x-identifier` / `x-unique` property annotations. The `password`
+// entry additionally carries [domain.FlowFieldCredentialPassword],
+// modeling what the schema-driven resolver will derive by
+// cross-referencing schema-level `x-auth-methods` with the property
+// name.
 //
 // The `userSchemaURL` argument on both methods is accepted for forward
 // compatibility and ignored.
@@ -53,6 +57,7 @@ var defaultCatalog = map[string]domain.FlowField{
 		TextKey:    "field.password",
 		Required:   true,
 		Validation: &domain.FlowFieldValidation{MinLength: 8},
+		Credential: domain.FlowFieldCredentialPassword,
 	},
 	"given_name": {
 		Type:       domain.FlowFieldTypeText,

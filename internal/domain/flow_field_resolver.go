@@ -53,8 +53,11 @@ type FlowResolvedFields struct {
 //     component (Type, TextKey, Required, Value, Validation), which the
 //     API layer maps to the response DTO.
 //   - The server-side traits the state machine routes on (IsIdentifier,
-//     Unique), derived from the user meta-schema's `x-*` annotations
-//     (see api/openapi/endpoints/schemas/user-property.yaml).
+//     Unique, Credential). IsIdentifier and Unique come directly from
+//     the property's `x-identifier` and `x-unique` annotations in the
+//     user meta-schema (api/openapi/endpoints/schemas/user-property.yaml);
+//     Credential is derived by cross-referencing the schema-level
+//     `x-auth-methods` map with the property name.
 //
 // Annotations the meta-schema defines but the MVP state machine does
 // not yet consume (`x-claim`, `x-editable`, `x-sensitive`, `x-mfa`,
@@ -93,7 +96,32 @@ type FlowField struct {
 	// the value must be unique, or [FlowFieldUniqueScopeNone] when the
 	// annotation is absent.
 	Unique FlowFieldUniqueScope
+
+	// Credential names the auth method the field carries a proof for,
+	// or [FlowFieldCredentialNone] when the field is not a credential.
+	// It is derived: the resolver cross-references the schema-level
+	// `x-auth-methods` map (which methods are enabled for this user
+	// type) with the property name, so a property named `password` on
+	// a schema with `x-auth-methods.password.enabled = true` surfaces
+	// as [FlowFieldCredentialPassword]. The state machine consults it
+	// on submit to route the value through the auth-attempt service.
+	Credential FlowFieldCredential
 }
+
+// FlowFieldCredential names the auth method a credential field carries
+// a proof for. Values mirror the keys of `x-auth-methods` in the user
+// meta-schema (api/openapi/endpoints/schemas/user-schema.yaml). Empty
+// means the field is not a credential.
+type FlowFieldCredential string
+
+const (
+	FlowFieldCredentialNone      FlowFieldCredential = ""
+	FlowFieldCredentialPassword  FlowFieldCredential = "password"
+	FlowFieldCredentialPasskey   FlowFieldCredential = "passkey"
+	FlowFieldCredentialMagicLink FlowFieldCredential = "magic_link"
+	FlowFieldCredentialSSO       FlowFieldCredential = "sso"
+	FlowFieldCredentialOTP       FlowFieldCredential = "otp"
+)
 
 // FlowFieldUniqueScope mirrors the `x-unique` enum in the user
 // meta-schema (api/openapi/endpoints/schemas/user-property.yaml).
