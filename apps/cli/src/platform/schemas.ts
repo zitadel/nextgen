@@ -103,7 +103,7 @@ export const claimStatusResponseSchema = z.object({
   new_project_secret: z.string().optional(),
   team_id: z.string().optional(),
   claimed_at: z.string().optional(),
-  dashboard_url: z.string().url().optional(),
+  dashboard_url: z.url().optional(),
   tier: z.enum(["free", "pro", "enterprise"]).optional(),
 });
 export type ClaimStatusResponse = z.infer<typeof claimStatusResponseSchema>;
