@@ -1,5 +1,7 @@
 package domain
 
+import "time"
+
 // FlowState is the runtime state of a single in-flight flow. The handler
 // JSON-encodes it as the payload of the sealed `_zflow` cookie on every
 // response and decodes it back on every incoming request. Issued-at
@@ -52,6 +54,34 @@ type FlowState struct {
 	// it against the session's assurance levels to decide whether the
 	// flow can complete.
 	RequestedACR *string
+
+	// PendingChallenge binds an outstanding ceremony (passkey today,
+	// other methods later) to the current step. Set by the state
+	// machine when entering a step that declares a challenge; cleared
+	// once the matching ChallengeResponse verifies. Nil when no
+	// ceremony is in flight.
+	PendingChallenge *FlowPendingChallenge
+}
+
+// FlowPendingChallenge records the server-issued challenge the next
+// submit must satisfy. The challenge body itself (WebAuthn options,
+// etc.) lives in the ChallengeService's store, keyed by ID — this
+// struct just threads the binding through the cookie so the verify
+// step can locate it.
+type FlowPendingChallenge struct {
+	// ID is the challenge identifier returned by the ChallengeService
+	// at issue time. The client echoes it back in ChallengeResponse.
+	ID string
+
+	// Method names the ceremony kind (e.g. "passkey"). The state
+	// machine uses it to route verification to the right service.
+	Method string
+
+	// IssuedAt is when the challenge was minted. The ChallengeService
+	// enforces its own freshness window; this field is kept for
+	// diagnostics and for the state machine to short-circuit obviously
+	// stale challenges before calling Verify.
+	IssuedAt time.Time
 }
 
 // FlowProgress captures the user's position within a single flow
