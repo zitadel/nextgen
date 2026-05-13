@@ -5,6 +5,8 @@ patch:
     - User
   parameters:
     - $ref: ../../../components/parameters/user-id.yaml
+    - $ref: ../../../components/parameters/project-id.yaml
+    - $ref: ../../../components/parameters/team-id.yaml
   security:
     - oauth2:
         - users.write

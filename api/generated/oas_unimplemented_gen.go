@@ -100,7 +100,7 @@ func (UnimplementedHandler) CreateSession(ctx context.Context, req *CreateSessio
 // Create user.
 //
 // POST /users
-func (UnimplementedHandler) CreateUser(ctx context.Context, req *User) (r CreateUserRes, _ error) {
+func (UnimplementedHandler) CreateUser(ctx context.Context, req *User, params CreateUserParams) (r CreateUserRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

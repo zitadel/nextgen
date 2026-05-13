@@ -53,6 +53,9 @@ post:
   security:
     - oauth2:
         - users.write
+  parameters:
+    - $ref: ../../components/parameters/project-id.yaml
+    - $ref: ../../components/parameters/team-id.yaml
   requestBody:
     required: true
     content:

@@ -97,7 +97,7 @@ type Invoker interface {
 	// Create user.
 	//
 	// POST /users
-	CreateUser(ctx context.Context, request *User) (CreateUserRes, error)
+	CreateUser(ctx context.Context, request *User, params CreateUserParams) (CreateUserRes, error)
 	// EndSession invokes endSession operation.
 	//
 	// End a session.
@@ -1325,12 +1325,12 @@ func (c *Client) sendCreateSession(ctx context.Context, request *CreateSessionRe
 // Create user.
 //
 // POST /users
-func (c *Client) CreateUser(ctx context.Context, request *User) (CreateUserRes, error) {
-	res, err := c.sendCreateUser(ctx, request)
+func (c *Client) CreateUser(ctx context.Context, request *User, params CreateUserParams) (CreateUserRes, error) {
+	res, err := c.sendCreateUser(ctx, request, params)
 	return res, err
 }
 
-func (c *Client) sendCreateUser(ctx context.Context, request *User) (res CreateUserRes, err error) {
+func (c *Client) sendCreateUser(ctx context.Context, request *User, params CreateUserParams) (res CreateUserRes, err error) {
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("createUser"),
 		semconv.HTTPRequestMethodKey.String("POST"),
@@ -1370,6 +1370,50 @@ func (c *Client) sendCreateUser(ctx context.Context, request *User) (res CreateU
 	var pathParts [1]string
 	pathParts[0] = "/users"
 	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "ProjectID" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "ProjectID",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.ProjectID.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "TeamID" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "TeamID",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.TeamID.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
 
 	stage = "EncodeRequest"
 	r, err := ht.NewRequest(ctx, "POST", u)
@@ -4094,6 +4138,50 @@ func (c *Client) sendUpdateUser(ctx context.Context, request *User, params Updat
 		pathParts[1] = encoded
 	}
 	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "ProjectID" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "ProjectID",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.ProjectID.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "TeamID" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "TeamID",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.TeamID.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
 
 	stage = "EncodeRequest"
 	r, err := ht.NewRequest(ctx, "PATCH", u)

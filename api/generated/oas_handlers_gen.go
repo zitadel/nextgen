@@ -1359,6 +1359,16 @@ func (s *Server) handleCreateUserRequest(args [0]string, argsEscaped bool, w htt
 			return
 		}
 	}
+	params, err := decodeCreateUserParams(args, argsEscaped, r)
+	if err != nil {
+		err = &ogenerrors.DecodeParamsError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeParams", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
 
 	var rawBody []byte
 	request, rawBody, close, err := s.decodeCreateUserRequest(r)
@@ -1386,13 +1396,22 @@ func (s *Server) handleCreateUserRequest(args [0]string, argsEscaped bool, w htt
 			OperationID:      "createUser",
 			Body:             request,
 			RawBody:          rawBody,
-			Params:           middleware.Parameters{},
-			Raw:              r,
+			Params: middleware.Parameters{
+				{
+					Name: "ProjectID",
+					In:   "query",
+				}: params.ProjectID,
+				{
+					Name: "TeamID",
+					In:   "query",
+				}: params.TeamID,
+			},
+			Raw: r,
 		}
 
 		type (
 			Request  = *User
-			Params   = struct{}
+			Params   = CreateUserParams
 			Response = CreateUserRes
 		)
 		response, err = middleware.HookMiddleware[
@@ -1402,14 +1421,14 @@ func (s *Server) handleCreateUserRequest(args [0]string, argsEscaped bool, w htt
 		](
 			m,
 			mreq,
-			nil,
+			unpackCreateUserParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.CreateUser(ctx, request)
+				response, err = s.h.CreateUser(ctx, request, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.CreateUser(ctx, request)
+		response, err = s.h.CreateUser(ctx, request, params)
 	}
 	if err != nil {
 		if errRes, ok := errors.Into[*ErrorDetailsStatusCode](err); ok {
@@ -5493,6 +5512,14 @@ func (s *Server) handleUpdateUserRequest(args [1]string, argsEscaped bool, w htt
 					Name: "user_id",
 					In:   "path",
 				}: params.UserID,
+				{
+					Name: "ProjectID",
+					In:   "query",
+				}: params.ProjectID,
+				{
+					Name: "TeamID",
+					In:   "query",
+				}: params.TeamID,
 			},
 			Raw: r,
 		}

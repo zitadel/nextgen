@@ -77,7 +77,7 @@ type Handler interface {
 	// Create user.
 	//
 	// POST /users
-	CreateUser(ctx context.Context, req *User) (CreateUserRes, error)
+	CreateUser(ctx context.Context, req *User, params CreateUserParams) (CreateUserRes, error)
 	// EndSession implements endSession operation.
 	//
 	// End a session.
