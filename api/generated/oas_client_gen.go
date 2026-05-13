@@ -1268,7 +1268,10 @@ func (c *Client) sendCreateSchema(ctx context.Context, request CreateSchemaReq, 
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
 			if val, ok := params.ProjectID.Get(); ok {
-				return e.EncodeValue(conv.StringToString(val))
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
 			}
 			return nil
 		}); err != nil {
@@ -1285,7 +1288,10 @@ func (c *Client) sendCreateSchema(ctx context.Context, request CreateSchemaReq, 
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
 			if val, ok := params.TeamID.Get(); ok {
-				return e.EncodeValue(conv.StringToString(val))
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
 			}
 			return nil
 		}); err != nil {
@@ -2526,7 +2532,10 @@ func (c *Client) sendGetSchemaById(ctx context.Context, params GetSchemaByIdPara
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
 			if val, ok := params.ProjectID.Get(); ok {
-				return e.EncodeValue(conv.StringToString(val))
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
 			}
 			return nil
 		}); err != nil {
@@ -2543,7 +2552,10 @@ func (c *Client) sendGetSchemaById(ctx context.Context, params GetSchemaByIdPara
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
 			if val, ok := params.TeamID.Get(); ok {
-				return e.EncodeValue(conv.StringToString(val))
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
 			}
 			return nil
 		}); err != nil {
@@ -3322,7 +3334,10 @@ func (c *Client) sendListSessions(ctx context.Context, params ListSessionsParams
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
 			if val, ok := params.ProjectID.Get(); ok {
-				return e.EncodeValue(conv.StringToString(val))
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
 			}
 			return nil
 		}); err != nil {

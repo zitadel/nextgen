@@ -5162,6 +5162,52 @@ func (o OptPostTokenRequestGrantType) Or(d PostTokenRequestGrantType) PostTokenR
 	return d
 }
 
+// NewOptProjectID returns new OptProjectID with value set to v.
+func NewOptProjectID(v ProjectID) OptProjectID {
+	return OptProjectID{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptProjectID is optional ProjectID.
+type OptProjectID struct {
+	Value ProjectID
+	Set   bool
+}
+
+// IsSet returns true if OptProjectID was set.
+func (o OptProjectID) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptProjectID) Reset() {
+	var v ProjectID
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptProjectID) SetTo(v ProjectID) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptProjectID) Get() (v ProjectID, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptProjectID) Or(d ProjectID) ProjectID {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptStepTexts returns new OptStepTexts with value set to v.
 func NewOptStepTexts(v StepTexts) OptStepTexts {
 	return OptStepTexts{
@@ -5248,6 +5294,52 @@ func (o OptString) Get() (v string, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptString) Or(d string) string {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptTeamID returns new OptTeamID with value set to v.
+func NewOptTeamID(v TeamID) OptTeamID {
+	return OptTeamID{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptTeamID is optional TeamID.
+type OptTeamID struct {
+	Value TeamID
+	Set   bool
+}
+
+// IsSet returns true if OptTeamID was set.
+func (o OptTeamID) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptTeamID) Reset() {
+	var v TeamID
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptTeamID) SetTo(v TeamID) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptTeamID) Get() (v TeamID, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptTeamID) Or(d TeamID) TeamID {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -6237,6 +6329,8 @@ func (*SubmitFlowStepBadRequest) submitFlowStepRes() {}
 type SubmitFlowStepOK FlowResponseHeaders
 
 func (*SubmitFlowStepOK) submitFlowStepRes() {}
+
+type TeamID string
 
 // Ref: #
 type TokenResponse struct {
