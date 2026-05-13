@@ -62,6 +62,8 @@ paths:
     $ref: endpoints/auth_attempts/by_id/handoff/methods.yaml
   /projects:
     $ref: endpoints/projects/methods.yaml
+  /projects/{project_id}:
+    $ref: endpoints/projects/by_id/methods.yaml
   /sessions:
     $ref: endpoints/sessions/methods.yaml
   /sessions/exchange:
