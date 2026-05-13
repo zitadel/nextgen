@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 
 import { describe, expect, it, vi } from "vitest";
 
-import { runSyncLoop } from "../../src/sync/loop";
+import { buildSyncPlan, runSyncLoop } from "../../src/sync/loop";
 import type { ResourceSyncer } from "../../src/sync/syncers";
 import type { PlatformClient } from "../../src/platform/client";
 
@@ -41,6 +41,7 @@ function makeClient(): PlatformClient {
 
 function makeSyncer(overrides: Partial<ResourceSyncer> = {}): ResourceSyncer {
   return {
+    kind: "schema",
     directory: ".zitadel/schemas",
     mutable: false,
     create: vi.fn().mockResolvedValue("created-id"),
@@ -49,6 +50,169 @@ function makeSyncer(overrides: Partial<ResourceSyncer> = {}): ResourceSyncer {
     ...overrides,
   };
 }
+
+describe("buildSyncPlan", () => {
+  it("returns create action when file exists with no state entry", async () => {
+    const cwd = makeCwd();
+    try {
+      await writeState(cwd, { framework: "next", resources: {} });
+      await writeResource(cwd, ".zitadel/schemas", "user.json", { kind: "user-schema" });
+
+      const syncer = makeSyncer();
+      const actions = await buildSyncPlan(cwd, [syncer]);
+
+      expect(actions).toHaveLength(1);
+      expect(actions[0].kind).toBe("create");
+      expect(actions[0].path).toBe(".zitadel/schemas/user.json");
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("returns skip(immutable) when immutable resource already has an id in state", async () => {
+    const cwd = makeCwd();
+    try {
+      const data = { kind: "user-schema" };
+      const { createHash } = await import("node:crypto");
+      const hash = createHash("sha256").update(JSON.stringify(data)).digest("hex");
+      await writeState(cwd, {
+        framework: "next",
+        resources: { ".zitadel/schemas/user.json": { id: "existing-id", hash } },
+      });
+      await writeResource(cwd, ".zitadel/schemas", "user.json", data);
+
+      const syncer = makeSyncer({ mutable: false });
+      const actions = await buildSyncPlan(cwd, [syncer]);
+
+      expect(actions).toHaveLength(1);
+      expect(actions[0].kind).toBe("skip");
+      if (actions[0].kind === "skip") {
+        expect(actions[0].reason).toBe("immutable");
+      }
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("returns skip(no-change) when mutable resource hash is unchanged", async () => {
+    const cwd = makeCwd();
+    try {
+      const data = { kind: "flow-definition" };
+      const { createHash } = await import("node:crypto");
+      const hash = createHash("sha256").update(JSON.stringify(data)).digest("hex");
+      await writeState(cwd, {
+        framework: "next",
+        resources: { ".zitadel/flows/default.json": { id: "flow-001", hash } },
+      });
+      await writeResource(cwd, ".zitadel/flows", "default.json", data);
+
+      const syncer = makeSyncer({ directory: ".zitadel/flows", mutable: true });
+      const actions = await buildSyncPlan(cwd, [syncer]);
+
+      expect(actions).toHaveLength(1);
+      expect(actions[0].kind).toBe("skip");
+      if (actions[0].kind === "skip") {
+        expect(actions[0].reason).toBe("no-change");
+      }
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("returns update action when mutable resource hash changed", async () => {
+    const cwd = makeCwd();
+    try {
+      await writeState(cwd, {
+        framework: "next",
+        resources: { ".zitadel/flows/default.json": { id: "flow-001", hash: "old-hash" } },
+      });
+      await writeResource(cwd, ".zitadel/flows", "default.json", { kind: "flow-definition", version: 2 });
+
+      const syncer = makeSyncer({ directory: ".zitadel/flows", mutable: true });
+      const actions = await buildSyncPlan(cwd, [syncer]);
+
+      expect(actions).toHaveLength(1);
+      expect(actions[0].kind).toBe("update");
+      if (actions[0].kind === "update") {
+        expect(actions[0].id).toBe("flow-001");
+        expect(actions[0].path).toBe(".zitadel/flows/default.json");
+      }
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("returns delete action when resource is in state but missing from disk", async () => {
+    const cwd = makeCwd();
+    try {
+      await writeState(cwd, {
+        framework: "next",
+        resources: { ".zitadel/schemas/old.json": { id: "old-id", hash: "abc" } },
+      });
+      await mkdir(join(cwd, ".zitadel/schemas"), { recursive: true });
+
+      const syncer = makeSyncer();
+      const actions = await buildSyncPlan(cwd, [syncer]);
+
+      expect(actions).toHaveLength(1);
+      expect(actions[0].kind).toBe("delete");
+      if (actions[0].kind === "delete") {
+        expect(actions[0].id).toBe("old-id");
+        expect(actions[0].path).toBe(".zitadel/schemas/old.json");
+      }
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("fetches oldContent via syncer.fetch when client is provided", async () => {
+    const cwd = makeCwd();
+    try {
+      await writeState(cwd, {
+        framework: "next",
+        resources: { ".zitadel/schemas/old.json": { id: "old-id", hash: "abc" } },
+      });
+      await mkdir(join(cwd, ".zitadel/schemas"), { recursive: true });
+
+      const fetchedContent = { kind: "user-schema", version: 1 };
+      const fetchFn = vi.fn().mockResolvedValue(fetchedContent);
+      const syncer = makeSyncer({ fetch: fetchFn });
+      const client = makeClient();
+      const actions = await buildSyncPlan(cwd, [syncer], client);
+
+      expect(fetchFn).toHaveBeenCalledWith(client, "old-id");
+      expect(actions[0].kind).toBe("delete");
+      if (actions[0].kind === "delete") {
+        expect(actions[0].oldContent).toEqual(fetchedContent);
+      }
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("leaves oldContent null when fetch throws", async () => {
+    const cwd = makeCwd();
+    try {
+      await writeState(cwd, {
+        framework: "next",
+        resources: { ".zitadel/schemas/old.json": { id: "old-id", hash: "abc" } },
+      });
+      await mkdir(join(cwd, ".zitadel/schemas"), { recursive: true });
+
+      const fetchFn = vi.fn().mockRejectedValue(new Error("network error"));
+      const syncer = makeSyncer({ fetch: fetchFn });
+      const client = makeClient();
+      const actions = await buildSyncPlan(cwd, [syncer], client);
+
+      expect(actions[0].kind).toBe("delete");
+      if (actions[0].kind === "delete") {
+        expect(actions[0].oldContent).toBeNull();
+      }
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+});
 
 describe("runSyncLoop", () => {
   it("creates resource when no id in state", async () => {
