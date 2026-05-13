@@ -7,6 +7,10 @@
     ".": {
       "types": "./src/index.ts",
       "import": "./src/index.ts"
+    },
+    "./public-dir": {
+      "types": "./src/public-dir.ts",
+      "import": "./src/public-dir.ts"
     }
   },
   "scripts": {},
@@ -14,8 +18,27 @@
     "@zitadel-nextgen/api": "workspace:*",
     "xstate": "catalog:"
   },
+  "peerDependencies": {
+    "msw": "catalog:"
+  },
   "devDependencies": {
+    "@types/node": "catalog:",
     "@vitest/browser-playwright": "catalog:",
     "msw": "catalog:"
+  },
+  "nx": {
+    "targets": {
+      "build": {
+        "executor": "nx:noop",
+        "dependsOn": [
+          "^build"
+        ]
+      }
+    }
+  },
+  "msw": {
+    "workerDirectory": [
+      "public"
+    ]
   }
 }
