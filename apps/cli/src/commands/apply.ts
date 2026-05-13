@@ -49,7 +49,17 @@ export async function runApply(io: CliIO, opts: ApplyOptions): Promise<void> {
 
   if (opts.planOnly || opts.dryRun) {
     const plan = await buildSyncPlan(opts.cwd, syncers, client);
-    writePretty(io, renderPlan(plan, io.isTTY));
+    if (opts.json) {
+      const active = plan.filter((a) => a.kind !== "skip");
+      ok(io, {
+        creates: active.filter((a) => a.kind === "create").length,
+        updates: active.filter((a) => a.kind === "update").length,
+        deletes: active.filter((a) => a.kind === "delete").length,
+        total: active.length,
+      }, opts);
+    } else {
+      writePretty(io, renderPlan(plan, io.isTTY));
+    }
     return;
   }
 

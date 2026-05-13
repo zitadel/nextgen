@@ -139,10 +139,11 @@ export async function runSetup(io: CliIO, opts: SetupOptions): Promise<void> {
   const warnings: string[] = [];
 
   const setupOpts = { ...opts, source: effectiveServer };
-  const apply =
-    opts.noApply || opts.dryRun
-      ? undefined
-      : await runApply(io, { ...setupOpts, json: true, silent: true });
+  let apply: { synced: boolean } | undefined;
+  if (!opts.noApply && !opts.dryRun) {
+    await runApply(io, { ...setupOpts, json: true, silent: true });
+    apply = { synced: true };
+  }
   const deploy =
     !deployTarget || deployTarget.id === "none" || opts.skipDeployPlatform || opts.dryRun
       ? undefined

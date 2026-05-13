@@ -27,7 +27,6 @@ const VALID_FLOW = {
     {
       name: "identifier",
       type: "identifier",
-      texts: {},
       fields: {},
       actions: {},
       gates: {},
@@ -100,7 +99,7 @@ describe("apply pre-flight checks", () => {
     try {
       await expect(
         runApply(makeIO(), { ...makeOpts(cwd), environment: "production" }),
-      ).rejects.toThrow("E_CLAIM_REQUIRED");
+      ).rejects.toMatchObject({ code: "E_CLAIM_REQUIRED" });
     } finally {
       await rm(cwd, { recursive: true, force: true });
     }
@@ -122,7 +121,7 @@ describe("apply pre-flight checks", () => {
       "bad.json": { version: 99, kind: "wrong" },
     });
     try {
-      await expect(runApply(makeIO(), makeOpts(cwd))).rejects.toThrow("E_VALIDATION");
+      await expect(runApply(makeIO(), makeOpts(cwd))).rejects.toMatchObject({ code: "E_VALIDATION" });
     } finally {
       await rm(cwd, { recursive: true, force: true });
     }
@@ -134,7 +133,7 @@ describe("apply pre-flight checks", () => {
       steps: [
         {
           ...VALID_FLOW.steps[0],
-          gates: { client_secret_env: "MY_SECRET" },
+          gates: { captcha: { type: "captcha", config: { client_secret_env: "MY_SECRET" } } },
         },
       ],
     };
@@ -154,7 +153,7 @@ describe("apply pre-flight checks", () => {
       steps: [
         {
           ...VALID_FLOW.steps[0],
-          gates: { client_secret_env: "MY_SECRET" },
+          gates: { captcha: { type: "captcha", config: { client_secret_env: "MY_SECRET" } } },
         },
       ],
     };

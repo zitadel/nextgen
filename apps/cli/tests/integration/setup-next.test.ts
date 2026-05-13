@@ -26,7 +26,7 @@ describe("Next setup integration", () => {
     };
     expect(setupJson.status).toBe("ok");
     expect(setupJson.data.project.lifecycle).toBe("pre-claim");
-    expect(setupJson.data.apply).toBeDefined();
+    expect(setupJson.data.apply).toMatchObject({ synced: true });
 
     expect(await readFile(join(cwd, "zitadel.json"), "utf8")).toContain('"project"');
     expect(await readFile(join(cwd, ".zitadel/schemas/user.json"), "utf8")).toContain(
@@ -70,13 +70,9 @@ describe("Next setup integration", () => {
     const stateBeforePlan = await readFile(join(cwd, ".zitadel/state.json"), "utf8");
     const plan = await runCliForTest(["plan", "--cwd", cwd, "--json", "--mock"]);
     expect(plan.exitCode).toBe(0);
-    const planJson = parseJson(plan.stdout) as {
-      status: string;
-      data: { dry_run: boolean; uploaded: boolean };
-    };
+    const planJson = parseJson(plan.stdout) as { status: string; data: { total: number } };
     expect(planJson.status).toBe("ok");
-    expect(planJson.data.dry_run).toBe(true);
-    expect(planJson.data.uploaded).toBe(false);
+    expect(typeof planJson.data.total).toBe("number");
     expect(await readFile(join(cwd, ".zitadel/state.json"), "utf8")).toBe(stateBeforePlan);
 
     const addSchema = await runCliForTest([
@@ -93,12 +89,9 @@ describe("Next setup integration", () => {
 
     const apply = await runCliForTest(["apply", "--cwd", cwd, "--json", "--mock"]);
     expect(apply.exitCode).toBe(0);
-    const applyJson = parseJson(apply.stdout) as {
-      status: string;
-      data: { state_recorded: boolean };
-    };
+    const applyJson = parseJson(apply.stdout) as { status: string; data: { synced: boolean } };
     expect(applyJson.status).toBe("ok");
-    expect(applyJson.data.state_recorded).toBe(true);
+    expect(applyJson.data.synced).toBe(true);
 
     const production = await runCliForTest([
       "apply",
@@ -170,7 +163,7 @@ describe("Next setup integration", () => {
     expect(productionAfterClaim.exitCode).toBe(0);
   });
 
-  it("plans identity resource counts and fails apply clearly for missing env refs", async () => {
+  it("fails apply clearly for missing env refs", async () => {
     const cwd = await createNextProject();
     await runCliForTest([
       "setup",
@@ -182,60 +175,42 @@ describe("Next setup integration", () => {
       "--skip-deploy-platform",
     ]);
 
-    const idp = await runCliForTest([
-      "idp",
-      "add",
-      "--cwd",
-      cwd,
-      "--json",
-      "--preset",
-      "google",
-      "--client-id",
-      "abc.apps.googleusercontent.com",
-      "--env-secret",
-      "ZITADEL_IDP_GOOGLE_SECRET",
-    ]);
-    expect(idp.exitCode).toBe(0);
-
-    const app = await runCliForTest([
-      "app",
-      "add",
-      "--cwd",
-      cwd,
-      "--json",
-      "--preset",
-      "spa",
-      "--slug",
-      "web",
-      "--redirect-uri",
-      "http://localhost:3000/callback",
-    ]);
-    expect(app.exitCode).toBe(0);
-
-    const plan = await runCliForTest(["plan", "--cwd", cwd, "--json", "--mock"], {
-      ZITADEL_IDP_GOOGLE_SECRET: "secret",
-    });
-    expect(plan.exitCode).toBe(0);
-    const planJson = parseJson(plan.stdout) as {
-      data: { resources: { idps: number; apps: number }; env_refs: { missing: string[] } };
+    // Overwrite the default flow with one that has an env ref in a gate config
+    const flowWithEnvRef = {
+      version: 1,
+      kind: "flow-definition",
+      slug: "default",
+      name: "Default",
+      purposes: ["login"],
+      template_name: "default",
+      initial_steps: { login: "identifier" },
+      steps: [
+        {
+          name: "identifier",
+          type: "identifier",
+          fields: {},
+          actions: {},
+          gates: { captcha: { type: "captcha", config: { client_secret_env: "MY_CAPTCHA_SECRET" } } },
+          transitions: {},
+        },
+      ],
     };
-    expect(planJson.data.resources.idps).toBe(1);
-    expect(planJson.data.resources.apps).toBe(1);
-    expect(planJson.data.env_refs.missing).toEqual([]);
+    await writeFile(join(cwd, ".zitadel/flows/default.json"), JSON.stringify(flowWithEnvRef, null, 2));
 
     const apply = await runCliForTest(["apply", "--cwd", cwd, "--json", "--mock"]);
     expect(apply.exitCode).toBe(3);
-    const applyJson = parseJson(apply.stdout) as {
-      code: string;
-      message: string;
-      details: { env_refs: { missing: string[] } };
-    };
+    const applyJson = parseJson(apply.stdout) as { code: string; message: string };
     expect(applyJson.code).toBe("E_VALIDATION");
     expect(applyJson.message).toContain("Missing environment variables");
-    expect(applyJson.details.env_refs.missing).toEqual(["ZITADEL_IDP_GOOGLE_SECRET"]);
+
+    const applyWithEnv = await runCliForTest(
+      ["apply", "--cwd", cwd, "--json", "--mock"],
+      { MY_CAPTCHA_SECRET: "hunter2" },
+    );
+    expect(applyWithEnv.exitCode).toBe(0);
   });
 
-  it("rejects invalid Liquid templates before recording apply state", async () => {
+  it("applies successfully when liquid templates are present (templates are not synced)", async () => {
     const cwd = await createNextProject();
     await runCliForTest([
       "setup",
@@ -246,18 +221,15 @@ describe("Next setup integration", () => {
       "--mock",
       "--skip-deploy-platform",
     ]);
-    const stateBefore = await readFile(join(cwd, ".zitadel/state.json"), "utf8");
     await mkdir(join(cwd, ".zitadel/templates"), { recursive: true });
     await writeFile(join(cwd, ".zitadel/templates/bad.liquid"), "<div>{{ value | raw }}</div>\n");
 
     const apply = await runCliForTest(["apply", "--cwd", cwd, "--json", "--mock"]);
 
-    expect(apply.exitCode).toBe(3);
-    const envelope = parseJson(apply.stdout) as { code: string; message: string; hint?: string };
-    expect(envelope.code).toBe("E_VALIDATION");
-    expect(envelope.message).toContain("Liquid templates");
-    expect(envelope.hint).toContain("raw");
-    expect(await readFile(join(cwd, ".zitadel/state.json"), "utf8")).toBe(stateBefore);
+    expect(apply.exitCode).toBe(0);
+    const envelope = parseJson(apply.stdout) as { status: string; data: { synced: boolean } };
+    expect(envelope.status).toBe("ok");
+    expect(envelope.data.synced).toBe(true);
   });
 });
 

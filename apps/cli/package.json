@@ -23,6 +23,7 @@
   "scripts": {
     "build": "tsdown",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
     "gen:agents-md": "tsx scripts/gen-agents-md.ts"
   },
   "dependencies": {
@@ -35,7 +36,8 @@
   "devDependencies": {
     "@zitadel-nextgen/sdk-next": "workspace:*",
     "tsdown": "^0.21.10",
-    "tsx": "catalog:"
+    "tsx": "catalog:",
+    "vitest": "^3.0.0"
   },
   "nx": {
     "targets": {
