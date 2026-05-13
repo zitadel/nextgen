@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"strings"
+
+	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 // FlowFieldResolver maps property names referenced by a flow step to
@@ -16,20 +18,21 @@ import (
 // api/openapi/endpoints/schemas/user-schema.yaml — customers author
 // schemas conforming to that meta-schema, and every trait the resolver
 // surfaces on [FlowField] must be derivable from one of its keywords.
-// MVP ships an in-package catalog implementation; the schema-driven
-// implementation lands behind the same interface once the user-schema
-// library is established — callers do not move.
+// The implementation loads the user schema via [JSONSchemaResolver],
+// which handles caching, `$ref` resolution, and the optional built-in
+// embedded schemas (the flow engine ships a default user schema this
+// way).
 type FlowFieldResolver interface {
-	// Resolve returns the per-field metadata for fieldNames. The
-	// userSchemaURL is accepted for forward compatibility with the
-	// schema-driven implementation; the stub catalog ignores it.
-	Resolve(ctx context.Context, userSchemaURL string, fieldNames []string) (FlowResolvedFields, error)
+	// Resolve returns the per-field metadata for fieldNames sourced
+	// from the user schema at userSchemaURL.
+	Resolve(ctx context.Context, client database.QueryExecutor, projectID, userSchemaURL string, fieldNames []string) (FlowResolvedFields, error)
 
-	// Validate checks submitted values against the schema-derived rules.
-	// Returns [FlowFieldValidationErrors] (as error) when one or more
-	// rules fail. The state machine surfaces it on the current step;
+	// Validate checks submitted values against the rules derived from
+	// the user schema at userSchemaURL. Returns
+	// [FlowFieldValidationErrors] (as error) when one or more rules
+	// fail. The state machine surfaces it on the current step;
 	// transport-level errors bubble up as plain errors.
-	Validate(ctx context.Context, userSchemaURL string, values map[string]any) error
+	Validate(ctx context.Context, client database.QueryExecutor, projectID, userSchemaURL string, values map[string]any) error
 }
 
 // FlowResolvedFields is the output of [FlowFieldResolver.Resolve]. It
