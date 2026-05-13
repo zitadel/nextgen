@@ -21,7 +21,7 @@
   },
   "dependencies": {
     "@nextgen/sdk-nuxt": "workspace:*",
-    "@nextgen/ui-lit": "workspace:*",
+    "@zitadel-nextgen/components": "workspace:*",
     "nuxt": "^4.4.2"
   },
   "devDependencies": {

@@ -3,7 +3,7 @@
     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px">
       <h1 style="font-size: 24px; font-weight: 700; margin: 0">Admin</h1>
       <ClientOnly>
-        <nextgen-logout proxy-base="/__nextgen" post-sign-out-url="/login" />
+        <zitadel-logout proxy-base="/__nextgen" post-sign-out-url="/login" />
       </ClientOnly>
     </div>
     <p style="color: #6b7280">
@@ -13,7 +13,7 @@
 </template>
 
 <script setup lang="ts">
-import "@nextgen/ui-lit";
+import "@zitadel-nextgen/components";
 import type { ClientAuthResult } from "@nextgen/sdk-nuxt";
 
 const auth = useState<ClientAuthResult>("nextgen-auth");
