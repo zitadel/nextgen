@@ -27,6 +27,7 @@ export interface ConfigClient {
 
 export interface SchemaClient {
   createSchema(data: object): Promise<{ id: string }>;
+  getSchema(id: string): Promise<object>;
   deleteSchema(id: string): Promise<void>;
 }
 

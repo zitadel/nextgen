@@ -2,12 +2,13 @@ import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import type { CliIO, GlobalOptions } from "../io/output";
-import { ok } from "../io/output";
+import { ok, writePretty } from "../io/output";
 import { ZitadelError } from "../lib/errors";
 import { createPlatformClient } from "../platform";
 import { environmentSchema, type ZitadelEnvironment } from "../platform/schemas";
 import { flowDefinitionSchema } from "../resources/flow";
-import { runSyncLoop } from "../sync/loop";
+import { buildSyncPlan, runSyncLoop } from "../sync/loop";
+import { renderPlan } from "../sync/plan-renderer";
 import { syncers } from "../sync/syncers";
 import type { ZitadelSecret } from "./shared";
 import { readZitadelSecret } from "./shared";
@@ -46,12 +47,16 @@ export async function runApply(io: CliIO, opts: ApplyOptions): Promise<void> {
 
   const client = createPlatformClient(opts.source, secret.project_secret);
 
-  if (!opts.planOnly && !opts.dryRun) {
-    await runSyncLoop(opts.cwd, client, syncers);
+  if (opts.planOnly || opts.dryRun) {
+    const plan = await buildSyncPlan(opts.cwd, syncers, client);
+    writePretty(io, renderPlan(plan, io.isTTY));
+    return;
   }
 
+  await runSyncLoop(opts.cwd, client, syncers);
+
   if (!opts.silent) {
-    ok(io, { synced: !opts.planOnly && !opts.dryRun }, opts);
+    ok(io, { synced: true }, opts);
   }
 }
 

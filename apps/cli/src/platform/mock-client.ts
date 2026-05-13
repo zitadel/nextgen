@@ -122,6 +122,10 @@ export class MockPlatformClient implements PlatformClient {
     return { id: "mock-schema-id" };
   }
 
+  async getSchema(_id: string): Promise<object> {
+    return {};
+  }
+
   async deleteSchema(_id: string): Promise<void> {
     return;
   }

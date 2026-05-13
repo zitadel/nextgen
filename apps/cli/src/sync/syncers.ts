@@ -1,16 +1,19 @@
 import type { PlatformClient } from "../platform/client.js";
 
 export interface ResourceSyncer {
-  directory: string;
-  mutable: boolean;
+  readonly kind: string;
+  readonly directory: string;
+  readonly mutable: boolean;
   create(client: PlatformClient, data: object): Promise<string>;
   update(client: PlatformClient, id: string, data: object): Promise<void>;
   delete(client: PlatformClient, id: string): Promise<void>;
+  fetch?(client: PlatformClient, id: string): Promise<object>;
 }
 
 export class SchemaSyncer implements ResourceSyncer {
-  directory = ".zitadel/schemas";
-  mutable = false;
+  readonly kind = "schema";
+  readonly directory = ".zitadel/schemas";
+  readonly mutable = false;
 
   async create(client: PlatformClient, data: object): Promise<string> {
     const result = await client.createSchema(data);
@@ -24,11 +27,16 @@ export class SchemaSyncer implements ResourceSyncer {
   async delete(client: PlatformClient, id: string): Promise<void> {
     await client.deleteSchema(id);
   }
+
+  async fetch(client: PlatformClient, id: string): Promise<object> {
+    return client.getSchema(id);
+  }
 }
 
 export class FlowDefinitionSyncer implements ResourceSyncer {
-  directory = ".zitadel/flows";
-  mutable = true;
+  readonly kind = "flow";
+  readonly directory = ".zitadel/flows";
+  readonly mutable = true;
 
   async create(client: PlatformClient, data: object): Promise<string> {
     const result = await client.createFlowDefinition(data);
@@ -42,6 +50,8 @@ export class FlowDefinitionSyncer implements ResourceSyncer {
   async delete(client: PlatformClient, id: string): Promise<void> {
     await client.deleteFlowDefinition(id);
   }
+
+  // no fetch — GET /flow_definitions/{id} not implemented in backend
 }
 
 export const syncers: ResourceSyncer[] = [new SchemaSyncer(), new FlowDefinitionSyncer()];

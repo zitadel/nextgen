@@ -61,6 +61,10 @@ export class HttpPlatformClient implements PlatformClient {
     return this.request("POST", "/schemas", data);
   }
 
+  async getSchema(id: string): Promise<object> {
+    return this.request("GET", `/schemas/${encodeURIComponent(id)}`);
+  }
+
   async deleteSchema(id: string): Promise<void> {
     return this.request("DELETE", `/schemas/${encodeURIComponent(id)}`);
   }
