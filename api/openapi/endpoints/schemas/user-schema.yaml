@@ -1,6 +1,5 @@
 title: UserSchema
 $schema: "https://json-schema.org/draft/2020-12/schema"
-$id: https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.yaml
 type: object
 required:
   - $schema
