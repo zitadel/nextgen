@@ -1754,7 +1754,7 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 							switch method {
 							case "DELETE":
 								r.name = DeleteFlowDefinitionOperation
-								r.summary = ""
+								r.summary = "Delete a flow definition by id"
 								r.operationID = "deleteFlowDefinition"
 								r.operationGroup = ""
 								r.pathPattern = "/flow_definitions/{id}"
@@ -1763,7 +1763,7 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 								return r, true
 							case "GET":
 								r.name = GetFlowDefinitionOperation
-								r.summary = ""
+								r.summary = "Get a flow definition by id"
 								r.operationID = "getFlowDefinition"
 								r.operationGroup = ""
 								r.pathPattern = "/flow_definitions/{id}"
@@ -1772,7 +1772,7 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 								return r, true
 							case "PATCH":
 								r.name = UpdateFlowDefinitionOperation
-								r.summary = ""
+								r.summary = "Update a flow definition by id"
 								r.operationID = "updateFlowDefinition"
 								r.operationGroup = ""
 								r.pathPattern = "/flow_definitions/{id}"

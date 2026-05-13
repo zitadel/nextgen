@@ -957,6 +957,8 @@ func (s *CreateSessionRequestUserAgentAdditional) init() CreateSessionRequestUse
 // DeleteFlowDefinitionNoContent is response for DeleteFlowDefinition operation.
 type DeleteFlowDefinitionNoContent struct{}
 
+func (*DeleteFlowDefinitionNoContent) deleteFlowDefinitionRes() {}
+
 // Ref: #
 type DeviceAuthorizationResponse struct {
 	// The device code that the client will use to poll for authorization.
@@ -1083,17 +1085,18 @@ func (s *ErrorDetails) SetDetails(val OptErrorDetailsDetails) {
 	s.Details = val
 }
 
-func (*ErrorDetails) authorizeDeviceRes()     {}
-func (*ErrorDetails) authorizeGetRes()        {}
-func (*ErrorDetails) createFlowRes()          {}
-func (*ErrorDetails) createSessionRes()       {}
-func (*ErrorDetails) endSessionRes()          {}
-func (*ErrorDetails) getAuthAttemptRes()      {}
-func (*ErrorDetails) getFlowDefinitionRes()   {}
-func (*ErrorDetails) getSchemaByIdRes()       {}
-func (*ErrorDetails) introspectRes()          {}
-func (*ErrorDetails) listFlowDefinitionsRes() {}
-func (*ErrorDetails) submitFlowStepRes()      {}
+func (*ErrorDetails) authorizeDeviceRes()      {}
+func (*ErrorDetails) authorizeGetRes()         {}
+func (*ErrorDetails) createFlowRes()           {}
+func (*ErrorDetails) createSessionRes()        {}
+func (*ErrorDetails) deleteFlowDefinitionRes() {}
+func (*ErrorDetails) endSessionRes()           {}
+func (*ErrorDetails) getAuthAttemptRes()       {}
+func (*ErrorDetails) getFlowDefinitionRes()    {}
+func (*ErrorDetails) getSchemaByIdRes()        {}
+func (*ErrorDetails) introspectRes()           {}
+func (*ErrorDetails) listFlowDefinitionsRes()  {}
+func (*ErrorDetails) submitFlowStepRes()       {}
 
 // Additional error-specific context.
 type ErrorDetailsDetails map[string]jx.Raw

@@ -98,7 +98,7 @@ type Handler interface {
 	// Delete a flow definition by id.
 	//
 	// DELETE /flow_definitions/{id}
-	DeleteFlowDefinition(ctx context.Context, params DeleteFlowDefinitionParams) error
+	DeleteFlowDefinition(ctx context.Context, params DeleteFlowDefinitionParams) (DeleteFlowDefinitionRes, error)
 	// EndSession implements endSession operation.
 	//
 	// End a session.

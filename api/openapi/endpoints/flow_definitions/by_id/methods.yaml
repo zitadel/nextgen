@@ -1,5 +1,6 @@
 get:
   operationId: getFlowDefinition
+  summary: Get a flow definition by id
   description: Get a flow definition by id
   tags:
     - Flow Definitions
@@ -30,6 +31,7 @@ get:
 
 patch:
   operationId: updateFlowDefinition
+  summary: Update a flow definition by id
   description: Update a flow definition by id
   tags:
     - Flow Definitions
@@ -72,6 +74,7 @@ patch:
 
 delete:
   operationId: deleteFlowDefinition
+  summary: Delete a flow definition by id
   description: Delete a flow definition by id
   tags:
     - Flow Definitions
@@ -83,6 +86,12 @@ delete:
   responses:
     '204':
       description: Flow definition deleted successfully.
+    '404':
+      description: Flow definition not found.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
     default:
       description: Unexpected error.
       content:

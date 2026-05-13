@@ -1781,12 +1781,12 @@ func (s *Server) handleDeleteFlowDefinitionRequest(args [1]string, argsEscaped b
 
 	var rawBody []byte
 
-	var response *DeleteFlowDefinitionNoContent
+	var response DeleteFlowDefinitionRes
 	if m := s.cfg.Middleware; m != nil {
 		mreq := middleware.Request{
 			Context:          ctx,
 			OperationName:    DeleteFlowDefinitionOperation,
-			OperationSummary: "",
+			OperationSummary: "Delete a flow definition by id",
 			OperationID:      "deleteFlowDefinition",
 			Body:             nil,
 			RawBody:          rawBody,
@@ -1802,7 +1802,7 @@ func (s *Server) handleDeleteFlowDefinitionRequest(args [1]string, argsEscaped b
 		type (
 			Request  = struct{}
 			Params   = DeleteFlowDefinitionParams
-			Response = *DeleteFlowDefinitionNoContent
+			Response = DeleteFlowDefinitionRes
 		)
 		response, err = middleware.HookMiddleware[
 			Request,
@@ -1813,12 +1813,12 @@ func (s *Server) handleDeleteFlowDefinitionRequest(args [1]string, argsEscaped b
 			mreq,
 			unpackDeleteFlowDefinitionParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				err = s.h.DeleteFlowDefinition(ctx, params)
+				response, err = s.h.DeleteFlowDefinition(ctx, params)
 				return response, err
 			},
 		)
 	} else {
-		err = s.h.DeleteFlowDefinition(ctx, params)
+		response, err = s.h.DeleteFlowDefinition(ctx, params)
 	}
 	if err != nil {
 		if errRes, ok := errors.Into[*ErrorDetailsStatusCode](err); ok {
@@ -2638,7 +2638,7 @@ func (s *Server) handleGetFlowDefinitionRequest(args [1]string, argsEscaped bool
 		mreq := middleware.Request{
 			Context:          ctx,
 			OperationName:    GetFlowDefinitionOperation,
-			OperationSummary: "",
+			OperationSummary: "Get a flow definition by id",
 			OperationID:      "getFlowDefinition",
 			Body:             nil,
 			RawBody:          rawBody,
@@ -6298,7 +6298,7 @@ func (s *Server) handleUpdateFlowDefinitionRequest(args [1]string, argsEscaped b
 		mreq := middleware.Request{
 			Context:          ctx,
 			OperationName:    UpdateFlowDefinitionOperation,
-			OperationSummary: "",
+			OperationSummary: "Update a flow definition by id",
 			OperationID:      "updateFlowDefinition",
 			Body:             request,
 			RawBody:          rawBody,

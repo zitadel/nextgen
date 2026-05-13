@@ -33,6 +33,10 @@ type CreateSessionRes interface {
 	createSessionRes()
 }
 
+type DeleteFlowDefinitionRes interface {
+	deleteFlowDefinitionRes()
+}
+
 type EndSessionRes interface {
 	endSessionRes()
 }

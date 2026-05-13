@@ -118,7 +118,7 @@ type Invoker interface {
 	// Delete a flow definition by id.
 	//
 	// DELETE /flow_definitions/{id}
-	DeleteFlowDefinition(ctx context.Context, params DeleteFlowDefinitionParams) error
+	DeleteFlowDefinition(ctx context.Context, params DeleteFlowDefinitionParams) (DeleteFlowDefinitionRes, error)
 	// EndSession invokes endSession operation.
 	//
 	// End a session.
@@ -1606,12 +1606,12 @@ func (c *Client) sendCreateSession(ctx context.Context, request *CreateSessionRe
 // Delete a flow definition by id.
 //
 // DELETE /flow_definitions/{id}
-func (c *Client) DeleteFlowDefinition(ctx context.Context, params DeleteFlowDefinitionParams) error {
-	_, err := c.sendDeleteFlowDefinition(ctx, params)
-	return err
+func (c *Client) DeleteFlowDefinition(ctx context.Context, params DeleteFlowDefinitionParams) (DeleteFlowDefinitionRes, error) {
+	res, err := c.sendDeleteFlowDefinition(ctx, params)
+	return res, err
 }
 
-func (c *Client) sendDeleteFlowDefinition(ctx context.Context, params DeleteFlowDefinitionParams) (res *DeleteFlowDefinitionNoContent, err error) {
+func (c *Client) sendDeleteFlowDefinition(ctx context.Context, params DeleteFlowDefinitionParams) (res DeleteFlowDefinitionRes, err error) {
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("deleteFlowDefinition"),
 		semconv.HTTPRequestMethodKey.String("DELETE"),

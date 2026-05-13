@@ -127,8 +127,8 @@ func (UnimplementedHandler) CreateSession(ctx context.Context, req *CreateSessio
 // Delete a flow definition by id.
 //
 // DELETE /flow_definitions/{id}
-func (UnimplementedHandler) DeleteFlowDefinition(ctx context.Context, params DeleteFlowDefinitionParams) error {
-	return ht.ErrNotImplemented
+func (UnimplementedHandler) DeleteFlowDefinition(ctx context.Context, params DeleteFlowDefinitionParams) (r DeleteFlowDefinitionRes, _ error) {
+	return r, ht.ErrNotImplemented
 }
 
 // EndSession implements endSession operation.
