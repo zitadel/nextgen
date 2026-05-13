@@ -28,6 +28,9 @@
       "path": "./packages/api"
     },
     {
+      "path": "./packages/api-mock"
+    },
+    {
       "path": "./packages/mockserver"
     },
     {
