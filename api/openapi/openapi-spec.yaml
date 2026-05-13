@@ -70,6 +70,10 @@ paths:
     $ref: endpoints/schemas/methods.yaml
   /schemas/{id}:
     $ref: endpoints/schemas/by_id/methods.yaml
+  /flow_definitions:
+    $ref: endpoints/flow_definitions/methods.yaml
+  /flow_definitions/{id}:
+    $ref: endpoints/flow_definitions/by_id/methods.yaml
 
 components:
   securitySchemes:
