@@ -46,6 +46,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	CreateHandoffOperation: []string{
 		"auth_attempts.write",
 	},
+	CreateProjectOperation: []string{
+		"projects.write",
+	},
 	CreateSchemaOperation: []string{
 		"schema.write",
 	},
