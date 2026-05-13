@@ -15,11 +15,12 @@ import (
 // customer schema conforming to the user meta-schema at
 // api/openapi/endpoints/schemas/user-schema.yaml — JSON `type` +
 // `format`, `minLength` / `maxLength`, top-level `required`, and the
-// `x-identifier` / `x-unique` property annotations. The `password`
-// entry additionally carries [domain.FlowFieldCredentialPassword],
-// modeling what the schema-driven resolver will derive by
-// cross-referencing schema-level `x-auth-methods` with the property
-// name.
+// `x-identifier` / `x-unique` property annotations. The identifier
+// entries carry [domain.FlowFieldChallengeIdentifier] and the
+// `password` entry carries [domain.FlowFieldChallengePassword],
+// modeling what the schema-driven resolver will derive from
+// `x-identifier` and from cross-referencing schema-level
+// `x-auth-methods` with the property name.
 //
 // The `userSchemaURL` argument on both methods is accepted for forward
 // compatibility and ignored.
@@ -37,27 +38,27 @@ var _ domain.FlowFieldResolver = (*CatalogFieldResolver)(nil)
 
 var defaultCatalog = map[string]domain.FlowField{
 	"email": {
-		Type:         domain.FlowFieldTypeEmail,
-		TextKey:      "field.email",
-		Required:     true,
-		Validation:   &domain.FlowFieldValidation{Format: "email", MaxLength: 320},
-		IsIdentifier: true,
-		Unique:       domain.FlowFieldUniqueScopeOrganization,
+		Type:       domain.FlowFieldTypeEmail,
+		TextKey:    "field.email",
+		Required:   true,
+		Validation: &domain.FlowFieldValidation{Format: "email", MaxLength: 320},
+		Unique:     domain.FlowFieldUniqueScopeOrganization,
+		Challenge:  domain.FlowFieldChallengeIdentifier,
 	},
 	"username": {
-		Type:         domain.FlowFieldTypeText,
-		TextKey:      "field.username",
-		Required:     true,
-		Validation:   &domain.FlowFieldValidation{MinLength: 3, MaxLength: 64},
-		IsIdentifier: true,
-		Unique:       domain.FlowFieldUniqueScopeOrganization,
+		Type:       domain.FlowFieldTypeText,
+		TextKey:    "field.username",
+		Required:   true,
+		Validation: &domain.FlowFieldValidation{MinLength: 3, MaxLength: 64},
+		Unique:     domain.FlowFieldUniqueScopeOrganization,
+		Challenge:  domain.FlowFieldChallengeIdentifier,
 	},
 	"password": {
 		Type:       domain.FlowFieldTypePassword,
 		TextKey:    "field.password",
 		Required:   true,
 		Validation: &domain.FlowFieldValidation{MinLength: 8},
-		Credential: domain.FlowFieldCredentialPassword,
+		Challenge:  domain.FlowFieldChallengePassword,
 	},
 	"given_name": {
 		Type:       domain.FlowFieldTypeText,
@@ -84,7 +85,7 @@ func (r *CatalogFieldResolver) Resolve(_ context.Context, _ string, fieldNames [
 		}
 		entry.Validation = cloneValidation(entry.Validation)
 		fields[name] = entry
-		if entry.IsIdentifier {
+		if entry.Challenge == domain.FlowFieldChallengeIdentifier {
 			implicit[name] = append(implicit[name], domain.FlowImplicitOutcomeUserNotFound)
 		}
 	}

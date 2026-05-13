@@ -57,30 +57,33 @@ func TestCatalogFieldResolver_Resolve_IdentifierImpliesUserNotFound(t *testing.T
 	if !slices.Contains(got.ImplicitOutcomes["email"], domain.FlowImplicitOutcomeUserNotFound) {
 		t.Errorf("Resolve email ImplicitOutcomes = %v, want user_not_found", got.ImplicitOutcomes["email"])
 	}
-	if !got.Fields["email"].IsIdentifier {
-		t.Error("Resolve email IsIdentifier = false, want true")
+	if got.Fields["email"].Challenge != domain.FlowFieldChallengeIdentifier {
+		t.Errorf("Resolve email Challenge = %q, want %q", got.Fields["email"].Challenge, domain.FlowFieldChallengeIdentifier)
 	}
 	if len(got.ImplicitOutcomes["password"]) != 0 {
 		t.Errorf("Resolve password ImplicitOutcomes = %v, want empty", got.ImplicitOutcomes["password"])
 	}
-	if got.Fields["password"].IsIdentifier {
-		t.Error("Resolve password IsIdentifier = true, want false")
+	if got.Fields["password"].Challenge == domain.FlowFieldChallengeIdentifier {
+		t.Error("Resolve password Challenge = identifier, want non-identifier")
 	}
 }
 
-func TestCatalogFieldResolver_Resolve_CredentialSurfaces(t *testing.T) {
+func TestCatalogFieldResolver_Resolve_ChallengeSurfaces(t *testing.T) {
 	resolver := flow.NewCatalogFieldResolver()
 
-	got, err := resolver.Resolve(t.Context(), "", []string{"email", "password"})
+	got, err := resolver.Resolve(t.Context(), "", []string{"email", "password", "given_name"})
 	if err != nil {
 		t.Fatalf("Resolve returned error: %v", err)
 	}
 
-	if got.Fields["password"].Credential != domain.FlowFieldCredentialPassword {
-		t.Errorf("Resolve password Credential = %q, want %q", got.Fields["password"].Credential, domain.FlowFieldCredentialPassword)
+	if got.Fields["email"].Challenge != domain.FlowFieldChallengeIdentifier {
+		t.Errorf("Resolve email Challenge = %q, want %q", got.Fields["email"].Challenge, domain.FlowFieldChallengeIdentifier)
 	}
-	if got.Fields["email"].Credential != domain.FlowFieldCredentialNone {
-		t.Errorf("Resolve email Credential = %q, want %q", got.Fields["email"].Credential, domain.FlowFieldCredentialNone)
+	if got.Fields["password"].Challenge != domain.FlowFieldChallengePassword {
+		t.Errorf("Resolve password Challenge = %q, want %q", got.Fields["password"].Challenge, domain.FlowFieldChallengePassword)
+	}
+	if got.Fields["given_name"].Challenge != domain.FlowFieldChallengeNone {
+		t.Errorf("Resolve given_name Challenge = %q, want %q", got.Fields["given_name"].Challenge, domain.FlowFieldChallengeNone)
 	}
 }
 

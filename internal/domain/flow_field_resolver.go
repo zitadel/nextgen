@@ -52,12 +52,14 @@ type FlowResolvedFields struct {
 //   - The render-time shape mirrored in the OpenAPI flow-field
 //     component (Type, TextKey, Required, Value, Validation), which the
 //     API layer maps to the response DTO.
-//   - The server-side traits the state machine routes on (IsIdentifier,
-//     Unique, Credential). IsIdentifier and Unique come directly from
-//     the property's `x-identifier` and `x-unique` annotations in the
-//     user meta-schema (api/openapi/endpoints/schemas/user-property.yaml);
-//     Credential is derived by cross-referencing the schema-level
-//     `x-auth-methods` map with the property name.
+//   - The server-side traits the state machine routes on (Challenge,
+//     Unique). Unique comes directly from the property's `x-unique`
+//     annotation in the user meta-schema
+//     (api/openapi/endpoints/schemas/user-property.yaml). Challenge
+//     unifies two routing signals onto one enum: `x-identifier`
+//     produces [FlowFieldChallengeIdentifier], and the schema-level
+//     `x-auth-methods` map cross-referenced with the property name
+//     produces the matching credential kind.
 //
 // Annotations the meta-schema defines but the MVP state machine does
 // not yet consume (`x-claim`, `x-editable`, `x-sensitive`, `x-mfa`,
@@ -87,40 +89,42 @@ type FlowField struct {
 	// the property has no rules beyond its JSON type.
 	Validation *FlowFieldValidation
 
-	// IsIdentifier reflects `x-identifier` on the property. The state
-	// machine uses it to drive identifier resolution and the
-	// `user_not_found` implicit outcome.
-	IsIdentifier bool
-
 	// Unique reflects `x-unique` on the property: the scope at which
 	// the value must be unique, or [FlowFieldUniqueScopeNone] when the
 	// annotation is absent.
 	Unique FlowFieldUniqueScope
 
-	// Credential names the auth method the field carries a proof for,
-	// or [FlowFieldCredentialNone] when the field is not a credential.
-	// It is derived: the resolver cross-references the schema-level
-	// `x-auth-methods` map (which methods are enabled for this user
-	// type) with the property name, so a property named `password` on
-	// a schema with `x-auth-methods.password.enabled = true` surfaces
-	// as [FlowFieldCredentialPassword]. The state machine consults it
-	// on submit to route the value through the auth-attempt service.
-	Credential FlowFieldCredential
+	// Challenge names the auth-attempt challenge the field maps to, or
+	// [FlowFieldChallengeNone] when the field carries neither an
+	// identifier nor a credential proof. It unifies two derivation
+	// paths: `x-identifier` on the property surfaces as
+	// [FlowFieldChallengeIdentifier]; the schema-level `x-auth-methods`
+	// map cross-referenced with the property name surfaces as the
+	// matching credential kind (a property named `password` on a
+	// schema with `x-auth-methods.password.enabled = true` surfaces as
+	// [FlowFieldChallengePassword]). The state machine consults it on
+	// submit to route the value through the auth-attempt service —
+	// identifier fields drive identifier resolution (and the
+	// `user_not_found` implicit outcome), credential fields drive the
+	// matching challenge.
+	Challenge FlowFieldChallenge
 }
 
-// FlowFieldCredential names the auth method a credential field carries
-// a proof for. Values mirror the keys of `x-auth-methods` in the user
-// meta-schema (api/openapi/endpoints/schemas/user-schema.yaml). Empty
-// means the field is not a credential.
-type FlowFieldCredential string
+// FlowFieldChallenge names the auth-attempt challenge a field maps to.
+// `identifier` is sourced from the property's `x-identifier`
+// annotation; the credential values mirror the keys of `x-auth-methods`
+// in the user meta-schema (api/openapi/endpoints/schemas/user-schema.yaml).
+// Empty means the field maps to no challenge.
+type FlowFieldChallenge string
 
 const (
-	FlowFieldCredentialNone      FlowFieldCredential = ""
-	FlowFieldCredentialPassword  FlowFieldCredential = "password"
-	FlowFieldCredentialPasskey   FlowFieldCredential = "passkey"
-	FlowFieldCredentialMagicLink FlowFieldCredential = "magic_link"
-	FlowFieldCredentialSSO       FlowFieldCredential = "sso"
-	FlowFieldCredentialOTP       FlowFieldCredential = "otp"
+	FlowFieldChallengeNone       FlowFieldChallenge = ""
+	FlowFieldChallengeIdentifier FlowFieldChallenge = "identifier"
+	FlowFieldChallengePassword   FlowFieldChallenge = "password"
+	FlowFieldChallengePasskey    FlowFieldChallenge = "passkey"
+	FlowFieldChallengeMagicLink  FlowFieldChallenge = "magic_link"
+	FlowFieldChallengeSSO        FlowFieldChallenge = "sso"
+	FlowFieldChallengeOTP        FlowFieldChallenge = "otp"
 )
 
 // FlowFieldUniqueScope mirrors the `x-unique` enum in the user
@@ -208,7 +212,7 @@ func (e FlowFieldValidationErrors) Error() string {
 }
 
 // FlowImplicitOutcomeUserNotFound is the implicit transition outcome
-// the resolver surfaces for any `x-identifier` field.
+// the resolver surfaces for any [FlowFieldChallengeIdentifier] field.
 const FlowImplicitOutcomeUserNotFound = "user_not_found"
 
 // ErrFlowFieldUnknown is returned by [FlowFieldResolver.Resolve] when a
