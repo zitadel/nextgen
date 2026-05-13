@@ -148,6 +148,39 @@ func TestSealer_OpensWithPreviousKey(t *testing.T) {
 	}
 }
 
+func TestSealer_PreviousKeyIsCopied(t *testing.T) {
+	// After construction, mutating the caller's previous-key struct must
+	// not affect the sealer: keys are copied on the way in.
+	prev := key(1, 0xAA)
+	value, err := func() (string, error) {
+		oldSealer, err := NewSealer(prev, nil, 10*time.Minute)
+		if err != nil {
+			return "", err
+		}
+		return oldSealer.Seal([]byte("hello"))
+	}()
+	if err != nil {
+		t.Fatalf("Seal (old): %v", err)
+	}
+
+	newCurrent := key(2, 0xBB)
+	s, err := NewSealer(newCurrent, &prev, 10*time.Minute)
+	if err != nil {
+		t.Fatalf("NewSealer: %v", err)
+	}
+
+	prev.Bytes[0] ^= 0xFF
+	prev.Version = 9
+
+	got, err := s.Open(value)
+	if err != nil {
+		t.Fatalf("Open after caller mutated prev: %v", err)
+	}
+	if string(got) != "hello" {
+		t.Fatalf("Open: got %q, want %q", got, "hello")
+	}
+}
+
 func TestSealer_SealAlwaysUsesCurrentKey(t *testing.T) {
 	prev := key(1, 0xAA)
 	s, err := NewSealer(key(2, 0xBB), &prev, 10*time.Minute)

@@ -65,9 +65,14 @@ func NewSealer(current Key, previous *Key, maxAge time.Duration) (*Sealer, error
 	if previous != nil && previous.Version == current.Version {
 		return nil, errors.New("cookie: previous key must have a different version byte than current")
 	}
+	var prev *Key
+	if previous != nil {
+		p := *previous
+		prev = &p
+	}
 	return &Sealer{
 		current:  current,
-		previous: previous,
+		previous: prev,
 		maxAge:   maxAge,
 		now:      time.Now,
 	}, nil
