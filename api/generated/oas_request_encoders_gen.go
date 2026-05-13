@@ -42,6 +42,20 @@ func encodeCreateFlowRequest(
 	return nil
 }
 
+func encodeCreateFlowDefinitionRequest(
+	req *FlowDefinitionCreateRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
 func encodeCreateSchemaRequest(
 	req CreateSchemaReq,
 	r *http.Request,
@@ -342,6 +356,20 @@ func encodeSubmitFlowEventRequest(
 
 func encodeSubmitFlowStepRequest(
 	req *FlowSubmitRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeUpdateFlowDefinitionRequest(
+	req *FlowDefinitionUpdateRequest,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"
