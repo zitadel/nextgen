@@ -1,4 +1,4 @@
-export { NextgenLogin } from '@nextgen/ui-lit';
+export { ZitadelLogin, ZitadelLogout } from '@zitadel-nextgen/components';
 export { createNextgenMiddleware, getAuth } from './server.js';
 export type {
   NextgenMiddlewareOptions,

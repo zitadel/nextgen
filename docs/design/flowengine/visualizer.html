@@ -244,20 +244,6 @@
     outline: none;
     tab-size: 2;
   }
-  textarea.template-editor[data-locked="true"] {
-    color: var(--muted);
-    caret-color: transparent;
-    cursor: not-allowed;
-  }
-  .template-locked-banner {
-    display: none;
-    padding: 6px 10px;
-    background: rgba(108, 140, 255, 0.08);
-    border-bottom: 1px solid var(--border);
-    color: var(--muted);
-    font-size: 12px;
-  }
-  body[data-template-locked="true"] .template-locked-banner { display: block; }
 
   .editor-status {
     height: 28px;
@@ -549,35 +535,6 @@
     overflow: auto;
   }
 
-  /* ── Real Components view ── */
-  #real-view { padding: 0; }
-  .real-toolbar {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 8px 16px; background: var(--surface);
-    border-bottom: 1px solid var(--border); flex-shrink: 0;
-    font-size: 12px; color: var(--muted);
-  }
-  .real-toolbar code { color: var(--accent); font-family: var(--editor-font); }
-  .real-restart {
-    font-size: 11px; color: var(--muted); background: rgba(108, 140, 255, 0.08);
-    border: 1px solid var(--border); border-radius: 6px;
-    padding: 4px 8px; cursor: pointer;
-  }
-  .real-restart:hover { background: rgba(108, 140, 255, 0.18); color: var(--text); }
-  .real-frame {
-    flex: 1 1 auto; overflow: auto; background: #f8fafc;
-    display: flex; align-items: stretch; justify-content: center;
-  }
-  .real-frame zitadel-login { display: block; width: 100%; min-height: 100%; }
-  .real-frame .real-error {
-    margin: 24px; padding: 16px; border: 1px solid var(--border);
-    border-radius: var(--radius); background: var(--surface); color: var(--text);
-    font-size: 13px; line-height: 1.5;
-  }
-  .real-frame .real-error code {
-    font-family: var(--editor-font); background: var(--bg); padding: 2px 6px;
-    border-radius: 4px; color: var(--accent);
-  }
 </style>
 </head>
 <body>
@@ -608,13 +565,6 @@
     </div>
     <!-- Liquid template pane -->
     <div class="editor-pane" id="template-pane">
-      <div class="template-locked-banner">
-        Read-only: this is the bundled <code>auth_form.liquid</code> the
-        <code>&lt;zitadel-login&gt;</code> element is rendering. Editing is
-        disabled here because the orchestrator does not yet expose a
-        <code>template</code> override. Switch back to <strong>Diagram</strong>
-        or <strong>Simulate</strong> to edit your draft.
-      </div>
       <textarea id="template-editor" class="template-editor" spellcheck="false"></textarea>
     </div>
     <!-- User schema pane -->
@@ -632,7 +582,6 @@
     <div class="tab-bar">
       <button class="tab-btn active" data-view="diagram-view">Diagram</button>
       <button class="tab-btn" data-view="sim-view">Simulate</button>
-      <button class="tab-btn" data-view="real-view">Real components</button>
       <button class="tab-btn" data-view="api-view">API Log</button>
     </div>
     <div class="right-content">
@@ -642,13 +591,6 @@
       <div id="sim-view" class="view">
         <div class="sim-phone" id="sim-phone"></div>
         <div class="sim-resolved" id="sim-resolved"></div>
-      </div>
-      <div id="real-view" class="view">
-        <div class="real-toolbar" id="real-toolbar">
-          <span>Walks <code>step.transitions</code> in the editor &middot; <code>&lt;zitadel-login&gt;</code> + <code>WalkingFixtureTransport</code></span>
-          <button class="real-restart" id="real-restart" type="button">Restart flow</button>
-        </div>
-        <div class="real-frame" id="real-frame"></div>
       </div>
       <div id="api-view" class="view">
         <div class="api-toolbar">

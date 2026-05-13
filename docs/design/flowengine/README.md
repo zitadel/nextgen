@@ -33,7 +33,7 @@ complete → redirect                      → build native UI, step-up if neede
 | [Session API sketch](api/session-api.yaml) | Preliminary | Design-facing OpenAPI sketch; implementation source of truth lives under `api/openapi/`. |
 | [Flow API sketch](api/flow-api.yaml) | In Review | Design-facing OpenAPI sketch; implementation source of truth lives under `api/openapi/`. |
 | **Tooling** | | |
-| [Flow visualizer](visualizer.html) | Living | HTML tool for previewing flow payloads. Run `corepack pnpm --filter @zitadel-nextgen/components dev`, then open `http://localhost:5174/visualizer.html`. The "Real components" tab imports the components straight from `packages/components/src` (no build step) and walks `step.transitions` via `WalkingFixtureTransport`. |
+| [Flow visualizer](visualizer.html) | Living | Self-contained HTML tool for previewing flow payloads — diagram, simulator, and API log views. Open `visualizer.html` directly in a browser; no dev server required. |
 
 ## Core Concepts
 

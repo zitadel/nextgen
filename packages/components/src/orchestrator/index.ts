@@ -4,8 +4,10 @@
  */
 
 import "./zitadel-login.js";
+import "./zitadel-logout.js";
 
 export { ZitadelLogin } from "./zitadel-login.js";
+export { ZitadelLogout } from "./zitadel-logout.js";
 export {
   applyBrandingTokens,
   buildBrandingStylesheet,
@@ -37,6 +39,7 @@ export {
   type StartInput,
   type WalkingFixtureOptions,
 } from "./transport.js";
+export { ProxyTransport, type ProxyTransportOptions } from "./proxy-transport.js";
 export { validateBranding, type BrandingValidationResult } from "./branding-validator.js";
 export type {
   Branding,

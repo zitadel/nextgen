@@ -60,6 +60,10 @@ paths:
     $ref: endpoints/auth_attempts/by_id/challenges/by_id/methods.yaml
   /auth_attempts/{attempt_id}/handoff:
     $ref: endpoints/auth_attempts/by_id/handoff/methods.yaml
+  /projects:
+    $ref: endpoints/projects/methods.yaml
+  /projects/{project_id}:
+    $ref: endpoints/projects/by_id/methods.yaml
   /sessions:
     $ref: endpoints/sessions/methods.yaml
   /sessions/exchange:
@@ -70,6 +74,10 @@ paths:
     $ref: endpoints/schemas/methods.yaml
   /schemas/{id}:
     $ref: endpoints/schemas/by_id/methods.yaml
+  /flow_definitions:
+    $ref: endpoints/flow_definitions/methods.yaml
+  /flow_definitions/{id}:
+    $ref: endpoints/flow_definitions/by_id/methods.yaml
 
 components:
   securitySchemes:

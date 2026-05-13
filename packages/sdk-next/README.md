@@ -82,7 +82,7 @@ export function UserBadge() {
 
 ### 4. Login page
 
-The `<nextgen-login>` web component must be rendered client-side only. Split it into a server wrapper and a client widget:
+The `<zitadel-login>` web component (from `@zitadel-nextgen/components`) must be rendered client-side only. Split it into a server wrapper and a client widget:
 
 ```tsx
 // app/login/page.tsx (server)
@@ -102,16 +102,14 @@ export default async function LoginPage() {
 'use client';
 import dynamic from 'next/dynamic';
 
-const NextgenLogin = dynamic(
+const ZitadelLogin = dynamic(
   async () => {
-    await import('@nextgen/ui-lit');
-    return function NextgenLoginElement() {
+    await import('@zitadel-nextgen/components');
+    return function ZitadelLoginElement() {
       return (
-        <nextgen-login
+        <zitadel-login
           proxy-base="/__nextgen"
-          onNextgen-signin={() => {
-            window.location.href = '/admin';
-          }}
+          post-sign-in-url="/admin"
         />
       );
     };
@@ -120,7 +118,7 @@ const NextgenLogin = dynamic(
 );
 
 export function LoginWidget() {
-  return <NextgenLogin />;
+  return <ZitadelLogin />;
 }
 ```
 
