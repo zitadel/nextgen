@@ -55,8 +55,7 @@
     "build": "tsdown",
     "test": "vitest run --project unit",
     "test:browser": "vitest run --project browser",
-    "test:all": "vitest run",
-    "typecheck": "tsc --noEmit -p tsconfig.lib.json"
+    "test:all": "vitest run"
   },
   "dependencies": {
     "@zitadel-nextgen/api": "workspace:*",

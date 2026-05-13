@@ -136,8 +136,7 @@ form-associated inputs.
 
 The "Custom template" surface is not yet exposed on `<zitadel-login>`; the
 orchestrator currently uses the bundled `auth_form.liquid`. Tracked as a
-follow-up; the visualizer's Template tab is read-only when on the Real
-components view to reflect this honestly.
+follow-up.
 
 ## Element APIs
 
@@ -189,11 +188,11 @@ See [`src/atoms/`](src/atoms) for full TypeScript types and JSDoc.
 
 ```
 packages/components/
-├── dev/                   Vite playground (atoms + login routes; serves visualizer)
+├── dev/                   Vite playground (atoms + login routes)
 │   ├── index.html
 │   ├── main.ts
 │   ├── pages/             atom playground + <zitadel-login> demo
-│   └── fixtures/          login flow fixture for the demo & visualizer
+│   └── fixtures/          login flow fixture for the dev demo
 ├── src/
 │   ├── atoms/             zl-field, zl-submit, zl-action, zl-error + tests
 │   ├── orchestrator/      <zitadel-login>, transport, liquid, sanitiser, branding
@@ -204,7 +203,7 @@ packages/components/
 │   ├── manifests.ts       per-atom attribute / part / event manifests
 │   └── index.ts           barrel
 ├── tsdown.config.ts       library build (externalises lit/liquidjs/dompurify)
-├── vite.config.mts        dev server + visualizer alias
+├── vite.config.mts        dev server
 └── vitest.config.ts       jsdom (unit) + chromium (browser) projects
 ```
 
@@ -214,10 +213,9 @@ packages/components/
 # install once at the repo root
 corepack pnpm install
 
-# run the playground (atoms + login demo + visualizer)
+# run the playground (atoms + login demo)
 corepack pnpm --filter @zitadel-nextgen/components dev
 # → http://localhost:5174/             playground
-# → http://localhost:5174/visualizer.html flow visualizer (real components)
 
 # unit tests (jsdom)
 corepack pnpm --filter @zitadel-nextgen/components test
@@ -250,18 +248,6 @@ Tests are split across two Vitest projects:
 
 Files ending in `.browser.spec.ts` run only in the browser project; everything
 else runs in jsdom.
-
-## Visualizer
-
-`docs/design/flowengine/visualizer.html` is a static visualizer for the flow
-API. The dev server aliases `/visualizer.html` to it and substitutes the
-component bundle path with a `/@fs/` URL pointing at `src/index.ts`, so the
-"Real components" tab mounts the live source — no build required.
-
-```sh
-corepack pnpm --filter @zitadel-nextgen/components dev
-# open http://localhost:5174/visualizer.html
-```
 
 ## Related design docs
 

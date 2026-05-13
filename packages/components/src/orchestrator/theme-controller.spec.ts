@@ -23,7 +23,7 @@ function fakeMatchMedia(initial: boolean): { mql: FakeMql; matchMedia: typeof ma
     removeListener: () => undefined,
     dispatchEvent: () => false,
     __triggerChange: (matches: boolean) => {
-      mql.matches = matches;
+      (mql as { matches: boolean }).matches = matches;
       const event = { matches } as MediaQueryListEvent;
       for (const listener of [...listeners]) listener(event);
     },

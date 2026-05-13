@@ -139,8 +139,7 @@ export class FixtureTransport implements FlowTransport {
 export type FlowTransitionTarget = string | { switch: string } | { pivot: string };
 
 /**
- * Flow graph shape consumed by {@link WalkingFixtureTransport}. Compatible
- * with the JSON definitions used by `docs/design/flowengine/visualizer.html`.
+ * Flow graph shape consumed by {@link WalkingFixtureTransport}.
  */
 export type FlowDefinition = {
   name?: string;
@@ -180,8 +179,8 @@ const MAX_TRANSITION_HOPS = 16;
 
 /**
  * Dev/test transport that walks a {@link FlowDefinition} via
- * `step.transitions`. Used to drive the dev playground and the visualizer's
- * "Real components" tab end-to-end without a backend.
+ * `step.transitions`. Used to drive the dev playground end-to-end without a
+ * backend.
  *
  * Behaviour:
  *

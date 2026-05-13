@@ -32,9 +32,11 @@ export { focusVisibleStyles } from "./styles/focus-ring.js";
 
 export {
   ZitadelLogin,
+  ZitadelLogout,
   FetchTransport,
   FixtureTransport,
   FlowTransportError,
+  ProxyTransport,
   WalkingFixtureTransport,
   applyBrandingTokens,
   buildBrandingStylesheet,
@@ -71,6 +73,7 @@ export {
   type FlowTransport,
   type FixtureScript,
   type FetchTransportOptions,
+  type ProxyTransportOptions,
   type FlowDefinition,
   type FlowDefinitionStep,
   type FlowTransitionTarget,
