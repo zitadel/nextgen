@@ -83,7 +83,7 @@ export const flowDefinitionSchema = z.object({
     .object({
       team_ids: z.array(z.string()).optional(),
       app_ids: z.array(z.string()).optional(),
-      schema_ids: z.array(z.string()).optional(),
+      user_schema_ids: z.array(z.string()).optional(),
     })
     .optional(),
   steps: z.array(stepDefinitionSchema).nonempty(),
