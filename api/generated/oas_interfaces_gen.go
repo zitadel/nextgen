@@ -25,6 +25,10 @@ type CreateHandoffRes interface {
 	createHandoffRes()
 }
 
+type CreateProjectRes interface {
+	createProjectRes()
+}
+
 type CreateSchemaRes interface {
 	createSchemaRes()
 }
@@ -71,6 +75,10 @@ type GetLiveRes interface {
 
 type GetOpenIDConfigurationRes interface {
 	getOpenIDConfigurationRes()
+}
+
+type GetProjectRes interface {
+	getProjectRes()
 }
 
 type GetReadyRes interface {
