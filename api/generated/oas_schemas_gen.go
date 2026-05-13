@@ -404,6 +404,8 @@ func (s *CaptchaProofCaptcha) SetToken(val string) {
 
 type ChallengeID string
 
+type ChallengeNonce string
+
 // A factor challenge issued within an authentication attempt.
 // A challenge presents a single-factor verification prompt (password entry, TOTP code, passkey
 // assertion, etc.).
@@ -547,10 +549,8 @@ func (*CreateAuthAttemptBadRequest) createAuthAttemptRes() {}
 // Request to create a new authentication attempt.
 // Ref: #
 type CreateAuthAttemptRequest struct {
-	ProjectID ProjectID `json:"project_id"`
-	// Optional. The challenge nonce from POST /bootstrap/challenge.
-	// This nonce is origin-bound (for browser clients) and single-use.
-	ChallengeNonce OptString `json:"challenge_nonce"`
+	ProjectID      ProjectID         `json:"project_id"`
+	ChallengeNonce OptChallengeNonce `json:"challenge_nonce"`
 	// Optional. If provided, this attempt adds factors to an existing session (step-up auth).
 	// If omitted, a new session is created implicitly on successful handoff.
 	SessionID OptNilSessionID `json:"session_id"`
@@ -562,7 +562,7 @@ func (s *CreateAuthAttemptRequest) GetProjectID() ProjectID {
 }
 
 // GetChallengeNonce returns the value of ChallengeNonce.
-func (s *CreateAuthAttemptRequest) GetChallengeNonce() OptString {
+func (s *CreateAuthAttemptRequest) GetChallengeNonce() OptChallengeNonce {
 	return s.ChallengeNonce
 }
 
@@ -577,7 +577,7 @@ func (s *CreateAuthAttemptRequest) SetProjectID(val ProjectID) {
 }
 
 // SetChallengeNonce sets the value of ChallengeNonce.
-func (s *CreateAuthAttemptRequest) SetChallengeNonce(val OptString) {
+func (s *CreateAuthAttemptRequest) SetChallengeNonce(val OptChallengeNonce) {
 	s.ChallengeNonce = val
 }
 
@@ -600,18 +600,16 @@ func (*CreateFlowDefinitionConflict) createFlowDefinitionRes() {}
 
 // Ref: #
 type CreateFlowRequest struct {
-	Purpose CreateFlowRequestPurpose `json:"purpose"`
+	ProjectID ProjectID                `json:"project_id"`
+	Purpose   CreateFlowRequestPurpose `json:"purpose"`
 	// Name of a specific flow definition to use.
 	// When omitted, the engine selects the best-matching definition
 	// based on purpose + audience context.
 	FlowDefinitionName OptString `json:"flow_definition_name"`
 	// Semver version of the flow definition JSON Schema to use.
 	// When omitted, the latest version is used.
-	SchemaVersion OptString `json:"schema_version"`
-	// Origin-bound nonce obtained from `POST /bootstrap/challenge`.
-	// Binds the flow to the browser that requested it, preventing
-	// cross-origin replay of flow cookies.
-	ChallengeNonce OptString `json:"challenge_nonce"`
+	SchemaVersion  OptString         `json:"schema_version"`
+	ChallengeNonce OptChallengeNonce `json:"challenge_nonce"`
 	// Existing session to attach to (for step-up / reauth).
 	// Omit to let the flow create a new session implicitly.
 	SessionID OptString `json:"session_id"`
@@ -619,6 +617,11 @@ type CreateFlowRequest struct {
 	AuthRequestID OptString   `json:"auth_request_id"`
 	RedirectURI   OptURI      `json:"redirect_uri"`
 	Hint          OptFlowHint `json:"hint"`
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *CreateFlowRequest) GetProjectID() ProjectID {
+	return s.ProjectID
 }
 
 // GetPurpose returns the value of Purpose.
@@ -637,7 +640,7 @@ func (s *CreateFlowRequest) GetSchemaVersion() OptString {
 }
 
 // GetChallengeNonce returns the value of ChallengeNonce.
-func (s *CreateFlowRequest) GetChallengeNonce() OptString {
+func (s *CreateFlowRequest) GetChallengeNonce() OptChallengeNonce {
 	return s.ChallengeNonce
 }
 
@@ -661,6 +664,11 @@ func (s *CreateFlowRequest) GetHint() OptFlowHint {
 	return s.Hint
 }
 
+// SetProjectID sets the value of ProjectID.
+func (s *CreateFlowRequest) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
 // SetPurpose sets the value of Purpose.
 func (s *CreateFlowRequest) SetPurpose(val CreateFlowRequestPurpose) {
 	s.Purpose = val
@@ -677,7 +685,7 @@ func (s *CreateFlowRequest) SetSchemaVersion(val OptString) {
 }
 
 // SetChallengeNonce sets the value of ChallengeNonce.
-func (s *CreateFlowRequest) SetChallengeNonce(val OptString) {
+func (s *CreateFlowRequest) SetChallengeNonce(val OptChallengeNonce) {
 	s.ChallengeNonce = val
 }
 
@@ -5402,6 +5410,52 @@ func (o OptBrandingLayout) Get() (v BrandingLayout, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptBrandingLayout) Or(d BrandingLayout) BrandingLayout {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptChallengeNonce returns new OptChallengeNonce with value set to v.
+func NewOptChallengeNonce(v ChallengeNonce) OptChallengeNonce {
+	return OptChallengeNonce{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptChallengeNonce is optional ChallengeNonce.
+type OptChallengeNonce struct {
+	Value ChallengeNonce
+	Set   bool
+}
+
+// IsSet returns true if OptChallengeNonce was set.
+func (o OptChallengeNonce) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptChallengeNonce) Reset() {
+	var v ChallengeNonce
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptChallengeNonce) SetTo(v ChallengeNonce) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptChallengeNonce) Get() (v ChallengeNonce, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptChallengeNonce) Or(d ChallengeNonce) ChallengeNonce {
 	if v, ok := o.Get(); ok {
 		return v
 	}

@@ -890,6 +890,46 @@ func (s *ChallengeID) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes ChallengeNonce as json.
+func (s ChallengeNonce) Encode(e *jx.Encoder) {
+	unwrapped := string(s)
+
+	e.Str(unwrapped)
+}
+
+// Decode decodes ChallengeNonce from json.
+func (s *ChallengeNonce) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ChallengeNonce to nil")
+	}
+	var unwrapped string
+	if err := func() error {
+		v, err := d.Str()
+		unwrapped = string(v)
+		if err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = ChallengeNonce(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s ChallengeNonce) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ChallengeNonce) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode implements json.Marshaler.
 func (s *ChallengeResponse) Encode(e *jx.Encoder) {
 	e.ObjStart()
@@ -1382,6 +1422,10 @@ func (s *CreateFlowRequest) Encode(e *jx.Encoder) {
 // encodeFields encodes fields.
 func (s *CreateFlowRequest) encodeFields(e *jx.Encoder) {
 	{
+		e.FieldStart("project_id")
+		s.ProjectID.Encode(e)
+	}
+	{
 		e.FieldStart("purpose")
 		s.Purpose.Encode(e)
 	}
@@ -1429,15 +1473,16 @@ func (s *CreateFlowRequest) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfCreateFlowRequest = [8]string{
-	0: "purpose",
-	1: "flow_definition_name",
-	2: "schema_version",
-	3: "challenge_nonce",
-	4: "session_id",
-	5: "auth_request_id",
-	6: "redirect_uri",
-	7: "hint",
+var jsonFieldsNameOfCreateFlowRequest = [9]string{
+	0: "project_id",
+	1: "purpose",
+	2: "flow_definition_name",
+	3: "schema_version",
+	4: "challenge_nonce",
+	5: "session_id",
+	6: "auth_request_id",
+	7: "redirect_uri",
+	8: "hint",
 }
 
 // Decode decodes CreateFlowRequest from json.
@@ -1445,12 +1490,22 @@ func (s *CreateFlowRequest) Decode(d *jx.Decoder) error {
 	if s == nil {
 		return errors.New("invalid: unable to decode CreateFlowRequest to nil")
 	}
-	var requiredBitSet [1]uint8
+	var requiredBitSet [2]uint8
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
-		case "purpose":
+		case "project_id":
 			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				if err := s.ProjectID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"project_id\"")
+			}
+		case "purpose":
+			requiredBitSet[0] |= 1 << 1
 			if err := func() error {
 				if err := s.Purpose.Decode(d); err != nil {
 					return err
@@ -1538,8 +1593,9 @@ func (s *CreateFlowRequest) Decode(d *jx.Decoder) error {
 	}
 	// Validate required fields.
 	var failures []validate.FieldError
-	for i, mask := range [1]uint8{
-		0b00000001,
+	for i, mask := range [2]uint8{
+		0b00000011,
+		0b00000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -10755,6 +10811,39 @@ func (s OptBrandingLayout) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *OptBrandingLayout) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes ChallengeNonce as json.
+func (o OptChallengeNonce) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes ChallengeNonce from json.
+func (o *OptChallengeNonce) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptChallengeNonce to nil")
+	}
+	o.Set = true
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptChallengeNonce) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptChallengeNonce) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }

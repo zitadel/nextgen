@@ -1,6 +1,8 @@
 type: object
-required: [purpose]
+required: [project_id, purpose]
 properties:
+  project_id:
+    $ref: ../schemas/project-id.yaml
   purpose:
     type: string
     enum: [login, register, recovery, profiling, reauth, link_account]
@@ -20,11 +22,7 @@ properties:
     pattern: '^\d+\.\d+\.\d+$'
     example: "1.0.0"
   challenge_nonce:
-    type: string
-    description: |
-      Origin-bound nonce obtained from `POST /bootstrap/challenge`.
-      Binds the flow to the browser that requested it, preventing
-      cross-origin replay of flow cookies.
+    $ref: ../schemas/challenge-nonce.yaml
   session_id:
     type: string
     description: |
