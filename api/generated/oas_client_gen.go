@@ -1259,15 +1259,32 @@ func (c *Client) sendCreateSchema(ctx context.Context, request CreateSchemaReq, 
 	stage = "EncodeQueryParams"
 	q := uri.NewQueryEncoder()
 	{
-		// Encode "project_id" parameter.
+		// Encode "projectID" parameter.
 		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "project_id",
+			Name:    "projectID",
 			Style:   uri.QueryStyleForm,
 			Explode: true,
 		}
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
 			if val, ok := params.ProjectID.Get(); ok {
+				return e.EncodeValue(conv.StringToString(val))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "teamID" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "teamID",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.TeamID.Get(); ok {
 				return e.EncodeValue(conv.StringToString(val))
 			}
 			return nil
@@ -2500,15 +2517,32 @@ func (c *Client) sendGetSchemaById(ctx context.Context, params GetSchemaByIdPara
 	stage = "EncodeQueryParams"
 	q := uri.NewQueryEncoder()
 	{
-		// Encode "project_id" parameter.
+		// Encode "projectID" parameter.
 		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "project_id",
+			Name:    "projectID",
 			Style:   uri.QueryStyleForm,
 			Explode: true,
 		}
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
 			if val, ok := params.ProjectID.Get(); ok {
+				return e.EncodeValue(conv.StringToString(val))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "teamID" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "teamID",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.TeamID.Get(); ok {
 				return e.EncodeValue(conv.StringToString(val))
 			}
 			return nil
@@ -3279,9 +3313,9 @@ func (c *Client) sendListSessions(ctx context.Context, params ListSessionsParams
 		}
 	}
 	{
-		// Encode "project_id" parameter.
+		// Encode "projectID" parameter.
 		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "project_id",
+			Name:    "projectID",
 			Style:   uri.QueryStyleForm,
 			Explode: true,
 		}

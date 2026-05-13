@@ -14,6 +14,7 @@ get:
       schema:
         type: string
     - $ref: ../../../components/parameters/project-id.yaml
+    - $ref: ../../../components/parameters/team-id.yaml
   responses:
     '200':
       description: The schema was retrieved successfully

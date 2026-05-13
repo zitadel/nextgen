@@ -1,4 +1,4 @@
-name: projectID
+name: teamID
 in: query
 description: The unique identifier of the project
 schema:

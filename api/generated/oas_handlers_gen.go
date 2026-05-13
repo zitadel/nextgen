@@ -1194,9 +1194,13 @@ func (s *Server) handleCreateSchemaRequest(args [0]string, argsEscaped bool, w h
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
 				{
-					Name: "project_id",
+					Name: "projectID",
 					In:   "query",
 				}: params.ProjectID,
+				{
+					Name: "teamID",
+					In:   "query",
+				}: params.TeamID,
 			},
 			Raw: r,
 		}
@@ -3093,9 +3097,13 @@ func (s *Server) handleGetSchemaByIdRequest(args [1]string, argsEscaped bool, w 
 					In:   "path",
 				}: params.ID,
 				{
-					Name: "project_id",
+					Name: "projectID",
 					In:   "query",
 				}: params.ProjectID,
+				{
+					Name: "teamID",
+					In:   "query",
+				}: params.TeamID,
 			},
 			Raw: r,
 		}
@@ -4310,7 +4318,7 @@ func (s *Server) handleListSessionsRequest(args [0]string, argsEscaped bool, w h
 					In:   "query",
 				}: params.PageToken,
 				{
-					Name: "project_id",
+					Name: "projectID",
 					In:   "query",
 				}: params.ProjectID,
 				{

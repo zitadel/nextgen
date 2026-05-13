@@ -21,10 +21,10 @@ func (h *Handler) CreateSchema(ctx context.Context, req api.CreateSchemaReq, par
 		if err != nil {
 			return nil, err
 		}
-		id, err = h.schemaService.CreateSchema(ctx, params.ProjectID.Value, sch)
+		id, err = h.schemaService.CreateSchema(ctx, params.ProjectID.Value, params.TeamID.Value, sch)
 	case api.SchemaURLCreateSchemaReq:
 		id = &req.SchemaURL.URL
-		err = h.schemaService.CreateSchemaByUrl(ctx, params.ProjectID.Value, req.SchemaURL.URL)
+		err = h.schemaService.CreateSchemaByUrl(ctx, params.ProjectID.Value, params.TeamID.Value, req.SchemaURL.URL)
 	default:
 		return nil, UnknownSchemaKindError
 	}
@@ -61,7 +61,7 @@ func (h *Handler) GetSchemaById(ctx context.Context, params api.GetSchemaByIdPar
 		return nil, err
 	}
 
-	schema, err := h.schemaService.GetSchema(ctx, params.ProjectID.Value, *uri)
+	schema, err := h.schemaService.GetSchema(ctx, params.ProjectID.Value, params.TeamID.Value, *uri)
 	if err != nil {
 		return h.getSchemaByIdError(err)
 	}
