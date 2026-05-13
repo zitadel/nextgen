@@ -191,7 +191,7 @@ func encodeCreateFlowResponse(response CreateFlowRes, w http.ResponseWriter, spa
 
 func encodeCreateFlowDefinitionResponse(response CreateFlowDefinitionRes, w http.ResponseWriter, span trace.Span) error {
 	switch response := response.(type) {
-	case *FlowDefinitionResponse:
+	case *FlowDefinitionDetailResponse:
 		if err := func() error {
 			if err := response.Validate(); err != nil {
 				return err

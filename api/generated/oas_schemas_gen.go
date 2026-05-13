@@ -1782,6 +1782,7 @@ func (s *FlowDefinitionDetailResponse) SetUpdatedAt(val time.Time) {
 	s.UpdatedAt = val
 }
 
+func (*FlowDefinitionDetailResponse) createFlowDefinitionRes() {}
 func (*FlowDefinitionDetailResponse) getFlowDefinitionRes()    {}
 func (*FlowDefinitionDetailResponse) updateFlowDefinitionRes() {}
 
@@ -2068,8 +2069,6 @@ func (s *FlowDefinitionResponse) SetCreatedAt(val time.Time) {
 func (s *FlowDefinitionResponse) SetUpdatedAt(val time.Time) {
 	s.UpdatedAt = val
 }
-
-func (*FlowDefinitionResponse) createFlowDefinitionRes() {}
 
 // A step in a flow definition. This is the admin-authored configuration,
 // not the runtime payload sent to the frontend.

@@ -565,7 +565,7 @@ func decodeCreateFlowDefinitionResponse(resp *http.Response) (res CreateFlowDefi
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response FlowDefinitionResponse
+			var response FlowDefinitionDetailResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
