@@ -319,9 +319,9 @@ importers:
 
   apps/demo-next:
     dependencies:
-      '@nextgen/ui-lit':
+      '@zitadel-nextgen/components':
         specifier: workspace:*
-        version: link:../../packages/ui-lit
+        version: link:../../packages/components
       '@zitadel-nextgen/sdk-next':
         specifier: workspace:*
         version: link:../../packages/sdk-next
@@ -353,9 +353,9 @@ importers:
       '@nextgen/sdk-nuxt':
         specifier: workspace:*
         version: link:../../packages/sdk-nuxt
-      '@nextgen/ui-lit':
+      '@zitadel-nextgen/components':
         specifier: workspace:*
-        version: link:../../packages/ui-lit
+        version: link:../../packages/components
       nuxt:
         specifier: ^4.4.2
         version: 4.4.5(@babel/core@7.29.0)(@babel/plugin-proposal-decorators@7.29.0(@babel/core@7.29.0))(@babel/plugin-syntax-jsx@7.28.6(@babel/core@7.29.0))(@parcel/watcher@2.5.6)(@rollup/plugin-babel@6.1.0(@babel/core@7.29.0)(rollup@4.60.2))(@types/node@25.6.0)(@vue/compiler-sfc@3.5.34)(cac@6.7.14)(db0@0.3.4)(encoding@0.1.13)(eslint@10.2.1(jiti@2.6.1))(ioredis@5.10.1)(lightningcss@1.32.0)(magicast@0.5.2)(optionator@0.9.4)(oxlint@1.61.0)(rolldown@1.0.0-rc.17)(rollup-plugin-visualizer@7.0.1(rolldown@1.0.0-rc.17)(rollup@4.60.2))(rollup@4.60.2)(srvx@0.11.15)(terser@5.46.1)(tsx@4.21.0)(typescript@5.9.3)(vite@8.0.9(@types/node@25.6.0)(esbuild@0.28.0)(jiti@2.6.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))(yaml@2.8.3)
@@ -472,9 +472,9 @@ importers:
 
   packages/sdk-next:
     dependencies:
-      '@nextgen/ui-lit':
+      '@zitadel-nextgen/components':
         specifier: workspace:*
-        version: link:../ui-lit
+        version: link:../components
       '@zitadel-nextgen/sdk-core':
         specifier: workspace:*
         version: link:../sdk-core
@@ -560,9 +560,9 @@ importers:
 
   packages/sdk-nuxt:
     dependencies:
-      '@nextgen/ui-lit':
+      '@zitadel-nextgen/components':
         specifier: workspace:*
-        version: link:../ui-lit
+        version: link:../components
       nuxt:
         specifier: '>=4'
         version: 4.4.5(@babel/core@7.29.0)(@babel/plugin-proposal-decorators@7.29.0(@babel/core@7.29.0))(@babel/plugin-syntax-jsx@7.28.6(@babel/core@7.29.0))(@parcel/watcher@2.5.6)(@rollup/plugin-babel@6.1.0(@babel/core@7.29.0)(rollup@4.60.2))(@types/node@25.6.0)(@vue/compiler-sfc@3.5.34)(cac@6.7.14)(db0@0.3.4)(encoding@0.1.13)(eslint@9.39.4(jiti@2.7.0))(ioredis@5.10.1)(lightningcss@1.32.0)(magicast@0.5.2)(optionator@0.9.4)(oxlint@1.61.0)(rolldown@1.0.0-rc.17)(rollup-plugin-visualizer@7.0.1(rolldown@1.0.0-rc.17)(rollup@4.60.2))(rollup@4.60.2)(terser@5.46.1)(tsx@4.21.0)(typescript@5.9.3)(vite@8.0.9(@types/node@25.6.0)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))(yaml@2.8.3)
@@ -615,52 +615,6 @@ importers:
       vitest:
         specifier: ^3.0.0
         version: 3.2.4(@types/debug@4.1.13)(@types/node@25.6.0)(jiti@2.7.0)(jsdom@29.0.2)(lightningcss@1.32.0)(msw@2.14.6(@types/node@25.6.0)(typescript@5.9.3))(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3)
-
-  packages/ui-lit:
-    dependencies:
-      lit:
-        specifier: ^3.2.0
-        version: 3.3.2
-    devDependencies:
-      '@eslint/js':
-        specifier: ^9.0.0
-        version: 9.39.4
-      '@eslint/json':
-        specifier: ^0.11.0
-        version: 0.11.0
-      '@eslint/markdown':
-        specifier: ^6.0.0
-        version: 6.6.0
-      eslint:
-        specifier: ^9.0.0
-        version: 9.39.4(jiti@2.7.0)
-      eslint-config-prettier:
-        specifier: ^10.0.0
-        version: 10.1.8(eslint@9.39.4(jiti@2.7.0))
-      eslint-import-resolver-typescript:
-        specifier: ^3.7.0
-        version: 3.10.1(eslint-plugin-import@2.32.0)(eslint@9.39.4(jiti@2.7.0))
-      eslint-plugin-import:
-        specifier: ^2.31.0
-        version: 2.32.0(@typescript-eslint/parser@8.59.3(eslint@10.2.1(jiti@2.7.0))(typescript@6.0.3))(eslint-import-resolver-typescript@3.10.1)(eslint@9.39.4(jiti@2.7.0))
-      eslint-plugin-perfectionist:
-        specifier: ^4.0.0
-        version: 4.15.1(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3)
-      eslint-plugin-prettier:
-        specifier: ^5.0.0
-        version: 5.5.5(@types/eslint@9.6.1)(eslint-config-prettier@10.1.8(eslint@9.39.4(jiti@2.7.0)))(eslint@9.39.4(jiti@2.7.0))(prettier@3.8.3)
-      prettier:
-        specifier: ^3.0.0
-        version: 3.8.3
-      tsup:
-        specifier: ^8.3.5
-        version: 8.5.1(@swc/core@1.15.8(@swc/helpers@0.5.18))(jiti@2.7.0)(postcss@8.5.14)(tsx@4.21.0)(typescript@5.9.3)(yaml@2.8.3)
-      typescript:
-        specifier: ^5.7.3
-        version: 5.9.3
-      typescript-eslint:
-        specifier: ^8.0.0
-        version: 8.59.3(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3)
 
 packages:
 
