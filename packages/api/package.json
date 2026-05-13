@@ -4,10 +4,8 @@
   "description": "Generated TypeScript API client for Zitadel NextGen",
   "type": "module",
   "exports": {
-    ".": {
-      "types": "./src/index.ts",
-      "import": "./src/index.ts"
-    }
+    "./generated/model": "./src/generated/model/index.ts",
+    "./*": "./src/*.ts"
   },
   "scripts": {
     "generate": "orval --config orval.config.ts --clean"
@@ -15,7 +13,8 @@
   "devDependencies": {
     "@faker-js/faker": "catalog:",
     "msw": "catalog:",
-    "orval": "catalog:"
+    "orval": "catalog:",
+    "zod": "catalog:"
   },
   "peerDependencies": {
     "@tanstack/react-query": "catalog:"
