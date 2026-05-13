@@ -4286,7 +4286,7 @@ func (s *Server) handleListSessionsRequest(args [0]string, argsEscaped bool, w h
 					In:   "query",
 				}: params.PageToken,
 				{
-					Name: "project_id",
+					Name: "ProjectID",
 					In:   "query",
 				}: params.ProjectID,
 				{
@@ -4501,6 +4501,14 @@ func (s *Server) handleListUsersRequest(args [0]string, argsEscaped bool, w http
 					Name: "page_token",
 					In:   "query",
 				}: params.PageToken,
+				{
+					Name: "ProjectID",
+					In:   "query",
+				}: params.ProjectID,
+				{
+					Name: "TeamID",
+					In:   "query",
+				}: params.TeamID,
 			},
 			Raw: r,
 		}

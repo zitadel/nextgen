@@ -5219,6 +5219,52 @@ func (o OptString) Or(d string) string {
 	return d
 }
 
+// NewOptTeamID returns new OptTeamID with value set to v.
+func NewOptTeamID(v TeamID) OptTeamID {
+	return OptTeamID{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptTeamID is optional TeamID.
+type OptTeamID struct {
+	Value TeamID
+	Set   bool
+}
+
+// IsSet returns true if OptTeamID was set.
+func (o OptTeamID) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptTeamID) Reset() {
+	var v TeamID
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptTeamID) SetTo(v TeamID) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptTeamID) Get() (v TeamID, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptTeamID) Or(d TeamID) TeamID {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptURI returns new OptURI with value set to v.
 func NewOptURI(v url.URL) OptURI {
 	return OptURI{
@@ -6126,6 +6172,8 @@ func (*SubmitFlowStepBadRequest) submitFlowStepRes() {}
 type SubmitFlowStepOK FlowResponseHeaders
 
 func (*SubmitFlowStepOK) submitFlowStepRes() {}
+
+type TeamID string
 
 // Ref: #
 type TokenResponse struct {

@@ -3227,9 +3227,9 @@ func (c *Client) sendListSessions(ctx context.Context, params ListSessionsParams
 		}
 	}
 	{
-		// Encode "project_id" parameter.
+		// Encode "ProjectID" parameter.
 		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "project_id",
+			Name:    "ProjectID",
 			Style:   uri.QueryStyleForm,
 			Explode: true,
 		}
@@ -3421,6 +3421,46 @@ func (c *Client) sendListUsers(ctx context.Context, params ListUsersParams) (res
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
 			if val, ok := params.PageToken.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "ProjectID" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "ProjectID",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.ProjectID.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "TeamID" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "TeamID",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.TeamID.Get(); ok {
 				if unwrapped := string(val); true {
 					return e.EncodeValue(conv.StringToString(unwrapped))
 				}

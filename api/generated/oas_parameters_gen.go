@@ -2028,7 +2028,7 @@ func unpackListSessionsParams(packed middleware.Parameters) (params ListSessions
 	}
 	{
 		key := middleware.ParameterKey{
-			Name: "project_id",
+			Name: "ProjectID",
 			In:   "query",
 		}
 		if v, ok := packed[key]; ok {
@@ -2177,10 +2177,10 @@ func decodeListSessionsParams(args [0]string, argsEscaped bool, r *http.Request)
 			Err:  err,
 		}
 	}
-	// Decode query: project_id.
+	// Decode query: ProjectID.
 	if err := func() error {
 		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "project_id",
+			Name:    "ProjectID",
 			Style:   uri.QueryStyleForm,
 			Explode: true,
 		}
@@ -2235,7 +2235,7 @@ func decodeListSessionsParams(args [0]string, argsEscaped bool, r *http.Request)
 		return nil
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
-			Name: "project_id",
+			Name: "ProjectID",
 			In:   "query",
 			Err:  err,
 		}
@@ -2371,6 +2371,10 @@ type ListUsersParams struct {
 	// Omit to start from the beginning.
 	// Its format is opaque and may change between releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
+	// The unique identifier of the project.
+	ProjectID OptProjectID `json:",omitempty,omitzero"`
+	// The unique identifier of the project.
+	TeamID OptTeamID `json:",omitempty,omitzero"`
 }
 
 func unpackListUsersParams(packed middleware.Parameters) (params ListUsersParams) {
@@ -2390,6 +2394,24 @@ func unpackListUsersParams(packed middleware.Parameters) (params ListUsersParams
 		}
 		if v, ok := packed[key]; ok {
 			params.PageToken = v.(OptPageToken)
+		}
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "ProjectID",
+			In:   "query",
+		}
+		if v, ok := packed[key]; ok {
+			params.ProjectID = v.(OptProjectID)
+		}
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "TeamID",
+			In:   "query",
+		}
+		if v, ok := packed[key]; ok {
+			params.TeamID = v.(OptTeamID)
 		}
 	}
 	return params
@@ -2512,6 +2534,132 @@ func decodeListUsersParams(args [0]string, argsEscaped bool, r *http.Request) (p
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
 			Name: "page_token",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	// Decode query: ProjectID.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "ProjectID",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotProjectIDVal ProjectID
+				if err := func() error {
+					var paramsDotProjectIDValVal string
+					if err := func() error {
+						val, err := d.DecodeValue()
+						if err != nil {
+							return err
+						}
+
+						c, err := conv.ToString(val)
+						if err != nil {
+							return err
+						}
+
+						paramsDotProjectIDValVal = c
+						return nil
+					}(); err != nil {
+						return err
+					}
+					paramsDotProjectIDVal = ProjectID(paramsDotProjectIDValVal)
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.ProjectID.SetTo(paramsDotProjectIDVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if value, ok := params.ProjectID.Get(); ok {
+					if err := func() error {
+						if err := value.Validate(); err != nil {
+							return err
+						}
+						return nil
+					}(); err != nil {
+						return err
+					}
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "ProjectID",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	// Decode query: TeamID.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "TeamID",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotTeamIDVal TeamID
+				if err := func() error {
+					var paramsDotTeamIDValVal string
+					if err := func() error {
+						val, err := d.DecodeValue()
+						if err != nil {
+							return err
+						}
+
+						c, err := conv.ToString(val)
+						if err != nil {
+							return err
+						}
+
+						paramsDotTeamIDValVal = c
+						return nil
+					}(); err != nil {
+						return err
+					}
+					paramsDotTeamIDVal = TeamID(paramsDotTeamIDValVal)
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.TeamID.SetTo(paramsDotTeamIDVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if value, ok := params.TeamID.Get(); ok {
+					if err := func() error {
+						if err := value.Validate(); err != nil {
+							return err
+						}
+						return nil
+					}(); err != nil {
+						return err
+					}
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "TeamID",
 			In:   "query",
 			Err:  err,
 		}

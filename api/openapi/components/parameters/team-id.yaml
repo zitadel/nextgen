@@ -1,5 +1,5 @@
-name: ProjectID
+name: TeamID
 in: query
 description: The unique identifier of the project
 schema:
-  $ref: '../schemas/project-id.yaml'
+  $ref: '../schemas/team-id.yaml'
