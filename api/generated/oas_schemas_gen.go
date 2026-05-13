@@ -4233,9 +4233,20 @@ type ListUsersInternalServerError ErrorDetails
 
 func (*ListUsersInternalServerError) listUsersRes() {}
 
-type ListUsersOKApplicationJSON []jx.Raw
+type ListUsersOKApplicationJSON []ListUsersOKItem
 
 func (*ListUsersOKApplicationJSON) listUsersRes() {}
+
+type ListUsersOKItem map[string]jx.Raw
+
+func (s *ListUsersOKItem) init() ListUsersOKItem {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
 
 // Ref: #
 type NestedUserProperty struct {

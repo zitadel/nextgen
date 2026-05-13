@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/go-faster/errors"
-	"github.com/go-faster/jx"
 	"github.com/ogen-go/ogen/validate"
 )
 
@@ -1760,7 +1759,7 @@ func (s ListSessionsState) Validate() error {
 }
 
 func (s ListUsersOKApplicationJSON) Validate() error {
-	alias := ([]jx.Raw)(s)
+	alias := ([]ListUsersOKItem)(s)
 	if alias == nil {
 		return errors.New("nil is invalid value")
 	}
