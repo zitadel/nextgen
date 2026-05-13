@@ -15,7 +15,9 @@ flows:
       session.delete: Revoke an individual session
       users.read: Read users
       users.write: Create and update users
-  clientCredentials: 
+      schema.read: Permission to read schemas
+      schema.write: Permission to create and manage schemas
+  clientCredentials:
     tokenUrl: https://acc.nextgen.zitadel.com/oauth/token
     scopes: 
       openid: OpenID Connect scope
@@ -27,4 +29,5 @@ flows:
       session.delete: Revoke an individual session
       users.read: Read users
       users.write: Create and update users
-    
+      schema.read: Permission to read schemas
+      schema.write: Permission to create and manage schemas

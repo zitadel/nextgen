@@ -4,13 +4,12 @@ import (
 	"context"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-
 	"github.com/zitadel/nextgen/internal/storage/database"
-	"github.com/zitadel/nextgen/internal/storage/database/dialect/postgres/migration"
 )
 
 type pgxConn struct {
 	*pgxpool.Conn
+	pool *Pool
 }
 
 var _ database.Connection = (*pgxConn)(nil)
@@ -27,7 +26,7 @@ func (c *pgxConn) Begin(ctx context.Context, opts *database.TransactionOptions) 
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	return &Transaction{tx}, nil
+	return PGxTx(tx), nil
 }
 
 // Query implements [database.Connection].
@@ -37,13 +36,13 @@ func (c *pgxConn) Query(ctx context.Context, sql string, args ...any) (database.
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	return &Rows{rows}, nil
+	return newRows(rows), nil
 }
 
 // QueryRow implements [database.Connection].
 // Subtle: this method shadows the method (*Conn).QueryRow of [pgxConn.Conn].
 func (c *pgxConn) QueryRow(ctx context.Context, sql string, args ...any) database.Row {
-	return &Row{c.Conn.QueryRow(ctx, sql, args...)}
+	return newRow(c.Conn.QueryRow(ctx, sql, args...))
 }
 
 // QueryRow implements [database.Connection].
@@ -66,7 +65,7 @@ func (c *pgxConn) Migrate(ctx context.Context) error {
 	if isMigrated {
 		return nil
 	}
-	err := migration.Migrate(ctx, c.Conn.Conn())
+	err := c.pool.Migrate(ctx)
 	isMigrated = err == nil
 	return wrapError(err)
 }

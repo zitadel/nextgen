@@ -57,6 +57,17 @@ type Handler interface {
 	//
 	// POST /auth_attempts/{attempt_id}/handoff
 	CreateHandoff(ctx context.Context, params CreateHandoffParams) (CreateHandoffRes, error)
+	// CreateSchema implements createSchema operation.
+	//
+	// Create a new schema. The schema definition must include a unique $id field,
+	// which will be used to identify the schema in future requests. The $id must
+	// be a valid URI and should ideally point to the location where the schema
+	// can be accessed.
+	// The schema can either be a concrete schema, e.g. a user schema, or a
+	// schema-url which will be resolved by the server.
+	//
+	// POST /schemas
+	CreateSchema(ctx context.Context, req CreateSchemaReq) (CreateSchemaRes, error)
 	// CreateSession implements createSession operation.
 	//
 	// Creates an anonymous session shell with no user and no factors (`state: building`).
@@ -150,6 +161,12 @@ type Handler interface {
 	//
 	// GET /readyz
 	GetReady(ctx context.Context) (GetReadyRes, error)
+	// GetSchemaById implements getSchemaById operation.
+	//
+	// Get a schema by its ID. This will return the default revision of the schema.
+	//
+	// GET /schemas/{id}
+	GetSchemaById(ctx context.Context, params GetSchemaByIdParams) (GetSchemaByIdRes, error)
 	// GetSession implements getSession operation.
 	//
 	// Returns the current state of a session including its factors and all currently

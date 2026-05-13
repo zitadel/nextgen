@@ -43,6 +43,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	CreateHandoffOperation: []string{
 		"auth_attempts.write",
 	},
+	CreateSchemaOperation: []string{
+		"schema.write",
+	},
 	CreateSessionOperation: []string{
 		"sessions.write",
 	},
@@ -54,6 +57,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	GetAuthAttemptOperation: []string{
 		"auth_attempts.read",
+	},
+	GetSchemaByIdOperation: []string{
+		"schema.read",
 	},
 	GetSessionOperation: []string{
 		"session.read",

@@ -68,6 +68,10 @@ paths:
     $ref: endpoints/users/methods.yaml
   /users/{user_id}:
     $ref: endpoints/users/by_id/methods.yaml
+  /schemas:
+    $ref: endpoints/schemas/methods.yaml
+  /schemas/{id}:
+    $ref: endpoints/schemas/by_id/methods.yaml
 
 components:
   securitySchemes:
@@ -75,4 +79,3 @@ components:
       $ref: security/oauth2.yaml
     usernamePassword:
       $ref: security/username-password.yaml
-
