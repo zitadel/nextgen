@@ -4,20 +4,19 @@ import (
 	"context"
 	"net/url"
 
-	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/pkg/errors"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/domain/idgen"
 )
 
 type SchemaFetcher interface {
-	Get(ctx context.Context, projectID string, teamID string, uri url.URL) (schema *jsonschema.Schema, err error)
+	Get(ctx context.Context, projectID string, teamID string, uri url.URL) (schema []byte, err error)
 }
 type SchemaSaver interface {
-	Save(ctx context.Context, projectID string, teamID string, uri url.URL, schema *jsonschema.Schema) error
+	Save(ctx context.Context, projectID string, teamID string, uri url.URL, schema []byte) error
 }
 type SchemaValidator interface {
-	Validate(ctx context.Context, schema *jsonschema.Schema) error
+	Validate(ctx context.Context, schema []byte) error
 }
 
 type SchemaService struct {
@@ -44,7 +43,7 @@ func NewSchemaService(
 	}
 }
 
-func (s *SchemaService) CreateSchema(ctx context.Context, projectID string, teamID string, schema *jsonschema.Schema) (*url.URL, error) {
+func (s *SchemaService) CreateSchema(ctx context.Context, projectID string, teamID string, schema []byte) (*url.URL, error) {
 	id, err := s.idGenerator.New("sch")
 	if err != nil {
 		return nil, &FailedToGenerateSchemaIdError{err}
@@ -96,7 +95,7 @@ func (s *SchemaService) CreateSchemaByUrl(ctx context.Context, projectID string,
 	return nil
 }
 
-func (s *SchemaService) GetSchema(ctx context.Context, projectID string, teamID string, uri url.URL) (*jsonschema.Schema, error) {
+func (s *SchemaService) GetSchema(ctx context.Context, projectID string, teamID string, uri url.URL) ([]byte, error) {
 	schema, err := s.databaseSchemaFetcher.Get(ctx, projectID, teamID, uri)
 	if err != nil {
 		if errors.Is(err, RepositoryErrorNotFound) {

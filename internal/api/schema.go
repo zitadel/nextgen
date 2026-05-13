@@ -6,7 +6,6 @@ import (
 
 	"github.com/pkg/errors"
 	api "github.com/zitadel/nextgen/api/generated"
-	"github.com/zitadel/nextgen/internal/api/convert"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 )
@@ -17,11 +16,11 @@ func (h *Handler) CreateSchema(ctx context.Context, req api.CreateSchemaReq, par
 
 	switch req.Type {
 	case api.UserSchemaCreateSchemaReq:
-		sch, err := convert.UserSchemaToJsonschema(req.UserSchema)
+		schemabs, err := req.UserSchema.MarshalJSON()
 		if err != nil {
 			return nil, err
 		}
-		id, err = h.schemaService.CreateSchema(ctx, string(params.ProjectID.Value), string(params.TeamID.Value), sch)
+		id, err = h.schemaService.CreateSchema(ctx, string(params.ProjectID.Value), string(params.TeamID.Value), schemabs)
 	case api.SchemaURLCreateSchemaReq:
 		id = &req.SchemaURL.URL
 		err = h.schemaService.CreateSchemaByUrl(ctx, string(params.ProjectID.Value), string(params.TeamID.Value), req.SchemaURL.URL)
@@ -61,19 +60,20 @@ func (h *Handler) GetSchemaById(ctx context.Context, params api.GetSchemaByIdPar
 		return nil, err
 	}
 
-	schema, err := h.schemaService.GetSchema(ctx, string(params.ProjectID.Value), string(params.TeamID.Value), *uri)
+	schemaBs, err := h.schemaService.GetSchema(ctx, string(params.ProjectID.Value), string(params.TeamID.Value), *uri)
 	if err != nil {
 		return h.getSchemaByIdError(err)
 	}
 
-	apiSchema, err := convert.JsonschemaToUserSchema(schema)
+	apiSchema := api.UserSchema{}
+	err = apiSchema.UnmarshalJSON(schemaBs)
 	if err != nil {
 		return nil, err
 	}
 
 	return &api.GetSchemaByIdOK{
 		Type:       api.UserSchemaGetSchemaByIdOK,
-		UserSchema: *apiSchema,
+		UserSchema: apiSchema,
 	}, nil
 }
 
