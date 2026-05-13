@@ -28,6 +28,7 @@
   "dependencies": {
     "@clack/prompts": "catalog:",
     "ajv": "catalog:",
+    "consola": "^3.4.2",
     "liquidjs": "catalog:",
     "zod": "catalog:"
   },

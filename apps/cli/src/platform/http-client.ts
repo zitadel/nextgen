@@ -57,6 +57,26 @@ export class HttpPlatformClient implements PlatformClient {
     );
   }
 
+  async createSchema(data: object): Promise<{ id: string }> {
+    return this.request("POST", "/schemas", data);
+  }
+
+  async deleteSchema(id: string): Promise<void> {
+    return this.request("DELETE", `/schemas/${encodeURIComponent(id)}`);
+  }
+
+  async createFlowDefinition(data: object): Promise<{ id: string }> {
+    return this.request("POST", "/flow_definitions", data);
+  }
+
+  async updateFlowDefinition(id: string, data: object): Promise<void> {
+    return this.request("PATCH", `/flow_definitions/${encodeURIComponent(id)}`, data);
+  }
+
+  async deleteFlowDefinition(id: string): Promise<void> {
+    return this.request("DELETE", `/flow_definitions/${encodeURIComponent(id)}`);
+  }
+
   async getCapabilities(): Promise<CapabilitiesResponse> {
     return this.request("GET", "/capabilities");
   }

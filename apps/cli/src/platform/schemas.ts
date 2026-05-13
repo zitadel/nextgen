@@ -114,3 +114,11 @@ export const capabilitiesResponseSchema = z.object({
   features: z.record(z.string(), z.boolean()),
 });
 export type CapabilitiesResponse = z.infer<typeof capabilitiesResponseSchema>;
+
+export type CreateSchemaResponse = {
+  id: string;
+};
+
+export type CreateFlowDefinitionResponse = {
+  id: string;
+};

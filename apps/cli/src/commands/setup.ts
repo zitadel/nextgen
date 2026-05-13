@@ -10,7 +10,6 @@ import { runInteractiveSetup } from "../interactive/setup";
 import type { CliIO, GlobalOptions } from "../io/output";
 import { ok, skipped } from "../io/output";
 import { ZitadelError } from "../lib/errors";
-import { sha256 } from "../lib/hash";
 import { stableStringify } from "../lib/json";
 import { createPlatformClient } from "../platform";
 import { DEFAULT_SERVER, MOCK_SENTINEL } from "../platform/resolve-server";
@@ -258,10 +257,7 @@ function basePlan(input: {
         path: ".zitadel/state.json",
         contents: `${stableStringify({
           framework: input.framework,
-          package_manager: input.packageManager,
-          setup_version: 1,
-          config_hash: sha256(input.config),
-          dev_port: input.devPort,
+          resources: {},
         })}\n`,
       },
     ],

@@ -118,6 +118,26 @@ export class MockPlatformClient implements PlatformClient {
     return { status: "pending" };
   }
 
+  async createSchema(_data: object): Promise<{ id: string }> {
+    return { id: "mock-schema-id" };
+  }
+
+  async deleteSchema(_id: string): Promise<void> {
+    return;
+  }
+
+  async createFlowDefinition(_data: object): Promise<{ id: string }> {
+    return { id: "mock-flow-definition-id" };
+  }
+
+  async updateFlowDefinition(_id: string, _data: object): Promise<void> {
+    return;
+  }
+
+  async deleteFlowDefinition(_id: string): Promise<void> {
+    return;
+  }
+
   async getCapabilities(): Promise<CapabilitiesResponse> {
     return {
       mode: "mock",

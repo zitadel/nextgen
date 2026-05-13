@@ -44,6 +44,8 @@ export type GlobalOptions = {
   cliVersion: string;
   source: string;
   serverFlag?: string;
+  verbose: boolean;
+  debug: boolean;
 };
 
 export const defaultIO: CliIO = {
