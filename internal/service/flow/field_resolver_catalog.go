@@ -20,7 +20,7 @@ import (
 // The `userSchemaURL` argument on both methods is accepted for forward
 // compatibility and ignored.
 type CatalogFieldResolver struct {
-	catalog map[string]catalogEntry
+	catalog map[string]domain.FlowField
 }
 
 // NewCatalogFieldResolver returns a [domain.FlowFieldResolver] backed
@@ -31,32 +31,22 @@ func NewCatalogFieldResolver() *CatalogFieldResolver {
 
 var _ domain.FlowFieldResolver = (*CatalogFieldResolver)(nil)
 
-// catalogEntry stores the per-field shape the stub catalog returns. It
-// is the in-package analogue of a property in the customer's user
-// schema: type / format / length rules, x-identifier, x-unique, and
-// whether the schema-level `required` array names the field.
-type catalogEntry struct {
-	Type       domain.FlowFieldType
-	TextKey    string
-	Required   bool
-	Validation *domain.FlowFieldValidation
-	Behavior   domain.FlowFieldBehavior
-}
-
-var defaultCatalog = map[string]catalogEntry{
+var defaultCatalog = map[string]domain.FlowField{
 	"email": {
-		Type:       domain.FlowFieldTypeEmail,
-		TextKey:    "field.email",
-		Required:   true,
-		Validation: &domain.FlowFieldValidation{Format: "email", MaxLength: 320},
-		Behavior:   domain.FlowFieldBehavior{IsIdentifier: true, Unique: domain.FlowFieldUniqueScopeOrganization},
+		Type:         domain.FlowFieldTypeEmail,
+		TextKey:      "field.email",
+		Required:     true,
+		Validation:   &domain.FlowFieldValidation{Format: "email", MaxLength: 320},
+		IsIdentifier: true,
+		Unique:       domain.FlowFieldUniqueScopeOrganization,
 	},
 	"username": {
-		Type:       domain.FlowFieldTypeText,
-		TextKey:    "field.username",
-		Required:   true,
-		Validation: &domain.FlowFieldValidation{MinLength: 3, MaxLength: 64},
-		Behavior:   domain.FlowFieldBehavior{IsIdentifier: true, Unique: domain.FlowFieldUniqueScopeOrganization},
+		Type:         domain.FlowFieldTypeText,
+		TextKey:      "field.username",
+		Required:     true,
+		Validation:   &domain.FlowFieldValidation{MinLength: 3, MaxLength: 64},
+		IsIdentifier: true,
+		Unique:       domain.FlowFieldUniqueScopeOrganization,
 	},
 	"password": {
 		Type:       domain.FlowFieldTypePassword,
@@ -80,7 +70,6 @@ var defaultCatalog = map[string]catalogEntry{
 
 func (r *CatalogFieldResolver) Resolve(_ context.Context, _ string, fieldNames []string) (domain.FlowResolvedFields, error) {
 	fields := make(map[string]domain.FlowField, len(fieldNames))
-	behaviors := make(map[string]domain.FlowFieldBehavior, len(fieldNames))
 	implicit := make(map[string][]string)
 
 	for _, name := range fieldNames {
@@ -88,21 +77,15 @@ func (r *CatalogFieldResolver) Resolve(_ context.Context, _ string, fieldNames [
 		if !ok {
 			return domain.FlowResolvedFields{}, fmt.Errorf("%w: %q", domain.ErrFlowFieldUnknown, name)
 		}
-		fields[name] = domain.FlowField{
-			Type:       entry.Type,
-			TextKey:    entry.TextKey,
-			Required:   entry.Required,
-			Validation: cloneValidation(entry.Validation),
-		}
-		behaviors[name] = entry.Behavior
-		if entry.Behavior.IsIdentifier {
+		entry.Validation = cloneValidation(entry.Validation)
+		fields[name] = entry
+		if entry.IsIdentifier {
 			implicit[name] = append(implicit[name], domain.FlowImplicitOutcomeUserNotFound)
 		}
 	}
 
 	return domain.FlowResolvedFields{
 		Fields:           fields,
-		Behaviors:        behaviors,
 		ImplicitOutcomes: implicit,
 	}, nil
 }
