@@ -2,24 +2,22 @@ package cookie
 
 import (
 	"bytes"
-	"encoding/base64"
 	"errors"
-	"strings"
 	"testing"
 	"time"
 )
 
-func key(version byte, fill byte) Key {
-	k := Key{Version: version}
-	for i := range k.Bytes {
-		k.Bytes[i] = fill
+func filledKey(fill byte) Key {
+	var k Key
+	for i := range k {
+		k[i] = fill
 	}
 	return k
 }
 
-func newSealer(t *testing.T, previous *Key, maxAge time.Duration) *Sealer {
+func newSealer(t *testing.T, maxAge time.Duration) *Sealer {
 	t.Helper()
-	s, err := NewSealer(key(1, 0xAA), previous, maxAge)
+	s, err := NewSealer(filledKey(0xAA), maxAge)
 	if err != nil {
 		t.Fatalf("NewSealer: %v", err)
 	}
@@ -33,7 +31,7 @@ func SetNow(s *Sealer, now func() time.Time) {
 }
 
 func TestSealer_Roundtrip(t *testing.T) {
-	s := newSealer(t, nil, 10*time.Minute)
+	s := newSealer(t, 10*time.Minute)
 	payload := []byte(`{"session_id":"sess_123","current_step":"identify"}`)
 
 	value, err := s.Seal(payload)
@@ -50,7 +48,7 @@ func TestSealer_Roundtrip(t *testing.T) {
 }
 
 func TestSealer_RoundtripEmptyPayload(t *testing.T) {
-	s := newSealer(t, nil, 10*time.Minute)
+	s := newSealer(t, 10*time.Minute)
 	value, err := s.Seal(nil)
 	if err != nil {
 		t.Fatalf("Seal: %v", err)
@@ -65,45 +63,41 @@ func TestSealer_RoundtripEmptyPayload(t *testing.T) {
 }
 
 func TestSealer_RejectsTamperedCiphertext(t *testing.T) {
-	s := newSealer(t, nil, 10*time.Minute)
+	s := newSealer(t, 10*time.Minute)
 	value, err := s.Seal([]byte("hello"))
 	if err != nil {
 		t.Fatalf("Seal: %v", err)
 	}
 
-	raw, err := base64.RawURLEncoding.DecodeString(value)
-	if err != nil {
-		t.Fatalf("base64 decode: %v", err)
-	}
-	raw[len(raw)-5] ^= 0x01
-	tampered := base64.RawURLEncoding.EncodeToString(raw)
+	// JWE compact is `header.cek.iv.ct.tag`. Flip a byte inside the
+	// tag (last segment) so GCM authentication fails.
+	tampered := flipLastByte(value)
 
 	if _, err := s.Open(tampered); !errors.Is(err, ErrInvalid) {
 		t.Fatalf("Open tampered: err = %v, want ErrInvalid", err)
 	}
 }
 
-func TestSealer_RejectsSwappedVersionByte(t *testing.T) {
-	s := newSealer(t, nil, 10*time.Minute)
-	value, err := s.Seal([]byte("hello"))
+func TestSealer_RejectsForeignKey(t *testing.T) {
+	// A value sealed with a different key must not decrypt — GCM auth
+	// fails and Open returns ErrInvalid.
+	foreign, err := NewSealer(filledKey(0xCC), 10*time.Minute)
 	if err != nil {
-		t.Fatalf("Seal: %v", err)
+		t.Fatalf("NewSealer (foreign): %v", err)
+	}
+	value, err := foreign.Seal([]byte("hello"))
+	if err != nil {
+		t.Fatalf("Seal (foreign): %v", err)
 	}
 
-	raw, err := base64.RawURLEncoding.DecodeString(value)
-	if err != nil {
-		t.Fatalf("base64 decode: %v", err)
-	}
-	raw[0] = 0xFF
-	tampered := base64.RawURLEncoding.EncodeToString(raw)
-
-	if _, err := s.Open(tampered); !errors.Is(err, ErrInvalid) {
-		t.Fatalf("Open unknown version: err = %v, want ErrInvalid", err)
+	s := newSealer(t, 10*time.Minute)
+	if _, err := s.Open(value); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("Open foreign-key value: err = %v, want ErrInvalid", err)
 	}
 }
 
 func TestSealer_RejectsExpired(t *testing.T) {
-	s := newSealer(t, nil, time.Minute)
+	s := newSealer(t, time.Minute)
 
 	value, err := s.Seal([]byte("hello"))
 	if err != nil {
@@ -119,96 +113,14 @@ func TestSealer_RejectsExpired(t *testing.T) {
 	}
 }
 
-func TestSealer_OpensWithPreviousKey(t *testing.T) {
-	// Pre-rotation sealer holds v=1; after rotation v=2 is current and v=1
-	// is the previous key. Values issued by the old sealer must still open.
-	oldCurrent := key(1, 0xAA)
-	oldSealer, err := NewSealer(oldCurrent, nil, 10*time.Minute)
-	if err != nil {
-		t.Fatalf("NewSealer (old): %v", err)
-	}
-	value, err := oldSealer.Seal([]byte("hello"))
-	if err != nil {
-		t.Fatalf("Seal (old): %v", err)
-	}
-
-	newCurrent := key(2, 0xBB)
-	prev := oldCurrent
-	newSealer, err := NewSealer(newCurrent, &prev, 10*time.Minute)
-	if err != nil {
-		t.Fatalf("NewSealer (new): %v", err)
-	}
-
-	got, err := newSealer.Open(value)
-	if err != nil {
-		t.Fatalf("Open after rotation: %v", err)
-	}
-	if string(got) != "hello" {
-		t.Fatalf("Open after rotation: got %q, want %q", got, "hello")
-	}
-}
-
-func TestSealer_PreviousKeyIsCopied(t *testing.T) {
-	// After construction, mutating the caller's previous-key struct must
-	// not affect the sealer: keys are copied on the way in.
-	prev := key(1, 0xAA)
-	value, err := func() (string, error) {
-		oldSealer, err := NewSealer(prev, nil, 10*time.Minute)
-		if err != nil {
-			return "", err
-		}
-		return oldSealer.Seal([]byte("hello"))
-	}()
-	if err != nil {
-		t.Fatalf("Seal (old): %v", err)
-	}
-
-	newCurrent := key(2, 0xBB)
-	s, err := NewSealer(newCurrent, &prev, 10*time.Minute)
-	if err != nil {
-		t.Fatalf("NewSealer: %v", err)
-	}
-
-	prev.Bytes[0] ^= 0xFF
-	prev.Version = 9
-
-	got, err := s.Open(value)
-	if err != nil {
-		t.Fatalf("Open after caller mutated prev: %v", err)
-	}
-	if string(got) != "hello" {
-		t.Fatalf("Open: got %q, want %q", got, "hello")
-	}
-}
-
-func TestSealer_SealAlwaysUsesCurrentKey(t *testing.T) {
-	prev := key(1, 0xAA)
-	s, err := NewSealer(key(2, 0xBB), &prev, 10*time.Minute)
-	if err != nil {
-		t.Fatalf("NewSealer: %v", err)
-	}
-
-	value, err := s.Seal([]byte("hello"))
-	if err != nil {
-		t.Fatalf("Seal: %v", err)
-	}
-	raw, err := base64.RawURLEncoding.DecodeString(value)
-	if err != nil {
-		t.Fatalf("base64 decode: %v", err)
-	}
-	if raw[0] != 2 {
-		t.Fatalf("Seal used version byte %d, want 2 (current)", raw[0])
-	}
-}
-
 func TestSealer_RejectsMalformedInput(t *testing.T) {
-	s := newSealer(t, nil, 10*time.Minute)
+	s := newSealer(t, 10*time.Minute)
 
 	cases := map[string]string{
-		"not base64":  "!!!not-base64!!!",
-		"empty":       "",
-		"too short":   base64.RawURLEncoding.EncodeToString([]byte{1, 2, 3}),
-		"only header": base64.RawURLEncoding.EncodeToString(append([]byte{1}, make([]byte, 12)...)),
+		"empty":               "",
+		"not a JWE":           "not-a-jwe",
+		"wrong segment count": "aaa.bbb.ccc",
+		"garbage segments":    "AAA.BBB.CCC.DDD.EEE",
 	}
 	for name, value := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -219,18 +131,25 @@ func TestSealer_RejectsMalformedInput(t *testing.T) {
 	}
 }
 
-func TestNewSealer_RejectsInvalidConfig(t *testing.T) {
-	current := key(1, 0xAA)
-	t.Run("zero max-age", func(t *testing.T) {
-		if _, err := NewSealer(current, nil, 0); err == nil {
-			t.Fatalf("expected error for max-age=0")
-		}
-	})
-	t.Run("previous version collides with current", func(t *testing.T) {
-		prev := key(1, 0xBB)
-		_, err := NewSealer(current, &prev, time.Minute)
-		if err == nil || !strings.Contains(err.Error(), "version") {
-			t.Fatalf("expected version-collision error, got %v", err)
-		}
-	})
+func TestNewSealer_RejectsZeroMaxAge(t *testing.T) {
+	if _, err := NewSealer(filledKey(0xAA), 0); err == nil {
+		t.Fatalf("expected error for max-age=0")
+	}
+}
+
+// flipLastByte returns value with its final character changed. For a
+// JWE compact serialization the final segment is the GCM tag, so this
+// guarantees authentication failure on Decrypt.
+func flipLastByte(value string) string {
+	if value == "" {
+		return value
+	}
+	b := []byte(value)
+	last := b[len(b)-1]
+	if last == 'A' {
+		b[len(b)-1] = 'B'
+	} else {
+		b[len(b)-1] = 'A'
+	}
+	return string(b)
 }
