@@ -1,4 +1,4 @@
-package cookie_test
+package cookie
 
 import (
 	"bytes"
@@ -7,25 +7,29 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/zitadel/nextgen/internal/cookie"
 )
 
-func key(version byte, fill byte) cookie.Key {
-	k := cookie.Key{Version: version}
+func key(version byte, fill byte) Key {
+	k := Key{Version: version}
 	for i := range k.Bytes {
 		k.Bytes[i] = fill
 	}
 	return k
 }
 
-func newSealer(t *testing.T, previous *cookie.Key, maxAge time.Duration) *cookie.Sealer {
+func newSealer(t *testing.T, previous *Key, maxAge time.Duration) *Sealer {
 	t.Helper()
-	s, err := cookie.NewSealer(key(1, 0xAA), previous, maxAge)
+	s, err := NewSealer(key(1, 0xAA), previous, maxAge)
 	if err != nil {
 		t.Fatalf("NewSealer: %v", err)
 	}
 	return s
+}
+
+// SetNow replaces the sealer's clock for tests. The production
+// constructor does not expose this seam.
+func SetNow(s *Sealer, now func() time.Time) {
+	s.now = now
 }
 
 func TestSealer_Roundtrip(t *testing.T) {
@@ -74,7 +78,7 @@ func TestSealer_RejectsTamperedCiphertext(t *testing.T) {
 	raw[len(raw)-5] ^= 0x01
 	tampered := base64.RawURLEncoding.EncodeToString(raw)
 
-	if _, err := s.Open(tampered); !errors.Is(err, cookie.ErrInvalid) {
+	if _, err := s.Open(tampered); !errors.Is(err, ErrInvalid) {
 		t.Fatalf("Open tampered: err = %v, want ErrInvalid", err)
 	}
 }
@@ -93,7 +97,7 @@ func TestSealer_RejectsSwappedVersionByte(t *testing.T) {
 	raw[0] = 0xFF
 	tampered := base64.RawURLEncoding.EncodeToString(raw)
 
-	if _, err := s.Open(tampered); !errors.Is(err, cookie.ErrInvalid) {
+	if _, err := s.Open(tampered); !errors.Is(err, ErrInvalid) {
 		t.Fatalf("Open unknown version: err = %v, want ErrInvalid", err)
 	}
 }
@@ -106,11 +110,11 @@ func TestSealer_RejectsExpired(t *testing.T) {
 		t.Fatalf("Seal: %v", err)
 	}
 
-	cookie.SetNow(s, func() time.Time {
+	SetNow(s, func() time.Time {
 		return time.Now().Add(2 * time.Minute)
 	})
 
-	if _, err := s.Open(value); !errors.Is(err, cookie.ErrExpired) {
+	if _, err := s.Open(value); !errors.Is(err, ErrExpired) {
 		t.Fatalf("Open expired: err = %v, want ErrExpired", err)
 	}
 }
@@ -119,7 +123,7 @@ func TestSealer_OpensWithPreviousKey(t *testing.T) {
 	// Pre-rotation sealer holds v=1; after rotation v=2 is current and v=1
 	// is the previous key. Values issued by the old sealer must still open.
 	oldCurrent := key(1, 0xAA)
-	oldSealer, err := cookie.NewSealer(oldCurrent, nil, 10*time.Minute)
+	oldSealer, err := NewSealer(oldCurrent, nil, 10*time.Minute)
 	if err != nil {
 		t.Fatalf("NewSealer (old): %v", err)
 	}
@@ -130,7 +134,7 @@ func TestSealer_OpensWithPreviousKey(t *testing.T) {
 
 	newCurrent := key(2, 0xBB)
 	prev := oldCurrent
-	newSealer, err := cookie.NewSealer(newCurrent, &prev, 10*time.Minute)
+	newSealer, err := NewSealer(newCurrent, &prev, 10*time.Minute)
 	if err != nil {
 		t.Fatalf("NewSealer (new): %v", err)
 	}
@@ -146,7 +150,7 @@ func TestSealer_OpensWithPreviousKey(t *testing.T) {
 
 func TestSealer_SealAlwaysUsesCurrentKey(t *testing.T) {
 	prev := key(1, 0xAA)
-	s, err := cookie.NewSealer(key(2, 0xBB), &prev, 10*time.Minute)
+	s, err := NewSealer(key(2, 0xBB), &prev, 10*time.Minute)
 	if err != nil {
 		t.Fatalf("NewSealer: %v", err)
 	}
@@ -175,7 +179,7 @@ func TestSealer_RejectsMalformedInput(t *testing.T) {
 	}
 	for name, value := range cases {
 		t.Run(name, func(t *testing.T) {
-			if _, err := s.Open(value); !errors.Is(err, cookie.ErrInvalid) {
+			if _, err := s.Open(value); !errors.Is(err, ErrInvalid) {
 				t.Fatalf("Open %q: err = %v, want ErrInvalid", name, err)
 			}
 		})
@@ -185,13 +189,13 @@ func TestSealer_RejectsMalformedInput(t *testing.T) {
 func TestNewSealer_RejectsInvalidConfig(t *testing.T) {
 	current := key(1, 0xAA)
 	t.Run("zero max-age", func(t *testing.T) {
-		if _, err := cookie.NewSealer(current, nil, 0); err == nil {
+		if _, err := NewSealer(current, nil, 0); err == nil {
 			t.Fatalf("expected error for max-age=0")
 		}
 	})
 	t.Run("previous version collides with current", func(t *testing.T) {
 		prev := key(1, 0xBB)
-		_, err := cookie.NewSealer(current, &prev, time.Minute)
+		_, err := NewSealer(current, &prev, time.Minute)
 		if err == nil || !strings.Contains(err.Error(), "version") {
 			t.Fatalf("expected version-collision error, got %v", err)
 		}
