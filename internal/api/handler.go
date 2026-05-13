@@ -4,16 +4,19 @@ import (
 	"context"
 
 	api "github.com/zitadel/nextgen/api/generated"
+	"github.com/zitadel/nextgen/internal/service"
 )
 
 type Handler struct {
 	// UnimplementedHandler is embedded to provide default "not implemented"
 	// responses for all endpoints, so only implemented methods need to be defined.
 	api.UnimplementedHandler
+
+	flowService service.FlowService
 }
 
-func NewHandler() *Handler {
-	return &Handler{}
+func NewHandler(flowService service.FlowService) *Handler {
+	return &Handler{flowService: flowService}
 }
 
 func (h Handler) NewError(ctx context.Context, err error) *api.ErrorDetailsStatusCode {

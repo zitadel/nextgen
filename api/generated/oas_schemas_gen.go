@@ -2739,7 +2739,7 @@ type FlowHint struct {
 	// Scopes flow resolution to a team.
 	TeamID OptString `json:"team_id"`
 	// Scopes to a specific user type.
-	SchemaID OptString `json:"schema_id"`
+	UserSchemaID OptString `json:"user_schema_id"`
 	// Scopes to a specific application.
 	AppID OptString `json:"app_id"`
 }
@@ -2754,9 +2754,9 @@ func (s *FlowHint) GetTeamID() OptString {
 	return s.TeamID
 }
 
-// GetSchemaID returns the value of SchemaID.
-func (s *FlowHint) GetSchemaID() OptString {
-	return s.SchemaID
+// GetUserSchemaID returns the value of UserSchemaID.
+func (s *FlowHint) GetUserSchemaID() OptString {
+	return s.UserSchemaID
 }
 
 // GetAppID returns the value of AppID.
@@ -2774,9 +2774,9 @@ func (s *FlowHint) SetTeamID(val OptString) {
 	s.TeamID = val
 }
 
-// SetSchemaID sets the value of SchemaID.
-func (s *FlowHint) SetSchemaID(val OptString) {
-	s.SchemaID = val
+// SetUserSchemaID sets the value of UserSchemaID.
+func (s *FlowHint) SetUserSchemaID(val OptString) {
+	s.UserSchemaID = val
 }
 
 // SetAppID sets the value of AppID.
