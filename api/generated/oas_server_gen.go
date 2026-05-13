@@ -177,6 +177,12 @@ type Handler interface {
 	//
 	// GET /.well-known/openid-configuration
 	GetOpenIDConfiguration(ctx context.Context) (GetOpenIDConfigurationRes, error)
+	// GetProject implements getProject operation.
+	//
+	// Returns the current state of a project.
+	//
+	// GET /projects/{project_id}
+	GetProject(ctx context.Context, params GetProjectParams) (GetProjectRes, error)
 	// GetReady implements getReady operation.
 	//
 	// Check whether the server is ready to accept requests.

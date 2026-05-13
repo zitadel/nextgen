@@ -77,6 +77,10 @@ type GetOpenIDConfigurationRes interface {
 	getOpenIDConfigurationRes()
 }
 
+type GetProjectRes interface {
+	getProjectRes()
+}
+
 type GetReadyRes interface {
 	getReadyRes()
 }

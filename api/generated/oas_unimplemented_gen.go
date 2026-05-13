@@ -239,6 +239,15 @@ func (UnimplementedHandler) GetOpenIDConfiguration(ctx context.Context) (r GetOp
 	return r, ht.ErrNotImplemented
 }
 
+// GetProject implements getProject operation.
+//
+// Returns the current state of a project.
+//
+// GET /projects/{project_id}
+func (UnimplementedHandler) GetProject(ctx context.Context, params GetProjectParams) (r GetProjectRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // GetReady implements getReady operation.
 //
 // Check whether the server is ready to accept requests.

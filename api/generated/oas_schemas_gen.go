@@ -3378,6 +3378,57 @@ func (s GetLiveOK) Read(p []byte) (n int, err error) {
 
 func (*GetLiveOK) getLiveRes() {}
 
+type GetProjectNotFound ErrorDetails
+
+func (*GetProjectNotFound) getProjectRes() {}
+
+// The current state of a project.
+// Ref: #
+type GetProjectResponse struct {
+	// The unique identifier of the project.
+	ID string `json:"id"`
+	// The time when the project was created.
+	CreatedAt time.Time `json:"createdAt"`
+	// The time when the project was last updated.
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+// GetID returns the value of ID.
+func (s *GetProjectResponse) GetID() string {
+	return s.ID
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *GetProjectResponse) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetUpdatedAt returns the value of UpdatedAt.
+func (s *GetProjectResponse) GetUpdatedAt() time.Time {
+	return s.UpdatedAt
+}
+
+// SetID sets the value of ID.
+func (s *GetProjectResponse) SetID(val string) {
+	s.ID = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *GetProjectResponse) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetUpdatedAt sets the value of UpdatedAt.
+func (s *GetProjectResponse) SetUpdatedAt(val time.Time) {
+	s.UpdatedAt = val
+}
+
+func (*GetProjectResponse) getProjectRes() {}
+
+type GetProjectUnauthorized ErrorDetails
+
+func (*GetProjectUnauthorized) getProjectRes() {}
+
 type GetReadyOK struct {
 	Data io.Reader
 }
