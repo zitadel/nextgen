@@ -1491,68 +1491,101 @@ func (s *FlowAudience) SetAppIds(val []string) {
 	s.AppIds = val
 }
 
-// Merged schema.
+// A flow definition is the server-side configuration that describes a complete
+// authentication or identity flow. It is NOT sent to the frontend — the flow
+// engine evaluates it and produces FlowResponse payloads (steps with capability
+// dictionaries) for the client.
+// Flow definitions are created by administrators and stored in the project/team
+// configuration hierarchy. The engine selects the matching definition based on
+// the purpose + audience when a flow is created via POST /flow.
 // Ref: #
-type FlowDefinitionCreateRequest struct {
+type FlowDefinition struct {
 	// Stable identifier for this flow, used as the target of cross-flow
 	// `switch` and `pivot` transitions. Renaming is not supported — the
 	// `name` is part of the public contract another definition may
 	// reference. Acts as the human display label as well; no separate slug.
 	Name string `json:"name"`
-	// URI of the server-published flow definition schema this definition was
-	// authored against. The server uses this to validate the definition.
-	// If not provided, the engine will use the latest schema version for validation.
-	SchemaURI OptURI `json:"schema_uri"`
 	// User schema this flow operates on. Step `fields` reference properties
 	// defined in this schema. The engine resolves field types, validation,
 	// and implicit outcomes from schema annotations at runtime.
 	UserSchema url.URL `json:"user_schema"`
 	// Which flow purposes this definition handles. A definition can serve
 	// multiple purposes (e.g. a combined login/register flow).
-	Purposes []FlowDefinitionCreateRequestPurposesItem `json:"purposes"`
+	Purposes []FlowDefinitionPurposesItem `json:"purposes"`
 	// Maps each purpose to the step name that starts the flow for that purpose.
 	// Keys must be a subset of `purposes`.
-	InitialSteps FlowDefinitionCreateRequestInitialSteps `json:"initial_steps"`
-	Audience     OptFlowAudience                         `json:"audience"`
+	InitialSteps FlowDefinitionInitialSteps `json:"initial_steps"`
+	Audience     OptFlowAudience            `json:"audience"`
 	// Ordered list of steps in this flow. The order is for human readability —
 	// actual step sequencing is determined by transitions.
-	Steps     []FlowDefinitionStep `json:"steps"`
-	ProjectID ProjectID            `json:"project_id"`
+	Steps []FlowDefinitionStep `json:"steps"`
 }
 
 // GetName returns the value of Name.
-func (s *FlowDefinitionCreateRequest) GetName() string {
+func (s *FlowDefinition) GetName() string {
 	return s.Name
 }
 
-// GetSchemaURI returns the value of SchemaURI.
-func (s *FlowDefinitionCreateRequest) GetSchemaURI() OptURI {
-	return s.SchemaURI
-}
-
 // GetUserSchema returns the value of UserSchema.
-func (s *FlowDefinitionCreateRequest) GetUserSchema() url.URL {
+func (s *FlowDefinition) GetUserSchema() url.URL {
 	return s.UserSchema
 }
 
 // GetPurposes returns the value of Purposes.
-func (s *FlowDefinitionCreateRequest) GetPurposes() []FlowDefinitionCreateRequestPurposesItem {
+func (s *FlowDefinition) GetPurposes() []FlowDefinitionPurposesItem {
 	return s.Purposes
 }
 
 // GetInitialSteps returns the value of InitialSteps.
-func (s *FlowDefinitionCreateRequest) GetInitialSteps() FlowDefinitionCreateRequestInitialSteps {
+func (s *FlowDefinition) GetInitialSteps() FlowDefinitionInitialSteps {
 	return s.InitialSteps
 }
 
 // GetAudience returns the value of Audience.
-func (s *FlowDefinitionCreateRequest) GetAudience() OptFlowAudience {
+func (s *FlowDefinition) GetAudience() OptFlowAudience {
 	return s.Audience
 }
 
 // GetSteps returns the value of Steps.
-func (s *FlowDefinitionCreateRequest) GetSteps() []FlowDefinitionStep {
+func (s *FlowDefinition) GetSteps() []FlowDefinitionStep {
 	return s.Steps
+}
+
+// SetName sets the value of Name.
+func (s *FlowDefinition) SetName(val string) {
+	s.Name = val
+}
+
+// SetUserSchema sets the value of UserSchema.
+func (s *FlowDefinition) SetUserSchema(val url.URL) {
+	s.UserSchema = val
+}
+
+// SetPurposes sets the value of Purposes.
+func (s *FlowDefinition) SetPurposes(val []FlowDefinitionPurposesItem) {
+	s.Purposes = val
+}
+
+// SetInitialSteps sets the value of InitialSteps.
+func (s *FlowDefinition) SetInitialSteps(val FlowDefinitionInitialSteps) {
+	s.InitialSteps = val
+}
+
+// SetAudience sets the value of Audience.
+func (s *FlowDefinition) SetAudience(val OptFlowAudience) {
+	s.Audience = val
+}
+
+// SetSteps sets the value of Steps.
+func (s *FlowDefinition) SetSteps(val []FlowDefinitionStep) {
+	s.Steps = val
+}
+
+// Ref: #
+type FlowDefinitionCreateRequest struct {
+	ProjectID      ProjectID      `json:"project_id"`
+	SchemaURI      OptSchemaURI   `json:"schema_uri"`
+	FlowDefinition FlowDefinition `json:"flow_definition"`
 }
 
 // GetProjectID returns the value of ProjectID.
@@ -1560,39 +1593,14 @@ func (s *FlowDefinitionCreateRequest) GetProjectID() ProjectID {
 	return s.ProjectID
 }
 
-// SetName sets the value of Name.
-func (s *FlowDefinitionCreateRequest) SetName(val string) {
-	s.Name = val
+// GetSchemaURI returns the value of SchemaURI.
+func (s *FlowDefinitionCreateRequest) GetSchemaURI() OptSchemaURI {
+	return s.SchemaURI
 }
 
-// SetSchemaURI sets the value of SchemaURI.
-func (s *FlowDefinitionCreateRequest) SetSchemaURI(val OptURI) {
-	s.SchemaURI = val
-}
-
-// SetUserSchema sets the value of UserSchema.
-func (s *FlowDefinitionCreateRequest) SetUserSchema(val url.URL) {
-	s.UserSchema = val
-}
-
-// SetPurposes sets the value of Purposes.
-func (s *FlowDefinitionCreateRequest) SetPurposes(val []FlowDefinitionCreateRequestPurposesItem) {
-	s.Purposes = val
-}
-
-// SetInitialSteps sets the value of InitialSteps.
-func (s *FlowDefinitionCreateRequest) SetInitialSteps(val FlowDefinitionCreateRequestInitialSteps) {
-	s.InitialSteps = val
-}
-
-// SetAudience sets the value of Audience.
-func (s *FlowDefinitionCreateRequest) SetAudience(val OptFlowAudience) {
-	s.Audience = val
-}
-
-// SetSteps sets the value of Steps.
-func (s *FlowDefinitionCreateRequest) SetSteps(val []FlowDefinitionStep) {
-	s.Steps = val
+// GetFlowDefinition returns the value of FlowDefinition.
+func (s *FlowDefinitionCreateRequest) GetFlowDefinition() FlowDefinition {
+	return s.FlowDefinition
 }
 
 // SetProjectID sets the value of ProjectID.
@@ -1600,86 +1608,14 @@ func (s *FlowDefinitionCreateRequest) SetProjectID(val ProjectID) {
 	s.ProjectID = val
 }
 
-// Maps each purpose to the step name that starts the flow for that purpose.
-// Keys must be a subset of `purposes`.
-type FlowDefinitionCreateRequestInitialSteps map[string]string
-
-func (s *FlowDefinitionCreateRequestInitialSteps) init() FlowDefinitionCreateRequestInitialSteps {
-	m := *s
-	if m == nil {
-		m = map[string]string{}
-		*s = m
-	}
-	return m
+// SetSchemaURI sets the value of SchemaURI.
+func (s *FlowDefinitionCreateRequest) SetSchemaURI(val OptSchemaURI) {
+	s.SchemaURI = val
 }
 
-type FlowDefinitionCreateRequestPurposesItem string
-
-const (
-	FlowDefinitionCreateRequestPurposesItemLogin       FlowDefinitionCreateRequestPurposesItem = "login"
-	FlowDefinitionCreateRequestPurposesItemRegister    FlowDefinitionCreateRequestPurposesItem = "register"
-	FlowDefinitionCreateRequestPurposesItemRecovery    FlowDefinitionCreateRequestPurposesItem = "recovery"
-	FlowDefinitionCreateRequestPurposesItemProfiling   FlowDefinitionCreateRequestPurposesItem = "profiling"
-	FlowDefinitionCreateRequestPurposesItemReauth      FlowDefinitionCreateRequestPurposesItem = "reauth"
-	FlowDefinitionCreateRequestPurposesItemLinkAccount FlowDefinitionCreateRequestPurposesItem = "link_account"
-)
-
-// AllValues returns all FlowDefinitionCreateRequestPurposesItem values.
-func (FlowDefinitionCreateRequestPurposesItem) AllValues() []FlowDefinitionCreateRequestPurposesItem {
-	return []FlowDefinitionCreateRequestPurposesItem{
-		FlowDefinitionCreateRequestPurposesItemLogin,
-		FlowDefinitionCreateRequestPurposesItemRegister,
-		FlowDefinitionCreateRequestPurposesItemRecovery,
-		FlowDefinitionCreateRequestPurposesItemProfiling,
-		FlowDefinitionCreateRequestPurposesItemReauth,
-		FlowDefinitionCreateRequestPurposesItemLinkAccount,
-	}
-}
-
-// MarshalText implements encoding.TextMarshaler.
-func (s FlowDefinitionCreateRequestPurposesItem) MarshalText() ([]byte, error) {
-	switch s {
-	case FlowDefinitionCreateRequestPurposesItemLogin:
-		return []byte(s), nil
-	case FlowDefinitionCreateRequestPurposesItemRegister:
-		return []byte(s), nil
-	case FlowDefinitionCreateRequestPurposesItemRecovery:
-		return []byte(s), nil
-	case FlowDefinitionCreateRequestPurposesItemProfiling:
-		return []byte(s), nil
-	case FlowDefinitionCreateRequestPurposesItemReauth:
-		return []byte(s), nil
-	case FlowDefinitionCreateRequestPurposesItemLinkAccount:
-		return []byte(s), nil
-	default:
-		return nil, errors.Errorf("invalid value: %q", s)
-	}
-}
-
-// UnmarshalText implements encoding.TextUnmarshaler.
-func (s *FlowDefinitionCreateRequestPurposesItem) UnmarshalText(data []byte) error {
-	switch FlowDefinitionCreateRequestPurposesItem(data) {
-	case FlowDefinitionCreateRequestPurposesItemLogin:
-		*s = FlowDefinitionCreateRequestPurposesItemLogin
-		return nil
-	case FlowDefinitionCreateRequestPurposesItemRegister:
-		*s = FlowDefinitionCreateRequestPurposesItemRegister
-		return nil
-	case FlowDefinitionCreateRequestPurposesItemRecovery:
-		*s = FlowDefinitionCreateRequestPurposesItemRecovery
-		return nil
-	case FlowDefinitionCreateRequestPurposesItemProfiling:
-		*s = FlowDefinitionCreateRequestPurposesItemProfiling
-		return nil
-	case FlowDefinitionCreateRequestPurposesItemReauth:
-		*s = FlowDefinitionCreateRequestPurposesItemReauth
-		return nil
-	case FlowDefinitionCreateRequestPurposesItemLinkAccount:
-		*s = FlowDefinitionCreateRequestPurposesItemLinkAccount
-		return nil
-	default:
-		return errors.Errorf("invalid value: %q", data)
-	}
+// SetFlowDefinition sets the value of FlowDefinition.
+func (s *FlowDefinitionCreateRequest) SetFlowDefinition(val FlowDefinition) {
+	s.FlowDefinition = val
 }
 
 // Merged schema.
@@ -1690,10 +1626,6 @@ type FlowDefinitionDetailResponse struct {
 	// `name` is part of the public contract another definition may
 	// reference. Acts as the human display label as well; no separate slug.
 	Name string `json:"name"`
-	// URI of the server-published flow definition schema this definition was
-	// authored against. The server uses this to validate the definition.
-	// If not provided, the engine will use the latest schema version for validation.
-	SchemaURI OptURI `json:"schema_uri"`
 	// User schema this flow operates on. Step `fields` reference properties
 	// defined in this schema. The engine resolves field types, validation,
 	// and implicit outcomes from schema annotations at runtime.
@@ -1712,6 +1644,10 @@ type FlowDefinitionDetailResponse struct {
 	ID string `json:"id"`
 	// Identifier of the project this flow definition belongs to.
 	ProjectID string `json:"project_id"`
+	// URI of the flow definition schema this definition was authored against.
+	// If the schema_uri was not provided in the request, the flow definition is validated against the
+	// latest version of the schema, and the response includes the schema_uri of the latest version.
+	SchemaURI url.URL `json:"schema_uri"`
 	// Status of the flow definition.
 	Status    string    `json:"status"`
 	CreatedAt time.Time `json:"created_at"`
@@ -1721,11 +1657,6 @@ type FlowDefinitionDetailResponse struct {
 // GetName returns the value of Name.
 func (s *FlowDefinitionDetailResponse) GetName() string {
 	return s.Name
-}
-
-// GetSchemaURI returns the value of SchemaURI.
-func (s *FlowDefinitionDetailResponse) GetSchemaURI() OptURI {
-	return s.SchemaURI
 }
 
 // GetUserSchema returns the value of UserSchema.
@@ -1763,6 +1694,11 @@ func (s *FlowDefinitionDetailResponse) GetProjectID() string {
 	return s.ProjectID
 }
 
+// GetSchemaURI returns the value of SchemaURI.
+func (s *FlowDefinitionDetailResponse) GetSchemaURI() url.URL {
+	return s.SchemaURI
+}
+
 // GetStatus returns the value of Status.
 func (s *FlowDefinitionDetailResponse) GetStatus() string {
 	return s.Status
@@ -1781,11 +1717,6 @@ func (s *FlowDefinitionDetailResponse) GetUpdatedAt() time.Time {
 // SetName sets the value of Name.
 func (s *FlowDefinitionDetailResponse) SetName(val string) {
 	s.Name = val
-}
-
-// SetSchemaURI sets the value of SchemaURI.
-func (s *FlowDefinitionDetailResponse) SetSchemaURI(val OptURI) {
-	s.SchemaURI = val
 }
 
 // SetUserSchema sets the value of UserSchema.
@@ -1821,6 +1752,11 @@ func (s *FlowDefinitionDetailResponse) SetID(val string) {
 // SetProjectID sets the value of ProjectID.
 func (s *FlowDefinitionDetailResponse) SetProjectID(val string) {
 	s.ProjectID = val
+}
+
+// SetSchemaURI sets the value of SchemaURI.
+func (s *FlowDefinitionDetailResponse) SetSchemaURI(val url.URL) {
+	s.SchemaURI = val
 }
 
 // SetStatus sets the value of Status.
@@ -1923,6 +1859,19 @@ func (s *FlowDefinitionDetailResponsePurposesItem) UnmarshalText(data []byte) er
 	}
 }
 
+// Maps each purpose to the step name that starts the flow for that purpose.
+// Keys must be a subset of `purposes`.
+type FlowDefinitionInitialSteps map[string]string
+
+func (s *FlowDefinitionInitialSteps) init() FlowDefinitionInitialSteps {
+	m := *s
+	if m == nil {
+		m = map[string]string{}
+		*s = m
+	}
+	return m
+}
+
 // Ref: #
 type FlowDefinitionListResponse struct {
 	FlowDefinitions []FlowDefinitionResponse `json:"flow_definitions"`
@@ -1951,6 +1900,75 @@ func (s *FlowDefinitionListResponse) SetNextPageToken(val OptNilPageToken) {
 }
 
 func (*FlowDefinitionListResponse) listFlowDefinitionsRes() {}
+
+type FlowDefinitionPurposesItem string
+
+const (
+	FlowDefinitionPurposesItemLogin       FlowDefinitionPurposesItem = "login"
+	FlowDefinitionPurposesItemRegister    FlowDefinitionPurposesItem = "register"
+	FlowDefinitionPurposesItemRecovery    FlowDefinitionPurposesItem = "recovery"
+	FlowDefinitionPurposesItemProfiling   FlowDefinitionPurposesItem = "profiling"
+	FlowDefinitionPurposesItemReauth      FlowDefinitionPurposesItem = "reauth"
+	FlowDefinitionPurposesItemLinkAccount FlowDefinitionPurposesItem = "link_account"
+)
+
+// AllValues returns all FlowDefinitionPurposesItem values.
+func (FlowDefinitionPurposesItem) AllValues() []FlowDefinitionPurposesItem {
+	return []FlowDefinitionPurposesItem{
+		FlowDefinitionPurposesItemLogin,
+		FlowDefinitionPurposesItemRegister,
+		FlowDefinitionPurposesItemRecovery,
+		FlowDefinitionPurposesItemProfiling,
+		FlowDefinitionPurposesItemReauth,
+		FlowDefinitionPurposesItemLinkAccount,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FlowDefinitionPurposesItem) MarshalText() ([]byte, error) {
+	switch s {
+	case FlowDefinitionPurposesItemLogin:
+		return []byte(s), nil
+	case FlowDefinitionPurposesItemRegister:
+		return []byte(s), nil
+	case FlowDefinitionPurposesItemRecovery:
+		return []byte(s), nil
+	case FlowDefinitionPurposesItemProfiling:
+		return []byte(s), nil
+	case FlowDefinitionPurposesItemReauth:
+		return []byte(s), nil
+	case FlowDefinitionPurposesItemLinkAccount:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FlowDefinitionPurposesItem) UnmarshalText(data []byte) error {
+	switch FlowDefinitionPurposesItem(data) {
+	case FlowDefinitionPurposesItemLogin:
+		*s = FlowDefinitionPurposesItemLogin
+		return nil
+	case FlowDefinitionPurposesItemRegister:
+		*s = FlowDefinitionPurposesItemRegister
+		return nil
+	case FlowDefinitionPurposesItemRecovery:
+		*s = FlowDefinitionPurposesItemRecovery
+		return nil
+	case FlowDefinitionPurposesItemProfiling:
+		*s = FlowDefinitionPurposesItemProfiling
+		return nil
+	case FlowDefinitionPurposesItemReauth:
+		*s = FlowDefinitionPurposesItemReauth
+		return nil
+	case FlowDefinitionPurposesItemLinkAccount:
+		*s = FlowDefinitionPurposesItemLinkAccount
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
 
 // Response object for a flow definition after creation.
 // Ref: #
@@ -7371,6 +7389,52 @@ func (o OptProjectID) Or(d ProjectID) ProjectID {
 	return d
 }
 
+// NewOptSchemaURI returns new OptSchemaURI with value set to v.
+func NewOptSchemaURI(v SchemaURI) OptSchemaURI {
+	return OptSchemaURI{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptSchemaURI is optional SchemaURI.
+type OptSchemaURI struct {
+	Value SchemaURI
+	Set   bool
+}
+
+// IsSet returns true if OptSchemaURI was set.
+func (o OptSchemaURI) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptSchemaURI) Reset() {
+	var v SchemaURI
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptSchemaURI) SetTo(v SchemaURI) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptSchemaURI) Get() (v SchemaURI, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptSchemaURI) Or(d SchemaURI) SchemaURI {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptStepTexts returns new OptStepTexts with value set to v.
 func NewOptStepTexts(v StepTexts) OptStepTexts {
 	return OptStepTexts{
@@ -8128,6 +8192,8 @@ func (s *SSOProvider) SetName(val string) {
 func (s *SSOProvider) SetTemplate(val string) {
 	s.Template = val
 }
+
+type SchemaURI url.URL
 
 // A schema definition that references an external schema via a URL. It is
 // on creation, validated against its metaschema and cached in the database.

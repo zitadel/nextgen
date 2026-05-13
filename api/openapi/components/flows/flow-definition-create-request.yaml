@@ -1,8 +1,11 @@
-allOf:
-  - $ref: flow-definition.yaml
-  - type: object
-    required:
-      - project_id
-    properties:
-      project_id:
-        $ref: ../../components/schemas/project-id.yaml
+type: object
+required:
+  - project_id
+  - flow_definition
+properties:
+  project_id:
+    $ref: ../../components/schemas/project-id.yaml
+  schema_uri:
+    $ref: ../../components/schemas/schema-uri.yaml
+  flow_definition:
+    $ref: flow-definition.yaml

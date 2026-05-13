@@ -606,7 +606,7 @@ func (s FieldType) Validate() error {
 	}
 }
 
-func (s *FlowDefinitionCreateRequest) Validate() error {
+func (s *FlowDefinition) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
 	}
@@ -721,6 +721,18 @@ func (s *FlowDefinitionCreateRequest) Validate() error {
 			Error: err,
 		})
 	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *FlowDefinitionCreateRequest) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
 	if err := func() error {
 		if err := s.ProjectID.Validate(); err != nil {
 			return err
@@ -732,38 +744,21 @@ func (s *FlowDefinitionCreateRequest) Validate() error {
 			Error: err,
 		})
 	}
+	if err := func() error {
+		if err := s.FlowDefinition.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "flow_definition",
+			Error: err,
+		})
+	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
 	}
 	return nil
-}
-
-func (s FlowDefinitionCreateRequestInitialSteps) Validate() error {
-	var failures []validate.FieldError
-
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
-	}
-	return nil
-}
-
-func (s FlowDefinitionCreateRequestPurposesItem) Validate() error {
-	switch s {
-	case "login":
-		return nil
-	case "register":
-		return nil
-	case "recovery":
-		return nil
-	case "profiling":
-		return nil
-	case "reauth":
-		return nil
-	case "link_account":
-		return nil
-	default:
-		return errors.Errorf("invalid value: %v", s)
-	}
 }
 
 func (s *FlowDefinitionDetailResponse) Validate() error {
@@ -915,6 +910,15 @@ func (s FlowDefinitionDetailResponsePurposesItem) Validate() error {
 	}
 }
 
+func (s FlowDefinitionInitialSteps) Validate() error {
+	var failures []validate.FieldError
+
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s *FlowDefinitionListResponse) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -953,6 +957,25 @@ func (s *FlowDefinitionListResponse) Validate() error {
 		return &validate.Error{Fields: failures}
 	}
 	return nil
+}
+
+func (s FlowDefinitionPurposesItem) Validate() error {
+	switch s {
+	case "login":
+		return nil
+	case "register":
+		return nil
+	case "recovery":
+		return nil
+	case "profiling":
+		return nil
+	case "reauth":
+		return nil
+	case "link_account":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
 }
 
 func (s *FlowDefinitionResponse) Validate() error {

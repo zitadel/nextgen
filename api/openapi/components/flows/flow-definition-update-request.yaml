@@ -32,6 +32,9 @@ properties:
       Replaces the full map of purpose-to-initial-step if provided.
       Keys must be a subset of `purposes`.
     minProperties: 1
+    propertyNames:
+      type: string
+      enum: [login, register, recovery, profiling, reauth, link_account]
     additionalProperties:
       type: string
     example:
