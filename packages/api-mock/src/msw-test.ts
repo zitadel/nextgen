@@ -1,19 +1,10 @@
 /**
  * Vitest fixture that boots a fresh `msw/browser` worker per test and
- * tears it down afterwards. Consumed by `index.spec.ts` and any future
- * spec that wants to drive the orval client against the api-mock
- * handlers under chromium.
+ * tears it down afterwards. Consumed by `*.browser.spec.ts` files that
+ * exercise the `setupMock(worker)` browser entry point.
  *
- * Tests written against this fixture look like:
- *
- * ```ts
- * import { test } from "./msw-test";
- *
- * test("walks the flow", async ({ worker }) => {
- *   setupMock(worker);
- *   // ... call createFlow / submitFlowStep ...
- * });
- * ```
+ * The node-mode contract suite (`index.spec.ts`) uses `msw/node`
+ * directly and does not need this fixture.
  */
 import { setupWorker, type SetupWorker } from "msw/browser";
 import { test as testBase } from "vitest";

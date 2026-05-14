@@ -4,34 +4,43 @@ import {
   submitFlowStep,
 } from "@zitadel-nextgen/api/generated/endpoints/zitadelNextGen";
 import { setApiBaseUrl } from "@zitadel-nextgen/api/runtime/base-url";
-import { beforeAll, beforeEach, describe, expect } from "vitest";
+import { setupServer } from "msw/node";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "vitest";
 
 import {
   applyBranding,
   clearBranding,
   getCapturedRequests,
   resetFlow,
-  setupMock,
+  setupMockHandlers,
 } from "./index.js";
-import { test } from "./msw-test.js";
 
 const PROJECT_ID = "demo-project";
+const server = setupServer();
 
 beforeAll(() => {
-  // Same-origin so the worker has an absolute URL to intercept; the host
-  // doesn't have to resolve — the orval-generated handlers match `*/flow*`.
-  setApiBaseUrl(window.location.origin);
+  // Any absolute URL works — the orval-generated handlers match `*/flow*`
+  // with a wildcard prefix.
+  setApiBaseUrl("http://localhost");
+  server.listen({ onUnhandledRequest: "error" });
+});
+
+afterAll(() => {
+  server.close();
 });
 
 beforeEach(() => {
+  server.use(...setupMockHandlers());
   resetFlow();
   clearBranding();
 });
 
-describe("setupMock", () => {
-  test("walks identifier -> password -> done", async ({ worker }) => {
-    setupMock(worker);
+afterEach(() => {
+  server.resetHandlers();
+});
 
+describe("setupMockHandlers", () => {
+  test("walks identifier -> password -> done", async () => {
     const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
     expect(start.step.name).toBe("identifier");
     expect(start.id).toBeTruthy();
@@ -54,9 +63,7 @@ describe("setupMock", () => {
     expect(submitPassword.handoff_token).toBeTruthy();
   });
 
-  test("captures every request body for assertions", async ({ worker }) => {
-    setupMock(worker);
-
+  test("captures every request body for assertions", async () => {
     const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
     await submitFlowStep(start.id, {
       session_token: start.session_token,
@@ -78,9 +85,7 @@ describe("setupMock", () => {
     expect(captured[2]).toMatchObject({ kind: "getFlowStep" });
   });
 
-  test("rotates the session token on every response", async ({ worker }) => {
-    setupMock(worker);
-
+  test("rotates the session token on every response", async () => {
     const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
     const submit = await submitFlowStep(start.id, {
       session_token: start.session_token,
@@ -90,9 +95,7 @@ describe("setupMock", () => {
     expect(start.session_token).not.toBe(submit.session_token);
   });
 
-  test("routes register through its own step before password", async ({ worker }) => {
-    setupMock(worker);
-
+  test("routes register through its own step before password", async () => {
     const start = await createFlow({ purpose: "register", project_id: PROJECT_ID });
     expect(start.step.name).toBe("register");
     const submit = await submitFlowStep(start.id, {
@@ -107,9 +110,7 @@ describe("setupMock", () => {
     expect(submit.step.name).toBe("password");
   });
 
-  test("redirects to SSO when sso_provider_id is set", async ({ worker }) => {
-    setupMock(worker);
-
+  test("redirects to SSO when sso_provider_id is set", async () => {
     const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
     const submit = await submitFlowStep(start.id, {
       session_token: start.session_token,
@@ -121,8 +122,7 @@ describe("setupMock", () => {
     expect(submit.step.redirect_url).toBeTruthy();
   });
 
-  test("merges the active branding overlay onto every response", async ({ worker }) => {
-    setupMock(worker);
+  test("merges the active branding overlay onto every response", async () => {
     applyBranding({ layout: "split", logo_url: "https://logo.example/img.svg" });
 
     const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });

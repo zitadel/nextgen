@@ -65,12 +65,21 @@ should clear the overlay between cases via `clearBranding()`.
 
 ## Testing
 
-`pnpm vitest run` runs the spec in real Chromium via
-`@vitest/browser-playwright`. The end-to-end walk in
-`src/index.spec.ts` exercises the typed orval client against an in-page
-`setupWorker(...setupMockHandlers())` — it is the canonical contract
-test. When fixing a regression in step routing, add a case there before
-touching the consumers in `packages/components`.
+Two Vitest projects, mirroring `packages/components`:
+
+- `unit` — node mode against `msw/node`'s `setupServer`. Picks up
+  `*.spec.ts`. The end-to-end walk in `src/index.spec.ts` is the
+  canonical contract test for the handlers and is what CI runs as
+  `pnpm test`.
+- `browser` — real Chromium via Playwright against `msw/browser`'s
+  `setupWorker`. Picks up `*.browser.spec.ts`. `index.browser.spec.ts`
+  smoke-tests the `setupMock(worker)` entry point that the dev
+  playground uses. Runs locally via `pnpm test:browser` and requires a
+  Playwright browser install (`pnpm exec playwright install`); skipped
+  in CI to keep the runner image lean.
+
+`pnpm test:all` runs both projects. When fixing a regression in step
+routing, add a case to the unit spec first — that is what CI gates on.
 
 ## Don't
 
