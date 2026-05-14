@@ -1,7 +1,7 @@
 # ADR 010: Session, Auth Attempt, and Check Persistence
 
-> **Status:** Proposed
-> **Date:** 2026-05-12
+> **Status:** Proposed  
+> **Date:** 2026-05-12  
 > **Context:** Interactive authentication persistence for nextgen
 
 ## Context
