@@ -1,6 +1,7 @@
 package repository_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -15,7 +16,7 @@ func TestJSONSchemaRepository_CRUD(t *testing.T) {
 	defer rollback()
 
 	projectID := "proj-crud"
-	_, err := tx.Exec(t.Context(), "INSERT INTO zitadel_nextgen.projects (id) VALUES ($1)", projectID)
+	_, err := tx.Exec(t.Context(), fmt.Sprintf("INSERT INTO %s (id) VALUES ($1)", dbTable("projects")), projectID)
 	require.NoError(t, err)
 
 	schema := &domain.JSONSchema{
