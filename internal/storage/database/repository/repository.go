@@ -30,16 +30,31 @@ func checkRestrictingColumns(
 	return nil
 }
 
-// checkPKCondition checks if the Primary Key columns are part of the condition.
-// This can ensure only a single row is affected by updates and deletes.
-func checkPKCondition(
+// uniqueKeyLocator is implemented by repositories whose rows can also be
+// addressed by a database UNIQUE constraint (natural key) in addition to
+// the primary key.
+type uniqueKeyLocator interface {
+	UniqueKeyColumns() []database.Column
+}
+
+// checkPKOrUniqueKeyCondition ensures the condition restricts either all primary
+// key columns or, when supported, all columns of an alternate unique key.
+func checkPKOrUniqueKeyCondition(
 	repo domain.Repository,
 	condition database.Condition,
 ) error {
-	return checkRestrictingColumns(
-		condition,
-		repo.PrimaryKeyColumns()...,
-	)
+	pkErr := checkRestrictingColumns(condition, repo.PrimaryKeyColumns()...)
+	if pkErr == nil {
+		return nil
+	}
+	if u, ok := repo.(uniqueKeyLocator); ok {
+		if cols := u.UniqueKeyColumns(); len(cols) > 0 {
+			if err := checkRestrictingColumns(condition, cols...); err == nil {
+				return nil
+			}
+		}
+	}
+	return pkErr
 }
 
 func getOne[Target any](ctx context.Context, querier database.Querier, builder *database.StatementBuilder) (*Target, error) {
@@ -76,7 +91,7 @@ func updateOne[Target updatable](ctx context.Context, client database.QueryExecu
 	if len(changes) == 0 {
 		return 0, database.ErrNoChanges
 	}
-	if err := checkPKCondition(target, condition); err != nil {
+	if err := checkPKOrUniqueKeyCondition(target, condition); err != nil {
 		return 0, err
 	}
 	if !database.Changes(changes).IsOnColumn(target.UpdatedAtColumn()) {
@@ -99,7 +114,7 @@ type deletable interface {
 }
 
 func deleteOne[Target deletable](ctx context.Context, client database.QueryExecutor, target Target, condition database.Condition) (int64, error) {
-	if err := checkPKCondition(target, condition); err != nil {
+	if err := checkPKOrUniqueKeyCondition(target, condition); err != nil {
 		return 0, err
 	}
 

@@ -11,6 +11,7 @@ import (
 const userTotpTable = "zitadel_nextgen.user_totp"
 
 var (
+	colTotpID             = database.NewColumn(userTotpTable, "id")
 	colTotpProjectID      = database.NewColumn(userTotpTable, "project_id")
 	colTotpUserID         = database.NewColumn(userTotpTable, "user_id")
 	colTotpSecret         = database.NewColumn(userTotpTable, "secret")
@@ -30,6 +31,10 @@ func NewUserTOTPRepository() *UserTOTPRepository {
 func (r *UserTOTPRepository) qualifiedTableName() string { return userTotpTable }
 
 func (r *UserTOTPRepository) PrimaryKeyColumns() []database.Column {
+	return []database.Column{colTotpID}
+}
+
+func (r *UserTOTPRepository) UniqueKeyColumns() []database.Column {
 	return []database.Column{colTotpProjectID, colTotpUserID}
 }
 
@@ -43,7 +48,11 @@ func (r *UserTOTPRepository) UserIDCondition(uid string) database.Condition {
 	return database.NewTextCondition(colTotpUserID, database.TextOperationEqual, uid)
 }
 
-func (r *UserTOTPRepository) PrimaryKeyCondition(pid, uid string) database.Condition {
+func (r *UserTOTPRepository) PrimaryKeyCondition(id int64) database.Condition {
+	return database.NewNumberCondition(colTotpID, database.NumberOperationEqual, id)
+}
+
+func (r *UserTOTPRepository) UniqueCondition(pid, uid string) database.Condition {
 	return database.And(r.ProjectIDCondition(pid), r.UserIDCondition(uid))
 }
 
@@ -73,7 +82,7 @@ func (r *UserTOTPRepository) ResetFailedAttempts() database.Change {
 func (r *UserTOTPRepository) Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*domain.UserTOTP, error) {
 	builder := database.NewStatementBuilder("SELECT ")
 	database.Columns{
-		colTotpProjectID, colTotpUserID, colTotpSecret, colTotpVerifiedAt, colTotpLastSuccessful,
+		colTotpID, colTotpProjectID, colTotpUserID, colTotpSecret, colTotpVerifiedAt, colTotpLastSuccessful,
 		colTotpFailedAttempts, colTotpCreatedAt, colTotpUpdatedAt,
 	}.WriteQualified(builder)
 	builder.WriteString(" FROM ")
@@ -93,7 +102,7 @@ func (r *UserTOTPRepository) Get(ctx context.Context, client database.QueryExecu
 func (r *UserTOTPRepository) List(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) ([]*domain.UserTOTP, error) {
 	builder := database.NewStatementBuilder("SELECT ")
 	database.Columns{
-		colTotpProjectID, colTotpUserID, colTotpSecret, colTotpVerifiedAt, colTotpLastSuccessful,
+		colTotpID, colTotpProjectID, colTotpUserID, colTotpSecret, colTotpVerifiedAt, colTotpLastSuccessful,
 		colTotpFailedAttempts, colTotpCreatedAt, colTotpUpdatedAt,
 	}.WriteQualified(builder)
 	builder.WriteString(" FROM ")
@@ -130,6 +139,7 @@ func (r *UserTOTPRepository) Delete(ctx context.Context, client database.QueryEx
 }
 
 type userTOTPRow struct {
+	ID                  int64                    `db:"id"`
 	ProjectID           string                   `db:"project_id"`
 	UserID              string                   `db:"user_id"`
 	Secret              []byte                   `db:"secret"`
@@ -142,6 +152,7 @@ type userTOTPRow struct {
 
 func (row *userTOTPRow) toDomain() *domain.UserTOTP {
 	t := &domain.UserTOTP{
+		ID:             row.ID,
 		ProjectID:      row.ProjectID,
 		UserID:         row.UserID,
 		Secret:         append([]byte(nil), row.Secret...),

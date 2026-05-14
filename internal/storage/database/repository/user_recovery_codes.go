@@ -11,6 +11,7 @@ import (
 const userRecoveryTable = "zitadel_nextgen.user_recovery_codes"
 
 var (
+	colRecoveryID             = database.NewColumn(userRecoveryTable, "id")
 	colRecoveryProjectID      = database.NewColumn(userRecoveryTable, "project_id")
 	colRecoveryUserID         = database.NewColumn(userRecoveryTable, "user_id")
 	colRecoveryCodes          = database.NewColumn(userRecoveryTable, "recovery_codes")
@@ -29,6 +30,10 @@ func NewUserRecoveryCodesRepository() *UserRecoveryCodesRepository {
 func (r *UserRecoveryCodesRepository) qualifiedTableName() string { return userRecoveryTable }
 
 func (r *UserRecoveryCodesRepository) PrimaryKeyColumns() []database.Column {
+	return []database.Column{colRecoveryID}
+}
+
+func (r *UserRecoveryCodesRepository) UniqueKeyColumns() []database.Column {
 	return []database.Column{colRecoveryProjectID, colRecoveryUserID}
 }
 
@@ -42,7 +47,11 @@ func (r *UserRecoveryCodesRepository) UserIDCondition(uid string) database.Condi
 	return database.NewTextCondition(colRecoveryUserID, database.TextOperationEqual, uid)
 }
 
-func (r *UserRecoveryCodesRepository) PrimaryKeyCondition(pid, uid string) database.Condition {
+func (r *UserRecoveryCodesRepository) PrimaryKeyCondition(id int64) database.Condition {
+	return database.NewNumberCondition(colRecoveryID, database.NumberOperationEqual, id)
+}
+
+func (r *UserRecoveryCodesRepository) UniqueCondition(pid, uid string) database.Condition {
 	return database.And(r.ProjectIDCondition(pid), r.UserIDCondition(uid))
 }
 
@@ -68,7 +77,7 @@ func (r *UserRecoveryCodesRepository) ResetFailedAttempts() database.Change {
 func (r *UserRecoveryCodesRepository) Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*domain.UserRecoveryCodes, error) {
 	b := database.NewStatementBuilder("SELECT ")
 	database.Columns{
-		colRecoveryProjectID, colRecoveryUserID, colRecoveryCodes,
+		colRecoveryID, colRecoveryProjectID, colRecoveryUserID, colRecoveryCodes,
 		colRecoveryLastSuccessful, colRecoveryFailedAttempts, colRecoveryCreatedAt, colRecoveryUpdatedAt,
 	}.WriteQualified(b)
 	b.WriteString(" FROM ")
@@ -88,7 +97,7 @@ func (r *UserRecoveryCodesRepository) Get(ctx context.Context, client database.Q
 func (r *UserRecoveryCodesRepository) List(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) ([]*domain.UserRecoveryCodes, error) {
 	b := database.NewStatementBuilder("SELECT ")
 	database.Columns{
-		colRecoveryProjectID, colRecoveryUserID, colRecoveryCodes,
+		colRecoveryID, colRecoveryProjectID, colRecoveryUserID, colRecoveryCodes,
 		colRecoveryLastSuccessful, colRecoveryFailedAttempts, colRecoveryCreatedAt, colRecoveryUpdatedAt,
 	}.WriteQualified(b)
 	b.WriteString(" FROM ")
@@ -125,6 +134,7 @@ func (r *UserRecoveryCodesRepository) Delete(ctx context.Context, client databas
 }
 
 type userRecoveryRow struct {
+	ID                  int64                    `db:"id"`
 	ProjectID           string                   `db:"project_id"`
 	UserID              string                   `db:"user_id"`
 	RecoveryCodes       []string                 `db:"recovery_codes"`
@@ -136,6 +146,7 @@ type userRecoveryRow struct {
 
 func (row *userRecoveryRow) toDomain() *domain.UserRecoveryCodes {
 	o := &domain.UserRecoveryCodes{
+		ID:             row.ID,
 		ProjectID:      row.ProjectID,
 		UserID:         row.UserID,
 		RecoveryCodes:  append([]string(nil), row.RecoveryCodes...),

@@ -11,6 +11,7 @@ import (
 const userPasskeyTable = "zitadel_nextgen.user_passkeys"
 
 var (
+	colPasskeyID              = database.NewColumn(userPasskeyTable, "id")
 	colPasskeyProjectID       = database.NewColumn(userPasskeyTable, "project_id")
 	colPasskeyUserID          = database.NewColumn(userPasskeyTable, "user_id")
 	colPasskeyCredentialID    = database.NewColumn(userPasskeyTable, "credential_id")
@@ -37,6 +38,10 @@ func NewUserPasskeyRepository() *UserPasskeyRepository {
 func (r *UserPasskeyRepository) qualifiedTableName() string { return userPasskeyTable }
 
 func (r *UserPasskeyRepository) PrimaryKeyColumns() []database.Column {
+	return []database.Column{colPasskeyID}
+}
+
+func (r *UserPasskeyRepository) UniqueKeyColumns() []database.Column {
 	return []database.Column{colPasskeyProjectID, colPasskeyUserID, colPasskeyCredentialID}
 }
 
@@ -54,7 +59,11 @@ func (r *UserPasskeyRepository) CredentialIDCondition(cid string) database.Condi
 	return database.NewTextCondition(colPasskeyCredentialID, database.TextOperationEqual, cid)
 }
 
-func (r *UserPasskeyRepository) PrimaryKeyCondition(pid, uid, cid string) database.Condition {
+func (r *UserPasskeyRepository) PrimaryKeyCondition(id int64) database.Condition {
+	return database.NewNumberCondition(colPasskeyID, database.NumberOperationEqual, id)
+}
+
+func (r *UserPasskeyRepository) UniqueCondition(pid, uid, cid string) database.Condition {
 	return database.And(
 		r.ProjectIDCondition(pid),
 		r.UserIDCondition(uid),
@@ -97,7 +106,7 @@ func (r *UserPasskeyRepository) SetLastUsedAt(t time.Time) database.Change {
 func (r *UserPasskeyRepository) Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*domain.UserPasskey, error) {
 	b := database.NewStatementBuilder("SELECT ")
 	database.Columns{
-		colPasskeyProjectID, colPasskeyUserID, colPasskeyCredentialID, colPasskeyPublicKey,
+		colPasskeyID, colPasskeyProjectID, colPasskeyUserID, colPasskeyCredentialID, colPasskeyPublicKey,
 		colPasskeyAAGUID, colPasskeyAttestationType, colPasskeyTransports, colPasskeySignCount,
 		colPasskeyBackupEligible, colPasskeyBackupState, colPasskeyName, colPasskeyVerifiedAt, colPasskeyLastUsedAt,
 		colPasskeyCreatedAt, colPasskeyUpdatedAt,
@@ -119,7 +128,7 @@ func (r *UserPasskeyRepository) Get(ctx context.Context, client database.QueryEx
 func (r *UserPasskeyRepository) List(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) ([]*domain.UserPasskey, error) {
 	b := database.NewStatementBuilder("SELECT ")
 	database.Columns{
-		colPasskeyProjectID, colPasskeyUserID, colPasskeyCredentialID, colPasskeyPublicKey,
+		colPasskeyID, colPasskeyProjectID, colPasskeyUserID, colPasskeyCredentialID, colPasskeyPublicKey,
 		colPasskeyAAGUID, colPasskeyAttestationType, colPasskeyTransports, colPasskeySignCount,
 		colPasskeyBackupEligible, colPasskeyBackupState, colPasskeyName, colPasskeyVerifiedAt, colPasskeyLastUsedAt,
 		colPasskeyCreatedAt, colPasskeyUpdatedAt,
@@ -161,6 +170,7 @@ func (r *UserPasskeyRepository) Delete(ctx context.Context, client database.Quer
 }
 
 type userPasskeyRow struct {
+	ID              int64                    `db:"id"`
 	ProjectID       string                   `db:"project_id"`
 	UserID          string                   `db:"user_id"`
 	CredentialID    string                   `db:"credential_id"`
@@ -180,6 +190,7 @@ type userPasskeyRow struct {
 
 func (row *userPasskeyRow) toDomain() *domain.UserPasskey {
 	p := &domain.UserPasskey{
+		ID:             row.ID,
 		ProjectID:      row.ProjectID,
 		UserID:         row.UserID,
 		CredentialID:   row.CredentialID,

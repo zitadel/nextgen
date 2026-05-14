@@ -8,6 +8,7 @@ import (
 )
 
 type UserRecoveryCodes struct {
+	ID                  int64
 	ProjectID           string
 	UserID              string
 	RecoveryCodes       []string
@@ -38,7 +39,8 @@ type UserRecoveryCodesRepository interface {
 type userRecoveryCodesConditions interface {
 	ProjectIDCondition(projectID string) database.Condition
 	UserIDCondition(userID string) database.Condition
-	PrimaryKeyCondition(projectID, userID string) database.Condition
+	PrimaryKeyCondition(id int64) database.Condition
+	UniqueCondition(projectID, userID string) database.Condition
 }
 
 type userRecoveryCodesChanges interface {

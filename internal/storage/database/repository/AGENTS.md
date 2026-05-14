@@ -34,7 +34,9 @@ Repository structs should expose:
 ## 5. Safety Constraints
 
 - Ensure write operations are constrained by primary key and tenant scope.
-- Use `checkPKCondition(target, condition)` inside repository methods.
+- `updateOne` / `deleteOne` validate conditions with `checkPKOrUniqueKeyCondition`
+  (primary key columns, or `UniqueKeyColumns` when implemented). For custom write
+  helpers, mirror that pattern.
 
 ## 6. Relational Example (Non-User Entity)
 

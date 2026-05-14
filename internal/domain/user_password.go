@@ -8,6 +8,7 @@ import (
 )
 
 type UserPassword struct {
+	ID                  int64
 	ProjectID           string
 	UserID              string
 	EncodedHash         string
@@ -43,7 +44,8 @@ type UserPasswordRepository interface {
 type userPasswordConditions interface {
 	ProjectIDCondition(projectID string) database.Condition
 	UserIDCondition(userID string) database.Condition
-	PrimaryKeyCondition(projectID, userID string) database.Condition
+	PrimaryKeyCondition(id int64) database.Condition
+	UniqueCondition(projectID, userID string) database.Condition
 }
 
 type userPasswordChanges interface {

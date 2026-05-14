@@ -54,8 +54,9 @@ func TestUserPasswordRepository_CRUD(t *testing.T) {
 		VerificationID: &vid,
 	}))
 
-	got, err := repo.Get(ctx, tx, database.WithCondition(repo.PrimaryKeyCondition(pid, userID)))
+	got, err := repo.Get(ctx, tx, database.WithCondition(repo.UniqueCondition(pid, userID)))
 	require.NoError(t, err)
+	require.Positive(t, got.ID)
 	require.Equal(t, pid, got.ProjectID)
 	require.Equal(t, userID, got.UserID)
 	require.Equal(t, "argon2id$v=19$m=65536,t=3,p=4$fake", got.EncodedHash)
@@ -63,12 +64,30 @@ func TestUserPasswordRepository_CRUD(t *testing.T) {
 	require.NotNil(t, got.VerificationID)
 	require.Equal(t, vid, *got.VerificationID)
 
+	byID, err := repo.Get(ctx, tx, database.WithCondition(repo.PrimaryKeyCondition(got.ID)))
+	require.NoError(t, err)
+	require.Equal(t, got.ID, byID.ID)
+
 	list, err := repo.List(ctx, tx, database.WithCondition(repo.ProjectIDCondition(pid)))
 	require.NoError(t, err)
 	require.Len(t, list, 1)
 
-	require.NoError(t, repo.Delete(ctx, tx, repo.PrimaryKeyCondition(pid, userID)))
-	_, err = repo.Get(ctx, tx, database.WithCondition(repo.PrimaryKeyCondition(pid, userID)))
+	require.NoError(t, repo.Delete(ctx, tx, repo.PrimaryKeyCondition(got.ID)))
+	_, err = repo.Get(ctx, tx, database.WithCondition(repo.UniqueCondition(pid, userID)))
+	require.ErrorIs(t, err, new(database.NoRowFoundError))
+
+	require.NoError(t, repo.Create(ctx, tx, &domain.CreateUserPassword{
+		ProjectID:      pid,
+		UserID:         userID,
+		EncodedHash:    "argon2id$v=19$m=65536,t=3,p=4$fake2",
+		ChangeRequired: false,
+		VerificationID: nil,
+	}))
+	got2, err := repo.Get(ctx, tx, database.WithCondition(repo.UniqueCondition(pid, userID)))
+	require.NoError(t, err)
+	require.Positive(t, got2.ID)
+	require.NoError(t, repo.Delete(ctx, tx, repo.UniqueCondition(pid, userID)))
+	_, err = repo.Get(ctx, tx, database.WithCondition(repo.UniqueCondition(pid, userID)))
 	require.ErrorIs(t, err, new(database.NoRowFoundError))
 }
 
@@ -94,14 +113,31 @@ func TestUserTOTPRepository_CRUD(t *testing.T) {
 		Secret:    secret,
 	}))
 
-	got, err := repo.Get(ctx, tx, database.WithCondition(repo.PrimaryKeyCondition(pid, userID)))
+	got, err := repo.Get(ctx, tx, database.WithCondition(repo.UniqueCondition(pid, userID)))
 	require.NoError(t, err)
+	require.Positive(t, got.ID)
 	require.Equal(t, pid, got.ProjectID)
 	require.Equal(t, userID, got.UserID)
 	require.Equal(t, secret, got.Secret)
 
-	require.NoError(t, repo.Delete(ctx, tx, repo.PrimaryKeyCondition(pid, userID)))
-	_, err = repo.Get(ctx, tx, database.WithCondition(repo.PrimaryKeyCondition(pid, userID)))
+	byID, err := repo.Get(ctx, tx, database.WithCondition(repo.PrimaryKeyCondition(got.ID)))
+	require.NoError(t, err)
+	require.Equal(t, got.ID, byID.ID)
+
+	require.NoError(t, repo.Delete(ctx, tx, repo.PrimaryKeyCondition(got.ID)))
+	_, err = repo.Get(ctx, tx, database.WithCondition(repo.UniqueCondition(pid, userID)))
+	require.ErrorIs(t, err, new(database.NoRowFoundError))
+
+	require.NoError(t, repo.Create(ctx, tx, &domain.CreateUserTOTP{
+		ProjectID: pid,
+		UserID:    userID,
+		Secret:    secret,
+	}))
+	got2, err := repo.Get(ctx, tx, database.WithCondition(repo.UniqueCondition(pid, userID)))
+	require.NoError(t, err)
+	require.Positive(t, got2.ID)
+	require.NoError(t, repo.Delete(ctx, tx, repo.UniqueCondition(pid, userID)))
+	_, err = repo.Get(ctx, tx, database.WithCondition(repo.UniqueCondition(pid, userID)))
 	require.ErrorIs(t, err, new(database.NoRowFoundError))
 }
 
@@ -127,12 +163,29 @@ func TestUserRecoveryCodesRepository_CRUD(t *testing.T) {
 		RecoveryCodes: codes,
 	}))
 
-	got, err := repo.Get(ctx, tx, database.WithCondition(repo.PrimaryKeyCondition(pid, userID)))
+	got, err := repo.Get(ctx, tx, database.WithCondition(repo.UniqueCondition(pid, userID)))
 	require.NoError(t, err)
+	require.Positive(t, got.ID)
 	require.Equal(t, codes, got.RecoveryCodes)
 
-	require.NoError(t, repo.Delete(ctx, tx, repo.PrimaryKeyCondition(pid, userID)))
-	_, err = repo.Get(ctx, tx, database.WithCondition(repo.PrimaryKeyCondition(pid, userID)))
+	byID, err := repo.Get(ctx, tx, database.WithCondition(repo.PrimaryKeyCondition(got.ID)))
+	require.NoError(t, err)
+	require.Equal(t, got.ID, byID.ID)
+
+	require.NoError(t, repo.Delete(ctx, tx, repo.PrimaryKeyCondition(got.ID)))
+	_, err = repo.Get(ctx, tx, database.WithCondition(repo.UniqueCondition(pid, userID)))
+	require.ErrorIs(t, err, new(database.NoRowFoundError))
+
+	require.NoError(t, repo.Create(ctx, tx, &domain.CreateRecoveryCodes{
+		ProjectID:     pid,
+		UserID:        userID,
+		RecoveryCodes: codes,
+	}))
+	got2, err := repo.Get(ctx, tx, database.WithCondition(repo.UniqueCondition(pid, userID)))
+	require.NoError(t, err)
+	require.Positive(t, got2.ID)
+	require.NoError(t, repo.Delete(ctx, tx, repo.UniqueCondition(pid, userID)))
+	_, err = repo.Get(ctx, tx, database.WithCondition(repo.UniqueCondition(pid, userID)))
 	require.ErrorIs(t, err, new(database.NoRowFoundError))
 }
 
@@ -168,8 +221,9 @@ func TestUserPasskeyRepository_CRUD(t *testing.T) {
 		VerifiedAt:      &now,
 	}))
 
-	got, err := repo.Get(ctx, tx, database.WithCondition(repo.PrimaryKeyCondition(pid, userID, credStr)))
+	got, err := repo.Get(ctx, tx, database.WithCondition(repo.UniqueCondition(pid, userID, credStr)))
 	require.NoError(t, err)
+	require.Positive(t, got.ID)
 	require.Equal(t, credStr, got.CredentialID)
 	require.Equal(t, []byte{1, 2, 3}, got.PublicKey)
 	require.Equal(t, int64(3), got.SignCount)
@@ -177,11 +231,36 @@ func TestUserPasskeyRepository_CRUD(t *testing.T) {
 	require.NotNil(t, got.VerifiedAt)
 	require.True(t, got.VerifiedAt.Equal(now))
 
+	byID, err := repo.Get(ctx, tx, database.WithCondition(repo.PrimaryKeyCondition(got.ID)))
+	require.NoError(t, err)
+	require.Equal(t, got.ID, byID.ID)
+
 	list, err := repo.List(ctx, tx, database.WithCondition(repo.UserIDCondition(userID)))
 	require.NoError(t, err)
 	require.Len(t, list, 1)
 
-	require.NoError(t, repo.Delete(ctx, tx, repo.PrimaryKeyCondition(pid, userID, credStr)))
-	_, err = repo.Get(ctx, tx, database.WithCondition(repo.PrimaryKeyCondition(pid, userID, credStr)))
+	require.NoError(t, repo.Delete(ctx, tx, repo.PrimaryKeyCondition(got.ID)))
+	_, err = repo.Get(ctx, tx, database.WithCondition(repo.UniqueCondition(pid, userID, credStr)))
+	require.ErrorIs(t, err, new(database.NoRowFoundError))
+
+	require.NoError(t, repo.Create(ctx, tx, &domain.CreateUserPasskey{
+		ProjectID:       pid,
+		UserID:          userID,
+		CredentialID:    credStr,
+		PublicKey:       []byte{1, 2, 3},
+		AAGUID:          []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+		AttestationType: gu.Ptr("packed"),
+		Transports:      []string{"internal"},
+		SignCount:       3,
+		BackupEligible:  true,
+		BackupState:     false,
+		Name:            "primary",
+		VerifiedAt:      &now,
+	}))
+	got2, err := repo.Get(ctx, tx, database.WithCondition(repo.UniqueCondition(pid, userID, credStr)))
+	require.NoError(t, err)
+	require.Positive(t, got2.ID)
+	require.NoError(t, repo.Delete(ctx, tx, repo.UniqueCondition(pid, userID, credStr)))
+	_, err = repo.Get(ctx, tx, database.WithCondition(repo.UniqueCondition(pid, userID, credStr)))
 	require.ErrorIs(t, err, new(database.NoRowFoundError))
 }

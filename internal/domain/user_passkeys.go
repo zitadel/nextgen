@@ -8,6 +8,7 @@ import (
 )
 
 type UserPasskey struct {
+	ID              int64
 	ProjectID       string
 	UserID          string
 	CredentialID    string
@@ -56,7 +57,8 @@ type userPasskeyConditions interface {
 	ProjectIDCondition(projectID string) database.Condition
 	UserIDCondition(userID string) database.Condition
 	CredentialIDCondition(credentialID string) database.Condition
-	PrimaryKeyCondition(projectID, userID, credentialID string) database.Condition
+	PrimaryKeyCondition(id int64) database.Condition
+	UniqueCondition(projectID, userID, credentialID string) database.Condition
 }
 
 type userPasskeyChanges interface {

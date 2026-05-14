@@ -11,6 +11,7 @@ import (
 const userPasswordTable = "zitadel_nextgen.user_passwords"
 
 var (
+	colPasswordID             = database.NewColumn(userPasswordTable, "id")
 	colPasswordProjectID      = database.NewColumn(userPasswordTable, "project_id")
 	colPasswordUserID         = database.NewColumn(userPasswordTable, "user_id")
 	colPasswordEncodedHash    = database.NewColumn(userPasswordTable, "encoded_hash")
@@ -32,6 +33,10 @@ func NewUserPasswordRepository() *UserPasswordRepository {
 func (r *UserPasswordRepository) qualifiedTableName() string { return userPasswordTable }
 
 func (r *UserPasswordRepository) PrimaryKeyColumns() []database.Column {
+	return []database.Column{colPasswordID}
+}
+
+func (r *UserPasswordRepository) UniqueKeyColumns() []database.Column {
 	return []database.Column{colPasswordProjectID, colPasswordUserID}
 }
 
@@ -45,7 +50,11 @@ func (r *UserPasswordRepository) UserIDCondition(uid string) database.Condition 
 	return database.NewTextCondition(colPasswordUserID, database.TextOperationEqual, uid)
 }
 
-func (r *UserPasswordRepository) PrimaryKeyCondition(pid, uid string) database.Condition {
+func (r *UserPasswordRepository) PrimaryKeyCondition(id int64) database.Condition {
+	return database.NewNumberCondition(colPasswordID, database.NumberOperationEqual, id)
+}
+
+func (r *UserPasswordRepository) UniqueCondition(pid, uid string) database.Condition {
 	return database.And(r.ProjectIDCondition(pid), r.UserIDCondition(uid))
 }
 
@@ -83,6 +92,7 @@ func (r *UserPasswordRepository) ResetFailedAttempts() database.Change {
 func (r *UserPasswordRepository) Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*domain.UserPassword, error) {
 	builder := database.NewStatementBuilder("SELECT ")
 	database.Columns{
+		colPasswordID,
 		colPasswordProjectID,
 		colPasswordUserID,
 		colPasswordEncodedHash,
@@ -111,6 +121,7 @@ func (r *UserPasswordRepository) Get(ctx context.Context, client database.QueryE
 func (r *UserPasswordRepository) List(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) ([]*domain.UserPassword, error) {
 	builder := database.NewStatementBuilder("SELECT ")
 	database.Columns{
+		colPasswordID,
 		colPasswordProjectID,
 		colPasswordUserID,
 		colPasswordEncodedHash,
@@ -145,6 +156,7 @@ func (r *UserPasswordRepository) Create(ctx context.Context, client database.Que
 	builder.WriteString(r.qualifiedTableName())
 	builder.WriteString(" (")
 	database.Columns{
+		colPasswordID,
 		colPasswordProjectID,
 		colPasswordUserID,
 		colPasswordEncodedHash,
@@ -164,6 +176,7 @@ func (r *UserPasswordRepository) Delete(ctx context.Context, client database.Que
 }
 
 type userPasswordRow struct {
+	ID                  int64                    `db:"id"`
 	ProjectID           string                   `db:"project_id"`
 	UserID              string                   `db:"user_id"`
 	EncodedHash         string                   `db:"encoded_hash"`
@@ -178,6 +191,7 @@ type userPasswordRow struct {
 
 func (row *userPasswordRow) toDomain() *domain.UserPassword {
 	up := &domain.UserPassword{
+		ID:             row.ID,
 		ProjectID:      row.ProjectID,
 		UserID:         row.UserID,
 		EncodedHash:    row.EncodedHash,

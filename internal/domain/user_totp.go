@@ -8,6 +8,7 @@ import (
 )
 
 type UserTOTP struct {
+	ID                  int64
 	ProjectID           string
 	UserID              string
 	Secret              []byte
@@ -40,7 +41,8 @@ type UserTOTPRepository interface {
 type userTOTPConditions interface {
 	ProjectIDCondition(projectID string) database.Condition
 	UserIDCondition(userID string) database.Condition
-	PrimaryKeyCondition(projectID, userID string) database.Condition
+	PrimaryKeyCondition(id int64) database.Condition
+	UniqueCondition(projectID, userID string) database.Condition
 }
 
 type userTOTPChanges interface {
