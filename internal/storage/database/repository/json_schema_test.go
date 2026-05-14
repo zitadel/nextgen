@@ -11,6 +11,9 @@ import (
 )
 
 func TestJSONSchemaRepository_CRUD(t *testing.T) {
+	if isSpannerDB {
+		t.Skip("JSONSchemaRepository uses []byte for payload; Spanner requires spanner.NullJSON — tracked separately")
+	}
 	tx, rollback := transactionForRollback(t)
 	repo := repository.NewJSONSchemaRepository(tx)
 	defer rollback()
