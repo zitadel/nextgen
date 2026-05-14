@@ -37,6 +37,8 @@ func NewJSONSchemaRepository(client database.QueryExecutor) *JSONSchemaRepositor
 func newJSONSchemaRepository(table string, now database.Instruction, encodePayload func([]byte) any) *JSONSchemaRepository {
 	return &JSONSchemaRepository{
 		table:           table,
+		now:             now,
+		encodePayload:   encodePayload,
 		columnProjectID: database.NewColumn(table, "project_id"),
 		columnURL:       database.NewColumn(table, "url"),
 		columnCreatedAt: database.NewColumn(table, "created_at"),

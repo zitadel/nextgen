@@ -156,7 +156,6 @@ func (r *UserPasswordRepository) Create(ctx context.Context, client database.Que
 	builder.WriteString(r.qualifiedTableName())
 	builder.WriteString(" (")
 	database.Columns{
-		colPasswordID,
 		colPasswordProjectID,
 		colPasswordUserID,
 		colPasswordEncodedHash,
