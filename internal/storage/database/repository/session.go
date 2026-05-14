@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
+	"slices"
 	"strings"
 	"time"
 
@@ -65,43 +67,32 @@ const sessionGetByTokenStmt = sessionGetSelect +
 	` WHERE project_id = $1 AND token = $2`
 
 // SetExpiresAt implements [domain.SessionRepository].
-func (s *Session) SetExpiresAt(expiresAt time.Time) database.Change {
+func (s Session) SetExpiresAt(expiresAt time.Time) database.Change {
 	return database.NewChange(sessionColExpiresAt, expiresAt)
 }
 
 // SetFactors implements [domain.SessionRepository].
-func (s *Session) SetFactors(factors ...*domain.SessionFactor) database.Change {
-	payload := make([]sessionFactorJSON, 0, len(factors))
-	for _, factor := range factors {
-		if factor == nil {
+func (s Session) SetFactors(factors ...*domain.SessionFactor) database.Change {
+	var change database.PatchJSONB
+	for i, factor := range factors {
+		if i == 0 {
+			change = database.SetJSONValue(sessionColFactors, []string{factor.Type.String()}, factor.Factor).(database.PatchJSONB)
 			continue
 		}
-		payload = append(payload, sessionFactorJSON{
-			Type:       factor.Type,
-			VerifiedAt: factor.VerifiedAt,
-			Factor:     factor.Factor,
-		})
+		change = database.SetJSONValue(change, []string{factor.Type.String()}, factor.Factor).(database.PatchJSONB)
 	}
-
-	raw, err := json.Marshal(payload)
-	if err != nil {
-		return nil
-	}
-
-	return database.NewChangeToStatement(sessionColFactors, func(builder *database.StatementBuilder) {
-		builder.WriteArg(raw)
-		builder.WriteString("::JSONB")
-	})
+	return change
 }
 
 // SetUserAgent implements [domain.SessionRepository].
-func (s *Session) SetUserAgent(userAgent map[string]any) database.Change {
+func (s Session) SetUserAgent(userAgent map[string]any) database.Change {
 	if userAgent == nil {
 		return database.NewChangeToNull(sessionColUserAgent)
 	}
 
 	raw, err := json.Marshal(userAgent)
 	if err != nil {
+		log.Println("failed to marshal user agent to change")
 		return nil
 	}
 
@@ -112,7 +103,7 @@ func (s *Session) SetUserAgent(userAgent map[string]any) database.Change {
 }
 
 // SetUserID implements [domain.SessionRepository].
-func (s *Session) SetUserID(userID string) database.Change {
+func (s Session) SetUserID(userID string) database.Change {
 	return database.NewChange(sessionColUserID, userID)
 }
 
@@ -122,7 +113,7 @@ const sessionCreateStmt = `INSERT INTO zitadel_nextgen.sessions` +
 	` RETURNING created_at, updated_at`
 
 // Create implements [domain.SessionRepository].
-func (s *Session) Create(ctx context.Context, client database.QueryExecutor, session *domain.Session) error {
+func (s Session) Create(ctx context.Context, client database.QueryExecutor, session *domain.Session) error {
 	if session == nil {
 		return fmt.Errorf("failed to create session: session is required")
 	}
@@ -168,7 +159,7 @@ func (s *Session) Create(ctx context.Context, client database.QueryExecutor, ses
 }
 
 // Delete implements [domain.SessionRepository].
-func (s *Session) Delete(ctx context.Context, client database.QueryExecutor, projectID string, sessionID string) error {
+func (s Session) Delete(ctx context.Context, client database.QueryExecutor, projectID string, sessionID string) error {
 	condition := database.And(
 		database.NewTextCondition(sessionColProjectID, database.TextOperationEqual, projectID),
 		database.NewTextCondition(sessionColID, database.TextOperationEqual, sessionID),
@@ -182,17 +173,17 @@ func (s *Session) Delete(ctx context.Context, client database.QueryExecutor, pro
 }
 
 // GetByID implements [domain.SessionRepository].
-func (s *Session) GetByID(ctx context.Context, client database.QueryExecutor, projectID string, sessionID string) (*domain.Session, error) {
+func (s Session) GetByID(ctx context.Context, client database.QueryExecutor, projectID string, sessionID string) (*domain.Session, error) {
 	return s.get(ctx, client, sessionGetByIDStmt, projectID, sessionID)
 }
 
 // GetByToken implements [domain.SessionRepository].
-func (s *Session) GetByToken(ctx context.Context, client database.QueryExecutor, projectID string, token string) (*domain.Session, error) {
+func (s Session) GetByToken(ctx context.Context, client database.QueryExecutor, projectID string, token string) (*domain.Session, error) {
 	return s.get(ctx, client, sessionGetByTokenStmt, projectID, token)
 }
 
 // Update implements [domain.SessionRepository].
-func (s *Session) Update(ctx context.Context, client database.QueryExecutor, projectID string, sessionID string, token string, changes ...database.Change) (*domain.Session, error) {
+func (s Session) Update(ctx context.Context, client database.QueryExecutor, projectID string, sessionID string, token string, changes ...database.Change) (*domain.Session, error) {
 	if token == "" {
 		return nil, fmt.Errorf("failed to update session: token is required")
 	}
@@ -236,7 +227,7 @@ func (s *Session) Update(ctx context.Context, client database.QueryExecutor, pro
 	return updated, nil
 }
 
-func (s *Session) get(ctx context.Context, client database.QueryExecutor, query, projectID, matcher string) (*domain.Session, error) {
+func (s Session) get(ctx context.Context, client database.QueryExecutor, query, projectID, matcher string) (*domain.Session, error) {
 	rows, err := client.Query(ctx, query, projectID, matcher)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query session: %w", err)
@@ -298,14 +289,7 @@ func validateSessionChanges(changes []database.Change) error {
 			return fmt.Errorf("change must not be nil")
 		}
 
-		valid := false
-		for _, col := range sessionAllowedUpdateColumns {
-			if change.IsOnColumn(col) {
-				valid = true
-				break
-			}
-		}
-
+		valid := slices.ContainsFunc(sessionAllowedUpdateColumns, change.IsOnColumn)
 		if !valid {
 			return fmt.Errorf("unsupported session change")
 		}
@@ -355,6 +339,145 @@ func nullableExpiresAt(value time.Time) any {
 		return nil
 	}
 	return value
+}
+
+// ProjectIDColumn implements [domain.SessionColumns].
+func (Session) ProjectIDColumn() database.Column {
+	return sessionColProjectID
+}
+
+// IDColumn implements [domain.SessionColumns].
+func (Session) IDColumn() database.Column {
+	return sessionColID
+}
+
+// CreatedAtColumn implements [domain.SessionColumns].
+func (Session) CreatedAtColumn() database.Column {
+	return sessionColCreatedAt
+}
+
+// ExpiresAtColumn implements [domain.SessionColumns].
+func (Session) ExpiresAtColumn() database.Column {
+	return sessionColExpiresAt
+}
+
+// TokenColumn implements [domain.SessionColumns].
+func (Session) TokenColumn() database.Column {
+	return sessionColToken
+}
+
+// UserIDColumn implements [domain.SessionColumns].
+func (Session) UserIDColumn() database.Column {
+	return sessionColUserID
+}
+
+// UserAgentColumn implements [domain.SessionColumns].
+func (Session) UserAgentColumn() database.Column {
+	return sessionColUserAgent
+}
+
+// FactorsColumn implements [domain.SessionColumns].
+func (Session) FactorsColumn() database.Column {
+	return sessionColFactors
+}
+
+// ProjectIDCondition implements [domain.SessionConditions].
+func (Session) ProjectIDCondition(projectID string) database.Condition {
+	return database.NewTextCondition(sessionColProjectID, database.TextOperationEqual, projectID)
+}
+
+// IDCondition implements [domain.SessionConditions].
+func (Session) IDCondition(sessionID string) database.Condition {
+	return database.NewTextCondition(sessionColID, database.TextOperationEqual, sessionID)
+}
+
+// UserIDCondition implements [domain.SessionConditions].
+func (Session) UserIDCondition(userID string) database.Condition {
+	return database.NewTextCondition(sessionColUserID, database.TextOperationEqual, userID)
+}
+
+// IsExpiredCondition implements [domain.SessionConditions].
+func (Session) IsExpiredCondition() database.Condition {
+	return database.And(
+		database.NewNumberCondition(sessionColExpiresAt, database.NumberOperationLessThan, database.NowInstruction),
+		database.IsNotNull(sessionColExpiresAt),
+	)
+}
+
+// List implements [domain.SessionRepository].
+func (s Session) List(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) ([]*domain.Session, error) {
+	builder := database.NewStatementBuilder(sessionGetSelect)
+
+	queryOpts := &database.QueryOpts{}
+	for _, opt := range opts {
+		opt(queryOpts)
+	}
+	queryOpts.Write(builder)
+
+	rows, err := client.Query(ctx, builder.String(), builder.Args()...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query sessions: %w", err)
+	}
+	defer rows.Close()
+
+	sessions := make([]*domain.Session, 0)
+	sessionMap := make(map[string]*domain.Session)
+
+	for rows.Next() {
+		var (
+			expiresAt   database.Null[time.Time]
+			userID      database.Null[string]
+			userAgent   []byte
+			factorsJSON []byte
+		)
+
+		stored := new(domain.Session)
+		err = rows.Scan(
+			&stored.ProjectID,
+			&stored.ID,
+			&stored.CreatedAt,
+			&stored.UpdatedAt,
+			&expiresAt,
+			&stored.Token,
+			&userID,
+			&userAgent,
+			&factorsJSON,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan session: %w", err)
+		}
+
+		sessionKey := stored.ProjectID + ":" + stored.ID
+		if _, exists := sessionMap[sessionKey]; !exists {
+			sessionMap[sessionKey] = stored
+			sessions = append(sessions, stored)
+		} else {
+			stored = sessionMap[sessionKey]
+		}
+
+		if expiresAt.Valid {
+			stored.ExpiresAt = expiresAt.V
+		}
+		if userID.Valid {
+			stored.UserID = &userID.V
+		}
+		if len(userAgent) > 0 && string(userAgent) != "null" {
+			if err := json.Unmarshal(userAgent, &stored.UserAgent); err != nil {
+				return nil, fmt.Errorf("failed to decode session user agent: %w", err)
+			}
+		}
+
+		stored.Factors, err = unmarshalSessionFactors(factorsJSON)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode session factors: %w", err)
+		}
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to read session rows: %w", err)
+	}
+
+	return sessions, nil
 }
 
 var _ domain.SessionRepository = (*Session)(nil)

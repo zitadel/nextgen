@@ -73,8 +73,7 @@ func TestChangeWrite(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			var builder StatementBuilder
-			err := test.change.Write(&builder)
-			require.NoError(t, err)
+			test.change.Write(&builder)
 			assert.Equal(t, test.want.stmt, builder.String())
 			require.Len(t, builder.Args(), len(test.want.args))
 			for i, arg := range test.want.args {
@@ -120,11 +119,11 @@ func TestChangeToStatement(t *testing.T) {
 			name: "change to statement with existing builder args",
 			prefillBuilder: func(builder *StatementBuilder) {
 				builder.WriteString("UPDATE table SET ")
-				assert.NoError(t, NewChanges(
+				NewChanges(
 					NewChange(NewColumn("table", "field1"), "asdf"),
 					NewChangeToNull(NewColumn("table", "field2")),
 					NewChangeToColumn(NewColumn("table", "field3"), NewColumn("table", "field4")),
-				).Write(builder))
+				).Write(builder)
 				builder.WriteString(", ")
 			},
 			change: NewChangeToStatement(NewColumn("table", "column"), func(builder *StatementBuilder) {
@@ -144,7 +143,7 @@ func TestChangeToStatement(t *testing.T) {
 			if test.prefillBuilder != nil {
 				test.prefillBuilder(&builder)
 			}
-			assert.NoError(t, test.change.Write(&builder))
+			test.change.Write(&builder)
 			assert.Equal(t, test.want.stmt, builder.String())
 			assert.Equal(t, builder.Args(), test.want.args)
 		})
@@ -259,7 +258,7 @@ func TestCTEChange(t *testing.T) {
 			if test.afterCTE != nil {
 				test.afterCTE(&builder)
 			}
-			assert.NoError(t, test.change.Write(&builder))
+			test.change.Write(&builder)
 
 			assert.Equal(t, test.want.stmt, builder.String())
 			assert.Equal(t, builder.Args(), test.want.args)

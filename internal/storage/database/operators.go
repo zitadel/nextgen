@@ -119,7 +119,7 @@ func writeTextOperation[T Text](builder *StatementBuilder, col Column, op TextOp
 }
 
 type Number interface {
-	constraints.Integer | constraints.Float | constraints.Complex | time.Time | time.Duration
+	constraints.Integer | constraints.Float | constraints.Complex | time.Time | time.Duration | Instruction
 }
 
 // NumberOperation are operations that can be performed on number values.

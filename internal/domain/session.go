@@ -68,42 +68,33 @@ const (
 )
 
 type SessionRepository interface {
-	// Create persists a new session (including all the fields which are set in the struct). The storage must set the read only fields (CreatedAt, UpdatedAt) and return an error if any of the required fields are missing.
-	// The token must be unique across all sessions and is used for authentication, so it should be generated securely (e.g. using a cryptographically secure random generator) and should not be guessable.
-	Create(ctx context.Context, client database.QueryExecutor, session *Session) error
+	// Create persists a new session (including all the fields which are set in the struct).
+	//
+	// The token must be unique across all sessions and is used for authentication,
+	// so it should be generated securely (e.g. using a cryptographically secure random generator) and should not be guessable.
+	//
+	// The storage must set the read only fields (CreatedAt, UpdatedAt) and return an error if any of the required fields are missing.
+	Create(ctx context.Context, session *Session) error
 
 	// GetByID retrieves a session by its project and session ID.
-	GetByID(ctx context.Context, client database.QueryExecutor, projectID, sessionID string) (*Session, error)
+	GetByID(ctx context.Context, projectID, sessionID string) (*Session, error)
 	// GetByToken retrieves a session by its project and token.
-	GetByToken(ctx context.Context, client database.QueryExecutor, projectID, token string) (*Session, error)
+	GetByToken(ctx context.Context, projectID, token string) (*Session, error)
 
 	// List returns a list of sessions based on the given condition.
-	List(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) ([]*Session, error)
+	List(ctx context.Context, opts ...database.QueryOption) ([]*Session, error)
 
-	// Update applies the given changes to the session and returns the updated session. The token is rotated on every update.
-	// The storage must update the [Session.UpdatedAt] field and return an error if the session does not exist or if any of the required fields are missing after applying the changes.
-	Update(ctx context.Context, client database.QueryExecutor, projectID, sessionID, token string, changes ...database.Change) (*Session, error)
+	// Merges an auth attempt into a session by its project and session ID. The auth attempt is identified by its handoff token.
+	// Merges the succeeded checks of the auth attempt into the session as factors.
+	// The checks are merged based on the authenticator identifier. The latest succeeded (not handed off at) check wins.
+	MergeAttempt(ctx context.Context, projectID, sessionID, handoffToken string) (*Session, error)
 
 	// Deletes a session by its project and session ID.
 	// It does NOT return an error if the session does not exist.
-	Delete(ctx context.Context, client database.QueryExecutor, projectID, sessionID string) error
+	Delete(ctx context.Context, projectID, sessionID string) error
 
-	SessionChanges
 	SessionConditions
 	SessionColumns
-}
-
-type SessionChanges interface {
-	// Sets the [Session.UserID] field in the database.
-	SetUserID(userID string) database.Change
-	// Sets the [Session.UserAgent] field in the database.
-	// The operation overwrites the whole user agent, so the caller must ensure to include all relevant information (e.g. device and browser details) in the map.
-	SetUserAgent(userAgent map[string]any) database.Change
-	// Adds or updates a session factor in the [Session.Factors] array in the database.
-	// The factor is identified by its type, so adding a factor with an existing type will overwrite the previous one.
-	SetFactors(factors ...*SessionFactor) database.Change
-	// Sets the [Session.ExpiresAt] field in the database.
-	SetExpiresAt(expiresAt time.Time) database.Change
 }
 
 // Conditions to list sessions, used for filtering in [SessionRepository.List].
@@ -112,20 +103,17 @@ type SessionConditions interface {
 	IDCondition(sessionID string) database.Condition
 	IsExpiredCondition() database.Condition
 	UserIDCondition(userID string) database.Condition
-	StateCondition(state SessionState) database.Condition
 }
 
 // Columns for the session table, used for ordering.
 type SessionColumns interface {
-	ProjectIDColumn() string
-	IDColumn() string
-	CreatedAtColumn() string
-	UpdatedAtColumn() string
-	ExpiresAtColumn() string
-	TokenColumn() string
-	UserIDColumn() string
-	UserAgentColumn() string
-	StateColumn() string
-	AssuranceLevelsColumn() string
-	FactorsColumn() string
+	ProjectIDColumn() database.Column
+	IDColumn() database.Column
+	CreatedAtColumn() database.Column
+	UpdatedAtColumn() database.Column
+	ExpiresAtColumn() database.Column
+	TokenColumn() database.Column
+	UserIDColumn() database.Column
+	UserAgentColumn() database.Column
+	FactorsColumn() database.Column
 }
