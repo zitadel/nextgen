@@ -3,6 +3,7 @@ post:
   summary: Create project
   tags:
     - Project
+  security: []
   requestBody:
     required: true
     content:
