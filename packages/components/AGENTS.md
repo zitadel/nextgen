@@ -85,20 +85,6 @@ Always cover form-associated behaviour, focus delegation, and Enter-to-submit
 in the browser project. Anything markup-only (aria attributes, classes, slot
 projection) belongs in the unit project for speed.
 
-## Visualizer
-
-`docs/design/flowengine/visualizer.html` is served by the dev server via the
-`zitadel:serve-visualizer` plugin in `vite.config.mts`. The plugin substitutes
-`__COMPONENTS_BUNDLE__` in the HTML with a `/@fs/<absolute>/src/index.ts` URL
-so the "Real components" tab imports source TS through Vite's pipeline (no
-build step). When changing the visualizer:
-
-- keep the placeholder `__COMPONENTS_BUNDLE__` literal in place,
-- do not re-introduce the dist/ bundle path,
-- if you need a new dependency at runtime, add it to the import map in the
-  HTML head and pin the version to the workspace catalog
-  (`pnpm-workspace.yaml`).
-
 ## Build
 
 `tsdown.config.ts` produces ESM + `.d.mts` and externalises `lit`, `liquidjs`,

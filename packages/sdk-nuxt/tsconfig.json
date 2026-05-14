@@ -12,5 +12,10 @@
     "src/module.ts",
     "src/runtime/plugin.ts",
     "src/runtime/composables/useAuth.ts"
+  ],
+  "references": [
+    {
+      "path": "../components"
+    }
   ]
 }

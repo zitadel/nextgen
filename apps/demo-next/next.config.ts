@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  transpilePackages: ["@nextgen/ui-lit"],
+  transpilePackages: ["@zitadel-nextgen/components"],
 };
 
 export default nextConfig;
