@@ -1,7 +1,6 @@
 package repository_test
 
 import (
-	"encoding/base64"
 	"testing"
 	"time"
 
@@ -152,8 +151,7 @@ func TestUserPasskeyRepository_CRUD(t *testing.T) {
 
 	insertProjectTeamSchemaUser(t, tx, pid, tid, schemaURL, userID)
 
-	rawCred := []byte{9, 8, 7, 6, 5}
-	credStr := base64.RawURLEncoding.EncodeToString(rawCred)
+	credStr := "cred_pk_test_01"
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	require.NoError(t, repo.Create(ctx, tx, &domain.CreateUserPasskey{
 		ProjectID:       pid,

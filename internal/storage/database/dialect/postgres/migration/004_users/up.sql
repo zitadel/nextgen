@@ -145,7 +145,7 @@ CREATE TABLE zitadel_nextgen.user_recovery_codes (
 CREATE TABLE zitadel_nextgen.user_passkeys (
     project_id TEXT COLLATE "C" NOT NULL
     , user_id TEXT COLLATE "C" NOT NULL
-    , credential_id BYTEA NOT NULL
+    , credential_id TEXT COLLATE "C" NOT NULL CHECK (credential_id <> '')
     , public_key BYTEA NOT NULL
     , aaguid BYTEA
     , attestation_type TEXT

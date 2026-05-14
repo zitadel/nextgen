@@ -2,8 +2,6 @@ package repository
 
 import (
 	"context"
-	"encoding/base64"
-	"fmt"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
@@ -53,11 +51,7 @@ func (r *UserPasskeyRepository) UserIDCondition(uid string) database.Condition {
 }
 
 func (r *UserPasskeyRepository) CredentialIDCondition(cid string) database.Condition {
-	cred, err := base64.RawURLEncoding.DecodeString(cid)
-	if err != nil {
-		return malformedPasskeyCredCondition{}
-	}
-	return database.NewBytesCondition[[]byte](colPasskeyCredentialID, database.BytesOperationEqual, cred)
+	return database.NewTextCondition(colPasskeyCredentialID, database.TextOperationEqual, cid)
 }
 
 func (r *UserPasskeyRepository) PrimaryKeyCondition(pid, uid, cid string) database.Condition {
@@ -149,19 +143,15 @@ func (r *UserPasskeyRepository) List(ctx context.Context, client database.QueryE
 }
 
 func (r *UserPasskeyRepository) Create(ctx context.Context, client database.QueryExecutor, p *domain.CreateUserPasskey) error {
-	cred, err := base64.RawURLEncoding.DecodeString(p.CredentialID)
-	if err != nil {
-		return fmt.Errorf("credential_id: %w", err)
-	}
 	builder := database.NewStatementBuilder("INSERT INTO ")
 	builder.WriteString(r.qualifiedTableName())
 	builder.WriteString(` (project_id, user_id, credential_id, public_key, aaguid, attestation_type, transports, sign_count,
 		backup_eligible, backup_state, name, verified_at) VALUES (`)
 	builder.WriteArgs(
-		p.ProjectID, p.UserID, cred, p.PublicKey, nullBytes(p.AAGUID), p.AttestationType,
+		p.ProjectID, p.UserID, p.CredentialID, p.PublicKey, nullBytes(p.AAGUID), p.AttestationType,
 		p.Transports, p.SignCount, p.BackupEligible, p.BackupState, p.Name, p.VerifiedAt)
 	builder.WriteString(")")
-	_, err = client.Exec(ctx, builder.String(), builder.Args()...)
+	_, err := client.Exec(ctx, builder.String(), builder.Args()...)
 	return err
 }
 
@@ -170,24 +160,10 @@ func (r *UserPasskeyRepository) Delete(ctx context.Context, client database.Quer
 	return err
 }
 
-type malformedPasskeyCredCondition struct{}
-
-func (malformedPasskeyCredCondition) Write(b *database.StatementBuilder) {
-	b.WriteString("FALSE")
-}
-
-func (malformedPasskeyCredCondition) Matches(any) bool { return true }
-
-func (malformedPasskeyCredCondition) String() string { return "malformedPasskeyCredCondition" }
-
-func (malformedPasskeyCredCondition) IsRestrictingColumn(database.Column) bool { return false }
-
-var _ database.Condition = malformedPasskeyCredCondition{}
-
 type userPasskeyRow struct {
 	ProjectID       string                   `db:"project_id"`
 	UserID          string                   `db:"user_id"`
-	CredentialIDRaw []byte                   `db:"credential_id"`
+	CredentialID    string                   `db:"credential_id"`
 	PublicKey       []byte                   `db:"public_key"`
 	AAGUID          []byte                   `db:"aaguid"`
 	AttestationType database.Null[string]    `db:"attestation_type"`
@@ -206,7 +182,7 @@ func (row *userPasskeyRow) toDomain() *domain.UserPasskey {
 	p := &domain.UserPasskey{
 		ProjectID:      row.ProjectID,
 		UserID:         row.UserID,
-		CredentialID:   base64.RawURLEncoding.EncodeToString(row.CredentialIDRaw),
+		CredentialID:   row.CredentialID,
 		PublicKey:      append([]byte(nil), row.PublicKey...),
 		AAGUID:         append([]byte(nil), row.AAGUID...),
 		Transports:     append([]string(nil), row.Transports...),
