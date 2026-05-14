@@ -1,7 +1,7 @@
 -- +goose NO TRANSACTION
 -- +goose Up
 -- +goose StatementBegin
-CREATE TABLE projects (
+CREATE TABLE IF NOT EXISTS projects (
     id              STRING(MAX) NOT NULL,
     created_at      TIMESTAMP   NOT NULL DEFAULT (CURRENT_TIMESTAMP()),
     updated_at      TIMESTAMP   NOT NULL DEFAULT (CURRENT_TIMESTAMP()),
