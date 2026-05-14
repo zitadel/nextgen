@@ -6,7 +6,7 @@ properties:
   team_id:
     type: string
     description: Scopes flow resolution to a team.
-  schema_id:
+  user_schema_id:
     type: string
     description: Scopes to a specific user type.
   app_id:
