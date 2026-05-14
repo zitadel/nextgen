@@ -13,6 +13,11 @@ export default defineConfig(() => ({
   // folder so the home-route MSW bootstrap finds it at /mockServiceWorker.js
   // without copying the file into this app.
   publicDir: apiMockPublicDir,
+  // Resolve workspace `@zitadel-nextgen/*` packages straight from `.ts`
+  // source for hot dev iteration. Production builds (CI / `nuxt build`
+  // and friends) do not set this condition and pick up the pre-built
+  // `dist/*.mjs` via the default `import` condition instead.
+  resolve: { conditions: ["@zitadel-nextgen/source"] },
   plugins: [
     tailwindcss(),
     devtools(),
