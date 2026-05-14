@@ -5,8 +5,8 @@ CREATE TABLE projects (
     id              STRING(MAX) NOT NULL,
     created_at      TIMESTAMP   NOT NULL DEFAULT (CURRENT_TIMESTAMP()),
     updated_at      TIMESTAMP   NOT NULL DEFAULT (CURRENT_TIMESTAMP()),
-    project_secret  STRING(MAX) NOT NULL DEFAULT (''),
-    preview_secret  STRING(MAX) NOT NULL DEFAULT (''),
+    project_secret  STRING(MAX) NOT NULL DEFAULT ('') CHECK (project_secret != ''),
+    preview_secret  STRING(MAX) NOT NULL DEFAULT ('') CHECK (preview_secret != ''),
     preview_origins STRING(MAX) NOT NULL DEFAULT ('[]'),
 ) PRIMARY KEY (id)
 -- +goose StatementEnd
