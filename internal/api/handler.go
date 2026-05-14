@@ -12,11 +12,12 @@ type Handler struct {
 	// responses for all endpoints, so only implemented methods need to be defined.
 	api.UnimplementedHandler
 
-	flowService service.FlowService
+	flowService    service.FlowService
+	projectService service.ProjectService
 }
 
-func NewHandler(flowService service.FlowService) *Handler {
-	return &Handler{flowService: flowService}
+func NewHandler(flowService service.FlowService, projectService service.ProjectService) *Handler {
+	return &Handler{flowService: flowService, projectService: projectService}
 }
 
 func (h Handler) NewError(ctx context.Context, err error) *api.ErrorDetailsStatusCode {
