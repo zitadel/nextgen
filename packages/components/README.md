@@ -112,6 +112,20 @@ fixtures:
   [`dev/main.ts`](dev/main.ts) for a working setup. `applyBranding(...)`
   injects a tenant branding overlay merged into every response.
 
+### Two preview surfaces
+
+Two places run the components against `@zitadel-nextgen/api-mock`. They
+have different jobs — keep both:
+
+| Surface | Run | Audience | What it gives you |
+| --- | --- | --- | --- |
+| **`packages/components/dev/`** | `pnpm --filter @zitadel-nextgen/components dev` | component author | Fast Vite cold-start, no React/Tailwind layer, branding-preset switcher, event log, restart-flow button. Source TS served directly from `src/`. |
+| **`apps/console/`** | `pnpm --filter @zitadel-nextgen/console dev` | consumer/integration | Proves the components work inside React via `@lit/react`, inside TanStack Router, inside the Tailwind-styled console shell. MSW is gated on `import.meta.env.DEV`. |
+
+The dev playground iterates on the components themselves; the console
+proves they integrate. When tweaking visuals or shadow-DOM behaviour,
+reach for the playground first — it round-trips faster.
+
 ### Atoms-only (bypass the orchestrator)
 
 If you want a fully bespoke shell, use the atoms directly. You give up the

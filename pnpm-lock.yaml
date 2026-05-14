@@ -261,9 +261,18 @@ importers:
       '@tanstack/react-router-devtools':
         specifier: 'catalog:'
         version: 1.166.13(@tanstack/react-router@1.168.23(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(@tanstack/router-core@1.168.15)(csstype@3.2.3)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+      '@zitadel-nextgen/api':
+        specifier: workspace:*
+        version: link:../../packages/api
+      '@zitadel-nextgen/api-mock':
+        specifier: workspace:*
+        version: link:../../packages/api-mock
       '@zitadel-nextgen/components':
         specifier: workspace:*
         version: link:../../packages/components
+      msw:
+        specifier: 'catalog:'
+        version: 2.14.6(@types/node@25.6.0)(typescript@6.0.3)
       react:
         specifier: 'catalog:'
         version: 19.2.5

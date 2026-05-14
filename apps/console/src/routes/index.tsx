@@ -1,13 +1,21 @@
 import { createComponent } from "@lit/react";
 import { createFileRoute } from "@tanstack/react-router";
+import { applyBranding } from "@zitadel-nextgen/api-mock";
 import {
+  ZitadelLogin,
   ZlAction,
   ZlError,
   ZlField,
   ZlSubmit,
+  type Branding,
 } from "@zitadel-nextgen/components";
 import react from "react";
 
+const ZitadelLoginEl = createComponent({
+  tagName: "zitadel-login",
+  elementClass: ZitadelLogin,
+  react,
+});
 const ZlFieldEl = createComponent({
   tagName: "zl-field",
   elementClass: ZlField,
@@ -29,9 +37,55 @@ const ZlErrorEl = createComponent({
   react,
 });
 
+const brandingPresets = {
+  centered: {
+    layout: "centered",
+    palette: {
+      primary: "#4A90D9",
+      on_primary: "#FFFFFF",
+      background: "#F8FAFC",
+      surface: "#FFFFFF",
+      muted: "#F1F5F9",
+      border: "#E2E8F0",
+      text: "#0F172A",
+      text_muted: "#64748B",
+      link: "#2563EB",
+    },
+    typography: { font_family: "'Inter', ui-sans-serif, system-ui, sans-serif" },
+    shape: { radius: "md", density: "regular" },
+  } satisfies Branding,
+  dark: {
+    layout: "centered",
+    palette: {
+      primary: "#7C9CFF",
+      on_primary: "#0A0A0A",
+      background: "#0A0A0A",
+      surface: "#111111",
+      muted: "#1A1A1A",
+      border: "#262626",
+      text: "#FAFAFA",
+      text_muted: "#A1A1AA",
+      link: "#9DBBFF",
+    },
+    typography: { font_family: "'Inter', ui-sans-serif, system-ui, sans-serif" },
+    shape: { radius: "md", density: "regular" },
+    theme: { mode: "dark" },
+  } satisfies Branding,
+} as const;
+
+type PresetId = keyof typeof brandingPresets;
+
 export const Route = createFileRoute("/")({ component: Home });
 
 function Home() {
+  const [presetId, setPresetId] = react.useState<PresetId>("centered");
+  const [mountKey, setMountKey] = react.useState(0);
+
+  react.useEffect(() => {
+    applyBranding(brandingPresets[presetId]);
+    setMountKey((n) => n + 1);
+  }, [presetId]);
+
   return (
     <div className="mx-auto max-w-5xl space-y-12 p-10">
       <header className="space-y-2">
@@ -39,21 +93,61 @@ function Home() {
         <p className="text-zinc-600">
           Renders <code>@zitadel-nextgen/components</code> through{" "}
           <code>@lit/react</code>. The composed{" "}
-          <code>&lt;zitadel-login&gt;</code> orchestrator now drives the typed
-          Flow API in <code>@zitadel-nextgen/api</code>; spin it up against
-          the MSW-backed dev playground (<code>pnpm --filter
-            @zitadel-nextgen/components dev</code>) until the console gets
-          real auth wiring.
+          <code>&lt;zitadel-login&gt;</code> orchestrator below calls the
+          typed Flow API in <code>@zitadel-nextgen/api</code>; requests
+          are intercepted in dev by an MSW worker driven by{" "}
+          <code>@zitadel-nextgen/api-mock</code>'s xstate flow machine.
+          Type any email, then any password to walk the canonical flow.
         </p>
       </header>
+
+      <section className="space-y-4">
+        <header className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-semibold">
+              <code>&lt;zitadel-login&gt;</code>
+            </h2>
+            <p className="text-sm text-zinc-600">
+              Drop-in orchestrator. Backed by{" "}
+              <code>@zitadel-nextgen/api-mock</code> in dev.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-xs uppercase tracking-wide text-zinc-500">
+              Branding
+            </label>
+            <select
+              className="rounded-md border border-zinc-200 bg-white px-2 py-1 text-sm"
+              value={presetId}
+              onChange={(e) => setPresetId(e.target.value as PresetId)}
+            >
+              <option value="centered">Centered (light)</option>
+              <option value="dark">Centered (dark)</option>
+            </select>
+            <button
+              type="button"
+              className="rounded-md border border-zinc-200 bg-white px-2 py-1 text-sm hover:bg-zinc-50"
+              onClick={() => setMountKey((n) => n + 1)}
+            >
+              Restart
+            </button>
+          </div>
+        </header>
+        <div className="overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm">
+          <ZitadelLoginEl
+            key={mountKey}
+            purpose="login"
+            project-id="console-preview"
+          />
+        </div>
+      </section>
 
       <section className="space-y-4">
         <header>
           <h2 className="text-xl font-semibold">Atoms</h2>
           <p className="text-sm text-zinc-600">
             Standalone samples — these are individual primitives, not a
-            working form. The composed form lives in{" "}
-            <code>&lt;zitadel-login&gt;</code>.
+            working form. The composed form is the orchestrator above.
           </p>
         </header>
         <div className="grid gap-4 sm:grid-cols-2">
