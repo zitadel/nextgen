@@ -24,9 +24,9 @@ import (
 // JSONSchema represent a JSON schema which can be used to validate JSON data.
 type JSONSchema struct {
 	ProjectID string
-	URL        string
-	CreatedAt  time.Time
-	Schema     []byte
+	URL       string
+	CreatedAt time.Time
+	Schema    []byte
 }
 
 //go:generate go tool mockgen -typed -package domainmock -destination ./mock/json_schema.mock.go . JSONSchemaRepository
@@ -64,8 +64,8 @@ const (
 	DefaultMaxJSONSchemaResolveDepth = 10
 	DefaultMaxJSONSchemaSize         = 1 << 20 // 1 MB
 
-	// jsonSchemaResolverCacheKeySep separates instance ID and schema URL in [JSONSchemaResolverCacheKey].
-	// Instance IDs must not contain this rune (true for typical IDs).
+	// jsonSchemaResolverCacheKeySep separates project ID and schema URL in [JSONSchemaResolverCacheKey].
+	// Project IDs must not contain this rune (true for typical IDs).
 	jsonSchemaResolverCacheKeySep = "\x00"
 )
 
@@ -118,7 +118,7 @@ func init() {
 	builtinTemplates = m
 }
 
-// jsonSchemaResolverCacheKey is the string used as an LRU key for a resolved schema for this instance and URL.
+// jsonSchemaResolverCacheKey is the string used as an LRU key for a resolved schema for this project and URL.
 func jsonSchemaResolverCacheKey(projectID, schemaURL string) string {
 	return projectID + jsonSchemaResolverCacheKeySep + schemaURL
 }
@@ -306,8 +306,8 @@ func (r *JSONSchemaResolver) getFromDatabase(ctx context.Context, client databas
 	}
 	dbSchema = &JSONSchema{
 		ProjectID: projectID,
-		URL:        schemaURL,
-		Schema:     data,
+		URL:       schemaURL,
+		Schema:    data,
 	}
 	if err := r.repository.Create(ctx, client, dbSchema); err != nil {
 		return nil, err

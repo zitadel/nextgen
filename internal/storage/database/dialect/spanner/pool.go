@@ -4,96 +4,93 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/database/dialect/spanner/migration"
 )
 
-type pgxPool struct {
-	*pgxpool.Pool
+type spannerPool struct {
+	db         *sql.DB
+	isMigrated bool
 }
 
 type SpannerPooler interface {
 	isSpanner()
 }
 
-var _ database.Pool = (*pgxPool)(nil)
-var _ database.PoolTest = (*pgxPool)(nil)
-var _ SpannerPooler = (*pgxPool)(nil)
+var _ database.Pool = (*spannerPool)(nil)
+var _ database.PoolTest = (*spannerPool)(nil)
+var _ SpannerPooler = (*spannerPool)(nil)
 
-func (p *pgxPool) isSpanner() {}
+func (p *spannerPool) isSpanner() {}
 
-func (p *pgxPool) RawDB() *sql.DB {
-	return stdlib.OpenDBFromPool(p.Pool)
-}
+// RawDB implements [database.PoolTest].
+func (p *spannerPool) RawDB() *sql.DB { return p.db }
 
-func (p *pgxPool) Acquire(ctx context.Context) (database.Connection, error) {
-	conn, err := p.Pool.Acquire(ctx)
+// Acquire implements [database.Pool].
+func (p *spannerPool) Acquire(ctx context.Context) (database.Connection, error) {
+	conn, err := p.db.Conn(ctx)
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	return &pgxConn{Conn: conn}, nil
+	return &spannerConn{conn: conn, pool: p}, nil
 }
 
-func (p *pgxPool) Query(ctx context.Context, sql string, args ...any) (database.Rows, error) {
-	rows, err := p.Pool.Query(ctx, sql, args...)
+// Query implements [database.Pool].
+func (p *spannerPool) Query(ctx context.Context, query string, args ...any) (database.Rows, error) {
+	rows, err := p.db.QueryContext(ctx, convertPlaceholders(query), args...)
 	if err != nil {
 		return nil, wrapError(err)
 	}
 	return newRows(rows), nil
 }
 
-func (p *pgxPool) QueryRow(ctx context.Context, sql string, args ...any) database.Row {
-	return newRow(p.Pool.QueryRow(ctx, sql, args...))
+// QueryRow implements [database.Pool].
+func (p *spannerPool) QueryRow(ctx context.Context, query string, args ...any) database.Row {
+	return newRow(p.db.QueryRowContext(ctx, convertPlaceholders(query), args...))
 }
 
-func (p *pgxPool) Exec(ctx context.Context, sql string, args ...any) (int64, error) {
-	res, err := p.Pool.Exec(ctx, sql, args...)
+// Exec implements [database.Pool].
+func (p *spannerPool) Exec(ctx context.Context, query string, args ...any) (int64, error) {
+	res, err := p.db.ExecContext(ctx, convertPlaceholders(query), args...)
 	if err != nil {
 		return 0, wrapError(err)
 	}
-	return res.RowsAffected(), nil
+	n, err := res.RowsAffected()
+	return n, wrapError(err)
 }
 
-func (p *pgxPool) Begin(ctx context.Context, opts *database.TransactionOptions) (database.Transaction, error) {
-	tx, err := p.BeginTx(ctx, transactionOptionsToPgx(opts))
+// Begin implements [database.Pool].
+func (p *spannerPool) Begin(ctx context.Context, opts *database.TransactionOptions) (database.Transaction, error) {
+	tx, err := p.db.BeginTx(ctx, transactionOptions(opts))
 	if err != nil {
 		return nil, wrapError(err)
 	}
 	return newTransaction(tx), nil
 }
 
-func (p *pgxPool) Close(_ context.Context) error {
-	p.Pool.Close()
-	return nil
+// Close implements [database.Pool].
+func (p *spannerPool) Close(_ context.Context) error {
+	return wrapError(p.db.Close())
 }
 
-func (p *pgxPool) Ping(ctx context.Context) error {
-	return wrapError(p.Pool.Ping(ctx))
+// Ping implements [database.Pool].
+func (p *spannerPool) Ping(ctx context.Context) error {
+	return wrapError(p.db.PingContext(ctx))
 }
 
-func (p *pgxPool) Migrate(ctx context.Context) error {
-	if isMigrated {
+// Migrate implements [database.Migrator].
+func (p *spannerPool) Migrate(ctx context.Context) error {
+	if p.isMigrated {
 		return nil
 	}
-	client, err := p.Pool.Acquire(ctx)
-	if err != nil {
-		return err
-	}
-	defer client.Release()
-	err = migration.Migrate(ctx, client.Conn())
-	isMigrated = err == nil
+	err := migration.Migrate(ctx, p.db)
+	p.isMigrated = err == nil
 	return wrapError(err)
 }
 
-func (p *pgxPool) MigrateTest(ctx context.Context) error {
-	client, err := p.Pool.Acquire(ctx)
-	if err != nil {
-		return err
-	}
-	defer client.Release()
-	err = migration.Migrate(ctx, client.Conn())
-	isMigrated = err == nil
+// MigrateTest implements [database.PoolTest].
+func (p *spannerPool) MigrateTest(ctx context.Context) error {
+	err := migration.Migrate(ctx, p.db)
+	p.isMigrated = err == nil
 	return err
 }

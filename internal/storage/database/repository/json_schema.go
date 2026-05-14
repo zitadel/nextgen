@@ -6,12 +6,14 @@ import (
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/database/dialect/postgres"
+	"github.com/zitadel/nextgen/internal/storage/database/dialect/spanner"
 )
 
-const jsonSchemaTable = "zitadel_nextgen.json_schemas"
-
 type JSONSchemaRepository struct {
-	table string
+	table         string
+	now           database.Instruction
+	encodePayload func([]byte) any
 
 	columnProjectID database.Column
 	columnURL       database.Column
@@ -19,13 +21,26 @@ type JSONSchemaRepository struct {
 	columnPayload   database.Column
 }
 
-func NewJSONSchemaRepository() *JSONSchemaRepository {
+func NewJSONSchemaRepository(client database.QueryExecutor) *JSONSchemaRepository {
+	const pgTable = "zitadel_nextgen.json_schemas"
+	const spannerTable = "json_schemas"
+
+	switch client.(type) {
+	case spanner.SpannerPooler:
+		return newJSONSchemaRepository(spannerTable, database.CurrentTimestampInstruction, func(b []byte) any { return string(b) })
+	case postgres.PostgresPooler:
+		return newJSONSchemaRepository(pgTable, database.NowInstruction, func(b []byte) any { return b })
+	}
+	panic("NewJSONSchemaRepository: unsupported client type")
+}
+
+func newJSONSchemaRepository(table string, now database.Instruction, encodePayload func([]byte) any) *JSONSchemaRepository {
 	return &JSONSchemaRepository{
-		table:           jsonSchemaTable,
-		columnProjectID: database.NewColumn(jsonSchemaTable, "project_id"),
-		columnURL:       database.NewColumn(jsonSchemaTable, "url"),
-		columnCreatedAt: database.NewColumn(jsonSchemaTable, "created_at"),
-		columnPayload:   database.NewColumn(jsonSchemaTable, "payload"),
+		table:           table,
+		columnProjectID: database.NewColumn(table, "project_id"),
+		columnURL:       database.NewColumn(table, "url"),
+		columnCreatedAt: database.NewColumn(table, "created_at"),
+		columnPayload:   database.NewColumn(table, "payload"),
 	}
 }
 
@@ -132,8 +147,8 @@ func (r *JSONSchemaRepository) Create(ctx context.Context, client database.Query
 	builder.WriteArgs(
 		schema.ProjectID,
 		schema.URL,
-		database.NowInstruction,
-		schema.Schema,
+		r.now,
+		r.encodePayload(schema.Schema),
 	)
 	builder.WriteString(")")
 	_, err := client.Exec(ctx, builder.String(), builder.Args()...)
