@@ -74,6 +74,7 @@ erDiagram
         string session_id FK
         string type
         interval time_to_live
+        datetime handedoff_at
     }
     checks {
         string id PK
@@ -82,7 +83,6 @@ erDiagram
         string authenticator_id FK
         datetime started_at
         datetime succeeded_at
-        datetime handedoff_at
         jsonb challenge
         jsonb factor
         int failure_count
