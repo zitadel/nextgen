@@ -14,6 +14,8 @@ CREATE TABLE zitadel_nextgen.tokens (
     , user_id     TEXT COLLATE "C" NOT NULL
     , token_type  zitadel_nextgen.token_types NOT NULL
     , session_id  TEXT COLLATE "C"
+    , oidc_session_id TEXT COLLATE "C"
+    , saml_session_id TEXT COLLATE "C"
     , scope       TEXT[] NOT NULL DEFAULT '{}'
     , created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
     , expires_at  TIMESTAMPTZ NULL
@@ -22,6 +24,19 @@ CREATE TABLE zitadel_nextgen.tokens (
     , FOREIGN KEY (project_id, user_id)
         REFERENCES zitadel_nextgen.users (project_id, id)
         ON DELETE CASCADE
+    , CONSTRAINT chk_tokens_type_identifiers CHECK (
+        (token_type = 'session_token'::zitadel_nextgen.token_types
+            AND session_id IS NOT NULL AND session_id <> ''
+            AND oidc_session_id IS NULL AND saml_session_id IS NULL)
+        OR (token_type = 'oidc_access_token'::zitadel_nextgen.token_types
+            AND oidc_session_id IS NOT NULL AND oidc_session_id <> ''
+            AND session_id IS NULL AND saml_session_id IS NULL)
+        OR (token_type = 'saml_assertion'::zitadel_nextgen.token_types
+            AND saml_session_id IS NOT NULL AND saml_session_id <> ''
+            AND session_id IS NULL AND oidc_session_id IS NULL)
+        OR (token_type = 'personal_access_token'::zitadel_nextgen.token_types
+            AND session_id IS NULL AND oidc_session_id IS NULL AND saml_session_id IS NULL)
+    )
 );
 
 -- +goose Down

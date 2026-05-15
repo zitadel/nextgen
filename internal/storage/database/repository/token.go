@@ -17,29 +17,35 @@ const (
 )
 
 var (
-	colTokenPGProjectID  = database.NewColumn(tokenPGTable, "project_id")
-	colTokenPGTokenID    = database.NewColumn(tokenPGTable, "token_id")
-	colTokenPGUserID     = database.NewColumn(tokenPGTable, "user_id")
-	colTokenPGTokenType  = database.NewColumn(tokenPGTable, "token_type")
-	colTokenPGSessionID  = database.NewColumn(tokenPGTable, "session_id")
-	colTokenPGScope      = database.NewColumn(tokenPGTable, "scope")
-	colTokenPGExpiresAt  = database.NewColumn(tokenPGTable, "expires_at")
-	colTokenPGCreatedAt  = database.NewColumn(tokenPGTable, "created_at")
+	colTokenPGProjectID     = database.NewColumn(tokenPGTable, "project_id")
+	colTokenPGTokenID       = database.NewColumn(tokenPGTable, "token_id")
+	colTokenPGUserID        = database.NewColumn(tokenPGTable, "user_id")
+	colTokenPGTokenType     = database.NewColumn(tokenPGTable, "token_type")
+	colTokenPGSessionID     = database.NewColumn(tokenPGTable, "session_id")
+	colTokenPGOIDCSessionID = database.NewColumn(tokenPGTable, "oidc_session_id")
+	colTokenPGSAMLSessionID = database.NewColumn(tokenPGTable, "saml_session_id")
+	colTokenPGScope         = database.NewColumn(tokenPGTable, "scope")
+	colTokenPGExpiresAt     = database.NewColumn(tokenPGTable, "expires_at")
+	colTokenPGCreatedAt     = database.NewColumn(tokenPGTable, "created_at")
 )
 
 var (
-	colTokenSpProjectID  = database.NewColumn(tokenSpTable, "project_id")
-	colTokenSpTokenID    = database.NewColumn(tokenSpTable, "token_id")
-	colTokenSpUserID     = database.NewColumn(tokenSpTable, "user_id")
-	colTokenSpTokenType  = database.NewColumn(tokenSpTable, "token_type")
-	colTokenSpSessionID  = database.NewColumn(tokenSpTable, "session_id")
-	colTokenSpScope      = database.NewColumn(tokenSpTable, "scope")
-	colTokenSpExpiresAt  = database.NewColumn(tokenSpTable, "expires_at")
-	colTokenSpCreatedAt  = database.NewColumn(tokenSpTable, "created_at")
+	colTokenSpProjectID     = database.NewColumn(tokenSpTable, "project_id")
+	colTokenSpTokenID       = database.NewColumn(tokenSpTable, "token_id")
+	colTokenSpUserID        = database.NewColumn(tokenSpTable, "user_id")
+	colTokenSpTokenType     = database.NewColumn(tokenSpTable, "token_type")
+	colTokenSpSessionID     = database.NewColumn(tokenSpTable, "session_id")
+	colTokenSpOIDCSessionID = database.NewColumn(tokenSpTable, "oidc_session_id")
+	colTokenSpSAMLSessionID = database.NewColumn(tokenSpTable, "saml_session_id")
+	colTokenSpScope         = database.NewColumn(tokenSpTable, "scope")
+	colTokenSpExpiresAt     = database.NewColumn(tokenSpTable, "expires_at")
+	colTokenSpCreatedAt     = database.NewColumn(tokenSpTable, "created_at")
 )
 
 type tokenTableCols struct {
-	projectID, tokenID, userID, tokenType, sessionID, scope, expiresAt, createdAt database.Column
+	projectID, tokenID, userID, tokenType database.Column
+	sessionID, oidcSessionID, samlSessionID database.Column
+	scope, expiresAt, createdAt           database.Column
 }
 
 type TokenRepository struct {
@@ -68,25 +74,26 @@ func (r *TokenRepository) qualifiedTableName() string { return r.table }
 func (r *TokenRepository) cols() tokenTableCols {
 	if r.table == tokenPGTable {
 		return tokenTableCols{
-			projectID: colTokenPGProjectID,
-			tokenID:   colTokenPGTokenID,
-			userID:    colTokenPGUserID,
+			projectID: colTokenPGProjectID, tokenID: colTokenPGTokenID, userID: colTokenPGUserID,
 			tokenType: colTokenPGTokenType,
-			sessionID: colTokenPGSessionID,
-			scope:     colTokenPGScope,
-			expiresAt: colTokenPGExpiresAt,
-			createdAt: colTokenPGCreatedAt,
+			sessionID: colTokenPGSessionID, oidcSessionID: colTokenPGOIDCSessionID, samlSessionID: colTokenPGSAMLSessionID,
+			scope: colTokenPGScope, expiresAt: colTokenPGExpiresAt, createdAt: colTokenPGCreatedAt,
 		}
 	}
 	return tokenTableCols{
-		projectID: colTokenSpProjectID,
-		tokenID:   colTokenSpTokenID,
-		userID:    colTokenSpUserID,
+		projectID: colTokenSpProjectID, tokenID: colTokenSpTokenID, userID: colTokenSpUserID,
 		tokenType: colTokenSpTokenType,
-		sessionID: colTokenSpSessionID,
-		scope:     colTokenSpScope,
-		expiresAt: colTokenSpExpiresAt,
-		createdAt: colTokenSpCreatedAt,
+		sessionID: colTokenSpSessionID, oidcSessionID: colTokenSpOIDCSessionID, samlSessionID: colTokenSpSAMLSessionID,
+		scope: colTokenSpScope, expiresAt: colTokenSpExpiresAt, createdAt: colTokenSpCreatedAt,
+	}
+}
+
+func (r *TokenRepository) selectColumns() database.Columns {
+	c := r.cols()
+	return database.Columns{
+		c.projectID, c.tokenID, c.userID, c.tokenType,
+		c.sessionID, c.oidcSessionID, c.samlSessionID,
+		c.scope, c.expiresAt, c.createdAt,
 	}
 }
 
@@ -115,11 +122,8 @@ func (r *TokenRepository) UserIDCondition(userID string) database.Condition {
 }
 
 func (r *TokenRepository) Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*domain.Token, error) {
-	c := r.cols()
 	builder := database.NewStatementBuilder("SELECT ")
-	database.Columns{
-		c.projectID, c.tokenID, c.userID, c.tokenType, c.sessionID, c.scope, c.expiresAt, c.createdAt,
-	}.WriteQualified(builder)
+	r.selectColumns().WriteQualified(builder)
 	builder.WriteString(" FROM ")
 	builder.WriteString(r.qualifiedTableName())
 	queryOpts := new(database.QueryOpts)
@@ -136,11 +140,8 @@ func (r *TokenRepository) Get(ctx context.Context, client database.QueryExecutor
 }
 
 func (r *TokenRepository) List(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) ([]*domain.Token, error) {
-	c := r.cols()
 	builder := database.NewStatementBuilder("SELECT ")
-	database.Columns{
-		c.projectID, c.tokenID, c.userID, c.tokenType, c.sessionID, c.scope, c.expiresAt, c.createdAt,
-	}.WriteQualified(builder)
+	r.selectColumns().WriteQualified(builder)
 	builder.WriteString(" FROM ")
 	builder.WriteString(r.qualifiedTableName())
 	queryOpts := new(database.QueryOpts)
@@ -161,8 +162,8 @@ func (r *TokenRepository) List(ctx context.Context, client database.QueryExecuto
 }
 
 func (r *TokenRepository) Create(ctx context.Context, client database.QueryExecutor, token *domain.Token) error {
-	if !token.Type.Persistable() {
-		return domain.ErrInvalidTokenType
+	if err := token.ValidatePersisted(); err != nil {
+		return err
 	}
 
 	scope := token.Scope
@@ -170,10 +171,9 @@ func (r *TokenRepository) Create(ctx context.Context, client database.QueryExecu
 		scope = []string{}
 	}
 
-	sessionArg := any(database.NullInstruction)
-	if token.SessionID != nil {
-		sessionArg = *token.SessionID
-	}
+	sessionArg := optionalStringArg(token.SessionID)
+	oidcSessionArg := optionalStringArg(token.OIDCSessionID)
+	samlSessionArg := optionalStringArg(token.SAMLSessionID)
 	expiresArg := any(database.NullInstruction)
 	if token.ExpiresAt != nil {
 		expiresArg = *token.ExpiresAt
@@ -184,22 +184,26 @@ func (r *TokenRepository) Create(ctx context.Context, client database.QueryExecu
 	builder.WriteString(r.qualifiedTableName())
 	builder.WriteString(" (")
 	database.Columns{
-		c.projectID, c.tokenID, c.userID, c.tokenType, c.sessionID, c.scope, c.expiresAt, c.createdAt,
+		c.projectID, c.tokenID, c.userID, c.tokenType,
+		c.sessionID, c.oidcSessionID, c.samlSessionID,
+		c.scope, c.expiresAt, c.createdAt,
 	}.WriteUnqualified(builder)
 	builder.WriteString(") VALUES (")
 	builder.WriteArgs(token.ProjectID, token.TokenID, token.UserID)
 	builder.WriteString(", ")
 	builder.WriteString(builder.AppendArg(token.Type.String()) + r.tokenTypeCast)
 	builder.WriteString(", ")
-	builder.WriteArgs(
-		sessionArg,
-		r.encodeScope(scope),
-		expiresArg,
-		r.now,
-	)
+	builder.WriteArgs(sessionArg, oidcSessionArg, samlSessionArg, r.encodeScope(scope), expiresArg, r.now)
 	builder.WriteString(")")
 	_, err := client.Exec(ctx, builder.String(), builder.Args()...)
 	return err
+}
+
+func optionalStringArg(s *string) any {
+	if s == nil {
+		return database.NullInstruction
+	}
+	return *s
 }
 
 func (r *TokenRepository) Delete(ctx context.Context, client database.QueryExecutor, condition database.Condition) error {
@@ -208,14 +212,16 @@ func (r *TokenRepository) Delete(ctx context.Context, client database.QueryExecu
 }
 
 type tokenRow struct {
-	ProjectID string           `db:"project_id"`
-	TokenID   string           `db:"token_id"`
-	UserID    string           `db:"user_id"`
-	Type      domain.TokenType `db:"token_type"`
-	SessionID sql.NullString   `db:"session_id"`
-	Scope     []string         `db:"scope"`
-	ExpiresAt sql.NullTime     `db:"expires_at"`
-	CreatedAt time.Time        `db:"created_at"`
+	ProjectID     string           `db:"project_id"`
+	TokenID       string           `db:"token_id"`
+	UserID        string           `db:"user_id"`
+	Type          domain.TokenType `db:"token_type"`
+	SessionID     sql.NullString   `db:"session_id"`
+	OIDCSessionID sql.NullString   `db:"oidc_session_id"`
+	SAMLSessionID sql.NullString   `db:"saml_session_id"`
+	Scope         []string         `db:"scope"`
+	ExpiresAt     sql.NullTime     `db:"expires_at"`
+	CreatedAt     time.Time        `db:"created_at"`
 }
 
 func (r *tokenRow) toDomain() *domain.Token {
@@ -234,6 +240,14 @@ func (r *tokenRow) toDomain() *domain.Token {
 	if r.SessionID.Valid {
 		s := r.SessionID.String
 		t.SessionID = &s
+	}
+	if r.OIDCSessionID.Valid {
+		s := r.OIDCSessionID.String
+		t.OIDCSessionID = &s
+	}
+	if r.SAMLSessionID.Valid {
+		s := r.SAMLSessionID.String
+		t.SAMLSessionID = &s
 	}
 	if r.ExpiresAt.Valid {
 		exp := r.ExpiresAt.Time
