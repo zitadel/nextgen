@@ -8,7 +8,7 @@ const ZitadelLogin = dynamic(
   async () => {
     await import("@zitadel-nextgen/components");
     return function ZitadelLoginElement() {
-      return <zitadel-login proxy-base="/__nextgen" />;
+      return <zitadel-login api-base="/__nextgen" project-id="demo" />;
     };
   },
   { ssr: false },
