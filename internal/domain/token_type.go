@@ -6,10 +6,10 @@ import (
 	"fmt"
 )
 
-// ErrInvalidTokenType is returned when a token is persisted with [TokenTypeUnspecified].
-var ErrInvalidTokenType = errors.New("token type must be a concrete value, not unspecified")
+// ErrInvalidTokenType is returned when a token type cannot be stored (see [TokenType.Persistable]).
+var ErrInvalidTokenType = errors.New("token type is not persistable")
 
-//go:generate go tool enumer -type TokenType -transform snake -trimprefix TokenType
+//go:generate go tool enumer -type TokenType -transform snake -trimprefix TokenType -json
 type TokenType uint8
 
 const (
@@ -18,11 +18,32 @@ const (
 	TokenTypeOIDCAccessToken
 	TokenTypeSAMLAssertion
 	TokenTypePersonalAccessToken
+	// TokenTypeFlow is carried in a flow-engine cookie; it is not stored and must not be used as a bearer token.
+	TokenTypeFlow
+	// TokenTypeJWTProfile is a self-signed JWT verified with a stored public key; it is not stored but may be used as a bearer token.
+	TokenTypeJWTProfile
 )
 
-// Persistable reports whether t may be written to storage. [TokenTypeUnspecified] is never persistable.
+// Persistable reports whether t may be written to the tokens table.
 func (t TokenType) Persistable() bool {
-	return t != TokenTypeUnspecified
+	switch t {
+	case TokenTypeUnspecified:
+		return false
+	case TokenTypeSessionToken:
+		return true
+	case TokenTypeOIDCAccessToken:
+		return true
+	case TokenTypeSAMLAssertion:
+		return true
+	case TokenTypePersonalAccessToken:
+		return true
+	case TokenTypeFlow:
+		return false
+	case TokenTypeJWTProfile:
+		return false
+	default:
+		return false
+	}
 }
 
 func (t TokenType) Value() (driver.Value, error) {
