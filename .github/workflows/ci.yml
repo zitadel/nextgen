@@ -95,7 +95,7 @@ jobs:
         run: corepack pnpm install --frozen-lockfile
 
       - name: Build packages
-        run: corepack pnpm -r build
+        run: corepack pnpm nx run-many -t build
 
       - name: Smoke test built CLI
         run: |
