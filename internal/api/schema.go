@@ -20,7 +20,7 @@ func (h *Handler) CreateSchema(ctx context.Context, req api.CreateSchemaReq, par
 		schema, err = h.schemaService.CreateSchema(ctx,
 			string(params.ProjectID.Value),
 			string(params.TeamID.Value),
-			req.UserSchema.ID,
+			req.UserSchema.ID.String(),
 			schemabs)
 		if err != nil {
 			return nil, err

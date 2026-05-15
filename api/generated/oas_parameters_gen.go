@@ -1160,7 +1160,7 @@ func unpackCreateSchemaParams(packed middleware.Parameters) (params CreateSchema
 	}
 	{
 		key := middleware.ParameterKey{
-			Name: "teamID",
+			Name: "team_id",
 			In:   "query",
 		}
 		if v, ok := packed[key]; ok {
@@ -1235,10 +1235,10 @@ func decodeCreateSchemaParams(args [0]string, argsEscaped bool, r *http.Request)
 			Err:  err,
 		}
 	}
-	// Decode query: teamID.
+	// Decode query: team_id.
 	if err := func() error {
 		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "teamID",
+			Name:    "team_id",
 			Style:   uri.QueryStyleForm,
 			Explode: true,
 		}
@@ -1293,7 +1293,7 @@ func decodeCreateSchemaParams(args [0]string, argsEscaped bool, r *http.Request)
 		return nil
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
-			Name: "teamID",
+			Name: "team_id",
 			In:   "query",
 			Err:  err,
 		}
@@ -2148,7 +2148,7 @@ func unpackGetSchemaByIdParams(packed middleware.Parameters) (params GetSchemaBy
 	}
 	{
 		key := middleware.ParameterKey{
-			Name: "teamID",
+			Name: "team_id",
 			In:   "query",
 		}
 		if v, ok := packed[key]; ok {
@@ -2268,10 +2268,10 @@ func decodeGetSchemaByIdParams(args [1]string, argsEscaped bool, r *http.Request
 			Err:  err,
 		}
 	}
-	// Decode query: teamID.
+	// Decode query: team_id.
 	if err := func() error {
 		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "teamID",
+			Name:    "team_id",
 			Style:   uri.QueryStyleForm,
 			Explode: true,
 		}
@@ -2326,7 +2326,7 @@ func decodeGetSchemaByIdParams(args [1]string, argsEscaped bool, r *http.Request
 		return nil
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
-			Name: "teamID",
+			Name: "team_id",
 			In:   "query",
 			Err:  err,
 		}

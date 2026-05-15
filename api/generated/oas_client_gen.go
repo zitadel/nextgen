@@ -1559,9 +1559,9 @@ func (c *Client) sendCreateSchema(ctx context.Context, request CreateSchemaReq, 
 		}
 	}
 	{
-		// Encode "teamID" parameter.
+		// Encode "team_id" parameter.
 		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "teamID",
+			Name:    "team_id",
 			Style:   uri.QueryStyleForm,
 			Explode: true,
 		}
@@ -3201,9 +3201,9 @@ func (c *Client) sendGetSchemaById(ctx context.Context, params GetSchemaByIdPara
 		}
 	}
 	{
-		// Encode "teamID" parameter.
+		// Encode "team_id" parameter.
 		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "teamID",
+			Name:    "team_id",
 			Style:   uri.QueryStyleForm,
 			Explode: true,
 		}

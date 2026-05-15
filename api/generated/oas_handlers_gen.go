@@ -1602,7 +1602,7 @@ func (s *Server) handleCreateSchemaRequest(args [0]string, argsEscaped bool, w h
 					In:   "query",
 				}: params.ProjectID,
 				{
-					Name: "teamID",
+					Name: "team_id",
 					In:   "query",
 				}: params.TeamID,
 			},
@@ -4105,7 +4105,7 @@ func (s *Server) handleGetSchemaByIdRequest(args [1]string, argsEscaped bool, w 
 					In:   "query",
 				}: params.ProjectID,
 				{
-					Name: "teamID",
+					Name: "team_id",
 					In:   "query",
 				}: params.TeamID,
 			},
