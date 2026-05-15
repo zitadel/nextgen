@@ -60,6 +60,10 @@ type jsonSchemaConditions interface {
 	URLCondition(url string) database.Condition
 }
 
+type SchemaValidator interface {
+	ValidateAgainstMetaSchema(tenantSchemaBytes []byte) error
+}
+
 const (
 	DefaultMaxJSONSchemaResolveDepth = 10
 	DefaultMaxJSONSchemaSize         = 1 << 20 // 1 MB
@@ -128,6 +132,7 @@ func jsonSchemaResolverCacheKey(projectID, schemaURL string) string {
 // It caches resolved schemas in memory and uses a repository to store them for future use.
 type JSONSchemaResolver struct {
 	repository JSONSchemaRepository
+	validator  SchemaValidator
 	// cache of fully resolved JSON schemas,
 	// keyed by projectID and schemaURL
 	cache           *lru.TwoQueueCache[string, *jsonschema.Schema]
@@ -145,6 +150,7 @@ type JSONSchemaResolver struct {
 // instead of the database; they are not persisted via [JSONSchemaRepository.Create].
 func NewJSONSchemaResolver(
 	repository JSONSchemaRepository,
+	validator SchemaValidator,
 	cache *lru.TwoQueueCache[string, *jsonschema.Schema],
 	maxResolveDepth int,
 	maxSize int,
@@ -166,6 +172,7 @@ func NewJSONSchemaResolver(
 	}
 	return &JSONSchemaResolver{
 		repository:        repository,
+		validator:         validator,
 		cache:             cache,
 		maxResolveDepth:   maxResolveDepth,
 		maxSize:           maxSize,
@@ -281,7 +288,14 @@ func writeBuiltinJSONSchema(w io.Writer, schemaPath string, canonicalDocumentURL
 	if !ok {
 		return fmt.Errorf("unknown builtin JSON schema path %q", schemaPath)
 	}
-	data := struct{ SchemaURL string }{SchemaURL: canonicalDocumentURL}
+	baseURL := canonicalDocumentURL[:strings.LastIndex(canonicalDocumentURL, "/")]
+	data := struct {
+		SchemaURL string
+		BaseURL   string
+	}{
+		SchemaURL: canonicalDocumentURL,
+		BaseURL:   baseURL,
+	}
 	return tmpl.Execute(w, data)
 }
 
@@ -303,6 +317,12 @@ func (r *JSONSchemaResolver) getFromDatabase(ctx context.Context, client databas
 	data, err := r.resolveFromURL(ctx, schemaURL)
 	if err != nil {
 		return nil, err
+	}
+	if r.validator != nil {
+		err = r.validator.ValidateAgainstMetaSchema(data)
+		if err != nil {
+			return nil, err
+		}
 	}
 	dbSchema = &JSONSchema{
 		ProjectID: projectID,

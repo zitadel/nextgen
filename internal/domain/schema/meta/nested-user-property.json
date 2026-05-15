@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "{{ .SchemaURL }}",
+  "kind": "nested-user-property",
+  "title": "NestedUserProperty",
+  "type": "object",
+  "properties": {
+    "title": { "type": "string" },
+    "type":  { "type": "string", "enum": ["string", "number", "boolean", "object", "array"] },
+    "required": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "properties": {
+      "type": "object",
+      "additionalProperties": { "$ref": "{{ .SchemaURL }}" }
+    }
+  }
+}

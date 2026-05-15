@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "{{ .SchemaURL }}",
+  "kind": "auth-method",
+  "title": "AuthMethod",
+  "type": "object",
+  "required": ["enabled", "position"],
+  "properties": {
+    "enabled":  { "type": "boolean" },
+    "position": { "type": "integer", "minimum": 0 }
+  }
+}

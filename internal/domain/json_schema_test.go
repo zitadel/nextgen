@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -43,12 +44,17 @@ func mustJSONSchemaCache(t *testing.T, size int) *lru.TwoQueueCache[string, *jso
 
 func newTestResolver(t *testing.T, repo domain.JSONSchemaRepository, httpClient *http.Client) *domain.JSONSchemaResolver {
 	t.Helper()
-	return domain.NewJSONSchemaResolver(repo, mustJSONSchemaCache(t, 128), 0, 0, httpClient, nil)
+	return domain.NewJSONSchemaResolver(repo, nil, mustJSONSchemaCache(t, 128), 0, 0, httpClient, nil)
 }
 
 func newTestResolverWithDepth(t *testing.T, repo domain.JSONSchemaRepository, maxResolveDepth int, httpClient *http.Client) *domain.JSONSchemaResolver {
 	t.Helper()
-	return domain.NewJSONSchemaResolver(repo, mustJSONSchemaCache(t, 128), maxResolveDepth, 0, httpClient, nil)
+	return domain.NewJSONSchemaResolver(repo, nil, mustJSONSchemaCache(t, 128), maxResolveDepth, 0, httpClient, nil)
+}
+
+func newTestResolverWithValidator(t *testing.T, repo domain.JSONSchemaRepository, validator *domain.TenantSchemaValidator, httpClient *http.Client) *domain.JSONSchemaResolver {
+	t.Helper()
+	return domain.NewJSONSchemaResolver(repo, validator, mustJSONSchemaCache(t, 128), 0, 0, httpClient, nil)
 }
 
 func mustParseURL(t *testing.T, raw string) *url.URL {
@@ -63,13 +69,13 @@ func TestNewJSONSchemaResolver(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 		cache := mustJSONSchemaCache(t, 128)
-		r := domain.NewJSONSchemaResolver(mockRepo, cache, 0, 0, nil, nil)
+		r := domain.NewJSONSchemaResolver(mockRepo, nil, cache, 0, 0, nil, nil)
 		require.NotNil(t, r)
 	})
 
 	t.Run("nil cache panics", func(t *testing.T) {
 		assert.Panics(t, func() {
-			domain.NewJSONSchemaResolver(mockRepo, nil, 0, 0, nil, nil)
+			domain.NewJSONSchemaResolver(mockRepo, nil, nil, 0, 0, nil, nil)
 		})
 	})
 }
@@ -77,7 +83,7 @@ func TestNewJSONSchemaResolver(t *testing.T) {
 func TestJSONSchemaResolver_Resolve(t *testing.T) {
 	ctx := context.Background()
 	const (
-		projectID   = "proj-1"
+		projectID    = "proj-1"
 		simpleURL    = "https://example.test/schemas/simple.json"
 		simpleSchema = `{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object"}`
 	)
@@ -305,6 +311,117 @@ func TestJSONSchemaResolver_Resolve(t *testing.T) {
 				require.NotNil(t, got)
 			},
 		},
+		{
+			name: "validate against metaschema: HTTP-fetched dep without kind is not persisted",
+			run: func(t *testing.T, ctrl *gomock.Controller) {
+				srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+					w.Header().Set("Content-Type", "application/json")
+					_, _ = w.Write([]byte(simpleSchema)) // no kind
+				}))
+				t.Cleanup(srv.Close)
+
+				mockRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
+				mockRepo.EXPECT().PrimaryKeyCondition(projectID, srv.URL).Return(pkCond)
+				mockRepo.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, database.NewNoRowFoundError(nil))
+
+				validator, err := domain.NewTenantSchemaValidator("https://example.test/schemas")
+				require.NoError(t, err)
+				resolver := newTestResolverWithValidator(t, mockRepo, validator, srv.Client())
+
+				_, err = resolver.Resolve(ctx, nil, projectID, srv.URL, nil)
+				require.Error(t, err)
+				assert.ErrorIs(t, err, domain.ErrMissingSchemaKind)
+			},
+		},
+		{
+			name: "validate against metaschema: HTTP-fetched dep with unknown kind is not persisted",
+			run: func(t *testing.T, ctrl *gomock.Controller) {
+				srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+					w.Header().Set("Content-Type", "application/json")
+					_, _ = w.Write([]byte(`{"$schema":"https://json-schema.org/draft/2020-12/schema","kind":"random-schema","type":"object"}`))
+				}))
+				t.Cleanup(srv.Close)
+
+				mockRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
+				mockRepo.EXPECT().PrimaryKeyCondition(projectID, srv.URL).Return(pkCond)
+				mockRepo.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, database.NewNoRowFoundError(nil))
+
+				validator, err := domain.NewTenantSchemaValidator("https://example.test/schemas")
+				require.NoError(t, err)
+				resolver := newTestResolverWithValidator(t, mockRepo, validator, srv.Client())
+
+				_, err = resolver.Resolve(ctx, nil, projectID, srv.URL, nil)
+				require.Error(t, err)
+				assert.ErrorIs(t, err, domain.ErrUnknownSchemaKind)
+			},
+		},
+		{
+			name: "validator passes for HTTP-fetched schema with user-schema kind and persisted",
+			run: func(t *testing.T, ctrl *gomock.Controller) {
+				var srvURL string
+				srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+					w.Header().Set("Content-Type", "application/json")
+					_, _ = fmt.Fprintf(w, `{
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "$id":     "%s",
+                "kind":    "user-schema",
+                "title":   "My User",
+                "x-auth-methods": {}
+            }`, srvURL)
+				}))
+				t.Cleanup(srv.Close)
+				srvURL = srv.URL
+
+				mockRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
+				mockRepo.EXPECT().PrimaryKeyCondition(projectID, srv.URL).Return(pkCond)
+				mockRepo.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, database.NewNoRowFoundError(nil))
+				mockRepo.EXPECT().Create(gomock.Any(), gomock.Any(), gomock.AssignableToTypeOf(&domain.JSONSchema{})).
+					DoAndReturn(func(_ context.Context, _ database.QueryExecutor, s *domain.JSONSchema) error {
+						assert.Equal(t, projectID, s.ProjectID)
+						assert.Equal(t, srv.URL, s.URL)
+						return nil
+					})
+
+				validator, err := domain.NewTenantSchemaValidator("https://example.test/schemas")
+				require.NoError(t, err)
+				resolver := newTestResolverWithValidator(t, mockRepo, validator, srv.Client())
+
+				_, err = resolver.Resolve(ctx, nil, projectID, srv.URL, nil)
+				require.NoError(t, err)
+			},
+		},
+		{
+			name: "validator called on dep but not on root provided directly",
+			run: func(t *testing.T, ctrl *gomock.Controller) {
+				depSchema := []byte(`{
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id":     "https://example.test/dep.json",
+            "kind":    "user-property",
+            "title":   "Email",
+            "type":    "string"
+        }`)
+				srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+					w.Header().Set("Content-Type", "application/json")
+					_, _ = w.Write(depSchema)
+				}))
+				t.Cleanup(srv.Close)
+
+				depSrvURL := srv.URL + "/dep.json"
+				rootWithRef := []byte(`{"$schema":"https://json-schema.org/draft/2020-12/schema","$ref":"` + depSrvURL + `"}`)
+
+				mockRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
+				mockRepo.EXPECT().PrimaryKeyCondition(projectID, depSrvURL).Return(pkCond)
+				mockRepo.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, database.NewNoRowFoundError(nil))
+				mockRepo.EXPECT().Create(gomock.Any(), gomock.Any(), gomock.AssignableToTypeOf(&domain.JSONSchema{})).Return(nil)
+
+				validator, err := domain.NewTenantSchemaValidator("https://example.test/schemas")
+				require.NoError(t, err)
+				resolver := newTestResolverWithValidator(t, mockRepo, validator, srv.Client())
+
+				_, err = resolver.Resolve(ctx, nil, projectID, simpleURL, rootWithRef)
+				require.NoError(t, err)
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -338,7 +455,7 @@ func TestJSONSchemaResolver_BuiltinEmbedded(t *testing.T) {
 	t.Run("resolve skips repository", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		mockRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
-		r := domain.NewJSONSchemaResolver(mockRepo, mustJSONSchemaCache(t, 128), 0, 0, nil, base)
+		r := domain.NewJSONSchemaResolver(mockRepo, nil, mustJSONSchemaCache(t, 128), 0, 0, nil, base)
 		schema, err := r.Resolve(ctx, nil, "proj-1", full, nil)
 		require.NoError(t, err)
 		require.NotNil(t, schema)
@@ -346,14 +463,14 @@ func TestJSONSchemaResolver_BuiltinEmbedded(t *testing.T) {
 	t.Run("URL under base but unknown path errors without repository access", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		mockRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
-		r := domain.NewJSONSchemaResolver(mockRepo, mustJSONSchemaCache(t, 128), 0, 0, nil, base)
+		r := domain.NewJSONSchemaResolver(mockRepo, nil, mustJSONSchemaCache(t, 128), 0, 0, nil, base)
 		_, err := r.Resolve(ctx, nil, "proj-1", "https://example.test/app/schemas/unknown/v.json", nil)
 		require.Error(t, err)
 	})
 	t.Run("schema URL equals base only errors", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		mockRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
-		r := domain.NewJSONSchemaResolver(mockRepo, mustJSONSchemaCache(t, 128), 0, 0, nil, base)
+		r := domain.NewJSONSchemaResolver(mockRepo, nil, mustJSONSchemaCache(t, 128), 0, 0, nil, base)
 		_, err := r.Resolve(ctx, nil, "proj-1", base.String(), nil)
 		require.Error(t, err)
 	})
