@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/ianlancetaylor/jsonschema"
 )
@@ -13,6 +14,7 @@ import (
 // Errors
 var (
 	ErrMissingBuiltinPublicBase    = errors.New("missing builtinPublicBase")
+	ErrInvalidBuiltinPublicBase    = errors.New("invalid builtinPublicBase")
 	ErrBuiltinTemplateRenderFailed = errors.New("failed to render builtin template")
 	ErrMetaSchemaCompileFailed     = errors.New("failed to compile meta-schema")
 	ErrMissingBuiltinMetaSchema    = errors.New("missing built-in meta-schema")
@@ -50,6 +52,11 @@ func NewTenantSchemaValidator(builtinPublicBase string) (*TenantSchemaValidator,
 	if builtinPublicBase == "" {
 		return nil, ErrMissingBuiltinPublicBase
 	}
+	u, err := url.Parse(builtinPublicBase)
+	if err != nil || !u.IsAbs() || u.Host == "" {
+		return nil, fmt.Errorf("%w: %q must be an absolute URL with a host", ErrInvalidBuiltinPublicBase, builtinPublicBase)
+	}
+	builtinPublicBase = strings.TrimSuffix(builtinPublicBase, "/")
 
 	// Render meta-schema builtin templates into memory
 	rendered := make(map[string][]byte)

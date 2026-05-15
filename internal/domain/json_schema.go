@@ -288,13 +288,16 @@ func writeBuiltinJSONSchema(w io.Writer, schemaPath string, canonicalDocumentURL
 	if !ok {
 		return fmt.Errorf("unknown builtin JSON schema path %q", schemaPath)
 	}
-	baseURL := canonicalDocumentURL[:strings.LastIndex(canonicalDocumentURL, "/")]
+	idx := strings.LastIndex(canonicalDocumentURL, "/")
+	if idx < 0 {
+		return fmt.Errorf("canonicalDocumentURL %q contains no '/' separator", canonicalDocumentURL)
+	}
 	data := struct {
 		SchemaURL string
 		BaseURL   string
 	}{
 		SchemaURL: canonicalDocumentURL,
-		BaseURL:   baseURL,
+		BaseURL:   canonicalDocumentURL[:idx],
 	}
 	return tmpl.Execute(w, data)
 }

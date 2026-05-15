@@ -366,7 +366,9 @@ func TestJSONSchemaResolver_Resolve(t *testing.T) {
                 "$id":     "%s",
                 "kind":    "user-schema",
                 "title":   "My User",
-                "x-auth-methods": {}
+                "x-auth-methods": {
+					"password": { "enabled": true, "position": 0 }
+				}
             }`, srvURL)
 				}))
 				t.Cleanup(srv.Close)

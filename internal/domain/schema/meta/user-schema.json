@@ -13,13 +13,15 @@
     "description": { "type": "string", "maxLength": 1024 },
     "x-auth-methods": {
       "type": "object",
+      "minProperties": 1,
       "properties": {
         "password":   { "$ref": "{{ .BaseURL }}/auth-method.json" },
         "passkey":    { "$ref": "{{ .BaseURL }}/auth-method.json" },
         "magic_link": { "$ref": "{{ .BaseURL }}/auth-method.json" },
         "sso":        { "$ref": "{{ .BaseURL }}/auth-method.json" },
         "otp":        { "$ref": "{{ .BaseURL }}/auth-method.json" }
-      }
+      },
+      "additionalProperties": false
     },
     "required": {
       "type": "array",

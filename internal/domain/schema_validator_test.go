@@ -29,6 +29,21 @@ func TestNewTenantSchemaValidator(t *testing.T) {
 		_, err := domain.NewTenantSchemaValidator("")
 		require.Error(t, err)
 	})
+	t.Run("fails with relative base", func(t *testing.T) {
+		_, err := domain.NewTenantSchemaValidator("schemas/meta")
+		require.Error(t, err)
+		assert.ErrorIs(t, err, domain.ErrInvalidBuiltinPublicBase)
+	})
+	t.Run("fails with no-host URL", func(t *testing.T) {
+		_, err := domain.NewTenantSchemaValidator("file:///local/path")
+		require.Error(t, err)
+		assert.ErrorIs(t, err, domain.ErrInvalidBuiltinPublicBase)
+	})
+	t.Run("trailing slash is normalized", func(t *testing.T) {
+		v, err := domain.NewTenantSchemaValidator("https://example.test/schemas/")
+		require.NoError(t, err)
+		require.NotNil(t, v)
+	})
 }
 
 func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
@@ -75,7 +90,9 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				"$id": "https://example.test/schemas/my-user.json",
 				"kind":    "user-schema",
 				"title":   "My User",
-				"x-auth-methods": {},
+				"x-auth-methods": {
+					"password": { "enabled": true, "position": 0 }
+				},
 				"properties": {
 					"address": {
 						"type": "object",
@@ -93,7 +110,9 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				"$id": "https://example.test/schemas/my-user.json",
 				"kind": "user-schema",
 				"title": "My User",
-				"x-auth-methods": {}
+				"x-auth-methods": {
+					"password": { "enabled": true, "position": 0 }
+				}
 			}`),
 			wantErr: domain.ErrSchemaValidationFailed,
 		},
@@ -103,7 +122,9 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				"$schema": "https://json-schema.org/draft/2020-12/schema",
 				"kind":    "user-schema",
 				"title":   "My User",
-				"x-auth-methods": {}
+				"x-auth-methods": {
+					"password": { "enabled": true, "position": 0 }
+				}
 			}`),
 			wantErr: domain.ErrSchemaValidationFailed,
 		},
@@ -123,7 +144,9 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				"$schema": "https://json-schema.org/draft/2020-12/schema",
 				"$id": "https://example.test/schemas/my-user.json",
 				"kind": "user-schema",
-				"x-auth-methods": {}
+				"x-auth-methods": {
+					"password": { "enabled": true, "position": 0 }
+				}
 			}`),
 			wantErr: domain.ErrSchemaValidationFailed,
 		},
@@ -144,7 +167,9 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				"$id": "https://example.test/schemas/my-user.json",
 				"kind": "user-schema",
 				"title": "` + strings.Repeat("aaa", 300) + `",
-				"x-auth-methods": {}
+				"x-auth-methods": {
+					"password": { "enabled": true, "position": 0 }
+				}
 			}`),
 			wantErr: domain.ErrSchemaValidationFailed,
 		},
@@ -181,7 +206,9 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				"$id": "https://example.test/schemas/my-user.json",
 				"kind": "user-schema",
 				"title": "My User",
-				"x-auth-methods": {},
+				"x-auth-methods": {
+					"password": { "enabled": true, "position": 0 }
+				},
 				"properties": {
 					"email": { "title": "Email" }
 				}
@@ -195,7 +222,9 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				"$id": "https://example.test/schemas/my-user.json",
 				"kind": "user-schema",
 				"title": "My User",
-				"x-auth-methods": {},
+				"x-auth-methods": {
+					"password": { "enabled": true, "position": 0 }
+				},
 				"properties": {
 					"email": { "type": "string" }
 				}
@@ -209,9 +238,24 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				"$id": "https://example.test/schemas/my-user.json",
 				"kind": "user-schema",
 				"title": "My User",
-				"x-auth-methods": {},
+				"x-auth-methods": {
+					"password": { "enabled": true, "position": 0 }
+				},
 				"properties": {
 					"email": { "type": "random", "title": "Email" }
+				}
+			}`),
+			wantErr: domain.ErrSchemaValidationFailed,
+		},
+		{
+			name: "unknown auth method key rejected",
+			input: []byte(`{
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"$id": "https://example.test/schemas/my-user.json",
+				"kind": "user-schema",
+				"title": "My User",
+				"x-auth-methods": {
+					"totp": { "enabled": true, "position": 0 }
 				}
 			}`),
 			wantErr: domain.ErrSchemaValidationFailed,
