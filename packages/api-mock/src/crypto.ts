@@ -14,8 +14,8 @@ const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 20
 
 export const KEY_ID = "mock-key-1";
 
-/** Public JWK for the JWKS endpoint. */
-export const JWK: JsonWebKey = {
+/** Public JWK for the JWKS endpoint (JsonWebKey + kid, which the DOM type omits). */
+export const JWK: JsonWebKey & { kid: string } = {
   ...(publicKey.export({ format: "jwk" }) as JsonWebKey),
   kid: KEY_ID,
   use: "sig",
