@@ -24,13 +24,16 @@
     "test:all": "vitest run"
   },
   "dependencies": {
+    "@mswjs/http-middleware": "catalog:",
     "@zitadel-nextgen/api": "workspace:*",
+    "express": "catalog:",
     "xstate": "catalog:"
   },
   "peerDependencies": {
     "msw": "catalog:"
   },
   "devDependencies": {
+    "@types/express": "catalog:",
     "@types/node": "catalog:",
     "@vitest/browser-playwright": "catalog:",
     "msw": "catalog:",
