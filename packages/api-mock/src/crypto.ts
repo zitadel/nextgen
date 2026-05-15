@@ -44,7 +44,7 @@ export function signHandoffToken(claims: { sub: string; iss: string }): string {
   const now = Math.floor(Date.now() / 1000);
   return buildJwt(
     { alg: "RS256", typ: "JWT", kid: KEY_ID },
-    { ...claims, aud: "exchange", iat: now, exp: now + 60 },
+    { ...claims, aud: "exchange", iat: now, nbf: now, exp: now + 60 },
   );
 }
 
@@ -60,7 +60,7 @@ export function signSessionToken(claims: {
   const now = Math.floor(Date.now() / 1000);
   return buildJwt(
     { alg: "RS256", typ: "JWT", kid: KEY_ID },
-    { ...claims, iat: now, exp: now + 3600 },
+    { ...claims, iat: now, nbf: now, exp: now + 3600 },
   );
 }
 
@@ -79,13 +79,22 @@ export function verifyHandoffToken(
   const parts = token.split(".");
   if (parts.length !== 3) throw new Error("invalid token structure");
   const [h, p, s] = parts as [string, string, string];
+
+  // Validate algorithm before touching the signature — defence against alg:none attacks.
+  const header = JSON.parse(Buffer.from(h, "base64url").toString()) as { alg?: string };
+  if (header.alg !== "RS256") throw new Error(`unsupported algorithm: ${header.alg ?? "none"}`);
+
+  // Verify signature. Use "base64url" encoding so Node handles the url-safe
+  // alphabet (-_) and missing padding (=) correctly without manual fixups.
   const signing = `${h}.${p}`;
-  const sig = Buffer.from(s.replace(/-/g, "+").replace(/_/g, "/"), "base64");
+  const sig = Buffer.from(s, "base64url");
   const ok = createVerify("SHA256")
     .update(signing)
     .verify(publicKey as KeyObject, sig);
   if (!ok) throw new Error("invalid signature");
-  const payload = JSON.parse(Buffer.from(p, "base64").toString()) as {
+
+  // Decode payload with "base64url" for the same reason as above.
+  const payload = JSON.parse(Buffer.from(p, "base64url").toString()) as {
     sub: string;
     iss: string;
     aud: string;
