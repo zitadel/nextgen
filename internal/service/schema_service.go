@@ -75,7 +75,8 @@ func (s *SchemaService) CreateSchemaByUrl(ctx context.Context, projectID string,
 		}
 	}()
 
-	_, err = s.schemaResolver.Resolve(ctx, tx, projectID, uri.String(), nil)
+	strUri := uri.String()
+	_, err = s.schemaResolver.Resolve(ctx, tx, projectID, strUri, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -85,9 +86,11 @@ func (s *SchemaService) CreateSchemaByUrl(ctx context.Context, projectID string,
 		return nil, errors.New(`domain.ErrInternal(err).WitMessage("failed to commit transaction")`)
 	}
 
-	return s.schemaRepo.Get(ctx, s.pool, nil) // TODO(wim) figure out how to pass the ids and uri
+	// TODO(wim): Since repository does not yet have a get by id, we need to use the condition. This will change in the future
+	return s.schemaRepo.Get(ctx, s.pool, database.WithCondition(s.schemaRepo.PrimaryKeyCondition(projectID, strUri)))
 }
 
 func (s *SchemaService) GetSchema(ctx context.Context, projectID string, teamID string, id string) (*domain.JSONSchema, error) {
-	return s.schemaRepo.Get(ctx, s.pool, nil) // TODO(wim) figure out how to pass the ids and uri
+	// TODO(wim): Since repository does not yet have a get by id, we need to use the condition. This will change in the future
+	return s.schemaRepo.Get(ctx, s.pool, database.WithCondition(s.schemaRepo.PrimaryKeyCondition(projectID, id)))
 }
