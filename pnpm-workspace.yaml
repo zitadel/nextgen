@@ -5,7 +5,7 @@ packages:
 
 catalog:
   "@clack/prompts": ^1.2.0
-  '@faker-js/faker': ^10.4.0
+  "@faker-js/faker": ^10.4.0
   "@lit/react": ^1.0.8
   "@nx/devkit": ^22.7.0
   "@nx/esbuild": ^22.7.0
@@ -20,7 +20,7 @@ catalog:
   "@tanstack/devtools-vite": ^0.6.0
   "@tanstack/eslint-plugin-router": ^1.161.6
   "@tanstack/react-devtools": ^0.10.2
-  '@tanstack/react-query': ^5.100.6
+  "@tanstack/react-query": ^5.100.6
   "@tanstack/react-router": ^1.168.23
   "@tanstack/react-router-devtools": ^1.166.13
   "@tanstack/router-plugin": ^1.167.22
@@ -42,7 +42,7 @@ catalog:
   lit: ^3.3.2
   msw: ^2.14.6
   nx: ^22.7.0
-  orval: ^8.9.0
+  orval: ^8.10.0
   oxfmt: ^0.46.0
   oxlint: ^1.61.0
   playwright: ^1.59.1
@@ -58,6 +58,7 @@ catalog:
   vite: ^8.0.9
   vitest: ^4.1.5
   vue-tsc: ^3.2.8
+  xstate: ^5.31.1
   zod: ^4.3.6
 
 catalogMode: strict

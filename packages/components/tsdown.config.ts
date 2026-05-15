@@ -14,7 +14,6 @@ export default defineConfig({
     manifests: "src/manifests.ts",
     "tokens/index": "src/tokens/index.ts",
     "orchestrator/index": "src/orchestrator/index.ts",
-    "orchestrator/transport": "src/orchestrator/transport.ts",
   },
   outDir: "dist",
   format: ["esm"],
@@ -23,5 +22,13 @@ export default defineConfig({
   sourcemap: true,
   clean: true,
   target: "es2022",
-  external: ["lit", /^lit\//, "liquidjs", "dompurify"],
+  external: [
+    "lit",
+    /^lit\//,
+    "liquidjs",
+    "dompurify",
+    "@zitadel-nextgen/api",
+    /^@zitadel-nextgen\/api\//,
+    "@zitadel-nextgen/api-mock",
+  ],
 });

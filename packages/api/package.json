@@ -3,17 +3,48 @@
   "version": "0.0.0",
   "description": "Generated TypeScript API client for Zitadel NextGen",
   "type": "module",
+  "files": [
+    "dist",
+    "src"
+  ],
   "exports": {
-    "./generated/model": "./src/generated/model/index.ts",
-    "./*": "./src/*.ts"
+    "./package.json": "./package.json",
+    "./generated/model": {
+      "@zitadel-nextgen/source": "./src/generated/model/index.ts",
+      "types": "./dist/generated/model/index.d.mts",
+      "import": "./dist/generated/model/index.mjs"
+    },
+    "./generated/endpoints/zitadelNextGen": {
+      "@zitadel-nextgen/source": "./src/generated/endpoints/zitadelNextGen.ts",
+      "types": "./dist/generated/endpoints/zitadelNextGen.d.mts",
+      "import": "./dist/generated/endpoints/zitadelNextGen.mjs"
+    },
+    "./generated/endpoints/zitadelNextGen.msw": {
+      "@zitadel-nextgen/source": "./src/generated/endpoints/zitadelNextGen.msw.ts",
+      "types": "./dist/generated/endpoints/zitadelNextGen.msw.d.mts",
+      "import": "./dist/generated/endpoints/zitadelNextGen.msw.mjs"
+    },
+    "./generated/endpoints/zitadelNextGen.zod": {
+      "@zitadel-nextgen/source": "./src/generated/endpoints/zitadelNextGen.zod.ts",
+      "types": "./dist/generated/endpoints/zitadelNextGen.zod.d.mts",
+      "import": "./dist/generated/endpoints/zitadelNextGen.zod.mjs"
+    },
+    "./runtime/base-url": {
+      "@zitadel-nextgen/source": "./src/runtime/base-url.ts",
+      "types": "./dist/runtime/base-url.d.mts",
+      "import": "./dist/runtime/base-url.mjs"
+    }
   },
   "scripts": {
-    "generate": "orval --config orval.config.ts --clean"
+    "generate": "orval --config orval.config.ts --clean",
+    "build": "tsdown"
   },
   "devDependencies": {
     "@faker-js/faker": "catalog:",
     "msw": "catalog:",
     "orval": "catalog:",
+    "tsdown": "catalog:",
+    "tslib": "catalog:",
     "zod": "catalog:"
   },
   "peerDependencies": {
@@ -35,9 +66,11 @@
         ]
       },
       "build": {
-        "executor": "nx:noop",
         "dependsOn": [
           "generate"
+        ],
+        "outputs": [
+          "{projectRoot}/dist"
         ]
       },
       "typecheck": {
