@@ -19,6 +19,12 @@ export type StepFixtureInput = {
   sessionToken: string;
   /** Issuer URL embedded in signed tokens (e.g. `"http://localhost:4000"`). */
   iss: string;
+  /**
+   * Email captured from the identifier step, used as the JWT `sub` claim in
+   * the handoff token. Falls back to `"mock-user@example.com"` when absent
+   * (e.g. SSO flows that skip the identifier step).
+   */
+  capturedEmail?: string;
 };
 
 const submitContinue = { submit: { text_key: "submit.continue", primary: true } };
