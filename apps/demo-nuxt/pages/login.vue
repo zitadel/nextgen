@@ -34,7 +34,11 @@ onMounted(() => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ handoff_token }),
     });
-    await navigateTo("/admin");
+    // Hard navigation forces a full server round-trip so Nuxt's server
+    // middleware re-runs with the new __nextgen_session cookie. A client-side
+    // navigateTo() would skip the server and leave useState("nextgen-auth")
+    // stale from the login-page SSR.
+    window.location.href = "/admin";
   }
 
   document.addEventListener("zitadel-flow-complete", handleFlowComplete);
