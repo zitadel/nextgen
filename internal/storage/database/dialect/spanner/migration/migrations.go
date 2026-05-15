@@ -1,29 +1,27 @@
-// Package migration holds DDL migration statements for the Cloud Spanner dialect.
-//
-// To apply migrations, use the Cloud Spanner Database Admin client
-// (cloud.google.com/go/spanner/admin/database/apiv1) to execute the DDL
-// statements in [Migrations] in order. Each entry's Up field contains the
-// statements for applying a migration; Down contains the rollback statements.
-//
-// Example (pseudocode):
-//
-//	adminClient.UpdateDatabaseDdl(ctx, &adminpb.UpdateDatabaseDdlRequest{
-//	    Database:   dbName,
-//	    Statements: splitStatements(Migrations[i].Up),
-//	})
 package migration
 
-// Migration holds the up and down DDL for a single migration step.
-type Migration struct {
-	Up   string
-	Down string
-}
+import (
+	"context"
+	"database/sql"
+	"embed"
+	"io/fs"
 
-// Migrations contains all DDL migration statements in order.
-// Add the Cloud Spanner Go SDK (cloud.google.com/go/spanner) to go.mod
-// before wiring up a real migration runner.
-var Migrations []*Migration
+	"github.com/pressly/goose/v3"
+)
 
-func registerMigration(up, down string) {
-	Migrations = append(Migrations, &Migration{Up: up, Down: down})
+//go:embed sql/*.sql
+var sqlFiles embed.FS
+
+func Migrate(ctx context.Context, db *sql.DB) error {
+	sqlFS, err := fs.Sub(sqlFiles, "sql")
+	if err != nil {
+		return err
+	}
+	// WithIsolateDDL runs DDL statements outside transactions, which Spanner requires.
+	p, err := goose.NewProvider(goose.DialectSpanner, db, sqlFS, goose.WithIsolateDDL(true))
+	if err != nil {
+		return err
+	}
+	_, err = p.Up(ctx)
+	return err
 }

@@ -29,7 +29,7 @@ type Session struct {
 	UserID *string
 
 	// UserAgent contains information about the user's device and browser.
-	UserAgent map[string]any
+	UserAgent *UserAgent
 
 	// State is computed at runtime and therefore not stored in the database.
 	State SessionState
@@ -47,6 +47,12 @@ type SessionFactor struct {
 	VerifiedAt time.Time
 	// Stored as jsonb
 	Factor any
+}
+
+// UserAgent contains information about the user's device and browser.
+type UserAgent struct {
+	ID   string
+	Info map[string]any
 }
 
 func (s *Session) GetFactor(typ AuthCheckType) *SessionFactor {

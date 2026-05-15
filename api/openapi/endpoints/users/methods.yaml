@@ -19,6 +19,9 @@ get:
         application/json:
           schema:
             type: array
+            items:
+              type: object
+              additionalProperties: true
     '400':
       description: The provided input was not valid
       content:

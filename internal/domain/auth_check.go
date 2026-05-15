@@ -16,7 +16,7 @@ type AuthCheck struct {
 	FailureCount uint16
 }
 
-//go:generate go tool enumer -type AuthCheckType -transform snake -trimprefix AuthCheckType -sql
+//go:generate go tool enumer -type AuthCheckType -transform snake -trimprefix AuthCheckType
 type AuthCheckType uint8
 
 const (

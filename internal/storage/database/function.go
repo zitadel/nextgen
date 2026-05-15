@@ -26,7 +26,7 @@ func (c coalesce) IsOnColumn(col Column) bool {
 }
 
 // Write implements [Change].
-func (c coalesce) Write(builder *StatementBuilder) error {
+func (c coalesce) Write(builder *StatementBuilder) {
 	builder.WriteString("COALESCE(")
 	for i, value := range c.values {
 		if i > 0 {
@@ -35,7 +35,6 @@ func (c coalesce) Write(builder *StatementBuilder) error {
 		builder.WriteArg(value)
 	}
 	builder.WriteString(")")
-	return nil
 }
 
 // Equals implements [Column].

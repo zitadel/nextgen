@@ -1,85 +1,52 @@
 type: object
-required: [name, type]
+required: [name]
 description: |
   A step in a flow definition. This is the admin-authored configuration,
   not the runtime payload sent to the frontend.
 
-  Steps fall into two categories:
+  Steps are schema-driven: `fields` references properties from the flow's
+  user schema, and the engine resolves field metadata (type, validation,
+  implicit outcomes) from schema annotations at runtime.
 
-  **Rendered steps** — sent to the frontend as a FlowStep response.
-  The engine strips `transitions` and `config` before sending.
-  Types: identifier, credential, form, verification, consent, info,
-  redirect, captcha, complete.
-
-  **Server-only steps** — never sent to the frontend. The engine
-  evaluates them and auto-transitions to the next step.
-  Types: policy_check, action.
+  A step with only `complete` set is a terminal step. All other steps are
+  rendered to the frontend as capability payloads.
 properties:
   name:
     type: string
     description: |
       Unique step identifier within this flow. Used as transition targets
       and returned in the API response as `step.name`.
-    example: identifier
-
-  type:
-    type: string
-    enum:
-      # Rendered by frontend
-      - identifier
-      - credential
-      - form
-      - verification
-      - consent
-      - info
-      - redirect
-      - captcha
-      - complete
-      # Server-only (never sent to frontend)
-      - policy_check
-      - action
-    description: |
-      Step type. Determines engine behavior:
-
-      Rendered types (sent to frontend):
-      - identifier: collect login handle (email, phone, username)
-      - credential: collect secret (password, OTP, passkey proof)
-      - form: generic data collection (profile, address)
-      - verification: code entry (email, phone)
-      - consent: approve/deny (terms, scopes, permissions)
-      - info: read-only informational screen
-      - redirect: navigate to external URL (SSO provider) — no fields rendered
-      - captcha: dedicated captcha challenge
-      - complete: terminal step — see `behavior`
-
-      Server-only types (auto-transitioned, never reach frontend):
-      - policy_check: evaluate a condition, branch to next step
-      - action: execute a server-side mutation (create session, write auth attempt)
-
-  texts:
-    $ref: step-texts.yaml
+    example: login
 
   fields:
-    type: object
+    type: array
     description: |
-      Input fields to collect from the user. Keyed by field name.
-      Only relevant for rendered steps.
-    additionalProperties:
-      $ref: field.yaml
-    default: {}
+      Schema property names to collect from the user. Each entry references
+      a property in the flow's user schema. The engine resolves field type,
+      validation rules, and implicit outcomes from schema annotations
+      (e.g. `x-identifier` implies a `user_not_found` transition outcome).
+    items:
+      type: string
+    default: []
+    example: [email, password]
 
   actions:
     type: object
     description: |
       Actions the user can take. Keyed by action name.
       The action name is what the frontend sends back in the submit request.
+      If omitted, the engine provides a default `submit` action.
     additionalProperties:
       $ref: step-action.yaml
     default: {}
 
   gates:
     type: object
-    description: Security gates that must be satisfied before submission.
+    description: |
+      Security gates that must be satisfied before submission. Keyed by gate
+      name. Each gate selects a type (e.g. "captcha") and provider-specific
+      configuration. The engine may also inject gates dynamically based on
+      policy.
     additionalProperties:
       $ref: gate.yaml
     default: {}
@@ -91,42 +58,34 @@ properties:
       $ref: sso-provider.yaml
     default: []
 
-  behavior:
+  on_success:
+    type: string
+    enum: [create_user, reset_credential]
+    description: |
+      Server-side mutation to execute when this step completes successfully.
+      Runs after field validation passes, before the transition fires.
+
+      - create_user: creates the user record (registration flows)
+      - reset_credential: replaces a stored credential (recovery flows)
+    example: create_user
+
+  complete:
     type: string
     enum: [redirect, show]
     description: |
-      Only used on `complete` steps. Tells the frontend what to do:
+      Marks this as a terminal step. Tells the frontend what to do:
       - redirect: navigate to redirect_uri (OIDC/SAML callback done)
       - show: render as a success/info screen
-
-  config:
-    type: object
-    description: |
-      Server-only configuration for `policy_check` and `action` steps.
-      Never sent to the frontend.
-    properties:
-      check:
-        type: string
-        description: |
-          Policy check identifier for `policy_check` steps.
-          The engine evaluates this and picks a transition branch.
-        example: required_factors
-      action:
-        type: string
-        description: |
-          Mutation identifier for `action` steps.
-          The engine executes this side effect and advances.
-        example: create_user_and_session
 
   transitions:
     type: object
     description: |
       Maps action/outcome names to their transition descriptor.
 
-      For `policy_check` steps, keys are outcome names (e.g. "found", "not_found").
-      For `action` steps, keys are result names (e.g. "created").
-      For rendered steps, keys match action names from the `actions` dict,
-      plus "sso" and "callback" for SSO-related transitions.
+      Keys match action names from the `actions` dict. Additional keys
+      come from implicit outcomes based on schema annotations
+      (e.g. `user_not_found` from `x-identifier` fields) and engine
+      events (e.g. `sso`, `callback`).
     additionalProperties:
       type: object
       required: [target]
@@ -134,13 +93,14 @@ properties:
         target:
           type: string
           description: |
-            Step name within this flow (when `action` is null), or the slug
+            Step name within this flow (when `action` is null), or the name
             of another flow (when `action` is `switch` or `pivot`).
           example: password
         action:
-          type: string
-          enum: [switch, pivot]
-          nullable: true
+          oneOf:
+            - type: string
+              enum: [switch, pivot]
+            - type: 'null'
           description: |
             How to interpret `target`:
             - null (omitted): transition to a step in the current flow.

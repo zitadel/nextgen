@@ -13,10 +13,13 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"]
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],
-  "exclude": ["src/**/*.spec.ts"],
+  "exclude": ["src/**/*.spec.ts", "src/**/*.test.ts"],
   "references": [
     {
       "path": "../sdk-core/tsconfig.lib.json"
+    },
+    {
+      "path": "../components/tsconfig.lib.json"
     }
   ]
 }

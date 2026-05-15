@@ -11,6 +11,7 @@ import { applyFontUrl } from "./font-loader.js";
 import { createLiquidEngine, TEMPLATE_NAMES } from "./liquid.js";
 import { en, type Locale } from "./locales/en.js";
 import { patchMandatoryGates } from "./mandatory-gates.js";
+import { ProxyTransport } from "./proxy-transport.js";
 import { createSanitiser } from "./sanitiser.js";
 import { layoutChromeCss } from "./templates/default.liquid.js";
 import { ThemeController } from "./theme-controller.js";
@@ -66,6 +67,21 @@ export class ZitadelLogin extends LitElement {
 
   /** Base URL when the orchestrator falls back to {@link FetchTransport}. */
   @property({ type: String, attribute: "base-url" }) accessor baseUrl = "";
+
+  /**
+   * Same-origin auth proxy base path (e.g. `/__nextgen`). When set, the
+   * orchestrator drives a {@link ProxyTransport} against the SDK proxy
+   * shipped in `feat/sdk-packages` instead of talking to a Zitadel backend
+   * directly. Takes precedence over `baseUrl`.
+   */
+  @property({ type: String, attribute: "proxy-base" }) accessor proxyBase = "";
+
+  /**
+   * Optional URL to navigate to after a successful sign-in. Mirrors the
+   * `post-sign-in-url` attribute on the placeholder `<nextgen-login>` so
+   * consumers can configure the post-login redirect declaratively.
+   */
+  @property({ type: String, attribute: "post-sign-in-url" }) accessor postSignInUrl = "";
 
   /** Override locale dict. Defaults to bundled `en`. */
   @property({ attribute: false }) accessor locale: Locale = en;
@@ -169,9 +185,13 @@ export class ZitadelLogin extends LitElement {
     if (this.transport) {
       return this.transport;
     }
+    if (this.proxyBase) {
+      this.transport = new ProxyTransport({ proxyBase: this.proxyBase });
+      return this.transport;
+    }
     if (!this.baseUrl) {
       throw new Error(
-        "<zitadel-login> requires either a `transport` property or a `base-url` attribute.",
+        "<zitadel-login> requires a `transport` property, a `proxy-base` attribute, or a `base-url` attribute.",
       );
     }
     this.transport = new FetchTransport({ baseUrl: this.baseUrl });
@@ -210,6 +230,20 @@ export class ZitadelLogin extends LitElement {
       console.warn("[zitadel-login] branding payload has issues:", issues);
     }
     this.formValues = collectInitialValues(response.step);
+    this.maybeRedirectAfterSignIn(response.step);
+  }
+
+  /**
+   * Navigates to {@link postSignInUrl} when the flow has reached a terminal
+   * `complete` step. Mirrors the placeholder `<nextgen-login>`'s
+   * `post-sign-in-url` attribute so consumers can wire post-login redirects
+   * declaratively without subscribing to events.
+   */
+  private maybeRedirectAfterSignIn(step: FlowStep): void {
+    if (step.type !== "complete") return;
+    if (!this.postSignInUrl) return;
+    if (typeof window === "undefined") return;
+    window.location.href = this.postSignInUrl;
   }
 
   private renderStep(step: FlowStep, engine: Liquid): string {
