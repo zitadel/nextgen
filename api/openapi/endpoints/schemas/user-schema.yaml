@@ -14,6 +14,7 @@ properties:
     description: The JSON Schema version used for this schema.
   $id:
     type: string
+    format: uri
     description: The unique identifier for this schema, which is also the URL where this schema can be accessed.
   kind:
     type: string
@@ -22,7 +23,7 @@ properties:
   type:
     type: string
     const: object
-    description: The type of a user must alwasy be an object
+    description: The type of a user must always be an object
   title:
     type: string
     minLength: 1
