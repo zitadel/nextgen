@@ -31,6 +31,8 @@ properties:
     description: A description of this schema.
   x-auth-methods:
     type: object
+    minProperties: 1
+    additionalProperties: false
     description: |
       A list of authentication methods supported by the user definition.
     properties:
