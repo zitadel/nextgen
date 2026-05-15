@@ -67,6 +67,12 @@ type Handler interface {
 	//
 	// POST /auth_attempts/{attempt_id}/handoff
 	CreateHandoff(ctx context.Context, params CreateHandoffParams) (CreateHandoffRes, error)
+	// CreateProject implements createProject operation.
+	//
+	// Create project.
+	//
+	// POST /projects
+	CreateProject(ctx context.Context, req *CreateProjectRequest) (CreateProjectRes, error)
 	// CreateSchema implements createSchema operation.
 	//
 	// Create a new schema. The schema definition must include a unique $id field,
@@ -171,6 +177,12 @@ type Handler interface {
 	//
 	// GET /.well-known/openid-configuration
 	GetOpenIDConfiguration(ctx context.Context) (GetOpenIDConfigurationRes, error)
+	// GetProject implements getProject operation.
+	//
+	// Returns the current state of a project.
+	//
+	// GET /projects/{project_id}
+	GetProject(ctx context.Context, params GetProjectParams) (GetProjectRes, error)
 	// GetReady implements getReady operation.
 	//
 	// Check whether the server is ready to accept requests.

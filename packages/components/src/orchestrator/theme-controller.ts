@@ -10,7 +10,7 @@
  */
 import type { ReactiveController, ReactiveControllerHost } from "lit";
 
-import type { Branding } from "./types.js";
+import type { Branding } from "./branding.js";
 
 export type ResolvedTheme = "light" | "dark";
 

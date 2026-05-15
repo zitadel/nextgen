@@ -17,5 +17,13 @@
     ]
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["src/**/*.spec.ts"]
+  "exclude": ["src/**/*.spec.ts"],
+  "references": [
+    {
+      "path": "../api-mock/tsconfig.lib.json"
+    },
+    {
+      "path": "../api/tsconfig.lib.json"
+    }
+  ]
 }

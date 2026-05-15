@@ -790,6 +790,88 @@ type CreateHandoffNotFound ErrorDetails
 
 func (*CreateHandoffNotFound) createHandoffRes() {}
 
+// Ref: #
+type CreateProjectRequest struct {
+	// Origins which are allowed for previewing and testing the project.
+	PreviewOrigins []string `json:"previewOrigins"`
+}
+
+// GetPreviewOrigins returns the value of PreviewOrigins.
+func (s *CreateProjectRequest) GetPreviewOrigins() []string {
+	return s.PreviewOrigins
+}
+
+// SetPreviewOrigins sets the value of PreviewOrigins.
+func (s *CreateProjectRequest) SetPreviewOrigins(val []string) {
+	s.PreviewOrigins = val
+}
+
+// Ref: #
+type CreateProjectResponse struct {
+	// The unique identifier of the project.
+	ID string `json:"id"`
+	// Secret which can be used for authentication when modifying the project.
+	ProjectSecret string `json:"projectSecret"`
+	// Secret which can be used for previewing and testing the project.
+	PreviewSecret string `json:"previewSecret"`
+	// Origins which are allowed for previewing and testing the project.
+	PreviewOrigins []string `json:"previewOrigins"`
+	// The time when the project was created.
+	CreatedAt time.Time `json:"createdAt"`
+}
+
+// GetID returns the value of ID.
+func (s *CreateProjectResponse) GetID() string {
+	return s.ID
+}
+
+// GetProjectSecret returns the value of ProjectSecret.
+func (s *CreateProjectResponse) GetProjectSecret() string {
+	return s.ProjectSecret
+}
+
+// GetPreviewSecret returns the value of PreviewSecret.
+func (s *CreateProjectResponse) GetPreviewSecret() string {
+	return s.PreviewSecret
+}
+
+// GetPreviewOrigins returns the value of PreviewOrigins.
+func (s *CreateProjectResponse) GetPreviewOrigins() []string {
+	return s.PreviewOrigins
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *CreateProjectResponse) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// SetID sets the value of ID.
+func (s *CreateProjectResponse) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectSecret sets the value of ProjectSecret.
+func (s *CreateProjectResponse) SetProjectSecret(val string) {
+	s.ProjectSecret = val
+}
+
+// SetPreviewSecret sets the value of PreviewSecret.
+func (s *CreateProjectResponse) SetPreviewSecret(val string) {
+	s.PreviewSecret = val
+}
+
+// SetPreviewOrigins sets the value of PreviewOrigins.
+func (s *CreateProjectResponse) SetPreviewOrigins(val []string) {
+	s.PreviewOrigins = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *CreateProjectResponse) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+func (*CreateProjectResponse) createProjectRes() {}
+
 type CreateSchemaBadRequest ErrorDetails
 
 func (*CreateSchemaBadRequest) createSchemaRes() {}
@@ -1096,6 +1178,7 @@ func (s *ErrorDetails) SetDetails(val OptErrorDetailsDetails) {
 func (*ErrorDetails) authorizeDeviceRes()      {}
 func (*ErrorDetails) authorizeGetRes()         {}
 func (*ErrorDetails) createFlowRes()           {}
+func (*ErrorDetails) createProjectRes()        {}
 func (*ErrorDetails) createSessionRes()        {}
 func (*ErrorDetails) deleteFlowDefinitionRes() {}
 func (*ErrorDetails) endSessionRes()           {}
@@ -2656,7 +2739,7 @@ type FlowHint struct {
 	// Scopes flow resolution to a team.
 	TeamID OptString `json:"team_id"`
 	// Scopes to a specific user type.
-	SchemaID OptString `json:"schema_id"`
+	UserSchemaID OptString `json:"user_schema_id"`
 	// Scopes to a specific application.
 	AppID OptString `json:"app_id"`
 }
@@ -2671,9 +2754,9 @@ func (s *FlowHint) GetTeamID() OptString {
 	return s.TeamID
 }
 
-// GetSchemaID returns the value of SchemaID.
-func (s *FlowHint) GetSchemaID() OptString {
-	return s.SchemaID
+// GetUserSchemaID returns the value of UserSchemaID.
+func (s *FlowHint) GetUserSchemaID() OptString {
+	return s.UserSchemaID
 }
 
 // GetAppID returns the value of AppID.
@@ -2691,9 +2774,9 @@ func (s *FlowHint) SetTeamID(val OptString) {
 	s.TeamID = val
 }
 
-// SetSchemaID sets the value of SchemaID.
-func (s *FlowHint) SetSchemaID(val OptString) {
-	s.SchemaID = val
+// SetUserSchemaID sets the value of UserSchemaID.
+func (s *FlowHint) SetUserSchemaID(val OptString) {
+	s.UserSchemaID = val
 }
 
 // SetAppID sets the value of AppID.
@@ -3294,6 +3377,57 @@ func (s GetLiveOK) Read(p []byte) (n int, err error) {
 }
 
 func (*GetLiveOK) getLiveRes() {}
+
+type GetProjectNotFound ErrorDetails
+
+func (*GetProjectNotFound) getProjectRes() {}
+
+// The current state of a project.
+// Ref: #
+type GetProjectResponse struct {
+	// The unique identifier of the project.
+	ID string `json:"id"`
+	// The time when the project was created.
+	CreatedAt time.Time `json:"createdAt"`
+	// The time when the project was last updated.
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+// GetID returns the value of ID.
+func (s *GetProjectResponse) GetID() string {
+	return s.ID
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *GetProjectResponse) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetUpdatedAt returns the value of UpdatedAt.
+func (s *GetProjectResponse) GetUpdatedAt() time.Time {
+	return s.UpdatedAt
+}
+
+// SetID sets the value of ID.
+func (s *GetProjectResponse) SetID(val string) {
+	s.ID = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *GetProjectResponse) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetUpdatedAt sets the value of UpdatedAt.
+func (s *GetProjectResponse) SetUpdatedAt(val time.Time) {
+	s.UpdatedAt = val
+}
+
+func (*GetProjectResponse) getProjectRes() {}
+
+type GetProjectUnauthorized ErrorDetails
+
+func (*GetProjectUnauthorized) getProjectRes() {}
 
 type GetReadyOK struct {
 	Data io.Reader
@@ -4233,9 +4367,20 @@ type ListUsersInternalServerError ErrorDetails
 
 func (*ListUsersInternalServerError) listUsersRes() {}
 
-type ListUsersOKApplicationJSON []jx.Raw
+type ListUsersOKApplicationJSON []ListUsersOKItem
 
 func (*ListUsersOKApplicationJSON) listUsersRes() {}
+
+type ListUsersOKItem map[string]jx.Raw
+
+func (s *ListUsersOKItem) init() ListUsersOKItem {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
 
 // Ref: #
 type NestedUserProperty struct {

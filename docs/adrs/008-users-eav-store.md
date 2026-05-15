@@ -8,7 +8,7 @@
 Zitadel requires a storage mechanism for user attributes that supports a flexible, schema-driven Entity-Attribute-Value (EAV) model. Key requirements include:
 * Scalability to 10M+ users.
 * Low-latency retrieval (<2ms) for fully hydrated user objects.
-* Enforcement of both Organization-scoped and Global-scoped uniqueness for specific attributes (e.g., Email, Username).
+* Enforcement of both Team-scoped and Global-scoped uniqueness for specific attributes (e.g., Email, Username).
 * Avoidance of the "Large Table Bloat" performance degradation common in PostgreSQL.
 
 ## Decision
@@ -22,22 +22,22 @@ To maintain clarity within the `zitadel_nextgen` schema, we adopt canonical, des
 
 ### 2. Table Partitioning Strategy
 Both the data store and the registry are partitioned using **Hash Partitioning**.
-* **`user_attributes`** is partitioned by `(instance_id, user_id)`.
-* **`user_unique_attributes`** is partitioned by `(instance_id, key)`.
+* **`user_attributes`** is partitioned by `(project_id, user_id)`.
+* **`user_unique_attributes`** is partitioned by `(project_id, key)`.
 
 **Rationale:** Beyond query performance, partitioning is utilized to optimize **PostgreSQL Vacuum** operations. By splitting large datasets into smaller physical files, autovacuum can process partitions independently, reducing IO-wait times and preventing table-wide bloat in high-write environments.
 
 ### 3. Data Integrity & Nuances
 * **JSON Blob Validation:** To prevent "dirty data" and storage of useless metadata, a `CHECK` constraint is applied to the `value` column to prevent the insertion of empty JSON objects (`{}`) or JSON nulls.
 * **Registry Usage:** We explicitly decouple uniqueness from the data store. The `user_unique_attributes` table stores binary hashes (`BYTEA`) of values to ensure the Primary Key remains dense and high-performing, even when the underlying data is a large JSON string.
-* **Hash Scoping:** The registry uses an `organization_id` field that is populated with the actual ID for Org-scoped uniqueness or an empty string (`''`) for Global-scoped uniqueness, allowing a single table to handle both B2B and B2C constraints.
+* **Hash Scoping:** The registry uses a `team_id` field that is populated with the actual ID for Team-scoped uniqueness or an empty string (`''`) for Global-scoped uniqueness, allowing a single table to handle both B2B and B2C constraints.
 
 ### 4. Indexing Strategy
 We employ a hybrid indexing strategy to support multi-modal data:
 * **Primary Keys:** All tables use composite primary keys optimized for the most common join paths.
 * **B-Tree Scalar Index:** A partial index is maintained for scalar types (string, number, boolean) to support high-speed lookups and filtering.
-* **GIN Array Search:** We utilize the `btree_gin` extension to provide GIN indexes on attributes containing arrays, enabling efficient "contains" (`@>`) operations while maintaining B-Tree performance on the prefix columns (`instance_id`, `key`).
-* **Foreign Key Indices:** Explicit indices are maintained on `organization_id` and `instance_id` to support cascading deletes and multi-tenant isolation cleanup.
+* **GIN Array Search:** We utilize the `btree_gin` extension to provide GIN indexes on attributes containing arrays, enabling efficient "contains" (`@>`) operations while maintaining B-Tree performance on the prefix columns (`project_id`, `key`).
+* **Foreign Key Indices:** Explicit indices are maintained on `team_id` and `project_id` to support cascading deletes and multi-tenant isolation cleanup.
 
 ## Consequences
 

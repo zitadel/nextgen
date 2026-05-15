@@ -1,4 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { setApiBaseUrl } from "@zitadel-nextgen/api/runtime/base-url";
 
 import "./zitadel-logout.js";
 import type { ZitadelLogout } from "./zitadel-logout.js";
@@ -7,7 +9,18 @@ import type { ZitadelLogout } from "./zitadel-logout.js";
  * Real-browser checks for `<zitadel-logout>`. Outside-click + Escape close
  * behaviour and focus restoration depend on a real platform; the unit spec
  * covers cookie parsing, template-slot mode, and aria attributes.
+ *
+ * Network calls go through the typed `endSession` operation in
+ * `@zitadel-nextgen/api`. We swap `globalThis.fetch` for a lightweight stub
+ * (rather than running `msw/browser`) because vitest's browser provider
+ * does not register a service worker out of the box.
  */
+const API_BASE = "https://logout.test.invalid";
+
+beforeAll(() => {
+  setApiBaseUrl(API_BASE);
+});
+
 function setDisplayCookie(name: string, email: string): void {
   const value = btoa(JSON.stringify({ name, email }));
   document.cookie = `__nextgen_display=${value}; path=/`;
@@ -17,12 +30,6 @@ function clearDisplayCookie(): void {
   document.cookie = "__nextgen_display=; path=/; max-age=0";
 }
 
-/**
- * Resolves a shadow-DOM element by selector, throwing if either the shadow
- * root or the queried element is missing. Avoids the
- * `(host.shadowRoot?.querySelector("X") as Y).click()` pattern that lints as
- * unsafe optional chaining.
- */
 function shadowQuery<T extends Element>(host: Element, selector: string): T {
   const root = host.shadowRoot;
   if (!root) {
@@ -47,20 +54,23 @@ async function waitFor<T>(probe: () => T | null | undefined, timeout = 1500): Pr
 
 describe("<zitadel-logout> open/close (chromium)", () => {
   let host: HTMLDivElement;
+  let originalFetch: typeof fetch;
 
   beforeEach(() => {
     host = document.createElement("div");
     document.body.appendChild(host);
     setDisplayCookie("Alice Liddell", "alice@acme.com");
+    originalFetch = globalThis.fetch;
   });
 
   afterEach(() => {
     host.remove();
     clearDisplayCookie();
+    globalThis.fetch = originalFetch;
   });
 
   async function mount(): Promise<ZitadelLogout> {
-    host.innerHTML = `<zitadel-logout proxy-base="/__nextgen"></zitadel-logout>`;
+    host.innerHTML = `<zitadel-logout></zitadel-logout>`;
     const element = host.querySelector("zitadel-logout") as ZitadelLogout;
     await waitFor(() => element.shadowRoot?.querySelector(".trigger"));
     return element;
@@ -90,18 +100,18 @@ describe("<zitadel-logout> open/close (chromium)", () => {
     expect(element.shadowRoot?.activeElement).toBe(trigger);
   });
 
-  it("calls the configured fetch and respects post-sign-out-url", async () => {
+  it("calls the typed end-session URL with credentials", async () => {
     const element = await mount();
-    const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
-    element.fetchImpl = fetchMock as unknown as typeof fetch;
+    const fetchMock = vi.fn(async () => new Response(null, { status: 204 }));
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
     element.postSignOutUrl = "";
 
     shadowQuery<HTMLButtonElement>(element, ".trigger").click();
     await element.updateComplete;
     shadowQuery<HTMLButtonElement>(element, ".signout-btn").click();
     await waitFor(() => (fetchMock.mock.calls.length > 0 ? fetchMock : null));
-    expect((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[0]).toBe(
-      "/__nextgen/v1/logout",
-    );
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url.startsWith(`${API_BASE}/auth/end-session`)).toBe(true);
+    expect(init.credentials).toBe("include");
   });
 });

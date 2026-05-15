@@ -23,6 +23,18 @@
     },
     {
       "path": "./apps/cli"
+    },
+    {
+      "path": "./packages/api"
+    },
+    {
+      "path": "./packages/api-mock"
+    },
+    {
+      "path": "./packages/mockserver"
+    },
+    {
+      "path": "./apps/demo-next"
     }
   ]
 }

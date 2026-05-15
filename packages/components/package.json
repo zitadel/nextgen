@@ -41,11 +41,10 @@
     "./orchestrator": {
       "types": "./dist/orchestrator/index.d.mts",
       "import": "./dist/orchestrator/index.mjs"
-    },
-    "./orchestrator/transport": {
-      "types": "./dist/orchestrator/transport.d.mts",
-      "import": "./dist/orchestrator/transport.mjs"
     }
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "dev": "vite",
@@ -54,10 +53,8 @@
     "test:browser": "vitest run --project browser",
     "test:all": "vitest run"
   },
-  "publishConfig": {
-    "access": "public"
-  },
   "dependencies": {
+    "@zitadel-nextgen/api": "workspace:*",
     "dompurify": "catalog:",
     "liquidjs": "catalog:",
     "lit": "catalog:"
@@ -65,7 +62,9 @@
   "devDependencies": {
     "@vitest/browser": "catalog:",
     "@vitest/browser-playwright": "catalog:",
+    "@zitadel-nextgen/api-mock": "workspace:*",
     "jsdom": "catalog:",
+    "msw": "catalog:",
     "playwright": "catalog:",
     "ts-lit-plugin": "catalog:",
     "tsdown": "catalog:",
