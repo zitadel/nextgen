@@ -93,13 +93,7 @@ export async function runSetup(io: CliIO, opts: SetupOptions): Promise<void> {
   const project = opts.dryRun
     ? dryRunProject(previewOrigins)
     : await createPlatformClient(effectiveServer).createProject({
-        preview_origins: previewOrigins,
-        slug_preference: pkg.name,
-        client_metadata: {
-          framework: framework.id,
-          package_manager: packageManager,
-          cli: "zitadel",
-        },
+        previewOrigins: previewOrigins,
       });
 
   const rendererId = opts.renderer ?? "react";
@@ -114,9 +108,9 @@ export async function runSetup(io: CliIO, opts: SetupOptions): Promise<void> {
     framework,
     renderer,
     config: {
-      project_id: project.project_id,
+      project_id: project.id,
       issuer,
-      preview_origins: project.preview_origins,
+      preview_origins: project.previewOrigins,
       userSchemaPath: ".zitadel/schemas/user.json",
     },
     isInitialSetup: true,
@@ -165,10 +159,9 @@ export async function runSetup(io: CliIO, opts: SetupOptions): Promise<void> {
     {
       title: "Zitadel is ready in pre-claim mode.",
       project: {
-        project_id: project.project_id,
+        project_id: project.id,
         lifecycle: "pre-claim",
         issuer,
-        scratch_dashboard_url: project.scratch_dashboard_url,
       },
       framework: framework.id,
       package_manager: packageManager,
@@ -211,12 +204,11 @@ function basePlan(input: {
         path: ".zitadel/secret",
         mode: 0o600,
         contents: `${stableStringify({
-          project_id: input.project.project_id,
-          project_secret: input.project.project_secret,
-          preview_secret: input.project.preview_secret,
-          preview_origins: input.project.preview_origins,
-          created_at: input.project.created_at,
-          schema_version: input.project.schema_version,
+          project_id: input.project.id,
+          project_secret: input.project.projectSecret,
+          preview_secret: input.project.previewSecret,
+          preview_origins: input.project.previewOrigins,
+          created_at: input.project.createdAt,
         })}\n`,
       },
       { kind: "write", path: "zitadel.json", contents: `${stableStringify(input.config)}\n` },
@@ -248,7 +240,7 @@ function basePlan(input: {
         kind: "merge-env",
         path: ".env.local",
         entries: {
-          ZITADEL_PROJECT_ID: input.project.project_id,
+          ZITADEL_PROJECT_ID: input.project.id,
           ZITADEL_ENVIRONMENT: "development",
           ZITADEL_ISSUER: input.issuer,
         },
@@ -281,15 +273,15 @@ function projectConfig(
   const environments: Record<string, unknown> = {
     development: { issuer },
   };
-  if (project.preview_origins.length > 0) {
+  if (project.previewOrigins.length > 0) {
     environments.preview = {
-      issuer_pattern: project.preview_origins.map((origin) => `https://${origin}`),
+      issuer_pattern: project.previewOrigins.map((origin) => `https://${origin}`),
     };
   }
 
   return {
     $schema: "https://schemas.zitadel.com/v2/project.schema.json",
-    project: project.project_id,
+    project: project.id,
     server: projectDefaultServer(source),
     framework: { id: framework },
     branding: {
@@ -475,13 +467,11 @@ function splitCsv(value: string | undefined): string[] | undefined {
 
 function dryRunProject(previewOrigins: string[]): CreateProjectResponse {
   return {
-    project_id: "dry-run-0000",
-    project_secret: "sk_proj_dry_run_full",
-    preview_secret: "sk_proj_dry_run_preview",
-    preview_origins: previewOrigins,
-    created_at: "2026-04-21T14:03:11.000Z",
-    scratch_dashboard_url: "https://zitadel.dev/scratch/dry-run-0000",
-    schema_version: 2,
+    id: "dry-run-0000",
+    projectSecret: "sk_proj_dry_run_full",
+    previewSecret: "sk_proj_dry_run_preview",
+    previewOrigins,
+    createdAt: "2026-04-21T14:03:11.000Z",
   };
 }
 

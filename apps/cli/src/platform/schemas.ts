@@ -7,37 +7,23 @@ export const serverSchema = z.union([z.literal("mock"), z.string().url()]);
 export type ZitadelServer = z.infer<typeof serverSchema>;
 
 export const createProjectRequestSchema = z.object({
-  preview_origins: z.array(z.string()).default([]),
-  slug_preference: z.string().optional(),
-  client_metadata: z.record(z.string(), z.unknown()).optional(),
+  previewOrigins: z.array(z.string()).default([]),
 });
 export type CreateProjectRequest = z.infer<typeof createProjectRequestSchema>;
 
 export const createProjectResponseSchema = z.object({
-  project_id: z.string(),
-  project_secret: z.string(),
-  preview_secret: z.string(),
-  preview_origins: z.array(z.string()),
-  created_at: z.string(),
-  scratch_dashboard_url: z.url(),
-  schema_version: z.number().default(2),
+  id: z.string(),
+  projectSecret: z.string(),
+  previewSecret: z.string(),
+  previewOrigins: z.array(z.string()),
+  createdAt: z.string(),
 });
 export type CreateProjectResponse = z.infer<typeof createProjectResponseSchema>;
 
-const lifecycleSchema = z.enum(["pre-claim", "claimed", "unclaimed"]).transform((value) => {
-  return value === "unclaimed" ? "pre-claim" : value;
-});
-
 export const projectResponseSchema = z.object({
-  project_id: z.string(),
-  lifecycle: lifecycleSchema,
-  declared_issuers: z.record(z.string(), z.unknown()).optional(),
-  preview_origins: z.array(z.string()).default([]),
-  team_id: z.string().optional(),
-  created_at: z.string().optional(),
-  claimed_at: z.string().optional(),
-  config_hash: z.string().optional(),
-  tier: z.enum(["free", "pro", "enterprise"]).optional(),
+  id: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
 });
 export type GetProjectResponse = z.infer<typeof projectResponseSchema>;
 

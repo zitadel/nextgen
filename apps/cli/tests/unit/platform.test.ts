@@ -13,13 +13,12 @@ describe("MockPlatformClient", () => {
   it("returns schema-valid project and config responses", async () => {
     const client = new MockPlatformClient();
     const project = await client.createProject({
-      preview_origins: ["*.vercel.app"],
-      slug_preference: "demo-app",
+      previewOrigins: ["*.vercel.app"],
     });
-    expect(createProjectResponseSchema.parse(project).schema_version).toBe(2);
-    const upload = await client.uploadConfig(project.project_id, "development", {
+    expect(createProjectResponseSchema.parse(project).id).toBeTruthy();
+    const upload = await client.uploadConfig(project.id, "development", {
       config: {
-        project: project.project_id,
+        project: project.id,
         environments: { development: { issuer: "http://localhost:3000" } },
       },
       hash: "sha256:test",
@@ -39,7 +38,7 @@ describe("MockPlatformClient", () => {
     const uploadConfig = JSON.parse(
       await readFile(join(root, "uploadConfig.ok.json"), "utf8"),
     ) as unknown;
-    expect(createProjectResponseSchema.parse(createProject).schema_version).toBe(2);
+    expect(createProjectResponseSchema.parse(createProject).id).toBe("river-8421");
     expect(
       configUploadResponseSchema.parse(uploadConfig).server_capabilities.flow_protocol_version,
     ).toBe("1.0");

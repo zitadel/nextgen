@@ -22,23 +22,19 @@ export class MockPlatformClient implements PlatformClient {
   private configVersion = 0;
 
   async createProject(req: CreateProjectRequest): Promise<CreateProjectResponse> {
-    const projectId = toProjectId(req.slug_preference);
+    const projectId = toProjectId(undefined);
     const response: CreateProjectResponse = {
-      project_id: projectId,
-      project_secret: `sk_proj_mock_${projectId.replace(/[^a-z0-9]/g, "")}_full`,
-      preview_secret: `sk_proj_mock_${projectId.replace(/[^a-z0-9]/g, "")}_preview`,
-      preview_origins: req.preview_origins ?? [],
-      created_at: CREATED_AT,
-      scratch_dashboard_url: `https://zitadel.dev/scratch/${projectId}`,
-      schema_version: 2,
+      id: projectId,
+      projectSecret: `sk_proj_mock_${projectId.replace(/[^a-z0-9]/g, "")}_full`,
+      previewSecret: `sk_proj_mock_${projectId.replace(/[^a-z0-9]/g, "")}_preview`,
+      previewOrigins: req.previewOrigins ?? [],
+      createdAt: CREATED_AT,
     };
 
     this.projects.set(projectId, {
-      project_id: projectId,
-      lifecycle: "pre-claim",
-      declared_issuers: {},
-      preview_origins: response.preview_origins,
-      created_at: response.created_at,
+      id: projectId,
+      createdAt: CREATED_AT,
+      updatedAt: CREATED_AT,
     });
 
     return response;
@@ -47,11 +43,9 @@ export class MockPlatformClient implements PlatformClient {
   async getProject(projectId: string): Promise<GetProjectResponse> {
     return (
       this.projects.get(projectId) ?? {
-        project_id: projectId,
-        lifecycle: "pre-claim",
-        declared_issuers: {},
-        preview_origins: [],
-        created_at: CREATED_AT,
+        id: projectId,
+        createdAt: CREATED_AT,
+        updatedAt: CREATED_AT,
       }
     );
   }
