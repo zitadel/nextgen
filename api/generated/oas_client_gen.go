@@ -3983,9 +3983,9 @@ func (c *Client) sendListFlowDefinitions(ctx context.Context, params ListFlowDef
 		}
 	}
 	{
-		// Encode "project_id" parameter.
+		// Encode "projectID" parameter.
 		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "project_id",
+			Name:    "projectID",
 			Style:   uri.QueryStyleForm,
 			Explode: true,
 		}

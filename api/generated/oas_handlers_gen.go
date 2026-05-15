@@ -5322,7 +5322,7 @@ func (s *Server) handleListFlowDefinitionsRequest(args [0]string, argsEscaped bo
 					In:   "query",
 				}: params.PageToken,
 				{
-					Name: "project_id",
+					Name: "projectID",
 					In:   "query",
 				}: params.ProjectID,
 				{

@@ -4,5 +4,4 @@ required:
 properties:
   id:
     type: string
-    format: uri
     description: The ID of the created schema

@@ -13,7 +13,7 @@ type Handler struct {
 	api.UnimplementedHandler
 
 	schemaService service.SchemaService
-	flowService service.FlowService
+	flowService   service.FlowService
 }
 
 func NewHandler(
@@ -22,7 +22,7 @@ func NewHandler(
 ) *Handler {
 	return &Handler{
 		schemaService: schemaService,
-		flowService: flowService,
+		flowService:   flowService,
 	}
 }
 
