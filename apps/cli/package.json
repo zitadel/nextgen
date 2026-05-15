@@ -34,7 +34,9 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@zitadel-nextgen/api-mock": "workspace:*",
     "@zitadel-nextgen/sdk-next": "workspace:*",
+    "msw": "catalog:",
     "tsdown": "^0.21.10",
     "tsx": "catalog:",
     "vitest": "^3.0.0"

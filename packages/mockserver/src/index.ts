@@ -1,4 +1,4 @@
-import { generateKeyPairSync, createSign, randomUUID, type KeyObject } from 'node:crypto';
+import { generateKeyPairSync, createSign, type KeyObject } from 'node:crypto';
 import {
   createServer,
   type IncomingMessage,
@@ -93,38 +93,13 @@ function json(
 
 const JWKS_PATHS = new Set(['/.well-known/jwks.json', '/oauth/v2/keys']);
 
-// ── In-memory stores for CLI platform API ──────────────────────────────────
-
-type Project = {
-  id: string;
-  projectSecret: string;
-  previewSecret: string;
-  previewOrigins: string[];
-  createdAt: string;
-  updatedAt: string;
-  configVersion: number;
-  configHash?: string;
-};
-
-const projects = new Map<string, Project>();
-const schemas = new Map<string, object>();
-const flowDefinitions = new Map<string, object>();
-
-function now(): string {
-  return new Date().toISOString();
-}
-
-function shortId(): string {
-  return randomUUID().replace(/-/g, '').slice(0, 12);
-}
-
 const server = createServer(async (req, res) => {
   if (req.method === 'OPTIONS') {
     res.writeHead(204, {
       ...corsHeaders(req),
-      'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       'Access-Control-Allow-Headers':
-        'Content-Type, Authorization, X-CSRF-Token, Nextgen-Proxy-Url, Nextgen-Secret-Key',
+        'Content-Type, X-CSRF-Token, Nextgen-Proxy-Url, Nextgen-Secret-Key',
     });
     res.end();
     return;
@@ -154,167 +129,6 @@ const server = createServer(async (req, res) => {
     res.end(JSON.stringify({ status: 'ok' }));
     return;
   }
-
-  // ── CLI platform API ───────────────────────────────────────────────────────
-
-  // GET /capabilities
-  if (url.pathname === '/capabilities' && req.method === 'GET') {
-    return json(res, req, 200, {
-      mode: 'mock',
-      version: now().slice(0, 10),
-      features: {
-        browser_bootstrap: true,
-        preview_secrets: true,
-        config_apply: true,
-      },
-    });
-  }
-
-  // POST /projects
-  if (url.pathname === '/projects' && req.method === 'POST') {
-    const body = JSON.parse((await readBody(req)) || '{}') as {
-      previewOrigins?: string[];
-    };
-    const id = `proj-${shortId()}`;
-    const createdAt = now();
-    const project: Project = {
-      id,
-      projectSecret: `sk_proj_${id.replace(/-/g, '')}_full`,
-      previewSecret: `sk_proj_${id.replace(/-/g, '')}_preview`,
-      previewOrigins: body.previewOrigins ?? [],
-      createdAt,
-      updatedAt: createdAt,
-      configVersion: 0,
-    };
-    projects.set(id, project);
-    console.log(`  <-- 201 project created id=${id}`);
-    return json(res, req, 201, {
-      id: project.id,
-      projectSecret: project.projectSecret,
-      previewSecret: project.previewSecret,
-      previewOrigins: project.previewOrigins,
-      createdAt: project.createdAt,
-    });
-  }
-
-  // GET /projects/:id
-  const projectMatch = url.pathname.match(/^\/projects\/([^/]+)$/);
-  if (projectMatch && req.method === 'GET') {
-    const project = projects.get(projectMatch[1]!);
-    if (!project) return json(res, req, 404, { error: 'not_found' });
-    return json(res, req, 200, {
-      id: project.id,
-      createdAt: project.createdAt,
-      updatedAt: project.updatedAt,
-    });
-  }
-
-  // PUT /projects/:id/config
-  const configMatch = url.pathname.match(/^\/projects\/([^/]+)\/config$/);
-  if (configMatch && req.method === 'PUT') {
-    const project = projects.get(configMatch[1]!);
-    if (!project) return json(res, req, 404, { error: 'not_found' });
-    const body = JSON.parse((await readBody(req)) || '{}') as { hash?: string };
-    project.configVersion += 1;
-    project.configHash = body.hash;
-    project.updatedAt = now();
-    return json(res, req, 200, {
-      config_version: project.configVersion,
-      hash: body.hash ?? '',
-      applied_at: project.updatedAt,
-      server_capabilities: {
-        schema_version: '2.0',
-        flow_protocol_version: '1.0',
-        step_types: ['identifier', 'credential', 'form', 'verification', 'redirect', 'info', 'complete'],
-        idp_types: ['oidc'],
-        delivery_modes: ['dev_inbox'],
-        renderer_modes: ['default'],
-        features: ['preview_secrets', 'capability_handshake_v1'],
-      },
-      warnings: [],
-    });
-  }
-
-  // GET /projects/:id/config
-  if (configMatch && req.method === 'GET') {
-    const project = projects.get(configMatch[1]!);
-    if (!project) return json(res, req, 404, { error: 'not_found' });
-    return json(res, req, 200, { project_id: project.id, source: 'mock' });
-  }
-
-  // POST /projects/:id/claim/init
-  const claimInitMatch = url.pathname.match(/^\/projects\/([^/]+)\/claim\/init$/);
-  if (claimInitMatch && req.method === 'POST') {
-    const projectId = claimInitMatch[1]!;
-    const challengeId = `chal_${shortId()}`;
-    return json(res, req, 200, {
-      claim_url: `http://localhost:${PORT}/claim/${projectId}/${challengeId}`,
-      challenge_id: challengeId,
-      expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
-    });
-  }
-
-  // GET /projects/:id/claim/status
-  const claimStatusMatch = url.pathname.match(/^\/projects\/([^/]+)\/claim\/status$/);
-  if (claimStatusMatch && req.method === 'GET') {
-    return json(res, req, 200, { status: 'pending' });
-  }
-
-  // POST /schemas
-  if (url.pathname === '/schemas' && req.method === 'POST') {
-    const body = JSON.parse((await readBody(req)) || '{}') as object;
-    const id = `schema_${shortId()}`;
-    schemas.set(id, body);
-    console.log(`  <-- 201 schema created id=${id}`);
-    return json(res, req, 201, { id });
-  }
-
-  // GET /schemas/:id
-  const schemaMatch = url.pathname.match(/^\/schemas\/([^/]+)$/);
-  if (schemaMatch && req.method === 'GET') {
-    const schema = schemas.get(schemaMatch[1]!);
-    if (!schema) return json(res, req, 404, { error: 'not_found' });
-    return json(res, req, 200, schema);
-  }
-
-  // DELETE /schemas/:id
-  if (schemaMatch && req.method === 'DELETE') {
-    schemas.delete(schemaMatch[1]!);
-    res.writeHead(204, corsHeaders(req));
-    res.end();
-    return;
-  }
-
-  // POST /flow_definitions
-  if (url.pathname === '/flow_definitions' && req.method === 'POST') {
-    const body = JSON.parse((await readBody(req)) || '{}') as object;
-    const id = `flow_${shortId()}`;
-    flowDefinitions.set(id, body);
-    console.log(`  <-- 201 flow_definition created id=${id}`);
-    return json(res, req, 201, { id });
-  }
-
-  // PATCH /flow_definitions/:id
-  const flowMatch = url.pathname.match(/^\/flow_definitions\/([^/]+)$/);
-  if (flowMatch && req.method === 'PATCH') {
-    if (!flowDefinitions.has(flowMatch[1]!))
-      return json(res, req, 404, { error: 'not_found' });
-    const body = JSON.parse((await readBody(req)) || '{}') as object;
-    flowDefinitions.set(flowMatch[1]!, body);
-    res.writeHead(204, corsHeaders(req));
-    res.end();
-    return;
-  }
-
-  // DELETE /flow_definitions/:id
-  if (flowMatch && req.method === 'DELETE') {
-    flowDefinitions.delete(flowMatch[1]!);
-    res.writeHead(204, corsHeaders(req));
-    res.end();
-    return;
-  }
-
-  // ── Frontend login flow ────────────────────────────────────────────────────
 
   if (url.pathname !== '/v1/flow') {
     return json(res, req, 404, { error: 'not_found' });

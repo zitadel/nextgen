@@ -8,6 +8,10 @@
       "types": "./src/index.ts",
       "import": "./src/index.ts"
     },
+    "./platform": {
+      "types": "./src/platform-handlers.ts",
+      "import": "./src/platform-handlers.ts"
+    },
     "./public-dir": {
       "types": "./src/public-dir.ts",
       "import": "./src/public-dir.ts"

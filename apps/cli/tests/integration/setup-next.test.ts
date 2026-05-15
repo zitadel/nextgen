@@ -2,21 +2,41 @@ import { mkdtemp, readFile, stat, writeFile, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { describe, expect, it } from "vitest";
+import {
+  completeMockClaim,
+  resetPlatformStore,
+  setupPlatformHandlers,
+} from "@zitadel-nextgen/api-mock/platform";
+import { setupServer } from "msw/node";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { parseJson, runCliForTest } from "../helpers/run-cli";
+
+const MOCK_SERVER_URL = "http://mock.zitadel.test";
+
+const server = setupServer(...setupPlatformHandlers());
+
+beforeAll(() => server.listen({ onUnhandledRequest: "warn" }));
+afterAll(() => server.close());
+afterEach(() => {
+  server.resetHandlers();
+  resetPlatformStore();
+});
+
+function cli(args: string[], env: NodeJS.ProcessEnv = {}) {
+  return runCliForTest(["--server", MOCK_SERVER_URL, ...args], env);
+}
 
 describe("Next setup integration", () => {
   it("sets up, verifies, edits schema, applies, and preserves idempotency", async () => {
     const cwd = await createNextProject();
 
-    const setup = await runCliForTest([
+    const setup = await cli([
       "setup",
       "--cwd",
       cwd,
       "--non-interactive",
       "--json",
-      "--mock",
       "--skip-deploy-platform",
     ]);
     expect(setup.exitCode).toBe(0);
@@ -49,11 +69,11 @@ describe("Next setup integration", () => {
     expect(envLocal).not.toContain("ZITADEL_PREVIEW_SECRET");
     expect((await stat(join(cwd, ".zitadel/secret"))).mode & 0o777).toBe(0o600);
 
-    const doctor = await runCliForTest(["doctor", "--cwd", cwd, "--json"]);
+    const doctor = await cli(["doctor", "--cwd", cwd, "--json"]);
     expect(doctor.exitCode).toBe(0);
     expect((parseJson(doctor.stdout) as { status: string }).status).toBe("ok");
 
-    const noArg = await runCliForTest(["--cwd", cwd, "--json"]);
+    const noArg = await cli(["--cwd", cwd, "--json"]);
     expect(noArg.exitCode).toBe(0);
     const status = parseJson(noArg.stdout) as {
       status: string;
@@ -63,19 +83,19 @@ describe("Next setup integration", () => {
     expect(status.data.project.lifecycle).toBe("pre-claim");
     expect(status.data.next_actions.join(" ")).toContain("apply");
 
-    const rerun = await runCliForTest(["setup", "--cwd", cwd, "--json"]);
+    const rerun = await cli(["setup", "--cwd", cwd, "--json"]);
     expect(rerun.exitCode).toBe(0);
     expect((parseJson(rerun.stdout) as { status: string }).status).toBe("skipped");
 
     const stateBeforePlan = await readFile(join(cwd, ".zitadel/state.json"), "utf8");
-    const plan = await runCliForTest(["plan", "--cwd", cwd, "--json", "--mock"]);
+    const plan = await cli(["plan", "--cwd", cwd, "--json"]);
     expect(plan.exitCode).toBe(0);
     const planJson = parseJson(plan.stdout) as { status: string; data: { total: number } };
     expect(planJson.status).toBe("ok");
     expect(typeof planJson.data.total).toBe("number");
     expect(await readFile(join(cwd, ".zitadel/state.json"), "utf8")).toBe(stateBeforePlan);
 
-    const addSchema = await runCliForTest([
+    const addSchema = await cli([
       "add",
       "schema",
       "--cwd",
@@ -87,25 +107,17 @@ describe("Next setup integration", () => {
     expect(addSchema.exitCode).toBe(0);
     expect(await readFile(join(cwd, ".zitadel/schemas/user.json"), "utf8")).toContain('"phone"');
 
-    const apply = await runCliForTest(["apply", "--cwd", cwd, "--json", "--mock"]);
+    const apply = await cli(["apply", "--cwd", cwd, "--json"]);
     expect(apply.exitCode).toBe(0);
     const applyJson = parseJson(apply.stdout) as { status: string; data: { synced: boolean } };
     expect(applyJson.status).toBe("ok");
     expect(applyJson.data.synced).toBe(true);
 
-    const production = await runCliForTest([
-      "apply",
-      "--cwd",
-      cwd,
-      "--json",
-      "--mock",
-      "--environment",
-      "production",
-    ]);
+    const production = await cli(["apply", "--cwd", cwd, "--json", "--environment", "production"]);
     expect(production.exitCode).toBe(3);
     expect((parseJson(production.stdout) as { code: string }).code).toBe("E_CLAIM_REQUIRED");
 
-    const claim = await runCliForTest(["claim", "--cwd", cwd, "--json", "--mock"]);
+    const claim = await cli(["claim", "--cwd", cwd, "--json"]);
     expect(claim.exitCode).toBe(0);
     const claimJson = parseJson(claim.stdout) as {
       status: string;
@@ -115,13 +127,12 @@ describe("Next setup integration", () => {
     expect(claimJson.data.handoff).toBe("human");
     expect(claimJson.data.claim_url).toContain("claim");
 
-    const pendingClaim = await runCliForTest([
+    const pendingClaim = await cli([
       "claim",
       "status",
       "--cwd",
       cwd,
       "--json",
-      "--mock",
       "--challenge-id",
       claimJson.data.challenge_id,
     ]);
@@ -130,14 +141,14 @@ describe("Next setup integration", () => {
       "pending",
     );
 
-    const completedClaim = await runCliForTest([
+    completeMockClaim();
+
+    const completedClaim = await cli([
       "claim",
       "status",
       "--cwd",
       cwd,
       "--json",
-      "--mock",
-      "--mock-complete-claim",
       "--challenge-id",
       claimJson.data.challenge_id,
     ]);
@@ -151,12 +162,11 @@ describe("Next setup integration", () => {
     expect(secret).toContain('"claimed_at"');
     expect(secret).toContain('"team_id": "team_mock"');
 
-    const productionAfterClaim = await runCliForTest([
+    const productionAfterClaim = await cli([
       "apply",
       "--cwd",
       cwd,
       "--json",
-      "--mock",
       "--environment",
       "production",
     ]);
@@ -165,17 +175,15 @@ describe("Next setup integration", () => {
 
   it("fails apply clearly for missing env refs", async () => {
     const cwd = await createNextProject();
-    await runCliForTest([
+    await cli([
       "setup",
       "--cwd",
       cwd,
       "--non-interactive",
       "--json",
-      "--mock",
       "--skip-deploy-platform",
     ]);
 
-    // Overwrite the default flow with one that has an env ref in a gate config
     const flowWithEnvRef = {
       version: 1,
       kind: "flow-definition",
@@ -197,35 +205,30 @@ describe("Next setup integration", () => {
     };
     await writeFile(join(cwd, ".zitadel/flows/default.json"), JSON.stringify(flowWithEnvRef, null, 2));
 
-    const apply = await runCliForTest(["apply", "--cwd", cwd, "--json", "--mock"]);
+    const apply = await cli(["apply", "--cwd", cwd, "--json"]);
     expect(apply.exitCode).toBe(3);
     const applyJson = parseJson(apply.stdout) as { code: string; message: string };
     expect(applyJson.code).toBe("E_VALIDATION");
     expect(applyJson.message).toContain("Missing environment variables");
 
-    const applyWithEnv = await runCliForTest(
-      ["apply", "--cwd", cwd, "--json", "--mock"],
-      { MY_CAPTCHA_SECRET: "hunter2" },
-    );
+    const applyWithEnv = await cli(["apply", "--cwd", cwd, "--json"], { MY_CAPTCHA_SECRET: "hunter2" });
     expect(applyWithEnv.exitCode).toBe(0);
   });
 
   it("applies successfully when liquid templates are present (templates are not synced)", async () => {
     const cwd = await createNextProject();
-    await runCliForTest([
+    await cli([
       "setup",
       "--cwd",
       cwd,
       "--non-interactive",
       "--json",
-      "--mock",
       "--skip-deploy-platform",
     ]);
     await mkdir(join(cwd, ".zitadel/templates"), { recursive: true });
     await writeFile(join(cwd, ".zitadel/templates/bad.liquid"), "<div>{{ value | raw }}</div>\n");
 
-    const apply = await runCliForTest(["apply", "--cwd", cwd, "--json", "--mock"]);
-
+    const apply = await cli(["apply", "--cwd", cwd, "--json"]);
     expect(apply.exitCode).toBe(0);
     const envelope = parseJson(apply.stdout) as { status: string; data: { synced: boolean } };
     expect(envelope.status).toBe("ok");
