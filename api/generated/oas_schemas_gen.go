@@ -8287,10 +8287,10 @@ type UserSchema struct {
 	// The JSON Schema version used for this schema.
 	Schema string `json:"$schema"`
 	// The unique identifier for this schema, which is also the URL where this schema can be accessed.
-	ID string `json:"$id"`
+	ID url.URL `json:"$id"`
 	// Discriminator value for a user schema create request.
 	Kind string `json:"kind"`
-	// The type of a user must alwasy be an object.
+	// The type of a user must always be an object.
 	Type OptString `json:"type"`
 	// Human-readable name for this schema.
 	Title string `json:"title"`
@@ -8310,7 +8310,7 @@ func (s *UserSchema) GetSchema() string {
 }
 
 // GetID returns the value of ID.
-func (s *UserSchema) GetID() string {
+func (s *UserSchema) GetID() url.URL {
 	return s.ID
 }
 
@@ -8355,7 +8355,7 @@ func (s *UserSchema) SetSchema(val string) {
 }
 
 // SetID sets the value of ID.
-func (s *UserSchema) SetID(val string) {
+func (s *UserSchema) SetID(val url.URL) {
 	s.ID = val
 }
 

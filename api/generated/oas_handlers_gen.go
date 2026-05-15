@@ -1598,7 +1598,7 @@ func (s *Server) handleCreateSchemaRequest(args [0]string, argsEscaped bool, w h
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
 				{
-					Name: "projectID",
+					Name: "project_id",
 					In:   "query",
 				}: params.ProjectID,
 				{
@@ -4101,7 +4101,7 @@ func (s *Server) handleGetSchemaByIdRequest(args [1]string, argsEscaped bool, w 
 					In:   "path",
 				}: params.ID,
 				{
-					Name: "projectID",
+					Name: "project_id",
 					In:   "query",
 				}: params.ProjectID,
 				{
@@ -5322,7 +5322,7 @@ func (s *Server) handleListFlowDefinitionsRequest(args [0]string, argsEscaped bo
 					In:   "query",
 				}: params.PageToken,
 				{
-					Name: "projectID",
+					Name: "project_id",
 					In:   "query",
 				}: params.ProjectID,
 				{
@@ -5535,7 +5535,7 @@ func (s *Server) handleListSessionsRequest(args [0]string, argsEscaped bool, w h
 					In:   "query",
 				}: params.PageToken,
 				{
-					Name: "projectID",
+					Name: "project_id",
 					In:   "query",
 				}: params.ProjectID,
 				{

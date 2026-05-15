@@ -1144,14 +1144,14 @@ func decodeCreateHandoffParams(args [1]string, argsEscaped bool, r *http.Request
 type CreateSchemaParams struct {
 	// The unique identifier of the project.
 	ProjectID OptProjectID `json:",omitempty,omitzero"`
-	// The unique identifier of the project.
+	// The unique identifier of the team.
 	TeamID OptTeamID `json:",omitempty,omitzero"`
 }
 
 func unpackCreateSchemaParams(packed middleware.Parameters) (params CreateSchemaParams) {
 	{
 		key := middleware.ParameterKey{
-			Name: "projectID",
+			Name: "project_id",
 			In:   "query",
 		}
 		if v, ok := packed[key]; ok {
@@ -1172,10 +1172,10 @@ func unpackCreateSchemaParams(packed middleware.Parameters) (params CreateSchema
 
 func decodeCreateSchemaParams(args [0]string, argsEscaped bool, r *http.Request) (params CreateSchemaParams, _ error) {
 	q := uri.NewQueryDecoder(r.URL.Query())
-	// Decode query: projectID.
+	// Decode query: project_id.
 	if err := func() error {
 		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "projectID",
+			Name:    "project_id",
 			Style:   uri.QueryStyleForm,
 			Explode: true,
 		}
@@ -1230,7 +1230,7 @@ func decodeCreateSchemaParams(args [0]string, argsEscaped bool, r *http.Request)
 		return nil
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
-			Name: "projectID",
+			Name: "project_id",
 			In:   "query",
 			Err:  err,
 		}
@@ -2125,7 +2125,7 @@ type GetSchemaByIdParams struct {
 	ID string
 	// The unique identifier of the project.
 	ProjectID OptProjectID `json:",omitempty,omitzero"`
-	// The unique identifier of the project.
+	// The unique identifier of the team.
 	TeamID OptTeamID `json:",omitempty,omitzero"`
 }
 
@@ -2139,7 +2139,7 @@ func unpackGetSchemaByIdParams(packed middleware.Parameters) (params GetSchemaBy
 	}
 	{
 		key := middleware.ParameterKey{
-			Name: "projectID",
+			Name: "project_id",
 			In:   "query",
 		}
 		if v, ok := packed[key]; ok {
@@ -2205,10 +2205,10 @@ func decodeGetSchemaByIdParams(args [1]string, argsEscaped bool, r *http.Request
 			Err:  err,
 		}
 	}
-	// Decode query: projectID.
+	// Decode query: project_id.
 	if err := func() error {
 		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "projectID",
+			Name:    "project_id",
 			Style:   uri.QueryStyleForm,
 			Explode: true,
 		}
@@ -2263,7 +2263,7 @@ func decodeGetSchemaByIdParams(args [1]string, argsEscaped bool, r *http.Request
 		return nil
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
-			Name: "projectID",
+			Name: "project_id",
 			In:   "query",
 			Err:  err,
 		}
@@ -2532,7 +2532,7 @@ func unpackListFlowDefinitionsParams(packed middleware.Parameters) (params ListF
 	}
 	{
 		key := middleware.ParameterKey{
-			Name: "projectID",
+			Name: "project_id",
 			In:   "query",
 		}
 		if v, ok := packed[key]; ok {
@@ -2672,10 +2672,10 @@ func decodeListFlowDefinitionsParams(args [0]string, argsEscaped bool, r *http.R
 			Err:  err,
 		}
 	}
-	// Decode query: projectID.
+	// Decode query: project_id.
 	if err := func() error {
 		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "projectID",
+			Name:    "project_id",
 			Style:   uri.QueryStyleForm,
 			Explode: true,
 		}
@@ -2730,7 +2730,7 @@ func decodeListFlowDefinitionsParams(args [0]string, argsEscaped bool, r *http.R
 		return nil
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
-			Name: "projectID",
+			Name: "project_id",
 			In:   "query",
 			Err:  err,
 		}
@@ -2832,7 +2832,7 @@ func unpackListSessionsParams(packed middleware.Parameters) (params ListSessions
 	}
 	{
 		key := middleware.ParameterKey{
-			Name: "projectID",
+			Name: "project_id",
 			In:   "query",
 		}
 		if v, ok := packed[key]; ok {
@@ -2981,10 +2981,10 @@ func decodeListSessionsParams(args [0]string, argsEscaped bool, r *http.Request)
 			Err:  err,
 		}
 	}
-	// Decode query: projectID.
+	// Decode query: project_id.
 	if err := func() error {
 		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "projectID",
+			Name:    "project_id",
 			Style:   uri.QueryStyleForm,
 			Explode: true,
 		}
@@ -3039,7 +3039,7 @@ func decodeListSessionsParams(args [0]string, argsEscaped bool, r *http.Request)
 		return nil
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
-			Name: "projectID",
+			Name: "project_id",
 			In:   "query",
 			Err:  err,
 		}

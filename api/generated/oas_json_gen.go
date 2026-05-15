@@ -2282,7 +2282,7 @@ func (s CreateSchemaReq) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("$id")
-				e.Str(s.ID)
+				json.EncodeURI(e, s.ID)
 			}
 			{
 				e.FieldStart("type")
@@ -7792,7 +7792,7 @@ func (s GetSchemaByIdOK) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("$id")
-				e.Str(s.ID)
+				json.EncodeURI(e, s.ID)
 			}
 			{
 				e.FieldStart("type")
@@ -15306,7 +15306,7 @@ func (s *UserSchema) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("$id")
-		e.Str(s.ID)
+		json.EncodeURI(e, s.ID)
 	}
 	{
 		e.FieldStart("kind")
@@ -15384,8 +15384,8 @@ func (s *UserSchema) Decode(d *jx.Decoder) error {
 		case "$id":
 			requiredBitSet[0] |= 1 << 1
 			if err := func() error {
-				v, err := d.Str()
-				s.ID = string(v)
+				v, err := json.DecodeURI(d)
+				s.ID = v
 				if err != nil {
 					return err
 				}

@@ -1539,9 +1539,9 @@ func (c *Client) sendCreateSchema(ctx context.Context, request CreateSchemaReq, 
 	stage = "EncodeQueryParams"
 	q := uri.NewQueryEncoder()
 	{
-		// Encode "projectID" parameter.
+		// Encode "project_id" parameter.
 		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "projectID",
+			Name:    "project_id",
 			Style:   uri.QueryStyleForm,
 			Explode: true,
 		}
@@ -3181,9 +3181,9 @@ func (c *Client) sendGetSchemaById(ctx context.Context, params GetSchemaByIdPara
 	stage = "EncodeQueryParams"
 	q := uri.NewQueryEncoder()
 	{
-		// Encode "projectID" parameter.
+		// Encode "project_id" parameter.
 		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "projectID",
+			Name:    "project_id",
 			Style:   uri.QueryStyleForm,
 			Explode: true,
 		}
@@ -3983,9 +3983,9 @@ func (c *Client) sendListFlowDefinitions(ctx context.Context, params ListFlowDef
 		}
 	}
 	{
-		// Encode "projectID" parameter.
+		// Encode "project_id" parameter.
 		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "projectID",
+			Name:    "project_id",
 			Style:   uri.QueryStyleForm,
 			Explode: true,
 		}
@@ -4169,9 +4169,9 @@ func (c *Client) sendListSessions(ctx context.Context, params ListSessionsParams
 		}
 	}
 	{
-		// Encode "projectID" parameter.
+		// Encode "project_id" parameter.
 		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "projectID",
+			Name:    "project_id",
 			Style:   uri.QueryStyleForm,
 			Explode: true,
 		}

@@ -48,7 +48,7 @@ func (s *SchemaService) CreateSchema(ctx context.Context, projectID string, team
 
 	err = s.schemaRepo.Create(ctx, tx, model)
 	if err != nil {
-		return nil, errors.New("")
+		return nil, err
 	}
 
 	_, err = s.schemaResolver.Resolve(ctx, tx, projectID, schemaID, nil)
