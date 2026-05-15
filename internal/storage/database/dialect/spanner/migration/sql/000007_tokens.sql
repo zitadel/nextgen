@@ -5,6 +5,7 @@ CREATE TABLE tokens (
     project_id  STRING(MAX) NOT NULL,
     token_id    STRING(MAX) NOT NULL,
     user_id     STRING(MAX) NOT NULL,
+    token_type  STRING(MAX) NOT NULL,
     session_id  STRING(MAX),
     scope       ARRAY<STRING(MAX)> NOT NULL,
     expires_at  TIMESTAMP,

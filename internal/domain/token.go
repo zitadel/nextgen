@@ -13,6 +13,7 @@ type Token struct {
 	ProjectID string
 	TokenID   string
 	UserID    string
+	Type      TokenType
 	SessionID *string
 	Scope     []string
 	CreatedAt time.Time

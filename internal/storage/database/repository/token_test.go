@@ -52,6 +52,7 @@ func TestTokenRepository_CRUD(t *testing.T) {
 		ProjectID: pid,
 		TokenID:   "tok_opaque_1",
 		UserID:    userID,
+		Type:      domain.TokenTypeOIDCAccessToken,
 		SessionID: &sess,
 		Scope:     []string{"openid", "profile"},
 		ExpiresAt: &exp,
@@ -66,6 +67,7 @@ func TestTokenRepository_CRUD(t *testing.T) {
 	require.NotNil(t, got.SessionID)
 	require.Equal(t, sess, *got.SessionID)
 	require.Equal(t, []string{"openid", "profile"}, got.Scope)
+	require.Equal(t, domain.TokenTypeOIDCAccessToken, got.Type)
 	require.NotNil(t, got.ExpiresAt)
 	require.True(t, exp.Equal(*got.ExpiresAt))
 	require.NotZero(t, got.CreatedAt)
@@ -127,6 +129,7 @@ func TestTokenRepository_NullSessionAndExpiry(t *testing.T) {
 		ProjectID: pid,
 		TokenID:   "tok_pat_like",
 		UserID:    userID,
+		Type:      domain.TokenTypePersonalAccessToken,
 		SessionID: nil,
 		Scope:     nil,
 		ExpiresAt: nil,
@@ -135,6 +138,7 @@ func TestTokenRepository_NullSessionAndExpiry(t *testing.T) {
 
 	got, err := tokenRepo.Get(ctx, tx, database.WithCondition(tokenRepo.PrimaryKeyCondition(pid, tok.TokenID)))
 	require.NoError(t, err)
+	require.Equal(t, domain.TokenTypePersonalAccessToken, got.Type)
 	require.Nil(t, got.SessionID)
 	require.Nil(t, got.ExpiresAt)
 	require.Equal(t, []string{}, got.Scope)
@@ -190,6 +194,7 @@ func TestTokenRepository_CascadeUserDelete(t *testing.T) {
 		ProjectID: pid,
 		TokenID:   "tok_cascade",
 		UserID:    userID,
+		Type:      domain.TokenTypeSessionToken,
 		Scope:     []string{"read"},
 	}))
 
@@ -197,4 +202,50 @@ func TestTokenRepository_CascadeUserDelete(t *testing.T) {
 
 	_, err = tokenRepo.Get(ctx, tx, database.WithCondition(tokenRepo.PrimaryKeyCondition(pid, "tok_cascade")))
 	require.ErrorIs(t, err, new(database.NoRowFoundError))
+}
+
+func TestTokenRepository_CreateRejectsUnspecifiedType(t *testing.T) {
+	tx, rollback := transactionForRollback(t)
+	defer rollback()
+	ctx := t.Context()
+
+	userRepo := repository.NewUserRepository()
+	tokenRepo := repository.NewTokenRepository(tx)
+
+	const (
+		pid       = "proj-token-bad-type"
+		tid       = "team-token-bad-type"
+		schemaURL = "https://schemas.test/tokens-bad/v1.json"
+		userID    = "usr_token_bad"
+	)
+
+	_, err := tx.Exec(ctx, `INSERT INTO zitadel_nextgen.projects (id) VALUES ($1)`, pid)
+	require.NoError(t, err)
+	_, err = tx.Exec(ctx, `INSERT INTO zitadel_nextgen.teams (project_id, id) VALUES ($1,$2)`, pid, tid)
+	require.NoError(t, err)
+	_, err = tx.Exec(ctx,
+		`INSERT INTO zitadel_nextgen.json_schemas (project_id, url, payload) VALUES ($1,$2,$3::json)`,
+		pid, schemaURL, []byte("{}"),
+	)
+	require.NoError(t, err)
+
+	attr, err := domain.NewCreateAttribute("country", "IT", domain.AttributeUniquenessUnspecified)
+	require.NoError(t, err)
+	teamCopy := tid
+	require.NoError(t, userRepo.Create(ctx, tx, &domain.CreateUser{
+		ProjectID:  pid,
+		SchemaURL:  schemaURL,
+		ID:         userID,
+		TeamID:     &teamCopy,
+		Attributes: []*domain.CreateAttribute{attr},
+	}))
+
+	err = tokenRepo.Create(ctx, tx, &domain.Token{
+		ProjectID: pid,
+		TokenID:   "tok_bad",
+		UserID:    userID,
+		Type:      domain.TokenTypeUnspecified,
+		Scope:     []string{"read"},
+	})
+	require.ErrorIs(t, err, domain.ErrInvalidTokenType)
 }
