@@ -17,4 +17,9 @@ export default defineNuxtConfig({
       include: ["lit"],
     },
   },
+  nitro: {
+    routeRules: {
+      "/__nextgen/**": {},
+    },
+  },
 });
