@@ -11,13 +11,15 @@
  *   GET    /.well-known/jwks.json — JWKS for JWT verification
  *   GET    /oauth/v2/keys         — alias for JWKS
  */
+import { type Server } from "node:http";
+
 import express from "express";
 import { createMiddleware } from "@mswjs/http-middleware";
 
 import { JWK, signSessionToken, verifyHandoffToken } from "./crypto.js";
 import { setupMockHandlers } from "./handlers.js";
 
-export function startMockServer(port: number): void {
+export function startMockServer(port: number): Server {
   const iss = `http://localhost:${port}`;
   const app = express();
 
@@ -85,7 +87,7 @@ export function startMockServer(port: number): void {
   // ─── Flow API — reuse MSW handlers, zero duplication ──────────────────────
   app.use(createMiddleware(...setupMockHandlers({ iss })));
 
-  app.listen(port, () => {
+  return app.listen(port, () => {
     console.log(`\napi-mock server listening on http://localhost:${port}`);
     console.log(`  JWKS: http://localhost:${port}/.well-known/jwks.json`);
     console.log(`  Sessions exchange: http://localhost:${port}/sessions/exchange\n`);
