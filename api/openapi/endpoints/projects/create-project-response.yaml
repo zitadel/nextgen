@@ -1,0 +1,29 @@
+type: object
+required:
+  - id
+  - projectSecret
+  - previewSecret
+  - previewOrigins
+  - createdAt
+properties:
+  id:
+    type: string
+    description: The unique identifier of the project.
+  projectSecret:
+    type: string
+    description: |
+      Secret which can be used for authentication when modifying the project.
+  previewSecret:
+    type: string
+    description: |
+      Secret which can be used for previewing and testing the project.
+  previewOrigins:
+    type: array
+    items:
+      type: string
+    description: |
+      Origins which are allowed for previewing and testing the project.
+  createdAt:
+    type: string
+    format: date-time
+    description: The time when the project was created.

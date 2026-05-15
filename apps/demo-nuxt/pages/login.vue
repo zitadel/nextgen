@@ -10,13 +10,13 @@
     "
   >
     <ClientOnly>
-      <nextgen-login proxy-base="/__nextgen" post-sign-in-url="/admin" />
+      <zitadel-login proxy-base="/__nextgen" post-sign-in-url="/admin" />
     </ClientOnly>
   </main>
 </template>
 
 <script setup lang="ts">
-import "@nextgen/ui-lit";
+import "@zitadel-nextgen/components";
 import type { ClientAuthResult } from "@nextgen/sdk-nuxt";
 
 const auth = useState<ClientAuthResult>("nextgen-auth");

@@ -61,6 +61,19 @@ func (UnimplementedHandler) CreateFlow(ctx context.Context, req *CreateFlowReque
 	return r, ht.ErrNotImplemented
 }
 
+// CreateFlowDefinition implements createFlowDefinition operation.
+//
+// Creates a new flow definition.
+// Flow definitions are templates that define the sequence of steps (capabilities)
+// for a particular user journey (e.g., registration, login, password reset).
+// Flow definitions are created based on the flow meta schema, which includes the flow's purpose,
+// audience, and the steps involved.
+//
+// POST /flow_definitions
+func (UnimplementedHandler) CreateFlowDefinition(ctx context.Context, req *FlowDefinitionCreateRequest) (r CreateFlowDefinitionRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // CreateHandoff implements createHandoff operation.
 //
 // Completes the authentication attempt and mints a `handoff_token`.
@@ -74,6 +87,15 @@ func (UnimplementedHandler) CreateFlow(ctx context.Context, req *CreateFlowReque
 //
 // POST /auth_attempts/{attempt_id}/handoff
 func (UnimplementedHandler) CreateHandoff(ctx context.Context, params CreateHandoffParams) (r CreateHandoffRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// CreateProject implements createProject operation.
+//
+// Create project.
+//
+// POST /projects
+func (UnimplementedHandler) CreateProject(ctx context.Context, req *CreateProjectRequest) (r CreateProjectRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -106,6 +128,15 @@ func (UnimplementedHandler) CreateSchema(ctx context.Context, req CreateSchemaRe
 //
 // POST /sessions
 func (UnimplementedHandler) CreateSession(ctx context.Context, req *CreateSessionRequest) (r CreateSessionRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// DeleteFlowDefinition implements deleteFlowDefinition operation.
+//
+// Delete a flow definition by id.
+//
+// DELETE /flow_definitions/{id}
+func (UnimplementedHandler) DeleteFlowDefinition(ctx context.Context, params DeleteFlowDefinitionParams) (r DeleteFlowDefinitionRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -153,6 +184,15 @@ func (UnimplementedHandler) GetAuthAttempt(ctx context.Context, params GetAuthAt
 	return r, ht.ErrNotImplemented
 }
 
+// GetFlowDefinition implements getFlowDefinition operation.
+//
+// Get a flow definition by id.
+//
+// GET /flow_definitions/{id}
+func (UnimplementedHandler) GetFlowDefinition(ctx context.Context, params GetFlowDefinitionParams) (r GetFlowDefinitionRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // GetFlowStep implements getFlowStep operation.
 //
 // Returns the current capability step without advancing the state machine.
@@ -196,6 +236,15 @@ func (UnimplementedHandler) GetLive(ctx context.Context) (r GetLiveRes, _ error)
 //
 // GET /.well-known/openid-configuration
 func (UnimplementedHandler) GetOpenIDConfiguration(ctx context.Context) (r GetOpenIDConfigurationRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// GetProject implements getProject operation.
+//
+// Returns the current state of a project.
+//
+// GET /projects/{project_id}
+func (UnimplementedHandler) GetProject(ctx context.Context, params GetProjectParams) (r GetProjectRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -267,6 +316,16 @@ func (UnimplementedHandler) Introspect(ctx context.Context, req *IntrospectReque
 //
 // POST /auth_attempts/{attempt_id}/challenges
 func (UnimplementedHandler) IssueChallenge(ctx context.Context, req *IssueChallengeRequest, params IssueChallengeParams) (r IssueChallengeRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// ListFlowDefinitions implements listFlowDefinitions operation.
+//
+// Retrieves a list of all flow definitions.
+// This endpoint can be used to view existing flow definitions and their configurations.
+//
+// GET /flow_definitions
+func (UnimplementedHandler) ListFlowDefinitions(ctx context.Context, params ListFlowDefinitionsParams) (r ListFlowDefinitionsRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -345,6 +404,15 @@ func (UnimplementedHandler) SubmitFlowEvent(ctx context.Context, req *FlowEventR
 //
 // POST /flow/{id}/submit
 func (UnimplementedHandler) SubmitFlowStep(ctx context.Context, req *FlowSubmitRequest, params SubmitFlowStepParams) (r SubmitFlowStepRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// UpdateFlowDefinition implements updateFlowDefinition operation.
+//
+// Update a flow definition by id.
+//
+// PATCH /flow_definitions/{id}
+func (UnimplementedHandler) UpdateFlowDefinition(ctx context.Context, req *FlowDefinitionUpdateRequest, params UpdateFlowDefinitionParams) (r UpdateFlowDefinitionRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

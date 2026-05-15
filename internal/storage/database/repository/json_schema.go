@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"encoding/json"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
@@ -17,9 +16,9 @@ type JSONSchemaRepository struct {
 	encodePayload func([]byte) any
 
 	columnProjectID database.Column
-	columnURL        database.Column
-	columnCreatedAt  database.Column
-	columnPayload    database.Column
+	columnURL       database.Column
+	columnCreatedAt database.Column
+	columnPayload   database.Column
 }
 
 func NewJSONSchemaRepository(client database.QueryExecutor) *JSONSchemaRepository {
@@ -37,13 +36,13 @@ func NewJSONSchemaRepository(client database.QueryExecutor) *JSONSchemaRepositor
 
 func newJSONSchemaRepository(table string, now database.Instruction, encodePayload func([]byte) any) *JSONSchemaRepository {
 	return &JSONSchemaRepository{
-		table:            table,
-		now:              now,
-		encodePayload:    encodePayload,
+		table:           table,
+		now:             now,
+		encodePayload:   encodePayload,
 		columnProjectID: database.NewColumn(table, "project_id"),
-		columnURL:        database.NewColumn(table, "url"),
-		columnCreatedAt:  database.NewColumn(table, "created_at"),
-		columnPayload:    database.NewColumn(table, "payload"),
+		columnURL:       database.NewColumn(table, "url"),
+		columnCreatedAt: database.NewColumn(table, "created_at"),
+		columnPayload:   database.NewColumn(table, "payload"),
 	}
 }
 
@@ -164,18 +163,18 @@ func (r *JSONSchemaRepository) Delete(ctx context.Context, client database.Query
 }
 
 type jsonSchemaRow struct {
-	ProjectID  string               `db:"project_id"`
-	URL        string               `db:"url"`
-	CreatedAt  time.Time            `db:"created_at"`
-	Payload    JSON[json.RawMessage] `db:"payload"`
+	ProjectID string    `db:"project_id"`
+	URL       string    `db:"url"`
+	CreatedAt time.Time `db:"created_at"`
+	Payload   []byte    `db:"payload"`
 }
 
 func (r *jsonSchemaRow) toDomain() *domain.JSONSchema {
 	return &domain.JSONSchema{
 		ProjectID: r.ProjectID,
-		URL:        r.URL,
-		CreatedAt:  r.CreatedAt,
-		Schema:     []byte(r.Payload.Value),
+		URL:       r.URL,
+		CreatedAt: r.CreatedAt,
+		Schema:    r.Payload,
 	}
 }
 

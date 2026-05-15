@@ -6,6 +6,8 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
+//go:generate go tool mockgen -typed -package domainmock -destination ./mock/flow_definition.mock.go . FlowDefinitionRepository
+
 // FlowDefinitionRepository provides storage operations for [FlowDefinition] aggregates.
 type FlowDefinitionRepository interface {
 	// CreateFlowDefinition persists a new flow definition and all its child
@@ -32,6 +34,7 @@ type FlowDefinitionListOption func(*FlowDefinitionListOpts)
 
 // FlowDefinitionListOpts holds the resolved options for a list query.
 type FlowDefinitionListOpts struct {
+	Name          *string
 	Status        *FlowDefinitionStatus
 	Purpose       *FlowDefinitionPurpose
 	SchemaVersion *string
@@ -46,6 +49,19 @@ func ApplyFlowDefinitionListOptions(opts []FlowDefinitionListOption) *FlowDefini
 		opt(o)
 	}
 	return o
+}
+
+// WithFlowDefinitionName filters results to definitions matching the given name.
+// Names act as project-scoped slugs.
+//
+// TODO: enforce uniqueness of (project_id, name, schema_version) at the
+// storage layer. The flow service currently assumes at most one row per
+// name + version; without a DB constraint two concurrent admin writes could
+// break that assumption.
+func WithFlowDefinitionName(name string) FlowDefinitionListOption {
+	return func(o *FlowDefinitionListOpts) {
+		o.Name = &name
+	}
 }
 
 // WithFlowDefinitionStatus filters results to definitions with the given status.
