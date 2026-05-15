@@ -105,6 +105,8 @@ type QueryOpts struct {
 	// Condition is the condition to filter the results.
 	// It is used to build the WHERE clause of the SQL statement.
 	Condition Condition
+	// Extra holds optional structured data decoded by repositories (e.g. user list filters).
+	Extra any
 	// OrderBy is the columns to order the results by.
 	// It is used to build the ORDER BY clause of the SQL statement.
 	OrderBy Columns
@@ -128,6 +130,13 @@ type QueryOpts struct {
 	Permission string
 	// ShouldLock the results during the transaction.
 	ShouldLock bool
+}
+
+// WithExtra attaches repository-specific data to QueryOpts ([QueryOpts.Extra]).
+func WithExtra(extra any) QueryOption {
+	return func(opts *QueryOpts) {
+		opts.Extra = extra
+	}
 }
 
 // Matches implements [gomock.Matcher].

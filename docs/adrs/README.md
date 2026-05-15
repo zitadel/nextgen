@@ -15,3 +15,4 @@ This directory contains architecture decision records (ADRs) for nextgen.
 | [007](007-gitops-configuration-surface.md) | GitOps Configuration Surface | Repo files describe config; `plan`/`apply` validate and upload bundles; local secrets excluded from VCS. |
 | [008](008-users-eav-store.md) | Scalable EAV Storage for User Attributes | Partitioned header/EAV/registry model for user attributes at scale with uniqueness enforcement. |
 | [009](009-user-json-schema-validation.md) | User JSON Schema Validation | Users validated with instance-stored JSON Schemas; `$schema` URL versioning; no automatic cross-schema migration; upgrades via transactional PUT/PATCH with validation before commit. |
+| [010](010-session-auth-attempt-check-model.md) | Session, Auth Attempt, and Check Persistence | ER model for sessions, auth attempts, checks, and authenticators; handoff and step-up; `failure_count` on checks; merged session and auth-attempt repository module. |

@@ -1,8 +1,8 @@
 -- +goose Up
 CREATE TABLE zitadel_nextgen.json_schemas (
-    project_id   TEXT        NOT NULL
+    project_id   TEXT COLLATE "C" NOT NULL
         REFERENCES zitadel_nextgen.projects (id) ON DELETE CASCADE
-    , url        TEXT        NOT NULL
+    , url        TEXT COLLATE "C" NOT NULL
     , created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     , payload    JSON        NOT NULL
 

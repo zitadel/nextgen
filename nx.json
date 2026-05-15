@@ -44,6 +44,7 @@
       "dependsOn": ["^build", "^typecheck"]
     },
     "typecheck": {
+      "dependsOn": ["^build", "^typecheck"],
       "outputs": [
         "{projectRoot}/dist/**/*.d.ts",
         "{projectRoot}/dist/**/*.d.ts.map",

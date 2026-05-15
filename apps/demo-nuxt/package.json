@@ -17,14 +17,15 @@
     "dev": "nuxt dev --port 3001",
     "build": "nuxt build",
     "start": "nuxt start",
-    "typecheck": "nuxt typecheck"
+    "typecheck": "nuxt prepare && vue-tsc --noEmit -p .nuxt/tsconfig.json"
   },
   "dependencies": {
     "@nextgen/sdk-nuxt": "workspace:*",
-    "@nextgen/ui-lit": "workspace:*",
+    "@zitadel-nextgen/components": "workspace:*",
     "nuxt": "^4.4.2"
   },
   "devDependencies": {
-    "typescript": "^5.7.3"
+    "typescript": "^5.7.3",
+    "vue-tsc": "catalog:"
   }
 }

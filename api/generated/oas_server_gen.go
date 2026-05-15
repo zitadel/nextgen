@@ -44,6 +44,16 @@ type Handler interface {
 	//
 	// POST /flow
 	CreateFlow(ctx context.Context, req *CreateFlowRequest) (CreateFlowRes, error)
+	// CreateFlowDefinition implements createFlowDefinition operation.
+	//
+	// Creates a new flow definition.
+	// Flow definitions are templates that define the sequence of steps (capabilities)
+	// for a particular user journey (e.g., registration, login, password reset).
+	// Flow definitions are created based on the flow meta schema, which includes the flow's purpose,
+	// audience, and the steps involved.
+	//
+	// POST /flow_definitions
+	CreateFlowDefinition(ctx context.Context, req *FlowDefinitionCreateRequest) (CreateFlowDefinitionRes, error)
 	// CreateHandoff implements createHandoff operation.
 	//
 	// Completes the authentication attempt and mints a `handoff_token`.
@@ -57,6 +67,12 @@ type Handler interface {
 	//
 	// POST /auth_attempts/{attempt_id}/handoff
 	CreateHandoff(ctx context.Context, params CreateHandoffParams) (CreateHandoffRes, error)
+	// CreateProject implements createProject operation.
+	//
+	// Create project.
+	//
+	// POST /projects
+	CreateProject(ctx context.Context, req *CreateProjectRequest) (CreateProjectRes, error)
 	// CreateSchema implements createSchema operation.
 	//
 	// Create a new schema. The schema definition must include a unique $id field,
@@ -83,6 +99,12 @@ type Handler interface {
 	//
 	// POST /sessions
 	CreateSession(ctx context.Context, req *CreateSessionRequest) (CreateSessionRes, error)
+	// DeleteFlowDefinition implements deleteFlowDefinition operation.
+	//
+	// Delete a flow definition by id.
+	//
+	// DELETE /flow_definitions/{id}
+	DeleteFlowDefinition(ctx context.Context, params DeleteFlowDefinitionParams) (DeleteFlowDefinitionRes, error)
 	// EndSession implements endSession operation.
 	//
 	// End a session.
@@ -118,6 +140,12 @@ type Handler interface {
 	//
 	// GET /auth_attempts/{attempt_id}
 	GetAuthAttempt(ctx context.Context, params GetAuthAttemptParams) (GetAuthAttemptRes, error)
+	// GetFlowDefinition implements getFlowDefinition operation.
+	//
+	// Get a flow definition by id.
+	//
+	// GET /flow_definitions/{id}
+	GetFlowDefinition(ctx context.Context, params GetFlowDefinitionParams) (GetFlowDefinitionRes, error)
 	// GetFlowStep implements getFlowStep operation.
 	//
 	// Returns the current capability step without advancing the state machine.
@@ -149,6 +177,12 @@ type Handler interface {
 	//
 	// GET /.well-known/openid-configuration
 	GetOpenIDConfiguration(ctx context.Context) (GetOpenIDConfigurationRes, error)
+	// GetProject implements getProject operation.
+	//
+	// Returns the current state of a project.
+	//
+	// GET /projects/{project_id}
+	GetProject(ctx context.Context, params GetProjectParams) (GetProjectRes, error)
 	// GetReady implements getReady operation.
 	//
 	// Check whether the server is ready to accept requests.
@@ -199,6 +233,13 @@ type Handler interface {
 	//
 	// POST /auth_attempts/{attempt_id}/challenges
 	IssueChallenge(ctx context.Context, req *IssueChallengeRequest, params IssueChallengeParams) (IssueChallengeRes, error)
+	// ListFlowDefinitions implements listFlowDefinitions operation.
+	//
+	// Retrieves a list of all flow definitions.
+	// This endpoint can be used to view existing flow definitions and their configurations.
+	//
+	// GET /flow_definitions
+	ListFlowDefinitions(ctx context.Context, params ListFlowDefinitionsParams) (ListFlowDefinitionsRes, error)
 	// ListSessions implements listSessions operation.
 	//
 	// Returns a paginated list of sessions for a project.
@@ -259,6 +300,12 @@ type Handler interface {
 	//
 	// POST /flow/{id}/submit
 	SubmitFlowStep(ctx context.Context, req *FlowSubmitRequest, params SubmitFlowStepParams) (SubmitFlowStepRes, error)
+	// UpdateFlowDefinition implements updateFlowDefinition operation.
+	//
+	// Update a flow definition by id.
+	//
+	// PATCH /flow_definitions/{id}
+	UpdateFlowDefinition(ctx context.Context, req *FlowDefinitionUpdateRequest, params UpdateFlowDefinitionParams) (UpdateFlowDefinitionRes, error)
 	// VerifyChallengeProof implements verifyChallengeProof operation.
 	//
 	// Submits a proof (credential, code, assertion) to verify a factor challenge.

@@ -1,5 +1,4 @@
 $schema: https://json-schema.org/draft/2020-12/schema
-$id: https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/flow-definition.yaml
 title: FlowDefinition
 description: |
   Admin-authored configuration for a flow. A flow definition is a directed
@@ -18,7 +17,7 @@ additionalProperties: false
 properties:
   name:
     type: string
-    pattern: '^[a-z][a-z0-9-]*$'
+    pattern: "^[a-z][a-z0-9-]*$"
     examples: [standard-login, combined-auth]
     description: |
       Stable identifier for this flow, used as the target of cross-flow
@@ -43,7 +42,7 @@ properties:
     minItems: 1
     uniqueItems: true
     items:
-      $ref: '#/$defs/Purpose'
+      $ref: "#/$defs/Purpose"
     examples:
       - [login]
       - [login, register]
@@ -56,7 +55,7 @@ properties:
     type: object
     minProperties: 1
     propertyNames:
-      $ref: '#/$defs/Purpose'
+      $ref: "#/$defs/Purpose"
     additionalProperties:
       type: string
       description: Name of an entry-point step within this definition.
@@ -70,7 +69,7 @@ properties:
       this schema.
 
   audience:
-    $ref: '#/$defs/Audience'
+    $ref: "#/$defs/Audience"
     description: |
       Scopes which requests this definition applies to. Omitted or empty
       means project-wide default. The engine ranks matches by specificity
@@ -80,14 +79,13 @@ properties:
     type: array
     minItems: 1
     items:
-      $ref: '#/$defs/Step'
+      $ref: "#/$defs/Step"
     description: |
       Step graph. Order is for human readability; actual sequencing is
       determined entirely by `transitions`. Every step's `name` must be
       unique within this array.
 
 $defs:
-
   Purpose:
     type: string
     enum: [login, register, recovery, profiling, reauth, link_account]
@@ -128,7 +126,7 @@ $defs:
     properties:
       name:
         type: string
-        pattern: '^[a-z][a-z0-9-]*$'
+        pattern: "^[a-z][a-z0-9-]*$"
         examples: [identify, authenticate, done]
         description: |
           Unique step identifier within this definition. Slug-shaped so
@@ -159,7 +157,7 @@ $defs:
       actions:
         type: object
         additionalProperties:
-          $ref: '#/$defs/Action'
+          $ref: "#/$defs/Action"
         description: |
           Actions the user can take on this step. The key is the action
           name the client echoes back on submit. Every action key must
@@ -169,7 +167,7 @@ $defs:
       gates:
         type: object
         additionalProperties:
-          $ref: '#/$defs/Gate'
+          $ref: "#/$defs/Gate"
         description: |
           Security challenges that must be satisfied before this step's
           submission is accepted. Keyed by gate name (free identifier;
@@ -180,7 +178,7 @@ $defs:
       sso_providers:
         type: array
         items:
-          $ref: '#/$defs/SSOProvider'
+          $ref: "#/$defs/SSOProvider"
         description: |
           Identity providers available on this step. When non-empty, the
           step must define a `transitions.callback` entry — the engine
@@ -214,7 +212,7 @@ $defs:
       transitions:
         type: object
         additionalProperties:
-          $ref: '#/$defs/Transition'
+          $ref: "#/$defs/Transition"
         description: |
           Maps action names and engine-emitted outcomes to the next state.
           Keys are either:

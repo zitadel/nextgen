@@ -20,7 +20,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@nextgen/ui-lit": "workspace:*",
+    "@zitadel-nextgen/components": "workspace:*",
     "@zitadel-nextgen/sdk-next": "workspace:*",
     "next": "^16.2.4",
     "react": "^19.0.0",
