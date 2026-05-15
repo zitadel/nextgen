@@ -7,7 +7,10 @@
     "@tanstack/react-devtools": "catalog:",
     "@tanstack/react-router": "catalog:",
     "@tanstack/react-router-devtools": "catalog:",
+    "@zitadel-nextgen/api": "workspace:*",
+    "@zitadel-nextgen/api-mock": "workspace:*",
     "@zitadel-nextgen/components": "workspace:*",
+    "msw": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
     "tailwindcss": "catalog:"

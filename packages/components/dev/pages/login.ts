@@ -1,21 +1,15 @@
 /**
- * `<zitadel-login>` playground. Mounts the orchestrator with a
- * {@link WalkingFixtureTransport} that walks a real flow definition via
- * `step.transitions`. Branding can be switched live and the password step's
- * identity is hydrated from whatever the user types into the identifier
- * field.
- *
- * It is still a fixture: the in-memory flow only models the happy login
- * path. Real branching flows (register, recovery, MFA) come from the Flow
- * API once `@zitadel-nextgen/api` is wired up.
+ * `<zitadel-login>` playground. Mounts the orchestrator and lets it drive
+ * the typed `@zitadel-nextgen/api` Flow API. Network calls are intercepted
+ * by the MSW worker started in `dev/main.ts` (handlers from
+ * `@zitadel-nextgen/api-mock`); branding can be switched live via
+ * `applyBranding` so the orchestrator's CSS-token bridge has something to
+ * render.
  */
-import { WalkingFixtureTransport, type ZitadelLogin } from "../../src/orchestrator/index.js";
-import {
-  brandingPresets,
-  decorateLoginStep,
-  loginFlow,
-  type BrandingPresetId,
-} from "../fixtures/index.js";
+import { applyBranding } from "@zitadel-nextgen/api-mock";
+
+import type { ZitadelLogin } from "../../src/orchestrator/index.js";
+import { brandingPresets, type BrandingPresetId } from "../branding-presets.js";
 
 const PRESET_LABEL: Record<BrandingPresetId, string> = {
   centered: "Centered (light)",
@@ -115,13 +109,12 @@ export function renderLoginPage(host: HTMLElement): void {
     <div class="layout">
       <aside class="controls">
         <p class="preview-note">
-          <strong>Fixture-driven happy path.</strong>
-          The orchestrator walks an in-memory <code>FlowDefinition</code>
-          (identifier &rarr; password &rarr; done) via
-          <code>WalkingFixtureTransport</code>. Whatever email you type carries
-          forward as the identity on the password step. Branching flows
-          (register, recovery, MFA) arrive once
-          <code>@zitadel-nextgen/api</code> ships.
+          <strong>MSW-driven flow walk.</strong>
+          The orchestrator calls the typed
+          <code>@zitadel-nextgen/api</code> client. Requests are
+          intercepted by <code>@zitadel-nextgen/api-mock</code>'s xstate
+          flow machine. Type any email, then any password — branching
+          flows (register, recovery, MFA) require a real backend.
         </p>
         <h2>Branding</h2>
         <label>
@@ -156,14 +149,11 @@ export function renderLoginPage(host: HTMLElement): void {
   }
 
   function mount(presetId: BrandingPresetId): void {
+    applyBranding(brandingPresets[presetId]);
     frame.innerHTML = "";
     const element = document.createElement("zitadel-login") as ZitadelLogin;
-    element.transport = new WalkingFixtureTransport({
-      flow: loginFlow,
-      branding: brandingPresets[presetId],
-      decorate: decorateLoginStep,
-    });
     element.purpose = "login";
+    element.projectId = "dev-playground";
     element.addEventListener("zitadel-flow-input", (event) =>
       logEvent("zitadel-flow-input", (event as CustomEvent).detail),
     );
@@ -172,6 +162,9 @@ export function renderLoginPage(host: HTMLElement): void {
     );
     element.addEventListener("zitadel-flow-step", (event) =>
       logEvent("zitadel-flow-step", { step: (event as CustomEvent).detail.step.name }),
+    );
+    element.addEventListener("zitadel-flow-complete", (event) =>
+      logEvent("zitadel-flow-complete", (event as CustomEvent).detail),
     );
     element.addEventListener("zitadel-flow-error", (event) =>
       logEvent("zitadel-flow-error", (event as CustomEvent).detail),

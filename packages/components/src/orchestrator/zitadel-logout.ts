@@ -1,5 +1,9 @@
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
+import {
+  endSession,
+  getEndSessionUrl,
+} from "@zitadel-nextgen/api/generated/endpoints/zitadelNextGen";
 
 import { baseHostStyles } from "../styles/base.js";
 import { cssTokenVar as v } from "../styles/css-helpers.js";
@@ -24,9 +28,10 @@ const DISPLAY_COOKIE_NAME = "__nextgen_display";
  * sign out without touching the flow API.
  *
  * Reads the user's display name + email from the `__nextgen_display` cookie
- * (set by the auth backend / SDK proxy on sign-in), renders an avatar trigger
- * with a dropdown that exposes a "Sign out" action, and POSTs to
- * `${proxyBase}/v1/logout`. The proxy clears the session cookie via
+ * (set by the auth backend on sign-in), renders an avatar trigger with a
+ * dropdown that exposes a "Sign out" action, and calls the typed
+ * `endSession` operation in `@zitadel-nextgen/api`
+ * (`GET /auth/end-session`). The server clears the session cookie via
  * `Set-Cookie: Max-Age=0`; on success the element fires `zitadel-signout`
  * and optionally navigates to `post-sign-out-url`.
  *
@@ -185,14 +190,16 @@ export class ZitadelLogout extends LitElement {
     `,
   ];
 
-  /** Same-origin auth proxy base path. Defaults to `/__nextgen`. */
-  @property({ type: String, attribute: "proxy-base" }) accessor proxyBase = "/__nextgen";
-
   /** URL to navigate to after a successful sign-out. */
   @property({ type: String, attribute: "post-sign-out-url" }) accessor postSignOutUrl = "";
 
-  /** Test/dev override. Defaults to the global `fetch`. */
-  @property({ attribute: false }) accessor fetchImpl: typeof fetch | null = null;
+  /**
+   * OIDC `client_id` to forward as a query parameter on the end-session
+   * request, mirroring the standard end-session contract. Optional —
+   * leaving this empty is fine when the backend can resolve the client
+   * from the session cookie alone.
+   */
+  @property({ type: String, attribute: "client-id" }) accessor clientId = "";
 
   @state() private accessor displayName = "";
 
@@ -297,34 +304,25 @@ export class ZitadelLogout extends LitElement {
   }
 
   /**
-   * POSTs to `${proxyBase}/v1/logout`. The proxy clears the session and
-   * display cookies; on success this element fires `zitadel-signout` and
-   * optionally navigates to `postSignOutUrl`.
+   * Calls the typed `endSession` operation (`GET /auth/end-session`) with
+   * `credentials: "include"`. The server clears the session cookie via
+   * `Set-Cookie: Max-Age=0`; on success this element fires `zitadel-signout`
+   * and optionally navigates to `postSignOutUrl`.
    */
   private async doLogout(): Promise<void> {
     this.loading = true;
     this.errorMessage = "";
 
-    const fetchImpl = this.fetchImpl ?? fetch.bind(globalThis);
-    const proxyBase = this.proxyBase.replace(/\/$/, "");
+    const params = {
+      ...(this.clientId ? { client_id: this.clientId } : {}),
+      ...(this.postSignOutUrl ? { post_logout_redirect_uri: this.postSignOutUrl } : {}),
+    };
 
-    let response: Response;
     try {
-      response = await fetchImpl(`${proxyBase}/v1/logout`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "content-type": "application/json" },
-      });
-    } catch {
-      this.errorMessage = "Network error. Please try again.";
-      this.loading = false;
-      return;
-    }
-
-    if (!response.ok) {
-      const body = (await response.json().catch(() => ({}))) as { message?: string };
-      this.errorMessage =
-        typeof body.message === "string" ? body.message : `Sign-out failed (${response.status})`;
+      await endSession(params, { credentials: "include" });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+      this.errorMessage = message || "Sign-out failed. Please try again.";
       this.loading = false;
       return;
     }
@@ -344,6 +342,20 @@ export class ZitadelLogout extends LitElement {
     if (this.postSignOutUrl && typeof window !== "undefined") {
       window.location.href = this.postSignOutUrl;
     }
+  }
+
+  /**
+   * Returns the absolute URL the end-session request will hit. Useful for
+   * test assertions and for consumers that prefer to navigate the browser
+   * directly (instead of fetching) so the OIDC session-end redirect is
+   * driven by the user agent.
+   */
+  getEndSessionUrl(): string {
+    const params = {
+      ...(this.clientId ? { client_id: this.clientId } : {}),
+      ...(this.postSignOutUrl ? { post_logout_redirect_uri: this.postSignOutUrl } : {}),
+    };
+    return getEndSessionUrl(params);
   }
 
   private handleSignOutClick(event: Event): void {

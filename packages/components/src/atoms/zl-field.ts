@@ -1,3 +1,4 @@
+import type { CreateFlow201StepFieldsType } from "@zitadel-nextgen/api/generated/model";
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 
@@ -8,7 +9,13 @@ import { cssTokenVar as v } from "../styles/css-helpers.js";
 import { focusVisibleStyles } from "../styles/focus-ring.js";
 import { tokens } from "../tokens/catalogue.js";
 
-export type ZlFieldType = "text" | "email" | "password" | "tel" | "url" | "number";
+/**
+ * Alias of the orval-generated wire enum for field types so the atom's
+ * accepted `type` values track the API contract exactly. Keeping this an
+ * explicit alias (rather than re-importing the orval name everywhere) means
+ * `<zl-field>` consumers still get a stable, atom-named symbol.
+ */
+export type ZlFieldType = CreateFlow201StepFieldsType;
 
 /**
  * Atom: `<zl-field>` — labelled input bound to a step `field`.
