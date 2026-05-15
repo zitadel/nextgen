@@ -2,6 +2,7 @@ import {
   zlActionManifest,
   zlErrorManifest,
   zlFieldManifest,
+  zlPasskeyManifest,
   zlSubmitManifest,
 } from "./atoms/index.js";
 /**
@@ -19,6 +20,7 @@ export const manifestRegistry: readonly AtomManifest[] = [
   zlSubmitManifest,
   zlActionManifest,
   zlErrorManifest,
+  zlPasskeyManifest,
 ] as const;
 
 export function findManifest(tag: string): AtomManifest | undefined {

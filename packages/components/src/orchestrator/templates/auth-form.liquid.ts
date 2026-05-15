@@ -57,6 +57,14 @@ export const authFormTemplate = String.raw`
       {% endunless %}
     {% endfor %}
 
+    {% if challenge and challenge.type == "passkey" %}
+      <zl-passkey
+        ceremony="{{ challenge.options.ceremony | default: 'authenticate' }}"
+        challenge-id="{{ challenge.challenge_id }}"
+        options='{{ challenge.options | json }}'
+      ></zl-passkey>
+    {% endif %}
+
     {% mandatory_gates %}
   </div>
 </div>
