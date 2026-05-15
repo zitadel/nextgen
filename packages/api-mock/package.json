@@ -13,7 +13,12 @@
       "import": "./src/public-dir.ts"
     }
   },
+  "bin": {
+    "api-mock": "./bin/start.ts"
+  },
   "scripts": {
+    "start": "tsx bin/start.ts",
+    "dev": "tsx watch bin/start.ts",
     "test": "vitest run --project unit",
     "test:browser": "vitest run --project browser",
     "test:all": "vitest run"

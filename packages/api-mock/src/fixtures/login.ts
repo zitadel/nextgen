@@ -12,6 +12,8 @@
  */
 import type { CreateFlow201, CreateFlow201Step } from "@zitadel-nextgen/api/generated/model";
 
+import { signHandoffToken } from "../crypto.js";
+
 export type StepFixtureInput = {
   flowId: string;
   sessionToken: string;
@@ -89,7 +91,7 @@ export function doneStep(input: StepFixtureInput & { redirectUri?: string }): Cr
       gates: {},
     },
     {
-      handoff_token: "handoff_mock",
+      handoff_token: signHandoffToken({ sub: "mock-user@example.com", iss: "http://localhost:4000" }),
       handoff_token_expires_at: new Date(Date.now() + 60_000).toISOString(),
       ...(redirectUri ? { redirect_uri: redirectUri } : {}),
     },
