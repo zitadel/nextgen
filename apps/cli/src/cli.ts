@@ -299,14 +299,12 @@ async function buildGlobalOptions(parsed: ParsedArgs, io: CliIO): Promise<Global
   const command = resolveCommandName(parsed);
   const environment = stringOpt(parsed, "environment") ?? "development";
   const serverFlag = typeof parsed.options.server === "string" ? parsed.options.server : undefined;
-  const mockFlag = Boolean(parsed.options.mock);
 
   const source = await resolveServer({
     cwd,
     env: io.env,
     serverFlag,
     environment,
-    mockFlag,
   });
 
   const verbose = Boolean(parsed.options.verbose);

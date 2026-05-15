@@ -12,7 +12,7 @@ import { ok, skipped } from "../io/output";
 import { ZitadelError } from "../lib/errors";
 import { stableStringify } from "../lib/json";
 import { createPlatformClient } from "../platform";
-import { DEFAULT_SERVER, MOCK_SENTINEL } from "../platform/resolve-server";
+import { DEFAULT_SERVER } from "../platform/resolve-server";
 import type { CreateProjectResponse } from "../platform/schemas";
 import { getRenderer } from "../renderers/registry";
 import { scaffold } from "../scaffolder";
@@ -293,7 +293,6 @@ function projectConfig(
 }
 
 function projectDefaultServer(source: string): string {
-  if (source === MOCK_SENTINEL) return MOCK_SENTINEL;
   try {
     return new URL(source).origin;
   } catch {

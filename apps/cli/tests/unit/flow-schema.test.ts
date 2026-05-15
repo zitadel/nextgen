@@ -3,10 +3,22 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { resetPlatformStore, setupPlatformHandlers } from "@zitadel-nextgen/api-mock/platform";
+import { setupServer } from "msw/node";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { collectTextKeys, flowDefinitionSchema } from "../../src/resources/flow";
 import { runCliForTest } from "../helpers/run-cli";
+
+const MOCK_SERVER_URL = "http://mock.zitadel.test";
+const server = setupServer(...setupPlatformHandlers());
+beforeAll(() => server.listen({ onUnhandledRequest: "warn" }));
+afterAll(() => server.close());
+afterEach(() => { server.resetHandlers(); resetPlatformStore(); });
+
+function cli(args: string[]) {
+  return runCliForTest(["--server", MOCK_SERVER_URL, ...args]);
+}
 
 describe("flow definition schema", () => {
   it("setup emits a FlowDefinition that parses against the zod schema", async () => {
@@ -21,13 +33,12 @@ describe("flow definition schema", () => {
       "export default function Layout({ children }: { children: React.ReactNode }) { return <html><body>{children}</body></html>; }\n",
     );
 
-    const result = await runCliForTest([
+    const result = await cli([
       "setup",
       "--cwd",
       cwd,
       "--non-interactive",
       "--json",
-      "--mock",
       "--skip-deploy-platform",
       "--no-apply",
     ]);
@@ -48,7 +59,6 @@ describe("flow definition schema", () => {
     expect(identifier).toBeDefined();
     if (!identifier) return;
 
-    // fields/actions/gates are objects, not arrays
     expect(Array.isArray(identifier.fields)).toBe(false);
     expect(typeof identifier.fields).toBe("object");
     const emailField = identifier.fields.email;
@@ -61,7 +71,6 @@ describe("flow definition schema", () => {
     expect(submitAction.primary).toBe(true);
     expect(submitAction.text_key).toBe("identifier.action.submit");
 
-    // every field must have a text_key
     for (const step of flow.steps) {
       for (const [name, field] of Object.entries(step.fields)) {
         expect(field.text_key, `field ${step.name}.${name} missing text_key`).toMatch(
@@ -70,7 +79,6 @@ describe("flow definition schema", () => {
       }
     }
 
-    // collectTextKeys returns sorted keys present in the flow
     const keys = collectTextKeys(flow);
     expect(keys).toContain("identifier.title");
     expect(keys).toContain("identifier.field.email");
