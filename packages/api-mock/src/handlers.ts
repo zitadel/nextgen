@@ -39,7 +39,6 @@ let actor: FlowActor = startFlowActor();
 let captured: CapturedRequest[] = [];
 
 const FLOW_ID = "flow_mock";
-const FINAL_REDIRECT_URI = "https://app.mock.invalid/post-signin";
 
 export function resetFlow(): void {
   actor = startFlowActor();
@@ -62,7 +61,7 @@ function currentResponse(): CreateFlow201 {
     case "sso-redirect":
       return withBranding(ssoRedirectStep(input));
     case "done":
-      return withBranding(doneStep({ ...input, redirectUri: FINAL_REDIRECT_URI }));
+      return withBranding(doneStep(input));
     default:
       return withBranding(identifierStep(input));
   }
