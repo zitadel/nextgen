@@ -54,15 +54,40 @@ func checkRowID(projectID, authAttemptID string, typ domain.AuthCheckType) strin
 	return projectID + ":" + authAttemptID + ":" + typ.String()
 }
 
-func scanCheckIntoAuthChecker(
+func scanAuthChecker(
+	projectID string,
 	id string,
+	authAttemptID, sessionID database.Null[string],
 	typ domain.AuthCheckType,
-	startedAt, succeededAt database.Null[time.Time],
-	failedAt database.Null[time.Time],
+	userPasswordID, userTotpID, userPasskeyID, userRecoveryCodesID database.Null[int64],
+	startedAt, succeededAt, failedAt, handedOffAt database.Null[time.Time],
 	failureCount database.Null[uint16],
 	challenge, factor json.RawMessage,
+	supersedes database.Null[string],
 ) (domain.AuthChecker, error) {
-	check := domain.AuthCheck{ID: id, Type: typ}
+	check := &domain.AuthCheck{
+		ProjectID: projectID,
+		ID:        id,
+		Type:      typ,
+	}
+	if authAttemptID.Valid {
+		check.AuthAttemptID = &authAttemptID.V
+	}
+	if sessionID.Valid {
+		check.SessionID = &sessionID.V
+	}
+	if userPasswordID.Valid {
+		check.UserPasswordID = &userPasswordID.V
+	}
+	if userTotpID.Valid {
+		check.UserTOTPID = &userTotpID.V
+	}
+	if userPasskeyID.Valid {
+		check.UserPasskeyID = &userPasskeyID.V
+	}
+	if userRecoveryCodesID.Valid {
+		check.UserRecoveryCodesID = &userRecoveryCodesID.V
+	}
 	if startedAt.Valid {
 		check.LastChallengedAt = startedAt.V
 	}
@@ -72,90 +97,42 @@ func scanCheckIntoAuthChecker(
 	if failedAt.Valid {
 		check.LastFailedAt = &failedAt.V
 	}
+	if handedOffAt.Valid {
+		check.HandedOffAt = &handedOffAt.V
+	}
 	if failureCount.Valid {
 		check.FailureCount = failureCount.V
 	}
-	return newAuthCheck(&check, challenge, factor)
-}
-
-func scanDomainCheck(
-	projectID string,
-	id string,
-	authAttemptID, sessionID database.Null[string],
-	typ domain.AuthCheckType,
-	userPasswordID, userTotpID, userPasskeyID, userRecoveryCodesID database.Null[int64],
-	startedAt, succeededAt database.Null[time.Time],
-	failedAt, handedOffAt database.Null[time.Time],
-	failureCount database.Null[uint16],
-	challenge, factor json.RawMessage,
-	supersedes database.Null[string],
-) *domain.Check {
-	c := &domain.Check{
-		ProjectID: projectID,
-		ID:        id,
-		Type:      typ,
-	}
-	if authAttemptID.Valid {
-		c.AuthAttemptID = &authAttemptID.V
-	}
-	if sessionID.Valid {
-		c.SessionID = &sessionID.V
-	}
-	if userPasswordID.Valid {
-		c.UserPasswordID = &userPasswordID.V
-	}
-	if userTotpID.Valid {
-		c.UserTOTPID = &userTotpID.V
-	}
-	if userPasskeyID.Valid {
-		c.UserPasskeyID = &userPasskeyID.V
-	}
-	if userRecoveryCodesID.Valid {
-		c.UserRecoveryCodesID = &userRecoveryCodesID.V
-	}
-	if startedAt.Valid {
-		c.StartedAt = startedAt.V
-	}
-	if succeededAt.Valid {
-		c.SucceededAt = succeededAt.V
-	}
-	if failedAt.Valid {
-		c.FailedAt = &failedAt.V
-	}
-	if handedOffAt.Valid {
-		c.HandedOffAt = &handedOffAt.V
-	}
-	if failureCount.Valid {
-		c.FailureCount = failureCount.V
-	}
-	if len(challenge) > 0 && string(challenge) != "null" {
-		_ = json.Unmarshal(challenge, &c.Challenge)
-	}
-	if len(factor) > 0 && string(factor) != "null" {
-		_ = json.Unmarshal(factor, &c.Factor)
-	}
 	if supersedes.Valid {
-		c.Supersedes = &supersedes.V
+		check.Supersedes = &supersedes.V
 	}
-	return c
+	return newAuthCheck(check, challenge, factor)
 }
 
-func checksToSessionFactors(checks []*domain.Check) []*domain.SessionFactor {
-	factors := make([]*domain.SessionFactor, 0, len(checks))
-	for _, c := range checks {
-		if c == nil || !c.Succeeded() || c.HandedOffAt == nil {
+func checksToSessionFactors(checkers []domain.AuthChecker) []*domain.SessionFactor {
+	factors := make([]*domain.SessionFactor, 0, len(checkers))
+	for _, checker := range checkers {
+		if checker == nil {
 			continue
 		}
+		ac := checker.Check()
+		if ac == nil || !ac.Succeeded() || ac.HandedOffAt == nil {
+			continue
+		}
+		var factor any
+		if f, ok := checker.(domain.AuthFactorer); ok {
+			factor = f.FactorPayload()
+		}
 		factors = append(factors, &domain.SessionFactor{
-			Type:       c.Type,
-			VerifiedAt: c.SucceededAt,
-			Factor:     c.Factor,
+			Type:       ac.Type,
+			VerifiedAt: ac.LastVerifiedAt,
+			Factor:     factor,
 		})
 	}
 	return factors
 }
 
-func loadSessionChecks(ctx context.Context, client database.QueryExecutor, projectID, sessionID string) ([]*domain.Check, error) {
+func loadSessionChecks(ctx context.Context, client database.QueryExecutor, projectID, sessionID string) ([]domain.AuthChecker, error) {
 	d := checksDialectFor(client)
 	b := sessionChecksSelectBuilder(d)
 	b.WriteString(" WHERE c.project_id = ")
@@ -169,29 +146,58 @@ func loadSessionChecks(ctx context.Context, client database.QueryExecutor, proje
 	}
 	defer rows.Close()
 
-	var out []*domain.Check
+	var out []domain.AuthChecker
 	for rows.Next() {
-		var (
-			id                                                   string
-			authAttemptID, supersedes                            database.Null[string]
-			typ                                                  int16
-			userPasswordID, userTotpID, userPasskeyID, userRecoveryCodesID database.Null[int64]
-			startedAt, succeededAt, failedAt, handedOffAt        database.Null[time.Time]
-			failureCount                                         database.Null[uint16]
-			challenge, factor                                    json.RawMessage
-		)
-		if err := rows.Scan(
-			&id, &authAttemptID, &typ, &userPasswordID, &userTotpID, &userPasskeyID, &userRecoveryCodesID,
-			&startedAt, &succeededAt, &failedAt, &handedOffAt, &failureCount, &challenge, &factor, &supersedes,
-		); err != nil {
+		checker, err := scanAuthCheckerRow(rows, projectID, database.Null[string]{Valid: true, V: sessionID})
+		if err != nil {
 			return nil, err
 		}
-		c := scanDomainCheck(projectID, id, authAttemptID, database.Null[string]{Valid: true, V: sessionID},
-			domain.AuthCheckType(typ), userPasswordID, userTotpID, userPasskeyID, userRecoveryCodesID,
-			startedAt, succeededAt, failedAt, handedOffAt, failureCount, challenge, factor, supersedes)
-		out = append(out, c)
+		out = append(out, checker)
 	}
 	return out, rows.Err()
+}
+
+func scanAuthCheckerRow(rows database.Rows, projectID string, sessionID database.Null[string]) (domain.AuthChecker, error) {
+	var (
+		id                                                   string
+		authAttemptID, supersedes                            database.Null[string]
+		typ                                                  int16
+		userPasswordID, userTotpID, userPasskeyID, userRecoveryCodesID database.Null[int64]
+		startedAt, succeededAt, failedAt, handedOffAt        database.Null[time.Time]
+		failureCount                                         database.Null[uint16]
+		challenge, factor                                    json.RawMessage
+	)
+	if err := rows.Scan(
+		&id, &authAttemptID, &typ, &userPasswordID, &userTotpID, &userPasskeyID, &userRecoveryCodesID,
+		&startedAt, &succeededAt, &failedAt, &handedOffAt, &failureCount, &challenge, &factor, &supersedes,
+	); err != nil {
+		return nil, err
+	}
+	return scanAuthChecker(projectID, id, authAttemptID, sessionID, domain.AuthCheckType(typ),
+		userPasswordID, userTotpID, userPasskeyID, userRecoveryCodesID,
+		startedAt, succeededAt, failedAt, handedOffAt, failureCount, challenge, factor, supersedes)
+}
+
+func scanAttemptAuthCheckerRow(rows database.Rows, projectID string) (domain.AuthChecker, error) {
+	var (
+		id                                                   string
+		authAttemptID, sessionID, supersedes                 database.Null[string]
+		typ                                                  int16
+		userPasswordID, userTotpID, userPasskeyID, userRecoveryCodesID database.Null[int64]
+		startedAt, succeededAt, failedAt, handedOffAt        database.Null[time.Time]
+		failureCount                                         database.Null[uint16]
+		challenge, factor                                    json.RawMessage
+	)
+	if err := rows.Scan(
+		&id, &authAttemptID, &sessionID, &typ,
+		&userPasswordID, &userTotpID, &userPasskeyID, &userRecoveryCodesID,
+		&startedAt, &succeededAt, &failedAt, &handedOffAt, &failureCount, &challenge, &factor, &supersedes,
+	); err != nil {
+		return nil, err
+	}
+	return scanAuthChecker(projectID, id, authAttemptID, sessionID, domain.AuthCheckType(typ),
+		userPasswordID, userTotpID, userPasskeyID, userRecoveryCodesID,
+		startedAt, succeededAt, failedAt, handedOffAt, failureCount, challenge, factor, supersedes)
 }
 
 type credentialFailureFlusher struct {
@@ -200,30 +206,34 @@ type credentialFailureFlusher struct {
 	recovery  *UserRecoveryCodesRepository
 }
 
-func (f *credentialFailureFlusher) flush(ctx context.Context, client database.QueryExecutor, c *domain.Check) error {
-	if c == nil {
+func (f *credentialFailureFlusher) flush(ctx context.Context, client database.QueryExecutor, checker domain.AuthChecker) error {
+	if checker == nil {
+		return nil
+	}
+	ac := checker.Check()
+	if ac == nil {
 		return nil
 	}
 	var changes []database.Change
-	if c.Succeeded() {
+	if ac.Succeeded() {
 		switch {
-		case c.UserPasswordID != nil:
+		case ac.UserPasswordID != nil:
 			changes = []database.Change{f.passwords.ResetFailedAttempts()}
-		case c.UserTOTPID != nil:
+		case ac.UserTOTPID != nil:
 			changes = []database.Change{f.totp.ResetFailedAttempts()}
-		case c.UserRecoveryCodesID != nil:
+		case ac.UserRecoveryCodesID != nil:
 			changes = []database.Change{f.recovery.ResetFailedAttempts()}
 		default:
 			return nil
 		}
-	} else if c.FailureCount > 0 {
+	} else if ac.FailureCount > 0 {
 		switch {
-		case c.UserPasswordID != nil:
-			changes = []database.Change{f.passwords.AddFailedAttempts(int16(c.FailureCount))}
-		case c.UserTOTPID != nil:
-			changes = []database.Change{f.totp.AddFailedAttempts(int16(c.FailureCount))}
-		case c.UserRecoveryCodesID != nil:
-			changes = []database.Change{f.recovery.AddFailedAttempts(int16(c.FailureCount))}
+		case ac.UserPasswordID != nil:
+			changes = []database.Change{f.passwords.AddFailedAttempts(int16(ac.FailureCount))}
+		case ac.UserTOTPID != nil:
+			changes = []database.Change{f.totp.AddFailedAttempts(int16(ac.FailureCount))}
+		case ac.UserRecoveryCodesID != nil:
+			changes = []database.Change{f.recovery.AddFailedAttempts(int16(ac.FailureCount))}
 		default:
 			return nil
 		}
@@ -231,53 +241,60 @@ func (f *credentialFailureFlusher) flush(ctx context.Context, client database.Qu
 		return nil
 	}
 
-	cond := credentialCondition(c)
+	cond := credentialCondition(ac)
 	if cond == nil {
 		return nil
 	}
-	_, err := updateCredential(ctx, client, c, f, changes...)
+	_, err := updateCredential(ctx, client, ac, f, changes...)
 	return err
 }
 
-func credentialCondition(c *domain.Check) database.Condition {
+func credentialCondition(ac *domain.AuthCheck) database.Condition {
+	if ac == nil {
+		return nil
+	}
 	switch {
-	case c.UserPasswordID != nil:
-		return NewUserPasswordRepository().PrimaryKeyCondition(*c.UserPasswordID)
-	case c.UserTOTPID != nil:
-		return NewUserTOTPRepository().PrimaryKeyCondition(*c.UserTOTPID)
-	case c.UserRecoveryCodesID != nil:
-		return NewUserRecoveryCodesRepository().PrimaryKeyCondition(*c.UserRecoveryCodesID)
+	case ac.UserPasswordID != nil:
+		return NewUserPasswordRepository().PrimaryKeyCondition(*ac.UserPasswordID)
+	case ac.UserTOTPID != nil:
+		return NewUserTOTPRepository().PrimaryKeyCondition(*ac.UserTOTPID)
+	case ac.UserRecoveryCodesID != nil:
+		return NewUserRecoveryCodesRepository().PrimaryKeyCondition(*ac.UserRecoveryCodesID)
 	default:
 		return nil
 	}
 }
 
-func updateCredential(ctx context.Context, client database.QueryExecutor, c *domain.Check, f *credentialFailureFlusher, changes ...database.Change) (int64, error) {
+func updateCredential(ctx context.Context, client database.QueryExecutor, ac *domain.AuthCheck, f *credentialFailureFlusher, changes ...database.Change) (int64, error) {
 	switch {
-	case c.UserPasswordID != nil:
-		return updateOne(ctx, client, f.passwords, f.passwords.PrimaryKeyCondition(*c.UserPasswordID), changes...)
-	case c.UserTOTPID != nil:
-		return updateOne(ctx, client, f.totp, f.totp.PrimaryKeyCondition(*c.UserTOTPID), changes...)
-	case c.UserRecoveryCodesID != nil:
-		return updateOne(ctx, client, f.recovery, f.recovery.PrimaryKeyCondition(*c.UserRecoveryCodesID), changes...)
+	case ac.UserPasswordID != nil:
+		return updateOne(ctx, client, f.passwords, f.passwords.PrimaryKeyCondition(*ac.UserPasswordID), changes...)
+	case ac.UserTOTPID != nil:
+		return updateOne(ctx, client, f.totp, f.totp.PrimaryKeyCondition(*ac.UserTOTPID), changes...)
+	case ac.UserRecoveryCodesID != nil:
+		return updateOne(ctx, client, f.recovery, f.recovery.PrimaryKeyCondition(*ac.UserRecoveryCodesID), changes...)
 	default:
 		return 0, nil
 	}
 }
 
-func deleteSessionChecksForCredential(ctx context.Context, client database.QueryExecutor, projectID, sessionID string, c *domain.Check) error {
+func deleteSessionChecksForCredential(ctx context.Context, client database.QueryExecutor, projectID, sessionID string, checker domain.AuthChecker) error {
+	ac := checker.Check()
+	if ac == nil {
+		return nil
+	}
 	d := checksDialectFor(client)
 	var col string
 	var id int64
 	switch {
-	case c.UserPasswordID != nil:
-		col, id = "user_password_id", *c.UserPasswordID
-	case c.UserTOTPID != nil:
-		col, id = "user_totp_id", *c.UserTOTPID
-	case c.UserPasskeyID != nil:
-		col, id = "user_passkey_id", *c.UserPasskeyID
-	case c.UserRecoveryCodesID != nil:
-		col, id = "user_recovery_codes_id", *c.UserRecoveryCodesID
+	case ac.UserPasswordID != nil:
+		col, id = "user_password_id", *ac.UserPasswordID
+	case ac.UserTOTPID != nil:
+		col, id = "user_totp_id", *ac.UserTOTPID
+	case ac.UserPasskeyID != nil:
+		col, id = "user_passkey_id", *ac.UserPasskeyID
+	case ac.UserRecoveryCodesID != nil:
+		col, id = "user_recovery_codes_id", *ac.UserRecoveryCodesID
 	default:
 		return nil
 	}
@@ -296,7 +313,11 @@ func deleteSessionChecksForCredential(ctx context.Context, client database.Query
 	return err
 }
 
-func promoteCheckToSession(ctx context.Context, client database.QueryExecutor, projectID, sessionID string, c *domain.Check) error {
+func promoteCheckToSession(ctx context.Context, client database.QueryExecutor, projectID, sessionID string, checker domain.AuthChecker) error {
+	ac := checker.Check()
+	if ac == nil {
+		return nil
+	}
 	d := checksDialectFor(client)
 	b := database.NewStatementBuilder("UPDATE ")
 	b.WriteString(d.table)
@@ -307,12 +328,12 @@ func promoteCheckToSession(ctx context.Context, client database.QueryExecutor, p
 	b.WriteString(", auth_attempt_id = NULL WHERE project_id = ")
 	b.WriteArg(projectID)
 	b.WriteString(" AND id = ")
-	b.WriteArg(c.ID)
+	b.WriteArg(ac.ID)
 	_, err := client.Exec(ctx, b.String(), b.Args()...)
 	return err
 }
 
-func listAttemptChecks(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string) ([]*domain.Check, error) {
+func listAttemptChecks(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string) ([]domain.AuthChecker, error) {
 	d := checksDialectFor(client)
 	b := attemptChecksSelectBuilder(d)
 	b.WriteString(" WHERE c.project_id = ")
@@ -324,27 +345,13 @@ func listAttemptChecks(ctx context.Context, client database.QueryExecutor, proje
 		return nil, err
 	}
 	defer rows.Close()
-	var out []*domain.Check
+	var out []domain.AuthChecker
 	for rows.Next() {
-		var (
-			id                                                   string
-			authAttemptID, sessionID, supersedes                 database.Null[string]
-			typ                                                  int16
-			userPasswordID, userTotpID, userPasskeyID, userRecoveryCodesID database.Null[int64]
-			startedAt, succeededAt, failedAt, handedOffAt        database.Null[time.Time]
-			failureCount                                         database.Null[uint16]
-			challenge, factor                                    json.RawMessage
-		)
-		if err := rows.Scan(
-			&id, &authAttemptID, &sessionID, &typ,
-			&userPasswordID, &userTotpID, &userPasskeyID, &userRecoveryCodesID,
-			&startedAt, &succeededAt, &failedAt, &handedOffAt, &failureCount, &challenge, &factor, &supersedes,
-		); err != nil {
+		checker, err := scanAttemptAuthCheckerRow(rows, projectID)
+		if err != nil {
 			return nil, err
 		}
-		out = append(out, scanDomainCheck(projectID, id, authAttemptID, sessionID, domain.AuthCheckType(typ),
-			userPasswordID, userTotpID, userPasskeyID, userRecoveryCodesID,
-			startedAt, succeededAt, failedAt, handedOffAt, failureCount, challenge, factor, supersedes))
+		out = append(out, checker)
 	}
 	return out, rows.Err()
 }

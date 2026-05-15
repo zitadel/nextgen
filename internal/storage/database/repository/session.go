@@ -211,16 +211,17 @@ func (r *sessionRepository) MergeAttempt(ctx context.Context, projectID, session
 	}
 
 	hasSucceeded := false
-	for _, c := range checks {
-		if err := r.flusher.flush(ctx, tx, c); err != nil {
+	for _, checker := range checks {
+		if err := r.flusher.flush(ctx, tx, checker); err != nil {
 			return nil, fmt.Errorf("failed to merge attempt: flush credential failures: %w", err)
 		}
-		if c.Succeeded() {
+		ac := checker.Check()
+		if ac != nil && ac.Succeeded() {
 			hasSucceeded = true
-			if err := deleteSessionChecksForCredential(ctx, tx, projectID, sessionID, c); err != nil {
+			if err := deleteSessionChecksForCredential(ctx, tx, projectID, sessionID, checker); err != nil {
 				return nil, fmt.Errorf("failed to merge attempt: %w", err)
 			}
-			if err := promoteCheckToSession(ctx, tx, projectID, sessionID, c); err != nil {
+			if err := promoteCheckToSession(ctx, tx, projectID, sessionID, checker); err != nil {
 				return nil, fmt.Errorf("failed to merge attempt: %w", err)
 			}
 		}
