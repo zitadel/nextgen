@@ -38,9 +38,12 @@ func (r *UserAgentRepository) Create(ctx context.Context, client database.QueryE
 	if err != nil {
 		return fmt.Errorf("failed to create user agent: %w", err)
 	}
-	_, err = client.Exec(ctx,
-		`INSERT INTO `+r.table+` (project_id, id, info) VALUES ($1, $2, $3)`,
-		projectID, agent.ID, info)
+	b := database.NewStatementBuilder("INSERT INTO ")
+	b.WriteString(r.table)
+	b.WriteString(" (project_id, id, info) VALUES (")
+	b.WriteArgs(projectID, agent.ID, info)
+	b.WriteString(")")
+	_, err = client.Exec(ctx, b.String(), b.Args()...)
 	if err != nil {
 		return fmt.Errorf("failed to create user agent: %w", err)
 	}
@@ -48,9 +51,13 @@ func (r *UserAgentRepository) Create(ctx context.Context, client database.QueryE
 }
 
 func (r *UserAgentRepository) GetByID(ctx context.Context, client database.QueryExecutor, projectID, id string) (*domain.UserAgent, error) {
-	rows, err := client.Query(ctx,
-		`SELECT id, info FROM `+r.table+` WHERE project_id = $1 AND id = $2`,
-		projectID, id)
+	b := database.NewStatementBuilder("SELECT id, info FROM ")
+	b.WriteString(r.table)
+	b.WriteString(" WHERE project_id = ")
+	b.WriteArg(projectID)
+	b.WriteString(" AND id = ")
+	b.WriteArg(id)
+	rows, err := client.Query(ctx, b.String(), b.Args()...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user agent: %w", err)
 	}

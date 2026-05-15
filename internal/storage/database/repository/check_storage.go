@@ -3,7 +3,6 @@ package repository
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
@@ -17,14 +16,30 @@ const (
 
 type checksDialect struct {
 	table string
-	now   string
+	now   database.Instruction
 }
 
 func checksDialectFor(client database.QueryExecutor) checksDialect {
 	if isSpannerPooler(client) {
-		return checksDialect{table: spannerChecksTable, now: "CURRENT_TIMESTAMP()"}
+		return checksDialect{table: spannerChecksTable, now: database.CurrentTimestampInstruction}
 	}
-	return checksDialect{table: pgChecksTable, now: "NOW()"}
+	return checksDialect{table: pgChecksTable, now: database.NowInstruction}
+}
+
+func sessionChecksSelectBuilder(d checksDialect) *database.StatementBuilder {
+	b := database.NewStatementBuilder("SELECT c.id, c.auth_attempt_id, c.type, c.user_password_id, c.user_totp_id, c.user_passkey_id, c.user_recovery_codes_id,")
+	b.WriteString(" c.started_at, c.succeeded_at, c.failed_at, c.handedoff_at, c.failure_count, c.challenge, c.factor, c.supersedes FROM ")
+	b.WriteString(d.table)
+	b.WriteString(" c")
+	return b
+}
+
+func attemptChecksSelectBuilder(d checksDialect) *database.StatementBuilder {
+	b := database.NewStatementBuilder("SELECT c.id, c.auth_attempt_id, c.session_id, c.type, c.user_password_id, c.user_totp_id, c.user_passkey_id, c.user_recovery_codes_id,")
+	b.WriteString(" c.started_at, c.succeeded_at, c.failed_at, c.handedoff_at, c.failure_count, c.challenge, c.factor, c.supersedes FROM ")
+	b.WriteString(d.table)
+	b.WriteString(" c")
+	return b
 }
 
 func isSpannerPooler(client database.QueryExecutor) bool {
@@ -142,12 +157,13 @@ func checksToSessionFactors(checks []*domain.Check) []*domain.SessionFactor {
 
 func loadSessionChecks(ctx context.Context, client database.QueryExecutor, projectID, sessionID string) ([]*domain.Check, error) {
 	d := checksDialectFor(client)
-	rows, err := client.Query(ctx,
-		`SELECT c.id, c.auth_attempt_id, c.type, c.user_password_id, c.user_totp_id, c.user_passkey_id, c.user_recovery_codes_id,`+
-			` c.started_at, c.succeeded_at, c.failed_at, c.handedoff_at, c.failure_count, c.challenge, c.factor, c.supersedes`+
-			` FROM `+d.table+` c`+
-			` WHERE c.project_id = $1 AND c.session_id = $2 AND c.handedoff_at IS NOT NULL AND c.succeeded_at IS NOT NULL`,
-		projectID, sessionID)
+	b := sessionChecksSelectBuilder(d)
+	b.WriteString(" WHERE c.project_id = ")
+	b.WriteArg(projectID)
+	b.WriteString(" AND c.session_id = ")
+	b.WriteArg(sessionID)
+	b.WriteString(" AND c.handedoff_at IS NOT NULL AND c.succeeded_at IS NOT NULL")
+	rows, err := client.Query(ctx, b.String(), b.Args()...)
 	if err != nil {
 		return nil, err
 	}
@@ -265,28 +281,45 @@ func deleteSessionChecksForCredential(ctx context.Context, client database.Query
 	default:
 		return nil
 	}
-	_, err := client.Exec(ctx,
-		fmt.Sprintf(`DELETE FROM %s WHERE project_id = $1 AND session_id = $2 AND %s = $3 AND handedoff_at IS NOT NULL`, d.table, col),
-		projectID, sessionID, id)
+	b := database.NewStatementBuilder("DELETE FROM ")
+	b.WriteString(d.table)
+	b.WriteString(" WHERE project_id = ")
+	b.WriteArg(projectID)
+	b.WriteString(" AND session_id = ")
+	b.WriteArg(sessionID)
+	b.WriteString(" AND ")
+	b.WriteString(col)
+	b.WriteString(" = ")
+	b.WriteArg(id)
+	b.WriteString(" AND handedoff_at IS NOT NULL")
+	_, err := client.Exec(ctx, b.String(), b.Args()...)
 	return err
 }
 
 func promoteCheckToSession(ctx context.Context, client database.QueryExecutor, projectID, sessionID string, c *domain.Check) error {
 	d := checksDialectFor(client)
-	_, err := client.Exec(ctx,
-		`UPDATE `+d.table+` SET session_id = $1, handedoff_at = `+d.now+`, auth_attempt_id = NULL`+
-			` WHERE project_id = $2 AND id = $3`,
-		sessionID, projectID, c.ID)
+	b := database.NewStatementBuilder("UPDATE ")
+	b.WriteString(d.table)
+	b.WriteString(" SET session_id = ")
+	b.WriteArg(sessionID)
+	b.WriteString(", handedoff_at = ")
+	b.WriteArg(d.now)
+	b.WriteString(", auth_attempt_id = NULL WHERE project_id = ")
+	b.WriteArg(projectID)
+	b.WriteString(" AND id = ")
+	b.WriteArg(c.ID)
+	_, err := client.Exec(ctx, b.String(), b.Args()...)
 	return err
 }
 
 func listAttemptChecks(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string) ([]*domain.Check, error) {
 	d := checksDialectFor(client)
-	rows, err := client.Query(ctx,
-		`SELECT c.id, c.auth_attempt_id, c.session_id, c.type, c.user_password_id, c.user_totp_id, c.user_passkey_id, c.user_recovery_codes_id,`+
-			` c.started_at, c.succeeded_at, c.failed_at, c.handedoff_at, c.failure_count, c.challenge, c.factor, c.supersedes`+
-			` FROM `+d.table+` c WHERE c.project_id = $1 AND c.auth_attempt_id = $2`,
-		projectID, authAttemptID)
+	b := attemptChecksSelectBuilder(d)
+	b.WriteString(" WHERE c.project_id = ")
+	b.WriteArg(projectID)
+	b.WriteString(" AND c.auth_attempt_id = ")
+	b.WriteArg(authAttemptID)
+	rows, err := client.Query(ctx, b.String(), b.Args()...)
 	if err != nil {
 		return nil, err
 	}

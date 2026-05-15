@@ -124,15 +124,16 @@ func (r *sessionRepository) Create(ctx context.Context, session *domain.Session)
 }
 
 func (r *sessionRepository) GetByID(ctx context.Context, projectID, sessionID string) (*domain.Session, error) {
-	return r.get(ctx, r.exec, ` WHERE project_id = $1 AND id = $2`, projectID, sessionID)
+	return r.get(ctx, r.exec, "id", projectID, sessionID)
 }
 
 func (r *sessionRepository) GetByToken(ctx context.Context, projectID, token string) (*domain.Session, error) {
-	return r.get(ctx, r.exec, ` WHERE project_id = $1 AND token = $2`, projectID, token)
+	return r.get(ctx, r.exec, "token", projectID, token)
 }
 
 func (r *sessionRepository) List(ctx context.Context, opts ...database.QueryOption) ([]*domain.Session, error) {
-	builder := database.NewStatementBuilder(`SELECT project_id, id, created_at, updated_at, expires_at, token, user_id, user_agent_id FROM ` + r.meta.table)
+	builder := database.NewStatementBuilder("SELECT project_id, id, created_at, updated_at, expires_at, token, user_id, user_agent_id FROM ")
+	builder.WriteString(r.meta.table)
 	queryOpts := &database.QueryOpts{}
 	for _, opt := range opts {
 		opt(queryOpts)
@@ -199,7 +200,7 @@ func (r *sessionRepository) MergeAttempt(ctx context.Context, projectID, session
 		return nil, fmt.Errorf("failed to merge attempt: session id mismatch")
 	}
 
-	session, err := r.get(ctx, tx, ` WHERE project_id = $1 AND id = $2`, projectID, sessionID)
+	session, err := r.get(ctx, tx, "id", projectID, sessionID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to merge attempt: %w", err)
 	}
@@ -275,13 +276,19 @@ func (r *sessionRepository) MergeAttempt(ctx context.Context, projectID, session
 	}
 
 	err = nil
-	return r.get(ctx, tx, ` WHERE project_id = $1 AND id = $2`, projectID, sessionID)
+	return r.get(ctx, tx, "id", projectID, sessionID)
 }
 
-func (r *sessionRepository) get(ctx context.Context, client database.QueryExecutor, whereClause, projectID, matcher string) (*domain.Session, error) {
-	rows, err := client.Query(ctx,
-		`SELECT project_id, id, created_at, updated_at, expires_at, token, user_id, user_agent_id FROM `+r.meta.table+whereClause,
-		projectID, matcher)
+func (r *sessionRepository) get(ctx context.Context, client database.QueryExecutor, column, projectID, value string) (*domain.Session, error) {
+	b := database.NewStatementBuilder("SELECT project_id, id, created_at, updated_at, expires_at, token, user_id, user_agent_id FROM ")
+	b.WriteString(r.meta.table)
+	b.WriteString(" WHERE project_id = ")
+	b.WriteArg(projectID)
+	b.WriteString(" AND ")
+	b.WriteString(column)
+	b.WriteString(" = ")
+	b.WriteArg(value)
+	rows, err := client.Query(ctx, b.String(), b.Args()...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query session: %w", err)
 	}
