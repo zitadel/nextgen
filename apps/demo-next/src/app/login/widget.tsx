@@ -24,17 +24,21 @@ export function LoginWidget() {
     // new __nextgen_session cookie without needing a full hard reload.
     async function handleFlowComplete(event: Event) {
       const { handoff_token } = (event as CustomEvent<{ handoff_token: string }>).detail;
-      const resp = await fetch("/__nextgen/sessions/exchange", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ handoff_token }),
-      });
-      if (!resp.ok) {
-        console.error("[nextgen] sessions/exchange failed:", resp.status, await resp.text());
-        return;
+      try {
+        const resp = await fetch("/__nextgen/sessions/exchange", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ handoff_token }),
+        });
+        if (!resp.ok) {
+          console.error("[nextgen] sessions/exchange failed:", resp.status, await resp.text());
+          return;
+        }
+        router.push("/admin");
+      } catch (err) {
+        console.error("[nextgen] sessions/exchange error:", err);
       }
-      router.push("/admin");
     }
 
     document.addEventListener("zitadel-flow-complete", handleFlowComplete);
