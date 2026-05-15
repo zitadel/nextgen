@@ -1,32 +1,5 @@
-CREATE TABLE IF NOT EXISTS zitadel_nextgen.user_agents (
-    project_id   TEXT        NOT NULL
-    , id         TEXT        NOT NULL CHECK (id <> '')
-    , info       JSONB       NOT NULL DEFAULT '{}'::JSONB
-    , created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    , updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-
-    , PRIMARY KEY (project_id, id)
-    , FOREIGN KEY (project_id) REFERENCES zitadel_nextgen.instances(id) -- TODO: rename instances to projects and update the foreign key reference accordingly
-);
-
-CREATE TABLE IF NOT EXISTS zitadel_nextgen.sessions (
-    project_id     TEXT        NOT NULL
-    , id           TEXT        NOT NULL CHECK (id <> '')
-    , created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
-    , updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
-    , expires_at   TIMESTAMPTZ
-    , token        TEXT        NOT NULL CHECK (token <> '')
-    , user_id      TEXT
-    , user_agent_id TEXT
-
-    , PRIMARY KEY (project_id, id)
-    , UNIQUE (project_id, token)
-    , FOREIGN KEY (project_id) REFERENCES zitadel_nextgen.instances(id) -- TODO: rename instances to projects and update the foreign key reference accordingly
-    , FOREIGN KEY (project_id, user_id) REFERENCES zitadel_nextgen.users(project_id, id)
-    , FOREIGN KEY (project_id, user_agent_id) REFERENCES zitadel_nextgen.user_agents(project_id, id)
-);
-
-CREATE TABLE IF NOT EXISTS zitadel_nextgen.checks (
+-- +goose Up
+CREATE TABLE zitadel_nextgen.checks (
     project_id TEXT NOT NULL
     , id TEXT NOT NULL CHECK (id <> '')
     , auth_attempt_id TEXT
@@ -58,9 +31,12 @@ CREATE TABLE IF NOT EXISTS zitadel_nextgen.checks (
     )
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS checks_auth_attempt_type
+CREATE UNIQUE INDEX checks_auth_attempt_type
     ON zitadel_nextgen.checks (project_id, auth_attempt_id, type);
 
-CREATE INDEX IF NOT EXISTS checks_session
+CREATE INDEX checks_session
     ON zitadel_nextgen.checks (project_id, session_id)
     WHERE session_id IS NOT NULL;
+
+-- +goose Down
+DROP TABLE IF EXISTS zitadel_nextgen.checks;

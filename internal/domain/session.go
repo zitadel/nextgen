@@ -120,6 +120,5 @@ type SessionColumns interface {
 	ExpiresAtColumn() database.Column
 	TokenColumn() database.Column
 	UserIDColumn() database.Column
-	UserAgentColumn() database.Column
-	FactorsColumn() database.Column
+	UserAgentIDColumn() database.Column
 }

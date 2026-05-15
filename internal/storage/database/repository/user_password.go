@@ -89,6 +89,14 @@ func (r *UserPasswordRepository) ResetFailedAttempts() database.Change {
 	return database.NewChange(colPasswordFailedAttempts, int16(0))
 }
 
+func (r *UserPasswordRepository) AddFailedAttempts(count int16) database.Change {
+	return database.NewChangeToStatement(colPasswordFailedAttempts, func(b *database.StatementBuilder) {
+		colPasswordFailedAttempts.WriteQualified(b)
+		b.WriteString(" + ")
+		b.WriteArg(count)
+	})
+}
+
 func (r *UserPasswordRepository) Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*domain.UserPassword, error) {
 	builder := database.NewStatementBuilder("SELECT ")
 	database.Columns{

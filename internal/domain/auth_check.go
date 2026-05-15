@@ -3,6 +3,8 @@ package domain
 import "time"
 
 type AuthCheck struct {
+	// ID is the storage identifier for the underlying check row when persisted.
+	ID string
 	Type AuthCheckType
 	// When the check was verified successfully, it must be set by the storage and is read only.
 	LastVerifiedAt time.Time

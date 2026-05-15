@@ -32,7 +32,9 @@ func (c userUnsupportedChange) String() string { return "userUnsupportedChange" 
 
 func (c userUnsupportedChange) WriteArg(*database.StatementBuilder) {}
 
-func (c userUnsupportedChange) Write(*database.StatementBuilder) error { return c.err }
+func (c userUnsupportedChange) Write(*database.StatementBuilder) {
+	_ = c.err
+}
 
 func (c userUnsupportedChange) IsOnColumn(col database.Column) bool {
 	return c.column.Equals(col)

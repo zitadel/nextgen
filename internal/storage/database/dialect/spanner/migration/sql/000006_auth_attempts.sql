@@ -18,26 +18,9 @@ CREATE TABLE auth_attempts (
 CREATE UNIQUE NULL_FILTERED INDEX idx_auth_attempts_handoff_token
     ON auth_attempts (project_id, handoff_token)
 -- +goose StatementEnd
--- +goose StatementBegin
-CREATE TABLE auth_attempt_checks (
-    project_id          STRING(MAX) NOT NULL,
-    auth_attempt_id     STRING(MAX) NOT NULL,
-    type                INT64       NOT NULL,
-    last_challenged_at  TIMESTAMP,
-    last_verified_at    TIMESTAMP,
-    last_failed_at      TIMESTAMP,
-    failure_count       INT64       NOT NULL DEFAULT (0),
-    challenge_payload   JSON,
-    factor_payload      JSON,
-    FOREIGN KEY (project_id, auth_attempt_id) REFERENCES auth_attempts (project_id, id) ON DELETE CASCADE,
-) PRIMARY KEY (project_id, auth_attempt_id, type)
--- +goose StatementEnd
 
 -- +goose Down
 -- +goose NO TRANSACTION
--- +goose StatementBegin
-DROP TABLE IF EXISTS auth_attempt_checks
--- +goose StatementEnd
 -- +goose StatementBegin
 DROP INDEX IF EXISTS idx_auth_attempts_handoff_token
 -- +goose StatementEnd

@@ -74,6 +74,14 @@ func (r *UserRecoveryCodesRepository) ResetFailedAttempts() database.Change {
 	return database.NewChange(colRecoveryFailedAttempts, int16(0))
 }
 
+func (r *UserRecoveryCodesRepository) AddFailedAttempts(count int16) database.Change {
+	return database.NewChangeToStatement(colRecoveryFailedAttempts, func(b *database.StatementBuilder) {
+		colRecoveryFailedAttempts.WriteQualified(b)
+		b.WriteString(" + ")
+		b.WriteArg(count)
+	})
+}
+
 func (r *UserRecoveryCodesRepository) Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*domain.UserRecoveryCodes, error) {
 	b := database.NewStatementBuilder("SELECT ")
 	database.Columns{

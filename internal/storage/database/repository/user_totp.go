@@ -79,6 +79,14 @@ func (r *UserTOTPRepository) ResetFailedAttempts() database.Change {
 	return database.NewChange(colTotpFailedAttempts, int16(0))
 }
 
+func (r *UserTOTPRepository) AddFailedAttempts(count int16) database.Change {
+	return database.NewChangeToStatement(colTotpFailedAttempts, func(b *database.StatementBuilder) {
+		colTotpFailedAttempts.WriteQualified(b)
+		b.WriteString(" + ")
+		b.WriteArg(count)
+	})
+}
+
 func (r *UserTOTPRepository) Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*domain.UserTOTP, error) {
 	builder := database.NewStatementBuilder("SELECT ")
 	database.Columns{

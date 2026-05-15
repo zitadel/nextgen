@@ -17,10 +17,9 @@ Repository structs should expose:
 
 ## 3. Relational CRUD Patterns
 
-- **Create**: Use `client.Exec` with `database.NewStatementBuilder("INSERT ...")`.
-- **Read**: Use `repository.getOne[T]` or `repository.getMany[T]`.
-- **Update**: Use `repository.updateOne[T]`; do not hand-build UPDATE strings.
-- **Delete**: Use `repository.deleteOne[T]`.
+- **Create / read / update / delete**: Use `database.NewStatementBuilder` for SQL, or focused parameterized statements when clearer (for example multi-statement handoff transactions).
+- **Read**: Use `repository.getOne[T]` or `repository.getMany[T]` where they fit.
+- Optional helpers such as `updateOne` / `deleteOne` exist in `repository.go`; use them when convenient, not as a requirement.
 
 ## 4. Conditions And Changes
 
@@ -34,19 +33,5 @@ Repository structs should expose:
 ## 5. Safety Constraints
 
 - Ensure write operations are constrained by primary key and tenant scope.
-- `updateOne` / `deleteOne` validate conditions with `checkPKOrUniqueKeyCondition`
-  (primary key columns, or `UniqueKeyColumns` when implemented). For custom write
-  helpers, mirror that pattern.
-
-## 6. Relational Example (Non-User Entity)
-
-```go
-func (r *Repository) UpdateProject(ctx context.Context, projectID, id string, changes ...database.Change) error {
-	cond := database.And(
-		database.NewTextCondition(r.columnID, database.TextOperationEqual, id),
-		database.NewTextCondition(r.columnProjectID, database.TextOperationEqual, projectID),
-	)
-	_, err := updateOne[*Project](ctx, r.client, r, cond, changes...)
-	return err
-}
-```
+- When using `updateOne` / `deleteOne`, they validate conditions with
+  `checkPKOrUniqueKeyCondition`. Custom write helpers should mirror that pattern.
