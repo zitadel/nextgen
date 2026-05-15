@@ -204,9 +204,6 @@ func (r *sessionRepository) MergeAttempt(ctx context.Context, projectID, session
 	if err != nil {
 		return nil, fmt.Errorf("failed to merge attempt: %w", err)
 	}
-	if session.ID == "" {
-		return nil, fmt.Errorf("failed to merge attempt: session not found")
-	}
 
 	checks, err := listAttemptChecks(ctx, tx, projectID, attempt.ID)
 	if err != nil {
@@ -294,7 +291,7 @@ func (r *sessionRepository) get(ctx context.Context, client database.QueryExecut
 	}
 	defer rows.Close()
 	if !rows.Next() {
-		return &domain.Session{}, rows.Err()
+		return nil, coerceNoRows(rows.Err())
 	}
 	s, userAgentID, err := r.scanSessionRow(rows)
 	if err != nil {

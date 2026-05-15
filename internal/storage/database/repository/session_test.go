@@ -68,11 +68,10 @@ func TestSession_CreateAndGet(t *testing.T) {
 		assert.Equal(t, session.ID, stored.ID)
 	})
 
-	t.Run("missing get returns empty aggregate", func(t *testing.T) {
+	t.Run("not found returns NoRowFoundError", func(t *testing.T) {
 		repo := repository.NewSessionRepository(pool, repository.NewAuthAttemptRepository(pool))
-		stored, err := repo.GetByID(t.Context(), "missing-project", "missing-session")
-		require.NoError(t, err)
-		assert.Empty(t, stored.ID)
+		_, err := repo.GetByID(t.Context(), "missing-project", "missing-session")
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 	})
 
 	t.Run("duplicate token in same project fails", func(t *testing.T) {
@@ -106,9 +105,8 @@ func TestSession_Delete(t *testing.T) {
 
 		require.NoError(t, repo.Delete(t.Context(), session.ProjectID, session.ID))
 
-		stored, err := repo.GetByID(t.Context(), session.ProjectID, session.ID)
-		require.NoError(t, err)
-		assert.Empty(t, stored.ID)
+		_, err := repo.GetByID(t.Context(), session.ProjectID, session.ID)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 	})
 
 	t.Run("delete missing is no-op", func(t *testing.T) {
