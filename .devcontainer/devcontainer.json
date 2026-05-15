@@ -6,7 +6,8 @@
   "features": {
     "ghcr.io/devcontainers/features/node:1": {
       "version": "lts"
-    }
+    },
+    "ghcr.io/devcontainers/features/github-cli:1": {}
   },
   "postCreateCommand": "go mod download",
   "forwardPorts": [5050],

@@ -77,7 +77,7 @@ func TestNewJSONSchemaResolver(t *testing.T) {
 func TestJSONSchemaResolver_Resolve(t *testing.T) {
 	ctx := context.Background()
 	const (
-		projectID   = "proj-1"
+		projectID    = "proj-1"
 		simpleURL    = "https://example.test/schemas/simple.json"
 		simpleSchema = `{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object"}`
 	)

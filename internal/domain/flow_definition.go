@@ -73,11 +73,11 @@ type FlowDefinitionPurposeEntry struct {
 }
 
 // FlowDefinitionAudience describes which requests this definition should be selected for.
-// Fields are applied with specificity: AppID > TeamID > SchemaID > IsProjectDefault.
+// Fields are applied with specificity: AppID > TeamID > UserSchemaID > IsProjectDefault.
 type FlowDefinitionAudience struct {
 	AppID            *string
 	TeamID           *string
-	SchemaID         *string
+	UserSchemaID     *string
 	IsProjectDefault bool
 }
 

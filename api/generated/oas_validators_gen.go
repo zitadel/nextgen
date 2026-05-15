@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/go-faster/errors"
-	"github.com/go-faster/jx"
 	"github.com/ogen-go/ogen/validate"
 )
 
@@ -507,6 +506,29 @@ func (s CreateFlowRequestPurpose) Validate() error {
 	default:
 		return errors.Errorf("invalid value: %v", s)
 	}
+}
+
+func (s *CreateProjectResponse) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if s.PreviewOrigins == nil {
+			return errors.New("nil is invalid value")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "previewOrigins",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
 }
 
 func (s CreateSchemaReq) Validate() error {
@@ -1760,7 +1782,7 @@ func (s ListSessionsState) Validate() error {
 }
 
 func (s ListUsersOKApplicationJSON) Validate() error {
-	alias := ([]jx.Raw)(s)
+	alias := ([]ListUsersOKItem)(s)
 	if alias == nil {
 		return errors.New("nil is invalid value")
 	}

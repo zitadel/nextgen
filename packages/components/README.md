@@ -3,14 +3,14 @@
 Lit-based atomic web components and the `<zitadel-login>` orchestrator for the
 Zitadel auth UI.
 
-The package ships:
+The package exports:
 
 - **Atoms** — `<zl-field>`, `<zl-submit>`, `<zl-action>`, `<zl-error>`. Form-
   associated, accessible, branding-aware Lit elements that map 1:1 to the
-  primitives the flow API talks about.
-- **Orchestrator** — `<zitadel-login>`. A single drop-in element that talks to
-  the flow API, renders each step through a Liquid template, manages focus and
-  form submission, and applies branding/theme/locale.
+  flow API field/action/error primitives.
+- **Orchestrator** — `<zitadel-login>`. A single drop-in element that calls
+  the flow API, renders each step through a Liquid template, manages focus
+  and form submission, and applies branding/theme/locale.
 - **Tokens & manifests** — design tokens (`--zl-*` CSS custom properties), a
   Liquid template registry, and per-atom manifests describing allowed
   attributes/parts/events for sanitiser allowlists.
@@ -38,8 +38,8 @@ externalised so npm consumers dedupe with their own copies.
 
 ## Quickstart — drop on a page
 
-The 90% case: paste the element, hand it a backend URL, locale, and branding.
-It owns everything else.
+The 90% case: render the element, point the typed Flow API client at your
+backend, set a locale.
 
 ```html
 <script type="module" src="@zitadel-nextgen/components"></script>
@@ -47,16 +47,19 @@ It owns everything else.
 <zitadel-login id="login" purpose="login" project-id="proj_123"></zitadel-login>
 
 <script type="module">
+  import { setApiBaseUrl } from '@zitadel-nextgen/api/runtime/base-url';
+
+  setApiBaseUrl('https://api.tenant.com');
+
   const el = document.getElementById('login');
-  el.baseUrl = 'https://api.tenant.com/v2/flow';
-  el.branding = await fetch('/branding').then((r) => r.json());
   el.locale = await fetch('/i18n/en.json').then((r) => r.json());
 </script>
 ```
 
-What you get without writing a line of UI code:
+What `<zitadel-login>` handles for you:
 
-- `POST /flow/start` on mount, full step traversal, `complete` redirect.
+- `POST /flow` on mount, `POST /flow/{id}/submit` for every step, terminal
+  `redirect` / `show` honoured automatically.
 - Native `<form>` semantics: Enter submits, password managers see the inputs,
   `<button type="submit">` works, browser autofill works.
 - Focus moved to the first field on every step change.
@@ -64,6 +67,8 @@ What you get without writing a line of UI code:
 - Light/dark theme via `prefers-color-scheme`, hot-swappable.
 - Mandatory gates (terms, captcha) enforced before submit.
 - Output sanitised with DOMPurify against a per-atom allowlist before injection.
+- Stateless server: the `_zflow` HttpOnly cookie is the source of truth
+  between requests; every call runs with `credentials: "include"`.
 
 ### React / Astro / Next
 
@@ -73,16 +78,17 @@ attributes).
 
 ```tsx
 import '@zitadel-nextgen/components';
+import { setApiBaseUrl } from '@zitadel-nextgen/api/runtime/base-url';
 
-export function Login({ branding, locale }: Props) {
+setApiBaseUrl(import.meta.env.VITE_ZITADEL_API_BASE);
+
+export function Login({ locale }: Props) {
   return (
     <zitadel-login
       purpose="login"
       project-id="proj_123"
-      base-url="https://api.tenant.com/v2/flow"
       ref={(el) => {
         if (!el) return;
-        el.branding = branding;
         el.locale = locale;
       }}
     />
@@ -90,25 +96,35 @@ export function Login({ branding, locale }: Props) {
 }
 ```
 
-### Custom transport (offline demos, fixtures)
+### Mocking for offline demos and tests
 
-Replace the network with a `FlowTransport` implementation. The package ships
-two:
+The orchestrator calls the typed `@zitadel-nextgen/api` fetch client
+directly — there is no transport abstraction to swap. Intercept at the
+network layer via the workspace-internal `@zitadel-nextgen/api-mock`
+package, which walks an xstate flow machine through identifier →
+password → done (with register and SSO branches) using orval-typed step
+fixtures:
 
-- `FetchTransport` — wraps `fetch` against a base URL.
-- `FixtureTransport` — replays a pre-baked sequence of `FlowResponse` objects.
-- `WalkingFixtureTransport` — walks `step.transitions` of a `FlowDefinition`
-  graph; useful for visualizers and demos that exercise multiple branches.
+- **Tests (`msw/node`)** — pass `setupMockHandlers()` from
+  `@zitadel-nextgen/api-mock` into `setupServer(...)`.
+  `getCapturedRequests()` exposes captured request bodies for assertions.
+- **Dev playgrounds / browser (`msw/browser`)** — `setupMock(worker)`; see
+  [`dev/main.ts`](dev/main.ts) for a working setup. `applyBranding(...)`
+  injects a tenant branding overlay merged into every response.
 
-```ts
-import { WalkingFixtureTransport } from '@zitadel-nextgen/components';
+### Two preview surfaces
 
-el.transport = new WalkingFixtureTransport({
-  flow: myFlowDefinition,
-  purpose: 'login',
-  branding,
-});
-```
+Two places run the components against `@zitadel-nextgen/api-mock`. They
+have different jobs — keep both:
+
+| Surface | Run | Audience | What it gives you |
+| --- | --- | --- | --- |
+| **`packages/components/dev/`** | `pnpm --filter @zitadel-nextgen/components dev` | component author | Fast Vite cold-start, no React/Tailwind layer, branding-preset switcher, event log, restart-flow button. Source TS served directly from `src/`. |
+| **`apps/console/`** | `pnpm --filter @zitadel-nextgen/console dev` | consumer/integration | Proves the components work inside React via `@lit/react`, inside TanStack Router, inside the Tailwind-styled console shell. MSW is gated on `import.meta.env.DEV`. |
+
+The dev playground iterates on the components themselves; the console
+proves they integrate. When tweaking visuals or shadow-DOM behaviour,
+reach for the playground first — it round-trips faster.
 
 ### Atoms-only (bypass the orchestrator)
 
@@ -127,17 +143,17 @@ form-associated inputs.
 
 | Tier | Surface | Use when |
 | --- | --- | --- |
-| Tokens only | `el.branding = {...}` | most tenants — colour, logo, font |
+| API base | `setApiBaseUrl()` from `@zitadel-nextgen/api` | every consumer — points at your backend |
+| Tokens | branding payload returned from the server | tenant colour / logo / font |
 | CSS hooks | `zitadel-login::part(form)`, `zl-field::part(input)` | targeted overrides from the host page |
 | Locale | `el.locale = { ... }` | i18n / custom copy |
-| Custom transport | `el.transport = new ...()` | offline / staging / fixtures |
+| MSW mocks | `setupWorker` / `setupServer` from `msw` | offline / staging / fixtures |
 | Custom template | (planned) | tenant-supplied Liquid layouts |
 | Atoms-only | hand-built form | non-standard flow shells |
 
 The "Custom template" surface is not yet exposed on `<zitadel-login>`; the
 orchestrator currently uses the bundled `auth_form.liquid`. Tracked as a
-follow-up; the visualizer's Template tab is read-only when on the Real
-components view to reflect this honestly.
+follow-up.
 
 ## Element APIs
 
@@ -146,15 +162,15 @@ components view to reflect this honestly.
 | Property | Type | Notes |
 | --- | --- | --- |
 | `purpose` | `'login' \| 'register' \| 'reset_password' \| string` | Which flow purpose to drive |
-| `projectId` / `project-id` | `string` | Project / tenant id sent with `start` |
-| `baseUrl` / `base-url` | `string` | Convenience for spinning up a `FetchTransport` |
-| `transport` | `FlowTransport` | Use instead of `baseUrl` for fixtures / custom networks |
-| `branding` | `Branding` | Tokens + assets; validated and mapped to CSS variables |
+| `projectId` / `project-id` | `string` | Project / tenant id sent with `POST /flow` |
+| `apiBase` / `api-base` | `string` | Optional declarative override for `setApiBaseUrl()` |
+| `postSignInUrl` / `post-sign-in-url` | `string` | Fallback nav for terminal `complete: "show"` steps |
+| `resumeFlowId` / `resume-flow-id` | `string` | Resume an existing flow handle instead of starting fresh |
 | `locale` | `Record<string, string>` | i18n dictionary consumed by Liquid's `\| t` filter |
-| `issuer` | `string` | Optional discovery hint; passed through to the API |
 
-`<zitadel-login>` also supports `::part(form)` and emits no public events
-today (network responses are surfaced through transport callbacks).
+Events: `zitadel-flow-input`, `zitadel-flow-action`, `zitadel-flow-step`,
+`zitadel-flow-complete`, `zitadel-flow-error`. The orchestrator exposes
+`::part(form)` for tenant-side CSS hooks.
 
 ### `<zl-field>`
 
@@ -189,14 +205,14 @@ See [`src/atoms/`](src/atoms) for full TypeScript types and JSDoc.
 
 ```
 packages/components/
-├── dev/                   Vite playground (atoms + login routes; serves visualizer)
+├── dev/                   Vite playground (atoms + login routes)
 │   ├── index.html
-│   ├── main.ts
-│   ├── pages/             atom playground + <zitadel-login> demo
-│   └── fixtures/          login flow fixture for the demo & visualizer
+│   ├── main.ts            bootstraps @zitadel-nextgen/api-mock + MSW worker
+│   ├── branding-presets.ts tenant-style branding payloads
+│   └── pages/             atom playground + <zitadel-login> demo
 ├── src/
 │   ├── atoms/             zl-field, zl-submit, zl-action, zl-error + tests
-│   ├── orchestrator/      <zitadel-login>, transport, liquid, sanitiser, branding
+│   ├── orchestrator/      <zitadel-login>, api-client, liquid, sanitiser, branding
 │   │   ├── locales/       bundled English fallback
 │   │   └── templates/     bundled auth_form.liquid + default chrome
 │   ├── tokens/            design-token catalogue + cssVar helpers
@@ -204,7 +220,7 @@ packages/components/
 │   ├── manifests.ts       per-atom attribute / part / event manifests
 │   └── index.ts           barrel
 ├── tsdown.config.ts       library build (externalises lit/liquidjs/dompurify)
-├── vite.config.mts        dev server + visualizer alias
+├── vite.config.mts        dev server
 └── vitest.config.ts       jsdom (unit) + chromium (browser) projects
 ```
 
@@ -214,10 +230,9 @@ packages/components/
 # install once at the repo root
 corepack pnpm install
 
-# run the playground (atoms + login demo + visualizer)
+# run the playground (atoms + login demo)
 corepack pnpm --filter @zitadel-nextgen/components dev
 # → http://localhost:5174/             playground
-# → http://localhost:5174/visualizer.html flow visualizer (real components)
 
 # unit tests (jsdom)
 corepack pnpm --filter @zitadel-nextgen/components test
@@ -250,18 +265,6 @@ Tests are split across two Vitest projects:
 
 Files ending in `.browser.spec.ts` run only in the browser project; everything
 else runs in jsdom.
-
-## Visualizer
-
-`docs/design/flowengine/visualizer.html` is a static visualizer for the flow
-API. The dev server aliases `/visualizer.html` to it and substitutes the
-component bundle path with a `/@fs/` URL pointing at `src/index.ts`, so the
-"Real components" tab mounts the live source — no build required.
-
-```sh
-corepack pnpm --filter @zitadel-nextgen/components dev
-# open http://localhost:5174/visualizer.html
-```
 
 ## Related design docs
 
