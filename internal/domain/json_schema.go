@@ -21,13 +21,6 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-const SchemaRootUrl = "https://zitadel.com/schemas/"
-const UserMetaSchemaRootUrl = SchemaRootUrl + "user/"
-
-func CreateSchemaUrlFromId(id string) (*url.URL, error) {
-	return url.Parse(SchemaRootUrl + id + ".json")
-}
-
 // JSONSchema represent a JSON schema which can be used to validate JSON data.
 type JSONSchema struct {
 	ProjectID string
