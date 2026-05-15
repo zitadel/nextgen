@@ -16,7 +16,6 @@ require (
 	github.com/muhlemmer/gu v0.3.1
 	github.com/ogen-go/ogen v1.20.3
 	github.com/oklog/ulid/v2 v2.1.1
-	github.com/pkg/errors v0.9.1
 	github.com/pressly/goose/v3 v3.27.1
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0

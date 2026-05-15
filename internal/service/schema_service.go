@@ -2,10 +2,10 @@ package service
 
 import (
 	"context"
+	"errors"
 	"net/url"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )

@@ -2,8 +2,8 @@ package api
 
 import (
 	"context"
+	"errors"
 
-	"github.com/pkg/errors"
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
 )
