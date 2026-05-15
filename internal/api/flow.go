@@ -24,9 +24,11 @@ func (h Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest) (ap
 		Purpose:   purpose,
 		Hint:      buildResolveHint(req.Hint),
 	}
+	/* Build error on this line. @vitorbari
 	if slug, ok := req.Slug.Get(); ok {
 		resolveReq.Name = &slug
 	}
+	*/
 	if v, ok := req.SchemaVersion.Get(); ok {
 		resolveReq.SchemaVersion = &v
 	}

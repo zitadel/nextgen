@@ -8,7 +8,7 @@
 /*
 DEALLOCATE ALL;
 PREPARE put_user (
-    TEXT, -- $1 instance_id
+    TEXT, -- $1 project_id
     TEXT, -- $2 user_id (users.id)
     zitadel_nextgen.incoming_user_attribute[] -- $3 full attribute set
 ) AS
@@ -17,12 +17,12 @@ PREPARE put_user (
 WITH _header AS (
     UPDATE zitadel_nextgen.users u
     SET updated_at = now()
-    WHERE u.instance_id = $1
+    WHERE u.project_id = $1
       AND u.id = $2
     RETURNING
-        u.instance_id
+        u.project_id
         , u.id
-        , u.organization_id
+        , u.team_id
         , u.schema_url
         , u.created_at
         , u.updated_at
@@ -37,64 +37,64 @@ WITH _header AS (
 )
 , _desired_registry AS (
     SELECT
-        h.instance_id
+        h.project_id
         , h.id AS user_id
         , CASE
             WHEN d.unique_scope = 'global'::zitadel_nextgen.uniqueness_scope THEN ''::text
-            ELSE h.organization_id
-          END AS organization_id
+            ELSE COALESCE(h.team_id, '')::text
+          END AS team_id
         , d.key
         , d.value_hash
     FROM _input_data d
     CROSS JOIN _header h
     WHERE d.unique_scope IN (
-            'organization'::zitadel_nextgen.uniqueness_scope
+            'team'::zitadel_nextgen.uniqueness_scope
             , 'global'::zitadel_nextgen.uniqueness_scope
         )
       AND d.value_hash IS NOT NULL
 )
 , _del_registry AS (
     DELETE FROM zitadel_nextgen.user_unique_attributes uua
-    WHERE uua.instance_id = $1
+    WHERE uua.project_id = $1
       AND uua.user_id = $2
       AND NOT EXISTS (
             SELECT 1
             FROM _desired_registry dr
-            WHERE dr.instance_id = uua.instance_id
+            WHERE dr.project_id = uua.project_id
               AND dr.user_id = uua.user_id
-              AND dr.organization_id = uua.organization_id
+              AND dr.team_id = uua.team_id
               AND dr.key = uua.key
               AND dr.value_hash = uua.value_hash
         )
 )
 , _ins_registry AS (
     INSERT INTO zitadel_nextgen.user_unique_attributes (
-        instance_id
+        project_id
         , user_id
-        , organization_id
+        , team_id
         , key
         , value_hash
     )
     SELECT
-        dr.instance_id
+        dr.project_id
         , dr.user_id
-        , dr.organization_id
+        , dr.team_id
         , dr.key
         , dr.value_hash
     FROM _desired_registry dr
     WHERE NOT EXISTS (
         SELECT 1
         FROM zitadel_nextgen.user_unique_attributes uua
-        WHERE uua.instance_id = dr.instance_id
+        WHERE uua.project_id = dr.project_id
             AND uua.user_id = dr.user_id
-            AND uua.organization_id = dr.organization_id
+            AND uua.team_id = dr.team_id
             AND uua.key = dr.key
             AND uua.value_hash = dr.value_hash
     )
 )
 , _del_attrs AS (
     DELETE FROM zitadel_nextgen.user_attributes ua
-    WHERE ua.instance_id = $1
+    WHERE ua.project_id = $1
       AND ua.user_id = $2
       AND NOT EXISTS (
             SELECT 1
@@ -105,22 +105,22 @@ WITH _header AS (
 )
 , _ins_attrs AS (
     INSERT INTO zitadel_nextgen.user_attributes (
-        instance_id
-        , organization_id
+        project_id
+        , team_id
         , user_id
         , key
         , value
     )
     SELECT
-        s.instance_id
-        , s.organization_id
+        s.project_id
+        , s.team_id
         , s.user_id
         , s.key
         , s.value
     FROM (
         SELECT
-            h.instance_id
-            , h.organization_id
+            h.project_id
+            , h.team_id
             , h.id AS user_id
             , d.key
             , d.value
@@ -130,17 +130,17 @@ WITH _header AS (
     WHERE NOT EXISTS (
             SELECT 1
             FROM zitadel_nextgen.user_attributes ua
-            WHERE ua.instance_id = s.instance_id
+            WHERE ua.project_id = s.project_id
               AND ua.user_id = s.user_id
               AND ua.key = s.key
-              AND ua.organization_id = s.organization_id
+              AND ua.team_id IS NOT DISTINCT FROM s.team_id
               AND ua.value = s.value
         )
-    ON CONFLICT (instance_id, user_id, key) DO UPDATE
+    ON CONFLICT (project_id, user_id, key) DO UPDATE
         SET value = EXCLUDED.value
-        , organization_id = EXCLUDED.organization_id
+        , team_id = EXCLUDED.team_id
     WHERE zitadel_nextgen.user_attributes.value IS DISTINCT FROM EXCLUDED.value
-       OR zitadel_nextgen.user_attributes.organization_id IS DISTINCT FROM EXCLUDED.organization_id
+       OR zitadel_nextgen.user_attributes.team_id IS DISTINCT FROM EXCLUDED.team_id
     RETURNING key
 )
 , _del_attrs_count AS (
@@ -154,7 +154,7 @@ WITH _header AS (
 SELECT
     h.schema_url
     , h.id
-    , h.organization_id
+    , h.team_id
     , h.created_at
     , h.updated_at
     , (
@@ -168,16 +168,5 @@ CROSS JOIN _del_attrs_count dac
 CROSS JOIN _upsert_attrs_count uac;
 
 /*
-EXECUTE put_user(
-    'inst_1' -- $1 instance_id
-    , 'usr_00101002' -- $2 user_id
-    , ARRAY[ -- $3 full sync payload (same shape as insert_user)
-        ROW('username'::TEXT, '"tester_alpha"'::JSONB, digest('"tester_alpha"'::text, 'md5'), 'global'::TEXT)::zitadel_nextgen.incoming_user_attribute
-        , ROW('email'::TEXT, '"tester@zitadel.com"'::JSONB, digest('"tester@zitadel.com"'::text, 'md5'), 'global'::TEXT)::zitadel_nextgen.incoming_user_attribute
-        , ROW('email_verified'::TEXT, 'true'::JSONB, NULL::bytea, 'unspecified'::TEXT)::zitadel_nextgen.incoming_user_attribute
-        , ROW('nickname'::TEXT, '"TheAlpha"'::JSONB, digest('"TheAlpha"'::text, 'md5'), 'organization'::TEXT)::zitadel_nextgen.incoming_user_attribute
-        , ROW('address.country'::TEXT, '"Netherlands"'::JSONB, NULL::bytea, 'unspecified'::TEXT)::zitadel_nextgen.incoming_user_attribute
-        , ROW('address.locality'::TEXT, '"Amsterdam"'::JSONB, NULL::bytea, 'unspecified'::TEXT)::zitadel_nextgen.incoming_user_attribute
-    ]
-);
+EXECUTE put_user(...);
 */
