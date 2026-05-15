@@ -24,20 +24,21 @@
     "test:all": "vitest run"
   },
   "dependencies": {
-    "@mswjs/http-middleware": "catalog:",
     "@zitadel-nextgen/api": "workspace:*",
-    "express": "catalog:",
     "xstate": "catalog:"
   },
   "peerDependencies": {
     "msw": "catalog:"
   },
   "devDependencies": {
+    "@mswjs/http-middleware": "catalog:",
     "@types/express": "catalog:",
     "@types/node": "catalog:",
     "@vitest/browser-playwright": "catalog:",
+    "express": "catalog:",
     "msw": "catalog:",
-    "playwright": "catalog:"
+    "playwright": "catalog:",
+    "tsx": "catalog:"
   },
   "nx": {
     "targets": {

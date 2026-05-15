@@ -19,14 +19,21 @@ export function LoginWidget() {
 
   useEffect(() => {
     // TODO: move into <zitadel-login> web component (follow-up PR)
+    // Note: router.push() is correct here — Next.js middleware runs on every
+    // navigation (including client-side), so the server will re-evaluate the
+    // new __nextgen_session cookie without needing a full hard reload.
     async function handleFlowComplete(event: Event) {
       const { handoff_token } = (event as CustomEvent<{ handoff_token: string }>).detail;
-      await fetch("/__nextgen/sessions/exchange", {
+      const resp = await fetch("/__nextgen/sessions/exchange", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ handoff_token }),
       });
+      if (!resp.ok) {
+        console.error("[nextgen] sessions/exchange failed:", resp.status, await resp.text());
+        return;
+      }
       router.push("/admin");
     }
 

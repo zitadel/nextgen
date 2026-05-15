@@ -40,6 +40,9 @@ let captured: CapturedRequest[] = [];
 
 const FLOW_ID = "flow_mock";
 
+/** Issuer URL used when signing handoff tokens; set by {@link setupMockHandlers}. */
+let currentIss = "http://localhost:4000";
+
 export function resetFlow(): void {
   actor = startFlowActor();
   captured = [];
@@ -51,7 +54,7 @@ export function getCapturedRequests(): readonly CapturedRequest[] {
 
 function currentResponse(): CreateFlow201 {
   const snapshot = actor.getSnapshot();
-  const input = { flowId: FLOW_ID, sessionToken: snapshot.context.sessionToken };
+  const input = { flowId: FLOW_ID, sessionToken: snapshot.context.sessionToken, iss: currentIss };
   const step = snapshot.value as FlowStepName | "idle";
   switch (step) {
     case "register":
@@ -71,8 +74,13 @@ function currentResponse(): CreateFlow201 {
  * Build the MSW handlers. Each call to `setupMockHandlers()` resets the
  * actor so consumers get a fresh walk. The returned array is consumed by
  * `setupServer(...)` (node) or `setupWorker(...)` (browser).
+ *
+ * @param options.iss - Issuer URL embedded in the handoff token (default:
+ *   `"http://localhost:4000"`). Pass the server's own origin so that
+ *   `verifyHandoffToken` can enforce issuer consistency.
  */
-export function setupMockHandlers(): RequestHandler[] {
+export function setupMockHandlers(options: { iss?: string } = {}): RequestHandler[] {
+  currentIss = options.iss ?? "http://localhost:4000";
   resetFlow();
 
   return [

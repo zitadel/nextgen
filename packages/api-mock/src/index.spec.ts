@@ -58,8 +58,10 @@ describe("setupMockHandlers", () => {
       fields: { password: "hunter2" },
     });
     expect(submitPassword.step.name).toBe("done");
-    expect(submitPassword.step.complete).toBe("redirect");
-    expect(submitPassword.redirect_uri).toBeTruthy();
+    // complete: "show" — the web component fires zitadel-flow-complete and
+    // waits for the app to navigate; the server does not redirect.
+    expect(submitPassword.step.complete).toBe("show");
+    expect(submitPassword.redirect_uri).toBeUndefined();
     expect(submitPassword.handoff_token).toBeTruthy();
   });
 

@@ -129,7 +129,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
     expect(typeof submits[0]?.body.session_token).toBe("string");
   });
 
-  it("emits zitadel-flow-complete when the step ends with `complete: redirect`", async () => {
+  it("emits zitadel-flow-complete when the step ends with `complete: show`", async () => {
     const element = await mount(host);
     const completeEvents: CustomEvent[] = [];
     element.addEventListener("zitadel-flow-complete", (event) =>
@@ -155,8 +155,10 @@ describe("<zitadel-login> against the typed Flow API", () => {
       }),
     );
     await waitFor(() => (completeEvents.length > 0 ? completeEvents : null));
+    // The mock returns complete: "show" so the app (not the component) drives
+    // navigation after exchanging the handoff_token for a session cookie.
     expect(completeEvents[0]?.detail).toEqual(
-      expect.objectContaining({ behavior: "redirect" }),
+      expect.objectContaining({ behavior: "show" }),
     );
     expect(completeEvents[0]?.detail.handoff_token).toBeTruthy();
   });

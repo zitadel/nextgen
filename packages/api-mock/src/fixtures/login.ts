@@ -17,6 +17,8 @@ import { signHandoffToken } from "../crypto.js";
 export type StepFixtureInput = {
   flowId: string;
   sessionToken: string;
+  /** Issuer URL embedded in signed tokens (e.g. `"http://localhost:4000"`). */
+  iss: string;
 };
 
 const submitContinue = { submit: { text_key: "submit.continue", primary: true } };
@@ -79,7 +81,7 @@ export function ssoRedirectStep(
 }
 
 export function doneStep(input: StepFixtureInput & { redirectUri?: string }): CreateFlow201 {
-  const { redirectUri } = input;
+  const { redirectUri, iss } = input;
   return wrap(
     input,
     {
@@ -91,7 +93,7 @@ export function doneStep(input: StepFixtureInput & { redirectUri?: string }): Cr
       gates: {},
     },
     {
-      handoff_token: signHandoffToken({ sub: "mock-user@example.com", iss: "http://localhost:4000" }),
+      handoff_token: signHandoffToken({ sub: "mock-user@example.com", iss }),
       handoff_token_expires_at: new Date(Date.now() + 60_000).toISOString(),
       ...(redirectUri ? { redirect_uri: redirectUri } : {}),
     },

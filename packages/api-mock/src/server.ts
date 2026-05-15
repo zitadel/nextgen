@@ -22,13 +22,20 @@ export function startMockServer(port: number): void {
   const app = express();
 
   // ─── CORS ──────────────────────────────────────────────────────────────────
+  // Reflects the incoming Origin verbatim and allows credentials so that the
+  // demo apps (running on different ports) can make credentialed fetch()
+  // calls to this server. This is intentionally permissive because this is a
+  // LOCAL DEVELOPMENT MOCK ONLY — never deploy this server publicly.
   app.use((req, res, next) => {
     const origin = req.headers.origin;
     res.setHeader("Access-Control-Allow-Origin", origin ?? "*");
     if (origin) res.setHeader("Access-Control-Allow-Credentials", "true");
     if (req.method === "OPTIONS") {
       res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Cookie");
+      // Note: 'Cookie' is a browser-forbidden header name and is never sent
+      // as a JS request header; it does not need to be in Allow-Headers.
+      // Cookies are carried automatically via credentials: "include".
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type");
       res.status(204).end();
       return;
     }
@@ -52,7 +59,7 @@ export function startMockServer(port: number): void {
     }
     let claims: { sub: string; iss: string };
     try {
-      claims = verifyHandoffToken(handoff_token);
+      claims = verifyHandoffToken(handoff_token, { expectedIss: iss });
     } catch {
       res.status(401).json({ error: "invalid_handoff_token" });
       return;
@@ -76,7 +83,7 @@ export function startMockServer(port: number): void {
   });
 
   // ─── Flow API — reuse MSW handlers, zero duplication ──────────────────────
-  app.use(createMiddleware(...setupMockHandlers()));
+  app.use(createMiddleware(...setupMockHandlers({ iss })));
 
   app.listen(port, () => {
     console.log(`\napi-mock server listening on http://localhost:${port}`);

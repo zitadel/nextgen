@@ -66,10 +66,16 @@ export function signSessionToken(claims: {
 
 /**
  * Verifies a handoff token issued by `signHandoffToken`.
- * Throws if the signature is invalid, the token is expired, or the audience
- * is wrong.
+ * Throws if the signature is invalid, the token is expired, the audience is
+ * wrong, or (when `expectedIss` is supplied) the issuer does not match.
+ *
+ * @param token       - Raw JWT string.
+ * @param expectedIss - When provided, the `iss` claim must equal this value.
  */
-export function verifyHandoffToken(token: string): { sub: string; iss: string } {
+export function verifyHandoffToken(
+  token: string,
+  { expectedIss }: { expectedIss?: string } = {},
+): { sub: string; iss: string } {
   const parts = token.split(".");
   if (parts.length !== 3) throw new Error("invalid token structure");
   const [h, p, s] = parts as [string, string, string];
@@ -87,5 +93,8 @@ export function verifyHandoffToken(token: string): { sub: string; iss: string } 
   };
   if (payload.aud !== "exchange") throw new Error("wrong audience");
   if (payload.exp < Math.floor(Date.now() / 1000)) throw new Error("token expired");
+  if (expectedIss !== undefined && payload.iss !== expectedIss) {
+    throw new Error(`wrong issuer: expected ${expectedIss}, got ${payload.iss}`);
+  }
   return { sub: payload.sub, iss: payload.iss };
 }
