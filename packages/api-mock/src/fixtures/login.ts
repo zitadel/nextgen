@@ -34,7 +34,10 @@ export function identifierStep(input: StepFixtureInput): CreateFlow201 {
     name: "identifier",
     texts: { title_key: "identifier.title", description_key: "identifier.description" },
     fields: { email: { type: "email", text_key: "identifier.field.email", required: true } },
-    actions: submitContinue,
+    actions: {
+      ...submitContinue,
+      passkey: { text_key: "action.passkey.signin" },
+    },
     gates: {},
   });
 }
@@ -48,7 +51,10 @@ export function registerStep(input: StepFixtureInput): CreateFlow201 {
       given_name: { type: "text", text_key: "register.field.given_name", required: true },
       family_name: { type: "text", text_key: "register.field.family_name", required: true },
     },
-    actions: submitContinue,
+    actions: {
+      ...submitContinue,
+      passkey: { text_key: "action.passkey.register" },
+    },
     gates: {},
   });
 }
@@ -94,4 +100,72 @@ export function doneStep(input: StepFixtureInput & { redirectUri?: string }): Cr
       ...(redirectUri ? { redirect_uri: redirectUri } : {}),
     },
   );
+}
+
+/**
+ * Mock passkey challenge step. Contains a synthetic
+ * `PublicKeyCredentialRequestOptions` that the `<zl-passkey>` atom will
+ * try to pass to `navigator.credentials.get()`. In a browser without a
+ * virtual authenticator this will fail — which is fine for verifying the
+ * wiring (the error flow fires `zl-passkey-error`).
+ */
+export function passkeyChallenge(input: StepFixtureInput): CreateFlow201 {
+  return wrap(input, {
+    name: "passkey-challenge",
+    texts: { title_key: "passkey.challenge.title", description_key: "passkey.challenge.description" },
+    fields: {},
+    actions: { submit: { text_key: "submit.verify", primary: true } },
+    gates: {},
+    challenge: {
+      type: "passkey",
+      challenge_id: "ch_mock_001",
+      options: {
+        challenge: "dGVzdC1jaGFsbGVuZ2UtZnJvbS1tb2Nr",
+        rpId: "localhost",
+        timeout: 60000,
+        userVerification: "preferred",
+        allowCredentials: [],
+      },
+    },
+  });
+}
+
+/**
+ * Mock passkey enrollment step for registration. Uses `ceremony: "register"`
+ * so the `<zl-passkey>` atom calls `navigator.credentials.create()` instead
+ * of `get()`. The options contain a synthetic `PublicKeyCredentialCreationOptions`.
+ */
+export function passkeyEnroll(input: StepFixtureInput): CreateFlow201 {
+  return wrap(input, {
+    name: "passkey-enroll",
+    texts: { title_key: "passkey.enroll.title", description_key: "passkey.enroll.description" },
+    fields: {},
+    actions: { submit: { text_key: "submit.verify", primary: true } },
+    gates: {},
+    challenge: {
+      type: "passkey",
+      challenge_id: "ch_mock_enroll_001",
+      options: {
+        ceremony: "register",
+        challenge: "cmVnaXN0ZXItY2hhbGxlbmdlLW1vY2s",
+        rp: { id: "localhost", name: "Zitadel Dev" },
+        user: {
+          id: "dXNlcl9tb2NrXzAx",
+          name: "user@example.com",
+          displayName: "Mock User",
+        },
+        pubKeyCredParams: [
+          { type: "public-key", alg: -7 },
+          { type: "public-key", alg: -257 },
+        ],
+        timeout: 60000,
+        attestation: "none",
+        authenticatorSelection: {
+          authenticatorAttachment: "platform",
+          residentKey: "preferred",
+          userVerification: "preferred",
+        },
+      },
+    },
+  });
 }

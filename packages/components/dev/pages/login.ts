@@ -113,9 +113,16 @@ export function renderLoginPage(host: HTMLElement): void {
           The orchestrator calls the typed
           <code>@zitadel-nextgen/api</code> client. Requests are
           intercepted by <code>@zitadel-nextgen/api-mock</code>'s xstate
-          flow machine. Type any email, then any password — branching
-          flows (register, recovery, MFA) require a real backend.
+          flow machine. Type any email, then any password.
         </p>
+        <h2>Flow</h2>
+        <label>
+          <span>Purpose</span>
+          <select id="purpose">
+            <option value="login" selected>Login</option>
+            <option value="register">Register</option>
+          </select>
+        </label>
         <h2>Branding</h2>
         <label>
           <span>Preset</span>
@@ -134,10 +141,11 @@ export function renderLoginPage(host: HTMLElement): void {
   `;
 
   const select = host.querySelector<HTMLSelectElement>("#preset");
+  const purposeSelect = host.querySelector<HTMLSelectElement>("#purpose");
   const resetButton = host.querySelector<HTMLButtonElement>("#reset");
   const frameEl = host.querySelector<HTMLElement>("#frame");
   const eventsEl = host.querySelector<HTMLPreElement>("#events");
-  if (!select || !resetButton || !frameEl || !eventsEl) {
+  if (!select || !purposeSelect || !resetButton || !frameEl || !eventsEl) {
     throw new Error("Login playground markup is missing required nodes.");
   }
   const frame: HTMLElement = frameEl;
@@ -152,7 +160,7 @@ export function renderLoginPage(host: HTMLElement): void {
     applyBranding(brandingPresets[presetId]);
     frame.innerHTML = "";
     const element = document.createElement("zitadel-login") as ZitadelLogin;
-    element.purpose = "login";
+    element.purpose = purposeSelect.value as "login" | "register";
     element.projectId = "dev-playground";
     element.addEventListener("zitadel-flow-input", (event) =>
       logEvent("zitadel-flow-input", (event as CustomEvent).detail),
@@ -173,6 +181,7 @@ export function renderLoginPage(host: HTMLElement): void {
   }
 
   select.addEventListener("change", () => mount(select.value as BrandingPresetId));
+  purposeSelect.addEventListener("change", () => mount(select.value as BrandingPresetId));
   resetButton.addEventListener("click", () => mount(select.value as BrandingPresetId));
 
   mount("centered");

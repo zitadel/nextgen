@@ -25,6 +25,8 @@ import { startFlowActor, type FlowActor, type FlowStepName } from "./flow-machin
 import {
   doneStep,
   identifierStep,
+  passkeyChallenge,
+  passkeyEnroll,
   passwordStep,
   registerStep,
   ssoRedirectStep,
@@ -59,6 +61,10 @@ function currentResponse(): CreateFlow201 {
       return withBranding(registerStep(input));
     case "password":
       return withBranding(passwordStep(input));
+    case "passkey-challenge":
+      return withBranding(passkeyChallenge(input));
+    case "passkey-enroll":
+      return withBranding(passkeyEnroll(input));
     case "sso-redirect":
       return withBranding(ssoRedirectStep(input));
     case "done":
