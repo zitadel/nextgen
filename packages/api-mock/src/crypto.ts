@@ -122,9 +122,13 @@ export async function verifyHandoffToken(
     iss: string;
     aud: string;
     exp: number;
+    nbf?: number;
   };
   if (payload.aud !== "exchange") throw new Error("wrong audience");
   if (payload.exp < Math.floor(Date.now() / 1000)) throw new Error("token expired");
+  if (payload.nbf !== undefined && payload.nbf > Math.floor(Date.now() / 1000)) {
+    throw new Error("token not yet valid");
+  }
   if (expectedIss !== undefined && payload.iss !== expectedIss) {
     throw new Error(`wrong issuer: expected ${expectedIss}, got ${payload.iss}`);
   }
