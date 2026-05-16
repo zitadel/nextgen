@@ -30,6 +30,10 @@ export function startMockServer(port: number): Server {
   // LOCAL DEVELOPMENT MOCK ONLY — never deploy this server publicly.
   app.use((req, res, next) => {
     const origin = req.headers.origin;
+    // Vary must be set before the response is cached — it tells any proxy that
+    // the response differs per Origin so it cannot serve Origin-A's response
+    // to Origin-B's request.
+    res.setHeader("Vary", "Origin");
     res.setHeader("Access-Control-Allow-Origin", origin ?? "*");
     if (origin) res.setHeader("Access-Control-Allow-Credentials", "true");
     if (req.method === "OPTIONS") {
@@ -54,8 +58,8 @@ export function startMockServer(port: number): Server {
 
   // ─── Sessions exchange ─────────────────────────────────────────────────────
   app.post("/sessions/exchange", express.json(), async (req, res) => {
-    const { handoff_token } = req.body as { handoff_token?: string };
-    if (!handoff_token) {
+    const { handoff_token } = req.body as { handoff_token?: unknown };
+    if (!handoff_token || typeof handoff_token !== "string") {
       res.status(400).json({ error: "missing_handoff_token" });
       return;
     }
@@ -68,7 +72,7 @@ export function startMockServer(port: number): Server {
     }
     const sessionJwt = await signSessionToken({ sub: claims.sub, email: claims.sub, iss });
     res.setHeader("Set-Cookie", [
-      `__nextgen_session=${sessionJwt}; HttpOnly; Path=/; SameSite=Lax`,
+      `__nextgen_session=${sessionJwt}; HttpOnly; Path=/; SameSite=Lax; Max-Age=3600`,
       `_zflow=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
     ]);
     res.json({ status: "ok" });
