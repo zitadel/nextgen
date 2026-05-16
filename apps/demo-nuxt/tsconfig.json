@@ -1,5 +1,5 @@
 {
-  "extends": "/tmp/demo-nuxt-build/tsconfig.json",
+  "extends": ".nuxt/tsconfig.json",
   "references": [
     {
       "path": "../../packages/components"
