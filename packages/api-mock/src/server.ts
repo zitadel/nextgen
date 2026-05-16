@@ -53,7 +53,7 @@ export function startMockServer(port: number): Server {
   });
 
   // ─── Sessions exchange ─────────────────────────────────────────────────────
-  app.post("/sessions/exchange", express.json(), (req, res) => {
+  app.post("/sessions/exchange", express.json(), async (req, res) => {
     const { handoff_token } = req.body as { handoff_token?: string };
     if (!handoff_token) {
       res.status(400).json({ error: "missing_handoff_token" });
@@ -61,12 +61,12 @@ export function startMockServer(port: number): Server {
     }
     let claims: { sub: string; iss: string };
     try {
-      claims = verifyHandoffToken(handoff_token, { expectedIss: iss });
+      claims = await verifyHandoffToken(handoff_token, { expectedIss: iss });
     } catch {
       res.status(401).json({ error: "invalid_handoff_token" });
       return;
     }
-    const sessionJwt = signSessionToken({ sub: claims.sub, email: claims.sub, iss });
+    const sessionJwt = await signSessionToken({ sub: claims.sub, email: claims.sub, iss });
     res.setHeader("Set-Cookie", [
       `__nextgen_session=${sessionJwt}; HttpOnly; Path=/; SameSite=Lax`,
       `_zflow=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
@@ -85,7 +85,7 @@ export function startMockServer(port: number): Server {
   });
 
   // ─── Flow API — reuse MSW handlers, zero duplication ──────────────────────
-  app.use(createMiddleware(...setupMockHandlers({ iss })));
+  app.use(createMiddleware(...setupMockHandlers({ iss }).handlers));
 
   return app.listen(port, () => {
     console.log(`\napi-mock server listening on http://localhost:${port}`);

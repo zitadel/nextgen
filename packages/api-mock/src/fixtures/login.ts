@@ -86,7 +86,7 @@ export function ssoRedirectStep(
   });
 }
 
-export function doneStep(input: StepFixtureInput): CreateFlow201 {
+export async function doneStep(input: StepFixtureInput): Promise<CreateFlow201> {
   const { iss, capturedEmail } = input;
   return wrap(
     input,
@@ -99,7 +99,7 @@ export function doneStep(input: StepFixtureInput): CreateFlow201 {
       gates: {},
     },
     {
-      handoff_token: signHandoffToken({
+      handoff_token: await signHandoffToken({
         sub: capturedEmail ?? "mock-user@example.com",
         iss,
       }),

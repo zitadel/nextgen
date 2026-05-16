@@ -2,36 +2,60 @@
  * Ephemeral RSA-2048 key pair for JWT signing in the standalone mock server
  * and MSW handler context.
  *
- * The key pair is generated once at module load time using `node:crypto`.
- * No keys are committed to the repository — they are fresh on every process
- * start. Both the standalone HTTP server and the MSW in-process handlers
- * import from this module, so they share the same ephemeral pair within a
- * single process.
+ * Uses the Web Crypto API (`globalThis.crypto.subtle`) so the module works
+ * in both Node.js ≥ 18 and modern browsers without polyfills or bundler
+ * shims. The key pair is generated once at module load via top-level await.
+ * No keys are committed to the repository — they are fresh on every
+ * process/page start.
+ *
+ * Both the standalone HTTP server and the MSW in-process handlers import
+ * from this module, so they share the same ephemeral pair within a single
+ * process.
  */
-import { createSign, createVerify, generateKeyPairSync, type KeyObject } from "node:crypto";
 
-const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+const enc = new TextEncoder();
+const dec = new TextDecoder();
+
+function toBase64url(buf: ArrayBuffer | Uint8Array): string {
+  const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
+  let s = "";
+  for (const b of bytes) s += String.fromCharCode(b);
+  return btoa(s).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+}
+
+function fromBase64url(s: string): Uint8Array {
+  const pad = s.length % 4 === 0 ? "" : "=".repeat(4 - (s.length % 4));
+  return Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/") + pad), (c) =>
+    c.charCodeAt(0),
+  );
+}
+
+const ALG = { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" } as const;
+
+const { privateKey, publicKey } = await globalThis.crypto.subtle.generateKey(
+  { ...ALG, modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]) },
+  /* extractable */ true,
+  ["sign", "verify"],
+);
+
+const rawJwk = await globalThis.crypto.subtle.exportKey("jwk", publicKey);
 
 export const KEY_ID = "mock-key-1";
 
 /** Public JWK for the JWKS endpoint (JsonWebKey + kid, which the DOM type omits). */
 export const JWK: JsonWebKey & { kid: string } = {
-  ...(publicKey.export({ format: "jwk" }) as JsonWebKey),
+  ...rawJwk,
   kid: KEY_ID,
   use: "sig",
   alg: "RS256",
 };
 
-function base64url(buf: Buffer): string {
-  return buf.toString("base64").replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
-}
-
-function buildJwt(header: object, payload: object): string {
-  const h = base64url(Buffer.from(JSON.stringify(header)));
-  const p = base64url(Buffer.from(JSON.stringify(payload)));
+async function buildJwt(header: object, payload: object): Promise<string> {
+  const h = toBase64url(enc.encode(JSON.stringify(header)));
+  const p = toBase64url(enc.encode(JSON.stringify(payload)));
   const signing = `${h}.${p}`;
-  const sig = base64url(
-    createSign("SHA256").update(signing).sign(privateKey as KeyObject),
+  const sig = toBase64url(
+    await globalThis.crypto.subtle.sign(ALG.name, privateKey, enc.encode(signing)),
   );
   return `${signing}.${sig}`;
 }
@@ -40,7 +64,7 @@ function buildJwt(header: object, payload: object): string {
  * Signs a short-lived handoff token (60 s, aud=exchange) suitable for
  * `POST /sessions/exchange`.
  */
-export function signHandoffToken(claims: { sub: string; iss: string }): string {
+export async function signHandoffToken(claims: { sub: string; iss: string }): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   return buildJwt(
     { alg: "RS256", typ: "JWT", kid: KEY_ID },
@@ -52,11 +76,11 @@ export function signHandoffToken(claims: { sub: string; iss: string }): string {
  * Signs a long-lived session token (1 h) suitable for the
  * `__nextgen_session` HttpOnly cookie.
  */
-export function signSessionToken(claims: {
+export async function signSessionToken(claims: {
   sub: string;
   email: string;
   iss: string;
-}): string {
+}): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   return buildJwt(
     { alg: "RS256", typ: "JWT", kid: KEY_ID },
@@ -72,29 +96,28 @@ export function signSessionToken(claims: {
  * @param token       - Raw JWT string.
  * @param expectedIss - When provided, the `iss` claim must equal this value.
  */
-export function verifyHandoffToken(
+export async function verifyHandoffToken(
   token: string,
   { expectedIss }: { expectedIss?: string } = {},
-): { sub: string; iss: string } {
+): Promise<{ sub: string; iss: string }> {
   const parts = token.split(".");
   if (parts.length !== 3) throw new Error("invalid token structure");
   const [h, p, s] = parts as [string, string, string];
 
   // Validate algorithm before touching the signature — defence against alg:none attacks.
-  const header = JSON.parse(Buffer.from(h, "base64url").toString()) as { alg?: string };
+  const header = JSON.parse(dec.decode(fromBase64url(h))) as { alg?: string };
   if (header.alg !== "RS256") throw new Error(`unsupported algorithm: ${header.alg ?? "none"}`);
 
-  // Verify signature. Use "base64url" encoding so Node handles the url-safe
-  // alphabet (-_) and missing padding (=) correctly without manual fixups.
   const signing = `${h}.${p}`;
-  const sig = Buffer.from(s, "base64url");
-  const ok = createVerify("SHA256")
-    .update(signing)
-    .verify(publicKey as KeyObject, sig);
+  const ok = await globalThis.crypto.subtle.verify(
+    ALG.name,
+    publicKey,
+    fromBase64url(s),
+    enc.encode(signing),
+  );
   if (!ok) throw new Error("invalid signature");
 
-  // Decode payload with "base64url" for the same reason as above.
-  const payload = JSON.parse(Buffer.from(p, "base64url").toString()) as {
+  const payload = JSON.parse(dec.decode(fromBase64url(p))) as {
     sub: string;
     iss: string;
     aud: string;
