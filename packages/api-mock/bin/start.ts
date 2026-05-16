@@ -14,6 +14,9 @@ const server = startMockServer(port);
 
 function shutdown(signal: string): void {
   console.log(`\n[api-mock] received ${signal}, shutting down…`);
+  // closeAllConnections() terminates idle keep-alive connections immediately
+  // so server.close() can fire its callback without hanging indefinitely.
+  server.closeAllConnections();
   server.close(() => {
     console.log("[api-mock] server closed");
     process.exit(0);
