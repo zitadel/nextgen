@@ -13,10 +13,9 @@ import { setApiBaseUrl } from "@zitadel-nextgen/api/runtime/base-url";
 import {
   applyBranding,
   clearBranding,
-  getCapturedRequests,
-  resetFlow,
   setupMockHandlers,
   type CapturedRequest,
+  type MockHandle,
 } from "@zitadel-nextgen/api-mock";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
@@ -27,7 +26,8 @@ import type { ZitadelLogin } from "./zitadel-login.js";
 
 const API_BASE = "https://flow.test.invalid";
 
-const server = setupServer(...setupMockHandlers());
+let mock: MockHandle = setupMockHandlers();
+const server = setupServer(...mock.handlers);
 
 beforeAll(() => {
   setApiBaseUrl(API_BASE);
@@ -35,8 +35,9 @@ beforeAll(() => {
 });
 
 beforeEach(() => {
-  resetFlow();
-  server.resetHandlers(...setupMockHandlers());
+  mock = setupMockHandlers();
+  mock.reset();
+  server.resetHandlers(...mock.handlers);
   clearBranding();
 });
 
@@ -117,7 +118,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
       return next?.getAttribute("name") === "password" ? next : null;
     });
 
-    const submits = getCapturedRequests().filter(
+    const submits = mock.getCaptured().filter(
       (req): req is Extract<CapturedRequest, { kind: "submitFlowStep" }> =>
         req.kind === "submitFlowStep",
     );
@@ -188,7 +189,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
   it("renders branding overlay applied via api-mock applyBranding", async () => {
     applyBranding({ layout: "split", logo_url: "https://logo.example/img.svg" });
     await mount(host);
-    const captured = getCapturedRequests();
+    const captured = mock.getCaptured();
     expect(captured[0]).toEqual({
       kind: "createFlow",
       body: { purpose: "login", project_id: "demo-project" },

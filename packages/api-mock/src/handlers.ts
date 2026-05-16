@@ -6,12 +6,13 @@
  * the matching step fixture; `GET /flow/{id}` re-renders the current step.
  *
  * Branding is applied by `withBranding` (overlay set via `applyBranding`).
- * Request bodies are captured for assertions via `getCapturedRequests()`.
+ * Request bodies are captured for assertions via the `getCaptured` method
+ * returned by `setupMockHandlers()`.
  *
  * Each call to `setupMockHandlers()` creates an isolated closure — `actor`,
- * `captured`, and `iss` are local to that invocation. `resetFlow()` and
- * `getCapturedRequests()` delegate to the most recently created handle so
- * existing test call-sites work without modification.
+ * `captured`, and `iss` are local to that invocation. Callers own their own
+ * `reset` and `getCaptured` references, so parallel test suites never share
+ * state even when running in the same worker.
  */
 import {
   getCreateFlowMockHandler,
@@ -40,33 +41,27 @@ export type CapturedRequest =
   | { kind: "submitFlowStep"; flowId: string; body: SubmitFlowStepBody }
   | { kind: "getFlowStep"; flowId: string };
 
+export type MockHandle = {
+  handlers: RequestHandler[];
+  /** Reset the actor to idle and clear captured requests. */
+  reset: () => void;
+  /** Return captured request bodies for test assertions. */
+  getCaptured: () => readonly CapturedRequest[];
+};
+
 const FLOW_ID = "flow_mock";
-
-/** Points to the most recently created mock handle for delegation. */
-let _current: { reset: () => void; getCaptured: () => readonly CapturedRequest[] } | null = null;
-
-/** Reset the active mock's actor to the idle state and clear captured requests. */
-export function resetFlow(): void {
-  _current?.reset();
-}
-
-/** Return captured request bodies from the active mock for test assertions. */
-export function getCapturedRequests(): readonly CapturedRequest[] {
-  return _current?.getCaptured() ?? [];
-}
 
 /**
  * Build the MSW handlers. Each call creates an independent closure (actor,
- * captured log, iss) so parallel test suites never share state. The returned
- * array is consumed by `setupServer(...)` (node) or passed to a worker
- * (browser). `resetFlow()` and `getCapturedRequests()` automatically delegate
- * to the most recently returned set of handlers.
+ * captured log, iss) so parallel test suites never share state. Callers
+ * should hold onto the returned `reset` and `getCaptured` references instead
+ * of going through a shared module-level pointer.
  *
  * @param options.iss - Issuer URL embedded in the handoff token (default:
  *   `"http://localhost:4000"`). Pass the server's own origin so that
  *   `verifyHandoffToken` can enforce issuer consistency.
  */
-export function setupMockHandlers(options: { iss?: string } = {}): RequestHandler[] {
+export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
   const iss = options.iss ?? "http://localhost:4000";
   let actor: FlowActor = startFlowActor();
   let captured: CapturedRequest[] = [];
@@ -80,7 +75,7 @@ export function setupMockHandlers(options: { iss?: string } = {}): RequestHandle
     return captured;
   }
 
-  function currentResponse(): CreateFlow201 {
+  async function currentResponse(): Promise<CreateFlow201> {
     const snapshot = actor.getSnapshot();
     const input = {
       flowId: FLOW_ID,
@@ -97,16 +92,13 @@ export function setupMockHandlers(options: { iss?: string } = {}): RequestHandle
       case "sso-redirect":
         return withBranding(ssoRedirectStep(input));
       case "done":
-        return withBranding(doneStep(input));
+        return withBranding(await doneStep(input));
       default:
         return withBranding(identifierStep(input));
     }
   }
 
-  // Register as the active handle so resetFlow() / getCapturedRequests() work.
-  _current = { reset, getCaptured };
-
-  return [
+  const handlers: RequestHandler[] = [
     getCreateFlowMockHandler(async ({ request }) => {
       const body = (await request.clone().json()) as CreateFlowBody;
       captured.push({ kind: "createFlow", body });
@@ -131,4 +123,6 @@ export function setupMockHandlers(options: { iss?: string } = {}): RequestHandle
       return currentResponse();
     }),
   ];
+
+  return { handlers, reset, getCaptured };
 }
