@@ -1,6 +1,7 @@
 package repository_test
 
 import (
+	"strconv"
 	"testing"
 	"time"
 
@@ -10,6 +11,24 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/database/repository"
 )
+
+func ensureProjectTeamSchemaUser(t *testing.T, client database.QueryExecutor, pid, tid, schemaURL, userID string) {
+	t.Helper()
+	ctx := t.Context()
+	ensureProject(t, client, pid)
+	_, err := client.Exec(ctx, `INSERT INTO zitadel_nextgen.teams (project_id, id) VALUES ($1,$2) ON CONFLICT DO NOTHING`, pid, tid)
+	require.NoError(t, err)
+	_, err = client.Exec(ctx,
+		`INSERT INTO zitadel_nextgen.json_schemas (project_id, url, payload) VALUES ($1,$2,$3::json) ON CONFLICT DO NOTHING`,
+		pid, schemaURL, []byte("{}"),
+	)
+	require.NoError(t, err)
+	_, err = client.Exec(ctx,
+		`INSERT INTO zitadel_nextgen.users (project_id, schema_url, id, team_id) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`,
+		pid, schemaURL, userID, tid,
+	)
+	require.NoError(t, err)
+}
 
 func newTestSession(projectID, sessionID, token string) *domain.Session {
 	expiresAt := time.Now().Add(10 * time.Minute).UTC()
@@ -151,5 +170,62 @@ func TestSession_MergeAttempt(t *testing.T) {
 		storedAttempt, err := attemptRepo.GetByID(t.Context(), pool, projectID, attempt.ID)
 		require.NoError(t, err)
 		assert.Empty(t, storedAttempt.ID)
+	})
+
+	t.Run("merge resets credential failed_attempts when check is bound to user password", func(t *testing.T) {
+		const (
+			projectID = "p-merge-cred"
+			teamID    = "team-merge-cred"
+			schemaURL = "https://schemas.test/merge-cred.json"
+			userID    = "user-merge-cred"
+		)
+		ensureProjectTeamSchemaUser(t, pool, projectID, teamID, schemaURL, userID)
+
+		pwRepo := repository.NewUserPasswordRepository()
+		require.NoError(t, pwRepo.Create(t.Context(), pool, &domain.CreateUserPassword{
+			ProjectID:      projectID,
+			UserID:         userID,
+			EncodedHash:    "argon2id$v=19$m=65536,t=3,p=4$fake",
+			ChangeRequired: false,
+		}))
+		password, err := pwRepo.Get(t.Context(), pool, database.WithCondition(pwRepo.UniqueCondition(projectID, userID)))
+		require.NoError(t, err)
+
+		_, err = pool.Exec(t.Context(),
+			`UPDATE zitadel_nextgen.user_passwords SET failed_attempts = 5 WHERE id = $1`,
+			password.ID,
+		)
+		require.NoError(t, err)
+
+		session := newTestSession(projectID, "sess-merge-cred", "stok-merge-cred")
+		require.NoError(t, sessRepo.Create(t.Context(), session))
+
+		check := &domain.PasswordAuthCheck{AuthCheck: &domain.AuthCheck{Type: domain.AuthCheckTypePassword}}
+		attempt := &domain.AuthAttempt{
+			ProjectID:      projectID,
+			ID:             "attempt-merge-cred",
+			RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypePassword},
+			Checks:         []domain.AuthChecker{check},
+		}
+		require.NoError(t, attemptRepo.Create(t.Context(), pool, attempt))
+		require.NoError(t, attemptRepo.ChallengeSucceeded(t.Context(), pool, projectID, attempt.ID, check))
+
+		checkID := projectID + ":" + attempt.ID + ":" + strconv.Itoa(int(domain.AuthCheckTypePassword))
+		_, err = pool.Exec(t.Context(),
+			`UPDATE zitadel_nextgen.checks SET user_password_id = $1 WHERE project_id = $2 AND id = $3`,
+			password.ID, projectID, checkID,
+		)
+		require.NoError(t, err)
+
+		token := "handoff-merge-cred"
+		attempt.HandoffToken = &token
+		require.NoError(t, attemptRepo.Handoff(t.Context(), pool, attempt))
+
+		_, err = sessRepo.MergeAttempt(t.Context(), projectID, session.ID, token)
+		require.NoError(t, err)
+
+		after, err := pwRepo.Get(t.Context(), pool, database.WithCondition(pwRepo.PrimaryKeyCondition(password.ID)))
+		require.NoError(t, err)
+		assert.Equal(t, int16(0), after.FailedAttempts)
 	})
 }

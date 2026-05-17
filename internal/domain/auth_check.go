@@ -12,10 +12,10 @@ type AuthCheck struct {
 	AuthAttemptID *string
 	SessionID     *string
 
-	UserPasswordID      *int64
-	UserTOTPID          *int64
-	UserPasskeyID       *int64
-	UserRecoveryCodesID *int64
+	UserPassword      *UserPassword
+	UserTOTP          *UserTOTP
+	UserPasskey       *UserPasskey
+	UserRecoveryCodes *UserRecoveryCodes
 
 	// When the check was verified successfully, it must be set by the storage and is read only.
 	LastVerifiedAt time.Time
@@ -44,14 +44,33 @@ func (a *AuthCheck) CredentialKey() (kind string, id int64, ok bool) {
 		return "", 0, false
 	}
 	switch {
-	case a.UserPasswordID != nil:
-		return "password", *a.UserPasswordID, true
-	case a.UserTOTPID != nil:
-		return "totp", *a.UserTOTPID, true
-	case a.UserPasskeyID != nil:
-		return "passkey", *a.UserPasskeyID, true
-	case a.UserRecoveryCodesID != nil:
-		return "recovery", *a.UserRecoveryCodesID, true
+	case a.UserPassword != nil:
+		return "password", a.UserPassword.ID, true
+	case a.UserTOTP != nil:
+		return "totp", a.UserTOTP.ID, true
+	case a.UserPasskey != nil:
+		return "passkey", a.UserPasskey.ID, true
+	case a.UserRecoveryCodes != nil:
+		return "recovery", a.UserRecoveryCodes.ID, true
+	default:
+		return "", 0, false
+	}
+}
+
+// PersistCredentialFK returns the checks-table column and id for the bound credential, if any.
+func (a *AuthCheck) PersistCredentialFK() (column string, id int64, ok bool) {
+	if a == nil {
+		return "", 0, false
+	}
+	switch {
+	case a.UserPassword != nil:
+		return "user_password_id", a.UserPassword.ID, true
+	case a.UserTOTP != nil:
+		return "user_totp_id", a.UserTOTP.ID, true
+	case a.UserPasskey != nil:
+		return "user_passkey_id", a.UserPasskey.ID, true
+	case a.UserRecoveryCodes != nil:
+		return "user_recovery_codes_id", a.UserRecoveryCodes.ID, true
 	default:
 		return "", 0, false
 	}
