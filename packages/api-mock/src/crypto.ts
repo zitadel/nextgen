@@ -23,7 +23,7 @@ function toBase64url(buf: ArrayBuffer | Uint8Array): string {
   return btoa(s).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
 }
 
-function fromBase64url(s: string): Uint8Array {
+function fromBase64url(s: string): Uint8Array<ArrayBuffer> {
   const pad = s.length % 4 === 0 ? "" : "=".repeat(4 - (s.length % 4));
   return Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/") + pad), (c) =>
     c.charCodeAt(0),
