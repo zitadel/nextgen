@@ -6,7 +6,7 @@ const ZitadelLogout = dynamic(
   async () => {
     await import("@zitadel-nextgen/components");
     return function ZitadelLogoutElement() {
-      return <zitadel-logout proxy-base="/__nextgen" post-sign-out-url="/login" />;
+      return <zitadel-logout api-base="/__nextgen" post-sign-out-url="/login" />;
     };
   },
   { ssr: false },
