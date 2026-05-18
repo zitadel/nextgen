@@ -15,7 +15,10 @@ import (
 	"github.com/spf13/viper"
 	oasapi "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
+	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/nextgen/internal/storage/database"
 	_ "github.com/zitadel/nextgen/internal/storage/database/dialect/all"
+	"github.com/zitadel/nextgen/internal/storage/database/repository"
 )
 
 func NewCommand() *cobra.Command {
@@ -30,12 +33,12 @@ func NewCommand() *cobra.Command {
 				return err
 			}
 
-			_, err = cfg.Database.Build()
+			pool, err := startDatabase(cmd.Context(), cfg.Database)
 			if err != nil {
 				return err
 			}
 
-			return run(cmd.Context(), cfg)
+			return run(cmd.Context(), cfg, pool)
 		},
 	}
 
@@ -44,11 +47,52 @@ func NewCommand() *cobra.Command {
 	return cmd
 }
 
-func run(ctx context.Context, cfg Config) error {
+func startDatabase(ctx context.Context, config database.Config) (database.Pool, error) {
+	connector, err := config.Build()
+	if err != nil {
+		return nil, err
+	}
+	pool, err := connector.Connect(ctx)
+	if err != nil {
+		return nil, err
+	}
+	err = pool.Migrate(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return pool, nil
+}
+
+func run(ctx context.Context, cfg Config, pool database.Pool) error {
+
+	// ── Repositories ─────────────────
+	projectRepo := repository.NewProjectRepository(pool)
+	userRepo := repository.NewUserRepository()
+	userPasswordRepo := repository.NewUserPasswordRepository()
+	userPasskeyRepo := repository.NewUserPasskeyRepository()
+	sessionRepo := repository.NewSessionRepository(pool)
+	attemptRepo := repository.NewAuthAttemptRepository(pool)
+
+	// ── Services ─────────────────────
+	authAttemptSvc := service.NewAuthAttemptService(
+		pool,
+		attemptRepo,
+		sessionRepo,
+		projectRepo,
+		userRepo,
+		userPasswordRepo,
+		userPasskeyRepo,
+	)
+
+	// ── HTTP Server ─────────────────
+
 	ctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	oasServer, err := oasapi.NewServer(api.NewHandler(), api.NewSecurityHandler())
+	oasServer, err := oasapi.NewServer(
+		api.NewHandler(nil, authAttemptSvc),
+		api.NewSecurityHandler(),
+		oasapi.WithErrorHandler(api.OgenErrorHandler))
 	if err != nil {
 		return fmt.Errorf("build api server: %w", err)
 	}
