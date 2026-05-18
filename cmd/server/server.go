@@ -13,9 +13,12 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
 	oasapi "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
+	"github.com/zitadel/nextgen/internal/service"
 	_ "github.com/zitadel/nextgen/internal/storage/database/dialect/all"
+	"github.com/zitadel/nextgen/internal/storage/database/repository"
 )
 
 func NewCommand() *cobra.Command {
@@ -26,11 +29,6 @@ func NewCommand() *cobra.Command {
 		Short: "Run the server",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			cfg, err := loadConfig(configPath)
-			if err != nil {
-				return err
-			}
-
-			_, err = cfg.Database.Build()
 			if err != nil {
 				return err
 			}
@@ -48,7 +46,27 @@ func run(ctx context.Context, cfg Config) error {
 	ctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	oasServer, err := oasapi.NewServer(api.NewHandler(), api.NewSecurityHandler())
+	connector, err := cfg.Database.Build()
+	if err != nil {
+		return err
+	}
+
+	pool, err := connector.Connect(ctx)
+	if err != nil {
+		return fmt.Errorf("connect database: %w", err)
+	}
+	defer func() {
+		if err := pool.Close(context.Background()); err != nil {
+			log.Printf("close database pool: %v", err)
+		}
+	}()
+
+	// Services
+	flowService := service.NewFlowService(pool, repository.NewFlowDefinitionRepository(pool))
+
+	handler := api.NewHandler(flowService)
+
+	oasServer, err := oasapi.NewServer(handler, api.NewSecurityHandler())
 	if err != nil {
 		return fmt.Errorf("build api server: %w", err)
 	}
