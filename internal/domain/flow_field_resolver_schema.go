@@ -11,9 +11,10 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-// SchemaResolver is the subset of [JSONSchemaResolver] the flow-field
-// resolver needs. Defined here so tests can swap in a fake without
-// constructing a real LRU cache + repository.
+// SchemaResolver is the read seam [SchemaFieldResolver] depends on.
+// Narrowed to a single method so tests can swap in a fake without
+// constructing a real LRU cache + repository + HTTP client.
+// [JSONSchemaResolver] satisfies it in production.
 type SchemaResolver interface {
 	Resolve(ctx context.Context, client database.QueryExecutor, projectID, schemaURL string, rootSchema []byte) (*jsonschema.Schema, error)
 }
