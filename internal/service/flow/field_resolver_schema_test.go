@@ -323,6 +323,71 @@ func TestSchemaFieldResolver_Validate_NonStringValueReportsFormat(t *testing.T) 
 	}
 }
 
+func TestSchemaFieldResolver_Resolve_FormatAndTypeVariants(t *testing.T) {
+	const url = "https://example.test/variants.json"
+	bytes := []byte(`{
+		"$schema": "https://json-schema.org/draft/2020-12/schema",
+		"type": "object",
+		"properties": {
+			"website":  { "type": "string", "format": "uri" },
+			"birthday": { "type": "string", "format": "date" },
+			"created":  { "type": "string", "format": "date-time" },
+			"nickname": { "type": "string" }
+		}
+	}`)
+	resolver := flow.NewSchemaFieldResolver(newFakeResolver(t, map[string][]byte{url: bytes}))
+
+	got, err := resolver.Resolve(t.Context(), nil, testProjectID, url,
+		[]string{"website", "birthday", "created", "nickname"})
+	if err != nil {
+		t.Fatalf("Resolve returned error: %v", err)
+	}
+
+	wantTypes := map[string]domain.FlowFieldType{
+		"website":  domain.FlowFieldTypeURL,
+		"birthday": domain.FlowFieldTypeDate,
+		"created":  domain.FlowFieldTypeDate,
+		"nickname": domain.FlowFieldTypeText,
+	}
+	for name, want := range wantTypes {
+		if got.Fields[name].Type != want {
+			t.Errorf("Resolve field %q Type = %q, want %q", name, got.Fields[name].Type, want)
+		}
+	}
+	if got.Fields["nickname"].Validation != nil {
+		t.Errorf("Resolve nickname Validation = %+v, want nil (no rules)", got.Fields["nickname"].Validation)
+	}
+}
+
+func TestSchemaFieldResolver_Resolve_UniqueScopeInstance(t *testing.T) {
+	const url = "https://example.test/instance-unique.json"
+	bytes := []byte(`{
+		"$schema": "https://json-schema.org/draft/2020-12/schema",
+		"type": "object",
+		"properties": {
+			"handle": { "type": "string", "x-unique": "instance" }
+		}
+	}`)
+	resolver := flow.NewSchemaFieldResolver(newFakeResolver(t, map[string][]byte{url: bytes}))
+
+	got, err := resolver.Resolve(t.Context(), nil, testProjectID, url, []string{"handle"})
+	if err != nil {
+		t.Fatalf("Resolve returned error: %v", err)
+	}
+	if got.Fields["handle"].Unique != domain.FlowFieldUniqueScopeInstance {
+		t.Errorf("Resolve handle Unique = %q, want %q", got.Fields["handle"].Unique, domain.FlowFieldUniqueScopeInstance)
+	}
+}
+
+func TestSchemaFieldResolver_Validate_SchemaLoadFailurePropagates(t *testing.T) {
+	resolver := flow.NewSchemaFieldResolver(newFakeResolver(t, nil))
+
+	err := resolver.Validate(t.Context(), nil, testProjectID, "https://example.test/missing.json", map[string]any{"email": "a@b.c"})
+	if err == nil {
+		t.Fatal("Validate err = nil, want load failure")
+	}
+}
+
 func hasValidationRule(t *testing.T, err error, field string, rule domain.FlowFieldValidationRule) bool {
 	t.Helper()
 	var errs domain.FlowFieldValidationErrors

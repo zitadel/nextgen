@@ -59,9 +59,9 @@ func (r *SchemaFieldResolver) Resolve(
 		return domain.FlowResolvedFields{}, fmt.Errorf("flow field resolver: load user schema: %w", err)
 	}
 
-	authMethods := readAuthMethods(schema)
+	passwordEnabled := passwordAuthEnabled(schema)
 	required := readRequiredSet(schema)
-	properties, _ := lookupProperties(schema)
+	properties := lookupProperties(schema)
 
 	fields := make(map[string]domain.FlowField, len(fieldNames))
 	implicit := make(map[string][]string)
@@ -71,7 +71,7 @@ func (r *SchemaFieldResolver) Resolve(
 		if !ok {
 			return domain.FlowResolvedFields{}, fmt.Errorf("%w: %q", domain.ErrFlowFieldUnknown, name)
 		}
-		field := buildFlowField(name, propSchema, required, authMethods)
+		field := buildFlowField(name, propSchema, required, passwordEnabled)
 		fields[name] = field
 		if field.Challenge == domain.FlowFieldChallengeIdentifier {
 			implicit[name] = append(implicit[name], domain.FlowImplicitOutcomeUserNotFound)
@@ -101,7 +101,7 @@ func (r *SchemaFieldResolver) Validate(
 	}
 
 	required := readRequiredSet(schema)
-	properties, _ := lookupProperties(schema)
+	properties := lookupProperties(schema)
 
 	var errs domain.FlowFieldValidationErrors
 	for name, value := range values {
@@ -131,11 +131,11 @@ func (r *SchemaFieldResolver) Validate(
 }
 
 // buildFlowField translates a user-schema property into a [domain.FlowField].
-func buildFlowField(name string, propSchema *jsonschema.Schema, required, authMethods map[string]struct{}) domain.FlowField {
+func buildFlowField(name string, propSchema *jsonschema.Schema, required map[string]struct{}, passwordEnabled bool) domain.FlowField {
 	field := domain.FlowField{
 		TextKey:   "field." + name,
 		Type:      deriveFieldType(propSchema),
-		Challenge: deriveChallenge(propSchema, authMethods),
+		Challenge: deriveChallenge(propSchema, passwordEnabled),
 		Unique:    deriveUnique(propSchema),
 	}
 	if _, ok := required[name]; ok {
@@ -147,9 +147,8 @@ func buildFlowField(name string, propSchema *jsonschema.Schema, required, authMe
 	return field
 }
 
-// deriveFieldType maps the property's JSON `type` and `format` to a
-// [domain.FlowFieldType]. `x-password: true` forces a password input
-// regardless of `format`.
+// deriveFieldType maps the property's `format` to a [domain.FlowFieldType].
+// `x-password: true` forces a password input regardless of `format`.
 func deriveFieldType(propSchema *jsonschema.Schema) domain.FlowFieldType {
 	if isPassword(propSchema) {
 		return domain.FlowFieldTypePassword
@@ -162,10 +161,6 @@ func deriveFieldType(propSchema *jsonschema.Schema) domain.FlowFieldType {
 	case "date", "date-time":
 		return domain.FlowFieldTypeDate
 	}
-	switch lookupString(propSchema, "type") {
-	case "number", "integer":
-		return domain.FlowFieldTypeNumber
-	}
 	return domain.FlowFieldTypeText
 }
 
@@ -174,14 +169,12 @@ func deriveFieldType(propSchema *jsonschema.Schema) domain.FlowFieldType {
 // surfaces as Password when the schema-level `x-auth-methods.password`
 // is enabled. Other credential kinds (passkey, magic_link, sso, otp)
 // have no user-property-shaped proof and are never surfaced here.
-func deriveChallenge(propSchema *jsonschema.Schema, authMethods map[string]struct{}) domain.FlowFieldChallenge {
+func deriveChallenge(propSchema *jsonschema.Schema, passwordEnabled bool) domain.FlowFieldChallenge {
 	if isIdentifier(propSchema) {
 		return domain.FlowFieldChallengeIdentifier
 	}
-	if isPassword(propSchema) {
-		if _, ok := authMethods["password"]; ok {
-			return domain.FlowFieldChallengePassword
-		}
+	if isPassword(propSchema) && passwordEnabled {
+		return domain.FlowFieldChallengePassword
 	}
 	return domain.FlowFieldChallengeNone
 }
@@ -236,32 +229,28 @@ func looksLikeEmail(s string) bool {
 	return strings.IndexByte(s[at+1:], '@') < 0
 }
 
-// readAuthMethods returns the set of auth-method names whose
-// `x-auth-methods.<name>.enabled` is true on the root schema.
-func readAuthMethods(schema *jsonschema.Schema) map[string]struct{} {
-	out := map[string]struct{}{}
+// passwordAuthEnabled reports whether the root schema declares
+// `x-auth-methods.password.enabled = true`. Password is the only
+// credential the resolver surfaces, so the broader set isn't needed.
+func passwordAuthEnabled(schema *jsonschema.Schema) bool {
 	v, ok := schema.LookupKeyword("x-auth-methods")
 	if !ok {
-		return out
+		return false
 	}
 	raw, ok := v.(types.PartAny)
 	if !ok {
-		return out
+		return false
 	}
 	methods, ok := raw.V.(map[string]any)
 	if !ok {
-		return out
+		return false
 	}
-	for name, raw := range methods {
-		entry, ok := raw.(map[string]any)
-		if !ok {
-			continue
-		}
-		if enabled, _ := entry["enabled"].(bool); enabled {
-			out[name] = struct{}{}
-		}
+	entry, ok := methods["password"].(map[string]any)
+	if !ok {
+		return false
 	}
-	return out
+	enabled, _ := entry["enabled"].(bool)
+	return enabled
 }
 
 // readRequiredSet returns the names listed in the root schema's
@@ -282,19 +271,19 @@ func readRequiredSet(schema *jsonschema.Schema) map[string]struct{} {
 	return out
 }
 
-// lookupProperties returns the root schema's `properties` map. The
-// second return is false when the schema has no `properties` keyword
-// (callers treat that as "every field is unknown").
-func lookupProperties(schema *jsonschema.Schema) (map[string]*jsonschema.Schema, bool) {
+// lookupProperties returns the root schema's `properties` map, or nil
+// when the keyword is absent or malformed. A nil map yields the
+// "every field is unknown" behavior at lookup sites.
+func lookupProperties(schema *jsonschema.Schema) map[string]*jsonschema.Schema {
 	v, ok := schema.LookupKeyword("properties")
 	if !ok {
-		return nil, false
+		return nil
 	}
 	m, ok := v.(types.PartMapSchema)
 	if !ok {
-		return nil, false
+		return nil
 	}
-	return map[string]*jsonschema.Schema(m), true
+	return map[string]*jsonschema.Schema(m)
 }
 
 func lookupString(schema *jsonschema.Schema, keyword string) string {
