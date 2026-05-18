@@ -37,10 +37,13 @@ properties:
           Matches the server-side challenge for verification.
       method:
         type: string
-        enum: [passkey]
-        description: Which auth method this response is for.
-      passkey:
-        $ref: passkey-proof.yaml
+        description: Which auth method this response is for (e.g., 'passkey').
+      proof:
+        type: object
+        description: |
+          Method-specific proof payload.
+          For passkeys, this is the WebAuthn JSON serialization of PublicKeyCredential.
+        additionalProperties: true
   sso_provider_id:
     type: string
     description: |
