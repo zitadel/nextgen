@@ -1,4 +1,4 @@
-package flow
+package domain
 
 import (
 	"context"
@@ -8,77 +8,76 @@ import (
 	"github.com/ianlancetaylor/jsonschema"
 	"github.com/ianlancetaylor/jsonschema/types"
 
-	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-// SchemaResolver is the subset of [domain.JSONSchemaResolver] the
-// flow-field resolver needs. Defined here so tests can swap in a fake
-// without constructing a real LRU cache + repository.
+// SchemaResolver is the subset of [JSONSchemaResolver] the flow-field
+// resolver needs. Defined here so tests can swap in a fake without
+// constructing a real LRU cache + repository.
 type SchemaResolver interface {
 	Resolve(ctx context.Context, client database.QueryExecutor, projectID, schemaURL string, rootSchema []byte) (*jsonschema.Schema, error)
 }
 
-// SchemaFieldResolver is the production [domain.FlowFieldResolver]. It
-// reads a customer's user schema through [SchemaResolver] and translates
-// its keywords into [domain.FlowField] payloads.
+// SchemaFieldResolver is the production [FlowFieldResolver]. It reads a
+// customer's user schema through [SchemaResolver] and translates its
+// keywords into [FlowField] payloads.
 //
-// Translation map (user meta-schema → [domain.FlowField]):
+// Translation map (user meta-schema → [FlowField]):
 //
-//   - `type` + `format` → [domain.FlowFieldType]; `x-password: true`
-//     forces [domain.FlowFieldTypePassword].
-//   - top-level `required` membership → [domain.FlowField.Required]
-//   - `minLength`, `maxLength`, `format` → [domain.FlowFieldValidation]
-//   - `x-identifier` → [domain.FlowFieldChallengeIdentifier] +
-//     [domain.FlowImplicitOutcomeUserNotFound]
-//   - `x-unique` → [domain.FlowField.Unique]
+//   - `type` + `format` → [FlowFieldType]; `x-password: true` forces
+//     [FlowFieldTypePassword].
+//   - top-level `required` membership → [FlowField.Required]
+//   - `minLength`, `maxLength`, `format` → [FlowFieldValidation]
+//   - `x-identifier` → [FlowFieldChallengeIdentifier] +
+//     [FlowImplicitOutcomeUserNotFound]
+//   - `x-unique` → [FlowField.Unique]
 //   - `x-password: true` combined with schema-level
 //     `x-auth-methods.password.enabled = true` →
-//     [domain.FlowFieldChallengePassword]. Other auth methods do not
-//     have user-property-shaped credentials and are not surfaced here.
+//     [FlowFieldChallengePassword]. Other auth methods do not have
+//     user-property-shaped credentials and are not surfaced here.
 type SchemaFieldResolver struct {
 	schemas SchemaResolver
 }
 
-// NewSchemaFieldResolver returns a [domain.FlowFieldResolver] backed by
-// the given [SchemaResolver].
+// NewSchemaFieldResolver returns a [FlowFieldResolver] backed by the
+// given [SchemaResolver].
 func NewSchemaFieldResolver(schemas SchemaResolver) *SchemaFieldResolver {
 	return &SchemaFieldResolver{schemas: schemas}
 }
 
-var _ domain.FlowFieldResolver = (*SchemaFieldResolver)(nil)
+var _ FlowFieldResolver = (*SchemaFieldResolver)(nil)
 
 func (r *SchemaFieldResolver) Resolve(
 	ctx context.Context,
 	client database.QueryExecutor,
 	projectID, userSchemaURL string,
 	fieldNames []string,
-) (domain.FlowResolvedFields, error) {
+) (FlowResolvedFields, error) {
 	schema, err := r.schemas.Resolve(ctx, client, projectID, userSchemaURL, nil)
 	if err != nil {
-		return domain.FlowResolvedFields{}, fmt.Errorf("flow field resolver: load user schema: %w", err)
+		return FlowResolvedFields{}, fmt.Errorf("flow field resolver: load user schema: %w", err)
 	}
 
 	passwordEnabled := passwordAuthEnabled(schema)
 	required := readRequiredSet(schema)
 	properties := lookupProperties(schema)
 
-	fields := make(map[string]domain.FlowField, len(fieldNames))
+	fields := make(map[string]FlowField, len(fieldNames))
 	implicit := make(map[string][]string)
 
 	for _, name := range fieldNames {
 		propSchema, ok := properties[name]
 		if !ok {
-			return domain.FlowResolvedFields{}, fmt.Errorf("%w: %q", domain.ErrFlowFieldUnknown, name)
+			return FlowResolvedFields{}, fmt.Errorf("%w: %q", ErrFlowFieldUnknown, name)
 		}
 		field := buildFlowField(name, propSchema, required, passwordEnabled)
 		fields[name] = field
-		if outcomes := domain.ImplicitOutcomesForChallenge(field.Challenge); len(outcomes) > 0 {
+		if outcomes := ImplicitOutcomesForChallenge(field.Challenge); len(outcomes) > 0 {
 			implicit[name] = append(implicit[name], outcomes...)
 		}
 	}
 
-	return domain.FlowResolvedFields{
+	return FlowResolvedFields{
 		Fields:           fields,
 		ImplicitOutcomes: implicit,
 	}, nil
@@ -103,21 +102,21 @@ func (r *SchemaFieldResolver) Validate(
 	required := readRequiredSet(schema)
 	properties := lookupProperties(schema)
 
-	var errs domain.FlowFieldValidationErrors
+	var errs FlowFieldValidationErrors
 	for name, value := range values {
 		propSchema, ok := properties[name]
 		if !ok {
-			errs = append(errs, domain.FlowFieldValidationError{Field: name, Rule: domain.FlowFieldValidationRuleUnknown})
+			errs = append(errs, FlowFieldValidationError{Field: name, Rule: FlowFieldValidationRuleUnknown})
 			continue
 		}
 		str, isString := value.(string)
 		if !isString {
-			errs = append(errs, domain.FlowFieldValidationError{Field: name, Rule: domain.FlowFieldValidationRuleFormat})
+			errs = append(errs, FlowFieldValidationError{Field: name, Rule: FlowFieldValidationRuleFormat})
 			continue
 		}
 		if str == "" {
 			if _, isRequired := required[name]; isRequired {
-				errs = append(errs, domain.FlowFieldValidationError{Field: name, Rule: domain.FlowFieldValidationRuleRequired})
+				errs = append(errs, FlowFieldValidationError{Field: name, Rule: FlowFieldValidationRuleRequired})
 			}
 			continue
 		}
@@ -130,9 +129,9 @@ func (r *SchemaFieldResolver) Validate(
 	return nil
 }
 
-// buildFlowField translates a user-schema property into a [domain.FlowField].
-func buildFlowField(name string, propSchema *jsonschema.Schema, required map[string]struct{}, passwordEnabled bool) domain.FlowField {
-	field := domain.FlowField{
+// buildFlowField translates a user-schema property into a [FlowField].
+func buildFlowField(name string, propSchema *jsonschema.Schema, required map[string]struct{}, passwordEnabled bool) FlowField {
+	field := FlowField{
 		TextKey:   "field." + name,
 		Type:      deriveFieldType(propSchema),
 		Challenge: deriveChallenge(propSchema, passwordEnabled),
@@ -147,50 +146,50 @@ func buildFlowField(name string, propSchema *jsonschema.Schema, required map[str
 	return field
 }
 
-// deriveFieldType maps the property's `format` to a [domain.FlowFieldType].
+// deriveFieldType maps the property's `format` to a [FlowFieldType].
 // `x-password: true` forces a password input regardless of `format`.
-func deriveFieldType(propSchema *jsonschema.Schema) domain.FlowFieldType {
+func deriveFieldType(propSchema *jsonschema.Schema) FlowFieldType {
 	if isPassword(propSchema) {
-		return domain.FlowFieldTypePassword
+		return FlowFieldTypePassword
 	}
 	switch lookupString(propSchema, "format") {
 	case "email":
-		return domain.FlowFieldTypeEmail
+		return FlowFieldTypeEmail
 	case "uri":
-		return domain.FlowFieldTypeURL
+		return FlowFieldTypeURL
 	case "date", "date-time":
-		return domain.FlowFieldTypeDate
+		return FlowFieldTypeDate
 	}
-	return domain.FlowFieldTypeText
+	return FlowFieldTypeText
 }
 
-// deriveChallenge resolves the unified [domain.FlowFieldChallenge].
+// deriveChallenge resolves the unified [FlowFieldChallenge].
 // `x-identifier: true` surfaces as Identifier; `x-password: true`
 // surfaces as Password when the schema-level `x-auth-methods.password`
 // is enabled. Other credential kinds (passkey, magic_link, sso, otp)
 // have no user-property-shaped proof and are never surfaced here.
-func deriveChallenge(propSchema *jsonschema.Schema, passwordEnabled bool) domain.FlowFieldChallenge {
+func deriveChallenge(propSchema *jsonschema.Schema, passwordEnabled bool) FlowFieldChallenge {
 	if isIdentifier(propSchema) {
-		return domain.FlowFieldChallengeIdentifier
+		return FlowFieldChallengeIdentifier
 	}
 	if isPassword(propSchema) && passwordEnabled {
-		return domain.FlowFieldChallengePassword
+		return FlowFieldChallengePassword
 	}
-	return domain.FlowFieldChallengeNone
+	return FlowFieldChallengeNone
 }
 
-func deriveUnique(propSchema *jsonschema.Schema) domain.FlowFieldUniqueScope {
+func deriveUnique(propSchema *jsonschema.Schema) FlowFieldUniqueScope {
 	switch lookupString(propSchema, "x-unique") {
 	case "organization":
-		return domain.FlowFieldUniqueScopeOrganization
+		return FlowFieldUniqueScopeOrganization
 	case "instance":
-		return domain.FlowFieldUniqueScopeInstance
+		return FlowFieldUniqueScopeInstance
 	}
-	return domain.FlowFieldUniqueScopeNone
+	return FlowFieldUniqueScopeNone
 }
 
-func buildValidation(propSchema *jsonschema.Schema) *domain.FlowFieldValidation {
-	v := domain.FlowFieldValidation{
+func buildValidation(propSchema *jsonschema.Schema) *FlowFieldValidation {
+	v := FlowFieldValidation{
 		Format:    lookupString(propSchema, "format"),
 		MinLength: lookupInt(propSchema, "minLength"),
 		MaxLength: lookupInt(propSchema, "maxLength"),
@@ -202,19 +201,19 @@ func buildValidation(propSchema *jsonschema.Schema) *domain.FlowFieldValidation 
 }
 
 // validateString runs the per-keyword checks for a single property.
-// Each known keyword maps 1:1 to a [domain.FlowFieldValidationRule]; an
+// Each known keyword maps 1:1 to a [FlowFieldValidationRule]; an
 // unknown keyword on the property is silently skipped, mirroring how
 // the library treats it.
-func validateString(name, value string, propSchema *jsonschema.Schema) []domain.FlowFieldValidationError {
-	var out []domain.FlowFieldValidationError
+func validateString(name, value string, propSchema *jsonschema.Schema) []FlowFieldValidationError {
+	var out []FlowFieldValidationError
 	if min := lookupInt(propSchema, "minLength"); min > 0 && len(value) < min {
-		out = append(out, domain.FlowFieldValidationError{Field: name, Rule: domain.FlowFieldValidationRuleMinLength})
+		out = append(out, FlowFieldValidationError{Field: name, Rule: FlowFieldValidationRuleMinLength})
 	}
 	if max := lookupInt(propSchema, "maxLength"); max > 0 && len(value) > max {
-		out = append(out, domain.FlowFieldValidationError{Field: name, Rule: domain.FlowFieldValidationRuleMaxLength})
+		out = append(out, FlowFieldValidationError{Field: name, Rule: FlowFieldValidationRuleMaxLength})
 	}
 	if lookupString(propSchema, "format") == "email" && !looksLikeEmail(value) {
-		out = append(out, domain.FlowFieldValidationError{Field: name, Rule: domain.FlowFieldValidationRuleFormat})
+		out = append(out, FlowFieldValidationError{Field: name, Rule: FlowFieldValidationRuleFormat})
 	}
 	return out
 }

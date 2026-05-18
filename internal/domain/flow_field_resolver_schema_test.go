@@ -1,4 +1,4 @@
-package flow_test
+package domain_test
 
 import (
 	"context"
@@ -10,7 +10,6 @@ import (
 	"github.com/ianlancetaylor/jsonschema"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/service/flow"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -36,7 +35,7 @@ func (f *fakeSchemaResolver) Resolve(_ context.Context, _ database.QueryExecutor
 	return jsonschema.SchemaFromJSON("https://json-schema.org/draft/2020-12/schema", nil, v)
 }
 
-func newFakeResolver(t *testing.T, schemas map[string][]byte) flow.SchemaResolver {
+func newFakeResolver(t *testing.T, schemas map[string][]byte) domain.SchemaResolver {
 	t.Helper()
 	return &fakeSchemaResolver{bytesByURL: schemas}
 }
@@ -62,9 +61,9 @@ func defaultSchemaBytes() []byte {
 	}`)
 }
 
-func newDefaultResolver(t *testing.T) *flow.SchemaFieldResolver {
+func newDefaultResolver(t *testing.T) *domain.SchemaFieldResolver {
 	t.Helper()
-	return flow.NewSchemaFieldResolver(newFakeResolver(t, map[string][]byte{
+	return domain.NewSchemaFieldResolver(newFakeResolver(t, map[string][]byte{
 		defaultSchemaURL: defaultSchemaBytes(),
 	}))
 }
@@ -157,7 +156,7 @@ func TestSchemaFieldResolver_Resolve_PasswordChallengeRequiresAuthMethodEnabled(
 			"password": { "type": "string", "minLength": 8, "x-password": true }
 		}
 	}`)
-	resolver := flow.NewSchemaFieldResolver(newFakeResolver(t, map[string][]byte{url: bytes}))
+	resolver := domain.NewSchemaFieldResolver(newFakeResolver(t, map[string][]byte{url: bytes}))
 
 	got, err := resolver.Resolve(t.Context(), nil, testProjectID, url, []string{"password"})
 	if err != nil {
@@ -178,7 +177,7 @@ func TestSchemaFieldResolver_Resolve_PasswordChallengeRequiresXPassword(t *testi
 			"password": { "type": "string", "minLength": 8 }
 		}
 	}`)
-	resolver := flow.NewSchemaFieldResolver(newFakeResolver(t, map[string][]byte{url: bytes}))
+	resolver := domain.NewSchemaFieldResolver(newFakeResolver(t, map[string][]byte{url: bytes}))
 
 	got, err := resolver.Resolve(t.Context(), nil, testProjectID, url, []string{"password"})
 	if err != nil {
@@ -202,7 +201,7 @@ func TestSchemaFieldResolver_Resolve_RenamedPasswordField(t *testing.T) {
 			"secret": { "type": "string", "minLength": 8, "x-password": true }
 		}
 	}`)
-	resolver := flow.NewSchemaFieldResolver(newFakeResolver(t, map[string][]byte{url: bytes}))
+	resolver := domain.NewSchemaFieldResolver(newFakeResolver(t, map[string][]byte{url: bytes}))
 
 	got, err := resolver.Resolve(t.Context(), nil, testProjectID, url, []string{"secret"})
 	if err != nil {
@@ -242,7 +241,7 @@ func TestSchemaFieldResolver_Resolve_UnknownField(t *testing.T) {
 }
 
 func TestSchemaFieldResolver_Resolve_SchemaLoadFailurePropagates(t *testing.T) {
-	resolver := flow.NewSchemaFieldResolver(newFakeResolver(t, nil))
+	resolver := domain.NewSchemaFieldResolver(newFakeResolver(t, nil))
 
 	_, err := resolver.Resolve(t.Context(), nil, testProjectID, "https://example.test/missing.json", []string{"email"})
 	if err == nil {
@@ -335,7 +334,7 @@ func TestSchemaFieldResolver_Resolve_FormatAndTypeVariants(t *testing.T) {
 			"nickname": { "type": "string" }
 		}
 	}`)
-	resolver := flow.NewSchemaFieldResolver(newFakeResolver(t, map[string][]byte{url: bytes}))
+	resolver := domain.NewSchemaFieldResolver(newFakeResolver(t, map[string][]byte{url: bytes}))
 
 	got, err := resolver.Resolve(t.Context(), nil, testProjectID, url,
 		[]string{"website", "birthday", "created", "nickname"})
@@ -368,7 +367,7 @@ func TestSchemaFieldResolver_Resolve_UniqueScopeInstance(t *testing.T) {
 			"handle": { "type": "string", "x-unique": "instance" }
 		}
 	}`)
-	resolver := flow.NewSchemaFieldResolver(newFakeResolver(t, map[string][]byte{url: bytes}))
+	resolver := domain.NewSchemaFieldResolver(newFakeResolver(t, map[string][]byte{url: bytes}))
 
 	got, err := resolver.Resolve(t.Context(), nil, testProjectID, url, []string{"handle"})
 	if err != nil {
@@ -380,7 +379,7 @@ func TestSchemaFieldResolver_Resolve_UniqueScopeInstance(t *testing.T) {
 }
 
 func TestSchemaFieldResolver_Validate_SchemaLoadFailurePropagates(t *testing.T) {
-	resolver := flow.NewSchemaFieldResolver(newFakeResolver(t, nil))
+	resolver := domain.NewSchemaFieldResolver(newFakeResolver(t, nil))
 
 	err := resolver.Validate(t.Context(), nil, testProjectID, "https://example.test/missing.json", map[string]any{"email": "a@b.c"})
 	if err == nil {
