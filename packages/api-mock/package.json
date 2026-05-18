@@ -17,23 +17,32 @@
       "import": "./src/public-dir.ts"
     }
   },
+  "bin": {
+    "api-mock": "./bin/start.ts"
+  },
   "scripts": {
+    "start": "tsx bin/start.ts",
+    "dev": "tsx watch bin/start.ts",
     "test": "vitest run --project unit",
     "test:browser": "vitest run --project browser",
     "test:all": "vitest run"
   },
   "dependencies": {
+    "@mswjs/http-middleware": "catalog:",
     "@zitadel-nextgen/api": "workspace:*",
+    "express": "catalog:",
     "xstate": "catalog:"
   },
   "peerDependencies": {
     "msw": "catalog:"
   },
   "devDependencies": {
+    "@types/express": "catalog:",
     "@types/node": "catalog:",
     "@vitest/browser-playwright": "catalog:",
     "msw": "catalog:",
-    "playwright": "catalog:"
+    "playwright": "catalog:",
+    "tsx": "catalog:"
   },
   "nx": {
     "targets": {

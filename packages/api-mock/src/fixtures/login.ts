@@ -12,9 +12,19 @@
  */
 import type { CreateFlow201, CreateFlow201Step } from "@zitadel-nextgen/api/generated/model";
 
+import { signHandoffToken } from "../crypto.js";
+
 export type StepFixtureInput = {
   flowId: string;
   sessionToken: string;
+  /** Issuer URL embedded in signed tokens (e.g. `"http://localhost:4000"`). */
+  iss: string;
+  /**
+   * Email captured from the identifier step, used as the JWT `sub` claim in
+   * the handoff token. Falls back to `"mock-user@example.com"` when absent
+   * (e.g. SSO flows that skip the identifier step).
+   */
+  capturedEmail?: string;
 };
 
 const submitContinue = { submit: { text_key: "submit.continue", primary: true } };
@@ -76,22 +86,24 @@ export function ssoRedirectStep(
   });
 }
 
-export function doneStep(input: StepFixtureInput & { redirectUri?: string }): CreateFlow201 {
-  const { redirectUri } = input;
+export async function doneStep(input: StepFixtureInput): Promise<CreateFlow201> {
+  const { iss, capturedEmail } = input;
   return wrap(
     input,
     {
       name: "done",
       texts: { title_key: "complete.title" },
-      complete: redirectUri ? "redirect" : "show",
+      complete: "show",
       fields: {},
       actions: {},
       gates: {},
     },
     {
-      handoff_token: "handoff_mock",
+      handoff_token: await signHandoffToken({
+        sub: capturedEmail ?? "mock-user@example.com",
+        iss,
+      }),
       handoff_token_expires_at: new Date(Date.now() + 60_000).toISOString(),
-      ...(redirectUri ? { redirect_uri: redirectUri } : {}),
     },
   );
 }
