@@ -65,6 +65,10 @@ func (s *UserProperty) setDefaults() {
 		s.XMinusIdentifier.SetTo(val)
 	}
 	{
+		val := bool(false)
+		s.XMinusPassword.SetTo(val)
+	}
+	{
 		val := bool(true)
 		s.XMinusEditable.SetTo(val)
 	}

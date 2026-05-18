@@ -8958,6 +8958,8 @@ type UserProperty struct {
 	MaxLength OptNilInt `json:"maxLength"`
 	// Whether this property is an identifier for the user or not.
 	XMinusIdentifier OptBool `json:"x-identifier"`
+	// Whether this property carries the user's password proof.
+	XMinusPassword OptBool `json:"x-password"`
 	// The verification method for this property, if applicable.
 	XMinusVerify OptNilString `json:"x-verify"`
 	// The level of uniqueness for this property, if applicable.
@@ -9004,6 +9006,11 @@ func (s *UserProperty) GetMaxLength() OptNilInt {
 // GetXMinusIdentifier returns the value of XMinusIdentifier.
 func (s *UserProperty) GetXMinusIdentifier() OptBool {
 	return s.XMinusIdentifier
+}
+
+// GetXMinusPassword returns the value of XMinusPassword.
+func (s *UserProperty) GetXMinusPassword() OptBool {
+	return s.XMinusPassword
 }
 
 // GetXMinusVerify returns the value of XMinusVerify.
@@ -9074,6 +9081,11 @@ func (s *UserProperty) SetMaxLength(val OptNilInt) {
 // SetXMinusIdentifier sets the value of XMinusIdentifier.
 func (s *UserProperty) SetXMinusIdentifier(val OptBool) {
 	s.XMinusIdentifier = val
+}
+
+// SetXMinusPassword sets the value of XMinusPassword.
+func (s *UserProperty) SetXMinusPassword(val OptBool) {
+	s.XMinusPassword = val
 }
 
 // SetXMinusVerify sets the value of XMinusVerify.
