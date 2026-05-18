@@ -26,6 +26,7 @@
  *   PATCH  /flow_definitions/:id      — update flow definition
  *   DELETE /flow_definitions/:id      — delete flow definition
  */
+import { randomUUID } from "node:crypto";
 import { type Server } from "node:http";
 
 import express from "express";
@@ -34,6 +35,8 @@ import { createMiddleware } from "@mswjs/http-middleware";
 import { JWK, signSessionToken, verifyHandoffToken } from "./crypto.js";
 import { setupMockHandlers } from "./handlers.js";
 import { errorBody, setupPlatformHandlers } from "./platform-handlers.js";
+
+const SESSION_TTL_SECONDS = 3600;
 
 export function startMockServer(port: number): Server {
   const iss = `http://localhost:${port}`;
@@ -88,10 +91,29 @@ export function startMockServer(port: number): Server {
     }
     const sessionJwt = await signSessionToken({ sub: claims.sub, email: claims.sub, iss });
     res.setHeader("Set-Cookie", [
-      `__nextgen_session=${sessionJwt}; HttpOnly; Path=/; SameSite=Lax; Max-Age=3600`,
+      `__nextgen_session=${sessionJwt}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${SESSION_TTL_SECONDS}`,
       `_zflow=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
     ]);
-    res.json({ status: "ok" });
+    // Spec: 200 returns `session-with-token-response.yaml` —
+    // `{session: <SessionResponse>, session_token}`. The mock synthesises a
+    // minimal session_response from the handoff claims: `state` is "active"
+    // (we just authenticated), `factors` and `assurance_levels` are empty
+    // (the mock has no factor catalogue), and the TTLs come from the
+    // session-cookie window so they stay consistent with the JWT exp.
+    const createdAt = new Date();
+    const expiresAt = new Date(createdAt.getTime() + SESSION_TTL_SECONDS * 1000);
+    res.json({
+      session: {
+        session_id: `sess_${randomUUID().replace(/-/g, "").slice(0, 12)}`,
+        project_id: claims.sub,
+        state: "active",
+        factors: [],
+        assurance_levels: [],
+        created_at: createdAt.toISOString(),
+        expires_at: expiresAt.toISOString(),
+      },
+      session_token: sessionJwt,
+    });
   });
 
   // ─── OIDC-style end-session ──────────────────────────────────────────────
