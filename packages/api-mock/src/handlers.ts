@@ -102,7 +102,13 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
     getCreateFlowMockHandler(async ({ request }) => {
       const body = (await request.clone().json()) as CreateFlowBody;
       captured.push({ kind: "createFlow", body });
-      actor.send({ type: "RESET" });
+      // Replace the actor outright. The flow machine's `done` state is a
+      // final (absorbing) state, so sending RESET to an actor that has
+      // already reached `done` is a no-op — reusing it would replay the
+      // previous session's captured email on the next createFlow call,
+      // which made logout+login appear to re-authenticate as the prior
+      // user without any user input.
+      actor = startFlowActor();
       actor.send({ type: "START", purpose: body.purpose });
       return currentResponse();
     }),
