@@ -2278,7 +2278,7 @@ func (s CreateSchemaReq) encodeFields(e *jx.Encoder) {
 			s := s.UserSchema
 			{
 				e.FieldStart("$schema")
-				e.Str("https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.yaml")
+				e.Str("https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json")
 			}
 			{
 				e.FieldStart("$id")
@@ -7788,7 +7788,7 @@ func (s GetSchemaByIdOK) encodeFields(e *jx.Encoder) {
 			s := s.UserSchema
 			{
 				e.FieldStart("$schema")
-				e.Str("https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.yaml")
+				e.Str("https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json")
 			}
 			{
 				e.FieldStart("$id")
@@ -15302,7 +15302,7 @@ func (s *UserSchema) Encode(e *jx.Encoder) {
 func (s *UserSchema) encodeFields(e *jx.Encoder) {
 	{
 		e.FieldStart("$schema")
-		e.Str("https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.yaml")
+		e.Str("https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json")
 	}
 	{
 		e.FieldStart("$id")
