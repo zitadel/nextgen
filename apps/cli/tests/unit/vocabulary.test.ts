@@ -21,7 +21,6 @@ describe("public vocabulary", () => {
       "README.md",
       "AGENTS.md",
       "src/platform/fixtures/createProject.ok.json",
-      "src/platform/fixtures/uploadConfig.ok.json",
     ];
 
     for (const file of files) {

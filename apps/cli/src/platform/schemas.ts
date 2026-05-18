@@ -27,45 +27,6 @@ export const projectResponseSchema = z.object({
 });
 export type GetProjectResponse = z.infer<typeof projectResponseSchema>;
 
-export const configUploadRequestSchema = z.object({
-  config: z.record(z.string(), z.unknown()),
-  resources: z.record(z.string(), z.record(z.string(), z.unknown())).optional(),
-  templates: z.record(z.string(), z.string()).optional(),
-  hash: z.string(),
-  schema_version: z.string().optional(),
-  sdk_version: z.string().optional(),
-  ejected_renderer_pin: z.string().optional(),
-});
-export type UploadConfigRequest = z.infer<typeof configUploadRequestSchema>;
-
-export const serverCapabilitiesSchema = z.object({
-  schema_version: z.string(),
-  flow_protocol_version: z.string(),
-  step_types: z.array(z.string()),
-  idp_types: z.array(z.string()),
-  delivery_modes: z.array(z.string()),
-  renderer_modes: z.array(z.string()),
-  features: z.array(z.string()).default([]),
-});
-export type ServerCapabilities = z.infer<typeof serverCapabilitiesSchema>;
-
-export const configWarningSchema = z.object({
-  code: z.string(),
-  path: z.string(),
-  message: z.string(),
-  severity: z.enum(["info", "warning", "error"]).default("warning"),
-});
-export type ConfigWarning = z.infer<typeof configWarningSchema>;
-
-export const configUploadResponseSchema = z.object({
-  config_version: z.number(),
-  hash: z.string(),
-  applied_at: z.string(),
-  server_capabilities: serverCapabilitiesSchema,
-  warnings: z.array(configWarningSchema).default([]),
-});
-export type UploadConfigResponse = z.infer<typeof configUploadResponseSchema>;
-
 export const initClaimRequestSchema = z.object({
   suggested_team_name: z.string().optional(),
 });
@@ -93,13 +54,6 @@ export const claimStatusResponseSchema = z.object({
   tier: z.enum(["free", "pro", "enterprise"]).optional(),
 });
 export type ClaimStatusResponse = z.infer<typeof claimStatusResponseSchema>;
-
-export const capabilitiesResponseSchema = z.object({
-  mode: z.enum(["mock", "cloud", "server"]),
-  version: z.string(),
-  features: z.record(z.string(), z.boolean()),
-});
-export type CapabilitiesResponse = z.infer<typeof capabilitiesResponseSchema>;
 
 export type CreateSchemaResponse = {
   id: string;

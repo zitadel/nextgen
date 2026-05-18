@@ -78,10 +78,4 @@ describe("platform client", () => {
     });
   });
 
-  it("getCapabilities returns expected shape", async () => {
-    const client = createPlatformClient(MOCK_SERVER_URL);
-    const caps = await client.getCapabilities();
-    expect(caps.mode).toBe("mock");
-    expect(caps.features.config_apply).toBe(true);
-  });
 });

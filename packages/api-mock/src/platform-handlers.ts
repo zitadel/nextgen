@@ -4,18 +4,16 @@
  * Covers (in sync with `api/openapi/openapi-spec.yaml` on main):
  *   - POST   /projects
  *   - GET    /projects/:id
- *   - PUT    /projects/:id/config   (CLI-only, no spec yet)
  *   - POST   /projects/:id/claim/init   (CLI-only, no spec yet)
  *   - GET    /projects/:id/claim/status (CLI-only, no spec yet)
  *   - POST   /schemas
  *   - GET    /schemas/:id
- *   - DELETE /schemas/:id           (no spec — CLI never deletes schemas today)
+ *   - DELETE /schemas/:id           (CLI uses; spec-gap follow-up issue filed)
  *   - POST   /flow_definitions      (returns flow-definition-detail-response)
  *   - GET    /flow_definitions      (list)
  *   - GET    /flow_definitions/:id
  *   - PATCH  /flow_definitions/:id  (returns 200 + flow-definition-detail-response)
  *   - DELETE /flow_definitions/:id  (returns 204)
- *   - GET    /capabilities          (CLI-only, no spec yet)
  *
  * Usage (Node / vitest):
  *
@@ -46,7 +44,6 @@ type Project = {
   previewOrigins: string[];
   createdAt: string;
   updatedAt: string;
-  configVersion: number;
   challengeId?: string;
 };
 
@@ -115,15 +112,6 @@ export function completeMockClaim(): void {
 
 export function setupPlatformHandlers() {
   return [
-    // GET /capabilities
-    http.get("*/capabilities", () =>
-      HttpResponse.json({
-        mode: "mock",
-        version: nowIso().slice(0, 10),
-        features: { browser_bootstrap: true, preview_secrets: true, config_apply: true },
-      }),
-    ),
-
     // POST /projects
     http.post("*/projects", async ({ request }) => {
       const body = (await request.json()) as { previewOrigins?: string[] };
@@ -136,7 +124,6 @@ export function setupPlatformHandlers() {
         previewOrigins: body.previewOrigins ?? [],
         createdAt,
         updatedAt: createdAt,
-        configVersion: 0,
       };
       store.projects.set(id, project);
       return HttpResponse.json(
@@ -159,30 +146,6 @@ export function setupPlatformHandlers() {
         id: project.id,
         createdAt: project.createdAt,
         updatedAt: project.updatedAt,
-      });
-    }),
-
-    // PUT /projects/:id/config
-    http.put("*/projects/:id/config", async ({ params, request }) => {
-      const project = store.projects.get(params.id as string);
-      if (!project) return HttpResponse.json({ error: "not_found" }, { status: 404 });
-      const body = (await request.json()) as { hash?: string };
-      project.configVersion += 1;
-      project.updatedAt = nowIso();
-      return HttpResponse.json({
-        config_version: project.configVersion,
-        hash: body.hash ?? "",
-        applied_at: project.updatedAt,
-        server_capabilities: {
-          schema_version: "2.0",
-          flow_protocol_version: "1.0",
-          step_types: ["identifier", "credential", "form", "verification", "redirect", "info", "complete"],
-          idp_types: ["oidc"],
-          delivery_modes: ["dev_inbox"],
-          renderer_modes: ["default"],
-          features: ["preview_secrets", "capability_handshake_v1"],
-        },
-        warnings: [],
       });
     }),
 

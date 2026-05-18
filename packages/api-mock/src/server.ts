@@ -2,13 +2,12 @@
  * Standalone HTTP server for the api-mock.
  *
  * Flow routes (POST /flow, GET /flow/:id, POST /flow/:id/submit) and the
- * platform CRUD routes (projects, schemas, flow_definitions, capabilities,
- * claim) are served by reusing the existing MSW handlers via
- * @mswjs/http-middleware — zero duplication of routing logic.
+ * platform CRUD routes (projects, schemas, flow_definitions, claim) are
+ * served by reusing the existing MSW handlers via @mswjs/http-middleware —
+ * zero duplication of routing logic.
  *
  * Custom-only routes added on top:
  *   POST   /sessions/exchange     — exchange handoff_token for session cookie
- *   POST   /logout                — clear session cookies
  *   GET    /auth/end-session      — OIDC-style end-session, clears cookies
  *   GET    /.well-known/jwks.json — JWKS for JWT verification
  *   GET    /oauth/v2/keys         — alias for JWKS
@@ -16,16 +15,16 @@
  * Platform routes (mounted via setupPlatformHandlers):
  *   POST   /projects                  — create project
  *   GET    /projects/:id              — fetch project
- *   PUT    /projects/:id/config       — upload config
  *   POST   /projects/:id/claim/init   — start claim (stays pending until completeMockClaim())
  *   GET    /projects/:id/claim/status — poll claim status
  *   POST   /schemas                   — create user schema
  *   GET    /schemas/:id               — fetch user schema
  *   DELETE /schemas/:id               — delete user schema
  *   POST   /flow_definitions          — create flow definition
+ *   GET    /flow_definitions          — list flow definitions
+ *   GET    /flow_definitions/:id      — get flow definition
  *   PATCH  /flow_definitions/:id      — update flow definition
  *   DELETE /flow_definitions/:id      — delete flow definition
- *   GET    /capabilities              — server capabilities
  */
 import { type Server } from "node:http";
 
@@ -95,25 +94,15 @@ export function startMockServer(port: number): Server {
     res.json({ status: "ok" });
   });
 
-  // ─── Logout ────────────────────────────────────────────────────────────────
-  const clearSessionCookies = (res: express.Response): void => {
+  // ─── OIDC-style end-session ──────────────────────────────────────────────
+  // What `<zitadel-logout>` calls via the generated `endSession()` client.
+  // Clears cookies and returns 204 No Content, matching the OpenAPI contract.
+  app.get("/auth/end-session", (_req, res) => {
     res.setHeader("Set-Cookie", [
       `__nextgen_session=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
       `__nextgen_display=; Path=/; SameSite=Lax; Max-Age=0`,
       `_zflow=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
     ]);
-  };
-
-  app.post("/logout", (_req, res) => {
-    clearSessionCookies(res);
-    res.json({ status: "ok" });
-  });
-
-  // OIDC-style end-session — what `<zitadel-logout>` calls via the generated
-  // `endSession()` client. Clears cookies and returns 204 No Content, matching
-  // the OpenAPI contract.
-  app.get("/auth/end-session", (_req, res) => {
-    clearSessionCookies(res);
     res.status(204).end();
   });
 

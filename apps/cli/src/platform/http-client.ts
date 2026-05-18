@@ -1,16 +1,12 @@
 import { ZitadelError } from "../lib/errors";
 import type { CreateFlowDefinitionRequest, PlatformClient } from "./client";
 import type {
-  CapabilitiesResponse,
   ClaimStatusResponse,
   CreateProjectRequest,
   CreateProjectResponse,
   GetProjectResponse,
   InitClaimRequest,
   InitClaimResponse,
-  UploadConfigRequest,
-  UploadConfigResponse,
-  ZitadelEnvironment,
 } from "./schemas";
 
 export class HttpPlatformClient implements PlatformClient {
@@ -25,25 +21,6 @@ export class HttpPlatformClient implements PlatformClient {
 
   async getProject(projectId: string): Promise<GetProjectResponse> {
     return this.request("GET", `/projects/${encodeURIComponent(projectId)}`);
-  }
-
-  async uploadConfig(
-    projectId: string,
-    environment: ZitadelEnvironment,
-    req: UploadConfigRequest,
-  ): Promise<UploadConfigResponse> {
-    return this.request(
-      "PUT",
-      `/projects/${encodeURIComponent(projectId)}/config?environment=${encodeURIComponent(environment)}`,
-      req,
-    );
-  }
-
-  async getConfig(projectId: string, environment: ZitadelEnvironment): Promise<unknown> {
-    return this.request(
-      "GET",
-      `/projects/${encodeURIComponent(projectId)}/config?environment=${encodeURIComponent(environment)}`,
-    );
   }
 
   async initClaim(projectId: string, req: InitClaimRequest): Promise<InitClaimResponse> {
@@ -79,10 +56,6 @@ export class HttpPlatformClient implements PlatformClient {
 
   async deleteFlowDefinition(id: string): Promise<void> {
     return this.request("DELETE", `/flow_definitions/${encodeURIComponent(id)}`);
-  }
-
-  async getCapabilities(): Promise<CapabilitiesResponse> {
-    return this.request("GET", "/capabilities");
   }
 
   private async request<T>(method: string, path: string, body?: unknown): Promise<T> {

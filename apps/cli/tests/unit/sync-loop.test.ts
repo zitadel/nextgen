@@ -26,8 +26,6 @@ function makeClient(): PlatformClient {
   return {
     createProject: vi.fn(),
     getProject: vi.fn(),
-    uploadConfig: vi.fn(),
-    getConfig: vi.fn(),
     createSchema: vi.fn().mockResolvedValue({ id: "schema-001" }),
     deleteSchema: vi.fn().mockResolvedValue(undefined),
     createFlowDefinition: vi.fn().mockResolvedValue({ id: "flow-001" }),
@@ -35,7 +33,6 @@ function makeClient(): PlatformClient {
     deleteFlowDefinition: vi.fn().mockResolvedValue(undefined),
     initClaim: vi.fn(),
     getClaimStatus: vi.fn(),
-    getCapabilities: vi.fn(),
   } as unknown as PlatformClient;
 }
 
