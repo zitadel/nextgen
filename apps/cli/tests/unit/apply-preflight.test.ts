@@ -16,12 +16,11 @@ vi.mock("../../src/platform/index", () => ({
 }));
 
 const VALID_FLOW = {
-  version: 1,
-  kind: "flow-definition",
-  slug: "default",
-  name: "Default",
+  // Spec: `name` is a slug-pattern stable identifier; required fields are
+  // [name, user_schema, purposes, initial_steps, steps].
+  name: "default",
+  user_schema: "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/human-user.yaml",
   purposes: ["login"],
-  template_name: "default",
   initial_steps: { login: "identifier" },
   steps: [
     {

@@ -53,7 +53,10 @@ describe("Next setup integration", () => {
       '"x-unique": "project"',
     );
     const flowRaw = await readFile(join(cwd, ".zitadel/flows/default.json"), "utf8");
-    expect(flowRaw).toContain('"template_name": "default"');
+    // Spec: `name` is the slug-pattern stable identifier; `template_name`
+    // was a non-spec field the CLI used to emit.
+    expect(flowRaw).toContain('"name": "default"');
+    expect(flowRaw).toContain('"user_schema":');
     expect(flowRaw).toContain('"text_key": "identifier.field.email"');
     const localeRaw = await readFile(join(cwd, ".zitadel/locales/en.json"), "utf8");
     expect(localeRaw).toContain('"identifier.title": "Sign in"');
@@ -185,12 +188,11 @@ describe("Next setup integration", () => {
     ]);
 
     const flowWithEnvRef = {
-      version: 1,
-      kind: "flow-definition",
-      slug: "default",
-      name: "Default",
+      // Spec: `name` is the slug-pattern stable identifier; required fields
+      // are [name, user_schema, purposes, initial_steps, steps].
+      name: "default",
+      user_schema: "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/human-user.yaml",
       purposes: ["login"],
-      template_name: "default",
       initial_steps: { login: "identifier" },
       steps: [
         {

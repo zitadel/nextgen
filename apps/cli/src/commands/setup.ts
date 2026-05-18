@@ -21,6 +21,15 @@ import { validateJsonSchema } from "../schema/validate";
 import { runApply } from "./apply";
 import { runDeployConnect } from "./deploy";
 
+/**
+ * Canonical URI for the human-user schema flow definitions reference by
+ * default. The schema body the CLI writes locally (`.zitadel/schemas/user.json`)
+ * is derived from this same shape; the URI is the spec-required pointer the
+ * platform stores against the flow.
+ */
+const DEFAULT_USER_SCHEMA_URI =
+  "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/human-user.yaml";
+
 export type SetupOptions = GlobalOptions & {
   framework?: string;
   userFields?: string;
@@ -316,12 +325,14 @@ function defaultFlowDefinition(fields: string[], authMethods: string[]): Record<
   }
 
   return {
-    version: 1,
-    kind: "flow-definition",
-    slug: "default",
-    name: "Default login & registration",
+    // Spec: `flow-definition.yaml` requires [name, user_schema, purposes,
+    // initial_steps, steps]. `name` is a slug (pattern `^[a-z][a-z0-9-]*$`)
+    // that doubles as the display label — there is no separate `slug` or
+    // `display_name` field. `version` / `kind` / `template_name` are NOT in
+    // the spec and have been dropped.
+    name: "default",
+    user_schema: DEFAULT_USER_SCHEMA_URI,
     purposes: ["login", "register"],
-    template_name: "default",
     initial_steps: {
       login: "identifier",
       register: "register_profile",

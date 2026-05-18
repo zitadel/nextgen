@@ -51,7 +51,10 @@ describe("flow definition schema", () => {
     if (!parsed.success) return;
 
     const flow = parsed.data;
-    expect(flow.template_name).toBe("default");
+    // Spec: `name` is the slug-pattern stable identifier — there is no
+    // separate `slug` or `template_name`.
+    expect(flow.name).toBe("default");
+    expect(flow.user_schema).toMatch(/^https?:\/\//);
     expect(flow.purposes).toContain("login");
     expect(flow.purposes).toContain("register");
 
@@ -87,10 +90,8 @@ describe("flow definition schema", () => {
 
   it("rejects flow definitions with array-shaped fields (legacy)", () => {
     const legacy = {
-      version: 1,
-      kind: "flow-definition",
-      slug: "legacy",
-      name: "Legacy",
+      name: "legacy",
+      user_schema: "https://example.com/user.yaml",
       purposes: ["login"],
       initial_steps: { login: "identifier" },
       steps: [
