@@ -155,49 +155,49 @@ type PasskeyProof struct {
 
 func (PasskeyProof) proofCheckType() domain.AuthCheckType { return domain.AuthCheckTypePasskey }
 
+// ---- Secondary ports -------------------------------------------------------------
+
+type sessionResolver interface {
+	GetByID(ctx context.Context, q database.QueryExecutor, projectID, sessionID string) (*domain.Session, error)
+}
+
+type projectLoader interface {
+	Get(ctx context.Context, client database.QueryExecutor, id string) (*domain.Project, error)
+}
+
+type userLookup interface {
+	Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*domain.User, error)
+}
+
+type userPasswords interface {
+	Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*domain.UserPassword, error)
+}
+
+type userPasskeys interface {
+	Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*domain.UserPasskey, error)
+	List(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) ([]*domain.UserPasskey, error)
+}
+
 // ---- Implementation ----------------------------------------------------------
 
 type authAttemptService struct {
 	pool          database.Pool
 	attempts      domain.AuthAttemptRepository
 	sessions      sessionResolver
-	projects      projectConfigLoader
+	projects      projectLoader
 	users         userLookup
 	userPasswords userPasswords
 	userPasskeys  userPasskeys
-	keyManager    *crypto.KeyManager
-}
-
-type sessionResolver interface {
-	GetByID(ctx context.Context, q database.QueryExecutor, projectID, sessionID string) (*domain.Session, error)
-}
-
-type projectConfigLoader interface {
-	GetConfig(ctx context.Context, pool database.QueryExecutor, projectID string) (*domain.ProjectConfig, error)
-}
-
-type userLookup interface {
-	Get(ctx context.Context, q database.QueryExecutor, projectID, username string) (*domain.User, error)
-}
-
-type userPasswords interface {
-	Get(ctx context.Context, q database.QueryExecutor, projectID, userID string) (*domain.UserPassword, error)
-}
-
-type userPasskeys interface {
-	Get(ctx context.Context, q database.QueryExecutor, projectID, userID, passkeyID string) (*domain.UserPasskey, error)
-	List(ctx context.Context, q database.QueryExecutor, projectID, userID string) ([]*domain.UserPasskey, error)
 }
 
 func NewAuthAttemptService(
 	pool database.Pool,
 	attempts domain.AuthAttemptRepository,
 	sessions sessionResolver,
-	projects projectConfigLoader,
+	projects projectLoader,
 	users userLookup,
 	userPasswords userPasswords,
 	userPasskeys userPasskeys,
-	keyManager *crypto.KeyManager,
 ) AuthAttemptService {
 	return &authAttemptService{
 		pool:          pool,
@@ -207,7 +207,6 @@ func NewAuthAttemptService(
 		users:         users,
 		userPasswords: userPasswords,
 		userPasskeys:  userPasskeys,
-		keyManager:    keyManager,
 	}
 }
 
@@ -217,7 +216,7 @@ func NewAuthAttemptService(
 func (s *authAttemptService) Create(ctx context.Context, input CreateAuthAttemptInput) (res *domain.AuthAttempt, err error) {
 	requiredChecks := input.RequiredChecks
 	if requiredChecks == nil {
-		cfg, err := s.projects.GetConfig(ctx, s.pool, input.ProjectID)
+		cfg, err := s.projects.Get(ctx, s.pool, input.ProjectID)
 		if err != nil {
 			return nil, domain.ErrInternal(err).WithMessage("failed to load project config")
 		}
@@ -376,6 +375,7 @@ func (s *authAttemptService) VerifyProof(ctx context.Context, input VerifyProofI
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to start transaction")
 	}
+
 	defer func() {
 		// don't shadow errors already returned to the user
 		if err != nil {

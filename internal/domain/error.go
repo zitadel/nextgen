@@ -75,3 +75,10 @@ func newError(code string, message string, details any, parent error) Error {
 func ErrInternal(err error) Error {
 	return newError("internal", "an unexpected error occurred", nil, err)
 }
+
+// ErrRequestInvalid is returned when an incoming HTTP request fails structural
+// validation (missing required fields, wrong types, failed regex, etc.)
+// before it reaches domain logic.
+func ErrRequestInvalid() Error {
+	return newError("req.invalid", "invalid request", nil, nil)
+}

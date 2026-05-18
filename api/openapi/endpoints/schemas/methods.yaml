@@ -1,0 +1,68 @@
+post:
+  operationId: createSchema
+  summary: Create new schema
+  description: |
+    Create a new schema. The schema definition must include a unique $id field,
+    which will be used to identify the schema in future requests. The $id must 
+    be a valid URI and should ideally point to the location where the schema 
+    can be accessed.
+    
+    The schema can either be a concrete schema, e.g. a user schema, or a 
+    schema-url which will be resolved by the server.
+  tags:
+    - Schema
+  security:
+    - oauth2:
+        - schema.write
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          oneOf:
+            - $ref: user-schema.json
+            - $ref: schema-url.yaml
+          discriminator:
+            propertyName: kind
+            mapping:
+              user-schema: user-schema.json
+              schema-url:  schema-url.yaml
+        examples:
+          userSchema:
+            summary: An example of a schema definition for a user.
+            externalValue: examples/user-schema-example.yaml
+          schemaURL:
+            summary: |
+              An example of a schema definition that references an external 
+              schema URL.
+            externalValue: examples/schema-url-example.yaml
+  responses:
+    '201':
+      description: The schema was created successfully
+      content:
+        application/json:
+          schema:
+            $ref: create-schema-response.yaml
+          examples:
+            userSchemaResponse:
+              summary: |
+                An example of a successful response for creating a user schema.
+              externalValue: examples/create-user-schema-response-example.yaml
+    '400':
+      description: The provided input was not valid
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '409':
+      description: A schema with the same $id already exists
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    default:
+      description: Unexpected error response.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml

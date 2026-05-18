@@ -21,7 +21,6 @@ properties:
     type: string
     enum:
       - pending
-      - verified
       - failed
       - expired
     description: |

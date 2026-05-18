@@ -4,14 +4,20 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
+	"os/signal"
 	"strings"
+	"syscall"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/zitadel/nextgen/api/generated"
-	internal_api "github.com/zitadel/nextgen/internal/api"
+
+	oasapi "github.com/zitadel/nextgen/api/generated"
+	"github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/nextgen/internal/storage/database"
 	_ "github.com/zitadel/nextgen/internal/storage/database/dialect/all"
 	"github.com/zitadel/nextgen/internal/storage/database/repository"
 )
@@ -22,63 +28,18 @@ func NewCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "server",
 		Short: "Run the server",
-		RunE: func(_ *cobra.Command, _ []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			cfg, err := loadConfig(configPath)
 			if err != nil {
 				return err
 			}
 
-			ctx := context.Background()
-
-			// ── Database ─────────────────────
-			connector, err := cfg.Database.Build()
-			if err != nil {
-				return err
-			}
-			pool, err := connector.Connect(ctx)
-			if err != nil {
-				return err
-			}
-			err = pool.Migrate(ctx)
+			pool, err := startDatabase(cmd.Context(), cfg.Database)
 			if err != nil {
 				return err
 			}
 
-			// ── Repositories ─────────────────
-			projectRepo := &repository.Project{}
-			userRepo := &repository.User{}
-			userPasswordRepo := &repository.UserPasswordRepository{}
-			userPasskeyRepo := &repository.UserPasskeyRepository{}
-			sessionRepo := &repository.Session{}
-			attemptRepo := &repository.AuthAttempt{}
-
-			// ── Services ─────────────────────
-			authAttemptSvc := service.NewAuthAttemptService(
-				pool,
-				attemptRepo,
-				sessionRepo,
-				projectRepo,
-				userRepo,
-				userPasswordRepo,
-				userPasskeyRepo,
-			)
-
-			// ── HTTP handlers ─────────────────
-			handler := internal_api.NewHandler(authAttemptSvc)
-
-			server, err := api.NewServer(
-				handler,
-				internal_api.NewSecurityHandler(),
-				api.WithErrorHandler(internal_api.OgenErrorHandler),
-			)
-			if err != nil {
-				return err
-			}
-			err = http.ListenAndServe(":8080", server)
-			if err != nil {
-				return err
-			}
-			return nil
+			return run(cmd.Context(), cfg, pool)
 		},
 	}
 
@@ -87,11 +48,101 @@ func NewCommand() *cobra.Command {
 	return cmd
 }
 
+func startDatabase(ctx context.Context, config database.Config) (database.Pool, error) {
+	connector, err := config.Build()
+	if err != nil {
+		return nil, err
+	}
+	pool, err := connector.Connect(ctx)
+	if err != nil {
+		return nil, err
+	}
+	err = pool.Migrate(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return pool, nil
+}
+
+func run(ctx context.Context, cfg Config, pool database.Pool) error {
+	defer func() {
+		if err := pool.Close(context.Background()); err != nil {
+			log.Printf("close database pool: %v", err)
+		}
+	}()
+
+	// ── Repositories ─────────────────
+	projectRepo := repository.NewProjectRepository(pool)
+	userRepo := repository.NewUserRepository()
+	userPasswordRepo := repository.NewUserPasswordRepository()
+	userPasskeyRepo := repository.NewUserPasskeyRepository()
+	sessionRepo := repository.NewSessionRepository(pool)
+	flowRepo := repository.NewFlowDefinitionRepository(pool)
+	attemptRepo := repository.NewAuthAttemptRepository(pool)
+
+	// ── Services ─────────────────────
+	flowService := service.NewFlowService(pool, flowRepo)
+	authAttemptSvc := service.NewAuthAttemptService(
+		pool,
+		attemptRepo,
+		sessionRepo,
+		projectRepo,
+		userRepo,
+		userPasswordRepo,
+		userPasskeyRepo,
+	)
+
+	// ── HTTP Server ─────────────────
+
+	ctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	oasServer, err := oasapi.NewServer(
+		api.NewHandler(flowService, authAttemptSvc),
+		api.NewSecurityHandler(),
+		oasapi.WithErrorHandler(api.OgenErrorHandler))
+	if err != nil {
+		return fmt.Errorf("build api server: %w", err)
+	}
+
+	httpServer := &http.Server{
+		Addr:              cfg.Server.Address,
+		Handler:           oasServer,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+
+	serverErr := make(chan error, 1)
+	go func() {
+		log.Printf("server listening on %s", httpServer.Addr)
+		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			serverErr <- err
+		}
+		close(serverErr)
+	}()
+
+	select {
+	case <-ctx.Done():
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		if err := httpServer.Shutdown(shutdownCtx); err != nil {
+			return fmt.Errorf("shutdown server: %w", err)
+		}
+		return nil
+	case err := <-serverErr:
+		return err
+	}
+}
+
 func loadConfig(configPath string) (Config, error) {
 	v := viper.New()
 	v.SetEnvPrefix("NEXTGEN")
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	v.AutomaticEnv()
+
+	v.SetDefault("server.address", ":8080")
 
 	if configPath != "" {
 		v.SetConfigFile(configPath)

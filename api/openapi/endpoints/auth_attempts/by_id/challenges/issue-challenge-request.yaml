@@ -29,8 +29,8 @@ properties:
         items:
           type: string
           format: uri
-        example: ['https://example.com']
+        example: [ 'https://example.com' ]
       user_verification:
         type: string
-        enum: [required, preferred, discouraged]
+        enum: [ required, preferred, discouraged ]
         example: required

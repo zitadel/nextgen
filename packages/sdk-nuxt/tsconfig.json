@@ -1,0 +1,21 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": false,
+    "declarationMap": false,
+    "emitDeclarationOnly": false,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "outDir": "./dist"
+  },
+  "include": ["src"],
+  "exclude": [
+    "src/module.ts",
+    "src/runtime/plugin.ts",
+    "src/runtime/composables/useAuth.ts"
+  ],
+  "references": [
+    {
+      "path": "../components"
+    }
+  ]
+}

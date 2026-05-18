@@ -2,34 +2,35 @@ package migration
 
 import (
 	"context"
-	"fmt"
+	"database/sql"
+	"embed"
+	"io/fs"
 
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/tern/v2/migrate"
+	"github.com/pressly/goose/v3"
 )
 
-var migrations []*migrate.Migration
+//go:embed sql/*.sql
+var sqlFiles embed.FS
 
-const SCHEMA_NAME = "zitadel_nextgen"
+const schemaName = "zitadel_nextgen"
 
-func Migrate(ctx context.Context, conn *pgx.Conn) error {
-	_, err := conn.Exec(ctx, "CREATE SCHEMA IF NOT EXISTS "+SCHEMA_NAME)
+// Migrate applies all pending migrations to db. It is idempotent: already-applied
+// migrations are skipped. The zitadel_nextgen schema is created if it does not exist,
+// since the goose tracking table lives there.
+func Migrate(ctx context.Context, db *sql.DB) error {
+	if _, err := db.ExecContext(ctx, "CREATE SCHEMA IF NOT EXISTS "+schemaName); err != nil {
+		return err
+	}
+	sqlFS, err := fs.Sub(sqlFiles, "sql")
 	if err != nil {
 		return err
 	}
-	migrator, err := migrate.NewMigrator(ctx, conn, fmt.Sprintf("%s.migrations", SCHEMA_NAME))
+	p, err := goose.NewProvider(goose.DialectPostgres, db, sqlFS,
+		goose.WithTableName(schemaName+".goose_db_version"),
+	)
 	if err != nil {
 		return err
 	}
-	migrator.Migrations = migrations
-	return migrator.Migrate(ctx)
-}
-
-func registerSQLMigration(up, down string) {
-	migID := len(migrations) + 1
-	migrations = append(migrations, &migrate.Migration{
-		Sequence: int32(migID),
-		UpSQL:    up,
-		DownSQL:  down,
-	})
+	_, err = p.Up(ctx)
+	return err
 }

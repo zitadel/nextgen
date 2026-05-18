@@ -2,22 +2,70 @@ package domain
 
 import (
 	"context"
+	"time"
 
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-// User represents the object defined [here](https://github.com/zitadel/nextgen/blob/main/docs/design/api/resource-map.md#users)
-// The user might contain PII data and should be stored in a specific region.
+type AuthMethod int
+
+const (
+	AuthMethodPassword AuthMethod = iota
+	AuthMethodPasskey
+	AuthMethodTOTP
+	AuthMethodRecoveryCodes
+)
+
+// User is a hydrated user projection (header + optional EAV joins).
 type User struct {
-	// ProjectID links to [Project].
 	ProjectID string
-	// TeamID links to [Team]. A user may belong to a team, but it's not required.
-	// If TeamID is nil, the user belongs to the project but not to any team.
-	TeamID *string
-	// ID is the unique identifier for the user within the project and team.
-	ID string
+	SchemaURL string
+	ID        string
+	TeamID    *string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+
+	// The following fields are only populated when corresponding query options are set.
+	Attributes           []Attribute
+	AvailableAuthMethods []AuthMethod
+}
+
+type CreateUser struct {
+	ProjectID  string
+	SchemaURL  string
+	ID         string
+	TeamID     *string
+	Attributes []*CreateAttribute
 }
 
 type UserRepository interface {
-	Get(ctx context.Context, q database.QueryExecutor, projectID, username string) (*User, error)
+	Repository
+
+	userConditions
+	userChanges
+	userJoins
+
+	Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*User, error)
+	List(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) ([]*User, error)
+	Create(ctx context.Context, client database.QueryExecutor, user *CreateUser) error
+	Delete(ctx context.Context, client database.QueryExecutor, condition database.Condition) error
+}
+
+type userConditions interface {
+	ProjectIDCondition(projectID string) database.Condition
+	IDCondition(id string) database.Condition
+	PrimaryKeyCondition(projectID, id string) database.Condition
+	TeamIDCondition(teamID string) database.Condition
+	AttributesCondition(attributes []Attribute) database.Condition
+}
+
+type userChanges interface {
+	SetTeam(teamID *string) database.Change
+	SetAttribute(a CreateAttribute) database.Change
+	DeleteAttribute(key string) database.Condition
+}
+
+type userJoins interface {
+	WithAttributes(filterKeys ...string) database.QueryOption
+	WithAvailableAuthMethods() database.QueryOption
 }

@@ -11,12 +11,18 @@ type Handler struct {
 	// UnimplementedHandler is embedded to provide default "not implemented"
 	// responses for all endpoints, so only implemented methods need to be defined.
 	api.UnimplementedHandler
-	authAttempts service.AuthAttemptService
+
+	flowService        service.FlowService
+	authAttemptService service.AuthAttemptService
 }
 
-func NewHandler(authAttempts service.AuthAttemptService) *Handler {
+func NewHandler(
+	flowService service.FlowService,
+	authAttemptService service.AuthAttemptService,
+) *Handler {
 	return &Handler{
-		authAttempts: authAttempts,
+		flowService:        flowService,
+		authAttemptService: authAttemptService,
 	}
 }
 
@@ -24,7 +30,7 @@ func NewHandler(authAttempts service.AuthAttemptService) *Handler {
 // returned by an endpoint handler into a well-formed error response.
 // By centralizing this logic here, we can ensure that all errors are handled
 // consistently regardless of where they originate.
-func (h *Handler) NewError(ctx context.Context, err error) *api.ErrorDetailsStatusCode {
+func (h Handler) NewError(ctx context.Context, err error) *api.ErrorDetailsStatusCode {
 	return errorResponse(err)
 }
 
