@@ -13,6 +13,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
 	oasapi "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/service"
@@ -64,6 +65,11 @@ func startDatabase(ctx context.Context, config database.Config) (database.Pool, 
 }
 
 func run(ctx context.Context, cfg Config, pool database.Pool) error {
+	defer func() {
+		if err := pool.Close(context.Background()); err != nil {
+			log.Printf("close database pool: %v", err)
+		}
+	}()
 
 	// ── Repositories ─────────────────
 	projectRepo := repository.NewProjectRepository(pool)
@@ -74,6 +80,7 @@ func run(ctx context.Context, cfg Config, pool database.Pool) error {
 	attemptRepo := repository.NewAuthAttemptRepository(pool)
 
 	// ── Services ─────────────────────
+	flowService := service.NewFlowService(pool, repository.NewFlowDefinitionRepository(pool))
 	authAttemptSvc := service.NewAuthAttemptService(
 		pool,
 		attemptRepo,
@@ -90,7 +97,7 @@ func run(ctx context.Context, cfg Config, pool database.Pool) error {
 	defer stop()
 
 	oasServer, err := oasapi.NewServer(
-		api.NewHandler(nil, authAttemptSvc),
+		api.NewHandler(flowService, authAttemptSvc),
 		api.NewSecurityHandler(),
 		oasapi.WithErrorHandler(api.OgenErrorHandler))
 	if err != nil {
