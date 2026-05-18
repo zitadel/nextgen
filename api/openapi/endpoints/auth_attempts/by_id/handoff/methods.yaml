@@ -31,28 +31,5 @@ post:
         application/json:
           schema:
             $ref: handoff-response.yaml
-    '400':
-      description: Invalid request
-      content:
-        application/json:
-          schema:
-            $ref: ../../../../components/error-details.yaml
-    '404':
-      description: Attempt not found
-      content:
-        application/json:
-          schema:
-            $ref: ../../../../components/error-details.yaml
-    '409':
-      description: Attempt not in completed state (missing required factors)
-      content:
-        application/json:
-          schema:
-            $ref: ../../../../components/error-details.yaml
     default:
-      description: Unexpected error
-      content:
-        application/json:
-          schema:
-            $ref: ../../../../components/error-details.yaml
-
+      $ref: createHandoff-error-response.yaml
