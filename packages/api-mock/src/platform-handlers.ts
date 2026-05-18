@@ -211,9 +211,23 @@ export function setupPlatformHandlers() {
     }),
 
     // POST /schemas
+    //
+    // Spec: `api/openapi/endpoints/schemas/methods.yaml` defines the request
+    // as `oneOf [user-schema, schema-url]` keyed on the `kind` discriminator.
+    // We accept either; anything else is 400 invalid_schema.
     http.post("*/schemas", async ({ request }) => {
       const body = await readJson(request);
       if (body === null) return HttpResponse.json(INVALID_JSON, { status: 400 });
+      const kind = body.kind;
+      if (kind !== "user-schema" && kind !== "schema-url") {
+        return HttpResponse.json(
+          errorBody(
+            "invalid_schema",
+            "schema body must include kind: \"user-schema\" or \"schema-url\"",
+          ),
+          { status: 400 },
+        );
+      }
       const id = `schema_${shortId()}`;
       store.schemas.set(id, body);
       return HttpResponse.json({ id }, { status: 201 });

@@ -32,9 +32,16 @@ describe("platform client", () => {
 
   it("createSchema and deleteSchema round-trip", async () => {
     const client = createPlatformClient(MOCK_SERVER_URL);
-    const { id } = await client.createSchema({ type: "object" });
+    // Spec: POST /schemas requires the `kind` discriminator
+    // (`oneOf [user-schema, schema-url]`).
+    const { id } = await client.createSchema({ kind: "user-schema", type: "object" });
     expect(id).toBeTruthy();
     await expect(client.deleteSchema(id)).resolves.toBeUndefined();
+  });
+
+  it("createSchema rejects bodies missing the kind discriminator", async () => {
+    const client = createPlatformClient(MOCK_SERVER_URL);
+    await expect(client.createSchema({ type: "object" })).rejects.toThrow(/400/);
   });
 
   it("createFlowDefinition, updateFlowDefinition, deleteFlowDefinition round-trip", async () => {
