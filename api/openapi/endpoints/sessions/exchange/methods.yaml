@@ -39,6 +39,9 @@ post:
   responses:
     '200':
       description: Handoff exchanged successfully. Returns the session and new session_token.
+      headers:
+        Set-Cookie:
+          $ref: ../../../components/headers/set-cookie-session-token.yaml
       content:
         application/json:
           schema:

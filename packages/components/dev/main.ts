@@ -1,4 +1,9 @@
 import "../src/index.js";
+import { setApiBaseUrl } from "@zitadel-nextgen/api/runtime/base-url";
+import { applyBranding, setupMock } from "@zitadel-nextgen/api-mock";
+import { setupWorker } from "msw/browser";
+
+import { brandingPresets } from "./branding-presets.js";
 import { renderAtomPlayground } from "./pages/atoms.js";
 import { renderLoginPage } from "./pages/login.js";
 
@@ -33,5 +38,22 @@ function mountRoute(): void {
   }
 }
 
-window.addEventListener("popstate", mountRoute);
-mountRoute();
+async function bootstrap(): Promise<void> {
+  // Point the orval client at any same-origin host so the MSW worker has
+  // an absolute URL to intercept. The host doesn't have to resolve — the
+  // generated handlers match against `*/flow*` regardless.
+  setApiBaseUrl(window.location.origin);
+
+  const worker = setupWorker();
+  setupMock(worker);
+  applyBranding(brandingPresets.centered);
+
+  // Vite serves dev/ at /, so MSW finds dev/mockServiceWorker.js at the
+  // default URL (/mockServiceWorker.js) without an explicit override.
+  await worker.start({ onUnhandledRequest: "bypass" });
+
+  window.addEventListener("popstate", mountRoute);
+  mountRoute();
+}
+
+void bootstrap();

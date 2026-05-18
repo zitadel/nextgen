@@ -28,7 +28,7 @@
       "path": "./packages/api"
     },
     {
-      "path": "./packages/mockserver"
+      "path": "./packages/api-mock"
     },
     {
       "path": "./apps/demo-next"
