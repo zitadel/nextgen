@@ -4,44 +4,59 @@
  *
  * Two entry points:
  *
- * - `setupMockHandlers()` returns an array of MSW `RequestHandler`s. Plug
- *   into `setupServer(...)` for node tests or pass to a worker for the
- *   browser. Calling it resets the underlying xstate actor so each test /
- *   playground session starts at the identifier step.
- * - `setupMock(worker)` is a tiny convenience for the browser path that
- *   pipes the same handlers into `worker.use(...)`.
+ * - `setupMockHandlers()` returns `{ handlers, reset, getCaptured }`. Plug
+ *   `handlers` into `setupServer(...)` for node tests or pass to a worker
+ *   for the browser. Callers should hold onto `reset` and `getCaptured` and
+ *   call them directly — this avoids any shared module-level state.
+ * - `setupMock(worker)` is a convenience for the browser path that pipes the
+ *   same handlers into `worker.use(...)`. The module-level `resetFlow()` and
+ *   `getCapturedRequests()` delegate to the most recently created handle from
+ *   `setupMock`, which is safe when only one mock is active at a time.
  *
  * Helpers:
  *
  * - `applyBranding(branding)` injects a tenant branding overlay merged into
  *   every response. Pass `null` (or call `clearBranding()`) to remove it.
- * - `getCapturedRequests()` exposes captured request bodies for assertions.
- * - `resetFlow()` rewinds the actor without rebuilding handlers — handy for
- *   tests that share a `setupServer` across cases.
  */
 import type { SetupWorker } from "msw/browser";
 
 import { applyBranding, clearBranding } from "./branding.js";
-import {
-  getCapturedRequests,
-  resetFlow,
-  setupMockHandlers,
-  type CapturedRequest,
-} from "./handlers.js";
+import { setupMockHandlers, type CapturedRequest, type MockHandle } from "./handlers.js";
+
+/** Tracks the most recent handle from setupMock() for browser-path delegation. */
+let _browserHandle: MockHandle | null = null;
 
 export function setupMock(worker: SetupWorker): SetupWorker {
-  worker.use(...setupMockHandlers());
+  const mock = setupMockHandlers();
+  _browserHandle = mock;
+  worker.use(...mock.handlers);
   return worker;
+}
+
+/**
+ * Reset the actor for the most recently created browser mock.
+ * For node tests, prefer calling `mock.reset()` on the object returned by
+ * `setupMockHandlers()` directly.
+ */
+export function resetFlow(): void {
+  _browserHandle?.reset();
+}
+
+/**
+ * Return captured requests for the most recently created browser mock.
+ * For node tests, prefer calling `mock.getCaptured()` on the object returned
+ * by `setupMockHandlers()` directly.
+ */
+export function getCapturedRequests(): readonly CapturedRequest[] {
+  return _browserHandle?.getCaptured() ?? [];
 }
 
 export {
   applyBranding,
   clearBranding,
-  getCapturedRequests,
-  resetFlow,
   setupMockHandlers,
 };
 
-export type { CapturedRequest };
+export type { CapturedRequest, MockHandle };
 export type { MockBranding } from "./branding.js";
 export type { FlowStepName } from "./flow-machine.js";
