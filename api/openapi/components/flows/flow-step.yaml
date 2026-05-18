@@ -110,10 +110,10 @@ properties:
       The challenge is NOT present on the initial step — it appears only after
       the user explicitly selects a ceremony-based action.
     properties:
-      type:
+      method:
         type: string
         enum: [passkey]
-        description: Challenge type. Determines which component handles the ceremony.
+        description: Challenge method. Determines which component handles the ceremony.
       challenge_id:
         type: string
         description: |

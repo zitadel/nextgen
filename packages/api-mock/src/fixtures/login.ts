@@ -117,7 +117,7 @@ export function passkeyChallenge(input: StepFixtureInput): CreateFlow201 {
     actions: { submit: { text_key: "submit.verify", primary: true } },
     gates: {},
     challenge: {
-      type: "passkey",
+      method: "passkey",
       challenge_id: "ch_mock_001",
       options: {
         challenge: "dGVzdC1jaGFsbGVuZ2UtZnJvbS1tb2Nr",
@@ -143,7 +143,7 @@ export function passkeyEnroll(input: StepFixtureInput): CreateFlow201 {
     actions: { submit: { text_key: "submit.verify", primary: true } },
     gates: {},
     challenge: {
-      type: "passkey",
+      method: "passkey",
       challenge_id: "ch_mock_enroll_001",
       options: {
         ceremony: "register",

@@ -6592,9 +6592,9 @@ func (s *FlowStepChallenge) Encode(e *jx.Encoder) {
 // encodeFields encodes fields.
 func (s *FlowStepChallenge) encodeFields(e *jx.Encoder) {
 	{
-		if s.Type.Set {
-			e.FieldStart("type")
-			s.Type.Encode(e)
+		if s.Method.Set {
+			e.FieldStart("method")
+			s.Method.Encode(e)
 		}
 	}
 	{
@@ -6612,7 +6612,7 @@ func (s *FlowStepChallenge) encodeFields(e *jx.Encoder) {
 }
 
 var jsonFieldsNameOfFlowStepChallenge = [3]string{
-	0: "type",
+	0: "method",
 	1: "challenge_id",
 	2: "options",
 }
@@ -6625,15 +6625,15 @@ func (s *FlowStepChallenge) Decode(d *jx.Decoder) error {
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
-		case "type":
+		case "method":
 			if err := func() error {
-				s.Type.Reset()
-				if err := s.Type.Decode(d); err != nil {
+				s.Method.Reset()
+				if err := s.Method.Decode(d); err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"type\"")
+				return errors.Wrap(err, "decode field \"method\"")
 			}
 		case "challenge_id":
 			if err := func() error {
@@ -6675,6 +6675,44 @@ func (s *FlowStepChallenge) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *FlowStepChallenge) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes FlowStepChallengeMethod as json.
+func (s FlowStepChallengeMethod) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes FlowStepChallengeMethod from json.
+func (s *FlowStepChallengeMethod) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode FlowStepChallengeMethod to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch FlowStepChallengeMethod(v) {
+	case FlowStepChallengeMethodPasskey:
+		*s = FlowStepChallengeMethodPasskey
+	default:
+		*s = FlowStepChallengeMethod(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s FlowStepChallengeMethod) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *FlowStepChallengeMethod) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -6733,44 +6771,6 @@ func (s FlowStepChallengeOptions) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *FlowStepChallengeOptions) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes FlowStepChallengeType as json.
-func (s FlowStepChallengeType) Encode(e *jx.Encoder) {
-	e.Str(string(s))
-}
-
-// Decode decodes FlowStepChallengeType from json.
-func (s *FlowStepChallengeType) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode FlowStepChallengeType to nil")
-	}
-	v, err := d.StrBytes()
-	if err != nil {
-		return err
-	}
-	// Try to use constant string.
-	switch FlowStepChallengeType(v) {
-	case FlowStepChallengeTypePasskey:
-		*s = FlowStepChallengeTypePasskey
-	default:
-		*s = FlowStepChallengeType(v)
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s FlowStepChallengeType) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *FlowStepChallengeType) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -12210,6 +12210,39 @@ func (s *OptFlowStepChallenge) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes FlowStepChallengeMethod as json.
+func (o OptFlowStepChallengeMethod) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	e.Str(string(o.Value))
+}
+
+// Decode decodes FlowStepChallengeMethod from json.
+func (o *OptFlowStepChallengeMethod) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptFlowStepChallengeMethod to nil")
+	}
+	o.Set = true
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptFlowStepChallengeMethod) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptFlowStepChallengeMethod) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes FlowStepChallengeOptions as json.
 func (o OptFlowStepChallengeOptions) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -12240,39 +12273,6 @@ func (s OptFlowStepChallengeOptions) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *OptFlowStepChallengeOptions) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes FlowStepChallengeType as json.
-func (o OptFlowStepChallengeType) Encode(e *jx.Encoder) {
-	if !o.Set {
-		return
-	}
-	e.Str(string(o.Value))
-}
-
-// Decode decodes FlowStepChallengeType from json.
-func (o *OptFlowStepChallengeType) Decode(d *jx.Decoder) error {
-	if o == nil {
-		return errors.New("invalid: unable to decode OptFlowStepChallengeType to nil")
-	}
-	o.Set = true
-	if err := o.Value.Decode(d); err != nil {
-		return err
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s OptFlowStepChallengeType) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *OptFlowStepChallengeType) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }

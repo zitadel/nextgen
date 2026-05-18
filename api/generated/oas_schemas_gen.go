@@ -3078,8 +3078,8 @@ func (s *FlowStepActions) init() FlowStepActions {
 // The challenge is NOT present on the initial step — it appears only after
 // the user explicitly selects a ceremony-based action.
 type FlowStepChallenge struct {
-	// Challenge type. Determines which component handles the ceremony.
-	Type OptFlowStepChallengeType `json:"type"`
+	// Challenge method. Determines which component handles the ceremony.
+	Method OptFlowStepChallengeMethod `json:"method"`
 	// Server-side challenge identifier. Included in the proof submission
 	// so the server can match the response to the original challenge.
 	ChallengeID OptString `json:"challenge_id"`
@@ -3090,9 +3090,9 @@ type FlowStepChallenge struct {
 	Options OptFlowStepChallengeOptions `json:"options"`
 }
 
-// GetType returns the value of Type.
-func (s *FlowStepChallenge) GetType() OptFlowStepChallengeType {
-	return s.Type
+// GetMethod returns the value of Method.
+func (s *FlowStepChallenge) GetMethod() OptFlowStepChallengeMethod {
+	return s.Method
 }
 
 // GetChallengeID returns the value of ChallengeID.
@@ -3105,9 +3105,9 @@ func (s *FlowStepChallenge) GetOptions() OptFlowStepChallengeOptions {
 	return s.Options
 }
 
-// SetType sets the value of Type.
-func (s *FlowStepChallenge) SetType(val OptFlowStepChallengeType) {
-	s.Type = val
+// SetMethod sets the value of Method.
+func (s *FlowStepChallenge) SetMethod(val OptFlowStepChallengeMethod) {
+	s.Method = val
 }
 
 // SetChallengeID sets the value of ChallengeID.
@@ -3118,6 +3118,41 @@ func (s *FlowStepChallenge) SetChallengeID(val OptString) {
 // SetOptions sets the value of Options.
 func (s *FlowStepChallenge) SetOptions(val OptFlowStepChallengeOptions) {
 	s.Options = val
+}
+
+// Challenge method. Determines which component handles the ceremony.
+type FlowStepChallengeMethod string
+
+const (
+	FlowStepChallengeMethodPasskey FlowStepChallengeMethod = "passkey"
+)
+
+// AllValues returns all FlowStepChallengeMethod values.
+func (FlowStepChallengeMethod) AllValues() []FlowStepChallengeMethod {
+	return []FlowStepChallengeMethod{
+		FlowStepChallengeMethodPasskey,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FlowStepChallengeMethod) MarshalText() ([]byte, error) {
+	switch s {
+	case FlowStepChallengeMethodPasskey:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FlowStepChallengeMethod) UnmarshalText(data []byte) error {
+	switch FlowStepChallengeMethod(data) {
+	case FlowStepChallengeMethodPasskey:
+		*s = FlowStepChallengeMethodPasskey
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
 }
 
 // Protocol-specific challenge options. For passkey, this is the
@@ -3133,41 +3168,6 @@ func (s *FlowStepChallengeOptions) init() FlowStepChallengeOptions {
 		*s = m
 	}
 	return m
-}
-
-// Challenge type. Determines which component handles the ceremony.
-type FlowStepChallengeType string
-
-const (
-	FlowStepChallengeTypePasskey FlowStepChallengeType = "passkey"
-)
-
-// AllValues returns all FlowStepChallengeType values.
-func (FlowStepChallengeType) AllValues() []FlowStepChallengeType {
-	return []FlowStepChallengeType{
-		FlowStepChallengeTypePasskey,
-	}
-}
-
-// MarshalText implements encoding.TextMarshaler.
-func (s FlowStepChallengeType) MarshalText() ([]byte, error) {
-	switch s {
-	case FlowStepChallengeTypePasskey:
-		return []byte(s), nil
-	default:
-		return nil, errors.Errorf("invalid value: %q", s)
-	}
-}
-
-// UnmarshalText implements encoding.TextUnmarshaler.
-func (s *FlowStepChallengeType) UnmarshalText(data []byte) error {
-	switch FlowStepChallengeType(data) {
-	case FlowStepChallengeTypePasskey:
-		*s = FlowStepChallengeTypePasskey
-		return nil
-	default:
-		return errors.Errorf("invalid value: %q", data)
-	}
 }
 
 // Present only on terminal steps. Tells the frontend what to do:
@@ -6431,6 +6431,52 @@ func (o OptFlowStepChallenge) Or(d FlowStepChallenge) FlowStepChallenge {
 	return d
 }
 
+// NewOptFlowStepChallengeMethod returns new OptFlowStepChallengeMethod with value set to v.
+func NewOptFlowStepChallengeMethod(v FlowStepChallengeMethod) OptFlowStepChallengeMethod {
+	return OptFlowStepChallengeMethod{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFlowStepChallengeMethod is optional FlowStepChallengeMethod.
+type OptFlowStepChallengeMethod struct {
+	Value FlowStepChallengeMethod
+	Set   bool
+}
+
+// IsSet returns true if OptFlowStepChallengeMethod was set.
+func (o OptFlowStepChallengeMethod) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFlowStepChallengeMethod) Reset() {
+	var v FlowStepChallengeMethod
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFlowStepChallengeMethod) SetTo(v FlowStepChallengeMethod) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFlowStepChallengeMethod) Get() (v FlowStepChallengeMethod, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFlowStepChallengeMethod) Or(d FlowStepChallengeMethod) FlowStepChallengeMethod {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptFlowStepChallengeOptions returns new OptFlowStepChallengeOptions with value set to v.
 func NewOptFlowStepChallengeOptions(v FlowStepChallengeOptions) OptFlowStepChallengeOptions {
 	return OptFlowStepChallengeOptions{
@@ -6471,52 +6517,6 @@ func (o OptFlowStepChallengeOptions) Get() (v FlowStepChallengeOptions, ok bool)
 
 // Or returns value if set, or given parameter if does not.
 func (o OptFlowStepChallengeOptions) Or(d FlowStepChallengeOptions) FlowStepChallengeOptions {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptFlowStepChallengeType returns new OptFlowStepChallengeType with value set to v.
-func NewOptFlowStepChallengeType(v FlowStepChallengeType) OptFlowStepChallengeType {
-	return OptFlowStepChallengeType{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptFlowStepChallengeType is optional FlowStepChallengeType.
-type OptFlowStepChallengeType struct {
-	Value FlowStepChallengeType
-	Set   bool
-}
-
-// IsSet returns true if OptFlowStepChallengeType was set.
-func (o OptFlowStepChallengeType) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptFlowStepChallengeType) Reset() {
-	var v FlowStepChallengeType
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptFlowStepChallengeType) SetTo(v FlowStepChallengeType) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptFlowStepChallengeType) Get() (v FlowStepChallengeType, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptFlowStepChallengeType) Or(d FlowStepChallengeType) FlowStepChallengeType {
 	if v, ok := o.Get(); ok {
 		return v
 	}

@@ -13,7 +13,7 @@ import type { AtomManifest } from "../manifest.js";
 export type ZlPasskeyResultDetail = {
   challenge_id: string;
   method: "passkey";
-  passkey: {
+  proof: {
     id: string;
     rawId: string;
     type: "public-key";
@@ -260,10 +260,10 @@ export class ZlPasskey extends LitElement {
    */
   private serializeCredential(
     credential: PublicKeyCredential,
-  ): ZlPasskeyResultDetail["passkey"] {
+  ): ZlPasskeyResultDetail["proof"] {
     const response = credential.response;
 
-    const serialized: ZlPasskeyResultDetail["passkey"] = {
+    const serialized: ZlPasskeyResultDetail["proof"] = {
       id: credential.id,
       rawId: bufferToBase64Url(credential.rawId),
       type: "public-key",
@@ -301,11 +301,11 @@ export class ZlPasskey extends LitElement {
     return serialized;
   }
 
-  private emitResult(passkey: ZlPasskeyResultDetail["passkey"]): void {
+  private emitResult(proof: ZlPasskeyResultDetail["proof"]): void {
     const detail: ZlPasskeyResultDetail = {
       challenge_id: this.challengeId,
       method: "passkey",
-      passkey,
+      proof,
     };
     this.dispatchEvent(
       new CustomEvent("zl-passkey-result", {

@@ -57,7 +57,7 @@ export const authFormTemplate = String.raw`
       {% endunless %}
     {% endfor %}
 
-    {% if challenge and challenge.type == "passkey" %}
+    {% if challenge and challenge.method == "passkey" %}
       <zl-passkey
         ceremony="{{ challenge.options.ceremony | default: 'authenticate' }}"
         challenge-id="{{ challenge.challenge_id }}"
