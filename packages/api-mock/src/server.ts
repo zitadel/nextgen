@@ -8,6 +8,7 @@
  * Custom-only routes added on top:
  *   POST   /sessions/exchange     — exchange handoff_token for session cookie
  *   POST   /logout                — clear session cookies
+ *   GET    /auth/end-session      — OIDC-style end-session, clears cookies
  *   GET    /.well-known/jwks.json — JWKS for JWT verification
  *   GET    /oauth/v2/keys         — alias for JWKS
  */
@@ -79,13 +80,25 @@ export function startMockServer(port: number): Server {
   });
 
   // ─── Logout ────────────────────────────────────────────────────────────────
-  app.post("/logout", (_req, res) => {
+  const clearSessionCookies = (res: express.Response): void => {
     res.setHeader("Set-Cookie", [
       `__nextgen_session=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
       `__nextgen_display=; Path=/; SameSite=Lax; Max-Age=0`,
       `_zflow=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
     ]);
+  };
+
+  app.post("/logout", (_req, res) => {
+    clearSessionCookies(res);
     res.json({ status: "ok" });
+  });
+
+  // OIDC-style end-session — what `<zitadel-logout>` calls via the generated
+  // `endSession()` client. Clears cookies and returns 204 No Content, matching
+  // the OpenAPI contract.
+  app.get("/auth/end-session", (_req, res) => {
+    clearSessionCookies(res);
+    res.status(204).end();
   });
 
   // ─── Flow API — reuse MSW handlers, zero duplication ──────────────────────
