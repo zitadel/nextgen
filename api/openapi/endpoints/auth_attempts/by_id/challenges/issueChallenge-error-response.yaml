@@ -5,15 +5,17 @@ content:
     schema:
       oneOf:
         - $ref: '../../../../components/schemas/errors/att-not_found.yaml'
+        - $ref: '../../../../components/schemas/errors/att-invalid_request.yaml'
         - $ref: '../../../../components/schemas/errors/att-invalid_state.yaml'
-        - $ref: '../../../../components/schemas/errors/att-not_completed.yaml'
+        - $ref: '../../../../components/schemas/errors/att-already_completed.yaml'
         - $ref: '../../../../components/schemas/errors/internal.yaml'
       discriminator:
         propertyName: code
         mapping:
           att.not_found: '../../../../components/schemas/errors/att-not_found.yaml'
+          att.invalid_request: '../../../../components/schemas/errors/att-invalid_request.yaml'
           att.invalid_state: '../../../../components/schemas/errors/att-invalid_state.yaml'
-          att.not_completed: '../../../../components/schemas/errors/att-not_completed.yaml'
+          att.already_completed: '../../../../components/schemas/errors/att-already_completed.yaml'
           internal: '../../../../components/schemas/errors/internal.yaml'
     examples:
       att.not_found:
@@ -21,16 +23,21 @@ content:
         value:
           code: att.not_found
           message: auth attempt not found
+      att.invalid_request:
+        summary: att.invalid_request
+        value:
+          code: att.invalid_request
+          message: invalid request
       att.invalid_state:
         summary: att.invalid_state
         value:
           code: att.invalid_state
           message: invalid attempt state
-      att.not_completed:
-        summary: att.not_completed
+      att.already_completed:
+        summary: att.already_completed
         value:
-          code: att.not_completed
-          message: attempt not in completed state
+          code: att.already_completed
+          message: The auth attempt is already completed and can no longer be changed.
       internal:
         summary: internal
         value:
