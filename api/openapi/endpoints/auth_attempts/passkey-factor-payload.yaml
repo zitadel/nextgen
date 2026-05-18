@@ -22,4 +22,3 @@ properties:
     type: string
     enum: [platform, cross-platform]
     description: Authenticator attachment modality
-    nullable: true
