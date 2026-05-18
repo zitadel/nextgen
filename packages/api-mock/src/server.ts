@@ -1,9 +1,10 @@
 /**
  * Standalone HTTP server for the api-mock.
  *
- * Flow routes (POST /flow, GET /flow/:id, POST /flow/:id/submit) are served
- * by reusing the existing MSW handlers via @mswjs/http-middleware — zero
- * duplication of routing logic.
+ * Flow routes (POST /flow, GET /flow/:id, POST /flow/:id/submit) and the
+ * platform CRUD routes (projects, schemas, flow_definitions, capabilities,
+ * claim) are served by reusing the existing MSW handlers via
+ * @mswjs/http-middleware — zero duplication of routing logic.
  *
  * Custom-only routes added on top:
  *   POST   /sessions/exchange     — exchange handoff_token for session cookie
@@ -11,6 +12,20 @@
  *   GET    /auth/end-session      — OIDC-style end-session, clears cookies
  *   GET    /.well-known/jwks.json — JWKS for JWT verification
  *   GET    /oauth/v2/keys         — alias for JWKS
+ *
+ * Platform routes (mounted via setupPlatformHandlers):
+ *   POST   /projects                  — create project
+ *   GET    /projects/:id              — fetch project
+ *   PUT    /projects/:id/config       — upload config
+ *   POST   /projects/:id/claim/init   — start claim (stays pending until completeMockClaim())
+ *   GET    /projects/:id/claim/status — poll claim status
+ *   POST   /schemas                   — create user schema
+ *   GET    /schemas/:id               — fetch user schema
+ *   DELETE /schemas/:id               — delete user schema
+ *   POST   /flow_definitions          — create flow definition
+ *   PATCH  /flow_definitions/:id      — update flow definition
+ *   DELETE /flow_definitions/:id      — delete flow definition
+ *   GET    /capabilities              — server capabilities
  */
 import { type Server } from "node:http";
 
@@ -19,6 +34,7 @@ import { createMiddleware } from "@mswjs/http-middleware";
 
 import { JWK, signSessionToken, verifyHandoffToken } from "./crypto.js";
 import { setupMockHandlers } from "./handlers.js";
+import { setupPlatformHandlers } from "./platform-handlers.js";
 
 export function startMockServer(port: number): Server {
   const iss = `http://localhost:${port}`;
@@ -101,8 +117,13 @@ export function startMockServer(port: number): Server {
     res.status(204).end();
   });
 
-  // ─── Flow API — reuse MSW handlers, zero duplication ──────────────────────
-  app.use(createMiddleware(...setupMockHandlers({ iss }).handlers));
+  // ─── Flow API + Platform API — reuse MSW handlers, zero duplication ──────
+  app.use(
+    createMiddleware(
+      ...setupMockHandlers({ iss }).handlers,
+      ...setupPlatformHandlers(),
+    ),
+  );
 
   return app.listen(port, () => {
     console.log(`\napi-mock server listening on http://localhost:${port}`);

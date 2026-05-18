@@ -1,8 +1,21 @@
 /**
  * MSW handlers for the Zitadel platform API used by the CLI.
  *
- * Covers: /projects, /schemas, /flow_definitions, /capabilities,
- * /projects/:id/claim/init, /projects/:id/claim/status.
+ * Covers (in sync with `api/openapi/openapi-spec.yaml` on main):
+ *   - POST   /projects
+ *   - GET    /projects/:id
+ *   - PUT    /projects/:id/config   (CLI-only, no spec yet)
+ *   - POST   /projects/:id/claim/init   (CLI-only, no spec yet)
+ *   - GET    /projects/:id/claim/status (CLI-only, no spec yet)
+ *   - POST   /schemas
+ *   - GET    /schemas/:id
+ *   - DELETE /schemas/:id           (no spec — CLI never deletes schemas today)
+ *   - POST   /flow_definitions      (returns flow-definition-detail-response)
+ *   - GET    /flow_definitions      (list)
+ *   - GET    /flow_definitions/:id
+ *   - PATCH  /flow_definitions/:id  (returns 200 + flow-definition-detail-response)
+ *   - DELETE /flow_definitions/:id  (returns 204)
+ *   - GET    /capabilities          (CLI-only, no spec yet)
  *
  * Usage (Node / vitest):
  *
@@ -39,10 +52,24 @@ type Project = {
 
 type ClaimState = "pending" | "claimed" | "expired";
 
+/**
+ * Server-side metadata wrapped around the flow body so the mock can answer
+ * `flow-definition-detail-response` per the OpenAPI contract.
+ */
+type FlowDefinitionRecord = {
+  id: string;
+  projectId: string;
+  schemaUri: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  body: Record<string, unknown>;
+};
+
 type Store = {
   projects: Map<string, Project>;
   schemas: Map<string, object>;
-  flowDefinitions: Map<string, object>;
+  flowDefinitions: Map<string, FlowDefinitionRecord>;
   claimState: ClaimState;
 };
 
@@ -52,6 +79,25 @@ function makeStore(): Store {
     schemas: new Map(),
     flowDefinitions: new Map(),
     claimState: "pending",
+  };
+}
+
+const DEFAULT_SCHEMA_URI =
+  "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/components/flows/flow-definition.yaml";
+
+/**
+ * Build a `flow-definition-detail-response` envelope around a stored body, as
+ * specified by `api/openapi/components/flows/flow-definition-detail-response.yaml`.
+ */
+function flowDetailResponse(r: FlowDefinitionRecord): Record<string, unknown> {
+  return {
+    id: r.id,
+    project_id: r.projectId,
+    schema_uri: r.schemaUri,
+    status: r.status,
+    created_at: r.createdAt,
+    updated_at: r.updatedAt,
+    ...r.body,
   };
 }
 
@@ -191,20 +237,68 @@ export function setupPlatformHandlers() {
     }),
 
     // POST /flow_definitions
+    //
+    // Spec: requestBody is the `flow-definition-create-request` envelope
+    // (`{ project_id, schema_uri?, flow_definition }`). The mock accepts both
+    // that and a bare flow-definition body for backwards-compatibility while
+    // the CLI still POSTs the bare body. When the CLI is updated to send the
+    // envelope, the bare-body branch becomes dead.
     http.post("*/flow_definitions", async ({ request }) => {
-      const body = (await request.json()) as object;
+      const raw = (await request.json()) as Record<string, unknown>;
+      const looksLikeEnvelope =
+        raw &&
+        typeof raw === "object" &&
+        "flow_definition" in raw &&
+        typeof raw.flow_definition === "object";
+      const projectId = looksLikeEnvelope ? String(raw.project_id ?? "proj_mock") : "proj_mock";
+      const schemaUri = looksLikeEnvelope
+        ? String(raw.schema_uri ?? DEFAULT_SCHEMA_URI)
+        : DEFAULT_SCHEMA_URI;
+      const body = (looksLikeEnvelope ? raw.flow_definition : raw) as Record<string, unknown>;
+
       const id = `flow_${shortId()}`;
-      store.flowDefinitions.set(id, body);
-      return HttpResponse.json({ id }, { status: 201 });
+      const now = nowIso();
+      const record: FlowDefinitionRecord = {
+        id,
+        projectId,
+        schemaUri,
+        status: "active",
+        createdAt: now,
+        updatedAt: now,
+        body,
+      };
+      store.flowDefinitions.set(id, record);
+      return HttpResponse.json(flowDetailResponse(record), { status: 201 });
+    }),
+
+    // GET /flow_definitions (list)
+    http.get("*/flow_definitions", () => {
+      return HttpResponse.json({
+        flow_definitions: Array.from(store.flowDefinitions.values()).map(flowDetailResponse),
+      });
+    }),
+
+    // GET /flow_definitions/:id
+    http.get("*/flow_definitions/:id", ({ params }) => {
+      const record = store.flowDefinitions.get(params.id as string);
+      if (!record) return HttpResponse.json({ error: "not_found" }, { status: 404 });
+      return HttpResponse.json(flowDetailResponse(record));
     }),
 
     // PATCH /flow_definitions/:id
+    //
+    // Spec: partial update — only supplied fields are replaced; arrays/objects
+    // are replaced atomically when supplied. The mock merges top-level keys
+    // shallowly (sufficient for the CLI's "send full body" pattern and good
+    // enough for partial spec-correct patches). Returns 200 + detail response
+    // per `flow-definition-detail-response`.
     http.patch("*/flow_definitions/:id", async ({ params, request }) => {
-      if (!store.flowDefinitions.has(params.id as string))
-        return HttpResponse.json({ error: "not_found" }, { status: 404 });
-      const body = (await request.json()) as object;
-      store.flowDefinitions.set(params.id as string, body);
-      return new HttpResponse(null, { status: 204 });
+      const record = store.flowDefinitions.get(params.id as string);
+      if (!record) return HttpResponse.json({ error: "not_found" }, { status: 404 });
+      const patch = (await request.json()) as Record<string, unknown>;
+      record.body = { ...record.body, ...patch };
+      record.updatedAt = nowIso();
+      return HttpResponse.json(flowDetailResponse(record), { status: 200 });
     }),
 
     // DELETE /flow_definitions/:id
