@@ -223,6 +223,23 @@ func (e FlowFieldValidationErrors) Error() string {
 // the resolver surfaces for any [FlowFieldChallengeIdentifier] field.
 const FlowImplicitOutcomeUserNotFound = "user_not_found"
 
+// implicitOutcomesByChallenge lists the transition outcomes a field
+// contributes by virtue of its [FlowFieldChallenge]. New mappings
+// (e.g. a future challenge that also implies an outcome) land here as
+// additional entries.
+var implicitOutcomesByChallenge = map[FlowFieldChallenge][]string{
+	FlowFieldChallengeIdentifier: {FlowImplicitOutcomeUserNotFound},
+}
+
+// ImplicitOutcomesForChallenge returns the transition outcomes a field
+// contributes by virtue of its challenge. Returns nil when the
+// challenge implies no outcomes. Resolvers call it to populate
+// [FlowResolvedFields.ImplicitOutcomes]; the state machine calls it to
+// validate flow definitions against schema-implied outcomes.
+func ImplicitOutcomesForChallenge(c FlowFieldChallenge) []string {
+	return implicitOutcomesByChallenge[c]
+}
+
 // ErrFlowFieldUnknown is returned by [FlowFieldResolver.Resolve] when a
 // requested field name is not part of the resolver's schema or catalog.
 var ErrFlowFieldUnknown = errors.New("flow field: not in resolver catalog")

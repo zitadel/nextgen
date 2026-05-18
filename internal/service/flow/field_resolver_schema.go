@@ -48,14 +48,6 @@ func NewSchemaFieldResolver(schemas SchemaResolver) *SchemaFieldResolver {
 
 var _ domain.FlowFieldResolver = (*SchemaFieldResolver)(nil)
 
-// implicitOutcomesByChallenge lists the transition outcomes a field
-// contributes by virtue of its [domain.FlowFieldChallenge]. New
-// mappings (e.g. a future challenge that also implies an outcome)
-// land here as additional entries — no branching in [Resolve].
-var implicitOutcomesByChallenge = map[domain.FlowFieldChallenge][]string{
-	domain.FlowFieldChallengeIdentifier: {domain.FlowImplicitOutcomeUserNotFound},
-}
-
 func (r *SchemaFieldResolver) Resolve(
 	ctx context.Context,
 	client database.QueryExecutor,
@@ -81,7 +73,7 @@ func (r *SchemaFieldResolver) Resolve(
 		}
 		field := buildFlowField(name, propSchema, required, passwordEnabled)
 		fields[name] = field
-		if outcomes := implicitOutcomesByChallenge[field.Challenge]; len(outcomes) > 0 {
+		if outcomes := domain.ImplicitOutcomesForChallenge(field.Challenge); len(outcomes) > 0 {
 			implicit[name] = append(implicit[name], outcomes...)
 		}
 	}
