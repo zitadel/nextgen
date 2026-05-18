@@ -1,22 +1,22 @@
+import type { CreateFlow201Step } from "@zitadel-nextgen/api/generated/model";
 import { describe, expect, it } from "vitest";
 
 import { mandatoryGatesMarkerComment, patchMandatoryGates } from "./mandatory-gates.js";
-import type { FlowStep } from "./types.js";
 
 const locale: Record<string, string> = {
   "identifier.field.email": "Email address",
   "submit.continue": "Continue",
 };
 
-const step: FlowStep = {
+const step: CreateFlow201Step = {
   name: "identifier",
-  type: "identifier",
   fields: {
     email: { type: "email", text_key: "identifier.field.email", required: true },
   },
   actions: {
     submit: { text_key: "submit.continue", primary: true },
   },
+  gates: {},
 };
 
 describe("patchMandatoryGates", () => {
@@ -58,7 +58,7 @@ describe("patchMandatoryGates", () => {
   });
 
   it("escapes attribute values in injected fields so the payload can't break out", () => {
-    const malicious: FlowStep = {
+    const malicious: CreateFlow201Step = {
       ...step,
       fields: {
         '"><script>': {

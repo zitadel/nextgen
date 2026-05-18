@@ -1,0 +1,8 @@
+type: object
+properties:
+  previewOrigins:
+    type: array
+    items:
+      type: string
+    description: |
+      Origins which are allowed for previewing and testing the project.

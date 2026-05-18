@@ -18,6 +18,12 @@
   "references": [
     {
       "path": "../../packages/components/tsconfig.lib.json"
+    },
+    {
+      "path": "../../packages/api-mock/tsconfig.lib.json"
+    },
+    {
+      "path": "../../packages/api/tsconfig.lib.json"
     }
   ]
 }

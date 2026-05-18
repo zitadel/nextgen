@@ -15,6 +15,7 @@ import { defineConfig } from "vitest/config";
  * `pnpm test:browser` runs the browser project. `pnpm test:all` runs both.
  */
 export default defineConfig({
+  resolve: { conditions: ["@zitadel-nextgen/source"] },
   test: {
     name: "@zitadel-nextgen/components",
     watch: false,
