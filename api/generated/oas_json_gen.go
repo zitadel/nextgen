@@ -4,6 +4,7 @@ package api
 
 import (
 	"math/bits"
+	"net/url"
 	"strconv"
 	"time"
 
@@ -2098,44 +2099,8 @@ func (s ChallengeResponsePayload) encodeFields(e *jx.Encoder) {
 		{
 			s := s.PasskeyChallengePayload
 			{
-				e.FieldStart("challenge")
-				e.Str(s.Challenge)
-			}
-			{
-				if s.AllowedCredentials != nil {
-					e.FieldStart("allowed_credentials")
-					e.ArrStart()
-					for _, elem := range s.AllowedCredentials {
-						elem.Encode(e)
-					}
-					e.ArrEnd()
-				}
-			}
-			{
-				if s.UserVerification.Set {
-					e.FieldStart("user_verification")
-					s.UserVerification.Encode(e)
-				}
-			}
-			{
-				if s.RpID.Set {
-					e.FieldStart("rp_id")
-					s.RpID.Encode(e)
-				}
-			}
-		}
-	case IdpChallengePayloadChallengeResponsePayload:
-		e.FieldStart("method")
-		e.Str("idp")
-		{
-			s := s.IdpChallengePayload
-			{
-				e.FieldStart("authorization_url")
-				json.EncodeURI(e, s.AuthorizationURL)
-			}
-			{
-				e.FieldStart("provider_id")
-				e.Str(s.ProviderID)
+				e.FieldStart("public_key")
+				s.PublicKey.Encode(e)
 			}
 		}
 	}
@@ -2173,9 +2138,6 @@ func (s *ChallengeResponsePayload) Decode(d *jx.Decoder) error {
 				case "passkey":
 					s.Type = PasskeyChallengePayloadChallengeResponsePayload
 					found = true
-				case "idp":
-					s.Type = IdpChallengePayloadChallengeResponsePayload
-					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
 				}
@@ -2200,10 +2162,6 @@ func (s *ChallengeResponsePayload) Decode(d *jx.Decoder) error {
 		}
 	case PasskeyChallengePayloadChallengeResponsePayload:
 		if err := s.PasskeyChallengePayload.Decode(d); err != nil {
-			return err
-		}
-	case IdpChallengePayloadChallengeResponsePayload:
-		if err := s.IdpChallengePayload.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -2451,26 +2409,6 @@ func (s CompletedFactorPayload) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case IdpFactorPayloadCompletedFactorPayload:
-		e.FieldStart("method")
-		e.Str("idp")
-		{
-			s := s.IdpFactorPayload
-			{
-				e.FieldStart("provider_id")
-				e.Str(s.ProviderID)
-			}
-			{
-				e.FieldStart("external_user_id")
-				e.Str(s.ExternalUserID)
-			}
-			{
-				if s.Email.Set {
-					e.FieldStart("email")
-					s.Email.Encode(e)
-				}
-			}
-		}
 	}
 }
 
@@ -2506,9 +2444,6 @@ func (s *CompletedFactorPayload) Decode(d *jx.Decoder) error {
 				case "passkey":
 					s.Type = PasskeyFactorPayloadCompletedFactorPayload
 					found = true
-				case "idp":
-					s.Type = IdpFactorPayloadCompletedFactorPayload
-					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
 				}
@@ -2533,10 +2468,6 @@ func (s *CompletedFactorPayload) Decode(d *jx.Decoder) error {
 		}
 	case PasskeyFactorPayloadCompletedFactorPayload:
 		if err := s.PasskeyFactorPayload.Decode(d); err != nil {
-			return err
-		}
-	case IdpFactorPayloadCompletedFactorPayload:
-		if err := s.IdpFactorPayload.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -4095,8 +4026,6 @@ func (s *FactorMethod) Decode(d *jx.Decoder) error {
 		*s = FactorMethodPassword
 	case FactorMethodPasskey:
 		*s = FactorMethodPasskey
-	case FactorMethodIdp:
-		*s = FactorMethodIdp
 	default:
 		*s = FactorMethod(v)
 	}
@@ -6758,456 +6687,6 @@ func (s *IdentifierProof) UnmarshalJSON(data []byte) error {
 }
 
 // Encode implements json.Marshaler.
-func (s *IdpChallengePayload) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-// encodeFields encodes fields.
-func (s *IdpChallengePayload) encodeFields(e *jx.Encoder) {
-	{
-		e.FieldStart("authorization_url")
-		json.EncodeURI(e, s.AuthorizationURL)
-	}
-	{
-		e.FieldStart("provider_id")
-		e.Str(s.ProviderID)
-	}
-}
-
-var jsonFieldsNameOfIdpChallengePayload = [2]string{
-	0: "authorization_url",
-	1: "provider_id",
-}
-
-// Decode decodes IdpChallengePayload from json.
-func (s *IdpChallengePayload) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode IdpChallengePayload to nil")
-	}
-	var requiredBitSet [1]uint8
-
-	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		switch string(k) {
-		case "authorization_url":
-			requiredBitSet[0] |= 1 << 0
-			if err := func() error {
-				v, err := json.DecodeURI(d)
-				s.AuthorizationURL = v
-				if err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"authorization_url\"")
-			}
-		case "provider_id":
-			requiredBitSet[0] |= 1 << 1
-			if err := func() error {
-				v, err := d.Str()
-				s.ProviderID = string(v)
-				if err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"provider_id\"")
-			}
-		default:
-			return d.Skip()
-		}
-		return nil
-	}); err != nil {
-		return errors.Wrap(err, "decode IdpChallengePayload")
-	}
-	// Validate required fields.
-	var failures []validate.FieldError
-	for i, mask := range [1]uint8{
-		0b00000011,
-	} {
-		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
-			// Mask only required fields and check equality to mask using XOR.
-			//
-			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
-			// Bits of fields which would be set are actually bits of missed fields.
-			missed := bits.OnesCount8(result)
-			for bitN := 0; bitN < missed; bitN++ {
-				bitIdx := bits.TrailingZeros8(result)
-				fieldIdx := i*8 + bitIdx
-				var name string
-				if fieldIdx < len(jsonFieldsNameOfIdpChallengePayload) {
-					name = jsonFieldsNameOfIdpChallengePayload[fieldIdx]
-				} else {
-					name = strconv.Itoa(fieldIdx)
-				}
-				failures = append(failures, validate.FieldError{
-					Name:  name,
-					Error: validate.ErrFieldRequired,
-				})
-				// Reset bit.
-				result &^= 1 << bitIdx
-			}
-		}
-	}
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *IdpChallengePayload) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *IdpChallengePayload) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode implements json.Marshaler.
-func (s *IdpFactorPayload) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-// encodeFields encodes fields.
-func (s *IdpFactorPayload) encodeFields(e *jx.Encoder) {
-	{
-		e.FieldStart("provider_id")
-		e.Str(s.ProviderID)
-	}
-	{
-		e.FieldStart("external_user_id")
-		e.Str(s.ExternalUserID)
-	}
-	{
-		if s.Email.Set {
-			e.FieldStart("email")
-			s.Email.Encode(e)
-		}
-	}
-}
-
-var jsonFieldsNameOfIdpFactorPayload = [3]string{
-	0: "provider_id",
-	1: "external_user_id",
-	2: "email",
-}
-
-// Decode decodes IdpFactorPayload from json.
-func (s *IdpFactorPayload) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode IdpFactorPayload to nil")
-	}
-	var requiredBitSet [1]uint8
-
-	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		switch string(k) {
-		case "provider_id":
-			requiredBitSet[0] |= 1 << 0
-			if err := func() error {
-				v, err := d.Str()
-				s.ProviderID = string(v)
-				if err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"provider_id\"")
-			}
-		case "external_user_id":
-			requiredBitSet[0] |= 1 << 1
-			if err := func() error {
-				v, err := d.Str()
-				s.ExternalUserID = string(v)
-				if err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"external_user_id\"")
-			}
-		case "email":
-			if err := func() error {
-				s.Email.Reset()
-				if err := s.Email.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"email\"")
-			}
-		default:
-			return d.Skip()
-		}
-		return nil
-	}); err != nil {
-		return errors.Wrap(err, "decode IdpFactorPayload")
-	}
-	// Validate required fields.
-	var failures []validate.FieldError
-	for i, mask := range [1]uint8{
-		0b00000011,
-	} {
-		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
-			// Mask only required fields and check equality to mask using XOR.
-			//
-			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
-			// Bits of fields which would be set are actually bits of missed fields.
-			missed := bits.OnesCount8(result)
-			for bitN := 0; bitN < missed; bitN++ {
-				bitIdx := bits.TrailingZeros8(result)
-				fieldIdx := i*8 + bitIdx
-				var name string
-				if fieldIdx < len(jsonFieldsNameOfIdpFactorPayload) {
-					name = jsonFieldsNameOfIdpFactorPayload[fieldIdx]
-				} else {
-					name = strconv.Itoa(fieldIdx)
-				}
-				failures = append(failures, validate.FieldError{
-					Name:  name,
-					Error: validate.ErrFieldRequired,
-				})
-				// Reset bit.
-				result &^= 1 << bitIdx
-			}
-		}
-	}
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *IdpFactorPayload) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *IdpFactorPayload) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode implements json.Marshaler.
-func (s *IdpProof) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-// encodeFields encodes fields.
-func (s *IdpProof) encodeFields(e *jx.Encoder) {
-	{
-		e.FieldStart("idp_assertion")
-		s.IdpAssertion.Encode(e)
-	}
-}
-
-var jsonFieldsNameOfIdpProof = [1]string{
-	0: "idp_assertion",
-}
-
-// Decode decodes IdpProof from json.
-func (s *IdpProof) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode IdpProof to nil")
-	}
-	var requiredBitSet [1]uint8
-
-	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		switch string(k) {
-		case "idp_assertion":
-			requiredBitSet[0] |= 1 << 0
-			if err := func() error {
-				if err := s.IdpAssertion.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"idp_assertion\"")
-			}
-		default:
-			return errors.Errorf("unexpected field %q", k)
-		}
-		return nil
-	}); err != nil {
-		return errors.Wrap(err, "decode IdpProof")
-	}
-	// Validate required fields.
-	var failures []validate.FieldError
-	for i, mask := range [1]uint8{
-		0b00000001,
-	} {
-		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
-			// Mask only required fields and check equality to mask using XOR.
-			//
-			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
-			// Bits of fields which would be set are actually bits of missed fields.
-			missed := bits.OnesCount8(result)
-			for bitN := 0; bitN < missed; bitN++ {
-				bitIdx := bits.TrailingZeros8(result)
-				fieldIdx := i*8 + bitIdx
-				var name string
-				if fieldIdx < len(jsonFieldsNameOfIdpProof) {
-					name = jsonFieldsNameOfIdpProof[fieldIdx]
-				} else {
-					name = strconv.Itoa(fieldIdx)
-				}
-				failures = append(failures, validate.FieldError{
-					Name:  name,
-					Error: validate.ErrFieldRequired,
-				})
-				// Reset bit.
-				result &^= 1 << bitIdx
-			}
-		}
-	}
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *IdpProof) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *IdpProof) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode implements json.Marshaler.
-func (s *IdpProofIdpAssertion) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-// encodeFields encodes fields.
-func (s *IdpProofIdpAssertion) encodeFields(e *jx.Encoder) {
-	{
-		e.FieldStart("code")
-		e.Str(s.Code)
-	}
-	{
-		if s.State.Set {
-			e.FieldStart("state")
-			s.State.Encode(e)
-		}
-	}
-}
-
-var jsonFieldsNameOfIdpProofIdpAssertion = [2]string{
-	0: "code",
-	1: "state",
-}
-
-// Decode decodes IdpProofIdpAssertion from json.
-func (s *IdpProofIdpAssertion) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode IdpProofIdpAssertion to nil")
-	}
-	var requiredBitSet [1]uint8
-
-	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		switch string(k) {
-		case "code":
-			requiredBitSet[0] |= 1 << 0
-			if err := func() error {
-				v, err := d.Str()
-				s.Code = string(v)
-				if err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"code\"")
-			}
-		case "state":
-			if err := func() error {
-				s.State.Reset()
-				if err := s.State.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"state\"")
-			}
-		default:
-			return d.Skip()
-		}
-		return nil
-	}); err != nil {
-		return errors.Wrap(err, "decode IdpProofIdpAssertion")
-	}
-	// Validate required fields.
-	var failures []validate.FieldError
-	for i, mask := range [1]uint8{
-		0b00000001,
-	} {
-		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
-			// Mask only required fields and check equality to mask using XOR.
-			//
-			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
-			// Bits of fields which would be set are actually bits of missed fields.
-			missed := bits.OnesCount8(result)
-			for bitN := 0; bitN < missed; bitN++ {
-				bitIdx := bits.TrailingZeros8(result)
-				fieldIdx := i*8 + bitIdx
-				var name string
-				if fieldIdx < len(jsonFieldsNameOfIdpProofIdpAssertion) {
-					name = jsonFieldsNameOfIdpProofIdpAssertion[fieldIdx]
-				} else {
-					name = strconv.Itoa(fieldIdx)
-				}
-				failures = append(failures, validate.FieldError{
-					Name:  name,
-					Error: validate.ErrFieldRequired,
-				})
-				// Reset bit.
-				result &^= 1 << bitIdx
-			}
-		}
-	}
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *IdpProofIdpAssertion) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *IdpProofIdpAssertion) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode implements json.Marshaler.
 func (s *Internal) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
@@ -7847,18 +7326,11 @@ func (s *IssueChallengeRequest) encodeFields(e *jx.Encoder) {
 			s.PasskeyOptions.Encode(e)
 		}
 	}
-	{
-		if s.IdpProvider.Set {
-			e.FieldStart("idp_provider")
-			s.IdpProvider.Encode(e)
-		}
-	}
 }
 
-var jsonFieldsNameOfIssueChallengeRequest = [3]string{
+var jsonFieldsNameOfIssueChallengeRequest = [2]string{
 	0: "method",
 	1: "passkey_options",
-	2: "idp_provider",
 }
 
 // Decode decodes IssueChallengeRequest from json.
@@ -7889,16 +7361,6 @@ func (s *IssueChallengeRequest) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"passkey_options\"")
-			}
-		case "idp_provider":
-			if err := func() error {
-				s.IdpProvider.Reset()
-				if err := s.IdpProvider.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"idp_provider\"")
 			}
 		default:
 			return errors.Errorf("unexpected field %q", k)
@@ -7966,15 +7428,33 @@ func (s *IssueChallengeRequestPasskeyOptions) Encode(e *jx.Encoder) {
 // encodeFields encodes fields.
 func (s *IssueChallengeRequestPasskeyOptions) encodeFields(e *jx.Encoder) {
 	{
+		if s.RpID.Set {
+			e.FieldStart("rp_id")
+			s.RpID.Encode(e)
+		}
+	}
+	{
+		if s.RpOrigins != nil {
+			e.FieldStart("rp_origins")
+			e.ArrStart()
+			for _, elem := range s.RpOrigins {
+				json.EncodeURI(e, elem)
+			}
+			e.ArrEnd()
+		}
+	}
+	{
 		if s.UserVerification.Set {
-			e.FieldStart("userVerification")
+			e.FieldStart("user_verification")
 			s.UserVerification.Encode(e)
 		}
 	}
 }
 
-var jsonFieldsNameOfIssueChallengeRequestPasskeyOptions = [1]string{
-	0: "userVerification",
+var jsonFieldsNameOfIssueChallengeRequestPasskeyOptions = [3]string{
+	0: "rp_id",
+	1: "rp_origins",
+	2: "user_verification",
 }
 
 // Decode decodes IssueChallengeRequestPasskeyOptions from json.
@@ -7985,7 +7465,36 @@ func (s *IssueChallengeRequestPasskeyOptions) Decode(d *jx.Decoder) error {
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
-		case "userVerification":
+		case "rp_id":
+			if err := func() error {
+				s.RpID.Reset()
+				if err := s.RpID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"rp_id\"")
+			}
+		case "rp_origins":
+			if err := func() error {
+				s.RpOrigins = make([]url.URL, 0)
+				if err := d.Arr(func(d *jx.Decoder) error {
+					var elem url.URL
+					v, err := json.DecodeURI(d)
+					elem = v
+					if err != nil {
+						return err
+					}
+					s.RpOrigins = append(s.RpOrigins, elem)
+					return nil
+				}); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"rp_origins\"")
+			}
+		case "user_verification":
 			if err := func() error {
 				s.UserVerification.Reset()
 				if err := s.UserVerification.Decode(d); err != nil {
@@ -7993,7 +7502,7 @@ func (s *IssueChallengeRequestPasskeyOptions) Decode(d *jx.Decoder) error {
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"userVerification\"")
+				return errors.Wrap(err, "decode field \"user_verification\"")
 			}
 		default:
 			return errors.Errorf("unexpected field %q", k)
@@ -11176,18 +10685,18 @@ func (s *OptNilUserID) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes PasskeyChallengePayloadUserVerification as json.
-func (o OptPasskeyChallengePayloadUserVerification) Encode(e *jx.Encoder) {
+// Encode encodes PasskeyChallengePayloadPublicKeyUserVerification as json.
+func (o OptPasskeyChallengePayloadPublicKeyUserVerification) Encode(e *jx.Encoder) {
 	if !o.Set {
 		return
 	}
 	e.Str(string(o.Value))
 }
 
-// Decode decodes PasskeyChallengePayloadUserVerification from json.
-func (o *OptPasskeyChallengePayloadUserVerification) Decode(d *jx.Decoder) error {
+// Decode decodes PasskeyChallengePayloadPublicKeyUserVerification from json.
+func (o *OptPasskeyChallengePayloadPublicKeyUserVerification) Decode(d *jx.Decoder) error {
 	if o == nil {
-		return errors.New("invalid: unable to decode OptPasskeyChallengePayloadUserVerification to nil")
+		return errors.New("invalid: unable to decode OptPasskeyChallengePayloadPublicKeyUserVerification to nil")
 	}
 	o.Set = true
 	if err := o.Value.Decode(d); err != nil {
@@ -11197,14 +10706,14 @@ func (o *OptPasskeyChallengePayloadUserVerification) Decode(d *jx.Decoder) error
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s OptPasskeyChallengePayloadUserVerification) MarshalJSON() ([]byte, error) {
+func (s OptPasskeyChallengePayloadPublicKeyUserVerification) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *OptPasskeyChallengePayloadUserVerification) UnmarshalJSON(data []byte) error {
+func (s *OptPasskeyChallengePayloadPublicKeyUserVerification) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -11428,38 +10937,13 @@ func (s *PasskeyChallengePayload) Encode(e *jx.Encoder) {
 // encodeFields encodes fields.
 func (s *PasskeyChallengePayload) encodeFields(e *jx.Encoder) {
 	{
-		e.FieldStart("challenge")
-		e.Str(s.Challenge)
-	}
-	{
-		if s.AllowedCredentials != nil {
-			e.FieldStart("allowed_credentials")
-			e.ArrStart()
-			for _, elem := range s.AllowedCredentials {
-				elem.Encode(e)
-			}
-			e.ArrEnd()
-		}
-	}
-	{
-		if s.UserVerification.Set {
-			e.FieldStart("user_verification")
-			s.UserVerification.Encode(e)
-		}
-	}
-	{
-		if s.RpID.Set {
-			e.FieldStart("rp_id")
-			s.RpID.Encode(e)
-		}
+		e.FieldStart("public_key")
+		s.PublicKey.Encode(e)
 	}
 }
 
-var jsonFieldsNameOfPasskeyChallengePayload = [4]string{
-	0: "challenge",
-	1: "allowed_credentials",
-	2: "user_verification",
-	3: "rp_id",
+var jsonFieldsNameOfPasskeyChallengePayload = [1]string{
+	0: "public_key",
 }
 
 // Decode decodes PasskeyChallengePayload from json.
@@ -11471,54 +10955,15 @@ func (s *PasskeyChallengePayload) Decode(d *jx.Decoder) error {
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
-		case "challenge":
+		case "public_key":
 			requiredBitSet[0] |= 1 << 0
 			if err := func() error {
-				v, err := d.Str()
-				s.Challenge = string(v)
-				if err != nil {
+				if err := s.PublicKey.Decode(d); err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"challenge\"")
-			}
-		case "allowed_credentials":
-			if err := func() error {
-				s.AllowedCredentials = make([]PasskeyChallengePayloadAllowedCredentialsItem, 0)
-				if err := d.Arr(func(d *jx.Decoder) error {
-					var elem PasskeyChallengePayloadAllowedCredentialsItem
-					if err := elem.Decode(d); err != nil {
-						return err
-					}
-					s.AllowedCredentials = append(s.AllowedCredentials, elem)
-					return nil
-				}); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"allowed_credentials\"")
-			}
-		case "user_verification":
-			if err := func() error {
-				s.UserVerification.Reset()
-				if err := s.UserVerification.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"user_verification\"")
-			}
-		case "rp_id":
-			if err := func() error {
-				s.RpID.Reset()
-				if err := s.RpID.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"rp_id\"")
+				return errors.Wrap(err, "decode field \"public_key\"")
 			}
 		default:
 			return d.Skip()
@@ -11577,14 +11022,172 @@ func (s *PasskeyChallengePayload) UnmarshalJSON(data []byte) error {
 }
 
 // Encode implements json.Marshaler.
-func (s *PasskeyChallengePayloadAllowedCredentialsItem) Encode(e *jx.Encoder) {
+func (s *PasskeyChallengePayloadPublicKey) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
 	e.ObjEnd()
 }
 
 // encodeFields encodes fields.
-func (s *PasskeyChallengePayloadAllowedCredentialsItem) encodeFields(e *jx.Encoder) {
+func (s *PasskeyChallengePayloadPublicKey) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("challenge")
+		e.Str(s.Challenge)
+	}
+	{
+		if s.AllowedCredentials != nil {
+			e.FieldStart("allowed_credentials")
+			e.ArrStart()
+			for _, elem := range s.AllowedCredentials {
+				elem.Encode(e)
+			}
+			e.ArrEnd()
+		}
+	}
+	{
+		if s.UserVerification.Set {
+			e.FieldStart("user_verification")
+			s.UserVerification.Encode(e)
+		}
+	}
+	{
+		if s.RpID.Set {
+			e.FieldStart("rp_id")
+			s.RpID.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfPasskeyChallengePayloadPublicKey = [4]string{
+	0: "challenge",
+	1: "allowed_credentials",
+	2: "user_verification",
+	3: "rp_id",
+}
+
+// Decode decodes PasskeyChallengePayloadPublicKey from json.
+func (s *PasskeyChallengePayloadPublicKey) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode PasskeyChallengePayloadPublicKey to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "challenge":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.Challenge = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"challenge\"")
+			}
+		case "allowed_credentials":
+			if err := func() error {
+				s.AllowedCredentials = make([]PasskeyChallengePayloadPublicKeyAllowedCredentialsItem, 0)
+				if err := d.Arr(func(d *jx.Decoder) error {
+					var elem PasskeyChallengePayloadPublicKeyAllowedCredentialsItem
+					if err := elem.Decode(d); err != nil {
+						return err
+					}
+					s.AllowedCredentials = append(s.AllowedCredentials, elem)
+					return nil
+				}); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"allowed_credentials\"")
+			}
+		case "user_verification":
+			if err := func() error {
+				s.UserVerification.Reset()
+				if err := s.UserVerification.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_verification\"")
+			}
+		case "rp_id":
+			if err := func() error {
+				s.RpID.Reset()
+				if err := s.RpID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"rp_id\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode PasskeyChallengePayloadPublicKey")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000001,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfPasskeyChallengePayloadPublicKey) {
+					name = jsonFieldsNameOfPasskeyChallengePayloadPublicKey[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *PasskeyChallengePayloadPublicKey) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *PasskeyChallengePayloadPublicKey) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *PasskeyChallengePayloadPublicKeyAllowedCredentialsItem) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *PasskeyChallengePayloadPublicKeyAllowedCredentialsItem) encodeFields(e *jx.Encoder) {
 	{
 		e.FieldStart("id")
 		e.Str(s.ID)
@@ -11595,15 +11198,15 @@ func (s *PasskeyChallengePayloadAllowedCredentialsItem) encodeFields(e *jx.Encod
 	}
 }
 
-var jsonFieldsNameOfPasskeyChallengePayloadAllowedCredentialsItem = [2]string{
+var jsonFieldsNameOfPasskeyChallengePayloadPublicKeyAllowedCredentialsItem = [2]string{
 	0: "id",
 	1: "type",
 }
 
-// Decode decodes PasskeyChallengePayloadAllowedCredentialsItem from json.
-func (s *PasskeyChallengePayloadAllowedCredentialsItem) Decode(d *jx.Decoder) error {
+// Decode decodes PasskeyChallengePayloadPublicKeyAllowedCredentialsItem from json.
+func (s *PasskeyChallengePayloadPublicKeyAllowedCredentialsItem) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode PasskeyChallengePayloadAllowedCredentialsItem to nil")
+		return errors.New("invalid: unable to decode PasskeyChallengePayloadPublicKeyAllowedCredentialsItem to nil")
 	}
 	var requiredBitSet [1]uint8
 
@@ -11636,7 +11239,7 @@ func (s *PasskeyChallengePayloadAllowedCredentialsItem) Decode(d *jx.Decoder) er
 		}
 		return nil
 	}); err != nil {
-		return errors.Wrap(err, "decode PasskeyChallengePayloadAllowedCredentialsItem")
+		return errors.Wrap(err, "decode PasskeyChallengePayloadPublicKeyAllowedCredentialsItem")
 	}
 	// Validate required fields.
 	var failures []validate.FieldError
@@ -11653,8 +11256,8 @@ func (s *PasskeyChallengePayloadAllowedCredentialsItem) Decode(d *jx.Decoder) er
 				bitIdx := bits.TrailingZeros8(result)
 				fieldIdx := i*8 + bitIdx
 				var name string
-				if fieldIdx < len(jsonFieldsNameOfPasskeyChallengePayloadAllowedCredentialsItem) {
-					name = jsonFieldsNameOfPasskeyChallengePayloadAllowedCredentialsItem[fieldIdx]
+				if fieldIdx < len(jsonFieldsNameOfPasskeyChallengePayloadPublicKeyAllowedCredentialsItem) {
+					name = jsonFieldsNameOfPasskeyChallengePayloadPublicKeyAllowedCredentialsItem[fieldIdx]
 				} else {
 					name = strconv.Itoa(fieldIdx)
 				}
@@ -11675,94 +11278,94 @@ func (s *PasskeyChallengePayloadAllowedCredentialsItem) Decode(d *jx.Decoder) er
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *PasskeyChallengePayloadAllowedCredentialsItem) MarshalJSON() ([]byte, error) {
+func (s *PasskeyChallengePayloadPublicKeyAllowedCredentialsItem) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *PasskeyChallengePayloadAllowedCredentialsItem) UnmarshalJSON(data []byte) error {
+func (s *PasskeyChallengePayloadPublicKeyAllowedCredentialsItem) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
 
-// Encode encodes PasskeyChallengePayloadAllowedCredentialsItemType as json.
-func (s PasskeyChallengePayloadAllowedCredentialsItemType) Encode(e *jx.Encoder) {
+// Encode encodes PasskeyChallengePayloadPublicKeyAllowedCredentialsItemType as json.
+func (s PasskeyChallengePayloadPublicKeyAllowedCredentialsItemType) Encode(e *jx.Encoder) {
 	e.Str(string(s))
 }
 
-// Decode decodes PasskeyChallengePayloadAllowedCredentialsItemType from json.
-func (s *PasskeyChallengePayloadAllowedCredentialsItemType) Decode(d *jx.Decoder) error {
+// Decode decodes PasskeyChallengePayloadPublicKeyAllowedCredentialsItemType from json.
+func (s *PasskeyChallengePayloadPublicKeyAllowedCredentialsItemType) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode PasskeyChallengePayloadAllowedCredentialsItemType to nil")
+		return errors.New("invalid: unable to decode PasskeyChallengePayloadPublicKeyAllowedCredentialsItemType to nil")
 	}
 	v, err := d.StrBytes()
 	if err != nil {
 		return err
 	}
 	// Try to use constant string.
-	switch PasskeyChallengePayloadAllowedCredentialsItemType(v) {
-	case PasskeyChallengePayloadAllowedCredentialsItemTypePublicKey:
-		*s = PasskeyChallengePayloadAllowedCredentialsItemTypePublicKey
+	switch PasskeyChallengePayloadPublicKeyAllowedCredentialsItemType(v) {
+	case PasskeyChallengePayloadPublicKeyAllowedCredentialsItemTypePublicKey:
+		*s = PasskeyChallengePayloadPublicKeyAllowedCredentialsItemTypePublicKey
 	default:
-		*s = PasskeyChallengePayloadAllowedCredentialsItemType(v)
+		*s = PasskeyChallengePayloadPublicKeyAllowedCredentialsItemType(v)
 	}
 
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s PasskeyChallengePayloadAllowedCredentialsItemType) MarshalJSON() ([]byte, error) {
+func (s PasskeyChallengePayloadPublicKeyAllowedCredentialsItemType) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *PasskeyChallengePayloadAllowedCredentialsItemType) UnmarshalJSON(data []byte) error {
+func (s *PasskeyChallengePayloadPublicKeyAllowedCredentialsItemType) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
 
-// Encode encodes PasskeyChallengePayloadUserVerification as json.
-func (s PasskeyChallengePayloadUserVerification) Encode(e *jx.Encoder) {
+// Encode encodes PasskeyChallengePayloadPublicKeyUserVerification as json.
+func (s PasskeyChallengePayloadPublicKeyUserVerification) Encode(e *jx.Encoder) {
 	e.Str(string(s))
 }
 
-// Decode decodes PasskeyChallengePayloadUserVerification from json.
-func (s *PasskeyChallengePayloadUserVerification) Decode(d *jx.Decoder) error {
+// Decode decodes PasskeyChallengePayloadPublicKeyUserVerification from json.
+func (s *PasskeyChallengePayloadPublicKeyUserVerification) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode PasskeyChallengePayloadUserVerification to nil")
+		return errors.New("invalid: unable to decode PasskeyChallengePayloadPublicKeyUserVerification to nil")
 	}
 	v, err := d.StrBytes()
 	if err != nil {
 		return err
 	}
 	// Try to use constant string.
-	switch PasskeyChallengePayloadUserVerification(v) {
-	case PasskeyChallengePayloadUserVerificationRequired:
-		*s = PasskeyChallengePayloadUserVerificationRequired
-	case PasskeyChallengePayloadUserVerificationPreferred:
-		*s = PasskeyChallengePayloadUserVerificationPreferred
-	case PasskeyChallengePayloadUserVerificationDiscouraged:
-		*s = PasskeyChallengePayloadUserVerificationDiscouraged
+	switch PasskeyChallengePayloadPublicKeyUserVerification(v) {
+	case PasskeyChallengePayloadPublicKeyUserVerificationRequired:
+		*s = PasskeyChallengePayloadPublicKeyUserVerificationRequired
+	case PasskeyChallengePayloadPublicKeyUserVerificationPreferred:
+		*s = PasskeyChallengePayloadPublicKeyUserVerificationPreferred
+	case PasskeyChallengePayloadPublicKeyUserVerificationDiscouraged:
+		*s = PasskeyChallengePayloadPublicKeyUserVerificationDiscouraged
 	default:
-		*s = PasskeyChallengePayloadUserVerification(v)
+		*s = PasskeyChallengePayloadPublicKeyUserVerification(v)
 	}
 
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s PasskeyChallengePayloadUserVerification) MarshalJSON() ([]byte, error) {
+func (s PasskeyChallengePayloadPublicKeyUserVerification) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *PasskeyChallengePayloadUserVerification) UnmarshalJSON(data []byte) error {
+func (s *PasskeyChallengePayloadPublicKeyUserVerification) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -12076,7 +11679,7 @@ func (s *PasskeyProofPasskey) Encode(e *jx.Encoder) {
 func (s *PasskeyProofPasskey) encodeFields(e *jx.Encoder) {
 	{
 		e.FieldStart("assertion")
-		e.Str(s.Assertion)
+		s.Assertion.Encode(e)
 	}
 }
 
@@ -12096,9 +11699,7 @@ func (s *PasskeyProofPasskey) Decode(d *jx.Decoder) error {
 		case "assertion":
 			requiredBitSet[0] |= 1 << 0
 			if err := func() error {
-				v, err := d.Str()
-				s.Assertion = string(v)
-				if err != nil {
+				if err := s.Assertion.Decode(d); err != nil {
 					return err
 				}
 				return nil
@@ -12157,6 +11758,64 @@ func (s *PasskeyProofPasskey) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *PasskeyProofPasskey) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s PasskeyProofPasskeyAssertion) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields implements json.Marshaler.
+func (s PasskeyProofPasskeyAssertion) encodeFields(e *jx.Encoder) {
+	for k, elem := range s {
+		e.FieldStart(k)
+
+		if len(elem) != 0 {
+			e.Raw(elem)
+		}
+	}
+}
+
+// Decode decodes PasskeyProofPasskeyAssertion from json.
+func (s *PasskeyProofPasskeyAssertion) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode PasskeyProofPasskeyAssertion to nil")
+	}
+	m := s.init()
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		var elem jx.Raw
+		if err := func() error {
+			v, err := d.RawAppend(nil)
+			elem = jx.Raw(v)
+			if err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrapf(err, "decode field %q", k)
+		}
+		m[string(k)] = elem
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode PasskeyProofPasskeyAssertion")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s PasskeyProofPasskeyAssertion) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *PasskeyProofPasskeyAssertion) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -14186,8 +13845,6 @@ func (s VerifyChallengeRequestSum) Encode(e *jx.Encoder) {
 		s.PasswordProof.Encode(e)
 	case PasskeyProofVerifyChallengeRequestSum:
 		s.PasskeyProof.Encode(e)
-	case IdpProofVerifyChallengeRequestSum:
-		s.IdpProof.Encode(e)
 	}
 }
 
@@ -14199,8 +13856,6 @@ func (s VerifyChallengeRequestSum) encodeFields(e *jx.Encoder) {
 		s.PasswordProof.encodeFields(e)
 	case PasskeyProofVerifyChallengeRequestSum:
 		s.PasskeyProof.encodeFields(e)
-	case IdpProofVerifyChallengeRequestSum:
-		s.IdpProof.encodeFields(e)
 	}
 }
 
@@ -14218,19 +13873,6 @@ func (s *VerifyChallengeRequestSum) Decode(d *jx.Decoder) error {
 	if err := d.Capture(func(d *jx.Decoder) error {
 		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
 			switch string(key) {
-			case "idp_assertion":
-				// Type-based discrimination: check if field has expected JSON type
-				if typ := d.Next(); typ != jx.Object {
-					// Field exists but has wrong type, not a match for this variant
-					return d.Skip()
-				}
-				match := IdpProofVerifyChallengeRequestSum
-				if found && s.Type != match {
-					s.Type = ""
-					return errors.Errorf("multiple oneOf matches: (%v, %v)", s.Type, match)
-				}
-				found = true
-				s.Type = match
 			case "login_name":
 				// Type-based discrimination: check if field has expected JSON type
 				if typ := d.Next(); typ != jx.String {
@@ -14290,10 +13932,6 @@ func (s *VerifyChallengeRequestSum) Decode(d *jx.Decoder) error {
 		}
 	case PasskeyProofVerifyChallengeRequestSum:
 		if err := s.PasskeyProof.Decode(d); err != nil {
-			return err
-		}
-	case IdpProofVerifyChallengeRequestSum:
-		if err := s.IdpProof.Decode(d); err != nil {
 			return err
 		}
 	default:

@@ -45,7 +45,7 @@ func (a *AuthAttempt) get(ctx context.Context, client database.QueryExecutor, qu
 	for rows.Next() {
 		found = true
 		var (
-			handoffToken          database.Null[string]
+			handoffToken          database.Null[[]byte]
 			handedOffAt           database.Null[time.Time]
 			handoffIdempotencyKey database.Null[string]
 			sessionID             database.Null[string]
@@ -63,7 +63,7 @@ func (a *AuthAttempt) get(ctx context.Context, client database.QueryExecutor, qu
 			return nil, fmt.Errorf("failed to scan auth attempt: %w", err)
 		}
 		if handoffToken.Valid {
-			attempt.HandoffToken = &handoffToken.V
+			attempt.HandoffToken = &domain.HandoffToken{EncryptedToken: handoffToken.V}
 		}
 		if handedOffAt.Valid {
 			attempt.HandedOffAt = &handedOffAt.V
@@ -229,7 +229,7 @@ func (a *AuthAttempt) Handoff(ctx context.Context, client database.QueryExecutor
 		return fmt.Errorf("failed to handoff auth attempt: handoff token is required")
 	}
 	var handedOffAt time.Time
-	err := client.QueryRow(ctx, authAttemptHandoffStmt, attempt.ProjectID, attempt.ID, *attempt.HandoffToken, idempotencyKey).
+	err := client.QueryRow(ctx, authAttemptHandoffStmt, attempt.ProjectID, attempt.ID, attempt.HandoffToken.EncryptedToken, idempotencyKey).
 		Scan(&handedOffAt)
 	if err != nil {
 		return fmt.Errorf("failed to handoff auth attempt: %w", err)
@@ -285,7 +285,7 @@ func (a *AuthAttempt) ChallengeSucceeded(ctx context.Context, client database.Qu
 		// No rows mean the challenge_id didn't match — it was re-issued or already consumed
 		return domain.ErrAuthAttemptStaleChallenge()
 	}
-	check.(domain.AuthFactor).SetLastVerifiedAt(lastVerifiedAt)
+	check.SetLastVerifiedAt(lastVerifiedAt)
 	return nil
 }
 
@@ -359,27 +359,6 @@ func newAuthChecks(
 				}
 			}
 			checks = append(checks, passkeyCheck)
-		}
-	case domain.AuthCheckTypeIdentityProvider:
-		if !verifiedAt.IsZero() {
-			identityProviderFactor := domain.NewAuthFactorIdentityProvider(verifiedAt)
-			if len(factor) > 0 {
-				err = json.Unmarshal(factor, identityProviderFactor)
-				if err != nil {
-					return nil, fmt.Errorf("failed to unmarshal identity provider auth check factor payload: %w", err)
-				}
-			}
-			checks = append(checks, identityProviderFactor)
-		}
-		if !lastChallengedAt.IsZero() {
-			identityProviderChallenge := domain.NewAuthChallengeIdentityProvider(id, lastChallengedAt, lastFailedAt, failureCount)
-			if len(challenge) > 0 {
-				err = json.Unmarshal(challenge, identityProviderChallenge)
-				if err != nil {
-					return nil, fmt.Errorf("failed to unmarshal identity provider auth check challenge payload: %w", err)
-				}
-			}
-			checks = append(checks, identityProviderChallenge)
 		}
 	default:
 		log.Println("unsupported auth check type:", checkType)

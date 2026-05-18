@@ -51,11 +51,9 @@ properties:
       - $ref: ./identifier-challenge-payload.yaml
       - $ref: ./password-challenge-payload.yaml
       - $ref: ./passkey-challenge-payload.yaml
-      - $ref: ./idp-challenge-payload.yaml
     discriminator:
       propertyName: method
       mapping:
         identifier: ./identifier-challenge-payload.yaml
         password: ./password-challenge-payload.yaml
         passkey: ./passkey-challenge-payload.yaml
-        idp: ./idp-challenge-payload.yaml

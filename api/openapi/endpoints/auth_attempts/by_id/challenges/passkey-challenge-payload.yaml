@@ -2,36 +2,44 @@ title: PasskeyChallengePayload
 type: object
 description: WebAuthn-specific challenge data for passkey authentication
 required:
-  - challenge
+  - public_key
 properties:
-  challenge:
-    type: string
-    description: Base64-encoded WebAuthn challenge
-    example: 'dGVzdGNoYWxsZW5nZQ=='
-  allowed_credentials:
-    type: array
-    description: List of credential IDs that can be used for this authentication
-    items:
-      type: object
-      required:
-        - id
-        - type
-      properties:
-        id:
-          type: string
-          description: Base64-encoded credential ID
-        type:
-          type: string
-          enum: [public-key]
-    example:
-      - id: 'Y3JlZGVudGlhbDE='
-        type: public-key
-  user_verification:
-    type: string
-    enum: [required, preferred, discouraged]
-    description: User verification requirement for this challenge
-    example: 'preferred'
-  rp_id:
-    type: string
-    description: Relying Party ID for WebAuthn
-    example: 'example.com'
+  public_key:
+    type: object
+    description: |
+      Contains the options for the Assertion Generation (dictionary PublicKeyCredentialRequestOptions).
+      See also: https://www.w3.org/TR/webauthn/#dictdef-publickeycredentialrequestoptions
+    required:
+      - challenge
+    properties:
+      challenge:
+        type: string
+        description: Base64-encoded WebAuthn challenge
+        example: 'dGVzdGNoYWxsZW5nZQ=='
+      allowed_credentials:
+        type: array
+        description: List of credential IDs that can be used for this authentication
+        items:
+          type: object
+          required:
+            - id
+            - type
+          properties:
+            id:
+              type: string
+              description: Base64-encoded credential ID
+            type:
+              type: string
+              enum: [public-key]
+        example:
+          - id: 'Y3JlZGVudGlhbDE='
+            type: public-key
+      user_verification:
+        type: string
+        enum: [required, preferred, discouraged]
+        description: User verification requirement for this challenge
+        example: 'preferred'
+      rp_id:
+        type: string
+        description: Relying Party ID for WebAuthn
+        example: 'example.com'

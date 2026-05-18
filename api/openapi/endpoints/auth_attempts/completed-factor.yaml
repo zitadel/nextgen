@@ -20,16 +20,13 @@ properties:
       - `identifier`: includes user_id
       - `password`: no additional data
       - `passkey`: includes credential details and verification flags
-      - `idp`: includes provider and external user information
     oneOf:
       - $ref: ./identifier-factor-payload.yaml
       - $ref: ./password-factor-payload.yaml
       - $ref: ./passkey-factor-payload.yaml
-      - $ref: ./idp-factor-payload.yaml
     discriminator:
       propertyName: method
       mapping:
         identifier: ./identifier-factor-payload.yaml
         password: ./password-factor-payload.yaml
         passkey: ./passkey-factor-payload.yaml
-        idp: ./idp-factor-payload.yaml

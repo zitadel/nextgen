@@ -9,4 +9,3 @@ oneOf:
   - $ref: "identifier-proof.yaml"
   - $ref: "password-proof.yaml"
   - $ref: "passkey-proof.yaml"
-  - $ref: "idp-proof.yaml"

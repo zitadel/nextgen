@@ -7,7 +7,6 @@ func NewPasskeyAuthCheckChallenge(passkeyChallenge *PasskeyChallenge) (*AuthChal
 	if err != nil {
 		return nil, err
 	}
-	// TODO: ?
 	return &AuthChallengePasskey{
 		PasskeyChallenge: passkeyChallenge,
 		authChallenge:    challenge,
@@ -16,12 +15,13 @@ func NewPasskeyAuthCheckChallenge(passkeyChallenge *PasskeyChallenge) (*AuthChal
 
 type AuthFactorPasskey struct {
 	UserVerified bool
-	*authFactor
+	UserID       string
+	authFactor
 }
 
 func NewAuthFactorPasskey(lastVerifiedAt time.Time) *AuthFactorPasskey {
 	return &AuthFactorPasskey{
-		authFactor: &authFactor{
+		authFactor: authFactor{
 			LastVerifiedAt: lastVerifiedAt,
 		},
 	}

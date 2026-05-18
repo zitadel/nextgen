@@ -19,21 +19,18 @@ properties:
     description: Optional WebAuthn ceremony options. Only relevant when `method` is `passkey`.
     additionalProperties: false
     properties:
-      userVerification:
+      rp_id:
+        type: string
+        description: Relying Party ID for WebAuthn. Optional; if not provided, the server may use a default value.
+        example: example.com
+      rp_origins:
+        type: array
+        description: List of allowed origins for this WebAuthn challenge. Optional; if not provided, the server may use a default value.
+        items:
+          type: string
+          format: uri
+        example: ['https://example.com']
+      user_verification:
         type: string
         enum: [required, preferred, discouraged]
         example: required
-  idp_provider:
-    type: string
-    description: The federated identity provider to redirect to. Required when `method` is `idp`.
-    example: google
-if:
-  properties:
-    method:
-      const: idp
-then:
-  properties:
-    idp_provider:
-      type: string
-  required:
-    - idp_provider

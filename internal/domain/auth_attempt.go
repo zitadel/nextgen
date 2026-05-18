@@ -6,13 +6,15 @@ import (
 	"time"
 
 	"github.com/muhlemmer/gu"
+	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 const (
-	PrefixAuthAttempt  ResourcePrefix = "att"
-	PrefixChallenge    ResourcePrefix = "ch"
-	PrefixHandoffToken ResourcePrefix = "handoff"
+	PrefixAuthAttempt      ResourcePrefix = "att"
+	PrefixChallenge        ResourcePrefix = "ch"
+	PrefixHandoffToken     ResourcePrefix = "handoff"
+	HandoffTokenExpiration                = time.Minute
 )
 
 func ErrAuthAttemptNotFound() Error {
@@ -60,7 +62,7 @@ type AuthAttempt struct {
 	// ID is the unique identifier for the auth attempt within the project.
 	ID string
 
-	HandoffToken          *string
+	HandoffToken          *HandoffToken
 	HandedOffAt           *time.Time
 	HandoffIdempotencyKey *string
 
@@ -189,15 +191,15 @@ func (a *AuthAttempt) PrepareChallenge(typ AuthCheckType) error {
 	if a.IsCompleted() {
 		return ErrAuthAttemptAlreadyCompleted()
 	}
-	found := slices.Contains(a.RequiredChecks, typ)
-	if !found {
-		return ErrAuthAttemptInvalidRequest()
-	}
+	//found := slices.Contains(a.RequiredChecks, typ). TODO: do we need to restrict this?
+	//if !found {
+	//	return ErrAuthAttemptInvalidRequest()
+	//}
 	return nil
 }
 
 // PrepareUserChallenge validates that a user challenge can be issued.
-// It's prohibited it the auth attempt is linked to a session with a verified user as this could lead to security issues.
+// It's prohibited if the auth attempt is linked to a session with a verified user as this could lead to security issues.
 // Also, as soon as there are more factors verified than the user (e.g. password) we'll not allow to change the user anymore.
 // We'll probably change the latter in the future and reset all factors as soon as the new user challenge succeeded.
 func (a *AuthAttempt) PrepareUserChallenge() error {
@@ -232,16 +234,16 @@ func (a *AuthAttempt) PreparePasswordChallenge() error {
 }
 
 // PreparePasskeyChallenge validates that a passkey challenge can be issued
-// and returns the user ID needed to build the WebAuthn challenge payload.
-func (a *AuthAttempt) PreparePasskeyChallenge() (*AuthFactorUser, error) {
+// and returns the user ID if the user was already identified.
+func (a *AuthAttempt) PreparePasskeyChallenge() (string, error) {
 	if err := a.PrepareChallenge(AuthCheckTypePasskey); err != nil {
-		return nil, err
+		return "", err
 	}
 	userCheck, ok := CheckAs[*AuthFactorUser](a, AuthCheckTypeUser)
 	if !ok {
-		return nil, ErrAuthAttemptInvalidRequest().WithMessage("passkey challenge requires user verification first")
+		return "", nil
 	}
-	return userCheck, nil
+	return userCheck.UserID, nil
 }
 
 // PrepareUserVerification validates that the attempt is in a state where
@@ -273,22 +275,26 @@ func (a *AuthAttempt) PreparePasswordVerification() (*AuthFactorUser, error) {
 }
 
 // PreparePasskeyVerification validates that a passkey proof can be submitted
-// and returns the user ID to verify against.
-func (a *AuthAttempt) PreparePasskeyVerification() (*AuthFactorUser, error) {
+// and returns the user ID to verify against if there was a user identified already.
+func (a *AuthAttempt) PreparePasskeyVerification() (string, error) {
 	if a.IsExpired() {
-		return nil, ErrAuthAttemptInvalidState()
+		return "", ErrAuthAttemptInvalidState()
 	}
 	if a.IsCompleted() {
-		return nil, ErrAuthAttemptAlreadyCompleted()
+		return "", ErrAuthAttemptAlreadyCompleted()
 	}
 	userCheck, ok := CheckAs[*AuthFactorUser](a, AuthCheckTypeUser)
 	if !ok {
-		return nil, ErrAuthAttemptInvalidRequest()
+		return "", nil
 	}
-	return userCheck, nil
+	return userCheck.UserID, nil
 }
 
-func (a *AuthAttempt) PrepareHandoff(idempotencyKey *string) error { //TODO: should we encrypt here and return plain additionally?
+// PrepareHandoff validates that a handoff can be issued.
+// And will generate and store the handoff token.
+// Note: The HandoffToken is generated using a crypto/rand token and stored in a hashed way for security reasons.
+// If an idempotency key is provided and matches the stored idempotency key, the handoff token will not be re-generated.
+func (a *AuthAttempt) PrepareHandoff(idempotencyKey *string, keyManager *crypto.KeyManager) error {
 	if a.IsExpired() {
 		return ErrAuthAttemptInvalidState()
 	}
@@ -296,23 +302,32 @@ func (a *AuthAttempt) PrepareHandoff(idempotencyKey *string) error { //TODO: sho
 		return ErrAuthAttemptNotCompleted()
 	}
 
+	// check if there was already a token handed off
 	if a.HandoffToken != nil {
-		if idempotencyKey != nil && gu.Value(idempotencyKey) == gu.Value(a.HandoffIdempotencyKey) {
-			return nil
+		// which requires the same idempotency key to be sent again
+		if idempotencyKey == nil ||
+			gu.Value(idempotencyKey) != gu.Value(a.HandoffIdempotencyKey) {
+			return ErrAuthAttemptAlreadyHandedOff()
 		}
-		return ErrAuthAttemptAlreadyHandedOff()
+		// decrypt handoff token and return it
+		if err := a.HandoffToken.Decrypt(keyManager); err != nil {
+			return err
+		}
+		return nil
 	}
 
-	token, err := newID(PrefixHandoffToken)
+	token, err := newHandoffToken(keyManager)
 	if err != nil {
 		return err
 	}
-
-	a.HandoffToken = &token
+	a.HandoffToken = token
 	a.HandoffIdempotencyKey = idempotencyKey
 	return nil
 }
 
+// SetCheck sets a check to the given check.
+// In the case of an AuthChallenge, it will overwrite an existing challenge of the same type but keep factors of the same type.
+// In the case of an AuthFactor, it will overwrite an existing factor of the same type and remove challenges of the same type.
 func (a *AuthAttempt) SetCheck(check AuthCheck) {
 	for i, c := range a.Checks {
 		if c.Type() != check.Type() {

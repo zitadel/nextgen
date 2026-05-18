@@ -3,8 +3,10 @@ package service
 import (
 	"context"
 	"errors"
+	"net/url"
 
 	"github.com/muhlemmer/gu"
+	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
@@ -77,7 +79,8 @@ type CreateAuthAttemptInput struct {
 type IssueChallengeInput struct {
 	ProjectID string
 	AttemptID string
-	CheckType domain.AuthCheckType
+	// Challenge is a discriminated union — use one of the Challenge* types below.
+	Challenge Challenge
 }
 
 type VerifyProofInput struct {
@@ -95,6 +98,34 @@ type HandoffInput struct {
 	AttemptID      string
 	IdempotencyKey *string
 }
+
+// ---- Challenge types (discriminated union) --------------------------------------
+
+// Challenge is implemented by each check-type-specific challenge value.
+type Challenge interface {
+	ChallengeCheckType() domain.AuthCheckType
+}
+
+// UserChallenge identifies the user by login name (email, username, phone).
+type UserChallenge struct{}
+
+func (UserChallenge) ChallengeCheckType() domain.AuthCheckType { return domain.AuthCheckTypeUser }
+
+// PasswordChallenge carries the plaintext password for verification.
+type PasswordChallenge struct{}
+
+func (PasswordChallenge) ChallengeCheckType() domain.AuthCheckType {
+	return domain.AuthCheckTypePassword
+}
+
+// PasskeyChallenge carries the raw WebAuthn assertion response bytes.
+type PasskeyChallenge struct {
+	UserVerification string
+	RPID             string
+	RPOrigins        []url.URL
+}
+
+func (PasskeyChallenge) ChallengeCheckType() domain.AuthCheckType { return domain.AuthCheckTypePasskey }
 
 // ---- Proof types (discriminated union) --------------------------------------
 
@@ -124,14 +155,6 @@ type PasskeyProof struct {
 
 func (PasskeyProof) proofCheckType() domain.AuthCheckType { return domain.AuthCheckTypePasskey }
 
-// IdPProof carries ... // TODO: ?
-type IdPProof struct {
-	Code  string
-	State string
-}
-
-func (IdPProof) proofCheckType() domain.AuthCheckType { return domain.AuthCheckTypeIdentityProvider }
-
 // ---- Implementation ----------------------------------------------------------
 
 type authAttemptService struct {
@@ -142,6 +165,7 @@ type authAttemptService struct {
 	users         userLookup
 	userPasswords userPasswords
 	userPasskeys  userPasskeys
+	keyManager    *crypto.KeyManager
 }
 
 type sessionResolver interface {
@@ -173,6 +197,7 @@ func NewAuthAttemptService(
 	users userLookup,
 	userPasswords userPasswords,
 	userPasskeys userPasskeys,
+	keyManager *crypto.KeyManager,
 ) AuthAttemptService {
 	return &authAttemptService{
 		pool:          pool,
@@ -182,6 +207,7 @@ func NewAuthAttemptService(
 		users:         users,
 		userPasswords: userPasswords,
 		userPasskeys:  userPasskeys,
+		keyManager:    keyManager,
 	}
 }
 
@@ -252,7 +278,7 @@ func (s *authAttemptService) IssueChallenge(ctx context.Context, input IssueChal
 		return nil, err
 	}
 
-	challenger, err := s.buildChallenger(ctx, attempt, input.CheckType)
+	challenger, err := s.buildChallenger(ctx, attempt, input.Challenge)
 	if err != nil {
 		return nil, err
 	}
@@ -265,11 +291,10 @@ func (s *authAttemptService) IssueChallenge(ctx context.Context, input IssueChal
 }
 
 // buildChallenger constructs the challenger for the given check type.
-// Domain validation runs first (pure, no I/O), then I/O for payload generation.
-func (s *authAttemptService) buildChallenger(ctx context.Context, attempt *domain.AuthAttempt, typ domain.AuthCheckType) (domain.AuthChallenge, error) {
-	switch typ {
-	case domain.AuthCheckTypeUser:
-		if err := attempt.PrepareChallenge(typ); err != nil {
+func (s *authAttemptService) buildChallenger(ctx context.Context, attempt *domain.AuthAttempt, challenge Challenge) (domain.AuthChallenge, error) {
+	switch typ := challenge.(type) {
+	case UserChallenge:
+		if err := attempt.PrepareChallenge(typ.ChallengeCheckType()); err != nil {
 			return nil, err
 		}
 		userChallenge, err := domain.NewUserAuthCheck()
@@ -279,7 +304,7 @@ func (s *authAttemptService) buildChallenger(ctx context.Context, attempt *domai
 		attempt.SetCheck(userChallenge)
 		return userChallenge, nil
 
-	case domain.AuthCheckTypePassword:
+	case PasswordChallenge:
 		if err := attempt.PreparePasswordChallenge(); err != nil {
 			return nil, err
 		}
@@ -290,16 +315,19 @@ func (s *authAttemptService) buildChallenger(ctx context.Context, attempt *domai
 		attempt.SetCheck(passwordChallenge)
 		return passwordChallenge, nil
 
-	case domain.AuthCheckTypePasskey:
-		userFactor, err := attempt.PreparePasskeyChallenge()
+	case PasskeyChallenge:
+		userID, err := attempt.PreparePasskeyChallenge()
 		if err != nil {
 			return nil, err
 		}
-		passkeys, err := s.userPasskeys.List(ctx, s.pool, attempt.ProjectID, userFactor.UserID)
-		if err != nil {
-			return nil, domain.ErrInternal(err).WithMessage("failed to load user passkeys")
+		var passkeys []*domain.UserPasskey
+		if userID != "" {
+			passkeys, err = s.userPasskeys.List(ctx, s.pool, attempt.ProjectID, userID)
+			if err != nil {
+				return nil, domain.ErrInternal(err).WithMessage("failed to load user passkeys")
+			}
 		}
-		challenge, err := domain.CreatePasskeyChallenge(passkeys)
+		challenge, err := domain.CreatePasskeyChallenge(userID, passkeys, typ.UserVerification, typ.RPID, typ.RPOrigins)
 		if err != nil {
 			return nil, err
 		}
@@ -310,8 +338,6 @@ func (s *authAttemptService) buildChallenger(ctx context.Context, attempt *domai
 
 		attempt.SetCheck(passkeyChallenge)
 		return passkeyChallenge, nil
-
-		// TODO: idp
 
 	default:
 		return nil, domain.ErrAuthAttemptInvalidRequest()
@@ -362,7 +388,6 @@ func (s *authAttemptService) VerifyProof(ctx context.Context, input VerifyProofI
 	}
 	attempt.SetCheck(factor) // Update the attempt with the successful factor for accurate state in the response
 
-	// Pure domain check — no I/O
 	if attempt.IsCompleted() {
 		if err = s.attempts.Complete(ctx, tx, attempt); err != nil {
 			return nil, err
@@ -407,19 +432,26 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 		return &domain.AuthFactorPassword{}, nil
 
 	case PasskeyProof:
-		userCheck, err := attempt.PreparePasskeyVerification()
+		userID, err := attempt.PreparePasskeyVerification()
 		if err != nil {
 			return nil, err
 		}
 		passkeyCheck := check.(*domain.AuthChallengePasskey)
-		passkeys, err := s.userPasskeys.List(ctx, s.pool, attempt.ProjectID, userCheck.UserID)
-		userVerified, err := domain.VerifyPasskeyChallenge(passkeyCheck.PasskeyChallenge, p.AssertionResponse, passkeys)
+		var passkeys []*domain.UserPasskey
+		if userID != "" {
+			passkeys, err = s.userPasskeys.List(ctx, s.pool, attempt.ProjectID, userID)
+			if err != nil {
+				return nil, err
+			}
+		}
+		getUserPasskeys := func(userID string) ([]*domain.UserPasskey, error) {
+			return s.userPasskeys.List(ctx, s.pool, attempt.ProjectID, userID)
+		}
+		verification, err := domain.VerifyPasskeyChallenge(passkeyCheck.PasskeyChallenge, p.AssertionResponse, userID, passkeys, getUserPasskeys)
 		if err != nil {
 			return nil, domain.ErrAuthAttemptProofRejected().WithParent(err)
 		}
-		return &domain.AuthFactorPasskey{UserVerified: userVerified}, nil
-
-		// TODO: idp
+		return &domain.AuthFactorPasskey{UserVerified: verification.UserVerified, UserID: verification.UserID}, nil
 
 	default:
 		return nil, domain.ErrAuthAttemptInvalidRequest().WithDetails("unsupported proof type")
@@ -434,7 +466,7 @@ func (s *authAttemptService) Handoff(ctx context.Context, input HandoffInput) (*
 		return nil, err
 	}
 
-	if err := attempt.PrepareHandoff(input.IdempotencyKey); err != nil {
+	if err := attempt.PrepareHandoff(input.IdempotencyKey, s.keyManager); err != nil {
 		return nil, err
 	}
 

@@ -4,6 +4,5 @@ enum:
   - identifier
   - password
   - passkey
-  - idp
 example: password
 

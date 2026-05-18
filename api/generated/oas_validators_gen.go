@@ -336,8 +336,6 @@ func (s ChallengeResponsePayload) Validate() error {
 			return err
 		}
 		return nil
-	case IdpChallengePayloadChallengeResponsePayload:
-		return nil // no validation needed
 	default:
 		return errors.Errorf("invalid type %q", s.Type)
 	}
@@ -410,11 +408,6 @@ func (s CompletedFactorPayload) Validate() error {
 		return nil // no validation needed
 	case PasskeyFactorPayloadCompletedFactorPayload:
 		if err := s.PasskeyFactorPayload.Validate(); err != nil {
-			return err
-		}
-		return nil
-	case IdpFactorPayloadCompletedFactorPayload:
-		if err := s.IdpFactorPayload.Validate(); err != nil {
 			return err
 		}
 		return nil
@@ -596,8 +589,6 @@ func (s FactorMethod) Validate() error {
 	case "password":
 		return nil
 	case "passkey":
-		return nil
-	case "idp":
 		return nil
 	default:
 		return errors.Errorf("invalid value: %v", s)
@@ -954,48 +945,6 @@ func (s *IdentifierFactorPayload) Validate() error {
 	return nil
 }
 
-func (s *IdpFactorPayload) Validate() error {
-	if s == nil {
-		return validate.ErrNilPointer
-	}
-
-	var failures []validate.FieldError
-	if err := func() error {
-		if value, ok := s.Email.Get(); ok {
-			if err := func() error {
-				if err := (validate.String{
-					MinLength:     0,
-					MinLengthSet:  false,
-					MaxLength:     0,
-					MaxLengthSet:  false,
-					Email:         true,
-					Hostname:      false,
-					Regex:         nil,
-					MinNumeric:    0,
-					MinNumericSet: false,
-					MaxNumeric:    0,
-					MaxNumericSet: false,
-				}).Validate(string(value)); err != nil {
-					return errors.Wrap(err, "string")
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "email",
-			Error: err,
-		})
-	}
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
-	}
-	return nil
-}
-
 func (s *IssueChallengeRequest) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -1057,7 +1006,7 @@ func (s *IssueChallengeRequestPasskeyOptions) Validate() error {
 		return nil
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
-			Name:  "userVerification",
+			Name:  "user_verification",
 			Error: err,
 		})
 	}
@@ -1301,6 +1250,29 @@ func (s *PasskeyChallengePayload) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := s.PublicKey.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "public_key",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *PasskeyChallengePayloadPublicKey) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
 		var failures []validate.FieldError
 		for i, elem := range s.AllowedCredentials {
 			if err := func() error {
@@ -1349,7 +1321,7 @@ func (s *PasskeyChallengePayload) Validate() error {
 	return nil
 }
 
-func (s *PasskeyChallengePayloadAllowedCredentialsItem) Validate() error {
+func (s *PasskeyChallengePayloadPublicKeyAllowedCredentialsItem) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
 	}
@@ -1372,7 +1344,7 @@ func (s *PasskeyChallengePayloadAllowedCredentialsItem) Validate() error {
 	return nil
 }
 
-func (s PasskeyChallengePayloadAllowedCredentialsItemType) Validate() error {
+func (s PasskeyChallengePayloadPublicKeyAllowedCredentialsItemType) Validate() error {
 	switch s {
 	case "public-key":
 		return nil
@@ -1381,7 +1353,7 @@ func (s PasskeyChallengePayloadAllowedCredentialsItemType) Validate() error {
 	}
 }
 
-func (s PasskeyChallengePayloadUserVerification) Validate() error {
+func (s PasskeyChallengePayloadPublicKeyUserVerification) Validate() error {
 	switch s {
 	case "required":
 		return nil

@@ -1,7 +1,7 @@
 CREATE TABLE zitadel_nextgen.auth_attempts (
     project_id TEXT NOT NULL
     , id TEXT NOT NULL CHECK (id <> '')
-    , handoff_token TEXT
+    , handoff_token BYTEA
     , handed_off_at TIMESTAMPTZ
     , handoff_idempotency_key TEXT
     , session_id TEXT

@@ -2,9 +2,7 @@ package api
 
 import (
 	"context"
-	"encoding/base64"
 	"net/http"
-	"time"
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -38,20 +36,21 @@ func (h *Handler) GetAuthAttempt(ctx context.Context, params api.GetAuthAttemptP
 func (h *Handler) IssueChallenge(ctx context.Context, req *api.IssueChallengeRequest, params api.IssueChallengeParams) (api.IssueChallengeRes, error) {
 	scopeCtx, _ := GetScopeContext(ctx)
 
-	checkType, err := factorMethodToCheckType(req.GetMethod())
+	challenge, err := challengeRequestToChallenge(req)
 	if err != nil {
 		return nil, err
 	}
+
 	attempt, err := h.authAttempts.IssueChallenge(ctx, service.IssueChallengeInput{
 		ProjectID: scopeCtx.ProjectID,
 		AttemptID: string(params.AttemptID),
-		CheckType: checkType,
+		Challenge: challenge,
 	})
 	if err != nil {
 		return nil, err
 	}
 	// Return only the newly issued challenge for the requested check type
-	check, ok := attempt.ChallengeByType(checkType)
+	check, ok := attempt.ChallengeByType(challenge.ChallengeCheckType())
 	if !ok {
 		return nil, domain.ErrInternal(nil).WithMessage("challenge not found after issue")
 	}
@@ -91,9 +90,36 @@ func (h *Handler) CreateHandoff(ctx context.Context, params api.CreateHandoffPar
 		return nil, err
 	}
 	return &api.HandoffResponse{
-		HandoffToken: *attempt.HandoffToken,
-		ExpiresAt:    time.Time{},
+		HandoffToken: attempt.HandoffToken.Plain(),
+		ExpiresAt:    attempt.HandoffToken.Expiration(attempt.HandedOffAt),
 	}, nil
+}
+
+// challengeRequestToChallenge maps the API oneOf challenge to the service Challenge discriminated union.
+func challengeRequestToChallenge(req *api.IssueChallengeRequest) (service.Challenge, error) {
+	checkType, err := factorMethodToCheckType(req.GetMethod())
+	if err != nil {
+		return nil, err
+	}
+	switch checkType {
+	case domain.AuthCheckTypeUser:
+		return service.UserChallenge{}, nil
+	case domain.AuthCheckTypePassword:
+		return service.PasswordChallenge{}, err
+	case domain.AuthCheckTypePasskey:
+		opts, ok := req.GetPasskeyOptions().Get()
+		if !ok {
+			return nil, domain.ErrAuthAttemptInvalidRequest().WithMessage("passkey options missing")
+		}
+		userVerification, _ := opts.GetUserVerification().Get()
+		return service.PasskeyChallenge{
+			UserVerification: string(userVerification),
+			RPID:             opts.GetRpID().Value,
+			RPOrigins:        opts.GetRpOrigins(),
+		}, nil
+	default:
+		return nil, domain.ErrAuthAttemptInvalidRequest()
+	}
 }
 
 // verifyRequestToProof maps the API oneOf proof to the service Proof discriminated union.
@@ -112,16 +138,13 @@ func verifyRequestToProof(req *api.VerifyChallengeRequest) (service.Proof, error
 	case api.PasskeyProofVerifyChallengeRequestSum:
 		p := req.GetOneOf().PasskeyProof
 		pk := p.GetPasskey()
-		raw, err := base64.StdEncoding.DecodeString(pk.GetAssertion())
+		raw, err := pk.GetAssertion().MarshalJSON()
 		if err != nil {
 			return nil, domain.ErrAuthAttemptInvalidProof()
 		}
 		return service.PasskeyProof{
 			AssertionResponse: raw,
 		}, nil
-	case api.IdpProofVerifyChallengeRequestSum:
-		p := req.GetOneOf().IdpProof
-		return service.IdPProof{Code: p.IdpAssertion.GetCode(), State: p.IdpAssertion.GetState().Value}, nil
 	default:
 		return nil, domain.ErrAuthAttemptInvalidRequest()
 	}
@@ -143,11 +166,30 @@ func factorMethodToCheckType(method api.FactorMethod) (domain.AuthCheckType, err
 }
 
 func checkToChallenge(check domain.AuthChallenge) *api.ChallengeResponse {
+	check.Payload()
 	resp := &api.ChallengeResponse{
 		ChallengeID: api.ChallengeID(check.GetID()),
 		Method:      checkTypeToAPI(check.Type()),
 		State:       api.ChallengeResponseStatePending,
 		CreatedAt:   check.GetLastChallengedAt(),
+		ExpiresAt:   api.OptNilDateTime{},
+		Payload:     api.OptChallengeResponsePayload{},
+	}
+	if passkey, ok := check.(*domain.AuthChallengePasskey); ok {
+		resp.Payload = api.NewOptChallengeResponsePayload(api.ChallengeResponsePayload{
+			Type: api.PasskeyChallengePayloadChallengeResponsePayload,
+			PasskeyChallengePayload: api.PasskeyChallengePayload{
+				PublicKey: api.PasskeyChallengePayloadPublicKey{
+					Challenge:          passkey.Challenge,
+					AllowedCredentials: nil,
+					UserVerification:   api.OptPasskeyChallengePayloadPublicKeyUserVerification{},
+					RpID: api.OptString{
+						Value: passkey.RPID,
+						Set:   true,
+					},
+				},
+			},
+		})
 	}
 	return resp
 }
