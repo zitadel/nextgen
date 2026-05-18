@@ -37,6 +37,18 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
+/**
+ * Build an error body matching `api/openapi/components/error-details.yaml`:
+ * `{ code, message, details? }`. Use everywhere we return a non-2xx status.
+ */
+export function errorBody(
+  code: string,
+  message: string,
+  details?: Record<string, unknown>,
+): { code: string; message: string; details?: Record<string, unknown> } {
+  return details === undefined ? { code, message } : { code, message, details };
+}
+
 type Project = {
   id: string;
   projectSecret: string;
@@ -141,7 +153,7 @@ export function setupPlatformHandlers() {
     // GET /projects/:id
     http.get("*/projects/:id", ({ params }) => {
       const project = store.projects.get(params.id as string);
-      if (!project) return HttpResponse.json({ error: "not_found" }, { status: 404 });
+      if (!project) return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
       return HttpResponse.json({
         id: project.id,
         createdAt: project.createdAt,
@@ -189,7 +201,7 @@ export function setupPlatformHandlers() {
     // GET /schemas/:id
     http.get("*/schemas/:id", ({ params }) => {
       const schema = store.schemas.get(params.id as string);
-      if (!schema) return HttpResponse.json({ error: "not_found" }, { status: 404 });
+      if (!schema) return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
       return HttpResponse.json(schema);
     }),
 
@@ -215,11 +227,10 @@ export function setupPlatformHandlers() {
         raw.flow_definition !== null;
       if (!hasEnvelope) {
         return HttpResponse.json(
-          {
-            code: "invalid_request",
-            message:
-              "POST /flow_definitions requires {project_id, flow_definition, schema_uri?} envelope",
-          },
+          errorBody(
+            "invalid_request",
+            "POST /flow_definitions requires {project_id, flow_definition, schema_uri?} envelope",
+          ),
           { status: 400 },
         );
       }
@@ -253,7 +264,7 @@ export function setupPlatformHandlers() {
     // GET /flow_definitions/:id
     http.get("*/flow_definitions/:id", ({ params }) => {
       const record = store.flowDefinitions.get(params.id as string);
-      if (!record) return HttpResponse.json({ error: "not_found" }, { status: 404 });
+      if (!record) return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
       return HttpResponse.json(flowDetailResponse(record));
     }),
 
@@ -266,7 +277,7 @@ export function setupPlatformHandlers() {
     // per `flow-definition-detail-response`.
     http.patch("*/flow_definitions/:id", async ({ params, request }) => {
       const record = store.flowDefinitions.get(params.id as string);
-      if (!record) return HttpResponse.json({ error: "not_found" }, { status: 404 });
+      if (!record) return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
       const patch = (await request.json()) as Record<string, unknown>;
       record.body = { ...record.body, ...patch };
       record.updatedAt = nowIso();

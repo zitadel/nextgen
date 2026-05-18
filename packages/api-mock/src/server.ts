@@ -33,7 +33,7 @@ import { createMiddleware } from "@mswjs/http-middleware";
 
 import { JWK, signSessionToken, verifyHandoffToken } from "./crypto.js";
 import { setupMockHandlers } from "./handlers.js";
-import { setupPlatformHandlers } from "./platform-handlers.js";
+import { errorBody, setupPlatformHandlers } from "./platform-handlers.js";
 
 export function startMockServer(port: number): Server {
   const iss = `http://localhost:${port}`;
@@ -76,14 +76,14 @@ export function startMockServer(port: number): Server {
   app.post("/sessions/exchange", express.json(), async (req, res) => {
     const { handoff_token } = req.body as { handoff_token?: unknown };
     if (!handoff_token || typeof handoff_token !== "string") {
-      res.status(400).json({ error: "missing_handoff_token" });
+      res.status(400).json(errorBody("missing_handoff_token", "handoff_token is required and must be a string"));
       return;
     }
     let claims: { sub: string; iss: string };
     try {
       claims = await verifyHandoffToken(handoff_token, { expectedIss: iss });
     } catch {
-      res.status(401).json({ error: "invalid_handoff_token" });
+      res.status(401).json(errorBody("invalid_handoff_token", "handoff token failed verification"));
       return;
     }
     const sessionJwt = await signSessionToken({ sub: claims.sub, email: claims.sub, iss });
