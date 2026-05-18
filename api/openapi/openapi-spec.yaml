@@ -70,6 +70,8 @@ paths:
     $ref: endpoints/sessions/exchange/methods.yaml
   /sessions/{session_id}:
     $ref: endpoints/sessions/by_id/methods.yaml
+  /sessions/me:
+    $ref: endpoints/sessions/me/methods.yaml
   /schemas:
     $ref: endpoints/schemas/methods.yaml
   /schemas/{id}:

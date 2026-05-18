@@ -17,6 +17,7 @@ import (
 	oasapi "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/nextgen/internal/storage/database"
 	_ "github.com/zitadel/nextgen/internal/storage/database/dialect/all"
 	"github.com/zitadel/nextgen/internal/storage/database/repository"
 )
@@ -33,7 +34,12 @@ func NewCommand() *cobra.Command {
 				return err
 			}
 
-			return run(cmd.Context(), cfg)
+			pool, err := startDatabase(cmd.Context(), cfg.Database)
+			if err != nil {
+				return err
+			}
+
+			return run(cmd.Context(), cfg, pool)
 		},
 	}
 
@@ -42,31 +48,59 @@ func NewCommand() *cobra.Command {
 	return cmd
 }
 
-func run(ctx context.Context, cfg Config) error {
-	ctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
-
-	connector, err := cfg.Database.Build()
+func startDatabase(ctx context.Context, config database.Config) (database.Pool, error) {
+	connector, err := config.Build()
 	if err != nil {
-		return err
+		return nil, err
 	}
-
 	pool, err := connector.Connect(ctx)
 	if err != nil {
-		return fmt.Errorf("connect database: %w", err)
+		return nil, err
 	}
+	err = pool.Migrate(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return pool, nil
+}
+
+func run(ctx context.Context, cfg Config, pool database.Pool) error {
 	defer func() {
 		if err := pool.Close(context.Background()); err != nil {
 			log.Printf("close database pool: %v", err)
 		}
 	}()
 
-	// Services
-	flowService := service.NewFlowService(pool, repository.NewFlowDefinitionRepository(pool))
+	// ── Repositories ─────────────────
+	projectRepo := repository.NewProjectRepository(pool)
+	userRepo := repository.NewUserRepository()
+	userPasswordRepo := repository.NewUserPasswordRepository()
+	userPasskeyRepo := repository.NewUserPasskeyRepository()
+	sessionRepo := repository.NewSessionRepository(pool)
+	flowRepo := repository.NewFlowDefinitionRepository(pool)
+	attemptRepo := repository.NewAuthAttemptRepository(pool)
 
-	handler := api.NewHandler(flowService)
+	// ── Services ─────────────────────
+	flowService := service.NewFlowService(pool, flowRepo)
+	authAttemptSvc := service.NewAuthAttemptService(
+		pool,
+		attemptRepo,
+		sessionRepo,
+		projectRepo,
+		userRepo,
+		userPasswordRepo,
+		userPasskeyRepo,
+	)
 
-	oasServer, err := oasapi.NewServer(handler, api.NewSecurityHandler())
+	// ── HTTP Server ─────────────────
+
+	ctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	oasServer, err := oasapi.NewServer(
+		api.NewHandler(flowService, authAttemptSvc),
+		api.NewSecurityHandler(),
+		oasapi.WithErrorHandler(api.OgenErrorHandler))
 	if err != nil {
 		return fmt.Errorf("build api server: %w", err)
 	}
