@@ -49,20 +49,16 @@ func TestFlowDefinitionRepository_CreateAndGet(t *testing.T) {
 	assert.Equal(t, []any{"email"}, identifier.Config["methods"])
 	require.Len(t, identifier.Transitions, 2)
 
-	var currentFlowTr, crossFlowTr domain.FlowStepTransition
-	for _, tr := range identifier.Transitions {
-		if tr.Action == nil {
-			currentFlowTr = tr
-		} else {
-			crossFlowTr = tr
-		}
-	}
-	assert.Equal(t, "resolve_user", currentFlowTr.Target)
-	assert.True(t, currentFlowTr.IsCurrentFlow())
+	submitTr, ok := identifier.Transitions["submit"]
+	require.True(t, ok)
+	assert.Equal(t, "resolve_user", submitTr.Target)
+	assert.True(t, submitTr.IsCurrentFlow())
 
-	require.NotNil(t, crossFlowTr.Action)
-	assert.Equal(t, domain.Pivot, *crossFlowTr.Action)
-	assert.Equal(t, "register-flow", crossFlowTr.Target)
+	registerTr, ok := identifier.Transitions["register"]
+	require.True(t, ok)
+	require.NotNil(t, registerTr.Action)
+	assert.Equal(t, domain.Pivot, *registerTr.Action)
+	assert.Equal(t, "register-flow", registerTr.Target)
 }
 
 func TestFlowDefinitionRepository_GetNotFound(t *testing.T) {
@@ -246,24 +242,24 @@ func sampleFlowDefinition(projectID, id string) *domain.FlowDefinition {
 				Config: map[string]any{
 					"methods": []any{"email"},
 				},
-				Transitions: []domain.FlowStepTransition{
-					{Target: "resolve_user"},
-					{Action: &pivotAction, Target: "register-flow"},
+				Transitions: map[string]domain.FlowStepTransition{
+					"submit":   {Target: "resolve_user"},
+					"register": {Action: &pivotAction, Target: "register-flow"},
 				},
 			},
 			{
 				Name:   "resolve_user",
 				Type:   domain.FlowStepTypePolicyCheck,
 				Config: nil,
-				Transitions: []domain.FlowStepTransition{
-					{Target: "password"},
+				Transitions: map[string]domain.FlowStepTransition{
+					"submit": {Target: "password"},
 				},
 			},
 			{
 				Name:        "password",
 				Type:        domain.FlowStepTypeCredential,
 				Config:      map[string]any{"factor": "password"},
-				Transitions: []domain.FlowStepTransition{},
+				Transitions: map[string]domain.FlowStepTransition{},
 			},
 		},
 	}

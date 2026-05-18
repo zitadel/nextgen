@@ -83,18 +83,33 @@ type FlowDefinitionAudience struct {
 
 // FlowDefinitionStep is a single node in the step graph.
 type FlowDefinitionStep struct {
-	Name        string
-	Type        FlowStepType
-	Config      map[string]any
-	Transitions []FlowStepTransition
+	Name string
+	Type FlowStepType
+	// OnSuccess names the [FlowOnSuccessHandler] the state machine
+	// invokes after field validation. Empty means no handler — the
+	// state machine advances on the submitted action directly.
+	OnSuccess string
+	Config    map[string]any
+	// Transitions maps an outcome name (e.g. "submit", "user_not_found",
+	// "register") to its destination. Outcomes come from three sources:
+	// user-submitted action names declared in the step's `actions` dict,
+	// implicit outcomes derived from schema annotations (e.g.
+	// `user_not_found` from `x-identifier`), and engine-emitted events
+	// (e.g. `sso`, `callback`). Keys are unique per step.
+	Transitions map[string]FlowStepTransition
 }
 
-// FlowStepTransition maps an action name to either a target step (regular) or a pivot purpose.
+// FlowStepTransition is the destination of a transition. The outcome
+// that triggers it is the map key in [FlowDefinitionStep.Transitions].
 type FlowStepTransition struct {
+	// Action selects how Target is interpreted:
+	//   nil   — Target is a step name in the current flow.
+	//   Switch — Target is another flow definition; replace the current flow.
+	//   Pivot — Target is another flow definition; push and resume on pop.
 	Action *FlowDefinitionTransitionAction
-	// Target is either a step in the current flow OR a new flow.
-	// When Action == nil, Target refers to a step in the current flow
-	// When Action != nil, Target refers to another flow.
+
+	// Target is either a step in the current flow (when Action == nil)
+	// or a flow definition name (when Action is Switch or Pivot).
 	Target string
 }
 

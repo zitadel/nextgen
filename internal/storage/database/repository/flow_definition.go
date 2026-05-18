@@ -48,14 +48,15 @@ type flowDefinitionAudienceJSON struct {
 }
 
 type flowDefinitionStepJSON struct {
-	Name        string                   `json:"name"`
-	Type        string                   `json:"type"`
-	Config      map[string]any           `json:"config,omitempty"`
-	Transitions []flowStepTransitionJSON `json:"transitions"`
+	Name        string                            `json:"name"`
+	Type        string                            `json:"type"`
+	OnSuccess   string                            `json:"on_success,omitempty"`
+	Config      map[string]any                    `json:"config,omitempty"`
+	Transitions map[string]flowStepTransitionJSON `json:"transitions"`
 }
 
 type flowStepTransitionJSON struct {
-	Action *string `json:"action"`
+	Action *string `json:"action,omitempty"`
 	Target string  `json:"target,omitempty"`
 }
 
@@ -250,17 +251,19 @@ func marshalFlowDefinitionContent(def *domain.FlowDefinition) ([]byte, error) {
 
 	steps := make([]flowDefinitionStepJSON, len(def.Steps))
 	for i, s := range def.Steps {
-		transitions := make([]flowStepTransitionJSON, len(s.Transitions))
-		for j, t := range s.Transitions {
+		transitions := make(map[string]flowStepTransitionJSON, len(s.Transitions))
+		for outcome, t := range s.Transitions {
 			tr := flowStepTransitionJSON{Target: t.Target}
 			if t.Action != nil {
-				tr.Action = new(t.Action.String())
+				action := t.Action.String()
+				tr.Action = &action
 			}
-			transitions[j] = tr
+			transitions[outcome] = tr
 		}
 		steps[i] = flowDefinitionStepJSON{
 			Name:        s.Name,
 			Type:        s.Type.String(),
+			OnSuccess:   s.OnSuccess,
 			Config:      s.Config,
 			Transitions: transitions,
 		}
@@ -296,8 +299,8 @@ func rowToFlowDefinition(row flowDefinitionRow) (*domain.FlowDefinition, error) 
 		if err != nil {
 			return nil, err
 		}
-		transitions := make([]domain.FlowStepTransition, len(s.Transitions))
-		for j, t := range s.Transitions {
+		transitions := make(map[string]domain.FlowStepTransition, len(s.Transitions))
+		for outcome, t := range s.Transitions {
 			tr := domain.FlowStepTransition{Target: t.Target}
 			if t.Action != nil {
 				action, err := domain.FlowDefinitionTransitionActionString(*t.Action)
@@ -306,11 +309,12 @@ func rowToFlowDefinition(row flowDefinitionRow) (*domain.FlowDefinition, error) 
 				}
 				tr.Action = &action
 			}
-			transitions[j] = tr
+			transitions[outcome] = tr
 		}
 		steps[i] = domain.FlowDefinitionStep{
 			Name:        s.Name,
 			Type:        stepType,
+			OnSuccess:   s.OnSuccess,
 			Config:      s.Config,
 			Transitions: transitions,
 		}

@@ -11,6 +11,18 @@ import "time"
 // live on PivotStack. The remaining fields are session/OIDC context
 // that only makes sense at the top level.
 type FlowState struct {
+	// ProjectID scopes the flow to a single tenant. The state machine
+	// uses it for every downstream lookup (definition, user, password)
+	// so the cookie alone is enough to identify the project context;
+	// the handler does not need to thread ProjectID separately.
+	ProjectID string
+
+	// UserSchemaURL is the user schema this flow validates against.
+	// Captured at Start time so every Process call resolves fields
+	// from the same schema even if the project's default schema
+	// changes mid-flow.
+	UserSchemaURL string
+
 	// FlowProgress is the user's current progress: which definition is
 	// running, which step is being shown, and what's been collected so
 	// far. Promoted to the top level so callers read e.g.
