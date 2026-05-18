@@ -1,8 +1,8 @@
 get:
-  operationId: getSession
-  summary: Get session state
+  operationId: getMySession
+  summary: Get my session state
   description: |
-    Returns the current state of a session including its factors and all currently
+    Returns the current state of the current session including its factors and all currently
     satisfied assurance levels.
 
     `assurance_levels[]` may shrink over time as factor freshness windows expire,
@@ -11,10 +11,13 @@ get:
   tags:
     - Sessions
   parameters:
-    - $ref: ../../../components/parameters/session-id.yaml
-  security:
-    - oauth2:
-        - session.read
+    - name: __nextgen_session
+      in: cookie
+      required: true
+      description: The __nextgen_session cookie issued at session creation or superseding handoff exchange.
+      schema:
+        type: string
+  security: []
   responses:
     '200':
       description: Session state.
@@ -42,20 +45,23 @@ get:
             $ref: ../../../components/error-details.yaml
 
 delete:
-  operationId: revokeSession
-  summary: Revoke session
+  operationId: revokeMySession
+  summary: Revoke my session
   description: |
     Revokes the session immediately (`state: revoked`). This is the logout operation.
 
-    The session_token issued at creation (or superseded by a handoff exchange) is required.
-    After revocation, any tokens derived from this session are invalidated.
+    The __nextgen_session cookie issued at creation (or superseded by a handoff exchange) is required.
+    After revocation, any tokens derived from this session are invalidated including the cookie itself, which is cleared in the response.
   tags:
     - Sessions
   parameters:
-    - $ref: ../../../components/parameters/session-id.yaml
-  security:
-    - oauth2:
-        - session.delete
+      - name: __nextgen_session
+        in: cookie
+        required: true
+        description: The session_token cookie issued at session creation or superseding handoff exchange.
+        schema:
+          type: string
+  security: []
   responses:
     '204':
       description: Session revoked successfully.
