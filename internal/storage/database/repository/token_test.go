@@ -35,6 +35,12 @@ func insertTokenTestUser(t *testing.T, ctx context.Context, tx database.QueryExe
 	}))
 }
 
+func requireGeneratedTokenID(t *testing.T, tokenID string) {
+	t.Helper()
+	require.NotEmpty(t, tokenID)
+	require.True(t, database.Identity(tokenID).IsNumeric())
+}
+
 func TestTokenRepository_CRUD_OIDCAccessToken(t *testing.T) {
 	tx, rollback := transactionForRollback(t)
 	defer rollback()
@@ -50,10 +56,9 @@ func TestTokenRepository_CRUD_OIDCAccessToken(t *testing.T) {
 
 	tokenRepo := repository.NewTokenRepository(tx)
 	exp := time.Date(2030, 1, 2, 3, 4, 5, 0, time.UTC)
-	oidcSess := "oidc_sess_abc"
+	oidcSess := "2001"
 	tok := &domain.Token{
 		ProjectID:     pid,
-		TokenID:       "tok_opaque_1",
 		UserID:        userID,
 		Type:          domain.TokenTypeOIDCAccessToken,
 		OIDCSessionID: &oidcSess,
@@ -61,6 +66,7 @@ func TestTokenRepository_CRUD_OIDCAccessToken(t *testing.T) {
 		ExpiresAt:     &exp,
 	}
 	require.NoError(t, tokenRepo.Create(ctx, tx, tok))
+	requireGeneratedTokenID(t, tok.TokenID)
 
 	got, err := tokenRepo.Get(ctx, tx, database.WithCondition(tokenRepo.PrimaryKeyCondition(pid, tok.TokenID)))
 	require.NoError(t, err)
@@ -100,10 +106,9 @@ func TestTokenRepository_SessionToken(t *testing.T) {
 	)
 	insertTokenTestUser(t, ctx, tx, pid, tid, schemaURL, userID)
 
-	sess := "sess_internal"
+	sess := "1001"
 	tok := &domain.Token{
 		ProjectID: pid,
-		TokenID:   "tok_session",
 		UserID:    userID,
 		Type:      domain.TokenTypeSessionToken,
 		SessionID: &sess,
@@ -111,6 +116,7 @@ func TestTokenRepository_SessionToken(t *testing.T) {
 	}
 	tokenRepo := repository.NewTokenRepository(tx)
 	require.NoError(t, tokenRepo.Create(ctx, tx, tok))
+	requireGeneratedTokenID(t, tok.TokenID)
 
 	got, err := tokenRepo.Get(ctx, tx, database.WithCondition(tokenRepo.PrimaryKeyCondition(pid, tok.TokenID)))
 	require.NoError(t, err)
@@ -134,10 +140,9 @@ func TestTokenRepository_SAMLAssertion(t *testing.T) {
 	)
 	insertTokenTestUser(t, ctx, tx, pid, tid, schemaURL, userID)
 
-	samlSess := "saml_sess_1"
+	samlSess := "3001"
 	tok := &domain.Token{
 		ProjectID:     pid,
-		TokenID:       "tok_saml",
 		UserID:        userID,
 		Type:          domain.TokenTypeSAMLAssertion,
 		SAMLSessionID: &samlSess,
@@ -145,6 +150,7 @@ func TestTokenRepository_SAMLAssertion(t *testing.T) {
 	}
 	tokenRepo := repository.NewTokenRepository(tx)
 	require.NoError(t, tokenRepo.Create(ctx, tx, tok))
+	requireGeneratedTokenID(t, tok.TokenID)
 
 	got, err := tokenRepo.Get(ctx, tx, database.WithCondition(tokenRepo.PrimaryKeyCondition(pid, tok.TokenID)))
 	require.NoError(t, err)
@@ -170,7 +176,6 @@ func TestTokenRepository_PersonalAccessToken(t *testing.T) {
 
 	tok := &domain.Token{
 		ProjectID: pid,
-		TokenID:   "tok_pat_like",
 		UserID:    userID,
 		Type:      domain.TokenTypePersonalAccessToken,
 		Scope:     nil,
@@ -178,6 +183,7 @@ func TestTokenRepository_PersonalAccessToken(t *testing.T) {
 	}
 	tokenRepo := repository.NewTokenRepository(tx)
 	require.NoError(t, tokenRepo.Create(ctx, tx, tok))
+	requireGeneratedTokenID(t, tok.TokenID)
 
 	got, err := tokenRepo.Get(ctx, tx, database.WithCondition(tokenRepo.PrimaryKeyCondition(pid, tok.TokenID)))
 	require.NoError(t, err)
@@ -203,17 +209,43 @@ func TestTokenRepository_CreateRejectsWrongIdentifier(t *testing.T) {
 	)
 	insertTokenTestUser(t, ctx, tx, pid, tid, schemaURL, userID)
 
-	sess := "sess_wrong_column"
+	sess := "1002"
 	tokenRepo := repository.NewTokenRepository(tx)
 	err := tokenRepo.Create(ctx, tx, &domain.Token{
 		ProjectID: pid,
-		TokenID:   "tok_wrong",
 		UserID:    userID,
 		Type:      domain.TokenTypeOIDCAccessToken,
 		SessionID: &sess,
 		Scope:     []string{"openid"},
 	})
 	require.ErrorIs(t, err, domain.ErrInvalidTokenIdentifiers)
+}
+
+func TestTokenRepository_CreateRejectsClientTokenID(t *testing.T) {
+	tx, rollback := transactionForRollback(t)
+	defer rollback()
+	ctx := t.Context()
+
+	const (
+		pid       = "proj-token-client-id"
+		tid       = "team-token-client-id"
+		schemaURL = "https://schemas.test/tokens-client-id/v1.json"
+		userID    = "usr_token_client_id"
+	)
+	insertTokenTestUser(t, ctx, tx, pid, tid, schemaURL, userID)
+
+	oidcSess := "2002"
+	tokenRepo := repository.NewTokenRepository(tx)
+	err := tokenRepo.Create(ctx, tx, &domain.Token{
+		ProjectID:     pid,
+		TokenID:       "42",
+		UserID:        userID,
+		Type:          domain.TokenTypeOIDCAccessToken,
+		OIDCSessionID: &oidcSess,
+		Scope:         []string{"openid"},
+	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "token_id must not be set on create")
 }
 
 func TestTokenRepository_DeleteRequiresPK(t *testing.T) {
@@ -238,21 +270,22 @@ func TestTokenRepository_CascadeUserDelete(t *testing.T) {
 	)
 	insertTokenTestUser(t, ctx, tx, pid, tid, schemaURL, userID)
 
-	sess := "sess_cascade"
-	tokenRepo := repository.NewTokenRepository(tx)
-	require.NoError(t, tokenRepo.Create(ctx, tx, &domain.Token{
+	sess := "1003"
+	tok := &domain.Token{
 		ProjectID: pid,
-		TokenID:   "tok_cascade",
 		UserID:    userID,
 		Type:      domain.TokenTypeSessionToken,
 		SessionID: &sess,
 		Scope:     []string{"read"},
-	}))
+	}
+	tokenRepo := repository.NewTokenRepository(tx)
+	require.NoError(t, tokenRepo.Create(ctx, tx, tok))
+	requireGeneratedTokenID(t, tok.TokenID)
 
 	userRepo := repository.NewUserRepository()
 	require.NoError(t, userRepo.Delete(ctx, tx, userRepo.PrimaryKeyCondition(pid, userID)))
 
-	_, err := tokenRepo.Get(ctx, tx, database.WithCondition(tokenRepo.PrimaryKeyCondition(pid, "tok_cascade")))
+	_, err := tokenRepo.Get(ctx, tx, database.WithCondition(tokenRepo.PrimaryKeyCondition(pid, tok.TokenID)))
 	require.ErrorIs(t, err, new(database.NoRowFoundError))
 }
 
@@ -272,7 +305,6 @@ func TestTokenRepository_CreateRejectsUnspecifiedType(t *testing.T) {
 	tokenRepo := repository.NewTokenRepository(tx)
 	err := tokenRepo.Create(ctx, tx, &domain.Token{
 		ProjectID: pid,
-		TokenID:   "tok_bad",
 		UserID:    userID,
 		Type:      domain.TokenTypeUnspecified,
 		Scope:     []string{"read"},

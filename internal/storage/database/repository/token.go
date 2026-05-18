@@ -3,6 +3,8 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
@@ -114,7 +116,7 @@ func (r *TokenRepository) ProjectIDCondition(projectID string) database.Conditio
 }
 
 func (r *TokenRepository) TokenIDCondition(tokenID string) database.Condition {
-	return database.NewTextCondition(r.cols().tokenID, database.TextOperationEqual, tokenID)
+	return database.NewIdentityEqualCondition(r.cols().tokenID, tokenID)
 }
 
 func (r *TokenRepository) UserIDCondition(userID string) database.Condition {
@@ -165,15 +167,15 @@ func (r *TokenRepository) Create(ctx context.Context, client database.QueryExecu
 	if err := token.ValidatePersisted(); err != nil {
 		return err
 	}
+	if token.TokenID != "" {
+		return fmt.Errorf("token_id must not be set on create")
+	}
 
 	scope := token.Scope
 	if scope == nil {
 		scope = []string{}
 	}
 
-	sessionArg := optionalStringArg(token.SessionID)
-	oidcSessionArg := optionalStringArg(token.OIDCSessionID)
-	samlSessionArg := optionalStringArg(token.SAMLSessionID)
 	expiresArg := any(database.NullInstruction)
 	if token.ExpiresAt != nil {
 		expiresArg = *token.ExpiresAt
@@ -184,26 +186,35 @@ func (r *TokenRepository) Create(ctx context.Context, client database.QueryExecu
 	builder.WriteString(r.qualifiedTableName())
 	builder.WriteString(" (")
 	database.Columns{
-		c.projectID, c.tokenID, c.userID, c.tokenType,
+		c.projectID, c.userID, c.tokenType,
 		c.sessionID, c.oidcSessionID, c.samlSessionID,
 		c.scope, c.expiresAt, c.createdAt,
 	}.WriteUnqualified(builder)
 	builder.WriteString(") VALUES (")
-	builder.WriteArgs(token.ProjectID, token.TokenID, token.UserID)
+	builder.WriteArgs(token.ProjectID, token.UserID)
 	builder.WriteString(", ")
 	builder.WriteString(builder.AppendArg(token.Type.String()) + r.tokenTypeCast)
 	builder.WriteString(", ")
-	builder.WriteArgs(sessionArg, oidcSessionArg, samlSessionArg, r.encodeScope(scope), expiresArg, r.now)
-	builder.WriteString(")")
-	_, err := client.Exec(ctx, builder.String(), builder.Args()...)
-	return err
-}
+	builder.WriteArgs(
+		sessionIDArg(token.SessionID),
+		sessionIDArg(token.OIDCSessionID),
+		sessionIDArg(token.SAMLSessionID),
+		r.encodeScope(scope),
+		expiresArg,
+		r.now,
+	)
+	builder.WriteString(") RETURNING ")
+	c.tokenID.WriteUnqualified(builder)
 
-func optionalStringArg(s *string) any {
-	if s == nil {
-		return database.NullInstruction
+	var tokenID database.Identity
+	if err := client.QueryRow(ctx, builder.String(), builder.Args()...).Scan(&tokenID); err != nil {
+		return err
 	}
-	return *s
+	if tokenID == "" {
+		return fmt.Errorf("failed to create token: no token_id returned")
+	}
+	token.TokenID = tokenID.String()
+	return nil
 }
 
 func (r *TokenRepository) Delete(ctx context.Context, client database.QueryExecutor, condition database.Condition) error {
@@ -212,22 +223,22 @@ func (r *TokenRepository) Delete(ctx context.Context, client database.QueryExecu
 }
 
 type tokenRow struct {
-	ProjectID     string           `db:"project_id"`
-	TokenID       string           `db:"token_id"`
-	UserID        string           `db:"user_id"`
-	Type          domain.TokenType `db:"token_type"`
-	SessionID     sql.NullString   `db:"session_id"`
-	OIDCSessionID sql.NullString   `db:"oidc_session_id"`
-	SAMLSessionID sql.NullString   `db:"saml_session_id"`
-	Scope         []string         `db:"scope"`
-	ExpiresAt     sql.NullTime     `db:"expires_at"`
-	CreatedAt     time.Time        `db:"created_at"`
+	ProjectID     string             `db:"project_id"`
+	TokenID       database.Identity  `db:"token_id"`
+	UserID        string             `db:"user_id"`
+	Type          domain.TokenType   `db:"token_type"`
+	SessionID     sql.NullInt64      `db:"session_id"`
+	OIDCSessionID sql.NullInt64      `db:"oidc_session_id"`
+	SAMLSessionID sql.NullInt64      `db:"saml_session_id"`
+	Scope         []string           `db:"scope"`
+	ExpiresAt     sql.NullTime       `db:"expires_at"`
+	CreatedAt     time.Time          `db:"created_at"`
 }
 
 func (r *tokenRow) toDomain() *domain.Token {
 	t := &domain.Token{
 		ProjectID: r.ProjectID,
-		TokenID:   r.TokenID,
+		TokenID:   r.TokenID.String(),
 		UserID:    r.UserID,
 		Type:      r.Type,
 		CreatedAt: r.CreatedAt,
@@ -238,15 +249,15 @@ func (r *tokenRow) toDomain() *domain.Token {
 		t.Scope = []string{}
 	}
 	if r.SessionID.Valid {
-		s := r.SessionID.String
+		s := strconv.FormatInt(r.SessionID.Int64, 10)
 		t.SessionID = &s
 	}
 	if r.OIDCSessionID.Valid {
-		s := r.OIDCSessionID.String
+		s := strconv.FormatInt(r.OIDCSessionID.Int64, 10)
 		t.OIDCSessionID = &s
 	}
 	if r.SAMLSessionID.Valid {
-		s := r.SAMLSessionID.String
+		s := strconv.FormatInt(r.SAMLSessionID.Int64, 10)
 		t.SAMLSessionID = &s
 	}
 	if r.ExpiresAt.Valid {
