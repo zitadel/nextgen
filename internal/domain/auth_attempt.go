@@ -8,8 +8,52 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-// AuthAttempt represents the object defined [here](https://github.com/zitadel/nextgen/blob/main/docs/design/api/resource-map.md#auth-flows)
-// It is short lived and should therefore be stored near the client, do not store PII data in it.
+const (
+	PrefixAuthAttempt      ResourcePrefix = "att"
+	PrefixChallenge        ResourcePrefix = "ch"
+	PrefixHandoffToken     ResourcePrefix = "handoff"
+	HandoffTokenExpiration                = time.Minute
+)
+
+func ErrAuthAttemptNotFound() Error {
+	return newError(PrefixAuthAttempt.ErrorCodePrefix("not_found"), "auth attempt not found", nil, nil)
+}
+
+func ErrAuthAttemptInvalidRequest() Error {
+	return newError(PrefixAuthAttempt.ErrorCodePrefix("invalid_request"), "invalid request", nil, nil)
+}
+
+func ErrAuthAttemptInvalidState() Error {
+	return newError(PrefixAuthAttempt.ErrorCodePrefix("invalid_state"), "invalid attempt state", nil, nil)
+}
+
+func ErrAuthAttemptAlreadyCompleted() Error {
+	return newError(PrefixAuthAttempt.ErrorCodePrefix("already_completed"), "The auth attempt is already completed and can no longer be changed.", nil, nil)
+}
+
+func ErrAuthAttemptNotCompleted() Error {
+	return newError(PrefixAuthAttempt.ErrorCodePrefix("not_completed"), "attempt not in completed state", nil, nil)
+}
+
+func ErrAuthAttemptAlreadyHandedOff() Error {
+	return newError(PrefixAuthAttempt.ErrorCodePrefix("already_handed_off"), "The auth attempt was already handed off. "+
+		"No new handoff can be created and the previous token will only be returned if the same Idempotency-Key header is provided.", nil, nil)
+}
+
+func ErrAuthAttemptInvalidProof() Error {
+	return newError(PrefixAuthAttempt.ErrorCodePrefix("invalid_proof"), "invalid proof or request", nil, nil)
+}
+
+func ErrAuthAttemptProofRejected() Error {
+	return newError(PrefixAuthAttempt.ErrorCodePrefix("proof_rejected"), "proof rejected", nil, nil)
+}
+
+func ErrAuthAttemptStaleChallenge() Error {
+	return newError(PrefixAuthAttempt.ErrorCodePrefix("stale_challenge"), "challenge is stale or was re-issued", nil, nil)
+}
+
+// AuthAttempt represents the object defined [here](https://github.com/zitadel/nextgen/blob/15bd7f438d709fcd5205a163e24374f6f667b68f/docs/design/api/resource-map.md#auth-flows)
+// It is short-lived and should therefore be stored near the client, do not store PII data in it.
 type AuthAttempt struct {
 	// ProjectID links to [Project].
 	ProjectID string
