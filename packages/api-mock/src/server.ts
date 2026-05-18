@@ -81,7 +81,11 @@ export function startMockServer(port: number): Server {
     res.setHeader("Access-Control-Allow-Origin", origin ?? "*");
     if (origin) res.setHeader("Access-Control-Allow-Credentials", "true");
     if (req.method === "OPTIONS") {
-      res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+      // Includes PUT/PATCH/DELETE so cross-origin preflights for the
+      // /flow_definitions/:id (PATCH, DELETE) and /schemas/:id (DELETE)
+      // routes succeed. Without these, a browser would block the actual
+      // request and the failure would surface as a confusing CORS error.
+      res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
       // Note: 'Cookie' is a browser-forbidden header name and is never sent
       // as a JS request header; it does not need to be in Allow-Headers.
       // Cookies are carried automatically via credentials: "include".
