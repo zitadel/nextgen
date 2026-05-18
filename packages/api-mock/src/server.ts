@@ -49,6 +49,20 @@ const SESSION_TTL_SECONDS = 3600;
  */
 const consumedHandoffJtis = new Set<string>();
 
+/**
+ * Cache of completed `/sessions/exchange` responses keyed by the caller's
+ * `Idempotency-Key` header. Per `api/openapi/components/parameters/idempotency-key.yaml`,
+ * a retry with the same key within the call window returns the cached
+ * payload without consuming a fresh handoff token. The TTL matches the
+ * 60-second handoff lifetime so stale keys don't pile up.
+ */
+type IdempotencyCacheEntry = {
+  body: object;
+  setCookie: string[];
+};
+const IDEMPOTENCY_TTL_MS = 60_000;
+const idempotencyCache = new Map<string, IdempotencyCacheEntry>();
+
 export function startMockServer(port: number): Server {
   const iss = `http://localhost:${port}`;
   const app = express();
@@ -88,6 +102,20 @@ export function startMockServer(port: number): Server {
 
   // ─── Sessions exchange ─────────────────────────────────────────────────────
   app.post("/sessions/exchange", express.json(), async (req, res) => {
+    // Idempotency-Key short-circuit: if the caller already exchanged with
+    // this key inside the cache window, replay the cached body+cookies
+    // without consuming a fresh handoff. Pairs with single-use enforcement
+    // so retries don't accidentally 410 on a network blip.
+    const idempotencyKey = req.header("Idempotency-Key");
+    if (idempotencyKey) {
+      const cached = idempotencyCache.get(idempotencyKey);
+      if (cached) {
+        res.setHeader("Set-Cookie", cached.setCookie);
+        res.json(cached.body);
+        return;
+      }
+    }
+
     const { handoff_token } = req.body as { handoff_token?: unknown };
     if (!handoff_token || typeof handoff_token !== "string") {
       res.status(400).json(errorBody("missing_handoff_token", "handoff_token is required and must be a string"));
@@ -115,10 +143,11 @@ export function startMockServer(port: number): Server {
     if (claims.jti !== undefined) consumedHandoffJtis.add(claims.jti);
 
     const sessionJwt = await signSessionToken({ sub: claims.sub, email: claims.sub, iss });
-    res.setHeader("Set-Cookie", [
+    const setCookie = [
       `__nextgen_session=${sessionJwt}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${SESSION_TTL_SECONDS}`,
       `_zflow=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
-    ]);
+    ];
+    res.setHeader("Set-Cookie", setCookie);
     // Spec: 200 returns `session-with-token-response.yaml` —
     // `{session: <SessionResponse>, session_token}`. The mock synthesises a
     // minimal session_response from the handoff claims: `state` is "active"
@@ -127,7 +156,7 @@ export function startMockServer(port: number): Server {
     // session-cookie window so they stay consistent with the JWT exp.
     const createdAt = new Date();
     const expiresAt = new Date(createdAt.getTime() + SESSION_TTL_SECONDS * 1000);
-    res.json({
+    const body = {
       session: {
         session_id: `sess_${randomUUID().replace(/-/g, "").slice(0, 12)}`,
         project_id: claims.sub,
@@ -138,7 +167,14 @@ export function startMockServer(port: number): Server {
         expires_at: expiresAt.toISOString(),
       },
       session_token: sessionJwt,
-    });
+    };
+
+    if (idempotencyKey) {
+      idempotencyCache.set(idempotencyKey, { body, setCookie });
+      setTimeout(() => idempotencyCache.delete(idempotencyKey), IDEMPOTENCY_TTL_MS).unref();
+    }
+
+    res.json(body);
   });
 
   // ─── OIDC-style end-session ──────────────────────────────────────────────
