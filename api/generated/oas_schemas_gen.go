@@ -4389,8 +4389,8 @@ type NestedUserProperty struct {
 	Type  OptNestedUserPropertyType `json:"type"`
 	// A list of required fields for the user definition.
 	Required []string `json:"required"`
-	// A map of additional properties for the user definition, where the key
-	// is the property name and the value is the property schema.
+	// A map of additional properties for the user definition, where the key is the property name and the
+	// value is the property schema.
 	Properties OptNestedUserPropertyProperties `json:"properties"`
 	Example    OptNestedUserPropertyExample    `json:"example"`
 }
@@ -4621,8 +4621,8 @@ func NewNullNestedUserPropertyExample(v struct{}) NestedUserPropertyExample {
 
 type NestedUserPropertyExample3 struct{}
 
-// A map of additional properties for the user definition, where the key
-// is the property name and the value is the property schema.
+// A map of additional properties for the user definition, where the key is the property name and the
+// value is the property schema.
 type NestedUserPropertyProperties map[string]NestedUserProperty
 
 func (s *NestedUserPropertyProperties) init() NestedUserPropertyProperties {
@@ -8970,8 +8970,8 @@ type UserProperty struct {
 	XMinusSensitive OptBool `json:"x-sensitive"`
 	// Whether this property is used for multi-factor authentication or not.
 	XMinusMfa OptBool `json:"x-mfa"`
-	// A map of additional properties for the user definition, where the key
-	// is the property name and the value is the property schema.
+	// A map of additional properties for the user definition, where the key is the property name and the
+	// value is the property schema.
 	Properties OptUserPropertyProperties `json:"properties"`
 	Example    OptUserPropertyExample    `json:"example"`
 }
@@ -9343,8 +9343,8 @@ func (s *UserPropertyFormat) UnmarshalText(data []byte) error {
 	}
 }
 
-// A map of additional properties for the user definition, where the key
-// is the property name and the value is the property schema.
+// A map of additional properties for the user definition, where the key is the property name and the
+// value is the property schema.
 type UserPropertyProperties map[string]NestedUserProperty
 
 func (s *UserPropertyProperties) init() UserPropertyProperties {
@@ -9475,8 +9475,8 @@ type UserSchema struct {
 	XMinusAuthMinusMethods UserSchemaXMinusAuthMinusMethods `json:"x-auth-methods"`
 	// A list of required fields for the user definition.
 	Required []string `json:"required"`
-	// A map of additional properties for the user definition, where the key
-	// is the property name and the value is the property schema.
+	// A map of additional properties for the user definition, where the key is the property name and the
+	// value is the property schema.
 	Properties OptUserSchemaProperties `json:"properties"`
 	Example    OptUserSchemaExample    `json:"example"`
 }
@@ -9743,8 +9743,8 @@ func NewNullUserSchemaExample(v struct{}) UserSchemaExample {
 
 type UserSchemaExample3 struct{}
 
-// A map of additional properties for the user definition, where the key
-// is the property name and the value is the property schema.
+// A map of additional properties for the user definition, where the key is the property name and the
+// value is the property schema.
 type UserSchemaProperties map[string]UserProperty
 
 func (s *UserSchemaProperties) init() UserSchemaProperties {
