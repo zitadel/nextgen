@@ -32,11 +32,22 @@ import { type Server } from "node:http";
 import express from "express";
 import { createMiddleware } from "@mswjs/http-middleware";
 
-import { JWK, signSessionToken, verifyHandoffToken } from "./crypto.js";
+import { HandoffError, JWK, signSessionToken, verifyHandoffToken } from "./crypto.js";
 import { setupMockHandlers } from "./handlers.js";
 import { errorBody, setupPlatformHandlers } from "./platform-handlers.js";
 
 const SESSION_TTL_SECONDS = 3600;
+
+/**
+ * Tracks handoff tokens (by `jti`) we've already consumed so a replay
+ * surfaces as 410 Gone. Per the spec a handoff is single-use — a real
+ * backend rejects the second exchange.
+ *
+ * Module-scoped because each process keeps one set; for the dev loop the
+ * mock runs for the whole session and we want consumption state to persist
+ * across requests. Vitest workers get their own copy via worker isolation.
+ */
+const consumedHandoffJtis = new Set<string>();
 
 export function startMockServer(port: number): Server {
   const iss = `http://localhost:${port}`;
@@ -82,13 +93,27 @@ export function startMockServer(port: number): Server {
       res.status(400).json(errorBody("missing_handoff_token", "handoff_token is required and must be a string"));
       return;
     }
-    let claims: { sub: string; iss: string };
+    let claims: { sub: string; iss: string; jti?: string };
     try {
       claims = await verifyHandoffToken(handoff_token, { expectedIss: iss });
-    } catch {
+    } catch (err) {
+      // Spec maps consumed/expired handoff tokens to 410 Gone; every other
+      // verification failure (signature, audience, issuer, structure) is 401.
+      if (err instanceof HandoffError && err.kind === "expired") {
+        res.status(410).json(errorBody("handoff_consumed", "handoff token expired or already consumed"));
+        return;
+      }
       res.status(401).json(errorBody("invalid_handoff_token", "handoff token failed verification"));
       return;
     }
+    // Single-use enforcement: once a handoff has been exchanged, any further
+    // exchange (replay) returns 410 just like an expired token would.
+    if (claims.jti !== undefined && consumedHandoffJtis.has(claims.jti)) {
+      res.status(410).json(errorBody("handoff_consumed", "handoff token expired or already consumed"));
+      return;
+    }
+    if (claims.jti !== undefined) consumedHandoffJtis.add(claims.jti);
+
     const sessionJwt = await signSessionToken({ sub: claims.sub, email: claims.sub, iss });
     res.setHeader("Set-Cookie", [
       `__nextgen_session=${sessionJwt}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${SESSION_TTL_SECONDS}`,

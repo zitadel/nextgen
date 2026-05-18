@@ -61,14 +61,49 @@ async function buildJwt(header: object, payload: object): Promise<string> {
 }
 
 /**
+ * Discriminated error for handoff-token verification failures. Lets the
+ * `/sessions/exchange` handler map distinct failure modes to distinct HTTP
+ * status codes per the OpenAPI contract:
+ *   - `expired`   → 410 Gone (also used for replays of an already-consumed
+ *                   token; both surface the same status to the client)
+ *   - everything else → 401 Unauthorized
+ */
+export type HandoffErrorKind =
+  | "structure"
+  | "algorithm"
+  | "signature"
+  | "audience"
+  | "issuer"
+  | "expired"
+  | "not_yet_valid";
+
+export class HandoffError extends Error {
+  constructor(
+    public readonly kind: HandoffErrorKind,
+    message: string,
+  ) {
+    super(message);
+    this.name = "HandoffError";
+  }
+}
+
+/**
  * Signs a short-lived handoff token (60 s, aud=exchange) suitable for
- * `POST /sessions/exchange`.
+ * `POST /sessions/exchange`. Includes a random `jti` so the consumer can
+ * enforce single-use semantics.
  */
 export async function signHandoffToken(claims: { sub: string; iss: string }): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   return buildJwt(
     { alg: "RS256", typ: "JWT", kid: KEY_ID },
-    { ...claims, aud: "exchange", iat: now, nbf: now, exp: now + 60 },
+    {
+      ...claims,
+      aud: "exchange",
+      iat: now,
+      nbf: now,
+      exp: now + 60,
+      jti: toBase64url(globalThis.crypto.getRandomValues(new Uint8Array(16))),
+    },
   );
 }
 
@@ -99,14 +134,16 @@ export async function signSessionToken(claims: {
 export async function verifyHandoffToken(
   token: string,
   { expectedIss }: { expectedIss?: string } = {},
-): Promise<{ sub: string; iss: string }> {
+): Promise<{ sub: string; iss: string; jti?: string }> {
   const parts = token.split(".");
-  if (parts.length !== 3) throw new Error("invalid token structure");
+  if (parts.length !== 3) throw new HandoffError("structure", "invalid token structure");
   const [h, p, s] = parts as [string, string, string];
 
   // Validate algorithm before touching the signature — defence against alg:none attacks.
   const header = JSON.parse(dec.decode(fromBase64url(h))) as { alg?: string };
-  if (header.alg !== "RS256") throw new Error(`unsupported algorithm: ${header.alg ?? "none"}`);
+  if (header.alg !== "RS256") {
+    throw new HandoffError("algorithm", `unsupported algorithm: ${header.alg ?? "none"}`);
+  }
 
   const signing = `${h}.${p}`;
   const ok = await globalThis.crypto.subtle.verify(
@@ -115,7 +152,7 @@ export async function verifyHandoffToken(
     fromBase64url(s),
     enc.encode(signing),
   );
-  if (!ok) throw new Error("invalid signature");
+  if (!ok) throw new HandoffError("signature", "invalid signature");
 
   const payload = JSON.parse(dec.decode(fromBase64url(p))) as {
     sub: string;
@@ -123,14 +160,17 @@ export async function verifyHandoffToken(
     aud: string;
     exp: number;
     nbf?: number;
+    jti?: string;
   };
-  if (payload.aud !== "exchange") throw new Error("wrong audience");
-  if (payload.exp < Math.floor(Date.now() / 1000)) throw new Error("token expired");
+  if (payload.aud !== "exchange") throw new HandoffError("audience", "wrong audience");
+  if (payload.exp < Math.floor(Date.now() / 1000)) {
+    throw new HandoffError("expired", "token expired");
+  }
   if (payload.nbf !== undefined && payload.nbf > Math.floor(Date.now() / 1000)) {
-    throw new Error("token not yet valid");
+    throw new HandoffError("not_yet_valid", "token not yet valid");
   }
   if (expectedIss !== undefined && payload.iss !== expectedIss) {
-    throw new Error(`wrong issuer: expected ${expectedIss}, got ${payload.iss}`);
+    throw new HandoffError("issuer", `wrong issuer: expected ${expectedIss}, got ${payload.iss}`);
   }
-  return { sub: payload.sub, iss: payload.iss };
+  return { sub: payload.sub, iss: payload.iss, jti: payload.jti };
 }
