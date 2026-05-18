@@ -14,6 +14,7 @@ type AuthAttempt struct {
 	// ProjectID links to [Project].
 	ProjectID string
 	// ID is the unique identifier for the auth attempt within the project.
+	// The storage layer assigns this value on Create (database-generated identity).
 	ID string
 
 	HandoffToken *string
