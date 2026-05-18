@@ -105,7 +105,20 @@ export function startMockServer(port: number): Server {
   });
 
   // ─── Sessions exchange ─────────────────────────────────────────────────────
-  app.post("/sessions/exchange", express.json(), async (req, res) => {
+  //
+  // express.json() returns a SyntaxError into Express's default error handler
+  // on malformed bodies, which renders an HTML 400. Wrap it in an error
+  // middleware that emits our spec-compliant errorBody envelope instead.
+  const jsonBodyParser: express.RequestHandler = (req, res, next) => {
+    express.json()(req, res, (err) => {
+      if (err) {
+        res.status(400).json(errorBody("invalid_json", "request body must be valid JSON"));
+        return;
+      }
+      next();
+    });
+  };
+  app.post("/sessions/exchange", jsonBodyParser, async (req, res) => {
     // Idempotency-Key short-circuit: if the caller already exchanged with
     // this key inside the cache window, replay the cached body+cookies
     // without consuming a fresh handoff. Pairs with single-use enforcement

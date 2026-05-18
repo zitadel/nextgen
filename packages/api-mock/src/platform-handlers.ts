@@ -49,6 +49,24 @@ export function errorBody(
   return details === undefined ? { code, message } : { code, message, details };
 }
 
+/**
+ * Safely read a JSON request body. Returns the parsed object on success,
+ * `null` on parse failure or non-object payload. Handlers map `null` to a
+ * 400 with `errorBody("invalid_json", ...)` so malformed requests never
+ * surface as an opaque 500 from inside the runtime.
+ */
+async function readJson(request: Request): Promise<Record<string, unknown> | null> {
+  try {
+    const parsed = (await request.json()) as unknown;
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+    return parsed as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+const INVALID_JSON = errorBody("invalid_json", "request body must be valid JSON");
+
 type Project = {
   id: string;
   projectSecret: string;
@@ -126,7 +144,9 @@ export function setupPlatformHandlers() {
   return [
     // POST /projects
     http.post("*/projects", async ({ request }) => {
-      const body = (await request.json()) as { previewOrigins?: string[] };
+      const raw = await readJson(request);
+      if (raw === null) return HttpResponse.json(INVALID_JSON, { status: 400 });
+      const body = raw as { previewOrigins?: string[] };
       const id = `proj-${shortId()}`;
       const createdAt = nowIso();
       const project: Project = {
@@ -192,7 +212,8 @@ export function setupPlatformHandlers() {
 
     // POST /schemas
     http.post("*/schemas", async ({ request }) => {
-      const body = (await request.json()) as object;
+      const body = await readJson(request);
+      if (body === null) return HttpResponse.json(INVALID_JSON, { status: 400 });
       const id = `schema_${shortId()}`;
       store.schemas.set(id, body);
       return HttpResponse.json({ id }, { status: 201 });
@@ -218,10 +239,9 @@ export function setupPlatformHandlers() {
     // the envelope and 400s if `project_id` or `flow_definition` is missing,
     // matching the contract any real backend would enforce.
     http.post("*/flow_definitions", async ({ request }) => {
-      const raw = (await request.json()) as Record<string, unknown>;
+      const raw = await readJson(request);
+      if (raw === null) return HttpResponse.json(INVALID_JSON, { status: 400 });
       const hasEnvelope =
-        raw &&
-        typeof raw === "object" &&
         typeof raw.project_id === "string" &&
         typeof raw.flow_definition === "object" &&
         raw.flow_definition !== null;
@@ -278,7 +298,8 @@ export function setupPlatformHandlers() {
     http.patch("*/flow_definitions/:id", async ({ params, request }) => {
       const record = store.flowDefinitions.get(params.id as string);
       if (!record) return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
-      const patch = (await request.json()) as Record<string, unknown>;
+      const patch = await readJson(request);
+      if (patch === null) return HttpResponse.json(INVALID_JSON, { status: 400 });
       record.body = { ...record.body, ...patch };
       record.updatedAt = nowIso();
       return HttpResponse.json(flowDetailResponse(record), { status: 200 });
