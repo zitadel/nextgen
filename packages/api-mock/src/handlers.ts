@@ -6,7 +6,13 @@
  * the matching step fixture; `GET /flow/{id}` re-renders the current step.
  *
  * Branding is applied by `withBranding` (overlay set via `applyBranding`).
- * Request bodies are captured for assertions via `getCapturedRequests()`.
+ * Request bodies are captured for assertions via the `getCaptured` method
+ * returned by `setupMockHandlers()`.
+ *
+ * Each call to `setupMockHandlers()` creates an isolated closure — `actor`,
+ * `captured`, and `iss` are local to that invocation. Callers own their own
+ * `reset` and `getCaptured` references, so parallel test suites never share
+ * state even when running in the same worker.
  */
 import {
   getCreateFlowMockHandler,
@@ -35,52 +41,74 @@ export type CapturedRequest =
   | { kind: "submitFlowStep"; flowId: string; body: SubmitFlowStepBody }
   | { kind: "getFlowStep"; flowId: string };
 
-let actor: FlowActor = startFlowActor();
-let captured: CapturedRequest[] = [];
+export type MockHandle = {
+  handlers: RequestHandler[];
+  /** Reset the actor to idle and clear captured requests. */
+  reset: () => void;
+  /** Return captured request bodies for test assertions. */
+  getCaptured: () => readonly CapturedRequest[];
+};
 
 const FLOW_ID = "flow_mock";
-const FINAL_REDIRECT_URI = "https://app.mock.invalid/post-signin";
-
-export function resetFlow(): void {
-  actor = startFlowActor();
-  captured = [];
-}
-
-export function getCapturedRequests(): readonly CapturedRequest[] {
-  return captured;
-}
-
-function currentResponse(): CreateFlow201 {
-  const snapshot = actor.getSnapshot();
-  const input = { flowId: FLOW_ID, sessionToken: snapshot.context.sessionToken };
-  const step = snapshot.value as FlowStepName | "idle";
-  switch (step) {
-    case "register":
-      return withBranding(registerStep(input));
-    case "password":
-      return withBranding(passwordStep(input));
-    case "sso-redirect":
-      return withBranding(ssoRedirectStep(input));
-    case "done":
-      return withBranding(doneStep({ ...input, redirectUri: FINAL_REDIRECT_URI }));
-    default:
-      return withBranding(identifierStep(input));
-  }
-}
 
 /**
- * Build the MSW handlers. Each call to `setupMockHandlers()` resets the
- * actor so consumers get a fresh walk. The returned array is consumed by
- * `setupServer(...)` (node) or `setupWorker(...)` (browser).
+ * Build the MSW handlers. Each call creates an independent closure (actor,
+ * captured log, iss) so parallel test suites never share state. Callers
+ * should hold onto the returned `reset` and `getCaptured` references instead
+ * of going through a shared module-level pointer.
+ *
+ * @param options.iss - Issuer URL embedded in the handoff token (default:
+ *   `"http://localhost:4000"`). Pass the server's own origin so that
+ *   `verifyHandoffToken` can enforce issuer consistency.
  */
-export function setupMockHandlers(): RequestHandler[] {
-  resetFlow();
+export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
+  const iss = options.iss ?? "http://localhost:4000";
+  let actor: FlowActor = startFlowActor();
+  let captured: CapturedRequest[] = [];
 
-  return [
+  function reset(): void {
+    actor = startFlowActor();
+    captured = [];
+  }
+
+  function getCaptured(): readonly CapturedRequest[] {
+    return captured;
+  }
+
+  async function currentResponse(): Promise<CreateFlow201> {
+    const snapshot = actor.getSnapshot();
+    const input = {
+      flowId: FLOW_ID,
+      sessionToken: snapshot.context.sessionToken,
+      capturedEmail: snapshot.context.capturedFields["email"],
+      iss,
+    };
+    const step = snapshot.value as FlowStepName | "idle";
+    switch (step) {
+      case "register":
+        return withBranding(registerStep(input));
+      case "password":
+        return withBranding(passwordStep(input));
+      case "sso-redirect":
+        return withBranding(ssoRedirectStep(input));
+      case "done":
+        return withBranding(await doneStep(input));
+      default:
+        return withBranding(identifierStep(input));
+    }
+  }
+
+  const handlers: RequestHandler[] = [
     getCreateFlowMockHandler(async ({ request }) => {
       const body = (await request.clone().json()) as CreateFlowBody;
       captured.push({ kind: "createFlow", body });
-      actor.send({ type: "RESET" });
+      // Replace the actor outright. The flow machine's `done` state is a
+      // final (absorbing) state, so sending RESET to an actor that has
+      // already reached `done` is a no-op — reusing it would replay the
+      // previous session's captured email on the next createFlow call,
+      // which made logout+login appear to re-authenticate as the prior
+      // user without any user input.
+      actor = startFlowActor();
       actor.send({ type: "START", purpose: body.purpose });
       return currentResponse();
     }),
@@ -101,4 +129,6 @@ export function setupMockHandlers(): RequestHandler[] {
       return currentResponse();
     }),
   ];
+
+  return { handlers, reset, getCaptured };
 }

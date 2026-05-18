@@ -10,13 +10,13 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } fr
 import {
   applyBranding,
   clearBranding,
-  getCapturedRequests,
-  resetFlow,
   setupMockHandlers,
 } from "./index.js";
+import type { MockHandle } from "./index.js";
 
 const PROJECT_ID = "demo-project";
 const server = setupServer();
+let mock: MockHandle = setupMockHandlers();
 
 beforeAll(() => {
   // Any absolute URL works — the orval-generated handlers match `*/flow*`
@@ -30,8 +30,9 @@ afterAll(() => {
 });
 
 beforeEach(() => {
-  server.use(...setupMockHandlers());
-  resetFlow();
+  mock = setupMockHandlers();
+  server.use(...mock.handlers);
+  mock.reset();
   clearBranding();
 });
 
@@ -58,8 +59,10 @@ describe("setupMockHandlers", () => {
       fields: { password: "hunter2" },
     });
     expect(submitPassword.step.name).toBe("done");
-    expect(submitPassword.step.complete).toBe("redirect");
-    expect(submitPassword.redirect_uri).toBeTruthy();
+    // complete: "show" — the web component fires zitadel-flow-complete and
+    // waits for the app to navigate; the server does not redirect.
+    expect(submitPassword.step.complete).toBe("show");
+    expect(submitPassword.redirect_uri).toBeUndefined();
     expect(submitPassword.handoff_token).toBeTruthy();
   });
 
@@ -72,7 +75,7 @@ describe("setupMockHandlers", () => {
     });
     await getFlowStep(start.id);
 
-    const captured = getCapturedRequests();
+    const captured = mock.getCaptured();
     expect(captured).toHaveLength(3);
     expect(captured[0]).toEqual({
       kind: "createFlow",
