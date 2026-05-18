@@ -4989,15 +4989,6 @@ func (c *Client) VerifyChallengeProof(ctx context.Context, request *VerifyChalle
 }
 
 func (c *Client) sendVerifyChallengeProof(ctx context.Context, request *VerifyChallengeRequest, params VerifyChallengeProofParams) (res VerifyChallengeProofRes, err error) {
-	// Validate request before sending.
-	if err := func() error {
-		if err := request.Validate(); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return res, errors.Wrap(err, "validate")
-	}
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("verifyChallengeProof"),
 		semconv.HTTPRequestMethodKey.String("POST"),

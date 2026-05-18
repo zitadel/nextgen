@@ -5,8 +5,7 @@ required:
   - message
 properties:
   code:
-    type: string
-    description: Stable machine-readable error code.
+    $ref: schemas/error-code.yaml
   message:
     type: string
     description: Human-readable explanation of the error.
