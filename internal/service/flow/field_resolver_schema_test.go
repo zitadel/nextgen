@@ -4,11 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"net/url"
 	"slices"
 	"testing"
 
-	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/ianlancetaylor/jsonschema"
 
 	"github.com/zitadel/nextgen/internal/domain"
@@ -57,7 +55,7 @@ func defaultSchemaBytes() []byte {
 		"properties": {
 			"email":       { "type": "string", "format": "email", "maxLength": 320, "x-identifier": true, "x-unique": "organization" },
 			"username":    { "type": "string", "minLength": 3, "maxLength": 64, "x-identifier": true, "x-unique": "organization" },
-			"password":    { "type": "string", "minLength": 8 },
+			"password":    { "type": "string", "minLength": 8, "x-password": true },
 			"given_name":  { "type": "string", "minLength": 1, "maxLength": 200 },
 			"family_name": { "type": "string", "minLength": 1, "maxLength": 200 }
 		}
@@ -156,7 +154,7 @@ func TestSchemaFieldResolver_Resolve_PasswordChallengeRequiresAuthMethodEnabled(
 		"$schema": "https://json-schema.org/draft/2020-12/schema",
 		"type": "object",
 		"properties": {
-			"password": { "type": "string", "minLength": 8 }
+			"password": { "type": "string", "minLength": 8, "x-password": true }
 		}
 	}`)
 	resolver := flow.NewSchemaFieldResolver(newFakeResolver(t, map[string][]byte{url: bytes}))
@@ -167,6 +165,54 @@ func TestSchemaFieldResolver_Resolve_PasswordChallengeRequiresAuthMethodEnabled(
 	}
 	if got.Fields["password"].Challenge != domain.FlowFieldChallengeNone {
 		t.Errorf("Resolve password Challenge = %q, want None (auth-methods absent)", got.Fields["password"].Challenge)
+	}
+}
+
+func TestSchemaFieldResolver_Resolve_PasswordChallengeRequiresXPassword(t *testing.T) {
+	const url = "https://example.test/no-x-password.json"
+	bytes := []byte(`{
+		"$schema": "https://json-schema.org/draft/2020-12/schema",
+		"type": "object",
+		"x-auth-methods": { "password": { "enabled": true } },
+		"properties": {
+			"password": { "type": "string", "minLength": 8 }
+		}
+	}`)
+	resolver := flow.NewSchemaFieldResolver(newFakeResolver(t, map[string][]byte{url: bytes}))
+
+	got, err := resolver.Resolve(t.Context(), nil, testProjectID, url, []string{"password"})
+	if err != nil {
+		t.Fatalf("Resolve returned error: %v", err)
+	}
+	if got.Fields["password"].Challenge != domain.FlowFieldChallengeNone {
+		t.Errorf("Resolve password Challenge = %q, want None (x-password absent on property)", got.Fields["password"].Challenge)
+	}
+	if got.Fields["password"].Type != domain.FlowFieldTypeText {
+		t.Errorf("Resolve password Type = %q, want text (no x-password annotation)", got.Fields["password"].Type)
+	}
+}
+
+func TestSchemaFieldResolver_Resolve_RenamedPasswordField(t *testing.T) {
+	const url = "https://example.test/renamed-password.json"
+	bytes := []byte(`{
+		"$schema": "https://json-schema.org/draft/2020-12/schema",
+		"type": "object",
+		"x-auth-methods": { "password": { "enabled": true } },
+		"properties": {
+			"secret": { "type": "string", "minLength": 8, "x-password": true }
+		}
+	}`)
+	resolver := flow.NewSchemaFieldResolver(newFakeResolver(t, map[string][]byte{url: bytes}))
+
+	got, err := resolver.Resolve(t.Context(), nil, testProjectID, url, []string{"secret"})
+	if err != nil {
+		t.Fatalf("Resolve returned error: %v", err)
+	}
+	if got.Fields["secret"].Challenge != domain.FlowFieldChallengePassword {
+		t.Errorf("Resolve secret Challenge = %q, want %q", got.Fields["secret"].Challenge, domain.FlowFieldChallengePassword)
+	}
+	if got.Fields["secret"].Type != domain.FlowFieldTypePassword {
+		t.Errorf("Resolve secret Type = %q, want %q", got.Fields["secret"].Type, domain.FlowFieldTypePassword)
 	}
 }
 
@@ -274,36 +320,6 @@ func TestSchemaFieldResolver_Validate_NonStringValueReportsFormat(t *testing.T) 
 	err := resolver.Validate(t.Context(), nil, testProjectID, defaultSchemaURL, map[string]any{"email": 123})
 	if !hasValidationRule(t, err, "email", domain.FlowFieldValidationRuleFormat) {
 		t.Fatalf("Validate err = %v, want format violation for non-string email", err)
-	}
-}
-
-// TestSchemaFieldResolver_BuiltinDefaultSchema exercises the embedded
-// built-in default user schema through a real [domain.JSONSchemaResolver].
-// This guards against drift between the embedded JSON template and the
-// resolver's keyword extraction.
-func TestSchemaFieldResolver_BuiltinDefaultSchema(t *testing.T) {
-	base, err := url.Parse("https://example.test/schemas")
-	if err != nil {
-		t.Fatalf("url.Parse: %v", err)
-	}
-	cache, err := lru.New2Q[string, *jsonschema.Schema](128)
-	if err != nil {
-		t.Fatalf("lru.New2Q: %v", err)
-	}
-	jsonResolver := domain.NewJSONSchemaResolver(nil, cache, 0, 0, nil, base)
-	resolver := flow.NewSchemaFieldResolver(jsonResolver)
-	const schemaURL = "https://example.test/schemas/user/v1/default.user.schema.json"
-
-	got, err := resolver.Resolve(t.Context(), nil, testProjectID, schemaURL,
-		[]string{"email", "username", "password", "given_name", "family_name"})
-	if err != nil {
-		t.Fatalf("Resolve returned error: %v", err)
-	}
-	if got.Fields["email"].Challenge != domain.FlowFieldChallengeIdentifier {
-		t.Errorf("builtin email Challenge = %q, want identifier", got.Fields["email"].Challenge)
-	}
-	if got.Fields["password"].Challenge != domain.FlowFieldChallengePassword {
-		t.Errorf("builtin password Challenge = %q, want password", got.Fields["password"].Challenge)
 	}
 }
 

@@ -25,14 +25,17 @@ type SchemaResolver interface {
 //
 // Translation map (user meta-schema → [domain.FlowField]):
 //
-//   - `type` + `format` + property name → [domain.FlowFieldType]
+//   - `type` + `format` → [domain.FlowFieldType]; `x-password: true`
+//     forces [domain.FlowFieldTypePassword].
 //   - top-level `required` membership → [domain.FlowField.Required]
 //   - `minLength`, `maxLength`, `format` → [domain.FlowFieldValidation]
 //   - `x-identifier` → [domain.FlowFieldChallengeIdentifier] +
 //     [domain.FlowImplicitOutcomeUserNotFound]
 //   - `x-unique` → [domain.FlowField.Unique]
-//   - schema-level `x-auth-methods` ∩ property name → credential
-//     [domain.FlowFieldChallenge]
+//   - `x-password: true` combined with schema-level
+//     `x-auth-methods.password.enabled = true` →
+//     [domain.FlowFieldChallengePassword]. Other auth methods do not
+//     have user-property-shaped credentials and are not surfaced here.
 type SchemaFieldResolver struct {
 	schemas SchemaResolver
 }
@@ -131,8 +134,8 @@ func (r *SchemaFieldResolver) Validate(
 func buildFlowField(name string, propSchema *jsonschema.Schema, required, authMethods map[string]struct{}) domain.FlowField {
 	field := domain.FlowField{
 		TextKey:   "field." + name,
-		Type:      deriveFieldType(name, propSchema),
-		Challenge: deriveChallenge(name, propSchema, authMethods),
+		Type:      deriveFieldType(propSchema),
+		Challenge: deriveChallenge(propSchema, authMethods),
 		Unique:    deriveUnique(propSchema),
 	}
 	if _, ok := required[name]; ok {
@@ -144,12 +147,11 @@ func buildFlowField(name string, propSchema *jsonschema.Schema, required, authMe
 	return field
 }
 
-// deriveFieldType maps the property's JSON `type`/`format` plus its
-// name to a [domain.FlowFieldType]. The property name acts as a
-// tiebreaker (a string property named `password` is rendered as a
-// password input).
-func deriveFieldType(name string, propSchema *jsonschema.Schema) domain.FlowFieldType {
-	if name == "password" {
+// deriveFieldType maps the property's JSON `type` and `format` to a
+// [domain.FlowFieldType]. `x-password: true` forces a password input
+// regardless of `format`.
+func deriveFieldType(propSchema *jsonschema.Schema) domain.FlowFieldType {
+	if isPassword(propSchema) {
 		return domain.FlowFieldTypePassword
 	}
 	switch lookupString(propSchema, "format") {
@@ -167,28 +169,19 @@ func deriveFieldType(name string, propSchema *jsonschema.Schema) domain.FlowFiel
 	return domain.FlowFieldTypeText
 }
 
-// deriveChallenge resolves the unified [domain.FlowFieldChallenge]: an
-// `x-identifier` property surfaces as Identifier; otherwise the
-// property's name is matched against the schema-level enabled
-// `x-auth-methods`.
-func deriveChallenge(name string, propSchema *jsonschema.Schema, authMethods map[string]struct{}) domain.FlowFieldChallenge {
+// deriveChallenge resolves the unified [domain.FlowFieldChallenge].
+// `x-identifier: true` surfaces as Identifier; `x-password: true`
+// surfaces as Password when the schema-level `x-auth-methods.password`
+// is enabled. Other credential kinds (passkey, magic_link, sso, otp)
+// have no user-property-shaped proof and are never surfaced here.
+func deriveChallenge(propSchema *jsonschema.Schema, authMethods map[string]struct{}) domain.FlowFieldChallenge {
 	if isIdentifier(propSchema) {
 		return domain.FlowFieldChallengeIdentifier
 	}
-	if _, ok := authMethods[name]; !ok {
-		return domain.FlowFieldChallengeNone
-	}
-	switch name {
-	case "password":
-		return domain.FlowFieldChallengePassword
-	case "passkey":
-		return domain.FlowFieldChallengePasskey
-	case "magic_link":
-		return domain.FlowFieldChallengeMagicLink
-	case "sso":
-		return domain.FlowFieldChallengeSSO
-	case "otp":
-		return domain.FlowFieldChallengeOTP
+	if isPassword(propSchema) {
+		if _, ok := authMethods["password"]; ok {
+			return domain.FlowFieldChallengePassword
+		}
 	}
 	return domain.FlowFieldChallengeNone
 }
@@ -332,7 +325,15 @@ func lookupInt(schema *jsonschema.Schema, keyword string) int {
 }
 
 func isIdentifier(schema *jsonschema.Schema) bool {
-	v, ok := schema.LookupKeyword("x-identifier")
+	return lookupBool(schema, "x-identifier")
+}
+
+func isPassword(schema *jsonschema.Schema) bool {
+	return lookupBool(schema, "x-password")
+}
+
+func lookupBool(schema *jsonschema.Schema, keyword string) bool {
+	v, ok := schema.LookupKeyword(keyword)
 	if !ok {
 		return false
 	}
