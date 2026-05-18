@@ -11,6 +11,377 @@ import (
 	"github.com/go-faster/jx"
 )
 
+// Merged schema.
+// Ref: #
+type AttAlreadyCompleted struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptAttAlreadyCompletedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *AttAlreadyCompleted) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *AttAlreadyCompleted) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *AttAlreadyCompleted) GetDetails() OptAttAlreadyCompletedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *AttAlreadyCompleted) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *AttAlreadyCompleted) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *AttAlreadyCompleted) SetDetails(val OptAttAlreadyCompletedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type AttAlreadyCompletedDetails map[string]jx.Raw
+
+func (s *AttAlreadyCompletedDetails) init() AttAlreadyCompletedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type AttInvalidRequest struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptAttInvalidRequestDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *AttInvalidRequest) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *AttInvalidRequest) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *AttInvalidRequest) GetDetails() OptAttInvalidRequestDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *AttInvalidRequest) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *AttInvalidRequest) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *AttInvalidRequest) SetDetails(val OptAttInvalidRequestDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type AttInvalidRequestDetails map[string]jx.Raw
+
+func (s *AttInvalidRequestDetails) init() AttInvalidRequestDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type AttInvalidState struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptAttInvalidStateDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *AttInvalidState) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *AttInvalidState) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *AttInvalidState) GetDetails() OptAttInvalidStateDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *AttInvalidState) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *AttInvalidState) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *AttInvalidState) SetDetails(val OptAttInvalidStateDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type AttInvalidStateDetails map[string]jx.Raw
+
+func (s *AttInvalidStateDetails) init() AttInvalidStateDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type AttNotCompleted struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptAttNotCompletedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *AttNotCompleted) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *AttNotCompleted) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *AttNotCompleted) GetDetails() OptAttNotCompletedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *AttNotCompleted) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *AttNotCompleted) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *AttNotCompleted) SetDetails(val OptAttNotCompletedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type AttNotCompletedDetails map[string]jx.Raw
+
+func (s *AttNotCompletedDetails) init() AttNotCompletedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type AttNotFound struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptAttNotFoundDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *AttNotFound) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *AttNotFound) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *AttNotFound) GetDetails() OptAttNotFoundDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *AttNotFound) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *AttNotFound) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *AttNotFound) SetDetails(val OptAttNotFoundDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type AttNotFoundDetails map[string]jx.Raw
+
+func (s *AttNotFoundDetails) init() AttNotFoundDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type AttProofRejected struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptAttProofRejectedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *AttProofRejected) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *AttProofRejected) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *AttProofRejected) GetDetails() OptAttProofRejectedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *AttProofRejected) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *AttProofRejected) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *AttProofRejected) SetDetails(val OptAttProofRejectedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type AttProofRejectedDetails map[string]jx.Raw
+
+func (s *AttProofRejectedDetails) init() AttProofRejectedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type AttStaleChallenge struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptAttStaleChallengeDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *AttStaleChallenge) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *AttStaleChallenge) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *AttStaleChallenge) GetDetails() OptAttStaleChallengeDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *AttStaleChallenge) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *AttStaleChallenge) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *AttStaleChallenge) SetDetails(val OptAttStaleChallengeDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type AttStaleChallengeDetails map[string]jx.Raw
+
+func (s *AttStaleChallengeDetails) init() AttStaleChallengeDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
 type AttemptID string
 
 // The current state of an authentication attempt.
@@ -757,10 +1128,78 @@ func NewPasskeyFactorPayloadCompletedFactorPayload(v PasskeyFactorPayload) Compl
 	return s
 }
 
-// CreateAuthAttemptErrorResponseStatusCode wraps jx.Raw with StatusCode.
+// CreateAuthAttemptErrorResponse represents sum type.
+type CreateAuthAttemptErrorResponse struct {
+	Type              CreateAuthAttemptErrorResponseType // switch on this field
+	AttInvalidRequest AttInvalidRequest
+	Internal          Internal
+}
+
+// CreateAuthAttemptErrorResponseType is oneOf type of CreateAuthAttemptErrorResponse.
+type CreateAuthAttemptErrorResponseType string
+
+// Possible values for CreateAuthAttemptErrorResponseType.
+const (
+	AttInvalidRequestCreateAuthAttemptErrorResponse CreateAuthAttemptErrorResponseType = "att.invalid_request"
+	InternalCreateAuthAttemptErrorResponse          CreateAuthAttemptErrorResponseType = "internal"
+)
+
+// IsAttInvalidRequest reports whether CreateAuthAttemptErrorResponse is AttInvalidRequest.
+func (s CreateAuthAttemptErrorResponse) IsAttInvalidRequest() bool {
+	return s.Type == AttInvalidRequestCreateAuthAttemptErrorResponse
+}
+
+// IsInternal reports whether CreateAuthAttemptErrorResponse is Internal.
+func (s CreateAuthAttemptErrorResponse) IsInternal() bool {
+	return s.Type == InternalCreateAuthAttemptErrorResponse
+}
+
+// SetAttInvalidRequest sets CreateAuthAttemptErrorResponse to AttInvalidRequest.
+func (s *CreateAuthAttemptErrorResponse) SetAttInvalidRequest(v AttInvalidRequest) {
+	s.Type = AttInvalidRequestCreateAuthAttemptErrorResponse
+	s.AttInvalidRequest = v
+}
+
+// GetAttInvalidRequest returns AttInvalidRequest and true boolean if CreateAuthAttemptErrorResponse is AttInvalidRequest.
+func (s CreateAuthAttemptErrorResponse) GetAttInvalidRequest() (v AttInvalidRequest, ok bool) {
+	if !s.IsAttInvalidRequest() {
+		return v, false
+	}
+	return s.AttInvalidRequest, true
+}
+
+// NewAttInvalidRequestCreateAuthAttemptErrorResponse returns new CreateAuthAttemptErrorResponse from AttInvalidRequest.
+func NewAttInvalidRequestCreateAuthAttemptErrorResponse(v AttInvalidRequest) CreateAuthAttemptErrorResponse {
+	var s CreateAuthAttemptErrorResponse
+	s.SetAttInvalidRequest(v)
+	return s
+}
+
+// SetInternal sets CreateAuthAttemptErrorResponse to Internal.
+func (s *CreateAuthAttemptErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalCreateAuthAttemptErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if CreateAuthAttemptErrorResponse is Internal.
+func (s CreateAuthAttemptErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalCreateAuthAttemptErrorResponse returns new CreateAuthAttemptErrorResponse from Internal.
+func NewInternalCreateAuthAttemptErrorResponse(v Internal) CreateAuthAttemptErrorResponse {
+	var s CreateAuthAttemptErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// CreateAuthAttemptErrorResponseStatusCode wraps CreateAuthAttemptErrorResponse with StatusCode.
 type CreateAuthAttemptErrorResponseStatusCode struct {
 	StatusCode int
-	Response   jx.Raw
+	Response   CreateAuthAttemptErrorResponse
 }
 
 // GetStatusCode returns the value of StatusCode.
@@ -769,7 +1208,7 @@ func (s *CreateAuthAttemptErrorResponseStatusCode) GetStatusCode() int {
 }
 
 // GetResponse returns the value of Response.
-func (s *CreateAuthAttemptErrorResponseStatusCode) GetResponse() jx.Raw {
+func (s *CreateAuthAttemptErrorResponseStatusCode) GetResponse() CreateAuthAttemptErrorResponse {
 	return s.Response
 }
 
@@ -779,7 +1218,7 @@ func (s *CreateAuthAttemptErrorResponseStatusCode) SetStatusCode(val int) {
 }
 
 // SetResponse sets the value of Response.
-func (s *CreateAuthAttemptErrorResponseStatusCode) SetResponse(val jx.Raw) {
+func (s *CreateAuthAttemptErrorResponseStatusCode) SetResponse(val CreateAuthAttemptErrorResponse) {
 	s.Response = val
 }
 
@@ -1013,10 +1452,134 @@ func (s *CreateFlowRequestPurpose) UnmarshalText(data []byte) error {
 	}
 }
 
-// CreateHandoffErrorResponseStatusCode wraps jx.Raw with StatusCode.
+// CreateHandoffErrorResponse represents sum type.
+type CreateHandoffErrorResponse struct {
+	Type            CreateHandoffErrorResponseType // switch on this field
+	AttNotFound     AttNotFound
+	AttInvalidState AttInvalidState
+	AttNotCompleted AttNotCompleted
+	Internal        Internal
+}
+
+// CreateHandoffErrorResponseType is oneOf type of CreateHandoffErrorResponse.
+type CreateHandoffErrorResponseType string
+
+// Possible values for CreateHandoffErrorResponseType.
+const (
+	AttNotFoundCreateHandoffErrorResponse     CreateHandoffErrorResponseType = "att.not_found"
+	AttInvalidStateCreateHandoffErrorResponse CreateHandoffErrorResponseType = "att.invalid_state"
+	AttNotCompletedCreateHandoffErrorResponse CreateHandoffErrorResponseType = "att.not_completed"
+	InternalCreateHandoffErrorResponse        CreateHandoffErrorResponseType = "internal"
+)
+
+// IsAttNotFound reports whether CreateHandoffErrorResponse is AttNotFound.
+func (s CreateHandoffErrorResponse) IsAttNotFound() bool {
+	return s.Type == AttNotFoundCreateHandoffErrorResponse
+}
+
+// IsAttInvalidState reports whether CreateHandoffErrorResponse is AttInvalidState.
+func (s CreateHandoffErrorResponse) IsAttInvalidState() bool {
+	return s.Type == AttInvalidStateCreateHandoffErrorResponse
+}
+
+// IsAttNotCompleted reports whether CreateHandoffErrorResponse is AttNotCompleted.
+func (s CreateHandoffErrorResponse) IsAttNotCompleted() bool {
+	return s.Type == AttNotCompletedCreateHandoffErrorResponse
+}
+
+// IsInternal reports whether CreateHandoffErrorResponse is Internal.
+func (s CreateHandoffErrorResponse) IsInternal() bool {
+	return s.Type == InternalCreateHandoffErrorResponse
+}
+
+// SetAttNotFound sets CreateHandoffErrorResponse to AttNotFound.
+func (s *CreateHandoffErrorResponse) SetAttNotFound(v AttNotFound) {
+	s.Type = AttNotFoundCreateHandoffErrorResponse
+	s.AttNotFound = v
+}
+
+// GetAttNotFound returns AttNotFound and true boolean if CreateHandoffErrorResponse is AttNotFound.
+func (s CreateHandoffErrorResponse) GetAttNotFound() (v AttNotFound, ok bool) {
+	if !s.IsAttNotFound() {
+		return v, false
+	}
+	return s.AttNotFound, true
+}
+
+// NewAttNotFoundCreateHandoffErrorResponse returns new CreateHandoffErrorResponse from AttNotFound.
+func NewAttNotFoundCreateHandoffErrorResponse(v AttNotFound) CreateHandoffErrorResponse {
+	var s CreateHandoffErrorResponse
+	s.SetAttNotFound(v)
+	return s
+}
+
+// SetAttInvalidState sets CreateHandoffErrorResponse to AttInvalidState.
+func (s *CreateHandoffErrorResponse) SetAttInvalidState(v AttInvalidState) {
+	s.Type = AttInvalidStateCreateHandoffErrorResponse
+	s.AttInvalidState = v
+}
+
+// GetAttInvalidState returns AttInvalidState and true boolean if CreateHandoffErrorResponse is AttInvalidState.
+func (s CreateHandoffErrorResponse) GetAttInvalidState() (v AttInvalidState, ok bool) {
+	if !s.IsAttInvalidState() {
+		return v, false
+	}
+	return s.AttInvalidState, true
+}
+
+// NewAttInvalidStateCreateHandoffErrorResponse returns new CreateHandoffErrorResponse from AttInvalidState.
+func NewAttInvalidStateCreateHandoffErrorResponse(v AttInvalidState) CreateHandoffErrorResponse {
+	var s CreateHandoffErrorResponse
+	s.SetAttInvalidState(v)
+	return s
+}
+
+// SetAttNotCompleted sets CreateHandoffErrorResponse to AttNotCompleted.
+func (s *CreateHandoffErrorResponse) SetAttNotCompleted(v AttNotCompleted) {
+	s.Type = AttNotCompletedCreateHandoffErrorResponse
+	s.AttNotCompleted = v
+}
+
+// GetAttNotCompleted returns AttNotCompleted and true boolean if CreateHandoffErrorResponse is AttNotCompleted.
+func (s CreateHandoffErrorResponse) GetAttNotCompleted() (v AttNotCompleted, ok bool) {
+	if !s.IsAttNotCompleted() {
+		return v, false
+	}
+	return s.AttNotCompleted, true
+}
+
+// NewAttNotCompletedCreateHandoffErrorResponse returns new CreateHandoffErrorResponse from AttNotCompleted.
+func NewAttNotCompletedCreateHandoffErrorResponse(v AttNotCompleted) CreateHandoffErrorResponse {
+	var s CreateHandoffErrorResponse
+	s.SetAttNotCompleted(v)
+	return s
+}
+
+// SetInternal sets CreateHandoffErrorResponse to Internal.
+func (s *CreateHandoffErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalCreateHandoffErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if CreateHandoffErrorResponse is Internal.
+func (s CreateHandoffErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalCreateHandoffErrorResponse returns new CreateHandoffErrorResponse from Internal.
+func NewInternalCreateHandoffErrorResponse(v Internal) CreateHandoffErrorResponse {
+	var s CreateHandoffErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// CreateHandoffErrorResponseStatusCode wraps CreateHandoffErrorResponse with StatusCode.
 type CreateHandoffErrorResponseStatusCode struct {
 	StatusCode int
-	Response   jx.Raw
+	Response   CreateHandoffErrorResponse
 }
 
 // GetStatusCode returns the value of StatusCode.
@@ -1025,7 +1588,7 @@ func (s *CreateHandoffErrorResponseStatusCode) GetStatusCode() int {
 }
 
 // GetResponse returns the value of Response.
-func (s *CreateHandoffErrorResponseStatusCode) GetResponse() jx.Raw {
+func (s *CreateHandoffErrorResponseStatusCode) GetResponse() CreateHandoffErrorResponse {
 	return s.Response
 }
 
@@ -1035,7 +1598,7 @@ func (s *CreateHandoffErrorResponseStatusCode) SetStatusCode(val int) {
 }
 
 // SetResponse sets the value of Response.
-func (s *CreateHandoffErrorResponseStatusCode) SetResponse(val jx.Raw) {
+func (s *CreateHandoffErrorResponseStatusCode) SetResponse(val CreateHandoffErrorResponse) {
 	s.Response = val
 }
 
@@ -1501,7 +2064,6 @@ func (*ErrorDetailsStatusCode) getSessionRes()             {}
 func (*ErrorDetailsStatusCode) getTokenRes()               {}
 func (*ErrorDetailsStatusCode) getUserInfoRes()            {}
 func (*ErrorDetailsStatusCode) introspectRes()             {}
-func (*ErrorDetailsStatusCode) issueChallengeRes()         {}
 func (*ErrorDetailsStatusCode) listFlowDefinitionsRes()    {}
 func (*ErrorDetailsStatusCode) listSessionsRes()           {}
 func (*ErrorDetailsStatusCode) listUsersRes()              {}
@@ -3571,10 +4133,78 @@ func (s *GateType) UnmarshalText(data []byte) error {
 	}
 }
 
-// GetAuthAttemptErrorResponseStatusCode wraps jx.Raw with StatusCode.
+// GetAuthAttemptErrorResponse represents sum type.
+type GetAuthAttemptErrorResponse struct {
+	Type        GetAuthAttemptErrorResponseType // switch on this field
+	AttNotFound AttNotFound
+	Internal    Internal
+}
+
+// GetAuthAttemptErrorResponseType is oneOf type of GetAuthAttemptErrorResponse.
+type GetAuthAttemptErrorResponseType string
+
+// Possible values for GetAuthAttemptErrorResponseType.
+const (
+	AttNotFoundGetAuthAttemptErrorResponse GetAuthAttemptErrorResponseType = "att.not_found"
+	InternalGetAuthAttemptErrorResponse    GetAuthAttemptErrorResponseType = "internal"
+)
+
+// IsAttNotFound reports whether GetAuthAttemptErrorResponse is AttNotFound.
+func (s GetAuthAttemptErrorResponse) IsAttNotFound() bool {
+	return s.Type == AttNotFoundGetAuthAttemptErrorResponse
+}
+
+// IsInternal reports whether GetAuthAttemptErrorResponse is Internal.
+func (s GetAuthAttemptErrorResponse) IsInternal() bool {
+	return s.Type == InternalGetAuthAttemptErrorResponse
+}
+
+// SetAttNotFound sets GetAuthAttemptErrorResponse to AttNotFound.
+func (s *GetAuthAttemptErrorResponse) SetAttNotFound(v AttNotFound) {
+	s.Type = AttNotFoundGetAuthAttemptErrorResponse
+	s.AttNotFound = v
+}
+
+// GetAttNotFound returns AttNotFound and true boolean if GetAuthAttemptErrorResponse is AttNotFound.
+func (s GetAuthAttemptErrorResponse) GetAttNotFound() (v AttNotFound, ok bool) {
+	if !s.IsAttNotFound() {
+		return v, false
+	}
+	return s.AttNotFound, true
+}
+
+// NewAttNotFoundGetAuthAttemptErrorResponse returns new GetAuthAttemptErrorResponse from AttNotFound.
+func NewAttNotFoundGetAuthAttemptErrorResponse(v AttNotFound) GetAuthAttemptErrorResponse {
+	var s GetAuthAttemptErrorResponse
+	s.SetAttNotFound(v)
+	return s
+}
+
+// SetInternal sets GetAuthAttemptErrorResponse to Internal.
+func (s *GetAuthAttemptErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetAuthAttemptErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if GetAuthAttemptErrorResponse is Internal.
+func (s GetAuthAttemptErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalGetAuthAttemptErrorResponse returns new GetAuthAttemptErrorResponse from Internal.
+func NewInternalGetAuthAttemptErrorResponse(v Internal) GetAuthAttemptErrorResponse {
+	var s GetAuthAttemptErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// GetAuthAttemptErrorResponseStatusCode wraps GetAuthAttemptErrorResponse with StatusCode.
 type GetAuthAttemptErrorResponseStatusCode struct {
 	StatusCode int
-	Response   jx.Raw
+	Response   GetAuthAttemptErrorResponse
 }
 
 // GetStatusCode returns the value of StatusCode.
@@ -3583,7 +4213,7 @@ func (s *GetAuthAttemptErrorResponseStatusCode) GetStatusCode() int {
 }
 
 // GetResponse returns the value of Response.
-func (s *GetAuthAttemptErrorResponseStatusCode) GetResponse() jx.Raw {
+func (s *GetAuthAttemptErrorResponseStatusCode) GetResponse() GetAuthAttemptErrorResponse {
 	return s.Response
 }
 
@@ -3593,7 +4223,7 @@ func (s *GetAuthAttemptErrorResponseStatusCode) SetStatusCode(val int) {
 }
 
 // SetResponse sets the value of Response.
-func (s *GetAuthAttemptErrorResponseStatusCode) SetResponse(val jx.Raw) {
+func (s *GetAuthAttemptErrorResponseStatusCode) SetResponse(val GetAuthAttemptErrorResponse) {
 	s.Response = val
 }
 
@@ -3921,6 +4551,59 @@ func (s *IdentifierProof) SetLoginName(val string) {
 	s.LoginName = val
 }
 
+// Merged schema.
+// Ref: #
+type Internal struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptInternalDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *Internal) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *Internal) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *Internal) GetDetails() OptInternalDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *Internal) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *Internal) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *Internal) SetDetails(val OptInternalDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type InternalDetails map[string]jx.Raw
+
+func (s *InternalDetails) init() InternalDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
 // Ref: #
 type IntrospectRequest struct {
 	// The token to introspect.
@@ -4099,17 +4782,185 @@ func (s *IntrospectResponse) SetUsername(val OptString) {
 
 func (*IntrospectResponse) introspectRes() {}
 
-type IssueChallengeBadRequest ErrorDetails
+// IssueChallengeErrorResponse represents sum type.
+type IssueChallengeErrorResponse struct {
+	Type                IssueChallengeErrorResponseType // switch on this field
+	AttNotFound         AttNotFound
+	AttInvalidRequest   AttInvalidRequest
+	AttInvalidState     AttInvalidState
+	AttAlreadyCompleted AttAlreadyCompleted
+	Internal            Internal
+}
 
-func (*IssueChallengeBadRequest) issueChallengeRes() {}
+// IssueChallengeErrorResponseType is oneOf type of IssueChallengeErrorResponse.
+type IssueChallengeErrorResponseType string
 
-type IssueChallengeConflict ErrorDetails
+// Possible values for IssueChallengeErrorResponseType.
+const (
+	AttNotFoundIssueChallengeErrorResponse         IssueChallengeErrorResponseType = "att.not_found"
+	AttInvalidRequestIssueChallengeErrorResponse   IssueChallengeErrorResponseType = "att.invalid_request"
+	AttInvalidStateIssueChallengeErrorResponse     IssueChallengeErrorResponseType = "att.invalid_state"
+	AttAlreadyCompletedIssueChallengeErrorResponse IssueChallengeErrorResponseType = "att.already_completed"
+	InternalIssueChallengeErrorResponse            IssueChallengeErrorResponseType = "internal"
+)
 
-func (*IssueChallengeConflict) issueChallengeRes() {}
+// IsAttNotFound reports whether IssueChallengeErrorResponse is AttNotFound.
+func (s IssueChallengeErrorResponse) IsAttNotFound() bool {
+	return s.Type == AttNotFoundIssueChallengeErrorResponse
+}
 
-type IssueChallengeNotFound ErrorDetails
+// IsAttInvalidRequest reports whether IssueChallengeErrorResponse is AttInvalidRequest.
+func (s IssueChallengeErrorResponse) IsAttInvalidRequest() bool {
+	return s.Type == AttInvalidRequestIssueChallengeErrorResponse
+}
 
-func (*IssueChallengeNotFound) issueChallengeRes() {}
+// IsAttInvalidState reports whether IssueChallengeErrorResponse is AttInvalidState.
+func (s IssueChallengeErrorResponse) IsAttInvalidState() bool {
+	return s.Type == AttInvalidStateIssueChallengeErrorResponse
+}
+
+// IsAttAlreadyCompleted reports whether IssueChallengeErrorResponse is AttAlreadyCompleted.
+func (s IssueChallengeErrorResponse) IsAttAlreadyCompleted() bool {
+	return s.Type == AttAlreadyCompletedIssueChallengeErrorResponse
+}
+
+// IsInternal reports whether IssueChallengeErrorResponse is Internal.
+func (s IssueChallengeErrorResponse) IsInternal() bool {
+	return s.Type == InternalIssueChallengeErrorResponse
+}
+
+// SetAttNotFound sets IssueChallengeErrorResponse to AttNotFound.
+func (s *IssueChallengeErrorResponse) SetAttNotFound(v AttNotFound) {
+	s.Type = AttNotFoundIssueChallengeErrorResponse
+	s.AttNotFound = v
+}
+
+// GetAttNotFound returns AttNotFound and true boolean if IssueChallengeErrorResponse is AttNotFound.
+func (s IssueChallengeErrorResponse) GetAttNotFound() (v AttNotFound, ok bool) {
+	if !s.IsAttNotFound() {
+		return v, false
+	}
+	return s.AttNotFound, true
+}
+
+// NewAttNotFoundIssueChallengeErrorResponse returns new IssueChallengeErrorResponse from AttNotFound.
+func NewAttNotFoundIssueChallengeErrorResponse(v AttNotFound) IssueChallengeErrorResponse {
+	var s IssueChallengeErrorResponse
+	s.SetAttNotFound(v)
+	return s
+}
+
+// SetAttInvalidRequest sets IssueChallengeErrorResponse to AttInvalidRequest.
+func (s *IssueChallengeErrorResponse) SetAttInvalidRequest(v AttInvalidRequest) {
+	s.Type = AttInvalidRequestIssueChallengeErrorResponse
+	s.AttInvalidRequest = v
+}
+
+// GetAttInvalidRequest returns AttInvalidRequest and true boolean if IssueChallengeErrorResponse is AttInvalidRequest.
+func (s IssueChallengeErrorResponse) GetAttInvalidRequest() (v AttInvalidRequest, ok bool) {
+	if !s.IsAttInvalidRequest() {
+		return v, false
+	}
+	return s.AttInvalidRequest, true
+}
+
+// NewAttInvalidRequestIssueChallengeErrorResponse returns new IssueChallengeErrorResponse from AttInvalidRequest.
+func NewAttInvalidRequestIssueChallengeErrorResponse(v AttInvalidRequest) IssueChallengeErrorResponse {
+	var s IssueChallengeErrorResponse
+	s.SetAttInvalidRequest(v)
+	return s
+}
+
+// SetAttInvalidState sets IssueChallengeErrorResponse to AttInvalidState.
+func (s *IssueChallengeErrorResponse) SetAttInvalidState(v AttInvalidState) {
+	s.Type = AttInvalidStateIssueChallengeErrorResponse
+	s.AttInvalidState = v
+}
+
+// GetAttInvalidState returns AttInvalidState and true boolean if IssueChallengeErrorResponse is AttInvalidState.
+func (s IssueChallengeErrorResponse) GetAttInvalidState() (v AttInvalidState, ok bool) {
+	if !s.IsAttInvalidState() {
+		return v, false
+	}
+	return s.AttInvalidState, true
+}
+
+// NewAttInvalidStateIssueChallengeErrorResponse returns new IssueChallengeErrorResponse from AttInvalidState.
+func NewAttInvalidStateIssueChallengeErrorResponse(v AttInvalidState) IssueChallengeErrorResponse {
+	var s IssueChallengeErrorResponse
+	s.SetAttInvalidState(v)
+	return s
+}
+
+// SetAttAlreadyCompleted sets IssueChallengeErrorResponse to AttAlreadyCompleted.
+func (s *IssueChallengeErrorResponse) SetAttAlreadyCompleted(v AttAlreadyCompleted) {
+	s.Type = AttAlreadyCompletedIssueChallengeErrorResponse
+	s.AttAlreadyCompleted = v
+}
+
+// GetAttAlreadyCompleted returns AttAlreadyCompleted and true boolean if IssueChallengeErrorResponse is AttAlreadyCompleted.
+func (s IssueChallengeErrorResponse) GetAttAlreadyCompleted() (v AttAlreadyCompleted, ok bool) {
+	if !s.IsAttAlreadyCompleted() {
+		return v, false
+	}
+	return s.AttAlreadyCompleted, true
+}
+
+// NewAttAlreadyCompletedIssueChallengeErrorResponse returns new IssueChallengeErrorResponse from AttAlreadyCompleted.
+func NewAttAlreadyCompletedIssueChallengeErrorResponse(v AttAlreadyCompleted) IssueChallengeErrorResponse {
+	var s IssueChallengeErrorResponse
+	s.SetAttAlreadyCompleted(v)
+	return s
+}
+
+// SetInternal sets IssueChallengeErrorResponse to Internal.
+func (s *IssueChallengeErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalIssueChallengeErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if IssueChallengeErrorResponse is Internal.
+func (s IssueChallengeErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalIssueChallengeErrorResponse returns new IssueChallengeErrorResponse from Internal.
+func NewInternalIssueChallengeErrorResponse(v Internal) IssueChallengeErrorResponse {
+	var s IssueChallengeErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// IssueChallengeErrorResponseStatusCode wraps IssueChallengeErrorResponse with StatusCode.
+type IssueChallengeErrorResponseStatusCode struct {
+	StatusCode int
+	Response   IssueChallengeErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *IssueChallengeErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *IssueChallengeErrorResponseStatusCode) GetResponse() IssueChallengeErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *IssueChallengeErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *IssueChallengeErrorResponseStatusCode) SetResponse(val IssueChallengeErrorResponse) {
+	s.Response = val
+}
+
+func (*IssueChallengeErrorResponseStatusCode) issueChallengeRes() {}
 
 // Request to issue a factor challenge.
 // The `method` field selects which factor to challenge. Additional fields are
@@ -5626,6 +6477,328 @@ func (s *OpenidConfigurationTokenEndpointAuthMethodsSupportedItem) UnmarshalText
 	}
 }
 
+// NewOptAttAlreadyCompletedDetails returns new OptAttAlreadyCompletedDetails with value set to v.
+func NewOptAttAlreadyCompletedDetails(v AttAlreadyCompletedDetails) OptAttAlreadyCompletedDetails {
+	return OptAttAlreadyCompletedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptAttAlreadyCompletedDetails is optional AttAlreadyCompletedDetails.
+type OptAttAlreadyCompletedDetails struct {
+	Value AttAlreadyCompletedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptAttAlreadyCompletedDetails was set.
+func (o OptAttAlreadyCompletedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptAttAlreadyCompletedDetails) Reset() {
+	var v AttAlreadyCompletedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptAttAlreadyCompletedDetails) SetTo(v AttAlreadyCompletedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptAttAlreadyCompletedDetails) Get() (v AttAlreadyCompletedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptAttAlreadyCompletedDetails) Or(d AttAlreadyCompletedDetails) AttAlreadyCompletedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptAttInvalidRequestDetails returns new OptAttInvalidRequestDetails with value set to v.
+func NewOptAttInvalidRequestDetails(v AttInvalidRequestDetails) OptAttInvalidRequestDetails {
+	return OptAttInvalidRequestDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptAttInvalidRequestDetails is optional AttInvalidRequestDetails.
+type OptAttInvalidRequestDetails struct {
+	Value AttInvalidRequestDetails
+	Set   bool
+}
+
+// IsSet returns true if OptAttInvalidRequestDetails was set.
+func (o OptAttInvalidRequestDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptAttInvalidRequestDetails) Reset() {
+	var v AttInvalidRequestDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptAttInvalidRequestDetails) SetTo(v AttInvalidRequestDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptAttInvalidRequestDetails) Get() (v AttInvalidRequestDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptAttInvalidRequestDetails) Or(d AttInvalidRequestDetails) AttInvalidRequestDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptAttInvalidStateDetails returns new OptAttInvalidStateDetails with value set to v.
+func NewOptAttInvalidStateDetails(v AttInvalidStateDetails) OptAttInvalidStateDetails {
+	return OptAttInvalidStateDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptAttInvalidStateDetails is optional AttInvalidStateDetails.
+type OptAttInvalidStateDetails struct {
+	Value AttInvalidStateDetails
+	Set   bool
+}
+
+// IsSet returns true if OptAttInvalidStateDetails was set.
+func (o OptAttInvalidStateDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptAttInvalidStateDetails) Reset() {
+	var v AttInvalidStateDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptAttInvalidStateDetails) SetTo(v AttInvalidStateDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptAttInvalidStateDetails) Get() (v AttInvalidStateDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptAttInvalidStateDetails) Or(d AttInvalidStateDetails) AttInvalidStateDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptAttNotCompletedDetails returns new OptAttNotCompletedDetails with value set to v.
+func NewOptAttNotCompletedDetails(v AttNotCompletedDetails) OptAttNotCompletedDetails {
+	return OptAttNotCompletedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptAttNotCompletedDetails is optional AttNotCompletedDetails.
+type OptAttNotCompletedDetails struct {
+	Value AttNotCompletedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptAttNotCompletedDetails was set.
+func (o OptAttNotCompletedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptAttNotCompletedDetails) Reset() {
+	var v AttNotCompletedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptAttNotCompletedDetails) SetTo(v AttNotCompletedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptAttNotCompletedDetails) Get() (v AttNotCompletedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptAttNotCompletedDetails) Or(d AttNotCompletedDetails) AttNotCompletedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptAttNotFoundDetails returns new OptAttNotFoundDetails with value set to v.
+func NewOptAttNotFoundDetails(v AttNotFoundDetails) OptAttNotFoundDetails {
+	return OptAttNotFoundDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptAttNotFoundDetails is optional AttNotFoundDetails.
+type OptAttNotFoundDetails struct {
+	Value AttNotFoundDetails
+	Set   bool
+}
+
+// IsSet returns true if OptAttNotFoundDetails was set.
+func (o OptAttNotFoundDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptAttNotFoundDetails) Reset() {
+	var v AttNotFoundDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptAttNotFoundDetails) SetTo(v AttNotFoundDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptAttNotFoundDetails) Get() (v AttNotFoundDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptAttNotFoundDetails) Or(d AttNotFoundDetails) AttNotFoundDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptAttProofRejectedDetails returns new OptAttProofRejectedDetails with value set to v.
+func NewOptAttProofRejectedDetails(v AttProofRejectedDetails) OptAttProofRejectedDetails {
+	return OptAttProofRejectedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptAttProofRejectedDetails is optional AttProofRejectedDetails.
+type OptAttProofRejectedDetails struct {
+	Value AttProofRejectedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptAttProofRejectedDetails was set.
+func (o OptAttProofRejectedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptAttProofRejectedDetails) Reset() {
+	var v AttProofRejectedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptAttProofRejectedDetails) SetTo(v AttProofRejectedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptAttProofRejectedDetails) Get() (v AttProofRejectedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptAttProofRejectedDetails) Or(d AttProofRejectedDetails) AttProofRejectedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptAttStaleChallengeDetails returns new OptAttStaleChallengeDetails with value set to v.
+func NewOptAttStaleChallengeDetails(v AttStaleChallengeDetails) OptAttStaleChallengeDetails {
+	return OptAttStaleChallengeDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptAttStaleChallengeDetails is optional AttStaleChallengeDetails.
+type OptAttStaleChallengeDetails struct {
+	Value AttStaleChallengeDetails
+	Set   bool
+}
+
+// IsSet returns true if OptAttStaleChallengeDetails was set.
+func (o OptAttStaleChallengeDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptAttStaleChallengeDetails) Reset() {
+	var v AttStaleChallengeDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptAttStaleChallengeDetails) SetTo(v AttStaleChallengeDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptAttStaleChallengeDetails) Get() (v AttStaleChallengeDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptAttStaleChallengeDetails) Or(d AttStaleChallengeDetails) AttStaleChallengeDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptAuthMethod returns new OptAuthMethod with value set to v.
 func NewOptAuthMethod(v AuthMethod) OptAuthMethod {
 	return OptAuthMethod{
@@ -6776,6 +7949,52 @@ func (o OptInt) Or(d int) int {
 	return d
 }
 
+// NewOptInternalDetails returns new OptInternalDetails with value set to v.
+func NewOptInternalDetails(v InternalDetails) OptInternalDetails {
+	return OptInternalDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptInternalDetails is optional InternalDetails.
+type OptInternalDetails struct {
+	Value InternalDetails
+	Set   bool
+}
+
+// IsSet returns true if OptInternalDetails was set.
+func (o OptInternalDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptInternalDetails) Reset() {
+	var v InternalDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptInternalDetails) SetTo(v InternalDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptInternalDetails) Get() (v InternalDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptInternalDetails) Or(d InternalDetails) InternalDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptIssueChallengeRequestPasskeyOptions returns new OptIssueChallengeRequestPasskeyOptions with value set to v.
 func NewOptIssueChallengeRequestPasskeyOptions(v IssueChallengeRequestPasskeyOptions) OptIssueChallengeRequestPasskeyOptions {
 	return OptIssueChallengeRequestPasskeyOptions{
@@ -7350,69 +8569,6 @@ func (o OptNilPageToken) Or(d PageToken) PageToken {
 	return d
 }
 
-// NewOptNilPasskeyFactorPayloadAuthenticatorAttachment returns new OptNilPasskeyFactorPayloadAuthenticatorAttachment with value set to v.
-func NewOptNilPasskeyFactorPayloadAuthenticatorAttachment(v PasskeyFactorPayloadAuthenticatorAttachment) OptNilPasskeyFactorPayloadAuthenticatorAttachment {
-	return OptNilPasskeyFactorPayloadAuthenticatorAttachment{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptNilPasskeyFactorPayloadAuthenticatorAttachment is optional nullable PasskeyFactorPayloadAuthenticatorAttachment.
-type OptNilPasskeyFactorPayloadAuthenticatorAttachment struct {
-	Value PasskeyFactorPayloadAuthenticatorAttachment
-	Set   bool
-	Null  bool
-}
-
-// IsSet returns true if OptNilPasskeyFactorPayloadAuthenticatorAttachment was set.
-func (o OptNilPasskeyFactorPayloadAuthenticatorAttachment) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptNilPasskeyFactorPayloadAuthenticatorAttachment) Reset() {
-	var v PasskeyFactorPayloadAuthenticatorAttachment
-	o.Value = v
-	o.Set = false
-	o.Null = false
-}
-
-// SetTo sets value to v.
-func (o *OptNilPasskeyFactorPayloadAuthenticatorAttachment) SetTo(v PasskeyFactorPayloadAuthenticatorAttachment) {
-	o.Set = true
-	o.Null = false
-	o.Value = v
-}
-
-// IsNull returns true if value is Null.
-func (o OptNilPasskeyFactorPayloadAuthenticatorAttachment) IsNull() bool { return o.Null }
-
-// SetToNull sets value to null.
-func (o *OptNilPasskeyFactorPayloadAuthenticatorAttachment) SetToNull() {
-	o.Set = true
-	o.Null = true
-	var v PasskeyFactorPayloadAuthenticatorAttachment
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptNilPasskeyFactorPayloadAuthenticatorAttachment) Get() (v PasskeyFactorPayloadAuthenticatorAttachment, ok bool) {
-	if o.Null {
-		return v, false
-	}
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptNilPasskeyFactorPayloadAuthenticatorAttachment) Or(d PasskeyFactorPayloadAuthenticatorAttachment) PasskeyFactorPayloadAuthenticatorAttachment {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptNilSessionID returns new OptNilSessionID with value set to v.
 func NewOptNilSessionID(v SessionID) OptNilSessionID {
 	return OptNilSessionID{
@@ -7940,6 +9096,52 @@ func (o OptPasskeyChallengePayloadPublicKeyUserVerification) Get() (v PasskeyCha
 
 // Or returns value if set, or given parameter if does not.
 func (o OptPasskeyChallengePayloadPublicKeyUserVerification) Or(d PasskeyChallengePayloadPublicKeyUserVerification) PasskeyChallengePayloadPublicKeyUserVerification {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptPasskeyFactorPayloadAuthenticatorAttachment returns new OptPasskeyFactorPayloadAuthenticatorAttachment with value set to v.
+func NewOptPasskeyFactorPayloadAuthenticatorAttachment(v PasskeyFactorPayloadAuthenticatorAttachment) OptPasskeyFactorPayloadAuthenticatorAttachment {
+	return OptPasskeyFactorPayloadAuthenticatorAttachment{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptPasskeyFactorPayloadAuthenticatorAttachment is optional PasskeyFactorPayloadAuthenticatorAttachment.
+type OptPasskeyFactorPayloadAuthenticatorAttachment struct {
+	Value PasskeyFactorPayloadAuthenticatorAttachment
+	Set   bool
+}
+
+// IsSet returns true if OptPasskeyFactorPayloadAuthenticatorAttachment was set.
+func (o OptPasskeyFactorPayloadAuthenticatorAttachment) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptPasskeyFactorPayloadAuthenticatorAttachment) Reset() {
+	var v PasskeyFactorPayloadAuthenticatorAttachment
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptPasskeyFactorPayloadAuthenticatorAttachment) SetTo(v PasskeyFactorPayloadAuthenticatorAttachment) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptPasskeyFactorPayloadAuthenticatorAttachment) Get() (v PasskeyFactorPayloadAuthenticatorAttachment, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptPasskeyFactorPayloadAuthenticatorAttachment) Or(d PasskeyFactorPayloadAuthenticatorAttachment) PasskeyFactorPayloadAuthenticatorAttachment {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -8646,7 +9848,7 @@ type PasskeyFactorPayload struct {
 	// Whether the credential is currently backed up.
 	BackupState OptBool `json:"backup_state"`
 	// Authenticator attachment modality.
-	AuthenticatorAttachment OptNilPasskeyFactorPayloadAuthenticatorAttachment `json:"authenticator_attachment"`
+	AuthenticatorAttachment OptPasskeyFactorPayloadAuthenticatorAttachment `json:"authenticator_attachment"`
 }
 
 // GetCredentialID returns the value of CredentialID.
@@ -8670,7 +9872,7 @@ func (s *PasskeyFactorPayload) GetBackupState() OptBool {
 }
 
 // GetAuthenticatorAttachment returns the value of AuthenticatorAttachment.
-func (s *PasskeyFactorPayload) GetAuthenticatorAttachment() OptNilPasskeyFactorPayloadAuthenticatorAttachment {
+func (s *PasskeyFactorPayload) GetAuthenticatorAttachment() OptPasskeyFactorPayloadAuthenticatorAttachment {
 	return s.AuthenticatorAttachment
 }
 
@@ -8695,7 +9897,7 @@ func (s *PasskeyFactorPayload) SetBackupState(val OptBool) {
 }
 
 // SetAuthenticatorAttachment sets the value of AuthenticatorAttachment.
-func (s *PasskeyFactorPayload) SetAuthenticatorAttachment(val OptNilPasskeyFactorPayloadAuthenticatorAttachment) {
+func (s *PasskeyFactorPayload) SetAuthenticatorAttachment(val OptPasskeyFactorPayloadAuthenticatorAttachment) {
 	s.AuthenticatorAttachment = val
 }
 
@@ -10493,10 +11695,218 @@ func (s *UsernamePassword) SetRoles(val []string) {
 	s.Roles = val
 }
 
-// VerifyChallengeProofErrorResponseStatusCode wraps jx.Raw with StatusCode.
+// VerifyChallengeProofErrorResponse represents sum type.
+type VerifyChallengeProofErrorResponse struct {
+	Type                VerifyChallengeProofErrorResponseType // switch on this field
+	AttNotFound         AttNotFound
+	AttStaleChallenge   AttStaleChallenge
+	AttInvalidRequest   AttInvalidRequest
+	AttProofRejected    AttProofRejected
+	AttInvalidState     AttInvalidState
+	AttAlreadyCompleted AttAlreadyCompleted
+	Internal            Internal
+}
+
+// VerifyChallengeProofErrorResponseType is oneOf type of VerifyChallengeProofErrorResponse.
+type VerifyChallengeProofErrorResponseType string
+
+// Possible values for VerifyChallengeProofErrorResponseType.
+const (
+	AttNotFoundVerifyChallengeProofErrorResponse         VerifyChallengeProofErrorResponseType = "att.not_found"
+	AttStaleChallengeVerifyChallengeProofErrorResponse   VerifyChallengeProofErrorResponseType = "att.stale_challenge"
+	AttInvalidRequestVerifyChallengeProofErrorResponse   VerifyChallengeProofErrorResponseType = "att.invalid_request"
+	AttProofRejectedVerifyChallengeProofErrorResponse    VerifyChallengeProofErrorResponseType = "att.proof_rejected"
+	AttInvalidStateVerifyChallengeProofErrorResponse     VerifyChallengeProofErrorResponseType = "att.invalid_state"
+	AttAlreadyCompletedVerifyChallengeProofErrorResponse VerifyChallengeProofErrorResponseType = "att.already_completed"
+	InternalVerifyChallengeProofErrorResponse            VerifyChallengeProofErrorResponseType = "internal"
+)
+
+// IsAttNotFound reports whether VerifyChallengeProofErrorResponse is AttNotFound.
+func (s VerifyChallengeProofErrorResponse) IsAttNotFound() bool {
+	return s.Type == AttNotFoundVerifyChallengeProofErrorResponse
+}
+
+// IsAttStaleChallenge reports whether VerifyChallengeProofErrorResponse is AttStaleChallenge.
+func (s VerifyChallengeProofErrorResponse) IsAttStaleChallenge() bool {
+	return s.Type == AttStaleChallengeVerifyChallengeProofErrorResponse
+}
+
+// IsAttInvalidRequest reports whether VerifyChallengeProofErrorResponse is AttInvalidRequest.
+func (s VerifyChallengeProofErrorResponse) IsAttInvalidRequest() bool {
+	return s.Type == AttInvalidRequestVerifyChallengeProofErrorResponse
+}
+
+// IsAttProofRejected reports whether VerifyChallengeProofErrorResponse is AttProofRejected.
+func (s VerifyChallengeProofErrorResponse) IsAttProofRejected() bool {
+	return s.Type == AttProofRejectedVerifyChallengeProofErrorResponse
+}
+
+// IsAttInvalidState reports whether VerifyChallengeProofErrorResponse is AttInvalidState.
+func (s VerifyChallengeProofErrorResponse) IsAttInvalidState() bool {
+	return s.Type == AttInvalidStateVerifyChallengeProofErrorResponse
+}
+
+// IsAttAlreadyCompleted reports whether VerifyChallengeProofErrorResponse is AttAlreadyCompleted.
+func (s VerifyChallengeProofErrorResponse) IsAttAlreadyCompleted() bool {
+	return s.Type == AttAlreadyCompletedVerifyChallengeProofErrorResponse
+}
+
+// IsInternal reports whether VerifyChallengeProofErrorResponse is Internal.
+func (s VerifyChallengeProofErrorResponse) IsInternal() bool {
+	return s.Type == InternalVerifyChallengeProofErrorResponse
+}
+
+// SetAttNotFound sets VerifyChallengeProofErrorResponse to AttNotFound.
+func (s *VerifyChallengeProofErrorResponse) SetAttNotFound(v AttNotFound) {
+	s.Type = AttNotFoundVerifyChallengeProofErrorResponse
+	s.AttNotFound = v
+}
+
+// GetAttNotFound returns AttNotFound and true boolean if VerifyChallengeProofErrorResponse is AttNotFound.
+func (s VerifyChallengeProofErrorResponse) GetAttNotFound() (v AttNotFound, ok bool) {
+	if !s.IsAttNotFound() {
+		return v, false
+	}
+	return s.AttNotFound, true
+}
+
+// NewAttNotFoundVerifyChallengeProofErrorResponse returns new VerifyChallengeProofErrorResponse from AttNotFound.
+func NewAttNotFoundVerifyChallengeProofErrorResponse(v AttNotFound) VerifyChallengeProofErrorResponse {
+	var s VerifyChallengeProofErrorResponse
+	s.SetAttNotFound(v)
+	return s
+}
+
+// SetAttStaleChallenge sets VerifyChallengeProofErrorResponse to AttStaleChallenge.
+func (s *VerifyChallengeProofErrorResponse) SetAttStaleChallenge(v AttStaleChallenge) {
+	s.Type = AttStaleChallengeVerifyChallengeProofErrorResponse
+	s.AttStaleChallenge = v
+}
+
+// GetAttStaleChallenge returns AttStaleChallenge and true boolean if VerifyChallengeProofErrorResponse is AttStaleChallenge.
+func (s VerifyChallengeProofErrorResponse) GetAttStaleChallenge() (v AttStaleChallenge, ok bool) {
+	if !s.IsAttStaleChallenge() {
+		return v, false
+	}
+	return s.AttStaleChallenge, true
+}
+
+// NewAttStaleChallengeVerifyChallengeProofErrorResponse returns new VerifyChallengeProofErrorResponse from AttStaleChallenge.
+func NewAttStaleChallengeVerifyChallengeProofErrorResponse(v AttStaleChallenge) VerifyChallengeProofErrorResponse {
+	var s VerifyChallengeProofErrorResponse
+	s.SetAttStaleChallenge(v)
+	return s
+}
+
+// SetAttInvalidRequest sets VerifyChallengeProofErrorResponse to AttInvalidRequest.
+func (s *VerifyChallengeProofErrorResponse) SetAttInvalidRequest(v AttInvalidRequest) {
+	s.Type = AttInvalidRequestVerifyChallengeProofErrorResponse
+	s.AttInvalidRequest = v
+}
+
+// GetAttInvalidRequest returns AttInvalidRequest and true boolean if VerifyChallengeProofErrorResponse is AttInvalidRequest.
+func (s VerifyChallengeProofErrorResponse) GetAttInvalidRequest() (v AttInvalidRequest, ok bool) {
+	if !s.IsAttInvalidRequest() {
+		return v, false
+	}
+	return s.AttInvalidRequest, true
+}
+
+// NewAttInvalidRequestVerifyChallengeProofErrorResponse returns new VerifyChallengeProofErrorResponse from AttInvalidRequest.
+func NewAttInvalidRequestVerifyChallengeProofErrorResponse(v AttInvalidRequest) VerifyChallengeProofErrorResponse {
+	var s VerifyChallengeProofErrorResponse
+	s.SetAttInvalidRequest(v)
+	return s
+}
+
+// SetAttProofRejected sets VerifyChallengeProofErrorResponse to AttProofRejected.
+func (s *VerifyChallengeProofErrorResponse) SetAttProofRejected(v AttProofRejected) {
+	s.Type = AttProofRejectedVerifyChallengeProofErrorResponse
+	s.AttProofRejected = v
+}
+
+// GetAttProofRejected returns AttProofRejected and true boolean if VerifyChallengeProofErrorResponse is AttProofRejected.
+func (s VerifyChallengeProofErrorResponse) GetAttProofRejected() (v AttProofRejected, ok bool) {
+	if !s.IsAttProofRejected() {
+		return v, false
+	}
+	return s.AttProofRejected, true
+}
+
+// NewAttProofRejectedVerifyChallengeProofErrorResponse returns new VerifyChallengeProofErrorResponse from AttProofRejected.
+func NewAttProofRejectedVerifyChallengeProofErrorResponse(v AttProofRejected) VerifyChallengeProofErrorResponse {
+	var s VerifyChallengeProofErrorResponse
+	s.SetAttProofRejected(v)
+	return s
+}
+
+// SetAttInvalidState sets VerifyChallengeProofErrorResponse to AttInvalidState.
+func (s *VerifyChallengeProofErrorResponse) SetAttInvalidState(v AttInvalidState) {
+	s.Type = AttInvalidStateVerifyChallengeProofErrorResponse
+	s.AttInvalidState = v
+}
+
+// GetAttInvalidState returns AttInvalidState and true boolean if VerifyChallengeProofErrorResponse is AttInvalidState.
+func (s VerifyChallengeProofErrorResponse) GetAttInvalidState() (v AttInvalidState, ok bool) {
+	if !s.IsAttInvalidState() {
+		return v, false
+	}
+	return s.AttInvalidState, true
+}
+
+// NewAttInvalidStateVerifyChallengeProofErrorResponse returns new VerifyChallengeProofErrorResponse from AttInvalidState.
+func NewAttInvalidStateVerifyChallengeProofErrorResponse(v AttInvalidState) VerifyChallengeProofErrorResponse {
+	var s VerifyChallengeProofErrorResponse
+	s.SetAttInvalidState(v)
+	return s
+}
+
+// SetAttAlreadyCompleted sets VerifyChallengeProofErrorResponse to AttAlreadyCompleted.
+func (s *VerifyChallengeProofErrorResponse) SetAttAlreadyCompleted(v AttAlreadyCompleted) {
+	s.Type = AttAlreadyCompletedVerifyChallengeProofErrorResponse
+	s.AttAlreadyCompleted = v
+}
+
+// GetAttAlreadyCompleted returns AttAlreadyCompleted and true boolean if VerifyChallengeProofErrorResponse is AttAlreadyCompleted.
+func (s VerifyChallengeProofErrorResponse) GetAttAlreadyCompleted() (v AttAlreadyCompleted, ok bool) {
+	if !s.IsAttAlreadyCompleted() {
+		return v, false
+	}
+	return s.AttAlreadyCompleted, true
+}
+
+// NewAttAlreadyCompletedVerifyChallengeProofErrorResponse returns new VerifyChallengeProofErrorResponse from AttAlreadyCompleted.
+func NewAttAlreadyCompletedVerifyChallengeProofErrorResponse(v AttAlreadyCompleted) VerifyChallengeProofErrorResponse {
+	var s VerifyChallengeProofErrorResponse
+	s.SetAttAlreadyCompleted(v)
+	return s
+}
+
+// SetInternal sets VerifyChallengeProofErrorResponse to Internal.
+func (s *VerifyChallengeProofErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalVerifyChallengeProofErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if VerifyChallengeProofErrorResponse is Internal.
+func (s VerifyChallengeProofErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalVerifyChallengeProofErrorResponse returns new VerifyChallengeProofErrorResponse from Internal.
+func NewInternalVerifyChallengeProofErrorResponse(v Internal) VerifyChallengeProofErrorResponse {
+	var s VerifyChallengeProofErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// VerifyChallengeProofErrorResponseStatusCode wraps VerifyChallengeProofErrorResponse with StatusCode.
 type VerifyChallengeProofErrorResponseStatusCode struct {
 	StatusCode int
-	Response   jx.Raw
+	Response   VerifyChallengeProofErrorResponse
 }
 
 // GetStatusCode returns the value of StatusCode.
@@ -10505,7 +11915,7 @@ func (s *VerifyChallengeProofErrorResponseStatusCode) GetStatusCode() int {
 }
 
 // GetResponse returns the value of Response.
-func (s *VerifyChallengeProofErrorResponseStatusCode) GetResponse() jx.Raw {
+func (s *VerifyChallengeProofErrorResponseStatusCode) GetResponse() VerifyChallengeProofErrorResponse {
 	return s.Response
 }
 
@@ -10515,7 +11925,7 @@ func (s *VerifyChallengeProofErrorResponseStatusCode) SetStatusCode(val int) {
 }
 
 // SetResponse sets the value of Response.
-func (s *VerifyChallengeProofErrorResponseStatusCode) SetResponse(val jx.Raw) {
+func (s *VerifyChallengeProofErrorResponseStatusCode) SetResponse(val VerifyChallengeProofErrorResponse) {
 	s.Response = val
 }
 

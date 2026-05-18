@@ -162,9 +162,7 @@ func encodeCreateAuthAttemptResponse(response CreateAuthAttemptRes, w http.Respo
 		}
 
 		e := new(jx.Encoder)
-		if len(response.Response) != 0 {
-			e.Raw(response.Response)
-		}
+		response.Response.Encode(e)
 		if _, err := e.WriteTo(w); err != nil {
 			return errors.Wrap(err, "write")
 		}
@@ -374,9 +372,7 @@ func encodeCreateHandoffResponse(response CreateHandoffRes, w http.ResponseWrite
 		}
 
 		e := new(jx.Encoder)
-		if len(response.Response) != 0 {
-			e.Raw(response.Response)
-		}
+		response.Response.Encode(e)
 		if _, err := e.WriteTo(w); err != nil {
 			return errors.Wrap(err, "write")
 		}
@@ -826,9 +822,7 @@ func encodeGetAuthAttemptResponse(response GetAuthAttemptRes, w http.ResponseWri
 		}
 
 		e := new(jx.Encoder)
-		if len(response.Response) != 0 {
-			e.Raw(response.Response)
-		}
+		response.Response.Encode(e)
 		if _, err := e.WriteTo(w); err != nil {
 			return errors.Wrap(err, "write")
 		}
@@ -1622,46 +1616,7 @@ func encodeIssueChallengeResponse(response IssueChallengeRes, w http.ResponseWri
 
 		return nil
 
-	case *IssueChallengeBadRequest:
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
-
-		e := new(jx.Encoder)
-		response.Encode(e)
-		if _, err := e.WriteTo(w); err != nil {
-			return errors.Wrap(err, "write")
-		}
-
-		return nil
-
-	case *IssueChallengeNotFound:
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
-
-		e := new(jx.Encoder)
-		response.Encode(e)
-		if _, err := e.WriteTo(w); err != nil {
-			return errors.Wrap(err, "write")
-		}
-
-		return nil
-
-	case *IssueChallengeConflict:
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		w.WriteHeader(409)
-		span.SetStatus(codes.Error, http.StatusText(409))
-
-		e := new(jx.Encoder)
-		response.Encode(e)
-		if _, err := e.WriteTo(w); err != nil {
-			return errors.Wrap(err, "write")
-		}
-
-		return nil
-
-	case *ErrorDetailsStatusCode:
+	case *IssueChallengeErrorResponseStatusCode:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -2351,9 +2306,7 @@ func encodeVerifyChallengeProofResponse(response VerifyChallengeProofRes, w http
 		}
 
 		e := new(jx.Encoder)
-		if len(response.Response) != 0 {
-			e.Raw(response.Response)
-		}
+		response.Response.Encode(e)
 		if _, err := e.WriteTo(w); err != nil {
 			return errors.Wrap(err, "write")
 		}

@@ -77,10 +77,11 @@ func run(ctx context.Context, cfg Config, pool database.Pool) error {
 	userPasswordRepo := repository.NewUserPasswordRepository()
 	userPasskeyRepo := repository.NewUserPasskeyRepository()
 	sessionRepo := repository.NewSessionRepository(pool)
+	flowRepo := repository.NewFlowDefinitionRepository(pool)
 	attemptRepo := repository.NewAuthAttemptRepository(pool)
 
 	// ── Services ─────────────────────
-	flowService := service.NewFlowService(pool, repository.NewFlowDefinitionRepository(pool))
+	flowService := service.NewFlowService(pool, flowRepo)
 	authAttemptSvc := service.NewAuthAttemptService(
 		pool,
 		attemptRepo,
