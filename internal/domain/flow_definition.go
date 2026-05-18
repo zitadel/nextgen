@@ -151,12 +151,17 @@ type FlowSSOProvider struct {
 	Template string
 }
 
-// FlowStepTransition maps an action name to either a target step (regular) or a pivot purpose.
+// FlowStepTransition is the destination of a transition. The outcome
+// that triggers it is the map key in [FlowDefinitionStep.Transitions].
 type FlowStepTransition struct {
+	// Action selects how Target is interpreted:
+	//   nil   — Target is a step name in the current flow.
+	//   Switch — Target is another flow definition; replace the current flow.
+	//   Pivot — Target is another flow definition; push and resume on pop.
 	Action *FlowDefinitionTransitionAction
-	// Target is either a step in the current flow OR a new flow.
-	// When Action == nil, Target refers to a step in the current flow
-	// When Action != nil, Target refers to another flow.
+
+	// Target is either a step in the current flow (when Action == nil)
+	// or a flow definition name (when Action is Switch or Pivot).
 	Target string
 }
 
