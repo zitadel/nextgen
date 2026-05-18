@@ -57,6 +57,9 @@ func run(ctx context.Context, cfg Config) error {
 		Addr:              cfg.Server.Address,
 		Handler:           oasServer,
 		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
 	}
 
 	serverErr := make(chan error, 1)
