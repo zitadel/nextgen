@@ -33,10 +33,10 @@ Step 1 (login):
   → POST /flow/{id}/submit { action: "passkey" }
 
 Step 2 (passkey challenge):
-  challenge: { type: "passkey", challenge_id: "ch_123", options: {...} }
+  challenge: { method: "passkey", challenge_id: "ch_123", options: {...} }
   actions: { submit }
   <zl-passkey> reads step.challenge.options → triggers navigator.credentials.get()
-  → POST /flow/{id}/submit { action: "submit", challenge_response: { challenge_id, passkey: {...} } }
+  → POST /flow/{id}/submit { action: "submit", challenge_response: { challenge_id, method: "passkey", proof: {...} } }
 
 Step 3 (done):
   complete: "redirect"
@@ -57,7 +57,7 @@ processing the passkey action — no HTTP round-trip from the client to
    options generated on-demand by the auth_attempts service.
 
 3. **`<zl-passkey>` component.** An invisible Lit web component mounted by the
-   Liquid template. When `step.challenge.type === "passkey"`, it reads the
+   Liquid template. When `step.challenge.method === "passkey"`, it reads the
    options, triggers the browser's credential API, and auto-submits the proof.
 
 4. **`challenge_response` on submit.** The proof goes in a `challenge_response`
@@ -106,13 +106,12 @@ the step response and submit request.
 
 ## Consequences
 
-- **`flow-step.yaml`** gains a `challenge` property (type, challenge_id,
+- **`flow-step.yaml`** gains a `challenge` property (method, challenge_id,
   options).
 - **`flow-submit-request.yaml`** gains a `challenge_response` field
-  (challenge_id, method, passkey proof).
+  (challenge_id, method, proof).
 - **`gate.yaml`** — `passkey` removed from enum. Gates are captcha-only.
 - **`step-action.yaml`** — unchanged. Actions stay plain.
-- **New schema file:** `passkey-proof.yaml` (serialized PublicKeyCredential).
 - **Session factor:** `passkey` factor carries `user_verified`, `hardware`,
   `phishing_resistant`, `backup_eligible`, `backup_state`.
 - **Credential management** (`/users/{id}/passkeys`) is out of scope.
@@ -136,7 +135,7 @@ the initial step when the instance policy allows discoverable credentials:
       "passkey": { "text_key": "login.action.passkey" }
     },
     "challenge": {
-      "type": "passkey",
+      "method": "passkey",
       "mediation": "conditional",
       "challenge_id": "ch_pre_123",
       "options": {
