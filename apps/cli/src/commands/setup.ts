@@ -2,7 +2,6 @@ import type { ProjectContext } from "../adapters";
 import { getAdapter } from "../adapters/registry";
 import { detectDeployTarget } from "../deploy";
 import { detectFramework } from "../detect/framework";
-import { readPackageJson } from "../detect/package-json";
 import { detectPackageManager } from "../detect/package-manager";
 import { detectDevPort, issuerFromPort } from "../detect/port";
 import { hasZitadelConfig, hasZitadelSecret } from "../detect/state";
@@ -50,7 +49,6 @@ export async function runSetup(io: CliIO, opts: SetupOptions): Promise<void> {
   let deployTarget = opts.skipDeployPlatform
     ? undefined
     : await detectDeployTarget(opts.cwd, opts.platform);
-  const pkg = await readPackageJson(opts.cwd);
   let detectedPort = await detectDevPort(opts.cwd);
   let effectiveServer = opts.source;
 

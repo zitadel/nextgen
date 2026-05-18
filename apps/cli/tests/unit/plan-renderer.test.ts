@@ -11,8 +11,8 @@ function makeSyncer(kind: string, directory: string, mutable = false): ResourceS
     directory,
     mutable,
     async create(_c: PlatformClient, _d: object) { return "id"; },
-    async update() {},
-    async delete() {},
+    async update() { /* no-op: renderer tests do not exercise update */ },
+    async delete() { /* no-op: renderer tests do not exercise delete */ },
   };
 }
 

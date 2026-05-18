@@ -133,13 +133,15 @@ describe("<zitadel-login> form + focus (chromium)", () => {
 
   it("intercepts native submit and walks to the next step", async () => {
     const element = await mount();
-    const field = element.shadowRoot!.querySelector("zl-field") as HTMLElement & {
+    const shadowRoot = element.shadowRoot;
+    if (!shadowRoot) throw new Error("expected element to have a shadow root");
+    const field = shadowRoot.querySelector("zl-field") as HTMLElement & {
       value: string;
       updateComplete: Promise<unknown>;
     };
     field.value = "alice@acme.com";
     await field.updateComplete;
-    const form = element.shadowRoot!.querySelector("form") as HTMLFormElement;
+    const form = shadowRoot.querySelector("form") as HTMLFormElement;
     form.requestSubmit();
     await waitFor(() => {
       const next = element.shadowRoot?.querySelector("zl-field");
@@ -151,13 +153,15 @@ describe("<zitadel-login> form + focus (chromium)", () => {
 
   it("moves focus to the first field after a step swap", async () => {
     const element = await mount();
-    const field = element.shadowRoot!.querySelector("zl-field") as HTMLElement & {
+    const shadowRoot = element.shadowRoot;
+    if (!shadowRoot) throw new Error("expected element to have a shadow root");
+    const field = shadowRoot.querySelector("zl-field") as HTMLElement & {
       value: string;
       updateComplete: Promise<unknown>;
     };
     field.value = "alice@acme.com";
     await field.updateComplete;
-    const form = element.shadowRoot!.querySelector("form") as HTMLFormElement;
+    const form = shadowRoot.querySelector("form") as HTMLFormElement;
     form.requestSubmit();
     await waitFor(() => {
       const next = element.shadowRoot?.querySelector("zl-field");
