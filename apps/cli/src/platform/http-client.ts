@@ -1,5 +1,5 @@
 import { ZitadelError } from "../lib/errors";
-import type { PlatformClient } from "./client";
+import type { CreateFlowDefinitionRequest, PlatformClient } from "./client";
 import type {
   CapabilitiesResponse,
   ClaimStatusResponse,
@@ -69,8 +69,8 @@ export class HttpPlatformClient implements PlatformClient {
     return this.request("DELETE", `/schemas/${encodeURIComponent(id)}`);
   }
 
-  async createFlowDefinition(data: object): Promise<{ id: string }> {
-    return this.request("POST", "/flow_definitions", data);
+  async createFlowDefinition(req: CreateFlowDefinitionRequest): Promise<{ id: string }> {
+    return this.request("POST", "/flow_definitions", req);
   }
 
   async updateFlowDefinition(id: string, data: object): Promise<void> {

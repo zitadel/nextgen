@@ -31,8 +31,19 @@ export interface SchemaClient {
   deleteSchema(id: string): Promise<void>;
 }
 
+/**
+ * Request envelope for `POST /flow_definitions` per the OpenAPI spec
+ * (`api/openapi/components/flows/flow-definition-create-request.yaml`).
+ * The flow body itself goes under `flow_definition`.
+ */
+export interface CreateFlowDefinitionRequest {
+  readonly project_id: string;
+  readonly schema_uri?: string;
+  readonly flow_definition: object;
+}
+
 export interface FlowDefinitionClient {
-  createFlowDefinition(data: object): Promise<{ id: string }>;
+  createFlowDefinition(req: CreateFlowDefinitionRequest): Promise<{ id: string }>;
   updateFlowDefinition(id: string, data: object): Promise<void>;
   deleteFlowDefinition(id: string): Promise<void>;
 }

@@ -38,12 +38,24 @@ export class FlowDefinitionSyncer implements ResourceSyncer {
   readonly directory = ".zitadel/flows";
   readonly mutable = true;
 
+  constructor(private readonly projectId: string) {}
+
   async create(client: PlatformClient, data: object): Promise<string> {
-    const result = await client.createFlowDefinition(data);
+    // Wrap the bare flow body in the spec envelope before sending. The flow
+    // file on disk stays the bare flow-definition object so it is editable
+    // by humans; only the wire request carries `project_id` and the
+    // surrounding envelope per
+    // `api/openapi/components/flows/flow-definition-create-request.yaml`.
+    const result = await client.createFlowDefinition({
+      project_id: this.projectId,
+      flow_definition: data,
+    });
     return result.id;
   }
 
   async update(client: PlatformClient, id: string, data: object): Promise<void> {
+    // PATCH body is the bare partial flow per `flow-definition-update-request`
+    // — no envelope.
     await client.updateFlowDefinition(id, data);
   }
 
@@ -51,7 +63,16 @@ export class FlowDefinitionSyncer implements ResourceSyncer {
     await client.deleteFlowDefinition(id);
   }
 
-  // no fetch — GET /flow_definitions/{id} not implemented in backend
+  // no fetch — GET /flow_definitions/{id} is currently in the spec but the
+  // CLI doesn't read it back; a field-level diff in `plan` is therefore
+  // marked as "unavailable" rather than fetched.
 }
 
-export const syncers: ResourceSyncer[] = [new SchemaSyncer(), new FlowDefinitionSyncer()];
+/**
+ * Build the syncer list with the project context every flow create needs.
+ * Callers (apply / plan) read `project_id` from `.zitadel/secret` and pass
+ * it here.
+ */
+export function makeSyncers(opts: { projectId: string }): ResourceSyncer[] {
+  return [new SchemaSyncer(), new FlowDefinitionSyncer(opts.projectId)];
+}

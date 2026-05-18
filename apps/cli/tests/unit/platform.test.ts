@@ -39,20 +39,26 @@ describe("platform client", () => {
 
   it("createFlowDefinition, updateFlowDefinition, deleteFlowDefinition round-trip", async () => {
     const client = createPlatformClient(MOCK_SERVER_URL);
-    const { id } = await client.createFlowDefinition({ version: 1, slug: "default" });
+    const { id } = await client.createFlowDefinition({
+      project_id: "proj_test",
+      flow_definition: { name: "default", purposes: ["login"] },
+    });
     expect(id).toBeTruthy();
     // PATCH now returns 200 + flow-definition-detail-response per the spec
     // (was 204). The CLI client's typed return is `Promise<void>` and
     // discards the body, but the runtime value is the parsed envelope.
     await expect(
-      client.updateFlowDefinition(id, { version: 1, slug: "updated" }),
-    ).resolves.toMatchObject({ id, project_id: expect.any(String), status: "active" });
+      client.updateFlowDefinition(id, { name: "default", purposes: ["login", "register"] }),
+    ).resolves.toMatchObject({ id, project_id: "proj_test", status: "active" });
     await expect(client.deleteFlowDefinition(id)).resolves.toBeUndefined();
   });
 
   it("listFlowDefinitions and getFlowDefinition expose detail responses", async () => {
     const client = createPlatformClient(MOCK_SERVER_URL);
-    const { id } = await client.createFlowDefinition({ slug: "default" });
+    const { id } = await client.createFlowDefinition({
+      project_id: "proj_test",
+      flow_definition: { name: "default" },
+    });
 
     const single = await fetch(new URL(`/flow_definitions/${id}`, MOCK_SERVER_URL));
     expect(single.status).toBe(200);

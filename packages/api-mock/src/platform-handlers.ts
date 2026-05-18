@@ -239,22 +239,31 @@ export function setupPlatformHandlers() {
     // POST /flow_definitions
     //
     // Spec: requestBody is the `flow-definition-create-request` envelope
-    // (`{ project_id, schema_uri?, flow_definition }`). The mock accepts both
-    // that and a bare flow-definition body for backwards-compatibility while
-    // the CLI still POSTs the bare body. When the CLI is updated to send the
-    // envelope, the bare-body branch becomes dead.
+    // (`{ project_id, schema_uri?, flow_definition }`). The mock validates
+    // the envelope and 400s if `project_id` or `flow_definition` is missing,
+    // matching the contract any real backend would enforce.
     http.post("*/flow_definitions", async ({ request }) => {
       const raw = (await request.json()) as Record<string, unknown>;
-      const looksLikeEnvelope =
+      const hasEnvelope =
         raw &&
         typeof raw === "object" &&
-        "flow_definition" in raw &&
-        typeof raw.flow_definition === "object";
-      const projectId = looksLikeEnvelope ? String(raw.project_id ?? "proj_mock") : "proj_mock";
-      const schemaUri = looksLikeEnvelope
-        ? String(raw.schema_uri ?? DEFAULT_SCHEMA_URI)
-        : DEFAULT_SCHEMA_URI;
-      const body = (looksLikeEnvelope ? raw.flow_definition : raw) as Record<string, unknown>;
+        typeof raw.project_id === "string" &&
+        typeof raw.flow_definition === "object" &&
+        raw.flow_definition !== null;
+      if (!hasEnvelope) {
+        return HttpResponse.json(
+          {
+            code: "invalid_request",
+            message:
+              "POST /flow_definitions requires {project_id, flow_definition, schema_uri?} envelope",
+          },
+          { status: 400 },
+        );
+      }
+
+      const projectId = raw.project_id as string;
+      const schemaUri = typeof raw.schema_uri === "string" ? raw.schema_uri : DEFAULT_SCHEMA_URI;
+      const body = raw.flow_definition as Record<string, unknown>;
 
       const id = `flow_${shortId()}`;
       const now = nowIso();
