@@ -89,7 +89,9 @@ export function startMockServer(port: number): Server {
       // Note: 'Cookie' is a browser-forbidden header name and is never sent
       // as a JS request header; it does not need to be in Allow-Headers.
       // Cookies are carried automatically via credentials: "include".
-      res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+      // Idempotency-Key is custom (see /sessions/exchange) — must be listed
+      // explicitly or the browser preflight blocks the actual request.
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Idempotency-Key");
       res.status(204).end();
       return;
     }

@@ -289,9 +289,16 @@ export function setupPlatformHandlers() {
     }),
 
     // GET /flow_definitions (list)
+    //
+    // Spec `flow-definition-list-response.yaml` defines an optional
+    // `next_page_token` field that may be `null` when there is no next
+    // page. The mock never paginates (in-memory store), so we always emit
+    // explicit null — spec-strict consumers iterating with cursors can rely
+    // on its presence to detect end-of-list rather than `undefined`.
     http.get("*/flow_definitions", () => {
       return HttpResponse.json({
         flow_definitions: Array.from(store.flowDefinitions.values()).map(flowDetailResponse),
+        next_page_token: null,
       });
     }),
 
