@@ -1,0 +1,21 @@
+{
+  "type": "object",
+  "description": "A list of authentication methods supported by the user definition.",
+  "properties": {
+    "password": {
+      "$ref": "auth-method.json"
+    },
+    "passkey": {
+      "$ref": "auth-method.json"
+    },
+    "magic_link": {
+      "$ref": "auth-method.json"
+    },
+    "sso": {
+      "$ref": "auth-method.json"
+    },
+    "otp": {
+      "$ref": "auth-method.json"
+    }
+  }
+}

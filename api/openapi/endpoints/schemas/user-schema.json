@@ -1,7 +1,7 @@
 {
   "title": "UserSchema",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "type": "object",
+  "type": ["object"],
   "required": [
     "$schema",
     "$id",
@@ -17,13 +17,17 @@
     },
     "$id": {
       "type": "string",
-      "format": "uri",
       "description": "The unique identifier for this schema, which is also the URL where this schema can be accessed."
     },
     "kind": {
       "type": "string",
       "const": "user-schema",
       "description": "Discriminator value for a user schema create request."
+    },
+    "type": {
+      "type": "string",
+      "const": "object",
+      "description": "The type of a user must always be an object"
     },
     "title": {
       "type": "string",
@@ -37,25 +41,7 @@
       "description": "A description of this schema."
     },
     "x-auth-methods": {
-      "type": "object",
-      "description": "A list of authentication methods supported by the user definition.",
-      "properties": {
-        "password": {
-          "$ref": "auth-method.json"
-        },
-        "passkey": {
-          "$ref": "auth-method.json"
-        },
-        "magic_link": {
-          "$ref": "auth-method.json"
-        },
-        "sso": {
-          "$ref": "auth-method.json"
-        },
-        "otp": {
-          "$ref": "auth-method.json"
-        }
-      }
+      "$ref": "auth-methods.json"
     },
     "required": {
       "type": "array",
@@ -70,29 +56,6 @@
       "additionalProperties": {
         "$ref": "user-property.json"
       }
-    },
-    "example": {
-      "oneOf": [
-        {
-          "type": "string"
-        },
-        {
-          "type": "number"
-        },
-        {
-          "type": "boolean"
-        },
-        {
-          "type": "object"
-        },
-        {
-          "type": "array",
-          "items": {}
-        },
-        {
-          "type": "null"
-        }
-      ]
     }
   }
 }
