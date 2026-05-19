@@ -433,7 +433,7 @@ func (a *spannerAuthAttempt) Create(ctx context.Context, client database.QueryEx
 
 	var attemptID database.Identity
 	err := client.QueryRow(ctx,
-		`INSERT INTO auth_attempts (project_id, required_checks, time_to_live, session_id, created_at) VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+		`INSERT INTO auth_attempts (project_id, required_checks, time_to_live, session_id, created_at) VALUES ($1, $2, $3, $4, $5) THEN RETURN id`,
 		attempt.ProjectID, req, ttlNanos, sessionIDArg(attempt.SessionID), now).
 		Scan(&attemptID)
 	if err != nil {

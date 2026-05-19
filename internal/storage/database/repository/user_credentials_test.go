@@ -31,6 +31,7 @@ func insertProjectTeamSchemaUser(t *testing.T, tx database.Transaction, pid, tid
 }
 
 func TestUserPasswordRepository_CRUD(t *testing.T) {
+	skipIfSpanner(t)
 	repo := repository.NewUserPasswordRepository()
 	tx, rollback := transactionForRollback(t)
 	defer rollback()
@@ -92,6 +93,7 @@ func TestUserPasswordRepository_CRUD(t *testing.T) {
 }
 
 func TestUserTOTPRepository_CRUD(t *testing.T) {
+	skipIfSpanner(t)
 	repo := repository.NewUserTOTPRepository()
 	tx, rollback := transactionForRollback(t)
 	defer rollback()
@@ -142,6 +144,7 @@ func TestUserTOTPRepository_CRUD(t *testing.T) {
 }
 
 func TestUserRecoveryCodesRepository_CRUD(t *testing.T) {
+	skipIfSpanner(t)
 	repo := repository.NewUserRecoveryCodesRepository()
 	tx, rollback := transactionForRollback(t)
 	defer rollback()
@@ -190,6 +193,7 @@ func TestUserRecoveryCodesRepository_CRUD(t *testing.T) {
 }
 
 func TestUserPasskeyRepository_CRUD(t *testing.T) {
+	skipIfSpanner(t)
 	repo := repository.NewUserPasskeyRepository()
 	tx, rollback := transactionForRollback(t)
 	defer rollback()

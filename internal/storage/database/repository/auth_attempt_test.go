@@ -11,23 +11,6 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database/repository"
 )
 
-func ensureProject(t *testing.T, client database.QueryExecutor, projectID string) {
-	t.Helper()
-	var err error
-	if isSpannerDB {
-		_, err = client.Exec(t.Context(),
-			`INSERT OR IGNORE INTO projects (id, created_at, updated_at) VALUES ($1, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP())`,
-			projectID,
-		)
-	} else {
-		_, err = client.Exec(t.Context(),
-			`INSERT INTO zitadel_nextgen.projects (id) VALUES ($1) ON CONFLICT (id) DO NOTHING`,
-			projectID,
-		)
-	}
-	require.NoError(t, err)
-}
-
 // newTestAttempt inserts an auth attempt with one password check into the given executor.
 // It returns the attempt and the pre-created check so callers can reference the same objects.
 func newTestAttempt(t *testing.T, repo domain.AuthAttemptRepository, client database.QueryExecutor, projectID string) (*domain.AuthAttempt, *domain.PasswordAuthCheck) {
