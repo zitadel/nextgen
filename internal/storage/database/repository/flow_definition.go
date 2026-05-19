@@ -48,8 +48,9 @@ type flowDefinitionAudienceJSON struct {
 
 type flowDefinitionStepJSON struct {
 	Name        string                   `json:"name"`
-	Type        string                   `json:"type"`
-	Config      map[string]any           `json:"config,omitempty"`
+	Fields      []string                 `json:"fields,omitempty"`
+	OnSuccess   *string                  `json:"on_success,omitempty"`
+	Complete    *string                  `json:"complete,omitempty"`
 	Transitions []flowStepTransitionJSON `json:"transitions"`
 }
 
@@ -251,16 +252,25 @@ func marshalFlowDefinitionContent(def *domain.FlowDefinition) ([]byte, error) {
 		for j, t := range s.Transitions {
 			tr := flowStepTransitionJSON{Target: t.Target}
 			if t.Action != nil {
-				tr.Action = new(t.Action.String())
+				action := t.Action.String()
+				tr.Action = &action
 			}
 			transitions[j] = tr
 		}
-		steps[i] = flowDefinitionStepJSON{
+		stepJSON := flowDefinitionStepJSON{
 			Name:        s.Name,
-			Type:        s.Type.String(),
-			Config:      s.Config,
+			Fields:      s.Fields,
 			Transitions: transitions,
 		}
+		if s.OnSuccess != nil {
+			onSuccess := s.OnSuccess.String()
+			stepJSON.OnSuccess = &onSuccess
+		}
+		if s.Complete != nil {
+			complete := s.Complete.String()
+			stepJSON.Complete = &complete
+		}
+		steps[i] = stepJSON
 	}
 
 	return json.Marshal(flowDefinitionContent{
@@ -290,10 +300,6 @@ func rowToFlowDefinition(row flowDefinitionRow) (*domain.FlowDefinition, error) 
 
 	steps := make([]domain.FlowDefinitionStep, len(content.Steps))
 	for i, s := range content.Steps {
-		stepType, err := domain.FlowStepTypeString(s.Type)
-		if err != nil {
-			return nil, err
-		}
 		transitions := make([]domain.FlowStepTransition, len(s.Transitions))
 		for j, t := range s.Transitions {
 			tr := domain.FlowStepTransition{Target: t.Target}
@@ -306,12 +312,26 @@ func rowToFlowDefinition(row flowDefinitionRow) (*domain.FlowDefinition, error) 
 			}
 			transitions[j] = tr
 		}
-		steps[i] = domain.FlowDefinitionStep{
+		step := domain.FlowDefinitionStep{
 			Name:        s.Name,
-			Type:        stepType,
-			Config:      s.Config,
+			Fields:      s.Fields,
 			Transitions: transitions,
 		}
+		if s.OnSuccess != nil {
+			onSuccess, err := domain.FlowOnSuccessString(*s.OnSuccess)
+			if err != nil {
+				return nil, err
+			}
+			step.OnSuccess = &onSuccess
+		}
+		if s.Complete != nil {
+			complete, err := domain.FlowStepCompleteString(*s.Complete)
+			if err != nil {
+				return nil, err
+			}
+			step.Complete = &complete
+		}
+		steps[i] = step
 	}
 
 	return &domain.FlowDefinition{

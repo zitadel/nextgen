@@ -24,21 +24,34 @@ const (
 	FlowDefinitionPurposeLinkAccount
 )
 
-//go:generate go tool enumer -type FlowStepType -transform snake -trimprefix FlowStepType -sql
-type FlowStepType uint8
+// FlowOnSuccess names the server-side mutation that runs after a step's
+// fields validate and before its transition fires. Empty (pointer nil
+// on [FlowDefinitionStep.OnSuccess]) means no side effect — advance
+// directly on the submitted action.
+//
+//go:generate go tool enumer -type FlowOnSuccess -transform snake -trimprefix FlowOnSuccess -sql
+type FlowOnSuccess uint8
 
 const (
-	FlowStepTypeIdentifier FlowStepType = iota
-	FlowStepTypeCredential
-	FlowStepTypeForm
-	FlowStepTypeVerification
-	FlowStepTypePolicyCheck
-	FlowStepTypeAction
-	FlowStepTypeConsent
-	FlowStepTypeCaptcha
-	FlowStepTypeRedirect
-	FlowStepTypeInfo
-	FlowStepTypeComplete
+	// FlowOnSuccessCreateUser materializes the user record from the
+	// step's collected fields. Used by register flows.
+	FlowOnSuccessCreateUser FlowOnSuccess = iota
+)
+
+// FlowStepComplete classifies a terminal step. The frontend uses this
+// to decide between navigating to a protocol redirect URI or rendering
+// a success/info screen. Set on [FlowDefinitionStep.Complete] to mark
+// the step as terminal; nil for regular interactive steps.
+//
+//go:generate go tool enumer -type FlowStepComplete -transform snake -trimprefix FlowStepComplete -sql
+type FlowStepComplete uint8
+
+const (
+	// FlowStepCompleteRedirect navigates the client to the protocol
+	// redirect URI (typically the OIDC/SAML callback).
+	FlowStepCompleteRedirect FlowStepComplete = iota
+	// FlowStepCompleteShow renders the step as a success or info screen.
+	FlowStepCompleteShow
 )
 
 //go:generate go tool enumer -type FlowDefinitionTransitionAction -transform snake -trimprefix FlowDefinitionTransitionAction -sql
@@ -84,9 +97,19 @@ type FlowDefinitionAudience struct {
 
 // FlowDefinitionStep is a single node in the step graph.
 type FlowDefinitionStep struct {
-	Name        string
-	Type        FlowStepType
-	Config      map[string]any
+	Name string
+	// Fields lists the user-schema property names this step collects.
+	// Resolved against [FlowDefinition.UserSchema] at runtime to derive
+	// per-field type, validation, and implicit outcomes.
+	Fields []string
+	// OnSuccess names the server-side mutation to run after field
+	// validation passes, before the transition fires. Nil means advance
+	// directly with no side effect.
+	OnSuccess *FlowOnSuccess
+	// Complete, when non-nil, marks this step as terminal and dictates
+	// how the frontend finishes (redirect vs. success screen). Nil for
+	// regular interactive steps.
+	Complete    *FlowStepComplete
 	Transitions []FlowStepTransition
 }
 

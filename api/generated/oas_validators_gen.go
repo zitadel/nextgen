@@ -1131,8 +1131,6 @@ func (s FlowDefinitionStepOnSuccess) Validate() error {
 	switch s {
 	case "create_user":
 		return nil
-	case "reset_credential":
-		return nil
 	default:
 		return errors.Errorf("invalid value: %v", s)
 	}

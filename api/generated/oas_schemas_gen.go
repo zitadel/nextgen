@@ -2825,8 +2825,7 @@ type FlowDefinitionStep struct {
 	SSOProviders []SSOProvider `json:"sso_providers"`
 	// Server-side mutation to execute when this step completes successfully.
 	// Runs after field validation passes, before the transition fires.
-	// - create_user: creates the user record (registration flows)
-	// - reset_credential: replaces a stored credential (recovery flows).
+	// - create_user: creates the user record (registration flows).
 	OnSuccess OptFlowDefinitionStepOnSuccess `json:"on_success"`
 	// Marks this as a terminal step. Tells the frontend what to do:
 	// - redirect: navigate to redirect_uri (OIDC/SAML callback done)
@@ -2995,20 +2994,17 @@ func (s *FlowDefinitionStepGates) init() FlowDefinitionStepGates {
 
 // Server-side mutation to execute when this step completes successfully.
 // Runs after field validation passes, before the transition fires.
-// - create_user: creates the user record (registration flows)
-// - reset_credential: replaces a stored credential (recovery flows).
+// - create_user: creates the user record (registration flows).
 type FlowDefinitionStepOnSuccess string
 
 const (
-	FlowDefinitionStepOnSuccessCreateUser      FlowDefinitionStepOnSuccess = "create_user"
-	FlowDefinitionStepOnSuccessResetCredential FlowDefinitionStepOnSuccess = "reset_credential"
+	FlowDefinitionStepOnSuccessCreateUser FlowDefinitionStepOnSuccess = "create_user"
 )
 
 // AllValues returns all FlowDefinitionStepOnSuccess values.
 func (FlowDefinitionStepOnSuccess) AllValues() []FlowDefinitionStepOnSuccess {
 	return []FlowDefinitionStepOnSuccess{
 		FlowDefinitionStepOnSuccessCreateUser,
-		FlowDefinitionStepOnSuccessResetCredential,
 	}
 }
 
@@ -3016,8 +3012,6 @@ func (FlowDefinitionStepOnSuccess) AllValues() []FlowDefinitionStepOnSuccess {
 func (s FlowDefinitionStepOnSuccess) MarshalText() ([]byte, error) {
 	switch s {
 	case FlowDefinitionStepOnSuccessCreateUser:
-		return []byte(s), nil
-	case FlowDefinitionStepOnSuccessResetCredential:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -3029,9 +3023,6 @@ func (s *FlowDefinitionStepOnSuccess) UnmarshalText(data []byte) error {
 	switch FlowDefinitionStepOnSuccess(data) {
 	case FlowDefinitionStepOnSuccessCreateUser:
 		*s = FlowDefinitionStepOnSuccessCreateUser
-		return nil
-	case FlowDefinitionStepOnSuccessResetCredential:
-		*s = FlowDefinitionStepOnSuccessResetCredential
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)

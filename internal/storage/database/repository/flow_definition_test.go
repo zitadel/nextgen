@@ -45,8 +45,9 @@ func TestFlowDefinitionRepository_CreateAndGet(t *testing.T) {
 	}
 
 	identifier := stepsByName["identifier"]
-	assert.Equal(t, domain.FlowStepTypeIdentifier, identifier.Type)
-	assert.Equal(t, []any{"email"}, identifier.Config["methods"])
+	assert.Equal(t, []string{"email"}, identifier.Fields)
+	assert.Nil(t, identifier.OnSuccess)
+	assert.Nil(t, identifier.Complete)
 	require.Len(t, identifier.Transitions, 2)
 
 	var currentFlowTr, crossFlowTr domain.FlowStepTransition
@@ -225,6 +226,8 @@ func TestFlowDefinitionRepository_ProjectIsolation(t *testing.T) {
 
 func sampleFlowDefinition(projectID, id string) *domain.FlowDefinition {
 	pivotAction := domain.Pivot
+	createUser := domain.FlowOnSuccessCreateUser
+	completeShow := domain.FlowStepCompleteShow
 	return &domain.FlowDefinition{
 		ProjectID:     projectID,
 		ID:            id,
@@ -240,28 +243,24 @@ func sampleFlowDefinition(projectID, id string) *domain.FlowDefinition {
 		},
 		Steps: []domain.FlowDefinitionStep{
 			{
-				Name: "identifier",
-				Type: domain.FlowStepTypeIdentifier,
-				Config: map[string]any{
-					"methods": []any{"email"},
-				},
+				Name:   "identifier",
+				Fields: []string{"email"},
 				Transitions: []domain.FlowStepTransition{
 					{Target: "resolve_user"},
 					{Action: &pivotAction, Target: "register-flow"},
 				},
 			},
 			{
-				Name:   "resolve_user",
-				Type:   domain.FlowStepTypePolicyCheck,
-				Config: nil,
+				Name: "resolve_user",
 				Transitions: []domain.FlowStepTransition{
 					{Target: "password"},
 				},
 			},
 			{
 				Name:        "password",
-				Type:        domain.FlowStepTypeCredential,
-				Config:      map[string]any{"factor": "password"},
+				Fields:      []string{"password"},
+				OnSuccess:   &createUser,
+				Complete:    &completeShow,
 				Transitions: []domain.FlowStepTransition{},
 			},
 		},
