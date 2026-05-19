@@ -69,14 +69,10 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 	ids := &fakeIDGen{id: "01TEST"}
 	hasher := fakeHasher{}
 
-	registry := domain.NewFlowOnSuccessRegistry()
-	if err := registry.Register(domain.FlowOnSuccessCreateUser, domain.NewFlowCreateUserHandler(ids, users, pws, hasher)); err != nil {
-		t.Fatalf("register create_user: %v", err)
-	}
-
+	createUser := domain.NewFlowCreateUserHandler(ids, users, pws, hasher)
 	resolver := newDefaultResolver(t)
 	now := func() time.Time { return time.Unix(1700000000, 0).UTC() }
-	sm := domain.NewFlowStateMachine(resolver, registry, now)
+	sm := domain.NewFlowStateMachine(resolver, createUser, now)
 
 	return &flowTestWorld{users: users, pws: pws, ids: ids, hasher: hasher, sm: sm}
 }

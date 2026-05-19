@@ -24,17 +24,14 @@ const (
 	FlowDefinitionPurposeLinkAccount
 )
 
-// FlowOnSuccess names the server-side mutation that runs after a step's
-// fields validate and before its transition fires. Empty (pointer nil
-// on [FlowDefinitionStep.OnSuccess]) means no side effect — advance
-// directly on the submitted action.
+// FlowOnSuccess names the server-side mutation that runs after a
+// step's fields validate, before its transition fires. Nil on
+// [FlowDefinitionStep.OnSuccess] means no side effect.
 //
 //go:generate go tool enumer -type FlowOnSuccess -transform snake -trimprefix FlowOnSuccess -sql
 type FlowOnSuccess uint8
 
 const (
-	// FlowOnSuccessCreateUser materializes the user record from the
-	// step's collected fields. Used by register flows.
 	FlowOnSuccessCreateUser FlowOnSuccess = iota
 )
 
@@ -92,9 +89,8 @@ type FlowDefinition struct {
 	Steps    []FlowDefinitionStep
 }
 
-// InitialStepFor returns the name of the entry-point step the
-// definition declares for purpose, or false if the definition does not
-// serve it.
+// InitialStepFor returns the entry-point step name for purpose, or
+// false if the definition does not serve it.
 func (d *FlowDefinition) InitialStepFor(purpose FlowDefinitionPurpose) (string, bool) {
 	step, ok := d.Purposes[purpose]
 	return step, ok
