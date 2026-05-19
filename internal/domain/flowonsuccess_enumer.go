@@ -8,11 +8,11 @@ import (
 	"strings"
 )
 
-const _FlowOnSuccessName = "create_userverify_credentials"
+const _FlowOnSuccessName = "create_user"
 
-var _FlowOnSuccessIndex = [...]uint8{0, 11, 29}
+var _FlowOnSuccessIndex = [...]uint8{0, 11}
 
-const _FlowOnSuccessLowerName = "create_userverify_credentials"
+const _FlowOnSuccessLowerName = "create_user"
 
 func (i FlowOnSuccess) String() string {
 	if i >= FlowOnSuccess(len(_FlowOnSuccessIndex)-1) {
@@ -26,21 +26,17 @@ func (i FlowOnSuccess) String() string {
 func _FlowOnSuccessNoOp() {
 	var x [1]struct{}
 	_ = x[FlowOnSuccessCreateUser-(0)]
-	_ = x[FlowOnSuccessVerifyCredentials-(1)]
 }
 
-var _FlowOnSuccessValues = []FlowOnSuccess{FlowOnSuccessCreateUser, FlowOnSuccessVerifyCredentials}
+var _FlowOnSuccessValues = []FlowOnSuccess{FlowOnSuccessCreateUser}
 
 var _FlowOnSuccessNameToValueMap = map[string]FlowOnSuccess{
-	_FlowOnSuccessName[0:11]:       FlowOnSuccessCreateUser,
-	_FlowOnSuccessLowerName[0:11]:  FlowOnSuccessCreateUser,
-	_FlowOnSuccessName[11:29]:      FlowOnSuccessVerifyCredentials,
-	_FlowOnSuccessLowerName[11:29]: FlowOnSuccessVerifyCredentials,
+	_FlowOnSuccessName[0:11]:      FlowOnSuccessCreateUser,
+	_FlowOnSuccessLowerName[0:11]: FlowOnSuccessCreateUser,
 }
 
 var _FlowOnSuccessNames = []string{
 	_FlowOnSuccessName[0:11],
-	_FlowOnSuccessName[11:29],
 }
 
 // FlowOnSuccessString retrieves an enum value from the enum constants string name.

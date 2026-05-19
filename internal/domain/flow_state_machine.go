@@ -37,8 +37,8 @@ type FlowStateMachine interface {
 }
 
 // FlowStartInput carries everything the state machine needs to bootstrap
-// a new flow: the resolved definition, the purpose, the session it sits
-// on top of, and the audience hint used to pick the definition.
+// a new flow: the resolved definition, the purpose, and the session it
+// sits on top of.
 //
 // UserSchemaURL is the resolved location of the user schema this flow
 // validates against. The state machine plumbs it through to
@@ -49,7 +49,6 @@ type FlowStartInput struct {
 	Purpose       FlowDefinitionPurpose
 	Session       FlowSessionRef
 	AuthRequest   *FlowAuthRequestRef
-	Hint          FlowHint
 	UserSchemaURL string
 }
 
@@ -184,16 +183,6 @@ type FlowAuthRequestRef struct {
 	RequestedACR *string
 }
 
-// FlowHint mirrors the audience information used by [FlowService] to
-// pick a definition. The state machine carries it forward so on_success
-// handlers and downstream services can scope their work to the same
-// audience the definition was selected for.
-type FlowHint struct {
-	AppID        *string
-	TeamID       *string
-	UserSchemaID *string
-}
-
 // FlowCollectedUserIDKey is the reserved key under which on_success
 // handlers stash the resolved user id on [FlowProgress.CollectedData].
 // The handler picks it up at terminate time to mint the session token
@@ -258,7 +247,7 @@ func (r *FlowStateMachineRuntime) Start(ctx context.Context, client database.Que
 	if in.Definition == nil {
 		return FlowStepResult{}, fmt.Errorf("%w: start without definition", ErrIntegrity)
 	}
-	initialStepName, ok := initialStepFor(in.Definition, in.Purpose)
+	initialStepName, ok := in.Definition.InitialStepFor(in.Purpose)
 	if !ok {
 		return FlowStepResult{}, fmt.Errorf("%w: definition %q does not serve purpose %s", ErrIntegrity, in.Definition.ID, in.Purpose)
 	}
@@ -302,7 +291,7 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 		return FlowStepResult{}, fmt.Errorf("%w: gate proofs", ErrUnsupported)
 	}
 
-	currentStep, ok := findStep(def, state.CurrentStep)
+	currentStep, ok := def.FindStep(state.CurrentStep)
 	if !ok {
 		return FlowStepResult{}, fmt.Errorf("%w: current step %q missing from definition", ErrIntegrity, state.CurrentStep)
 	}
@@ -373,7 +362,7 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 		return FlowStepResult{}, fmt.Errorf("%w: cross-flow transitions", ErrUnsupported)
 	}
 
-	nextStep, ok := findStep(def, transition.Target)
+	nextStep, ok := def.FindStep(transition.Target)
 	if !ok {
 		return FlowStepResult{}, fmt.Errorf("%w: transition target %q missing from definition", ErrIntegrity, transition.Target)
 	}
@@ -427,7 +416,7 @@ func (r *FlowStateMachineRuntime) terminate(ctx context.Context, client database
 func (r *FlowStateMachineRuntime) renderStep(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState, userSchemaURL string, stepOverride *FlowDefinitionStep) (*FlowStep, error) {
 	step := stepOverride
 	if step == nil {
-		s, ok := findStep(def, state.CurrentStep)
+		s, ok := def.FindStep(state.CurrentStep)
 		if !ok {
 			return nil, fmt.Errorf("%w: render unknown step %q", ErrIntegrity, state.CurrentStep)
 		}
@@ -477,24 +466,6 @@ func (r *FlowStateMachineRuntime) buildStep(step *FlowDefinitionStep, resolved F
 		Actions:      actions,
 		SSOProviders: nil,
 	}
-}
-
-// initialStepFor returns the entry step the definition declares for
-// the given purpose, or false if the definition does not serve it.
-func initialStepFor(def *FlowDefinition, purpose FlowDefinitionPurpose) (string, bool) {
-	step, ok := def.Purposes[purpose]
-	return step, ok
-}
-
-// findStep returns a pointer into def.Steps for the step named name,
-// or false if no such step exists.
-func findStep(def *FlowDefinition, name string) (*FlowDefinitionStep, bool) {
-	for i := range def.Steps {
-		if def.Steps[i].Name == name {
-			return &def.Steps[i], true
-		}
-	}
-	return nil, false
 }
 
 // recordResolvedUser stores the user id surfaced by an on_success

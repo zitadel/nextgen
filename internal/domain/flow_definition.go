@@ -36,9 +36,6 @@ const (
 	// FlowOnSuccessCreateUser materializes the user record from the
 	// step's collected fields. Used by register flows.
 	FlowOnSuccessCreateUser FlowOnSuccess = iota
-	// FlowOnSuccessVerifyCredentials resolves the identifier to a user
-	// and checks the supplied password. Used by login flows.
-	FlowOnSuccessVerifyCredentials
 )
 
 // FlowStepComplete classifies a terminal step. The frontend uses this
@@ -93,6 +90,25 @@ type FlowDefinition struct {
 	Purposes map[FlowDefinitionPurpose]string
 	Audience FlowDefinitionAudience
 	Steps    []FlowDefinitionStep
+}
+
+// InitialStepFor returns the name of the entry-point step the
+// definition declares for purpose, or false if the definition does not
+// serve it.
+func (d *FlowDefinition) InitialStepFor(purpose FlowDefinitionPurpose) (string, bool) {
+	step, ok := d.Purposes[purpose]
+	return step, ok
+}
+
+// FindStep returns a pointer into d.Steps for the step named name, or
+// false if no such step exists.
+func (d *FlowDefinition) FindStep(name string) (*FlowDefinitionStep, bool) {
+	for i := range d.Steps {
+		if d.Steps[i].Name == name {
+			return &d.Steps[i], true
+		}
+	}
+	return nil, false
 }
 
 // FlowDefinitionAudience describes which requests this definition should be selected for.
@@ -154,17 +170,12 @@ type FlowSSOProvider struct {
 	Template string
 }
 
-// FlowStepTransition is the destination of a transition. The outcome
-// that triggers it is the map key in [FlowDefinitionStep.Transitions].
+// FlowStepTransition maps an action name to either a target step (regular) or a pivot purpose.
 type FlowStepTransition struct {
-	// Action selects how Target is interpreted:
-	//   nil   — Target is a step name in the current flow.
-	//   Switch — Target is another flow definition; replace the current flow.
-	//   Pivot — Target is another flow definition; push and resume on pop.
 	Action *FlowDefinitionTransitionAction
-
-	// Target is either a step in the current flow (when Action == nil)
-	// or a flow definition name (when Action is Switch or Pivot).
+	// Target is either a step in the current flow OR a new flow.
+	// When Action == nil, Target refers to a step in the current flow
+	// When Action != nil, Target refers to another flow.
 	Target string
 }
 

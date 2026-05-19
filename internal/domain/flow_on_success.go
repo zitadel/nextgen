@@ -14,10 +14,10 @@ import (
 // handler reports which outcome the state machine should advance on, or
 // surfaces a step-level failure that keeps the user on the current step.
 //
-// Each handler is registered under a stable name (e.g. "create_user",
-// "verify_credentials"); [FlowDefinitionStep.OnSuccess] references that
-// name. The registry is the only public seam — new handlers slot in
-// without the state machine knowing about them.
+// Each handler is registered under a [FlowOnSuccess] value;
+// [FlowDefinitionStep.OnSuccess] references it. The registry is the
+// only public seam — new handlers slot in without the state machine
+// knowing about them.
 type FlowOnSuccessHandler interface {
 	// Handle runs the side effect and reports the outcome.
 	Handle(ctx context.Context, client database.QueryExecutor, in FlowOnSuccessInput) (FlowOnSuccessResult, error)
@@ -63,8 +63,7 @@ type FlowOnSuccessResult struct {
 	StepError *string
 
 	// UserID, when set, is recorded on [FlowState] as the resolved
-	// user identifier (e.g. after a successful create_user or
-	// verify_credentials).
+	// user identifier (e.g. after a successful create_user).
 	UserID string
 }
 
@@ -107,13 +106,6 @@ func (r *FlowOnSuccessRegistry) Lookup(kind FlowOnSuccess) (FlowOnSuccessHandler
 	return h, nil
 }
 
-// FlowImplicitOutcomeInvalidCredentials is the outcome surfaced by
-// [FlowOnSuccessVerifyCredentials] when an identifier resolves but
-// the supplied credential is wrong. Steps that route on it must
-// declare a matching transition; otherwise the state machine surfaces
-// it as [FlowStep.Error] and stays put.
-const FlowImplicitOutcomeInvalidCredentials = "invalid_credentials"
-
 // ErrUnknownOnSuccessHandler is returned by
 // [FlowOnSuccessRegistry.Lookup] for a name that has never been
 // registered. The state machine maps it to [ErrIntegrity] — referring
@@ -122,29 +114,13 @@ const FlowImplicitOutcomeInvalidCredentials = "invalid_credentials"
 var ErrUnknownOnSuccessHandler = errors.New("flow on_success registry: handler not registered")
 
 // FlowPasswordHasher is the seam the flow engine's on_success handlers
-// use to produce and verify password hashes. The encoded form is the
-// PHC string (`$argon2id$...`) stored on [UserPassword.EncodedHash];
-// callers never see plaintext after Hash returns.
-//
-// A production implementation backed by argon2id lands with the
-// credentials work; the flow engine accepts an interface so PR 6 can
-// ship `create_user` and `verify_credentials` with a stub
-// implementation in tests.
+// use to produce password hashes. The encoded form is the PHC string
+// (`$argon2id$...`) stored on [UserPassword.EncodedHash]; callers
+// never see plaintext after Hash returns.
 type FlowPasswordHasher interface {
 	// Hash derives an encoded PHC string from the plaintext password.
 	Hash(plain string) (encoded string, err error)
-
-	// Verify reports whether the plaintext matches the encoded hash.
-	// A non-nil error signals a hasher-level failure (malformed
-	// encoding, unsupported algorithm); a mismatch is reported as
-	// (false, nil), not as an error.
-	Verify(plain, encoded string) (ok bool, err error)
 }
-
-// ErrPasswordHashUnsupported is returned by [FlowPasswordHasher]
-// implementations when the encoded hash uses an algorithm or
-// parameter set the hasher cannot evaluate.
-var ErrPasswordHashUnsupported = errors.New("flow password hasher: encoded hash uses unsupported algorithm")
 
 // flowUserWriter is the narrow write seam [FlowCreateUserHandler] uses
 // to persist a new user. [UserRepository] satisfies it.
@@ -243,101 +219,6 @@ func (h *FlowCreateUserHandler) Handle(ctx context.Context, client database.Quer
 	return FlowOnSuccessResult{UserID: userID}, nil
 }
 
-// flowUserReader is the narrow read seam [FlowVerifyCredentialsHandler]
-// depends on. [UserRepository] satisfies it; tests can swap in a
-// minimal fake without implementing the repository's full surface.
-type flowUserReader interface {
-	ProjectIDCondition(projectID string) database.Condition
-	AttributesCondition(attributes []Attribute) database.Condition
-	Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*User, error)
-}
-
-// flowUserPasswordReader is the narrow read seam for
-// [FlowVerifyCredentialsHandler]'s password lookup. [UserPasswordRepository]
-// satisfies it.
-type flowUserPasswordReader interface {
-	UniqueCondition(projectID, userID string) database.Condition
-	Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*UserPassword, error)
-}
-
-// FlowVerifyCredentialsHandler is the MVP `verify_credentials`
-// [FlowOnSuccessHandler]. It resolves the identifier to a user, fetches
-// the stored password hash, and compares it against the submitted
-// password. Outcomes:
-//
-//   - identifier resolves and password matches: returns
-//     [FlowOnSuccessResult.UserID] set; the state machine advances on
-//     the submitted action.
-//   - identifier does not resolve: returns Outcome =
-//     [FlowImplicitOutcomeUserNotFound]; the state machine advances on
-//     the user_not_found transition declared by the step.
-//   - identifier resolves but password mismatches: returns
-//     StepError = [FlowImplicitOutcomeInvalidCredentials]; the state
-//     machine keeps the user on the current step and surfaces the
-//     error.
-//
-// When the eventual auth-attempt domain lands, this handler's body
-// moves behind that service.
-type FlowVerifyCredentialsHandler struct {
-	users     flowUserReader
-	passwords flowUserPasswordReader
-	hasher    FlowPasswordHasher
-}
-
-// NewFlowVerifyCredentialsHandler wires the handler's dependencies.
-// In production the seams are satisfied by [UserRepository] and
-// [UserPasswordRepository].
-func NewFlowVerifyCredentialsHandler(users flowUserReader, passwords flowUserPasswordReader, hasher FlowPasswordHasher) *FlowVerifyCredentialsHandler {
-	return &FlowVerifyCredentialsHandler{users: users, passwords: passwords, hasher: hasher}
-}
-
-var _ FlowOnSuccessHandler = (*FlowVerifyCredentialsHandler)(nil)
-
-func (h *FlowVerifyCredentialsHandler) Handle(ctx context.Context, client database.QueryExecutor, in FlowOnSuccessInput) (FlowOnSuccessResult, error) {
-	identifierName, identifierValue, hasID := findIdentifierField(in.Resolved.Fields, in.Fields)
-	if !hasID {
-		return FlowOnSuccessResult{}, fmt.Errorf("%w: verify_credentials step has no identifier field", ErrIntegrity)
-	}
-	_, passwordValue, hasPassword := findPasswordField(in.Resolved.Fields, in.Fields)
-	if !hasPassword {
-		return FlowOnSuccessResult{}, fmt.Errorf("%w: verify_credentials step has no password field", ErrIntegrity)
-	}
-
-	cond := database.And(
-		h.users.ProjectIDCondition(in.ProjectID),
-		h.users.AttributesCondition([]Attribute{{Key: identifierName, Value: identifierValue}}),
-	)
-	user, err := h.users.Get(ctx, client, database.WithCondition(cond))
-	if err != nil {
-		if isNoRows(err) {
-			return FlowOnSuccessResult{Outcome: FlowImplicitOutcomeUserNotFound}, nil
-		}
-		return FlowOnSuccessResult{}, fmt.Errorf("flow on_success verify_credentials: lookup user: %w", err)
-	}
-
-	pw, err := h.passwords.Get(ctx, client,
-		database.WithCondition(h.passwords.UniqueCondition(in.ProjectID, user.ID)),
-	)
-	if err != nil {
-		if isNoRows(err) {
-			msg := FlowImplicitOutcomeInvalidCredentials
-			return FlowOnSuccessResult{StepError: &msg}, nil
-		}
-		return FlowOnSuccessResult{}, fmt.Errorf("flow on_success verify_credentials: fetch password: %w", err)
-	}
-
-	ok, err := h.hasher.Verify(asString(passwordValue), pw.EncodedHash)
-	if err != nil {
-		return FlowOnSuccessResult{}, fmt.Errorf("flow on_success verify_credentials: verify password: %w", err)
-	}
-	if !ok {
-		msg := FlowImplicitOutcomeInvalidCredentials
-		return FlowOnSuccessResult{StepError: &msg}, nil
-	}
-
-	return FlowOnSuccessResult{UserID: user.ID}, nil
-}
-
 // findIdentifierField returns the property name and submitted value of
 // the field tagged [FlowFieldChallengeIdentifier]. Resolver contract
 // guarantees at most one such field per step.
@@ -385,12 +266,4 @@ func attributeUniquenessFor(name, identifierName string, scope FlowFieldUniqueSc
 func asString(v any) string {
 	s, _ := v.(string)
 	return s
-}
-
-// isNoRows reports whether err is the storage layer's no-rows error.
-// Centralised so verify_credentials does not depend on the dialect
-// packages.
-func isNoRows(err error) bool {
-	var nrfe *database.NoRowFoundError
-	return errors.As(err, &nrfe)
 }
