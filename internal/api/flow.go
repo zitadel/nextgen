@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -69,7 +70,7 @@ func mapResolveError(err error) *api.ErrorDetailsStatusCode {
 	switch {
 	case errors.Is(err, domain.ErrFlowDefinitionNotFound):
 		return &api.ErrorDetailsStatusCode{
-			StatusCode: 404,
+			StatusCode: http.StatusNotFound,
 			Response: api.ErrorDetails{
 				Code:    "flow_not_found",
 				Message: err.Error(),
@@ -77,7 +78,7 @@ func mapResolveError(err error) *api.ErrorDetailsStatusCode {
 		}
 	case errors.Is(err, domain.ErrFlowDefinitionPurposeMismatch):
 		return &api.ErrorDetailsStatusCode{
-			StatusCode: 400,
+			StatusCode: http.StatusBadRequest,
 			Response: api.ErrorDetails{
 				Code:    "purpose_mismatch",
 				Message: err.Error(),
@@ -85,7 +86,7 @@ func mapResolveError(err error) *api.ErrorDetailsStatusCode {
 		}
 	default:
 		return &api.ErrorDetailsStatusCode{
-			StatusCode: 500,
+			StatusCode: http.StatusInternalServerError,
 			Response: api.ErrorDetails{
 				Code:    "internal_error",
 				Message: err.Error(),
