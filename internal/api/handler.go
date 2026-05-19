@@ -15,37 +15,29 @@ type Handler struct {
 	// responses for all endpoints, so only implemented methods need to be defined.
 	api.UnimplementedHandler
 
-	schemaService *service.SchemaService
-	flowService   service.FlowService
+	schemaService      service.SchemaService
+	flowService        service.FlowService
+	authAttemptService service.AuthAttemptService
 }
 
 func NewHandler(
-	schemaService *service.SchemaService,
 	flowService service.FlowService,
+	authAttemptService service.AuthAttemptService,
+	schemaService service.SchemaService,
 ) *Handler {
 	return &Handler{
-		schemaService: schemaService,
-		flowService:   flowService,
+		flowService:        flowService,
+		authAttemptService: authAttemptService,
+		schemaService:      schemaService,
 	}
 }
 
+// NewError implements the api.Handler interface and is used by ogen to convert any error
+// returned by an endpoint handler into a well-formed error response.
+// By centralizing this logic here, we can ensure that all errors are handled
+// consistently regardless of where they originate.
 func (h *Handler) NewError(ctx context.Context, err error) *api.ErrorDetailsStatusCode {
-	if errors.Is(err, ogenerrors.ErrSecurityRequirementIsNotSatisfied) {
-		return &api.ErrorDetailsStatusCode{
-			StatusCode: http.StatusUnauthorized,
-			Response: api.ErrorDetails{
-				Code:    "auth_not_satisfied",
-				Message: err.Error(),
-			},
-		}
-	}
-	return &api.ErrorDetailsStatusCode{
-		StatusCode: http.StatusInternalServerError,
-		Response: api.ErrorDetails{
-			Code:    "unknown_error",
-			Message: err.Error(),
-		},
-	}
+	return errorResponse(err)
 }
 
 var _ api.Handler = (*Handler)(nil)

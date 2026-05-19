@@ -8,10 +8,4 @@ description: |
 oneOf:
   - $ref: "identifier-proof.yaml"
   - $ref: "password-proof.yaml"
-  - $ref: "totp-proof.yaml"
-  - $ref: "otp-sms-proof.yaml"
-  - $ref: "otp-email-proof.yaml"
-  - $ref: "recovery-code-proof.yaml"
   - $ref: "passkey-proof.yaml"
-  - $ref: "idp-proof.yaml"
-  - $ref: "captcha-proof.yaml"

@@ -7,8 +7,8 @@ A minimal Next.js application demonstrating [Nextgen Auth](../../packages/sdk-ne
 Start the mock auth backend and the demo in separate terminals:
 
 ```bash
-# Terminal 1 — mock OIDC server on port 4000
-pnpm --filter @nextgen/mockserver start
+# Terminal 1 — mock auth server on port 4000
+pnpm --filter @zitadel-nextgen/api-mock start
 
 # Terminal 2 — Next.js app on port 3002
 NEXTGEN_ISSUER_URL=http://localhost:4000 pnpm --filter @nextgen/demo-next dev

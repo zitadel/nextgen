@@ -1,0 +1,61 @@
+{
+  "title": "UserSchema",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "$schema",
+    "$id",
+    "kind",
+    "title",
+    "x-auth-methods"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "const": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
+      "description": "The JSON Schema version used for this schema."
+    },
+    "$id": {
+      "type": "string",
+      "description": "The unique identifier for this schema, which is also the URL where this schema can be accessed."
+    },
+    "kind": {
+      "type": "string",
+      "const": "user-schema",
+      "description": "Discriminator value for a user schema create request."
+    },
+    "type": {
+      "type": "string",
+      "const": "object",
+      "description": "The type of a user must always be an object"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255,
+      "description": "Human-readable name for this schema."
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1024,
+      "description": "A description of this schema."
+    },
+    "x-auth-methods": {
+      "$ref": "auth-methods.json"
+    },
+    "required": {
+      "type": "array",
+      "description": "A list of required fields for the user definition",
+      "items": {
+        "type": "string"
+      }
+    },
+    "properties": {
+      "type": "object",
+      "description": "A map of additional properties for the user definition, where the key is the property name and the value is the property schema",
+      "additionalProperties": {
+        "$ref": "user-property.json"
+      }
+    }
+  }
+}

@@ -2040,6 +2040,62 @@ func decodeGetFlowStepParams(args [1]string, argsEscaped bool, r *http.Request) 
 	return params, nil
 }
 
+// GetMySessionParams is parameters of getMySession operation.
+type GetMySessionParams struct {
+	// The __nextgen_session cookie issued at session creation or superseding handoff exchange.
+	NextgenSession string
+}
+
+func unpackGetMySessionParams(packed middleware.Parameters) (params GetMySessionParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "__nextgen_session",
+			In:   "cookie",
+		}
+		params.NextgenSession = packed[key].(string)
+	}
+	return params
+}
+
+func decodeGetMySessionParams(args [0]string, argsEscaped bool, r *http.Request) (params GetMySessionParams, _ error) {
+	c := uri.NewCookieDecoder(r)
+	// Decode cookie: __nextgen_session.
+	if err := func() error {
+		cfg := uri.CookieParameterDecodingConfig{
+			Name:    "__nextgen_session",
+			Explode: true,
+		}
+		if err := c.HasParam(cfg); err == nil {
+			if err := c.DecodeParam(cfg, func(d uri.Decoder) error {
+				val, err := d.DecodeValue()
+				if err != nil {
+					return err
+				}
+
+				c, err := conv.ToString(val)
+				if err != nil {
+					return err
+				}
+
+				params.NextgenSession = c
+				return nil
+			}); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "__nextgen_session",
+			In:   "cookie",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
 // GetProjectParams is parameters of getProject operation.
 type GetProjectParams struct {
 	ProjectID ProjectID
@@ -3337,6 +3393,62 @@ func decodeListUsersParams(args [0]string, argsEscaped bool, r *http.Request) (p
 		return params, &ogenerrors.DecodeParamError{
 			Name: "limit",
 			In:   "query",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
+// RevokeMySessionParams is parameters of revokeMySession operation.
+type RevokeMySessionParams struct {
+	// The session_token cookie issued at session creation or superseding handoff exchange.
+	NextgenSession string
+}
+
+func unpackRevokeMySessionParams(packed middleware.Parameters) (params RevokeMySessionParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "__nextgen_session",
+			In:   "cookie",
+		}
+		params.NextgenSession = packed[key].(string)
+	}
+	return params
+}
+
+func decodeRevokeMySessionParams(args [0]string, argsEscaped bool, r *http.Request) (params RevokeMySessionParams, _ error) {
+	c := uri.NewCookieDecoder(r)
+	// Decode cookie: __nextgen_session.
+	if err := func() error {
+		cfg := uri.CookieParameterDecodingConfig{
+			Name:    "__nextgen_session",
+			Explode: true,
+		}
+		if err := c.HasParam(cfg); err == nil {
+			if err := c.DecodeParam(cfg, func(d uri.Decoder) error {
+				val, err := d.DecodeValue()
+				if err != nil {
+					return err
+				}
+
+				c, err := conv.ToString(val)
+				if err != nil {
+					return err
+				}
+
+				params.NextgenSession = c
+				return nil
+			}); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "__nextgen_session",
+			In:   "cookie",
 			Err:  err,
 		}
 	}

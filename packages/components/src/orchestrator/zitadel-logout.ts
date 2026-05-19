@@ -4,6 +4,7 @@ import {
   endSession,
   getEndSessionUrl,
 } from "@zitadel-nextgen/api/generated/endpoints/zitadelNextGen";
+import { setApiBaseUrl } from "@zitadel-nextgen/api/runtime/base-url";
 
 import { baseHostStyles } from "../styles/base.js";
 import { cssTokenVar as v } from "../styles/css-helpers.js";
@@ -190,6 +191,14 @@ export class ZitadelLogout extends LitElement {
     `,
   ];
 
+  /**
+   * Base URL (or path prefix) for all API calls, e.g. `"/__nextgen"` when
+   * the SDK is proxied through the app server. Equivalent to calling
+   * `setApiBaseUrl()` from `@zitadel-nextgen/api`. Must be set before the
+   * component connects so the first `endSession` call uses the right origin.
+   */
+  @property({ type: String, attribute: "api-base" }) accessor apiBase = "";
+
   /** URL to navigate to after a successful sign-out. */
   @property({ type: String, attribute: "post-sign-out-url" }) accessor postSignOutUrl = "";
 
@@ -218,6 +227,9 @@ export class ZitadelLogout extends LitElement {
 
   override connectedCallback(): void {
     super.connectedCallback();
+    if (this.apiBase) {
+      setApiBaseUrl(this.apiBase);
+    }
     this.readDisplayCookie();
 
     const tmpl = this.querySelector("template");

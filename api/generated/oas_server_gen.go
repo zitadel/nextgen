@@ -171,6 +171,16 @@ type Handler interface {
 	//
 	// GET /livez
 	GetLive(ctx context.Context) (GetLiveRes, error)
+	// GetMySession implements getMySession operation.
+	//
+	// Returns the current state of the current session including its factors and all currently
+	// satisfied assurance levels.
+	// `assurance_levels[]` may shrink over time as factor freshness windows expire,
+	// without the session itself expiring. Use step-up authentication (a new `auth_attempt`
+	// against the same `session_id`) to restore a dropped assurance level.
+	//
+	// GET /sessions/me
+	GetMySession(ctx context.Context, params GetMySessionParams) (GetMySessionRes, error)
 	// GetOpenIDConfiguration implements getOpenIDConfiguration operation.
 	//
 	// Retrieve the OpenID Connect configuration.
@@ -253,6 +263,15 @@ type Handler interface {
 	//
 	// GET /user
 	ListUsers(ctx context.Context, params ListUsersParams) (ListUsersRes, error)
+	// RevokeMySession implements revokeMySession operation.
+	//
+	// Revokes the session immediately (`state: revoked`). This is the logout operation.
+	// The __nextgen_session cookie issued at creation (or superseded by a handoff exchange) is required.
+	// After revocation, any tokens derived from this session are invalidated including the cookie itself,
+	//  which is cleared in the response.
+	//
+	// DELETE /sessions/me
+	RevokeMySession(ctx context.Context, params RevokeMySessionParams) (RevokeMySessionRes, error)
 	// RevokeSession implements revokeSession operation.
 	//
 	// Revokes the session immediately (`state: revoked`). This is the logout operation.
@@ -319,10 +338,6 @@ type Handler interface {
 	//
 	// POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify
 	VerifyChallengeProof(ctx context.Context, req *VerifyChallengeRequest, params VerifyChallengeProofParams) (VerifyChallengeProofRes, error)
-	// NewError creates *ErrorDetailsStatusCode from error returned by handler.
-	//
-	// Used for common default response.
-	NewError(ctx context.Context, err error) *ErrorDetailsStatusCode
 }
 
 // Server implements http server based on OpenAPI v3 specification and

@@ -95,5 +95,6 @@ nextgen.yaml
 /apps/console/dist/*
 !/apps/console/dist/.gitkeep
 apps/demo-next/tsconfig.tsbuildinfo
+packages/api-mock/tsconfig.tsbuildinfo
 
 .nx/polygraph
