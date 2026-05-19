@@ -52,8 +52,8 @@ func defaultSchemaBytes() []byte {
 		"x-auth-methods": { "password": { "enabled": true } },
 		"required": ["email", "username", "password", "given_name", "family_name"],
 		"properties": {
-			"email":       { "type": "string", "format": "email", "maxLength": 320, "x-identifier": true },
-			"username":    { "type": "string", "minLength": 3, "maxLength": 64, "x-identifier": true },
+			"email":       { "type": "string", "format": "email", "maxLength": 320, "x-identifier": true, "x-unique": "organization" },
+			"username":    { "type": "string", "minLength": 3, "maxLength": 64, "x-identifier": true, "x-unique": "organization" },
 			"password":    { "type": "string", "minLength": 8, "x-password": true },
 			"given_name":  { "type": "string", "minLength": 1, "maxLength": 200 },
 			"family_name": { "type": "string", "minLength": 1, "maxLength": 200 }
@@ -212,6 +212,42 @@ func TestSchemaFieldResolver_Resolve_RenamedPasswordField(t *testing.T) {
 	}
 	if got.Fields["secret"].Type != domain.FlowFieldTypePassword {
 		t.Errorf("Resolve secret Type = %q, want %q", got.Fields["secret"].Type, domain.FlowFieldTypePassword)
+	}
+}
+
+func TestSchemaFieldResolver_Resolve_UniqueScopeSurfaces(t *testing.T) {
+	resolver := newDefaultResolver(t)
+
+	got, err := resolver.Resolve(t.Context(), nil, testProjectID, defaultSchemaURL, []string{"email", "password"})
+	if err != nil {
+		t.Fatalf("Resolve returned error: %v", err)
+	}
+
+	if got.Fields["email"].Unique != domain.FlowFieldUniqueScopeOrganization {
+		t.Errorf("Resolve email Unique = %q, want %q", got.Fields["email"].Unique, domain.FlowFieldUniqueScopeOrganization)
+	}
+	if got.Fields["password"].Unique != domain.FlowFieldUniqueScopeNone {
+		t.Errorf("Resolve password Unique = %q, want %q", got.Fields["password"].Unique, domain.FlowFieldUniqueScopeNone)
+	}
+}
+
+func TestSchemaFieldResolver_Resolve_UniqueScopeInstance(t *testing.T) {
+	const url = "https://example.test/instance-unique.json"
+	bytes := []byte(`{
+		"$schema": "https://json-schema.org/draft/2020-12/schema",
+		"type": "object",
+		"properties": {
+			"handle": { "type": "string", "x-unique": "instance" }
+		}
+	}`)
+	resolver := domain.NewSchemaFieldResolver(newFakeResolver(t, map[string][]byte{url: bytes}))
+
+	got, err := resolver.Resolve(t.Context(), nil, testProjectID, url, []string{"handle"})
+	if err != nil {
+		t.Fatalf("Resolve returned error: %v", err)
+	}
+	if got.Fields["handle"].Unique != domain.FlowFieldUniqueScopeInstance {
+		t.Errorf("Resolve handle Unique = %q, want %q", got.Fields["handle"].Unique, domain.FlowFieldUniqueScopeInstance)
 	}
 }
 

@@ -61,6 +61,12 @@ type FlowField struct {
 	// the property has no rules beyond its JSON type.
 	Validation *FlowFieldValidation
 
+	// Unique mirrors the property's `x-unique` annotation: the scope at
+	// which the value must be unique, or [FlowFieldUniqueScopeNone] when
+	// absent. The user-creation path consults it to set the per-attribute
+	// uniqueness scope on storage.
+	Unique FlowFieldUniqueScope
+
 	// Challenge names the auth-attempt challenge the field maps to, or
 	// [FlowFieldChallengeNone] when the field carries neither an
 	// identifier nor a credential proof. Derivation paths:
@@ -98,6 +104,16 @@ const (
 	FlowFieldChallengeMagicLink  FlowFieldChallenge = "magic_link"
 	FlowFieldChallengeSSO        FlowFieldChallenge = "sso"
 	FlowFieldChallengeOTP        FlowFieldChallenge = "otp"
+)
+
+// FlowFieldUniqueScope mirrors the `x-unique` enum in the user
+// meta-schema (api/openapi/endpoints/schemas/user-property.yaml).
+type FlowFieldUniqueScope string
+
+const (
+	FlowFieldUniqueScopeNone         FlowFieldUniqueScope = ""
+	FlowFieldUniqueScopeInstance     FlowFieldUniqueScope = "instance"
+	FlowFieldUniqueScopeOrganization FlowFieldUniqueScope = "organization"
 )
 
 // FlowFieldValidation carries the validation rules the resolver

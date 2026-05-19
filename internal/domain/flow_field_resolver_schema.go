@@ -30,6 +30,7 @@ type SchemaResolver interface {
 //   - `minLength`, `maxLength`, `format` → [FlowFieldValidation]
 //   - `x-identifier` → [FlowFieldChallengeIdentifier] +
 //     [FlowImplicitOutcomeUserNotFound]
+//   - `x-unique` → [FlowField.Unique]
 //   - `x-password: true` combined with schema-level
 //     `x-auth-methods.password.enabled = true` →
 //     [FlowFieldChallengePassword]. Other auth methods do not have
@@ -88,6 +89,7 @@ func buildFlowField(name string, propSchema *jsonschema.Schema, required map[str
 		TextKey:   "field." + name,
 		Type:      deriveFieldType(propSchema),
 		Challenge: deriveChallenge(propSchema, passwordEnabled),
+		Unique:    deriveUnique(propSchema),
 	}
 	if _, ok := required[name]; ok {
 		field.Required = true
@@ -128,6 +130,16 @@ func deriveChallenge(propSchema *jsonschema.Schema, passwordEnabled bool) FlowFi
 		return FlowFieldChallengePassword
 	}
 	return FlowFieldChallengeNone
+}
+
+func deriveUnique(propSchema *jsonschema.Schema) FlowFieldUniqueScope {
+	switch lookupString(propSchema, "x-unique") {
+	case "organization":
+		return FlowFieldUniqueScopeOrganization
+	case "instance":
+		return FlowFieldUniqueScopeInstance
+	}
+	return FlowFieldUniqueScopeNone
 }
 
 func buildValidation(propSchema *jsonschema.Schema) *FlowFieldValidation {
