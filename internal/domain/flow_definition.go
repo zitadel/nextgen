@@ -36,6 +36,9 @@ const (
 	// FlowOnSuccessCreateUser materializes the user record from the
 	// step's collected fields. Used by register flows.
 	FlowOnSuccessCreateUser FlowOnSuccess = iota
+	// FlowOnSuccessVerifyCredentials resolves the identifier to a user
+	// and checks the supplied password. Used by login flows.
+	FlowOnSuccessVerifyCredentials
 )
 
 // FlowStepComplete classifies a terminal step. The frontend uses this

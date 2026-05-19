@@ -155,30 +155,27 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 // step with email+password, on_success=create_user, transitioning to
 // the `done` terminal on `submit`.
 func signupDefinition() *domain.FlowDefinition {
+	createUser := domain.FlowOnSuccessCreateUser
+	show := domain.FlowStepCompleteShow
 	return &domain.FlowDefinition{
-		ProjectID: testProjectID,
-		ID:        "def-signup",
-		Purposes: []domain.FlowDefinitionPurposeEntry{
-			{Purpose: domain.FlowDefinitionPurposeRegister, InitialStep: "credentials"},
+		ProjectID:  testProjectID,
+		ID:         "def-signup",
+		UserSchema: defaultSchemaURL,
+		Purposes: map[domain.FlowDefinitionPurpose]string{
+			domain.FlowDefinitionPurposeRegister: "credentials",
 		},
 		Steps: []domain.FlowDefinitionStep{
 			{
 				Name:      "credentials",
-				Type:      domain.FlowStepTypeCredential,
-				OnSuccess: domain.FlowOnSuccessCreateUser,
-				Config: map[string]any{
-					"fields": []any{"email", "password"},
-				},
+				Fields:    []string{"email", "password"},
+				OnSuccess: &createUser,
 				Transitions: map[string]domain.FlowStepTransition{
 					domain.FlowActionSubmit: {Target: "done"},
 				},
 			},
 			{
-				Name: "done",
-				Type: domain.FlowStepTypeComplete,
-				Config: map[string]any{
-					"complete": "show",
-				},
+				Name:     "done",
+				Complete: &show,
 			},
 		},
 	}
@@ -189,38 +186,32 @@ func signupDefinition() *domain.FlowDefinition {
 // `submit` to `done` and on `user_not_found` to a `no_account`
 // terminal.
 func loginDefinition() *domain.FlowDefinition {
+	verify := domain.FlowOnSuccessVerifyCredentials
+	show := domain.FlowStepCompleteShow
 	return &domain.FlowDefinition{
-		ProjectID: testProjectID,
-		ID:        "def-login",
-		Purposes: []domain.FlowDefinitionPurposeEntry{
-			{Purpose: domain.FlowDefinitionPurposeLogin, InitialStep: "credentials"},
+		ProjectID:  testProjectID,
+		ID:         "def-login",
+		UserSchema: defaultSchemaURL,
+		Purposes: map[domain.FlowDefinitionPurpose]string{
+			domain.FlowDefinitionPurposeLogin: "credentials",
 		},
 		Steps: []domain.FlowDefinitionStep{
 			{
 				Name:      "credentials",
-				Type:      domain.FlowStepTypeCredential,
-				OnSuccess: domain.FlowOnSuccessVerifyCredentials,
-				Config: map[string]any{
-					"fields": []any{"email", "password"},
-				},
+				Fields:    []string{"email", "password"},
+				OnSuccess: &verify,
 				Transitions: map[string]domain.FlowStepTransition{
-					domain.FlowActionSubmit:                  {Target: "done"},
-					domain.FlowImplicitOutcomeUserNotFound:   {Target: "no_account"},
+					domain.FlowActionSubmit:                {Target: "done"},
+					domain.FlowImplicitOutcomeUserNotFound: {Target: "no_account"},
 				},
 			},
 			{
-				Name: "done",
-				Type: domain.FlowStepTypeComplete,
-				Config: map[string]any{
-					"complete": "show",
-				},
+				Name:     "done",
+				Complete: &show,
 			},
 			{
-				Name: "no_account",
-				Type: domain.FlowStepTypeComplete,
-				Config: map[string]any{
-					"complete": "show",
-				},
+				Name:     "no_account",
+				Complete: &show,
 			},
 		},
 	}
