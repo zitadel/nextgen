@@ -7122,8 +7122,10 @@ func (s *FlowEventRequest) Encode(e *jx.Encoder) {
 // encodeFields encodes fields.
 func (s *FlowEventRequest) encodeFields(e *jx.Encoder) {
 	{
-		e.FieldStart("session_token")
-		e.Str(s.SessionToken)
+		if s.SessionToken.Set {
+			e.FieldStart("session_token")
+			s.SessionToken.Encode(e)
+		}
 	}
 	{
 		e.FieldStart("type")
@@ -7153,11 +7155,9 @@ func (s *FlowEventRequest) Decode(d *jx.Decoder) error {
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
 		case "session_token":
-			requiredBitSet[0] |= 1 << 0
 			if err := func() error {
-				v, err := d.Str()
-				s.SessionToken = string(v)
-				if err != nil {
+				s.SessionToken.Reset()
+				if err := s.SessionToken.Decode(d); err != nil {
 					return err
 				}
 				return nil
@@ -7194,7 +7194,7 @@ func (s *FlowEventRequest) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [1]uint8{
-		0b00000011,
+		0b00000010,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -7470,8 +7470,10 @@ func (s *FlowResponse) encodeFields(e *jx.Encoder) {
 		e.Str(s.SessionID)
 	}
 	{
-		e.FieldStart("session_token")
-		e.Str(s.SessionToken)
+		if s.SessionToken.Set {
+			e.FieldStart("session_token")
+			s.SessionToken.Encode(e)
+		}
 	}
 	{
 		e.FieldStart("step")
@@ -7548,11 +7550,9 @@ func (s *FlowResponse) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"session_id\"")
 			}
 		case "session_token":
-			requiredBitSet[0] |= 1 << 2
 			if err := func() error {
-				v, err := d.Str()
-				s.SessionToken = string(v)
-				if err != nil {
+				s.SessionToken.Reset()
+				if err := s.SessionToken.Decode(d); err != nil {
 					return err
 				}
 				return nil
@@ -7619,7 +7619,7 @@ func (s *FlowResponse) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [1]uint8{
-		0b00001111,
+		0b00001011,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -8115,8 +8115,10 @@ func (s *FlowSubmitRequest) Encode(e *jx.Encoder) {
 // encodeFields encodes fields.
 func (s *FlowSubmitRequest) encodeFields(e *jx.Encoder) {
 	{
-		e.FieldStart("session_token")
-		e.Str(s.SessionToken)
+		if s.SessionToken.Set {
+			e.FieldStart("session_token")
+			s.SessionToken.Encode(e)
+		}
 	}
 	{
 		e.FieldStart("action")
@@ -8160,11 +8162,9 @@ func (s *FlowSubmitRequest) Decode(d *jx.Decoder) error {
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
 		case "session_token":
-			requiredBitSet[0] |= 1 << 0
 			if err := func() error {
-				v, err := d.Str()
-				s.SessionToken = string(v)
-				if err != nil {
+				s.SessionToken.Reset()
+				if err := s.SessionToken.Decode(d); err != nil {
 					return err
 				}
 				return nil
@@ -8223,7 +8223,7 @@ func (s *FlowSubmitRequest) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [1]uint8{
-		0b00000011,
+		0b00000010,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.

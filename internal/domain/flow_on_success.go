@@ -219,7 +219,7 @@ func (h *FlowCreateUserHandler) Handle(ctx context.Context, client database.Quer
 			// resolver validates the catalog) but we drop them defensively.
 			continue
 		}
-		uniqueScope := attributeUniquenessFor(name, identifierName, field.Unique)
+		uniqueScope := attributeUniquenessFor(name, identifierName)
 		attr, err := NewCreateAttribute(name, value, uniqueScope)
 		if err != nil {
 			return FlowOnSuccessResult{}, fmt.Errorf("flow on_success create_user: build attribute %q: %w", name, err)
@@ -370,17 +370,11 @@ func findPasswordField(resolved map[string]FlowField, submitted map[string]any) 
 	return "", nil, false
 }
 
-// attributeUniquenessFor maps a [FlowFieldUniqueScope] to the
-// [AttributeUniqueness] enum the user repository understands. The
-// identifier field is always uniqueness-scoped at minimum to the team
-// level so two users can't share the same login.
-func attributeUniquenessFor(name, identifierName string, scope FlowFieldUniqueScope) AttributeUniqueness {
-	switch scope {
-	case FlowFieldUniqueScopeInstance:
-		return AttributeUniquenessGlobal
-	case FlowFieldUniqueScopeOrganization:
-		return AttributeUniquenessTeam
-	}
+// attributeUniquenessFor returns the [AttributeUniqueness] scope a
+// submitted field should be persisted with. The identifier field is
+// always uniqueness-scoped to the team so two users in the same team
+// can't share the same login.
+func attributeUniquenessFor(name, identifierName string) AttributeUniqueness {
 	if name == identifierName {
 		return AttributeUniquenessTeam
 	}

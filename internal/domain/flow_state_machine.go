@@ -34,6 +34,11 @@ type FlowStateMachine interface {
 	// the state machine does not need to re-fetch it from storage on
 	// every submit.
 	Process(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState, in FlowSubmitInput) (FlowStepResult, error)
+
+	// Render re-emits the current step without advancing the state
+	// machine. Used by the GET /flow/{id} handler to refresh a stale
+	// client view after a reload or network error.
+	Render(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState) (FlowStepResult, error)
 }
 
 // FlowStartInput carries everything the state machine needs to bootstrap
@@ -44,11 +49,18 @@ type FlowStateMachine interface {
 // validates against. The state machine plumbs it through to
 // [FlowFieldResolver]; it is captured here (rather than re-derived per
 // step) because the schema is constant for the lifetime of a flow.
+//
+// RedirectURI is the terminal redirect destination for `complete:
+// redirect` flows. It is hoisted out of [FlowAuthRequestRef] so a
+// flow can carry a redirect target without being bound to an OIDC
+// auth-request (e.g. a standalone register flow whose creator passed
+// `redirect_uri` directly).
 type FlowStartInput struct {
 	Definition    *FlowDefinition
 	Purpose       FlowDefinitionPurpose
 	Session       FlowSessionRef
 	AuthRequest   *FlowAuthRequestRef
+	RedirectURI   *string
 	Hint          FlowHint
 	UserSchemaURL string
 }
@@ -196,15 +208,14 @@ type FlowSessionRef struct {
 
 // FlowAuthRequestRef ties a flow to the OIDC authorization request it
 // is fulfilling. Nil on [FlowStartInput.AuthRequest] for flows started
-// outside an OIDC context (standalone registration, recovery).
+// outside an OIDC context (standalone registration, recovery). The
+// terminal redirect destination lives on [FlowStartInput.RedirectURI]
+// directly so the OIDC binding and the redirect URL are independent
+// concerns.
 type FlowAuthRequestRef struct {
 	// ID is the authorization request identifier the OIDC layer
 	// minted.
 	ID string
-
-	// RedirectURI is the terminal redirect destination for
-	// [FlowStepCompleteRedirect] flows.
-	RedirectURI string
 
 	// RequestedACR is the Authentication Context Class Reference asked
 	// for by the relying party. Reserved for future risk-policy use;
@@ -304,14 +315,29 @@ func (r *FlowStateMachineRuntime) Start(ctx context.Context, client database.Que
 		IssuedAt:       r.now(),
 		SessionID:      in.Session.ID,
 		SessionVersion: in.Session.Version,
+		RedirectURI:    in.RedirectURI,
 	}
 	if in.AuthRequest != nil {
 		state.AuthRequestID = &in.AuthRequest.ID
-		state.RedirectURI = &in.AuthRequest.RedirectURI
 		state.RequestedACR = in.AuthRequest.RequestedACR
 	}
 
 	step, err := r.renderStep(ctx, client, in.Definition, state, in.UserSchemaURL, nil)
+	if err != nil {
+		return FlowStepResult{}, err
+	}
+	return FlowStepResult{State: state, Step: step}, nil
+}
+
+// Render re-emits the current step against the supplied definition
+// without advancing the state machine. The returned [FlowStepResult.State]
+// is the same state value passed in — Render does not refresh
+// [FlowState.IssuedAt] because nothing about the flow has changed.
+func (r *FlowStateMachineRuntime) Render(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState) (FlowStepResult, error) {
+	if def == nil || state == nil {
+		return FlowStepResult{}, fmt.Errorf("%w: render without definition or state", ErrIntegrity)
+	}
+	step, err := r.renderStep(ctx, client, def, state, state.UserSchemaURL, nil)
 	if err != nil {
 		return FlowStepResult{}, err
 	}
@@ -341,7 +367,7 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 		return FlowStepResult{}, err
 	}
 
-	if validationErr := r.fields.Validate(ctx, client, state.ProjectID, userSchemaURL, in.Fields); validationErr != nil {
+	if validationErr := r.fields.Validate(resolved, in.Fields); validationErr != nil {
 		var errs FlowFieldValidationErrors
 		if asValidationErrors(validationErr, &errs) {
 			msg := errs.Error()

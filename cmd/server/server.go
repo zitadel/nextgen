@@ -11,16 +11,33 @@ import (
 	"syscall"
 	"time"
 
+	lru "github.com/hashicorp/golang-lru/v2"
+	"github.com/ianlancetaylor/jsonschema"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
 	oasapi "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
+	"github.com/zitadel/nextgen/internal/cookie"
+	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/domain/idgen"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	_ "github.com/zitadel/nextgen/internal/storage/database/dialect/all"
 	"github.com/zitadel/nextgen/internal/storage/database/repository"
 )
+
+// devSealerKey is a hardcoded 32-byte key used to seal the flow cookie.
+// TODO: inject via config/env once the secrets story lands; this constant
+// is dev-only and must not ship to production.
+var devSealerKey = cookie.Key{
+	0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+	0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+	0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+	0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f,
+}
+
+const flowSchemaCacheSize = 256
 
 func NewCommand() *cobra.Command {
 	var configPath string
@@ -79,9 +96,37 @@ func run(ctx context.Context, cfg Config, pool database.Pool) error {
 	sessionRepo := repository.NewSessionRepository(pool)
 	flowRepo := repository.NewFlowDefinitionRepository(pool)
 	attemptRepo := repository.NewAuthAttemptRepository(pool)
+	jsonSchemaRepo := repository.NewJSONSchemaRepository(pool)
+
+	// ── Flow engine plumbing ─────────
+	sealer, err := cookie.NewSealer(devSealerKey)
+	if err != nil {
+		return fmt.Errorf("build cookie sealer: %w", err)
+	}
+
+	schemaCache, err := lru.New2Q[string, *jsonschema.Schema](flowSchemaCacheSize)
+	if err != nil {
+		return fmt.Errorf("build schema cache: %w", err)
+	}
+	schemas := domain.NewJSONSchemaResolver(jsonSchemaRepo, schemaCache, 0, 0, nil, nil)
+	fields := domain.NewSchemaFieldResolver(schemas)
+	ids := idgen.NewULID()
+	hasher := devPasswordHasher{}
+
+	registry := domain.NewFlowOnSuccessRegistry()
+	if err := registry.Register(domain.FlowOnSuccessCreateUser,
+		domain.NewFlowCreateUserHandler(ids, userRepo, userPasswordRepo, hasher)); err != nil {
+		return fmt.Errorf("register create_user handler: %w", err)
+	}
+	if err := registry.Register(domain.FlowOnSuccessVerifyCredentials,
+		domain.NewFlowVerifyCredentialsHandler(userRepo, userPasswordRepo, hasher)); err != nil {
+		return fmt.Errorf("register verify_credentials handler: %w", err)
+	}
+
+	stateMachine := domain.NewFlowStateMachine(fields, registry, time.Now)
 
 	// ── Services ─────────────────────
-	flowService := service.NewFlowService(pool, flowRepo)
+	flowService := service.NewFlowService(pool, flowRepo, stateMachine, ids)
 	authAttemptSvc := service.NewAuthAttemptService(
 		pool,
 		attemptRepo,
@@ -98,7 +143,7 @@ func run(ctx context.Context, cfg Config, pool database.Pool) error {
 	defer stop()
 
 	oasServer, err := oasapi.NewServer(
-		api.NewHandler(flowService, authAttemptSvc),
+		api.NewHandler(flowService, authAttemptSvc, sealer, time.Now),
 		api.NewSecurityHandler(),
 		oasapi.WithErrorHandler(api.OgenErrorHandler))
 	if err != nil {

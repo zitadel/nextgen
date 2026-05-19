@@ -1,8 +1,11 @@
 type: object
-required: [session_token, action]
+required: [action]
 properties:
   session_token:
     type: string
+    description: |
+      Optional bearer form of the sealed flow state. Cookie-based callers
+      omit this field and rely on the `_zflow` cookie instead.
   action:
     type: string
     description: |
