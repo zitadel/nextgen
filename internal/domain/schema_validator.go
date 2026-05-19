@@ -30,16 +30,12 @@ type KnownSchemaKind string
 
 const (
 	SchemaKindUser           KnownSchemaKind = "user-schema"
-	SchemaKindAuthMethod     KnownSchemaKind = "auth-method"
-	SchemaKindUserProperty   KnownSchemaKind = "user-property"
-	SchemaKindNestedProperty KnownSchemaKind = "nested-user-property"
+	SchemaKindFlowDefinition KnownSchemaKind = "flow-definition"
 )
 
 var schemaKindPathMap = map[KnownSchemaKind]string{
 	SchemaKindUser:           "user-schema.json",
-	SchemaKindAuthMethod:     "auth-method.json",
-	SchemaKindUserProperty:   "user-property.json",
-	SchemaKindNestedProperty: "nested-user-property.json",
+	SchemaKindFlowDefinition: "flow-definition.json",
 }
 
 // TenantSchemaValidator validates a tenant schema document against the
@@ -63,7 +59,7 @@ func NewTenantSchemaValidator(builtinPublicBase string) (*TenantSchemaValidator,
 	for name := range builtinSchemas {
 		canonicalURL := builtinPublicBase + "/" + name
 		var buf bytes.Buffer
-		if err := writeBuiltinJSONSchema(&buf, name, canonicalURL); err != nil {
+		if err := WriteBuiltinJSONSchema(&buf, name, canonicalURL); err != nil {
 			return nil, fmt.Errorf("%w for %q: %w", ErrBuiltinTemplateRenderFailed, name, err)
 		}
 		rendered[canonicalURL] = buf.Bytes()
@@ -87,19 +83,19 @@ func NewTenantSchemaValidator(builtinPublicBase string) (*TenantSchemaValidator,
 
 // ValidateAgainstMetaSchema safely checks byte payloads entirely in memory.
 func (v *TenantSchemaValidator) ValidateAgainstMetaSchema(tenantSchemaBytes []byte) error {
-	kind, err := kindFromSchema(tenantSchemaBytes)
-	if err != nil {
-		return err
-	}
-
-	metaSchema, ok := v.metaSchemas[KnownSchemaKind(kind)]
-	if !ok {
-		return fmt.Errorf("%w: %q", ErrUnknownSchemaKind, kind)
-	}
-
-	var tenantSchema any
+	var tenantSchema map[string]any
 	if err := json.Unmarshal(tenantSchemaBytes, &tenantSchema); err != nil {
 		return fmt.Errorf("%w: %w", ErrSchemaParseFailed, err)
+	}
+
+	kindVal, _ := tenantSchema["kind"].(string)
+	if kindVal == "" {
+		return ErrMissingSchemaKind
+	}
+
+	metaSchema, ok := v.metaSchemas[KnownSchemaKind(kindVal)]
+	if !ok {
+		return fmt.Errorf("%w: %q", ErrUnknownSchemaKind, kindVal)
 	}
 
 	if err := metaSchema.Validate(tenantSchema); err != nil {
@@ -108,57 +104,18 @@ func (v *TenantSchemaValidator) ValidateAgainstMetaSchema(tenantSchemaBytes []by
 	return nil
 }
 
-func kindFromSchema(b []byte) (string, error) {
-	var top struct {
-		Kind string `json:"kind"`
-	}
-	if err := json.Unmarshal(b, &top); err != nil {
-		return "", fmt.Errorf("%w: %w", ErrSchemaParseFailed, err)
-	}
-	if top.Kind == "" {
-		return "", ErrMissingSchemaKind
-	}
-	return top.Kind, nil
-}
-
-// todo (grvijayan): Refactor; the recursive resolution is kinda duplicated from JSONSchemaResolver.Resolve to avoid circular dependency between resolver and validator.
 func compileMetaSchema(metaURL string, rendered map[string][]byte, maxDepth int) (*jsonschema.Schema, error) {
 	cache := make(map[string]*jsonschema.Schema)
-	var resolve func(schemaURL string, data []byte, depth int) (*jsonschema.Schema, error)
-	resolve = func(schemaURL string, data []byte, depth int) (*jsonschema.Schema, error) {
-		if depth > maxDepth {
-			return nil, ErrMaxResolveDepthReached
+	loader := func(url string) ([]byte, error) {
+		data, ok := rendered[url]
+		if !ok {
+			return nil, fmt.Errorf("%w: %q", ErrMetaSchemaRefNotFound, url)
 		}
-		if s, ok := cache[schemaURL]; ok {
-			return s, nil
-		}
-		schema, err := unmarshalJSONSchema(schemaURL, data)
-		if err != nil {
-			return nil, err
-		}
-		cache[schemaURL] = schema
-		err = schema.Resolve(&jsonschema.ResolveOpts{
-			Loader: func(schemaID string, uri *url.URL) (*jsonschema.Schema, error) {
-				refURL := uri.String()
-				if s, ok := cache[refURL]; ok {
-					return s, nil
-				}
-				refData, ok := rendered[refURL]
-				if !ok {
-					return nil, fmt.Errorf("%w: %q", ErrMetaSchemaRefNotFound, refURL)
-				}
-				return resolve(refURL, refData, depth+1)
-			},
-		})
-		if err != nil {
-			return nil, err
-		}
-		return schema, nil
+		return data, nil
 	}
-
 	data, ok := rendered[metaURL]
 	if !ok {
 		return nil, fmt.Errorf("%w: %q", ErrMissingBuiltinMetaSchema, metaURL)
 	}
-	return resolve(metaURL, data, 0)
+	return compileSchema(metaURL, data, 0, maxDepth, cache, loader)
 }

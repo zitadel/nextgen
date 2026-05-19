@@ -212,7 +212,7 @@ func TestJSONSchemaResolver_Resolve(t *testing.T) {
 
 				_, err := resolver.Resolve(ctx, nil, projectID, urlA, nil)
 				require.Error(t, err)
-				assert.ErrorContains(t, err, "max resolve depth")
+				assert.ErrorIs(t, err, domain.ErrMaxResolveDepthReached)
 				assert.Equal(t, 2, getCalls)
 			},
 		},
@@ -328,11 +328,23 @@ func TestWriteBuiltinJSONSchema(t *testing.T) {
 		err := domain.WriteBuiltinJSONSchema(&buf, "nope/not-there.json", "https://example.test/x")
 		require.Error(t, err)
 	})
+	t.Run("relative url", func(t *testing.T) {
+		var buf bytes.Buffer
+		err := domain.WriteBuiltinJSONSchema(&buf, "user-schema.json", "not-absolute")
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "must be absolute")
+	})
+	t.Run("invalid url", func(t *testing.T) {
+		var buf bytes.Buffer
+		err := domain.WriteBuiltinJSONSchema(&buf, "user-schema.json", "://bad url")
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "invalid canonicalDocumentURL")
+	})
 }
 
 func TestJSONSchemaResolver_BuiltinEmbedded(t *testing.T) {
 	ctx := context.Background()
-	base := mustParseURL(t, "https://example.test/app/schemas/")
+	base := mustParseURL(t, "https://example.test/app/schemas")
 	full := "https://example.test/app/schemas/user-schema.json"
 
 	t.Run("resolve skips repository", func(t *testing.T) {
