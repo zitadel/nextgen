@@ -41,6 +41,7 @@ type JSONSchemaRepository interface {
 	jsonSchemaColumns
 	jsonSchemaConditions
 
+	GetByID(ctx context.Context, client database.QueryExecutor, projectID string, schemaID string) (*JSONSchema, error)
 	Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*JSONSchema, error)
 	List(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) ([]*JSONSchema, error)
 	Create(ctx context.Context, client database.QueryExecutor, schema *JSONSchema) error

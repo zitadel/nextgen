@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"errors"
 	"net/url"
 	"time"
 
@@ -48,7 +47,7 @@ func NewSchemaService(
 func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInput) (*domain.JSONSchema, error) {
 	tx, err := s.pool.Begin(ctx, nil)
 	if err != nil {
-		return nil, errors.New(`domain.ErrInternal(err).WitMessage("failed to start transaction")`)
+		return nil, domain.ErrInternal(err).WithMessage("failed to start transaction")
 	}
 	defer func() {
 		if err != nil {
@@ -75,7 +74,7 @@ func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInpu
 
 	err = tx.Commit(ctx)
 	if err != nil {
-		return nil, errors.New(`domain.ErrInternal(err).WitMessage("failed to commit transaction")`)
+		return nil, domain.ErrInternal(err).WithMessage("failed to commit transaction")
 	}
 
 	return model, nil
@@ -84,7 +83,7 @@ func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInpu
 func (s *SchemaService) CreateSchemaByUrl(ctx context.Context, input CreateSchemaByURLInput) (*domain.JSONSchema, error) {
 	tx, err := s.pool.Begin(ctx, nil)
 	if err != nil {
-		return nil, errors.New(`domain.ErrInternal(err).WitMessage("failed to start transaction")`)
+		return nil, domain.ErrInternal(err).WithMessage("failed to start transaction")
 	}
 	defer func() {
 		if err != nil {
@@ -100,14 +99,12 @@ func (s *SchemaService) CreateSchemaByUrl(ctx context.Context, input CreateSchem
 
 	err = tx.Commit(ctx)
 	if err != nil {
-		return nil, errors.New(`domain.ErrInternal(err).WitMessage("failed to commit transaction")`)
+		return nil, domain.ErrInternal(err).WithMessage("failed to commit transaction")
 	}
 
-	// TODO(wim): Since repository does not yet have a get by id, we need to use the condition. This will change in the future
-	return s.schemaRepo.Get(ctx, s.pool, database.WithCondition(s.schemaRepo.PrimaryKeyCondition(input.ProjectID, strUri)))
+	return s.schemaRepo.GetByID(ctx, s.pool, input.ProjectID, strUri)
 }
 
-func (s *SchemaService) GetSchema(ctx context.Context, projectID string, teamID string, id string) (*domain.JSONSchema, error) {
-	// TODO(wim): Since repository does not yet have a get by id, we need to use the condition. This will change in the future
-	return s.schemaRepo.Get(ctx, s.pool, database.WithCondition(s.schemaRepo.PrimaryKeyCondition(projectID, id)))
+func (s *SchemaService) GetSchema(ctx context.Context, projectID string, teamID string, schemaID string) (*domain.JSONSchema, error) {
+	return s.schemaRepo.GetByID(ctx, s.pool, projectID, schemaID)
 }
