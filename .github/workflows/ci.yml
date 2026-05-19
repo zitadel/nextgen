@@ -69,40 +69,8 @@ jobs:
       - name: Install dependencies
         run: corepack pnpm install --frozen-lockfile
 
-      - name: DEBUG — inspect api dist between tasks
-        run: |
-          echo "=== api/dist BEFORE anything ==="
-          ls -la packages/api/dist 2>/dev/null || echo "(no dist)"
-          echo
-          echo "=== Run api:typecheck only ==="
-          corepack pnpm nx run @zitadel-nextgen/api:typecheck
-          echo
-          echo "=== api/dist AFTER api:typecheck ==="
-          ls -la packages/api/dist 2>/dev/null | head -20
-          find packages/api/dist -name '*.d.ts' | wc -l | xargs echo ".d.ts count:"
-          find packages/api/dist -name '*.d.mts' | wc -l | xargs echo ".d.mts count:"
-          find packages/api/dist -name '*.tsbuildinfo' | wc -l | xargs echo "tsbuildinfo count:"
-          echo
-          echo "=== Run api:build only ==="
-          corepack pnpm nx run @zitadel-nextgen/api:build
-          echo
-          echo "=== api/dist AFTER api:build ==="
-          ls -la packages/api/dist 2>/dev/null | head -20
-          find packages/api/dist -name '*.d.ts' | wc -l | xargs echo ".d.ts count:"
-          find packages/api/dist -name '*.d.mts' | wc -l | xargs echo ".d.mts count:"
-          find packages/api/dist -name '*.tsbuildinfo' | wc -l | xargs echo "tsbuildinfo count:"
-          echo
-          echo "=== Run api-mock:typecheck only (THE failing task) ==="
-          corepack pnpm nx run @zitadel-nextgen/api-mock:typecheck --verbose || echo "FAILED — continuing to capture state"
-          echo
-          echo "=== api/dist AFTER api-mock:typecheck ==="
-          ls -la packages/api/dist 2>/dev/null | head -20
-          find packages/api/dist -name '*.d.ts' | wc -l | xargs echo ".d.ts count:"
-          find packages/api/dist -name '*.d.mts' | wc -l | xargs echo ".d.mts count:"
-          find packages/api/dist -name '*.tsbuildinfo' | wc -l | xargs echo "tsbuildinfo count:"
-          echo
-          echo "=== Done. Failing intentionally so CI doesn't run other steps ==="
-          exit 1
+      - name: Node checks
+        run: corepack pnpm nx run-many -t lint,typecheck,build,test
 
   npm-pack-smoke:
     runs-on: ubuntu-latest
