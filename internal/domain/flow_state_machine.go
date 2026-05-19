@@ -9,41 +9,20 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-// FlowStateMachine drives a flow definition forward in response to client
-// submissions. It owns the runtime semantics of the definition — applying
-// transitions, running on_success hooks, validating field values — and
-// produces a [FlowStepResult] the handler turns into the API response.
+// FlowStateMachine drives a flow definition forward in response to
+// client submissions. The handler owns cookie I/O; the state machine
+// never touches cookies.
 //
-// The handler owns cookie I/O: it decodes the sealed `_zflow` cookie into
-// a [FlowState] before calling [FlowStateMachine.Process], and re-encodes
-// the returned [FlowState] on the way out. The state machine never
-// touches cookies.
-//
-// MVP scope (per PR 6): a single linear flow per `flow_id`, no pivot
-// stack, no challenges, no gates. `Pop` on [FlowStepResult] stays
-// reserved for the deferred pivot work — it is always false today.
+// MVP scope: single linear flow per `flow_id`, no pivot stack, no
+// challenges, no gates. `Pop` on [FlowStepResult] stays reserved for
+// the deferred pivot work.
 type FlowStateMachine interface {
-	// Start initializes a new flow on top of (possibly empty) prior
-	// state and returns the first visible step.
 	Start(ctx context.Context, client database.QueryExecutor, in FlowStartInput) (FlowStepResult, error)
-
-	// Process consumes a client submission against the current step and
-	// produces the next visible step. The state argument is the decoded
-	// cookie payload; the returned [FlowStepResult.State] supersedes
-	// it. The handler passes the resolved [FlowDefinition] each call so
-	// the state machine does not need to re-fetch it from storage on
-	// every submit.
 	Process(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState, in FlowSubmitInput) (FlowStepResult, error)
 }
 
-// FlowStartInput carries everything the state machine needs to bootstrap
-// a new flow: the resolved definition, the purpose, and the session it
-// sits on top of.
-//
-// UserSchemaURL is the resolved location of the user schema this flow
-// validates against. The state machine plumbs it through to
-// [FlowFieldResolver]; it is captured here (rather than re-derived per
-// step) because the schema is constant for the lifetime of a flow.
+// FlowStartInput carries everything the state machine needs to
+// bootstrap a new flow.
 type FlowStartInput struct {
 	Definition    *FlowDefinition
 	Purpose       FlowDefinitionPurpose
@@ -52,17 +31,10 @@ type FlowStartInput struct {
 	UserSchemaURL string
 }
 
-// FlowSubmitInput carries a single client submission. The state machine
-// dispatches on Action against the current step's declared transitions
-// and validates Fields against the resolved user schema.
+// FlowSubmitInput carries a single client submission.
 //
-// GateProofs and SSOProvider are reserved for future PRs (gates land in
-// PR 3, SSO is deferred from MVP); they are accepted today but the
-// state machine returns [ErrUnsupported] for any flow that mentions
-// them.
-//
-// ChallengeResponse intentionally absent: it lands when PR 4 wires the
-// passkey ceremony.
+// GateProofs and SSOProvider are reserved; the state machine returns
+// [ErrUnsupported] for any flow that exercises them today.
 type FlowSubmitInput struct {
 	Action      string
 	Fields      map[string]any
@@ -70,179 +42,84 @@ type FlowSubmitInput struct {
 	SSOProvider *FlowSSOProviderRef
 }
 
-// FlowSSOProviderRef identifies the provider the user selected on an
-// `sso` action. Reserved for the deferred SSO ceremony; MVP returns
-// [ErrUnsupported] when this is set.
 type FlowSSOProviderRef struct {
 	ID string
 }
 
 // FlowStepResult is what the state machine returns from [Start] and
-// [Process]. The handler seals State back into the cookie and renders
-// Step as the response body.
-//
-// Pop is reserved for the deferred pivot stack: when a child flow
-// completes and the parent's progress is restored, Pop is true and Step
-// is the parent's next visible step. MVP never sets it.
+// [Process]. Pop is reserved for the deferred pivot stack.
 type FlowStepResult struct {
 	State *FlowState
 	Step  *FlowStep
 	Pop   bool
 }
 
-// FlowStep is the capability payload the API surfaces to the client. It
-// mirrors the OpenAPI `flow-step` component
-// (api/openapi/components/flows/flow-step.yaml) in domain terms; the
-// handler maps it to the generated DTO.
-//
-// MVP omits the components that arrive with later PRs: gates (PR 3),
-// challenge (PR 4), branding (handler-level), and step-level texts
-// (which the flow definition does not yet carry).
+// FlowStep is the capability payload the API surfaces to the client.
+// It mirrors the OpenAPI `flow-step` component in domain terms.
 type FlowStep struct {
-	// Name is the step name from the flow definition. The client echoes
-	// it back on submit so the state machine can confirm the step the
-	// submission is targeting.
-	Name string
-
-	// Error carries a localization key for a step-level error message
-	// raised by the previous submission (e.g. invalid credentials).
-	// Per-field validation errors live on FlowField, not here.
-	Error *string
-
-	// Complete is set on terminal steps. The client uses it to decide
-	// between navigating to RedirectURL ([FlowStepCompleteRedirect]) or
-	// rendering a success screen ([FlowStepCompleteShow]).
-	Complete *FlowStepComplete
-
-	// RedirectURL is the destination for [FlowStepCompleteRedirect]
-	// terminal steps — typically the OIDC callback derived from
-	// [FlowAuthRequestRef.RedirectURI].
-	RedirectURL *string
-
-	// Fields holds the resolved input capabilities for this step, keyed
-	// by property name. Sourced from [FlowFieldResolver.Resolve] over
-	// the step's declared fields.
-	Fields map[string]FlowField
-
-	// Actions enumerates the actions the user can take on this step,
-	// keyed by action name. The keys mirror the outcomes declared on
-	// [FlowDefinitionStep.Transitions].
-	Actions map[string]FlowAction
-
-	// SSOProviders surfaces the identity providers available on this
-	// step. Reserved for the deferred SSO ceremony; MVP always emits an
-	// empty slice.
+	Name         string
+	Error        *string
+	Complete     *FlowStepComplete
+	RedirectURL  *string
+	Fields       map[string]FlowField
+	Actions      map[string]FlowAction
 	SSOProviders []FlowSSOProvider
 }
 
 // FlowAction is a single user action surfaced on [FlowStep.Actions].
-// The action name is the map key in [FlowStep.Actions], matching the
-// outcome key on [FlowDefinitionStep.Transitions].
 type FlowAction struct {
-	// TextKey is a localization key for the action label, resolved
-	// client-side via the `| t` filter. The state machine defaults it
-	// to `action.{name}` when the flow definition does not carry an
-	// override.
 	TextKey string
-
-	// Primary marks the default/primary action on the step. The flow
-	// definition does not yet declare it; today only the conventional
-	// `submit` outcome is treated as primary.
 	Primary bool
 }
 
 // FlowActionSubmit is the conventional outcome name for the primary
-// "advance forward" action on a step. The state machine flags it as
-// primary on the rendered [FlowStep.Actions].
+// "advance forward" action on a step.
 const FlowActionSubmit = "submit"
 
-// FlowSessionRef pins the session row this flow runs on top of.
-// SessionVersion is used by the state machine to detect concurrent
-// session mutations (logout from another tab, etc.); a mismatch
-// surfaces as [ErrSessionConflict].
+// FlowSessionRef pins the session row this flow runs on top of. A
+// version mismatch surfaces as [ErrSessionConflict].
 type FlowSessionRef struct {
 	ID      string
 	Version int64
 }
 
 // FlowAuthRequestRef ties a flow to the OIDC authorization request it
-// is fulfilling. Nil on [FlowStartInput.AuthRequest] for flows started
-// outside an OIDC context (standalone registration, recovery).
+// is fulfilling.
 type FlowAuthRequestRef struct {
-	// ID is the authorization request identifier the OIDC layer
-	// minted.
-	ID string
-
-	// RedirectURI is the terminal redirect destination for
-	// [FlowStepCompleteRedirect] flows.
-	RedirectURI string
-
-	// RequestedACR is the Authentication Context Class Reference asked
-	// for by the relying party. Reserved for future risk-policy use;
-	// MVP carries it through to [FlowState] but does not act on it.
+	ID           string
+	RedirectURI  string
 	RequestedACR *string
 }
 
 // FlowCollectedUserIDKey is the reserved key under which on_success
 // handlers stash the resolved user id on [FlowProgress.CollectedData].
-// The handler picks it up at terminate time to mint the session token
-// / handoff token. Exposed because the handler reads it from the
-// sealed cookie payload after the state machine returns.
 const FlowCollectedUserIDKey = "_user_id"
 
-// State-machine error sentinels. The handler maps them to the
-// appropriate HTTP status; in-flow recoverable failures (validation,
-// credential mismatch) are surfaced on [FlowStep.Error] rather than
-// returned as errors.
 var (
-	// ErrInvalidAction is returned when the submitted action is not
-	// declared on the current step's transitions.
-	ErrInvalidAction = errors.New("flow state machine: action not allowed on current step")
-
-	// ErrSessionConflict is returned when the session version pinned
-	// in [FlowState] no longer matches the live session row. The
-	// handler maps it to HTTP 409.
+	ErrInvalidAction   = errors.New("flow state machine: action not allowed on current step")
 	ErrSessionConflict = errors.New("flow state machine: session version conflict")
-
-	// ErrIntegrity is returned for definition/data inconsistencies
-	// that should never happen for an activated definition — e.g. a
-	// transition targeting a non-existent step. Mapped to HTTP 500.
-	ErrIntegrity = errors.New("flow state machine: integrity violation")
-
-	// ErrUnsupported is returned when a submission exercises a feature
-	// the MVP engine does not implement (SSO actions, gate proofs,
-	// challenge responses). The handler maps it to HTTP 400.
-	ErrUnsupported = errors.New("flow state machine: feature not supported in MVP")
+	ErrIntegrity       = errors.New("flow state machine: integrity violation")
+	ErrUnsupported     = errors.New("flow state machine: feature not supported in MVP")
 )
 
-// FlowStateMachineRuntime is the production [FlowStateMachine]. It
-// composes a [FlowFieldResolver] for per-step schema work and a
-// [FlowOnSuccessRegistry] for the side-effect handlers each step can
-// declare.
-//
-// MVP scope: single linear flow, no pivot stack, no gates, no
-// challenges. The runtime carries the per-call ordering documented on
-// [FlowStateMachine] and stops at the first terminal step it reaches.
+// FlowStateMachineRuntime is the production [FlowStateMachine].
 type FlowStateMachineRuntime struct {
-	fields    FlowFieldResolver
-	onSuccess *FlowOnSuccessRegistry
-	now       func() time.Time
+	fields     FlowFieldResolver
+	createUser *FlowCreateUserHandler
+	now        func() time.Time
 }
 
-// NewFlowStateMachine wires the runtime. The now hook is injectable
-// so tests can produce deterministic [FlowState.IssuedAt] values.
-func NewFlowStateMachine(fields FlowFieldResolver, onSuccess *FlowOnSuccessRegistry, now func() time.Time) *FlowStateMachineRuntime {
+// NewFlowStateMachine wires the runtime. The now hook is injectable so
+// tests can produce deterministic [FlowState.IssuedAt] values.
+func NewFlowStateMachine(fields FlowFieldResolver, createUser *FlowCreateUserHandler, now func() time.Time) *FlowStateMachineRuntime {
 	if now == nil {
 		now = time.Now
 	}
-	return &FlowStateMachineRuntime{fields: fields, onSuccess: onSuccess, now: now}
+	return &FlowStateMachineRuntime{fields: fields, createUser: createUser, now: now}
 }
 
 var _ FlowStateMachine = (*FlowStateMachineRuntime)(nil)
 
-// Start bootstraps a new flow against the supplied definition. It
-// builds the initial [FlowState], renders the entry step, and returns
-// both for the handler to seal and emit.
 func (r *FlowStateMachineRuntime) Start(ctx context.Context, client database.QueryExecutor, in FlowStartInput) (FlowStepResult, error) {
 	if in.Definition == nil {
 		return FlowStepResult{}, fmt.Errorf("%w: start without definition", ErrIntegrity)
@@ -279,7 +156,6 @@ func (r *FlowStateMachineRuntime) Start(ctx context.Context, client database.Que
 	return FlowStepResult{State: state, Step: step}, nil
 }
 
-// Process executes one submit against the current step.
 func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState, in FlowSubmitInput) (FlowStepResult, error) {
 	if def == nil || state == nil {
 		return FlowStepResult{}, fmt.Errorf("%w: process without definition or state", ErrIntegrity)
@@ -317,18 +193,7 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 
 	routeOutcome := in.Action
 	if currentStep.OnSuccess != nil {
-		handler, err := r.onSuccess.Lookup(*currentStep.OnSuccess)
-		if err != nil {
-			return FlowStepResult{}, fmt.Errorf("%w: %v", ErrIntegrity, err)
-		}
-		result, err := handler.Handle(ctx, client, FlowOnSuccessInput{
-			ProjectID:     state.ProjectID,
-			UserSchemaURL: userSchemaURL,
-			Fields:        in.Fields,
-			Resolved:      resolved,
-			State:         state,
-			ResolvedFlow:  def,
-		})
+		result, err := r.runOnSuccess(ctx, client, def, state, userSchemaURL, currentStep, in.Fields, resolved)
 		if err != nil {
 			return FlowStepResult{}, err
 		}
@@ -358,7 +223,6 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 		return FlowStepResult{}, fmt.Errorf("%w: %q on step %q", ErrInvalidAction, in.Action, currentStep.Name)
 	}
 	if transition.Action != nil {
-		// Switch / pivot — MVP scope explicitly excludes the pivot stack.
 		return FlowStepResult{}, fmt.Errorf("%w: cross-flow transitions", ErrUnsupported)
 	}
 
@@ -384,17 +248,34 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 	return FlowStepResult{State: state, Step: step}, nil
 }
 
-// advance is the pure local move: push the previous step onto history,
-// move CurrentStep to next, and re-issue the cookie timestamp.
+// runOnSuccess dispatches the step's on_success mutation. Add a case
+// when a new [FlowOnSuccess] handler lands.
+func (r *FlowStateMachineRuntime) runOnSuccess(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState, userSchemaURL string, step *FlowDefinitionStep, fields map[string]any, resolved FlowResolvedFields) (FlowOnSuccessResult, error) {
+	in := FlowOnSuccessInput{
+		ProjectID:     state.ProjectID,
+		UserSchemaURL: userSchemaURL,
+		Fields:        fields,
+		Resolved:      resolved,
+		State:         state,
+		ResolvedFlow:  def,
+	}
+	switch *step.OnSuccess {
+	case FlowOnSuccessCreateUser:
+		if r.createUser == nil {
+			return FlowOnSuccessResult{}, fmt.Errorf("%w: create_user handler not wired", ErrIntegrity)
+		}
+		return r.createUser.Handle(ctx, client, in)
+	default:
+		return FlowOnSuccessResult{}, fmt.Errorf("%w: unknown on_success %s", ErrIntegrity, *step.OnSuccess)
+	}
+}
+
 func (r *FlowStateMachineRuntime) advance(state *FlowState, prev *FlowDefinitionStep, nextStepName string) {
 	state.History = append(state.History, prev.Name)
 	state.CurrentStep = nextStepName
 	state.IssuedAt = r.now()
 }
 
-// terminate renders the terminal step. It reads the complete kind from
-// [FlowDefinitionStep.Complete] and threads the state's RedirectURL onto
-// the step when the kind is [FlowStepCompleteRedirect].
 func (r *FlowStateMachineRuntime) terminate(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState, userSchemaURL string, step *FlowDefinitionStep) (*FlowStep, error) {
 	rendered, err := r.renderStep(ctx, client, def, state, userSchemaURL, step)
 	if err != nil {
@@ -409,10 +290,6 @@ func (r *FlowStateMachineRuntime) terminate(ctx context.Context, client database
 	return rendered, nil
 }
 
-// renderStep produces the [FlowStep] payload for the current step.
-// stepOverride is the step to render; nil means "use state.CurrentStep".
-// This indirection lets [Start] and [Process] reuse the same render
-// helper.
 func (r *FlowStateMachineRuntime) renderStep(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState, userSchemaURL string, stepOverride *FlowDefinitionStep) (*FlowStep, error) {
 	step := stepOverride
 	if step == nil {
@@ -429,10 +306,6 @@ func (r *FlowStateMachineRuntime) renderStep(ctx context.Context, client databas
 	return r.buildStep(step, resolved, nil, nil, nil), nil
 }
 
-// resolveStepFields asks the [FlowFieldResolver] for the resolved
-// per-field metadata for the step's declared fields. A step with no
-// fields (e.g. consent or terminal steps) resolves to the empty
-// catalog.
 func (r *FlowStateMachineRuntime) resolveStepFields(ctx context.Context, client database.QueryExecutor, projectID, userSchemaURL string, step *FlowDefinitionStep) (FlowResolvedFields, error) {
 	if len(step.Fields) == 0 {
 		return FlowResolvedFields{}, nil
@@ -444,11 +317,6 @@ func (r *FlowStateMachineRuntime) resolveStepFields(ctx context.Context, client 
 	return resolved, nil
 }
 
-// buildStep assembles the [FlowStep] payload from a step's definition
-// and its resolved fields. Optional inputs:
-//   - errorKey: when non-nil, sets [FlowStep.Error].
-//   - complete: when non-nil, sets [FlowStep.Complete].
-//   - redirectURL: when non-nil, sets [FlowStep.RedirectURL].
 func (r *FlowStateMachineRuntime) buildStep(step *FlowDefinitionStep, resolved FlowResolvedFields, errorKey *string, complete *FlowStepComplete, redirectURL *string) *FlowStep {
 	actions := make(map[string]FlowAction, len(step.Transitions))
 	for outcome := range step.Transitions {
@@ -468,8 +336,6 @@ func (r *FlowStateMachineRuntime) buildStep(step *FlowDefinitionStep, resolved F
 	}
 }
 
-// recordResolvedUser stores the user id surfaced by an on_success
-// handler under the reserved key.
 func recordResolvedUser(state *FlowState, userID string) {
 	if state.CollectedData == nil {
 		state.CollectedData = map[string]any{}
@@ -477,10 +343,6 @@ func recordResolvedUser(state *FlowState, userID string) {
 	state.CollectedData[FlowCollectedUserIDKey] = userID
 }
 
-// mergeCollected copies the submitted field values onto the state's
-// collected data map, creating the map if needed. Subsequent
-// submissions overwrite earlier values for the same key — matching the
-// "last write wins" expectation when a user re-submits a step.
 func mergeCollected(state *FlowState, fields map[string]any) {
 	if len(fields) == 0 {
 		return
@@ -493,10 +355,6 @@ func mergeCollected(state *FlowState, fields map[string]any) {
 	}
 }
 
-// asValidationErrors unwraps err into a [FlowFieldValidationErrors] if
-// the underlying type matches, mirroring `errors.As` ergonomics
-// without forcing handlers to import the errors package just for this
-// one check.
 func asValidationErrors(err error, out *FlowFieldValidationErrors) bool {
 	if errs, ok := err.(FlowFieldValidationErrors); ok {
 		*out = errs
