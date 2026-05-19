@@ -4,6 +4,8 @@
 > **Date:** 2026-05-12  
 > **Context:** Interactive authentication persistence for nextgen
 
+> **Note:** Identifier column types for **SESSION**, **AUTH_ATTEMPT**, and **CHECK** are defined in [ADR 011](011-resource-identifiers.md) (ephemeral `BIGINT` identity in storage, decimal string in Go). The ER diagram below still uses logical `string` labels until tables are migrated and the diagram is refreshed.
+
 ## Context
 
 Interactive sign-in and step-up flows need durable state for:
