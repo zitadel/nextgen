@@ -1486,13 +1486,13 @@ func (s *Gate) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
-		if err := s.Type.Validate(); err != nil {
+		if err := s.Kind.Validate(); err != nil {
 			return err
 		}
 		return nil
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
-			Name:  "type",
+			Name:  "kind",
 			Error: err,
 		})
 	}
@@ -1502,11 +1502,9 @@ func (s *Gate) Validate() error {
 	return nil
 }
 
-func (s GateType) Validate() error {
+func (s GateKind) Validate() error {
 	switch s {
 	case "captcha":
-		return nil
-	case "passkey":
 		return nil
 	default:
 		return errors.Errorf("invalid value: %v", s)

@@ -32,8 +32,7 @@ func TestFlowDefinitionRepository_CreateAndGet(t *testing.T) {
 	assert.WithinDuration(t, time.Now(), got.UpdatedAt, 5*time.Second)
 
 	require.Len(t, got.Purposes, 1)
-	assert.Equal(t, domain.FlowDefinitionPurposeLogin, got.Purposes[0].Purpose)
-	assert.Equal(t, "identifier", got.Purposes[0].InitialStep)
+	assert.Equal(t, "identifier", got.Purposes[domain.FlowDefinitionPurposeLogin])
 
 	assert.Equal(t, def.Audience.AppIDs, got.Audience.AppIDs)
 	assert.Empty(t, got.Audience.TeamIDs)
@@ -56,9 +55,8 @@ func TestFlowDefinitionRepository_CreateAndGet(t *testing.T) {
 
 	require.Contains(t, identifier.Gates, "bot")
 	bot := identifier.Gates["bot"]
-	assert.Equal(t, domain.FlowGateTypeCaptcha, bot.Type)
+	assert.Equal(t, domain.FlowGateKindCaptcha, bot.Kind)
 	assert.Equal(t, "altcha", bot.Provider)
-	assert.True(t, bot.Required)
 	assert.Equal(t, "abc", bot.Config["site_key"])
 
 	require.Len(t, identifier.SSOProviders, 1)
@@ -129,10 +127,7 @@ func TestFlowDefinitionRepository_ListByPurpose(t *testing.T) {
 
 	// flow-pb: serves both login and register
 	defB := sampleFlowDefinition("proj-jpurp", "flow-pb")
-	defB.Purposes = append(defB.Purposes, domain.FlowDefinitionPurposeEntry{
-		Purpose:     domain.FlowDefinitionPurposeRegister,
-		InitialStep: "start",
-	})
+	defB.Purposes[domain.FlowDefinitionPurposeRegister] = "start"
 	require.NoError(t, repo.CreateFlowDefinition(t.Context(), tx, defB))
 
 	loginOnly, err := repo.ListFlowDefinitions(t.Context(), tx, "proj-jpurp",
@@ -251,8 +246,8 @@ func sampleFlowDefinition(projectID, id string) *domain.FlowDefinition {
 		SchemaVersion: "1.0.0",
 		Status:        domain.FlowDefinitionStatusDraft,
 		UserSchema:    "https://example.com/schemas/human-user.json",
-		Purposes: []domain.FlowDefinitionPurposeEntry{
-			{Purpose: domain.FlowDefinitionPurposeLogin, InitialStep: "identifier"},
+		Purposes: map[domain.FlowDefinitionPurpose]string{
+			domain.FlowDefinitionPurposeLogin: "identifier",
 		},
 		Audience: domain.FlowDefinitionAudience{
 			AppIDs: []string{"app-1"},
@@ -266,24 +261,23 @@ func sampleFlowDefinition(projectID, id string) *domain.FlowDefinition {
 				},
 				Gates: map[string]domain.FlowStepGate{
 					"bot": {
-						Type:     domain.FlowGateTypeCaptcha,
+						Kind:     domain.FlowGateKindCaptcha,
 						Provider: "altcha",
-						Required: true,
 						Config:   map[string]any{"site_key": "abc"},
 					},
 				},
 				SSOProviders: []domain.FlowSSOProvider{
 					{ID: "google-1", Name: "Google", Template: "google"},
 				},
-				Transitions: []domain.FlowStepTransition{
-					{Target: "resolve_user"},
-					{Action: &pivotAction, Target: "register-flow"},
+				Transitions: map[string]domain.FlowStepTransition{
+					"submit":   {Target: "resolve_user"},
+					"register": {Action: &pivotAction, Target: "register-flow"},
 				},
 			},
 			{
 				Name: "resolve_user",
-				Transitions: []domain.FlowStepTransition{
-					{Target: "password"},
+				Transitions: map[string]domain.FlowStepTransition{
+					"submit": {Target: "password"},
 				},
 			},
 			{
@@ -291,7 +285,7 @@ func sampleFlowDefinition(projectID, id string) *domain.FlowDefinition {
 				Fields:      []string{"password"},
 				OnSuccess:   &createUser,
 				Complete:    &completeShow,
-				Transitions: []domain.FlowStepTransition{},
+				Transitions: map[string]domain.FlowStepTransition{},
 			},
 		},
 	}

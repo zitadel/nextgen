@@ -1,25 +1,27 @@
 type: object
-required: [type]
+required: [kind, provider]
 description: |
-  A security gate that must be satisfied. The orchestrator appends any
-  required-but-unrendered gates automatically as a safety net.
+  A security challenge that must be satisfied before this step's submission
+  is accepted. The engine may also inject gates at runtime based on policy
+  or risk evaluation.
 properties:
-  type:
+  kind:
     type: string
-    enum: [captcha, passkey]
-    description: Gate type.
+    enum: [captcha]
+    description: |
+      The gate category. Only `captcha` is currently defined. Authenticator
+      ceremonies (e.g. passkey) are modelled as credential auth_attempts via
+      `x-credential` on a field, not as gates.
   provider:
     type: string
-    description: Provider identifier (e.g., "altcha", "turnstile").
+    description: |
+      Provider identifier within the gate kind — e.g. `altcha`, `turnstile`,
+      `hcaptcha`. The engine looks up an implementation in its provider
+      registry.
     example: altcha
-  required:
-    type: boolean
-    default: true
-  satisfied:
-    type: boolean
-    default: false
-    description: Whether this gate has already been satisfied in this flow.
   config:
     type: object
-    description: Provider-specific challenge parameters.
+    description: |
+      Provider-specific configuration consumed by the implementation when
+      issuing the per-render challenge. Opaque to the engine.
     additionalProperties: true

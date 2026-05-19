@@ -53,20 +53,16 @@ func stubListFlowDefinitions(t *testing.T, defs []*domain.FlowDefinition) *domai
 }
 
 func hasPurpose(def *domain.FlowDefinition, purpose domain.FlowDefinitionPurpose) bool {
-	for _, p := range def.Purposes {
-		if p.Purpose == purpose {
-			return true
-		}
-	}
-	return false
+	_, ok := def.Purposes[purpose]
+	return ok
 }
 
 func ptr[T any](v T) *T { return &v }
 
 func newDef(name, version string, audience domain.FlowDefinitionAudience, purposes ...domain.FlowDefinitionPurpose) *domain.FlowDefinition {
-	entries := make([]domain.FlowDefinitionPurposeEntry, len(purposes))
-	for i, p := range purposes {
-		entries[i] = domain.FlowDefinitionPurposeEntry{Purpose: p, InitialStep: "start"}
+	entries := make(map[domain.FlowDefinitionPurpose]string, len(purposes))
+	for _, p := range purposes {
+		entries[p] = "start"
 	}
 	return &domain.FlowDefinition{
 		ProjectID:     "proj",

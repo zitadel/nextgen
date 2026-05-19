@@ -44,7 +44,7 @@ properties:
     type: object
     description: |
       Security gates that must be satisfied before submission. Keyed by gate
-      name. Each gate selects a type (e.g. "captcha") and provider-specific
+      name. Each gate selects a kind (e.g. "captcha") and provider-specific
       configuration. The engine may also inject gates dynamically based on
       policy.
     additionalProperties:

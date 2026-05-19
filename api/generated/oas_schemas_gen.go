@@ -2817,7 +2817,7 @@ type FlowDefinitionStep struct {
 	// If omitted, the engine provides a default `submit` action.
 	Actions OptFlowDefinitionStepActions `json:"actions"`
 	// Security gates that must be satisfied before submission. Keyed by gate
-	// name. Each gate selects a type (e.g. "captcha") and provider-specific
+	// name. Each gate selects a kind (e.g. "captcha") and provider-specific
 	// configuration. The engine may also inject gates dynamically based on
 	// policy.
 	Gates OptFlowDefinitionStepGates `json:"gates"`
@@ -2978,7 +2978,7 @@ func (s *FlowDefinitionStepComplete) UnmarshalText(data []byte) error {
 }
 
 // Security gates that must be satisfied before submission. Keyed by gate
-// name. Each gate selects a type (e.g. "captcha") and provider-specific
+// name. Each gate selects a kind (e.g. "captcha") and provider-specific
 // configuration. The engine may also inject gates dynamically based on
 // policy.
 type FlowDefinitionStepGates map[string]Gate
@@ -3771,39 +3771,32 @@ func (s *FlowSubmitRequestGateProofs) init() FlowSubmitRequestGateProofs {
 	return m
 }
 
-// A security gate that must be satisfied. The orchestrator appends any
-// required-but-unrendered gates automatically as a safety net.
+// A security challenge that must be satisfied before this step's submission
+// is accepted. The engine may also inject gates at runtime based on policy
+// or risk evaluation.
 // Ref: #
 type Gate struct {
-	// Gate type.
-	Type GateType `json:"type"`
-	// Provider identifier (e.g., "altcha", "turnstile").
-	Provider OptString `json:"provider"`
-	Required OptBool   `json:"required"`
-	// Whether this gate has already been satisfied in this flow.
-	Satisfied OptBool `json:"satisfied"`
-	// Provider-specific challenge parameters.
+	// The gate category. Only `captcha` is currently defined. Authenticator
+	// ceremonies (e.g. passkey) are modelled as credential auth_attempts via
+	// `x-credential` on a field, not as gates.
+	Kind GateKind `json:"kind"`
+	// Provider identifier within the gate kind — e.g. `altcha`, `turnstile`,
+	// `hcaptcha`. The engine looks up an implementation in its provider
+	// registry.
+	Provider string `json:"provider"`
+	// Provider-specific configuration consumed by the implementation when
+	// issuing the per-render challenge. Opaque to the engine.
 	Config OptGateConfig `json:"config"`
 }
 
-// GetType returns the value of Type.
-func (s *Gate) GetType() GateType {
-	return s.Type
+// GetKind returns the value of Kind.
+func (s *Gate) GetKind() GateKind {
+	return s.Kind
 }
 
 // GetProvider returns the value of Provider.
-func (s *Gate) GetProvider() OptString {
+func (s *Gate) GetProvider() string {
 	return s.Provider
-}
-
-// GetRequired returns the value of Required.
-func (s *Gate) GetRequired() OptBool {
-	return s.Required
-}
-
-// GetSatisfied returns the value of Satisfied.
-func (s *Gate) GetSatisfied() OptBool {
-	return s.Satisfied
 }
 
 // GetConfig returns the value of Config.
@@ -3811,24 +3804,14 @@ func (s *Gate) GetConfig() OptGateConfig {
 	return s.Config
 }
 
-// SetType sets the value of Type.
-func (s *Gate) SetType(val GateType) {
-	s.Type = val
+// SetKind sets the value of Kind.
+func (s *Gate) SetKind(val GateKind) {
+	s.Kind = val
 }
 
 // SetProvider sets the value of Provider.
-func (s *Gate) SetProvider(val OptString) {
+func (s *Gate) SetProvider(val string) {
 	s.Provider = val
-}
-
-// SetRequired sets the value of Required.
-func (s *Gate) SetRequired(val OptBool) {
-	s.Required = val
-}
-
-// SetSatisfied sets the value of Satisfied.
-func (s *Gate) SetSatisfied(val OptBool) {
-	s.Satisfied = val
 }
 
 // SetConfig sets the value of Config.
@@ -3836,7 +3819,8 @@ func (s *Gate) SetConfig(val OptGateConfig) {
 	s.Config = val
 }
 
-// Provider-specific challenge parameters.
+// Provider-specific configuration consumed by the implementation when
+// issuing the per-render challenge. Opaque to the engine.
 type GateConfig map[string]jx.Raw
 
 func (s *GateConfig) init() GateConfig {
@@ -3848,28 +3832,26 @@ func (s *GateConfig) init() GateConfig {
 	return m
 }
 
-// Gate type.
-type GateType string
+// The gate category. Only `captcha` is currently defined. Authenticator
+// ceremonies (e.g. passkey) are modelled as credential auth_attempts via
+// `x-credential` on a field, not as gates.
+type GateKind string
 
 const (
-	GateTypeCaptcha GateType = "captcha"
-	GateTypePasskey GateType = "passkey"
+	GateKindCaptcha GateKind = "captcha"
 )
 
-// AllValues returns all GateType values.
-func (GateType) AllValues() []GateType {
-	return []GateType{
-		GateTypeCaptcha,
-		GateTypePasskey,
+// AllValues returns all GateKind values.
+func (GateKind) AllValues() []GateKind {
+	return []GateKind{
+		GateKindCaptcha,
 	}
 }
 
 // MarshalText implements encoding.TextMarshaler.
-func (s GateType) MarshalText() ([]byte, error) {
+func (s GateKind) MarshalText() ([]byte, error) {
 	switch s {
-	case GateTypeCaptcha:
-		return []byte(s), nil
-	case GateTypePasskey:
+	case GateKindCaptcha:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -3877,13 +3859,10 @@ func (s GateType) MarshalText() ([]byte, error) {
 }
 
 // UnmarshalText implements encoding.TextUnmarshaler.
-func (s *GateType) UnmarshalText(data []byte) error {
-	switch GateType(data) {
-	case GateTypeCaptcha:
-		*s = GateTypeCaptcha
-		return nil
-	case GateTypePasskey:
-		*s = GateTypePasskey
+func (s *GateKind) UnmarshalText(data []byte) error {
+	switch GateKind(data) {
+	case GateKindCaptcha:
+		*s = GateKindCaptcha
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
@@ -10478,19 +10457,20 @@ func (s *SessionWithTokenResponseHeaders) SetResponse(val SessionWithTokenRespon
 func (*SessionWithTokenResponseHeaders) createSessionRes()   {}
 func (*SessionWithTokenResponseHeaders) exchangeHandoffRes() {}
 
-// An action the user can take. Keyed by action name in the parent dictionary.
-// The action name is sent back in the submit request as `action`.
+// Configuration for a user-invokable action on a step. Keyed by action name
+// in the parent dictionary. The action name is sent back in the submit
+// request as `action`.
 // Ref: #
 type StepAction struct {
-	// Localization key for the action label.
-	TextKey string `json:"text_key"`
-	// Whether this is the primary/default action.
+	// Marks this as the default/primary action. The runtime template uses
+	// this hint to choose visual emphasis. At most one action per step
+	// should be primary; this is not enforced here.
 	Primary OptBool `json:"primary"`
-}
-
-// GetTextKey returns the value of TextKey.
-func (s *StepAction) GetTextKey() string {
-	return s.TextKey
+	// Optional localization key override for the action's label. When
+	// omitted, the engine derives a key from the step and action names.
+	// Display text is resolved client-side from a locale dictionary, never
+	// by the engine.
+	TextKey OptString `json:"text_key"`
 }
 
 // GetPrimary returns the value of Primary.
@@ -10498,14 +10478,19 @@ func (s *StepAction) GetPrimary() OptBool {
 	return s.Primary
 }
 
-// SetTextKey sets the value of TextKey.
-func (s *StepAction) SetTextKey(val string) {
-	s.TextKey = val
+// GetTextKey returns the value of TextKey.
+func (s *StepAction) GetTextKey() OptString {
+	return s.TextKey
 }
 
 // SetPrimary sets the value of Primary.
 func (s *StepAction) SetPrimary(val OptBool) {
 	s.Primary = val
+}
+
+// SetTextKey sets the value of TextKey.
+func (s *StepAction) SetTextKey(val OptString) {
+	s.TextKey = val
 }
 
 // Step-level localization keys. Resolved client-side via the `| t` LiquidJS filter.

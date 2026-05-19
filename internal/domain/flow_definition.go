@@ -64,12 +64,13 @@ const (
 	Pivot
 )
 
-//go:generate go tool enumer -type FlowGateType -transform snake -trimprefix FlowGateType -sql
-type FlowGateType uint8
+//go:generate go tool enumer -type FlowGateKind -transform snake -trimprefix FlowGateKind -sql
+type FlowGateKind uint8
 
 const (
-	FlowGateTypeCaptcha FlowGateType = iota
-	FlowGateTypePasskey
+	// FlowGateKindCaptcha challenges the user with a bot-detection
+	// provider (altcha, turnstile, hcaptcha, etc).
+	FlowGateKindCaptcha FlowGateKind = iota
 )
 
 // FlowDefinition is a customer-configured directed graph of authentication steps.
@@ -84,15 +85,11 @@ type FlowDefinition struct {
 	UpdatedAt     time.Time
 	// UserSchema is the URL of the JSON schema this flow operates on.
 	UserSchema string
-	Purposes   []FlowDefinitionPurposeEntry
-	Audience   FlowDefinitionAudience
-	Steps      []FlowDefinitionStep
-}
-
-// FlowDefinitionPurposeEntry maps a purpose to its entry-point step within the definition.
-type FlowDefinitionPurposeEntry struct {
-	Purpose     FlowDefinitionPurpose
-	InitialStep string
+	// Purposes maps each purpose this definition handles to the name of
+	// its entry-point step. Every value must match a step in [Steps].
+	Purposes map[FlowDefinitionPurpose]string
+	Audience FlowDefinitionAudience
+	Steps    []FlowDefinitionStep
 }
 
 // FlowDefinitionAudience describes which requests this definition should be selected for.
@@ -125,8 +122,12 @@ type FlowDefinitionStep struct {
 	// Complete, when non-nil, marks this step as terminal and dictates
 	// how the frontend finishes (redirect vs. success screen). Nil for
 	// regular interactive steps.
-	Complete    *FlowStepComplete
-	Transitions []FlowStepTransition
+	Complete *FlowStepComplete
+	// Transitions maps an action or engine-emitted outcome name to the
+	// next state. The key is either an action declared in [Actions] or a
+	// reserved outcome the engine produces (e.g. `user_not_found`,
+	// `callback`).
+	Transitions map[string]FlowStepTransition
 }
 
 // FlowStepAction is a user-selectable action declared on a step.
@@ -137,10 +138,10 @@ type FlowStepAction struct {
 
 // FlowStepGate is a security challenge attached to a step.
 type FlowStepGate struct {
-	Type     FlowGateType
+	Kind     FlowGateKind
 	Provider string
-	Required bool
-	Config   map[string]any
+	// Config is provider-specific challenge configuration, opaque to the engine.
+	Config map[string]any
 }
 
 // FlowSSOProvider is an identity provider option offered on a step.

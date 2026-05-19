@@ -30,15 +30,10 @@ type flowDefinitionRow struct {
 
 // flowDefinitionContent is the structure stored inside the definition JSONB column.
 type flowDefinitionContent struct {
-	UserSchema string                      `json:"user_schema"`
-	Purposes   []flowDefinitionPurposeJSON `json:"purposes"`
-	Audience   flowDefinitionAudienceJSON  `json:"audience"`
-	Steps      []flowDefinitionStepJSON    `json:"steps"`
-}
-
-type flowDefinitionPurposeJSON struct {
-	Purpose     string `json:"purpose"`
-	InitialStep string `json:"initial_step"`
+	UserSchema string                     `json:"user_schema"`
+	Purposes   map[string]string          `json:"purposes"`
+	Audience   flowDefinitionAudienceJSON `json:"audience"`
+	Steps      []flowDefinitionStepJSON   `json:"steps"`
 }
 
 type flowDefinitionAudienceJSON struct {
@@ -47,25 +42,24 @@ type flowDefinitionAudienceJSON struct {
 }
 
 type flowDefinitionStepJSON struct {
-	Name         string                       `json:"name"`
-	Fields       []string                     `json:"fields,omitempty"`
-	Actions      map[string]flowStepActionJSON `json:"actions,omitempty"`
-	Gates        map[string]flowStepGateJSON   `json:"gates,omitempty"`
-	SSOProviders []flowSSOProviderJSON        `json:"sso_providers,omitempty"`
-	OnSuccess    *string                      `json:"on_success,omitempty"`
-	Complete     *string                      `json:"complete,omitempty"`
-	Transitions  []flowStepTransitionJSON     `json:"transitions"`
+	Name         string                             `json:"name"`
+	Fields       []string                           `json:"fields,omitempty"`
+	Actions      map[string]flowStepActionJSON      `json:"actions,omitempty"`
+	Gates        map[string]flowStepGateJSON        `json:"gates,omitempty"`
+	SSOProviders []flowSSOProviderJSON              `json:"sso_providers,omitempty"`
+	OnSuccess    *string                            `json:"on_success,omitempty"`
+	Complete     *string                            `json:"complete,omitempty"`
+	Transitions  map[string]flowStepTransitionJSON  `json:"transitions,omitempty"`
 }
 
 type flowStepActionJSON struct {
-	TextKey string `json:"text_key"`
+	TextKey string `json:"text_key,omitempty"`
 	Primary bool   `json:"primary,omitempty"`
 }
 
 type flowStepGateJSON struct {
-	Type     string         `json:"type"`
+	Kind     string         `json:"kind"`
 	Provider string         `json:"provider,omitempty"`
-	Required bool           `json:"required,omitempty"`
 	Config   map[string]any `json:"config,omitempty"`
 }
 
@@ -76,8 +70,8 @@ type flowSSOProviderJSON struct {
 }
 
 type flowStepTransitionJSON struct {
-	Action *string `json:"action"`
-	Target string  `json:"target,omitempty"`
+	Action *string `json:"action,omitempty"`
+	Target string  `json:"target"`
 }
 
 type flowDefinitionMeta struct {
@@ -145,9 +139,9 @@ func (r *FlowDefinitionRepository) CreateFlowDefinition(ctx context.Context, cli
 		return err
 	}
 
-	purposeStrs := make([]string, len(def.Purposes))
-	for i, p := range def.Purposes {
-		purposeStrs[i] = p.Purpose.String()
+	purposeStrs := make([]string, 0, len(def.Purposes))
+	for p := range def.Purposes {
+		purposeStrs = append(purposeStrs, p.String())
 	}
 
 	b := database.NewStatementBuilder("INSERT INTO ")
@@ -254,12 +248,9 @@ func (r *FlowDefinitionRepository) DeleteFlowDefinition(ctx context.Context, cli
 // marshalFlowDefinitionContent converts the domain aggregate's nested fields
 // into a JSON byte slice ready for the definition column.
 func marshalFlowDefinitionContent(def *domain.FlowDefinition) ([]byte, error) {
-	purposes := make([]flowDefinitionPurposeJSON, len(def.Purposes))
-	for i, p := range def.Purposes {
-		purposes[i] = flowDefinitionPurposeJSON{
-			Purpose:     p.Purpose.String(),
-			InitialStep: p.InitialStep,
-		}
+	purposes := make(map[string]string, len(def.Purposes))
+	for p, initialStep := range def.Purposes {
+		purposes[p.String()] = initialStep
 	}
 
 	audience := flowDefinitionAudienceJSON{
@@ -269,14 +260,17 @@ func marshalFlowDefinitionContent(def *domain.FlowDefinition) ([]byte, error) {
 
 	steps := make([]flowDefinitionStepJSON, len(def.Steps))
 	for i, s := range def.Steps {
-		transitions := make([]flowStepTransitionJSON, len(s.Transitions))
-		for j, t := range s.Transitions {
-			tr := flowStepTransitionJSON{Target: t.Target}
-			if t.Action != nil {
-				action := t.Action.String()
-				tr.Action = &action
+		var transitions map[string]flowStepTransitionJSON
+		if len(s.Transitions) > 0 {
+			transitions = make(map[string]flowStepTransitionJSON, len(s.Transitions))
+			for name, t := range s.Transitions {
+				tr := flowStepTransitionJSON{Target: t.Target}
+				if t.Action != nil {
+					action := t.Action.String()
+					tr.Action = &action
+				}
+				transitions[name] = tr
 			}
-			transitions[j] = tr
 		}
 		stepJSON := flowDefinitionStepJSON{
 			Name:        s.Name,
@@ -296,9 +290,8 @@ func marshalFlowDefinitionContent(def *domain.FlowDefinition) ([]byte, error) {
 			stepJSON.Gates = make(map[string]flowStepGateJSON, len(s.Gates))
 			for name, g := range s.Gates {
 				stepJSON.Gates[name] = flowStepGateJSON{
-					Type:     g.Type.String(),
+					Kind:     g.Kind.String(),
 					Provider: g.Provider,
-					Required: g.Required,
 					Config:   g.Config,
 				}
 			}
@@ -337,31 +330,34 @@ func marshalFlowDefinitionContent(def *domain.FlowDefinition) ([]byte, error) {
 func rowToFlowDefinition(row flowDefinitionRow) (*domain.FlowDefinition, error) {
 	content := row.Definition.Value
 
-	purposes := make([]domain.FlowDefinitionPurposeEntry, len(content.Purposes))
-	for i, p := range content.Purposes {
-		purpose, err := domain.FlowDefinitionPurposeString(p.Purpose)
-		if err != nil {
-			return nil, err
-		}
-		purposes[i] = domain.FlowDefinitionPurposeEntry{
-			Purpose:     purpose,
-			InitialStep: p.InitialStep,
+	var purposes map[domain.FlowDefinitionPurpose]string
+	if len(content.Purposes) > 0 {
+		purposes = make(map[domain.FlowDefinitionPurpose]string, len(content.Purposes))
+		for purposeStr, initialStep := range content.Purposes {
+			purpose, err := domain.FlowDefinitionPurposeString(purposeStr)
+			if err != nil {
+				return nil, err
+			}
+			purposes[purpose] = initialStep
 		}
 	}
 
 	steps := make([]domain.FlowDefinitionStep, len(content.Steps))
 	for i, s := range content.Steps {
-		transitions := make([]domain.FlowStepTransition, len(s.Transitions))
-		for j, t := range s.Transitions {
-			tr := domain.FlowStepTransition{Target: t.Target}
-			if t.Action != nil {
-				action, err := domain.FlowDefinitionTransitionActionString(*t.Action)
-				if err != nil {
-					return nil, err
+		var transitions map[string]domain.FlowStepTransition
+		if len(s.Transitions) > 0 {
+			transitions = make(map[string]domain.FlowStepTransition, len(s.Transitions))
+			for name, t := range s.Transitions {
+				tr := domain.FlowStepTransition{Target: t.Target}
+				if t.Action != nil {
+					action, err := domain.FlowDefinitionTransitionActionString(*t.Action)
+					if err != nil {
+						return nil, err
+					}
+					tr.Action = &action
 				}
-				tr.Action = &action
+				transitions[name] = tr
 			}
-			transitions[j] = tr
 		}
 		step := domain.FlowDefinitionStep{
 			Name:        s.Name,
@@ -380,14 +376,13 @@ func rowToFlowDefinition(row flowDefinitionRow) (*domain.FlowDefinition, error) 
 		if len(s.Gates) > 0 {
 			step.Gates = make(map[string]domain.FlowStepGate, len(s.Gates))
 			for name, g := range s.Gates {
-				gateType, err := domain.FlowGateTypeString(g.Type)
+				gateKind, err := domain.FlowGateKindString(g.Kind)
 				if err != nil {
 					return nil, err
 				}
 				step.Gates[name] = domain.FlowStepGate{
-					Type:     gateType,
+					Kind:     gateKind,
 					Provider: g.Provider,
-					Required: g.Required,
 					Config:   g.Config,
 				}
 			}
