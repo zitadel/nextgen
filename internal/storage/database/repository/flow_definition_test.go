@@ -64,20 +64,20 @@ func TestFlowDefinitionRepository_CreateAndGet(t *testing.T) {
 	assert.Equal(t, "Google", identifier.SSOProviders[0].Name)
 	assert.Equal(t, "google", identifier.SSOProviders[0].Template)
 
-	var currentFlowTr, crossFlowTr domain.FlowStepTransition
+	var currentFlowTr domain.FlowStepTransition
 	for _, tr := range identifier.Transitions {
 		if tr.Action == nil {
 			currentFlowTr = tr
-		} else {
-			crossFlowTr = tr
 		}
 	}
 	assert.Equal(t, "resolve_user", currentFlowTr.Target)
 	assert.True(t, currentFlowTr.IsCurrentFlow())
 
-	require.NotNil(t, crossFlowTr.Action)
-	assert.Equal(t, domain.Pivot, *crossFlowTr.Action)
-	assert.Equal(t, "register-flow", crossFlowTr.Target)
+	registerTr, ok := identifier.Transitions["register"]
+	require.True(t, ok)
+	require.NotNil(t, registerTr.Action)
+	assert.Equal(t, domain.Pivot, *registerTr.Action)
+	assert.Equal(t, "register-flow", registerTr.Target)
 }
 
 func TestFlowDefinitionRepository_GetNotFound(t *testing.T) {
