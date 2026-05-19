@@ -86,7 +86,7 @@ func mapResolveError(err error) *api.ErrorDetailsStatusCode {
 		}
 	default:
 		return &api.ErrorDetailsStatusCode{
-			StatusCode: http.StatusInternalServerError,
+			StatusCode: 500,
 			Response: api.ErrorDetails{
 				Code:    "internal_error",
 				Message: err.Error(),

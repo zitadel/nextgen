@@ -157,7 +157,7 @@ func TestResolve_ResolveByName_NotFound(t *testing.T) {
 		Purpose:   domain.FlowDefinitionPurposeLogin,
 		Name:      ptr("missing"),
 	})
-	if !errors.Is(err, domain.ErrFlowDefinitionNotFound) {
+	if !errors.Is(err, domain.ErrFlowDefinitionNotFound()) {
 		t.Fatalf("Resolve err = %v, want ErrFlowNotFound", err)
 	}
 }
@@ -171,7 +171,7 @@ func TestResolve_ResolveByName_PurposeMismatch(t *testing.T) {
 		Purpose:   domain.FlowDefinitionPurposeRegister,
 		Name:      ptr("login"),
 	})
-	if !errors.Is(err, domain.ErrFlowDefinitionPurposeMismatch) {
+	if !errors.Is(err, domain.ErrFlowDefinitionPurposeMismatch()) {
 		t.Fatalf("Resolve err = %v, want ErrPurposeMismatch", err)
 	}
 }
@@ -201,7 +201,7 @@ func TestResolve_ResolveByAudience_NoMatch(t *testing.T) {
 		ProjectID: "proj",
 		Purpose:   domain.FlowDefinitionPurposeRegister,
 	})
-	if !errors.Is(err, domain.ErrFlowDefinitionNotFound) {
+	if !errors.Is(err, domain.ErrFlowDefinitionNotFound()) {
 		t.Fatalf("Resolve err = %v, want ErrFlowNotFound", err)
 	}
 }
