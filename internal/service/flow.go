@@ -134,12 +134,8 @@ func (s *flowService) resolveByAudience(ctx context.Context, req ResolveFlowRequ
 }
 
 func flowServesPurpose(def *domain.FlowDefinition, purpose domain.FlowDefinitionPurpose) bool {
-	for _, p := range def.Purposes {
-		if p.Purpose == purpose {
-			return true
-		}
-	}
-	return false
+	_, ok := def.Purposes[purpose]
+	return ok
 }
 
 // pickLatestFlowVersion returns the definition with the highest SchemaVersion
