@@ -6,6 +6,7 @@ import (
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
 )
 
 func (h *Handler) CreateSchema(ctx context.Context, req api.CreateSchemaReq, params api.CreateSchemaParams) (api.CreateSchemaRes, error) {
@@ -18,19 +19,23 @@ func (h *Handler) CreateSchema(ctx context.Context, req api.CreateSchemaReq, par
 			return nil, err
 		}
 		schema, err = h.schemaService.CreateSchema(ctx,
-			string(params.ProjectID.Value),
-			string(params.TeamID.Value),
-			req.UserSchema.ID.String(),
-			schemabs)
+			service.CreateSchemaInput{
+				ProjectID: string(params.ProjectID.Value),
+				TeamID:    string(params.TeamID.Value),
+				SchemaID:  req.UserSchema.ID,
+				Schema:    schemabs,
+			})
 		if err != nil {
 			return nil, err
 		}
 		return &api.CreateSchemaResponse{ID: schema.URL}, nil
 	case api.SchemaURLCreateSchemaReq:
 		schema, err := h.schemaService.CreateSchemaByUrl(ctx,
-			string(params.ProjectID.Value),
-			string(params.TeamID.Value),
-			req.SchemaURL.URL)
+			service.CreateSchemaByURLInput{
+				ProjectID: string(params.ProjectID.Value),
+				TeamID:    string(params.TeamID.Value),
+				URL:       req.SchemaURL.URL,
+			})
 		if err != nil {
 			return nil, err
 		}

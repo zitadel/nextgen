@@ -11,9 +11,9 @@ post:
     schema-url which will be resolved by the server.
   tags:
     - Schema
-#  parameters:
-#    - $ref: ../../components/parameters/project-id.yaml
-#    - $ref: ../../components/parameters/team-id.yaml
+  parameters:
+    - $ref: ../../components/parameters/project-id.yaml
+    - $ref: ../../components/parameters/team-id.yaml
   security:
     - oauth2:
         - schema.write
