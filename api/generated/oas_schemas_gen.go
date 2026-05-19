@@ -2379,14 +2379,15 @@ func (s *FieldValidation) SetMaxLength(val OptInt) {
 	s.MaxLength = val
 }
 
-// Scopes which teams, apps, or projects this flow definition applies to.
-// When all fields are empty/omitted, the definition is a project-wide default.
-// The engine picks the most specific matching definition: app > team > project.
+// Scopes which teams or apps this flow definition applies to. Empty or
+// omitted fields mean "no restriction"; when both are empty the definition
+// matches every request in the project. The engine picks the most specific
+// matching definition: app > team > project-wide.
 // Ref: #
 type FlowAudience struct {
-	// Restrict to specific teams (organizations).
+	// Restrict to specific teams (organizations). Empty means no team restriction.
 	TeamIds []string `json:"team_ids"`
-	// Restrict to specific applications.
+	// Restrict to specific applications. Empty means no app restriction.
 	AppIds []string `json:"app_ids"`
 }
 
@@ -2428,13 +2429,12 @@ type FlowDefinition struct {
 	// defined in this schema. The engine resolves field types, validation,
 	// and implicit outcomes from schema annotations at runtime.
 	UserSchema url.URL `json:"user_schema"`
-	// Which flow purposes this definition handles. A definition can serve
-	// multiple purposes (e.g. a combined login/register flow).
-	Purposes []FlowDefinitionPurposesItem `json:"purposes"`
-	// Maps each purpose to the step name that starts the flow for that purpose.
-	// Keys must be a subset of `purposes`.
-	InitialSteps FlowDefinitionInitialSteps `json:"initial_steps"`
-	Audience     OptFlowAudience            `json:"audience"`
+	// Maps each purpose this definition handles to its entry-point step.
+	// Keys are purpose names; values must match a `name` in `steps`. A
+	// definition can serve multiple purposes (e.g. a combined login/register
+	// flow) by listing one entry per purpose.
+	Purposes FlowDefinitionPurposes `json:"purposes"`
+	Audience OptFlowAudience        `json:"audience"`
 	// Ordered list of steps in this flow. The order is for human readability —
 	// actual step sequencing is determined by transitions.
 	Steps []FlowDefinitionStep `json:"steps"`
@@ -2451,13 +2451,8 @@ func (s *FlowDefinition) GetUserSchema() url.URL {
 }
 
 // GetPurposes returns the value of Purposes.
-func (s *FlowDefinition) GetPurposes() []FlowDefinitionPurposesItem {
+func (s *FlowDefinition) GetPurposes() FlowDefinitionPurposes {
 	return s.Purposes
-}
-
-// GetInitialSteps returns the value of InitialSteps.
-func (s *FlowDefinition) GetInitialSteps() FlowDefinitionInitialSteps {
-	return s.InitialSteps
 }
 
 // GetAudience returns the value of Audience.
@@ -2481,13 +2476,8 @@ func (s *FlowDefinition) SetUserSchema(val url.URL) {
 }
 
 // SetPurposes sets the value of Purposes.
-func (s *FlowDefinition) SetPurposes(val []FlowDefinitionPurposesItem) {
+func (s *FlowDefinition) SetPurposes(val FlowDefinitionPurposes) {
 	s.Purposes = val
-}
-
-// SetInitialSteps sets the value of InitialSteps.
-func (s *FlowDefinition) SetInitialSteps(val FlowDefinitionInitialSteps) {
-	s.InitialSteps = val
 }
 
 // SetAudience sets the value of Audience.
@@ -2549,13 +2539,12 @@ type FlowDefinitionDetailResponse struct {
 	// defined in this schema. The engine resolves field types, validation,
 	// and implicit outcomes from schema annotations at runtime.
 	UserSchema url.URL `json:"user_schema"`
-	// Which flow purposes this definition handles. A definition can serve
-	// multiple purposes (e.g. a combined login/register flow).
-	Purposes []FlowDefinitionDetailResponsePurposesItem `json:"purposes"`
-	// Maps each purpose to the step name that starts the flow for that purpose.
-	// Keys must be a subset of `purposes`.
-	InitialSteps FlowDefinitionDetailResponseInitialSteps `json:"initial_steps"`
-	Audience     OptFlowAudience                          `json:"audience"`
+	// Maps each purpose this definition handles to its entry-point step.
+	// Keys are purpose names; values must match a `name` in `steps`. A
+	// definition can serve multiple purposes (e.g. a combined login/register
+	// flow) by listing one entry per purpose.
+	Purposes FlowDefinitionDetailResponsePurposes `json:"purposes"`
+	Audience OptFlowAudience                      `json:"audience"`
 	// Ordered list of steps in this flow. The order is for human readability —
 	// actual step sequencing is determined by transitions.
 	Steps []FlowDefinitionStep `json:"steps"`
@@ -2584,13 +2573,8 @@ func (s *FlowDefinitionDetailResponse) GetUserSchema() url.URL {
 }
 
 // GetPurposes returns the value of Purposes.
-func (s *FlowDefinitionDetailResponse) GetPurposes() []FlowDefinitionDetailResponsePurposesItem {
+func (s *FlowDefinitionDetailResponse) GetPurposes() FlowDefinitionDetailResponsePurposes {
 	return s.Purposes
-}
-
-// GetInitialSteps returns the value of InitialSteps.
-func (s *FlowDefinitionDetailResponse) GetInitialSteps() FlowDefinitionDetailResponseInitialSteps {
-	return s.InitialSteps
 }
 
 // GetAudience returns the value of Audience.
@@ -2644,13 +2628,8 @@ func (s *FlowDefinitionDetailResponse) SetUserSchema(val url.URL) {
 }
 
 // SetPurposes sets the value of Purposes.
-func (s *FlowDefinitionDetailResponse) SetPurposes(val []FlowDefinitionDetailResponsePurposesItem) {
+func (s *FlowDefinitionDetailResponse) SetPurposes(val FlowDefinitionDetailResponsePurposes) {
 	s.Purposes = val
-}
-
-// SetInitialSteps sets the value of InitialSteps.
-func (s *FlowDefinitionDetailResponse) SetInitialSteps(val FlowDefinitionDetailResponseInitialSteps) {
-	s.InitialSteps = val
 }
 
 // SetAudience sets the value of Audience.
@@ -2697,93 +2676,13 @@ func (*FlowDefinitionDetailResponse) createFlowDefinitionRes() {}
 func (*FlowDefinitionDetailResponse) getFlowDefinitionRes()    {}
 func (*FlowDefinitionDetailResponse) updateFlowDefinitionRes() {}
 
-// Maps each purpose to the step name that starts the flow for that purpose.
-// Keys must be a subset of `purposes`.
-type FlowDefinitionDetailResponseInitialSteps map[string]string
+// Maps each purpose this definition handles to its entry-point step.
+// Keys are purpose names; values must match a `name` in `steps`. A
+// definition can serve multiple purposes (e.g. a combined login/register
+// flow) by listing one entry per purpose.
+type FlowDefinitionDetailResponsePurposes map[string]string
 
-func (s *FlowDefinitionDetailResponseInitialSteps) init() FlowDefinitionDetailResponseInitialSteps {
-	m := *s
-	if m == nil {
-		m = map[string]string{}
-		*s = m
-	}
-	return m
-}
-
-type FlowDefinitionDetailResponsePurposesItem string
-
-const (
-	FlowDefinitionDetailResponsePurposesItemLogin       FlowDefinitionDetailResponsePurposesItem = "login"
-	FlowDefinitionDetailResponsePurposesItemRegister    FlowDefinitionDetailResponsePurposesItem = "register"
-	FlowDefinitionDetailResponsePurposesItemRecovery    FlowDefinitionDetailResponsePurposesItem = "recovery"
-	FlowDefinitionDetailResponsePurposesItemProfiling   FlowDefinitionDetailResponsePurposesItem = "profiling"
-	FlowDefinitionDetailResponsePurposesItemReauth      FlowDefinitionDetailResponsePurposesItem = "reauth"
-	FlowDefinitionDetailResponsePurposesItemLinkAccount FlowDefinitionDetailResponsePurposesItem = "link_account"
-)
-
-// AllValues returns all FlowDefinitionDetailResponsePurposesItem values.
-func (FlowDefinitionDetailResponsePurposesItem) AllValues() []FlowDefinitionDetailResponsePurposesItem {
-	return []FlowDefinitionDetailResponsePurposesItem{
-		FlowDefinitionDetailResponsePurposesItemLogin,
-		FlowDefinitionDetailResponsePurposesItemRegister,
-		FlowDefinitionDetailResponsePurposesItemRecovery,
-		FlowDefinitionDetailResponsePurposesItemProfiling,
-		FlowDefinitionDetailResponsePurposesItemReauth,
-		FlowDefinitionDetailResponsePurposesItemLinkAccount,
-	}
-}
-
-// MarshalText implements encoding.TextMarshaler.
-func (s FlowDefinitionDetailResponsePurposesItem) MarshalText() ([]byte, error) {
-	switch s {
-	case FlowDefinitionDetailResponsePurposesItemLogin:
-		return []byte(s), nil
-	case FlowDefinitionDetailResponsePurposesItemRegister:
-		return []byte(s), nil
-	case FlowDefinitionDetailResponsePurposesItemRecovery:
-		return []byte(s), nil
-	case FlowDefinitionDetailResponsePurposesItemProfiling:
-		return []byte(s), nil
-	case FlowDefinitionDetailResponsePurposesItemReauth:
-		return []byte(s), nil
-	case FlowDefinitionDetailResponsePurposesItemLinkAccount:
-		return []byte(s), nil
-	default:
-		return nil, errors.Errorf("invalid value: %q", s)
-	}
-}
-
-// UnmarshalText implements encoding.TextUnmarshaler.
-func (s *FlowDefinitionDetailResponsePurposesItem) UnmarshalText(data []byte) error {
-	switch FlowDefinitionDetailResponsePurposesItem(data) {
-	case FlowDefinitionDetailResponsePurposesItemLogin:
-		*s = FlowDefinitionDetailResponsePurposesItemLogin
-		return nil
-	case FlowDefinitionDetailResponsePurposesItemRegister:
-		*s = FlowDefinitionDetailResponsePurposesItemRegister
-		return nil
-	case FlowDefinitionDetailResponsePurposesItemRecovery:
-		*s = FlowDefinitionDetailResponsePurposesItemRecovery
-		return nil
-	case FlowDefinitionDetailResponsePurposesItemProfiling:
-		*s = FlowDefinitionDetailResponsePurposesItemProfiling
-		return nil
-	case FlowDefinitionDetailResponsePurposesItemReauth:
-		*s = FlowDefinitionDetailResponsePurposesItemReauth
-		return nil
-	case FlowDefinitionDetailResponsePurposesItemLinkAccount:
-		*s = FlowDefinitionDetailResponsePurposesItemLinkAccount
-		return nil
-	default:
-		return errors.Errorf("invalid value: %q", data)
-	}
-}
-
-// Maps each purpose to the step name that starts the flow for that purpose.
-// Keys must be a subset of `purposes`.
-type FlowDefinitionInitialSteps map[string]string
-
-func (s *FlowDefinitionInitialSteps) init() FlowDefinitionInitialSteps {
+func (s *FlowDefinitionDetailResponsePurposes) init() FlowDefinitionDetailResponsePurposes {
 	m := *s
 	if m == nil {
 		m = map[string]string{}
@@ -2821,73 +2720,19 @@ func (s *FlowDefinitionListResponse) SetNextPageToken(val OptNilPageToken) {
 
 func (*FlowDefinitionListResponse) listFlowDefinitionsRes() {}
 
-type FlowDefinitionPurposesItem string
+// Maps each purpose this definition handles to its entry-point step.
+// Keys are purpose names; values must match a `name` in `steps`. A
+// definition can serve multiple purposes (e.g. a combined login/register
+// flow) by listing one entry per purpose.
+type FlowDefinitionPurposes map[string]string
 
-const (
-	FlowDefinitionPurposesItemLogin       FlowDefinitionPurposesItem = "login"
-	FlowDefinitionPurposesItemRegister    FlowDefinitionPurposesItem = "register"
-	FlowDefinitionPurposesItemRecovery    FlowDefinitionPurposesItem = "recovery"
-	FlowDefinitionPurposesItemProfiling   FlowDefinitionPurposesItem = "profiling"
-	FlowDefinitionPurposesItemReauth      FlowDefinitionPurposesItem = "reauth"
-	FlowDefinitionPurposesItemLinkAccount FlowDefinitionPurposesItem = "link_account"
-)
-
-// AllValues returns all FlowDefinitionPurposesItem values.
-func (FlowDefinitionPurposesItem) AllValues() []FlowDefinitionPurposesItem {
-	return []FlowDefinitionPurposesItem{
-		FlowDefinitionPurposesItemLogin,
-		FlowDefinitionPurposesItemRegister,
-		FlowDefinitionPurposesItemRecovery,
-		FlowDefinitionPurposesItemProfiling,
-		FlowDefinitionPurposesItemReauth,
-		FlowDefinitionPurposesItemLinkAccount,
+func (s *FlowDefinitionPurposes) init() FlowDefinitionPurposes {
+	m := *s
+	if m == nil {
+		m = map[string]string{}
+		*s = m
 	}
-}
-
-// MarshalText implements encoding.TextMarshaler.
-func (s FlowDefinitionPurposesItem) MarshalText() ([]byte, error) {
-	switch s {
-	case FlowDefinitionPurposesItemLogin:
-		return []byte(s), nil
-	case FlowDefinitionPurposesItemRegister:
-		return []byte(s), nil
-	case FlowDefinitionPurposesItemRecovery:
-		return []byte(s), nil
-	case FlowDefinitionPurposesItemProfiling:
-		return []byte(s), nil
-	case FlowDefinitionPurposesItemReauth:
-		return []byte(s), nil
-	case FlowDefinitionPurposesItemLinkAccount:
-		return []byte(s), nil
-	default:
-		return nil, errors.Errorf("invalid value: %q", s)
-	}
-}
-
-// UnmarshalText implements encoding.TextUnmarshaler.
-func (s *FlowDefinitionPurposesItem) UnmarshalText(data []byte) error {
-	switch FlowDefinitionPurposesItem(data) {
-	case FlowDefinitionPurposesItemLogin:
-		*s = FlowDefinitionPurposesItemLogin
-		return nil
-	case FlowDefinitionPurposesItemRegister:
-		*s = FlowDefinitionPurposesItemRegister
-		return nil
-	case FlowDefinitionPurposesItemRecovery:
-		*s = FlowDefinitionPurposesItemRecovery
-		return nil
-	case FlowDefinitionPurposesItemProfiling:
-		*s = FlowDefinitionPurposesItemProfiling
-		return nil
-	case FlowDefinitionPurposesItemReauth:
-		*s = FlowDefinitionPurposesItemReauth
-		return nil
-	case FlowDefinitionPurposesItemLinkAccount:
-		*s = FlowDefinitionPurposesItemLinkAccount
-		return nil
-	default:
-		return errors.Errorf("invalid value: %q", data)
-	}
+	return m
 }
 
 // Response object for a flow definition after creation.
@@ -3318,20 +3163,18 @@ func (s *FlowDefinitionStepTransitionsItemAction) UnmarshalText(data []byte) err
 
 // Partial update for a flow definition. Only provided fields are replaced;
 // omitted fields retain their current server-side values.
-// Array fields (`steps`, `purposes`, `initial_steps`) are treated atomically:
-// if provided, the entire array/object is replaced. If omitted, the current
+// Collection fields (`steps`, `purposes`) are treated atomically: if
+// provided, the entire array/object is replaced. If omitted, the current
 // value is preserved unchanged.
 // `name` is a stable identifier and cannot be changed after creation.
 // Ref: #
 type FlowDefinitionUpdateRequest struct {
 	// User schema this flow operates on. Replaces the current value if provided.
 	UserSchema OptURI `json:"user_schema"`
-	// Replaces the full list of purposes this definition handles if provided.
-	Purposes []FlowDefinitionUpdateRequestPurposesItem `json:"purposes"`
-	// Replaces the full map of purpose-to-initial-step if provided.
-	// Keys must be a subset of `purposes`.
-	InitialSteps OptFlowDefinitionUpdateRequestInitialSteps `json:"initial_steps"`
-	Audience     OptFlowAudience                            `json:"audience"`
+	// Replaces the full purpose-to-entry-step map if provided. Keys are
+	// purpose names; values must match a `name` in `steps`.
+	Purposes OptFlowDefinitionUpdateRequestPurposes `json:"purposes"`
+	Audience OptFlowAudience                        `json:"audience"`
 	// Replaces the full steps array if provided. Partial step lists are not
 	// supported — supply all steps when updating this field.
 	Steps []FlowDefinitionStep `json:"steps"`
@@ -3343,13 +3186,8 @@ func (s *FlowDefinitionUpdateRequest) GetUserSchema() OptURI {
 }
 
 // GetPurposes returns the value of Purposes.
-func (s *FlowDefinitionUpdateRequest) GetPurposes() []FlowDefinitionUpdateRequestPurposesItem {
+func (s *FlowDefinitionUpdateRequest) GetPurposes() OptFlowDefinitionUpdateRequestPurposes {
 	return s.Purposes
-}
-
-// GetInitialSteps returns the value of InitialSteps.
-func (s *FlowDefinitionUpdateRequest) GetInitialSteps() OptFlowDefinitionUpdateRequestInitialSteps {
-	return s.InitialSteps
 }
 
 // GetAudience returns the value of Audience.
@@ -3368,13 +3206,8 @@ func (s *FlowDefinitionUpdateRequest) SetUserSchema(val OptURI) {
 }
 
 // SetPurposes sets the value of Purposes.
-func (s *FlowDefinitionUpdateRequest) SetPurposes(val []FlowDefinitionUpdateRequestPurposesItem) {
+func (s *FlowDefinitionUpdateRequest) SetPurposes(val OptFlowDefinitionUpdateRequestPurposes) {
 	s.Purposes = val
-}
-
-// SetInitialSteps sets the value of InitialSteps.
-func (s *FlowDefinitionUpdateRequest) SetInitialSteps(val OptFlowDefinitionUpdateRequestInitialSteps) {
-	s.InitialSteps = val
 }
 
 // SetAudience sets the value of Audience.
@@ -3387,86 +3220,17 @@ func (s *FlowDefinitionUpdateRequest) SetSteps(val []FlowDefinitionStep) {
 	s.Steps = val
 }
 
-// Replaces the full map of purpose-to-initial-step if provided.
-// Keys must be a subset of `purposes`.
-type FlowDefinitionUpdateRequestInitialSteps map[string]string
+// Replaces the full purpose-to-entry-step map if provided. Keys are
+// purpose names; values must match a `name` in `steps`.
+type FlowDefinitionUpdateRequestPurposes map[string]string
 
-func (s *FlowDefinitionUpdateRequestInitialSteps) init() FlowDefinitionUpdateRequestInitialSteps {
+func (s *FlowDefinitionUpdateRequestPurposes) init() FlowDefinitionUpdateRequestPurposes {
 	m := *s
 	if m == nil {
 		m = map[string]string{}
 		*s = m
 	}
 	return m
-}
-
-type FlowDefinitionUpdateRequestPurposesItem string
-
-const (
-	FlowDefinitionUpdateRequestPurposesItemLogin       FlowDefinitionUpdateRequestPurposesItem = "login"
-	FlowDefinitionUpdateRequestPurposesItemRegister    FlowDefinitionUpdateRequestPurposesItem = "register"
-	FlowDefinitionUpdateRequestPurposesItemRecovery    FlowDefinitionUpdateRequestPurposesItem = "recovery"
-	FlowDefinitionUpdateRequestPurposesItemProfiling   FlowDefinitionUpdateRequestPurposesItem = "profiling"
-	FlowDefinitionUpdateRequestPurposesItemReauth      FlowDefinitionUpdateRequestPurposesItem = "reauth"
-	FlowDefinitionUpdateRequestPurposesItemLinkAccount FlowDefinitionUpdateRequestPurposesItem = "link_account"
-)
-
-// AllValues returns all FlowDefinitionUpdateRequestPurposesItem values.
-func (FlowDefinitionUpdateRequestPurposesItem) AllValues() []FlowDefinitionUpdateRequestPurposesItem {
-	return []FlowDefinitionUpdateRequestPurposesItem{
-		FlowDefinitionUpdateRequestPurposesItemLogin,
-		FlowDefinitionUpdateRequestPurposesItemRegister,
-		FlowDefinitionUpdateRequestPurposesItemRecovery,
-		FlowDefinitionUpdateRequestPurposesItemProfiling,
-		FlowDefinitionUpdateRequestPurposesItemReauth,
-		FlowDefinitionUpdateRequestPurposesItemLinkAccount,
-	}
-}
-
-// MarshalText implements encoding.TextMarshaler.
-func (s FlowDefinitionUpdateRequestPurposesItem) MarshalText() ([]byte, error) {
-	switch s {
-	case FlowDefinitionUpdateRequestPurposesItemLogin:
-		return []byte(s), nil
-	case FlowDefinitionUpdateRequestPurposesItemRegister:
-		return []byte(s), nil
-	case FlowDefinitionUpdateRequestPurposesItemRecovery:
-		return []byte(s), nil
-	case FlowDefinitionUpdateRequestPurposesItemProfiling:
-		return []byte(s), nil
-	case FlowDefinitionUpdateRequestPurposesItemReauth:
-		return []byte(s), nil
-	case FlowDefinitionUpdateRequestPurposesItemLinkAccount:
-		return []byte(s), nil
-	default:
-		return nil, errors.Errorf("invalid value: %q", s)
-	}
-}
-
-// UnmarshalText implements encoding.TextUnmarshaler.
-func (s *FlowDefinitionUpdateRequestPurposesItem) UnmarshalText(data []byte) error {
-	switch FlowDefinitionUpdateRequestPurposesItem(data) {
-	case FlowDefinitionUpdateRequestPurposesItemLogin:
-		*s = FlowDefinitionUpdateRequestPurposesItemLogin
-		return nil
-	case FlowDefinitionUpdateRequestPurposesItemRegister:
-		*s = FlowDefinitionUpdateRequestPurposesItemRegister
-		return nil
-	case FlowDefinitionUpdateRequestPurposesItemRecovery:
-		*s = FlowDefinitionUpdateRequestPurposesItemRecovery
-		return nil
-	case FlowDefinitionUpdateRequestPurposesItemProfiling:
-		*s = FlowDefinitionUpdateRequestPurposesItemProfiling
-		return nil
-	case FlowDefinitionUpdateRequestPurposesItemReauth:
-		*s = FlowDefinitionUpdateRequestPurposesItemReauth
-		return nil
-	case FlowDefinitionUpdateRequestPurposesItemLinkAccount:
-		*s = FlowDefinitionUpdateRequestPurposesItemLinkAccount
-		return nil
-	default:
-		return errors.Errorf("invalid value: %q", data)
-	}
 }
 
 // Ref: #
@@ -7627,38 +7391,38 @@ func (o OptFlowDefinitionStepTransitions) Or(d FlowDefinitionStepTransitions) Fl
 	return d
 }
 
-// NewOptFlowDefinitionUpdateRequestInitialSteps returns new OptFlowDefinitionUpdateRequestInitialSteps with value set to v.
-func NewOptFlowDefinitionUpdateRequestInitialSteps(v FlowDefinitionUpdateRequestInitialSteps) OptFlowDefinitionUpdateRequestInitialSteps {
-	return OptFlowDefinitionUpdateRequestInitialSteps{
+// NewOptFlowDefinitionUpdateRequestPurposes returns new OptFlowDefinitionUpdateRequestPurposes with value set to v.
+func NewOptFlowDefinitionUpdateRequestPurposes(v FlowDefinitionUpdateRequestPurposes) OptFlowDefinitionUpdateRequestPurposes {
+	return OptFlowDefinitionUpdateRequestPurposes{
 		Value: v,
 		Set:   true,
 	}
 }
 
-// OptFlowDefinitionUpdateRequestInitialSteps is optional FlowDefinitionUpdateRequestInitialSteps.
-type OptFlowDefinitionUpdateRequestInitialSteps struct {
-	Value FlowDefinitionUpdateRequestInitialSteps
+// OptFlowDefinitionUpdateRequestPurposes is optional FlowDefinitionUpdateRequestPurposes.
+type OptFlowDefinitionUpdateRequestPurposes struct {
+	Value FlowDefinitionUpdateRequestPurposes
 	Set   bool
 }
 
-// IsSet returns true if OptFlowDefinitionUpdateRequestInitialSteps was set.
-func (o OptFlowDefinitionUpdateRequestInitialSteps) IsSet() bool { return o.Set }
+// IsSet returns true if OptFlowDefinitionUpdateRequestPurposes was set.
+func (o OptFlowDefinitionUpdateRequestPurposes) IsSet() bool { return o.Set }
 
 // Reset unsets value.
-func (o *OptFlowDefinitionUpdateRequestInitialSteps) Reset() {
-	var v FlowDefinitionUpdateRequestInitialSteps
+func (o *OptFlowDefinitionUpdateRequestPurposes) Reset() {
+	var v FlowDefinitionUpdateRequestPurposes
 	o.Value = v
 	o.Set = false
 }
 
 // SetTo sets value to v.
-func (o *OptFlowDefinitionUpdateRequestInitialSteps) SetTo(v FlowDefinitionUpdateRequestInitialSteps) {
+func (o *OptFlowDefinitionUpdateRequestPurposes) SetTo(v FlowDefinitionUpdateRequestPurposes) {
 	o.Set = true
 	o.Value = v
 }
 
 // Get returns value and boolean that denotes whether value was set.
-func (o OptFlowDefinitionUpdateRequestInitialSteps) Get() (v FlowDefinitionUpdateRequestInitialSteps, ok bool) {
+func (o OptFlowDefinitionUpdateRequestPurposes) Get() (v FlowDefinitionUpdateRequestPurposes, ok bool) {
 	if !o.Set {
 		return v, false
 	}
@@ -7666,7 +7430,7 @@ func (o OptFlowDefinitionUpdateRequestInitialSteps) Get() (v FlowDefinitionUpdat
 }
 
 // Or returns value if set, or given parameter if does not.
-func (o OptFlowDefinitionUpdateRequestInitialSteps) Or(d FlowDefinitionUpdateRequestInitialSteps) FlowDefinitionUpdateRequestInitialSteps {
+func (o OptFlowDefinitionUpdateRequestPurposes) Or(d FlowDefinitionUpdateRequestPurposes) FlowDefinitionUpdateRequestPurposes {
 	if v, ok := o.Get(); ok {
 		return v
 	}
