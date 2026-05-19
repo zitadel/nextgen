@@ -27,16 +27,15 @@ func TestFlowDefinitionRepository_CreateAndGet(t *testing.T) {
 	assert.Equal(t, def.Name, got.Name)
 	assert.Equal(t, def.SchemaVersion, got.SchemaVersion)
 	assert.Equal(t, def.Status, got.Status)
+	assert.Equal(t, def.UserSchema, got.UserSchema)
 	assert.WithinDuration(t, time.Now(), got.CreatedAt, 5*time.Second)
 	assert.WithinDuration(t, time.Now(), got.UpdatedAt, 5*time.Second)
 
 	require.Len(t, got.Purposes, 1)
-	assert.Equal(t, domain.FlowDefinitionPurposeLogin, got.Purposes[0].Purpose)
-	assert.Equal(t, "identifier", got.Purposes[0].InitialStep)
+	assert.Equal(t, "identifier", got.Purposes[domain.FlowDefinitionPurposeLogin])
 
-	assert.Equal(t, def.Audience.AppID, got.Audience.AppID)
-	assert.Nil(t, got.Audience.TeamID)
-	assert.False(t, got.Audience.IsProjectDefault)
+	assert.Equal(t, def.Audience.AppIDs, got.Audience.AppIDs)
+	assert.Empty(t, got.Audience.TeamIDs)
 
 	require.Len(t, got.Steps, 3)
 	stepsByName := make(map[string]domain.FlowDefinitionStep)
@@ -45,9 +44,25 @@ func TestFlowDefinitionRepository_CreateAndGet(t *testing.T) {
 	}
 
 	identifier := stepsByName["identifier"]
-	assert.Equal(t, domain.FlowStepTypeIdentifier, identifier.Type)
-	assert.Equal(t, []any{"email"}, identifier.Config["methods"])
+	assert.Equal(t, []string{"email"}, identifier.Fields)
+	assert.Nil(t, identifier.OnSuccess)
+	assert.Nil(t, identifier.Complete)
 	require.Len(t, identifier.Transitions, 2)
+
+	require.Contains(t, identifier.Actions, "submit")
+	assert.Equal(t, "identifier.submit", identifier.Actions["submit"].TextKey)
+	assert.True(t, identifier.Actions["submit"].Primary)
+
+	require.Contains(t, identifier.Gates, "bot")
+	bot := identifier.Gates["bot"]
+	assert.Equal(t, domain.FlowGateKindCaptcha, bot.Kind)
+	assert.Equal(t, "altcha", bot.Provider)
+	assert.Equal(t, "abc", bot.Config["site_key"])
+
+	require.Len(t, identifier.SSOProviders, 1)
+	assert.Equal(t, "google-1", identifier.SSOProviders[0].ID)
+	assert.Equal(t, "Google", identifier.SSOProviders[0].Name)
+	assert.Equal(t, "google", identifier.SSOProviders[0].Template)
 
 	var currentFlowTr, crossFlowTr domain.FlowStepTransition
 	for _, tr := range identifier.Transitions {
@@ -112,10 +127,7 @@ func TestFlowDefinitionRepository_ListByPurpose(t *testing.T) {
 
 	// flow-pb: serves both login and register
 	defB := sampleFlowDefinition("proj-jpurp", "flow-pb")
-	defB.Purposes = append(defB.Purposes, domain.FlowDefinitionPurposeEntry{
-		Purpose:     domain.FlowDefinitionPurposeRegister,
-		InitialStep: "start",
-	})
+	defB.Purposes[domain.FlowDefinitionPurposeRegister] = "start"
 	require.NoError(t, repo.CreateFlowDefinition(t.Context(), tx, defB))
 
 	loginOnly, err := repo.ListFlowDefinitions(t.Context(), tx, "proj-jpurp",
@@ -225,45 +237,55 @@ func TestFlowDefinitionRepository_ProjectIsolation(t *testing.T) {
 
 func sampleFlowDefinition(projectID, id string) *domain.FlowDefinition {
 	pivotAction := domain.Pivot
-	appID := "app-1"
+	createUser := domain.FlowOnSuccessCreateUser
+	completeShow := domain.FlowStepCompleteShow
 	return &domain.FlowDefinition{
 		ProjectID:     projectID,
 		ID:            id,
 		Name:          "Default Login",
 		SchemaVersion: "1.0.0",
 		Status:        domain.FlowDefinitionStatusDraft,
-		Purposes: []domain.FlowDefinitionPurposeEntry{
-			{Purpose: domain.FlowDefinitionPurposeLogin, InitialStep: "identifier"},
+		UserSchema:    "https://example.com/schemas/human-user.json",
+		Purposes: map[domain.FlowDefinitionPurpose]string{
+			domain.FlowDefinitionPurposeLogin: "identifier",
 		},
 		Audience: domain.FlowDefinitionAudience{
-			AppID:            &appID,
-			IsProjectDefault: false,
+			AppIDs: []string{"app-1"},
 		},
 		Steps: []domain.FlowDefinitionStep{
 			{
-				Name: "identifier",
-				Type: domain.FlowStepTypeIdentifier,
-				Config: map[string]any{
-					"methods": []any{"email"},
+				Name:   "identifier",
+				Fields: []string{"email"},
+				Actions: map[string]domain.FlowStepAction{
+					"submit": {TextKey: "identifier.submit", Primary: true},
 				},
-				Transitions: []domain.FlowStepTransition{
-					{Target: "resolve_user"},
-					{Action: &pivotAction, Target: "register-flow"},
+				Gates: map[string]domain.FlowStepGate{
+					"bot": {
+						Kind:     domain.FlowGateKindCaptcha,
+						Provider: "altcha",
+						Config:   map[string]any{"site_key": "abc"},
+					},
+				},
+				SSOProviders: []domain.FlowSSOProvider{
+					{ID: "google-1", Name: "Google", Template: "google"},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					"submit":   {Target: "resolve_user"},
+					"register": {Action: &pivotAction, Target: "register-flow"},
 				},
 			},
 			{
-				Name:   "resolve_user",
-				Type:   domain.FlowStepTypePolicyCheck,
-				Config: nil,
-				Transitions: []domain.FlowStepTransition{
-					{Target: "password"},
+				Name: "resolve_user",
+				Transitions: map[string]domain.FlowStepTransition{
+					"submit": {Target: "password"},
 				},
 			},
 			{
 				Name:        "password",
-				Type:        domain.FlowStepTypeCredential,
-				Config:      map[string]any{"factor": "password"},
-				Transitions: []domain.FlowStepTransition{},
+				Fields:      []string{"password"},
+				OnSuccess:   &createUser,
+				Complete:    &completeShow,
+				Transitions: map[string]domain.FlowStepTransition{},
 			},
 		},
 	}
