@@ -101,13 +101,21 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
+      # `pnpm exec` from the workspace root cannot find the `playwright`
+      # binary on a clean CI checkout because @playwright/test is a dep of
+      # the e2e packages only, not of root. Scoping the exec with --filter
+      # routes through that workspace's node_modules/.bin.
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: corepack pnpm exec playwright install --with-deps chromium
+        run: >-
+          corepack pnpm --filter @nextgen/demo-next-e2e
+          exec playwright install --with-deps chromium
 
       - name: Install Playwright system deps
         if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: corepack pnpm exec playwright install-deps chromium
+        run: >-
+          corepack pnpm --filter @nextgen/demo-next-e2e
+          exec playwright install-deps chromium
 
       # Boots the demo dev servers + api-mock through Playwright's webServer
       # config; Nx rebuilds @zitadel-nextgen/components first via ^build.
