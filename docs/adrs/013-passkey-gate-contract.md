@@ -1,4 +1,4 @@
-# ADR 010: Passkey Action Contract
+# ADR 013: Passkey Action Contract
 
 > **Status:** Proposed
 > **Date:** 2026-05-12
