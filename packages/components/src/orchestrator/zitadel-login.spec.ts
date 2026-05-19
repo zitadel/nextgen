@@ -19,7 +19,16 @@ import {
 } from "@zitadel-nextgen/api-mock";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 import "./zitadel-login.js";
 import type { ZitadelLogin } from "./zitadel-login.js";
@@ -156,12 +165,61 @@ describe("<zitadel-login> against the typed Flow API", () => {
       }),
     );
     await waitFor(() => (completeEvents.length > 0 ? completeEvents : null));
-    // The mock returns complete: "show" so the app (not the component) drives
-    // navigation after exchanging the handoff_token for a session cookie.
     expect(completeEvents[0]?.detail).toEqual(
       expect.objectContaining({ behavior: "show" }),
     );
     expect(completeEvents[0]?.detail.handoff_token).toBeTruthy();
+  });
+
+  it("exchanges the handoff token and navigates when post-sign-in-url is set", async () => {
+    const assign = vi.fn();
+    const { location } = window;
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...location, assign },
+    });
+
+    try {
+      const element = document.createElement("zitadel-login") as ZitadelLogin;
+      element.purpose = "login";
+      element.projectId = "demo-project";
+      element.postSignInUrl = "/admin";
+      host.appendChild(element);
+      await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
+
+      element.shadowRoot?.dispatchEvent(
+        new CustomEvent("zl-submit", {
+          bubbles: true,
+          composed: true,
+          detail: { action: "submit" },
+        }),
+      );
+      await waitFor(() => {
+        const next = element.shadowRoot?.querySelector("zl-field");
+        return next?.getAttribute("name") === "password" ? next : null;
+      });
+      element.shadowRoot?.dispatchEvent(
+        new CustomEvent("zl-submit", {
+          bubbles: true,
+          composed: true,
+          detail: { action: "submit" },
+        }),
+      );
+
+      await waitFor(() => (assign.mock.calls.length > 0 ? assign : null));
+      expect(assign).toHaveBeenCalledWith("/admin");
+      const exchanges = mock.getCaptured().filter(
+        (req): req is Extract<CapturedRequest, { kind: "exchangeHandoff" }> =>
+          req.kind === "exchangeHandoff",
+      );
+      expect(exchanges).toHaveLength(1);
+      expect(exchanges[0]?.body.handoff_token).toBeTruthy();
+    } finally {
+      Object.defineProperty(window, "location", {
+        configurable: true,
+        value: location,
+      });
+    }
   });
 
   it("surfaces network errors via zitadel-flow-error", async () => {

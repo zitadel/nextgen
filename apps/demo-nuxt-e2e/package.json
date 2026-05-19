@@ -1,0 +1,9 @@
+{
+  "name": "@nextgen/demo-nuxt-e2e",
+  "version": "0.0.1",
+  "private": true,
+  "devDependencies": {
+    "@playwright/test": "catalog:",
+    "eslint-plugin-playwright": "catalog:"
+  }
+}

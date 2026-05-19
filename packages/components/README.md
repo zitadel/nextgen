@@ -164,7 +164,7 @@ follow-up.
 | `purpose` | `'login' \| 'register' \| 'reset_password' \| string` | Which flow purpose to drive |
 | `projectId` / `project-id` | `string` | Project / tenant id sent with `POST /flow` |
 | `apiBase` / `api-base` | `string` | Optional declarative override for `setApiBaseUrl()` |
-| `postSignInUrl` / `post-sign-in-url` | `string` | Fallback nav for terminal `complete: "show"` steps |
+| `postSignInUrl` / `post-sign-in-url` | `string` | After `complete: "show"`, exchange the `handoff_token` at `POST /sessions/exchange` and navigate here |
 | `resumeFlowId` / `resume-flow-id` | `string` | Resume an existing flow handle instead of starting fresh |
 | `locale` | `Record<string, string>` | i18n dictionary consumed by Liquid's `\| t` filter |
 
