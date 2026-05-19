@@ -12,7 +12,6 @@ required:
   - attempt_id
   - project_id
   - state
-  - expires_at
   - created_at
 properties:
   attempt_id:
@@ -59,11 +58,16 @@ properties:
   completed_factors:
     type: array
     description: |
-      The factor methods that have been successfully verified in this attempt so far.
+      The factors that have been successfully verified in this attempt so far.
+      Each item includes method-specific metadata in the payload field.
+      
+      The flow engine uses verified_at timestamps to enforce time-based policies, such as
+      requiring password verification within the last 5 minutes for step-up auth to
+      access sensitive operations.
+      
       A factor appears here once its challenge reaches `verified` state.
     items:
-      $ref: ../../components/schemas/factor-method.yaml
-    example: [identifier]
+      $ref: ./completed-factor.yaml
   challenges:
     type: array
     description: |

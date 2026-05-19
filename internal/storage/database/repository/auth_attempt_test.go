@@ -30,17 +30,17 @@ func ensureProject(t *testing.T, client database.QueryExecutor, projectID string
 
 // newTestAttempt inserts an auth attempt with one password check into the given executor.
 // It returns the attempt and the pre-created check so callers can reference the same objects.
-func newTestAttempt(t *testing.T, repo domain.AuthAttemptRepository, client database.QueryExecutor, projectID, attemptID string) (*domain.AuthAttempt, *domain.PasswordAuthCheck) {
+func newTestAttempt(t *testing.T, repo domain.AuthAttemptRepository, client database.QueryExecutor, projectID string) (*domain.AuthAttempt, *domain.PasswordAuthCheck) {
 	t.Helper()
 	ensureProject(t, client, projectID)
 	check := &domain.PasswordAuthCheck{AuthCheck: &domain.AuthCheck{Type: domain.AuthCheckTypePassword}}
 	attempt := &domain.AuthAttempt{
 		ProjectID:      projectID,
-		ID:             attemptID,
 		RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypePassword},
 		Checks:         []domain.AuthChecker{check},
 	}
 	require.NoError(t, repo.Create(t.Context(), client, attempt))
+	require.NotEmpty(t, attempt.ID)
 	return attempt, check
 }
 
@@ -57,14 +57,14 @@ func TestAuthAttempt_Create(t *testing.T) {
 			name: "no checks — Get returns the attempt with empty checks",
 			attempt: &domain.AuthAttempt{
 				ProjectID: "p",
-				ID:        "a",
 			},
 			assertAttempt: func(t *testing.T, attempt *domain.AuthAttempt) {
+				assert.NotEmpty(t, attempt.ID)
 				assert.False(t, attempt.CreatedAt.IsZero())
 			},
 			assertStored: func(t *testing.T, stored *domain.AuthAttempt) {
 				assert.Equal(t, "p", stored.ProjectID)
-				assert.Equal(t, "a", stored.ID)
+				assert.NotEmpty(t, stored.ID)
 				assert.Empty(t, stored.Checks)
 				assert.False(t, stored.CreatedAt.IsZero())
 			},
@@ -73,7 +73,6 @@ func TestAuthAttempt_Create(t *testing.T) {
 			name: "password check - create sets challenge timestamp but not verification timestamp",
 			attempt: &domain.AuthAttempt{
 				ProjectID:      "p",
-				ID:             "a",
 				RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypePassword},
 				Checks: []domain.AuthChecker{
 					&domain.PasswordAuthCheck{AuthCheck: &domain.AuthCheck{Type: domain.AuthCheckTypePassword}},
@@ -98,7 +97,6 @@ func TestAuthAttempt_Create(t *testing.T) {
 			name: "user check - factor payload roundtrips and create sets verified timestamp",
 			attempt: &domain.AuthAttempt{
 				ProjectID:      "p",
-				ID:             "a",
 				RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypeUser},
 				Checks: []domain.AuthChecker{
 					&domain.UserAuthCheck{
@@ -125,7 +123,6 @@ func TestAuthAttempt_Create(t *testing.T) {
 			name: "passkey check - challenge and factor payloads roundtrip and create sets challenge timestamp only",
 			attempt: &domain.AuthAttempt{
 				ProjectID:      "p",
-				ID:             "a",
 				RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypePasskey},
 				Checks: []domain.AuthChecker{
 					&domain.PasskeyAuthCheck{
@@ -154,7 +151,6 @@ func TestAuthAttempt_Create(t *testing.T) {
 			name: "all check types - challenge and verify timestamps are set per checker capabilities",
 			attempt: &domain.AuthAttempt{
 				ProjectID: "p",
-				ID:        "a",
 				RequiredChecks: []domain.AuthCheckType{
 					domain.AuthCheckTypeUser,
 					domain.AuthCheckTypePassword,
@@ -225,24 +221,18 @@ func TestAuthAttempt_Create(t *testing.T) {
 		})
 	}
 
-	t.Run("duplicate ID returns error", func(t *testing.T) {
+	t.Run("two creates receive distinct database-generated ids", func(t *testing.T) {
 		tx, rollback := transactionForRollback(t)
 		defer rollback()
 
 		ensureProject(t, tx, "p-dup")
-		require.NoError(t, repo.Create(t.Context(), tx, &domain.AuthAttempt{ProjectID: "p-dup", ID: "a-dup"}))
-
-		var err error
-		if isSpannerDB {
-			// Spanner DML errors don't abort the transaction, so no savepoint needed.
-			err = repo.Create(t.Context(), tx, &domain.AuthAttempt{ProjectID: "p-dup", ID: "a-dup"})
-		} else {
-			// Use a savepoint so the expected PK error does not abort the outer transaction.
-			sp, spRollback := savepointForRollback(t, tx)
-			err = repo.Create(t.Context(), sp, &domain.AuthAttempt{ProjectID: "p-dup", ID: "a-dup"})
-			spRollback()
-		}
-		assert.Error(t, err)
+		first := &domain.AuthAttempt{ProjectID: "p-dup"}
+		second := &domain.AuthAttempt{ProjectID: "p-dup"}
+		require.NoError(t, repo.Create(t.Context(), tx, first))
+		require.NoError(t, repo.Create(t.Context(), tx, second))
+		assert.NotEmpty(t, first.ID)
+		assert.NotEmpty(t, second.ID)
+		assert.NotEqual(t, first.ID, second.ID)
 	})
 }
 
@@ -255,7 +245,6 @@ func TestAuthAttempt_GetByID(t *testing.T) {
 
 		attempt := &domain.AuthAttempt{
 			ProjectID: "p-get-no-checks",
-			ID:        "a-get-no-checks",
 		}
 		ensureProject(t, tx, attempt.ProjectID)
 		require.NoError(t, repo.Create(t.Context(), tx, attempt))
@@ -272,10 +261,9 @@ func TestAuthAttempt_GetByID(t *testing.T) {
 		tx, rollback := transactionForRollback(t)
 		defer rollback()
 
-		sessionID := "session-123"
+		sessionID := "42"
 		attempt := &domain.AuthAttempt{
 			ProjectID: "p-get-session",
-			ID:        "a-get-session",
 			SessionID: &sessionID,
 		}
 		ensureProject(t, tx, attempt.ProjectID)
@@ -294,7 +282,6 @@ func TestAuthAttempt_GetByID(t *testing.T) {
 		ttl := 5 * time.Minute
 		attempt := &domain.AuthAttempt{
 			ProjectID:  "p-get-ttl",
-			ID:         "a-get-ttl",
 			TimeToLive: &ttl,
 		}
 		ensureProject(t, tx, attempt.ProjectID)
@@ -310,7 +297,7 @@ func TestAuthAttempt_GetByID(t *testing.T) {
 		tx, rollback := transactionForRollback(t)
 		defer rollback()
 
-		created, _ := newTestAttempt(t, repo, tx, "p-get-with-checks", "a-get-with-checks")
+		created, _ := newTestAttempt(t, repo, tx, "p-get-with-checks")
 
 		stored, err := repo.GetByID(t.Context(), tx, created.ProjectID, created.ID)
 		require.NoError(t, err)
@@ -326,7 +313,7 @@ func TestAuthAttempt_GetByID(t *testing.T) {
 		tx, rollback := transactionForRollback(t)
 		defer rollback()
 
-		stored, err := repo.GetByID(t.Context(), tx, "project-missing", "attempt-missing")
+		stored, err := repo.GetByID(t.Context(), tx, "project-missing", "999999")
 		require.NoError(t, err)
 		assert.Empty(t, stored.ID)
 		assert.Empty(t, stored.ProjectID)
@@ -341,7 +328,7 @@ func TestAuthAttempt_SetChallenge(t *testing.T) {
 		tx, rollback := transactionForRollback(t)
 		defer rollback()
 
-		attempt := &domain.AuthAttempt{ProjectID: "p", ID: "a"}
+		attempt := &domain.AuthAttempt{ProjectID: "p"}
 		ensureProject(t, tx, attempt.ProjectID)
 		require.NoError(t, repo.Create(t.Context(), tx, attempt))
 
@@ -365,7 +352,7 @@ func TestAuthAttempt_SetChallenge(t *testing.T) {
 		tx, rollback := transactionForRollback(t)
 		defer rollback()
 
-		attempt := &domain.AuthAttempt{ProjectID: "p", ID: "a"}
+		attempt := &domain.AuthAttempt{ProjectID: "p"}
 		ensureProject(t, tx, attempt.ProjectID)
 		require.NoError(t, repo.Create(t.Context(), tx, attempt))
 
@@ -397,7 +384,7 @@ func TestAuthAttempt_Delete(t *testing.T) {
 		tx, rollback := transactionForRollback(t)
 		defer rollback()
 
-		attempt, _ := newTestAttempt(t, repo, tx, "p", "a")
+		attempt, _ := newTestAttempt(t, repo, tx, "p")
 
 		require.NoError(t, repo.Delete(t.Context(), tx, attempt.ProjectID, attempt.ID))
 
@@ -410,7 +397,7 @@ func TestAuthAttempt_Delete(t *testing.T) {
 		tx, rollback := transactionForRollback(t)
 		defer rollback()
 
-		err := repo.Delete(t.Context(), tx, "project-ghost", "attempt-ghost")
+		err := repo.Delete(t.Context(), tx, "project-ghost", "999999")
 		assert.NoError(t, err)
 	})
 }
@@ -431,12 +418,12 @@ func TestAuthAttempt_ChallengeFailed(t *testing.T) {
 			tx, rollback := transactionForRollback(t)
 			defer rollback()
 
-			_, check := newTestAttempt(t, repo, tx, "p", "a")
+			attempt, check := newTestAttempt(t, repo, tx, "p")
 
 			for i := range tt.failureCount {
 				prev := check.LastFailedAt
 
-				require.NoError(t, repo.ChallengeFailed(t.Context(), tx, "p", "a", check.AuthCheck))
+				require.NoError(t, repo.ChallengeFailed(t.Context(), tx, attempt.ProjectID, attempt.ID, check.AuthCheck))
 				require.NotNil(t, check.LastFailedAt, "LastFailedAt must be set after failure %d", i+1) // gates dereference below
 				assert.Equal(t, uint16(i+1), check.FailureCount)
 				if prev != nil {
@@ -455,14 +442,14 @@ func TestAuthAttempt_ChallengeSucceeded(t *testing.T) {
 		tx, rollback := transactionForRollback(t)
 		defer rollback()
 
-		_, check := newTestAttempt(t, repo, tx, "p", "a")
+		attempt, check := newTestAttempt(t, repo, tx, "p")
 		previousVerifiedAt := check.LastVerifiedAt
 
-		require.NoError(t, repo.ChallengeSucceeded(t.Context(), tx, "p", "a", check.AuthCheck))
+		require.NoError(t, repo.ChallengeSucceeded(t.Context(), tx, attempt.ProjectID, attempt.ID, check.AuthCheck))
 		assert.False(t, check.LastVerifiedAt.IsZero())
 		assert.True(t, check.LastVerifiedAt.After(previousVerifiedAt) || check.LastVerifiedAt.Equal(previousVerifiedAt))
 
-		stored, err := repo.GetByID(t.Context(), tx, "p", "a")
+		stored, err := repo.GetByID(t.Context(), tx, attempt.ProjectID, attempt.ID)
 		require.NoError(t, err)
 		storedCheck, ok := stored.CheckByType(domain.AuthCheckTypePassword)
 		require.True(t, ok) // gates .Check() call below
@@ -473,15 +460,15 @@ func TestAuthAttempt_ChallengeSucceeded(t *testing.T) {
 		tx, rollback := transactionForRollback(t)
 		defer rollback()
 
-		_, check := newTestAttempt(t, repo, tx, "p", "a")
-		require.NoError(t, repo.ChallengeFailed(t.Context(), tx, "p", "a", check.AuthCheck))
-		require.NoError(t, repo.ChallengeFailed(t.Context(), tx, "p", "a", check.AuthCheck))
+		attempt, check := newTestAttempt(t, repo, tx, "p")
+		require.NoError(t, repo.ChallengeFailed(t.Context(), tx, attempt.ProjectID, attempt.ID, check.AuthCheck))
+		require.NoError(t, repo.ChallengeFailed(t.Context(), tx, attempt.ProjectID, attempt.ID, check.AuthCheck))
 		assert.Equal(t, uint16(2), check.FailureCount)
 
-		require.NoError(t, repo.ChallengeSucceeded(t.Context(), tx, "p", "a", check.AuthCheck))
+		require.NoError(t, repo.ChallengeSucceeded(t.Context(), tx, attempt.ProjectID, attempt.ID, check.AuthCheck))
 		assert.False(t, check.LastVerifiedAt.IsZero())
 
-		stored, err := repo.GetByID(t.Context(), tx, "p", "a")
+		stored, err := repo.GetByID(t.Context(), tx, attempt.ProjectID, attempt.ID)
 		require.NoError(t, err)
 		storedCheck, ok := stored.CheckByType(domain.AuthCheckTypePassword)
 		require.True(t, ok) // gates .Check() call below
@@ -493,7 +480,7 @@ func TestAuthAttempt_ChallengeSucceeded(t *testing.T) {
 		tx, rollback := transactionForRollback(t)
 		defer rollback()
 
-		attempt := &domain.AuthAttempt{ProjectID: "p", ID: "a"}
+		attempt := &domain.AuthAttempt{ProjectID: "p"}
 		ensureProject(t, tx, attempt.ProjectID)
 		require.NoError(t, repo.Create(t.Context(), tx, attempt))
 
@@ -523,7 +510,7 @@ func TestAuthAttempt_Complete(t *testing.T) {
 
 		attempt := &domain.AuthAttempt{
 			ProjectID: "p",
-			ID:        "non-existing",
+			ID:        "999999",
 		}
 
 		err := repo.Complete(t.Context(), tx, attempt)
@@ -535,7 +522,7 @@ func TestAuthAttempt_Complete(t *testing.T) {
 		tx, rollback := transactionForRollback(t)
 		defer rollback()
 
-		attempt, _ := newTestAttempt(t, repo, tx, "p", "a")
+		attempt, _ := newTestAttempt(t, repo, tx, "p")
 		assert.Nil(t, attempt.CompletedAt, "CompletedAt must be nil before Complete is called")
 
 		require.NoError(t, repo.Complete(t.Context(), tx, attempt))
@@ -547,7 +534,7 @@ func TestAuthAttempt_Complete(t *testing.T) {
 		tx, rollback := transactionForRollback(t)
 		defer rollback()
 
-		attempt, _ := newTestAttempt(t, repo, tx, "p", "a")
+		attempt, _ := newTestAttempt(t, repo, tx, "p")
 		require.NoError(t, repo.Complete(t.Context(), tx, attempt))
 		first := *attempt.CompletedAt
 
@@ -566,7 +553,7 @@ func TestAuthAttempt_Handoff(t *testing.T) {
 		defer rollback()
 
 		token := "handoff-token"
-		attempt := &domain.AuthAttempt{ProjectID: "p", ID: "a", HandoffToken: &token}
+		attempt := &domain.AuthAttempt{ProjectID: "p", HandoffToken: &token}
 		ensureProject(t, tx, attempt.ProjectID)
 		require.NoError(t, repo.Create(t.Context(), tx, attempt))
 
@@ -587,7 +574,7 @@ func TestAuthAttempt_Handoff(t *testing.T) {
 		tx, rollback := transactionForRollback(t)
 		defer rollback()
 
-		attempt := &domain.AuthAttempt{ProjectID: "p", ID: "a"}
+		attempt := &domain.AuthAttempt{ProjectID: "p"}
 		ensureProject(t, tx, attempt.ProjectID)
 		require.NoError(t, repo.Create(t.Context(), tx, attempt))
 
