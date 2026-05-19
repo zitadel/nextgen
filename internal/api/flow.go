@@ -36,7 +36,7 @@ func (h Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest) (ap
 
 	def, err := h.flowService.Resolve(ctx, resolveReq)
 	if err != nil {
-		return nil, mapResolveError(err)
+		return mapResolveError(err), nil
 	}
 
 	// Execution is intentionally stopped here. The service resolved a
@@ -65,12 +65,7 @@ func buildResolveHint(opt api.OptFlowHint) service.ResolveFlowHint {
 	return out
 }
 
-// mapResolveError translates a Resolve error into an HTTP status code.
-// The ogen-generated handler unwraps *api.ErrorDetailsStatusCode from the
-// error return path and writes its StatusCode + Response verbatim; the
-// success-path *api.ErrorDetails fallback would otherwise force every
-// failure to HTTP 400.
-func mapResolveError(err error) error {
+func mapResolveError(err error) *api.ErrorDetailsStatusCode {
 	switch {
 	case errors.Is(err, domain.ErrFlowDefinitionNotFound):
 		return &api.ErrorDetailsStatusCode{
