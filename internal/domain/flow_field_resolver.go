@@ -15,30 +15,18 @@ import (
 // schema-derived rules.
 //
 // The contract is shaped to the user meta-schema at
-// api/openapi/endpoints/schemas/user-schema.yaml — customers author
-// schemas conforming to that meta-schema, and every trait the resolver
-// surfaces on [FlowField] must be derivable from one of its keywords.
-// The implementation loads the user schema via [JSONSchemaResolver],
-// which handles caching, `$ref` resolution, and the optional built-in
-// embedded schemas (the flow engine ships a default user schema this
-// way).
+// api/openapi/endpoints/schemas/user-schema.yaml.
 type FlowFieldResolver interface {
 	// Resolve returns the per-field metadata for fieldNames sourced
 	// from the user schema at userSchemaURL.
 	Resolve(ctx context.Context, client database.QueryExecutor, projectID, userSchemaURL string, fieldNames []string) (FlowResolvedFields, error)
 
-	// Validate checks submitted values against the rules derived from
-	// the user schema at userSchemaURL. Returns
-	// [FlowFieldValidationErrors] (as error) when one or more rules
-	// fail. The state machine surfaces it on the current step;
-	// transport-level errors bubble up as plain errors.
-	Validate(ctx context.Context, client database.QueryExecutor, projectID, userSchemaURL string, values map[string]any) error
+	// Validate checks submitted values against the rules carried by a
+	// previously resolved field set.
+	Validate(fields FlowResolvedFields, values map[string]any) error
 }
 
-// FlowResolvedFields is the output of [FlowFieldResolver.Resolve]. It
-// carries the per-field payloads (Fields) and the implicit transition
-// outcomes the resolver derived from schema annotations
-// (ImplicitOutcomes).
+// FlowResolvedFields is the output of [FlowFieldResolver.Resolve].
 type FlowResolvedFields struct {
 	// Fields holds the resolved per-field metadata. Keys match the
 	// property names passed to Resolve.
@@ -50,24 +38,7 @@ type FlowResolvedFields struct {
 	ImplicitOutcomes map[string][]string
 }
 
-// FlowField is the resolved per-field metadata. It mixes:
-//
-//   - The render-time shape mirrored in the OpenAPI flow-field
-//     component (Type, TextKey, Required, Value, Validation), which the
-//     API layer maps to the response DTO.
-//   - The server-side traits the state machine routes on (Challenge,
-//     Unique). Unique comes directly from the property's `x-unique`
-//     annotation in the user meta-schema
-//     (api/openapi/endpoints/schemas/user-property.yaml). Challenge
-//     unifies two routing signals onto one enum: `x-identifier`
-//     produces [FlowFieldChallengeIdentifier], and the schema-level
-//     `x-auth-methods` map cross-referenced with the property name
-//     produces the matching credential kind.
-//
-// Annotations the meta-schema defines but the MVP state machine does
-// not yet consume (`x-claim`, `x-editable`, `x-sensitive`, `x-mfa`,
-// `x-verify`) are not surfaced here — they will be added as the
-// consumers that need them land.
+// FlowField is the resolved per-field metadata.
 type FlowField struct {
 	// Type is the UI input kind the client should render. It is
 	// derived from the property's JSON `type` and `format` in the user
@@ -79,8 +50,7 @@ type FlowField struct {
 	// `field.email`). Resolved client-side via the `| t` filter.
 	TextKey string
 
-	// Required reflects membership in the schema's top-level `required`
-	// array.
+	// Required reflects membership in the schema's top-level `required` array.
 	Required bool
 
 	// Value is an optional pre-fill (e.g. an identifier carried over
@@ -90,11 +60,6 @@ type FlowField struct {
 	// Validation carries the schema-derived validation rules. Nil when
 	// the property has no rules beyond its JSON type.
 	Validation *FlowFieldValidation
-
-	// Unique reflects `x-unique` on the property: the scope at which
-	// the value must be unique, or [FlowFieldUniqueScopeNone] when the
-	// annotation is absent.
-	Unique FlowFieldUniqueScope
 
 	// Challenge names the auth-attempt challenge the field maps to, or
 	// [FlowFieldChallengeNone] when the field carries neither an
@@ -133,24 +98,6 @@ const (
 	FlowFieldChallengeMagicLink  FlowFieldChallenge = "magic_link"
 	FlowFieldChallengeSSO        FlowFieldChallenge = "sso"
 	FlowFieldChallengeOTP        FlowFieldChallenge = "otp"
-)
-
-// FlowFieldUniqueScope mirrors the `x-unique` enum in the user
-// meta-schema (api/openapi/endpoints/schemas/user-property.yaml).
-type FlowFieldUniqueScope string
-
-const (
-	// FlowFieldUniqueScopeNone means the property has no `x-unique`
-	// annotation; no uniqueness check is enforced.
-	FlowFieldUniqueScopeNone FlowFieldUniqueScope = ""
-
-	// FlowFieldUniqueScopeInstance enforces uniqueness across the
-	// entire deployment.
-	FlowFieldUniqueScopeInstance FlowFieldUniqueScope = "instance"
-
-	// FlowFieldUniqueScopeOrganization enforces uniqueness within the
-	// owning organization.
-	FlowFieldUniqueScopeOrganization FlowFieldUniqueScope = "organization"
 )
 
 // FlowFieldValidation carries the validation rules the resolver

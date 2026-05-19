@@ -3,7 +3,6 @@ package domain
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/ianlancetaylor/jsonschema"
 	"github.com/ianlancetaylor/jsonschema/types"
@@ -31,7 +30,6 @@ type SchemaResolver interface {
 //   - `minLength`, `maxLength`, `format` → [FlowFieldValidation]
 //   - `x-identifier` → [FlowFieldChallengeIdentifier] +
 //     [FlowImplicitOutcomeUserNotFound]
-//   - `x-unique` → [FlowField.Unique]
 //   - `x-password: true` combined with schema-level
 //     `x-auth-methods.password.enabled = true` →
 //     [FlowFieldChallengePassword]. Other auth methods do not have
@@ -84,59 +82,12 @@ func (r *SchemaFieldResolver) Resolve(
 	}, nil
 }
 
-// Validate runs the schema-derived rules over the submitted values.
-// Required-on-empty-string and unknown-property checks are layered on
-// top of the library's per-keyword validators (the library treats
-// `required` as a presence check, not an emptiness check, and treats
-// `format` as an annotation unless an external validator is registered).
-func (r *SchemaFieldResolver) Validate(
-	ctx context.Context,
-	client database.QueryExecutor,
-	projectID, userSchemaURL string,
-	values map[string]any,
-) error {
-	schema, err := r.schemas.Resolve(ctx, client, projectID, userSchemaURL, nil)
-	if err != nil {
-		return fmt.Errorf("flow field resolver: load user schema: %w", err)
-	}
-
-	required := readRequiredSet(schema)
-	properties := lookupProperties(schema)
-
-	var errs FlowFieldValidationErrors
-	for name, value := range values {
-		propSchema, ok := properties[name]
-		if !ok {
-			errs = append(errs, FlowFieldValidationError{Field: name, Rule: FlowFieldValidationRuleUnknown})
-			continue
-		}
-		str, isString := value.(string)
-		if !isString {
-			errs = append(errs, FlowFieldValidationError{Field: name, Rule: FlowFieldValidationRuleFormat})
-			continue
-		}
-		if str == "" {
-			if _, isRequired := required[name]; isRequired {
-				errs = append(errs, FlowFieldValidationError{Field: name, Rule: FlowFieldValidationRuleRequired})
-			}
-			continue
-		}
-		errs = append(errs, validateString(name, str, propSchema)...)
-	}
-
-	if len(errs) > 0 {
-		return errs
-	}
-	return nil
-}
-
 // buildFlowField translates a user-schema property into a [FlowField].
 func buildFlowField(name string, propSchema *jsonschema.Schema, required map[string]struct{}, passwordEnabled bool) FlowField {
 	field := FlowField{
 		TextKey:   "field." + name,
 		Type:      deriveFieldType(propSchema),
 		Challenge: deriveChallenge(propSchema, passwordEnabled),
-		Unique:    deriveUnique(propSchema),
 	}
 	if _, ok := required[name]; ok {
 		field.Required = true
@@ -179,16 +130,6 @@ func deriveChallenge(propSchema *jsonschema.Schema, passwordEnabled bool) FlowFi
 	return FlowFieldChallengeNone
 }
 
-func deriveUnique(propSchema *jsonschema.Schema) FlowFieldUniqueScope {
-	switch lookupString(propSchema, "x-unique") {
-	case "organization":
-		return FlowFieldUniqueScopeOrganization
-	case "instance":
-		return FlowFieldUniqueScopeInstance
-	}
-	return FlowFieldUniqueScopeNone
-}
-
 func buildValidation(propSchema *jsonschema.Schema) *FlowFieldValidation {
 	v := FlowFieldValidation{
 		Format:    lookupString(propSchema, "format"),
@@ -199,34 +140,6 @@ func buildValidation(propSchema *jsonschema.Schema) *FlowFieldValidation {
 		return nil
 	}
 	return &v
-}
-
-// validateString runs the per-keyword checks for a single property.
-// Each known keyword maps 1:1 to a [FlowFieldValidationRule]; an
-// unknown keyword on the property is silently skipped, mirroring how
-// the library treats it.
-func validateString(name, value string, propSchema *jsonschema.Schema) []FlowFieldValidationError {
-	var out []FlowFieldValidationError
-	if min := lookupInt(propSchema, "minLength"); min > 0 && len(value) < min {
-		out = append(out, FlowFieldValidationError{Field: name, Rule: FlowFieldValidationRuleMinLength})
-	}
-	if max := lookupInt(propSchema, "maxLength"); max > 0 && len(value) > max {
-		out = append(out, FlowFieldValidationError{Field: name, Rule: FlowFieldValidationRuleMaxLength})
-	}
-	if lookupString(propSchema, "format") == "email" && !looksLikeEmail(value) {
-		out = append(out, FlowFieldValidationError{Field: name, Rule: FlowFieldValidationRuleFormat})
-	}
-	return out
-}
-
-// looksLikeEmail is a deliberately minimal MVP check: one '@' with
-// non-empty local and domain parts.
-func looksLikeEmail(s string) bool {
-	at := strings.IndexByte(s, '@')
-	if at <= 0 || at == len(s)-1 {
-		return false
-	}
-	return strings.IndexByte(s[at+1:], '@') < 0
 }
 
 // passwordAuthEnabled reports whether the root schema declares

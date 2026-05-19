@@ -52,8 +52,8 @@ func defaultSchemaBytes() []byte {
 		"x-auth-methods": { "password": { "enabled": true } },
 		"required": ["email", "username", "password", "given_name", "family_name"],
 		"properties": {
-			"email":       { "type": "string", "format": "email", "maxLength": 320, "x-identifier": true, "x-unique": "organization" },
-			"username":    { "type": "string", "minLength": 3, "maxLength": 64, "x-identifier": true, "x-unique": "organization" },
+			"email":       { "type": "string", "format": "email", "maxLength": 320, "x-identifier": true },
+			"username":    { "type": "string", "minLength": 3, "maxLength": 64, "x-identifier": true },
 			"password":    { "type": "string", "minLength": 8, "x-password": true },
 			"given_name":  { "type": "string", "minLength": 1, "maxLength": 200 },
 			"family_name": { "type": "string", "minLength": 1, "maxLength": 200 }
@@ -215,22 +215,6 @@ func TestSchemaFieldResolver_Resolve_RenamedPasswordField(t *testing.T) {
 	}
 }
 
-func TestSchemaFieldResolver_Resolve_UniqueScopeSurfaces(t *testing.T) {
-	resolver := newDefaultResolver(t)
-
-	got, err := resolver.Resolve(t.Context(), nil, testProjectID, defaultSchemaURL, []string{"email", "password"})
-	if err != nil {
-		t.Fatalf("Resolve returned error: %v", err)
-	}
-
-	if got.Fields["email"].Unique != domain.FlowFieldUniqueScopeOrganization {
-		t.Errorf("Resolve email Unique = %q, want %q", got.Fields["email"].Unique, domain.FlowFieldUniqueScopeOrganization)
-	}
-	if got.Fields["password"].Unique != domain.FlowFieldUniqueScopeNone {
-		t.Errorf("Resolve password Unique = %q, want %q", got.Fields["password"].Unique, domain.FlowFieldUniqueScopeNone)
-	}
-}
-
 func TestSchemaFieldResolver_Resolve_UnknownField(t *testing.T) {
 	resolver := newDefaultResolver(t)
 
@@ -246,79 +230,6 @@ func TestSchemaFieldResolver_Resolve_SchemaLoadFailurePropagates(t *testing.T) {
 	_, err := resolver.Resolve(t.Context(), nil, testProjectID, "https://example.test/missing.json", []string{"email"})
 	if err == nil {
 		t.Fatal("Resolve err = nil, want load failure")
-	}
-}
-
-func TestSchemaFieldResolver_Validate_RequiredEmptyValue(t *testing.T) {
-	resolver := newDefaultResolver(t)
-
-	err := resolver.Validate(t.Context(), nil, testProjectID, defaultSchemaURL, map[string]any{"email": ""})
-	if !hasValidationRule(t, err, "email", domain.FlowFieldValidationRuleRequired) {
-		t.Fatalf("Validate err = %v, want required violation for email", err)
-	}
-}
-
-func TestSchemaFieldResolver_Validate_EmailFormat(t *testing.T) {
-	resolver := newDefaultResolver(t)
-
-	err := resolver.Validate(t.Context(), nil, testProjectID, defaultSchemaURL, map[string]any{"email": "not-an-email"})
-	if !hasValidationRule(t, err, "email", domain.FlowFieldValidationRuleFormat) {
-		t.Fatalf("Validate err = %v, want format violation for email", err)
-	}
-}
-
-func TestSchemaFieldResolver_Validate_MinLength(t *testing.T) {
-	resolver := newDefaultResolver(t)
-
-	err := resolver.Validate(t.Context(), nil, testProjectID, defaultSchemaURL, map[string]any{"password": "short"})
-	if !hasValidationRule(t, err, "password", domain.FlowFieldValidationRuleMinLength) {
-		t.Fatalf("Validate err = %v, want min_length violation for password", err)
-	}
-}
-
-func TestSchemaFieldResolver_Validate_MaxLength(t *testing.T) {
-	resolver := newDefaultResolver(t)
-	long := make([]byte, 65)
-	for i := range long {
-		long[i] = 'a'
-	}
-
-	err := resolver.Validate(t.Context(), nil, testProjectID, defaultSchemaURL, map[string]any{"username": string(long)})
-	if !hasValidationRule(t, err, "username", domain.FlowFieldValidationRuleMaxLength) {
-		t.Fatalf("Validate err = %v, want max_length violation for username", err)
-	}
-}
-
-func TestSchemaFieldResolver_Validate_HappyPath(t *testing.T) {
-	resolver := newDefaultResolver(t)
-
-	err := resolver.Validate(t.Context(), nil, testProjectID, defaultSchemaURL, map[string]any{
-		"email":       "alice@example.com",
-		"password":    "correct-horse-battery-staple",
-		"given_name":  "Alice",
-		"family_name": "Doe",
-		"username":    "alice",
-	})
-	if err != nil {
-		t.Fatalf("Validate returned error: %v", err)
-	}
-}
-
-func TestSchemaFieldResolver_Validate_UnknownField(t *testing.T) {
-	resolver := newDefaultResolver(t)
-
-	err := resolver.Validate(t.Context(), nil, testProjectID, defaultSchemaURL, map[string]any{"not_in_schema": "x"})
-	if !hasValidationRule(t, err, "not_in_schema", domain.FlowFieldValidationRuleUnknown) {
-		t.Fatalf("Validate err = %v, want unknown_field violation", err)
-	}
-}
-
-func TestSchemaFieldResolver_Validate_NonStringValueReportsFormat(t *testing.T) {
-	resolver := newDefaultResolver(t)
-
-	err := resolver.Validate(t.Context(), nil, testProjectID, defaultSchemaURL, map[string]any{"email": 123})
-	if !hasValidationRule(t, err, "email", domain.FlowFieldValidationRuleFormat) {
-		t.Fatalf("Validate err = %v, want format violation for non-string email", err)
 	}
 }
 
@@ -358,45 +269,3 @@ func TestSchemaFieldResolver_Resolve_FormatAndTypeVariants(t *testing.T) {
 	}
 }
 
-func TestSchemaFieldResolver_Resolve_UniqueScopeInstance(t *testing.T) {
-	const url = "https://example.test/instance-unique.json"
-	bytes := []byte(`{
-		"$schema": "https://json-schema.org/draft/2020-12/schema",
-		"type": "object",
-		"properties": {
-			"handle": { "type": "string", "x-unique": "instance" }
-		}
-	}`)
-	resolver := domain.NewSchemaFieldResolver(newFakeResolver(t, map[string][]byte{url: bytes}))
-
-	got, err := resolver.Resolve(t.Context(), nil, testProjectID, url, []string{"handle"})
-	if err != nil {
-		t.Fatalf("Resolve returned error: %v", err)
-	}
-	if got.Fields["handle"].Unique != domain.FlowFieldUniqueScopeInstance {
-		t.Errorf("Resolve handle Unique = %q, want %q", got.Fields["handle"].Unique, domain.FlowFieldUniqueScopeInstance)
-	}
-}
-
-func TestSchemaFieldResolver_Validate_SchemaLoadFailurePropagates(t *testing.T) {
-	resolver := domain.NewSchemaFieldResolver(newFakeResolver(t, nil))
-
-	err := resolver.Validate(t.Context(), nil, testProjectID, "https://example.test/missing.json", map[string]any{"email": "a@b.c"})
-	if err == nil {
-		t.Fatal("Validate err = nil, want load failure")
-	}
-}
-
-func hasValidationRule(t *testing.T, err error, field string, rule domain.FlowFieldValidationRule) bool {
-	t.Helper()
-	var errs domain.FlowFieldValidationErrors
-	if !errors.As(err, &errs) {
-		return false
-	}
-	for _, e := range errs {
-		if e.Field == field && e.Rule == rule {
-			return true
-		}
-	}
-	return false
-}
