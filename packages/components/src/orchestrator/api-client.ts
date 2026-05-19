@@ -17,9 +17,9 @@
  * orchestrator stores them as `CreateFlow201` because that is the alias
  * orval gives the start-of-flow response.
  */
+import { getApiBaseUrl } from "@zitadel-nextgen/api/runtime/base-url";
 import {
   createFlow,
-  exchangeHandoff,
   getFlowStep,
   submitFlowStep,
 } from "@zitadel-nextgen/api/generated/endpoints/zitadelNextGen";
@@ -31,7 +31,39 @@ import type {
   SubmitFlowStepBody,
 } from "@zitadel-nextgen/api/generated/model";
 
+/** OpenAPI default; used when `session-exchange-path` is omitted on `<zitadel-login>`. */
+export const DEFAULT_SESSION_EXCHANGE_PATH = "/sessions/exchange";
+
 const apiRequestInit: RequestInit = { credentials: "include" };
+
+/**
+ * Resolve the URL for `POST …/sessions/exchange` (or a host override).
+ *
+ * - Default path (`/sessions/exchange`): prefixed with `getApiBaseUrl()` so
+ *   `api-base="/__nextgen"` continues to hit `/__nextgen/sessions/exchange`.
+ * - Any other path: resolved from `location.origin`, independent of
+ *   `api-base`, for SPAs that rewrite exchange under a separate prefix
+ *   (e.g. `/api/auth/exchange`).
+ */
+export function resolveSessionExchangeUrl(
+  sessionExchangePath = DEFAULT_SESSION_EXCHANGE_PATH,
+): string {
+  const path = sessionExchangePath.startsWith("/")
+    ? sessionExchangePath
+    : `/${sessionExchangePath}`;
+
+  if (path !== DEFAULT_SESSION_EXCHANGE_PATH) {
+    const origin =
+      typeof globalThis.location !== "undefined" ? globalThis.location.origin : "";
+    if (!origin) {
+      throw new Error("Custom session-exchange-path requires a browser origin.");
+    }
+    return new URL(path, origin).href;
+  }
+
+  const apiBase = getApiBaseUrl().replace(/\/$/, "");
+  return apiBase ? `${apiBase}${path}` : path;
+}
 
 export async function startFlow(input: CreateFlowBody): Promise<CreateFlow201> {
   return createFlow(input, apiRequestInit);
@@ -54,6 +86,16 @@ export async function getCurrentStep(id: string): Promise<CreateFlow201> {
  */
 export async function exchangeSession(
   body: ExchangeHandoffBody,
+  sessionExchangePath?: string,
 ): Promise<ExchangeHandoff200> {
-  return exchangeHandoff(body, apiRequestInit);
+  const res = await fetch(resolveSessionExchangeUrl(sessionExchangePath), {
+    ...apiRequestInit,
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  const text = [204, 205, 304].includes(res.status) ? null : await res.text();
+  const data: ExchangeHandoff200 = text ? JSON.parse(text) : {};
+  return data;
 }

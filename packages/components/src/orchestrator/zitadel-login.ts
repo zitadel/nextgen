@@ -12,6 +12,7 @@ import type { Liquid, Template } from "liquidjs";
 
 import "../atoms/index.js";
 import {
+  DEFAULT_SESSION_EXCHANGE_PATH,
   exchangeSession,
   getCurrentStep,
   startFlow as apiStartFlow,
@@ -83,9 +84,19 @@ export class ZitadelLogin extends LitElement {
   @property({ type: String, attribute: "api-base" }) accessor apiBase = "";
 
   /**
+   * Path for the handoff exchange request. Defaults to `/sessions/exchange`
+   * and is prefixed with `api-base` when that attribute is set (so
+   * `api-base="/__nextgen"` → `/__nextgen/sessions/exchange`). Any other
+   * value is resolved from `location.origin` instead, so SPAs can route
+   * exchange separately from the flow API (e.g. `/api/auth/exchange`).
+   */
+  @property({ type: String, attribute: "session-exchange-path" })
+  accessor sessionExchangePath = DEFAULT_SESSION_EXCHANGE_PATH;
+
+  /**
    * URL to navigate to after a successful embedded sign-in. When set, the
-   * orchestrator exchanges the terminal `handoff_token` at
-   * `POST /sessions/exchange` (setting the session cookie) and then performs
+   * orchestrator exchanges the terminal `handoff_token` at the configured
+   * `session-exchange-path` (setting the session cookie) and then performs
    * a full navigation to this URL so host middleware can observe the cookie.
    * For `complete: "redirect"` the orchestrator follows `redirect_uri`
    * instead and does not run the exchange.
@@ -277,7 +288,7 @@ export class ZitadelLogin extends LitElement {
     if (behavior === "show" && handoffToken && this.postSignInUrl) {
       this.loading = true;
       try {
-        await exchangeSession({ handoff_token: handoffToken });
+        await exchangeSession({ handoff_token: handoffToken }, this.sessionExchangePath);
         window.location.assign(this.postSignInUrl);
       } catch (error) {
         this.handleTransportError(error);
