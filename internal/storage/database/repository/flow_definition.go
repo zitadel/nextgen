@@ -47,11 +47,32 @@ type flowDefinitionAudienceJSON struct {
 }
 
 type flowDefinitionStepJSON struct {
-	Name        string                   `json:"name"`
-	Fields      []string                 `json:"fields,omitempty"`
-	OnSuccess   *string                  `json:"on_success,omitempty"`
-	Complete    *string                  `json:"complete,omitempty"`
-	Transitions []flowStepTransitionJSON `json:"transitions"`
+	Name         string                       `json:"name"`
+	Fields       []string                     `json:"fields,omitempty"`
+	Actions      map[string]flowStepActionJSON `json:"actions,omitempty"`
+	Gates        map[string]flowStepGateJSON   `json:"gates,omitempty"`
+	SSOProviders []flowSSOProviderJSON        `json:"sso_providers,omitempty"`
+	OnSuccess    *string                      `json:"on_success,omitempty"`
+	Complete     *string                      `json:"complete,omitempty"`
+	Transitions  []flowStepTransitionJSON     `json:"transitions"`
+}
+
+type flowStepActionJSON struct {
+	TextKey string `json:"text_key"`
+	Primary bool   `json:"primary,omitempty"`
+}
+
+type flowStepGateJSON struct {
+	Type     string         `json:"type"`
+	Provider string         `json:"provider,omitempty"`
+	Required bool           `json:"required,omitempty"`
+	Config   map[string]any `json:"config,omitempty"`
+}
+
+type flowSSOProviderJSON struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Template string `json:"template"`
 }
 
 type flowStepTransitionJSON struct {
@@ -262,6 +283,36 @@ func marshalFlowDefinitionContent(def *domain.FlowDefinition) ([]byte, error) {
 			Fields:      s.Fields,
 			Transitions: transitions,
 		}
+		if len(s.Actions) > 0 {
+			stepJSON.Actions = make(map[string]flowStepActionJSON, len(s.Actions))
+			for name, a := range s.Actions {
+				stepJSON.Actions[name] = flowStepActionJSON{
+					TextKey: a.TextKey,
+					Primary: a.Primary,
+				}
+			}
+		}
+		if len(s.Gates) > 0 {
+			stepJSON.Gates = make(map[string]flowStepGateJSON, len(s.Gates))
+			for name, g := range s.Gates {
+				stepJSON.Gates[name] = flowStepGateJSON{
+					Type:     g.Type.String(),
+					Provider: g.Provider,
+					Required: g.Required,
+					Config:   g.Config,
+				}
+			}
+		}
+		if len(s.SSOProviders) > 0 {
+			stepJSON.SSOProviders = make([]flowSSOProviderJSON, len(s.SSOProviders))
+			for j, p := range s.SSOProviders {
+				stepJSON.SSOProviders[j] = flowSSOProviderJSON{
+					ID:       p.ID,
+					Name:     p.Name,
+					Template: p.Template,
+				}
+			}
+		}
 		if s.OnSuccess != nil {
 			onSuccess := s.OnSuccess.String()
 			stepJSON.OnSuccess = &onSuccess
@@ -316,6 +367,40 @@ func rowToFlowDefinition(row flowDefinitionRow) (*domain.FlowDefinition, error) 
 			Name:        s.Name,
 			Fields:      s.Fields,
 			Transitions: transitions,
+		}
+		if len(s.Actions) > 0 {
+			step.Actions = make(map[string]domain.FlowStepAction, len(s.Actions))
+			for name, a := range s.Actions {
+				step.Actions[name] = domain.FlowStepAction{
+					TextKey: a.TextKey,
+					Primary: a.Primary,
+				}
+			}
+		}
+		if len(s.Gates) > 0 {
+			step.Gates = make(map[string]domain.FlowStepGate, len(s.Gates))
+			for name, g := range s.Gates {
+				gateType, err := domain.FlowGateTypeString(g.Type)
+				if err != nil {
+					return nil, err
+				}
+				step.Gates[name] = domain.FlowStepGate{
+					Type:     gateType,
+					Provider: g.Provider,
+					Required: g.Required,
+					Config:   g.Config,
+				}
+			}
+		}
+		if len(s.SSOProviders) > 0 {
+			step.SSOProviders = make([]domain.FlowSSOProvider, len(s.SSOProviders))
+			for j, p := range s.SSOProviders {
+				step.SSOProviders[j] = domain.FlowSSOProvider{
+					ID:       p.ID,
+					Name:     p.Name,
+					Template: p.Template,
+				}
+			}
 		}
 		if s.OnSuccess != nil {
 			onSuccess, err := domain.FlowOnSuccessString(*s.OnSuccess)

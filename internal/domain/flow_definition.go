@@ -64,6 +64,14 @@ const (
 	Pivot
 )
 
+//go:generate go tool enumer -type FlowGateType -transform snake -trimprefix FlowGateType -sql
+type FlowGateType uint8
+
+const (
+	FlowGateTypeCaptcha FlowGateType = iota
+	FlowGateTypePasskey
+)
+
 // FlowDefinition is a customer-configured directed graph of authentication steps.
 // It is immutable: modifications produce a new revision with a new SchemaVersion.
 type FlowDefinition struct {
@@ -102,6 +110,14 @@ type FlowDefinitionStep struct {
 	// Resolved against [FlowDefinition.UserSchema] at runtime to derive
 	// per-field type, validation, and implicit outcomes.
 	Fields []string
+	// Actions are the user-selectable actions on this step, keyed by the
+	// name the frontend echoes back in the submit request.
+	Actions map[string]FlowStepAction
+	// Gates are security challenges that must be satisfied before the
+	// step's submission is accepted, keyed by gate name.
+	Gates map[string]FlowStepGate
+	// SSOProviders lists the identity providers available on this step.
+	SSOProviders []FlowSSOProvider
 	// OnSuccess names the server-side mutation to run after field
 	// validation passes, before the transition fires. Nil means advance
 	// directly with no side effect.
@@ -111,6 +127,27 @@ type FlowDefinitionStep struct {
 	// regular interactive steps.
 	Complete    *FlowStepComplete
 	Transitions []FlowStepTransition
+}
+
+// FlowStepAction is a user-selectable action declared on a step.
+type FlowStepAction struct {
+	TextKey string
+	Primary bool
+}
+
+// FlowStepGate is a security challenge attached to a step.
+type FlowStepGate struct {
+	Type     FlowGateType
+	Provider string
+	Required bool
+	Config   map[string]any
+}
+
+// FlowSSOProvider is an identity provider option offered on a step.
+type FlowSSOProvider struct {
+	ID       string
+	Name     string
+	Template string
 }
 
 // FlowStepTransition maps an action name to either a target step (regular) or a pivot purpose.

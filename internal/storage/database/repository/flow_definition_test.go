@@ -50,6 +50,22 @@ func TestFlowDefinitionRepository_CreateAndGet(t *testing.T) {
 	assert.Nil(t, identifier.Complete)
 	require.Len(t, identifier.Transitions, 2)
 
+	require.Contains(t, identifier.Actions, "submit")
+	assert.Equal(t, "identifier.submit", identifier.Actions["submit"].TextKey)
+	assert.True(t, identifier.Actions["submit"].Primary)
+
+	require.Contains(t, identifier.Gates, "bot")
+	bot := identifier.Gates["bot"]
+	assert.Equal(t, domain.FlowGateTypeCaptcha, bot.Type)
+	assert.Equal(t, "altcha", bot.Provider)
+	assert.True(t, bot.Required)
+	assert.Equal(t, "abc", bot.Config["site_key"])
+
+	require.Len(t, identifier.SSOProviders, 1)
+	assert.Equal(t, "google-1", identifier.SSOProviders[0].ID)
+	assert.Equal(t, "Google", identifier.SSOProviders[0].Name)
+	assert.Equal(t, "google", identifier.SSOProviders[0].Template)
+
 	var currentFlowTr, crossFlowTr domain.FlowStepTransition
 	for _, tr := range identifier.Transitions {
 		if tr.Action == nil {
@@ -245,6 +261,20 @@ func sampleFlowDefinition(projectID, id string) *domain.FlowDefinition {
 			{
 				Name:   "identifier",
 				Fields: []string{"email"},
+				Actions: map[string]domain.FlowStepAction{
+					"submit": {TextKey: "identifier.submit", Primary: true},
+				},
+				Gates: map[string]domain.FlowStepGate{
+					"bot": {
+						Type:     domain.FlowGateTypeCaptcha,
+						Provider: "altcha",
+						Required: true,
+						Config:   map[string]any{"site_key": "abc"},
+					},
+				},
+				SSOProviders: []domain.FlowSSOProvider{
+					{ID: "google-1", Name: "Google", Template: "google"},
+				},
 				Transitions: []domain.FlowStepTransition{
 					{Target: "resolve_user"},
 					{Action: &pivotAction, Target: "register-flow"},
