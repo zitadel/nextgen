@@ -39,6 +39,8 @@
     "x-auth-methods": {
       "type": "object",
       "description": "A list of authentication methods supported by the user definition.",
+      "minProperties": 1,
+      "additionalProperties": false,
       "properties": {
         "password": {
           "$ref": "auth-method.json"

@@ -3,7 +3,6 @@ package domain
 import (
 	"bytes"
 	"context"
-	"embed"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,15 +10,18 @@ import (
 	"io/fs"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
-	"text/template"
 	"time"
 
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/ianlancetaylor/jsonschema"
+	apischemas "github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
 	"github.com/zitadel/nextgen/internal/httputil"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
+
+var absoluteScheme = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9+\-.]*:`)
 
 // JSONSchema represent a JSON schema which can be used to validate JSON data.
 type JSONSchema struct {
@@ -60,10 +62,6 @@ type jsonSchemaConditions interface {
 	URLCondition(url string) database.Condition
 }
 
-type SchemaValidator interface {
-	ValidateAgainstMetaSchema(tenantSchemaBytes []byte) error
-}
-
 const (
 	DefaultMaxJSONSchemaResolveDepth = 10
 	DefaultMaxJSONSchemaSize         = 1 << 20 // 1 MB
@@ -73,53 +71,29 @@ const (
 	jsonSchemaResolverCacheKeySep = "\x00"
 )
 
-const schemaEmbedRoot = "schema"
-
-//go:embed schema
-var schemaFS embed.FS
-
-// builtinTemplates maps URL path after the configured public base to parsed text/template
-// sources (see [JSONSchemaResolver.builtinPublicBase]). Populated in [init]; panics on embed
-// or template errors so broken builtins fail at process start.
-var builtinTemplates map[string]*template.Template
+// builtinSchemas maps relative schema filename (e.g. "user-schema.json") to raw JSON bytes.
+var builtinSchemas map[string][]byte
 
 func init() {
-	m := make(map[string]*template.Template)
-	err := fs.WalkDir(schemaFS, schemaEmbedRoot, func(fsPath string, d fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
-		}
-		if d.IsDir() {
-			return nil
-		}
-		if !strings.HasSuffix(fsPath, ".json") {
-			return nil
-		}
-		raw, err := schemaFS.ReadFile(fsPath)
-		if err != nil {
-			return fmt.Errorf("domain: read builtin schema %q: %w", fsPath, err)
-		}
-		tmpl, err := template.New(fsPath).Parse(string(raw))
-		if err != nil {
-			return fmt.Errorf("domain: parse builtin schema %q: %w", fsPath, err)
-		}
-		rel, ok := strings.CutPrefix(fsPath, schemaEmbedRoot+"/")
-		if !ok {
-			return fmt.Errorf("domain: builtin schema %q not under %s/", fsPath, schemaEmbedRoot)
-		}
-		if _, exists := m[rel]; exists {
-			return fmt.Errorf("domain: duplicate builtin JSON schema path %q", rel)
-		}
-		m[rel] = tmpl
-		return nil
-	})
+	m := make(map[string][]byte)
+	entries, err := fs.ReadDir(apischemas.FS, ".")
 	if err != nil {
-		panic(err)
+		panic(fmt.Sprintf("domain: read builtin schemas: %v", err))
+	}
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".json") {
+			continue
+		}
+		raw, err := apischemas.FS.ReadFile(e.Name())
+		if err != nil {
+			panic(fmt.Sprintf("domain: read builtin schema %q: %v", e.Name(), err))
+		}
+		m[e.Name()] = raw
 	}
 	if len(m) == 0 {
-		panic("domain: no builtin JSON schemas (*.json) under embed path " + schemaEmbedRoot)
+		panic("domain: no builtin JSON schemas found")
 	}
-	builtinTemplates = m
+	builtinSchemas = m
 }
 
 // jsonSchemaResolverCacheKey is the string used as an LRU key for a resolved schema for this project and URL.
@@ -132,7 +106,6 @@ func jsonSchemaResolverCacheKey(projectID, schemaURL string) string {
 // It caches resolved schemas in memory and uses a repository to store them for future use.
 type JSONSchemaResolver struct {
 	repository JSONSchemaRepository
-	validator  SchemaValidator
 	// cache of fully resolved JSON schemas,
 	// keyed by projectID and schemaURL
 	cache           *lru.TwoQueueCache[string, *jsonschema.Schema]
@@ -150,7 +123,6 @@ type JSONSchemaResolver struct {
 // instead of the database; they are not persisted via [JSONSchemaRepository.Create].
 func NewJSONSchemaResolver(
 	repository JSONSchemaRepository,
-	validator SchemaValidator,
 	cache *lru.TwoQueueCache[string, *jsonschema.Schema],
 	maxResolveDepth int,
 	maxSize int,
@@ -172,7 +144,6 @@ func NewJSONSchemaResolver(
 	}
 	return &JSONSchemaResolver{
 		repository:        repository,
-		validator:         validator,
 		cache:             cache,
 		maxResolveDepth:   maxResolveDepth,
 		maxSize:           maxSize,
@@ -197,7 +168,7 @@ func (r *JSONSchemaResolver) Resolve(
 	if schema, ok := r.cache.Get(cacheKey); ok {
 		return schema, nil
 	}
-	schema, err := r.resolveRecursively(ctx, client, projectID, schemaURL, 0, rootSchema)
+	schema, err := r.resolveRecursively(ctx, client, projectID, schemaURL, 0, rootSchema, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -212,9 +183,19 @@ func (r *JSONSchemaResolver) resolveRecursively(
 	schemaURL string,
 	depth int,
 	schemaData []byte,
+	resolverCache map[string]*jsonschema.Schema,
 ) (_ *jsonschema.Schema, err error) {
 	if depth > r.maxResolveDepth {
 		return nil, fmt.Errorf("max resolve depth reached")
+	}
+	// this cache is used for resolved schemas during recursive resolution;
+	// if a schema is referenced again or self-referenced,
+	// the already-resolved schema is returned, preventing infinite recursion.
+	if resolverCache == nil {
+		resolverCache = make(map[string]*jsonschema.Schema)
+	}
+	if s, ok := resolverCache[schemaURL]; ok {
+		return s, nil
 	}
 	if len(schemaData) == 0 {
 		schemaData, err = r.loadSchemaPayload(ctx, client, projectID, schemaURL)
@@ -226,9 +207,10 @@ func (r *JSONSchemaResolver) resolveRecursively(
 	if err != nil {
 		return nil, err
 	}
+	resolverCache[schemaURL] = schema
 	err = schema.Resolve(&jsonschema.ResolveOpts{
 		Loader: func(schemaID string, uri *url.URL) (*jsonschema.Schema, error) {
-			next, err := r.resolveRecursively(ctx, client, projectID, uri.String(), depth+1, nil)
+			next, err := r.resolveRecursively(ctx, client, projectID, uri.String(), depth+1, nil, resolverCache)
 			if err != nil {
 				return nil, err
 			}
@@ -284,7 +266,7 @@ func WriteBuiltinJSONSchema(w io.Writer, schemaPath string, canonicalDocumentURL
 }
 
 func writeBuiltinJSONSchema(w io.Writer, schemaPath string, canonicalDocumentURL string) error {
-	tmpl, ok := builtinTemplates[schemaPath]
+	raw, ok := builtinSchemas[schemaPath]
 	if !ok {
 		return fmt.Errorf("unknown builtin JSON schema path %q", schemaPath)
 	}
@@ -292,14 +274,67 @@ func writeBuiltinJSONSchema(w io.Writer, schemaPath string, canonicalDocumentURL
 	if idx < 0 {
 		return fmt.Errorf("canonicalDocumentURL %q contains no '/' separator", canonicalDocumentURL)
 	}
-	data := struct {
-		SchemaURL string
-		BaseURL   string
-	}{
-		SchemaURL: canonicalDocumentURL,
-		BaseURL:   canonicalDocumentURL[:idx],
+	baseURL := canonicalDocumentURL[:idx]
+	var doc any
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		return fmt.Errorf("parse builtin schema %q: %w", schemaPath, err)
 	}
-	return tmpl.Execute(w, data)
+	resolved, err := resolveRefs(doc, baseURL)
+	if err != nil {
+		return err
+	}
+	return json.NewEncoder(w).Encode(resolved)
+}
+
+func isRelativeRef(ref string) bool {
+	// Leave JSON Pointer anchors (#/...) and absolute URIs alone
+	if len(ref) == 0 || ref[0] == '#' {
+		return false
+	}
+	return !absoluteScheme.MatchString(ref)
+}
+
+// resolveRefs walks a parsed JSON document and rewrites relative $ref values
+// (e.g. "auth-method.json") to absolute URLs using baseURL as the prefix.
+func resolveRefs(node any, baseURL string) (any, error) {
+	if !strings.HasSuffix(baseURL, "/") {
+		baseURL += "/"
+	}
+
+	base, err := url.Parse(baseURL)
+	if err != nil {
+		return nil, fmt.Errorf("invalid baseURL: %w", err)
+	}
+
+	var walk func(any) any
+	walk = func(node any) any {
+		switch v := node.(type) {
+		case map[string]any:
+			out := make(map[string]any, len(v))
+			for key, val := range v {
+				if key == "$ref" {
+					if ref, ok := val.(string); ok && isRelativeRef(ref) {
+						if resolved, err := base.Parse(ref); err == nil {
+							out[key] = resolved.String()
+							continue
+						}
+					}
+				}
+				out[key] = walk(val)
+			}
+			return out
+		case []any:
+			out := make([]any, len(v))
+			for i, item := range v {
+				out[i] = walk(item)
+			}
+			return out
+		default:
+			return v
+		}
+	}
+
+	return walk(node), nil
 }
 
 func (r *JSONSchemaResolver) getFromDatabase(ctx context.Context, client database.QueryExecutor, projectID, schemaURL string) ([]byte, error) {
@@ -320,12 +355,6 @@ func (r *JSONSchemaResolver) getFromDatabase(ctx context.Context, client databas
 	data, err := r.resolveFromURL(ctx, schemaURL)
 	if err != nil {
 		return nil, err
-	}
-	if r.validator != nil {
-		err = r.validator.ValidateAgainstMetaSchema(data)
-		if err != nil {
-			return nil, err
-		}
 	}
 	dbSchema = &JSONSchema{
 		ProjectID: projectID,

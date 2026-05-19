@@ -57,36 +57,36 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 		{
 			name: "valid user schema",
 			input: []byte(`{
-				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"$schema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
 				"$id": "https://example.test/schemas/my-user.json",
 				"kind": "user-schema",
 				"title": "My User",
 				"x-auth-methods": {
-					"password": { "enabled": true, "position": 0 }
+					"password": { "kind": "auth-method", "enabled": true, "position": 0 }
 				}
 			}`),
 		},
 		{
 			name: "valid user schema with optional properties",
 			input: []byte(`{
-				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"$schema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
 				"$id": "https://example.test/schemas/my-user.json",
 				"kind": "user-schema",
 				"title": "My User",
 				"description": "A user schema",
 				"x-auth-methods": {
-					"passkey": { "enabled": true, "position": 1 }
+					"passkey": { "kind": "auth-method", "enabled": true, "position": 1 }
 				},
 				"required": ["email"],
 				"properties": {
-					"email": { "type": "string", "title": "Email" }
+					"email": { "kind": "user-property", "type": "string", "title": "Email" }
 				}
 			}`),
 		},
 		{
 			name: "valid with nested property",
 			input: []byte(`{
-				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"$schema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
 				"$id": "https://example.test/schemas/my-user.json",
 				"kind":    "user-schema",
 				"title":   "My User",
@@ -255,7 +255,7 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				"kind": "user-schema",
 				"title": "My User",
 				"x-auth-methods": {
-					"totp": { "enabled": true, "position": 0 }
+					"totp": { "kind": "auth-method", "enabled": true, "position": 0 }
 				}
 			}`),
 			wantErr: domain.ErrSchemaValidationFailed,
