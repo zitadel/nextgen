@@ -43,7 +43,7 @@ type flowDefinitionPurposeJSON struct {
 type flowDefinitionAudienceJSON struct {
 	AppID            *string `json:"app_id,omitempty"`
 	TeamID           *string `json:"team_id,omitempty"`
-	SchemaID         *string `json:"schema_id,omitempty"`
+	UserSchemaID     *string `json:"user_schema_id,omitempty"`
 	IsProjectDefault bool    `json:"is_project_default"`
 }
 
@@ -170,6 +170,11 @@ func (r *FlowDefinitionRepository) ListFlowDefinitions(ctx context.Context, clie
 	b.WriteString(" WHERE project_id = ")
 	b.WriteArg(projectID)
 
+	if o.Name != nil {
+		b.WriteString(" AND name = ")
+		b.WriteArg(*o.Name)
+	}
+
 	if o.Status != nil {
 		b.WriteString(" AND status = ")
 		b.WriteString(b.AppendArg(o.Status.String()) + r.statusCast)
@@ -239,7 +244,7 @@ func marshalFlowDefinitionContent(def *domain.FlowDefinition) ([]byte, error) {
 	audience := flowDefinitionAudienceJSON{
 		AppID:            def.Audience.AppID,
 		TeamID:           def.Audience.TeamID,
-		SchemaID:         def.Audience.SchemaID,
+		UserSchemaID:     def.Audience.UserSchemaID,
 		IsProjectDefault: def.Audience.IsProjectDefault,
 	}
 
@@ -323,7 +328,7 @@ func rowToFlowDefinition(row flowDefinitionRow) (*domain.FlowDefinition, error) 
 		Audience: domain.FlowDefinitionAudience{
 			AppID:            content.Audience.AppID,
 			TeamID:           content.Audience.TeamID,
-			SchemaID:         content.Audience.SchemaID,
+			UserSchemaID:     content.Audience.UserSchemaID,
 			IsProjectDefault: content.Audience.IsProjectDefault,
 		},
 		Steps: steps,

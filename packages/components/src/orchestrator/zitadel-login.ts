@@ -1,10 +1,18 @@
-import { LitElement, html } from "lit";
+import { setApiBaseUrl } from "@zitadel-nextgen/api/runtime/base-url";
+import type {
+  CreateFlow201,
+  CreateFlow201Step,
+  CreateFlowBodyPurpose,
+  SubmitFlowStepBody,
+} from "@zitadel-nextgen/api/generated/model";
+import { html, LitElement } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import type { Liquid, Template } from "liquidjs";
 
 import "../atoms/index.js";
-
+import { getCurrentStep, startFlow as apiStartFlow, submitStep as apiSubmitStep } from "./api-client.js";
+import type { Branding } from "./branding.js";
 import { applyBrandingTokens } from "./branding-to-tokens.js";
 import { validateBranding } from "./branding-validator.js";
 import { applyFontUrl } from "./font-loader.js";
@@ -12,24 +20,19 @@ import { createLiquidEngine, TEMPLATE_NAMES } from "./liquid.js";
 import { en, type Locale } from "./locales/en.js";
 import { patchMandatoryGates } from "./mandatory-gates.js";
 import { createSanitiser } from "./sanitiser.js";
+import type { FlowError, LiquidContext } from "./template-context.js";
 import { layoutChromeCss } from "./templates/default.liquid.js";
 import { ThemeController } from "./theme-controller.js";
-import {
-  FetchTransport,
-  type FlowTransport,
-  FlowTransportError,
-  type StartInput,
-} from "./transport.js";
-import type { Branding, FlowResponse, FlowStep } from "./types.js";
 
 /**
  * `<zitadel-login>` — the auth-UI orchestrator.
  *
- * Reads step + branding payloads from a {@link FlowTransport}, renders them
- * through LiquidJS, sanitises the output via DOMPurify, mounts the result
- * inside a real `<form>` element in its Shadow DOM via Lit's `unsafeHTML`
- * directive, and wires atom CustomEvents (`zl-input` / `zl-submit` /
- * `zl-action`) and the form's native `submit` event back into the Flow API
+ * Drives the typed `@zitadel-nextgen/api` Flow API directly: `POST /flow`
+ * starts a flow, `POST /flow/{id}/submit` advances it. Renders each step
+ * through LiquidJS, sanitises the output via DOMPurify, and mounts the
+ * result inside a real `<form>` element in its Shadow DOM via Lit's
+ * `unsafeHTML` directive. Atom CustomEvents (`zl-input` / `zl-submit` /
+ * `zl-action`) and the form's native `submit` event feed back into the
  * submit cycle.
  *
  * Form participation: the orchestrator owns the `<form>` so Enter submits,
@@ -39,6 +42,11 @@ import type { Branding, FlowResponse, FlowStep } from "./types.js";
  * the form even though it lives inside its own shadow root. The shadow root
  * also delegates focus, and after each step swap focus moves to the first
  * field so screen-reader and keyboard users land in a sensible spot.
+ *
+ * Session/state: the server is stateless between requests — a `_zflow`
+ * HttpOnly cookie carries orchestration state. We always run with
+ * `credentials: "include"` (set in `api-client.ts`). The flow handle (`id`)
+ * may rotate on pivots/pops; we re-read it from every response.
  *
  * Spec sources:
  * - `docs/design/flowengine/flow-engine-guide.md`
@@ -55,24 +63,40 @@ export class ZitadelLogin extends LitElement {
     delegatesFocus: true,
   };
 
-  @property({ type: String }) accessor purpose = "login";
+  @property({ type: String }) accessor purpose: CreateFlowBodyPurpose = "login";
 
   @property({ type: String, attribute: "project-id" }) accessor projectId = "";
 
   @property({ type: String }) accessor issuer = "";
 
-  /** Override transport for tests / dev playground. */
-  @property({ attribute: false }) accessor transport: FlowTransport | null = null;
+  /**
+   * Override the API base URL for tests / dev playgrounds. Setting this is
+   * equivalent to calling `setApiBaseUrl()` from `@zitadel-nextgen/api`
+   * before the orchestrator runs; we apply it on first use so consumers can
+   * configure it declaratively.
+   */
+  @property({ type: String, attribute: "api-base" }) accessor apiBase = "";
 
-  /** Base URL when the orchestrator falls back to {@link FetchTransport}. */
-  @property({ type: String, attribute: "base-url" }) accessor baseUrl = "";
+  /**
+   * Optional URL to navigate to after a successful sign-in. Used when the
+   * terminal step's `complete` is `"show"` (where there is no canonical
+   * `redirect_uri`). For `complete: "redirect"` the orchestrator follows
+   * `response.redirect_uri` directly.
+   */
+  @property({ type: String, attribute: "post-sign-in-url" }) accessor postSignInUrl = "";
+
+  /**
+   * Existing flow handle to resume rather than start a new flow. When set,
+   * the orchestrator hits `GET /flow/{id}` instead of `POST /flow` on
+   * mount, so a page reload after a network blip can re-render the same
+   * step without losing collected state.
+   */
+  @property({ type: String, attribute: "resume-flow-id" }) accessor resumeFlowId = "";
 
   /** Override locale dict. Defaults to bundled `en`. */
   @property({ attribute: false }) accessor locale: Locale = en;
 
-  @state() private accessor session: { id: string; token: string } | null = null;
-
-  @state() private accessor step: FlowStep | null = null;
+  @state() private accessor response: CreateFlow201 | null = null;
 
   @state() private accessor branding: Branding | undefined = undefined;
 
@@ -88,16 +112,24 @@ export class ZitadelLogin extends LitElement {
 
   private readonly sanitise = createSanitiser();
 
-  // Cached compiled tenant template, keyed by source string. Re-rendering on
-  // every `formValues` change otherwise re-parses the same template.
+  /**
+   * Cached compiled tenant template, keyed by source string. Re-rendering on
+   * every `formValues` change otherwise re-parses the same template.
+   */
   private tenantTemplateCache: { source: string; template: Template[] } | null = null;
 
   override createRenderRoot(): HTMLElement | DocumentFragment {
     const root = super.createRenderRoot();
     if (root instanceof ShadowRoot) {
+      // jsdom 29 partially implements `adoptedStyleSheets` — the property
+      // exists but isn't iterable. Treat a missing iterable as the empty
+      // list so the orchestrator boots in unit tests without crashing.
+      const existing: readonly CSSStyleSheet[] = Array.isArray(root.adoptedStyleSheets)
+        ? root.adoptedStyleSheets
+        : [];
       const sheet = new CSSStyleSheet();
       sheet.replaceSync(layoutChromeCss);
-      root.adoptedStyleSheets = [...root.adoptedStyleSheets, sheet];
+      root.adoptedStyleSheets = [...existing, sheet];
       root.addEventListener("zl-input", this.handleAtomInput as EventListener);
       root.addEventListener("zl-submit", this.handleAtomSubmit as EventListener);
       root.addEventListener("zl-action", this.handleAtomAction as EventListener);
@@ -112,14 +144,12 @@ export class ZitadelLogin extends LitElement {
   /**
    * Start the flow after the first render rather than in `connectedCallback`.
    * Frameworks that wrap web components (e.g. `@lit/react` in the console)
-   * attach the element first and then assign object properties (`transport`,
-   * `branding`, `locale`) via setters. `connectedCallback` runs synchronously
-   * on attach — before any setters from a wrapper's effects/refs — so a flow
-   * kicked off there would always see `transport === null` and throw
-   * "requires either a `transport` property or a `base-url` attribute".
-   * `firstUpdated` runs after Lit's first render, by which time setters from
-   * the wrapping framework have fired, so `resolveTransport()` finds the
-   * value the consumer assigned.
+   * attach the element first and then assign object properties (`branding`,
+   * `locale`) via setters. `connectedCallback` runs synchronously on attach
+   * — before any setters from a wrapper's effects/refs — so reading those
+   * properties there sees stale defaults. `firstUpdated` runs after Lit's
+   * first render, by which time setters from the wrapping framework have
+   * fired.
    */
   protected override firstUpdated(): void {
     void this.startFlow();
@@ -140,7 +170,7 @@ export class ZitadelLogin extends LitElement {
     this.toggleAttribute("data-theme-dark", this.themeController.theme === "dark");
     this.setAttribute("aria-busy", this.loading ? "true" : "false");
     this.applyValuesToFields();
-    if (changed.has("step")) {
+    if (changed.has("response")) {
       this.moveFocusToFirstField();
     }
   }
@@ -151,10 +181,10 @@ export class ZitadelLogin extends LitElement {
         <zl-error message="${this.startupError}"></zl-error>
       </form>`;
     }
-    if (!this.step || !this.engine) {
+    if (!this.response || !this.engine) {
       return html`<slot name="loader"></slot>`;
     }
-    const rendered = this.renderStep(this.step, this.engine);
+    const rendered = this.renderStep(this.response.step, this.engine);
     return html`<form
       class="zl-mount"
       part="form"
@@ -165,34 +195,23 @@ export class ZitadelLogin extends LitElement {
     </form>`;
   }
 
-  private resolveTransport(): FlowTransport {
-    if (this.transport) {
-      return this.transport;
-    }
-    if (!this.baseUrl) {
-      throw new Error(
-        "<zitadel-login> requires either a `transport` property or a `base-url` attribute.",
-      );
-    }
-    this.transport = new FetchTransport({ baseUrl: this.baseUrl });
-    return this.transport;
-  }
-
-  private buildStartInput(): StartInput {
-    return {
-      purpose: this.purpose,
-      project_id: this.projectId || undefined,
-      issuer: this.issuer || undefined,
-    };
-  }
-
   private async startFlow(): Promise<void> {
+    if (this.apiBase) {
+      setApiBaseUrl(this.apiBase);
+    }
     this.loading = true;
     this.startupError = null;
     try {
-      const transport = this.resolveTransport();
-      const response = await transport.start(this.buildStartInput());
-      this.applyResponse(response);
+      let wire: CreateFlow201;
+      if (this.resumeFlowId) {
+        wire = await getCurrentStep(this.resumeFlowId);
+      } else {
+        if (!this.projectId) {
+          throw new Error("<zitadel-login> requires a `project-id` attribute to start a flow.");
+        }
+        wire = await apiStartFlow({ project_id: this.projectId, purpose: this.purpose });
+      }
+      this.applyResponse(wire);
     } catch (error) {
       this.handleTransportError(error);
     } finally {
@@ -200,38 +219,79 @@ export class ZitadelLogin extends LitElement {
     }
   }
 
-  private applyResponse(response: FlowResponse): void {
-    this.session = { id: response.session_id, token: response.session_token };
-    this.step = response.step;
-    const { branding, issues } = validateBranding(response.branding);
+  private applyResponse(wire: CreateFlow201): void {
+    this.response = wire;
+    const { branding, issues } = validateBranding(wire.branding);
     this.branding = branding;
     this.themeController.setBranding(branding);
     if (issues.length > 0) {
       console.warn("[zitadel-login] branding payload has issues:", issues);
     }
-    this.formValues = collectInitialValues(response.step);
+    this.formValues = collectInitialValues(wire.step);
+    this.maybeCompleteFlow(wire);
   }
 
-  private renderStep(step: FlowStep, engine: Liquid): string {
+  /**
+   * Acts on terminal flow steps. The wire surfaces two kinds of completion:
+   *
+   * - `step.complete === "redirect"` — navigate the browser to
+   *   `response.redirect_uri` (OIDC/SAML `auth_request_id` resolved). This
+   *   takes precedence over `post-sign-in-url`.
+   * - `step.complete === "show"` — render the step as a success screen.
+   *   Optionally navigate to `post-sign-in-url` if the consumer set it.
+   *
+   * In both cases we also fire `zitadel-flow-complete` so SDK consumers can
+   * handle the post-sign-in handoff (`handoff_token`) themselves.
+   */
+  private maybeCompleteFlow(response: CreateFlow201): void {
+    const behavior = response.step.complete;
+    if (!behavior) return;
+
+    this.dispatchEvent(
+      new CustomEvent("zitadel-flow-complete", {
+        bubbles: true,
+        composed: true,
+        detail: {
+          behavior,
+          redirect_uri: response.redirect_uri,
+          handoff_token: response.handoff_token,
+          handoff_token_expires_at: response.handoff_token_expires_at,
+        },
+      }),
+    );
+
+    if (typeof window === "undefined") return;
+    if (behavior === "redirect" && response.redirect_uri) {
+      window.location.href = response.redirect_uri;
+      return;
+    }
+    if (behavior === "show" && this.postSignInUrl) {
+      window.location.href = this.postSignInUrl;
+    }
+  }
+
+  private renderStep(step: CreateFlow201Step, engine: Liquid): string {
     const tenantSource =
       typeof this.branding?.liquid_template === "string" &&
       this.branding.liquid_template.length > 0
         ? this.branding.liquid_template
         : null;
 
-    const context = {
+    const errors: FlowError[] = step.error ? [{ message: step.error }] : [];
+
+    const context: LiquidContext = {
       step: {
         name: step.name,
-        type: step.type,
+        complete: step.complete,
         texts: step.texts ?? {},
       },
       fields: step.fields ?? {},
       actions: step.actions ?? {},
       gates: step.gates ?? {},
       sso_providers: step.sso_providers ?? [],
-      messages: step.messages ?? [],
-      identity: step.identity ?? null,
-      errors: step.errors ?? [],
+      messages: [],
+      identity: null,
+      errors,
       branding: this.branding ?? {},
       loading: this.loading,
     };
@@ -341,25 +401,22 @@ export class ZitadelLogin extends LitElement {
   };
 
   private async submit(action: string | null): Promise<void> {
-    if (!this.session || !this.step) return;
+    if (!this.response) return;
+    const { id, session_token } = this.response;
     this.loading = true;
     try {
-      const transport = this.resolveTransport();
-      const response = await transport.submit({
-        session_id: this.session.id,
-        session_token: this.session.token,
-        payload: {
-          action,
-          step: this.step.name,
-          values: { ...this.formValues },
-        },
-      });
-      this.applyResponse(response);
+      const body: SubmitFlowStepBody = {
+        session_token,
+        action: action ?? "submit",
+        fields: { ...this.formValues },
+      };
+      const wire = await apiSubmitStep(id, body);
+      this.applyResponse(wire);
       this.dispatchEvent(
         new CustomEvent("zitadel-flow-step", {
           bubbles: true,
           composed: true,
-          detail: { step: response.step },
+          detail: { step: wire.step },
         }),
       );
     } catch (error) {
@@ -371,11 +428,7 @@ export class ZitadelLogin extends LitElement {
 
   private handleTransportError(error: unknown): void {
     const message =
-      error instanceof FlowTransportError
-        ? `Flow API error (${error.status})`
-        : error instanceof Error
-          ? error.message
-          : "Unexpected error contacting the Flow API.";
+      error instanceof Error ? error.message : "Unexpected error contacting the Flow API.";
     this.startupError = message;
     console.error("[zitadel-login]", error);
     this.dispatchEvent(
@@ -388,11 +441,11 @@ export class ZitadelLogin extends LitElement {
   }
 }
 
-function collectInitialValues(step: FlowStep): Record<string, string> {
+function collectInitialValues(step: CreateFlow201Step): Record<string, string> {
   const values: Record<string, string> = {};
   if (!step.fields) return values;
   for (const [name, field] of Object.entries(step.fields)) {
-    values[name] = field.value ?? "";
+    values[name] = typeof field.value === "string" ? field.value : "";
   }
   return values;
 }

@@ -33,8 +33,13 @@ go.work.sum
 
 __debug_bin*
 
-# Local Codex/Claude workspace metadata
+# Local agent workspace metadata (Nx writes these on update; not project-owned)
 .claude/
+.codex/
+.opencode/
+opencode.json
+.agents/
+.cursor/agents/
 
 # OSX
 .DS_Store
@@ -89,3 +94,7 @@ nextgen.yaml
 !/apps/console/dist/
 /apps/console/dist/*
 !/apps/console/dist/.gitkeep
+apps/demo-next/tsconfig.tsbuildinfo
+packages/api-mock/tsconfig.tsbuildinfo
+
+.nx/polygraph

@@ -3,12 +3,15 @@ import type React from "react";
 declare module "react" {
   namespace JSX {
     interface IntrinsicElements {
-      "nextgen-login": React.HTMLAttributes<HTMLElement> & {
-        "proxy-base"?: string;
+      "zitadel-login": React.HTMLAttributes<HTMLElement> & {
+        "api-base"?: string;
         "post-sign-in-url"?: string;
+        purpose?: string;
+        "project-id"?: string;
+        issuer?: string;
       };
-      "nextgen-logout": React.HTMLAttributes<HTMLElement> & {
-        "proxy-base"?: string;
+      "zitadel-logout": React.HTMLAttributes<HTMLElement> & {
+        "api-base"?: string;
         "post-sign-out-url"?: string;
       };
     }

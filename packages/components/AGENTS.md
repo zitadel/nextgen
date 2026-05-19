@@ -5,10 +5,43 @@ Scoped instructions for `packages/components/`. Read together with the
 
 ## What's in here
 
-Lit-based atoms (`<zl-*>`) and the `<zitadel-login>` orchestrator that drives
-the auth flow API. The package is consumed by tenant pages directly and by the
-`apps/console` shell. See [`README.md`](README.md) for the consumer-facing
+Lit-based atoms (`<zl-*>`) and the `<zitadel-login>` orchestrator for the
+auth flow API. Consumed directly by tenant pages and indirectly by the
+`apps/console` shell. See [`README.md`](README.md) for consumer-facing
 docs.
+
+The orchestrator calls `@zitadel-nextgen/api` (orval-generated typed fetch
+client) through the wrappers in `src/orchestrator/api-client.ts`. There is
+no transport abstraction, no wire-vs-internal type split, and no shadow
+types — the orchestrator stores the orval `CreateFlow201` shape directly
+and the Liquid renderer reads it through the `LiquidContext` projection.
+
+Tests intercept at the network layer with MSW. The dev playground and the
+unit tests both source their handlers from `@zitadel-nextgen/api-mock`
+(`setupMock(worker)` for the browser, `setupMockHandlers()` for
+`msw/node`). Configure the API base URL with `setApiBaseUrl()` from
+`@zitadel-nextgen/api/runtime/base-url`, or via the `api-base` attribute
+on `<zitadel-login>` for declarative setups.
+
+## Type boundaries
+
+There are exactly three places types live in this package:
+
+- **Wire shapes** — never declared here; imported from
+  `@zitadel-nextgen/api/generated/model` (`CreateFlow201`,
+  `CreateFlow201Step`, `CreateFlowBody`, `SubmitFlowStepBody`, …).
+- **Branding** — `src/orchestrator/branding.ts` carries the client-side
+  branding extensions (`Branding`, `BrandingPalette`, `BrandingShape`,
+  `BrandingTheme`, `BrandingTypography`, `BrandingAssets`, `FlowLayout`).
+  These are real client extensions of the OpenAPI Branding component
+  (palette / typography / shape / theme tokenisation aren't on the wire).
+- **Template context** — `src/orchestrator/template-context.ts` carries
+  the projection tenant Liquid templates can reference (`FlowMessage`,
+  `FlowIdentity`, `FlowError[]`, `LiquidContext`). Lifted from the wire
+  by the orchestrator at render time.
+
+Do not introduce new shadow types that mirror orval. If the wire shape is
+fine, use it directly.
 
 ## Source-level conventions
 
@@ -85,25 +118,17 @@ Always cover form-associated behaviour, focus delegation, and Enter-to-submit
 in the browser project. Anything markup-only (aria attributes, classes, slot
 projection) belongs in the unit project for speed.
 
-## Visualizer
-
-`docs/design/flowengine/visualizer.html` is served by the dev server via the
-`zitadel:serve-visualizer` plugin in `vite.config.mts`. The plugin substitutes
-`__COMPONENTS_BUNDLE__` in the HTML with a `/@fs/<absolute>/src/index.ts` URL
-so the "Real components" tab imports source TS through Vite's pipeline (no
-build step). When changing the visualizer:
-
-- keep the placeholder `__COMPONENTS_BUNDLE__` literal in place,
-- do not re-introduce the dist/ bundle path,
-- if you need a new dependency at runtime, add it to the import map in the
-  HTML head and pin the version to the workspace catalog
-  (`pnpm-workspace.yaml`).
+When a test needs the Flow API, prefer `setupMockHandlers()` from
+`@zitadel-nextgen/api-mock` over hand-rolled handlers — it walks the same
+xstate machine the dev playground uses, so step fixtures and step routing
+stay consistent.
 
 ## Build
 
 `tsdown.config.ts` produces ESM + `.d.mts` and externalises `lit`, `liquidjs`,
-and `dompurify` so npm consumers dedupe with their own copies. Do not bundle
-those in by default — that breaks shared instances and bloats the package.
+`dompurify`, and the `@zitadel-nextgen/api*` packages so npm consumers dedupe
+with their own copies. Do not bundle those in by default — that breaks shared
+instances and bloats the package.
 
 ## Don't
 
@@ -117,3 +142,6 @@ those in by default — that breaks shared instances and bloats the package.
   if it owns user input, and an entry in the orchestrator's sanitiser
   allowlist (which reads from `manifestRegistry` automatically — but verify
   with a spec).
+- Don't re-introduce a `FlowResponse` / `FlowStep` / `FlowField` alias that
+  duplicates orval. If the wire isn't usable directly, fix that in
+  `packages/api/orval.config.ts` so the typed client improves for everyone.

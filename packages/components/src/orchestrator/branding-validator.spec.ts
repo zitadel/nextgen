@@ -22,13 +22,13 @@ describe("validateBranding", () => {
 
   it("rejects http URLs", () => {
     const result = validateBranding({ logo_url: "http://insecure.example.com/logo.svg" });
-    expect(result.branding?.logo_url).toBeNull();
+    expect(result.branding?.logo_url).toBeUndefined();
     expect(result.issues[0]).toMatch(/logo_url/);
   });
 
   it("rejects malformed URLs", () => {
     const result = validateBranding({ font_url: "not-a-url" });
-    expect(result.branding?.font_url).toBeNull();
+    expect(result.branding?.font_url).toBeUndefined();
     expect(result.issues[0]).toMatch(/font_url/);
   });
 
@@ -39,7 +39,7 @@ describe("validateBranding", () => {
         favicon: "https://cdn.example.com/favicon.ico",
       },
     });
-    expect(result.branding?.assets?.logo_dark).toBeNull();
+    expect(result.branding?.assets?.logo_dark).toBeUndefined();
     expect(result.branding?.assets?.favicon).toBe("https://cdn.example.com/favicon.ico");
   });
 

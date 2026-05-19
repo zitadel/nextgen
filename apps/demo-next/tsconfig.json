@@ -3,6 +3,7 @@
   "compilerOptions": {
     "baseUrl": ".",
     "jsx": "preserve",
+    "lib": ["ES2022", "DOM"],
     "plugins": [{ "name": "next" }],
     "experimentalDecorators": true,
     "useDefineForClassFields": false,
@@ -11,5 +12,13 @@
     }
   },
   "include": ["next-env.d.ts", "src/**/*.ts", "src/**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules"],
+  "references": [
+    {
+      "path": "../../packages/sdk-next"
+    },
+    {
+      "path": "../../packages/components"
+    }
+  ]
 }

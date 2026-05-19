@@ -18,14 +18,19 @@
  * delegates HTML attribute escaping to the browser's serialiser — no manual
  * string-escaping in this module.
  */
+import type { CreateFlow201Step } from "@zitadel-nextgen/api/generated/model";
+
 import type { Locale } from "./locales/en.js";
-import type { FlowStep } from "./types.js";
 
 export const MANDATORY_GATES_MARKER = "ZL_MANDATORY_GATES";
 
 export const mandatoryGatesMarkerComment = `<!--${MANDATORY_GATES_MARKER}-->`;
 
-export function patchMandatoryGates(html: string, step: FlowStep, locale: Locale): string {
+export function patchMandatoryGates(
+  html: string,
+  step: CreateFlow201Step,
+  locale: Locale,
+): string {
   const template = document.createElement("template");
   template.innerHTML = html;
   const fragment = template.content;
@@ -49,7 +54,7 @@ export function patchMandatoryGates(html: string, step: FlowStep, locale: Locale
 
 function collectMissingAtoms(
   fragment: DocumentFragment,
-  step: FlowStep,
+  step: CreateFlow201Step,
   locale: Locale,
 ): Element[] {
   const additions: Element[] = [];

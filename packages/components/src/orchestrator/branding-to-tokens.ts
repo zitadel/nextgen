@@ -11,7 +11,7 @@
  * `light | dark | auto` happens in `<zitadel-login>`.
  */
 import type { ResolvedTheme } from "./theme-controller.js";
-import type { Branding, BrandingPalette, BrandingShape, BrandingTypography } from "./types.js";
+import type { Branding, BrandingPalette, BrandingShape, BrandingTypography } from "./branding.js";
 
 const RADIUS_MAP: Record<NonNullable<BrandingShape["radius"]>, string> = {
   none: "0",

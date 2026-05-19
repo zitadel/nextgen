@@ -76,23 +76,19 @@ if (auth.value?.isAuthenticated) {
 
 ### 4. Login page
 
-The `<nextgen-login>` web component must be rendered client-side only. Use `<ClientOnly>`:
+The `<zitadel-login>` web component (from `@zitadel-nextgen/components`) must be rendered client-side only. Use `<ClientOnly>`:
 
 ```vue
 <template>
   <main>
     <ClientOnly>
-      <nextgen-login proxy-base="/__nextgen" @nextgen-signin="onSignIn" />
+      <zitadel-login proxy-base="/__nextgen" post-sign-in-url="/admin" />
     </ClientOnly>
   </main>
 </template>
 
 <script setup lang="ts">
-import '@nextgen/ui-lit';
-
-function onSignIn() {
-  navigateTo('/admin');
-}
+import '@zitadel-nextgen/components';
 </script>
 ```
 

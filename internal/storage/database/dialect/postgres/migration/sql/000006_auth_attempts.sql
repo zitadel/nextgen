@@ -1,10 +1,10 @@
 -- +goose Up
 CREATE TABLE zitadel_nextgen.auth_attempts (
     project_id      TEXT        NOT NULL
-    , id            TEXT        NOT NULL CHECK (id <> '')
+    , id            BIGINT      GENERATED ALWAYS AS IDENTITY
     , handoff_token TEXT
     , handed_off_at TIMESTAMPTZ
-    , session_id    TEXT
+    , session_id    BIGINT
     , required_checks SMALLINT[]
     , created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
     , completed_at  TIMESTAMPTZ
@@ -17,7 +17,7 @@ CREATE TABLE zitadel_nextgen.auth_attempts (
 
 CREATE TABLE zitadel_nextgen.auth_attempt_checks (
     project_id          TEXT        NOT NULL
-    , auth_attempt_id   TEXT        NOT NULL
+    , auth_attempt_id   BIGINT      NOT NULL
     , type              SMALLINT    NOT NULL CHECK(type > 0)
 
     , last_challenged_at    TIMESTAMPTZ

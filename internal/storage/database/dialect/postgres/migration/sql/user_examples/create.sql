@@ -1,44 +1,43 @@
 /*
 DEALLOCATE ALL;
 PREPARE insert_user (
-    TEXT, -- $1 instance_id
+    TEXT, -- $1 project_id
     TEXT, -- $2 schema_url
     TEXT, -- $3 id
-    TEXT, -- $4 organization_id
+    TEXT, -- $4 team_id (nullable)
     zitadel_nextgen.incoming_user_attribute[] -- $5 Typed Array
 ) AS
 */
 
 WITH _user_header AS (
     INSERT INTO zitadel_nextgen.users (
-        instance_id, schema_url, id, organization_id
+        project_id, schema_url, id, team_id
     )
     VALUES ($1, $2, $3, $4)
-    RETURNING instance_id, id, organization_id, schema_url, created_at, updated_at
+    RETURNING project_id, id, team_id, schema_url, created_at, updated_at
 ),
 _input_data AS (
-    -- Now includes value_hash directly
     SELECT key, value, value_hash, unique_scope
     FROM unnest($5::zitadel_nextgen.incoming_user_attribute[])
 ),
 _registry AS (
     INSERT INTO zitadel_nextgen.user_unique_attributes (
-        instance_id, user_id, organization_id, key, value_hash
+        project_id, user_id, team_id, key, value_hash
     )
-    SELECT 
-        $1, $3, 
-        CASE WHEN unique_scope = 'global' THEN '' ELSE $4 END, 
+    SELECT
+        $1, $3,
+        CASE WHEN unique_scope = 'global' THEN ''::text ELSE $4 END,
         key, value_hash
     FROM _input_data
     WHERE unique_scope <> 'unspecified'
 ),
 _attributes AS (
-    INSERT INTO zitadel_nextgen.user_attributes (instance_id, organization_id, user_id, key, value)
+    INSERT INTO zitadel_nextgen.user_attributes (project_id, team_id, user_id, key, value)
     SELECT $1, $4, $3, key, value
     FROM _input_data
 )
-SELECT 
-    u.schema_url, u.id, u.organization_id, u.created_at, u.updated_at,
+SELECT
+    u.schema_url, u.id, u.team_id, u.created_at, u.updated_at,
     (
         SELECT array_agg(ROW(i.key, i.value))
         FROM _input_data i
@@ -47,11 +46,11 @@ FROM _user_header u;
 
 /*
 EXECUTE insert_user(
-    'inst_1'                               -- $1 instance_id
-    , './user.schema.json'                 -- $2 schema_url
-    , 'usr_99999999'                       -- $3 id
-    , 'org_0001'                           -- $4 organization_id
-    , ARRAY[                               -- $5 Attributes array
+    'proj_1'
+    , './user.schema.json'
+    , 'usr_99999999'
+    , 'team_0001'
+, ARRAY[
         ROW('username'::TEXT,           '"tester_alpha"'::JSONB,        digest('"tester_alpha"'::text, 'md5'),          'global'::TEXT)::zitadel_nextgen.incoming_user_attribute
         , ROW('email'::TEXT,            '"tester@zitadel.com"'::JSONB,  digest('"tester@zitadel.com"'::text, 'md5'),    'global'::TEXT)::zitadel_nextgen.incoming_user_attribute
         , ROW('email_verified'::TEXT,   'true'::JSONB,                  null,                                              'unspecified'::TEXT)::zitadel_nextgen.incoming_user_attribute
