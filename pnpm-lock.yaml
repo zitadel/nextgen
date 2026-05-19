@@ -377,6 +377,12 @@ importers:
       '@playwright/test':
         specifier: 'catalog:'
         version: 1.59.1
+      '@zitadel-nextgen/api-mock':
+        specifier: workspace:*
+        version: link:../../packages/api-mock
+      '@zitadel-nextgen/sdk-next':
+        specifier: workspace:*
+        version: link:../../packages/sdk-next
       eslint-plugin-playwright:
         specifier: 'catalog:'
         version: 2.10.2(eslint@10.2.1(jiti@2.7.0))
@@ -402,9 +408,15 @@ importers:
 
   apps/demo-nuxt-e2e:
     devDependencies:
+      '@nextgen/sdk-nuxt':
+        specifier: workspace:*
+        version: link:../../packages/sdk-nuxt
       '@playwright/test':
         specifier: 'catalog:'
         version: 1.59.1
+      '@zitadel-nextgen/api-mock':
+        specifier: workspace:*
+        version: link:../../packages/api-mock
       eslint-plugin-playwright:
         specifier: 'catalog:'
         version: 2.10.2(eslint@10.2.1(jiti@2.7.0))
