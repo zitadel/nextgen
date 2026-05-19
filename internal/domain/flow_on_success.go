@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/zitadel/nextgen/internal/domain/idgen"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -111,8 +112,8 @@ func (r *FlowOnSuccessRegistry) Lookup(name string) (FlowOnSuccessHandler, error
 // Names registered with the on_success registry. Stable handler ids
 // the state machine and definition validators reference.
 const (
-	FlowOnSuccessCreateUser         = "create_user"
-	FlowOnSuccessVerifyCredentials  = "verify_credentials"
+	FlowOnSuccessCreateUser        = "create_user"
+	FlowOnSuccessVerifyCredentials = "verify_credentials"
 )
 
 // FlowImplicitOutcomeInvalidCredentials is the outcome surfaced by
@@ -128,3 +129,277 @@ const FlowImplicitOutcomeInvalidCredentials = "invalid_credentials"
 // to an unknown handler means the definition was activated against a
 // registry it isn't compatible with.
 var ErrUnknownOnSuccessHandler = errors.New("flow on_success registry: handler not registered")
+
+// FlowPasswordHasher is the seam the flow engine's on_success handlers
+// use to produce and verify password hashes. The encoded form is the
+// PHC string (`$argon2id$...`) stored on [UserPassword.EncodedHash];
+// callers never see plaintext after Hash returns.
+//
+// A production implementation backed by argon2id lands with the
+// credentials work; the flow engine accepts an interface so PR 6 can
+// ship `create_user` and `verify_credentials` with a stub
+// implementation in tests.
+type FlowPasswordHasher interface {
+	// Hash derives an encoded PHC string from the plaintext password.
+	Hash(plain string) (encoded string, err error)
+
+	// Verify reports whether the plaintext matches the encoded hash.
+	// A non-nil error signals a hasher-level failure (malformed
+	// encoding, unsupported algorithm); a mismatch is reported as
+	// (false, nil), not as an error.
+	Verify(plain, encoded string) (ok bool, err error)
+}
+
+// ErrPasswordHashUnsupported is returned by [FlowPasswordHasher]
+// implementations when the encoded hash uses an algorithm or
+// parameter set the hasher cannot evaluate.
+var ErrPasswordHashUnsupported = errors.New("flow password hasher: encoded hash uses unsupported algorithm")
+
+// flowUserWriter is the narrow write seam [FlowCreateUserHandler] uses
+// to persist a new user. [UserRepository] satisfies it.
+type flowUserWriter interface {
+	Create(ctx context.Context, client database.QueryExecutor, user *CreateUser) error
+}
+
+// flowUserPasswordWriter is the narrow write seam for the password row.
+// [UserPasswordRepository] satisfies it.
+type flowUserPasswordWriter interface {
+	Create(ctx context.Context, client database.QueryExecutor, password *CreateUserPassword) error
+}
+
+// FlowCreateUserHandler is the MVP `create_user` [FlowOnSuccessHandler].
+// It produces a new user from validated identifier + password fields:
+// generates the user id, persists the user with one attribute per
+// submitted field, hashes the password, and writes the password row.
+//
+// When the eventual auth-attempt domain lands the handler's body moves
+// behind that service; the state machine's call site does not move.
+type FlowCreateUserHandler struct {
+	ids       idgen.Generator
+	users     flowUserWriter
+	passwords flowUserPasswordWriter
+	hasher    FlowPasswordHasher
+}
+
+// NewFlowCreateUserHandler wires the dependencies the handler needs to
+// run. In production the seams are satisfied by [UserRepository] and
+// [UserPasswordRepository].
+func NewFlowCreateUserHandler(ids idgen.Generator, users flowUserWriter, passwords flowUserPasswordWriter, hasher FlowPasswordHasher) *FlowCreateUserHandler {
+	return &FlowCreateUserHandler{
+		ids:       ids,
+		users:     users,
+		passwords: passwords,
+		hasher:    hasher,
+	}
+}
+
+var _ FlowOnSuccessHandler = (*FlowCreateUserHandler)(nil)
+
+func (h *FlowCreateUserHandler) Handle(ctx context.Context, client database.QueryExecutor, in FlowOnSuccessInput) (FlowOnSuccessResult, error) {
+	identifierName, _, ok := findIdentifierField(in.Resolved.Fields, in.Fields)
+	if !ok {
+		return FlowOnSuccessResult{}, fmt.Errorf("%w: create_user step has no identifier field", ErrIntegrity)
+	}
+	_, passwordValue, hasPassword := findPasswordField(in.Resolved.Fields, in.Fields)
+	if !hasPassword {
+		return FlowOnSuccessResult{}, fmt.Errorf("%w: create_user step has no password field", ErrIntegrity)
+	}
+
+	userID, err := h.ids.New("user")
+	if err != nil {
+		return FlowOnSuccessResult{}, fmt.Errorf("flow on_success create_user: generate id: %w", err)
+	}
+
+	attrs := make([]*CreateAttribute, 0, len(in.Fields))
+	for name, value := range in.Fields {
+		field, known := in.Resolved.Fields[name]
+		if !known || field.Challenge == FlowFieldChallengePassword {
+			// Skip password — it lives in user_passwords, not as an
+			// attribute. Unknown fields shouldn't appear here (the
+			// resolver validates the catalog) but we drop them defensively.
+			continue
+		}
+		uniqueScope := attributeUniquenessFor(name, identifierName, field.Unique)
+		attr, err := NewCreateAttribute(name, value, uniqueScope)
+		if err != nil {
+			return FlowOnSuccessResult{}, fmt.Errorf("flow on_success create_user: build attribute %q: %w", name, err)
+		}
+		attrs = append(attrs, attr)
+	}
+
+	encodedHash, err := h.hasher.Hash(asString(passwordValue))
+	if err != nil {
+		return FlowOnSuccessResult{}, fmt.Errorf("flow on_success create_user: hash password: %w", err)
+	}
+
+	if err := h.users.Create(ctx, client, &CreateUser{
+		ProjectID:  in.ProjectID,
+		SchemaURL:  in.UserSchemaURL,
+		ID:         userID,
+		Attributes: attrs,
+	}); err != nil {
+		return FlowOnSuccessResult{}, fmt.Errorf("flow on_success create_user: insert user: %w", err)
+	}
+
+	if err := h.passwords.Create(ctx, client, &CreateUserPassword{
+		ProjectID:   in.ProjectID,
+		UserID:      userID,
+		EncodedHash: encodedHash,
+	}); err != nil {
+		return FlowOnSuccessResult{}, fmt.Errorf("flow on_success create_user: insert password: %w", err)
+	}
+
+	return FlowOnSuccessResult{UserID: userID}, nil
+}
+
+// flowUserReader is the narrow read seam [FlowVerifyCredentialsHandler]
+// depends on. [UserRepository] satisfies it; tests can swap in a
+// minimal fake without implementing the repository's full surface.
+type flowUserReader interface {
+	ProjectIDCondition(projectID string) database.Condition
+	AttributesCondition(attributes []Attribute) database.Condition
+	Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*User, error)
+}
+
+// flowUserPasswordReader is the narrow read seam for
+// [FlowVerifyCredentialsHandler]'s password lookup. [UserPasswordRepository]
+// satisfies it.
+type flowUserPasswordReader interface {
+	UniqueCondition(projectID, userID string) database.Condition
+	Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*UserPassword, error)
+}
+
+// FlowVerifyCredentialsHandler is the MVP `verify_credentials`
+// [FlowOnSuccessHandler]. It resolves the identifier to a user, fetches
+// the stored password hash, and compares it against the submitted
+// password. Outcomes:
+//
+//   - identifier resolves and password matches: returns
+//     [FlowOnSuccessResult.UserID] set; the state machine advances on
+//     the submitted action.
+//   - identifier does not resolve: returns Outcome =
+//     [FlowImplicitOutcomeUserNotFound]; the state machine advances on
+//     the user_not_found transition declared by the step.
+//   - identifier resolves but password mismatches: returns
+//     StepError = [FlowImplicitOutcomeInvalidCredentials]; the state
+//     machine keeps the user on the current step and surfaces the
+//     error.
+//
+// When the eventual auth-attempt domain lands, this handler's body
+// moves behind that service.
+type FlowVerifyCredentialsHandler struct {
+	users     flowUserReader
+	passwords flowUserPasswordReader
+	hasher    FlowPasswordHasher
+}
+
+// NewFlowVerifyCredentialsHandler wires the handler's dependencies.
+// In production the seams are satisfied by [UserRepository] and
+// [UserPasswordRepository].
+func NewFlowVerifyCredentialsHandler(users flowUserReader, passwords flowUserPasswordReader, hasher FlowPasswordHasher) *FlowVerifyCredentialsHandler {
+	return &FlowVerifyCredentialsHandler{users: users, passwords: passwords, hasher: hasher}
+}
+
+var _ FlowOnSuccessHandler = (*FlowVerifyCredentialsHandler)(nil)
+
+func (h *FlowVerifyCredentialsHandler) Handle(ctx context.Context, client database.QueryExecutor, in FlowOnSuccessInput) (FlowOnSuccessResult, error) {
+	identifierName, identifierValue, hasID := findIdentifierField(in.Resolved.Fields, in.Fields)
+	if !hasID {
+		return FlowOnSuccessResult{}, fmt.Errorf("%w: verify_credentials step has no identifier field", ErrIntegrity)
+	}
+	_, passwordValue, hasPassword := findPasswordField(in.Resolved.Fields, in.Fields)
+	if !hasPassword {
+		return FlowOnSuccessResult{}, fmt.Errorf("%w: verify_credentials step has no password field", ErrIntegrity)
+	}
+
+	cond := database.And(
+		h.users.ProjectIDCondition(in.ProjectID),
+		h.users.AttributesCondition([]Attribute{{Key: identifierName, Value: identifierValue}}),
+	)
+	user, err := h.users.Get(ctx, client, database.WithCondition(cond))
+	if err != nil {
+		if isNoRows(err) {
+			return FlowOnSuccessResult{Outcome: FlowImplicitOutcomeUserNotFound}, nil
+		}
+		return FlowOnSuccessResult{}, fmt.Errorf("flow on_success verify_credentials: lookup user: %w", err)
+	}
+
+	pw, err := h.passwords.Get(ctx, client,
+		database.WithCondition(h.passwords.UniqueCondition(in.ProjectID, user.ID)),
+	)
+	if err != nil {
+		if isNoRows(err) {
+			msg := FlowImplicitOutcomeInvalidCredentials
+			return FlowOnSuccessResult{StepError: &msg}, nil
+		}
+		return FlowOnSuccessResult{}, fmt.Errorf("flow on_success verify_credentials: fetch password: %w", err)
+	}
+
+	ok, err := h.hasher.Verify(asString(passwordValue), pw.EncodedHash)
+	if err != nil {
+		return FlowOnSuccessResult{}, fmt.Errorf("flow on_success verify_credentials: verify password: %w", err)
+	}
+	if !ok {
+		msg := FlowImplicitOutcomeInvalidCredentials
+		return FlowOnSuccessResult{StepError: &msg}, nil
+	}
+
+	return FlowOnSuccessResult{UserID: user.ID}, nil
+}
+
+// findIdentifierField returns the property name and submitted value of
+// the field tagged [FlowFieldChallengeIdentifier]. Resolver contract
+// guarantees at most one such field per step.
+func findIdentifierField(resolved map[string]FlowField, submitted map[string]any) (name string, value any, ok bool) {
+	for n, f := range resolved {
+		if f.Challenge == FlowFieldChallengeIdentifier {
+			return n, submitted[n], true
+		}
+	}
+	return "", nil, false
+}
+
+// findPasswordField mirrors [findIdentifierField] for the
+// [FlowFieldChallengePassword] field.
+func findPasswordField(resolved map[string]FlowField, submitted map[string]any) (name string, value any, ok bool) {
+	for n, f := range resolved {
+		if f.Challenge == FlowFieldChallengePassword {
+			return n, submitted[n], true
+		}
+	}
+	return "", nil, false
+}
+
+// attributeUniquenessFor maps a [FlowFieldUniqueScope] to the
+// [AttributeUniqueness] enum the user repository understands. The
+// identifier field is always uniqueness-scoped at minimum to the team
+// level so two users can't share the same login.
+func attributeUniquenessFor(name, identifierName string, scope FlowFieldUniqueScope) AttributeUniqueness {
+	switch scope {
+	case FlowFieldUniqueScopeInstance:
+		return AttributeUniquenessGlobal
+	case FlowFieldUniqueScopeOrganization:
+		return AttributeUniquenessTeam
+	}
+	if name == identifierName {
+		return AttributeUniquenessTeam
+	}
+	return AttributeUniquenessUnspecified
+}
+
+// asString coerces a submitted field value to a string. Field
+// validation has already rejected non-string credentials by the time we
+// get here, so a non-string at this point is a programmer error in the
+// resolver — we surface "" rather than panicking.
+func asString(v any) string {
+	s, _ := v.(string)
+	return s
+}
+
+// isNoRows reports whether err is the storage layer's no-rows error.
+// Centralised so verify_credentials does not depend on the dialect
+// packages.
+func isNoRows(err error) bool {
+	var nrfe *database.NoRowFoundError
+	return errors.As(err, &nrfe)
+}
