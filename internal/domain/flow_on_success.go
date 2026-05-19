@@ -68,53 +68,44 @@ type FlowOnSuccessResult struct {
 	UserID string
 }
 
-// FlowOnSuccessRegistry resolves a handler by its registered name. The
-// state machine calls [Lookup] for every step that declares an
-// [FlowDefinitionStep.OnSuccess]; an unknown name surfaces as
+// FlowOnSuccessRegistry resolves a handler by its [FlowOnSuccess] value.
+// The state machine calls [Lookup] for every step that declares an
+// [FlowDefinitionStep.OnSuccess]; an unknown value surfaces as
 // [ErrUnknownOnSuccessHandler].
 type FlowOnSuccessRegistry struct {
-	handlers map[string]FlowOnSuccessHandler
+	handlers map[FlowOnSuccess]FlowOnSuccessHandler
 }
 
 // NewFlowOnSuccessRegistry returns an empty registry. Register
 // handlers with [FlowOnSuccessRegistry.Register].
 func NewFlowOnSuccessRegistry() *FlowOnSuccessRegistry {
-	return &FlowOnSuccessRegistry{handlers: map[string]FlowOnSuccessHandler{}}
+	return &FlowOnSuccessRegistry{handlers: map[FlowOnSuccess]FlowOnSuccessHandler{}}
 }
 
-// Register associates a handler with a name. Re-registering the same
-// name returns an error rather than silently overriding — production
-// wiring happens at bootstrap and a duplicate is almost always a bug.
-func (r *FlowOnSuccessRegistry) Register(name string, h FlowOnSuccessHandler) error {
-	if name == "" {
-		return fmt.Errorf("flow on_success registry: name must not be empty")
-	}
+// Register associates a handler with a [FlowOnSuccess] value.
+// Re-registering the same value returns an error rather than silently
+// overriding — production wiring happens at bootstrap and a duplicate
+// is almost always a bug.
+func (r *FlowOnSuccessRegistry) Register(kind FlowOnSuccess, h FlowOnSuccessHandler) error {
 	if h == nil {
-		return fmt.Errorf("flow on_success registry: handler for %q is nil", name)
+		return fmt.Errorf("flow on_success registry: handler for %q is nil", kind)
 	}
-	if _, exists := r.handlers[name]; exists {
-		return fmt.Errorf("flow on_success registry: handler %q already registered", name)
+	if _, exists := r.handlers[kind]; exists {
+		return fmt.Errorf("flow on_success registry: handler %q already registered", kind)
 	}
-	r.handlers[name] = h
+	r.handlers[kind] = h
 	return nil
 }
 
-// Lookup returns the handler registered under name. Returns
+// Lookup returns the handler registered under kind. Returns
 // [ErrUnknownOnSuccessHandler] if no such handler exists.
-func (r *FlowOnSuccessRegistry) Lookup(name string) (FlowOnSuccessHandler, error) {
-	h, ok := r.handlers[name]
+func (r *FlowOnSuccessRegistry) Lookup(kind FlowOnSuccess) (FlowOnSuccessHandler, error) {
+	h, ok := r.handlers[kind]
 	if !ok {
-		return nil, fmt.Errorf("%w: %q", ErrUnknownOnSuccessHandler, name)
+		return nil, fmt.Errorf("%w: %q", ErrUnknownOnSuccessHandler, kind)
 	}
 	return h, nil
 }
-
-// Names registered with the on_success registry. Stable handler ids
-// the state machine and definition validators reference.
-const (
-	FlowOnSuccessCreateUser        = "create_user"
-	FlowOnSuccessVerifyCredentials = "verify_credentials"
-)
 
 // FlowImplicitOutcomeInvalidCredentials is the outcome surfaced by
 // [FlowOnSuccessVerifyCredentials] when an identifier resolves but

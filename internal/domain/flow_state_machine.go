@@ -136,20 +136,6 @@ type FlowStep struct {
 	SSOProviders []FlowSSOProvider
 }
 
-// FlowStepComplete classifies a terminal step. Values mirror the
-// `complete` enum on the OpenAPI flow-step component.
-type FlowStepComplete string
-
-const (
-	// FlowStepCompleteRedirect means the client should navigate to
-	// [FlowStep.RedirectURL] (the typical OIDC/SAML finish).
-	FlowStepCompleteRedirect FlowStepComplete = "redirect"
-
-	// FlowStepCompleteShow means the client should render the step as
-	// a success screen (e.g. registration confirmed).
-	FlowStepCompleteShow FlowStepComplete = "show"
-)
-
 // FlowAction is a single user action surfaced on [FlowStep.Actions].
 // The action name is the map key in [FlowStep.Actions], matching the
 // outcome key on [FlowDefinitionStep.Transitions].
@@ -170,20 +156,6 @@ type FlowAction struct {
 // "advance forward" action on a step. The state machine flags it as
 // primary on the rendered [FlowStep.Actions].
 const FlowActionSubmit = "submit"
-
-// FlowSSOProvider is the per-step view of an available identity
-// provider. Reserved for the deferred SSO ceremony.
-type FlowSSOProvider struct {
-	// ID identifies a configured provider instance.
-	ID string
-
-	// Name is the display name for the provider.
-	Name string
-
-	// Template hints at how the client should render the provider's
-	// button (logo, colors).
-	Template string
-}
 
 // FlowSessionRef pins the session row this flow runs on top of.
 // SessionVersion is used by the state machine to detect concurrent
@@ -341,7 +313,7 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 		return FlowStepResult{}, err
 	}
 
-	if validationErr := r.fields.Validate(ctx, client, state.ProjectID, userSchemaURL, in.Fields); validationErr != nil {
+	if validationErr := r.fields.Validate(resolved, in.Fields); validationErr != nil {
 		var errs FlowFieldValidationErrors
 		if asValidationErrors(validationErr, &errs) {
 			msg := errs.Error()
@@ -355,8 +327,8 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 	mergeCollected(state, in.Fields)
 
 	routeOutcome := in.Action
-	if currentStep.OnSuccess != "" {
-		handler, err := r.onSuccess.Lookup(currentStep.OnSuccess)
+	if currentStep.OnSuccess != nil {
+		handler, err := r.onSuccess.Lookup(*currentStep.OnSuccess)
 		if err != nil {
 			return FlowStepResult{}, fmt.Errorf("%w: %v", ErrIntegrity, err)
 		}
@@ -408,7 +380,7 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 
 	r.advance(state, currentStep, nextStep.Name)
 
-	if nextStep.Type == FlowStepTypeComplete {
+	if nextStep.Complete != nil {
 		step, err := r.terminate(ctx, client, def, state, userSchemaURL, nextStep)
 		if err != nil {
 			return FlowStepResult{}, err
@@ -432,16 +404,15 @@ func (r *FlowStateMachineRuntime) advance(state *FlowState, prev *FlowDefinition
 }
 
 // terminate renders the terminal step. It reads the complete kind from
-// step.Config["complete"] (defaulting to "show") and threads the
-// state's RedirectURL onto the step when the kind is "redirect".
+// [FlowDefinitionStep.Complete] and threads the state's RedirectURL onto
+// the step when the kind is [FlowStepCompleteRedirect].
 func (r *FlowStateMachineRuntime) terminate(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState, userSchemaURL string, step *FlowDefinitionStep) (*FlowStep, error) {
-	kind := readCompleteKind(step.Config)
 	rendered, err := r.renderStep(ctx, client, def, state, userSchemaURL, step)
 	if err != nil {
 		return nil, err
 	}
-	complete := kind
-	rendered.Complete = &complete
+	kind := *step.Complete
+	rendered.Complete = &kind
 	if kind == FlowStepCompleteRedirect && state.RedirectURI != nil {
 		uri := *state.RedirectURI
 		rendered.RedirectURL = &uri
@@ -469,16 +440,15 @@ func (r *FlowStateMachineRuntime) renderStep(ctx context.Context, client databas
 	return r.buildStep(step, resolved, nil, nil, nil), nil
 }
 
-// resolveStepFields reads the step's field-name list from its Config
-// and asks the [FlowFieldResolver] for the resolved per-field
-// metadata. A step without `fields` in its Config resolves to the
-// empty catalog (e.g. consent or terminal steps).
+// resolveStepFields asks the [FlowFieldResolver] for the resolved
+// per-field metadata for the step's declared fields. A step with no
+// fields (e.g. consent or terminal steps) resolves to the empty
+// catalog.
 func (r *FlowStateMachineRuntime) resolveStepFields(ctx context.Context, client database.QueryExecutor, projectID, userSchemaURL string, step *FlowDefinitionStep) (FlowResolvedFields, error) {
-	names := readFieldNames(step.Config)
-	if len(names) == 0 {
+	if len(step.Fields) == 0 {
 		return FlowResolvedFields{}, nil
 	}
-	resolved, err := r.fields.Resolve(ctx, client, projectID, userSchemaURL, names)
+	resolved, err := r.fields.Resolve(ctx, client, projectID, userSchemaURL, step.Fields)
 	if err != nil {
 		return FlowResolvedFields{}, fmt.Errorf("flow state machine: resolve fields on step %q: %w", step.Name, err)
 	}
@@ -512,12 +482,8 @@ func (r *FlowStateMachineRuntime) buildStep(step *FlowDefinitionStep, resolved F
 // initialStepFor returns the entry step the definition declares for
 // the given purpose, or false if the definition does not serve it.
 func initialStepFor(def *FlowDefinition, purpose FlowDefinitionPurpose) (string, bool) {
-	for _, p := range def.Purposes {
-		if p.Purpose == purpose {
-			return p.InitialStep, true
-		}
-	}
-	return "", false
+	step, ok := def.Purposes[purpose]
+	return step, ok
 }
 
 // findStep returns a pointer into def.Steps for the step named name,
@@ -529,46 +495,6 @@ func findStep(def *FlowDefinition, name string) (*FlowDefinitionStep, bool) {
 		}
 	}
 	return nil, false
-}
-
-// readFieldNames extracts the `fields` list from a step's Config. The
-// list is encoded as `[]any` of strings on the JSON side; the
-// repository decodes it through `json.Unmarshal` into the same shape.
-func readFieldNames(config map[string]any) []string {
-	raw, ok := config["fields"]
-	if !ok {
-		return nil
-	}
-	values, ok := raw.([]any)
-	if !ok {
-		return nil
-	}
-	names := make([]string, 0, len(values))
-	for _, v := range values {
-		if s, ok := v.(string); ok {
-			names = append(names, s)
-		}
-	}
-	return names
-}
-
-// readCompleteKind reads the terminal step's `complete` Config entry.
-// Defaults to [FlowStepCompleteShow] when the entry is missing or
-// invalid — a terminal step without a redirect destination is a
-// success screen.
-func readCompleteKind(config map[string]any) FlowStepComplete {
-	raw, ok := config["complete"]
-	if !ok {
-		return FlowStepCompleteShow
-	}
-	s, ok := raw.(string)
-	if !ok {
-		return FlowStepCompleteShow
-	}
-	if s == string(FlowStepCompleteRedirect) {
-		return FlowStepCompleteRedirect
-	}
-	return FlowStepCompleteShow
 }
 
 // recordResolvedUser stores the user id surfaced by an on_success
