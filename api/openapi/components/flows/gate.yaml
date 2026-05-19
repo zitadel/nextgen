@@ -8,6 +8,7 @@ properties:
   kind:
     type: string
     enum: [captcha]
+    example: captcha
     description: |
       The gate category. Only `captcha` is currently defined. Authenticator
       ceremonies (e.g. passkey) are modelled as credential auth_attempts via
@@ -25,3 +26,5 @@ properties:
       Provider-specific configuration consumed by the implementation when
       issuing the per-render challenge. Opaque to the engine.
     additionalProperties: true
+    example:
+      site_key: "0x4AAAAAAA-example-site-key"
