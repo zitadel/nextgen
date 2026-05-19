@@ -27,6 +27,7 @@ func TestFlowDefinitionRepository_CreateAndGet(t *testing.T) {
 	assert.Equal(t, def.Name, got.Name)
 	assert.Equal(t, def.SchemaVersion, got.SchemaVersion)
 	assert.Equal(t, def.Status, got.Status)
+	assert.Equal(t, def.UserSchema, got.UserSchema)
 	assert.WithinDuration(t, time.Now(), got.CreatedAt, 5*time.Second)
 	assert.WithinDuration(t, time.Now(), got.UpdatedAt, 5*time.Second)
 
@@ -34,9 +35,8 @@ func TestFlowDefinitionRepository_CreateAndGet(t *testing.T) {
 	assert.Equal(t, domain.FlowDefinitionPurposeLogin, got.Purposes[0].Purpose)
 	assert.Equal(t, "identifier", got.Purposes[0].InitialStep)
 
-	assert.Equal(t, def.Audience.AppID, got.Audience.AppID)
-	assert.Nil(t, got.Audience.TeamID)
-	assert.False(t, got.Audience.IsProjectDefault)
+	assert.Equal(t, def.Audience.AppIDs, got.Audience.AppIDs)
+	assert.Empty(t, got.Audience.TeamIDs)
 
 	require.Len(t, got.Steps, 3)
 	stepsByName := make(map[string]domain.FlowDefinitionStep)
@@ -221,19 +221,18 @@ func TestFlowDefinitionRepository_ProjectIsolation(t *testing.T) {
 
 func sampleFlowDefinition(projectID, id string) *domain.FlowDefinition {
 	pivotAction := domain.Pivot
-	appID := "app-1"
 	return &domain.FlowDefinition{
 		ProjectID:     projectID,
 		ID:            id,
 		Name:          "Default Login",
 		SchemaVersion: "1.0.0",
 		Status:        domain.FlowDefinitionStatusDraft,
+		UserSchema:    "https://example.com/schemas/human-user.json",
 		Purposes: []domain.FlowDefinitionPurposeEntry{
 			{Purpose: domain.FlowDefinitionPurposeLogin, InitialStep: "identifier"},
 		},
 		Audience: domain.FlowDefinitionAudience{
-			AppID:            &appID,
-			IsProjectDefault: false,
+			AppIDs: []string{"app-1"},
 		},
 		Steps: []domain.FlowDefinitionStep{
 			{
