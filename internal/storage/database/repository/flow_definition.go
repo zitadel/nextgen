@@ -30,9 +30,10 @@ type flowDefinitionRow struct {
 
 // flowDefinitionContent is the structure stored inside the definition JSONB column.
 type flowDefinitionContent struct {
-	Purposes []flowDefinitionPurposeJSON `json:"purposes"`
-	Audience flowDefinitionAudienceJSON  `json:"audience"`
-	Steps    []flowDefinitionStepJSON    `json:"steps"`
+	UserSchema string                      `json:"user_schema"`
+	Purposes   []flowDefinitionPurposeJSON `json:"purposes"`
+	Audience   flowDefinitionAudienceJSON  `json:"audience"`
+	Steps      []flowDefinitionStepJSON    `json:"steps"`
 }
 
 type flowDefinitionPurposeJSON struct {
@@ -267,9 +268,10 @@ func marshalFlowDefinitionContent(def *domain.FlowDefinition) ([]byte, error) {
 	}
 
 	return json.Marshal(flowDefinitionContent{
-		Purposes: purposes,
-		Audience: audience,
-		Steps:    steps,
+		UserSchema: def.UserSchema,
+		Purposes:   purposes,
+		Audience:   audience,
+		Steps:      steps,
 	})
 }
 
@@ -324,6 +326,7 @@ func rowToFlowDefinition(row flowDefinitionRow) (*domain.FlowDefinition, error) 
 		Status:        row.Status,
 		CreatedAt:     row.CreatedAt,
 		UpdatedAt:     row.UpdatedAt,
+		UserSchema:    content.UserSchema,
 		Purposes:      purposes,
 		Audience: domain.FlowDefinitionAudience{
 			AppID:            content.Audience.AppID,

@@ -27,6 +27,7 @@ func TestFlowDefinitionRepository_CreateAndGet(t *testing.T) {
 	assert.Equal(t, def.Name, got.Name)
 	assert.Equal(t, def.SchemaVersion, got.SchemaVersion)
 	assert.Equal(t, def.Status, got.Status)
+	assert.Equal(t, def.UserSchema, got.UserSchema)
 	assert.WithinDuration(t, time.Now(), got.CreatedAt, 5*time.Second)
 	assert.WithinDuration(t, time.Now(), got.UpdatedAt, 5*time.Second)
 
@@ -232,6 +233,7 @@ func sampleFlowDefinition(projectID, id string) *domain.FlowDefinition {
 		Name:          "Default Login",
 		SchemaVersion: "1.0.0",
 		Status:        domain.FlowDefinitionStatusDraft,
+		UserSchema:    "https://example.com/schemas/human-user.json",
 		Purposes: []domain.FlowDefinitionPurposeEntry{
 			{Purpose: domain.FlowDefinitionPurposeLogin, InitialStep: "identifier"},
 		},
