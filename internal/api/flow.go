@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -36,7 +37,7 @@ func (h Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest) (ap
 
 	def, err := h.flowService.Resolve(ctx, resolveReq)
 	if err != nil {
-		return nil, mapResolveError(err)
+		return mapResolveError(err), nil
 	}
 
 	// Execution is intentionally stopped here. The service resolved a
@@ -65,16 +66,11 @@ func buildResolveHint(opt api.OptFlowHint) service.ResolveFlowHint {
 	return out
 }
 
-// mapResolveError translates a Resolve error into an HTTP status code.
-// The ogen-generated handler unwraps *api.ErrorDetailsStatusCode from the
-// error return path and writes its StatusCode + Response verbatim; the
-// success-path *api.ErrorDetails fallback would otherwise force every
-// failure to HTTP 400.
-func mapResolveError(err error) error {
+func mapResolveError(err error) *api.ErrorDetailsStatusCode {
 	switch {
 	case errors.Is(err, domain.ErrFlowDefinitionNotFound):
 		return &api.ErrorDetailsStatusCode{
-			StatusCode: 404,
+			StatusCode: http.StatusNotFound,
 			Response: api.ErrorDetails{
 				Code:    "flow_not_found",
 				Message: err.Error(),
@@ -82,7 +78,7 @@ func mapResolveError(err error) error {
 		}
 	case errors.Is(err, domain.ErrFlowDefinitionPurposeMismatch):
 		return &api.ErrorDetailsStatusCode{
-			StatusCode: 400,
+			StatusCode: http.StatusBadRequest,
 			Response: api.ErrorDetails{
 				Code:    "purpose_mismatch",
 				Message: err.Error(),
@@ -90,7 +86,7 @@ func mapResolveError(err error) error {
 		}
 	default:
 		return &api.ErrorDetailsStatusCode{
-			StatusCode: 500,
+			StatusCode: http.StatusInternalServerError,
 			Response: api.ErrorDetails{
 				Code:    "internal_error",
 				Message: err.Error(),
