@@ -97,12 +97,12 @@ func (s *flowService) resolveByName(ctx context.Context, req ResolveFlowRequest)
 		return nil, err
 	}
 	if len(defs) == 0 {
-		return nil, domain.ErrFlowDefinitionNotFound
+		return nil, domain.ErrFlowDefinitionNotFound()
 	}
 
 	def := pickLatestFlowVersion(defs)
 	if !flowServesPurpose(def, req.Purpose) {
-		return nil, domain.ErrFlowDefinitionPurposeMismatch
+		return nil, domain.ErrFlowDefinitionPurposeMismatch()
 	}
 	return def, nil
 }
@@ -128,7 +128,7 @@ func (s *flowService) resolveByAudience(ctx context.Context, req ResolveFlowRequ
 		return nil, err
 	}
 	if len(defs) == 0 {
-		return nil, domain.ErrFlowDefinitionNotFound
+		return nil, domain.ErrFlowDefinitionNotFound()
 	}
 	return defs[0], nil
 }
