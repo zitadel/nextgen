@@ -2348,14 +2348,15 @@ func (s *FieldValidation) SetMaxLength(val OptInt) {
 	s.MaxLength = val
 }
 
-// Scopes which teams, apps, or projects this flow definition applies to.
-// When all fields are empty/omitted, the definition is a project-wide default.
-// The engine picks the most specific matching definition: app > team > project.
+// Scopes which teams or apps this flow definition applies to. Empty or
+// omitted fields mean "no restriction"; when both are empty the definition
+// matches every request in the project. The engine picks the most specific
+// matching definition: app > team > project-wide.
 // Ref: #
 type FlowAudience struct {
-	// Restrict to specific teams (organizations).
+	// Restrict to specific teams (organizations). Empty means no team restriction.
 	TeamIds []string `json:"team_ids"`
-	// Restrict to specific applications.
+	// Restrict to specific applications. Empty means no app restriction.
 	AppIds []string `json:"app_ids"`
 }
 

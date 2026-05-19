@@ -42,10 +42,8 @@ type flowDefinitionPurposeJSON struct {
 }
 
 type flowDefinitionAudienceJSON struct {
-	AppID            *string `json:"app_id,omitempty"`
-	TeamID           *string `json:"team_id,omitempty"`
-	UserSchemaID     *string `json:"user_schema_id,omitempty"`
-	IsProjectDefault bool    `json:"is_project_default"`
+	AppIDs  []string `json:"app_ids,omitempty"`
+	TeamIDs []string `json:"team_ids,omitempty"`
 }
 
 type flowDefinitionStepJSON struct {
@@ -243,10 +241,8 @@ func marshalFlowDefinitionContent(def *domain.FlowDefinition) ([]byte, error) {
 	}
 
 	audience := flowDefinitionAudienceJSON{
-		AppID:            def.Audience.AppID,
-		TeamID:           def.Audience.TeamID,
-		UserSchemaID:     def.Audience.UserSchemaID,
-		IsProjectDefault: def.Audience.IsProjectDefault,
+		AppIDs:  def.Audience.AppIDs,
+		TeamIDs: def.Audience.TeamIDs,
 	}
 
 	steps := make([]flowDefinitionStepJSON, len(def.Steps))
@@ -329,10 +325,8 @@ func rowToFlowDefinition(row flowDefinitionRow) (*domain.FlowDefinition, error) 
 		UserSchema:    content.UserSchema,
 		Purposes:      purposes,
 		Audience: domain.FlowDefinitionAudience{
-			AppID:            content.Audience.AppID,
-			TeamID:           content.Audience.TeamID,
-			UserSchemaID:     content.Audience.UserSchemaID,
-			IsProjectDefault: content.Audience.IsProjectDefault,
+			AppIDs:  content.Audience.AppIDs,
+			TeamIDs: content.Audience.TeamIDs,
 		},
 		Steps: steps,
 	}, nil

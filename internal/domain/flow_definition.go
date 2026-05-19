@@ -75,12 +75,11 @@ type FlowDefinitionPurposeEntry struct {
 }
 
 // FlowDefinitionAudience describes which requests this definition should be selected for.
-// Fields are applied with specificity: AppID > TeamID > UserSchemaID > IsProjectDefault.
+// Empty slices (or nil) mean "no restriction". Specificity for resolution
+// is app > team > project-wide (both empty).
 type FlowDefinitionAudience struct {
-	AppID            *string
-	TeamID           *string
-	UserSchemaID     *string
-	IsProjectDefault bool
+	AppIDs  []string
+	TeamIDs []string
 }
 
 // FlowDefinitionStep is a single node in the step graph.

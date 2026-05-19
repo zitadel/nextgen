@@ -35,9 +35,8 @@ func TestFlowDefinitionRepository_CreateAndGet(t *testing.T) {
 	assert.Equal(t, domain.FlowDefinitionPurposeLogin, got.Purposes[0].Purpose)
 	assert.Equal(t, "identifier", got.Purposes[0].InitialStep)
 
-	assert.Equal(t, def.Audience.AppID, got.Audience.AppID)
-	assert.Nil(t, got.Audience.TeamID)
-	assert.False(t, got.Audience.IsProjectDefault)
+	assert.Equal(t, def.Audience.AppIDs, got.Audience.AppIDs)
+	assert.Empty(t, got.Audience.TeamIDs)
 
 	require.Len(t, got.Steps, 3)
 	stepsByName := make(map[string]domain.FlowDefinitionStep)
@@ -226,7 +225,6 @@ func TestFlowDefinitionRepository_ProjectIsolation(t *testing.T) {
 
 func sampleFlowDefinition(projectID, id string) *domain.FlowDefinition {
 	pivotAction := domain.Pivot
-	appID := "app-1"
 	return &domain.FlowDefinition{
 		ProjectID:     projectID,
 		ID:            id,
@@ -238,8 +236,7 @@ func sampleFlowDefinition(projectID, id string) *domain.FlowDefinition {
 			{Purpose: domain.FlowDefinitionPurposeLogin, InitialStep: "identifier"},
 		},
 		Audience: domain.FlowDefinitionAudience{
-			AppID:            &appID,
-			IsProjectDefault: false,
+			AppIDs: []string{"app-1"},
 		},
 		Steps: []domain.FlowDefinitionStep{
 			{

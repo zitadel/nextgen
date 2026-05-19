@@ -51,7 +51,7 @@
     },
     "audience": {
       "$ref": "#/$defs/Audience",
-      "description": "Scopes which requests this definition applies to. Omitted or empty means project-wide default. The engine ranks matches by specificity (app > team > schema > project default)."
+      "description": "Scopes which requests this definition applies to. Omitted or empty arrays mean project-wide. The engine ranks matches by specificity (app > team > project-wide)."
     },
     "steps": {
       "type": "array",
