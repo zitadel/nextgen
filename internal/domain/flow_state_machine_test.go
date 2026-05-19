@@ -26,59 +26,14 @@ func (g *fakeIDGen) New(prefix string) (string, error) {
 }
 
 // fakeHasher is a prefix-based password hasher: Hash returns
-// "hashed:"+plain, Verify reports whether the encoded form matches that
-// shape. Trivial to reason about in tests.
+// "hashed:"+plain. Trivial to reason about in tests.
 type fakeHasher struct{}
 
 func (fakeHasher) Hash(plain string) (string, error) { return "hashed:" + plain, nil }
 
-func (fakeHasher) Verify(plain, encoded string) (bool, error) {
-	return encoded == "hashed:"+plain, nil
-}
-
-// captureCondition is a no-op condition used by the fake repositories.
-// Tests never inspect the condition graph the handler builds; the fakes
-// route off values captured when their condition constructors are
-// called.
-type captureCondition struct{ tag string }
-
-func (c *captureCondition) Write(*database.StatementBuilder)             {}
-func (c *captureCondition) Matches(any) bool                             { return false }
-func (c *captureCondition) String() string                               { return c.tag }
-func (c *captureCondition) IsRestrictingColumn(database.Column) bool     { return false }
-
-// fakeUserRepo backs both flowUserReader and flowUserWriter. It stores
-// users keyed by the most recent identifier value captured via
-// AttributesCondition.
+// fakeUserRepo records the users create_user persists.
 type fakeUserRepo struct {
-	usersByIdentifier map[string]*domain.User
-	captureID         string
-	created           []*domain.CreateUser
-}
-
-func newFakeUserRepo() *fakeUserRepo {
-	return &fakeUserRepo{usersByIdentifier: map[string]*domain.User{}}
-}
-
-func (f *fakeUserRepo) ProjectIDCondition(string) database.Condition {
-	return &captureCondition{tag: "project_id"}
-}
-
-func (f *fakeUserRepo) AttributesCondition(attributes []domain.Attribute) database.Condition {
-	if len(attributes) > 0 {
-		if s, ok := attributes[0].Value.(string); ok {
-			f.captureID = s
-		}
-	}
-	return &captureCondition{tag: "attributes"}
-}
-
-func (f *fakeUserRepo) Get(_ context.Context, _ database.QueryExecutor, _ ...database.QueryOption) (*domain.User, error) {
-	u, ok := f.usersByIdentifier[f.captureID]
-	if !ok {
-		return nil, database.NewNoRowFoundError(nil)
-	}
-	return u, nil
+	created []*domain.CreateUser
 }
 
 func (f *fakeUserRepo) Create(_ context.Context, _ database.QueryExecutor, user *domain.CreateUser) error {
@@ -86,35 +41,13 @@ func (f *fakeUserRepo) Create(_ context.Context, _ database.QueryExecutor, user 
 	return nil
 }
 
-// fakeUserPasswordRepo backs both flowUserPasswordReader and
-// flowUserPasswordWriter. UniqueCondition captures the user id so Get
-// can resolve the stored hash; Create records the persisted row.
+// fakeUserPasswordRepo records the password rows create_user persists.
 type fakeUserPasswordRepo struct {
-	hashByUserID  map[string]string
-	captureUserID string
-	created       []*domain.CreateUserPassword
-}
-
-func newFakeUserPasswordRepo() *fakeUserPasswordRepo {
-	return &fakeUserPasswordRepo{hashByUserID: map[string]string{}}
-}
-
-func (f *fakeUserPasswordRepo) UniqueCondition(_, userID string) database.Condition {
-	f.captureUserID = userID
-	return &captureCondition{tag: "user_password_unique"}
-}
-
-func (f *fakeUserPasswordRepo) Get(_ context.Context, _ database.QueryExecutor, _ ...database.QueryOption) (*domain.UserPassword, error) {
-	hash, ok := f.hashByUserID[f.captureUserID]
-	if !ok {
-		return nil, database.NewNoRowFoundError(nil)
-	}
-	return &domain.UserPassword{UserID: f.captureUserID, EncodedHash: hash}, nil
+	created []*domain.CreateUserPassword
 }
 
 func (f *fakeUserPasswordRepo) Create(_ context.Context, _ database.QueryExecutor, pw *domain.CreateUserPassword) error {
 	f.created = append(f.created, pw)
-	f.hashByUserID[pw.UserID] = pw.EncodedHash
 	return nil
 }
 
@@ -131,17 +64,14 @@ type flowTestWorld struct {
 
 func newFlowTestWorld(t *testing.T) *flowTestWorld {
 	t.Helper()
-	users := newFakeUserRepo()
-	pws := newFakeUserPasswordRepo()
+	users := &fakeUserRepo{}
+	pws := &fakeUserPasswordRepo{}
 	ids := &fakeIDGen{id: "01TEST"}
 	hasher := fakeHasher{}
 
 	registry := domain.NewFlowOnSuccessRegistry()
 	if err := registry.Register(domain.FlowOnSuccessCreateUser, domain.NewFlowCreateUserHandler(ids, users, pws, hasher)); err != nil {
 		t.Fatalf("register create_user: %v", err)
-	}
-	if err := registry.Register(domain.FlowOnSuccessVerifyCredentials, domain.NewFlowVerifyCredentialsHandler(users, pws, hasher)); err != nil {
-		t.Fatalf("register verify_credentials: %v", err)
 	}
 
 	resolver := newDefaultResolver(t)
@@ -175,42 +105,6 @@ func signupDefinition() *domain.FlowDefinition {
 			},
 			{
 				Name:     "done",
-				Complete: &show,
-			},
-		},
-	}
-}
-
-// loginDefinition builds a single-step login flow: `credentials` with
-// email+password, on_success=verify_credentials, transitioning on
-// `submit` to `done` and on `user_not_found` to a `no_account`
-// terminal.
-func loginDefinition() *domain.FlowDefinition {
-	verify := domain.FlowOnSuccessVerifyCredentials
-	show := domain.FlowStepCompleteShow
-	return &domain.FlowDefinition{
-		ProjectID:  testProjectID,
-		ID:         "def-login",
-		UserSchema: defaultSchemaURL,
-		Purposes: map[domain.FlowDefinitionPurpose]string{
-			domain.FlowDefinitionPurposeLogin: "credentials",
-		},
-		Steps: []domain.FlowDefinitionStep{
-			{
-				Name:      "credentials",
-				Fields:    []string{"email", "password"},
-				OnSuccess: &verify,
-				Transitions: map[string]domain.FlowStepTransition{
-					domain.FlowActionSubmit:                {Target: "done"},
-					domain.FlowImplicitOutcomeUserNotFound: {Target: "no_account"},
-				},
-			},
-			{
-				Name:     "done",
-				Complete: &show,
-			},
-			{
-				Name:     "no_account",
 				Complete: &show,
 			},
 		},
@@ -296,110 +190,6 @@ func TestFlowStateMachine_Process_RegistrationHappyPath(t *testing.T) {
 	}
 	if got := result.State.CollectedData[domain.FlowCollectedUserIDKey]; got != wantUserID {
 		t.Errorf("CollectedData[%s] = %v, want %q", domain.FlowCollectedUserIDKey, got, wantUserID)
-	}
-}
-
-func TestFlowStateMachine_Process_LoginHappyPath(t *testing.T) {
-	w := newFlowTestWorld(t)
-	def := loginDefinition()
-	w.users.usersByIdentifier["alice@example.com"] = &domain.User{ID: "user_existing", ProjectID: testProjectID}
-	w.pws.hashByUserID["user_existing"] = "hashed:hunter2hunter2"
-
-	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
-		Definition:    def,
-		Purpose:       domain.FlowDefinitionPurposeLogin,
-		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
-		UserSchemaURL: defaultSchemaURL,
-	})
-	if err != nil {
-		t.Fatalf("Start error: %v", err)
-	}
-
-	result, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
-		Action: domain.FlowActionSubmit,
-		Fields: map[string]any{
-			"email":    "alice@example.com",
-			"password": "hunter2hunter2",
-		},
-	})
-	if err != nil {
-		t.Fatalf("Process error: %v", err)
-	}
-	if result.Step == nil || result.Step.Name != "done" {
-		t.Fatalf("Process step = %+v, want done", result.Step)
-	}
-	if got := result.State.CollectedData[domain.FlowCollectedUserIDKey]; got != "user_existing" {
-		t.Errorf("CollectedData[%s] = %v, want user_existing", domain.FlowCollectedUserIDKey, got)
-	}
-}
-
-func TestFlowStateMachine_Process_LoginInvalidPasswordKeepsStep(t *testing.T) {
-	w := newFlowTestWorld(t)
-	def := loginDefinition()
-	w.users.usersByIdentifier["alice@example.com"] = &domain.User{ID: "user_existing", ProjectID: testProjectID}
-	w.pws.hashByUserID["user_existing"] = "hashed:hunter2hunter2"
-
-	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
-		Definition:    def,
-		Purpose:       domain.FlowDefinitionPurposeLogin,
-		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
-		UserSchemaURL: defaultSchemaURL,
-	})
-	if err != nil {
-		t.Fatalf("Start error: %v", err)
-	}
-
-	result, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
-		Action: domain.FlowActionSubmit,
-		Fields: map[string]any{
-			"email":    "alice@example.com",
-			"password": "wrong-pw-but-long-enough",
-		},
-	})
-	if err != nil {
-		t.Fatalf("Process error: %v", err)
-	}
-	if result.Step == nil || result.Step.Name != "credentials" {
-		t.Fatalf("Process step = %+v, want stay on credentials", result.Step)
-	}
-	if result.Step.Error == nil || *result.Step.Error != domain.FlowImplicitOutcomeInvalidCredentials {
-		t.Errorf("Step.Error = %v, want %q", result.Step.Error, domain.FlowImplicitOutcomeInvalidCredentials)
-	}
-	if result.Step.Complete != nil {
-		t.Errorf("Step.Complete = %v, want nil (still on credentials)", result.Step.Complete)
-	}
-}
-
-func TestFlowStateMachine_Process_LoginUnknownIdentifierRoutesUserNotFound(t *testing.T) {
-	w := newFlowTestWorld(t)
-	def := loginDefinition()
-	// No user seeded — repo will return NoRowFoundError.
-
-	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
-		Definition:    def,
-		Purpose:       domain.FlowDefinitionPurposeLogin,
-		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
-		UserSchemaURL: defaultSchemaURL,
-	})
-	if err != nil {
-		t.Fatalf("Start error: %v", err)
-	}
-
-	result, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
-		Action: domain.FlowActionSubmit,
-		Fields: map[string]any{
-			"email":    "ghost@example.com",
-			"password": "doesnt-matter-but-long-enough",
-		},
-	})
-	if err != nil {
-		t.Fatalf("Process error: %v", err)
-	}
-	if result.Step == nil || result.Step.Name != "no_account" {
-		t.Fatalf("Process step = %+v, want no_account", result.Step)
-	}
-	if result.Step.Complete == nil || *result.Step.Complete != domain.FlowStepCompleteShow {
-		t.Errorf("Step.Complete = %v, want show", result.Step.Complete)
 	}
 }
 
