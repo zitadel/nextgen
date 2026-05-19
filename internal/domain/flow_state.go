@@ -74,6 +74,11 @@ type FlowState struct {
 	// once the matching ChallengeResponse verifies. Nil when no
 	// ceremony is in flight.
 	PendingChallenge *FlowPendingChallenge
+
+	// AuthAttemptID names the auth_attempts row this flow is collecting
+	// factors against. Created at Start; completed at the terminal step;
+	// handed off by the API handler at the OIDC redirect boundary.
+	AuthAttemptID string
 }
 
 // FlowPendingChallenge records the server-issued challenge the next

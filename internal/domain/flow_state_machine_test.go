@@ -51,15 +51,60 @@ func (f *fakeUserPasswordRepo) Create(_ context.Context, _ database.QueryExecuto
 	return nil
 }
 
+// fakeAuthAttempts captures the [domain.FlowAuthAttemptService] calls
+// the state machine drives so tests can assert lifecycle wiring and
+// challenge dispatch.
+type fakeAuthAttempts struct {
+	startCalls    []domain.FlowStartAttemptInput
+	identifyCalls []domain.FlowResolveIdentifierInput
+	passwordCalls []domain.FlowVerifyPasswordInput
+	completed     []string
+
+	nextAttemptID    string
+	identifierResult map[string]domain.FlowResolvedIdentifier
+	identifierErrs   map[string]error
+	passwordErrs     map[string]error
+}
+
+func (f *fakeAuthAttempts) Start(_ context.Context, in domain.FlowStartAttemptInput) (*domain.AuthAttempt, error) {
+	f.startCalls = append(f.startCalls, in)
+	return &domain.AuthAttempt{ProjectID: in.ProjectID, ID: f.nextAttemptID}, nil
+}
+
+func (f *fakeAuthAttempts) ResolveIdentifier(_ context.Context, in domain.FlowResolveIdentifierInput) (domain.FlowResolvedIdentifier, error) {
+	f.identifyCalls = append(f.identifyCalls, in)
+	if err, ok := f.identifierErrs[in.Value]; ok {
+		return domain.FlowResolvedIdentifier{}, err
+	}
+	if ref, ok := f.identifierResult[in.Value]; ok {
+		return ref, nil
+	}
+	return domain.FlowResolvedIdentifier{}, domain.ErrFlowIdentifierUnknown
+}
+
+func (f *fakeAuthAttempts) VerifyPassword(_ context.Context, in domain.FlowVerifyPasswordInput) error {
+	f.passwordCalls = append(f.passwordCalls, in)
+	if err, ok := f.passwordErrs[in.Plain]; ok {
+		return err
+	}
+	return nil
+}
+
+func (f *fakeAuthAttempts) Complete(_ context.Context, _, attemptID string) error {
+	f.completed = append(f.completed, attemptID)
+	return nil
+}
+
 // flowTestWorld is the wiring a flow test exercises: resolver +
 // registry + handlers + state machine, sharing the fakes the test
 // inspects after a run.
 type flowTestWorld struct {
-	users  *fakeUserRepo
-	pws    *fakeUserPasswordRepo
-	ids    *fakeIDGen
-	hasher fakeHasher
-	sm     *domain.FlowStateMachineRuntime
+	users    *fakeUserRepo
+	pws      *fakeUserPasswordRepo
+	ids      *fakeIDGen
+	hasher   fakeHasher
+	attempts *fakeAuthAttempts
+	sm       *domain.FlowStateMachineRuntime
 }
 
 func newFlowTestWorld(t *testing.T) *flowTestWorld {
@@ -68,13 +113,48 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 	pws := &fakeUserPasswordRepo{}
 	ids := &fakeIDGen{id: "01TEST"}
 	hasher := fakeHasher{}
+	attempts := &fakeAuthAttempts{nextAttemptID: "att_01TEST"}
 
 	createUser := domain.NewFlowCreateUserHandler(ids, users, pws, hasher)
 	resolver := newDefaultResolver(t)
 	now := func() time.Time { return time.Unix(1700000000, 0).UTC() }
-	sm := domain.NewFlowStateMachine(resolver, createUser, now)
+	sm := domain.NewFlowStateMachine(resolver, createUser, attempts, now)
 
-	return &flowTestWorld{users: users, pws: pws, ids: ids, hasher: hasher, sm: sm}
+	return &flowTestWorld{users: users, pws: pws, ids: ids, hasher: hasher, attempts: attempts, sm: sm}
+}
+
+// loginDefinition builds a single-step login flow: a `credentials`
+// step with email (identifier) + password, no on_success, transitioning
+// to the `done` terminal on `submit` and to `not_found` on
+// `user_not_found`.
+func loginDefinition() *domain.FlowDefinition {
+	show := domain.FlowStepCompleteShow
+	return &domain.FlowDefinition{
+		ProjectID:  testProjectID,
+		ID:         "def-login",
+		UserSchema: defaultSchemaURL,
+		Purposes: map[domain.FlowDefinitionPurpose]string{
+			domain.FlowDefinitionPurposeLogin: "credentials",
+		},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name:   "credentials",
+				Fields: []string{"email", "password"},
+				Transitions: map[string]domain.FlowStepTransition{
+					domain.FlowActionSubmit:                {Target: "done"},
+					domain.FlowImplicitOutcomeUserNotFound: {Target: "not_found"},
+				},
+			},
+			{
+				Name:     "done",
+				Complete: &show,
+			},
+			{
+				Name:     "not_found",
+				Complete: &show,
+			},
+		},
+	}
 }
 
 // signupDefinition builds a single-step signup flow: a `credentials`
@@ -138,6 +218,15 @@ func TestFlowStateMachine_Start_RendersInitialStep(t *testing.T) {
 	if act, ok := result.Step.Actions[domain.FlowActionSubmit]; !ok || !act.Primary {
 		t.Errorf("Step.Actions[submit] = %+v, want primary=true", act)
 	}
+	if len(w.attempts.startCalls) != 1 {
+		t.Fatalf("auth attempt Start called %d times, want 1", len(w.attempts.startCalls))
+	}
+	if got := w.attempts.startCalls[0].ProjectID; got != testProjectID {
+		t.Errorf("Start input ProjectID = %q, want %q", got, testProjectID)
+	}
+	if result.State.AuthAttemptID != "att_01TEST" {
+		t.Errorf("State.AuthAttemptID = %q, want att_01TEST", result.State.AuthAttemptID)
+	}
 }
 
 func TestFlowStateMachine_Process_RegistrationHappyPath(t *testing.T) {
@@ -186,6 +275,126 @@ func TestFlowStateMachine_Process_RegistrationHappyPath(t *testing.T) {
 	}
 	if got := result.State.CollectedData[domain.FlowCollectedUserIDKey]; got != wantUserID {
 		t.Errorf("CollectedData[%s] = %v, want %q", domain.FlowCollectedUserIDKey, got, wantUserID)
+	}
+	if len(w.attempts.completed) != 1 || w.attempts.completed[0] != "att_01TEST" {
+		t.Errorf("auth attempt Complete calls = %v, want [att_01TEST]", w.attempts.completed)
+	}
+	if len(w.attempts.identifyCalls) != 0 {
+		t.Errorf("ResolveIdentifier called %d times on registration, want 0", len(w.attempts.identifyCalls))
+	}
+	if len(w.attempts.passwordCalls) != 0 {
+		t.Errorf("VerifyPassword called %d times on registration, want 0", len(w.attempts.passwordCalls))
+	}
+}
+
+func TestFlowStateMachine_Process_LoginHappyPath(t *testing.T) {
+	w := newFlowTestWorld(t)
+	w.attempts.identifierResult = map[string]domain.FlowResolvedIdentifier{
+		"alice@example.com": {UserID: "user_alice"},
+	}
+	def := loginDefinition()
+
+	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	if err != nil {
+		t.Fatalf("Start error: %v", err)
+	}
+
+	result, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{
+			"email":    "alice@example.com",
+			"password": "correct-horse-battery-staple",
+		},
+	})
+	if err != nil {
+		t.Fatalf("Process error: %v", err)
+	}
+	if result.Step == nil || result.Step.Name != "done" {
+		t.Fatalf("Process step = %+v, want done", result.Step)
+	}
+	if len(w.attempts.identifyCalls) != 1 || w.attempts.identifyCalls[0].Value != "alice@example.com" {
+		t.Errorf("identify calls = %+v, want one for alice@example.com", w.attempts.identifyCalls)
+	}
+	if len(w.attempts.passwordCalls) != 1 || w.attempts.passwordCalls[0].UserID != "user_alice" {
+		t.Errorf("password calls = %+v, want one against user_alice", w.attempts.passwordCalls)
+	}
+	if got := result.State.CollectedData[domain.FlowCollectedUserIDKey]; got != "user_alice" {
+		t.Errorf("CollectedData[%s] = %v, want user_alice", domain.FlowCollectedUserIDKey, got)
+	}
+}
+
+func TestFlowStateMachine_Process_LoginUserNotFound(t *testing.T) {
+	w := newFlowTestWorld(t)
+	def := loginDefinition()
+
+	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	if err != nil {
+		t.Fatalf("Start error: %v", err)
+	}
+
+	result, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{
+			"email":    "ghost@example.com",
+			"password": "irrelevant",
+		},
+	})
+	if err != nil {
+		t.Fatalf("Process error: %v", err)
+	}
+	if result.Step == nil || result.Step.Name != "not_found" {
+		t.Fatalf("Process step = %+v, want not_found", result.Step)
+	}
+	if len(w.attempts.passwordCalls) != 0 {
+		t.Errorf("VerifyPassword called %d times on user_not_found, want 0", len(w.attempts.passwordCalls))
+	}
+}
+
+func TestFlowStateMachine_Process_LoginInvalidPassword(t *testing.T) {
+	w := newFlowTestWorld(t)
+	w.attempts.identifierResult = map[string]domain.FlowResolvedIdentifier{
+		"alice@example.com": {UserID: "user_alice"},
+	}
+	w.attempts.passwordErrs = map[string]error{
+		"wrong-password": domain.ErrFlowPasswordInvalid,
+	}
+	def := loginDefinition()
+
+	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	if err != nil {
+		t.Fatalf("Start error: %v", err)
+	}
+
+	result, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{
+			"email":    "alice@example.com",
+			"password": "wrong-password",
+		},
+	})
+	if err != nil {
+		t.Fatalf("Process error: %v", err)
+	}
+	if result.Step == nil || result.Step.Name != "credentials" {
+		t.Fatalf("Process step = %+v, want stay on credentials", result.Step)
+	}
+	if result.Step.Error == nil {
+		t.Errorf("Step.Error = nil, want a password error key")
 	}
 }
 
