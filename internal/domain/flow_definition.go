@@ -63,11 +63,9 @@ type FlowDefinition struct {
 	UpdatedAt     time.Time
 	// UserSchema is the URL of the JSON schema this flow operates on.
 	UserSchema string
-	// Purposes collapses the OpenAPI `purposes` array and `initial_steps`
-	// map into a single slice of (Purpose, InitialStep) tuples.
-	Purposes []FlowDefinitionPurposeEntry
-	Audience FlowDefinitionAudience
-	Steps    []FlowDefinitionStep
+	Purposes   []FlowDefinitionPurposeEntry
+	Audience   FlowDefinitionAudience
+	Steps      []FlowDefinitionStep
 }
 
 // FlowDefinitionPurposeEntry maps a purpose to its entry-point step within the definition.

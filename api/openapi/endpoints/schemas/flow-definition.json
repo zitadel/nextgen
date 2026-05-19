@@ -7,7 +7,6 @@
     "name",
     "user_schema",
     "purposes",
-    "initial_steps",
     "steps"
   ],
   "additionalProperties": false,
@@ -30,24 +29,6 @@
       "description": "URL of the user schema this flow operates on. Step `fields` reference property names defined in that schema; the engine resolves field type, validation, and implicit transition outcomes from the schema's `x-*` annotations at runtime. URLs follow the same publishing convention as this document."
     },
     "purposes": {
-      "type": "array",
-      "minItems": 1,
-      "uniqueItems": true,
-      "items": {
-        "$ref": "#/$defs/Purpose"
-      },
-      "examples": [
-        [
-          "login"
-        ],
-        [
-          "login",
-          "register"
-        ]
-      ],
-      "description": "Which intents this definition can serve. A definition may handle more than one purpose by exposing a different entry-point step per purpose (see `initial_steps`)."
-    },
-    "initial_steps": {
       "type": "object",
       "minProperties": 1,
       "propertyNames": {
@@ -66,7 +47,7 @@
           "register": "identify"
         }
       ],
-      "description": "Maps each purpose to the step that begins the flow for that purpose. Every key must also appear in `purposes`; every value must match a `name` in `steps`. Both checks are enforced by the engine, not by this schema."
+      "description": "Maps each purpose this definition handles to the step that begins the flow for that purpose. Every value must match a `name` in `steps`; the check is enforced by the engine, not by this schema."
     },
     "audience": {
       "$ref": "#/$defs/Audience",
@@ -141,7 +122,7 @@
             "authenticate",
             "done"
           ],
-          "description": "Unique step identifier within this definition. Slug-shaped so it is safe to use as a transition `target` and as a key in `initial_steps`. Referenced by other steps in the same definition."
+          "description": "Unique step identifier within this definition. Slug-shaped so it is safe to use as a transition `target` and as a value in `purposes`. Referenced by other steps in the same definition."
         },
         "fields": {
           "type": "array",
