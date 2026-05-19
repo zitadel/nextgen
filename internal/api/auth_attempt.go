@@ -9,7 +9,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 )
 
-func (h *Handler) CreateAuthAttempt(ctx context.Context, req *api.CreateAuthAttemptRequest) (api.CreateAuthAttemptRes, error) {
+func (h Handler) CreateAuthAttempt(ctx context.Context, req *api.CreateAuthAttemptRequest) (api.CreateAuthAttemptRes, error) {
 	input := service.CreateAuthAttemptInput{
 		ProjectID: string(req.GetProjectID()),
 	}
@@ -17,23 +17,23 @@ func (h *Handler) CreateAuthAttempt(ctx context.Context, req *api.CreateAuthAtte
 		input.SessionID = new(string(sessionID))
 	}
 
-	attempt, err := h.authAttempts.Create(ctx, input)
+	attempt, err := h.authAttemptService.Create(ctx, input)
 	if err != nil {
 		return nil, err
 	}
 	return authAttemptToAPI(attempt), nil
 }
 
-func (h *Handler) GetAuthAttempt(ctx context.Context, params api.GetAuthAttemptParams) (api.GetAuthAttemptRes, error) {
+func (h Handler) GetAuthAttempt(ctx context.Context, params api.GetAuthAttemptParams) (api.GetAuthAttemptRes, error) {
 	scopeCtx, _ := GetScopeContext(ctx)
-	attempt, err := h.authAttempts.GetByID(ctx, scopeCtx.ProjectID, string(params.AttemptID))
+	attempt, err := h.authAttemptService.GetByID(ctx, scopeCtx.ProjectID, string(params.AttemptID))
 	if err != nil {
 		return nil, err
 	}
 	return authAttemptToAPI(attempt), nil
 }
 
-func (h *Handler) IssueChallenge(ctx context.Context, req *api.IssueChallengeRequest, params api.IssueChallengeParams) (api.IssueChallengeRes, error) {
+func (h Handler) IssueChallenge(ctx context.Context, req *api.IssueChallengeRequest, params api.IssueChallengeParams) (api.IssueChallengeRes, error) {
 	scopeCtx, _ := GetScopeContext(ctx)
 
 	challenge, err := challengeRequestToChallenge(req)
@@ -41,7 +41,7 @@ func (h *Handler) IssueChallenge(ctx context.Context, req *api.IssueChallengeReq
 		return nil, err
 	}
 
-	attempt, err := h.authAttempts.IssueChallenge(ctx, service.IssueChallengeInput{
+	attempt, err := h.authAttemptService.IssueChallenge(ctx, service.IssueChallengeInput{
 		ProjectID: scopeCtx.ProjectID,
 		AttemptID: string(params.AttemptID),
 		Challenge: challenge,
@@ -57,14 +57,14 @@ func (h *Handler) IssueChallenge(ctx context.Context, req *api.IssueChallengeReq
 	return checkToChallenge(check), nil
 }
 
-func (h *Handler) VerifyChallengeProof(ctx context.Context, req *api.VerifyChallengeRequest, params api.VerifyChallengeProofParams) (api.VerifyChallengeProofRes, error) {
+func (h Handler) VerifyChallengeProof(ctx context.Context, req *api.VerifyChallengeRequest, params api.VerifyChallengeProofParams) (api.VerifyChallengeProofRes, error) {
 	scopeCtx, _ := GetScopeContext(ctx)
 
 	proof, err := verifyRequestToProof(req)
 	if err != nil {
 		return nil, err
 	}
-	attempt, err := h.authAttempts.VerifyProof(ctx, service.VerifyProofInput{
+	attempt, err := h.authAttemptService.VerifyProof(ctx, service.VerifyProofInput{
 		ProjectID:   scopeCtx.ProjectID,
 		AttemptID:   string(params.AttemptID),
 		ChallengeID: string(params.ChallengeID),
@@ -76,7 +76,7 @@ func (h *Handler) VerifyChallengeProof(ctx context.Context, req *api.VerifyChall
 	return authAttemptToAPI(attempt), nil
 }
 
-func (h *Handler) CreateHandoff(ctx context.Context, params api.CreateHandoffParams) (api.CreateHandoffRes, error) {
+func (h Handler) CreateHandoff(ctx context.Context, params api.CreateHandoffParams) (api.CreateHandoffRes, error) {
 	scopeCtx, _ := GetScopeContext(ctx)
 	input := service.HandoffInput{
 		ProjectID: scopeCtx.ProjectID,
@@ -85,7 +85,7 @@ func (h *Handler) CreateHandoff(ctx context.Context, params api.CreateHandoffPar
 	if key, ok := params.IdempotencyKey.Get(); ok {
 		input.IdempotencyKey = new(key)
 	}
-	attempt, err := h.authAttempts.Handoff(ctx, input)
+	attempt, err := h.authAttemptService.Handoff(ctx, input)
 	if err != nil {
 		return nil, err
 	}
@@ -210,7 +210,7 @@ func authAttemptToAPI(attempt *domain.AuthAttempt) *api.AuthAttemptResponse {
 		resp.SessionID = api.NewOptNilSessionID(api.SessionID(*attempt.SessionID))
 	}
 	if !attempt.ExpiresAt().IsZero() {
-		resp.ExpiresAt = api.NewOptNilDateTime(attempt.ExpiresAt())
+		resp.ExpiresAt = api.NewOptDateTime(attempt.ExpiresAt())
 	}
 	return resp
 }

@@ -6,7 +6,6 @@ import (
 	"net/url"
 
 	"github.com/muhlemmer/gu"
-	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
@@ -167,15 +166,22 @@ type projectLoader interface {
 
 type userLookup interface {
 	Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*domain.User, error)
+	ProjectIDCondition(projectID string) database.Condition
+	IDCondition(id string) database.Condition
+	AttributesCondition(attributes []domain.Attribute) database.Condition
 }
 
 type userPasswords interface {
 	Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*domain.UserPassword, error)
+	UserIDCondition(userID string) database.Condition
+	ProjectIDCondition(pid string) database.Condition
 }
 
 type userPasskeys interface {
 	Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*domain.UserPasskey, error)
 	List(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) ([]*domain.UserPasskey, error)
+	UserIDCondition(userID string) database.Condition
+	ProjectIDCondition(pid string) database.Condition
 }
 
 // ---- Implementation ----------------------------------------------------------
@@ -216,11 +222,12 @@ func NewAuthAttemptService(
 func (s *authAttemptService) Create(ctx context.Context, input CreateAuthAttemptInput) (res *domain.AuthAttempt, err error) {
 	requiredChecks := input.RequiredChecks
 	if requiredChecks == nil {
-		cfg, err := s.projects.Get(ctx, s.pool, input.ProjectID)
+		project, err := s.projects.Get(ctx, s.pool, input.ProjectID)
 		if err != nil {
 			return nil, domain.ErrInternal(err).WithMessage("failed to load project config")
 		}
-		requiredChecks = cfg.DefaultRequiredChecks
+		_ = project
+		// TODO: requiredChecks = cfg.DefaultRequiredChecks
 	}
 
 	opts := make([]domain.AuthAttemptOption, 0, 1)
@@ -321,7 +328,7 @@ func (s *authAttemptService) buildChallenger(ctx context.Context, attempt *domai
 		}
 		var passkeys []*domain.UserPasskey
 		if userID != "" {
-			passkeys, err = s.userPasskeys.List(ctx, s.pool, attempt.ProjectID, userID)
+			passkeys, err = s.listUserPasskeys(ctx, attempt.ProjectID, userID)
 			if err != nil {
 				return nil, domain.ErrInternal(err).WithMessage("failed to load user passkeys")
 			}
@@ -409,7 +416,22 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 		if err := attempt.PrepareUserVerification(); err != nil {
 			return nil, err
 		}
-		user, err := s.users.Get(ctx, s.pool, attempt.ProjectID, p.LoginName)
+
+		// TODO: get the schema to retrieve the identifying attribute
+		// schema, err := s.schema.Get()
+		// if err != nil {
+		//
+		// }
+		var identifierAttributeKey string
+		user, err := s.users.Get(
+			ctx,
+			s.pool,
+			database.WithCondition(s.users.ProjectIDCondition(attempt.ProjectID)),
+			database.WithCondition(s.users.AttributesCondition([]domain.Attribute{{
+				Key:   identifierAttributeKey,
+				Value: p.LoginName,
+			}})),
+		)
 		if err != nil {
 			return nil, domain.ErrAuthAttemptProofRejected().WithParent(err)
 		}
@@ -422,7 +444,12 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 		if err != nil {
 			return nil, err
 		}
-		password, err := s.userPasswords.Get(ctx, s.pool, attempt.ProjectID, userFactor.UserID)
+		password, err := s.userPasswords.Get(
+			ctx,
+			s.pool,
+			database.WithCondition(s.userPasswords.ProjectIDCondition(attempt.ProjectID)),
+			database.WithCondition(s.userPasswords.UserIDCondition(userFactor.UserID)),
+		)
 		if err != nil {
 			return nil, domain.ErrAuthAttemptProofRejected().WithParent(err)
 		}
@@ -439,15 +466,20 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 		passkeyCheck := check.(*domain.AuthChallengePasskey)
 		var passkeys []*domain.UserPasskey
 		if userID != "" {
-			passkeys, err = s.userPasskeys.List(ctx, s.pool, attempt.ProjectID, userID)
+			passkeys, err = s.listUserPasskeys(ctx, attempt.ProjectID, userID)
 			if err != nil {
 				return nil, err
 			}
 		}
-		getUserPasskeys := func(userID string) ([]*domain.UserPasskey, error) {
-			return s.userPasskeys.List(ctx, s.pool, attempt.ProjectID, userID)
-		}
-		verification, err := domain.VerifyPasskeyChallenge(passkeyCheck.PasskeyChallenge, p.AssertionResponse, userID, passkeys, getUserPasskeys)
+		verification, err := domain.VerifyPasskeyChallenge(
+			passkeyCheck.PasskeyChallenge,
+			p.AssertionResponse,
+			userID,
+			passkeys,
+			func(userID string) ([]*domain.UserPasskey, error) {
+				return s.listUserPasskeys(ctx, attempt.ProjectID, userID)
+			},
+		)
 		if err != nil {
 			return nil, domain.ErrAuthAttemptProofRejected().WithParent(err)
 		}
@@ -466,7 +498,7 @@ func (s *authAttemptService) Handoff(ctx context.Context, input HandoffInput) (*
 		return nil, err
 	}
 
-	if err := attempt.PrepareHandoff(input.IdempotencyKey, s.keyManager); err != nil {
+	if err := attempt.PrepareHandoff(input.IdempotencyKey); err != nil {
 		return nil, err
 	}
 
@@ -474,6 +506,15 @@ func (s *authAttemptService) Handoff(ctx context.Context, input HandoffInput) (*
 		return nil, err
 	}
 	return attempt, nil
+}
+
+func (s *authAttemptService) listUserPasskeys(ctx context.Context, projectID, userID string) ([]*domain.UserPasskey, error) {
+	return s.userPasskeys.List(
+		ctx,
+		s.pool,
+		database.WithCondition(s.userPasskeys.ProjectIDCondition(projectID)),
+		database.WithCondition(s.userPasskeys.UserIDCondition(userID)),
+	)
 }
 
 var _ AuthAttemptService = (*authAttemptService)(nil)

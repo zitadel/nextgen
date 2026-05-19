@@ -6,15 +6,8 @@ import (
 
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
+	"github.com/muhlemmer/gu"
 )
-
-type UserPasskey struct {
-	KeyID                        []byte
-	PublicKey                    []byte
-	AttestationType              string
-	AuthenticatorAttestationGUID []byte
-	SignCount                    uint32
-}
 
 type PasskeyChallenge struct {
 	data                 []byte
@@ -113,12 +106,12 @@ func PasskeysToCredentials(passkeys []*UserPasskey) []webauthn.Credential {
 
 	for _, pkey := range passkeys {
 		creds = append(creds, webauthn.Credential{
-			ID:              pkey.KeyID,
+			ID:              []byte(pkey.CredentialID),
 			PublicKey:       pkey.PublicKey,
-			AttestationType: pkey.AttestationType,
+			AttestationType: gu.Value(pkey.AttestationType),
 			Authenticator: webauthn.Authenticator{
-				AAGUID:    pkey.AuthenticatorAttestationGUID,
-				SignCount: pkey.SignCount,
+				AAGUID:    pkey.AAGUID,
+				SignCount: uint32(pkey.SignCount),
 			},
 		})
 	}

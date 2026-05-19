@@ -28,7 +28,3 @@ type Session struct {
 type SessionRepository interface {
 	GetByID(ctx context.Context, q database.QueryExecutor, projectID, sessionID string) (*Session, error)
 }
-
-type SessionRepository interface {
-	GetByID(ctx context.Context, q database.QueryExecutor, projectID, sessionID string) (*Session, error)
-}

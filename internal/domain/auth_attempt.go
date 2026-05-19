@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/muhlemmer/gu"
-	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -294,7 +293,7 @@ func (a *AuthAttempt) PreparePasskeyVerification() (string, error) {
 // And will generate and store the handoff token.
 // Note: The HandoffToken is generated using a crypto/rand token and stored in a hashed way for security reasons.
 // If an idempotency key is provided and matches the stored idempotency key, the handoff token will not be re-generated.
-func (a *AuthAttempt) PrepareHandoff(idempotencyKey *string, keyManager *crypto.KeyManager) error {
+func (a *AuthAttempt) PrepareHandoff(idempotencyKey *string) error {
 	if a.IsExpired() {
 		return ErrAuthAttemptInvalidState()
 	}
@@ -309,14 +308,14 @@ func (a *AuthAttempt) PrepareHandoff(idempotencyKey *string, keyManager *crypto.
 			gu.Value(idempotencyKey) != gu.Value(a.HandoffIdempotencyKey) {
 			return ErrAuthAttemptAlreadyHandedOff()
 		}
-		// decrypt handoff token and return it
-		if err := a.HandoffToken.Decrypt(keyManager); err != nil {
-			return err
-		}
+		//// decrypt handoff token and return it
+		//if err := a.HandoffToken.Decrypt(keyManager); err != nil {
+		//	return err
+		//}
 		return nil
 	}
 
-	token, err := newHandoffToken(keyManager)
+	token, err := newHandoffToken()
 	if err != nil {
 		return err
 	}
