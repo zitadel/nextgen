@@ -3,7 +3,7 @@
  *
  * Configures the engine per the security pipeline in
  * `docs/design/flowengine/template-security.md` and registers the
- * `| t` filter and `{% mandatory_gates %}` tag from
+ * `| t` filter and `{% fallback_ui %}` tag from
  * `docs/design/branding/templates.md`.
  *
  * Hard rules:
@@ -16,7 +16,7 @@
 import { Liquid } from "liquidjs";
 
 import type { Locale } from "./locales/en.js";
-import { mandatoryGatesMarkerComment } from "./mandatory-gates.js";
+import { fallbackUiMarkerComment } from "./fallback-ui.js";
 import { authFormTemplate } from "./templates/auth-form.liquid.js";
 import { defaultTemplate } from "./templates/default.liquid.js";
 
@@ -72,14 +72,14 @@ export function createLiquidEngine(options: CreateLiquidOptions): Liquid {
     },
   );
 
-  // `{% mandatory_gates %}` — emits a unique marker comment that the
-  // orchestrator post-processes via `patchMandatoryGates`.
-  engine.registerTag("mandatory_gates", {
+  // `{% fallback_ui %}` — emits a unique marker comment that the
+  // orchestrator post-processes via `patchFallbackUi`.
+  engine.registerTag("fallback_ui", {
     parse() {
       // No body, no args — nothing to consume.
     },
     render() {
-      return mandatoryGatesMarkerComment;
+      return fallbackUiMarkerComment;
     },
   });
 

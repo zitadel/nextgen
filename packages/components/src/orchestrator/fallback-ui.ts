@@ -1,5 +1,5 @@
 /**
- * `{% mandatory_gates %}` runtime patcher.
+ * `{% fallback_ui %}` runtime patcher.
  *
  * Per `docs/design/branding/validator.md` §Runtime safety net:
  *
@@ -9,7 +9,7 @@
  *      - Any required `gates[*]` without a matching consumer.
  *      - A `<zl-submit>` if none was reached."
  *
- * Implementation: the LiquidJS `{% mandatory_gates %}` tag emits a unique
+ * Implementation: the LiquidJS `{% fallback_ui %}` tag emits a unique
  * marker comment. After Liquid renders, this patcher parses the produced
  * HTML into a `<template>`, builds any missing atoms as real DOM elements,
  * replaces the marker with them, and serialises back to a string.
@@ -22,11 +22,11 @@ import type { CreateFlow201Step } from "@zitadel-nextgen/api/generated/model";
 
 import type { Locale } from "./locales/en.js";
 
-export const MANDATORY_GATES_MARKER = "ZL_MANDATORY_GATES";
+export const FALLBACK_UI_MARKER = "ZL_FALLBACK_UI";
 
-export const mandatoryGatesMarkerComment = `<!--${MANDATORY_GATES_MARKER}-->`;
+export const fallbackUiMarkerComment = `<!--${FALLBACK_UI_MARKER}-->`;
 
-export function patchMandatoryGates(
+export function patchFallbackUi(
   html: string,
   step: CreateFlow201Step,
   locale: Locale,
@@ -75,6 +75,15 @@ function collectMissingAtoms(
     }
   }
 
+  if (step.gates) {
+    for (const [name, gate] of Object.entries(step.gates)) {
+      if (!gate.required || gate.satisfied) continue;
+      const tagName = `zl-${gate.provider || "captcha"}`;
+      if (fragment.querySelector(tagName)) continue;
+      additions.push(buildGate(name, gate));
+    }
+  }
+
   if (!fragment.querySelector("zl-error")) {
     additions.push(buildErrorOutlet());
   }
@@ -99,7 +108,7 @@ function findMarkerComment(fragment: DocumentFragment): Comment | null {
   );
   let node: Node | null = walker.nextNode();
   while (node) {
-    if (node.nodeValue?.trim() === MANDATORY_GATES_MARKER) {
+    if (node.nodeValue?.trim() === FALLBACK_UI_MARKER) {
       return node as Comment;
     }
     node = walker.nextNode();
@@ -133,6 +142,16 @@ function buildSubmit(name: string, textKey: string | undefined, locale: Locale):
 
 function buildErrorOutlet(): Element {
   return document.createElement("zl-error");
+}
+
+function buildGate(name: string, gate: any): Element {
+  const tagName = `zl-${gate.provider || "captcha"}`;
+  const el = document.createElement(tagName);
+  el.setAttribute("name", name);
+  if (gate.config) {
+    el.setAttribute("config", JSON.stringify(gate.config));
+  }
+  return el;
 }
 
 function lookup(locale: Locale, key: string): string {

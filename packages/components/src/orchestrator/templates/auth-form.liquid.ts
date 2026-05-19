@@ -65,7 +65,7 @@ export const authFormTemplate = String.raw`
       ></zl-passkey>
     {% endif %}
 
-    {% mandatory_gates %}
+    {% fallback_ui %}
   </div>
 </div>
 `;

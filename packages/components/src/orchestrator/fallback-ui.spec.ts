@@ -1,7 +1,7 @@
 import type { CreateFlow201Step } from "@zitadel-nextgen/api/generated/model";
 import { describe, expect, it } from "vitest";
 
-import { mandatoryGatesMarkerComment, patchMandatoryGates } from "./mandatory-gates.js";
+import { fallbackUiMarkerComment, patchFallbackUi } from "./fallback-ui.js";
 
 const locale: Record<string, string> = {
   "identifier.field.email": "Email address",
@@ -19,39 +19,39 @@ const step: CreateFlow201Step = {
   gates: {},
 };
 
-describe("patchMandatoryGates", () => {
+describe("patchFallbackUi", () => {
   it("appends a missing required field at the marker", () => {
-    const html = `<div>${mandatoryGatesMarkerComment}</div>`;
-    const out = patchMandatoryGates(html, step, locale);
-    expect(out).not.toContain(mandatoryGatesMarkerComment);
+    const html = `<div>${fallbackUiMarkerComment}</div>`;
+    const out = patchFallbackUi(html, step, locale);
+    expect(out).not.toContain(fallbackUiMarkerComment);
     expect(out).toContain('<zl-field name="email"');
     expect(out).toContain('label="Email address"');
     expect(out).toContain("required");
   });
 
   it("appends a missing primary submit at the marker", () => {
-    const html = `<zl-field name="email"></zl-field>${mandatoryGatesMarkerComment}`;
-    const out = patchMandatoryGates(html, step, locale);
+    const html = `<zl-field name="email"></zl-field>${fallbackUiMarkerComment}`;
+    const out = patchFallbackUi(html, step, locale);
     expect(out).toContain('<zl-submit action="submit"');
     expect(out).toContain('label="Continue"');
   });
 
   it("appends a missing zl-error outlet", () => {
-    const html = `<zl-field name="email"></zl-field><zl-submit action="submit"></zl-submit>${mandatoryGatesMarkerComment}`;
-    const out = patchMandatoryGates(html, step, locale);
+    const html = `<zl-field name="email"></zl-field><zl-submit action="submit"></zl-submit>${fallbackUiMarkerComment}`;
+    const out = patchFallbackUi(html, step, locale);
     expect(out).toContain("<zl-error></zl-error>");
   });
 
   it("does not add a zl-field when one already exists for the name", () => {
-    const html = `<zl-field name="email"></zl-field><zl-submit action="submit"></zl-submit><zl-error></zl-error>${mandatoryGatesMarkerComment}`;
-    const out = patchMandatoryGates(html, step, locale);
+    const html = `<zl-field name="email"></zl-field><zl-submit action="submit"></zl-submit><zl-error></zl-error>${fallbackUiMarkerComment}`;
+    const out = patchFallbackUi(html, step, locale);
     const fieldMatches = out.match(/<zl-field/g) ?? [];
     expect(fieldMatches.length).toBe(1);
   });
 
   it("appends at end if the marker is missing entirely", () => {
     const html = `<zl-field name="email"></zl-field>`;
-    const out = patchMandatoryGates(html, step, locale);
+    const out = patchFallbackUi(html, step, locale);
     expect(out.startsWith("<zl-field")).toBe(true);
     expect(out).toContain("<zl-submit");
     expect(out).toContain("<zl-error");
@@ -68,7 +68,7 @@ describe("patchMandatoryGates", () => {
         },
       },
     };
-    const out = patchMandatoryGates(mandatoryGatesMarkerComment, malicious, locale);
+    const out = patchFallbackUi(fallbackUiMarkerComment, malicious, locale);
     // The original payload must not appear verbatim — the browser serialiser
     // escapes the closing quote so the value stays trapped inside the
     // attribute. (The HTML spec only requires `&`, `"` and U+00A0 to be

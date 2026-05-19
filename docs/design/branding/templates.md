@@ -2,7 +2,7 @@
 
 **Status:** Stub. Liquid layer is specified with the flow engine docs; grouping TBD ([`README.md`](README.md) q2–q3). **Parent:** [`README.md`](README.md). **See also:** [`../flowengine/template-security.md`](../flowengine/template-security.md) (escape, CSP, banned filters).
 
-A template is a Liquid string the component evaluates against the flow payload. It composes `<zl-*>` atoms in a chosen order and grouping, resolves labels through the i18n filter, and calls `{% mandatory_gates %}` as the safety net. Nothing more.
+A template is a Liquid string the component evaluates against the flow payload. It composes `<zl-*>` atoms in a chosen order and grouping, resolves labels through the i18n filter, and calls `{% fallback_ui %}` as the safety net. Nothing more.
 
 Templates are carried on the branding projection as `branding.liquid_template` (see [`schema.md`](schema.md)); omitting it falls back to the bundled default for the current `branding.layout`.
 
@@ -94,7 +94,7 @@ Templates iterate these bindings. They never mutate them.
       ></zl-action>
     {% endif %}
 
-    {% mandatory_gates %}
+    {% fallback_ui %}
   </div>
 </div>
 ```
@@ -103,7 +103,7 @@ Notes:
 
 - The `font_url` stylesheet is injected by the orchestrator; the template does not emit the `<link>` tag itself.
 - `actions` is a keyed dictionary with a `primary: true` flag on the primary entry; there is no `actions.primary` alias. Exactly one entry must be `primary`.
-- `{% mandatory_gates %}` appends missing required UI. Structural validator requires this tag.
+- `{% fallback_ui %}` appends missing required UI. Structural validator requires this tag.
 
 ## Built-in set
 
@@ -125,9 +125,9 @@ Regardless of grouping decision (open question 3 in [`README.md`](README.md)), e
 - Exactly one `<zl-submit>` wired to the action with `primary: true`.
 - A consumer for every secondary action declared (`<zl-action>` for navigation, `<zl-sso-providers>` for SSO).
 - A `<zl-error>` outlet for step-level errors.
-- A single trailing `{% mandatory_gates %}` tag.
+- A single trailing `{% fallback_ui %}` tag.
 
-The runtime `{% mandatory_gates %}` tag appends any missing required element to the rendered output as a safety net. See [`validator.md`](validator.md) for the static structural-validation equivalent, and [`../flowengine/template-security.md`](../flowengine/template-security.md) for the orthogonal security validator.
+The runtime `{% fallback_ui %}` tag appends any missing required element to the rendered output as a safety net. See [`validator.md`](validator.md) for the static structural-validation equivalent, and [`../flowengine/template-security.md`](../flowengine/template-security.md) for the orthogonal security validator.
 
 ## Grouping (open, README q3)
 

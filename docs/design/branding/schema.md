@@ -170,7 +170,7 @@ Every branding payload the component receives passes through:
 
 1. **Shape validation**: types, enums, URLs, invariants. Every paint, cheap.
 2. **Template validation**: if `liquid_template` is set, structural AST pass vs flow ([`validator.md`](validator.md)). Once per load, cached.
-3. **Runtime safety net**: `{% mandatory_gates %}` appends missing required UI so a bad template still yields a submittable step.
+3. **Runtime safety net**: `{% fallback_ui %}` appends missing required UI so a bad template still yields a submittable step.
 
 Stages 1 and 2 run in the component. Stage 3 runs as part of Liquid rendering. The security pipeline in [`../flowengine/template-security.md`](../flowengine/template-security.md) runs on save server-side; this doc assumes it. The widget does not re-check security at paint time.
 

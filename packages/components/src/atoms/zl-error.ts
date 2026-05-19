@@ -9,7 +9,7 @@ import { tokens } from "../tokens/catalogue.js";
 /**
  * Atom: `<zl-error>` — step-level error outlet.
  *
- * Templates render at most one of these per step (the `{% mandatory_gates %}`
+ * Templates render at most one of these per step (the `{% fallback_ui %}`
  * tag appends one if missing). The host stays in the DOM but collapses to
  * `display: none` when there's neither a `message` property nor slotted
  * content, so layout templates don't have to branch on whether errors exist.

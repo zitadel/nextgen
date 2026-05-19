@@ -2,7 +2,7 @@
 
 How `<zitadel-login>` and the `<zl-*>` atoms keep the login UI accessible and well-behaved with password managers / autofill / screen readers, while remaining encapsulated inside Shadow DOM.
 
-**See also:** [`../cli/bdui-renderer.md`](../cli/bdui-renderer.md) (why Shadow DOM), [`../flowengine/template-security.md`](../flowengine/template-security.md) (`innerHTML` pipeline), [`templates.md`](templates.md) (atom contract), [`validator.md`](validator.md) (`{% mandatory_gates %}`).
+**See also:** [`../cli/bdui-renderer.md`](../cli/bdui-renderer.md) (why Shadow DOM), [`../flowengine/template-security.md`](../flowengine/template-security.md) (`innerHTML` pipeline), [`templates.md`](templates.md) (atom contract), [`validator.md`](validator.md) (`{% fallback_ui %}`).
 
 ## The tension
 
