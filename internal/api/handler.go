@@ -33,7 +33,7 @@ func NewHandler(
 // returned by an endpoint handler into a well-formed error response.
 // By centralizing this logic here, we can ensure that all errors are handled
 // consistently regardless of where they originate.
-func (h Handler) NewError(ctx context.Context, err error) *api.ErrorDetailsStatusCode {
+func (h *Handler) NewError(ctx context.Context, err error) *api.ErrorDetailsStatusCode {
 	return errorResponse(err)
 }
 
