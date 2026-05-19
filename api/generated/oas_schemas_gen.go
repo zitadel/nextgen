@@ -2115,6 +2115,7 @@ func (*ErrorDetailsStatusCode) getFlowStepRes()            {}
 func (*ErrorDetailsStatusCode) getHealthRes()              {}
 func (*ErrorDetailsStatusCode) getKeysRes()                {}
 func (*ErrorDetailsStatusCode) getLiveRes()                {}
+func (*ErrorDetailsStatusCode) getMySessionRes()           {}
 func (*ErrorDetailsStatusCode) getOpenIDConfigurationRes() {}
 func (*ErrorDetailsStatusCode) getProjectRes()             {}
 func (*ErrorDetailsStatusCode) getReadyRes()               {}
@@ -2126,6 +2127,7 @@ func (*ErrorDetailsStatusCode) introspectRes()             {}
 func (*ErrorDetailsStatusCode) listFlowDefinitionsRes()    {}
 func (*ErrorDetailsStatusCode) listSessionsRes()           {}
 func (*ErrorDetailsStatusCode) listUsersRes()              {}
+func (*ErrorDetailsStatusCode) revokeMySessionRes()        {}
 func (*ErrorDetailsStatusCode) revokeSessionRes()          {}
 func (*ErrorDetailsStatusCode) revokeTokenRes()            {}
 func (*ErrorDetailsStatusCode) submitFlowEventRes()        {}
@@ -4327,6 +4329,14 @@ func (s GetLiveOK) Read(p []byte) (n int, err error) {
 }
 
 func (*GetLiveOK) getLiveRes() {}
+
+type GetMySessionNotFound ErrorDetails
+
+func (*GetMySessionNotFound) getMySessionRes() {}
+
+type GetMySessionUnauthorized ErrorDetails
+
+func (*GetMySessionUnauthorized) getMySessionRes() {}
 
 type GetProjectNotFound ErrorDetails
 
@@ -10244,6 +10254,35 @@ func (s *PostTokenRequestGrantType) UnmarshalText(data []byte) error {
 
 type ProjectID string
 
+type RevokeMySessionConflict ErrorDetails
+
+func (*RevokeMySessionConflict) revokeMySessionRes() {}
+
+// RevokeMySessionNoContent is response for RevokeMySession operation.
+type RevokeMySessionNoContent struct {
+	SetCookie OptString
+}
+
+// GetSetCookie returns the value of SetCookie.
+func (s *RevokeMySessionNoContent) GetSetCookie() OptString {
+	return s.SetCookie
+}
+
+// SetSetCookie sets the value of SetCookie.
+func (s *RevokeMySessionNoContent) SetSetCookie(val OptString) {
+	s.SetCookie = val
+}
+
+func (*RevokeMySessionNoContent) revokeMySessionRes() {}
+
+type RevokeMySessionNotFound ErrorDetails
+
+func (*RevokeMySessionNotFound) revokeMySessionRes() {}
+
+type RevokeMySessionUnauthorized ErrorDetails
+
+func (*RevokeMySessionUnauthorized) revokeMySessionRes() {}
+
 // Ref: #
 type RevokeRequest struct {
 	// The token to revoke (access token or refresh token).
@@ -10277,7 +10316,19 @@ type RevokeSessionConflict ErrorDetails
 func (*RevokeSessionConflict) revokeSessionRes() {}
 
 // RevokeSessionNoContent is response for RevokeSession operation.
-type RevokeSessionNoContent struct{}
+type RevokeSessionNoContent struct {
+	SetCookie OptString
+}
+
+// GetSetCookie returns the value of SetCookie.
+func (s *RevokeSessionNoContent) GetSetCookie() OptString {
+	return s.SetCookie
+}
+
+// SetSetCookie sets the value of SetCookie.
+func (s *RevokeSessionNoContent) SetSetCookie(val OptString) {
+	s.SetCookie = val
+}
 
 func (*RevokeSessionNoContent) revokeSessionRes() {}
 
@@ -10540,7 +10591,8 @@ func (s *SessionResponse) SetExpiresAt(val time.Time) {
 	s.ExpiresAt = val
 }
 
-func (*SessionResponse) getSessionRes() {}
+func (*SessionResponse) getMySessionRes() {}
+func (*SessionResponse) getSessionRes()   {}
 
 // Verified authentication factors accumulated by this session.
 // Each key is a factor type (e.g. `password`, `totp`, `passkey`).
@@ -10709,8 +10761,34 @@ func (s *SessionWithTokenResponse) SetSessionToken(val string) {
 	s.SessionToken = val
 }
 
-func (*SessionWithTokenResponse) createSessionRes()   {}
-func (*SessionWithTokenResponse) exchangeHandoffRes() {}
+// SessionWithTokenResponseHeaders wraps SessionWithTokenResponse with response headers.
+type SessionWithTokenResponseHeaders struct {
+	SetCookie OptString
+	Response  SessionWithTokenResponse
+}
+
+// GetSetCookie returns the value of SetCookie.
+func (s *SessionWithTokenResponseHeaders) GetSetCookie() OptString {
+	return s.SetCookie
+}
+
+// GetResponse returns the value of Response.
+func (s *SessionWithTokenResponseHeaders) GetResponse() SessionWithTokenResponse {
+	return s.Response
+}
+
+// SetSetCookie sets the value of SetCookie.
+func (s *SessionWithTokenResponseHeaders) SetSetCookie(val OptString) {
+	s.SetCookie = val
+}
+
+// SetResponse sets the value of Response.
+func (s *SessionWithTokenResponseHeaders) SetResponse(val SessionWithTokenResponse) {
+	s.Response = val
+}
+
+func (*SessionWithTokenResponseHeaders) createSessionRes()   {}
+func (*SessionWithTokenResponseHeaders) exchangeHandoffRes() {}
 
 // An action the user can take. Keyed by action name in the parent dictionary.
 // The action name is sent back in the submit request as `action`.

@@ -109,7 +109,7 @@ func (UnimplementedHandler) CreateProject(ctx context.Context, req *CreateProjec
 // schema-url which will be resolved by the server.
 //
 // POST /schemas
-func (UnimplementedHandler) CreateSchema(ctx context.Context, req CreateSchemaReq, params CreateSchemaParams) (r CreateSchemaRes, _ error) {
+func (UnimplementedHandler) CreateSchema(ctx context.Context, req CreateSchemaReq) (r CreateSchemaRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -230,6 +230,19 @@ func (UnimplementedHandler) GetLive(ctx context.Context) (r GetLiveRes, _ error)
 	return r, ht.ErrNotImplemented
 }
 
+// GetMySession implements getMySession operation.
+//
+// Returns the current state of the current session including its factors and all currently
+// satisfied assurance levels.
+// `assurance_levels[]` may shrink over time as factor freshness windows expire,
+// without the session itself expiring. Use step-up authentication (a new `auth_attempt`
+// against the same `session_id`) to restore a dropped assurance level.
+//
+// GET /sessions/me
+func (UnimplementedHandler) GetMySession(ctx context.Context, params GetMySessionParams) (r GetMySessionRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // GetOpenIDConfiguration implements getOpenIDConfiguration operation.
 //
 // Retrieve the OpenID Connect configuration.
@@ -345,6 +358,19 @@ func (UnimplementedHandler) ListSessions(ctx context.Context, params ListSession
 //
 // GET /user
 func (UnimplementedHandler) ListUsers(ctx context.Context, params ListUsersParams) (r ListUsersRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// RevokeMySession implements revokeMySession operation.
+//
+// Revokes the session immediately (`state: revoked`). This is the logout operation.
+// The __nextgen_session cookie issued at creation (or superseded by a handoff exchange) is required.
+// After revocation, any tokens derived from this session are invalidated including the cookie itself,
+//
+//	which is cleared in the response.
+//
+// DELETE /sessions/me
+func (UnimplementedHandler) RevokeMySession(ctx context.Context, params RevokeMySessionParams) (r RevokeMySessionRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

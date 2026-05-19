@@ -20,11 +20,12 @@ type Handler struct {
 func NewHandler(
 	flowService service.FlowService,
 	authAttemptService service.AuthAttemptService,
+	schemaService service.SchemaService,
 ) *Handler {
 	return &Handler{
 		flowService:        flowService,
 		authAttemptService: authAttemptService,
-		schemaService: schemaService,
+		schemaService:      schemaService,
 	}
 }
 
