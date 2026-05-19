@@ -321,7 +321,7 @@ func TestWriteBuiltinJSONSchema(t *testing.T) {
 		canonical := "https://example.test/app/schemas/user-schema.json"
 		require.NoError(t, domain.WriteBuiltinJSONSchema(&buf, "user-schema.json", canonical))
 		assert.True(t, json.Valid(buf.Bytes()))
-		//assert.Contains(t, buf.String(), canonical) // todo: review $id
+		assert.Contains(t, buf.String(), canonical)
 	})
 	t.Run("unknown schema path", func(t *testing.T) {
 		var buf bytes.Buffer

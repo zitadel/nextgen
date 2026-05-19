@@ -270,15 +270,16 @@ func writeBuiltinJSONSchema(w io.Writer, schemaPath string, canonicalDocumentURL
 	if !ok {
 		return fmt.Errorf("unknown builtin JSON schema path %q", schemaPath)
 	}
+	var doc map[string]any
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		return fmt.Errorf("parse builtin schema %q: %w", schemaPath, err)
+	}
+	doc["$id"] = canonicalDocumentURL
 	idx := strings.LastIndex(canonicalDocumentURL, "/")
 	if idx < 0 {
 		return fmt.Errorf("canonicalDocumentURL %q contains no '/' separator", canonicalDocumentURL)
 	}
 	baseURL := canonicalDocumentURL[:idx]
-	var doc any
-	if err := json.Unmarshal(raw, &doc); err != nil {
-		return fmt.Errorf("parse builtin schema %q: %w", schemaPath, err)
-	}
 	resolved, err := resolveRefs(doc, baseURL)
 	if err != nil {
 		return err
