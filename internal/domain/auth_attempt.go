@@ -37,8 +37,7 @@ func ErrAuthAttemptNotCompleted() Error {
 }
 
 func ErrAuthAttemptAlreadyHandedOff() Error {
-	return newError(PrefixAuthAttempt.ErrorCodePrefix("already_handed_off"), "The auth attempt was already handed off. "+
-		"No new handoff can be created and the previous token will only be returned if the same Idempotency-Key header is provided.", nil, nil)
+	return newError(PrefixAuthAttempt.ErrorCodePrefix("already_handed_off"), "The auth attempt was already handed off. No new handoff can be created and the previous token will only be returned if the same Idempotency-Key header is provided.", nil, nil)
 }
 
 func ErrAuthAttemptInvalidProof() Error {
