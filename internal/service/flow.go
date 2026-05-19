@@ -112,8 +112,8 @@ func (s *flowService) resolveByName(ctx context.Context, req ResolveFlowRequest)
 //
 // TODO: honor [ResolveFlowRequest.Hint]. The MVP returns whichever row the
 // repository yields first; once admin UX produces multiple audience-targeted
-// definitions per purpose, score candidates by AppID > TeamID > UserSchemaID
-// > IsProjectDefault and tie-break by created_at DESC.
+// definitions per purpose, score candidates by AppIDs > TeamIDs >
+// project-wide (both empty) and tie-break by created_at DESC.
 func (s *flowService) resolveByAudience(ctx context.Context, req ResolveFlowRequest) (*domain.FlowDefinition, error) {
 	opts := []domain.FlowDefinitionListOption{
 		domain.WithFlowDefinitionStatus(domain.FlowDefinitionStatusActive),
