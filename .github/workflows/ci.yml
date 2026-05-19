@@ -122,16 +122,12 @@ jobs:
       # console-e2e has no specs yet — it's intentionally excluded until
       # Playwright would otherwise fail with "no tests found".
       #
-      # --parallel=1 serialises the two e2e projects because each spawns its
-      # own @zitadel-nextgen/api-mock on the shared port 4000 — running them
-      # concurrently produces EADDRINUSE on the second project. Per-project
-      # ports would require diverging next.config / nuxt.config proxy
-      # targets and is not worth the complexity for a ~30s CI saving.
+      # demo-next-e2e and demo-nuxt-e2e use distinct api-mock ports
+      # (4000 / 4001) so Nx can run them in parallel without EADDRINUSE.
       - name: End-to-end tests
         run: >-
           corepack pnpm nx run-many -t e2e
           -p @nextgen/demo-next-e2e,@nextgen/demo-nuxt-e2e
-          --parallel=1
 
       - name: Upload Playwright reports on failure
         if: failure()

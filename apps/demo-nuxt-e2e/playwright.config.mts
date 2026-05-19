@@ -28,14 +28,23 @@ export default defineConfig({
   // first request. Direct pnpm filter commands (rather than `nx run …`)
   // avoid the `@nx/playwright/plugin` task graph treating these
   // long-running processes as e2e dependencies that must complete first.
+  //
+  // The api-mock listens on PORT 4001 here so this project can run in
+  // parallel with `apps/demo-next-e2e/` (which uses the default 4000)
+  // under `nx run-many`. Both api-mock (`bin/start.ts` reads PORT) and
+  // the SDKs (NEXTGEN_ISSUER_URL) already accept the override; no
+  // application code changes.
   webServer: [
     {
       command: "pnpm --filter @zitadel-nextgen/api-mock start",
-      url: "http://localhost:4000/.well-known/jwks.json",
+      url: "http://localhost:4001/.well-known/jwks.json",
       reuseExistingServer: true,
       cwd: workspaceRoot,
       stdout: "pipe",
       stderr: "pipe",
+      env: {
+        PORT: "4001",
+      },
     },
     {
       command: "pnpm --filter @nextgen/demo-nuxt dev",
@@ -46,7 +55,7 @@ export default defineConfig({
       stderr: "pipe",
       timeout: 120_000,
       env: {
-        NEXTGEN_ISSUER_URL: "http://localhost:4000",
+        NEXTGEN_ISSUER_URL: "http://localhost:4001",
       },
     },
   ],
