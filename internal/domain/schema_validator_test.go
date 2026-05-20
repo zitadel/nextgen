@@ -11,7 +11,7 @@ import (
 
 const testBuiltinBase = "https://example.test/schemas"
 
-func newTestValidator(t *testing.T) *domain.TenantSchemaValidator {
+func newTestValidator(t *testing.T) *domain.SchemaValidator {
 	t.Helper()
 	v, err := domain.NewTenantSchemaValidator(testBuiltinBase)
 	require.NoError(t, err)
@@ -313,4 +313,42 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSchemaValidator_GetBuiltinSchema(t *testing.T) {
+	v := newTestValidator(t)
+
+	t.Run("returns schema for user-schema kind", func(t *testing.T) {
+		schema, err := v.GetBuiltinSchema(domain.SchemaKindUser)
+		require.NoError(t, err)
+		require.NotNil(t, schema)
+	})
+
+	t.Run("returns schema for flow-definition kind", func(t *testing.T) {
+		schema, err := v.GetBuiltinSchema(domain.SchemaKindFlowDefinition)
+		require.NoError(t, err)
+		require.NotNil(t, schema)
+	})
+
+	t.Run("returns independent clone — mutations do not affect validator", func(t *testing.T) {
+		s1, err := v.GetBuiltinSchema(domain.SchemaKindUser)
+		require.NoError(t, err)
+		// Truncate s1's parts; s2 must remain intact
+		s1.Parts = s1.Parts[:0]
+		s2, err := v.GetBuiltinSchema(domain.SchemaKindUser)
+		require.NoError(t, err)
+		assert.NotEmpty(t, s2.Parts, "second clone should be unaffected by mutation of first")
+	})
+
+	t.Run("returns error for unknown kind", func(t *testing.T) {
+		schema, err := v.GetBuiltinSchema("unknown-kind")
+		require.ErrorIs(t, err, domain.ErrUnknownSchemaKind)
+		assert.Nil(t, schema)
+	})
+
+	t.Run("returns error for empty kind", func(t *testing.T) {
+		schema, err := v.GetBuiltinSchema("")
+		require.ErrorIs(t, err, domain.ErrUnknownSchemaKind)
+		assert.Nil(t, schema)
+	})
 }

@@ -34,21 +34,22 @@ const (
 	SchemaKindFlowDefinition KnownSchemaKind = "flow-definition"
 )
 
+// todo: handling multiple versions of the meta-schemas, e.g. "flow-definition-v1.2.3.json" or "flow-definition/1.2.3/schema.json"?
 var schemaKindPathMap = map[KnownSchemaKind]string{
 	SchemaKindUser:           "user-schema.json",
 	SchemaKindFlowDefinition: "flow-definition.json",
 }
 
-// TenantSchemaValidator validates a tenant schema document against the
+// SchemaValidator validates a tenant schema document against the
 // server-owned meta-schema for its declared kind.
-type TenantSchemaValidator struct {
-	metaSchemas map[KnownSchemaKind]*jsonschema.Schema
+type SchemaValidator struct {
+	compiledSchemas map[KnownSchemaKind]*jsonschema.Schema
 }
 
-// NewTenantSchemaValidator compiles the meta-schemas for the tenant schema kinds into memory and returns a TenantSchemaValidator instance.
+// NewTenantSchemaValidator compiles the meta-schemas for the tenant schema kinds into memory and returns a SchemaValidator instance.
 // The builtinPublicBase is used to construct canonical URLs for the built-in meta-schemas.
 // It must be an absolute URL with a host (e.g. "https://raw.githubusercontent.com/zitadel/nextgen/refs/tags/v1.2.3/api/openapi/endpoints/schemas").
-func NewTenantSchemaValidator(builtinPublicBase string) (*TenantSchemaValidator, error) {
+func NewTenantSchemaValidator(builtinPublicBase string) (*SchemaValidator, error) {
 	if builtinPublicBase == "" {
 		return nil, ErrMissingBuiltinPublicBase
 	}
@@ -80,14 +81,14 @@ func NewTenantSchemaValidator(builtinPublicBase string) (*TenantSchemaValidator,
 		metaSchemas[kind] = metaSchema
 	}
 
-	return &TenantSchemaValidator{
-		metaSchemas: metaSchemas,
+	return &SchemaValidator{
+		compiledSchemas: metaSchemas,
 	}, nil
 }
 
 // ValidateAgainstMetaSchema validates the given tenant schema document against the appropriate meta-schema based on its declared "kind" property.
 // At the moment, only "user-schema" and "flow-definition" are supported.
-func (v *TenantSchemaValidator) ValidateAgainstMetaSchema(tenantSchemaBytes []byte) error {
+func (v *SchemaValidator) ValidateAgainstMetaSchema(tenantSchemaBytes []byte) error {
 	var tenantSchema map[string]any
 	if err := json.Unmarshal(tenantSchemaBytes, &tenantSchema); err != nil {
 		return fmt.Errorf("%w: %w", ErrSchemaParseFailed, err)
@@ -98,15 +99,37 @@ func (v *TenantSchemaValidator) ValidateAgainstMetaSchema(tenantSchemaBytes []by
 		return ErrMissingSchemaKind
 	}
 
-	metaSchema, ok := v.metaSchemas[KnownSchemaKind(kindVal)]
-	if !ok {
-		return fmt.Errorf("%w: %q", ErrUnknownSchemaKind, kindVal)
+	metaSchema, err := v.GetBuiltinSchema(KnownSchemaKind(kindVal))
+	if err != nil {
+		return err
 	}
 
 	if err := metaSchema.Validate(tenantSchema); err != nil {
 		return fmt.Errorf("%w: %w", ErrSchemaValidationFailed, err)
 	}
 	return nil
+}
+
+// GetBuiltinSchema returns a clone of the compiled meta-schema for the given kind.
+// The returned schema has all $refs resolved.
+//
+// Example usage:
+//
+//	flowDefSchema, err := validator.GetBuiltinSchema(SchemaKindFlowDefinition)
+//	if err != nil {
+//		return err
+//	}
+//	if err := flowDefSchema.Validate(flowDefinition); err != nil {
+//		return fmt.Errorf("flow definition invalid: %w", err)
+//	}
+//
+// todo: support fetching compiled schema by version as well when multiple versions of the meta-schemas are available.
+func (v *SchemaValidator) GetBuiltinSchema(kind KnownSchemaKind) (*jsonschema.Schema, error) {
+	compiledSchema, ok := v.compiledSchemas[kind]
+	if !ok {
+		return nil, fmt.Errorf("%w: %q", ErrUnknownSchemaKind, kind)
+	}
+	return compiledSchema.Clone(), nil
 }
 
 // FlattenValidationErrors collects meta-schema validation errors into
