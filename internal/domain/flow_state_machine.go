@@ -269,24 +269,19 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 	return FlowStepResult{State: state, Step: step}, nil
 }
 
-// flowDispatchResult is the per-submit summary of the challenge
-// dispatch loop. Outcome diverts routing (e.g. user_not_found);
-// StepError holds the user on the current step (e.g. invalid password).
-// At most one is set.
+// flowDispatchResult summarizes the challenge dispatch loop. Outcome
+// diverts routing; StepError holds the user on the current step. At
+// most one is set.
 type flowDispatchResult struct {
 	Outcome   string
 	StepError *string
 }
 
-// dispatchChallenges routes per-field submissions into the matching
-// auth-attempt challenge. The auth-attempt domain enforces ordering —
-// password verification requires the user to be identified first — so
-// dispatch runs identifier challenges first, then password challenges.
-//
-// Steps whose on_success is create_user skip dispatch entirely: the
-// create_user handler owns identifier uniqueness and password setting,
-// so calling SubmitIdentifier or SubmitPassword against the same
-// submission would be wrong.
+// dispatchChallenges runs identifier-then-password passes — the
+// auth-attempt domain requires the user to be identified before a
+// password can be verified. Steps with on_success=create_user skip
+// dispatch entirely: create_user owns identifier uniqueness and
+// password setting.
 func (r *FlowStateMachineRuntime) dispatchChallenges(ctx context.Context, state *FlowState, step *FlowDefinitionStep, resolved FlowResolvedFields, fields map[string]any) (flowDispatchResult, error) {
 	if step.OnSuccess != nil && *step.OnSuccess == FlowOnSuccessCreateUser {
 		return flowDispatchResult{}, nil
@@ -381,11 +376,8 @@ func (r *FlowStateMachineRuntime) terminate(ctx context.Context, client database
 	if err != nil {
 		return nil, err
 	}
-	// Completion of the underlying auth attempt is intrinsic to the
-	// last successful SubmitPassword / SubmitIdentifier / … call: the
-	// service writes CompletedAt once all required factors land. The
-	// state machine has no separate Complete to issue here — the
-	// handler picks up the (now-complete) attempt at handoff time.
+	// Auth-attempt completion is intrinsic to the last successful
+	// Submit* call; the handler picks up the attempt at handoff time.
 	kind := *step.Complete
 	rendered.Complete = &kind
 	if kind == FlowStepCompleteRedirect && state.RedirectURI != nil {

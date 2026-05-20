@@ -231,30 +231,3 @@ func (a *authAttemptService) Handoff(ctx context.Context, input HandoffInput) (*
 	//TODO implement me
 	panic("implement me")
 }
-
-// ---- domain.FlowAuthAttemptService -------------------------------------------
-//
-// The flow state machine consumes a narrower view of the auth-attempt
-// domain via [domain.FlowAuthAttemptService] (see
-// internal/domain/flow_auth_attempt.go). *authAttemptService is that
-// view's production implementation: each method here collapses the
-// two-phase IssueChallenge + VerifyProof cycle into a single
-// state-machine-friendly call. Stubs delegate to the existing methods
-// once their bodies are filled in by the auth-attempt PR line.
-
-var _ domain.FlowAuthAttemptService = (*authAttemptService)(nil)
-
-func (a *authAttemptService) Start(ctx context.Context, in domain.FlowCreateAttemptInput) (string, error) {
-	//TODO delegate to a.Create once Create is implemented
-	panic("implement me")
-}
-
-func (a *authAttemptService) SubmitIdentifier(ctx context.Context, in domain.FlowSubmitIdentifierInput) (string, error) {
-	//TODO delegate to a.IssueChallenge(UserChallenge{}) + a.VerifyProof(UserProof{LoginName: in.Value})
-	panic("implement me")
-}
-
-func (a *authAttemptService) SubmitPassword(ctx context.Context, in domain.FlowSubmitPasswordInput) error {
-	//TODO delegate to a.IssueChallenge(PasswordChallenge{}) + a.VerifyProof(PasswordProof{Password: in.Plain})
-	panic("implement me")
-}
