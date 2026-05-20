@@ -8,6 +8,7 @@ import (
 
 	generated "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
+	"github.com/zitadel/nextgen/internal/api/integration_test/test_data"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -22,12 +23,21 @@ type Harness struct {
 	Handler         *api.Handler
 	SecurityHandler *api.SecurityHandler
 
-	SchemaService *service.SchemaService
-	FlowService   service.FlowService
+	SchemaService      *service.SchemaService
+	FlowService        service.FlowService
+	AuthAttemptService service.AuthAttemptService
 
 	SchemaRepo         domain.JSONSchemaRepository
 	SchemaResolver     *domain.JSONSchemaResolver
 	FlowDefinitionRepo domain.FlowDefinitionRepository
+	AuthAttemptRepo    domain.AuthAttemptRepository
+	SessionRepo        domain.SessionRepository
+	ProjectRepo        domain.ProjectRepository
+	UserRepo           domain.UserRepository
+	UserPasswordRepo   domain.UserPasswordRepository
+	UserPasskeyRepo    domain.UserPasskeyRepository
+
+	Schemas test_data.Schemas
 
 	Project *domain.Project
 }

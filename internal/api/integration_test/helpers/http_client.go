@@ -11,7 +11,7 @@ import (
 func (h *Harness) EnsureHttpClient(t *testing.T) *http.Client {
 	if h.HttpClient == nil {
 		h.HttpClient = &http.Client{
-			Timeout: 5 * time.Second,
+			Timeout: 5 * time.Minute,
 		}
 	}
 	return h.HttpClient

@@ -17,7 +17,7 @@ func (h *Harness) EnsureSchemaService(t *testing.T) *service.SchemaService {
 	t.Helper()
 	if h.SchemaService == nil {
 		h.SchemaService = service.NewSchemaService(
-			h.EnsurePgDatabase(t),
+			h.EnsureDBPool(t),
 			h.EnsureSchemaRepo(t),
 			h.EnsureSchemaResolver(t),
 		)
@@ -29,7 +29,7 @@ func (h *Harness) EnsureSchemaRepo(t *testing.T) domain.JSONSchemaRepository {
 	t.Helper()
 	if h.SchemaRepo == nil {
 		h.SchemaRepo = repository.NewJSONSchemaRepository(
-			h.EnsurePgDatabase(t),
+			h.EnsureDBPool(t),
 		)
 	}
 	return h.SchemaRepo

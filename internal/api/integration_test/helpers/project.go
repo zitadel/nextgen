@@ -11,6 +11,17 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database/repository"
 )
 
+func (h *Harness) EnsureProjectRepo(t *testing.T) domain.ProjectRepository {
+	t.Helper()
+	if h.ProjectRepo == nil {
+		h.ProjectRepo = repository.NewProjectRepository(
+			h.EnsureDBPool(t),
+		)
+	}
+
+	return h.ProjectRepo
+}
+
 func (h *Harness) WithProject(t *testing.T) *domain.Project {
 	t.Helper()
 	if h.Project == nil {
@@ -19,7 +30,7 @@ func (h *Harness) WithProject(t *testing.T) *domain.Project {
 			CreatedAt: time.Now().UTC(),
 			UpdatedAt: time.Now().UTC(),
 		}
-		pool := h.EnsurePgDatabase(t)
+		pool := h.EnsureDBPool(t)
 		repo := repository.NewProjectRepository(pool)
 		err := repo.Create(t.Context(), pool, project)
 		require.NoError(t, err)

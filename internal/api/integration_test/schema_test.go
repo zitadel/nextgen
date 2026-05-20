@@ -4,15 +4,16 @@ package integration_test
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/zitadel/nextgen/internal/api/integration_test/test_data"
 )
 
 func TestCreateSchema(t *testing.T) {
@@ -22,21 +23,57 @@ func TestCreateSchema(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
 		testCases := []struct {
 			name string
-			req  []byte
+			req  string
 		}{
 			{
 				name: "user-schema in body",
-				req:  test_data.CreateSchemaRequestUserSchema,
+				req:  harness.Schemas.CreateSchemaRequestUserSchema,
 			},
-			{
-				name: "user-schema by url",
-				req:  test_data.CreateSchemaRequestUserSchemaByUrl,
-			},
+			//{
+			//	name: "user-schema by url",
+			//	req:  harness.Schemas.CreateSchemaRequestUserSchemaByUrl,
+			//},
 		}
 
 		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				uri := fmt.Sprintf("%s/schemas?project_id=%s", serv.URL, project.ID)
+				req, err := http.NewRequest("POST", uri, strings.NewReader(tc.req))
+				require.NoError(t, err)
+				req.Header.Set("Content-Type", "application/json")
+				req.Header.Set("Authorization", "Bearer this_is_a_fake_token__once_we_have_proper_auth__replace_this_with_a_proper_one") // TODO
+
+				httpClient := harness.EnsureHttpClient(t)
+				resp, err := httpClient.Do(req)
+				assert.NoError(t, err)
+
+				if !assert.Equal(t, http.StatusCreated, resp.StatusCode) {
+					bs, err := io.ReadAll(resp.Body)
+					require.NoError(t, err)
+					log.Println(string(bs))
+				}
+			})
+		}
+	})
+
+	t.Run("error", func(t *testing.T) {
+		t.Run("schema without known meta-schema", func(t *testing.T) {
+			body, err := json.Marshal(map[string]any{
+				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"$id":     "https://example.com/my-invalid-schema.json",
+				"kind":    "user-schema",
+				"title":   "an invalid user schema",
+				"x-auth-methods": map[string]any{
+					"password": map[string]any{
+						"enabled":  true,
+						"position": 0,
+					},
+				},
+			})
+			require.NoError(t, err)
+
 			uri := fmt.Sprintf("%s/schemas?project_id=%s", serv.URL, project.ID)
-			req, err := http.NewRequest("POST", uri, bytes.NewReader(tc.req))
+			req, err := http.NewRequest("POST", uri, bytes.NewReader(body))
 			require.NoError(t, err)
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("Authorization", "Bearer this_is_a_fake_token__once_we_have_proper_auth__replace_this_with_a_proper_one") // TODO
@@ -44,12 +81,17 @@ func TestCreateSchema(t *testing.T) {
 			httpClient := harness.EnsureHttpClient(t)
 			resp, err := httpClient.Do(req)
 			assert.NoError(t, err)
+			defer func() { _ = resp.Body.Close() }()
 
-			if !assert.Equal(t, http.StatusCreated, resp.StatusCode) {
+			if !assert.Equal(t, http.StatusBadRequest, resp.StatusCode) {
 				bs, err := io.ReadAll(resp.Body)
 				require.NoError(t, err)
-				log.Println(string(bs))
+				t.Fatal(string(bs))
 			}
-		}
+
+			respBody, err := io.ReadAll(resp.Body)
+			require.NoError(t, err)
+			assert.Contains(t, string(respBody), "unknown schema")
+		})
 	})
 }

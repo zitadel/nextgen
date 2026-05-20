@@ -11,7 +11,7 @@ import (
 
 var Connector database.Connector
 
-func (h *Harness) EnsurePgDatabase(t *testing.T) database.Pool {
+func (h *Harness) EnsureDBPool(t *testing.T) database.Pool {
 	t.Helper()
 
 	if h.DBPool == nil {

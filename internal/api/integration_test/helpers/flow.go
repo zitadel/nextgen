@@ -14,7 +14,7 @@ func (h *Harness) EnsureFlowService(t *testing.T) service.FlowService {
 	t.Helper()
 	if h.FlowService == nil {
 		h.FlowService = service.NewFlowService(
-			h.EnsurePgDatabase(t),
+			h.EnsureDBPool(t),
 			h.EnsureFlowDefinitionRepo(t),
 		)
 	}
@@ -25,7 +25,7 @@ func (h *Harness) EnsureFlowDefinitionRepo(t *testing.T) domain.FlowDefinitionRe
 	t.Helper()
 	if h.FlowDefinitionRepo == nil {
 		h.FlowDefinitionRepo = repository.NewFlowDefinitionRepository(
-			h.EnsurePgDatabase(t),
+			h.EnsureDBPool(t),
 		)
 	}
 	return h.FlowDefinitionRepo

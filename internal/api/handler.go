@@ -2,10 +2,7 @@ package api
 
 import (
 	"context"
-	"errors"
-	"net/http"
 
-	"github.com/ogen-go/ogen/ogenerrors"
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/service"
 )
@@ -15,15 +12,15 @@ type Handler struct {
 	// responses for all endpoints, so only implemented methods need to be defined.
 	api.UnimplementedHandler
 
-	schemaService      service.SchemaService
 	flowService        service.FlowService
 	authAttemptService service.AuthAttemptService
+	schemaService      *service.SchemaService
 }
 
 func NewHandler(
 	flowService service.FlowService,
 	authAttemptService service.AuthAttemptService,
-	schemaService service.SchemaService,
+	schemaService *service.SchemaService,
 ) *Handler {
 	return &Handler{
 		flowService:        flowService,

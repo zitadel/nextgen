@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	generated "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
+	"github.com/zitadel/nextgen/internal/api/integration_test/test_data"
 )
 
 func (h *Harness) EnsureTestServer(t *testing.T) *httptest.Server {
@@ -18,6 +19,7 @@ func (h *Harness) EnsureTestServer(t *testing.T) *httptest.Server {
 			h.EnsureGeneratedServer(t),
 		)
 		t.Cleanup(h.TestServer.Close)
+		h.Schemas = test_data.BuildSchemas(h.TestServer.URL)
 	}
 	return h.TestServer
 }
@@ -39,8 +41,9 @@ func (h *Harness) EnsureHandler(t *testing.T) *api.Handler {
 	t.Helper()
 	if h.Handler == nil {
 		h.Handler = api.NewHandler(
-			h.EnsureSchemaService(t),
 			h.EnsureFlowService(t),
+			h.EnsureAuthAttemptService(t),
+			h.EnsureSchemaService(t),
 		)
 	}
 	return h.Handler
