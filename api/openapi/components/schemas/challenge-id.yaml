@@ -1,4 +1,4 @@
 type: string
-pattern: '^ch_[a-zA-Z0-9_-]+$'
-example: ch_abc123def456
+pattern: '^[a-zA-Z0-9_-]+$'
+example: abc123def456
 description: Unique identifier for this challenge
