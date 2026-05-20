@@ -113,7 +113,7 @@ fixtures:
   [`dev/main.ts`](dev/main.ts) for a working setup. `applyBranding(...)`
   injects a tenant branding overlay merged into every response (presets
   include `font_url` for Inter).
-- **Framework demos (TCP server)** — `pnpm --filter @zitadel-nextgen/api-mock start`
+- **Framework demos (TCP server)** — `corepack pnpm nx start @zitadel-nextgen/api-mock`
   serves the same handlers on port 4000 with `defaultDevBranding` (Arimo
   `font_url`) applied at boot. See [`apps/demo-next`](../../apps/demo-next/README.md)
   and [`apps/demo-nuxt`](../../apps/demo-nuxt/README.md).
@@ -123,12 +123,12 @@ fixtures:
 Two places run the components against `@zitadel-nextgen/api-mock`. They
 have different jobs — keep both:
 
-| Surface | Run | Audience | What it gives you |
+| Surface | Nx command | URLs | What it gives you |
 | --- | --- | --- | --- |
-| **`packages/components/dev/`** | `pnpm --filter @zitadel-nextgen/components dev` | component author | Fast Vite cold-start, no React/Tailwind layer, branding-preset switcher, event log, restart-flow button. Source TS served directly from `src/`. → `http://localhost:5173` |
-| **`apps/console/`** | `pnpm --filter @zitadel-nextgen/console dev` | consumer/integration | Proves the components work inside React via `@lit/react`, inside TanStack Router, inside the Tailwind-styled console shell. MSW is gated on `import.meta.env.DEV`. → `http://localhost:5174` |
-| **`apps/demo-next/`** | mock `:4000` + demo `:3002` | Next.js integration | SDK middleware, client-only `<zitadel-login>`, `<zitadel-logout>` on `/admin`. Loads built `dist/`. |
-| **`apps/demo-nuxt/`** | mock `:4000` + demo `:3001` | Nuxt integration | Nitro middleware, `<ClientOnly>` login, client plugins for components + fonts. Loads built `dist/`. |
+| **Lit playground** | `corepack pnpm nx dev @zitadel-nextgen/components` | [login](http://localhost:5173/?route=login) · [atoms](http://localhost:5173/?route=atoms) | Component author surface: branding presets, event log, source TS from `src/`. MSW runs in the browser — no TCP mock server. |
+| **Console playground** | `corepack pnpm nx dev @zitadel-nextgen/console` | [http://localhost:5174](http://localhost:5174) | Lit vs React atom parity in TanStack Router + Tailwind. MSW in `import.meta.env.DEV`. |
+| **demo-next** | mock `nx start @zitadel-nextgen/api-mock` + `NEXTGEN_ISSUER_URL=http://localhost:4000 nx dev @nextgen/demo-next` | `:3002/login` | Next.js SDK + built `dist/`. See [`apps/demo-next`](../../apps/demo-next/README.md). |
+| **demo-nuxt** | mock + `NEXTGEN_ISSUER_URL=http://localhost:4000 nx dev @nextgen/demo-nuxt` | `:3001/login` | Nuxt SDK + built `dist/`. See [`apps/demo-nuxt`](../../apps/demo-nuxt/README.md). |
 
 The dev playground iterates on the components themselves; the console
 proves they integrate. When tweaking visuals or shadow-DOM behaviour,
@@ -137,7 +137,7 @@ reach for the playground first — it round-trips faster.
 **Stale Lit styles on `:5173`?** Atom `.ts` changes use
 `vite-plugin-web-components-hmr` (Lit HMR). Edits to `shared-component-styles`
 CSS alone trigger a full reload. If it still looks old, run
-`pnpm --filter @zitadel-nextgen/components dev:clean` and hard-refresh.
+`corepack pnpm nx dev:clean @zitadel-nextgen/components` and hard-refresh.
 Console (`:5174`) will not pick up Lit-only edits until you rebuild or
 change the paired React/CSS path.
 
@@ -281,32 +281,39 @@ packages/components/
 
 ## Develop
 
+Use **Nx** for tasks in this monorepo (`corepack pnpm nx <target> <project>`).
+It matches CI caching and dependency order. Equivalent `pnpm --filter …` scripts
+still exist on some packages, but Nx is the documented path.
+
 ```sh
 # install once at the repo root
 corepack pnpm install
 
-# run the playground (atoms + login demo)
-corepack pnpm --filter @zitadel-nextgen/components dev
-# → http://localhost:5173/             playground (?route=login | ?route=atoms)
+# --- Playgrounds (two terminals) ---
 
-# unit tests (jsdom)
-corepack pnpm --filter @zitadel-nextgen/components test
+# Lit: atoms + login, in-browser MSW
+corepack pnpm nx dev @zitadel-nextgen/components
+# → http://localhost:5173/?route=login
+# → http://localhost:5173/?route=atoms
 
-# browser tests (real Chromium via Playwright; covers form-associated behaviour)
-corepack pnpm --filter @zitadel-nextgen/components test:browser
+# Console: Lit vs React atom playground
+corepack pnpm nx dev @zitadel-nextgen/console
+# → http://localhost:5174
 
-# everything
-corepack pnpm --filter @zitadel-nextgen/components test:all
+# --- Package checks ---
 
-# type-check
-corepack pnpm --filter @zitadel-nextgen/components typecheck
-
-# build the publishable bundle (ESM + .d.mts)
-corepack pnpm --filter @zitadel-nextgen/components build
+corepack pnpm nx test @zitadel-nextgen/components
+corepack pnpm nx test:browser @zitadel-nextgen/components
+corepack pnpm nx typecheck @zitadel-nextgen/components
+corepack pnpm nx build @zitadel-nextgen/components
 ```
 
-The dev server imports source TS straight from `src/` and hot-reloads on edits.
-You only need to run `build` to test the published shape of the bundle.
+The components dev server imports source TS from `src/` and hot-reloads on edits.
+Run `build` when testing the published `dist/` shape (demos and npm consumers).
+
+**Framework demos** need the TCP mock plus a rebuild after orchestrator changes —
+see [`apps/demo-next/README.md`](../../apps/demo-next/README.md) and
+[`apps/demo-nuxt/README.md`](../../apps/demo-nuxt/README.md).
 
 ## Testing strategy
 

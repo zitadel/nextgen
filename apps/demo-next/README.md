@@ -4,17 +4,24 @@ A minimal Next.js application demonstrating [Nextgen Auth](../../packages/sdk-ne
 
 ## Running locally
 
-Start the mock auth backend and the demo in separate terminals:
+Use **Nx** from the repo root (`corepack pnpm install` first). Two terminals:
 
 ```bash
 # Terminal 1 — mock auth server on port 4000
-corepack pnpm --filter @zitadel-nextgen/api-mock start
+corepack pnpm nx start @zitadel-nextgen/api-mock
 
-# Terminal 2 — Next.js app on port 3002
-NEXTGEN_ISSUER_URL=http://localhost:4000 corepack pnpm --filter @nextgen/demo-next dev
+# Terminal 2 — Next.js on port 3002
+NEXTGEN_ISSUER_URL=http://localhost:4000 corepack pnpm nx dev @nextgen/demo-next
 ```
 
 Open [http://localhost:3002/login](http://localhost:3002/login). Any email/password combination is accepted by the mock server.
+
+**UI-only iteration** (no Next.js): use the Lit playground or console instead — no TCP mock required:
+
+```bash
+corepack pnpm nx dev @zitadel-nextgen/components   # → http://localhost:5173/?route=login
+corepack pnpm nx dev @zitadel-nextgen/console      # → http://localhost:5174
+```
 
 After changing `@zitadel-nextgen/components`, rebuild before refreshing:
 
