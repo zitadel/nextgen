@@ -21,9 +21,23 @@ export const en: Record<string, string> = {
   // Action labels
   "submit.continue": "Continue",
   "submit.signin": "Sign in",
+  "submit.verify": "Verify",
   "action.register": "Create account",
   "action.forgot_password": "Forgot password?",
   "action.back": "Back",
+  "action.passkey.signin": "Sign in with passkey",
+  "action.passkey.register": "Register with passkey",
+  // Register step
+  "register.title": "Create your account",
+  "register.description": "Fill in your details to get started.",
+  "register.field.email": "Email address",
+  "register.field.given_name": "First name",
+  "register.field.family_name": "Last name",
+  // Passkey ceremony
+  "passkey.challenge.title": "Authenticating\u2026",
+  "passkey.challenge.description": "Complete the passkey ceremony in your browser.",
+  "passkey.enroll.title": "Register your passkey",
+  "passkey.enroll.description": "Use your device to create a passkey for this account.",
   // Errors
   "error.invalid_credentials": "Those credentials don't match. Try again.",
   "error.required": "This field is required.",

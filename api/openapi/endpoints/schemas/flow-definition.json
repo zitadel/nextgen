@@ -165,10 +165,9 @@
         "on_success": {
           "type": "string",
           "enum": [
-            "create_user",
-            "reset_credential"
+            "create_user"
           ],
-          "description": "Server-side mutation to run after the step's fields validate and any auth_attempt verification passes, and before the transition fires. - create_user: materialize the user from collected schema   fields. Used by register flows. - reset_credential: replace a stored credential (e.g. password)   with a freshly-collected value. Used by recovery flows."
+          "description": "Server-side mutation to run after the step's fields validate and before the transition fires. - create_user: materialize the user from collected schema   fields. Used by register flows."
         },
         "complete": {
           "type": "string",

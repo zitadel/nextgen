@@ -6,8 +6,8 @@ properties:
   action:
     type: string
     description: |
-      Which action to take. Either:
-      - A key from the step's `actions` dictionary (e.g., "submit", "register", "back")
+      Which action to take. Must be a key from the step's `actions` dictionary:
+      - A regular action (e.g., "submit", "register", "back")
       - The reserved value "sso" — triggers SSO redirect (requires `sso_provider_id`)
   fields:
     type: object
@@ -20,9 +20,30 @@ properties:
     type: object
     description: |
       Solutions for security gates. Keys match gate names from the step's `gates` dictionary.
-      The orchestrator collects these from `<zl-captcha>` / `<zl-passkey>` component events.
+      The orchestrator collects these from `<zl-captcha>` component events.
     additionalProperties:
       type: string
+  challenge_response:
+    type: object
+    description: |
+      Response to a pending challenge on the step. Required when the step has a
+      `challenge` property (e.g., after submitting a passkey action).
+      The `<zl-passkey>` component populates this after the WebAuthn ceremony.
+    properties:
+      challenge_id:
+        type: string
+        description: |
+          The challenge identifier from `step.challenge.challenge_id`.
+          Matches the server-side challenge for verification.
+      method:
+        type: string
+        description: Which auth method this response is for (e.g., 'passkey').
+      proof:
+        type: object
+        description: |
+          Method-specific proof payload.
+          For passkeys, this is the WebAuthn JSON serialization of PublicKeyCredential.
+        additionalProperties: true
   sso_provider_id:
     type: string
     description: |
