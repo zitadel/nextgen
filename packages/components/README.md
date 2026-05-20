@@ -126,13 +126,14 @@ have different jobs — keep both:
 | Surface | Nx command | URLs | What it gives you |
 | --- | --- | --- | --- |
 | **Lit playground** | `corepack pnpm nx dev @zitadel-nextgen/components` | [login](http://localhost:5173/?route=login) · [atoms](http://localhost:5173/?route=atoms) | Component author surface: branding presets, event log, source TS from `src/`. MSW runs in the browser — no TCP mock server. |
-| **Console playground** | `corepack pnpm nx dev @zitadel-nextgen/console` | [http://localhost:5174](http://localhost:5174) | Lit vs React atom parity in TanStack Router + Tailwind. MSW in `import.meta.env.DEV`. |
-| **demo-next** | mock `nx start @zitadel-nextgen/api-mock` + `NEXTGEN_ISSUER_URL=http://localhost:4000 nx dev @nextgen/demo-next` | `:3002/login` | Next.js SDK + built `dist/`. See [`apps/demo-next`](../../apps/demo-next/README.md). |
-| **demo-nuxt** | mock + `NEXTGEN_ISSUER_URL=http://localhost:4000 nx dev @nextgen/demo-nuxt` | `:3001/login` | Nuxt SDK + built `dist/`. See [`apps/demo-nuxt`](../../apps/demo-nuxt/README.md). |
+| **React console playground** | `corepack pnpm nx dev @zitadel-nextgen/console` | [http://localhost:5174](http://localhost:5174) | `@zitadel-nextgen/ui-react` atom matrices in the pre-release console shell. MSW in `import.meta.env.DEV`. Compare against Lit `:5173/?route=atoms` in a second tab. |
+| **demo-next** | `corepack pnpm nx start @zitadel-nextgen/api-mock` + `NEXTGEN_ISSUER_URL=http://localhost:4000 corepack pnpm nx dev @nextgen/demo-next` | [http://localhost:3002/login](http://localhost:3002/login) (mock on `:4000`) | Next.js SDK, middleware, cookies, built `dist/`. See [`apps/demo-next`](../../apps/demo-next/README.md). |
+| **demo-nuxt** | mock on `:4000`, then `NEXTGEN_ISSUER_URL=http://localhost:4000 corepack pnpm nx dev @nextgen/demo-nuxt` | [http://localhost:3001/login](http://localhost:3001/login) | Nuxt SDK, middleware, cookies, built `dist/`. See [`apps/demo-nuxt`](../../apps/demo-nuxt/README.md). |
 
-The dev playground iterates on the components themselves; the console
-proves they integrate. When tweaking visuals or shadow-DOM behaviour,
-reach for the playground first — it round-trips faster.
+The Lit dev playground iterates on `<zl-*>` source; the React console
+playground exercises `@zitadel-nextgen/ui-react` in the internal shell.
+When tweaking Lit visuals or shadow-DOM behaviour, use `:5173` first —
+it round-trips faster. For React pair tweaks, use `:5174`.
 
 **Stale Lit styles on `:5173`?** Atom `.ts` changes use
 `vite-plugin-web-components-hmr` (Lit HMR). Edits to `shared-component-styles`
@@ -296,9 +297,14 @@ corepack pnpm nx dev @zitadel-nextgen/components
 # → http://localhost:5173/?route=login
 # → http://localhost:5173/?route=atoms
 
-# Console: Lit vs React atom playground
+# React console: ui-react atom playground (compare to Lit ?route=atoms in another tab)
 corepack pnpm nx dev @zitadel-nextgen/console
 # → http://localhost:5174
+
+# Framework demos (TCP mock + SDK) — see apps/demo-*/README.md
+# corepack pnpm nx start @zitadel-nextgen/api-mock   # → http://localhost:4000
+# NEXTGEN_ISSUER_URL=http://localhost:4000 corepack pnpm nx dev @nextgen/demo-next  # → :3002
+# NEXTGEN_ISSUER_URL=http://localhost:4000 corepack pnpm nx dev @nextgen/demo-nuxt  # → :3001
 
 # --- Package checks ---
 

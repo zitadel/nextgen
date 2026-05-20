@@ -16,11 +16,17 @@ NEXTGEN_ISSUER_URL=http://localhost:4000 corepack pnpm nx dev @nextgen/demo-next
 
 Open [http://localhost:3002/login](http://localhost:3002/login). Any email/password combination is accepted by the mock server.
 
-**UI-only iteration** (no Next.js): use the Lit playground or console instead — no TCP mock required:
+**UI-only iteration** (no Next.js, no TCP mock): MSW runs in the browser on these dev servers:
 
 ```bash
-corepack pnpm nx dev @zitadel-nextgen/components   # → http://localhost:5173/?route=login
-corepack pnpm nx dev @zitadel-nextgen/console      # → http://localhost:5174
+# Lit atoms + <zitadel-login> (source from packages/components/src)
+corepack pnpm nx dev @zitadel-nextgen/components
+# → http://localhost:5173/?route=login
+# → http://localhost:5173/?route=atoms
+
+# React paired atoms (@zitadel-nextgen/ui-react) — compare Lit matrices in another tab
+corepack pnpm nx dev @zitadel-nextgen/console
+# → http://localhost:5174
 ```
 
 After changing `@zitadel-nextgen/components`, rebuild before refreshing:

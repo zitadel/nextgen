@@ -16,11 +16,15 @@ NEXTGEN_ISSUER_URL=http://localhost:4000 corepack pnpm nx dev @nextgen/demo-nuxt
 
 Open [http://localhost:3001/login](http://localhost:3001/login). Any email/password combination is accepted by the mock server.
 
-**UI-only iteration** (no Nuxt):
+**UI-only iteration** (no Nuxt, no TCP mock):
 
 ```bash
-corepack pnpm nx dev @zitadel-nextgen/components   # → http://localhost:5173/?route=login
-corepack pnpm nx dev @zitadel-nextgen/console      # → http://localhost:5174
+corepack pnpm nx dev @zitadel-nextgen/components
+# → http://localhost:5173/?route=login
+# → http://localhost:5173/?route=atoms
+
+corepack pnpm nx dev @zitadel-nextgen/console
+# → http://localhost:5174
 ```
 
 After changing `@zitadel-nextgen/components`, rebuild before refreshing:
