@@ -14,6 +14,7 @@ describe("atom event contract", () => {
     "zl-submit": ["zl-submit"],
     "zl-action": ["zl-action"],
     "zl-error": [],
+    "zl-passkey": ["zl-passkey-result", "zl-passkey-error"],
   };
 
   for (const manifest of manifestRegistry) {

@@ -18,3 +18,4 @@ This directory contains architecture decision records (ADRs) for nextgen.
 | [010](010-session-auth-attempt-check-model.md) | Session, Auth Attempt, and Check Persistence | ER model for sessions, auth attempts, checks, and authenticators; handoff and step-up; `failure_count` on checks; merged session and auth-attempt repository module. |
 | [011](011-resource-identifiers.md) | Resource Identifier Strategy | Ephemeral DB-generated integers vs managed API strings; PostgreSQL and Spanner DDL; `database.Identity` in Go. |
 | [012](012-ephemeral-id-api-representation.md) | Ephemeral Identifier API Representation | Placeholder: deferred decision on how ephemeral integer ids appear in HTTP/OpenAPI. |
+| [013](013-passkey-gate-contract.md) | Passkey Action Contract | WebAuthn passkey as actions with `ceremony` property (not gates); structured JSON proofs via `ceremony_proof`; conditional UI via autofill; attestation `none` by default. |
