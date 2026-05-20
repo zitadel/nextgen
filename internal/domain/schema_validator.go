@@ -45,6 +45,9 @@ type TenantSchemaValidator struct {
 	metaSchemas map[KnownSchemaKind]*jsonschema.Schema
 }
 
+// NewTenantSchemaValidator compiles the meta-schemas for the tenant schema kinds into memory and returns a TenantSchemaValidator instance.
+// The builtinPublicBase is used to construct canonical URLs for the built-in meta-schemas.
+// It must be an absolute URL with a host (e.g. "https://raw.githubusercontent.com/zitadel/nextgen/refs/tags/v1.2.3/api/openapi/endpoints/schemas").
 func NewTenantSchemaValidator(builtinPublicBase string) (*TenantSchemaValidator, error) {
 	if builtinPublicBase == "" {
 		return nil, ErrMissingBuiltinPublicBase
@@ -82,7 +85,8 @@ func NewTenantSchemaValidator(builtinPublicBase string) (*TenantSchemaValidator,
 	}, nil
 }
 
-// ValidateAgainstMetaSchema safely checks byte payloads entirely in memory.
+// ValidateAgainstMetaSchema validates the given tenant schema document against the appropriate meta-schema based on its declared "kind" property.
+// At the moment, only "user-schema" and "flow-definition" are supported.
 func (v *TenantSchemaValidator) ValidateAgainstMetaSchema(tenantSchemaBytes []byte) error {
 	var tenantSchema map[string]any
 	if err := json.Unmarshal(tenantSchemaBytes, &tenantSchema); err != nil {
@@ -105,22 +109,6 @@ func (v *TenantSchemaValidator) ValidateAgainstMetaSchema(tenantSchemaBytes []by
 	return nil
 }
 
-func compileMetaSchema(metaURL string, rendered map[string][]byte) (*jsonschema.Schema, error) {
-	cache := make(map[string]*jsonschema.Schema)
-	loader := func(url string) ([]byte, error) {
-		data, ok := rendered[url]
-		if !ok {
-			return nil, fmt.Errorf("%w: %q", ErrMetaSchemaRefNotFound, url)
-		}
-		return data, nil
-	}
-	data, ok := rendered[metaURL]
-	if !ok {
-		return nil, fmt.Errorf("%w: %q", ErrMissingBuiltinMetaSchema, metaURL)
-	}
-	return compileSchema(metaURL, data, 0, DefaultMaxJSONSchemaResolveDepth, cache, loader)
-}
-
 // FlattenValidationErrors collects meta-schema validation errors into
 // a loc → msg map. loc segments are joined with "/" (e.g. "/required/x-auth-methods").
 func FlattenValidationErrors(err error) map[string]string {
@@ -138,9 +126,28 @@ func FlattenValidationErrors(err error) map[string]string {
 	return out
 }
 
+// validationLocString formats the error location as a string.
+// If the location is empty, it returns "/". Otherwise, it joins the segments with "/" and prefixes with "/".
 func validationLocString(ve *types.ValidationError) string {
 	if ve.Loc == nil || len(*ve.Loc) == 0 {
 		return "/"
 	}
 	return "/" + strings.Join(*ve.Loc, "/")
+}
+
+// compileMetaSchema compiles a meta-schema from a rendered JSON document.
+func compileMetaSchema(metaURL string, rendered map[string][]byte) (*jsonschema.Schema, error) {
+	cache := make(map[string]*jsonschema.Schema)
+	loader := func(url string) ([]byte, error) {
+		data, ok := rendered[url]
+		if !ok {
+			return nil, fmt.Errorf("%w: %q", ErrMetaSchemaRefNotFound, url)
+		}
+		return data, nil
+	}
+	data, ok := rendered[metaURL]
+	if !ok {
+		return nil, fmt.Errorf("%w: %q", ErrMissingBuiltinMetaSchema, metaURL)
+	}
+	return compileSchema(metaURL, data, 0, DefaultMaxJSONSchemaResolveDepth, cache, loader)
 }
