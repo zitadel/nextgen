@@ -29,6 +29,7 @@
 import { randomUUID } from "node:crypto";
 import { type Server } from "node:http";
 
+import type { ExchangeHandoff200 } from "@zitadel-nextgen/api/generated/model";
 import express from "express";
 import { createMiddleware } from "@mswjs/http-middleware";
 
@@ -57,7 +58,7 @@ const consumedHandoffJtis = new Set<string>();
  * 60-second handoff lifetime so stale keys don't pile up.
  */
 type IdempotencyCacheEntry = {
-  body: object;
+  body: ExchangeHandoff200;
   setCookie: string[];
 };
 const IDEMPOTENCY_TTL_MS = 60_000;
@@ -120,81 +121,100 @@ export function startMockServer(port: number): Server {
       next();
     });
   };
-  app.post("/sessions/exchange", jsonBodyParser, async (req: express.Request, res: express.Response) => {
-    // Idempotency-Key short-circuit: if the caller already exchanged with
-    // this key inside the cache window, replay the cached body+cookies
-    // without consuming a fresh handoff. Pairs with single-use enforcement
-    // so retries don't accidentally 410 on a network blip.
-    const idempotencyKey = req.header("Idempotency-Key");
-    if (idempotencyKey) {
-      const cached = idempotencyCache.get(idempotencyKey);
-      if (cached) {
-        res.setHeader("Set-Cookie", cached.setCookie);
-        res.json(cached.body);
+  app.post(
+    "/sessions/exchange",
+    jsonBodyParser,
+    async (req: express.Request, res: express.Response) => {
+      // Idempotency-Key short-circuit: if the caller already exchanged with
+      // this key inside the cache window, replay the cached body+cookies
+      // without consuming a fresh handoff. Pairs with single-use enforcement
+      // so retries don't accidentally 410 on a network blip.
+      const idempotencyKey = req.header("Idempotency-Key");
+      if (idempotencyKey) {
+        const cached = idempotencyCache.get(idempotencyKey);
+        if (cached) {
+          res.setHeader("Set-Cookie", cached.setCookie);
+          res.json(cached.body);
+          return;
+        }
+      }
+
+      const { handoff_token } = req.body as { handoff_token?: unknown };
+      if (!handoff_token || typeof handoff_token !== "string") {
+        res
+          .status(400)
+          .json(
+            errorBody("missing_handoff_token", "handoff_token is required and must be a string"),
+          );
         return;
       }
-    }
-
-    const { handoff_token } = req.body as { handoff_token?: unknown };
-    if (!handoff_token || typeof handoff_token !== "string") {
-      res.status(400).json(errorBody("missing_handoff_token", "handoff_token is required and must be a string"));
-      return;
-    }
-    let claims: { sub: string; iss: string; jti?: string };
-    try {
-      claims = await verifyHandoffToken(handoff_token, { expectedIss: iss });
-    } catch (err) {
-      // Spec maps consumed/expired handoff tokens to 410 Gone; every other
-      // verification failure (signature, audience, issuer, structure) is 401.
-      if (err instanceof HandoffError && err.kind === "expired") {
-        res.status(410).json(errorBody("handoff_consumed", "handoff token expired or already consumed"));
+      let claims: { sub: string; iss: string; jti?: string };
+      try {
+        claims = await verifyHandoffToken(handoff_token, { expectedIss: iss });
+      } catch (err) {
+        // Spec maps consumed/expired handoff tokens to 410 Gone; every other
+        // verification failure (signature, audience, issuer, structure) is 401.
+        if (err instanceof HandoffError && err.kind === "expired") {
+          res
+            .status(410)
+            .json(errorBody("handoff_consumed", "handoff token expired or already consumed"));
+          return;
+        }
+        res
+          .status(401)
+          .json(errorBody("invalid_handoff_token", "handoff token failed verification"));
         return;
       }
-      res.status(401).json(errorBody("invalid_handoff_token", "handoff token failed verification"));
-      return;
-    }
-    // Single-use enforcement: once a handoff has been exchanged, any further
-    // exchange (replay) returns 410 just like an expired token would.
-    if (claims.jti !== undefined && consumedHandoffJtis.has(claims.jti)) {
-      res.status(410).json(errorBody("handoff_consumed", "handoff token expired or already consumed"));
-      return;
-    }
-    if (claims.jti !== undefined) consumedHandoffJtis.add(claims.jti);
+      // Single-use enforcement: once a handoff has been exchanged, any further
+      // exchange (replay) returns 410 just like an expired token would.
+      if (claims.jti !== undefined && consumedHandoffJtis.has(claims.jti)) {
+        res
+          .status(410)
+          .json(errorBody("handoff_consumed", "handoff token expired or already consumed"));
+        return;
+      }
+      if (claims.jti !== undefined) consumedHandoffJtis.add(claims.jti);
 
-    const sessionJwt = await signSessionToken({ sub: claims.sub, email: claims.sub, iss });
-    const setCookie = [
-      `__nextgen_session=${sessionJwt}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${SESSION_TTL_SECONDS}`,
-      `_zflow=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
-    ];
-    res.setHeader("Set-Cookie", setCookie);
-    // Spec: 200 returns `session-with-token-response.yaml` —
-    // `{session: <SessionResponse>, session_token}`. The mock synthesises a
-    // minimal session_response from the handoff claims: `state` is "active"
-    // (we just authenticated), `factors` and `assurance_levels` are empty
-    // (the mock has no factor catalogue), and the TTLs come from the
-    // session-cookie window so they stay consistent with the JWT exp.
-    const createdAt = new Date();
-    const expiresAt = new Date(createdAt.getTime() + SESSION_TTL_SECONDS * 1000);
-    const body = {
-      session: {
-        session_id: `sess_${randomUUID().replace(/-/g, "").slice(0, 12)}`,
-        project_id: claims.sub,
-        state: "active",
-        factors: [],
-        assurance_levels: [],
-        created_at: createdAt.toISOString(),
-        expires_at: expiresAt.toISOString(),
-      },
-      session_token: sessionJwt,
-    };
+      const sessionJwt = await signSessionToken({ sub: claims.sub, email: claims.sub, iss });
+      const setCookie = [
+        `__nextgen_session=${sessionJwt}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${SESSION_TTL_SECONDS}`,
+        `_zflow=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
+      ];
+      res.setHeader("Set-Cookie", setCookie);
+      // Spec: 200 returns `session-with-token-response.yaml` —
+      // `{session: <SessionResponse>, session_token}`. The mock synthesises a
+      // minimal session_response from the handoff claims: `state` is "active"
+      // (we just authenticated), `factors` is an empty record and
+      // `assurance_levels` an empty list (the mock has no factor catalogue),
+      // and the TTLs come from the session-cookie window so they stay
+      // consistent with the JWT exp.
+      //
+      // Body is typed against the orval-generated `ExchangeHandoff200` so any
+      // future spec change (added required field, renamed key) surfaces here
+      // as a typecheck error rather than silent runtime drift.
+      const createdAt = new Date();
+      const expiresAt = new Date(createdAt.getTime() + SESSION_TTL_SECONDS * 1000);
+      const body: ExchangeHandoff200 = {
+        session: {
+          session_id: `sess_${randomUUID().replace(/-/g, "").slice(0, 12)}`,
+          project_id: claims.sub,
+          state: "active",
+          factors: {},
+          assurance_levels: [],
+          created_at: createdAt.toISOString(),
+          expires_at: expiresAt.toISOString(),
+        },
+        session_token: sessionJwt,
+      };
 
-    if (idempotencyKey) {
-      idempotencyCache.set(idempotencyKey, { body, setCookie });
-      setTimeout(() => idempotencyCache.delete(idempotencyKey), IDEMPOTENCY_TTL_MS).unref();
-    }
+      if (idempotencyKey) {
+        idempotencyCache.set(idempotencyKey, { body, setCookie });
+        setTimeout(() => idempotencyCache.delete(idempotencyKey), IDEMPOTENCY_TTL_MS).unref();
+      }
 
-    res.json(body);
-  });
+      res.json(body);
+    },
+  );
 
   // ─── OIDC-style end-session ──────────────────────────────────────────────
   // What `<zitadel-logout>` calls via the generated `endSession()` client.
@@ -209,12 +229,7 @@ export function startMockServer(port: number): Server {
   });
 
   // ─── Flow API + Platform API — reuse MSW handlers, zero duplication ──────
-  app.use(
-    createMiddleware(
-      ...setupMockHandlers({ iss }).handlers,
-      ...setupPlatformHandlers(),
-    ),
-  );
+  app.use(createMiddleware(...setupMockHandlers({ iss }).handlers, ...setupPlatformHandlers()));
 
   return app.listen(port, () => {
     console.log(`\napi-mock server listening on http://localhost:${port}`);
