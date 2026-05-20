@@ -23,8 +23,8 @@ var (
 	ErrMaxResolveDepthReached      = errors.New("max resolve depth reached")
 	ErrSchemaValidationFailed      = errors.New("schema validation failed")
 	ErrSchemaParseFailed           = errors.New("schema parse failed")
-	ErrMissingSchemaKind           = errors.New("missing schema kind")
-	ErrUnknownSchemaKind           = errors.New("unknown schema kind")
+	ErrMissingSchemaID             = errors.New("missing schema ID")
+	ErrUnknownSchemaURI            = errors.New("unknown built-in schema URI")
 )
 
 type KnownSchemaKind string
@@ -35,7 +35,7 @@ const (
 )
 
 // todo: handling multiple versions of the meta-schemas, e.g. "flow-definition-v1.2.3.json" or "flow-definition/1.2.3/schema.json"?
-var schemaKindPathMap = map[KnownSchemaKind]string{
+var schemaKindFilenames = map[KnownSchemaKind]string{
 	SchemaKindUser:           "user-schema.json",
 	SchemaKindFlowDefinition: "flow-definition.json",
 }
@@ -43,7 +43,11 @@ var schemaKindPathMap = map[KnownSchemaKind]string{
 // SchemaValidator validates a tenant schema document against the
 // server-owned meta-schema for its declared kind.
 type SchemaValidator struct {
-	compiledSchemas map[KnownSchemaKind]*jsonschema.Schema
+	// compiledSchemas holds all compiled meta-schemas keyed by their canonical URI.
+	compiledSchemas map[string]*jsonschema.Schema
+	// latestURIByKind maps a schema kind stem (e.g. "flow-definition") to the
+	// canonical URI of its latest known version.
+	latestVersionByKind map[KnownSchemaKind]string
 }
 
 // NewTenantSchemaValidator compiles the meta-schemas for the tenant schema kinds into memory and returns a SchemaValidator instance.
@@ -59,7 +63,7 @@ func NewTenantSchemaValidator(builtinPublicBase string) (*SchemaValidator, error
 	}
 	builtinPublicBase = strings.TrimSuffix(builtinPublicBase, "/")
 
-	// Render meta-schema builtins into memory
+	// Render all embedded builtins into memory
 	rendered := make(map[string][]byte)
 	for name := range builtinSchemas {
 		canonicalURL := builtinPublicBase + "/" + name
@@ -70,19 +74,29 @@ func NewTenantSchemaValidator(builtinPublicBase string) (*SchemaValidator, error
 		rendered[canonicalURL] = buf.Bytes()
 	}
 
-	// Compile and resolve the root meta-schemas
-	metaSchemas := make(map[KnownSchemaKind]*jsonschema.Schema)
-	for kind, path := range schemaKindPathMap {
-		metaURL := builtinPublicBase + "/" + path
-		metaSchema, err := compileMetaSchema(metaURL, rendered)
+	// Compile and resolve the rendered schemas under its canonical URL
+	compiledSchemas := make(map[string]*jsonschema.Schema)
+	for uri := range rendered {
+		schema, err := compileMetaSchema(uri, rendered)
 		if err != nil {
-			return nil, fmt.Errorf("%w for kind %q (URL %q): %w", ErrMetaSchemaCompileFailed, kind, metaURL, err)
+			return nil, fmt.Errorf("%w for URI %q: %w", ErrMetaSchemaCompileFailed, uri, err)
 		}
-		metaSchemas[kind] = metaSchema
+		compiledSchemas[uri] = schema
+	}
+
+	// Record the latest URI for each known kind stem.
+	latestURIByKind := make(map[KnownSchemaKind]string, len(schemaKindFilenames))
+	for kind, filename := range schemaKindFilenames {
+		uri := builtinPublicBase + "/" + filename
+		if _, ok := compiledSchemas[uri]; !ok {
+			return nil, fmt.Errorf("%w: no compiled schema for kind %q at URI %q", ErrMissingBuiltinMetaSchema, kind, uri)
+		}
+		latestURIByKind[kind] = uri
 	}
 
 	return &SchemaValidator{
-		compiledSchemas: metaSchemas,
+		compiledSchemas:     compiledSchemas,
+		latestVersionByKind: latestURIByKind,
 	}, nil
 }
 
@@ -94,12 +108,12 @@ func (v *SchemaValidator) ValidateAgainstMetaSchema(tenantSchemaBytes []byte) er
 		return fmt.Errorf("%w: %w", ErrSchemaParseFailed, err)
 	}
 
-	kindVal, _ := tenantSchema["kind"].(string)
-	if kindVal == "" {
-		return ErrMissingSchemaKind
+	schemaID, _ := tenantSchema["$schema"].(string)
+	if schemaID == "" {
+		return ErrMissingSchemaID
 	}
 
-	metaSchema, err := v.GetBuiltinSchema(KnownSchemaKind(kindVal))
+	metaSchema, err := v.GetBuiltinSchema(schemaID)
 	if err != nil {
 		return err
 	}
@@ -124,12 +138,23 @@ func (v *SchemaValidator) ValidateAgainstMetaSchema(tenantSchemaBytes []byte) er
 //	}
 //
 // todo: support fetching compiled schema by version as well when multiple versions of the meta-schemas are available.
-func (v *SchemaValidator) GetBuiltinSchema(kind KnownSchemaKind) (*jsonschema.Schema, error) {
-	compiledSchema, ok := v.compiledSchemas[kind]
+func (v *SchemaValidator) GetBuiltinSchema(uri string) (*jsonschema.Schema, error) {
+	compiledSchema, ok := v.compiledSchemas[uri]
 	if !ok {
-		return nil, fmt.Errorf("%w: %q", ErrUnknownSchemaKind, kind)
+		return nil, fmt.Errorf("%w: %q", ErrUnknownSchemaURI, uri)
 	}
 	return compiledSchema.Clone(), nil
+}
+
+// LatestSchemaURI returns the canonical URI of the latest registered version
+// for the given kind stem (e.g. "flow-definition", "user-schema").
+// This is useful for fetching the latest version of a schema when it's optional to provide a version.
+func (v *SchemaValidator) LatestSchemaURI(kind KnownSchemaKind) (string, error) {
+	uri, ok := v.latestVersionByKind[kind]
+	if !ok {
+		return "", fmt.Errorf("%w: no latest URI for kind %q", ErrUnknownSchemaURI, kind)
+	}
+	return uri, nil
 }
 
 // FlattenValidationErrors collects meta-schema validation errors into
