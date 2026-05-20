@@ -10,9 +10,13 @@
   },
   "type": "module",
   "files": [
+    "dist",
     "src",
     "pairs.json"
   ],
+  "scripts": {
+    "build": "tsdown"
+  },
   "exports": {
     "./package.json": "./package.json",
     "./styles.css": "./src/styles.css",
@@ -20,7 +24,12 @@
     "./text-field.css": "./src/text-field.css",
     "./alert.css": "./src/alert.css",
     "./pill.css": "./src/pill.css",
-    "./attribution-markup": "./src/attribution-markup.ts",
+    "./attribution-markup": {
+      "@zitadel-nextgen/source": "./src/attribution-markup.ts",
+      "types": "./dist/attribution-markup.d.mts",
+      "import": "./dist/attribution-markup.mjs",
+      "default": "./dist/attribution-markup.mjs"
+    },
     "./icon.css": "./src/icon.css",
     "./card.css": "./src/card.css",
     "./page-shell.css": "./src/page-shell.css",
@@ -32,5 +41,16 @@
     "./lit/card-host.css": "./src/lit/card-host.css",
     "./lit/page-shell-host.css": "./src/lit/page-shell-host.css",
     "./pairs.json": "./pairs.json"
+  },
+  "devDependencies": {
+    "tsdown": "catalog:",
+    "tslib": "catalog:"
+  },
+  "nx": {
+    "targets": {
+      "build": {
+        "outputs": ["{projectRoot}/dist"]
+      }
+    }
   }
 }

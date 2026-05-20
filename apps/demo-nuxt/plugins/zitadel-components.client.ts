@@ -5,4 +5,6 @@
  */
 import "@zitadel-nextgen/components";
 
-export default defineNuxtPlugin(() => {});
+export default defineNuxtPlugin(() => {
+  return;
+});

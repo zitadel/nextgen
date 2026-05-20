@@ -387,6 +387,7 @@ export class ZitadelLogin extends LitElement {
       actions: step.actions ?? {},
       gates: step.gates ?? {},
       sso_providers: step.sso_providers ?? [],
+      challenge: step.challenge ?? null,
       messages: [],
       identity: this.deriveIdentity(),
       errors,

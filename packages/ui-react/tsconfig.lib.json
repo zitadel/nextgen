@@ -15,7 +15,7 @@
   "exclude": ["src/**/*.spec.ts", "src/**/*.spec.tsx", "figma/**"],
   "references": [
     {
-      "path": "../shared-component-styles"
+      "path": "../shared-component-styles/tsconfig.lib.json"
     },
     {
       "path": "../design-tokens/tsconfig.lib.json"
