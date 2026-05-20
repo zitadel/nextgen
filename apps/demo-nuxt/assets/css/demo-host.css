@@ -1,0 +1,7 @@
+/* Host page chrome — keep in sync with apps/demo-next/src/app/layout.tsx */
+html,
+body {
+  margin: 0;
+  font-family: sans-serif;
+  background: #f3f4f6;
+}

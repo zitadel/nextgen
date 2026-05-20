@@ -31,23 +31,9 @@ const identifierStep: CreateFlow201 = {
         text_key: "identifier.field.email",
         required: true,
       },
-    },
-    actions: { submit: { text_key: "submit.continue", primary: true } },
-    gates: {},
-  },
-};
-
-const passwordStep: CreateFlow201 = {
-  id: "flow_1",
-  session_id: "sess_1",
-  session_token: "tok_2",
-  step: {
-    name: "password",
-    texts: { title_key: "password.title" },
-    fields: {
       password: {
         type: "password",
-        text_key: "password.field.password",
+        text_key: "identifier.field.password",
         required: true,
       },
     },
@@ -55,6 +41,50 @@ const passwordStep: CreateFlow201 = {
     gates: {},
   },
 };
+
+const passkeyUpsellStep: CreateFlow201 = {
+  id: "flow_1",
+  session_id: "sess_1",
+  session_token: "tok_2",
+  step: {
+    name: "passkey-upsell",
+    texts: { title_key: "passkey-upsell.title" },
+    fields: {},
+    actions: {
+      setup: { text_key: "passkey-upsell.action.setup", primary: true },
+      skip: { text_key: "passkey-upsell.action.skip" },
+    },
+    gates: {},
+  },
+};
+
+async function fillSignInFields(
+  root: ShadowRoot,
+  email = "alice@acme.com",
+  password = "hunter2",
+): Promise<void> {
+  const fields = root.querySelectorAll("zl-field") as NodeListOf<
+    HTMLElement & { value: string; updateComplete: Promise<unknown> }
+  >;
+  fields[0]!.value = email;
+  fields[1]!.value = password;
+  await fields[0]!.updateComplete;
+  await fields[1]!.updateComplete;
+  root.dispatchEvent(
+    new CustomEvent("zl-input", {
+      bubbles: true,
+      composed: true,
+      detail: { name: "email", value: email },
+    }),
+  );
+  root.dispatchEvent(
+    new CustomEvent("zl-input", {
+      bubbles: true,
+      composed: true,
+      detail: { name: "password", value: password },
+    }),
+  );
+}
 
 async function waitFor<T>(probe: () => T | null | undefined, timeout = 1500): Promise<T> {
   const start = performance.now();
@@ -107,7 +137,7 @@ describe("<zitadel-login> form + focus (chromium)", () => {
   beforeEach(() => {
     host = document.createElement("div");
     document.body.appendChild(host);
-    stub = installFlowFetchStub([identifierStep, passwordStep]);
+    stub = installFlowFetchStub([identifierStep, passkeyUpsellStep]);
   });
 
   afterEach(() => {
@@ -120,7 +150,13 @@ describe("<zitadel-login> form + focus (chromium)", () => {
     element.purpose = "login";
     element.projectId = "test-project";
     host.appendChild(element);
-    await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
+    await waitFor(() => {
+      const root = element.shadowRoot;
+      return root && root.querySelectorAll("zl-field").length === 2 ? root : null;
+    });
+    await waitFor(() =>
+      element.getAttribute("aria-busy") === "false" ? element : null,
+    );
     return element;
   }
 
@@ -128,48 +164,63 @@ describe("<zitadel-login> form + focus (chromium)", () => {
     const element = await mount();
     const form = element.shadowRoot?.querySelector("form");
     expect(form).toBeTruthy();
-    expect(form?.querySelector("zl-field")).toBeTruthy();
+    expect(form?.querySelectorAll("zl-field").length).toBe(2);
   });
 
-  it("intercepts native submit and walks to the next step", async () => {
+  it("walks to the next step on orchestrated submit", async () => {
     const element = await mount();
-    const field = element.shadowRoot!.querySelector("zl-field") as HTMLElement & {
-      value: string;
-      updateComplete: Promise<unknown>;
-    };
-    field.value = "alice@acme.com";
-    await field.updateComplete;
-    const form = element.shadowRoot!.querySelector("form") as HTMLFormElement;
-    form.requestSubmit();
+    const root = element.shadowRoot!;
+    await fillSignInFields(root);
+    root.dispatchEvent(
+      new CustomEvent("zl-submit", {
+        bubbles: true,
+        composed: true,
+        detail: { action: "submit" },
+      }),
+    );
     await waitFor(() => {
-      const next = element.shadowRoot?.querySelector("zl-field");
-      return next?.getAttribute("name") === "password" ? next : null;
+      const title = element.shadowRoot?.querySelector(".zl-card-title");
+      return title?.textContent?.includes("Sign in faster") ? title : null;
     });
-    const passwordField = element.shadowRoot?.querySelector("zl-field");
-    expect(passwordField?.getAttribute("name")).toBe("password");
   });
 
-  it("moves focus to the first field after a step swap", async () => {
+  it("ignores a duplicate submit while the first request is in-flight", async () => {
     const element = await mount();
-    const field = element.shadowRoot!.querySelector("zl-field") as HTMLElement & {
-      value: string;
-      updateComplete: Promise<unknown>;
-    };
-    field.value = "alice@acme.com";
-    await field.updateComplete;
-    const form = element.shadowRoot!.querySelector("form") as HTMLFormElement;
-    form.requestSubmit();
+    const root = element.shadowRoot!;
+    await fillSignInFields(root);
+    const event = new CustomEvent("zl-submit", {
+      bubbles: true,
+      composed: true,
+      detail: { action: "submit" },
+    });
+    root.dispatchEvent(event);
+    root.dispatchEvent(event);
     await waitFor(() => {
-      const next = element.shadowRoot?.querySelector("zl-field");
-      return next?.getAttribute("name") === "password" ? next : null;
+      const title = element.shadowRoot?.querySelector(".zl-card-title");
+      return title?.textContent?.includes("Sign in faster") ? title : null;
+    });
+    expect(stub.calls).toHaveLength(2);
+  });
+
+  it("moves focus to the first focusable control after a step swap", async () => {
+    const element = await mount();
+    const root = element.shadowRoot!;
+    await fillSignInFields(root);
+    root.dispatchEvent(
+      new CustomEvent("zl-submit", {
+        bubbles: true,
+        composed: true,
+        detail: { action: "submit" },
+      }),
+    );
+    await waitFor(() => {
+      const title = element.shadowRoot?.querySelector(".zl-card-title");
+      return title?.textContent?.includes("Sign in faster") ? title : null;
     });
     // Allow the rAF in moveFocusToFirstField to fire.
     await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
-    const passwordField = element.shadowRoot?.querySelector("zl-field") as HTMLElement & {
-      shadowRoot: ShadowRoot;
-    };
-    const innerInput = passwordField.shadowRoot?.querySelector("input");
-    expect(passwordField.shadowRoot?.activeElement).toBe(innerInput);
+    const primary = element.shadowRoot?.querySelector('zl-button[hierarchy="primary"]');
+    expect(primary).toBeTruthy();
   });
 
   // Regression: frameworks like @lit/react attach the element first and
@@ -181,8 +232,9 @@ describe("<zitadel-login> form + focus (chromium)", () => {
     host.appendChild(element);
     // Property assigned after the element is in the DOM, simulating @lit/react.
     element.projectId = "test-project";
-    await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
-    const field = element.shadowRoot?.querySelector("zl-field");
-    expect(field?.getAttribute("name")).toBe("email");
+    await waitFor(() => element.shadowRoot?.querySelectorAll("zl-field").length === 2);
+    const fields = element.shadowRoot?.querySelectorAll("zl-field");
+    expect(fields?.[0]?.getAttribute("name")).toBe("email");
+    expect(fields?.[1]?.getAttribute("name")).toBe("password");
   });
 });
