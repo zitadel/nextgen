@@ -53,7 +53,7 @@ type Handler interface {
 	// audience, and the steps involved.
 	//
 	// POST /flow_definitions
-	CreateFlowDefinition(ctx context.Context, req *FlowDefinitionCreateRequest) (CreateFlowDefinitionRes, error)
+	CreateFlowDefinition(ctx context.Context, req *CreateFlowDefinitionRequest) (CreateFlowDefinitionRes, error)
 	// CreateHandoff implements createHandoff operation.
 	//
 	// Completes the authentication attempt and mints a `handoff_token`.

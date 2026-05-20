@@ -17,7 +17,7 @@ post:
     content:
       application/json:
         schema:
-          $ref: ../../components/flows/flow-definition-create-request.yaml
+          $ref: ../../components/flows/create-flow-definition-request.yaml
   responses:
     '201':
       description: Flow definition created successfully.

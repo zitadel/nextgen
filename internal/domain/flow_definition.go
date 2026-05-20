@@ -1,6 +1,9 @@
 package domain
 
-import "time"
+import (
+	"net/url"
+	"time"
+)
 
 //go:generate go tool enumer -type FlowDefinitionStatus -transform snake -trimprefix FlowDefinitionStatus -sql
 type FlowDefinitionStatus uint8
@@ -84,7 +87,7 @@ type FlowDefinition struct {
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 	// UserSchema is the URL of the JSON schema this flow operates on.
-	UserSchema string
+	UserSchema url.URL
 	// Purposes maps each purpose this definition handles to the name of
 	// its entry-point step. Every value must match a step in [Steps].
 	Purposes map[FlowDefinitionPurpose]string

@@ -73,7 +73,7 @@ type Invoker interface {
 	// audience, and the steps involved.
 	//
 	// POST /flow_definitions
-	CreateFlowDefinition(ctx context.Context, request *FlowDefinitionCreateRequest) (CreateFlowDefinitionRes, error)
+	CreateFlowDefinition(ctx context.Context, request *CreateFlowDefinitionRequest) (CreateFlowDefinitionRes, error)
 	// CreateHandoff invokes createHandoff operation.
 	//
 	// Completes the authentication attempt and mints a `handoff_token`.
@@ -1113,12 +1113,12 @@ func (c *Client) sendCreateFlow(ctx context.Context, request *CreateFlowRequest)
 // audience, and the steps involved.
 //
 // POST /flow_definitions
-func (c *Client) CreateFlowDefinition(ctx context.Context, request *FlowDefinitionCreateRequest) (CreateFlowDefinitionRes, error) {
+func (c *Client) CreateFlowDefinition(ctx context.Context, request *CreateFlowDefinitionRequest) (CreateFlowDefinitionRes, error) {
 	res, err := c.sendCreateFlowDefinition(ctx, request)
 	return res, err
 }
 
-func (c *Client) sendCreateFlowDefinition(ctx context.Context, request *FlowDefinitionCreateRequest) (res CreateFlowDefinitionRes, err error) {
+func (c *Client) sendCreateFlowDefinition(ctx context.Context, request *CreateFlowDefinitionRequest) (res CreateFlowDefinitionRes, err error) {
 	// Validate request before sending.
 	if err := func() error {
 		if err := request.Validate(); err != nil {
