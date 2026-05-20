@@ -5,7 +5,6 @@ import (
 	"slices"
 	"time"
 
-	"github.com/muhlemmer/gu"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -61,9 +60,8 @@ type AuthAttempt struct {
 	// The storage layer assigns this value on Create (database-generated identity).
 	ID string
 
-	HandoffToken          *HandoffToken
-	HandedOffAt           *time.Time
-	HandoffIdempotencyKey *string
+	HandoffToken *HandoffToken
+	HandedOffAt  *time.Time
 
 	// Used to link an auth attempt to a session. Use case is step up auth.
 	// In this case we need to copy the factors from the session back to the auth attempt.
@@ -148,6 +146,10 @@ func (a *AuthAttempt) IsCompleted() bool {
 	return true
 }
 
+func (a *AuthAttempt) IsHandedOff() bool {
+	return a.HandoffToken != nil
+}
+
 func (a *AuthAttempt) FactorByType(typ AuthCheckType) (AuthFactor, bool) {
 	for _, check := range a.Checks {
 		challenge, ok := check.(AuthFactor)
@@ -185,8 +187,8 @@ func (a *AuthAttempt) PrepareChallenge(typ AuthCheckType) error {
 	if a.IsExpired() {
 		return ErrAuthAttemptInvalidState()
 	}
-	if a.IsCompleted() {
-		return ErrAuthAttemptAlreadyCompleted()
+	if a.IsHandedOff() {
+		return ErrAuthAttemptAlreadyHandedOff()
 	}
 	//found := slices.Contains(a.RequiredChecks, typ). TODO: do we need to restrict this?
 	//if !found {
@@ -249,8 +251,13 @@ func (a *AuthAttempt) PrepareUserVerification() error {
 	if a.IsExpired() {
 		return ErrAuthAttemptInvalidState()
 	}
-	if a.IsCompleted() {
-		return ErrAuthAttemptAlreadyCompleted()
+	if a.IsHandedOff() {
+		return ErrAuthAttemptAlreadyHandedOff()
+	}
+	for _, check := range a.Checks {
+		if _, ok := check.(AuthFactor); ok && check.Type() != AuthCheckTypeUser {
+			return ErrAuthAttemptInvalidRequest().WithMessage("The user must not be changed after it was authenticated.")
+		}
 	}
 	return nil
 }
@@ -261,8 +268,8 @@ func (a *AuthAttempt) PreparePasswordVerification() (*AuthFactorUser, error) {
 	if a.IsExpired() {
 		return nil, ErrAuthAttemptInvalidState()
 	}
-	if a.IsCompleted() {
-		return nil, ErrAuthAttemptAlreadyCompleted()
+	if a.IsHandedOff() {
+		return nil, ErrAuthAttemptAlreadyHandedOff()
 	}
 	userCheck, ok := CheckAs[*AuthFactorUser](a, AuthCheckTypeUser)
 	if !ok {
@@ -277,8 +284,8 @@ func (a *AuthAttempt) PreparePasskeyVerification() (string, error) {
 	if a.IsExpired() {
 		return "", ErrAuthAttemptInvalidState()
 	}
-	if a.IsCompleted() {
-		return "", ErrAuthAttemptAlreadyCompleted()
+	if a.IsHandedOff() {
+		return "", ErrAuthAttemptAlreadyHandedOff()
 	}
 	userCheck, ok := CheckAs[*AuthFactorUser](a, AuthCheckTypeUser)
 	if !ok {
@@ -290,27 +297,15 @@ func (a *AuthAttempt) PreparePasskeyVerification() (string, error) {
 // PrepareHandoff validates that a handoff can be issued.
 // And will generate and store the handoff token.
 // Note: The HandoffToken is generated using a crypto/rand token and stored in a hashed way for security reasons.
-// If an idempotency key is provided and matches the stored idempotency key, the handoff token will not be re-generated.
-func (a *AuthAttempt) PrepareHandoff(idempotencyKey *string) error {
+func (a *AuthAttempt) PrepareHandoff() error {
 	if a.IsExpired() {
 		return ErrAuthAttemptInvalidState()
 	}
 	if !a.IsCompleted() {
 		return ErrAuthAttemptNotCompleted()
 	}
-
-	// check if there was already a token handed off
-	if a.HandoffToken != nil {
-		// which requires the same idempotency key to be sent again
-		if idempotencyKey == nil ||
-			gu.Value(idempotencyKey) != gu.Value(a.HandoffIdempotencyKey) {
-			return ErrAuthAttemptAlreadyHandedOff()
-		}
-		//// decrypt handoff token and return it
-		//if err := a.HandoffToken.Decrypt(keyManager); err != nil {
-		//	return err
-		//}
-		return nil
+	if a.IsHandedOff() {
+		return ErrAuthAttemptAlreadyHandedOff()
 	}
 
 	token, err := newHandoffToken()
@@ -318,7 +313,6 @@ func (a *AuthAttempt) PrepareHandoff(idempotencyKey *string) error {
 		return err
 	}
 	a.HandoffToken = token
-	a.HandoffIdempotencyKey = idempotencyKey
 	return nil
 }
 
@@ -366,7 +360,7 @@ type AuthAttemptRepository interface {
 	Delete(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string) error
 
 	// Handoff stores the handoff token for an auth attempt and sets the handoff time to the current time.
-	Handoff(ctx context.Context, client database.QueryExecutor, attempt *AuthAttempt, idempotencyKey string) error
+	Handoff(ctx context.Context, client database.QueryExecutor, attempt *AuthAttempt) error
 
 	// SetChallenge sets a check to challenged and sets the challenge payload.
 	// If the check is not stored yet, the method creates a new check with the given type and challenge payload, otherwise it updates the existing check with the new challenge payload and id.

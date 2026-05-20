@@ -5,7 +5,12 @@ import (
 	"time"
 
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/passwap"
 )
+
+func ErrUserPasswordInvalid() Error {
+	return newError("user.password.invalid", "The password is invalid", nil, nil)
+}
 
 type UserPassword struct {
 	ID                  int64
@@ -21,8 +26,11 @@ type UserPassword struct {
 	UpdatedAt           time.Time
 }
 
-
-func (u *UserPassword) Verify(password string) error {
+func (u *UserPassword) Verify(password string, verifier *passwap.Swapper) error {
+	_, err := verifier.Verify(u.EncodedHash, password)
+	if err != nil {
+		return ErrUserPasswordInvalid()
+	}
 	return nil
 }
 

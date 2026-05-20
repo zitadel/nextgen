@@ -1,14 +1,13 @@
 -- +goose Up
 CREATE TABLE zitadel_nextgen.auth_attempts (
-    project_id                TEXT        NOT NULL
-    , id                      BIGINT      GENERATED ALWAYS AS IDENTITY
-    , handoff_token           TEXT
-    , handed_off_at           TIMESTAMPTZ
-    , handoff_idempotency_key TEXT
-    , session_id              BIGINT
-    , required_checks         SMALLINT[]
-    , created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    , time_to_live            INTERVAL
+    project_id          TEXT        NOT NULL
+    , id                BIGINT      GENERATED ALWAYS AS IDENTITY
+    , handoff_token     TEXT
+    , handed_off_at     TIMESTAMPTZ
+    , session_id        BIGINT
+    , required_checks   SMALLINT[]
+    , created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    , time_to_live      INTERVAL
 
     , PRIMARY KEY (project_id, id)
     , UNIQUE (project_id, handoff_token)

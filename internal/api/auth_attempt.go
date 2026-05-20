@@ -92,7 +92,7 @@ func (h Handler) CreateHandoff(ctx context.Context, params api.CreateHandoffPara
 	}
 	return &api.HandoffResponse{
 		HandoffToken: attempt.HandoffToken.Plain(),
-		ExpiresAt:    attempt.HandoffToken.Expiration(attempt.HandedOffAt),
+		ExpiresAt:    attempt.HandoffToken.ExpiresAt(attempt.HandedOffAt),
 	}, nil
 }
 

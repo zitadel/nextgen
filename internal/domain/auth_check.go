@@ -46,10 +46,10 @@ type AuthChallenge interface {
 }
 
 type authChallenge struct {
-	ID               string
-	LastChallengedAt time.Time
-	LastFailedAt     time.Time
-	FailureCount     uint16
+	ID               string    `json:"-"`
+	LastChallengedAt time.Time `json:"-"`
+	LastFailedAt     time.Time `json:"-"`
+	FailureCount     uint16    `json:"-"`
 }
 
 func (a *authChallenge) GetID() string {
@@ -81,7 +81,7 @@ func (a *authChallenge) SetFailureCount(failureCount uint16) {
 }
 
 type authFactor struct {
-	LastVerifiedAt time.Time
+	LastVerifiedAt time.Time `json:"-"`
 }
 
 func (a *authFactor) GetLastVerifiedAt() time.Time {

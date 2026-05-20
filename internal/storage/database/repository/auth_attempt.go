@@ -34,7 +34,7 @@ type pgAuthAttempt struct{}
 
 var _ domain.AuthAttemptRepository = (*pgAuthAttempt)(nil)
 
-const pgAuthAttemptGetSelect = `SELECT aa.project_id, aa.id, aa.handoff_token, aa.handed_off_at, aa.handoff_idempotency_key, aa.session_id,` +
+const pgAuthAttemptGetSelect = `SELECT aa.project_id, aa.id, aa.handoff_token, aa.handed_off_at, aa.session_id,` +
 	` aa.required_checks, aa.created_at, aac.type, aa.time_to_live,` +
 	` aac.challenge_id, aac.last_challenged_at, aac.last_verified_at, aac.last_failed_at, aac.failure_count, aac.challenge_payload, aac.factor_payload` +
 	` FROM zitadel_nextgen.auth_attempts aa` +
@@ -63,24 +63,23 @@ func (a *pgAuthAttempt) scan(rows database.Rows, attempt *domain.AuthAttempt) er
 	for rows.Next() {
 		found = true
 		var (
-			attemptID             database.Identity
-			handoffToken          database.Null[[]byte]
-			handedOffAt           database.Null[time.Time]
-			handoffIdempotencyKey database.Null[string]
-			sessionID             database.Null[int64]
-			requiredChecks        []int16
-			checkType             database.Null[domain.AuthCheckType]
-			timeToLive            *time.Duration
-			challengeID           database.Null[string]
-			lastChallengedAt      database.Null[time.Time]
-			verifiedAt            database.Null[time.Time]
-			lastFailedAt          database.Null[time.Time]
-			failureCount          database.Null[uint16]
-			challenge             json.RawMessage
-			factor                json.RawMessage
+			attemptID        database.Identity
+			handoffToken     database.Null[[]byte]
+			handedOffAt      database.Null[time.Time]
+			sessionID        database.Null[int64]
+			requiredChecks   []int16
+			checkType        database.Null[domain.AuthCheckType]
+			timeToLive       *time.Duration
+			challengeID      database.Null[string]
+			lastChallengedAt database.Null[time.Time]
+			verifiedAt       database.Null[time.Time]
+			lastFailedAt     database.Null[time.Time]
+			failureCount     database.Null[uint16]
+			challenge        json.RawMessage
+			factor           json.RawMessage
 		)
 		err := rows.Scan(
-			&attempt.ProjectID, &attemptID, &handoffToken, &handedOffAt, &handoffIdempotencyKey, &sessionID,
+			&attempt.ProjectID, &attemptID, &handoffToken, &handedOffAt, &sessionID,
 			&requiredChecks, &attempt.CreatedAt, &checkType, &timeToLive,
 			&challengeID, &lastChallengedAt, &verifiedAt, &lastFailedAt, &failureCount, &challenge, &factor)
 		if err != nil {
@@ -93,13 +92,10 @@ func (a *pgAuthAttempt) scan(rows database.Rows, attempt *domain.AuthAttempt) er
 			attempt.RequiredChecks[i] = domain.AuthCheckType(c)
 		}
 		if handoffToken.Valid {
-			attempt.HandoffToken = &domain.HandoffToken{EncryptedToken: handoffToken.V}
+			attempt.HandoffToken = &domain.HandoffToken{TokenHash: handoffToken.V}
 		}
 		if handedOffAt.Valid {
 			attempt.HandedOffAt = &handedOffAt.V
-		}
-		if handoffIdempotencyKey.Valid {
-			attempt.HandoffIdempotencyKey = &handoffIdempotencyKey.V
 		}
 		if sessionID.Valid {
 			s := strconv.FormatInt(sessionID.V, 10)
@@ -244,14 +240,14 @@ func (a *pgAuthAttempt) Delete(ctx context.Context, client database.QueryExecuto
 	return err
 }
 
-func (a *pgAuthAttempt) Handoff(ctx context.Context, client database.QueryExecutor, attempt *domain.AuthAttempt, idempotencyKey string) error {
+func (a *pgAuthAttempt) Handoff(ctx context.Context, client database.QueryExecutor, attempt *domain.AuthAttempt) error {
 	if attempt.HandoffToken == nil {
 		return fmt.Errorf("failed to handoff auth attempt: handoff token is required")
 	}
 	var handedOffAt time.Time
 	err := client.QueryRow(ctx,
-		`UPDATE zitadel_nextgen.auth_attempts SET handoff_token = $3, handed_off_at = NOW(), handoff_idempotency_key = $4 WHERE project_id = $1 AND id = $2 RETURNING handed_off_at`,
-		attempt.ProjectID, database.Identity(attempt.ID), attempt.HandoffToken.EncryptedToken, idempotencyKey).Scan(&handedOffAt)
+		`UPDATE zitadel_nextgen.auth_attempts SET handoff_token = $3, handed_off_at = NOW() WHERE project_id = $1 AND id = $2 RETURNING handed_off_at`,
+		attempt.ProjectID, database.Identity(attempt.ID), attempt.HandoffToken.TokenHash).Scan(&handedOffAt)
 	if err != nil {
 		return fmt.Errorf("failed to handoff auth attempt: %w", err)
 	}
@@ -295,7 +291,7 @@ func (a *pgAuthAttempt) ChallengeSucceeded(ctx context.Context, client database.
 	var lastVerifiedAt time.Time
 	err = client.QueryRow(ctx,
 		`UPDATE zitadel_nextgen.auth_attempt_checks`+
-			` SET last_verified_at = NOW(), factor_payload = $4::JSONB, challenge_payload = NULL, challenge_id = NULL`+
+			` SET last_verified_at = NOW(), factor_payload = $4::JSONB, challenge_payload = NULL, challenge_id = NULL, last_challenged_at = NULL, failure_count = 0`+
 			` WHERE project_id = $1 AND auth_attempt_id = $2 AND type = $3 AND challenge_id = $5`+
 			` RETURNING last_verified_at`,
 		projectID, database.Identity(authAttemptID), factor.Type(), factorPayload, id).
@@ -337,7 +333,7 @@ type spannerAuthAttempt struct{}
 
 var _ domain.AuthAttemptRepository = (*spannerAuthAttempt)(nil)
 
-const spannerAuthAttemptGetSelect = `SELECT aa.project_id, aa.id, aa.handoff_token, aa.handed_off_at, aa.handoff_idempotency_key, aa.session_id,` +
+const spannerAuthAttemptGetSelect = `SELECT aa.project_id, aa.id, aa.handoff_token, aa.handed_off_at, aa.session_id,` +
 	` aa.required_checks, aa.created_at, aac.type, aa.time_to_live,` +
 	` aac.challenge_id, aac.last_challenged_at, aac.last_verified_at, aac.last_failed_at, aac.failure_count, aac.challenge_payload, aac.factor_payload` +
 	` FROM auth_attempts aa` +
@@ -366,21 +362,20 @@ func (a *spannerAuthAttempt) scan(rows database.Rows, attempt *domain.AuthAttemp
 	for rows.Next() {
 		found = true
 		var (
-			attemptID             database.Identity
-			handoffToken          database.Null[[]byte]
-			handedOffAt           database.Null[time.Time]
-			handoffIdempotencyKey database.Null[string]
-			sessionID             database.Null[int64]
-			requiredChecks        []googspanner.NullInt64
-			checkType             database.Null[int64]
-			timeToLiveNanos       database.Null[int64]
-			challengeID           database.Null[string]
-			lastChallengedAt      database.Null[time.Time]
-			verifiedAt            database.Null[time.Time]
-			lastFailedAt          database.Null[time.Time]
-			failureCount          database.Null[int64]
-			challenge             JSON[json.RawMessage]
-			factor                JSON[json.RawMessage]
+			attemptID        database.Identity
+			handoffToken     database.Null[[]byte]
+			handedOffAt      database.Null[time.Time]
+			sessionID        database.Null[int64]
+			requiredChecks   []googspanner.NullInt64
+			checkType        database.Null[int64]
+			timeToLiveNanos  database.Null[int64]
+			challengeID      database.Null[string]
+			lastChallengedAt database.Null[time.Time]
+			verifiedAt       database.Null[time.Time]
+			lastFailedAt     database.Null[time.Time]
+			failureCount     database.Null[int64]
+			challenge        JSON[json.RawMessage]
+			factor           JSON[json.RawMessage]
 		)
 		err := rows.Scan(
 			&attempt.ProjectID, &attemptID, &handoffToken, &handedOffAt, &sessionID,
@@ -396,13 +391,10 @@ func (a *spannerAuthAttempt) scan(rows database.Rows, attempt *domain.AuthAttemp
 			attempt.RequiredChecks[i] = domain.AuthCheckType(c.Int64)
 		}
 		if handoffToken.Valid {
-			attempt.HandoffToken = &domain.HandoffToken{EncryptedToken: handoffToken.V}
+			attempt.HandoffToken = &domain.HandoffToken{TokenHash: handoffToken.V}
 		}
 		if handedOffAt.Valid {
 			attempt.HandedOffAt = &handedOffAt.V
-		}
-		if handoffIdempotencyKey.Valid {
-			attempt.HandoffIdempotencyKey = &handoffIdempotencyKey.V
 		}
 		if sessionID.Valid {
 			attempt.SessionID = new(strconv.FormatInt(sessionID.V, 10))
@@ -500,14 +492,14 @@ func (a *spannerAuthAttempt) Delete(ctx context.Context, client database.QueryEx
 	return err
 }
 
-func (a *spannerAuthAttempt) Handoff(ctx context.Context, client database.QueryExecutor, attempt *domain.AuthAttempt, idempotencyKey string) error {
+func (a *spannerAuthAttempt) Handoff(ctx context.Context, client database.QueryExecutor, attempt *domain.AuthAttempt) error {
 	if attempt.HandoffToken == nil {
 		return fmt.Errorf("failed to handoff auth attempt: handoff token is required")
 	}
 	now := time.Now().UTC()
 	_, err := client.Exec(ctx,
-		`UPDATE auth_attempts SET handoff_token = $1, handed_off_at = $2, handoff_idempotency_key = $3 WHERE project_id = $4 AND id = $5`,
-		*attempt.HandoffToken, now, attempt.ProjectID, idempotencyKey, database.Identity(attempt.ID))
+		`UPDATE auth_attempts SET handoff_token = $1, handed_off_at = $2 WHERE project_id = $3 AND id = $4`,
+		*attempt.HandoffToken, now, attempt.ProjectID, database.Identity(attempt.ID))
 	if err != nil {
 		return fmt.Errorf("failed to handoff auth attempt: %w", err)
 	}
@@ -557,7 +549,7 @@ func (a *spannerAuthAttempt) ChallengeSucceeded(ctx context.Context, client data
 	}
 
 	n, err := client.Exec(ctx,
-		`UPDATE auth_attempt_checks SET last_verified_at = $1, factor_payload = $2, challenge_payload = NULLL, challenge_id = NULLL`+
+		`UPDATE auth_attempt_checks SET last_verified_at = $1, factor_payload = $2, challenge_payload = NULLL, challenge_id = NULLL, last_challenged_at = NULLL, failure_count = 0`+
 			` WHERE project_id = $3 AND auth_attempt_id = $4 AND type = $5 and challenge_id = $6`,
 		now, factorStr, projectID, database.Identity(authAttemptID), int64(factor.Type()), id)
 	if err != nil {

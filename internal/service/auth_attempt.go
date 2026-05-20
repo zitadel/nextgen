@@ -5,9 +5,9 @@ import (
 	"errors"
 	"net/url"
 
-	"github.com/muhlemmer/gu"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/passwap"
 )
 
 // ---- Service interface -------------------------------------------------------
@@ -187,13 +187,14 @@ type userPasskeys interface {
 // ---- Implementation ----------------------------------------------------------
 
 type authAttemptService struct {
-	pool          database.Pool
-	attempts      domain.AuthAttemptRepository
-	sessions      sessionResolver
-	projects      projectLoader
-	users         userLookup
-	userPasswords userPasswords
-	userPasskeys  userPasskeys
+	pool             database.Pool
+	attempts         domain.AuthAttemptRepository
+	sessions         sessionResolver
+	projects         projectLoader
+	users            userLookup
+	userPasswords    userPasswords
+	userPasskeys     userPasskeys
+	passwordVerifier *passwap.Swapper
 }
 
 func NewAuthAttemptService(
@@ -204,15 +205,17 @@ func NewAuthAttemptService(
 	users userLookup,
 	userPasswords userPasswords,
 	userPasskeys userPasskeys,
+	passwordVerifier *passwap.Swapper,
 ) AuthAttemptService {
 	return &authAttemptService{
-		pool:          pool,
-		attempts:      attempts,
-		sessions:      sessions,
-		projects:      projects,
-		users:         users,
-		userPasswords: userPasswords,
-		userPasskeys:  userPasskeys,
+		pool:             pool,
+		attempts:         attempts,
+		sessions:         sessions,
+		projects:         projects,
+		users:            users,
+		userPasswords:    userPasswords,
+		userPasskeys:     userPasskeys,
+		passwordVerifier: passwordVerifier,
 	}
 }
 
@@ -281,7 +284,7 @@ func (s *authAttemptService) IssueChallenge(ctx context.Context, input IssueChal
 func (s *authAttemptService) buildChallenger(ctx context.Context, attempt *domain.AuthAttempt, challenge Challenge) (domain.AuthChallenge, error) {
 	switch typ := challenge.(type) {
 	case UserChallenge:
-		if err := attempt.PrepareChallenge(typ.ChallengeCheckType()); err != nil {
+		if err := attempt.PrepareUserChallenge(); err != nil {
 			return nil, err
 		}
 		userChallenge, err := domain.NewUserAuthCheck()
@@ -412,7 +415,7 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 		if err != nil {
 			return nil, domain.ErrAuthAttemptProofRejected().WithParent(err)
 		}
-		if err := password.Verify(p.Password); err != nil {
+		if err := password.Verify(p.Password, s.passwordVerifier); err != nil {
 			return nil, domain.ErrAuthAttemptProofRejected().WithParent(err)
 		}
 		return &domain.AuthFactorPassword{}, nil
@@ -457,11 +460,11 @@ func (s *authAttemptService) Handoff(ctx context.Context, input HandoffInput) (*
 		return nil, err
 	}
 
-	if err := attempt.PrepareHandoff(input.IdempotencyKey); err != nil {
+	if err := attempt.PrepareHandoff(); err != nil {
 		return nil, err
 	}
 
-	if err := s.attempts.Handoff(ctx, s.pool, attempt, gu.Value(input.IdempotencyKey)); err != nil {
+	if err := s.attempts.Handoff(ctx, s.pool, attempt); err != nil {
 		return nil, err
 	}
 	return attempt, nil
