@@ -33,8 +33,14 @@ export default defineConfig({
     /^lit\//,
     "liquidjs",
     "dompurify",
+    "lucide",
+    /^lucide\//,
     "@zitadel-nextgen/api",
     /^@zitadel-nextgen\/api\//,
     "@zitadel-nextgen/api-mock",
+    "@zitadel-nextgen/design-tokens",
+    /^@zitadel-nextgen\/design-tokens\//,
   ],
+  /** Surface CSS must inline into dist — demos/Next cannot resolve `?inline` from source. */
+  noExternal: [/^@zitadel-nextgen\/shared-component-styles/],
 });

@@ -33,7 +33,9 @@ import type { ExchangeHandoff200 } from "@zitadel-nextgen/api/generated/model";
 import express from "express";
 import { createMiddleware } from "@mswjs/http-middleware";
 
+import { applyBranding } from "./branding.js";
 import { HandoffError, JWK, signSessionToken, verifyHandoffToken } from "./crypto.js";
+import { defaultDevBranding } from "./default-dev-branding.js";
 import { setupMockHandlers } from "./handlers.js";
 import { errorBody, setupPlatformHandlers } from "./platform-handlers.js";
 
@@ -65,6 +67,7 @@ const IDEMPOTENCY_TTL_MS = 60_000;
 const idempotencyCache = new Map<string, IdempotencyCacheEntry>();
 
 export function startMockServer(port: number): Server {
+  applyBranding(defaultDevBranding);
   const iss = `http://localhost:${port}`;
   const app = express();
 

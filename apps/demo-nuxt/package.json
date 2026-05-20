@@ -22,6 +22,8 @@
   "dependencies": {
     "@nextgen/sdk-nuxt": "workspace:*",
     "@zitadel-nextgen/components": "workspace:*",
+    "@zitadel-nextgen/design-tokens": "workspace:*",
+    "@zitadel-nextgen/shared-component-styles": "workspace:*",
     "nuxt": "^4.4.2"
   },
   "devDependencies": {
