@@ -77,8 +77,9 @@ function validFlowDefinitionBody(): Record<string, unknown> {
     name: "login-flow",
     user_schema:
       "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.yaml",
-    purposes: ["login"],
-    initial_steps: { login: "identifier" },
+    // Per `flow-definition.yaml`, `purposes` is an object mapping each
+    // purpose name to its entry-point step (must match a `name` in `steps`).
+    purposes: { login: "identifier" },
     steps: [
       {
         name: "identifier",
