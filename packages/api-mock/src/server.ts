@@ -80,7 +80,9 @@ export function startMockServer(port: number): Server {
     // to Origin-B's request.
     res.setHeader("Vary", "Origin");
     res.setHeader("Access-Control-Allow-Origin", origin ?? "*");
-    if (origin) res.setHeader("Access-Control-Allow-Credentials", "true");
+    if (origin) {
+      res.setHeader("Access-Control-Allow-Credentials", "true");
+    }
     if (req.method === "OPTIONS") {
       // Includes PUT/PATCH/DELETE so cross-origin preflights for the
       // /flow_definitions/:id (PATCH, DELETE) and /schemas/:id (DELETE)
@@ -173,7 +175,9 @@ export function startMockServer(port: number): Server {
           .json(errorBody("handoff_consumed", "handoff token expired or already consumed"));
         return;
       }
-      if (claims.jti !== undefined) consumedHandoffJtis.add(claims.jti);
+      if (claims.jti !== undefined) {
+        consumedHandoffJtis.add(claims.jti);
+      }
 
       const sessionJwt = await signSessionToken({ sub: claims.sub, email: claims.sub, iss });
       const setCookie = [

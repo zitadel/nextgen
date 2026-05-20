@@ -80,7 +80,9 @@ export function errorBody(
 async function readJson(request: Request): Promise<Record<string, unknown> | null> {
   try {
     const parsed = (await request.json()) as unknown;
-    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return null;
+    }
     return parsed as Record<string, unknown>;
   } catch {
     return null;
@@ -180,7 +182,9 @@ export function setupPlatformHandlers() {
     // POST /projects
     http.post("*/projects", async ({ request }) => {
       const raw = await readJson(request);
-      if (raw === null) return HttpResponse.json(INVALID_JSON, { status: 400 });
+      if (raw === null) {
+        return HttpResponse.json(INVALID_JSON, { status: 400 });
+      }
       const body = raw as { previewOrigins?: string[] };
       const id = `proj-${shortId()}`;
       const createdAt = nowIso();
@@ -206,8 +210,9 @@ export function setupPlatformHandlers() {
     // GET /projects/:id
     http.get("*/projects/:id", ({ params }) => {
       const project = store.projects.get(params.id as string);
-      if (!project)
+      if (!project) {
         return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
+      }
       const responseBody: GetProject200 = {
         id: project.id,
         createdAt: project.createdAt,
@@ -221,7 +226,9 @@ export function setupPlatformHandlers() {
       const projectId = params.id as string;
       const challengeId = `chal_${shortId()}`;
       const project = store.projects.get(projectId);
-      if (project) project.challengeId = challengeId;
+      if (project) {
+        project.challengeId = challengeId;
+      }
       return HttpResponse.json({
         claim_url: `https://zitadel.cloud/claim/${projectId}/${challengeId}`,
         challenge_id: challengeId,
@@ -252,7 +259,9 @@ export function setupPlatformHandlers() {
     // We accept either; anything else is 400 invalid_schema.
     http.post("*/schemas", async ({ request }) => {
       const body = await readJson(request);
-      if (body === null) return HttpResponse.json(INVALID_JSON, { status: 400 });
+      if (body === null) {
+        return HttpResponse.json(INVALID_JSON, { status: 400 });
+      }
       const kind = body.kind;
       if (kind !== "user-schema" && kind !== "schema-url") {
         return HttpResponse.json(
@@ -275,8 +284,9 @@ export function setupPlatformHandlers() {
     // GET /schemas/:id
     http.get("*/schemas/:id", ({ params }) => {
       const schema = store.schemas.get(params.id as string);
-      if (!schema)
+      if (!schema) {
         return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
+      }
       return HttpResponse.json(schema);
     }),
 
@@ -294,7 +304,9 @@ export function setupPlatformHandlers() {
     // matching the contract any real backend would enforce.
     http.post("*/flow_definitions", async ({ request }) => {
       const raw = await readJson(request);
-      if (raw === null) return HttpResponse.json(INVALID_JSON, { status: 400 });
+      if (raw === null) {
+        return HttpResponse.json(INVALID_JSON, { status: 400 });
+      }
       const hasEnvelope =
         typeof raw.project_id === "string" &&
         typeof raw.flow_definition === "object" &&
@@ -347,8 +359,9 @@ export function setupPlatformHandlers() {
     // GET /flow_definitions/:id
     http.get("*/flow_definitions/:id", ({ params }) => {
       const record = store.flowDefinitions.get(params.id as string);
-      if (!record)
+      if (!record) {
         return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
+      }
       const responseBody: GetFlowDefinition200 = flowDetailResponse(record);
       return HttpResponse.json(responseBody);
     }),
@@ -362,10 +375,13 @@ export function setupPlatformHandlers() {
     // per `flow-definition-detail-response`.
     http.patch("*/flow_definitions/:id", async ({ params, request }) => {
       const record = store.flowDefinitions.get(params.id as string);
-      if (!record)
+      if (!record) {
         return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
+      }
       const patch = await readJson(request);
-      if (patch === null) return HttpResponse.json(INVALID_JSON, { status: 400 });
+      if (patch === null) {
+        return HttpResponse.json(INVALID_JSON, { status: 400 });
+      }
       record.body = { ...record.body, ...patch };
       record.updatedAt = nowIso();
       const responseBody: UpdateFlowDefinition200 = flowDetailResponse(record);

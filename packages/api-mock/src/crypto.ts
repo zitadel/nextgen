@@ -136,7 +136,9 @@ export async function verifyHandoffToken(
   { expectedIss }: { expectedIss?: string } = {},
 ): Promise<{ sub: string; iss: string; jti?: string }> {
   const parts = token.split(".");
-  if (parts.length !== 3) throw new HandoffError("structure", "invalid token structure");
+  if (parts.length !== 3) {
+    throw new HandoffError("structure", "invalid token structure");
+  }
   const [h, p, s] = parts as [string, string, string];
 
   // Validate algorithm before touching the signature — defence against alg:none attacks.
@@ -152,7 +154,9 @@ export async function verifyHandoffToken(
     fromBase64url(s),
     enc.encode(signing),
   );
-  if (!ok) throw new HandoffError("signature", "invalid signature");
+  if (!ok) {
+    throw new HandoffError("signature", "invalid signature");
+  }
 
   const payload = JSON.parse(dec.decode(fromBase64url(p))) as {
     sub: string;
@@ -162,7 +166,9 @@ export async function verifyHandoffToken(
     nbf?: number;
     jti?: string;
   };
-  if (payload.aud !== "exchange") throw new HandoffError("audience", "wrong audience");
+  if (payload.aud !== "exchange") {
+    throw new HandoffError("audience", "wrong audience");
+  }
   if (payload.exp < Math.floor(Date.now() / 1000)) {
     throw new HandoffError("expired", "token expired");
   }
