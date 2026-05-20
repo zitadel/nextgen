@@ -8,13 +8,21 @@ Start the mock auth backend and the demo in separate terminals:
 
 ```bash
 # Terminal 1 — mock auth server on port 4000
-pnpm --filter @zitadel-nextgen/api-mock start
+corepack pnpm --filter @zitadel-nextgen/api-mock start
 
 # Terminal 2 — Nuxt app on port 3001
-NEXTGEN_ISSUER_URL=http://localhost:4000 pnpm --filter @nextgen/demo-nuxt dev
+NEXTGEN_ISSUER_URL=http://localhost:4000 corepack pnpm --filter @nextgen/demo-nuxt dev
 ```
 
 Open [http://localhost:3001/login](http://localhost:3001/login). Any email/password combination is accepted by the mock server.
+
+After changing `@zitadel-nextgen/components`, rebuild before refreshing:
+
+```bash
+corepack pnpm nx build @zitadel-nextgen/components
+```
+
+The demo imports the package from `dist/`, not source.
 
 ## What it shows
 
@@ -32,6 +40,15 @@ Open [http://localhost:3001/login](http://localhost:3001/login). Any email/passw
 **Login page** renders the `<zitadel-login>` web component (from `@zitadel-nextgen/components`) inside `<ClientOnly>` to avoid SSR.
 
 **Admin page** reads `useState('nextgen-auth')` to display the signed-in user's email, with the `<zitadel-logout>` component in the header.
+
+**Client plugins** (do not import `@zitadel-nextgen/components` from page `<script setup>` — that runs during SSR and breaks hydration/fonts):
+
+| Plugin | Role |
+| ------ | ---- |
+| `plugins/zitadel-components.client.ts` | Registers `<zitadel-login>` and `<zitadel-logout>` on the client |
+| `plugins/auth.server.ts` | Seeds `useState('nextgen-auth')` from verified middleware context |
+
+**Fonts and branding** — same as demo-next: the mock server applies `defaultDevBranding` (Arimo `font_url`), and `<zitadel-login>` injects it into its shadow root. `assets/css/demo-host.css` sets host `body` styles to match Next's `layout.tsx`. Heading tokens may still list **APK Futural** first — that face needs a tenant CDN URL in branding.
 
 ## Environment variables
 

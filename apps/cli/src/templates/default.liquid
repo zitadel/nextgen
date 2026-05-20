@@ -42,11 +42,12 @@
 
     <div class="zitadel-flow__actions">
       {% for entry in actions %}
-        <zl-action
-          name="{{ entry[0] }}"
+        <zl-button
+          action="{{ entry[0] }}"
           label="{{ entry[1].text_key | t }}"
-          {% if entry[1].primary %}primary{% endif %}
-        ></zl-action>
+          hierarchy="{% if entry[1].primary %}primary{% else %}secondary{% endif %}"
+          {% if entry[1].primary %}type="submit"{% endif %}
+        ></zl-button>
       {% endfor %}
     </div>
   </form>

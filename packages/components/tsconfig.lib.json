@@ -16,14 +16,20 @@
       }
     ]
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.ts", "src/**/*.d.ts", "src/css-inline.d.ts"],
   "exclude": ["src/**/*.spec.ts"],
   "references": [
+    {
+      "path": "../shared-component-styles"
+    },
     {
       "path": "../api-mock/tsconfig.lib.json"
     },
     {
       "path": "../api/tsconfig.lib.json"
+    },
+    {
+      "path": "../design-tokens/tsconfig.lib.json"
     }
   ]
 }

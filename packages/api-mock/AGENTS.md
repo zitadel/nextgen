@@ -12,7 +12,9 @@ for the typed `@zitadel-nextgen/api` Flow API. Consumers:
   playground.
 - `packages/components/src/orchestrator/zitadel-login.spec.ts` — feeds
   the handlers into `msw/node`'s `setupServer`.
-- Future consumers (apps/console, demo apps) that want a local mock.
+- `apps/demo-next/` and `apps/demo-nuxt/` — hit the standalone TCP server
+  started by `pnpm --filter @zitadel-nextgen/api-mock start` (not an
+  in-browser worker).
 
 It is **not** published. There is no built artifact; consumers import
 the source directly via the workspace export map.
@@ -38,7 +40,7 @@ the three orval response aliases (`CreateFlow201`, `GetFlowStep200`,
 ## Adding a new flow step
 
 State names in the xstate machine **are** the canonical wire step names
-(`identifier`, `register`, `password`, `sso-redirect`, `done`) — no
+(`identifier`, `register`, `password`, `passkey-upsell`, `sso-redirect`, `done`) — no
 mapping function. To add a step:
 
 1. Add a state to the machine in `src/flow-machine.ts` named exactly as
@@ -52,6 +54,23 @@ mapping function. To add a step:
 4. Add a walk test in `src/index.spec.ts` that exercises the typed
    orval client through the new branch.
 
+## Dev fixture emails
+
+`src/handlers.ts` recognizes special emails for the components login
+playground (`http://localhost:5173/?route=login`). The sidebar there
+documents the same table.
+
+| When | Email | Result |
+|------|-------|--------|
+| Sign in submit | `wrong@example.com` | Stays on identifier; `error.invalid_credentials` on password |
+| Sign in submit | `server@example.com` | Stays on identifier; `error.sign_in_server` form alert |
+| Sign up submit | `exists@example.com` | Stays on register; `error.email_exists` on email |
+| Passkey upsell, action `setup` | `passkey-cancel@example.com` (captured from sign-in) | Stays on passkey-upsell; `error.passkey_cancelled` |
+| Passkey upsell, action `setup` | `passkey-unsupported@example.com` | `error.passkey_unsupported` |
+| Passkey upsell, action `setup` | `passkey-fail@example.com` | `error.passkey_failed` |
+
+Happy path: any other email → identifier/register → passkey-upsell → `done`.
+
 ## Branding
 
 `applyBranding(branding)` writes a module-level overlay merged into
@@ -62,6 +81,14 @@ the open record allows orchestrator-side v2 extension fields
 this package depend on the components type surface. The orchestrator's
 branding-validator strips anything the OpenAPI doesn't model. Tests
 should clear the overlay between cases via `clearBranding()`.
+
+The standalone TCP server (`startMockServer` in `src/server.ts`) calls
+`applyBranding(defaultDevBranding)` on boot so demo apps receive a
+baseline `font_url` (Google Fonts Arimo) without extra setup. The payload
+lives in `src/default-dev-branding.ts` and mirrors
+`docs/design/branding/branding.example.json`. MSW-only consumers
+(`setupMockHandlers` / `setupMock`) do **not** get this overlay unless
+they call `applyBranding` themselves — same as before.
 
 ## Testing
 

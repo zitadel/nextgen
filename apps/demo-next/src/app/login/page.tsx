@@ -12,7 +12,6 @@ export default async function LoginPage() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        padding: "24px",
         background: "#f3f4f6",
       }}
     >
