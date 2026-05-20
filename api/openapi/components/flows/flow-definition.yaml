@@ -1,5 +1,5 @@
 type: object
-required: [name, user_schema, purposes, initial_steps, steps]
+required: [name, user_schema, purposes, steps]
 description: |
   A flow definition is the server-side configuration that describes a complete
   authentication or identity flow. It is NOT sent to the frontend — the flow
@@ -30,21 +30,12 @@ properties:
     example: https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/human-user.yaml
 
   purposes:
-    type: array
-    items:
-      type: string
-      enum: [login, register, recovery, profiling, reauth, link_account]
-    minItems: 1
-    uniqueItems: true
-    description: |
-      Which flow purposes this definition handles. A definition can serve
-      multiple purposes (e.g. a combined login/register flow).
-
-  initial_steps:
     type: object
     description: |
-      Maps each purpose to the step name that starts the flow for that purpose.
-      Keys must be a subset of `purposes`.
+      Maps each purpose this definition handles to its entry-point step.
+      Keys are purpose names; values must match a `name` in `steps`. A
+      definition can serve multiple purposes (e.g. a combined login/register
+      flow) by listing one entry per purpose.
     minProperties: 1
     propertyNames:
       type: string
@@ -52,11 +43,12 @@ properties:
     additionalProperties:
       type: string
     example:
-      login: identifier
-      register: profile
+      login: identify
 
   audience:
     $ref: flow-audience.yaml
+    example:
+      app_ids: [app_saas]
 
   steps:
     type: array
@@ -66,3 +58,19 @@ properties:
     description: |
       Ordered list of steps in this flow. The order is for human readability —
       actual step sequencing is determined by transitions.
+    example:
+      - name: identify
+        fields: [email]
+        actions:
+          submit: { primary: true }
+        transitions:
+          submit: { target: authenticate }
+          user_not_found: { target: register, action: switch }
+      - name: authenticate
+        fields: [password]
+        actions:
+          submit: { primary: true }
+        transitions:
+          submit: { target: done }
+      - name: done
+        complete: redirect

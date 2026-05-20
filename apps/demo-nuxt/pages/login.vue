@@ -10,7 +10,11 @@
     "
   >
     <ClientOnly>
-      <zitadel-login proxy-base="/__nextgen" post-sign-in-url="/admin" />
+      <zitadel-login
+        api-base="/__nextgen"
+        project-id="demo"
+        post-sign-in-url="/admin"
+      />
     </ClientOnly>
   </main>
 </template>

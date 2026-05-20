@@ -1,4 +1,3 @@
-export type ZitadelFlowPurpose = "login" | "register";
 export type ZitadelEnvironment = "development" | "preview" | "production";
 
 export type ZitadelRuntime = {
@@ -21,57 +20,6 @@ export class ZitadelRuntimeError extends Error {
     this.name = "ZitadelRuntimeError";
     this.code = code;
   }
-}
-
-export type MockFlowField = {
-  name: string;
-  label: string;
-  type: "text" | "email" | "password";
-  required: boolean;
-};
-
-export type MockFlow = {
-  purpose: ZitadelFlowPurpose;
-  title: string;
-  fields: MockFlowField[];
-  actions: string[];
-};
-
-export function createMockFlow(purpose: ZitadelFlowPurpose): MockFlow {
-  if (purpose === "login") {
-    return {
-      purpose,
-      title: "Sign in",
-      fields: [{ name: "email", label: "Email address", type: "email", required: true }],
-      actions: ["Continue with passkey", "Continue with password"],
-    };
-  }
-
-  return {
-    purpose,
-    title: "Create account",
-    fields: [
-      { name: "email", label: "Email address", type: "email", required: true },
-      { name: "given_name", label: "First name", type: "text", required: true },
-      { name: "family_name", label: "Last name", type: "text", required: true },
-    ],
-    actions: ["Create passkey account"],
-  };
-}
-
-export function mockSubmit(
-  purpose: ZitadelFlowPurpose,
-  values: Record<string, FormDataEntryValue>,
-): {
-  ok: true;
-  message: string;
-  user: Record<string, string>;
-} {
-  return {
-    ok: true,
-    message: purpose === "login" ? "Mock session created." : "Mock user registered.",
-    user: Object.fromEntries(Object.entries(values).map(([key, value]) => [key, String(value)])),
-  };
 }
 
 export function resolveZitadelRuntimeEnv(

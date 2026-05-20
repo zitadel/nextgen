@@ -3,11 +3,21 @@ import tailwindcss from "@tailwindcss/vite";
 import { devtools } from "@tanstack/devtools-vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
+import { apiMockPublicDir } from "@zitadel-nextgen/api-mock/public-dir";
 import { defineConfig } from "vite";
 
 export default defineConfig(() => ({
   root: import.meta.dirname,
   cacheDir: "../../node_modules/.vite/apps/console",
+  // Serve `mockServiceWorker.js` from `@zitadel-nextgen/api-mock`'s public
+  // folder so the home-route MSW bootstrap finds it at /mockServiceWorker.js
+  // without copying the file into this app.
+  publicDir: apiMockPublicDir,
+  // Resolve workspace `@zitadel-nextgen/*` packages straight from `.ts`
+  // source for hot dev iteration. Production builds (CI / `nuxt build`
+  // and friends) do not set this condition and pick up the pre-built
+  // `dist/*.mjs` via the default `import` condition instead.
+  resolve: { conditions: ["@zitadel-nextgen/source"] },
   plugins: [
     tailwindcss(),
     devtools(),

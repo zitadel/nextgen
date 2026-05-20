@@ -60,12 +60,18 @@ paths:
     $ref: endpoints/auth_attempts/by_id/challenges/by_id/methods.yaml
   /auth_attempts/{attempt_id}/handoff:
     $ref: endpoints/auth_attempts/by_id/handoff/methods.yaml
+  /projects:
+    $ref: endpoints/projects/methods.yaml
+  /projects/{project_id}:
+    $ref: endpoints/projects/by_id/methods.yaml
   /sessions:
     $ref: endpoints/sessions/methods.yaml
   /sessions/exchange:
     $ref: endpoints/sessions/exchange/methods.yaml
   /sessions/{session_id}:
     $ref: endpoints/sessions/by_id/methods.yaml
+  /sessions/me:
+    $ref: endpoints/sessions/me/methods.yaml
   /schemas:
     $ref: endpoints/schemas/methods.yaml
   /schemas/{id}:

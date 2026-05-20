@@ -1,4 +1,8 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+
+import { http, HttpResponse } from "msw";
+import { setupServer } from "msw/node";
+import { setApiBaseUrl } from "@zitadel-nextgen/api/runtime/base-url";
 
 import "./zitadel-logout.js";
 import type { ZitadelLogout } from "./zitadel-logout.js";
@@ -9,6 +13,34 @@ import type { ZitadelLogout } from "./zitadel-logout.js";
  * here. Outside-click and keyboard handling that depend on real focus
  * traversal go in `zitadel-logout.browser.spec.ts`.
  */
+const API_BASE = "https://logout.test.invalid";
+const requestLog: { url: string; method: string; credentials: string }[] = [];
+
+const okHandler = http.get(`${API_BASE}/auth/end-session`, ({ request }) => {
+  requestLog.push({
+    url: request.url,
+    method: request.method,
+    credentials: request.credentials,
+  });
+  return new HttpResponse(null, { status: 204 });
+});
+
+const server = setupServer(okHandler);
+
+beforeAll(() => {
+  setApiBaseUrl(API_BASE);
+  server.listen({ onUnhandledRequest: "error" });
+});
+
+afterEach(() => {
+  requestLog.length = 0;
+  server.resetHandlers(okHandler);
+});
+
+afterAll(() => {
+  server.close();
+});
+
 function setDisplayCookie(name: string, email: string): void {
   const value = btoa(JSON.stringify({ name, email }));
   document.cookie = `__nextgen_display=${value}; path=/`;
@@ -39,13 +71,13 @@ function shadowQuery<T extends Element>(host: Element, selector: string): T {
 describe("<zitadel-logout>", () => {
   let host: HTMLDivElement;
 
-  beforeEach(() => {
+  beforeAll(() => {
     host = document.createElement("div");
     document.body.appendChild(host);
   });
 
   afterEach(() => {
-    host.remove();
+    host.innerHTML = "";
     clearDisplayCookie();
   });
 
@@ -97,7 +129,7 @@ describe("<zitadel-logout>", () => {
   it("substitutes template tokens and wires data-action='logout' triggers", async () => {
     setDisplayCookie("Bob Builder", "bob@example.com");
     const element = mount(`
-      <zitadel-logout proxy-base="/__nextgen">
+      <zitadel-logout>
         <template>
           <button data-action="logout">Sign out {{name}} ({{email}}) [{{initial}}]</button>
         </template>
@@ -109,14 +141,9 @@ describe("<zitadel-logout>", () => {
     expect(element.shadowRoot?.querySelector(".trigger")).toBeNull();
   });
 
-  it("POSTs to {proxyBase}/v1/logout, fires zitadel-signout, and redirects", async () => {
+  it("calls the typed end-session operation, fires zitadel-signout", async () => {
     setDisplayCookie("Alice Liddell", "alice@acme.com");
-    const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
-
     const element = mount();
-    element.fetchImpl = fetchMock as unknown as typeof fetch;
-    element.proxyBase = "/__nextgen";
-    element.postSignOutUrl = "";
     await element.updateComplete;
     shadowQuery<HTMLButtonElement>(element, ".trigger").click();
     await element.updateComplete;
@@ -127,14 +154,13 @@ describe("<zitadel-logout>", () => {
     });
 
     shadowQuery<HTMLButtonElement>(element, ".signout-btn").click();
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise((resolve) => setTimeout(resolve, 16));
     await element.updateComplete;
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe("/__nextgen/v1/logout");
-    expect(init.method).toBe("POST");
-    expect(init.credentials).toBe("include");
+    expect(requestLog).toHaveLength(1);
+    expect(requestLog[0]?.method).toBe("GET");
+    expect(requestLog[0]?.url).toBe(`${API_BASE}/auth/end-session`);
+    expect(requestLog[0]?.credentials).toBe("include");
     expect(signoutEvents).toHaveLength(1);
     expect(signoutEvents[0]?.detail).toEqual({
       name: "Alice Liddell",
@@ -142,42 +168,38 @@ describe("<zitadel-logout>", () => {
     });
   });
 
-  it("strips a trailing slash on proxy-base before composing the URL", async () => {
+  it("forwards client-id and post-sign-out-url as end-session query params", async () => {
     setDisplayCookie("Alice", "alice@acme.com");
-    const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
-
     const element = mount();
-    element.fetchImpl = fetchMock as unknown as typeof fetch;
-    element.proxyBase = "/__nextgen/";
+    element.clientId = "console-app";
+    element.postSignOutUrl = "https://app.test/done";
     await element.updateComplete;
     shadowQuery<HTMLButtonElement>(element, ".trigger").click();
     await element.updateComplete;
     shadowQuery<HTMLButtonElement>(element, ".signout-btn").click();
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise((resolve) => setTimeout(resolve, 16));
 
-    expect((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[0]).toBe(
-      "/__nextgen/v1/logout",
+    expect(requestLog).toHaveLength(1);
+    const url = new URL(requestLog[0]!.url);
+    expect(url.searchParams.get("client_id")).toBe("console-app");
+    expect(url.searchParams.get("post_logout_redirect_uri")).toBe(
+      "https://app.test/done",
     );
   });
 
-  it("surfaces a server error message in the dropdown without redirecting", async () => {
+  it("surfaces a network error in the dropdown without redirecting", async () => {
     setDisplayCookie("Alice", "alice@acme.com");
-    const fetchMock = vi.fn(
-      async () =>
-        new Response(JSON.stringify({ message: "Session already cleared." }), { status: 500 }),
-    );
+    server.use(http.get(`${API_BASE}/auth/end-session`, () => HttpResponse.error()));
 
     const element = mount();
-    element.fetchImpl = fetchMock as unknown as typeof fetch;
-    element.proxyBase = "/__nextgen";
     await element.updateComplete;
     shadowQuery<HTMLButtonElement>(element, ".trigger").click();
     await element.updateComplete;
     shadowQuery<HTMLButtonElement>(element, ".signout-btn").click();
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise((resolve) => setTimeout(resolve, 32));
     await element.updateComplete;
 
     const errorBar = shadowQuery<HTMLElement>(element, ".error-bar");
-    expect(errorBar.textContent?.trim()).toBe("Session already cleared.");
+    expect(errorBar.textContent?.trim().length).toBeGreaterThan(0);
   });
 });

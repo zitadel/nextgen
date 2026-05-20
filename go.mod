@@ -8,6 +8,7 @@ require (
 	github.com/georgysavva/scany/v2 v2.1.4
 	github.com/go-faster/errors v0.7.1
 	github.com/go-faster/jx v1.2.0
+	github.com/go-jose/go-jose/v4 v4.1.4
 	github.com/googleapis/go-sql-spanner v1.25.1
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/ianlancetaylor/jsonschema v0.0.0-20251021232724-46ecbf32a0a5
@@ -28,6 +29,7 @@ require (
 	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f
 	google.golang.org/api v0.276.0
 	google.golang.org/grpc v1.80.0
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -78,7 +80,6 @@ require (
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect
 	github.com/go-faster/yaml v0.4.6 // indirect
-	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
@@ -145,7 +146,6 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260427160629-7cedc36a6bc4 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
 tool (

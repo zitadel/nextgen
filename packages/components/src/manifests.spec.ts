@@ -5,7 +5,7 @@ import { findManifest, listKnownTags, manifestRegistry } from "./manifests.js";
 describe("manifest registry", () => {
   it("exposes the documented atom set", () => {
     expect([...listKnownTags()].sort()).toEqual(
-      ["zl-action", "zl-error", "zl-field", "zl-submit"].sort(),
+      ["zl-action", "zl-error", "zl-field", "zl-passkey", "zl-submit"].sort(),
     );
   });
 
@@ -20,8 +20,10 @@ describe("manifest registry", () => {
     }
   });
 
-  it("lists at least one part for every atom", () => {
+  it("lists at least one part for visible atoms", () => {
     for (const manifest of manifestRegistry) {
+      // zl-passkey is invisible — no shadow DOM, no parts
+      if (manifest.tag === "zl-passkey") continue;
       expect(manifest.parts.length).toBeGreaterThan(0);
       expect(manifest.parts).toContain("root");
     }

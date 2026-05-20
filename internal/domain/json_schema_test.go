@@ -77,7 +77,7 @@ func TestNewJSONSchemaResolver(t *testing.T) {
 func TestJSONSchemaResolver_Resolve(t *testing.T) {
 	ctx := context.Background()
 	const (
-		projectID   = "proj-1"
+		projectID    = "proj-1"
 		simpleURL    = "https://example.test/schemas/simple.json"
 		simpleSchema = `{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object"}`
 	)
@@ -318,8 +318,8 @@ func TestJSONSchemaResolver_Resolve(t *testing.T) {
 func TestWriteBuiltinJSONSchema(t *testing.T) {
 	t.Run("writes valid JSON", func(t *testing.T) {
 		var buf bytes.Buffer
-		canonical := "https://example.test/app/schemas/user/v1/user.schema.json"
-		require.NoError(t, domain.WriteBuiltinJSONSchema(&buf, "user/v1/user.schema.json", canonical))
+		canonical := "https://example.test/app/schemas/user-schema.json"
+		require.NoError(t, domain.WriteBuiltinJSONSchema(&buf, "user-schema.json", canonical))
 		assert.True(t, json.Valid(buf.Bytes()))
 		assert.Contains(t, buf.String(), canonical)
 	})
@@ -328,12 +328,24 @@ func TestWriteBuiltinJSONSchema(t *testing.T) {
 		err := domain.WriteBuiltinJSONSchema(&buf, "nope/not-there.json", "https://example.test/x")
 		require.Error(t, err)
 	})
+	t.Run("relative url", func(t *testing.T) {
+		var buf bytes.Buffer
+		err := domain.WriteBuiltinJSONSchema(&buf, "user-schema.json", "not-absolute")
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "must be absolute")
+	})
+	t.Run("invalid url", func(t *testing.T) {
+		var buf bytes.Buffer
+		err := domain.WriteBuiltinJSONSchema(&buf, "user-schema.json", "://bad url")
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "invalid canonicalDocumentURL")
+	})
 }
 
 func TestJSONSchemaResolver_BuiltinEmbedded(t *testing.T) {
 	ctx := context.Background()
 	base := mustParseURL(t, "https://example.test/app/schemas")
-	full := "https://example.test/app/schemas/user/v1/user.schema.json"
+	full := "https://example.test/app/schemas/user-schema.json"
 
 	t.Run("resolve skips repository", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
