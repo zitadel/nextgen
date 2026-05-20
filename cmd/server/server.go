@@ -91,6 +91,7 @@ func run(ctx context.Context, cfg Config, pool database.Pool) error {
 		userPasswordRepo,
 		userPasskeyRepo,
 	)
+	sessionService := service.NewSessionService(pool, sessionRepo)
 
 	// ── HTTP Server ─────────────────
 
@@ -98,7 +99,7 @@ func run(ctx context.Context, cfg Config, pool database.Pool) error {
 	defer stop()
 
 	oasServer, err := oasapi.NewServer(
-		api.NewHandler(flowService, authAttemptSvc),
+		api.NewHandler(flowService, authAttemptSvc, sessionService),
 		api.NewSecurityHandler(),
 		oasapi.WithErrorHandler(api.OgenErrorHandler))
 	if err != nil {

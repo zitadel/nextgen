@@ -9927,16 +9927,16 @@ func (*RevokeMySessionConflict) revokeMySessionRes() {}
 
 // RevokeMySessionNoContent is response for RevokeMySession operation.
 type RevokeMySessionNoContent struct {
-	SetCookie OptString
+	SetCookie string
 }
 
 // GetSetCookie returns the value of SetCookie.
-func (s *RevokeMySessionNoContent) GetSetCookie() OptString {
+func (s *RevokeMySessionNoContent) GetSetCookie() string {
 	return s.SetCookie
 }
 
 // SetSetCookie sets the value of SetCookie.
-func (s *RevokeMySessionNoContent) SetSetCookie(val OptString) {
+func (s *RevokeMySessionNoContent) SetSetCookie(val string) {
 	s.SetCookie = val
 }
 
@@ -9984,16 +9984,16 @@ func (*RevokeSessionConflict) revokeSessionRes() {}
 
 // RevokeSessionNoContent is response for RevokeSession operation.
 type RevokeSessionNoContent struct {
-	SetCookie OptString
+	SetCookie string
 }
 
 // GetSetCookie returns the value of SetCookie.
-func (s *RevokeSessionNoContent) GetSetCookie() OptString {
+func (s *RevokeSessionNoContent) GetSetCookie() string {
 	return s.SetCookie
 }
 
 // SetSetCookie sets the value of SetCookie.
-func (s *RevokeSessionNoContent) SetSetCookie(val OptString) {
+func (s *RevokeSessionNoContent) SetSetCookie(val string) {
 	s.SetCookie = val
 }
 
@@ -10430,12 +10430,12 @@ func (s *SessionWithTokenResponse) SetSessionToken(val string) {
 
 // SessionWithTokenResponseHeaders wraps SessionWithTokenResponse with response headers.
 type SessionWithTokenResponseHeaders struct {
-	SetCookie OptString
+	SetCookie string
 	Response  SessionWithTokenResponse
 }
 
 // GetSetCookie returns the value of SetCookie.
-func (s *SessionWithTokenResponseHeaders) GetSetCookie() OptString {
+func (s *SessionWithTokenResponseHeaders) GetSetCookie() string {
 	return s.SetCookie
 }
 
@@ -10445,7 +10445,7 @@ func (s *SessionWithTokenResponseHeaders) GetResponse() SessionWithTokenResponse
 }
 
 // SetSetCookie sets the value of SetCookie.
-func (s *SessionWithTokenResponseHeaders) SetSetCookie(val OptString) {
+func (s *SessionWithTokenResponseHeaders) SetSetCookie(val string) {
 	s.SetCookie = val
 }
 

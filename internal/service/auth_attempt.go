@@ -155,7 +155,7 @@ func (PasskeyProof) proofCheckType() domain.AuthCheckType { return domain.AuthCh
 // ---- Secondary ports -------------------------------------------------------------
 
 type sessionResolver interface {
-	GetByID(ctx context.Context, q database.QueryExecutor, projectID, sessionID string) (*domain.Session, error)
+	Get(ctx context.Context, q database.QueryExecutor, projectID, sessionID string) (*domain.Session, error)
 }
 
 type projectLoader interface {
