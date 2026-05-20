@@ -33,26 +33,3 @@ type FlowSubmitPasswordInput struct {
 	AttemptID string
 	Plain     string
 }
-
-// FlowAuthAttemptRuntime is the production [FlowAuthAttemptService].
-// Methods are panic-stubbed until the auth-attempt PR line fleshes out
-// the underlying issue+verify primitives.
-type FlowAuthAttemptRuntime struct{}
-
-func NewFlowAuthAttemptRuntime() *FlowAuthAttemptRuntime {
-	return &FlowAuthAttemptRuntime{}
-}
-
-var _ FlowAuthAttemptService = (*FlowAuthAttemptRuntime)(nil)
-
-func (r *FlowAuthAttemptRuntime) Start(ctx context.Context, in FlowCreateAttemptInput) (string, error) {
-	panic("implement me")
-}
-
-func (r *FlowAuthAttemptRuntime) SubmitIdentifier(ctx context.Context, in FlowSubmitIdentifierInput) (string, error) {
-	panic("implement me")
-}
-
-func (r *FlowAuthAttemptRuntime) SubmitPassword(ctx context.Context, in FlowSubmitPasswordInput) error {
-	panic("implement me")
-}

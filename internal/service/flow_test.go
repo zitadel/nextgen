@@ -52,6 +52,24 @@ func stubListFlowDefinitions(t *testing.T, defs []*domain.FlowDefinition) *domai
 	return repo
 }
 
+// stubGetFlowDefinition wires GetFlowDefinition to return def when the
+// id matches and a not-found error otherwise.
+func stubGetFlowDefinition(t *testing.T, def *domain.FlowDefinition) *domainmock.MockFlowDefinitionRepository {
+	t.Helper()
+	ctrl := gomock.NewController(t)
+	repo := domainmock.NewMockFlowDefinitionRepository(ctrl)
+	repo.EXPECT().
+		GetFlowDefinition(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, _ database.QueryExecutor, projectID, id string) (*domain.FlowDefinition, error) {
+			if projectID != def.ProjectID || id != def.ID {
+				return nil, domain.ErrFlowDefinitionNotFound()
+			}
+			return def, nil
+		}).
+		AnyTimes()
+	return repo
+}
+
 func hasPurpose(def *domain.FlowDefinition, purpose domain.FlowDefinitionPurpose) bool {
 	_, ok := def.Purposes[purpose]
 	return ok
@@ -80,7 +98,7 @@ func TestResolve_ResolveByName_ExactVersion(t *testing.T) {
 	other := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
 	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{other, want})
 
-	got, err := service.NewFlowService(stubPool(), repo).Resolve(t.Context(), service.ResolveFlowRequest{
+	got, err := service.NewFlowService(stubPool(), repo, nil, nil).Resolve(t.Context(), service.ResolveFlowRequest{
 		ProjectID:     "proj",
 		Purpose:       domain.FlowDefinitionPurposeLogin,
 		Name:          ptr("login"),
@@ -115,7 +133,7 @@ func TestResolve_ResolveByName_FiltersWithRequestedOptions(t *testing.T) {
 			return []*domain.FlowDefinition{def}, nil
 		})
 
-	_, err := service.NewFlowService(stubPool(), repo).Resolve(t.Context(), service.ResolveFlowRequest{
+	_, err := service.NewFlowService(stubPool(), repo, nil, nil).Resolve(t.Context(), service.ResolveFlowRequest{
 		ProjectID:     "proj",
 		Purpose:       domain.FlowDefinitionPurposeLogin,
 		Name:          ptr("login"),
@@ -132,7 +150,7 @@ func TestResolve_ResolveByName_LatestActiveWhenVersionNil(t *testing.T) {
 	v15 := newDef("login", "1.5.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
 	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{v1, v2, v15})
 
-	got, err := service.NewFlowService(stubPool(), repo).Resolve(t.Context(), service.ResolveFlowRequest{
+	got, err := service.NewFlowService(stubPool(), repo, nil, nil).Resolve(t.Context(), service.ResolveFlowRequest{
 		ProjectID: "proj",
 		Purpose:   domain.FlowDefinitionPurposeLogin,
 		Name:      ptr("login"),
@@ -148,7 +166,7 @@ func TestResolve_ResolveByName_LatestActiveWhenVersionNil(t *testing.T) {
 func TestResolve_ResolveByName_NotFound(t *testing.T) {
 	repo := stubListFlowDefinitions(t, nil)
 
-	_, err := service.NewFlowService(stubPool(), repo).Resolve(t.Context(), service.ResolveFlowRequest{
+	_, err := service.NewFlowService(stubPool(), repo, nil, nil).Resolve(t.Context(), service.ResolveFlowRequest{
 		ProjectID: "proj",
 		Purpose:   domain.FlowDefinitionPurposeLogin,
 		Name:      ptr("missing"),
@@ -162,7 +180,7 @@ func TestResolve_ResolveByName_PurposeMismatch(t *testing.T) {
 	def := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
 	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{def})
 
-	_, err := service.NewFlowService(stubPool(), repo).Resolve(t.Context(), service.ResolveFlowRequest{
+	_, err := service.NewFlowService(stubPool(), repo, nil, nil).Resolve(t.Context(), service.ResolveFlowRequest{
 		ProjectID: "proj",
 		Purpose:   domain.FlowDefinitionPurposeRegister,
 		Name:      ptr("login"),
@@ -177,7 +195,7 @@ func TestResolve_ResolveByAudience_ReturnsFirstMatchingPurpose(t *testing.T) {
 	second := newDef("alt", "1.0.0", domain.FlowDefinitionAudience{AppIDs: []string{"app-1"}}, domain.FlowDefinitionPurposeLogin)
 	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{first, second})
 
-	got, err := service.NewFlowService(stubPool(), repo).Resolve(t.Context(), service.ResolveFlowRequest{
+	got, err := service.NewFlowService(stubPool(), repo, nil, nil).Resolve(t.Context(), service.ResolveFlowRequest{
 		ProjectID: "proj",
 		Purpose:   domain.FlowDefinitionPurposeLogin,
 	})
@@ -193,7 +211,7 @@ func TestResolve_ResolveByAudience_NoMatch(t *testing.T) {
 	def := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
 	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{def})
 
-	_, err := service.NewFlowService(stubPool(), repo).Resolve(t.Context(), service.ResolveFlowRequest{
+	_, err := service.NewFlowService(stubPool(), repo, nil, nil).Resolve(t.Context(), service.ResolveFlowRequest{
 		ProjectID: "proj",
 		Purpose:   domain.FlowDefinitionPurposeRegister,
 	})
@@ -207,7 +225,7 @@ func TestResolve_ResolveByAudience_ExactVersionFiltersOlder(t *testing.T) {
 	v2 := newDef("login", "2.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
 	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{v1, v2})
 
-	got, err := service.NewFlowService(stubPool(), repo).Resolve(t.Context(), service.ResolveFlowRequest{
+	got, err := service.NewFlowService(stubPool(), repo, nil, nil).Resolve(t.Context(), service.ResolveFlowRequest{
 		ProjectID:     "proj",
 		Purpose:       domain.FlowDefinitionPurposeLogin,
 		SchemaVersion: ptr("1.0.0"),
@@ -228,7 +246,7 @@ func TestResolve_ResolveByAudience_RepoErrorPropagates(t *testing.T) {
 		ListFlowDefinitions(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(nil, sentinel)
 
-	_, err := service.NewFlowService(stubPool(), repo).Resolve(t.Context(), service.ResolveFlowRequest{
+	_, err := service.NewFlowService(stubPool(), repo, nil, nil).Resolve(t.Context(), service.ResolveFlowRequest{
 		ProjectID: "proj",
 		Purpose:   domain.FlowDefinitionPurposeLogin,
 	})

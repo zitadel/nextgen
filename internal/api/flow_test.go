@@ -1,0 +1,339 @@
+package api_test
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+	"time"
+
+	gen "github.com/zitadel/nextgen/api/generated"
+	"github.com/zitadel/nextgen/internal/api"
+	"github.com/zitadel/nextgen/internal/cookie"
+	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
+)
+
+// ─── fakes ──────────────────────────────────────────────────────────
+
+type fakeFlowSvc struct {
+	def      *domain.FlowDefinition
+	resolveErr error
+
+	startResult  service.FlowStepResult
+	startErr     error
+	submitResult service.FlowStepResult
+	submitErr    error
+	getResult    service.FlowStepResult
+	getErr       error
+
+	gotStartReq  service.StartFlowRequest
+	gotSubmitReq service.SubmitFlowRequest
+	gotGetReq    service.GetFlowStepRequest
+}
+
+func (f *fakeFlowSvc) Resolve(_ context.Context, _ service.ResolveFlowRequest) (*domain.FlowDefinition, error) {
+	return f.def, f.resolveErr
+}
+
+func (f *fakeFlowSvc) Start(_ context.Context, req service.StartFlowRequest) (service.FlowStepResult, error) {
+	f.gotStartReq = req
+	return f.startResult, f.startErr
+}
+
+func (f *fakeFlowSvc) Submit(_ context.Context, req service.SubmitFlowRequest) (service.FlowStepResult, error) {
+	f.gotSubmitReq = req
+	return f.submitResult, f.submitErr
+}
+
+func (f *fakeFlowSvc) GetStep(_ context.Context, req service.GetFlowStepRequest) (service.FlowStepResult, error) {
+	f.gotGetReq = req
+	return f.getResult, f.getErr
+}
+
+var _ service.FlowService = (*fakeFlowSvc)(nil)
+
+// stubAuthAttempt is the bare-minimum implementation needed to satisfy
+// the handler dependency. The flow handlers never call into it
+// directly; the state machine does (and we use a fake FlowService that
+// short-circuits the state machine).
+type stubAuthAttempt struct{}
+
+func (stubAuthAttempt) Create(context.Context, service.CreateAuthAttemptInput) (*domain.AuthAttempt, error) {
+	return nil, errors.New("stub auth attempt")
+}
+func (stubAuthAttempt) GetByID(context.Context, string, string) (*domain.AuthAttempt, error) {
+	return nil, errors.New("stub auth attempt")
+}
+func (stubAuthAttempt) IssueChallenge(context.Context, service.IssueChallengeInput) (*domain.AuthAttempt, error) {
+	return nil, errors.New("stub auth attempt")
+}
+func (stubAuthAttempt) VerifyProof(context.Context, service.VerifyProofInput) (*domain.AuthAttempt, error) {
+	return nil, errors.New("stub auth attempt")
+}
+func (stubAuthAttempt) Handoff(context.Context, service.HandoffInput) (*domain.AuthAttempt, error) {
+	return nil, errors.New("stub auth attempt")
+}
+
+var _ service.AuthAttemptService = stubAuthAttempt{}
+
+// ─── helpers ────────────────────────────────────────────────────────
+
+// fixedKey is a deterministic key for cookie sealing inside tests.
+// Tests never touch real secrets; the sealer just needs a valid key.
+var fixedKey = cookie.Key{
+	0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+	0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+	0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+	0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f,
+}
+
+type testServer struct {
+	srv    *httptest.Server
+	sealer *cookie.Sealer
+	fake   *fakeFlowSvc
+	now    func() time.Time
+}
+
+func newTestServer(t *testing.T, now func() time.Time) *testServer {
+	t.Helper()
+	sealer, err := cookie.NewSealer(fixedKey)
+	if err != nil {
+		t.Fatalf("NewSealer: %v", err)
+	}
+	fake := &fakeFlowSvc{}
+	if now == nil {
+		now = time.Now
+	}
+	handler := api.NewHandler(fake, stubAuthAttempt{}, sealer, now)
+	oas, err := gen.NewServer(handler, api.NewSecurityHandler(), gen.WithErrorHandler(api.OgenErrorHandler))
+	if err != nil {
+		t.Fatalf("NewServer: %v", err)
+	}
+	srv := httptest.NewServer(oas)
+	t.Cleanup(srv.Close)
+	return &testServer{srv: srv, sealer: sealer, fake: fake, now: now}
+}
+
+// sealCookie marshals a FlowState and seals it the same way the
+// handler does, so tests can craft an inbound cookie for Submit / Get
+// / Event without bootstrapping a full CreateFlow.
+func (ts *testServer) sealCookie(t *testing.T, state *domain.FlowState) string {
+	t.Helper()
+	payload, err := json.Marshal(state)
+	if err != nil {
+		t.Fatalf("marshal state: %v", err)
+	}
+	value, err := ts.sealer.Seal(payload)
+	if err != nil {
+		t.Fatalf("seal: %v", err)
+	}
+	return value
+}
+
+func doRequest(t *testing.T, method, url string, body any, cookieValue string) (*http.Response, []byte) {
+	t.Helper()
+	var rdr io.Reader
+	if body != nil {
+		b, err := json.Marshal(body)
+		if err != nil {
+			t.Fatalf("marshal body: %v", err)
+		}
+		rdr = bytes.NewReader(b)
+	}
+	req, err := http.NewRequest(method, url, rdr)
+	if err != nil {
+		t.Fatalf("NewRequest: %v", err)
+	}
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	if cookieValue != "" {
+		req.AddCookie(&http.Cookie{Name: "_zflow", Value: cookieValue})
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("Do: %v", err)
+	}
+	defer resp.Body.Close()
+	data, _ := io.ReadAll(resp.Body)
+	return resp, data
+}
+
+// ─── tests ──────────────────────────────────────────────────────────
+
+func TestCreateFlow_ReturnsCookieAndFlowID(t *testing.T) {
+	ts := newTestServer(t, nil)
+	ts.fake.def = &domain.FlowDefinition{ProjectID: "proj_1", ID: "def_1", Purposes: map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "identify"}}
+	ts.fake.startResult = service.FlowStepResult{
+		State: &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", SessionID: "sess_1", IssuedAt: ts.now()},
+		Step:  &domain.FlowStep{Name: "identify"},
+	}
+
+	resp, body := doRequest(t, http.MethodPost, ts.srv.URL+"/flow", map[string]any{
+		"project_id": "proj_1",
+		"purpose":    "login",
+	}, "")
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("status = %d, body = %s", resp.StatusCode, body)
+	}
+	if !strings.Contains(resp.Header.Get("Set-Cookie"), "_zflow=") {
+		t.Errorf("expected Set-Cookie header, got %q", resp.Header.Get("Set-Cookie"))
+	}
+	var fr gen.FlowResponse
+	if err := json.Unmarshal(body, &fr); err != nil {
+		t.Fatalf("unmarshal: %v (body=%s)", err, body)
+	}
+	if fr.ID != "flow_1" {
+		t.Errorf("id = %q, want flow_1", fr.ID)
+	}
+	if b, ok := fr.Branding.Get(); !ok || !b.LiquidTemplate.IsSet() || b.LiquidTemplate.Value == "" {
+		t.Errorf("expected branding.liquid_template to be set, got %+v", fr.Branding)
+	}
+}
+
+func TestSubmitFlowStep_PathIDMismatchReturns404(t *testing.T) {
+	ts := newTestServer(t, nil)
+	state := &domain.FlowState{ID: "flow_real", IssuedAt: ts.now()}
+	cookieVal := ts.sealCookie(t, state)
+
+	resp, body := doRequest(t, http.MethodPost, ts.srv.URL+"/flow/flow_wrong/submit", map[string]any{
+		"action": "submit",
+	}, cookieVal)
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("status = %d, body = %s", resp.StatusCode, body)
+	}
+}
+
+func TestSubmitFlowStep_TamperedCookieReturns401(t *testing.T) {
+	ts := newTestServer(t, nil)
+	resp, _ := doRequest(t, http.MethodPost, ts.srv.URL+"/flow/flow_1/submit", map[string]any{
+		"action": "submit",
+	}, "garbage")
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("status = %d", resp.StatusCode)
+	}
+}
+
+func TestSubmitFlowStep_StaleCookieReturns401(t *testing.T) {
+	now := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
+	ts := newTestServer(t, func() time.Time { return now })
+
+	stale := now.Add(-30 * time.Minute)
+	state := &domain.FlowState{ID: "flow_1", IssuedAt: stale}
+	cookieVal := ts.sealCookie(t, state)
+
+	resp, _ := doRequest(t, http.MethodPost, ts.srv.URL+"/flow/flow_1/submit", map[string]any{
+		"action": "submit",
+	}, cookieVal)
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 401 for stale cookie", resp.StatusCode)
+	}
+}
+
+func TestSubmitFlowStep_HappyPath_RotatesCookie(t *testing.T) {
+	ts := newTestServer(t, nil)
+	state := &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", SessionID: "sess_1", IssuedAt: ts.now()}
+	cookieVal := ts.sealCookie(t, state)
+
+	advanced := &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", SessionID: "sess_1", IssuedAt: ts.now()}
+	ts.fake.submitResult = service.FlowStepResult{State: advanced, Step: &domain.FlowStep{Name: "password"}}
+
+	resp, body := doRequest(t, http.MethodPost, ts.srv.URL+"/flow/flow_1/submit", map[string]any{
+		"action": "submit",
+		"fields": map[string]any{"identifier": "alice@example.com"},
+	}, cookieVal)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", resp.StatusCode, body)
+	}
+	if got := resp.Header.Get("Set-Cookie"); !strings.Contains(got, "_zflow=") {
+		t.Errorf("expected rotated Set-Cookie, got %q", got)
+	}
+	if got := ts.fake.gotSubmitReq.Fields["identifier"]; got != "alice@example.com" {
+		t.Errorf("decoded identifier = %v, want alice@example.com", got)
+	}
+}
+
+func TestSubmitFlowStep_TerminalClearsCookie(t *testing.T) {
+	ts := newTestServer(t, nil)
+	state := &domain.FlowState{ID: "flow_1", IssuedAt: ts.now()}
+	cookieVal := ts.sealCookie(t, state)
+
+	complete := domain.FlowStepCompleteShow
+	terminal := &domain.FlowState{ID: "flow_1", IssuedAt: ts.now()}
+	ts.fake.submitResult = service.FlowStepResult{State: terminal, Step: &domain.FlowStep{Name: "done", Complete: &complete}}
+
+	resp, _ := doRequest(t, http.MethodPost, ts.srv.URL+"/flow/flow_1/submit", map[string]any{
+		"action": "submit",
+	}, cookieVal)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d", resp.StatusCode)
+	}
+	got := resp.Header.Get("Set-Cookie")
+	if !strings.Contains(got, "Max-Age=0") {
+		t.Errorf("expected Max-Age=0 on terminal, got %q", got)
+	}
+}
+
+func TestGetFlowStep_ReturnsCurrentStep(t *testing.T) {
+	ts := newTestServer(t, nil)
+	state := &domain.FlowState{
+		ID:           "flow_1",
+		ProjectID:    "proj_1",
+		SessionID:    "sess_1",
+		IssuedAt:     ts.now(),
+		FlowProgress: domain.FlowProgress{CurrentStep: "identify"},
+	}
+	cookieVal := ts.sealCookie(t, state)
+	ts.fake.getResult = service.FlowStepResult{State: state, Step: &domain.FlowStep{Name: "identify"}}
+
+	resp, body := doRequest(t, http.MethodGet, ts.srv.URL+"/flow/flow_1", nil, cookieVal)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", resp.StatusCode, body)
+	}
+	var fr gen.FlowResponse
+	if err := json.Unmarshal(body, &fr); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if fr.Step.Name != "identify" {
+		t.Errorf("step name = %q, want identify", fr.Step.Name)
+	}
+}
+
+func TestGetFlowStep_TerminalReturns410(t *testing.T) {
+	ts := newTestServer(t, nil)
+	state := &domain.FlowState{ID: "flow_1", IssuedAt: ts.now()}
+	cookieVal := ts.sealCookie(t, state)
+
+	complete := domain.FlowStepCompleteShow
+	ts.fake.getResult = service.FlowStepResult{
+		State: state,
+		Step:  &domain.FlowStep{Name: "done", Complete: &complete},
+	}
+
+	resp, _ := doRequest(t, http.MethodGet, ts.srv.URL+"/flow/flow_1", nil, cookieVal)
+	if resp.StatusCode != http.StatusGone {
+		t.Fatalf("status = %d, want 410", resp.StatusCode)
+	}
+}
+
+func TestSubmitFlowEvent_ReturnsNoContentWithoutSetCookie(t *testing.T) {
+	ts := newTestServer(t, nil)
+	state := &domain.FlowState{ID: "flow_1", IssuedAt: ts.now()}
+	cookieVal := ts.sealCookie(t, state)
+
+	resp, _ := doRequest(t, http.MethodPost, ts.srv.URL+"/flow/flow_1/event", map[string]any{
+		"type": "telemetry",
+	}, cookieVal)
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("status = %d", resp.StatusCode)
+	}
+	if got := resp.Header.Get("Set-Cookie"); got != "" {
+		t.Errorf("expected no Set-Cookie, got %q", got)
+	}
+}

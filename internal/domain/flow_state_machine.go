@@ -19,15 +19,19 @@ import (
 type FlowStateMachine interface {
 	Start(ctx context.Context, client database.QueryExecutor, in FlowStartInput) (FlowStepResult, error)
 	Process(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState, in FlowSubmitInput) (FlowStepResult, error)
+	Render(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState) (FlowStepResult, error)
 }
 
 // FlowStartInput carries everything the state machine needs to
-// bootstrap a new flow.
+// bootstrap a new flow. RedirectURI is independent of AuthRequest so
+// standalone flows (no OIDC binding) can still terminate with a
+// redirect target.
 type FlowStartInput struct {
 	Definition    *FlowDefinition
 	Purpose       FlowDefinitionPurpose
 	Session       FlowSessionRef
 	AuthRequest   *FlowAuthRequestRef
+	RedirectURI   *string
 	UserSchemaURL string
 }
 
@@ -87,7 +91,6 @@ type FlowSessionRef struct {
 // is fulfilling.
 type FlowAuthRequestRef struct {
 	ID           string
-	RedirectURI  string
 	RequestedACR *string
 }
 
@@ -146,8 +149,11 @@ func (r *FlowStateMachineRuntime) Start(ctx context.Context, client database.Que
 	}
 	if in.AuthRequest != nil {
 		state.AuthRequestID = &in.AuthRequest.ID
-		state.RedirectURI = &in.AuthRequest.RedirectURI
 		state.RequestedACR = in.AuthRequest.RequestedACR
+	}
+	if in.RedirectURI != nil {
+		uri := *in.RedirectURI
+		state.RedirectURI = &uri
 	}
 
 	if r.authAttempts == nil {
@@ -163,6 +169,22 @@ func (r *FlowStateMachineRuntime) Start(ctx context.Context, client database.Que
 	if err != nil {
 		return FlowStepResult{}, err
 	}
+	return FlowStepResult{State: state, Step: step}, nil
+}
+
+// Render re-emits the current step without advancing. Used by
+// GET /flow/{id} so refresh works without consuming a transition.
+// Refreshes [FlowState.IssuedAt] so the cookie max-age window slides
+// while the user is still on the step.
+func (r *FlowStateMachineRuntime) Render(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState) (FlowStepResult, error) {
+	if def == nil || state == nil {
+		return FlowStepResult{}, fmt.Errorf("%w: render without definition or state", ErrIntegrity)
+	}
+	step, err := r.renderStep(ctx, client, def, state, state.UserSchemaURL, nil)
+	if err != nil {
+		return FlowStepResult{}, err
+	}
+	state.IssuedAt = r.now()
 	return FlowStepResult{State: state, Step: step}, nil
 }
 

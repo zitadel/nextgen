@@ -2,15 +2,16 @@ package service
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/domain/idgen"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-// FlowService is the flow engine's use-case surface. For now only
-// [FlowService.Resolve] is wired; step emission, submission, and session
-// handling will land as additional methods so the API handler keeps a
-// single dependency.
+// FlowService is the flow engine's use-case surface. The API handler
+// depends only on this interface — never on the state machine or
+// repositories directly.
 type FlowService interface {
 	// Resolve returns the [domain.FlowDefinition] to run for an incoming
 	// flow request. Read-only — never touches sessions or cookies.
@@ -28,6 +29,56 @@ type FlowService interface {
 	//     is plumbed through but not yet honored — see TODO on
 	//     resolveByAudience.
 	Resolve(ctx context.Context, req ResolveFlowRequest) (*domain.FlowDefinition, error)
+
+	// Start mints a fresh flow on top of the resolved definition. The
+	// returned [FlowStepResult] carries the initial step plus a
+	// [domain.FlowState] with [domain.FlowState.ID] and
+	// [domain.FlowState.SessionID] populated.
+	Start(ctx context.Context, req StartFlowRequest) (FlowStepResult, error)
+
+	// Submit drives a single client submission through the state
+	// machine. The handler is responsible for opening + resealing the
+	// cookie; this method just re-fetches the definition by
+	// [domain.FlowState.DefinitionID] and calls Process.
+	Submit(ctx context.Context, req SubmitFlowRequest) (FlowStepResult, error)
+
+	// GetStep re-emits the current step without advancing. Backs
+	// `GET /flow/{id}` so page refreshes don't consume transitions.
+	GetStep(ctx context.Context, req GetFlowStepRequest) (FlowStepResult, error)
+}
+
+// FlowStepResult is the service-layer projection of
+// [domain.FlowStepResult]. Handlers receive a single shape regardless
+// of whether the result came from Start, Submit, or GetStep.
+type FlowStepResult struct {
+	State *domain.FlowState
+	Step  *domain.FlowStep
+}
+
+// StartFlowRequest carries the inputs to [FlowService.Start]. The
+// resolved definition is passed back in by the handler so Start does
+// not re-walk the resolution algorithm.
+type StartFlowRequest struct {
+	Definition    *domain.FlowDefinition
+	Purpose       domain.FlowDefinitionPurpose
+	RedirectURI   *string
+	AuthRequestID *string
+	SessionID     *string
+}
+
+// SubmitFlowRequest carries one client submission. State is the cookie
+// payload the handler decoded for this request.
+type SubmitFlowRequest struct {
+	State         *domain.FlowState
+	Action        string
+	Fields        map[string]any
+	GateProofs    map[string]string
+	SSOProviderID *string
+}
+
+// GetFlowStepRequest carries the cookie payload for a refresh.
+type GetFlowStepRequest struct {
+	State *domain.FlowState
 }
 
 // ResolveFlowRequest is the input to [FlowService.Resolve].
@@ -59,16 +110,28 @@ type ResolveFlowHint struct {
 	UserSchemaID *string
 }
 
-// NewFlowService returns a [FlowService] backed by the given
-// [domain.FlowDefinitionRepository]. The pool is used as the
+// NewFlowService returns a [FlowService] composing the definition
+// repository, the state machine, and an ID generator. The pool is the
 // [database.QueryExecutor] for every read.
-func NewFlowService(pool database.Pool, flowDefs domain.FlowDefinitionRepository) FlowService {
-	return &flowService{pool: pool, flowDefs: flowDefs}
+func NewFlowService(
+	pool database.Pool,
+	flowDefs domain.FlowDefinitionRepository,
+	stateMachine domain.FlowStateMachine,
+	ids idgen.Generator,
+) FlowService {
+	return &flowService{
+		pool:         pool,
+		flowDefs:     flowDefs,
+		stateMachine: stateMachine,
+		ids:          ids,
+	}
 }
 
 type flowService struct {
-	pool     database.Pool
-	flowDefs domain.FlowDefinitionRepository
+	pool         database.Pool
+	flowDefs     domain.FlowDefinitionRepository
+	stateMachine domain.FlowStateMachine
+	ids          idgen.Generator
 }
 
 var _ FlowService = (*flowService)(nil)
@@ -131,6 +194,85 @@ func (s *flowService) resolveByAudience(ctx context.Context, req ResolveFlowRequ
 		return nil, domain.ErrFlowDefinitionNotFound()
 	}
 	return defs[0], nil
+}
+
+func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (FlowStepResult, error) {
+	if req.Definition == nil {
+		return FlowStepResult{}, fmt.Errorf("flow service: start without definition")
+	}
+
+	sessionID := ""
+	if req.SessionID != nil {
+		sessionID = *req.SessionID
+	} else {
+		id, err := s.ids.New("sess")
+		if err != nil {
+			return FlowStepResult{}, fmt.Errorf("flow service: mint session id: %w", err)
+		}
+		sessionID = id
+	}
+
+	in := domain.FlowStartInput{
+		Definition:    req.Definition,
+		Purpose:       req.Purpose,
+		Session:       domain.FlowSessionRef{ID: sessionID},
+		RedirectURI:   req.RedirectURI,
+		UserSchemaURL: req.Definition.UserSchema,
+	}
+	if req.AuthRequestID != nil {
+		in.AuthRequest = &domain.FlowAuthRequestRef{ID: *req.AuthRequestID}
+	}
+
+	result, err := s.stateMachine.Start(ctx, s.pool, in)
+	if err != nil {
+		return FlowStepResult{}, err
+	}
+
+	flowID, err := s.ids.New("flow")
+	if err != nil {
+		return FlowStepResult{}, fmt.Errorf("flow service: mint flow id: %w", err)
+	}
+	result.State.ID = flowID
+
+	return FlowStepResult{State: result.State, Step: result.Step}, nil
+}
+
+func (s *flowService) Submit(ctx context.Context, req SubmitFlowRequest) (FlowStepResult, error) {
+	if req.State == nil {
+		return FlowStepResult{}, fmt.Errorf("flow service: submit without state")
+	}
+	def, err := s.flowDefs.GetFlowDefinition(ctx, s.pool, req.State.ProjectID, req.State.DefinitionID)
+	if err != nil {
+		return FlowStepResult{}, err
+	}
+	in := domain.FlowSubmitInput{
+		Action:     req.Action,
+		Fields:     req.Fields,
+		GateProofs: req.GateProofs,
+	}
+	if req.SSOProviderID != nil {
+		in.SSOProvider = &domain.FlowSSOProviderRef{ID: *req.SSOProviderID}
+	}
+	result, err := s.stateMachine.Process(ctx, s.pool, def, req.State, in)
+	if err != nil {
+		return FlowStepResult{}, err
+	}
+	return FlowStepResult{State: result.State, Step: result.Step}, nil
+}
+
+func (s *flowService) GetStep(ctx context.Context, req GetFlowStepRequest) (FlowStepResult, error) {
+	if req.State == nil {
+		return FlowStepResult{}, fmt.Errorf("flow service: get step without state")
+	}
+	def, err := s.flowDefs.GetFlowDefinition(ctx, s.pool, req.State.ProjectID, req.State.DefinitionID)
+	if err != nil {
+		return FlowStepResult{}, err
+	}
+	result, err := s.stateMachine.Render(ctx, s.pool, def, req.State)
+	if err != nil {
+		return FlowStepResult{}, err
+	}
+	return FlowStepResult{State: result.State, Step: result.Step}, nil
 }
 
 func flowServesPurpose(def *domain.FlowDefinition, purpose domain.FlowDefinitionPurpose) bool {

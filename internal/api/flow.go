@@ -2,13 +2,41 @@ package api
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
+	"time"
 
+	"github.com/go-faster/jx"
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 )
+
+// flowCookieName is the cookie that carries the sealed [domain.FlowState].
+const flowCookieName = "_zflow"
+
+// flowCookieMaxAgeSeconds bounds how long a sealed [domain.FlowState]
+// remains replayable. Validated on Open via [domain.FlowState.IssuedAt].
+const flowCookieMaxAgeSeconds = 600
+
+// flowCookiePath scopes the cookie to the /flow space; browsers will
+// only resend it for those routes.
+const flowCookiePath = "/flow"
+
+// ─── error sentinels ────────────────────────────────────────────────
+
+var (
+	errFlowCookieMissing = errors.New("flow cookie missing")
+	errFlowCookieInvalid = errors.New("flow cookie invalid")
+	errFlowCookieExpired = errors.New("flow cookie expired")
+	errFlowIDMismatch    = errors.New("flow id does not match cookie")
+	errFlowCompleted     = errors.New("flow already completed")
+)
+
+// ─── CreateFlow ─────────────────────────────────────────────────────
 
 func (h Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest) (api.CreateFlowRes, error) {
 	purpose, err := domain.FlowDefinitionPurposeString(string(req.Purpose))
@@ -39,12 +67,329 @@ func (h Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest) (ap
 		return errorResponse(err), nil
 	}
 
-	// Execution is intentionally stopped here. The service resolved a
-	// definition; emitting steps + cookies is the next slice of work.
-	return &api.ErrorDetails{
-		Code:    "flow_execution_not_implemented",
-		Message: fmt.Sprintf("selected flow %q (version %s, id %s); execution not yet implemented", def.Name, def.SchemaVersion, def.ID),
+	startReq := service.StartFlowRequest{
+		Definition: def,
+		Purpose:    purpose,
+	}
+	if uri, ok := req.RedirectURI.Get(); ok {
+		// TODO: validate against the RP's redirect_uri allowlist once
+		// the OIDC layer ships.
+		s := uri.String()
+		startReq.RedirectURI = &s
+	}
+	if id, ok := req.AuthRequestID.Get(); ok {
+		// TODO: bind the auth request once OIDC mints them.
+		startReq.AuthRequestID = &id
+	}
+	if id, ok := req.SessionID.Get(); ok {
+		startReq.SessionID = &id
+	}
+
+	result, err := h.flowService.Start(ctx, startReq)
+	if err != nil {
+		return mapFlowErrorStatus(err), nil
+	}
+
+	cookieValue, err := h.sealState(result.State)
+	if err != nil {
+		return internalErrorResponse(err), nil
+	}
+
+	resp := h.buildFlowResponse(result, false)
+	return &api.FlowResponseHeaders{
+		SetCookie: api.NewOptString(flowSetCookie(cookieValue, false)),
+		Response:  resp,
 	}, nil
+}
+
+// ─── SubmitFlowStep ─────────────────────────────────────────────────
+
+func (h Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest, params api.SubmitFlowStepParams) (api.SubmitFlowStepRes, error) {
+	state, err := h.openState(params.Zflow)
+	if err != nil {
+		return mapFlowErrorStatus(err), nil
+	}
+	if state.ID != params.ID {
+		return mapFlowErrorStatus(errFlowIDMismatch), nil
+	}
+
+	submitReq := service.SubmitFlowRequest{
+		State:  state,
+		Action: req.Action,
+	}
+	if fields, ok := req.Fields.Get(); ok {
+		decoded, err := decodeFlowFields(fields)
+		if err != nil {
+			return errorResponseWithStatusCode(http.StatusBadRequest, domain.ErrRequestInvalid().WithMessage(err.Error())), nil
+		}
+		submitReq.Fields = decoded
+	}
+	if proofs, ok := req.GateProofs.Get(); ok {
+		submitReq.GateProofs = proofs
+	}
+	if id, ok := req.SSOProviderID.Get(); ok {
+		submitReq.SSOProviderID = &id
+	}
+
+	result, err := h.flowService.Submit(ctx, submitReq)
+	if err != nil {
+		return mapFlowErrorStatus(err), nil
+	}
+
+	cookieValue, err := h.sealState(result.State)
+	if err != nil {
+		return internalErrorResponse(err), nil
+	}
+
+	terminal := result.Step != nil && result.Step.Complete != nil
+	flowResp := h.buildFlowResponse(result, terminal)
+
+	// On a validation error the state machine returns the step with
+	// `Error` set and a non-terminal completion. Surface it as 400.
+	if result.Step != nil && result.Step.Error != nil {
+		return &api.SubmitFlowStepBadRequest{
+			SetCookie: api.NewOptString(flowSetCookie(cookieValue, false)),
+			Response:  flowResp,
+		}, nil
+	}
+
+	return &api.SubmitFlowStepOK{
+		SetCookie: api.NewOptString(flowSetCookie(cookieValue, terminal)),
+		Response:  flowResp,
+	}, nil
+}
+
+// ─── GetFlowStep ────────────────────────────────────────────────────
+
+func (h Handler) GetFlowStep(ctx context.Context, params api.GetFlowStepParams) (api.GetFlowStepRes, error) {
+	state, err := h.openState(params.Zflow)
+	if err != nil {
+		return mapFlowGetError(err), nil
+	}
+	if state.ID != params.ID {
+		return mapFlowGetError(errFlowIDMismatch), nil
+	}
+
+	result, err := h.flowService.GetStep(ctx, service.GetFlowStepRequest{State: state})
+	if err != nil {
+		return errorResponse(err), nil
+	}
+	if result.Step != nil && result.Step.Complete != nil {
+		return mapFlowGetError(errFlowCompleted), nil
+	}
+
+	resp := h.buildFlowResponse(result, false)
+	return &resp, nil
+}
+
+// ─── SubmitFlowEvent ────────────────────────────────────────────────
+
+func (h Handler) SubmitFlowEvent(ctx context.Context, req *api.FlowEventRequest, params api.SubmitFlowEventParams) (api.SubmitFlowEventRes, error) {
+	state, err := h.openState(params.Zflow)
+	if err != nil {
+		return mapFlowEventError(err), nil
+	}
+	if state.ID != params.ID {
+		return mapFlowEventError(errFlowIDMismatch), nil
+	}
+	// Read-only ack — no state mutation, no Set-Cookie so event
+	// submissions don't act as stealth cookie keep-alives. Concrete
+	// event sinks land later.
+	return &api.SubmitFlowEventNoContent{}, nil
+}
+
+// ─── helpers ────────────────────────────────────────────────────────
+
+// openState decodes and freshness-checks the sealed flow cookie.
+func (h Handler) openState(raw string) (*domain.FlowState, error) {
+	if raw == "" {
+		return nil, errFlowCookieMissing
+	}
+	payload, err := h.sealer.Open(raw)
+	if err != nil {
+		return nil, errFlowCookieInvalid
+	}
+	var state domain.FlowState
+	if err := json.Unmarshal(payload, &state); err != nil {
+		return nil, errFlowCookieInvalid
+	}
+	if h.now().Sub(state.IssuedAt) > flowCookieMaxAgeSeconds*time.Second {
+		return nil, errFlowCookieExpired
+	}
+	return &state, nil
+}
+
+func (h Handler) sealState(state *domain.FlowState) (string, error) {
+	payload, err := json.Marshal(state)
+	if err != nil {
+		return "", fmt.Errorf("marshal flow state: %w", err)
+	}
+	return h.sealer.Seal(payload)
+}
+
+func flowSetCookie(value string, clear bool) string {
+	if clear {
+		return fmt.Sprintf("%s=; Path=%s; HttpOnly; Secure; SameSite=Strict; Max-Age=0",
+			flowCookieName, flowCookiePath)
+	}
+	return fmt.Sprintf("%s=%s; Path=%s; HttpOnly; Secure; SameSite=Strict; Max-Age=%d",
+		flowCookieName, value, flowCookiePath, flowCookieMaxAgeSeconds)
+}
+
+func (h Handler) buildFlowResponse(result service.FlowStepResult, terminal bool) api.FlowResponse {
+	resp := api.FlowResponse{
+		ID:        result.State.ID,
+		SessionID: result.State.SessionID,
+		Step:      toFlowStep(result.Step),
+		Branding:  api.NewOptBranding(defaultBranding()),
+	}
+	if terminal && result.State.RedirectURI != nil {
+		u, err := parseURI(*result.State.RedirectURI)
+		if err == nil {
+			resp.RedirectURI = api.NewOptURI(u)
+		}
+	}
+	return resp
+}
+
+func toFlowStep(step *domain.FlowStep) api.FlowStep {
+	if step == nil {
+		return api.FlowStep{}
+	}
+	out := api.FlowStep{
+		Name:    step.Name,
+		Fields:  toFlowStepFields(step.Fields),
+		Actions: toFlowStepActions(step.Actions),
+		Gates:   api.FlowStepGates{},
+	}
+	if step.Error != nil {
+		out.Error = api.NewOptNilString(*step.Error)
+	}
+	if step.Complete != nil {
+		out.Complete = api.NewOptFlowStepComplete(toFlowStepComplete(*step.Complete))
+	}
+	if step.RedirectURL != nil {
+		if u, err := parseURI(*step.RedirectURL); err == nil {
+			out.RedirectURL = api.NewOptURI(u)
+		}
+	}
+	return out
+}
+
+func toFlowStepFields(fields map[string]domain.FlowField) api.FlowStepFields {
+	out := make(api.FlowStepFields, len(fields))
+	for name, f := range fields {
+		out[name] = toFlowField(f)
+	}
+	return out
+}
+
+func toFlowField(f domain.FlowField) api.Field {
+	out := api.Field{
+		Type:     api.FieldType(f.Type),
+		TextKey:  f.TextKey,
+		Required: api.NewOptBool(f.Required),
+	}
+	if f.Value != nil {
+		out.Value = jx.Raw(jsonQuoted(*f.Value))
+	}
+	return out
+}
+
+func toFlowStepActions(actions map[string]domain.FlowAction) api.FlowStepActions {
+	out := make(api.FlowStepActions, len(actions))
+	for name, a := range actions {
+		out[name] = api.StepAction{
+			TextKey: api.NewOptString(a.TextKey),
+			Primary: api.NewOptBool(a.Primary),
+		}
+	}
+	return out
+}
+
+func toFlowStepComplete(c domain.FlowStepComplete) api.FlowStepComplete {
+	switch c {
+	case domain.FlowStepCompleteRedirect:
+		return api.FlowStepCompleteRedirect
+	case domain.FlowStepCompleteShow:
+		return api.FlowStepCompleteShow
+	}
+	return api.FlowStepCompleteShow
+}
+
+func decodeFlowFields(raw map[string]jx.Raw) (map[string]any, error) {
+	out := make(map[string]any, len(raw))
+	for k, v := range raw {
+		var decoded any
+		if err := json.Unmarshal(v, &decoded); err != nil {
+			return nil, fmt.Errorf("decode field %q: %w", k, err)
+		}
+		out[k] = decoded
+	}
+	return out, nil
+}
+
+func jsonQuoted(s string) []byte {
+	b, _ := json.Marshal(s)
+	return b
+}
+
+// mapFlowErrorStatus returns the ErrorDetailsStatusCode that satisfies
+// every flow response interface (Create / Submit / Event). Falls
+// through to errorResponse for anything outside the flow-cookie /
+// state-machine vocabulary so domain errors still get their dedicated
+// HTTP mapping.
+func mapFlowErrorStatus(err error) *api.ErrorDetailsStatusCode {
+	switch {
+	case errors.Is(err, errFlowCookieMissing), errors.Is(err, errFlowCookieInvalid):
+		return errorResponseWithStatusCode(http.StatusUnauthorized,
+			domain.Error{Code: "flow_cookie_invalid", Message: "flow cookie is missing or invalid"})
+	case errors.Is(err, errFlowCookieExpired):
+		return errorResponseWithStatusCode(http.StatusUnauthorized,
+			domain.Error{Code: "flow_cookie_expired", Message: "flow cookie has expired"})
+	case errors.Is(err, errFlowIDMismatch):
+		return errorResponseWithStatusCode(http.StatusNotFound,
+			domain.Error{Code: "flow_not_found", Message: "flow id does not match cookie"})
+	case errors.Is(err, errFlowCompleted):
+		return errorResponseWithStatusCode(http.StatusGone,
+			domain.Error{Code: "flow_completed", Message: "flow has already completed"})
+	case errors.Is(err, domain.ErrInvalidAction):
+		return errorResponseWithStatusCode(http.StatusBadRequest,
+			domain.Error{Code: "invalid_action", Message: err.Error()})
+	case errors.Is(err, domain.ErrSessionConflict):
+		return errorResponseWithStatusCode(http.StatusConflict,
+			domain.Error{Code: "session_conflict", Message: err.Error()})
+	case errors.Is(err, domain.ErrUnsupported):
+		return errorResponseWithStatusCode(http.StatusBadRequest,
+			domain.Error{Code: "unsupported", Message: err.Error()})
+	}
+	return errorResponse(err)
+}
+
+func mapFlowGetError(err error) api.GetFlowStepRes {
+	switch {
+	case errors.Is(err, errFlowCookieMissing), errors.Is(err, errFlowCookieInvalid),
+		errors.Is(err, errFlowCookieExpired), errors.Is(err, errFlowIDMismatch):
+		details := api.ErrorDetails{Code: "flow_not_found", Message: "flow not found"}
+		notFound := api.GetFlowStepNotFound(details)
+		return &notFound
+	case errors.Is(err, errFlowCompleted):
+		details := api.ErrorDetails{Code: "flow_completed", Message: "flow has already completed"}
+		gone := api.GetFlowStepGone(details)
+		return &gone
+	}
+	return errorResponse(err)
+}
+
+func mapFlowEventError(err error) api.SubmitFlowEventRes {
+	switch {
+	case errors.Is(err, errFlowCookieMissing), errors.Is(err, errFlowCookieInvalid),
+		errors.Is(err, errFlowCookieExpired), errors.Is(err, errFlowIDMismatch):
+		details := api.ErrorDetails{Code: "flow_not_found", Message: "flow not found"}
+		notFound := api.SubmitFlowEventNotFound(details)
+		return &notFound
+	}
+	return errorResponse(err)
 }
 
 func buildResolveHint(opt api.OptFlowHint) service.ResolveFlowHint {
@@ -74,4 +419,13 @@ func flowDefinitionErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 	default:
 		return internalErrorResponse(err)
 	}
+}
+
+// parseURI parses a string into the url.URL ogen requires for OptURI.
+func parseURI(s string) (url.URL, error) {
+	u, err := url.Parse(s)
+	if err != nil {
+		return url.URL{}, err
+	}
+	return *u, nil
 }

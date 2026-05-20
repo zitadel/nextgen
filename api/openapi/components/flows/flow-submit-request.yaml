@@ -1,8 +1,12 @@
 type: object
-required: [session_token, action]
+required: [action]
 properties:
   session_token:
     type: string
+    description: |
+      Reserved for future session-token rotation; not consumed in MVP.
+      The flow id on the URL path and the `_zflow` cookie are
+      authoritative.
   action:
     type: string
     description: |

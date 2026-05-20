@@ -2,8 +2,10 @@ package api
 
 import (
 	"context"
+	"time"
 
 	api "github.com/zitadel/nextgen/api/generated"
+	"github.com/zitadel/nextgen/internal/cookie"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
@@ -14,15 +16,24 @@ type Handler struct {
 
 	flowService        service.FlowService
 	authAttemptService service.AuthAttemptService
+	sealer             *cookie.Sealer
+	now                func() time.Time
 }
 
 func NewHandler(
 	flowService service.FlowService,
 	authAttemptService service.AuthAttemptService,
+	sealer *cookie.Sealer,
+	now func() time.Time,
 ) *Handler {
+	if now == nil {
+		now = time.Now
+	}
 	return &Handler{
 		flowService:        flowService,
 		authAttemptService: authAttemptService,
+		sealer:             sealer,
+		now:                now,
 	}
 }
 

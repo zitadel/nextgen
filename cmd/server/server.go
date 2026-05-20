@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log"
@@ -11,16 +12,26 @@ import (
 	"syscall"
 	"time"
 
+	lru "github.com/hashicorp/golang-lru/v2"
+	"github.com/ianlancetaylor/jsonschema"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
 	oasapi "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
+	"github.com/zitadel/nextgen/internal/cookie"
+	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/domain/idgen"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	_ "github.com/zitadel/nextgen/internal/storage/database/dialect/all"
 	"github.com/zitadel/nextgen/internal/storage/database/repository"
 )
+
+// flowSchemaCacheSize bounds the JSONSchemaResolver's in-memory LRU.
+// 128 entries is enough headroom for MVP customer schema counts; tune
+// later if cache miss rates rise.
+const flowSchemaCacheSize = 128
 
 func NewCommand() *cobra.Command {
 	var configPath string
@@ -48,6 +59,29 @@ func NewCommand() *cobra.Command {
 	return cmd
 }
 
+// buildCookieSealer decodes a hex-encoded sealer key and constructs
+// the [cookie.Sealer]. The key must be exactly [cookie.KeySize] bytes
+// after decoding; anything else is a configuration error.
+func buildCookieSealer(hexKey string) (*cookie.Sealer, error) {
+	if hexKey == "" {
+		return nil, errors.New("server: cookie_sealer_key is required (set NEXTGEN_SERVER_COOKIE_SEALER_KEY)")
+	}
+	raw, err := hex.DecodeString(hexKey)
+	if err != nil {
+		return nil, fmt.Errorf("server: decode cookie_sealer_key: %w", err)
+	}
+	if len(raw) != cookie.KeySize {
+		return nil, fmt.Errorf("server: cookie_sealer_key must decode to %d bytes, got %d", cookie.KeySize, len(raw))
+	}
+	var key cookie.Key
+	copy(key[:], raw)
+	sealer, err := cookie.NewSealer(key)
+	if err != nil {
+		return nil, fmt.Errorf("server: build cookie sealer: %w", err)
+	}
+	return sealer, nil
+}
+
 func startDatabase(ctx context.Context, config database.Config) (database.Pool, error) {
 	connector, err := config.Build()
 	if err != nil {
@@ -71,6 +105,11 @@ func run(ctx context.Context, cfg Config, pool database.Pool) error {
 		}
 	}()
 
+	sealer, err := buildCookieSealer(cfg.Server.CookieSealerKey)
+	if err != nil {
+		return err
+	}
+
 	// ── Repositories ─────────────────
 	projectRepo := repository.NewProjectRepository(pool)
 	userRepo := repository.NewUserRepository()
@@ -79,9 +118,9 @@ func run(ctx context.Context, cfg Config, pool database.Pool) error {
 	sessionRepo := repository.NewSessionRepository(pool)
 	flowRepo := repository.NewFlowDefinitionRepository(pool)
 	attemptRepo := repository.NewAuthAttemptRepository(pool)
+	schemaRepo := repository.NewJSONSchemaRepository(pool)
 
-	// ── Services ─────────────────────
-	flowService := service.NewFlowService(pool, flowRepo)
+	// ── Auth attempt service ─────────
 	authAttemptSvc := service.NewAuthAttemptService(
 		pool,
 		attemptRepo,
@@ -92,13 +131,32 @@ func run(ctx context.Context, cfg Config, pool database.Pool) error {
 		userPasskeyRepo,
 	)
 
+	// ── Flow engine ──────────────────
+	ids := idgen.NewULID()
+	schemaCache, err := lru.New2Q[string, *jsonschema.Schema](flowSchemaCacheSize)
+	if err != nil {
+		return fmt.Errorf("build schema cache: %w", err)
+	}
+	schemas := domain.NewJSONSchemaResolver(schemaRepo, schemaCache, 0, 0, nil, nil)
+	fields := domain.NewSchemaFieldResolver(schemas)
+
+	// create_user requires a password hasher; argon2id wiring lands in
+	// a follow-up PR. Until then the handler is nil — flows that try to
+	// invoke `create_user` (registration) will fail with ErrIntegrity.
+	// Login does not need it.
+	var createUser *domain.FlowCreateUserHandler
+	flowAuth := service.NewFlowAuthAttemptAdapter(authAttemptSvc)
+	stateMachine := domain.NewFlowStateMachine(fields, createUser, flowAuth, time.Now)
+
+	flowService := service.NewFlowService(pool, flowRepo, stateMachine, ids)
+
 	// ── HTTP Server ─────────────────
 
 	ctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
 	oasServer, err := oasapi.NewServer(
-		api.NewHandler(flowService, authAttemptSvc),
+		api.NewHandler(flowService, authAttemptSvc, sealer, time.Now),
 		api.NewSecurityHandler(),
 		oasapi.WithErrorHandler(api.OgenErrorHandler))
 	if err != nil {

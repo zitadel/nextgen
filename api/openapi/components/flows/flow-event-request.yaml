@@ -1,8 +1,12 @@
 type: object
-required: [session_token, type]
+required: [type]
 properties:
   session_token:
     type: string
+    description: |
+      Reserved for future session-token rotation; not consumed in MVP.
+      The flow id on the URL path and the `_zflow` cookie are
+      authoritative.
   type:
     type: string
     enum: [fingerprint, telemetry]
