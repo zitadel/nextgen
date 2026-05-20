@@ -99,7 +99,7 @@ func encodeCreateSessionRequest(
 }
 
 func encodeCreateUserRequest(
-	req *User,
+	req User,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"
@@ -411,7 +411,7 @@ func encodeUpdateFlowDefinitionRequest(
 }
 
 func encodeUpdateUserRequest(
-	req *User,
+	req User,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"

@@ -16,6 +16,10 @@ const (
 	AuthMethodRecoveryCodes
 )
 
+const (
+	PrefixUser ResourcePrefix = "user"
+)
+
 // User is a hydrated user projection (header + optional EAV joins).
 type User struct {
 	ProjectID string

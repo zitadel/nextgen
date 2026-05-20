@@ -136,7 +136,7 @@ func (UnimplementedHandler) CreateSession(ctx context.Context, req *CreateSessio
 // Create user.
 //
 // POST /users
-func (UnimplementedHandler) CreateUser(ctx context.Context, req *User, params CreateUserParams) (r CreateUserRes, _ error) {
+func (UnimplementedHandler) CreateUser(ctx context.Context, req User, params CreateUserParams) (r CreateUserRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -465,7 +465,7 @@ func (UnimplementedHandler) UpdateFlowDefinition(ctx context.Context, req *FlowD
 // Update user.
 //
 // PATCH /users/{user_id}
-func (UnimplementedHandler) UpdateUser(ctx context.Context, req *User, params UpdateUserParams) (r UpdateUserRes, _ error) {
+func (UnimplementedHandler) UpdateUser(ctx context.Context, req User, params UpdateUserParams) (r UpdateUserRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

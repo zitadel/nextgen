@@ -11,7 +11,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 )
 
-func (h Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest) (api.CreateFlowRes, error) {
+func (h *Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest) (api.CreateFlowRes, error) {
 	purpose, err := domain.FlowDefinitionPurposeString(string(req.Purpose))
 	if err != nil {
 		return &api.ErrorDetails{

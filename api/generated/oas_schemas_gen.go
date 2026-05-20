@@ -10740,7 +10740,16 @@ func (*UpdateUserUnauthorized) updateUserRes() {}
 // identity. The content of a user is determined by the configured schema for
 // users, this is only a base schema.
 // Ref: #
-type User struct{}
+type User map[string]jx.Raw
+
+func (s *User) init() User {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
 
 func (*User) getUserRes() {}
 

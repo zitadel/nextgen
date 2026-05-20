@@ -104,7 +104,7 @@ type Handler interface {
 	// Create user.
 	//
 	// POST /users
-	CreateUser(ctx context.Context, req *User, params CreateUserParams) (CreateUserRes, error)
+	CreateUser(ctx context.Context, req User, params CreateUserParams) (CreateUserRes, error)
 	// DeleteFlowDefinition implements deleteFlowDefinition operation.
 	//
 	// Delete a flow definition by id.
@@ -342,7 +342,7 @@ type Handler interface {
 	// Update user.
 	//
 	// PATCH /users/{user_id}
-	UpdateUser(ctx context.Context, req *User, params UpdateUserParams) (UpdateUserRes, error)
+	UpdateUser(ctx context.Context, req User, params UpdateUserParams) (UpdateUserRes, error)
 	// VerifyChallengeProof implements verifyChallengeProof operation.
 	//
 	// Submits a proof (credential, code, assertion) to verify a factor challenge.

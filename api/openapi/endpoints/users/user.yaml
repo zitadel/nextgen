@@ -5,3 +5,4 @@ description: |
   identity. The content of a user is determined by the configured schema for 
   users, this is only a base schema.
 type: object
+additionalProperties: true

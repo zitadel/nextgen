@@ -124,7 +124,7 @@ type Invoker interface {
 	// Create user.
 	//
 	// POST /users
-	CreateUser(ctx context.Context, request *User, params CreateUserParams) (CreateUserRes, error)
+	CreateUser(ctx context.Context, request User, params CreateUserParams) (CreateUserRes, error)
 	// DeleteFlowDefinition invokes deleteFlowDefinition operation.
 	//
 	// Delete a flow definition by id.
@@ -362,7 +362,7 @@ type Invoker interface {
 	// Update user.
 	//
 	// PATCH /users/{user_id}
-	UpdateUser(ctx context.Context, request *User, params UpdateUserParams) (UpdateUserRes, error)
+	UpdateUser(ctx context.Context, request User, params UpdateUserParams) (UpdateUserRes, error)
 	// VerifyChallengeProof invokes verifyChallengeProof operation.
 	//
 	// Submits a proof (credential, code, assertion) to verify a factor challenge.
@@ -1765,12 +1765,12 @@ func (c *Client) sendCreateSession(ctx context.Context, request *CreateSessionRe
 // Create user.
 //
 // POST /users
-func (c *Client) CreateUser(ctx context.Context, request *User, params CreateUserParams) (CreateUserRes, error) {
+func (c *Client) CreateUser(ctx context.Context, request User, params CreateUserParams) (CreateUserRes, error) {
 	res, err := c.sendCreateUser(ctx, request, params)
 	return res, err
 }
 
-func (c *Client) sendCreateUser(ctx context.Context, request *User, params CreateUserParams) (res CreateUserRes, err error) {
+func (c *Client) sendCreateUser(ctx context.Context, request User, params CreateUserParams) (res CreateUserRes, err error) {
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("createUser"),
 		semconv.HTTPRequestMethodKey.String("POST"),
@@ -5526,12 +5526,12 @@ func (c *Client) sendUpdateFlowDefinition(ctx context.Context, request *FlowDefi
 // Update user.
 //
 // PATCH /users/{user_id}
-func (c *Client) UpdateUser(ctx context.Context, request *User, params UpdateUserParams) (UpdateUserRes, error) {
+func (c *Client) UpdateUser(ctx context.Context, request User, params UpdateUserParams) (UpdateUserRes, error) {
 	res, err := c.sendUpdateUser(ctx, request, params)
 	return res, err
 }
 
-func (c *Client) sendUpdateUser(ctx context.Context, request *User, params UpdateUserParams) (res UpdateUserRes, err error) {
+func (c *Client) sendUpdateUser(ctx context.Context, request User, params UpdateUserParams) (res UpdateUserRes, err error) {
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("updateUser"),
 		semconv.HTTPRequestMethodKey.String("PATCH"),

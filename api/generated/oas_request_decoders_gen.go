@@ -485,7 +485,7 @@ func (s *Server) decodeCreateSessionRequest(r *http.Request) (
 }
 
 func (s *Server) decodeCreateUserRequest(r *http.Request) (
-	req *User,
+	req User,
 	rawBody []byte,
 	close func() error,
 	rerr error,
@@ -549,7 +549,7 @@ func (s *Server) decodeCreateUserRequest(r *http.Request) (
 			}
 			return req, rawBody, close, err
 		}
-		return &request, rawBody, close, nil
+		return request, rawBody, close, nil
 	default:
 		return req, rawBody, close, validate.InvalidContentType(ct)
 	}
@@ -1458,7 +1458,7 @@ func (s *Server) decodeUpdateFlowDefinitionRequest(r *http.Request) (
 }
 
 func (s *Server) decodeUpdateUserRequest(r *http.Request) (
-	req *User,
+	req User,
 	rawBody []byte,
 	close func() error,
 	rerr error,
@@ -1522,7 +1522,7 @@ func (s *Server) decodeUpdateUserRequest(r *http.Request) (
 			}
 			return req, rawBody, close, err
 		}
-		return &request, rawBody, close, nil
+		return request, rawBody, close, nil
 	default:
 		return req, rawBody, close, validate.InvalidContentType(ct)
 	}
