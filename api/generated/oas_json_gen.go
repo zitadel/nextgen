@@ -19844,8 +19844,10 @@ func (s *UserSchemaXMinusAuthMinusMethods) Decode(d *jx.Decoder) error {
 	if s == nil {
 		return errors.New("invalid: unable to decode UserSchemaXMinusAuthMinusMethods to nil")
 	}
+	var propertiesCount int
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		propertiesCount++
 		switch string(k) {
 		case "password":
 			if err := func() error {
@@ -19898,11 +19900,20 @@ func (s *UserSchemaXMinusAuthMinusMethods) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"otp\"")
 			}
 		default:
-			return d.Skip()
+			return errors.Errorf("unexpected field %q", k)
 		}
 		return nil
 	}); err != nil {
 		return errors.Wrap(err, "decode UserSchemaXMinusAuthMinusMethods")
+	}
+	// Validate properties count.
+	if err := (validate.Object{
+		MinProperties:    1,
+		MinPropertiesSet: true,
+		MaxProperties:    0,
+		MaxPropertiesSet: false,
+	}).ValidateProperties(propertiesCount); err != nil {
+		return errors.Wrap(err, "object")
 	}
 
 	return nil
