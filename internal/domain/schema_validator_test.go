@@ -50,9 +50,10 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 	v := newTestValidator(t)
 
 	tests := []struct {
-		name    string
-		input   []byte
-		wantErr error
+		name                 string
+		input                []byte
+		wantErr              error
+		wantValidationErrors map[string]string
 	}{
 		{
 			name: "valid user schema",
@@ -115,11 +116,14 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				}
 			}`),
 			wantErr: domain.ErrSchemaValidationFailed,
+			wantValidationErrors: map[string]string{
+				"/required/$schema": `missing required field "$schema"`,
+			},
 		},
 		{
 			name: "missing $id",
 			input: []byte(`{
-				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"$schema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
 				"kind":    "user-schema",
 				"title":   "My User",
 				"x-auth-methods": {
@@ -127,6 +131,9 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				}
 			}`),
 			wantErr: domain.ErrSchemaValidationFailed,
+			wantValidationErrors: map[string]string{
+				"/required/$id": `missing required field "$id"`,
+			},
 		},
 		{
 			name:    "missing kind",
@@ -141,7 +148,7 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 		{
 			name: "missing required title",
 			input: []byte(`{
-				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"$schema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
 				"$id": "https://example.test/schemas/my-user.json",
 				"kind": "user-schema",
 				"x-auth-methods": {
@@ -149,21 +156,27 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				}
 			}`),
 			wantErr: domain.ErrSchemaValidationFailed,
+			wantValidationErrors: map[string]string{
+				"/required/title": `missing required field "title"`,
+			},
 		},
 		{
 			name: "missing required x-auth-methods",
 			input: []byte(`{
-				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"$schema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
 				"$id": "https://example.test/schemas/my-user.json",
 				"kind": "user-schema",
 				"title": "My User"
 			}`),
 			wantErr: domain.ErrSchemaValidationFailed,
+			wantValidationErrors: map[string]string{
+				"/required/x-auth-methods": `missing required field "x-auth-methods"`,
+			},
 		},
 		{
 			name: "title exceeds maxLength",
 			input: []byte(`{
-				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"$schema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
 				"$id": "https://example.test/schemas/my-user.json",
 				"kind": "user-schema",
 				"title": "` + strings.Repeat("aaa", 300) + `",
@@ -171,12 +184,13 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 					"password": { "enabled": true, "position": 0 }
 				}
 			}`),
-			wantErr: domain.ErrSchemaValidationFailed,
+			wantErr:              domain.ErrSchemaValidationFailed,
+			wantValidationErrors: map[string]string{"/properties/title": `value "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" too long for "maxLength" argument 255`},
 		},
 		{
 			name: "invalid auth method — missing position",
 			input: []byte(`{
-				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"$schema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
 				"$id": "https://example.test/schemas/my-user.json",
 				"kind": "user-schema",
 				"title": "My User",
@@ -185,11 +199,14 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				}
 			}`),
 			wantErr: domain.ErrSchemaValidationFailed,
+			wantValidationErrors: map[string]string{
+				"/properties/x-auth-methods/properties/password/required/position": `missing required field "position"`,
+			},
 		},
 		{
 			name: "invalid auth method — missing enabled",
 			input: []byte(`{
-				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"$schema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
 				"$id": "https://example.test/schemas/my-user.json",
 				"kind": "user-schema",
 				"title": "My User",
@@ -198,11 +215,14 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				}
 			}`),
 			wantErr: domain.ErrSchemaValidationFailed,
+			wantValidationErrors: map[string]string{
+				"/properties/x-auth-methods/properties/password/required/enabled": `missing required field "enabled"`,
+			},
 		},
 		{
 			name: "invalid property — missing type",
 			input: []byte(`{
-				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"$schema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
 				"$id": "https://example.test/schemas/my-user.json",
 				"kind": "user-schema",
 				"title": "My User",
@@ -214,11 +234,14 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				}
 			}`),
 			wantErr: domain.ErrSchemaValidationFailed,
+			wantValidationErrors: map[string]string{
+				"/properties/properties/additionalProperties/email/required/type": `missing required field "type"`,
+			},
 		},
 		{
 			name: "invalid property — missing title",
 			input: []byte(`{
-				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"$schema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
 				"$id": "https://example.test/schemas/my-user.json",
 				"kind": "user-schema",
 				"title": "My User",
@@ -230,11 +253,14 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				}
 			}`),
 			wantErr: domain.ErrSchemaValidationFailed,
+			wantValidationErrors: map[string]string{
+				"/properties/properties/additionalProperties/email/required/title": `missing required field "title"`,
+			},
 		},
 		{
 			name: "invalid property — type not one of allowed",
 			input: []byte(`{
-				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"$schema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
 				"$id": "https://example.test/schemas/my-user.json",
 				"kind": "user-schema",
 				"title": "My User",
@@ -246,24 +272,31 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				}
 			}`),
 			wantErr: domain.ErrSchemaValidationFailed,
+			wantValidationErrors: map[string]string{
+				"/properties/properties/additionalProperties/email/properties/type": `no "enum" value matched`,
+			},
 		},
 		{
 			name: "unknown auth method key rejected",
 			input: []byte(`{
-				"$schema": "https://json-schema.org/draft/2020-12/schema",
+				"$schema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
 				"$id": "https://example.test/schemas/my-user.json",
 				"kind": "user-schema",
 				"title": "My User",
 				"x-auth-methods": {
-					"totp": { "kind": "auth-method", "enabled": true, "position": 0 }
+					"totp": { "enabled": true, "position": 0 }
 				}
 			}`),
 			wantErr: domain.ErrSchemaValidationFailed,
+			wantValidationErrors: map[string]string{
+				"/properties/x-auth-methods/additionalProperties/totp": `false schema never matches`,
+			},
 		},
 		{
-			name:    "invalid JSON",
-			input:   []byte(`{invalid`),
-			wantErr: domain.ErrSchemaParseFailed,
+			name:                 "invalid JSON",
+			input:                []byte(`{invalid`),
+			wantErr:              domain.ErrSchemaParseFailed,
+			wantValidationErrors: map[string]string{},
 		},
 	}
 
@@ -272,6 +305,9 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 			err := v.ValidateAgainstMetaSchema(tt.input)
 			if tt.wantErr != nil {
 				assert.ErrorIs(t, err, tt.wantErr)
+				if tt.wantValidationErrors != nil {
+					assert.Equal(t, tt.wantValidationErrors, domain.FlattenValidationErrors(err))
+				}
 			} else {
 				assert.NoError(t, err)
 			}

@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/ianlancetaylor/jsonschema"
+	"github.com/ianlancetaylor/jsonschema/types"
 )
 
 // Errors
@@ -69,7 +70,7 @@ func NewTenantSchemaValidator(builtinPublicBase string) (*TenantSchemaValidator,
 	metaSchemas := make(map[KnownSchemaKind]*jsonschema.Schema)
 	for kind, path := range schemaKindPathMap {
 		metaURL := builtinPublicBase + "/" + path
-		metaSchema, err := compileMetaSchema(metaURL, rendered, DefaultMaxJSONSchemaResolveDepth)
+		metaSchema, err := compileMetaSchema(metaURL, rendered)
 		if err != nil {
 			return nil, fmt.Errorf("%w for kind %q (URL %q): %w", ErrMetaSchemaCompileFailed, kind, metaURL, err)
 		}
@@ -104,7 +105,7 @@ func (v *TenantSchemaValidator) ValidateAgainstMetaSchema(tenantSchemaBytes []by
 	return nil
 }
 
-func compileMetaSchema(metaURL string, rendered map[string][]byte, maxDepth int) (*jsonschema.Schema, error) {
+func compileMetaSchema(metaURL string, rendered map[string][]byte) (*jsonschema.Schema, error) {
 	cache := make(map[string]*jsonschema.Schema)
 	loader := func(url string) ([]byte, error) {
 		data, ok := rendered[url]
@@ -117,5 +118,29 @@ func compileMetaSchema(metaURL string, rendered map[string][]byte, maxDepth int)
 	if !ok {
 		return nil, fmt.Errorf("%w: %q", ErrMissingBuiltinMetaSchema, metaURL)
 	}
-	return compileSchema(metaURL, data, 0, maxDepth, cache, loader)
+	return compileSchema(metaURL, data, 0, DefaultMaxJSONSchemaResolveDepth, cache, loader)
+}
+
+// FlattenValidationErrors collects meta-schema validation errors into
+// a loc → msg map. loc segments are joined with "/" (e.g. "/required/x-auth-methods").
+func FlattenValidationErrors(err error) map[string]string {
+	out := make(map[string]string)
+	var ves *types.ValidationErrors
+	var ve *types.ValidationError
+	switch {
+	case errors.As(err, &ves):
+		for _, e := range ves.Errs {
+			out[validationLocString(e)] = e.Msg
+		}
+	case errors.As(err, &ve):
+		out[validationLocString(ve)] = ve.Msg
+	}
+	return out
+}
+
+func validationLocString(ve *types.ValidationError) string {
+	if ve.Loc == nil || len(*ve.Loc) == 0 {
+		return "/"
+	}
+	return "/" + strings.Join(*ve.Loc, "/")
 }
