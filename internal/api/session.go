@@ -210,9 +210,17 @@ func sessionsToAPI(sessions []*domain.Session) *api.SessionListResponse {
 }
 
 func setSessionCookie(token string, expiresAt time.Time) string {
-	return fmt.Sprintf("__nextgen_session=%s; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=%d", token, expiresAt.Sub(time.Now()).Seconds())
+	maxAge := int(time.Until(expiresAt).Seconds())
+	if maxAge < 0 {
+		maxAge = 0
+	}
+	return sessionCookie(token, maxAge)
 }
 
 func deleteSessionCookie() string {
-	return "__nextgen_session; Max-Age=0"
+	return sessionCookie("", 0)
+}
+
+func sessionCookie(token string, maxAge int) string {
+	return fmt.Sprintf("__nextgen_session=%s; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=%d", token, maxAge)
 }
