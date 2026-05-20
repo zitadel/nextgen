@@ -10,7 +10,6 @@ CREATE TABLE auth_attempts (
     session_id              INT64,
     required_checks         ARRAY<INT64>,
     created_at              TIMESTAMP   NOT NULL DEFAULT (CURRENT_TIMESTAMP()),
-    completed_at            TIMESTAMP,
     time_to_live            INT64,
     FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE,
 ) PRIMARY KEY (project_id, id)

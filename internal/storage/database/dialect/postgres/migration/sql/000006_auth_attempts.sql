@@ -8,7 +8,6 @@ CREATE TABLE zitadel_nextgen.auth_attempts (
     , session_id              BIGINT
     , required_checks         SMALLINT[]
     , created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    , completed_at            TIMESTAMPTZ
     , time_to_live            INTERVAL
 
     , PRIMARY KEY (project_id, id)

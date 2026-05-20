@@ -16,6 +16,7 @@ func (h Handler) CreateAuthAttempt(ctx context.Context, req *api.CreateAuthAttem
 	if sessionID, ok := req.GetSessionID().Get(); ok {
 		input.SessionID = new(string(sessionID))
 	}
+	// TODO: handle challenge nonce in the future
 
 	attempt, err := h.authAttemptService.Create(ctx, input)
 	if err != nil {
@@ -49,7 +50,7 @@ func (h Handler) IssueChallenge(ctx context.Context, req *api.IssueChallengeRequ
 	if err != nil {
 		return nil, err
 	}
-	// Return only the newly issued challenge for the requested check type
+
 	check, ok := attempt.ChallengeByType(challenge.ChallengeCheckType())
 	if !ok {
 		return nil, domain.ErrInternal(nil).WithMessage("challenge not found after issue")
@@ -150,8 +151,6 @@ func verifyRequestToProof(req *api.VerifyChallengeRequest) (service.Proof, error
 	}
 }
 
-// factorMethodToCheckType maps the API FactorMethod to the domain AuthCheckType.
-// This is the adapter boundary — API types never leak into the service or domain.
 func factorMethodToCheckType(method api.FactorMethod) (domain.AuthCheckType, error) {
 	switch method {
 	case api.FactorMethodIdentifier:
@@ -166,17 +165,19 @@ func factorMethodToCheckType(method api.FactorMethod) (domain.AuthCheckType, err
 }
 
 func checkToChallenge(check domain.AuthChallenge) *api.ChallengeResponse {
-	check.Payload()
-	resp := &api.ChallengeResponse{
+	return &api.ChallengeResponse{
 		ChallengeID: api.ChallengeID(check.GetID()),
 		Method:      checkTypeToAPI(check.Type()),
 		State:       api.ChallengeResponseStatePending,
 		CreatedAt:   check.GetLastChallengedAt(),
 		ExpiresAt:   api.OptNilDateTime{},
-		Payload:     api.OptChallengeResponsePayload{},
+		Payload:     checkToChallengePayload(check),
 	}
+}
+
+func checkToChallengePayload(check domain.AuthChallenge) api.OptChallengeResponsePayload {
 	if passkey, ok := check.(*domain.AuthChallengePasskey); ok {
-		resp.Payload = api.NewOptChallengeResponsePayload(api.ChallengeResponsePayload{
+		return api.NewOptChallengeResponsePayload(api.ChallengeResponsePayload{
 			Type: api.PasskeyChallengePayloadChallengeResponsePayload,
 			PasskeyChallengePayload: api.PasskeyChallengePayload{
 				PublicKey: api.PasskeyChallengePayloadPublicKey{
@@ -191,7 +192,7 @@ func checkToChallenge(check domain.AuthChallenge) *api.ChallengeResponse {
 			},
 		})
 	}
-	return resp
+	return api.OptChallengeResponsePayload{}
 }
 
 func authAttemptToAPI(attempt *domain.AuthAttempt) *api.AuthAttemptResponse {
@@ -210,7 +211,7 @@ func authAttemptToAPI(attempt *domain.AuthAttempt) *api.AuthAttemptResponse {
 		resp.SessionID = api.NewOptNilSessionID(api.SessionID(*attempt.SessionID))
 	}
 	if !attempt.ExpiresAt().IsZero() {
-		resp.ExpiresAt = api.NewOptDateTime(attempt.ExpiresAt())
+		resp.ExpiresAt = api.NewOptNilDateTime(attempt.ExpiresAt())
 	}
 	return resp
 }
@@ -255,7 +256,7 @@ func checkTypeToAPI(check domain.AuthCheckType) api.FactorMethod {
 	case domain.AuthCheckTypePasskey:
 		return api.FactorMethodPasskey
 	default:
-		return api.FactorMethodIdentifier //TODO: ?
+		return ""
 	}
 }
 

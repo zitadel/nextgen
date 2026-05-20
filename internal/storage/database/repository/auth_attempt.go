@@ -35,7 +35,7 @@ type pgAuthAttempt struct{}
 var _ domain.AuthAttemptRepository = (*pgAuthAttempt)(nil)
 
 const pgAuthAttemptGetSelect = `SELECT aa.project_id, aa.id, aa.handoff_token, aa.handed_off_at, aa.handoff_idempotency_key, aa.session_id,` +
-	` aa.required_checks, aa.created_at, aa.completed_at, aac.type, aa.time_to_live,` +
+	` aa.required_checks, aa.created_at, aac.type, aa.time_to_live,` +
 	` aac.challenge_id, aac.last_challenged_at, aac.last_verified_at, aac.last_failed_at, aac.failure_count, aac.challenge_payload, aac.factor_payload` +
 	` FROM zitadel_nextgen.auth_attempts aa` +
 	` LEFT JOIN zitadel_nextgen.auth_attempt_checks aac ON aa.project_id = aac.project_id AND aa.id = aac.auth_attempt_id`
@@ -69,7 +69,6 @@ func (a *pgAuthAttempt) scan(rows database.Rows, attempt *domain.AuthAttempt) er
 			handoffIdempotencyKey database.Null[string]
 			sessionID             database.Null[int64]
 			requiredChecks        []int16
-			completedAt           database.Null[time.Time]
 			checkType             database.Null[domain.AuthCheckType]
 			timeToLive            *time.Duration
 			challengeID           database.Null[string]
@@ -82,7 +81,7 @@ func (a *pgAuthAttempt) scan(rows database.Rows, attempt *domain.AuthAttempt) er
 		)
 		err := rows.Scan(
 			&attempt.ProjectID, &attemptID, &handoffToken, &handedOffAt, &handoffIdempotencyKey, &sessionID,
-			&requiredChecks, &attempt.CreatedAt, &completedAt, &checkType, &timeToLive,
+			&requiredChecks, &attempt.CreatedAt, &checkType, &timeToLive,
 			&challengeID, &lastChallengedAt, &verifiedAt, &lastFailedAt, &failureCount, &challenge, &factor)
 		if err != nil {
 			return fmt.Errorf("failed to scan auth attempt: %w", err)
@@ -105,9 +104,6 @@ func (a *pgAuthAttempt) scan(rows database.Rows, attempt *domain.AuthAttempt) er
 		if sessionID.Valid {
 			s := strconv.FormatInt(sessionID.V, 10)
 			attempt.SessionID = &s
-		}
-		if completedAt.Valid {
-			attempt.CompletedAt = &completedAt.V
 		}
 		attempt.TimeToLive = timeToLive
 
@@ -248,12 +244,6 @@ func (a *pgAuthAttempt) Delete(ctx context.Context, client database.QueryExecuto
 	return err
 }
 
-func (a *pgAuthAttempt) Complete(ctx context.Context, client database.QueryExecutor, attempt *domain.AuthAttempt) error {
-	return client.QueryRow(ctx,
-		`UPDATE zitadel_nextgen.auth_attempts SET completed_at = NOW() WHERE project_id = $1 AND id = $2 RETURNING completed_at`,
-		attempt.ProjectID, database.Identity(attempt.ID)).Scan(&attempt.CompletedAt)
-}
-
 func (a *pgAuthAttempt) Handoff(ctx context.Context, client database.QueryExecutor, attempt *domain.AuthAttempt, idempotencyKey string) error {
 	if attempt.HandoffToken == nil {
 		return fmt.Errorf("failed to handoff auth attempt: handoff token is required")
@@ -348,7 +338,7 @@ type spannerAuthAttempt struct{}
 var _ domain.AuthAttemptRepository = (*spannerAuthAttempt)(nil)
 
 const spannerAuthAttemptGetSelect = `SELECT aa.project_id, aa.id, aa.handoff_token, aa.handed_off_at, aa.handoff_idempotency_key, aa.session_id,` +
-	` aa.required_checks, aa.created_at, aa.completed_at, aac.type, aa.time_to_live,` +
+	` aa.required_checks, aa.created_at, aac.type, aa.time_to_live,` +
 	` aac.challenge_id, aac.last_challenged_at, aac.last_verified_at, aac.last_failed_at, aac.failure_count, aac.challenge_payload, aac.factor_payload` +
 	` FROM auth_attempts aa` +
 	` LEFT JOIN auth_attempt_checks aac ON aa.project_id = aac.project_id AND aa.id = aac.auth_attempt_id`
@@ -382,7 +372,6 @@ func (a *spannerAuthAttempt) scan(rows database.Rows, attempt *domain.AuthAttemp
 			handoffIdempotencyKey database.Null[string]
 			sessionID             database.Null[int64]
 			requiredChecks        []googspanner.NullInt64
-			completedAt           database.Null[time.Time]
 			checkType             database.Null[int64]
 			timeToLiveNanos       database.Null[int64]
 			challengeID           database.Null[string]
@@ -395,7 +384,7 @@ func (a *spannerAuthAttempt) scan(rows database.Rows, attempt *domain.AuthAttemp
 		)
 		err := rows.Scan(
 			&attempt.ProjectID, &attemptID, &handoffToken, &handedOffAt, &sessionID,
-			&requiredChecks, &attempt.CreatedAt, &completedAt, &checkType, &timeToLiveNanos,
+			&requiredChecks, &attempt.CreatedAt, &checkType, &timeToLiveNanos,
 			&lastChallengedAt, &verifiedAt, &lastFailedAt, &failureCount, &challenge, &factor)
 		if err != nil {
 			return fmt.Errorf("failed to scan auth attempt: %w", err)
@@ -417,9 +406,6 @@ func (a *spannerAuthAttempt) scan(rows database.Rows, attempt *domain.AuthAttemp
 		}
 		if sessionID.Valid {
 			attempt.SessionID = new(strconv.FormatInt(sessionID.V, 10))
-		}
-		if completedAt.Valid {
-			attempt.CompletedAt = &completedAt.V
 		}
 		if timeToLiveNanos.Valid {
 			attempt.TimeToLive = new(time.Duration(timeToLiveNanos.V))
@@ -512,21 +498,6 @@ func (a *spannerAuthAttempt) Delete(ctx context.Context, client database.QueryEx
 		`DELETE FROM auth_attempts WHERE project_id = $1 AND id = $2`,
 		projectID, database.Identity(authAttemptID))
 	return err
-}
-
-func (a *spannerAuthAttempt) Complete(ctx context.Context, client database.QueryExecutor, attempt *domain.AuthAttempt) error {
-	now := time.Now().UTC()
-	n, err := client.Exec(ctx,
-		`UPDATE auth_attempts SET completed_at = $1 WHERE project_id = $2 AND id = $3`,
-		now, attempt.ProjectID, database.Identity(attempt.ID))
-	if err != nil {
-		return err
-	}
-	if n == 0 {
-		return database.NewNoRowFoundError(nil)
-	}
-	attempt.CompletedAt = &now
-	return nil
 }
 
 func (a *spannerAuthAttempt) Handoff(ctx context.Context, client database.QueryExecutor, attempt *domain.AuthAttempt, idempotencyKey string) error {

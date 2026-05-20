@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"strings"
 
 	"github.com/ogen-go/ogen/ogenerrors"
 	api "github.com/zitadel/nextgen/api/generated"
@@ -20,7 +21,11 @@ func (s SecurityHandler) HandleOAuth2(ctx context.Context, operationName api.Ope
 		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
 	}
 	// TODO: add proper token validation
-	return WithScopeContext(ctx, ScopeContext{ProjectID: t.Token}), nil
+	projectID, ok := strings.CutPrefix(t.Token, "sk_proj_")
+	if !ok {
+		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+	}
+	return WithScopeContext(ctx, ScopeContext{ProjectID: projectID}), nil
 }
 
 var _ api.SecurityHandler = (*SecurityHandler)(nil)

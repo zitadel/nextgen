@@ -74,10 +74,8 @@ type AuthAttempt struct {
 	Checks         []AuthCheck
 	RequiredChecks []AuthCheckType
 
-	// The time when the auth attempt was created, it must be set by the storage and is read only.
+	// The time when the auth attempt was created, it must be set by the storage and is read-only.
 	CreatedAt time.Time
-	// The time when the auth attempt was completed, it must be set by the storage and is read only. An auth attempt is completed when all required checks are verified successfully.
-	CompletedAt *time.Time
 
 	// TTL describes how long an auth attempt is valid, it should be set to a reasonable value (e.g. 5 minutes) to prevent abuse and to ensure that old auth attempts are cleaned up.
 	// An auth attempt gets garbage collected after CreatedAt + TimeToLive, so it is important to set it to a reasonable value to prevent abuse and to ensure that old auth attempts are cleaned up.
@@ -358,32 +356,28 @@ type AuthAttemptRepository interface {
 	GetByID(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string) (*AuthAttempt, error)
 	// GetByHandoffToken retrieves a single AuthAttempt by its handoff token and project ID.
 	GetByHandoffToken(ctx context.Context, client database.QueryExecutor, projectID, handoffToken string) (*AuthAttempt, error)
-	// Creates an auth attempt including all defined fields (except read-only fields).
+	// Create stores an auth attempt including all defined fields (except read-only fields).
 	// The repository MUST set the [AuthAttempt.CreatedAt] field to the current time.
-	// The repsoitory MUST store [AuthAttempts.Checks] following this recipe:
-	//  - If the check does NOT implement [AuthFactorer] AND [AuthChallenger] if MUST NOT SET `LastVerifiedAt` and `LastChallengedAt`.
-	//  - If the check does implement [AuthFactorer] but NOT [AuthChallenger] it MUST set `LastVerifiedAt` but NOT `LastChallengedAt`.
-	//  - If the check does NOT implement [AuthFactorer] but [AuthChallenger] it MUST NOT set `LastVerifiedAt` but `LastChallengedAt`.
-	//  - If the check does implement [AuthFactorer] AND [AuthChallenger] it MUST NOT set `LastVerifiedAt` but `LastChallengedAt`.
+	// The repository MUST store [AuthAttempts.Checks] following this recipe:
+	//  - If the check does implement [AuthFactor], it MUST SET `LastVerifiedAt`.
+	//  - If the check does implement [AuthChallenge], it MUST set `LastChallengedAt`.
 	Create(ctx context.Context, client database.QueryExecutor, authAttempt *AuthAttempt) error
 	// Delete an auth attempt by its ID and project ID.
 	Delete(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string) error
 
-	// Sets the [AuthAttempt.CompletedAt] field to the current time and stores it accordingly.
-	Complete(ctx context.Context, client database.QueryExecutor, attempt *AuthAttempt) error
-	// Stores the handoff token for an auth attempt and sets the handoff time to the current time.
+	// Handoff stores the handoff token for an auth attempt and sets the handoff time to the current time.
 	Handoff(ctx context.Context, client database.QueryExecutor, attempt *AuthAttempt, idempotencyKey string) error
 
 	// SetChallenge sets a check to challenged and sets the challenge payload.
-	// If the check is not stored yet the method creates a new check with the given type and challenge payload, otherwise it updates the existing check with the new challenge payload.
-	// The repository MUST set the [AuthCheck.LastChallengeAt] field of the check to the current time, reset the [AuthCheck.LastFailedAt] field to nil and reset the [AuthCheck.FailureCount] field to 0, and store the values accordingly.
-	SetChallenge(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string, challenger AuthChallenge) error
-	// ChallengeSucceeded sets the [AuthCheck.LastVerifiedAt] field of the check to the current time and stores it accordingly, and removes the challenge payload from the storage.
-	// If the check is not stored yet, the method creates a new check with the given type and sets the [AuthCheck.LastVerifiedAt] field to the current time, and stores it accordingly.
-	// If the check implements [AuthFactorer], the repository MUST also set the factor payload to the value returned by the [AuthFactorer.FactorPayload] method, and store it accordingly.
-	ChallengeSucceeded(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string, checker AuthFactor, challengeID string) error
-	// ChallengeFailed sets a check to failed.
-	// If the check is not stored yet, the method creates a new check with the given type and sets the [AuthCheck.LastFailedAt] field to the current time and the [AuthCheck.FailureCount] field to 1, and stores it accordingly.
-	// The repository MUST set the [AuthCheck.LastFailedAt] field of the check to the current time and increment the [AuthCheck.FailureCount] field by 1, and store the values accordingly.
-	ChallengeFailed(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string, checker AuthChallenge) error
+	// If the check is not stored yet, the method creates a new check with the given type and challenge payload, otherwise it updates the existing check with the new challenge payload and id.
+	// The repository MUST call the [AuthChallenge.SetLastChallengedAt] with the current time, reset the [AuthChallenge.SetLastFailedAt] to nil and reset the [AuthChallenge.SetFailureCount] to 0, and store the values accordingly.
+	SetChallenge(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string, challenge AuthChallenge) error
+	// ChallengeSucceeded sets the [AuthFactor.SetLastVerifiedAt] to the current time and stores it accordingly and removes the challenge payload from the storage.
+	// The factor must be stored already as an [AuthChallenge], with the same ID.
+	// The factor payload MUST be stored by the repository.
+	ChallengeSucceeded(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string, factor AuthFactor, challengeID string) error
+	// ChallengeFailed sets a challenge to failed.
+	// The challenge must be stored already as an [AuthChallenge], with the same ID.
+	// The [AuthChallenge.SetLastFailedAt] must be called with the current time and the [AuthChallenge.SetFailureCount] increased by 1, and store the values accordingly.
+	ChallengeFailed(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string, challenge AuthChallenge) error
 }

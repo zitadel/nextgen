@@ -222,12 +222,12 @@ func NewAuthAttemptService(
 func (s *authAttemptService) Create(ctx context.Context, input CreateAuthAttemptInput) (res *domain.AuthAttempt, err error) {
 	requiredChecks := input.RequiredChecks
 	if requiredChecks == nil {
-		project, err := s.projects.Get(ctx, s.pool, input.ProjectID)
-		if err != nil {
-			return nil, domain.ErrInternal(err).WithMessage("failed to load project config")
-		}
-		_ = project
-		// TODO: requiredChecks = cfg.DefaultRequiredChecks
+		// TODO: implement this
+		//project, err := s.projects.Get(ctx, s.pool, input.ProjectID)
+		//if err != nil {
+		//	return nil, domain.ErrInternal(err).WithMessage("failed to load project config")
+		//}
+		// requiredChecks = project.DefaultRequiredChecks
 	}
 
 	opts := make([]domain.AuthAttemptOption, 0, 1)
@@ -247,27 +247,8 @@ func (s *authAttemptService) Create(ctx context.Context, input CreateAuthAttempt
 		return nil, err
 	}
 
-	tx, err := s.pool.Begin(ctx, nil)
-	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to start transaction")
-	}
-	defer func() {
-		// dont shadow errors already returned to the user
-		if err != nil {
-			_ = tx.Rollback(ctx)
-		}
-	}()
-
-	if err = s.attempts.Create(ctx, tx, attempt); err != nil {
+	if err = s.attempts.Create(ctx, s.pool, attempt); err != nil {
 		return nil, err //TODO: error handling
-	}
-	if attempt.IsCompleted() {
-		if err = s.attempts.Complete(ctx, tx, attempt); err != nil {
-			return nil, err
-		}
-	}
-	if err = tx.Commit(ctx); err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to commit transaction")
 	}
 	return attempt, nil
 }
@@ -378,32 +359,10 @@ func (s *authAttemptService) VerifyProof(ctx context.Context, input VerifyProofI
 		return nil, err
 	}
 
-	tx, err := s.pool.Begin(ctx, nil)
-	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to start transaction")
-	}
-
-	defer func() {
-		// don't shadow errors already returned to the user
-		if err != nil {
-			_ = tx.Rollback(ctx)
-		}
-	}()
-
-	if err = s.attempts.ChallengeSucceeded(ctx, tx, input.ProjectID, input.AttemptID, factor, check.GetID()); err != nil {
+	if err = s.attempts.ChallengeSucceeded(ctx, s.pool, input.ProjectID, input.AttemptID, factor, check.GetID()); err != nil {
 		return nil, err
 	}
 	attempt.SetCheck(factor) // Update the attempt with the successful factor for accurate state in the response
-
-	if attempt.IsCompleted() {
-		if err = s.attempts.Complete(ctx, tx, attempt); err != nil {
-			return nil, err
-		}
-	}
-
-	if err = tx.Commit(ctx); err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to commit transaction")
-	}
 
 	return attempt, nil
 }
