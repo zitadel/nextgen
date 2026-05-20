@@ -153,11 +153,11 @@ func (r *FlowStateMachineRuntime) Start(ctx context.Context, client database.Que
 	if r.authAttempts == nil {
 		return FlowStepResult{}, fmt.Errorf("%w: auth-attempt service not wired", ErrIntegrity)
 	}
-	attempt, err := r.authAttempts.Start(ctx, FlowStartAttemptInput{ProjectID: state.ProjectID})
+	attemptID, err := r.authAttempts.Start(ctx, FlowCreateAttemptInput{ProjectID: state.ProjectID})
 	if err != nil {
 		return FlowStepResult{}, fmt.Errorf("flow state machine: start auth attempt: %w", err)
 	}
-	state.AuthAttemptID = attempt.ID
+	state.AuthAttemptID = attemptID
 
 	step, err := r.renderStep(ctx, client, in.Definition, state, in.UserSchemaURL, nil)
 	if err != nil {
@@ -279,53 +279,73 @@ type flowDispatchResult struct {
 }
 
 // dispatchChallenges routes per-field submissions into the matching
-// auth-attempt challenge. Fields with FlowFieldChallengeNone are
-// ignored. Steps whose on_success is create_user skip dispatch
-// entirely: the create_user handler owns identifier uniqueness and
-// password setting; calling ResolveIdentifier or VerifyPassword
-// against the same submission would be wrong.
+// auth-attempt challenge. The auth-attempt domain enforces ordering —
+// password verification requires the user to be identified first — so
+// dispatch runs identifier challenges first, then password challenges.
+//
+// Steps whose on_success is create_user skip dispatch entirely: the
+// create_user handler owns identifier uniqueness and password setting,
+// so calling SubmitIdentifier or SubmitPassword against the same
+// submission would be wrong.
 func (r *FlowStateMachineRuntime) dispatchChallenges(ctx context.Context, state *FlowState, step *FlowDefinitionStep, resolved FlowResolvedFields, fields map[string]any) (flowDispatchResult, error) {
 	if step.OnSuccess != nil && *step.OnSuccess == FlowOnSuccessCreateUser {
 		return flowDispatchResult{}, nil
 	}
+
 	for name, field := range resolved.Fields {
-		raw, ok := fields[name]
+		if field.Challenge != FlowFieldChallengeIdentifier {
+			continue
+		}
+		value, ok := stringField(fields, name)
 		if !ok {
 			continue
 		}
-		value, _ := raw.(string)
-		switch field.Challenge {
-		case FlowFieldChallengeIdentifier:
-			ref, err := r.authAttempts.ResolveIdentifier(ctx, FlowResolveIdentifierInput{
-				ProjectID: state.ProjectID,
-				AttemptID: state.AuthAttemptID,
-				Value:     value,
-			})
-			if errors.Is(err, ErrFlowIdentifierUnknown) {
-				return flowDispatchResult{Outcome: FlowImplicitOutcomeUserNotFound}, nil
-			}
-			if err != nil {
-				return flowDispatchResult{}, fmt.Errorf("flow state machine: resolve identifier: %w", err)
-			}
-			recordResolvedUser(state, ref.UserID)
-		case FlowFieldChallengePassword:
-			userID, _ := state.CollectedData[FlowCollectedUserIDKey].(string)
-			err := r.authAttempts.VerifyPassword(ctx, FlowVerifyPasswordInput{
-				ProjectID: state.ProjectID,
-				AttemptID: state.AuthAttemptID,
-				UserID:    userID,
-				Plain:     value,
-			})
-			if errors.Is(err, ErrFlowPasswordInvalid) {
-				msg := "auth_attempt.password_invalid"
-				return flowDispatchResult{StepError: &msg}, nil
-			}
-			if err != nil {
-				return flowDispatchResult{}, fmt.Errorf("flow state machine: verify password: %w", err)
-			}
+		userID, err := r.authAttempts.SubmitIdentifier(ctx, FlowSubmitIdentifierInput{
+			ProjectID: state.ProjectID,
+			AttemptID: state.AuthAttemptID,
+			Value:     value,
+		})
+		if errors.Is(err, ErrAuthAttemptProofRejected()) {
+			return flowDispatchResult{Outcome: FlowImplicitOutcomeUserNotFound}, nil
+		}
+		if err != nil {
+			return flowDispatchResult{}, fmt.Errorf("flow state machine: submit identifier: %w", err)
+		}
+		recordResolvedUser(state, userID)
+	}
+
+	for name, field := range resolved.Fields {
+		if field.Challenge != FlowFieldChallengePassword {
+			continue
+		}
+		value, ok := stringField(fields, name)
+		if !ok {
+			continue
+		}
+		err := r.authAttempts.SubmitPassword(ctx, FlowSubmitPasswordInput{
+			ProjectID: state.ProjectID,
+			AttemptID: state.AuthAttemptID,
+			Plain:     value,
+		})
+		if errors.Is(err, ErrAuthAttemptProofRejected()) {
+			msg := "auth_attempt.password_invalid"
+			return flowDispatchResult{StepError: &msg}, nil
+		}
+		if err != nil {
+			return flowDispatchResult{}, fmt.Errorf("flow state machine: submit password: %w", err)
 		}
 	}
+
 	return flowDispatchResult{}, nil
+}
+
+func stringField(fields map[string]any, name string) (string, bool) {
+	raw, ok := fields[name]
+	if !ok {
+		return "", false
+	}
+	s, _ := raw.(string)
+	return s, true
 }
 
 // runOnSuccess dispatches the step's on_success mutation. Add a case
@@ -361,11 +381,11 @@ func (r *FlowStateMachineRuntime) terminate(ctx context.Context, client database
 	if err != nil {
 		return nil, err
 	}
-	if state.AuthAttemptID != "" {
-		if err := r.authAttempts.Complete(ctx, state.ProjectID, state.AuthAttemptID); err != nil {
-			return nil, fmt.Errorf("flow state machine: complete auth attempt: %w", err)
-		}
-	}
+	// Completion of the underlying auth attempt is intrinsic to the
+	// last successful SubmitPassword / SubmitIdentifier / … call: the
+	// service writes CompletedAt once all required factors land. The
+	// state machine has no separate Complete to issue here — the
+	// handler picks up the (now-complete) attempt at handoff time.
 	kind := *step.Complete
 	rendered.Complete = &kind
 	if kind == FlowStepCompleteRedirect && state.RedirectURI != nil {

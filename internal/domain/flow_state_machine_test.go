@@ -52,46 +52,40 @@ func (f *fakeUserPasswordRepo) Create(_ context.Context, _ database.QueryExecuto
 }
 
 // fakeAuthAttempts captures the [domain.FlowAuthAttemptService] calls
-// the state machine drives so tests can assert lifecycle wiring and
-// challenge dispatch.
+// the state machine drives so tests can assert lifecycle wiring,
+// challenge dispatch, and ordering.
 type fakeAuthAttempts struct {
-	startCalls    []domain.FlowStartAttemptInput
-	identifyCalls []domain.FlowResolveIdentifierInput
-	passwordCalls []domain.FlowVerifyPasswordInput
-	completed     []string
+	startCalls    []domain.FlowCreateAttemptInput
+	identifyCalls []domain.FlowSubmitIdentifierInput
+	passwordCalls []domain.FlowSubmitPasswordInput
 
 	nextAttemptID    string
-	identifierResult map[string]domain.FlowResolvedIdentifier
+	identifierResult map[string]string // value → resolved user id
 	identifierErrs   map[string]error
 	passwordErrs     map[string]error
 }
 
-func (f *fakeAuthAttempts) Start(_ context.Context, in domain.FlowStartAttemptInput) (*domain.AuthAttempt, error) {
+func (f *fakeAuthAttempts) Start(_ context.Context, in domain.FlowCreateAttemptInput) (string, error) {
 	f.startCalls = append(f.startCalls, in)
-	return &domain.AuthAttempt{ProjectID: in.ProjectID, ID: f.nextAttemptID}, nil
+	return f.nextAttemptID, nil
 }
 
-func (f *fakeAuthAttempts) ResolveIdentifier(_ context.Context, in domain.FlowResolveIdentifierInput) (domain.FlowResolvedIdentifier, error) {
+func (f *fakeAuthAttempts) SubmitIdentifier(_ context.Context, in domain.FlowSubmitIdentifierInput) (string, error) {
 	f.identifyCalls = append(f.identifyCalls, in)
 	if err, ok := f.identifierErrs[in.Value]; ok {
-		return domain.FlowResolvedIdentifier{}, err
+		return "", err
 	}
-	if ref, ok := f.identifierResult[in.Value]; ok {
-		return ref, nil
+	if uid, ok := f.identifierResult[in.Value]; ok {
+		return uid, nil
 	}
-	return domain.FlowResolvedIdentifier{}, domain.ErrFlowIdentifierUnknown
+	return "", domain.ErrAuthAttemptProofRejected()
 }
 
-func (f *fakeAuthAttempts) VerifyPassword(_ context.Context, in domain.FlowVerifyPasswordInput) error {
+func (f *fakeAuthAttempts) SubmitPassword(_ context.Context, in domain.FlowSubmitPasswordInput) error {
 	f.passwordCalls = append(f.passwordCalls, in)
 	if err, ok := f.passwordErrs[in.Plain]; ok {
 		return err
 	}
-	return nil
-}
-
-func (f *fakeAuthAttempts) Complete(_ context.Context, _, attemptID string) error {
-	f.completed = append(f.completed, attemptID)
 	return nil
 }
 
@@ -276,21 +270,18 @@ func TestFlowStateMachine_Process_RegistrationHappyPath(t *testing.T) {
 	if got := result.State.CollectedData[domain.FlowCollectedUserIDKey]; got != wantUserID {
 		t.Errorf("CollectedData[%s] = %v, want %q", domain.FlowCollectedUserIDKey, got, wantUserID)
 	}
-	if len(w.attempts.completed) != 1 || w.attempts.completed[0] != "att_01TEST" {
-		t.Errorf("auth attempt Complete calls = %v, want [att_01TEST]", w.attempts.completed)
-	}
 	if len(w.attempts.identifyCalls) != 0 {
-		t.Errorf("ResolveIdentifier called %d times on registration, want 0", len(w.attempts.identifyCalls))
+		t.Errorf("SubmitIdentifier called %d times on registration, want 0", len(w.attempts.identifyCalls))
 	}
 	if len(w.attempts.passwordCalls) != 0 {
-		t.Errorf("VerifyPassword called %d times on registration, want 0", len(w.attempts.passwordCalls))
+		t.Errorf("SubmitPassword called %d times on registration, want 0", len(w.attempts.passwordCalls))
 	}
 }
 
 func TestFlowStateMachine_Process_LoginHappyPath(t *testing.T) {
 	w := newFlowTestWorld(t)
-	w.attempts.identifierResult = map[string]domain.FlowResolvedIdentifier{
-		"alice@example.com": {UserID: "user_alice"},
+	w.attempts.identifierResult = map[string]string{
+		"alice@example.com": "user_alice",
 	}
 	def := loginDefinition()
 
@@ -320,8 +311,8 @@ func TestFlowStateMachine_Process_LoginHappyPath(t *testing.T) {
 	if len(w.attempts.identifyCalls) != 1 || w.attempts.identifyCalls[0].Value != "alice@example.com" {
 		t.Errorf("identify calls = %+v, want one for alice@example.com", w.attempts.identifyCalls)
 	}
-	if len(w.attempts.passwordCalls) != 1 || w.attempts.passwordCalls[0].UserID != "user_alice" {
-		t.Errorf("password calls = %+v, want one against user_alice", w.attempts.passwordCalls)
+	if len(w.attempts.passwordCalls) != 1 || w.attempts.passwordCalls[0].AttemptID != "att_01TEST" {
+		t.Errorf("password calls = %+v, want one against att_01TEST", w.attempts.passwordCalls)
 	}
 	if got := result.State.CollectedData[domain.FlowCollectedUserIDKey]; got != "user_alice" {
 		t.Errorf("CollectedData[%s] = %v, want user_alice", domain.FlowCollectedUserIDKey, got)
@@ -362,11 +353,11 @@ func TestFlowStateMachine_Process_LoginUserNotFound(t *testing.T) {
 
 func TestFlowStateMachine_Process_LoginInvalidPassword(t *testing.T) {
 	w := newFlowTestWorld(t)
-	w.attempts.identifierResult = map[string]domain.FlowResolvedIdentifier{
-		"alice@example.com": {UserID: "user_alice"},
+	w.attempts.identifierResult = map[string]string{
+		"alice@example.com": "user_alice",
 	}
 	w.attempts.passwordErrs = map[string]error{
-		"wrong-password": domain.ErrFlowPasswordInvalid,
+		"wrong-password": domain.ErrAuthAttemptProofRejected(),
 	}
 	def := loginDefinition()
 
