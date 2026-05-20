@@ -5,6 +5,7 @@ declare module "react" {
     interface IntrinsicElements {
       "zitadel-login": React.HTMLAttributes<HTMLElement> & {
         "api-base"?: string;
+        "session-exchange-path"?: string;
         "post-sign-in-url"?: string;
         purpose?: string;
         "project-id"?: string;

@@ -6691,8 +6691,6 @@ func (s *FlowDefinitionStepOnSuccess) Decode(d *jx.Decoder) error {
 	switch FlowDefinitionStepOnSuccess(v) {
 	case FlowDefinitionStepOnSuccessCreateUser:
 		*s = FlowDefinitionStepOnSuccessCreateUser
-	case FlowDefinitionStepOnSuccessResetCredential:
-		*s = FlowDefinitionStepOnSuccessResetCredential
 	default:
 		*s = FlowDefinitionStepOnSuccess(v)
 	}
@@ -8393,26 +8391,12 @@ func (s *Gate) Encode(e *jx.Encoder) {
 // encodeFields encodes fields.
 func (s *Gate) encodeFields(e *jx.Encoder) {
 	{
-		e.FieldStart("type")
-		s.Type.Encode(e)
+		e.FieldStart("kind")
+		s.Kind.Encode(e)
 	}
 	{
-		if s.Provider.Set {
-			e.FieldStart("provider")
-			s.Provider.Encode(e)
-		}
-	}
-	{
-		if s.Required.Set {
-			e.FieldStart("required")
-			s.Required.Encode(e)
-		}
-	}
-	{
-		if s.Satisfied.Set {
-			e.FieldStart("satisfied")
-			s.Satisfied.Encode(e)
-		}
+		e.FieldStart("provider")
+		e.Str(s.Provider)
 	}
 	{
 		if s.Config.Set {
@@ -8422,12 +8406,10 @@ func (s *Gate) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfGate = [5]string{
-	0: "type",
+var jsonFieldsNameOfGate = [3]string{
+	0: "kind",
 	1: "provider",
-	2: "required",
-	3: "satisfied",
-	4: "config",
+	2: "config",
 }
 
 // Decode decodes Gate from json.
@@ -8436,49 +8418,30 @@ func (s *Gate) Decode(d *jx.Decoder) error {
 		return errors.New("invalid: unable to decode Gate to nil")
 	}
 	var requiredBitSet [1]uint8
-	s.setDefaults()
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
-		case "type":
+		case "kind":
 			requiredBitSet[0] |= 1 << 0
 			if err := func() error {
-				if err := s.Type.Decode(d); err != nil {
+				if err := s.Kind.Decode(d); err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"type\"")
+				return errors.Wrap(err, "decode field \"kind\"")
 			}
 		case "provider":
+			requiredBitSet[0] |= 1 << 1
 			if err := func() error {
-				s.Provider.Reset()
-				if err := s.Provider.Decode(d); err != nil {
+				v, err := d.Str()
+				s.Provider = string(v)
+				if err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"provider\"")
-			}
-		case "required":
-			if err := func() error {
-				s.Required.Reset()
-				if err := s.Required.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"required\"")
-			}
-		case "satisfied":
-			if err := func() error {
-				s.Satisfied.Reset()
-				if err := s.Satisfied.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"satisfied\"")
 			}
 		case "config":
 			if err := func() error {
@@ -8500,7 +8463,7 @@ func (s *Gate) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [1]uint8{
-		0b00000001,
+		0b00000011,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -8604,42 +8567,40 @@ func (s *GateConfig) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes GateType as json.
-func (s GateType) Encode(e *jx.Encoder) {
+// Encode encodes GateKind as json.
+func (s GateKind) Encode(e *jx.Encoder) {
 	e.Str(string(s))
 }
 
-// Decode decodes GateType from json.
-func (s *GateType) Decode(d *jx.Decoder) error {
+// Decode decodes GateKind from json.
+func (s *GateKind) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode GateType to nil")
+		return errors.New("invalid: unable to decode GateKind to nil")
 	}
 	v, err := d.StrBytes()
 	if err != nil {
 		return err
 	}
 	// Try to use constant string.
-	switch GateType(v) {
-	case GateTypeCaptcha:
-		*s = GateTypeCaptcha
-	case GateTypePasskey:
-		*s = GateTypePasskey
+	switch GateKind(v) {
+	case GateKindCaptcha:
+		*s = GateKindCaptcha
 	default:
-		*s = GateType(v)
+		*s = GateKind(v)
 	}
 
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s GateType) MarshalJSON() ([]byte, error) {
+func (s GateKind) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *GateType) UnmarshalJSON(data []byte) error {
+func (s *GateKind) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -17742,20 +17703,22 @@ func (s *StepAction) Encode(e *jx.Encoder) {
 // encodeFields encodes fields.
 func (s *StepAction) encodeFields(e *jx.Encoder) {
 	{
-		e.FieldStart("text_key")
-		e.Str(s.TextKey)
-	}
-	{
 		if s.Primary.Set {
 			e.FieldStart("primary")
 			s.Primary.Encode(e)
 		}
 	}
+	{
+		if s.TextKey.Set {
+			e.FieldStart("text_key")
+			s.TextKey.Encode(e)
+		}
+	}
 }
 
 var jsonFieldsNameOfStepAction = [2]string{
-	0: "text_key",
-	1: "primary",
+	0: "primary",
+	1: "text_key",
 }
 
 // Decode decodes StepAction from json.
@@ -17763,23 +17726,10 @@ func (s *StepAction) Decode(d *jx.Decoder) error {
 	if s == nil {
 		return errors.New("invalid: unable to decode StepAction to nil")
 	}
-	var requiredBitSet [1]uint8
 	s.setDefaults()
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
-		case "text_key":
-			requiredBitSet[0] |= 1 << 0
-			if err := func() error {
-				v, err := d.Str()
-				s.TextKey = string(v)
-				if err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"text_key\"")
-			}
 		case "primary":
 			if err := func() error {
 				s.Primary.Reset()
@@ -17790,44 +17740,22 @@ func (s *StepAction) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"primary\"")
 			}
+		case "text_key":
+			if err := func() error {
+				s.TextKey.Reset()
+				if err := s.TextKey.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"text_key\"")
+			}
 		default:
 			return d.Skip()
 		}
 		return nil
 	}); err != nil {
 		return errors.Wrap(err, "decode StepAction")
-	}
-	// Validate required fields.
-	var failures []validate.FieldError
-	for i, mask := range [1]uint8{
-		0b00000001,
-	} {
-		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
-			// Mask only required fields and check equality to mask using XOR.
-			//
-			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
-			// Bits of fields which would be set are actually bits of missed fields.
-			missed := bits.OnesCount8(result)
-			for bitN := 0; bitN < missed; bitN++ {
-				bitIdx := bits.TrailingZeros8(result)
-				fieldIdx := i*8 + bitIdx
-				var name string
-				if fieldIdx < len(jsonFieldsNameOfStepAction) {
-					name = jsonFieldsNameOfStepAction[fieldIdx]
-				} else {
-					name = strconv.Itoa(fieldIdx)
-				}
-				failures = append(failures, validate.FieldError{
-					Name:  name,
-					Error: validate.ErrFieldRequired,
-				})
-				// Reset bit.
-				result &^= 1 << bitIdx
-			}
-		}
-	}
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
 	}
 
 	return nil
