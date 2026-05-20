@@ -72,6 +72,9 @@
     },
     "lint": {
       "dependsOn": ["^build"]
+    },
+    "e2e": {
+      "dependsOn": ["^build"]
     }
   },
   "analytics": false

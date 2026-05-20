@@ -2876,7 +2876,7 @@ type FlowDefinitionStep struct {
 	// If omitted, the engine provides a default `submit` action.
 	Actions OptFlowDefinitionStepActions `json:"actions"`
 	// Security gates that must be satisfied before submission. Keyed by gate
-	// name. Each gate selects a type (e.g. "captcha") and provider-specific
+	// name. Each gate selects a kind (e.g. "captcha") and provider-specific
 	// configuration. The engine may also inject gates dynamically based on
 	// policy.
 	Gates OptFlowDefinitionStepGates `json:"gates"`
@@ -2884,8 +2884,7 @@ type FlowDefinitionStep struct {
 	SSOProviders []SSOProvider `json:"sso_providers"`
 	// Server-side mutation to execute when this step completes successfully.
 	// Runs after field validation passes, before the transition fires.
-	// - create_user: creates the user record (registration flows)
-	// - reset_credential: replaces a stored credential (recovery flows).
+	// - create_user: creates the user record (registration flows).
 	OnSuccess OptFlowDefinitionStepOnSuccess `json:"on_success"`
 	// Marks this as a terminal step. Tells the frontend what to do:
 	// - redirect: navigate to redirect_uri (OIDC/SAML callback done)
@@ -3038,7 +3037,7 @@ func (s *FlowDefinitionStepComplete) UnmarshalText(data []byte) error {
 }
 
 // Security gates that must be satisfied before submission. Keyed by gate
-// name. Each gate selects a type (e.g. "captcha") and provider-specific
+// name. Each gate selects a kind (e.g. "captcha") and provider-specific
 // configuration. The engine may also inject gates dynamically based on
 // policy.
 type FlowDefinitionStepGates map[string]Gate
@@ -3054,20 +3053,17 @@ func (s *FlowDefinitionStepGates) init() FlowDefinitionStepGates {
 
 // Server-side mutation to execute when this step completes successfully.
 // Runs after field validation passes, before the transition fires.
-// - create_user: creates the user record (registration flows)
-// - reset_credential: replaces a stored credential (recovery flows).
+// - create_user: creates the user record (registration flows).
 type FlowDefinitionStepOnSuccess string
 
 const (
-	FlowDefinitionStepOnSuccessCreateUser      FlowDefinitionStepOnSuccess = "create_user"
-	FlowDefinitionStepOnSuccessResetCredential FlowDefinitionStepOnSuccess = "reset_credential"
+	FlowDefinitionStepOnSuccessCreateUser FlowDefinitionStepOnSuccess = "create_user"
 )
 
 // AllValues returns all FlowDefinitionStepOnSuccess values.
 func (FlowDefinitionStepOnSuccess) AllValues() []FlowDefinitionStepOnSuccess {
 	return []FlowDefinitionStepOnSuccess{
 		FlowDefinitionStepOnSuccessCreateUser,
-		FlowDefinitionStepOnSuccessResetCredential,
 	}
 }
 
@@ -3075,8 +3071,6 @@ func (FlowDefinitionStepOnSuccess) AllValues() []FlowDefinitionStepOnSuccess {
 func (s FlowDefinitionStepOnSuccess) MarshalText() ([]byte, error) {
 	switch s {
 	case FlowDefinitionStepOnSuccessCreateUser:
-		return []byte(s), nil
-	case FlowDefinitionStepOnSuccessResetCredential:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -3088,9 +3082,6 @@ func (s *FlowDefinitionStepOnSuccess) UnmarshalText(data []byte) error {
 	switch FlowDefinitionStepOnSuccess(data) {
 	case FlowDefinitionStepOnSuccessCreateUser:
 		*s = FlowDefinitionStepOnSuccessCreateUser
-		return nil
-	case FlowDefinitionStepOnSuccessResetCredential:
-		*s = FlowDefinitionStepOnSuccessResetCredential
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
@@ -3569,6 +3560,13 @@ type FlowStep struct {
 	Gates FlowStepGates `json:"gates"`
 	// Available SSO identity providers for this step.
 	SSOProviders []SSOProvider `json:"sso_providers"`
+	// A pending authentication challenge issued by the server. Present when the
+	// flow engine has issued a challenge via auth_attempts (e.g., after the user
+	// submits `action: "passkey"`). The `<zl-passkey>` component reads this and
+	// triggers the appropriate WebAuthn ceremony.
+	// The challenge is NOT present on the initial step — it appears only after
+	// the user explicitly selects a ceremony-based action.
+	Challenge OptFlowStepChallenge `json:"challenge"`
 }
 
 // GetName returns the value of Name.
@@ -3616,6 +3614,11 @@ func (s *FlowStep) GetSSOProviders() []SSOProvider {
 	return s.SSOProviders
 }
 
+// GetChallenge returns the value of Challenge.
+func (s *FlowStep) GetChallenge() OptFlowStepChallenge {
+	return s.Challenge
+}
+
 // SetName sets the value of Name.
 func (s *FlowStep) SetName(val string) {
 	s.Name = val
@@ -3661,6 +3664,11 @@ func (s *FlowStep) SetSSOProviders(val []SSOProvider) {
 	s.SSOProviders = val
 }
 
+// SetChallenge sets the value of Challenge.
+func (s *FlowStep) SetChallenge(val OptFlowStepChallenge) {
+	s.Challenge = val
+}
+
 // Unordered dictionary of available user actions. Keyed by action name.
 // The LiquidJS template controls positioning and presentation.
 type FlowStepActions map[string]StepAction
@@ -3669,6 +3677,105 @@ func (s *FlowStepActions) init() FlowStepActions {
 	m := *s
 	if m == nil {
 		m = map[string]StepAction{}
+		*s = m
+	}
+	return m
+}
+
+// A pending authentication challenge issued by the server. Present when the
+// flow engine has issued a challenge via auth_attempts (e.g., after the user
+// submits `action: "passkey"`). The `<zl-passkey>` component reads this and
+// triggers the appropriate WebAuthn ceremony.
+// The challenge is NOT present on the initial step — it appears only after
+// the user explicitly selects a ceremony-based action.
+type FlowStepChallenge struct {
+	// Challenge method. Determines which component handles the ceremony.
+	Method OptFlowStepChallengeMethod `json:"method"`
+	// Server-side challenge identifier. Included in the proof submission
+	// so the server can match the response to the original challenge.
+	ChallengeID OptString `json:"challenge_id"`
+	// Protocol-specific challenge options. For passkey, this is the
+	// `PublicKeyCredentialRequestOptions` (authenticate) or
+	// `PublicKeyCredentialCreationOptions` (register). Passed directly
+	// to the browser's `navigator.credentials` API.
+	Options OptFlowStepChallengeOptions `json:"options"`
+}
+
+// GetMethod returns the value of Method.
+func (s *FlowStepChallenge) GetMethod() OptFlowStepChallengeMethod {
+	return s.Method
+}
+
+// GetChallengeID returns the value of ChallengeID.
+func (s *FlowStepChallenge) GetChallengeID() OptString {
+	return s.ChallengeID
+}
+
+// GetOptions returns the value of Options.
+func (s *FlowStepChallenge) GetOptions() OptFlowStepChallengeOptions {
+	return s.Options
+}
+
+// SetMethod sets the value of Method.
+func (s *FlowStepChallenge) SetMethod(val OptFlowStepChallengeMethod) {
+	s.Method = val
+}
+
+// SetChallengeID sets the value of ChallengeID.
+func (s *FlowStepChallenge) SetChallengeID(val OptString) {
+	s.ChallengeID = val
+}
+
+// SetOptions sets the value of Options.
+func (s *FlowStepChallenge) SetOptions(val OptFlowStepChallengeOptions) {
+	s.Options = val
+}
+
+// Challenge method. Determines which component handles the ceremony.
+type FlowStepChallengeMethod string
+
+const (
+	FlowStepChallengeMethodPasskey FlowStepChallengeMethod = "passkey"
+)
+
+// AllValues returns all FlowStepChallengeMethod values.
+func (FlowStepChallengeMethod) AllValues() []FlowStepChallengeMethod {
+	return []FlowStepChallengeMethod{
+		FlowStepChallengeMethodPasskey,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FlowStepChallengeMethod) MarshalText() ([]byte, error) {
+	switch s {
+	case FlowStepChallengeMethodPasskey:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FlowStepChallengeMethod) UnmarshalText(data []byte) error {
+	switch FlowStepChallengeMethod(data) {
+	case FlowStepChallengeMethodPasskey:
+		*s = FlowStepChallengeMethodPasskey
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Protocol-specific challenge options. For passkey, this is the
+// `PublicKeyCredentialRequestOptions` (authenticate) or
+// `PublicKeyCredentialCreationOptions` (register). Passed directly
+// to the browser's `navigator.credentials` API.
+type FlowStepChallengeOptions map[string]jx.Raw
+
+func (s *FlowStepChallengeOptions) init() FlowStepChallengeOptions {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
 		*s = m
 	}
 	return m
@@ -3750,15 +3857,19 @@ func (s *FlowStepGates) init() FlowStepGates {
 // Ref: #
 type FlowSubmitRequest struct {
 	SessionToken string `json:"session_token"`
-	// Which action to take. Either:
-	// - A key from the step's `actions` dictionary (e.g., "submit", "register", "back")
+	// Which action to take. Must be a key from the step's `actions` dictionary:
+	// - A regular action (e.g., "submit", "register", "back")
 	// - The reserved value "sso" — triggers SSO redirect (requires `sso_provider_id`).
 	Action string `json:"action"`
 	// User input values. Keys match field names from the step's `fields` dictionary.
 	Fields OptFlowSubmitRequestFields `json:"fields"`
 	// Solutions for security gates. Keys match gate names from the step's `gates` dictionary.
-	// The orchestrator collects these from `<zl-captcha>` / `<zl-passkey>` component events.
+	// The orchestrator collects these from `<zl-captcha>` component events.
 	GateProofs OptFlowSubmitRequestGateProofs `json:"gate_proofs"`
+	// Response to a pending challenge on the step. Required when the step has a
+	// `challenge` property (e.g., after submitting a passkey action).
+	// The `<zl-passkey>` component populates this after the WebAuthn ceremony.
+	ChallengeResponse OptFlowSubmitRequestChallengeResponse `json:"challenge_response"`
 	// ID of the selected SSO provider (from `sso_providers[].id`).
 	// Required when `action` is "sso".
 	SSOProviderID OptString `json:"sso_provider_id"`
@@ -3782,6 +3893,11 @@ func (s *FlowSubmitRequest) GetFields() OptFlowSubmitRequestFields {
 // GetGateProofs returns the value of GateProofs.
 func (s *FlowSubmitRequest) GetGateProofs() OptFlowSubmitRequestGateProofs {
 	return s.GateProofs
+}
+
+// GetChallengeResponse returns the value of ChallengeResponse.
+func (s *FlowSubmitRequest) GetChallengeResponse() OptFlowSubmitRequestChallengeResponse {
+	return s.ChallengeResponse
 }
 
 // GetSSOProviderID returns the value of SSOProviderID.
@@ -3809,9 +3925,71 @@ func (s *FlowSubmitRequest) SetGateProofs(val OptFlowSubmitRequestGateProofs) {
 	s.GateProofs = val
 }
 
+// SetChallengeResponse sets the value of ChallengeResponse.
+func (s *FlowSubmitRequest) SetChallengeResponse(val OptFlowSubmitRequestChallengeResponse) {
+	s.ChallengeResponse = val
+}
+
 // SetSSOProviderID sets the value of SSOProviderID.
 func (s *FlowSubmitRequest) SetSSOProviderID(val OptString) {
 	s.SSOProviderID = val
+}
+
+// Response to a pending challenge on the step. Required when the step has a
+// `challenge` property (e.g., after submitting a passkey action).
+// The `<zl-passkey>` component populates this after the WebAuthn ceremony.
+type FlowSubmitRequestChallengeResponse struct {
+	// The challenge identifier from `step.challenge.challenge_id`.
+	// Matches the server-side challenge for verification.
+	ChallengeID OptString `json:"challenge_id"`
+	// Which auth method this response is for (e.g., 'passkey').
+	Method OptString `json:"method"`
+	// Method-specific proof payload.
+	// For passkeys, this is the WebAuthn JSON serialization of PublicKeyCredential.
+	Proof OptFlowSubmitRequestChallengeResponseProof `json:"proof"`
+}
+
+// GetChallengeID returns the value of ChallengeID.
+func (s *FlowSubmitRequestChallengeResponse) GetChallengeID() OptString {
+	return s.ChallengeID
+}
+
+// GetMethod returns the value of Method.
+func (s *FlowSubmitRequestChallengeResponse) GetMethod() OptString {
+	return s.Method
+}
+
+// GetProof returns the value of Proof.
+func (s *FlowSubmitRequestChallengeResponse) GetProof() OptFlowSubmitRequestChallengeResponseProof {
+	return s.Proof
+}
+
+// SetChallengeID sets the value of ChallengeID.
+func (s *FlowSubmitRequestChallengeResponse) SetChallengeID(val OptString) {
+	s.ChallengeID = val
+}
+
+// SetMethod sets the value of Method.
+func (s *FlowSubmitRequestChallengeResponse) SetMethod(val OptString) {
+	s.Method = val
+}
+
+// SetProof sets the value of Proof.
+func (s *FlowSubmitRequestChallengeResponse) SetProof(val OptFlowSubmitRequestChallengeResponseProof) {
+	s.Proof = val
+}
+
+// Method-specific proof payload.
+// For passkeys, this is the WebAuthn JSON serialization of PublicKeyCredential.
+type FlowSubmitRequestChallengeResponseProof map[string]jx.Raw
+
+func (s *FlowSubmitRequestChallengeResponseProof) init() FlowSubmitRequestChallengeResponseProof {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
 }
 
 // User input values. Keys match field names from the step's `fields` dictionary.
@@ -3827,7 +4005,7 @@ func (s *FlowSubmitRequestFields) init() FlowSubmitRequestFields {
 }
 
 // Solutions for security gates. Keys match gate names from the step's `gates` dictionary.
-// The orchestrator collects these from `<zl-captcha>` / `<zl-passkey>` component events.
+// The orchestrator collects these from `<zl-captcha>` component events.
 type FlowSubmitRequestGateProofs map[string]string
 
 func (s *FlowSubmitRequestGateProofs) init() FlowSubmitRequestGateProofs {
@@ -3839,39 +4017,32 @@ func (s *FlowSubmitRequestGateProofs) init() FlowSubmitRequestGateProofs {
 	return m
 }
 
-// A security gate that must be satisfied. The orchestrator appends any
-// required-but-unrendered gates automatically as a safety net.
+// A security challenge that must be satisfied before this step's submission
+// is accepted. The engine may also inject gates at runtime based on policy
+// or risk evaluation.
 // Ref: #
 type Gate struct {
-	// Gate type.
-	Type GateType `json:"type"`
-	// Provider identifier (e.g., "altcha", "turnstile").
-	Provider OptString `json:"provider"`
-	Required OptBool   `json:"required"`
-	// Whether this gate has already been satisfied in this flow.
-	Satisfied OptBool `json:"satisfied"`
-	// Provider-specific challenge parameters.
+	// The gate category. Only `captcha` is currently defined. Authenticator
+	// ceremonies (e.g. passkey) are modelled as credential auth_attempts via
+	// `x-credential` on a field, not as gates.
+	Kind GateKind `json:"kind"`
+	// Provider identifier within the gate kind — e.g. `altcha`, `turnstile`,
+	// `hcaptcha`. The engine looks up an implementation in its provider
+	// registry.
+	Provider string `json:"provider"`
+	// Provider-specific configuration consumed by the implementation when
+	// issuing the per-render challenge. Opaque to the engine.
 	Config OptGateConfig `json:"config"`
 }
 
-// GetType returns the value of Type.
-func (s *Gate) GetType() GateType {
-	return s.Type
+// GetKind returns the value of Kind.
+func (s *Gate) GetKind() GateKind {
+	return s.Kind
 }
 
 // GetProvider returns the value of Provider.
-func (s *Gate) GetProvider() OptString {
+func (s *Gate) GetProvider() string {
 	return s.Provider
-}
-
-// GetRequired returns the value of Required.
-func (s *Gate) GetRequired() OptBool {
-	return s.Required
-}
-
-// GetSatisfied returns the value of Satisfied.
-func (s *Gate) GetSatisfied() OptBool {
-	return s.Satisfied
 }
 
 // GetConfig returns the value of Config.
@@ -3879,24 +4050,14 @@ func (s *Gate) GetConfig() OptGateConfig {
 	return s.Config
 }
 
-// SetType sets the value of Type.
-func (s *Gate) SetType(val GateType) {
-	s.Type = val
+// SetKind sets the value of Kind.
+func (s *Gate) SetKind(val GateKind) {
+	s.Kind = val
 }
 
 // SetProvider sets the value of Provider.
-func (s *Gate) SetProvider(val OptString) {
+func (s *Gate) SetProvider(val string) {
 	s.Provider = val
-}
-
-// SetRequired sets the value of Required.
-func (s *Gate) SetRequired(val OptBool) {
-	s.Required = val
-}
-
-// SetSatisfied sets the value of Satisfied.
-func (s *Gate) SetSatisfied(val OptBool) {
-	s.Satisfied = val
 }
 
 // SetConfig sets the value of Config.
@@ -3904,7 +4065,8 @@ func (s *Gate) SetConfig(val OptGateConfig) {
 	s.Config = val
 }
 
-// Provider-specific challenge parameters.
+// Provider-specific configuration consumed by the implementation when
+// issuing the per-render challenge. Opaque to the engine.
 type GateConfig map[string]jx.Raw
 
 func (s *GateConfig) init() GateConfig {
@@ -3916,28 +4078,26 @@ func (s *GateConfig) init() GateConfig {
 	return m
 }
 
-// Gate type.
-type GateType string
+// The gate category. Only `captcha` is currently defined. Authenticator
+// ceremonies (e.g. passkey) are modelled as credential auth_attempts via
+// `x-credential` on a field, not as gates.
+type GateKind string
 
 const (
-	GateTypeCaptcha GateType = "captcha"
-	GateTypePasskey GateType = "passkey"
+	GateKindCaptcha GateKind = "captcha"
 )
 
-// AllValues returns all GateType values.
-func (GateType) AllValues() []GateType {
-	return []GateType{
-		GateTypeCaptcha,
-		GateTypePasskey,
+// AllValues returns all GateKind values.
+func (GateKind) AllValues() []GateKind {
+	return []GateKind{
+		GateKindCaptcha,
 	}
 }
 
 // MarshalText implements encoding.TextMarshaler.
-func (s GateType) MarshalText() ([]byte, error) {
+func (s GateKind) MarshalText() ([]byte, error) {
 	switch s {
-	case GateTypeCaptcha:
-		return []byte(s), nil
-	case GateTypePasskey:
+	case GateKindCaptcha:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -3945,13 +4105,10 @@ func (s GateType) MarshalText() ([]byte, error) {
 }
 
 // UnmarshalText implements encoding.TextUnmarshaler.
-func (s *GateType) UnmarshalText(data []byte) error {
-	switch GateType(data) {
-	case GateTypeCaptcha:
-		*s = GateTypeCaptcha
-		return nil
-	case GateTypePasskey:
-		*s = GateTypePasskey
+func (s *GateKind) UnmarshalText(data []byte) error {
+	switch GateKind(data) {
+	case GateKindCaptcha:
+		*s = GateKindCaptcha
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
@@ -7560,6 +7717,144 @@ func (o OptFlowHint) Or(d FlowHint) FlowHint {
 	return d
 }
 
+// NewOptFlowStepChallenge returns new OptFlowStepChallenge with value set to v.
+func NewOptFlowStepChallenge(v FlowStepChallenge) OptFlowStepChallenge {
+	return OptFlowStepChallenge{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFlowStepChallenge is optional FlowStepChallenge.
+type OptFlowStepChallenge struct {
+	Value FlowStepChallenge
+	Set   bool
+}
+
+// IsSet returns true if OptFlowStepChallenge was set.
+func (o OptFlowStepChallenge) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFlowStepChallenge) Reset() {
+	var v FlowStepChallenge
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFlowStepChallenge) SetTo(v FlowStepChallenge) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFlowStepChallenge) Get() (v FlowStepChallenge, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFlowStepChallenge) Or(d FlowStepChallenge) FlowStepChallenge {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptFlowStepChallengeMethod returns new OptFlowStepChallengeMethod with value set to v.
+func NewOptFlowStepChallengeMethod(v FlowStepChallengeMethod) OptFlowStepChallengeMethod {
+	return OptFlowStepChallengeMethod{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFlowStepChallengeMethod is optional FlowStepChallengeMethod.
+type OptFlowStepChallengeMethod struct {
+	Value FlowStepChallengeMethod
+	Set   bool
+}
+
+// IsSet returns true if OptFlowStepChallengeMethod was set.
+func (o OptFlowStepChallengeMethod) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFlowStepChallengeMethod) Reset() {
+	var v FlowStepChallengeMethod
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFlowStepChallengeMethod) SetTo(v FlowStepChallengeMethod) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFlowStepChallengeMethod) Get() (v FlowStepChallengeMethod, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFlowStepChallengeMethod) Or(d FlowStepChallengeMethod) FlowStepChallengeMethod {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptFlowStepChallengeOptions returns new OptFlowStepChallengeOptions with value set to v.
+func NewOptFlowStepChallengeOptions(v FlowStepChallengeOptions) OptFlowStepChallengeOptions {
+	return OptFlowStepChallengeOptions{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFlowStepChallengeOptions is optional FlowStepChallengeOptions.
+type OptFlowStepChallengeOptions struct {
+	Value FlowStepChallengeOptions
+	Set   bool
+}
+
+// IsSet returns true if OptFlowStepChallengeOptions was set.
+func (o OptFlowStepChallengeOptions) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFlowStepChallengeOptions) Reset() {
+	var v FlowStepChallengeOptions
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFlowStepChallengeOptions) SetTo(v FlowStepChallengeOptions) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFlowStepChallengeOptions) Get() (v FlowStepChallengeOptions, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFlowStepChallengeOptions) Or(d FlowStepChallengeOptions) FlowStepChallengeOptions {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptFlowStepComplete returns new OptFlowStepComplete with value set to v.
 func NewOptFlowStepComplete(v FlowStepComplete) OptFlowStepComplete {
 	return OptFlowStepComplete{
@@ -7600,6 +7895,98 @@ func (o OptFlowStepComplete) Get() (v FlowStepComplete, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptFlowStepComplete) Or(d FlowStepComplete) FlowStepComplete {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptFlowSubmitRequestChallengeResponse returns new OptFlowSubmitRequestChallengeResponse with value set to v.
+func NewOptFlowSubmitRequestChallengeResponse(v FlowSubmitRequestChallengeResponse) OptFlowSubmitRequestChallengeResponse {
+	return OptFlowSubmitRequestChallengeResponse{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFlowSubmitRequestChallengeResponse is optional FlowSubmitRequestChallengeResponse.
+type OptFlowSubmitRequestChallengeResponse struct {
+	Value FlowSubmitRequestChallengeResponse
+	Set   bool
+}
+
+// IsSet returns true if OptFlowSubmitRequestChallengeResponse was set.
+func (o OptFlowSubmitRequestChallengeResponse) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFlowSubmitRequestChallengeResponse) Reset() {
+	var v FlowSubmitRequestChallengeResponse
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFlowSubmitRequestChallengeResponse) SetTo(v FlowSubmitRequestChallengeResponse) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFlowSubmitRequestChallengeResponse) Get() (v FlowSubmitRequestChallengeResponse, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFlowSubmitRequestChallengeResponse) Or(d FlowSubmitRequestChallengeResponse) FlowSubmitRequestChallengeResponse {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptFlowSubmitRequestChallengeResponseProof returns new OptFlowSubmitRequestChallengeResponseProof with value set to v.
+func NewOptFlowSubmitRequestChallengeResponseProof(v FlowSubmitRequestChallengeResponseProof) OptFlowSubmitRequestChallengeResponseProof {
+	return OptFlowSubmitRequestChallengeResponseProof{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFlowSubmitRequestChallengeResponseProof is optional FlowSubmitRequestChallengeResponseProof.
+type OptFlowSubmitRequestChallengeResponseProof struct {
+	Value FlowSubmitRequestChallengeResponseProof
+	Set   bool
+}
+
+// IsSet returns true if OptFlowSubmitRequestChallengeResponseProof was set.
+func (o OptFlowSubmitRequestChallengeResponseProof) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFlowSubmitRequestChallengeResponseProof) Reset() {
+	var v FlowSubmitRequestChallengeResponseProof
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFlowSubmitRequestChallengeResponseProof) SetTo(v FlowSubmitRequestChallengeResponseProof) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFlowSubmitRequestChallengeResponseProof) Get() (v FlowSubmitRequestChallengeResponseProof, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFlowSubmitRequestChallengeResponseProof) Or(d FlowSubmitRequestChallengeResponseProof) FlowSubmitRequestChallengeResponseProof {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -10554,19 +10941,20 @@ func (s *SessionWithTokenResponseHeaders) SetResponse(val SessionWithTokenRespon
 func (*SessionWithTokenResponseHeaders) createSessionRes()   {}
 func (*SessionWithTokenResponseHeaders) exchangeHandoffRes() {}
 
-// An action the user can take. Keyed by action name in the parent dictionary.
-// The action name is sent back in the submit request as `action`.
+// Configuration for a user-invokable action on a step. Keyed by action name
+// in the parent dictionary. The action name is sent back in the submit
+// request as `action`.
 // Ref: #
 type StepAction struct {
-	// Localization key for the action label.
-	TextKey string `json:"text_key"`
-	// Whether this is the primary/default action.
+	// Marks this as the default/primary action. The runtime template uses
+	// this hint to choose visual emphasis. At most one action per step
+	// should be primary; this is not enforced here.
 	Primary OptBool `json:"primary"`
-}
-
-// GetTextKey returns the value of TextKey.
-func (s *StepAction) GetTextKey() string {
-	return s.TextKey
+	// Optional localization key override for the action's label. When
+	// omitted, the engine derives a key from the step and action names.
+	// Display text is resolved client-side from a locale dictionary, never
+	// by the engine.
+	TextKey OptString `json:"text_key"`
 }
 
 // GetPrimary returns the value of Primary.
@@ -10574,14 +10962,19 @@ func (s *StepAction) GetPrimary() OptBool {
 	return s.Primary
 }
 
-// SetTextKey sets the value of TextKey.
-func (s *StepAction) SetTextKey(val string) {
-	s.TextKey = val
+// GetTextKey returns the value of TextKey.
+func (s *StepAction) GetTextKey() OptString {
+	return s.TextKey
 }
 
 // SetPrimary sets the value of Primary.
 func (s *StepAction) SetPrimary(val OptBool) {
 	s.Primary = val
+}
+
+// SetTextKey sets the value of TextKey.
+func (s *StepAction) SetTextKey(val OptString) {
+	s.TextKey = val
 }
 
 // Step-level localization keys. Resolved client-side via the `| t` LiquidJS filter.

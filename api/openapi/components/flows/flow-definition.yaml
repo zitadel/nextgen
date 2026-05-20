@@ -43,11 +43,12 @@ properties:
     additionalProperties:
       type: string
     example:
-      login: identifier
-      register: profile
+      login: identify
 
   audience:
     $ref: flow-audience.yaml
+    example:
+      app_ids: [app_saas]
 
   steps:
     type: array
@@ -57,3 +58,19 @@ properties:
     description: |
       Ordered list of steps in this flow. The order is for human readability —
       actual step sequencing is determined by transitions.
+    example:
+      - name: identify
+        fields: [email]
+        actions:
+          submit: { primary: true }
+        transitions:
+          submit: { target: authenticate }
+          user_not_found: { target: register, action: switch }
+      - name: authenticate
+        fields: [password]
+        actions:
+          submit: { primary: true }
+        transitions:
+          submit: { target: done }
+      - name: done
+        complete: redirect
