@@ -64,12 +64,12 @@ func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInpu
 
 	err = s.schemaRepo.Create(ctx, tx, model)
 	if err != nil {
-		return nil, err
+		return nil, domain.ErrInternal(err).WithMessage("failed to create schema in database")
 	}
 
 	_, err = s.schemaResolver.Resolve(ctx, tx, input.ProjectID, input.SchemaID, nil)
 	if err != nil {
-		return nil, err
+		return nil, domain.ErrInternal(err).WithMessage("failed to resolve schema when creating")
 	}
 
 	err = tx.Commit(ctx)
@@ -94,7 +94,7 @@ func (s *SchemaService) CreateSchemaByUrl(ctx context.Context, input CreateSchem
 	strUri := input.URL.String()
 	_, err = s.schemaResolver.Resolve(ctx, tx, input.ProjectID, strUri, nil)
 	if err != nil {
-		return nil, err
+		return nil, domain.ErrInternal(err).WithMessage("failed to resolve schema when creating")
 	}
 
 	err = tx.Commit(ctx)
