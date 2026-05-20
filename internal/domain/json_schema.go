@@ -21,7 +21,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-var absoluteScheme = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9+\-.]*:`)
+var absoluteScheme = regexp.MustCompile(`^https?://`)
 
 // JSONSchema represent a JSON schema which can be used to validate JSON data.
 type JSONSchema struct {
