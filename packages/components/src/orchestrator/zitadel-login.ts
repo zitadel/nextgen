@@ -11,6 +11,7 @@ import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import type { Liquid, Template } from "liquidjs";
 
 import "../atoms/index.js";
+import type { ZlPasskeyResultDetail, ZlPasskeyErrorDetail } from "../atoms/zl-passkey.js";
 import {
   DEFAULT_SESSION_EXCHANGE_PATH,
   exchangeSession,
@@ -124,6 +125,12 @@ export class ZitadelLogin extends LitElement {
 
   @state() private accessor formValues: Record<string, string> = {};
 
+  /**
+   * Pending challenge response from a `<zl-passkey>` ceremony. Populated by
+   * the `zl-passkey-result` event handler and included in the next submit.
+   */
+  @state() private accessor challengeResponse: ZlPasskeyResultDetail | null = null;
+
   private readonly themeController = new ThemeController(this);
 
   private engine: Liquid | null = null;
@@ -151,6 +158,8 @@ export class ZitadelLogin extends LitElement {
       root.addEventListener("zl-input", this.handleAtomInput as EventListener);
       root.addEventListener("zl-submit", this.handleAtomSubmit as EventListener);
       root.addEventListener("zl-action", this.handleAtomAction as EventListener);
+      root.addEventListener("zl-passkey-result", this.handlePasskeyResult as EventListener);
+      root.addEventListener("zl-passkey-error", this.handlePasskeyError as EventListener);
       // Native <form> submit fires on Enter inside any field and after the
       // browser's autofill / save-password handshake. Intercept it so we can
       // hand off to our flow-submit cycle without the page reloading.
@@ -246,6 +255,7 @@ export class ZitadelLogin extends LitElement {
       console.warn("[zitadel-login] branding payload has issues:", issues);
     }
     this.formValues = collectInitialValues(wire.step);
+    this.challengeResponse = null;
     void this.maybeCompleteFlow(wire);
   }
 
@@ -317,6 +327,7 @@ export class ZitadelLogin extends LitElement {
       actions: step.actions ?? {},
       gates: step.gates ?? {},
       sso_providers: step.sso_providers ?? [],
+      challenge: step.challenge ?? null,
       messages: [],
       identity: null,
       errors,
@@ -428,6 +439,29 @@ export class ZitadelLogin extends LitElement {
     }
   };
 
+  /**
+   * Handle passkey ceremony result from `<zl-passkey>`. Stores the proof
+   * and auto-submits so the user doesn't need to press a button.
+   */
+  private handlePasskeyResult = (event: CustomEvent<ZlPasskeyResultDetail>): void => {
+    this.challengeResponse = event.detail;
+    void this.submit("submit");
+  };
+
+  /**
+   * Handle passkey ceremony error from `<zl-passkey>`. If the user
+   * cancelled (aborted), we silently ignore. Otherwise emit a flow error.
+   */
+  private handlePasskeyError = (event: CustomEvent<ZlPasskeyErrorDetail>): void => {
+    const { error, aborted } = event.detail;
+    if (aborted) {
+      // User dismissed the passkey dialog — don't treat as an error.
+      // They can try again or use a different method.
+      return;
+    }
+    this.handleTransportError(new Error(error));
+  };
+
   private async submit(action: string | null): Promise<void> {
     if (!this.response) return;
     const { id, session_token } = this.response;
@@ -438,6 +472,13 @@ export class ZitadelLogin extends LitElement {
         action: action ?? "submit",
         fields: { ...this.formValues },
       };
+
+      // Attach challenge proof if a passkey ceremony completed
+      if (this.challengeResponse) {
+        (body as Record<string, unknown>).challenge_response = this.challengeResponse;
+        this.challengeResponse = null;
+      }
+
       const wire = await apiSubmitStep(id, body);
       this.applyResponse(wire);
       this.dispatchEvent(

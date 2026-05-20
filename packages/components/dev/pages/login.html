@@ -1,0 +1,56 @@
+<!--
+  Shell markup for the <zitadel-login> playground page.
+
+  Imported as a raw string by login.ts via Vite's `?raw` suffix.
+  Dynamic content (branding presets) is injected at runtime.
+-->
+<div class="pg-main">
+  <section class="pg-frame" id="frame"></section>
+  <aside class="pg-inspector">
+    <div class="pg-header">
+      <div class="pg-purpose">
+        <button class="pg-purpose-btn active" data-purpose="login">Login</button>
+        <button class="pg-purpose-btn" data-purpose="register">Register</button>
+      </div>
+      <button id="reset" class="pg-restart" type="button">Restart</button>
+    </div>
+    <div class="pg-tabs">
+      <button class="pg-tab active" data-pane="branding-pane">Branding</button>
+      <button class="pg-tab" data-pane="template-pane">Template</button>
+      <button class="pg-tab" data-pane="api-pane">API</button>
+      <button class="pg-tab" data-pane="events-pane">Events</button>
+    </div>
+
+    <!-- Branding pane -->
+    <div class="pg-pane active" id="branding-pane">
+      <div class="pg-pane-section">
+        <label class="pg-label">
+          <span>Preset</span>
+          <select id="preset">
+            {{PRESET_OPTIONS}}
+          </select>
+        </label>
+      </div>
+    </div>
+
+    <!-- Template pane -->
+    <div class="pg-pane" id="template-pane">
+      <textarea class="pg-editor" id="template-editor" spellcheck="false"></textarea>
+      <div class="pg-editor-actions">
+        <button id="apply-template" class="pg-btn primary">Apply</button>
+        <button id="reset-template" class="pg-btn">Reset</button>
+        <span class="pg-status" id="template-status">bundled default</span>
+      </div>
+    </div>
+
+    <!-- API pane -->
+    <div class="pg-pane" id="api-pane">
+      <textarea class="pg-response pg-response-full" id="flow-response" readonly></textarea>
+    </div>
+
+    <!-- Events pane -->
+    <div class="pg-pane" id="events-pane">
+      <pre class="pg-events" id="events"></pre>
+    </div>
+  </aside>
+</div>
