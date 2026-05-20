@@ -108,10 +108,9 @@ function Home() {
       <header className="space-y-2">
         <h1 className="text-3xl font-bold">Components preview</h1>
         <p className="text-zinc-600">
-          Renders <code>@zitadel-nextgen/components</code> through{" "}
-          <code>@lit/react</code>. The orchestrator below is wired to a{" "}
-          <code>WalkingFixtureTransport</code> so the form runs end-to-end
-          without a backend — type any email, then any password.
+          Renders <code>@zitadel-nextgen/components</code> through <code>@lit/react</code>. The
+          orchestrator below is wired to a <code>WalkingFixtureTransport</code> so the form runs
+          end-to-end without a backend — type any email, then any password.
         </p>
       </header>
 
@@ -119,9 +118,8 @@ function Home() {
         <header>
           <h2 className="text-xl font-semibold">Atoms</h2>
           <p className="text-sm text-zinc-600">
-            Standalone samples — these are individual primitives, not a working
-            form. The composed form lives in <code>&lt;zitadel-login&gt;</code>{" "}
-            below.
+            Standalone samples — these are individual primitives, not a working form. The composed
+            form lives in <code>&lt;zitadel-login&gt;</code> below.
           </p>
         </header>
         <div className="grid gap-4 sm:grid-cols-2">
@@ -181,16 +179,11 @@ function Home() {
             <code>&lt;zitadel-login&gt;</code>
           </h2>
           <p className="text-sm text-zinc-600">
-            The composed orchestrator. Drives the flow API end-to-end through a
-            fixture transport.
+            The composed orchestrator. Drives the flow API end-to-end through a fixture transport.
           </p>
         </header>
         <div className="rounded-lg border border-zinc-200 bg-white p-6 shadow-sm">
-          <ZitadelLoginEl
-            purpose="login"
-            transport={transport}
-            project-id="console-preview"
-          />
+          <ZitadelLoginEl purpose="login" transport={transport} project-id="console-preview" />
         </div>
       </section>
     </div>
