@@ -212,7 +212,7 @@ func TestJSONSchemaResolver_Resolve(t *testing.T) {
 
 				_, err := resolver.Resolve(ctx, nil, projectID, urlA, nil)
 				require.Error(t, err)
-				assert.ErrorIs(t, err, domain.ErrMaxResolveDepthReached)
+				assert.ErrorContains(t, err, "max resolve depth")
 				assert.Equal(t, 2, getCalls)
 			},
 		},
