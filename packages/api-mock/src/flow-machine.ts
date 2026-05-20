@@ -10,11 +10,13 @@
  * State graph:
  *
  *   idle --START(login)----> identifier --SUBMIT--> password
+ *                                       --SUBMIT(action:passkey)--> passkey-challenge
  *                                       --SUBMIT(sso_provider_id)--> sso-redirect
  *      \--START(register)--> register --SUBMIT--> password
+ *                                     --SUBMIT(action:passkey)--> passkey-enroll
  *
- *   password / sso-redirect --SUBMIT--> done
- *   anything                --RESET---> idle
+ *   password / sso-redirect / passkey-challenge / passkey-enroll --SUBMIT--> done
+ *   anything                                                     --RESET--> idle
  */
 import type { CreateFlowBodyPurpose } from "@zitadel-nextgen/api/generated/model";
 import { createMachine, type AnyActorRef, assign, createActor } from "xstate";
@@ -23,6 +25,8 @@ export type FlowStepName =
   | "identifier"
   | "register"
   | "password"
+  | "passkey-challenge"
+  | "passkey-enroll"
   | "sso-redirect"
   | "done";
 
@@ -111,6 +115,11 @@ export const flowMachine = createMachine({
             ],
           },
           {
+            guard: ({ event }) => event.action === "passkey",
+            target: "passkey-challenge",
+            actions: [captureFields, rotateToken],
+          },
+          {
             target: "password",
             actions: [captureFields, rotateToken],
           },
@@ -119,7 +128,17 @@ export const flowMachine = createMachine({
     },
     register: {
       on: {
-        SUBMIT: { target: "password", actions: [captureFields, rotateToken] },
+        SUBMIT: [
+          {
+            guard: ({ event }) => event.action === "passkey",
+            target: "passkey-enroll",
+            actions: [captureFields, rotateToken],
+          },
+          {
+            target: "password",
+            actions: [captureFields, rotateToken],
+          },
+        ],
       },
     },
     password: {
@@ -130,6 +149,16 @@ export const flowMachine = createMachine({
     "sso-redirect": {
       on: {
         SUBMIT: { target: "done", actions: [rotateToken] },
+      },
+    },
+    "passkey-challenge": {
+      on: {
+        SUBMIT: { target: "done", actions: [captureFields, rotateToken] },
+      },
+    },
+    "passkey-enroll": {
+      on: {
+        SUBMIT: { target: "done", actions: [captureFields, rotateToken] },
       },
     },
     done: { type: "final" },

@@ -18,7 +18,7 @@ func (s AttemptID) Validate() error {
 		MaxLengthSet:  false,
 		Email:         false,
 		Hostname:      false,
-		Regex:         regexMap["^att_[a-zA-Z0-9_-]+$"],
+		Regex:         regexMap["^[a-zA-Z0-9_-]+$"],
 		MinNumeric:    0,
 		MinNumericSet: false,
 		MaxNumeric:    0,
@@ -283,7 +283,7 @@ func (s ChallengeID) Validate() error {
 		MaxLengthSet:  false,
 		Email:         false,
 		Hostname:      false,
-		Regex:         regexMap["^ch_[a-zA-Z0-9_-]+$"],
+		Regex:         regexMap["^[a-zA-Z0-9_-]+$"],
 		MinNumeric:    0,
 		MinNumericSet: false,
 		MaxNumeric:    0,
@@ -1131,8 +1131,6 @@ func (s FlowDefinitionStepOnSuccess) Validate() error {
 	switch s {
 	case "create_user":
 		return nil
-	case "reset_credential":
-		return nil
 	default:
 		return errors.Errorf("invalid value: %v", s)
 	}
@@ -1420,10 +1418,67 @@ func (s *FlowStep) Validate() error {
 			Error: err,
 		})
 	}
+	if err := func() error {
+		if value, ok := s.Challenge.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "challenge",
+			Error: err,
+		})
+	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
 	}
 	return nil
+}
+
+func (s *FlowStepChallenge) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if value, ok := s.Method.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "method",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s FlowStepChallengeMethod) Validate() error {
+	switch s {
+	case "passkey":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
 }
 
 func (s FlowStepComplete) Validate() error {
@@ -1488,13 +1543,13 @@ func (s *Gate) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
-		if err := s.Type.Validate(); err != nil {
+		if err := s.Kind.Validate(); err != nil {
 			return err
 		}
 		return nil
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
-			Name:  "type",
+			Name:  "kind",
 			Error: err,
 		})
 	}
@@ -1504,11 +1559,9 @@ func (s *Gate) Validate() error {
 	return nil
 }
 
-func (s GateType) Validate() error {
+func (s GateKind) Validate() error {
 	switch s {
 	case "captcha":
-		return nil
-	case "passkey":
 		return nil
 	default:
 		return errors.Errorf("invalid value: %v", s)
@@ -2277,7 +2330,7 @@ func (s SessionID) Validate() error {
 		MaxLengthSet:  false,
 		Email:         false,
 		Hostname:      false,
-		Regex:         regexMap["^sess_[a-zA-Z0-9_-]+$"],
+		Regex:         regexMap["^[a-zA-Z0-9_-]+$"],
 		MinNumeric:    0,
 		MinNumericSet: false,
 		MaxNumeric:    0,

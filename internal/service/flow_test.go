@@ -53,20 +53,16 @@ func stubListFlowDefinitions(t *testing.T, defs []*domain.FlowDefinition) *domai
 }
 
 func hasPurpose(def *domain.FlowDefinition, purpose domain.FlowDefinitionPurpose) bool {
-	for _, p := range def.Purposes {
-		if p.Purpose == purpose {
-			return true
-		}
-	}
-	return false
+	_, ok := def.Purposes[purpose]
+	return ok
 }
 
 func ptr[T any](v T) *T { return &v }
 
 func newDef(name, version string, audience domain.FlowDefinitionAudience, purposes ...domain.FlowDefinitionPurpose) *domain.FlowDefinition {
-	entries := make([]domain.FlowDefinitionPurposeEntry, len(purposes))
-	for i, p := range purposes {
-		entries[i] = domain.FlowDefinitionPurposeEntry{Purpose: p, InitialStep: "start"}
+	entries := make(map[domain.FlowDefinitionPurpose]string, len(purposes))
+	for _, p := range purposes {
+		entries[p] = "start"
 	}
 	return &domain.FlowDefinition{
 		ProjectID:     "proj",
@@ -157,7 +153,7 @@ func TestResolve_ResolveByName_NotFound(t *testing.T) {
 		Purpose:   domain.FlowDefinitionPurposeLogin,
 		Name:      ptr("missing"),
 	})
-	if !errors.Is(err, domain.ErrFlowDefinitionNotFound) {
+	if !errors.Is(err, domain.ErrFlowDefinitionNotFound()) {
 		t.Fatalf("Resolve err = %v, want ErrFlowNotFound", err)
 	}
 }
@@ -171,7 +167,7 @@ func TestResolve_ResolveByName_PurposeMismatch(t *testing.T) {
 		Purpose:   domain.FlowDefinitionPurposeRegister,
 		Name:      ptr("login"),
 	})
-	if !errors.Is(err, domain.ErrFlowDefinitionPurposeMismatch) {
+	if !errors.Is(err, domain.ErrFlowDefinitionPurposeMismatch()) {
 		t.Fatalf("Resolve err = %v, want ErrPurposeMismatch", err)
 	}
 }
@@ -201,7 +197,7 @@ func TestResolve_ResolveByAudience_NoMatch(t *testing.T) {
 		ProjectID: "proj",
 		Purpose:   domain.FlowDefinitionPurposeRegister,
 	})
-	if !errors.Is(err, domain.ErrFlowDefinitionNotFound) {
+	if !errors.Is(err, domain.ErrFlowDefinitionNotFound()) {
 		t.Fatalf("Resolve err = %v, want ErrFlowNotFound", err)
 	}
 }

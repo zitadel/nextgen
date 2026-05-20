@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 
@@ -37,7 +36,7 @@ func (h Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest) (ap
 
 	def, err := h.flowService.Resolve(ctx, resolveReq)
 	if err != nil {
-		return mapResolveError(err), nil
+		return errorResponse(err), nil
 	}
 
 	// Execution is intentionally stopped here. The service resolved a
@@ -66,31 +65,13 @@ func buildResolveHint(opt api.OptFlowHint) service.ResolveFlowHint {
 	return out
 }
 
-func mapResolveError(err error) *api.ErrorDetailsStatusCode {
-	switch {
-	case errors.Is(err, domain.ErrFlowDefinitionNotFound):
-		return &api.ErrorDetailsStatusCode{
-			StatusCode: http.StatusNotFound,
-			Response: api.ErrorDetails{
-				Code:    "flow_not_found",
-				Message: err.Error(),
-			},
-		}
-	case errors.Is(err, domain.ErrFlowDefinitionPurposeMismatch):
-		return &api.ErrorDetailsStatusCode{
-			StatusCode: http.StatusBadRequest,
-			Response: api.ErrorDetails{
-				Code:    "purpose_mismatch",
-				Message: err.Error(),
-			},
-		}
+func flowDefinitionErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
+	switch err.Code {
+	case domain.ErrFlowDefinitionNotFound().Code:
+		return errorResponseWithStatusCode(http.StatusNotFound, err)
+	case domain.ErrFlowDefinitionPurposeMismatch().Code:
+		return errorResponseWithStatusCode(http.StatusBadRequest, err)
 	default:
-		return &api.ErrorDetailsStatusCode{
-			StatusCode: http.StatusInternalServerError,
-			Response: api.ErrorDetails{
-				Code:    "internal_error",
-				Message: err.Error(),
-			},
-		}
+		return internalErrorResponse(err)
 	}
 }

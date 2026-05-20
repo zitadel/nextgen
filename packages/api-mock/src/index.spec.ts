@@ -12,7 +12,7 @@ import {
   clearBranding,
   setupMockHandlers,
 } from "./index.js";
-import type { MockHandle } from "./index.js";
+import type { MockHandle } from "./handlers.js";
 
 const PROJECT_ID = "demo-project";
 const server = setupServer();
