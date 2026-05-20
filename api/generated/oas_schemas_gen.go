@@ -2056,6 +2056,7 @@ func (*ErrorDetailsStatusCode) getFlowStepRes()            {}
 func (*ErrorDetailsStatusCode) getHealthRes()              {}
 func (*ErrorDetailsStatusCode) getKeysRes()                {}
 func (*ErrorDetailsStatusCode) getLiveRes()                {}
+func (*ErrorDetailsStatusCode) getMySessionRes()           {}
 func (*ErrorDetailsStatusCode) getOpenIDConfigurationRes() {}
 func (*ErrorDetailsStatusCode) getProjectRes()             {}
 func (*ErrorDetailsStatusCode) getReadyRes()               {}
@@ -2067,6 +2068,7 @@ func (*ErrorDetailsStatusCode) introspectRes()             {}
 func (*ErrorDetailsStatusCode) listFlowDefinitionsRes()    {}
 func (*ErrorDetailsStatusCode) listSessionsRes()           {}
 func (*ErrorDetailsStatusCode) listUsersRes()              {}
+func (*ErrorDetailsStatusCode) revokeMySessionRes()        {}
 func (*ErrorDetailsStatusCode) revokeSessionRes()          {}
 func (*ErrorDetailsStatusCode) revokeTokenRes()            {}
 func (*ErrorDetailsStatusCode) submitFlowEventRes()        {}
@@ -2346,14 +2348,15 @@ func (s *FieldValidation) SetMaxLength(val OptInt) {
 	s.MaxLength = val
 }
 
-// Scopes which teams, apps, or projects this flow definition applies to.
-// When all fields are empty/omitted, the definition is a project-wide default.
-// The engine picks the most specific matching definition: app > team > project.
+// Scopes which teams or apps this flow definition applies to. Empty or
+// omitted fields mean "no restriction"; when both are empty the definition
+// matches every request in the project. The engine picks the most specific
+// matching definition: app > team > project-wide.
 // Ref: #
 type FlowAudience struct {
-	// Restrict to specific teams (organizations).
+	// Restrict to specific teams (organizations). Empty means no team restriction.
 	TeamIds []string `json:"team_ids"`
-	// Restrict to specific applications.
+	// Restrict to specific applications. Empty means no app restriction.
 	AppIds []string `json:"app_ids"`
 }
 
@@ -2395,13 +2398,12 @@ type FlowDefinition struct {
 	// defined in this schema. The engine resolves field types, validation,
 	// and implicit outcomes from schema annotations at runtime.
 	UserSchema url.URL `json:"user_schema"`
-	// Which flow purposes this definition handles. A definition can serve
-	// multiple purposes (e.g. a combined login/register flow).
-	Purposes []FlowDefinitionPurposesItem `json:"purposes"`
-	// Maps each purpose to the step name that starts the flow for that purpose.
-	// Keys must be a subset of `purposes`.
-	InitialSteps FlowDefinitionInitialSteps `json:"initial_steps"`
-	Audience     OptFlowAudience            `json:"audience"`
+	// Maps each purpose this definition handles to its entry-point step.
+	// Keys are purpose names; values must match a `name` in `steps`. A
+	// definition can serve multiple purposes (e.g. a combined login/register
+	// flow) by listing one entry per purpose.
+	Purposes FlowDefinitionPurposes `json:"purposes"`
+	Audience OptFlowAudience        `json:"audience"`
 	// Ordered list of steps in this flow. The order is for human readability —
 	// actual step sequencing is determined by transitions.
 	Steps []FlowDefinitionStep `json:"steps"`
@@ -2418,13 +2420,8 @@ func (s *FlowDefinition) GetUserSchema() url.URL {
 }
 
 // GetPurposes returns the value of Purposes.
-func (s *FlowDefinition) GetPurposes() []FlowDefinitionPurposesItem {
+func (s *FlowDefinition) GetPurposes() FlowDefinitionPurposes {
 	return s.Purposes
-}
-
-// GetInitialSteps returns the value of InitialSteps.
-func (s *FlowDefinition) GetInitialSteps() FlowDefinitionInitialSteps {
-	return s.InitialSteps
 }
 
 // GetAudience returns the value of Audience.
@@ -2448,13 +2445,8 @@ func (s *FlowDefinition) SetUserSchema(val url.URL) {
 }
 
 // SetPurposes sets the value of Purposes.
-func (s *FlowDefinition) SetPurposes(val []FlowDefinitionPurposesItem) {
+func (s *FlowDefinition) SetPurposes(val FlowDefinitionPurposes) {
 	s.Purposes = val
-}
-
-// SetInitialSteps sets the value of InitialSteps.
-func (s *FlowDefinition) SetInitialSteps(val FlowDefinitionInitialSteps) {
-	s.InitialSteps = val
 }
 
 // SetAudience sets the value of Audience.
@@ -2516,13 +2508,12 @@ type FlowDefinitionDetailResponse struct {
 	// defined in this schema. The engine resolves field types, validation,
 	// and implicit outcomes from schema annotations at runtime.
 	UserSchema url.URL `json:"user_schema"`
-	// Which flow purposes this definition handles. A definition can serve
-	// multiple purposes (e.g. a combined login/register flow).
-	Purposes []FlowDefinitionDetailResponsePurposesItem `json:"purposes"`
-	// Maps each purpose to the step name that starts the flow for that purpose.
-	// Keys must be a subset of `purposes`.
-	InitialSteps FlowDefinitionDetailResponseInitialSteps `json:"initial_steps"`
-	Audience     OptFlowAudience                          `json:"audience"`
+	// Maps each purpose this definition handles to its entry-point step.
+	// Keys are purpose names; values must match a `name` in `steps`. A
+	// definition can serve multiple purposes (e.g. a combined login/register
+	// flow) by listing one entry per purpose.
+	Purposes FlowDefinitionDetailResponsePurposes `json:"purposes"`
+	Audience OptFlowAudience                      `json:"audience"`
 	// Ordered list of steps in this flow. The order is for human readability —
 	// actual step sequencing is determined by transitions.
 	Steps []FlowDefinitionStep `json:"steps"`
@@ -2551,13 +2542,8 @@ func (s *FlowDefinitionDetailResponse) GetUserSchema() url.URL {
 }
 
 // GetPurposes returns the value of Purposes.
-func (s *FlowDefinitionDetailResponse) GetPurposes() []FlowDefinitionDetailResponsePurposesItem {
+func (s *FlowDefinitionDetailResponse) GetPurposes() FlowDefinitionDetailResponsePurposes {
 	return s.Purposes
-}
-
-// GetInitialSteps returns the value of InitialSteps.
-func (s *FlowDefinitionDetailResponse) GetInitialSteps() FlowDefinitionDetailResponseInitialSteps {
-	return s.InitialSteps
 }
 
 // GetAudience returns the value of Audience.
@@ -2611,13 +2597,8 @@ func (s *FlowDefinitionDetailResponse) SetUserSchema(val url.URL) {
 }
 
 // SetPurposes sets the value of Purposes.
-func (s *FlowDefinitionDetailResponse) SetPurposes(val []FlowDefinitionDetailResponsePurposesItem) {
+func (s *FlowDefinitionDetailResponse) SetPurposes(val FlowDefinitionDetailResponsePurposes) {
 	s.Purposes = val
-}
-
-// SetInitialSteps sets the value of InitialSteps.
-func (s *FlowDefinitionDetailResponse) SetInitialSteps(val FlowDefinitionDetailResponseInitialSteps) {
-	s.InitialSteps = val
 }
 
 // SetAudience sets the value of Audience.
@@ -2664,93 +2645,13 @@ func (*FlowDefinitionDetailResponse) createFlowDefinitionRes() {}
 func (*FlowDefinitionDetailResponse) getFlowDefinitionRes()    {}
 func (*FlowDefinitionDetailResponse) updateFlowDefinitionRes() {}
 
-// Maps each purpose to the step name that starts the flow for that purpose.
-// Keys must be a subset of `purposes`.
-type FlowDefinitionDetailResponseInitialSteps map[string]string
+// Maps each purpose this definition handles to its entry-point step.
+// Keys are purpose names; values must match a `name` in `steps`. A
+// definition can serve multiple purposes (e.g. a combined login/register
+// flow) by listing one entry per purpose.
+type FlowDefinitionDetailResponsePurposes map[string]string
 
-func (s *FlowDefinitionDetailResponseInitialSteps) init() FlowDefinitionDetailResponseInitialSteps {
-	m := *s
-	if m == nil {
-		m = map[string]string{}
-		*s = m
-	}
-	return m
-}
-
-type FlowDefinitionDetailResponsePurposesItem string
-
-const (
-	FlowDefinitionDetailResponsePurposesItemLogin       FlowDefinitionDetailResponsePurposesItem = "login"
-	FlowDefinitionDetailResponsePurposesItemRegister    FlowDefinitionDetailResponsePurposesItem = "register"
-	FlowDefinitionDetailResponsePurposesItemRecovery    FlowDefinitionDetailResponsePurposesItem = "recovery"
-	FlowDefinitionDetailResponsePurposesItemProfiling   FlowDefinitionDetailResponsePurposesItem = "profiling"
-	FlowDefinitionDetailResponsePurposesItemReauth      FlowDefinitionDetailResponsePurposesItem = "reauth"
-	FlowDefinitionDetailResponsePurposesItemLinkAccount FlowDefinitionDetailResponsePurposesItem = "link_account"
-)
-
-// AllValues returns all FlowDefinitionDetailResponsePurposesItem values.
-func (FlowDefinitionDetailResponsePurposesItem) AllValues() []FlowDefinitionDetailResponsePurposesItem {
-	return []FlowDefinitionDetailResponsePurposesItem{
-		FlowDefinitionDetailResponsePurposesItemLogin,
-		FlowDefinitionDetailResponsePurposesItemRegister,
-		FlowDefinitionDetailResponsePurposesItemRecovery,
-		FlowDefinitionDetailResponsePurposesItemProfiling,
-		FlowDefinitionDetailResponsePurposesItemReauth,
-		FlowDefinitionDetailResponsePurposesItemLinkAccount,
-	}
-}
-
-// MarshalText implements encoding.TextMarshaler.
-func (s FlowDefinitionDetailResponsePurposesItem) MarshalText() ([]byte, error) {
-	switch s {
-	case FlowDefinitionDetailResponsePurposesItemLogin:
-		return []byte(s), nil
-	case FlowDefinitionDetailResponsePurposesItemRegister:
-		return []byte(s), nil
-	case FlowDefinitionDetailResponsePurposesItemRecovery:
-		return []byte(s), nil
-	case FlowDefinitionDetailResponsePurposesItemProfiling:
-		return []byte(s), nil
-	case FlowDefinitionDetailResponsePurposesItemReauth:
-		return []byte(s), nil
-	case FlowDefinitionDetailResponsePurposesItemLinkAccount:
-		return []byte(s), nil
-	default:
-		return nil, errors.Errorf("invalid value: %q", s)
-	}
-}
-
-// UnmarshalText implements encoding.TextUnmarshaler.
-func (s *FlowDefinitionDetailResponsePurposesItem) UnmarshalText(data []byte) error {
-	switch FlowDefinitionDetailResponsePurposesItem(data) {
-	case FlowDefinitionDetailResponsePurposesItemLogin:
-		*s = FlowDefinitionDetailResponsePurposesItemLogin
-		return nil
-	case FlowDefinitionDetailResponsePurposesItemRegister:
-		*s = FlowDefinitionDetailResponsePurposesItemRegister
-		return nil
-	case FlowDefinitionDetailResponsePurposesItemRecovery:
-		*s = FlowDefinitionDetailResponsePurposesItemRecovery
-		return nil
-	case FlowDefinitionDetailResponsePurposesItemProfiling:
-		*s = FlowDefinitionDetailResponsePurposesItemProfiling
-		return nil
-	case FlowDefinitionDetailResponsePurposesItemReauth:
-		*s = FlowDefinitionDetailResponsePurposesItemReauth
-		return nil
-	case FlowDefinitionDetailResponsePurposesItemLinkAccount:
-		*s = FlowDefinitionDetailResponsePurposesItemLinkAccount
-		return nil
-	default:
-		return errors.Errorf("invalid value: %q", data)
-	}
-}
-
-// Maps each purpose to the step name that starts the flow for that purpose.
-// Keys must be a subset of `purposes`.
-type FlowDefinitionInitialSteps map[string]string
-
-func (s *FlowDefinitionInitialSteps) init() FlowDefinitionInitialSteps {
+func (s *FlowDefinitionDetailResponsePurposes) init() FlowDefinitionDetailResponsePurposes {
 	m := *s
 	if m == nil {
 		m = map[string]string{}
@@ -2788,73 +2689,19 @@ func (s *FlowDefinitionListResponse) SetNextPageToken(val OptNilPageToken) {
 
 func (*FlowDefinitionListResponse) listFlowDefinitionsRes() {}
 
-type FlowDefinitionPurposesItem string
+// Maps each purpose this definition handles to its entry-point step.
+// Keys are purpose names; values must match a `name` in `steps`. A
+// definition can serve multiple purposes (e.g. a combined login/register
+// flow) by listing one entry per purpose.
+type FlowDefinitionPurposes map[string]string
 
-const (
-	FlowDefinitionPurposesItemLogin       FlowDefinitionPurposesItem = "login"
-	FlowDefinitionPurposesItemRegister    FlowDefinitionPurposesItem = "register"
-	FlowDefinitionPurposesItemRecovery    FlowDefinitionPurposesItem = "recovery"
-	FlowDefinitionPurposesItemProfiling   FlowDefinitionPurposesItem = "profiling"
-	FlowDefinitionPurposesItemReauth      FlowDefinitionPurposesItem = "reauth"
-	FlowDefinitionPurposesItemLinkAccount FlowDefinitionPurposesItem = "link_account"
-)
-
-// AllValues returns all FlowDefinitionPurposesItem values.
-func (FlowDefinitionPurposesItem) AllValues() []FlowDefinitionPurposesItem {
-	return []FlowDefinitionPurposesItem{
-		FlowDefinitionPurposesItemLogin,
-		FlowDefinitionPurposesItemRegister,
-		FlowDefinitionPurposesItemRecovery,
-		FlowDefinitionPurposesItemProfiling,
-		FlowDefinitionPurposesItemReauth,
-		FlowDefinitionPurposesItemLinkAccount,
+func (s *FlowDefinitionPurposes) init() FlowDefinitionPurposes {
+	m := *s
+	if m == nil {
+		m = map[string]string{}
+		*s = m
 	}
-}
-
-// MarshalText implements encoding.TextMarshaler.
-func (s FlowDefinitionPurposesItem) MarshalText() ([]byte, error) {
-	switch s {
-	case FlowDefinitionPurposesItemLogin:
-		return []byte(s), nil
-	case FlowDefinitionPurposesItemRegister:
-		return []byte(s), nil
-	case FlowDefinitionPurposesItemRecovery:
-		return []byte(s), nil
-	case FlowDefinitionPurposesItemProfiling:
-		return []byte(s), nil
-	case FlowDefinitionPurposesItemReauth:
-		return []byte(s), nil
-	case FlowDefinitionPurposesItemLinkAccount:
-		return []byte(s), nil
-	default:
-		return nil, errors.Errorf("invalid value: %q", s)
-	}
-}
-
-// UnmarshalText implements encoding.TextUnmarshaler.
-func (s *FlowDefinitionPurposesItem) UnmarshalText(data []byte) error {
-	switch FlowDefinitionPurposesItem(data) {
-	case FlowDefinitionPurposesItemLogin:
-		*s = FlowDefinitionPurposesItemLogin
-		return nil
-	case FlowDefinitionPurposesItemRegister:
-		*s = FlowDefinitionPurposesItemRegister
-		return nil
-	case FlowDefinitionPurposesItemRecovery:
-		*s = FlowDefinitionPurposesItemRecovery
-		return nil
-	case FlowDefinitionPurposesItemProfiling:
-		*s = FlowDefinitionPurposesItemProfiling
-		return nil
-	case FlowDefinitionPurposesItemReauth:
-		*s = FlowDefinitionPurposesItemReauth
-		return nil
-	case FlowDefinitionPurposesItemLinkAccount:
-		*s = FlowDefinitionPurposesItemLinkAccount
-		return nil
-	default:
-		return errors.Errorf("invalid value: %q", data)
-	}
+	return m
 }
 
 // Response object for a flow definition after creation.
@@ -2970,7 +2817,7 @@ type FlowDefinitionStep struct {
 	// If omitted, the engine provides a default `submit` action.
 	Actions OptFlowDefinitionStepActions `json:"actions"`
 	// Security gates that must be satisfied before submission. Keyed by gate
-	// name. Each gate selects a type (e.g. "captcha") and provider-specific
+	// name. Each gate selects a kind (e.g. "captcha") and provider-specific
 	// configuration. The engine may also inject gates dynamically based on
 	// policy.
 	Gates OptFlowDefinitionStepGates `json:"gates"`
@@ -2978,8 +2825,7 @@ type FlowDefinitionStep struct {
 	SSOProviders []SSOProvider `json:"sso_providers"`
 	// Server-side mutation to execute when this step completes successfully.
 	// Runs after field validation passes, before the transition fires.
-	// - create_user: creates the user record (registration flows)
-	// - reset_credential: replaces a stored credential (recovery flows).
+	// - create_user: creates the user record (registration flows).
 	OnSuccess OptFlowDefinitionStepOnSuccess `json:"on_success"`
 	// Marks this as a terminal step. Tells the frontend what to do:
 	// - redirect: navigate to redirect_uri (OIDC/SAML callback done)
@@ -3132,7 +2978,7 @@ func (s *FlowDefinitionStepComplete) UnmarshalText(data []byte) error {
 }
 
 // Security gates that must be satisfied before submission. Keyed by gate
-// name. Each gate selects a type (e.g. "captcha") and provider-specific
+// name. Each gate selects a kind (e.g. "captcha") and provider-specific
 // configuration. The engine may also inject gates dynamically based on
 // policy.
 type FlowDefinitionStepGates map[string]Gate
@@ -3148,20 +2994,17 @@ func (s *FlowDefinitionStepGates) init() FlowDefinitionStepGates {
 
 // Server-side mutation to execute when this step completes successfully.
 // Runs after field validation passes, before the transition fires.
-// - create_user: creates the user record (registration flows)
-// - reset_credential: replaces a stored credential (recovery flows).
+// - create_user: creates the user record (registration flows).
 type FlowDefinitionStepOnSuccess string
 
 const (
-	FlowDefinitionStepOnSuccessCreateUser      FlowDefinitionStepOnSuccess = "create_user"
-	FlowDefinitionStepOnSuccessResetCredential FlowDefinitionStepOnSuccess = "reset_credential"
+	FlowDefinitionStepOnSuccessCreateUser FlowDefinitionStepOnSuccess = "create_user"
 )
 
 // AllValues returns all FlowDefinitionStepOnSuccess values.
 func (FlowDefinitionStepOnSuccess) AllValues() []FlowDefinitionStepOnSuccess {
 	return []FlowDefinitionStepOnSuccess{
 		FlowDefinitionStepOnSuccessCreateUser,
-		FlowDefinitionStepOnSuccessResetCredential,
 	}
 }
 
@@ -3169,8 +3012,6 @@ func (FlowDefinitionStepOnSuccess) AllValues() []FlowDefinitionStepOnSuccess {
 func (s FlowDefinitionStepOnSuccess) MarshalText() ([]byte, error) {
 	switch s {
 	case FlowDefinitionStepOnSuccessCreateUser:
-		return []byte(s), nil
-	case FlowDefinitionStepOnSuccessResetCredential:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -3182,9 +3023,6 @@ func (s *FlowDefinitionStepOnSuccess) UnmarshalText(data []byte) error {
 	switch FlowDefinitionStepOnSuccess(data) {
 	case FlowDefinitionStepOnSuccessCreateUser:
 		*s = FlowDefinitionStepOnSuccessCreateUser
-		return nil
-	case FlowDefinitionStepOnSuccessResetCredential:
-		*s = FlowDefinitionStepOnSuccessResetCredential
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
@@ -3285,20 +3123,18 @@ func (s *FlowDefinitionStepTransitionsItemAction) UnmarshalText(data []byte) err
 
 // Partial update for a flow definition. Only provided fields are replaced;
 // omitted fields retain their current server-side values.
-// Array fields (`steps`, `purposes`, `initial_steps`) are treated atomically:
-// if provided, the entire array/object is replaced. If omitted, the current
+// Collection fields (`steps`, `purposes`) are treated atomically: if
+// provided, the entire array/object is replaced. If omitted, the current
 // value is preserved unchanged.
 // `name` is a stable identifier and cannot be changed after creation.
 // Ref: #
 type FlowDefinitionUpdateRequest struct {
 	// User schema this flow operates on. Replaces the current value if provided.
 	UserSchema OptURI `json:"user_schema"`
-	// Replaces the full list of purposes this definition handles if provided.
-	Purposes []FlowDefinitionUpdateRequestPurposesItem `json:"purposes"`
-	// Replaces the full map of purpose-to-initial-step if provided.
-	// Keys must be a subset of `purposes`.
-	InitialSteps OptFlowDefinitionUpdateRequestInitialSteps `json:"initial_steps"`
-	Audience     OptFlowAudience                            `json:"audience"`
+	// Replaces the full purpose-to-entry-step map if provided. Keys are
+	// purpose names; values must match a `name` in `steps`.
+	Purposes OptFlowDefinitionUpdateRequestPurposes `json:"purposes"`
+	Audience OptFlowAudience                        `json:"audience"`
 	// Replaces the full steps array if provided. Partial step lists are not
 	// supported — supply all steps when updating this field.
 	Steps []FlowDefinitionStep `json:"steps"`
@@ -3310,13 +3146,8 @@ func (s *FlowDefinitionUpdateRequest) GetUserSchema() OptURI {
 }
 
 // GetPurposes returns the value of Purposes.
-func (s *FlowDefinitionUpdateRequest) GetPurposes() []FlowDefinitionUpdateRequestPurposesItem {
+func (s *FlowDefinitionUpdateRequest) GetPurposes() OptFlowDefinitionUpdateRequestPurposes {
 	return s.Purposes
-}
-
-// GetInitialSteps returns the value of InitialSteps.
-func (s *FlowDefinitionUpdateRequest) GetInitialSteps() OptFlowDefinitionUpdateRequestInitialSteps {
-	return s.InitialSteps
 }
 
 // GetAudience returns the value of Audience.
@@ -3335,13 +3166,8 @@ func (s *FlowDefinitionUpdateRequest) SetUserSchema(val OptURI) {
 }
 
 // SetPurposes sets the value of Purposes.
-func (s *FlowDefinitionUpdateRequest) SetPurposes(val []FlowDefinitionUpdateRequestPurposesItem) {
+func (s *FlowDefinitionUpdateRequest) SetPurposes(val OptFlowDefinitionUpdateRequestPurposes) {
 	s.Purposes = val
-}
-
-// SetInitialSteps sets the value of InitialSteps.
-func (s *FlowDefinitionUpdateRequest) SetInitialSteps(val OptFlowDefinitionUpdateRequestInitialSteps) {
-	s.InitialSteps = val
 }
 
 // SetAudience sets the value of Audience.
@@ -3354,86 +3180,17 @@ func (s *FlowDefinitionUpdateRequest) SetSteps(val []FlowDefinitionStep) {
 	s.Steps = val
 }
 
-// Replaces the full map of purpose-to-initial-step if provided.
-// Keys must be a subset of `purposes`.
-type FlowDefinitionUpdateRequestInitialSteps map[string]string
+// Replaces the full purpose-to-entry-step map if provided. Keys are
+// purpose names; values must match a `name` in `steps`.
+type FlowDefinitionUpdateRequestPurposes map[string]string
 
-func (s *FlowDefinitionUpdateRequestInitialSteps) init() FlowDefinitionUpdateRequestInitialSteps {
+func (s *FlowDefinitionUpdateRequestPurposes) init() FlowDefinitionUpdateRequestPurposes {
 	m := *s
 	if m == nil {
 		m = map[string]string{}
 		*s = m
 	}
 	return m
-}
-
-type FlowDefinitionUpdateRequestPurposesItem string
-
-const (
-	FlowDefinitionUpdateRequestPurposesItemLogin       FlowDefinitionUpdateRequestPurposesItem = "login"
-	FlowDefinitionUpdateRequestPurposesItemRegister    FlowDefinitionUpdateRequestPurposesItem = "register"
-	FlowDefinitionUpdateRequestPurposesItemRecovery    FlowDefinitionUpdateRequestPurposesItem = "recovery"
-	FlowDefinitionUpdateRequestPurposesItemProfiling   FlowDefinitionUpdateRequestPurposesItem = "profiling"
-	FlowDefinitionUpdateRequestPurposesItemReauth      FlowDefinitionUpdateRequestPurposesItem = "reauth"
-	FlowDefinitionUpdateRequestPurposesItemLinkAccount FlowDefinitionUpdateRequestPurposesItem = "link_account"
-)
-
-// AllValues returns all FlowDefinitionUpdateRequestPurposesItem values.
-func (FlowDefinitionUpdateRequestPurposesItem) AllValues() []FlowDefinitionUpdateRequestPurposesItem {
-	return []FlowDefinitionUpdateRequestPurposesItem{
-		FlowDefinitionUpdateRequestPurposesItemLogin,
-		FlowDefinitionUpdateRequestPurposesItemRegister,
-		FlowDefinitionUpdateRequestPurposesItemRecovery,
-		FlowDefinitionUpdateRequestPurposesItemProfiling,
-		FlowDefinitionUpdateRequestPurposesItemReauth,
-		FlowDefinitionUpdateRequestPurposesItemLinkAccount,
-	}
-}
-
-// MarshalText implements encoding.TextMarshaler.
-func (s FlowDefinitionUpdateRequestPurposesItem) MarshalText() ([]byte, error) {
-	switch s {
-	case FlowDefinitionUpdateRequestPurposesItemLogin:
-		return []byte(s), nil
-	case FlowDefinitionUpdateRequestPurposesItemRegister:
-		return []byte(s), nil
-	case FlowDefinitionUpdateRequestPurposesItemRecovery:
-		return []byte(s), nil
-	case FlowDefinitionUpdateRequestPurposesItemProfiling:
-		return []byte(s), nil
-	case FlowDefinitionUpdateRequestPurposesItemReauth:
-		return []byte(s), nil
-	case FlowDefinitionUpdateRequestPurposesItemLinkAccount:
-		return []byte(s), nil
-	default:
-		return nil, errors.Errorf("invalid value: %q", s)
-	}
-}
-
-// UnmarshalText implements encoding.TextUnmarshaler.
-func (s *FlowDefinitionUpdateRequestPurposesItem) UnmarshalText(data []byte) error {
-	switch FlowDefinitionUpdateRequestPurposesItem(data) {
-	case FlowDefinitionUpdateRequestPurposesItemLogin:
-		*s = FlowDefinitionUpdateRequestPurposesItemLogin
-		return nil
-	case FlowDefinitionUpdateRequestPurposesItemRegister:
-		*s = FlowDefinitionUpdateRequestPurposesItemRegister
-		return nil
-	case FlowDefinitionUpdateRequestPurposesItemRecovery:
-		*s = FlowDefinitionUpdateRequestPurposesItemRecovery
-		return nil
-	case FlowDefinitionUpdateRequestPurposesItemProfiling:
-		*s = FlowDefinitionUpdateRequestPurposesItemProfiling
-		return nil
-	case FlowDefinitionUpdateRequestPurposesItemReauth:
-		*s = FlowDefinitionUpdateRequestPurposesItemReauth
-		return nil
-	case FlowDefinitionUpdateRequestPurposesItemLinkAccount:
-		*s = FlowDefinitionUpdateRequestPurposesItemLinkAccount
-		return nil
-	default:
-		return errors.Errorf("invalid value: %q", data)
-	}
 }
 
 // Ref: #
@@ -4201,40 +3958,32 @@ func (s *FlowSubmitRequestGateProofs) init() FlowSubmitRequestGateProofs {
 	return m
 }
 
-// A security gate that must be satisfied before the step can be submitted.
-// The orchestrator appends any required-but-unrendered gates automatically
-// as a safety net.
+// A security challenge that must be satisfied before this step's submission
+// is accepted. The engine may also inject gates at runtime based on policy
+// or risk evaluation.
 // Ref: #
 type Gate struct {
-	// Gate type.
-	Type GateType `json:"type"`
-	// Provider identifier (e.g., "altcha", "turnstile").
-	Provider OptString `json:"provider"`
-	Required OptBool   `json:"required"`
-	// Whether this gate has already been satisfied in this flow.
-	Satisfied OptBool `json:"satisfied"`
-	// Provider-specific challenge parameters.
+	// The gate category. Only `captcha` is currently defined. Authenticator
+	// ceremonies (e.g. passkey) are modelled as credential auth_attempts via
+	// `x-credential` on a field, not as gates.
+	Kind GateKind `json:"kind"`
+	// Provider identifier within the gate kind — e.g. `altcha`, `turnstile`,
+	// `hcaptcha`. The engine looks up an implementation in its provider
+	// registry.
+	Provider string `json:"provider"`
+	// Provider-specific configuration consumed by the implementation when
+	// issuing the per-render challenge. Opaque to the engine.
 	Config OptGateConfig `json:"config"`
 }
 
-// GetType returns the value of Type.
-func (s *Gate) GetType() GateType {
-	return s.Type
+// GetKind returns the value of Kind.
+func (s *Gate) GetKind() GateKind {
+	return s.Kind
 }
 
 // GetProvider returns the value of Provider.
-func (s *Gate) GetProvider() OptString {
+func (s *Gate) GetProvider() string {
 	return s.Provider
-}
-
-// GetRequired returns the value of Required.
-func (s *Gate) GetRequired() OptBool {
-	return s.Required
-}
-
-// GetSatisfied returns the value of Satisfied.
-func (s *Gate) GetSatisfied() OptBool {
-	return s.Satisfied
 }
 
 // GetConfig returns the value of Config.
@@ -4242,24 +3991,14 @@ func (s *Gate) GetConfig() OptGateConfig {
 	return s.Config
 }
 
-// SetType sets the value of Type.
-func (s *Gate) SetType(val GateType) {
-	s.Type = val
+// SetKind sets the value of Kind.
+func (s *Gate) SetKind(val GateKind) {
+	s.Kind = val
 }
 
 // SetProvider sets the value of Provider.
-func (s *Gate) SetProvider(val OptString) {
+func (s *Gate) SetProvider(val string) {
 	s.Provider = val
-}
-
-// SetRequired sets the value of Required.
-func (s *Gate) SetRequired(val OptBool) {
-	s.Required = val
-}
-
-// SetSatisfied sets the value of Satisfied.
-func (s *Gate) SetSatisfied(val OptBool) {
-	s.Satisfied = val
 }
 
 // SetConfig sets the value of Config.
@@ -4267,7 +4006,8 @@ func (s *Gate) SetConfig(val OptGateConfig) {
 	s.Config = val
 }
 
-// Provider-specific challenge parameters.
+// Provider-specific configuration consumed by the implementation when
+// issuing the per-render challenge. Opaque to the engine.
 type GateConfig map[string]jx.Raw
 
 func (s *GateConfig) init() GateConfig {
@@ -4279,24 +4019,26 @@ func (s *GateConfig) init() GateConfig {
 	return m
 }
 
-// Gate type.
-type GateType string
+// The gate category. Only `captcha` is currently defined. Authenticator
+// ceremonies (e.g. passkey) are modelled as credential auth_attempts via
+// `x-credential` on a field, not as gates.
+type GateKind string
 
 const (
-	GateTypeCaptcha GateType = "captcha"
+	GateKindCaptcha GateKind = "captcha"
 )
 
-// AllValues returns all GateType values.
-func (GateType) AllValues() []GateType {
-	return []GateType{
-		GateTypeCaptcha,
+// AllValues returns all GateKind values.
+func (GateKind) AllValues() []GateKind {
+	return []GateKind{
+		GateKindCaptcha,
 	}
 }
 
 // MarshalText implements encoding.TextMarshaler.
-func (s GateType) MarshalText() ([]byte, error) {
+func (s GateKind) MarshalText() ([]byte, error) {
 	switch s {
-	case GateTypeCaptcha:
+	case GateKindCaptcha:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -4304,10 +4046,10 @@ func (s GateType) MarshalText() ([]byte, error) {
 }
 
 // UnmarshalText implements encoding.TextUnmarshaler.
-func (s *GateType) UnmarshalText(data []byte) error {
-	switch GateType(data) {
-	case GateTypeCaptcha:
-		*s = GateTypeCaptcha
+func (s *GateKind) UnmarshalText(data []byte) error {
+	switch GateKind(data) {
+	case GateKindCaptcha:
+		*s = GateKindCaptcha
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
@@ -4449,6 +4191,14 @@ func (s GetLiveOK) Read(p []byte) (n int, err error) {
 }
 
 func (*GetLiveOK) getLiveRes() {}
+
+type GetMySessionNotFound ErrorDetails
+
+func (*GetMySessionNotFound) getMySessionRes() {}
+
+type GetMySessionUnauthorized ErrorDetails
+
+func (*GetMySessionUnauthorized) getMySessionRes() {}
 
 type GetProjectNotFound ErrorDetails
 
@@ -7762,38 +7512,38 @@ func (o OptFlowDefinitionStepTransitions) Or(d FlowDefinitionStepTransitions) Fl
 	return d
 }
 
-// NewOptFlowDefinitionUpdateRequestInitialSteps returns new OptFlowDefinitionUpdateRequestInitialSteps with value set to v.
-func NewOptFlowDefinitionUpdateRequestInitialSteps(v FlowDefinitionUpdateRequestInitialSteps) OptFlowDefinitionUpdateRequestInitialSteps {
-	return OptFlowDefinitionUpdateRequestInitialSteps{
+// NewOptFlowDefinitionUpdateRequestPurposes returns new OptFlowDefinitionUpdateRequestPurposes with value set to v.
+func NewOptFlowDefinitionUpdateRequestPurposes(v FlowDefinitionUpdateRequestPurposes) OptFlowDefinitionUpdateRequestPurposes {
+	return OptFlowDefinitionUpdateRequestPurposes{
 		Value: v,
 		Set:   true,
 	}
 }
 
-// OptFlowDefinitionUpdateRequestInitialSteps is optional FlowDefinitionUpdateRequestInitialSteps.
-type OptFlowDefinitionUpdateRequestInitialSteps struct {
-	Value FlowDefinitionUpdateRequestInitialSteps
+// OptFlowDefinitionUpdateRequestPurposes is optional FlowDefinitionUpdateRequestPurposes.
+type OptFlowDefinitionUpdateRequestPurposes struct {
+	Value FlowDefinitionUpdateRequestPurposes
 	Set   bool
 }
 
-// IsSet returns true if OptFlowDefinitionUpdateRequestInitialSteps was set.
-func (o OptFlowDefinitionUpdateRequestInitialSteps) IsSet() bool { return o.Set }
+// IsSet returns true if OptFlowDefinitionUpdateRequestPurposes was set.
+func (o OptFlowDefinitionUpdateRequestPurposes) IsSet() bool { return o.Set }
 
 // Reset unsets value.
-func (o *OptFlowDefinitionUpdateRequestInitialSteps) Reset() {
-	var v FlowDefinitionUpdateRequestInitialSteps
+func (o *OptFlowDefinitionUpdateRequestPurposes) Reset() {
+	var v FlowDefinitionUpdateRequestPurposes
 	o.Value = v
 	o.Set = false
 }
 
 // SetTo sets value to v.
-func (o *OptFlowDefinitionUpdateRequestInitialSteps) SetTo(v FlowDefinitionUpdateRequestInitialSteps) {
+func (o *OptFlowDefinitionUpdateRequestPurposes) SetTo(v FlowDefinitionUpdateRequestPurposes) {
 	o.Set = true
 	o.Value = v
 }
 
 // Get returns value and boolean that denotes whether value was set.
-func (o OptFlowDefinitionUpdateRequestInitialSteps) Get() (v FlowDefinitionUpdateRequestInitialSteps, ok bool) {
+func (o OptFlowDefinitionUpdateRequestPurposes) Get() (v FlowDefinitionUpdateRequestPurposes, ok bool) {
 	if !o.Set {
 		return v, false
 	}
@@ -7801,7 +7551,7 @@ func (o OptFlowDefinitionUpdateRequestInitialSteps) Get() (v FlowDefinitionUpdat
 }
 
 // Or returns value if set, or given parameter if does not.
-func (o OptFlowDefinitionUpdateRequestInitialSteps) Or(d FlowDefinitionUpdateRequestInitialSteps) FlowDefinitionUpdateRequestInitialSteps {
+func (o OptFlowDefinitionUpdateRequestPurposes) Or(d FlowDefinitionUpdateRequestPurposes) FlowDefinitionUpdateRequestPurposes {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -10588,6 +10338,35 @@ func (s *PostTokenRequestGrantType) UnmarshalText(data []byte) error {
 
 type ProjectID string
 
+type RevokeMySessionConflict ErrorDetails
+
+func (*RevokeMySessionConflict) revokeMySessionRes() {}
+
+// RevokeMySessionNoContent is response for RevokeMySession operation.
+type RevokeMySessionNoContent struct {
+	SetCookie OptString
+}
+
+// GetSetCookie returns the value of SetCookie.
+func (s *RevokeMySessionNoContent) GetSetCookie() OptString {
+	return s.SetCookie
+}
+
+// SetSetCookie sets the value of SetCookie.
+func (s *RevokeMySessionNoContent) SetSetCookie(val OptString) {
+	s.SetCookie = val
+}
+
+func (*RevokeMySessionNoContent) revokeMySessionRes() {}
+
+type RevokeMySessionNotFound ErrorDetails
+
+func (*RevokeMySessionNotFound) revokeMySessionRes() {}
+
+type RevokeMySessionUnauthorized ErrorDetails
+
+func (*RevokeMySessionUnauthorized) revokeMySessionRes() {}
+
 // Ref: #
 type RevokeRequest struct {
 	// The token to revoke (access token or refresh token).
@@ -10621,7 +10400,19 @@ type RevokeSessionConflict ErrorDetails
 func (*RevokeSessionConflict) revokeSessionRes() {}
 
 // RevokeSessionNoContent is response for RevokeSession operation.
-type RevokeSessionNoContent struct{}
+type RevokeSessionNoContent struct {
+	SetCookie OptString
+}
+
+// GetSetCookie returns the value of SetCookie.
+func (s *RevokeSessionNoContent) GetSetCookie() OptString {
+	return s.SetCookie
+}
+
+// SetSetCookie sets the value of SetCookie.
+func (s *RevokeSessionNoContent) SetSetCookie(val OptString) {
+	s.SetCookie = val
+}
 
 func (*RevokeSessionNoContent) revokeSessionRes() {}
 
@@ -10884,7 +10675,8 @@ func (s *SessionResponse) SetExpiresAt(val time.Time) {
 	s.ExpiresAt = val
 }
 
-func (*SessionResponse) getSessionRes() {}
+func (*SessionResponse) getMySessionRes() {}
+func (*SessionResponse) getSessionRes()   {}
 
 // Verified authentication factors accumulated by this session.
 // Each key is a factor type (e.g. `password`, `totp`, `passkey`).
@@ -11053,22 +10845,49 @@ func (s *SessionWithTokenResponse) SetSessionToken(val string) {
 	s.SessionToken = val
 }
 
-func (*SessionWithTokenResponse) createSessionRes()   {}
-func (*SessionWithTokenResponse) exchangeHandoffRes() {}
-
-// An action the user can take. Keyed by action name in the parent dictionary.
-// The action name is sent back in the submit request as `action`.
-// Ref: #
-type StepAction struct {
-	// Localization key for the action label.
-	TextKey string `json:"text_key"`
-	// Whether this is the primary/default action.
-	Primary OptBool `json:"primary"`
+// SessionWithTokenResponseHeaders wraps SessionWithTokenResponse with response headers.
+type SessionWithTokenResponseHeaders struct {
+	SetCookie OptString
+	Response  SessionWithTokenResponse
 }
 
-// GetTextKey returns the value of TextKey.
-func (s *StepAction) GetTextKey() string {
-	return s.TextKey
+// GetSetCookie returns the value of SetCookie.
+func (s *SessionWithTokenResponseHeaders) GetSetCookie() OptString {
+	return s.SetCookie
+}
+
+// GetResponse returns the value of Response.
+func (s *SessionWithTokenResponseHeaders) GetResponse() SessionWithTokenResponse {
+	return s.Response
+}
+
+// SetSetCookie sets the value of SetCookie.
+func (s *SessionWithTokenResponseHeaders) SetSetCookie(val OptString) {
+	s.SetCookie = val
+}
+
+// SetResponse sets the value of Response.
+func (s *SessionWithTokenResponseHeaders) SetResponse(val SessionWithTokenResponse) {
+	s.Response = val
+}
+
+func (*SessionWithTokenResponseHeaders) createSessionRes()   {}
+func (*SessionWithTokenResponseHeaders) exchangeHandoffRes() {}
+
+// Configuration for a user-invokable action on a step. Keyed by action name
+// in the parent dictionary. The action name is sent back in the submit
+// request as `action`.
+// Ref: #
+type StepAction struct {
+	// Marks this as the default/primary action. The runtime template uses
+	// this hint to choose visual emphasis. At most one action per step
+	// should be primary; this is not enforced here.
+	Primary OptBool `json:"primary"`
+	// Optional localization key override for the action's label. When
+	// omitted, the engine derives a key from the step and action names.
+	// Display text is resolved client-side from a locale dictionary, never
+	// by the engine.
+	TextKey OptString `json:"text_key"`
 }
 
 // GetPrimary returns the value of Primary.
@@ -11076,14 +10895,19 @@ func (s *StepAction) GetPrimary() OptBool {
 	return s.Primary
 }
 
-// SetTextKey sets the value of TextKey.
-func (s *StepAction) SetTextKey(val string) {
-	s.TextKey = val
+// GetTextKey returns the value of TextKey.
+func (s *StepAction) GetTextKey() OptString {
+	return s.TextKey
 }
 
 // SetPrimary sets the value of Primary.
 func (s *StepAction) SetPrimary(val OptBool) {
 	s.Primary = val
+}
+
+// SetTextKey sets the value of TextKey.
+func (s *StepAction) SetTextKey(val OptString) {
+	s.TextKey = val
 }
 
 // Step-level localization keys. Resolved client-side via the `| t` LiquidJS filter.

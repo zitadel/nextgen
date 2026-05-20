@@ -16,12 +16,15 @@
  */
 import {
   getCreateFlowMockHandler,
+  getExchangeHandoffMockHandler,
+  getExchangeHandoffResponseMock,
   getGetFlowStepMockHandler,
   getSubmitFlowStepMockHandler,
 } from "@zitadel-nextgen/api/generated/endpoints/zitadelNextGen.msw";
 import type {
   CreateFlow201,
   CreateFlowBody,
+  ExchangeHandoffBody,
   SubmitFlowStepBody,
 } from "@zitadel-nextgen/api/generated/model";
 import type { RequestHandler } from "msw";
@@ -41,7 +44,8 @@ import {
 export type CapturedRequest =
   | { kind: "createFlow"; body: CreateFlowBody }
   | { kind: "submitFlowStep"; flowId: string; body: SubmitFlowStepBody }
-  | { kind: "getFlowStep"; flowId: string };
+  | { kind: "getFlowStep"; flowId: string }
+  | { kind: "exchangeHandoff"; body: ExchangeHandoffBody };
 
 export type MockHandle = {
   handlers: RequestHandler[];
@@ -133,6 +137,11 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
     getGetFlowStepMockHandler(({ params }) => {
       captured.push({ kind: "getFlowStep", flowId: String(params.id) });
       return currentResponse();
+    }),
+    getExchangeHandoffMockHandler(async ({ request }) => {
+      const body = (await request.clone().json()) as ExchangeHandoffBody;
+      captured.push({ kind: "exchangeHandoff", body });
+      return getExchangeHandoffResponseMock();
     }),
   ];
 

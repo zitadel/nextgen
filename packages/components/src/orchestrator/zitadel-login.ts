@@ -12,7 +12,13 @@ import type { Liquid, Template } from "liquidjs";
 
 import "../atoms/index.js";
 import type { ZlPasskeyResultDetail, ZlPasskeyErrorDetail } from "../atoms/zl-passkey.js";
-import { getCurrentStep, startFlow as apiStartFlow, submitStep as apiSubmitStep } from "./api-client.js";
+import {
+  DEFAULT_SESSION_EXCHANGE_PATH,
+  exchangeSession,
+  getCurrentStep,
+  startFlow as apiStartFlow,
+  submitStep as apiSubmitStep,
+} from "./api-client.js";
 import type { Branding } from "./branding.js";
 import { applyBrandingTokens } from "./branding-to-tokens.js";
 import { validateBranding } from "./branding-validator.js";
@@ -79,10 +85,22 @@ export class ZitadelLogin extends LitElement {
   @property({ type: String, attribute: "api-base" }) accessor apiBase = "";
 
   /**
-   * Optional URL to navigate to after a successful sign-in. Used when the
-   * terminal step's `complete` is `"show"` (where there is no canonical
-   * `redirect_uri`). For `complete: "redirect"` the orchestrator follows
-   * `response.redirect_uri` directly.
+   * Path for the handoff exchange request. Defaults to `/sessions/exchange`
+   * and is prefixed with `api-base` when that attribute is set (so
+   * `api-base="/__nextgen"` → `/__nextgen/sessions/exchange`). Any other
+   * value is resolved from `location.origin` instead, so SPAs can route
+   * exchange separately from the flow API (e.g. `/api/auth/exchange`).
+   */
+  @property({ type: String, attribute: "session-exchange-path" })
+  accessor sessionExchangePath = DEFAULT_SESSION_EXCHANGE_PATH;
+
+  /**
+   * URL to navigate to after a successful embedded sign-in. When set, the
+   * orchestrator exchanges the terminal `handoff_token` at the configured
+   * `session-exchange-path` (setting the session cookie) and then performs
+   * a full navigation to this URL so host middleware can observe the cookie.
+   * For `complete: "redirect"` the orchestrator follows `redirect_uri`
+   * instead and does not run the exchange.
    */
   @property({ type: String, attribute: "post-sign-in-url" }) accessor postSignInUrl = "";
 
@@ -238,7 +256,7 @@ export class ZitadelLogin extends LitElement {
     }
     this.formValues = collectInitialValues(wire.step);
     this.challengeResponse = null;
-    this.maybeCompleteFlow(wire);
+    void this.maybeCompleteFlow(wire);
   }
 
   /**
@@ -247,13 +265,13 @@ export class ZitadelLogin extends LitElement {
    * - `step.complete === "redirect"` — navigate the browser to
    *   `response.redirect_uri` (OIDC/SAML `auth_request_id` resolved). This
    *   takes precedence over `post-sign-in-url`.
-   * - `step.complete === "show"` — render the step as a success screen.
-   *   Optionally navigate to `post-sign-in-url` if the consumer set it.
+   * - `step.complete === "show"` — when `post-sign-in-url` is set, exchange
+   *   the `handoff_token` for a session cookie and navigate there.
    *
-   * In both cases we also fire `zitadel-flow-complete` so SDK consumers can
-   * handle the post-sign-in handoff (`handoff_token`) themselves.
+   * `zitadel-flow-complete` is always emitted so hosts with custom post-sign-in
+   * flows can handle the handoff themselves when `post-sign-in-url` is omitted.
    */
-  private maybeCompleteFlow(response: CreateFlow201): void {
+  private async maybeCompleteFlow(response: CreateFlow201): Promise<void> {
     const behavior = response.step.complete;
     if (!behavior) return;
 
@@ -272,11 +290,21 @@ export class ZitadelLogin extends LitElement {
 
     if (typeof window === "undefined") return;
     if (behavior === "redirect" && response.redirect_uri) {
-      window.location.href = response.redirect_uri;
+      window.location.assign(response.redirect_uri);
       return;
     }
-    if (behavior === "show" && this.postSignInUrl) {
-      window.location.href = this.postSignInUrl;
+
+    const handoffToken = response.handoff_token;
+    if (behavior === "show" && handoffToken && this.postSignInUrl) {
+      this.loading = true;
+      try {
+        await exchangeSession({ handoff_token: handoffToken }, this.sessionExchangePath);
+        window.location.assign(this.postSignInUrl);
+      } catch (error) {
+        this.handleTransportError(error);
+      } finally {
+        this.loading = false;
+      }
     }
   }
 
