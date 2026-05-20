@@ -32,6 +32,12 @@
     },
     {
       "path": "./apps/demo-next"
+    },
+    {
+      "path": "./apps/demo-next-e2e"
+    },
+    {
+      "path": "./apps/demo-nuxt-e2e"
     }
   ]
 }
