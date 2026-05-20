@@ -72,7 +72,7 @@ export function startMockServer(port: number): Server {
   // demo apps (running on different ports) can make credentialed fetch()
   // calls to this server. This is intentionally permissive because this is a
   // LOCAL DEVELOPMENT MOCK ONLY — never deploy this server publicly.
-  app.use((req, res, next) => {
+  app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
     const origin = req.headers.origin;
     // Vary must be set before the response is cached — it tells any proxy that
     // the response differs per Origin so it cannot serve Origin-A's response
@@ -99,10 +99,10 @@ export function startMockServer(port: number): Server {
   });
 
   // ─── JWKS ──────────────────────────────────────────────────────────────────
-  app.get("/.well-known/jwks.json", (_req, res) => {
+  app.get("/.well-known/jwks.json", (_req: express.Request, res: express.Response) => {
     res.json({ keys: [JWK] });
   });
-  app.get("/oauth/v2/keys", (_req, res) => {
+  app.get("/oauth/v2/keys", (_req: express.Request, res: express.Response) => {
     res.json({ keys: [JWK] });
   });
 
@@ -120,7 +120,7 @@ export function startMockServer(port: number): Server {
       next();
     });
   };
-  app.post("/sessions/exchange", jsonBodyParser, async (req, res) => {
+  app.post("/sessions/exchange", jsonBodyParser, async (req: express.Request, res: express.Response) => {
     // Idempotency-Key short-circuit: if the caller already exchanged with
     // this key inside the cache window, replay the cached body+cookies
     // without consuming a fresh handoff. Pairs with single-use enforcement
@@ -199,7 +199,7 @@ export function startMockServer(port: number): Server {
   // ─── OIDC-style end-session ──────────────────────────────────────────────
   // What `<zitadel-logout>` calls via the generated `endSession()` client.
   // Clears cookies and returns 204 No Content, matching the OpenAPI contract.
-  app.get("/auth/end-session", (_req, res) => {
+  app.get("/auth/end-session", (_req: express.Request, res: express.Response) => {
     res.setHeader("Set-Cookie", [
       `__nextgen_session=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
       `__nextgen_display=; Path=/; SameSite=Lax; Max-Age=0`,
