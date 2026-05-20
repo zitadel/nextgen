@@ -277,9 +277,16 @@ type flowDispatchResult struct {
 	StepError *string
 }
 
-// dispatchChallenges runs identifier-then-password passes — the
-// auth-attempt domain requires the user to be identified before a
-// password can be verified. Steps with on_success=create_user skip
+// challengeDispatchOrder pins the order in which field-shaped
+// challenges are submitted. Identifier precedes Password because the
+// auth-attempt domain requires the user to be identified first.
+var challengeDispatchOrder = []FlowFieldChallenge{
+	FlowFieldChallengeIdentifier,
+	FlowFieldChallengePassword,
+}
+
+// dispatchChallenges submits each field-shaped challenge in
+// [challengeDispatchOrder]. Steps with on_success=create_user skip
 // dispatch entirely: create_user owns identifier uniqueness and
 // password setting.
 func (r *FlowStateMachineRuntime) dispatchChallenges(ctx context.Context, state *FlowState, step *FlowDefinitionStep, resolved FlowResolvedFields, fields map[string]any) (flowDispatchResult, error) {
@@ -287,60 +294,57 @@ func (r *FlowStateMachineRuntime) dispatchChallenges(ctx context.Context, state 
 		return flowDispatchResult{}, nil
 	}
 
-	for name, field := range resolved.Fields {
-		if field.Challenge != FlowFieldChallengeIdentifier {
-			continue
-		}
-		value, ok := stringField(fields, name)
+	for _, challenge := range challengeDispatchOrder {
+		value, ok := fieldValueByChallenge(resolved, fields, challenge)
 		if !ok {
 			continue
 		}
-		userID, err := r.authAttempts.SubmitIdentifier(ctx, FlowSubmitIdentifierInput{
-			ProjectID: state.ProjectID,
-			AttemptID: state.AuthAttemptID,
-			Value:     value,
-		})
-		if errors.Is(err, ErrAuthAttemptProofRejected()) {
-			return flowDispatchResult{Outcome: FlowImplicitOutcomeUserNotFound}, nil
-		}
-		if err != nil {
-			return flowDispatchResult{}, fmt.Errorf("flow state machine: submit identifier: %w", err)
-		}
-		recordResolvedUser(state, userID)
-	}
-
-	for name, field := range resolved.Fields {
-		if field.Challenge != FlowFieldChallengePassword {
-			continue
-		}
-		value, ok := stringField(fields, name)
-		if !ok {
-			continue
-		}
-		err := r.authAttempts.SubmitPassword(ctx, FlowSubmitPasswordInput{
-			ProjectID: state.ProjectID,
-			AttemptID: state.AuthAttemptID,
-			Plain:     value,
-		})
-		if errors.Is(err, ErrAuthAttemptProofRejected()) {
-			msg := "auth_attempt.password_invalid"
-			return flowDispatchResult{StepError: &msg}, nil
-		}
-		if err != nil {
-			return flowDispatchResult{}, fmt.Errorf("flow state machine: submit password: %w", err)
+		switch challenge {
+		case FlowFieldChallengeIdentifier:
+			userID, err := r.authAttempts.SubmitIdentifier(ctx, FlowSubmitIdentifierInput{
+				ProjectID: state.ProjectID,
+				AttemptID: state.AuthAttemptID,
+				Value:     value,
+			})
+			if errors.Is(err, ErrAuthAttemptProofRejected()) {
+				return flowDispatchResult{Outcome: FlowImplicitOutcomeUserNotFound}, nil
+			}
+			if err != nil {
+				return flowDispatchResult{}, fmt.Errorf("flow state machine: submit identifier: %w", err)
+			}
+			recordResolvedUser(state, userID)
+		case FlowFieldChallengePassword:
+			err := r.authAttempts.SubmitPassword(ctx, FlowSubmitPasswordInput{
+				ProjectID: state.ProjectID,
+				AttemptID: state.AuthAttemptID,
+				Plain:     value,
+			})
+			if errors.Is(err, ErrAuthAttemptProofRejected()) {
+				msg := "auth_attempt.password_invalid"
+				return flowDispatchResult{StepError: &msg}, nil
+			}
+			if err != nil {
+				return flowDispatchResult{}, fmt.Errorf("flow state machine: submit password: %w", err)
+			}
 		}
 	}
 
 	return flowDispatchResult{}, nil
 }
 
-func stringField(fields map[string]any, name string) (string, bool) {
-	raw, ok := fields[name]
-	if !ok {
-		return "", false
+func fieldValueByChallenge(resolved FlowResolvedFields, fields map[string]any, target FlowFieldChallenge) (string, bool) {
+	for name, field := range resolved.Fields {
+		if field.Challenge != target {
+			continue
+		}
+		raw, ok := fields[name]
+		if !ok {
+			continue
+		}
+		s, _ := raw.(string)
+		return s, true
 	}
-	s, _ := raw.(string)
-	return s, true
+	return "", false
 }
 
 // runOnSuccess dispatches the step's on_success mutation. Add a case
