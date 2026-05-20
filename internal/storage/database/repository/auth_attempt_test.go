@@ -530,50 +530,6 @@ func TestAuthAttempt_ChallengeSucceeded(t *testing.T) {
 	})
 }
 
-func TestAuthAttempt_Complete(t *testing.T) {
-	repo := repository.NewAuthAttemptRepository(pool)
-
-	t.Run("non existing attempt", func(t *testing.T) {
-		tx, rollback := transactionForRollback(t)
-		defer rollback()
-
-		attempt := &domain.AuthAttempt{
-			ProjectID: "p",
-			ID:        "999999",
-		}
-
-		err := repo.Complete(t.Context(), tx, attempt)
-		assert.ErrorIs(t, err, new(database.NoRowFoundError))
-		assert.Nil(t, attempt.CompletedAt)
-	})
-
-	t.Run("sets completed_at on the attempt", func(t *testing.T) {
-		tx, rollback := transactionForRollback(t)
-		defer rollback()
-
-		attempt, _ := newTestAttemptWithFactor(t, repo, tx, "p")
-		assert.Nil(t, attempt.CompletedAt, "CompletedAt must be nil before Complete is called")
-
-		require.NoError(t, repo.Complete(t.Context(), tx, attempt))
-		require.NotNil(t, attempt.CompletedAt) // gates .IsZero() call below
-		assert.False(t, attempt.CompletedAt.IsZero())
-	})
-
-	t.Run("calling Complete twice updates completed_at", func(t *testing.T) {
-		tx, rollback := transactionForRollback(t)
-		defer rollback()
-
-		attempt, _ := newTestAttemptWithFactor(t, repo, tx, "p")
-		require.NoError(t, repo.Complete(t.Context(), tx, attempt))
-		first := *attempt.CompletedAt
-
-		require.NoError(t, repo.Complete(t.Context(), tx, attempt))
-		require.NotNil(t, attempt.CompletedAt) // gates .Before() call below
-		assert.False(t, attempt.CompletedAt.Before(first),
-			"second CompletedAt must not be before the first")
-	})
-}
-
 func TestAuthAttempt_Handoff(t *testing.T) {
 	repo := repository.NewAuthAttemptRepository(pool)
 
@@ -582,12 +538,11 @@ func TestAuthAttempt_Handoff(t *testing.T) {
 		defer rollback()
 
 		token := []byte("handoff-token")
-		idempotencyKey := "idempotency-key"
-		attempt := &domain.AuthAttempt{ProjectID: "p", HandoffToken: &domain.HandoffToken{EncryptedToken: token}}
+		attempt := &domain.AuthAttempt{ProjectID: "p", HandoffToken: &domain.HandoffToken{TokenHash: token}}
 		ensureProject(t, tx, attempt.ProjectID)
 		require.NoError(t, repo.Create(t.Context(), tx, attempt))
 
-		require.NoError(t, repo.Handoff(t.Context(), tx, attempt, idempotencyKey))
+		require.NoError(t, repo.Handoff(t.Context(), tx, attempt))
 		require.NotNil(t, attempt.HandedOffAt)
 		assert.False(t, attempt.HandedOffAt.IsZero())
 
@@ -595,7 +550,7 @@ func TestAuthAttempt_Handoff(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, attempt.ID, stored.ID)
 		require.NotNil(t, stored.HandoffToken)
-		assert.Equal(t, token, stored.HandoffToken.EncryptedToken)
+		assert.Equal(t, token, stored.HandoffToken.TokenHash)
 		require.NotNil(t, stored.HandedOffAt)
 		assert.False(t, stored.HandedOffAt.IsZero())
 	})
@@ -608,7 +563,7 @@ func TestAuthAttempt_Handoff(t *testing.T) {
 		ensureProject(t, tx, attempt.ProjectID)
 		require.NoError(t, repo.Create(t.Context(), tx, attempt))
 
-		err := repo.Handoff(t.Context(), tx, attempt, "")
+		err := repo.Handoff(t.Context(), tx, attempt)
 		require.Error(t, err)
 	})
 }
