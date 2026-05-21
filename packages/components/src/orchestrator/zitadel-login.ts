@@ -4,8 +4,9 @@ import type {
   CreateFlow201Step,
   CreateFlowBodyPurpose,
   SubmitFlowStepBody,
+  SubmitFlowStepBodyChallengeResponse,
 } from "@zitadel-nextgen/api/generated/model";
-import { css, html, LitElement } from "lit";
+import { css, html, LitElement, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import type { Liquid, Template } from "liquidjs";
@@ -172,6 +173,13 @@ export class ZitadelLogin extends LitElement {
       // browser's autofill / save-password handshake. Intercept it so we can
       // hand off to our flow-submit cycle without the page reloading.
       root.addEventListener("submit", this.handleFormSubmit as EventListener);
+      // <zl-passkey> emits `zl-passkey-result` after a successful WebAuthn
+      // ceremony. Auto-submit the proof so the user doesn't have to click
+      // "Continue" — the ceremony IS the submission (ADR 013).
+      root.addEventListener("zl-passkey-result", this.handlePasskeyResult as EventListener);
+      // <zl-passkey> emits `zl-passkey-error` when the ceremony fails or is
+      // cancelled. Surface the error on the current step.
+      root.addEventListener("zl-passkey-error", this.handlePasskeyError as EventListener);
     }
     return root;
   }
@@ -187,28 +195,34 @@ export class ZitadelLogin extends LitElement {
    * fired.
    */
   protected override firstUpdated(): void {
-    void this.startFlow();
+    // Defer so `startFlow()` can set `loading` without scheduling a second
+    // update before Lit finishes this commit (change-in-update warning).
+    queueMicrotask(() => void this.startFlow());
   }
 
-  override willUpdate(): void {
+  override willUpdate(changed: PropertyValues<this>): void {
     if (!this.engine) {
       this.engine = createLiquidEngine({ locale: this.locale });
     }
-  }
-
-  override updated(changed: Map<string, unknown>): void {
     const root = this.shadowRoot;
-    if (!root) return;
-    applyBaseTokens(root);
-    applyBrandingTokens(root, this.branding, this.themeController.theme);
-    applyFontUrl(root, this.branding?.font_url ?? null);
+    if (root) {
+      applyBaseTokens(root);
+      applyBrandingTokens(root, this.branding, this.themeController.theme);
+      applyFontUrl(root, this.branding?.font_url ?? null);
+    }
     this.dataset.theme = this.themeController.theme;
     this.toggleAttribute("data-theme-dark", this.themeController.theme === "dark");
     this.setAttribute("aria-busy", this.loading ? "true" : "false");
-    this.applyValuesToFields();
-    if (changed.has("response")) {
+  }
+
+  override updated(changed: PropertyValues<this>): void {
+    const props = changed as Map<string, unknown>;
+    if (!props.has("response")) return;
+    // Step markup exists only after this commit; defer field hydration/focus.
+    requestAnimationFrame(() => {
+      this.applyValuesToFields();
       this.moveFocusToFirstField();
-    }
+    });
   }
 
   override render() {
@@ -446,8 +460,10 @@ export class ZitadelLogin extends LitElement {
     if (fields.length === 0) return;
     for (const field of fields) {
       const name = field.getAttribute("name");
-      if (name && name in this.formValues) {
-        field.value = this.formValues[name];
+      if (!name || !(name in this.formValues)) continue;
+      const next = this.formValues[name];
+      if (field.value !== next) {
+        field.value = next;
       }
     }
   }
@@ -496,6 +512,51 @@ export class ZitadelLogin extends LitElement {
     void this.submit(action);
   };
 
+  /**
+   * Handle a successful WebAuthn ceremony. Auto-submit with the proof
+   * as `challenge_response` so the flow advances without extra user
+   * interaction — the ceremony IS the factor verification (ADR 013).
+   */
+  private handlePasskeyResult = (
+    event: CustomEvent<{ challenge_id: string; method: string; proof: Record<string, unknown> }>,
+  ): void => {
+    if (this.loading) return;
+    const { challenge_id, method, proof } = event.detail;
+    void this.submit("submit", {
+      challenge_id,
+      method,
+      proof,
+    });
+  };
+
+  /**
+   * Handle a WebAuthn ceremony error. Re-render the current step with
+   * an error message so the user sees feedback and can retry or skip.
+   *
+   * Guard: if the step already carries the same error key, skip the update.
+   * Mutating `this.response` triggers `unsafeHTML` to replace the DOM tree,
+   * which reconnects a fresh `<zl-passkey>` that immediately re-starts the
+   * ceremony — creating an infinite loop. The guard breaks the cycle.
+   *
+   * We also strip the `challenge` from the step so the template does not
+   * render a new `<zl-passkey>` on re-render. Without this, the first
+   * cancel would trigger a second ceremony (the guard prevents a third).
+   */
+  private handlePasskeyError = (
+    event: CustomEvent<{ challenge_id: string; error: string; aborted: boolean }>,
+  ): void => {
+    if (!this.response) return;
+    const { error: message, aborted } = event.detail;
+    const errorKey = aborted ? "error.passkey_cancelled" : "error.passkey_failed";
+    if (this.response.step.error === errorKey) return;
+    const { challenge: _dropped, ...stepWithoutChallenge } = this.response.step;
+    this.response = {
+      ...this.response,
+      step: { ...stepWithoutChallenge, error: errorKey },
+    };
+    console.warn(`[zitadel-login] passkey ceremony ${aborted ? "cancelled" : "failed"}: ${message}`);
+  };
+
   private findPrimaryAction(): string | null {
     const root = this.shadowRoot;
     if (!root) return null;
@@ -514,15 +575,30 @@ export class ZitadelLogin extends LitElement {
     });
   }
 
-  private async submit(action: string | null): Promise<void> {
+  private async submit(
+    action: string | null,
+    challengeResponse?: SubmitFlowStepBodyChallengeResponse,
+  ): Promise<void> {
     if (!this.response || this.loading) return;
     const { id, session_token } = this.response;
     this.loading = true;
     try {
+      // Only send field values that the current step defines. `formValues`
+      // carries state across steps (e.g. email for the signed-in greeting)
+      // but steps without fields should not leak prior values onto the wire.
+      const stepFieldKeys = Object.keys(this.response.step.fields ?? {});
+      const fields: Record<string, string> = {};
+      for (const key of stepFieldKeys) {
+        const value = this.formValues[key];
+        if (value !== undefined) {
+          fields[key] = value;
+        }
+      }
       const body: SubmitFlowStepBody = {
         session_token,
         action: action ?? "submit",
-        fields: { ...this.formValues },
+        fields,
+        ...(challengeResponse ? { challenge_response: challengeResponse } : {}),
       };
       const wire = await apiSubmitStep(id, body);
       this.applyResponse(wire);
