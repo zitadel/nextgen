@@ -14,10 +14,13 @@ describe("DOMPurify sanitiser", () => {
     expect(out).toContain("required");
   });
 
-  it("preserves <zl-submit> with action and label", () => {
-    const out = sanitise(`<zl-submit action="submit" label="Continue"></zl-submit>`);
-    expect(out).toContain("<zl-submit");
+  it("preserves <zl-button> with hierarchy, action, and label", () => {
+    const out = sanitise(
+      `<zl-button hierarchy="primary" size="medium" type="submit" action="submit" label="Continue"></zl-button>`,
+    );
+    expect(out).toContain("<zl-button");
     expect(out).toContain('action="submit"');
+    expect(out).toContain('hierarchy="primary"');
   });
 
   it("strips <script> tags", () => {
@@ -46,6 +49,15 @@ describe("DOMPurify sanitiser", () => {
     expect(out).not.toContain("<input");
     expect(out).not.toContain("<button");
     expect(out).not.toContain("<form");
+  });
+
+  it("preserves card nav links (data-action anchors, not zl-button)", () => {
+    const out = sanitise(
+      `<p class="zl-card-nav">Don't have an account? <a href="#" class="zl-card-nav__link" data-action="register">Sign up</a></p>`,
+    );
+    expect(out).toContain('class="zl-card-nav__link"');
+    expect(out).toContain('data-action="register"');
+    expect(out).not.toContain("<zl-button");
   });
 
   it("preserves data-* and aria-* attributes", () => {

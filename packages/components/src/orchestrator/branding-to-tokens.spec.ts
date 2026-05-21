@@ -16,26 +16,26 @@ describe("buildBrandingStylesheet", () => {
       },
     });
     expect(css).toContain(":host {");
-    expect(css).toContain("--zl-color-primary: #FF6600;");
-    expect(css).toContain("--zl-color-on-primary: #000000;");
-    expect(css).toContain("--zl-color-background: #FAFAFA;");
+    expect(css).toContain("--zl-color-surface-default-white: #FF6600;");
+    expect(css).toContain("--zl-color-text-button-default: #000000;");
+    expect(css).toContain("--zl-color-surface-default-black: #FAFAFA;");
   });
 
   it("maps shape.radius into --zl-radius-* declarations", () => {
     const css = buildBrandingStylesheet({ shape: { radius: "lg" } });
-    expect(css).toContain("--zl-radius-md: 0.75rem;");
-    expect(css).toContain("--zl-radius-sm:");
-    expect(css).toContain("--zl-radius-lg:");
+    expect(css).toContain("--zl-radius-s: 0.75rem;");
+    expect(css).toContain("--zl-radius-m:");
+    expect(css).toContain("--zl-radius-l:");
   });
 
-  it("maps shape.density to spacing/control overrides", () => {
+  it("maps shape.density to spacing overrides", () => {
     const css = buildBrandingStylesheet({ shape: { density: "compact" } });
-    expect(css).toContain("--zl-control-height-md: 2.25rem;");
+    expect(css).toContain("--zl-spacing-03: 0.75rem;");
   });
 
-  it("clamps typography.scale into [0.75, 1.25]", () => {
+  it("clamps typography.scale into [0.75, 1.25] and emits a scale knob", () => {
     const css = buildBrandingStylesheet({ typography: { scale: 5 } });
-    expect(css).toContain("--zl-font-size-md: 1.25rem;");
+    expect(css).toContain("--zl-font-scale: 1.25;");
   });
 
   it('emits a separate :host([data-theme="dark"]) block when dark palette is present', () => {
@@ -45,8 +45,8 @@ describe("buildBrandingStylesheet", () => {
     });
     expect(css).toContain(":host {");
     expect(css).toContain(':host([data-theme="dark"]) {');
-    expect(css).toContain("--zl-color-background: #FFFFFF;");
-    expect(css).toContain("--zl-color-background: #0A0A0A;");
+    expect(css).toContain("--zl-color-surface-default-black: #FFFFFF;");
+    expect(css).toContain("--zl-color-surface-default-black: #0A0A0A;");
   });
 
   it("merges dark overrides into :host when resolvedTheme is dark", () => {
@@ -58,18 +58,30 @@ describe("buildBrandingStylesheet", () => {
       { resolvedTheme: "dark" },
     );
     expect(css).not.toContain(':host([data-theme="dark"])');
-    expect(css).toContain("--zl-color-background: #0A0A0A;");
+    expect(css).toContain("--zl-color-surface-default-black: #0A0A0A;");
   });
 
   it("ignores empty-string palette values", () => {
     const css = buildBrandingStylesheet({ palette: { primary: "" } });
-    expect(css).not.toContain("--zl-color-primary");
+    expect(css).not.toContain("--zl-color-surface-default-white");
   });
 
-  it("maps font_family declarations", () => {
+  it("maps font_family declarations to both sans and heading slots", () => {
     const css = buildBrandingStylesheet({
       typography: { font_family: "'Arimo', sans-serif" },
     });
-    expect(css).toContain("--zl-font-family: 'Arimo', sans-serif;");
+    expect(css).toContain("--zl-font-family-sans: 'Arimo', sans-serif;");
+    expect(css).toContain("--zl-font-family-heading: 'Arimo', sans-serif;");
+  });
+
+  it("fans semantic colours out to icon and border slots where applicable", () => {
+    const css = buildBrandingStylesheet({
+      palette: { error: "#FF0044", success: "#00CC88" },
+    });
+    expect(css).toContain("--zl-color-text-error: #FF0044;");
+    expect(css).toContain("--zl-color-border-error: #FF0044;");
+    expect(css).toContain("--zl-color-icon-error: #FF0044;");
+    expect(css).toContain("--zl-color-text-success: #00CC88;");
+    expect(css).toContain("--zl-color-icon-success: #00CC88;");
   });
 });

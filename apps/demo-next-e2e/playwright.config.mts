@@ -39,7 +39,7 @@ export default defineConfig({
       stderr: "pipe",
     },
     {
-      command: "pnpm --filter @nextgen/demo-next dev",
+      command: "pnpm --filter @zitadel-nextgen/demo-next dev",
       url: "http://localhost:3002/login",
       reuseExistingServer: true,
       cwd: workspaceRoot,
