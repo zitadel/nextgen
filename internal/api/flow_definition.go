@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/url"
 
@@ -114,14 +115,35 @@ func mapDomainPurposesToAPI(domainPurposes map[domain.FlowDefinitionPurpose]stri
 func mapDomainStepsToAPI(domainSteps []domain.FlowDefinitionStep) []api.FlowDefinitionStep {
 	steps := make([]api.FlowDefinitionStep, len(domainSteps))
 	for _, step := range domainSteps {
-		ssoProviders := make([]api.SSOProvider, len(step.SSOProviders))
+		// actions
+		actions := make(map[string]api.StepAction, len(step.Actions))
+		for name, action := range step.Actions {
+			actions[name] = api.StepAction{
+				Primary: api.NewOptBool(action.Primary),
+				TextKey: api.NewOptString(action.TextKey),
+			}
+		}
+		// gates
 		gates := make(map[string]api.Gate, len(step.Gates))
 		for name, gate := range step.Gates {
+			gateConfig := make(api.GateConfig, len(gate.Config))
+			for k, v := range gate.Config {
+				val, err := json.Marshal(v) // todo: review
+				if err == nil {
+					gateConfig[k] = val
+				}
+			}
 			gates[name] = api.Gate{
 				Kind:     api.GateKind(gate.Kind.String()),
 				Provider: gate.Provider,
+				Config: api.OptGateConfig{
+					Value: gateConfig,
+					Set:   true,
+				},
 			}
 		}
+		// sso providers
+		ssoProviders := make([]api.SSOProvider, len(step.SSOProviders))
 		for i, ssoProvider := range step.SSOProviders {
 			ssoProviders[i] = api.SSOProvider{
 				ID:       ssoProvider.ID,
@@ -129,21 +151,40 @@ func mapDomainStepsToAPI(domainSteps []domain.FlowDefinitionStep) []api.FlowDefi
 				Template: ssoProvider.Template,
 			}
 		}
+		// transitions
+		transitions := make(map[string]api.FlowDefinitionStepTransitionsItem, len(step.Transitions))
+		for n, transition := range step.Transitions {
+			transitions[n] = api.FlowDefinitionStepTransitionsItem{
+				Target: transition.Target,
+				Action: api.OptNilFlowDefinitionStepTransitionsItemAction{
+					Value: api.FlowDefinitionStepTransitionsItemAction(transition.Action.String()),
+					Set:   transition.Action != nil, // todo: review
+					Null:  transition.Action == nil,
+				},
+			}
+		}
+
 		apiStep := api.FlowDefinitionStep{
 			Name:   step.Name,
 			Fields: step.Fields,
 			Actions: api.OptFlowDefinitionStepActions{
-				Value: api.FlowDefinitionStepActions{},
+				Value: actions,
 				Set:   true,
 			},
 			Gates: api.OptFlowDefinitionStepGates{
-				Value: api.FlowDefinitionStepGates{},
+				Value: gates,
 				Set:   true,
 			},
 			SSOProviders: ssoProviders,
-			OnSuccess:    api.OptFlowDefinitionStepOnSuccess{},
-			Complete:     api.OptFlowDefinitionStepComplete{},
-			Transitions:  api.OptFlowDefinitionStepTransitions{},
+			Transitions: api.OptFlowDefinitionStepTransitions{
+				Value: transitions,
+				Set:   true,
+			},
+			Complete: api.OptFlowDefinitionStepComplete{
+				Value: api.FlowDefinitionStepComplete(step.Complete.String()),
+				Set:   step.Complete != nil,
+			},
+			//OnSuccess: // todo: review
 		}
 		steps = append(steps, apiStep)
 	}
