@@ -576,8 +576,9 @@ export class ZitadelLogin extends LitElement {
       const stepFieldKeys = Object.keys(this.response.step.fields ?? {});
       const fields: Record<string, string> = {};
       for (const key of stepFieldKeys) {
-        if (key in this.formValues) {
-          fields[key] = this.formValues[key];
+        const value = this.formValues[key];
+        if (value !== undefined) {
+          fields[key] = value;
         }
       }
       const body: SubmitFlowStepBody = {
