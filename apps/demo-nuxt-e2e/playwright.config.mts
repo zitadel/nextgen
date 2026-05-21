@@ -10,7 +10,7 @@ import { defineConfig, devices } from "@playwright/test";
  *                    → /admin (server-rendered, authenticated)
  *
  * The Vue / Nitro story is structurally similar to demo-next-e2e but the
- * proxy and route-protection layers come from `@nextgen/sdk-nuxt`'s Nitro
+ * proxy and route-protection layers come from `@zitadel-nextgen/sdk-nuxt`'s Nitro
  * middleware rather than `@zitadel-nextgen/sdk-next`'s edge middleware.
  * Running the same scenario on both demos is the only way to catch a
  * regression in one SDK without the other.
@@ -47,7 +47,7 @@ export default defineConfig({
       },
     },
     {
-      command: "pnpm --filter @nextgen/demo-nuxt dev",
+      command: "pnpm --filter @zitadel-nextgen/demo-nuxt dev",
       url: "http://localhost:3001/login",
       reuseExistingServer: true,
       cwd: workspaceRoot,

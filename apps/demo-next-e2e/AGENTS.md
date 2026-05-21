@@ -35,7 +35,7 @@ this project.
 
 ```sh
 corepack pnpm exec playwright install        # one-time, browsers
-corepack pnpm exec nx run @nextgen/demo-next-e2e:e2e
+corepack pnpm exec nx run @zitadel-nextgen/demo-next-e2e:e2e
 ```
 
 Nx rebuilds `@zitadel-nextgen/components` first via `^build`, then

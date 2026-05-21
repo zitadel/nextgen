@@ -398,7 +398,7 @@ importers:
 
   apps/demo-nuxt:
     dependencies:
-      '@nextgen/sdk-nuxt':
+      '@zitadel-nextgen/sdk-nuxt':
         specifier: workspace:*
         version: link:../../packages/sdk-nuxt
       '@zitadel-nextgen/components':
@@ -423,7 +423,7 @@ importers:
 
   apps/demo-nuxt-e2e:
     devDependencies:
-      '@nextgen/sdk-nuxt':
+      '@zitadel-nextgen/sdk-nuxt':
         specifier: workspace:*
         version: link:../../packages/sdk-nuxt
       '@playwright/test':
