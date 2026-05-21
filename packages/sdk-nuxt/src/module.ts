@@ -10,7 +10,7 @@ import type { NextgenMiddlewareOptions } from './runtime/types';
 
 export default defineNuxtModule<NextgenMiddlewareOptions>({
   meta: {
-    name: '@nextgen/sdk-nuxt',
+    name: '@zitadel-nextgen/sdk-nuxt',
     configKey: 'nextgen',
   },
   defaults: {

@@ -1,5 +1,5 @@
 {
-  "name": "@nextgen/demo-next-e2e",
+  "name": "@zitadel-nextgen/demo-next-e2e",
   "version": "0.0.1",
   "private": true,
   "devDependencies": {
