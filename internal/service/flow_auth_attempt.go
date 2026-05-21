@@ -105,3 +105,29 @@ func challengeIDFor(attempt *domain.AuthAttempt, typ domain.AuthCheckType) strin
 	}
 	return ""
 }
+
+// ----
+// Dummy implementation while auth_attempt svc is not ready
+// ----
+
+type DummyFlowAuthAttemptAdapter struct {
+	svc AuthAttemptService
+}
+
+func NewDummyFlowAuthAttemptAdapter(_ AuthAttemptService) *DummyFlowAuthAttemptAdapter {
+	return &DummyFlowAuthAttemptAdapter{}
+}
+
+var _ domain.FlowAuthAttemptService = (*DummyFlowAuthAttemptAdapter)(nil)
+
+func (a *DummyFlowAuthAttemptAdapter) Start(ctx context.Context, in domain.FlowCreateAttemptInput) (string, error) {
+	return "attempt.ID", nil
+}
+
+func (a *DummyFlowAuthAttemptAdapter) SubmitIdentifier(ctx context.Context, in domain.FlowSubmitIdentifierInput) (string, error) {
+	return "userCheck.Factor.UserID", nil
+}
+
+func (a *DummyFlowAuthAttemptAdapter) SubmitPassword(ctx context.Context, in domain.FlowSubmitPasswordInput) error {
+	return nil
+}

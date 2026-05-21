@@ -59,6 +59,15 @@ func NewCommand() *cobra.Command {
 	return cmd
 }
 
+// mustBindEnv panics on viper's documented "this can't fail in
+// normal use" BindEnv error path. Keeps the env wiring readable
+// without sprinkling error handling at every binding.
+func mustBindEnv(v *viper.Viper, key string) {
+	if err := v.BindEnv(key); err != nil {
+		panic(fmt.Errorf("bind env %q: %w", key, err))
+	}
+}
+
 // buildCookieSealer decodes a hex-encoded sealer key and constructs
 // the [cookie.Sealer]. The key must be exactly [cookie.KeySize] bytes
 // after decoding; anything else is a configuration error.
@@ -145,7 +154,11 @@ func run(ctx context.Context, cfg Config, pool database.Pool) error {
 	// invoke `create_user` (registration) will fail with ErrIntegrity.
 	// Login does not need it.
 	var createUser *domain.FlowCreateUserHandler
-	flowAuth := service.NewFlowAuthAttemptAdapter(authAttemptSvc)
+
+	//flowAuth := service.NewFlowAuthAttemptAdapter(authAttemptSvc)
+	// TODO: replace back to the real adapter
+	flowAuth := service.NewDummyFlowAuthAttemptAdapter(authAttemptSvc)
+
 	stateMachine := domain.NewFlowStateMachine(fields, createUser, flowAuth, time.Now)
 
 	flowService := service.NewFlowService(pool, flowRepo, stateMachine, ids)
@@ -201,6 +214,11 @@ func loadConfig(configPath string) (Config, error) {
 	v.AutomaticEnv()
 
 	v.SetDefault("server.address", ":8080")
+
+	// AutomaticEnv only resolves nested keys viper already knows about
+	// (via default, config file, or explicit BindEnv). Anything without
+	// a default needs to be bound by hand.
+	mustBindEnv(v, "server.cookie_sealer_key")
 
 	if configPath != "" {
 		v.SetConfigFile(configPath)
