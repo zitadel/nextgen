@@ -40,7 +40,7 @@ the three orval response aliases (`CreateFlow201`, `GetFlowStep200`,
 ## Adding a new flow step
 
 State names in the xstate machine **are** the canonical wire step names
-(`identifier`, `register`, `password`, `passkey-upsell`, `passkey-setup`, `sso-redirect`, `done`) — no
+(`identifier`, `register`, `recover`, `password`, `passkey-login`, `passkey-upsell`, `passkey-setup`, `sso-redirect`, `done`) — no
 mapping function. To add a step:
 
 1. Add a state to the machine in `src/flow-machine.ts` named exactly as
