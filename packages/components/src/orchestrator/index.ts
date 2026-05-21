@@ -26,11 +26,14 @@ export {
 export { createSanitiser } from "./sanitiser.js";
 export { defaultTemplate, layoutChromeCss } from "./templates/default.liquid.js";
 export { authFormTemplate } from "./templates/auth-form.liquid.js";
+export { passkeyUpsellTemplate } from "./templates/passkey-upsell.liquid.js";
+export { signedInTemplate } from "./templates/signed-in.liquid.js";
 export { startFlow, submitStep, getCurrentStep } from "./api-client.js";
 export { validateBranding, type BrandingValidationResult } from "./branding-validator.js";
 export type {
   Branding,
   BrandingAssets,
+  BrandingAttribution,
   BrandingPalette,
   BrandingShape,
   BrandingTheme,

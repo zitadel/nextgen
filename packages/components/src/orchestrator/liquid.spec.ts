@@ -1,11 +1,19 @@
 import { describe, expect, it } from "vitest";
 
 import { createLiquidEngine, TEMPLATE_NAMES } from "./liquid.js";
+import { en as fullLocale } from "./locales/en.js";
 import { mandatoryGatesMarkerComment } from "./mandatory-gates.js";
 
 const locale: Record<string, string> = {
   "identifier.title": "Sign in",
-  "password.title": "Welcome back, {0}",
+  "identifier.field.email": "Work email",
+  "identifier.field.email.placeholder": "you@company.com",
+  "password.title": "Sign in",
+  "passkey-upsell.title": "Sign in faster next time",
+  "passkey-upsell.description.line1": "No password needed ever again.",
+  "passkey-upsell.description.line2": "Sign in with Face ID, Touch ID, or PIN.",
+  "passkey-upsell.action.setup": "Set up passkey",
+  "complete.title": "You're signed in as",
   "submit.continue": "Continue",
 };
 
@@ -30,10 +38,19 @@ describe("LiquidJS engine", () => {
     expect(result).toBe("unknown.key");
   });
 
-  it("the | t filter interpolates positional args", () => {
+  it("fieldPlaceholder resolves sibling keys", () => {
     const engine = createLiquidEngine({ locale });
-    const result = engine.parseAndRenderSync(`{{ "password.title" | t: "Alice" }}`, {});
-    expect(result).toBe("Welcome back, Alice");
+    const result = engine.parseAndRenderSync(
+      `{{ "identifier.field.email" | fieldPlaceholder }}`,
+      {},
+    );
+    expect(result).toBe("you@company.com");
+  });
+
+  it("fieldPlaceholder returns empty when undefined", () => {
+    const engine = createLiquidEngine({ locale });
+    const result = engine.parseAndRenderSync(`{{ "password.title" | fieldPlaceholder }}`, {});
+    expect(result).toBe("");
   });
 
   it("the | raw filter is overridden to escape", () => {
@@ -51,7 +68,7 @@ describe("LiquidJS engine", () => {
     expect(result).toBe(mandatoryGatesMarkerComment);
   });
 
-  it("renders the bundled default template", () => {
+  it("renders the bundled default template through the auth-form partial", () => {
     const engine = createLiquidEngine({ locale });
     const context = {
       step: { name: "identifier", type: "identifier", texts: { title_key: "identifier.title" } },
@@ -59,7 +76,7 @@ describe("LiquidJS engine", () => {
         identifier: { type: "email", text_key: "identifier.title", required: true },
       },
       actions: { submit: { text_key: "submit.continue", primary: true } },
-      branding: { layout: "centered" },
+      branding: {},
       loading: false,
       errors: [],
       gates: {},
@@ -68,19 +85,21 @@ describe("LiquidJS engine", () => {
       identity: null,
     };
     const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
-    expect(result).toContain("zl-layout--centered");
+    expect(result).toContain("<zl-page-shell");
+    expect(result).toContain("<zl-card");
     expect(result).toContain("<zl-field");
-    expect(result).toContain("<zl-submit");
+    expect(result).toContain('<zl-button');
+    expect(result).toContain('hierarchy="primary"');
     expect(result).toContain(mandatoryGatesMarkerComment);
   });
 
-  it("forwards identity.display_name to step.texts.title_key", () => {
+  it("renders step title from locale via default template", () => {
     const engine = createLiquidEngine({ locale });
     const context = {
-      step: { name: "password", type: "credential", texts: { title_key: "password.title" } },
+      step: { name: "password", texts: { title_key: "password.title" } },
       fields: {},
       actions: { submit: { text_key: "submit.continue", primary: true } },
-      branding: { layout: "centered" },
+      branding: {},
       loading: false,
       errors: [],
       gates: {},
@@ -89,17 +108,19 @@ describe("LiquidJS engine", () => {
       identity: { display_name: "Alice" },
     };
     const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
-    expect(result).toContain("Welcome back, Alice");
-    expect(result).not.toContain("{0}");
+    expect(result).toContain("Sign in");
   });
 
-  it("renders the split layout when branding.layout is split", () => {
-    const engine = createLiquidEngine({ locale });
+  it("renders passkey upsell (6594:630): compact card, copy, trailing icon, skip CTA", () => {
+    const engine = createLiquidEngine({ locale: fullLocale });
     const context = {
-      step: { name: "identifier", type: "identifier", texts: { title_key: "identifier.title" } },
+      step: { name: "passkey-upsell", texts: { title_key: "passkey-upsell.title" } },
       fields: {},
-      actions: { submit: { text_key: "submit.continue", primary: true } },
-      branding: { layout: "split", hero_url: "https://cdn.example.com/hero.jpg" },
+      actions: {
+        setup: { text_key: "passkey-upsell.action.setup", primary: true },
+        skip: { text_key: "passkey-upsell.action.skip" },
+      },
+      branding: {},
       loading: false,
       errors: [],
       gates: {},
@@ -108,7 +129,201 @@ describe("LiquidJS engine", () => {
       identity: null,
     };
     const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
-    expect(result).toContain("zl-layout--split");
-    expect(result).toContain("zl-layout-hero");
+    expect(result).toContain("compact");
+    expect(result).toContain("Sign in faster next time");
+    expect(result).toContain("No password needed ever again.");
+    expect(result).toContain("Sign in with Face ID, Touch ID, or PIN.");
+    expect(result).toContain('slot="trailing"');
+    expect(result).toContain('name="passkey"');
+    expect(result).toContain('action="setup"');
+    expect(result).toContain('action="skip"');
+    expect(result).toContain('hierarchy="secondary"');
+    expect(result).toContain('type="button"');
+    expect(result).toContain('label="Skip for now"');
+    expect(result).not.toContain("<zl-field");
+  });
+
+  it("renders passkey upsell setup error (6594:630): form-level alert, retry allowed", () => {
+    const engine = createLiquidEngine({ locale: fullLocale });
+    const context = {
+      step: { name: "passkey-upsell", texts: { title_key: "passkey-upsell.title" } },
+      fields: {},
+      actions: {
+        setup: { text_key: "passkey-upsell.action.setup", primary: true },
+        skip: { text_key: "passkey-upsell.action.skip" },
+      },
+      branding: {},
+      loading: false,
+      errors: [{ text_key: "error.passkey_cancelled" }],
+      gates: {},
+      sso_providers: [],
+      messages: [],
+      identity: null,
+    };
+    const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
+    expect(result).toContain('<zl-alert severity="error">');
+    expect(result).toContain("Passkey setup was cancelled");
+    expect(result).toContain('action="setup"');
+    expect(result).not.toContain("invalid");
+  });
+
+  it("renders the signed-in partial when the step is the signed-in confirmation", () => {
+    const engine = createLiquidEngine({ locale });
+    const context = {
+      step: { name: "signed-in", texts: { title_key: "complete.title" } },
+      fields: {},
+      actions: {},
+      branding: {},
+      loading: false,
+      errors: [],
+      gates: {},
+      sso_providers: [],
+      messages: [],
+      identity: { display_name: "Alice", email_address: "alice@acme.com" },
+    };
+    const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
+    expect(result).toContain("zl-card-title");
+    expect(result).toContain("alice@acme.com");
+    expect(result).not.toContain("zl-signed-in-hero");
+  });
+
+  it("renders combined sign-in (6593:141983): email+password, forgot link, sign-in CTA", () => {
+    const engine = createLiquidEngine({ locale: fullLocale });
+    const context = {
+      step: { name: "identifier", texts: { title_key: "identifier.title" } },
+      fields: {
+        email: { type: "email", text_key: "identifier.field.email", required: true },
+        password: { type: "password", text_key: "identifier.field.password", required: true },
+      },
+      actions: {
+        submit: { text_key: "submit.signin", primary: true },
+        passkey: { text_key: "identifier.action.passkey" },
+        register: { text_key: "identifier.action.register.link" },
+        recover: { text_key: "action.forgot_password" },
+      },
+      branding: {},
+      loading: false,
+      errors: [],
+      gates: {},
+      sso_providers: [],
+      messages: [],
+      identity: null,
+    };
+    const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
+    expect(result).toContain('autocomplete="email"');
+    expect(result).toContain('autocomplete="current-password"');
+    expect(result).toContain('class="zl-card-forgot"');
+    expect(result).toContain('data-action="recover"');
+    expect(result).not.toContain("forgot-password-href");
+    expect(result).toContain('label="Sign in"');
+    expect(result).not.toContain('label="Continue"');
+  });
+
+  it("renders sign-in wrong credentials (6602:180268): inline password error, no form alert", () => {
+    const engine = createLiquidEngine({ locale: fullLocale });
+    const context = {
+      step: { name: "identifier", texts: { title_key: "identifier.title" } },
+      fields: {
+        email: { type: "email", text_key: "identifier.field.email", required: true },
+        password: { type: "password", text_key: "identifier.field.password", required: true },
+      },
+      actions: {
+        submit: { text_key: "submit.signin", primary: true },
+        recover: { text_key: "action.forgot_password" },
+      },
+      branding: {},
+      loading: false,
+      errors: [{ text_key: "error.invalid_credentials" }],
+      gates: {},
+      sso_providers: [],
+      messages: [],
+      identity: null,
+    };
+    const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
+    expect(result).toContain("Wrong email or password.");
+    expect(result).toContain('name="password"');
+    expect(result).toContain('invalid');
+    expect(result).not.toContain('<zl-alert severity="error">Wrong email');
+    expect(result).not.toContain('<zl-alert severity="error"');
+  });
+
+  it("renders sign-in server error (6594:125237): heading + body alert, fields unchanged", () => {
+    const engine = createLiquidEngine({ locale: fullLocale });
+    const context = {
+      step: { name: "identifier", texts: { title_key: "identifier.title" } },
+      fields: {
+        email: { type: "email", text_key: "identifier.field.email", required: true },
+        password: { type: "password", text_key: "identifier.field.password", required: true },
+      },
+      actions: {
+        submit: { text_key: "submit.signin", primary: true },
+        recover: { text_key: "action.forgot_password" },
+      },
+      branding: {},
+      loading: false,
+      errors: [{ text_key: "error.sign_in_server" }],
+      gates: {},
+      sso_providers: [],
+      messages: [],
+      identity: null,
+    };
+    const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
+    expect(result).toContain('heading="We couldn&#39;t complete your sign in."');
+    expect(result).toContain("Please try again in a few minutes");
+    expect(result).toContain('autocomplete="email"');
+    expect(result).toContain('autocomplete="current-password"');
+    expect(result).not.toContain("Wrong email or password.");
+  });
+
+  it("renders sign-up field annotations (6593:141741): autocomplete, help, inline email error", () => {
+    const engine = createLiquidEngine({ locale: fullLocale });
+    const context = {
+      step: { name: "register", texts: { title_key: "register.title" } },
+      fields: {
+        email: { type: "email", text_key: "register.field.email", required: true },
+        password: { type: "password", text_key: "register.field.password", required: true },
+      },
+      actions: {
+        submit: { text_key: "register.action.submit", primary: true },
+      },
+      branding: {},
+      loading: false,
+      errors: [{ text_key: "error.email_exists" }],
+      gates: {},
+      sso_providers: [],
+      messages: [],
+      identity: null,
+    };
+    const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
+    expect(result).toContain('autocomplete="email"');
+    expect(result).toContain('autocomplete="new-password"');
+    expect(result).toContain("At least 8 characters");
+    expect(result).toContain("An account with this email already exists");
+    expect(result).not.toContain("forgot-password-href");
+    expect(result).not.toContain('<zl-alert severity="error">An account');
+    expect(result).not.toContain("forgot-password-href");
+    expect(result).not.toContain('data-action="sign_in"');
+    expect(result).not.toContain('class="zl-card-nav"');
+    expect(result).toContain('label="Sign up"');
+    expect(result).not.toContain('compact');
+  });
+
+  it("renders the signed-in partial when the API returns a terminal step (complete: show)", () => {
+    const engine = createLiquidEngine({ locale });
+    const context = {
+      step: { name: "done", complete: "show", texts: { title_key: "complete.title" } },
+      fields: {},
+      actions: {},
+      branding: {},
+      loading: false,
+      errors: [],
+      gates: {},
+      sso_providers: [],
+      messages: [],
+      identity: { email_address: "qwertz@acme.com" },
+    };
+    const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
+    expect(result).toContain("zl-card-title");
+    expect(result).toContain("qwertz@acme.com");
   });
 });

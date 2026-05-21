@@ -3,6 +3,12 @@ import { resolve } from "node:path";
 import { nxViteTsPaths } from "@nx/vite/plugins/nx-tsconfig-paths.plugin";
 import { apiMockPublicDir } from "@zitadel-nextgen/api-mock/public-dir";
 import { defineConfig } from "vite";
+import { hmrPlugin, presets } from "vite-plugin-web-components-hmr";
+
+import { workspaceStylesFullReload } from "./vite/lit-dev-hmr.ts";
+
+const workspaceRoot = resolve(import.meta.dirname, "../..");
+const packageRoot = resolve(import.meta.dirname, ".");
 
 /**
  * Dev playground only. The library itself is built by `tsdown` (see
@@ -21,14 +27,34 @@ import { defineConfig } from "vite";
  */
 
 export default defineConfig({
-  root: resolve(import.meta.dirname, "dev"),
+  root: resolve(packageRoot, "dev"),
+  server: {
+    port: 5173,
+    strictPort: true,
+    fs: { allow: [workspaceRoot] },
+    watch: {
+      ignored: ["**/.git/**", "**/node_modules/**", "**/dist/**"],
+    },
+  },
   publicDir: apiMockPublicDir,
   cacheDir: "../../node_modules/.vite/packages/components",
-  plugins: [nxViteTsPaths()],
-  // Workspace packages (`@zitadel-nextgen/api`, etc.) ship a conditional
-  // `exports` map: `@zitadel-nextgen/source` resolves to `.ts` for hot
-  // workspace iteration, the default `import` condition resolves to
-  // pre-built `.mjs` for external production consumers. Set the source
-  // condition here so Vite dev / vitest skip the rebuild step.
+  plugins: [
+    nxViteTsPaths(),
+    // Lit atoms only — dev/pages/*.ts is plain TS (innerHTML); wc-hmr breaks its HMR.
+    hmrPlugin({
+      include: [resolve(packageRoot, "src/**/*.ts")],
+      presets: [presets.lit],
+    }),
+    workspaceStylesFullReload(),
+  ],
   resolve: { conditions: ["@zitadel-nextgen/source"] },
+  optimizeDeps: {
+    exclude: [
+      "@zitadel-nextgen/components",
+      "@zitadel-nextgen/shared-component-styles",
+      "@zitadel-nextgen/design-tokens",
+      "@zitadel-nextgen/api",
+      "@zitadel-nextgen/api-mock",
+    ],
+  },
 });

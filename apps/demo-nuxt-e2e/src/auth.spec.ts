@@ -8,7 +8,7 @@ import { expect, test } from "@playwright/test";
  *    Nuxt's SSR pass.
  * 2. Form interactions reach the orchestrator across atom shadow roots.
  * 3. The terminal step's internal `POST /sessions/exchange` traverses the
- *    Nitro `/__nextgen` proxy installed by `@nextgen/sdk-nuxt` and the
+ *    Nitro `/__nextgen` proxy installed by `@zitadel-nextgen/sdk-nuxt` and the
  *    api-mock RS256 verification.
  * 4. `__nextgen_session` is set on the demo origin and `<zitadel-login>`'s
  *    full-page navigation lands on the protected `/admin` route.
@@ -23,10 +23,11 @@ test("signs in via the embedded component and lands on /admin", async ({ page })
 
   const email = "alice@acme.com";
   await page.getByLabel(/email/i).fill(email);
-  await page.getByRole("button", { name: /continue/i }).click();
-
   await page.getByLabel(/password/i).fill("hunter2");
-  await page.getByRole("button", { name: /sign in/i }).click();
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  const skip = page.getByRole("button", { name: /skip for now/i });
+  await expect(skip).toBeVisible({ timeout: 15_000 });
+  await skip.click();
 
   await page.waitForURL("**/admin");
   await expect(page.getByRole("heading", { name: "Admin" })).toBeVisible();

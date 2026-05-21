@@ -58,8 +58,11 @@ opencode.json
 ## compiled output
 dist
 tmp
+.tmp/
 out-tsc
 coverage/
+**/.vitest-attachments/
+**/__screenshots__/
 
 ## dependencies
 node_modules

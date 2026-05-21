@@ -2,7 +2,7 @@
  * `@zitadel-nextgen/api-mock` — shared mock for the typed
  * `@zitadel-nextgen/api` Flow API.
  *
- * Two entry points:
+ * Three entry points:
  *
  * - `setupMockHandlers()` returns `{ handlers, reset, getCaptured }`. Plug
  *   `handlers` into `setupServer(...)` for node tests or pass to a worker
@@ -12,6 +12,9 @@
  *   same handlers into `worker.use(...)`. The module-level `resetFlow()` and
  *   `getCapturedRequests()` delegate to the most recently created handle from
  *   `setupMock`, which is safe when only one mock is active at a time.
+ * - `startMockServer(port)` (from `./server.js`) — Express + MSW middleware
+ *   for `apps/demo-next` and `apps/demo-nuxt`. Applies `defaultDevBranding`
+ *   (Arimo `font_url`) on boot; see `default-dev-branding.ts`.
  *
  * Helpers:
  *

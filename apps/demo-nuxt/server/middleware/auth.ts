@@ -1,4 +1,4 @@
-import { createNextgenMiddleware } from "@nextgen/sdk-nuxt/server";
+import { createNextgenMiddleware } from "@zitadel-nextgen/sdk-nuxt/server";
 
 const { nextgenIssuerUrl } = useRuntimeConfig();
 

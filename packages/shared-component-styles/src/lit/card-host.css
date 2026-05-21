@@ -1,0 +1,11 @@
+/* Lit-only: <zl-card> width constraint and slotted margin reset. */
+:host {
+  display: block;
+  width: 100%;
+  max-width: var(--zl-container-auth-card, 24rem);
+  margin-inline: auto;
+}
+.zr-card ::slotted([slot="header"]),
+.zr-card ::slotted([slot="footer"]) {
+  margin: 0;
+}
