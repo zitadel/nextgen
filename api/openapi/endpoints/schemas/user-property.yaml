@@ -4,6 +4,7 @@ type: object
 description: |
   This schema is missing `"allOf": [{"$ref": "https://json-schema.org/draft/2020-12/schema"}],`. 
   This is done because a lot of code generators cannot handle that.
+additionalProperties: true
 properties:
   x-identifier:
     type: boolean
@@ -45,4 +46,3 @@ properties:
     description: A map of additional properties for the user definition, where the
       key is the property name and the value is the property schema
     additionalProperties: true
-  additionalProperties: true

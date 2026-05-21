@@ -8,12 +8,13 @@ required:
   - metaSchema
   - kind
   - x-auth-methods
+additionalProperties: true
 properties:
   "$schema":
     type: string
     const: https://json-schema.org/draft/2020-12/schema
     description: The JSON Schema version used for this schema.
-  id:
+  $id:
     type: string
     format: uri
     description: The unique identifier for this user schema.
@@ -47,4 +48,3 @@ properties:
       key is the property name and the value is the property schema
     additionalProperties:
       "$ref": user-property.yaml
-  additionalProperties: true

@@ -3742,6 +3742,12 @@ func (s CreateSchemaReq) encodeFields(e *jx.Encoder) {
 				e.Str("https://json-schema.org/draft/2020-12/schema")
 			}
 			{
+				if s.ID.Set {
+					e.FieldStart("$id")
+					s.ID.Encode(e)
+				}
+			}
+			{
 				e.FieldStart("metaSchema")
 				json.EncodeURI(e, s.MetaSchema)
 			}
@@ -3753,6 +3759,13 @@ func (s CreateSchemaReq) encodeFields(e *jx.Encoder) {
 				if s.Properties.Set {
 					e.FieldStart("properties")
 					s.Properties.Encode(e)
+				}
+			}
+			for k, elem := range s.AdditionalProps {
+				e.FieldStart(k)
+
+				if len(elem) != 0 {
+					e.Raw(elem)
 				}
 			}
 		}
@@ -9452,6 +9465,12 @@ func (s GetSchemaByIdOK) encodeFields(e *jx.Encoder) {
 				e.Str("https://json-schema.org/draft/2020-12/schema")
 			}
 			{
+				if s.ID.Set {
+					e.FieldStart("$id")
+					s.ID.Encode(e)
+				}
+			}
+			{
 				e.FieldStart("metaSchema")
 				json.EncodeURI(e, s.MetaSchema)
 			}
@@ -9463,6 +9482,13 @@ func (s GetSchemaByIdOK) encodeFields(e *jx.Encoder) {
 				if s.Properties.Set {
 					e.FieldStart("properties")
 					s.Properties.Encode(e)
+				}
+			}
+			for k, elem := range s.AdditionalProps {
+				e.FieldStart(k)
+
+				if len(elem) != 0 {
+					e.Raw(elem)
 				}
 			}
 		}
@@ -18016,12 +18042,6 @@ func (s *UserProperty) Encode(e *jx.Encoder) {
 // encodeFields encodes fields.
 func (s *UserProperty) encodeFields(e *jx.Encoder) {
 	{
-		if s.Title.Set {
-			e.FieldStart("title")
-			s.Title.Encode(e)
-		}
-	}
-	{
 		if s.XMinusIdentifier.Set {
 			e.FieldStart("x-identifier")
 			s.XMinusIdentifier.Encode(e)
@@ -18069,18 +18089,24 @@ func (s *UserProperty) encodeFields(e *jx.Encoder) {
 			s.Properties.Encode(e)
 		}
 	}
+	for k, elem := range s.AdditionalProps {
+		e.FieldStart(k)
+
+		if len(elem) != 0 {
+			e.Raw(elem)
+		}
+	}
 }
 
-var jsonFieldsNameOfUserProperty = [9]string{
-	0: "title",
-	1: "x-identifier",
-	2: "x-verify",
-	3: "x-unique",
-	4: "x-claim",
-	5: "x-editable",
-	6: "x-sensitive",
-	7: "x-mfa",
-	8: "properties",
+var jsonFieldsNameOfUserProperty = [8]string{
+	0: "x-identifier",
+	1: "x-verify",
+	2: "x-unique",
+	3: "x-claim",
+	4: "x-editable",
+	5: "x-sensitive",
+	6: "x-mfa",
+	7: "properties",
 }
 
 // Decode decodes UserProperty from json.
@@ -18089,19 +18115,10 @@ func (s *UserProperty) Decode(d *jx.Decoder) error {
 		return errors.New("invalid: unable to decode UserProperty to nil")
 	}
 	s.setDefaults()
+	s.AdditionalProps = map[string]jx.Raw{}
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
-		case "title":
-			if err := func() error {
-				s.Title.Reset()
-				if err := s.Title.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"title\"")
-			}
 		case "x-identifier":
 			if err := func() error {
 				s.XMinusIdentifier.Reset()
@@ -18183,7 +18200,18 @@ func (s *UserProperty) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"properties\"")
 			}
 		default:
-			return d.Skip()
+			var elem jx.Raw
+			if err := func() error {
+				v, err := d.RawAppend(nil)
+				elem = jx.Raw(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrapf(err, "decode field %q", k)
+			}
+			s.AdditionalProps[string(k)] = elem
 		}
 		return nil
 	}); err != nil {
@@ -18202,6 +18230,64 @@ func (s *UserProperty) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *UserProperty) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s UserPropertyAdditional) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields implements json.Marshaler.
+func (s UserPropertyAdditional) encodeFields(e *jx.Encoder) {
+	for k, elem := range s {
+		e.FieldStart(k)
+
+		if len(elem) != 0 {
+			e.Raw(elem)
+		}
+	}
+}
+
+// Decode decodes UserPropertyAdditional from json.
+func (s *UserPropertyAdditional) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode UserPropertyAdditional to nil")
+	}
+	m := s.init()
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		var elem jx.Raw
+		if err := func() error {
+			v, err := d.RawAppend(nil)
+			elem = jx.Raw(v)
+			if err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrapf(err, "decode field %q", k)
+		}
+		m[string(k)] = elem
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode UserPropertyAdditional")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s UserPropertyAdditional) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *UserPropertyAdditional) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -18318,6 +18404,12 @@ func (s *UserSchema) encodeFields(e *jx.Encoder) {
 		e.Str("https://json-schema.org/draft/2020-12/schema")
 	}
 	{
+		if s.ID.Set {
+			e.FieldStart("$id")
+			s.ID.Encode(e)
+		}
+	}
+	{
 		e.FieldStart("kind")
 		e.Str("user-schema")
 	}
@@ -18335,14 +18427,22 @@ func (s *UserSchema) encodeFields(e *jx.Encoder) {
 			s.Properties.Encode(e)
 		}
 	}
+	for k, elem := range s.AdditionalProps {
+		e.FieldStart(k)
+
+		if len(elem) != 0 {
+			e.Raw(elem)
+		}
+	}
 }
 
-var jsonFieldsNameOfUserSchema = [5]string{
+var jsonFieldsNameOfUserSchema = [6]string{
 	0: "$schema",
-	1: "kind",
-	2: "metaSchema",
-	3: "x-auth-methods",
-	4: "properties",
+	1: "$id",
+	2: "kind",
+	3: "metaSchema",
+	4: "x-auth-methods",
+	5: "properties",
 }
 
 // Decode decodes UserSchema from json.
@@ -18351,6 +18451,7 @@ func (s *UserSchema) Decode(d *jx.Decoder) error {
 		return errors.New("invalid: unable to decode UserSchema to nil")
 	}
 	var requiredBitSet [1]uint8
+	s.AdditionalProps = map[string]jx.Raw{}
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
@@ -18364,8 +18465,18 @@ func (s *UserSchema) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"$schema\"")
 			}
+		case "$id":
+			if err := func() error {
+				s.ID.Reset()
+				if err := s.ID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"$id\"")
+			}
 		case "kind":
-			requiredBitSet[0] |= 1 << 1
+			requiredBitSet[0] |= 1 << 2
 			if err := func() error {
 				v, err := d.Str()
 				s.Kind = string(v)
@@ -18377,7 +18488,7 @@ func (s *UserSchema) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"kind\"")
 			}
 		case "metaSchema":
-			requiredBitSet[0] |= 1 << 2
+			requiredBitSet[0] |= 1 << 3
 			if err := func() error {
 				v, err := json.DecodeURI(d)
 				s.MetaSchema = v
@@ -18389,7 +18500,7 @@ func (s *UserSchema) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metaSchema\"")
 			}
 		case "x-auth-methods":
-			requiredBitSet[0] |= 1 << 3
+			requiredBitSet[0] |= 1 << 4
 			if err := func() error {
 				if err := s.XMinusAuthMinusMethods.Decode(d); err != nil {
 					return err
@@ -18409,7 +18520,18 @@ func (s *UserSchema) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"properties\"")
 			}
 		default:
-			return d.Skip()
+			var elem jx.Raw
+			if err := func() error {
+				v, err := d.RawAppend(nil)
+				elem = jx.Raw(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrapf(err, "decode field %q", k)
+			}
+			s.AdditionalProps[string(k)] = elem
 		}
 		return nil
 	}); err != nil {
@@ -18418,7 +18540,7 @@ func (s *UserSchema) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [1]uint8{
-		0b00001110,
+		0b00011100,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -18460,6 +18582,64 @@ func (s *UserSchema) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *UserSchema) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s UserSchemaAdditional) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields implements json.Marshaler.
+func (s UserSchemaAdditional) encodeFields(e *jx.Encoder) {
+	for k, elem := range s {
+		e.FieldStart(k)
+
+		if len(elem) != 0 {
+			e.Raw(elem)
+		}
+	}
+}
+
+// Decode decodes UserSchemaAdditional from json.
+func (s *UserSchemaAdditional) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode UserSchemaAdditional to nil")
+	}
+	m := s.init()
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		var elem jx.Raw
+		if err := func() error {
+			v, err := d.RawAppend(nil)
+			elem = jx.Raw(v)
+			if err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrapf(err, "decode field %q", k)
+		}
+		m[string(k)] = elem
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode UserSchemaAdditional")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s UserSchemaAdditional) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *UserSchemaAdditional) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }

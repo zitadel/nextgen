@@ -10359,8 +10359,6 @@ type UserID string
 // This is done because a lot of code generators cannot handle that.
 // Ref: #
 type UserProperty struct {
-	// The title of the user property.
-	Title OptString `json:"title"`
 	// Whether this property is an identifier for the user or not.
 	XMinusIdentifier OptBool `json:"x-identifier"`
 	// The verification method for this property, if applicable.
@@ -10377,12 +10375,8 @@ type UserProperty struct {
 	XMinusMfa OptBool `json:"x-mfa"`
 	// A map of additional properties for the user definition, where the key is the property name and the
 	// value is the property schema.
-	Properties OptUserPropertyProperties `json:"properties"`
-}
-
-// GetTitle returns the value of Title.
-func (s *UserProperty) GetTitle() OptString {
-	return s.Title
+	Properties      OptUserPropertyProperties `json:"properties"`
+	AdditionalProps UserPropertyAdditional
 }
 
 // GetXMinusIdentifier returns the value of XMinusIdentifier.
@@ -10425,9 +10419,9 @@ func (s *UserProperty) GetProperties() OptUserPropertyProperties {
 	return s.Properties
 }
 
-// SetTitle sets the value of Title.
-func (s *UserProperty) SetTitle(val OptString) {
-	s.Title = val
+// GetAdditionalProps returns the value of AdditionalProps.
+func (s *UserProperty) GetAdditionalProps() UserPropertyAdditional {
+	return s.AdditionalProps
 }
 
 // SetXMinusIdentifier sets the value of XMinusIdentifier.
@@ -10468,6 +10462,22 @@ func (s *UserProperty) SetXMinusMfa(val OptBool) {
 // SetProperties sets the value of Properties.
 func (s *UserProperty) SetProperties(val OptUserPropertyProperties) {
 	s.Properties = val
+}
+
+// SetAdditionalProps sets the value of AdditionalProps.
+func (s *UserProperty) SetAdditionalProps(val UserPropertyAdditional) {
+	s.AdditionalProps = val
+}
+
+type UserPropertyAdditional map[string]jx.Raw
+
+func (s *UserPropertyAdditional) init() UserPropertyAdditional {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
 }
 
 // A map of additional properties for the user definition, where the key is the property name and the
@@ -10530,6 +10540,8 @@ func (s *UserPropertyXMinusUnique) UnmarshalText(data []byte) error {
 type UserSchema struct {
 	// The JSON Schema version used for this schema.
 	Schema OptString `json:"$schema"`
+	// The unique identifier for this user schema.
+	ID OptURI `json:"$id"`
 	// Discriminator value for a user schema create request.
 	Kind string `json:"kind"`
 	// The user Schema version used for this schema.
@@ -10538,12 +10550,18 @@ type UserSchema struct {
 	XMinusAuthMinusMethods UserSchemaXMinusAuthMinusMethods `json:"x-auth-methods"`
 	// A map of additional properties for the user definition, where the key is the property name and the
 	// value is the property schema.
-	Properties OptUserSchemaProperties `json:"properties"`
+	Properties      OptUserSchemaProperties `json:"properties"`
+	AdditionalProps UserSchemaAdditional
 }
 
 // GetSchema returns the value of Schema.
 func (s *UserSchema) GetSchema() OptString {
 	return s.Schema
+}
+
+// GetID returns the value of ID.
+func (s *UserSchema) GetID() OptURI {
+	return s.ID
 }
 
 // GetKind returns the value of Kind.
@@ -10566,9 +10584,19 @@ func (s *UserSchema) GetProperties() OptUserSchemaProperties {
 	return s.Properties
 }
 
+// GetAdditionalProps returns the value of AdditionalProps.
+func (s *UserSchema) GetAdditionalProps() UserSchemaAdditional {
+	return s.AdditionalProps
+}
+
 // SetSchema sets the value of Schema.
 func (s *UserSchema) SetSchema(val OptString) {
 	s.Schema = val
+}
+
+// SetID sets the value of ID.
+func (s *UserSchema) SetID(val OptURI) {
+	s.ID = val
 }
 
 // SetKind sets the value of Kind.
@@ -10589,6 +10617,22 @@ func (s *UserSchema) SetXMinusAuthMinusMethods(val UserSchemaXMinusAuthMinusMeth
 // SetProperties sets the value of Properties.
 func (s *UserSchema) SetProperties(val OptUserSchemaProperties) {
 	s.Properties = val
+}
+
+// SetAdditionalProps sets the value of AdditionalProps.
+func (s *UserSchema) SetAdditionalProps(val UserSchemaAdditional) {
+	s.AdditionalProps = val
+}
+
+type UserSchemaAdditional map[string]jx.Raw
+
+func (s *UserSchemaAdditional) init() UserSchemaAdditional {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
 }
 
 // A map of additional properties for the user definition, where the key is the property name and the
