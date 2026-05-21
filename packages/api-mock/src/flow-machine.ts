@@ -10,7 +10,8 @@
  * State graph:
  *
  *   idle --START(login)----> identifier (email+password, Figma 6593:141985)
- *                                       --SUBMIT(submit|recover)--> passkey-upsell
+ *                                       --SUBMIT(submit)--> passkey-upsell
+ *                                       --SUBMIT(recover)--> recover --SUBMIT--> identifier
  *                                       --SUBMIT(register)--> register
  *                                       --SUBMIT(passkey)--> passkey-login
  *                                       --SUBMIT(sso_provider_id)--> sso-redirect
@@ -31,6 +32,7 @@ export type FlowStepName =
   | "identifier"
   | "register"
   | "password"
+  | "recover"
   | "passkey-upsell"
   | "passkey-setup"
   | "passkey-login"
@@ -133,7 +135,7 @@ export const flowMachine = createMachine({
           },
           {
             guard: ({ event }) => event.action === "recover",
-            target: "passkey-upsell",
+            target: "recover",
             actions: [captureFields, rotateToken],
           },
           {
@@ -146,6 +148,11 @@ export const flowMachine = createMachine({
     register: {
       on: {
         SUBMIT: { target: "passkey-upsell", actions: [captureFields, rotateToken] },
+      },
+    },
+    recover: {
+      on: {
+        SUBMIT: { target: "identifier", actions: [rotateToken] },
       },
     },
     password: {

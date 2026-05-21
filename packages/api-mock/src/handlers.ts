@@ -38,6 +38,7 @@ import {
   passkeySetupStep,
   passkeyUpsellStep,
   passwordStep,
+  recoverStep,
   registerStep,
   ssoRedirectStep,
 } from "./fixtures/login.js";
@@ -94,6 +95,8 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
     switch (step) {
       case "register":
         return withBranding(registerStep(input));
+      case "recover":
+        return withBranding(recoverStep(input));
       case "password":
         return withBranding(passwordStep(input));
       case "passkey-upsell":

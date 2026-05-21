@@ -52,6 +52,12 @@ export const en: Record<string, string> = {
   "signed-in.continue": "Continue",
   "signed-in.logout": "Logout",
 
+  // --- Password recovery ---
+  "recover.title": "Check your email",
+  "recover.description":
+    "We sent a password reset link to your email address.",
+  "recover.action.back": "Back to sign in",
+
   // --- Passkey login ---
   "passkey-login.title": "Sign in with your passkey",
 

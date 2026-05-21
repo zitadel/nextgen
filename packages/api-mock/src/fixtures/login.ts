@@ -115,6 +115,26 @@ export function passwordStep(input: StepFixtureInput): CreateFlow201 {
   });
 }
 
+/**
+ * Password recovery step — shown when the user clicks "Forgot password?" on
+ * the identifier screen. Tells the user to check their email and offers a
+ * "Back to sign in" action (simulating the recovery pivot return).
+ */
+export function recoverStep(input: StepFixtureInput): CreateFlow201 {
+  return wrap(input, {
+    name: "recover",
+    texts: {
+      title_key: "recover.title",
+      description_key: "recover.description",
+    },
+    fields: {},
+    actions: {
+      submit: { text_key: "recover.action.back", primary: true },
+    },
+    gates: {},
+  });
+}
+
 export function passkeyUpsellStep(input: StepFixtureInput): CreateFlow201 {
   return wrap(input, {
     name: "passkey-upsell",
