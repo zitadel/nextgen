@@ -128,6 +128,49 @@ export function passkeyUpsellStep(input: StepFixtureInput): CreateFlow201 {
   });
 }
 
+/**
+ * Passkey setup step — returned after the user clicks "Set up passkey" on the
+ * upsell screen. Contains a mock `challenge` with WebAuthn registration
+ * options so `<zl-passkey ceremony="register">` can trigger
+ * `navigator.credentials.create()`. Follows the two-submit model from ADR 013.
+ */
+export function passkeySetupStep(input: StepFixtureInput): CreateFlow201 {
+  return wrap(input, {
+    name: "passkey-setup",
+    texts: { title_key: "passkey-upsell.title" },
+    fields: {},
+    actions: {
+      submit: { text_key: "submit.continue", primary: true },
+    },
+    gates: {},
+    challenge: {
+      method: "passkey",
+      challenge_id: "ch_mock_passkey_setup",
+      options: {
+        ceremony: "register",
+        challenge: "AAAAAAAAAAAAAAAAAAAAAA",
+        rp: { name: "Mock RP", id: "localhost" },
+        user: {
+          id: "dXNlcl9tb2Nr",
+          name: input.capturedEmail ?? "mock-user@example.com",
+          displayName: input.capturedEmail ?? "Mock User",
+        },
+        pubKeyCredParams: [
+          { type: "public-key", alg: -7 },
+          { type: "public-key", alg: -257 },
+        ],
+        timeout: 60000,
+        attestation: "none",
+        authenticatorSelection: {
+          authenticatorAttachment: "platform",
+          residentKey: "preferred",
+          userVerification: "preferred",
+        },
+      },
+    },
+  });
+}
+
 export function ssoRedirectStep(
   input: StepFixtureInput & { redirectUrl?: string },
 ): CreateFlow201 {

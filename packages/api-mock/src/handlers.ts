@@ -34,6 +34,7 @@ import { startFlowActor, type FlowActor, type FlowStepName } from "./flow-machin
 import {
   doneStep,
   identifierStep,
+  passkeySetupStep,
   passkeyUpsellStep,
   passwordStep,
   registerStep,
@@ -96,6 +97,8 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
         return withBranding(passwordStep(input));
       case "passkey-upsell":
         return withBranding(passkeyUpsellStep(input));
+      case "passkey-setup":
+        return withBranding(passkeySetupStep(input));
       case "sso-redirect":
         return withBranding(ssoRedirectStep(input));
       case "done":
@@ -176,7 +179,7 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
       };
 
       // Figma passkey upsell `6594:630` — setup failures stay on step with alert.
-      if (before === "passkey-upsell" && body.action === "setup") {
+      if (before === "passkey-upsell" && body.action !== "skip") {
         const passkeyErrorByEmail: Record<string, string> = {
           "passkey-cancel@example.com": "error.passkey_cancelled",
           "passkey-unsupported@example.com": "error.passkey_unsupported",

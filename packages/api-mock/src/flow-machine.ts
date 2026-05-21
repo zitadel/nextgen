@@ -17,7 +17,9 @@
  *      \--START(register)--> register --SUBMIT--> passkey-upsell
  *
  *   password -- legacy split step; kept for tests that target it directly
- *   passkey-upsell / sso-redirect --SUBMIT--> done
+ *   passkey-upsell --SUBMIT(skip)--> done
+ *   passkey-upsell --SUBMIT(*)----> passkey-setup --SUBMIT--> done
+ *   sso-redirect --SUBMIT--> done
  *   anything --RESET--> idle
  */
 import type { CreateFlowBodyPurpose } from "@zitadel-nextgen/api/generated/model";
@@ -28,6 +30,7 @@ export type FlowStepName =
   | "register"
   | "password"
   | "passkey-upsell"
+  | "passkey-setup"
   | "sso-redirect"
   | "done";
 
@@ -148,6 +151,21 @@ export const flowMachine = createMachine({
       },
     },
     "passkey-upsell": {
+      on: {
+        SUBMIT: [
+          {
+            guard: ({ event }) => event.action === "skip",
+            target: "done",
+            actions: [rotateToken],
+          },
+          {
+            target: "passkey-setup",
+            actions: [rotateToken],
+          },
+        ],
+      },
+    },
+    "passkey-setup": {
       on: {
         SUBMIT: { target: "done", actions: [rotateToken] },
       },

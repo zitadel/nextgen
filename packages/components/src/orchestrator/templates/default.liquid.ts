@@ -12,7 +12,7 @@
 export const defaultTemplate = String.raw`
 {%- if step.name == 'signed-in' or step.complete == 'show' -%}
   {%- include 'signed-in' -%}
-{%- elsif step.name == 'passkey' or step.name == 'passkey-upsell' -%}
+{%- elsif step.name == 'passkey' or step.name == 'passkey-upsell' or step.name == 'passkey-setup' -%}
   {%- include 'passkey-upsell' -%}
 {%- else -%}
   {%- include 'auth-form' -%}
