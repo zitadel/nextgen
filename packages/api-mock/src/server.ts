@@ -201,10 +201,17 @@ export function startMockServer(port: number): Server {
       // as a typecheck error rather than silent runtime drift.
       const createdAt = new Date();
       const expiresAt = new Date(createdAt.getTime() + SESSION_TTL_SECONDS * 1000);
+      // `project_id` must satisfy `^[a-zA-Z0-9_-]+$` per the spec. The
+      // handoff's `sub` claim is the captured user identifier (typically
+      // an email like `alice@example.com`) and would fail that pattern.
+      // The mock doesn't thread the real project_id through the flow ↔
+      // handoff ↔ exchange chain (it would require plumbing the value
+      // into the actor context and the JWT claim), so we emit a stable
+      // mock value that's pattern-valid.
       const body: ExchangeHandoff200 = {
         session: {
           session_id: `sess_${randomUUID().replace(/-/g, "").slice(0, 12)}`,
-          project_id: claims.sub,
+          project_id: "proj_mock",
           state: "active",
           factors: {},
           assurance_levels: [],
