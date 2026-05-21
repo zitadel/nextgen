@@ -18,10 +18,10 @@ func ErrFlowDefinitionAlreadyExists() Error {
 	return newError(PrefixFlowDefinition.ErrorCodePrefix("already_exists"), "flow definition: already exists", nil, nil)
 }
 
-func ErrFlowDefinitionInvalid(details string) Error {
-	return newError(PrefixFlowDefinition.ErrorCodePrefix("invalid"), "flow definition: invalid", details, nil)
+func ErrFlowDefinitionInvalid(details any, parent error) Error {
+	return newError(PrefixFlowDefinition.ErrorCodePrefix("invalid"), "flow definition: invalid", details, parent)
 }
 
-func ErrUserSchemaFetchFailed(details string) Error {
-	return newError(PrefixFlowDefinition.ErrorCodePrefix("user_schema_fetch_failed"), "flow definition: failed to fetch user schema", details, nil)
+func ErrSchemaFetchFailed(details any, parent error) Error {
+	return newError(PrefixFlowDefinition.ErrorCodePrefix("schema_fetch_failed"), "flow definition: failed to fetch schema", details, parent)
 }

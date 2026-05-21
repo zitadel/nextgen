@@ -3,17 +3,12 @@ package api
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"net/url"
 
+	"github.com/muhlemmer/gu"
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
-)
-
-var (
-	ErrMissingPurpose = errors.New("missing purpose")
-	ErrInvalidPurpose = errors.New("invalid purpose")
 )
 
 func (h Handler) CreateFlowDefinition(ctx context.Context, req *api.CreateFlowDefinitionRequest) (api.CreateFlowDefinitionRes, error) {
@@ -27,11 +22,9 @@ func (h Handler) CreateFlowDefinition(ctx context.Context, req *api.CreateFlowDe
 	}
 
 	svcReq := service.CreateFlowDefinitionRequest{
-		FlowDefinition: domain.FlowDefinition{
-			ProjectID:  string(req.GetProjectID()),
-			Name:       definition.GetName(),
-			UserSchema: definition.GetUserSchema(),
-		},
+		ProjectID:         string(req.GetProjectID()),
+		Name:              definition.GetName(),
+		UserSchema:        definition.GetUserSchema(),
 		RawFlowDefinition: rawFlowDefinition,
 	}
 	purposes, err := mapPurposesToDomain(definition)
@@ -43,9 +36,9 @@ func (h Handler) CreateFlowDefinition(ctx context.Context, req *api.CreateFlowDe
 	}
 	svcReq.Purposes = purposes
 
-	flowSchemaURI, ok := req.GetSchemaURI().Get()
+	reqFlowSchemaURI, ok := req.GetSchemaURI().Get()
 	if ok {
-		svcReq.FlowSchemaURI = url.URL(flowSchemaURI)
+		svcReq.FlowSchemaURI = url.URL(reqFlowSchemaURI)
 	}
 
 	if reqAudience, ok := definition.GetAudience().Get(); ok {
@@ -55,30 +48,30 @@ func (h Handler) CreateFlowDefinition(ctx context.Context, req *api.CreateFlowDe
 		}
 	}
 
-	create, err := h.flowDefinitionService.Create(ctx, svcReq)
+	create, flowSchemaURI, err := h.flowDefinitionService.Create(ctx, svcReq)
 	if err != nil {
-		return nil, err // todo: map service errors to API errors
+		return errorResponse(err), nil // todo: review
 	}
 
-	return flowDefinitionSuccessResponse(create, url.URL(flowSchemaURI)), nil
+	return flowDefinitionSuccessResponse(create, flowSchemaURI), nil
 }
 
 func mapPurposesToDomain(definition api.FlowDefinition) (map[domain.FlowDefinitionPurpose]string, error) {
 	if len(definition.GetPurposes()) == 0 {
-		return nil, ErrMissingPurpose
+		return nil, domain.ErrFlowDefinitionInvalid("no purposes defined", nil)
 	}
-	var purposes map[domain.FlowDefinitionPurpose]string
-	for p, v := range definition.GetPurposes() {
+	purposes := make(map[domain.FlowDefinitionPurpose]string, len(definition.GetPurposes()))
+	for p, entryStep := range definition.GetPurposes() {
 		purpose, err := domain.FlowDefinitionPurposeString(p)
 		if err != nil {
-			return nil, ErrInvalidPurpose
+			return nil, domain.ErrFlowDefinitionInvalid("invalid purpose", nil)
 		}
-		purposes[purpose] = v
+		purposes[purpose] = entryStep
 	}
 	return purposes, nil
 }
 
-func flowDefinitionSuccessResponse(flowDefinition *domain.FlowDefinition, schemaURI url.URL) api.CreateFlowDefinitionRes {
+func flowDefinitionSuccessResponse(flowDefinition *domain.FlowDefinition, schemaURI string) api.CreateFlowDefinitionRes {
 	purposes := mapDomainPurposesToAPI(flowDefinition.Purposes)
 	audience := api.OptFlowAudience{
 		Value: api.FlowAudience{
@@ -89,6 +82,8 @@ func flowDefinitionSuccessResponse(flowDefinition *domain.FlowDefinition, schema
 	}
 	steps := mapDomainStepsToAPI(flowDefinition.Steps)
 
+	parsedSchemaURI, _ := url.Parse(schemaURI)
+
 	return &api.FlowDefinitionDetailResponse{
 		Name:       flowDefinition.Name,
 		UserSchema: flowDefinition.UserSchema,
@@ -97,7 +92,7 @@ func flowDefinitionSuccessResponse(flowDefinition *domain.FlowDefinition, schema
 		Steps:      steps,
 		ID:         flowDefinition.ID,
 		ProjectID:  flowDefinition.ProjectID,
-		SchemaURI:  schemaURI, // todo: weird to set it from the request
+		SchemaURI:  gu.Value(parsedSchemaURI),
 		Status:     flowDefinition.Status.String(),
 		CreatedAt:  flowDefinition.CreatedAt,
 		UpdatedAt:  flowDefinition.UpdatedAt,
@@ -113,7 +108,7 @@ func mapDomainPurposesToAPI(domainPurposes map[domain.FlowDefinitionPurpose]stri
 }
 
 func mapDomainStepsToAPI(domainSteps []domain.FlowDefinitionStep) []api.FlowDefinitionStep {
-	steps := make([]api.FlowDefinitionStep, len(domainSteps))
+	steps := make([]api.FlowDefinitionStep, 0, len(domainSteps))
 	for _, step := range domainSteps {
 		// actions
 		actions := make(map[string]api.StepAction, len(step.Actions))
@@ -143,27 +138,35 @@ func mapDomainStepsToAPI(domainSteps []domain.FlowDefinitionStep) []api.FlowDefi
 			}
 		}
 		// sso providers
-		ssoProviders := make([]api.SSOProvider, len(step.SSOProviders))
-		for i, ssoProvider := range step.SSOProviders {
-			ssoProviders[i] = api.SSOProvider{
+		ssoProviders := make([]api.SSOProvider, 0, len(step.SSOProviders))
+		for _, ssoProvider := range step.SSOProviders {
+			ssoProviders = append(ssoProviders, api.SSOProvider{
 				ID:       ssoProvider.ID,
 				Name:     ssoProvider.Name,
 				Template: ssoProvider.Template,
-			}
+			})
 		}
 		// transitions
 		transitions := make(map[string]api.FlowDefinitionStepTransitionsItem, len(step.Transitions))
 		for n, transition := range step.Transitions {
+			var action string
+			if transition.Action != nil {
+				action = transition.Action.String()
+			}
 			transitions[n] = api.FlowDefinitionStepTransitionsItem{
 				Target: transition.Target,
 				Action: api.OptNilFlowDefinitionStepTransitionsItemAction{
-					Value: api.FlowDefinitionStepTransitionsItemAction(transition.Action.String()),
+					Value: api.FlowDefinitionStepTransitionsItemAction(action),
 					Set:   transition.Action != nil, // todo: review
 					Null:  transition.Action == nil,
 				},
 			}
 		}
 
+		var complete string
+		if step.Complete != nil {
+			complete = step.Complete.String()
+		}
 		apiStep := api.FlowDefinitionStep{
 			Name:   step.Name,
 			Fields: step.Fields,
@@ -181,7 +184,7 @@ func mapDomainStepsToAPI(domainSteps []domain.FlowDefinitionStep) []api.FlowDefi
 				Set:   true,
 			},
 			Complete: api.OptFlowDefinitionStepComplete{
-				Value: api.FlowDefinitionStepComplete(step.Complete.String()),
+				Value: api.FlowDefinitionStepComplete(complete),
 				Set:   step.Complete != nil,
 			},
 			//OnSuccess: // todo: review
