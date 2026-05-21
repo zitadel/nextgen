@@ -1,0 +1,69 @@
+# design-tokens Agent Notes
+
+Scoped instructions for `packages/design-tokens/`. Read together with
+the [root `AGENTS.md`](../../AGENTS.md) and the
+[`README.md`](README.md) (which is the consumer-facing doc).
+
+## Authority order
+
+1. The published Figma library (file key in `figma-tokens.lock`).
+2. `src/overrides.ts` — only for values Figma doesn't own.
+3. Nothing else. Atoms must not declare hex codes; consumers must not
+   re-derive radii or spacing.
+
+If a value belongs to the design system, put it in Figma and re-sync.
+If it doesn't belong (font fallback stack, motion curve, breakpoint),
+add it to `overrides.ts` with a doc comment explaining why.
+
+## Surfaces you can change
+
+- `src/overrides.ts` — hand-written supplements. Adding a new category
+  here means updating `scripts/build.ts` to emit it.
+- `scripts/sync-from-figma.ts` — Figma REST handling. Be careful: this
+  runs in CI with a real token; preserve the pinned-library guarantee.
+- `scripts/build.ts` — emitter. Output must remain deterministic for
+  the snapshot test to be meaningful.
+- `src/tokens.snapshot.spec.ts` — snapshot. Update intentionally when
+  the Figma sync legitimately renames a token; never blanket-accept the
+  snapshot diff without reviewing what consumers will need.
+
+## Surfaces you must NOT change by hand
+
+- `src/generated/figma.tokens.json` — overwritten by `:sync`.
+- `src/generated/tokens.css`, `tokens.ts`, `tailwind.css` —
+  overwritten by `:generate`.
+- `figma-tokens.lock` — only bumped as part of a sync PR.
+
+## Output ordering
+
+`scripts/build.ts` walks categories in a fixed order (color → spacing
+→ radius → font → motion → focus → breakpoint → container). Spacing
+keys are numeric-sorted. Keep new categories appended at the end so
+existing diffs stay small.
+
+## Tests
+
+Single Vitest project, Node mode. Just the snapshot for now. If you
+add a token category, extend `src/tokens.snapshot.spec.ts` to cover
+its keys so it can't silently disappear.
+
+## Branding overrides at runtime
+
+Tenants override colours/typography/shape on a per-flow basis through
+`<zitadel-login branding="...">`. That overlay is applied by
+`packages/components/src/orchestrator/branding-to-tokens.ts` — it
+writes to the same `--zl-*` variables that `tokens.css` defines, on
+the orchestrator's own shadow root. Do not introduce a separate
+"branding tokens" surface; everything routes through `--zl-*`.
+
+## Don't
+
+- Don't add a token category to `overrides.ts` that Figma should own.
+- Don't import this package from `packages/api` or `packages/api-mock`.
+  Tokens are a UI concern.
+- Don't hand-edit anything under `src/generated/`. If the generated
+  output is wrong, fix the input (lock, json, or overrides) and re-run
+  `:generate`.
+- Don't add a `light` mode override before Figma publishes a light
+  variable mode. The `[data-theme="light"]` selector in `tokens.css`
+  is intentionally empty until then.

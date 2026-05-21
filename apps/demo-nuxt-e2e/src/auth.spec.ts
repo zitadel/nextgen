@@ -23,10 +23,9 @@ test("signs in via the embedded component and lands on /admin", async ({ page })
 
   const email = "alice@acme.com";
   await page.getByLabel(/email/i).fill(email);
-  await page.getByRole("button", { name: /continue/i }).click();
-
   await page.getByLabel(/password/i).fill("hunter2");
-  await page.getByRole("button", { name: /sign in/i }).click();
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByRole("button", { name: /skip for now/i }).click();
 
   await page.waitForURL("**/admin");
   await expect(page.getByRole("heading", { name: "Admin" })).toBeVisible();
