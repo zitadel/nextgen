@@ -5,14 +5,24 @@
   "required": [
     "metaSchema",
     "kind",
-    "x-auth-methods"
+    "x-auth-methods",
+    "$id"
   ],
-  "allOf": [{"$ref": "https://json-schema.org/draft/2020-12/schema"}],
+  "allOf": [
+    {
+      "$ref": "https://json-schema.org/draft/2020-12/schema"
+    }
+  ],
   "properties": {
     "$schema": {
       "type": "string",
       "const": "https://json-schema.org/draft/2020-12/schema",
       "description": "The JSON Schema version used for this schema."
+    },
+    "$id": {
+      "type": "string",
+      "format": "uri",
+      "description": "The unique identifier for this user schema."
     },
     "kind": {
       "type": "string",
