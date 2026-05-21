@@ -1506,15 +1506,6 @@ func (c *Client) CreateSchema(ctx context.Context, request CreateSchemaReq) (Cre
 }
 
 func (c *Client) sendCreateSchema(ctx context.Context, request CreateSchemaReq) (res CreateSchemaRes, err error) {
-	// Validate request before sending.
-	if err := func() error {
-		if err := request.Validate(); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return res, errors.Wrap(err, "validate")
-	}
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("createSchema"),
 		semconv.HTTPRequestMethodKey.String("POST"),

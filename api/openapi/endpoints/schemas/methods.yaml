@@ -20,12 +20,12 @@ post:
       application/json:
         schema:
           oneOf:
-            - $ref: user-schema.json
+            - $ref: ../../components/schemas/any-object.yaml
             - $ref: schema-url.yaml
           discriminator:
             propertyName: kind
             mapping:
-              user-schema: user-schema.json
+              user-schema: ../../components/schemas/any-object.yaml
               schema-url:  schema-url.yaml
         examples:
           userSchema:

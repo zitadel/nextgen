@@ -3,38 +3,31 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "required": [
-    "$schema",
-    "$id",
+    "metaSchema",
     "kind",
     "title",
     "x-auth-methods"
   ],
+  "allOf": [
+    {
+      "$ref": "https://json-schema.org/draft/2020-12/schema"
+    }
+  ],
   "properties": {
     "$schema": {
       "type": "string",
-      "const": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
+      "const": "https://json-schema.org/draft/2020-12/schema",
       "description": "The JSON Schema version used for this schema."
-    },
-    "$id": {
-      "type": "string",
-      "format": "uri",
-      "description": "The unique identifier for this schema, which is also the URL where this schema can be accessed."
     },
     "kind": {
       "type": "string",
       "const": "user-schema",
       "description": "Discriminator value for a user schema create request."
     },
-    "title": {
+    "metaSchema": {
       "type": "string",
-      "minLength": 1,
-      "maxLength": 255,
-      "description": "Human-readable name for this schema."
-    },
-    "description": {
-      "type": "string",
-      "maxLength": 1024,
-      "description": "A description of this schema."
+      "format": "uri",
+      "description": "The user Schema version used for this schema."
     },
     "x-auth-methods": {
       "type": "object",
@@ -59,42 +52,12 @@
         }
       }
     },
-    "required": {
-      "type": "array",
-      "description": "A list of required fields for the user definition",
-      "items": {
-        "type": "string"
-      }
-    },
     "properties": {
       "type": "object",
       "description": "A map of additional properties for the user definition, where the key is the property name and the value is the property schema",
       "additionalProperties": {
         "$ref": "user-property.json"
       }
-    },
-    "example": {
-      "oneOf": [
-        {
-          "type": "string"
-        },
-        {
-          "type": "number"
-        },
-        {
-          "type": "boolean"
-        },
-        {
-          "type": "object"
-        },
-        {
-          "type": "array",
-          "items": {}
-        },
-        {
-          "type": "null"
-        }
-      ]
     }
   }
 }
