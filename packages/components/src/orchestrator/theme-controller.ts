@@ -23,7 +23,10 @@ export class ThemeController implements ReactiveController {
 
   private mediaQuery: MediaQueryList | null = null;
 
-  private _theme: ResolvedTheme = "light";
+  // Default surface is dark — the design system only publishes a dark
+  // variable mode today. See `branding-to-tokens.resolveTheme` for the
+  // matching logic on the orchestrator side.
+  private _theme: ResolvedTheme = "dark";
 
   constructor(host: ReactiveControllerHost) {
     this.host = host;
@@ -48,14 +51,17 @@ export class ThemeController implements ReactiveController {
   }
 
   private refresh(): void {
-    const mode = this.branding?.theme?.mode ?? "light";
+    const mode = this.branding?.theme?.mode ?? "dark";
     if (mode === "auto") {
       this.attach();
-      this.update(this.mediaQuery?.matches ? "dark" : "light");
+      // When tenants opt into auto and the OS preference is unknown, we
+      // bias toward dark since that's the only mode the design system
+      // currently publishes.
+      this.update(this.mediaQuery?.matches === false ? "light" : "dark");
       return;
     }
     this.detach();
-    this.update(mode === "dark" ? "dark" : "light");
+    this.update(mode === "light" ? "light" : "dark");
   }
 
   private attach(): void {
@@ -71,6 +77,8 @@ export class ThemeController implements ReactiveController {
   }
 
   private onMediaChange = (event: MediaQueryListEvent): void => {
+    // Auto-mode follows prefers-color-scheme. We watch the dark query, so
+    // `matches=true` ⇒ user wants dark.
     this.update(event.matches ? "dark" : "light");
   };
 

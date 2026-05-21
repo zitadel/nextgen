@@ -17,10 +17,13 @@ import { type Server } from "node:http";
 import express from "express";
 import { createMiddleware } from "@mswjs/http-middleware";
 
+import { applyBranding } from "./branding.js";
+import { defaultDevBranding } from "./default-dev-branding.js";
 import { JWK, signSessionToken, verifyHandoffToken } from "./crypto.js";
 import { setupMockHandlers } from "./handlers.js";
 
 export function startMockServer(port: number): Server {
+  applyBranding(defaultDevBranding);
   const iss = `http://localhost:${port}`;
   const app = express();
 

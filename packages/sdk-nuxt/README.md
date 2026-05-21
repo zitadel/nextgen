@@ -74,25 +74,36 @@ if (auth.value?.isAuthenticated) {
 </template>
 ```
 
-### 4. Login page
+### 4. Register components (client only)
 
-The `<zitadel-login>` web component (from `@zitadel-nextgen/components`) must be rendered client-side only. Use `<ClientOnly>`:
+Create `plugins/zitadel-components.client.ts` — do **not** import
+`@zitadel-nextgen/components` from page `<script setup>` (that runs during SSR):
+
+```ts
+import "@zitadel-nextgen/components";
+
+export default defineNuxtPlugin(() => {});
+```
+
+Set `body { margin: 0; font-family: sans-serif; }` in `app.vue` (see
+[`apps/demo-nuxt`](../../apps/demo-nuxt/README.md)). Arimo loads from
+`branding.font_url` inside `<zitadel-login>` when the mock/API supplies it.
+
+### 5. Login page
+
+Render `<zitadel-login>` inside `<ClientOnly>`:
 
 ```vue
 <template>
   <main>
     <ClientOnly>
-      <zitadel-login proxy-base="/__nextgen" post-sign-in-url="/admin" />
+      <zitadel-login api-base="/__nextgen" project-id="demo" post-sign-in-url="/admin" />
     </ClientOnly>
   </main>
 </template>
-
-<script setup lang="ts">
-import '@zitadel-nextgen/components';
-</script>
 ```
 
-### 5. Reading auth in a server route
+### 6. Reading auth in a server route
 
 ```ts
 import { getAuth } from '@nextgen/sdk-nuxt/server';

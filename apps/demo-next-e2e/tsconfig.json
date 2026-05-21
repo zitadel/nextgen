@@ -6,13 +6,5 @@
     "sourceMap": false,
     "types": ["node"]
   },
-  "include": ["playwright.config.mts", "src/**/*.spec.ts", "src/**/*.d.ts"],
-  "references": [
-    {
-      "path": "../../packages/sdk-next"
-    },
-    {
-      "path": "../../packages/api-mock"
-    }
-  ]
+  "include": ["playwright.config.mts", "src/**/*.spec.ts", "src/**/*.d.ts"]
 }

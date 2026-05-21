@@ -13,7 +13,6 @@
 </template>
 
 <script setup lang="ts">
-import "@zitadel-nextgen/components";
 import type { ClientAuthResult } from "@nextgen/sdk-nuxt";
 
 const auth = useState<ClientAuthResult>("nextgen-auth");

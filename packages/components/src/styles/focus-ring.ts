@@ -1,13 +1,13 @@
 import { css } from "lit";
 
-import { tokens } from "../tokens/catalogue.js";
-import { cssTokenVar as v } from "./css-helpers.js";
+import { t } from "./tokens.js";
 
 /**
- * Visible focus indicator shared across interactive atoms.
- * Atoms apply via `&:focus-visible { ${focusVisibleStyles} }`.
+ * Visible focus indicator shared across interactive atoms. Mirrors the
+ * Figma button "Focused" state — a 2px white outline offset by 2px from
+ * the element edge. Atoms apply via `&:focus-visible { ${focusVisibleStyles} }`.
  */
 export const focusVisibleStyles = css`
-  outline: ${v(tokens.border.widthStrong)} solid ${v(tokens.color.focusRing)};
-  outline-offset: 2px;
+  outline: ${t.focus.width} solid ${t.focus.color};
+  outline-offset: ${t.focus.offset};
 `;
