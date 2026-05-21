@@ -529,7 +529,7 @@ func TestAuthAttempt_Handoff(t *testing.T) {
 		require.NotNil(t, attempt.HandedOffAt)
 		assert.False(t, attempt.HandedOffAt.IsZero())
 
-		stored, err := repo.GetByHandoffToken(t.Context(), tx, attempt.ProjectID, string(token))
+		stored, err := repo.GetByHandoffToken(t.Context(), tx, attempt.ProjectID, token)
 		require.NoError(t, err)
 		assert.Equal(t, attempt.ID, stored.ID)
 		require.NotNil(t, stored.HandoffToken)

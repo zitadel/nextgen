@@ -2,7 +2,7 @@
 CREATE TABLE zitadel_nextgen.auth_attempts (
     project_id      TEXT        NOT NULL
     , id            BIGINT      GENERATED ALWAYS AS IDENTITY
-    , handoff_token TEXT
+    , handoff_token BYTEA
     , handed_off_at TIMESTAMPTZ
     , session_id    BIGINT
     , required_checks SMALLINT[]
