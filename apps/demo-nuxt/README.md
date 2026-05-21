@@ -11,7 +11,7 @@ Use **Nx** from the repo root (`corepack pnpm install` first). Two terminals:
 corepack pnpm nx start @zitadel-nextgen/api-mock
 
 # Terminal 2 — Nuxt on port 3001
-NEXTGEN_ISSUER_URL=http://localhost:4000 corepack pnpm nx dev @nextgen/demo-nuxt
+NEXTGEN_ISSUER_URL=http://localhost:4000 corepack pnpm nx dev @zitadel-nextgen/demo-nuxt
 ```
 
 Open [http://localhost:3001/login](http://localhost:3001/login). Any email/password combination is accepted by the mock server.
@@ -44,7 +44,7 @@ The demo imports the package from `dist/`, not source.
 
 ## How it works
 
-**Server middleware** (`server/middleware/auth.ts`) uses `createNextgenMiddleware` from `@nextgen/sdk-nuxt` to proxy `/__nextgen/*` requests to the auth backend, verify the session JWT on every request, and redirect unauthenticated users away from `/admin`.
+**Server middleware** (`server/middleware/auth.ts`) uses `createNextgenMiddleware` from `@zitadel-nextgen/sdk-nuxt` to proxy `/__nextgen/*` requests to the auth backend, verify the session JWT on every request, and redirect unauthenticated users away from `/admin`.
 
 **Plugin** (`plugins/auth.server.ts`) reads the verified auth context from the server event and writes it into Nuxt's shared `nextgen-auth` state so pages can access it without additional fetches.
 
