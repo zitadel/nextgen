@@ -9,8 +9,8 @@
  * Custom-only routes added on top:
  *   POST   /sessions/exchange     — exchange handoff_token for session cookie
  *   GET    /auth/end-session      — OIDC-style end-session, clears cookies
- *   GET    /.well-known/jwks.json — JWKS for JWT verification
- *   GET    /oauth/v2/keys         — alias for JWKS
+ *   GET    /.well-known/jwks.json — JWKS for JWT verification (dev convenience)
+ *   GET    /auth/keys             — JWKS, spec-defined endpoint (operation `getKeys`)
  *
  * Platform routes (mounted via setupPlatformHandlers):
  *   POST   /projects                  — create project
@@ -108,7 +108,7 @@ export function startMockServer(port: number): Server {
   app.get("/.well-known/jwks.json", (_req: express.Request, res: express.Response) => {
     res.json({ keys: [JWK] });
   });
-  app.get("/oauth/v2/keys", (_req: express.Request, res: express.Response) => {
+  app.get("/auth/keys", (_req: express.Request, res: express.Response) => {
     res.json({ keys: [JWK] });
   });
 
