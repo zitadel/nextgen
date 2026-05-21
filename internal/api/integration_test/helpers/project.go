@@ -22,20 +22,16 @@ func (h *Harness) EnsureProjectRepo(t *testing.T) domain.ProjectRepository {
 	return h.ProjectRepo
 }
 
-func (h *Harness) WithProject(t *testing.T) *domain.Project {
+func (h *Harness) CreateProject(t *testing.T, projectID string) string {
 	t.Helper()
-	if h.Project == nil {
-		project := &domain.Project{
-			ID:        "prj_test_1",
-			CreatedAt: time.Now().UTC(),
-			UpdatedAt: time.Now().UTC(),
-		}
-		pool := h.EnsureDBPool(t)
-		repo := repository.NewProjectRepository(pool)
-		err := repo.Create(t.Context(), pool, project)
-		require.NoError(t, err)
-
-		h.Project = project
+	project := &domain.Project{
+		ID:        projectID,
+		CreatedAt: time.Now().UTC(),
+		UpdatedAt: time.Now().UTC(),
 	}
-	return h.Project
+	pool := h.EnsureDBPool(t)
+	repo := repository.NewProjectRepository(pool)
+	err := repo.Create(t.Context(), pool, project)
+	require.NoError(t, err)
+	return project.ID
 }

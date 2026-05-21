@@ -23,7 +23,6 @@ import (
 
 var absoluteScheme = regexp.MustCompile(`^https?://`)
 
-// JSONSchema represent a JSON schema which can be used to validate JSON data.
 type JSONSchema struct {
 	ProjectID string
 	URL       string

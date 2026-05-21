@@ -23,6 +23,9 @@ type Harness struct {
 	Handler         *api.Handler
 	SecurityHandler *api.SecurityHandler
 
+	APIClient          *generated.Client
+	FakeSecuritySource *FakeSecuritySource
+
 	SchemaService      *service.SchemaService
 	FlowService        service.FlowService
 	AuthAttemptService service.AuthAttemptService
@@ -39,6 +42,4 @@ type Harness struct {
 	UserPasskeyRepo    domain.UserPasskeyRepository
 
 	Schemas test_data.Schemas
-
-	Project *domain.Project
 }

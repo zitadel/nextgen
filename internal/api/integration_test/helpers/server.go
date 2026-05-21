@@ -18,7 +18,6 @@ func (h *Harness) EnsureTestServer(t *testing.T) *httptest.Server {
 		h.TestServer = httptest.NewServer(
 			h.EnsureGeneratedServer(t),
 		)
-		t.Cleanup(h.TestServer.Close)
 		h.Schemas = test_data.BuildSchemas(h.TestServer.URL)
 	}
 	return h.TestServer

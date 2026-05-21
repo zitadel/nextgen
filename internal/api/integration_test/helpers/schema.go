@@ -8,6 +8,7 @@ import (
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/ianlancetaylor/jsonschema"
 	"github.com/stretchr/testify/require"
+	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database/repository"
@@ -65,4 +66,26 @@ func (h *Harness) EnsureSchemaValidator(t *testing.T) *domain.TenantSchemaValida
 		h.SchemaValidator = schemaValidator
 	}
 	return h.SchemaValidator
+}
+
+func (h *Harness) CreateUserSchema(t *testing.T, projectID string, schema string) string {
+	t.Helper()
+	client := h.EnsureAPIClient(t)
+
+	apiSchema := api.UserSchema{}
+	err := apiSchema.UnmarshalJSON([]byte(schema))
+	require.NoError(t, err)
+
+	req := api.CreateSchemaReq{
+		Type:       api.UserSchemaCreateSchemaReq,
+		UserSchema: apiSchema,
+	}
+	params := api.CreateSchemaParams{
+		ProjectID: api.OptProjectID{Set: true, Value: api.ProjectID(projectID)},
+	}
+
+	resp, err := client.CreateSchema(t.Context(), req, params)
+	require.NoError(t, err)
+	require.IsType(t, &api.CreateSchemaResponse{}, resp)
+	return resp.(*api.CreateSchemaResponse).ID
 }
