@@ -141,6 +141,23 @@ loads this package's built `dist/` (not source). The Nx `e2e` target has
 `dependsOn: ["^build"]` so CI is safe; manual loops need a fresh
 `nx build @zitadel-nextgen/components` after orchestrator changes.
 
+### Lit dev playground (`:5173`) and caching
+
+Atom `.ts` hot reload uses [`vite-plugin-web-components-hmr`](https://github.com/fi3ework/vite-plugin-web-components-hmr)
+(Open WC–derived Lit preset) on `src/**/*.ts` only. `dev/pages/*.ts` is plain
+`innerHTML` — `dev/main.ts` accepts those modules and calls `mountRoute()` again;
+`dev/playground-chrome.css` and sibling-package CSS trigger a full reload via
+`vite/lit-dev-hmr.ts` (`workspaceStylesFullReload`).
+
+If the playground still looks stale after save:
+
+```sh
+corepack pnpm --filter @zitadel-nextgen/components dev:clean
+```
+
+Then hard-refresh the browser. `apps/console` (`:5174`) does not pick up Lit-only
+source edits — use `:5173` for atom work.
+
 ## Build
 
 `tsdown.config.ts` produces ESM + `.d.mts` and externalises `lit`, `liquidjs`,

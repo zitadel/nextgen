@@ -27,8 +27,6 @@ export type StepFixtureInput = {
   capturedEmail?: string;
 };
 
-const submitContinue = { submit: { text_key: "submit.continue", primary: true } };
-
 function wrap(input: StepFixtureInput, step: CreateFlow201Step, extras?: Partial<CreateFlow201>): CreateFlow201 {
   return {
     id: input.flowId,
@@ -39,26 +37,60 @@ function wrap(input: StepFixtureInput, step: CreateFlow201Step, extras?: Partial
   };
 }
 
+/**
+ * Combined sign-in card — Figma 2xl `6593:141983`, card `6593:141985`,
+ * stack `6593:141989` (email + password + forgot + CTAs on one step).
+ *
+ * Matches the Flow API shape in `docs/design/flowengine/flow-engine.md`
+ * (single `login` step with `fields: [email, password]`).
+ */
 export function identifierStep(input: StepFixtureInput): CreateFlow201 {
   return wrap(input, {
     name: "identifier",
-    texts: { title_key: "identifier.title", description_key: "identifier.description" },
-    fields: { email: { type: "email", text_key: "identifier.field.email", required: true } },
-    actions: submitContinue,
+    texts: { title_key: "identifier.title" },
+    fields: {
+      email: {
+        type: "email",
+        text_key: "identifier.field.email",
+        required: true,
+      },
+      password: {
+        type: "password",
+        text_key: "identifier.field.password",
+        required: true,
+      },
+    },
+    actions: {
+      submit: { text_key: "submit.signin", primary: true },
+      passkey: { text_key: "identifier.action.passkey" },
+      register: { text_key: "identifier.action.register.link" },
+      recover: { text_key: "action.forgot_password" },
+    },
     gates: {},
   });
 }
 
+/** Sign-up 2xl frame `6593:141741`, card `6593:141743`, stack `6593:141747`. */
 export function registerStep(input: StepFixtureInput): CreateFlow201 {
   return wrap(input, {
     name: "register",
-    texts: { title_key: "register.title", description_key: "register.description" },
+    texts: { title_key: "register.title" },
     fields: {
-      email: { type: "email", text_key: "register.field.email", required: true },
-      given_name: { type: "text", text_key: "register.field.given_name", required: true },
-      family_name: { type: "text", text_key: "register.field.family_name", required: true },
+      email: {
+        type: "email",
+        text_key: "register.field.email",
+        required: true,
+      },
+      password: {
+        type: "password",
+        text_key: "register.field.password",
+        required: true,
+        validation: { min_length: 8 },
+      },
     },
-    actions: submitContinue,
+    actions: {
+      submit: { text_key: "register.action.submit", primary: true },
+    },
     gates: {},
   });
 }
@@ -66,9 +98,32 @@ export function registerStep(input: StepFixtureInput): CreateFlow201 {
 export function passwordStep(input: StepFixtureInput): CreateFlow201 {
   return wrap(input, {
     name: "password",
-    texts: { title_key: "password.title", description_key: "password.description" },
-    fields: { password: { type: "password", text_key: "password.field.password", required: true } },
-    actions: { submit: { text_key: "submit.signin", primary: true } },
+    texts: { title_key: "password.title" },
+    fields: {
+      password: {
+        type: "password",
+        text_key: "password.field.password",
+        required: true,
+      },
+    },
+    actions: {
+      submit: { text_key: "submit.signin", primary: true },
+      passkey: { text_key: "password.action.passkey" },
+      register: { text_key: "password.action.register.link" },
+    },
+    gates: {},
+  });
+}
+
+export function passkeyUpsellStep(input: StepFixtureInput): CreateFlow201 {
+  return wrap(input, {
+    name: "passkey-upsell",
+    texts: { title_key: "passkey-upsell.title" },
+    fields: {},
+    actions: {
+      setup: { text_key: "passkey-upsell.action.setup", primary: true },
+      skip: { text_key: "passkey-upsell.action.skip" },
+    },
     gates: {},
   });
 }
@@ -95,7 +150,10 @@ export async function doneStep(input: StepFixtureInput): Promise<CreateFlow201> 
       texts: { title_key: "complete.title" },
       complete: "show",
       fields: {},
-      actions: {},
+      actions: {
+        continue: { text_key: "signed-in.continue", primary: true },
+        logout: { text_key: "signed-in.logout" },
+      },
       gates: {},
     },
     {

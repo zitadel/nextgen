@@ -1,0 +1,83 @@
+{
+  "name": "@zitadel-nextgen/design-tokens",
+  "version": "0.0.0",
+  "description": "Figma-driven design tokens for ZITADEL NextGen — CSS variables, typed TypeScript constants, and a Tailwind v4 @theme block built from the published Zitadel Design System library.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zitadel/nextgen.git",
+    "directory": "packages/design-tokens"
+  },
+  "type": "module",
+  "files": [
+    "dist",
+    "src/generated",
+    "src/overrides.ts"
+  ],
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "@zitadel-nextgen/source": "./src/generated/tokens.ts",
+      "types": "./dist/tokens.d.mts",
+      "import": "./dist/tokens.mjs"
+    },
+    "./css/tokens.css": "./src/generated/tokens.css",
+    "./css/tailwind.css": "./src/generated/tailwind.css"
+  },
+  "scripts": {
+    "sync": "tsx scripts/sync-from-figma.ts",
+    "generate": "tsx scripts/build.ts",
+    "build": "tsdown",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "tsdown": "catalog:",
+    "tslib": "catalog:",
+    "tsx": "catalog:"
+  },
+  "nx": {
+    "targets": {
+      "sync": {
+        "cache": false,
+        "inputs": [
+          "{projectRoot}/figma-tokens.lock",
+          "{projectRoot}/scripts/sync-from-figma.ts",
+          {
+            "env": "FIGMA_TOKEN"
+          }
+        ],
+        "outputs": [
+          "{projectRoot}/src/generated/figma.tokens.json"
+        ]
+      },
+      "generate": {
+        "cache": true,
+        "inputs": [
+          "{workspaceRoot}/pnpm-lock.yaml",
+          "{projectRoot}/package.json",
+          "{projectRoot}/scripts/build.ts",
+          "{projectRoot}/src/overrides.ts",
+          "{projectRoot}/src/generated/figma.tokens.json"
+        ],
+        "outputs": [
+          "{projectRoot}/src/generated/tokens.css",
+          "{projectRoot}/src/generated/tokens.ts",
+          "{projectRoot}/src/generated/tailwind.css"
+        ]
+      },
+      "build": {
+        "dependsOn": ["generate"],
+        "outputs": ["{projectRoot}/dist"]
+      },
+      "typecheck": {
+        "dependsOn": ["generate"]
+      },
+      "test": {
+        "dependsOn": ["generate"]
+      },
+      "lint": {
+        "dependsOn": ["generate"]
+      }
+    }
+  }
+}

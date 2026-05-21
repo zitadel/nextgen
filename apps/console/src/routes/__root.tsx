@@ -11,7 +11,19 @@ export const Route = createRootRoute({
 function RootComponent() {
   return (
     <>
-      <Outlet />
+      <header>
+        <h1>@zitadel-nextgen/ui-react</h1>
+        <nav aria-label="Playground">
+          <a href="/" aria-current="page">
+            Atoms
+          </a>
+        </nav>
+      </header>
+      <main>
+        <div className="playground-host">
+          <Outlet />
+        </div>
+      </main>
       <TanStackDevtools
         config={{
           position: "bottom-right",

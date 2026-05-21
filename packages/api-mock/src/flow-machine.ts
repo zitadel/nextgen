@@ -9,12 +9,16 @@
  *
  * State graph:
  *
- *   idle --START(login)----> identifier --SUBMIT--> password
+ *   idle --START(login)----> identifier (email+password, Figma 6593:141985)
+ *                                       --SUBMIT(submit|recover)--> passkey-upsell
+ *                                       --SUBMIT(register)--> register
+ *                                       --SUBMIT(passkey)--> passkey-upsell
  *                                       --SUBMIT(sso_provider_id)--> sso-redirect
- *      \--START(register)--> register --SUBMIT--> password
+ *      \--START(register)--> register --SUBMIT--> passkey-upsell
  *
- *   password / sso-redirect --SUBMIT--> done
- *   anything                --RESET---> idle
+ *   password -- legacy split step; kept for tests that target it directly
+ *   passkey-upsell / sso-redirect --SUBMIT--> done
+ *   anything --RESET--> idle
  */
 import type { CreateFlowBodyPurpose } from "@zitadel-nextgen/api/generated/model";
 import { createMachine, type AnyActorRef, assign, createActor } from "xstate";
@@ -23,6 +27,7 @@ export type FlowStepName =
   | "identifier"
   | "register"
   | "password"
+  | "passkey-upsell"
   | "sso-redirect"
   | "done";
 
@@ -111,7 +116,22 @@ export const flowMachine = createMachine({
             ],
           },
           {
-            target: "password",
+            guard: ({ event }) => event.action === "register",
+            target: "register",
+            actions: [captureFields, rotateToken],
+          },
+          {
+            guard: ({ event }) => event.action === "passkey",
+            target: "passkey-upsell",
+            actions: [captureFields, rotateToken],
+          },
+          {
+            guard: ({ event }) => event.action === "recover",
+            target: "passkey-upsell",
+            actions: [captureFields, rotateToken],
+          },
+          {
+            target: "passkey-upsell",
             actions: [captureFields, rotateToken],
           },
         ],
@@ -119,12 +139,17 @@ export const flowMachine = createMachine({
     },
     register: {
       on: {
-        SUBMIT: { target: "password", actions: [captureFields, rotateToken] },
+        SUBMIT: { target: "passkey-upsell", actions: [captureFields, rotateToken] },
       },
     },
     password: {
       on: {
-        SUBMIT: { target: "done", actions: [captureFields, rotateToken] },
+        SUBMIT: { target: "passkey-upsell", actions: [captureFields, rotateToken] },
+      },
+    },
+    "passkey-upsell": {
+      on: {
+        SUBMIT: { target: "done", actions: [rotateToken] },
       },
     },
     "sso-redirect": {

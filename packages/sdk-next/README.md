@@ -108,7 +108,8 @@ const ZitadelLogin = dynamic(
     return function ZitadelLoginElement() {
       return (
         <zitadel-login
-          proxy-base="/__nextgen"
+          api-base="/__nextgen"
+          project-id="demo"
           post-sign-in-url="/admin"
         />
       );

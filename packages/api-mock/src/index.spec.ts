@@ -12,7 +12,7 @@ import {
   clearBranding,
   setupMockHandlers,
 } from "./index.js";
-import type { MockHandle } from "./index.js";
+import type { MockHandle } from "./handlers.js";
 
 const PROJECT_ID = "demo-project";
 const server = setupServer();
@@ -41,29 +41,31 @@ afterEach(() => {
 });
 
 describe("setupMockHandlers", () => {
-  test("walks identifier -> password -> done", async () => {
+  test("walks combined sign-in -> passkey-upsell -> done", async () => {
     const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
     expect(start.step.name).toBe("identifier");
+    expect(start.step.fields?.email).toBeTruthy();
+    expect(start.step.fields?.password).toBeTruthy();
     expect(start.id).toBeTruthy();
 
-    const submitIdentifier = await submitFlowStep(start.id, {
+    const submitSignIn = await submitFlowStep(start.id, {
       session_token: start.session_token,
       action: "submit",
-      fields: { email: "alice@acme.com" },
+      fields: { email: "alice@acme.com", password: "hunter2" },
     });
-    expect(submitIdentifier.step.name).toBe("password");
+    expect(submitSignIn.step.name).toBe("passkey-upsell");
 
-    const submitPassword = await submitFlowStep(submitIdentifier.id, {
-      session_token: submitIdentifier.session_token,
-      action: "submit",
-      fields: { password: "hunter2" },
+    const submitPasskey = await submitFlowStep(submitSignIn.id, {
+      session_token: submitSignIn.session_token,
+      action: "skip",
+      fields: {},
     });
-    expect(submitPassword.step.name).toBe("done");
+    expect(submitPasskey.step.name).toBe("done");
     // complete: "show" — the web component fires zitadel-flow-complete and
     // waits for the app to navigate; the server does not redirect.
-    expect(submitPassword.step.complete).toBe("show");
-    expect(submitPassword.redirect_uri).toBeUndefined();
-    expect(submitPassword.handoff_token).toBeTruthy();
+    expect(submitPasskey.step.complete).toBe("show");
+    expect(submitPasskey.redirect_uri).toBeUndefined();
+    expect(submitPasskey.handoff_token).toBeTruthy();
   });
 
   test("captures every request body for assertions", async () => {
@@ -71,7 +73,7 @@ describe("setupMockHandlers", () => {
     await submitFlowStep(start.id, {
       session_token: start.session_token,
       action: "submit",
-      fields: { email: "alice@acme.com" },
+      fields: { email: "alice@acme.com", password: "hunter2" },
     });
     await getFlowStep(start.id);
 
@@ -83,7 +85,7 @@ describe("setupMockHandlers", () => {
     });
     expect(captured[1]).toMatchObject({
       kind: "submitFlowStep",
-      body: { fields: { email: "alice@acme.com" } },
+      body: { fields: { email: "alice@acme.com", password: "hunter2" } },
     });
     expect(captured[2]).toMatchObject({ kind: "getFlowStep" });
   });
@@ -98,7 +100,7 @@ describe("setupMockHandlers", () => {
     expect(start.session_token).not.toBe(submit.session_token);
   });
 
-  test("routes register through its own step before password", async () => {
+  test("routes register through sign-up step to passkey-upsell", async () => {
     const start = await createFlow({ purpose: "register", project_id: PROJECT_ID });
     expect(start.step.name).toBe("register");
     const submit = await submitFlowStep(start.id, {
@@ -106,11 +108,10 @@ describe("setupMockHandlers", () => {
       action: "submit",
       fields: {
         email: "alice@acme.com",
-        given_name: "Alice",
-        family_name: "Acme",
+        password: "hunter2",
       },
     });
-    expect(submit.step.name).toBe("password");
+    expect(submit.step.name).toBe("passkey-upsell");
   });
 
   test("redirects to SSO when sso_provider_id is set", async () => {
@@ -123,6 +124,45 @@ describe("setupMockHandlers", () => {
     });
     expect(submit.step.name).toBe("sso-redirect");
     expect(submit.step.redirect_url).toBeTruthy();
+  });
+
+  test("sign-in wrong credentials stays on identifier with password field error", async () => {
+    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    const submit = await submitFlowStep(start.id, {
+      session_token: start.session_token,
+      action: "submit",
+      fields: { email: "wrong@example.com", password: "hunter2" },
+    });
+    expect(submit.step.name).toBe("identifier");
+    expect(submit.step.error).toBe("error.invalid_credentials");
+  });
+
+  test("passkey setup failure stays on passkey-upsell with error key", async () => {
+    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    const upsell = await submitFlowStep(start.id, {
+      session_token: start.session_token,
+      action: "submit",
+      fields: { email: "passkey-cancel@example.com", password: "hunter2" },
+    });
+    expect(upsell.step.name).toBe("passkey-upsell");
+    const fail = await submitFlowStep(upsell.id, {
+      session_token: upsell.session_token,
+      action: "setup",
+      fields: {},
+    });
+    expect(fail.step.name).toBe("passkey-upsell");
+    expect(fail.step.error).toBe("error.passkey_cancelled");
+  });
+
+  test("sign-in server error stays on identifier with form-level error key", async () => {
+    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    const submit = await submitFlowStep(start.id, {
+      session_token: start.session_token,
+      action: "submit",
+      fields: { email: "server@example.com", password: "hunter2" },
+    });
+    expect(submit.step.name).toBe("identifier");
+    expect(submit.step.error).toBe("error.sign_in_server");
   });
 
   test("merges the active branding overlay onto every response", async () => {

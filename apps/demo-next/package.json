@@ -21,6 +21,8 @@
   },
   "dependencies": {
     "@zitadel-nextgen/components": "workspace:*",
+    "@zitadel-nextgen/design-tokens": "workspace:*",
+    "@zitadel-nextgen/shared-component-styles": "workspace:*",
     "@zitadel-nextgen/sdk-next": "workspace:*",
     "next": "^16.2.4",
     "react": "^19.0.0",
