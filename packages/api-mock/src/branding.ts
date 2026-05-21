@@ -14,10 +14,7 @@
  * `@zitadel-nextgen/components` type surface. The orchestrator's branding
  * validator strips anything the OpenAPI doesn't model.
  */
-import type {
-  CreateFlow201,
-  CreateFlow201Branding,
-} from "@zitadel-nextgen/api/generated/model";
+import type { CreateFlow201, CreateFlow201Branding } from "@zitadel-nextgen/api/generated/model";
 
 export type MockBranding = CreateFlow201Branding & Record<string, unknown>;
 
@@ -36,7 +33,9 @@ export function clearBranding(): void {
  * object; `base` is not mutated.
  */
 export function withBranding(base: CreateFlow201): CreateFlow201 {
-  if (!overlay) return base;
+  if (!overlay) {
+    return base;
+  }
   return {
     ...base,
     branding: { ...overlay } as CreateFlow201["branding"],
