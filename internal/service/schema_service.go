@@ -29,13 +29,13 @@ type CreateSchemaByURLInput struct {
 type SchemaService struct {
 	pool           database.Pool
 	schemaRepo     domain.JSONSchemaRepository
-	schemaResolver domain.JSONSchemaResolver
+	schemaResolver *domain.JSONSchemaResolver
 }
 
 func NewSchemaService(
 	pool database.Pool,
 	schemaRepo domain.JSONSchemaRepository,
-	schemaResolver domain.JSONSchemaResolver,
+	schemaResolver *domain.JSONSchemaResolver,
 ) *SchemaService {
 	return &SchemaService{
 		pool:           pool,
