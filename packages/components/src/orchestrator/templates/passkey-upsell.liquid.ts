@@ -68,7 +68,7 @@ export const passkeyUpsellTemplate = String.raw`
       <zl-passkey
         ceremony="{{ challenge.options.ceremony | default: 'register' }}"
         challenge-id="{{ challenge.challenge_id }}"
-        options='{{ challenge.options | json | escape }}'
+        options='{{ challenge.options | json }}'
       ></zl-passkey>
     {% endif %}
   </zl-card>
