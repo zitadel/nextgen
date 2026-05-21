@@ -6,9 +6,13 @@
  */
 import type { Branding } from "../src/orchestrator/index.js";
 
+const INTER_FONT_URL =
+  "https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700&display=swap";
+
 export const brandingPresets = {
   centered: {
     layout: "centered",
+    font_url: INTER_FONT_URL,
     logo_url: new URL("./assets/zitadel-logo-light.svg", import.meta.url).href,
     palette: {
       primary: "#4A90D9",
@@ -28,6 +32,7 @@ export const brandingPresets = {
   } satisfies Branding,
   split: {
     layout: "split",
+    font_url: INTER_FONT_URL,
     logo_url: new URL("./assets/zitadel-logo-dark.svg", import.meta.url).href,
     hero_url:
       "https://images.unsplash.com/photo-1505765050516-f72dcac9c60e?auto=format&fit=crop&w=1280&q=60",
@@ -45,6 +50,7 @@ export const brandingPresets = {
   } satisfies Branding,
   dark: {
     layout: "centered",
+    font_url: INTER_FONT_URL,
     logo_url: new URL("./assets/zitadel-logo-dark.svg", import.meta.url).href,
     palette: {
       primary: "#7C9CFF",

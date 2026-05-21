@@ -48,6 +48,7 @@
   },
   "scripts": {
     "dev": "vite",
+    "dev:clean": "rm -rf ../../node_modules/.vite/packages/components && vite",
     "build": "tsdown",
     "test": "vitest run --project unit",
     "test:browser": "vitest run --project browser",
@@ -55,11 +56,25 @@
   },
   "dependencies": {
     "@zitadel-nextgen/api": "workspace:*",
+    "@zitadel-nextgen/design-tokens": "workspace:*",
+    "@zitadel-nextgen/shared-component-styles": "workspace:*",
     "dompurify": "catalog:",
     "liquidjs": "catalog:",
-    "lit": "catalog:"
+    "lit": "catalog:",
+    "lucide": "catalog:"
+  },
+  "nx": {
+    "targets": {
+      "build": {
+        "outputs": ["{projectRoot}/dist"]
+      },
+      "typecheck": {
+        "dependsOn": ["build"]
+      }
+    }
   },
   "devDependencies": {
+    "@tsdown/css": "catalog:",
     "@vitest/browser": "catalog:",
     "@vitest/browser-playwright": "catalog:",
     "@zitadel-nextgen/api-mock": "workspace:*",
@@ -67,6 +82,8 @@
     "msw": "catalog:",
     "playwright": "catalog:",
     "ts-lit-plugin": "catalog:",
+    "vite-plugin-web-components-hmr": "catalog:",
+    "lightningcss": "catalog:",
     "tsdown": "catalog:",
     "tslib": "catalog:"
   }

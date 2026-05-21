@@ -6,13 +6,17 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os/signal"
 	"strings"
 	"syscall"
 	"time"
 
+	lru "github.com/hashicorp/golang-lru/v2"
+	"github.com/ianlancetaylor/jsonschema"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/zitadel/nextgen/internal/domain"
 
 	oasapi "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
@@ -71,6 +75,8 @@ func run(ctx context.Context, cfg Config, pool database.Pool) error {
 		}
 	}()
 
+	// ----
+
 	// ── Repositories ─────────────────
 	projectRepo := repository.NewProjectRepository(pool)
 	userRepo := repository.NewUserRepository()
@@ -79,6 +85,17 @@ func run(ctx context.Context, cfg Config, pool database.Pool) error {
 	sessionRepo := repository.NewSessionRepository(pool)
 	flowRepo := repository.NewFlowDefinitionRepository(pool)
 	attemptRepo := repository.NewAuthAttemptRepository(pool)
+	schemaRepo := repository.NewJSONSchemaRepository(pool)
+
+	schemaCache, err := lru.New2Q[string, *jsonschema.Schema](1000)
+	if err != nil {
+		return fmt.Errorf("build schema cache: %w", err)
+	}
+	serverURL, err := url.Parse(cfg.Server.Address)
+	if err != nil {
+		return fmt.Errorf("invalid server url: %w", err)
+	}
+	schemaResolver := domain.NewJSONSchemaResolver(schemaRepo, schemaCache, 10, 1000_000, &http.Client{}, serverURL)
 
 	// ── Services ─────────────────────
 	flowService := service.NewFlowService(pool, flowRepo)
@@ -91,6 +108,7 @@ func run(ctx context.Context, cfg Config, pool database.Pool) error {
 		userPasswordRepo,
 		userPasskeyRepo,
 	)
+	schemaService := service.NewSchemaService(pool, schemaRepo, schemaResolver)
 
 	// ── HTTP Server ─────────────────
 
@@ -98,7 +116,7 @@ func run(ctx context.Context, cfg Config, pool database.Pool) error {
 	defer stop()
 
 	oasServer, err := oasapi.NewServer(
-		api.NewHandler(flowService, authAttemptSvc),
+		api.NewHandler(flowService, authAttemptSvc, schemaService),
 		api.NewSecurityHandler(),
 		oasapi.WithErrorHandler(api.OgenErrorHandler))
 	if err != nil {

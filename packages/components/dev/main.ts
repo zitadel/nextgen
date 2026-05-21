@@ -1,3 +1,10 @@
+// Base design-system tokens. Standalone atoms outside `<zitadel-login>`
+// resolve `var(--zl-*)` against the host page; loading the CSS here puts
+// `--zl-*` on `:root` so the atoms-only page paints correctly. Inside the
+// orchestrator, `applyBaseTokens` adopts the same layer into the shadow
+// root, so the `<zitadel-login>` route doesn't depend on this import.
+import "@zitadel-nextgen/design-tokens/css/tokens.css";
+
 import "../src/index.js";
 import { setApiBaseUrl } from "@zitadel-nextgen/api/runtime/base-url";
 import { applyBranding, setupMock } from "@zitadel-nextgen/api-mock";
@@ -54,6 +61,12 @@ async function bootstrap(): Promise<void> {
 
   window.addEventListener("popstate", mountRoute);
   mountRoute();
+}
+
+if (import.meta.hot) {
+  import.meta.hot.accept(["./pages/atoms.js", "./pages/login.js"], () => {
+    mountRoute();
+  });
 }
 
 void bootstrap();

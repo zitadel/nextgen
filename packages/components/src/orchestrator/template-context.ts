@@ -39,6 +39,7 @@ export type FlowError = {
 
 export type FlowIdentity = {
   display_name?: string;
+  email_address?: string;
   avatar_url?: string;
 };
 

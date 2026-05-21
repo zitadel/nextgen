@@ -9,18 +9,21 @@
  *   POST   /sessions/exchange     — exchange handoff_token for session cookie
  *   POST   /logout                — clear session cookies
  *   GET    /auth/end-session      — OIDC-style end-session, clears cookies
- *   GET    /.well-known/jwks.json — JWKS for JWT verification
- *   GET    /oauth/v2/keys         — alias for JWKS
+ *   GET    /.well-known/jwks.json — JWKS for JWT verification (dev convenience)
+ *   GET    /auth/keys             — JWKS, spec-defined endpoint (operation `getKeys`)
  */
 import { type Server } from "node:http";
 
 import express from "express";
 import { createMiddleware } from "@mswjs/http-middleware";
 
+import { applyBranding } from "./branding.js";
+import { defaultDevBranding } from "./default-dev-branding.js";
 import { JWK, signSessionToken, verifyHandoffToken } from "./crypto.js";
 import { setupMockHandlers } from "./handlers.js";
 
 export function startMockServer(port: number): Server {
+  applyBranding(defaultDevBranding);
   const iss = `http://localhost:${port}`;
   const app = express();
 
@@ -53,7 +56,7 @@ export function startMockServer(port: number): Server {
   app.get("/.well-known/jwks.json", (_req: express.Request, res: express.Response) => {
     res.json({ keys: [JWK] });
   });
-  app.get("/oauth/v2/keys", (_req: express.Request, res: express.Response) => {
+  app.get("/auth/keys", (_req: express.Request, res: express.Response) => {
     res.json({ keys: [JWK] });
   });
 
