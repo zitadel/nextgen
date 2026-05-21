@@ -96,6 +96,10 @@ func run(ctx context.Context, cfg Config, pool database.Pool) error {
 		return fmt.Errorf("invalid server url: %w", err)
 	}
 	schemaResolver := domain.NewJSONSchemaResolver(schemaRepo, schemaCache, 10, 1000_000, &http.Client{}, serverURL)
+	schemaValidator, err := domain.NewTenantSchemaValidator(serverURL.String())
+	if err != nil {
+		return fmt.Errorf("build schema validator: %w", err)
+	}
 
 	// ── Services ─────────────────────
 	flowService := service.NewFlowService(pool, flowRepo)
@@ -108,7 +112,7 @@ func run(ctx context.Context, cfg Config, pool database.Pool) error {
 		userPasswordRepo,
 		userPasskeyRepo,
 	)
-	schemaService := service.NewSchemaService(pool, schemaRepo, schemaResolver)
+	schemaService := service.NewSchemaService(pool, schemaRepo, schemaResolver, schemaValidator)
 
 	// ── HTTP Server ─────────────────
 

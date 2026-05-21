@@ -119,16 +119,13 @@ func TestCreateSchema(t *testing.T) {
 			}
 
 			resp, err := client.CreateSchema(t.Context(), req, params)
-			assert.Error(t, err)
-			_ = resp
 
-			// TODO: return correct error
-			// assert.NoError(t, err)
-			//if !assert.IsType(t, &api.CreateSchemaConflict{}, resp) {
-			//	bs, err := json.Marshal(resp)
-			//	require.NoError(t, err)
-			//	t.Fatal(string(bs))
-			//}
+			assert.NoError(t, err)
+			if !assert.IsType(t, &api.CreateSchemaConflict{}, resp) {
+				bs, err := json.Marshal(resp)
+				require.NoError(t, err)
+				t.Fatal(string(bs))
+			}
 		})
 	})
 }
@@ -163,16 +160,13 @@ func TestGetSchema(t *testing.T) {
 				ID:        "does-not-exist",
 				ProjectID: api.OptProjectID{Set: true, Value: api.ProjectID(projectID)},
 			})
-			assert.Error(t, err)
-			_ = resp
 
-			// TODO: return correct error
-			//assert.NoError(t, err)
-			//if !assert.IsType(t, &api.GetSchemaByIdNotFound{}, resp) {
-			//	bs, err := json.Marshal(resp)
-			//	require.NoError(t, err)
-			//	log.Println(string(bs))
-			//}
+			assert.NoError(t, err)
+			if !assert.IsType(t, &api.GetSchemaByIdNotFound{}, resp) {
+				bs, err := json.Marshal(resp)
+				require.NoError(t, err)
+				log.Println(string(bs))
+			}
 		})
 	})
 }

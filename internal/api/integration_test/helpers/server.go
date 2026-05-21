@@ -30,6 +30,7 @@ func (h *Harness) EnsureGeneratedServer(t *testing.T) *generated.Server {
 		h.GeneratedServer, err = generated.NewServer(
 			h.EnsureHandler(t),
 			h.EnsureSecurityHandler(t),
+			generated.WithErrorHandler(api.OgenErrorHandler),
 		)
 		require.NoError(t, err)
 	}

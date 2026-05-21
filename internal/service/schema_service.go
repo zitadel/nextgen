@@ -3,10 +3,11 @@ package service
 import (
 	"context"
 	"encoding/json"
-	"fmt"
+	"errors"
 	"net/url"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
@@ -62,7 +63,7 @@ func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInpu
 
 	var tenantSchema map[string]any
 	if err := json.Unmarshal(input.Schema, &tenantSchema); err != nil {
-		return nil, fmt.Errorf("%w: %w", "ErrSchemaParseFailed", err)
+		return nil, domain.ErrJSONSchemaInvalid().WithParent(err)
 	}
 
 	model := &domain.JSONSchema{
@@ -74,6 +75,9 @@ func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInpu
 
 	err := s.schemaRepo.Create(ctx, tx, model)
 	if err != nil {
+		if _, ok := errors.AsType[*database.IntegrityViolationError](err); ok {
+			return nil, domain.ErrJSONSchemaAlreadyExists().WithParent(err)
+		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to create schema in database")
 	}
 
@@ -84,7 +88,7 @@ func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInpu
 
 	err = s.schemaValidator.ValidateAgainstMetaSchema(input.Schema)
 	if err != nil {
-		return nil, domain.ErrRequestInvalid().WithParent(err).WithMessage("invalid schema")
+		return nil, domain.ErrJSONSchemaInvalid().WithParent(err)
 	}
 
 	err = tx.Commit(ctx)
@@ -121,5 +125,12 @@ func (s *SchemaService) CreateSchemaByUrl(ctx context.Context, input CreateSchem
 }
 
 func (s *SchemaService) GetSchema(ctx context.Context, projectID string, teamID string, schemaID string) (*domain.JSONSchema, error) {
-	return s.schemaRepo.GetByID(ctx, s.pool, projectID, schemaID)
+	schema, err := s.schemaRepo.GetByID(ctx, s.pool, projectID, schemaID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.ErrJSONSchemaNotFound()
+		}
+		return nil, domain.ErrInternal(err).WithMessage("failed to get schema from database")
+	}
+	return schema, nil
 }

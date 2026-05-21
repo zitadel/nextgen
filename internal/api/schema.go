@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"errors"
+	"net/http"
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -64,5 +65,16 @@ func (h *Handler) GetSchemaById(ctx context.Context, params api.GetSchemaByIdPar
 }
 
 // ------------------ Errors ---------------
+
+func schemaErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
+	switch err.Code {
+	case domain.ErrJSONSchemaNotFound().Code:
+		return errorResponseWithStatusCode(http.StatusNotFound, err)
+	case domain.ErrJSONSchemaAlreadyExists().Code:
+		return errorResponseWithStatusCode(http.StatusConflict, err)
+	default:
+		return internalErrorResponse(err)
+	}
+}
 
 var UnknownSchemaKindError = errors.New("unknown kind of schema")
