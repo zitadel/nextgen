@@ -23,8 +23,9 @@ test("signs in via the embedded component and lands on /admin", async ({ page })
   await page.getByLabel(/password/i).fill("hunter2");
   // Combined identifier step (email + password) — api-mock `identifierStep`.
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  // Passkey upsell before handoff — skip matches mock + Vitest happy path.
-  await page.getByRole("button", { name: /skip for now/i }).click();
+  const skip = page.getByRole("button", { name: /skip for now/i });
+  await expect(skip).toBeVisible({ timeout: 15_000 });
+  await skip.click();
 
   await page.waitForURL("**/admin");
   await expect(page.getByRole("heading", { name: "Admin" })).toBeVisible();
