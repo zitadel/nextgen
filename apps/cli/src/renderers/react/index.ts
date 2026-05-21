@@ -4,12 +4,15 @@ import type { RendererSpec } from "../types";
 /**
  * The Next.js App Router renderer scaffolds `/login`, `/register`, and
  * `/profile` pages that drive the `<zitadel-login>` and `<zitadel-logout>`
- * Lit web components from `@zitadel-nextgen/components`.
+ * Lit web components.
  *
- * Each page is a single client component (`"use client"`) that imports the
- * components package via `next/dynamic({ ssr: false })`. Lit elements call
- * `customElements.define` at module load, which needs a browser, so SSR is
- * disabled for the dynamic chunk.
+ * Each page is a single client component (`"use client"`) that imports
+ * `@zitadel-nextgen/sdk-next/client` via `next/dynamic({ ssr: false })`.
+ * That subpath re-exports from `@zitadel-nextgen/components`, so the
+ * `customElements.define` side-effect fires; importing components
+ * directly would fail on strict-resolution package managers (pnpm,
+ * yarn PnP) because the user only declares `sdk-next` as a direct dep.
+ * SSR is disabled because Lit's element registration needs a browser.
  *
  * Configuration is read from `NEXT_PUBLIC_*` env vars so the values reach
  * the client bundle. The CLI writes both `NEXT_PUBLIC_ZITADEL_API_BASE`
@@ -34,7 +37,7 @@ import dynamic from "next/dynamic";
 
 const ${elementName} = dynamic(
   async () => {
-    await import("@zitadel-nextgen/components");
+    await import("@zitadel-nextgen/sdk-next/client");
     return function ${elementName}Element() {
       return (
         <zitadel-login
@@ -68,7 +71,7 @@ import dynamic from "next/dynamic";
 
 const ZitadelLogout = dynamic(
   async () => {
-    await import("@zitadel-nextgen/components");
+    await import("@zitadel-nextgen/sdk-next/client");
     return function ZitadelLogoutElement() {
       return (
         <zitadel-logout
