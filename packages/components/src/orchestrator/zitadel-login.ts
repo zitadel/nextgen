@@ -529,6 +529,10 @@ export class ZitadelLogin extends LitElement {
    * Mutating `this.response` triggers `unsafeHTML` to replace the DOM tree,
    * which reconnects a fresh `<zl-passkey>` that immediately re-starts the
    * ceremony — creating an infinite loop. The guard breaks the cycle.
+   *
+   * We also strip the `challenge` from the step so the template does not
+   * render a new `<zl-passkey>` on re-render. Without this, the first
+   * cancel would trigger a second ceremony (the guard prevents a third).
    */
   private handlePasskeyError = (
     event: CustomEvent<{ challenge_id: string; error: string; aborted: boolean }>,
@@ -537,9 +541,10 @@ export class ZitadelLogin extends LitElement {
     const { error: message, aborted } = event.detail;
     const errorKey = aborted ? "error.passkey_cancelled" : "error.passkey_failed";
     if (this.response.step.error === errorKey) return;
+    const { challenge: _dropped, ...stepWithoutChallenge } = this.response.step;
     this.response = {
       ...this.response,
-      step: { ...this.response.step, error: errorKey },
+      step: { ...stepWithoutChallenge, error: errorKey },
     };
     console.warn(`[zitadel-login] passkey ceremony ${aborted ? "cancelled" : "failed"}: ${message}`);
   };
