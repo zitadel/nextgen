@@ -1,11 +1,11 @@
-# @nextgen/sdk-nuxt
+# @zitadel-nextgen/sdk-nuxt
 
 Nuxt middleware and helpers for Nextgen Auth.
 
 ## Installation
 
 ```bash
-pnpm add @nextgen/sdk-nuxt
+pnpm add @zitadel-nextgen/sdk-nuxt
 ```
 
 ## Setup
@@ -15,7 +15,7 @@ pnpm add @nextgen/sdk-nuxt
 Create `server/middleware/auth.ts`:
 
 ```ts
-import { createNextgenMiddleware } from '@nextgen/sdk-nuxt/server';
+import { createNextgenMiddleware } from '@zitadel-nextgen/sdk-nuxt/server';
 
 const { nextgenIssuerUrl } = useRuntimeConfig();
 
@@ -106,7 +106,7 @@ Render `<zitadel-login>` inside `<ClientOnly>`:
 ### 6. Reading auth in a server route
 
 ```ts
-import { getAuth } from '@nextgen/sdk-nuxt/server';
+import { getAuth } from '@zitadel-nextgen/sdk-nuxt/server';
 
 export default defineEventHandler((event) => {
   const auth = getAuth(event);
