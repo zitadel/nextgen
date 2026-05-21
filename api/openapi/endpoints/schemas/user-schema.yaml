@@ -7,7 +7,6 @@ description: |
 required:
   - metaSchema
   - kind
-  - title
   - x-auth-methods
 properties:
   "$schema":

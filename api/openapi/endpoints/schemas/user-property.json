@@ -13,10 +13,6 @@
       "const": "https://json-schema.org/draft/2020-12/schema",
       "description": "The JSON Schema version used for this schema."
     },
-    "title": {
-      "type": "string",
-      "description": "The title of the user property"
-    },
     "x-identifier": {
       "type": "boolean",
       "default": false,

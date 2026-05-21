@@ -1,15 +1,10 @@
 "$schema": https://json-schema.org/draft/2020-12/schema
 title: UserProperty
 type: object
-required:
-  - type
 description: |
   This schema is missing `"allOf": [{"$ref": "https://json-schema.org/draft/2020-12/schema"}],`. 
   This is done because a lot of code generators cannot handle that.
 properties:
-  title:
-    type: string
-    description: The title of the user property
   x-identifier:
     type: boolean
     default: false
