@@ -43,3 +43,4 @@ properties:
       key is the property name and the value is the property schema
     additionalProperties:
       "$ref": user-property.yaml
+  additionalProperties: true
