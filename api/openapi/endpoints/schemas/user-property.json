@@ -2,9 +2,6 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "UserProperty",
   "type": "object",
-  "required": [
-    "type"
-  ],
   "allOf": [
     {
       "$ref": "https://json-schema.org/draft/2020-12/schema"
