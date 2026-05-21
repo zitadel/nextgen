@@ -127,8 +127,8 @@ have different jobs — keep both:
 | --- | --- | --- | --- |
 | **Lit playground** | `corepack pnpm nx dev @zitadel-nextgen/components` | [login](http://localhost:5173/?route=login) · [atoms](http://localhost:5173/?route=atoms) | Component author surface: branding presets, event log, source TS from `src/`. MSW runs in the browser — no TCP mock server. |
 | **React console playground** | `corepack pnpm nx dev @zitadel-nextgen/console` | [http://localhost:5174](http://localhost:5174) | `@zitadel-nextgen/ui-react` atom matrices in the pre-release console shell. MSW in `import.meta.env.DEV`. Compare against Lit `:5173/?route=atoms` in a second tab. |
-| **demo-next** | `corepack pnpm nx start @zitadel-nextgen/api-mock` + `NEXTGEN_ISSUER_URL=http://localhost:4000 corepack pnpm nx dev @nextgen/demo-next` | [http://localhost:3002/login](http://localhost:3002/login) (mock on `:4000`) | Next.js SDK, middleware, cookies, built `dist/`. See [`apps/demo-next`](../../apps/demo-next/README.md). |
-| **demo-nuxt** | mock on `:4000`, then `NEXTGEN_ISSUER_URL=http://localhost:4000 corepack pnpm nx dev @nextgen/demo-nuxt` | [http://localhost:3001/login](http://localhost:3001/login) | Nuxt SDK, middleware, cookies, built `dist/`. See [`apps/demo-nuxt`](../../apps/demo-nuxt/README.md). |
+| **demo-next** | `corepack pnpm nx start @zitadel-nextgen/api-mock` + `NEXTGEN_ISSUER_URL=http://localhost:4000 corepack pnpm nx dev @zitadel-nextgen/demo-next` | [http://localhost:3002/login](http://localhost:3002/login) (mock on `:4000`) | Next.js SDK, middleware, cookies, built `dist/`. See [`apps/demo-next`](../../apps/demo-next/README.md). |
+| **demo-nuxt** | mock on `:4000`, then `NEXTGEN_ISSUER_URL=http://localhost:4000 corepack pnpm nx dev @zitadel-nextgen/demo-nuxt` | [http://localhost:3001/login](http://localhost:3001/login) | Nuxt SDK, middleware, cookies, built `dist/`. See [`apps/demo-nuxt`](../../apps/demo-nuxt/README.md). |
 
 The Lit dev playground iterates on `<zl-*>` source; the React console
 playground exercises `@zitadel-nextgen/ui-react` in the internal shell.
@@ -303,8 +303,8 @@ corepack pnpm nx dev @zitadel-nextgen/console
 
 # Framework demos (TCP mock + SDK) — see apps/demo-*/README.md
 # corepack pnpm nx start @zitadel-nextgen/api-mock   # → http://localhost:4000
-# NEXTGEN_ISSUER_URL=http://localhost:4000 corepack pnpm nx dev @nextgen/demo-next  # → :3002
-# NEXTGEN_ISSUER_URL=http://localhost:4000 corepack pnpm nx dev @nextgen/demo-nuxt  # → :3001
+# NEXTGEN_ISSUER_URL=http://localhost:4000 corepack pnpm nx dev @zitadel-nextgen/demo-next  # → :3002
+# NEXTGEN_ISSUER_URL=http://localhost:4000 corepack pnpm nx dev @zitadel-nextgen/demo-nuxt  # → :3001
 
 # --- Package checks ---
 

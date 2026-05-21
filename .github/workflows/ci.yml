@@ -108,13 +108,13 @@ jobs:
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: >-
-          corepack pnpm --filter @nextgen/demo-next-e2e
+          corepack pnpm --filter @zitadel-nextgen/demo-next-e2e
           exec playwright install --with-deps chromium
 
       - name: Install Playwright system deps
         if: steps.playwright-cache.outputs.cache-hit == 'true'
         run: >-
-          corepack pnpm --filter @nextgen/demo-next-e2e
+          corepack pnpm --filter @zitadel-nextgen/demo-next-e2e
           exec playwright install-deps chromium
 
       # Boots the demo dev servers + api-mock through Playwright's webServer
@@ -127,7 +127,7 @@ jobs:
       - name: End-to-end tests
         run: >-
           corepack pnpm nx run-many -t e2e
-          -p @nextgen/demo-next-e2e,@nextgen/demo-nuxt-e2e
+          -p @zitadel-nextgen/demo-next-e2e,@zitadel-nextgen/demo-nuxt-e2e
 
       - name: Upload Playwright reports on failure
         if: failure()
