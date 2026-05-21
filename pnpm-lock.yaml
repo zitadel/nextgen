@@ -410,15 +410,15 @@ importers:
 
   apps/demo-nuxt:
     dependencies:
-      '@zitadel-nextgen/sdk-nuxt':
-        specifier: workspace:*
-        version: link:../../packages/sdk-nuxt
       '@zitadel-nextgen/components':
         specifier: workspace:*
         version: link:../../packages/components
       '@zitadel-nextgen/design-tokens':
         specifier: workspace:*
         version: link:../../packages/design-tokens
+      '@zitadel-nextgen/sdk-nuxt':
+        specifier: workspace:*
+        version: link:../../packages/sdk-nuxt
       '@zitadel-nextgen/shared-component-styles':
         specifier: workspace:*
         version: link:../../packages/shared-component-styles
@@ -435,15 +435,15 @@ importers:
 
   apps/demo-nuxt-e2e:
     devDependencies:
-      '@zitadel-nextgen/sdk-nuxt':
-        specifier: workspace:*
-        version: link:../../packages/sdk-nuxt
       '@playwright/test':
         specifier: 'catalog:'
         version: 1.59.1
       '@zitadel-nextgen/api-mock':
         specifier: workspace:*
         version: link:../../packages/api-mock
+      '@zitadel-nextgen/sdk-nuxt':
+        specifier: workspace:*
+        version: link:../../packages/sdk-nuxt
       eslint-plugin-playwright:
         specifier: 'catalog:'
         version: 2.10.2(eslint@10.2.1(jiti@2.7.0))
@@ -596,9 +596,6 @@ importers:
       '@zitadel-nextgen/sdk-core':
         specifier: workspace:*
         version: link:../sdk-core
-      next:
-        specifier: '>=14'
-        version: 16.2.4(@babel/core@7.29.0)(@playwright/test@1.59.1)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       react:
         specifier: '>=18'
         version: 19.2.5
@@ -660,6 +657,9 @@ importers:
       jsdom:
         specifier: ^26.0.0
         version: 26.1.0
+      next:
+        specifier: ^16.2.4
+        version: 16.2.4(@babel/core@7.29.0)(@playwright/test@1.59.1)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       prettier:
         specifier: ^3.0.0
         version: 3.8.3

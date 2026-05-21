@@ -133,6 +133,7 @@ export async function runSetup(io: CliIO, opts: SetupOptions): Promise<void> {
       framework: framework.id,
       issuer,
       devPort,
+      server: effectiveServer,
     }),
     await adapter.planSetup(ctx),
   );
@@ -198,6 +199,7 @@ function basePlan(input: {
   framework: string;
   issuer: string;
   devPort: number;
+  server: string;
 }): ScaffoldPlan {
   return {
     ops: [
@@ -241,6 +243,8 @@ function basePlan(input: {
           ZITADEL_PROJECT_ID: "",
           ZITADEL_ENVIRONMENT: "",
           ZITADEL_ISSUER: "",
+          NEXT_PUBLIC_ZITADEL_API_BASE: "",
+          NEXT_PUBLIC_ZITADEL_PROJECT_ID: "",
         },
       },
       {
@@ -250,6 +254,8 @@ function basePlan(input: {
           ZITADEL_PROJECT_ID: input.project.id,
           ZITADEL_ENVIRONMENT: "development",
           ZITADEL_ISSUER: input.issuer,
+          NEXT_PUBLIC_ZITADEL_API_BASE: input.server,
+          NEXT_PUBLIC_ZITADEL_PROJECT_ID: input.project.id,
         },
       },
       {

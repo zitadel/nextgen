@@ -291,8 +291,15 @@ export function setupPlatformHandlers() {
     }),
 
     // DELETE /schemas/:id
+    //
+    // Spec includes a 404 not-found response — callers must be able to
+    // distinguish "deleted" from "id didn't exist". `Map.delete()`
+    // returns `true` only when the key was present.
     http.delete("*/schemas/:id", ({ params }) => {
-      store.schemas.delete(params.id as string);
+      const existed = store.schemas.delete(params.id as string);
+      if (!existed) {
+        return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
+      }
       return new HttpResponse(null, { status: 204 });
     }),
 
@@ -389,8 +396,15 @@ export function setupPlatformHandlers() {
     }),
 
     // DELETE /flow_definitions/:id
+    //
+    // Spec includes a 404 not-found response — callers must be able to
+    // distinguish "deleted" from "id didn't exist". `Map.delete()`
+    // returns `true` only when the key was present.
     http.delete("*/flow_definitions/:id", ({ params }) => {
-      store.flowDefinitions.delete(params.id as string);
+      const existed = store.flowDefinitions.delete(params.id as string);
+      if (!existed) {
+        return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
+      }
       return new HttpResponse(null, { status: 204 });
     }),
   ];
