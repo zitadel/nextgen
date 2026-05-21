@@ -9,7 +9,8 @@
 Back-navigation in the flow engine uses the **existing action contract**.
 The server declares a `back` action on steps where returning to the previous
 step is allowed. The orchestrator submits `{ action: "back" }` like any other
-action. The server pops its `history` stack and returns the previous step.
+action. The server follows the `back` transition in the flow definition and
+returns the target step.
 
 The `<zitadel-login>` orchestrator additionally integrates with the browser's
 **History API** so that the native back gesture (swipe, button, keyboard
@@ -92,9 +93,12 @@ the native back gesture work without page reloads.
 2. **On `popstate` event** (browser back button):
    - If the current step's `actions` contains `back` →
      submit `{ action: "back" }` to the API, apply the response
-   - If no `back` action → re-push the current state
-     (`history.pushState(...)`) to absorb the gesture, and surface a brief
-     visual indicator that going back is not available
+   - If no `back` action → call `history.forward()` to restore the
+     consumed entry without growing the stack, and surface a brief
+     visual indicator that going back is not available. This avoids
+     trapping the user in an ever-growing back loop — the history
+     stack stays fixed and the host page remains reachable once the
+     flow's entries are exhausted
 
 3. **On `disconnectedCallback`** (widget removed):
    - Remove the `popstate` listener — clean up
