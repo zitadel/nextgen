@@ -52,10 +52,14 @@ export const en: Record<string, string> = {
   "signed-in.continue": "Continue",
   "signed-in.logout": "Logout",
 
+  // --- Passkey login ---
+  "passkey-login.title": "Sign in with your passkey",
+
   // --- Shared actions ---
   "submit.continue": "Continue",
   "submit.signin": "Sign in",
   "action.forgot_password": "Forgot password?",
+  "action.cancel": "Cancel",
 
   // --- SSO ---
   "sso.redirect.title": "Redirecting to your provider…",

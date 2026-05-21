@@ -34,6 +34,7 @@ import { startFlowActor, type FlowActor, type FlowStepName } from "./flow-machin
 import {
   doneStep,
   identifierStep,
+  passkeyLoginStep,
   passkeySetupStep,
   passkeyUpsellStep,
   passwordStep,
@@ -99,6 +100,8 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
         return withBranding(passkeyUpsellStep(input));
       case "passkey-setup":
         return withBranding(passkeySetupStep(input));
+      case "passkey-login":
+        return withBranding(passkeyLoginStep(input));
       case "sso-redirect":
         return withBranding(ssoRedirectStep(input));
       case "done":

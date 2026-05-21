@@ -12,13 +12,15 @@
  *   idle --START(login)----> identifier (email+password, Figma 6593:141985)
  *                                       --SUBMIT(submit|recover)--> passkey-upsell
  *                                       --SUBMIT(register)--> register
- *                                       --SUBMIT(passkey)--> passkey-upsell
+ *                                       --SUBMIT(passkey)--> passkey-login
  *                                       --SUBMIT(sso_provider_id)--> sso-redirect
  *      \--START(register)--> register --SUBMIT--> passkey-upsell
  *
  *   password -- legacy split step; kept for tests that target it directly
  *   passkey-upsell --SUBMIT(skip)--> done
  *   passkey-upsell --SUBMIT(*)----> passkey-setup --SUBMIT--> done
+ *   passkey-login --SUBMIT--> done
+ *   passkey-login --SUBMIT(cancel)--> identifier
  *   sso-redirect --SUBMIT--> done
  *   anything --RESET--> idle
  */
@@ -31,6 +33,7 @@ export type FlowStepName =
   | "password"
   | "passkey-upsell"
   | "passkey-setup"
+  | "passkey-login"
   | "sso-redirect"
   | "done";
 
@@ -125,7 +128,7 @@ export const flowMachine = createMachine({
           },
           {
             guard: ({ event }) => event.action === "passkey",
-            target: "passkey-upsell",
+            target: "passkey-login",
             actions: [captureFields, rotateToken],
           },
           {
@@ -168,6 +171,21 @@ export const flowMachine = createMachine({
     "passkey-setup": {
       on: {
         SUBMIT: { target: "done", actions: [rotateToken] },
+      },
+    },
+    "passkey-login": {
+      on: {
+        SUBMIT: [
+          {
+            guard: ({ event }) => event.action === "cancel",
+            target: "identifier",
+            actions: [rotateToken],
+          },
+          {
+            target: "done",
+            actions: [rotateToken],
+          },
+        ],
       },
     },
     "sso-redirect": {

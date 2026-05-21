@@ -171,6 +171,44 @@ export function passkeySetupStep(input: StepFixtureInput): CreateFlow201 {
   });
 }
 
+/**
+ * Passkey login step — returned when the user clicks "Sign in with passkey"
+ * on the identifier screen. Contains a mock `challenge` with WebAuthn
+ * authentication options so `<zl-passkey ceremony="authenticate">` can
+ * trigger `navigator.credentials.get()`. The browser prompts for an
+ * existing credential (Touch ID / Windows Hello / security key).
+ */
+export function passkeyLoginStep(input: StepFixtureInput): CreateFlow201 {
+  return wrap(input, {
+    name: "passkey-login",
+    texts: { title_key: "passkey-login.title" },
+    fields: {},
+    actions: {
+      submit: { text_key: "submit.continue", primary: true },
+      cancel: { text_key: "action.cancel" },
+    },
+    gates: {},
+    challenge: {
+      method: "passkey",
+      challenge_id: "ch_mock_passkey_login",
+      options: {
+        ceremony: "authenticate",
+        challenge: "BBBBBBBBBBBBBBBBBBBBBB",
+        rpId: "localhost",
+        timeout: 60000,
+        userVerification: "preferred",
+        allowCredentials: [
+          {
+            type: "public-key",
+            id: "Y3JlZF9tb2Nr",
+            transports: ["internal"],
+          },
+        ],
+      },
+    },
+  });
+}
+
 export function ssoRedirectStep(
   input: StepFixtureInput & { redirectUrl?: string },
 ): CreateFlow201 {
