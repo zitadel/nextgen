@@ -151,15 +151,14 @@ func sessionWithTokenToAPI(session *domain.Session) *api.SessionWithTokenRespons
 }
 
 func sessionToAPI(session *domain.Session) *api.SessionResponse {
-	factors := make(api.SessionResponseFactors, len(session.Factors))
-	for _, factor := range session.Factors {
-		_ = factor // TODO: !
+	factors := make([]api.CompletedFactor, len(session.Factors))
+	for i, factor := range session.Factors {
+		factors[i] = factorToAPI(factor)
 	}
-	return &api.SessionResponse{
+	resp := &api.SessionResponse{
 		SessionID:       api.SessionID(session.ID),
 		ProjectID:       api.ProjectID(session.ProjectID),
 		State:           sessionStateToAPI(session.State),
-		UserID:          api.OptNilUserID{},
 		Factors:         factors,
 		AssuranceLevels: nil,                                 // TODO: ?!
 		Metadata:        api.OptNilSessionResponseMetadata{}, // TODO: ?!
@@ -167,6 +166,10 @@ func sessionToAPI(session *domain.Session) *api.SessionResponse {
 		CreatedAt:       session.CreatedAt,
 		ExpiresAt:       session.ExpiresAt,
 	}
+	if session.UserID != nil {
+		resp.UserID = api.NewOptNilUserID(api.UserID(*session.UserID))
+	}
+	return resp
 }
 
 func userAgentToAPI(agent *domain.UserAgent) api.OptNilSessionResponseUserAgent {
@@ -223,4 +226,55 @@ func deleteSessionCookie() string {
 
 func sessionCookie(token string, maxAge int) string {
 	return fmt.Sprintf("__nextgen_session=%s; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=%d", token, maxAge)
+}
+
+func factorToAPI(factor domain.AuthFactor) api.CompletedFactor {
+	resp := api.CompletedFactor{
+		Method:     checkTypeToAPI(factor.Type()),
+		VerifiedAt: factor.GetLastVerifiedAt(),
+		Payload:    factorPayloadToAPI(factor),
+	}
+	return resp
+}
+
+func factorPayloadToAPI(factor domain.AuthFactor) api.OptCompletedFactorPayload {
+	switch f := factor.(type) {
+	case *domain.AuthFactorUser:
+		return api.NewOptCompletedFactorPayload(api.CompletedFactorPayload{
+			Type: api.IdentifierFactorPayloadCompletedFactorPayload,
+			IdentifierFactorPayload: api.IdentifierFactorPayload{
+				UserID: api.UserID(f.UserID),
+			},
+		})
+	case *domain.AuthFactorPassword:
+		return api.NewOptCompletedFactorPayload(api.CompletedFactorPayload{
+			Type:                  api.PasswordFactorPayloadCompletedFactorPayload,
+			PasswordFactorPayload: api.PasswordFactorPayload{},
+		})
+	case *domain.AuthFactorPasskey:
+		return api.NewOptCompletedFactorPayload(api.CompletedFactorPayload{
+			Type: api.PasskeyFactorPayloadCompletedFactorPayload,
+			PasskeyFactorPayload: api.PasskeyFactorPayload{
+				CredentialID:            "",
+				UserVerified:            f.UserVerified,
+				BackupEligible:          api.OptBool{},
+				BackupState:             api.OptBool{},
+				AuthenticatorAttachment: api.OptPasskeyFactorPayloadAuthenticatorAttachment{},
+			},
+		})
+	}
+	return api.OptCompletedFactorPayload{}
+}
+
+func checkTypeToAPI(check domain.AuthCheckType) api.FactorMethod {
+	switch check {
+	case domain.AuthCheckTypeUser:
+		return api.FactorMethodIdentifier
+	case domain.AuthCheckTypePassword:
+		return api.FactorMethodPassword
+	case domain.AuthCheckTypePasskey:
+		return api.FactorMethodPasskey
+	default:
+		return ""
+	}
 }

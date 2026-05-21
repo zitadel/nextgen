@@ -10558,7 +10558,7 @@ type SessionResponse struct {
 	// Each key is a factor type (e.g. `password`, `totp`, `passkey`).
 	// Each value is a factor event object with at least `verified_at` and
 	// method-specific properties (e.g. `user_verified`, `hardware` for passkeys).
-	Factors SessionResponseFactors `json:"factors"`
+	Factors []CompletedFactor `json:"factors"`
 	// All assurance levels whose schemas the current session factors satisfy.
 	// This list shrinks as factor freshness windows expire and grows when step-up
 	// auth_attempts add or refresh factors.
@@ -10596,7 +10596,7 @@ func (s *SessionResponse) GetUserID() OptNilUserID {
 }
 
 // GetFactors returns the value of Factors.
-func (s *SessionResponse) GetFactors() SessionResponseFactors {
+func (s *SessionResponse) GetFactors() []CompletedFactor {
 	return s.Factors
 }
 
@@ -10646,7 +10646,7 @@ func (s *SessionResponse) SetUserID(val OptNilUserID) {
 }
 
 // SetFactors sets the value of Factors.
-func (s *SessionResponse) SetFactors(val SessionResponseFactors) {
+func (s *SessionResponse) SetFactors(val []CompletedFactor) {
 	s.Factors = val
 }
 
@@ -10677,21 +10677,6 @@ func (s *SessionResponse) SetExpiresAt(val time.Time) {
 
 func (*SessionResponse) getMySessionRes() {}
 func (*SessionResponse) getSessionRes()   {}
-
-// Verified authentication factors accumulated by this session.
-// Each key is a factor type (e.g. `password`, `totp`, `passkey`).
-// Each value is a factor event object with at least `verified_at` and
-// method-specific properties (e.g. `user_verified`, `hardware` for passkeys).
-type SessionResponseFactors map[string]jx.Raw
-
-func (s *SessionResponseFactors) init() SessionResponseFactors {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
 
 type SessionResponseMetadata map[string]jx.Raw
 

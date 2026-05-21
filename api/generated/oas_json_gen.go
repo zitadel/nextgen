@@ -17589,7 +17589,11 @@ func (s *SessionResponse) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("factors")
-		s.Factors.Encode(e)
+		e.ArrStart()
+		for _, elem := range s.Factors {
+			elem.Encode(e)
+		}
+		e.ArrEnd()
 	}
 	{
 		e.FieldStart("assurance_levels")
@@ -17686,7 +17690,15 @@ func (s *SessionResponse) Decode(d *jx.Decoder) error {
 		case "factors":
 			requiredBitSet[0] |= 1 << 4
 			if err := func() error {
-				if err := s.Factors.Decode(d); err != nil {
+				s.Factors = make([]CompletedFactor, 0)
+				if err := d.Arr(func(d *jx.Decoder) error {
+					var elem CompletedFactor
+					if err := elem.Decode(d); err != nil {
+						return err
+					}
+					s.Factors = append(s.Factors, elem)
+					return nil
+				}); err != nil {
 					return err
 				}
 				return nil
@@ -17810,64 +17822,6 @@ func (s *SessionResponse) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *SessionResponse) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode implements json.Marshaler.
-func (s SessionResponseFactors) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-// encodeFields implements json.Marshaler.
-func (s SessionResponseFactors) encodeFields(e *jx.Encoder) {
-	for k, elem := range s {
-		e.FieldStart(k)
-
-		if len(elem) != 0 {
-			e.Raw(elem)
-		}
-	}
-}
-
-// Decode decodes SessionResponseFactors from json.
-func (s *SessionResponseFactors) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode SessionResponseFactors to nil")
-	}
-	m := s.init()
-	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		var elem jx.Raw
-		if err := func() error {
-			v, err := d.RawAppend(nil)
-			elem = jx.Raw(v)
-			if err != nil {
-				return err
-			}
-			return nil
-		}(); err != nil {
-			return errors.Wrapf(err, "decode field %q", k)
-		}
-		m[string(k)] = elem
-		return nil
-	}); err != nil {
-		return errors.Wrap(err, "decode SessionResponseFactors")
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s SessionResponseFactors) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *SessionResponseFactors) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }

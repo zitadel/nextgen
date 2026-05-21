@@ -57,7 +57,7 @@ type Session struct {
 	// There is one factor per [AuthCheckType].
 	// The factors must be verified using [AuthAttempt]s before being added to the session, and the VerifiedAt field must be set to the time of verification.
 	// The factors are stored in the database.
-	Factors []AuthFactorer
+	Factors []AuthFactor
 }
 
 type SessionState uint8
@@ -83,8 +83,8 @@ type SessionRepository interface {
 
 	// Exchange is used to exchange a handoff token issued on an auth attempt for a session.
 	// In case the handoff token is valid, either the session associated with the auth attempt is updated or a new session is created if no session was linked.
-	// All the auth attempts factors are merged into the session.
-	// The auth attempt, including handoff token and challenges, are deleted.
+	// All the auth attempts (verified) factors are merged into the session.
+	// The auth attempt, including handoff token and unverified challenges, are deleted.
 	// And the newly created or updated session is returned.
 	//
 	// In case the handoff token is invalid in any way (e.g. the token does not exist, was already consumed, or has expired), ErrSessionInvalidHandoffToken is returned.
