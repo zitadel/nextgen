@@ -13,6 +13,8 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database/repository"
 )
 
+const BuiltinSchemaBaseURL = "https://test.example.schemas.com"
+
 func (h *Harness) EnsureSchemaService(t *testing.T) *service.SchemaService {
 	t.Helper()
 	if h.SchemaService == nil {
@@ -20,6 +22,7 @@ func (h *Harness) EnsureSchemaService(t *testing.T) *service.SchemaService {
 			h.EnsureDBPool(t),
 			h.EnsureSchemaRepo(t),
 			h.EnsureSchemaResolver(t),
+			h.EnsureSchemaValidator(t),
 		)
 	}
 	return h.SchemaService
@@ -51,4 +54,15 @@ func (h *Harness) EnsureSchemaResolver(t *testing.T) *domain.JSONSchemaResolver 
 		)
 	}
 	return h.SchemaResolver
+}
+
+func (h *Harness) EnsureSchemaValidator(t *testing.T) *domain.TenantSchemaValidator {
+	t.Helper()
+	if h.SchemaValidator == nil {
+		schemaValidator, err := domain.NewTenantSchemaValidator(BuiltinSchemaBaseURL)
+		require.NoError(t, err)
+
+		h.SchemaValidator = schemaValidator
+	}
+	return h.SchemaValidator
 }

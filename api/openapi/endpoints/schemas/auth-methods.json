@@ -1,5 +1,6 @@
 {
   "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "A list of authentication methods supported by the user definition.",
   "minProperties": 1,
   "additionalProperties": false,

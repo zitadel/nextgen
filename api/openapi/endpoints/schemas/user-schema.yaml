@@ -8,6 +8,7 @@ required:
   - metaSchema
   - kind
   - x-auth-methods
+  - $id
 additionalProperties: true
 properties:
   "$schema":

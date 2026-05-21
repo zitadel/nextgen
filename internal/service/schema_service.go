@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"net/url"
 	"time"
 
@@ -27,33 +29,41 @@ type CreateSchemaByURLInput struct {
 // ---- Secondary ports -------------------------------------------------------------
 
 type SchemaService struct {
-	pool           database.Pool
-	schemaRepo     domain.JSONSchemaRepository
-	schemaResolver *domain.JSONSchemaResolver
+	pool            database.Pool
+	schemaRepo      domain.JSONSchemaRepository
+	schemaResolver  *domain.JSONSchemaResolver
+	schemaValidator *domain.TenantSchemaValidator
 }
 
 func NewSchemaService(
 	pool database.Pool,
 	schemaRepo domain.JSONSchemaRepository,
 	schemaResolver *domain.JSONSchemaResolver,
+	schemaValidator *domain.TenantSchemaValidator,
 ) *SchemaService {
 	return &SchemaService{
-		pool:           pool,
-		schemaRepo:     schemaRepo,
-		schemaResolver: schemaResolver,
+		pool:            pool,
+		schemaRepo:      schemaRepo,
+		schemaResolver:  schemaResolver,
+		schemaValidator: schemaValidator,
 	}
 }
 
 func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInput) (*domain.JSONSchema, error) {
-	tx, err := s.pool.Begin(ctx, nil)
-	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to start transaction")
+	tx, txErr := s.pool.Begin(ctx, nil)
+	if txErr != nil {
+		return nil, domain.ErrInternal(txErr).WithMessage("failed to start transaction")
 	}
 	defer func() {
-		if err != nil {
+		if txErr != nil {
 			_ = tx.Rollback(ctx)
 		}
 	}()
+
+	var tenantSchema map[string]any
+	if err := json.Unmarshal(input.Schema, &tenantSchema); err != nil {
+		return nil, fmt.Errorf("%w: %w", "ErrSchemaParseFailed", err)
+	}
 
 	model := &domain.JSONSchema{
 		ProjectID: input.ProjectID,
@@ -62,7 +72,7 @@ func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInpu
 		Schema:    input.Schema,
 	}
 
-	err = s.schemaRepo.Create(ctx, tx, model)
+	err := s.schemaRepo.Create(ctx, tx, model)
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to create schema in database")
 	}
@@ -70,6 +80,11 @@ func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInpu
 	_, err = s.schemaResolver.Resolve(ctx, tx, input.ProjectID, input.SchemaID, nil)
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to resolve schema when creating")
+	}
+
+	err = s.schemaValidator.ValidateAgainstMetaSchema(input.Schema)
+	if err != nil {
+		return nil, domain.ErrRequestInvalid().WithParent(err).WithMessage("invalid schema")
 	}
 
 	err = tx.Commit(ctx)

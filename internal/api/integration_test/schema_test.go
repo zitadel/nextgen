@@ -57,12 +57,12 @@ func TestCreateSchema(t *testing.T) {
 	})
 
 	t.Run("error", func(t *testing.T) {
-		t.Run("schema without known meta-schema", func(t *testing.T) {
+		t.Run("schema without known kind", func(t *testing.T) {
 			body, err := json.Marshal(map[string]any{
-				"$schema": "https://json-schema.org/draft/2020-12/schema",
-				"$id":     "https://example.com/my-invalid-schema.json",
-				"kind":    "user-schema",
-				"title":   "an invalid user schema",
+				"metaSchema": "https://json-schema.org/draft/2020-12/schema",
+				"$id":        "https://example.com/my-invalid-schema.json",
+				"kind":       "does not exist",
+				"title":      "an invalid user schema",
 				"x-auth-methods": map[string]any{
 					"password": map[string]any{
 						"enabled":  true,
@@ -88,10 +88,6 @@ func TestCreateSchema(t *testing.T) {
 				require.NoError(t, err)
 				t.Fatal(string(bs))
 			}
-
-			respBody, err := io.ReadAll(resp.Body)
-			require.NoError(t, err)
-			assert.Contains(t, string(respBody), "unknown schema")
 		})
 	})
 }

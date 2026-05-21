@@ -22,7 +22,7 @@ func (h *Handler) CreateSchema(ctx context.Context, req api.CreateSchemaReq, par
 			service.CreateSchemaInput{
 				ProjectID: string(params.ProjectID.Value),
 				TeamID:    string(params.TeamID.Value),
-				SchemaID:  req.UserSchema.ID,
+				SchemaID:  req.UserSchema.ID.String(),
 				Schema:    schemabs,
 			})
 		if err != nil {
