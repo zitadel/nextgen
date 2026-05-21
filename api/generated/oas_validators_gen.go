@@ -200,6 +200,39 @@ func (s AuthAttemptResponseState) Validate() error {
 	}
 }
 
+func (s *AuthMethod) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.Int{
+			MinSet:        true,
+			Min:           0,
+			MaxSet:        false,
+			Max:           0,
+			MinExclusive:  false,
+			MaxExclusive:  false,
+			MultipleOfSet: false,
+			MultipleOf:    0,
+			Pattern:       nil,
+		}).Validate(int64(s.Position)); err != nil {
+			return errors.Wrap(err, "int")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "position",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s *Branding) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -588,6 +621,20 @@ func (s *CreateProjectResponse) Validate() error {
 		return &validate.Error{Fields: failures}
 	}
 	return nil
+}
+
+func (s CreateSchemaReq) Validate() error {
+	switch s.Type {
+	case UserSchemaCreateSchemaReq:
+		if err := s.UserSchema.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SchemaURLCreateSchemaReq:
+		return nil // no validation needed
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
 }
 
 func (s *CreateSessionRequest) Validate() error {
@@ -1521,6 +1568,18 @@ func (s GateKind) Validate() error {
 	}
 }
 
+func (s GetSchemaByIdOK) Validate() error {
+	switch s.Type {
+	case UserSchemaGetSchemaByIdOK:
+		if err := s.UserSchema.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
 func (s *GetUserInfoOK) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -2359,6 +2418,212 @@ func (s UserID) Validate() error {
 		MaxNumericSet: false,
 	}).Validate(string(alias)); err != nil {
 		return errors.Wrap(err, "string")
+	}
+	return nil
+}
+
+func (s *UserProperty) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if value, ok := s.XMinusUnique.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "x-unique",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s UserPropertyXMinusUnique) Validate() error {
+	switch s {
+	case "instance":
+		return nil
+	case "organization":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
+func (s *UserSchema) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.XMinusAuthMinusMethods.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "x-auth-methods",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if value, ok := s.Properties.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "properties",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s UserSchemaProperties) Validate() error {
+	var failures []validate.FieldError
+	for key, elem := range s {
+		if err := func() error {
+			if err := elem.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			failures = append(failures, validate.FieldError{
+				Name:  key,
+				Error: err,
+			})
+		}
+	}
+
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *UserSchemaXMinusAuthMinusMethods) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if value, ok := s.Password.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "password",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if value, ok := s.Passkey.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "passkey",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if value, ok := s.MagicLink.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "magic_link",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if value, ok := s.SSO.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "sso",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if value, ok := s.Otp.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "otp",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
 	}
 	return nil
 }

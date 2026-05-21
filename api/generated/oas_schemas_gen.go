@@ -11,18 +11,6 @@ import (
 	"github.com/go-faster/jx"
 )
 
-// Ref: #
-type AnyObject map[string]jx.Raw
-
-func (s *AnyObject) init() AnyObject {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
-
 // Merged schema.
 // Ref: #
 type AttAlreadyCompleted struct {
@@ -601,6 +589,34 @@ func (s *AuthAttemptResponseState) UnmarshalText(data []byte) error {
 	default:
 		return errors.Errorf("invalid value: %q", data)
 	}
+}
+
+// Ref: #
+type AuthMethod struct {
+	// Whether the authentication method is enabled or not.
+	Enabled bool `json:"enabled"`
+	// The position of the authentication method in the list of supported methods.
+	Position int `json:"position"`
+}
+
+// GetEnabled returns the value of Enabled.
+func (s *AuthMethod) GetEnabled() bool {
+	return s.Enabled
+}
+
+// GetPosition returns the value of Position.
+func (s *AuthMethod) GetPosition() int {
+	return s.Position
+}
+
+// SetEnabled sets the value of Enabled.
+func (s *AuthMethod) SetEnabled(val bool) {
+	s.Enabled = val
+}
+
+// SetPosition sets the value of Position.
+func (s *AuthMethod) SetPosition(val int) {
+	s.Position = val
 }
 
 // AuthorizeGetFound is response for AuthorizeGet operation.
@@ -1680,9 +1696,9 @@ func (*CreateSchemaConflict) createSchemaRes() {}
 
 // CreateSchemaReq represents sum type.
 type CreateSchemaReq struct {
-	Type      CreateSchemaReqType // switch on this field
-	AnyObject AnyObject
-	SchemaURL SchemaURL
+	Type       CreateSchemaReqType // switch on this field
+	UserSchema UserSchema
+	SchemaURL  SchemaURL
 }
 
 // CreateSchemaReqType is oneOf type of CreateSchemaReq.
@@ -1690,34 +1706,34 @@ type CreateSchemaReqType string
 
 // Possible values for CreateSchemaReqType.
 const (
-	AnyObjectCreateSchemaReq CreateSchemaReqType = "user-schema"
-	SchemaURLCreateSchemaReq CreateSchemaReqType = "schema-url"
+	UserSchemaCreateSchemaReq CreateSchemaReqType = "user-schema"
+	SchemaURLCreateSchemaReq  CreateSchemaReqType = "schema-url"
 )
 
-// IsAnyObject reports whether CreateSchemaReq is AnyObject.
-func (s CreateSchemaReq) IsAnyObject() bool { return s.Type == AnyObjectCreateSchemaReq }
+// IsUserSchema reports whether CreateSchemaReq is UserSchema.
+func (s CreateSchemaReq) IsUserSchema() bool { return s.Type == UserSchemaCreateSchemaReq }
 
 // IsSchemaURL reports whether CreateSchemaReq is SchemaURL.
 func (s CreateSchemaReq) IsSchemaURL() bool { return s.Type == SchemaURLCreateSchemaReq }
 
-// SetAnyObject sets CreateSchemaReq to AnyObject.
-func (s *CreateSchemaReq) SetAnyObject(v AnyObject) {
-	s.Type = AnyObjectCreateSchemaReq
-	s.AnyObject = v
+// SetUserSchema sets CreateSchemaReq to UserSchema.
+func (s *CreateSchemaReq) SetUserSchema(v UserSchema) {
+	s.Type = UserSchemaCreateSchemaReq
+	s.UserSchema = v
 }
 
-// GetAnyObject returns AnyObject and true boolean if CreateSchemaReq is AnyObject.
-func (s CreateSchemaReq) GetAnyObject() (v AnyObject, ok bool) {
-	if !s.IsAnyObject() {
+// GetUserSchema returns UserSchema and true boolean if CreateSchemaReq is UserSchema.
+func (s CreateSchemaReq) GetUserSchema() (v UserSchema, ok bool) {
+	if !s.IsUserSchema() {
 		return v, false
 	}
-	return s.AnyObject, true
+	return s.UserSchema, true
 }
 
-// NewAnyObjectCreateSchemaReq returns new CreateSchemaReq from AnyObject.
-func NewAnyObjectCreateSchemaReq(v AnyObject) CreateSchemaReq {
+// NewUserSchemaCreateSchemaReq returns new CreateSchemaReq from UserSchema.
+func NewUserSchemaCreateSchemaReq(v UserSchema) CreateSchemaReq {
 	var s CreateSchemaReq
-	s.SetAnyObject(v)
+	s.SetUserSchema(v)
 	return s
 }
 
@@ -4253,8 +4269,8 @@ func (*GetReadyOK) getReadyRes() {}
 
 // GetSchemaByIdOK represents sum type.
 type GetSchemaByIdOK struct {
-	Type      GetSchemaByIdOKType // switch on this field
-	AnyObject AnyObject
+	Type       GetSchemaByIdOKType // switch on this field
+	UserSchema UserSchema
 }
 
 // GetSchemaByIdOKType is oneOf type of GetSchemaByIdOK.
@@ -4262,30 +4278,30 @@ type GetSchemaByIdOKType string
 
 // Possible values for GetSchemaByIdOKType.
 const (
-	AnyObjectGetSchemaByIdOK GetSchemaByIdOKType = "user-schema"
+	UserSchemaGetSchemaByIdOK GetSchemaByIdOKType = "user-schema"
 )
 
-// IsAnyObject reports whether GetSchemaByIdOK is AnyObject.
-func (s GetSchemaByIdOK) IsAnyObject() bool { return s.Type == AnyObjectGetSchemaByIdOK }
+// IsUserSchema reports whether GetSchemaByIdOK is UserSchema.
+func (s GetSchemaByIdOK) IsUserSchema() bool { return s.Type == UserSchemaGetSchemaByIdOK }
 
-// SetAnyObject sets GetSchemaByIdOK to AnyObject.
-func (s *GetSchemaByIdOK) SetAnyObject(v AnyObject) {
-	s.Type = AnyObjectGetSchemaByIdOK
-	s.AnyObject = v
+// SetUserSchema sets GetSchemaByIdOK to UserSchema.
+func (s *GetSchemaByIdOK) SetUserSchema(v UserSchema) {
+	s.Type = UserSchemaGetSchemaByIdOK
+	s.UserSchema = v
 }
 
-// GetAnyObject returns AnyObject and true boolean if GetSchemaByIdOK is AnyObject.
-func (s GetSchemaByIdOK) GetAnyObject() (v AnyObject, ok bool) {
-	if !s.IsAnyObject() {
+// GetUserSchema returns UserSchema and true boolean if GetSchemaByIdOK is UserSchema.
+func (s GetSchemaByIdOK) GetUserSchema() (v UserSchema, ok bool) {
+	if !s.IsUserSchema() {
 		return v, false
 	}
-	return s.AnyObject, true
+	return s.UserSchema, true
 }
 
-// NewAnyObjectGetSchemaByIdOK returns new GetSchemaByIdOK from AnyObject.
-func NewAnyObjectGetSchemaByIdOK(v AnyObject) GetSchemaByIdOK {
+// NewUserSchemaGetSchemaByIdOK returns new GetSchemaByIdOK from UserSchema.
+func NewUserSchemaGetSchemaByIdOK(v UserSchema) GetSchemaByIdOK {
 	var s GetSchemaByIdOK
-	s.SetAnyObject(v)
+	s.SetUserSchema(v)
 	return s
 }
 
@@ -6400,6 +6416,52 @@ func (o OptAttStaleChallengeDetails) Or(d AttStaleChallengeDetails) AttStaleChal
 	return d
 }
 
+// NewOptAuthMethod returns new OptAuthMethod with value set to v.
+func NewOptAuthMethod(v AuthMethod) OptAuthMethod {
+	return OptAuthMethod{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptAuthMethod is optional AuthMethod.
+type OptAuthMethod struct {
+	Value AuthMethod
+	Set   bool
+}
+
+// IsSet returns true if OptAuthMethod was set.
+func (o OptAuthMethod) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptAuthMethod) Reset() {
+	var v AuthMethod
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptAuthMethod) SetTo(v AuthMethod) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptAuthMethod) Get() (v AuthMethod, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptAuthMethod) Or(d AuthMethod) AuthMethod {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptBool returns new OptBool with value set to v.
 func NewOptBool(v bool) OptBool {
 	return OptBool{
@@ -8468,6 +8530,69 @@ func (o OptNilUserID) Or(d UserID) UserID {
 	return d
 }
 
+// NewOptNilUserPropertyXMinusUnique returns new OptNilUserPropertyXMinusUnique with value set to v.
+func NewOptNilUserPropertyXMinusUnique(v UserPropertyXMinusUnique) OptNilUserPropertyXMinusUnique {
+	return OptNilUserPropertyXMinusUnique{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilUserPropertyXMinusUnique is optional nullable UserPropertyXMinusUnique.
+type OptNilUserPropertyXMinusUnique struct {
+	Value UserPropertyXMinusUnique
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilUserPropertyXMinusUnique was set.
+func (o OptNilUserPropertyXMinusUnique) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilUserPropertyXMinusUnique) Reset() {
+	var v UserPropertyXMinusUnique
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilUserPropertyXMinusUnique) SetTo(v UserPropertyXMinusUnique) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilUserPropertyXMinusUnique) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilUserPropertyXMinusUnique) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v UserPropertyXMinusUnique
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilUserPropertyXMinusUnique) Get() (v UserPropertyXMinusUnique, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilUserPropertyXMinusUnique) Or(d UserPropertyXMinusUnique) UserPropertyXMinusUnique {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptPageToken returns new OptPageToken with value set to v.
 func NewOptPageToken(v PageToken) OptPageToken {
 	return OptPageToken{
@@ -8922,6 +9047,98 @@ func (o OptUserID) Get() (v UserID, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptUserID) Or(d UserID) UserID {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptUserPropertyProperties returns new OptUserPropertyProperties with value set to v.
+func NewOptUserPropertyProperties(v UserPropertyProperties) OptUserPropertyProperties {
+	return OptUserPropertyProperties{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptUserPropertyProperties is optional UserPropertyProperties.
+type OptUserPropertyProperties struct {
+	Value UserPropertyProperties
+	Set   bool
+}
+
+// IsSet returns true if OptUserPropertyProperties was set.
+func (o OptUserPropertyProperties) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptUserPropertyProperties) Reset() {
+	var v UserPropertyProperties
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptUserPropertyProperties) SetTo(v UserPropertyProperties) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptUserPropertyProperties) Get() (v UserPropertyProperties, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptUserPropertyProperties) Or(d UserPropertyProperties) UserPropertyProperties {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptUserSchemaProperties returns new OptUserSchemaProperties with value set to v.
+func NewOptUserSchemaProperties(v UserSchemaProperties) OptUserSchemaProperties {
+	return OptUserSchemaProperties{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptUserSchemaProperties is optional UserSchemaProperties.
+type OptUserSchemaProperties struct {
+	Value UserSchemaProperties
+	Set   bool
+}
+
+// IsSet returns true if OptUserSchemaProperties was set.
+func (o OptUserSchemaProperties) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptUserSchemaProperties) Reset() {
+	var v UserSchemaProperties
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptUserSchemaProperties) SetTo(v UserSchemaProperties) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptUserSchemaProperties) Get() (v UserSchemaProperties, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptUserSchemaProperties) Or(d UserSchemaProperties) UserSchemaProperties {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -10137,6 +10354,314 @@ type UpdateFlowDefinitionNotFound ErrorDetails
 func (*UpdateFlowDefinitionNotFound) updateFlowDefinitionRes() {}
 
 type UserID string
+
+// This schema is missing `"allOf": [{"$ref": "https://json-schema.org/draft/2020-12/schema"}],`.
+// This is done because a lot of code generators cannot handle that.
+// Ref: #
+type UserProperty struct {
+	// The title of the user property.
+	Title OptString `json:"title"`
+	// Whether this property is an identifier for the user or not.
+	XMinusIdentifier OptBool `json:"x-identifier"`
+	// The verification method for this property, if applicable.
+	XMinusVerify OptNilString `json:"x-verify"`
+	// The level of uniqueness for this property, if applicable.
+	XMinusUnique OptNilUserPropertyXMinusUnique `json:"x-unique"`
+	// The claim name for this property, if applicable.
+	XMinusClaim OptNilString `json:"x-claim"`
+	// Whether this property is editable by the user or not.
+	XMinusEditable OptBool `json:"x-editable"`
+	// Whether this property contains sensitive information or not.
+	XMinusSensitive OptBool `json:"x-sensitive"`
+	// Whether this property is used for multi-factor authentication or not.
+	XMinusMfa OptBool `json:"x-mfa"`
+	// A map of additional properties for the user definition, where the key is the property name and the
+	// value is the property schema.
+	Properties OptUserPropertyProperties `json:"properties"`
+}
+
+// GetTitle returns the value of Title.
+func (s *UserProperty) GetTitle() OptString {
+	return s.Title
+}
+
+// GetXMinusIdentifier returns the value of XMinusIdentifier.
+func (s *UserProperty) GetXMinusIdentifier() OptBool {
+	return s.XMinusIdentifier
+}
+
+// GetXMinusVerify returns the value of XMinusVerify.
+func (s *UserProperty) GetXMinusVerify() OptNilString {
+	return s.XMinusVerify
+}
+
+// GetXMinusUnique returns the value of XMinusUnique.
+func (s *UserProperty) GetXMinusUnique() OptNilUserPropertyXMinusUnique {
+	return s.XMinusUnique
+}
+
+// GetXMinusClaim returns the value of XMinusClaim.
+func (s *UserProperty) GetXMinusClaim() OptNilString {
+	return s.XMinusClaim
+}
+
+// GetXMinusEditable returns the value of XMinusEditable.
+func (s *UserProperty) GetXMinusEditable() OptBool {
+	return s.XMinusEditable
+}
+
+// GetXMinusSensitive returns the value of XMinusSensitive.
+func (s *UserProperty) GetXMinusSensitive() OptBool {
+	return s.XMinusSensitive
+}
+
+// GetXMinusMfa returns the value of XMinusMfa.
+func (s *UserProperty) GetXMinusMfa() OptBool {
+	return s.XMinusMfa
+}
+
+// GetProperties returns the value of Properties.
+func (s *UserProperty) GetProperties() OptUserPropertyProperties {
+	return s.Properties
+}
+
+// SetTitle sets the value of Title.
+func (s *UserProperty) SetTitle(val OptString) {
+	s.Title = val
+}
+
+// SetXMinusIdentifier sets the value of XMinusIdentifier.
+func (s *UserProperty) SetXMinusIdentifier(val OptBool) {
+	s.XMinusIdentifier = val
+}
+
+// SetXMinusVerify sets the value of XMinusVerify.
+func (s *UserProperty) SetXMinusVerify(val OptNilString) {
+	s.XMinusVerify = val
+}
+
+// SetXMinusUnique sets the value of XMinusUnique.
+func (s *UserProperty) SetXMinusUnique(val OptNilUserPropertyXMinusUnique) {
+	s.XMinusUnique = val
+}
+
+// SetXMinusClaim sets the value of XMinusClaim.
+func (s *UserProperty) SetXMinusClaim(val OptNilString) {
+	s.XMinusClaim = val
+}
+
+// SetXMinusEditable sets the value of XMinusEditable.
+func (s *UserProperty) SetXMinusEditable(val OptBool) {
+	s.XMinusEditable = val
+}
+
+// SetXMinusSensitive sets the value of XMinusSensitive.
+func (s *UserProperty) SetXMinusSensitive(val OptBool) {
+	s.XMinusSensitive = val
+}
+
+// SetXMinusMfa sets the value of XMinusMfa.
+func (s *UserProperty) SetXMinusMfa(val OptBool) {
+	s.XMinusMfa = val
+}
+
+// SetProperties sets the value of Properties.
+func (s *UserProperty) SetProperties(val OptUserPropertyProperties) {
+	s.Properties = val
+}
+
+// A map of additional properties for the user definition, where the key is the property name and the
+// value is the property schema.
+type UserPropertyProperties map[string]jx.Raw
+
+func (s *UserPropertyProperties) init() UserPropertyProperties {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+type UserPropertyXMinusUnique string
+
+const (
+	UserPropertyXMinusUniqueInstance     UserPropertyXMinusUnique = "instance"
+	UserPropertyXMinusUniqueOrganization UserPropertyXMinusUnique = "organization"
+)
+
+// AllValues returns all UserPropertyXMinusUnique values.
+func (UserPropertyXMinusUnique) AllValues() []UserPropertyXMinusUnique {
+	return []UserPropertyXMinusUnique{
+		UserPropertyXMinusUniqueInstance,
+		UserPropertyXMinusUniqueOrganization,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s UserPropertyXMinusUnique) MarshalText() ([]byte, error) {
+	switch s {
+	case UserPropertyXMinusUniqueInstance:
+		return []byte(s), nil
+	case UserPropertyXMinusUniqueOrganization:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *UserPropertyXMinusUnique) UnmarshalText(data []byte) error {
+	switch UserPropertyXMinusUnique(data) {
+	case UserPropertyXMinusUniqueInstance:
+		*s = UserPropertyXMinusUniqueInstance
+		return nil
+	case UserPropertyXMinusUniqueOrganization:
+		*s = UserPropertyXMinusUniqueOrganization
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// This schema is missing `"allOf": [{"$ref": "https://json-schema.org/draft/2020-12/schema"}],`.
+// This is done because a lot of code generators cannot handle that.
+// Ref: #
+type UserSchema struct {
+	// The JSON Schema version used for this schema.
+	Schema OptString `json:"$schema"`
+	// Discriminator value for a user schema create request.
+	Kind string `json:"kind"`
+	// The user Schema version used for this schema.
+	MetaSchema url.URL `json:"metaSchema"`
+	// A list of authentication methods supported by the user definition.
+	XMinusAuthMinusMethods UserSchemaXMinusAuthMinusMethods `json:"x-auth-methods"`
+	// A map of additional properties for the user definition, where the key is the property name and the
+	// value is the property schema.
+	Properties OptUserSchemaProperties `json:"properties"`
+}
+
+// GetSchema returns the value of Schema.
+func (s *UserSchema) GetSchema() OptString {
+	return s.Schema
+}
+
+// GetKind returns the value of Kind.
+func (s *UserSchema) GetKind() string {
+	return s.Kind
+}
+
+// GetMetaSchema returns the value of MetaSchema.
+func (s *UserSchema) GetMetaSchema() url.URL {
+	return s.MetaSchema
+}
+
+// GetXMinusAuthMinusMethods returns the value of XMinusAuthMinusMethods.
+func (s *UserSchema) GetXMinusAuthMinusMethods() UserSchemaXMinusAuthMinusMethods {
+	return s.XMinusAuthMinusMethods
+}
+
+// GetProperties returns the value of Properties.
+func (s *UserSchema) GetProperties() OptUserSchemaProperties {
+	return s.Properties
+}
+
+// SetSchema sets the value of Schema.
+func (s *UserSchema) SetSchema(val OptString) {
+	s.Schema = val
+}
+
+// SetKind sets the value of Kind.
+func (s *UserSchema) SetKind(val string) {
+	s.Kind = val
+}
+
+// SetMetaSchema sets the value of MetaSchema.
+func (s *UserSchema) SetMetaSchema(val url.URL) {
+	s.MetaSchema = val
+}
+
+// SetXMinusAuthMinusMethods sets the value of XMinusAuthMinusMethods.
+func (s *UserSchema) SetXMinusAuthMinusMethods(val UserSchemaXMinusAuthMinusMethods) {
+	s.XMinusAuthMinusMethods = val
+}
+
+// SetProperties sets the value of Properties.
+func (s *UserSchema) SetProperties(val OptUserSchemaProperties) {
+	s.Properties = val
+}
+
+// A map of additional properties for the user definition, where the key is the property name and the
+// value is the property schema.
+type UserSchemaProperties map[string]UserProperty
+
+func (s *UserSchemaProperties) init() UserSchemaProperties {
+	m := *s
+	if m == nil {
+		m = map[string]UserProperty{}
+		*s = m
+	}
+	return m
+}
+
+// A list of authentication methods supported by the user definition.
+type UserSchemaXMinusAuthMinusMethods struct {
+	Password  OptAuthMethod `json:"password"`
+	Passkey   OptAuthMethod `json:"passkey"`
+	MagicLink OptAuthMethod `json:"magic_link"`
+	SSO       OptAuthMethod `json:"sso"`
+	Otp       OptAuthMethod `json:"otp"`
+}
+
+// GetPassword returns the value of Password.
+func (s *UserSchemaXMinusAuthMinusMethods) GetPassword() OptAuthMethod {
+	return s.Password
+}
+
+// GetPasskey returns the value of Passkey.
+func (s *UserSchemaXMinusAuthMinusMethods) GetPasskey() OptAuthMethod {
+	return s.Passkey
+}
+
+// GetMagicLink returns the value of MagicLink.
+func (s *UserSchemaXMinusAuthMinusMethods) GetMagicLink() OptAuthMethod {
+	return s.MagicLink
+}
+
+// GetSSO returns the value of SSO.
+func (s *UserSchemaXMinusAuthMinusMethods) GetSSO() OptAuthMethod {
+	return s.SSO
+}
+
+// GetOtp returns the value of Otp.
+func (s *UserSchemaXMinusAuthMinusMethods) GetOtp() OptAuthMethod {
+	return s.Otp
+}
+
+// SetPassword sets the value of Password.
+func (s *UserSchemaXMinusAuthMinusMethods) SetPassword(val OptAuthMethod) {
+	s.Password = val
+}
+
+// SetPasskey sets the value of Passkey.
+func (s *UserSchemaXMinusAuthMinusMethods) SetPasskey(val OptAuthMethod) {
+	s.Passkey = val
+}
+
+// SetMagicLink sets the value of MagicLink.
+func (s *UserSchemaXMinusAuthMinusMethods) SetMagicLink(val OptAuthMethod) {
+	s.MagicLink = val
+}
+
+// SetSSO sets the value of SSO.
+func (s *UserSchemaXMinusAuthMinusMethods) SetSSO(val OptAuthMethod) {
+	s.SSO = val
+}
+
+// SetOtp sets the value of Otp.
+func (s *UserSchemaXMinusAuthMinusMethods) SetOtp(val OptAuthMethod) {
+	s.Otp = val
+}
 
 type UsernamePassword struct {
 	Username string

@@ -15,64 +15,6 @@ import (
 )
 
 // Encode implements json.Marshaler.
-func (s AnyObject) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-// encodeFields implements json.Marshaler.
-func (s AnyObject) encodeFields(e *jx.Encoder) {
-	for k, elem := range s {
-		e.FieldStart(k)
-
-		if len(elem) != 0 {
-			e.Raw(elem)
-		}
-	}
-}
-
-// Decode decodes AnyObject from json.
-func (s *AnyObject) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode AnyObject to nil")
-	}
-	m := s.init()
-	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		var elem jx.Raw
-		if err := func() error {
-			v, err := d.RawAppend(nil)
-			elem = jx.Raw(v)
-			if err != nil {
-				return err
-			}
-			return nil
-		}(); err != nil {
-			return errors.Wrapf(err, "decode field %q", k)
-		}
-		m[string(k)] = elem
-		return nil
-	}); err != nil {
-		return errors.Wrap(err, "decode AnyObject")
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s AnyObject) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *AnyObject) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode implements json.Marshaler.
 func (s *AttAlreadyCompleted) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
@@ -1745,6 +1687,119 @@ func (s AuthAttemptResponseState) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *AuthAttemptResponseState) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *AuthMethod) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *AuthMethod) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("enabled")
+		e.Bool(s.Enabled)
+	}
+	{
+		e.FieldStart("position")
+		e.Int(s.Position)
+	}
+}
+
+var jsonFieldsNameOfAuthMethod = [2]string{
+	0: "enabled",
+	1: "position",
+}
+
+// Decode decodes AuthMethod from json.
+func (s *AuthMethod) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AuthMethod to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "enabled":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Bool()
+				s.Enabled = bool(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"enabled\"")
+			}
+		case "position":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Int()
+				s.Position = int(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"position\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode AuthMethod")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfAuthMethod) {
+					name = jsonFieldsNameOfAuthMethod[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *AuthMethod) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AuthMethod) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -3677,9 +3732,30 @@ func (s CreateSchemaReq) Encode(e *jx.Encoder) {
 
 func (s CreateSchemaReq) encodeFields(e *jx.Encoder) {
 	switch s.Type {
-	case AnyObjectCreateSchemaReq:
+	case UserSchemaCreateSchemaReq:
 		e.FieldStart("kind")
 		e.Str("user-schema")
+		{
+			s := s.UserSchema
+			{
+				e.FieldStart("$schema")
+				e.Str("https://json-schema.org/draft/2020-12/schema")
+			}
+			{
+				e.FieldStart("metaSchema")
+				json.EncodeURI(e, s.MetaSchema)
+			}
+			{
+				e.FieldStart("x-auth-methods")
+				s.XMinusAuthMinusMethods.Encode(e)
+			}
+			{
+				if s.Properties.Set {
+					e.FieldStart("properties")
+					s.Properties.Encode(e)
+				}
+			}
+		}
 	case SchemaURLCreateSchemaReq:
 		e.FieldStart("kind")
 		e.Str("schema-url")
@@ -3717,7 +3793,7 @@ func (s *CreateSchemaReq) Decode(d *jx.Decoder) error {
 				}
 				switch typ {
 				case "user-schema":
-					s.Type = AnyObjectCreateSchemaReq
+					s.Type = UserSchemaCreateSchemaReq
 					found = true
 				case "schema-url":
 					s.Type = SchemaURLCreateSchemaReq
@@ -3736,8 +3812,8 @@ func (s *CreateSchemaReq) Decode(d *jx.Decoder) error {
 		return errors.New("unable to detect sum type variant")
 	}
 	switch s.Type {
-	case AnyObjectCreateSchemaReq:
-		if err := s.AnyObject.Decode(d); err != nil {
+	case UserSchemaCreateSchemaReq:
+		if err := s.UserSchema.Decode(d); err != nil {
 			return err
 		}
 	case SchemaURLCreateSchemaReq:
@@ -9366,9 +9442,30 @@ func (s GetSchemaByIdOK) Encode(e *jx.Encoder) {
 
 func (s GetSchemaByIdOK) encodeFields(e *jx.Encoder) {
 	switch s.Type {
-	case AnyObjectGetSchemaByIdOK:
+	case UserSchemaGetSchemaByIdOK:
 		e.FieldStart("kind")
 		e.Str("user-schema")
+		{
+			s := s.UserSchema
+			{
+				e.FieldStart("$schema")
+				e.Str("https://json-schema.org/draft/2020-12/schema")
+			}
+			{
+				e.FieldStart("metaSchema")
+				json.EncodeURI(e, s.MetaSchema)
+			}
+			{
+				e.FieldStart("x-auth-methods")
+				s.XMinusAuthMinusMethods.Encode(e)
+			}
+			{
+				if s.Properties.Set {
+					e.FieldStart("properties")
+					s.Properties.Encode(e)
+				}
+			}
+		}
 	}
 }
 
@@ -9396,7 +9493,7 @@ func (s *GetSchemaByIdOK) Decode(d *jx.Decoder) error {
 				}
 				switch typ {
 				case "user-schema":
-					s.Type = AnyObjectGetSchemaByIdOK
+					s.Type = UserSchemaGetSchemaByIdOK
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -9412,8 +9509,8 @@ func (s *GetSchemaByIdOK) Decode(d *jx.Decoder) error {
 		return errors.New("unable to detect sum type variant")
 	}
 	switch s.Type {
-	case AnyObjectGetSchemaByIdOK:
-		if err := s.AnyObject.Decode(d); err != nil {
+	case UserSchemaGetSchemaByIdOK:
+		if err := s.UserSchema.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -13040,6 +13137,39 @@ func (s *OptAttStaleChallengeDetails) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes AuthMethod as json.
+func (o OptAuthMethod) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes AuthMethod from json.
+func (o *OptAuthMethod) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptAuthMethod to nil")
+	}
+	o.Set = true
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptAuthMethod) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptAuthMethod) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes bool as json.
 func (o OptBool) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -14511,6 +14641,55 @@ func (s *OptNilUserID) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes UserPropertyXMinusUnique as json.
+func (o OptNilUserPropertyXMinusUnique) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	if o.Null {
+		e.Null()
+		return
+	}
+	e.Str(string(o.Value))
+}
+
+// Decode decodes UserPropertyXMinusUnique from json.
+func (o *OptNilUserPropertyXMinusUnique) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptNilUserPropertyXMinusUnique to nil")
+	}
+	if d.Next() == jx.Null {
+		if err := d.Null(); err != nil {
+			return err
+		}
+
+		var v UserPropertyXMinusUnique
+		o.Value = v
+		o.Set = true
+		o.Null = true
+		return nil
+	}
+	o.Set = true
+	o.Null = false
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptNilUserPropertyXMinusUnique) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptNilUserPropertyXMinusUnique) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes PasskeyChallengePayloadPublicKeyUserVerification as json.
 func (o OptPasskeyChallengePayloadPublicKeyUserVerification) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -14775,6 +14954,74 @@ func (s OptUserID) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *OptUserID) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes UserPropertyProperties as json.
+func (o OptUserPropertyProperties) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes UserPropertyProperties from json.
+func (o *OptUserPropertyProperties) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptUserPropertyProperties to nil")
+	}
+	o.Set = true
+	o.Value = make(UserPropertyProperties)
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptUserPropertyProperties) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptUserPropertyProperties) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes UserSchemaProperties as json.
+func (o OptUserSchemaProperties) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes UserSchemaProperties from json.
+func (o *OptUserSchemaProperties) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptUserSchemaProperties to nil")
+	}
+	o.Set = true
+	o.Value = make(UserSchemaProperties)
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptUserSchemaProperties) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptUserSchemaProperties) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -17755,6 +18002,660 @@ func (s UserID) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *UserID) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *UserProperty) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *UserProperty) encodeFields(e *jx.Encoder) {
+	{
+		if s.Title.Set {
+			e.FieldStart("title")
+			s.Title.Encode(e)
+		}
+	}
+	{
+		if s.XMinusIdentifier.Set {
+			e.FieldStart("x-identifier")
+			s.XMinusIdentifier.Encode(e)
+		}
+	}
+	{
+		if s.XMinusVerify.Set {
+			e.FieldStart("x-verify")
+			s.XMinusVerify.Encode(e)
+		}
+	}
+	{
+		if s.XMinusUnique.Set {
+			e.FieldStart("x-unique")
+			s.XMinusUnique.Encode(e)
+		}
+	}
+	{
+		if s.XMinusClaim.Set {
+			e.FieldStart("x-claim")
+			s.XMinusClaim.Encode(e)
+		}
+	}
+	{
+		if s.XMinusEditable.Set {
+			e.FieldStart("x-editable")
+			s.XMinusEditable.Encode(e)
+		}
+	}
+	{
+		if s.XMinusSensitive.Set {
+			e.FieldStart("x-sensitive")
+			s.XMinusSensitive.Encode(e)
+		}
+	}
+	{
+		if s.XMinusMfa.Set {
+			e.FieldStart("x-mfa")
+			s.XMinusMfa.Encode(e)
+		}
+	}
+	{
+		if s.Properties.Set {
+			e.FieldStart("properties")
+			s.Properties.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfUserProperty = [9]string{
+	0: "title",
+	1: "x-identifier",
+	2: "x-verify",
+	3: "x-unique",
+	4: "x-claim",
+	5: "x-editable",
+	6: "x-sensitive",
+	7: "x-mfa",
+	8: "properties",
+}
+
+// Decode decodes UserProperty from json.
+func (s *UserProperty) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode UserProperty to nil")
+	}
+	s.setDefaults()
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "title":
+			if err := func() error {
+				s.Title.Reset()
+				if err := s.Title.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"title\"")
+			}
+		case "x-identifier":
+			if err := func() error {
+				s.XMinusIdentifier.Reset()
+				if err := s.XMinusIdentifier.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"x-identifier\"")
+			}
+		case "x-verify":
+			if err := func() error {
+				s.XMinusVerify.Reset()
+				if err := s.XMinusVerify.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"x-verify\"")
+			}
+		case "x-unique":
+			if err := func() error {
+				s.XMinusUnique.Reset()
+				if err := s.XMinusUnique.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"x-unique\"")
+			}
+		case "x-claim":
+			if err := func() error {
+				s.XMinusClaim.Reset()
+				if err := s.XMinusClaim.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"x-claim\"")
+			}
+		case "x-editable":
+			if err := func() error {
+				s.XMinusEditable.Reset()
+				if err := s.XMinusEditable.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"x-editable\"")
+			}
+		case "x-sensitive":
+			if err := func() error {
+				s.XMinusSensitive.Reset()
+				if err := s.XMinusSensitive.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"x-sensitive\"")
+			}
+		case "x-mfa":
+			if err := func() error {
+				s.XMinusMfa.Reset()
+				if err := s.XMinusMfa.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"x-mfa\"")
+			}
+		case "properties":
+			if err := func() error {
+				s.Properties.Reset()
+				if err := s.Properties.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"properties\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode UserProperty")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *UserProperty) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *UserProperty) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s UserPropertyProperties) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields implements json.Marshaler.
+func (s UserPropertyProperties) encodeFields(e *jx.Encoder) {
+	for k, elem := range s {
+		e.FieldStart(k)
+
+		if len(elem) != 0 {
+			e.Raw(elem)
+		}
+	}
+}
+
+// Decode decodes UserPropertyProperties from json.
+func (s *UserPropertyProperties) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode UserPropertyProperties to nil")
+	}
+	m := s.init()
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		var elem jx.Raw
+		if err := func() error {
+			v, err := d.RawAppend(nil)
+			elem = jx.Raw(v)
+			if err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrapf(err, "decode field %q", k)
+		}
+		m[string(k)] = elem
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode UserPropertyProperties")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s UserPropertyProperties) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *UserPropertyProperties) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes UserPropertyXMinusUnique as json.
+func (s UserPropertyXMinusUnique) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes UserPropertyXMinusUnique from json.
+func (s *UserPropertyXMinusUnique) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode UserPropertyXMinusUnique to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch UserPropertyXMinusUnique(v) {
+	case UserPropertyXMinusUniqueInstance:
+		*s = UserPropertyXMinusUniqueInstance
+	case UserPropertyXMinusUniqueOrganization:
+		*s = UserPropertyXMinusUniqueOrganization
+	default:
+		*s = UserPropertyXMinusUnique(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s UserPropertyXMinusUnique) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *UserPropertyXMinusUnique) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *UserSchema) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *UserSchema) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("$schema")
+		e.Str("https://json-schema.org/draft/2020-12/schema")
+	}
+	{
+		e.FieldStart("kind")
+		e.Str("user-schema")
+	}
+	{
+		e.FieldStart("metaSchema")
+		json.EncodeURI(e, s.MetaSchema)
+	}
+	{
+		e.FieldStart("x-auth-methods")
+		s.XMinusAuthMinusMethods.Encode(e)
+	}
+	{
+		if s.Properties.Set {
+			e.FieldStart("properties")
+			s.Properties.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfUserSchema = [5]string{
+	0: "$schema",
+	1: "kind",
+	2: "metaSchema",
+	3: "x-auth-methods",
+	4: "properties",
+}
+
+// Decode decodes UserSchema from json.
+func (s *UserSchema) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode UserSchema to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "$schema":
+			if err := func() error {
+				s.Schema.Reset()
+				if err := s.Schema.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"$schema\"")
+			}
+		case "kind":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.Kind = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"kind\"")
+			}
+		case "metaSchema":
+			requiredBitSet[0] |= 1 << 2
+			if err := func() error {
+				v, err := json.DecodeURI(d)
+				s.MetaSchema = v
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"metaSchema\"")
+			}
+		case "x-auth-methods":
+			requiredBitSet[0] |= 1 << 3
+			if err := func() error {
+				if err := s.XMinusAuthMinusMethods.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"x-auth-methods\"")
+			}
+		case "properties":
+			if err := func() error {
+				s.Properties.Reset()
+				if err := s.Properties.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"properties\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode UserSchema")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00001110,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfUserSchema) {
+					name = jsonFieldsNameOfUserSchema[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *UserSchema) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *UserSchema) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s UserSchemaProperties) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields implements json.Marshaler.
+func (s UserSchemaProperties) encodeFields(e *jx.Encoder) {
+	for k, elem := range s {
+		e.FieldStart(k)
+
+		elem.Encode(e)
+	}
+}
+
+// Decode decodes UserSchemaProperties from json.
+func (s *UserSchemaProperties) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode UserSchemaProperties to nil")
+	}
+	m := s.init()
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		var elem UserProperty
+		if err := func() error {
+			if err := elem.Decode(d); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrapf(err, "decode field %q", k)
+		}
+		m[string(k)] = elem
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode UserSchemaProperties")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s UserSchemaProperties) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *UserSchemaProperties) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *UserSchemaXMinusAuthMinusMethods) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *UserSchemaXMinusAuthMinusMethods) encodeFields(e *jx.Encoder) {
+	{
+		if s.Password.Set {
+			e.FieldStart("password")
+			s.Password.Encode(e)
+		}
+	}
+	{
+		if s.Passkey.Set {
+			e.FieldStart("passkey")
+			s.Passkey.Encode(e)
+		}
+	}
+	{
+		if s.MagicLink.Set {
+			e.FieldStart("magic_link")
+			s.MagicLink.Encode(e)
+		}
+	}
+	{
+		if s.SSO.Set {
+			e.FieldStart("sso")
+			s.SSO.Encode(e)
+		}
+	}
+	{
+		if s.Otp.Set {
+			e.FieldStart("otp")
+			s.Otp.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfUserSchemaXMinusAuthMinusMethods = [5]string{
+	0: "password",
+	1: "passkey",
+	2: "magic_link",
+	3: "sso",
+	4: "otp",
+}
+
+// Decode decodes UserSchemaXMinusAuthMinusMethods from json.
+func (s *UserSchemaXMinusAuthMinusMethods) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode UserSchemaXMinusAuthMinusMethods to nil")
+	}
+	var propertiesCount int
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		propertiesCount++
+		switch string(k) {
+		case "password":
+			if err := func() error {
+				s.Password.Reset()
+				if err := s.Password.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"password\"")
+			}
+		case "passkey":
+			if err := func() error {
+				s.Passkey.Reset()
+				if err := s.Passkey.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"passkey\"")
+			}
+		case "magic_link":
+			if err := func() error {
+				s.MagicLink.Reset()
+				if err := s.MagicLink.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"magic_link\"")
+			}
+		case "sso":
+			if err := func() error {
+				s.SSO.Reset()
+				if err := s.SSO.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"sso\"")
+			}
+		case "otp":
+			if err := func() error {
+				s.Otp.Reset()
+				if err := s.Otp.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"otp\"")
+			}
+		default:
+			return errors.Errorf("unexpected field %q", k)
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode UserSchemaXMinusAuthMinusMethods")
+	}
+	// Validate properties count.
+	if err := (validate.Object{
+		MinProperties:    1,
+		MinPropertiesSet: true,
+		MaxProperties:    0,
+		MaxPropertiesSet: false,
+	}).ValidateProperties(propertiesCount); err != nil {
+		return errors.Wrap(err, "object")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *UserSchemaXMinusAuthMinusMethods) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *UserSchemaXMinusAuthMinusMethods) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }

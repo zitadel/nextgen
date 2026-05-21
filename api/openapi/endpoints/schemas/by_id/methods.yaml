@@ -20,11 +20,11 @@ get:
         application/json:
           schema:
             oneOf:
-              - $ref: ../../../components/schemas/any-object.yaml
+              - $ref: ../user-schema.yaml
             discriminator:
               propertyName: kind
               mapping:
-                user-schema: ../../../components/schemas/any-object.yaml
+                user-schema: ../user-schema.yaml
     '400':
       description: The provided input was not valid
       content:
