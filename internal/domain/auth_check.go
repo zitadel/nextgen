@@ -4,16 +4,6 @@ import (
 	"time"
 )
 
-func newChallenge() (authChallenge, error) {
-	id, err := newID(PrefixChallenge)
-	if err != nil {
-		return authChallenge{}, err
-	}
-	return authChallenge{
-		ID: id,
-	}, nil
-}
-
 type AuthCheckType uint8
 
 const (
@@ -36,6 +26,7 @@ type AuthFactor interface {
 
 type AuthChallenge interface {
 	AuthCheck
+	SetID(id string)
 	GetID() string
 	GetLastChallengedAt() time.Time
 	SetLastChallengedAt(lastChallengedAt time.Time)
@@ -50,6 +41,10 @@ type authChallenge struct {
 	LastChallengedAt time.Time `json:"-"`
 	LastFailedAt     time.Time `json:"-"`
 	FailureCount     uint16    `json:"-"`
+}
+
+func (a *authChallenge) SetID(id string) {
+	a.ID = id
 }
 
 func (a *authChallenge) GetID() string {

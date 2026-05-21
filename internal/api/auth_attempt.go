@@ -55,7 +55,7 @@ func (h Handler) IssueChallenge(ctx context.Context, req *api.IssueChallengeRequ
 	if !ok {
 		return nil, domain.ErrInternal(nil).WithMessage("challenge not found after issue")
 	}
-	return checkToChallenge(check), nil
+	return challengeToAPI(check), nil
 }
 
 func (h Handler) VerifyChallengeProof(ctx context.Context, req *api.VerifyChallengeRequest, params api.VerifyChallengeProofParams) (api.VerifyChallengeProofRes, error) {
@@ -164,18 +164,18 @@ func factorMethodToCheckType(method api.FactorMethod) (domain.AuthCheckType, err
 	}
 }
 
-func checkToChallenge(check domain.AuthChallenge) *api.ChallengeResponse {
+func challengeToAPI(challeng domain.AuthChallenge) *api.ChallengeResponse {
 	return &api.ChallengeResponse{
-		ChallengeID: api.ChallengeID(check.GetID()),
-		Method:      checkTypeToAPI(check.Type()),
+		ChallengeID: api.ChallengeID(challeng.GetID()),
+		Method:      checkTypeToAPI(challeng.Type()),
 		State:       api.ChallengeResponseStatePending,
-		CreatedAt:   check.GetLastChallengedAt(),
+		CreatedAt:   challeng.GetLastChallengedAt(),
 		ExpiresAt:   api.OptNilDateTime{},
-		Payload:     checkToChallengePayload(check),
+		Payload:     challengePayloadToAPI(challeng),
 	}
 }
 
-func checkToChallengePayload(check domain.AuthChallenge) api.OptChallengeResponsePayload {
+func challengePayloadToAPI(check domain.AuthChallenge) api.OptChallengeResponsePayload {
 	if passkey, ok := check.(*domain.AuthChallengePasskey); ok {
 		return api.NewOptChallengeResponsePayload(api.ChallengeResponsePayload{
 			Type: api.PasskeyChallengePayloadChallengeResponsePayload,
@@ -222,21 +222,50 @@ func checksToAPI(checks []domain.AuthCheck) ([]api.CompletedFactor, []api.Challe
 	for _, check := range checks {
 		switch c := check.(type) {
 		case domain.AuthFactor:
-			factors = append(factors, checkToFactor(c))
+			factors = append(factors, factorToAPI(c))
 		case domain.AuthChallenge:
-			challenges = append(challenges, *checkToChallenge(c))
+			challenges = append(challenges, *challengeToAPI(c))
 		}
 	}
 	return factors, challenges
 }
 
-func checkToFactor(check domain.AuthFactor) api.CompletedFactor {
+func factorToAPI(factor domain.AuthFactor) api.CompletedFactor {
 	resp := api.CompletedFactor{
-		Method:     checkTypeToAPI(check.Type()),
-		VerifiedAt: check.GetLastVerifiedAt(),
-		Payload:    api.OptCompletedFactorPayload{},
+		Method:     checkTypeToAPI(factor.Type()),
+		VerifiedAt: factor.GetLastVerifiedAt(),
+		Payload:    factorPayloadToAPI(factor),
 	}
 	return resp
+}
+
+func factorPayloadToAPI(factor domain.AuthFactor) api.OptCompletedFactorPayload {
+	switch f := factor.(type) {
+	case *domain.AuthFactorUser:
+		return api.NewOptCompletedFactorPayload(api.CompletedFactorPayload{
+			Type: api.IdentifierFactorPayloadCompletedFactorPayload,
+			IdentifierFactorPayload: api.IdentifierFactorPayload{
+				UserID: api.UserID(f.UserID),
+			},
+		})
+	case *domain.AuthFactorPassword:
+		return api.NewOptCompletedFactorPayload(api.CompletedFactorPayload{
+			Type:                  api.PasswordFactorPayloadCompletedFactorPayload,
+			PasswordFactorPayload: api.PasswordFactorPayload{},
+		})
+	case *domain.AuthFactorPasskey:
+		return api.NewOptCompletedFactorPayload(api.CompletedFactorPayload{
+			Type: api.PasskeyFactorPayloadCompletedFactorPayload,
+			PasskeyFactorPayload: api.PasskeyFactorPayload{
+				CredentialID:            "",
+				UserVerified:            f.UserVerified,
+				BackupEligible:          api.OptBool{},
+				BackupState:             api.OptBool{},
+				AuthenticatorAttachment: api.OptPasskeyFactorPayloadAuthenticatorAttachment{},
+			},
+		})
+	}
+	return api.OptCompletedFactorPayload{}
 }
 
 func requiredFactorsToAPI(checks []domain.AuthCheckType) []api.FactorMethod {

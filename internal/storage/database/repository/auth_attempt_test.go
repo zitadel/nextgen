@@ -33,7 +33,7 @@ func ensureProject(t *testing.T, client database.QueryExecutor, projectID string
 func newTestAttemptWithFactor(t *testing.T, repo domain.AuthAttemptRepository, client database.QueryExecutor, projectID string) (*domain.AuthAttempt, *domain.AuthFactorPassword) {
 	t.Helper()
 	ensureProject(t, client, projectID)
-	check := domain.NewAuthFactorPassword(time.Time{})
+	check := &domain.AuthFactorPassword{}
 	attempt := &domain.AuthAttempt{
 		ProjectID:      projectID,
 		RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypePassword},
@@ -49,8 +49,7 @@ func newTestAttemptWithFactor(t *testing.T, repo domain.AuthAttemptRepository, c
 func newTestAttemptWithChallenge(t *testing.T, repo domain.AuthAttemptRepository, client database.QueryExecutor, projectID string) (*domain.AuthAttempt, *domain.AuthChallengePassword) {
 	t.Helper()
 	ensureProject(t, client, projectID)
-	check, err := domain.NewPasswordAuthCheck()
-	require.NoError(t, err)
+	check := &domain.AuthChallengePassword{}
 	attempt := &domain.AuthAttempt{
 		ProjectID:      projectID,
 		RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypePassword},
@@ -92,10 +91,7 @@ func TestAuthAttempt_Create(t *testing.T) {
 				ProjectID:      "p",
 				RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypePassword},
 				Checks: []domain.AuthCheck{
-					func() domain.AuthCheck {
-						check, _ := domain.NewPasswordAuthCheck()
-						return check
-					}(),
+					&domain.AuthChallengePassword{},
 				},
 			},
 			assertAttempt: func(t *testing.T, attempt *domain.AuthAttempt) {
@@ -118,7 +114,7 @@ func TestAuthAttempt_Create(t *testing.T) {
 				ProjectID:      "p",
 				RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypeUser},
 				Checks: []domain.AuthCheck{
-					domain.NewAuthFactorUser("user-abc", time.Time{}),
+					&domain.AuthFactorUser{UserID: "user-abc"},
 				},
 			},
 			assertAttempt: func(t *testing.T, attempt *domain.AuthAttempt) {
@@ -145,18 +141,9 @@ func TestAuthAttempt_Create(t *testing.T) {
 					domain.AuthCheckTypePasskey,
 				},
 				Checks: []domain.AuthCheck{
-					func() domain.AuthCheck {
-						check, _ := domain.NewUserAuthCheck()
-						return check
-					}(),
-					func() domain.AuthCheck {
-						check, _ := domain.NewPasswordAuthCheck()
-						return check
-					}(),
-					func() domain.AuthCheck {
-						check, _ := domain.NewPasskeyAuthCheckChallenge(&domain.PasskeyChallenge{Challenge: "challenge"})
-						return check
-					}(),
+					&domain.AuthChallengeUser{},
+					&domain.AuthChallengePassword{},
+					&domain.AuthChallengePasskey{PasskeyChallenge: &domain.PasskeyChallenge{Challenge: "challenge"}},
 				},
 			},
 			assertAttempt: func(t *testing.T, attempt *domain.AuthAttempt) {
@@ -199,9 +186,9 @@ func TestAuthAttempt_Create(t *testing.T) {
 					domain.AuthCheckTypePasskey,
 				},
 				Checks: []domain.AuthCheck{
-					domain.NewAuthFactorUser("verified-user", time.Time{}),
-					domain.NewAuthFactorPassword(time.Time{}),
-					domain.NewAuthFactorPasskey(time.Time{}),
+					&domain.AuthFactorUser{UserID: "verified-user"},
+					&domain.AuthFactorPassword{},
+					&domain.AuthFactorPasskey{},
 				},
 			},
 			assertAttempt: func(t *testing.T, attempt *domain.AuthAttempt) {
@@ -362,8 +349,7 @@ func TestAuthAttempt_SetChallenge(t *testing.T) {
 		ensureProject(t, tx, attempt.ProjectID)
 		require.NoError(t, repo.Create(t.Context(), tx, attempt))
 
-		challenge, err := domain.NewPasskeyAuthCheckChallenge(&domain.PasskeyChallenge{Challenge: "set-challenge"})
-		require.NoError(t, err)
+		challenge := &domain.AuthChallengePasskey{PasskeyChallenge: &domain.PasskeyChallenge{Challenge: "set-challenge"}}
 		require.NoError(t, repo.SetChallenge(t.Context(), tx, attempt.ProjectID, attempt.ID, challenge))
 		assert.NotZero(t, challenge.LastChallengedAt)
 
@@ -384,16 +370,14 @@ func TestAuthAttempt_SetChallenge(t *testing.T) {
 		ensureProject(t, tx, attempt.ProjectID)
 		require.NoError(t, repo.Create(t.Context(), tx, attempt))
 
-		challenge, err := domain.NewPasskeyAuthCheckChallenge(&domain.PasskeyChallenge{Challenge: "second"})
-		require.NoError(t, err)
+		challenge := &domain.AuthChallengePasskey{PasskeyChallenge: &domain.PasskeyChallenge{Challenge: "second"}}
 		require.NoError(t, repo.SetChallenge(t.Context(), tx, attempt.ProjectID, attempt.ID, challenge))
 		require.NoError(t, repo.ChallengeFailed(t.Context(), tx, attempt.ProjectID, attempt.ID, challenge))
 		require.NoError(t, repo.ChallengeFailed(t.Context(), tx, attempt.ProjectID, attempt.ID, challenge))
 		assert.Equal(t, uint16(2), challenge.FailureCount)
 		assert.NotNil(t, challenge.LastFailedAt)
 
-		challenge, err = domain.NewPasskeyAuthCheckChallenge(&domain.PasskeyChallenge{Challenge: "second"})
-		require.NoError(t, err)
+		challenge = &domain.AuthChallengePasskey{PasskeyChallenge: &domain.PasskeyChallenge{Challenge: "second"}}
 		require.NoError(t, repo.SetChallenge(t.Context(), tx, attempt.ProjectID, attempt.ID, challenge))
 
 		stored, err := repo.GetByID(t.Context(), tx, attempt.ProjectID, attempt.ID)
@@ -472,7 +456,7 @@ func TestAuthAttempt_ChallengeSucceeded(t *testing.T) {
 
 		attempt, challenge := newTestAttemptWithChallenge(t, repo, tx, "p")
 
-		factor := domain.NewAuthFactorPassword(time.Time{})
+		factor := &domain.AuthFactorPassword{}
 		previousVerifiedAt := factor.LastVerifiedAt
 		require.NoError(t, repo.Create(t.Context(), tx, attempt))
 		require.NoError(t, repo.ChallengeSucceeded(t.Context(), tx, attempt.ProjectID, attempt.ID, factor, challenge.GetID()))
@@ -495,7 +479,7 @@ func TestAuthAttempt_ChallengeSucceeded(t *testing.T) {
 		require.NoError(t, repo.ChallengeFailed(t.Context(), tx, attempt.ProjectID, attempt.ID, challenge))
 		assert.Equal(t, uint16(2), challenge.FailureCount)
 
-		factor := domain.NewAuthFactorPassword(time.Time{})
+		factor := &domain.AuthFactorPassword{}
 		require.NoError(t, repo.ChallengeSucceeded(t.Context(), tx, attempt.ProjectID, attempt.ID, factor, challenge.GetID()))
 		assert.NotZero(t, factor.LastVerifiedAt)
 
@@ -512,11 +496,10 @@ func TestAuthAttempt_ChallengeSucceeded(t *testing.T) {
 
 		attempt, _ := newTestAttemptWithChallenge(t, repo, tx, "p")
 
-		userChallenge, err := domain.NewUserAuthCheck()
-		require.NoError(t, err)
+		userChallenge := &domain.AuthChallengeUser{}
 		require.NoError(t, repo.SetChallenge(t.Context(), tx, attempt.ProjectID, attempt.ID, userChallenge))
 
-		userFactor := domain.NewAuthFactorUser("verified-user", time.Time{})
+		userFactor := &domain.AuthFactorUser{UserID: "verified-user"}
 		require.NoError(t, repo.ChallengeSucceeded(t.Context(), tx, attempt.ProjectID, attempt.ID, userFactor, userChallenge.GetID()))
 		assert.NotZero(t, userFactor.LastVerifiedAt)
 

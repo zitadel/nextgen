@@ -22,7 +22,7 @@ func (a *AuthFactorUser) Payload() any {
 	return a
 }
 
-func NewAuthChallengeUser(id string, lastChallengedAt, lastFailedAt time.Time, failureCount uint16) *AuthChallengeUser {
+func SetAuthChallengeUser(id string, lastChallengedAt, lastFailedAt time.Time, failureCount uint16) *AuthChallengeUser {
 	return &AuthChallengeUser{
 		authChallenge: authChallenge{
 			ID:               id,
@@ -33,24 +33,13 @@ func NewAuthChallengeUser(id string, lastChallengedAt, lastFailedAt time.Time, f
 	}
 }
 
-func NewUserAuthCheck() (*AuthChallengeUser, error) {
-	challenge, err := newChallenge()
-	if err != nil {
-		return nil, err
-	}
-	return &AuthChallengeUser{
-		authChallenge: challenge,
-	}, nil
-}
-
 type AuthFactorUser struct {
 	UserID string
 	authFactor
 }
 
-func NewAuthFactorUser(userID string, lastVerifiedAt time.Time) *AuthFactorUser {
+func SetAuthFactorUser(lastVerifiedAt time.Time) *AuthFactorUser {
 	return &AuthFactorUser{
-		UserID: userID,
 		authFactor: authFactor{
 			LastVerifiedAt: lastVerifiedAt,
 		},

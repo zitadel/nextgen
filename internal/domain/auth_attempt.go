@@ -245,6 +245,26 @@ func (a *AuthAttempt) PreparePasskeyChallenge() (string, error) {
 	return userCheck.UserID, nil
 }
 
+func (a *AuthAttempt) SetUserChallenge() *AuthChallengeUser {
+	challenge := &AuthChallengeUser{}
+	a.SetCheck(challenge)
+	return challenge
+}
+
+func (a *AuthAttempt) SetPasswordChallenge() *AuthChallengePassword {
+	challenge := &AuthChallengePassword{}
+	a.SetCheck(challenge)
+	return challenge
+}
+
+func (a *AuthAttempt) SetPasskeyChallenge(passkeyChallenge *PasskeyChallenge) *AuthChallengePasskey {
+	challenge := &AuthChallengePasskey{
+		PasskeyChallenge: passkeyChallenge,
+	}
+	a.SetCheck(challenge)
+	return challenge
+}
+
 // PrepareUserVerification validates that the attempt is in a state where
 // a user (identifier) proof can be submitted.
 func (a *AuthAttempt) PrepareUserVerification() error {
@@ -292,6 +312,29 @@ func (a *AuthAttempt) PreparePasskeyVerification() (string, error) {
 		return "", nil
 	}
 	return userCheck.UserID, nil
+}
+
+func (a *AuthAttempt) SetUserFactor(user *User) *AuthFactorUser {
+	factor := &AuthFactorUser{
+		UserID: user.ID,
+	}
+	a.SetCheck(factor)
+	return factor
+}
+
+func (a *AuthAttempt) SetPasswordFactor() *AuthFactorPassword {
+	factor := &AuthFactorPassword{}
+	a.SetCheck(factor)
+	return factor
+}
+
+func (a *AuthAttempt) SetPasskeyFactor(passkeyVerification *PasskeyVerification) *AuthFactorPasskey {
+	factor := &AuthFactorPasskey{
+		UserVerified: passkeyVerification.UserVerified,
+		UserID:       passkeyVerification.UserID,
+	}
+	a.SetCheck(factor)
+	return factor
 }
 
 // PrepareHandoff validates that a handoff can be issued.
@@ -364,11 +407,11 @@ type AuthAttemptRepository interface {
 
 	// SetChallenge sets a check to challenged and sets the challenge payload.
 	// If the check is not stored yet, the method creates a new check with the given type and challenge payload, otherwise it updates the existing check with the new challenge payload and id.
-	// The repository MUST call the [AuthChallenge.SetLastChallengedAt] with the current time, reset the [AuthChallenge.SetLastFailedAt] to nil and reset the [AuthChallenge.SetFailureCount] to 0, and store the values accordingly.
+	// The repository MUST call [AuthChallenge.SetID] with the generated id, [AuthChallenge.SetLastChallengedAt] with the current time, reset the [AuthChallenge.SetLastFailedAt] to nil and reset the [AuthChallenge.SetFailureCount] to 0, and store the values accordingly.
 	SetChallenge(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string, challenge AuthChallenge) error
 	// ChallengeSucceeded sets the [AuthFactor.SetLastVerifiedAt] to the current time and stores it accordingly and removes the challenge payload from the storage.
 	// The factor must be stored already as an [AuthChallenge], with the same ID.
-	// The factor payload MUST be stored by the repository.
+	// The factor's payload MUST be stored by the repository.
 	ChallengeSucceeded(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string, factor AuthFactor, challengeID string) error
 	// ChallengeFailed sets a challenge to failed.
 	// The challenge must be stored already as an [AuthChallenge], with the same ID.

@@ -125,14 +125,14 @@ const pgAuthAttemptCreateStmt = `WITH inserted_attempt AS (` +
 	` VALUES ($1, $2::SMALLINT[], $3::INTERVAL, $4::BIGINT)` +
 	` RETURNING project_id, id, created_at` +
 	`), inserted_checks AS (` +
-	` INSERT INTO zitadel_nextgen.auth_attempt_checks (project_id, auth_attempt_id, type, challenge_payload, factor_payload, challenge_id, last_challenged_at, last_verified_at)` +
-	` SELECT ia.project_id, ia.id, checks.type, checks.challenge_payload, checks.factor_payload, checks.challenge_id,` +
-	` CASE WHEN checks.is_challenger THEN NOW() ELSE NULL END,` +
-	` CASE WHEN checks.is_factorer AND NOT checks.is_challenger THEN NOW() ELSE NULL END` +
+	` INSERT INTO zitadel_nextgen.auth_attempt_checks (project_id, auth_attempt_id, type, challenge_payload, factor_payload, last_challenged_at, last_verified_at)` +
+	` SELECT ia.project_id, ia.id, checks.type, checks.challenge_payload, checks.factor_payload,` +
+	` CASE WHEN checks.is_challenge THEN NOW() ELSE NULL END,` +
+	` CASE WHEN checks.is_factor AND NOT checks.is_challenge THEN NOW() ELSE NULL END` +
 	` FROM inserted_attempt ia` +
-	` JOIN LATERAL jsonb_to_recordset(COALESCE($5::JSONB, '[]'::JSONB)) AS checks(type SMALLINT, challenge_payload JSONB, factor_payload JSONB, is_challenger BOOLEAN, is_factorer BOOLEAN, challenge_id TEXT) ON TRUE` +
-	` RETURNING type, last_challenged_at, last_verified_at` +
-	`) SELECT ia.id, ia.created_at, ic.type, ic.last_challenged_at, ic.last_verified_at` +
+	` JOIN LATERAL jsonb_to_recordset(COALESCE($5::JSONB, '[]'::JSONB)) AS checks(type SMALLINT, challenge_payload JSONB, factor_payload JSONB, is_challenge BOOLEAN, is_factor BOOLEAN) ON TRUE` +
+	` RETURNING challenge_id, type, last_challenged_at, last_verified_at` +
+	`) SELECT ia.id, ia.created_at, ic.challenge_id, ic.type, ic.last_challenged_at, ic.last_verified_at` +
 	` FROM inserted_attempt ia` +
 	` LEFT JOIN inserted_checks ic ON TRUE`
 
@@ -154,17 +154,19 @@ func (a *pgAuthAttempt) Create(ctx context.Context, client database.QueryExecuto
 	}
 	defer rows.Close()
 
+	challengeIDByType := make(map[domain.AuthCheckType]database.Identity, len(authAttempt.Checks))
 	lastChallengedAtByType := make(map[domain.AuthCheckType]time.Time, len(authAttempt.Checks))
 	lastVerifiedAtByType := make(map[domain.AuthCheckType]time.Time, len(authAttempt.Checks))
 	for rows.Next() {
 		var (
 			attemptID        database.Identity
 			createdAt        time.Time
+			challengeID      database.Identity
 			checkType        database.Null[uint8]
 			lastChallengedAt database.Null[time.Time]
 			lastVerifiedAt   database.Null[time.Time]
 		)
-		err = rows.Scan(&attemptID, &createdAt, &checkType, &lastChallengedAt, &lastVerifiedAt)
+		err = rows.Scan(&attemptID, &createdAt, &challengeID, &checkType, &lastChallengedAt, &lastVerifiedAt)
 		if err != nil {
 			return fmt.Errorf("failed to scan created auth attempt: %w", err)
 		}
@@ -172,6 +174,9 @@ func (a *pgAuthAttempt) Create(ctx context.Context, client database.QueryExecuto
 		authAttempt.CreatedAt = createdAt
 		if checkType.Valid {
 			checkTypeV := domain.AuthCheckType(checkType.V)
+			if challengeID.String() != "" {
+				challengeIDByType[checkTypeV] = challengeID
+			}
 			if lastChallengedAt.Valid {
 				lastChallengedAtByType[checkTypeV] = lastChallengedAt.V
 			}
@@ -188,6 +193,11 @@ func (a *pgAuthAttempt) Create(ctx context.Context, client database.QueryExecuto
 	}
 
 	for _, check := range authAttempt.Checks {
+		if t, ok := challengeIDByType[check.Type()]; ok {
+			if challenge, ok := check.(domain.AuthChallenge); ok {
+				challenge.SetID(t.String())
+			}
+		}
 		if t, ok := lastChallengedAtByType[check.Type()]; ok {
 			if challenge, ok := check.(domain.AuthChallenge); ok {
 				challenge.SetLastChallengedAt(t)
@@ -207,7 +217,7 @@ func (*pgAuthAttempt) checksToJSON(checks []domain.AuthCheck) ([]byte, error) {
 	for _, check := range checks {
 		checkRow := authAttemptCheckCreate{Type: uint8(check.Type())}
 		if challenge, ok := check.(domain.AuthChallenge); ok {
-			checkRow.IsChallenger = true
+			checkRow.IsChallenge = true
 			checkRow.ChallengeID = challenge.GetID()
 			var err error
 			checkRow.ChallengePayload, err = json.Marshal(challenge.Payload())
@@ -216,7 +226,7 @@ func (*pgAuthAttempt) checksToJSON(checks []domain.AuthCheck) ([]byte, error) {
 			}
 		}
 		if factor, ok := check.(domain.AuthFactor); ok {
-			checkRow.IsFactorer = true
+			checkRow.IsFactor = true
 			var err error
 			checkRow.FactorPayload, err = json.Marshal(factor.Payload())
 			if err != nil {
@@ -263,20 +273,25 @@ func (a *pgAuthAttempt) SetChallenge(ctx context.Context, client database.QueryE
 			return fmt.Errorf("failed to marshal challenge payload: %w", err)
 		}
 	}
+	var challengeID string
 	var lastChallengedAt time.Time
 	err = client.QueryRow(ctx,
 		`INSERT INTO zitadel_nextgen.auth_attempt_checks`+
-			` (project_id, auth_attempt_id, type, last_challenged_at, challenge_payload, challenge_id)`+
-			` VALUES ($1, $2, $3, NOW(), $4::JSONB, $5)`+
+			` (project_id, auth_attempt_id, type, last_challenged_at, challenge_payload)`+
+			` VALUES ($1, $2, $3, NOW(), $4::JSONB)`+
 			` ON CONFLICT (project_id, auth_attempt_id, type) DO UPDATE SET`+
-			` last_challenged_at = NOW(), challenge_payload = EXCLUDED.challenge_payload, challenge_id = EXCLUDED.challenge_id, failure_count = 0, last_failed_at = NULL`+
-			` RETURNING last_challenged_at`,
-		projectID, database.Identity(authAttemptID), challenge.Type(), payload, challenge.GetID()).
-		Scan(&lastChallengedAt)
+			` challenge_id = nextval(pg_get_serial_sequence('zitadel_nextgen.auth_attempt_checks', 'challenge_id')),`+
+			` last_challenged_at = NOW(), challenge_payload = EXCLUDED.challenge_payload, failure_count = 0, last_failed_at = NULL`+
+			` RETURNING challenge_id, last_challenged_at`,
+		projectID, database.Identity(authAttemptID), challenge.Type(), payload).
+		Scan(&challengeID, &lastChallengedAt)
 	if err != nil {
 		return err
 	}
+	challenge.SetID(challengeID)
 	challenge.SetLastChallengedAt(lastChallengedAt)
+	challenge.SetFailureCount(0)
+	challenge.SetLastFailedAt(time.Time{})
 	return nil
 }
 
@@ -291,7 +306,7 @@ func (a *pgAuthAttempt) ChallengeSucceeded(ctx context.Context, client database.
 	var lastVerifiedAt time.Time
 	err = client.QueryRow(ctx,
 		`UPDATE zitadel_nextgen.auth_attempt_checks`+
-			` SET last_verified_at = NOW(), factor_payload = $4::JSONB, challenge_payload = NULL, challenge_id = NULL, last_challenged_at = NULL, failure_count = 0`+
+			` SET last_verified_at = NOW(), factor_payload = $4::JSONB, challenge_payload = NULL, last_challenged_at = NULL, failure_count = 0`+
 			` WHERE project_id = $1 AND auth_attempt_id = $2 AND type = $3 AND challenge_id = $5`+
 			` RETURNING last_verified_at`,
 		projectID, database.Identity(authAttemptID), factor.Type(), factorPayload, id).
@@ -369,7 +384,7 @@ func (a *spannerAuthAttempt) scan(rows database.Rows, attempt *domain.AuthAttemp
 			requiredChecks   []googspanner.NullInt64
 			checkType        database.Null[int64]
 			timeToLiveNanos  database.Null[int64]
-			challengeID      database.Null[string]
+			challengeID      database.Identity
 			lastChallengedAt database.Null[time.Time]
 			verifiedAt       database.Null[time.Time]
 			lastFailedAt     database.Null[time.Time]
@@ -406,7 +421,7 @@ func (a *spannerAuthAttempt) scan(rows database.Rows, attempt *domain.AuthAttemp
 		if !checkType.Valid {
 			continue
 		}
-		checks, err := newAuthChecks(domain.AuthCheckType(checkType.V), challengeID.V, lastChallengedAt.V, lastFailedAt.V, verifiedAt.V, uint16(failureCount.V), challenge.Value, factor.Value)
+		checks, err := newAuthChecks(domain.AuthCheckType(checkType.V), challengeID.String(), lastChallengedAt.V, lastFailedAt.V, verifiedAt.V, uint16(failureCount.V), challenge.Value, factor.Value)
 		if err != nil {
 			return fmt.Errorf("failed to unmarshal auth check: %w", err)
 		}
@@ -518,22 +533,29 @@ func (a *spannerAuthAttempt) SetChallenge(ctx context.Context, client database.Q
 		payloadStr = new(string(b))
 	}
 
-	n, err := client.Exec(ctx,
-		`UPDATE auth_attempt_checks SET last_challenged_at = $1, challenge_payload = $2, failure_count = 0, last_failed_at = NULL, challenge_id = $3`+
-			` WHERE project_id = $4 AND auth_attempt_id = $5 AND type = $6`,
-		now, payloadStr, projectID, challenge.GetID(), database.Identity(authAttemptID), int64(challenge.Type()))
+	var id database.Identity
+	err = client.QueryRow(ctx,
+		`UPDATE auth_attempt_checks SET last_challenged_at = $1, challenge_payload = $2, failure_count = 0, last_failed_at = NULL, challenge_id = nextval('auth_attempt_checks_challenge_id_seq')`+
+			` WHERE project_id = $3 AND auth_attempt_id = $4 AND type = $5`+
+			` RETURNING challenge_id`,
+		now, payloadStr, projectID, database.Identity(authAttemptID), int64(challenge.Type())).
+		Scan(&id)
 	if err != nil {
 		return fmt.Errorf("failed to set challenge: %w", err)
 	}
-	if n == 0 {
-		_, err = client.Exec(ctx,
-			`INSERT INTO auth_attempt_checks (project_id, auth_attempt_id, type, last_challenged_at, challenge_payload, failure_count, challenge_id) VALUES ($1, $2, $3, $4, $5, 0, $6)`,
-			projectID, database.Identity(authAttemptID), int64(challenge.Type()), now, payloadStr, challenge.GetID())
+	if id == "" {
+		err = client.QueryRow(ctx,
+			`INSERT INTO auth_attempt_checks (project_id, auth_attempt_id, type, last_challenged_at, challenge_payload, failure_count) VALUES ($1, $2, $3, $4, $5, 0) RETURNING challenge_id`,
+			projectID, database.Identity(authAttemptID), int64(challenge.Type()), now, payloadStr).
+			Scan(&id)
 		if err != nil {
 			return fmt.Errorf("failed to insert challenge: %w", err)
 		}
 	}
+	challenge.SetID(id.String())
 	challenge.SetLastChallengedAt(now)
+	challenge.SetFailureCount(0)
+	challenge.SetLastFailedAt(time.Time{})
 	return nil
 }
 
@@ -549,7 +571,7 @@ func (a *spannerAuthAttempt) ChallengeSucceeded(ctx context.Context, client data
 	}
 
 	n, err := client.Exec(ctx,
-		`UPDATE auth_attempt_checks SET last_verified_at = $1, factor_payload = $2, challenge_payload = NULLL, challenge_id = NULLL, last_challenged_at = NULLL, failure_count = 0`+
+		`UPDATE auth_attempt_checks SET last_verified_at = $1, factor_payload = $2, challenge_payload = NULLL, last_challenged_at = NULLL, failure_count = 0`+
 			` WHERE project_id = $3 AND auth_attempt_id = $4 AND type = $5 and challenge_id = $6`,
 		now, factorStr, projectID, database.Identity(authAttemptID), int64(factor.Type()), id)
 	if err != nil {
@@ -608,7 +630,7 @@ func newAuthChecks(
 	switch checkType {
 	case domain.AuthCheckTypeUser:
 		if !verifiedAt.IsZero() {
-			userFactor := domain.NewAuthFactorUser("", verifiedAt)
+			userFactor := domain.SetAuthFactorUser(verifiedAt)
 			if len(factor) > 0 {
 				err = json.Unmarshal(factor, &userFactor)
 				if err != nil {
@@ -618,18 +640,18 @@ func newAuthChecks(
 			checks = append(checks, userFactor)
 		}
 		if !lastChallengedAt.IsZero() {
-			checks = append(checks, domain.NewAuthChallengeUser(id, lastChallengedAt, lastFailedAt, failureCount))
+			checks = append(checks, domain.SetAuthChallengeUser(id, lastChallengedAt, lastFailedAt, failureCount))
 		}
 	case domain.AuthCheckTypePassword:
 		if !verifiedAt.IsZero() {
-			checks = append(checks, domain.NewAuthFactorPassword(verifiedAt))
+			checks = append(checks, domain.SetAuthFactorPassword(verifiedAt))
 		}
 		if !lastChallengedAt.IsZero() {
-			checks = append(checks, domain.NewAuthChallengePassword(id, lastChallengedAt, lastFailedAt, failureCount))
+			checks = append(checks, domain.SetAuthChallengePassword(id, lastChallengedAt, lastFailedAt, failureCount))
 		}
 	case domain.AuthCheckTypePasskey:
 		if !verifiedAt.IsZero() {
-			passkeyFactor := domain.NewAuthFactorPasskey(verifiedAt)
+			passkeyFactor := domain.SetAuthFactorPasskey(verifiedAt)
 			if len(factor) > 0 {
 				err = json.Unmarshal(factor, passkeyFactor)
 				if err != nil {
@@ -639,7 +661,7 @@ func newAuthChecks(
 			checks = append(checks, passkeyFactor)
 		}
 		if !lastChallengedAt.IsZero() {
-			passkeyCheck := domain.NewAuthChallengePasskey(id, lastChallengedAt, lastFailedAt, failureCount)
+			passkeyCheck := domain.SetAuthChallengePasskey(id, lastChallengedAt, lastFailedAt, failureCount)
 			if len(challenge) > 0 {
 				err = json.Unmarshal(challenge, passkeyCheck)
 				if err != nil {
@@ -658,7 +680,7 @@ type authAttemptCheckCreate struct {
 	Type             uint8           `json:"type"`
 	ChallengePayload json.RawMessage `json:"challenge_payload,omitempty"`
 	FactorPayload    json.RawMessage `json:"factor_payload,omitempty"`
-	IsChallenger     bool            `json:"is_challenger"`
-	IsFactorer       bool            `json:"is_factorer"`
+	IsChallenge      bool            `json:"is_challenge"`
+	IsFactor         bool            `json:"is_factor"`
 	ChallengeID      string          `json:"challenge_id,omitempty"`
 }

@@ -6,7 +6,15 @@ type AuthChallengePassword struct {
 	authChallenge
 }
 
-func NewAuthChallengePassword(id string, lastChallengedAt, lastFailedAt time.Time, failureCount uint16) *AuthChallengePassword {
+func (a *AuthChallengePassword) Type() AuthCheckType {
+	return AuthCheckTypePassword
+}
+
+func (a *AuthChallengePassword) Payload() any {
+	return nil
+}
+
+func SetAuthChallengePassword(id string, lastChallengedAt, lastFailedAt time.Time, failureCount uint16) *AuthChallengePassword {
 	return &AuthChallengePassword{
 		authChallenge: authChallenge{
 			ID:               id,
@@ -17,34 +25,8 @@ func NewAuthChallengePassword(id string, lastChallengedAt, lastFailedAt time.Tim
 	}
 }
 
-func NewPasswordAuthCheck() (*AuthChallengePassword, error) {
-	challenge, err := newChallenge()
-	if err != nil {
-		return nil, err
-	}
-	return &AuthChallengePassword{
-		authChallenge: challenge,
-	}, nil
-}
-
-func (a *AuthChallengePassword) Type() AuthCheckType {
-	return AuthCheckTypePassword
-}
-
-func (a *AuthChallengePassword) Payload() any {
-	return nil
-}
-
 type AuthFactorPassword struct {
 	authFactor
-}
-
-func NewAuthFactorPassword(lastVerifiedAt time.Time) *AuthFactorPassword {
-	return &AuthFactorPassword{
-		authFactor: authFactor{
-			LastVerifiedAt: lastVerifiedAt,
-		},
-	}
 }
 
 func (a *AuthFactorPassword) Type() AuthCheckType {
@@ -53,6 +35,14 @@ func (a *AuthFactorPassword) Type() AuthCheckType {
 
 func (a *AuthFactorPassword) Payload() any {
 	return nil
+}
+
+func SetAuthFactorPassword(lastVerifiedAt time.Time) *AuthFactorPassword {
+	return &AuthFactorPassword{
+		authFactor: authFactor{
+			LastVerifiedAt: lastVerifiedAt,
+		},
+	}
 }
 
 var (

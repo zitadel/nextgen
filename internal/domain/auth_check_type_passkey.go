@@ -2,15 +2,29 @@ package domain
 
 import "time"
 
-func NewPasskeyAuthCheckChallenge(passkeyChallenge *PasskeyChallenge) (*AuthChallengePasskey, error) {
-	challenge, err := newChallenge()
-	if err != nil {
-		return nil, err
-	}
+type AuthChallengePasskey struct {
+	*PasskeyChallenge
+	authChallenge
+}
+
+func (a *AuthChallengePasskey) Type() AuthCheckType {
+	return AuthCheckTypePasskey
+}
+
+func (a *AuthChallengePasskey) Payload() any {
+	return a
+}
+
+func SetAuthChallengePasskey(id string, lastChallengedAt, lastFailedAt time.Time, failureCount uint16) *AuthChallengePasskey {
 	return &AuthChallengePasskey{
-		PasskeyChallenge: passkeyChallenge,
-		authChallenge:    challenge,
-	}, nil
+		PasskeyChallenge: new(PasskeyChallenge),
+		authChallenge: authChallenge{
+			ID:               id,
+			LastChallengedAt: lastChallengedAt,
+			LastFailedAt:     lastFailedAt,
+			FailureCount:     failureCount,
+		},
+	}
 }
 
 type AuthFactorPasskey struct {
@@ -19,7 +33,7 @@ type AuthFactorPasskey struct {
 	authFactor
 }
 
-func NewAuthFactorPasskey(lastVerifiedAt time.Time) *AuthFactorPasskey {
+func SetAuthFactorPasskey(lastVerifiedAt time.Time) *AuthFactorPasskey {
 	return &AuthFactorPasskey{
 		authFactor: authFactor{
 			LastVerifiedAt: lastVerifiedAt,
@@ -32,30 +46,6 @@ func (a *AuthFactorPasskey) Type() AuthCheckType {
 }
 
 func (a *AuthFactorPasskey) Payload() any {
-	return a
-}
-
-type AuthChallengePasskey struct {
-	*PasskeyChallenge
-	authChallenge
-}
-
-func NewAuthChallengePasskey(id string, lastChallengedAt, lastFailedAt time.Time, failureCount uint16) *AuthChallengePasskey {
-	return &AuthChallengePasskey{
-		authChallenge: authChallenge{
-			ID:               id,
-			LastChallengedAt: lastChallengedAt,
-			LastFailedAt:     lastFailedAt,
-			FailureCount:     failureCount,
-		},
-	}
-}
-
-func (a *AuthChallengePasskey) Type() AuthCheckType {
-	return AuthCheckTypePasskey
-}
-
-func (a *AuthChallengePasskey) Payload() any {
 	return a
 }
 

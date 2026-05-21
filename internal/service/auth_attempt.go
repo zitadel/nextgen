@@ -268,42 +268,32 @@ func (s *authAttemptService) IssueChallenge(ctx context.Context, input IssueChal
 		return nil, err
 	}
 
-	challenger, err := s.buildChallenger(ctx, attempt, input.Challenge)
+	challenge, err := s.buildChallenge(ctx, attempt, input.Challenge)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := s.attempts.SetChallenge(ctx, s.pool, input.ProjectID, input.AttemptID, challenger); err != nil {
+	if err := s.attempts.SetChallenge(ctx, s.pool, input.ProjectID, input.AttemptID, challenge); err != nil {
 		return nil, err
 	}
 
 	return attempt, nil
 }
 
-// buildChallenger constructs the challenger for the given check type.
-func (s *authAttemptService) buildChallenger(ctx context.Context, attempt *domain.AuthAttempt, challenge Challenge) (domain.AuthChallenge, error) {
+// buildChallenge constructs the challenge for the given check type.
+func (s *authAttemptService) buildChallenge(ctx context.Context, attempt *domain.AuthAttempt, challenge Challenge) (domain.AuthChallenge, error) {
 	switch typ := challenge.(type) {
 	case UserChallenge:
 		if err := attempt.PrepareUserChallenge(); err != nil {
 			return nil, err
 		}
-		userChallenge, err := domain.NewUserAuthCheck()
-		if err != nil {
-			return nil, err
-		}
-		attempt.SetCheck(userChallenge)
-		return userChallenge, nil
+		return attempt.SetUserChallenge(), nil
 
 	case PasswordChallenge:
 		if err := attempt.PreparePasswordChallenge(); err != nil {
 			return nil, err
 		}
-		passwordChallenge, err := domain.NewPasswordAuthCheck()
-		if err != nil {
-			return nil, err
-		}
-		attempt.SetCheck(passwordChallenge)
-		return passwordChallenge, nil
+		return attempt.SetPasswordChallenge(), nil
 
 	case PasskeyChallenge:
 		userID, err := attempt.PreparePasskeyChallenge()
@@ -317,17 +307,11 @@ func (s *authAttemptService) buildChallenger(ctx context.Context, attempt *domai
 				return nil, domain.ErrInternal(err).WithMessage("failed to load user passkeys")
 			}
 		}
-		challenge, err := domain.CreatePasskeyChallenge(userID, passkeys, typ.UserVerification, typ.RPID, typ.RPOrigins)
+		passkeyChallenge, err := domain.CreatePasskeyChallenge(userID, passkeys, typ.UserVerification, typ.RPID, typ.RPOrigins)
 		if err != nil {
 			return nil, err
 		}
-		passkeyChallenge, err := domain.NewPasskeyAuthCheckChallenge(challenge)
-		if err != nil {
-			return nil, err
-		}
-
-		attempt.SetCheck(passkeyChallenge)
-		return passkeyChallenge, nil
+		return attempt.SetPasskeyChallenge(passkeyChallenge), nil
 
 	default:
 		return nil, domain.ErrAuthAttemptInvalidRequest()
@@ -397,9 +381,7 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 		if err != nil {
 			return nil, domain.ErrAuthAttemptProofRejected().WithParent(err)
 		}
-		return &domain.AuthFactorUser{
-			UserID: user.ID,
-		}, nil
+		return attempt.SetUserFactor(user), nil
 
 	case PasswordProof:
 		userFactor, err := attempt.PreparePasswordVerification()
@@ -418,7 +400,7 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 		if err := password.Verify(p.Password, s.passwordVerifier); err != nil {
 			return nil, domain.ErrAuthAttemptProofRejected().WithParent(err)
 		}
-		return &domain.AuthFactorPassword{}, nil
+		return attempt.SetPasswordFactor(), nil
 
 	case PasskeyProof:
 		userID, err := attempt.PreparePasskeyVerification()
@@ -445,7 +427,7 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 		if err != nil {
 			return nil, domain.ErrAuthAttemptProofRejected().WithParent(err)
 		}
-		return &domain.AuthFactorPasskey{UserVerified: verification.UserVerified, UserID: verification.UserID}, nil
+		return attempt.SetPasskeyFactor(verification), nil
 
 	default:
 		return nil, domain.ErrAuthAttemptInvalidRequest().WithDetails("unsupported proof type")
