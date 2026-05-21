@@ -5,7 +5,7 @@ import type {
   CreateFlowBodyPurpose,
   SubmitFlowStepBody,
 } from "@zitadel-nextgen/api/generated/model";
-import { css, html, LitElement } from "lit";
+import { css, html, LitElement, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import type { Liquid, Template } from "liquidjs";
@@ -187,28 +187,34 @@ export class ZitadelLogin extends LitElement {
    * fired.
    */
   protected override firstUpdated(): void {
-    void this.startFlow();
+    // Defer so `startFlow()` can set `loading` without scheduling a second
+    // update before Lit finishes this commit (change-in-update warning).
+    queueMicrotask(() => void this.startFlow());
   }
 
-  override willUpdate(): void {
+  override willUpdate(changed: PropertyValues<this>): void {
     if (!this.engine) {
       this.engine = createLiquidEngine({ locale: this.locale });
     }
-  }
-
-  override updated(changed: Map<string, unknown>): void {
     const root = this.shadowRoot;
-    if (!root) return;
-    applyBaseTokens(root);
-    applyBrandingTokens(root, this.branding, this.themeController.theme);
-    applyFontUrl(root, this.branding?.font_url ?? null);
+    if (root) {
+      applyBaseTokens(root);
+      applyBrandingTokens(root, this.branding, this.themeController.theme);
+      applyFontUrl(root, this.branding?.font_url ?? null);
+    }
     this.dataset.theme = this.themeController.theme;
     this.toggleAttribute("data-theme-dark", this.themeController.theme === "dark");
     this.setAttribute("aria-busy", this.loading ? "true" : "false");
-    this.applyValuesToFields();
-    if (changed.has("response")) {
+  }
+
+  override updated(changed: PropertyValues<this>): void {
+    const props = changed as Map<string, unknown>;
+    if (!props.has("response")) return;
+    // Step markup exists only after this commit; defer field hydration/focus.
+    requestAnimationFrame(() => {
+      this.applyValuesToFields();
       this.moveFocusToFirstField();
-    }
+    });
   }
 
   override render() {
@@ -446,8 +452,10 @@ export class ZitadelLogin extends LitElement {
     if (fields.length === 0) return;
     for (const field of fields) {
       const name = field.getAttribute("name");
-      if (name && name in this.formValues) {
-        field.value = this.formValues[name];
+      if (!name || !(name in this.formValues)) continue;
+      const next = this.formValues[name];
+      if (field.value !== next) {
+        field.value = next;
       }
     }
   }

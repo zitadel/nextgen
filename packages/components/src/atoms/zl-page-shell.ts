@@ -1,5 +1,5 @@
 import { LitElement, html } from "lit";
-import { customElement, state } from "lit/decorators.js";
+import { customElement } from "lit/decorators.js";
 
 import pageShellHost from "@zitadel-nextgen/shared-component-styles/lit/page-shell-host.css?inline";
 import pageShellSurface from "@zitadel-nextgen/shared-component-styles/page-shell.css?inline";
@@ -42,45 +42,13 @@ export class ZlPageShell extends LitElement {
     ...surfaceStyles(pageShellHost, pageShellSurface),
   ];
 
-  @state() accessor hasHeaderSlot = false;
-
-  @state() accessor hasFooterSlot = false;
-
-  private headerSlot?: HTMLSlotElement;
-
-  private footerSlot?: HTMLSlotElement;
-
-  override firstUpdated(): void {
-    const root = this.shadowRoot;
-    if (!root) return;
-
-    this.headerSlot = root.querySelector('slot[name="header"]') ?? undefined;
-    this.footerSlot = root.querySelector('slot[name="footer"]') ?? undefined;
-    this.headerSlot?.addEventListener("slotchange", this.syncSlotPresence);
-    this.footerSlot?.addEventListener("slotchange", this.syncSlotPresence);
-    this.syncSlotPresence();
-  }
-
-  override updated(): void {
-    this.syncSlotPresence();
-  }
-
-  private syncSlotPresence = (): void => {
-    const hasHeader =
-      this.headerSlot instanceof HTMLSlotElement &&
-      this.headerSlot.assignedElements({ flatten: true }).length > 0;
-    const hasFooter =
-      this.footerSlot instanceof HTMLSlotElement &&
-      this.footerSlot.assignedElements({ flatten: true }).length > 0;
-    if (hasHeader !== this.hasHeaderSlot) this.hasHeaderSlot = hasHeader;
-    if (hasFooter !== this.hasFooterSlot) this.hasFooterSlot = hasFooter;
-  };
-
   override render() {
-    const headerClass = this.hasHeaderSlot
+    const hasHeader = this.lightDomSlotFilled("header");
+    const hasFooter = this.lightDomSlotFilled("footer");
+    const headerClass = hasHeader
       ? "zr-page-shell__header"
       : "zr-page-shell__header zr-page-shell__region--empty";
-    const footerClass = this.hasFooterSlot
+    const footerClass = hasFooter
       ? "zr-page-shell__footer"
       : "zr-page-shell__footer zr-page-shell__region--empty";
     return html`
@@ -96,6 +64,13 @@ export class ZlPageShell extends LitElement {
         </footer>
       </div>
     `;
+  }
+
+  private lightDomSlotFilled(slot: string): boolean {
+    for (const child of this.children) {
+      if (child.getAttribute("slot") === slot) return true;
+    }
+    return false;
   }
 }
 

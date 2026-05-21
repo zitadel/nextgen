@@ -25,7 +25,9 @@ test("signs in via the embedded component and lands on /admin", async ({ page })
   await page.getByLabel(/email/i).fill(email);
   await page.getByLabel(/password/i).fill("hunter2");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await page.getByRole("button", { name: /skip for now/i }).click();
+  const skip = page.getByRole("button", { name: /skip for now/i });
+  await expect(skip).toBeVisible({ timeout: 15_000 });
+  await skip.click();
 
   await page.waitForURL("**/admin");
   await expect(page.getByRole("heading", { name: "Admin" })).toBeVisible();
