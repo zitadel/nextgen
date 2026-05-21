@@ -65,11 +65,11 @@ documents the same table.
 | Sign in submit | `wrong@example.com` | Stays on identifier; `error.invalid_credentials` on password |
 | Sign in submit | `server@example.com` | Stays on identifier; `error.sign_in_server` form alert |
 | Sign up submit | `exists@example.com` | Stays on register; `error.email_exists` on email |
-| Passkey upsell, action `setup` | `passkey-cancel@example.com` (captured from sign-in) | Stays on passkey-upsell; `error.passkey_cancelled` |
-| Passkey upsell, action `setup` | `passkey-unsupported@example.com` | `error.passkey_unsupported` |
-| Passkey upsell, action `setup` | `passkey-fail@example.com` | `error.passkey_failed` |
+| Passkey upsell, any action except `skip` | `passkey-cancel@example.com` (captured from sign-in) | Stays on passkey-upsell; `error.passkey_cancelled` |
+| Passkey upsell, any action except `skip` | `passkey-unsupported@example.com` | `error.passkey_unsupported` |
+| Passkey upsell, any action except `skip` | `passkey-fail@example.com` | `error.passkey_failed` |
 
-Happy path: any other email → identifier/register → passkey-upsell → passkey-setup → `done`.
+Happy path: any other email → identifier/register → passkey-upsell → (skip) `done` or (setup) passkey-setup → `done`.
 
 ## Branding
 
