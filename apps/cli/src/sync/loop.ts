@@ -84,9 +84,11 @@ export async function buildSyncPlan(
       }
 
       let oldContent: object | null = null;
+      consola.debug(`plan update ${syncer.kind} ${entry.id}: client=${!!client} hasFetch=${!!syncer.fetch}`);
       if (client && syncer.fetch) {
         try {
           oldContent = await syncer.fetch(client, entry.id);
+          consola.debug(`fetch ${syncer.kind} ${entry.id} ok: oldContent keys=${Object.keys(oldContent ?? {}).join(",")}`);
         } catch (err) {
           consola.debug(`fetch ${syncer.kind} ${entry.id} failed:`, err);
         }
