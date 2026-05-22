@@ -35,6 +35,8 @@ func errorResponse(err error) *api.ErrorDetailsStatusCode {
 		return authAttemptErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixFlowDefinition.ErrorCodePrefix("")):
 		return flowDefinitionErrorResponse(e)
+	case strings.HasPrefix(e.Code, domain.PrefixSession.ErrorCodePrefix("")):
+		return sessionErrorResponse(e)
 	default:
 		return internalErrorResponse(err)
 	}

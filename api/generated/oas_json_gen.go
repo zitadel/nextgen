@@ -17596,12 +17596,14 @@ func (s *SessionResponse) encodeFields(e *jx.Encoder) {
 		e.ArrEnd()
 	}
 	{
-		e.FieldStart("assurance_levels")
-		e.ArrStart()
-		for _, elem := range s.AssuranceLevels {
-			e.Str(elem)
+		if s.AssuranceLevels != nil {
+			e.FieldStart("assurance_levels")
+			e.ArrStart()
+			for _, elem := range s.AssuranceLevels {
+				e.Str(elem)
+			}
+			e.ArrEnd()
 		}
-		e.ArrEnd()
 	}
 	{
 		if s.Metadata.Set {
@@ -17706,7 +17708,6 @@ func (s *SessionResponse) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"factors\"")
 			}
 		case "assurance_levels":
-			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
 				s.AssuranceLevels = make([]string, 0)
 				if err := d.Arr(func(d *jx.Decoder) error {
@@ -17779,7 +17780,7 @@ func (s *SessionResponse) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [2]uint8{
-		0b00110111,
+		0b00010111,
 		0b00000011,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {

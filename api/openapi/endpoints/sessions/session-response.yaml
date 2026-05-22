@@ -11,7 +11,6 @@ required:
   - project_id
   - state
   - factors
-  - assurance_levels
   - created_at
   - expires_at
 properties:
