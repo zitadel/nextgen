@@ -3,6 +3,7 @@
 package helpers
 
 import (
+	"net/url"
 	"testing"
 
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -51,7 +52,7 @@ func (h *Harness) EnsureSchemaResolver(t *testing.T) *domain.JSONSchemaResolver 
 			0,
 			0,
 			h.EnsureHttpClient(t),
-			nil,
+			mustParseURL(t, BuiltinSchemaBaseURL),
 		)
 	}
 	return h.SchemaResolver
@@ -88,4 +89,10 @@ func (h *Harness) CreateUserSchema(t *testing.T, projectID string, schema string
 	require.NoError(t, err)
 	require.IsType(t, &api.CreateSchemaResponse{}, resp)
 	return resp.(*api.CreateSchemaResponse).ID
+}
+
+func mustParseURL(t *testing.T, s string) *url.URL {
+	u, err := url.Parse(s)
+	require.NoError(t, err)
+	return u
 }
