@@ -222,16 +222,6 @@ func NewAuthAttemptService(
 // If input.SessionID is set, the existing session's verified checks are copied
 // into the attempt for step-up auth — no new session is created.
 func (s *authAttemptService) Create(ctx context.Context, input CreateAuthAttemptInput) (res *domain.AuthAttempt, err error) {
-	requiredChecks := input.RequiredChecks
-	if requiredChecks == nil {
-		// TODO: implement this
-		//project, err := s.projects.Get(ctx, s.pool, input.ProjectID)
-		//if err != nil {
-		//	return nil, domain.ErrInternal(err).WithMessage("Failed to load the project config for default required checks.")
-		//}
-		// requiredChecks = project.DefaultRequiredChecks
-	}
-
 	opts := make([]domain.AuthAttemptOption, 0, 1)
 	if input.SessionID != nil {
 		session, err := s.sessions.GetByID(ctx, s.pool, input.ProjectID, *input.SessionID)
@@ -244,7 +234,7 @@ func (s *authAttemptService) Create(ctx context.Context, input CreateAuthAttempt
 		opts = append(opts, domain.WithSession(input.SessionID, session.Factors...))
 	}
 
-	attempt, err := domain.NewAuthAttempt(input.ProjectID, requiredChecks, opts...)
+	attempt, err := domain.NewAuthAttempt(input.ProjectID, input.RequiredChecks, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -257,7 +247,14 @@ func (s *authAttemptService) Create(ctx context.Context, input CreateAuthAttempt
 
 // GetByID retrieves an auth attempt by its ID and all its factors and challenges.
 func (s *authAttemptService) GetByID(ctx context.Context, projectID, attemptID string) (*domain.AuthAttempt, error) {
-	return s.attempts.GetByID(ctx, s.pool, projectID, attemptID)
+	attempt, err := s.attempts.GetByID(ctx, s.pool, projectID, attemptID)
+	if err != nil {
+		if errors.Is(err, domain.ErrAuthAttemptNotFound()) {
+			return nil, err
+		}
+		return nil, domain.ErrInternal(err).WithMessage("Failed to load the auth attempt.")
+	}
+	return attempt, nil
 }
 
 // IssueChallenge issues a challenge for the given check type on an existing attempt.
