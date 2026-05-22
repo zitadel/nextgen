@@ -88,13 +88,21 @@ function renderFields(
       const suffix = ctx.deleteMode ? " -> null" : "";
       lines.push(col(`${pad}${prefix} ${pk} = ${formatted}${suffix}`));
     } else if (Array.isArray(val)) {
-      lines.push(col(`${pad}${prefix} ${pk} = [`));
-      renderArrayItems(val, prefix, prefixCol + 4, ctx, lines);
-      lines.push(`${" ".repeat(prefixCol + 2)}]`);
+      if (val.length === 0) {
+        lines.push(col(`${pad}${prefix} ${pk} = []`));
+      } else {
+        lines.push(col(`${pad}${prefix} ${pk} = [`));
+        renderArrayItems(val, prefix, prefixCol + 4, ctx, lines);
+        lines.push(`${" ".repeat(prefixCol + 2)}]`);
+      }
     } else if (isPlainObject(val)) {
-      lines.push(col(`${pad}${prefix} ${pk} = {`));
-      renderFields(val, prefix, prefixCol + 4, ctx, lines);
-      lines.push(`${" ".repeat(prefixCol + 2)}}`);
+      if (Object.keys(val).length === 0) {
+        lines.push(col(`${pad}${prefix} ${pk} = {}`));
+      } else {
+        lines.push(col(`${pad}${prefix} ${pk} = {`));
+        renderFields(val, prefix, prefixCol + 4, ctx, lines);
+        lines.push(`${" ".repeat(prefixCol + 2)}}`);
+      }
     }
   }
 }
@@ -117,13 +125,21 @@ function renderArrayItems(
       // field removals. Strip deleteMode here regardless of context.
       lines.push(col(`${pad}${prefix} ${formatted},`));
     } else if (Array.isArray(item)) {
-      lines.push(col(`${pad}${prefix} [`));
-      renderArrayItems(item, prefix, prefixCol + 4, ctx, lines);
-      lines.push(`${" ".repeat(prefixCol + 2)}],`);
+      if (item.length === 0) {
+        lines.push(col(`${pad}${prefix} [],`));
+      } else {
+        lines.push(col(`${pad}${prefix} [`));
+        renderArrayItems(item, prefix, prefixCol + 4, ctx, lines);
+        lines.push(`${" ".repeat(prefixCol + 2)}],`);
+      }
     } else if (isPlainObject(item)) {
-      lines.push(col(`${pad}${prefix} {`));
-      renderFields(item, prefix, prefixCol + 4, ctx, lines);
-      lines.push(`${" ".repeat(prefixCol + 2)}},`);
+      if (Object.keys(item).length === 0) {
+        lines.push(col(`${pad}${prefix} {},`));
+      } else {
+        lines.push(col(`${pad}${prefix} {`));
+        renderFields(item, prefix, prefixCol + 4, ctx, lines);
+        lines.push(`${" ".repeat(prefixCol + 2)}},`);
+      }
     }
   }
 }
@@ -200,37 +216,49 @@ function renderDiff(
     } else if (Array.isArray(oldVal) && Array.isArray(newVal)) {
       if (JSON.stringify(oldVal) === JSON.stringify(newVal)) {
         // Deeply equal — show as unchanged for context, no diff noise
-        lines.push(`${pad}  ${pk} = [`);
-        renderArrayItems(newVal, " ", prefixCol + 4, { tty, deleteMode: false }, lines);
-        lines.push(`${" ".repeat(prefixCol + 2)}]`);
+        if (newVal.length === 0) {
+          lines.push(`${pad}  ${pk} = []`);
+        } else {
+          lines.push(`${pad}  ${pk} = [`);
+          renderArrayItems(newVal, " ", prefixCol + 4, { tty, deleteMode: false }, lines);
+          lines.push(`${" ".repeat(prefixCol + 2)}]`);
+        }
       } else {
         // Changed — show full remove then full add (LCS diff is out of scope)
         hasChanges = true;
         const colR = (s: string) => paint(s, A.red, tty);
         const colA = (s: string) => paint(s, A.green, tty);
-        lines.push(colR(`${pad}- ${pk} = [`));
-        renderArrayItems(oldVal, "-", prefixCol + 4, { tty, deleteMode: false }, lines);
-        lines.push(`${" ".repeat(prefixCol + 2)}]`);
-        lines.push(colA(`${pad}+ ${pk} = [`));
-        renderArrayItems(newVal, "+", prefixCol + 4, { tty, deleteMode: false }, lines);
-        lines.push(`${" ".repeat(prefixCol + 2)}]`);
+        if (oldVal.length === 0) {
+          lines.push(colR(`${pad}- ${pk} = []`));
+        } else {
+          lines.push(colR(`${pad}- ${pk} = [`));
+          renderArrayItems(oldVal, "-", prefixCol + 4, { tty, deleteMode: false }, lines);
+          lines.push(`${" ".repeat(prefixCol + 2)}]`);
+        }
+        if (newVal.length === 0) {
+          lines.push(colA(`${pad}+ ${pk} = []`));
+        } else {
+          lines.push(colA(`${pad}+ ${pk} = [`));
+          renderArrayItems(newVal, "+", prefixCol + 4, { tty, deleteMode: false }, lines);
+          lines.push(`${" ".repeat(prefixCol + 2)}]`);
+        }
       }
     } else if (isPlainObject(oldVal) && isPlainObject(newVal)) {
       // Recurse into nested object diff; only mark as ~ if a child actually changed
       const childLines: string[] = [];
       const childHasChanges = renderDiff(oldVal, newVal, prefixCol + 4, tty, childLines);
-      if (childLines.length > 0) {
-        if (childHasChanges) {
-          hasChanges = true;
-          const col = (s: string) => paint(s, A.yellow, tty);
-          lines.push(col(`${pad}~ ${pk} = {`));
-        } else {
-          lines.push(`${pad}  ${pk} = {`);
-        }
+      if (childHasChanges) {
+        hasChanges = true;
+        const col = (s: string) => paint(s, A.yellow, tty);
+        lines.push(col(`${pad}~ ${pk} = {`));
+        lines.push(...childLines);
+        lines.push(`${" ".repeat(prefixCol + 2)}}`);
+      } else if (childLines.length > 0) {
+        lines.push(`${pad}  ${pk} = {`);
         lines.push(...childLines);
         lines.push(`${" ".repeat(prefixCol + 2)}}`);
       } else {
-        lines.push(`${pad}  ${pk} = { }`);
+        lines.push(`${pad}  ${pk} = {}`);
       }
     } else {
       // Type changed (e.g. string → object) — show as remove + add
