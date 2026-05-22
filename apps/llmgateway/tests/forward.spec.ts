@@ -3,14 +3,8 @@ import { strict as assert } from "node:assert";
 import type { TextBlockParam } from "@anthropic-ai/sdk/resources/messages";
 import { describe, expect, it, vi } from "vitest";
 
-import {
-	applyAuth,
-	buildUpstreamUrl,
-	extractV1PathSegments,
-	forward,
-	prepareBody,
-	type UpstreamAuth,
-} from "../src/forward.js";
+import { applyAuth, buildUpstreamUrl, type ClaudeAuth as UpstreamAuth } from "../src/lib/claude.js";
+import { extractV1PathSegments, forward, prepareBody } from "../src/forward.js";
 import { CLAUDE_CODE_IDENTIFIER_TEXT } from "../src/inject.js";
 
 const OAUTH_AUTH: UpstreamAuth = { mode: "oauth", token: "oauth-token" };

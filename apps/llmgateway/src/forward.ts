@@ -1,27 +1,11 @@
 import { injectSystemPrompt } from "./inject.js";
-import { effectiveHopByHopHeaders, filterHeaders, proxy } from "./lib/proxy.js";
+import { callClaude, type ClaudeAuth as UpstreamAuth } from "./lib/claude.js";
+import { effectiveHopByHopHeaders, filterHeaders } from "./lib/proxy.js";
 import { isPlainObject, tryParseJson } from "./utils/json.js";
 
-/**
- * Upstream credential strategy. Exactly one variant is resolved from the
- * gateway environment and passed to {@link forward} on every request.
- *
- * - `oauth`: bearer token issued by claude.ai (e.g. via `claude /login` for
- *   Claude Max subscribers). Billed against the user's subscription quota.
- *   Triggers the {@link ./inject.ts#CLAUDE_CODE_IDENTIFIER_TEXT} prefix and
- *   the `anthropic-beta: oauth-2025-04-20` header. Set via `ANTHROPIC_AUTH_TOKEN`.
- * - `apiKey`: a `sk-ant-…` key from `console.anthropic.com`. Billed
- *   per-token. Set via `ANTHROPIC_API_KEY`.
- */
-export type UpstreamAuth =
-	| { readonly mode: "oauth"; readonly token: string }
-	| { readonly mode: "apiKey"; readonly key: string };
+export type { ClaudeAuth as UpstreamAuth } from "./lib/claude.js";
 
-const ANTHROPIC_API_ORIGIN = "https://api.anthropic.com";
 const ANTHROPIC_API_VERSION_PREFIX = "v1";
-const ANTHROPIC_BETA_QUERY_PARAM = "beta";
-const ANTHROPIC_OAUTH_BETA = "oauth-2025-04-20";
-const DEFAULT_ANTHROPIC_VERSION = "2023-06-01";
 const MESSAGES_ENDPOINT = "messages";
 
 const INBOUND_RESERVED_HEADERS: ReadonlySet<string> = new Set([
@@ -52,19 +36,6 @@ export function extractV1PathSegments(pathname: string): ReadonlyArray<string> {
 		return parts.slice(1);
 	}
 	return parts;
-}
-
-/**
- * Compose the absolute Anthropic upstream URL. Strips the `beta` query
- * parameter Anthropic's gateway-fronting endpoints reject.
- */
-export function buildUpstreamUrl(pathParts: ReadonlyArray<string>, inboundSearch: string): string {
-	const suffix = pathParts.join("/");
-	const upstream = new URL(`${ANTHROPIC_API_ORIGIN}/${ANTHROPIC_API_VERSION_PREFIX}/${suffix}`);
-	const params = new URLSearchParams(inboundSearch);
-	params.delete(ANTHROPIC_BETA_QUERY_PARAM);
-	const qs = params.toString();
-	return qs.length > 0 ? `${upstream.toString()}?${qs}` : upstream.toString();
 }
 
 /**
@@ -103,43 +74,6 @@ export function prepareBody(
 		return { mutatedBody: mutated, serialised: JSON.stringify(mutated) };
 	}
 	return { mutatedBody: parsed.value, serialised: rawJson };
-}
-
-/**
- * Return a fresh `Headers` with the appropriate upstream auth applied.
- *
- * - OAuth: `Authorization: Bearer <token>` + ensure
- *   `anthropic-beta: oauth-2025-04-20` is present.
- * - API key: `x-api-key: <key>`.
- *
- * Always ensures `anthropic-version` is set (defaulting to
- * {@link DEFAULT_ANTHROPIC_VERSION} when missing).
- */
-export function applyAuth(input: Headers, auth: UpstreamAuth): Headers {
-	const out = new Headers(input);
-
-	if (auth.mode === "oauth") {
-		out.set("authorization", `Bearer ${auth.token}`);
-		const existingBeta = out.get("anthropic-beta");
-		if (existingBeta === null) {
-			out.set("anthropic-beta", ANTHROPIC_OAUTH_BETA);
-		} else {
-			const alreadyPresent = existingBeta
-				.split(",")
-				.map((s) => s.trim())
-				.includes(ANTHROPIC_OAUTH_BETA);
-			if (!alreadyPresent) {
-				out.set("anthropic-beta", `${existingBeta},${ANTHROPIC_OAUTH_BETA}`);
-			}
-		}
-	} else {
-		out.set("x-api-key", auth.key);
-	}
-
-	if (!out.has("anthropic-version")) {
-		out.set("anthropic-version", DEFAULT_ANTHROPIC_VERSION);
-	}
-	return out;
 }
 
 /** Compute the inbound strip set: RFC 7230 hop-by-hop ∪ Connection ∪ reserved. */
@@ -182,42 +116,40 @@ export async function forward(args: {
 		readonly upstreamStatus: number;
 	}) => void;
 }): Promise<Response> {
-	const pathParts = extractV1PathSegments(args.pathname);
-
 	const method = args.request.method.toUpperCase();
 	const hasBody = method !== "GET" && method !== "HEAD";
-
-	const prepared = hasBody
-		? prepareBody(await args.request.text(), pathParts, args.auth)
-		: { mutatedBody: undefined, serialised: "" };
-
-	if (prepared === null) {
-		return new Response(
-			JSON.stringify({ error: "invalid_json", message: "Request body is not valid JSON" }),
-			{ status: 400, headers: { "content-type": "application/json" } },
-		);
-	}
-
+	const pathParts = extractV1PathSegments(args.pathname);
+	const rawBody = hasBody ? await args.request.text() : undefined;
 	const filtered = filterHeaders(args.request.headers, inboundStripSet(args.request.headers));
-	const upstreamHeaders = applyAuth(filtered, args.auth);
-	if (hasBody) {
-		upstreamHeaders.set("content-type", "application/json");
-	}
 
-	const upstreamUrl = buildUpstreamUrl(pathParts, args.search.replace(/^\?/, ""));
+	let capturedMutatedBody: unknown;
+	const onBody =
+		rawBody !== undefined
+			? (raw: string): string | null => {
+					const prepared = prepareBody(raw, pathParts, args.auth);
+					if (prepared === null) {
+						return null;
+					}
+					capturedMutatedBody = prepared.mutatedBody;
+					return prepared.serialised;
+				}
+			: undefined;
 
-	return proxy({
-		upstreamUrl,
+	return callClaude({
+		auth: args.auth,
+		pathSegments: pathParts,
+		search: args.search.replace(/^\?/, ""),
 		method,
-		requestHeaders: upstreamHeaders,
-		body: prepared.serialised || undefined,
+		requestHeaders: filtered,
+		body: rawBody,
+		onBody,
 		filterResponseHeaders: (h) => filterHeaders(h, outboundStripSet(h)),
 		fetchImpl: args.fetchImpl,
 		onDebug: args.onDebug
 			? (url, status) => {
 					args.onDebug?.({
 						upstreamUrl: url,
-						mutatedBody: prepared.mutatedBody,
+						mutatedBody: capturedMutatedBody,
 						upstreamStatus: status,
 					});
 				}
