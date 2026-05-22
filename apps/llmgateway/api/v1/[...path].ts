@@ -1,5 +1,3 @@
-import { vercelEntry } from "../../src/vercel-adapter.js";
+export { default } from "../../src/handler.js";
 
 export const config = { runtime: "nodejs" } as const;
-
-export default vercelEntry;
