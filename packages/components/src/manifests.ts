@@ -13,6 +13,7 @@ import {
   zlFieldManifest,
   zlIconManifest,
   zlPageShellManifest,
+  zlPasskeyManifest,
   zlPillManifest,
 } from "./atoms/index.js";
 import type { AtomManifest } from "./manifest.js";
@@ -24,6 +25,7 @@ export const manifestRegistry: readonly AtomManifest[] = [
   zlFieldManifest,
   zlIconManifest,
   zlPageShellManifest,
+  zlPasskeyManifest,
   zlPillManifest,
 ] as const;
 
