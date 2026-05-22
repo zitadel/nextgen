@@ -3,6 +3,8 @@ package database
 import "context"
 
 // Transaction is an SQL transaction.
+//
+// [Beginner] on Transaction starts a sub transaction (for example a savepoint).
 type Transaction interface {
 	Beginner
 
