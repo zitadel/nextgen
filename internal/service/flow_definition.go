@@ -215,9 +215,18 @@ func mapPurposesToDomain(reqPurposes map[string]string) (map[domain.FlowDefiniti
 
 func (fd *flowDefinitionService) Get(ctx context.Context, projectID, id string) (*domain.FlowDefinition, error) {
 	// todo: get the project ID from the context when the functionality is implemented
+	if projectID == "" {
+		return nil, domain.ErrMissingProjectID()
+	}
+	if id == "" {
+		return nil, domain.ErrMissingFlowDefinitionID()
+	}
 	definition, err := fd.flowDefinitionRepo.GetFlowDefinition(ctx, fd.db, projectID, id)
 	if err != nil {
-		return nil, err
+		if errors.Is(err, &database.NoRowFoundError{}) {
+			return nil, domain.ErrFlowDefinitionNotFound()
+		}
+		return nil, domain.ErrInternal(err)
 	}
 	return definition, nil
 }

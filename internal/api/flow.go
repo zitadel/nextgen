@@ -69,9 +69,10 @@ func flowDefinitionErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 	switch err.Code {
 	case domain.ErrFlowDefinitionNotFound().Code:
 		return errorResponseWithStatusCode(http.StatusNotFound, err)
-	case domain.ErrFlowDefinitionPurposeMismatch().Code:
-		return errorResponseWithStatusCode(http.StatusBadRequest, err)
-	case domain.ErrFlowDefinitionInvalid(err.Details, err.Parent).Code:
+	case domain.ErrFlowDefinitionPurposeMismatch().Code,
+		domain.ErrFlowDefinitionInvalid(err.Details, err.Parent).Code,
+		domain.ErrMissingFlowDefinitionID().Code,
+		domain.ErrMissingProjectID().Code:
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
 	default:
 		return internalErrorResponse(err)
