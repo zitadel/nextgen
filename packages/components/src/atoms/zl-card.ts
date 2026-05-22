@@ -1,5 +1,5 @@
 import { LitElement, html } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { customElement, property } from "lit/decorators.js";
 
 import cardHost from "@zitadel-nextgen/shared-component-styles/lit/card-host.css?inline";
 import cardSurface from "@zitadel-nextgen/shared-component-styles/card.css?inline";
@@ -43,44 +43,12 @@ export class ZlCard extends LitElement {
 
   @property({ type: Boolean, reflect: true }) accessor compact = false;
 
-  @state() accessor hasHeaderSlot = false;
-
-  @state() accessor hasFooterSlot = false;
-
-  private headerSlot?: HTMLSlotElement;
-
-  private footerSlot?: HTMLSlotElement;
-
-  override firstUpdated(): void {
-    const root = this.shadowRoot;
-    if (!root) return;
-
-    this.headerSlot = root.querySelector('slot[name="header"]') ?? undefined;
-    this.footerSlot = root.querySelector('slot[name="footer"]') ?? undefined;
-    this.headerSlot?.addEventListener("slotchange", this.syncSlotPresence);
-    this.footerSlot?.addEventListener("slotchange", this.syncSlotPresence);
-    this.syncSlotPresence();
-  }
-
-  override updated(): void {
-    this.syncSlotPresence();
-  }
-
-  private syncSlotPresence = (): void => {
-    const hasHeader =
-      this.headerSlot instanceof HTMLSlotElement &&
-      this.headerSlot.assignedElements({ flatten: true }).length > 0;
-    const hasFooter =
-      this.footerSlot instanceof HTMLSlotElement &&
-      this.footerSlot.assignedElements({ flatten: true }).length > 0;
-    if (hasHeader !== this.hasHeaderSlot) this.hasHeaderSlot = hasHeader;
-    if (hasFooter !== this.hasFooterSlot) this.hasFooterSlot = hasFooter;
-  };
-
   override render() {
+    const hasHeader = this.lightDomSlotFilled("header");
+    const hasFooter = this.lightDomSlotFilled("footer");
     const cardClass = this.compact ? "zr-card zr-card--compact" : "zr-card";
-    const headerClass = this.hasHeaderSlot ? "zr-card__header" : "zr-card__header zr-card__region--empty";
-    const footerClass = this.hasFooterSlot ? "zr-card__footer" : "zr-card__footer zr-card__region--empty";
+    const headerClass = hasHeader ? "zr-card__header" : "zr-card__header zr-card__region--empty";
+    const footerClass = hasFooter ? "zr-card__footer" : "zr-card__footer zr-card__region--empty";
     return html`
       <section class=${cardClass} part="card">
         <header class=${headerClass} part="header">
@@ -94,6 +62,14 @@ export class ZlCard extends LitElement {
         </footer>
       </section>
     `;
+  }
+
+  /** Slotted nodes are always light-DOM children of the host in our templates. */
+  private lightDomSlotFilled(slot: string): boolean {
+    for (const child of this.children) {
+      if (child.getAttribute("slot") === slot) return true;
+    }
+    return false;
   }
 }
 
