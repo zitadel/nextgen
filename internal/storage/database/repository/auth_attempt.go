@@ -35,17 +35,17 @@ type pgAuthAttempt struct{}
 var _ domain.AuthAttemptRepository = (*pgAuthAttempt)(nil)
 
 const pgAuthAttemptGetSelect = `SELECT aa.project_id, aa.id, aa.handoff_token, aa.handed_off_at, aa.session_id,` +
-	` aa.required_checks, aa.created_at, aac.type, aa.time_to_live,` +
-	` aac.challenge_id, aac.last_challenged_at, aac.last_verified_at, aac.last_failed_at, aac.failure_count, aac.challenge_payload, aac.factor_payload` +
+	` aa.required_checks, aa.created_at, c.type, aa.time_to_live,` +
+	` c.id, c.last_challenged_at, c.last_verified_at, c.last_failed_at, c.failure_count, c.challenge_payload, c.factor_payload` +
 	` FROM zitadel_nextgen.auth_attempts aa` +
-	` LEFT JOIN zitadel_nextgen.auth_attempt_checks aac ON aa.project_id = aac.project_id AND aa.id = aac.auth_attempt_id`
+	` LEFT JOIN zitadel_nextgen.checks c ON aa.project_id = c.project_id AND aa.id = c.auth_attempt_id`
 
 func (a *pgAuthAttempt) GetByID(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string) (*domain.AuthAttempt, error) {
 	return a.get(ctx, client, pgAuthAttemptGetSelect+` WHERE aa.project_id = $1 AND aa.id = $2`, projectID, authAttemptID)
 }
 
-func (a *pgAuthAttempt) GetByHandoffToken(ctx context.Context, client database.QueryExecutor, projectID, handoffToken string) (*domain.AuthAttempt, error) {
-	return a.get(ctx, client, pgAuthAttemptGetSelect+` WHERE aa.project_id = $1 AND aa.handoff_token = $2`, projectID, handoffToken)
+func (a *pgAuthAttempt) GetByHandoffToken(ctx context.Context, client database.QueryExecutor, projectID string, handoffToken []byte) (*domain.AuthAttempt, error) {
+	return a.get(ctx, client, pgAuthAttemptGetSelect+` WHERE aa.project_id = $1 AND aa.handoff_token = $2`, projectID, string(handoffToken))
 }
 
 func (a *pgAuthAttempt) get(ctx context.Context, client database.QueryExecutor, query, projectID, matcher string) (*domain.AuthAttempt, error) {
@@ -125,14 +125,14 @@ const pgAuthAttemptCreateStmt = `WITH inserted_attempt AS (` +
 	` VALUES ($1, $2::SMALLINT[], $3::INTERVAL, $4::BIGINT)` +
 	` RETURNING project_id, id, created_at` +
 	`), inserted_checks AS (` +
-	` INSERT INTO zitadel_nextgen.auth_attempt_checks (project_id, auth_attempt_id, type, challenge_payload, factor_payload, last_challenged_at, last_verified_at)` +
+	` INSERT INTO zitadel_nextgen.checks (project_id, auth_attempt_id, type, challenge_payload, factor_payload, last_challenged_at, last_verified_at)` +
 	` SELECT ia.project_id, ia.id, checks.type, checks.challenge_payload, checks.factor_payload,` +
 	` CASE WHEN checks.is_challenge THEN NOW() ELSE NULL END,` +
 	` CASE WHEN checks.is_factor AND NOT checks.is_challenge THEN NOW() ELSE NULL END` +
 	` FROM inserted_attempt ia` +
 	` JOIN LATERAL jsonb_to_recordset(COALESCE($5::JSONB, '[]'::JSONB)) AS checks(type SMALLINT, challenge_payload JSONB, factor_payload JSONB, is_challenge BOOLEAN, is_factor BOOLEAN) ON TRUE` +
-	` RETURNING challenge_id, type, last_challenged_at, last_verified_at` +
-	`) SELECT ia.id, ia.created_at, ic.challenge_id, ic.type, ic.last_challenged_at, ic.last_verified_at` +
+	` RETURNING id, type, last_challenged_at, last_verified_at` +
+	`) SELECT ia.id, ia.created_at, ic.id, ic.type, ic.last_challenged_at, ic.last_verified_at` +
 	` FROM inserted_attempt ia` +
 	` LEFT JOIN inserted_checks ic ON TRUE`
 
@@ -218,7 +218,6 @@ func (*pgAuthAttempt) checksToJSON(checks []domain.AuthCheck) ([]byte, error) {
 		checkRow := authAttemptCheckCreate{Type: uint8(check.Type())}
 		if challenge, ok := check.(domain.AuthChallenge); ok {
 			checkRow.IsChallenge = true
-			checkRow.ChallengeID = challenge.GetID()
 			var err error
 			checkRow.ChallengePayload, err = json.Marshal(challenge.Payload())
 			if err != nil {
@@ -273,22 +272,22 @@ func (a *pgAuthAttempt) SetChallenge(ctx context.Context, client database.QueryE
 			return fmt.Errorf("failed to marshal challenge payload: %w", err)
 		}
 	}
-	var challengeID string
+	var id string
 	var lastChallengedAt time.Time
 	err = client.QueryRow(ctx,
-		`INSERT INTO zitadel_nextgen.auth_attempt_checks`+
+		`INSERT INTO zitadel_nextgen.checks`+
 			` (project_id, auth_attempt_id, type, last_challenged_at, challenge_payload)`+
 			` VALUES ($1, $2, $3, NOW(), $4::JSONB)`+
 			` ON CONFLICT (project_id, auth_attempt_id, type) DO UPDATE SET`+
-			` challenge_id = nextval(pg_get_serial_sequence('zitadel_nextgen.auth_attempt_checks', 'challenge_id')),`+
+			` id = nextval(pg_get_serial_sequence('zitadel_nextgen.checks', 'id')),`+
 			` last_challenged_at = NOW(), challenge_payload = EXCLUDED.challenge_payload, failure_count = 0, last_failed_at = NULL`+
-			` RETURNING challenge_id, last_challenged_at`,
+			` RETURNING id, last_challenged_at`,
 		projectID, database.Identity(authAttemptID), challenge.Type(), payload).
-		Scan(&challengeID, &lastChallengedAt)
+		Scan(&id, &lastChallengedAt)
 	if err != nil {
 		return err
 	}
-	challenge.SetID(challengeID)
+	challenge.SetID(id)
 	challenge.SetLastChallengedAt(lastChallengedAt)
 	challenge.SetFailureCount(0)
 	challenge.SetLastFailedAt(time.Time{})
@@ -305,9 +304,9 @@ func (a *pgAuthAttempt) ChallengeSucceeded(ctx context.Context, client database.
 	}
 	var lastVerifiedAt time.Time
 	err = client.QueryRow(ctx,
-		`UPDATE zitadel_nextgen.auth_attempt_checks`+
+		`UPDATE zitadel_nextgen.checks`+
 			` SET last_verified_at = NOW(), factor_payload = $4::JSONB, challenge_payload = NULL, last_challenged_at = NULL, failure_count = 0`+
-			` WHERE project_id = $1 AND auth_attempt_id = $2 AND type = $3 AND challenge_id = $5`+
+			` WHERE project_id = $1 AND auth_attempt_id = $2 AND type = $3 AND id = $5`+
 			` RETURNING last_verified_at`,
 		projectID, database.Identity(authAttemptID), factor.Type(), factorPayload, id).
 		Scan(&lastVerifiedAt)
@@ -325,9 +324,9 @@ func (a *pgAuthAttempt) ChallengeFailed(ctx context.Context, client database.Que
 	var lastFailedAt time.Time
 	var failureCount uint16
 	err := client.QueryRow(ctx,
-		`UPDATE zitadel_nextgen.auth_attempt_checks`+
+		`UPDATE zitadel_nextgen.checks`+
 			` SET last_failed_at = NOW(), failure_count = failure_count + 1`+
-			` WHERE project_id = $1 AND auth_attempt_id = $2 AND type = $3 AND challenge_id = $4`+
+			` WHERE project_id = $1 AND auth_attempt_id = $2 AND type = $3 AND id = $4`+
 			` RETURNING last_failed_at, failure_count`,
 		projectID, database.Identity(authAttemptID), challenge.Type(), challenge.GetID()).
 		Scan(&lastFailedAt, &failureCount)
@@ -349,22 +348,22 @@ type spannerAuthAttempt struct{}
 var _ domain.AuthAttemptRepository = (*spannerAuthAttempt)(nil)
 
 const spannerAuthAttemptGetSelect = `SELECT aa.project_id, aa.id, aa.handoff_token, aa.handed_off_at, aa.session_id,` +
-	` aa.required_checks, aa.created_at, aac.type, aa.time_to_live,` +
-	` aac.challenge_id, aac.last_challenged_at, aac.last_verified_at, aac.last_failed_at, aac.failure_count, aac.challenge_payload, aac.factor_payload` +
+	` aa.required_checks, aa.created_at, c.type, aa.time_to_live,` +
+	` c.id, c.last_challenged_at, c.last_verified_at, c.last_failed_at, c.failure_count, c.challenge_payload, c.factor_payload` +
 	` FROM auth_attempts aa` +
-	` LEFT JOIN auth_attempt_checks aac ON aa.project_id = aac.project_id AND aa.id = aac.auth_attempt_id`
+	` LEFT JOIN checks c ON aa.project_id = c.project_id AND aa.id = c.auth_attempt_id`
 
 func (a *spannerAuthAttempt) GetByID(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string) (*domain.AuthAttempt, error) {
-	return a.get(ctx, client, spannerAuthAttemptGetSelect+` WHERE aa.project_id = $1 AND aa.id = $2`, projectID, authAttemptID)
+	return a.get(ctx, client, spannerAuthAttemptGetSelect+` WHERE aa.project_id = $1 AND aa.id = $2`, projectID, database.Identity(authAttemptID))
 }
 
-func (a *spannerAuthAttempt) GetByHandoffToken(ctx context.Context, client database.QueryExecutor, projectID, handoffToken string) (*domain.AuthAttempt, error) {
+func (a *spannerAuthAttempt) GetByHandoffToken(ctx context.Context, client database.QueryExecutor, projectID string, handoffToken []byte) (*domain.AuthAttempt, error) {
 	return a.get(ctx, client, spannerAuthAttemptGetSelect+` WHERE aa.project_id = $1 AND aa.handoff_token = $2`, projectID, handoffToken)
 }
 
-func (a *spannerAuthAttempt) get(ctx context.Context, client database.QueryExecutor, query, projectID, matcher string) (*domain.AuthAttempt, error) {
+func (a *spannerAuthAttempt) get(ctx context.Context, client database.QueryExecutor, query, projectID string, matcher any) (*domain.AuthAttempt, error) {
 	attempt := new(domain.AuthAttempt)
-	rows, err := client.Query(ctx, query, projectID, database.Identity(matcher))
+	rows, err := client.Query(ctx, query, projectID, matcher)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query auth attempt: %w", err)
 	}
@@ -395,7 +394,7 @@ func (a *spannerAuthAttempt) scan(rows database.Rows, attempt *domain.AuthAttemp
 		err := rows.Scan(
 			&attempt.ProjectID, &attemptID, &handoffToken, &handedOffAt, &sessionID,
 			&requiredChecks, &attempt.CreatedAt, &checkType, &timeToLiveNanos,
-			&lastChallengedAt, &verifiedAt, &lastFailedAt, &failureCount, &challenge, &factor)
+			&challengeID, &lastChallengedAt, &verifiedAt, &lastFailedAt, &failureCount, &challenge, &factor)
 		if err != nil {
 			return fmt.Errorf("failed to scan auth attempt: %w", err)
 		}
@@ -449,7 +448,7 @@ func (a *spannerAuthAttempt) Create(ctx context.Context, client database.QueryEx
 
 	var attemptID database.Identity
 	err := client.QueryRow(ctx,
-		`INSERT INTO auth_attempts (project_id, required_checks, time_to_live, session_id, created_at) VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+		`INSERT INTO auth_attempts (project_id, required_checks, time_to_live, session_id, created_at) VALUES ($1, $2, $3, $4, $5) THEN RETURN id`,
 		attempt.ProjectID, req, ttlNanos, sessionIDArg(attempt.SessionID), now).
 		Scan(&attemptID)
 	if err != nil {
@@ -490,11 +489,16 @@ func (a *spannerAuthAttempt) Create(ctx context.Context, client database.QueryEx
 			}
 		}
 
-		_, err = client.Exec(ctx,
-			`INSERT INTO auth_attempt_checks (project_id, auth_attempt_id, type, last_challenged_at, last_verified_at, challenge_payload, factor_payload, failure_count) VALUES ($1, $2, $3, $4, $5, $6, $7, 0)`,
-			attempt.ProjectID, database.Identity(attempt.ID), int64(check.Type()), challengedAt, verifiedAt, challengePayload, factorPayload)
+		var checkID database.Identity
+		err = client.QueryRow(ctx,
+			`INSERT INTO checks (project_id, auth_attempt_id, type, last_challenged_at, last_verified_at, challenge_payload, factor_payload, failure_count) VALUES ($1, $2, $3, $4, $5, $6, $7, 0) THEN RETURN id`,
+			attempt.ProjectID, database.Identity(attempt.ID), int64(check.Type()), challengedAt, verifiedAt, challengePayload, factorPayload).
+			Scan(&checkID)
 		if err != nil {
 			return fmt.Errorf("failed to create auth attempt check: %w", err)
+		}
+		if isChallenge {
+			challenge.SetID(checkID.String())
 		}
 	}
 	return nil
@@ -514,7 +518,7 @@ func (a *spannerAuthAttempt) Handoff(ctx context.Context, client database.QueryE
 	now := time.Now().UTC()
 	_, err := client.Exec(ctx,
 		`UPDATE auth_attempts SET handoff_token = $1, handed_off_at = $2 WHERE project_id = $3 AND id = $4`,
-		*attempt.HandoffToken, now, attempt.ProjectID, database.Identity(attempt.ID))
+		attempt.HandoffToken.TokenHash[:], now, attempt.ProjectID, database.Identity(attempt.ID))
 	if err != nil {
 		return fmt.Errorf("failed to handoff auth attempt: %w", err)
 	}
@@ -535,22 +539,14 @@ func (a *spannerAuthAttempt) SetChallenge(ctx context.Context, client database.Q
 
 	var id database.Identity
 	err = client.QueryRow(ctx,
-		`UPDATE auth_attempt_checks SET last_challenged_at = $1, challenge_payload = $2, failure_count = 0, last_failed_at = NULL, challenge_id = nextval('auth_attempt_checks_challenge_id_seq')`+
-			` WHERE project_id = $3 AND auth_attempt_id = $4 AND type = $5`+
-			` RETURNING challenge_id`,
-		now, payloadStr, projectID, database.Identity(authAttemptID), int64(challenge.Type())).
+		`INSERT INTO checks (project_id, auth_attempt_id, type, last_challenged_at, challenge_payload, failure_count, last_failed_at)`+
+			` VALUES ($1, $2, $3, $4, $5, 0, NULL) ON CONFLICT (project_id, auth_attempt_id, type)`+
+			` DO UPDATE SET	last_challenged_at = EXCLUDED.last_challenged_at, challenge_payload = EXCLUDED.challenge_payload, failure_count = 0, last_failed_at = NULL`+
+			` THEN RETURN id`,
+		projectID, database.Identity(authAttemptID), int64(challenge.Type()), now, payloadStr).
 		Scan(&id)
 	if err != nil {
 		return fmt.Errorf("failed to set challenge: %w", err)
-	}
-	if id == "" {
-		err = client.QueryRow(ctx,
-			`INSERT INTO auth_attempt_checks (project_id, auth_attempt_id, type, last_challenged_at, challenge_payload, failure_count) VALUES ($1, $2, $3, $4, $5, 0) RETURNING challenge_id`,
-			projectID, database.Identity(authAttemptID), int64(challenge.Type()), now, payloadStr).
-			Scan(&id)
-		if err != nil {
-			return fmt.Errorf("failed to insert challenge: %w", err)
-		}
 	}
 	challenge.SetID(id.String())
 	challenge.SetLastChallengedAt(now)
@@ -571,9 +567,9 @@ func (a *spannerAuthAttempt) ChallengeSucceeded(ctx context.Context, client data
 	}
 
 	n, err := client.Exec(ctx,
-		`UPDATE auth_attempt_checks SET last_verified_at = $1, factor_payload = $2, challenge_payload = NULLL, last_challenged_at = NULLL, failure_count = 0`+
-			` WHERE project_id = $3 AND auth_attempt_id = $4 AND type = $5 and challenge_id = $6`,
-		now, factorStr, projectID, database.Identity(authAttemptID), int64(factor.Type()), id)
+		`UPDATE checks SET last_verified_at = $1, factor_payload = $2, challenge_payload = NULL, last_challenged_at = NULL, failure_count = 0`+
+			` WHERE project_id = $3 AND auth_attempt_id = $4 AND type = $5 and id = $6`,
+		now, factorStr, projectID, database.Identity(authAttemptID), int64(factor.Type()), database.Identity(id))
 	if err != nil {
 		return fmt.Errorf("failed to set challenge succeeded: %w", err)
 	}
@@ -587,9 +583,9 @@ func (a *spannerAuthAttempt) ChallengeSucceeded(ctx context.Context, client data
 func (a *spannerAuthAttempt) ChallengeFailed(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string, challenge domain.AuthChallenge) error {
 	now := time.Now().UTC()
 	n, err := client.Exec(ctx,
-		`UPDATE auth_attempt_checks SET last_failed_at = $1, failure_count = failure_count + 1`+
-			` WHERE project_id = $2 AND auth_attempt_id = $3 AND type = $4 and challenge_id = $5`,
-		now, projectID, database.Identity(authAttemptID), int64(challenge.Type()), challenge.GetID())
+		`UPDATE checks SET last_failed_at = $1, failure_count = failure_count + 1`+
+			` WHERE project_id = $2 AND auth_attempt_id = $3 AND type = $4 and id = $5`,
+		now, projectID, database.Identity(authAttemptID), int64(challenge.Type()), database.Identity(challenge.GetID()))
 	if err != nil {
 		return fmt.Errorf("failed to update challenge failed: %w", err)
 	}
@@ -600,8 +596,8 @@ func (a *spannerAuthAttempt) ChallengeFailed(ctx context.Context, client databas
 	var failureCount int64
 	var lastFailedAt time.Time
 	err = client.QueryRow(ctx,
-		`SELECT failure_count, last_failed_at FROM auth_attempt_checks WHERE project_id = $1 AND auth_attempt_id = $2 AND type = $3 and challenge_id = $4`,
-		projectID, database.Identity(authAttemptID), int64(challenge.Type()), challenge.GetID()).
+		`SELECT failure_count, last_failed_at FROM checks WHERE project_id = $1 AND auth_attempt_id = $2 AND type = $3 and id = $4`,
+		projectID, database.Identity(authAttemptID), int64(challenge.Type()), database.Identity(challenge.GetID())).
 		Scan(&failureCount, &lastFailedAt)
 	if err != nil {
 		return fmt.Errorf("failed to read failure count: %w", err)
@@ -682,5 +678,4 @@ type authAttemptCheckCreate struct {
 	FactorPayload    json.RawMessage `json:"factor_payload,omitempty"`
 	IsChallenge      bool            `json:"is_challenge"`
 	IsFactor         bool            `json:"is_factor"`
-	ChallengeID      string          `json:"challenge_id,omitempty"`
 }

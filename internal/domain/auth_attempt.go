@@ -392,7 +392,7 @@ type AuthAttemptRepository interface {
 	// GetByID retrieves a single AuthAttempt by its ID and project ID.
 	GetByID(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string) (*AuthAttempt, error)
 	// GetByHandoffToken retrieves a single AuthAttempt by its handoff token and project ID.
-	GetByHandoffToken(ctx context.Context, client database.QueryExecutor, projectID, handoffToken string) (*AuthAttempt, error)
+	GetByHandoffToken(ctx context.Context, client database.QueryExecutor, projectID string, handoffToken []byte) (*AuthAttempt, error)
 	// Create stores an auth attempt including all defined fields (except read-only fields).
 	// The repository MUST set the [AuthAttempt.CreatedAt] field to the current time.
 	// The repository MUST store [AuthAttempts.Checks] following this recipe:

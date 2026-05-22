@@ -9,14 +9,21 @@
  *
  * State graph:
  *
- *   idle --START(login)----> identifier --SUBMIT--> password
- *                                       --SUBMIT(action:passkey)--> passkey-challenge
+ *   idle --START(login)----> identifier (email+password, Figma 6593:141985)
+ *                                       --SUBMIT(submit)--> passkey-upsell
+ *                                       --SUBMIT(recover)--> recover --SUBMIT--> identifier
+ *                                       --SUBMIT(register)--> register
+ *                                       --SUBMIT(passkey)--> passkey-login
  *                                       --SUBMIT(sso_provider_id)--> sso-redirect
- *      \--START(register)--> register --SUBMIT--> password
- *                                     --SUBMIT(action:passkey)--> passkey-enroll
+ *      \--START(register)--> register --SUBMIT--> passkey-upsell
  *
- *   password / sso-redirect / passkey-challenge / passkey-enroll --SUBMIT--> done
- *   anything                                                     --RESET--> idle
+ *   password -- legacy split step; kept for tests that target it directly
+ *   passkey-upsell --SUBMIT(skip)--> done
+ *   passkey-upsell --SUBMIT(*)----> passkey-setup --SUBMIT--> done
+ *   passkey-login --SUBMIT--> done
+ *   passkey-login --SUBMIT(cancel)--> identifier
+ *   sso-redirect --SUBMIT--> done
+ *   anything --RESET--> idle
  */
 import type { CreateFlowBodyPurpose } from "@zitadel-nextgen/api/generated/model";
 import { createMachine, type AnyActorRef, assign, createActor } from "xstate";
@@ -25,8 +32,10 @@ export type FlowStepName =
   | "identifier"
   | "register"
   | "password"
-  | "passkey-challenge"
-  | "passkey-enroll"
+  | "recover"
+  | "passkey-upsell"
+  | "passkey-setup"
+  | "passkey-login"
   | "sso-redirect"
   | "done";
 
@@ -115,12 +124,22 @@ export const flowMachine = createMachine({
             ],
           },
           {
-            guard: ({ event }) => event.action === "passkey",
-            target: "passkey-challenge",
+            guard: ({ event }) => event.action === "register",
+            target: "register",
             actions: [captureFields, rotateToken],
           },
           {
-            target: "password",
+            guard: ({ event }) => event.action === "passkey",
+            target: "passkey-login",
+            actions: [captureFields, rotateToken],
+          },
+          {
+            guard: ({ event }) => event.action === "recover",
+            target: "recover",
+            actions: [captureFields, rotateToken],
+          },
+          {
+            target: "passkey-upsell",
             actions: [captureFields, rotateToken],
           },
         ],
@@ -128,37 +147,57 @@ export const flowMachine = createMachine({
     },
     register: {
       on: {
-        SUBMIT: [
-          {
-            guard: ({ event }) => event.action === "passkey",
-            target: "passkey-enroll",
-            actions: [captureFields, rotateToken],
-          },
-          {
-            target: "password",
-            actions: [captureFields, rotateToken],
-          },
-        ],
+        SUBMIT: { target: "passkey-upsell", actions: [captureFields, rotateToken] },
+      },
+    },
+    recover: {
+      on: {
+        SUBMIT: { target: "identifier", actions: [rotateToken] },
       },
     },
     password: {
       on: {
-        SUBMIT: { target: "done", actions: [captureFields, rotateToken] },
+        SUBMIT: { target: "passkey-upsell", actions: [captureFields, rotateToken] },
+      },
+    },
+    "passkey-upsell": {
+      on: {
+        SUBMIT: [
+          {
+            guard: ({ event }) => event.action === "skip",
+            target: "done",
+            actions: [rotateToken],
+          },
+          {
+            target: "passkey-setup",
+            actions: [rotateToken],
+          },
+        ],
+      },
+    },
+    "passkey-setup": {
+      on: {
+        SUBMIT: { target: "done", actions: [rotateToken] },
+      },
+    },
+    "passkey-login": {
+      on: {
+        SUBMIT: [
+          {
+            guard: ({ event }) => event.action === "cancel",
+            target: "identifier",
+            actions: [rotateToken],
+          },
+          {
+            target: "done",
+            actions: [rotateToken],
+          },
+        ],
       },
     },
     "sso-redirect": {
       on: {
         SUBMIT: { target: "done", actions: [rotateToken] },
-      },
-    },
-    "passkey-challenge": {
-      on: {
-        SUBMIT: { target: "done", actions: [captureFields, rotateToken] },
-      },
-    },
-    "passkey-enroll": {
-      on: {
-        SUBMIT: { target: "done", actions: [captureFields, rotateToken] },
       },
     },
     done: { type: "final" },

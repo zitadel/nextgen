@@ -3,14 +3,11 @@
   "version": "0.0.1",
   "private": true,
   "dependencies": {
-    "@lit/react": "catalog:",
     "@tanstack/react-devtools": "catalog:",
     "@tanstack/react-router": "catalog:",
     "@tanstack/react-router-devtools": "catalog:",
-    "@zitadel-nextgen/api": "workspace:*",
-    "@zitadel-nextgen/api-mock": "workspace:*",
-    "@zitadel-nextgen/components": "workspace:*",
-    "msw": "catalog:",
+    "@zitadel-nextgen/design-tokens": "workspace:*",
+    "@zitadel-nextgen/ui-react": "workspace:*",
     "react": "catalog:",
     "react-dom": "catalog:",
     "tailwindcss": "catalog:"

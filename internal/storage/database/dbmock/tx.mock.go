@@ -42,18 +42,18 @@ func (m *MockTransaction) EXPECT() *MockTransactionMockRecorder {
 }
 
 // Begin mocks base method.
-func (m *MockTransaction) Begin(ctx context.Context) (database.Transaction, error) {
+func (m *MockTransaction) Begin(ctx context.Context, opts *database.TransactionOptions) (database.Transaction, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Begin", ctx)
+	ret := m.ctrl.Call(m, "Begin", ctx, opts)
 	ret0, _ := ret[0].(database.Transaction)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Begin indicates an expected call of Begin.
-func (mr *MockTransactionMockRecorder) Begin(ctx any) *gomock.Call {
+func (mr *MockTransactionMockRecorder) Begin(ctx, opts any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Begin", reflect.TypeOf((*MockTransaction)(nil).Begin), ctx)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Begin", reflect.TypeOf((*MockTransaction)(nil).Begin), ctx, opts)
 }
 
 // Commit mocks base method.
