@@ -289,7 +289,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 					SchemaVersion: "1.0.0",
 					FlowSchemaURI: "",
 					UserSchema:    "https://tenant.com/schemas/my-user.json",
-					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1"},
+					Purposes:      map[string]string{"login": "step_1"},
 					Audience: domain.FlowDefinitionAudience{
 						AppIDs:  []string{"app1"},
 						TeamIDs: []string{"team1"},
@@ -400,7 +400,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 					SchemaVersion: "1.0.0",
 					FlowSchemaURI: "",
 					UserSchema:    "https://tenant.com/schemas/my-user.json",
-					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1"},
+					Purposes:      map[string]string{"login": "step_1"},
 					Audience: domain.FlowDefinitionAudience{
 						AppIDs:  []string{"app1"},
 						TeamIDs: []string{"team1"},
@@ -503,7 +503,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 					SchemaVersion: "1.0.0",
 					FlowSchemaURI: "",
 					UserSchema:    "https://tenant.com/schemas/my-user.json",
-					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1"},
+					Purposes:      map[string]string{"login": "step_1"},
 					Audience: domain.FlowDefinitionAudience{
 						AppIDs:  []string{"app1"},
 						TeamIDs: []string{"team1"},
@@ -569,7 +569,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 					SchemaVersion: "1.0.0",
 					FlowSchemaURI: "",
 					UserSchema:    "https://tenant.com/schemas/my-user.json",
-					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1"},
+					Purposes:      map[string]string{"login": "step_1"},
 					Audience: domain.FlowDefinitionAudience{
 						AppIDs:  []string{"app1"},
 						TeamIDs: []string{"team1"},
@@ -638,7 +638,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 					SchemaVersion: "1.0.0",
 					FlowSchemaURI: "",
 					UserSchema:    "https://tenant.com/schemas/my-user.json",
-					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1"},
+					Purposes:      map[string]string{"login": "step_1"},
 					Audience: domain.FlowDefinitionAudience{
 						AppIDs:  []string{"app1"},
 						TeamIDs: []string{"team1"},
@@ -702,7 +702,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 					SchemaVersion: "1.0.0",
 					FlowSchemaURI: "",
 					UserSchema:    "https://tenant.com/schemas/my-user.json",
-					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1"},
+					Purposes:      map[string]string{"login": "step_1"},
 					Audience: domain.FlowDefinitionAudience{
 						AppIDs:  []string{"app1"},
 						TeamIDs: []string{"team1"},
@@ -762,7 +762,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 					SchemaVersion: "1.0.0",
 					FlowSchemaURI: "",
 					UserSchema:    "https://tenant.com/schemas/my-user.json",
-					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1"},
+					Purposes:      map[string]string{"login": "step_1"},
 					Audience: domain.FlowDefinitionAudience{
 						AppIDs:  []string{"app1"},
 						TeamIDs: []string{"team1"},
@@ -822,7 +822,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 					SchemaVersion: "1.0.0",
 					FlowSchemaURI: "",
 					UserSchema:    "https://tenant.com/schemas/my-user.json",
-					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1"},
+					Purposes:      map[string]string{"login": "step_1"},
 					Audience: domain.FlowDefinitionAudience{
 						AppIDs:  []string{"app1"},
 						TeamIDs: []string{"team1"},
@@ -879,7 +879,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 					SchemaVersion: "1.0.0",
 					FlowSchemaURI: "",
 					UserSchema:    "https://tenant.com/schemas/my-user.json",
-					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1"},
+					Purposes:      map[string]string{"login": "step_1"},
 					Audience: domain.FlowDefinitionAudience{
 						AppIDs:  []string{"app1"},
 						TeamIDs: []string{"team1"},
@@ -939,7 +939,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 					SchemaVersion: "1.0.0",
 					FlowSchemaURI: "",
 					UserSchema:    "https://tenant.com/schemas/my-user.json",
-					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1"},
+					Purposes:      map[string]string{"login": "step_1"},
 					Audience: domain.FlowDefinitionAudience{
 						AppIDs:  []string{"app1"},
 						TeamIDs: []string{"team1"},

@@ -40,7 +40,7 @@ type CreateFlowDefinitionRequest struct {
 	SchemaVersion     string // todo: currently empty as the request does not contain schema version
 	FlowSchemaURI     string // todo: schema_version (semver) stored in the db vs schema_uri needed for validation
 	UserSchema        string
-	Purposes          map[domain.FlowDefinitionPurpose]string
+	Purposes          map[string]string
 	Audience          domain.FlowDefinitionAudience
 	Steps             []domain.FlowDefinitionStep
 	RawFlowDefinition []byte // todo: is there a better way to do this for validation against the flow definition schema?
@@ -96,13 +96,18 @@ func (fd *flowDefinitionService) Create(ctx context.Context, req CreateFlowDefin
 		return nil, "", domain.ErrInternal(err)
 	}
 
+	purposes, err := mapPurposesToDomain(req.Purposes)
+	if err != nil {
+		return nil, "", err
+	}
+
 	flowDefinition := domain.FlowDefinition{
 		ID:            flowDefID,
 		ProjectID:     req.ProjectID,
 		Name:          req.Name,
 		SchemaVersion: req.SchemaVersion,
 		UserSchema:    req.UserSchema,
-		Purposes:      req.Purposes,
+		Purposes:      purposes,
 		Audience:      req.Audience,
 		Steps:         req.Steps,
 	}
@@ -193,4 +198,16 @@ func (fd *flowDefinitionService) validatePivotingTargets(ctx context.Context, pi
 		}
 	}
 	return nil
+}
+
+func mapPurposesToDomain(reqPurposes map[string]string) (map[domain.FlowDefinitionPurpose]string, error) {
+	purposes := make(map[domain.FlowDefinitionPurpose]string, len(reqPurposes))
+	for p, entryStep := range reqPurposes {
+		purpose, err := domain.FlowDefinitionPurposeString(p)
+		if err != nil {
+			return nil, domain.ErrFlowDefinitionInvalid("invalid purpose", nil)
+		}
+		purposes[purpose] = entryStep
+	}
+	return purposes, nil
 }

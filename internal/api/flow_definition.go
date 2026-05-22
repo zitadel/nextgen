@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/url"
 
 	"github.com/muhlemmer/gu"
@@ -12,8 +13,7 @@ import (
 )
 
 func (h Handler) CreateFlowDefinition(ctx context.Context, req *api.CreateFlowDefinitionRequest) (api.CreateFlowDefinitionRes, error) {
-	definition := req.GetFlowDefinition()
-	rawFlowDefinition, err := definition.MarshalJSON()
+	svcReq, err := mapCreateRequestToService(req)
 	if err != nil {
 		return &api.CreateFlowDefinitionBadRequest{
 			Code:    "invalid_flow_definition",
@@ -21,19 +21,33 @@ func (h Handler) CreateFlowDefinition(ctx context.Context, req *api.CreateFlowDe
 		}, nil
 	}
 
+	create, flowSchemaURI, err := h.flowDefinitionService.Create(ctx, svcReq)
+	if err != nil {
+		return errorResponse(err), nil // todo: review
+	}
+
+	return flowDefinitionSuccessResponse(create, flowSchemaURI), nil
+}
+
+func mapCreateRequestToService(req *api.CreateFlowDefinitionRequest) (service.CreateFlowDefinitionRequest, error) {
+	definition := req.GetFlowDefinition()
+
 	userSchemaURI := definition.GetUserSchema()
 	svcReq := service.CreateFlowDefinitionRequest{
-		ProjectID:         string(req.GetProjectID()),
-		Name:              definition.GetName(),
-		UserSchema:        userSchemaURI.String(),
-		RawFlowDefinition: rawFlowDefinition,
+		ProjectID:  string(req.GetProjectID()),
+		Name:       definition.GetName(),
+		UserSchema: userSchemaURI.String(),
 	}
-	purposes, err := mapPurposesToDomain(definition)
+
+	rawFlowDefinition, err := definition.MarshalJSON()
 	if err != nil {
-		return &api.CreateFlowDefinitionBadRequest{
-			Code:    "invalid_purpose",
-			Message: err.Error(),
-		}, nil
+		return svcReq, fmt.Errorf("failed to marshal flow definition: %w", err)
+	}
+	svcReq.RawFlowDefinition = rawFlowDefinition
+
+	purposes := make(map[string]string, len(definition.GetPurposes()))
+	for purpose, entryStep := range definition.GetPurposes() {
+		purposes[purpose] = entryStep
 	}
 	svcReq.Purposes = purposes
 
@@ -49,28 +63,7 @@ func (h Handler) CreateFlowDefinition(ctx context.Context, req *api.CreateFlowDe
 			TeamIDs: reqAudience.GetTeamIds(),
 		}
 	}
-
-	create, flowSchemaURI, err := h.flowDefinitionService.Create(ctx, svcReq)
-	if err != nil {
-		return errorResponse(err), nil // todo: review
-	}
-
-	return flowDefinitionSuccessResponse(create, flowSchemaURI), nil
-}
-
-func mapPurposesToDomain(definition api.FlowDefinition) (map[domain.FlowDefinitionPurpose]string, error) {
-	if len(definition.GetPurposes()) == 0 {
-		return nil, domain.ErrFlowDefinitionInvalid("no purposes defined", nil)
-	}
-	purposes := make(map[domain.FlowDefinitionPurpose]string, len(definition.GetPurposes()))
-	for p, entryStep := range definition.GetPurposes() {
-		purpose, err := domain.FlowDefinitionPurposeString(p)
-		if err != nil {
-			return nil, domain.ErrFlowDefinitionInvalid("invalid purpose", nil)
-		}
-		purposes[purpose] = entryStep
-	}
-	return purposes, nil
+	return svcReq, nil
 }
 
 func flowDefinitionSuccessResponse(flowDefinition *domain.FlowDefinition, schemaURI string) api.CreateFlowDefinitionRes {
