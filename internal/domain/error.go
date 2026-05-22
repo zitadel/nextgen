@@ -27,7 +27,13 @@ func (e Error) Is(target error) bool {
 	if !errors.As(target, &t) {
 		return false
 	}
-	return e.Code == t.Code
+	if e.Code != t.Code {
+		return false
+	}
+	if t.Parent != nil {
+		return errors.Is(e.Parent, t.Parent)
+	}
+	return true
 }
 
 func (e Error) As(target any) bool {
@@ -73,12 +79,12 @@ func newError(code string, message string, details any, parent error) Error {
 
 // ErrInternal is the catch-all for unexpected errors that have no specific domain code.
 func ErrInternal(err error) Error {
-	return newError("internal", "an unexpected error occurred", nil, err)
+	return newError("internal", "An unexpected error occurred. Check the details for more information.", nil, err)
 }
 
 // ErrRequestInvalid is returned when an incoming HTTP request fails structural
 // validation (missing required fields, wrong types, failed regex, etc.)
 // before it reaches domain logic.
 func ErrRequestInvalid() Error {
-	return newError("req.invalid", "invalid request", nil, nil)
+	return newError("req.invalid", "The request is invalid and fails base validation (missing required fields, wrong types, failed regex, etc.). Check the details for more information.", nil, nil)
 }

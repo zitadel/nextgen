@@ -16,6 +16,7 @@ import (
 	"github.com/ianlancetaylor/jsonschema"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/zitadel/passwap"
 	"github.com/zitadel/nextgen/internal/domain"
 
 	oasapi "github.com/zitadel/nextgen/api/generated"
@@ -75,7 +76,7 @@ func run(ctx context.Context, cfg Config, pool database.Pool) error {
 		}
 	}()
 
-	// ----
+	var passwordHasher *passwap.Swapper // TODO: initialize with actual configuration
 
 	// ── Repositories ─────────────────
 	projectRepo := repository.NewProjectRepository(pool)
@@ -111,6 +112,7 @@ func run(ctx context.Context, cfg Config, pool database.Pool) error {
 		userRepo,
 		userPasswordRepo,
 		userPasskeyRepo,
+		passwordHasher,
 	)
 	schemaService := service.NewSchemaService(pool, schemaRepo, schemaResolver, schemaValidator)
 
