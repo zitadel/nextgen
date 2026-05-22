@@ -1,5 +1,7 @@
-import { forward, type UpstreamAuth } from "./forward.js";
+import { type ClaudeAuth } from "./lib/claude.js";
+import { forward } from "./forward.js";
 import { isDebugEnabled, truncateForLog } from "./utils/debug.js";
+import { jsonResponse } from "./utils/response.js";
 
 const PLACEHOLDER_BASE_URL = "http://placeholder.local";
 
@@ -24,20 +26,20 @@ export default async function handle(request: Request): Promise<Response> {
 	const oauthToken = process.env["ANTHROPIC_AUTH_TOKEN"];
 	const apiKey = process.env["ANTHROPIC_API_KEY"];
 
-	const auth: UpstreamAuth | null =
+	const auth: ClaudeAuth | null =
 		oauthToken !== undefined && oauthToken.length > 0
 			? { mode: "oauth", token: oauthToken }
 			: apiKey !== undefined && apiKey.length > 0
 				? { mode: "apiKey", key: apiKey }
 				: null;
 	if (auth === null) {
-		return new Response(
-			JSON.stringify({
+		return jsonResponse(
+			{
 				error: "configuration_error",
 				message:
 					"Gateway has no upstream credential. Set ANTHROPIC_AUTH_TOKEN (OAuth) or ANTHROPIC_API_KEY.",
-			}),
-			{ status: 500, headers: { "content-type": "application/json" } },
+			},
+			500,
 		);
 	}
 
@@ -45,7 +47,7 @@ export default async function handle(request: Request): Promise<Response> {
 	return forward({
 		request,
 		pathname: url.pathname,
-		search: url.search,
+		search: url.search.slice(1),
 		auth,
 		onDebug: isDebugEnabled()
 			? ({ upstreamUrl, mutatedBody, upstreamStatus }) => {

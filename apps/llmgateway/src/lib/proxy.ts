@@ -4,7 +4,7 @@
  *
  * See https://www.rfc-editor.org/rfc/rfc7230#section-6.1.
  */
-export const RFC_7230_HOP_BY_HOP: ReadonlySet<string> = new Set([
+const RFC_7230_HOP_BY_HOP: ReadonlySet<string> = new Set([
 	"connection",
 	"keep-alive",
 	"proxy-authenticate",

@@ -1,38 +1,36 @@
 import { describe, expect, it } from "vitest";
 
-import {
-	RFC_7230_HOP_BY_HOP,
-	effectiveHopByHopHeaders,
-	filterHeaders,
-} from "../../src/lib/proxy.js";
+import { effectiveHopByHopHeaders, filterHeaders } from "../../src/lib/proxy.js";
 
-describe("RFC_7230_HOP_BY_HOP", () => {
-	it("contains the eight RFC 7230 §6.1 hop-by-hop headers", () => {
-		for (const name of [
-			"connection",
-			"keep-alive",
-			"proxy-authenticate",
-			"proxy-authorization",
-			"te",
-			"trailer",
-			"transfer-encoding",
-			"upgrade",
-		]) {
-			expect(RFC_7230_HOP_BY_HOP.has(name)).toBe(true);
+const RFC_7230_NAMES = [
+	"connection",
+	"keep-alive",
+	"proxy-authenticate",
+	"proxy-authorization",
+	"te",
+	"trailer",
+	"transfer-encoding",
+	"upgrade",
+] as const;
+
+describe("effectiveHopByHopHeaders", () => {
+	it("includes all eight RFC 7230 §6.1 hop-by-hop headers by default", () => {
+		const out = effectiveHopByHopHeaders(new Headers());
+		for (const name of RFC_7230_NAMES) {
+			expect(out.has(name)).toBe(true);
 		}
 	});
 
-	it("uses lowercase names", () => {
-		for (const name of RFC_7230_HOP_BY_HOP) {
+	it("uses lowercase names for the default hop-by-hop set", () => {
+		const out = effectiveHopByHopHeaders(new Headers());
+		for (const name of out) {
 			expect(name).toBe(name.toLowerCase());
 		}
 	});
-});
 
-describe("effectiveHopByHopHeaders", () => {
-	it("returns the static RFC set when no Connection header is present", () => {
+	it("returns only the eight default headers when no Connection header is present", () => {
 		const out = effectiveHopByHopHeaders(new Headers());
-		expect(out).toBe(RFC_7230_HOP_BY_HOP);
+		expect(out.size).toBe(RFC_7230_NAMES.length);
 	});
 
 	it("expands with names listed in the Connection header (RFC 7230 §6.1)", () => {
@@ -50,10 +48,13 @@ describe("effectiveHopByHopHeaders", () => {
 		expect(out.has("x-trace-id")).toBe(true);
 	});
 
-	it("returns the static RFC set when Connection lists only connection-options", () => {
+	it("returns only the default set when Connection lists only connection-options", () => {
 		const input = new Headers({ connection: "close, keep-alive" });
 		const out = effectiveHopByHopHeaders(input);
-		expect(out).toBe(RFC_7230_HOP_BY_HOP);
+		expect(out.size).toBe(RFC_7230_NAMES.length);
+		for (const name of RFC_7230_NAMES) {
+			expect(out.has(name)).toBe(true);
+		}
 	});
 
 	it("lowercases names listed in the Connection header", () => {

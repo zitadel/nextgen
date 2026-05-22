@@ -1,3 +1,4 @@
+import { jsonResponse } from "../utils/response.js";
 import { proxy } from "./proxy.js";
 
 const ANTHROPIC_API_ORIGIN = "https://api.anthropic.com";
@@ -21,18 +22,15 @@ export type ClaudeAuth =
  * Compose the absolute Anthropic upstream URL from path segments and a query
  * string. Strips the `beta` query parameter before appending the remaining
  * query string.
- *
- * @param pathSegments - Path segments after `/v1/`, e.g. `["messages"]`.
- * @param search - Query string WITHOUT a leading `?`; `beta` is always stripped.
- * @returns The absolute upstream URL string.
  */
-export function buildUpstreamUrl(pathSegments: ReadonlyArray<string>, search: string): string {
-	const suffix = pathSegments.join("/");
-	const upstream = new URL(`${ANTHROPIC_API_ORIGIN}/${ANTHROPIC_API_VERSION_PREFIX}/${suffix}`);
+function buildUpstreamUrl(pathSegments: ReadonlyArray<string>, search: string): string {
+	const upstream = new URL(
+		`${ANTHROPIC_API_ORIGIN}/${ANTHROPIC_API_VERSION_PREFIX}/${pathSegments.join("/")}`,
+	);
 	const params = new URLSearchParams(search);
 	params.delete(ANTHROPIC_BETA_QUERY_PARAM);
-	const qs = params.toString();
-	return qs.length > 0 ? `${upstream.toString()}?${qs}` : upstream.toString();
+	upstream.search = params.toString();
+	return upstream.toString();
 }
 
 /**
@@ -46,12 +44,8 @@ export function buildUpstreamUrl(pathSegments: ReadonlyArray<string>, search: st
  *
  * Always ensures `anthropic-version` is set, defaulting to `"2023-06-01"` when
  * the header is absent from `input`.
- *
- * @param input - Inbound headers; not mutated.
- * @param auth - Credential to apply.
- * @returns A new `Headers` instance with auth applied.
  */
-export function applyAuth(input: Headers, auth: ClaudeAuth): Headers {
+function applyAuth(input: Headers, auth: ClaudeAuth): Headers {
 	const out = new Headers(input);
 
 	if (auth.mode === "oauth") {
@@ -132,18 +126,12 @@ export async function callClaude(options: ClaudeOptions): Promise<Response> {
 
 	let finalBody: string | undefined;
 
-	if (options.body !== undefined && options.onBody !== undefined) {
-		const result = options.onBody(options.body);
-		if (result === null) {
-			return new Response(
-				JSON.stringify({ error: "invalid_json", message: "Request body is not valid JSON" }),
-				{ status: 400, headers: { "content-type": "application/json" } },
-			);
+	if (options.body !== undefined) {
+		const transformed = options.onBody ? options.onBody(options.body) : options.body;
+		if (transformed === null) {
+			return jsonResponse({ error: "invalid_json", message: "Request body is not valid JSON" }, 400);
 		}
-		finalBody = result;
-		upstreamHeaders.set("content-type", "application/json");
-	} else if (options.body !== undefined) {
-		finalBody = options.body;
+		finalBody = transformed;
 		upstreamHeaders.set("content-type", "application/json");
 	}
 

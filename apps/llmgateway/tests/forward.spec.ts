@@ -3,12 +3,12 @@ import { strict as assert } from "node:assert";
 import type { TextBlockParam } from "@anthropic-ai/sdk/resources/messages";
 import { describe, expect, it, vi } from "vitest";
 
-import { applyAuth, buildUpstreamUrl, type ClaudeAuth as UpstreamAuth } from "../src/lib/claude.js";
+import { type ClaudeAuth } from "../src/forward.js";
 import { extractV1PathSegments, forward, prepareBody } from "../src/forward.js";
 import { CLAUDE_CODE_IDENTIFIER_TEXT } from "../src/inject.js";
 
-const OAUTH_AUTH: UpstreamAuth = { mode: "oauth", token: "oauth-token" };
-const API_KEY_AUTH: UpstreamAuth = { mode: "apiKey", key: "sk-ant-test" };
+const OAUTH_AUTH: ClaudeAuth = { mode: "oauth", token: "oauth-token" };
+const API_KEY_AUTH: ClaudeAuth = { mode: "apiKey", key: "sk-ant-test" };
 
 describe("extractV1PathSegments", () => {
 	it("strips /v1/ for direct hits", () => {
@@ -40,35 +40,6 @@ describe("extractV1PathSegments", () => {
 	it("returns the segments verbatim when the path doesn't match either pattern", () => {
 		expect(extractV1PathSegments("/health")).toEqual(["health"]);
 		expect(extractV1PathSegments("/")).toEqual([]);
-	});
-});
-
-describe("buildUpstreamUrl", () => {
-	it("joins path segments after /v1/", () => {
-		expect(buildUpstreamUrl(["messages"], "")).toBe("https://api.anthropic.com/v1/messages");
-		expect(buildUpstreamUrl(["messages", "count_tokens"], "")).toBe(
-			"https://api.anthropic.com/v1/messages/count_tokens",
-		);
-	});
-
-	it("strips the `beta` query parameter", () => {
-		expect(buildUpstreamUrl(["messages"], "beta=foo")).toBe(
-			"https://api.anthropic.com/v1/messages",
-		);
-	});
-
-	it("preserves non-beta query parameters", () => {
-		const url = buildUpstreamUrl(["messages"], "stream=true&extra=x");
-		expect(url).toContain("stream=true");
-		expect(url).toContain("extra=x");
-		expect(url).not.toContain("beta=");
-	});
-
-	it("strips only the `beta` param when mixed with other params", () => {
-		const url = buildUpstreamUrl(["messages"], "stream=true&beta=foo&extra=x");
-		expect(url).toContain("stream=true");
-		expect(url).toContain("extra=x");
-		expect(url).not.toContain("beta=foo");
 	});
 });
 
@@ -121,78 +92,6 @@ describe("prepareBody", () => {
 
 	it("returns null on malformed JSON", () => {
 		expect(prepareBody("not-json", ["messages"], OAUTH_AUTH)).toBeNull();
-	});
-});
-
-describe("applyAuth — OAuth mode", () => {
-	it("sets Authorization: Bearer <token>", () => {
-		expect(applyAuth(new Headers(), OAUTH_AUTH).get("authorization")).toBe("Bearer oauth-token");
-	});
-
-	it("adds the anthropic-beta oauth header when missing", () => {
-		expect(applyAuth(new Headers(), OAUTH_AUTH).get("anthropic-beta")).toBe("oauth-2025-04-20");
-	});
-
-	it("appends the oauth beta to an existing anthropic-beta header", () => {
-		const input = new Headers({ "anthropic-beta": "prompt-caching-2024-07-31" });
-		expect(applyAuth(input, OAUTH_AUTH).get("anthropic-beta")).toBe(
-			"prompt-caching-2024-07-31,oauth-2025-04-20",
-		);
-	});
-
-	it("does not duplicate the oauth beta when already present", () => {
-		const input = new Headers({ "anthropic-beta": "oauth-2025-04-20" });
-		expect(applyAuth(input, OAUTH_AUTH).get("anthropic-beta")).toBe("oauth-2025-04-20");
-	});
-
-	it("does not duplicate the oauth beta when present alongside others", () => {
-		const input = new Headers({ "anthropic-beta": "foo, oauth-2025-04-20, bar" });
-		expect(applyAuth(input, OAUTH_AUTH).get("anthropic-beta")).toBe("foo, oauth-2025-04-20, bar");
-	});
-
-	it("does not set x-api-key in OAuth mode", () => {
-		expect(applyAuth(new Headers(), OAUTH_AUTH).has("x-api-key")).toBe(false);
-	});
-});
-
-describe("applyAuth — API-key mode", () => {
-	it("sets x-api-key", () => {
-		expect(applyAuth(new Headers(), API_KEY_AUTH).get("x-api-key")).toBe("sk-ant-test");
-	});
-
-	it("does not set Authorization in API-key mode", () => {
-		expect(applyAuth(new Headers(), API_KEY_AUTH).has("authorization")).toBe(false);
-	});
-
-	it("does not add the anthropic-beta oauth header", () => {
-		expect(applyAuth(new Headers(), API_KEY_AUTH).get("anthropic-beta")).toBeNull();
-	});
-
-	it("preserves existing anthropic-beta header unmodified", () => {
-		const input = new Headers({ "anthropic-beta": "prompt-caching-2024-07-31" });
-		expect(applyAuth(input, API_KEY_AUTH).get("anthropic-beta")).toBe("prompt-caching-2024-07-31");
-	});
-});
-
-describe("applyAuth — both modes", () => {
-	it("sets anthropic-version to the default when missing", () => {
-		expect(applyAuth(new Headers(), OAUTH_AUTH).get("anthropic-version")).toBe("2023-06-01");
-		expect(applyAuth(new Headers(), API_KEY_AUTH).get("anthropic-version")).toBe("2023-06-01");
-	});
-
-	it("preserves caller-supplied anthropic-version", () => {
-		const input = new Headers({ "anthropic-version": "2024-01-01" });
-		expect(applyAuth(input, OAUTH_AUTH).get("anthropic-version")).toBe("2024-01-01");
-		expect(applyAuth(input, API_KEY_AUTH).get("anthropic-version")).toBe("2024-01-01");
-	});
-
-	it("does not mutate the input Headers", () => {
-		const input = new Headers({ "x-keep": "ok" });
-		applyAuth(input, OAUTH_AUTH);
-		applyAuth(input, API_KEY_AUTH);
-		expect(input.has("authorization")).toBe(false);
-		expect(input.has("x-api-key")).toBe(false);
-		expect(input.get("x-keep")).toBe("ok");
 	});
 });
 
@@ -422,7 +321,7 @@ describe("forward", () => {
 		await forward({
 			request,
 			pathname: "/v1/messages",
-			search: "?beta=foo&stream=true",
+			search: "beta=foo&stream=true",
 			auth: API_KEY_AUTH,
 			fetchImpl,
 		});

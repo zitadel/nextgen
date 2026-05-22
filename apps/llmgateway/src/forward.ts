@@ -1,9 +1,9 @@
 import { injectSystemPrompt } from "./inject.js";
-import { callClaude, type ClaudeAuth as UpstreamAuth } from "./lib/claude.js";
+import { callClaude, type ClaudeAuth } from "./lib/claude.js";
 import { effectiveHopByHopHeaders, filterHeaders } from "./lib/proxy.js";
 import { isPlainObject, tryParseJson } from "./utils/json.js";
 
-export type { ClaudeAuth as UpstreamAuth } from "./lib/claude.js";
+export type { ClaudeAuth } from "./lib/claude.js";
 
 const ANTHROPIC_API_VERSION_PREFIX = "v1";
 const MESSAGES_ENDPOINT = "messages";
@@ -54,7 +54,7 @@ export function extractV1PathSegments(pathname: string): ReadonlyArray<string> {
 export function prepareBody(
 	rawJson: string,
 	pathParts: ReadonlyArray<string>,
-	auth: UpstreamAuth,
+	auth: ClaudeAuth,
 ): { readonly mutatedBody: unknown; readonly serialised: string } | null {
 	if (rawJson.length === 0) {
 		return { mutatedBody: undefined, serialised: "" };
@@ -108,7 +108,7 @@ export async function forward(args: {
 	readonly request: Request;
 	readonly pathname: string;
 	readonly search: string;
-	readonly auth: UpstreamAuth;
+	readonly auth: ClaudeAuth;
 	readonly fetchImpl?: typeof fetch;
 	readonly onDebug?: (info: {
 		readonly upstreamUrl: string;
@@ -138,7 +138,7 @@ export async function forward(args: {
 	return callClaude({
 		auth: args.auth,
 		pathSegments: pathParts,
-		search: args.search.replace(/^\?/, ""),
+		search: args.search,
 		method,
 		requestHeaders: filtered,
 		body: rawBody,

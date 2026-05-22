@@ -25,10 +25,7 @@ export function tryParseJson<T = unknown>(raw: string): JsonParseResult<T> {
 	try {
 		return { ok: true, value: JSON.parse(raw) as T };
 	} catch (err) {
-		if (err instanceof SyntaxError) {
-			return { ok: false, error: err };
-		}
-		throw err;
+		return { ok: false, error: err instanceof SyntaxError ? err : new SyntaxError(String(err)) };
 	}
 }
 

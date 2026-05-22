@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { Readable } from "node:stream";
 
 import handle from "./handler.js";
+import { jsonResponse } from "./utils/response.js";
 
 const VERCEL_CATCHALL_PARAM = "path";
 const PLACEHOLDER_HOST = "placeholder.local";
@@ -20,17 +21,9 @@ export function buildWebRequestUrl(req: IncomingMessage): string {
 		? (protoHeader[0] ?? DEFAULT_PROTOCOL)
 		: (protoHeader ?? DEFAULT_PROTOCOL);
 
-	const rawUrl = req.url ?? "/";
-	const [pathname, search] = rawUrl.split("?", 2);
-	if (search === undefined) {
-		return `${protocol}://${host}${pathname}`;
-	}
-	const params = new URLSearchParams(search);
-	params.delete(VERCEL_CATCHALL_PARAM);
-	const cleaned = params.toString();
-	return cleaned.length > 0
-		? `${protocol}://${host}${pathname}?${cleaned}`
-		: `${protocol}://${host}${pathname}`;
+	const url = new URL(req.url ?? "/", `${protocol}://${host}`);
+	url.searchParams.delete(VERCEL_CATCHALL_PARAM);
+	return url.toString();
 }
 
 /**
@@ -79,8 +72,7 @@ export async function pipeResponseBack(webResponse: Response, res: ServerRespons
 		return;
 	}
 
-	const bodyText = webResponse.body !== null ? await webResponse.text() : "";
-	res.end(bodyText);
+	res.end(await webResponse.text());
 }
 
 /**
@@ -125,13 +117,12 @@ export async function vercelEntry(
 			res.end();
 			return;
 		}
-		res.statusCode = 500;
-		res.setHeader("content-type", "application/json");
-		res.end(
-			JSON.stringify({
-				error: "gateway_error",
-				message: err instanceof Error ? err.message : String(err),
-			}),
+		await pipeResponseBack(
+			jsonResponse(
+				{ error: "gateway_error", message: err instanceof Error ? err.message : String(err) },
+				500,
+			),
+			res,
 		);
 	}
 }
