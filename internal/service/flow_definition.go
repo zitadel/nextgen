@@ -81,7 +81,7 @@ func (fd *flowDefinitionService) Create(ctx context.Context, req CreateFlowDefin
 	}
 	defs, err := fd.flowDefinitionRepo.ListFlowDefinitions(ctx, fd.db, req.ProjectID, opts...)
 	if err != nil {
-		if !errors.Is(err, domain.ErrFlowDefinitionNotFound()) {
+		if !errors.Is(err, &database.NoRowFoundError{}) {
 			return nil, "", err
 		}
 	}

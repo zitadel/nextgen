@@ -66,7 +66,7 @@ func mapCreateRequestToService(req *api.CreateFlowDefinitionRequest) (service.Cr
 	return svcReq, nil
 }
 
-func flowDefinitionSuccessResponse(flowDefinition *domain.FlowDefinition, schemaURI string) api.CreateFlowDefinitionRes {
+func flowDefinitionSuccessResponse(flowDefinition *domain.FlowDefinition, schemaURI string) *api.FlowDefinitionDetailResponse {
 	purposes := mapDomainPurposesToAPI(flowDefinition.Purposes)
 	audience := api.OptFlowAudience{
 		Value: api.FlowAudience{
