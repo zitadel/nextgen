@@ -113,8 +113,9 @@ function renderArrayItems(
   for (const item of arr) {
     if (isPrimitive(item)) {
       const formatted = fmtPrimitive(item);
-      const suffix = ctx.deleteMode ? " -> null" : "";
-      lines.push(col(`${pad}${prefix} ${formatted},${suffix}`));
+      // Terraform never appends " -> null" to array elements — only to object
+      // field removals. Strip deleteMode here regardless of context.
+      lines.push(col(`${pad}${prefix} ${formatted},`));
     } else if (Array.isArray(item)) {
       lines.push(col(`${pad}${prefix} [`));
       renderArrayItems(item, prefix, prefixCol + 4, ctx, lines);
@@ -135,16 +136,18 @@ function renderArrayItems(
 //   added      →  "+" prefix
 //   removed    →  "-" prefix
 
+// Returns true if any actual change line (+ / - / ~) was emitted.
 function renderDiff(
   oldObj: Record<string, unknown>,
   newObj: Record<string, unknown>,
   prefixCol: number,
   tty: boolean,
   lines: string[],
-): void {
+): boolean {
   const allKeys = [...new Set([...Object.keys(oldObj), ...Object.keys(newObj)])].sort();
   const maxLen = allKeys.reduce((m, k) => Math.max(m, k.length), 0);
   const pad = " ".repeat(prefixCol);
+  let hasChanges = false;
 
   for (const key of allKeys) {
     const pk = key.padEnd(maxLen);
@@ -155,6 +158,7 @@ function renderDiff(
 
     if (!hasOld) {
       // Added
+      hasChanges = true;
       const col = (s: string) => paint(s, A.green, tty);
       if (isPrimitive(newVal)) {
         lines.push(col(`${pad}+ ${pk} = ${fmtPrimitive(newVal)}`));
@@ -169,12 +173,14 @@ function renderDiff(
       }
     } else if (!hasNew) {
       // Removed
+      hasChanges = true;
       const col = (s: string) => paint(s, A.red, tty);
       if (isPrimitive(oldVal)) {
         lines.push(col(`${pad}- ${pk} = ${fmtPrimitive(oldVal)} -> null`));
       } else if (Array.isArray(oldVal)) {
         lines.push(col(`${pad}- ${pk} = [`));
-        renderArrayItems(oldVal, "-", prefixCol + 4, { tty, deleteMode: true }, lines);
+        // Array items never get " -> null" — only scalar object fields do
+        renderArrayItems(oldVal, "-", prefixCol + 4, { tty, deleteMode: false }, lines);
         lines.push(`${" ".repeat(prefixCol + 2)}]`);
       } else if (isPlainObject(oldVal)) {
         lines.push(col(`${pad}- ${pk} = {`));
@@ -187,26 +193,40 @@ function renderDiff(
         lines.push(`${pad}  ${pk} = ${fmtPrimitive(newVal)}`);
       } else {
         // Changed primitive
+        hasChanges = true;
         const col = (s: string) => paint(s, A.yellow, tty);
         lines.push(col(`${pad}~ ${pk} = ${fmtPrimitive(oldVal)} -> ${fmtPrimitive(newVal)}`));
       }
     } else if (Array.isArray(oldVal) && Array.isArray(newVal)) {
-      // Arrays: show full remove then full add (proper LCS diff is out of scope)
-      const colR = (s: string) => paint(s, A.red, tty);
-      const colA = (s: string) => paint(s, A.green, tty);
-      lines.push(colR(`${pad}- ${pk} = [`));
-      renderArrayItems(oldVal, "-", prefixCol + 4, { tty, deleteMode: true }, lines);
-      lines.push(`${" ".repeat(prefixCol + 2)}]`);
-      lines.push(colA(`${pad}+ ${pk} = [`));
-      renderArrayItems(newVal, "+", prefixCol + 4, { tty, deleteMode: false }, lines);
-      lines.push(`${" ".repeat(prefixCol + 2)}]`);
+      if (JSON.stringify(oldVal) === JSON.stringify(newVal)) {
+        // Deeply equal — show as unchanged for context, no diff noise
+        lines.push(`${pad}  ${pk} = [`);
+        renderArrayItems(newVal, " ", prefixCol + 4, { tty, deleteMode: false }, lines);
+        lines.push(`${" ".repeat(prefixCol + 2)}]`);
+      } else {
+        // Changed — show full remove then full add (LCS diff is out of scope)
+        hasChanges = true;
+        const colR = (s: string) => paint(s, A.red, tty);
+        const colA = (s: string) => paint(s, A.green, tty);
+        lines.push(colR(`${pad}- ${pk} = [`));
+        renderArrayItems(oldVal, "-", prefixCol + 4, { tty, deleteMode: false }, lines);
+        lines.push(`${" ".repeat(prefixCol + 2)}]`);
+        lines.push(colA(`${pad}+ ${pk} = [`));
+        renderArrayItems(newVal, "+", prefixCol + 4, { tty, deleteMode: false }, lines);
+        lines.push(`${" ".repeat(prefixCol + 2)}]`);
+      }
     } else if (isPlainObject(oldVal) && isPlainObject(newVal)) {
-      // Recurse into nested object diff
+      // Recurse into nested object diff; only mark as ~ if a child actually changed
       const childLines: string[] = [];
-      renderDiff(oldVal, newVal, prefixCol + 4, tty, childLines);
+      const childHasChanges = renderDiff(oldVal, newVal, prefixCol + 4, tty, childLines);
       if (childLines.length > 0) {
-        const col = (s: string) => paint(s, A.yellow, tty);
-        lines.push(col(`${pad}~ ${pk} = {`));
+        if (childHasChanges) {
+          hasChanges = true;
+          const col = (s: string) => paint(s, A.yellow, tty);
+          lines.push(col(`${pad}~ ${pk} = {`));
+        } else {
+          lines.push(`${pad}  ${pk} = {`);
+        }
         lines.push(...childLines);
         lines.push(`${" ".repeat(prefixCol + 2)}}`);
       } else {
@@ -214,6 +234,7 @@ function renderDiff(
       }
     } else {
       // Type changed (e.g. string → object) — show as remove + add
+      hasChanges = true;
       const colR = (s: string) => paint(s, A.red, tty);
       const colA = (s: string) => paint(s, A.green, tty);
       if (isPrimitive(oldVal)) {
@@ -224,6 +245,8 @@ function renderDiff(
       }
     }
   }
+
+  return hasChanges;
 }
 
 // ─── Block rendering ──────────────────────────────────────────────────────────
