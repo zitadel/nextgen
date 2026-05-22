@@ -96,7 +96,7 @@ func run(ctx context.Context, cfg Config, pool database.Pool) error {
 		return fmt.Errorf("invalid server url: %w", err)
 	}
 	schemaResolver := domain.NewJSONSchemaResolver(schemaRepo, schemaCache, 10, 1000_000, &http.Client{}, serverURL)
-	schemaValidator, err := domain.NewTenantSchemaValidator(serverURL.String())
+	schemaValidator, err := domain.NewSchemaValidator(serverURL.String())
 	if err != nil {
 		return fmt.Errorf("build schema validator: %w", err)
 	}

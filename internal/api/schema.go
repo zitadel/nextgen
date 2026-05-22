@@ -72,6 +72,8 @@ func schemaErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		return errorResponseWithStatusCode(http.StatusNotFound, err)
 	case domain.ErrJSONSchemaAlreadyExists().Code:
 		return errorResponseWithStatusCode(http.StatusConflict, err)
+	case domain.ErrJSONSchemaInvalid().Code:
+		return errorResponseWithStatusCode(http.StatusBadRequest, err)
 	default:
 		return internalErrorResponse(err)
 	}

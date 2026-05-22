@@ -50,10 +50,10 @@ type SchemaValidator struct {
 	latestVersionByKind map[KnownSchemaKind]string
 }
 
-// NewTenantSchemaValidator compiles the meta-schemas for the tenant schema kinds into memory and returns a SchemaValidator instance.
+// NewSchemaValidator compiles the meta-schemas for the tenant schema kinds into memory and returns a SchemaValidator instance.
 // The builtinPublicBase is used to construct canonical URLs for the built-in meta-schemas.
 // It must be an absolute URL with a host (e.g. "https://raw.githubusercontent.com/zitadel/nextgen/refs/tags/v1.2.3/api/openapi/endpoints/schemas").
-func NewTenantSchemaValidator(builtinPublicBase string) (*SchemaValidator, error) {
+func NewSchemaValidator(builtinPublicBase string) (*SchemaValidator, error) {
 	if builtinPublicBase == "" {
 		return nil, ErrMissingBuiltinPublicBase
 	}
@@ -108,7 +108,7 @@ func (v *SchemaValidator) ValidateAgainstMetaSchema(tenantSchemaBytes []byte) er
 		return fmt.Errorf("%w: %w", ErrSchemaParseFailed, err)
 	}
 
-	schemaID, _ := tenantSchema["$schema"].(string)
+	schemaID, _ := tenantSchema["metaSchema"].(string)
 	if schemaID == "" {
 		return ErrMissingSchemaID
 	}

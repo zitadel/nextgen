@@ -33,14 +33,14 @@ type SchemaService struct {
 	pool            database.Pool
 	schemaRepo      domain.JSONSchemaRepository
 	schemaResolver  *domain.JSONSchemaResolver
-	schemaValidator *domain.TenantSchemaValidator
+	schemaValidator *domain.SchemaValidator
 }
 
 func NewSchemaService(
 	pool database.Pool,
 	schemaRepo domain.JSONSchemaRepository,
 	schemaResolver *domain.JSONSchemaResolver,
-	schemaValidator *domain.TenantSchemaValidator,
+	schemaValidator *domain.SchemaValidator,
 ) *SchemaService {
 	return &SchemaService{
 		pool:            pool,
