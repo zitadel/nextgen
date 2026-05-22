@@ -18042,12 +18042,6 @@ func (s *UserProperty) Encode(e *jx.Encoder) {
 // encodeFields encodes fields.
 func (s *UserProperty) encodeFields(e *jx.Encoder) {
 	{
-		if s.XMinusIdentifier.Set {
-			e.FieldStart("x-identifier")
-			s.XMinusIdentifier.Encode(e)
-		}
-	}
-	{
 		if s.XMinusVerify.Set {
 			e.FieldStart("x-verify")
 			s.XMinusVerify.Encode(e)
@@ -18098,15 +18092,14 @@ func (s *UserProperty) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfUserProperty = [8]string{
-	0: "x-identifier",
-	1: "x-verify",
-	2: "x-unique",
-	3: "x-claim",
-	4: "x-editable",
-	5: "x-sensitive",
-	6: "x-mfa",
-	7: "properties",
+var jsonFieldsNameOfUserProperty = [7]string{
+	0: "x-verify",
+	1: "x-unique",
+	2: "x-claim",
+	3: "x-editable",
+	4: "x-sensitive",
+	5: "x-mfa",
+	6: "properties",
 }
 
 // Decode decodes UserProperty from json.
@@ -18119,16 +18112,6 @@ func (s *UserProperty) Decode(d *jx.Decoder) error {
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
-		case "x-identifier":
-			if err := func() error {
-				s.XMinusIdentifier.Reset()
-				if err := s.XMinusIdentifier.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"x-identifier\"")
-			}
 		case "x-verify":
 			if err := func() error {
 				s.XMinusVerify.Reset()
@@ -18366,10 +18349,12 @@ func (s *UserPropertyXMinusUnique) Decode(d *jx.Decoder) error {
 	}
 	// Try to use constant string.
 	switch UserPropertyXMinusUnique(v) {
-	case UserPropertyXMinusUniqueInstance:
-		*s = UserPropertyXMinusUniqueInstance
-	case UserPropertyXMinusUniqueOrganization:
-		*s = UserPropertyXMinusUniqueOrganization
+	case UserPropertyXMinusUniqueUnspecified:
+		*s = UserPropertyXMinusUniqueUnspecified
+	case UserPropertyXMinusUniqueProject:
+		*s = UserPropertyXMinusUniqueProject
+	case UserPropertyXMinusUniqueTeam:
+		*s = UserPropertyXMinusUniqueTeam
 	default:
 		*s = UserPropertyXMinusUnique(v)
 	}
