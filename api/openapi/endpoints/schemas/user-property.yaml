@@ -6,10 +6,6 @@ description: |
   This is done because a lot of code generators cannot handle that.
 additionalProperties: true
 properties:
-  x-identifier:
-    type: boolean
-    default: false
-    description: Whether this property is an identifier for the user or not
   x-verify:
     oneOf:
       - type: string
@@ -19,8 +15,9 @@ properties:
     oneOf:
       - type: string
         enum:
-          - instance
-          - organization
+          - unspecified
+          - project
+          - team
       - type: 'null'
     description: The level of uniqueness for this property, if applicable
   x-claim:
