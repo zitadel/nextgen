@@ -9,9 +9,10 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
-const testBuiltinBase = "https://example.test/schemas"
+// todo (grvijayan): set to be the same as const defined for $schema in user-schema.json, will be updated once we have a decision on setting const
+const testBuiltinBase = "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas"
 
-func newTestValidator(t *testing.T) *domain.TenantSchemaValidator {
+func newTestValidator(t *testing.T) *domain.SchemaValidator {
 	t.Helper()
 	v, err := domain.NewTenantSchemaValidator(testBuiltinBase)
 	require.NoError(t, err)
@@ -115,10 +116,7 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 					"password": { "enabled": true, "position": 0 }
 				}
 			}`),
-			wantErr: domain.ErrSchemaValidationFailed,
-			wantValidationErrors: map[string]string{
-				"/required/$schema": `missing required field "$schema"`,
-			},
+			wantErr: domain.ErrMissingSchemaID,
 		},
 		{
 			name: "missing $id",
@@ -136,14 +134,14 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 			},
 		},
 		{
-			name:    "missing kind",
-			input:   []byte(`{"title": "No Kind"}`),
-			wantErr: domain.ErrMissingSchemaKind,
+			name:    "missing $schema field",
+			input:   []byte(`{"kind": "user-schema", "title": "No Schema ID"}`),
+			wantErr: domain.ErrMissingSchemaID,
 		},
 		{
-			name:    "unknown kind",
-			input:   []byte(`{"kind": "unknown-schema", "title": "Unknown"}`),
-			wantErr: domain.ErrUnknownSchemaKind,
+			name:    "unknown $schema URI",
+			input:   []byte(`{"$schema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/unknown.json", "title": "Unknown"}`),
+			wantErr: domain.ErrUnknownSchemaURI,
 		},
 		{
 			name: "missing required title",
@@ -313,4 +311,74 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSchemaValidator_GetBuiltinSchema(t *testing.T) {
+	v := newTestValidator(t)
+
+	t.Run("returns schema for user-schema kind", func(t *testing.T) {
+		uri := testBuiltinBase + "/user-schema.json"
+		schema, err := v.GetBuiltinSchema(uri)
+		require.NoError(t, err)
+		require.NotNil(t, schema)
+	})
+
+	t.Run("returns schema for flow-definition kind", func(t *testing.T) {
+		uri := testBuiltinBase + "/flow-definition.json"
+		schema, err := v.GetBuiltinSchema(uri)
+		require.NoError(t, err)
+		require.NotNil(t, schema)
+	})
+
+	t.Run("returns independent clone — mutations do not affect validator", func(t *testing.T) {
+		uri := testBuiltinBase + "/user-schema.json"
+		s1, err := v.GetBuiltinSchema(uri)
+		require.NoError(t, err)
+		// Truncate s1's parts; s2 must remain intact
+		s1.Parts = s1.Parts[:0]
+		s2, err := v.GetBuiltinSchema(uri)
+		require.NoError(t, err)
+		assert.NotEmpty(t, s2.Parts, "second clone should be unaffected by mutation of first")
+	})
+
+	t.Run("returns error for unknown kind", func(t *testing.T) {
+		schema, err := v.GetBuiltinSchema("https://example.test/schemas/unknown.json")
+		require.ErrorIs(t, err, domain.ErrUnknownSchemaURI)
+		assert.Nil(t, schema)
+	})
+
+	t.Run("returns error for empty kind", func(t *testing.T) {
+		schema, err := v.GetBuiltinSchema("")
+		require.ErrorIs(t, err, domain.ErrUnknownSchemaURI)
+		assert.Nil(t, schema)
+	})
+}
+
+func TestSchemaValidator_LatestSchemaURI(t *testing.T) {
+	v := newTestValidator(t)
+
+	t.Run("returns URI for user-schema kind", func(t *testing.T) {
+		uri, err := v.LatestSchemaURI(domain.SchemaKindUser)
+		require.NoError(t, err)
+		assert.Equal(t, testBuiltinBase+"/user-schema.json", uri)
+	})
+
+	t.Run("returns URI for flow-definition kind", func(t *testing.T) {
+		uri, err := v.LatestSchemaURI(domain.SchemaKindFlowDefinition)
+		require.NoError(t, err)
+		assert.Equal(t, testBuiltinBase+"/flow-definition.json", uri)
+	})
+
+	t.Run("returned URI resolves to a valid schema", func(t *testing.T) {
+		uri, err := v.LatestSchemaURI(domain.SchemaKindFlowDefinition)
+		require.NoError(t, err)
+		schema, err := v.GetBuiltinSchema(uri)
+		require.NoError(t, err)
+		assert.NotNil(t, schema)
+	})
+
+	t.Run("returns error for unknown kind", func(t *testing.T) {
+		_, err := v.LatestSchemaURI("unknown-kind")
+		require.ErrorIs(t, err, domain.ErrUnknownSchemaURI)
+	})
 }
