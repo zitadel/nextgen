@@ -1,0 +1,43 @@
+/* Shared surface for `<zl-page-shell>` / `<PageShell>`. Lit-only rules: lit/page-shell-host.css */
+.zr-page-shell {
+  min-height: 100vh;
+  background: var(--zl-color-surface-default-black, #0f0f11);
+  color: var(--zl-color-text-primary-white, #f4f4f6);
+  font-family: var(--zl-font-family-sans, system-ui, sans-serif);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--zl-spacing-04, 1.5rem);
+  padding-block: var(--zl-spacing-05, 2rem);
+  padding-inline: var(--zl-spacing-03, 1rem);
+  box-sizing: border-box;
+}
+@media (min-width: 48rem) {
+  .zr-page-shell {
+    padding-block: 3.25rem;
+    padding-inline: var(--zl-spacing-03, 1rem);
+  }
+}
+.zr-page-shell__header,
+.zr-page-shell__main,
+.zr-page-shell__footer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+.zr-page-shell__main {
+  flex: 0 0 auto;
+}
+.zr-page-shell__footer {
+  min-height: 1.5rem;
+}
+/* Lit keeps slots mounted; hide empty regions so flex gap matches React PageShell. */
+.zr-page-shell__region--empty {
+  display: none;
+}
+.zr-page-shell[data-embedded] {
+  min-height: 100%;
+  height: 100%;
+}

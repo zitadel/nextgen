@@ -9,10 +9,20 @@
  * Dark-mode overrides are emitted as `:host([data-theme="dark"]) { ... }`
  * (matching `docs/design/branding/tokens.md`). Resolution between
  * `light | dark | auto` happens in `<zitadel-login>`.
+ *
+ * Base layer: the design-tokens package ships the full `--zl-*` set as both a
+ * `.css` file (for host pages) and a `tokensCss` string (for shadow roots and
+ * SSR). We adopt the string into every orchestrator shadow root so atoms
+ * paint correctly even when the host page didn't `@import` tokens.css — the
+ * orchestrator is meant to drop into any page.
  */
+import { tokensCss } from "@zitadel-nextgen/design-tokens";
+
 import type { ResolvedTheme } from "./theme-controller.js";
 import type { Branding, BrandingPalette, BrandingShape, BrandingTypography } from "./branding.js";
 
+// Radius tokens (Figma corner-radius scale). Branding lets a tenant pick
+// one of five shapes; we override all three corner sizes in proportion.
 const RADIUS_MAP: Record<NonNullable<BrandingShape["radius"]>, string> = {
   none: "0",
   sm: "0.25rem",
@@ -21,37 +31,38 @@ const RADIUS_MAP: Record<NonNullable<BrandingShape["radius"]>, string> = {
   full: "9999px",
 };
 
+// Branding lets tenants tune perceived density. Padding bands are the
+// most visible knob; height tweaks come from the Figma button/field heights.
 const DENSITY_MAP: Record<NonNullable<BrandingShape["density"]>, Record<string, string>> = {
   compact: {
-    "--zl-control-height-sm": "1.75rem",
-    "--zl-control-height-md": "2.25rem",
-    "--zl-control-height-lg": "2.75rem",
-    "--zl-space-3": "0.5rem",
-    "--zl-space-5": "1rem",
+    "--zl-spacing-03": "0.75rem",
+    "--zl-spacing-05": "1.5rem",
   },
   regular: {},
   comfortable: {
-    "--zl-control-height-sm": "2.25rem",
-    "--zl-control-height-md": "2.75rem",
-    "--zl-control-height-lg": "3.25rem",
-    "--zl-space-3": "1rem",
-    "--zl-space-5": "1.5rem",
+    "--zl-spacing-03": "1.25rem",
+    "--zl-spacing-05": "2.25rem",
   },
 };
 
-const PALETTE_MAP: Record<keyof BrandingPalette, string> = {
-  primary: "--zl-color-primary",
-  on_primary: "--zl-color-on-primary",
-  background: "--zl-color-background",
-  surface: "--zl-color-surface",
-  muted: "--zl-color-muted",
-  border: "--zl-color-border",
-  text: "--zl-color-text",
-  text_muted: "--zl-color-text-muted",
-  link: "--zl-color-link",
-  success: "--zl-color-success",
-  warning: "--zl-color-warning",
-  error: "--zl-color-error",
+// Mapping from the Branding palette keys (stable, public API for tenants)
+// to the design-tokens variable names that atoms actually consume. The keys
+// are intentionally semantic — tenants do NOT see internal token names like
+// `--zl-color-surface-default-black`; they say "background", "surface",
+// "primary", "text", etc. The orchestrator translates here.
+const PALETTE_MAP: Record<keyof BrandingPalette, string[]> = {
+  primary: ["--zl-color-surface-default-white"],
+  on_primary: ["--zl-color-text-button-default"],
+  background: ["--zl-color-surface-default-black"],
+  surface: ["--zl-color-surface-default-primary-gray"],
+  muted: ["--zl-color-surface-default-secondary-gray"],
+  border: ["--zl-color-border-default-gray-200", "--zl-color-border-default-gray-100"],
+  text: ["--zl-color-text-primary-white"],
+  text_muted: ["--zl-color-text-secondary-gray"],
+  link: ["--zl-color-text-subtitle-pink"],
+  success: ["--zl-color-text-success", "--zl-color-border-success", "--zl-color-icon-success"],
+  warning: ["--zl-color-text-subtitle-orange"],
+  error: ["--zl-color-text-error", "--zl-color-border-error", "--zl-color-icon-error"],
 };
 
 export type BrandingToTokensOptions = {
@@ -105,10 +116,12 @@ function collectDeclarations(branding: Branding | undefined): Record<string, str
 function mapPalette(palette: BrandingPalette | undefined): Record<string, string> {
   if (!palette) return {};
   const out: Record<string, string> = {};
-  for (const [key, varName] of Object.entries(PALETTE_MAP) as [keyof BrandingPalette, string][]) {
+  for (const [key, varNames] of Object.entries(PALETTE_MAP) as [keyof BrandingPalette, string[]][]) {
     const value = palette[key];
     if (typeof value === "string" && value.length > 0) {
-      out[varName] = value;
+      for (const varName of varNames) {
+        out[varName] = value;
+      }
     }
   }
   return out;
@@ -117,19 +130,22 @@ function mapPalette(palette: BrandingPalette | undefined): Record<string, string
 function mapTypography(typography: BrandingTypography | undefined): Record<string, string> {
   if (!typography) return {};
   const out: Record<string, string> = {};
+  // Tenants can override sans (primary body), heading, and mono families.
+  // We keep them as separate overrides so a tenant can ship a display face
+  // without losing the design-system fallback chain for body copy.
   if (typography.font_family) {
-    out["--zl-font-family"] = typography.font_family;
+    out["--zl-font-family-sans"] = typography.font_family;
+    out["--zl-font-family-heading"] = typography.font_family;
   }
   if (typography.font_family_mono) {
     out["--zl-font-family-mono"] = typography.font_family_mono;
   }
+  // Typography scale tunes the *base* font sizes embedded in atoms.
+  // The Figma scale isn't published as variables, so we map to the
+  // implicit sizes the atoms use directly.
   const scale = clamp(typography.scale ?? 1, 0.75, 1.25);
   if (scale !== 1) {
-    out["--zl-font-size-xs"] = `${0.75 * scale}rem`;
-    out["--zl-font-size-sm"] = `${0.875 * scale}rem`;
-    out["--zl-font-size-md"] = `${1 * scale}rem`;
-    out["--zl-font-size-lg"] = `${1.125 * scale}rem`;
-    out["--zl-font-size-xl"] = `${1.5 * scale}rem`;
+    out["--zl-font-scale"] = `${scale}`;
   }
   return out;
 }
@@ -139,9 +155,11 @@ function mapShape(shape: BrandingShape | undefined): Record<string, string> {
   const out: Record<string, string> = {};
   if (shape.radius && RADIUS_MAP[shape.radius]) {
     const radius = RADIUS_MAP[shape.radius];
-    out["--zl-radius-md"] = radius;
-    out["--zl-radius-sm"] = radius === "0" ? "0" : `calc(${radius} * 0.5)`;
-    out["--zl-radius-lg"] = radius === "0" ? "0" : `calc(${radius} * 1.5)`;
+    // Map the chosen radius onto the corner-radius/s slot atoms use by
+    // default, plus the larger size for cards. xs stays as a small accent.
+    out["--zl-radius-s"] = radius;
+    out["--zl-radius-m"] = radius === "0" ? "0" : `calc(${radius} * 1.5)`;
+    out["--zl-radius-l"] = radius === "0" ? "0" : `calc(${radius} * 2)`;
   }
   if (shape.density) {
     Object.assign(out, DENSITY_MAP[shape.density]);
@@ -159,13 +177,52 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
+// Lazily-built base sheet, shared by every `<zitadel-login>` instance.
+// `tokensCss` ships the design-system defaults under `:root` and
+// `[data-theme="dark"]`; rewriting them to `:host` / `:host([data-theme="dark"])`
+// projects the same variables onto the orchestrator's shadow root so
+// `var(--zl-*)` lookups inside atoms resolve before branding overrides land.
+let baseTokenSheet: CSSStyleSheet | undefined;
+function getBaseTokenSheet(): CSSStyleSheet | undefined {
+  if (typeof CSSStyleSheet === "undefined") return undefined;
+  if (!baseTokenSheet) {
+    baseTokenSheet = new CSSStyleSheet();
+    baseTokenSheet.replaceSync(
+      tokensCss
+        .replaceAll(":root,\n[data-theme=\"dark\"]", ":host,\n:host([data-theme=\"dark\"])")
+        .replaceAll("[data-theme=\"light\"]", ":host([data-theme=\"light\"])"),
+    );
+  }
+  return baseTokenSheet;
+}
+
 /**
- * Apply a branding payload as the only `adoptedStyleSheet` token layer on a
- * `ShadowRoot`. Subsequent calls replace the previous sheet so a new branding
- * payload paints cleanly without leaking older declarations.
+ * Adopt the design-system base token layer onto a `ShadowRoot`. Safe to call
+ * many times — the underlying constructable sheet is shared across every
+ * orchestrator instance and de-duplicated in the adopted list.
+ */
+export function applyBaseTokens(shadowRoot: ShadowRoot): void {
+  const sheet = getBaseTokenSheet();
+  if (!sheet) return;
+  // jsdom partially implements `adoptedStyleSheets` — treat a non-array as empty.
+  const existing: readonly CSSStyleSheet[] = Array.isArray(shadowRoot.adoptedStyleSheets)
+    ? shadowRoot.adoptedStyleSheets
+    : [];
+  if (existing.includes(sheet)) return;
+  try {
+    shadowRoot.adoptedStyleSheets = [sheet, ...existing];
+  } catch {
+    // Environments without constructable stylesheet adoption.
+  }
+}
+
+/**
+ * Apply a branding payload as a `--zl-*` overrides layer on top of the base
+ * token sheet. Subsequent calls replace the previous override sheet so a new
+ * branding payload paints cleanly without leaking older declarations.
  *
- * Returns the resolved theme used so the caller can also reflect it on the
- * host's `data-theme` attribute.
+ * Callers should run `applyBaseTokens(shadowRoot)` first (once per shadow
+ * root) so the base values exist before branding patches them.
  */
 export function applyBrandingTokens(
   shadowRoot: ShadowRoot,
@@ -178,8 +235,8 @@ export function applyBrandingTokens(
   }
   const sheet = new CSSStyleSheet();
   sheet.replaceSync(css);
-  // Keep any non-token sheets that the host may have set; replace only the
-  // token sheet that we own.
+  // Replace only the branding override sheet we own; leave the base token
+  // sheet and any host-supplied sheets in place.
   const previous = (shadowRoot as ShadowRoot & { __zlTokenSheet?: CSSStyleSheet }).__zlTokenSheet;
   const others = shadowRoot.adoptedStyleSheets.filter((s) => s !== previous);
   shadowRoot.adoptedStyleSheets = [...others, sheet];
@@ -187,11 +244,16 @@ export function applyBrandingTokens(
 }
 
 export function resolveTheme(branding: Branding | undefined): ResolvedTheme {
-  const mode = branding?.theme?.mode ?? "light";
-  if (mode === "dark") return "dark";
+  // Default is dark — the design system only publishes a dark variable mode
+  // today. `light` and `auto` are accepted as branding inputs so existing
+  // payloads round-trip, but until a light mode lands they fall back to the
+  // dark surface. Light support is gated by a future Figma sync that fills
+  // the `[data-theme="light"]` block in tokens.css.
+  const mode = branding?.theme?.mode ?? "dark";
   if (mode === "light") return "light";
+  if (mode === "dark") return "dark";
   if (typeof matchMedia === "function") {
-    return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    return matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
   }
-  return "light";
+  return "dark";
 }

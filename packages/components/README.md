@@ -5,9 +5,10 @@ Zitadel auth UI.
 
 The package exports:
 
-- **Atoms** — `<zl-field>`, `<zl-submit>`, `<zl-action>`, `<zl-error>`. Form-
-  associated, accessible, branding-aware Lit elements that map 1:1 to the
-  flow API field/action/error primitives.
+- **Atoms** — `<zl-field>`, `<zl-button>`, `<zl-alert>`, `<zl-icon>`,
+  `<zl-pill>`, `<zl-card>`, `<zl-page-shell>`. Form-associated, accessible,
+  branding-aware Lit elements that map 1:1 to the flow API
+  field/action/error primitives and the Figma design system.
 - **Orchestrator** — `<zitadel-login>`. A single drop-in element that calls
   the flow API, renders each step through a Liquid template, manages focus
   and form submission, and applies branding/theme/locale.
@@ -110,21 +111,36 @@ fixtures:
   `getCapturedRequests()` exposes captured request bodies for assertions.
 - **Dev playgrounds / browser (`msw/browser`)** — `setupMock(worker)`; see
   [`dev/main.ts`](dev/main.ts) for a working setup. `applyBranding(...)`
-  injects a tenant branding overlay merged into every response.
+  injects a tenant branding overlay merged into every response (presets
+  include `font_url` for Inter).
+- **Framework demos (TCP server)** — `corepack pnpm nx start @zitadel-nextgen/api-mock`
+  serves the same handlers on port 4000 with `defaultDevBranding` (Arimo
+  `font_url`) applied at boot. See [`apps/demo-next`](../../apps/demo-next/README.md)
+  and [`apps/demo-nuxt`](../../apps/demo-nuxt/README.md).
 
 ### Two preview surfaces
 
 Two places run the components against `@zitadel-nextgen/api-mock`. They
 have different jobs — keep both:
 
-| Surface | Run | Audience | What it gives you |
+| Surface | Nx command | URLs | What it gives you |
 | --- | --- | --- | --- |
-| **`packages/components/dev/`** | `pnpm --filter @zitadel-nextgen/components dev` | component author | Fast Vite cold-start, no React/Tailwind layer, branding-preset switcher, event log, restart-flow button. Source TS served directly from `src/`. |
-| **`apps/console/`** | `pnpm --filter @zitadel-nextgen/console dev` | consumer/integration | Proves the components work inside React via `@lit/react`, inside TanStack Router, inside the Tailwind-styled console shell. MSW is gated on `import.meta.env.DEV`. |
+| **Lit playground** | `corepack pnpm nx dev @zitadel-nextgen/components` | [login](http://localhost:5173/?route=login) · [atoms](http://localhost:5173/?route=atoms) | Component author surface: branding presets, event log, source TS from `src/`. MSW runs in the browser — no TCP mock server. |
+| **React console playground** | `corepack pnpm nx dev @zitadel-nextgen/console` | [http://localhost:5174](http://localhost:5174) | `@zitadel-nextgen/ui-react` atom matrices in the pre-release console shell. MSW in `import.meta.env.DEV`. Compare against Lit `:5173/?route=atoms` in a second tab. |
+| **demo-next** | `corepack pnpm nx start @zitadel-nextgen/api-mock` + `NEXTGEN_ISSUER_URL=http://localhost:4000 corepack pnpm nx dev @zitadel-nextgen/demo-next` | [http://localhost:3002/login](http://localhost:3002/login) (mock on `:4000`) | Next.js SDK, middleware, cookies, built `dist/`. See [`apps/demo-next`](../../apps/demo-next/README.md). |
+| **demo-nuxt** | mock on `:4000`, then `NEXTGEN_ISSUER_URL=http://localhost:4000 corepack pnpm nx dev @zitadel-nextgen/demo-nuxt` | [http://localhost:3001/login](http://localhost:3001/login) | Nuxt SDK, middleware, cookies, built `dist/`. See [`apps/demo-nuxt`](../../apps/demo-nuxt/README.md). |
 
-The dev playground iterates on the components themselves; the console
-proves they integrate. When tweaking visuals or shadow-DOM behaviour,
-reach for the playground first — it round-trips faster.
+The Lit dev playground iterates on `<zl-*>` source; the React console
+playground exercises `@zitadel-nextgen/ui-react` in the internal shell.
+When tweaking Lit visuals or shadow-DOM behaviour, use `:5173` first —
+it round-trips faster. For React pair tweaks, use `:5174`.
+
+**Stale Lit styles on `:5173`?** Atom `.ts` changes use
+`vite-plugin-web-components-hmr` (Lit HMR). Edits to `shared-component-styles`
+CSS alone trigger a full reload. If it still looks old, run
+`corepack pnpm nx dev:clean @zitadel-nextgen/components` and hard-refresh.
+Console (`:5174`) will not pick up Lit-only edits until you rebuild or
+change the paired React/CSS path.
 
 ### Atoms-only (bypass the orchestrator)
 
@@ -135,7 +151,7 @@ form-associated inputs.
 ```html
 <form id="login">
   <zl-field name="email" label="Email" type="email" autocomplete="username" required></zl-field>
-  <zl-submit action="submit" label="Continue"></zl-submit>
+  <zl-button hierarchy="primary" type="submit" action="submit" label="Continue" block></zl-button>
 </form>
 ```
 
@@ -164,13 +180,32 @@ follow-up.
 | `purpose` | `'login' \| 'register' \| 'reset_password' \| string` | Which flow purpose to drive |
 | `projectId` / `project-id` | `string` | Project / tenant id sent with `POST /flow` |
 | `apiBase` / `api-base` | `string` | Optional declarative override for `setApiBaseUrl()` |
-| `postSignInUrl` / `post-sign-in-url` | `string` | Fallback nav for terminal `complete: "show"` steps |
+| `sessionExchangePath` / `session-exchange-path` | `string` | Handoff exchange path (default `/sessions/exchange`, prefixed with `api-base`). Any other value is resolved from `location.origin` instead — use when exchange is rewritten separately (e.g. `/api/auth/exchange`) |
+| `postSignInUrl` / `post-sign-in-url` | `string` | After `complete: "show"`, exchange the `handoff_token` at the configured exchange path and navigate here |
 | `resumeFlowId` / `resume-flow-id` | `string` | Resume an existing flow handle instead of starting fresh |
 | `locale` | `Record<string, string>` | i18n dictionary consumed by Liquid's `\| t` filter |
 
 Events: `zitadel-flow-input`, `zitadel-flow-action`, `zitadel-flow-step`,
 `zitadel-flow-complete`, `zitadel-flow-error`. The orchestrator exposes
-`::part(form)` for tenant-side CSS hooks.
+`::part(form)` for tenant-side CSS hooks. Adopts design tokens and
+`branding.font_url` into its shadow root on each update.
+
+### `<zitadel-logout>`
+
+Session menu / sign-out control for embedded apps. Reads the
+`__nextgen_display` cookie set during sign-in, calls `GET /auth/end-session`
+through `api-base`, and clears the session. Uses the same token adoption as
+`<zitadel-login>` (`applyBaseTokens` + optional `font_url` when hosted on a
+page without global tokens).
+
+| Property | Type | Notes |
+| --- | --- | --- |
+| `apiBase` / `api-base` | `string` | Proxied auth API prefix (e.g. `/__nextgen`) |
+| `postSignOutUrl` / `post-sign-out-url` | `string` | Navigate here after sign-out |
+| `clientId` / `client-id` | `string` | Optional OIDC client id forwarded to end-session |
+
+Supports a light-DOM `<template>` slot for a fully custom menu; default UI is
+the avatar trigger + dropdown.
 
 ### `<zl-field>`
 
@@ -189,15 +224,35 @@ state, restores on form reset, and forwards Enter to `form.requestSubmit()`.
 
 Parts: `field`, `label`, `input`, `error`, `help`.
 
-### `<zl-submit>` / `<zl-action>`
+### `<zl-button>`
 
-Primary submit button and secondary actions. Both emit `zl-action` events the
-orchestrator listens for; in atoms-only setups you can listen for them yourself.
+Single button atom covering the full Figma matrix:
 
-### `<zl-error>`
+| Attribute | Values | Notes |
+| --- | --- | --- |
+| `hierarchy` | `primary \| secondary \| text` | Visual rank |
+| `size` | `medium \| small` | Figma surface sizes |
+| `type` | `submit \| button` | When `submit`, takes part in the host `<form>` |
+| `action` | `string` | Forwarded with the `zl-submit` CustomEvent |
+| `loading`, `disabled`, `block` | `boolean` | |
+| `label` | `string` | Convenience text; default slot is also supported |
 
-Region for step-level errors. Hidden when no `message` attribute and no slotted
-content.
+Emits `zl-submit` for both primary submits and secondary navigations — the
+orchestrator switches on `type`/`action` to decide whether to advance the flow
+or just notify.
+
+### `<zl-alert>`
+
+Inline status message for the four Figma severities (`error \| success \|
+warning \| info`). Renders the matching icon automatically; supports an
+optional `heading` and default-slot body.
+
+### `<zl-icon>` / `<zl-pill>` / `<zl-card>` / `<zl-page-shell>`
+
+Pure presentational atoms — icons render from a curated inline-SVG sprite,
+pills carry the "Secured with Zitadel" attribution chip (and any tenant
+alternative), and `<zl-card>` + `<zl-page-shell>` build the auth-screen
+chrome from design tokens.
 
 See [`src/atoms/`](src/atoms) for full TypeScript types and JSDoc.
 
@@ -211,12 +266,13 @@ packages/components/
 │   ├── branding-presets.ts tenant-style branding payloads
 │   └── pages/             atom playground + <zitadel-login> demo
 ├── src/
-│   ├── atoms/             zl-field, zl-submit, zl-action, zl-error + tests
-│   ├── orchestrator/      <zitadel-login>, api-client, liquid, sanitiser, branding
+│   ├── atoms/             zl-field, zl-button, zl-alert, zl-icon, zl-pill,
+│   │                       zl-card, zl-page-shell + tests
+│   ├── orchestrator/      <zitadel-login>, <zitadel-logout>, api-client, liquid, branding
 │   │   ├── locales/       bundled English fallback
-│   │   └── templates/     bundled auth_form.liquid + default chrome
-│   ├── tokens/            design-token catalogue + cssVar helpers
-│   ├── styles/            shared host styles, focus ring
+│   │   └── templates/     auth-form / passkey-upsell / signed-in liquid partials
+│   ├── tokens/            re-export of @zitadel-nextgen/design-tokens
+│   ├── styles/            shared host styles, focus ring, t() css-var bridge
 │   ├── manifests.ts       per-atom attribute / part / event manifests
 │   └── index.ts           barrel
 ├── tsdown.config.ts       library build (externalises lit/liquidjs/dompurify)
@@ -226,32 +282,44 @@ packages/components/
 
 ## Develop
 
+Use **Nx** for tasks in this monorepo (`corepack pnpm nx <target> <project>`).
+It matches CI caching and dependency order. Equivalent `pnpm --filter …` scripts
+still exist on some packages, but Nx is the documented path.
+
 ```sh
 # install once at the repo root
 corepack pnpm install
 
-# run the playground (atoms + login demo)
-corepack pnpm --filter @zitadel-nextgen/components dev
-# → http://localhost:5174/             playground
+# --- Playgrounds (two terminals) ---
 
-# unit tests (jsdom)
-corepack pnpm --filter @zitadel-nextgen/components test
+# Lit: atoms + login, in-browser MSW
+corepack pnpm nx dev @zitadel-nextgen/components
+# → http://localhost:5173/?route=login
+# → http://localhost:5173/?route=atoms
 
-# browser tests (real Chromium via Playwright; covers form-associated behaviour)
-corepack pnpm --filter @zitadel-nextgen/components test:browser
+# React console: ui-react atom playground (compare to Lit ?route=atoms in another tab)
+corepack pnpm nx dev @zitadel-nextgen/console
+# → http://localhost:5174
 
-# everything
-corepack pnpm --filter @zitadel-nextgen/components test:all
+# Framework demos (TCP mock + SDK) — see apps/demo-*/README.md
+# corepack pnpm nx start @zitadel-nextgen/api-mock   # → http://localhost:4000
+# NEXTGEN_ISSUER_URL=http://localhost:4000 corepack pnpm nx dev @zitadel-nextgen/demo-next  # → :3002
+# NEXTGEN_ISSUER_URL=http://localhost:4000 corepack pnpm nx dev @zitadel-nextgen/demo-nuxt  # → :3001
 
-# type-check
-corepack pnpm --filter @zitadel-nextgen/components typecheck
+# --- Package checks ---
 
-# build the publishable bundle (ESM + .d.mts)
-corepack pnpm --filter @zitadel-nextgen/components build
+corepack pnpm nx test @zitadel-nextgen/components
+corepack pnpm nx test:browser @zitadel-nextgen/components
+corepack pnpm nx typecheck @zitadel-nextgen/components
+corepack pnpm nx build @zitadel-nextgen/components
 ```
 
-The dev server imports source TS straight from `src/` and hot-reloads on edits.
-You only need to run `build` to test the published shape of the bundle.
+The components dev server imports source TS from `src/` and hot-reloads on edits.
+Run `build` when testing the published `dist/` shape (demos and npm consumers).
+
+**Framework demos** need the TCP mock plus a rebuild after orchestrator changes —
+see [`apps/demo-next/README.md`](../../apps/demo-next/README.md) and
+[`apps/demo-nuxt/README.md`](../../apps/demo-nuxt/README.md).
 
 ## Testing strategy
 

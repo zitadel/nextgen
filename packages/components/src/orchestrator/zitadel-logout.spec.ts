@@ -149,7 +149,7 @@ describe("<zitadel-logout>", () => {
     await element.updateComplete;
 
     const signoutEvents: CustomEvent[] = [];
-    element.addEventListener("zitadel-signout", (event) => {
+    element.addEventListener("zitadel-signout", (event: Event) => {
       signoutEvents.push(event as CustomEvent);
     });
 

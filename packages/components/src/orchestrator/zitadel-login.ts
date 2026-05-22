@@ -4,21 +4,29 @@ import type {
   CreateFlow201Step,
   CreateFlowBodyPurpose,
   SubmitFlowStepBody,
+  SubmitFlowStepBodyChallengeResponse,
 } from "@zitadel-nextgen/api/generated/model";
-import { html, LitElement } from "lit";
+import { css, html, LitElement, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import type { Liquid, Template } from "liquidjs";
 
 import "../atoms/index.js";
-import { getCurrentStep, startFlow as apiStartFlow, submitStep as apiSubmitStep } from "./api-client.js";
+import {
+  DEFAULT_SESSION_EXCHANGE_PATH,
+  exchangeSession,
+  getCurrentStep,
+  startFlow as apiStartFlow,
+  submitStep as apiSubmitStep,
+} from "./api-client.js";
 import type { Branding } from "./branding.js";
-import { applyBrandingTokens } from "./branding-to-tokens.js";
+import { applyBaseTokens, applyBrandingTokens } from "./branding-to-tokens.js";
 import { validateBranding } from "./branding-validator.js";
 import { applyFontUrl } from "./font-loader.js";
 import { createLiquidEngine, TEMPLATE_NAMES } from "./liquid.js";
 import { en, type Locale } from "./locales/en.js";
 import { patchMandatoryGates } from "./mandatory-gates.js";
+import { zitadelAttributionPillInnerHtml } from "@zitadel-nextgen/shared-component-styles/attribution-markup";
 import { createSanitiser } from "./sanitiser.js";
 import type { FlowError, LiquidContext } from "./template-context.js";
 import { layoutChromeCss } from "./templates/default.liquid.js";
@@ -31,8 +39,8 @@ import { ThemeController } from "./theme-controller.js";
  * starts a flow, `POST /flow/{id}/submit` advances it. Renders each step
  * through LiquidJS, sanitises the output via DOMPurify, and mounts the
  * result inside a real `<form>` element in its Shadow DOM via Lit's
- * `unsafeHTML` directive. Atom CustomEvents (`zl-input` / `zl-submit` /
- * `zl-action`) and the form's native `submit` event feed back into the
+ * `unsafeHTML` directive. Atom CustomEvents (`zl-input` / `zl-submit`)
+ * and the form's native `submit` event feed back into the
  * submit cycle.
  *
  * Form participation: the orchestrator owns the `<form>` so Enter submits,
@@ -63,6 +71,19 @@ export class ZitadelLogin extends LitElement {
     delegatesFocus: true,
   };
 
+  // Host layout defaults. A bare custom element is inline-level, which makes
+  // it collapse to content width when dropped into a `display: flex` parent
+  // and never reach the orchestrator's intended full-bleed shell. We claim
+  // the page by default; host pages that want to constrain the orchestrator
+  // can still set `width`/`min-height` on the element directly.
+  static override styles = css`
+    :host {
+      display: block;
+      width: 100%;
+      min-height: 100vh;
+    }
+  `;
+
   @property({ type: String }) accessor purpose: CreateFlowBodyPurpose = "login";
 
   @property({ type: String, attribute: "project-id" }) accessor projectId = "";
@@ -78,10 +99,22 @@ export class ZitadelLogin extends LitElement {
   @property({ type: String, attribute: "api-base" }) accessor apiBase = "";
 
   /**
-   * Optional URL to navigate to after a successful sign-in. Used when the
-   * terminal step's `complete` is `"show"` (where there is no canonical
-   * `redirect_uri`). For `complete: "redirect"` the orchestrator follows
-   * `response.redirect_uri` directly.
+   * Path for the handoff exchange request. Defaults to `/sessions/exchange`
+   * and is prefixed with `api-base` when that attribute is set (so
+   * `api-base="/__nextgen"` → `/__nextgen/sessions/exchange`). Any other
+   * value is resolved from `location.origin` instead, so SPAs can route
+   * exchange separately from the flow API (e.g. `/api/auth/exchange`).
+   */
+  @property({ type: String, attribute: "session-exchange-path" })
+  accessor sessionExchangePath = DEFAULT_SESSION_EXCHANGE_PATH;
+
+  /**
+   * URL to navigate to after a successful embedded sign-in. When set, the
+   * orchestrator exchanges the terminal `handoff_token` at the configured
+   * `session-exchange-path` (setting the session cookie) and then performs
+   * a full navigation to this URL so host middleware can observe the cookie.
+   * For `complete: "redirect"` the orchestrator follows `redirect_uri`
+   * instead and does not run the exchange.
    */
   @property({ type: String, attribute: "post-sign-in-url" }) accessor postSignInUrl = "";
 
@@ -131,12 +164,22 @@ export class ZitadelLogin extends LitElement {
       sheet.replaceSync(layoutChromeCss);
       root.adoptedStyleSheets = [...existing, sheet];
       root.addEventListener("zl-input", this.handleAtomInput as EventListener);
+      // <zl-button> dispatches `zl-submit` for both primary submits and
+      // secondary actions; the orchestrator picks the right path based on
+      // the button's `type` and `action`.
       root.addEventListener("zl-submit", this.handleAtomSubmit as EventListener);
-      root.addEventListener("zl-action", this.handleAtomAction as EventListener);
+      root.addEventListener("click", this.handleDelegatedAction as EventListener);
       // Native <form> submit fires on Enter inside any field and after the
       // browser's autofill / save-password handshake. Intercept it so we can
       // hand off to our flow-submit cycle without the page reloading.
       root.addEventListener("submit", this.handleFormSubmit as EventListener);
+      // <zl-passkey> emits `zl-passkey-result` after a successful WebAuthn
+      // ceremony. Auto-submit the proof so the user doesn't have to click
+      // "Continue" — the ceremony IS the submission (ADR 013).
+      root.addEventListener("zl-passkey-result", this.handlePasskeyResult as EventListener);
+      // <zl-passkey> emits `zl-passkey-error` when the ceremony fails or is
+      // cancelled. Surface the error on the current step.
+      root.addEventListener("zl-passkey-error", this.handlePasskeyError as EventListener);
     }
     return root;
   }
@@ -152,39 +195,48 @@ export class ZitadelLogin extends LitElement {
    * fired.
    */
   protected override firstUpdated(): void {
-    void this.startFlow();
+    // Defer so `startFlow()` can set `loading` without scheduling a second
+    // update before Lit finishes this commit (change-in-update warning).
+    queueMicrotask(() => void this.startFlow());
   }
 
-  override willUpdate(): void {
+  override willUpdate(changed: PropertyValues<this>): void {
     if (!this.engine) {
       this.engine = createLiquidEngine({ locale: this.locale });
     }
-  }
-
-  override updated(changed: Map<string, unknown>): void {
     const root = this.shadowRoot;
-    if (!root) return;
-    applyBrandingTokens(root, this.branding, this.themeController.theme);
-    applyFontUrl(root, this.branding?.font_url ?? null);
+    if (root) {
+      applyBaseTokens(root);
+      applyBrandingTokens(root, this.branding, this.themeController.theme);
+      applyFontUrl(root, this.branding?.font_url ?? null);
+    }
     this.dataset.theme = this.themeController.theme;
     this.toggleAttribute("data-theme-dark", this.themeController.theme === "dark");
     this.setAttribute("aria-busy", this.loading ? "true" : "false");
-    this.applyValuesToFields();
-    if (changed.has("response")) {
+  }
+
+  override updated(changed: PropertyValues<this>): void {
+    const props = changed as Map<string, unknown>;
+    if (!props.has("response")) return;
+    // Step markup exists only after this commit; defer field hydration/focus.
+    requestAnimationFrame(() => {
+      this.applyValuesToFields();
       this.moveFocusToFirstField();
-    }
+    });
   }
 
   override render() {
     if (this.startupError) {
       return html`<form class="zl-mount" novalidate>
-        <zl-error message="${this.startupError}"></zl-error>
+        <zl-alert severity="error">${this.startupError}</zl-alert>
       </form>`;
     }
     if (!this.response || !this.engine) {
       return html`<slot name="loader"></slot>`;
     }
-    const rendered = this.renderStep(this.response.step, this.engine);
+    const rendered = this.injectAttribution(
+      this.renderStep(this.response.step, this.engine),
+    );
     return html`<form
       class="zl-mount"
       part="form"
@@ -193,6 +245,48 @@ export class ZitadelLogin extends LitElement {
     >
       ${unsafeHTML(rendered)}
     </form>`;
+  }
+
+  /**
+   * Inject the attribution badge into the rendered template's
+   * `<zl-page-shell>` footer slot. The attribution must live INSIDE the
+   * page-shell so it sits within the 100vh viewport rhythm (matching the
+   * Figma sign-in frame where the pill sits 24px below the card, both
+   * centred on the page). It can't be a sibling of the page-shell because
+   * the page-shell already occupies the full viewport height.
+   */
+  private injectAttribution(rendered: string): string {
+    const html = this.renderAttributionHtml();
+    if (!html) return rendered;
+    if (rendered.includes("</zl-page-shell>")) {
+      return rendered.replace("</zl-page-shell>", `${html}</zl-page-shell>`);
+    }
+    return rendered + html;
+  }
+
+  /**
+   * "Secured with Zitadel" attribution chrome injected into every
+   * template's page-shell footer slot. Controlled by
+   * `branding.attribution.show_zitadel` — defaults to `true` for
+   * community / OSS deployments. Licensed tenants can suppress the badge
+   * entirely or swap it for a `custom_link` value.
+   */
+  private renderAttributionHtml(): string {
+    const attribution = this.branding?.attribution;
+    const show = attribution?.show_zitadel !== false;
+    const custom = attribution?.custom_link;
+    if (!show && !custom) {
+      return "";
+    }
+    if (custom) {
+      const safeHref = String(custom.href).replace(/"/g, "&quot;");
+      const safeLabel = String(custom.label)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+      return `<div slot="footer" part="attribution" class="zl-attribution"><zl-pill tone="neutral" href="${safeHref}">${safeLabel}</zl-pill></div>`;
+    }
+    return `<div slot="footer" part="attribution" class="zl-attribution"><zl-pill tone="neutral" href="https://zitadel.com" part="attribution-pill" aria-label="Secured with Zitadel">${zitadelAttributionPillInnerHtml()}</zl-pill></div>`;
   }
 
   private async startFlow(): Promise<void> {
@@ -227,8 +321,12 @@ export class ZitadelLogin extends LitElement {
     if (issues.length > 0) {
       console.warn("[zitadel-login] branding payload has issues:", issues);
     }
-    this.formValues = collectInitialValues(wire.step);
-    this.maybeCompleteFlow(wire);
+    // Preserve carry-over fields (email captured on the identifier step
+    // is the identity we greet on the signed-in screen) by merging the
+    // next step's defaults *into* the existing values rather than
+    // replacing wholesale.
+    this.formValues = { ...this.formValues, ...collectInitialValues(wire.step) };
+    void this.maybeCompleteFlow(wire);
   }
 
   /**
@@ -237,13 +335,13 @@ export class ZitadelLogin extends LitElement {
    * - `step.complete === "redirect"` — navigate the browser to
    *   `response.redirect_uri` (OIDC/SAML `auth_request_id` resolved). This
    *   takes precedence over `post-sign-in-url`.
-   * - `step.complete === "show"` — render the step as a success screen.
-   *   Optionally navigate to `post-sign-in-url` if the consumer set it.
+   * - `step.complete === "show"` — when `post-sign-in-url` is set, exchange
+   *   the `handoff_token` for a session cookie and navigate there.
    *
-   * In both cases we also fire `zitadel-flow-complete` so SDK consumers can
-   * handle the post-sign-in handoff (`handoff_token`) themselves.
+   * `zitadel-flow-complete` is always emitted so hosts with custom post-sign-in
+   * flows can handle the handoff themselves when `post-sign-in-url` is omitted.
    */
-  private maybeCompleteFlow(response: CreateFlow201): void {
+  private async maybeCompleteFlow(response: CreateFlow201): Promise<void> {
     const behavior = response.step.complete;
     if (!behavior) return;
 
@@ -262,11 +360,21 @@ export class ZitadelLogin extends LitElement {
 
     if (typeof window === "undefined") return;
     if (behavior === "redirect" && response.redirect_uri) {
-      window.location.href = response.redirect_uri;
+      window.location.assign(response.redirect_uri);
       return;
     }
-    if (behavior === "show" && this.postSignInUrl) {
-      window.location.href = this.postSignInUrl;
+
+    const handoffToken = response.handoff_token;
+    if (behavior === "show" && handoffToken && this.postSignInUrl) {
+      this.loading = true;
+      try {
+        await exchangeSession({ handoff_token: handoffToken }, this.sessionExchangePath);
+        window.location.assign(this.postSignInUrl);
+      } catch (error) {
+        this.handleTransportError(error);
+      } finally {
+        this.loading = false;
+      }
     }
   }
 
@@ -277,7 +385,11 @@ export class ZitadelLogin extends LitElement {
         ? this.branding.liquid_template
         : null;
 
-    const errors: FlowError[] = step.error ? [{ message: step.error }] : [];
+    const errors: FlowError[] = step.error
+      ? step.error.startsWith("error.")
+        ? [{ text_key: step.error }]
+        : [{ message: step.error }]
+      : [];
 
     const context: LiquidContext = {
       step: {
@@ -289,8 +401,9 @@ export class ZitadelLogin extends LitElement {
       actions: step.actions ?? {},
       gates: step.gates ?? {},
       sso_providers: step.sso_providers ?? [],
+      challenge: step.challenge ?? null,
       messages: [],
-      identity: null,
+      identity: this.deriveIdentity(),
       errors,
       branding: this.branding ?? {},
       loading: this.loading,
@@ -313,12 +426,31 @@ export class ZitadelLogin extends LitElement {
       try {
         raw = engine.renderFileSync(TEMPLATE_NAMES.default, context);
       } catch {
-        return `<zl-error message="We couldn't render this step."></zl-error>`;
+        return `<zl-alert severity="error">We couldn't render this step.</zl-alert>`;
       }
     }
 
     const patched = patchMandatoryGates(raw, step, this.locale);
     return this.sanitise(patched);
+  }
+
+  /**
+   * Build a `FlowIdentity` from the orchestrator's captured form values so
+   * the signed-in template can greet the user by email without the API
+   * having to round-trip identity claims. Email comes from the
+   * identifier step; display name composes from `given_name` /
+   * `family_name` when the register step ran.
+   */
+  private deriveIdentity(): import("./template-context.js").FlowIdentity | null {
+    const email = this.formValues.email?.trim();
+    const given = this.formValues.given_name?.trim();
+    const family = this.formValues.family_name?.trim();
+    const display = [given, family].filter(Boolean).join(" ").trim();
+    if (!email && !display) return null;
+    return {
+      ...(email ? { email_address: email } : {}),
+      ...(display ? { display_name: display } : email ? { display_name: email } : {}),
+    };
   }
 
   private applyValuesToFields(): void {
@@ -328,8 +460,10 @@ export class ZitadelLogin extends LitElement {
     if (fields.length === 0) return;
     for (const field of fields) {
       const name = field.getAttribute("name");
-      if (name && name in this.formValues) {
-        field.value = this.formValues[name];
+      if (!name || !(name in this.formValues)) continue;
+      const next = this.formValues[name];
+      if (field.value !== next) {
+        field.value = next;
       }
     }
   }
@@ -349,7 +483,18 @@ export class ZitadelLogin extends LitElement {
   };
 
   private handleAtomSubmit = (event: CustomEvent<{ action: string | null }>): void => {
+    if (this.loading) return;
     void this.submit(event.detail?.action ?? null);
+  };
+
+  /** Secondary navigation rows (`data-action` on `.zl-card-nav__link`). */
+  private handleDelegatedAction = (event: Event): void => {
+    const target = (event.target as HTMLElement | null)?.closest<HTMLElement>("[data-action]");
+    if (!target || target.closest("zl-button") || this.loading) return;
+    const action = target.getAttribute("data-action");
+    if (!action) return;
+    event.preventDefault();
+    void this.submit(action);
   };
 
   private handleFormSubmit = (event: SubmitEvent): void => {
@@ -360,55 +505,100 @@ export class ZitadelLogin extends LitElement {
     // `submitter` is the button that triggered the submit. When the user
     // pressed Enter inside a `<zl-field>`, the field calls
     // `form.requestSubmit()` with no submitter, so we fall back to the first
-    // `<zl-submit>`'s action (the step's primary action).
+    // primary `<zl-button>`'s action (the step's primary action).
     const submitter = event.submitter as HTMLElement | null;
     const explicit = submitter?.getAttribute?.("action") ?? null;
     const action = explicit ?? this.findPrimaryAction();
     void this.submit(action);
   };
 
+  /**
+   * Handle a successful WebAuthn ceremony. Auto-submit with the proof
+   * as `challenge_response` so the flow advances without extra user
+   * interaction — the ceremony IS the factor verification (ADR 013).
+   */
+  private handlePasskeyResult = (
+    event: CustomEvent<{ challenge_id: string; method: string; proof: Record<string, unknown> }>,
+  ): void => {
+    if (this.loading) return;
+    const { challenge_id, method, proof } = event.detail;
+    void this.submit("submit", {
+      challenge_id,
+      method,
+      proof,
+    });
+  };
+
+  /**
+   * Handle a WebAuthn ceremony error. Re-render the current step with
+   * an error message so the user sees feedback and can retry or skip.
+   *
+   * Guard: if the step already carries the same error key, skip the update.
+   * Mutating `this.response` triggers `unsafeHTML` to replace the DOM tree,
+   * which reconnects a fresh `<zl-passkey>` that immediately re-starts the
+   * ceremony — creating an infinite loop. The guard breaks the cycle.
+   *
+   * We also strip the `challenge` from the step so the template does not
+   * render a new `<zl-passkey>` on re-render. Without this, the first
+   * cancel would trigger a second ceremony (the guard prevents a third).
+   */
+  private handlePasskeyError = (
+    event: CustomEvent<{ challenge_id: string; error: string; aborted: boolean }>,
+  ): void => {
+    if (!this.response) return;
+    const { error: message, aborted } = event.detail;
+    const errorKey = aborted ? "error.passkey_cancelled" : "error.passkey_failed";
+    if (this.response.step.error === errorKey) return;
+    const { challenge: _dropped, ...stepWithoutChallenge } = this.response.step;
+    this.response = {
+      ...this.response,
+      step: { ...stepWithoutChallenge, error: errorKey },
+    };
+    console.warn(`[zitadel-login] passkey ceremony ${aborted ? "cancelled" : "failed"}: ${message}`);
+  };
+
   private findPrimaryAction(): string | null {
     const root = this.shadowRoot;
     if (!root) return null;
-    const submit = root.querySelector("zl-submit");
-    return submit?.getAttribute("action") || null;
+    const primary = root.querySelector('zl-button[hierarchy="primary"][type="submit"]') ??
+      root.querySelector('zl-button[hierarchy="primary"]');
+    return primary?.getAttribute("action") || null;
   }
 
   private moveFocusToFirstField(): void {
     const root = this.shadowRoot;
     if (!root) return;
     requestAnimationFrame(() => {
-      const focusables = root.querySelectorAll<HTMLElement>(
-        "zl-field, zl-action, zl-submit",
-      );
+      const focusables = root.querySelectorAll<HTMLElement>("zl-field, zl-button");
       const target = Array.from(focusables).find((el) => !el.hasAttribute("disabled"));
       target?.focus();
     });
   }
 
-  private handleAtomAction = (event: CustomEvent<{ action: string | null }>): void => {
-    const action = event.detail?.action ?? null;
-    this.dispatchEvent(
-      new CustomEvent("zitadel-flow-action", {
-        bubbles: true,
-        composed: true,
-        detail: { action },
-      }),
-    );
-    if (action) {
-      void this.submit(action);
-    }
-  };
-
-  private async submit(action: string | null): Promise<void> {
-    if (!this.response) return;
+  private async submit(
+    action: string | null,
+    challengeResponse?: SubmitFlowStepBodyChallengeResponse,
+  ): Promise<void> {
+    if (!this.response || this.loading) return;
     const { id, session_token } = this.response;
     this.loading = true;
     try {
+      // Only send field values that the current step defines. `formValues`
+      // carries state across steps (e.g. email for the signed-in greeting)
+      // but steps without fields should not leak prior values onto the wire.
+      const stepFieldKeys = Object.keys(this.response.step.fields ?? {});
+      const fields: Record<string, string> = {};
+      for (const key of stepFieldKeys) {
+        const value = this.formValues[key];
+        if (value !== undefined) {
+          fields[key] = value;
+        }
+      }
       const body: SubmitFlowStepBody = {
         session_token,
         action: action ?? "submit",
-        fields: { ...this.formValues },
+        fields,
+        ...(challengeResponse ? { challenge_response: challengeResponse } : {}),
       };
       const wire = await apiSubmitStep(id, body);
       this.applyResponse(wire);
