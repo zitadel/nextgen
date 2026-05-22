@@ -16,15 +16,19 @@ export type SyncAction =
 
 async function readJsonDir(dirPath: string): Promise<Map<string, object>> {
   const result = new Map<string, object>();
+  let entries: string[];
   try {
-    const entries = await readdir(dirPath);
-    for (const entry of entries.filter((e) => e.endsWith(".json"))) {
-      const filePath = join(dirPath, entry);
-      const raw = await readFile(filePath, "utf8");
-      result.set(filePath, JSON.parse(raw) as object);
+    entries = await readdir(dirPath);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      return result;
     }
-  } catch {
-    // directory doesn't exist — return empty map
+    throw err;
+  }
+  for (const entry of entries.filter((e) => e.endsWith(".json"))) {
+    const filePath = join(dirPath, entry);
+    const raw = await readFile(filePath, "utf8");
+    result.set(filePath, JSON.parse(raw) as object);
   }
   return result;
 }
@@ -84,11 +88,9 @@ export async function buildSyncPlan(
       }
 
       let oldContent: object | null = null;
-      consola.debug(`plan update ${syncer.kind} ${entry.id}: client=${!!client} hasFetch=${!!syncer.fetch}`);
       if (client && syncer.fetch) {
         try {
           oldContent = await syncer.fetch(client, entry.id);
-          consola.debug(`fetch ${syncer.kind} ${entry.id} ok: oldContent keys=${Object.keys(oldContent ?? {}).join(",")}`);
         } catch (err) {
           consola.debug(`fetch ${syncer.kind} ${entry.id} failed:`, err);
         }
