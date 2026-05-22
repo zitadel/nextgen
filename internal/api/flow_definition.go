@@ -21,10 +21,11 @@ func (h Handler) CreateFlowDefinition(ctx context.Context, req *api.CreateFlowDe
 		}, nil
 	}
 
+	userSchemaURI := definition.GetUserSchema()
 	svcReq := service.CreateFlowDefinitionRequest{
 		ProjectID:         string(req.GetProjectID()),
 		Name:              definition.GetName(),
-		UserSchema:        definition.GetUserSchema(),
+		UserSchema:        userSchemaURI.String(),
 		RawFlowDefinition: rawFlowDefinition,
 	}
 	purposes, err := mapPurposesToDomain(definition)
@@ -38,7 +39,8 @@ func (h Handler) CreateFlowDefinition(ctx context.Context, req *api.CreateFlowDe
 
 	reqFlowSchemaURI, ok := req.GetSchemaURI().Get()
 	if ok {
-		svcReq.FlowSchemaURI = url.URL(reqFlowSchemaURI)
+		u := (url.URL)(reqFlowSchemaURI)
+		svcReq.FlowSchemaURI = u.String()
 	}
 
 	if reqAudience, ok := definition.GetAudience().Get(); ok {
@@ -83,10 +85,11 @@ func flowDefinitionSuccessResponse(flowDefinition *domain.FlowDefinition, schema
 	steps := mapDomainStepsToAPI(flowDefinition.Steps)
 
 	parsedSchemaURI, _ := url.Parse(schemaURI)
+	userSchemaURI, _ := url.Parse(flowDefinition.UserSchema)
 
 	return &api.FlowDefinitionDetailResponse{
 		Name:       flowDefinition.Name,
-		UserSchema: flowDefinition.UserSchema,
+		UserSchema: gu.Value(userSchemaURI),
 		Purposes:   purposes,
 		Audience:   audience,
 		Steps:      steps,

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/url"
 	"time"
 
 	"github.com/ianlancetaylor/jsonschema"
@@ -38,9 +37,9 @@ type flowDefinitionValidatorFunc func(userSchema *jsonschema.Schema, flowDefinit
 type CreateFlowDefinitionRequest struct {
 	ProjectID         string
 	Name              string
-	SchemaVersion     string  // todo: currently empty as the request does not contain schema version
-	FlowSchemaURI     url.URL // todo: schema_version (semver) stored in the db vs schema_uri needed for validation
-	UserSchema        url.URL
+	SchemaVersion     string // todo: currently empty as the request does not contain schema version
+	FlowSchemaURI     string // todo: schema_version (semver) stored in the db vs schema_uri needed for validation
+	UserSchema        string
 	Purposes          map[domain.FlowDefinitionPurpose]string
 	Audience          domain.FlowDefinitionAudience
 	Steps             []domain.FlowDefinitionStep
@@ -107,8 +106,8 @@ func (fd *flowDefinitionService) Create(ctx context.Context, req CreateFlowDefin
 		Audience:      req.Audience,
 		Steps:         req.Steps,
 	}
-	// if wantFlowSchemaURI is empty, use the latest flow definition schema from the builtin schema provider
-	flowSchemaURI := req.FlowSchemaURI.String()
+	// if req.FlowSchemaURI is empty, use the latest flow definition schema from the builtin schema provider
+	flowSchemaURI := req.FlowSchemaURI
 	if flowSchemaURI == "" {
 		flowSchemaURI, err = fd.builtinSchemaProvider.LatestSchemaURI(domain.SchemaKindFlowDefinition)
 		if err != nil {
@@ -138,7 +137,7 @@ func (fd *flowDefinitionService) Validate(ctx context.Context, flowDefinition do
 	}
 
 	// resolve the user schema from the user schema URI; todo: resolve from cache/db, not via http fetch
-	userSchema, err := fd.schemaResolver.Resolve(ctx, fd.db, flowDefinition.ProjectID, flowDefinition.UserSchema.String(), nil)
+	userSchema, err := fd.schemaResolver.Resolve(ctx, fd.db, flowDefinition.ProjectID, flowDefinition.UserSchema, nil)
 	if err != nil {
 		return domain.ErrSchemaFetchFailed("failed to resolve tenant user schema", err)
 	}
