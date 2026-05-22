@@ -79,16 +79,19 @@ export interface ProxyOptions {
 	readonly upstreamUrl: string;
 	/** HTTP method to use for the upstream request. */
 	readonly method: string;
-	/** Headers to send to the upstream (already filtered/rewritten by the caller). */
+	/**
+	 * Headers to send upstream. RFC 7230 hop-by-hop headers are always
+	 * stripped automatically; use {@link stripResponseHeaders} for any
+	 * additional headers to remove from the upstream response.
+	 */
 	readonly requestHeaders: Headers;
 	/** Serialised request body. Omit entirely for GET/HEAD requests. */
 	readonly body?: string;
 	/**
-	 * Optional hook applied to the upstream response headers before they are
-	 * included in the returned {@link Response}. Use this to strip hop-by-hop
-	 * or other unwanted outbound headers.
+	 * Additional response headers to strip beyond the RFC 7230 hop-by-hop
+	 * set, which is always removed automatically from the upstream response.
 	 */
-	readonly filterResponseHeaders?: (headers: Headers) => Headers;
+	readonly stripResponseHeaders?: ReadonlySet<string>;
 	/** Replaceable fetch implementation — useful for injecting test doubles. */
 	readonly fetchImpl?: typeof fetch;
 	/**
@@ -101,16 +104,19 @@ export interface ProxyOptions {
 /**
  * Generic HTTP reverse-proxy kernel.
  *
- * Sends `options.requestHeaders` and an optional `options.body` to
- * `options.upstreamUrl` using `options.method`, then returns a {@link Response}
- * whose body is streamed directly from the upstream. Response headers are
- * optionally transformed by `options.filterResponseHeaders` before being
- * forwarded to the caller.
+ * RFC 7230 hop-by-hop headers are stripped automatically from both the
+ * outgoing request and the incoming response. Additional response headers
+ * can be removed via {@link ProxyOptions.stripResponseHeaders}.
+ *
+ * The upstream response body is streamed back to the caller unchanged.
  */
 export async function proxy(options: ProxyOptions): Promise<Response> {
 	const fetchImpl = options.fetchImpl ?? fetch;
 
-	const init: RequestInit = { method: options.method, headers: options.requestHeaders };
+	const reqHopByHop = effectiveHopByHopHeaders(options.requestHeaders);
+	const filteredReq = filterHeaders(options.requestHeaders, reqHopByHop);
+
+	const init: RequestInit = { method: options.method, headers: filteredReq };
 	if (options.body !== undefined) {
 		init.body = options.body;
 	}
@@ -119,14 +125,15 @@ export async function proxy(options: ProxyOptions): Promise<Response> {
 
 	options.onDebug?.(options.upstreamUrl, upstream.status);
 
-	const headers =
-		options.filterResponseHeaders !== undefined
-			? options.filterResponseHeaders(upstream.headers)
-			: upstream.headers;
+	const resHopByHop = effectiveHopByHopHeaders(upstream.headers);
+	const resStrip = options.stripResponseHeaders
+		? new Set([...resHopByHop, ...options.stripResponseHeaders])
+		: resHopByHop;
+	const filteredRes = filterHeaders(upstream.headers, resStrip);
 
 	return new Response(upstream.body, {
 		status: upstream.status,
 		statusText: upstream.statusText,
-		headers,
+		headers: filteredRes,
 	});
 }

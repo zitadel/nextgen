@@ -1,6 +1,5 @@
 import { injectSystemPrompt } from "./inject.js";
 import { callClaude, type ClaudeAuth } from "./lib/claude.js";
-import { effectiveHopByHopHeaders, filterHeaders } from "./lib/proxy.js";
 import { isPlainObject, tryParseJson } from "./utils/json.js";
 
 export type { ClaudeAuth } from "./lib/claude.js";
@@ -8,13 +7,22 @@ export type { ClaudeAuth } from "./lib/claude.js";
 const ANTHROPIC_API_VERSION_PREFIX = "v1";
 const MESSAGES_ENDPOINT = "messages";
 
-const INBOUND_RESERVED_HEADERS: ReadonlySet<string> = new Set([
+/**
+ * Inbound request headers to strip before gateway auth is applied.
+ * These are gateway-specific concerns — not generic hop-by-hop headers,
+ * which the underlying proxy handles automatically.
+ */
+const STRIP_REQUEST_HEADERS: ReadonlySet<string> = new Set([
 	"authorization",
 	"host",
 	"content-length",
 ]);
 
-const OUTBOUND_RESERVED_HEADERS: ReadonlySet<string> = new Set([
+/**
+ * Upstream response headers to strip in addition to the RFC 7230
+ * hop-by-hop set, which the underlying proxy removes automatically.
+ */
+const STRIP_RESPONSE_HEADERS: ReadonlySet<string> = new Set([
 	"content-encoding",
 	"content-length",
 ]);
@@ -76,18 +84,6 @@ export function prepareBody(
 	return { mutatedBody: parsed.value, serialised: rawJson };
 }
 
-/** Compute the inbound strip set: RFC 7230 hop-by-hop ∪ Connection ∪ reserved. */
-function inboundStripSet(input: Headers): ReadonlySet<string> {
-	const hopByHop = effectiveHopByHopHeaders(input);
-	return new Set([...hopByHop, ...INBOUND_RESERVED_HEADERS]);
-}
-
-/** Compute the outbound strip set: RFC 7230 hop-by-hop ∪ Connection ∪ reserved. */
-function outboundStripSet(input: Headers): ReadonlySet<string> {
-	const hopByHop = effectiveHopByHopHeaders(input);
-	return new Set([...hopByHop, ...OUTBOUND_RESERVED_HEADERS]);
-}
-
 /**
  * Forward an inbound `/v1/...` request to `https://api.anthropic.com/v1/...`,
  * mutating the system prompt for `/v1/messages` and rewriting authentication
@@ -120,7 +116,6 @@ export async function forward(args: {
 	const hasBody = method !== "GET" && method !== "HEAD";
 	const pathParts = extractV1PathSegments(args.pathname);
 	const rawBody = hasBody ? await args.request.text() : undefined;
-	const filtered = filterHeaders(args.request.headers, inboundStripSet(args.request.headers));
 
 	let capturedMutatedBody: unknown;
 	const onBody =
@@ -140,10 +135,11 @@ export async function forward(args: {
 		pathSegments: pathParts,
 		search: args.search,
 		method,
-		requestHeaders: filtered,
+		requestHeaders: args.request.headers,
+		stripRequestHeaders: STRIP_REQUEST_HEADERS,
 		body: rawBody,
 		onBody,
-		filterResponseHeaders: (h) => filterHeaders(h, outboundStripSet(h)),
+		stripResponseHeaders: STRIP_RESPONSE_HEADERS,
 		fetchImpl: args.fetchImpl,
 		onDebug: args.onDebug
 			? (url, status) => {

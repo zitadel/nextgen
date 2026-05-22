@@ -1,5 +1,5 @@
 import { jsonResponse } from "../utils/response.js";
-import { proxy } from "./proxy.js";
+import { filterHeaders, proxy } from "./proxy.js";
 
 const ANTHROPIC_API_ORIGIN = "https://api.anthropic.com";
 const ANTHROPIC_API_VERSION_PREFIX = "v1";
@@ -85,10 +85,20 @@ export interface ClaudeOptions {
 	/** HTTP method to use for the upstream request. */
 	readonly method: string;
 	/**
-	 * Inbound headers already stripped of hop-by-hop and reserved headers.
-	 * Auth headers are added by {@link callClaude} — do not set them here.
+	 * Raw inbound headers. Business-specific headers (e.g. `authorization`,
+	 * `host`) are stripped via {@link stripRequestHeaders} before gateway auth
+	 * is applied. RFC 7230 hop-by-hop headers are stripped automatically by
+	 * the underlying proxy.
 	 */
 	readonly requestHeaders: Headers;
+	/**
+	 * Request headers to remove before gateway auth is applied. Use this for
+	 * headers whose inbound values must not reach the upstream — for example,
+	 * a client-supplied `Authorization` that the gateway replaces with its own
+	 * credential. Stripped before {@link auth} is written, so gateway auth
+	 * headers are never themselves removed.
+	 */
+	readonly stripRequestHeaders?: ReadonlySet<string>;
 	/** Pre-serialised request body. Omit for GET/HEAD requests. */
 	readonly body?: string;
 	/**
@@ -98,10 +108,10 @@ export interface ClaudeOptions {
 	 */
 	readonly onBody?: (body: string) => string | null;
 	/**
-	 * Optional hook applied to the upstream response headers before they are
-	 * included in the returned {@link Response}.
+	 * Additional response headers to strip beyond the RFC 7230 hop-by-hop set,
+	 * which is always removed automatically by the underlying proxy.
 	 */
-	readonly filterResponseHeaders?: (headers: Headers) => Headers;
+	readonly stripResponseHeaders?: ReadonlySet<string>;
 	/** Replaceable fetch implementation — useful for injecting test doubles. */
 	readonly fetchImpl?: typeof fetch;
 	/**
@@ -112,9 +122,9 @@ export interface ClaudeOptions {
 }
 
 /**
- * Generic Claude API client. Builds the upstream URL, applies auth headers,
- * optionally transforms the request body via `onBody`, and delegates the
- * actual HTTP call to {@link proxy}.
+ * Generic Claude API client. Builds the upstream URL, strips caller-specified
+ * request headers, applies auth, optionally transforms the body via `onBody`,
+ * and delegates the actual HTTP call to {@link proxy}.
  *
  * @param options - Call options; see {@link ClaudeOptions}.
  * @returns A {@link Response} from the upstream, or a `400` response when
@@ -122,7 +132,13 @@ export interface ClaudeOptions {
  */
 export async function callClaude(options: ClaudeOptions): Promise<Response> {
 	const upstreamUrl = buildUpstreamUrl(options.pathSegments, options.search);
-	const upstreamHeaders = applyAuth(options.requestHeaders, options.auth);
+
+	// Strip business-specific request headers first, then apply gateway auth
+	// so that the gateway's own auth headers are never inadvertently removed.
+	const strippedHeaders = options.stripRequestHeaders
+		? filterHeaders(options.requestHeaders, options.stripRequestHeaders)
+		: options.requestHeaders;
+	const upstreamHeaders = applyAuth(strippedHeaders, options.auth);
 
 	let finalBody: string | undefined;
 
@@ -140,7 +156,7 @@ export async function callClaude(options: ClaudeOptions): Promise<Response> {
 		method: options.method,
 		requestHeaders: upstreamHeaders,
 		body: finalBody,
-		filterResponseHeaders: options.filterResponseHeaders,
+		stripResponseHeaders: options.stripResponseHeaders,
 		fetchImpl: options.fetchImpl,
 		onDebug: options.onDebug,
 	});

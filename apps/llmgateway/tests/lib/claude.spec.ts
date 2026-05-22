@@ -390,8 +390,43 @@ describe("callClaude — onDebug", () => {
 	});
 });
 
-describe("callClaude — filterResponseHeaders", () => {
-	it("applies filterResponseHeaders to the upstream response", async () => {
+describe("callClaude — stripRequestHeaders", () => {
+	it("strips specified request headers before forwarding", async () => {
+		const { fetchImpl, calls } = buildFetchMock({ status: 200 });
+
+		await callClaude({
+			auth: API_KEY_AUTH,
+			pathSegments: ["messages"],
+			search: "",
+			method: "GET",
+			requestHeaders: new Headers({ "x-to-strip": "drop-me", "x-to-keep": "keep-me" }),
+			stripRequestHeaders: new Set(["x-to-strip"]),
+			fetchImpl,
+		});
+
+		expect(sentHeaders(calls).has("x-to-strip")).toBe(false);
+		expect(sentHeaders(calls).get("x-to-keep")).toBe("keep-me");
+	});
+
+	it("strips client auth before applying gateway auth so gateway auth survives", async () => {
+		const { fetchImpl, calls } = buildFetchMock({ status: 200 });
+
+		await callClaude({
+			auth: OAUTH_AUTH,
+			pathSegments: ["messages"],
+			search: "",
+			method: "GET",
+			requestHeaders: new Headers({ authorization: "Bearer client-token" }),
+			stripRequestHeaders: new Set(["authorization"]),
+			fetchImpl,
+		});
+
+		expect(sentHeaders(calls).get("authorization")).toBe("Bearer oauth-token");
+	});
+});
+
+describe("callClaude — stripResponseHeaders", () => {
+	it("strips specified response headers in addition to hop-by-hop", async () => {
 		const { fetchImpl } = buildFetchMock({
 			status: 200,
 			body: "{}",
@@ -408,11 +443,7 @@ describe("callClaude — filterResponseHeaders", () => {
 			method: "GET",
 			requestHeaders: new Headers(),
 			fetchImpl,
-			filterResponseHeaders: (headers) => {
-				const out = new Headers(headers);
-				out.delete("x-should-strip");
-				return out;
-			},
+			stripResponseHeaders: new Set(["x-should-strip"]),
 		});
 
 		expect(res.headers.has("x-should-strip")).toBe(false);
