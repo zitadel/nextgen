@@ -94,3 +94,21 @@ place. No npm publishing workflow is enabled yet.
 ### Local development
 
 The devcontainer at [.devcontainer/](.devcontainer/) pins Go 1.26 and a PostgreSQL sidecar.
+
+After changing devcontainer configuration, use **Dev Containers: Rebuild Container** so features and volume mounts apply.
+
+**Docker (Spanner integration tests)** — the devcontainer reuses the host Docker daemon (Docker-outside-of-Docker) so testcontainers can start the Cloud Spanner emulator. Verify inside the container:
+
+```sh
+docker info
+```
+
+Run Spanner repository tests (same command as CI):
+
+```sh
+go test -v -tags spanner_integration -timeout=10m ./internal/storage/database/repository/...
+```
+
+If `docker info` fails and the host uses **rootless Docker**, override the socket mount in [`.devcontainer/devcontainer.json`](.devcontainer/devcontainer.json) per the [docker-outside-of-docker feature docs](https://github.com/devcontainers/features/tree/main/src/docker-outside-of-docker#rootless-docker-support), for example bind `/run/user/<uid>/docker.sock` to `/var/run/docker-host.sock` (use `id -u` on the host for `<uid>`).
+
+To use an emulator you start yourself instead of testcontainers, set `ZITADEL_TEST_SPANNER_URL` to the Spanner DSN; tests skip container startup when that variable is set.
