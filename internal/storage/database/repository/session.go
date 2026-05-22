@@ -16,9 +16,9 @@ import (
 )
 
 const (
-	pgTableSessions    = "zitadel_nextgen.sessions"
-	pgTableUserAgents  = "zitadel_nextgen.user_agents"
-	pgTableChecks      = "zitadel_nextgen.checks"
+	pgTableSessions     = "zitadel_nextgen.sessions"
+	pgTableUserAgents   = "zitadel_nextgen.user_agents"
+	pgTableChecks       = "zitadel_nextgen.checks"
 	pgTableAuthAttempts = "zitadel_nextgen.auth_attempts"
 
 	spannerTableSessions     = "sessions"
@@ -137,9 +137,9 @@ func (r *sessionRepository) List(ctx context.Context, q database.QueryExecutor, 
 func (r *sessionRepository) Delete(ctx context.Context, q database.QueryExecutor, projectID, sessionID string) error {
 	cond := database.And(
 		database.NewTextCondition(database.NewColumn(r.meta.tableName, "project_id"), database.TextOperationEqual, projectID),
-		database.NewTextCondition(database.NewColumn(r.meta.tableName, "id"), database.TextOperationEqual, sessionID),
+		database.NewTextCondition(database.NewColumn(r.meta.tableName, "id"), database.TextOperationEqual, database.Identity(sessionID)),
 	)
-	n, err := deleteOne[*sessionMeta](ctx, q, &r.meta, cond)
+	n, err := deleteOne(ctx, q, &r.meta, cond)
 	if err != nil {
 		return err
 	}
@@ -151,8 +151,7 @@ func (r *sessionRepository) Delete(ctx context.Context, q database.QueryExecutor
 
 func (r *sessionRepository) Exchange(ctx context.Context, q database.QueryExecutor, projectID, handoffToken string, _ *string, ttl time.Duration) (*domain.Session, error) {
 	var result *domain.Session
-	err := withTransaction(ctx, q, func(ctx context.Context, tx database.QueryExecutor) error {
-		var err error
+	err := withTransaction(ctx, q, func(ctx context.Context, tx database.QueryExecutor) (err error) {
 		result, err = r.exchange(ctx, tx, projectID, handoffToken, ttl)
 		return err
 	})
