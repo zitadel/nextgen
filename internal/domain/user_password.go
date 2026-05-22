@@ -9,7 +9,7 @@ import (
 )
 
 func ErrUserPasswordInvalid() Error {
-	return newError("user.password.invalid", "The password is invalid", nil, nil)
+	return newError("user.password_invalid", "The password provided is invalid.", nil, nil)
 }
 
 type UserPassword struct {
