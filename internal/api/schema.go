@@ -42,7 +42,7 @@ func (h *Handler) CreateSchema(ctx context.Context, req api.CreateSchemaReq, par
 		}
 		return &api.CreateSchemaResponse{ID: schema.URL}, nil
 	default:
-		return nil, UnknownSchemaKindError
+		return nil, unknownSchemaKindError
 	}
 }
 
@@ -79,4 +79,4 @@ func schemaErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 	}
 }
 
-var UnknownSchemaKindError = errors.New("unknown kind of schema")
+var unknownSchemaKindError = errors.New("unknown kind of schema")
