@@ -30,6 +30,7 @@ func TestCreateSchema(t *testing.T) {
 				name:   "user-schema in body",
 				schema: harness.Schemas.CreateSchemaRequestUserSchema,
 			},
+			// TODO: add this test case once we have a public github-repo from which to get a schema
 			//{
 			//	name: "user-schema by url",
 			//	req:  harness.Schemas.CreateSchemaRequestUserSchemaByUrl,
