@@ -597,13 +597,15 @@ func (r *sessionRepository) exchange(ctx context.Context, q database.QueryExecut
 		database.NewTextCondition(database.NewColumn(r.meta.tableName, "project_id"), database.TextOperationEqual, projectID),
 		database.NewTextCondition(database.NewColumn(r.meta.tableName, "id"), database.TextOperationEqual, targetSession.ID),
 	)
-	if _, err := updateOne[*sessionMeta](ctx, q, &r.meta, cond, changes...); err != nil {
+	if _, err := updateOne(ctx, q, &r.meta, cond, changes...); err != nil {
 		return nil, fmt.Errorf("%w: %v", domain.ErrSessionExchangeConflict(), err)
 	}
 
 	if err := attemptRepo.Delete(ctx, q, projectID, attempt.ID); err != nil {
 		return nil, fmt.Errorf("%w: %v", domain.ErrSessionExchangeConflict(), err)
 	}
+
+	// TODO(adlerhurst): create a new session token and update the session (set the token_id to the new token and return it in the session), to prevent session fixation attacks.
 
 	return r.Get(ctx, q, projectID, targetSession.ID)
 }
