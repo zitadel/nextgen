@@ -1,0 +1,10 @@
+{
+	"extends": "../../tsconfig.base.json",
+	"compilerOptions": {
+		"outDir": "dist",
+		"tsBuildInfoFile": "dist/tsconfig.app.tsbuildinfo",
+		"types": ["node"]
+	},
+	"include": ["src/**/*.ts", "api/**/*.ts"],
+	"exclude": ["src/**/*.spec.ts", "tests/**/*", "dist", "node_modules", ".vercel"]
+}

@@ -47,8 +47,10 @@ catalog:
   msw: ^2.14.6
   nx: ^22.7.0
   orval: ^8.10.0
+  "@anthropic-ai/sdk": ^0.93.0
   oxfmt: ^0.46.0
   oxlint: ^1.61.0
+  vercel: ^48.0.0
   playwright: ^1.59.1
   react: ^19.2.5
   react-dom: ^19.2.5

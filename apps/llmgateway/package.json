@@ -1,0 +1,31 @@
+{
+	"name": "@zitadel-nextgen/llmgateway",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"build": "echo 'Production build is handled by Vercel; run vercel deploy instead.'",
+		"dev": "vercel dev",
+		"typecheck": "tsc --noEmit",
+		"test": "vitest run --exclude tests/e2e/**",
+		"test:watch": "vitest --exclude tests/e2e/**",
+		"test:e2e": "vitest run tests/e2e",
+		"lint": "oxlint",
+		"format": "oxfmt .",
+		"format:check": "oxfmt --check .",
+		"deploy": "vercel deploy --prod",
+		"deploy:preview": "vercel deploy"
+	},
+	"devDependencies": {
+		"@anthropic-ai/sdk": "catalog:",
+		"@types/node": "catalog:",
+		"oxfmt": "catalog:",
+		"oxlint": "catalog:",
+		"typescript": "catalog:",
+		"vercel": "catalog:",
+		"vitest": "catalog:"
+	},
+	"nx": {
+		"projectType": "application"
+	}
+}
