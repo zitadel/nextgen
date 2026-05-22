@@ -63,6 +63,14 @@ export const passkeyUpsellTemplate = String.raw`
     {% endfor %}
 
     {% mandatory_gates %}
+
+    {% if challenge and challenge.method == "passkey" %}
+      <zl-passkey
+        ceremony="{{ challenge.options.ceremony | default: 'register' }}"
+        challenge-id="{{ challenge.challenge_id }}"
+        options='{{ challenge.options | json }}'
+      ></zl-passkey>
+    {% endif %}
   </zl-card>
 </zl-page-shell>
 `;

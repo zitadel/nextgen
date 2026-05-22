@@ -320,4 +320,128 @@ describe("<zitadel-login> against the typed Flow API", () => {
       body: { purpose: "login", project_id: "demo-project" },
     });
   });
+
+  it("auto-submits challenge_response when zl-passkey-result is dispatched", async () => {
+    const element = await mount(host);
+
+    // Navigate to the passkey-login step by submitting action: "passkey"
+    element.shadowRoot?.dispatchEvent(
+      new CustomEvent("zl-submit", {
+        bubbles: true,
+        composed: true,
+        detail: { action: "passkey" },
+      }),
+    );
+
+    // Wait for the passkey-login step (which contains a challenge)
+    await waitFor(() => {
+      const submits = mock.getCaptured().filter(
+        (req): req is Extract<CapturedRequest, { kind: "submitFlowStep" }> =>
+          req.kind === "submitFlowStep",
+      );
+      return submits.some((s) => s.body.action === "passkey") ? submits : null;
+    });
+
+    // Simulate a successful WebAuthn ceremony by dispatching zl-passkey-result
+    const mockProof = {
+      id: "cred_mock_123",
+      rawId: "Y3JlZF9tb2NrXzEyMw",
+      type: "public-key",
+      response: {
+        authenticatorData: "AAAA",
+        clientDataJSON: "BBBB",
+        signature: "CCCC",
+      },
+    };
+    element.shadowRoot?.dispatchEvent(
+      new CustomEvent("zl-passkey-result", {
+        bubbles: true,
+        composed: true,
+        detail: {
+          challenge_id: "ch_mock_passkey_login",
+          method: "passkey",
+          proof: mockProof,
+        },
+      }),
+    );
+
+    // Wait for the flow to complete (done step)
+    const completeEvents: CustomEvent[] = [];
+    element.addEventListener("zitadel-flow-complete", (event: Event) =>
+      completeEvents.push(event as CustomEvent),
+    );
+    await waitFor(() => (completeEvents.length > 0 ? completeEvents : null));
+
+    // Assert the submit body includes challenge_response
+    const submits = mock.getCaptured().filter(
+      (req): req is Extract<CapturedRequest, { kind: "submitFlowStep" }> =>
+        req.kind === "submitFlowStep",
+    );
+    // Two submits: passkey action + challenge_response submit
+    expect(submits.length).toBeGreaterThanOrEqual(2);
+    const proofSubmit = submits.find((s) => s.body.challenge_response);
+    expect(proofSubmit).toBeDefined();
+    expect(proofSubmit?.body.action).toBe("submit");
+    expect(proofSubmit?.body.challenge_response).toEqual({
+      challenge_id: "ch_mock_passkey_login",
+      method: "passkey",
+      proof: mockProof,
+    });
+  });
+
+  it("re-renders with error and strips challenge on zl-passkey-error", async () => {
+    const element = await mount(host);
+
+    // Navigate to the passkey-login step
+    element.shadowRoot?.dispatchEvent(
+      new CustomEvent("zl-submit", {
+        bubbles: true,
+        composed: true,
+        detail: { action: "passkey" },
+      }),
+    );
+
+    // Wait for the passkey-login step
+    await waitFor(() => {
+      const submits = mock.getCaptured().filter(
+        (req): req is Extract<CapturedRequest, { kind: "submitFlowStep" }> =>
+          req.kind === "submitFlowStep",
+      );
+      return submits.some((s) => s.body.action === "passkey") ? submits : null;
+    });
+
+    // Allow the Lit render cycle to complete before dispatching the error
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    // Simulate a cancelled WebAuthn ceremony
+    element.shadowRoot?.dispatchEvent(
+      new CustomEvent("zl-passkey-error", {
+        bubbles: true,
+        composed: true,
+        detail: {
+          challenge_id: "ch_mock_passkey_login",
+          error: "The operation was cancelled.",
+          aborted: true,
+        },
+      }),
+    );
+
+    // Wait for the error to be applied to the step
+    await waitFor(() => {
+      // Access the internal response — the step should have the error key
+      // and the challenge should be stripped
+      const root = element.shadowRoot;
+      const alert = root?.querySelector("zl-alert");
+      return alert ? alert : null;
+    });
+
+    // The step should still be passkey-login (no additional submits from the error)
+    const postErrorSubmits = mock.getCaptured().filter(
+      (req): req is Extract<CapturedRequest, { kind: "submitFlowStep" }> =>
+        req.kind === "submitFlowStep",
+    );
+    // Only the initial "passkey" action submit — no extra submit from the error handler
+    expect(postErrorSubmits).toHaveLength(1);
+    expect(postErrorSubmits[0]?.body.action).toBe("passkey");
+  });
 });
