@@ -36,8 +36,7 @@ func ErrAuthAttemptNotCompleted() Error {
 }
 
 func ErrAuthAttemptAlreadyHandedOff() Error {
-	return newError(PrefixAuthAttempt.ErrorCodePrefix("already_handed_off"), "The auth attempt was already handed off. "+
-		"No new handoff can be created and the previous token will only be returned if the same Idempotency-Key header is provided.", nil, nil)
+	return newError(PrefixAuthAttempt.ErrorCodePrefix("already_handed_off"), "The auth attempt was already handed off. No new handoff can be created and the previous token will only be returned if the same Idempotency-Key header is provided.", nil, nil)
 }
 
 func ErrAuthAttemptInvalidProof() Error {
@@ -79,6 +78,35 @@ type AuthAttempt struct {
 	// TTL describes how long an auth attempt is valid, it should be set to a reasonable value (e.g. 5 minutes) to prevent abuse and to ensure that old auth attempts are cleaned up.
 	// An auth attempt gets garbage collected after CreatedAt + TimeToLive, so it is important to set it to a reasonable value to prevent abuse and to ensure that old auth attempts are cleaned up.
 	TimeToLive *time.Duration
+}
+
+const AuthAttemptTTL = 15 * time.Minute
+
+type AuthAttemptOption func(*AuthAttempt)
+
+func WithSession(sessionID *string, authFactors ...AuthFactor) AuthAttemptOption {
+	checks := make([]AuthCheck, len(authFactors))
+	for i, factor := range authFactors {
+		checks[i] = factor
+	}
+	return func(a *AuthAttempt) {
+		a.SessionID = sessionID
+		a.Checks = checks
+	}
+}
+
+func NewAuthAttempt(projectID string, requiredChecks []AuthCheckType, opts ...AuthAttemptOption) (*AuthAttempt, error) {
+	attempt := &AuthAttempt{
+		ProjectID:      projectID,
+		RequiredChecks: requiredChecks,
+		TimeToLive:     new(AuthAttemptTTL),
+	}
+
+	for _, opt := range opts {
+		opt(attempt)
+	}
+
+	return attempt, nil
 }
 
 func CheckAs[T AuthFactor](attempt *AuthAttempt, typ AuthCheckType) (T, bool) {
@@ -150,6 +178,154 @@ func (a *AuthAttempt) ChallengeByID(id string) (AuthChallenge, bool) {
 		}
 	}
 	return nil, false
+}
+
+// PrepareChallenge validates that a challenge can be issued for the given check type.
+func (a *AuthAttempt) PrepareChallenge(typ AuthCheckType) error {
+	if a.IsExpired() {
+		return ErrAuthAttemptInvalidState()
+	}
+	if a.IsHandedOff() {
+		return ErrAuthAttemptAlreadyHandedOff()
+	}
+	//found := slices.Contains(a.RequiredChecks, typ). TODO: do we need to restrict this?
+	//if !found {
+	//	return ErrAuthAttemptInvalidRequest()
+	//}
+	return nil
+}
+
+// PrepareUserChallenge validates that a user challenge can be issued.
+// It's prohibited if the auth attempt is linked to a session with a verified user as this could lead to security issues.
+// Also, as soon as there are more factors verified than the user (e.g. password) we'll not allow to change the user anymore.
+// We'll probably change the latter in the future and reset all factors as soon as the new user challenge succeeded.
+func (a *AuthAttempt) PrepareUserChallenge() error {
+	if err := a.PrepareChallenge(AuthCheckTypeUser); err != nil {
+		return err
+	}
+	if a.SessionID != nil {
+		_, ok := CheckAs[*AuthFactorUser](a, AuthCheckTypeUser)
+		if ok {
+			return ErrAuthAttemptInvalidRequest().WithMessage("The user was already authenticated.")
+		}
+		return nil
+	}
+	for _, check := range a.Checks {
+		if _, ok := check.(AuthFactor); ok && check.Type() != AuthCheckTypeUser {
+			return ErrAuthAttemptInvalidRequest().WithMessage("The user must not be changed after it was authenticated.")
+		}
+	}
+	return nil
+}
+
+// PreparePasswordChallenge validates that a password challenge can be issued,
+// which requires that a user was already identified to prevent issuing password challenges without a known user.
+func (a *AuthAttempt) PreparePasswordChallenge() error {
+	if err := a.PrepareChallenge(AuthCheckTypePassword); err != nil {
+		return err
+	}
+	_, ok := CheckAs[*AuthFactorUser](a, AuthCheckTypeUser)
+	if !ok {
+		return ErrAuthAttemptInvalidRequest().WithMessage("password challenge requires user verification first")
+	}
+	return nil
+}
+
+func (a *AuthAttempt) SetUserChallenge() *AuthChallengeUser {
+	challenge := &AuthChallengeUser{}
+	a.SetCheck(challenge)
+	return challenge
+}
+
+func (a *AuthAttempt) SetPasswordChallenge() *AuthChallengePassword {
+	challenge := &AuthChallengePassword{}
+	a.SetCheck(challenge)
+	return challenge
+}
+
+func (a *AuthAttempt) PrepareVerification(challengeID string, checkType AuthCheckType) (AuthChallenge, error) {
+	if a.IsExpired() {
+		return nil, ErrAuthAttemptInvalidState()
+	}
+	if a.IsHandedOff() {
+		return nil, ErrAuthAttemptAlreadyHandedOff()
+	}
+	// Validate the challenge ID is current — prevents stale proofs
+	check, ok := a.ChallengeByID(challengeID)
+	if !ok {
+		return nil, ErrAuthAttemptStaleChallenge()
+	}
+
+	// Proof type must match the challenge's check type
+	if check.Type() != checkType {
+		return nil, ErrAuthAttemptInvalidRequest()
+	}
+	return check, nil
+}
+
+// PrepareUserVerification validates that the attempt is in a state where
+// a user (identifier) proof can be submitted.
+func (a *AuthAttempt) PrepareUserVerification(challengeID string) (AuthChallenge, error) {
+	challenge, err := a.PrepareVerification(challengeID, AuthCheckTypeUser)
+	if err != nil {
+		return nil, err
+	}
+	for _, check := range a.Checks {
+		if _, ok := check.(AuthFactor); ok && check.Type() != AuthCheckTypeUser {
+			return nil, ErrAuthAttemptInvalidRequest().WithMessage("The user must not be changed after it was authenticated.")
+		}
+	}
+	return challenge, nil
+}
+
+// PreparePasswordVerification validates that a password proof can be submitted
+// and returns the user ID to verify against.
+func (a *AuthAttempt) PreparePasswordVerification(challengeID string) (AuthChallenge, *AuthFactorUser, error) {
+	challenge, err := a.PrepareVerification(challengeID, AuthCheckTypePassword)
+	if err != nil {
+		return nil, nil, err
+	}
+	userCheck, ok := CheckAs[*AuthFactorUser](a, AuthCheckTypeUser)
+	if !ok {
+		return nil, nil, ErrAuthAttemptInvalidRequest()
+	}
+	return challenge, userCheck, nil
+}
+
+func (a *AuthAttempt) SetUserFactor(user *User) *AuthFactorUser {
+	factor := &AuthFactorUser{
+		UserID: user.ID,
+	}
+	a.SetCheck(factor)
+	return factor
+}
+
+func (a *AuthAttempt) SetPasswordFactor() *AuthFactorPassword {
+	factor := &AuthFactorPassword{}
+	a.SetCheck(factor)
+	return factor
+}
+
+// PrepareHandoff validates that a handoff can be issued.
+// And will generate and store the handoff token.
+// Note: The HandoffToken is generated using a crypto/rand token and stored in a hashed way for security reasons.
+func (a *AuthAttempt) PrepareHandoff() error {
+	if a.IsExpired() {
+		return ErrAuthAttemptInvalidState()
+	}
+	if !a.IsCompleted() {
+		return ErrAuthAttemptNotCompleted()
+	}
+	if a.IsHandedOff() {
+		return ErrAuthAttemptAlreadyHandedOff()
+	}
+
+	token, err := newHandoffToken()
+	if err != nil {
+		return err
+	}
+	a.HandoffToken = token
+	return nil
 }
 
 // SetCheck sets a check to the given check.
