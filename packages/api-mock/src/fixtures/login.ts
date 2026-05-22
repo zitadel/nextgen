@@ -115,6 +115,26 @@ export function passwordStep(input: StepFixtureInput): CreateFlow201 {
   });
 }
 
+/**
+ * Password recovery step — shown when the user clicks "Forgot password?" on
+ * the identifier screen. Tells the user to check their email and offers a
+ * "Back to sign in" action (simulating the recovery pivot return).
+ */
+export function recoverStep(input: StepFixtureInput): CreateFlow201 {
+  return wrap(input, {
+    name: "recover",
+    texts: {
+      title_key: "recover.title",
+      description_key: "recover.description",
+    },
+    fields: {},
+    actions: {
+      submit: { text_key: "recover.action.back", primary: true },
+    },
+    gates: {},
+  });
+}
+
 export function passkeyUpsellStep(input: StepFixtureInput): CreateFlow201 {
   return wrap(input, {
     name: "passkey-upsell",
@@ -125,6 +145,87 @@ export function passkeyUpsellStep(input: StepFixtureInput): CreateFlow201 {
       skip: { text_key: "passkey-upsell.action.skip" },
     },
     gates: {},
+  });
+}
+
+/**
+ * Passkey setup step — returned after the user clicks "Set up passkey" on the
+ * upsell screen. Contains a mock `challenge` with WebAuthn registration
+ * options so `<zl-passkey ceremony="register">` can trigger
+ * `navigator.credentials.create()`. Follows the two-submit model from ADR 013.
+ */
+export function passkeySetupStep(input: StepFixtureInput): CreateFlow201 {
+  return wrap(input, {
+    name: "passkey-setup",
+    texts: { title_key: "passkey-upsell.title" },
+    fields: {},
+    actions: {
+      submit: { text_key: "submit.continue", primary: true },
+    },
+    gates: {},
+    challenge: {
+      method: "passkey",
+      challenge_id: "ch_mock_passkey_setup",
+      options: {
+        ceremony: "register",
+        challenge: "AAAAAAAAAAAAAAAAAAAAAA",
+        rp: { name: "Mock RP", id: "localhost" },
+        user: {
+          id: "dXNlcl9tb2Nr",
+          name: input.capturedEmail ?? "mock-user@example.com",
+          displayName: input.capturedEmail ?? "Mock User",
+        },
+        pubKeyCredParams: [
+          { type: "public-key", alg: -7 },
+          { type: "public-key", alg: -257 },
+        ],
+        timeout: 60000,
+        attestation: "none",
+        authenticatorSelection: {
+          authenticatorAttachment: "platform",
+          residentKey: "preferred",
+          userVerification: "preferred",
+        },
+      },
+    },
+  });
+}
+
+/**
+ * Passkey login step — returned when the user clicks "Sign in with passkey"
+ * on the identifier screen. Contains a mock `challenge` with WebAuthn
+ * authentication options so `<zl-passkey ceremony="authenticate">` can
+ * trigger `navigator.credentials.get()`. The browser prompts for an
+ * existing credential (Touch ID / Windows Hello / security key).
+ */
+export function passkeyLoginStep(input: StepFixtureInput): CreateFlow201 {
+  return wrap(input, {
+    name: "passkey-login",
+    texts: { title_key: "passkey-login.title" },
+    fields: {},
+    actions: {
+      submit: { text_key: "submit.continue", primary: true },
+      cancel: { text_key: "action.cancel" },
+    },
+    gates: {},
+    challenge: {
+      method: "passkey",
+      challenge_id: "ch_mock_passkey_login",
+      options: {
+        ceremony: "authenticate",
+        challenge: "BBBBBBBBBBBBBBBBBBBBBB",
+        rpId: "localhost",
+        timeout: 60000,
+        userVerification: "preferred",
+        allowCredentials: [
+          {
+            type: "public-key",
+            id: "Y3JlZF9tb2Nr",
+            transports: ["internal"],
+          },
+        ],
+      },
+    },
   });
 }
 

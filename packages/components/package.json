@@ -55,9 +55,6 @@
     "test:all": "vitest run"
   },
   "dependencies": {
-    "@zitadel-nextgen/api": "workspace:*",
-    "@zitadel-nextgen/design-tokens": "workspace:*",
-    "@zitadel-nextgen/shared-component-styles": "workspace:*",
     "dompurify": "catalog:",
     "liquidjs": "catalog:",
     "lit": "catalog:",
@@ -66,10 +63,14 @@
   "nx": {
     "targets": {
       "build": {
-        "outputs": ["{projectRoot}/dist"]
+        "outputs": [
+          "{projectRoot}/dist"
+        ]
       },
       "typecheck": {
-        "dependsOn": ["build"]
+        "dependsOn": [
+          "build"
+        ]
       }
     }
   },
@@ -85,6 +86,9 @@
     "vite-plugin-web-components-hmr": "catalog:",
     "lightningcss": "catalog:",
     "tsdown": "catalog:",
-    "tslib": "catalog:"
+    "tslib": "catalog:",
+    "@zitadel-nextgen/api": "workspace:*",
+    "@zitadel-nextgen/design-tokens": "workspace:*",
+    "@zitadel-nextgen/shared-component-styles": "workspace:*"
   }
 }

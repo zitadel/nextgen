@@ -1,11 +1,11 @@
-# @nextgen/sdk-nuxt
+# @zitadel-nextgen/sdk-nuxt
 
 Nuxt middleware and helpers for Nextgen Auth.
 
 ## Installation
 
 ```bash
-pnpm add @nextgen/sdk-nuxt
+pnpm add @zitadel-nextgen/sdk-nuxt
 ```
 
 ## Setup
@@ -15,7 +15,7 @@ pnpm add @nextgen/sdk-nuxt
 Create `server/middleware/auth.ts`:
 
 ```ts
-import { createNextgenMiddleware } from '@nextgen/sdk-nuxt/server';
+import { createNextgenMiddleware } from '@zitadel-nextgen/sdk-nuxt/server';
 
 const { nextgenIssuerUrl } = useRuntimeConfig();
 
@@ -106,7 +106,7 @@ Render `<zitadel-login>` inside `<ClientOnly>`:
 ### 6. Reading auth in a server route
 
 ```ts
-import { getAuth } from '@nextgen/sdk-nuxt/server';
+import { getAuth } from '@zitadel-nextgen/sdk-nuxt/server';
 
 export default defineEventHandler((event) => {
   const auth = getAuth(event);
@@ -136,7 +136,7 @@ export default defineEventHandler((event) => {
 2. The JWT header is decoded to extract `kid` and `alg`
 3. Tokens with an `alg` not in `allowedAlgorithms` (`RS256`, `ES256` by default) are rejected immediately — no JWKS fetch
 4. Tokens with a `typ` not in `allowedTokenTypes` are rejected immediately
-5. The public key is fetched from `{issuerUrl}/oauth/v2/keys` (JWKS) using the Web Crypto API, with a 5 s timeout, and cached for 5 minutes per `kid`
+5. The public key is fetched from `{issuerUrl}/auth/keys` (JWKS) using the Web Crypto API, with a 5 s timeout, and cached for 5 minutes per `kid`
 6. The signature is verified **before** any claim checks
 7. `iss` must be present and must equal `issuerUrl` — tokens without an issuer are rejected
 8. `exp` must be present and must be in the future (with `clockSkewMs` tolerance) — tokens without an expiry are rejected
