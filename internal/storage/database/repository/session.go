@@ -158,31 +158,166 @@ func (r *sessionRepository) Exchange(ctx context.Context, q database.QueryExecut
 	return result, err
 }
 
-func (r *sessionRepository) sessionSelect(whereClause string) string {
-	return `SELECT s.project_id, s.id, s.created_at, s.updated_at, s.expires_at, s.token_id, s.user_id,` +
-		` ua.id, ua.info,` +
-		` c.type, c.id, c.last_challenged_at, c.last_verified_at, c.last_failed_at, c.failure_count, c.challenge_payload, c.factor_payload` +
-		` FROM ` + r.meta.tableName + ` s` +
-		` LEFT JOIN ` + r.userAgentsTable + ` ua ON s.project_id = ua.project_id AND s.user_agent_id = ua.id` +
-		` LEFT JOIN ` + r.checksTable + ` c ON c.project_id = s.project_id AND c.session_id = s.id` +
-		whereClause
+func (r *sessionRepository) appendSessionSelect(b *database.StatementBuilder) {
+	b.WriteString("SELECT s.project_id, s.id, s.created_at, s.updated_at, s.expires_at, s.token_id, s.user_id,")
+	b.WriteString(" ua.id, ua.info,")
+	b.WriteString(" c.type, c.id, c.last_challenged_at, c.last_verified_at, c.last_failed_at, c.failure_count, c.challenge_payload, c.factor_payload")
+	b.WriteString(" FROM ")
+	b.WriteString(r.meta.tableName)
+	b.WriteString(" s LEFT JOIN ")
+	b.WriteString(r.userAgentsTable)
+	b.WriteString(" ua ON s.project_id = ua.project_id AND s.user_agent_id = ua.id LEFT JOIN ")
+	b.WriteString(r.checksTable)
+	b.WriteString(" c ON c.project_id = s.project_id AND c.session_id = s.id")
+}
+
+func (r *sessionRepository) appendSessionWhere(b *database.StatementBuilder, projectID, sessionID string) {
+	b.WriteString(" WHERE s.project_id = ")
+	b.WriteArg(projectID)
+	if sessionID != "" {
+		b.WriteString(" AND s.id = ")
+		b.WriteArg(database.Identity(sessionID))
+	}
+}
+
+func (r *sessionRepository) buildSessionListQuery(projectID, sessionID string) *database.StatementBuilder {
+	b := database.NewStatementBuilder("")
+	r.appendSessionSelect(b)
+	r.appendSessionWhere(b, projectID, sessionID)
+	b.WriteString(" ORDER BY s.id")
+	return b
 }
 
 func (r *sessionRepository) querySessions(ctx context.Context, q database.QueryExecutor, projectID, sessionID string) ([]*domain.Session, error) {
-	query := r.sessionSelect(` WHERE s.project_id = $1`)
-	args := []any{projectID}
-	if sessionID != "" {
-		query += ` AND s.id = $2`
-		args = append(args, database.Identity(sessionID))
-	}
-	query += ` ORDER BY s.id`
-
-	rows, err := q.Query(ctx, query, args...)
+	b := r.buildSessionListQuery(projectID, sessionID)
+	rows, err := q.Query(ctx, b.String(), b.Args()...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query sessions: %w", err)
 	}
 	defer rows.Close()
 	return scanSessions(rows)
+}
+
+func (r *sessionRepository) buildInsertUserAgent(projectID string, info []byte) *database.StatementBuilder {
+	b := database.NewStatementBuilder("INSERT INTO ")
+	b.WriteString(r.userAgentsTable)
+	b.WriteString(" (project_id, info) VALUES (")
+	b.WriteArg(projectID)
+	b.WriteString(", ")
+	b.WriteArg(r.encodeUserAgent(info))
+	b.WriteString(") RETURNING id")
+	return b
+}
+
+func (r *sessionRepository) buildInsertSessionPostgres(projectID string, userAgentID database.Identity, expiresAt time.Time) *database.StatementBuilder {
+	b := database.NewStatementBuilder("INSERT INTO ")
+	b.WriteString(r.meta.tableName)
+	b.WriteString(" (project_id, user_agent_id, expires_at, token_id) VALUES (")
+	b.WriteArg(projectID)
+	b.WriteString(", ")
+	b.WriteArg(userAgentID)
+	b.WriteString(", ")
+	b.WriteArg(expiresAt)
+	b.WriteString(", 0) RETURNING id, created_at, updated_at")
+	return b
+}
+
+func (r *sessionRepository) buildUpdateSessionTokenPostgres(projectID string, sessionID database.Identity) *database.StatementBuilder {
+	b := database.NewStatementBuilder("UPDATE ")
+	b.WriteString(r.meta.tableName)
+	b.WriteString(" SET token_id = id WHERE project_id = ")
+	b.WriteArg(projectID)
+	b.WriteString(" AND id = ")
+	b.WriteArg(sessionID)
+	return b
+}
+
+func (r *sessionRepository) buildInsertSessionSpanner(projectID string, userAgentID database.Identity, expiresAt time.Time) *database.StatementBuilder {
+	b := database.NewStatementBuilder("INSERT INTO ")
+	b.WriteString(r.meta.tableName)
+	b.WriteString(" (project_id, user_agent_id, expires_at, token_id, created_at, updated_at) VALUES (")
+	b.WriteArg(projectID)
+	b.WriteString(", ")
+	b.WriteArg(userAgentID)
+	b.WriteString(", ")
+	b.WriteArg(expiresAt)
+	b.WriteString(", 0, ")
+	b.WriteArg(r.now)
+	b.WriteString(", ")
+	b.WriteArg(r.now)
+	b.WriteString(") THEN RETURN id, created_at, updated_at")
+	return b
+}
+
+func (r *sessionRepository) buildUpdateSessionTokenSpanner(projectID string, sessionID database.Identity) *database.StatementBuilder {
+	b := database.NewStatementBuilder("UPDATE ")
+	b.WriteString(r.meta.tableName)
+	b.WriteString(" SET token_id = ")
+	b.WriteArg(sessionID)
+	b.WriteString(" WHERE project_id = ")
+	b.WriteArg(projectID)
+	b.WriteString(" AND id = ")
+	b.WriteArg(sessionID)
+	return b
+}
+
+func (r *sessionRepository) buildLoadAttemptChecks(projectID, attemptID string) *database.StatementBuilder {
+	b := database.NewStatementBuilder("SELECT id, type, last_verified_at FROM ")
+	b.WriteString(r.checksTable)
+	b.WriteString(" WHERE project_id = ")
+	b.WriteArg(projectID)
+	b.WriteString(" AND auth_attempt_id = ")
+	b.WriteArg(database.Identity(attemptID))
+	b.WriteString(" AND last_verified_at IS NOT NULL")
+	return b
+}
+
+func (r *sessionRepository) buildLoadSessionChecks(projectID, sessionID string) *database.StatementBuilder {
+	b := database.NewStatementBuilder("SELECT id, type, last_verified_at FROM ")
+	b.WriteString(r.checksTable)
+	b.WriteString(" WHERE project_id = ")
+	b.WriteArg(projectID)
+	b.WriteString(" AND session_id = ")
+	b.WriteArg(database.Identity(sessionID))
+	return b
+}
+
+func (r *sessionRepository) buildSelectFactorPayload(projectID, checkID string) *database.StatementBuilder {
+	b := database.NewStatementBuilder("SELECT factor_payload FROM ")
+	b.WriteString(r.checksTable)
+	b.WriteString(" WHERE project_id = ")
+	b.WriteArg(projectID)
+	b.WriteString(" AND id = ")
+	b.WriteArg(database.Identity(checkID))
+	return b
+}
+
+func (r *sessionRepository) buildPromoteCheck(sessionID, projectID string, checkID database.Identity) *database.StatementBuilder {
+	b := database.NewStatementBuilder("UPDATE ")
+	b.WriteString(r.checksTable)
+	b.WriteString(" SET session_id = ")
+	b.WriteArg(database.Identity(sessionID))
+	b.WriteString(", auth_attempt_id = NULL, challenge_payload = NULL, last_challenged_at = NULL, last_failed_at = NULL, failure_count = 0")
+	b.WriteString(" WHERE project_id = ")
+	b.WriteArg(projectID)
+	b.WriteString(" AND id = ")
+	b.WriteArg(checkID)
+	b.WriteString(" AND auth_attempt_id IS NOT NULL")
+	return b
+}
+
+func (r *sessionRepository) buildDeleteSessionCheckLoser(projectID, sessionID string, typ domain.AuthCheckType, winnerID string) *database.StatementBuilder {
+	b := database.NewStatementBuilder("DELETE FROM ")
+	b.WriteString(r.checksTable)
+	b.WriteString(" WHERE project_id = ")
+	b.WriteArg(projectID)
+	b.WriteString(" AND session_id = ")
+	b.WriteArg(database.Identity(sessionID))
+	b.WriteString(" AND type = ")
+	b.WriteArg(typ)
+	b.WriteString(" AND id <> ")
+	b.WriteArg(database.Identity(winnerID))
+	return b
 }
 
 func scanSessions(rows database.Rows) ([]*domain.Session, error) {
@@ -323,10 +458,8 @@ func (r *sessionRepository) insertSession(ctx context.Context, q database.QueryE
 		if err != nil {
 			return fmt.Errorf("failed to marshal user agent info: %w", err)
 		}
-		err = q.QueryRow(ctx,
-			`INSERT INTO `+r.userAgentsTable+` (project_id, info) VALUES ($1, $2) RETURNING id`,
-			session.ProjectID, r.encodeUserAgent(raw),
-		).Scan(&userAgentID)
+		b := r.buildInsertUserAgent(session.ProjectID, raw)
+		err = q.QueryRow(ctx, b.String(), b.Args()...).Scan(&userAgentID)
 		if err != nil {
 			return fmt.Errorf("failed to insert user agent: %w", err)
 		}
@@ -346,18 +479,13 @@ func (r *sessionRepository) insertSessionPostgres(ctx context.Context, q databas
 		createdAt time.Time
 		updatedAt time.Time
 	)
-	err := q.QueryRow(ctx,
-		`INSERT INTO `+r.meta.tableName+` (project_id, user_agent_id, expires_at, token_id)`+
-			` VALUES ($1, $2, $3, 0) RETURNING id, created_at, updated_at`,
-		session.ProjectID, userAgentID, expiresAt,
-	).Scan(&sessionID, &createdAt, &updatedAt)
+	insertB := r.buildInsertSessionPostgres(session.ProjectID, userAgentID, expiresAt)
+	err := q.QueryRow(ctx, insertB.String(), insertB.Args()...).Scan(&sessionID, &createdAt, &updatedAt)
 	if err != nil {
 		return fmt.Errorf("failed to insert session: %w", err)
 	}
-	_, err = q.Exec(ctx,
-		`UPDATE `+r.meta.tableName+` SET token_id = id WHERE project_id = $1 AND id = $2`,
-		session.ProjectID, sessionID,
-	)
+	updateB := r.buildUpdateSessionTokenPostgres(session.ProjectID, sessionID)
+	_, err = q.Exec(ctx, updateB.String(), updateB.Args()...)
 	if err != nil {
 		return fmt.Errorf("failed to set session token_id: %w", err)
 	}
@@ -373,18 +501,13 @@ func (r *sessionRepository) insertSessionPostgres(ctx context.Context, q databas
 func (r *sessionRepository) insertSessionSpanner(ctx context.Context, q database.QueryExecutor, session *domain.Session, userAgentID database.Identity) error {
 	expiresAt := time.Now().UTC().Add(session.TimeToLive)
 	var sessionID database.Identity
-	err := q.QueryRow(ctx,
-		`INSERT INTO `+r.meta.tableName+` (project_id, user_agent_id, expires_at, token_id, created_at, updated_at)`+
-			` VALUES ($1, $2, $3, 0, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()) THEN RETURN id, created_at, updated_at`,
-		session.ProjectID, userAgentID, expiresAt,
-	).Scan(&sessionID, &session.CreatedAt, &session.UpdatedAt)
+	insertB := r.buildInsertSessionSpanner(session.ProjectID, userAgentID, expiresAt)
+	err := q.QueryRow(ctx, insertB.String(), insertB.Args()...).Scan(&sessionID, &session.CreatedAt, &session.UpdatedAt)
 	if err != nil {
 		return fmt.Errorf("failed to insert session: %w", err)
 	}
-	_, err = q.Exec(ctx,
-		`UPDATE `+r.meta.tableName+` SET token_id = $1 WHERE project_id = $2 AND id = $3`,
-		sessionID, session.ProjectID, sessionID,
-	)
+	updateB := r.buildUpdateSessionTokenSpanner(session.ProjectID, sessionID)
+	_, err = q.Exec(ctx, updateB.String(), updateB.Args()...)
 	if err != nil {
 		return fmt.Errorf("failed to set session token_id: %w", err)
 	}
@@ -489,11 +612,8 @@ func validateHandoffAttempt(attempt *domain.AuthAttempt) error {
 }
 
 func (r *sessionRepository) loadAttemptChecks(ctx context.Context, q database.QueryExecutor, projectID, attemptID string) ([]storedCheck, error) {
-	rows, err := q.Query(ctx,
-		`SELECT id, type, last_verified_at FROM `+r.checksTable+
-			` WHERE project_id = $1 AND auth_attempt_id = $2 AND last_verified_at IS NOT NULL`,
-		projectID, database.Identity(attemptID),
-	)
+	b := r.buildLoadAttemptChecks(projectID, attemptID)
+	rows, err := q.Query(ctx, b.String(), b.Args()...)
 	if err != nil {
 		return nil, err
 	}
@@ -502,11 +622,8 @@ func (r *sessionRepository) loadAttemptChecks(ctx context.Context, q database.Qu
 }
 
 func (r *sessionRepository) loadSessionChecks(ctx context.Context, q database.QueryExecutor, projectID, sessionID string) ([]storedCheck, error) {
-	rows, err := q.Query(ctx,
-		`SELECT id, type, last_verified_at FROM `+r.checksTable+
-			` WHERE project_id = $1 AND session_id = $2`,
-		projectID, database.Identity(sessionID),
-	)
+	b := r.buildLoadSessionChecks(projectID, sessionID)
+	rows, err := q.Query(ctx, b.String(), b.Args()...)
 	if err != nil {
 		return nil, err
 	}
@@ -564,12 +681,8 @@ func (r *sessionRepository) applyExchange(ctx context.Context, q database.QueryE
 
 	if len(promoteIDs) > 0 {
 		for _, id := range promoteIDs {
-			n, err := q.Exec(ctx,
-				`UPDATE `+r.checksTable+
-					` SET session_id = $1, auth_attempt_id = NULL, challenge_payload = NULL, last_challenged_at = NULL, last_failed_at = NULL, failure_count = 0`+
-					` WHERE project_id = $2 AND id = $3 AND auth_attempt_id IS NOT NULL`,
-				database.Identity(sessionID), projectID, id,
-			)
+			b := r.buildPromoteCheck(sessionID, projectID, id)
+			n, err := q.Exec(ctx, b.String(), b.Args()...)
 			if err != nil {
 				return err
 			}
@@ -579,14 +692,9 @@ func (r *sessionRepository) applyExchange(ctx context.Context, q database.QueryE
 		}
 	}
 
-	// Remove session-scoped checks that lost their type to a newer winner.
 	for _, w := range winners {
-		_, err := q.Exec(ctx,
-			`DELETE FROM `+r.checksTable+
-				` WHERE project_id = $1 AND session_id = $2 AND type = $3 AND id <> $4`,
-			projectID, database.Identity(sessionID), w.Type, database.Identity(w.ID),
-		)
-		if err != nil {
+		b := r.buildDeleteSessionCheckLoser(projectID, sessionID, w.Type, w.ID)
+		if _, err := q.Exec(ctx, b.String(), b.Args()...); err != nil {
 			return err
 		}
 	}
@@ -600,10 +708,8 @@ func (r *sessionRepository) userIDFromWinners(ctx context.Context, q database.Qu
 		return nil
 	}
 	var factor json.RawMessage
-	err := q.QueryRow(ctx,
-		`SELECT factor_payload FROM `+r.checksTable+` WHERE project_id = $1 AND id = $2`,
-		projectID, database.Identity(w.ID),
-	).Scan(&factor)
+	b := r.buildSelectFactorPayload(projectID, w.ID)
+	err := q.QueryRow(ctx, b.String(), b.Args()...).Scan(&factor)
 	if err != nil {
 		return nil
 	}
