@@ -13,6 +13,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/zitadel/nextgen/internal/crypto"
 
 	oasapi "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
@@ -71,6 +72,11 @@ func run(ctx context.Context, cfg Config, pool database.Pool) error {
 		}
 	}()
 
+	passwordHasher, err := cfg.PasswordHasher.NewHasher()
+	if err != nil {
+		return fmt.Errorf("build password hasher: %w", err)
+	}
+
 	// ── Repositories ─────────────────
 	projectRepo := repository.NewProjectRepository(pool)
 	userRepo := repository.NewUserRepository()
@@ -90,6 +96,7 @@ func run(ctx context.Context, cfg Config, pool database.Pool) error {
 		userRepo,
 		userPasswordRepo,
 		userPasskeyRepo,
+		passwordHasher,
 	)
 
 	// ── HTTP Server ─────────────────
@@ -143,6 +150,11 @@ func loadConfig(configPath string) (Config, error) {
 	v.AutomaticEnv()
 
 	v.SetDefault("server.address", ":8080")
+	v.SetDefault("password_hasher.hasher.algorithm", crypto.HashNameBcrypt)
+	v.SetDefault("password_hasher.hasher.cost", 10)
+	v.SetDefault("password_hasher.limits", crypto.HashLimitsConfig{
+		Bcrypt: crypto.BcryptLimitsConfig{MinCost: 10, MaxCost: 16},
+	})
 
 	if configPath != "" {
 		v.SetConfigFile(configPath)

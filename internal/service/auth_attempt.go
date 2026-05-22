@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/url"
 
+	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
@@ -178,13 +179,14 @@ type userPasskeys interface {
 // ---- Implementation ----------------------------------------------------------
 
 type authAttemptService struct {
-	pool          database.Pool
-	attempts      domain.AuthAttemptRepository
-	sessions      sessionResolver
-	projects      projectLoader
-	users         userLookup
-	userPasswords userPasswords
-	userPasskeys  userPasskeys
+	pool             database.Pool
+	attempts         domain.AuthAttemptRepository
+	sessions         sessionResolver
+	projects         projectLoader
+	users            userLookup
+	userPasswords    userPasswords
+	userPasskeys     userPasskeys
+	passwordVerifier *crypto.Hasher
 }
 
 func NewAuthAttemptService(
@@ -195,15 +197,17 @@ func NewAuthAttemptService(
 	users userLookup,
 	userPasswords userPasswords,
 	userPasskeys userPasskeys,
+	passwordVerifier *crypto.Hasher,
 ) AuthAttemptService {
 	return &authAttemptService{
-		pool:          pool,
-		attempts:      attempts,
-		sessions:      sessions,
-		projects:      projects,
-		users:         users,
-		userPasswords: userPasswords,
-		userPasskeys:  userPasskeys,
+		pool:             pool,
+		attempts:         attempts,
+		sessions:         sessions,
+		projects:         projects,
+		users:            users,
+		userPasswords:    userPasswords,
+		userPasskeys:     userPasskeys,
+		passwordVerifier: passwordVerifier,
 	}
 }
 
