@@ -2,25 +2,36 @@ package domain
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
+	"github.com/zitadel/nextgen/internal/cookie"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 const (
-	SessionAnonymousTTL = 10 * time.Minute
+	PrefixSession       ResourcePrefix = "sess"
+	SessionAnonymousTTL                = 10 * time.Minute
 )
 
-func ErrSessionNotFound() error {
+func ErrSessionNotFound() Error {
 	return newError("sess.not_found", "The session was not found", nil, nil)
 }
 
-func ErrSessionInvalidHandoffToken() error {
+func ErrSessionInvalidHandoffToken() Error {
 	return newError("sess.invalid_handoff_token", "The handoff token is invalid. Either the token does not exists, was already consumed or has expired", nil, nil)
 }
 
-func ErrSessionExchangeConflict() error {
+func ErrSessionExchangeConflict() Error {
 	return newError("sess.exchange_conflict", "The exchange resulted in a conflict. Either the target session was revoked or verified factors could not be promoted consistently.", nil, nil)
+}
+
+func ErrSessionTokenCreationFailed() Error {
+	return newError("sess.token_creation_failed", "The session token could not be created", nil, nil)
+}
+
+func ErrSessionTokenInvalid() Error {
+	return newError("sess.token_invalid", "The session token is invalid (either malformed or expired).", nil, nil)
 }
 
 // Session represents the object defined [here](https://github.com/zitadel/nextgen/blob/main/docs/design/api/resource-map.md#sessions-durable-post-auth-only)
@@ -60,6 +71,49 @@ type Session struct {
 	Factors []AuthFactor
 }
 
+func NewSession(projectID string, agent *UserAgent) (*Session, error) {
+	return &Session{
+		ProjectID:  projectID,
+		UserAgent:  agent,
+		TimeToLive: SessionAnonymousTTL,
+	}, nil
+}
+
+func (s *Session) Token(sealer *cookie.Sealer) (string, error) {
+	payload, err := json.Marshal(&SessionToken{
+		ProjectID: s.ProjectID,
+		SessionID: s.ID,
+		TokenID:   s.TokenID,
+		UserID:    s.UserID,
+		CreatedAt: s.UpdatedAt,
+		ExpiresAt: s.ExpiresAt,
+	})
+	if err != nil {
+		return "", ErrSessionTokenCreationFailed()
+	}
+	token, err := sealer.Seal(payload)
+	if err != nil {
+		return "", ErrSessionTokenCreationFailed()
+	}
+	return token, nil
+}
+
+func DecryptSessionTokenString(tokenString string, sealer *cookie.Sealer) (*SessionToken, error) {
+	if tokenString == "" {
+		return nil, ErrSessionTokenInvalid()
+	}
+	payload, err := sealer.Open(tokenString)
+	if err != nil {
+		return nil, ErrSessionTokenInvalid()
+	}
+	var sessionToken SessionToken
+	err = json.Unmarshal(payload, &sessionToken)
+	if err != nil {
+		return nil, ErrSessionTokenInvalid()
+	}
+	return &sessionToken, err
+}
+
 type SessionState uint8
 
 const (
@@ -74,6 +128,15 @@ type UserAgent struct {
 	ID   string
 	IP   string
 	Info map[string]any
+}
+
+type SessionToken struct {
+	ProjectID string
+	SessionID string
+	TokenID   string
+	UserID    *string
+	CreatedAt time.Time
+	ExpiresAt time.Time
 }
 
 type SessionRepository interface {
@@ -99,12 +162,4 @@ type SessionRepository interface {
 
 	// Delete removes a session by its ID.
 	Delete(ctx context.Context, q database.QueryExecutor, projectID, sessionID string) error
-}
-
-func NewSession(projectID string, agent *UserAgent) (*Session, error) {
-	return &Session{
-		ProjectID:  projectID,
-		UserAgent:  agent,
-		TimeToLive: SessionAnonymousTTL,
-	}, nil
 }

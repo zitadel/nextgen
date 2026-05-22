@@ -2466,17 +2466,6 @@ func (s *SessionResponse) Validate() error {
 			Error: err,
 		})
 	}
-	if err := func() error {
-		if s.AssuranceLevels == nil {
-			return errors.New("nil is invalid value")
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "assurance_levels",
-			Error: err,
-		})
-	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
 	}

@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/zitadel/nextgen/internal/cookie"
 	"github.com/zitadel/passwap"
 
 	oasapi "github.com/zitadel/nextgen/api/generated"
@@ -72,6 +74,11 @@ func run(ctx context.Context, cfg Config, pool database.Pool) error {
 		}
 	}()
 
+	sealer, err := buildCookieSealer(cfg.Server.CookieSealerKey)
+	if err != nil {
+		return err
+	}
+
 	var passwordHasher *passwap.Swapper // TODO: initialize with actual configuration
 
 	// ── Repositories ─────────────────
@@ -103,7 +110,7 @@ func run(ctx context.Context, cfg Config, pool database.Pool) error {
 	defer stop()
 
 	oasServer, err := oasapi.NewServer(
-		api.NewHandler(flowService, authAttemptSvc, sessionService),
+		api.NewHandler(sealer, flowService, authAttemptSvc, sessionService),
 		api.NewSecurityHandler(),
 		oasapi.WithErrorHandler(api.OgenErrorHandler))
 	if err != nil {
@@ -149,6 +156,11 @@ func loadConfig(configPath string) (Config, error) {
 
 	v.SetDefault("server.address", ":8080")
 
+	// AutomaticEnv only resolves nested keys viper already knows about
+	// (via default, config file, or explicit BindEnv). Anything without
+	// a default needs to be bound by hand.
+	mustBindEnv(v, "server.cookie_sealer_key")
+
 	if configPath != "" {
 		v.SetConfigFile(configPath)
 	} else {
@@ -171,4 +183,36 @@ func loadConfig(configPath string) (Config, error) {
 	}
 
 	return cfg, nil
+}
+
+// mustBindEnv panics on viper's documented "this can't fail in
+// normal use" BindEnv error path. Keeps the env wiring readable
+// without sprinkling error handling at every binding.
+func mustBindEnv(v *viper.Viper, key string) {
+	if err := v.BindEnv(key); err != nil {
+		panic(fmt.Errorf("bind env %q: %w", key, err))
+	}
+}
+
+// buildCookieSealer decodes a hex-encoded sealer key and constructs
+// the [cookie.Sealer]. The key must be exactly [cookie.KeySize] bytes
+// after decoding; anything else is a configuration error.
+func buildCookieSealer(hexKey string) (*cookie.Sealer, error) {
+	if hexKey == "" {
+		return nil, errors.New("server: cookie_sealer_key is required (set NEXTGEN_SERVER_COOKIE_SEALER_KEY)")
+	}
+	raw, err := hex.DecodeString(hexKey)
+	if err != nil {
+		return nil, fmt.Errorf("server: decode cookie_sealer_key: %w", err)
+	}
+	if len(raw) != cookie.KeySize {
+		return nil, fmt.Errorf("server: cookie_sealer_key must decode to %d bytes, got %d", cookie.KeySize, len(raw))
+	}
+	var key cookie.Key
+	copy(key[:], raw)
+	sealer, err := cookie.NewSealer(key)
+	if err != nil {
+		return nil, fmt.Errorf("server: build cookie sealer: %w", err)
+	}
+	return sealer, nil
 }

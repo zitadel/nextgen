@@ -3,12 +3,18 @@ package api
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/go-faster/jx"
 	api "github.com/zitadel/nextgen/api/generated"
+	"github.com/zitadel/nextgen/internal/cookie"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
+)
+
+const (
+	sessionCookieName = "__nextgen_session"
 )
 
 func (h Handler) CreateSession(ctx context.Context, req *api.CreateSessionRequest) (api.CreateSessionRes, error) {
@@ -21,7 +27,7 @@ func (h Handler) CreateSession(ctx context.Context, req *api.CreateSessionReques
 	if err != nil {
 		return nil, err
 	}
-	return sessionWithTokenToAPI(session), nil
+	return sessionWithTokenToAPI(session, h.sealer)
 }
 
 func (h Handler) ExchangeHandoff(ctx context.Context, req *api.ExchangeRequest, params api.ExchangeHandoffParams) (api.ExchangeHandoffRes, error) {
@@ -38,7 +44,7 @@ func (h Handler) ExchangeHandoff(ctx context.Context, req *api.ExchangeRequest, 
 	if err != nil {
 		return nil, err
 	}
-	return sessionWithTokenToAPI(session), nil
+	return sessionWithTokenToAPI(session, h.sealer)
 }
 
 func (h Handler) GetSession(ctx context.Context, params api.GetSessionParams) (api.GetSessionRes, error) {
@@ -57,14 +63,14 @@ func (h Handler) GetSession(ctx context.Context, params api.GetSessionParams) (a
 }
 
 func (h Handler) GetMySession(ctx context.Context, params api.GetMySessionParams) (api.GetMySessionRes, error) {
-	scopeCtx, _ := GetScopeContext(ctx)
-
-	cookie := params.NextgenSession // TODO: handle cookie
-	input := service.GetSessionInput{
-		ProjectID: scopeCtx.ProjectID,
-		//SessionID: string(params.SessionID),
+	sessionToken, err := domain.DecryptSessionTokenString(params.NextgenSession, h.sealer)
+	if err != nil {
+		return nil, err
 	}
-	_ = cookie
+	input := service.GetSessionInput{
+		ProjectID: sessionToken.ProjectID,
+		SessionID: sessionToken.SessionID,
+	}
 
 	session, err := h.sessionService.Get(ctx, input)
 	if err != nil {
@@ -105,16 +111,16 @@ func (h Handler) RevokeSession(ctx context.Context, params api.RevokeSessionPara
 }
 
 func (h Handler) RevokeMySession(ctx context.Context, params api.RevokeMySessionParams) (api.RevokeMySessionRes, error) {
-	scopeCtx, _ := GetScopeContext(ctx)
-
-	cookie := params.NextgenSession // TODO: handle cookie
-	input := service.DeleteSessionInput{
-		ProjectID: scopeCtx.ProjectID,
-		//SessionID: string(params.SessionID),
+	sessionToken, err := domain.DecryptSessionTokenString(params.NextgenSession, h.sealer)
+	if err != nil {
+		return nil, err
 	}
-	_ = cookie
+	input := service.DeleteSessionInput{
+		ProjectID: sessionToken.ProjectID,
+		SessionID: sessionToken.SessionID,
+	}
 
-	err := h.sessionService.Delete(ctx, input)
+	err = h.sessionService.Delete(ctx, input)
 	if err != nil {
 		return nil, err
 	}
@@ -139,15 +145,18 @@ func userAgentToDomain(agent api.OptCreateSessionRequestUserAgent) *domain.UserA
 	}
 }
 
-func sessionWithTokenToAPI(session *domain.Session) *api.SessionWithTokenResponseHeaders {
-	var token string // TODO: !
+func sessionWithTokenToAPI(session *domain.Session, sealer *cookie.Sealer) (*api.SessionWithTokenResponseHeaders, error) {
+	token, err := session.Token(sealer)
+	if err != nil {
+		return nil, err
+	}
 	return &api.SessionWithTokenResponseHeaders{
 		SetCookie: setSessionCookie(token, session.ExpiresAt),
 		Response: api.SessionWithTokenResponse{
 			Session:      *sessionToAPI(session),
 			SessionToken: token,
 		},
-	}
+	}, nil
 }
 
 func sessionToAPI(session *domain.Session) *api.SessionResponse {
@@ -225,7 +234,7 @@ func deleteSessionCookie() string {
 }
 
 func sessionCookie(token string, maxAge int) string {
-	return fmt.Sprintf("__nextgen_session=%s; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=%d", token, maxAge)
+	return fmt.Sprintf("%s=%s; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=%d", sessionCookieName, token, maxAge)
 }
 
 func factorToAPI(factor domain.AuthFactor) api.CompletedFactor {
@@ -276,5 +285,22 @@ func checkTypeToAPI(check domain.AuthCheckType) api.FactorMethod {
 		return api.FactorMethodPasskey
 	default:
 		return ""
+	}
+}
+
+func sessionErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
+	switch err.Code {
+	case domain.ErrSessionNotFound().Code:
+		return errorResponseWithStatusCode(http.StatusNotFound, err)
+	case domain.ErrSessionTokenCreationFailed().Code:
+		return errorResponseWithStatusCode(http.StatusInternalServerError, err)
+	case domain.ErrSessionExchangeConflict().Code,
+		domain.ErrSessionInvalidHandoffToken().Code:
+		return errorResponseWithStatusCode(http.StatusBadRequest, err)
+	case domain.ErrSessionTokenInvalid().Code:
+		return errorResponseWithStatusCode(http.StatusUnauthorized, err)
+	default:
+		return internalErrorResponse(err)
+
 	}
 }
