@@ -12,12 +12,14 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/passwap"
 )
 
 type Harness struct {
 	DBPool     database.Pool
 	HttpClient *http.Client
 	TestServer *httptest.Server
+	Passwapper *passwap.Swapper
 
 	GeneratedServer *generated.Server
 	Handler         *api.Handler
