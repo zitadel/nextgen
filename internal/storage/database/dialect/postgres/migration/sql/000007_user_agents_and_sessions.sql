@@ -15,7 +15,8 @@ CREATE TABLE zitadel_nextgen.sessions (
     , id            BIGINT      GENERATED ALWAYS AS IDENTITY
     , created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
     , updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    , expires_at    TIMESTAMPTZ
+    , time_to_live  INTERVAL NOT NULL DEFAULT '10 minutes'::INTERVAL
+    , expires_at    TIMESTAMPTZ NOT NULL
     , token_id      BIGINT      NOT NULL -- TODO: reference to the token table
     , user_id       TEXT
     , user_agent_id BIGINT
@@ -27,6 +28,25 @@ CREATE TABLE zitadel_nextgen.sessions (
     , FOREIGN KEY (project_id, user_agent_id) REFERENCES zitadel_nextgen.user_agents(project_id, id)
 );
 
+-- +goose StatementBegin
+CREATE OR REPLACE FUNCTION zitadel_nextgen.set_session_expires_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.expires_at := NEW.updated_at + NEW.time_to_live;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_sessions_set_expires_at
+    BEFORE INSERT OR UPDATE OF updated_at, time_to_live ON zitadel_nextgen.sessions
+    FOR EACH ROW
+    EXECUTE FUNCTION zitadel_nextgen.set_session_expires_at();
+-- +goose StatementEnd
+
 -- +goose Down
+-- +goose StatementBegin
+DROP TRIGGER IF EXISTS trg_sessions_set_expires_at ON zitadel_nextgen.sessions;
+DROP FUNCTION IF EXISTS zitadel_nextgen.set_session_expires_at();
+-- +goose StatementEnd
 DROP TABLE IF EXISTS zitadel_nextgen.sessions;
 DROP TABLE IF EXISTS zitadel_nextgen.user_agents;

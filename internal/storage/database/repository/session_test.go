@@ -102,6 +102,11 @@ func TestSession_Create(t *testing.T) {
 		assert.Equal(t, session.ID, session.TokenID)
 		assert.False(t, session.CreatedAt.IsZero())
 		assert.False(t, session.ExpiresAt.IsZero())
+
+		stored, err := repo.Get(t.Context(), tx, session.ProjectID, session.ID)
+		require.NoError(t, err)
+		assert.Equal(t, domain.SessionAnonymousTTL, stored.TimeToLive)
+		assert.WithinDuration(t, stored.UpdatedAt.Add(stored.TimeToLive), stored.ExpiresAt, 2*time.Second)
 	})
 
 	t.Run("persists user agent", func(t *testing.T) {
@@ -146,25 +151,72 @@ func TestSession_Get(t *testing.T) {
 		require.NoError(t, err)
 		assert.Empty(t, stored.Factors)
 	})
+
+	t.Run("loads factors after exchange", func(t *testing.T) {
+		tx, rollback := transactionForRollback(t)
+		defer rollback()
+
+		projectID := "p-sess-get-factors"
+		plain, _ := handoffCompletedAttempt(t, tx, projectID, nil)
+		exchanged, err := repo.Exchange(t.Context(), tx, projectID, plain, nil, 0)
+		require.NoError(t, err)
+
+		stored, err := repo.Get(t.Context(), tx, projectID, exchanged.ID)
+		require.NoError(t, err)
+		factors := sessionFactorsByType(stored)
+		require.Contains(t, factors, domain.AuthCheckTypePassword)
+		assert.False(t, factors[domain.AuthCheckTypePassword].GetLastVerifiedAt().IsZero())
+	})
 }
 
 func TestSession_List(t *testing.T) {
 	repo := sessionRepo()
-	tx, rollback := transactionForRollback(t)
-	defer rollback()
 
-	projectID := "p-sess-list"
-	ensureProject(t, tx, projectID)
+	t.Run("returns all sessions in project", func(t *testing.T) {
+		tx, rollback := transactionForRollback(t)
+		defer rollback()
 
-	for range 2 {
-		s, err := domain.NewSession(projectID, nil)
+		projectID := "p-sess-list"
+		ensureProject(t, tx, projectID)
+
+		for range 2 {
+			s, err := domain.NewSession(projectID, nil)
+			require.NoError(t, err)
+			require.NoError(t, repo.Create(t.Context(), tx, s))
+		}
+
+		list, err := repo.List(t.Context(), tx, projectID)
 		require.NoError(t, err)
-		require.NoError(t, repo.Create(t.Context(), tx, s))
-	}
+		assert.Len(t, list, 2)
+	})
 
-	list, err := repo.List(t.Context(), tx, projectID)
-	require.NoError(t, err)
-	assert.Len(t, list, 2)
+	t.Run("loads factors for exchanged session only", func(t *testing.T) {
+		tx, rollback := transactionForRollback(t)
+		defer rollback()
+
+		projectID := "p-sess-list-factors"
+		ensureProject(t, tx, projectID)
+
+		anonymous, err := domain.NewSession(projectID, nil)
+		require.NoError(t, err)
+		require.NoError(t, repo.Create(t.Context(), tx, anonymous))
+
+		plain, _ := handoffCompletedAttempt(t, tx, projectID, nil)
+		exchanged, err := repo.Exchange(t.Context(), tx, projectID, plain, nil, 0)
+		require.NoError(t, err)
+
+		list, err := repo.List(t.Context(), tx, projectID)
+		require.NoError(t, err)
+		require.Len(t, list, 2)
+
+		byID := make(map[string]*domain.Session, len(list))
+		for _, s := range list {
+			byID[s.ID] = s
+		}
+		assert.Empty(t, byID[anonymous.ID].Factors)
+		factors := sessionFactorsByType(byID[exchanged.ID])
+		require.Contains(t, factors, domain.AuthCheckTypePassword)
+	})
 }
 
 func TestSession_Delete(t *testing.T) {
@@ -486,17 +538,19 @@ func TestSession_Exchange_ignoresIdempotencyKey(t *testing.T) {
 	assert.True(t, errors.Is(err, domain.ErrSessionInvalidHandoffToken()))
 }
 
-func TestSession_Get_afterExchange(t *testing.T) {
+func TestSession_Exchange_explicitTTL(t *testing.T) {
 	repo := sessionRepo()
 	tx, rollback := transactionForRollback(t)
 	defer rollback()
 
-	projectID := "p-get-after-ex"
+	projectID := "p-ex-ttl"
 	plain, _ := handoffCompletedAttempt(t, tx, projectID, nil)
-	exchanged, err := repo.Exchange(t.Context(), tx, projectID, plain, nil, 0)
+	const ttl = 2 * time.Hour
+	exchanged, err := repo.Exchange(t.Context(), tx, projectID, plain, nil, ttl)
 	require.NoError(t, err)
 
 	stored, err := repo.Get(t.Context(), tx, projectID, exchanged.ID)
 	require.NoError(t, err)
-	assert.NotEmpty(t, stored.Factors)
+	assert.Equal(t, ttl, stored.TimeToLive)
+	assert.WithinDuration(t, stored.UpdatedAt.Add(stored.TimeToLive), stored.ExpiresAt, 2*time.Second)
 }

@@ -159,7 +159,7 @@ func (r *sessionRepository) Exchange(ctx context.Context, q database.QueryExecut
 }
 
 func (r *sessionRepository) appendSessionSelect(b *database.StatementBuilder) {
-	b.WriteString("SELECT s.project_id, s.id, s.created_at, s.updated_at, s.expires_at, s.token_id, s.user_id,")
+	b.WriteString("SELECT s.project_id, s.id, s.created_at, s.updated_at, s.expires_at, s.time_to_live, s.token_id, s.user_id,")
 	b.WriteString(" ua.id, ua.info,")
 	b.WriteString(" c.type, c.id, c.last_challenged_at, c.last_verified_at, c.last_failed_at, c.failure_count, c.challenge_payload, c.factor_payload")
 	b.WriteString(" FROM ")
@@ -195,7 +195,7 @@ func (r *sessionRepository) querySessions(ctx context.Context, q database.QueryE
 		return nil, fmt.Errorf("failed to query sessions: %w", err)
 	}
 	defer rows.Close()
-	return scanSessions(rows)
+	return r.scanSessions(rows)
 }
 
 func (r *sessionRepository) buildInsertUserAgent(projectID string, info []byte) *database.StatementBuilder {
@@ -209,16 +209,16 @@ func (r *sessionRepository) buildInsertUserAgent(projectID string, info []byte) 
 	return b
 }
 
-func (r *sessionRepository) buildInsertSessionPostgres(projectID string, userAgentID database.Identity, expiresAt time.Time) *database.StatementBuilder {
+func (r *sessionRepository) buildInsertSessionPostgres(projectID string, userAgentID database.Identity, ttl time.Duration) *database.StatementBuilder {
 	b := database.NewStatementBuilder("INSERT INTO ")
 	b.WriteString(r.meta.tableName)
-	b.WriteString(" (project_id, user_agent_id, expires_at, token_id) VALUES (")
+	b.WriteString(" (project_id, user_agent_id, time_to_live, token_id) VALUES (")
 	b.WriteArg(projectID)
 	b.WriteString(", ")
 	b.WriteArg(userAgentID)
 	b.WriteString(", ")
-	b.WriteArg(expiresAt)
-	b.WriteString(", 0) RETURNING id, created_at, updated_at")
+	b.WriteArg(ttl)
+	b.WriteString("::INTERVAL, 0) RETURNING id, created_at, updated_at, expires_at")
 	return b
 }
 
@@ -232,21 +232,28 @@ func (r *sessionRepository) buildUpdateSessionTokenPostgres(projectID string, se
 	return b
 }
 
-func (r *sessionRepository) buildInsertSessionSpanner(projectID string, userAgentID database.Identity, expiresAt time.Time) *database.StatementBuilder {
+func (r *sessionRepository) buildInsertSessionSpanner(projectID string, userAgentID database.Identity, ttl time.Duration) *database.StatementBuilder {
 	b := database.NewStatementBuilder("INSERT INTO ")
 	b.WriteString(r.meta.tableName)
-	b.WriteString(" (project_id, user_agent_id, expires_at, token_id, created_at, updated_at) VALUES (")
+	b.WriteString(" (project_id, user_agent_id, time_to_live, token_id, created_at, updated_at) VALUES (")
 	b.WriteArg(projectID)
 	b.WriteString(", ")
 	b.WriteArg(userAgentID)
 	b.WriteString(", ")
-	b.WriteArg(expiresAt)
+	b.WriteArg(ttl.Nanoseconds())
 	b.WriteString(", 0, ")
 	b.WriteArg(r.now)
 	b.WriteString(", ")
 	b.WriteArg(r.now)
-	b.WriteString(") THEN RETURN id, created_at, updated_at")
+	b.WriteString(") THEN RETURN id, created_at, updated_at, expires_at")
 	return b
+}
+
+func (r *sessionRepository) sessionTTLChange(ttl time.Duration) database.Change {
+	if r.isSpanner {
+		return database.NewChange(database.NewColumn(r.meta.tableName, "time_to_live"), ttl.Nanoseconds())
+	}
+	return database.NewChange(database.NewColumn(r.meta.tableName, "time_to_live"), ttl)
 }
 
 func (r *sessionRepository) buildUpdateSessionTokenSpanner(projectID string, sessionID database.Identity) *database.StatementBuilder {
@@ -320,7 +327,7 @@ func (r *sessionRepository) buildDeleteSessionCheckLoser(projectID, sessionID st
 	return b
 }
 
-func scanSessions(rows database.Rows) ([]*domain.Session, error) {
+func (r *sessionRepository) scanSessions(rows database.Rows) ([]*domain.Session, error) {
 	byID := make(map[string]*domain.Session)
 	order := make([]string, 0)
 
@@ -330,7 +337,7 @@ func scanSessions(rows database.Rows) ([]*domain.Session, error) {
 			sessionID        database.Identity
 			createdAt        time.Time
 			updatedAt        time.Time
-			expiresAt        database.Null[time.Time]
+			expiresAt        time.Time
 			tokenID          database.Identity
 			userID           database.Null[string]
 			userAgentID      database.Null[int64]
@@ -346,12 +353,27 @@ func scanSessions(rows database.Rows) ([]*domain.Session, error) {
 			factor           json.RawMessage
 		)
 
-		if err := rows.Scan(
-			&projectID, &sessionID, &createdAt, &updatedAt, &expiresAt, &tokenID, &userID,
-			&userAgentID, &userAgentInfo,
-			&checkType, &checkID, &lastChallengedAt, &lastVerifiedAt, &lastFailedAt, &failureCount, &challenge, &factor,
-		); err != nil {
+		var timeToLive time.Duration
+		var timeToLiveNanos int64
+		var scanArgs []any
+		if r.isSpanner {
+			scanArgs = []any{
+				&projectID, &sessionID, &createdAt, &updatedAt, &expiresAt, &timeToLiveNanos, &tokenID, &userID,
+				&userAgentID, &userAgentInfo,
+				&checkType, &checkID, &lastChallengedAt, &lastVerifiedAt, &lastFailedAt, &failureCount, &challenge, &factor,
+			}
+		} else {
+			scanArgs = []any{
+				&projectID, &sessionID, &createdAt, &updatedAt, &expiresAt, &timeToLive, &tokenID, &userID,
+				&userAgentID, &userAgentInfo,
+				&checkType, &checkID, &lastChallengedAt, &lastVerifiedAt, &lastFailedAt, &failureCount, &challenge, &factor,
+			}
+		}
+		if err := rows.Scan(scanArgs...); err != nil {
 			return nil, fmt.Errorf("failed to scan session row: %w", err)
+		}
+		if r.isSpanner {
+			timeToLive = time.Duration(timeToLiveNanos)
 		}
 		checkIDValid = checkID.String() != ""
 
@@ -359,15 +381,13 @@ func scanSessions(rows database.Rows) ([]*domain.Session, error) {
 		sess, ok := byID[id]
 		if !ok {
 			sess = &domain.Session{
-				ProjectID: projectID,
-				ID:        id,
-				CreatedAt: createdAt,
-				UpdatedAt: updatedAt,
-				TokenID:   tokenID.String(),
-			}
-			if expiresAt.Valid {
-				sess.ExpiresAt = expiresAt.V
-				sess.TimeToLive = expiresAt.V.Sub(updatedAt)
+				ProjectID:  projectID,
+				ID:         id,
+				CreatedAt:  createdAt,
+				UpdatedAt:  updatedAt,
+				ExpiresAt:  expiresAt,
+				TimeToLive: timeToLive,
+				TokenID:    tokenID.String(),
 			}
 			if userID.Valid {
 				sess.UserID = &userID.V
@@ -473,14 +493,14 @@ func (r *sessionRepository) insertSession(ctx context.Context, q database.QueryE
 }
 
 func (r *sessionRepository) insertSessionPostgres(ctx context.Context, q database.QueryExecutor, session *domain.Session, userAgentID database.Identity) error {
-	expiresAt := time.Now().UTC().Add(session.TimeToLive)
 	var (
 		sessionID database.Identity
 		createdAt time.Time
 		updatedAt time.Time
+		expiresAt time.Time
 	)
-	insertB := r.buildInsertSessionPostgres(session.ProjectID, userAgentID, expiresAt)
-	err := q.QueryRow(ctx, insertB.String(), insertB.Args()...).Scan(&sessionID, &createdAt, &updatedAt)
+	insertB := r.buildInsertSessionPostgres(session.ProjectID, userAgentID, session.TimeToLive)
+	err := q.QueryRow(ctx, insertB.String(), insertB.Args()...).Scan(&sessionID, &createdAt, &updatedAt, &expiresAt)
 	if err != nil {
 		return fmt.Errorf("failed to insert session: %w", err)
 	}
@@ -494,15 +514,13 @@ func (r *sessionRepository) insertSessionPostgres(ctx context.Context, q databas
 	session.CreatedAt = createdAt
 	session.UpdatedAt = updatedAt
 	session.ExpiresAt = expiresAt
-	session.TimeToLive = expiresAt.Sub(createdAt)
 	return nil
 }
 
 func (r *sessionRepository) insertSessionSpanner(ctx context.Context, q database.QueryExecutor, session *domain.Session, userAgentID database.Identity) error {
-	expiresAt := time.Now().UTC().Add(session.TimeToLive)
 	var sessionID database.Identity
-	insertB := r.buildInsertSessionSpanner(session.ProjectID, userAgentID, expiresAt)
-	err := q.QueryRow(ctx, insertB.String(), insertB.Args()...).Scan(&sessionID, &session.CreatedAt, &session.UpdatedAt)
+	insertB := r.buildInsertSessionSpanner(session.ProjectID, userAgentID, session.TimeToLive)
+	err := q.QueryRow(ctx, insertB.String(), insertB.Args()...).Scan(&sessionID, &session.CreatedAt, &session.UpdatedAt, &session.ExpiresAt)
 	if err != nil {
 		return fmt.Errorf("failed to insert session: %w", err)
 	}
@@ -513,7 +531,6 @@ func (r *sessionRepository) insertSessionSpanner(ctx context.Context, q database
 	}
 	session.ID = sessionID.String()
 	session.TokenID = session.ID
-	session.ExpiresAt = expiresAt
 	return nil
 }
 
@@ -574,7 +591,7 @@ func (r *sessionRepository) exchange(ctx context.Context, q database.QueryExecut
 		changes = append(changes, database.NewChange(database.NewColumn(r.meta.tableName, "user_id"), userID))
 	}
 	if ttl > 0 {
-		changes = append(changes, database.NewChange(database.NewColumn(r.meta.tableName, "expires_at"), time.Now().UTC().Add(ttl)))
+		changes = append(changes, r.sessionTTLChange(ttl))
 	}
 	cond := database.And(
 		database.NewTextCondition(database.NewColumn(r.meta.tableName, "project_id"), database.TextOperationEqual, projectID),
