@@ -1,31 +1,22 @@
 import { injectSystemPrompt } from "./inject.js";
 import { callClaude, type ClaudeAuth } from "./lib/claude.js";
 import { isPlainObject, tryParseJson } from "./utils/json.js";
+import { jsonResponse } from "./utils/response.js";
 
 export type { ClaudeAuth } from "./lib/claude.js";
 
 const ANTHROPIC_API_VERSION_PREFIX = "v1";
 const MESSAGES_ENDPOINT = "messages";
+const COUNT_TOKENS_ENDPOINT = "count_tokens";
 
 /**
- * Inbound request headers to strip before gateway auth is applied.
- * These are gateway-specific concerns — not generic hop-by-hop headers,
- * which the underlying proxy handles automatically.
+ * Endpoints reachable through this gateway. Any `/v1/` path not in this
+ * list is rejected with a 404 before contacting the upstream.
  */
-const STRIP_REQUEST_HEADERS: ReadonlySet<string> = new Set([
-	"authorization",
-	"host",
-	"content-length",
-]);
-
-/**
- * Upstream response headers to strip in addition to the RFC 7230
- * hop-by-hop set, which the underlying proxy removes automatically.
- */
-const STRIP_RESPONSE_HEADERS: ReadonlySet<string> = new Set([
-	"content-encoding",
-	"content-length",
-]);
+const ALLOWED_PATHS: ReadonlyArray<ReadonlyArray<string>> = [
+	[MESSAGES_ENDPOINT],
+	[MESSAGES_ENDPOINT, COUNT_TOKENS_ENDPOINT],
+];
 
 /**
  * Extract the path segments after `/v1/` from a URL pathname. Handles both
@@ -92,9 +83,9 @@ export function prepareBody(
  *
  * Behaviour:
  *
+ * - Only `/v1/messages` and `/v1/messages/count_tokens` are accepted;
+ *   all other paths return `404 not_found`.
  * - GET/HEAD requests pass through with only auth + version header rewriting.
- * - Non-messages endpoints (e.g. `/v1/messages/count_tokens`) parse their
- *   body for validity but receive no system-prompt injection.
  * - Non-2xx upstream responses are forwarded verbatim so the calling SDK can
  *   apply its own 429/5xx detection.
  * - Invalid JSON in the inbound body returns `400 invalid_json` without
@@ -112,9 +103,21 @@ export async function forward(args: {
 		readonly upstreamStatus: number;
 	}) => void;
 }): Promise<Response> {
+	const pathParts = extractV1PathSegments(args.pathname);
+
+	const isAllowed = ALLOWED_PATHS.some(
+		(allowed) =>
+			allowed.length === pathParts.length && allowed.every((seg, i) => seg === pathParts[i]),
+	);
+	if (!isAllowed) {
+		return jsonResponse(
+			{ error: "not_found", message: `Unsupported endpoint: /v1/${pathParts.join("/")}` },
+			404,
+		);
+	}
+
 	const method = args.request.method.toUpperCase();
 	const hasBody = method !== "GET" && method !== "HEAD";
-	const pathParts = extractV1PathSegments(args.pathname);
 	const rawBody = hasBody ? await args.request.text() : undefined;
 
 	let capturedMutatedBody: unknown;
@@ -136,10 +139,8 @@ export async function forward(args: {
 		search: args.search,
 		method,
 		requestHeaders: args.request.headers,
-		stripRequestHeaders: STRIP_REQUEST_HEADERS,
 		body: rawBody,
 		onBody,
-		stripResponseHeaders: STRIP_RESPONSE_HEADERS,
 		fetchImpl: args.fetchImpl,
 		onDebug: args.onDebug
 			? (url, status) => {

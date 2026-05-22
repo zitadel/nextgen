@@ -22,6 +22,27 @@ const RFC_7230_HOP_BY_HOP: ReadonlySet<string> = new Set([
 const CONNECTION_OPTION_TOKENS: ReadonlySet<string> = new Set(["close", "keep-alive"]);
 
 /**
+ * Request headers stripped unconditionally on every forwarded request.
+ *
+ * - `host`: always rewritten to the upstream origin by the HTTP client;
+ *   forwarding the inbound value would send the wrong host to the upstream.
+ * - `content-length`: may be wrong after any body transformation; the HTTP
+ *   client recalculates it from the actual body string.
+ */
+const PROXY_STRIP_REQUEST: ReadonlySet<string> = new Set(["host", "content-length"]);
+
+/**
+ * Response headers stripped unconditionally before returning the upstream
+ * response to the caller.
+ *
+ * - `content-encoding`: `fetch()` decompresses transparently but keeps the
+ *   header, so the caller would attempt a second decompression pass.
+ * - `content-length`: after decompression the byte count no longer matches;
+ *   also wrong for chunked/streaming bodies.
+ */
+const PROXY_STRIP_RESPONSE: ReadonlySet<string> = new Set(["content-encoding", "content-length"]);
+
+/**
  * Compute the effective hop-by-hop header set for a message.
  *
  * Per RFC 7230 §6.1:
@@ -80,18 +101,12 @@ export interface ProxyOptions {
 	/** HTTP method to use for the upstream request. */
 	readonly method: string;
 	/**
-	 * Headers to send upstream. RFC 7230 hop-by-hop headers are always
-	 * stripped automatically; use {@link stripResponseHeaders} for any
-	 * additional headers to remove from the upstream response.
+	 * Headers to forward upstream. RFC 7230 hop-by-hop headers, `host`, and
+	 * `content-length` are always stripped automatically before forwarding.
 	 */
 	readonly requestHeaders: Headers;
 	/** Serialised request body. Omit entirely for GET/HEAD requests. */
 	readonly body?: string;
-	/**
-	 * Additional response headers to strip beyond the RFC 7230 hop-by-hop
-	 * set, which is always removed automatically from the upstream response.
-	 */
-	readonly stripResponseHeaders?: ReadonlySet<string>;
 	/** Replaceable fetch implementation — useful for injecting test doubles. */
 	readonly fetchImpl?: typeof fetch;
 	/**
@@ -104,17 +119,25 @@ export interface ProxyOptions {
 /**
  * Generic HTTP reverse-proxy kernel.
  *
- * RFC 7230 hop-by-hop headers are stripped automatically from both the
- * outgoing request and the incoming response. Additional response headers
- * can be removed via {@link ProxyOptions.stripResponseHeaders}.
+ * Automatically strips on every request:
+ * - RFC 7230 hop-by-hop headers (including `Connection`-listed names).
+ * - `host` and `content-length` (always wrong for a forwarded request).
+ *
+ * Automatically strips on every response:
+ * - RFC 7230 hop-by-hop headers.
+ * - `content-encoding` and `content-length` (fetch decompresses
+ *   transparently, leaving these stale).
  *
  * The upstream response body is streamed back to the caller unchanged.
  */
 export async function proxy(options: ProxyOptions): Promise<Response> {
 	const fetchImpl = options.fetchImpl ?? fetch;
 
-	const reqHopByHop = effectiveHopByHopHeaders(options.requestHeaders);
-	const filteredReq = filterHeaders(options.requestHeaders, reqHopByHop);
+	const reqStrip = new Set([
+		...effectiveHopByHopHeaders(options.requestHeaders),
+		...PROXY_STRIP_REQUEST,
+	]);
+	const filteredReq = filterHeaders(options.requestHeaders, reqStrip);
 
 	const init: RequestInit = { method: options.method, headers: filteredReq };
 	if (options.body !== undefined) {
@@ -125,10 +148,10 @@ export async function proxy(options: ProxyOptions): Promise<Response> {
 
 	options.onDebug?.(options.upstreamUrl, upstream.status);
 
-	const resHopByHop = effectiveHopByHopHeaders(upstream.headers);
-	const resStrip = options.stripResponseHeaders
-		? new Set([...resHopByHop, ...options.stripResponseHeaders])
-		: resHopByHop;
+	const resStrip = new Set([
+		...effectiveHopByHopHeaders(upstream.headers),
+		...PROXY_STRIP_RESPONSE,
+	]);
 	const filteredRes = filterHeaders(upstream.headers, resStrip);
 
 	return new Response(upstream.body, {

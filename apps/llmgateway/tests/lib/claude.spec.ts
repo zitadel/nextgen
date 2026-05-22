@@ -390,25 +390,8 @@ describe("callClaude — onDebug", () => {
 	});
 });
 
-describe("callClaude — stripRequestHeaders", () => {
-	it("strips specified request headers before forwarding", async () => {
-		const { fetchImpl, calls } = buildFetchMock({ status: 200 });
-
-		await callClaude({
-			auth: API_KEY_AUTH,
-			pathSegments: ["messages"],
-			search: "",
-			method: "GET",
-			requestHeaders: new Headers({ "x-to-strip": "drop-me", "x-to-keep": "keep-me" }),
-			stripRequestHeaders: new Set(["x-to-strip"]),
-			fetchImpl,
-		});
-
-		expect(sentHeaders(calls).has("x-to-strip")).toBe(false);
-		expect(sentHeaders(calls).get("x-to-keep")).toBe("keep-me");
-	});
-
-	it("strips client auth before applying gateway auth so gateway auth survives", async () => {
+describe("callClaude — client Authorization stripping", () => {
+	it("replaces a client-supplied Authorization with gateway OAuth auth", async () => {
 		const { fetchImpl, calls } = buildFetchMock({ status: 200 });
 
 		await callClaude({
@@ -417,36 +400,25 @@ describe("callClaude — stripRequestHeaders", () => {
 			search: "",
 			method: "GET",
 			requestHeaders: new Headers({ authorization: "Bearer client-token" }),
-			stripRequestHeaders: new Set(["authorization"]),
 			fetchImpl,
 		});
 
 		expect(sentHeaders(calls).get("authorization")).toBe("Bearer oauth-token");
 	});
-});
 
-describe("callClaude — stripResponseHeaders", () => {
-	it("strips specified response headers in addition to hop-by-hop", async () => {
-		const { fetchImpl } = buildFetchMock({
-			status: 200,
-			body: "{}",
-			headers: {
-				"content-type": "application/json",
-				"x-should-strip": "yes",
-			},
-		});
+	it("removes a client-supplied Authorization in API-key mode", async () => {
+		const { fetchImpl, calls } = buildFetchMock({ status: 200 });
 
-		const res = await callClaude({
+		await callClaude({
 			auth: API_KEY_AUTH,
 			pathSegments: ["messages"],
 			search: "",
 			method: "GET",
-			requestHeaders: new Headers(),
+			requestHeaders: new Headers({ authorization: "Bearer client-token" }),
 			fetchImpl,
-			stripResponseHeaders: new Set(["x-should-strip"]),
 		});
 
-		expect(res.headers.has("x-should-strip")).toBe(false);
-		expect(res.headers.get("content-type")).toBe("application/json");
+		expect(sentHeaders(calls).has("authorization")).toBe(false);
+		expect(sentHeaders(calls).get("x-api-key")).toBe("sk-ant-test");
 	});
 });

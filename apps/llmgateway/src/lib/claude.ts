@@ -1,5 +1,5 @@
 import { jsonResponse } from "../utils/response.js";
-import { filterHeaders, proxy } from "./proxy.js";
+import { proxy } from "./proxy.js";
 
 const ANTHROPIC_API_ORIGIN = "https://api.anthropic.com";
 const ANTHROPIC_API_VERSION_PREFIX = "v1";
@@ -19,34 +19,20 @@ export type ClaudeAuth =
 	| { readonly mode: "apiKey"; readonly key: string };
 
 /**
- * Compose the absolute Anthropic upstream URL from path segments and a query
- * string. Strips the `beta` query parameter before appending the remaining
- * query string.
- */
-function buildUpstreamUrl(pathSegments: ReadonlyArray<string>, search: string): string {
-	const upstream = new URL(
-		`${ANTHROPIC_API_ORIGIN}/${ANTHROPIC_API_VERSION_PREFIX}/${pathSegments.join("/")}`,
-	);
-	const params = new URLSearchParams(search);
-	params.delete(ANTHROPIC_BETA_QUERY_PARAM);
-	upstream.search = params.toString();
-	return upstream.toString();
-}
-
-/**
- * Return a new `Headers` with the appropriate upstream auth applied. Does NOT
- * mutate the input.
+ * Build the outgoing request headers: strip client-supplied `authorization`,
+ * apply gateway credentials, set `anthropic-version` if absent, and
+ * conditionally add `content-type: application/json` for requests with a body.
  *
- * - `oauth` mode: sets `Authorization: Bearer <token>` and ensures
- *   `anthropic-beta: oauth-2025-04-20` is present (appended when a beta header
- *   already exists; not duplicated when already listed).
- * - `apiKey` mode: sets `x-api-key: <key>`.
- *
- * Always ensures `anthropic-version` is set, defaulting to `"2023-06-01"` when
- * the header is absent from `input`.
+ * Accepting `hasJsonBody` here keeps header construction as a single,
+ * mutation-free step in {@link callClaude}.
  */
-function applyAuth(input: Headers, auth: ClaudeAuth): Headers {
+function buildRequestHeaders(input: Headers, auth: ClaudeAuth, hasJsonBody: boolean): Headers {
 	const out = new Headers(input);
+
+	// Remove any client-supplied Authorization before writing gateway auth so
+	// it does not leak to the upstream (especially in API-key mode, where
+	// applyAuth does not overwrite the header).
+	out.delete("authorization");
 
 	if (auth.mode === "oauth") {
 		out.set("authorization", `Bearer ${auth.token}`);
@@ -69,6 +55,11 @@ function applyAuth(input: Headers, auth: ClaudeAuth): Headers {
 	if (!out.has("anthropic-version")) {
 		out.set("anthropic-version", DEFAULT_ANTHROPIC_VERSION);
 	}
+
+	if (hasJsonBody) {
+		out.set("content-type", "application/json");
+	}
+
 	return out;
 }
 
@@ -84,21 +75,8 @@ export interface ClaudeOptions {
 	readonly search: string;
 	/** HTTP method to use for the upstream request. */
 	readonly method: string;
-	/**
-	 * Raw inbound headers. Business-specific headers (e.g. `authorization`,
-	 * `host`) are stripped via {@link stripRequestHeaders} before gateway auth
-	 * is applied. RFC 7230 hop-by-hop headers are stripped automatically by
-	 * the underlying proxy.
-	 */
+	/** Raw inbound headers; gateway auth is applied by {@link callClaude}. */
 	readonly requestHeaders: Headers;
-	/**
-	 * Request headers to remove before gateway auth is applied. Use this for
-	 * headers whose inbound values must not reach the upstream — for example,
-	 * a client-supplied `Authorization` that the gateway replaces with its own
-	 * credential. Stripped before {@link auth} is written, so gateway auth
-	 * headers are never themselves removed.
-	 */
-	readonly stripRequestHeaders?: ReadonlySet<string>;
 	/** Pre-serialised request body. Omit for GET/HEAD requests. */
 	readonly body?: string;
 	/**
@@ -107,11 +85,6 @@ export interface ClaudeOptions {
 	 * response. NOT called when `body` is `undefined`.
 	 */
 	readonly onBody?: (body: string) => string | null;
-	/**
-	 * Additional response headers to strip beyond the RFC 7230 hop-by-hop set,
-	 * which is always removed automatically by the underlying proxy.
-	 */
-	readonly stripResponseHeaders?: ReadonlySet<string>;
 	/** Replaceable fetch implementation — useful for injecting test doubles. */
 	readonly fetchImpl?: typeof fetch;
 	/**
@@ -122,41 +95,38 @@ export interface ClaudeOptions {
 }
 
 /**
- * Generic Claude API client. Builds the upstream URL, strips caller-specified
- * request headers, applies auth, optionally transforms the body via `onBody`,
- * and delegates the actual HTTP call to {@link proxy}.
+ * Generic Claude API client. Builds the upstream URL, applies gateway auth,
+ * optionally transforms the request body via `onBody`, and delegates the
+ * actual HTTP call to {@link proxy}.
  *
  * @param options - Call options; see {@link ClaudeOptions}.
  * @returns A {@link Response} from the upstream, or a `400` response when
  *   `onBody` returns `null`.
  */
 export async function callClaude(options: ClaudeOptions): Promise<Response> {
-	const upstreamUrl = buildUpstreamUrl(options.pathSegments, options.search);
+	const url = new URL(
+		`${ANTHROPIC_API_ORIGIN}/${ANTHROPIC_API_VERSION_PREFIX}/${options.pathSegments.join("/")}`,
+	);
+	const searchParams = new URLSearchParams(options.search);
+	searchParams.delete(ANTHROPIC_BETA_QUERY_PARAM);
+	url.search = searchParams.toString();
 
-	// Strip business-specific request headers first, then apply gateway auth
-	// so that the gateway's own auth headers are never inadvertently removed.
-	const strippedHeaders = options.stripRequestHeaders
-		? filterHeaders(options.requestHeaders, options.stripRequestHeaders)
-		: options.requestHeaders;
-	const upstreamHeaders = applyAuth(strippedHeaders, options.auth);
+	const body =
+		options.body === undefined
+			? undefined
+			: options.onBody
+				? options.onBody(options.body)
+				: options.body;
 
-	let finalBody: string | undefined;
-
-	if (options.body !== undefined) {
-		const transformed = options.onBody ? options.onBody(options.body) : options.body;
-		if (transformed === null) {
-			return jsonResponse({ error: "invalid_json", message: "Request body is not valid JSON" }, 400);
-		}
-		finalBody = transformed;
-		upstreamHeaders.set("content-type", "application/json");
+	if (body === null) {
+		return jsonResponse({ error: "invalid_json", message: "Request body is not valid JSON" }, 400);
 	}
 
 	return proxy({
-		upstreamUrl,
+		upstreamUrl: url.toString(),
 		method: options.method,
-		requestHeaders: upstreamHeaders,
-		body: finalBody,
-		stripResponseHeaders: options.stripResponseHeaders,
+		requestHeaders: buildRequestHeaders(options.requestHeaders, options.auth, body !== undefined),
+		body,
 		fetchImpl: options.fetchImpl,
 		onDebug: options.onDebug,
 	});

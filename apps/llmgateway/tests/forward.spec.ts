@@ -114,6 +114,61 @@ function buildFetchMock(
 	return { fetchImpl, calls };
 }
 
+describe("forward — endpoint allowlist", () => {
+	it("returns 404 for an unknown /v1/ path", async () => {
+		const { fetchImpl, calls } = buildFetchMock();
+		const request = new Request("http://placeholder.local/v1/models", { method: "GET" });
+
+		const res = await forward({
+			request,
+			pathname: "/v1/models",
+			search: "",
+			auth: API_KEY_AUTH,
+			fetchImpl,
+		});
+
+		expect(res.status).toBe(404);
+		expect(((await res.json()) as { error: string }).error).toBe("not_found");
+		expect(calls).toHaveLength(0);
+	});
+
+	it("allows /v1/messages", async () => {
+		const { fetchImpl } = buildFetchMock({ status: 200, body: "{}" });
+		const request = new Request("http://placeholder.local/v1/messages", {
+			method: "POST",
+			body: JSON.stringify({ messages: [] }),
+		});
+
+		const res = await forward({
+			request,
+			pathname: "/v1/messages",
+			search: "",
+			auth: API_KEY_AUTH,
+			fetchImpl,
+		});
+
+		expect(res.status).toBe(200);
+	});
+
+	it("allows /v1/messages/count_tokens", async () => {
+		const { fetchImpl } = buildFetchMock({ status: 200, body: "{}" });
+		const request = new Request("http://placeholder.local/v1/messages/count_tokens", {
+			method: "POST",
+			body: JSON.stringify({ messages: [] }),
+		});
+
+		const res = await forward({
+			request,
+			pathname: "/v1/messages/count_tokens",
+			search: "",
+			auth: API_KEY_AUTH,
+			fetchImpl,
+		});
+
+		expect(res.status).toBe(200);
+	});
+});
+
 describe("forward", () => {
 	it("returns 400 for invalid JSON without calling upstream", async () => {
 		const { fetchImpl, calls } = buildFetchMock();
@@ -236,6 +291,33 @@ describe("forward", () => {
 		expect(((calls[0] as { init: RequestInit }).init.headers as Headers).get("authorization")).toBe(
 			"Bearer oauth-token",
 		);
+	});
+
+	it("strips host and content-length from the forwarded request", async () => {
+		const { fetchImpl, calls } = buildFetchMock({ status: 200, body: "{}" });
+		const request = new Request("http://placeholder.local/v1/messages", {
+			method: "POST",
+			headers: {
+				host: "placeholder.local",
+				"content-length": "999",
+				"content-type": "application/json",
+				"x-keep": "kept",
+			},
+			body: JSON.stringify({ messages: [] }),
+		});
+
+		await forward({
+			request,
+			pathname: "/v1/messages",
+			search: "",
+			auth: API_KEY_AUTH,
+			fetchImpl,
+		});
+
+		const sent = (calls[0] as { init: RequestInit }).init.headers as Headers;
+		expect(sent.has("host")).toBe(false);
+		expect(sent.has("content-length")).toBe(false);
+		expect(sent.get("x-keep")).toBe("kept");
 	});
 
 	it("strips outbound content-encoding and content-length", async () => {
