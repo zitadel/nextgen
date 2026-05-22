@@ -11,7 +11,7 @@ Use **Nx** from the repo root (`corepack pnpm install` first). Two terminals:
 corepack pnpm nx start @zitadel-nextgen/api-mock
 
 # Terminal 2 — Next.js on port 3002
-NEXTGEN_ISSUER_URL=http://localhost:4000 corepack pnpm nx dev @nextgen/demo-next
+NEXTGEN_ISSUER_URL=http://localhost:4000 corepack pnpm nx dev @zitadel-nextgen/demo-next
 ```
 
 Open [http://localhost:3002/login](http://localhost:3002/login). Any email/password combination is accepted by the mock server.

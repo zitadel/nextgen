@@ -68,6 +68,36 @@ describe("setupMockHandlers", () => {
     expect(submitPasskey.handoff_token).toBeTruthy();
   });
 
+  test("walks sign-in -> passkey-upsell -> setup -> passkey-setup (challenge) -> done", async () => {
+    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    const upsell = await submitFlowStep(start.id, {
+      session_token: start.session_token,
+      action: "submit",
+      fields: { email: "alice@acme.com", password: "hunter2" },
+    });
+    expect(upsell.step.name).toBe("passkey-upsell");
+
+    const setup = await submitFlowStep(upsell.id, {
+      session_token: upsell.session_token,
+      action: "setup",
+      fields: {},
+    });
+    expect(setup.step.name).toBe("passkey-setup");
+    expect(setup.step.challenge).toBeTruthy();
+    expect(setup.step.challenge?.method).toBe("passkey");
+    expect(setup.step.challenge?.challenge_id).toBeTruthy();
+    expect(setup.step.challenge?.options).toBeTruthy();
+
+    const done = await submitFlowStep(setup.id, {
+      session_token: setup.session_token,
+      action: "submit",
+      fields: {},
+    });
+    expect(done.step.name).toBe("done");
+    expect(done.step.complete).toBe("show");
+    expect(done.handoff_token).toBeTruthy();
+  });
+
   test("captures every request body for assertions", async () => {
     const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
     await submitFlowStep(start.id, {

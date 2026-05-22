@@ -387,7 +387,7 @@ async function handleAuth(
   const tunnelled = tunnelHeaders(req, { 'x-nextgen-auth-token': '' });
   const staleNextgenCookies = req.cookies
     .getAll()
-    .filter((c) => c.name.startsWith('__nextgen'));
+    .filter((c: { name: string }) => c.name.startsWith('__nextgen'));
 
   if (matchesRoutes(pathname, protectedRoutes)) {
     const loginUrl = new URL(loginPath, req.url);
