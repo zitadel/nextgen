@@ -29,6 +29,14 @@ func (h Handler) CreateFlowDefinition(ctx context.Context, req *api.CreateFlowDe
 	return flowDefinitionSuccessResponse(create, flowSchemaURI), nil
 }
 
+func (h Handler) GetFlowDefinition(ctx context.Context, params api.GetFlowDefinitionParams) (api.GetFlowDefinitionRes, error) {
+	definition, err := h.flowDefinitionService.Get(ctx, string(params.ProjectID), params.ID)
+	if err != nil {
+		return errorResponse(err), nil
+	}
+	return flowDefinitionSuccessResponse(definition, ""), nil
+}
+
 func mapCreateRequestToService(req *api.CreateFlowDefinitionRequest) (service.CreateFlowDefinitionRequest, error) {
 	definition := req.GetFlowDefinition()
 
@@ -66,7 +74,7 @@ func mapCreateRequestToService(req *api.CreateFlowDefinitionRequest) (service.Cr
 	return svcReq, nil
 }
 
-func flowDefinitionSuccessResponse(flowDefinition *domain.FlowDefinition, schemaURI string) api.CreateFlowDefinitionRes {
+func flowDefinitionSuccessResponse(flowDefinition *domain.FlowDefinition, schemaURI string) *api.FlowDefinitionDetailResponse {
 	purposes := mapDomainPurposesToAPI(flowDefinition.Purposes)
 	audience := api.OptFlowAudience{
 		Value: api.FlowAudience{

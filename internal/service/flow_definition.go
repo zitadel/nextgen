@@ -15,6 +15,7 @@ import (
 
 type FlowDefinitionService interface {
 	Create(ctx context.Context, req CreateFlowDefinitionRequest) (*domain.FlowDefinition, string, error)
+	Get(ctx context.Context, projectID, id string) (*domain.FlowDefinition, error)
 }
 
 type SchemaResolver interface {
@@ -81,7 +82,7 @@ func (fd *flowDefinitionService) Create(ctx context.Context, req CreateFlowDefin
 	}
 	defs, err := fd.flowDefinitionRepo.ListFlowDefinitions(ctx, fd.db, req.ProjectID, opts...)
 	if err != nil {
-		if !errors.Is(err, domain.ErrFlowDefinitionNotFound()) {
+		if !errors.Is(err, &database.NoRowFoundError{}) {
 			return nil, "", err
 		}
 	}
@@ -210,4 +211,13 @@ func mapPurposesToDomain(reqPurposes map[string]string) (map[domain.FlowDefiniti
 		purposes[purpose] = entryStep
 	}
 	return purposes, nil
+}
+
+func (fd *flowDefinitionService) Get(ctx context.Context, projectID, id string) (*domain.FlowDefinition, error) {
+	// todo: get the project ID from the context when the functionality is implemented
+	definition, err := fd.flowDefinitionRepo.GetFlowDefinition(ctx, fd.db, projectID, id)
+	if err != nil {
+		return nil, err
+	}
+	return definition, nil
 }
