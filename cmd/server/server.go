@@ -99,8 +99,16 @@ func run(ctx context.Context, cfg Config, pool database.Pool) error {
 		}
 	}
 	// to resolve schema from cache/db, not via http fetch
-	// maxResolveDepth and maxSize default to the values set in the domain; we could make them configurable in the future
-	storageSchemaResolver := domain.NewJSONSchemaResolver(jsonSchemaRepo, schemaCache, 0, 0, nil, builtinPublicBase)
+	// maxResolveDepth and maxSize default to the values set in the domain;
+	// we could make them configurable in the future
+	storageSchemaResolver := domain.NewJSONSchemaResolver(
+		jsonSchemaRepo,
+		schemaCache,
+		0,
+		0,
+		nil,
+		builtinPublicBase,
+	)
 
 	schemaProvider, err := domain.NewSchemaValidator(cfg.Schema.BuiltinPublicBase)
 	if err != nil {
