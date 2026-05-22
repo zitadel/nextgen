@@ -31,6 +31,7 @@ export interface CreateFlowDefinitionRequest {
 
 export interface FlowDefinitionClient {
   createFlowDefinition(req: CreateFlowDefinitionRequest): Promise<{ id: string }>;
+  getFlowDefinition(id: string): Promise<object>;
   updateFlowDefinition(id: string, data: object): Promise<void>;
   deleteFlowDefinition(id: string): Promise<void>;
 }

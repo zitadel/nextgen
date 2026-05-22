@@ -63,9 +63,9 @@ export class FlowDefinitionSyncer implements ResourceSyncer {
     await client.deleteFlowDefinition(id);
   }
 
-  // no fetch — GET /flow_definitions/{id} is currently in the spec but the
-  // CLI doesn't read it back; a field-level diff in `plan` is therefore
-  // marked as "unavailable" rather than fetched.
+  async fetch(client: PlatformClient, id: string): Promise<object> {
+    return client.getFlowDefinition(id);
+  }
 }
 
 /**

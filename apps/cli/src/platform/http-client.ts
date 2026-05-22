@@ -50,6 +50,10 @@ export class HttpPlatformClient implements PlatformClient {
     return this.request("POST", "/flow_definitions", req);
   }
 
+  async getFlowDefinition(id: string): Promise<object> {
+    return this.request("GET", `/flow_definitions/${encodeURIComponent(id)}`);
+  }
+
   async updateFlowDefinition(id: string, data: object): Promise<void> {
     return this.request("PATCH", `/flow_definitions/${encodeURIComponent(id)}`, data);
   }

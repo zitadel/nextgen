@@ -60,28 +60,21 @@ describe("platform client", () => {
     await expect(client.deleteFlowDefinition(id)).resolves.toBeUndefined();
   });
 
-  it("listFlowDefinitions and getFlowDefinition expose detail responses", async () => {
+  it("getFlowDefinition returns the created flow definition", async () => {
     const client = createPlatformClient(MOCK_SERVER_URL);
     const { id } = await client.createFlowDefinition({
       project_id: "proj_test",
       flow_definition: { name: "default" },
     });
 
-    const single = await fetch(new URL(`/flow_definitions/${id}`, MOCK_SERVER_URL));
-    expect(single.status).toBe(200);
-    expect(await single.json()).toMatchObject({
+    const flow = await client.getFlowDefinition(id);
+    expect(flow).toMatchObject({
       id,
-      project_id: expect.any(String),
+      project_id: "proj_test",
       schema_uri: expect.any(String),
       status: "active",
       created_at: expect.any(String),
       updated_at: expect.any(String),
-    });
-
-    const list = await fetch(new URL("/flow_definitions", MOCK_SERVER_URL));
-    expect(list.status).toBe(200);
-    expect(await list.json()).toMatchObject({
-      flow_definitions: [expect.objectContaining({ id })],
     });
   });
 

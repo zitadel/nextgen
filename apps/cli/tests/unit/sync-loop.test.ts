@@ -29,6 +29,7 @@ function makeClient(): PlatformClient {
     createSchema: vi.fn().mockResolvedValue({ id: "schema-001" }),
     deleteSchema: vi.fn().mockResolvedValue(undefined),
     createFlowDefinition: vi.fn().mockResolvedValue({ id: "flow-001" }),
+    getFlowDefinition: vi.fn().mockResolvedValue({}),
     updateFlowDefinition: vi.fn().mockResolvedValue(undefined),
     deleteFlowDefinition: vi.fn().mockResolvedValue(undefined),
     initClaim: vi.fn(),
