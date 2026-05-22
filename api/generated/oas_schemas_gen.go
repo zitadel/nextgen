@@ -10474,8 +10474,6 @@ type UserID string
 // This is done because a lot of code generators cannot handle that.
 // Ref: #
 type UserProperty struct {
-	// Whether this property is an identifier for the user or not.
-	XMinusIdentifier OptBool `json:"x-identifier"`
 	// The verification method for this property, if applicable.
 	XMinusVerify OptNilString `json:"x-verify"`
 	// The level of uniqueness for this property, if applicable.
@@ -10492,11 +10490,6 @@ type UserProperty struct {
 	// value is the property schema.
 	Properties      OptUserPropertyProperties `json:"properties"`
 	AdditionalProps UserPropertyAdditional
-}
-
-// GetXMinusIdentifier returns the value of XMinusIdentifier.
-func (s *UserProperty) GetXMinusIdentifier() OptBool {
-	return s.XMinusIdentifier
 }
 
 // GetXMinusVerify returns the value of XMinusVerify.
@@ -10537,11 +10530,6 @@ func (s *UserProperty) GetProperties() OptUserPropertyProperties {
 // GetAdditionalProps returns the value of AdditionalProps.
 func (s *UserProperty) GetAdditionalProps() UserPropertyAdditional {
 	return s.AdditionalProps
-}
-
-// SetXMinusIdentifier sets the value of XMinusIdentifier.
-func (s *UserProperty) SetXMinusIdentifier(val OptBool) {
-	s.XMinusIdentifier = val
 }
 
 // SetXMinusVerify sets the value of XMinusVerify.
@@ -10611,24 +10599,28 @@ func (s *UserPropertyProperties) init() UserPropertyProperties {
 type UserPropertyXMinusUnique string
 
 const (
-	UserPropertyXMinusUniqueInstance     UserPropertyXMinusUnique = "instance"
-	UserPropertyXMinusUniqueOrganization UserPropertyXMinusUnique = "organization"
+	UserPropertyXMinusUniqueUnspecified UserPropertyXMinusUnique = "unspecified"
+	UserPropertyXMinusUniqueProject     UserPropertyXMinusUnique = "project"
+	UserPropertyXMinusUniqueTeam        UserPropertyXMinusUnique = "team"
 )
 
 // AllValues returns all UserPropertyXMinusUnique values.
 func (UserPropertyXMinusUnique) AllValues() []UserPropertyXMinusUnique {
 	return []UserPropertyXMinusUnique{
-		UserPropertyXMinusUniqueInstance,
-		UserPropertyXMinusUniqueOrganization,
+		UserPropertyXMinusUniqueUnspecified,
+		UserPropertyXMinusUniqueProject,
+		UserPropertyXMinusUniqueTeam,
 	}
 }
 
 // MarshalText implements encoding.TextMarshaler.
 func (s UserPropertyXMinusUnique) MarshalText() ([]byte, error) {
 	switch s {
-	case UserPropertyXMinusUniqueInstance:
+	case UserPropertyXMinusUniqueUnspecified:
 		return []byte(s), nil
-	case UserPropertyXMinusUniqueOrganization:
+	case UserPropertyXMinusUniqueProject:
+		return []byte(s), nil
+	case UserPropertyXMinusUniqueTeam:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -10638,11 +10630,14 @@ func (s UserPropertyXMinusUnique) MarshalText() ([]byte, error) {
 // UnmarshalText implements encoding.TextUnmarshaler.
 func (s *UserPropertyXMinusUnique) UnmarshalText(data []byte) error {
 	switch UserPropertyXMinusUnique(data) {
-	case UserPropertyXMinusUniqueInstance:
-		*s = UserPropertyXMinusUniqueInstance
+	case UserPropertyXMinusUniqueUnspecified:
+		*s = UserPropertyXMinusUniqueUnspecified
 		return nil
-	case UserPropertyXMinusUniqueOrganization:
-		*s = UserPropertyXMinusUniqueOrganization
+	case UserPropertyXMinusUniqueProject:
+		*s = UserPropertyXMinusUniqueProject
+		return nil
+	case UserPropertyXMinusUniqueTeam:
+		*s = UserPropertyXMinusUniqueTeam
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)

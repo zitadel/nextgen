@@ -14,11 +14,6 @@
       "const": "https://json-schema.org/draft/2020-12/schema",
       "description": "The JSON Schema version used for this schema."
     },
-    "x-identifier": {
-      "type": "boolean",
-      "default": false,
-      "description": "Whether this property is an identifier for the user or not"
-    },
     "x-verify": {
       "oneOf": [
         {
@@ -35,8 +30,9 @@
         {
           "type": "string",
           "enum": [
-            "instance",
-            "organization"
+            "unspecified",
+            "project",
+            "team"
           ]
         },
         {

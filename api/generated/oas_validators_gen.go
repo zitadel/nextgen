@@ -2576,9 +2576,11 @@ func (s *UserProperty) Validate() error {
 
 func (s UserPropertyXMinusUnique) Validate() error {
 	switch s {
-	case "instance":
+	case "unspecified":
 		return nil
-	case "organization":
+	case "project":
+		return nil
+	case "team":
 		return nil
 	default:
 		return errors.Errorf("invalid value: %v", s)
