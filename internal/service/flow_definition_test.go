@@ -190,20 +190,6 @@ var invalidFlowDefRaw = []byte(`{
   ]
 }`)
 
-var invalidFlowDefJSON = []byte(`{
-  "name": "Invalid_Flow_Name_With_Caps",
-  "user_schema": "just-a-random-string",
-  "purposes": {
-    "login": "step_1"
-  },
-  "steps": [
-    {
-      "name": "step_1",
-      "complete": "redirect"
-    },
-  ]
-}`)
-
 type mockSchemaResolver struct {
 	resolveFunc func(
 		ctx context.Context,
@@ -248,6 +234,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 		db                    database.Pool
 		schemaResolver        service.SchemaResolver
 		builtinSchemaProvider service.BuiltinSchemaProvider
+		validatorFn           func(userSchema *jsonschema.Schema, flowDefinition domain.FlowDefinition) ([]domain.PivotingTarget, error)
 		flowDefinitionRepo    func(ctrl *gomock.Controller) *domainmock.MockFlowDefinitionRepository
 	}
 	type args struct {
@@ -263,7 +250,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 		wantErr           error
 	}{
 		{
-			name: "flow definition created successfully - simple login flow",
+			name: "flow definition created successfully",
 			fields: fields{
 				db: stubPool(),
 				schemaResolver: &mockSchemaResolver{
@@ -278,6 +265,9 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 					latestSchemaURIFunc: func(kind domain.KnownSchemaKind) (string, error) {
 						return "https://example.com/schemas/flow-definition.json", nil
 					},
+				},
+				validatorFn: func(userSchema *jsonschema.Schema, flowDefinition domain.FlowDefinition) ([]domain.PivotingTarget, error) {
+					return nil, nil
 				},
 				flowDefinitionRepo: func(ctrl *gomock.Controller) *domainmock.MockFlowDefinitionRepository {
 					repo := domainmock.NewMockFlowDefinitionRepository(ctrl)
@@ -364,7 +354,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 			},
 		},
 		{
-			name: "flow definition created successfully - login flow with cycles",
+			name: "flow definition created successfully - target with an existing external flow",
 			fields: fields{
 				db: stubPool(),
 				schemaResolver: &mockSchemaResolver{
@@ -380,130 +370,14 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 						return "https://example.com/schemas/flow-definition.json", nil
 					},
 				},
-				flowDefinitionRepo: func(ctrl *gomock.Controller) *domainmock.MockFlowDefinitionRepository {
-					repo := domainmock.NewMockFlowDefinitionRepository(ctrl)
-					repo.EXPECT().
-						ListFlowDefinitions(gomock.Any(), gomock.Any(), "project1", gomock.Any()).
-						Times(1).
-						Return([]*domain.FlowDefinition{}, nil)
-					repo.EXPECT().
-						CreateFlowDefinition(gomock.Any(), gomock.Any(), gomock.Any()).
-						Times(1).
-						Return(nil)
-					return repo
-				},
-			},
-			args: args{
-				ctx: context.Background(),
-				req: service.CreateFlowDefinitionRequest{
-					ProjectID:     "project1",
-					Name:          "cycle-login",
-					SchemaVersion: "1.0.0",
-					FlowSchemaURI: url.URL{},
-					UserSchema: url.URL{
-						Scheme: "https",
-						Host:   "tenant.com",
-						Path:   "/schemas/my-user.json",
-					},
-					Purposes: map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "identify"},
-					Audience: domain.FlowDefinitionAudience{
-						AppIDs:  []string{"app1"},
-						TeamIDs: []string{"team1"},
-					},
-					Steps: []domain.FlowDefinitionStep{
+				validatorFn: func(userSchema *jsonschema.Schema, flowDefinition domain.FlowDefinition) ([]domain.PivotingTarget, error) {
+					return []domain.PivotingTarget{
 						{
-							Name:   "identify",
-							Fields: []string{"email"},
-							Actions: map[string]domain.FlowStepAction{
-								"submit":   {},
-								"get_help": {},
-							},
-							Transitions: map[string]domain.FlowStepTransition{
-								"submit":   {Target: "done"},
-								"get_help": {Target: "help"},
-							},
+							Name:       "external-flow",
+							Step:       "step_1",
+							Transition: "next",
 						},
-						{
-							Name: "help",
-							Actions: map[string]domain.FlowStepAction{
-								"go_back": {},
-							},
-							Transitions: map[string]domain.FlowStepTransition{
-								"go_back": {Target: "identify"}, // cycle back to identify
-							},
-						},
-						{
-							Name:     "done",
-							Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
-						},
-					},
-					// reusing the same definition since the raw content doesn't matter for this test
-					RawFlowDefinition: flowDefRaw,
-				},
-			},
-			wantFlowSchemaURI: "https://example.com/schemas/flow-definition.json",
-			want: &domain.FlowDefinition{
-				ProjectID:     "project1",
-				Name:          "cycle-login",
-				SchemaVersion: "1.0.0",
-				Status:        domain.FlowDefinitionStatusActive,
-				CreatedAt:     time.Now(),
-				UpdatedAt:     time.Now(),
-				UserSchema: url.URL{
-					Scheme: "https",
-					Host:   "tenant.com",
-					Path:   "/schemas/my-user.json",
-				},
-				Purposes: map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "identify"},
-				Audience: domain.FlowDefinitionAudience{
-					AppIDs:  []string{"app1"},
-					TeamIDs: []string{"team1"},
-				},
-				Steps: []domain.FlowDefinitionStep{
-					{
-						Name:   "identify",
-						Fields: []string{"email"},
-						Actions: map[string]domain.FlowStepAction{
-							"submit":   {},
-							"get_help": {},
-						},
-						Transitions: map[string]domain.FlowStepTransition{
-							"submit":   {Target: "done"},
-							"get_help": {Target: "help"},
-						},
-					},
-					{
-						Name: "help",
-						Actions: map[string]domain.FlowStepAction{
-							"go_back": {},
-						},
-						Transitions: map[string]domain.FlowStepTransition{
-							"go_back": {Target: "identify"}, // cycle back to identify
-						},
-					},
-					{
-						Name:     "done",
-						Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
-					},
-				},
-			},
-		},
-		{
-			name: "flow definition created successfully - login flow with pivot",
-			fields: fields{
-				db: stubPool(),
-				schemaResolver: &mockSchemaResolver{
-					resolveFunc: func(ctx context.Context, client database.QueryExecutor, projectID string, schemaURL string, rootSchema []byte) (*jsonschema.Schema, error) {
-						return &userSchema, nil
-					},
-				},
-				builtinSchemaProvider: &mockBuiltinSchemaProvider{
-					getBuiltinSchemaFunc: func(uri string) (*jsonschema.Schema, error) {
-						return &jsonschema.Schema{}, nil
-					},
-					latestSchemaURIFunc: func(kind domain.KnownSchemaKind) (string, error) {
-						return "https://example.com/schemas/flow-definition.json", nil
-					},
+					}, nil
 				},
 				flowDefinitionRepo: func(ctrl *gomock.Controller) *domainmock.MockFlowDefinitionRepository {
 					repo := domainmock.NewMockFlowDefinitionRepository(ctrl)
@@ -516,1239 +390,14 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 						Times(1).
 						Return([]*domain.FlowDefinition{
 							{
-								Name: "external-flow",
+								Name:   "external-flow",
+								Status: domain.FlowDefinitionStatusActive,
 							},
-						}, nil) // the second call to check the existence of the external flow
+						}, nil)
 					repo.EXPECT().
 						CreateFlowDefinition(gomock.Any(), gomock.Any(), gomock.Any()).
 						Times(1).
 						Return(nil)
-					return repo
-				},
-			},
-			args: args{
-				ctx: context.Background(),
-				req: service.CreateFlowDefinitionRequest{
-					ProjectID:     "project1",
-					Name:          "pivot-login",
-					SchemaVersion: "1.0.0",
-					FlowSchemaURI: url.URL{},
-					UserSchema: url.URL{
-						Scheme: "https",
-						Host:   "tenant.com",
-						Path:   "/schemas/my-user.json",
-					},
-					Purposes: map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "start"},
-					Audience: domain.FlowDefinitionAudience{
-						AppIDs:  []string{"app1"},
-						TeamIDs: []string{"team1"},
-					},
-					Steps: []domain.FlowDefinitionStep{
-						{
-							Name:   "start",
-							Fields: []string{"email"},
-							Actions: map[string]domain.FlowStepAction{
-								"loop":  {},
-								"pivot": {},
-							},
-							Transitions: map[string]domain.FlowStepTransition{
-								"loop":  {Target: "middle"},
-								"pivot": {Target: "external-flow", Action: gu.Ptr(domain.Switch)}, // switch to external flow
-							},
-						},
-						{
-							Name: "middle",
-							Actions: map[string]domain.FlowStepAction{
-								"back": {},
-							},
-							Transitions: map[string]domain.FlowStepTransition{
-								"back": {Target: "start"}, // cycle back to identify
-							},
-						},
-					},
-					RawFlowDefinition: flowDefRaw,
-				},
-			},
-			wantFlowSchemaURI: "https://example.com/schemas/flow-definition.json",
-			want: &domain.FlowDefinition{
-				ProjectID:     "project1",
-				Name:          "pivot-login",
-				SchemaVersion: "1.0.0",
-				Status:        domain.FlowDefinitionStatusActive,
-				CreatedAt:     time.Now(),
-				UpdatedAt:     time.Now(),
-				UserSchema: url.URL{
-					Scheme: "https",
-					Host:   "tenant.com",
-					Path:   "/schemas/my-user.json",
-				},
-				Purposes: map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "start"},
-				Audience: domain.FlowDefinitionAudience{
-					AppIDs:  []string{"app1"},
-					TeamIDs: []string{"team1"},
-				},
-				Steps: []domain.FlowDefinitionStep{
-					{
-						Name:   "start",
-						Fields: []string{"email"},
-						Actions: map[string]domain.FlowStepAction{
-							"loop":  {},
-							"pivot": {},
-						},
-						Transitions: map[string]domain.FlowStepTransition{
-							"loop":  {Target: "middle"},
-							"pivot": {Target: "external-flow", Action: gu.Ptr(domain.Switch)}, // switch to external flow
-						},
-					},
-					{
-						Name: "middle",
-						Actions: map[string]domain.FlowStepAction{
-							"back": {},
-						},
-						Transitions: map[string]domain.FlowStepTransition{
-							"back": {Target: "start"}, // cycle back to identify
-						},
-					},
-				},
-			},
-		},
-		{
-			name: "flow definition created successfully - with sso providers",
-			fields: fields{
-				db: stubPool(),
-				schemaResolver: &mockSchemaResolver{
-					resolveFunc: func(ctx context.Context, client database.QueryExecutor, projectID string, schemaURL string, rootSchema []byte) (*jsonschema.Schema, error) {
-						return &userSchema, nil
-					},
-				},
-				builtinSchemaProvider: &mockBuiltinSchemaProvider{
-					getBuiltinSchemaFunc: func(uri string) (*jsonschema.Schema, error) {
-						return &jsonschema.Schema{}, nil
-					},
-					latestSchemaURIFunc: func(kind domain.KnownSchemaKind) (string, error) {
-						return "https://example.com/schemas/flow-definition.json", nil
-					},
-				},
-				flowDefinitionRepo: func(ctrl *gomock.Controller) *domainmock.MockFlowDefinitionRepository {
-					repo := domainmock.NewMockFlowDefinitionRepository(ctrl)
-					repo.EXPECT().
-						ListFlowDefinitions(gomock.Any(), gomock.Any(), "project1", gomock.Any()).
-						Times(1).
-						Return([]*domain.FlowDefinition{}, nil)
-					repo.EXPECT().
-						CreateFlowDefinition(gomock.Any(), gomock.Any(), gomock.Any()).
-						Times(1).
-						Return(nil)
-					return repo
-				},
-			},
-			args: args{
-				ctx: context.Background(),
-				req: service.CreateFlowDefinitionRequest{
-					ProjectID:     "project1",
-					Name:          "sso-login",
-					SchemaVersion: "1.0.0",
-					FlowSchemaURI: url.URL{},
-					UserSchema: url.URL{
-						Scheme: "https",
-						Host:   "tenant.com",
-						Path:   "/schemas/my-user.json",
-					},
-					Purposes: map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "identify"},
-					Audience: domain.FlowDefinitionAudience{
-						AppIDs:  []string{"app1"},
-						TeamIDs: []string{"team1"},
-					},
-					Steps: []domain.FlowDefinitionStep{
-						{
-							Name: "identify",
-							SSOProviders: []domain.FlowSSOProvider{
-								{
-									ID:       "google",
-									Name:     "Google",
-									Template: "google",
-								},
-							},
-							Transitions: map[string]domain.FlowStepTransition{
-								"callback": {Target: "done"},
-							},
-						},
-						{
-							Name:     "done",
-							Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
-						},
-					},
-					RawFlowDefinition: flowDefRaw,
-				},
-			},
-			wantFlowSchemaURI: "https://example.com/schemas/flow-definition.json",
-			want: &domain.FlowDefinition{
-				ProjectID:     "project1",
-				Name:          "sso-login",
-				SchemaVersion: "1.0.0",
-				Status:        domain.FlowDefinitionStatusActive,
-				CreatedAt:     time.Now(),
-				UpdatedAt:     time.Now(),
-				UserSchema: url.URL{
-					Scheme: "https",
-					Host:   "tenant.com",
-					Path:   "/schemas/my-user.json",
-				},
-				Purposes: map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "identify"},
-				Audience: domain.FlowDefinitionAudience{
-					AppIDs:  []string{"app1"},
-					TeamIDs: []string{"team1"},
-				},
-				Steps: []domain.FlowDefinitionStep{
-					{
-						Name: "identify",
-						SSOProviders: []domain.FlowSSOProvider{
-							{
-								ID:       "google",
-								Name:     "Google",
-								Template: "google",
-							},
-						},
-						Transitions: map[string]domain.FlowStepTransition{
-							"callback": {Target: "done"},
-						},
-					},
-					{
-						Name:     "done",
-						Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
-					},
-				},
-			},
-		},
-		{
-			name: "invalid login with sso providers",
-			fields: fields{
-				db: stubPool(),
-				schemaResolver: &mockSchemaResolver{
-					resolveFunc: func(ctx context.Context, client database.QueryExecutor, projectID string, schemaURL string, rootSchema []byte) (*jsonschema.Schema, error) {
-						return &userSchema, nil
-					},
-				},
-				builtinSchemaProvider: &mockBuiltinSchemaProvider{
-					getBuiltinSchemaFunc: func(uri string) (*jsonschema.Schema, error) {
-						return &jsonschema.Schema{}, nil
-					},
-					latestSchemaURIFunc: func(kind domain.KnownSchemaKind) (string, error) {
-						return "https://example.com/schemas/flow-definition.json", nil
-					},
-				},
-				flowDefinitionRepo: func(ctrl *gomock.Controller) *domainmock.MockFlowDefinitionRepository {
-					repo := domainmock.NewMockFlowDefinitionRepository(ctrl)
-					repo.EXPECT().
-						ListFlowDefinitions(gomock.Any(), gomock.Any(), "project1", gomock.Any()).
-						Times(1).
-						Return([]*domain.FlowDefinition{}, nil)
-					return repo
-				},
-			},
-			args: args{
-				ctx: context.Background(),
-				req: service.CreateFlowDefinitionRequest{
-					ProjectID:     "project1",
-					Name:          "invalid-sso-login",
-					SchemaVersion: "1.0.0",
-					FlowSchemaURI: url.URL{},
-					UserSchema: url.URL{
-						Scheme: "https",
-						Host:   "tenant.com",
-						Path:   "/schemas/my-user.json",
-					},
-					Purposes: map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "identify"},
-					Audience: domain.FlowDefinitionAudience{
-						AppIDs:  []string{"app1"},
-						TeamIDs: []string{"team1"},
-					},
-					Steps: []domain.FlowDefinitionStep{
-						{
-							Name: "identify",
-							SSOProviders: []domain.FlowSSOProvider{
-								{
-									ID:       "google",
-									Name:     "Google",
-									Template: "google",
-								},
-							},
-							Transitions: map[string]domain.FlowStepTransition{
-								"cancel": {Target: "done"},
-							},
-						},
-						{
-							Name:     "done",
-							Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
-						},
-					},
-					RawFlowDefinition: flowDefRaw,
-				},
-			},
-			wantFlowSchemaURI: "https://example.com/schemas/flow-definition.json",
-			wantErr:           domain.ErrFlowDefinitionInvalid(`step "identify": has sso_providers but is missing transitions.callback`, nil),
-		},
-		{
-			name: "a flow with inescapable cycle",
-			fields: fields{
-				db: stubPool(),
-				schemaResolver: &mockSchemaResolver{
-					resolveFunc: func(ctx context.Context, client database.QueryExecutor, projectID string, schemaURL string, rootSchema []byte) (*jsonschema.Schema, error) {
-						return &userSchema, nil
-					},
-				},
-				builtinSchemaProvider: &mockBuiltinSchemaProvider{
-					getBuiltinSchemaFunc: func(uri string) (*jsonschema.Schema, error) {
-						return &jsonschema.Schema{}, nil
-					},
-					latestSchemaURIFunc: func(kind domain.KnownSchemaKind) (string, error) {
-						return "https://example.com/schemas/flow-definition.json", nil
-					},
-				},
-				flowDefinitionRepo: func(ctrl *gomock.Controller) *domainmock.MockFlowDefinitionRepository {
-					repo := domainmock.NewMockFlowDefinitionRepository(ctrl)
-					repo.EXPECT().
-						ListFlowDefinitions(gomock.Any(), gomock.Any(), "project1", gomock.Any()).
-						Times(1).
-						Return([]*domain.FlowDefinition{}, nil)
-					return repo
-				},
-			},
-			args: args{
-				ctx: context.Background(),
-				req: service.CreateFlowDefinitionRequest{
-					ProjectID:     "project1",
-					Name:          "trapped-flow",
-					SchemaVersion: "1.0.0",
-					FlowSchemaURI: url.URL{},
-					UserSchema: url.URL{
-						Scheme: "https",
-						Host:   "tenant.com",
-						Path:   "/schemas/my-user.json",
-					},
-					Purposes: map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "enter"},
-					Audience: domain.FlowDefinitionAudience{
-						AppIDs:  []string{"app1"},
-						TeamIDs: []string{"team1"},
-					},
-					Steps: []domain.FlowDefinitionStep{
-						{
-							Name: "enter",
-							Actions: map[string]domain.FlowStepAction{
-								"next": {},
-							},
-							Transitions: map[string]domain.FlowStepTransition{
-								"next": {Target: "trap_a"},
-							},
-						},
-						{
-							Name: "trap_a",
-							Actions: map[string]domain.FlowStepAction{
-								"loop": {},
-							},
-							Transitions: map[string]domain.FlowStepTransition{
-								"loop": {Target: "trap_b"},
-							},
-						},
-						{
-							Name: "trap_b",
-							Actions: map[string]domain.FlowStepAction{
-								"loop": {},
-							},
-							Transitions: map[string]domain.FlowStepTransition{
-								"loop": {Target: "trap_a"},
-							},
-						},
-					},
-					RawFlowDefinition: flowDefRaw,
-				},
-			},
-			wantFlowSchemaURI: "https://example.com/schemas/flow-definition.json",
-			wantErr:           domain.ErrFlowDefinitionInvalid(`step "enter" is trapped: no path to a terminal step or another flow`, nil),
-		},
-		{
-			name: "a flow with a dead-end",
-			fields: fields{
-				db: stubPool(),
-				schemaResolver: &mockSchemaResolver{
-					resolveFunc: func(ctx context.Context, client database.QueryExecutor, projectID string, schemaURL string, rootSchema []byte) (*jsonschema.Schema, error) {
-						return &userSchema, nil
-					},
-				},
-				builtinSchemaProvider: &mockBuiltinSchemaProvider{
-					getBuiltinSchemaFunc: func(uri string) (*jsonschema.Schema, error) {
-						return &jsonschema.Schema{}, nil
-					},
-					latestSchemaURIFunc: func(kind domain.KnownSchemaKind) (string, error) {
-						return "https://example.com/schemas/flow-definition.json", nil
-					},
-				},
-				flowDefinitionRepo: func(ctrl *gomock.Controller) *domainmock.MockFlowDefinitionRepository {
-					repo := domainmock.NewMockFlowDefinitionRepository(ctrl)
-					repo.EXPECT().
-						ListFlowDefinitions(gomock.Any(), gomock.Any(), "project1", gomock.Any()).
-						Times(1).
-						Return([]*domain.FlowDefinition{}, nil)
-					return repo
-				},
-			},
-			args: args{
-				ctx: context.Background(),
-				req: service.CreateFlowDefinitionRequest{
-					ProjectID:     "project1",
-					Name:          "dead-end",
-					SchemaVersion: "1.0.0",
-					FlowSchemaURI: url.URL{},
-					UserSchema: url.URL{
-						Scheme: "https",
-						Host:   "tenant.com",
-						Path:   "/schemas/my-user.json",
-					},
-					Purposes: map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "start"},
-					Audience: domain.FlowDefinitionAudience{
-						AppIDs:  []string{"app1"},
-						TeamIDs: []string{"team1"},
-					},
-					Steps: []domain.FlowDefinitionStep{
-						{
-							Name: "start",
-							Actions: map[string]domain.FlowStepAction{
-								"next": {},
-							},
-							Transitions: map[string]domain.FlowStepTransition{
-								"next": {Target: "broken_step"},
-							},
-						},
-						{
-							Name:   "broken_step",
-							Fields: []string{"email"},
-						},
-					},
-					RawFlowDefinition: flowDefRaw,
-				},
-			},
-			wantFlowSchemaURI: "https://example.com/schemas/flow-definition.json",
-			wantErr:           domain.ErrFlowDefinitionInvalid(`step "broken_step" is non-terminal but has no outgoing transitions`, nil),
-		},
-		{
-			name: "a flow with an unreachable step",
-			fields: fields{
-				db: stubPool(),
-				schemaResolver: &mockSchemaResolver{
-					resolveFunc: func(ctx context.Context, client database.QueryExecutor, projectID string, schemaURL string, rootSchema []byte) (*jsonschema.Schema, error) {
-						return &userSchema, nil
-					},
-				},
-				builtinSchemaProvider: &mockBuiltinSchemaProvider{
-					getBuiltinSchemaFunc: func(uri string) (*jsonschema.Schema, error) {
-						return &jsonschema.Schema{}, nil
-					},
-					latestSchemaURIFunc: func(kind domain.KnownSchemaKind) (string, error) {
-						return "https://example.com/schemas/flow-definition.json", nil
-					},
-				},
-				flowDefinitionRepo: func(ctrl *gomock.Controller) *domainmock.MockFlowDefinitionRepository {
-					repo := domainmock.NewMockFlowDefinitionRepository(ctrl)
-					repo.EXPECT().
-						ListFlowDefinitions(gomock.Any(), gomock.Any(), "project1", gomock.Any()).
-						Times(1).
-						Return([]*domain.FlowDefinition{}, nil)
-					return repo
-				},
-			},
-			args: args{
-				ctx: context.Background(),
-				req: service.CreateFlowDefinitionRequest{
-					ProjectID:     "project1",
-					Name:          "unreachable-step",
-					SchemaVersion: "1.0.0",
-					FlowSchemaURI: url.URL{},
-					UserSchema: url.URL{
-						Scheme: "https",
-						Host:   "tenant.com",
-						Path:   "/schemas/my-user.json",
-					},
-					Purposes: map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "start"},
-					Audience: domain.FlowDefinitionAudience{
-						AppIDs:  []string{"app1"},
-						TeamIDs: []string{"team1"},
-					},
-					Steps: []domain.FlowDefinitionStep{
-						{
-							Name: "start",
-							Actions: map[string]domain.FlowStepAction{
-								"next": {},
-							},
-							Transitions: map[string]domain.FlowStepTransition{
-								"next": {Target: "done"},
-							},
-						},
-						{
-							Name:   "catch_me_if_you_can",
-							Fields: []string{"email"},
-							Actions: map[string]domain.FlowStepAction{
-								"next": {},
-							},
-							Transitions: map[string]domain.FlowStepTransition{
-								"next": {Target: "done"},
-							},
-						},
-						{
-							Name:     "done",
-							Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
-						},
-					},
-					RawFlowDefinition: flowDefRaw,
-				},
-			},
-			wantFlowSchemaURI: "https://example.com/schemas/flow-definition.json",
-			wantErr:           domain.ErrFlowDefinitionInvalid(`step "catch_me_if_you_can" is unreachable from any entry point`, nil),
-		},
-		{
-			name: "a non-terminal step which does nothing",
-			fields: fields{
-				db: stubPool(),
-				schemaResolver: &mockSchemaResolver{
-					resolveFunc: func(ctx context.Context, client database.QueryExecutor, projectID string, schemaURL string, rootSchema []byte) (*jsonschema.Schema, error) {
-						return &userSchema, nil
-					},
-				},
-				builtinSchemaProvider: &mockBuiltinSchemaProvider{
-					getBuiltinSchemaFunc: func(uri string) (*jsonschema.Schema, error) {
-						return &jsonschema.Schema{}, nil
-					},
-					latestSchemaURIFunc: func(kind domain.KnownSchemaKind) (string, error) {
-						return "https://example.com/schemas/flow-definition.json", nil
-					},
-				},
-				flowDefinitionRepo: func(ctrl *gomock.Controller) *domainmock.MockFlowDefinitionRepository {
-					repo := domainmock.NewMockFlowDefinitionRepository(ctrl)
-					repo.EXPECT().
-						ListFlowDefinitions(gomock.Any(), gomock.Any(), "project1", gomock.Any()).
-						Times(1).
-						Return([]*domain.FlowDefinition{}, nil)
-					return repo
-				},
-			},
-			args: args{
-				ctx: context.Background(),
-				req: service.CreateFlowDefinitionRequest{
-					ProjectID:     "project1",
-					Name:          "do-nothing",
-					SchemaVersion: "1.0.0",
-					FlowSchemaURI: url.URL{},
-					UserSchema: url.URL{
-						Scheme: "https",
-						Host:   "tenant.com",
-						Path:   "/schemas/my-user.json",
-					},
-					Purposes: map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "doing_nothing"},
-					Audience: domain.FlowDefinitionAudience{
-						AppIDs:  []string{"app1"},
-						TeamIDs: []string{"team1"},
-					},
-					Steps: []domain.FlowDefinitionStep{
-						{
-							Name: "doing_nothing",
-							Transitions: map[string]domain.FlowStepTransition{
-								"next": {Target: "done"},
-							},
-						},
-						{
-							Name:     "done",
-							Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
-						},
-					},
-					RawFlowDefinition: flowDefRaw,
-				},
-			},
-			wantFlowSchemaURI: "https://example.com/schemas/flow-definition.json",
-			wantErr:           domain.ErrFlowDefinitionInvalid(`step "doing_nothing" is non-terminal but has no fields, actions, sso_providers, gates, or transitions.callback`, nil),
-		},
-		{
-			name: "entry point missing in steps",
-			fields: fields{
-				db: stubPool(),
-				schemaResolver: &mockSchemaResolver{
-					resolveFunc: func(ctx context.Context, client database.QueryExecutor, projectID string, schemaURL string, rootSchema []byte) (*jsonschema.Schema, error) {
-						return &userSchema, nil
-					},
-				},
-				builtinSchemaProvider: &mockBuiltinSchemaProvider{
-					getBuiltinSchemaFunc: func(uri string) (*jsonschema.Schema, error) {
-						return &jsonschema.Schema{}, nil
-					},
-					latestSchemaURIFunc: func(kind domain.KnownSchemaKind) (string, error) {
-						return "https://example.com/schemas/flow-definition.json", nil
-					},
-				},
-				flowDefinitionRepo: func(ctrl *gomock.Controller) *domainmock.MockFlowDefinitionRepository {
-					repo := domainmock.NewMockFlowDefinitionRepository(ctrl)
-					repo.EXPECT().
-						ListFlowDefinitions(gomock.Any(), gomock.Any(), "project1", gomock.Any()).
-						Times(1).
-						Return([]*domain.FlowDefinition{}, nil)
-					return repo
-				},
-			},
-			args: args{
-				ctx: context.Background(),
-				req: service.CreateFlowDefinitionRequest{
-					ProjectID:     "project1",
-					Name:          "entry-point-missing",
-					SchemaVersion: "1.0.0",
-					FlowSchemaURI: url.URL{},
-					UserSchema: url.URL{
-						Scheme: "https",
-						Host:   "tenant.com",
-						Path:   "/schemas/my-user.json",
-					},
-					Purposes: map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "start"},
-					Audience: domain.FlowDefinitionAudience{
-						AppIDs:  []string{"app1"},
-						TeamIDs: []string{"team1"},
-					},
-					Steps: []domain.FlowDefinitionStep{
-						{
-							Name:   "step_1",
-							Fields: []string{"email"},
-							Transitions: map[string]domain.FlowStepTransition{
-								"submit": {Target: "step_2"},
-							},
-							Actions: map[string]domain.FlowStepAction{
-								"submit": {Primary: true},
-							},
-						},
-						{
-							Name:     "step_2",
-							Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
-						},
-					},
-					RawFlowDefinition: flowDefRaw,
-				},
-			},
-			wantFlowSchemaURI: "https://example.com/schemas/flow-definition.json",
-			wantErr:           domain.ErrFlowDefinitionInvalid(`purpose "login" targets unknown entry-point step "start"`, nil),
-		},
-		{
-			name: "user schema missing properties",
-			fields: fields{
-				db: stubPool(),
-				schemaResolver: &mockSchemaResolver{
-					resolveFunc: func(ctx context.Context, client database.QueryExecutor, projectID string, schemaURL string, rootSchema []byte) (*jsonschema.Schema, error) {
-						return &userSchemaNoProps, nil
-					},
-				},
-				builtinSchemaProvider: &mockBuiltinSchemaProvider{
-					getBuiltinSchemaFunc: func(uri string) (*jsonschema.Schema, error) {
-						return &jsonschema.Schema{}, nil
-					},
-					latestSchemaURIFunc: func(kind domain.KnownSchemaKind) (string, error) {
-						return "https://example.com/schemas/flow-definition.json", nil
-					},
-				},
-				flowDefinitionRepo: func(ctrl *gomock.Controller) *domainmock.MockFlowDefinitionRepository {
-					repo := domainmock.NewMockFlowDefinitionRepository(ctrl)
-					repo.EXPECT().
-						ListFlowDefinitions(gomock.Any(), gomock.Any(), "project1", gomock.Any()).
-						Times(1).
-						Return([]*domain.FlowDefinition{}, nil)
-					return repo
-				},
-			},
-			args: args{
-				ctx: context.Background(),
-				req: service.CreateFlowDefinitionRequest{
-					ProjectID:     "project1",
-					Name:          "entry-point-missing",
-					SchemaVersion: "1.0.0",
-					FlowSchemaURI: url.URL{},
-					UserSchema: url.URL{
-						Scheme: "https",
-						Host:   "tenant.com",
-						Path:   "/schemas/my-user.json",
-					},
-					Purposes: map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1"},
-					Audience: domain.FlowDefinitionAudience{
-						AppIDs:  []string{"app1"},
-						TeamIDs: []string{"team1"},
-					},
-					Steps: []domain.FlowDefinitionStep{
-						{
-							Name:   "step_1",
-							Fields: []string{"email"},
-							Transitions: map[string]domain.FlowStepTransition{
-								"submit": {Target: "step_2"},
-							},
-							Actions: map[string]domain.FlowStepAction{
-								"submit": {Primary: true},
-							},
-						},
-						{
-							Name:     "step_2",
-							Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
-						},
-					},
-					RawFlowDefinition: flowDefRaw,
-				},
-			},
-			wantFlowSchemaURI: "https://example.com/schemas/flow-definition.json",
-			wantErr:           domain.ErrFlowDefinitionInvalid(`user schema has no properties`, nil),
-		},
-		{
-			name: "no purpose set",
-			fields: fields{
-				db: stubPool(),
-				schemaResolver: &mockSchemaResolver{
-					resolveFunc: func(ctx context.Context, client database.QueryExecutor, projectID string, schemaURL string, rootSchema []byte) (*jsonschema.Schema, error) {
-						return &userSchema, nil
-					},
-				},
-				builtinSchemaProvider: &mockBuiltinSchemaProvider{
-					getBuiltinSchemaFunc: func(uri string) (*jsonschema.Schema, error) {
-						return &jsonschema.Schema{}, nil
-					},
-					latestSchemaURIFunc: func(kind domain.KnownSchemaKind) (string, error) {
-						return "https://example.com/schemas/flow-definition.json", nil
-					},
-				},
-				flowDefinitionRepo: func(ctrl *gomock.Controller) *domainmock.MockFlowDefinitionRepository {
-					repo := domainmock.NewMockFlowDefinitionRepository(ctrl)
-					repo.EXPECT().
-						ListFlowDefinitions(gomock.Any(), gomock.Any(), "project1", gomock.Any()).
-						Times(1).
-						Return([]*domain.FlowDefinition{}, nil)
-					return repo
-				},
-			},
-			args: args{
-				ctx: context.Background(),
-				req: service.CreateFlowDefinitionRequest{
-					ProjectID:     "project1",
-					Name:          "entry-point-missing",
-					SchemaVersion: "1.0.0",
-					FlowSchemaURI: url.URL{},
-					UserSchema: url.URL{
-						Scheme: "https",
-						Host:   "tenant.com",
-						Path:   "/schemas/my-user.json",
-					},
-					Audience: domain.FlowDefinitionAudience{
-						AppIDs:  []string{"app1"},
-						TeamIDs: []string{"team1"},
-					},
-					Steps: []domain.FlowDefinitionStep{
-						{
-							Name:   "step_1",
-							Fields: []string{"email"},
-							Transitions: map[string]domain.FlowStepTransition{
-								"submit": {Target: "step_2"},
-							},
-							Actions: map[string]domain.FlowStepAction{
-								"submit": {Primary: true},
-							},
-						},
-						{
-							Name:     "step_2",
-							Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
-						},
-					},
-					RawFlowDefinition: flowDefRaw,
-				},
-			},
-			wantFlowSchemaURI: "https://example.com/schemas/flow-definition.json",
-			wantErr:           domain.ErrFlowDefinitionInvalid(`no purposes defined`, nil),
-		},
-		{
-			name: "purpose is invalid",
-			fields: fields{
-				db: stubPool(),
-				schemaResolver: &mockSchemaResolver{
-					resolveFunc: func(ctx context.Context, client database.QueryExecutor, projectID string, schemaURL string, rootSchema []byte) (*jsonschema.Schema, error) {
-						return &userSchema, nil
-					},
-				},
-				builtinSchemaProvider: &mockBuiltinSchemaProvider{
-					getBuiltinSchemaFunc: func(uri string) (*jsonschema.Schema, error) {
-						return &jsonschema.Schema{}, nil
-					},
-					latestSchemaURIFunc: func(kind domain.KnownSchemaKind) (string, error) {
-						return "https://example.com/schemas/flow-definition.json", nil
-					},
-				},
-				flowDefinitionRepo: func(ctrl *gomock.Controller) *domainmock.MockFlowDefinitionRepository {
-					repo := domainmock.NewMockFlowDefinitionRepository(ctrl)
-					repo.EXPECT().
-						ListFlowDefinitions(gomock.Any(), gomock.Any(), "project1", gomock.Any()).
-						Times(1).
-						Return([]*domain.FlowDefinition{}, nil)
-					return repo
-				},
-			},
-			args: args{
-				ctx: context.Background(),
-				req: service.CreateFlowDefinitionRequest{
-					ProjectID:     "project1",
-					Name:          "entry-point-missing",
-					SchemaVersion: "1.0.0",
-					FlowSchemaURI: url.URL{},
-					UserSchema: url.URL{
-						Scheme: "https",
-						Host:   "tenant.com",
-						Path:   "/schemas/my-user.json",
-					},
-					Purposes: map[domain.FlowDefinitionPurpose]string{6: "step_1"},
-					Audience: domain.FlowDefinitionAudience{
-						AppIDs:  []string{"app1"},
-						TeamIDs: []string{"team1"},
-					},
-					Steps: []domain.FlowDefinitionStep{
-						{
-							Name:   "step_1",
-							Fields: []string{"email"},
-							Transitions: map[string]domain.FlowStepTransition{
-								"submit": {Target: "step_2"},
-							},
-							Actions: map[string]domain.FlowStepAction{
-								"submit": {Primary: true},
-							},
-						},
-						{
-							Name:     "step_2",
-							Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
-						},
-					},
-					RawFlowDefinition: flowDefRaw,
-				},
-			},
-			wantFlowSchemaURI: "https://example.com/schemas/flow-definition.json",
-			wantErr:           domain.ErrFlowDefinitionInvalid(`'FlowDefinitionPurpose(6)' is not a valid purpose`, nil),
-		},
-		{
-			name: "entry step not set",
-			fields: fields{
-				db: stubPool(),
-				schemaResolver: &mockSchemaResolver{
-					resolveFunc: func(ctx context.Context, client database.QueryExecutor, projectID string, schemaURL string, rootSchema []byte) (*jsonschema.Schema, error) {
-						return &userSchema, nil
-					},
-				},
-				builtinSchemaProvider: &mockBuiltinSchemaProvider{
-					getBuiltinSchemaFunc: func(uri string) (*jsonschema.Schema, error) {
-						return &jsonschema.Schema{}, nil
-					},
-					latestSchemaURIFunc: func(kind domain.KnownSchemaKind) (string, error) {
-						return "https://example.com/schemas/flow-definition.json", nil
-					},
-				},
-				flowDefinitionRepo: func(ctrl *gomock.Controller) *domainmock.MockFlowDefinitionRepository {
-					repo := domainmock.NewMockFlowDefinitionRepository(ctrl)
-					repo.EXPECT().
-						ListFlowDefinitions(gomock.Any(), gomock.Any(), "project1", gomock.Any()).
-						Times(1).
-						Return([]*domain.FlowDefinition{}, nil)
-					return repo
-				},
-			},
-			args: args{
-				ctx: context.Background(),
-				req: service.CreateFlowDefinitionRequest{
-					ProjectID:     "project1",
-					Name:          "entry-point-missing",
-					SchemaVersion: "1.0.0",
-					FlowSchemaURI: url.URL{},
-					UserSchema: url.URL{
-						Scheme: "https",
-						Host:   "tenant.com",
-						Path:   "/schemas/my-user.json",
-					},
-					Purposes: map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1", domain.FlowDefinitionPurposeRegister: ""},
-					Audience: domain.FlowDefinitionAudience{
-						AppIDs:  []string{"app1"},
-						TeamIDs: []string{"team1"},
-					},
-					Steps: []domain.FlowDefinitionStep{
-						{
-							Name:   "step_1",
-							Fields: []string{"email"},
-							Transitions: map[string]domain.FlowStepTransition{
-								"submit": {Target: "step_2"},
-							},
-							Actions: map[string]domain.FlowStepAction{
-								"submit": {Primary: true},
-							},
-						},
-						{
-							Name:     "step_2",
-							Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
-						},
-					},
-					RawFlowDefinition: flowDefRaw,
-				},
-			},
-			wantFlowSchemaURI: "https://example.com/schemas/flow-definition.json",
-			wantErr:           domain.ErrFlowDefinitionInvalid(`initial step for purpose 'register' is empty`, nil),
-		},
-		{
-			name: "fields not in user schema",
-			fields: fields{
-				db: stubPool(),
-				schemaResolver: &mockSchemaResolver{
-					resolveFunc: func(ctx context.Context, client database.QueryExecutor, projectID string, schemaURL string, rootSchema []byte) (*jsonschema.Schema, error) {
-						return &userSchema, nil
-					},
-				},
-				builtinSchemaProvider: &mockBuiltinSchemaProvider{
-					getBuiltinSchemaFunc: func(uri string) (*jsonschema.Schema, error) {
-						return &jsonschema.Schema{}, nil
-					},
-					latestSchemaURIFunc: func(kind domain.KnownSchemaKind) (string, error) {
-						return "https://example.com/schemas/flow-definition.json", nil
-					},
-				},
-				flowDefinitionRepo: func(ctrl *gomock.Controller) *domainmock.MockFlowDefinitionRepository {
-					repo := domainmock.NewMockFlowDefinitionRepository(ctrl)
-					repo.EXPECT().
-						ListFlowDefinitions(gomock.Any(), gomock.Any(), "project1", gomock.Any()).
-						Times(1).
-						Return([]*domain.FlowDefinition{}, nil)
-					return repo
-				},
-			},
-			args: args{
-				ctx: context.Background(),
-				req: service.CreateFlowDefinitionRequest{
-					ProjectID:     "project1",
-					Name:          "entry-point-missing",
-					SchemaVersion: "1.0.0",
-					FlowSchemaURI: url.URL{},
-					UserSchema: url.URL{
-						Scheme: "https",
-						Host:   "tenant.com",
-						Path:   "/schemas/my-user.json",
-					},
-					Purposes: map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1"},
-					Audience: domain.FlowDefinitionAudience{
-						AppIDs:  []string{"app1"},
-						TeamIDs: []string{"team1"},
-					},
-					Steps: []domain.FlowDefinitionStep{
-						{
-							Name:   "step_1",
-							Fields: []string{"username", "password"},
-							Transitions: map[string]domain.FlowStepTransition{
-								"submit": {Target: "step_2"},
-							},
-							Actions: map[string]domain.FlowStepAction{
-								"submit": {Primary: true},
-							},
-						},
-						{
-							Name:     "step_2",
-							Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
-						},
-					},
-					RawFlowDefinition: flowDefRaw,
-				},
-			},
-			wantFlowSchemaURI: "https://example.com/schemas/flow-definition.json",
-			wantErr:           domain.ErrFlowDefinitionInvalid(`step "step_1": field "username" is not a property in the user schema`, nil),
-		},
-		{
-			name: "a terminal step with fields",
-			fields: fields{
-				db: stubPool(),
-				schemaResolver: &mockSchemaResolver{
-					resolveFunc: func(ctx context.Context, client database.QueryExecutor, projectID string, schemaURL string, rootSchema []byte) (*jsonschema.Schema, error) {
-						return &userSchema, nil
-					},
-				},
-				builtinSchemaProvider: &mockBuiltinSchemaProvider{
-					getBuiltinSchemaFunc: func(uri string) (*jsonschema.Schema, error) {
-						return &jsonschema.Schema{}, nil
-					},
-					latestSchemaURIFunc: func(kind domain.KnownSchemaKind) (string, error) {
-						return "https://example.com/schemas/flow-definition.json", nil
-					},
-				},
-				flowDefinitionRepo: func(ctrl *gomock.Controller) *domainmock.MockFlowDefinitionRepository {
-					repo := domainmock.NewMockFlowDefinitionRepository(ctrl)
-					repo.EXPECT().
-						ListFlowDefinitions(gomock.Any(), gomock.Any(), "project1", gomock.Any()).
-						Times(1).
-						Return([]*domain.FlowDefinition{}, nil)
-					return repo
-				},
-			},
-			args: args{
-				ctx: context.Background(),
-				req: service.CreateFlowDefinitionRequest{
-					ProjectID:     "project1",
-					Name:          "wrong-complete",
-					SchemaVersion: "1.0.0",
-					FlowSchemaURI: url.URL{},
-					UserSchema: url.URL{
-						Scheme: "https",
-						Host:   "tenant.com",
-						Path:   "/schemas/my-user.json",
-					},
-					Purposes: map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1"},
-					Audience: domain.FlowDefinitionAudience{
-						AppIDs:  []string{"app1"},
-						TeamIDs: []string{"team1"},
-					},
-					Steps: []domain.FlowDefinitionStep{
-						{
-							Name:   "step_1",
-							Fields: []string{"email"},
-							Transitions: map[string]domain.FlowStepTransition{
-								"submit": {Target: "step_2"},
-							},
-							Actions: map[string]domain.FlowStepAction{
-								"submit": {Primary: true},
-							},
-						},
-						{
-							Name:     "step_2",
-							Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
-							Fields:   []string{"email"},
-						},
-					},
-					RawFlowDefinition: flowDefRaw,
-				},
-			},
-			wantFlowSchemaURI: "https://example.com/schemas/flow-definition.json",
-			wantErr:           domain.ErrFlowDefinitionInvalid(`step "step_2" is terminal (complete is set) but has fields, actions, transitions, gates, or sso_providers`, nil),
-		},
-		{
-			name: "action without a matching transition",
-			fields: fields{
-				db: stubPool(),
-				schemaResolver: &mockSchemaResolver{
-					resolveFunc: func(ctx context.Context, client database.QueryExecutor, projectID string, schemaURL string, rootSchema []byte) (*jsonschema.Schema, error) {
-						return &userSchema, nil
-					},
-				},
-				builtinSchemaProvider: &mockBuiltinSchemaProvider{
-					getBuiltinSchemaFunc: func(uri string) (*jsonschema.Schema, error) {
-						return &jsonschema.Schema{}, nil
-					},
-					latestSchemaURIFunc: func(kind domain.KnownSchemaKind) (string, error) {
-						return "https://example.com/schemas/flow-definition.json", nil
-					},
-				},
-				flowDefinitionRepo: func(ctrl *gomock.Controller) *domainmock.MockFlowDefinitionRepository {
-					repo := domainmock.NewMockFlowDefinitionRepository(ctrl)
-					repo.EXPECT().
-						ListFlowDefinitions(gomock.Any(), gomock.Any(), "project1", gomock.Any()).
-						Times(1).
-						Return([]*domain.FlowDefinition{}, nil)
-					return repo
-				},
-			},
-			args: args{
-				ctx: context.Background(),
-				req: service.CreateFlowDefinitionRequest{
-					ProjectID:     "project1",
-					Name:          "missing-transition",
-					SchemaVersion: "1.0.0",
-					FlowSchemaURI: url.URL{},
-					UserSchema: url.URL{
-						Scheme: "https",
-						Host:   "tenant.com",
-						Path:   "/schemas/my-user.json",
-					},
-					Purposes: map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1"},
-					Audience: domain.FlowDefinitionAudience{
-						AppIDs:  []string{"app1"},
-						TeamIDs: []string{"team1"},
-					},
-					Steps: []domain.FlowDefinitionStep{
-						{
-							Name:   "step_1",
-							Fields: []string{"email"},
-							Actions: map[string]domain.FlowStepAction{
-								"submit": {Primary: true},
-							},
-							Transitions: map[string]domain.FlowStepTransition{
-								"submit11": {Target: "step_2"},
-							},
-						},
-						{
-							Name:     "step_2",
-							Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
-						},
-					},
-					RawFlowDefinition: flowDefRaw,
-				},
-			},
-			wantFlowSchemaURI: "https://example.com/schemas/flow-definition.json",
-			wantErr:           domain.ErrFlowDefinitionInvalid(`step "step_1": action "submit" has no matching transition`, nil),
-		},
-		{
-			name: "transaction is not a declared action or a reserved outcome",
-			fields: fields{
-				db: stubPool(),
-				schemaResolver: &mockSchemaResolver{
-					resolveFunc: func(ctx context.Context, client database.QueryExecutor, projectID string, schemaURL string, rootSchema []byte) (*jsonschema.Schema, error) {
-						return &userSchema, nil
-					},
-				},
-				builtinSchemaProvider: &mockBuiltinSchemaProvider{
-					getBuiltinSchemaFunc: func(uri string) (*jsonschema.Schema, error) {
-						return &jsonschema.Schema{}, nil
-					},
-					latestSchemaURIFunc: func(kind domain.KnownSchemaKind) (string, error) {
-						return "https://example.com/schemas/flow-definition.json", nil
-					},
-				},
-				flowDefinitionRepo: func(ctrl *gomock.Controller) *domainmock.MockFlowDefinitionRepository {
-					repo := domainmock.NewMockFlowDefinitionRepository(ctrl)
-					repo.EXPECT().
-						ListFlowDefinitions(gomock.Any(), gomock.Any(), "project1", gomock.Any()).
-						Times(1).
-						Return([]*domain.FlowDefinition{}, nil)
-					return repo
-				},
-			},
-			args: args{
-				ctx: context.Background(),
-				req: service.CreateFlowDefinitionRequest{
-					ProjectID:     "project1",
-					Name:          "missing-action-transition",
-					SchemaVersion: "1.0.0",
-					FlowSchemaURI: url.URL{},
-					UserSchema: url.URL{
-						Scheme: "https",
-						Host:   "tenant.com",
-						Path:   "/schemas/my-user.json",
-					},
-					Purposes: map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "start"},
-					Audience: domain.FlowDefinitionAudience{
-						AppIDs:  []string{"app1"},
-						TeamIDs: []string{"team1"},
-					},
-					Steps: []domain.FlowDefinitionStep{
-						{
-							Name:   "start",
-							Fields: []string{"email"},
-							Actions: map[string]domain.FlowStepAction{
-								"submit": {Primary: true},
-							},
-							Transitions: map[string]domain.FlowStepTransition{
-								"submit":     {Target: "done"},
-								"magic_link": {Target: "done"},
-							},
-						},
-						{
-							Name:     "done",
-							Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
-						},
-					},
-					RawFlowDefinition: flowDefRaw,
-				},
-			},
-			wantFlowSchemaURI: "https://example.com/schemas/flow-definition.json",
-			wantErr:           domain.ErrFlowDefinitionInvalid(`step "start": transition key "magic_link" is not an action name or reserved outcome (user_not_found, callback)`, nil),
-		},
-		{
-			name: "duplicate step names",
-			fields: fields{
-				db: stubPool(),
-				schemaResolver: &mockSchemaResolver{
-					resolveFunc: func(ctx context.Context, client database.QueryExecutor, projectID string, schemaURL string, rootSchema []byte) (*jsonschema.Schema, error) {
-						return &userSchema, nil
-					},
-				},
-				builtinSchemaProvider: &mockBuiltinSchemaProvider{
-					getBuiltinSchemaFunc: func(uri string) (*jsonschema.Schema, error) {
-						return &jsonschema.Schema{}, nil
-					},
-					latestSchemaURIFunc: func(kind domain.KnownSchemaKind) (string, error) {
-						return "https://example.com/schemas/flow-definition.json", nil
-					},
-				},
-				flowDefinitionRepo: func(ctrl *gomock.Controller) *domainmock.MockFlowDefinitionRepository {
-					repo := domainmock.NewMockFlowDefinitionRepository(ctrl)
-					repo.EXPECT().
-						ListFlowDefinitions(gomock.Any(), gomock.Any(), "project1", gomock.Any()).
-						Times(1).
-						Return([]*domain.FlowDefinition{}, nil)
-					return repo
-				},
-			},
-			args: args{
-				ctx: context.Background(),
-				req: service.CreateFlowDefinitionRequest{
-					ProjectID:     "project1",
-					Name:          "missing-action-transition",
-					SchemaVersion: "1.0.0",
-					FlowSchemaURI: url.URL{},
-					UserSchema: url.URL{
-						Scheme: "https",
-						Host:   "tenant.com",
-						Path:   "/schemas/my-user.json",
-					},
-					Purposes: map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1"},
-					Audience: domain.FlowDefinitionAudience{
-						AppIDs:  []string{"app1"},
-						TeamIDs: []string{"team1"},
-					},
-					Steps: []domain.FlowDefinitionStep{
-						{
-							Name:   "step_1",
-							Fields: []string{"email"},
-							Actions: map[string]domain.FlowStepAction{
-								"submit": {},
-							},
-							Transitions: map[string]domain.FlowStepTransition{
-								"submit": {Target: "done"},
-							},
-						},
-						{
-							Name:   "step_1",
-							Fields: []string{"email"},
-							Actions: map[string]domain.FlowStepAction{
-								"next": {},
-							},
-							Transitions: map[string]domain.FlowStepTransition{
-								"next": {Target: "done"},
-							},
-						},
-						{
-							Name:     "done",
-							Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
-						},
-					},
-					RawFlowDefinition: flowDefRaw,
-				},
-			},
-			wantFlowSchemaURI: "https://example.com/schemas/flow-definition.json",
-			wantErr:           domain.ErrFlowDefinitionInvalid(`duplicate step name "step_1"`, nil),
-		},
-		{
-			name: "target not a step",
-			fields: fields{
-				db: stubPool(),
-				schemaResolver: &mockSchemaResolver{
-					resolveFunc: func(ctx context.Context, client database.QueryExecutor, projectID string, schemaURL string, rootSchema []byte) (*jsonschema.Schema, error) {
-						return &userSchema, nil
-					},
-				},
-				builtinSchemaProvider: &mockBuiltinSchemaProvider{
-					getBuiltinSchemaFunc: func(uri string) (*jsonschema.Schema, error) {
-						return &jsonschema.Schema{}, nil
-					},
-					latestSchemaURIFunc: func(kind domain.KnownSchemaKind) (string, error) {
-						return "https://example.com/schemas/flow-definition.json", nil
-					},
-				},
-				flowDefinitionRepo: func(ctrl *gomock.Controller) *domainmock.MockFlowDefinitionRepository {
-					repo := domainmock.NewMockFlowDefinitionRepository(ctrl)
-					repo.EXPECT().
-						ListFlowDefinitions(gomock.Any(), gomock.Any(), "project1", gomock.Any()).
-						Times(1).
-						Return([]*domain.FlowDefinition{}, nil)
 					return repo
 				},
 			},
@@ -1779,7 +428,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 							},
 							Transitions: map[string]domain.FlowStepTransition{
 								"submit": {Target: "done"},
-								"next":   {Target: "step_2"},
+								"next":   {Target: "external-flow", Action: gu.Ptr(domain.Switch)},
 							},
 						},
 						{
@@ -1791,10 +440,45 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 				},
 			},
 			wantFlowSchemaURI: "https://example.com/schemas/flow-definition.json",
-			wantErr:           domain.ErrFlowDefinitionInvalid(`step "step_1": transition "next" targets unknown step "step_2"`, nil),
+			want: &domain.FlowDefinition{
+				ProjectID:     "project1",
+				Name:          "some-flow",
+				SchemaVersion: "1.0.0",
+				Status:        domain.FlowDefinitionStatusActive,
+				CreatedAt:     time.Now(),
+				UpdatedAt:     time.Now(),
+				UserSchema: url.URL{
+					Scheme: "https",
+					Host:   "tenant.com",
+					Path:   "/schemas/my-user.json",
+				},
+				Purposes: map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1"},
+				Audience: domain.FlowDefinitionAudience{
+					AppIDs:  []string{"app1"},
+					TeamIDs: []string{"team1"},
+				},
+				Steps: []domain.FlowDefinitionStep{
+					{
+						Name:   "step_1",
+						Fields: []string{"email"},
+						Actions: map[string]domain.FlowStepAction{
+							"submit": {},
+							"next":   {},
+						},
+						Transitions: map[string]domain.FlowStepTransition{
+							"submit": {Target: "done"},
+							"next":   {Target: "external-flow", Action: gu.Ptr(domain.Switch)},
+						},
+					},
+					{
+						Name:     "done",
+						Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
+					},
+				},
+			},
 		},
 		{
-			name: "target with a non-existing external flow",
+			name: "failed to create flow definition - target with a non-existing external flow",
 			fields: fields{
 				db: stubPool(),
 				schemaResolver: &mockSchemaResolver{
@@ -1809,6 +493,15 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 					latestSchemaURIFunc: func(kind domain.KnownSchemaKind) (string, error) {
 						return "https://example.com/schemas/flow-definition.json", nil
 					},
+				},
+				validatorFn: func(userSchema *jsonschema.Schema, flowDefinition domain.FlowDefinition) ([]domain.PivotingTarget, error) {
+					return []domain.PivotingTarget{
+						{
+							Name:       "external-flow",
+							Step:       "step_1",
+							Transition: "next",
+						},
+					}, nil
 				},
 				flowDefinitionRepo: func(ctrl *gomock.Controller) *domainmock.MockFlowDefinitionRepository {
 					repo := domainmock.NewMockFlowDefinitionRepository(ctrl)
@@ -1861,6 +554,75 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 			wantErr:           domain.ErrFlowDefinitionInvalid(`step "step_1": transition "next" targets unknown or inactive flow "external-flow"`, nil),
 		},
 		{
+			name: "failed to create flow definition - validation failed",
+			fields: fields{
+				db: stubPool(),
+				schemaResolver: &mockSchemaResolver{
+					resolveFunc: func(ctx context.Context, client database.QueryExecutor, projectID string, schemaURL string, rootSchema []byte) (*jsonschema.Schema, error) {
+						return &userSchema, nil
+					},
+				},
+				builtinSchemaProvider: &mockBuiltinSchemaProvider{
+					getBuiltinSchemaFunc: func(uri string) (*jsonschema.Schema, error) {
+						return &jsonschema.Schema{}, nil
+					},
+					latestSchemaURIFunc: func(kind domain.KnownSchemaKind) (string, error) {
+						return "https://example.com/schemas/flow-definition.json", nil
+					},
+				},
+				validatorFn: func(userSchema *jsonschema.Schema, flowDefinition domain.FlowDefinition) ([]domain.PivotingTarget, error) {
+					return nil, domain.ErrFlowDefinitionInvalid("validation failed", assert.AnError)
+				},
+				flowDefinitionRepo: func(ctrl *gomock.Controller) *domainmock.MockFlowDefinitionRepository {
+					repo := domainmock.NewMockFlowDefinitionRepository(ctrl)
+					repo.EXPECT().
+						ListFlowDefinitions(gomock.Any(), gomock.Any(), "project1", gomock.Any()).
+						Times(1).
+						Return([]*domain.FlowDefinition{}, nil)
+					return repo
+				},
+			},
+			args: args{
+				ctx: context.Background(),
+				req: service.CreateFlowDefinitionRequest{
+					ProjectID:     "project1",
+					Name:          "some-flow",
+					SchemaVersion: "1.0.0",
+					FlowSchemaURI: url.URL{},
+					UserSchema: url.URL{
+						Scheme: "https",
+						Host:   "tenant.com",
+						Path:   "/schemas/my-user.json",
+					},
+					Purposes: map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1"},
+					Audience: domain.FlowDefinitionAudience{
+						AppIDs:  []string{"app1"},
+						TeamIDs: []string{"team1"},
+					},
+					Steps: []domain.FlowDefinitionStep{
+						{
+							Name:   "step_1",
+							Fields: []string{"email"},
+							Actions: map[string]domain.FlowStepAction{
+								"submit": {},
+								"next":   {},
+							},
+							Transitions: map[string]domain.FlowStepTransition{
+								"submit": {Target: "done"},
+								"next":   {Target: "external-flow", Action: gu.Ptr(domain.Switch)},
+							},
+						},
+						{
+							Name:     "done",
+							Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
+						},
+					},
+					RawFlowDefinition: flowDefRaw,
+				},
+			},
+			wantErr: domain.ErrFlowDefinitionInvalid("validation failed", assert.AnError),
+		},
+		{
 			name: "failed to create flow definition - db error",
 			fields: fields{
 				db: stubPool(),
@@ -1876,6 +638,9 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 					latestSchemaURIFunc: func(kind domain.KnownSchemaKind) (string, error) {
 						return "https://example.com/schemas/flow-definition.json", nil
 					},
+				},
+				validatorFn: func(userSchema *jsonschema.Schema, flowDefinition domain.FlowDefinition) ([]domain.PivotingTarget, error) {
+					return []domain.PivotingTarget{}, nil
 				},
 				flowDefinitionRepo: func(ctrl *gomock.Controller) *domainmock.MockFlowDefinitionRepository {
 					repo := domainmock.NewMockFlowDefinitionRepository(ctrl)
@@ -2259,6 +1024,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 				tt.fields.db,
 				tt.fields.schemaResolver,
 				tt.fields.builtinSchemaProvider,
+				tt.fields.validatorFn,
 				tt.fields.flowDefinitionRepo(ctrl),
 			)
 			gotFlowDef, gotFlowSchemaURI, err := fd.Create(tt.args.ctx, tt.args.req)
