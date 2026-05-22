@@ -16,6 +16,7 @@ import (
 type FlowDefinitionService interface {
 	Create(ctx context.Context, req CreateFlowDefinitionRequest) (*domain.FlowDefinition, string, error)
 	Get(ctx context.Context, projectID, id string) (*domain.FlowDefinition, error)
+	List(ctx context.Context, req ListFlowDefinitionsRequest) ([]*domain.FlowDefinition, error)
 }
 
 type SchemaResolver interface {
@@ -226,7 +227,42 @@ func (fd *flowDefinitionService) Get(ctx context.Context, projectID, id string) 
 		if errors.Is(err, &database.NoRowFoundError{}) {
 			return nil, domain.ErrFlowDefinitionNotFound()
 		}
-		return nil, domain.ErrInternal(err)
+		return nil, err
 	}
 	return definition, nil
+}
+
+type ListFlowDefinitionsRequest struct {
+	ProjectID string
+	Purpose   string
+	Limit     int
+	PageToken string
+}
+
+func (fd *flowDefinitionService) List(ctx context.Context, req ListFlowDefinitionsRequest) ([]*domain.FlowDefinition, error) {
+	if req.ProjectID == "" {
+		return nil, domain.ErrMissingProjectID()
+	}
+	var filterOpts []domain.FlowDefinitionListOption
+	if req.Purpose != "" {
+		purpose, err := domain.FlowDefinitionPurposeString(req.Purpose)
+		if err != nil {
+			return nil, domain.ErrFlowDefinitionInvalid("invalid purpose", nil)
+		}
+		filterOpts = append(filterOpts, domain.WithFlowDefinitionPurpose(purpose))
+	}
+	// todo: the repository layer supports offset at the moment, but not page token
+	if req.Limit > 0 {
+		filterOpts = append(filterOpts, domain.WithFlowDefinitionLimit(uint32(req.Limit)))
+	}
+	defs, err := fd.flowDefinitionRepo.ListFlowDefinitions(
+		ctx,
+		fd.db,
+		req.ProjectID,
+		filterOpts...,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return defs, nil
 }
