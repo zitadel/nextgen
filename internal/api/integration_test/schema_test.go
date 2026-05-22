@@ -97,7 +97,7 @@ func TestCreateSchema(t *testing.T) {
 			if !assert.Equal(t, http.StatusBadRequest, resp.StatusCode) {
 				bs, err := io.ReadAll(resp.Body)
 				require.NoError(t, err)
-				t.Fatal(string(bs))
+				t.Log(string(bs))
 			}
 		})
 
@@ -125,7 +125,7 @@ func TestCreateSchema(t *testing.T) {
 			if !assert.IsType(t, &api.CreateSchemaConflict{}, resp) {
 				bs, err := json.Marshal(resp)
 				require.NoError(t, err)
-				t.Fatal(string(bs))
+				t.Log(string(bs))
 			}
 		})
 	})
@@ -148,7 +148,7 @@ func TestGetSchema(t *testing.T) {
 			if !assert.IsType(t, &api.GetSchemaByIdOK{}, resp) {
 				bs, err := json.Marshal(resp)
 				require.NoError(t, err)
-				log.Println(string(bs))
+				t.Log(string(bs))
 			}
 		})
 	})
@@ -166,7 +166,7 @@ func TestGetSchema(t *testing.T) {
 			if !assert.IsType(t, &api.GetSchemaByIdNotFound{}, resp) {
 				bs, err := json.Marshal(resp)
 				require.NoError(t, err)
-				log.Println(string(bs))
+				t.Log(string(bs))
 			}
 		})
 	})
