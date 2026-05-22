@@ -13,6 +13,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/zitadel/passwap"
 
 	oasapi "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
@@ -71,6 +72,8 @@ func run(ctx context.Context, cfg Config, pool database.Pool) error {
 		}
 	}()
 
+	var passwordHasher *passwap.Swapper // TODO: initialize with actual configuration
+
 	// ── Repositories ─────────────────
 	projectRepo := repository.NewProjectRepository(pool)
 	userRepo := repository.NewUserRepository()
@@ -90,6 +93,7 @@ func run(ctx context.Context, cfg Config, pool database.Pool) error {
 		userRepo,
 		userPasswordRepo,
 		userPasskeyRepo,
+		passwordHasher,
 	)
 	sessionService := service.NewSessionService(pool, sessionRepo)
 
