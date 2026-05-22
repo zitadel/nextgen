@@ -14,34 +14,34 @@ const testBuiltinBase = "https://raw.githubusercontent.com/zitadel/nextgen/refs/
 
 func newTestValidator(t *testing.T) *domain.SchemaValidator {
 	t.Helper()
-	v, err := domain.NewTenantSchemaValidator(testBuiltinBase)
+	v, err := domain.NewSchemaValidator(testBuiltinBase)
 	require.NoError(t, err)
 	return v
 }
 
 func TestNewTenantSchemaValidator(t *testing.T) {
 	t.Run("succeeds with valid base", func(t *testing.T) {
-		v, err := domain.NewTenantSchemaValidator(testBuiltinBase)
+		v, err := domain.NewSchemaValidator(testBuiltinBase)
 		require.NoError(t, err)
 		require.NotNil(t, v)
 	})
 
 	t.Run("fails with empty base", func(t *testing.T) {
-		_, err := domain.NewTenantSchemaValidator("")
+		_, err := domain.NewSchemaValidator("")
 		require.Error(t, err)
 	})
 	t.Run("fails with relative base", func(t *testing.T) {
-		_, err := domain.NewTenantSchemaValidator("schemas/meta")
+		_, err := domain.NewSchemaValidator("schemas/meta")
 		require.Error(t, err)
 		assert.ErrorIs(t, err, domain.ErrInvalidBuiltinPublicBase)
 	})
 	t.Run("fails with no-host URL", func(t *testing.T) {
-		_, err := domain.NewTenantSchemaValidator("file:///local/path")
+		_, err := domain.NewSchemaValidator("file:///local/path")
 		require.Error(t, err)
 		assert.ErrorIs(t, err, domain.ErrInvalidBuiltinPublicBase)
 	})
 	t.Run("trailing slash is normalized", func(t *testing.T) {
-		v, err := domain.NewTenantSchemaValidator("https://example.test/schemas/")
+		v, err := domain.NewSchemaValidator("https://example.test/schemas/")
 		require.NoError(t, err)
 		require.NotNil(t, v)
 	})
@@ -379,6 +379,6 @@ func TestSchemaValidator_LatestSchemaURI(t *testing.T) {
 
 	t.Run("returns error for unknown kind", func(t *testing.T) {
 		_, err := v.LatestSchemaURI("unknown-kind")
-		require.ErrorIs(t, err, domain.ErrUnknownSchemaURI)
+		require.ErrorIs(t, err, domain.ErrUnknownSchemaKind)
 	})
 }

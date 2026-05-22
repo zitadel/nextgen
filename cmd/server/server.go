@@ -6,16 +6,20 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os/signal"
 	"strings"
 	"syscall"
 	"time"
 
+	lru "github.com/hashicorp/golang-lru/v2"
+	"github.com/ianlancetaylor/jsonschema"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
 	oasapi "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
+	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	_ "github.com/zitadel/nextgen/internal/storage/database/dialect/all"
@@ -77,11 +81,34 @@ func run(ctx context.Context, cfg Config, pool database.Pool) error {
 	userPasswordRepo := repository.NewUserPasswordRepository()
 	userPasskeyRepo := repository.NewUserPasskeyRepository()
 	sessionRepo := repository.NewSessionRepository(pool)
-	flowRepo := repository.NewFlowDefinitionRepository(pool)
+	flowDefinitionRepo := repository.NewFlowDefinitionRepository(pool)
 	attemptRepo := repository.NewAuthAttemptRepository(pool)
+	jsonSchemaRepo := repository.NewJSONSchemaRepository(pool)
+
+	// ── Schema Stuff ─────────────────
+	schemaCache, err := lru.New2Q[string, *jsonschema.Schema](cfg.Schema.LRUCacheSize)
+	if err != nil {
+		return fmt.Errorf("init schema cache: %w", err)
+	}
+
+	var builtinPublicBase *url.URL
+	if cfg.Schema.BuiltinPublicBase != "" {
+		builtinPublicBase, err = url.Parse(cfg.Schema.BuiltinPublicBase)
+		if err != nil {
+			return fmt.Errorf("parse builtin public base: %w", err)
+		}
+	}
+	// to resolve schema from cache/db, not via http fetch
+	// maxResolveDepth and maxSize default to the values set in the domain; we could make them configurable in the future
+	storageSchemaResolver := domain.NewJSONSchemaResolver(jsonSchemaRepo, schemaCache, 0, 0, nil, builtinPublicBase)
+
+	schemaProvider, err := domain.NewSchemaValidator(cfg.Schema.BuiltinPublicBase)
+	if err != nil {
+		return fmt.Errorf("init tenant schema validator: %w", err)
+	}
 
 	// ── Services ─────────────────────
-	flowService := service.NewFlowService(pool, flowRepo)
+	flowService := service.NewFlowService(pool, flowDefinitionRepo)
 	authAttemptSvc := service.NewAuthAttemptService(
 		pool,
 		attemptRepo,
@@ -91,6 +118,13 @@ func run(ctx context.Context, cfg Config, pool database.Pool) error {
 		userPasswordRepo,
 		userPasskeyRepo,
 	)
+	flowDefinitionSvc := service.NewFlowDefinitionService(
+		pool,
+		storageSchemaResolver,
+		schemaProvider,
+		nil,
+		flowDefinitionRepo,
+	)
 
 	// ── HTTP Server ─────────────────
 
@@ -98,7 +132,7 @@ func run(ctx context.Context, cfg Config, pool database.Pool) error {
 	defer stop()
 
 	oasServer, err := oasapi.NewServer(
-		api.NewHandler(flowService, authAttemptSvc),
+		api.NewHandler(flowService, authAttemptSvc, flowDefinitionSvc),
 		api.NewSecurityHandler(),
 		oasapi.WithErrorHandler(api.OgenErrorHandler))
 	if err != nil {

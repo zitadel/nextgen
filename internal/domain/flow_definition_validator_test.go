@@ -2,7 +2,6 @@ package domain_test
 
 import (
 	"encoding/json"
-	"net/url"
 	"testing"
 
 	"github.com/ianlancetaylor/jsonschema"
@@ -82,12 +81,8 @@ func TestValidateFlowDefinition(t *testing.T) {
 					ProjectID:     "project1",
 					Name:          "login",
 					SchemaVersion: "1.0.0",
-					UserSchema: url.URL{
-						Scheme: "https",
-						Host:   "tenant.com",
-						Path:   "/schemas/my-user.json",
-					},
-					Purposes: map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1"},
+					UserSchema:    "https://tenant.com/schemas/my-user.json",
+					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1"},
 					Audience: domain.FlowDefinitionAudience{
 						AppIDs:  []string{"app1"},
 						TeamIDs: []string{"team1"},
@@ -119,12 +114,8 @@ func TestValidateFlowDefinition(t *testing.T) {
 					ProjectID:     "project1",
 					Name:          "login",
 					SchemaVersion: "1.0.0",
-					UserSchema: url.URL{
-						Scheme: "https",
-						Host:   "tenant.com",
-						Path:   "/schemas/my-user.json",
-					},
-					Purposes: map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "identify"},
+					UserSchema:    "https://tenant.com/schemas/my-user.json",
+					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "identify"},
 					Audience: domain.FlowDefinitionAudience{
 						AppIDs:  []string{"app1"},
 						TeamIDs: []string{"team1"},
@@ -167,12 +158,8 @@ func TestValidateFlowDefinition(t *testing.T) {
 					ProjectID:     "project1",
 					Name:          "login",
 					SchemaVersion: "1.0.0",
-					UserSchema: url.URL{
-						Scheme: "https",
-						Host:   "tenant.com",
-						Path:   "/schemas/my-user.json",
-					},
-					Purposes: map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "start"},
+					UserSchema:    "https://tenant.com/schemas/my-user.json",
+					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "start"},
 					Audience: domain.FlowDefinitionAudience{
 						AppIDs:  []string{"app1"},
 						TeamIDs: []string{"team1"},
@@ -218,12 +205,8 @@ func TestValidateFlowDefinition(t *testing.T) {
 					ProjectID:     "project1",
 					Name:          "login",
 					SchemaVersion: "1.0.0",
-					UserSchema: url.URL{
-						Scheme: "https",
-						Host:   "tenant.com",
-						Path:   "/schemas/my-user.json",
-					},
-					Purposes: map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "identify"},
+					UserSchema:    "https://tenant.com/schemas/my-user.json",
+					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "identify"},
 					Audience: domain.FlowDefinitionAudience{
 						AppIDs:  []string{"app1"},
 						TeamIDs: []string{"team1"},
@@ -258,12 +241,8 @@ func TestValidateFlowDefinition(t *testing.T) {
 					ProjectID:     "project1",
 					Name:          "login",
 					SchemaVersion: "1.0.0",
-					UserSchema: url.URL{
-						Scheme: "https",
-						Host:   "tenant.com",
-						Path:   "/schemas/my-user.json",
-					},
-					Purposes: map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "identify"},
+					UserSchema:    "https://tenant.com/schemas/my-user.json",
+					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "identify"},
 					Audience: domain.FlowDefinitionAudience{
 						AppIDs:  []string{"app1"},
 						TeamIDs: []string{"team1"},
@@ -299,12 +278,8 @@ func TestValidateFlowDefinition(t *testing.T) {
 					ProjectID:     "project1",
 					Name:          "login",
 					SchemaVersion: "1.0.0",
-					UserSchema: url.URL{
-						Scheme: "https",
-						Host:   "tenant.com",
-						Path:   "/schemas/my-user.json",
-					},
-					Purposes: map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "enter"},
+					UserSchema:    "https://tenant.com/schemas/my-user.json",
+					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "enter"},
 					Audience: domain.FlowDefinitionAudience{
 						AppIDs:  []string{"app1"},
 						TeamIDs: []string{"team1"},
@@ -350,12 +325,8 @@ func TestValidateFlowDefinition(t *testing.T) {
 					ProjectID:     "project1",
 					Name:          "login",
 					SchemaVersion: "1.0.0",
-					UserSchema: url.URL{
-						Scheme: "https",
-						Host:   "tenant.com",
-						Path:   "/schemas/my-user.json",
-					},
-					Purposes: map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "start"},
+					UserSchema:    "https://tenant.com/schemas/my-user.json",
+					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "start"},
 					Audience: domain.FlowDefinitionAudience{
 						AppIDs:  []string{"app1"},
 						TeamIDs: []string{"team1"},
@@ -387,12 +358,8 @@ func TestValidateFlowDefinition(t *testing.T) {
 					ProjectID:     "project1",
 					Name:          "login",
 					SchemaVersion: "1.0.0",
-					UserSchema: url.URL{
-						Scheme: "https",
-						Host:   "tenant.com",
-						Path:   "/schemas/my-user.json",
-					},
-					Purposes: map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "start"},
+					UserSchema:    "https://tenant.com/schemas/my-user.json",
+					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "start"},
 					Audience: domain.FlowDefinitionAudience{
 						AppIDs:  []string{"app1"},
 						TeamIDs: []string{"team1"},
@@ -434,12 +401,8 @@ func TestValidateFlowDefinition(t *testing.T) {
 					ProjectID:     "project1",
 					Name:          "login",
 					SchemaVersion: "1.0.0",
-					UserSchema: url.URL{
-						Scheme: "https",
-						Host:   "tenant.com",
-						Path:   "/schemas/my-user.json",
-					},
-					Purposes: map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "doing_nothing"},
+					UserSchema:    "https://tenant.com/schemas/my-user.json",
+					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "doing_nothing"},
 					Audience: domain.FlowDefinitionAudience{
 						AppIDs:  []string{"app1"},
 						TeamIDs: []string{"team1"},
@@ -468,12 +431,8 @@ func TestValidateFlowDefinition(t *testing.T) {
 					ProjectID:     "project1",
 					Name:          "login",
 					SchemaVersion: "1.0.0",
-					UserSchema: url.URL{
-						Scheme: "https",
-						Host:   "tenant.com",
-						Path:   "/schemas/my-user.json",
-					},
-					Purposes: map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "start"},
+					UserSchema:    "https://tenant.com/schemas/my-user.json",
+					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "start"},
 					Audience: domain.FlowDefinitionAudience{
 						AppIDs:  []string{"app1"},
 						TeamIDs: []string{"team1"},
@@ -506,12 +465,8 @@ func TestValidateFlowDefinition(t *testing.T) {
 					ProjectID:     "project1",
 					Name:          "login",
 					SchemaVersion: "1.0.0",
-					UserSchema: url.URL{
-						Scheme: "https",
-						Host:   "tenant.com",
-						Path:   "/schemas/my-user.json",
-					},
-					Purposes: map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "start"},
+					UserSchema:    "https://tenant.com/schemas/my-user.json",
+					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "start"},
 					Audience: domain.FlowDefinitionAudience{
 						AppIDs:  []string{"app1"},
 						TeamIDs: []string{"team1"},
@@ -544,11 +499,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 					ProjectID:     "project1",
 					Name:          "login",
 					SchemaVersion: "1.0.0",
-					UserSchema: url.URL{
-						Scheme: "https",
-						Host:   "tenant.com",
-						Path:   "/schemas/my-user.json",
-					},
+					UserSchema:    "https://tenant.com/schemas/my-user.json",
 					Audience: domain.FlowDefinitionAudience{
 						AppIDs:  []string{"app1"},
 						TeamIDs: []string{"team1"},
@@ -581,12 +532,8 @@ func TestValidateFlowDefinition(t *testing.T) {
 					ProjectID:     "project1",
 					Name:          "login",
 					SchemaVersion: "1.0.0",
-					UserSchema: url.URL{
-						Scheme: "https",
-						Host:   "tenant.com",
-						Path:   "/schemas/my-user.json",
-					},
-					Purposes: map[domain.FlowDefinitionPurpose]string{6: "step_1"},
+					UserSchema:    "https://tenant.com/schemas/my-user.json",
+					Purposes:      map[domain.FlowDefinitionPurpose]string{6: "step_1"},
 					Audience: domain.FlowDefinitionAudience{
 						AppIDs:  []string{"app1"},
 						TeamIDs: []string{"team1"},
@@ -619,12 +566,8 @@ func TestValidateFlowDefinition(t *testing.T) {
 					ProjectID:     "project1",
 					Name:          "login",
 					SchemaVersion: "1.0.0",
-					UserSchema: url.URL{
-						Scheme: "https",
-						Host:   "tenant.com",
-						Path:   "/schemas/my-user.json",
-					},
-					Purposes: map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1", domain.FlowDefinitionPurposeRegister: ""},
+					UserSchema:    "https://tenant.com/schemas/my-user.json",
+					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1", domain.FlowDefinitionPurposeRegister: ""},
 					Audience: domain.FlowDefinitionAudience{
 						AppIDs:  []string{"app1"},
 						TeamIDs: []string{"team1"},
@@ -657,12 +600,8 @@ func TestValidateFlowDefinition(t *testing.T) {
 					ProjectID:     "project1",
 					Name:          "login",
 					SchemaVersion: "1.0.0",
-					UserSchema: url.URL{
-						Scheme: "https",
-						Host:   "tenant.com",
-						Path:   "/schemas/my-user.json",
-					},
-					Purposes: map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1"},
+					UserSchema:    "https://tenant.com/schemas/my-user.json",
+					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1"},
 					Audience: domain.FlowDefinitionAudience{
 						AppIDs:  []string{"app1"},
 						TeamIDs: []string{"team1"},
@@ -695,12 +634,8 @@ func TestValidateFlowDefinition(t *testing.T) {
 					ProjectID:     "project1",
 					Name:          "login",
 					SchemaVersion: "1.0.0",
-					UserSchema: url.URL{
-						Scheme: "https",
-						Host:   "tenant.com",
-						Path:   "/schemas/my-user.json",
-					},
-					Purposes: map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1"},
+					UserSchema:    "https://tenant.com/schemas/my-user.json",
+					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1"},
 					Audience: domain.FlowDefinitionAudience{
 						AppIDs:  []string{"app1"},
 						TeamIDs: []string{"team1"},
@@ -733,12 +668,8 @@ func TestValidateFlowDefinition(t *testing.T) {
 					ProjectID:     "project1",
 					Name:          "login",
 					SchemaVersion: "1.0.0",
-					UserSchema: url.URL{
-						Scheme: "https",
-						Host:   "tenant.com",
-						Path:   "/schemas/my-user.json",
-					},
-					Purposes: map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1"},
+					UserSchema:    "https://tenant.com/schemas/my-user.json",
+					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1"},
 					Audience: domain.FlowDefinitionAudience{
 						AppIDs:  []string{"app1"},
 						TeamIDs: []string{"team1"},
@@ -772,12 +703,8 @@ func TestValidateFlowDefinition(t *testing.T) {
 					ProjectID:     "project1",
 					Name:          "login",
 					SchemaVersion: "1.0.0",
-					UserSchema: url.URL{
-						Scheme: "https",
-						Host:   "tenant.com",
-						Path:   "/schemas/my-user.json",
-					},
-					Purposes: map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1"},
+					UserSchema:    "https://tenant.com/schemas/my-user.json",
+					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1"},
 					Audience: domain.FlowDefinitionAudience{
 						AppIDs:  []string{"app1"},
 						TeamIDs: []string{"team1"},
@@ -810,12 +737,8 @@ func TestValidateFlowDefinition(t *testing.T) {
 					ProjectID:     "project1",
 					Name:          "login",
 					SchemaVersion: "1.0.0",
-					UserSchema: url.URL{
-						Scheme: "https",
-						Host:   "tenant.com",
-						Path:   "/schemas/my-user.json",
-					},
-					Purposes: map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "start"},
+					UserSchema:    "https://tenant.com/schemas/my-user.json",
+					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "start"},
 					Audience: domain.FlowDefinitionAudience{
 						AppIDs:  []string{"app1"},
 						TeamIDs: []string{"team1"},
@@ -849,12 +772,8 @@ func TestValidateFlowDefinition(t *testing.T) {
 					ProjectID:     "project1",
 					Name:          "login",
 					SchemaVersion: "1.0.0",
-					UserSchema: url.URL{
-						Scheme: "https",
-						Host:   "tenant.com",
-						Path:   "/schemas/my-user.json",
-					},
-					Purposes: map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1"},
+					UserSchema:    "https://tenant.com/schemas/my-user.json",
+					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1"},
 					Audience: domain.FlowDefinitionAudience{
 						AppIDs:  []string{"app1"},
 						TeamIDs: []string{"team1"},
@@ -897,12 +816,8 @@ func TestValidateFlowDefinition(t *testing.T) {
 					ProjectID:     "project1",
 					Name:          "login",
 					SchemaVersion: "1.0.0",
-					UserSchema: url.URL{
-						Scheme: "https",
-						Host:   "tenant.com",
-						Path:   "/schemas/my-user.json",
-					},
-					Purposes: map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1"},
+					UserSchema:    "https://tenant.com/schemas/my-user.json",
+					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1"},
 					Audience: domain.FlowDefinitionAudience{
 						AppIDs:  []string{"app1"},
 						TeamIDs: []string{"team1"},
@@ -937,12 +852,8 @@ func TestValidateFlowDefinition(t *testing.T) {
 					ProjectID:     "project1",
 					Name:          "login",
 					SchemaVersion: "1.0.0",
-					UserSchema: url.URL{
-						Scheme: "https",
-						Host:   "tenant.com",
-						Path:   "/schemas/my-user.json",
-					},
-					Purposes: map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1"},
+					UserSchema:    "https://tenant.com/schemas/my-user.json",
+					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1"},
 					Audience: domain.FlowDefinitionAudience{
 						AppIDs:  []string{"app1"},
 						TeamIDs: []string{"team1"},
