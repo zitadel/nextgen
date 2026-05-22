@@ -3,8 +3,10 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 
 	"github.com/ianlancetaylor/jsonschema"
+	"github.com/jackc/pgx/v5"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
@@ -39,6 +41,18 @@ type UserService struct {
 	schemaRepo domain.JSONSchemaRepository
 }
 
+func NewUserService(
+	pool database.Pool,
+	userRepo domain.UserRepository,
+	schemaRepo domain.JSONSchemaRepository,
+) *UserService {
+	return &UserService{
+		pool,
+		userRepo,
+		schemaRepo,
+	}
+}
+
 func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (*domain.User, error) {
 	tx, err := s.pool.Begin(ctx, nil)
 	if err != nil {
@@ -54,18 +68,20 @@ func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (*d
 
 	schemaURL, ok := input.User["$schema"]
 	if !ok {
-		return nil, domain.ErrRequestInvalid().
-			WithMessage("no $schema provided for the user").
-			WithDetails("A schema must be provided when creating a new user. Against this schema, the user will be validated")
+		return nil, domain.ErrUserInvalid().
+			WithDetails("No $schema provided for the user. A schema must be provided when creating a new user. Against this schema, the user will be validated")
 	}
 	strSchemaURL, ok := schemaURL.(string)
 	if !ok {
-		return nil, domain.ErrRequestInvalid().WithMessage("the schema must be a string")
+		return nil, domain.ErrUserInvalid().WithDetails("$schema must be a string, preferably in a uri format")
 	}
 
 	schemaEntity, err := s.schemaRepo.GetByID(ctx, tx, input.ProjectID, strSchemaURL)
 	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to get schema")
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.ErrUserInvalid().WithDetails("$schema no known to the system. First create a schema, then create users.")
+		}
+		return nil, domain.ErrInternal(err).WithMessage("failed to get schema from database")
 	}
 
 	// VALIDATE USER
@@ -78,13 +94,14 @@ func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (*d
 
 	err = schema.Validate(input.User)
 	if err != nil {
-		return nil, domain.ErrRequestInvalid().
+		return nil, domain.ErrUserInvalid().
 			WithParent(err).
 			WithMessage("user does is not valid according to schema")
 	}
 
 	// PREPARE DOMAIN USER
 
+	// TODO: let db generate database
 	id, err := domain.NewID(domain.PrefixUser)
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to generate id")
@@ -111,8 +128,7 @@ func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (*d
 		Attributes: attrs,
 	})
 	if err != nil {
-		// TODO(wim): add proper error handling
-		return nil, err
+		return nil, domain.ErrInternal(err).WithMessage("failed to create user in the database")
 	}
 
 	if err = tx.Commit(ctx); err != nil {
@@ -120,17 +136,28 @@ func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (*d
 	}
 
 	// FETCH CREATED ENTITY
-	panic("IMPLEMENT")
+	user, err := s.userRepo.GetByID(ctx, s.pool, input.ProjectID, input.TeamID, id)
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to find user which was just created")
+	}
+	return user, nil
 }
 
 func (s *UserService) UpdateUser(ctx context.Context, input UpdateUserInput) (*domain.User, error) {
 	panic("IMPLEMENT")
 }
 
-func (s *UserService) GetUser(ctx context.Context, projectID string, userID string) (*domain.User, error) {
-	panic("IMPLEMENT")
+func (s *UserService) GetUser(ctx context.Context, projectID string, teamID *string, userID string) (*domain.User, error) {
+	user, err := s.userRepo.GetByID(ctx, s.pool, projectID, teamID, userID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.ErrUserNotFound()
+		}
+		return nil, domain.ErrInternal(err).WithMessage("failed to get user from database")
+	}
+	return user, nil
 }
 
-func (s *UserService) ListUsers(ctx context.Context, input ListUsersInput) ([]domain.User, error) {
+func (s *UserService) ListUsers(ctx context.Context, input ListUsersInput) ([]*domain.User, error) {
 	panic("IMPLEMENT")
 }

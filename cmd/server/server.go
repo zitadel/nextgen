@@ -79,6 +79,7 @@ func run(ctx context.Context, cfg Config, pool database.Pool) error {
 	sessionRepo := repository.NewSessionRepository(pool)
 	flowRepo := repository.NewFlowDefinitionRepository(pool)
 	attemptRepo := repository.NewAuthAttemptRepository(pool)
+	schemaRepo := repository.NewJSONSchemaRepository(pool)
 
 	// ── Services ─────────────────────
 	flowService := service.NewFlowService(pool, flowRepo)
@@ -91,6 +92,10 @@ func run(ctx context.Context, cfg Config, pool database.Pool) error {
 		userPasswordRepo,
 		userPasskeyRepo,
 	)
+	userService := service.NewUserService(
+		pool, userRepo,
+		schemaRepo,
+	)
 
 	// ── HTTP Server ─────────────────
 
@@ -98,7 +103,7 @@ func run(ctx context.Context, cfg Config, pool database.Pool) error {
 	defer stop()
 
 	oasServer, err := oasapi.NewServer(
-		api.NewHandler(flowService, authAttemptSvc),
+		api.NewHandler(flowService, authAttemptSvc, userService),
 		api.NewSecurityHandler(),
 		oasapi.WithErrorHandler(api.OgenErrorHandler))
 	if err != nil {

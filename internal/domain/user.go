@@ -7,6 +7,18 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
+const (
+	PrefixUser ResourcePrefix = "user"
+)
+
+func ErrUserNotFound() Error {
+	return newError(PrefixUser.ErrorCodePrefix("not_found"), "user not found", nil, nil)
+}
+
+func ErrUserInvalid() Error {
+	return newError(PrefixUser.ErrorCodePrefix("invalid"), "user invalid", nil, nil)
+}
+
 type AuthMethod int
 
 const (
@@ -14,10 +26,6 @@ const (
 	AuthMethodPasskey
 	AuthMethodTOTP
 	AuthMethodRecoveryCodes
-)
-
-const (
-	PrefixUser ResourcePrefix = "user"
 )
 
 // User is a hydrated user projection (header + optional EAV joins).
@@ -49,6 +57,7 @@ type UserRepository interface {
 	userChanges
 	userJoins
 
+	GetByID(ctx context.Context, client database.QueryExecutor, projectID string, teamID *string, userID string) (*User, error)
 	Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*User, error)
 	List(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) ([]*User, error)
 	Create(ctx context.Context, client database.QueryExecutor, user *CreateUser) error

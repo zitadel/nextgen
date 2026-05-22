@@ -21,6 +21,10 @@ type JSONSchemaRepository struct {
 	columnPayload   database.Column
 }
 
+func (r *JSONSchemaRepository) GetByID(ctx context.Context, client database.QueryExecutor, projectID string, schemaID string) (*domain.JSONSchema, error) {
+	return r.Get(ctx, client, database.WithCondition(r.PrimaryKeyCondition(projectID, schemaID)))
+}
+
 func NewJSONSchemaRepository(client database.QueryExecutor) *JSONSchemaRepository {
 	const pgTable = "zitadel_nextgen.json_schemas"
 	const spannerTable = "json_schemas"
