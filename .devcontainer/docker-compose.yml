@@ -5,6 +5,8 @@ services:
       dockerfile: .devcontainer/Dockerfile
     volumes:
       - ..:/workspaces/nextgen:cached
+      - /var/run/docker.sock:/var/run/docker-host.sock
+    entrypoint: /usr/local/share/docker-init.sh
     command: sleep infinity
     depends_on:
       postgres:
