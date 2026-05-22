@@ -62,7 +62,8 @@ func (tx *Transaction) Exec(ctx context.Context, sql string, args ...any) (int64
 }
 
 // Begin creates a savepoint to emulate nested transactions.
-func (tx *Transaction) Begin(ctx context.Context) (database.Transaction, error) {
+// opts is ignored because pgx savepoints do not accept per-nested-tx options.
+func (tx *Transaction) Begin(ctx context.Context, _ *database.TransactionOptions) (database.Transaction, error) {
 	savepoint, err := tx.tx.Begin(ctx)
 	if err != nil {
 		return nil, tx.wrapErr(err)
