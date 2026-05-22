@@ -93,7 +93,7 @@ function renderFields(
       } else {
         lines.push(col(`${pad}${prefix} ${pk} = [`));
         renderArrayItems(val, prefix, prefixCol + 4, ctx, lines);
-        lines.push(`${" ".repeat(prefixCol + 2)}]`);
+        lines.push(col(`${" ".repeat(prefixCol + 2)}]`));
       }
     } else if (isPlainObject(val)) {
       if (Object.keys(val).length === 0) {
@@ -101,7 +101,7 @@ function renderFields(
       } else {
         lines.push(col(`${pad}${prefix} ${pk} = {`));
         renderFields(val, prefix, prefixCol + 4, ctx, lines);
-        lines.push(`${" ".repeat(prefixCol + 2)}}`);
+        lines.push(col(`${" ".repeat(prefixCol + 2)}}`));
       }
     }
   }
@@ -130,7 +130,7 @@ function renderArrayItems(
       } else {
         lines.push(col(`${pad}${prefix} [`));
         renderArrayItems(item, prefix, prefixCol + 4, ctx, lines);
-        lines.push(`${" ".repeat(prefixCol + 2)}],`);
+        lines.push(col(`${" ".repeat(prefixCol + 2)}],`));
       }
     } else if (isPlainObject(item)) {
       if (Object.keys(item).length === 0) {
@@ -138,7 +138,7 @@ function renderArrayItems(
       } else {
         lines.push(col(`${pad}${prefix} {`));
         renderFields(item, prefix, prefixCol + 4, ctx, lines);
-        lines.push(`${" ".repeat(prefixCol + 2)}},`);
+        lines.push(col(`${" ".repeat(prefixCol + 2)}},`));
       }
     }
   }
@@ -181,11 +181,11 @@ function renderDiff(
       } else if (Array.isArray(newVal)) {
         lines.push(col(`${pad}+ ${pk} = [`));
         renderArrayItems(newVal, "+", prefixCol + 4, { tty, deleteMode: false }, lines);
-        lines.push(`${" ".repeat(prefixCol + 2)}]`);
+        lines.push(col(`${" ".repeat(prefixCol + 2)}]`));
       } else if (isPlainObject(newVal)) {
         lines.push(col(`${pad}+ ${pk} = {`));
         renderFields(newVal, "+", prefixCol + 4, { tty, deleteMode: false }, lines);
-        lines.push(`${" ".repeat(prefixCol + 2)}}`);
+        lines.push(col(`${" ".repeat(prefixCol + 2)}}`));
       }
     } else if (!hasNew) {
       // Removed
@@ -197,11 +197,11 @@ function renderDiff(
         lines.push(col(`${pad}- ${pk} = [`));
         // Array items never get " -> null" — only scalar object fields do
         renderArrayItems(oldVal, "-", prefixCol + 4, { tty, deleteMode: false }, lines);
-        lines.push(`${" ".repeat(prefixCol + 2)}]`);
+        lines.push(col(`${" ".repeat(prefixCol + 2)}]`));
       } else if (isPlainObject(oldVal)) {
         lines.push(col(`${pad}- ${pk} = {`));
         renderFields(oldVal, "-", prefixCol + 4, { tty, deleteMode: true }, lines);
-        lines.push(`${" ".repeat(prefixCol + 2)}}`);
+        lines.push(col(`${" ".repeat(prefixCol + 2)}}`));
       }
     } else if (isPrimitive(oldVal) && isPrimitive(newVal)) {
       if (oldVal === newVal) {
@@ -233,14 +233,14 @@ function renderDiff(
         } else {
           lines.push(colR(`${pad}- ${pk} = [`));
           renderArrayItems(oldVal, "-", prefixCol + 4, { tty, deleteMode: false }, lines);
-          lines.push(`${" ".repeat(prefixCol + 2)}]`);
+          lines.push(colR(`${" ".repeat(prefixCol + 2)}]`));
         }
         if (newVal.length === 0) {
           lines.push(colA(`${pad}+ ${pk} = []`));
         } else {
           lines.push(colA(`${pad}+ ${pk} = [`));
           renderArrayItems(newVal, "+", prefixCol + 4, { tty, deleteMode: false }, lines);
-          lines.push(`${" ".repeat(prefixCol + 2)}]`);
+          lines.push(colA(`${" ".repeat(prefixCol + 2)}]`));
         }
       }
     } else if (isPlainObject(oldVal) && isPlainObject(newVal)) {
@@ -252,7 +252,7 @@ function renderDiff(
         const col = (s: string) => paint(s, A.yellow, tty);
         lines.push(col(`${pad}~ ${pk} = {`));
         lines.push(...childLines);
-        lines.push(`${" ".repeat(prefixCol + 2)}}`);
+        lines.push(col(`${" ".repeat(prefixCol + 2)}}`));
       } else if (childLines.length > 0) {
         lines.push(`${pad}  ${pk} = {`);
         lines.push(...childLines);
