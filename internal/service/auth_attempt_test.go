@@ -261,14 +261,27 @@ func TestAuthAttemptService_GetByID(t *testing.T) {
 			},
 		},
 		{
-			name: "propagates repository error",
+			name: "propagates repository auth attempt not found error",
+			repo: &fakeAuthAttemptRepo{getByIDErr: domain.ErrAuthAttemptNotFound()},
+			assert: func(t *testing.T, got *domain.AuthAttempt, err error) {
+				t.Helper()
+				if got != nil {
+					t.Fatalf("GetByID returned attempt = %v, want nil", got)
+				}
+				if !errors.Is(err, domain.ErrAuthAttemptNotFound()) {
+					t.Fatalf("GetByID err = %v, want %v", err, repoErr)
+				}
+			},
+		},
+		{
+			name: "maps repository error to internal error",
 			repo: &fakeAuthAttemptRepo{getByIDErr: repoErr},
 			assert: func(t *testing.T, got *domain.AuthAttempt, err error) {
 				t.Helper()
 				if got != nil {
 					t.Fatalf("GetByID returned attempt = %v, want nil", got)
 				}
-				if !errors.Is(err, repoErr) {
+				if !errors.Is(err, domain.ErrInternal(repoErr)) {
 					t.Fatalf("GetByID err = %v, want %v", err, repoErr)
 				}
 			},
