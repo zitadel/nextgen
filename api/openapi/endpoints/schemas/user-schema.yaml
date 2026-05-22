@@ -28,21 +28,7 @@ properties:
     format: uri
     description: The user Schema version used for this schema.
   x-auth-methods:
-    type: object
-    description: A list of authentication methods supported by the user definition.
-    minProperties: 1
-    additionalProperties: false
-    properties:
-      password:
-        "$ref": auth-method.json
-      passkey:
-        "$ref": auth-method.json
-      magic_link:
-        "$ref": auth-method.json
-      sso:
-        "$ref": auth-method.json
-      otp:
-        "$ref": auth-method.json
+    $ref: auth-methods.json
   properties:
     type: object
     description: A map of additional properties for the user definition, where the

@@ -619,6 +619,66 @@ func (s *AuthMethod) SetPosition(val int) {
 	s.Position = val
 }
 
+// A list of authentication methods supported by the user definition.
+// Ref: #
+type AuthMethods struct {
+	Password  OptAuthMethod `json:"password"`
+	Passkey   OptAuthMethod `json:"passkey"`
+	MagicLink OptAuthMethod `json:"magic_link"`
+	SSO       OptAuthMethod `json:"sso"`
+	Otp       OptAuthMethod `json:"otp"`
+}
+
+// GetPassword returns the value of Password.
+func (s *AuthMethods) GetPassword() OptAuthMethod {
+	return s.Password
+}
+
+// GetPasskey returns the value of Passkey.
+func (s *AuthMethods) GetPasskey() OptAuthMethod {
+	return s.Passkey
+}
+
+// GetMagicLink returns the value of MagicLink.
+func (s *AuthMethods) GetMagicLink() OptAuthMethod {
+	return s.MagicLink
+}
+
+// GetSSO returns the value of SSO.
+func (s *AuthMethods) GetSSO() OptAuthMethod {
+	return s.SSO
+}
+
+// GetOtp returns the value of Otp.
+func (s *AuthMethods) GetOtp() OptAuthMethod {
+	return s.Otp
+}
+
+// SetPassword sets the value of Password.
+func (s *AuthMethods) SetPassword(val OptAuthMethod) {
+	s.Password = val
+}
+
+// SetPasskey sets the value of Passkey.
+func (s *AuthMethods) SetPasskey(val OptAuthMethod) {
+	s.Passkey = val
+}
+
+// SetMagicLink sets the value of MagicLink.
+func (s *AuthMethods) SetMagicLink(val OptAuthMethod) {
+	s.MagicLink = val
+}
+
+// SetSSO sets the value of SSO.
+func (s *AuthMethods) SetSSO(val OptAuthMethod) {
+	s.SSO = val
+}
+
+// SetOtp sets the value of Otp.
+func (s *AuthMethods) SetOtp(val OptAuthMethod) {
+	s.Otp = val
+}
+
 // AuthorizeGetFound is response for AuthorizeGet operation.
 type AuthorizeGetFound struct{}
 
@@ -10600,9 +10660,8 @@ type UserSchema struct {
 	// Discriminator value for a user schema create request.
 	Kind string `json:"kind"`
 	// The user Schema version used for this schema.
-	MetaSchema url.URL `json:"metaSchema"`
-	// A list of authentication methods supported by the user definition.
-	XMinusAuthMinusMethods UserSchemaXMinusAuthMinusMethods `json:"x-auth-methods"`
+	MetaSchema             url.URL     `json:"metaSchema"`
+	XMinusAuthMinusMethods AuthMethods `json:"x-auth-methods"`
 	// A map of additional properties for the user definition, where the key is the property name and the
 	// value is the property schema.
 	Properties      OptUserSchemaProperties `json:"properties"`
@@ -10630,7 +10689,7 @@ func (s *UserSchema) GetMetaSchema() url.URL {
 }
 
 // GetXMinusAuthMinusMethods returns the value of XMinusAuthMinusMethods.
-func (s *UserSchema) GetXMinusAuthMinusMethods() UserSchemaXMinusAuthMinusMethods {
+func (s *UserSchema) GetXMinusAuthMinusMethods() AuthMethods {
 	return s.XMinusAuthMinusMethods
 }
 
@@ -10665,7 +10724,7 @@ func (s *UserSchema) SetMetaSchema(val url.URL) {
 }
 
 // SetXMinusAuthMinusMethods sets the value of XMinusAuthMinusMethods.
-func (s *UserSchema) SetXMinusAuthMinusMethods(val UserSchemaXMinusAuthMinusMethods) {
+func (s *UserSchema) SetXMinusAuthMinusMethods(val AuthMethods) {
 	s.XMinusAuthMinusMethods = val
 }
 
@@ -10701,65 +10760,6 @@ func (s *UserSchemaProperties) init() UserSchemaProperties {
 		*s = m
 	}
 	return m
-}
-
-// A list of authentication methods supported by the user definition.
-type UserSchemaXMinusAuthMinusMethods struct {
-	Password  OptAuthMethod `json:"password"`
-	Passkey   OptAuthMethod `json:"passkey"`
-	MagicLink OptAuthMethod `json:"magic_link"`
-	SSO       OptAuthMethod `json:"sso"`
-	Otp       OptAuthMethod `json:"otp"`
-}
-
-// GetPassword returns the value of Password.
-func (s *UserSchemaXMinusAuthMinusMethods) GetPassword() OptAuthMethod {
-	return s.Password
-}
-
-// GetPasskey returns the value of Passkey.
-func (s *UserSchemaXMinusAuthMinusMethods) GetPasskey() OptAuthMethod {
-	return s.Passkey
-}
-
-// GetMagicLink returns the value of MagicLink.
-func (s *UserSchemaXMinusAuthMinusMethods) GetMagicLink() OptAuthMethod {
-	return s.MagicLink
-}
-
-// GetSSO returns the value of SSO.
-func (s *UserSchemaXMinusAuthMinusMethods) GetSSO() OptAuthMethod {
-	return s.SSO
-}
-
-// GetOtp returns the value of Otp.
-func (s *UserSchemaXMinusAuthMinusMethods) GetOtp() OptAuthMethod {
-	return s.Otp
-}
-
-// SetPassword sets the value of Password.
-func (s *UserSchemaXMinusAuthMinusMethods) SetPassword(val OptAuthMethod) {
-	s.Password = val
-}
-
-// SetPasskey sets the value of Passkey.
-func (s *UserSchemaXMinusAuthMinusMethods) SetPasskey(val OptAuthMethod) {
-	s.Passkey = val
-}
-
-// SetMagicLink sets the value of MagicLink.
-func (s *UserSchemaXMinusAuthMinusMethods) SetMagicLink(val OptAuthMethod) {
-	s.MagicLink = val
-}
-
-// SetSSO sets the value of SSO.
-func (s *UserSchemaXMinusAuthMinusMethods) SetSSO(val OptAuthMethod) {
-	s.SSO = val
-}
-
-// SetOtp sets the value of Otp.
-func (s *UserSchemaXMinusAuthMinusMethods) SetOtp(val OptAuthMethod) {
-	s.Otp = val
 }
 
 type UsernamePassword struct {

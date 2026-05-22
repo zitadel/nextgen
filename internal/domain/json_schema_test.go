@@ -79,7 +79,7 @@ func TestJSONSchemaResolver_Resolve(t *testing.T) {
 	const (
 		projectID    = "proj-1"
 		simpleURL    = "https://example.test/schemas/simple.json"
-		simpleSchema = `{"metaSchema":"https://json-schema.org/draft/2020-12/schema","type":"object"}`
+		simpleSchema = `{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object"}`
 	)
 
 	tests := []struct {
@@ -185,8 +185,8 @@ func TestJSONSchemaResolver_Resolve(t *testing.T) {
 				const (
 					urlA    = "https://example.test/a.json"
 					urlB    = "https://example.test/b.json"
-					schemaA = `{"metaSchema":"https://json-schema.org/draft/2020-12/schema","$ref":"https://example.test/b.json"}`
-					schemaB = `{"metaSchema":"https://json-schema.org/draft/2020-12/schema","$ref":"https://example.test/c.json"}`
+					schemaA = `{"$schema":"https://json-schema.org/draft/2020-12/schema","$ref":"https://example.test/b.json"}`
+					schemaB = `{"$schema":"https://json-schema.org/draft/2020-12/schema","$ref":"https://example.test/c.json"}`
 				)
 
 				mockRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
@@ -246,7 +246,7 @@ func TestJSONSchemaResolver_Resolve(t *testing.T) {
 					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(http.StatusOK)
 					// type keyword expects a string or array, not a boolean.
-					_, _ = w.Write([]byte(`{"metaSchema":"https://json-schema.org/draft/2020-12/schema","type":true}`))
+					_, _ = w.Write([]byte(`{"$schema":"https://json-schema.org/draft/2020-12/schema","type":true}`))
 				}))
 				t.Cleanup(srv.Close)
 
@@ -288,8 +288,8 @@ func TestJSONSchemaResolver_Resolve(t *testing.T) {
 				const (
 					rootURL    = "https://example.test/root.json"
 					refURL     = "https://example.test/ref.json"
-					rootSchema = `{"metaSchema":"https://json-schema.org/draft/2020-12/schema","$ref":"https://example.test/ref.json"}`
-					refSchema  = `{"metaSchema":"https://json-schema.org/draft/2020-12/schema","type":"object"}`
+					rootSchema = `{"$schema":"https://json-schema.org/draft/2020-12/schema","$ref":"https://example.test/ref.json"}`
+					refSchema  = `{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object"}`
 				)
 
 				mockRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
