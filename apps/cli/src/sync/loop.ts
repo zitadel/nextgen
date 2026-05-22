@@ -55,8 +55,8 @@ export async function buildSyncPlan(
       if (client && syncer.fetch) {
         try {
           oldContent = await syncer.fetch(client, entry.id);
-        } catch {
-          // fetch failed — plan will show no field diff
+        } catch (err) {
+          consola.debug(`fetch ${syncer.kind} ${entry.id} failed:`, err);
         }
       }
       actions.push({ kind: "delete", path: filePath, syncer, id: entry.id, oldContent });
@@ -87,8 +87,8 @@ export async function buildSyncPlan(
       if (client && syncer.fetch) {
         try {
           oldContent = await syncer.fetch(client, entry.id);
-        } catch {
-          // fetch failed — plan will show no field diff
+        } catch (err) {
+          consola.debug(`fetch ${syncer.kind} ${entry.id} failed:`, err);
         }
       }
       actions.push({ kind: "update", path: relPath, syncer, id: entry.id, content, hash, oldContent });

@@ -64,7 +64,21 @@ export class FlowDefinitionSyncer implements ResourceSyncer {
   }
 
   async fetch(client: PlatformClient, id: string): Promise<object> {
-    return client.getFlowDefinition(id);
+    // The GET /flow_definitions/:id response wraps the bare flow body in a
+    // detail envelope (`id`, `project_id`, `schema_uri`, `status`,
+    // `created_at`, `updated_at`). Strip those envelope fields before
+    // returning so the diff compares apples-to-apples against the on-disk
+    // flow file, which stores only the bare body.
+    const {
+      id: _id,
+      project_id: _projectId,
+      schema_uri: _schemaUri,
+      status: _status,
+      created_at: _createdAt,
+      updated_at: _updatedAt,
+      ...body
+    } = (await client.getFlowDefinition(id)) as Record<string, unknown>;
+    return body;
   }
 }
 
