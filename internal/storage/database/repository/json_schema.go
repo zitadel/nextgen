@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
@@ -163,10 +164,10 @@ func (r *JSONSchemaRepository) Delete(ctx context.Context, client database.Query
 }
 
 type jsonSchemaRow struct {
-	ProjectID string    `db:"project_id"`
-	URL       string    `db:"url"`
-	CreatedAt time.Time `db:"created_at"`
-	Payload   []byte    `db:"payload"`
+	ProjectID string               `db:"project_id"`
+	URL       string               `db:"url"`
+	CreatedAt time.Time            `db:"created_at"`
+	Payload   JSON[json.RawMessage] `db:"payload"`
 }
 
 func (r *jsonSchemaRow) toDomain() *domain.JSONSchema {
@@ -174,7 +175,7 @@ func (r *jsonSchemaRow) toDomain() *domain.JSONSchema {
 		ProjectID: r.ProjectID,
 		URL:       r.URL,
 		CreatedAt: r.CreatedAt,
-		Schema:    r.Payload,
+		Schema:    r.Payload.Value,
 	}
 }
 
