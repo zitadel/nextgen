@@ -41,7 +41,7 @@ func (t *Transaction) End(ctx context.Context, err error) error {
 }
 
 // Begin returns an error: Spanner does not support nested transactions or savepoints.
-func (t *Transaction) Begin(_ context.Context) (database.Transaction, error) {
+func (t *Transaction) Begin(_ context.Context, _ *database.TransactionOptions) (database.Transaction, error) {
 	return nil, database.NewUnknownError(errors.New("nested transactions not supported in Spanner"))
 }
 

@@ -1,32 +1,51 @@
 package domain
 
-type PasswordAuthCheck struct {
-	*AuthCheck
+import "time"
+
+type AuthChallengePassword struct {
+	authChallenge
 }
 
-// Check implements [AuthFactorer].
-func (p *PasswordAuthCheck) Check() *AuthCheck {
-	return p.AuthCheck
+func (a *AuthChallengePassword) Type() AuthCheckType {
+	return AuthCheckTypePassword
 }
 
-// ChallengePayload implements [AuthChallenger].
-func (p *PasswordAuthCheck) ChallengePayload() any {
+func (a *AuthChallengePassword) Payload() any {
 	return nil
 }
 
-// IsChallenge implements [AuthChallenger].
-func (p *PasswordAuthCheck) IsChallenge() {}
+func SetAuthChallengePassword(id string, lastChallengedAt, lastFailedAt time.Time, failureCount uint16) *AuthChallengePassword {
+	return &AuthChallengePassword{
+		authChallenge: authChallenge{
+			ID:               id,
+			LastChallengedAt: lastChallengedAt,
+			LastFailedAt:     lastFailedAt,
+			FailureCount:     failureCount,
+		},
+	}
+}
 
-// FactorPayload implements [AuthFactorer].
-func (p *PasswordAuthCheck) FactorPayload() any {
+type AuthFactorPassword struct {
+	authFactor
+}
+
+func (a *AuthFactorPassword) Type() AuthCheckType {
+	return AuthCheckTypePassword
+}
+
+func (a *AuthFactorPassword) Payload() any {
 	return nil
 }
 
-// IsFactor implements [AuthFactorer].
-func (p *PasswordAuthCheck) IsFactor() {}
+func SetAuthFactorPassword(lastVerifiedAt time.Time) *AuthFactorPassword {
+	return &AuthFactorPassword{
+		authFactor: authFactor{
+			LastVerifiedAt: lastVerifiedAt,
+		},
+	}
+}
 
 var (
-	_ AuthChecker    = (*PasswordAuthCheck)(nil)
-	_ AuthChallenger = (*PasswordAuthCheck)(nil)
-	_ AuthFactorer   = (*PasswordAuthCheck)(nil)
+	_ AuthChallenge = (*AuthChallengePassword)(nil)
+	_ AuthFactor    = (*AuthFactorPassword)(nil)
 )
