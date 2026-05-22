@@ -2,42 +2,54 @@ package domain
 
 import "time"
 
-type PasskeyAuthCheck struct {
-	*AuthCheck
-	Challenge *PasskeyAuthCheckChallenge
-	Factor    *PasskeyAuthCheckFactor
+type AuthChallengePasskey struct {
+	*PasskeyChallenge
+	authChallenge
 }
 
-type PasskeyAuthCheckChallenge struct {
-	LastChallengedAt     time.Time
-	Challenge            string
-	AllowedCredentialIDs [][]byte
-	UserVerification     uint8 // domain.UserVerificationRequirement
-	RPID                 string
+func (a *AuthChallengePasskey) Type() AuthCheckType {
+	return AuthCheckTypePasskey
 }
 
-type PasskeyAuthCheckFactor struct {
+func (a *AuthChallengePasskey) Payload() any {
+	return a
+}
+
+func SetAuthChallengePasskey(id string, lastChallengedAt, lastFailedAt time.Time, failureCount uint16) *AuthChallengePasskey {
+	return &AuthChallengePasskey{
+		PasskeyChallenge: new(PasskeyChallenge),
+		authChallenge: authChallenge{
+			ID:               id,
+			LastChallengedAt: lastChallengedAt,
+			LastFailedAt:     lastFailedAt,
+			FailureCount:     failureCount,
+		},
+	}
+}
+
+type AuthFactorPasskey struct {
 	UserVerified bool
+	UserID       string
+	authFactor
 }
 
-// FactorPayload implements [AuthFactorer].
-func (p *PasskeyAuthCheck) FactorPayload() any {
-	return p.Factor
+func SetAuthFactorPasskey(lastVerifiedAt time.Time) *AuthFactorPasskey {
+	return &AuthFactorPasskey{
+		authFactor: authFactor{
+			LastVerifiedAt: lastVerifiedAt,
+		},
+	}
 }
 
-// IsFactor implements [AuthFactorer].
-func (p *PasskeyAuthCheck) IsFactor() {}
-
-// ChallengePayload implements [AuthChallenger].
-func (p *PasskeyAuthCheck) ChallengePayload() any {
-	return p.Challenge
+func (a *AuthFactorPasskey) Type() AuthCheckType {
+	return AuthCheckTypePasskey
 }
 
-// IsChallenge implements [AuthChallenger].
-func (p *PasskeyAuthCheck) IsChallenge() {}
+func (a *AuthFactorPasskey) Payload() any {
+	return a
+}
 
 var (
-	_ AuthChecker    = (*PasskeyAuthCheck)(nil)
-	_ AuthChallenger = (*PasskeyAuthCheck)(nil)
-	_ AuthFactorer   = (*PasskeyAuthCheck)(nil)
+	_ AuthChallenge = (*AuthChallengePasskey)(nil)
+	_ AuthFactor    = (*AuthFactorPasskey)(nil)
 )

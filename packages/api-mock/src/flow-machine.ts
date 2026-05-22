@@ -10,14 +10,19 @@
  * State graph:
  *
  *   idle --START(login)----> identifier (email+password, Figma 6593:141985)
- *                                       --SUBMIT(submit|recover)--> passkey-upsell
+ *                                       --SUBMIT(submit)--> passkey-upsell
+ *                                       --SUBMIT(recover)--> recover --SUBMIT--> identifier
  *                                       --SUBMIT(register)--> register
- *                                       --SUBMIT(passkey)--> passkey-upsell
+ *                                       --SUBMIT(passkey)--> passkey-login
  *                                       --SUBMIT(sso_provider_id)--> sso-redirect
  *      \--START(register)--> register --SUBMIT--> passkey-upsell
  *
  *   password -- legacy split step; kept for tests that target it directly
- *   passkey-upsell / sso-redirect --SUBMIT--> done
+ *   passkey-upsell --SUBMIT(skip)--> done
+ *   passkey-upsell --SUBMIT(*)----> passkey-setup --SUBMIT--> done
+ *   passkey-login --SUBMIT--> done
+ *   passkey-login --SUBMIT(cancel)--> identifier
+ *   sso-redirect --SUBMIT--> done
  *   anything --RESET--> idle
  */
 import type { CreateFlowBodyPurpose } from "@zitadel-nextgen/api/generated/model";
@@ -27,7 +32,10 @@ export type FlowStepName =
   | "identifier"
   | "register"
   | "password"
+  | "recover"
   | "passkey-upsell"
+  | "passkey-setup"
+  | "passkey-login"
   | "sso-redirect"
   | "done";
 
@@ -122,12 +130,12 @@ export const flowMachine = createMachine({
           },
           {
             guard: ({ event }) => event.action === "passkey",
-            target: "passkey-upsell",
+            target: "passkey-login",
             actions: [captureFields, rotateToken],
           },
           {
             guard: ({ event }) => event.action === "recover",
-            target: "passkey-upsell",
+            target: "recover",
             actions: [captureFields, rotateToken],
           },
           {
@@ -142,6 +150,11 @@ export const flowMachine = createMachine({
         SUBMIT: { target: "passkey-upsell", actions: [captureFields, rotateToken] },
       },
     },
+    recover: {
+      on: {
+        SUBMIT: { target: "identifier", actions: [rotateToken] },
+      },
+    },
     password: {
       on: {
         SUBMIT: { target: "passkey-upsell", actions: [captureFields, rotateToken] },
@@ -149,7 +162,37 @@ export const flowMachine = createMachine({
     },
     "passkey-upsell": {
       on: {
+        SUBMIT: [
+          {
+            guard: ({ event }) => event.action === "skip",
+            target: "done",
+            actions: [rotateToken],
+          },
+          {
+            target: "passkey-setup",
+            actions: [rotateToken],
+          },
+        ],
+      },
+    },
+    "passkey-setup": {
+      on: {
         SUBMIT: { target: "done", actions: [rotateToken] },
+      },
+    },
+    "passkey-login": {
+      on: {
+        SUBMIT: [
+          {
+            guard: ({ event }) => event.action === "cancel",
+            target: "identifier",
+            actions: [rotateToken],
+          },
+          {
+            target: "done",
+            actions: [rotateToken],
+          },
+        ],
       },
     },
     "sso-redirect": {
