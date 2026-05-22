@@ -15,38 +15,47 @@ const (
 	HandoffTokenExpiration                = time.Minute
 )
 
+// ErrAuthAttemptNotFound returns an error indicating that the requested auth attempt was not found.
 func ErrAuthAttemptNotFound() Error {
 	return newError(PrefixAuthAttempt.ErrorCodePrefix("not_found"), "auth attempt not found", nil, nil)
 }
 
+// ErrAuthAttemptInvalidRequest returns an error indicating that the request is invalid.
 func ErrAuthAttemptInvalidRequest() Error {
 	return newError(PrefixAuthAttempt.ErrorCodePrefix("invalid_request"), "invalid request", nil, nil)
 }
 
+// ErrAuthAttemptInvalidState returns an error indicating that the attempt is in an invalid state (e.g. expired).
 func ErrAuthAttemptInvalidState() Error {
 	return newError(PrefixAuthAttempt.ErrorCodePrefix("invalid_state"), "invalid attempt state", nil, nil)
 }
 
+// ErrAuthAttemptAlreadyCompleted returns an error indicating that the attempt is already completed.
 func ErrAuthAttemptAlreadyCompleted() Error {
 	return newError(PrefixAuthAttempt.ErrorCodePrefix("already_completed"), "The auth attempt is already completed and can no longer be changed.", nil, nil)
 }
 
+// ErrAuthAttemptNotCompleted returns an error indicating that the attempt is not completed.
 func ErrAuthAttemptNotCompleted() Error {
 	return newError(PrefixAuthAttempt.ErrorCodePrefix("not_completed"), "attempt not in completed state", nil, nil)
 }
 
+// ErrAuthAttemptAlreadyHandedOff returns an error indicating that the attempt is already handed off.
 func ErrAuthAttemptAlreadyHandedOff() Error {
 	return newError(PrefixAuthAttempt.ErrorCodePrefix("already_handed_off"), "The auth attempt was already handed off. No new handoff can be created and the previous token will only be returned if the same Idempotency-Key header is provided.", nil, nil)
 }
 
+// ErrAuthAttemptInvalidProof returns an error indicating that the proof is invalid.
 func ErrAuthAttemptInvalidProof() Error {
 	return newError(PrefixAuthAttempt.ErrorCodePrefix("invalid_proof"), "invalid proof or request", nil, nil)
 }
 
+// ErrAuthAttemptProofRejected returns an error indicating that the proof was rejected.
 func ErrAuthAttemptProofRejected() Error {
 	return newError(PrefixAuthAttempt.ErrorCodePrefix("proof_rejected"), "proof rejected", nil, nil)
 }
 
+// ErrAuthAttemptStaleChallenge returns an error indicating that the challenge is stale or has been re-issued.
 func ErrAuthAttemptStaleChallenge() Error {
 	return newError(PrefixAuthAttempt.ErrorCodePrefix("stale_challenge"), "challenge is stale or was re-issued", nil, nil)
 }
@@ -60,8 +69,10 @@ type AuthAttempt struct {
 	// The storage layer assigns this value on Create (database-generated identity).
 	ID string
 
+	// HandoffToken is the single-use token minted explicitly with the handoff call after all required factors are verified, used by the client to exchange for a session.
 	HandoffToken *HandoffToken
-	HandedOffAt  *time.Time
+	// HandedOffAt is the timestamp when the handoff token was generated after the attempt was completed.
+	HandedOffAt *time.Time
 
 	// Used to link an auth attempt to a session. Use case is step up auth.
 	// In this case we need to copy the factors from the session back to the auth attempt.
@@ -84,6 +95,7 @@ const AuthAttemptTTL = 15 * time.Minute
 
 type AuthAttemptOption func(*AuthAttempt)
 
+// WithSession sets the session ID and copies existing factors from the session to the attempt.
 func WithSession(sessionID *string, authFactors ...AuthFactor) AuthAttemptOption {
 	checks := make([]AuthCheck, len(authFactors))
 	for i, factor := range authFactors {
@@ -109,6 +121,7 @@ func NewAuthAttempt(projectID string, requiredChecks []AuthCheckType, opts ...Au
 	return attempt, nil
 }
 
+// CheckAs retrieves a check of the given type from the attempt and casts it to a specific AuthFactor type, returning the typed factor and true if it exists and matches the type.
 func CheckAs[T AuthFactor](attempt *AuthAttempt, typ AuthCheckType) (T, bool) {
 	check, ok := attempt.FactorByType(typ)
 	if !ok {
@@ -119,6 +132,7 @@ func CheckAs[T AuthFactor](attempt *AuthAttempt, typ AuthCheckType) (T, bool) {
 	return typedCheck, ok
 }
 
+// IsExpired returns true if the attempt's TTL has elapsed. Returns false if the attempt is not yet initialized (zero CreatedAt) or TTL is nil.
 func (a *AuthAttempt) IsExpired() bool {
 	if a.CreatedAt.IsZero() || a.TimeToLive == nil {
 		return false
@@ -126,6 +140,7 @@ func (a *AuthAttempt) IsExpired() bool {
 	return time.Now().After(a.ExpiresAt())
 }
 
+// ExpiresAt returns the timestamp when the attempt expires.
 func (a *AuthAttempt) ExpiresAt() time.Time {
 	if a.CreatedAt.IsZero() || a.TimeToLive == nil {
 		return time.Time{}
@@ -133,8 +148,8 @@ func (a *AuthAttempt) ExpiresAt() time.Time {
 	return a.CreatedAt.Add(*a.TimeToLive)
 }
 
+// IsCompleted returns true if all required checks are verified successfully.
 func (a *AuthAttempt) IsCompleted() bool {
-	// An auth attempt is completed if all required checks are verified successfully.
 	for _, requiredCheck := range a.RequiredChecks {
 		_, ok := a.FactorByType(requiredCheck)
 		if !ok {
@@ -144,10 +159,12 @@ func (a *AuthAttempt) IsCompleted() bool {
 	return true
 }
 
+// IsHandedOff returns true if a handoff token has been generated.
 func (a *AuthAttempt) IsHandedOff() bool {
 	return a.HandoffToken != nil
 }
 
+// FactorByType returns the verified factor of the given type, if it exists on the attempt.
 func (a *AuthAttempt) FactorByType(typ AuthCheckType) (AuthFactor, bool) {
 	for _, check := range a.Checks {
 		challenge, ok := check.(AuthFactor)
@@ -158,6 +175,7 @@ func (a *AuthAttempt) FactorByType(typ AuthCheckType) (AuthFactor, bool) {
 	return nil, false
 }
 
+// ChallengeByType returns the challenge of the given type, if it exists on the attempt.
 func (a *AuthAttempt) ChallengeByType(typ AuthCheckType) (AuthChallenge, bool) {
 	for _, check := range a.Checks {
 		challenge, ok := check.(AuthChallenge)
@@ -231,18 +249,21 @@ func (a *AuthAttempt) PreparePasswordChallenge() error {
 	return nil
 }
 
+// SetUserChallenge registers a new user challenge on the attempt, replacing any existing challenge of the same type.
 func (a *AuthAttempt) SetUserChallenge() *AuthChallengeUser {
 	challenge := &AuthChallengeUser{}
 	a.SetCheck(challenge)
 	return challenge
 }
 
+// SetPasswordChallenge registers a new password challenge on the attempt, replacing any existing challenge of the same type.
 func (a *AuthAttempt) SetPasswordChallenge() *AuthChallengePassword {
 	challenge := &AuthChallengePassword{}
 	a.SetCheck(challenge)
 	return challenge
 }
 
+// PrepareVerification verifies that the attempt is not expired or handed off, that the given challenge ID exists (preventing stale proofs), and that the proof type matches the challenge's type.
 func (a *AuthAttempt) PrepareVerification(challengeID string, checkType AuthCheckType) (AuthChallenge, error) {
 	if a.IsExpired() {
 		return nil, ErrAuthAttemptInvalidState()
@@ -292,6 +313,7 @@ func (a *AuthAttempt) PreparePasswordVerification(challengeID string) (AuthChall
 	return challenge, userCheck, nil
 }
 
+// SetUserFactor registers a verified user factor on the attempt, overwriting existing factors of the same type and clearing any associated challenges.
 func (a *AuthAttempt) SetUserFactor(user *User) *AuthFactorUser {
 	factor := &AuthFactorUser{
 		UserID: user.ID,
@@ -300,6 +322,7 @@ func (a *AuthAttempt) SetUserFactor(user *User) *AuthFactorUser {
 	return factor
 }
 
+// SetPasswordFactor registers a verified password factor on the attempt, overwriting existing factors of the same type and clearing any associated challenges.
 func (a *AuthAttempt) SetPasswordFactor() *AuthFactorPassword {
 	factor := &AuthFactorPassword{}
 	a.SetCheck(factor)
