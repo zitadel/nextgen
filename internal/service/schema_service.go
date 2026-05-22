@@ -72,8 +72,12 @@ func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInpu
 		CreatedAt: time.Now().UTC(),
 		Schema:    input.Schema,
 	}
+	err := s.schemaValidator.ValidateAgainstMetaSchema(input.Schema)
+	if err != nil {
+		return nil, domain.ErrJSONSchemaInvalid().WithParent(err)
+	}
 
-	err := s.schemaRepo.Create(ctx, tx, model)
+	err = s.schemaRepo.Create(ctx, tx, model)
 	if err != nil {
 		if _, ok := errors.AsType[*database.IntegrityViolationError](err); ok {
 			return nil, domain.ErrJSONSchemaAlreadyExists().WithParent(err)
@@ -84,11 +88,6 @@ func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInpu
 	_, err = s.schemaResolver.Resolve(ctx, tx, input.ProjectID, input.SchemaID, nil)
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to resolve schema when creating")
-	}
-
-	err = s.schemaValidator.ValidateAgainstMetaSchema(input.Schema)
-	if err != nil {
-		return nil, domain.ErrJSONSchemaInvalid().WithParent(err)
 	}
 
 	err = tx.Commit(ctx)
