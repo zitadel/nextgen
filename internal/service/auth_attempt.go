@@ -363,7 +363,7 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 			}})),
 		)
 		if err != nil {
-			return nil, nil, domain.ErrAuthAttemptProofRejected().WithParent(err)
+			return nil, nil, domain.ErrAuthAttemptProofRejected(err)
 		}
 		return userChallenge, attempt.SetUserFactor(user), nil
 
@@ -379,10 +379,10 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 			database.WithCondition(s.userPasswords.UserIDCondition(userFactor.UserID)),
 		)
 		if err != nil {
-			return nil, nil, domain.ErrAuthAttemptProofRejected().WithParent(err)
+			return nil, nil, domain.ErrAuthAttemptProofRejected(err)
 		}
 		if err := password.Verify(p.Password, s.passwordVerifier); err != nil {
-			return nil, nil, domain.ErrAuthAttemptProofRejected().WithParent(err)
+			return nil, nil, domain.ErrAuthAttemptProofRejected(err)
 		}
 		return passwordChallenge, attempt.SetPasswordFactor(), nil
 

@@ -27,7 +27,13 @@ func (e Error) Is(target error) bool {
 	if !errors.As(target, &t) {
 		return false
 	}
-	return e.Code == t.Code
+	if e.Code != t.Code {
+		return false
+	}
+	if t.Parent != nil {
+		return errors.Is(e.Parent, t.Parent)
+	}
+	return true
 }
 
 func (e Error) As(target any) bool {

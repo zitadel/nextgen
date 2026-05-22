@@ -476,7 +476,7 @@ func TestAuthAttemptService_VerifyProof(t *testing.T) {
 				if got != nil {
 					t.Fatalf("VerifyProof returned attempt = %v, want nil", got)
 				}
-				if !errors.Is(err, domain.ErrAuthAttemptProofRejected()) {
+				if !errors.Is(err, domain.ErrAuthAttemptProofRejected(rejectErr)) {
 					t.Fatalf("VerifyProof err = %v, want ErrAuthAttemptProofRejected", err)
 				}
 				if repo.challengeFailedCalls != 1 {

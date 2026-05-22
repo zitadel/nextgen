@@ -17,7 +17,7 @@ const (
 
 // ErrAuthAttemptNotFound returns an error indicating that the requested auth attempt was not found.
 func ErrAuthAttemptNotFound() Error {
-	return newError(PrefixAuthAttempt.ErrorCodePrefix("not_found"), "auth attempt not found", nil, nil)
+	return newError(PrefixAuthAttempt.ErrorCodePrefix("not_found"), "The auth attempt was not found.", nil, nil)
 }
 
 // ErrAuthAttemptInvalidRequest returns an error indicating that the request is invalid.
@@ -27,7 +27,7 @@ func ErrAuthAttemptInvalidRequest() Error {
 
 // ErrAuthAttemptInvalidState returns an error indicating that the attempt is in an invalid state (e.g. expired).
 func ErrAuthAttemptInvalidState() Error {
-	return newError(PrefixAuthAttempt.ErrorCodePrefix("invalid_state"), "invalid attempt state", nil, nil)
+	return newError(PrefixAuthAttempt.ErrorCodePrefix("invalid_state"), "The auth attempt is in an invalid state for the intended change.", nil, nil)
 }
 
 // ErrAuthAttemptAlreadyCompleted returns an error indicating that the attempt is already completed.
@@ -37,7 +37,7 @@ func ErrAuthAttemptAlreadyCompleted() Error {
 
 // ErrAuthAttemptNotCompleted returns an error indicating that the attempt is not completed.
 func ErrAuthAttemptNotCompleted() Error {
-	return newError(PrefixAuthAttempt.ErrorCodePrefix("not_completed"), "attempt not in completed state", nil, nil)
+	return newError(PrefixAuthAttempt.ErrorCodePrefix("not_completed"), "The auth attempt must be completed for any further action.", nil, nil)
 }
 
 // ErrAuthAttemptAlreadyHandedOff returns an error indicating that the attempt is already handed off.
@@ -47,17 +47,17 @@ func ErrAuthAttemptAlreadyHandedOff() Error {
 
 // ErrAuthAttemptInvalidProof returns an error indicating that the proof is invalid.
 func ErrAuthAttemptInvalidProof() Error {
-	return newError(PrefixAuthAttempt.ErrorCodePrefix("invalid_proof"), "invalid proof or request", nil, nil)
+	return newError(PrefixAuthAttempt.ErrorCodePrefix("invalid_proof"), "The proof or request is invalid.", nil, nil)
 }
 
 // ErrAuthAttemptProofRejected returns an error indicating that the proof was rejected.
-func ErrAuthAttemptProofRejected() Error {
-	return newError(PrefixAuthAttempt.ErrorCodePrefix("proof_rejected"), "proof rejected", nil, nil)
+func ErrAuthAttemptProofRejected(err error) Error {
+	return newError(PrefixAuthAttempt.ErrorCodePrefix("proof_rejected"), "The proof was rejected.", nil, err)
 }
 
 // ErrAuthAttemptStaleChallenge returns an error indicating that the challenge is stale or has been re-issued.
 func ErrAuthAttemptStaleChallenge() Error {
-	return newError(PrefixAuthAttempt.ErrorCodePrefix("stale_challenge"), "challenge is stale or was re-issued", nil, nil)
+	return newError(PrefixAuthAttempt.ErrorCodePrefix("stale_challenge"), "The challenge is stale or was re-issued.", nil, nil)
 }
 
 // AuthAttempt represents the object defined [here](https://github.com/zitadel/nextgen/blob/15bd7f438d709fcd5205a163e24374f6f667b68f/docs/design/api/resource-map.md#auth-flows)
