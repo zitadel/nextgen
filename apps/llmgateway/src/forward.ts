@@ -45,8 +45,9 @@ export function extractV1PathSegments(pathname: string): ReadonlyArray<string> {
  * inflate their reported token counts.
  *
  * Returns the parsed (and possibly mutated) body and the serialised JSON
- * ready to send upstream. `null` is returned when parsing fails so callers
- * can translate to a 400.
+ * ready to send upstream. `null` is returned when parsing fails or the body
+ * is not a plain object for the `/v1/messages` endpoint — callers translate
+ * both to a 400.
  */
 export function prepareBody(
 	rawJson: string,
@@ -64,7 +65,13 @@ export function prepareBody(
 
 	const isExactMessagesEndpoint = pathParts.length === 1 && pathParts[0] === MESSAGES_ENDPOINT;
 
-	if (isExactMessagesEndpoint && isPlainObject(parsed.value)) {
+	if (isExactMessagesEndpoint) {
+		// The guardrail is only injected into plain-object bodies. Reject
+		// anything else (null, arrays, primitives) with a 400 so the caller
+		// always goes through the guardrail path.
+		if (!isPlainObject(parsed.value)) {
+			return null;
+		}
 		const mutated = injectSystemPrompt(parsed.value, {
 			prependClaudeCodeIdentifier: auth.mode === "oauth",
 		});
@@ -112,13 +119,18 @@ export async function forward(args: {
 	const hasBody = method !== "GET" && method !== "HEAD";
 	const rawBody = hasBody ? await args.request.text() : undefined;
 
-	const onBody =
-		rawBody !== undefined
-			? (raw: string): string | null => {
-					const prepared = prepareBody(raw, pathParts, args.auth);
-					return prepared === null ? null : prepared.serialised;
-				}
-			: undefined;
+	// Pre-compute the body transformation once. This ensures both the first
+	// call and any refresh retry use identical payloads (avoids a second JSON
+	// parse + guardrail inject), and lets us return 400 before touching the
+	// upstream at all.
+	let outboundBody: string | undefined;
+	if (rawBody !== undefined) {
+		const prepared = prepareBody(rawBody, pathParts, args.auth);
+		if (prepared === null) {
+			return jsonResponse({ error: "invalid_json", message: "Request body is not valid JSON" }, 400);
+		}
+		outboundBody = prepared.serialised;
+	}
 
 	const proxyService = new ProxyService({
 		allowedUrls: ALLOWED_UPSTREAM_PATHS,
@@ -135,8 +147,7 @@ export async function forward(args: {
 		search: args.search,
 		method,
 		requestHeaders: args.request.headers,
-		body: rawBody,
-		onBody,
+		body: outboundBody,
 		onDebug: onDebug
 			? (url: string, status: number) => onDebug({ upstreamUrl: url, upstreamStatus: status })
 			: undefined,
@@ -150,7 +161,8 @@ export async function forward(args: {
 	if (
 		firstResponse.status === 401 &&
 		args.auth.mode === "oauth" &&
-		args.auth.refreshToken !== undefined
+		args.auth.refreshToken !== undefined &&
+		args.auth.refreshToken.length > 0
 	) {
 		const newTokens = await refreshOAuthToken(args.auth.refreshToken, args.fetchImpl).catch(
 			() => null,

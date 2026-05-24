@@ -38,9 +38,20 @@ function normaliseSystem(value: unknown): ReadonlyArray<TextBlockParam> {
 		return [{ type: "text", text: value }];
 	}
 	if (Array.isArray(value)) {
-		return (value as unknown[]).filter(
-			(item): item is TextBlockParam => typeof item === "object" && item !== null,
-		);
+		// Accept only plain text blocks; silently drop image / tool_use / etc.
+		// Also strip any caller-supplied cache_control: the Messages API caps
+		// cache markers at 4 per request and the SDK reserves them for its own
+		// blocks, so a leaked marker from the client could push the request
+		// over the limit and break caching on every subsequent block.
+		return (value as unknown[])
+			.filter(
+				(item): item is Record<string, unknown> =>
+					typeof item === "object" &&
+					item !== null &&
+					(item as Record<string, unknown>)["type"] === "text" &&
+					typeof (item as Record<string, unknown>)["text"] === "string",
+			)
+			.map((item) => ({ type: "text" as const, text: item["text"] as string }));
 	}
 	return [];
 }

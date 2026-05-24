@@ -80,18 +80,27 @@ describe("prepareBody", () => {
 		expect(out.serialised).toBe(raw);
 	});
 
-	it("returns raw bytes unchanged when parsed body is not a plain object", () => {
-		const arrRaw = JSON.stringify([1, 2, 3]);
-		const arrOut = prepareBody(arrRaw, ["messages"], OAUTH_AUTH);
-		expect(arrOut).not.toBeNull();
-		expect(arrOut!.mutatedBody).toEqual([1, 2, 3]);
-		expect(arrOut!.serialised).toBe(arrRaw);
+	it("returns null (→ 400) when the /v1/messages body is a JSON array", () => {
+		// Arrays are valid JSON but not a valid Messages API body. Passing them
+		// through un-injected would bypass the guardrail, so they are rejected.
+		expect(prepareBody(JSON.stringify([1, 2, 3]), ["messages"], OAUTH_AUTH)).toBeNull();
+	});
 
-		const nullRaw = "null";
-		const nullOut = prepareBody(nullRaw, ["messages"], OAUTH_AUTH);
-		expect(nullOut).not.toBeNull();
-		expect(nullOut!.mutatedBody).toBeNull();
-		expect(nullOut!.serialised).toBe(nullRaw);
+	it("returns null (→ 400) when the /v1/messages body is JSON null", () => {
+		expect(prepareBody("null", ["messages"], OAUTH_AUTH)).toBeNull();
+	});
+
+	it("returns null (→ 400) when the /v1/messages body is a JSON primitive", () => {
+		expect(prepareBody("42", ["messages"], OAUTH_AUTH)).toBeNull();
+		expect(prepareBody('"string"', ["messages"], OAUTH_AUTH)).toBeNull();
+	});
+
+	it("passes non-object JSON through unchanged for non-messages endpoints (e.g. count_tokens)", () => {
+		// count_tokens bodies are forwarded verbatim — no injection, no rejection.
+		const raw = JSON.stringify([1, 2, 3]);
+		const out = prepareBody(raw, ["messages", "count_tokens"], OAUTH_AUTH);
+		expect(out).not.toBeNull();
+		expect(out!.serialised).toBe(raw);
 	});
 
 	it("returns null on malformed JSON", () => {
@@ -466,11 +475,11 @@ describe("forward — OAuth token auto-refresh", () => {
 		tokenBody?: unknown;
 		retryStatus: number;
 		retryBody?: string;
-	}): { fetchImpl: typeof fetch; calls: Array<{ url: string }> } {
-		const calls: Array<{ url: string }> = [];
-		const fetchImpl: typeof fetch = async (url, _init) => {
+	}): { fetchImpl: typeof fetch; calls: Array<{ url: string; init: RequestInit }> } {
+		const calls: Array<{ url: string; init: RequestInit }> = [];
+		const fetchImpl: typeof fetch = async (url, init = {}) => {
 			const urlStr = typeof url === "string" ? url : url instanceof URL ? url.href : url.url;
-			calls.push({ url: urlStr });
+			calls.push({ url: urlStr, init });
 
 			if (urlStr.includes("oauth/token")) {
 				return new Response(
@@ -515,6 +524,9 @@ describe("forward — OAuth token auto-refresh", () => {
 		// 3 calls: first Anthropic (401), token endpoint, retry Anthropic (200)
 		expect(calls).toHaveLength(3);
 		expect(calls[1]?.url).toContain("oauth/token");
+		// The retry MUST carry the new access token, not the original expired one.
+		const retryHeaders = calls[2]?.init.headers as Headers;
+		expect(retryHeaders.get("authorization")).toBe("Bearer new-access");
 	});
 
 	it("returns the 401 when the refresh endpoint itself fails", async () => {

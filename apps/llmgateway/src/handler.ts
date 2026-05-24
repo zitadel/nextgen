@@ -1,5 +1,5 @@
 import { type ClaudeAuth, forward } from "./forward.js";
-import { isDebugEnabled } from "./utils/debug.js";
+import { isDebugEnabled, truncateForLog } from "./utils/debug.js";
 import { jsonResponse } from "./utils/response.js";
 
 const PLACEHOLDER_BASE_URL = "http://placeholder.local";
@@ -51,7 +51,7 @@ export default async function handle(request: Request): Promise<Response> {
 		auth,
 		onDebug: isDebugEnabled()
 			? ({ upstreamUrl, upstreamStatus }) => {
-					console.error(`[gateway] → ${upstreamUrl}`);
+					console.error(`[gateway] → ${truncateForLog(upstreamUrl)}`);
 					console.error(`[gateway] ← upstream status: ${upstreamStatus}`);
 				}
 			: undefined,

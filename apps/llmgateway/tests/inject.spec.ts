@@ -140,6 +140,45 @@ describe("injectSystemPrompt — invariants", () => {
 			expect(block.cache_control).toBeUndefined();
 		}
 	});
+
+	it("strips cache_control from caller-supplied system blocks", () => {
+		// A client could send cache_control markers to exhaust the 4-marker cap
+		// or displace the SDK's own caching strategy. The gateway must scrub them.
+		const callerBlocks = [
+			{ type: "text", text: "Block A", cache_control: { type: "ephemeral" } },
+			{ type: "text", text: "Block B" },
+		];
+		const out = injectSystemPrompt(
+			{ messages: [], system: callerBlocks },
+			{ prependClaudeCodeIdentifier: false, guardrailText: GUARDRAIL_FIXTURE },
+		);
+		const blocks = out["system"] as ReadonlyArray<TextBlockParam>;
+		for (const block of blocks) {
+			expect(block.cache_control).toBeUndefined();
+		}
+		// Text content is preserved
+		expect(blocks.map((b) => b.text)).toContain("Block A");
+		expect(blocks.map((b) => b.text)).toContain("Block B");
+	});
+
+	it("silently drops non-text caller system blocks (image, tool_use, etc.)", () => {
+		// Only text blocks are forwarded upstream; other types are dropped to
+		// prevent malformed requests and unvalidated content reaching Anthropic.
+		const callerBlocks = [
+			{ type: "text", text: "Keep me" },
+			{ type: "image", source: { type: "base64", media_type: "image/png", data: "abc" } },
+			{ type: "tool_use", id: "tu1", name: "bash", input: {} },
+		];
+		const out = injectSystemPrompt(
+			{ messages: [], system: callerBlocks },
+			{ prependClaudeCodeIdentifier: false, guardrailText: GUARDRAIL_FIXTURE },
+		);
+		const blocks = out["system"] as ReadonlyArray<TextBlockParam>;
+		// Only text blocks remain (guardrail + "Keep me")
+		expect(blocks.every((b) => b.type === "text")).toBe(true);
+		expect(blocks.map((b) => b.text)).toContain("Keep me");
+		expect(blocks).toHaveLength(2); // guardrail + caller text
+	});
 });
 
 describe("injectSystemPrompt — env fallback", () => {
