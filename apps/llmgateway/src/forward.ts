@@ -1,5 +1,7 @@
 import { injectSystemPrompt } from "./inject.js";
-import { callClaude, type ClaudeAuth } from "./lib/claude.js";
+import { ClaudeService, type ClaudeAuth } from "./lib/claude.js";
+import { refreshOAuthToken } from "./lib/oauth.js";
+import { ProxyService } from "./lib/proxy.js";
 import { isPlainObject, tryParseJson } from "./utils/json.js";
 import { jsonResponse } from "./utils/response.js";
 
@@ -9,13 +11,9 @@ const ANTHROPIC_API_VERSION_PREFIX = "v1";
 const MESSAGES_ENDPOINT = "messages";
 const COUNT_TOKENS_ENDPOINT = "count_tokens";
 
-/**
- * Endpoints reachable through this gateway. Any `/v1/` path not in this
- * list is rejected with a 404 before contacting the upstream.
- */
-const ALLOWED_PATHS: ReadonlyArray<ReadonlyArray<string>> = [
-	[MESSAGES_ENDPOINT],
-	[MESSAGES_ENDPOINT, COUNT_TOKENS_ENDPOINT],
+const ALLOWED_UPSTREAM_PATHS: ReadonlyArray<string> = [
+	`/${ANTHROPIC_API_VERSION_PREFIX}/${MESSAGES_ENDPOINT}`,
+	`/${ANTHROPIC_API_VERSION_PREFIX}/${MESSAGES_ENDPOINT}/${COUNT_TOKENS_ENDPOINT}`,
 ];
 
 /**
@@ -99,57 +97,82 @@ export async function forward(args: {
 	readonly fetchImpl?: typeof fetch;
 	readonly onDebug?: (info: {
 		readonly upstreamUrl: string;
-		readonly mutatedBody: unknown;
 		readonly upstreamStatus: number;
 	}) => void;
 }): Promise<Response> {
 	const pathParts = extractV1PathSegments(args.pathname);
 
-	const isAllowed = ALLOWED_PATHS.some(
-		(allowed) =>
-			allowed.length === pathParts.length && allowed.every((seg, i) => seg === pathParts[i]),
-	);
-	if (!isAllowed) {
-		return jsonResponse(
-			{ error: "not_found", message: `Unsupported endpoint: /v1/${pathParts.join("/")}` },
-			404,
-		);
+	if (!ALLOWED_UPSTREAM_PATHS.includes(`/${ANTHROPIC_API_VERSION_PREFIX}/${pathParts.join("/")}`)) {
+		return jsonResponse({ error: "not_found", message: "Endpoint not supported" }, 404);
 	}
+
+	const { onDebug } = args;
 
 	const method = args.request.method.toUpperCase();
 	const hasBody = method !== "GET" && method !== "HEAD";
 	const rawBody = hasBody ? await args.request.text() : undefined;
 
-	let capturedMutatedBody: unknown;
 	const onBody =
 		rawBody !== undefined
 			? (raw: string): string | null => {
 					const prepared = prepareBody(raw, pathParts, args.auth);
-					if (prepared === null) {
-						return null;
-					}
-					capturedMutatedBody = prepared.mutatedBody;
-					return prepared.serialised;
+					return prepared === null ? null : prepared.serialised;
 				}
 			: undefined;
 
-	return callClaude({
+	const proxyService = new ProxyService({
+		allowedUrls: ALLOWED_UPSTREAM_PATHS,
+		fetchImpl: args.fetchImpl,
+	});
+
+	const claudeService = new ClaudeService({
 		auth: args.auth,
+		transport: proxyService,
+	});
+
+	const callOptions = {
 		pathSegments: pathParts,
 		search: args.search,
 		method,
 		requestHeaders: args.request.headers,
 		body: rawBody,
 		onBody,
-		fetchImpl: args.fetchImpl,
-		onDebug: args.onDebug
-			? (url, status) => {
-					args.onDebug?.({
-						upstreamUrl: url,
-						mutatedBody: capturedMutatedBody,
-						upstreamStatus: status,
-					});
-				}
+		onDebug: onDebug
+			? (url: string, status: number) => onDebug({ upstreamUrl: url, upstreamStatus: status })
 			: undefined,
-	});
+	} as const;
+
+	const firstResponse = await claudeService.call(callOptions);
+
+	// Auto-refresh: when Anthropic returns 401 and we have a refresh token,
+	// exchange it for a new access token and retry the request once. If the
+	// refresh itself fails, the original 401 is returned to the caller.
+	if (
+		firstResponse.status === 401 &&
+		args.auth.mode === "oauth" &&
+		args.auth.refreshToken !== undefined
+	) {
+		const newTokens = await refreshOAuthToken(args.auth.refreshToken, args.fetchImpl).catch(
+			() => null,
+		);
+
+		if (newTokens !== null) {
+			// Release the upstream connection only once we know we will retry —
+			// if refresh failed we return firstResponse intact so the caller
+			// still gets Anthropic's original error body.
+			await firstResponse.body?.cancel().catch(() => {});
+
+			const refreshedService = new ClaudeService({
+				auth: {
+					mode: "oauth",
+					token: newTokens.accessToken,
+					refreshToken: newTokens.refreshToken,
+				},
+				transport: proxyService,
+			});
+			return refreshedService.call(callOptions);
+		}
+	}
+
+	return firstResponse;
 }

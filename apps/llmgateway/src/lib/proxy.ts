@@ -1,3 +1,5 @@
+import { jsonResponse } from "../utils/response.js";
+
 /**
  * Hop-by-hop headers defined by RFC 7230 §6.1. These describe a single
  * transport connection and MUST NOT be forwarded by an intermediary.
@@ -45,23 +47,8 @@ const PROXY_STRIP_RESPONSE: ReadonlySet<string> = new Set(["content-encoding", "
 /**
  * Compute the effective hop-by-hop header set for a message.
  *
- * Per RFC 7230 §6.1:
- *
- * > Connection options are case-insensitive. […] When a header field
- * > aside from `Connection` is used to supply control information for or
- * > about the current connection, the sender MUST list the corresponding
- * > field-name within the `Connection` header field. A proxy or gateway
- * > MUST parse a received `Connection` header field before a message is
- * > forwarded and […] remove the corresponding field(s).
- *
- * So the effective strip set is the union of:
- *
- * - The static RFC list in {@link RFC_7230_HOP_BY_HOP}.
- * - Every header name listed in the inbound `Connection` header.
- *
- * Bare connection-options (`close`, `keep-alive`) that appear in the
- * `Connection` value but don't name a real header pass through harmlessly —
- * the resulting set lookup just won't match anything.
+ * Per RFC 7230 §6.1 the effective strip set is the union of the static RFC
+ * list and every header name listed in the inbound `Connection` header.
  */
 export function effectiveHopByHopHeaders(input: Headers): ReadonlySet<string> {
 	const connection = input.get("connection");
@@ -93,70 +80,69 @@ export function filterHeaders(input: Headers, strip: ReadonlySet<string>): Heade
 }
 
 /**
- * Options for a single reverse-proxy request issued by {@link proxy}.
+ * Generic HTTP reverse-proxy service.
+ *
+ * Automatically strips hop-by-hop headers, `host`, and `content-length` on
+ * every forwarded request, and `content-encoding` / `content-length` on
+ * every upstream response.
+ *
+ * When `allowedUrls` is provided, the upstream URL's pathname must match at
+ * least one entry before the request is forwarded. A string entry is an exact
+ * pathname match; a RegExp entry is tested against the pathname. Non-matching
+ * requests return `404 not_found` without calling the upstream.
  */
-export interface ProxyOptions {
-	/** Absolute URL of the upstream endpoint to call. */
-	readonly upstreamUrl: string;
-	/** HTTP method to use for the upstream request. */
-	readonly method: string;
-	/**
-	 * Headers to forward upstream. RFC 7230 hop-by-hop headers, `host`, and
-	 * `content-length` are always stripped automatically before forwarding.
-	 */
-	readonly requestHeaders: Headers;
-	/** Serialised request body. Omit entirely for GET/HEAD requests. */
-	readonly body?: string;
-	/** Replaceable fetch implementation — useful for injecting test doubles. */
-	readonly fetchImpl?: typeof fetch;
-	/**
-	 * Optional debug callback fired after the upstream response arrives.
-	 * Receives the upstream URL and HTTP status code.
-	 */
-	readonly onDebug?: (upstreamUrl: string, upstreamStatus: number) => void;
-}
+export class ProxyService {
+	readonly #allowedUrls: ReadonlyArray<string | RegExp>;
+	readonly #fetchImpl: typeof fetch;
 
-/**
- * Generic HTTP reverse-proxy kernel.
- *
- * Automatically strips on every request:
- * - RFC 7230 hop-by-hop headers (including `Connection`-listed names).
- * - `host` and `content-length` (always wrong for a forwarded request).
- *
- * Automatically strips on every response:
- * - RFC 7230 hop-by-hop headers.
- * - `content-encoding` and `content-length` (fetch decompresses
- *   transparently, leaving these stale).
- *
- * The upstream response body is streamed back to the caller unchanged.
- */
-export async function proxy(options: ProxyOptions): Promise<Response> {
-	const fetchImpl = options.fetchImpl ?? fetch;
-
-	const reqStrip = new Set([
-		...effectiveHopByHopHeaders(options.requestHeaders),
-		...PROXY_STRIP_REQUEST,
-	]);
-	const filteredReq = filterHeaders(options.requestHeaders, reqStrip);
-
-	const init: RequestInit = { method: options.method, headers: filteredReq };
-	if (options.body !== undefined) {
-		init.body = options.body;
+	constructor(options: {
+		readonly allowedUrls?: ReadonlyArray<string | RegExp>;
+		readonly fetchImpl?: typeof fetch;
+	}) {
+		this.#allowedUrls = options.allowedUrls ?? [];
+		this.#fetchImpl = options.fetchImpl ?? fetch;
 	}
 
-	const upstream = await fetchImpl(options.upstreamUrl, init);
+	async call(
+		upstreamUrl: string,
+		method: string,
+		requestHeaders: Headers,
+		body?: string,
+		onDebug?: (upstreamUrl: string, upstreamStatus: number) => void,
+	): Promise<Response> {
+		if (this.#allowedUrls.length > 0) {
+			const { pathname } = new URL(upstreamUrl);
+			const allowed = this.#allowedUrls.some((entry) =>
+				typeof entry === "string" ? entry === pathname : entry.test(pathname),
+			);
+			if (!allowed) {
+				return jsonResponse(
+					{ error: "not_found", message: "Endpoint not supported" },
+					404,
+				);
+			}
+		}
 
-	options.onDebug?.(options.upstreamUrl, upstream.status);
+		const reqStrip = new Set([...effectiveHopByHopHeaders(requestHeaders), ...PROXY_STRIP_REQUEST]);
+		const filteredReq = filterHeaders(requestHeaders, reqStrip);
 
-	const resStrip = new Set([
-		...effectiveHopByHopHeaders(upstream.headers),
-		...PROXY_STRIP_RESPONSE,
-	]);
-	const filteredRes = filterHeaders(upstream.headers, resStrip);
+		const upstream = await this.#fetchImpl(upstreamUrl, {
+			method,
+			headers: filteredReq,
+			...(body !== undefined && { body }),
+		});
 
-	return new Response(upstream.body, {
-		status: upstream.status,
-		statusText: upstream.statusText,
-		headers: filteredRes,
-	});
+		onDebug?.(upstreamUrl, upstream.status);
+
+		const resStrip = new Set([
+			...effectiveHopByHopHeaders(upstream.headers),
+			...PROXY_STRIP_RESPONSE,
+		]);
+
+		return new Response(upstream.body, {
+			status: upstream.status,
+			statusText: upstream.statusText,
+			headers: filterHeaders(upstream.headers, resStrip),
+		});
+	}
 }

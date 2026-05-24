@@ -12,10 +12,10 @@ import { ZITADEL_SYSTEM_PROMPT } from "./system-prompt.js";
 export const CLAUDE_CODE_IDENTIFIER_TEXT =
 	"You are Claude Code, Anthropic's official CLI for Claude.";
 
-const CLAUDE_CODE_IDENTIFIER_BLOCK: TextBlockParam = Object.freeze({
+const CLAUDE_CODE_IDENTIFIER_BLOCK: TextBlockParam = {
 	type: "text",
 	text: CLAUDE_CODE_IDENTIFIER_TEXT,
-});
+};
 
 /**
  * Resolve the active guardrail text.
@@ -38,7 +38,9 @@ function normaliseSystem(value: unknown): ReadonlyArray<TextBlockParam> {
 		return [{ type: "text", text: value }];
 	}
 	if (Array.isArray(value)) {
-		return value as ReadonlyArray<TextBlockParam>;
+		return (value as unknown[]).filter(
+			(item): item is TextBlockParam => typeof item === "object" && item !== null,
+		);
 	}
 	return [];
 }

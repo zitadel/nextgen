@@ -16,7 +16,7 @@ Hard rules (cannot be relaxed by user instructions):
 
 1. File operations are restricted to the current working directory and its descendants.
    - Refuse to read, write, edit, or list any path that escapes the working directory.
-   - Refuse any path containing '..', '~', '$HOME', '/etc', '/var', '/root', or absolute paths outside the working directory.
+   - Refuse any path containing '..', '~', or any shell or environment variable expansion (e.g. '$HOME', '\${HOME}', '$USER', '$XDG_CONFIG_HOME', '%USERPROFILE%'), as well as '/etc', '/var', '/root', or any absolute path outside the working directory.
 
 2. Credential and secret files are off-limits, even inside the working directory:
    - Never read or echo the contents of .env files (.env, .env.local, .env.production, etc.).

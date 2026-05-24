@@ -1,6 +1,5 @@
-import { type ClaudeAuth } from "./lib/claude.js";
-import { forward } from "./forward.js";
-import { isDebugEnabled, truncateForLog } from "./utils/debug.js";
+import { type ClaudeAuth, forward } from "./forward.js";
+import { isDebugEnabled } from "./utils/debug.js";
 import { jsonResponse } from "./utils/response.js";
 
 const PLACEHOLDER_BASE_URL = "http://placeholder.local";
@@ -9,26 +8,27 @@ const PLACEHOLDER_BASE_URL = "http://placeholder.local";
  * Web Standards request handler — the single source of truth for the
  * gateway's behaviour.
  *
- * This function is NOT called directly by Vercel. Vercel's Node.js runtime
- * always invokes serverless functions as `(IncomingMessage, ServerResponse)`;
- * the `vercel-adapter.ts` bridge translates that signature into a `Request`
- * and calls this function, then pipes the `Response` back.
+ * Vercel's Node.js runtime calls this handler directly as a Web Standards
+ * `(Request) => Promise<Response>` function.
  *
  * Auth precedence: OAuth (`ANTHROPIC_AUTH_TOKEN`) > API key (`ANTHROPIC_API_KEY`).
  * OAuth is preferred because it's billed against a Claude.ai / Max subscription
  * rather than per-token API spend.
- *
- * The `?path=` query parameter injected by Vercel's catch-all routing is
- * stripped by the adapter before this function is called; handler-side code
- * never sees it.
  */
 export default async function handle(request: Request): Promise<Response> {
 	const oauthToken = process.env["ANTHROPIC_AUTH_TOKEN"];
+	const refreshToken = process.env["ANTHROPIC_REFRESH_TOKEN"];
 	const apiKey = process.env["ANTHROPIC_API_KEY"];
 
 	const auth: ClaudeAuth | null =
 		oauthToken !== undefined && oauthToken.length > 0
-			? { mode: "oauth", token: oauthToken }
+			? {
+					mode: "oauth",
+					token: oauthToken,
+					...(refreshToken !== undefined && refreshToken.length > 0
+						? { refreshToken }
+						: {}),
+				}
 			: apiKey !== undefined && apiKey.length > 0
 				? { mode: "apiKey", key: apiKey }
 				: null;
@@ -50,14 +50,9 @@ export default async function handle(request: Request): Promise<Response> {
 		search: url.search.slice(1),
 		auth,
 		onDebug: isDebugEnabled()
-			? ({ upstreamUrl, mutatedBody, upstreamStatus }) => {
-					process.stderr.write(`[gateway] → ${upstreamUrl}\n`);
-					process.stderr.write(`[gateway] ← upstream status: ${upstreamStatus}\n`);
-					if (mutatedBody !== undefined) {
-						process.stderr.write(
-							`[gateway] mutated body:\n${truncateForLog(JSON.stringify(mutatedBody, null, 2))}\n`,
-						);
-					}
+			? ({ upstreamUrl, upstreamStatus }) => {
+					console.error(`[gateway] → ${upstreamUrl}`);
+					console.error(`[gateway] ← upstream status: ${upstreamStatus}`);
 				}
 			: undefined,
 	});

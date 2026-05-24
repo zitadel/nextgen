@@ -4,8 +4,7 @@
  * Enabled in every environment except `NODE_ENV=production`, so:
  *
  * - Local dev (`tsx scripts/dev.ts`): on.
- * - Vercel preview deployments: on.
- * - Vercel production deployments: off.
+ * - Vercel deployments (preview and production): off (Vercel sets NODE_ENV=production for all runtimes).
  *
  * @param env - Source environment. Defaulted to `process.env` so callers may
  *   inject a stub in tests.
