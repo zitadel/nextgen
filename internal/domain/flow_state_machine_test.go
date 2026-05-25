@@ -8,22 +8,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/domain/idgen/idgenmock"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"go.uber.org/mock/gomock"
 )
-
-// fakeIDGen returns a fixed prefixed id so terminal-state checks can
-// assert the recorded user id exactly.
-type fakeIDGen struct {
-	id  string
-	err error
-}
-
-func (g *fakeIDGen) New(prefix string) (string, error) {
-	if g.err != nil {
-		return "", g.err
-	}
-	return prefix + "_" + g.id, nil
-}
 
 // fakeHasher is a prefix-based password hasher: Hash returns
 // "hashed:"+plain. Trivial to reason about in tests.
@@ -57,7 +45,7 @@ func (f *fakeUserPasswordRepo) Create(_ context.Context, _ database.QueryExecuto
 type flowTestWorld struct {
 	users  *fakeUserRepo
 	pws    *fakeUserPasswordRepo
-	ids    *fakeIDGen
+	ids    *idgenmock.MockGenerator
 	hasher fakeHasher
 	sm     *domain.FlowStateMachineRuntime
 }
@@ -66,7 +54,11 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 	t.Helper()
 	users := &fakeUserRepo{}
 	pws := &fakeUserPasswordRepo{}
-	ids := &fakeIDGen{id: "01TEST"}
+	ids := idgenmock.NewMockGenerator(gomock.NewController(t))
+	ids.EXPECT().
+		New(gomock.Any()).
+		DoAndReturn(func(prefix string) (string, error) { return prefix + "_01TEST", nil }).
+		AnyTimes()
 	hasher := fakeHasher{}
 
 	createUser := domain.NewFlowCreateUserHandler(ids, users, pws, hasher)
