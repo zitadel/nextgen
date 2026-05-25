@@ -26,6 +26,11 @@ export class LegacyPatcher implements Patcher {
    * then executes the combined plan against the filesystem.
    */
   async patch(ctx: PatchContext): Promise<ScaffoldResult> {
+    if (ctx.framework.id !== "next") {
+      throw new Error(
+        `LegacyPatcher only supports Next.js, got "${ctx.framework.id}"`,
+      );
+    }
     const renderer = getRenderer(ctx.rendererId);
     const config = buildProjectConfig(
       ctx.project,
@@ -197,7 +202,7 @@ function resolveDefaultServer(source: string): string {
   }
 }
 
-function buildFlowDefinition(
+export function buildFlowDefinition(
   fields: readonly string[],
   authMethods: readonly string[],
 ): Record<string, unknown> {
@@ -310,7 +315,10 @@ function fieldTypeFor(field: string): string {
   return "text";
 }
 
-/** Builds the locale seed map for the default flow definition. */
+/**
+ * Builds the locale seed map for the default flow definition.
+ * Exported for use by other patchers that share the same flow structure.
+ */
 export function buildLocaleSeed(
   fields: readonly string[],
   authMethods: readonly string[],

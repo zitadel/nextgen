@@ -13,7 +13,7 @@ export type ZitadelConfig = {
 export type ProjectContext = {
   cwd: string;
   packageManager: PackageManager;
-  framework: FrameworkDetection;
+  framework: Extract<FrameworkDetection, { id: "next" }>;
   config: ZitadelConfig;
   renderer: RendererSpec;
   isInitialSetup: boolean;

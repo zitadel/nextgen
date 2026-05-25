@@ -27,6 +27,7 @@
     "gen:agents-md": "tsx scripts/gen-agents-md.ts"
   },
   "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.2.62",
     "@clack/prompts": "catalog:",
     "ajv": "catalog:",
     "consola": "^3.4.2",

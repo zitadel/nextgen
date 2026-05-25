@@ -16,24 +16,3 @@ files to create and dependencies to install.
 - After writing files, validate with `tsc --noEmit`. If TypeScript errors remain, fix them and
   re-validate (up to two retries).
 
-## Environment variables
-
-Write the following to `.env.local` (create if absent):
-
-```
-ZITADEL_PROJECT_ID=<project_id>
-ZITADEL_ENVIRONMENT=development
-ZITADEL_ISSUER=<issuer>
-NEXT_PUBLIC_ZITADEL_API_BASE=<server>
-NEXT_PUBLIC_ZITADEL_PROJECT_ID=<project_id>
-```
-
-And the following placeholder keys to `.env.example`:
-
-```
-ZITADEL_PROJECT_ID=
-ZITADEL_ENVIRONMENT=
-ZITADEL_ISSUER=
-NEXT_PUBLIC_ZITADEL_API_BASE=
-NEXT_PUBLIC_ZITADEL_PROJECT_ID=
-```

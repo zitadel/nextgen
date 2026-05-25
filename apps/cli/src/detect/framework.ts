@@ -4,28 +4,41 @@ import { join } from "node:path";
 import { ZitadelError } from "../lib/errors";
 import { hasDependency, readPackageJson } from "./package-json";
 
-export type FrameworkId = "next";
+export type FrameworkId = "next" | "nuxt";
 
-export type FrameworkDetection = {
-  id: FrameworkId;
-  appDir: "app" | "src/app";
-};
+export type FrameworkDetection =
+  | { id: "next"; appDir: "app" | "src/app" }
+  | { id: "nuxt" };
 
 export async function detectFramework(
   cwd: string,
   requested?: string,
 ): Promise<FrameworkDetection> {
-  if (requested && requested !== "next") {
+  if (requested && requested !== "next" && requested !== "nuxt") {
     throw new ZitadelError("E_FRAMEWORK_NOT_DETECTED", `Unsupported framework "${requested}"`, {
-      hint: "V1 supports Next.js App Router projects only.",
+      hint: "Supported frameworks: next, nuxt.",
     });
   }
 
   const pkg = await readPackageJson(cwd).catch(() => undefined);
+
+  if (requested === "nuxt" || (!requested && pkg && hasDependency(pkg, "nuxt"))) {
+    if (!pkg || !hasDependency(pkg, "nuxt")) {
+      throw new ZitadelError("E_FRAMEWORK_NOT_DETECTED", "Could not detect a Nuxt project", {
+        hint: "Run this from a Nuxt project or pass --cwd <path>.",
+      });
+    }
+    return { id: "nuxt" };
+  }
+
   if (!pkg || !hasDependency(pkg, "next")) {
-    throw new ZitadelError("E_FRAMEWORK_NOT_DETECTED", "Could not detect a Next.js project", {
-      hint: "Run this from a Next.js App Router project or pass --cwd <path>.",
-    });
+    throw new ZitadelError(
+      "E_FRAMEWORK_NOT_DETECTED",
+      "Could not detect a Next.js or Nuxt project",
+      {
+        hint: "Run this from a supported project or pass --cwd <path>.",
+      },
+    );
   }
 
   const appDir = (await dirExists(join(cwd, "app")))

@@ -16,6 +16,7 @@
     "@nx/playwright": "catalog:",
     "@nx/vite": "catalog:",
     "@nx/vitest": "catalog:",
+    "@rolldown/binding-darwin-arm64": "1.0.0-rc.16",
     "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
     "nx": "catalog:",
