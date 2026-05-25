@@ -18,7 +18,7 @@ func authAttemptErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		domain.ErrAuthAttemptAlreadyCompleted().Code,
 		domain.ErrAuthAttemptNotCompleted().Code,
 		domain.ErrAuthAttemptStaleChallenge().Code,
-		domain.ErrAuthAttemptProofRejected().Code:
+		domain.ErrAuthAttemptProofRejected(nil).Code:
 		return errorResponseWithStatusCode(http.StatusConflict, err)
 	default:
 		return internalErrorResponse(err)
