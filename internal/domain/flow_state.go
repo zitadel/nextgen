@@ -11,6 +11,14 @@ import "time"
 // live on PivotStack. The remaining fields are session/OIDC context
 // that only makes sense at the top level.
 type FlowState struct {
+	// ProjectID scopes the flow to a single tenant.
+	ProjectID string
+
+	// UserSchemaURL is the user schema this flow validates against,
+	// captured at Start time so a mid-flow default change doesn't
+	// reshape in-flight data.
+	UserSchemaURL string
+
 	// FlowProgress is the user's current progress: which definition is
 	// running, which step is being shown, and what's been collected so
 	// far. Promoted to the top level so callers read e.g.
