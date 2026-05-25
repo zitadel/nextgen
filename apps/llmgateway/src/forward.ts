@@ -2,6 +2,7 @@ import { injectSystemPrompt } from "./inject.js";
 import { ClaudeService, type ClaudeAuth } from "./lib/claude.js";
 import { refreshOAuthToken } from "./lib/oauth.js";
 import { ProxyService } from "./lib/proxy.js";
+import { persistTokensToVercel } from "./lib/vercel.js";
 import { isPlainObject, tryParseJson } from "./utils/json.js";
 import { jsonResponse } from "./utils/response.js";
 
@@ -173,6 +174,13 @@ export async function forward(args: {
 			// if refresh failed we return firstResponse intact so the caller
 			// still gets Anthropic's original error body.
 			await firstResponse.body?.cancel().catch(() => {});
+
+			// Write the new token pair back to Vercel env vars so the next cold
+			// start gets a fresh AT instead of immediately expiring and having to
+			// refresh again. Fire-and-forget — never block or fail the response.
+			persistTokensToVercel(newTokens.accessToken, newTokens.refreshToken, args.fetchImpl).catch(
+				() => {},
+			);
 
 			const refreshedService = new ClaudeService({
 				auth: {
