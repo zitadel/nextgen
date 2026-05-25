@@ -3,6 +3,8 @@ package domain_test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
@@ -14,12 +16,13 @@ func TestFlowDefinition_InitialStepFor(t *testing.T) {
 		},
 	}
 
-	if got, ok := def.InitialStepFor(domain.FlowDefinitionPurposeRegister); !ok || got != "credentials" {
-		t.Errorf("InitialStepFor(register) = (%q, %v), want (credentials, true)", got, ok)
-	}
-	if got, ok := def.InitialStepFor(domain.FlowDefinitionPurposeRecovery); ok || got != "" {
-		t.Errorf("InitialStepFor(recovery) = (%q, %v), want (\"\", false)", got, ok)
-	}
+	got, ok := def.InitialStepFor(domain.FlowDefinitionPurposeRegister)
+	assert.True(t, ok)
+	assert.Equal(t, "credentials", got)
+
+	got, ok = def.InitialStepFor(domain.FlowDefinitionPurposeRecovery)
+	assert.False(t, ok)
+	assert.Empty(t, got)
 }
 
 func TestFlowDefinition_FindStep(t *testing.T) {
@@ -31,14 +34,10 @@ func TestFlowDefinition_FindStep(t *testing.T) {
 	}
 
 	got, ok := def.FindStep("done")
-	if !ok {
-		t.Fatalf("FindStep(done) ok = false, want true")
-	}
-	if got != &def.Steps[1] {
-		t.Errorf("FindStep(done) = %p, want pointer into def.Steps[1] (%p)", got, &def.Steps[1])
-	}
+	require.True(t, ok)
+	assert.Same(t, &def.Steps[1], got)
 
-	if got, ok := def.FindStep("missing"); ok || got != nil {
-		t.Errorf("FindStep(missing) = (%v, %v), want (nil, false)", got, ok)
-	}
+	got, ok = def.FindStep("missing")
+	assert.False(t, ok)
+	assert.Nil(t, got)
 }

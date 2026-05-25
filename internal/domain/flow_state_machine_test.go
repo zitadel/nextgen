@@ -2,11 +2,11 @@ package domain_test
 
 import (
 	"context"
-	"errors"
-	"strings"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
@@ -117,27 +117,16 @@ func TestFlowStateMachine_Start_RendersInitialStep(t *testing.T) {
 		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
 		UserSchemaURL: defaultSchemaURL,
 	})
-	if err != nil {
-		t.Fatalf("Start error: %v", err)
-	}
-	if result.Step == nil || result.Step.Name != "credentials" {
-		t.Fatalf("Start initial step = %+v, want credentials", result.Step)
-	}
-	if result.State.CurrentStep != "credentials" {
-		t.Fatalf("State.CurrentStep = %q, want credentials", result.State.CurrentStep)
-	}
-	if result.State.ProjectID != testProjectID {
-		t.Errorf("State.ProjectID = %q, want %q", result.State.ProjectID, testProjectID)
-	}
-	if result.State.UserSchemaURL != defaultSchemaURL {
-		t.Errorf("State.UserSchemaURL = %q, want %q", result.State.UserSchemaURL, defaultSchemaURL)
-	}
-	if _, ok := result.Step.Fields["email"]; !ok {
-		t.Errorf("Step.Fields missing email; got %v", result.Step.Fields)
-	}
-	if act, ok := result.Step.Actions[domain.FlowActionSubmit]; !ok || !act.Primary {
-		t.Errorf("Step.Actions[submit] = %+v, want primary=true", act)
-	}
+	require.NoError(t, err)
+	require.NotNil(t, result.Step)
+	require.Equal(t, "credentials", result.Step.Name)
+	require.Equal(t, "credentials", result.State.CurrentStep)
+	assert.Equal(t, testProjectID, result.State.ProjectID)
+	assert.Equal(t, defaultSchemaURL, result.State.UserSchemaURL)
+	assert.Contains(t, result.Step.Fields, "email")
+	act, ok := result.Step.Actions[domain.FlowActionSubmit]
+	assert.True(t, ok)
+	assert.True(t, act.Primary)
 }
 
 func TestFlowStateMachine_Process_RegistrationHappyPath(t *testing.T) {
@@ -150,9 +139,7 @@ func TestFlowStateMachine_Process_RegistrationHappyPath(t *testing.T) {
 		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
 		UserSchemaURL: defaultSchemaURL,
 	})
-	if err != nil {
-		t.Fatalf("Start error: %v", err)
-	}
+	require.NoError(t, err)
 
 	result, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
 		Action: domain.FlowActionSubmit,
@@ -161,32 +148,21 @@ func TestFlowStateMachine_Process_RegistrationHappyPath(t *testing.T) {
 			"password": "correct-horse-battery-staple",
 		},
 	})
-	if err != nil {
-		t.Fatalf("Process error: %v", err)
+	require.NoError(t, err)
+	require.NotNil(t, result.Step)
+	require.Equal(t, "done", result.Step.Name)
+	if assert.NotNil(t, result.Step.Complete) {
+		assert.Equal(t, domain.FlowStepCompleteShow, *result.Step.Complete)
 	}
-	if result.Step == nil || result.Step.Name != "done" {
-		t.Fatalf("Process step = %+v, want done", result.Step)
-	}
-	if result.Step.Complete == nil || *result.Step.Complete != domain.FlowStepCompleteShow {
-		t.Errorf("Step.Complete = %v, want show", result.Step.Complete)
-	}
-	if len(w.users.created) != 1 {
-		t.Fatalf("user repo Create called %d times, want 1", len(w.users.created))
-	}
-	createdUser := w.users.created[0]
+
+	require.Len(t, w.users.created, 1)
 	wantUserID := "user_01TEST"
-	if createdUser.ID != wantUserID {
-		t.Errorf("created user ID = %q, want %q", createdUser.ID, wantUserID)
-	}
-	if len(w.pws.created) != 1 {
-		t.Fatalf("password repo Create called %d times, want 1", len(w.pws.created))
-	}
-	if w.pws.created[0].EncodedHash != "hashed:correct-horse-battery-staple" {
-		t.Errorf("password EncodedHash = %q, want hashed:correct-horse-battery-staple", w.pws.created[0].EncodedHash)
-	}
-	if got := result.State.CollectedData[domain.FlowCollectedUserIDKey]; got != wantUserID {
-		t.Errorf("CollectedData[%s] = %v, want %q", domain.FlowCollectedUserIDKey, got, wantUserID)
-	}
+	assert.Equal(t, wantUserID, w.users.created[0].ID)
+
+	require.Len(t, w.pws.created, 1)
+	assert.Equal(t, "hashed:correct-horse-battery-staple", w.pws.created[0].EncodedHash)
+
+	assert.Equal(t, wantUserID, result.State.CollectedData[domain.FlowCollectedUserIDKey])
 }
 
 func TestFlowStateMachine_Process_FieldValidationErrorKeepsStep(t *testing.T) {
@@ -199,9 +175,7 @@ func TestFlowStateMachine_Process_FieldValidationErrorKeepsStep(t *testing.T) {
 		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
 		UserSchemaURL: defaultSchemaURL,
 	})
-	if err != nil {
-		t.Fatalf("Start error: %v", err)
-	}
+	require.NoError(t, err)
 
 	result, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
 		Action: domain.FlowActionSubmit,
@@ -210,18 +184,13 @@ func TestFlowStateMachine_Process_FieldValidationErrorKeepsStep(t *testing.T) {
 			"password": "correct-horse-battery-staple",
 		},
 	})
-	if err != nil {
-		t.Fatalf("Process error: %v", err)
+	require.NoError(t, err)
+	require.NotNil(t, result.Step)
+	require.Equal(t, "credentials", result.Step.Name)
+	if assert.NotNil(t, result.Step.Error) {
+		assert.Contains(t, *result.Step.Error, "email")
 	}
-	if result.Step == nil || result.Step.Name != "credentials" {
-		t.Fatalf("Process step = %+v, want stay on credentials", result.Step)
-	}
-	if result.Step.Error == nil || !strings.Contains(*result.Step.Error, "email") {
-		t.Errorf("Step.Error = %v, want a validation error mentioning email", result.Step.Error)
-	}
-	if len(w.users.created) != 0 {
-		t.Errorf("user repo Create called %d times on validation error, want 0", len(w.users.created))
-	}
+	assert.Empty(t, w.users.created)
 }
 
 func TestFlowStateMachine_Process_IntegrityOnMissingTargetStep(t *testing.T) {
@@ -236,9 +205,7 @@ func TestFlowStateMachine_Process_IntegrityOnMissingTargetStep(t *testing.T) {
 		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
 		UserSchemaURL: defaultSchemaURL,
 	})
-	if err != nil {
-		t.Fatalf("Start error: %v", err)
-	}
+	require.NoError(t, err)
 
 	_, err = w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
 		Action: domain.FlowActionSubmit,
@@ -247,9 +214,7 @@ func TestFlowStateMachine_Process_IntegrityOnMissingTargetStep(t *testing.T) {
 			"password": "correct-horse-battery-staple",
 		},
 	})
-	if !errors.Is(err, domain.ErrIntegrity) {
-		t.Fatalf("Process err = %v, want ErrIntegrity", err)
-	}
+	require.ErrorIs(t, err, domain.ErrIntegrity)
 }
 
 func TestFlowStateMachine_Process_InvalidActionRejected(t *testing.T) {
@@ -262,9 +227,7 @@ func TestFlowStateMachine_Process_InvalidActionRejected(t *testing.T) {
 		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
 		UserSchemaURL: defaultSchemaURL,
 	})
-	if err != nil {
-		t.Fatalf("Start error: %v", err)
-	}
+	require.NoError(t, err)
 
 	_, err = w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
 		Action: "not_declared",
@@ -273,9 +236,7 @@ func TestFlowStateMachine_Process_InvalidActionRejected(t *testing.T) {
 			"password": "correct-horse-battery-staple",
 		},
 	})
-	if !errors.Is(err, domain.ErrInvalidAction) {
-		t.Fatalf("Process err = %v, want ErrInvalidAction", err)
-	}
+	require.ErrorIs(t, err, domain.ErrInvalidAction)
 }
 
 func TestFlowStateMachine_Process_SSOSubmissionUnsupported(t *testing.T) {
@@ -288,15 +249,11 @@ func TestFlowStateMachine_Process_SSOSubmissionUnsupported(t *testing.T) {
 		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
 		UserSchemaURL: defaultSchemaURL,
 	})
-	if err != nil {
-		t.Fatalf("Start error: %v", err)
-	}
+	require.NoError(t, err)
 
 	_, err = w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
 		Action:      domain.FlowActionSubmit,
 		SSOProvider: &domain.FlowSSOProviderRef{ID: "google"},
 	})
-	if !errors.Is(err, domain.ErrUnsupported) {
-		t.Fatalf("Process err = %v, want ErrUnsupported", err)
-	}
+	require.ErrorIs(t, err, domain.ErrUnsupported)
 }
