@@ -3255,14 +3255,15 @@ func (s *FlowDefinitionUpdateRequestPurposes) init() FlowDefinitionUpdateRequest
 
 // Ref: #
 type FlowEventRequest struct {
-	SessionToken string               `json:"session_token"`
+	// Reserved for future rotation. The sealed `_zflow` cookie carries the flow state today.
+	SessionToken OptString            `json:"session_token"`
 	Type         FlowEventRequestType `json:"type"`
 	// Event payload (fingerprint hash, timing data, etc.).
 	Payload OptFlowEventRequestPayload `json:"payload"`
 }
 
 // GetSessionToken returns the value of SessionToken.
-func (s *FlowEventRequest) GetSessionToken() string {
+func (s *FlowEventRequest) GetSessionToken() OptString {
 	return s.SessionToken
 }
 
@@ -3277,7 +3278,7 @@ func (s *FlowEventRequest) GetPayload() OptFlowEventRequestPayload {
 }
 
 // SetSessionToken sets the value of SessionToken.
-func (s *FlowEventRequest) SetSessionToken(val string) {
+func (s *FlowEventRequest) SetSessionToken(val OptString) {
 	s.SessionToken = val
 }
 
@@ -3404,9 +3405,9 @@ type FlowResponse struct {
 	ID string `json:"id"`
 	// Underlying session ID. Stable across all stacked flows.
 	SessionID string `json:"session_id"`
-	// Rotated on every response. Required for the next request.
-	SessionToken string   `json:"session_token"`
-	Step         FlowStep `json:"step"`
+	// Reserved for future rotation. The sealed `_zflow` cookie carries the flow state today.
+	SessionToken OptString `json:"session_token"`
+	Step         FlowStep  `json:"step"`
 	// Resolved branding inherited from the app → team → project hierarchy.
 	// Determined at flow creation based on audience context. Does not change between steps.
 	Branding OptBranding `json:"branding"`
@@ -3432,7 +3433,7 @@ func (s *FlowResponse) GetSessionID() string {
 }
 
 // GetSessionToken returns the value of SessionToken.
-func (s *FlowResponse) GetSessionToken() string {
+func (s *FlowResponse) GetSessionToken() OptString {
 	return s.SessionToken
 }
 
@@ -3472,7 +3473,7 @@ func (s *FlowResponse) SetSessionID(val string) {
 }
 
 // SetSessionToken sets the value of SessionToken.
-func (s *FlowResponse) SetSessionToken(val string) {
+func (s *FlowResponse) SetSessionToken(val OptString) {
 	s.SessionToken = val
 }
 
@@ -3857,7 +3858,8 @@ func (s *FlowStepGates) init() FlowStepGates {
 
 // Ref: #
 type FlowSubmitRequest struct {
-	SessionToken string `json:"session_token"`
+	// Reserved for future rotation. The sealed `_zflow` cookie carries the flow state today.
+	SessionToken OptString `json:"session_token"`
 	// Which action to take. Must be a key from the step's `actions` dictionary:
 	// - A regular action (e.g., "submit", "register", "back")
 	// - The reserved value "sso" — triggers SSO redirect (requires `sso_provider_id`).
@@ -3877,7 +3879,7 @@ type FlowSubmitRequest struct {
 }
 
 // GetSessionToken returns the value of SessionToken.
-func (s *FlowSubmitRequest) GetSessionToken() string {
+func (s *FlowSubmitRequest) GetSessionToken() OptString {
 	return s.SessionToken
 }
 
@@ -3907,7 +3909,7 @@ func (s *FlowSubmitRequest) GetSSOProviderID() OptString {
 }
 
 // SetSessionToken sets the value of SessionToken.
-func (s *FlowSubmitRequest) SetSessionToken(val string) {
+func (s *FlowSubmitRequest) SetSessionToken(val OptString) {
 	s.SessionToken = val
 }
 

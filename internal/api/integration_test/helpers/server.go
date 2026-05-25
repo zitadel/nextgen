@@ -3,6 +3,7 @@ package helpers
 import (
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	generated "github.com/zitadel/nextgen/api/generated"
@@ -38,21 +39,37 @@ func (h *Harness) EnsureGeneratedServer(t *testing.T) *generated.Server {
 
 func (h *Harness) EnsureHandler(t *testing.T) *api.Handler {
 	t.Helper()
-	sealer, err := cookie.NewSealer(cookie.Key([]byte("MasterkeyNeedsToHave32Characters")))
-	require.NoError(t, err)
-
 	if h.Handler == nil {
 		h.Handler = api.NewHandler(
-			sealer,
+			h.EnsureSealer(t),
 			h.EnsureFlowService(t),
 			h.EnsureAuthAttemptService(t),
 			h.EnsureSessionService(t),
 			h.EnsureProjectService(t),
 			h.EnsureSchemaService(t),
 			h.EnsureFlowDefinitionService(t),
+			time.Now,
 		)
 	}
 	return h.Handler
+}
+
+// testSealerKey is a deterministic cookie sealer key for integration tests.
+var testSealerKey = cookie.Key{
+	0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+	0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+	0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+	0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f,
+}
+
+func (h *Harness) EnsureSealer(t *testing.T) *cookie.Sealer {
+	t.Helper()
+	if h.Sealer == nil {
+		sealer, err := cookie.NewSealer(testSealerKey)
+		require.NoError(t, err)
+		h.Sealer = sealer
+	}
+	return h.Sealer
 }
 
 func (h *Harness) EnsureSecurityHandler(t *testing.T) *api.SecurityHandler {

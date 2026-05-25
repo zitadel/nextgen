@@ -7,6 +7,7 @@ import (
 	generated "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/api/integration_test/test_data"
+	"github.com/zitadel/nextgen/internal/cookie"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
@@ -26,12 +27,14 @@ type Harness struct {
 	APIClient          *generated.Client
 	FakeSecuritySource *FakeSecuritySource
 
-	SchemaService      *service.SchemaService
-	SessionService     service.SessionService
-	FlowService        service.FlowService
-	AuthAttemptService service.AuthAttemptService
-	ProjectService     service.ProjectService
+	SchemaService         *service.SchemaService
+	SessionService        service.SessionService
+	FlowService           service.FlowService
+	AuthAttemptService    service.AuthAttemptService
+	ProjectService        service.ProjectService
 	FlowDefinitionService service.FlowDefinitionService
+	FlowStateMachine      *domain.FlowStateMachineRuntime
+	Sealer                *cookie.Sealer
 
 	SchemaRepo         domain.JSONSchemaRepository
 	SchemaResolver     *domain.JSONSchemaResolver

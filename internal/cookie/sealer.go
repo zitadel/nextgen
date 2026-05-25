@@ -14,6 +14,7 @@
 package cookie
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 
@@ -42,6 +43,25 @@ type Key [KeySize]byte
 type Sealer struct {
 	key       Key
 	encrypter jose.Encrypter
+}
+
+// NewSealerFromHex builds a Sealer from a hex-encoded key. The decoded
+// key must be exactly KeySize bytes; anything else is a configuration
+// error.
+func NewSealerFromHex(hexKey string) (*Sealer, error) {
+	if hexKey == "" {
+		return nil, errors.New("cookie: hex key is empty")
+	}
+	raw, err := hex.DecodeString(hexKey)
+	if err != nil {
+		return nil, fmt.Errorf("cookie: decode hex key: %w", err)
+	}
+	if len(raw) != KeySize {
+		return nil, fmt.Errorf("cookie: hex key must decode to %d bytes, got %d", KeySize, len(raw))
+	}
+	var key Key
+	copy(key[:], raw)
+	return NewSealer(key)
 }
 
 // NewSealer builds a Sealer with the given key.

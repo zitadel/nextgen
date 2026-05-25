@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"log"
@@ -59,6 +58,15 @@ func NewCommand() *cobra.Command {
 	return cmd
 }
 
+// mustBindEnv panics on viper's documented "this can't fail in
+// normal use" BindEnv error path. Keeps the env wiring readable
+// without sprinkling error handling at every binding.
+func mustBindEnv(v *viper.Viper, key string) {
+	if err := v.BindEnv(key); err != nil {
+		panic(fmt.Errorf("bind env %q: %w", key, err))
+	}
+}
+
 func startDatabase(ctx context.Context, config database.Config) (database.Pool, error) {
 	connector, err := config.Build()
 	if err != nil {
@@ -82,9 +90,9 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 		}
 	}()
 
-	sealer, err := buildCookieSealer(cfg.Server.CookieSealerKey)
+	sealer, err := cookie.NewSealerFromHex(cfg.Server.CookieSealerKey)
 	if err != nil {
-		return err
+		return fmt.Errorf("cookie sealer (set NEXTGEN_SERVER_COOKIE_SEALER_KEY): %w", err)
 	}
 
 	passwordHasher, err := cfg.PasswordHasher.NewHasher()
@@ -128,7 +136,6 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 	}
 
 	// ── Services ─────────────────────
-	flowService := service.NewFlowService(pool, flowDefinitionRepo)
 	authAttemptSvc := service.NewAuthAttemptService(
 		pool,
 		attemptRepo,
@@ -150,13 +157,26 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 		flowDefinitionRepo,
 	)
 
+	// ── Flow engine ──────────────────
+	ids := idgen.NewULID()
+	fields := domain.NewSchemaFieldResolver(storageSchemaResolver)
+
+	// TODO: argon2id wiring lands in a follow-up PR. Until then registration
+	// flows fail with ErrIntegrity; login is unaffected.
+	var createUser *domain.FlowCreateUserHandler
+
+	flowAuth := service.NewFlowAuthAttemptAdapter(authAttemptSvc)
+	stateMachine := domain.NewFlowStateMachine(fields, createUser, flowAuth, time.Now)
+
+	flowService := service.NewFlowService(pool, flowDefinitionRepo, stateMachine, ids)
+
 	// ── HTTP Server ─────────────────
 
 	ctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
 	oasServer, err := oasapi.NewServer(
-		api.NewHandler(sealer, flowService, authAttemptSvc, sessionService, projectService, schemaService, flowDefinitionSvc),
+		api.NewHandler(sealer, flowService, authAttemptSvc, sessionService, projectService, schemaService, flowDefinitionSvc, time.Now),
 		api.NewSecurityHandler(),
 		oasapi.WithErrorHandler(api.OgenErrorHandler))
 	if err != nil {
@@ -238,36 +258,4 @@ func loadConfig(configPath string) (Config, error) {
 	}
 
 	return cfg, nil
-}
-
-// mustBindEnv panics on viper's documented "this can't fail in
-// normal use" BindEnv error path. Keeps the env wiring readable
-// without sprinkling error handling at every binding.
-func mustBindEnv(v *viper.Viper, key string) {
-	if err := v.BindEnv(key); err != nil {
-		panic(fmt.Errorf("bind env %q: %w", key, err))
-	}
-}
-
-// buildCookieSealer decodes a hex-encoded sealer key and constructs
-// the [cookie.Sealer]. The key must be exactly [cookie.KeySize] bytes
-// after decoding; anything else is a configuration error.
-func buildCookieSealer(hexKey string) (*cookie.Sealer, error) {
-	if hexKey == "" {
-		return nil, errors.New("server: cookie_sealer_key is required (set NEXTGEN_SERVER_COOKIE_SEALER_KEY)")
-	}
-	raw, err := hex.DecodeString(hexKey)
-	if err != nil {
-		return nil, fmt.Errorf("server: decode cookie_sealer_key: %w", err)
-	}
-	if len(raw) != cookie.KeySize {
-		return nil, fmt.Errorf("server: cookie_sealer_key must decode to %d bytes, got %d", cookie.KeySize, len(raw))
-	}
-	var key cookie.Key
-	copy(key[:], raw)
-	sealer, err := cookie.NewSealer(key)
-	if err != nil {
-		return nil, fmt.Errorf("server: build cookie sealer: %w", err)
-	}
-	return sealer, nil
 }

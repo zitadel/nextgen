@@ -1,0 +1,52 @@
+{% comment %}
+  Default LiquidJS template for the flow engine MVP. Rendered by the
+  orchestrator into Shadow DOM. Customers can replace it via the
+  Team/App Branding API once that endpoint ships.
+
+  Available context:
+    step.name             - step identifier
+    step.error            - optional error key
+    step.fields           - dictionary of {name -> field}
+    step.actions          - dictionary of {name -> action}
+    step.complete         - "redirect" | "show" | null
+    step.redirect_url     - present when complete == "redirect"
+{% endcomment %}
+
+<section class="zl-flow zl-flow--{{ step.name }}">
+  {% if step.error %}
+    <p class="zl-flow__error" role="alert">{{ step.error | t }}</p>
+  {% endif %}
+
+  {% if step.complete == "show" %}
+    <p class="zl-flow__done">{{ step.name | t }}</p>
+  {% else %}
+    <form class="zl-flow__form">
+      {% for entry in step.fields %}
+        {% assign name = entry[0] %}
+        {% assign field = entry[1] %}
+        <label class="zl-flow__field">
+          <span>{{ field.text_key | t }}</span>
+          <input
+            name="{{ name }}"
+            type="{{ field.type }}"
+            {% if field.required %}required{% endif %}
+            {% if field.value %}value="{{ field.value }}"{% endif %}
+          />
+        </label>
+      {% endfor %}
+
+      <div class="zl-flow__actions">
+        {% for entry in step.actions %}
+          {% assign name = entry[0] %}
+          {% assign action = entry[1] %}
+          <button
+            type="submit"
+            name="action"
+            value="{{ name }}"
+            {% if action.primary %}class="zl-flow__action--primary"{% endif %}
+          >{{ action.text_key | t }}</button>
+        {% endfor %}
+      </div>
+    </form>
+  {% endif %}
+</section>

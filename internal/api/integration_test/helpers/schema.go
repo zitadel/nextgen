@@ -45,7 +45,7 @@ func (h *Harness) EnsureSchemaResolver(t *testing.T) *domain.JSONSchemaResolver 
 		require.NoError(t, err)
 
 		h.SchemaResolver = domain.NewJSONSchemaResolver(
-			h.SchemaRepo,
+			h.EnsureSchemaRepo(t),
 			cache,
 			0,
 			0,
