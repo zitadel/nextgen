@@ -38,8 +38,16 @@ and SDK packages will publish through future changesets automation.
 - `apps/cli/` contains the `zitadel` npm CLI.
 - `apps/console/` contains the pre-release Vite React console shell.
 - `apps/console-e2e/` contains the Playwright project for console e2e tests.
+- `apps/demo-next/` and `apps/demo-nuxt/` are reference integrations of the
+  embedded sign-in component on each framework.
+- `apps/demo-next-e2e/` and `apps/demo-nuxt-e2e/` are the Playwright projects
+  that exercise each demo through real framework middleware against the
+  api-mock TCP server.
 - `packages/components/` contains shared Lit components.
-- `packages/sdk-core/` and `packages/sdk-next/` contain public TypeScript SDKs.
+- `packages/sdk-core/`, `packages/sdk-next/`, and `packages/sdk-nuxt/` contain
+  public TypeScript SDKs.
+- `packages/api-mock/` contains the in-process MSW handlers and standalone
+  mock auth server used by demos and e2e tests.
 - `packages/lint/` contains the local Nx plugin that infers Oxlint targets.
 - `docs/` contains design notes and ADRs that explain product intent.
 
@@ -57,6 +65,47 @@ go test ./...
 
 Prefer Nx project targets for narrow package work, for example
 `corepack pnpm nx test @zitadel-nextgen/cli`.
+
+End-to-end tests are **opt-in locally** — they're not part of the
+default `run-many -t lint,typecheck,build,test` invocation because they
+boot real dev servers and need browsers installed:
+
+```sh
+corepack pnpm exec playwright install
+corepack pnpm nx run-many -t e2e
+```
+
+In CI the dedicated `node-e2e` job (in `.github/workflows/ci.yml`) gates
+merges on the e2e suites, so changes that break the demo integrations
+fail the PR. Browsers are cached on the runner; an unrelated PR pays
+roughly one minute of wall time.
+
+## Testing Layers
+
+Pick the lowest layer that can prove the property and **do not duplicate
+upward**. When deciding where a new test belongs:
+
+1. **Unit (Vitest, `jsdom`)** — markup, props, ARIA, slot projection,
+   event-contract shape, pure logic. Fastest; covers the bulk of behaviour.
+2. **Browser (Vitest, real Chromium via `@vitest/browser-playwright`)** —
+   form-association, focus delegation, Enter-to-submit, anything that
+   needs a real `ElementInternals` or `HTMLFormElement`. Lives in
+   `*.browser.spec.ts`.
+3. **End-to-end (Playwright)** — full HTTP path through framework
+   middleware, the `/__nextgen` proxy, real `Set-Cookie` round-trip,
+   and full-page navigation. Owned by `apps/<demo>-e2e/`. Each framework
+   SDK (`sdk-next`, `sdk-nuxt`) has its own e2e project because the proxy
+   and route-protection layers are framework-specific.
+
+A new test belongs at e2e level only when the boundary it covers is
+exclusively the framework integration (middleware, cookie origin, full
+navigation). Component, atom, and orchestrator behaviour stays in
+Vitest.
+
+E2E targets `dependsOn: ["^build"]`, so the components `dist/` is rebuilt
+automatically before each run — be aware of this when iterating with a
+long-running dev server: stale `dist/` will silently mask orchestrator
+changes.
 
 ## Generated Files
 
@@ -88,3 +137,29 @@ human `claim_url`; only a human completes claim, after which agents may run
 - Server and console application paths are AGPL-3.0-only by default.
 - Keep local secrets, private keys, tokens, and `.zitadel/secret`-style files out
   of source control and browser-safe runtime metadata.
+
+
+<!-- nx configuration start-->
+<!-- Leave the start & end comments to automatically receive updates. -->
+
+## General Guidelines for working with Nx
+
+- For navigating/exploring the workspace, invoke the `nx-workspace` skill first - it has patterns for querying projects, targets, and dependencies
+- When running tasks (for example build, lint, test, e2e, etc.), always prefer running the task through `nx` (i.e. `nx run`, `nx run-many`, `nx affected`) instead of using the underlying tooling directly
+- Prefix nx commands with the workspace's package manager (e.g., `pnpm nx build`, `npm exec nx test`) - avoids using globally installed CLI
+- You have access to the Nx MCP server and its tools, use them to help the user
+- For Nx plugin best practices, check `node_modules/@nx/<plugin>/PLUGIN.md`. Not all plugins have this file - proceed without it if unavailable.
+- NEVER guess CLI flags - always check nx_docs or `--help` first when unsure
+
+## Scaffolding & Generators
+
+- For scaffolding tasks (creating apps, libs, project structure, setup), ALWAYS invoke the `nx-generate` skill FIRST before exploring or calling MCP tools
+
+## When to use nx_docs
+
+- USE for: advanced config options, unfamiliar flags, migration guides, plugin configuration, edge cases
+- DON'T USE for: basic generator syntax (`nx g @nx/react:app`), standard commands, things you already know
+- The `nx-generate` skill handles generator discovery internally - don't call nx_docs just to look up generator syntax
+
+
+<!-- nx configuration end-->

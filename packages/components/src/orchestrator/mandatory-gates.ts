@@ -7,7 +7,7 @@
  *    and appends:
  *      - Any required `fields[*]` without a matching `<zl-field>`.
  *      - Any required `gates[*]` without a matching consumer.
- *      - A `<zl-submit>` if none was reached."
+ *      - A primary `<zl-button type="submit">` if none was reached."
  *
  * Implementation: the LiquidJS `{% mandatory_gates %}` tag emits a unique
  * marker comment. After Liquid renders, this patcher parses the produced
@@ -18,14 +18,19 @@
  * delegates HTML attribute escaping to the browser's serialiser — no manual
  * string-escaping in this module.
  */
+import type { CreateFlow201Step } from "@zitadel-nextgen/api/generated/model";
+
 import type { Locale } from "./locales/en.js";
-import type { FlowStep } from "./types.js";
 
 export const MANDATORY_GATES_MARKER = "ZL_MANDATORY_GATES";
 
 export const mandatoryGatesMarkerComment = `<!--${MANDATORY_GATES_MARKER}-->`;
 
-export function patchMandatoryGates(html: string, step: FlowStep, locale: Locale): string {
+export function patchMandatoryGates(
+  html: string,
+  step: CreateFlow201Step,
+  locale: Locale,
+): string {
   const template = document.createElement("template");
   template.innerHTML = html;
   const fragment = template.content;
@@ -49,7 +54,7 @@ export function patchMandatoryGates(html: string, step: FlowStep, locale: Locale
 
 function collectMissingAtoms(
   fragment: DocumentFragment,
-  step: FlowStep,
+  step: CreateFlow201Step,
   locale: Locale,
 ): Element[] {
   const additions: Element[] = [];
@@ -62,7 +67,7 @@ function collectMissingAtoms(
     }
   }
 
-  if (step.actions && !fragment.querySelector("zl-submit")) {
+  if (step.actions && !hasPrimaryButton(fragment)) {
     const primary = Object.entries(step.actions).find(([, action]) => action.primary);
     if (primary) {
       const [name, action] = primary;
@@ -70,11 +75,13 @@ function collectMissingAtoms(
     }
   }
 
-  if (!fragment.querySelector("zl-error")) {
-    additions.push(buildErrorOutlet());
-  }
-
   return additions;
+}
+
+function hasPrimaryButton(fragment: DocumentFragment): boolean {
+  // CSS attribute selectors with quotes are fine for static values like
+  // "primary"; no escaping risk here.
+  return Boolean(fragment.querySelector('zl-button[hierarchy="primary"]'));
 }
 
 function hasFieldFor(fragment: DocumentFragment, name: string): boolean {
@@ -120,14 +127,14 @@ function buildField(
 }
 
 function buildSubmit(name: string, textKey: string | undefined, locale: Locale): Element {
-  const el = document.createElement("zl-submit");
+  const el = document.createElement("zl-button");
+  el.setAttribute("hierarchy", "primary");
+  el.setAttribute("size", "medium");
+  el.setAttribute("type", "submit");
+  el.setAttribute("block", "");
   el.setAttribute("action", name);
   el.setAttribute("label", lookup(locale, textKey ?? "submit.continue"));
   return el;
-}
-
-function buildErrorOutlet(): Element {
-  return document.createElement("zl-error");
 }
 
 function lookup(locale: Locale, key: string): string {

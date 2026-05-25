@@ -69,6 +69,12 @@
         "{projectRoot}/dist/**/*.mjs",
         "{projectRoot}/dist/**/*.js"
       ]
+    },
+    "lint": {
+      "dependsOn": ["^build"]
+    },
+    "e2e": {
+      "dependsOn": ["^build"]
     }
   },
   "analytics": false

@@ -130,7 +130,7 @@ func jsonCast() string {
 
 func savepointForRollback(t *testing.T, tx database.Transaction) (savepoint database.Transaction, rollback func()) {
 	t.Helper()
-	savepoint, err := tx.Begin(t.Context())
+	savepoint, err := tx.Begin(t.Context(), nil)
 	require.NoError(t, err)
 	return savepoint, func() {
 		// context.Background to ensure rollback does not return an error if test is already done

@@ -2,8 +2,8 @@ package api
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"net/http"
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -24,11 +24,9 @@ func (h Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest) (ap
 		Purpose:   purpose,
 		Hint:      buildResolveHint(req.Hint),
 	}
-	/* Build error on this line. @vitorbari
-	if slug, ok := req.Slug.Get(); ok {
-		resolveReq.Name = &slug
+	if name, ok := req.FlowDefinitionName.Get(); ok {
+		resolveReq.Name = &name
 	}
-	*/
 	if v, ok := req.SchemaVersion.Get(); ok {
 		resolveReq.SchemaVersion = &v
 	}
@@ -38,7 +36,7 @@ func (h Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest) (ap
 
 	def, err := h.flowService.Resolve(ctx, resolveReq)
 	if err != nil {
-		return nil, mapResolveError(err)
+		return errorResponse(err), nil
 	}
 
 	// Execution is intentionally stopped here. The service resolved a
@@ -67,36 +65,13 @@ func buildResolveHint(opt api.OptFlowHint) service.ResolveFlowHint {
 	return out
 }
 
-// mapResolveError translates a Resolve error into an HTTP status code.
-// The ogen-generated handler unwraps *api.ErrorDetailsStatusCode from the
-// error return path and writes its StatusCode + Response verbatim; the
-// success-path *api.ErrorDetails fallback would otherwise force every
-// failure to HTTP 400.
-func mapResolveError(err error) error {
-	switch {
-	case errors.Is(err, domain.ErrFlowDefinitionNotFound):
-		return &api.ErrorDetailsStatusCode{
-			StatusCode: 404,
-			Response: api.ErrorDetails{
-				Code:    "flow_not_found",
-				Message: err.Error(),
-			},
-		}
-	case errors.Is(err, domain.ErrFlowDefinitionPurposeMismatch):
-		return &api.ErrorDetailsStatusCode{
-			StatusCode: 400,
-			Response: api.ErrorDetails{
-				Code:    "purpose_mismatch",
-				Message: err.Error(),
-			},
-		}
+func flowDefinitionErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
+	switch err.Code {
+	case domain.ErrFlowDefinitionNotFound().Code:
+		return errorResponseWithStatusCode(http.StatusNotFound, err)
+	case domain.ErrFlowDefinitionPurposeMismatch().Code:
+		return errorResponseWithStatusCode(http.StatusBadRequest, err)
 	default:
-		return &api.ErrorDetailsStatusCode{
-			StatusCode: 500,
-			Response: api.ErrorDetails{
-				Code:    "internal_error",
-				Message: err.Error(),
-			},
-		}
+		return internalErrorResponse(err)
 	}
 }

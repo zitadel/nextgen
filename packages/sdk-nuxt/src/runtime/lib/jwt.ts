@@ -91,7 +91,7 @@
  * during key-rotation incidents where two servers briefly share a key identifier.
  *
  * A cache miss — on first use or after TTL expiry — triggers a fresh fetch
- * from `{issuerUrl}/oauth/v2/keys`.
+ * from `{issuerUrl}/auth/keys`.
  *
  * > **Note (serverless):** the cache is module-level. In serverless environments
  * > each cold start gets a fresh cache; warm instances share it across requests.
@@ -193,7 +193,7 @@ export interface VerifyJwtOptions {
    * Base URL of the auth backend.
    *
    * Serves two purposes:
-   * 1. Determines the JWKS endpoint: `{issuerUrl}/oauth/v2/keys`
+   * 1. Determines the JWKS endpoint: `{issuerUrl}/auth/keys`
    * 2. Is compared against the `iss` claim when present in the token.
    */
   readonly issuerUrl: string;
@@ -524,7 +524,7 @@ export async function verifyJwt(
 
     const kid = header.kid;
     const cryptoKey = await fetchAndCacheJwks(
-      `${issuerUrl}/oauth/v2/keys`,
+      `${issuerUrl}/auth/keys`,
       kid,
       jwksTimeoutMs,
     );

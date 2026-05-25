@@ -11,13 +11,13 @@ import (
 func (h Handler) CreateProject(ctx context.Context, req *api.CreateProjectRequest) (api.CreateProjectRes, error) {
 	project, err := h.projectService.Create(ctx, req.PreviewOrigins)
 	if err != nil {
-		return nil, &api.ErrorDetailsStatusCode{
+		return &api.ErrorDetailsStatusCode{
 			StatusCode: 500,
 			Response: api.ErrorDetails{
 				Code:    "internal_error",
 				Message: err.Error(),
 			},
-		}
+		}, nil
 	}
 	return &api.CreateProjectResponse{
 		ID:             project.ID,
@@ -37,13 +37,13 @@ func (h Handler) GetProject(ctx context.Context, params api.GetProjectParams) (a
 				Message: "project not found: " + notFound.Error(),
 			}, nil
 		}
-		return nil, &api.ErrorDetailsStatusCode{
+		return &api.ErrorDetailsStatusCode{
 			StatusCode: 500,
 			Response: api.ErrorDetails{
 				Code:    "internal_error",
 				Message: err.Error(),
 			},
-		}
+		}, nil
 	}
 	return &api.GetProjectResponse{
 		ID:        project.ID,

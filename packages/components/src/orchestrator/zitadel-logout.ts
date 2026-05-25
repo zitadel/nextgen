@@ -1,10 +1,13 @@
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
+import {
+  endSession,
+  getEndSessionUrl,
+} from "@zitadel-nextgen/api/generated/endpoints/zitadelNextGen";
+import { setApiBaseUrl } from "@zitadel-nextgen/api/runtime/base-url";
 
-import { baseHostStyles } from "../styles/base.js";
-import { cssTokenVar as v } from "../styles/css-helpers.js";
-import { focusVisibleStyles } from "../styles/focus-ring.js";
-import { tokens } from "../tokens/catalogue.js";
+import { applyBaseTokens } from "./branding-to-tokens.js";
+import { baseHostStyles, focusVisibleStyles, t } from "../styles/index.js";
 
 /**
  * Shape of the decoded `__nextgen_display` cookie set by the auth backend on
@@ -24,9 +27,10 @@ const DISPLAY_COOKIE_NAME = "__nextgen_display";
  * sign out without touching the flow API.
  *
  * Reads the user's display name + email from the `__nextgen_display` cookie
- * (set by the auth backend / SDK proxy on sign-in), renders an avatar trigger
- * with a dropdown that exposes a "Sign out" action, and POSTs to
- * `${proxyBase}/v1/logout`. The proxy clears the session cookie via
+ * (set by the auth backend on sign-in), renders an avatar trigger with a
+ * dropdown that exposes a "Sign out" action, and calls the typed
+ * `endSession` operation in `@zitadel-nextgen/api`
+ * (`GET /auth/end-session`). The server clears the session cookie via
  * `Set-Cookie: Max-Age=0`; on success the element fires `zitadel-signout`
  * and optionally navigates to `post-sign-out-url`.
  *
@@ -55,36 +59,36 @@ export class ZitadelLogout extends LitElement {
       .trigger {
         all: unset;
         cursor: pointer;
-        width: ${v(tokens.control.heightMd)};
-        height: ${v(tokens.control.heightMd)};
-        border-radius: ${v(tokens.radius.full)};
-        background: ${v(tokens.color.primary)};
-        color: ${v(tokens.color.onPrimary)};
-        font-size: ${v(tokens.font.sizeSm)};
-        font-weight: ${v(tokens.font.weightBold)};
+        width: 2.5rem;
+        height: 2.5rem;
+        border-radius: 9999px;
+        background: ${t.color.surface.defaultWhite};
+        color: ${t.color.text.buttonDefault};
+        font-size: 0.875rem;
+        font-weight: 600;
         display: inline-flex;
         align-items: center;
         justify-content: center;
         letter-spacing: 0.02em;
         user-select: none;
-        transition: box-shadow ${v(tokens.motion.durationFast)} ${v(tokens.motion.easeDefault)};
+        transition: box-shadow ${t.motion.duration.fast} ${t.motion.easing.standard};
       }
       .trigger:focus-visible {
         ${focusVisibleStyles};
       }
       .trigger[aria-expanded="true"] {
-        box-shadow: 0 0 0 2px ${v(tokens.color.focusRing)};
+        box-shadow: 0 0 0 2px ${t.focus.color};
       }
 
       .dropdown {
         position: absolute;
-        top: calc(100% + ${v(tokens.space.s2)});
+        top: calc(100% + ${t.spacing["02"]});
         right: 0;
         width: 14rem;
-        background: ${v(tokens.color.surface)};
-        border: ${v(tokens.border.width)} solid ${v(tokens.color.border)};
-        border-radius: ${v(tokens.radius.lg)};
-        box-shadow: ${v(tokens.shadow.lg)};
+        background: ${t.color.surface.defaultPrimaryGray};
+        border: 1px solid ${t.color.border.defaultGray100};
+        border-radius: ${t.radius.m};
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.32);
         z-index: 9999;
         overflow: hidden;
       }
@@ -92,19 +96,19 @@ export class ZitadelLogout extends LitElement {
       .preview {
         display: flex;
         align-items: center;
-        gap: ${v(tokens.space.s3)};
-        padding: ${v(tokens.space.s4)};
-        border-bottom: ${v(tokens.border.width)} solid ${v(tokens.color.border)};
+        gap: ${t.spacing["03"]};
+        padding: ${t.spacing["03"]};
+        border-bottom: 1px solid ${t.color.border.defaultGray100};
       }
       .preview-avatar {
         flex-shrink: 0;
-        width: ${v(tokens.control.heightMd)};
-        height: ${v(tokens.control.heightMd)};
-        border-radius: ${v(tokens.radius.full)};
-        background: ${v(tokens.color.primary)};
-        color: ${v(tokens.color.onPrimary)};
-        font-size: ${v(tokens.font.sizeSm)};
-        font-weight: ${v(tokens.font.weightBold)};
+        width: 2.5rem;
+        height: 2.5rem;
+        border-radius: 9999px;
+        background: ${t.color.surface.defaultWhite};
+        color: ${t.color.text.buttonDefault};
+        font-size: 0.875rem;
+        font-weight: 600;
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -114,16 +118,16 @@ export class ZitadelLogout extends LitElement {
         flex: 1;
       }
       .preview-name {
-        font-size: ${v(tokens.font.sizeSm)};
-        font-weight: ${v(tokens.font.weightBold)};
-        color: ${v(tokens.color.text)};
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: ${t.color.text.primaryWhite};
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
       }
       .preview-email {
-        font-size: ${v(tokens.font.sizeXs)};
-        color: ${v(tokens.color.textMuted)};
+        font-size: 0.75rem;
+        color: ${t.color.text.secondaryGray};
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -131,24 +135,24 @@ export class ZitadelLogout extends LitElement {
       }
 
       .actions {
-        padding: ${v(tokens.space.s2)};
+        padding: ${t.spacing["02"]};
       }
       .signout-btn {
         all: unset;
         cursor: pointer;
         display: flex;
         align-items: center;
-        gap: ${v(tokens.space.s2)};
+        gap: ${t.spacing["02"]};
         width: 100%;
-        padding: ${v(tokens.space.s2)} ${v(tokens.space.s3)};
-        border-radius: ${v(tokens.radius.md)};
-        color: ${v(tokens.color.error)};
-        font-size: ${v(tokens.font.sizeSm)};
-        font-weight: ${v(tokens.font.weightMedium)};
+        padding: ${t.spacing["02"]} ${t.spacing["03"]};
+        border-radius: ${t.radius.s};
+        color: ${t.color.text.error};
+        font-size: 0.875rem;
+        font-weight: 500;
         box-sizing: border-box;
       }
       .signout-btn:hover:not([disabled]) {
-        background: color-mix(in srgb, ${v(tokens.color.error)} 8%, transparent);
+        background: color-mix(in srgb, ${t.color.text.error} 12%, transparent);
       }
       .signout-btn:focus-visible {
         ${focusVisibleStyles};
@@ -164,7 +168,7 @@ export class ZitadelLogout extends LitElement {
       .spinner {
         width: 1em;
         height: 1em;
-        border-radius: ${v(tokens.radius.full)};
+        border-radius: 9999px;
         border: 2px solid currentColor;
         border-top-color: transparent;
         animation: zl-logout-spin 600ms linear infinite;
@@ -176,23 +180,33 @@ export class ZitadelLogout extends LitElement {
       }
 
       .error-bar {
-        padding: ${v(tokens.space.s2)} ${v(tokens.space.s3)};
-        font-size: ${v(tokens.font.sizeXs)};
-        color: ${v(tokens.color.error)};
-        background: color-mix(in srgb, ${v(tokens.color.error)} 8%, transparent);
-        border-top: ${v(tokens.border.width)} solid ${v(tokens.color.border)};
+        padding: ${t.spacing["02"]} ${t.spacing["03"]};
+        font-size: 0.75rem;
+        color: ${t.color.text.error};
+        background: color-mix(in srgb, ${t.color.text.error} 12%, transparent);
+        border-top: 1px solid ${t.color.border.defaultGray100};
       }
     `,
   ];
 
-  /** Same-origin auth proxy base path. Defaults to `/__nextgen`. */
-  @property({ type: String, attribute: "proxy-base" }) accessor proxyBase = "/__nextgen";
+  /**
+   * Base URL (or path prefix) for all API calls, e.g. `"/__nextgen"` when
+   * the SDK is proxied through the app server. Equivalent to calling
+   * `setApiBaseUrl()` from `@zitadel-nextgen/api`. Must be set before the
+   * component connects so the first `endSession` call uses the right origin.
+   */
+  @property({ type: String, attribute: "api-base" }) accessor apiBase = "";
 
   /** URL to navigate to after a successful sign-out. */
   @property({ type: String, attribute: "post-sign-out-url" }) accessor postSignOutUrl = "";
 
-  /** Test/dev override. Defaults to the global `fetch`. */
-  @property({ attribute: false }) accessor fetchImpl: typeof fetch | null = null;
+  /**
+   * OIDC `client_id` to forward as a query parameter on the end-session
+   * request, mirroring the standard end-session contract. Optional —
+   * leaving this empty is fine when the backend can resolve the client
+   * from the session cookie alone.
+   */
+  @property({ type: String, attribute: "client-id" }) accessor clientId = "";
 
   @state() private accessor displayName = "";
 
@@ -211,6 +225,10 @@ export class ZitadelLogout extends LitElement {
 
   override connectedCallback(): void {
     super.connectedCallback();
+    this.dataset.theme = "dark";
+    if (this.apiBase) {
+      setApiBaseUrl(this.apiBase);
+    }
     this.readDisplayCookie();
 
     const tmpl = this.querySelector("template");
@@ -227,6 +245,13 @@ export class ZitadelLogout extends LitElement {
     super.disconnectedCallback();
     document.removeEventListener("click", this.handleDocumentClick);
     document.removeEventListener("keydown", this.handleDocumentKeydown);
+  }
+
+  override updated(): void {
+    const root = this.shadowRoot;
+    if (root && !this.templateMode) {
+      applyBaseTokens(root);
+    }
   }
 
   /**
@@ -297,34 +322,25 @@ export class ZitadelLogout extends LitElement {
   }
 
   /**
-   * POSTs to `${proxyBase}/v1/logout`. The proxy clears the session and
-   * display cookies; on success this element fires `zitadel-signout` and
-   * optionally navigates to `postSignOutUrl`.
+   * Calls the typed `endSession` operation (`GET /auth/end-session`) with
+   * `credentials: "include"`. The server clears the session cookie via
+   * `Set-Cookie: Max-Age=0`; on success this element fires `zitadel-signout`
+   * and optionally navigates to `postSignOutUrl`.
    */
   private async doLogout(): Promise<void> {
     this.loading = true;
     this.errorMessage = "";
 
-    const fetchImpl = this.fetchImpl ?? fetch.bind(globalThis);
-    const proxyBase = this.proxyBase.replace(/\/$/, "");
+    const params = {
+      ...(this.clientId ? { client_id: this.clientId } : {}),
+      ...(this.postSignOutUrl ? { post_logout_redirect_uri: this.postSignOutUrl } : {}),
+    };
 
-    let response: Response;
     try {
-      response = await fetchImpl(`${proxyBase}/v1/logout`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "content-type": "application/json" },
-      });
-    } catch {
-      this.errorMessage = "Network error. Please try again.";
-      this.loading = false;
-      return;
-    }
-
-    if (!response.ok) {
-      const body = (await response.json().catch(() => ({}))) as { message?: string };
-      this.errorMessage =
-        typeof body.message === "string" ? body.message : `Sign-out failed (${response.status})`;
+      await endSession(params, { credentials: "include" });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+      this.errorMessage = message || "Sign-out failed. Please try again.";
       this.loading = false;
       return;
     }
@@ -344,6 +360,20 @@ export class ZitadelLogout extends LitElement {
     if (this.postSignOutUrl && typeof window !== "undefined") {
       window.location.href = this.postSignOutUrl;
     }
+  }
+
+  /**
+   * Returns the absolute URL the end-session request will hit. Useful for
+   * test assertions and for consumers that prefer to navigate the browser
+   * directly (instead of fetching) so the OIDC session-end redirect is
+   * driven by the user agent.
+   */
+  getEndSessionUrl(): string {
+    const params = {
+      ...(this.clientId ? { client_id: this.clientId } : {}),
+      ...(this.postSignOutUrl ? { post_logout_redirect_uri: this.postSignOutUrl } : {}),
+    };
+    return getEndSessionUrl(params);
   }
 
   private handleSignOutClick(event: Event): void {

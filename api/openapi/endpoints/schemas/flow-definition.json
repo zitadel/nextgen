@@ -1,0 +1,307 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "FlowDefinition",
+  "description": "Admin-authored configuration for a flow. A flow definition is a directed graph of steps backed by a user schema. The flow engine selects a definition based on `purpose` and `audience`, then walks the graph by evaluating `transitions` against client submissions.  This schema describes the configuration shape only. Runtime emission to the client (capability dictionaries, branding, localized text) is a separate concern and is not modelled here.",
+  "type": "object",
+  "required": [
+    "name",
+    "user_schema",
+    "purposes",
+    "steps"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "examples": [
+        "standard-login",
+        "combined-auth"
+      ],
+      "description": "Stable identifier for this flow, used as the target of cross-flow `switch` and `pivot` transitions. Renaming is not supported \u2014 the `name` is part of the public contract another definition may reference. Acts as the human display label as well; no separate slug."
+    },
+    "user_schema": {
+      "type": "string",
+      "format": "uri",
+      "examples": [
+        "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/human-user.yaml"
+      ],
+      "description": "URL of the user schema this flow operates on. Step `fields` reference property names defined in that schema; the engine resolves field type, validation, and implicit transition outcomes from the schema's `x-*` annotations at runtime. URLs follow the same publishing convention as this document."
+    },
+    "purposes": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {
+        "$ref": "#/$defs/Purpose"
+      },
+      "additionalProperties": {
+        "type": "string",
+        "description": "Name of an entry-point step within this definition."
+      },
+      "examples": [
+        {
+          "login": "identify"
+        },
+        {
+          "login": "identify",
+          "register": "identify"
+        }
+      ],
+      "description": "Maps each purpose this definition handles to the step that begins the flow for that purpose. Every value must match a `name` in `steps`; the check is enforced by the engine, not by this schema."
+    },
+    "audience": {
+      "$ref": "#/$defs/Audience",
+      "description": "Scopes which requests this definition applies to. Omitted or empty arrays mean project-wide. The engine ranks matches by specificity (app > team > project-wide)."
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/Step"
+      },
+      "description": "Step graph. Order is for human readability; actual sequencing is determined entirely by `transitions`. Every step's `name` must be unique within this array."
+    }
+  },
+  "$defs": {
+    "Purpose": {
+      "type": "string",
+      "enum": [
+        "login",
+        "register",
+        "recovery",
+        "profiling",
+        "reauth",
+        "link_account"
+      ],
+      "description": "What the user is trying to accomplish. - login: authenticate an existing user. - register: create a new user. - recovery: recover access (e.g. password reset). - profiling: collect required profile fields after authentication. - reauth: re-verify factors on an active session for step-up. - link_account: attach an external identity to an existing user."
+    },
+    "Audience": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "team_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          },
+          "examples": [
+            [
+              "team_acme"
+            ]
+          ],
+          "description": "Restrict to specific teams (organizations)."
+        },
+        "app_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          },
+          "examples": [
+            [
+              "app_dashboard"
+            ]
+          ],
+          "description": "Restrict to specific applications."
+        }
+      }
+    },
+    "Step": {
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "examples": [
+            "identify",
+            "authenticate",
+            "done"
+          ],
+          "description": "Unique step identifier within this definition. Slug-shaped so it is safe to use as a transition `target` and as a value in `purposes`. Referenced by other steps in the same definition."
+        },
+        "fields": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          },
+          "examples": [
+            [
+              "email"
+            ],
+            [
+              "email",
+              "password"
+            ]
+          ],
+          "description": "Schema property names to collect from the user on this step. Each entry must resolve to a property in the definition's `user_schema`. The engine reads the schema's `x-*` annotations to derive: - field type and validation (rendered into the runtime payload), - implicit transition outcomes \u2014 e.g. `x-identifier: true` makes   `user_not_found` a valid `transitions` key on this step, - credential verification \u2014 e.g. `x-credential: password` causes   submission to invoke an auth_attempt verification before the   transition fires."
+        },
+        "actions": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/Action"
+          },
+          "description": "Actions the user can take on this step. The key is the action name the client echoes back on submit. Every action key must have a matching key in `transitions`; the engine rejects submissions for actions without a defined transition."
+        },
+        "gates": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/Gate"
+          },
+          "description": "Security challenges that must be satisfied before this step's submission is accepted. Keyed by gate name (free identifier; referenced as the key in the runtime `step.gates` dictionary). The engine may inject additional gates at runtime based on policy or risk evaluation."
+        },
+        "sso_providers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SSOProvider"
+          },
+          "description": "Identity providers available on this step. When non-empty, the step must define a `transitions.callback` entry \u2014 the engine handles the reserved `sso` action transparently (redirect to the IdP, code exchange, user resolution) and fires `callback` on this step when the IdP returns. The flow author never writes a `transitions.sso`."
+        },
+        "on_success": {
+          "type": "string",
+          "enum": [
+            "create_user"
+          ],
+          "description": "Server-side mutation to run after the step's fields validate and before the transition fires. - create_user: materialize the user from collected schema   fields. Used by register flows."
+        },
+        "complete": {
+          "type": "string",
+          "enum": [
+            "redirect",
+            "show"
+          ],
+          "description": "Marks this step as terminal. A terminal step has no `fields`, `actions`, `transitions`, `gates`, or `sso_providers`. - redirect: client navigates to a `redirect_uri` resolved from   the originating protocol request (OIDC, SAML). - show: client renders the step as a success or info screen."
+        },
+        "transitions": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/Transition"
+          },
+          "description": "Maps action names and engine-emitted outcomes to the next state. Keys are either: - an action name declared in this step's `actions`, or - a reserved outcome the engine produces:   - `user_not_found` \u2014 emitted when a field with     `x-identifier: true` does not match an existing user.   - `callback` \u2014 emitted when an external system returns control     to the flow (SSO callback, device authorization poll, etc.). A transition's `action` field controls whether the target is interpreted as a step in this definition (default) or as the name of another definition to switch or pivot into. "
+        }
+      }
+    },
+    "Action": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "primary": {
+          "type": "boolean",
+          "default": false,
+          "description": "Marks this as the default/primary action. The runtime template uses this hint to choose visual emphasis. At most one action per step should be primary; this is not enforced here."
+        },
+        "text_key": {
+          "type": "string",
+          "examples": [
+            "actions.signin.submit"
+          ],
+          "description": "Optional localization key override for the action's label. When omitted, the engine derives a key from the step and action names. Display text is resolved client-side from a locale dictionary, never by the engine."
+        }
+      },
+      "description": "Configuration for a user-invokable action on a step."
+    },
+    "Gate": {
+      "type": "object",
+      "required": [
+        "kind",
+        "provider"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "captcha"
+          ],
+          "description": "The gate category. Only `captcha` is currently defined. Authenticator ceremonies (e.g. passkey) are modelled as credential auth_attempts via `x-credential` on a field, not as gates."
+        },
+        "provider": {
+          "type": "string",
+          "examples": [
+            "altcha",
+            "turnstile",
+            "hcaptcha"
+          ],
+          "description": "Provider identifier within the gate kind \u2014 e.g. `altcha`, `turnstile`, `hcaptcha`. The engine looks up an implementation in its provider registry."
+        },
+        "config": {
+          "type": "object",
+          "additionalProperties": true,
+          "examples": [
+            {
+              "site_key": "0x4AAAAAAAxxxxxxxxxxxxxx"
+            }
+          ],
+          "description": "Provider-specific configuration consumed by the implementation when issuing the per-render challenge. Opaque to the engine."
+        }
+      }
+    },
+    "SSOProvider": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "template"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "examples": [
+            "google",
+            "corp_idp"
+          ],
+          "description": "Provider instance identifier. Echoed back by the client when the user picks a provider; routed to the corresponding configured IdP at the engine."
+        },
+        "name": {
+          "type": "string",
+          "examples": [
+            "Google",
+            "Acme SSO"
+          ],
+          "description": "Display name surfaced to the user. Localized client-side if a matching text key exists in the locale dictionary."
+        },
+        "template": {
+          "type": "string",
+          "examples": [
+            "google",
+            "entraid",
+            "github"
+          ],
+          "description": "Hint for rendering (logo, brand colors) \u2014 e.g. `google`, `entraid`, `github`. Consumed by the runtime template, not by the engine."
+        }
+      }
+    },
+    "Transition": {
+      "type": "object",
+      "required": [
+        "target"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "target": {
+          "type": "string",
+          "examples": [
+            "authenticate",
+            "register",
+            "recovery"
+          ],
+          "description": "When `action` is omitted, the `name` of a step in the same definition. When `action` is `switch` or `pivot`, the `name` of another flow definition in the same project."
+        },
+        "action": {
+          "type": "string",
+          "enum": [
+            "switch",
+            "pivot"
+          ],
+          "description": "How to interpret `target`. - Omitted: transition to a step in the current definition. - `switch`: replace the current flow with the target flow.   No return; the current flow is discarded. Typical use:   navigating between peer flows like login \u2194 register. - `pivot`: push the target flow onto the stack. The current   flow is paused; when the target flow completes the engine   auto-pops back. Typical use: login \u2192 recovery \u2192 back to login."
+        }
+      }
+    }
+  }
+}

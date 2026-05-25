@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ThemeController } from "./theme-controller.js";
-import type { Branding } from "./types.js";
+import type { Branding } from "./branding.js";
 
 type FakeMql = MediaQueryList & {
   __triggerChange: (matches: boolean) => void;
@@ -69,31 +69,31 @@ describe("ThemeController", () => {
     vi.restoreAllMocks();
   });
 
-  it("defaults to light when no branding is set", () => {
+  it("defaults to dark when no branding is set", () => {
     const controller = new ThemeController(host);
     controller.hostConnected();
-    expect(controller.theme).toBe("light");
+    expect(controller.theme).toBe("dark");
   });
 
-  it("respects an explicit dark mode", () => {
+  it("respects an explicit light mode opt-in", () => {
     const controller = new ThemeController(host);
-    controller.setBranding({ theme: { mode: "dark" } } as Branding);
-    expect(controller.theme).toBe("dark");
+    controller.setBranding({ theme: { mode: "light" } } as Branding);
+    expect(controller.theme).toBe("light");
   });
 
   it("subscribes to prefers-color-scheme when mode is auto", () => {
-    const { mql, matchMedia } = fakeMatchMedia(false);
+    const { mql, matchMedia } = fakeMatchMedia(true);
     globalThis.matchMedia = matchMedia;
     const controller = new ThemeController(host);
     controller.setBranding({ theme: { mode: "auto" } } as Branding);
-    expect(controller.theme).toBe("light");
-    mql.__triggerChange(true);
     expect(controller.theme).toBe("dark");
+    mql.__triggerChange(false);
+    expect(controller.theme).toBe("light");
     expect(host.updateCount).toBeGreaterThanOrEqual(1);
   });
 
   it("detaches the media listener when switching back to a fixed mode", () => {
-    const { mql, matchMedia } = fakeMatchMedia(true);
+    const { mql, matchMedia } = fakeMatchMedia(false);
     globalThis.matchMedia = matchMedia;
     const removeSpy = vi.spyOn(mql, "removeEventListener");
     const controller = new ThemeController(host);

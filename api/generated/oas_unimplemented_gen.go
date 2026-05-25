@@ -230,6 +230,19 @@ func (UnimplementedHandler) GetLive(ctx context.Context) (r GetLiveRes, _ error)
 	return r, ht.ErrNotImplemented
 }
 
+// GetMySession implements getMySession operation.
+//
+// Returns the current state of the current session including its factors and all currently
+// satisfied assurance levels.
+// `assurance_levels[]` may shrink over time as factor freshness windows expire,
+// without the session itself expiring. Use step-up authentication (a new `auth_attempt`
+// against the same `session_id`) to restore a dropped assurance level.
+//
+// GET /sessions/me
+func (UnimplementedHandler) GetMySession(ctx context.Context, params GetMySessionParams) (r GetMySessionRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // GetOpenIDConfiguration implements getOpenIDConfiguration operation.
 //
 // Retrieve the OpenID Connect configuration.
@@ -348,6 +361,19 @@ func (UnimplementedHandler) ListUsers(ctx context.Context, params ListUsersParam
 	return r, ht.ErrNotImplemented
 }
 
+// RevokeMySession implements revokeMySession operation.
+//
+// Revokes the session immediately (`state: revoked`). This is the logout operation.
+// The __nextgen_session cookie issued at creation (or superseded by a handoff exchange) is required.
+// After revocation, any tokens derived from this session are invalidated including the cookie itself,
+//
+//	which is cleared in the response.
+//
+// DELETE /sessions/me
+func (UnimplementedHandler) RevokeMySession(ctx context.Context, params RevokeMySessionParams) (r RevokeMySessionRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // RevokeSession implements revokeSession operation.
 //
 // Revokes the session immediately (`state: revoked`). This is the logout operation.
@@ -430,12 +456,4 @@ func (UnimplementedHandler) UpdateFlowDefinition(ctx context.Context, req *FlowD
 // POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify
 func (UnimplementedHandler) VerifyChallengeProof(ctx context.Context, req *VerifyChallengeRequest, params VerifyChallengeProofParams) (r VerifyChallengeProofRes, _ error) {
 	return r, ht.ErrNotImplemented
-}
-
-// NewError creates *ErrorDetailsStatusCode from error returned by handler.
-//
-// Used for common default response.
-func (UnimplementedHandler) NewError(ctx context.Context, err error) (r *ErrorDetailsStatusCode) {
-	r = new(ErrorDetailsStatusCode)
-	return r
 }

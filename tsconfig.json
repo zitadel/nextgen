@@ -13,6 +13,9 @@
       "path": "./packages/components"
     },
     {
+      "path": "./packages/design-tokens"
+    },
+    {
       "path": "./packages/lint"
     },
     {
@@ -22,16 +25,28 @@
       "path": "./packages/sdk-next"
     },
     {
+      "path": "./packages/ui-react"
+    },
+    {
+      "path": "./packages/shared-component-styles"
+    },
+    {
       "path": "./apps/cli"
     },
     {
       "path": "./packages/api"
     },
     {
-      "path": "./packages/mockserver"
+      "path": "./packages/api-mock"
     },
     {
       "path": "./apps/demo-next"
+    },
+    {
+      "path": "./apps/demo-next-e2e"
+    },
+    {
+      "path": "./apps/demo-nuxt-e2e"
     }
   ]
 }

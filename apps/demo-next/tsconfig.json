@@ -3,6 +3,7 @@
   "compilerOptions": {
     "baseUrl": ".",
     "jsx": "preserve",
+    "lib": ["ES2022", "DOM"],
     "plugins": [{ "name": "next" }],
     "experimentalDecorators": true,
     "useDefineForClassFields": false,
@@ -15,6 +16,12 @@
   "references": [
     {
       "path": "../../packages/sdk-next"
+    },
+    {
+      "path": "../../packages/shared-component-styles"
+    },
+    {
+      "path": "../../packages/design-tokens"
     },
     {
       "path": "../../packages/components"

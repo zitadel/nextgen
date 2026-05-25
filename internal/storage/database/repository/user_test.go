@@ -12,9 +12,7 @@ import (
 )
 
 func TestUserRepository_CreateGetListDelete(t *testing.T) {
-	if isSpannerDB {
-		t.Skip("test fixture inserts json_schemas payload as []byte; Spanner requires spanner.NullJSON — tracked separately")
-	}
+	skipIfSpanner(t)
 	repo := repository.NewUserRepository()
 	tx, rollback := transactionForRollback(t)
 	defer rollback()
@@ -44,10 +42,10 @@ func TestUserRepository_CreateGetListDelete(t *testing.T) {
 
 	teamCopy := tid
 	create := &domain.CreateUser{
-		ProjectID: pid,
-		SchemaURL: schemaURL,
-		ID:        userID,
-		TeamID:    &teamCopy,
+		ProjectID:  pid,
+		SchemaURL:  schemaURL,
+		ID:         userID,
+		TeamID:     &teamCopy,
 		Attributes: []*domain.CreateAttribute{attr1, attr2},
 	}
 	require.NoError(t, repo.Create(ctx, tx, create))

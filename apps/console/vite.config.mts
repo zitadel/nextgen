@@ -7,7 +7,19 @@ import { defineConfig } from "vite";
 
 export default defineConfig(() => ({
   root: import.meta.dirname,
+  server: {
+    port: 5174,
+    strictPort: true,
+    watch: {
+      // Playground chrome lives outside `apps/console`; ensure CSS edits propagate.
+      ignored: ["**/.git/**", "**/node_modules/**", "**/dist/**"],
+    },
+  },
   cacheDir: "../../node_modules/.vite/apps/console",
+  // Resolve workspace `@zitadel-nextgen/*` packages straight from `.ts`
+  // source for hot dev iteration. Production builds pick up pre-built
+  // `dist/*.mjs` via the default `import` condition instead.
+  resolve: { conditions: ["@zitadel-nextgen/source"] },
   plugins: [
     tailwindcss(),
     devtools(),

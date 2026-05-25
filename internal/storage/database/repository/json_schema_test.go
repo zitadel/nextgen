@@ -1,7 +1,6 @@
 package repository_test
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -19,15 +18,14 @@ func TestJSONSchemaRepository_CRUD(t *testing.T) {
 	defer rollback()
 
 	projectID := "proj-crud"
-	_, err := tx.Exec(t.Context(), fmt.Sprintf("INSERT INTO %s (id) VALUES ($1)", dbTable("projects")), projectID)
-	require.NoError(t, err)
+	ensureProject(t, tx, projectID)
 
 	schema := &domain.JSONSchema{
 		ProjectID: projectID,
 		URL:       "https://example.com/schemas/user.v1.json",
 		Schema:    []byte(`{"type":"object","properties":{"name":{"type":"string"}}}`),
 	}
-	err = repo.Create(t.Context(), tx, schema)
+	err := repo.Create(t.Context(), tx, schema)
 	require.NoError(t, err)
 
 	got, err := repo.Get(t.Context(), tx, database.WithCondition(repo.PrimaryKeyCondition(projectID, schema.URL)))

@@ -1,31 +1,52 @@
 package domain
 
-type UserAuthCheck struct {
-	*AuthCheck
-	Factor *UserFactor
+import "time"
+
+type AuthChallengeUser struct {
+	authChallenge
 }
 
-type UserFactor struct {
+func (a *AuthChallengeUser) Type() AuthCheckType {
+	return AuthCheckTypeUser
+}
+
+func (a *AuthChallengeUser) Payload() any {
+	return nil
+}
+
+func (a *AuthFactorUser) Type() AuthCheckType {
+	return AuthCheckTypeUser
+}
+
+func (a *AuthFactorUser) Payload() any {
+	return a
+}
+
+func SetAuthChallengeUser(id string, lastChallengedAt, lastFailedAt time.Time, failureCount uint16) *AuthChallengeUser {
+	return &AuthChallengeUser{
+		authChallenge: authChallenge{
+			ID:               id,
+			LastChallengedAt: lastChallengedAt,
+			LastFailedAt:     lastFailedAt,
+			FailureCount:     failureCount,
+		},
+	}
+}
+
+type AuthFactorUser struct {
 	UserID string
+	authFactor
 }
 
-// Check implements [AuthChecker].
-func (a *UserAuthCheck) Check() *AuthCheck {
-	return a.AuthCheck
-}
-
-type UserAuthCheckFactor struct {
-	UserID string
-}
-
-// IsFactor implements [AuthFactorer].
-func (u *UserAuthCheck) IsFactor() {}
-
-func (a UserAuthCheck) FactorPayload() any {
-	return a.Factor
+func SetAuthFactorUser(lastVerifiedAt time.Time) *AuthFactorUser {
+	return &AuthFactorUser{
+		authFactor: authFactor{
+			LastVerifiedAt: lastVerifiedAt,
+		},
+	}
 }
 
 var (
-	_ AuthChecker  = (*UserAuthCheck)(nil)
-	_ AuthFactorer = (*UserAuthCheck)(nil)
+	_ AuthChallenge = (*AuthChallengeUser)(nil)
+	_ AuthFactor    = (*AuthFactorUser)(nil)
 )

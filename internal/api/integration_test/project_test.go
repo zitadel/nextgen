@@ -12,7 +12,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
 	generatedapi "github.com/zitadel/nextgen/api/generated"
 	internalapi "github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -29,7 +28,7 @@ func newTestServer(t *testing.T) *httptest.Server {
 	repo := repository.NewProjectRepository(testPool)
 	projectSvc := service.NewProjectService(testPool, repo, idgen.NewULID())
 
-	handler := internalapi.NewHandler(stubFlowService{}, projectSvc)
+	handler := internalapi.NewHandler(stubFlowService{}, &stubAuthAttemptService{}, projectSvc)
 	secHandler := internalapi.NewSecurityHandler()
 
 	srv, err := generatedapi.NewServer(handler, secHandler)
@@ -46,6 +45,36 @@ type stubFlowService struct{}
 func (stubFlowService) Resolve(_ context.Context, _ service.ResolveFlowRequest) (*domain.FlowDefinition, error) {
 	return nil, nil
 }
+
+// stubAuthAttemptService satisfies [service.AuthAttemptService] while doing nothing.
+type stubAuthAttemptService struct{}
+
+// Create implements [service.AuthAttemptService].
+func (s *stubAuthAttemptService) Create(ctx context.Context, input service.CreateAuthAttemptInput) (*domain.AuthAttempt, error) {
+	return nil, nil
+}
+
+// GetByID implements [service.AuthAttemptService].
+func (s *stubAuthAttemptService) GetByID(ctx context.Context, projectID string, attemptID string) (*domain.AuthAttempt, error) {
+	return nil, nil
+}
+
+// Handoff implements [service.AuthAttemptService].
+func (s *stubAuthAttemptService) Handoff(ctx context.Context, input service.HandoffInput) (*domain.AuthAttempt, error) {
+	return nil, nil
+}
+
+// IssueChallenge implements [service.AuthAttemptService].
+func (s *stubAuthAttemptService) IssueChallenge(ctx context.Context, input service.IssueChallengeInput) (*domain.AuthAttempt, error) {
+	return nil, nil
+}
+
+// VerifyProof implements [service.AuthAttemptService].
+func (s *stubAuthAttemptService) VerifyProof(ctx context.Context, input service.VerifyProofInput) (*domain.AuthAttempt, error) {
+	return nil, nil
+}
+
+var _ service.AuthAttemptService = (*stubAuthAttemptService)(nil)
 
 func TestCreateProject(t *testing.T) {
 	ts := newTestServer(t)

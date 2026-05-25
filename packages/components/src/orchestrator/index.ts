@@ -1,6 +1,7 @@
 /**
- * Orchestrator surface: the `<zitadel-login>` element and its supporting
- * primitives. Importing this barrel side-effect-registers the element.
+ * Orchestrator surface: the `<zitadel-login>` and `<zitadel-logout>`
+ * elements and their supporting primitives. Importing this barrel
+ * side-effect-registers the elements.
  */
 
 import "./zitadel-login.js";
@@ -25,38 +26,23 @@ export {
 export { createSanitiser } from "./sanitiser.js";
 export { defaultTemplate, layoutChromeCss } from "./templates/default.liquid.js";
 export { authFormTemplate } from "./templates/auth-form.liquid.js";
-export {
-  FetchTransport,
-  FixtureTransport,
-  FlowTransportError,
-  WalkingFixtureTransport,
-  type FlowTransport,
-  type FixtureScript,
-  type FetchTransportOptions,
-  type FlowDefinition,
-  type FlowDefinitionStep,
-  type FlowTransitionTarget,
-  type StartInput,
-  type WalkingFixtureOptions,
-} from "./transport.js";
-export { ProxyTransport, type ProxyTransportOptions } from "./proxy-transport.js";
+export { passkeyUpsellTemplate } from "./templates/passkey-upsell.liquid.js";
+export { signedInTemplate } from "./templates/signed-in.liquid.js";
+export { startFlow, submitStep, getCurrentStep } from "./api-client.js";
 export { validateBranding, type BrandingValidationResult } from "./branding-validator.js";
 export type {
   Branding,
+  BrandingAssets,
+  BrandingAttribution,
   BrandingPalette,
   BrandingShape,
   BrandingTheme,
   BrandingTypography,
-  FlowAction,
-  FlowError,
-  FlowField,
-  FlowFieldType,
-  FlowGate,
-  FlowIdentity,
   FlowLayout,
+} from "./branding.js";
+export type {
+  FlowError,
+  FlowIdentity,
   FlowMessage,
-  FlowResponse,
-  FlowStep,
-  FlowSsoProvider,
-  FlowSubmitInput,
-} from "./types.js";
+  LiquidContext,
+} from "./template-context.js";
