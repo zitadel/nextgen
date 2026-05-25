@@ -22,7 +22,6 @@ func TestProjectService_Create(t *testing.T) {
 	tests := []struct {
 		name           string
 		previewOrigins []string
-		setupIDs       func(*idgenmock.MockGenerator)
 		setupRepo      func(*domainmock.MockProjectRepository)
 		wantErr        bool
 		check          func(t *testing.T, got *domain.Project)
@@ -30,13 +29,6 @@ func TestProjectService_Create(t *testing.T) {
 		{
 			name:           "ok — no preview origins",
 			previewOrigins: nil,
-			setupIDs: func(g *idgenmock.MockGenerator) {
-				gomock.InOrder(
-					g.EXPECT().New("proj").Return("proj_aaa", nil),
-					g.EXPECT().New("sk_proj").Return("sk_proj_bbb", nil),
-					g.EXPECT().New("sk_proj").Return("sk_proj_ccc", nil),
-				)
-			},
 			setupRepo: func(r *domainmock.MockProjectRepository) {
 				r.EXPECT().
 					Create(gomock.Any(), gomock.Any(), gomock.Any()).
@@ -66,13 +58,6 @@ func TestProjectService_Create(t *testing.T) {
 		{
 			name:           "ok — with preview origins",
 			previewOrigins: []string{"*.vercel.app", "*.netlify.app"},
-			setupIDs: func(g *idgenmock.MockGenerator) {
-				gomock.InOrder(
-					g.EXPECT().New("proj").Return("proj_xxx", nil),
-					g.EXPECT().New("sk_proj").Return("sk_proj_yyy", nil),
-					g.EXPECT().New("sk_proj").Return("sk_proj_zzz", nil),
-				)
-			},
 			setupRepo: func(r *domainmock.MockProjectRepository) {
 				r.EXPECT().
 					Create(gomock.Any(), gomock.Any(), gomock.Any()).
@@ -81,11 +66,11 @@ func TestProjectService_Create(t *testing.T) {
 						return nil
 					})
 				r.EXPECT().
-					Get(gomock.Any(), gomock.Any(), "proj_xxx").
+					Get(gomock.Any(), gomock.Any(), "proj_aaa").
 					Return(&domain.Project{
-						ID:             "proj_xxx",
-						ProjectSecret:  "sk_proj_yyy",
-						PreviewSecret:  "sk_proj_zzz",
+						ID:             "proj_aaa",
+						ProjectSecret:  "sk_proj_bbb",
+						PreviewSecret:  "sk_proj_ccc",
 						PreviewOrigins: []string{"*.vercel.app", "*.netlify.app"},
 						CreatedAt:      now,
 						UpdatedAt:      now,
@@ -98,13 +83,6 @@ func TestProjectService_Create(t *testing.T) {
 		{
 			name:           "repo Create error",
 			previewOrigins: nil,
-			setupIDs: func(g *idgenmock.MockGenerator) {
-				gomock.InOrder(
-					g.EXPECT().New("proj").Return("proj_aaa", nil),
-					g.EXPECT().New("sk_proj").Return("sk_proj_bbb", nil),
-					g.EXPECT().New("sk_proj").Return("sk_proj_ccc", nil),
-				)
-			},
 			setupRepo: func(r *domainmock.MockProjectRepository) {
 				r.EXPECT().
 					Create(gomock.Any(), gomock.Any(), gomock.Any()).
@@ -119,7 +97,9 @@ func TestProjectService_Create(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			ids := idgenmock.NewMockGenerator(ctrl)
 			repo := domainmock.NewMockProjectRepository(ctrl)
-			tc.setupIDs(ids)
+			ids.EXPECT().New("proj").Return("proj_aaa", nil)
+			ids.EXPECT().New("sk_proj").Return("sk_proj_bbb", nil)
+			ids.EXPECT().New("sk_proj").Return("sk_proj_ccc", nil)
 			tc.setupRepo(repo)
 
 			svc := service.NewProjectService(stubPool(), repo, ids)
