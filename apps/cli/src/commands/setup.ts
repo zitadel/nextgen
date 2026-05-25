@@ -157,7 +157,9 @@ export async function runSetup(io: CliIO, opts: SetupOptions): Promise<void> {
 }
 
 function splitCsv(value: string | undefined): string[] | undefined {
-  if (!value) return undefined;
+  if (!value) {
+    return undefined;
+  }
   return value
     .split(",")
     .map((entry) => entry.trim())

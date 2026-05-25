@@ -1,7 +1,7 @@
 import type { CliIO, GlobalOptions } from "../io/output";
 import { ok } from "../io/output";
 import { EXIT_CODES } from "../lib/errors";
-import { listRenderers } from "../renderers/registry";
+import { listRenderers } from "../lib/orca/patchers/legacy/next/renderers/registry";
 import {
   KNOWN_FIELD_ANNOTATIONS,
   KNOWN_MFA_VALUES,

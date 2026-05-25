@@ -306,9 +306,13 @@ function readRendererId(config: Record<string, unknown>): string {
 
 async function resolveIssuer(cwd: string, config: Record<string, unknown>): Promise<string> {
   const fromConfig = readIssuer(config);
-  if (typeof fromConfig === "string" && fromConfig.length > 0) return fromConfig;
+  if (typeof fromConfig === "string" && fromConfig.length > 0) {
+    return fromConfig;
+  }
   const state = await readState(cwd);
-  if (typeof state?.dev_port === "number") return `http://localhost:${state.dev_port}`;
+  if (typeof state?.dev_port === "number") {
+    return `http://localhost:${state.dev_port}`;
+  }
   const detected = await detectDevPort(cwd);
   return issuerFromPort(detected);
 }

@@ -1,3 +1,5 @@
+import { spawnSync } from "node:child_process";
+
 /** Options passed to a scaffolder when creating a new project. */
 export type ScaffoldOptions = {
   readonly projectName?: string;
@@ -50,10 +52,11 @@ export abstract class AbstractCLIScaffolder implements Scaffolder {
    * scaffolder's output in real time. Throws if the command exits non-zero.
    */
   protected runCommand(cmd: string, args: readonly string[], cwd: string): void {
-    const { spawnSync } = require("node:child_process") as typeof import("node:child_process");
     const result = spawnSync(cmd, [...args], { cwd, stdio: "inherit" });
     if (result.status !== 0) {
-      throw new Error(`Command "${cmd} ${args.join(" ")}" exited with status ${String(result.status)}`);
+      throw new Error(
+        `Command "${cmd} ${args.join(" ")}" exited with status ${String(result.status)}`,
+      );
     }
   }
 }
@@ -92,7 +95,6 @@ export abstract class AbstractGitCloneScaffolder implements Scaffolder {
    * so the user starts with a clean working tree.
    */
   async scaffold(cwd: string, _framework: string, _opts: ScaffoldOptions): Promise<ScaffolderResult> {
-    const { spawnSync } = require("node:child_process") as typeof import("node:child_process");
     const clone = spawnSync("git", ["clone", "--depth=1", this.templateUrl, "."], {
       cwd,
       stdio: "inherit",
