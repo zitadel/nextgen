@@ -1,9 +1,10 @@
 import { detectDeployTarget } from "../deploy";
 import { detectFramework } from "../detect/framework";
+import { detectEmptyProject } from "../lib/orca/detect/empty-project";
 import { detectPackageManager } from "../detect/package-manager";
 import { detectDevPort, issuerFromPort } from "../detect/port";
 import { hasZitadelConfig, hasZitadelSecret } from "../detect/state";
-import { runInteractiveSetup } from "../interactive/setup";
+import { pickFramework, runInteractiveSetup } from "../interactive/setup";
 import type { CliIO, GlobalOptions } from "../io/output";
 import { ok, skipped } from "../io/output";
 import { ZitadelError } from "../lib/errors";
@@ -40,7 +41,33 @@ export async function runSetup(io: CliIO, opts: SetupOptions): Promise<void> {
     });
   }
 
-  const framework = await detectFramework(opts.cwd, opts.framework);
+  const orca = new Orca(scaffolders, patchers);
+
+  // When no framework is detected, check whether the directory is empty. If it
+  // is, scaffold a fresh project first, then re-detect the framework.
+  let framework = await detectFramework(opts.cwd, opts.framework).catch(async (err: unknown) => {
+    if (
+      !(err instanceof ZitadelError) ||
+      err.code !== "E_FRAMEWORK_NOT_DETECTED" ||
+      !(await detectEmptyProject(opts.cwd))
+    ) {
+      throw err;
+    }
+
+    const frameworkId =
+      opts.framework ??
+      (opts.nonInteractive
+        ? (() => {
+            throw new ZitadelError("E_FRAMEWORK_NOT_DETECTED", "Empty directory — pass --framework", {
+              hint: "Example: --framework nuxt",
+            });
+          })()
+        : await pickFramework(orca.availableFrameworks()));
+
+    await orca.scaffold(opts.cwd, frameworkId, { packageManager: "pnpm" });
+    return detectFramework(opts.cwd, frameworkId);
+  });
+
   const packageManager = await detectPackageManager(opts.cwd);
   let deployTarget = opts.skipDeployPlatform
     ? undefined
@@ -90,7 +117,7 @@ export async function runSetup(io: CliIO, opts: SetupOptions): Promise<void> {
         previewOrigins: previewOrigins,
       });
 
-  const result = await new Orca(scaffolders, patchers).patch({
+  const result = await orca.patch({
     cwd: opts.cwd,
     packageManager,
     framework,

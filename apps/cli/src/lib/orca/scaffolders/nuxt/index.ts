@@ -7,8 +7,9 @@ export class NuxtScaffolder extends AbstractCLIScaffolder {
 
   /**
    * Runs `npx nuxi@latest init . --template minimal --package-manager pnpm --no-install
-   * --no-git-init` in the target directory, creating a minimal Nuxt project in-place.
-   * Explicit flags prevent all interactive prompts so the command runs unattended.
+   * --no-git-init --force` in the target directory, creating a minimal Nuxt project
+   * in-place. Explicit flags prevent all interactive prompts so the command runs
+   * unattended; `--force` suppresses the "directory already exists" confirmation.
    */
   async scaffold(cwd: string, _framework: string, opts: ScaffoldOptions): Promise<ScaffolderResult> {
     const pm = opts.packageManager ?? "pnpm";
@@ -24,6 +25,7 @@ export class NuxtScaffolder extends AbstractCLIScaffolder {
         pm,
         "--no-install",
         "--no-git-init",
+        "--force",
       ],
       cwd,
     );

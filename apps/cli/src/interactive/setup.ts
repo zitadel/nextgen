@@ -131,6 +131,24 @@ export async function runInteractiveSetup(
   };
 }
 
+/**
+ * Displays an interactive framework picker and returns the selected framework ID.
+ * Used when the working directory is empty and no framework can be auto-detected.
+ *
+ * @param choices - Available frameworks from {@link Orca.availableFrameworks}.
+ */
+export async function pickFramework(
+  choices: ReadonlyArray<{ id: string; displayName: string }>,
+): Promise<string> {
+  intro("Zitadel setup — new project");
+  const picked = await select({
+    message: "Choose a framework to scaffold",
+    options: choices.map((c) => ({ value: c.id, label: c.displayName })),
+  });
+  bail(picked);
+  return picked as string;
+}
+
 function bail<T>(value: T | symbol): asserts value is T {
   if (isCancel(value)) {
     cancel("Setup cancelled.");

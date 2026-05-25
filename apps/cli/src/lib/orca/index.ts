@@ -1,5 +1,5 @@
 import type { Patcher, PatchContext } from "./patchers/types";
-import type { Scaffolder } from "./scaffolders/types";
+import type { ScaffoldOptions, Scaffolder, ScaffolderResult } from "./scaffolders/types";
 import type { OrcaResult } from "./types";
 
 /**
@@ -31,6 +31,22 @@ export class Orca {
       );
     }
     return patcher.patch(ctx);
+  }
+
+  /**
+   * Scaffolds a new project in the given directory using the registered scaffolder
+   * that supports the requested framework.
+   *
+   * @throws {Error} when no registered scaffolder supports the requested framework.
+   */
+  async scaffold(cwd: string, framework: string, opts: ScaffoldOptions): Promise<ScaffolderResult> {
+    const scaffolder = this.scaffolders.find((s) => s.canScaffold(framework));
+    if (!scaffolder) {
+      throw new Error(
+        `No scaffolder supports framework "${framework}". Registered scaffolders: ${this.scaffolders.map((s) => s.displayName).join(", ")}`,
+      );
+    }
+    return scaffolder.scaffold(cwd, framework, opts);
   }
 
   /**
