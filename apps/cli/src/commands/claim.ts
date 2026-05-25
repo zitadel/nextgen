@@ -3,7 +3,7 @@ import { ok, skipped } from "../io/output";
 import { ZitadelError } from "../lib/errors";
 import { createPlatformClient } from "../platform";
 import type { ClaimStatusResponse } from "../platform/schemas";
-import { scaffold } from "../scaffolder";
+import { scaffold } from "../lib/orca/patchers/legacy/file-writer";
 import { readZitadelSecret, writeZitadelSecret, type ZitadelSecret } from "./shared";
 
 export type ClaimOptions = GlobalOptions & {

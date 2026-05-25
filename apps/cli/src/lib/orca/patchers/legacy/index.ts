@@ -1,4 +1,4 @@
-import { stableStringify } from "../../../../json";
+import { stableStringify } from "../../../json";
 import { DEFAULT_SERVER } from "../../../../platform/resolve-server";
 import type { CreateProjectResponse } from "../../../../platform/schemas";
 import type { PackageManager } from "../../../../detect/package-manager";
