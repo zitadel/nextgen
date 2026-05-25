@@ -18,6 +18,7 @@
 import type {
   CreateFlow201Step,
   CreateFlow201StepActions,
+  CreateFlow201StepChallenge,
   CreateFlow201StepFields,
   CreateFlow201StepGates,
   CreateFlow201StepSsoProvidersItem,
@@ -38,6 +39,7 @@ export type FlowError = {
 
 export type FlowIdentity = {
   display_name?: string;
+  email_address?: string;
   avatar_url?: string;
 };
 
@@ -55,6 +57,7 @@ export type LiquidContext = {
   actions: CreateFlow201StepActions;
   gates: CreateFlow201StepGates;
   sso_providers: readonly CreateFlow201StepSsoProvidersItem[];
+  challenge: CreateFlow201StepChallenge | null;
   messages: readonly FlowMessage[];
   identity: FlowIdentity | null;
   errors: readonly FlowError[];

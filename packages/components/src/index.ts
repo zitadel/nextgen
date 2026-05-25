@@ -11,24 +11,28 @@ import "./atoms/index.js";
 import "./orchestrator/index.js";
 
 export {
-  ZlAction,
-  ZlError,
+  ZlAlert,
+  ZlButton,
+  ZlCard,
   ZlField,
-  ZlSubmit,
+  ZlIcon,
+  ZlPageShell,
+  ZlPill,
+  type IconName,
   type ZlFieldType,
-  zlActionManifest,
-  zlErrorManifest,
+  zlAlertManifest,
+  zlButtonManifest,
+  zlCardManifest,
   zlFieldManifest,
-  zlSubmitManifest,
+  zlIconManifest,
+  zlPageShellManifest,
+  zlPillManifest,
 } from "./atoms/index.js";
 
 export { manifestRegistry, findManifest, listKnownTags, type AtomManifest } from "./manifests.js";
 
-export { tokens, flattenTokens, type TokenCatalogue } from "./tokens/catalogue.js";
-export { cssVar, cssVarRef, type DesignToken } from "./tokens/css-var.js";
-
-export { baseHostStyles } from "./styles/base.js";
-export { focusVisibleStyles } from "./styles/focus-ring.js";
+export { tokens, cssVars, type Tokens, type CssVars } from "./tokens/index.js";
+export { baseHostStyles, focusVisibleStyles, t } from "./styles/index.js";
 
 export {
   ZitadelLogin,
@@ -45,6 +49,8 @@ export {
   defaultTemplate,
   layoutChromeCss,
   authFormTemplate,
+  passkeyUpsellTemplate,
+  signedInTemplate,
   TEMPLATE_NAMES,
   en,
   startFlow,
@@ -52,6 +58,7 @@ export {
   getCurrentStep,
   type Branding,
   type BrandingAssets,
+  type BrandingAttribution,
   type BrandingPalette,
   type BrandingShape,
   type BrandingTheme,

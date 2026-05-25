@@ -653,6 +653,9 @@ const T = {
   "passkey_prompt.description": "Use your passkey or security key to sign in",
   "passkey_prompt.action.authenticate": "Use passkey",
   "passkey_prompt.action.fallback": "Use password instead",
+  "passkey_challenge.title": "Authenticating\u2026",
+  "passkey_challenge.description": "Complete the passkey ceremony in your browser",
+  "passkey_challenge.action.submit": "Verify",
 
   // Additional field labels (resolved from schema title, but t() fallback covers them)
   "profile.field.display_name": "Display name",
@@ -687,7 +690,15 @@ const DEFAULT_TEMPLATE = `<h2>{{ texts.title_key | t }}</h2>
 {% else %}
 <button class="link" data-action="{{ action.name }}">{{ action.text_key | t }}</button>
 {% endif %}
-{% endfor %}`;
+{% endfor %}
+
+{% if challenge %}
+<div class="passkey-ceremony" style="text-align:center;padding:16px 0;">
+  <div style="font-size:32px;margin-bottom:8px;">🔐</div>
+  <p style="font-size:13px;color:#8b8fa3;">WebAuthn ceremony: {{ challenge.type }}</p>
+  <p style="font-size:11px;color:#4a4d5a;">challenge_id: {{ challenge.challenge_id }}</p>
+</div>
+{% endif %}`;
 
 // ── User Schemas ──────────────────────────────────────────────────
 
@@ -1035,14 +1046,44 @@ const FLOWS = {
     steps: [
       {
         name: "passkey_prompt",
+        fields: ["email"],
         actions: {
-          authenticate: { primary: true },
-          fallback: {}
+          submit: { primary: true },
+          authenticate: {}
         },
-        gates: { passkey: { type: "passkey" } },
         transitions: {
-          authenticate: { target: "done" },
-          fallback: { target: "default-login", action: "switch" }
+          submit: { target: "login" },
+          authenticate: { target: "passkey_challenge" }
+        }
+      },
+      {
+        name: "passkey_challenge",
+        actions: {
+          submit: { primary: true }
+        },
+        challenge: {
+          type: "passkey",
+          challenge_id: "ch_viz_001",
+          options: {
+            challenge: "dGVzdC1jaGFsbGVuZ2UtdmlzdWFsaXplcg",
+            rpId: "localhost",
+            timeout: 60000,
+            userVerification: "preferred",
+            allowCredentials: []
+          }
+        },
+        transitions: {
+          submit: { target: "done" }
+        }
+      },
+      {
+        name: "login",
+        fields: ["email", "password"],
+        actions: {
+          submit: { primary: true }
+        },
+        transitions: {
+          submit: { target: "done" }
         }
       },
       { name: "done", complete: "redirect" }
@@ -1606,6 +1647,7 @@ function buildStepPayload(step) {
   }
 
   if (step.gates && Object.keys(step.gates).length > 0) payload.gates = step.gates;
+  if (step.challenge) payload.challenge = step.challenge;
 
   if (step.sso_providers?.length > 0) payload.sso_providers = step.sso_providers;
   if (step.on_success) payload.on_success = step.on_success;
@@ -1832,6 +1874,7 @@ async function renderSim() {
         actions_list: Object.entries(resolved.actions || {}).map(([name, a]) => ({ name, ...a })),
         sso_providers: resolved.sso_providers || [],
         gates: resolved.gates || {},
+        challenge: resolved.challenge || null,
         error: simState.error
       };
       bodyHtml = await engine.parseAndRender(currentTemplate, context);
@@ -1884,11 +1927,23 @@ function renderStepFallback(step, resolved) {
     return `<button class="sim-btn ${cls}" data-action="${name}">${t(a.text_key)}</button>`;
   }).join('');
 
+  let challengeHtml = '';
+  if (resolved.challenge) {
+    challengeHtml = `
+      <div style="text-align:center;padding:20px 0;">
+        <div style="font-size:32px;margin-bottom:8px;">🔐</div>
+        <p style="font-size:13px;color:var(--muted);">WebAuthn ceremony: ${resolved.challenge.type}</p>
+        <p style="font-size:11px;color:var(--muted);margin-top:4px;">challenge_id: <code style="color:var(--accent);">${resolved.challenge.challenge_id}</code></p>
+        <p style="font-size:11px;color:var(--muted);margin-top:4px;">rpId: <code style="color:var(--accent);">${resolved.challenge.options?.rpId || 'n/a'}</code></p>
+      </div>`;
+  }
+
   return `
     <h2 style="font-size:20px;font-weight:600;margin-bottom:4px;">${title}<span class="step-badge">${step.name}</span></h2>
     ${desc ? `<p style="font-size:13px;color:var(--muted);margin-bottom:12px;">${desc}</p>` : ''}
     ${errorHtml}
     ${fieldsHtml}
+    ${challengeHtml}
     <div class="sim-actions">${ssoHtml}${actionsHtml}</div>`;
 }
 

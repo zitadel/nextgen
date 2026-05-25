@@ -61,6 +61,12 @@ export type BrandingAssets = {
  * Wire shape (`CreateFlow201Branding`) plus the v2 client-only extension.
  * Structurally a superset, so any `CreateFlow201Branding` payload from the
  * wire is assignable to `Branding` without a cast.
+ *
+ * `attribution.show_zitadel` controls the "Secured with Zitadel" pill in
+ * the orchestrator footer. Tenants set it to `false` only when they have a
+ * licence that permits removing attribution (community / OSS deployments
+ * always show it). The flag intentionally lives on `Branding` so it can
+ * be overridden per-flow alongside the rest of the visual surface.
  */
 export type Branding = CreateFlow201Branding & {
   palette?: BrandingPalette;
@@ -68,4 +74,10 @@ export type Branding = CreateFlow201Branding & {
   shape?: BrandingShape;
   assets?: BrandingAssets;
   theme?: BrandingTheme;
+  attribution?: BrandingAttribution;
+};
+
+export type BrandingAttribution = {
+  show_zitadel?: boolean;
+  custom_link?: { label: string; href: string };
 };

@@ -75,7 +75,8 @@
       },
       "typecheck": {
         "dependsOn": [
-          "generate"
+          "generate",
+          "build"
         ]
       },
       "test": {

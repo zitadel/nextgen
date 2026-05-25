@@ -4,17 +4,38 @@ A minimal Next.js application demonstrating [Nextgen Auth](../../packages/sdk-ne
 
 ## Running locally
 
-Start the mock auth backend and the demo in separate terminals:
+Use **Nx** from the repo root (`corepack pnpm install` first). Two terminals:
 
 ```bash
 # Terminal 1 — mock auth server on port 4000
-pnpm --filter @zitadel-nextgen/api-mock start
+corepack pnpm nx start @zitadel-nextgen/api-mock
 
-# Terminal 2 — Next.js app on port 3002
-NEXTGEN_ISSUER_URL=http://localhost:4000 pnpm --filter @nextgen/demo-next dev
+# Terminal 2 — Next.js on port 3002
+NEXTGEN_ISSUER_URL=http://localhost:4000 corepack pnpm nx dev @zitadel-nextgen/demo-next
 ```
 
 Open [http://localhost:3002/login](http://localhost:3002/login). Any email/password combination is accepted by the mock server.
+
+**UI-only iteration** (no Next.js, no TCP mock): MSW runs in the browser on these dev servers:
+
+```bash
+# Lit atoms + <zitadel-login> (source from packages/components/src)
+corepack pnpm nx dev @zitadel-nextgen/components
+# → http://localhost:5173/?route=login
+# → http://localhost:5173/?route=atoms
+
+# React paired atoms (@zitadel-nextgen/ui-react) — compare Lit matrices in another tab
+corepack pnpm nx dev @zitadel-nextgen/console
+# → http://localhost:5174
+```
+
+After changing `@zitadel-nextgen/components`, rebuild before refreshing:
+
+```bash
+corepack pnpm nx build @zitadel-nextgen/components
+```
+
+The demo imports the package from `dist/`, not source.
 
 ## What it shows
 
@@ -30,6 +51,10 @@ Open [http://localhost:3002/login](http://localhost:3002/login). Any email/passw
 **Login page** renders the `<zitadel-login>` web component (from `@zitadel-nextgen/components`) inside a client-only dynamic import to avoid SSR.
 
 **Admin page** calls `auth()` on the server to read the verified session and display the signed-in user's email, with the `<zitadel-logout>` component in the header.
+
+**Login widget** (`src/app/login/widget.tsx`) dynamically imports `@zitadel-nextgen/components` with `ssr: false` so custom elements register only in the browser.
+
+**Fonts and branding** — the mock server ships a default `font_url` (Arimo via Google Fonts) on every flow response. `<zitadel-login>` injects it into its shadow root. Root `layout.tsx` sets `body { margin: 0; font-family: sans-serif; }`. **APK Futural** in heading tokens still needs a tenant font URL when you brand beyond the mock baseline.
 
 ## Environment variables
 
