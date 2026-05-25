@@ -46,6 +46,18 @@ func (stubFlowService) Resolve(_ context.Context, _ service.ResolveFlowRequest) 
 	return nil, nil
 }
 
+func (stubFlowService) Start(_ context.Context, _ service.StartFlowRequest) (service.FlowStepResult, error) {
+	return service.FlowStepResult{}, nil
+}
+
+func (stubFlowService) Submit(_ context.Context, _ service.SubmitFlowRequest) (service.FlowStepResult, error) {
+	return service.FlowStepResult{}, nil
+}
+
+func (stubFlowService) GetStep(_ context.Context, _ service.GetFlowStepRequest) (service.FlowStepResult, error) {
+	return service.FlowStepResult{}, nil
+}
+
 // stubAuthAttemptService satisfies [service.AuthAttemptService] while doing nothing.
 type stubAuthAttemptService struct{}
 
