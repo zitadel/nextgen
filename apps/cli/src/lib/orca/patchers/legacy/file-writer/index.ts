@@ -1,10 +1,14 @@
 import { chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
-import { ZitadelError } from "../lib/errors";
-import { parseJsonObject, stableStringify } from "../lib/json";
+import { ZitadelError } from "../../../../errors";
+import { parseJsonObject, stableStringify } from "../../../../json";
 import type { FileOp, ScaffoldPlan, ScaffoldResult } from "./plan";
 
+/**
+ * Executes a scaffold plan against the filesystem, applying each operation
+ * in sequence and respecting dry-run mode throughout.
+ */
 export async function scaffold(
   plan: ScaffoldPlan,
   opts: { cwd: string; dryRun: boolean; force: boolean },
@@ -223,7 +227,7 @@ async function addDependency(
     throw new ZitadelError("E_VALIDATION", "package.json is required to add Zitadel dependencies");
   }
   const current = parseJsonObject(existing, path);
-  const key = op.dev ? "devDependencies" : "dependencies";
+  const key = op.dev === true ? "devDependencies" : "dependencies";
   const deps = isObject(current[key]) ? (current[key] as Record<string, unknown>) : {};
   if (deps[op.name] === op.version) {
     result.filesSkipped.push(path);

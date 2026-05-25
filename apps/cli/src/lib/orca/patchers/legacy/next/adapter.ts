@@ -1,12 +1,14 @@
 import { join } from "node:path";
 
-import type { ScaffoldPlan } from "../../scaffolder/plan";
-import type { FrameworkAdapter, ProjectContext } from "../index";
+import type { FrameworkId } from "../../../../../detect/framework";
+import type { ScaffoldPlan } from "../file-writer/plan";
+import type { FrameworkAdapter, ProjectContext } from "../types";
 
 export class NextAdapter implements FrameworkAdapter {
-  readonly id = "next" as const;
+  readonly id: FrameworkId = "next";
   readonly displayName = "Next.js App Router";
 
+  /** Produces the full scaffold plan: login, register, profile, provider, and SDK dependency. */
   async planSetup(ctx: ProjectContext): Promise<ScaffoldPlan> {
     const ops = [
       ...(await this.planAddLogin(ctx)).ops,
@@ -21,9 +23,6 @@ export class NextAdapter implements FrameworkAdapter {
         contents: provider.contents,
       });
     }
-    // JSX type declarations for the `<zitadel-login>` / `<zitadel-logout>`
-    // custom elements. Required so TypeScript doesn't complain about the
-    // unknown JSX tags in the scaffolded pages.
     const customElementsDts = ctx.renderer.templates.customElementsDts?.();
     if (customElementsDts) {
       ops.push({
@@ -45,6 +44,7 @@ export class NextAdapter implements FrameworkAdapter {
     };
   }
 
+  /** Produces the scaffold plan for the login route only. */
   async planAddLogin(ctx: ProjectContext): Promise<ScaffoldPlan> {
     const page = ctx.renderer.templates.authPage("login");
     return {
@@ -61,6 +61,7 @@ export class NextAdapter implements FrameworkAdapter {
     };
   }
 
+  /** Produces the scaffold plan for the register route only. */
   async planAddRegister(ctx: ProjectContext): Promise<ScaffoldPlan> {
     const page = ctx.renderer.templates.authPage("register");
     return {
@@ -77,9 +78,12 @@ export class NextAdapter implements FrameworkAdapter {
     };
   }
 
+  /** Produces the scaffold plan for the profile route only. */
   async planAddProfile(ctx: ProjectContext): Promise<ScaffoldPlan> {
     const page = ctx.renderer.templates.profilePage?.();
-    if (!page) return { ops: [], summary: [] };
+    if (!page) {
+      return { ops: [], summary: [] };
+    }
     return {
       ops: [
         {
@@ -94,10 +98,12 @@ export class NextAdapter implements FrameworkAdapter {
     };
   }
 
+  /** Returns the SDK package entry for this renderer context. */
   sdkDependency(ctx: ProjectContext): { name: string; version: string } {
     return ctx.renderer.dependency;
   }
 
+  /** Returns the environment variable keys required by the Next.js adapter. */
   envKeys(): string[] {
     return [
       "ZITADEL_PROJECT_ID",
@@ -107,4 +113,9 @@ export class NextAdapter implements FrameworkAdapter {
       "NEXT_PUBLIC_ZITADEL_PROJECT_ID",
     ];
   }
+}
+
+/** Returns the adapter for the given framework identifier. */
+export function getAdapter(_id: FrameworkId): FrameworkAdapter {
+  return new NextAdapter();
 }

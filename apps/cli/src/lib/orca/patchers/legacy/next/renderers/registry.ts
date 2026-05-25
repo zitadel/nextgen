@@ -1,4 +1,4 @@
-import { ZitadelError } from "../lib/errors";
+import { ZitadelError } from "../../../../../errors";
 import { litRenderer } from "./lit";
 import { reactRenderer } from "./react";
 import { isRendererId, type RendererId, type RendererSpec } from "./types";
@@ -8,6 +8,10 @@ export const RENDERERS: Record<RendererId, RendererSpec> = {
   "web-component": litRenderer,
 };
 
+/**
+ * Returns the renderer spec for the given identifier.
+ * Throws if the id is unknown or if the renderer is not yet implemented.
+ */
 export function getRenderer(id: string): RendererSpec {
   if (!isRendererId(id)) {
     throw new ZitadelError("E_VALIDATION", `Unknown renderer "${id}"`, {
@@ -27,6 +31,9 @@ export function getRenderer(id: string): RendererSpec {
   return renderer;
 }
 
+/**
+ * Returns a summary of all registered renderers for display purposes.
+ */
 export function listRenderers(): Array<{
   id: RendererId;
   status: string;

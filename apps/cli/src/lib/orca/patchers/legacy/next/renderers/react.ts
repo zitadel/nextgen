@@ -1,5 +1,5 @@
-import { MANAGED_MARKER } from "../../lib/paths";
-import type { RendererSpec } from "../types";
+import { MANAGED_MARKER } from "../../../../../paths";
+import type { RendererSpec } from "./types";
 
 /**
  * The Next.js App Router renderer scaffolds `/login`, `/register`, and

@@ -1,8 +1,6 @@
 import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 
-import type { ProjectContext } from "../adapters";
-import { getAdapter } from "../adapters/registry";
 import { detectDeployTarget } from "../deploy";
 import { detectFramework } from "../detect/framework";
 import { detectPackageManager } from "../detect/package-manager";
@@ -11,9 +9,11 @@ import type { CliIO, GlobalOptions } from "../io/output";
 import { ok } from "../io/output";
 import { ZitadelError } from "../lib/errors";
 import { MANAGED_MARKER } from "../lib/paths";
-import { getRenderer } from "../renderers/registry";
-import { scaffold } from "../scaffolder";
-import type { ScaffoldPlan } from "../scaffolder/plan";
+import { getAdapter } from "../lib/orca/patchers/legacy/next/adapter";
+import type { ProjectContext } from "../lib/orca/patchers/legacy/types";
+import { getRenderer } from "../lib/orca/patchers/legacy/next/renderers/registry";
+import { scaffold } from "../lib/orca/patchers/legacy/file-writer";
+import type { ScaffoldPlan } from "../lib/orca/patchers/legacy/file-writer/plan";
 import { validateJsonSchema } from "../schema/validate";
 import { readZitadelConfig, readZitadelSecret } from "./shared";
 
@@ -243,8 +243,6 @@ async function applyFixes(opts: DoctorOptions): Promise<void> {
     ],
     summary: [{ title: "Doctor fix", detail: "Re-applied missing managed files." }],
   };
-  // Managed files carry a marker; `doctor --fix` is expected to reclaim them
-  // even if they have local edits. Unmanaged files stay protected by the conflict guard.
   await scaffold(plan, { cwd: opts.cwd, dryRun: opts.dryRun, force: true });
 }
 

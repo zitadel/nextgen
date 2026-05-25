@@ -1,5 +1,5 @@
-import { MANAGED_MARKER } from "../../lib/paths";
-import type { RendererSpec } from "../types";
+import { MANAGED_MARKER } from "../../../../../paths";
+import type { RendererSpec } from "./types";
 
 export const litRenderer: RendererSpec = {
   id: "web-component",
@@ -13,9 +13,6 @@ export const litRenderer: RendererSpec = {
       return {
         mode,
         contents: `${MANAGED_MARKER}
-// The web component renderer ships a <zitadel-flow> element. Until
-// @zitadel/ui-lit is published, this template only declares the
-// intended integration point. See docs/design/cli/bdui-renderer.md.
 import "@zitadel/ui-lit";
 
 const environment =

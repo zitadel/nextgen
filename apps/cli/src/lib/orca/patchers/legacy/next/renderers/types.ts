@@ -33,6 +33,7 @@ export type RendererSpec = {
   templates: RendererTemplates;
 };
 
+/** Returns true if the given value is a valid renderer identifier. */
 export function isRendererId(value: unknown): value is RendererId {
   return typeof value === "string" && (RENDERER_IDS as string[]).includes(value);
 }
