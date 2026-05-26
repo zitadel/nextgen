@@ -9,27 +9,28 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database/repository"
 )
 
-func (h *Harness) EnsureProjectRepo(t *testing.T) domain.ProjectRepository {
+func (h *Harness) EnsureTeamRepo(t *testing.T) domain.TeamRepository {
 	t.Helper()
-	if h.ProjectRepo == nil {
-		h.ProjectRepo = repository.NewProjectRepository(
+	if h.TeamRepo == nil {
+		h.TeamRepo = repository.NewTeamRepository(
 			h.EnsureDBPool(t),
 		)
 	}
 
-	return h.ProjectRepo
+	return h.TeamRepo
 }
 
-func (h *Harness) CreateProject(t *testing.T, projectID string) string {
+func (h *Harness) CreateTeam(t *testing.T, projectID string, teamID string) string {
 	t.Helper()
-	project := &domain.Project{
+	team := &domain.Team{
+		ProjectID: projectID,
 		ID:        projectID,
 		CreatedAt: time.Now().UTC(),
 		UpdatedAt: time.Now().UTC(),
 	}
 	pool := h.EnsureDBPool(t)
-	repo := h.EnsureProjectRepo(t)
-	err := repo.Create(t.Context(), pool, project)
+	repo := h.EnsureTeamRepo(t)
+	err := repo.Create(t.Context(), pool, team)
 	require.NoError(t, err)
-	return project.ID
+	return team.ID
 }

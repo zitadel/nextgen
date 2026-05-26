@@ -379,6 +379,15 @@ func (UnimplementedHandler) ListUsers(ctx context.Context, params ListUsersParam
 	return r, ht.ErrNotImplemented
 }
 
+// PatchUser implements patchUser operation.
+//
+// Patch user.
+//
+// PATCH /users/{user_id}
+func (UnimplementedHandler) PatchUser(ctx context.Context, req User, params PatchUserParams) (r PatchUserRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // RevokeMySession implements revokeMySession operation.
 //
 // Revokes the session immediately (`state: revoked`). This is the logout operation.
@@ -457,15 +466,6 @@ func (UnimplementedHandler) SubmitFlowStep(ctx context.Context, req *FlowSubmitR
 //
 // PATCH /flow_definitions/{id}
 func (UnimplementedHandler) UpdateFlowDefinition(ctx context.Context, req *FlowDefinitionUpdateRequest, params UpdateFlowDefinitionParams) (r UpdateFlowDefinitionRes, _ error) {
-	return r, ht.ErrNotImplemented
-}
-
-// UpdateUser implements updateUser operation.
-//
-// Update user.
-//
-// PATCH /users/{user_id}
-func (UnimplementedHandler) UpdateUser(ctx context.Context, req User, params UpdateUserParams) (r UpdateUserRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

@@ -275,6 +275,12 @@ type Handler interface {
 	//
 	// GET /users
 	ListUsers(ctx context.Context, params ListUsersParams) (ListUsersRes, error)
+	// PatchUser implements patchUser operation.
+	//
+	// Patch user.
+	//
+	// PATCH /users/{user_id}
+	PatchUser(ctx context.Context, req User, params PatchUserParams) (PatchUserRes, error)
 	// RevokeMySession implements revokeMySession operation.
 	//
 	// Revokes the session immediately (`state: revoked`). This is the logout operation.
@@ -337,12 +343,6 @@ type Handler interface {
 	//
 	// PATCH /flow_definitions/{id}
 	UpdateFlowDefinition(ctx context.Context, req *FlowDefinitionUpdateRequest, params UpdateFlowDefinitionParams) (UpdateFlowDefinitionRes, error)
-	// UpdateUser implements updateUser operation.
-	//
-	// Update user.
-	//
-	// PATCH /users/{user_id}
-	UpdateUser(ctx context.Context, req User, params UpdateUserParams) (UpdateUserRes, error)
 	// VerifyChallengeProof implements verifyChallengeProof operation.
 	//
 	// Submits a proof (credential, code, assertion) to verify a factor challenge.

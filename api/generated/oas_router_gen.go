@@ -1176,7 +1176,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 								args[0],
 							}, elemIsEscaped, w, r)
 						case "PATCH":
-							s.handleUpdateUserRequest([1]string{
+							s.handlePatchUserRequest([1]string{
 								args[0],
 							}, elemIsEscaped, w, r)
 						default:
@@ -2348,9 +2348,9 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 							r.count = 1
 							return r, true
 						case "PATCH":
-							r.name = UpdateUserOperation
-							r.summary = "Update user"
-							r.operationID = "updateUser"
+							r.name = PatchUserOperation
+							r.summary = "Patch user"
+							r.operationID = "patchUser"
 							r.operationGroup = ""
 							r.pathPattern = "/users/{user_id}"
 							r.args = args

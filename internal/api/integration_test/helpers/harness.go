@@ -41,6 +41,7 @@ type Harness struct {
 	UserRepo           domain.UserRepository
 	UserPasswordRepo   domain.UserPasswordRepository
 	UserPasskeyRepo    domain.UserPasskeyRepository
+	TeamRepo           domain.TeamRepository
 
 	TestData test_data.TestData
 }

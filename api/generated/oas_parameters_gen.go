@@ -1151,7 +1151,7 @@ type CreateSchemaParams struct {
 func unpackCreateSchemaParams(packed middleware.Parameters) (params CreateSchemaParams) {
 	{
 		key := middleware.ParameterKey{
-			Name: "ProjectID",
+			Name: "project_id",
 			In:   "query",
 		}
 		if v, ok := packed[key]; ok {
@@ -1172,10 +1172,10 @@ func unpackCreateSchemaParams(packed middleware.Parameters) (params CreateSchema
 
 func decodeCreateSchemaParams(args [0]string, argsEscaped bool, r *http.Request) (params CreateSchemaParams, _ error) {
 	q := uri.NewQueryDecoder(r.URL.Query())
-	// Decode query: ProjectID.
+	// Decode query: project_id.
 	if err := func() error {
 		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "ProjectID",
+			Name:    "project_id",
 			Style:   uri.QueryStyleForm,
 			Explode: true,
 		}
@@ -1230,7 +1230,7 @@ func decodeCreateSchemaParams(args [0]string, argsEscaped bool, r *http.Request)
 		return nil
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
-			Name: "ProjectID",
+			Name: "project_id",
 			In:   "query",
 			Err:  err,
 		}
@@ -1312,7 +1312,7 @@ type CreateUserParams struct {
 func unpackCreateUserParams(packed middleware.Parameters) (params CreateUserParams) {
 	{
 		key := middleware.ParameterKey{
-			Name: "ProjectID",
+			Name: "project_id",
 			In:   "query",
 		}
 		if v, ok := packed[key]; ok {
@@ -1333,10 +1333,10 @@ func unpackCreateUserParams(packed middleware.Parameters) (params CreateUserPara
 
 func decodeCreateUserParams(args [0]string, argsEscaped bool, r *http.Request) (params CreateUserParams, _ error) {
 	q := uri.NewQueryDecoder(r.URL.Query())
-	// Decode query: ProjectID.
+	// Decode query: project_id.
 	if err := func() error {
 		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "ProjectID",
+			Name:    "project_id",
 			Style:   uri.QueryStyleForm,
 			Explode: true,
 		}
@@ -1391,7 +1391,7 @@ func decodeCreateUserParams(args [0]string, argsEscaped bool, r *http.Request) (
 		return nil
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
-			Name: "ProjectID",
+			Name: "project_id",
 			In:   "query",
 			Err:  err,
 		}
@@ -2356,7 +2356,7 @@ func unpackGetSchemaByIdParams(packed middleware.Parameters) (params GetSchemaBy
 	}
 	{
 		key := middleware.ParameterKey{
-			Name: "ProjectID",
+			Name: "project_id",
 			In:   "query",
 		}
 		if v, ok := packed[key]; ok {
@@ -2422,10 +2422,10 @@ func decodeGetSchemaByIdParams(args [1]string, argsEscaped bool, r *http.Request
 			Err:  err,
 		}
 	}
-	// Decode query: ProjectID.
+	// Decode query: project_id.
 	if err := func() error {
 		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "ProjectID",
+			Name:    "project_id",
 			Style:   uri.QueryStyleForm,
 			Explode: true,
 		}
@@ -2480,7 +2480,7 @@ func decodeGetSchemaByIdParams(args [1]string, argsEscaped bool, r *http.Request
 		return nil
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
-			Name: "ProjectID",
+			Name: "project_id",
 			In:   "query",
 			Err:  err,
 		}
@@ -2830,7 +2830,7 @@ func unpackListFlowDefinitionsParams(packed middleware.Parameters) (params ListF
 	}
 	{
 		key := middleware.ParameterKey{
-			Name: "ProjectID",
+			Name: "project_id",
 			In:   "query",
 		}
 		if v, ok := packed[key]; ok {
@@ -2970,10 +2970,10 @@ func decodeListFlowDefinitionsParams(args [0]string, argsEscaped bool, r *http.R
 			Err:  err,
 		}
 	}
-	// Decode query: ProjectID.
+	// Decode query: project_id.
 	if err := func() error {
 		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "ProjectID",
+			Name:    "project_id",
 			Style:   uri.QueryStyleForm,
 			Explode: true,
 		}
@@ -3028,7 +3028,7 @@ func decodeListFlowDefinitionsParams(args [0]string, argsEscaped bool, r *http.R
 		return nil
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
-			Name: "ProjectID",
+			Name: "project_id",
 			In:   "query",
 			Err:  err,
 		}
@@ -3130,7 +3130,7 @@ func unpackListSessionsParams(packed middleware.Parameters) (params ListSessions
 	}
 	{
 		key := middleware.ParameterKey{
-			Name: "ProjectID",
+			Name: "project_id",
 			In:   "query",
 		}
 		if v, ok := packed[key]; ok {
@@ -3279,10 +3279,10 @@ func decodeListSessionsParams(args [0]string, argsEscaped bool, r *http.Request)
 			Err:  err,
 		}
 	}
-	// Decode query: ProjectID.
+	// Decode query: project_id.
 	if err := func() error {
 		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "ProjectID",
+			Name:    "project_id",
 			Style:   uri.QueryStyleForm,
 			Explode: true,
 		}
@@ -3337,7 +3337,7 @@ func decodeListSessionsParams(args [0]string, argsEscaped bool, r *http.Request)
 		return nil
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
-			Name: "ProjectID",
+			Name: "project_id",
 			In:   "query",
 			Err:  err,
 		}
@@ -3500,7 +3500,7 @@ func unpackListUsersParams(packed middleware.Parameters) (params ListUsersParams
 	}
 	{
 		key := middleware.ParameterKey{
-			Name: "ProjectID",
+			Name: "project_id",
 			In:   "query",
 		}
 		if v, ok := packed[key]; ok {
@@ -3640,10 +3640,10 @@ func decodeListUsersParams(args [0]string, argsEscaped bool, r *http.Request) (p
 			Err:  err,
 		}
 	}
-	// Decode query: ProjectID.
+	// Decode query: project_id.
 	if err := func() error {
 		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "ProjectID",
+			Name:    "project_id",
 			Style:   uri.QueryStyleForm,
 			Explode: true,
 		}
@@ -3698,7 +3698,237 @@ func decodeListUsersParams(args [0]string, argsEscaped bool, r *http.Request) (p
 		return nil
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
-			Name: "ProjectID",
+			Name: "project_id",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	// Decode query: team_id.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "team_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotTeamIDVal TeamID
+				if err := func() error {
+					var paramsDotTeamIDValVal string
+					if err := func() error {
+						val, err := d.DecodeValue()
+						if err != nil {
+							return err
+						}
+
+						c, err := conv.ToString(val)
+						if err != nil {
+							return err
+						}
+
+						paramsDotTeamIDValVal = c
+						return nil
+					}(); err != nil {
+						return err
+					}
+					paramsDotTeamIDVal = TeamID(paramsDotTeamIDValVal)
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.TeamID.SetTo(paramsDotTeamIDVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if value, ok := params.TeamID.Get(); ok {
+					if err := func() error {
+						if err := value.Validate(); err != nil {
+							return err
+						}
+						return nil
+					}(); err != nil {
+						return err
+					}
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "team_id",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
+// PatchUserParams is parameters of patchUser operation.
+type PatchUserParams struct {
+	// The unique identifier of the user.
+	UserID UserID
+	// The unique identifier of the project.
+	ProjectID OptProjectID `json:",omitempty,omitzero"`
+	// The unique identifier of the team.
+	TeamID OptTeamID `json:",omitempty,omitzero"`
+}
+
+func unpackPatchUserParams(packed middleware.Parameters) (params PatchUserParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "user_id",
+			In:   "path",
+		}
+		params.UserID = packed[key].(UserID)
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "project_id",
+			In:   "query",
+		}
+		if v, ok := packed[key]; ok {
+			params.ProjectID = v.(OptProjectID)
+		}
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "team_id",
+			In:   "query",
+		}
+		if v, ok := packed[key]; ok {
+			params.TeamID = v.(OptTeamID)
+		}
+	}
+	return params
+}
+
+func decodePatchUserParams(args [1]string, argsEscaped bool, r *http.Request) (params PatchUserParams, _ error) {
+	q := uri.NewQueryDecoder(r.URL.Query())
+	// Decode path: user_id.
+	if err := func() error {
+		param := args[0]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[0])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "user_id",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				var paramsDotUserIDVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotUserIDVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.UserID = UserID(paramsDotUserIDVal)
+				return nil
+			}(); err != nil {
+				return err
+			}
+			if err := func() error {
+				if err := params.UserID.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "user_id",
+			In:   "path",
+			Err:  err,
+		}
+	}
+	// Decode query: project_id.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotProjectIDVal ProjectID
+				if err := func() error {
+					var paramsDotProjectIDValVal string
+					if err := func() error {
+						val, err := d.DecodeValue()
+						if err != nil {
+							return err
+						}
+
+						c, err := conv.ToString(val)
+						if err != nil {
+							return err
+						}
+
+						paramsDotProjectIDValVal = c
+						return nil
+					}(); err != nil {
+						return err
+					}
+					paramsDotProjectIDVal = ProjectID(paramsDotProjectIDValVal)
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.ProjectID.SetTo(paramsDotProjectIDVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if value, ok := params.ProjectID.Get(); ok {
+					if err := func() error {
+						if err := value.Validate(); err != nil {
+							return err
+						}
+						return nil
+					}(); err != nil {
+						return err
+					}
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "project_id",
 			In:   "query",
 			Err:  err,
 		}
@@ -4204,236 +4434,6 @@ func decodeUpdateFlowDefinitionParams(args [1]string, argsEscaped bool, r *http.
 		return params, &ogenerrors.DecodeParamError{
 			Name: "id",
 			In:   "path",
-			Err:  err,
-		}
-	}
-	return params, nil
-}
-
-// UpdateUserParams is parameters of updateUser operation.
-type UpdateUserParams struct {
-	// The unique identifier of the user.
-	UserID UserID
-	// The unique identifier of the project.
-	ProjectID OptProjectID `json:",omitempty,omitzero"`
-	// The unique identifier of the team.
-	TeamID OptTeamID `json:",omitempty,omitzero"`
-}
-
-func unpackUpdateUserParams(packed middleware.Parameters) (params UpdateUserParams) {
-	{
-		key := middleware.ParameterKey{
-			Name: "user_id",
-			In:   "path",
-		}
-		params.UserID = packed[key].(UserID)
-	}
-	{
-		key := middleware.ParameterKey{
-			Name: "ProjectID",
-			In:   "query",
-		}
-		if v, ok := packed[key]; ok {
-			params.ProjectID = v.(OptProjectID)
-		}
-	}
-	{
-		key := middleware.ParameterKey{
-			Name: "team_id",
-			In:   "query",
-		}
-		if v, ok := packed[key]; ok {
-			params.TeamID = v.(OptTeamID)
-		}
-	}
-	return params
-}
-
-func decodeUpdateUserParams(args [1]string, argsEscaped bool, r *http.Request) (params UpdateUserParams, _ error) {
-	q := uri.NewQueryDecoder(r.URL.Query())
-	// Decode path: user_id.
-	if err := func() error {
-		param := args[0]
-		if argsEscaped {
-			unescaped, err := url.PathUnescape(args[0])
-			if err != nil {
-				return errors.Wrap(err, "unescape path")
-			}
-			param = unescaped
-		}
-		if len(param) > 0 {
-			d := uri.NewPathDecoder(uri.PathDecoderConfig{
-				Param:   "user_id",
-				Value:   param,
-				Style:   uri.PathStyleSimple,
-				Explode: false,
-			})
-
-			if err := func() error {
-				var paramsDotUserIDVal string
-				if err := func() error {
-					val, err := d.DecodeValue()
-					if err != nil {
-						return err
-					}
-
-					c, err := conv.ToString(val)
-					if err != nil {
-						return err
-					}
-
-					paramsDotUserIDVal = c
-					return nil
-				}(); err != nil {
-					return err
-				}
-				params.UserID = UserID(paramsDotUserIDVal)
-				return nil
-			}(); err != nil {
-				return err
-			}
-			if err := func() error {
-				if err := params.UserID.Validate(); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
-		} else {
-			return validate.ErrFieldRequired
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "user_id",
-			In:   "path",
-			Err:  err,
-		}
-	}
-	// Decode query: ProjectID.
-	if err := func() error {
-		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "ProjectID",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.HasParam(cfg); err == nil {
-			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
-				var paramsDotProjectIDVal ProjectID
-				if err := func() error {
-					var paramsDotProjectIDValVal string
-					if err := func() error {
-						val, err := d.DecodeValue()
-						if err != nil {
-							return err
-						}
-
-						c, err := conv.ToString(val)
-						if err != nil {
-							return err
-						}
-
-						paramsDotProjectIDValVal = c
-						return nil
-					}(); err != nil {
-						return err
-					}
-					paramsDotProjectIDVal = ProjectID(paramsDotProjectIDValVal)
-					return nil
-				}(); err != nil {
-					return err
-				}
-				params.ProjectID.SetTo(paramsDotProjectIDVal)
-				return nil
-			}); err != nil {
-				return err
-			}
-			if err := func() error {
-				if value, ok := params.ProjectID.Get(); ok {
-					if err := func() error {
-						if err := value.Validate(); err != nil {
-							return err
-						}
-						return nil
-					}(); err != nil {
-						return err
-					}
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "ProjectID",
-			In:   "query",
-			Err:  err,
-		}
-	}
-	// Decode query: team_id.
-	if err := func() error {
-		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "team_id",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.HasParam(cfg); err == nil {
-			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
-				var paramsDotTeamIDVal TeamID
-				if err := func() error {
-					var paramsDotTeamIDValVal string
-					if err := func() error {
-						val, err := d.DecodeValue()
-						if err != nil {
-							return err
-						}
-
-						c, err := conv.ToString(val)
-						if err != nil {
-							return err
-						}
-
-						paramsDotTeamIDValVal = c
-						return nil
-					}(); err != nil {
-						return err
-					}
-					paramsDotTeamIDVal = TeamID(paramsDotTeamIDValVal)
-					return nil
-				}(); err != nil {
-					return err
-				}
-				params.TeamID.SetTo(paramsDotTeamIDVal)
-				return nil
-			}); err != nil {
-				return err
-			}
-			if err := func() error {
-				if value, ok := params.TeamID.Get(); ok {
-					if err := func() error {
-						if err := value.Validate(); err != nil {
-							return err
-						}
-						return nil
-					}(); err != nil {
-						return err
-					}
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "team_id",
-			In:   "query",
 			Err:  err,
 		}
 	}

@@ -2157,13 +2157,13 @@ func (*ErrorDetailsStatusCode) introspectRes()             {}
 func (*ErrorDetailsStatusCode) listFlowDefinitionsRes()    {}
 func (*ErrorDetailsStatusCode) listSessionsRes()           {}
 func (*ErrorDetailsStatusCode) listUsersRes()              {}
+func (*ErrorDetailsStatusCode) patchUserRes()              {}
 func (*ErrorDetailsStatusCode) revokeMySessionRes()        {}
 func (*ErrorDetailsStatusCode) revokeSessionRes()          {}
 func (*ErrorDetailsStatusCode) revokeTokenRes()            {}
 func (*ErrorDetailsStatusCode) submitFlowEventRes()        {}
 func (*ErrorDetailsStatusCode) submitFlowStepRes()         {}
 func (*ErrorDetailsStatusCode) updateFlowDefinitionRes()   {}
-func (*ErrorDetailsStatusCode) updateUserRes()             {}
 
 type ExchangeHandoffBadRequest ErrorDetails
 
@@ -9653,6 +9653,27 @@ func (s *PasswordProof) SetPassword(val string) {
 	s.Password = val
 }
 
+type PatchUserBadRequest ErrorDetails
+
+func (*PatchUserBadRequest) patchUserRes() {}
+
+type PatchUserForbidden ErrorDetails
+
+func (*PatchUserForbidden) patchUserRes() {}
+
+type PatchUserNotFound ErrorDetails
+
+func (*PatchUserNotFound) patchUserRes() {}
+
+// PatchUserOK is response for PatchUser operation.
+type PatchUserOK struct{}
+
+func (*PatchUserOK) patchUserRes() {}
+
+type PatchUserUnauthorized ErrorDetails
+
+func (*PatchUserUnauthorized) patchUserRes() {}
+
 // Ref: #
 type PostTokenRequest struct {
 	// The authorization code received from the authorization server. Required
@@ -10503,27 +10524,6 @@ func (*UpdateFlowDefinitionBadRequest) updateFlowDefinitionRes() {}
 type UpdateFlowDefinitionNotFound ErrorDetails
 
 func (*UpdateFlowDefinitionNotFound) updateFlowDefinitionRes() {}
-
-type UpdateUserBadRequest ErrorDetails
-
-func (*UpdateUserBadRequest) updateUserRes() {}
-
-type UpdateUserForbidden ErrorDetails
-
-func (*UpdateUserForbidden) updateUserRes() {}
-
-type UpdateUserNotFound ErrorDetails
-
-func (*UpdateUserNotFound) updateUserRes() {}
-
-// UpdateUserOK is response for UpdateUser operation.
-type UpdateUserOK struct{}
-
-func (*UpdateUserOK) updateUserRes() {}
-
-type UpdateUserUnauthorized ErrorDetails
-
-func (*UpdateUserUnauthorized) updateUserRes() {}
 
 // A user represents an individual identity in the system. It can be used to
 // represent a human user, but also a service account or any other type of

@@ -4,7 +4,6 @@ package integration_test
 
 import (
 	"encoding/json"
-	"strings"
 	"testing"
 
 	"github.com/go-faster/jx"
@@ -19,6 +18,8 @@ func TestCreateUser(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
 		t.Run("simple", func(t *testing.T) {
 			projectID := harness.CreateProject(t, "project_user_create_ok_simple")
+			teamID := harness.CreateTeam(t, projectID, "team_user_create_ok_simple")
+
 			harness.CreateUserSchema(t, projectID, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
 			userBs := []byte(harness.TestData.Users.CreateUserRequest)
 
@@ -28,6 +29,7 @@ func TestCreateUser(t *testing.T) {
 
 			params := api.CreateUserParams{
 				ProjectID: api.OptProjectID{Set: true, Value: api.ProjectID(projectID)},
+				TeamID:    api.OptTeamID{Set: true, Value: api.TeamID(teamID)},
 			}
 
 			resp, err := client.CreateUser(t.Context(), user, params)
@@ -75,10 +77,12 @@ func TestCreateUser(t *testing.T) {
 
 		for _, tc := range tcs {
 			t.Run(tc.name, func(t *testing.T) {
-				projectID := harness.CreateProject(t, "project_user_create_error_"+strings.Replace(tc.name, " ", "_", -1))
+				projectID := harness.CreateProject(t, "project_user_create_ok_simple")
+				teamID := harness.CreateTeam(t, projectID, "team_user_create_ok_simple")
 
 				params := api.CreateUserParams{
 					ProjectID: api.OptProjectID{Set: true, Value: api.ProjectID(projectID)},
+					TeamID:    api.OptTeamID{Set: true, Value: api.TeamID(teamID)},
 				}
 
 				resp, err := client.CreateUser(t.Context(), tc.user, params)

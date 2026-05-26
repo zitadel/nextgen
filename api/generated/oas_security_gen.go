@@ -96,15 +96,15 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	ListUsersOperation: []string{
 		"users.read",
 	},
+	PatchUserOperation: []string{
+		"users.write",
+	},
 	RevokeSessionOperation: []string{
 		"session.delete",
 	},
 	RevokeTokenOperation: []string{},
 	UpdateFlowDefinitionOperation: []string{
 		"flow_definitions.write",
-	},
-	UpdateUserOperation: []string{
-		"users.write",
 	},
 	VerifyChallengeProofOperation: []string{
 		"auth_attempts.write",

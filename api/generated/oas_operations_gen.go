@@ -39,12 +39,12 @@ const (
 	ListFlowDefinitionsOperation    OperationName = "ListFlowDefinitions"
 	ListSessionsOperation           OperationName = "ListSessions"
 	ListUsersOperation              OperationName = "ListUsers"
+	PatchUserOperation              OperationName = "PatchUser"
 	RevokeMySessionOperation        OperationName = "RevokeMySession"
 	RevokeSessionOperation          OperationName = "RevokeSession"
 	RevokeTokenOperation            OperationName = "RevokeToken"
 	SubmitFlowEventOperation        OperationName = "SubmitFlowEvent"
 	SubmitFlowStepOperation         OperationName = "SubmitFlowStep"
 	UpdateFlowDefinitionOperation   OperationName = "UpdateFlowDefinition"
-	UpdateUserOperation             OperationName = "UpdateUser"
 	VerifyChallengeProofOperation   OperationName = "VerifyChallengeProof"
 )

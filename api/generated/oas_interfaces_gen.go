@@ -133,6 +133,10 @@ type ListUsersRes interface {
 	listUsersRes()
 }
 
+type PatchUserRes interface {
+	patchUserRes()
+}
+
 type RevokeMySessionRes interface {
 	revokeMySessionRes()
 }
@@ -155,10 +159,6 @@ type SubmitFlowStepRes interface {
 
 type UpdateFlowDefinitionRes interface {
 	updateFlowDefinitionRes()
-}
-
-type UpdateUserRes interface {
-	updateUserRes()
 }
 
 type VerifyChallengeProofRes interface {

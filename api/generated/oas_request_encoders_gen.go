@@ -323,6 +323,20 @@ func encodeIssueChallengeRequest(
 	return nil
 }
 
+func encodePatchUserRequest(
+	req User,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
 func encodeRevokeTokenRequest(
 	req *RevokeRequest,
 	r *http.Request,
@@ -398,20 +412,6 @@ func encodeSubmitFlowStepRequest(
 
 func encodeUpdateFlowDefinitionRequest(
 	req *FlowDefinitionUpdateRequest,
-	r *http.Request,
-) error {
-	const contentType = "application/json"
-	e := new(jx.Encoder)
-	{
-		req.Encode(e)
-	}
-	encoded := e.Bytes()
-	ht.SetBody(r, bytes.NewReader(encoded), contentType)
-	return nil
-}
-
-func encodeUpdateUserRequest(
-	req User,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"
