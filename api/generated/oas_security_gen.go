@@ -40,6 +40,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	CreateAuthAttemptOperation: []string{
 		"auth_attempts.write",
 	},
+	CreateFlowDefinitionOperation: []string{
+		"flow_definitions.write",
+	},
 	CreateHandoffOperation: []string{
 		"auth_attempts.write",
 	},
@@ -49,11 +52,17 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	CreateSessionOperation: []string{
 		"sessions.write",
 	},
+	DeleteFlowDefinitionOperation: []string{
+		"flow_definitions.delete",
+	},
 	ExchangeHandoffOperation: []string{
 		"sessions.write",
 	},
 	GetAuthAttemptOperation: []string{
 		"auth_attempts.read",
+	},
+	GetFlowDefinitionOperation: []string{
+		"flow_definitions.read",
 	},
 	GetProjectOperation: []string{
 		"projects.read",
@@ -69,6 +78,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	IssueChallengeOperation: []string{
 		"auth_attempts.write",
 	},
+	ListFlowDefinitionsOperation: []string{
+		"flow_definitions.read",
+	},
 	ListSessionsOperation: []string{
 		"sessions.read",
 	},
@@ -79,6 +91,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 		"session.delete",
 	},
 	RevokeTokenOperation: []string{},
+	UpdateFlowDefinitionOperation: []string{
+		"flow_definitions.write",
+	},
 	VerifyChallengeProofOperation: []string{
 		"auth_attempts.write",
 	},

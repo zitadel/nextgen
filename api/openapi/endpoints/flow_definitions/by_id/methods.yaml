@@ -4,9 +4,9 @@ get:
   description: Get a flow definition by id
   tags:
     - Flow Definitions
-  security: []
-#    - oauth2:
-#        - flow_definitions.read
+  security:
+    - oauth2:
+        - flow_definitions.read
   parameters:
     - $ref: ../../../components/parameters/flow-definition-id.yaml
   responses:
@@ -35,9 +35,9 @@ patch:
   description: Update a flow definition by id
   tags:
     - Flow Definitions
-  security: []
-#    - oauth2:
-#        - flow_definitions.write
+  security:
+    - oauth2:
+        - flow_definitions.write
   parameters:
     - $ref: ../../../components/parameters/flow-definition-id.yaml
   requestBody:
@@ -78,9 +78,9 @@ delete:
   description: Delete a flow definition by id
   tags:
     - Flow Definitions
-  security: []
-#    - oauth2:
-#        - flow_definitions.delete
+  security:
+    - oauth2:
+        - flow_definitions.delete
   parameters:
     - $ref: ../../../components/parameters/flow-definition-id.yaml
   responses:
