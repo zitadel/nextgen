@@ -139,7 +139,7 @@
               "password"
             ]
           ],
-          "description": "Schema property names to collect from the user on this step. Each entry must resolve to a property in the definition's `user_schema`. The engine reads the schema's `x-*` annotations to derive: - field type and validation (rendered into the runtime payload), - implicit transition outcomes \u2014 e.g. `x-identifier: true` makes   `user_not_found` a valid `transitions` key on this step, - credential verification \u2014 e.g. `x-credential: password` causes   submission to invoke an auth_attempt verification before the   transition fires."
+          "description": "Schema property names to collect from the user on this step. Each entry must resolve to a property in the definition's `user_schema`. The engine reads the schema's `x-*` annotations to derive: - field type and validation (rendered into the runtime payload), - implicit transition outcomes - e.g. a property with a non-empty   `x-unique` scope makes `user_not_found` a valid `transitions` key   on this step, - credential verification - e.g. `x-credential: password` causes   submission to invoke an auth_attempt verification before the   transition fires."
         },
         "actions": {
           "type": "object",
@@ -182,7 +182,7 @@
           "additionalProperties": {
             "$ref": "#/$defs/Transition"
           },
-          "description": "Maps action names and engine-emitted outcomes to the next state. Keys are either: - an action name declared in this step's `actions`, or - a reserved outcome the engine produces:   - `user_not_found` \u2014 emitted when a field with     `x-identifier: true` does not match an existing user.   - `callback` \u2014 emitted when an external system returns control     to the flow (SSO callback, device authorization poll, etc.). A transition's `action` field controls whether the target is interpreted as a step in this definition (default) or as the name of another definition to switch or pivot into. "
+          "description": "Maps action names and engine-emitted outcomes to the next state. Keys are either: - an action name declared in this step's `actions`, or - a reserved outcome the engine produces:   - `user_not_found` - emitted when a unique field     (`x-unique`) does not match an existing user.   - `callback` - emitted when an external system returns control     to the flow (SSO callback, device authorization poll, etc.). A transition's `action` field controls whether the target is interpreted as a step in this definition (default) or as the name of another definition to switch or pivot into. "
         }
       }
     },

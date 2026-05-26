@@ -2869,7 +2869,8 @@ type FlowDefinitionStep struct {
 	// Schema property names to collect from the user. Each entry references
 	// a property in the flow's user schema. The engine resolves field type,
 	// validation rules, and implicit outcomes from schema annotations
-	// (e.g. `x-identifier` implies a `user_not_found` transition outcome).
+	// (e.g. a property with `x-unique` set implies a `user_not_found`
+	// transition outcome).
 	Fields []string `json:"fields"`
 	// Actions the user can take. Keyed by action name.
 	// The action name is what the frontend sends back in the submit request.
@@ -2893,7 +2894,7 @@ type FlowDefinitionStep struct {
 	// Maps action/outcome names to their transition descriptor.
 	// Keys match action names from the `actions` dict. Additional keys
 	// come from implicit outcomes based on schema annotations
-	// (e.g. `user_not_found` from `x-identifier` fields) and engine
+	// (e.g. `user_not_found` from `x-unique` fields) and engine
 	// events (e.g. `sso`, `callback`).
 	Transitions OptFlowDefinitionStepTransitions `json:"transitions"`
 }
@@ -3091,7 +3092,7 @@ func (s *FlowDefinitionStepOnSuccess) UnmarshalText(data []byte) error {
 // Maps action/outcome names to their transition descriptor.
 // Keys match action names from the `actions` dict. Additional keys
 // come from implicit outcomes based on schema annotations
-// (e.g. `user_not_found` from `x-identifier` fields) and engine
+// (e.g. `user_not_found` from `x-unique` fields) and engine
 // events (e.g. `sso`, `callback`).
 type FlowDefinitionStepTransitions map[string]FlowDefinitionStepTransitionsItem
 
