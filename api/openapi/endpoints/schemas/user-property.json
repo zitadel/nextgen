@@ -2,67 +2,17 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "UserProperty",
   "type": "object",
-  "required": [
-    "type",
-    "title"
+  "allOf": [
+    {
+      "$ref": "https://json-schema.org/draft/2020-12/schema"
+    }
   ],
+  "additionalProperties": true,
   "properties": {
-    "type": {
+    "$schema": {
       "type": "string",
-      "enum": [
-        "string",
-        "number",
-        "boolean",
-        "object",
-        "array"
-      ]
-    },
-    "format": {
-      "oneOf": [
-        {
-          "type": "string",
-          "enum": [
-            "email",
-            "date-time",
-            "uuid",
-            "uri"
-          ]
-        },
-        {
-          "type": "null"
-        }
-      ]
-    },
-    "title": {
-      "type": "string",
-      "description": "The title of the user property"
-    },
-    "minLength": {
-      "oneOf": [
-        {
-          "type": "integer"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "description": "The minimum length of the property value, if applicable"
-    },
-    "maxLength": {
-      "oneOf": [
-        {
-          "type": "integer"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "description": "The maximum length of the property value, if applicable"
-    },
-    "x-identifier": {
-      "type": "boolean",
-      "default": false,
-      "description": "Whether this property is an identifier for the user or not"
+      "const": "https://json-schema.org/draft/2020-12/schema",
+      "description": "The JSON Schema version used for this schema."
     },
     "x-password": {
       "type": "boolean",
@@ -85,8 +35,9 @@
         {
           "type": "string",
           "enum": [
-            "instance",
-            "organization"
+            "unspecified",
+            "project",
+            "team"
           ]
         },
         {
@@ -124,32 +75,7 @@
     "properties": {
       "type": "object",
       "description": "A map of additional properties for the user definition, where the key is the property name and the value is the property schema",
-      "additionalProperties": {
-        "$ref": "nested-user-property.json"
-      }
-    },
-    "example": {
-      "oneOf": [
-        {
-          "type": "string"
-        },
-        {
-          "type": "number"
-        },
-        {
-          "type": "boolean"
-        },
-        {
-          "type": "object"
-        },
-        {
-          "type": "array",
-          "items": {}
-        },
-        {
-          "type": "null"
-        }
-      ]
+      "additionalProperties": true
     }
   }
 }
