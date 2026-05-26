@@ -25,12 +25,13 @@ var (
 	ErrSchemaParseFailed           = errors.New("schema parse failed")
 	ErrMissingSchemaID             = errors.New("missing schema ID")
 	ErrUnknownSchemaURI            = errors.New("unknown built-in schema URI")
+	ErrUnknownSchemaKind           = errors.New("unknown schema kind")
 )
 
 type KnownSchemaKind string
 
 const (
-	SchemaKindUser           KnownSchemaKind = "user-schema"
+	SchemaKindUser           KnownSchemaKind = "user"
 	SchemaKindFlowDefinition KnownSchemaKind = "flow-definition"
 )
 
@@ -47,7 +48,7 @@ type SchemaValidator struct {
 	compiledSchemas map[string]*jsonschema.Schema
 	// latestURIByKind maps a schema kind stem (e.g. "flow-definition") to the
 	// canonical URI of its latest known version.
-	latestVersionByKind map[KnownSchemaKind]string
+	latestSchemaURIByKind map[KnownSchemaKind]string
 }
 
 // NewSchemaValidator compiles the meta-schemas for the tenant schema kinds into memory and returns a SchemaValidator instance.
@@ -95,8 +96,8 @@ func NewSchemaValidator(builtinPublicBase string) (*SchemaValidator, error) {
 	}
 
 	return &SchemaValidator{
-		compiledSchemas:     compiledSchemas,
-		latestVersionByKind: latestURIByKind,
+		compiledSchemas:       compiledSchemas,
+		latestSchemaURIByKind: latestURIByKind,
 	}, nil
 }
 
@@ -150,9 +151,9 @@ func (v *SchemaValidator) GetBuiltinSchema(uri string) (*jsonschema.Schema, erro
 // for the given kind stem (e.g. "flow-definition", "user-schema").
 // This is useful for fetching the latest version of a schema when it's optional to provide a version.
 func (v *SchemaValidator) LatestSchemaURI(kind KnownSchemaKind) (string, error) {
-	uri, ok := v.latestVersionByKind[kind]
+	uri, ok := v.latestSchemaURIByKind[kind]
 	if !ok {
-		return "", fmt.Errorf("%w: no latest URI for kind %q", ErrUnknownSchemaURI, kind)
+		return "", fmt.Errorf("%w: no latest URI for kind %q", ErrUnknownSchemaKind, kind)
 	}
 	return uri, nil
 }

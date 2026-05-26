@@ -19,6 +19,7 @@ type Handler struct {
 	sessionService     service.SessionService
 	projectService     service.ProjectService
 	schemaService      *service.SchemaService
+	flowDefinitionService service.FlowDefinitionService
 }
 
 func NewHandler(
@@ -28,6 +29,7 @@ func NewHandler(
 	sessionService service.SessionService,
 	projectService service.ProjectService,
 	schemaService *service.SchemaService,
+	flowDefinitionService service.FlowDefinitionService,
 ) *Handler {
 	return &Handler{
 		sealer:             sealer,
@@ -36,6 +38,7 @@ func NewHandler(
 		sessionService:     sessionService,
 		projectService:     projectService,
 		schemaService:      schemaService,
+		flowDefinitionService: flowDefinitionService,
 	}
 }
 

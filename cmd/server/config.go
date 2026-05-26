@@ -9,6 +9,7 @@ type Config struct {
 	Server         ServerConfig      `mapstructure:"server"`
 	Database       database.Config   `mapstructure:"database"`
 	PasswordHasher crypto.HashConfig `mapstructure:"password_hasher"`
+	Schema   SchemaConfig    `mapstructure:"schema"`
 }
 
 type ServerConfig struct {
@@ -17,4 +18,9 @@ type ServerConfig struct {
 	// key used to seal flow cookies. Required — the server refuses to
 	// boot without it. Bind via NEXTGEN_SERVER_COOKIE_SEALER_KEY.
 	CookieSealerKey string `mapstructure:"cookie_sealer_key"`
+}
+
+type SchemaConfig struct {
+	BuiltinPublicBase string `mapstructure:"builtin_public_base"`
+	LRUCacheSize      int    `mapstructure:"lru_cache_size"`
 }

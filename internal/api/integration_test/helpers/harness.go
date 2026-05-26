@@ -31,6 +31,7 @@ type Harness struct {
 	FlowService        service.FlowService
 	AuthAttemptService service.AuthAttemptService
 	ProjectService     service.ProjectService
+	FlowDefinitionService service.FlowDefinitionService
 
 	SchemaRepo         domain.JSONSchemaRepository
 	SchemaResolver     *domain.JSONSchemaResolver

@@ -1333,6 +1333,43 @@ type CreateFlowDefinitionConflict ErrorDetails
 func (*CreateFlowDefinitionConflict) createFlowDefinitionRes() {}
 
 // Ref: #
+type CreateFlowDefinitionRequest struct {
+	ProjectID      ProjectID      `json:"project_id"`
+	SchemaURI      OptSchemaURI   `json:"schema_uri"`
+	FlowDefinition FlowDefinition `json:"flow_definition"`
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *CreateFlowDefinitionRequest) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetSchemaURI returns the value of SchemaURI.
+func (s *CreateFlowDefinitionRequest) GetSchemaURI() OptSchemaURI {
+	return s.SchemaURI
+}
+
+// GetFlowDefinition returns the value of FlowDefinition.
+func (s *CreateFlowDefinitionRequest) GetFlowDefinition() FlowDefinition {
+	return s.FlowDefinition
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *CreateFlowDefinitionRequest) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetSchemaURI sets the value of SchemaURI.
+func (s *CreateFlowDefinitionRequest) SetSchemaURI(val OptSchemaURI) {
+	s.SchemaURI = val
+}
+
+// SetFlowDefinition sets the value of FlowDefinition.
+func (s *CreateFlowDefinitionRequest) SetFlowDefinition(val FlowDefinition) {
+	s.FlowDefinition = val
+}
+
+// Ref: #
 type CreateFlowRequest struct {
 	ProjectID ProjectID                `json:"project_id"`
 	Purpose   CreateFlowRequestPurpose `json:"purpose"`
@@ -2518,43 +2555,6 @@ func (s *FlowDefinition) SetSteps(val []FlowDefinitionStep) {
 	s.Steps = val
 }
 
-// Ref: #
-type FlowDefinitionCreateRequest struct {
-	ProjectID      ProjectID      `json:"project_id"`
-	SchemaURI      OptSchemaURI   `json:"schema_uri"`
-	FlowDefinition FlowDefinition `json:"flow_definition"`
-}
-
-// GetProjectID returns the value of ProjectID.
-func (s *FlowDefinitionCreateRequest) GetProjectID() ProjectID {
-	return s.ProjectID
-}
-
-// GetSchemaURI returns the value of SchemaURI.
-func (s *FlowDefinitionCreateRequest) GetSchemaURI() OptSchemaURI {
-	return s.SchemaURI
-}
-
-// GetFlowDefinition returns the value of FlowDefinition.
-func (s *FlowDefinitionCreateRequest) GetFlowDefinition() FlowDefinition {
-	return s.FlowDefinition
-}
-
-// SetProjectID sets the value of ProjectID.
-func (s *FlowDefinitionCreateRequest) SetProjectID(val ProjectID) {
-	s.ProjectID = val
-}
-
-// SetSchemaURI sets the value of SchemaURI.
-func (s *FlowDefinitionCreateRequest) SetSchemaURI(val OptSchemaURI) {
-	s.SchemaURI = val
-}
-
-// SetFlowDefinition sets the value of FlowDefinition.
-func (s *FlowDefinitionCreateRequest) SetFlowDefinition(val FlowDefinition) {
-	s.FlowDefinition = val
-}
-
 // Merged schema.
 // Ref: #
 type FlowDefinitionDetailResponse struct {
@@ -2869,7 +2869,8 @@ type FlowDefinitionStep struct {
 	// Schema property names to collect from the user. Each entry references
 	// a property in the flow's user schema. The engine resolves field type,
 	// validation rules, and implicit outcomes from schema annotations
-	// (e.g. `x-identifier` implies a `user_not_found` transition outcome).
+	// (e.g. a property with `x-unique` set implies a `user_not_found`
+	// transition outcome).
 	Fields []string `json:"fields"`
 	// Actions the user can take. Keyed by action name.
 	// The action name is what the frontend sends back in the submit request.
@@ -2893,7 +2894,7 @@ type FlowDefinitionStep struct {
 	// Maps action/outcome names to their transition descriptor.
 	// Keys match action names from the `actions` dict. Additional keys
 	// come from implicit outcomes based on schema annotations
-	// (e.g. `user_not_found` from `x-identifier` fields) and engine
+	// (e.g. `user_not_found` from `x-unique` fields) and engine
 	// events (e.g. `sso`, `callback`).
 	Transitions OptFlowDefinitionStepTransitions `json:"transitions"`
 }
@@ -3091,7 +3092,7 @@ func (s *FlowDefinitionStepOnSuccess) UnmarshalText(data []byte) error {
 // Maps action/outcome names to their transition descriptor.
 // Keys match action names from the `actions` dict. Additional keys
 // come from implicit outcomes based on schema annotations
-// (e.g. `user_not_found` from `x-identifier` fields) and engine
+// (e.g. `user_not_found` from `x-unique` fields) and engine
 // events (e.g. `sso`, `callback`).
 type FlowDefinitionStepTransitions map[string]FlowDefinitionStepTransitionsItem
 
