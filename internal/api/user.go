@@ -3,12 +3,17 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
 func (h *Handler) CreateUser(ctx context.Context, req api.User, params api.CreateUserParams) (r api.CreateUserRes, _ error) {
+	if !params.TeamID.Set {
+		return nil, TeamIdRequiredError
+	}
+
 	user := make(map[string]any, len(req))
 	err := convertUserToJson(req, &user)
 	if err != nil {
@@ -36,7 +41,7 @@ func (h *Handler) CreateUser(ctx context.Context, req api.User, params api.Creat
 	return resp, nil
 }
 
-func (h *Handler) UpdateUser(ctx context.Context, req api.User, params api.UpdateUserParams) (r api.UpdateUserRes, _ error) {
+func (h *Handler) PatchUser(ctx context.Context, req api.User, params api.PatchUserParams) (r api.PatchUserRes, _ error) {
 	user := make(map[string]any, len(req))
 	err := convertUserToJson(req, &user)
 	if err != nil {
@@ -52,12 +57,12 @@ func (h *Handler) UpdateUser(ctx context.Context, req api.User, params api.Updat
 		i.TeamID = new(string(params.TeamID.Value))
 	}
 
-	u, err := h.userService.UpdateUser(ctx, i)
+	u, err := h.userService.PatchUser(ctx, i)
 	if err != nil {
 		return nil, err
 	}
 
-	resp := &api.UpdateUserOK{}
+	resp := &api.PatchUserOK{}
 	err = convertUserToJson(u, resp)
 	if err != nil {
 		return nil, err
@@ -84,3 +89,5 @@ func convertUserToJson(source any, target any) error {
 	}
 	return json.Unmarshal(bs, target)
 }
+
+var TeamIdRequiredError = errors.New("team id is required")

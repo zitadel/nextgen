@@ -1,6 +1,6 @@
 patch:
-  operationId: updateUser
-  summary: Update user
+  operationId: patchUser
+  summary: Patch user
   tags:
     - User
   parameters:

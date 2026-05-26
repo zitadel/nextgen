@@ -38,6 +38,9 @@ func errorResponse(err error) *api.ErrorDetailsStatusCode {
 	case strings.HasPrefix(e.Code, domain.PrefixJSONSchema.ErrorCodePrefix("")):
 		return schemaErrorResponse(e)
 	default:
+		if errors.Is(err, TeamIdRequiredError) {
+			return errorResponseWithStatusCode(http.StatusBadRequest, err)
+		}
 		return internalErrorResponse(err)
 	}
 }

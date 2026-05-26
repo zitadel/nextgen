@@ -54,12 +54,12 @@ func NewUserService(
 }
 
 func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (*domain.User, error) {
-	tx, err := s.pool.Begin(ctx, nil)
-	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to create transaction")
+	tx, txErr := s.pool.Begin(ctx, nil)
+	if txErr != nil {
+		return nil, domain.ErrInternal(txErr).WithMessage("failed to create transaction")
 	}
 	defer func() {
-		if err != nil {
+		if txErr != nil {
 			_ = tx.Rollback(ctx)
 		}
 	}()
@@ -143,7 +143,7 @@ func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (*d
 	return user, nil
 }
 
-func (s *UserService) UpdateUser(ctx context.Context, input UpdateUserInput) (*domain.User, error) {
+func (s *UserService) PatchUser(ctx context.Context, input UpdateUserInput) (*domain.User, error) {
 	panic("IMPLEMENT")
 }
 
