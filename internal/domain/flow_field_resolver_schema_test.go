@@ -52,8 +52,8 @@ func defaultSchemaBytes() []byte {
 		"x-auth-methods": { "password": { "enabled": true } },
 		"required": ["email", "username", "password", "given_name", "family_name"],
 		"properties": {
-			"email":       { "type": "string", "format": "email", "maxLength": 320, "x-unique": "organization" },
-			"username":    { "type": "string", "minLength": 3, "maxLength": 64, "x-unique": "organization" },
+			"email":       { "type": "string", "format": "email", "maxLength": 320, "x-unique": "team" },
+			"username":    { "type": "string", "minLength": 3, "maxLength": 64, "x-unique": "team" },
 			"password":    { "type": "string", "minLength": 8, "x-password": true },
 			"given_name":  { "type": "string", "minLength": 1, "maxLength": 200 },
 			"family_name": { "type": "string", "minLength": 1, "maxLength": 200 }
@@ -223,21 +223,21 @@ func TestSchemaFieldResolver_Resolve_UniqueScopeSurfaces(t *testing.T) {
 		t.Fatalf("Resolve returned error: %v", err)
 	}
 
-	if got.Fields["email"].Unique != domain.FlowFieldUniqueScopeOrganization {
-		t.Errorf("Resolve email Unique = %q, want %q", got.Fields["email"].Unique, domain.FlowFieldUniqueScopeOrganization)
+	if got.Fields["email"].Unique != domain.FlowFieldUniqueScopeTeam {
+		t.Errorf("Resolve email Unique = %q, want %q", got.Fields["email"].Unique, domain.FlowFieldUniqueScopeTeam)
 	}
 	if got.Fields["password"].Unique != domain.FlowFieldUniqueScopeNone {
 		t.Errorf("Resolve password Unique = %q, want %q", got.Fields["password"].Unique, domain.FlowFieldUniqueScopeNone)
 	}
 }
 
-func TestSchemaFieldResolver_Resolve_UniqueScopeInstance(t *testing.T) {
-	const url = "https://example.test/instance-unique.json"
+func TestSchemaFieldResolver_Resolve_UniqueScopeProject(t *testing.T) {
+	const url = "https://example.test/project-unique.json"
 	bytes := []byte(`{
 		"$schema": "https://json-schema.org/draft/2020-12/schema",
 		"type": "object",
 		"properties": {
-			"handle": { "type": "string", "x-unique": "instance" }
+			"handle": { "type": "string", "x-unique": "project" }
 		}
 	}`)
 	resolver := domain.NewSchemaFieldResolver(newFakeResolver(t, map[string][]byte{url: bytes}))
@@ -246,8 +246,8 @@ func TestSchemaFieldResolver_Resolve_UniqueScopeInstance(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Resolve returned error: %v", err)
 	}
-	if got.Fields["handle"].Unique != domain.FlowFieldUniqueScopeInstance {
-		t.Errorf("Resolve handle Unique = %q, want %q", got.Fields["handle"].Unique, domain.FlowFieldUniqueScopeInstance)
+	if got.Fields["handle"].Unique != domain.FlowFieldUniqueScopeProject {
+		t.Errorf("Resolve handle Unique = %q, want %q", got.Fields["handle"].Unique, domain.FlowFieldUniqueScopeProject)
 	}
 }
 

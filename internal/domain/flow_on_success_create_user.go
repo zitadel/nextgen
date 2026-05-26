@@ -104,14 +104,14 @@ func findPasswordField(resolved map[string]FlowField, submitted map[string]any) 
 }
 
 // attributeUniquenessFor maps a [FlowFieldUniqueScope] to the
-// [AttributeUniqueness] the user repository understands. The
-// identifier field defaults to team-level uniqueness so two users
+// [AttributeUniqueness] the user repository understands. Both Project
+// and Team meta-schema scopes currently land on team-level storage
+// uniqueness; storage doesn't yet expose a project-wide scope short of
+// Global. The identifier field defaults to team-level so two users
 // can't share the same login.
 func attributeUniquenessFor(name, identifierName string, scope FlowFieldUniqueScope) AttributeUniqueness {
 	switch scope {
-	case FlowFieldUniqueScopeInstance:
-		return AttributeUniquenessGlobal
-	case FlowFieldUniqueScopeOrganization:
+	case FlowFieldUniqueScopeProject, FlowFieldUniqueScopeTeam:
 		return AttributeUniquenessTeam
 	}
 	if name == identifierName {

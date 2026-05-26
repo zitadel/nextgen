@@ -111,9 +111,9 @@ const (
 type FlowFieldUniqueScope string
 
 const (
-	FlowFieldUniqueScopeNone         FlowFieldUniqueScope = ""
-	FlowFieldUniqueScopeInstance     FlowFieldUniqueScope = "instance"
-	FlowFieldUniqueScopeOrganization FlowFieldUniqueScope = "organization"
+	FlowFieldUniqueScopeNone    FlowFieldUniqueScope = ""
+	FlowFieldUniqueScopeProject FlowFieldUniqueScope = "project"
+	FlowFieldUniqueScopeTeam    FlowFieldUniqueScope = "team"
 )
 
 // FlowFieldValidation carries the validation rules the resolver

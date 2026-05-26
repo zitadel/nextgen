@@ -135,10 +135,10 @@ func deriveChallenge(propSchema *jsonschema.Schema, unique FlowFieldUniqueScope,
 
 func deriveUnique(propSchema *jsonschema.Schema) FlowFieldUniqueScope {
 	switch lookupString(propSchema, "x-unique") {
-	case "organization":
-		return FlowFieldUniqueScopeOrganization
-	case "instance":
-		return FlowFieldUniqueScopeInstance
+	case "project":
+		return FlowFieldUniqueScopeProject
+	case "team":
+		return FlowFieldUniqueScopeTeam
 	}
 	return FlowFieldUniqueScopeNone
 }
