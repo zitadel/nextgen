@@ -18706,6 +18706,12 @@ func (s *UserProperty) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.XMinusPassword.Set {
+			e.FieldStart("x-password")
+			s.XMinusPassword.Encode(e)
+		}
+	}
+	{
 		if s.XMinusVerify.Set {
 			e.FieldStart("x-verify")
 			s.XMinusVerify.Encode(e)
@@ -18755,21 +18761,22 @@ func (s *UserProperty) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfUserProperty = [14]string{
+var jsonFieldsNameOfUserProperty = [15]string{
 	0:  "type",
 	1:  "format",
 	2:  "title",
 	3:  "minLength",
 	4:  "maxLength",
 	5:  "x-identifier",
-	6:  "x-verify",
-	7:  "x-unique",
-	8:  "x-claim",
-	9:  "x-editable",
-	10: "x-sensitive",
-	11: "x-mfa",
-	12: "properties",
-	13: "example",
+	6:  "x-password",
+	7:  "x-verify",
+	8:  "x-unique",
+	9:  "x-claim",
+	10: "x-editable",
+	11: "x-sensitive",
+	12: "x-mfa",
+	13: "properties",
+	14: "example",
 }
 
 // Decode decodes UserProperty from json.
@@ -18843,6 +18850,16 @@ func (s *UserProperty) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"x-identifier\"")
+			}
+		case "x-password":
+			if err := func() error {
+				s.XMinusPassword.Reset()
+				if err := s.XMinusPassword.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"x-password\"")
 			}
 		case "x-verify":
 			if err := func() error {
