@@ -103,7 +103,10 @@ func run(ctx context.Context, cfg Config, pool database.Pool) error {
 			return fmt.Errorf("parse builtin public base: %w", err)
 		}
 	}
-	schemaResolver := domain.NewJSONSchemaResolver(schemaRepo, schemaCache, 10, 1000_000, &http.Client{}, builtinPublicBase)
+	schemaResolverWithHTTP := domain.NewJSONSchemaResolver(schemaRepo, schemaCache, 10, 1000_000, &http.Client{}, builtinPublicBase)
+
+	// storageSchemaResolver without an HTTP client to fetch tenant schemas from the cache/storage
+	storageSchemaResolver := domain.NewJSONSchemaResolver(schemaRepo, schemaCache, 10, 1000_000, nil, builtinPublicBase)
 	schemaValidator, err := domain.NewSchemaValidator(builtinPublicBase.String())
 	if err != nil {
 		return fmt.Errorf("build schema validator: %w", err)
@@ -121,10 +124,10 @@ func run(ctx context.Context, cfg Config, pool database.Pool) error {
 		userPasskeyRepo,
 		passwordHasher,
 	)
-	schemaService := service.NewSchemaService(pool, schemaRepo, schemaResolver, schemaValidator)
+	schemaService := service.NewSchemaService(pool, schemaRepo, schemaResolverWithHTTP, schemaValidator)
 	flowDefinitionSvc := service.NewFlowDefinitionService(
 		pool,
-		schemaResolver,
+		storageSchemaResolver,
 		schemaValidator,
 		nil,
 		flowDefinitionRepo,
