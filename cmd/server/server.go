@@ -16,12 +16,12 @@ import (
 	"github.com/ianlancetaylor/jsonschema"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/zitadel/nextgen/internal/domain"
-
 	oasapi "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/bootstrap/users"
 	"github.com/zitadel/nextgen/internal/crypto"
+	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/domain/idgen"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	_ "github.com/zitadel/nextgen/internal/storage/database/dialect/all"
@@ -124,6 +124,7 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 		userPasskeyRepo,
 		passwordHasher,
 	)
+	projectService := service.NewProjectService(pool, projectRepo, idgen.NewULID())
 	schemaService := service.NewSchemaService(pool, schemaRepo, schemaResolver, schemaValidator)
 
 	// ── HTTP Server ─────────────────
@@ -132,7 +133,7 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 	defer stop()
 
 	oasServer, err := oasapi.NewServer(
-		api.NewHandler(flowService, authAttemptSvc, schemaService),
+		api.NewHandler(flowService, authAttemptSvc, projectService, schemaService),
 		api.NewSecurityHandler(),
 		oasapi.WithErrorHandler(api.OgenErrorHandler))
 	if err != nil {

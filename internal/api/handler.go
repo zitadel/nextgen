@@ -14,17 +14,20 @@ type Handler struct {
 
 	flowService        service.FlowService
 	authAttemptService service.AuthAttemptService
+	projectService     service.ProjectService
 	schemaService      *service.SchemaService
 }
 
 func NewHandler(
 	flowService service.FlowService,
 	authAttemptService service.AuthAttemptService,
+	projectService service.ProjectService,
 	schemaService *service.SchemaService,
 ) *Handler {
 	return &Handler{
 		flowService:        flowService,
 		authAttemptService: authAttemptService,
+		projectService:     projectService,
 		schemaService:      schemaService,
 	}
 }
