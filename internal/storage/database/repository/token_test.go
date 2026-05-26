@@ -13,16 +13,13 @@ import (
 
 func insertTokenTestUser(t *testing.T, ctx context.Context, tx database.QueryExecutor, pid, tid, schemaURL, userID string) {
 	t.Helper()
-	_, err := tx.Exec(ctx, `INSERT INTO zitadel_nextgen.projects (id) VALUES ($1)`, pid)
-	require.NoError(t, err)
-	_, err = tx.Exec(ctx, `INSERT INTO zitadel_nextgen.teams (project_id, id) VALUES ($1,$2)`, pid, tid)
-	require.NoError(t, err)
-	_, err = tx.Exec(ctx,
-		`INSERT INTO zitadel_nextgen.json_schemas (project_id, url, payload) VALUES ($1,$2,$3::json)`,
-		pid, schemaURL, []byte("{}"),
-	)
-	require.NoError(t, err)
-
+	if isSpannerDB {
+		ensureUser(t, tx, pid, tid, schemaURL, userID)
+		return
+	}
+	ensureProject(t, tx, pid)
+	ensureTeam(t, tx, pid, tid)
+	ensureJSONSchemaRow(t, tx, pid, schemaURL, []byte("{}"))
 	attr, err := domain.NewCreateAttribute("country", "CH", domain.AttributeUniquenessUnspecified)
 	require.NoError(t, err)
 	teamCopy := tid
@@ -282,8 +279,7 @@ func TestTokenRepository_CascadeUserDelete(t *testing.T) {
 	require.NoError(t, tokenRepo.Create(ctx, tx, tok))
 	requireGeneratedTokenID(t, tok.TokenID)
 
-	userRepo := repository.NewUserRepository()
-	require.NoError(t, userRepo.Delete(ctx, tx, userRepo.PrimaryKeyCondition(pid, userID)))
+	deleteUser(t, tx, pid, userID)
 
 	_, err := tokenRepo.Get(ctx, tx, database.WithCondition(tokenRepo.PrimaryKeyCondition(pid, tok.TokenID)))
 	require.ErrorIs(t, err, new(database.NoRowFoundError))

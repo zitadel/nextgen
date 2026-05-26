@@ -203,7 +203,11 @@ func (r *TokenRepository) Create(ctx context.Context, client database.QueryExecu
 		expiresArg,
 		r.now,
 	)
-	builder.WriteString(") RETURNING ")
+	if r.table == tokenSpTable {
+		builder.WriteString(") THEN RETURN ")
+	} else {
+		builder.WriteString(") RETURNING ")
+	}
 	c.tokenID.WriteUnqualified(builder)
 
 	var tokenID database.Identity
@@ -230,7 +234,7 @@ type tokenRow struct {
 	SessionID     sql.NullInt64      `db:"session_id"`
 	OIDCSessionID sql.NullInt64      `db:"oidc_session_id"`
 	SAMLSessionID sql.NullInt64      `db:"saml_session_id"`
-	Scope         []string           `db:"scope"`
+	Scope         StringArray        `db:"scope"`
 	ExpiresAt     sql.NullTime       `db:"expires_at"`
 	CreatedAt     time.Time          `db:"created_at"`
 }
@@ -243,8 +247,8 @@ func (r *tokenRow) toDomain() *domain.Token {
 		Type:      r.Type,
 		CreatedAt: r.CreatedAt,
 	}
-	if r.Scope != nil {
-		t.Scope = r.Scope
+	if len(r.Scope) > 0 {
+		t.Scope = []string(r.Scope)
 	} else {
 		t.Scope = []string{}
 	}
