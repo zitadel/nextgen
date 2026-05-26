@@ -86,8 +86,7 @@ Usage: `zitadel setup [--framework next] [--user-fields ...] [--auth-methods ...
 | `--non-interactive` / `-n` | `boolean` | Disable prompts. Required when scripting or running as an agent. |
 | `--dry-run` | `boolean` | Preview the work without mutating files or hitting the platform. |
 | `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
-| `--server` / `-s` | `string` | Override the resolved server URL (or "mock"). |
-| `--mock` | `boolean` | Alias for --server mock. |
+| `--server` / `-s` | `string` | Override the resolved server URL. |
 | `--framework` | `string` | Framework to target (v1 supports "next"). |
 | `--user-fields` | `string` | Comma-separated list of user fields. |
 | `--auth-methods` | `string` | Comma-separated list of auth methods. |
@@ -110,8 +109,7 @@ Usage: `zitadel plan [--environment development|preview|production]`
 | `--non-interactive` / `-n` | `boolean` | Disable prompts. Required when scripting or running as an agent. |
 | `--dry-run` | `boolean` | Preview the work without mutating files or hitting the platform. |
 | `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
-| `--server` / `-s` | `string` | Override the resolved server URL (or "mock"). |
-| `--mock` | `boolean` | Alias for --server mock. |
+| `--server` / `-s` | `string` | Override the resolved server URL. |
 | `--environment` / `-e` | `string` | Target environment (default: development). |
 | `--platform` | `string` | Deploy platform override. |
 
@@ -128,8 +126,7 @@ Usage: `zitadel apply [--environment development|preview|production]`
 | `--non-interactive` / `-n` | `boolean` | Disable prompts. Required when scripting or running as an agent. |
 | `--dry-run` | `boolean` | Preview the work without mutating files or hitting the platform. |
 | `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
-| `--server` / `-s` | `string` | Override the resolved server URL (or "mock"). |
-| `--mock` | `boolean` | Alias for --server mock. |
+| `--server` / `-s` | `string` | Override the resolved server URL. |
 | `--environment` / `-e` | `string` | Target environment (default: development). |
 | `--platform` | `string` | Deploy platform override. |
 
@@ -146,8 +143,7 @@ Usage: `zitadel doctor [--fix]`
 | `--non-interactive` / `-n` | `boolean` | Disable prompts. Required when scripting or running as an agent. |
 | `--dry-run` | `boolean` | Preview the work without mutating files or hitting the platform. |
 | `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
-| `--server` / `-s` | `string` | Override the resolved server URL (or "mock"). |
-| `--mock` | `boolean` | Alias for --server mock. |
+| `--server` / `-s` | `string` | Override the resolved server URL. |
 | `--fix` | `boolean` | Re-apply missing managed files. |
 
 ### `zitadel deploy status`
@@ -165,8 +161,7 @@ Usage: `zitadel deploy status [--platform vercel|netlify|cloudflare]`
 | `--non-interactive` / `-n` | `boolean` | Disable prompts. Required when scripting or running as an agent. |
 | `--dry-run` | `boolean` | Preview the work without mutating files or hitting the platform. |
 | `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
-| `--server` / `-s` | `string` | Override the resolved server URL (or "mock"). |
-| `--mock` | `boolean` | Alias for --server mock. |
+| `--server` / `-s` | `string` | Override the resolved server URL. |
 | `--platform` | `string` | Force a deploy platform adapter. |
 | `--environment` / `-e` | `string` | Target environment (default: preview). |
 
@@ -185,8 +180,7 @@ Usage: `zitadel deploy connect [--environment preview|production]`
 | `--non-interactive` / `-n` | `boolean` | Disable prompts. Required when scripting or running as an agent. |
 | `--dry-run` | `boolean` | Preview the work without mutating files or hitting the platform. |
 | `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
-| `--server` / `-s` | `string` | Override the resolved server URL (or "mock"). |
-| `--mock` | `boolean` | Alias for --server mock. |
+| `--server` / `-s` | `string` | Override the resolved server URL. |
 | `--platform` | `string` | Force a deploy platform adapter. |
 | `--environment` / `-e` | `string` | Target environment (default: preview). |
 | `--manual` | `boolean` | Emit manual steps instead of configuring. |
@@ -206,8 +200,7 @@ Usage: `zitadel claim`
 | `--non-interactive` / `-n` | `boolean` | Disable prompts. Required when scripting or running as an agent. |
 | `--dry-run` | `boolean` | Preview the work without mutating files or hitting the platform. |
 | `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
-| `--server` / `-s` | `string` | Override the resolved server URL (or "mock"). |
-| `--mock` | `boolean` | Alias for --server mock. |
+| `--server` / `-s` | `string` | Override the resolved server URL. |
 
 ### `zitadel claim status`
 
@@ -222,11 +215,8 @@ Usage: `zitadel claim status --challenge-id <id>`
 | `--non-interactive` / `-n` | `boolean` | Disable prompts. Required when scripting or running as an agent. |
 | `--dry-run` | `boolean` | Preview the work without mutating files or hitting the platform. |
 | `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
-| `--server` / `-s` | `string` | Override the resolved server URL (or "mock"). |
-| `--mock` | `boolean` | Alias for --server mock. |
+| `--server` / `-s` | `string` | Override the resolved server URL. |
 | `--challenge-id` | `string` | Claim challenge ID returned by `zitadel claim`. |
-| `--mock-complete-claim` | `boolean` | Mock-only: complete the claim handoff and refresh local state. |
-| `--mock-advance-claim` | `boolean` | Alias for --mock-complete-claim. |
 
 ### `zitadel schema add`
 
@@ -243,8 +233,7 @@ Usage: `zitadel schema add [--preset name] [--add-field-json '{...}' | --add-fie
 | `--non-interactive` / `-n` | `boolean` | Disable prompts. Required when scripting or running as an agent. |
 | `--dry-run` | `boolean` | Preview the work without mutating files or hitting the platform. |
 | `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
-| `--server` / `-s` | `string` | Override the resolved server URL (or "mock"). |
-| `--mock` | `boolean` | Alias for --server mock. |
+| `--server` / `-s` | `string` | Override the resolved server URL. |
 | `--preset` | `string[]` | Apply a named field preset (run `zitadel capabilities` for the list). |
 | `--add-field` | `string[]` | Add a field using the colon-DSL (name:type:key=value,...). |
 | `--add-field-json` | `string[]` | Add a field using a JSON object. Preferred for agents. |
@@ -265,8 +254,7 @@ Usage: `zitadel idp add (--preset google|microsoft|okta-oidc | --protocol oidc|s
 | `--non-interactive` / `-n` | `boolean` | Disable prompts. Required when scripting or running as an agent. |
 | `--dry-run` | `boolean` | Preview the work without mutating files or hitting the platform. |
 | `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
-| `--server` / `-s` | `string` | Override the resolved server URL (or "mock"). |
-| `--mock` | `boolean` | Alias for --server mock. |
+| `--server` / `-s` | `string` | Override the resolved server URL. |
 | `--slug` | `string` | Local slug (filename). Defaults to preset id. |
 | `--display-name` | `string` | Human-readable IdP name. |
 | `--protocol` | `string` | Protocol: oidc or saml. |
@@ -293,8 +281,7 @@ Usage: `zitadel idp list`
 | `--non-interactive` / `-n` | `boolean` | Disable prompts. Required when scripting or running as an agent. |
 | `--dry-run` | `boolean` | Preview the work without mutating files or hitting the platform. |
 | `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
-| `--server` / `-s` | `string` | Override the resolved server URL (or "mock"). |
-| `--mock` | `boolean` | Alias for --server mock. |
+| `--server` / `-s` | `string` | Override the resolved server URL. |
 
 ### `zitadel idp show`
 
@@ -311,8 +298,7 @@ Usage: `zitadel idp show <slug>`
 | `--non-interactive` / `-n` | `boolean` | Disable prompts. Required when scripting or running as an agent. |
 | `--dry-run` | `boolean` | Preview the work without mutating files or hitting the platform. |
 | `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
-| `--server` / `-s` | `string` | Override the resolved server URL (or "mock"). |
-| `--mock` | `boolean` | Alias for --server mock. |
+| `--server` / `-s` | `string` | Override the resolved server URL. |
 
 ### `zitadel idp remove`
 
@@ -329,8 +315,7 @@ Usage: `zitadel idp remove <slug>`
 | `--non-interactive` / `-n` | `boolean` | Disable prompts. Required when scripting or running as an agent. |
 | `--dry-run` | `boolean` | Preview the work without mutating files or hitting the platform. |
 | `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
-| `--server` / `-s` | `string` | Override the resolved server URL (or "mock"). |
-| `--mock` | `boolean` | Alias for --server mock. |
+| `--server` / `-s` | `string` | Override the resolved server URL. |
 
 ### `zitadel locale scaffold`
 
@@ -347,8 +332,7 @@ Usage: `zitadel locale scaffold [--lang en]`
 | `--non-interactive` / `-n` | `boolean` | Disable prompts. Required when scripting or running as an agent. |
 | `--dry-run` | `boolean` | Preview the work without mutating files or hitting the platform. |
 | `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
-| `--server` / `-s` | `string` | Override the resolved server URL (or "mock"). |
-| `--mock` | `boolean` | Alias for --server mock. |
+| `--server` / `-s` | `string` | Override the resolved server URL. |
 | `--lang` | `string` | Target locale code (default: en). |
 
 ### `zitadel locale list`
@@ -364,8 +348,7 @@ Usage: `zitadel locale list`
 | `--non-interactive` / `-n` | `boolean` | Disable prompts. Required when scripting or running as an agent. |
 | `--dry-run` | `boolean` | Preview the work without mutating files or hitting the platform. |
 | `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
-| `--server` / `-s` | `string` | Override the resolved server URL (or "mock"). |
-| `--mock` | `boolean` | Alias for --server mock. |
+| `--server` / `-s` | `string` | Override the resolved server URL. |
 
 ### `zitadel app add`
 
@@ -382,8 +365,7 @@ Usage: `zitadel app add (--preset spa|web|native|machine | --protocol oidc|saml)
 | `--non-interactive` / `-n` | `boolean` | Disable prompts. Required when scripting or running as an agent. |
 | `--dry-run` | `boolean` | Preview the work without mutating files or hitting the platform. |
 | `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
-| `--server` / `-s` | `string` | Override the resolved server URL (or "mock"). |
-| `--mock` | `boolean` | Alias for --server mock. |
+| `--server` / `-s` | `string` | Override the resolved server URL. |
 | `--slug` | `string` | Local slug (filename). |
 | `--display-name` | `string` | Human-readable app name. |
 | `--protocol` | `string` | Protocol: oidc or saml. |
@@ -411,8 +393,7 @@ Usage: `zitadel app list`
 | `--non-interactive` / `-n` | `boolean` | Disable prompts. Required when scripting or running as an agent. |
 | `--dry-run` | `boolean` | Preview the work without mutating files or hitting the platform. |
 | `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
-| `--server` / `-s` | `string` | Override the resolved server URL (or "mock"). |
-| `--mock` | `boolean` | Alias for --server mock. |
+| `--server` / `-s` | `string` | Override the resolved server URL. |
 
 ### `zitadel app show`
 
@@ -429,8 +410,7 @@ Usage: `zitadel app show <slug>`
 | `--non-interactive` / `-n` | `boolean` | Disable prompts. Required when scripting or running as an agent. |
 | `--dry-run` | `boolean` | Preview the work without mutating files or hitting the platform. |
 | `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
-| `--server` / `-s` | `string` | Override the resolved server URL (or "mock"). |
-| `--mock` | `boolean` | Alias for --server mock. |
+| `--server` / `-s` | `string` | Override the resolved server URL. |
 
 ### `zitadel app remove`
 
@@ -447,8 +427,7 @@ Usage: `zitadel app remove <slug>`
 | `--non-interactive` / `-n` | `boolean` | Disable prompts. Required when scripting or running as an agent. |
 | `--dry-run` | `boolean` | Preview the work without mutating files or hitting the platform. |
 | `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
-| `--server` / `-s` | `string` | Override the resolved server URL (or "mock"). |
-| `--mock` | `boolean` | Alias for --server mock. |
+| `--server` / `-s` | `string` | Override the resolved server URL. |
 
 ### `zitadel capabilities`
 
@@ -463,8 +442,7 @@ Usage: `zitadel capabilities [--json]`
 | `--non-interactive` / `-n` | `boolean` | Disable prompts. Required when scripting or running as an agent. |
 | `--dry-run` | `boolean` | Preview the work without mutating files or hitting the platform. |
 | `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
-| `--server` / `-s` | `string` | Override the resolved server URL (or "mock"). |
-| `--mock` | `boolean` | Alias for --server mock. |
+| `--server` / `-s` | `string` | Override the resolved server URL. |
 
 ### `zitadel help`
 
@@ -479,8 +457,7 @@ Usage: `zitadel help [command]`
 | `--non-interactive` / `-n` | `boolean` | Disable prompts. Required when scripting or running as an agent. |
 | `--dry-run` | `boolean` | Preview the work without mutating files or hitting the platform. |
 | `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
-| `--server` / `-s` | `string` | Override the resolved server URL (or "mock"). |
-| `--mock` | `boolean` | Alias for --server mock. |
+| `--server` / `-s` | `string` | Override the resolved server URL. |
 
 ### `zitadel status`
 
@@ -495,8 +472,7 @@ Usage: `zitadel status`
 | `--non-interactive` / `-n` | `boolean` | Disable prompts. Required when scripting or running as an agent. |
 | `--dry-run` | `boolean` | Preview the work without mutating files or hitting the platform. |
 | `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
-| `--server` / `-s` | `string` | Override the resolved server URL (or "mock"). |
-| `--mock` | `boolean` | Alias for --server mock. |
+| `--server` / `-s` | `string` | Override the resolved server URL. |
 
 ### `zitadel eject`
 
@@ -513,8 +489,7 @@ Usage: `zitadel eject [--force]`
 | `--non-interactive` / `-n` | `boolean` | Disable prompts. Required when scripting or running as an agent. |
 | `--dry-run` | `boolean` | Preview the work without mutating files or hitting the platform. |
 | `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
-| `--server` / `-s` | `string` | Override the resolved server URL (or "mock"). |
-| `--mock` | `boolean` | Alias for --server mock. |
+| `--server` / `-s` | `string` | Override the resolved server URL. |
 
 ## Exit codes
 

@@ -110,13 +110,6 @@ describe("envelope contract", () => {
     expect(envelope.source).toBe("https://api.zitadel.cloud");
   });
 
-  it("--mock flag sets source to mock", async () => {
-    const cwd = await mkdtemp(join(tmpdir(), "zitadel-contract-mock-"));
-    const result = await runCliForTest(["capabilities", "--json", "--cwd", cwd, "--mock"]);
-    const envelope = parseJson(result.stdout) as Record<string, unknown>;
-    expect(envelope.source).toBe("mock");
-  });
-
   it("zitadel.json server field takes precedence over default", async () => {
     const cwd = await scaffoldNextProject();
     await writeFile(
@@ -144,7 +137,7 @@ describe("envelope contract", () => {
         {
           $schema: "https://schemas.zitadel.com/v2/project.schema.json",
           project: "orphan",
-          server: "mock",
+          server: "https://api.zitadel.cloud",
         },
         null,
         2,

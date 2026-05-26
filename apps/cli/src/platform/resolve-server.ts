@@ -5,7 +5,6 @@ import { ZitadelError } from "../lib/errors";
 import { parseJsonObject } from "../lib/json";
 
 export const DEFAULT_SERVER = "https://api.zitadel.cloud";
-export const MOCK_SENTINEL = "mock";
 
 export type ResolvedServer = {
   value: string;
@@ -17,13 +16,9 @@ export type ResolveServerInput = {
   env: NodeJS.ProcessEnv;
   serverFlag?: string;
   environment?: string;
-  mockFlag?: boolean;
 };
 
 export async function resolveServer(input: ResolveServerInput): Promise<ResolvedServer> {
-  if (input.mockFlag) {
-    return validate({ value: MOCK_SENTINEL, origin: "flag" });
-  }
   if (input.serverFlag) {
     return validate({ value: input.serverFlag, origin: "flag" });
   }
@@ -48,7 +43,6 @@ export async function resolveServer(input: ResolveServerInput): Promise<Resolved
 }
 
 function validate(resolved: ResolvedServer): ResolvedServer {
-  if (resolved.value === MOCK_SENTINEL) return resolved;
   try {
     const url = new URL(resolved.value);
     if (url.protocol !== "https:" && url.protocol !== "http:") {
