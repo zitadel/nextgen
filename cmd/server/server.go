@@ -21,6 +21,7 @@ import (
 
 	oasapi "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
+	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	_ "github.com/zitadel/nextgen/internal/storage/database/dialect/all"
@@ -76,7 +77,10 @@ func run(ctx context.Context, cfg Config, pool database.Pool) error {
 		}
 	}()
 
-	var passwordHasher *passwap.Swapper // TODO: initialize with actual configuration
+	passwordHasher, err := cfg.PasswordHasher.NewHasher()
+	if err != nil {
+		return fmt.Errorf("build password hasher: %w", err)
+	}
 
 	// ── Repositories ─────────────────
 	projectRepo := repository.NewProjectRepository(pool)
@@ -167,6 +171,11 @@ func loadConfig(configPath string) (Config, error) {
 	v.AutomaticEnv()
 
 	v.SetDefault("server.address", ":8080")
+	v.SetDefault("password_hasher.hasher.algorithm", crypto.HashNameBcrypt)
+	v.SetDefault("password_hasher.hasher.cost", 10)
+	v.SetDefault("password_hasher.limits", crypto.HashLimitsConfig{
+		Bcrypt: crypto.BcryptLimitsConfig{MinCost: 10, MaxCost: 16},
+	})
 
 	if configPath != "" {
 		v.SetConfigFile(configPath)
