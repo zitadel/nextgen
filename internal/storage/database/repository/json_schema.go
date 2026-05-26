@@ -22,10 +22,6 @@ type JSONSchemaRepository struct {
 	columnPayload   database.Column
 }
 
-func (r *JSONSchemaRepository) GetByID(ctx context.Context, client database.QueryExecutor, projectID string, schemaID string) (*domain.JSONSchema, error) {
-	return r.Get(ctx, client, database.WithCondition(r.PrimaryKeyCondition(projectID, schemaID)))
-}
-
 func NewJSONSchemaRepository(client database.QueryExecutor) *JSONSchemaRepository {
 	const pgTable = "zitadel_nextgen.json_schemas"
 	const spannerTable = "json_schemas"
@@ -172,9 +168,9 @@ func (r *JSONSchemaRepository) Delete(ctx context.Context, client database.Query
 }
 
 type jsonSchemaRow struct {
-	ProjectID string               `db:"project_id"`
-	URL       string               `db:"url"`
-	CreatedAt time.Time            `db:"created_at"`
+	ProjectID string                `db:"project_id"`
+	URL       string                `db:"url"`
+	CreatedAt time.Time             `db:"created_at"`
 	Payload   JSON[json.RawMessage] `db:"payload"`
 }
 

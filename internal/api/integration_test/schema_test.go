@@ -28,7 +28,7 @@ func TestCreateSchema(t *testing.T) {
 		}{
 			{
 				name:   "user-schema in body",
-				schema: harness.Schemas.CreateSchemaRequestUserSchema,
+				schema: harness.TestData.Schemas.CreateSchemaRequestUserSchema,
 			},
 			// TODO: add this test case once we have a public github-repo from which to get a schema
 			//{
@@ -105,10 +105,10 @@ func TestCreateSchema(t *testing.T) {
 			client := harness.EnsureAPIClient(t)
 
 			projectID := harness.CreateProject(t, "project_schema_create_duplicates")
-			harness.CreateUserSchema(t, projectID, harness.Schemas.CreateSchemaRequestUserSchema)
+			harness.CreateUserSchema(t, projectID, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
 
 			apiSchema := api.UserSchema{}
-			err := apiSchema.UnmarshalJSON([]byte(harness.Schemas.CreateSchemaRequestUserSchema))
+			err := apiSchema.UnmarshalJSON([]byte(harness.TestData.Schemas.CreateSchemaRequestUserSchema))
 			require.NoError(t, err)
 
 			req := api.CreateSchemaReq{
@@ -137,7 +137,7 @@ func TestGetSchema(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
 		t.Run("simple", func(t *testing.T) {
 			projectID := harness.CreateProject(t, "project_schema_get_simple")
-			schemaID := harness.CreateUserSchema(t, projectID, harness.Schemas.CreateSchemaRequestUserSchema)
+			schemaID := harness.CreateUserSchema(t, projectID, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
 
 			resp, err := client.GetSchemaById(t.Context(), api.GetSchemaByIdParams{
 				ID:        schemaID,

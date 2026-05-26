@@ -101,7 +101,10 @@ func TestFlattenMapToCreateAttributes(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				as, err := FlattenMapToCreateAttributes(tc.mapValue, tc.schema, "")
 				assert.NoError(t, err)
-				assert.EqualValues(t, tc.expected, as)
+				assert.Equal(t, len(tc.expected), len(as))
+				for _, a := range as {
+					assert.Contains(t, tc.expected, a)
+				}
 			})
 		}
 	})

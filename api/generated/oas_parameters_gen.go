@@ -1140,11 +1140,172 @@ func decodeCreateHandoffParams(args [1]string, argsEscaped bool, r *http.Request
 	return params, nil
 }
 
+// CreateSchemaParams is parameters of createSchema operation.
+type CreateSchemaParams struct {
+	// The unique identifier of the project.
+	ProjectID OptProjectID `json:",omitempty,omitzero"`
+	// The unique identifier of the team.
+	TeamID OptTeamID `json:",omitempty,omitzero"`
+}
+
+func unpackCreateSchemaParams(packed middleware.Parameters) (params CreateSchemaParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "ProjectID",
+			In:   "query",
+		}
+		if v, ok := packed[key]; ok {
+			params.ProjectID = v.(OptProjectID)
+		}
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "team_id",
+			In:   "query",
+		}
+		if v, ok := packed[key]; ok {
+			params.TeamID = v.(OptTeamID)
+		}
+	}
+	return params
+}
+
+func decodeCreateSchemaParams(args [0]string, argsEscaped bool, r *http.Request) (params CreateSchemaParams, _ error) {
+	q := uri.NewQueryDecoder(r.URL.Query())
+	// Decode query: ProjectID.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "ProjectID",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotProjectIDVal ProjectID
+				if err := func() error {
+					var paramsDotProjectIDValVal string
+					if err := func() error {
+						val, err := d.DecodeValue()
+						if err != nil {
+							return err
+						}
+
+						c, err := conv.ToString(val)
+						if err != nil {
+							return err
+						}
+
+						paramsDotProjectIDValVal = c
+						return nil
+					}(); err != nil {
+						return err
+					}
+					paramsDotProjectIDVal = ProjectID(paramsDotProjectIDValVal)
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.ProjectID.SetTo(paramsDotProjectIDVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if value, ok := params.ProjectID.Get(); ok {
+					if err := func() error {
+						if err := value.Validate(); err != nil {
+							return err
+						}
+						return nil
+					}(); err != nil {
+						return err
+					}
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "ProjectID",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	// Decode query: team_id.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "team_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotTeamIDVal TeamID
+				if err := func() error {
+					var paramsDotTeamIDValVal string
+					if err := func() error {
+						val, err := d.DecodeValue()
+						if err != nil {
+							return err
+						}
+
+						c, err := conv.ToString(val)
+						if err != nil {
+							return err
+						}
+
+						paramsDotTeamIDValVal = c
+						return nil
+					}(); err != nil {
+						return err
+					}
+					paramsDotTeamIDVal = TeamID(paramsDotTeamIDValVal)
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.TeamID.SetTo(paramsDotTeamIDVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if value, ok := params.TeamID.Get(); ok {
+					if err := func() error {
+						if err := value.Validate(); err != nil {
+							return err
+						}
+						return nil
+					}(); err != nil {
+						return err
+					}
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "team_id",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
 // CreateUserParams is parameters of createUser operation.
 type CreateUserParams struct {
 	// The unique identifier of the project.
 	ProjectID OptProjectID `json:",omitempty,omitzero"`
-	// The unique identifier of the project.
+	// The unique identifier of the team.
 	TeamID OptTeamID `json:",omitempty,omitzero"`
 }
 
@@ -1160,7 +1321,7 @@ func unpackCreateUserParams(packed middleware.Parameters) (params CreateUserPara
 	}
 	{
 		key := middleware.ParameterKey{
-			Name: "TeamID",
+			Name: "team_id",
 			In:   "query",
 		}
 		if v, ok := packed[key]; ok {
@@ -1235,10 +1396,10 @@ func decodeCreateUserParams(args [0]string, argsEscaped bool, r *http.Request) (
 			Err:  err,
 		}
 	}
-	// Decode query: TeamID.
+	// Decode query: team_id.
 	if err := func() error {
 		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "TeamID",
+			Name:    "team_id",
 			Style:   uri.QueryStyleForm,
 			Explode: true,
 		}
@@ -1293,7 +1454,7 @@ func decodeCreateUserParams(args [0]string, argsEscaped bool, r *http.Request) (
 		return nil
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
-			Name: "TeamID",
+			Name: "team_id",
 			In:   "query",
 			Err:  err,
 		}
@@ -2179,6 +2340,10 @@ func decodeGetProjectParams(args [1]string, argsEscaped bool, r *http.Request) (
 // GetSchemaByIdParams is parameters of getSchemaById operation.
 type GetSchemaByIdParams struct {
 	ID string
+	// The unique identifier of the project.
+	ProjectID OptProjectID `json:",omitempty,omitzero"`
+	// The unique identifier of the team.
+	TeamID OptTeamID `json:",omitempty,omitzero"`
 }
 
 func unpackGetSchemaByIdParams(packed middleware.Parameters) (params GetSchemaByIdParams) {
@@ -2189,10 +2354,29 @@ func unpackGetSchemaByIdParams(packed middleware.Parameters) (params GetSchemaBy
 		}
 		params.ID = packed[key].(string)
 	}
+	{
+		key := middleware.ParameterKey{
+			Name: "ProjectID",
+			In:   "query",
+		}
+		if v, ok := packed[key]; ok {
+			params.ProjectID = v.(OptProjectID)
+		}
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "team_id",
+			In:   "query",
+		}
+		if v, ok := packed[key]; ok {
+			params.TeamID = v.(OptTeamID)
+		}
+	}
 	return params
 }
 
 func decodeGetSchemaByIdParams(args [1]string, argsEscaped bool, r *http.Request) (params GetSchemaByIdParams, _ error) {
+	q := uri.NewQueryDecoder(r.URL.Query())
 	// Decode path: id.
 	if err := func() error {
 		param := args[0]
@@ -2235,6 +2419,132 @@ func decodeGetSchemaByIdParams(args [1]string, argsEscaped bool, r *http.Request
 		return params, &ogenerrors.DecodeParamError{
 			Name: "id",
 			In:   "path",
+			Err:  err,
+		}
+	}
+	// Decode query: ProjectID.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "ProjectID",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotProjectIDVal ProjectID
+				if err := func() error {
+					var paramsDotProjectIDValVal string
+					if err := func() error {
+						val, err := d.DecodeValue()
+						if err != nil {
+							return err
+						}
+
+						c, err := conv.ToString(val)
+						if err != nil {
+							return err
+						}
+
+						paramsDotProjectIDValVal = c
+						return nil
+					}(); err != nil {
+						return err
+					}
+					paramsDotProjectIDVal = ProjectID(paramsDotProjectIDValVal)
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.ProjectID.SetTo(paramsDotProjectIDVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if value, ok := params.ProjectID.Get(); ok {
+					if err := func() error {
+						if err := value.Validate(); err != nil {
+							return err
+						}
+						return nil
+					}(); err != nil {
+						return err
+					}
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "ProjectID",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	// Decode query: team_id.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "team_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotTeamIDVal TeamID
+				if err := func() error {
+					var paramsDotTeamIDValVal string
+					if err := func() error {
+						val, err := d.DecodeValue()
+						if err != nil {
+							return err
+						}
+
+						c, err := conv.ToString(val)
+						if err != nil {
+							return err
+						}
+
+						paramsDotTeamIDValVal = c
+						return nil
+					}(); err != nil {
+						return err
+					}
+					paramsDotTeamIDVal = TeamID(paramsDotTeamIDValVal)
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.TeamID.SetTo(paramsDotTeamIDVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if value, ok := params.TeamID.Get(); ok {
+					if err := func() error {
+						if err := value.Validate(); err != nil {
+							return err
+						}
+						return nil
+					}(); err != nil {
+						return err
+					}
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "team_id",
+			In:   "query",
 			Err:  err,
 		}
 	}
@@ -3165,7 +3475,7 @@ type ListUsersParams struct {
 	PageToken OptPageToken `json:",omitempty,omitzero"`
 	// The unique identifier of the project.
 	ProjectID OptProjectID `json:",omitempty,omitzero"`
-	// The unique identifier of the project.
+	// The unique identifier of the team.
 	TeamID OptTeamID `json:",omitempty,omitzero"`
 }
 
@@ -3199,7 +3509,7 @@ func unpackListUsersParams(packed middleware.Parameters) (params ListUsersParams
 	}
 	{
 		key := middleware.ParameterKey{
-			Name: "TeamID",
+			Name: "team_id",
 			In:   "query",
 		}
 		if v, ok := packed[key]; ok {
@@ -3393,10 +3703,10 @@ func decodeListUsersParams(args [0]string, argsEscaped bool, r *http.Request) (p
 			Err:  err,
 		}
 	}
-	// Decode query: TeamID.
+	// Decode query: team_id.
 	if err := func() error {
 		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "TeamID",
+			Name:    "team_id",
 			Style:   uri.QueryStyleForm,
 			Explode: true,
 		}
@@ -3451,7 +3761,7 @@ func decodeListUsersParams(args [0]string, argsEscaped bool, r *http.Request) (p
 		return nil
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
-			Name: "TeamID",
+			Name: "team_id",
 			In:   "query",
 			Err:  err,
 		}
@@ -3906,7 +4216,7 @@ type UpdateUserParams struct {
 	UserID UserID
 	// The unique identifier of the project.
 	ProjectID OptProjectID `json:",omitempty,omitzero"`
-	// The unique identifier of the project.
+	// The unique identifier of the team.
 	TeamID OptTeamID `json:",omitempty,omitzero"`
 }
 
@@ -3929,7 +4239,7 @@ func unpackUpdateUserParams(packed middleware.Parameters) (params UpdateUserPara
 	}
 	{
 		key := middleware.ParameterKey{
-			Name: "TeamID",
+			Name: "team_id",
 			In:   "query",
 		}
 		if v, ok := packed[key]; ok {
@@ -4064,10 +4374,10 @@ func decodeUpdateUserParams(args [1]string, argsEscaped bool, r *http.Request) (
 			Err:  err,
 		}
 	}
-	// Decode query: TeamID.
+	// Decode query: team_id.
 	if err := func() error {
 		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "TeamID",
+			Name:    "team_id",
 			Style:   uri.QueryStyleForm,
 			Explode: true,
 		}
@@ -4122,7 +4432,7 @@ func decodeUpdateUserParams(args [1]string, argsEscaped bool, r *http.Request) (
 		return nil
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
-			Name: "TeamID",
+			Name: "team_id",
 			In:   "query",
 			Err:  err,
 		}

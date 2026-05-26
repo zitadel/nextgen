@@ -1509,7 +1509,7 @@ func (s *Server) handleCreateSchemaRequest(args [0]string, argsEscaped bool, w h
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
 				{
-					Name: "project_id",
+					Name: "ProjectID",
 					In:   "query",
 				}: params.ProjectID,
 				{
@@ -1915,7 +1915,7 @@ func (s *Server) handleCreateUserRequest(args [0]string, argsEscaped bool, w htt
 					In:   "query",
 				}: params.ProjectID,
 				{
-					Name: "TeamID",
+					Name: "team_id",
 					In:   "query",
 				}: params.TeamID,
 			},
@@ -4195,7 +4195,7 @@ func (s *Server) handleGetSchemaByIdRequest(args [1]string, argsEscaped bool, w 
 					In:   "path",
 				}: params.ID,
 				{
-					Name: "project_id",
+					Name: "ProjectID",
 					In:   "query",
 				}: params.ProjectID,
 				{
@@ -5932,7 +5932,7 @@ func (s *Server) handleListUsersRequest(args [0]string, argsEscaped bool, w http
 					In:   "query",
 				}: params.ProjectID,
 				{
-					Name: "TeamID",
+					Name: "team_id",
 					In:   "query",
 				}: params.TeamID,
 			},
@@ -7212,7 +7212,7 @@ func (s *Server) handleUpdateUserRequest(args [1]string, argsEscaped bool, w htt
 					In:   "query",
 				}: params.ProjectID,
 				{
-					Name: "TeamID",
+					Name: "team_id",
 					In:   "query",
 				}: params.TeamID,
 			},

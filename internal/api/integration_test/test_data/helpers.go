@@ -1,5 +1,3 @@
-//go:build integration
-
 package test_data
 
 import (
@@ -34,7 +32,7 @@ type TestData struct {
 func BuildTestData() TestData {
 	return TestData{
 		Schemas: Schemas{
-			CreateSchemaRequestUserSchema: string(createSchemaRequestUserSchema),
+			CreateSchemaRequestUserSchema:      string(createSchemaRequestUserSchema),
 			CreateSchemaRequestUserSchemaByUrl: string(createSchemaRequestUserSchemaByUrl),
 		},
 		Users: Users{

@@ -1576,9 +1576,9 @@ func (c *Client) sendCreateSchema(ctx context.Context, request CreateSchemaReq, 
 	stage = "EncodeQueryParams"
 	q := uri.NewQueryEncoder()
 	{
-		// Encode "project_id" parameter.
+		// Encode "ProjectID" parameter.
 		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "project_id",
+			Name:    "ProjectID",
 			Style:   uri.QueryStyleForm,
 			Explode: true,
 		}
@@ -1878,9 +1878,9 @@ func (c *Client) sendCreateUser(ctx context.Context, request User, params Create
 		}
 	}
 	{
-		// Encode "TeamID" parameter.
+		// Encode "team_id" parameter.
 		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "TeamID",
+			Name:    "team_id",
 			Style:   uri.QueryStyleForm,
 			Explode: true,
 		}
@@ -3466,9 +3466,9 @@ func (c *Client) sendGetSchemaById(ctx context.Context, params GetSchemaByIdPara
 	stage = "EncodeQueryParams"
 	q := uri.NewQueryEncoder()
 	{
-		// Encode "project_id" parameter.
+		// Encode "ProjectID" parameter.
 		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "project_id",
+			Name:    "ProjectID",
 			Style:   uri.QueryStyleForm,
 			Explode: true,
 		}
@@ -4807,9 +4807,9 @@ func (c *Client) sendListUsers(ctx context.Context, params ListUsersParams) (res
 		}
 	}
 	{
-		// Encode "TeamID" parameter.
+		// Encode "team_id" parameter.
 		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "TeamID",
+			Name:    "team_id",
 			Style:   uri.QueryStyleForm,
 			Explode: true,
 		}
@@ -5704,9 +5704,9 @@ func (c *Client) sendUpdateUser(ctx context.Context, request User, params Update
 		}
 	}
 	{
-		// Encode "TeamID" parameter.
+		// Encode "team_id" parameter.
 		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "TeamID",
+			Name:    "team_id",
 			Style:   uri.QueryStyleForm,
 			Explode: true,
 		}
