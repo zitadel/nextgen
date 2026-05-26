@@ -1,5 +1,3 @@
-//go:build integration
-
 package helpers
 
 import (
@@ -21,7 +19,7 @@ func (h *Harness) EnsureAuthAttemptService(t *testing.T) service.AuthAttemptServ
 			h.EnsureUserRepo(t),
 			h.EnsureUserPasswordRepo(t),
 			h.EnsureUserPasskeyRepo(t),
-			h.EnsurePasswap(t),
+			h.EnsureHasher(t),
 		)
 	}
 	return h.AuthAttemptService

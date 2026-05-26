@@ -1,5 +1,3 @@
-//go:build integration
-
 package test_data
 
 import (

@@ -1,5 +1,3 @@
-//go:build integration
-
 package helpers
 
 import (
@@ -9,17 +7,17 @@ import (
 	generated "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/api/integration_test/test_data"
+	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
-	"github.com/zitadel/passwap"
 )
 
 type Harness struct {
 	DBPool     database.Pool
 	HttpClient *http.Client
 	TestServer *httptest.Server
-	Passwapper *passwap.Swapper
+	Hasher     *crypto.Hasher
 
 	GeneratedServer *generated.Server
 	Handler         *api.Handler
