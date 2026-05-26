@@ -63,6 +63,82 @@ func mapCreateRequestToService(req *api.CreateFlowDefinitionRequest) (service.Cr
 			TeamIDs: reqAudience.GetTeamIds(),
 		}
 	}
+
+	// map steps to domain
+	steps := make([]domain.FlowDefinitionStep, 0, len(definition.GetSteps()))
+	for _, step := range definition.GetSteps() {
+		s := domain.FlowDefinitionStep{
+			Name:   step.GetName(),
+			Fields: step.GetFields(),
+		}
+		// actions
+		if step.GetActions().IsSet() {
+			actions := make(map[string]domain.FlowStepAction, len(step.GetActions().Value))
+			for name, apiAction := range step.GetActions().Value {
+				actions[name] = domain.FlowStepAction{
+					Primary: apiAction.GetPrimary().Value,
+					TextKey: apiAction.GetTextKey().Value,
+				}
+			}
+			s.Actions = actions
+		}
+
+		// gates
+		if step.GetGates().IsSet() {
+			gates := make(map[string]domain.FlowStepGate, len(step.GetGates().Value))
+			for name, apiGate := range step.GetGates().Value {
+				kind, _ := domain.FlowGateKindString(string(apiGate.GetKind())) // validated in the domain
+
+				cfg := make(map[string]any, len(apiGate.GetConfig().Value))
+				for k, v := range apiGate.GetConfig().Value {
+					var val any
+					if err := json.Unmarshal(v, &val); err == nil {
+						cfg[k] = val
+					}
+				}
+				gates[name] = domain.FlowStepGate{
+					Kind:     kind,
+					Provider: apiGate.GetProvider(),
+					Config:   cfg,
+				}
+			}
+			s.Gates = gates
+		}
+
+		// sso providers
+		ssoProviders := make([]domain.FlowSSOProvider, 0, len(step.GetSSOProviders()))
+		for _, ssoProvider := range step.GetSSOProviders() {
+			s := domain.FlowSSOProvider{
+				ID:       ssoProvider.GetID(),
+				Name:     ssoProvider.GetName(),
+				Template: ssoProvider.GetTemplate(),
+			}
+			ssoProviders = append(ssoProviders, s)
+		}
+		s.SSOProviders = ssoProviders
+
+		// transitions
+		if step.GetTransitions().IsSet() {
+			transitions := make(map[string]domain.FlowStepTransition, len(step.GetTransitions().Value))
+			for name, apiTransition := range step.GetTransitions().Value {
+				action, _ := domain.FlowDefinitionTransitionActionString(string(apiTransition.GetAction().Value)) // validated in the domain
+				t := domain.FlowStepTransition{
+					Action: &action,
+					Target: apiTransition.GetTarget(),
+				}
+				transitions[name] = t
+			}
+			s.Transitions = transitions
+		}
+
+		// complete
+		if step.GetComplete().IsSet() {
+			complete, _ := domain.FlowStepCompleteString(string(step.GetComplete().Value))
+			s.Complete = &complete
+		}
+		steps = append(steps, s)
+	}
+	svcReq.Steps = steps
 	return svcReq, nil
 }
 
