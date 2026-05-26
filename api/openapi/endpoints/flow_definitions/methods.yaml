@@ -9,7 +9,7 @@ post:
     Flow definitions are created based on the flow meta schema, which includes the flow's purpose, audience, and the steps involved.
   tags:
     - Flow Definitions
-#  security:
+  security: []
 #    - oauth2:
 #        - flow_definitions.write
   requestBody:
@@ -52,7 +52,7 @@ get:
     This endpoint can be used to view existing flow definitions and their configurations.
   tags:
     - Flow Definitions
-#  security:
+  security: []
 #    - oauth2:
 #        - flow_definitions.read
   parameters:

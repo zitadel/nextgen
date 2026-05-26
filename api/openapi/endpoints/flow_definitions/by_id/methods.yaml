@@ -4,7 +4,7 @@ get:
   description: Get a flow definition by id
   tags:
     - Flow Definitions
-#  security:
+  security: []
 #    - oauth2:
 #        - flow_definitions.read
   parameters:
@@ -35,7 +35,7 @@ patch:
   description: Update a flow definition by id
   tags:
     - Flow Definitions
-#  security:
+  security: []
 #    - oauth2:
 #        - flow_definitions.write
   parameters:
@@ -78,7 +78,7 @@ delete:
   description: Delete a flow definition by id
   tags:
     - Flow Definitions
-#  security:
+  security: []
 #    - oauth2:
 #        - flow_definitions.delete
   parameters:
