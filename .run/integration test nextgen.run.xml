@@ -1,0 +1,13 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="integration test nextgen" type="GoTestRunConfiguration" factoryName="Go Test">
+    <module name="nextgen" />
+    <working_directory value="$PROJECT_DIR$" />
+    <useCustomBuildTags value="true" />
+    <kind value="PACKAGE" />
+    <package value="github.com/zitadel/nextgen/internal/api/integration_test" />
+    <directory value="$PROJECT_DIR$" />
+    <filePath value="$PROJECT_DIR$/../nextgen|$PROJECT_DIR$/internal/api/integration_test/helpers/pg_test_main.go" />
+    <framework value="gotest" />
+    <method v="2" />
+  </configuration>
+</component>
