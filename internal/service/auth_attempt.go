@@ -5,9 +5,9 @@ import (
 	"errors"
 	"net/url"
 
+	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
-	"github.com/zitadel/passwap"
 )
 
 // ---- Service interface -------------------------------------------------------
@@ -193,7 +193,7 @@ type authAttemptService struct {
 	users            userLookup
 	userPasswords    userPasswords
 	userPasskeys     userPasskeys
-	passwordVerifier *passwap.Swapper
+	passwordVerifier *crypto.Hasher
 }
 
 func NewAuthAttemptService(
@@ -204,7 +204,7 @@ func NewAuthAttemptService(
 	users userLookup,
 	userPasswords userPasswords,
 	userPasskeys userPasskeys,
-	passwordVerifier *passwap.Swapper,
+	passwordVerifier *crypto.Hasher,
 ) AuthAttemptService {
 	return &authAttemptService{
 		pool:             pool,

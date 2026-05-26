@@ -2,9 +2,12 @@
 -- +goose Up
 -- +goose StatementBegin
 CREATE TABLE projects (
-    id          STRING(MAX) NOT NULL,
-    created_at  TIMESTAMP   NOT NULL DEFAULT (CURRENT_TIMESTAMP()),
-    updated_at  TIMESTAMP   NOT NULL DEFAULT (CURRENT_TIMESTAMP()),
+    id              STRING(MAX) NOT NULL,
+    created_at      TIMESTAMP   NOT NULL DEFAULT (CURRENT_TIMESTAMP()),
+    updated_at      TIMESTAMP   NOT NULL DEFAULT (CURRENT_TIMESTAMP()),
+    project_secret  STRING(MAX) NOT NULL DEFAULT (''),
+    preview_secret  STRING(MAX) NOT NULL DEFAULT (''),
+    preview_origins STRING(MAX) NOT NULL DEFAULT ('[]'),
 ) PRIMARY KEY (id)
 -- +goose StatementEnd
 

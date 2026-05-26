@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
@@ -14,9 +15,12 @@ const pgTableProjects = "zitadel_nextgen.projects"
 const spannerTableProjects = "projects"
 
 type projectRow struct {
-	ID        string    `db:"id"`
-	CreatedAt time.Time `db:"created_at"`
-	UpdatedAt time.Time `db:"updated_at"`
+	ID             string         `db:"id"`
+	CreatedAt      time.Time      `db:"created_at"`
+	UpdatedAt      time.Time      `db:"updated_at"`
+	ProjectSecret  string         `db:"project_secret"`
+	PreviewSecret  string         `db:"preview_secret"`
+	PreviewOrigins JSONArray[string] `db:"preview_origins"`
 }
 
 type projectMeta struct{ tableName string }
@@ -60,21 +64,35 @@ func NewProjectRepository(client database.QueryExecutor) *ProjectRepository {
 }
 
 func (r *ProjectRepository) Create(ctx context.Context, client database.QueryExecutor, project *domain.Project) error {
+	origins := project.PreviewOrigins
+	if origins == nil {
+		origins = []string{}
+	}
+	originsJSON, err := json.Marshal(origins)
+	if err != nil {
+		return err
+	}
 	b := database.NewStatementBuilder("INSERT INTO ")
 	b.WriteString(r.meta.tableName)
-	b.WriteString(" (id, created_at, updated_at) VALUES (")
+	b.WriteString(" (id, created_at, updated_at, project_secret, preview_secret, preview_origins) VALUES (")
 	b.WriteArg(project.ID)
 	b.WriteString(", ")
 	b.WriteArg(r.now)
 	b.WriteString(", ")
 	b.WriteArg(r.now)
+	b.WriteString(", ")
+	b.WriteArg(project.ProjectSecret)
+	b.WriteString(", ")
+	b.WriteArg(project.PreviewSecret)
+	b.WriteString(", ")
+	b.WriteArg(string(originsJSON))
 	b.WriteString(")")
-	_, err := client.Exec(ctx, b.String(), b.Args()...)
+	_, err = client.Exec(ctx, b.String(), b.Args()...)
 	return err
 }
 
 func (r *ProjectRepository) Get(ctx context.Context, client database.QueryExecutor, id string) (*domain.Project, error) {
-	b := database.NewStatementBuilder("SELECT id, created_at, updated_at FROM ")
+	b := database.NewStatementBuilder("SELECT id, created_at, updated_at, project_secret, preview_secret, preview_origins FROM ")
 	b.WriteString(r.meta.tableName)
 	b.WriteString(" WHERE id = ")
 	b.WriteArg(id)
@@ -82,5 +100,12 @@ func (r *ProjectRepository) Get(ctx context.Context, client database.QueryExecut
 	if err != nil {
 		return nil, err
 	}
-	return &domain.Project{ID: row.ID, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}, nil
+	return &domain.Project{
+		ID:             row.ID,
+		CreatedAt:      row.CreatedAt,
+		UpdatedAt:      row.UpdatedAt,
+		ProjectSecret:  row.ProjectSecret,
+		PreviewSecret:  row.PreviewSecret,
+		PreviewOrigins: []string(row.PreviewOrigins),
+	}, nil
 }

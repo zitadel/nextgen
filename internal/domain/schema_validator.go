@@ -50,10 +50,10 @@ type SchemaValidator struct {
 	latestVersionByKind map[KnownSchemaKind]string
 }
 
-// NewTenantSchemaValidator compiles the meta-schemas for the tenant schema kinds into memory and returns a SchemaValidator instance.
+// NewSchemaValidator compiles the meta-schemas for the tenant schema kinds into memory and returns a SchemaValidator instance.
 // The builtinPublicBase is used to construct canonical URLs for the built-in meta-schemas.
 // It must be an absolute URL with a host (e.g. "https://raw.githubusercontent.com/zitadel/nextgen/refs/tags/v1.2.3/api/openapi/endpoints/schemas").
-func NewTenantSchemaValidator(builtinPublicBase string) (*SchemaValidator, error) {
+func NewSchemaValidator(builtinPublicBase string) (*SchemaValidator, error) {
 	if builtinPublicBase == "" {
 		return nil, ErrMissingBuiltinPublicBase
 	}
@@ -102,13 +102,13 @@ func NewTenantSchemaValidator(builtinPublicBase string) (*SchemaValidator, error
 
 // ValidateAgainstMetaSchema validates the given tenant schema document against the appropriate meta-schema based on its declared "kind" property.
 // At the moment, only "user-schema" and "flow-definition" are supported.
-func (v *SchemaValidator) ValidateAgainstMetaSchema(tenantSchemaBytes []byte) error {
-	var tenantSchema map[string]any
-	if err := json.Unmarshal(tenantSchemaBytes, &tenantSchema); err != nil {
+func (v *SchemaValidator) ValidateAgainstMetaSchema(schemaBs []byte) error {
+	var schema map[string]any
+	if err := json.Unmarshal(schemaBs, &schema); err != nil {
 		return fmt.Errorf("%w: %w", ErrSchemaParseFailed, err)
 	}
 
-	schemaID, _ := tenantSchema["$schema"].(string)
+	schemaID, _ := schema["metaSchema"].(string)
 	if schemaID == "" {
 		return ErrMissingSchemaID
 	}
@@ -118,7 +118,7 @@ func (v *SchemaValidator) ValidateAgainstMetaSchema(tenantSchemaBytes []byte) er
 		return err
 	}
 
-	if err := metaSchema.Validate(tenantSchema); err != nil {
+	if err := metaSchema.Validate(schema); err != nil {
 		return fmt.Errorf("%w: %w", ErrSchemaValidationFailed, err)
 	}
 	return nil
