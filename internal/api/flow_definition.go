@@ -26,7 +26,7 @@ func (h Handler) CreateFlowDefinition(ctx context.Context, req *api.CreateFlowDe
 		return errorResponse(err), nil // todo (grvijayan): review
 	}
 
-	return flowDefinitionSuccessResponse(create, flowSchemaURI), nil
+	return flowDefinitionDetailResponse(create, flowSchemaURI), nil
 }
 
 func mapCreateRequestToService(req *api.CreateFlowDefinitionRequest) (service.CreateFlowDefinitionRequest, error) {
@@ -148,7 +148,59 @@ func mapCreateRequestToService(req *api.CreateFlowDefinitionRequest) (service.Cr
 	return svcReq, nil
 }
 
-func flowDefinitionSuccessResponse(flowDefinition *domain.FlowDefinition, schemaURI string) *api.FlowDefinitionDetailResponse {
+func (h Handler) GetFlowDefinition(ctx context.Context, params api.GetFlowDefinitionParams) (api.GetFlowDefinitionRes, error) {
+	definition, err := h.flowDefinitionService.Get(ctx, string(params.ProjectID), params.ID)
+	if err != nil {
+		return errorResponse(err), nil
+	}
+	return flowDefinitionDetailResponse(definition, ""), nil
+}
+
+func (h Handler) ListFlowDefinitions(ctx context.Context, params api.ListFlowDefinitionsParams) (api.ListFlowDefinitionsRes, error) {
+	svcReq := mapListRequestToService(params)
+
+	definitions, err := h.flowDefinitionService.List(ctx, svcReq)
+	if err != nil {
+		return errorResponse(err), nil
+	}
+	respDefinitions := make([]api.FlowDefinitionResponse, 0, len(definitions))
+	for _, def := range definitions {
+		respDefinitions = append(respDefinitions, flowDefinitionResponse(def))
+	}
+	return &api.FlowDefinitionListResponse{FlowDefinitions: respDefinitions}, nil
+}
+
+func mapListRequestToService(params api.ListFlowDefinitionsParams) service.ListFlowDefinitionsRequest {
+	req := service.ListFlowDefinitionsRequest{
+		ProjectID: string(params.ProjectID),
+	}
+	purpose, ok := params.Purpose.Get()
+	if ok {
+		req.Purpose = string(purpose)
+	}
+	limit, ok := params.Limit.Get()
+	if ok {
+		req.Limit = limit
+	}
+	pageToken, ok := params.PageToken.Get()
+	if ok {
+		req.PageToken = string(pageToken)
+	}
+	return req
+}
+
+func flowDefinitionResponse(flowDefinition *domain.FlowDefinition) api.FlowDefinitionResponse {
+	return api.FlowDefinitionResponse{
+		ID:        flowDefinition.ID,
+		Name:      flowDefinition.Name,
+		ProjectID: flowDefinition.ProjectID,
+		CreatedAt: flowDefinition.CreatedAt,
+		UpdatedAt: flowDefinition.UpdatedAt,
+		Status:    flowDefinition.Status.String(),
+	}
+}
+
+func flowDefinitionDetailResponse(flowDefinition *domain.FlowDefinition, schemaURI string) *api.FlowDefinitionDetailResponse {
 	purposes := mapDomainPurposesToAPI(flowDefinition.Purposes)
 	audience := api.OptFlowAudience{
 		Value: api.FlowAudience{
