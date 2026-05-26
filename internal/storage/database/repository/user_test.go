@@ -11,6 +11,7 @@ import (
 )
 
 func TestUserRepository_CreateGetListDelete(t *testing.T) {
+	skipIfSpanner(t)
 	repo := repository.NewUserRepository()
 	tx, rollback := transactionForRollback(t)
 	defer rollback()

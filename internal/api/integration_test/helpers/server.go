@@ -1,5 +1,3 @@
-//go:build integration
-
 package helpers
 
 import (
@@ -9,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 	generated "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
+	"github.com/zitadel/nextgen/internal/api/integration_test/test_data"
 )
 
 func (h *Harness) EnsureTestServer(t *testing.T) *httptest.Server {
@@ -17,6 +16,7 @@ func (h *Harness) EnsureTestServer(t *testing.T) *httptest.Server {
 		h.TestServer = httptest.NewServer(
 			h.EnsureGeneratedServer(t),
 		)
+		h.Schemas = test_data.BuildSchemas(h.TestServer.URL)
 	}
 	return h.TestServer
 }

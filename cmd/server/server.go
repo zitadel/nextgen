@@ -6,16 +6,21 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os/signal"
 	"strings"
 	"syscall"
 	"time"
 
+	lru "github.com/hashicorp/golang-lru/v2"
+	"github.com/ianlancetaylor/jsonschema"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/zitadel/nextgen/internal/domain"
 
 	oasapi "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
+	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	_ "github.com/zitadel/nextgen/internal/storage/database/dialect/all"
@@ -71,6 +76,11 @@ func run(ctx context.Context, cfg Config, pool database.Pool) error {
 		}
 	}()
 
+	passwordHasher, err := cfg.PasswordHasher.NewHasher()
+	if err != nil {
+		return fmt.Errorf("build password hasher: %w", err)
+	}
+
 	// ── Repositories ─────────────────
 	projectRepo := repository.NewProjectRepository(pool)
 	userRepo := repository.NewUserRepository()
@@ -80,6 +90,20 @@ func run(ctx context.Context, cfg Config, pool database.Pool) error {
 	flowRepo := repository.NewFlowDefinitionRepository(pool)
 	attemptRepo := repository.NewAuthAttemptRepository(pool)
 	schemaRepo := repository.NewJSONSchemaRepository(pool)
+
+	schemaCache, err := lru.New2Q[string, *jsonschema.Schema](1000)
+	if err != nil {
+		return fmt.Errorf("build schema cache: %w", err)
+	}
+	serverURL, err := url.Parse(cfg.Server.Address)
+	if err != nil {
+		return fmt.Errorf("invalid server url: %w", err)
+	}
+	schemaResolver := domain.NewJSONSchemaResolver(schemaRepo, schemaCache, 10, 1000_000, &http.Client{}, serverURL)
+	schemaValidator, err := domain.NewSchemaValidator(serverURL.String())
+	if err != nil {
+		return fmt.Errorf("build schema validator: %w", err)
+	}
 
 	// ── Services ─────────────────────
 	flowService := service.NewFlowService(pool, flowRepo)
@@ -91,11 +115,13 @@ func run(ctx context.Context, cfg Config, pool database.Pool) error {
 		userRepo,
 		userPasswordRepo,
 		userPasskeyRepo,
+		passwordHasher,
 	)
 	userService := service.NewUserService(
 		pool, userRepo,
 		schemaRepo,
 	)
+	schemaService := service.NewSchemaService(pool, schemaRepo, schemaResolver, schemaValidator)
 
 	// ── HTTP Server ─────────────────
 
@@ -103,7 +129,7 @@ func run(ctx context.Context, cfg Config, pool database.Pool) error {
 	defer stop()
 
 	oasServer, err := oasapi.NewServer(
-		api.NewHandler(flowService, authAttemptSvc, userService),
+		api.NewHandler(flowService, authAttemptSvc, schemaService, userService),
 		api.NewSecurityHandler(),
 		oasapi.WithErrorHandler(api.OgenErrorHandler))
 	if err != nil {
@@ -148,6 +174,11 @@ func loadConfig(configPath string) (Config, error) {
 	v.AutomaticEnv()
 
 	v.SetDefault("server.address", ":8080")
+	v.SetDefault("password_hasher.hasher.algorithm", crypto.HashNameBcrypt)
+	v.SetDefault("password_hasher.hasher.cost", 10)
+	v.SetDefault("password_hasher.limits", crypto.HashLimitsConfig{
+		Bcrypt: crypto.BcryptLimitsConfig{MinCost: 10, MaxCost: 16},
+	})
 
 	if configPath != "" {
 		v.SetConfigFile(configPath)

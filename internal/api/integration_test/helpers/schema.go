@@ -1,8 +1,7 @@
-//go:build integration
-
 package helpers
 
 import (
+	"net/url"
 	"testing"
 
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -10,10 +9,24 @@ import (
 	"github.com/stretchr/testify/require"
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database/repository"
 )
 
-const BuiltinSchemaBaseURL = "https://test.example.schemas.com"
+const BuiltinSchemaBaseURL = "https://test.example.schemas.com/schemas"
+
+func (h *Harness) EnsureSchemaService(t *testing.T) *service.SchemaService {
+	t.Helper()
+	if h.SchemaService == nil {
+		h.SchemaService = service.NewSchemaService(
+			h.EnsureDBPool(t),
+			h.EnsureSchemaRepo(t),
+			h.EnsureSchemaResolver(t),
+			h.EnsureSchemaValidator(t),
+		)
+	}
+	return h.SchemaService
+}
 
 func (h *Harness) EnsureSchemaRepo(t *testing.T) domain.JSONSchemaRepository {
 	t.Helper()
@@ -37,16 +50,16 @@ func (h *Harness) EnsureSchemaResolver(t *testing.T) *domain.JSONSchemaResolver 
 			0,
 			0,
 			h.EnsureHttpClient(t),
-			nil,
+			mustParseURL(t, BuiltinSchemaBaseURL),
 		)
 	}
 	return h.SchemaResolver
 }
 
-func (h *Harness) EnsureSchemaValidator(t *testing.T) *domain.TenantSchemaValidator {
+func (h *Harness) EnsureSchemaValidator(t *testing.T) *domain.SchemaValidator {
 	t.Helper()
 	if h.SchemaValidator == nil {
-		schemaValidator, err := domain.NewTenantSchemaValidator(BuiltinSchemaBaseURL)
+		schemaValidator, err := domain.NewSchemaValidator(BuiltinSchemaBaseURL)
 		require.NoError(t, err)
 
 		h.SchemaValidator = schemaValidator
@@ -66,9 +79,18 @@ func (h *Harness) CreateUserSchema(t *testing.T, projectID string, schema string
 		Type:       api.UserSchemaCreateSchemaReq,
 		UserSchema: apiSchema,
 	}
+	params := api.CreateSchemaParams{
+		ProjectID: api.OptProjectID{Set: true, Value: api.ProjectID(projectID)},
+	}
 
-	resp, err := client.CreateSchema(t.Context(), req)
+	resp, err := client.CreateSchema(t.Context(), req, params)
 	require.NoError(t, err)
 	require.IsType(t, &api.CreateSchemaResponse{}, resp)
-	return resp.(*api.CreateSchemaResponse).ID.Value
+	return resp.(*api.CreateSchemaResponse).ID
+}
+
+func mustParseURL(t *testing.T, s string) *url.URL {
+	u, err := url.Parse(s)
+	require.NoError(t, err)
+	return u
 }

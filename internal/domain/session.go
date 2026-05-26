@@ -21,7 +21,7 @@ type Session struct {
 	// A user may have multiple sessions (e.g. from different devices or browsers), and UserID may be nil during some lifecycle stages.
 	UserID *string
 
-	// AuthAttempts are deleted as soon as they are handed off to a session and are therefore not accessible on a session.
+	Factors []AuthFactor
 }
 
 type SessionRepository interface {

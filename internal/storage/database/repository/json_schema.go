@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
@@ -89,6 +90,10 @@ func (r *JSONSchemaRepository) URLCondition(url string) database.Condition {
 	return database.NewTextCondition(r.URL(), database.TextOperationEqual, url)
 }
 
+func (r *JSONSchemaRepository) GetByID(ctx context.Context, client database.QueryExecutor, projectID string, schemaID string) (*domain.JSONSchema, error) {
+	return r.Get(ctx, client, database.WithCondition(r.PrimaryKeyCondition(projectID, schemaID)))
+}
+
 func (r *JSONSchemaRepository) Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*domain.JSONSchema, error) {
 	builder := database.NewStatementBuilder("SELECT ")
 	database.Columns{
@@ -167,10 +172,10 @@ func (r *JSONSchemaRepository) Delete(ctx context.Context, client database.Query
 }
 
 type jsonSchemaRow struct {
-	ProjectID string    `db:"project_id"`
-	URL       string    `db:"url"`
-	CreatedAt time.Time `db:"created_at"`
-	Payload   []byte    `db:"payload"`
+	ProjectID string               `db:"project_id"`
+	URL       string               `db:"url"`
+	CreatedAt time.Time            `db:"created_at"`
+	Payload   JSON[json.RawMessage] `db:"payload"`
 }
 
 func (r *jsonSchemaRow) toDomain() *domain.JSONSchema {
@@ -178,7 +183,7 @@ func (r *jsonSchemaRow) toDomain() *domain.JSONSchema {
 		ProjectID: r.ProjectID,
 		URL:       r.URL,
 		CreatedAt: r.CreatedAt,
-		Schema:    r.Payload,
+		Schema:    r.Payload.Value,
 	}
 }
 

@@ -1,6 +1,6 @@
 {
   "title": "ExampleUserSchema",
-  "metaSchema": "https://test.example.schemas.com/schemas/user-schema.yaml",
+  "metaSchema": "https://test.example.schemas.com/schemas/user-schema.json",
   "$id": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml",
   "kind": "user-schema",
   "type": "object",
@@ -33,8 +33,7 @@
     },
     "firstName": {
       "type": "string",
-      "description": "The user's first name.",
-      "x-unique": "team"
+      "description": "The user's first name."
     },
     "lastName": {
       "type": "string",

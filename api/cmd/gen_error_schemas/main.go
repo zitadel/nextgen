@@ -70,7 +70,6 @@ allOf:
 
 type errorInfo struct {
 	code        string
-	message     string
 	description string
 }
 
@@ -102,20 +101,6 @@ func extractDomainErrors(domainPath string) []errorInfo {
 					return true
 				}
 
-				// Extract documentation comment
-				doc := ""
-				if funcDecl.Doc != nil {
-					var lines []string
-					for _, comment := range funcDecl.Doc.List {
-						line := strings.TrimPrefix(comment.Text, "//")
-						line = strings.TrimSpace(line)
-						if line != "" {
-							lines = append(lines, line)
-						}
-					}
-					doc = strings.Join(lines, " ")
-				}
-
 				// Find newError() call
 				for _, stmt := range funcDecl.Body.List {
 					retStmt, ok := stmt.(*ast.ReturnStmt)
@@ -138,17 +123,10 @@ func extractDomainErrors(domainPath string) []errorInfo {
 									if !ok {
 										continue
 									}
-									message := strings.Trim(msgLit.Value, `"`)
-
-									// Use doc comment as description, or fall back to message
-									description := doc
-									if description == "" {
-										description = capitalizeFirst(message)
-									}
+									description := capitalizeFirst(strings.Trim(msgLit.Value, `"`))
 
 									errors = append(errors, errorInfo{
 										code:        code,
-										message:     message,
 										description: description,
 									})
 								}

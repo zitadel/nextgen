@@ -21,9 +21,24 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
+const (
+	PrefixJSONSchema ResourcePrefix = "sch"
+)
+
+func ErrJSONSchemaNotFound() Error {
+	return newError(PrefixJSONSchema.ErrorCodePrefix("not_found"), "schema not found", nil, nil)
+}
+
+func ErrJSONSchemaInvalid() Error {
+	return newError(PrefixJSONSchema.ErrorCodePrefix("invalid_request"), "invalid request", nil, nil)
+}
+
+func ErrJSONSchemaAlreadyExists() Error {
+	return newError(PrefixJSONSchema.ErrorCodePrefix("already_exists"), "a schema with the given id already exists", nil, nil)
+}
+
 var absoluteScheme = regexp.MustCompile(`^https?://`)
 
-// JSONSchema represent a JSON schema which can be used to validate JSON data.
 type JSONSchema struct {
 	ProjectID string
 	URL       string
