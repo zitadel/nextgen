@@ -1333,6 +1333,43 @@ type CreateFlowDefinitionConflict ErrorDetails
 func (*CreateFlowDefinitionConflict) createFlowDefinitionRes() {}
 
 // Ref: #
+type CreateFlowDefinitionRequest struct {
+	ProjectID      ProjectID      `json:"project_id"`
+	SchemaURI      OptSchemaURI   `json:"schema_uri"`
+	FlowDefinition FlowDefinition `json:"flow_definition"`
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *CreateFlowDefinitionRequest) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetSchemaURI returns the value of SchemaURI.
+func (s *CreateFlowDefinitionRequest) GetSchemaURI() OptSchemaURI {
+	return s.SchemaURI
+}
+
+// GetFlowDefinition returns the value of FlowDefinition.
+func (s *CreateFlowDefinitionRequest) GetFlowDefinition() FlowDefinition {
+	return s.FlowDefinition
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *CreateFlowDefinitionRequest) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetSchemaURI sets the value of SchemaURI.
+func (s *CreateFlowDefinitionRequest) SetSchemaURI(val OptSchemaURI) {
+	s.SchemaURI = val
+}
+
+// SetFlowDefinition sets the value of FlowDefinition.
+func (s *CreateFlowDefinitionRequest) SetFlowDefinition(val FlowDefinition) {
+	s.FlowDefinition = val
+}
+
+// Ref: #
 type CreateFlowRequest struct {
 	ProjectID ProjectID                `json:"project_id"`
 	Purpose   CreateFlowRequestPurpose `json:"purpose"`
@@ -2516,43 +2553,6 @@ func (s *FlowDefinition) SetAudience(val OptFlowAudience) {
 // SetSteps sets the value of Steps.
 func (s *FlowDefinition) SetSteps(val []FlowDefinitionStep) {
 	s.Steps = val
-}
-
-// Ref: #
-type FlowDefinitionCreateRequest struct {
-	ProjectID      ProjectID      `json:"project_id"`
-	SchemaURI      OptSchemaURI   `json:"schema_uri"`
-	FlowDefinition FlowDefinition `json:"flow_definition"`
-}
-
-// GetProjectID returns the value of ProjectID.
-func (s *FlowDefinitionCreateRequest) GetProjectID() ProjectID {
-	return s.ProjectID
-}
-
-// GetSchemaURI returns the value of SchemaURI.
-func (s *FlowDefinitionCreateRequest) GetSchemaURI() OptSchemaURI {
-	return s.SchemaURI
-}
-
-// GetFlowDefinition returns the value of FlowDefinition.
-func (s *FlowDefinitionCreateRequest) GetFlowDefinition() FlowDefinition {
-	return s.FlowDefinition
-}
-
-// SetProjectID sets the value of ProjectID.
-func (s *FlowDefinitionCreateRequest) SetProjectID(val ProjectID) {
-	s.ProjectID = val
-}
-
-// SetSchemaURI sets the value of SchemaURI.
-func (s *FlowDefinitionCreateRequest) SetSchemaURI(val OptSchemaURI) {
-	s.SchemaURI = val
-}
-
-// SetFlowDefinition sets the value of FlowDefinition.
-func (s *FlowDefinitionCreateRequest) SetFlowDefinition(val FlowDefinition) {
-	s.FlowDefinition = val
 }
 
 // Merged schema.

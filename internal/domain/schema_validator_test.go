@@ -292,6 +292,6 @@ func TestSchemaValidator_LatestSchemaURI(t *testing.T) {
 
 	t.Run("returns error for unknown kind", func(t *testing.T) {
 		_, err := v.LatestSchemaURI("unknown-kind")
-		require.ErrorIs(t, err, domain.ErrUnknownSchemaURI)
+		require.ErrorIs(t, err, domain.ErrUnknownSchemaKind)
 	})
 }
