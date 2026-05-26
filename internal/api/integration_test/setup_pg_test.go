@@ -8,6 +8,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/database/dialect/postgres"
 	"github.com/zitadel/nextgen/internal/storage/database/dialect/postgres/embedded"
@@ -34,6 +35,7 @@ func runTests(m *testing.M) int {
 		stop = func() {}
 	} else {
 		connector, stop, err = embedded.StartEmbedded()
+		helpers.Connector = connector
 	}
 	if err != nil {
 		log.Printf("setup: failed to start database: %v", err)
