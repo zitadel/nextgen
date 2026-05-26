@@ -60,6 +60,7 @@ type SessionRepository struct {
 	UserAgentsTable   string
 	ChecksTable       string
 	AuthAttemptsTable string
+	tokenRepo         domain.TokenRepository
 	now               database.Instruction
 	encodeUserAgent   func(info []byte) any
 	isSpanner         bool
@@ -76,6 +77,7 @@ func NewSessionRepository(pool database.QueryExecutor) *SessionRepository {
 			UserAgentsTable:   spannerTableUserAgents,
 			ChecksTable:       spannerTableChecks,
 			AuthAttemptsTable: spannerTableAuthAttempts,
+			tokenRepo:         NewTokenRepository(pool),
 			now:               database.CurrentTimestampInstruction,
 			encodeUserAgent:   func(b []byte) any { return string(b) },
 			isSpanner:         true,
@@ -88,6 +90,7 @@ func NewSessionRepository(pool database.QueryExecutor) *SessionRepository {
 			UserAgentsTable:   pgTableUserAgents,
 			ChecksTable:       pgTableChecks,
 			AuthAttemptsTable: pgTableAuthAttempts,
+			tokenRepo:         NewTokenRepository(pool),
 			now:               database.NowInstruction,
 			encodeUserAgent:   func(b []byte) any { return b },
 			isSpanner:         false,
@@ -233,14 +236,54 @@ func (r *SessionRepository) buildInsertSessionPostgres(projectID string, userAge
 	return b
 }
 
-func (r *SessionRepository) buildUpdateSessionTokenPostgres(projectID string, sessionID database.Identity) *database.StatementBuilder {
+func (r *SessionRepository) buildUpdateSessionTokenID(projectID string, sessionID, tokenID database.Identity) *database.StatementBuilder {
 	b := database.NewStatementBuilder("UPDATE ")
 	b.WriteString(r.meta.tableName)
-	b.WriteString(" SET token_id = id WHERE project_id = ")
+	b.WriteString(" SET token_id = ")
+	b.WriteArg(tokenID)
+	b.WriteString(" WHERE project_id = ")
 	b.WriteArg(projectID)
 	b.WriteString(" AND id = ")
 	b.WriteArg(sessionID)
 	return b
+}
+
+func shouldRevokePreviousToken(previousTokenID string) bool {
+	return previousTokenID != "" && previousTokenID != "0"
+}
+
+func (r *SessionRepository) createSessionToken(ctx context.Context, q database.QueryExecutor, session *domain.Session, previousTokenID string) error {
+	if session.ID == "" {
+		return fmt.Errorf("session id is required")
+	}
+
+	expiresAt := session.ExpiresAt
+	tok := &domain.Token{
+		ProjectID: session.ProjectID,
+		Type:      domain.TokenTypeSessionToken,
+		SessionID: &session.ID,
+		ExpiresAt: &expiresAt,
+		Scope:     []string{},
+	}
+	if session.UserID != nil {
+		tok.UserID = *session.UserID
+	}
+	if err := r.tokenRepo.Create(ctx, q, tok); err != nil {
+		return fmt.Errorf("failed to create session token: %w", err)
+	}
+
+	updateB := r.buildUpdateSessionTokenID(session.ProjectID, database.Identity(session.ID), database.Identity(tok.TokenID))
+	if _, err := q.Exec(ctx, updateB.String(), updateB.Args()...); err != nil {
+		return fmt.Errorf("failed to set session token_id: %w", err)
+	}
+	session.TokenID = tok.TokenID
+
+	if shouldRevokePreviousToken(previousTokenID) {
+		if err := r.tokenRepo.Delete(ctx, q, r.tokenRepo.PrimaryKeyCondition(session.ProjectID, previousTokenID)); err != nil {
+			return fmt.Errorf("failed to revoke previous session token: %w", err)
+		}
+	}
+	return nil
 }
 
 func (r *SessionRepository) buildInsertSessionSpanner(projectID string, userAgentID database.Identity, ttl time.Duration) *database.StatementBuilder {
@@ -265,18 +308,6 @@ func (r *SessionRepository) sessionTTLChange(ttl time.Duration) database.Change 
 		return database.NewChange(database.NewColumn(r.meta.tableName, "time_to_live"), ttl.Nanoseconds())
 	}
 	return database.NewChange(database.NewColumn(r.meta.tableName, "time_to_live"), ttl)
-}
-
-func (r *SessionRepository) buildUpdateSessionTokenSpanner(projectID string, sessionID database.Identity) *database.StatementBuilder {
-	b := database.NewStatementBuilder("UPDATE ")
-	b.WriteString(r.meta.tableName)
-	b.WriteString(" SET token_id = ")
-	b.WriteArg(sessionID)
-	b.WriteString(" WHERE project_id = ")
-	b.WriteArg(projectID)
-	b.WriteString(" AND id = ")
-	b.WriteArg(sessionID)
-	return b
 }
 
 func (r *SessionRepository) buildLoadAttemptChecks(projectID, attemptID string) *database.StatementBuilder {
@@ -525,17 +556,11 @@ func (r *SessionRepository) insertSessionPostgres(ctx context.Context, q databas
 		if err != nil {
 			return fmt.Errorf("failed to insert session: %w", err)
 		}
-		updateB := r.buildUpdateSessionTokenPostgres(session.ProjectID, sessionID)
-		_, err = tx.Exec(ctx, updateB.String(), updateB.Args()...)
-		if err != nil {
-			return fmt.Errorf("failed to set session token_id: %w", err)
-		}
 		session.ID = sessionID.String()
-		session.TokenID = session.ID
 		session.CreatedAt = createdAt
 		session.UpdatedAt = updatedAt
 		session.ExpiresAt = expiresAt
-		return nil
+		return r.createSessionToken(ctx, tx, session, "")
 	})
 }
 
@@ -547,14 +572,8 @@ func (r *SessionRepository) insertSessionSpanner(ctx context.Context, q database
 		if err != nil {
 			return fmt.Errorf("failed to insert session: %w", err)
 		}
-		updateB := r.buildUpdateSessionTokenSpanner(session.ProjectID, sessionID)
-		_, err = tx.Exec(ctx, updateB.String(), updateB.Args()...)
-		if err != nil {
-			return fmt.Errorf("failed to set session token_id: %w", err)
-		}
 		session.ID = sessionID.String()
-		session.TokenID = session.ID
-		return nil
+		return r.createSessionToken(ctx, tx, session, "")
 	})
 }
 
@@ -611,6 +630,10 @@ func (r *SessionRepository) exchange(ctx context.Context, q database.QueryExecut
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", domain.ErrSessionExchangeConflict(), err)
 	}
+	oldTokenID := targetSession.TokenID
+	if userID != nil {
+		targetSession.UserID = userID
+	}
 	changes := []database.Change{
 		database.NewChange(database.NewColumn(r.meta.tableName, "updated_at"), r.now),
 	}
@@ -632,9 +655,14 @@ func (r *SessionRepository) exchange(ctx context.Context, q database.QueryExecut
 		return nil, fmt.Errorf("%w: %v", domain.ErrSessionExchangeConflict(), err)
 	}
 
-	// TODO(adlerhurst): create a new session token and update the session (set the token_id to the new token and return it in the session), to prevent session fixation attacks.
-
-	return r.Get(ctx, q, projectID, targetSession.ID)
+	refreshed, err := r.Get(ctx, q, projectID, targetSession.ID)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", domain.ErrSessionExchangeConflict(), err)
+	}
+	if err := r.createSessionToken(ctx, q, refreshed, oldTokenID); err != nil {
+		return nil, fmt.Errorf("%w: %v", domain.ErrSessionExchangeConflict(), err)
+	}
+	return refreshed, nil
 }
 
 func exchangeTTL(ttl time.Duration) time.Duration {

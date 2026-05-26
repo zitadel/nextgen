@@ -76,6 +76,9 @@ func (h Handler) GetMySession(ctx context.Context, params api.GetMySessionParams
 	if err != nil {
 		return nil, err
 	}
+	if err := validateSessionToken(session, sessionToken); err != nil {
+		return nil, err
+	}
 	return sessionToAPI(session), nil
 }
 
@@ -120,6 +123,17 @@ func (h Handler) RevokeMySession(ctx context.Context, params api.RevokeMySession
 		SessionID: sessionToken.SessionID,
 	}
 
+	session, err := h.sessionService.Get(ctx, service.GetSessionInput{
+		ProjectID: input.ProjectID,
+		SessionID: input.SessionID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if err := validateSessionToken(session, sessionToken); err != nil {
+		return nil, err
+	}
+
 	err = h.sessionService.Delete(ctx, input)
 	if err != nil {
 		return nil, err
@@ -127,6 +141,16 @@ func (h Handler) RevokeMySession(ctx context.Context, params api.RevokeMySession
 	return &api.RevokeMySessionNoContent{
 		SetCookie: deleteSessionCookie(),
 	}, nil
+}
+
+func validateSessionToken(session *domain.Session, token *domain.SessionToken) error {
+	if session.TokenID != token.TokenID {
+		return domain.ErrSessionTokenInvalid()
+	}
+	if time.Now().After(session.ExpiresAt) {
+		return domain.ErrSessionTokenInvalid()
+	}
+	return nil
 }
 
 func userAgentToDomain(agent api.OptCreateSessionRequestUserAgent) *domain.UserAgent {

@@ -70,7 +70,15 @@ func TestSession_Create(t *testing.T) {
 		require.NoError(t, repo.Create(t.Context(), tx, session))
 		assert.NotEmpty(t, session.ID)
 		assert.NotEmpty(t, session.TokenID)
-		assert.Equal(t, session.ID, session.TokenID)
+
+		tokenRepo := repository.NewTokenRepository(pool)
+		storedToken, err := tokenRepo.Get(t.Context(), tx, database.WithCondition(
+			tokenRepo.PrimaryKeyCondition(session.ProjectID, session.TokenID),
+		))
+		require.NoError(t, err)
+		assert.Equal(t, domain.TokenTypeSessionToken, storedToken.Type)
+		require.NotNil(t, storedToken.SessionID)
+		assert.Equal(t, session.ID, *storedToken.SessionID)
 		assert.False(t, session.CreatedAt.IsZero())
 		assert.False(t, session.ExpiresAt.IsZero())
 
@@ -230,6 +238,56 @@ func TestSession_Exchange_deletesAttempt(t *testing.T) {
 
 	_, err = repository.NewAuthAttemptRepository(pool).GetByID(t.Context(), tx, projectID, attempt.ID)
 	require.ErrorIs(t, err, domain.ErrAuthAttemptNotFound())
+}
+
+func TestSession_Exchange_rotatesToken(t *testing.T) {
+	repo := repository.NewSessionRepository(pool)
+	tokenRepo := repository.NewTokenRepository(pool)
+
+	t.Run("new_session", func(t *testing.T) {
+		tx, rollback := transactionForRollback(t)
+		defer rollback()
+
+		projectID := "p-ex-rotate-new"
+		plain, _ := handoffCompletedAttempt(t, tx, projectID, nil)
+
+		exchanged, err := repo.Exchange(t.Context(), tx, projectID, plain, nil, 0)
+		require.NoError(t, err)
+		assert.NotEmpty(t, exchanged.TokenID)
+	})
+
+	t.Run("step_up_existing_session", func(t *testing.T) {
+		tx, rollback := transactionForRollback(t)
+		defer rollback()
+
+		projectID := "p-ex-rotate-step"
+		ensureProject(t, tx, projectID)
+
+		anonymous, err := domain.NewSession(projectID, nil)
+		require.NoError(t, err)
+		require.NoError(t, repo.Create(t.Context(), tx, anonymous))
+		oldTokenID := anonymous.TokenID
+
+		plain, _ := handoffCompletedAttempt(t, tx, projectID, func(a *domain.AuthAttempt) {
+			a.SessionID = &anonymous.ID
+		})
+
+		exchanged, err := repo.Exchange(t.Context(), tx, projectID, plain, nil, 0)
+		require.NoError(t, err)
+		assert.Equal(t, anonymous.ID, exchanged.ID)
+		assert.NotEqual(t, oldTokenID, exchanged.TokenID)
+
+		_, err = tokenRepo.Get(t.Context(), tx, database.WithCondition(
+			tokenRepo.PrimaryKeyCondition(projectID, oldTokenID),
+		))
+		require.Error(t, err)
+
+		current, err := tokenRepo.Get(t.Context(), tx, database.WithCondition(
+			tokenRepo.PrimaryKeyCondition(projectID, exchanged.TokenID),
+		))
+		require.NoError(t, err)
+		assert.Equal(t, domain.TokenTypeSessionToken, current.Type)
+	})
 }
 
 func TestSession_Exchange_conflictMissingSession(t *testing.T) {
