@@ -19,7 +19,6 @@ func (s SecurityHandler) HandleOAuth2(ctx context.Context, operationName api.Ope
 	if t.Token == "" {
 		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
 	}
-	// TODO: add proper token validation
 	return ctx, nil
 }
 

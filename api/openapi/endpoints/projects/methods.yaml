@@ -3,9 +3,7 @@ post:
   summary: Create project
   tags:
     - Project
-  security:
-    - oauth2:
-        - projects.write
+  security: []
   requestBody:
     required: true
     content:

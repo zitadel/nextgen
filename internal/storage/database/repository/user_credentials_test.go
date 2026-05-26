@@ -1,6 +1,7 @@
 package repository_test
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -14,17 +15,17 @@ import (
 func insertProjectTeamSchemaUser(t *testing.T, tx database.Transaction, pid, tid, schemaURL, userID string) {
 	t.Helper()
 	ctx := t.Context()
-	_, err := tx.Exec(ctx, `INSERT INTO zitadel_nextgen.projects (id) VALUES ($1)`, pid)
+	_, err := tx.Exec(ctx, fmt.Sprintf(`INSERT INTO %s (id) VALUES ($1)`, dbTable("projects")), pid)
 	require.NoError(t, err)
-	_, err = tx.Exec(ctx, `INSERT INTO zitadel_nextgen.teams (project_id, id) VALUES ($1,$2)`, pid, tid)
+	_, err = tx.Exec(ctx, fmt.Sprintf(`INSERT INTO %s (project_id, id) VALUES ($1,$2)`, dbTable("teams")), pid, tid)
 	require.NoError(t, err)
 	_, err = tx.Exec(ctx,
-		`INSERT INTO zitadel_nextgen.json_schemas (project_id, url, payload) VALUES ($1,$2,$3::json)`,
+		fmt.Sprintf(`INSERT INTO %s (project_id, url, payload) VALUES ($1,$2,$3%s)`, dbTable("json_schemas"), jsonCast()),
 		pid, schemaURL, []byte("{}"),
 	)
 	require.NoError(t, err)
 	_, err = tx.Exec(ctx,
-		`INSERT INTO zitadel_nextgen.users (project_id, schema_url, id, team_id) VALUES ($1,$2,$3,$4)`,
+		fmt.Sprintf(`INSERT INTO %s (project_id, schema_url, id, team_id) VALUES ($1,$2,$3,$4)`, dbTable("users")),
 		pid, schemaURL, userID, tid,
 	)
 	require.NoError(t, err)

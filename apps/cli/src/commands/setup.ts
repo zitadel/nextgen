@@ -18,6 +18,15 @@ import { validateJsonSchema } from "../schema/validate";
 import { runApply } from "./apply";
 import { runDeployConnect } from "./deploy";
 
+/**
+ * Canonical URI for the human-user schema flow definitions reference by
+ * default. The schema body the CLI writes locally (`.zitadel/schemas/user.json`)
+ * is derived from this same shape; the URI is the spec-required pointer the
+ * platform stores against the flow.
+ */
+const DEFAULT_USER_SCHEMA_URI =
+  "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/human-user.yaml";
+
 export type SetupOptions = GlobalOptions & {
   framework?: string;
   userFields?: string;
@@ -132,6 +141,7 @@ export async function runSetup(io: CliIO, opts: SetupOptions): Promise<void> {
     dryRun: opts.dryRun ?? false,
     force: opts.force ?? false,
   });
+
   const warnings: string[] = [];
 
   const setupOpts = { ...opts, source: effectiveServer };

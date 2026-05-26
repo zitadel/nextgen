@@ -75,9 +75,16 @@ all others are patches. By versioning the Meta-Schema separately from the binary
 allows for a more fine-grained communication of what changed in the engine
 instead of the entire application.
 
+Since we possibly need to validate against multiple versions of schemas when 
+a CUSTOMER submits an instance, we need to keep multiple versions of the schema
+in the application. This is done using adding the version to the filename.
+E.g.: 
+- `api/openapi/endpoints/schemas/user-schema/user-schema-v1.0.yaml`
+- `api/openapi/endpoints/schemas/user-schema/user-schema-v1.1.yaml`
+
 Schemas created by the CUSTOMER which are stored in ZITADEL are not versioned.
 It is assumed that each schema is immutable. If a CUSTOMER wants to create a
-new version they can submit a brand new schema.
+new version they can submit a new schema.
 
 Since instances are the result of a schema, they should contain the version from
 which they were created. They are not versioned themselves though, since they do
