@@ -48,42 +48,46 @@ func (m sessionMeta) UpdatedAtColumn() database.Column {
 func (m sessionMeta) qualifiedTableName() string { return m.tableName }
 
 var (
-	_ domain.SessionRepository = (*sessionRepository)(nil)
+	_ domain.SessionRepository = (*SessionRepository)(nil)
 	_ updatable                = (*sessionMeta)(nil)
 	_ deletable                = (*sessionMeta)(nil)
 )
 
-type sessionRepository struct {
+// SessionRepository implements [domain.SessionRepository].
+type SessionRepository struct {
 	meta              sessionMeta
-	userAgentsTable   string
-	checksTable       string
-	authAttemptsTable string
+	SessionsTable     string
+	UserAgentsTable   string
+	ChecksTable       string
+	AuthAttemptsTable string
 	now               database.Instruction
 	encodeUserAgent   func(info []byte) any
 	isSpanner         bool
 	pool              database.QueryExecutor
 }
 
-// NewSessionRepository returns a dialect-specific implementation of [domain.SessionRepository].
-func NewSessionRepository(pool database.QueryExecutor) domain.SessionRepository {
+// NewSessionRepository returns a dialect-specific [SessionRepository].
+func NewSessionRepository(pool database.QueryExecutor) *SessionRepository {
 	switch pool.(type) {
 	case spanner.SpannerPooler:
-		return &sessionRepository{
+		return &SessionRepository{
 			meta:              sessionMeta{tableName: spannerTableSessions},
-			userAgentsTable:   spannerTableUserAgents,
-			checksTable:       spannerTableChecks,
-			authAttemptsTable: spannerTableAuthAttempts,
+			SessionsTable:     spannerTableSessions,
+			UserAgentsTable:   spannerTableUserAgents,
+			ChecksTable:       spannerTableChecks,
+			AuthAttemptsTable: spannerTableAuthAttempts,
 			now:               database.CurrentTimestampInstruction,
 			encodeUserAgent:   func(b []byte) any { return string(b) },
 			isSpanner:         true,
 			pool:              pool,
 		}
 	case postgres.PostgresPooler:
-		return &sessionRepository{
+		return &SessionRepository{
 			meta:              sessionMeta{tableName: pgTableSessions},
-			userAgentsTable:   pgTableUserAgents,
-			checksTable:       pgTableChecks,
-			authAttemptsTable: pgTableAuthAttempts,
+			SessionsTable:     pgTableSessions,
+			UserAgentsTable:   pgTableUserAgents,
+			ChecksTable:       pgTableChecks,
+			AuthAttemptsTable: pgTableAuthAttempts,
 			now:               database.NowInstruction,
 			encodeUserAgent:   func(b []byte) any { return b },
 			isSpanner:         false,
@@ -111,11 +115,11 @@ func withTransaction(ctx context.Context, q database.QueryExecutor, fn func(ctx 
 	return tx.End(ctx, err)
 }
 
-func (r *sessionRepository) Create(ctx context.Context, q database.QueryExecutor, session *domain.Session) error {
+func (r *SessionRepository) Create(ctx context.Context, q database.QueryExecutor, session *domain.Session) error {
 	return r.insertSession(ctx, q, session)
 }
 
-func (r *sessionRepository) Get(ctx context.Context, q database.QueryExecutor, projectID, sessionID string) (*domain.Session, error) {
+func (r *SessionRepository) Get(ctx context.Context, q database.QueryExecutor, projectID, sessionID string) (*domain.Session, error) {
 	sessions, err := r.querySessions(ctx, q, projectID, sessionID)
 	if err != nil {
 		return nil, err
@@ -126,7 +130,7 @@ func (r *sessionRepository) Get(ctx context.Context, q database.QueryExecutor, p
 	return sessions[0], nil
 }
 
-func (r *sessionRepository) List(ctx context.Context, q database.QueryExecutor, projectID string) ([]*domain.Session, error) {
+func (r *SessionRepository) List(ctx context.Context, q database.QueryExecutor, projectID string) ([]*domain.Session, error) {
 	sessions, err := r.querySessions(ctx, q, projectID, "")
 	if err != nil {
 		return nil, err
@@ -137,7 +141,7 @@ func (r *sessionRepository) List(ctx context.Context, q database.QueryExecutor, 
 	return sessions, nil
 }
 
-func (r *sessionRepository) Delete(ctx context.Context, q database.QueryExecutor, projectID, sessionID string) error {
+func (r *SessionRepository) Delete(ctx context.Context, q database.QueryExecutor, projectID, sessionID string) error {
 	cond := database.And(
 		database.NewTextCondition(database.NewColumn(r.meta.tableName, "project_id"), database.TextOperationEqual, projectID),
 		database.NewTextCondition(database.NewColumn(r.meta.tableName, "id"), database.TextOperationEqual, database.Identity(sessionID)),
@@ -152,7 +156,7 @@ func (r *sessionRepository) Delete(ctx context.Context, q database.QueryExecutor
 	return nil
 }
 
-func (r *sessionRepository) Exchange(ctx context.Context, q database.QueryExecutor, projectID, handoffToken string, _ *string, ttl time.Duration) (*domain.Session, error) {
+func (r *SessionRepository) Exchange(ctx context.Context, q database.QueryExecutor, projectID, handoffToken string, _ *string, ttl time.Duration) (*domain.Session, error) {
 	var result *domain.Session
 	err := withTransaction(ctx, q, func(ctx context.Context, tx database.QueryExecutor) (err error) {
 		result, err = r.exchange(ctx, tx, projectID, handoffToken, ttl)
@@ -161,20 +165,20 @@ func (r *sessionRepository) Exchange(ctx context.Context, q database.QueryExecut
 	return result, err
 }
 
-func (r *sessionRepository) appendSessionSelect(b *database.StatementBuilder) {
+func (r *SessionRepository) appendSessionSelect(b *database.StatementBuilder) {
 	b.WriteString("SELECT s.project_id, s.id, s.created_at, s.updated_at, s.expires_at, s.time_to_live, s.token_id, s.user_id,")
 	b.WriteString(" ua.id, ua.info,")
 	b.WriteString(" c.type, c.id, c.last_challenged_at, c.last_verified_at, c.last_failed_at, c.failure_count, c.challenge_payload, c.factor_payload")
 	b.WriteString(" FROM ")
 	b.WriteString(r.meta.tableName)
 	b.WriteString(" s LEFT JOIN ")
-	b.WriteString(r.userAgentsTable)
+	b.WriteString(r.UserAgentsTable)
 	b.WriteString(" ua ON s.project_id = ua.project_id AND s.user_agent_id = ua.id LEFT JOIN ")
-	b.WriteString(r.checksTable)
+	b.WriteString(r.ChecksTable)
 	b.WriteString(" c ON c.project_id = s.project_id AND c.session_id = s.id")
 }
 
-func (r *sessionRepository) appendSessionWhere(b *database.StatementBuilder, projectID, sessionID string) {
+func (r *SessionRepository) appendSessionWhere(b *database.StatementBuilder, projectID, sessionID string) {
 	b.WriteString(" WHERE s.project_id = ")
 	b.WriteArg(projectID)
 	if sessionID != "" {
@@ -183,7 +187,7 @@ func (r *sessionRepository) appendSessionWhere(b *database.StatementBuilder, pro
 	}
 }
 
-func (r *sessionRepository) buildSessionListQuery(projectID, sessionID string) *database.StatementBuilder {
+func (r *SessionRepository) buildSessionListQuery(projectID, sessionID string) *database.StatementBuilder {
 	b := database.NewStatementBuilder("")
 	r.appendSessionSelect(b)
 	r.appendSessionWhere(b, projectID, sessionID)
@@ -191,7 +195,7 @@ func (r *sessionRepository) buildSessionListQuery(projectID, sessionID string) *
 	return b
 }
 
-func (r *sessionRepository) querySessions(ctx context.Context, q database.QueryExecutor, projectID, sessionID string) ([]*domain.Session, error) {
+func (r *SessionRepository) querySessions(ctx context.Context, q database.QueryExecutor, projectID, sessionID string) ([]*domain.Session, error) {
 	b := r.buildSessionListQuery(projectID, sessionID)
 	rows, err := q.Query(ctx, b.String(), b.Args()...)
 	if err != nil {
@@ -201,9 +205,9 @@ func (r *sessionRepository) querySessions(ctx context.Context, q database.QueryE
 	return r.scanSessions(rows)
 }
 
-func (r *sessionRepository) buildInsertUserAgent(projectID string, info []byte) *database.StatementBuilder {
+func (r *SessionRepository) buildInsertUserAgent(projectID string, info []byte) *database.StatementBuilder {
 	b := database.NewStatementBuilder("INSERT INTO ")
-	b.WriteString(r.userAgentsTable)
+	b.WriteString(r.UserAgentsTable)
 	b.WriteString(" (project_id, info) VALUES (")
 	b.WriteArg(projectID)
 	b.WriteString(", ")
@@ -216,7 +220,7 @@ func (r *sessionRepository) buildInsertUserAgent(projectID string, info []byte) 
 	return b
 }
 
-func (r *sessionRepository) buildInsertSessionPostgres(projectID string, userAgentID database.Identity, ttl time.Duration) *database.StatementBuilder {
+func (r *SessionRepository) buildInsertSessionPostgres(projectID string, userAgentID database.Identity, ttl time.Duration) *database.StatementBuilder {
 	b := database.NewStatementBuilder("INSERT INTO ")
 	b.WriteString(r.meta.tableName)
 	b.WriteString(" (project_id, user_agent_id, time_to_live, token_id) VALUES (")
@@ -229,7 +233,7 @@ func (r *sessionRepository) buildInsertSessionPostgres(projectID string, userAge
 	return b
 }
 
-func (r *sessionRepository) buildUpdateSessionTokenPostgres(projectID string, sessionID database.Identity) *database.StatementBuilder {
+func (r *SessionRepository) buildUpdateSessionTokenPostgres(projectID string, sessionID database.Identity) *database.StatementBuilder {
 	b := database.NewStatementBuilder("UPDATE ")
 	b.WriteString(r.meta.tableName)
 	b.WriteString(" SET token_id = id WHERE project_id = ")
@@ -239,7 +243,7 @@ func (r *sessionRepository) buildUpdateSessionTokenPostgres(projectID string, se
 	return b
 }
 
-func (r *sessionRepository) buildInsertSessionSpanner(projectID string, userAgentID database.Identity, ttl time.Duration) *database.StatementBuilder {
+func (r *SessionRepository) buildInsertSessionSpanner(projectID string, userAgentID database.Identity, ttl time.Duration) *database.StatementBuilder {
 	b := database.NewStatementBuilder("INSERT INTO ")
 	b.WriteString(r.meta.tableName)
 	b.WriteString(" (project_id, user_agent_id, time_to_live, token_id, created_at, updated_at) VALUES (")
@@ -256,14 +260,14 @@ func (r *sessionRepository) buildInsertSessionSpanner(projectID string, userAgen
 	return b
 }
 
-func (r *sessionRepository) sessionTTLChange(ttl time.Duration) database.Change {
+func (r *SessionRepository) sessionTTLChange(ttl time.Duration) database.Change {
 	if r.isSpanner {
 		return database.NewChange(database.NewColumn(r.meta.tableName, "time_to_live"), ttl.Nanoseconds())
 	}
 	return database.NewChange(database.NewColumn(r.meta.tableName, "time_to_live"), ttl)
 }
 
-func (r *sessionRepository) buildUpdateSessionTokenSpanner(projectID string, sessionID database.Identity) *database.StatementBuilder {
+func (r *SessionRepository) buildUpdateSessionTokenSpanner(projectID string, sessionID database.Identity) *database.StatementBuilder {
 	b := database.NewStatementBuilder("UPDATE ")
 	b.WriteString(r.meta.tableName)
 	b.WriteString(" SET token_id = ")
@@ -275,9 +279,9 @@ func (r *sessionRepository) buildUpdateSessionTokenSpanner(projectID string, ses
 	return b
 }
 
-func (r *sessionRepository) buildLoadAttemptChecks(projectID, attemptID string) *database.StatementBuilder {
+func (r *SessionRepository) buildLoadAttemptChecks(projectID, attemptID string) *database.StatementBuilder {
 	b := database.NewStatementBuilder("SELECT id, type, last_verified_at FROM ")
-	b.WriteString(r.checksTable)
+	b.WriteString(r.ChecksTable)
 	b.WriteString(" WHERE project_id = ")
 	b.WriteArg(projectID)
 	b.WriteString(" AND auth_attempt_id = ")
@@ -286,9 +290,9 @@ func (r *sessionRepository) buildLoadAttemptChecks(projectID, attemptID string) 
 	return b
 }
 
-func (r *sessionRepository) buildLoadSessionChecks(projectID, sessionID string) *database.StatementBuilder {
+func (r *SessionRepository) buildLoadSessionChecks(projectID, sessionID string) *database.StatementBuilder {
 	b := database.NewStatementBuilder("SELECT id, type, last_verified_at FROM ")
-	b.WriteString(r.checksTable)
+	b.WriteString(r.ChecksTable)
 	b.WriteString(" WHERE project_id = ")
 	b.WriteArg(projectID)
 	b.WriteString(" AND session_id = ")
@@ -297,9 +301,9 @@ func (r *sessionRepository) buildLoadSessionChecks(projectID, sessionID string) 
 	return b
 }
 
-func (r *sessionRepository) buildSelectFactorPayload(projectID, checkID string) *database.StatementBuilder {
+func (r *SessionRepository) buildSelectFactorPayload(projectID, checkID string) *database.StatementBuilder {
 	b := database.NewStatementBuilder("SELECT factor_payload FROM ")
-	b.WriteString(r.checksTable)
+	b.WriteString(r.ChecksTable)
 	b.WriteString(" WHERE project_id = ")
 	b.WriteArg(projectID)
 	b.WriteString(" AND id = ")
@@ -307,9 +311,9 @@ func (r *sessionRepository) buildSelectFactorPayload(projectID, checkID string) 
 	return b
 }
 
-func (r *sessionRepository) buildPromoteCheck(sessionID, projectID string, checkID database.Identity) *database.StatementBuilder {
+func (r *SessionRepository) buildPromoteCheck(sessionID, projectID string, checkID database.Identity) *database.StatementBuilder {
 	b := database.NewStatementBuilder("UPDATE ")
-	b.WriteString(r.checksTable)
+	b.WriteString(r.ChecksTable)
 	b.WriteString(" SET session_id = ")
 	b.WriteArg(database.Identity(sessionID))
 	b.WriteString(", auth_attempt_id = NULL, challenge_payload = NULL, last_challenged_at = NULL, last_failed_at = NULL, failure_count = 0")
@@ -321,9 +325,9 @@ func (r *sessionRepository) buildPromoteCheck(sessionID, projectID string, check
 	return b
 }
 
-func (r *sessionRepository) buildDeleteSessionCheckLoser(projectID, sessionID string, typ domain.AuthCheckType, winnerID string) *database.StatementBuilder {
+func (r *SessionRepository) buildDeleteSessionCheckLoser(projectID, sessionID string, typ domain.AuthCheckType, winnerID string) *database.StatementBuilder {
 	b := database.NewStatementBuilder("DELETE FROM ")
-	b.WriteString(r.checksTable)
+	b.WriteString(r.ChecksTable)
 	b.WriteString(" WHERE project_id = ")
 	b.WriteArg(projectID)
 	b.WriteString(" AND session_id = ")
@@ -346,7 +350,7 @@ func userAgentFromStoredInfo(info map[string]any) *domain.UserAgent {
 	return ua
 }
 
-func (r *sessionRepository) scanSessions(rows database.Rows) ([]*domain.Session, error) {
+func (r *SessionRepository) scanSessions(rows database.Rows) ([]*domain.Session, error) {
 	byID := make(map[string]*domain.Session)
 	order := make([]string, 0)
 
@@ -474,7 +478,7 @@ type storedCheck struct {
 	OnAttempt      bool
 }
 
-func (r *sessionRepository) insertSession(ctx context.Context, q database.QueryExecutor, session *domain.Session) error {
+func (r *SessionRepository) insertSession(ctx context.Context, q database.QueryExecutor, session *domain.Session) error {
 	if session.TimeToLive <= 0 {
 		session.TimeToLive = domain.SessionAnonymousTTL
 	}
@@ -508,7 +512,7 @@ func (r *sessionRepository) insertSession(ctx context.Context, q database.QueryE
 	return r.insertSessionPostgres(ctx, q, session, userAgentID)
 }
 
-func (r *sessionRepository) insertSessionPostgres(ctx context.Context, q database.QueryExecutor, session *domain.Session, userAgentID database.Identity) error {
+func (r *SessionRepository) insertSessionPostgres(ctx context.Context, q database.QueryExecutor, session *domain.Session, userAgentID database.Identity) error {
 	return withTransaction(ctx, q, func(ctx context.Context, tx database.QueryExecutor) error {
 		var (
 			sessionID database.Identity
@@ -535,7 +539,7 @@ func (r *sessionRepository) insertSessionPostgres(ctx context.Context, q databas
 	})
 }
 
-func (r *sessionRepository) insertSessionSpanner(ctx context.Context, q database.QueryExecutor, session *domain.Session, userAgentID database.Identity) error {
+func (r *SessionRepository) insertSessionSpanner(ctx context.Context, q database.QueryExecutor, session *domain.Session, userAgentID database.Identity) error {
 	return withTransaction(ctx, q, func(ctx context.Context, tx database.QueryExecutor) error {
 		var sessionID database.Identity
 		insertB := r.buildInsertSessionSpanner(session.ProjectID, userAgentID, session.TimeToLive)
@@ -554,7 +558,7 @@ func (r *sessionRepository) insertSessionSpanner(ctx context.Context, q database
 	})
 }
 
-func (r *sessionRepository) exchange(ctx context.Context, q database.QueryExecutor, projectID, handoffToken string, ttl time.Duration) (*domain.Session, error) {
+func (r *SessionRepository) exchange(ctx context.Context, q database.QueryExecutor, projectID, handoffToken string, ttl time.Duration) (*domain.Session, error) {
 	attemptRepo := NewAuthAttemptRepository(r.pool)
 	attempt, err := attemptRepo.GetByHandoffToken(ctx, q, projectID, hashHandoffToken(handoffToken))
 	if err != nil {
@@ -653,7 +657,7 @@ func validateHandoffAttempt(attempt *domain.AuthAttempt) error {
 	return nil
 }
 
-func (r *sessionRepository) loadAttemptChecks(ctx context.Context, q database.QueryExecutor, projectID, attemptID string) ([]storedCheck, error) {
+func (r *SessionRepository) loadAttemptChecks(ctx context.Context, q database.QueryExecutor, projectID, attemptID string) ([]storedCheck, error) {
 	b := r.buildLoadAttemptChecks(projectID, attemptID)
 	rows, err := q.Query(ctx, b.String(), b.Args()...)
 	if err != nil {
@@ -663,7 +667,7 @@ func (r *sessionRepository) loadAttemptChecks(ctx context.Context, q database.Qu
 	return scanStoredChecks(rows, true)
 }
 
-func (r *sessionRepository) loadSessionChecks(ctx context.Context, q database.QueryExecutor, projectID, sessionID string) ([]storedCheck, error) {
+func (r *SessionRepository) loadSessionChecks(ctx context.Context, q database.QueryExecutor, projectID, sessionID string) ([]storedCheck, error) {
 	b := r.buildLoadSessionChecks(projectID, sessionID)
 	rows, err := q.Query(ctx, b.String(), b.Args()...)
 	if err != nil {
@@ -709,7 +713,7 @@ func pickLastVerifiedChecksByType(attemptChecks, sessionChecks []storedCheck) ma
 	return lastVerifiedChecks
 }
 
-func (r *sessionRepository) applyExchange(ctx context.Context, q database.QueryExecutor, projectID, sessionID string, lastVerifiedChecks map[domain.AuthCheckType]storedCheck) error {
+func (r *SessionRepository) applyExchange(ctx context.Context, q database.QueryExecutor, projectID, sessionID string, lastVerifiedChecks map[domain.AuthCheckType]storedCheck) error {
 	if len(lastVerifiedChecks) == 0 {
 		return nil
 	}
@@ -744,7 +748,7 @@ func (r *sessionRepository) applyExchange(ctx context.Context, q database.QueryE
 	return nil
 }
 
-func (r *sessionRepository) userIDFromLastVerifiedChecks(ctx context.Context, q database.QueryExecutor, projectID string, lastVerifiedChecks map[domain.AuthCheckType]storedCheck) (*string, error) {
+func (r *SessionRepository) userIDFromLastVerifiedChecks(ctx context.Context, q database.QueryExecutor, projectID string, lastVerifiedChecks map[domain.AuthCheckType]storedCheck) (*string, error) {
 	w, ok := lastVerifiedChecks[domain.AuthCheckTypeUser]
 	if !ok {
 		return nil, nil
