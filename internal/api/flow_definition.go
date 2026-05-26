@@ -87,7 +87,7 @@ func mapCreateRequestToService(req *api.CreateFlowDefinitionRequest) (service.Cr
 		if step.GetGates().IsSet() {
 			gates := make(map[string]domain.FlowStepGate, len(step.GetGates().Value))
 			for name, apiGate := range step.GetGates().Value {
-				kind, _ := domain.FlowGateKindString(string(apiGate.GetKind())) // validated in the domain
+				kind, _ := domain.FlowGateKindString(string(apiGate.GetKind())) // todo: validate in the domain layer
 
 				cfg := make(map[string]any, len(apiGate.GetConfig().Value))
 				for k, v := range apiGate.GetConfig().Value {
@@ -121,9 +121,14 @@ func mapCreateRequestToService(req *api.CreateFlowDefinitionRequest) (service.Cr
 		if step.GetTransitions().IsSet() {
 			transitions := make(map[string]domain.FlowStepTransition, len(step.GetTransitions().Value))
 			for name, apiTransition := range step.GetTransitions().Value {
-				action, _ := domain.FlowDefinitionTransitionActionString(string(apiTransition.GetAction().Value)) // validated in the domain
+				var transitionAction *domain.FlowDefinitionTransitionAction
+				if apiTransition.Action.IsSet() {
+					a, _ := domain.FlowDefinitionTransitionActionString(string(apiTransition.GetAction().Value)) // validated in the domain
+					transitionAction = &a
+				}
+
 				t := domain.FlowStepTransition{
-					Action: &action,
+					Action: transitionAction,
 					Target: apiTransition.GetTarget(),
 				}
 				transitions[name] = t

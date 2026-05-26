@@ -158,6 +158,10 @@ func validateGraph(flowDefinition FlowDefinition) ([]PivotingTarget, error) {
 						"step %q: transition %q targets unknown step %q", step.Name, key, t.Target), nil)
 				}
 			} else {
+				if !t.Action.IsAFlowDefinitionTransitionAction() {
+					return nil, ErrFlowDefinitionInvalid(fmt.Sprintf(
+						"step %q: transition %q has invalid action %q", step.Name, key, t.Action), nil)
+				}
 				// switch/pivot: target must be an active flow definition in the same project
 				// the service layer must validate that an active flow definition exists with this target name in the same project.
 				pivotingTargets = append(pivotingTargets, PivotingTarget{
