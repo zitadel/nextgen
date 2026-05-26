@@ -455,11 +455,18 @@ func (r *FlowStateMachineRuntime) resolveStepFields(ctx context.Context, client 
 }
 
 func (r *FlowStateMachineRuntime) buildStep(step *FlowDefinitionStep, resolved FlowResolvedFields, errorKey *string, complete *FlowStepComplete, redirectURL *string) *FlowStep {
-	actions := make(map[string]FlowAction, len(step.Transitions))
-	for outcome := range step.Transitions {
-		actions[outcome] = FlowAction{
-			TextKey: "action." + outcome,
-			Primary: outcome == FlowActionSubmit,
+	// Surface only user-selectable actions declared on the step.
+	// Implicit outcomes (e.g. user_not_found) live in step.Transitions
+	// but are engine-emitted routing keys, not buttons for the client.
+	actions := make(map[string]FlowAction, len(step.Actions))
+	for name, a := range step.Actions {
+		textKey := a.TextKey
+		if textKey == "" {
+			textKey = "action." + name
+		}
+		actions[name] = FlowAction{
+			TextKey: textKey,
+			Primary: a.Primary,
 		}
 	}
 	return &FlowStep{

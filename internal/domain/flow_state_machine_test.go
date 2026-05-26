@@ -140,6 +140,9 @@ func loginDefinition() *domain.FlowDefinition {
 			{
 				Name:   "credentials",
 				Fields: []string{"email", "password"},
+				Actions: map[string]domain.FlowStepAction{
+					domain.FlowActionSubmit: {Primary: true},
+				},
 				Transitions: map[string]domain.FlowStepTransition{
 					domain.FlowActionSubmit:                {Target: "done"},
 					domain.FlowImplicitOutcomeUserNotFound: {Target: "not_found"},
@@ -175,6 +178,9 @@ func signupDefinition() *domain.FlowDefinition {
 				Name:      "credentials",
 				Fields:    []string{"email", "password"},
 				OnSuccess: &createUser,
+				Actions: map[string]domain.FlowStepAction{
+					domain.FlowActionSubmit: {Primary: true},
+				},
 				Transitions: map[string]domain.FlowStepTransition{
 					domain.FlowActionSubmit: {Target: "done"},
 				},
