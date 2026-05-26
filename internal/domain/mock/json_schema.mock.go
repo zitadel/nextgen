@@ -200,6 +200,45 @@ func (c *MockJSONSchemaRepositoryGetCall) DoAndReturn(f func(context.Context, da
 	return c
 }
 
+// GetByID mocks base method.
+func (m *MockJSONSchemaRepository) GetByID(ctx context.Context, client database.QueryExecutor, projectID, schemaID string) (*domain.JSONSchema, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetByID", ctx, client, projectID, schemaID)
+	ret0, _ := ret[0].(*domain.JSONSchema)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetByID indicates an expected call of GetByID.
+func (mr *MockJSONSchemaRepositoryMockRecorder) GetByID(ctx, client, projectID, schemaID any) *MockJSONSchemaRepositoryGetByIDCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByID", reflect.TypeOf((*MockJSONSchemaRepository)(nil).GetByID), ctx, client, projectID, schemaID)
+	return &MockJSONSchemaRepositoryGetByIDCall{Call: call}
+}
+
+// MockJSONSchemaRepositoryGetByIDCall wrap *gomock.Call
+type MockJSONSchemaRepositoryGetByIDCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockJSONSchemaRepositoryGetByIDCall) Return(arg0 *domain.JSONSchema, arg1 error) *MockJSONSchemaRepositoryGetByIDCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockJSONSchemaRepositoryGetByIDCall) Do(f func(context.Context, database.QueryExecutor, string, string) (*domain.JSONSchema, error)) *MockJSONSchemaRepositoryGetByIDCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockJSONSchemaRepositoryGetByIDCall) DoAndReturn(f func(context.Context, database.QueryExecutor, string, string) (*domain.JSONSchema, error)) *MockJSONSchemaRepositoryGetByIDCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // List mocks base method.
 func (m *MockJSONSchemaRepository) List(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) ([]*domain.JSONSchema, error) {
 	m.ctrl.T.Helper()

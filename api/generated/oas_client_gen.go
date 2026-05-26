@@ -103,7 +103,7 @@ type Invoker interface {
 	// schema-url which will be resolved by the server.
 	//
 	// POST /schemas
-	CreateSchema(ctx context.Context, request CreateSchemaReq) (CreateSchemaRes, error)
+	CreateSchema(ctx context.Context, request CreateSchemaReq, params CreateSchemaParams) (CreateSchemaRes, error)
 	// CreateSession invokes createSession operation.
 	//
 	// Creates an anonymous session shell with no user and no factors (`state: building`).
@@ -1500,12 +1500,12 @@ func (c *Client) sendCreateProject(ctx context.Context, request *CreateProjectRe
 // schema-url which will be resolved by the server.
 //
 // POST /schemas
-func (c *Client) CreateSchema(ctx context.Context, request CreateSchemaReq) (CreateSchemaRes, error) {
-	res, err := c.sendCreateSchema(ctx, request)
+func (c *Client) CreateSchema(ctx context.Context, request CreateSchemaReq, params CreateSchemaParams) (CreateSchemaRes, error) {
+	res, err := c.sendCreateSchema(ctx, request, params)
 	return res, err
 }
 
-func (c *Client) sendCreateSchema(ctx context.Context, request CreateSchemaReq) (res CreateSchemaRes, err error) {
+func (c *Client) sendCreateSchema(ctx context.Context, request CreateSchemaReq, params CreateSchemaParams) (res CreateSchemaRes, err error) {
 	// Validate request before sending.
 	if err := func() error {
 		if err := request.Validate(); err != nil {
@@ -1554,6 +1554,50 @@ func (c *Client) sendCreateSchema(ctx context.Context, request CreateSchemaReq) 
 	var pathParts [1]string
 	pathParts[0] = "/schemas"
 	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.ProjectID.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "team_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "team_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.TeamID.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
 
 	stage = "EncodeRequest"
 	r, err := ht.NewRequest(ctx, "POST", u)
@@ -3246,6 +3290,50 @@ func (c *Client) sendGetSchemaById(ctx context.Context, params GetSchemaByIdPara
 		pathParts[1] = encoded
 	}
 	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.ProjectID.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "team_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "team_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.TeamID.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
 
 	stage = "EncodeRequest"
 	r, err := ht.NewRequest(ctx, "GET", u)

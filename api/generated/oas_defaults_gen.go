@@ -49,14 +49,6 @@ func (s *StepAction) setDefaults() {
 // setDefaults set default value of fields.
 func (s *UserProperty) setDefaults() {
 	{
-		val := bool(false)
-		s.XMinusIdentifier.SetTo(val)
-	}
-	{
-		val := bool(false)
-		s.XMinusPassword.SetTo(val)
-	}
-	{
 		val := bool(true)
 		s.XMinusEditable.SetTo(val)
 	}
