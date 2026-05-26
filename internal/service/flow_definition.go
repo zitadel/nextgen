@@ -37,13 +37,13 @@ type flowDefinitionValidatorFunc func(userSchema *jsonschema.Schema, flowDefinit
 type CreateFlowDefinitionRequest struct {
 	ProjectID         string
 	Name              string
-	SchemaVersion     string // todo: currently empty as the request does not contain schema version
-	FlowSchemaURI     string // todo: schema_version (semver) stored in the db vs schema_uri needed for validation
+	SchemaVersion     string // todo (grvijayan): currently empty as the request does not contain schema version
+	FlowSchemaURI     string // todo (grvijayan): schema_version (semver) stored in the db vs schema_uri needed for validation
 	UserSchema        string
 	Purposes          map[string]string
 	Audience          domain.FlowDefinitionAudience
 	Steps             []domain.FlowDefinitionStep
-	RawFlowDefinition []byte // todo: is there a better way to do this for validation against the flow definition schema?
+	RawFlowDefinition []byte
 }
 
 type flowDefinitionService struct {
@@ -85,7 +85,6 @@ func (fd *flowDefinitionService) Create(ctx context.Context, req CreateFlowDefin
 			return nil, "", err
 		}
 	}
-	// todo: ideally shouldn't be more than 1
 	if len(defs) > 0 {
 		return nil, "", domain.ErrFlowDefinitionAlreadyExists()
 	}
@@ -141,7 +140,7 @@ func (fd *flowDefinitionService) Validate(ctx context.Context, flowDefinition do
 		return err
 	}
 
-	// resolve the user schema from the user schema URI; todo: resolve from cache/db, not via http fetch
+	// resolve the user schema from the user schema URI
 	userSchema, err := fd.schemaResolver.Resolve(ctx, fd.db, flowDefinition.ProjectID, flowDefinition.UserSchema, nil)
 	if err != nil {
 		return domain.ErrSchemaFetchFailed("failed to resolve tenant user schema", err)

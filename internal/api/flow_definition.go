@@ -23,7 +23,7 @@ func (h Handler) CreateFlowDefinition(ctx context.Context, req *api.CreateFlowDe
 
 	create, flowSchemaURI, err := h.flowDefinitionService.Create(ctx, svcReq)
 	if err != nil {
-		return errorResponse(err), nil // todo: review
+		return errorResponse(err), nil // todo (grvijayan): review
 	}
 
 	return flowDefinitionSuccessResponse(create, flowSchemaURI), nil
@@ -34,9 +34,10 @@ func mapCreateRequestToService(req *api.CreateFlowDefinitionRequest) (service.Cr
 
 	userSchemaURI := definition.GetUserSchema()
 	svcReq := service.CreateFlowDefinitionRequest{
-		ProjectID:  string(req.GetProjectID()),
-		Name:       definition.GetName(),
-		UserSchema: userSchemaURI.String(),
+		ProjectID:     string(req.GetProjectID()),
+		Name:          definition.GetName(),
+		UserSchema:    userSchemaURI.String(),
+		SchemaVersion: "1.0.0.", // todo (grvijayan): find a way to set this based on the schema URI or the request (currently not set in the request)
 	}
 
 	rawFlowDefinition, err := definition.MarshalJSON()
@@ -87,7 +88,7 @@ func mapCreateRequestToService(req *api.CreateFlowDefinitionRequest) (service.Cr
 		if step.GetGates().IsSet() {
 			gates := make(map[string]domain.FlowStepGate, len(step.GetGates().Value))
 			for name, apiGate := range step.GetGates().Value {
-				kind, _ := domain.FlowGateKindString(string(apiGate.GetKind())) // todo: validate in the domain layer
+				kind, _ := domain.FlowGateKindString(string(apiGate.GetKind())) // todo (grvijayan): validate in the domain layer
 
 				cfg := make(map[string]any, len(apiGate.GetConfig().Value))
 				for k, v := range apiGate.GetConfig().Value {
@@ -200,7 +201,7 @@ func mapDomainStepsToAPI(domainSteps []domain.FlowDefinitionStep) []api.FlowDefi
 		for name, gate := range step.Gates {
 			gateConfig := make(api.GateConfig, len(gate.Config))
 			for k, v := range gate.Config {
-				val, err := json.Marshal(v) // todo: review
+				val, err := json.Marshal(v)
 				if err == nil {
 					gateConfig[k] = val
 				}

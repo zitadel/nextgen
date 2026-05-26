@@ -131,7 +131,7 @@ func validateSteps(steps []FlowDefinitionStep, userSchema *jsonschema.Schema) er
 			}
 		}
 
-		// todo: a step with an x-identifier field defines a user_not_found transition or return an error
+		// todo (grvijayan): a step with an x-identifier field defines a user_not_found transition or return an error
 	}
 	return nil
 }
