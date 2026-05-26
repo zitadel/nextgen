@@ -97,12 +97,12 @@ func (s *flowService) resolveByName(ctx context.Context, req ResolveFlowRequest)
 		return nil, err
 	}
 	if len(defs) == 0 {
-		return nil, domain.ErrFlowDefinitionNotFound
+		return nil, domain.ErrFlowDefinitionNotFound()
 	}
 
 	def := pickLatestFlowVersion(defs)
 	if !flowServesPurpose(def, req.Purpose) {
-		return nil, domain.ErrFlowDefinitionPurposeMismatch
+		return nil, domain.ErrFlowDefinitionPurposeMismatch()
 	}
 	return def, nil
 }
@@ -112,8 +112,8 @@ func (s *flowService) resolveByName(ctx context.Context, req ResolveFlowRequest)
 //
 // TODO: honor [ResolveFlowRequest.Hint]. The MVP returns whichever row the
 // repository yields first; once admin UX produces multiple audience-targeted
-// definitions per purpose, score candidates by AppID > TeamID > UserSchemaID
-// > IsProjectDefault and tie-break by created_at DESC.
+// definitions per purpose, score candidates by AppIDs > TeamIDs >
+// project-wide (both empty) and tie-break by created_at DESC.
 func (s *flowService) resolveByAudience(ctx context.Context, req ResolveFlowRequest) (*domain.FlowDefinition, error) {
 	opts := []domain.FlowDefinitionListOption{
 		domain.WithFlowDefinitionStatus(domain.FlowDefinitionStatusActive),
@@ -128,18 +128,14 @@ func (s *flowService) resolveByAudience(ctx context.Context, req ResolveFlowRequ
 		return nil, err
 	}
 	if len(defs) == 0 {
-		return nil, domain.ErrFlowDefinitionNotFound
+		return nil, domain.ErrFlowDefinitionNotFound()
 	}
 	return defs[0], nil
 }
 
 func flowServesPurpose(def *domain.FlowDefinition, purpose domain.FlowDefinitionPurpose) bool {
-	for _, p := range def.Purposes {
-		if p.Purpose == purpose {
-			return true
-		}
-	}
-	return false
+	_, ok := def.Purposes[purpose]
+	return ok
 }
 
 // pickLatestFlowVersion returns the definition with the highest SchemaVersion

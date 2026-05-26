@@ -9,9 +9,19 @@ export type RendererAuthPage = {
   contents: string;
 };
 
+export type RendererProfilePage = {
+  contents: string;
+};
+
+export type RendererCustomElementsDts = {
+  contents: string;
+};
+
 export type RendererTemplates = {
   provider?: { filename: string; contents: string };
   authPage(mode: "login" | "register"): RendererAuthPage;
+  profilePage?(): RendererProfilePage;
+  customElementsDts?(): RendererCustomElementsDts;
 };
 
 export type RendererSpec = {

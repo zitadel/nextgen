@@ -73,6 +73,10 @@ type GetLiveRes interface {
 	getLiveRes()
 }
 
+type GetMySessionRes interface {
+	getMySessionRes()
+}
+
 type GetOpenIDConfigurationRes interface {
 	getOpenIDConfigurationRes()
 }
@@ -119,6 +123,10 @@ type ListSessionsRes interface {
 
 type ListUsersRes interface {
 	listUsersRes()
+}
+
+type RevokeMySessionRes interface {
+	revokeMySessionRes()
 }
 
 type RevokeSessionRes interface {

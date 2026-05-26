@@ -16,12 +16,15 @@
  */
 import {
   getCreateFlowMockHandler,
+  getExchangeHandoffMockHandler,
+  getExchangeHandoffResponseMock,
   getGetFlowStepMockHandler,
   getSubmitFlowStepMockHandler,
 } from "@zitadel-nextgen/api/generated/endpoints/zitadelNextGen.msw";
 import type {
   CreateFlow201,
   CreateFlowBody,
+  ExchangeHandoffBody,
   SubmitFlowStepBody,
 } from "@zitadel-nextgen/api/generated/model";
 import type { RequestHandler } from "msw";
@@ -31,7 +34,11 @@ import { startFlowActor, type FlowActor, type FlowStepName } from "./flow-machin
 import {
   doneStep,
   identifierStep,
+  passkeyLoginStep,
+  passkeySetupStep,
+  passkeyUpsellStep,
   passwordStep,
+  recoverStep,
   registerStep,
   ssoRedirectStep,
 } from "./fixtures/login.js";
@@ -39,7 +46,8 @@ import {
 export type CapturedRequest =
   | { kind: "createFlow"; body: CreateFlowBody }
   | { kind: "submitFlowStep"; flowId: string; body: SubmitFlowStepBody }
-  | { kind: "getFlowStep"; flowId: string };
+  | { kind: "getFlowStep"; flowId: string }
+  | { kind: "exchangeHandoff"; body: ExchangeHandoffBody };
 
 export type MockHandle = {
   handlers: RequestHandler[];
@@ -87,8 +95,16 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
     switch (step) {
       case "register":
         return withBranding(registerStep(input));
+      case "recover":
+        return withBranding(recoverStep(input));
       case "password":
         return withBranding(passwordStep(input));
+      case "passkey-upsell":
+        return withBranding(passkeyUpsellStep(input));
+      case "passkey-setup":
+        return withBranding(passkeySetupStep(input));
+      case "passkey-login":
+        return withBranding(passkeyLoginStep(input));
       case "sso-redirect":
         return withBranding(ssoRedirectStep(input));
       case "done":
@@ -116,6 +132,75 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
       const flowId = String(params.id);
       const body = (await request.clone().json()) as SubmitFlowStepBody;
       captured.push({ kind: "submitFlowStep", flowId, body });
+      const before = actor.getSnapshot().value as FlowStepName | "idle";
+      const fields = (body.fields ?? {}) as Record<string, string>;
+      const email = fields.email;
+      const snapshot = actor.getSnapshot();
+      const fixtureInput = {
+        flowId: FLOW_ID,
+        sessionToken: snapshot.context.sessionToken,
+        capturedEmail: email,
+        iss,
+      };
+
+      // Figma sign-up `6593:141741`: duplicate email → inline error on email field.
+      if (before === "register" && body.action === "submit" && email === "exists@example.com") {
+        const response = withBranding(registerStep(fixtureInput));
+        return {
+          ...response,
+          step: { ...response.step, error: "error.email_exists" },
+        };
+      }
+
+      // Figma sign-in `6602:180268`: failed auth → inline error on password field.
+      if (
+        before === "identifier" &&
+        body.action === "submit" &&
+        email?.toLowerCase() === "wrong@example.com"
+      ) {
+        const response = withBranding(identifierStep(fixtureInput));
+        return {
+          ...response,
+          step: { ...response.step, error: "error.invalid_credentials" },
+        };
+      }
+
+      // Figma sign-in `6594:125237`: server-side failure → form-level alert.
+      if (
+        before === "identifier" &&
+        body.action === "submit" &&
+        email?.toLowerCase() === "server@example.com"
+      ) {
+        const response = withBranding(identifierStep(fixtureInput));
+        return {
+          ...response,
+          step: { ...response.step, error: "error.sign_in_server" },
+        };
+      }
+
+      const capturedEmail = snapshot.context.capturedFields.email?.toLowerCase();
+      const passkeyUpsellInput = {
+        ...fixtureInput,
+        capturedEmail: snapshot.context.capturedFields.email,
+      };
+
+      // Figma passkey upsell `6594:630` — setup failures stay on step with alert.
+      if (before === "passkey-upsell" && body.action !== "skip") {
+        const passkeyErrorByEmail: Record<string, string> = {
+          "passkey-cancel@example.com": "error.passkey_cancelled",
+          "passkey-unsupported@example.com": "error.passkey_unsupported",
+          "passkey-fail@example.com": "error.passkey_failed",
+        };
+        const errorKey = capturedEmail ? passkeyErrorByEmail[capturedEmail] : undefined;
+        if (errorKey) {
+          const response = withBranding(passkeyUpsellStep(passkeyUpsellInput));
+          return {
+            ...response,
+            step: { ...response.step, error: errorKey },
+          };
+        }
+      }
+
       actor.send({
         type: "SUBMIT",
         action: body.action,
@@ -127,6 +212,11 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
     getGetFlowStepMockHandler(({ params }) => {
       captured.push({ kind: "getFlowStep", flowId: String(params.id) });
       return currentResponse();
+    }),
+    getExchangeHandoffMockHandler(async ({ request }) => {
+      const body = (await request.clone().json()) as ExchangeHandoffBody;
+      captured.push({ kind: "exchangeHandoff", body });
+      return getExchangeHandoffResponseMock();
     }),
   ];
 

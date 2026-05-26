@@ -1,4 +1,5 @@
 {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "UserProperty",
   "type": "object",
   "required": [
@@ -62,6 +63,11 @@
       "type": "boolean",
       "default": false,
       "description": "Whether this property is an identifier for the user or not"
+    },
+    "x-password": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether this property carries the user's password proof."
     },
     "x-verify": {
       "oneOf": [

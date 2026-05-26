@@ -19,18 +19,6 @@ func (s *Field) setDefaults() {
 }
 
 // setDefaults set default value of fields.
-func (s *Gate) setDefaults() {
-	{
-		val := bool(true)
-		s.Required.SetTo(val)
-	}
-	{
-		val := bool(false)
-		s.Satisfied.SetTo(val)
-	}
-}
-
-// setDefaults set default value of fields.
 func (s *OpenidConfiguration) setDefaults() {
 	{
 		val := bool(false)
@@ -63,6 +51,10 @@ func (s *UserProperty) setDefaults() {
 	{
 		val := bool(false)
 		s.XMinusIdentifier.SetTo(val)
+	}
+	{
+		val := bool(false)
+		s.XMinusPassword.SetTo(val)
 	}
 	{
 		val := bool(true)

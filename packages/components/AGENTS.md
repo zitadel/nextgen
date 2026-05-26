@@ -123,6 +123,41 @@ When a test needs the Flow API, prefer `setupMockHandlers()` from
 xstate machine the dev playground uses, so step fixtures and step routing
 stay consistent.
 
+The full sign-in handover (terminal step → session exchange → real
+`Set-Cookie` on the demo origin → full-page navigation to a protected
+route) is covered end-to-end in `apps/demo-next-e2e/` and
+`apps/demo-nuxt-e2e/`, not here. The exchange URL is controlled by
+`session-exchange-path` on `<zitadel-login>`: the default
+`/sessions/exchange` is prefixed with `api-base`; any other path is
+resolved from `location.origin` so SPAs can rewrite exchange separately
+from the flow API. Unit coverage lives in `api-client.spec.ts` and
+`zitadel-login.spec.ts`. When a change touches `maybeCompleteFlow`,
+`sessionExchangePath`, or the `postSignInUrl` path, run **both** e2e projects — they exercise
+different SDK middlewares against the same orchestrator code, which is
+how a regression in one framework slips past the other.
+
+When iterating against a long-running demo dev server, remember the demo
+loads this package's built `dist/` (not source). The Nx `e2e` target has
+`dependsOn: ["^build"]` so CI is safe; manual loops need a fresh
+`nx build @zitadel-nextgen/components` after orchestrator changes.
+
+### Lit dev playground (`:5173`) and caching
+
+Atom `.ts` hot reload uses [`vite-plugin-web-components-hmr`](https://github.com/fi3ework/vite-plugin-web-components-hmr)
+(Open WC–derived Lit preset) on `src/**/*.ts` only. `dev/pages/*.ts` is plain
+`innerHTML` — `dev/main.ts` accepts those modules and calls `mountRoute()` again;
+`dev/playground-chrome.css` and sibling-package CSS trigger a full reload via
+`vite/lit-dev-hmr.ts` (`workspaceStylesFullReload`).
+
+If the playground still looks stale after save:
+
+```sh
+corepack pnpm --filter @zitadel-nextgen/components dev:clean
+```
+
+Then hard-refresh the browser. `apps/console` (`:5174`) does not pick up Lit-only
+source edits — use `:5173` for atom work.
+
 ## Build
 
 `tsdown.config.ts` produces ESM + `.d.mts` and externalises `lit`, `liquidjs`,

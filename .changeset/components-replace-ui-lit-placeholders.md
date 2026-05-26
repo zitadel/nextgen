@@ -1,7 +1,7 @@
 ---
 "@zitadel-nextgen/components": minor
 "@zitadel-nextgen/sdk-next": patch
-"@nextgen/sdk-nuxt": patch
+"@zitadel-nextgen/sdk-nuxt": patch
 ---
 
 Replace the `@nextgen/ui-lit` placeholder web components with the real
@@ -24,7 +24,7 @@ Replace the `@nextgen/ui-lit` placeholder web components with the real
   `FlowResponse` with `email` + `password` fields so the existing
   orchestrator + atom pipeline renders against it unchanged.
 - Drop the `@nextgen/ui-lit` package and switch `@zitadel-nextgen/sdk-next`,
-  `@nextgen/sdk-nuxt`, and the `apps/demo-next` / `apps/demo-nuxt` apps to
+  `@zitadel-nextgen/sdk-nuxt`, and the `apps/demo-next` / `apps/demo-nuxt` apps to
   re-export and consume `@zitadel-nextgen/components` instead. Existing
   `<nextgen-login>` / `<nextgen-logout>` tags become `<zitadel-login>` /
   `<zitadel-logout>` with the same `proxy-base` and post-sign-{in,out}-url

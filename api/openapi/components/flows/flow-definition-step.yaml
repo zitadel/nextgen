@@ -39,17 +39,25 @@ properties:
     additionalProperties:
       $ref: step-action.yaml
     default: {}
+    example:
+      submit:
+        primary: true
+      forgot_password: {}
 
   gates:
     type: object
     description: |
       Security gates that must be satisfied before submission. Keyed by gate
-      name. Each gate selects a type (e.g. "captcha") and provider-specific
+      name. Each gate selects a kind (e.g. "captcha") and provider-specific
       configuration. The engine may also inject gates dynamically based on
       policy.
     additionalProperties:
       $ref: gate.yaml
     default: {}
+    example:
+      bot_check:
+        kind: captcha
+        provider: altcha
 
   sso_providers:
     type: array
@@ -57,21 +65,25 @@ properties:
     items:
       $ref: sso-provider.yaml
     default: []
+    example:
+      - id: google-1
+        name: Google
+        template: google
 
   on_success:
     type: string
-    enum: [create_user, reset_credential]
+    enum: [create_user]
     description: |
       Server-side mutation to execute when this step completes successfully.
       Runs after field validation passes, before the transition fires.
 
       - create_user: creates the user record (registration flows)
-      - reset_credential: replaces a stored credential (recovery flows)
     example: create_user
 
   complete:
     type: string
     enum: [redirect, show]
+    example: redirect
     description: |
       Marks this as a terminal step. Tells the frontend what to do:
       - redirect: navigate to redirect_uri (OIDC/SAML callback done)
