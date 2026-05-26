@@ -289,8 +289,11 @@ func (s *authAttemptService) VerifyProof(ctx context.Context, input VerifyProofI
 
 	challenge, factor, err := s.verify(ctx, attempt, input.Proof, input.ChallengeID)
 	if err != nil {
-		// Record the failure for rate-limiting — best effort, don't shadow the original error
-		_ = s.attempts.ChallengeFailed(ctx, s.pool, input.ProjectID, input.AttemptID, challenge)
+		// Record the failure for rate-limiting — best effort, don't shadow
+		// the original error. Skip when verify couldn't identify a challenge row.
+		if challenge != nil {
+			_ = s.attempts.ChallengeFailed(ctx, s.pool, input.ProjectID, input.AttemptID, challenge)
+		}
 		return nil, err
 	}
 
@@ -360,7 +363,7 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 			}})),
 		)
 		if err != nil {
-			return nil, nil, domain.ErrAuthAttemptProofRejected(err)
+			return userChallenge, nil, domain.ErrAuthAttemptProofRejected(err)
 		}
 		return userChallenge, attempt.SetUserFactor(user), nil
 
@@ -376,10 +379,10 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 			database.WithCondition(s.userPasswords.UserIDCondition(userFactor.UserID)),
 		)
 		if err != nil {
-			return nil, nil, domain.ErrAuthAttemptProofRejected(err)
+			return passwordChallenge, nil, domain.ErrAuthAttemptProofRejected(err)
 		}
 		if err := password.Verify(p.Password, s.passwordVerifier); err != nil {
-			return nil, nil, domain.ErrAuthAttemptProofRejected(err)
+			return passwordChallenge, nil, domain.ErrAuthAttemptProofRejected(err)
 		}
 		return passwordChallenge, attempt.SetPasswordFactor(), nil
 
