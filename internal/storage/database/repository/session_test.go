@@ -61,6 +61,10 @@ func TestSession_Create(t *testing.T) {
 	repo := repository.NewSessionRepository(pool)
 
 	t.Run("sets ids and expiry", func(t *testing.T) {
+		if isSpannerDB {
+			t.Skip("sub transactions not supported in Spanner, and this test relies on rollback to avoid committing")
+		}
+
 		tx, rollback := transactionForRollback(t)
 		defer rollback()
 
@@ -89,6 +93,10 @@ func TestSession_Create(t *testing.T) {
 	})
 
 	t.Run("persists user agent", func(t *testing.T) {
+		if isSpannerDB {
+			t.Skip("sub transactions not supported in Spanner, and this test relies on rollback to avoid committing")
+		}
+
 		tx, rollback := transactionForRollback(t)
 		defer rollback()
 
@@ -119,6 +127,10 @@ func TestSession_Get(t *testing.T) {
 	})
 
 	t.Run("empty factors on anonymous session", func(t *testing.T) {
+		if isSpannerDB {
+			t.Skip("sub transactions not supported in Spanner, and this test relies on rollback to avoid committing")
+		}
+
 		tx, rollback := transactionForRollback(t)
 		defer rollback()
 
@@ -133,6 +145,10 @@ func TestSession_Get(t *testing.T) {
 	})
 
 	t.Run("loads factors after exchange", func(t *testing.T) {
+		if isSpannerDB {
+			t.Skip("sub transactions not supported in Spanner, and this test relies on rollback to avoid committing")
+		}
+
 		tx, rollback := transactionForRollback(t)
 		defer rollback()
 
@@ -153,6 +169,10 @@ func TestSession_List(t *testing.T) {
 	repo := repository.NewSessionRepository(pool)
 
 	t.Run("returns all sessions in project", func(t *testing.T) {
+		if isSpannerDB {
+			t.Skip("sub transactions not supported in Spanner, and this test relies on rollback to avoid committing")
+		}
+
 		tx, rollback := transactionForRollback(t)
 		defer rollback()
 
@@ -171,6 +191,10 @@ func TestSession_List(t *testing.T) {
 	})
 
 	t.Run("loads factors for exchanged session only", func(t *testing.T) {
+		if isSpannerDB {
+			t.Skip("sub transactions not supported in Spanner, and this test relies on rollback to avoid committing")
+		}
+
 		tx, rollback := transactionForRollback(t)
 		defer rollback()
 
@@ -200,6 +224,10 @@ func TestSession_List(t *testing.T) {
 }
 
 func TestSession_Delete(t *testing.T) {
+	if isSpannerDB {
+		t.Skip("sub transactions not supported in Spanner, and this test relies on rollback to avoid committing")
+	}
+
 	repo := repository.NewSessionRepository(pool)
 	tx, rollback := transactionForRollback(t)
 	defer rollback()
@@ -215,6 +243,10 @@ func TestSession_Delete(t *testing.T) {
 }
 
 func TestSession_Exchange_invalidToken(t *testing.T) {
+	if isSpannerDB {
+		t.Skip("sub transactions not supported in Spanner, and this test relies on rollback to avoid committing")
+	}
+
 	repo := repository.NewSessionRepository(pool)
 	tx, rollback := transactionForRollback(t)
 	defer rollback()
@@ -225,6 +257,10 @@ func TestSession_Exchange_invalidToken(t *testing.T) {
 }
 
 func TestSession_Exchange_deletesAttempt(t *testing.T) {
+	if isSpannerDB {
+		t.Skip("sub transactions not supported in Spanner, and this test relies on rollback to avoid committing")
+	}
+
 	repo := repository.NewSessionRepository(pool)
 	tx, rollback := transactionForRollback(t)
 	defer rollback()
@@ -245,6 +281,10 @@ func TestSession_Exchange_rotatesToken(t *testing.T) {
 	tokenRepo := repository.NewTokenRepository(pool)
 
 	t.Run("new_session", func(t *testing.T) {
+		if isSpannerDB {
+			t.Skip("sub transactions not supported in Spanner, and this test relies on rollback to avoid committing")
+		}
+
 		tx, rollback := transactionForRollback(t)
 		defer rollback()
 
@@ -257,6 +297,10 @@ func TestSession_Exchange_rotatesToken(t *testing.T) {
 	})
 
 	t.Run("step_up_existing_session", func(t *testing.T) {
+		if isSpannerDB {
+			t.Skip("sub transactions not supported in Spanner, and this test relies on rollback to avoid committing")
+		}
+
 		tx, rollback := transactionForRollback(t)
 		defer rollback()
 
@@ -291,6 +335,10 @@ func TestSession_Exchange_rotatesToken(t *testing.T) {
 }
 
 func TestSession_Exchange_conflictMissingSession(t *testing.T) {
+	if isSpannerDB {
+		t.Skip("sub transactions not supported in Spanner, and this test relies on rollback to avoid committing")
+	}
+
 	repo := repository.NewSessionRepository(pool)
 	tx, rollback := transactionForRollback(t)
 	defer rollback()
@@ -309,6 +357,10 @@ func TestSession_Exchange_mergeChecks(t *testing.T) {
 	repo := repository.NewSessionRepository(pool)
 
 	t.Run("no_checks_yet", func(t *testing.T) {
+		if isSpannerDB {
+			t.Skip("sub transactions not supported in Spanner, and this test relies on rollback to avoid committing")
+		}
+
 		tx, rollback := transactionForRollback(t)
 		defer rollback()
 
@@ -340,6 +392,10 @@ func TestSession_Exchange_mergeChecks(t *testing.T) {
 	})
 
 	t.Run("promote_multiple_types", func(t *testing.T) {
+		if isSpannerDB {
+			t.Skip("sub transactions not supported in Spanner, and this test relies on rollback to avoid committing")
+		}
+
 		tx, rollback := transactionForRollback(t)
 		defer rollback()
 
@@ -368,6 +424,10 @@ func TestSession_Exchange_mergeChecks(t *testing.T) {
 	})
 
 	t.Run("unverified_not_promoted", func(t *testing.T) {
+		if isSpannerDB {
+			t.Skip("sub transactions not supported in Spanner, and this test relies on rollback to avoid committing")
+		}
+
 		tx, rollback := transactionForRollback(t)
 		defer rollback()
 
@@ -403,6 +463,10 @@ func TestSession_Exchange_mergeChecks(t *testing.T) {
 	})
 
 	t.Run("overwrite_with_newer_attempt", func(t *testing.T) {
+		if isSpannerDB {
+			t.Skip("sub transactions not supported in Spanner, and this test relies on rollback to avoid committing")
+		}
+
 		tx, rollback := transactionForRollback(t)
 		defer rollback()
 
@@ -450,6 +514,10 @@ func TestSession_Exchange_mergeChecks(t *testing.T) {
 	})
 
 	t.Run("keep_newer_session_factor", func(t *testing.T) {
+		if isSpannerDB {
+			t.Skip("sub transactions not supported in Spanner, and this test relies on rollback to avoid committing")
+		}
+
 		tx, rollback := transactionForRollback(t)
 		defer rollback()
 
@@ -490,6 +558,10 @@ func TestSession_Exchange_mergeChecks(t *testing.T) {
 	})
 
 	t.Run("add_new_type_to_session", func(t *testing.T) {
+		if isSpannerDB {
+			t.Skip("sub transactions not supported in Spanner, and this test relies on rollback to avoid committing")
+		}
+
 		tx, rollback := transactionForRollback(t)
 		defer rollback()
 
@@ -553,6 +625,10 @@ func TestSession_Exchange_mergeChecks(t *testing.T) {
 }
 
 func TestSession_Exchange_ignoresIdempotencyKey(t *testing.T) {
+	if isSpannerDB {
+		t.Skip("sub transactions not supported in Spanner, and this test relies on rollback to avoid committing")
+	}
+
 	repo := repository.NewSessionRepository(pool)
 	tx, rollback := transactionForRollback(t)
 	defer rollback()
@@ -569,6 +645,10 @@ func TestSession_Exchange_ignoresIdempotencyKey(t *testing.T) {
 }
 
 func TestSession_Exchange_explicitTTL(t *testing.T) {
+	if isSpannerDB {
+		t.Skip("sub transactions not supported in Spanner, and this test relies on rollback to avoid committing")
+	}
+
 	repo := repository.NewSessionRepository(pool)
 	tx, rollback := transactionForRollback(t)
 	defer rollback()
