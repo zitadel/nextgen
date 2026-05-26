@@ -84,7 +84,7 @@ type fakeSessionResolver struct {
 	calls   int
 }
 
-func (f *fakeSessionResolver) GetByID(_ context.Context, _ database.QueryExecutor, _, _ string) (*domain.Session, error) {
+func (f *fakeSessionResolver) Get(_ context.Context, _ database.QueryExecutor, _, _ string) (*domain.Session, error) {
 	f.calls++
 	if f.err != nil {
 		return nil, f.err

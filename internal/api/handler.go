@@ -4,6 +4,7 @@ import (
 	"context"
 
 	api "github.com/zitadel/nextgen/api/generated"
+	"github.com/zitadel/nextgen/internal/cookie"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
@@ -12,23 +13,29 @@ type Handler struct {
 	// responses for all endpoints, so only implemented methods need to be defined.
 	api.UnimplementedHandler
 
+	sealer             *cookie.Sealer
 	flowService        service.FlowService
 	authAttemptService service.AuthAttemptService
+	sessionService     service.SessionService
 	projectService     service.ProjectService
 	schemaService      *service.SchemaService
 	flowDefinitionService service.FlowDefinitionService
 }
 
 func NewHandler(
+	sealer *cookie.Sealer,
 	flowService service.FlowService,
 	authAttemptService service.AuthAttemptService,
+	sessionService service.SessionService,
 	projectService service.ProjectService,
 	schemaService *service.SchemaService,
 	flowDefinitionService service.FlowDefinitionService,
 ) *Handler {
 	return &Handler{
+		sealer:             sealer,
 		flowService:        flowService,
 		authAttemptService: authAttemptService,
+		sessionService:     sessionService,
 		projectService:     projectService,
 		schemaService:      schemaService,
 		flowDefinitionService: flowDefinitionService,

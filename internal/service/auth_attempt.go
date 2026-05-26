@@ -158,7 +158,7 @@ func (PasskeyProof) proofCheckType() domain.AuthCheckType { return domain.AuthCh
 // ---- Secondary ports -------------------------------------------------------------
 
 type sessionResolver interface {
-	GetByID(ctx context.Context, q database.QueryExecutor, projectID, sessionID string) (*domain.Session, error)
+	Get(ctx context.Context, q database.QueryExecutor, projectID, sessionID string) (*domain.Session, error)
 }
 
 type projectLoader interface {
@@ -224,7 +224,7 @@ func NewAuthAttemptService(
 func (s *authAttemptService) Create(ctx context.Context, input CreateAuthAttemptInput) (res *domain.AuthAttempt, err error) {
 	opts := make([]domain.AuthAttemptOption, 0, 1)
 	if input.SessionID != nil {
-		session, err := s.sessions.GetByID(ctx, s.pool, input.ProjectID, *input.SessionID)
+		session, err := s.sessions.Get(ctx, s.pool, input.ProjectID, *input.SessionID)
 		if err != nil {
 			if errors.Is(err, domain.ErrSessionNotFound()) {
 				return nil, domain.ErrAuthAttemptInvalidRequest().WithParent(err).WithMessage("The session was not found.")
