@@ -1,7 +1,7 @@
 # Bot Detection & Captcha
 
-> **Status:** Preliminary — depends on policy engine design
-> **See also:** [Overview](README.md) · [Flow Engine](flow-engine.md) · [Session API](session-api.md)
+> **Status:** Contract decided in [ADR 016](../../adrs/016-captcha-gate-and-bot-signals.md); risk-based activation still depends on policy engine design
+> **See also:** [Overview](README.md) · [Flow Engine](flow-engine.md) · [Session API](session-api.md) · [ADR 016](../../adrs/016-captcha-gate-and-bot-signals.md)
 > **POC ADRs:** [021](https://github.com/zitadel/oxidel/blob/main/docs/adr/021-login-flow-schema.md) Bot Detection & Telemetry, [024](https://github.com/zitadel/oxidel/blob/main/docs/adr/024-risk-evaluation-policy-consumers.md) Risk Evaluation
 
 Bot detection is a **first-class, composable subsystem** — not an afterthought bolted onto login.
@@ -39,6 +39,25 @@ Bot detection is a **first-class, composable subsystem** — not an afterthought
               Policy Engine consumes
               RiskResult and decides
 ```
+
+### Platform / edge signals
+
+Apps deployed behind an edge platform (Vercel, Cloudflare) often already run bot
+management there — Vercel BotID, Cloudflare managed challenge / WAF — producing a
+**server-side verdict with no widget**. That verdict is a first-class signal:
+
+- **Capture:** the SDK Edge proxy (`/__nextgen`, running in the customer's deployment)
+  reads the platform verdict server-side and stamps it on the proxied flow request as the
+  reserved header `X-Zitadel-Risk-Signal` (structured-field: `provider`, `level`, optional
+  `score`/`reasons`).
+- **Trust:** Zitadel honors the header only when the request also carries a valid
+  origin-scoped `sk_proj_` secret (the `ZITADEL_PREVIEW_SECRET` already provisioned to the
+  deploy platform — see [secret.md](../platform/secret.md)). Browser-relayed signals are
+  ignored.
+- **Effect:** the risk evaluator fuses it like any other signal — a `clean` verdict can
+  suppress an otherwise-required captcha; a `suspicious` verdict can inject one.
+
+Full contract and trust model: [ADR 016](../../adrs/016-captcha-gate-and-bot-signals.md).
 
 ## Captcha Providers
 
@@ -92,10 +111,8 @@ Third-party providers require configuration (site key, secret key) at the projec
 ```json
 {
   "kind": "captcha",
-  "name": "captcha",
-  "label": "Complete the challenge",
+  "provider": "recaptcha",
   "config": {
-    "provider": "recaptcha",
     "site_key": "6Lc..."
   }
 }
@@ -106,10 +123,8 @@ vs. the built-in Altcha:
 ```json
 {
   "kind": "captcha",
-  "name": "captcha",
-  "label": "Complete the challenge",
+  "provider": "altcha",
   "config": {
-    "provider": "altcha",
     "algorithm": "SHA-256",
     "challenge": "abc...",
     "salt": "xyz...",
@@ -118,7 +133,7 @@ vs. the built-in Altcha:
 }
 ```
 
-The frontend dispatches on `config.provider` to render the right widget. The submit payload varies by provider (Altcha sends `{ salt, number }`, reCAPTCHA/hCaptcha/Turnstile send `{ token }`).
+The frontend dispatches on the gate's `provider` to render the right widget. The submit payload varies by provider (Altcha sends `{ salt, number }`, reCAPTCHA/hCaptcha/Turnstile send `{ token }`).
 
 ### Schema Annotation
 
@@ -180,7 +195,7 @@ Three modes:
      "name": "profile",
      "fields": ["email", "given_name", "family_name"],
      "gates": {
-       "captcha": { "type": "captcha", "provider": "altcha" }
+       "captcha": { "kind": "captcha", "provider": "altcha" }
      },
      "transitions": {
        "submit": { "target": "set_password" }
