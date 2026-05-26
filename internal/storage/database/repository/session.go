@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
@@ -16,15 +15,19 @@ import (
 )
 
 const (
-	pgTableSessions     = "zitadel_nextgen.sessions"
-	pgTableUserAgents   = "zitadel_nextgen.user_agents"
-	pgTableChecks       = "zitadel_nextgen.checks"
-	pgTableAuthAttempts = "zitadel_nextgen.auth_attempts"
+	pgSchema = "zitadel_nextgen."
+
+	pgTableSessions     = pgSchema + "sessions"
+	pgTableUserAgents   = pgSchema + "user_agents"
+	pgTableChecks       = pgSchema + "checks"
+	pgTableAuthAttempts = pgSchema + "auth_attempts"
 
 	spannerTableSessions     = "sessions"
 	spannerTableUserAgents   = "user_agents"
 	spannerTableChecks       = "checks"
 	spannerTableAuthAttempts = "auth_attempts"
+
+	userAgentFingerprintKey = "fingerprint"
 )
 
 type sessionMeta struct {
@@ -205,7 +208,11 @@ func (r *sessionRepository) buildInsertUserAgent(projectID string, info []byte) 
 	b.WriteArg(projectID)
 	b.WriteString(", ")
 	b.WriteArg(r.encodeUserAgent(info))
-	b.WriteString(") RETURNING id")
+	if r.isSpanner {
+		b.WriteString(") THEN RETURN id")
+	} else {
+		b.WriteString(") RETURNING id")
+	}
 	return b
 }
 
@@ -286,6 +293,7 @@ func (r *sessionRepository) buildLoadSessionChecks(projectID, sessionID string) 
 	b.WriteArg(projectID)
 	b.WriteString(" AND session_id = ")
 	b.WriteArg(database.Identity(sessionID))
+	b.WriteString(" AND last_verified_at IS NOT NULL")
 	return b
 }
 
@@ -327,6 +335,17 @@ func (r *sessionRepository) buildDeleteSessionCheckLoser(projectID, sessionID st
 	return b
 }
 
+func userAgentFromStoredInfo(info map[string]any) *domain.UserAgent {
+	ua := &domain.UserAgent{Info: info}
+	if ip, ok := info["ip"].(string); ok {
+		ua.IP = ip
+	}
+	if fingerprint, ok := info[userAgentFingerprintKey].(string); ok {
+		ua.ID = fingerprint
+	}
+	return ua
+}
+
 func (r *sessionRepository) scanSessions(rows database.Rows) ([]*domain.Session, error) {
 	byID := make(map[string]*domain.Session)
 	order := make([]string, 0)
@@ -341,7 +360,7 @@ func (r *sessionRepository) scanSessions(rows database.Rows) ([]*domain.Session,
 			tokenID          database.Identity
 			userID           database.Null[string]
 			userAgentID      database.Null[int64]
-			userAgentInfo    json.RawMessage
+			userAgentInfo    JSON[json.RawMessage]
 			checkType        database.Null[int64]
 			checkID          database.Identity
 			checkIDValid     bool
@@ -349,8 +368,8 @@ func (r *sessionRepository) scanSessions(rows database.Rows) ([]*domain.Session,
 			lastVerifiedAt   database.Null[time.Time]
 			lastFailedAt     database.Null[time.Time]
 			failureCount     database.Null[uint16]
-			challenge        json.RawMessage
-			factor           json.RawMessage
+			challenge        JSON[json.RawMessage]
+			factor           JSON[json.RawMessage]
 		)
 
 		var timeToLive time.Duration
@@ -394,17 +413,12 @@ func (r *sessionRepository) scanSessions(rows database.Rows) ([]*domain.Session,
 			}
 			if userAgentID.Valid {
 				info := map[string]any{}
-				if len(userAgentInfo) > 0 {
-					_ = json.Unmarshal(userAgentInfo, &info)
+				if len(userAgentInfo.Value) > 0 {
+					if err := json.Unmarshal(userAgentInfo.Value, &info); err != nil {
+						return nil, fmt.Errorf("failed to unmarshal user agent info: %w", err)
+					}
 				}
-				ua := &domain.UserAgent{
-					ID:   strconv.FormatInt(userAgentID.V, 10),
-					Info: info,
-				}
-				if ip, ok := info["ip"].(string); ok {
-					ua.IP = ip
-				}
-				sess.UserAgent = ua
+				sess.UserAgent = userAgentFromStoredInfo(info)
 			}
 			byID[id] = sess
 			order = append(order, id)
@@ -420,8 +434,8 @@ func (r *sessionRepository) scanSessions(rows database.Rows) ([]*domain.Session,
 			lastFailedAt.V,
 			lastVerifiedAt.V,
 			failureCount.V,
-			challenge,
-			factor,
+			challenge.Value,
+			factor.Value,
 		)
 		if err != nil {
 			return nil, err
@@ -474,6 +488,9 @@ func (r *sessionRepository) insertSession(ctx context.Context, q database.QueryE
 		if session.UserAgent.IP != "" {
 			info["ip"] = session.UserAgent.IP
 		}
+		if session.UserAgent.ID != "" {
+			info[userAgentFingerprintKey] = session.UserAgent.ID
+		}
 		raw, err := json.Marshal(info)
 		if err != nil {
 			return fmt.Errorf("failed to marshal user agent info: %w", err)
@@ -483,7 +500,6 @@ func (r *sessionRepository) insertSession(ctx context.Context, q database.QueryE
 		if err != nil {
 			return fmt.Errorf("failed to insert user agent: %w", err)
 		}
-		session.UserAgent.ID = userAgentID.String()
 	}
 
 	if r.isSpanner {
@@ -493,45 +509,49 @@ func (r *sessionRepository) insertSession(ctx context.Context, q database.QueryE
 }
 
 func (r *sessionRepository) insertSessionPostgres(ctx context.Context, q database.QueryExecutor, session *domain.Session, userAgentID database.Identity) error {
-	var (
-		sessionID database.Identity
-		createdAt time.Time
-		updatedAt time.Time
-		expiresAt time.Time
-	)
-	insertB := r.buildInsertSessionPostgres(session.ProjectID, userAgentID, session.TimeToLive)
-	err := q.QueryRow(ctx, insertB.String(), insertB.Args()...).Scan(&sessionID, &createdAt, &updatedAt, &expiresAt)
-	if err != nil {
-		return fmt.Errorf("failed to insert session: %w", err)
-	}
-	updateB := r.buildUpdateSessionTokenPostgres(session.ProjectID, sessionID)
-	_, err = q.Exec(ctx, updateB.String(), updateB.Args()...)
-	if err != nil {
-		return fmt.Errorf("failed to set session token_id: %w", err)
-	}
-	session.ID = sessionID.String()
-	session.TokenID = session.ID
-	session.CreatedAt = createdAt
-	session.UpdatedAt = updatedAt
-	session.ExpiresAt = expiresAt
-	return nil
+	return withTransaction(ctx, q, func(ctx context.Context, tx database.QueryExecutor) error {
+		var (
+			sessionID database.Identity
+			createdAt time.Time
+			updatedAt time.Time
+			expiresAt time.Time
+		)
+		insertB := r.buildInsertSessionPostgres(session.ProjectID, userAgentID, session.TimeToLive)
+		err := tx.QueryRow(ctx, insertB.String(), insertB.Args()...).Scan(&sessionID, &createdAt, &updatedAt, &expiresAt)
+		if err != nil {
+			return fmt.Errorf("failed to insert session: %w", err)
+		}
+		updateB := r.buildUpdateSessionTokenPostgres(session.ProjectID, sessionID)
+		_, err = tx.Exec(ctx, updateB.String(), updateB.Args()...)
+		if err != nil {
+			return fmt.Errorf("failed to set session token_id: %w", err)
+		}
+		session.ID = sessionID.String()
+		session.TokenID = session.ID
+		session.CreatedAt = createdAt
+		session.UpdatedAt = updatedAt
+		session.ExpiresAt = expiresAt
+		return nil
+	})
 }
 
 func (r *sessionRepository) insertSessionSpanner(ctx context.Context, q database.QueryExecutor, session *domain.Session, userAgentID database.Identity) error {
-	var sessionID database.Identity
-	insertB := r.buildInsertSessionSpanner(session.ProjectID, userAgentID, session.TimeToLive)
-	err := q.QueryRow(ctx, insertB.String(), insertB.Args()...).Scan(&sessionID, &session.CreatedAt, &session.UpdatedAt, &session.ExpiresAt)
-	if err != nil {
-		return fmt.Errorf("failed to insert session: %w", err)
-	}
-	updateB := r.buildUpdateSessionTokenSpanner(session.ProjectID, sessionID)
-	_, err = q.Exec(ctx, updateB.String(), updateB.Args()...)
-	if err != nil {
-		return fmt.Errorf("failed to set session token_id: %w", err)
-	}
-	session.ID = sessionID.String()
-	session.TokenID = session.ID
-	return nil
+	return withTransaction(ctx, q, func(ctx context.Context, tx database.QueryExecutor) error {
+		var sessionID database.Identity
+		insertB := r.buildInsertSessionSpanner(session.ProjectID, userAgentID, session.TimeToLive)
+		err := tx.QueryRow(ctx, insertB.String(), insertB.Args()...).Scan(&sessionID, &session.CreatedAt, &session.UpdatedAt, &session.ExpiresAt)
+		if err != nil {
+			return fmt.Errorf("failed to insert session: %w", err)
+		}
+		updateB := r.buildUpdateSessionTokenSpanner(session.ProjectID, sessionID)
+		_, err = tx.Exec(ctx, updateB.String(), updateB.Args()...)
+		if err != nil {
+			return fmt.Errorf("failed to set session token_id: %w", err)
+		}
+		session.ID = sessionID.String()
+		session.TokenID = session.ID
+		return nil
+	})
 }
 
 func (r *sessionRepository) exchange(ctx context.Context, q database.QueryExecutor, projectID, handoffToken string, ttl time.Duration) (*domain.Session, error) {
@@ -578,12 +598,15 @@ func (r *sessionRepository) exchange(ctx context.Context, q database.QueryExecut
 		return nil, err
 	}
 
-	winners := pickCheckWinners(attemptChecks, sessionChecks)
-	if err := r.applyExchange(ctx, q, projectID, targetSession.ID, winners); err != nil {
+	lastVerifiedChecks := pickLastVerifiedChecksByType(attemptChecks, sessionChecks)
+	if err := r.applyExchange(ctx, q, projectID, targetSession.ID, lastVerifiedChecks); err != nil {
 		return nil, fmt.Errorf("%w: %v", domain.ErrSessionExchangeConflict(), err)
 	}
 
-	userID := r.userIDFromWinners(ctx, q, projectID, winners)
+	userID, err := r.userIDFromLastVerifiedChecks(ctx, q, projectID, lastVerifiedChecks)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", domain.ErrSessionExchangeConflict(), err)
+	}
 	changes := []database.Change{
 		database.NewChange(database.NewColumn(r.meta.tableName, "updated_at"), r.now),
 	}
@@ -671,30 +694,30 @@ func scanStoredChecks(rows database.Rows, onAttempt bool) ([]storedCheck, error)
 	return out, rows.Err()
 }
 
-// pickCheckWinners keeps at most one check per type, preferring the most recent last_verified_at.
-func pickCheckWinners(attemptChecks, sessionChecks []storedCheck) map[domain.AuthCheckType]storedCheck {
-	winners := make(map[domain.AuthCheckType]storedCheck)
+// pickLastVerifiedChecksByType keeps at most one check per type, preferring the most recent last_verified_at.
+func pickLastVerifiedChecksByType(attemptChecks, sessionChecks []storedCheck) map[domain.AuthCheckType]storedCheck {
+	lastVerifiedChecks := make(map[domain.AuthCheckType]storedCheck)
 	for _, c := range sessionChecks {
-		winners[c.Type] = c
+		lastVerifiedChecks[c.Type] = c
 	}
 	for _, c := range attemptChecks {
-		existing, ok := winners[c.Type]
+		existing, ok := lastVerifiedChecks[c.Type]
 		if !ok || c.LastVerifiedAt.After(existing.LastVerifiedAt) {
-			winners[c.Type] = c
+			lastVerifiedChecks[c.Type] = c
 		}
 	}
-	return winners
+	return lastVerifiedChecks
 }
 
-func (r *sessionRepository) applyExchange(ctx context.Context, q database.QueryExecutor, projectID, sessionID string, winners map[domain.AuthCheckType]storedCheck) error {
-	if len(winners) == 0 {
+func (r *sessionRepository) applyExchange(ctx context.Context, q database.QueryExecutor, projectID, sessionID string, lastVerifiedChecks map[domain.AuthCheckType]storedCheck) error {
+	if len(lastVerifiedChecks) == 0 {
 		return nil
 	}
 
-	promoteIDs := make([]database.Identity, 0, len(winners))
-	for _, w := range winners {
-		if w.OnAttempt {
-			promoteIDs = append(promoteIDs, database.Identity(w.ID))
+	promoteIDs := make([]database.Identity, 0, len(lastVerifiedChecks))
+	for _, c := range lastVerifiedChecks {
+		if c.OnAttempt {
+			promoteIDs = append(promoteIDs, database.Identity(c.ID))
 		}
 	}
 
@@ -711,8 +734,8 @@ func (r *sessionRepository) applyExchange(ctx context.Context, q database.QueryE
 		}
 	}
 
-	for _, w := range winners {
-		b := r.buildDeleteSessionCheckLoser(projectID, sessionID, w.Type, w.ID)
+	for _, c := range lastVerifiedChecks {
+		b := r.buildDeleteSessionCheckLoser(projectID, sessionID, c.Type, c.ID)
 		if _, err := q.Exec(ctx, b.String(), b.Args()...); err != nil {
 			return err
 		}
@@ -721,25 +744,25 @@ func (r *sessionRepository) applyExchange(ctx context.Context, q database.QueryE
 	return nil
 }
 
-func (r *sessionRepository) userIDFromWinners(ctx context.Context, q database.QueryExecutor, projectID string, winners map[domain.AuthCheckType]storedCheck) *string {
-	w, ok := winners[domain.AuthCheckTypeUser]
+func (r *sessionRepository) userIDFromLastVerifiedChecks(ctx context.Context, q database.QueryExecutor, projectID string, lastVerifiedChecks map[domain.AuthCheckType]storedCheck) (*string, error) {
+	w, ok := lastVerifiedChecks[domain.AuthCheckTypeUser]
 	if !ok {
-		return nil
+		return nil, nil
 	}
-	var factor json.RawMessage
+	var factor JSON[json.RawMessage]
 	b := r.buildSelectFactorPayload(projectID, w.ID)
 	err := q.QueryRow(ctx, b.String(), b.Args()...).Scan(&factor)
 	if err != nil {
-		return nil
+		return nil, fmt.Errorf("failed to load user factor payload: %w", err)
 	}
 	var payload domain.AuthFactorUser
-	if len(factor) > 0 {
-		if err := json.Unmarshal(factor, &payload); err != nil {
-			return nil
+	if len(factor.Value) > 0 {
+		if err := json.Unmarshal(factor.Value, &payload); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal user factor payload: %w", err)
 		}
 	}
 	if payload.UserID == "" {
-		return nil
+		return nil, nil
 	}
-	return &payload.UserID
+	return &payload.UserID, nil
 }

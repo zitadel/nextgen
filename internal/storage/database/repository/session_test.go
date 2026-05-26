@@ -21,25 +21,8 @@ func authRepo() domain.AuthAttemptRepository {
 	return repository.NewAuthAttemptRepository(pool)
 }
 
-func checksTableName() string {
-	if isSpannerDB {
-		return "checks"
-	}
-	return "zitadel_nextgen.checks"
-}
-
-func sessionsTableName() string {
-	if isSpannerDB {
-		return "sessions"
-	}
-	return "zitadel_nextgen.sessions"
-}
-
-func authAttemptsTableName() string {
-	if isSpannerDB {
-		return "auth_attempts"
-	}
-	return "zitadel_nextgen.auth_attempts"
+func testTables() repository.TestTableNames {
+	return repository.TestTableNamesFor(pool)
 }
 
 func countChecks(t *testing.T, tx database.QueryExecutor, query string, args ...any) int64 {
@@ -113,7 +96,7 @@ func TestSession_Create(t *testing.T) {
 		tx, rollback := transactionForRollback(t)
 		defer rollback()
 
-		ua := &domain.UserAgent{IP: "203.0.113.1", Info: map[string]any{"browser": "test"}}
+		ua := &domain.UserAgent{ID: "fp-test-123", IP: "203.0.113.1", Info: map[string]any{"browser": "test"}}
 		session, err := domain.NewSession("p-sess-ua", ua)
 		require.NoError(t, err)
 		ensureProject(t, tx, session.ProjectID)
@@ -122,6 +105,7 @@ func TestSession_Create(t *testing.T) {
 		stored, err := repo.Get(t.Context(), tx, session.ProjectID, session.ID)
 		require.NoError(t, err)
 		require.NotNil(t, stored.UserAgent)
+		assert.Equal(t, ua.ID, stored.UserAgent.ID)
 		assert.Equal(t, ua.IP, stored.UserAgent.IP)
 		assert.Equal(t, "test", stored.UserAgent.Info["browser"])
 	})
@@ -292,14 +276,14 @@ func TestSession_Exchange_mergeChecks(t *testing.T) {
 		require.Contains(t, factors, domain.AuthCheckTypePassword)
 
 		n := countChecks(t, tx,
-			`SELECT COUNT(*) FROM `+checksTableName()+` WHERE project_id = $1 AND session_id = $2`,
+			`SELECT COUNT(*) FROM `+testTables().Checks+` WHERE project_id = $1 AND session_id = $2`,
 			projectID, database.Identity(sess.ID),
 		)
 		assert.Equal(t, int64(1), n)
 
 		var authAttemptID database.Null[int64]
 		err = tx.QueryRow(t.Context(),
-			`SELECT auth_attempt_id FROM `+checksTableName()+` WHERE project_id = $1 AND session_id = $2 LIMIT 1`,
+			`SELECT auth_attempt_id FROM `+testTables().Checks+` WHERE project_id = $1 AND session_id = $2 LIMIT 1`,
 			projectID, database.Identity(sess.ID),
 		).Scan(&authAttemptID)
 		require.NoError(t, err)
@@ -360,13 +344,13 @@ func TestSession_Exchange_mergeChecks(t *testing.T) {
 		assert.Len(t, sess.Factors, 1)
 
 		n := countChecks(t, tx,
-			`SELECT COUNT(*) FROM `+checksTableName()+` WHERE project_id = $1 AND auth_attempt_id = $2`,
+			`SELECT COUNT(*) FROM `+testTables().Checks+` WHERE project_id = $1 AND auth_attempt_id = $2`,
 			projectID, database.Identity(attempt.ID),
 		)
 		assert.Equal(t, int64(0), n)
 
 		challengeCount := countChecks(t, tx,
-			`SELECT COUNT(*) FROM `+checksTableName()+` WHERE project_id = $1 AND session_id = $2 AND type = $3`,
+			`SELECT COUNT(*) FROM `+testTables().Checks+` WHERE project_id = $1 AND session_id = $2 AND type = $3`,
 			projectID, database.Identity(sess.ID), int64(domain.AuthCheckTypePasskey),
 		)
 		assert.Equal(t, int64(0), challengeCount)
@@ -383,7 +367,7 @@ func TestSession_Exchange_mergeChecks(t *testing.T) {
 
 		oldVerified := time.Now().UTC().Add(-2 * time.Hour)
 		_, err = tx.Exec(t.Context(),
-			`UPDATE `+checksTableName()+` SET last_verified_at = $1 WHERE project_id = $2 AND session_id = $3`,
+			`UPDATE `+testTables().Checks+` SET last_verified_at = $1 WHERE project_id = $2 AND session_id = $3`,
 			oldVerified, projectID, database.Identity(sess.ID),
 		)
 		require.NoError(t, err)
@@ -413,7 +397,7 @@ func TestSession_Exchange_mergeChecks(t *testing.T) {
 		assert.True(t, factor.GetLastVerifiedAt().After(oldVerified))
 
 		n := countChecks(t, tx,
-			`SELECT COUNT(*) FROM `+checksTableName()+` WHERE project_id = $1 AND session_id = $2 AND type = $3`,
+			`SELECT COUNT(*) FROM `+testTables().Checks+` WHERE project_id = $1 AND session_id = $2 AND type = $3`,
 			projectID, database.Identity(sess.ID), int64(domain.AuthCheckTypePassword),
 		)
 		assert.Equal(t, int64(1), n)
@@ -430,7 +414,7 @@ func TestSession_Exchange_mergeChecks(t *testing.T) {
 
 		newer := time.Now().UTC()
 		_, err = tx.Exec(t.Context(),
-			`UPDATE `+checksTableName()+` SET last_verified_at = $1 WHERE project_id = $2 AND session_id = $3`,
+			`UPDATE `+testTables().Checks+` SET last_verified_at = $1 WHERE project_id = $2 AND session_id = $3`,
 			newer, projectID, database.Identity(sess.ID),
 		)
 		require.NoError(t, err)
@@ -444,7 +428,7 @@ func TestSession_Exchange_mergeChecks(t *testing.T) {
 		ensureProject(t, tx, projectID)
 		require.NoError(t, authRepo().Create(t.Context(), tx, attempt2))
 		_, err = tx.Exec(t.Context(),
-			`UPDATE `+checksTableName()+` SET last_verified_at = $1 WHERE project_id = $2 AND auth_attempt_id = $3`,
+			`UPDATE `+testTables().Checks+` SET last_verified_at = $1 WHERE project_id = $2 AND auth_attempt_id = $3`,
 			newer.Add(-time.Hour), projectID, database.Identity(attempt2.ID),
 		)
 		require.NoError(t, err)
