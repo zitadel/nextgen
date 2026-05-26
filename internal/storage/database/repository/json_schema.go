@@ -86,6 +86,10 @@ func (r *JSONSchemaRepository) URLCondition(url string) database.Condition {
 	return database.NewTextCondition(r.URL(), database.TextOperationEqual, url)
 }
 
+func (r *JSONSchemaRepository) GetByID(ctx context.Context, client database.QueryExecutor, projectID string, schemaID string) (*domain.JSONSchema, error) {
+	return r.Get(ctx, client, database.WithCondition(r.PrimaryKeyCondition(projectID, schemaID)))
+}
+
 func (r *JSONSchemaRepository) Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*domain.JSONSchema, error) {
 	builder := database.NewStatementBuilder("SELECT ")
 	database.Columns{

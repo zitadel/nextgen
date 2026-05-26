@@ -2,8 +2,10 @@ package service
 
 import (
 	"context"
+	"errors"
 	"net/url"
 
+	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
@@ -52,7 +54,7 @@ type AuthAttemptService interface {
 
 	// Handoff mints a single-use handoff token for a completed attempt.
 	//
-	// The token is exchanged by the client at POST /sessions/exchange to create
+	// The client exchanges the token at POST /sessions/exchange to create
 	// a new session or add factors to an existing session.
 	//
 	// The attempt must be in a completed state and not expired.
@@ -133,7 +135,8 @@ type Proof interface {
 
 // UserProof identifies the user by login name (email, username, phone).
 type UserProof struct {
-	LoginName string
+	AttributeName string
+	LoginName     string
 }
 
 func (UserProof) proofCheckType() domain.AuthCheckType { return domain.AuthCheckTypeUser }
@@ -164,10 +167,15 @@ type projectLoader interface {
 
 type userLookup interface {
 	Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*domain.User, error)
+	ProjectIDCondition(projectID string) database.Condition
+	IDCondition(id string) database.Condition
+	AttributesCondition(attributes []domain.Attribute) database.Condition
 }
 
 type userPasswords interface {
 	Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*domain.UserPassword, error)
+	UserIDCondition(userID string) database.Condition
+	ProjectIDCondition(pid string) database.Condition
 }
 
 type userPasskeys interface {
@@ -178,13 +186,14 @@ type userPasskeys interface {
 // ---- Implementation ----------------------------------------------------------
 
 type authAttemptService struct {
-	pool          database.Pool
-	attempts      domain.AuthAttemptRepository
-	sessions      sessionResolver
-	projects      projectLoader
-	users         userLookup
-	userPasswords userPasswords
-	userPasskeys  userPasskeys
+	pool             database.Pool
+	attempts         domain.AuthAttemptRepository
+	sessions         sessionResolver
+	projects         projectLoader
+	users            userLookup
+	userPasswords    userPasswords
+	userPasskeys     userPasskeys
+	passwordVerifier *crypto.Hasher
 }
 
 func NewAuthAttemptService(
@@ -195,39 +204,190 @@ func NewAuthAttemptService(
 	users userLookup,
 	userPasswords userPasswords,
 	userPasskeys userPasskeys,
+	passwordVerifier *crypto.Hasher,
 ) AuthAttemptService {
 	return &authAttemptService{
-		pool:          pool,
-		attempts:      attempts,
-		sessions:      sessions,
-		projects:      projects,
-		users:         users,
-		userPasswords: userPasswords,
-		userPasskeys:  userPasskeys,
+		pool:             pool,
+		attempts:         attempts,
+		sessions:         sessions,
+		projects:         projects,
+		users:            users,
+		userPasswords:    userPasswords,
+		userPasskeys:     userPasskeys,
+		passwordVerifier: passwordVerifier,
 	}
 }
 
-func (a *authAttemptService) Create(ctx context.Context, input CreateAuthAttemptInput) (*domain.AuthAttempt, error) {
-	//TODO implement me
-	panic("implement me")
+// Create creates a new auth attempt.
+// If input.SessionID is set, the existing session's verified checks are copied
+// into the attempt for step-up auth — no new session is created.
+func (s *authAttemptService) Create(ctx context.Context, input CreateAuthAttemptInput) (res *domain.AuthAttempt, err error) {
+	opts := make([]domain.AuthAttemptOption, 0, 1)
+	if input.SessionID != nil {
+		session, err := s.sessions.GetByID(ctx, s.pool, input.ProjectID, *input.SessionID)
+		if err != nil {
+			if errors.Is(err, domain.ErrSessionNotFound()) {
+				return nil, domain.ErrAuthAttemptInvalidRequest().WithParent(err).WithMessage("The session was not found.")
+			}
+			return nil, domain.ErrInternal(err).WithMessage("Failed to load the session.")
+		}
+		opts = append(opts, domain.WithSession(input.SessionID, session.Factors...))
+	}
+
+	attempt, err := domain.NewAuthAttempt(input.ProjectID, input.RequiredChecks, opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = s.attempts.Create(ctx, s.pool, attempt); err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("Failed to create the auth attempt.")
+	}
+	return attempt, nil
 }
 
-func (a *authAttemptService) GetByID(ctx context.Context, projectID, attemptID string) (*domain.AuthAttempt, error) {
-	//TODO implement me
-	panic("implement me")
+// GetByID retrieves an auth attempt by its ID and all its factors and challenges.
+func (s *authAttemptService) GetByID(ctx context.Context, projectID, attemptID string) (*domain.AuthAttempt, error) {
+	attempt, err := s.attempts.GetByID(ctx, s.pool, projectID, attemptID)
+	if err != nil {
+		if errors.Is(err, domain.ErrAuthAttemptNotFound()) {
+			return nil, err
+		}
+		return nil, domain.ErrInternal(err).WithMessage("Failed to load the auth attempt.")
+	}
+	return attempt, nil
 }
 
-func (a *authAttemptService) IssueChallenge(ctx context.Context, input IssueChallengeInput) (*domain.AuthAttempt, error) {
-	//TODO implement me
-	panic("implement me")
+// IssueChallenge issues a challenge for the given check type on an existing attempt.
+// For passkey, the user check must already be verified so the user ID is known.
+func (s *authAttemptService) IssueChallenge(ctx context.Context, input IssueChallengeInput) (*domain.AuthAttempt, error) {
+	attempt, err := s.attempts.GetByID(ctx, s.pool, input.ProjectID, input.AttemptID)
+	if err != nil {
+		return nil, err
+	}
+
+	challenge, err := s.buildChallenge(ctx, attempt, input.Challenge)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.attempts.SetChallenge(ctx, s.pool, input.ProjectID, input.AttemptID, challenge); err != nil {
+		return nil, err
+	}
+
+	return attempt, nil
 }
 
-func (a *authAttemptService) VerifyProof(ctx context.Context, input VerifyProofInput) (*domain.AuthAttempt, error) {
-	//TODO implement me
-	panic("implement me")
+// VerifyProof verifies the submitted proof against the challenge identified by ChallengeID.
+// On success, it persists the verification and marks the attempt complete if all
+// required checks are now satisfied.
+// On failure, it records the failed attempt for rate-limiting purposes.
+func (s *authAttemptService) VerifyProof(ctx context.Context, input VerifyProofInput) (res *domain.AuthAttempt, err error) {
+	attempt, err := s.attempts.GetByID(ctx, s.pool, input.ProjectID, input.AttemptID)
+	if err != nil {
+		return nil, err
+	}
+
+	challenge, factor, err := s.verify(ctx, attempt, input.Proof, input.ChallengeID)
+	if err != nil {
+		// Record the failure for rate-limiting — best effort, don't shadow the original error
+		_ = s.attempts.ChallengeFailed(ctx, s.pool, input.ProjectID, input.AttemptID, challenge)
+		return nil, err
+	}
+
+	if err = s.attempts.ChallengeSucceeded(ctx, s.pool, input.ProjectID, input.AttemptID, factor, challenge.GetID()); err != nil {
+		return nil, err
+	}
+
+	return attempt, nil
 }
 
-func (a *authAttemptService) Handoff(ctx context.Context, input HandoffInput) (*domain.AuthAttempt, error) {
-	//TODO implement me
-	panic("implement me")
+// Handoff mints a single-use handoff token for a completed attempt.
+// The client exchanges the token at POST /sessions/exchange.
+func (s *authAttemptService) Handoff(ctx context.Context, input HandoffInput) (*domain.AuthAttempt, error) {
+	attempt, err := s.attempts.GetByID(ctx, s.pool, input.ProjectID, input.AttemptID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := attempt.PrepareHandoff(); err != nil {
+		return nil, err
+	}
+
+	if err := s.attempts.Handoff(ctx, s.pool, attempt); err != nil {
+		return nil, err
+	}
+	return attempt, nil
 }
+
+// buildChallenge constructs the challenge for the given check type.
+func (s *authAttemptService) buildChallenge(ctx context.Context, attempt *domain.AuthAttempt, challenge Challenge) (domain.AuthChallenge, error) {
+	switch challenge.(type) {
+	case UserChallenge:
+		if err := attempt.PrepareUserChallenge(); err != nil {
+			return nil, err
+		}
+		return attempt.SetUserChallenge(), nil
+
+	case PasswordChallenge:
+		if err := attempt.PreparePasswordChallenge(); err != nil {
+			return nil, err
+		}
+		return attempt.SetPasswordChallenge(), nil
+
+	// TODO: passkey challenge
+
+	default:
+		return nil, domain.ErrAuthAttemptInvalidRequest()
+	}
+}
+
+// verify dispatches proof verification to the appropriate secondary port.
+// Returns the checker to persist (always, even on failure) and any error.
+func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAttempt, proof Proof, challengeID string) (domain.AuthChallenge, domain.AuthFactor, error) {
+	switch p := proof.(type) {
+	case UserProof:
+		userChallenge, err := attempt.PrepareUserVerification(challengeID)
+		if err != nil {
+			return nil, nil, err
+		}
+		user, err := s.users.Get(
+			ctx,
+			s.pool,
+			database.WithCondition(s.users.ProjectIDCondition(attempt.ProjectID)),
+			database.WithCondition(s.users.AttributesCondition([]domain.Attribute{{
+				Key:   p.AttributeName,
+				Value: p.LoginName,
+			}})),
+		)
+		if err != nil {
+			return nil, nil, domain.ErrAuthAttemptProofRejected(err)
+		}
+		return userChallenge, attempt.SetUserFactor(user), nil
+
+	case PasswordProof:
+		passwordChallenge, userFactor, err := attempt.PreparePasswordVerification(challengeID)
+		if err != nil {
+			return nil, nil, err
+		}
+		password, err := s.userPasswords.Get(
+			ctx,
+			s.pool,
+			database.WithCondition(s.userPasswords.ProjectIDCondition(attempt.ProjectID)),
+			database.WithCondition(s.userPasswords.UserIDCondition(userFactor.UserID)),
+		)
+		if err != nil {
+			return nil, nil, domain.ErrAuthAttemptProofRejected(err)
+		}
+		if err := password.Verify(p.Password, s.passwordVerifier); err != nil {
+			return nil, nil, domain.ErrAuthAttemptProofRejected(err)
+		}
+		return passwordChallenge, attempt.SetPasswordFactor(), nil
+
+	// TODO: passkey challenge
+
+	default:
+		return nil, nil, domain.ErrAuthAttemptInvalidRequest().WithDetails("unsupported proof type")
+	}
+}
+
+var _ AuthAttemptService = (*authAttemptService)(nil)
