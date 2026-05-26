@@ -1,0 +1,37 @@
+title: UserSchema
+"$schema": https://json-schema.org/draft/2020-12/schema
+type: object
+description: |
+  This schema is missing `"allOf": [{"$ref": "https://json-schema.org/draft/2020-12/schema"}],`. 
+  This is done because a lot of code generators cannot handle that.
+required:
+  - metaSchema
+  - kind
+  - x-auth-methods
+  - $id
+additionalProperties: true
+properties:
+  "$schema":
+    type: string
+    const: https://json-schema.org/draft/2020-12/schema
+    description: The JSON Schema version used for this schema.
+  $id:
+    type: string
+    format: uri
+    description: The unique identifier for this user schema.
+  kind:
+    type: string
+    const: user-schema
+    description: Discriminator value for a user schema create request.
+  metaSchema:
+    type: string
+    format: uri
+    description: The user Schema version used for this schema.
+  x-auth-methods:
+    $ref: auth-methods.json
+  properties:
+    type: object
+    description: A map of additional properties for the user definition, where the
+      key is the property name and the value is the property schema
+    additionalProperties:
+      "$ref": user-property.yaml

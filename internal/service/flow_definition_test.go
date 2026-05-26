@@ -44,6 +44,23 @@ var tenantUserSchema = []byte(`{
   }
 }`)
 
+var tenantUserSchemaNoProps = []byte(`{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "metaSchema": "https://nextgen.com/schemas/user-meta-schema.json",
+  "$id": "https://tenant.com/schemas/my-user.json",
+  "kind": "user-schema",
+  "type": "object",
+  "required": [
+    "email"
+  ],
+  "x-auth-methods": {
+    "password": {
+      "enabled": true,
+      "position": 0
+    }
+  }
+}`)
+
 var flowDefSchema = []byte(`{
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",

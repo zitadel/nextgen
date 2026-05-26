@@ -124,6 +124,14 @@ func TestWrite(t *testing.T) {
 			},
 		},
 		{
+			name: "identity equal condition",
+			cond: NewIdentityEqualCondition(NewColumn("table", "token_id"), "42"),
+			want: want{
+				stmt: "table.token_id = $1",
+				args: []any{Identity("42")},
+			},
+		},
+		{
 			name: "boolean condition",
 			cond: NewBooleanCondition(NewColumn("table", "column1"), true),
 			want: want{

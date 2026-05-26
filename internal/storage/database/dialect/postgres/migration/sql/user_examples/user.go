@@ -42,7 +42,7 @@ func (u *User) MarshalJSON() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	tree["$schema"] = u.SchemaURL
+	tree["metaSchema"] = u.SchemaURL
 	tree["$id"] = u.ID
 	tree["organization_id"] = u.OrganizationID
 	tree["created_at"] = u.CreatedAt

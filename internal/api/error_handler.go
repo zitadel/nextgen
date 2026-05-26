@@ -2,10 +2,12 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"strings"
 
 	"github.com/go-faster/errors"
+	"github.com/go-faster/jx"
 	"github.com/ogen-go/ogen/ogenerrors"
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -19,10 +21,22 @@ func domainErrorDetails(err error) api.ErrorDetails {
 	if !errors.As(err, &domErr) {
 		domErr = domain.ErrInternal(err)
 	}
-	return api.ErrorDetails{
+	apiErrDetails := api.ErrorDetails{
 		Code:    api.ErrorCode(domErr.Code),
 		Message: domErr.Message,
 	}
+	if domErr.Details != nil {
+		details := make(map[string]jx.Raw)
+		b, err := json.Marshal(domErr.Details)
+		if err == nil {
+			details["details"] = b // todo (grvijayan): temp
+			apiErrDetails.Details = api.OptErrorDetailsDetails{
+				Value: details,
+				Set:   true,
+			}
+		}
+	}
+	return apiErrDetails
 }
 
 func errorResponse(err error) *api.ErrorDetailsStatusCode {
@@ -35,6 +49,10 @@ func errorResponse(err error) *api.ErrorDetailsStatusCode {
 		return authAttemptErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixFlowDefinition.ErrorCodePrefix("")):
 		return flowDefinitionErrorResponse(e)
+	case strings.HasPrefix(e.Code, domain.PrefixSession.ErrorCodePrefix("")):
+		return sessionErrorResponse(e)
+	case strings.HasPrefix(e.Code, domain.PrefixJSONSchema.ErrorCodePrefix("")):
+		return schemaErrorResponse(e)
 	default:
 		return internalErrorResponse(err)
 	}

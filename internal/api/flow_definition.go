@@ -23,7 +23,7 @@ func (h Handler) CreateFlowDefinition(ctx context.Context, req *api.CreateFlowDe
 
 	create, flowSchemaURI, err := h.flowDefinitionService.Create(ctx, svcReq)
 	if err != nil {
-		return errorResponse(err), nil // todo: review
+		return errorResponse(err), nil // todo (grvijayan): review
 	}
 
 	return flowDefinitionDetailResponse(create, flowSchemaURI), nil
@@ -75,9 +75,10 @@ func mapCreateRequestToService(req *api.CreateFlowDefinitionRequest) (service.Cr
 
 	userSchemaURI := definition.GetUserSchema()
 	svcReq := service.CreateFlowDefinitionRequest{
-		ProjectID:  string(req.GetProjectID()),
-		Name:       definition.GetName(),
-		UserSchema: userSchemaURI.String(),
+		ProjectID:     string(req.GetProjectID()),
+		Name:          definition.GetName(),
+		UserSchema:    userSchemaURI.String(),
+		SchemaVersion: "1.0.0.", // todo (grvijayan): find a way to set this based on the schema URI or the request (currently not set in the request)
 	}
 
 	rawFlowDefinition, err := definition.MarshalJSON()
@@ -104,6 +105,87 @@ func mapCreateRequestToService(req *api.CreateFlowDefinitionRequest) (service.Cr
 			TeamIDs: reqAudience.GetTeamIds(),
 		}
 	}
+
+	// map steps to domain
+	steps := make([]domain.FlowDefinitionStep, 0, len(definition.GetSteps()))
+	for _, step := range definition.GetSteps() {
+		s := domain.FlowDefinitionStep{
+			Name:   step.GetName(),
+			Fields: step.GetFields(),
+		}
+		// actions
+		if step.GetActions().IsSet() {
+			actions := make(map[string]domain.FlowStepAction, len(step.GetActions().Value))
+			for name, apiAction := range step.GetActions().Value {
+				actions[name] = domain.FlowStepAction{
+					Primary: apiAction.GetPrimary().Value,
+					TextKey: apiAction.GetTextKey().Value,
+				}
+			}
+			s.Actions = actions
+		}
+
+		// gates
+		if step.GetGates().IsSet() {
+			gates := make(map[string]domain.FlowStepGate, len(step.GetGates().Value))
+			for name, apiGate := range step.GetGates().Value {
+				kind, _ := domain.FlowGateKindString(string(apiGate.GetKind())) // todo (grvijayan): validate in the domain layer
+
+				cfg := make(map[string]any, len(apiGate.GetConfig().Value))
+				for k, v := range apiGate.GetConfig().Value {
+					var val any
+					if err := json.Unmarshal(v, &val); err == nil {
+						cfg[k] = val
+					}
+				}
+				gates[name] = domain.FlowStepGate{
+					Kind:     kind,
+					Provider: apiGate.GetProvider(),
+					Config:   cfg,
+				}
+			}
+			s.Gates = gates
+		}
+
+		// sso providers
+		ssoProviders := make([]domain.FlowSSOProvider, 0, len(step.GetSSOProviders()))
+		for _, ssoProvider := range step.GetSSOProviders() {
+			s := domain.FlowSSOProvider{
+				ID:       ssoProvider.GetID(),
+				Name:     ssoProvider.GetName(),
+				Template: ssoProvider.GetTemplate(),
+			}
+			ssoProviders = append(ssoProviders, s)
+		}
+		s.SSOProviders = ssoProviders
+
+		// transitions
+		if step.GetTransitions().IsSet() {
+			transitions := make(map[string]domain.FlowStepTransition, len(step.GetTransitions().Value))
+			for name, apiTransition := range step.GetTransitions().Value {
+				var transitionAction *domain.FlowDefinitionTransitionAction
+				if apiTransition.Action.IsSet() {
+					a, _ := domain.FlowDefinitionTransitionActionString(string(apiTransition.GetAction().Value)) // validated in the domain
+					transitionAction = &a
+				}
+
+				t := domain.FlowStepTransition{
+					Action: transitionAction,
+					Target: apiTransition.GetTarget(),
+				}
+				transitions[name] = t
+			}
+			s.Transitions = transitions
+		}
+
+		// complete
+		if step.GetComplete().IsSet() {
+			complete, _ := domain.FlowStepCompleteString(string(step.GetComplete().Value))
+			s.Complete = &complete
+		}
+		steps = append(steps, s)
+	}
+	svcReq.Steps = steps
 	return svcReq, nil
 }
 
@@ -171,7 +253,7 @@ func mapDomainStepsToAPI(domainSteps []domain.FlowDefinitionStep) []api.FlowDefi
 		for name, gate := range step.Gates {
 			gateConfig := make(api.GateConfig, len(gate.Config))
 			for k, v := range gate.Config {
-				val, err := json.Marshal(v) // todo: review
+				val, err := json.Marshal(v)
 				if err == nil {
 					gateConfig[k] = val
 				}

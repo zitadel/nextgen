@@ -70,7 +70,7 @@ get:
       description: Filter flow definitions by purpose (e.g., registration, login).
       schema:
         type: string
-        enum: [login, register, recovery, profiling, reauth, link_account]
+        enum: [ login, register, recovery, profiling, reauth, link_account ]
   responses:
     '200':
       description: A list of flow definitions.

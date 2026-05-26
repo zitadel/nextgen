@@ -2,9 +2,17 @@ import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { resetPlatformStore, setupPlatformHandlers } from "@zitadel-nextgen/api-mock/platform";
+import { setupServer } from "msw/node";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { parseJson, runCliForTest } from "../helpers/run-cli";
+
+const MOCK_SERVER_URL = "http://mock.zitadel.test";
+const server = setupServer(...setupPlatformHandlers());
+beforeAll(() => server.listen({ onUnhandledRequest: "warn" }));
+afterAll(() => server.close());
+afterEach(() => { server.resetHandlers(); resetPlatformStore(); });
 
 async function scaffoldProject(): Promise<string> {
   const cwd = await mkdtemp(join(tmpdir(), "zitadel-locale-"));
@@ -18,12 +26,13 @@ async function scaffoldProject(): Promise<string> {
     "export default function Layout({ children }: { children: React.ReactNode }) { return <html><body>{children}</body></html>; }\n",
   );
   const setup = await runCliForTest([
+    "--server",
+    MOCK_SERVER_URL,
     "setup",
     "--cwd",
     cwd,
     "--non-interactive",
     "--json",
-    "--mock",
     "--skip-deploy-platform",
     "--no-apply",
   ]);
@@ -46,7 +55,6 @@ describe("locale tooling", () => {
   it("locale scaffold is idempotent and adds missing keys", async () => {
     const cwd = await scaffoldProject();
 
-    // First run should be a no-op
     const first = await runCliForTest(["locale", "scaffold", "--cwd", cwd, "--json"]);
     expect(first.exitCode).toBe(0);
     const firstEnv = parseJson(first.stdout) as {
@@ -57,7 +65,6 @@ describe("locale tooling", () => {
     expect(firstEnv.data.changed).toBe(false);
     expect(firstEnv.data.added_keys).toEqual([]);
 
-    // Corrupt en.json (drop a known key) and re-run
     const path = join(cwd, ".zitadel/locales/en.json");
     const raw = JSON.parse(await readFile(path, "utf8")) as Record<string, string>;
     delete raw["identifier.title"];
@@ -71,7 +78,6 @@ describe("locale tooling", () => {
     expect(secondEnv.data.changed).toBe(true);
     expect(secondEnv.data.added_keys).toContain("identifier.title");
 
-    // Added keys should be empty strings, existing values preserved
     const updated = JSON.parse(await readFile(path, "utf8")) as Record<string, string>;
     expect(updated["identifier.title"]).toBe("");
     expect(updated["identifier.action.submit"]).toBe("Continue");
