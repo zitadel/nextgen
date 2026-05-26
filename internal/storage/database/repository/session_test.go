@@ -13,14 +13,6 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database/repository"
 )
 
-func sessionRepo() *repository.SessionRepository {
-	return repository.NewSessionRepository(pool)
-}
-
-func authRepo() domain.AuthAttemptRepository {
-	return repository.NewAuthAttemptRepository(pool)
-}
-
 func countChecks(t *testing.T, tx database.QueryExecutor, query string, args ...any) int64 {
 	t.Helper()
 	var n int64
@@ -59,14 +51,14 @@ func handoffCompletedAttempt(
 		mutate(attempt)
 	}
 	ensureProject(t, tx, projectID)
-	require.NoError(t, authRepo().Create(t.Context(), tx, attempt))
+	require.NoError(t, repository.NewAuthAttemptRepository(pool).Create(t.Context(), tx, attempt))
 	attempt.HandoffToken = handoffTokenForTest(plainToken)
-	require.NoError(t, authRepo().Handoff(t.Context(), tx, attempt))
+	require.NoError(t, repository.NewAuthAttemptRepository(pool).Handoff(t.Context(), tx, attempt))
 	return plainToken, attempt
 }
 
 func TestSession_Create(t *testing.T) {
-	repo := sessionRepo()
+	repo := repository.NewSessionRepository(pool)
 
 	t.Run("sets ids and expiry", func(t *testing.T) {
 		tx, rollback := transactionForRollback(t)
@@ -108,7 +100,7 @@ func TestSession_Create(t *testing.T) {
 }
 
 func TestSession_Get(t *testing.T) {
-	repo := sessionRepo()
+	repo := repository.NewSessionRepository(pool)
 
 	t.Run("not found", func(t *testing.T) {
 		tx, rollback := transactionForRollback(t)
@@ -150,7 +142,7 @@ func TestSession_Get(t *testing.T) {
 }
 
 func TestSession_List(t *testing.T) {
-	repo := sessionRepo()
+	repo := repository.NewSessionRepository(pool)
 
 	t.Run("returns all sessions in project", func(t *testing.T) {
 		tx, rollback := transactionForRollback(t)
@@ -200,7 +192,7 @@ func TestSession_List(t *testing.T) {
 }
 
 func TestSession_Delete(t *testing.T) {
-	repo := sessionRepo()
+	repo := repository.NewSessionRepository(pool)
 	tx, rollback := transactionForRollback(t)
 	defer rollback()
 
@@ -215,7 +207,7 @@ func TestSession_Delete(t *testing.T) {
 }
 
 func TestSession_Exchange_invalidToken(t *testing.T) {
-	repo := sessionRepo()
+	repo := repository.NewSessionRepository(pool)
 	tx, rollback := transactionForRollback(t)
 	defer rollback()
 
@@ -225,7 +217,7 @@ func TestSession_Exchange_invalidToken(t *testing.T) {
 }
 
 func TestSession_Exchange_deletesAttempt(t *testing.T) {
-	repo := sessionRepo()
+	repo := repository.NewSessionRepository(pool)
 	tx, rollback := transactionForRollback(t)
 	defer rollback()
 
@@ -236,12 +228,12 @@ func TestSession_Exchange_deletesAttempt(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, sess.ID)
 
-	_, err = authRepo().GetByID(t.Context(), tx, projectID, attempt.ID)
+	_, err = repository.NewAuthAttemptRepository(pool).GetByID(t.Context(), tx, projectID, attempt.ID)
 	require.ErrorIs(t, err, domain.ErrAuthAttemptNotFound())
 }
 
 func TestSession_Exchange_conflictMissingSession(t *testing.T) {
-	repo := sessionRepo()
+	repo := repository.NewSessionRepository(pool)
 	tx, rollback := transactionForRollback(t)
 	defer rollback()
 
@@ -256,7 +248,7 @@ func TestSession_Exchange_conflictMissingSession(t *testing.T) {
 }
 
 func TestSession_Exchange_mergeChecks(t *testing.T) {
-	repo := sessionRepo()
+	repo := repository.NewSessionRepository(pool)
 
 	t.Run("no_checks_yet", func(t *testing.T) {
 		tx, rollback := transactionForRollback(t)
@@ -285,7 +277,7 @@ func TestSession_Exchange_mergeChecks(t *testing.T) {
 		require.NoError(t, err)
 		assert.False(t, authAttemptID.Valid)
 
-		_, err = authRepo().GetByID(t.Context(), tx, projectID, attempt.ID)
+		_, err = repository.NewAuthAttemptRepository(pool).GetByID(t.Context(), tx, projectID, attempt.ID)
 		require.ErrorIs(t, err, domain.ErrAuthAttemptNotFound())
 	})
 
@@ -306,10 +298,10 @@ func TestSession_Exchange_mergeChecks(t *testing.T) {
 			},
 		}
 		ensureProject(t, tx, projectID)
-		require.NoError(t, authRepo().Create(t.Context(), tx, attempt))
+		require.NoError(t, repository.NewAuthAttemptRepository(pool).Create(t.Context(), tx, attempt))
 		plain := "handoff_" + projectID
 		attempt.HandoffToken = handoffTokenForTest(plain)
-		require.NoError(t, authRepo().Handoff(t.Context(), tx, attempt))
+		require.NoError(t, repository.NewAuthAttemptRepository(pool).Handoff(t.Context(), tx, attempt))
 
 		sess, err := repo.Exchange(t.Context(), tx, projectID, plain, nil, 0)
 		require.NoError(t, err)
@@ -328,12 +320,12 @@ func TestSession_Exchange_mergeChecks(t *testing.T) {
 			Checks:         []domain.AuthCheck{&domain.AuthFactorPassword{}},
 		}
 		ensureProject(t, tx, projectID)
-		require.NoError(t, authRepo().Create(t.Context(), tx, attempt))
-		require.NoError(t, authRepo().SetChallenge(t.Context(), tx, projectID, attempt.ID, &domain.AuthChallengePasskey{}))
+		require.NoError(t, repository.NewAuthAttemptRepository(pool).Create(t.Context(), tx, attempt))
+		require.NoError(t, repository.NewAuthAttemptRepository(pool).SetChallenge(t.Context(), tx, projectID, attempt.ID, &domain.AuthChallengePasskey{}))
 
 		plain := "handoff_" + projectID
 		attempt.HandoffToken = handoffTokenForTest(plain)
-		require.NoError(t, authRepo().Handoff(t.Context(), tx, attempt))
+		require.NoError(t, repository.NewAuthAttemptRepository(pool).Handoff(t.Context(), tx, attempt))
 
 		sess, err := repo.Exchange(t.Context(), tx, projectID, plain, nil, 0)
 		require.NoError(t, err)
@@ -375,14 +367,14 @@ func TestSession_Exchange_mergeChecks(t *testing.T) {
 			Checks:         []domain.AuthCheck{&domain.AuthChallengePassword{}},
 		}
 		ensureProject(t, tx, projectID)
-		require.NoError(t, authRepo().Create(t.Context(), tx, attempt2))
+		require.NoError(t, repository.NewAuthAttemptRepository(pool).Create(t.Context(), tx, attempt2))
 		challenge, ok := attempt2.ChallengeByType(domain.AuthCheckTypePassword)
 		require.True(t, ok)
-		require.NoError(t, authRepo().ChallengeSucceeded(t.Context(), tx, projectID, attempt2.ID, &domain.AuthFactorPassword{}, challenge.GetID()))
+		require.NoError(t, repository.NewAuthAttemptRepository(pool).ChallengeSucceeded(t.Context(), tx, projectID, attempt2.ID, &domain.AuthFactorPassword{}, challenge.GetID()))
 
 		plain2 := "handoff_" + projectID + "_2"
 		attempt2.HandoffToken = handoffTokenForTest(plain2)
-		require.NoError(t, authRepo().Handoff(t.Context(), tx, attempt2))
+		require.NoError(t, repository.NewAuthAttemptRepository(pool).Handoff(t.Context(), tx, attempt2))
 
 		updated, err := repo.Exchange(t.Context(), tx, projectID, plain2, nil, 0)
 		require.NoError(t, err)
@@ -422,7 +414,7 @@ func TestSession_Exchange_mergeChecks(t *testing.T) {
 			Checks:         []domain.AuthCheck{&domain.AuthFactorPassword{}},
 		}
 		ensureProject(t, tx, projectID)
-		require.NoError(t, authRepo().Create(t.Context(), tx, attempt2))
+		require.NoError(t, repository.NewAuthAttemptRepository(pool).Create(t.Context(), tx, attempt2))
 		_, err = tx.Exec(t.Context(),
 			`UPDATE `+repo.ChecksTable+` SET last_verified_at = $1 WHERE project_id = $2 AND auth_attempt_id = $3`,
 			newer.Add(-time.Hour), projectID, database.Identity(attempt2.ID),
@@ -431,7 +423,7 @@ func TestSession_Exchange_mergeChecks(t *testing.T) {
 
 		plain2 := "handoff_" + projectID + "_keep"
 		attempt2.HandoffToken = handoffTokenForTest(plain2)
-		require.NoError(t, authRepo().Handoff(t.Context(), tx, attempt2))
+		require.NoError(t, repository.NewAuthAttemptRepository(pool).Handoff(t.Context(), tx, attempt2))
 
 		updated, err := repo.Exchange(t.Context(), tx, projectID, plain2, nil, 0)
 		require.NoError(t, err)
@@ -455,10 +447,10 @@ func TestSession_Exchange_mergeChecks(t *testing.T) {
 			Checks:         []domain.AuthCheck{domain.SetAuthFactorPasskey(time.Now().UTC())},
 		}
 		ensureProject(t, tx, projectID)
-		require.NoError(t, authRepo().Create(t.Context(), tx, attempt2))
+		require.NoError(t, repository.NewAuthAttemptRepository(pool).Create(t.Context(), tx, attempt2))
 		plain2 := "handoff_" + projectID + "_add"
 		attempt2.HandoffToken = handoffTokenForTest(plain2)
-		require.NoError(t, authRepo().Handoff(t.Context(), tx, attempt2))
+		require.NoError(t, repository.NewAuthAttemptRepository(pool).Handoff(t.Context(), tx, attempt2))
 
 		updated, err := repo.Exchange(t.Context(), tx, projectID, plain2, nil, 0)
 		require.NoError(t, err)
@@ -490,10 +482,10 @@ func TestSession_Exchange_mergeChecks(t *testing.T) {
 			RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypeUser},
 			Checks:         []domain.AuthCheck{&domain.AuthFactorUser{UserID: userID}},
 		}
-		require.NoError(t, authRepo().Create(t.Context(), tx, attempt))
+		require.NoError(t, repository.NewAuthAttemptRepository(pool).Create(t.Context(), tx, attempt))
 		plain := "handoff_" + projectID
 		attempt.HandoffToken = handoffTokenForTest(plain)
-		require.NoError(t, authRepo().Handoff(t.Context(), tx, attempt))
+		require.NoError(t, repository.NewAuthAttemptRepository(pool).Handoff(t.Context(), tx, attempt))
 
 		sess, err := repo.Exchange(t.Context(), tx, projectID, plain, nil, 0)
 		require.NoError(t, err)
@@ -503,7 +495,7 @@ func TestSession_Exchange_mergeChecks(t *testing.T) {
 }
 
 func TestSession_Exchange_ignoresIdempotencyKey(t *testing.T) {
-	repo := sessionRepo()
+	repo := repository.NewSessionRepository(pool)
 	tx, rollback := transactionForRollback(t)
 	defer rollback()
 
@@ -519,7 +511,7 @@ func TestSession_Exchange_ignoresIdempotencyKey(t *testing.T) {
 }
 
 func TestSession_Exchange_explicitTTL(t *testing.T) {
-	repo := sessionRepo()
+	repo := repository.NewSessionRepository(pool)
 	tx, rollback := transactionForRollback(t)
 	defer rollback()
 

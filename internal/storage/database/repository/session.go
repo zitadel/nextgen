@@ -401,9 +401,9 @@ func (r *SessionRepository) scanSessions(rows database.Rows) ([]*domain.Session,
 		checkIDValid = checkID.String() != ""
 
 		id := sessionID.String()
-		sess, ok := byID[id]
+		session, ok := byID[id]
 		if !ok {
-			sess = &domain.Session{
+			session = &domain.Session{
 				ProjectID:  projectID,
 				ID:         id,
 				CreatedAt:  createdAt,
@@ -413,7 +413,7 @@ func (r *SessionRepository) scanSessions(rows database.Rows) ([]*domain.Session,
 				TokenID:    tokenID.String(),
 			}
 			if userID.Valid {
-				sess.UserID = &userID.V
+				session.UserID = &userID.V
 			}
 			if userAgentID.Valid {
 				info := map[string]any{}
@@ -422,9 +422,9 @@ func (r *SessionRepository) scanSessions(rows database.Rows) ([]*domain.Session,
 						return nil, fmt.Errorf("failed to unmarshal user agent info: %w", err)
 					}
 				}
-				sess.UserAgent = userAgentFromStoredInfo(info)
+				session.UserAgent = userAgentFromStoredInfo(info)
 			}
-			byID[id] = sess
+			byID[id] = session
 			order = append(order, id)
 		}
 
@@ -446,7 +446,7 @@ func (r *SessionRepository) scanSessions(rows database.Rows) ([]*domain.Session,
 		}
 		for _, check := range checks {
 			if factor, ok := check.(domain.AuthFactor); ok {
-				appendSessionFactor(sess, factor)
+				appendSessionFactor(session, factor)
 			}
 		}
 	}
@@ -461,14 +461,14 @@ func (r *SessionRepository) scanSessions(rows database.Rows) ([]*domain.Session,
 	return out, nil
 }
 
-func appendSessionFactor(sess *domain.Session, factor domain.AuthFactor) {
-	for i, f := range sess.Factors {
+func appendSessionFactor(session *domain.Session, factor domain.AuthFactor) {
+	for i, f := range session.Factors {
 		if f.Type() == factor.Type() {
-			sess.Factors[i] = factor
+			session.Factors[i] = factor
 			return
 		}
 	}
-	sess.Factors = append(sess.Factors, factor)
+	session.Factors = append(session.Factors, factor)
 }
 
 type storedCheck struct {
