@@ -16,7 +16,6 @@ import (
 	"github.com/ianlancetaylor/jsonschema"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/zitadel/nextgen/internal/domain"
 
 	oasapi "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
@@ -92,27 +91,11 @@ func run(ctx context.Context, cfg Config, pool database.Pool) error {
 	attemptRepo := repository.NewAuthAttemptRepository(pool)
 	schemaRepo := repository.NewJSONSchemaRepository(pool)
 
-	schemaCache, err := lru.New2Q[string, *jsonschema.Schema](1000)
-	if err != nil {
-		return fmt.Errorf("build schema cache: %w", err)
-	}
-	serverURL, err := url.Parse(cfg.Server.Address)
-	if err != nil {
-		return fmt.Errorf("invalid server url: %w", err)
-	}
-	schemaResolver := domain.NewJSONSchemaResolver(schemaRepo, schemaCache, 10, 1000_000, &http.Client{}, serverURL)
-	schemaValidator, err := domain.NewSchemaValidator(serverURL.String())
-	if err != nil {
-		return fmt.Errorf("build schema validator: %w", err)
-	}
-	jsonSchemaRepo := repository.NewJSONSchemaRepository(pool)
-
 	// ── Schema Stuff ─────────────────
 	schemaCache, err := lru.New2Q[string, *jsonschema.Schema](cfg.Schema.LRUCacheSize)
 	if err != nil {
-		return fmt.Errorf("init schema cache: %w", err)
+		return fmt.Errorf("build schema cache: %w", err)
 	}
-
 	var builtinPublicBase *url.URL
 	if cfg.Schema.BuiltinPublicBase != "" {
 		builtinPublicBase, err = url.Parse(cfg.Schema.BuiltinPublicBase)
@@ -120,21 +103,10 @@ func run(ctx context.Context, cfg Config, pool database.Pool) error {
 			return fmt.Errorf("parse builtin public base: %w", err)
 		}
 	}
-	// to resolve schema from cache/db, not via http fetch
-	// maxResolveDepth and maxSize default to the values set in the domain;
-	// we could make them configurable in the future
-	storageSchemaResolver := domain.NewJSONSchemaResolver(
-		jsonSchemaRepo,
-		schemaCache,
-		0,
-		0,
-		nil,
-		builtinPublicBase,
-	)
-
-	schemaProvider, err := domain.NewSchemaValidator(cfg.Schema.BuiltinPublicBase)
+	schemaResolver := domain.NewJSONSchemaResolver(schemaRepo, schemaCache, 10, 1000_000, &http.Client{}, builtinPublicBase)
+	schemaValidator, err := domain.NewSchemaValidator(builtinPublicBase.String())
 	if err != nil {
-		return fmt.Errorf("init tenant schema validator: %w", err)
+		return fmt.Errorf("build schema validator: %w", err)
 	}
 
 	// ── Services ─────────────────────
@@ -152,8 +124,8 @@ func run(ctx context.Context, cfg Config, pool database.Pool) error {
 	schemaService := service.NewSchemaService(pool, schemaRepo, schemaResolver, schemaValidator)
 	flowDefinitionSvc := service.NewFlowDefinitionService(
 		pool,
-		storageSchemaResolver,
-		schemaProvider,
+		schemaResolver,
+		schemaValidator,
 		nil,
 		flowDefinitionRepo,
 	)
@@ -164,8 +136,7 @@ func run(ctx context.Context, cfg Config, pool database.Pool) error {
 	defer stop()
 
 	oasServer, err := oasapi.NewServer(
-		api.NewHandler(flowService, authAttemptSvc, schemaService),
-		api.NewHandler(flowService, authAttemptSvc, flowDefinitionSvc),
+		api.NewHandler(flowService, authAttemptSvc, schemaService, flowDefinitionSvc),
 		api.NewSecurityHandler(),
 		oasapi.WithErrorHandler(api.OgenErrorHandler))
 	if err != nil {
@@ -215,6 +186,8 @@ func loadConfig(configPath string) (Config, error) {
 	v.SetDefault("password_hasher.limits", crypto.HashLimitsConfig{
 		Bcrypt: crypto.BcryptLimitsConfig{MinCost: 10, MaxCost: 16},
 	})
+	v.SetDefault("schema.lru_cache_size", 1000)                                   // todo: temp, review
+	v.SetDefault("schema.builtin_public_base", "https://nextgen.com/api/schemas") // todo: temp, review
 
 	if configPath != "" {
 		v.SetConfigFile(configPath)
