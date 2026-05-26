@@ -13,6 +13,16 @@ type Project struct {
 	ID        string
 	CreatedAt time.Time
 	UpdatedAt time.Time
+	// ProjectSecret is a bearer token that authenticates API calls for this project.
+	// Callers of [ProjectRepository.Create] must pre-populate this field; the
+	// repository does not generate it.
+	ProjectSecret string
+	// PreviewSecret is an origin-scoped bearer token for preview/testing.
+	// Callers of [ProjectRepository.Create] must pre-populate this field.
+	PreviewSecret string
+	// PreviewOrigins are the allowed origins for the preview secret.
+	// Callers of [ProjectRepository.Create] must pre-populate this field.
+	PreviewOrigins []string
 }
 
 //go:generate go tool mockgen -typed -package domainmock -destination ./mock/project.mock.go . ProjectRepository
@@ -21,7 +31,8 @@ type Project struct {
 type ProjectRepository interface {
 	// Create persists a new project. The repository sets [Project.CreatedAt] and
 	// [Project.UpdatedAt] to the current time; callers should not pre-populate
-	// those fields.
+	// those fields. Callers MUST pre-populate [Project.ProjectSecret],
+	// [Project.PreviewSecret], and [Project.PreviewOrigins].
 	// Returns an [database.IntegrityViolationError] (specifically [database.UniqueError])
 	// if a project with the same ID already exists.
 	Create(ctx context.Context, client database.QueryExecutor, project *Project) error

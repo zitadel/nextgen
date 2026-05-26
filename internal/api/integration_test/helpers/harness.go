@@ -26,9 +26,10 @@ type Harness struct {
 	APIClient          *generated.Client
 	FakeSecuritySource *FakeSecuritySource
 
-	SchemaService         *service.SchemaService
-	FlowService           service.FlowService
-	AuthAttemptService    service.AuthAttemptService
+	SchemaService      *service.SchemaService
+	FlowService        service.FlowService
+	AuthAttemptService service.AuthAttemptService
+	ProjectService     service.ProjectService
 	FlowDefinitionService service.FlowDefinitionService
 
 	SchemaRepo         domain.JSONSchemaRepository

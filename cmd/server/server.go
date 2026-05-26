@@ -19,8 +19,10 @@ import (
 
 	oasapi "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
+	"github.com/zitadel/nextgen/internal/bootstrap/users"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/domain/idgen"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	_ "github.com/zitadel/nextgen/internal/storage/database/dialect/all"
@@ -29,6 +31,7 @@ import (
 
 func NewCommand() *cobra.Command {
 	var configPath string
+	var userFiles []string
 
 	cmd := &cobra.Command{
 		Use:   "server",
@@ -44,11 +47,12 @@ func NewCommand() *cobra.Command {
 				return err
 			}
 
-			return run(cmd.Context(), cfg, pool)
+			return run(cmd.Context(), cfg, pool, userFiles)
 		},
 	}
 
 	cmd.Flags().StringVarP(&configPath, "config", "c", "", "Path to YAML configuration file")
+	cmd.Flags().StringArrayVar(&userFiles, "user-file", nil, "Bootstrap user JSON file (repeatable)")
 
 	return cmd
 }
@@ -69,7 +73,7 @@ func startDatabase(ctx context.Context, config database.Config) (database.Pool, 
 	return pool, nil
 }
 
-func run(ctx context.Context, cfg Config, pool database.Pool) error {
+func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string) error {
 	defer func() {
 		if err := pool.Close(context.Background()); err != nil {
 			log.Printf("close database pool: %v", err)
@@ -79,6 +83,10 @@ func run(ctx context.Context, cfg Config, pool database.Pool) error {
 	passwordHasher, err := cfg.PasswordHasher.NewHasher()
 	if err != nil {
 		return fmt.Errorf("build password hasher: %w", err)
+	}
+
+	if err := users.Import(ctx, pool, passwordHasher, users.DialectFromConfig(cfg.Database.Raw), userFiles); err != nil {
+		return fmt.Errorf("bootstrap users: %w", err)
 	}
 
 	// ── Repositories ─────────────────
@@ -124,6 +132,7 @@ func run(ctx context.Context, cfg Config, pool database.Pool) error {
 		userPasskeyRepo,
 		passwordHasher,
 	)
+	projectService := service.NewProjectService(pool, projectRepo, idgen.NewULID())
 	schemaService := service.NewSchemaService(pool, schemaRepo, schemaResolverWithHTTP, schemaValidator)
 	flowDefinitionSvc := service.NewFlowDefinitionService(
 		pool,
@@ -139,7 +148,7 @@ func run(ctx context.Context, cfg Config, pool database.Pool) error {
 	defer stop()
 
 	oasServer, err := oasapi.NewServer(
-		api.NewHandler(flowService, authAttemptSvc, schemaService, flowDefinitionSvc),
+		api.NewHandler(flowService, authAttemptSvc, projectService, schemaService, flowDefinitionSvc),
 		api.NewSecurityHandler(),
 		oasapi.WithErrorHandler(api.OgenErrorHandler))
 	if err != nil {

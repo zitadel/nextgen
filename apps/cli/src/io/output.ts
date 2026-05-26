@@ -44,6 +44,8 @@ export type GlobalOptions = {
   cliVersion: string;
   source: string;
   serverFlag?: string;
+  verbose: boolean;
+  debug: boolean;
 };
 
 export const defaultIO: CliIO = {
@@ -180,9 +182,6 @@ function renderKnownSections(lines: string[], data: Record<string, unknown>): vo
     if (typeof project.lifecycle === "string") segments.push(`lifecycle=${project.lifecycle}`);
     if (typeof project.issuer === "string") segments.push(`issuer=${project.issuer}`);
     if (segments.length > 0) lines.push(`Project: ${segments.join("  ")}`);
-    if (typeof project.scratch_dashboard_url === "string") {
-      lines.push(`Dashboard: ${project.scratch_dashboard_url}`);
-    }
   }
 
   if (typeof data.framework === "string" || typeof data.package_manager === "string") {
