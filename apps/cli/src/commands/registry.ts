@@ -46,9 +46,8 @@ const globalFlags: FlagSpec[] = [
     name: "server",
     alias: "s",
     type: "string",
-    description: 'Override the resolved server URL (or "mock").',
+    description: "Override the resolved server URL.",
   },
-  { name: "mock", type: "boolean", description: "Alias for --server mock." },
 ];
 
 export const COMMANDS: CommandSpec[] = [
@@ -195,16 +194,6 @@ export const COMMANDS: CommandSpec[] = [
         name: "challenge-id",
         type: "string",
         description: "Claim challenge ID returned by `zitadel claim`.",
-      },
-      {
-        name: "mock-complete-claim",
-        type: "boolean",
-        description: "Mock-only: complete the claim handoff and refresh local state.",
-      },
-      {
-        name: "mock-advance-claim",
-        type: "boolean",
-        description: "Alias for --mock-complete-claim.",
       },
     ],
   },

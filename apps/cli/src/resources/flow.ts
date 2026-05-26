@@ -69,15 +69,18 @@ export const stepDefinitionSchema = z.object({
   config: z.record(z.string(), z.unknown()).optional(),
 });
 
+// Shape per `api/openapi/components/flows/flow-definition.yaml`:
+// required: [name, user_schema, purposes, initial_steps, steps].
+// `name` is a slug-pattern stable identifier and doubles as the display
+// label — there is no separate `slug` or `display_name`.
+// `version`, `kind`, `template_name` are NOT in the spec; the CLI used to
+// emit them but no longer does.
 export const flowDefinitionSchema = z.object({
-  version: z.literal(1),
-  kind: z.literal("flow-definition"),
-  slug: z.string().regex(/^[a-z][a-z0-9-]*$/),
-  name: z.string().min(1),
+  name: z.string().regex(/^[a-z][a-z0-9-]*$/, "name must match ^[a-z][a-z0-9-]*$"),
+  user_schema: z.string().url(),
   purposes: z
     .array(z.enum(["login", "register", "recovery", "profiling", "reauth", "link_account"]))
     .nonempty(),
-  template_name: z.string().default("default"),
   initial_steps: z.record(z.string(), z.string()),
   audience: z
     .object({
