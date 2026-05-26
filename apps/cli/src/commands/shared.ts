@@ -10,7 +10,6 @@ export type ZitadelSecret = {
   preview_secret: string;
   preview_origins: string[];
   created_at: string;
-  schema_version: number;
   claimed_at?: string;
   team_id?: string;
 };

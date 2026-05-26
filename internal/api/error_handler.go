@@ -37,6 +37,8 @@ func errorResponse(err error) *api.ErrorDetailsStatusCode {
 		return flowDefinitionErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixSession.ErrorCodePrefix("")):
 		return sessionErrorResponse(e)
+	case strings.HasPrefix(e.Code, domain.PrefixJSONSchema.ErrorCodePrefix("")):
+		return schemaErrorResponse(e)
 	default:
 		return internalErrorResponse(err)
 	}

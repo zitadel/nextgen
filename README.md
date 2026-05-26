@@ -24,6 +24,12 @@ go vet ./...
 go test ./...
 ```
 
+To seed demo users for local login testing, pass bootstrap JSON files when starting the server (see [examples/bootstrap-users/](examples/bootstrap-users/)):
+
+```sh
+go run . server -c <config.yaml> --user-file examples/bootstrap-users/demo-admin.json
+```
+
 Package smoke checks:
 
 ```sh

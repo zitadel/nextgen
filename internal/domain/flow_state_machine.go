@@ -47,11 +47,14 @@ type FlowSSOProviderRef struct {
 }
 
 // FlowStepResult is what the state machine returns from [Start] and
-// [Process]. Pop is reserved for the deferred pivot stack.
+// [Process]. Pop is reserved for the deferred pivot stack. HandoffToken
+// + HandoffTokenExpiresAt are populated only on the terminal step.
 type FlowStepResult struct {
-	State *FlowState
-	Step  *FlowStep
-	Pop   bool
+	State                 *FlowState
+	Step                  *FlowStep
+	Pop                   bool
+	HandoffToken          string
+	HandoffTokenExpiresAt time.Time
 }
 
 // FlowStep is the capability payload the API surfaces to the client.
@@ -104,18 +107,19 @@ var (
 
 // FlowStateMachineRuntime is the production [FlowStateMachine].
 type FlowStateMachineRuntime struct {
-	fields     FlowFieldResolver
-	createUser *FlowCreateUserHandler
-	now        func() time.Time
+	fields       FlowFieldResolver
+	createUser   *FlowCreateUserHandler
+	authAttempts FlowAuthAttemptService
+	now          func() time.Time
 }
 
 // NewFlowStateMachine wires the runtime. The now hook is injectable so
 // tests can produce deterministic [FlowState.IssuedAt] values.
-func NewFlowStateMachine(fields FlowFieldResolver, createUser *FlowCreateUserHandler, now func() time.Time) *FlowStateMachineRuntime {
+func NewFlowStateMachine(fields FlowFieldResolver, createUser *FlowCreateUserHandler, authAttempts FlowAuthAttemptService, now func() time.Time) *FlowStateMachineRuntime {
 	if now == nil {
 		now = time.Now
 	}
-	return &FlowStateMachineRuntime{fields: fields, createUser: createUser, now: now}
+	return &FlowStateMachineRuntime{fields: fields, createUser: createUser, authAttempts: authAttempts, now: now}
 }
 
 var _ FlowStateMachine = (*FlowStateMachineRuntime)(nil)
@@ -148,6 +152,15 @@ func (r *FlowStateMachineRuntime) Start(ctx context.Context, client database.Que
 		state.RedirectURI = &in.AuthRequest.RedirectURI
 		state.RequestedACR = in.AuthRequest.RequestedACR
 	}
+
+	if r.authAttempts == nil {
+		return FlowStepResult{}, fmt.Errorf("%w: auth-attempt service not wired", ErrIntegrity)
+	}
+	attemptID, err := r.authAttempts.Start(ctx, FlowCreateAttemptInput{ProjectID: state.ProjectID})
+	if err != nil {
+		return FlowStepResult{}, fmt.Errorf("flow state machine: start auth attempt: %w", err)
+	}
+	state.AuthAttemptID = attemptID
 
 	step, err := r.renderStep(ctx, client, in.Definition, state, in.UserSchemaURL, nil)
 	if err != nil {
@@ -192,7 +205,18 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 	mergeCollected(state, in.Fields)
 
 	routeOutcome := in.Action
-	if currentStep.OnSuccess != nil {
+	dispatch, err := r.dispatchChallenges(ctx, state, currentStep, resolved, in.Fields)
+	if err != nil {
+		return FlowStepResult{}, err
+	}
+	if dispatch.StepError != nil {
+		step := r.buildStep(currentStep, resolved, dispatch.StepError, nil, nil)
+		state.IssuedAt = r.now()
+		return FlowStepResult{State: state, Step: step}, nil
+	}
+	if dispatch.Outcome != "" {
+		routeOutcome = dispatch.Outcome
+	} else if currentStep.OnSuccess != nil {
 		result, err := r.runOnSuccess(ctx, client, def, state, userSchemaURL, currentStep, in.Fields, resolved)
 		if err != nil {
 			return FlowStepResult{}, err
@@ -234,11 +258,16 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 	r.advance(state, currentStep, nextStep.Name)
 
 	if nextStep.Complete != nil {
-		step, err := r.terminate(ctx, client, def, state, userSchemaURL, nextStep)
+		step, handoff, err := r.terminate(ctx, client, def, state, userSchemaURL, nextStep)
 		if err != nil {
 			return FlowStepResult{}, err
 		}
-		return FlowStepResult{State: state, Step: step}, nil
+		return FlowStepResult{
+			State:                 state,
+			Step:                  step,
+			HandoffToken:          handoff.Token,
+			HandoffTokenExpiresAt: handoff.ExpiresAt,
+		}, nil
 	}
 
 	step, err := r.renderStep(ctx, client, def, state, userSchemaURL, nextStep)
@@ -246,6 +275,84 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 		return FlowStepResult{}, err
 	}
 	return FlowStepResult{State: state, Step: step}, nil
+}
+
+// flowDispatchResult summarizes the challenge dispatch loop. Outcome
+// diverts routing (e.g. user_not_found); StepError holds the user on
+// the current step (e.g. password rejected). At most one is set.
+type flowDispatchResult struct {
+	Outcome   string
+	StepError *string
+}
+
+// challengeDispatchOrder pins the order in which field-shaped
+// challenges are submitted. Identifier precedes Password because the
+// auth-attempt domain requires the user to be identified first.
+var challengeDispatchOrder = []FlowFieldChallenge{
+	FlowFieldChallengeIdentifier,
+	FlowFieldChallengePassword,
+}
+
+// dispatchChallenges submits each field-shaped challenge in
+// [challengeDispatchOrder]. Steps with on_success=create_user skip
+// dispatch entirely: create_user owns identifier uniqueness and
+// password setting; routing them through auth-attempt would double up.
+func (r *FlowStateMachineRuntime) dispatchChallenges(ctx context.Context, state *FlowState, step *FlowDefinitionStep, resolved FlowResolvedFields, fields map[string]any) (flowDispatchResult, error) {
+	if step.OnSuccess != nil && *step.OnSuccess == FlowOnSuccessCreateUser {
+		return flowDispatchResult{}, nil
+	}
+
+	for _, challenge := range challengeDispatchOrder {
+		name, value, ok := fieldValueByChallenge(resolved, fields, challenge)
+		if !ok {
+			continue
+		}
+		switch challenge {
+		case FlowFieldChallengeIdentifier:
+			userID, err := r.authAttempts.SubmitIdentifier(ctx, FlowSubmitIdentifierInput{
+				ProjectID:     state.ProjectID,
+				AttemptID:     state.AuthAttemptID,
+				AttributeName: name,
+				Value:         value,
+			})
+			if errors.Is(err, ErrAuthAttemptProofRejected(nil)) {
+				return flowDispatchResult{Outcome: FlowImplicitOutcomeUserNotFound}, nil
+			}
+			if err != nil {
+				return flowDispatchResult{}, fmt.Errorf("flow state machine: submit identifier: %w", err)
+			}
+			recordResolvedUser(state, userID)
+		case FlowFieldChallengePassword:
+			err := r.authAttempts.SubmitPassword(ctx, FlowSubmitPasswordInput{
+				ProjectID: state.ProjectID,
+				AttemptID: state.AuthAttemptID,
+				Plain:     value,
+			})
+			if errors.Is(err, ErrAuthAttemptProofRejected(nil)) {
+				msg := "auth_attempt.password_invalid"
+				return flowDispatchResult{StepError: &msg}, nil
+			}
+			if err != nil {
+				return flowDispatchResult{}, fmt.Errorf("flow state machine: submit password: %w", err)
+			}
+		}
+	}
+	return flowDispatchResult{}, nil
+}
+
+func fieldValueByChallenge(resolved FlowResolvedFields, fields map[string]any, target FlowFieldChallenge) (name, value string, ok bool) {
+	for n, field := range resolved.Fields {
+		if field.Challenge != target {
+			continue
+		}
+		raw, present := fields[n]
+		if !present {
+			continue
+		}
+		s, _ := raw.(string)
+		return n, s, true
+	}
+	return "", "", false
 }
 
 // runOnSuccess dispatches the step's on_success mutation. Add a case
@@ -276,10 +383,10 @@ func (r *FlowStateMachineRuntime) advance(state *FlowState, prev *FlowDefinition
 	state.IssuedAt = r.now()
 }
 
-func (r *FlowStateMachineRuntime) terminate(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState, userSchemaURL string, step *FlowDefinitionStep) (*FlowStep, error) {
+func (r *FlowStateMachineRuntime) terminate(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState, userSchemaURL string, step *FlowDefinitionStep) (*FlowStep, FlowHandoffOutput, error) {
 	rendered, err := r.renderStep(ctx, client, def, state, userSchemaURL, step)
 	if err != nil {
-		return nil, err
+		return nil, FlowHandoffOutput{}, err
 	}
 	kind := *step.Complete
 	rendered.Complete = &kind
@@ -287,7 +394,18 @@ func (r *FlowStateMachineRuntime) terminate(ctx context.Context, client database
 		uri := *state.RedirectURI
 		rendered.RedirectURL = &uri
 	}
-	return rendered, nil
+
+	if state.AuthAttemptID == "" {
+		return nil, FlowHandoffOutput{}, fmt.Errorf("%w: terminate without auth attempt id", ErrIntegrity)
+	}
+	handoff, err := r.authAttempts.Handoff(ctx, FlowHandoffInput{
+		ProjectID: state.ProjectID,
+		AttemptID: state.AuthAttemptID,
+	})
+	if err != nil {
+		return nil, FlowHandoffOutput{}, fmt.Errorf("flow state machine: handoff: %w", err)
+	}
+	return rendered, handoff, nil
 }
 
 func (r *FlowStateMachineRuntime) renderStep(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState, userSchemaURL string, stepOverride *FlowDefinitionStep) (*FlowStep, error) {

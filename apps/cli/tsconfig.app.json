@@ -10,6 +10,9 @@
   "references": [
     {
       "path": "../../packages/sdk-next/tsconfig.lib.json"
+    },
+    {
+      "path": "../../packages/api-mock/tsconfig.lib.json"
     }
   ]
 }

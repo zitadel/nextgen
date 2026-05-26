@@ -45,9 +45,9 @@ var (
 )
 
 type tokenTableCols struct {
-	projectID, tokenID, userID, tokenType database.Column
+	projectID, tokenID, userID, tokenType   database.Column
 	sessionID, oidcSessionID, samlSessionID database.Column
-	scope, expiresAt, createdAt           database.Column
+	scope, expiresAt, createdAt             database.Column
 }
 
 type TokenRepository struct {
@@ -234,16 +234,16 @@ func userIDArg(userID string, tokenType domain.TokenType) any {
 }
 
 type tokenRow struct {
-	ProjectID     string             `db:"project_id"`
-	TokenID       database.Identity  `db:"token_id"`
-	UserID        sql.NullString     `db:"user_id"`
-	Type          domain.TokenType   `db:"token_type"`
-	SessionID     sql.NullInt64      `db:"session_id"`
-	OIDCSessionID sql.NullInt64      `db:"oidc_session_id"`
-	SAMLSessionID sql.NullInt64      `db:"saml_session_id"`
-	Scope         StringArray        `db:"scope"`
-	ExpiresAt     sql.NullTime       `db:"expires_at"`
-	CreatedAt     time.Time          `db:"created_at"`
+	ProjectID     string            `db:"project_id"`
+	TokenID       database.Identity `db:"token_id"`
+	UserID        sql.NullString    `db:"user_id"`
+	Type          domain.TokenType  `db:"token_type"`
+	SessionID     sql.NullInt64     `db:"session_id"`
+	OIDCSessionID sql.NullInt64     `db:"oidc_session_id"`
+	SAMLSessionID sql.NullInt64     `db:"saml_session_id"`
+	Scope         StringArray       `db:"scope"`
+	ExpiresAt     sql.NullTime      `db:"expires_at"`
+	CreatedAt     time.Time         `db:"created_at"`
 }
 
 func (r *tokenRow) toDomain() *domain.Token {

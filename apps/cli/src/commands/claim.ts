@@ -2,15 +2,12 @@ import type { CliIO, GlobalOptions } from "../io/output";
 import { ok, skipped } from "../io/output";
 import { ZitadelError } from "../lib/errors";
 import { createPlatformClient } from "../platform";
-import { MOCK_SENTINEL } from "../platform/resolve-server";
 import type { ClaimStatusResponse } from "../platform/schemas";
 import { scaffold } from "../scaffolder";
 import { readZitadelSecret, writeZitadelSecret, type ZitadelSecret } from "./shared";
 
 export type ClaimOptions = GlobalOptions & {
   challengeId?: string;
-  mockCompleteClaim?: boolean;
-  mockAdvanceClaim?: boolean;
 };
 
 export async function runClaim(io: CliIO, opts: ClaimOptions): Promise<void> {
@@ -102,12 +99,10 @@ export async function runClaimStatus(io: CliIO, opts: ClaimOptions): Promise<voi
   }
 
   const response = normalizeClaimStatus(
-    opts.source === MOCK_SENTINEL && (opts.mockCompleteClaim || opts.mockAdvanceClaim)
-      ? mockCompletedClaim(secret)
-      : await createPlatformClient(opts.source, secret.project_secret).getClaimStatus(
-          secret.project_id,
-          challengeId,
-        ),
+    await createPlatformClient(opts.source, secret.project_secret).getClaimStatus(
+      secret.project_id,
+      challengeId,
+    ),
   );
 
   if (response.status === "claimed") {
@@ -169,17 +164,6 @@ async function readLastChallengeId(cwd: string): Promise<string | undefined> {
   } catch {
     return undefined;
   }
-}
-
-function mockCompletedClaim(secret: ZitadelSecret): ClaimStatusResponse {
-  return {
-    status: "claimed",
-    new_project_secret: `${secret.project_secret}_claimed`,
-    team_id: "team_mock",
-    claimed_at: "2026-04-21T14:15:11.000Z",
-    dashboard_url: `https://zitadel.cloud/projects/${secret.project_id}`,
-    tier: "free",
-  };
 }
 
 function normalizeClaimStatus(response: ClaimStatusResponse): ClaimStatusResponse {

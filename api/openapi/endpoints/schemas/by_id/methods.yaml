@@ -13,6 +13,8 @@ get:
       required: true
       schema:
         type: string
+    - $ref: ../../../components/parameters/project-id.yaml
+    - $ref: ../../../components/parameters/team-id.yaml
   responses:
     '200':
       description: The schema was retrieved successfully
@@ -20,13 +22,19 @@ get:
         application/json:
           schema:
             oneOf:
-              - $ref: ../user-schema.json
+              - $ref: ../user-schema.yaml
             discriminator:
               propertyName: kind
               mapping:
-                user-schema: ../user-schema.json
+                user-schema: ../user-schema.yaml
     '400':
       description: The provided input was not valid
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '404':
+      description: No schema was found with the given id
       content:
         application/json:
           schema:
