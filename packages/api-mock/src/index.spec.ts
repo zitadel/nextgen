@@ -235,6 +235,35 @@ describe("setupMockHandlers", () => {
     });
     expect(done.step.name).toBe("done");
     expect(done.handoff_token).toBeTruthy();
+    const payload = JSON.parse(
+      Buffer.from(done.handoff_token!.split(".")[1], "base64url").toString("utf8"),
+    ) as { sub: string };
+    expect(payload.sub).toBe("alice@acme.com");
+  });
+
+  test("passkey-login: discoverable credential carries authenticated user into handoff token", async () => {
+    mock.registerCredential("bob@example.com", "cred-bob-1");
+
+    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    const login = await submitFlowStep(start.id, {
+      session_token: start.session_token,
+      action: "passkey",
+      fields: {},
+    });
+    expect(login.step.name).toBe("passkey-login");
+
+    const done = await submitFlowStep(login.id, {
+      session_token: login.session_token,
+      action: "submit",
+      fields: {},
+      challenge_response: { proof: { id: "cred-bob-1" } },
+    });
+    expect(done.step.name).toBe("done");
+    expect(done.handoff_token).toBeTruthy();
+    const payload = JSON.parse(
+      Buffer.from(done.handoff_token!.split(".")[1], "base64url").toString("utf8"),
+    ) as { sub: string };
+    expect(payload.sub).toBe("bob@example.com");
   });
 
   test("passkey-login: unregistered credential stays on passkey-login with error", async () => {

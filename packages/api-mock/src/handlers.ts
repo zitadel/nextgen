@@ -215,10 +215,11 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
         return { ...base, step: { ...step, error: passkeyLoginErrorKey } };
       }
 
+      const baseFields = (body.fields ?? {}) as Record<string, string>;
       actor.send({
         type: "SUBMIT",
         action: body.action,
-        fields: (body.fields ?? {}) as Record<string, string>,
+        fields: loginCred ? { ...baseFields, email: loginCred.userHandle } : baseFields,
         sso_provider_id: body.sso_provider_id ?? null,
       });
       return currentResponse();

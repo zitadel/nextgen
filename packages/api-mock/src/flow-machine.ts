@@ -189,7 +189,7 @@ export const flowMachine = createMachine({
           },
           {
             target: "done",
-            actions: [rotateToken],
+            actions: [captureFields, rotateToken],
           },
         ],
       },
