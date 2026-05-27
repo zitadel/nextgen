@@ -45,9 +45,9 @@ var (
 )
 
 type tokenTableCols struct {
-	projectID, tokenID, userID, tokenType database.Column
+	projectID, tokenID, userID, tokenType   database.Column
 	sessionID, oidcSessionID, samlSessionID database.Column
-	scope, expiresAt, createdAt           database.Column
+	scope, expiresAt, createdAt             database.Column
 }
 
 type TokenRepository struct {
@@ -191,7 +191,7 @@ func (r *TokenRepository) Create(ctx context.Context, client database.QueryExecu
 		c.scope, c.expiresAt, c.createdAt,
 	}.WriteUnqualified(builder)
 	builder.WriteString(") VALUES (")
-	builder.WriteArgs(token.ProjectID, token.UserID)
+	builder.WriteArgs(token.ProjectID, userIDArg(token.UserID, token.Type))
 	builder.WriteString(", ")
 	builder.WriteString(builder.AppendArg(token.Type.String()) + r.tokenTypeCast)
 	builder.WriteString(", ")
@@ -226,26 +226,35 @@ func (r *TokenRepository) Delete(ctx context.Context, client database.QueryExecu
 	return err
 }
 
+func userIDArg(userID string, tokenType domain.TokenType) any {
+	if tokenType == domain.TokenTypeSessionToken && userID == "" {
+		return database.NullInstruction
+	}
+	return userID
+}
+
 type tokenRow struct {
-	ProjectID     string             `db:"project_id"`
-	TokenID       database.Identity  `db:"token_id"`
-	UserID        string             `db:"user_id"`
-	Type          domain.TokenType   `db:"token_type"`
-	SessionID     sql.NullInt64      `db:"session_id"`
-	OIDCSessionID sql.NullInt64      `db:"oidc_session_id"`
-	SAMLSessionID sql.NullInt64      `db:"saml_session_id"`
-	Scope         StringArray        `db:"scope"`
-	ExpiresAt     sql.NullTime       `db:"expires_at"`
-	CreatedAt     time.Time          `db:"created_at"`
+	ProjectID     string            `db:"project_id"`
+	TokenID       database.Identity `db:"token_id"`
+	UserID        sql.NullString    `db:"user_id"`
+	Type          domain.TokenType  `db:"token_type"`
+	SessionID     sql.NullInt64     `db:"session_id"`
+	OIDCSessionID sql.NullInt64     `db:"oidc_session_id"`
+	SAMLSessionID sql.NullInt64     `db:"saml_session_id"`
+	Scope         StringArray       `db:"scope"`
+	ExpiresAt     sql.NullTime      `db:"expires_at"`
+	CreatedAt     time.Time         `db:"created_at"`
 }
 
 func (r *tokenRow) toDomain() *domain.Token {
 	t := &domain.Token{
 		ProjectID: r.ProjectID,
 		TokenID:   r.TokenID.String(),
-		UserID:    r.UserID,
 		Type:      r.Type,
 		CreatedAt: r.CreatedAt,
+	}
+	if r.UserID.Valid {
+		t.UserID = r.UserID.String
 	}
 	if len(r.Scope) > 0 {
 		t.Scope = []string(r.Scope)

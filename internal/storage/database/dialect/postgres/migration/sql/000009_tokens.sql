@@ -11,7 +11,7 @@ CREATE TABLE zitadel_nextgen.tokens (
         REFERENCES zitadel_nextgen.projects (id)
         ON DELETE CASCADE
     , token_id    BIGINT      GENERATED ALWAYS AS IDENTITY
-    , user_id     TEXT COLLATE "C" NOT NULL
+    , user_id     TEXT COLLATE "C"
     , token_type  zitadel_nextgen.token_types NOT NULL
     , session_id  BIGINT
     , oidc_session_id BIGINT

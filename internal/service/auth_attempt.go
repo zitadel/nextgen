@@ -158,7 +158,7 @@ func (PasskeyProof) proofCheckType() domain.AuthCheckType { return domain.AuthCh
 // ---- Secondary ports -------------------------------------------------------------
 
 type sessionResolver interface {
-	GetByID(ctx context.Context, q database.QueryExecutor, projectID, sessionID string) (*domain.Session, error)
+	Get(ctx context.Context, q database.QueryExecutor, projectID, sessionID string) (*domain.Session, error)
 }
 
 type projectLoader interface {
@@ -224,7 +224,7 @@ func NewAuthAttemptService(
 func (s *authAttemptService) Create(ctx context.Context, input CreateAuthAttemptInput) (res *domain.AuthAttempt, err error) {
 	opts := make([]domain.AuthAttemptOption, 0, 1)
 	if input.SessionID != nil {
-		session, err := s.sessions.GetByID(ctx, s.pool, input.ProjectID, *input.SessionID)
+		session, err := s.sessions.Get(ctx, s.pool, input.ProjectID, *input.SessionID)
 		if err != nil {
 			if errors.Is(err, domain.ErrSessionNotFound()) {
 				return nil, domain.ErrAuthAttemptInvalidRequest().WithParent(err).WithMessage("The session was not found.")
@@ -289,8 +289,11 @@ func (s *authAttemptService) VerifyProof(ctx context.Context, input VerifyProofI
 
 	challenge, factor, err := s.verify(ctx, attempt, input.Proof, input.ChallengeID)
 	if err != nil {
-		// Record the failure for rate-limiting — best effort, don't shadow the original error
-		_ = s.attempts.ChallengeFailed(ctx, s.pool, input.ProjectID, input.AttemptID, challenge)
+		// Record the failure for rate-limiting — best effort, don't shadow
+		// the original error. Skip when verify couldn't identify a challenge row.
+		if challenge != nil {
+			_ = s.attempts.ChallengeFailed(ctx, s.pool, input.ProjectID, input.AttemptID, challenge)
+		}
 		return nil, err
 	}
 
@@ -360,7 +363,7 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 			}})),
 		)
 		if err != nil {
-			return nil, nil, domain.ErrAuthAttemptProofRejected(err)
+			return userChallenge, nil, domain.ErrAuthAttemptProofRejected(err)
 		}
 		return userChallenge, attempt.SetUserFactor(user), nil
 
@@ -376,10 +379,10 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 			database.WithCondition(s.userPasswords.UserIDCondition(userFactor.UserID)),
 		)
 		if err != nil {
-			return nil, nil, domain.ErrAuthAttemptProofRejected(err)
+			return passwordChallenge, nil, domain.ErrAuthAttemptProofRejected(err)
 		}
 		if err := password.Verify(p.Password, s.passwordVerifier); err != nil {
-			return nil, nil, domain.ErrAuthAttemptProofRejected(err)
+			return passwordChallenge, nil, domain.ErrAuthAttemptProofRejected(err)
 		}
 		return passwordChallenge, attempt.SetPasswordFactor(), nil
 

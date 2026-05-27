@@ -177,7 +177,7 @@ func (s *Server) decodeCreateFlowRequest(r *http.Request) (
 }
 
 func (s *Server) decodeCreateFlowDefinitionRequest(r *http.Request) (
-	req *FlowDefinitionCreateRequest,
+	req *CreateFlowDefinitionRequest,
 	rawBody []byte,
 	close func() error,
 	rerr error,
@@ -224,7 +224,7 @@ func (s *Server) decodeCreateFlowDefinitionRequest(r *http.Request) (
 		rawBody = append(rawBody, buf...)
 		d := jx.DecodeBytes(buf)
 
-		var request FlowDefinitionCreateRequest
+		var request CreateFlowDefinitionRequest
 		if err := func() error {
 			if err := request.Decode(d); err != nil {
 				return err

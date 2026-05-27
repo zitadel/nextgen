@@ -27,9 +27,11 @@ type Harness struct {
 	FakeSecuritySource *FakeSecuritySource
 
 	SchemaService      *service.SchemaService
+	SessionService     service.SessionService
 	FlowService        service.FlowService
 	AuthAttemptService service.AuthAttemptService
 	ProjectService     service.ProjectService
+	FlowDefinitionService service.FlowDefinitionService
 
 	SchemaRepo         domain.JSONSchemaRepository
 	SchemaResolver     *domain.JSONSchemaResolver

@@ -189,7 +189,7 @@ export function startMockServer(port: number): Server {
       // Spec: 200 returns `session-with-token-response.yaml` —
       // `{session: <SessionResponse>, session_token}`. The mock synthesises a
       // minimal session_response from the handoff claims: `state` is "active"
-      // (we just authenticated), `factors` is an empty record and
+      // (we just authenticated), `factors` is an empty list and
       // `assurance_levels` an empty list (the mock has no factor catalogue),
       // and the TTLs come from the session-cookie window so they stay
       // consistent with the JWT exp.
@@ -211,7 +211,7 @@ export function startMockServer(port: number): Server {
           session_id: `sess_${randomUUID().replace(/-/g, "").slice(0, 12)}`,
           project_id: "proj_mock",
           state: "active",
-          factors: {},
+          factors: [],
           assurance_levels: [],
           created_at: createdAt.toISOString(),
           expires_at: expiresAt.toISOString(),

@@ -20,7 +20,7 @@ type Schemas struct {
 
 func BuildSchemas(host string) Schemas {
 	return Schemas{
-		CreateSchemaRequestUserSchema:      strings.Replace(string(createSchemaRequestUserSchema), hostPlaceholder, host, -1),
-		CreateSchemaRequestUserSchemaByUrl: strings.Replace(string(createSchemaRequestUserSchemaByUrl), hostPlaceholder, host, -1),
+		CreateSchemaRequestUserSchema:      strings.ReplaceAll(string(createSchemaRequestUserSchema), hostPlaceholder, host),
+		CreateSchemaRequestUserSchemaByUrl: strings.ReplaceAll(string(createSchemaRequestUserSchemaByUrl), hostPlaceholder, host),
 	}
 }

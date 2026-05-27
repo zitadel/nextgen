@@ -28,9 +28,8 @@ type SchemaResolver interface {
 //     [FlowFieldTypePassword].
 //   - top-level `required` membership → [FlowField.Required]
 //   - `minLength`, `maxLength`, `format` → [FlowFieldValidation]
-//   - `x-identifier` → [FlowFieldChallengeIdentifier] +
-//     [FlowImplicitOutcomeUserNotFound]
-//   - `x-unique` → [FlowField.Unique]
+//   - `x-unique` (non-empty) → [FlowFieldChallengeIdentifier] +
+//     [FlowImplicitOutcomeUserNotFound] + [FlowField.Unique]
 //   - `x-password: true` combined with schema-level
 //     `x-auth-methods.password.enabled = true` →
 //     [FlowFieldChallengePassword]. Other auth methods do not have
@@ -85,11 +84,12 @@ func (r *SchemaFieldResolver) Resolve(
 
 // buildFlowField translates a user-schema property into a [FlowField].
 func buildFlowField(name string, propSchema *jsonschema.Schema, required map[string]struct{}, passwordEnabled bool) FlowField {
+	unique := deriveUnique(propSchema)
 	field := FlowField{
 		TextKey:   "field." + name,
 		Type:      deriveFieldType(propSchema),
-		Challenge: deriveChallenge(propSchema, passwordEnabled),
-		Unique:    deriveUnique(propSchema),
+		Challenge: deriveChallenge(propSchema, unique, passwordEnabled),
+		Unique:    unique,
 	}
 	if _, ok := required[name]; ok {
 		field.Required = true
@@ -117,13 +117,14 @@ func deriveFieldType(propSchema *jsonschema.Schema) FlowFieldType {
 	return FlowFieldTypeText
 }
 
-// deriveChallenge resolves the unified [FlowFieldChallenge].
-// `x-identifier: true` surfaces as Identifier; `x-password: true`
+// deriveChallenge resolves the unified [FlowFieldChallenge]. A
+// non-empty `x-unique` scope marks the field as Identifier (any
+// uniquely-keyed property can identify a user). `x-password: true`
 // surfaces as Password when the schema-level `x-auth-methods.password`
 // is enabled. Other credential kinds (passkey, magic_link, sso, otp)
 // have no user-property-shaped proof and are never surfaced here.
-func deriveChallenge(propSchema *jsonschema.Schema, passwordEnabled bool) FlowFieldChallenge {
-	if isIdentifier(propSchema) {
+func deriveChallenge(propSchema *jsonschema.Schema, unique FlowFieldUniqueScope, passwordEnabled bool) FlowFieldChallenge {
+	if unique != FlowFieldUniqueScopeNone {
 		return FlowFieldChallengeIdentifier
 	}
 	if isPassword(propSchema) && passwordEnabled {
@@ -236,10 +237,6 @@ func lookupInt(schema *jsonschema.Schema, keyword string) int {
 		return int(n)
 	}
 	return 0
-}
-
-func isIdentifier(schema *jsonschema.Schema) bool {
-	return lookupBool(schema, "x-identifier")
 }
 
 func isPassword(schema *jsonschema.Schema) bool {

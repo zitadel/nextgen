@@ -52,8 +52,8 @@ func defaultSchemaBytes() []byte {
 		"x-auth-methods": { "password": { "enabled": true } },
 		"required": ["email", "username", "password", "given_name", "family_name"],
 		"properties": {
-			"email":       { "type": "string", "format": "email", "maxLength": 320, "x-identifier": true, "x-unique": "organization" },
-			"username":    { "type": "string", "minLength": 3, "maxLength": 64, "x-identifier": true, "x-unique": "organization" },
+			"email":       { "type": "string", "format": "email", "maxLength": 320, "x-unique": "organization" },
+			"username":    { "type": "string", "minLength": 3, "maxLength": 64, "x-unique": "organization" },
 			"password":    { "type": "string", "minLength": 8, "x-password": true },
 			"given_name":  { "type": "string", "minLength": 1, "maxLength": 200 },
 			"family_name": { "type": "string", "minLength": 1, "maxLength": 200 }
