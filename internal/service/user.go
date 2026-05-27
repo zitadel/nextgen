@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/ogen-go/ogen/json"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -37,7 +36,7 @@ func NewUserService(
 func (s *UserService) GetUser(ctx context.Context, input GetUserInput) ([]byte, error) {
 	user, err := s.userRepo.GetById(ctx, s.pool, input.ProjectID, input.UserID)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil, domain.ErrUserNotFound()
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to get user from database")
