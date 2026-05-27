@@ -258,7 +258,9 @@ export class AuthnStore {
    * @returns The newly stored credential, or `null` when `proof.id` is absent.
    */
   registerFromProof(userHandle: string, proof: PasskeyProof): StoredCredential | null {
-    if (!proof.id) return null;
+    if (!proof.id) {
+      return null;
+    }
     const transports: AuthenticatorTransport[] =
       proof.authenticatorAttachment === "cross-platform"
         ? ["usb", "ble", "nfc"]
@@ -307,7 +309,9 @@ export class AuthnStore {
    */
   authenticate(credentialId: string): StoredCredential | undefined {
     const cred = this.byId.get(credentialId);
-    if (!cred) return undefined;
+    if (!cred) {
+      return undefined;
+    }
     cred.signCount += 1;
     cred.lastUsedAt = new Date().toISOString();
     return cred;
@@ -324,7 +328,9 @@ export class AuthnStore {
    * @returns The updated credential record, or `null`.
    */
   authenticateFromProof(proof: PasskeyProof): StoredCredential | null {
-    if (!proof.id) return null;
+    if (!proof.id) {
+      return null;
+    }
     return this.authenticate(proof.id) ?? null;
   }
 
