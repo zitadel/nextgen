@@ -176,7 +176,7 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
         return { ...base, step: { ...base.step, error: upsellErrorKey } };
       }
 
-      const proof = (body.challenge_response as { proof?: PasskeyProof } | null)?.proof;
+      const proof = body.challenge_response?.proof as PasskeyProof | undefined;
 
       const setupCred = before === "passkey-setup" && proof
         ? authn.registerFromProof(contextEmail ?? "mock-user@example.com", proof)

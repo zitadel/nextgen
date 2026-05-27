@@ -217,7 +217,7 @@ export class AuthnStore {
   register(
     userHandle: string,
     credentialId: string,
-    transports: AuthenticatorTransport[] = ["internal"],
+    transports: readonly AuthenticatorTransport[] = ["internal"],
   ): StoredCredential {
     const cred: StoredCredential = {
       credentialId,
