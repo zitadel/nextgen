@@ -64,12 +64,20 @@ type FlowStepResult struct {
 // It mirrors the OpenAPI `flow-step` component in domain terms.
 type FlowStep struct {
 	Name         string
+	Texts        FlowStepTexts
 	Error        *string
 	Complete     *FlowStepComplete
 	RedirectURL  *string
 	Fields       map[string]FlowField
 	Actions      map[string]FlowAction
 	SSOProviders []FlowSSOProvider
+}
+
+// FlowStepTexts holds the step-level localization keys (`<step>.title`,
+// `<step>.description`) the template resolves via the `| t` filter.
+type FlowStepTexts struct {
+	TitleKey       string
+	DescriptionKey string
 }
 
 // FlowAction is a single user action surfaced on [FlowStep.Actions].
@@ -447,7 +455,7 @@ func (r *FlowStateMachineRuntime) resolveStepFields(ctx context.Context, client 
 	if len(step.Fields) == 0 {
 		return FlowResolvedFields{}, nil
 	}
-	resolved, err := r.fields.Resolve(ctx, client, projectID, userSchemaURL, step.Fields)
+	resolved, err := r.fields.Resolve(ctx, client, projectID, userSchemaURL, step.Name, step.Fields)
 	if err != nil {
 		return FlowResolvedFields{}, fmt.Errorf("flow state machine: resolve fields on step %q: %w", step.Name, err)
 	}
@@ -471,6 +479,7 @@ func (r *FlowStateMachineRuntime) buildStep(step *FlowDefinitionStep, resolved F
 	}
 	return &FlowStep{
 		Name:         step.Name,
+		Texts:        FlowStepTexts{TitleKey: step.Name + ".title", DescriptionKey: step.Name + ".description"},
 		Error:        errorKey,
 		Complete:     complete,
 		RedirectURL:  redirectURL,
