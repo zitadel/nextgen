@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { AUTH_METHODS, buildFlowAndLocale } from "../../../../src/lib/flows";
+import { AUTH_METHODS, buildFlow } from "../../../../src/lib/flows";
 import { buildPasskeyFlow } from "../../../../src/lib/flows/passkey";
 import { buildPasswordFlow } from "../../../../src/lib/flows/password";
 
@@ -10,21 +10,20 @@ describe("AUTH_METHODS", () => {
   });
 });
 
-describe("buildFlowAndLocale", () => {
+describe("buildFlow", () => {
   it("password dispatch matches calling buildPasswordFlow directly", () => {
     const fields = ["email", "given_name"];
-    expect(buildFlowAndLocale("password", fields)).toEqual(buildPasswordFlow(fields));
+    expect(buildFlow("password", fields)).toEqual(buildPasswordFlow(fields));
   });
 
   it("passkey dispatch matches calling buildPasskeyFlow directly", () => {
     const fields = ["email"];
-    expect(buildFlowAndLocale("passkey", fields)).toEqual(buildPasskeyFlow(fields));
+    expect(buildFlow("passkey", fields)).toEqual(buildPasskeyFlow(fields));
   });
 
-  it("returns freshly allocated objects, not the same reference across calls", () => {
-    const a = buildFlowAndLocale("password", ["email"]);
-    const b = buildFlowAndLocale("password", ["email"]);
-    expect(a.flow).not.toBe(b.flow);
-    expect(a.locale).not.toBe(b.locale);
+  it("returns a freshly allocated object on every call", () => {
+    const a = buildFlow("password", ["email"]);
+    const b = buildFlow("password", ["email"]);
+    expect(a).not.toBe(b);
   });
 });

@@ -53,17 +53,11 @@ export async function runCapabilities(io: CliIO, opts: GlobalOptions): Promise<v
       resource_directories: [
         { kind: "schema", dir: ".zitadel/schemas" },
         { kind: "flow-definition", dir: ".zitadel/flows" },
-        { kind: "locale", dir: ".zitadel/locales" },
         { kind: "template", dir: ".zitadel/templates" },
         { kind: "idp", dir: ".zitadel/idps" },
         { kind: "app", dir: ".zitadel/apps" },
       ],
       renderers: listRenderers(),
-      i18n: {
-        locale_directory: ".zitadel/locales",
-        default_locale: "en",
-        text_key_convention: "<step>.<scope>.<name>",
-      },
       template_security: {
         banned_filters: BANNED_FILTERS,
         banned_tags: BANNED_TAGS,

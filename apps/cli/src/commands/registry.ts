@@ -265,25 +265,6 @@ export const COMMANDS: CommandSpec[] = [
     flags: globalFlags,
   },
   {
-    name: "locale scaffold",
-    summary: "Add missing text_key entries to .zitadel/locales/<lang>.json (idempotent).",
-    usage: "zitadel locale scaffold [--lang en]",
-    agent_status: "supported",
-    notes:
-      "Walks .zitadel/flows/*.json, extracts every text_key, adds missing keys with empty strings.",
-    flags: [
-      ...globalFlags,
-      { name: "lang", type: "string", description: "Target locale code (default: en)." },
-    ],
-  },
-  {
-    name: "locale list",
-    summary: "List local .zitadel/locales/*.json files with key counts.",
-    usage: "zitadel locale list",
-    agent_status: "supported",
-    flags: globalFlags,
-  },
-  {
     name: "app add",
     summary:
       "Add or update an app resource (.zitadel/apps/<slug>.json). Apps consume Zitadel's OIDC/SAML server.",

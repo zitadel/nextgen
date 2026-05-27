@@ -27,7 +27,7 @@ Do not edit the generated capabilities block in this file by hand. Keep `zitadel
 
 The supported POC path is Next.js App Router setup, local mock/dev auth, and config plan/apply.
 
-Setup creates `zitadel.json`, `.zitadel/secret`, schema/flow/locale resources under `.zitadel/`, browser-safe env metadata, and framework routes that mount `ZitadelFlow`. Project and preview secrets stay out of browser runtime.
+Setup creates `zitadel.json`, `.zitadel/secret`, schema and flow resources under `.zitadel/`, browser-safe env metadata, and framework routes that mount `ZitadelFlow`. Project and preview secrets stay out of browser runtime.
 
 ## Renderer Direction
 
@@ -35,7 +35,7 @@ Generated routes use `ZitadelFlow({ purpose, projectId, issuer, environment })` 
 
 ## CLI vs. Runtime API
 
-This CLI manages the dev-owned shape of a Zitadel deployment: default IdPs, app definitions, schemas, flows, locales, templates. For per-customer-org configuration (e.g. a B2B customer's own SSO), end-user CRUD, or any unbounded set, route to the runtime Admin/Org API instead — not `zitadel` commands or `.zitadel/` files. Subordinate config (claim mappings, redirect URIs, role bindings) lives wherever its parent resource lives. See `docs/design/cli/README.md` § *What lives in `.zitadel/`* for the ownership rule and the resource-by-resource split.
+This CLI manages the dev-owned shape of a Zitadel deployment: default IdPs, app definitions, schemas, flows, templates. For per-customer-org configuration (e.g. a B2B customer's own SSO), end-user CRUD, or any unbounded set, route to the runtime Admin/Org API instead — not `zitadel` commands or `.zitadel/` files. Subordinate config (claim mappings, redirect URIs, role bindings) lives wherever its parent resource lives. See `docs/design/cli/README.md` § *What lives in `.zitadel/`* for the ownership rule and the resource-by-resource split.
 
 <!-- generated:capabilities:begin -->
 
@@ -56,8 +56,6 @@ Envelope schema version: `1`. Every envelope carries `cli_version`, `command`, `
 | `zitadel idp list` | List local IdP resources. | experimental |
 | `zitadel idp show` | Show a single IdP resource by slug. | experimental |
 | `zitadel idp remove` | Remove an IdP resource by slug. | experimental |
-| `zitadel locale scaffold` | Add missing text_key entries to .zitadel/locales/<lang>.json (idempotent). | supported |
-| `zitadel locale list` | List local .zitadel/locales/*.json files with key counts. | supported |
 | `zitadel app add` | Add or update an app resource (.zitadel/apps/<slug>.json). Apps consume Zitadel's OIDC/SAML server. | experimental |
 | `zitadel app list` | List local app resources. | experimental |
 | `zitadel app show` | Show a single app resource by slug. | experimental |
@@ -268,39 +266,6 @@ Remove an IdP resource by slug.
 > Experimental POC surface.
 
 Usage: `zitadel idp remove <slug>`
-
-| Flag | Type | Description |
-|---|---|---|
-| `--cwd` / `-c` | `string` | Project directory to operate on. |
-| `--json` / `-j` | `boolean` | Emit the JSON envelope instead of pretty output. |
-| `--non-interactive` / `-n` | `boolean` | Disable prompts. Required when scripting or running as an agent. |
-| `--dry-run` | `boolean` | Preview the work without mutating files or hitting the platform. |
-| `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
-| `--server` / `-s` | `string` | Override the resolved server URL. |
-
-### `zitadel locale scaffold`
-
-Add missing text_key entries to .zitadel/locales/<lang>.json (idempotent).
-
-> Walks .zitadel/flows/*.json, extracts every text_key, adds missing keys with empty strings.
-
-Usage: `zitadel locale scaffold [--lang en]`
-
-| Flag | Type | Description |
-|---|---|---|
-| `--cwd` / `-c` | `string` | Project directory to operate on. |
-| `--json` / `-j` | `boolean` | Emit the JSON envelope instead of pretty output. |
-| `--non-interactive` / `-n` | `boolean` | Disable prompts. Required when scripting or running as an agent. |
-| `--dry-run` | `boolean` | Preview the work without mutating files or hitting the platform. |
-| `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
-| `--server` / `-s` | `string` | Override the resolved server URL. |
-| `--lang` | `string` | Target locale code (default: en). |
-
-### `zitadel locale list`
-
-List local .zitadel/locales/*.json files with key counts.
-
-Usage: `zitadel locale list`
 
 | Flag | Type | Description |
 |---|---|---|

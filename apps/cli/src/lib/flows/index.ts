@@ -12,12 +12,16 @@
  * constant and {@link validateFlows} parser. Future domain modules
  * (`lib/user-schema/`, ...) follow the same rule: sideways onto
  * `lib/<utility>/` is fine; upward into app code is not.
+ *
+ * **Locales are out of scope.** Display text is resolved client-side
+ * from the rendering layer's bundled locale dictionary; the OAS spec
+ * defines no locale API and this module emits only `text_key`
+ * references on the flow.
  */
 export type { FlowDefinition } from "./schema";
 export { flowDefinitionSchema } from "./schema";
 export type { AuthMethod } from "./types";
-export { collectTextKeys } from "./text-keys";
-export { AUTH_METHODS, buildFlowAndLocale } from "./registry";
+export { AUTH_METHODS, buildFlow } from "./registry";
 export { validateFlows } from "./validate";
 
 /**

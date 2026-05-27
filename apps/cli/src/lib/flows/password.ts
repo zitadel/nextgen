@@ -10,26 +10,24 @@ const USER_SCHEMA_URI =
   "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/human-user.yaml";
 
 /**
- * Build the password-authentication flow and its English locale seed.
+ * Build the password-authentication flow.
  *
  * The flow scaffolds the four canonical steps a login + register
  * journey needs (identifier, credential, register_profile, complete)
- * with a `password` field on the credential step and a `forgot` action
- * that pivots into the recovery purpose. The locale fragment seeds
- * every `text_key` the flow references, including the password label
- * and the "Forgot password?" action.
+ * with a `password` field on the credential step and a `forgot`
+ * action that pivots into the recovery purpose. Localized text is
+ * resolved client-side from the rendering layer's bundled locale
+ * dictionary; the flow only carries `text_key` references.
  *
- * Pure: touches no filesystem or network. The returned flow and
- * locale objects are newly allocated on every call so callers may
- * retain references without risk of internal mutation.
+ * Pure: touches no filesystem or network. The returned object is
+ * newly allocated on every call so callers may retain references
+ * without risk of internal mutation.
  *
  * @param fields - User-schema property names to collect on the
  *   register step, in display order (e.g. `["email", "given_name"]`).
  */
-export function buildPasswordFlow(
-  fields: ReadonlyArray<string>,
-): { flow: FlowDefinition; locale: Record<string, string> } {
-  const flow: FlowDefinition = {
+export function buildPasswordFlow(fields: ReadonlyArray<string>): FlowDefinition {
+  return {
     name: "default",
     user_schema: USER_SCHEMA_URI,
     purposes: ["login", "register"],
@@ -114,26 +112,6 @@ export function buildPasswordFlow(
       },
     ],
   };
-
-  const locale: Record<string, string> = {
-    "identifier.title": "Sign in",
-    "identifier.field.email": "Email address",
-    "identifier.action.submit": "Continue",
-    "identifier.action.register": "Create account",
-    "credential.title": "Enter your credential",
-    "credential.action.submit": "Sign in",
-    "credential.field.password": "Password",
-    "credential.action.forgot": "Forgot password?",
-    "register_profile.title": "Create your account",
-    "register_profile.action.submit": "Create account",
-    "register_profile.action.login": "Already have an account? Sign in",
-    "complete.title": "You're signed in",
-    ...Object.fromEntries(
-      fields.map((field) => [`register_profile.field.${field}`, fieldLabel(field)]),
-    ),
-  };
-
-  return { flow, locale };
 }
 
 /**
@@ -154,33 +132,4 @@ function fieldType(field: string): "text" | "email" | "password" | "tel" | "date
     return "date";
   }
   return "text";
-}
-
-/**
- * English locale label for a known user-schema property. Returns
- * empty string for unknown names so callers can decide whether to
- * synthesize a label or leave the entry blank for translators.
- */
-function fieldLabel(field: string): string {
-  switch (field) {
-    case "email": {
-      return "Email address";
-    }
-    case "given_name": {
-      return "First name";
-    }
-    case "family_name": {
-      return "Last name";
-    }
-    case "phone": {
-      return "Phone number";
-    }
-    case "date_of_birth":
-    case "birthdate": {
-      return "Date of birth";
-    }
-    default: {
-      return "";
-    }
-  }
 }

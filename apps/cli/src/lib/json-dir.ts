@@ -6,9 +6,9 @@ import { ZitadelError } from "./errors";
 /**
  * Options for {@link readJsonDir}. `requireDir: true` throws an
  * `E_VALIDATION` `ZitadelError` when the directory is missing, which
- * suits commands like `locale scaffold` that want a clear "you forgot
- * to run setup" error. The default (`false`) treats a missing
- * directory as an empty result set.
+ * suits commands that want a clear "you forgot to run setup" error.
+ * The default (`false`) treats a missing directory as an empty result
+ * set.
  */
 type ReadJsonDirOptions = {
   readonly requireDir?: boolean;

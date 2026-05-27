@@ -9,7 +9,6 @@ import { runDoctor } from "./commands/doctor";
 import { runEject } from "./commands/eject";
 import { runHelp } from "./commands/help";
 import { runIdpAdd, runIdpList, runIdpRemove, runIdpShow } from "./commands/idp";
-import { runLocaleList, runLocaleScaffold } from "./commands/locale";
 import { runSetup } from "./commands/setup";
 import { runStatus } from "./commands/status";
 import { hasZitadelConfig } from "./detect/state";
@@ -152,21 +151,6 @@ async function dispatch(parsed: ParsedArgs, io: CliIO, global: GlobalOptions): P
       }
       if (subcommand === "remove") {
         await runIdpRemove(io, idpGlobal, parsed.positionals[2]);
-        return;
-      }
-      break;
-    }
-    case "locale": {
-      const localeGlobal = withSubcommand(global, `locale ${subcommand ?? ""}`.trim());
-      if (subcommand === "scaffold") {
-        await runLocaleScaffold(io, {
-          ...localeGlobal,
-          lang: stringOpt(parsed, "lang"),
-        });
-        return;
-      }
-      if (subcommand === "list") {
-        await runLocaleList(io, localeGlobal);
         return;
       }
       break;
@@ -343,7 +327,6 @@ function resolveCommandName(parsed: ParsedArgs): string {
   ) {
     return `${head} ${next}`;
   }
-  if (head === "locale" && (next === "scaffold" || next === "list")) return `locale ${next}`;
   if (head === "help") return "help";
   return head;
 }

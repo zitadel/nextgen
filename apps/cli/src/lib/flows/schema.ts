@@ -9,8 +9,9 @@ const fieldType = z.enum(["text", "email", "password", "tel", "number", "url", "
 
 /**
  * A localization key. Pattern enforces the convention
- * `<step>.<scope>.<name>` (snake-case segments) so locale scaffolding
- * can round-trip keys without ambiguity.
+ * `<step>.<scope>.<name>` (snake-case segments). Display text is
+ * resolved client-side from the rendering layer's bundled locale
+ * dictionary; the OAS spec defines no locale API.
  */
 const textKey = z
   .string()

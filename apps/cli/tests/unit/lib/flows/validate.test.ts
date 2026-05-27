@@ -1,16 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { buildFlowAndLocale, validateFlows } from "../../../../src/lib/flows";
+import { buildFlow, validateFlows } from "../../../../src/lib/flows";
 import { ZitadelError } from "../../../../src/lib/errors";
 
 describe("validateFlows", () => {
   it("returns the parsed flows on success", () => {
-    const { flow } = buildFlowAndLocale("password", ["email"]);
+    const flow = buildFlow("password", ["email"]);
     expect(validateFlows([flow])).toHaveLength(1);
   });
 
   it("throws E_VALIDATION when any input fails to parse", () => {
-    const { flow } = buildFlowAndLocale("password", ["email"]);
+    const flow = buildFlow("password", ["email"]);
     expect(() => validateFlows([flow, { name: "bad" }])).toThrow(ZitadelError);
   });
 

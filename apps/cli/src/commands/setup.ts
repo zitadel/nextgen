@@ -9,7 +9,7 @@ import { runInteractiveSetup } from "../interactive/setup";
 import type { CliIO, GlobalOptions } from "../io/output";
 import { ok, skipped } from "../io/output";
 import { ZitadelError } from "../lib/errors";
-import { AUTH_METHODS, type AuthMethod, buildFlowAndLocale } from "../lib/flows";
+import { AUTH_METHODS, type AuthMethod, buildFlow } from "../lib/flows";
 import { stableStringify } from "../lib/json";
 import { createPlatformClient } from "../platform";
 import { DEFAULT_SERVER } from "../platform/resolve-server";
@@ -98,7 +98,7 @@ export async function runSetup(io: CliIO, opts: SetupOptions): Promise<void> {
   const rendererId = opts.renderer ?? "react";
   const renderer = getRenderer(rendererId);
   const config = projectConfig(project, issuer, framework.id, effectiveServer, rendererId);
-  const { flow, locale } = buildFlowAndLocale(resolvedMethod, userFields);
+  const flow = buildFlow(resolvedMethod, userFields);
   const adapter = getAdapter(framework.id);
   const ctx: ProjectContext = {
     cwd: opts.cwd,
@@ -119,7 +119,6 @@ export async function runSetup(io: CliIO, opts: SetupOptions): Promise<void> {
       config,
       userSchema,
       flow,
-      locale,
       packageManager,
       framework: framework.id,
       issuer,
@@ -181,7 +180,6 @@ function basePlan(input: {
   config: Record<string, unknown>;
   userSchema: unknown;
   flow: unknown;
-  locale: Readonly<Record<string, string>>;
   packageManager: string;
   framework: string;
   issuer: string;
@@ -193,7 +191,6 @@ function basePlan(input: {
       { kind: "mkdir", path: ".zitadel", mode: 0o700 },
       { kind: "mkdir", path: ".zitadel/flows" },
       { kind: "mkdir", path: ".zitadel/schemas" },
-      { kind: "mkdir", path: ".zitadel/locales" },
       { kind: "append-gitignore", entries: [".zitadel/secret", ".env*", "!.env.example"] },
       {
         kind: "write",
@@ -217,11 +214,6 @@ function basePlan(input: {
         kind: "write",
         path: ".zitadel/flows/default.json",
         contents: `${stableStringify(input.flow)}\n`,
-      },
-      {
-        kind: "write",
-        path: ".zitadel/locales/en.json",
-        contents: `${stableStringify(input.locale)}\n`,
       },
       {
         kind: "merge-env",

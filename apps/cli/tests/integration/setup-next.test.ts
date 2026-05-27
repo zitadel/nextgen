@@ -53,8 +53,6 @@ describe("Next setup integration", () => {
     expect(flowRaw).toContain('"name": "default"');
     expect(flowRaw).toContain('"user_schema":');
     expect(flowRaw).toContain('"text_key": "identifier.field.email"');
-    const localeRaw = await readFile(join(cwd, ".zitadel/locales/en.json"), "utf8");
-    expect(localeRaw).toContain('"identifier.title": "Sign in"');
     const loginPage = await readFile(join(cwd, "app/login/page.tsx"), "utf8");
     expect(loginPage).toContain("zitadel-cli: managed-file v1");
     expect(loginPage).toContain('"use client"');

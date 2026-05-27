@@ -12,13 +12,7 @@ const BUILDERS = {
   password: buildPasswordFlow,
   passkey: buildPasskeyFlow,
 } as const satisfies Readonly<
-  Record<
-    AuthMethod,
-    (fields: ReadonlyArray<string>) => {
-      flow: FlowDefinition;
-      locale: Record<string, string>;
-    }
-  >
+  Record<AuthMethod, (fields: ReadonlyArray<string>) => FlowDefinition>
 >;
 
 /**
@@ -28,19 +22,19 @@ const BUILDERS = {
 export const AUTH_METHODS = ["passkey", "password"] as const satisfies ReadonlyArray<AuthMethod>;
 
 /**
- * Build a flow_definition body and its English locale seed for the
- * chosen authentication method. Pure: touches no filesystem or
- * network. The returned objects are newly allocated; callers may
- * retain references without risk of internal mutation.
+ * Build a flow_definition body for the chosen authentication method.
+ * Pure: touches no filesystem or network. The returned object is
+ * newly allocated; callers may retain references without risk of
+ * internal mutation.
  *
  * @param method - The auth method to scaffold. Must be a member of
  *   {@link AUTH_METHODS}; values outside this set are a type error.
  * @param fields - User-schema property names to collect on the
  *   register step, in display order.
  */
-export function buildFlowAndLocale(
+export function buildFlow(
   method: AuthMethod,
   fields: ReadonlyArray<string>,
-): { flow: FlowDefinition; locale: Record<string, string> } {
+): FlowDefinition {
   return BUILDERS[method](fields);
 }

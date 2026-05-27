@@ -7,7 +7,7 @@ import { resetPlatformStore, setupPlatformHandlers } from "@zitadel-nextgen/api-
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import { collectTextKeys, flowDefinitionSchema } from "../../src/lib/flows";
+import { flowDefinitionSchema } from "../../src/lib/flows";
 import { runCliForTest } from "../helpers/run-cli";
 
 const MOCK_SERVER_URL = "http://mock.zitadel.test";
@@ -91,11 +91,6 @@ describe("flow definition schema", () => {
         );
       }
     }
-
-    const keys = collectTextKeys(flow);
-    expect(keys).toContain("identifier.title");
-    expect(keys).toContain("identifier.field.email");
-    expect(keys).toContain("identifier.action.submit");
   });
 
   it("emits a passkey-shaped credential step when --auth-method=passkey", async () => {
