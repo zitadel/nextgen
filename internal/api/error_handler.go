@@ -40,9 +40,6 @@ func domainErrorDetails(err error) api.ErrorDetails {
 }
 
 func errorResponse(err error) *api.ErrorDetailsStatusCode {
-	if errors.Is(err, NoProjectError) || errors.Is(err, NoTeamError) {
-		return errorResponseWithStatusCode(http.StatusBadRequest, err)
-	}
 	var e domain.Error
 	if !errors.As(err, &e) {
 		return internalErrorResponse(err)

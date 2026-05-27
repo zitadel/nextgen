@@ -11,7 +11,7 @@ import (
 
 func (h *Handler) CreateTeam(ctx context.Context, req *api.CreateTeamRequest, params api.CreateTeamParams) (r api.CreateTeamRes, _ error) {
 	if !params.ProjectID.IsSet() {
-		return nil, NoProjectError
+		return nil, domain.ErrTeamProjectNotFound()
 	}
 	team, err := h.teamService.CreateTeam(ctx, service.CreateTeamInput{ProjectID: string(params.ProjectID.Value)})
 	if err != nil {
@@ -25,7 +25,7 @@ func (h *Handler) CreateTeam(ctx context.Context, req *api.CreateTeamRequest, pa
 
 func (h *Handler) GetTeam(ctx context.Context, params api.GetTeamParams) (api.GetTeamRes, error) {
 	if !params.ProjectID.IsSet() {
-		return nil, NoProjectError
+		return nil, domain.ErrTeamProjectNotFound()
 	}
 	team, err := h.teamService.GetTeam(ctx, string(params.ProjectID.Value), string(params.TeamID))
 	if err != nil {
