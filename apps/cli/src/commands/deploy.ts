@@ -23,12 +23,6 @@ export async function runDeployConnect(io: CliIO, opts: DeployOptions) {
   const adapter = await detectDeployTarget(opts.cwd, opts.platform);
   const environment = parseDeployEnvironment(opts.environment);
 
-  if (environment === "production" && !(secret.claimed_at && secret.team_id)) {
-    throw new ZitadelError("E_CLAIM_REQUIRED", "Production deploys require a claimed project", {
-      hint: "Run `zitadel claim` before connecting production secrets.",
-      nextCommands: ["zitadel claim"],
-    });
-  }
   if (environment === "production" && !readProductionIssuer(config)) {
     throw new ZitadelError(
       "E_VALIDATION",

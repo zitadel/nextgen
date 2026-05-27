@@ -134,19 +134,15 @@ Agents should prefer \`next_commands\` over free-text hints.
 
 ## Maintainer Notes
 
-This file is packaged with the CLI and is generated from the command registry. When changing commands, flags, envelope fields, agent support status, server resolution, claim behavior, or renderer behavior, update the registry and tests first, then run \`corepack pnpm nx run @zitadel-nextgen/cli:gen:agents-md\`.
+This file is packaged with the CLI and is generated from the command registry. When changing commands, flags, envelope fields, agent support status, server resolution, or renderer behavior, update the registry and tests first, then run \`corepack pnpm nx run @zitadel-nextgen/cli:gen:agents-md\`.
 
 Do not edit the generated capabilities block in this file by hand. Keep \`zitadel capabilities --json\`, \`zitadel help --json\`, and this contract in sync.
 
 ## Golden Path
 
-The supported POC path is Next.js App Router setup, local mock/dev auth, config plan/apply, human claim handoff, claim-status refresh, and production apply after claim.
+The supported POC path is Next.js App Router setup, local mock/dev auth, and config plan/apply.
 
 Setup creates \`zitadel.json\`, \`.zitadel/secret\`, schema/flow/locale resources under \`.zitadel/\`, browser-safe env metadata, and framework routes that mount \`ZitadelFlow\`. Project and preview secrets stay out of browser runtime.
-
-## Claim Boundary
-
-Agents do not claim projects. \`zitadel claim\` returns a human \`claim_url\`; after the human completes it, agents may run \`zitadel claim status --challenge-id <id>\` to refresh local claimed state.
 
 ## Renderer Direction
 

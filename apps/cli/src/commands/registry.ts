@@ -13,7 +13,7 @@ export type CommandSpec = {
   summary: string;
   usage: string;
   flags: FlagSpec[];
-  agent_status: "supported" | "supported-mock-default" | "handoff" | "experimental";
+  agent_status: "supported" | "supported-mock-default" | "experimental";
   notes?: string;
 };
 
@@ -53,7 +53,7 @@ const globalFlags: FlagSpec[] = [
 export const COMMANDS: CommandSpec[] = [
   {
     name: "setup",
-    summary: "Create a pre-claim project and scaffold local auth.",
+    summary: "Create a Zitadel project and scaffold local auth.",
     usage: "zitadel setup [--framework next] [--user-fields ...] [--auth-methods ...]",
     agent_status: "supported-mock-default",
     flags: [
@@ -144,7 +144,7 @@ export const COMMANDS: CommandSpec[] = [
     usage: "zitadel deploy status [--platform vercel|netlify|cloudflare]",
     agent_status: "experimental",
     notes:
-      "Experimental POC surface; agents should prefer setup, plan, apply, and claim for the golden path.",
+      "Experimental POC surface; agents should prefer setup, plan, and apply for the golden path.",
     flags: [
       ...globalFlags,
       { name: "platform", type: "string", description: "Force a deploy platform adapter." },
@@ -162,7 +162,7 @@ export const COMMANDS: CommandSpec[] = [
     usage: "zitadel deploy connect [--environment preview|production]",
     agent_status: "experimental",
     notes:
-      "Experimental POC surface; agents should prefer setup, plan, apply, and claim for the golden path.",
+      "Experimental POC surface; agents should prefer setup, plan, and apply for the golden path.",
     flags: [
       ...globalFlags,
       { name: "platform", type: "string", description: "Force a deploy platform adapter." },
@@ -173,28 +173,6 @@ export const COMMANDS: CommandSpec[] = [
         description: "Target environment (default: preview).",
       },
       { name: "manual", type: "boolean", description: "Emit manual steps instead of configuring." },
-    ],
-  },
-  {
-    name: "claim",
-    summary: "Begin the human handoff to claim the project.",
-    usage: "zitadel claim",
-    agent_status: "handoff",
-    notes: "Agents must stop here and hand the claim URL to a human.",
-    flags: globalFlags,
-  },
-  {
-    name: "claim status",
-    summary: "Check a human claim handoff and refresh local claimed state.",
-    usage: "zitadel claim status --challenge-id <id>",
-    agent_status: "supported-mock-default",
-    flags: [
-      ...globalFlags,
-      {
-        name: "challenge-id",
-        type: "string",
-        description: "Claim challenge ID returned by `zitadel claim`.",
-      },
     ],
   },
   {
