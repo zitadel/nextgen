@@ -1,12 +1,9 @@
 import { ZitadelError } from "../lib/errors";
 import type { CreateFlowDefinitionRequest, PlatformClient } from "./client";
 import type {
-  ClaimStatusResponse,
   CreateProjectRequest,
   CreateProjectResponse,
   GetProjectResponse,
-  InitClaimRequest,
-  InitClaimResponse,
 } from "./schemas";
 
 export class HttpPlatformClient implements PlatformClient {
@@ -21,17 +18,6 @@ export class HttpPlatformClient implements PlatformClient {
 
   async getProject(projectId: string): Promise<GetProjectResponse> {
     return this.request("GET", `/projects/${encodeURIComponent(projectId)}`);
-  }
-
-  async initClaim(projectId: string, req: InitClaimRequest): Promise<InitClaimResponse> {
-    return this.request("POST", `/projects/${encodeURIComponent(projectId)}/claim/init`, req);
-  }
-
-  async getClaimStatus(projectId: string, challengeId: string): Promise<ClaimStatusResponse> {
-    return this.request(
-      "GET",
-      `/projects/${encodeURIComponent(projectId)}/claim/status?challenge_id=${encodeURIComponent(challengeId)}`,
-    );
   }
 
   async createSchema(data: object): Promise<{ id: string }> {

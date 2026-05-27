@@ -7,18 +7,6 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-const (
-	PrefixTeam ResourcePrefix = "team"
-)
-
-func ErrTeamNotFound() Error {
-	return newError(PrefixTeam.ErrorCodePrefix("not_found"), "team not found", nil, nil)
-}
-
-func ErrTeamProjectNotFound() Error {
-	return newError(PrefixTeam.ErrorCodePrefix("not_found"), "project not found", nil, nil)
-}
-
 // Team represents the object defined [here](https://github.com/zitadel/nextgen/blob/main/docs/design/api/resource-map.md#teams)
 // It is hardly ever modified but read a lot therefore it should be stored in global tables.
 type Team struct {
@@ -34,8 +22,10 @@ type Team struct {
 
 // TeamRepository provides storage operations for [Team]s.
 type TeamRepository interface {
-	// Create persists a new team. The repository sets [Team.CreatedAt] and [Team.UpdatedAt]
-	// to the current time; callers should not pre-populate those fields.
+	// Create persists a new team. Callers must pre-populate [Team.ID] with a value
+	// generated via idgen.Generator (e.g. idgen.New("team")); an empty ID is rejected.
+	// The repository sets [Team.CreatedAt] and [Team.UpdatedAt] to the current time;
+	// callers should not pre-populate those fields.
 	// Returns a [database.IntegrityViolationError] (specifically [database.UniqueError])
 	// if a team with the same (project_id, id) already exists.
 	Create(ctx context.Context, client database.QueryExecutor, team *Team) error

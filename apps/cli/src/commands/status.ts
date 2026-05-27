@@ -32,7 +32,6 @@ export async function runStatus(io: CliIO, opts: GlobalOptions): Promise<void> {
           isObject(config.environments) && isObject(config.environments.development)
             ? config.environments.development.issuer
             : undefined,
-        lifecycle: secret.claimed_at && secret.team_id ? "claimed" : "pre-claim",
       },
       server: opts.source,
       next_actions: ["Run `zitadel doctor`.", "Run `zitadel apply` after config changes."],

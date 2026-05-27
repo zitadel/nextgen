@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
@@ -64,6 +65,9 @@ func NewTeamRepository(client database.QueryExecutor) *TeamRepository {
 }
 
 func (r *TeamRepository) Create(ctx context.Context, client database.QueryExecutor, team *domain.Team) error {
+	if team.ID == "" {
+		return errors.New("team ID must not be empty")
+	}
 	b := database.NewStatementBuilder("INSERT INTO ")
 	b.WriteString(r.meta.tableName)
 	b.WriteString(" (project_id, id, created_at, updated_at) VALUES (")
