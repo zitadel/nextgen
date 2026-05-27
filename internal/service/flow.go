@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/domain/idgen"
@@ -24,10 +25,14 @@ type FlowService interface {
 	GetStep(ctx context.Context, req GetFlowStepRequest) (FlowStepResult, error)
 }
 
-// FlowStepResult is what Start/Submit/GetStep return.
+// FlowStepResult is what Start/Submit/GetStep return. HandoffToken and
+// HandoffTokenExpiresAt are populated only on the submit that terminates
+// the flow; zero values on every other call.
 type FlowStepResult struct {
-	State *domain.FlowState
-	Step  *domain.FlowStep
+	State                 *domain.FlowState
+	Step                  *domain.FlowStep
+	HandoffToken          string
+	HandoffTokenExpiresAt time.Time
 }
 
 type StartFlowRequest struct {
@@ -202,7 +207,12 @@ func (s *flowService) Submit(ctx context.Context, req SubmitFlowRequest) (FlowSt
 	if err != nil {
 		return FlowStepResult{}, err
 	}
-	return FlowStepResult{State: result.State, Step: result.Step}, nil
+	return FlowStepResult{
+		State:                 result.State,
+		Step:                  result.Step,
+		HandoffToken:          result.HandoffToken,
+		HandoffTokenExpiresAt: result.HandoffTokenExpiresAt,
+	}, nil
 }
 
 func (s *flowService) GetStep(ctx context.Context, req GetFlowStepRequest) (FlowStepResult, error) {

@@ -271,6 +271,38 @@ func TestSubmitFlowStep_TerminalClearsCookie(t *testing.T) {
 	}
 }
 
+func TestSubmitFlowStep_TerminalSurfacesHandoffToken(t *testing.T) {
+	ts := newTestServer(t, nil)
+	state := &domain.FlowState{ID: "flow_1", IssuedAt: ts.now()}
+	cookieVal := ts.sealCookie(t, state)
+
+	complete := domain.FlowStepCompleteShow
+	expiresAt := time.Date(2026, 5, 27, 12, 0, 0, 0, time.UTC)
+	ts.fake.submitResult = service.FlowStepResult{
+		State:                 &domain.FlowState{ID: "flow_1", IssuedAt: ts.now()},
+		Step:                  &domain.FlowStep{Name: "done", Complete: &complete},
+		HandoffToken:          "ht_abc",
+		HandoffTokenExpiresAt: expiresAt,
+	}
+
+	resp, body := doRequest(t, http.MethodPost, ts.srv.URL+"/flow/flow_1/submit", map[string]any{
+		"action": "submit",
+	}, cookieVal)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", resp.StatusCode, body)
+	}
+	var fr gen.FlowResponse
+	if err := json.Unmarshal(body, &fr); err != nil {
+		t.Fatalf("unmarshal: %v (body=%s)", err, body)
+	}
+	if got, ok := fr.HandoffToken.Get(); !ok || got != "ht_abc" {
+		t.Errorf("handoff_token = %v (set=%t), want ht_abc", got, ok)
+	}
+	if got, ok := fr.HandoffTokenExpiresAt.Get(); !ok || !got.Equal(expiresAt) {
+		t.Errorf("handoff_token_expires_at = %v (set=%t), want %v", got, ok, expiresAt)
+	}
+}
+
 func TestGetFlowStep_ReturnsCurrentStep(t *testing.T) {
 	ts := newTestServer(t, nil)
 	state := &domain.FlowState{

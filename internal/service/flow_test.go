@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strconv"
 	"testing"
+	"time"
 
 	"go.uber.org/mock/gomock"
 
@@ -398,6 +399,38 @@ func TestFlowService_Submit_RefetchesDefinitionAndCallsProcess(t *testing.T) {
 	}
 	if sm.gotSubmitInput.Action != "submit" {
 		t.Errorf("Action = %q, want submit", sm.gotSubmitInput.Action)
+	}
+}
+
+func TestFlowService_Submit_PropagatesHandoffToken(t *testing.T) {
+	def := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
+	repo := stubGetFlowDefinition(t, def)
+	expiresAt := time.Date(2026, 5, 27, 12, 0, 0, 0, time.UTC)
+	sm := &fakeStateMachine{processResult: domain.FlowStepResult{
+		State:                 &domain.FlowState{ID: "flow_1"},
+		Step:                  &domain.FlowStep{Name: "done"},
+		HandoffToken:          "ht_abc",
+		HandoffTokenExpiresAt: expiresAt,
+	}}
+
+	svc := service.NewFlowService(stubPool(), repo, sm, &stubIDGen{})
+
+	res, err := svc.Submit(t.Context(), service.SubmitFlowRequest{
+		State: &domain.FlowState{
+			ID:           "flow_1",
+			ProjectID:    def.ProjectID,
+			FlowProgress: domain.FlowProgress{DefinitionID: def.ID},
+		},
+		Action: "submit",
+	})
+	if err != nil {
+		t.Fatalf("Submit: %v", err)
+	}
+	if res.HandoffToken != "ht_abc" {
+		t.Errorf("HandoffToken = %q, want ht_abc", res.HandoffToken)
+	}
+	if !res.HandoffTokenExpiresAt.Equal(expiresAt) {
+		t.Errorf("HandoffTokenExpiresAt = %v, want %v", res.HandoffTokenExpiresAt, expiresAt)
 	}
 }
 

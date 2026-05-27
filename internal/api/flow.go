@@ -219,6 +219,10 @@ func (h *Handler)buildFlowResponse(result service.FlowStepResult, terminal bool)
 			resp.RedirectURI = api.NewOptURI(u)
 		}
 	}
+	if terminal && result.HandoffToken != "" {
+		resp.HandoffToken = api.NewOptString(result.HandoffToken)
+		resp.HandoffTokenExpiresAt = api.NewOptDateTime(result.HandoffTokenExpiresAt)
+	}
 	return resp
 }
 
