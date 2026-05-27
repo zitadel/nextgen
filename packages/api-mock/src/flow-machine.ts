@@ -1,7 +1,7 @@
 /**
- * xstate machine that walks a happy-path login flow.
+ * XState machine that walks a happy-path login flow.
  *
- * The mock backend's job is just to advance through the canonical Zitadel
+ * The mock backend's job is to advance through the canonical Zitadel
  * authentication flow without performing any real authentication work.
  * State names are deliberately the canonical wire step names (matching
  * `CreateFlow201Step.name`) so handlers can use the snapshot value directly
@@ -17,16 +17,17 @@
  *                                       --SUBMIT(sso_provider_id)--> sso-redirect
  *      \--START(register)--> register --SUBMIT--> passkey-upsell
  *
- *   password -- legacy split step; kept for tests that target it directly
+ *   password -- legacy split step; not reachable from any START transition;
+ *               kept so tests can target it directly via actor injection
  *   passkey-upsell --SUBMIT(skip)--> done
  *   passkey-upsell --SUBMIT(*)----> passkey-setup --SUBMIT--> done
  *   passkey-login --SUBMIT--> done
  *   passkey-login --SUBMIT(cancel)--> identifier
  *   sso-redirect --SUBMIT--> done
- *   anything --RESET--> idle
+ *   anything --RESET--> .idle  (root on: uses child-relative target syntax)
  */
 import type { CreateFlowBodyPurpose } from "@zitadel-nextgen/api/generated/model";
-import { createMachine, type AnyActorRef, assign, createActor } from "xstate";
+import { createMachine, type Actor, assign, createActor } from "xstate";
 
 export type FlowStepName =
   | "identifier"
@@ -40,7 +41,6 @@ export type FlowStepName =
   | "done";
 
 export type FlowMachineContext = {
-  flowId: string;
   tokenSeq: number;
   sessionToken: string;
   purpose: CreateFlowBodyPurpose | null;
@@ -59,7 +59,6 @@ export type FlowMachineEvent =
   | { type: "RESET" };
 
 const initialContext: FlowMachineContext = {
-  flowId: "flow_mock",
   tokenSeq: 0,
   sessionToken: "tok_mock_0",
   purpose: null,
@@ -204,8 +203,19 @@ export const flowMachine = createMachine({
   },
 });
 
-export type FlowActor = AnyActorRef;
+/** The concrete actor type produced by {@link startFlowActor}. */
+export type FlowActor = Actor<typeof flowMachine>;
 
+/**
+ * Create and start a new actor for {@link flowMachine}.
+ *
+ * The actor begins in the `idle` state with a fresh context. Callers in
+ * `setupMockHandlers()` replace the actor reference on every `createFlow`
+ * request rather than resetting it, because the `done` state is final and
+ * cannot be exited via an event.
+ *
+ * @returns A running actor ready to receive `START` and `SUBMIT` events.
+ */
 export function startFlowActor(): FlowActor {
   const actor = createActor(flowMachine);
   actor.start();
