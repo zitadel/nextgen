@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"errors"
 	"net/http"
 
 	api "github.com/zitadel/nextgen/api/generated"
@@ -16,7 +15,7 @@ func (h *Handler) GetMyUser(ctx context.Context, params api.GetMyUserParams) (ap
 		return nil, err
 	}
 	if sessionToken.UserID == nil {
-		return nil, noUserIdInSessionTokenErr
+		return nil, domain.ErrUserNotFound()
 	}
 	input := service.GetUserInput{
 		ProjectID: sessionToken.ProjectID,
@@ -46,5 +45,3 @@ func userErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		return internalErrorResponse(err)
 	}
 }
-
-var noUserIdInSessionTokenErr = errors.New("no user id found in session token")
