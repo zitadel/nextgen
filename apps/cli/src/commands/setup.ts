@@ -98,7 +98,7 @@ export async function runSetup(io: CliIO, opts: SetupOptions): Promise<void> {
   const rendererId = opts.renderer ?? "react";
   const renderer = getRenderer(rendererId);
   const config = projectConfig(project, issuer, framework.id, effectiveServer, rendererId);
-  const { flow, locale } = buildFlowAndLocale(resolvedMethod, { fields: userFields });
+  const { flow, locale } = buildFlowAndLocale(resolvedMethod, userFields);
   const adapter = getAdapter(framework.id);
   const ctx: ProjectContext = {
     cwd: opts.cwd,

@@ -1,6 +1,9 @@
+import { join } from "node:path";
+
 import type { CliIO, GlobalOptions } from "../io/output";
 import { ok } from "../io/output";
-import { collectTextKeys, readLocalFlows, validateFlows } from "../lib/flows";
+import { FLOWS_DIR, collectTextKeys, validateFlows } from "../lib/flows";
+import { readJsonDir } from "../lib/json-dir";
 import {
   DEFAULT_LOCALE,
   listLocales as listLocaleFiles,
@@ -64,7 +67,11 @@ export async function runLocaleList(io: CliIO, opts: GlobalOptions): Promise<voi
 }
 
 async function collectReferencedKeys(cwd: string): Promise<string[]> {
-  const raw = await readLocalFlows(cwd, { requireDir: true });
+  const raw = await readJsonDir(join(cwd, FLOWS_DIR), {
+    requireDir: true,
+    missingMessage: "No .zitadel/flows directory — run `zitadel setup` first.",
+    missingNextCommands: ["zitadel setup"],
+  });
   const flows = validateFlows(raw);
   const keys = new Set<string>();
   for (const flow of flows) {

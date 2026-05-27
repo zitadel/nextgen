@@ -1,7 +1,10 @@
+import { join } from "node:path";
+
 import type { CliIO, GlobalOptions } from "../io/output";
 import { ok, writePretty } from "../io/output";
 import { ZitadelError } from "../lib/errors";
-import { readLocalFlows, validateFlows } from "../lib/flows";
+import { FLOWS_DIR, validateFlows } from "../lib/flows";
+import { readJsonDir } from "../lib/json-dir";
 import { createPlatformClient } from "../platform";
 import { environmentSchema, type ZitadelEnvironment } from "../platform/schemas";
 import { buildSyncPlan, runSyncLoop } from "../sync/loop";
@@ -20,7 +23,7 @@ export async function runApply(io: CliIO, opts: ApplyOptions): Promise<void> {
   parseEnvironment(opts.environment);
   const secret = await readZitadelSecret(opts.cwd);
 
-  const flows = await readLocalFlows(opts.cwd);
+  const flows = await readJsonDir(join(opts.cwd, FLOWS_DIR));
   validateFlows(flows);
 
   const envRefs = findEnvRefs(flows);

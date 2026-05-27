@@ -1,21 +1,17 @@
 import { describe, expect, it } from "vitest";
 
 import { flowDefinitionSchema } from "../../../../src/lib/flows";
-import { password } from "../../../../src/lib/flows/password";
+import { buildPasswordFlow } from "../../../../src/lib/flows/password";
 
-describe("password.build", () => {
-  it("returns the password id", () => {
-    expect(password.id).toBe("password");
-  });
-
+describe("buildPasswordFlow", () => {
   it("emits a flow that round-trips through flowDefinitionSchema", () => {
-    const { flow } = password.build({ fields: ["email", "given_name"] });
+    const { flow } = buildPasswordFlow(["email", "given_name"]);
     const parsed = flowDefinitionSchema.safeParse(flow);
     expect(parsed.success, parsed.success ? "" : JSON.stringify(parsed.error.issues)).toBe(true);
   });
 
   it("adds a password field and a forgot action on the credential step", () => {
-    const { flow } = password.build({ fields: ["email"] });
+    const { flow } = buildPasswordFlow(["email"]);
     const credential = flow.steps.find((step) => step.name === "credential");
     expect(credential?.fields.password?.type).toBe("password");
     expect(credential?.fields.password?.text_key).toBe("credential.field.password");
@@ -27,20 +23,20 @@ describe("password.build", () => {
   });
 
   it("seeds credential.field.password and credential.action.forgot in the locale", () => {
-    const { locale } = password.build({ fields: [] });
+    const { locale } = buildPasswordFlow([]);
     expect(locale["credential.field.password"]).toBe("Password");
     expect(locale["credential.action.forgot"]).toBe("Forgot password?");
   });
 
   it("includes register-step locale entries for the requested fields", () => {
-    const { locale } = password.build({ fields: ["email", "given_name"] });
+    const { locale } = buildPasswordFlow(["email", "given_name"]);
     expect(locale["register_profile.field.email"]).toBe("Email address");
     expect(locale["register_profile.field.given_name"]).toBe("First name");
   });
 
   it("returns freshly allocated objects on every call", () => {
-    const a = password.build({ fields: ["email"] });
-    const b = password.build({ fields: ["email"] });
+    const a = buildPasswordFlow(["email"]);
+    const b = buildPasswordFlow(["email"]);
     expect(a.flow).not.toBe(b.flow);
     expect(a.locale).not.toBe(b.locale);
     expect(a.flow).toEqual(b.flow);
