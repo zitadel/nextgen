@@ -126,10 +126,6 @@ The CLI is an agent-facing product surface. Preserve the JSON envelope contract:
 Agent scripts should pass `--non-interactive --json` and prefer structured
 `next_commands` over prose hints.
 
-Do not let agents complete account ownership. `zitadel claim` may return a
-human `claim_url`; only a human completes claim, after which agents may run
-`zitadel claim status --challenge-id <id>`.
-
 ## Release, Licensing, And Secrets
 
 - User-visible changes to `apps/cli/` or `packages/sdk-*` need a changeset.
