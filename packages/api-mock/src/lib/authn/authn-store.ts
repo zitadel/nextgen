@@ -44,12 +44,12 @@ export type AuthenticatorTransport =
  */
 export type StoredCredential = {
   /** base64url credential ID as returned by `PublicKeyCredential.id`. */
-  credentialId: string;
+  readonly credentialId: string;
   /**
    * Opaque user identifier — the email address typed at the identifier step
    * in this mock.
    */
-  userHandle: string;
+  readonly userHandle: string;
   /**
    * COSE public key extracted from the attestation object.
    *
@@ -57,7 +57,7 @@ export type StoredCredential = {
    * placeholder rather than the real encoded key bytes. A real RP would store
    * the output of `AuthenticatorAttestationResponse.getPublicKey()` here.
    */
-  publicKey: string;
+  readonly publicKey: string;
   /**
    * Signature counter. Starts at `0` on registration; incremented by one on
    * every successful `authenticate()` call.
@@ -75,9 +75,9 @@ export type StoredCredential = {
    * `AuthenticatorAttestationResponse.getTransports()` is not included in the
    * serialised proof shape that `<zl-passkey>` emits.
    */
-  transports: AuthenticatorTransport[];
+  readonly transports: readonly AuthenticatorTransport[];
   /** ISO 8601 timestamp when the credential was first registered. */
-  createdAt: string;
+  readonly createdAt: string;
   /**
    * ISO 8601 timestamp of the most recent successful assertion, or `null` if
    * the credential has never been used for authentication.
@@ -108,6 +108,10 @@ export type PasskeyProof = {
    */
   authenticatorAttachment?: string;
 };
+
+function nowIso(): string {
+  return new Date().toISOString();
+}
 
 /**
  * Emails that trigger a **field-level error** on the register step.
@@ -221,7 +225,7 @@ export class AuthnStore {
       publicKey: "mock-public-key",
       signCount: 0,
       transports,
-      createdAt: new Date().toISOString(),
+      createdAt: nowIso(),
       lastUsedAt: null,
     };
     const existing = (this.#byUser.get(userHandle) ?? []).filter(
@@ -276,7 +280,7 @@ export class AuthnStore {
    * @param userHandle - Opaque user identifier (email in this mock).
    * @returns Zero or more credential records; never throws.
    */
-  getByUser(userHandle: string): StoredCredential[] {
+  getByUser(userHandle: string): readonly StoredCredential[] {
     return this.#byUser.get(userHandle) ?? [];
   }
 
@@ -310,7 +314,7 @@ export class AuthnStore {
       return undefined;
     }
     cred.signCount += 1;
-    cred.lastUsedAt = new Date().toISOString();
+    cred.lastUsedAt = nowIso();
     return cred;
   }
 
