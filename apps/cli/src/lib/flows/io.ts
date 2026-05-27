@@ -24,13 +24,18 @@ export type ReadLocalFlowsOptions = {
 };
 
 /**
- * Read and parse every `.json` file under `<cwd>/.zitadel/flows`.
- * Files are read in lexical order so the result is deterministic for
- * downstream hashing and diffs. Each entry is validated against
- * {@link flowDefinitionSchema}; on failure the function throws an
- * `E_VALIDATION` `ZitadelError` carrying the offending file path and
- * Zod issues. Returns an empty array when the directory is missing,
- * unless `requireDir` is true.
+ * Read every `.json` file under `<cwd>/.zitadel/flows` and return the
+ * raw parsed JSON. Files are read in lexical order so the result is
+ * deterministic for downstream hashing and diffs. Throws an
+ * `E_VALIDATION` `ZitadelError` for syntactically invalid JSON;
+ * schema validation is **not** performed here so unknown keys (e.g.
+ * forward-compatible flow properties, `${VAR}` placeholders inside
+ * custom fields) survive intact. Callers that need schema-validated
+ * `FlowDefinition` values should pass the result to {@link validateFlows}.
+ *
+ * Returns an empty array when the directory is missing, unless
+ * `requireDir` is true (the `locale` command uses that mode so users
+ * get a pointer back to `zitadel setup`).
  *
  * @param cwd - The project root.
  * @param opts - See {@link ReadLocalFlowsOptions}.
@@ -38,7 +43,7 @@ export type ReadLocalFlowsOptions = {
 export async function readLocalFlows(
   cwd: string,
   opts: ReadLocalFlowsOptions = {},
-): Promise<ReadonlyArray<FlowDefinition>> {
+): Promise<ReadonlyArray<Record<string, unknown>>> {
   const dir = join(cwd, FLOWS_DIR);
   let entries: string[];
   try {
@@ -56,7 +61,7 @@ export async function readLocalFlows(
     }
     throw error;
   }
-  const result: FlowDefinition[] = [];
+  const result: Record<string, unknown>[] = [];
   for (const entry of entries.filter((name) => name.endsWith(".json")).sort()) {
     const abs = join(dir, entry);
     let raw: unknown;
@@ -65,13 +70,10 @@ export async function readLocalFlows(
     } catch {
       throw new ZitadelError("E_VALIDATION", `Flow definition ${entry} is not valid JSON`);
     }
-    const parsed = flowDefinitionSchema.safeParse(raw);
-    if (!parsed.success) {
-      throw new ZitadelError("E_VALIDATION", `Flow ${entry} is not a valid FlowDefinition`, {
-        details: { path: abs, issues: parsed.error.issues },
-      });
+    if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+      throw new ZitadelError("E_VALIDATION", `Flow definition ${entry} must be a JSON object`);
     }
-    result.push(parsed.data);
+    result.push(raw as Record<string, unknown>);
   }
   return result;
 }

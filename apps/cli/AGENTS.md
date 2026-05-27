@@ -71,7 +71,7 @@ Envelope schema version: `1`. Every envelope carries `cli_version`, `command`, `
 
 Create a Zitadel project and scaffold local auth.
 
-Usage: `zitadel setup [--framework next] [--user-fields ...] [--auth-methods ...]`
+Usage: `zitadel setup [--framework next] [--user-fields ...] [--auth-method passkey|password]`
 
 | Flag | Type | Description |
 |---|---|---|
@@ -83,7 +83,7 @@ Usage: `zitadel setup [--framework next] [--user-fields ...] [--auth-methods ...
 | `--server` / `-s` | `string` | Override the resolved server URL. |
 | `--framework` | `string` | Framework to target (v1 supports "next"). |
 | `--user-fields` | `string` | Comma-separated list of user fields. |
-| `--auth-methods` | `string` | Comma-separated list of auth methods. |
+| `--auth-method` | `string` | Auth method to scaffold: `passkey` (default) or `password`. |
 | `--renderer` | `string` | Renderer: react (default) or web-component (planned <zitadel-flow>). |
 | `--skip-deploy-platform` | `boolean` | Skip deploy platform detection and connect. |
 | `--platform` | `string` | Deploy platform override (vercel/netlify/cloudflare/none). |

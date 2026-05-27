@@ -1,6 +1,6 @@
 import type { CliIO, GlobalOptions } from "../io/output";
 import { ok } from "../io/output";
-import { collectTextKeys, readLocalFlows } from "../lib/flows";
+import { collectTextKeys, readLocalFlows, validateFlows } from "../lib/flows";
 import {
   DEFAULT_LOCALE,
   listLocales as listLocaleFiles,
@@ -64,7 +64,8 @@ export async function runLocaleList(io: CliIO, opts: GlobalOptions): Promise<voi
 }
 
 async function collectReferencedKeys(cwd: string): Promise<string[]> {
-  const flows = await readLocalFlows(cwd, { requireDir: true });
+  const raw = await readLocalFlows(cwd, { requireDir: true });
+  const flows = validateFlows(raw);
   const keys = new Set<string>();
   for (const flow of flows) {
     for (const key of collectTextKeys(flow)) {

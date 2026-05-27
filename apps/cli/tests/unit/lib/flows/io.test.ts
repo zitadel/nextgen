@@ -59,12 +59,30 @@ describe("readLocalFlows", () => {
     await expect(readLocalFlows(cwd)).rejects.toBeInstanceOf(ZitadelError);
   });
 
-  it("throws E_VALIDATION when a file's content is not a valid FlowDefinition", async () => {
+  it("does not validate schema — schema-invalid bodies pass through and are caught by validateFlows", async () => {
     await mkdir(join(cwd, FLOWS_DIR), { recursive: true });
     await writeFile(
       join(cwd, FLOWS_DIR, "bad.json"),
       JSON.stringify({ name: "bad", purposes: [] }),
     );
+    const result = await readLocalFlows(cwd);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toEqual({ name: "bad", purposes: [] });
+    expect(() => validateFlows(result)).toThrow(ZitadelError);
+  });
+
+  it("preserves unknown top-level keys so preflight scans see custom placeholders", async () => {
+    const { flow } = buildFlowAndLocale("password", { fields: ["email"] });
+    const augmented = { ...flow, "x-custom-secret_env": "MY_SECRET" };
+    await mkdir(join(cwd, FLOWS_DIR), { recursive: true });
+    await writeFile(join(cwd, FLOWS_DIR, "default.json"), JSON.stringify(augmented));
+    const result = await readLocalFlows(cwd);
+    expect(result[0]["x-custom-secret_env"]).toBe("MY_SECRET");
+  });
+
+  it("rejects JSON arrays and primitives at the root", async () => {
+    await mkdir(join(cwd, FLOWS_DIR), { recursive: true });
+    await writeFile(join(cwd, FLOWS_DIR, "bad.json"), JSON.stringify([]));
     await expect(readLocalFlows(cwd)).rejects.toBeInstanceOf(ZitadelError);
   });
 
