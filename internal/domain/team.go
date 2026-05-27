@@ -12,11 +12,11 @@ const (
 )
 
 func ErrTeamNotFound() Error {
-	return newError(PrefixTeam.ErrorCodePrefix("not_found"), "team not found", nil, nil)
+	return newError(PrefixTeam.ErrorCodePrefix("team_not_found"), "team not found", nil, nil)
 }
 
 func ErrTeamProjectNotFound() Error {
-	return newError(PrefixTeam.ErrorCodePrefix("not_found"), "project not found", nil, nil)
+	return newError(PrefixTeam.ErrorCodePrefix("project_not_found"), "project not found", nil, nil)
 }
 
 // Team represents the object defined [here](https://github.com/zitadel/nextgen/blob/main/docs/design/api/resource-map.md#teams)
@@ -39,8 +39,6 @@ func NewTeam(projectID string) (*Team, error) {
 	return &Team{
 		ProjectID: projectID,
 		ID:        id,
-		CreatedAt: time.Now().UTC(),
-		UpdatedAt: time.Now().UTC(),
 	}, nil
 }
 

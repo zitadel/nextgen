@@ -56,6 +56,7 @@ func TestGetTeam(t *testing.T) {
 		team, err := harness.EnsureTeamService(t).CreateTeam(t.Context(), service.CreateTeamInput{
 			ProjectID: project.ID,
 		})
+		require.NoError(t, err)
 
 		params := api.GetTeamParams{
 			ProjectID: api.OptProjectID{Set: true, Value: api.ProjectID(project.ID)},
