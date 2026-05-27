@@ -15,9 +15,9 @@ const USER_SCHEMA_URI =
  * The flow scaffolds the four canonical steps a login + register
  * journey needs (identifier, credential, register_profile, complete)
  * with a `password` field on the credential step and a `forgot`
- * action that pivots into the recovery purpose. Localized text is
- * resolved client-side from the rendering layer's bundled locale
- * dictionary; the flow only carries `text_key` references.
+ * action that pivots into the recovery purpose. Display text is
+ * resolved client-side from the rendering layer; the flow only
+ * carries `text_key` references.
  *
  * Pure: touches no filesystem or network. The returned object is
  * newly allocated on every call so callers may retain references

@@ -8,7 +8,6 @@ import { runDeployConnect, runDeployStatus } from "./commands/deploy";
 import { runDoctor } from "./commands/doctor";
 import { runEject } from "./commands/eject";
 import { runHelp } from "./commands/help";
-import { runIdpAdd, runIdpList, runIdpRemove, runIdpShow } from "./commands/idp";
 import { runSetup } from "./commands/setup";
 import { runStatus } from "./commands/status";
 import { hasZitadelConfig } from "./detect/state";
@@ -123,38 +122,6 @@ async function dispatch(parsed: ParsedArgs, io: CliIO, global: GlobalOptions): P
         return;
       }
       break;
-    case "idp": {
-      const idpGlobal = withSubcommand(global, `idp ${subcommand ?? ""}`.trim());
-      if (subcommand === "add") {
-        await runIdpAdd(io, {
-          ...idpGlobal,
-          slug: stringOpt(parsed, "slug"),
-          displayName: stringOpt(parsed, "displayName"),
-          protocol: stringOpt(parsed, "protocol"),
-          preset: stringOpt(parsed, "preset"),
-          issuer: stringOpt(parsed, "issuer"),
-          clientId: stringOpt(parsed, "clientId"),
-          clientSecretEnv: stringOpt(parsed, "envSecret") ?? stringOpt(parsed, "clientSecretEnv"),
-          metadataUrl: stringOpt(parsed, "metadataUrl"),
-          scopes: stringOpt(parsed, "scopes"),
-          fromFile: stringOpt(parsed, "fromFile"),
-        });
-        return;
-      }
-      if (subcommand === "list") {
-        await runIdpList(io, idpGlobal);
-        return;
-      }
-      if (subcommand === "show") {
-        await runIdpShow(io, idpGlobal, parsed.positionals[2]);
-        return;
-      }
-      if (subcommand === "remove") {
-        await runIdpRemove(io, idpGlobal, parsed.positionals[2]);
-        return;
-      }
-      break;
-    }
     case "app": {
       const appGlobal = withSubcommand(global, `app ${subcommand ?? ""}`.trim());
       if (subcommand === "add") {
@@ -322,10 +289,10 @@ function resolveCommandName(parsed: ParsedArgs): string {
   if (head === "add" && next === "schema") return "add schema";
   if (head === "schema" && next === "add") return "schema add";
   if (
-    (head === "idp" || head === "app") &&
+    head === "app" &&
     (next === "add" || next === "list" || next === "show" || next === "remove")
   ) {
-    return `${head} ${next}`;
+    return `app ${next}`;
   }
   if (head === "help") return "help";
   return head;

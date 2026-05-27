@@ -7,40 +7,40 @@ describe("findEnvRefs", () => {
     expect(findEnvRefs({ url: "${ZITADEL_API_BASE}/foo" })).toEqual(["ZITADEL_API_BASE"]);
   });
 
-  it("detects *_env convention keys on IdP resources", () => {
-    const idp = {
+  it("detects *_env convention keys on nested resources", () => {
+    const resource = {
       version: 1,
-      kind: "idp",
-      slug: "google",
+      kind: "app",
+      slug: "demo",
       protocol: "oidc",
       oidc: {
-        client_id: "abc.apps.googleusercontent.com",
-        client_secret_env: "ZITADEL_IDP_GOOGLE_SECRET",
+        client_id: "demo.apps.googleusercontent.com",
+        client_secret_env: "ZITADEL_APP_DEMO_SECRET",
       },
     };
-    expect(findEnvRefs(idp)).toEqual(["ZITADEL_IDP_GOOGLE_SECRET"]);
+    expect(findEnvRefs(resource)).toEqual(["ZITADEL_APP_DEMO_SECRET"]);
   });
 
   it("merges both conventions and deduplicates", () => {
     const bundle = {
-      ".zitadel/idps/google.json": {
-        oidc: { client_secret_env: "GOOGLE_SECRET" },
+      ".zitadel/apps/web.json": {
+        oidc: { client_secret_env: "WEB_SECRET" },
       },
-      ".zitadel/idps/okta.json": {
-        oidc: { issuer: "${OKTA_ISSUER}", client_secret_env: "OKTA_SECRET" },
+      ".zitadel/apps/api.json": {
+        oidc: { issuer: "${API_ISSUER}", client_secret_env: "API_SECRET" },
       },
       server: "${ZITADEL_API_BASE}",
     };
     expect(findEnvRefs(bundle)).toEqual([
-      "GOOGLE_SECRET",
-      "OKTA_ISSUER",
-      "OKTA_SECRET",
+      "API_ISSUER",
+      "API_SECRET",
+      "WEB_SECRET",
       "ZITADEL_API_BASE",
     ]);
   });
 
   it("ignores *_env keys whose value is not a plain env var name", () => {
-    const idp = { oidc: { client_secret_env: "not a var name" } };
-    expect(findEnvRefs(idp)).toEqual([]);
+    const resource = { oidc: { client_secret_env: "not a var name" } };
+    expect(findEnvRefs(resource)).toEqual([]);
   });
 });

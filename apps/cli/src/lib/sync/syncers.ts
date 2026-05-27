@@ -1,5 +1,5 @@
-import { FLOWS_DIR } from "../lib/flows";
-import type { PlatformClient } from "../platform/client.js";
+import { FLOWS_DIR } from "../flows";
+import type { PlatformClient } from "../../platform/client.js";
 
 export interface ResourceSyncer {
   readonly kind: string;

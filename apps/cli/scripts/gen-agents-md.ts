@@ -150,7 +150,7 @@ Generated routes use \`ZitadelFlow({ purpose, projectId, issuer, environment })\
 
 ## CLI vs. Runtime API
 
-This CLI manages the dev-owned shape of a Zitadel deployment: default IdPs, app definitions, schemas, flows, templates. For per-customer-org configuration (e.g. a B2B customer's own SSO), end-user CRUD, or any unbounded set, route to the runtime Admin/Org API instead — not \`zitadel\` commands or \`.zitadel/\` files. Subordinate config (claim mappings, redirect URIs, role bindings) lives wherever its parent resource lives. See \`docs/design/cli/README.md\` § *What lives in \`.zitadel/\`* for the ownership rule and the resource-by-resource split.`;
+This CLI manages the dev-owned shape of a Zitadel deployment: app definitions, schemas, flows, templates. For per-customer-org configuration (e.g. a B2B customer's own SSO), end-user CRUD, or any unbounded set, route to the runtime Admin/Org API instead — not \`zitadel\` commands or \`.zitadel/\` files. Subordinate config (claim mappings, redirect URIs, role bindings) lives wherever its parent resource lives. See \`docs/design/cli/README.md\` § *What lives in \`.zitadel/\`* for the ownership rule and the resource-by-resource split.`;
 }
 
 main().catch((error) => {

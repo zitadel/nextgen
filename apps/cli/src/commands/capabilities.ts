@@ -54,7 +54,6 @@ export async function runCapabilities(io: CliIO, opts: GlobalOptions): Promise<v
         { kind: "schema", dir: ".zitadel/schemas" },
         { kind: "flow-definition", dir: ".zitadel/flows" },
         { kind: "template", dir: ".zitadel/templates" },
-        { kind: "idp", dir: ".zitadel/idps" },
         { kind: "app", dir: ".zitadel/apps" },
       ],
       renderers: listRenderers(),

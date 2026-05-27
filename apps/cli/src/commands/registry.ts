@@ -203,68 +203,6 @@ export const COMMANDS: CommandSpec[] = [
     ],
   },
   {
-    name: "idp add",
-    summary: "Add or update an identity provider (.zitadel/idps/<slug>.json).",
-    usage:
-      "zitadel idp add (--preset google|microsoft|okta-oidc | --protocol oidc|saml) [--slug] [--issuer] [--client-id] [--env-secret] [--metadata-url]",
-    agent_status: "experimental",
-    notes: "Experimental POC surface; presets are limited to providers with an OIDC issuer.",
-    flags: [
-      ...globalFlags,
-      {
-        name: "slug",
-        type: "string",
-        description: "Local slug (filename). Defaults to preset id.",
-      },
-      { name: "display-name", type: "string", description: "Human-readable IdP name." },
-      { name: "protocol", type: "string", description: "Protocol: oidc or saml." },
-      { name: "preset", type: "string", description: "Preset: google, microsoft, okta-oidc." },
-      {
-        name: "issuer",
-        type: "string",
-        description: "OIDC issuer URL (required with --protocol oidc or okta-oidc preset).",
-      },
-      { name: "client-id", type: "string", description: "OIDC client ID." },
-      {
-        name: "env-secret",
-        type: "string",
-        description:
-          "Name of env var holding the OIDC client secret (e.g. ZITADEL_IDP_GOOGLE_SECRET).",
-      },
-      { name: "metadata-url", type: "string", description: "SAML metadata URL." },
-      { name: "scopes", type: "string", description: "Comma-separated OIDC scopes." },
-      {
-        name: "from-file",
-        type: "string",
-        description: "Path to an existing IdP resource JSON file.",
-      },
-    ],
-  },
-  {
-    name: "idp list",
-    summary: "List local IdP resources.",
-    usage: "zitadel idp list",
-    agent_status: "experimental",
-    notes: "Experimental POC surface.",
-    flags: globalFlags,
-  },
-  {
-    name: "idp show",
-    summary: "Show a single IdP resource by slug.",
-    usage: "zitadel idp show <slug>",
-    agent_status: "experimental",
-    notes: "Experimental POC surface.",
-    flags: globalFlags,
-  },
-  {
-    name: "idp remove",
-    summary: "Remove an IdP resource by slug.",
-    usage: "zitadel idp remove <slug>",
-    agent_status: "experimental",
-    notes: "Experimental POC surface.",
-    flags: globalFlags,
-  },
-  {
     name: "app add",
     summary:
       "Add or update an app resource (.zitadel/apps/<slug>.json). Apps consume Zitadel's OIDC/SAML server.",

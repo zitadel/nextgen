@@ -18,9 +18,8 @@ const USER_SCHEMA_URI =
  * driven by the client and the OAS spec models passkey verification
  * via `x-credential: "passkey"` on the referenced user-schema
  * property (see `api/openapi/endpoints/schemas/flow-definition.json`).
- * Localized text is resolved client-side from the rendering layer's
- * bundled locale dictionary; the flow only carries `text_key`
- * references.
+ * Display text is resolved client-side from the rendering layer; the
+ * flow only carries `text_key` references.
  *
  * Pure: touches no filesystem or network. The returned object is
  * newly allocated on every call so callers may retain references

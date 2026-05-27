@@ -4,8 +4,8 @@ import { tmpdir } from "node:os";
 
 import { describe, expect, it, vi } from "vitest";
 
-import { buildSyncPlan, runSyncLoop } from "../../src/sync/loop";
-import type { ResourceSyncer } from "../../src/sync/syncers";
+import { buildSyncPlan, runSyncLoop } from "../../src/lib/sync/loop";
+import type { ResourceSyncer } from "../../src/lib/sync/syncers";
 import type { PlatformClient } from "../../src/platform/client";
 
 function makeCwd(): string {

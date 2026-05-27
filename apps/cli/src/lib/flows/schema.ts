@@ -8,10 +8,10 @@ import { z } from "zod";
 const fieldType = z.enum(["text", "email", "password", "tel", "number", "url", "date", "hidden"]);
 
 /**
- * A localization key. Pattern enforces the convention
+ * A `text_key` reference. Pattern enforces the convention
  * `<step>.<scope>.<name>` (snake-case segments). Display text is
- * resolved client-side from the rendering layer's bundled locale
- * dictionary; the OAS spec defines no locale API.
+ * resolved client-side from the rendering layer; the OAS spec does
+ * not model it here.
  */
 const textKey = z
   .string()

@@ -35,7 +35,7 @@ Generated routes use `ZitadelFlow({ purpose, projectId, issuer, environment })` 
 
 ## CLI vs. Runtime API
 
-This CLI manages the dev-owned shape of a Zitadel deployment: default IdPs, app definitions, schemas, flows, templates. For per-customer-org configuration (e.g. a B2B customer's own SSO), end-user CRUD, or any unbounded set, route to the runtime Admin/Org API instead — not `zitadel` commands or `.zitadel/` files. Subordinate config (claim mappings, redirect URIs, role bindings) lives wherever its parent resource lives. See `docs/design/cli/README.md` § *What lives in `.zitadel/`* for the ownership rule and the resource-by-resource split.
+This CLI manages the dev-owned shape of a Zitadel deployment: app definitions, schemas, flows, templates. For per-customer-org configuration (e.g. a B2B customer's own SSO), end-user CRUD, or any unbounded set, route to the runtime Admin/Org API instead — not `zitadel` commands or `.zitadel/` files. Subordinate config (claim mappings, redirect URIs, role bindings) lives wherever its parent resource lives. See `docs/design/cli/README.md` § *What lives in `.zitadel/`* for the ownership rule and the resource-by-resource split.
 
 <!-- generated:capabilities:begin -->
 
@@ -52,10 +52,6 @@ Envelope schema version: `1`. Every envelope carries `cli_version`, `command`, `
 | `zitadel deploy status` | Report deploy platform readiness. | experimental |
 | `zitadel deploy connect` | Configure preview or production platform env vars. | experimental |
 | `zitadel schema add` | Add or remove fields on the user schema. | supported |
-| `zitadel idp add` | Add or update an identity provider (.zitadel/idps/<slug>.json). | experimental |
-| `zitadel idp list` | List local IdP resources. | experimental |
-| `zitadel idp show` | Show a single IdP resource by slug. | experimental |
-| `zitadel idp remove` | Remove an IdP resource by slug. | experimental |
 | `zitadel app add` | Add or update an app resource (.zitadel/apps/<slug>.json). Apps consume Zitadel's OIDC/SAML server. | experimental |
 | `zitadel app list` | List local app resources. | experimental |
 | `zitadel app show` | Show a single app resource by slug. | experimental |
@@ -197,84 +193,6 @@ Usage: `zitadel schema add [--preset name] [--add-field-json '{...}' | --add-fie
 | `--add-field` | `string[]` | Add a field using the colon-DSL (name:type:key=value,...). |
 | `--add-field-json` | `string[]` | Add a field using a JSON object. Preferred for agents. |
 | `--remove-field` | `string[]` | Remove a field by name. |
-
-### `zitadel idp add`
-
-Add or update an identity provider (.zitadel/idps/<slug>.json).
-
-> Experimental POC surface; presets are limited to providers with an OIDC issuer.
-
-Usage: `zitadel idp add (--preset google|microsoft|okta-oidc | --protocol oidc|saml) [--slug] [--issuer] [--client-id] [--env-secret] [--metadata-url]`
-
-| Flag | Type | Description |
-|---|---|---|
-| `--cwd` / `-c` | `string` | Project directory to operate on. |
-| `--json` / `-j` | `boolean` | Emit the JSON envelope instead of pretty output. |
-| `--non-interactive` / `-n` | `boolean` | Disable prompts. Required when scripting or running as an agent. |
-| `--dry-run` | `boolean` | Preview the work without mutating files or hitting the platform. |
-| `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
-| `--server` / `-s` | `string` | Override the resolved server URL. |
-| `--slug` | `string` | Local slug (filename). Defaults to preset id. |
-| `--display-name` | `string` | Human-readable IdP name. |
-| `--protocol` | `string` | Protocol: oidc or saml. |
-| `--preset` | `string` | Preset: google, microsoft, okta-oidc. |
-| `--issuer` | `string` | OIDC issuer URL (required with --protocol oidc or okta-oidc preset). |
-| `--client-id` | `string` | OIDC client ID. |
-| `--env-secret` | `string` | Name of env var holding the OIDC client secret (e.g. ZITADEL_IDP_GOOGLE_SECRET). |
-| `--metadata-url` | `string` | SAML metadata URL. |
-| `--scopes` | `string` | Comma-separated OIDC scopes. |
-| `--from-file` | `string` | Path to an existing IdP resource JSON file. |
-
-### `zitadel idp list`
-
-List local IdP resources.
-
-> Experimental POC surface.
-
-Usage: `zitadel idp list`
-
-| Flag | Type | Description |
-|---|---|---|
-| `--cwd` / `-c` | `string` | Project directory to operate on. |
-| `--json` / `-j` | `boolean` | Emit the JSON envelope instead of pretty output. |
-| `--non-interactive` / `-n` | `boolean` | Disable prompts. Required when scripting or running as an agent. |
-| `--dry-run` | `boolean` | Preview the work without mutating files or hitting the platform. |
-| `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
-| `--server` / `-s` | `string` | Override the resolved server URL. |
-
-### `zitadel idp show`
-
-Show a single IdP resource by slug.
-
-> Experimental POC surface.
-
-Usage: `zitadel idp show <slug>`
-
-| Flag | Type | Description |
-|---|---|---|
-| `--cwd` / `-c` | `string` | Project directory to operate on. |
-| `--json` / `-j` | `boolean` | Emit the JSON envelope instead of pretty output. |
-| `--non-interactive` / `-n` | `boolean` | Disable prompts. Required when scripting or running as an agent. |
-| `--dry-run` | `boolean` | Preview the work without mutating files or hitting the platform. |
-| `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
-| `--server` / `-s` | `string` | Override the resolved server URL. |
-
-### `zitadel idp remove`
-
-Remove an IdP resource by slug.
-
-> Experimental POC surface.
-
-Usage: `zitadel idp remove <slug>`
-
-| Flag | Type | Description |
-|---|---|---|
-| `--cwd` / `-c` | `string` | Project directory to operate on. |
-| `--json` / `-j` | `boolean` | Emit the JSON envelope instead of pretty output. |
-| `--non-interactive` / `-n` | `boolean` | Disable prompts. Required when scripting or running as an agent. |
-| `--dry-run` | `boolean` | Preview the work without mutating files or hitting the platform. |
-| `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
-| `--server` / `-s` | `string` | Override the resolved server URL. |
 
 ### `zitadel app add`
 

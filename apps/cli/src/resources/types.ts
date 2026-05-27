@@ -1,7 +1,6 @@
-export type ResourceKind = "idp" | "app";
+export type ResourceKind = "app";
 
 export const RESOURCE_DIRECTORIES: Record<ResourceKind, string> = {
-  idp: ".zitadel/idps",
   app: ".zitadel/apps",
 };
 

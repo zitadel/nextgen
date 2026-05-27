@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { consola } from "consola";
 
-import type { PlatformClient } from "../platform/client.js";
+import type { PlatformClient } from "../../platform/client.js";
 import { readState, removeFromState, updateState } from "./state.js";
 import type { ResourceSyncer } from "./syncers.js";
 

@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from "vitest";
 import { runApply } from "../../src/commands/apply";
 import type { CliIO, GlobalOptions } from "../../src/io/output";
 
-vi.mock("../../src/sync/loop", () => ({
+vi.mock("../../src/lib/sync/loop", () => ({
   runSyncLoop: vi.fn().mockResolvedValue(undefined),
 }));
 
