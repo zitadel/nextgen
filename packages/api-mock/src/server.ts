@@ -69,32 +69,15 @@ export function startMockServer(port: number): Server {
   const iss = `http://localhost:${port}`;
   const app = express();
 
-  // ─── CORS ──────────────────────────────────────────────────────────────────
-  // Reflects the incoming Origin verbatim and allows credentials so that the
-  // demo apps (running on different ports) can make credentialed fetch()
-  // calls to this server. This is intentionally permissive because this is a
-  // LOCAL DEVELOPMENT MOCK ONLY — never deploy this server publicly.
   app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
     const origin = req.headers.origin;
-    // Vary must be set before the response is cached — it tells any proxy that
-    // the response differs per Origin so it cannot serve Origin-A's response
-    // to Origin-B's request.
     res.setHeader("Vary", "Origin");
     res.setHeader("Access-Control-Allow-Origin", origin ?? "*");
     if (origin) {
       res.setHeader("Access-Control-Allow-Credentials", "true");
     }
     if (req.method === "OPTIONS") {
-      // Includes PUT/PATCH/DELETE so cross-origin preflights for the
-      // /flow_definitions/:id (PATCH, DELETE) and /schemas/:id (DELETE)
-      // routes succeed. Without these, a browser would block the actual
-      // request and the failure would surface as a confusing CORS error.
       res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
-      // Note: 'Cookie' is a browser-forbidden header name and is never sent
-      // as a JS request header; it does not need to be in Allow-Headers.
-      // Cookies are carried automatically via credentials: "include".
-      // Idempotency-Key is custom (see /sessions/exchange) — must be listed
-      // explicitly or the browser preflight blocks the actual request.
       res.setHeader("Access-Control-Allow-Headers", "Content-Type, Idempotency-Key");
       res.status(204).end();
       return;
@@ -102,7 +85,6 @@ export function startMockServer(port: number): Server {
     next();
   });
 
-  // ─── JWKS ──────────────────────────────────────────────────────────────────
   app.get("/.well-known/jwks.json", (_req: express.Request, res: express.Response) => {
     res.json({ keys: [JWK] });
   });
@@ -110,11 +92,6 @@ export function startMockServer(port: number): Server {
     res.json({ keys: [JWK] });
   });
 
-  // ─── Sessions exchange ─────────────────────────────────────────────────────
-  //
-  // express.json() returns a SyntaxError into Express's default error handler
-  // on malformed bodies, which renders an HTML 400. Wrap it in an error
-  // middleware that emits our spec-compliant errorBody envelope instead.
   const jsonBodyParser: express.RequestHandler = (req, res, next) => {
     express.json()(req, res, (err) => {
       if (err) {
@@ -128,10 +105,6 @@ export function startMockServer(port: number): Server {
     "/sessions/exchange",
     jsonBodyParser,
     async (req: express.Request, res: express.Response) => {
-      // Idempotency-Key short-circuit: if the caller already exchanged with
-      // this key inside the cache window, replay the cached body+cookies
-      // without consuming a fresh handoff. Pairs with single-use enforcement
-      // so retries don't accidentally 410 on a network blip.
       const idempotencyKey = req.header("Idempotency-Key");
       if (idempotencyKey) {
         const cached = idempotencyCache.get(idempotencyKey);
@@ -155,8 +128,6 @@ export function startMockServer(port: number): Server {
       try {
         claims = await verifyHandoffToken(handoff_token, { expectedIss: iss });
       } catch (err) {
-        // Spec maps consumed/expired handoff tokens to 410 Gone; every other
-        // verification failure (signature, audience, issuer, structure) is 401.
         if (err instanceof HandoffError && err.kind === "expired") {
           res
             .status(410)
@@ -185,26 +156,8 @@ export function startMockServer(port: number): Server {
         `_zflow=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
       ];
       res.setHeader("Set-Cookie", setCookie);
-      // Spec: 200 returns `session-with-token-response.yaml` —
-      // `{session: <SessionResponse>, session_token}`. The mock synthesises a
-      // minimal session_response from the handoff claims: `state` is "active"
-      // (we just authenticated), `factors` is an empty list and
-      // `assurance_levels` an empty list (the mock has no factor catalogue),
-      // and the TTLs come from the session-cookie window so they stay
-      // consistent with the JWT exp.
-      //
-      // Body is typed against the orval-generated `ExchangeHandoff200` so any
-      // future spec change (added required field, renamed key) surfaces here
-      // as a typecheck error rather than silent runtime drift.
       const createdAt = new Date();
       const expiresAt = new Date(createdAt.getTime() + SESSION_TTL_SECONDS * 1000);
-      // `project_id` must satisfy `^[a-zA-Z0-9_-]+$` per the spec. The
-      // handoff's `sub` claim is the captured user identifier (typically
-      // an email like `alice@example.com`) and would fail that pattern.
-      // The mock doesn't thread the real project_id through the flow ↔
-      // handoff ↔ exchange chain (it would require plumbing the value
-      // into the actor context and the JWT claim), so we emit a stable
-      // mock value that's pattern-valid.
       const body: ExchangeHandoff200 = {
         session: {
           session_id: `sess_${randomUUID().replaceAll("-", "").slice(0, 12)}`,
@@ -227,9 +180,6 @@ export function startMockServer(port: number): Server {
     },
   );
 
-  // ─── OIDC-style end-session ──────────────────────────────────────────────
-  // What `<zitadel-logout>` calls via the generated `endSession()` client.
-  // Clears cookies and returns 204 No Content, matching the OpenAPI contract.
   app.get("/auth/end-session", (_req: express.Request, res: express.Response) => {
     res.setHeader("Set-Cookie", [
       `__nextgen_session=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
@@ -239,7 +189,6 @@ export function startMockServer(port: number): Server {
     res.status(204).end();
   });
 
-  // ─── Flow API + Platform API — reuse MSW handlers, zero duplication ──────
   app.use(createMiddleware(...setupMockHandlers({ iss }).handlers, ...setupPlatformHandlers()));
 
   return app.listen(port, () => {
