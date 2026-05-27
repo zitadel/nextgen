@@ -15,6 +15,22 @@ import {
 import type { MockHandle } from "./handlers.js";
 
 const PROJECT_ID = "demo-project";
+
+/**
+ * Decode the payload of a JWT without verifying its signature. Used by the
+ * handoff-token assertions below to inspect the `sub` claim — the standalone
+ * `/sessions/exchange` endpoint already verifies the signature elsewhere.
+ */
+function decodeJwtPayload(token: string): { sub: string } {
+  const parts = token.split(".");
+  if (parts.length !== 3) {
+    throw new Error(`expected three JWT parts, got ${parts.length}`);
+  }
+  const [, payload] = parts as [string, string, string];
+  return JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as {
+    sub: string;
+  };
+}
 const server = setupServer();
 let mock: MockHandle = setupMockHandlers();
 
@@ -235,10 +251,7 @@ describe("setupMockHandlers", () => {
     });
     expect(done.step.name).toBe("done");
     expect(done.handoff_token).toBeTruthy();
-    const payload = JSON.parse(
-      Buffer.from(done.handoff_token!.split(".")[1], "base64url").toString("utf8"),
-    ) as { sub: string };
-    expect(payload.sub).toBe("alice@acme.com");
+    expect(decodeJwtPayload(done.handoff_token ?? "").sub).toBe("alice@acme.com");
   });
 
   test("passkey-login: discoverable credential carries authenticated user into handoff token", async () => {
@@ -260,10 +273,7 @@ describe("setupMockHandlers", () => {
     });
     expect(done.step.name).toBe("done");
     expect(done.handoff_token).toBeTruthy();
-    const payload = JSON.parse(
-      Buffer.from(done.handoff_token!.split(".")[1], "base64url").toString("utf8"),
-    ) as { sub: string };
-    expect(payload.sub).toBe("bob@example.com");
+    expect(decodeJwtPayload(done.handoff_token ?? "").sub).toBe("bob@example.com");
   });
 
   test("passkey-login: unregistered credential stays on passkey-login with error", async () => {
