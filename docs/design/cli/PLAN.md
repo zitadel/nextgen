@@ -6,7 +6,7 @@
 
 ## Context
 
-The [POC CLI](../../../apps/cli) ships the easy half of the product vision: create-before-signup, pre-claim/claim lifecycle, three environments, framework detection, an agent-grade JSON envelope, and a build-time capabilities registry. Reading the [flow engine](../flowengine/README.md) design alongside the CLI revealed several material re-framings, most recently absorbed from the `frontend-adr-001` branch:
+The [POC CLI](../../../apps/cli) ships the easy half of the product vision: create-before-signup, three environments, framework detection, an agent-grade JSON envelope, and a build-time capabilities registry. Reading the [flow engine](../flowengine/README.md) design alongside the CLI revealed several material re-framings, most recently absorbed from the `frontend-adr-001` branch:
 
 1. **The Lit web component is a BDUI renderer, not a login page.** Login/register are scaffolded by the framework adapter; the thing they host is a server-driven step tree fetched from `/v1/flows`. The renderer parses a **Liquid template** against unordered capability dicts; it does not iterate arrays. See [BDUI Renderer](bdui-renderer.md).
 2. **"IDP management" is three separate nouns.** IdPs (login/SSO sources), **external factor providers (MFA) — reserved**, and apps (Zitadel-as-IdP). External factors are deferred until the upstream contract resurfaces. See [Identity Surface](identity-surface.md).
@@ -41,7 +41,7 @@ Those reframings drive the ordering below.
 
 **A.2** — Align local flow resources with `flow-api.yaml` (frontend-adr-001 shape): `fields` / `actions` / `gates` as dicts keyed by name, `texts: { title_key }`, `template_name`, transitions. Default scaffold ships one `FlowDefinition` with `purposes: ["login", "register"]`. ✅
 
-**A.3** — Land user schema annotation vocabulary in the CLI: `x-identifier`, `x-verify`, `x-mfa`, `x-sensitive`, `x-editable`, `x-unique`, `x-claim`, `x-auth-methods`. Warn on unknown `x-*` attrs. Presets: `--preset email`, `phone-mfa-sms`, `full-name`, `date-of-birth`. ✅
+**A.3** — Land user schema annotation vocabulary in the CLI: `x-identifier`, `x-verify`, `x-mfa`, `x-sensitive`, `x-editable`, `x-unique`, `x-claim` (OIDC token claim mapping), `x-auth-methods`. Warn on unknown `x-*` attrs. Presets: `--preset email`, `phone-mfa-sms`, `full-name`, `date-of-birth`. ✅
 
 **A.4** — Locale + Liquid template tooling:
 - `.zitadel/locales/<lang>.json` flat `text_key → string` maps. Setup seeds `en.json`.
@@ -78,21 +78,17 @@ Those reframings drive the ordering below.
 
 **D.4** — Drift warning on `zitadel apply` without `--plan`: if server state differs from the last-applied snapshot stored in `.zitadel/state.json`, require `--force` or `--refresh`.
 
-### Phase E — Claim lifecycle + agent ergonomics
+### Phase E — Agent ergonomics
 
-**E.1** — `zitadel claim status --challenge-id <id>`. Async-polling subcommand with deterministic envelope. Mock supports `--mock-advance-claim` to simulate completion.
+**E.1** — Default to `--non-interactive` when `!process.stdout.isTTY`. Interactive prompts throw `E_INTERACTIVE_REQUIRED` with the exact flag to pass.
 
-**E.2** — Post-claim secret refresh. On `claim` completion or `doctor --refresh`, CLI refetches project credentials and rewrites `.zitadel/secret`.
+**E.2** — Split `E_AUTH` into `E_FS_PERMISSION`, `E_CREDENTIAL_MISSING`, `E_CREDENTIAL_STALE`. Add `E_INTERACTIVE_REQUIRED`, `E_DRIFT`.
 
-**E.3** — Default to `--non-interactive` when `!process.stdout.isTTY`. Interactive prompts throw `E_INTERACTIVE_REQUIRED` with the exact flag to pass.
+**E.3** — Split `agent_status` in the registry into `{ agent: "supported" | "unsupported", mock_behavior: "complete" | "partial" | "none" }`.
 
-**E.4** — Split `E_AUTH` into `E_FS_PERMISSION`, `E_CREDENTIAL_MISSING`, `E_CREDENTIAL_STALE`. Add `E_INTERACTIVE_REQUIRED`, `E_DRIFT`.
+**E.4** — Persist mock state to `.zitadel/mock-db.json`. Add `zitadel mock reset`.
 
-**E.5** — Split `agent_status` in the registry into `{ agent: "supported" | "handoff" | "unsupported", mock_behavior: "complete" | "partial" | "none" }`.
-
-**E.6** — Persist mock state to `.zitadel/mock-db.json`. Add `zitadel mock reset`.
-
-**E.7** — Add `cli_version` and `state_version` to `.zitadel/state.json`.
+**E.5** — Add `cli_version` and `state_version` to `.zitadel/state.json`.
 
 ## Phase dependencies
 
@@ -103,8 +99,7 @@ A.1 ── A.2 ── A.3 ── B.1
                             │
 A.1 ── C.1 ── C.2 ── C.3    │
                             │
-                E.1 ── E.2 ─┘   (independent of B/C/D)
-                E.3, E.4, E.5, E.6, E.7 — independent; can ship in any order
+                E.1, E.2, E.3, E.4, E.5 — independent; can ship in any order
 ```
 
 ## Verification per phase
@@ -113,7 +108,7 @@ A.1 ── C.1 ── C.2 ── C.3    │
 - **B** — integration tests that add an IdP/external-factor/app to a fresh project, apply, and see the mock record it.
 - **C** — snapshot tests of every renderer × framework template.
 - **D** — integration test that drifts the mock by direct mutation, then `zitadel apply` warns.
-- **E** — end-to-end agent flow test against `--mock` that covers setup → apply dev → claim initiate → `--mock-advance-claim` → post-claim secret refresh → apply production.
+- **E** — end-to-end agent flow test against `--mock` that covers setup → apply dev → apply production with mock state persisted across runs.
 
 ## Open questions
 

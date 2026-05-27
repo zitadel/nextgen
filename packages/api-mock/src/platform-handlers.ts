@@ -4,8 +4,6 @@
  * Covers (in sync with `api/openapi/openapi-spec.yaml` on main):
  *   - POST   /projects
  *   - GET    /projects/:id
- *   - POST   /projects/:id/claim/init   (CLI-only, no spec yet)
- *   - GET    /projects/:id/claim/status (CLI-only, no spec yet)
  *   - POST   /schemas
  *   - GET    /schemas/:id
  *   - DELETE /schemas/:id           (CLI uses; spec-gap follow-up issue filed)
@@ -94,8 +92,8 @@ const INVALID_JSON = errorBody("invalid_json", "request body must be valid JSON"
 /**
  * Server-side record for a project. Strict superset of the spec response
  * types (`CreateProject201`, `GetProject200`): includes the server-only
- * secrets, `updatedAt`, and the in-flight `challengeId` from claim/init.
- * Handlers project from this record to the right wire shape at the boundary.
+ * secrets and `updatedAt`. Handlers project from this record to the right
+ * wire shape at the boundary.
  */
 type ProjectRecord = {
   id: string;
@@ -104,10 +102,7 @@ type ProjectRecord = {
   previewOrigins: string[];
   createdAt: string;
   updatedAt: string;
-  challengeId?: string;
 };
-
-type ClaimState = "pending" | "claimed" | "expired";
 
 /**
  * Server-side metadata wrapped around the flow body so the mock can answer
@@ -127,7 +122,6 @@ type Store = {
   projects: Map<string, ProjectRecord>;
   schemas: Map<string, GetSchemaById200>;
   flowDefinitions: Map<string, FlowDefinitionRecord>;
-  claimState: ClaimState;
 };
 
 function makeStore(): Store {
@@ -135,7 +129,6 @@ function makeStore(): Store {
     projects: new Map(),
     schemas: new Map(),
     flowDefinitions: new Map(),
-    claimState: "pending",
   };
 }
 
@@ -170,11 +163,6 @@ let store: Store = makeStore();
 /** Reset all in-memory state between tests. */
 export function resetPlatformStore(): void {
   store = makeStore();
-}
-
-/** Advance the claim status to "claimed" — call this in tests that exercise the claim flow. */
-export function completeMockClaim(): void {
-  store.claimState = "claimed";
 }
 
 export function setupPlatformHandlers() {
@@ -219,37 +207,6 @@ export function setupPlatformHandlers() {
         updatedAt: project.updatedAt,
       };
       return HttpResponse.json(responseBody);
-    }),
-
-    // POST /projects/:id/claim/init
-    http.post("*/projects/:id/claim/init", ({ params }) => {
-      const projectId = params.id as string;
-      const challengeId = `chal_${shortId()}`;
-      const project = store.projects.get(projectId);
-      if (project) {
-        project.challengeId = challengeId;
-      }
-      return HttpResponse.json({
-        claim_url: `https://zitadel.cloud/claim/${projectId}/${challengeId}`,
-        challenge_id: challengeId,
-        expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
-      });
-    }),
-
-    // GET /projects/:id/claim/status
-    http.get("*/projects/:id/claim/status", ({ params }) => {
-      const project = store.projects.get(params.id as string);
-      if (store.claimState === "claimed") {
-        return HttpResponse.json({
-          status: "claimed",
-          new_project_secret: `${project?.projectSecret ?? "sk"}_claimed`,
-          team_id: "team_mock",
-          claimed_at: nowIso(),
-          dashboard_url: `https://zitadel.cloud/projects/${params.id as string}`,
-          tier: "free",
-        });
-      }
-      return HttpResponse.json({ status: store.claimState });
     }),
 
     // POST /schemas

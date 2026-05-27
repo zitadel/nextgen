@@ -19,19 +19,15 @@ Agents should prefer `next_commands` over free-text hints.
 
 ## Maintainer Notes
 
-This file is packaged with the CLI and is generated from the command registry. When changing commands, flags, envelope fields, agent support status, server resolution, claim behavior, or renderer behavior, update the registry and tests first, then run `corepack pnpm nx run @zitadel-nextgen/cli:gen:agents-md`.
+This file is packaged with the CLI and is generated from the command registry. When changing commands, flags, envelope fields, agent support status, server resolution, or renderer behavior, update the registry and tests first, then run `corepack pnpm nx run @zitadel-nextgen/cli:gen:agents-md`.
 
 Do not edit the generated capabilities block in this file by hand. Keep `zitadel capabilities --json`, `zitadel help --json`, and this contract in sync.
 
 ## Golden Path
 
-The supported POC path is Next.js App Router setup, local mock/dev auth, config plan/apply, human claim handoff, claim-status refresh, and production apply after claim.
+The supported POC path is Next.js App Router setup, local mock/dev auth, and config plan/apply.
 
 Setup creates `zitadel.json`, `.zitadel/secret`, schema/flow/locale resources under `.zitadel/`, browser-safe env metadata, and framework routes that mount `ZitadelFlow`. Project and preview secrets stay out of browser runtime.
-
-## Claim Boundary
-
-Agents do not claim projects. `zitadel claim` returns a human `claim_url`; after the human completes it, agents may run `zitadel claim status --challenge-id <id>` to refresh local claimed state.
 
 ## Renderer Direction
 
@@ -49,14 +45,12 @@ Envelope schema version: `1`. Every envelope carries `cli_version`, `command`, `
 
 | Command | Summary | Agent status |
 |---|---|---|
-| `zitadel setup` | Create a pre-claim project and scaffold local auth. | supported-mock-default |
+| `zitadel setup` | Create a Zitadel project and scaffold local auth. | supported-mock-default |
 | `zitadel plan` | Validate config and deploy readiness without mutation. | supported |
 | `zitadel apply` | Validate and upload repo config to the platform. | supported-mock-default |
 | `zitadel doctor` | Verify generated files and local state. | supported |
 | `zitadel deploy status` | Report deploy platform readiness. | experimental |
 | `zitadel deploy connect` | Configure preview or production platform env vars. | experimental |
-| `zitadel claim` | Begin the human handoff to claim the project. | handoff |
-| `zitadel claim status` | Check a human claim handoff and refresh local claimed state. | supported-mock-default |
 | `zitadel schema add` | Add or remove fields on the user schema. | supported |
 | `zitadel idp add` | Add or update an identity provider (.zitadel/idps/<slug>.json). | experimental |
 | `zitadel idp list` | List local IdP resources. | experimental |
@@ -75,7 +69,7 @@ Envelope schema version: `1`. Every envelope carries `cli_version`, `command`, `
 
 ### `zitadel setup`
 
-Create a pre-claim project and scaffold local auth.
+Create a Zitadel project and scaffold local auth.
 
 Usage: `zitadel setup [--framework next] [--user-fields ...] [--auth-methods ...]`
 
@@ -150,7 +144,7 @@ Usage: `zitadel doctor [--fix]`
 
 Report deploy platform readiness.
 
-> Experimental POC surface; agents should prefer setup, plan, apply, and claim for the golden path.
+> Experimental POC surface; agents should prefer setup, plan, and apply for the golden path.
 
 Usage: `zitadel deploy status [--platform vercel|netlify|cloudflare]`
 
@@ -169,7 +163,7 @@ Usage: `zitadel deploy status [--platform vercel|netlify|cloudflare]`
 
 Configure preview or production platform env vars.
 
-> Experimental POC surface; agents should prefer setup, plan, apply, and claim for the golden path.
+> Experimental POC surface; agents should prefer setup, plan, and apply for the golden path.
 
 Usage: `zitadel deploy connect [--environment preview|production]`
 
@@ -184,39 +178,6 @@ Usage: `zitadel deploy connect [--environment preview|production]`
 | `--platform` | `string` | Force a deploy platform adapter. |
 | `--environment` / `-e` | `string` | Target environment (default: preview). |
 | `--manual` | `boolean` | Emit manual steps instead of configuring. |
-
-### `zitadel claim`
-
-Begin the human handoff to claim the project.
-
-> Agents must stop here and hand the claim URL to a human.
-
-Usage: `zitadel claim`
-
-| Flag | Type | Description |
-|---|---|---|
-| `--cwd` / `-c` | `string` | Project directory to operate on. |
-| `--json` / `-j` | `boolean` | Emit the JSON envelope instead of pretty output. |
-| `--non-interactive` / `-n` | `boolean` | Disable prompts. Required when scripting or running as an agent. |
-| `--dry-run` | `boolean` | Preview the work without mutating files or hitting the platform. |
-| `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
-| `--server` / `-s` | `string` | Override the resolved server URL. |
-
-### `zitadel claim status`
-
-Check a human claim handoff and refresh local claimed state.
-
-Usage: `zitadel claim status --challenge-id <id>`
-
-| Flag | Type | Description |
-|---|---|---|
-| `--cwd` / `-c` | `string` | Project directory to operate on. |
-| `--json` / `-j` | `boolean` | Emit the JSON envelope instead of pretty output. |
-| `--non-interactive` / `-n` | `boolean` | Disable prompts. Required when scripting or running as an agent. |
-| `--dry-run` | `boolean` | Preview the work without mutating files or hitting the platform. |
-| `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
-| `--server` / `-s` | `string` | Override the resolved server URL. |
-| `--challenge-id` | `string` | Claim challenge ID returned by `zitadel claim`. |
 
 ### `zitadel schema add`
 
@@ -498,10 +459,9 @@ Usage: `zitadel eject [--force]`
 | 0 | `E_ALREADY_INIT` |
 | 1 | `E_AUTH` |
 | 2 | `E_NOT_IMPLEMENTED` |
-| 3 | `E_FRAMEWORK_NOT_DETECTED`, `E_UNSUPPORTED_PROJECT_SHAPE`, `E_VALIDATION`, `E_CLAIM_REQUIRED` |
+| 3 | `E_FRAMEWORK_NOT_DETECTED`, `E_UNSUPPORTED_PROJECT_SHAPE`, `E_VALIDATION` |
 | 4 | `E_NETWORK` |
 | 5 | `E_CONFLICT` |
-| 6 | `E_PLATFORM_HANDOFF` |
 
 ## Server resolution
 

@@ -2,9 +2,9 @@
  * Standalone HTTP server for the api-mock.
  *
  * Flow routes (POST /flow, GET /flow/:id, POST /flow/:id/submit) and the
- * platform CRUD routes (projects, schemas, flow_definitions, claim) are
- * served by reusing the existing MSW handlers via @mswjs/http-middleware —
- * zero duplication of routing logic.
+ * platform CRUD routes (projects, schemas, flow_definitions) are served by
+ * reusing the existing MSW handlers via @mswjs/http-middleware — zero
+ * duplication of routing logic.
  *
  * Custom-only routes added on top:
  *   POST   /sessions/exchange     — exchange handoff_token for session cookie
@@ -15,8 +15,6 @@
  * Platform routes (mounted via setupPlatformHandlers):
  *   POST   /projects                  — create project
  *   GET    /projects/:id              — fetch project
- *   POST   /projects/:id/claim/init   — start claim (stays pending until completeMockClaim())
- *   GET    /projects/:id/claim/status — poll claim status
  *   POST   /schemas                   — create user schema
  *   GET    /schemas/:id               — fetch user schema
  *   DELETE /schemas/:id               — delete user schema

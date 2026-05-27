@@ -1,22 +1,13 @@
 # ADR 003: Create First, Claim Later
 
-> **Status:** Proposed
+> **Status:** Withdrawn
 > **Date:** 2026-04-26
 > **Context:** AI-native Zitadel CLI onboarding
 
-## Decision
+## Withdrawal
 
-Zitadel setup starts in **pre-claim** mode: a developer or agent can create local auth configuration and run a mock/dev flow before the human signs up. Claim is a later human handoff that attaches the project to an accountable team.
+The pre-claim / claim lifecycle has been removed from the CLI and api-mock pending a server-side `claim` contract (`/projects/{id}/claim/init` and `/projects/{id}/claim/status` are not in the OpenAPI spec). If and when the backend lands, a follow-up ADR will re-propose the lifecycle aligned with the shipped server surface.
 
-Agents may initiate claim and return a `claim_url`, but they do not complete claim. The CLI exposes `zitadel claim status` so a completed human handoff can refresh local state and unblock production apply.
+## Original proposal
 
-## Context
-
-Modern agent-driven setup breaks when the first step is a browser signup, email verification loop, or billing screen. The CLI should let agents finish the local integration and then stop at the accountability boundary.
-
-## Consequences
-
-- The golden path is fast: `setup` creates local config, schema, flow, locale, env metadata, and framework routes.
-- Pre-claim projects are suitable for local development only.
-- Production apply requires claimed local state.
-- Recovery before claim is best-effort; claim early when ownership matters.
+Zitadel setup would start in **pre-claim** mode: a developer or agent could create local auth configuration and run a mock/dev flow before the human signed up. Claim was meant to be a later human handoff that attached the project to an accountable team. Agents would initiate claim and return a `claim_url`, but would not complete claim. The CLI exposed `zitadel claim status` so a completed human handoff could refresh local state and unblock production apply.
