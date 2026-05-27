@@ -1,9 +1,7 @@
 /**
  * Public surface for the flow domain. Every caller outside this module
  * imports from here (not from individual files) so the package
- * boundary stays observable. Internal helpers in `fields.ts`,
- * `method.ts`, and the per-method builders are intentionally not
- * re-exported.
+ * boundary stays observable.
  *
  * **Dependency rule.** This module has no upward dependencies (it
  * never imports from `commands/`, `sync/`, `platform/`, etc.) and no
@@ -18,7 +16,6 @@
 export type { FlowDefinition } from "./schema";
 export { flowDefinitionSchema } from "./schema";
 export type { AuthMethod } from "./types";
-export type { FlowFragment } from "./method";
 export { collectTextKeys } from "./text-keys";
 export { AUTH_METHODS, buildFlowAndLocale } from "./registry";
 export { validateFlows } from "./validate";
