@@ -84,7 +84,7 @@ type fakeSessionResolver struct {
 	calls   int
 }
 
-func (f *fakeSessionResolver) GetByID(_ context.Context, _ database.QueryExecutor, _, _ string) (*domain.Session, error) {
+func (f *fakeSessionResolver) Get(_ context.Context, _ database.QueryExecutor, _, _ string) (*domain.Session, error) {
 	f.calls++
 	if f.err != nil {
 		return nil, f.err
@@ -459,7 +459,7 @@ func TestAuthAttemptService_VerifyProof(t *testing.T) {
 			},
 		},
 		{
-			name:  "stale challenge returns error and records failure",
+			name:  "stale challenge returns error without recording failure",
 			repo:  &fakeAuthAttemptRepo{getByIDAttempt: newUserChallengeAttempt()},
 			users: &fakeUserLookup{user: &domain.User{ID: "user-1"}},
 			input: service.VerifyProofInput{ProjectID: "proj", AttemptID: "att-1", ChallengeID: "different", Proof: service.UserProof{AttributeName: "email", LoginName: "u@example.com"}},
@@ -471,11 +471,9 @@ func TestAuthAttemptService_VerifyProof(t *testing.T) {
 				if !errors.Is(err, domain.ErrAuthAttemptStaleChallenge()) {
 					t.Fatalf("VerifyProof err = %v, want ErrAuthAttemptStaleChallenge", err)
 				}
-				if repo.challengeFailedCalls != 1 {
-					t.Fatalf("ChallengeFailed called %d times, want 1", repo.challengeFailedCalls)
-				}
-				if repo.challengeFailedValue != nil {
-					t.Fatalf("ChallengeFailed challenge = %v, want nil for stale challenge", repo.challengeFailedValue)
+				// Prepare-phase failure: no challenge row to update, skip ChallengeFailed.
+				if repo.challengeFailedCalls != 0 {
+					t.Fatalf("ChallengeFailed called %d times, want 0", repo.challengeFailedCalls)
 				}
 			},
 		},
@@ -495,8 +493,8 @@ func TestAuthAttemptService_VerifyProof(t *testing.T) {
 				if repo.challengeFailedCalls != 1 {
 					t.Fatalf("ChallengeFailed called %d times, want 1", repo.challengeFailedCalls)
 				}
-				if repo.challengeFailedValue != nil {
-					t.Fatalf("ChallengeFailed challenge = %v, want nil for rejected proof", repo.challengeFailedValue)
+				if _, ok := repo.challengeFailedValue.(*domain.AuthChallengeUser); !ok {
+					t.Fatalf("ChallengeFailed challenge = %T, want *domain.AuthChallengeUser", repo.challengeFailedValue)
 				}
 			},
 		},

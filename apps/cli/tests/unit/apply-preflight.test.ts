@@ -34,19 +34,13 @@ const VALID_FLOW = {
   ],
 };
 
-const UNCLAIMED_SECRET = {
+const SECRET = {
   project_id: "proj-001",
   project_secret: "sk_proj_test",
   preview_secret: "sk_proj_preview",
   preview_origins: [],
   created_at: "2026-01-01T00:00:00.000Z",
   schema_version: 2,
-};
-
-const CLAIMED_SECRET = {
-  ...UNCLAIMED_SECRET,
-  claimed_at: "2026-02-01T00:00:00.000Z",
-  team_id: "team-001",
 };
 
 function makeOpts(cwd: string, overrides: Partial<GlobalOptions> = {}): Parameters<typeof runApply>[1] {
@@ -93,30 +87,8 @@ async function makeCwd(secret: object, flows: Record<string, object> = {}): Prom
 }
 
 describe("apply pre-flight checks", () => {
-  it("blocks production apply when project is unclaimed", async () => {
-    const cwd = await makeCwd(UNCLAIMED_SECRET);
-    try {
-      await expect(
-        runApply(makeIO(), { ...makeOpts(cwd), environment: "production" }),
-      ).rejects.toMatchObject({ code: "E_CLAIM_REQUIRED" });
-    } finally {
-      await rm(cwd, { recursive: true, force: true });
-    }
-  });
-
-  it("allows production apply when project is claimed", async () => {
-    const cwd = await makeCwd(CLAIMED_SECRET, { "default.json": VALID_FLOW });
-    try {
-      await expect(
-        runApply(makeIO(), { ...makeOpts(cwd), environment: "production" }),
-      ).resolves.not.toThrow();
-    } finally {
-      await rm(cwd, { recursive: true, force: true });
-    }
-  });
-
   it("blocks when a flow definition is invalid", async () => {
-    const cwd = await makeCwd(UNCLAIMED_SECRET, {
+    const cwd = await makeCwd(SECRET, {
       "bad.json": { version: 99, kind: "wrong" },
     });
     try {
@@ -136,7 +108,7 @@ describe("apply pre-flight checks", () => {
         },
       ],
     };
-    const cwd = await makeCwd(UNCLAIMED_SECRET, { "default.json": flowWithEnvRef });
+    const cwd = await makeCwd(SECRET, { "default.json": flowWithEnvRef });
     try {
       await expect(
         runApply(makeIO({}), makeOpts(cwd)),
@@ -156,7 +128,7 @@ describe("apply pre-flight checks", () => {
         },
       ],
     };
-    const cwd = await makeCwd(UNCLAIMED_SECRET, { "default.json": flowWithEnvRef });
+    const cwd = await makeCwd(SECRET, { "default.json": flowWithEnvRef });
     try {
       await expect(
         runApply(makeIO({ MY_SECRET: "hunter2" }), makeOpts(cwd)),

@@ -84,7 +84,7 @@ describe("envelope contract", () => {
     const root = join(import.meta.dirname, "../..");
     const agents = await readFile(join(root, "AGENTS.md"), "utf8");
     expect(agents).toContain("Zitadel CLI Agent Contract");
-    expect(agents).toContain("zitadel claim status");
+    expect(agents).toContain("zitadel setup");
     expect(agents).not.toContain("Compatibility note");
   });
 

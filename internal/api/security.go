@@ -27,3 +27,18 @@ var _ api.SecurityHandler = (*SecurityHandler)(nil)
 func NewSecurityHandler() *SecurityHandler {
 	return &SecurityHandler{}
 }
+
+type contextKey struct{}
+
+type ScopeContext struct {
+	ProjectID string
+}
+
+func WithScopeContext(ctx context.Context, scopeCtx ScopeContext) context.Context {
+	return context.WithValue(ctx, contextKey{}, scopeCtx)
+}
+
+func GetScopeContext(ctx context.Context) (ScopeContext, bool) {
+	v, ok := ctx.Value(contextKey{}).(ScopeContext)
+	return v, ok
+}

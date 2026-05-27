@@ -41,16 +41,16 @@ const pgAuthAttemptGetSelect = `SELECT aa.project_id, aa.id, aa.handoff_token, a
 	` LEFT JOIN zitadel_nextgen.checks c ON aa.project_id = c.project_id AND aa.id = c.auth_attempt_id`
 
 func (a *pgAuthAttempt) GetByID(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string) (*domain.AuthAttempt, error) {
-	return a.get(ctx, client, pgAuthAttemptGetSelect+` WHERE aa.project_id = $1 AND aa.id = $2`, projectID, authAttemptID)
+	return a.get(ctx, client, pgAuthAttemptGetSelect+` WHERE aa.project_id = $1 AND aa.id = $2`, projectID, database.Identity(authAttemptID))
 }
 
 func (a *pgAuthAttempt) GetByHandoffToken(ctx context.Context, client database.QueryExecutor, projectID string, handoffToken []byte) (*domain.AuthAttempt, error) {
-	return a.get(ctx, client, pgAuthAttemptGetSelect+` WHERE aa.project_id = $1 AND aa.handoff_token = $2`, projectID, string(handoffToken))
+	return a.get(ctx, client, pgAuthAttemptGetSelect+` WHERE aa.project_id = $1 AND aa.handoff_token = $2`, projectID, handoffToken)
 }
 
-func (a *pgAuthAttempt) get(ctx context.Context, client database.QueryExecutor, query, projectID, matcher string) (*domain.AuthAttempt, error) {
+func (a *pgAuthAttempt) get(ctx context.Context, client database.QueryExecutor, query, projectID string, matcher any) (*domain.AuthAttempt, error) {
 	attempt := new(domain.AuthAttempt)
-	rows, err := client.Query(ctx, query, projectID, database.Identity(matcher))
+	rows, err := client.Query(ctx, query, projectID, matcher)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query auth attempt: %w", err)
 	}

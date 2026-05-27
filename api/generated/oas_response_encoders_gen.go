@@ -547,10 +547,7 @@ func encodeCreateSessionResponse(response CreateSessionRes, w http.ResponseWrite
 					Explode: false,
 				}
 				if err := h.EncodeParam(cfg, func(e uri.Encoder) error {
-					if val, ok := response.SetCookie.Get(); ok {
-						return e.EncodeValue(conv.StringToString(val))
-					}
-					return nil
+					return e.EncodeValue(conv.StringToString(response.SetCookie))
 				}); err != nil {
 					return errors.Wrap(err, "encode Set-Cookie header")
 				}
@@ -735,10 +732,7 @@ func encodeExchangeHandoffResponse(response ExchangeHandoffRes, w http.ResponseW
 					Explode: false,
 				}
 				if err := h.EncodeParam(cfg, func(e uri.Encoder) error {
-					if val, ok := response.SetCookie.Get(); ok {
-						return e.EncodeValue(conv.StringToString(val))
-					}
-					return nil
+					return e.EncodeValue(conv.StringToString(response.SetCookie))
 				}); err != nil {
 					return errors.Wrap(err, "encode Set-Cookie header")
 				}
@@ -2029,10 +2023,7 @@ func encodeRevokeMySessionResponse(response RevokeMySessionRes, w http.ResponseW
 					Explode: false,
 				}
 				if err := h.EncodeParam(cfg, func(e uri.Encoder) error {
-					if val, ok := response.SetCookie.Get(); ok {
-						return e.EncodeValue(conv.StringToString(val))
-					}
-					return nil
+					return e.EncodeValue(conv.StringToString(response.SetCookie))
 				}); err != nil {
 					return errors.Wrap(err, "encode Set-Cookie header")
 				}
@@ -2126,10 +2117,7 @@ func encodeRevokeSessionResponse(response RevokeSessionRes, w http.ResponseWrite
 					Explode: false,
 				}
 				if err := h.EncodeParam(cfg, func(e uri.Encoder) error {
-					if val, ok := response.SetCookie.Get(); ok {
-						return e.EncodeValue(conv.StringToString(val))
-					}
-					return nil
+					return e.EncodeValue(conv.StringToString(response.SetCookie))
 				}); err != nil {
 					return errors.Wrap(err, "encode Set-Cookie header")
 				}
