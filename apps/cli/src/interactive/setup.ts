@@ -1,7 +1,7 @@
 import { cancel, confirm, intro, isCancel, multiselect, outro, select, text } from "@clack/prompts";
 
 import { ZitadelError } from "../lib/errors";
-import { DEFAULT_SERVER, MOCK_SENTINEL } from "../platform/resolve-server";
+import { DEFAULT_SERVER } from "../platform/resolve-server";
 
 export type InteractiveSetupAnswers = {
   userFields: string[];
@@ -70,11 +70,6 @@ export async function runInteractiveSetup(
         value: DEFAULT_SERVER,
         label: "Zitadel Cloud (api.zitadel.cloud)",
         hint: "recommended for real projects",
-      },
-      {
-        value: MOCK_SENTINEL,
-        label: "Mock (offline development)",
-        hint: "no network, no real data",
       },
       { value: "__custom__", label: "Custom URL (self-hosted)" },
     ],

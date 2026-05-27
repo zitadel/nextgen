@@ -73,7 +73,7 @@ type Invoker interface {
 	// audience, and the steps involved.
 	//
 	// POST /flow_definitions
-	CreateFlowDefinition(ctx context.Context, request *FlowDefinitionCreateRequest) (CreateFlowDefinitionRes, error)
+	CreateFlowDefinition(ctx context.Context, request *CreateFlowDefinitionRequest) (CreateFlowDefinitionRes, error)
 	// CreateHandoff invokes createHandoff operation.
 	//
 	// Completes the authentication attempt and mints a `handoff_token`.
@@ -1131,12 +1131,12 @@ func (c *Client) sendCreateFlow(ctx context.Context, request *CreateFlowRequest)
 // audience, and the steps involved.
 //
 // POST /flow_definitions
-func (c *Client) CreateFlowDefinition(ctx context.Context, request *FlowDefinitionCreateRequest) (CreateFlowDefinitionRes, error) {
+func (c *Client) CreateFlowDefinition(ctx context.Context, request *CreateFlowDefinitionRequest) (CreateFlowDefinitionRes, error) {
 	res, err := c.sendCreateFlowDefinition(ctx, request)
 	return res, err
 }
 
-func (c *Client) sendCreateFlowDefinition(ctx context.Context, request *FlowDefinitionCreateRequest) (res CreateFlowDefinitionRes, err error) {
+func (c *Client) sendCreateFlowDefinition(ctx context.Context, request *CreateFlowDefinitionRequest) (res CreateFlowDefinitionRes, err error) {
 	// Validate request before sending.
 	if err := func() error {
 		if err := request.Validate(); err != nil {
@@ -1456,39 +1456,6 @@ func (c *Client) sendCreateProject(ctx context.Context, request *CreateProjectRe
 	}
 	if err := encodeCreateProjectRequest(request, r); err != nil {
 		return res, errors.Wrap(err, "encode request")
-	}
-
-	{
-		type bitset = [1]uint8
-		var satisfied bitset
-		{
-			stage = "Security:OAuth2"
-			switch err := c.securityOAuth2(ctx, CreateProjectOperation, r); {
-			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
-			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
-				// Skip this security.
-			default:
-				return res, errors.Wrap(err, "security \"OAuth2\"")
-			}
-		}
-
-		if ok := func() bool {
-		nextRequirement:
-			for _, requirement := range []bitset{
-				{0b00000001},
-			} {
-				for i, mask := range requirement {
-					if satisfied[i]&mask != mask {
-						continue nextRequirement
-					}
-				}
-				return true
-			}
-			return false
-		}(); !ok {
-			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
-		}
 	}
 
 	stage = "SendRequest"

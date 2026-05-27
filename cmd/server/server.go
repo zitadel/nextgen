@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log"
@@ -16,11 +17,14 @@ import (
 	"github.com/ianlancetaylor/jsonschema"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/zitadel/nextgen/internal/domain"
 
 	oasapi "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
+	"github.com/zitadel/nextgen/internal/bootstrap/users"
+	"github.com/zitadel/nextgen/internal/cookie"
 	"github.com/zitadel/nextgen/internal/crypto"
+	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/domain/idgen"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	_ "github.com/zitadel/nextgen/internal/storage/database/dialect/all"
@@ -29,6 +33,7 @@ import (
 
 func NewCommand() *cobra.Command {
 	var configPath string
+	var userFiles []string
 
 	cmd := &cobra.Command{
 		Use:   "server",
@@ -44,11 +49,12 @@ func NewCommand() *cobra.Command {
 				return err
 			}
 
-			return run(cmd.Context(), cfg, pool)
+			return run(cmd.Context(), cfg, pool, userFiles)
 		},
 	}
 
 	cmd.Flags().StringVarP(&configPath, "config", "c", "", "Path to YAML configuration file")
+	cmd.Flags().StringArrayVar(&userFiles, "user-file", nil, "Bootstrap user JSON file (repeatable)")
 
 	return cmd
 }
@@ -69,16 +75,25 @@ func startDatabase(ctx context.Context, config database.Config) (database.Pool, 
 	return pool, nil
 }
 
-func run(ctx context.Context, cfg Config, pool database.Pool) error {
+func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string) error {
 	defer func() {
 		if err := pool.Close(context.Background()); err != nil {
 			log.Printf("close database pool: %v", err)
 		}
 	}()
 
+	sealer, err := buildCookieSealer(cfg.Server.CookieSealerKey)
+	if err != nil {
+		return err
+	}
+
 	passwordHasher, err := cfg.PasswordHasher.NewHasher()
 	if err != nil {
 		return fmt.Errorf("build password hasher: %w", err)
+	}
+
+	if err := users.Import(ctx, pool, passwordHasher, users.DialectFromConfig(cfg.Database.Raw), userFiles); err != nil {
+		return fmt.Errorf("bootstrap users: %w", err)
 	}
 
 	// ── Repositories ─────────────────
@@ -87,26 +102,33 @@ func run(ctx context.Context, cfg Config, pool database.Pool) error {
 	userPasswordRepo := repository.NewUserPasswordRepository()
 	userPasskeyRepo := repository.NewUserPasskeyRepository()
 	sessionRepo := repository.NewSessionRepository(pool)
-	flowRepo := repository.NewFlowDefinitionRepository(pool)
+	flowDefinitionRepo := repository.NewFlowDefinitionRepository(pool)
 	attemptRepo := repository.NewAuthAttemptRepository(pool)
 	schemaRepo := repository.NewJSONSchemaRepository(pool)
 
-	schemaCache, err := lru.New2Q[string, *jsonschema.Schema](1000)
+	// ── Schema Stuff ─────────────────
+	schemaCache, err := lru.New2Q[string, *jsonschema.Schema](cfg.Schema.LRUCacheSize)
 	if err != nil {
 		return fmt.Errorf("build schema cache: %w", err)
 	}
-	serverURL, err := url.Parse(cfg.Server.Address)
-	if err != nil {
-		return fmt.Errorf("invalid server url: %w", err)
+	var builtinPublicBase *url.URL
+	if cfg.Schema.BuiltinPublicBase != "" {
+		builtinPublicBase, err = url.Parse(cfg.Schema.BuiltinPublicBase)
+		if err != nil {
+			return fmt.Errorf("parse builtin public base: %w", err)
+		}
 	}
-	schemaResolver := domain.NewJSONSchemaResolver(schemaRepo, schemaCache, 10, 1000_000, &http.Client{}, serverURL)
-	schemaValidator, err := domain.NewSchemaValidator(serverURL.String())
+	schemaResolverWithHTTP := domain.NewJSONSchemaResolver(schemaRepo, schemaCache, 10, 1000_000, &http.Client{}, builtinPublicBase)
+
+	// storageSchemaResolver without an HTTP client to fetch tenant schemas from the cache/storage
+	storageSchemaResolver := domain.NewJSONSchemaResolver(schemaRepo, schemaCache, 10, 1000_000, nil, builtinPublicBase)
+	schemaValidator, err := domain.NewSchemaValidator(builtinPublicBase.String())
 	if err != nil {
 		return fmt.Errorf("build schema validator: %w", err)
 	}
 
 	// ── Services ─────────────────────
-	flowService := service.NewFlowService(pool, flowRepo)
+	flowService := service.NewFlowService(pool, flowDefinitionRepo)
 	authAttemptSvc := service.NewAuthAttemptService(
 		pool,
 		attemptRepo,
@@ -117,11 +139,20 @@ func run(ctx context.Context, cfg Config, pool database.Pool) error {
 		userPasskeyRepo,
 		passwordHasher,
 	)
+	sessionService := service.NewSessionService(pool, sessionRepo)
+	projectService := service.NewProjectService(pool, projectRepo, idgen.NewULID())
+	schemaService := service.NewSchemaService(pool, schemaRepo, schemaResolverWithHTTP, schemaValidator)
+	flowDefinitionSvc := service.NewFlowDefinitionService(
+		pool,
+		storageSchemaResolver,
+		schemaValidator,
+		nil,
+		flowDefinitionRepo,
+	)
 	userService := service.NewUserService(
 		pool, userRepo,
 		schemaRepo,
 	)
-	schemaService := service.NewSchemaService(pool, schemaRepo, schemaResolver, schemaValidator)
 
 	// ── HTTP Server ─────────────────
 
@@ -129,7 +160,7 @@ func run(ctx context.Context, cfg Config, pool database.Pool) error {
 	defer stop()
 
 	oasServer, err := oasapi.NewServer(
-		api.NewHandler(flowService, authAttemptSvc, userService, schemaService),
+		api.NewHandler(sealer, flowService, authAttemptSvc, sessionService, projectService, userService, schemaService, flowDefinitionSvc),
 		api.NewSecurityHandler(),
 		oasapi.WithErrorHandler(api.OgenErrorHandler))
 	if err != nil {
@@ -179,6 +210,13 @@ func loadConfig(configPath string) (Config, error) {
 	v.SetDefault("password_hasher.limits", crypto.HashLimitsConfig{
 		Bcrypt: crypto.BcryptLimitsConfig{MinCost: 10, MaxCost: 16},
 	})
+	v.SetDefault("schema.lru_cache_size", 1000)                                   // todo: temp, review
+	v.SetDefault("schema.builtin_public_base", "https://nextgen.com/api/schemas") // todo: temp, review
+
+	// AutomaticEnv only resolves nested keys viper already knows about
+	// (via default, config file, or explicit BindEnv). Anything without
+	// a default needs to be bound by hand.
+	mustBindEnv(v, "server.cookie_sealer_key")
 
 	if configPath != "" {
 		v.SetConfigFile(configPath)
@@ -191,7 +229,7 @@ func loadConfig(configPath string) (Config, error) {
 
 	if err := v.ReadInConfig(); err != nil {
 		var notFound viper.ConfigFileNotFoundError
-		if !(configPath == "" && errors.As(err, &notFound)) {
+		if configPath != "" || !errors.As(err, &notFound) {
 			return Config{}, fmt.Errorf("read config: %w", err)
 		}
 	}
@@ -202,4 +240,36 @@ func loadConfig(configPath string) (Config, error) {
 	}
 
 	return cfg, nil
+}
+
+// mustBindEnv panics on viper's documented "this can't fail in
+// normal use" BindEnv error path. Keeps the env wiring readable
+// without sprinkling error handling at every binding.
+func mustBindEnv(v *viper.Viper, key string) {
+	if err := v.BindEnv(key); err != nil {
+		panic(fmt.Errorf("bind env %q: %w", key, err))
+	}
+}
+
+// buildCookieSealer decodes a hex-encoded sealer key and constructs
+// the [cookie.Sealer]. The key must be exactly [cookie.KeySize] bytes
+// after decoding; anything else is a configuration error.
+func buildCookieSealer(hexKey string) (*cookie.Sealer, error) {
+	if hexKey == "" {
+		return nil, errors.New("server: cookie_sealer_key is required (set NEXTGEN_SERVER_COOKIE_SEALER_KEY)")
+	}
+	raw, err := hex.DecodeString(hexKey)
+	if err != nil {
+		return nil, fmt.Errorf("server: decode cookie_sealer_key: %w", err)
+	}
+	if len(raw) != cookie.KeySize {
+		return nil, fmt.Errorf("server: cookie_sealer_key must decode to %d bytes, got %d", cookie.KeySize, len(raw))
+	}
+	var key cookie.Key
+	copy(key[:], raw)
+	sealer, err := cookie.NewSealer(key)
+	if err != nil {
+		return nil, fmt.Errorf("server: build cookie sealer: %w", err)
+	}
+	return sealer, nil
 }

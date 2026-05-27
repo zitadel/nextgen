@@ -5,3 +5,4 @@ description: |
 schema:
   type: string
   example: __nextgen_session=<session-token>; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=<ttl-seconds>
+required: true

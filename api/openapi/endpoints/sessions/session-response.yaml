@@ -11,7 +11,6 @@ required:
   - project_id
   - state
   - factors
-  - assurance_levels
   - created_at
   - expires_at
 properties:
@@ -41,21 +40,14 @@ properties:
       - $ref: ../../components/schemas/user-id.yaml
       - type: 'null'
   factors:
-    type: object
+    type: array
     description: |
       Verified authentication factors accumulated by this session.
       Each key is a factor type (e.g. `password`, `totp`, `passkey`).
       Each value is a factor event object with at least `verified_at` and
       method-specific properties (e.g. `user_verified`, `hardware` for passkeys).
-    additionalProperties: true
-    example:
-      user:
-        user_id: user_abc123
-        verified_at: '2026-04-29T10:00:00Z'
-      password:
-        verified_at: '2026-04-29T10:01:00Z'
-      totp:
-        verified_at: '2026-04-29T10:02:00Z'
+    items:
+      $ref: ../../components/checks/completed-factor.yaml
   assurance_levels:
     type: array
     description: |

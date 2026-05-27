@@ -1333,6 +1333,43 @@ type CreateFlowDefinitionConflict ErrorDetails
 func (*CreateFlowDefinitionConflict) createFlowDefinitionRes() {}
 
 // Ref: #
+type CreateFlowDefinitionRequest struct {
+	ProjectID      ProjectID      `json:"project_id"`
+	SchemaURI      OptSchemaURI   `json:"schema_uri"`
+	FlowDefinition FlowDefinition `json:"flow_definition"`
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *CreateFlowDefinitionRequest) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetSchemaURI returns the value of SchemaURI.
+func (s *CreateFlowDefinitionRequest) GetSchemaURI() OptSchemaURI {
+	return s.SchemaURI
+}
+
+// GetFlowDefinition returns the value of FlowDefinition.
+func (s *CreateFlowDefinitionRequest) GetFlowDefinition() FlowDefinition {
+	return s.FlowDefinition
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *CreateFlowDefinitionRequest) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetSchemaURI sets the value of SchemaURI.
+func (s *CreateFlowDefinitionRequest) SetSchemaURI(val OptSchemaURI) {
+	s.SchemaURI = val
+}
+
+// SetFlowDefinition sets the value of FlowDefinition.
+func (s *CreateFlowDefinitionRequest) SetFlowDefinition(val FlowDefinition) {
+	s.FlowDefinition = val
+}
+
+// Ref: #
 type CreateFlowRequest struct {
 	ProjectID ProjectID                `json:"project_id"`
 	Purpose   CreateFlowRequestPurpose `json:"purpose"`
@@ -2549,43 +2586,6 @@ func (s *FlowDefinition) SetSteps(val []FlowDefinitionStep) {
 	s.Steps = val
 }
 
-// Ref: #
-type FlowDefinitionCreateRequest struct {
-	ProjectID      ProjectID      `json:"project_id"`
-	SchemaURI      OptSchemaURI   `json:"schema_uri"`
-	FlowDefinition FlowDefinition `json:"flow_definition"`
-}
-
-// GetProjectID returns the value of ProjectID.
-func (s *FlowDefinitionCreateRequest) GetProjectID() ProjectID {
-	return s.ProjectID
-}
-
-// GetSchemaURI returns the value of SchemaURI.
-func (s *FlowDefinitionCreateRequest) GetSchemaURI() OptSchemaURI {
-	return s.SchemaURI
-}
-
-// GetFlowDefinition returns the value of FlowDefinition.
-func (s *FlowDefinitionCreateRequest) GetFlowDefinition() FlowDefinition {
-	return s.FlowDefinition
-}
-
-// SetProjectID sets the value of ProjectID.
-func (s *FlowDefinitionCreateRequest) SetProjectID(val ProjectID) {
-	s.ProjectID = val
-}
-
-// SetSchemaURI sets the value of SchemaURI.
-func (s *FlowDefinitionCreateRequest) SetSchemaURI(val OptSchemaURI) {
-	s.SchemaURI = val
-}
-
-// SetFlowDefinition sets the value of FlowDefinition.
-func (s *FlowDefinitionCreateRequest) SetFlowDefinition(val FlowDefinition) {
-	s.FlowDefinition = val
-}
-
 // Merged schema.
 // Ref: #
 type FlowDefinitionDetailResponse struct {
@@ -2900,7 +2900,8 @@ type FlowDefinitionStep struct {
 	// Schema property names to collect from the user. Each entry references
 	// a property in the flow's user schema. The engine resolves field type,
 	// validation rules, and implicit outcomes from schema annotations
-	// (e.g. `x-identifier` implies a `user_not_found` transition outcome).
+	// (e.g. a property with `x-unique` set implies a `user_not_found`
+	// transition outcome).
 	Fields []string `json:"fields"`
 	// Actions the user can take. Keyed by action name.
 	// The action name is what the frontend sends back in the submit request.
@@ -2924,7 +2925,7 @@ type FlowDefinitionStep struct {
 	// Maps action/outcome names to their transition descriptor.
 	// Keys match action names from the `actions` dict. Additional keys
 	// come from implicit outcomes based on schema annotations
-	// (e.g. `user_not_found` from `x-identifier` fields) and engine
+	// (e.g. `user_not_found` from `x-unique` fields) and engine
 	// events (e.g. `sso`, `callback`).
 	Transitions OptFlowDefinitionStepTransitions `json:"transitions"`
 }
@@ -3122,7 +3123,7 @@ func (s *FlowDefinitionStepOnSuccess) UnmarshalText(data []byte) error {
 // Maps action/outcome names to their transition descriptor.
 // Keys match action names from the `actions` dict. Additional keys
 // come from implicit outcomes based on schema annotations
-// (e.g. `user_not_found` from `x-identifier` fields) and engine
+// (e.g. `user_not_found` from `x-unique` fields) and engine
 // events (e.g. `sso`, `callback`).
 type FlowDefinitionStepTransitions map[string]FlowDefinitionStepTransitionsItem
 
@@ -9844,16 +9845,16 @@ func (*RevokeMySessionConflict) revokeMySessionRes() {}
 
 // RevokeMySessionNoContent is response for RevokeMySession operation.
 type RevokeMySessionNoContent struct {
-	SetCookie OptString
+	SetCookie string
 }
 
 // GetSetCookie returns the value of SetCookie.
-func (s *RevokeMySessionNoContent) GetSetCookie() OptString {
+func (s *RevokeMySessionNoContent) GetSetCookie() string {
 	return s.SetCookie
 }
 
 // SetSetCookie sets the value of SetCookie.
-func (s *RevokeMySessionNoContent) SetSetCookie(val OptString) {
+func (s *RevokeMySessionNoContent) SetSetCookie(val string) {
 	s.SetCookie = val
 }
 
@@ -9901,16 +9902,16 @@ func (*RevokeSessionConflict) revokeSessionRes() {}
 
 // RevokeSessionNoContent is response for RevokeSession operation.
 type RevokeSessionNoContent struct {
-	SetCookie OptString
+	SetCookie string
 }
 
 // GetSetCookie returns the value of SetCookie.
-func (s *RevokeSessionNoContent) GetSetCookie() OptString {
+func (s *RevokeSessionNoContent) GetSetCookie() string {
 	return s.SetCookie
 }
 
 // SetSetCookie sets the value of SetCookie.
-func (s *RevokeSessionNoContent) SetSetCookie(val OptString) {
+func (s *RevokeSessionNoContent) SetSetCookie(val string) {
 	s.SetCookie = val
 }
 
@@ -10058,7 +10059,7 @@ type SessionResponse struct {
 	// Each key is a factor type (e.g. `password`, `totp`, `passkey`).
 	// Each value is a factor event object with at least `verified_at` and
 	// method-specific properties (e.g. `user_verified`, `hardware` for passkeys).
-	Factors SessionResponseFactors `json:"factors"`
+	Factors []CompletedFactor `json:"factors"`
 	// All assurance levels whose schemas the current session factors satisfy.
 	// This list shrinks as factor freshness windows expire and grows when step-up
 	// auth_attempts add or refresh factors.
@@ -10096,7 +10097,7 @@ func (s *SessionResponse) GetUserID() OptNilUserID {
 }
 
 // GetFactors returns the value of Factors.
-func (s *SessionResponse) GetFactors() SessionResponseFactors {
+func (s *SessionResponse) GetFactors() []CompletedFactor {
 	return s.Factors
 }
 
@@ -10146,7 +10147,7 @@ func (s *SessionResponse) SetUserID(val OptNilUserID) {
 }
 
 // SetFactors sets the value of Factors.
-func (s *SessionResponse) SetFactors(val SessionResponseFactors) {
+func (s *SessionResponse) SetFactors(val []CompletedFactor) {
 	s.Factors = val
 }
 
@@ -10177,21 +10178,6 @@ func (s *SessionResponse) SetExpiresAt(val time.Time) {
 
 func (*SessionResponse) getMySessionRes() {}
 func (*SessionResponse) getSessionRes()   {}
-
-// Verified authentication factors accumulated by this session.
-// Each key is a factor type (e.g. `password`, `totp`, `passkey`).
-// Each value is a factor event object with at least `verified_at` and
-// method-specific properties (e.g. `user_verified`, `hardware` for passkeys).
-type SessionResponseFactors map[string]jx.Raw
-
-func (s *SessionResponseFactors) init() SessionResponseFactors {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
 
 type SessionResponseMetadata map[string]jx.Raw
 
@@ -10347,12 +10333,12 @@ func (s *SessionWithTokenResponse) SetSessionToken(val string) {
 
 // SessionWithTokenResponseHeaders wraps SessionWithTokenResponse with response headers.
 type SessionWithTokenResponseHeaders struct {
-	SetCookie OptString
+	SetCookie string
 	Response  SessionWithTokenResponse
 }
 
 // GetSetCookie returns the value of SetCookie.
-func (s *SessionWithTokenResponseHeaders) GetSetCookie() OptString {
+func (s *SessionWithTokenResponseHeaders) GetSetCookie() string {
 	return s.SetCookie
 }
 
@@ -10362,7 +10348,7 @@ func (s *SessionWithTokenResponseHeaders) GetResponse() SessionWithTokenResponse
 }
 
 // SetSetCookie sets the value of SetCookie.
-func (s *SessionWithTokenResponseHeaders) SetSetCookie(val OptString) {
+func (s *SessionWithTokenResponseHeaders) SetSetCookie(val string) {
 	s.SetCookie = val
 }
 

@@ -1,3 +1,5 @@
+import { consola } from "consola";
+
 import { runAddSchema } from "./commands/add-schema";
 import { runAppAdd, runAppList, runAppRemove, runAppShow } from "./commands/app";
 import { runApply } from "./commands/apply";
@@ -297,15 +299,17 @@ async function buildGlobalOptions(parsed: ParsedArgs, io: CliIO): Promise<Global
   const command = resolveCommandName(parsed);
   const environment = stringOpt(parsed, "environment") ?? "development";
   const serverFlag = typeof parsed.options.server === "string" ? parsed.options.server : undefined;
-  const mockFlag = Boolean(parsed.options.mock);
 
   const source = await resolveServer({
     cwd,
     env: io.env,
     serverFlag,
     environment,
-    mockFlag,
   });
+
+  const verbose = Boolean(parsed.options.verbose);
+  const debug = Boolean(parsed.options.debug);
+  consola.level = debug ? 4 : verbose ? 3 : 2;
 
   return {
     cwd,
@@ -318,6 +322,8 @@ async function buildGlobalOptions(parsed: ParsedArgs, io: CliIO): Promise<Global
     cliVersion: CLI_VERSION,
     source: source.value,
     serverFlag,
+    verbose,
+    debug,
   };
 }
 
@@ -333,6 +339,8 @@ function fallbackMeta(parsed: ParsedArgs, io: CliIO): GlobalOptions {
     command: resolveCommandName(parsed),
     cliVersion: CLI_VERSION,
     source: DEFAULT_SERVER,
+    verbose: Boolean(parsed.options.verbose),
+    debug: Boolean(parsed.options.debug),
   };
 }
 

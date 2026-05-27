@@ -38,9 +38,9 @@ jobs:
           git diff --stat --exit-code -- .
           test -z "$(git status --porcelain)"
       - run: go vet ./...
-      - run: go test -tags integration -v -timeout=10m ./...
+      - run: go test -v -timeout=10m ./...
 
-  go-test-spanner:
+  go-integration-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -48,7 +48,20 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - run: go test -v -tags spanner_integration -timeout=10m ./internal/storage/database/repository/...
+      - name: Install embedded-postgres runtime deps
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq libicu-dev libssl-dev
+      - run: go test -v -tags integration -timeout=10m ./...
+
+  go-integration-test-spanner:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: go test -v -tags spanner_integration -timeout=10m ./...
+
 
   node-check:
     runs-on: ubuntu-latest
@@ -194,7 +207,7 @@ jobs:
 
   goreleaser-snapshot:
     runs-on: ubuntu-latest
-    needs: [go-test, go-test-spanner, node-check]
+    needs: [go-test, go-integration-test, go-integration-test-spanner, node-check]
     steps:
       - name: Checkout
         uses: actions/checkout@v6
