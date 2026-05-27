@@ -22,12 +22,12 @@ function toBase64url(buf: ArrayBuffer | Uint8Array): string {
   for (const b of bytes) {
     s += String.fromCharCode(b);
   }
-  return btoa(s).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+  return btoa(s).replaceAll("=", "").replaceAll("+", "-").replaceAll("/", "_");
 }
 
 function fromBase64url(s: string): Uint8Array {
   const pad = s.length % 4 === 0 ? "" : "=".repeat(4 - (s.length % 4));
-  return Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/") + pad), (c) =>
+  return Uint8Array.from(atob(s.replaceAll("-", "+").replaceAll("_", "/") + pad), (c) =>
     c.charCodeAt(0),
   );
 }

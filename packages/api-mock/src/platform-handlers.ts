@@ -38,7 +38,7 @@ import type {
 import { http, HttpResponse } from "msw";
 
 function shortId(): string {
-  return randomUUID().replace(/-/g, "").slice(0, 12);
+  return randomUUID().replaceAll("-", "").slice(0, 12);
 }
 
 function nowIso(): string {
@@ -178,8 +178,8 @@ export function setupPlatformHandlers() {
       const createdAt = nowIso();
       const project: ProjectRecord = {
         id,
-        projectSecret: `sk_proj_${id.replace(/-/g, "")}_full`,
-        previewSecret: `sk_proj_${id.replace(/-/g, "")}_preview`,
+        projectSecret: `sk_proj_${id.replaceAll("-", "")}_full`,
+        previewSecret: `sk_proj_${id.replaceAll("-", "")}_preview`,
         previewOrigins: body.previewOrigins ?? [],
         createdAt,
         updatedAt: createdAt,
@@ -314,7 +314,7 @@ export function setupPlatformHandlers() {
     // on its presence to detect end-of-list rather than `undefined`.
     http.get("*/flow_definitions", () => {
       const responseBody: ListFlowDefinitions200 = {
-        flow_definitions: Array.from(store.flowDefinitions.values()).map(flowDetailResponse),
+        flow_definitions: [...store.flowDefinitions.values()].map(flowDetailResponse),
         next_page_token: null,
       };
       return HttpResponse.json(responseBody);

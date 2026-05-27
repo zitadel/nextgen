@@ -207,7 +207,7 @@ export function startMockServer(port: number): Server {
       // mock value that's pattern-valid.
       const body: ExchangeHandoff200 = {
         session: {
-          session_id: `sess_${randomUUID().replace(/-/g, "").slice(0, 12)}`,
+          session_id: `sess_${randomUUID().replaceAll("-", "").slice(0, 12)}`,
           project_id: "proj_mock",
           state: "active",
           factors: {},
