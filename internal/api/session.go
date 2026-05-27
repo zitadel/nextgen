@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -31,10 +32,8 @@ func (h Handler) CreateSession(ctx context.Context, req *api.CreateSessionReques
 }
 
 func (h Handler) ExchangeHandoff(ctx context.Context, req *api.ExchangeRequest, params api.ExchangeHandoffParams) (api.ExchangeHandoffRes, error) {
-	scopeCtx, _ := GetScopeContext(ctx)
-
 	input := service.ExchangeInput{
-		ProjectID:    scopeCtx.ProjectID,
+		ProjectID:    string(params.ProjectID.Value),
 		HandoffToken: req.HandoffToken,
 	}
 	if key, ok := params.IdempotencyKey.Get(); ok {
@@ -48,10 +47,8 @@ func (h Handler) ExchangeHandoff(ctx context.Context, req *api.ExchangeRequest, 
 }
 
 func (h Handler) GetSession(ctx context.Context, params api.GetSessionParams) (api.GetSessionRes, error) {
-	scopeCtx, _ := GetScopeContext(ctx)
-
 	input := service.GetSessionInput{
-		ProjectID: scopeCtx.ProjectID,
+		ProjectID: string(params.ProjectID.Value),
 		SessionID: string(params.SessionID),
 	}
 
@@ -83,10 +80,8 @@ func (h Handler) GetMySession(ctx context.Context, params api.GetMySessionParams
 }
 
 func (h Handler) ListSessions(ctx context.Context, params api.ListSessionsParams) (api.ListSessionsRes, error) {
-	scopeCtx, _ := GetScopeContext(ctx)
-
 	input := service.ListSessionInput{
-		ProjectID: scopeCtx.ProjectID,
+		ProjectID: string(params.ProjectID.Value),
 		// TODO: handle params
 	}
 	sessions, err := h.sessionService.List(ctx, input)
@@ -97,10 +92,8 @@ func (h Handler) ListSessions(ctx context.Context, params api.ListSessionsParams
 }
 
 func (h Handler) RevokeSession(ctx context.Context, params api.RevokeSessionParams) (api.RevokeSessionRes, error) {
-	scopeCtx, _ := GetScopeContext(ctx)
-
 	input := service.DeleteSessionInput{
-		ProjectID: scopeCtx.ProjectID,
+		ProjectID: string(params.ProjectID.Value),
 		SessionID: string(params.SessionID),
 	}
 
@@ -123,10 +116,7 @@ func (h Handler) RevokeMySession(ctx context.Context, params api.RevokeMySession
 		SessionID: sessionToken.SessionID,
 	}
 
-	session, err := h.sessionService.Get(ctx, service.GetSessionInput{
-		ProjectID: input.ProjectID,
-		SessionID: input.SessionID,
-	})
+	session, err := h.sessionService.Get(ctx, service.GetSessionInput(input))
 	if err != nil {
 		return nil, err
 	}
@@ -211,7 +201,15 @@ func userAgentToAPI(agent *domain.UserAgent) api.OptNilSessionResponseUserAgent 
 	}
 	info := make(map[string]jx.Raw)
 	for key, value := range agent.Info {
-		info[key] = jx.Raw(fmt.Sprintf("%v", value))
+		switch key {
+		case "fingerprint", "ip":
+			continue
+		}
+		raw, err := json.Marshal(value)
+		if err != nil {
+			raw = []byte("null")
+		}
+		info[key] = jx.Raw(raw)
 	}
 	return api.NewOptNilSessionResponseUserAgent(api.SessionResponseUserAgent{
 		Fingerprint:     api.NewOptString(agent.ID),

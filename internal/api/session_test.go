@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -29,4 +30,30 @@ func TestValidateSessionToken(t *testing.T) {
 	token.TokenID = "100"
 	session.ExpiresAt = now.Add(-time.Minute)
 	require.ErrorIs(t, validateSessionToken(session, token), domain.ErrSessionTokenInvalid())
+}
+
+func TestUserAgentToAPI(t *testing.T) {
+	t.Parallel()
+
+	opt := userAgentToAPI(&domain.UserAgent{
+		ID: "fp_abc123",
+		IP: "203.0.113.42",
+		Info: map[string]any{
+			"browser":     "test",
+			"fingerprint": "shadow",
+			"ip":          "shadow-ip",
+		},
+	})
+
+	ua, ok := opt.Get()
+	require.True(t, ok)
+	require.Equal(t, "fp_abc123", ua.GetFingerprint().Value)
+	require.Equal(t, "203.0.113.42", ua.GetIP().Value)
+	require.Contains(t, ua.AdditionalProps, "browser")
+	require.NotContains(t, ua.AdditionalProps, "fingerprint")
+	require.NotContains(t, ua.AdditionalProps, "ip")
+
+	data, err := json.Marshal(&ua)
+	require.NoError(t, err)
+	require.JSONEq(t, `{"fingerprint":"fp_abc123","ip":"203.0.113.42","browser":"test"}`, string(data))
 }

@@ -82,7 +82,7 @@ func (s *sessionService) Get(ctx context.Context, input GetSessionInput) (*domai
 
 func (s *sessionService) List(ctx context.Context, input ListSessionInput) ([]*domain.Session, error) {
 	//TODO implement me
-	panic("implement me")
+	return nil, domain.ErrNotImplemented()
 }
 
 func (s *sessionService) Delete(ctx context.Context, input DeleteSessionInput) error {
