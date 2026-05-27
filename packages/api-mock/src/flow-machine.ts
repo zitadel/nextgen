@@ -66,16 +66,16 @@ const initialContext = {
   ssoProviderId: null,
 } satisfies FlowMachineContext;
 
-const rotateToken = assign<FlowMachineContext, FlowMachineEvent>({
+const rotateToken = assign<FlowMachineContext, FlowMachineEvent, undefined, FlowMachineEvent, never>({
   tokenSeq: ({ context }) => context.tokenSeq + 1,
   sessionToken: ({ context }) => `tok_mock_${context.tokenSeq + 1}`,
 });
 
-const captureFields = assign<FlowMachineContext, FlowMachineEvent & { type: "SUBMIT" }>({
+const captureFields = assign<FlowMachineContext, FlowMachineEvent & { type: "SUBMIT" }, undefined, FlowMachineEvent, never>({
   capturedFields: ({ context, event }) => ({ ...context.capturedFields, ...event.fields }),
 });
 
-const setPurpose = assign<FlowMachineContext, FlowMachineEvent & { type: "START" }>({
+const setPurpose = assign<FlowMachineContext, FlowMachineEvent & { type: "START" }, undefined, FlowMachineEvent, never>({
   purpose: ({ event }) => event.purpose,
 });
 

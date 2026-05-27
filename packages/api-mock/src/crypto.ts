@@ -151,7 +151,7 @@ export async function verifyHandoffToken(
   const ok = await globalThis.crypto.subtle.verify(
     ALG.name,
     publicKey,
-    fromBase64url(s),
+    new Uint8Array(fromBase64url(s)),
     enc.encode(signing),
   );
   if (!ok) {

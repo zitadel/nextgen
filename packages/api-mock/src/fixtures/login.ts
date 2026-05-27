@@ -38,7 +38,7 @@ export type StepFixtureInput = {
    * All other step builders ignore this field; it is safe to always populate
    * it regardless of which step is being rendered.
    */
-  registeredCredentials?: Pick<StoredCredential, "credentialId" | "transports">[];
+  registeredCredentials?: readonly Pick<StoredCredential, "credentialId" | "transports">[];
 };
 
 /**
