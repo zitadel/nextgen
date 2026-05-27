@@ -168,16 +168,15 @@ export function startMockServer(port: number): Server {
           .json(errorBody("invalid_handoff_token", "handoff token failed verification"));
         return;
       }
-      // Single-use enforcement: once a handoff has been exchanged, any further
-      // exchange (replay) returns 410 just like an expired token would.
-      if (claims.jti !== undefined && consumedHandoffJtis.has(claims.jti)) {
+      const { jti } = claims;
+      if (jti !== undefined && consumedHandoffJtis.has(jti)) {
         res
           .status(410)
           .json(errorBody("handoff_consumed", "handoff token expired or already consumed"));
         return;
       }
-      if (claims.jti !== undefined) {
-        consumedHandoffJtis.add(claims.jti);
+      if (jti !== undefined) {
+        consumedHandoffJtis.add(jti);
       }
 
       const sessionJwt = await signSessionToken({ sub: claims.sub, email: claims.sub, iss });

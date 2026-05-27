@@ -19,11 +19,13 @@ const dec = new TextDecoder();
 function toBase64url(buf: ArrayBuffer | Uint8Array): string {
   const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
   let s = "";
-  for (const b of bytes) s += String.fromCharCode(b);
+  for (const b of bytes) {
+    s += String.fromCharCode(b);
+  }
   return btoa(s).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
 }
 
-function fromBase64url(s: string): Uint8Array<ArrayBuffer> {
+function fromBase64url(s: string): Uint8Array {
   const pad = s.length % 4 === 0 ? "" : "=".repeat(4 - (s.length % 4));
   return Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/") + pad), (c) =>
     c.charCodeAt(0),

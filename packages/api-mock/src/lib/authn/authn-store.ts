@@ -145,8 +145,8 @@ const PASSKEY_UPSELL_ERRORS: ReadonlyMap<string, string> = new Map([
  * single object. See the module-level JSDoc for the full design rationale.
  */
 export class AuthnStore {
-  private readonly byUser = new Map<string, StoredCredential[]>();
-  private readonly byId = new Map<string, StoredCredential>();
+  readonly #byUser = new Map<string, StoredCredential[]>();
+  readonly #byId = new Map<string, StoredCredential>();
 
   /**
    * Return the i18n error key to surface on the **register** step for
@@ -224,14 +224,11 @@ export class AuthnStore {
       createdAt: new Date().toISOString(),
       lastUsedAt: null,
     };
-    // Filter out any existing entry for this credentialId before appending so
-    // that re-registration replaces rather than duplicates the record in the
-    // per-user list (byId is overwritten by Map.set, which is already correct).
-    const existing = (this.byUser.get(userHandle) ?? []).filter(
+    const existing = (this.#byUser.get(userHandle) ?? []).filter(
       (c) => c.credentialId !== credentialId,
     );
-    this.byUser.set(userHandle, [...existing, cred]);
-    this.byId.set(credentialId, cred);
+    this.#byUser.set(userHandle, [...existing, cred]);
+    this.#byId.set(credentialId, cred);
     return cred;
   }
 
@@ -280,7 +277,7 @@ export class AuthnStore {
    * @returns Zero or more credential records; never throws.
    */
   getByUser(userHandle: string): StoredCredential[] {
-    return this.byUser.get(userHandle) ?? [];
+    return this.#byUser.get(userHandle) ?? [];
   }
 
   /**
@@ -290,7 +287,7 @@ export class AuthnStore {
    * @returns The matching credential, or `undefined` if not found.
    */
   getById(credentialId: string): StoredCredential | undefined {
-    return this.byId.get(credentialId);
+    return this.#byId.get(credentialId);
   }
 
   /**
@@ -308,7 +305,7 @@ export class AuthnStore {
    *   registered.
    */
   authenticate(credentialId: string): StoredCredential | undefined {
-    const cred = this.byId.get(credentialId);
+    const cred = this.#byId.get(credentialId);
     if (!cred) {
       return undefined;
     }
@@ -342,7 +339,7 @@ export class AuthnStore {
    * affected by this call.
    */
   clear(): void {
-    this.byUser.clear();
-    this.byId.clear();
+    this.#byUser.clear();
+    this.#byId.clear();
   }
 }
