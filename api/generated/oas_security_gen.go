@@ -52,6 +52,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	CreateSessionOperation: []string{
 		"sessions.write",
 	},
+	CreateUserOperation: []string{
+		"users.write",
+	},
 	DeleteFlowDefinitionOperation: []string{
 		"flow_definitions.delete",
 	},
@@ -85,7 +88,7 @@ var oauth2ScopesOAuth2 = map[string][]string{
 		"sessions.read",
 	},
 	ListUsersOperation: []string{
-		"openid",
+		"user.list",
 	},
 	RevokeSessionOperation: []string{
 		"session.delete",

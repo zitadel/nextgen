@@ -2,6 +2,8 @@ package api
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/cookie"
@@ -13,12 +15,13 @@ type Handler struct {
 	// responses for all endpoints, so only implemented methods need to be defined.
 	api.UnimplementedHandler
 
-	sealer             *cookie.Sealer
-	flowService        service.FlowService
-	authAttemptService service.AuthAttemptService
-	sessionService     service.SessionService
-	projectService     service.ProjectService
-	schemaService      *service.SchemaService
+	sealer                *cookie.Sealer
+	flowService           service.FlowService
+	authAttemptService    service.AuthAttemptService
+	sessionService        service.SessionService
+	projectService        service.ProjectService
+	userService           *service.UserService
+	schemaService         *service.SchemaService
 	flowDefinitionService service.FlowDefinitionService
 }
 
@@ -28,16 +31,18 @@ func NewHandler(
 	authAttemptService service.AuthAttemptService,
 	sessionService service.SessionService,
 	projectService service.ProjectService,
+	userService *service.UserService,
 	schemaService *service.SchemaService,
 	flowDefinitionService service.FlowDefinitionService,
 ) *Handler {
 	return &Handler{
-		sealer:             sealer,
-		flowService:        flowService,
-		authAttemptService: authAttemptService,
-		sessionService:     sessionService,
-		projectService:     projectService,
-		schemaService:      schemaService,
+		sealer:                sealer,
+		flowService:           flowService,
+		authAttemptService:    authAttemptService,
+		sessionService:        sessionService,
+		projectService:        projectService,
+		userService:           userService,
+		schemaService:         schemaService,
 		flowDefinitionService: flowDefinitionService,
 	}
 }
@@ -51,3 +56,19 @@ func (h *Handler) NewError(ctx context.Context, err error) *api.ErrorDetailsStat
 }
 
 var _ api.Handler = (*Handler)(nil)
+
+// ---- Converters -------------------------------------------------------------
+
+func convertUsingJson(source any, target any) error {
+	// unmarshalling and unmarshalling is not performant, but I don't want to write a custom converter using reflection.
+	// as long https://github.com/ogen-go/ogen/issues/1313 is open, I don't see another way.
+	bs, err := json.Marshal(source)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(bs, target)
+}
+
+// ------------------ Errors ---------------
+
+var NoProjectError = errors.New("a project must be provided")

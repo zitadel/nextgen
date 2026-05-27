@@ -1955,6 +1955,60 @@ func (s *CreateSessionRequestUserAgentAdditional) init() CreateSessionRequestUse
 	return m
 }
 
+type CreateUserBadRequest ErrorDetails
+
+func (*CreateUserBadRequest) createUserRes() {}
+
+type CreateUserForbidden ErrorDetails
+
+func (*CreateUserForbidden) createUserRes() {}
+
+// The content of this response is determined by the configured
+// schema for users.
+// Ref: #
+type CreateUserResponse struct {
+	// The unique identifier of the created user.
+	ID              string `json:"id"`
+	AdditionalProps CreateUserResponseAdditional
+}
+
+// GetID returns the value of ID.
+func (s *CreateUserResponse) GetID() string {
+	return s.ID
+}
+
+// GetAdditionalProps returns the value of AdditionalProps.
+func (s *CreateUserResponse) GetAdditionalProps() CreateUserResponseAdditional {
+	return s.AdditionalProps
+}
+
+// SetID sets the value of ID.
+func (s *CreateUserResponse) SetID(val string) {
+	s.ID = val
+}
+
+// SetAdditionalProps sets the value of AdditionalProps.
+func (s *CreateUserResponse) SetAdditionalProps(val CreateUserResponseAdditional) {
+	s.AdditionalProps = val
+}
+
+func (*CreateUserResponse) createUserRes() {}
+
+type CreateUserResponseAdditional map[string]jx.Raw
+
+func (s *CreateUserResponseAdditional) init() CreateUserResponseAdditional {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+type CreateUserUnauthorized ErrorDetails
+
+func (*CreateUserUnauthorized) createUserRes() {}
+
 // DeleteFlowDefinitionNoContent is response for DeleteFlowDefinition operation.
 type DeleteFlowDefinitionNoContent struct{}
 
@@ -2144,6 +2198,7 @@ func (*ErrorDetailsStatusCode) createFlowRes()             {}
 func (*ErrorDetailsStatusCode) createProjectRes()          {}
 func (*ErrorDetailsStatusCode) createSchemaRes()           {}
 func (*ErrorDetailsStatusCode) createSessionRes()          {}
+func (*ErrorDetailsStatusCode) createUserRes()             {}
 func (*ErrorDetailsStatusCode) deleteFlowDefinitionRes()   {}
 func (*ErrorDetailsStatusCode) endSessionRes()             {}
 func (*ErrorDetailsStatusCode) exchangeHandoffRes()        {}
@@ -10453,6 +10508,50 @@ func (*UpdateFlowDefinitionBadRequest) updateFlowDefinitionRes() {}
 type UpdateFlowDefinitionNotFound ErrorDetails
 
 func (*UpdateFlowDefinitionNotFound) updateFlowDefinitionRes() {}
+
+// A user represents an individual identity in the system. It can be used to
+// represent a human user, but also a service account or any other type of
+// identity. The content of a user is determined by the configured schema for
+// users, this is only a base schema.
+// Ref: #
+type User struct {
+	// The schema that defines the content of the user. This is determined by
+	// the configuration of the system and can be used to validate the content
+	// of the user.
+	Schema          string `json:"$schema"`
+	AdditionalProps UserAdditional
+}
+
+// GetSchema returns the value of Schema.
+func (s *User) GetSchema() string {
+	return s.Schema
+}
+
+// GetAdditionalProps returns the value of AdditionalProps.
+func (s *User) GetAdditionalProps() UserAdditional {
+	return s.AdditionalProps
+}
+
+// SetSchema sets the value of Schema.
+func (s *User) SetSchema(val string) {
+	s.Schema = val
+}
+
+// SetAdditionalProps sets the value of AdditionalProps.
+func (s *User) SetAdditionalProps(val UserAdditional) {
+	s.AdditionalProps = val
+}
+
+type UserAdditional map[string]jx.Raw
+
+func (s *UserAdditional) init() UserAdditional {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
 
 type UserID string
 

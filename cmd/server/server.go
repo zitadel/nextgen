@@ -149,6 +149,7 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 		nil,
 		flowDefinitionRepo,
 	)
+	userService := service.NewUserService(pool, userRepo, schemaRepo)
 
 	// ── HTTP Server ─────────────────
 
@@ -156,7 +157,16 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 	defer stop()
 
 	oasServer, err := oasapi.NewServer(
-		api.NewHandler(sealer, flowService, authAttemptSvc, sessionService, projectService, schemaService, flowDefinitionSvc),
+		api.NewHandler(
+			sealer,
+			flowService,
+			authAttemptSvc,
+			sessionService,
+			projectService,
+			userService,
+			schemaService,
+			flowDefinitionSvc,
+		),
 		api.NewSecurityHandler(),
 		oasapi.WithErrorHandler(api.OgenErrorHandler))
 	if err != nil {

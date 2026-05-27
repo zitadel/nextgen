@@ -1,0 +1,17 @@
+title: User
+description: |
+  A user represents an individual identity in the system. It can be used to 
+  represent a human user, but also a service account or any other type of 
+  identity. The content of a user is determined by the configured schema for 
+  users, this is only a base schema.
+type: object
+additionalProperties: true
+required:
+  - $schema
+properties:
+  $schema:
+    type: string
+    description: |
+      The schema that defines the content of the user. This is determined by
+      the configuration of the system and can be used to validate the content 
+      of the user.

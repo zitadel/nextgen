@@ -26,12 +26,13 @@ type Harness struct {
 	APIClient          *generated.Client
 	FakeSecuritySource *FakeSecuritySource
 
-	SchemaService      *service.SchemaService
-	SessionService     service.SessionService
-	FlowService        service.FlowService
-	AuthAttemptService service.AuthAttemptService
-	ProjectService     service.ProjectService
+	SchemaService         *service.SchemaService
+	SessionService        service.SessionService
+	FlowService           service.FlowService
+	AuthAttemptService    service.AuthAttemptService
+	ProjectService        service.ProjectService
 	FlowDefinitionService service.FlowDefinitionService
+	UserService           *service.UserService
 
 	SchemaRepo         domain.JSONSchemaRepository
 	SchemaResolver     *domain.JSONSchemaResolver
@@ -44,5 +45,5 @@ type Harness struct {
 	UserPasswordRepo   domain.UserPasswordRepository
 	UserPasskeyRepo    domain.UserPasskeyRepository
 
-	Schemas test_data.Schemas
+	TestData test_data.TestData
 }

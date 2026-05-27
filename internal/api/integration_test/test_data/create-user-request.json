@@ -1,0 +1,13 @@
+{
+  "$schema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml",
+  "email": "john.doe@example.com",
+  "firstName": "john",
+  "lastName": "doe",
+  "address": {
+    "street": "Main Street",
+    "houseNumber": "42a",
+    "city": "Lake town",
+    "postalCode": "6699",
+    "country": "Madeupia"
+  }
+}

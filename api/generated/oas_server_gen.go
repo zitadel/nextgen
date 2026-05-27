@@ -99,6 +99,12 @@ type Handler interface {
 	//
 	// POST /sessions
 	CreateSession(ctx context.Context, req *CreateSessionRequest) (CreateSessionRes, error)
+	// CreateUser implements createUser operation.
+	//
+	// Create user.
+	//
+	// POST /user
+	CreateUser(ctx context.Context, req *User, params CreateUserParams) (CreateUserRes, error)
 	// DeleteFlowDefinition implements deleteFlowDefinition operation.
 	//
 	// Delete a flow definition by id.
