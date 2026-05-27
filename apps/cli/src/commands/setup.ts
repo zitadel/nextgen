@@ -9,6 +9,7 @@ import { runInteractiveSetup } from "../interactive/setup";
 import type { CliIO, GlobalOptions } from "../io/output";
 import { ok, skipped } from "../io/output";
 import { ZitadelError } from "../lib/errors";
+import { AUTH_METHODS, type AuthMethod, buildFlowAndLocale } from "../lib/flows";
 import { stableStringify } from "../lib/json";
 import { createPlatformClient } from "../platform";
 import { DEFAULT_SERVER } from "../platform/resolve-server";
@@ -21,19 +22,10 @@ import { validateJsonSchema } from "../schema/validate";
 import { runApply } from "./apply";
 import { runDeployConnect } from "./deploy";
 
-/**
- * Canonical URI for the human-user schema flow definitions reference by
- * default. The schema body the CLI writes locally (`.zitadel/schemas/user.json`)
- * is derived from this same shape; the URI is the spec-required pointer the
- * platform stores against the flow.
- */
-const DEFAULT_USER_SCHEMA_URI =
-  "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/human-user.yaml";
-
 export type SetupOptions = GlobalOptions & {
   framework?: string;
   userFields?: string;
-  authMethods?: string;
+  authMethod?: string;
   skipDeployPlatform?: boolean;
   manualDeploy?: boolean;
   noApply?: boolean;
@@ -62,7 +54,7 @@ export async function runSetup(io: CliIO, opts: SetupOptions): Promise<void> {
   let effectiveServer = opts.source;
 
   let userFields = splitCsv(opts.userFields);
-  let authMethods = splitCsv(opts.authMethods);
+  let authMethod: AuthMethod | undefined = parseAuthMethod(opts.authMethod);
 
   if (!opts.nonInteractive && !opts.dryRun) {
     const answers = await runInteractiveSetup({
@@ -76,7 +68,7 @@ export async function runSetup(io: CliIO, opts: SetupOptions): Promise<void> {
       currentServer: opts.source,
     });
     userFields = userFields ?? answers.userFields;
-    authMethods = authMethods ?? answers.authMethods;
+    authMethod = authMethod ?? answers.authMethod;
     effectiveServer = answers.serverChoice;
     detectedPort = answers.devPort;
     if (answers.deployPlatform !== (deployTarget?.id ?? "none")) {
@@ -88,8 +80,8 @@ export async function runSetup(io: CliIO, opts: SetupOptions): Promise<void> {
   const devPort = detectedPort;
   const issuer = issuerFromPort(devPort);
   userFields = userFields ?? ["email", "given_name", "family_name"];
-  authMethods = authMethods ?? ["passkey", "password"];
-  const userSchema = defaultUserSchema({ fields: userFields, authMethods });
+  const resolvedMethod: AuthMethod = authMethod ?? "passkey";
+  const userSchema = defaultUserSchema({ fields: userFields, authMethods: resolvedMethod });
   const schemaValidation = validateJsonSchema(userSchema);
   if (!schemaValidation.valid) {
     throw new ZitadelError("E_VALIDATION", "Generated user schema is invalid", {
@@ -106,8 +98,7 @@ export async function runSetup(io: CliIO, opts: SetupOptions): Promise<void> {
   const rendererId = opts.renderer ?? "react";
   const renderer = getRenderer(rendererId);
   const config = projectConfig(project, issuer, framework.id, effectiveServer, rendererId);
-  const flow = defaultFlowDefinition(userFields, authMethods);
-  const locale = defaultLocaleSeed(userFields, authMethods);
+  const { flow, locale } = buildFlowAndLocale(resolvedMethod, { fields: userFields });
   const adapter = getAdapter(framework.id);
   const ctx: ProjectContext = {
     cwd: opts.cwd,
@@ -193,8 +184,8 @@ function basePlan(input: {
   project: CreateProjectResponse;
   config: Record<string, unknown>;
   userSchema: unknown;
-  flow: Record<string, unknown>;
-  locale: Record<string, string>;
+  flow: unknown;
+  locale: Readonly<Record<string, string>>;
   packageManager: string;
   framework: string;
   issuer: string;
@@ -313,155 +304,21 @@ function projectDefaultServer(source: string): string {
   }
 }
 
-function defaultFlowDefinition(fields: string[], authMethods: string[]): Record<string, unknown> {
-  const registerFields: Record<string, Record<string, unknown>> = {};
-  for (const field of fields) {
-    registerFields[field] = {
-      type: fieldTypeFor(field),
-      text_key: `register_profile.field.${field}`,
-      required: true,
-    };
+function parseAuthMethod(value: string | undefined): AuthMethod | undefined {
+  if (value === undefined) {
+    return undefined;
   }
-
-  const credentialActions: Record<string, Record<string, unknown>> = {
-    submit: { text_key: "credential.action.submit", primary: true },
-  };
-  if (authMethods.includes("password")) {
-    credentialActions.forgot = { text_key: "credential.action.forgot" };
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return undefined;
   }
-
-  return {
-    // Spec: `flow-definition.yaml` requires [name, user_schema, purposes,
-    // initial_steps, steps]. `name` is a slug (pattern `^[a-z][a-z0-9-]*$`)
-    // that doubles as the display label — there is no separate `slug` or
-    // `display_name` field. `version` / `kind` / `template_name` are NOT in
-    // the spec and have been dropped.
-    name: "default",
-    user_schema: DEFAULT_USER_SCHEMA_URI,
-    purposes: ["login", "register"],
-    initial_steps: {
-      login: "identifier",
-      register: "register_profile",
-    },
-    steps: [
-      {
-        name: "identifier",
-        type: "identifier",
-        texts: { title_key: "identifier.title" },
-        fields: {
-          email: {
-            type: "email",
-            text_key: "identifier.field.email",
-            required: true,
-          },
-        },
-        actions: {
-          submit: { text_key: "identifier.action.submit", primary: true },
-          register: { text_key: "identifier.action.register" },
-        },
-        gates: {},
-        transitions: {
-          submit: "credential",
-          register: { pivot: "register" },
-        },
-      },
-      {
-        name: "credential",
-        type: "credential",
-        texts: { title_key: "credential.title" },
-        fields: authMethods.includes("password")
-          ? {
-              password: {
-                type: "password",
-                text_key: "credential.field.password",
-                required: true,
-              },
-            }
-          : {},
-        actions: credentialActions,
-        gates: {},
-        transitions: {
-          submit: "complete",
-          forgot: { pivot: "recovery" },
-        },
-      },
-      {
-        name: "register_profile",
-        type: "form",
-        texts: { title_key: "register_profile.title" },
-        fields: registerFields,
-        actions: {
-          submit: { text_key: "register_profile.action.submit", primary: true },
-          login: { text_key: "register_profile.action.login" },
-        },
-        gates: {},
-        transitions: {
-          submit: "complete",
-          login: { pivot: "login" },
-        },
-      },
-      {
-        name: "complete",
-        type: "complete",
-        texts: { title_key: "complete.title" },
-        fields: {},
-        actions: {},
-        gates: {},
-      },
-    ],
-  };
-}
-
-function fieldTypeFor(field: string): string {
-  if (field === "email") return "email";
-  if (field === "phone") return "tel";
-  if (field === "password") return "password";
-  if (field === "date_of_birth" || field === "birthdate") return "date";
-  return "text";
-}
-
-export function defaultLocaleSeed(fields: string[], authMethods: string[]): Record<string, string> {
-  const base: Record<string, string> = {
-    "identifier.title": "Sign in",
-    "identifier.field.email": "Email address",
-    "identifier.action.submit": "Continue",
-    "identifier.action.register": "Create account",
-    "credential.title": "Enter your credential",
-    "credential.action.submit": "Sign in",
-    "register_profile.title": "Create your account",
-    "register_profile.action.submit": "Create account",
-    "register_profile.action.login": "Already have an account? Sign in",
-    "complete.title": "You're signed in",
-  };
-  if (authMethods.includes("password")) {
-    base["credential.field.password"] = "Password";
-    base["credential.action.forgot"] = "Forgot password?";
+  if (!(AUTH_METHODS as ReadonlyArray<string>).includes(trimmed)) {
+    throw new ZitadelError(
+      "E_VALIDATION",
+      `Unknown auth method "${trimmed}". Allowed: ${AUTH_METHODS.join(", ")}.`,
+    );
   }
-  for (const field of fields) {
-    const key = `register_profile.field.${field}`;
-    if (!(key in base)) {
-      base[key] = fieldLabelFor(field);
-    }
-  }
-  return base;
-}
-
-function fieldLabelFor(field: string): string {
-  switch (field) {
-    case "email":
-      return "Email address";
-    case "given_name":
-      return "First name";
-    case "family_name":
-      return "Last name";
-    case "phone":
-      return "Phone number";
-    case "date_of_birth":
-    case "birthdate":
-      return "Date of birth";
-    default:
-      return "";
-  }
+  return trimmed as AuthMethod;
 }
 
 function mergePlans(...plans: ScaffoldPlan[]): ScaffoldPlan {

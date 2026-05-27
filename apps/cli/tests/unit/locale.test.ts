@@ -14,7 +14,7 @@ beforeAll(() => server.listen({ onUnhandledRequest: "warn" }));
 afterAll(() => server.close());
 afterEach(() => { server.resetHandlers(); resetPlatformStore(); });
 
-async function scaffoldProject(): Promise<string> {
+async function scaffoldProject(authMethod?: "passkey" | "password"): Promise<string> {
   const cwd = await mkdtemp(join(tmpdir(), "zitadel-locale-"));
   await mkdir(join(cwd, "app"), { recursive: true });
   await writeFile(
@@ -25,7 +25,7 @@ async function scaffoldProject(): Promise<string> {
     join(cwd, "app/layout.tsx"),
     "export default function Layout({ children }: { children: React.ReactNode }) { return <html><body>{children}</body></html>; }\n",
   );
-  const setup = await runCliForTest([
+  const args = [
     "--server",
     MOCK_SERVER_URL,
     "setup",
@@ -35,14 +35,18 @@ async function scaffoldProject(): Promise<string> {
     "--json",
     "--skip-deploy-platform",
     "--no-apply",
-  ]);
+  ];
+  if (authMethod) {
+    args.push("--auth-method", authMethod);
+  }
+  const setup = await runCliForTest(args);
   if (setup.exitCode !== 0) throw new Error(`setup failed: ${setup.stdout}`);
   return cwd;
 }
 
 describe("locale tooling", () => {
-  it("setup seeds .zitadel/locales/en.json with populated core keys", async () => {
-    const cwd = await scaffoldProject();
+  it("setup with --auth-method=password seeds credential password keys", async () => {
+    const cwd = await scaffoldProject("password");
     const raw = JSON.parse(await readFile(join(cwd, ".zitadel/locales/en.json"), "utf8")) as Record<
       string,
       string
@@ -50,6 +54,20 @@ describe("locale tooling", () => {
     expect(raw["identifier.title"]).toBe("Sign in");
     expect(raw["identifier.action.submit"]).toBe("Continue");
     expect(raw["register_profile.action.submit"]).toBe("Create account");
+    expect(raw["credential.field.password"]).toBe("Password");
+    expect(raw["credential.action.forgot"]).toBe("Forgot password?");
+  });
+
+  it("setup with --auth-method=passkey omits the password-specific locale keys", async () => {
+    const cwd = await scaffoldProject("passkey");
+    const raw = JSON.parse(await readFile(join(cwd, ".zitadel/locales/en.json"), "utf8")) as Record<
+      string,
+      string
+    >;
+    expect(raw["identifier.title"]).toBe("Sign in");
+    expect(raw["credential.action.submit"]).toBe("Sign in");
+    expect(raw).not.toHaveProperty("credential.field.password");
+    expect(raw).not.toHaveProperty("credential.action.forgot");
   });
 
   it("locale scaffold is idempotent and adds missing keys", async () => {

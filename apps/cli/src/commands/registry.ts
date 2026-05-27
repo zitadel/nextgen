@@ -54,7 +54,7 @@ export const COMMANDS: CommandSpec[] = [
   {
     name: "setup",
     summary: "Create a pre-claim project and scaffold local auth.",
-    usage: "zitadel setup [--framework next] [--user-fields ...] [--auth-methods ...]",
+    usage: "zitadel setup [--framework next] [--user-fields ...] [--auth-method passkey|password]",
     agent_status: "supported-mock-default",
     flags: [
       ...globalFlags,
@@ -65,9 +65,9 @@ export const COMMANDS: CommandSpec[] = [
       },
       { name: "user-fields", type: "string", description: "Comma-separated list of user fields." },
       {
-        name: "auth-methods",
+        name: "auth-method",
         type: "string",
-        description: "Comma-separated list of auth methods.",
+        description: "Auth method to scaffold: `passkey` (default) or `password`.",
       },
       {
         name: "renderer",

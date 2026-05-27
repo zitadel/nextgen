@@ -7,7 +7,7 @@ import { resetPlatformStore, setupPlatformHandlers } from "@zitadel-nextgen/api-
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import { collectTextKeys, flowDefinitionSchema } from "../../src/resources/flow";
+import { collectTextKeys, flowDefinitionSchema } from "../../src/lib/flows";
 import { runCliForTest } from "../helpers/run-cli";
 
 const MOCK_SERVER_URL = "http://mock.zitadel.test";
@@ -20,29 +20,39 @@ function cli(args: string[]) {
   return runCliForTest(["--server", MOCK_SERVER_URL, ...args]);
 }
 
+async function scaffoldProject(authMethod?: "passkey" | "password"): Promise<string> {
+  const cwd = await mkdtemp(join(tmpdir(), "zitadel-flow-schema-"));
+  await mkdir(join(cwd, "app"), { recursive: true });
+  await writeFile(
+    join(cwd, "package.json"),
+    JSON.stringify({ name: "demo", private: true, dependencies: { next: "^15" } }, null, 2),
+  );
+  await writeFile(
+    join(cwd, "app/layout.tsx"),
+    "export default function Layout({ children }: { children: React.ReactNode }) { return <html><body>{children}</body></html>; }\n",
+  );
+  const args = [
+    "setup",
+    "--cwd",
+    cwd,
+    "--non-interactive",
+    "--json",
+    "--skip-deploy-platform",
+    "--no-apply",
+  ];
+  if (authMethod) {
+    args.push("--auth-method", authMethod);
+  }
+  const result = await cli(args);
+  if (result.exitCode !== 0) {
+    throw new Error(`setup failed: ${result.stdout}`);
+  }
+  return cwd;
+}
+
 describe("flow definition schema", () => {
   it("setup emits a FlowDefinition that parses against the zod schema", async () => {
-    const cwd = await mkdtemp(join(tmpdir(), "zitadel-flow-schema-"));
-    await mkdir(join(cwd, "app"), { recursive: true });
-    await writeFile(
-      join(cwd, "package.json"),
-      JSON.stringify({ name: "demo", private: true, dependencies: { next: "^15" } }, null, 2),
-    );
-    await writeFile(
-      join(cwd, "app/layout.tsx"),
-      "export default function Layout({ children }: { children: React.ReactNode }) { return <html><body>{children}</body></html>; }\n",
-    );
-
-    const result = await cli([
-      "setup",
-      "--cwd",
-      cwd,
-      "--non-interactive",
-      "--json",
-      "--skip-deploy-platform",
-      "--no-apply",
-    ]);
-    expect(result.exitCode).toBe(0);
+    const cwd = await scaffoldProject();
 
     const flowPath = join(cwd, ".zitadel/flows/default.json");
     const raw = JSON.parse(await readFile(flowPath, "utf8")) as unknown;
@@ -86,6 +96,41 @@ describe("flow definition schema", () => {
     expect(keys).toContain("identifier.title");
     expect(keys).toContain("identifier.field.email");
     expect(keys).toContain("identifier.action.submit");
+  });
+
+  it("emits a passkey-shaped credential step when --auth-method=passkey", async () => {
+    const cwd = await scaffoldProject("passkey");
+    const flowPath = join(cwd, ".zitadel/flows/default.json");
+    const raw = JSON.parse(await readFile(flowPath, "utf8")) as unknown;
+    const parsed = flowDefinitionSchema.safeParse(raw);
+    expect(parsed.success, parsed.success ? "" : JSON.stringify(parsed.error.issues)).toBe(true);
+    if (!parsed.success) return;
+    const credential = parsed.data.steps.find((step) => step.name === "credential");
+    expect(credential?.fields).toEqual({});
+    expect(credential?.actions.forgot).toBeUndefined();
+    expect(credential?.transitions).toEqual({ submit: "complete" });
+
+    const userSchema = JSON.parse(
+      await readFile(join(cwd, ".zitadel/schemas/user.json"), "utf8"),
+    ) as { "x-auth-methods": Record<string, unknown> };
+    expect(Object.keys(userSchema["x-auth-methods"])).toEqual(["passkey"]);
+  });
+
+  it("emits a password-shaped credential step when --auth-method=password", async () => {
+    const cwd = await scaffoldProject("password");
+    const flowPath = join(cwd, ".zitadel/flows/default.json");
+    const raw = JSON.parse(await readFile(flowPath, "utf8")) as unknown;
+    const parsed = flowDefinitionSchema.safeParse(raw);
+    expect(parsed.success).toBe(true);
+    if (!parsed.success) return;
+    const credential = parsed.data.steps.find((step) => step.name === "credential");
+    expect(credential?.fields.password?.type).toBe("password");
+    expect(credential?.actions.forgot?.text_key).toBe("credential.action.forgot");
+
+    const userSchema = JSON.parse(
+      await readFile(join(cwd, ".zitadel/schemas/user.json"), "utf8"),
+    ) as { "x-auth-methods": Record<string, unknown> };
+    expect(Object.keys(userSchema["x-auth-methods"])).toEqual(["password"]);
   });
 
   it("rejects flow definitions with array-shaped fields (legacy)", () => {

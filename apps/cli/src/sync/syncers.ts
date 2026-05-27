@@ -1,3 +1,4 @@
+import { FLOWS_DIR } from "../lib/flows";
 import type { PlatformClient } from "../platform/client.js";
 
 export interface ResourceSyncer {
@@ -35,7 +36,7 @@ export class SchemaSyncer implements ResourceSyncer {
 
 export class FlowDefinitionSyncer implements ResourceSyncer {
   readonly kind = "flow";
-  readonly directory = ".zitadel/flows";
+  readonly directory = FLOWS_DIR;
   readonly mutable = true;
 
   constructor(private readonly projectId: string) {}

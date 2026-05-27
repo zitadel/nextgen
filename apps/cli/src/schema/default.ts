@@ -67,7 +67,7 @@ const FIELD_PRESETS: Record<string, Record<string, unknown>> = {
 export function defaultUserSchema(
   opts: {
     fields?: string[];
-    authMethods?: string[] | AuthMethods;
+    authMethods?: string | string[] | AuthMethods;
   } = {},
 ): UserSchema {
   const fields = opts.fields?.length ? opts.fields : ["email", "given_name", "family_name"];
@@ -90,12 +90,15 @@ export function defaultUserSchema(
   }) as UserSchema;
 }
 
-export function normalizeAuthMethods(methods?: string[] | AuthMethods): AuthMethods {
+export function normalizeAuthMethods(methods?: string | string[] | AuthMethods): AuthMethods {
+  if (typeof methods === "string") {
+    return { [methods]: { enabled: true, position: 0 } };
+  }
   if (methods && !Array.isArray(methods)) {
     return methods;
   }
 
-  const selected = methods?.length ? methods : ["passkey", "password"];
+  const selected = methods?.length ? methods : ["passkey"];
   const out: AuthMethods = {};
   selected.forEach((method, index) => {
     out[method] = { enabled: true, position: index };

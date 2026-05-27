@@ -1,11 +1,25 @@
 import { z } from "zod";
 
+/**
+ * Input types accepted by an interactive `flow-field`. Mirrors the
+ * `FlowField.type` enum in the OAS spec at
+ * `api/openapi/endpoints/schemas/flow-field.yaml`.
+ */
 const fieldType = z.enum(["text", "email", "password", "tel", "number", "url", "date", "hidden"]);
 
+/**
+ * A localization key. Pattern enforces the convention
+ * `<step>.<scope>.<name>` (snake-case segments) so locale scaffolding can
+ * round-trip keys without ambiguity.
+ */
 const textKey = z
   .string()
   .regex(/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/, "text_key must follow <step>.<scope>.<name>");
 
+/**
+ * A single field collected on a step. The renderer maps `type` to a
+ * concrete input control; `text_key` resolves to the field label.
+ */
 export const flowFieldSchema = z.object({
   type: fieldType,
   text_key: textKey,
@@ -21,11 +35,21 @@ export const flowFieldSchema = z.object({
     .optional(),
 });
 
+/**
+ * A user-invokable action on a step (typically a button). `primary`
+ * controls visual emphasis; the runtime never inspects more than one
+ * primary per step.
+ */
 export const flowActionSchema = z.object({
   text_key: textKey,
   primary: z.boolean().default(false),
 });
 
+/**
+ * A pre-submit gate (today: captcha or passkey). Gates are evaluated
+ * before the step's fields are accepted; failure pins the user on the
+ * current step.
+ */
 export const flowGateSchema = z.object({
   type: z.enum(["captcha", "passkey"]),
   provider: z.string().optional(),
@@ -34,11 +58,19 @@ export const flowGateSchema = z.object({
   config: z.record(z.string(), z.unknown()).optional(),
 });
 
+/**
+ * Localization keys for a step's display text. Both keys are optional —
+ * a step may render purely from its fields and actions.
+ */
 export const stepTextsSchema = z.object({
   title_key: textKey,
   description_key: textKey.optional(),
 });
 
+/**
+ * A transition target. Either a sibling step name (string) or a pivot
+ * into another flow purpose (`{ pivot: "<purpose>" }`).
+ */
 const transitionTarget = z.union([
   z.string().min(1),
   z.object({
@@ -46,6 +78,10 @@ const transitionTarget = z.union([
   }),
 ]);
 
+/**
+ * One node in the flow graph. `transitions` maps action/outcome names to
+ * the next step; the engine walks this map after each submit.
+ */
 export const stepDefinitionSchema = z.object({
   name: z.string().regex(/^[a-z][a-z0-9_]*$/, "step name must be snake_case"),
   type: z.enum([
@@ -69,12 +105,15 @@ export const stepDefinitionSchema = z.object({
   config: z.record(z.string(), z.unknown()).optional(),
 });
 
-// Shape per `api/openapi/components/flows/flow-definition.yaml`:
-// required: [name, user_schema, purposes, initial_steps, steps].
-// `name` is a slug-pattern stable identifier and doubles as the display
-// label — there is no separate `slug` or `display_name`.
-// `version`, `kind`, `template_name` are NOT in the spec; the CLI used to
-// emit them but no longer does.
+/**
+ * The on-disk shape per the OAS spec
+ * `api/openapi/components/flows/flow-definition.yaml`. Required keys:
+ * `name, user_schema, purposes, initial_steps, steps`. `name` is a
+ * slug-pattern identifier and doubles as the display label — there is
+ * no separate `slug` or `display_name`. `version`, `kind`, and
+ * `template_name` are NOT in the spec; the CLI used to emit them but
+ * no longer does.
+ */
 export const flowDefinitionSchema = z.object({
   name: z.string().regex(/^[a-z][a-z0-9-]*$/, "name must match ^[a-z][a-z0-9-]*$"),
   user_schema: z.string().url(),
@@ -92,23 +131,17 @@ export const flowDefinitionSchema = z.object({
   steps: z.array(stepDefinitionSchema).nonempty(),
 });
 
+/** Parsed, validated flow-definition body. */
 export type FlowDefinition = z.infer<typeof flowDefinitionSchema>;
-export type StepDefinition = z.infer<typeof stepDefinitionSchema>;
-export type FlowField = z.infer<typeof flowFieldSchema>;
-export type FlowAction = z.infer<typeof flowActionSchema>;
-export type FlowGate = z.infer<typeof flowGateSchema>;
 
-export function collectTextKeys(flow: FlowDefinition): string[] {
-  const keys = new Set<string>();
-  for (const step of flow.steps) {
-    if (step.texts?.title_key) keys.add(step.texts.title_key);
-    if (step.texts?.description_key) keys.add(step.texts.description_key);
-    for (const field of Object.values(step.fields ?? {})) {
-      keys.add(field.text_key);
-    }
-    for (const action of Object.values(step.actions ?? {})) {
-      keys.add(action.text_key);
-    }
-  }
-  return [...keys].sort();
-}
+/** Parsed, validated step. */
+export type StepDefinition = z.infer<typeof stepDefinitionSchema>;
+
+/** Parsed, validated field. */
+export type FlowField = z.infer<typeof flowFieldSchema>;
+
+/** Parsed, validated action. */
+export type FlowAction = z.infer<typeof flowActionSchema>;
+
+/** Parsed, validated gate. */
+export type FlowGate = z.infer<typeof flowGateSchema>;

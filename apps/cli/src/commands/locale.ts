@@ -1,10 +1,6 @@
-import { readdir, readFile } from "node:fs/promises";
-import { join } from "node:path";
-
 import type { CliIO, GlobalOptions } from "../io/output";
 import { ok } from "../io/output";
-import { ZitadelError } from "../lib/errors";
-import { flowDefinitionSchema, collectTextKeys } from "../resources/flow";
+import { collectTextKeys, readLocalFlows } from "../lib/flows";
 import {
   DEFAULT_LOCALE,
   listLocales as listLocaleFiles,
@@ -68,37 +64,10 @@ export async function runLocaleList(io: CliIO, opts: GlobalOptions): Promise<voi
 }
 
 async function collectReferencedKeys(cwd: string): Promise<string[]> {
-  const flowsDir = join(cwd, ".zitadel/flows");
-  let entries: string[];
-  try {
-    entries = await readdir(flowsDir);
-  } catch (error) {
-    if (
-      typeof error === "object" &&
-      error !== null &&
-      "code" in error &&
-      (error as { code?: string }).code === "ENOENT"
-    ) {
-      throw new ZitadelError(
-        "E_VALIDATION",
-        "No .zitadel/flows directory — run `zitadel setup` first.",
-        {
-          nextCommands: ["zitadel setup"],
-        },
-      );
-    }
-    throw error;
-  }
+  const flows = await readLocalFlows(cwd, { requireDir: true });
   const keys = new Set<string>();
-  for (const entry of entries.filter((name) => name.endsWith(".json")).sort()) {
-    const abs = join(flowsDir, entry);
-    const parsed = flowDefinitionSchema.safeParse(JSON.parse(await readFile(abs, "utf8")));
-    if (!parsed.success) {
-      throw new ZitadelError("E_VALIDATION", `Flow ${entry} is not a valid FlowDefinition`, {
-        details: { path: abs, issues: parsed.error.issues },
-      });
-    }
-    for (const key of collectTextKeys(parsed.data)) {
+  for (const flow of flows) {
+    for (const key of collectTextKeys(flow)) {
       keys.add(key);
     }
   }

@@ -1,11 +1,12 @@
 import { cancel, confirm, intro, isCancel, multiselect, outro, select, text } from "@clack/prompts";
 
 import { ZitadelError } from "../lib/errors";
+import type { AuthMethod } from "../lib/flows";
 import { DEFAULT_SERVER } from "../platform/resolve-server";
 
 export type InteractiveSetupAnswers = {
   userFields: string[];
-  authMethods: string[];
+  authMethod: AuthMethod;
   serverChoice: string;
   devPort: number;
   deployPlatform: "vercel" | "netlify" | "cloudflare" | "none";
@@ -25,10 +26,13 @@ const USER_FIELD_CHOICES = [
   { value: "phone", label: "phone", hint: "enables SMS MFA" },
 ];
 
-const AUTH_METHOD_CHOICES = [
+const AUTH_METHOD_CHOICES: ReadonlyArray<{
+  value: AuthMethod;
+  label: string;
+  hint?: string;
+}> = [
   { value: "passkey", label: "passkey", hint: "recommended" },
   { value: "password", label: "password" },
-  { value: "totp", label: "totp" },
 ];
 
 export async function runInteractiveSetup(
@@ -55,13 +59,12 @@ export async function runInteractiveSetup(
   });
   bail(userFields);
 
-  const authMethods = await multiselect({
-    message: "Auth methods",
-    options: AUTH_METHOD_CHOICES,
-    initialValues: ["passkey", "password"],
-    required: true,
+  const authMethod = await select<AuthMethod>({
+    message: "Auth method",
+    options: AUTH_METHOD_CHOICES.map(({ value, label, hint }) => ({ value, label, hint })),
+    initialValue: "passkey",
   });
-  bail(authMethods);
+  bail(authMethod);
 
   const serverChoice = await select({
     message: "Which server should zitadel.json point to?",
@@ -124,7 +127,7 @@ export async function runInteractiveSetup(
 
   return {
     userFields: userFields as string[],
-    authMethods: authMethods as string[],
+    authMethod: authMethod as AuthMethod,
     serverChoice: resolvedServer,
     devPort,
     deployPlatform: deployPlatform as InteractiveSetupAnswers["deployPlatform"],

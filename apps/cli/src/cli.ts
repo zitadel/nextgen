@@ -281,7 +281,7 @@ function setupOptions(parsed: ParsedArgs, global: GlobalOptions) {
     ...global,
     framework: stringOpt(parsed, "framework"),
     userFields: stringOpt(parsed, "userFields"),
-    authMethods: stringOpt(parsed, "authMethods"),
+    authMethod: stringOpt(parsed, "authMethod"),
     renderer: stringOpt(parsed, "renderer"),
     skipDeployPlatform: boolOpt(parsed, "skipDeployPlatform"),
     manualDeploy: boolOpt(parsed, "manual"),
