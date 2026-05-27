@@ -4,7 +4,6 @@ import { runAddSchema } from "./commands/add-schema";
 import { runAppAdd, runAppList, runAppRemove, runAppShow } from "./commands/app";
 import { runApply } from "./commands/apply";
 import { runCapabilities } from "./commands/capabilities";
-import { runClaim, runClaimStatus } from "./commands/claim";
 import { runDeployConnect, runDeployStatus } from "./commands/deploy";
 import { runDoctor } from "./commands/doctor";
 import { runEject } from "./commands/eject";
@@ -101,18 +100,6 @@ async function dispatch(parsed: ParsedArgs, io: CliIO, global: GlobalOptions): P
         return;
       }
       break;
-    case "claim":
-      if (subcommand === "status") {
-        await runClaimStatus(io, {
-          ...withSubcommand(global, "claim status"),
-          challengeId: stringOpt(parsed, "challengeId"),
-          mockCompleteClaim: boolOpt(parsed, "mockCompleteClaim"),
-          mockAdvanceClaim: boolOpt(parsed, "mockAdvanceClaim"),
-        });
-        return;
-      }
-      await runClaim(io, global);
-      return;
     case "add":
       if (subcommand === "schema") {
         await runAddSchema(io, {
@@ -348,7 +335,6 @@ function resolveCommandName(parsed: ParsedArgs): string {
   const [head, next] = parsed.positionals;
   if (!head) return "(default)";
   if (head === "deploy" && (next === "connect" || next === "status")) return `deploy ${next}`;
-  if (head === "claim" && next === "status") return "claim status";
   if (head === "add" && next === "schema") return "add schema";
   if (head === "schema" && next === "add") return "schema add";
   if (

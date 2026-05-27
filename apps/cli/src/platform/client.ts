@@ -1,10 +1,7 @@
 import type {
-  ClaimStatusResponse,
   CreateProjectRequest,
   CreateProjectResponse,
   GetProjectResponse,
-  InitClaimRequest,
-  InitClaimResponse,
 } from "./schemas";
 
 export interface ProjectClient {
@@ -36,12 +33,4 @@ export interface FlowDefinitionClient {
   deleteFlowDefinition(id: string): Promise<void>;
 }
 
-export interface ClaimClient {
-  initClaim(projectId: string, req: InitClaimRequest): Promise<InitClaimResponse>;
-  getClaimStatus(projectId: string, challengeId: string): Promise<ClaimStatusResponse>;
-}
-
-export type PlatformClient = ProjectClient &
-  SchemaClient &
-  FlowDefinitionClient &
-  ClaimClient;
+export type PlatformClient = ProjectClient & SchemaClient & FlowDefinitionClient;
