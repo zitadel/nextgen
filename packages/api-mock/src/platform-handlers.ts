@@ -38,7 +38,7 @@ import type {
 import { http, HttpResponse } from "msw";
 
 function shortId(): string {
-  return randomUUID().replace(/-/g, "").slice(0, 12);
+  return randomUUID().replaceAll("-", "").slice(0, 12);
 }
 
 function nowIso(): string {
@@ -167,7 +167,6 @@ export function resetPlatformStore(): void {
 
 export function setupPlatformHandlers() {
   return [
-    // POST /projects
     http.post("*/projects", async ({ request }) => {
       const raw = await readJson(request);
       if (raw === null) {
@@ -178,8 +177,8 @@ export function setupPlatformHandlers() {
       const createdAt = nowIso();
       const project: ProjectRecord = {
         id,
-        projectSecret: `sk_proj_${id.replace(/-/g, "")}_full`,
-        previewSecret: `sk_proj_${id.replace(/-/g, "")}_preview`,
+        projectSecret: `sk_proj_${id.replaceAll("-", "")}_full`,
+        previewSecret: `sk_proj_${id.replaceAll("-", "")}_preview`,
         previewOrigins: body.previewOrigins ?? [],
         createdAt,
         updatedAt: createdAt,
@@ -195,7 +194,6 @@ export function setupPlatformHandlers() {
       return HttpResponse.json(responseBody, { status: 201 });
     }),
 
-    // GET /projects/:id
     http.get("*/projects/:id", ({ params }) => {
       const project = store.projects.get(params.id as string);
       if (!project) {
@@ -209,11 +207,6 @@ export function setupPlatformHandlers() {
       return HttpResponse.json(responseBody);
     }),
 
-    // POST /schemas
-    //
-    // Spec: `api/openapi/endpoints/schemas/methods.yaml` defines the request
-    // as `oneOf [user-schema, schema-url]` keyed on the `kind` discriminator.
-    // We accept either; anything else is 400 invalid_schema.
     http.post("*/schemas", async ({ request }) => {
       const body = await readJson(request);
       if (body === null) {
@@ -230,15 +223,11 @@ export function setupPlatformHandlers() {
         );
       }
       const id = `schema_${shortId()}`;
-      // The mock stores whatever the user POSTed and serves it back unchanged.
-      // The cast acknowledges we trust the body; we don't re-validate it
-      // against `user-schema.yaml` / `schema-url.yaml` schemas at runtime.
       store.schemas.set(id, body as unknown as GetSchemaById200);
       const responseBody: CreateSchema201 = { id };
       return HttpResponse.json(responseBody, { status: 201 });
     }),
 
-    // GET /schemas/:id
     http.get("*/schemas/:id", ({ params }) => {
       const schema = store.schemas.get(params.id as string);
       if (!schema) {
@@ -247,11 +236,6 @@ export function setupPlatformHandlers() {
       return HttpResponse.json(schema);
     }),
 
-    // DELETE /schemas/:id
-    //
-    // Spec includes a 404 not-found response — callers must be able to
-    // distinguish "deleted" from "id didn't exist". `Map.delete()`
-    // returns `true` only when the key was present.
     http.delete("*/schemas/:id", ({ params }) => {
       const existed = store.schemas.delete(params.id as string);
       if (!existed) {
@@ -260,12 +244,6 @@ export function setupPlatformHandlers() {
       return new HttpResponse(null, { status: 204 });
     }),
 
-    // POST /flow_definitions
-    //
-    // Spec: requestBody is the `flow-definition-create-request` envelope
-    // (`{ project_id, schema_uri?, flow_definition }`). The mock validates
-    // the envelope and 400s if `project_id` or `flow_definition` is missing,
-    // matching the contract any real backend would enforce.
     http.post("*/flow_definitions", async ({ request }) => {
       const raw = await readJson(request);
       if (raw === null) {
@@ -305,22 +283,14 @@ export function setupPlatformHandlers() {
       return HttpResponse.json(responseBody, { status: 201 });
     }),
 
-    // GET /flow_definitions (list)
-    //
-    // Spec `flow-definition-list-response.yaml` defines an optional
-    // `next_page_token` field that may be `null` when there is no next
-    // page. The mock never paginates (in-memory store), so we always emit
-    // explicit null — spec-strict consumers iterating with cursors can rely
-    // on its presence to detect end-of-list rather than `undefined`.
     http.get("*/flow_definitions", () => {
       const responseBody: ListFlowDefinitions200 = {
-        flow_definitions: Array.from(store.flowDefinitions.values()).map(flowDetailResponse),
+        flow_definitions: [...store.flowDefinitions.values()].map(flowDetailResponse),
         next_page_token: null,
       };
       return HttpResponse.json(responseBody);
     }),
 
-    // GET /flow_definitions/:id
     http.get("*/flow_definitions/:id", ({ params }) => {
       const record = store.flowDefinitions.get(params.id as string);
       if (!record) {
@@ -330,13 +300,6 @@ export function setupPlatformHandlers() {
       return HttpResponse.json(responseBody);
     }),
 
-    // PATCH /flow_definitions/:id
-    //
-    // Spec: partial update — only supplied fields are replaced; arrays/objects
-    // are replaced atomically when supplied. The mock merges top-level keys
-    // shallowly (sufficient for the CLI's "send full body" pattern and good
-    // enough for partial spec-correct patches). Returns 200 + detail response
-    // per `flow-definition-detail-response`.
     http.patch("*/flow_definitions/:id", async ({ params, request }) => {
       const record = store.flowDefinitions.get(params.id as string);
       if (!record) {
@@ -352,11 +315,6 @@ export function setupPlatformHandlers() {
       return HttpResponse.json(responseBody, { status: 200 });
     }),
 
-    // DELETE /flow_definitions/:id
-    //
-    // Spec includes a 404 not-found response — callers must be able to
-    // distinguish "deleted" from "id didn't exist". `Map.delete()`
-    // returns `true` only when the key was present.
     http.delete("*/flow_definitions/:id", ({ params }) => {
       const existed = store.flowDefinitions.delete(params.id as string);
       if (!existed) {
