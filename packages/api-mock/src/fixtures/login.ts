@@ -52,7 +52,7 @@ export type StepFixtureInput = {
  * browser's keychain from conflating credentials belonging to different users.
  */
 function emailToUserHandle(email: string): string {
-  return btoa(email).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+  return Buffer.from(email).toString("base64url");
 }
 
 /**
