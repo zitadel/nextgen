@@ -10,7 +10,6 @@ import { flowDefinitionSchema } from "../resources/flow";
 import { buildSyncPlan, runSyncLoop } from "../sync/loop";
 import { renderPlan } from "../sync/plan-renderer";
 import { makeSyncers } from "../sync/syncers";
-import type { ZitadelSecret } from "./shared";
 import { readZitadelSecret } from "./shared";
 
 export type ApplyOptions = GlobalOptions & {
@@ -21,16 +20,8 @@ export type ApplyOptions = GlobalOptions & {
 };
 
 export async function runApply(io: CliIO, opts: ApplyOptions): Promise<void> {
-  const environment = parseEnvironment(opts.environment);
+  parseEnvironment(opts.environment);
   const secret = await readZitadelSecret(opts.cwd);
-
-  if (environment === "production" && !isClaimedSecret(secret)) {
-    throw new ZitadelError(
-      "E_CLAIM_REQUIRED",
-      "Production applies require a claimed project. Run `zitadel claim`.",
-      { nextCommands: ["zitadel claim"] },
-    );
-  }
 
   const flows = await readFlowFiles(opts.cwd);
 
@@ -113,10 +104,6 @@ function parseEnvironment(value: string | undefined): ZitadelEnvironment {
     });
   }
   return result.data;
-}
-
-function isClaimedSecret(secret: ZitadelSecret): boolean {
-  return Boolean(secret.claimed_at && secret.team_id);
 }
 
 export function findEnvRefs(value: unknown): string[] {

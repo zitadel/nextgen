@@ -32,8 +32,6 @@ function makeClient(): PlatformClient {
     getFlowDefinition: vi.fn().mockResolvedValue({}),
     updateFlowDefinition: vi.fn().mockResolvedValue(undefined),
     deleteFlowDefinition: vi.fn().mockResolvedValue(undefined),
-    initClaim: vi.fn(),
-    getClaimStatus: vi.fn(),
   } as unknown as PlatformClient;
 }
 

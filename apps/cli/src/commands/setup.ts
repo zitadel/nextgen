@@ -165,10 +165,9 @@ export async function runSetup(io: CliIO, opts: SetupOptions): Promise<void> {
   ok(
     io,
     {
-      title: "Zitadel is ready in pre-claim mode.",
+      title: "Zitadel is ready.",
       project: {
         project_id: project.id,
-        lifecycle: "pre-claim",
         issuer,
       },
       framework: framework.id,
@@ -178,11 +177,8 @@ export async function runSetup(io: CliIO, opts: SetupOptions): Promise<void> {
       files_skipped: result.filesSkipped.map((file) => relativeDisplay(opts.cwd, file)),
       apply,
       deploy,
-      next_actions: [
-        "Run `zitadel doctor` to verify setup.",
-        "Run `zitadel claim` before production.",
-      ],
-      next_commands: ["zitadel doctor", "zitadel claim"],
+      next_actions: ["Run `zitadel doctor` to verify setup."],
+      next_commands: ["zitadel doctor"],
     },
     setupOpts,
     warnings,
