@@ -205,7 +205,7 @@ const DEFAULT_MAX_RETRIES = 3;
  * Atom: `<zl-gate>` — invisible gate proof handler.
  *
  * This component is intentionally invisible. It is mounted by the Liquid
- * template (or injected by the `mandatory-gates` patcher) when a step
+ * template (or injected by the `required-atoms` patcher) when a step
  * carries a gate. On mount, it reads the gate configuration from attributes,
  * dispatches on `kind` + `provider` to pick a solver strategy, and emits
  * the proof.

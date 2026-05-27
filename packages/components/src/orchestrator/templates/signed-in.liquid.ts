@@ -91,7 +91,7 @@ export const signedInTemplate = String.raw`
       ></zl-button>
     {% endif %}
 
-    {% mandatory_gates %}
+    {% required_atoms %}
   </zl-card>
 </zl-page-shell>
 `;

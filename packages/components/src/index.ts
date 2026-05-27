@@ -45,7 +45,7 @@ export {
   createLiquidEngine,
   createSanitiser,
   validateBranding,
-  patchMandatoryGates,
+  patchRequiredAtoms,
   defaultTemplate,
   layoutChromeCss,
   authFormTemplate,

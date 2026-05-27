@@ -101,7 +101,7 @@ beyond captcha in the future) is an invisible, auto-submitting Lit component mod
 `<zl-passkey>` ([ADR 013][adr013] §3). It dispatches on the gate's `provider`, and mounts
 third-party vendor widgets in **light DOM** to avoid shadow-DOM and cross-origin iframe
 friction (Turnstile tolerates shadow DOM; reCAPTCHA/hCaptcha do not). It declares
-`satisfies_gate: "captcha"` in its manifest, and the `mandatory-gates` patcher gains a gate
+`satisfies_gate: "captcha"` in its manifest, and the `required-atoms` patcher gains a gate
 branch that auto-injects it when a required gate has no matching consumer in the template.
 
 ```mermaid
@@ -216,7 +216,7 @@ This list doubles as the implementation checklist for the follow-up PRs.
 **Frontend**
 - New `<zl-gate>` component — invisible/auto-submit, dispatch on `provider`, third-party
   widgets in light DOM; manifest declares `satisfies_gate: "captcha"`.
-- `mandatory-gates` patcher — add a gate branch to inject `<zl-gate>` for a required gate
+- `required-atoms` patcher — add a gate branch to inject `<zl-gate>` for a required gate
   with no consumer.
 - SDK proxy (`sdk-next`, `sdk-nuxt` middleware) — read the platform verdict, stamp
   `X-Zitadel-Risk-Signal`, attach the project secret on the flow hop, extend the forward
@@ -230,7 +230,7 @@ This list doubles as the implementation checklist for the follow-up PRs.
 ## Reviewer split
 
 - **Frontend engineers:** the `<zl-gate>` component, provider dispatch and light-DOM
-  mount, manifest + `mandatory-gates` injection, and the proxy header stamping.
+  mount, manifest + `required-atoms` injection, and the proxy header stamping.
 - **Backend engineers:** runtime `FlowStep` gates, the `Process()` verify path, the
   `auth_attempts` captcha method, the secret store, risk-signal trust + header acceptance,
   and risk-evaluator consumption.

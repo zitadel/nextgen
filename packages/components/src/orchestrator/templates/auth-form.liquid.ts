@@ -111,7 +111,7 @@ export const authFormTemplate = String.raw`
       ></zl-passkey>
     {% endif %}
 
-    {% mandatory_gates %}
+    {% required_atoms %}
   </zl-card>
 </zl-page-shell>
 `;

@@ -1,7 +1,7 @@
 import type { CreateFlow201Step } from "@zitadel-nextgen/api/generated/model";
 import { describe, expect, it } from "vitest";
 
-import { mandatoryGatesMarkerComment, patchMandatoryGates } from "./mandatory-gates.js";
+import { requiredAtomsMarkerComment, patchRequiredAtoms } from "./required-atoms.js";
 
 const locale: Record<string, string> = {
   "identifier.field.email": "Work email",
@@ -19,19 +19,19 @@ const step: CreateFlow201Step = {
   gates: {},
 };
 
-describe("patchMandatoryGates", () => {
+describe("patchRequiredAtoms", () => {
   it("appends a missing required field at the marker", () => {
-    const html = `<div>${mandatoryGatesMarkerComment}</div>`;
-    const out = patchMandatoryGates(html, step, locale);
-    expect(out).not.toContain(mandatoryGatesMarkerComment);
+    const html = `<div>${requiredAtomsMarkerComment}</div>`;
+    const out = patchRequiredAtoms(html, step, locale);
+    expect(out).not.toContain(requiredAtomsMarkerComment);
     expect(out).toContain('<zl-field name="email"');
     expect(out).toContain('label="Work email"');
     expect(out).toContain("required");
   });
 
   it("appends a missing primary submit button at the marker", () => {
-    const html = `<zl-field name="email"></zl-field>${mandatoryGatesMarkerComment}`;
-    const out = patchMandatoryGates(html, step, locale);
+    const html = `<zl-field name="email"></zl-field>${requiredAtomsMarkerComment}`;
+    const out = patchRequiredAtoms(html, step, locale);
     expect(out).toContain('<zl-button hierarchy="primary"');
     expect(out).toContain('type="submit"');
     expect(out).toContain('action="submit"');
@@ -42,8 +42,8 @@ describe("patchMandatoryGates", () => {
     const html =
       `<zl-field name="email"></zl-field>` +
       `<zl-button hierarchy="primary" type="submit" action="submit"></zl-button>` +
-      `${mandatoryGatesMarkerComment}`;
-    const out = patchMandatoryGates(html, step, locale);
+      `${requiredAtomsMarkerComment}`;
+    const out = patchRequiredAtoms(html, step, locale);
     const matches = out.match(/<zl-button[^>]*hierarchy="primary"/g) ?? [];
     expect(matches.length).toBe(1);
   });
@@ -52,15 +52,15 @@ describe("patchMandatoryGates", () => {
     const html =
       `<zl-field name="email"></zl-field>` +
       `<zl-button hierarchy="primary" type="submit" action="submit"></zl-button>` +
-      `${mandatoryGatesMarkerComment}`;
-    const out = patchMandatoryGates(html, step, locale);
+      `${requiredAtomsMarkerComment}`;
+    const out = patchRequiredAtoms(html, step, locale);
     const fieldMatches = out.match(/<zl-field/g) ?? [];
     expect(fieldMatches.length).toBe(1);
   });
 
   it("appends at end if the marker is missing entirely", () => {
     const html = `<zl-field name="email"></zl-field>`;
-    const out = patchMandatoryGates(html, step, locale);
+    const out = patchRequiredAtoms(html, step, locale);
     expect(out.startsWith("<zl-field")).toBe(true);
     expect(out).toContain('<zl-button hierarchy="primary"');
   });
@@ -76,7 +76,7 @@ describe("patchMandatoryGates", () => {
         },
       },
     };
-    const out = patchMandatoryGates(mandatoryGatesMarkerComment, malicious, locale);
+    const out = patchRequiredAtoms(requiredAtomsMarkerComment, malicious, locale);
     // The original payload must not appear verbatim — the browser serialiser
     // escapes the closing quote so the value stays trapped inside the
     // attribute. (The HTML spec only requires `&`, `"` and U+00A0 to be
@@ -98,8 +98,8 @@ describe("patchMandatoryGates", () => {
         bot_check: { kind: "captcha", provider: "altcha", config: { challenge: "abc", salt: "xyz", max_number: 100000 } },
       },
     };
-    const html = `<zl-field name="email"></zl-field>${mandatoryGatesMarkerComment}`;
-    const out = patchMandatoryGates(html, gateStep, locale);
+    const html = `<zl-field name="email"></zl-field>${requiredAtomsMarkerComment}`;
+    const out = patchRequiredAtoms(html, gateStep, locale);
     expect(out).toContain('<zl-gate gate-name="bot_check"');
     expect(out).toContain('kind="captcha"');
     expect(out).toContain('provider="altcha"');
@@ -116,8 +116,8 @@ describe("patchMandatoryGates", () => {
     const html =
       `<zl-gate gate-name="bot_check" kind="captcha" provider="altcha"></zl-gate>` +
       `<zl-field name="email"></zl-field>` +
-      `${mandatoryGatesMarkerComment}`;
-    const out = patchMandatoryGates(html, gateStep, locale);
+      `${requiredAtomsMarkerComment}`;
+    const out = patchRequiredAtoms(html, gateStep, locale);
     const gateMatches = out.match(/<zl-gate/g) ?? [];
     expect(gateMatches.length).toBe(1);
   });
@@ -129,7 +129,7 @@ describe("patchMandatoryGates", () => {
         bot_check: { kind: "captcha", provider: "turnstile", config: { site_key: "0x4AAA" } },
       },
     };
-    const out = patchMandatoryGates(mandatoryGatesMarkerComment, gateStep, locale);
+    const out = patchRequiredAtoms(requiredAtomsMarkerComment, gateStep, locale);
     const parsed = new DOMParser().parseFromString(out, "text/html");
     const gate = parsed.querySelector("zl-gate");
     expect(gate).not.toBeNull();

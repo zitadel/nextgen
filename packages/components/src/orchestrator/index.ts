@@ -19,10 +19,10 @@ export { applyFontUrl } from "./font-loader.js";
 export { createLiquidEngine, TEMPLATE_NAMES } from "./liquid.js";
 export { en, type Locale } from "./locales/en.js";
 export {
-  patchMandatoryGates,
-  mandatoryGatesMarkerComment,
-  MANDATORY_GATES_MARKER,
-} from "./mandatory-gates.js";
+  patchRequiredAtoms,
+  requiredAtomsMarkerComment,
+  REQUIRED_ATOMS_MARKER,
+} from "./required-atoms.js";
 export { createSanitiser } from "./sanitiser.js";
 export { defaultTemplate, layoutChromeCss } from "./templates/default.liquid.js";
 export { authFormTemplate } from "./templates/auth-form.liquid.js";

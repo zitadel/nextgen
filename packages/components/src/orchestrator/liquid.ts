@@ -3,7 +3,7 @@
  *
  * Configures the engine per the security pipeline in
  * `docs/design/flowengine/template-security.md` and registers the
- * `| t` filter and `{% mandatory_gates %}` tag from
+ * `| t` filter and `{% required_atoms %}` tag from
  * `docs/design/branding/templates.md`.
  *
  * Hard rules:
@@ -17,7 +17,7 @@ import { Liquid } from "liquidjs";
 
 import type { FlowError } from "./template-context.js";
 import type { Locale } from "./locales/en.js";
-import { mandatoryGatesMarkerComment } from "./mandatory-gates.js";
+import { requiredAtomsMarkerComment } from "./required-atoms.js";
 import { authFormTemplate } from "./templates/auth-form.liquid.js";
 import { defaultTemplate } from "./templates/default.liquid.js";
 import { passkeyUpsellTemplate } from "./templates/passkey-upsell.liquid.js";
@@ -133,14 +133,14 @@ export function createLiquidEngine(options: CreateLiquidOptions): Liquid {
     return key === "" || !(key in fieldErrorKeys);
   });
 
-  // `{% mandatory_gates %}` — emits a unique marker comment that the
-  // orchestrator post-processes via `patchMandatoryGates`.
-  engine.registerTag("mandatory_gates", {
+  // `{% required_atoms %}` — emits a unique marker comment that the
+  // patcher replaces with any missing required atoms after Liquid renders.
+  engine.registerTag("required_atoms", {
     parse() {
       // No body, no args — nothing to consume.
     },
     render() {
-      return mandatoryGatesMarkerComment;
+      return requiredAtomsMarkerComment;
     },
   });
 

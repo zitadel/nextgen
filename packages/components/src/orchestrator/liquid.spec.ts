@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { createLiquidEngine, TEMPLATE_NAMES } from "./liquid.js";
 import { en as fullLocale } from "./locales/en.js";
-import { mandatoryGatesMarkerComment } from "./mandatory-gates.js";
+import { requiredAtomsMarkerComment } from "./required-atoms.js";
 
 const locale: Record<string, string> = {
   "identifier.title": "Sign in",
@@ -62,10 +62,10 @@ describe("LiquidJS engine", () => {
     expect(result).toContain("&lt;script&gt;");
   });
 
-  it("emits the mandatory_gates marker comment", () => {
+  it("emits the required_atoms marker comment", () => {
     const engine = createLiquidEngine({ locale });
-    const result = engine.parseAndRenderSync("{% mandatory_gates %}", {});
-    expect(result).toBe(mandatoryGatesMarkerComment);
+    const result = engine.parseAndRenderSync("{% required_atoms %}", {});
+    expect(result).toBe(requiredAtomsMarkerComment);
   });
 
   it("renders the bundled default template through the auth-form partial", () => {
@@ -90,7 +90,7 @@ describe("LiquidJS engine", () => {
     expect(result).toContain("<zl-field");
     expect(result).toContain('<zl-button');
     expect(result).toContain('hierarchy="primary"');
-    expect(result).toContain(mandatoryGatesMarkerComment);
+    expect(result).toContain(requiredAtomsMarkerComment);
   });
 
   it("renders step title from locale via default template", () => {

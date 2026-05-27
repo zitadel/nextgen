@@ -28,7 +28,7 @@ graph LR
 
 ## Invariants
 
-Liquid output uses `<zl-*>` tags, not raw form controls. User-facing strings use `text_key` and `| t`. Templates must not emit `<style>` blocks — theming is orchestrator-owned. Liquid safety: [`../flowengine/template-security.md`](../flowengine/template-security.md). Required fields/gates: [`validator.md`](validator.md) plus `{% mandatory_gates %}`.
+Liquid output uses `<zl-*>` tags, not raw form controls. User-facing strings use `text_key` and `| t`. Templates must not emit `<style>` blocks — theming is orchestrator-owned. Liquid safety: [`../flowengine/template-security.md`](../flowengine/template-security.md). Required fields/gates: [`validator.md`](validator.md) plus `{% required_atoms %}`.
 
 ## Rollout sketch
 

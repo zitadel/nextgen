@@ -1,5 +1,5 @@
 /**
- * `{% mandatory_gates %}` runtime patcher.
+ * `{% required_atoms %}` runtime patcher.
  *
  * Per `docs/design/branding/validator.md` §Runtime safety net:
  *
@@ -9,7 +9,7 @@
  *      - Any required `gates[*]` without a matching consumer.
  *      - A primary `<zl-button type="submit">` if none was reached."
  *
- * Implementation: the LiquidJS `{% mandatory_gates %}` tag emits a unique
+ * Implementation: the LiquidJS `{% required_atoms %}` tag emits a unique
  * marker comment. After Liquid renders, this patcher parses the produced
  * HTML into a `<template>`, builds any missing atoms as real DOM elements,
  * replaces the marker with them, and serialises back to a string.
@@ -22,11 +22,11 @@ import type { CreateFlow201Step } from "@zitadel-nextgen/api/generated/model";
 
 import type { Locale } from "./locales/en.js";
 
-export const MANDATORY_GATES_MARKER = "ZL_MANDATORY_GATES";
+export const REQUIRED_ATOMS_MARKER = "ZL_REQUIRED_ATOMS";
 
-export const mandatoryGatesMarkerComment = `<!--${MANDATORY_GATES_MARKER}-->`;
+export const requiredAtomsMarkerComment = `<!--${REQUIRED_ATOMS_MARKER}-->`;
 
-export function patchMandatoryGates(
+export function patchRequiredAtoms(
   html: string,
   step: CreateFlow201Step,
   locale: Locale,
@@ -117,7 +117,7 @@ function findMarkerComment(fragment: DocumentFragment): Comment | null {
   );
   let node: Node | null = walker.nextNode();
   while (node) {
-    if (node.nodeValue?.trim() === MANDATORY_GATES_MARKER) {
+    if (node.nodeValue?.trim() === REQUIRED_ATOMS_MARKER) {
       return node as Comment;
     }
     node = walker.nextNode();

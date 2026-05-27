@@ -1,8 +1,8 @@
 # Validator
 
-**Status:** Stub. See [`README.md`](README.md) open question 7. **Parent:** [`README.md`](README.md). **Scope:** Structural checks only (required atoms present, `{% mandatory_gates %}`). Security (XSS, CSP, filters, DOMPurify) is [`../flowengine/template-security.md`](../flowengine/template-security.md). Run both.
+**Status:** Stub. See [`README.md`](README.md) open question 7. **Parent:** [`README.md`](README.md). **Scope:** Structural checks only (required atoms present, `{% required_atoms %}`). Security (XSS, CSP, filters, DOMPurify) is [`../flowengine/template-security.md`](../flowengine/template-security.md). Run both.
 
-A template is structurally valid if, for every reachable step, required fields and gates have matching `<zl-*>` tags. Static pass before render; `{% mandatory_gates %}` patches gaps at runtime.
+A template is structurally valid if, for every reachable step, required fields and gates have matching `<zl-*>` tags. Static pass before render; `{% required_atoms %}` patches gaps at runtime.
 
 ```mermaid
 flowchart TB
@@ -18,7 +18,7 @@ flowchart TB
 | Concern | Validator | Source | Runs when |
 |---|---|---|---|
 | XSS, auto-escape, banned filters (`raw`), CSP enforcement, DOMPurify sanitisation | **Security** | [`../flowengine/template-security.md`](../flowengine/template-security.md) | Server-side on save. Non-negotiable. |
-| Required fields/gates present, one primary action, no unknown atoms, `{% mandatory_gates %}` emitted | **Structural** (this doc) | Atom manifests + flow definition | Client-side on load + editor/CI. Falls back on failure. |
+| Required fields/gates present, one primary action, no unknown atoms, `{% required_atoms %}` emitted | **Structural** (this doc) | Atom manifests + flow definition | Client-side on load + editor/CI. Falls back on failure. |
 
 Authoritative XSS/CSP rules live in `template-security.md`. This file is capability coverage only.
 
@@ -65,14 +65,14 @@ Given a flow definition (from the flow engine) and a template:
    - Every required entry in `gates` has exactly one matching `satisfies_gate` consumer.
    - Exactly one `<zl-submit>` is reachable.
    - Every secondary entry in `actions` has at most one matching `<zl-action>` / `<zl-sso-providers>`.
-   - A trailing `{% mandatory_gates %}` tag is present.
+   - A trailing `{% required_atoms %}` tag is present.
    - No `<zl-*>` tags are unknown to the manifest registry.
 
 Output is structured: `{ step_name, missing[], unknown[], duplicated[] }`. The editor surfaces these inline; `npx zitadel push` surfaces them before upload.
 
 ## Runtime safety net
 
-`{% mandatory_gates %}` is a Liquid tag the built-in templates place at the end of their body. After the template finishes rendering, the tag inspects the produced DOM and appends:
+`{% required_atoms %}` is a Liquid tag the built-in templates place at the end of their body. After the template finishes rendering, the tag inspects the produced DOM and appends:
 
 - Any required `fields[*]` without a matching `<zl-field>`.
 - Any required `gates[*]` without a matching consumer.

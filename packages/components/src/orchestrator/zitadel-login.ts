@@ -25,7 +25,7 @@ import { validateBranding } from "./branding-validator.js";
 import { applyFontUrl } from "./font-loader.js";
 import { createLiquidEngine, TEMPLATE_NAMES } from "./liquid.js";
 import { en, type Locale } from "./locales/en.js";
-import { patchMandatoryGates } from "./mandatory-gates.js";
+import { patchRequiredAtoms } from "./required-atoms.js";
 import { zitadelAttributionPillInnerHtml } from "@zitadel-nextgen/shared-component-styles/attribution-markup";
 import { createSanitiser } from "./sanitiser.js";
 import type { FlowError, LiquidContext } from "./template-context.js";
@@ -443,7 +443,7 @@ export class ZitadelLogin extends LitElement {
       }
     }
 
-    const patched = patchMandatoryGates(raw, step, this.locale);
+    const patched = patchRequiredAtoms(raw, step, this.locale);
     return this.sanitise(patched);
   }
 

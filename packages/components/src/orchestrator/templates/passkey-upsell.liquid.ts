@@ -62,7 +62,7 @@ export const passkeyUpsellTemplate = String.raw`
       {% endunless %}
     {% endfor %}
 
-    {% mandatory_gates %}
+    {% required_atoms %}
 
     {% if challenge and challenge.method == "passkey" %}
       <zl-passkey
