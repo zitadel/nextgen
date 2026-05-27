@@ -9,8 +9,8 @@ const fieldType = z.enum(["text", "email", "password", "tel", "number", "url", "
 
 /**
  * A localization key. Pattern enforces the convention
- * `<step>.<scope>.<name>` (snake-case segments) so locale scaffolding can
- * round-trip keys without ambiguity.
+ * `<step>.<scope>.<name>` (snake-case segments) so locale scaffolding
+ * can round-trip keys without ambiguity.
  */
 const textKey = z
   .string()
@@ -20,7 +20,7 @@ const textKey = z
  * A single field collected on a step. The renderer maps `type` to a
  * concrete input control; `text_key` resolves to the field label.
  */
-export const flowFieldSchema = z.object({
+const flowFieldSchema = z.object({
   type: fieldType,
   text_key: textKey,
   required: z.boolean().default(false),
@@ -40,7 +40,7 @@ export const flowFieldSchema = z.object({
  * controls visual emphasis; the runtime never inspects more than one
  * primary per step.
  */
-export const flowActionSchema = z.object({
+const flowActionSchema = z.object({
   text_key: textKey,
   primary: z.boolean().default(false),
 });
@@ -50,7 +50,7 @@ export const flowActionSchema = z.object({
  * before the step's fields are accepted; failure pins the user on the
  * current step.
  */
-export const flowGateSchema = z.object({
+const flowGateSchema = z.object({
   type: z.enum(["captcha", "passkey"]),
   provider: z.string().optional(),
   required: z.boolean().default(true),
@@ -59,10 +59,10 @@ export const flowGateSchema = z.object({
 });
 
 /**
- * Localization keys for a step's display text. Both keys are optional —
- * a step may render purely from its fields and actions.
+ * Localization keys for a step's display text. Both keys are optional
+ * — a step may render purely from its fields and actions.
  */
-export const stepTextsSchema = z.object({
+const stepTextsSchema = z.object({
   title_key: textKey,
   description_key: textKey.optional(),
 });
@@ -79,10 +79,10 @@ const transitionTarget = z.union([
 ]);
 
 /**
- * One node in the flow graph. `transitions` maps action/outcome names to
- * the next step; the engine walks this map after each submit.
+ * One node in the flow graph. `transitions` maps action/outcome names
+ * to the next step; the engine walks this map after each submit.
  */
-export const stepDefinitionSchema = z.object({
+const stepDefinitionSchema = z.object({
   name: z.string().regex(/^[a-z][a-z0-9_]*$/, "step name must be snake_case"),
   type: z.enum([
     "identifier",
@@ -133,15 +133,3 @@ export const flowDefinitionSchema = z.object({
 
 /** Parsed, validated flow-definition body. */
 export type FlowDefinition = z.infer<typeof flowDefinitionSchema>;
-
-/** Parsed, validated step. */
-export type StepDefinition = z.infer<typeof stepDefinitionSchema>;
-
-/** Parsed, validated field. */
-export type FlowField = z.infer<typeof flowFieldSchema>;
-
-/** Parsed, validated action. */
-export type FlowAction = z.infer<typeof flowActionSchema>;
-
-/** Parsed, validated gate. */
-export type FlowGate = z.infer<typeof flowGateSchema>;

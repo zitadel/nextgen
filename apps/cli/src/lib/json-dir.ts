@@ -10,7 +10,7 @@ import { ZitadelError } from "./errors";
  * to run setup" error. The default (`false`) treats a missing
  * directory as an empty result set.
  */
-export type ReadJsonDirOptions = {
+type ReadJsonDirOptions = {
   readonly requireDir?: boolean;
   /**
    * Message used when `requireDir: true` and the directory is missing.
