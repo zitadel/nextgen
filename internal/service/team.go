@@ -43,11 +43,12 @@ func (s *TeamService) CreateTeam(ctx context.Context, input CreateTeamInput) (*d
 		}
 	}()
 
-	model := &domain.Team{
-		ProjectID: input.ProjectID,
+	model, err := domain.NewTeam(input.ProjectID)
+	if err != nil {
+		return nil, err
 	}
 
-	err := s.teamRepo.Create(ctx, tx, model)
+	err = s.teamRepo.Create(ctx, tx, model)
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to create team in database")
 	}

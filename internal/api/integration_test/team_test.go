@@ -65,7 +65,7 @@ func TestGetTeam(t *testing.T) {
 		resp, err := client.GetTeam(t.Context(), params)
 		require.NoError(t, err)
 
-		if !assert.IsType(t, &api.CreateTeamResponse{}, resp) {
+		if !assert.IsType(t, &api.GetTeamResponse{}, resp) {
 			helpers.LogInvalidResponse(t, resp)
 		}
 	})
