@@ -18,10 +18,7 @@ const dec = new TextDecoder();
 
 function toBase64url(buf: ArrayBuffer | Uint8Array): string {
   const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
-  let s = "";
-  for (const b of bytes) {
-    s += String.fromCharCode(b);
-  }
+  const s = Array.from(bytes, (b) => String.fromCharCode(b)).join("");
   return btoa(s).replaceAll("=", "").replaceAll("+", "-").replaceAll("/", "_");
 }
 

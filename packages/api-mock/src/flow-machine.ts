@@ -58,24 +58,24 @@ export type FlowMachineEvent =
     }
   | { type: "RESET" };
 
-const initialContext: FlowMachineContext = {
+const initialContext = {
   tokenSeq: 0,
   sessionToken: "tok_mock_0",
   purpose: null,
   capturedFields: {},
   ssoProviderId: null,
-};
+} satisfies FlowMachineContext;
 
-const rotateToken = assign<FlowMachineContext, FlowMachineEvent, undefined, FlowMachineEvent, never>({
+const rotateToken = assign<FlowMachineContext, FlowMachineEvent>({
   tokenSeq: ({ context }) => context.tokenSeq + 1,
   sessionToken: ({ context }) => `tok_mock_${context.tokenSeq + 1}`,
 });
 
-const captureFields = assign<FlowMachineContext, FlowMachineEvent & { type: "SUBMIT" }, undefined, FlowMachineEvent, never>({
+const captureFields = assign<FlowMachineContext, FlowMachineEvent & { type: "SUBMIT" }>({
   capturedFields: ({ context, event }) => ({ ...context.capturedFields, ...event.fields }),
 });
 
-const setPurpose = assign<FlowMachineContext, FlowMachineEvent & { type: "START" }, undefined, FlowMachineEvent, never>({
+const setPurpose = assign<FlowMachineContext, FlowMachineEvent & { type: "START" }>({
   purpose: ({ event }) => event.purpose,
 });
 
