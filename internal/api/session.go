@@ -244,10 +244,7 @@ func sessionsToAPI(sessions []*domain.Session) *api.SessionListResponse {
 }
 
 func setSessionCookie(token string, expiresAt time.Time) string {
-	maxAge := int(time.Until(expiresAt).Seconds())
-	if maxAge < 0 {
-		maxAge = 0
-	}
+	maxAge := max(int(time.Until(expiresAt).Seconds()), 0)
 	return sessionCookie(token, maxAge)
 }
 
@@ -321,6 +318,8 @@ func sessionErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
 	case domain.ErrSessionTokenInvalid().Code:
 		return errorResponseWithStatusCode(http.StatusUnauthorized, err)
+	case domain.ErrNotImplemented().Code:
+		return errorResponseWithStatusCode(http.StatusNotImplemented, err)
 	default:
 		return internalErrorResponse(err)
 

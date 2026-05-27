@@ -65,7 +65,6 @@ get:
     - $ref: ../../components/parameters/page-token.yaml
     - $ref: ../../components/parameters/project-id.yaml
       description: Filter sessions by project.
-      required: true
     - name: state
       in: query
       required: false
