@@ -211,7 +211,7 @@ export function startMockServer(port: number): Server {
           session_id: `sess_${randomUUID().replace(/-/g, "").slice(0, 12)}`,
           project_id: "proj_mock",
           state: "active",
-          factors: [],
+          factors: {},
           assurance_levels: [],
           created_at: createdAt.toISOString(),
           expires_at: expiresAt.toISOString(),
