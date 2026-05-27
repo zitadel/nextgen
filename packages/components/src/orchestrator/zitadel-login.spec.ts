@@ -84,6 +84,15 @@ async function advanceMockLoginFlow(element: ZitadelLogin, email = "alice@acme.c
       detail: { name: "password", value: "hunter2" },
     }),
   );
+  // Simulate <zl-gate> solving the Altcha PoW — jsdom doesn't run custom
+  // element lifecycles, so we dispatch the result event manually.
+  element.shadowRoot?.dispatchEvent(
+    new CustomEvent("zl-gate-result", {
+      bubbles: true,
+      composed: true,
+      detail: { gate_name: "bot_check", proof: { number: 42, salt: "mock" } },
+    }),
+  );
   element.shadowRoot?.dispatchEvent(
     new CustomEvent("zl-submit", {
       bubbles: true,
@@ -155,6 +164,14 @@ describe("<zitadel-login> against the typed Flow API", () => {
         bubbles: true,
         composed: true,
         detail: { name: "password", value: "hunter2" },
+      }),
+    );
+    // Simulate <zl-gate> solving the Altcha PoW.
+    element.shadowRoot?.dispatchEvent(
+      new CustomEvent("zl-gate-result", {
+        bubbles: true,
+        composed: true,
+        detail: { gate_name: "bot_check", proof: { number: 42, salt: "mock" } },
       }),
     );
 
@@ -324,7 +341,9 @@ describe("<zitadel-login> against the typed Flow API", () => {
   it("auto-submits challenge_response when zl-passkey-result is dispatched", async () => {
     const element = await mount(host);
 
-    // Navigate to the passkey-login step by submitting action: "passkey"
+    // Navigate to the passkey-login step by submitting action: "passkey".
+    // The identifier step has a gate, but the "passkey" action skips gate
+    // validation on the server (only "submit" checks gates).
     element.shadowRoot?.dispatchEvent(
       new CustomEvent("zl-submit", {
         bubbles: true,

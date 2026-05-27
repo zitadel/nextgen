@@ -59,6 +59,14 @@ function collectMissingAtoms(
 ): Element[] {
   const additions: Element[] = [];
 
+  // Gates first — invisible, need to start solving immediately on mount.
+  if (step.gates) {
+    for (const [name, gate] of Object.entries(step.gates)) {
+      if (hasGateFor(fragment, name)) continue;
+      additions.push(buildGate(name, gate));
+    }
+  }
+
   if (step.fields) {
     for (const [name, field] of Object.entries(step.fields)) {
       if (!field.required) continue;
@@ -94,6 +102,14 @@ function hasFieldFor(fragment: DocumentFragment, name: string): boolean {
   return false;
 }
 
+function hasGateFor(fragment: DocumentFragment, gateName: string): boolean {
+  for (const el of fragment.querySelectorAll("zl-gate")) {
+    if (el.getAttribute("gate-name") === gateName) return true;
+  }
+  return false;
+}
+
+
 function findMarkerComment(fragment: DocumentFragment): Comment | null {
   const walker = (fragment.ownerDocument ?? document).createTreeWalker(
     fragment,
@@ -107,6 +123,20 @@ function findMarkerComment(fragment: DocumentFragment): Comment | null {
     node = walker.nextNode();
   }
   return null;
+}
+
+function buildGate(
+  gateName: string,
+  gate: { kind: string; provider: string; config?: Record<string, unknown> },
+): Element {
+  const el = document.createElement("zl-gate");
+  el.setAttribute("gate-name", gateName);
+  el.setAttribute("kind", gate.kind);
+  el.setAttribute("provider", gate.provider);
+  if (gate.config) {
+    el.setAttribute("config", JSON.stringify(gate.config));
+  }
+  return el;
 }
 
 function buildField(

@@ -69,9 +69,9 @@ describe("patchMandatoryGates", () => {
     const malicious: CreateFlow201Step = {
       ...step,
       fields: {
-        '"><script>': {
+        '">\u003cscript>': {
           type: "text",
-          text_key: '"><script>alert(1)</script>',
+          text_key: '">\u003cscript>alert(1)\u003c/script>',
           required: true,
         },
       },
@@ -88,6 +88,53 @@ describe("patchMandatoryGates", () => {
     expect(parsed.querySelector("script")).toBeNull();
     const field = parsed.querySelector("zl-field");
     expect(field).not.toBeNull();
-    expect(field?.getAttribute("name")).toBe('"><script>');
+    expect(field?.getAttribute("name")).toBe('">\u003cscript>');
+  });
+
+  it("injects a zl-gate for a gate with no consumer", () => {
+    const gateStep: CreateFlow201Step = {
+      ...step,
+      gates: {
+        bot_check: { kind: "captcha", provider: "altcha", config: { challenge: "abc", salt: "xyz", max_number: 100000 } },
+      },
+    };
+    const html = `<zl-field name="email"></zl-field>${mandatoryGatesMarkerComment}`;
+    const out = patchMandatoryGates(html, gateStep, locale);
+    expect(out).toContain('<zl-gate gate-name="bot_check"');
+    expect(out).toContain('kind="captcha"');
+    expect(out).toContain('provider="altcha"');
+    expect(out).toContain("config=");
+  });
+
+  it("does not duplicate a zl-gate when one already exists for the gate name", () => {
+    const gateStep: CreateFlow201Step = {
+      ...step,
+      gates: {
+        bot_check: { kind: "captcha", provider: "altcha" },
+      },
+    };
+    const html =
+      `<zl-gate gate-name="bot_check" kind="captcha" provider="altcha"></zl-gate>` +
+      `<zl-field name="email"></zl-field>` +
+      `${mandatoryGatesMarkerComment}`;
+    const out = patchMandatoryGates(html, gateStep, locale);
+    const gateMatches = out.match(/<zl-gate/g) ?? [];
+    expect(gateMatches.length).toBe(1);
+  });
+
+  it("serializes gate config as a JSON attribute", () => {
+    const gateStep: CreateFlow201Step = {
+      ...step,
+      gates: {
+        bot_check: { kind: "captcha", provider: "turnstile", config: { site_key: "0x4AAA" } },
+      },
+    };
+    const out = patchMandatoryGates(mandatoryGatesMarkerComment, gateStep, locale);
+    const parsed = new DOMParser().parseFromString(out, "text/html");
+    const gate = parsed.querySelector("zl-gate");
+    expect(gate).not.toBeNull();
+    expect(gate?.getAttribute("gate-name")).toBe("bot_check");
+    const config = JSON.parse(gate?.getAttribute("config") ?? "{}");
+    expect(config.site_key).toBe("0x4AAA");
   });
 });

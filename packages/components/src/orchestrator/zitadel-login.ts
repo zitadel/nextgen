@@ -139,6 +139,12 @@ export class ZitadelLogin extends LitElement {
 
   @state() private accessor formValues: Record<string, string> = {};
 
+  /**
+   * Accumulated gate proofs from `<zl-gate>` result events. Keyed by
+   * gate name (matching `step.gates`). Cleared on every step transition.
+   */
+  @state() private accessor gateProofs: Record<string, Record<string, unknown>> = {};
+
   private readonly themeController = new ThemeController(this);
 
   private engine: Liquid | null = null;
@@ -180,6 +186,11 @@ export class ZitadelLogin extends LitElement {
       // <zl-passkey> emits `zl-passkey-error` when the ceremony fails or is
       // cancelled. Surface the error on the current step.
       root.addEventListener("zl-passkey-error", this.handlePasskeyError as EventListener);
+      // <zl-gate> emits `zl-gate-result` when a gate proof is solved
+      // (e.g. Altcha PoW, vendor captcha token). Collect into gateProofs.
+      root.addEventListener("zl-gate-result", this.handleGateResult as EventListener);
+      // <zl-gate> emits `zl-gate-error` when solving fails after retries.
+      root.addEventListener("zl-gate-error", this.handleGateError as EventListener);
     }
     return root;
   }
@@ -326,6 +337,8 @@ export class ZitadelLogin extends LitElement {
     // next step's defaults *into* the existing values rather than
     // replacing wholesale.
     this.formValues = { ...this.formValues, ...collectInitialValues(wire.step) };
+    // Clear stale gate proofs from the previous step.
+    this.gateProofs = {};
     void this.maybeCompleteFlow(wire);
   }
 
@@ -557,6 +570,35 @@ export class ZitadelLogin extends LitElement {
     console.warn(`[zitadel-login] passkey ceremony ${aborted ? "cancelled" : "failed"}: ${message}`);
   };
 
+  /**
+   * Handle a successful gate solve. Accumulate the proof so it can be
+   * attached to `gate_proofs` on the next submit.
+   */
+  private handleGateResult = (
+    event: CustomEvent<{ gate_name: string; proof: Record<string, unknown> }>,
+  ): void => {
+    const { gate_name, proof } = event.detail;
+    this.gateProofs = { ...this.gateProofs, [gate_name]: proof };
+  };
+
+  /**
+   * Handle a gate solve error. Surface the error on the current step
+   * (same pattern as passkey errors).
+   */
+  private handleGateError = (
+    event: CustomEvent<{ gate_name: string; error: string }>,
+  ): void => {
+    if (!this.response) return;
+    const { error: message, gate_name } = event.detail;
+    const errorKey = "error.gate_failed";
+    if (this.response.step.error === errorKey) return;
+    this.response = {
+      ...this.response,
+      step: { ...this.response.step, error: errorKey },
+    };
+    console.warn(`[zitadel-login] gate "${gate_name}" failed: ${message}`);
+  };
+
   private findPrimaryAction(): string | null {
     const root = this.shadowRoot;
     if (!root) return null;
@@ -598,6 +640,9 @@ export class ZitadelLogin extends LitElement {
         session_token,
         action: action ?? "submit",
         fields,
+        ...(Object.keys(this.gateProofs).length > 0
+          ? { gate_proofs: this.gateProofs }
+          : {}),
         ...(challengeResponse ? { challenge_response: challengeResponse } : {}),
       };
       const wire = await apiSubmitStep(id, body);

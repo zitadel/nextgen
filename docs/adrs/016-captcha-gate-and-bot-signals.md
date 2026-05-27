@@ -1,7 +1,8 @@
 # ADR 016: Captcha Gate Contract & Bot-Detection Signals
 
-> **Status:** Proposed
+> **Status:** Accepted
 > **Date:** 2026-05-26
+> **Amended:** 2026-05-27 — component renamed `<zl-captcha>` → `<zl-gate>`, `gate_proofs` values changed from string to object
 > **Context:** Flow engine gates, bot detection, captcha providers, edge/platform risk signals
 
 ## Decision
@@ -16,7 +17,7 @@ Two mechanisms, one trust rule:
    provider-specific challenge — the built-in **Altcha** proof-of-work (the one we bring
    along, self-hosted, no third-party account) or a **third-party** provider the customer
    already uses (Cloudflare Turnstile / hCaptcha / reCAPTCHA, with their own keys). The
-   invisible `<zl-captcha>` component solves it, the proof returns via `gate_proofs`, and
+   invisible `<zl-gate>` component solves it, the proof returns via `gate_proofs`, and
    the engine verifies it through the existing `auth_attempts` challenge/verify path. The
    public `site_key` lives in the client-visible gate `config`; any third-party **secret**
    stays server-side in the project secret store ([ADR 005][adr005]).
@@ -64,7 +65,7 @@ modes differ in what fills `config` and where verification credentials live:
   { "kind": "captcha", "provider": "turnstile", "config": { "site_key": "0x4AAA…" } }
   ```
 
-  `<zl-captcha>` loads the vendor widget with that site key; the proof is the vendor token.
+  `<zl-gate>` loads the vendor widget with that site key; the proof is the vendor token.
   The **secret key** is resolved server-side at verify time from the project secret store
   (see *Secret placement*) and is never serialized into `config`.
 
@@ -74,8 +75,9 @@ modes differ in what fills `config` and where verification credentials live:
 never emits one. This ADR makes surfacing gates a requirement.
 
 **Proof submission.** Proofs return in `gate_proofs` (already in
-`flow-submit-request.yaml`), a map keyed by gate name, collected from `<zl-captcha>`
-events. No schema change.
+`flow-submit-request.yaml`), a map keyed by gate name with **object** values (not strings),
+collected from `<zl-gate>` events. The Altcha proof is `{ number, salt }`; a vendor proof
+is `{ token }`. No further schema change beyond `additionalProperties: object`.
 
 **Verification placement.** Captcha verifies through the existing `auth_attempts`
 challenge/verify model as a new `captcha` method, exactly mirroring passkey
@@ -94,7 +96,8 @@ bot-detection gate and **does not** contribute to the session's `assurance_level
 store keyed by project (and team), resolved server-side at verify. The gate `config`
 carries only the public `site_key` ([ADR 005][adr005]; secret store per [secret.md][secret]).
 
-**Frontend.** `<zl-captcha>` is an invisible, auto-submitting Lit component modeled on
+**Frontend.** `<zl-gate>` (named generically because the gate abstraction may expand
+beyond captcha in the future) is an invisible, auto-submitting Lit component modeled on
 `<zl-passkey>` ([ADR 013][adr013] §3). It dispatches on the gate's `provider`, and mounts
 third-party vendor widgets in **light DOM** to avoid shadow-DOM and cross-origin iframe
 friction (Turnstile tolerates shadow DOM; reCAPTCHA/hCaptcha do not). It declares
@@ -103,14 +106,14 @@ branch that auto-injects it when a required gate has no matching consumer in the
 
 ```mermaid
 sequenceDiagram
-    participant B as Browser (<zl-captcha>)
+    participant B as Browser (<zl-gate>)
     participant E as Flow engine
     participant A as auth_attempts
     participant P as Provider (Altcha self / vendor API)
     E->>B: step.gates[bot_check] = { kind, provider, config }
     Note over E,A: Altcha challenge minted server-side at render
     B->>B: solve PoW (Altcha) OR vendor widget token
-    B->>E: POST /flow/{id}/submit { gate_proofs: { bot_check: "<proof>" } }
+    B->>E: POST /flow/{id}/submit { gate_proofs: { bot_check: { number, salt } } }
     E->>A: issue+verify challenge (method: captcha)
     A->>P: verify (Altcha recompute / vendor siteverify + secret)
     P-->>A: ok / fail
@@ -211,9 +214,9 @@ This list doubles as the implementation checklist for the follow-up PRs.
 - Session factors — unaffected (captcha is not an auth factor).
 
 **Frontend**
-- New `<zl-captcha>` component — invisible/auto-submit, dispatch on `provider`, third-party
+- New `<zl-gate>` component — invisible/auto-submit, dispatch on `provider`, third-party
   widgets in light DOM; manifest declares `satisfies_gate: "captcha"`.
-- `mandatory-gates` patcher — add a gate branch to inject `<zl-captcha>` for a required gate
+- `mandatory-gates` patcher — add a gate branch to inject `<zl-gate>` for a required gate
   with no consumer.
 - SDK proxy (`sdk-next`, `sdk-nuxt` middleware) — read the platform verdict, stamp
   `X-Zitadel-Risk-Signal`, attach the project secret on the flow hop, extend the forward
@@ -226,7 +229,7 @@ This list doubles as the implementation checklist for the follow-up PRs.
 
 ## Reviewer split
 
-- **Frontend engineers:** the `<zl-captcha>` component, provider dispatch and light-DOM
+- **Frontend engineers:** the `<zl-gate>` component, provider dispatch and light-DOM
   mount, manifest + `mandatory-gates` injection, and the proxy header stamping.
 - **Backend engineers:** runtime `FlowStep` gates, the `Process()` verify path, the
   `auth_attempts` captcha method, the secret store, risk-signal trust + header acceptance,

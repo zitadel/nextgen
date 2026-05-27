@@ -29,6 +29,7 @@ import type {
 } from "@zitadel-nextgen/api/generated/model";
 import type { RequestHandler } from "msw";
 
+import { verifyAltchaProof, type AltchaChallenge } from "./altcha.js";
 import { withBranding } from "./branding.js";
 import { startFlowActor, type FlowActor, type FlowStepName } from "./flow-machine.js";
 import {
@@ -68,19 +69,46 @@ const FLOW_ID = "flow_mock";
  * @param options.iss - Issuer URL embedded in the handoff token (default:
  *   `"http://localhost:4000"`). Pass the server's own origin so that
  *   `verifyHandoffToken` can enforce issuer consistency.
+ * @param options.verifyGates - When true, the submit handler verifies
+ *   Altcha gate proofs against issued challenges and rejects invalid or
+ *   missing proofs. Defaults to `false` (test-friendly). The standalone
+ *   mock server passes `true`.
  */
-export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
+export function setupMockHandlers(options: { iss?: string; verifyGates?: boolean } = {}): MockHandle {
   const iss = options.iss ?? "http://localhost:4000";
+  const verifyGates = options.verifyGates ?? false;
   let actor: FlowActor = startFlowActor();
   let captured: CapturedRequest[] = [];
 
   function reset(): void {
     actor = startFlowActor();
     captured = [];
+    issuedChallenges.clear();
   }
 
   function getCaptured(): readonly CapturedRequest[] {
     return captured;
+  }
+
+  /**
+   * Issued gate challenges, keyed by gate name. The handler stores these
+   * when a step with gates is returned, and verifies proofs on submit.
+   */
+  const issuedChallenges = new Map<string, AltchaChallenge>();
+
+  /**
+   * Track any gate challenges present in a response so we can verify
+   * the proofs when the client submits.
+   */
+  function trackChallenges(response: CreateFlow201): CreateFlow201 {
+    if (response.step.gates) {
+      for (const [name, gate] of Object.entries(response.step.gates)) {
+        if (gate.kind === "captcha" && gate.provider === "altcha" && gate.config) {
+          issuedChallenges.set(name, gate.config as unknown as AltchaChallenge);
+        }
+      }
+    }
+    return response;
   }
 
   async function currentResponse(): Promise<CreateFlow201> {
@@ -110,7 +138,7 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
       case "done":
         return withBranding(await doneStep(input));
       default:
-        return withBranding(identifierStep(input));
+        return trackChallenges(withBranding(await identifierStep(input)));
     }
   }
 
@@ -133,6 +161,56 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
       const body = (await request.clone().json()) as SubmitFlowStepBody;
       captured.push({ kind: "submitFlowStep", flowId, body });
       const before = actor.getSnapshot().value as FlowStepName | "idle";
+
+      // --- Gate proof verification ---
+      // If the current step had gates, verify the proofs before advancing.
+      if (verifyGates && issuedChallenges.size > 0 && body.action === "submit") {
+        const gateProofs = (body.gate_proofs ?? {}) as Record<string, Record<string, unknown>>;
+
+        for (const [gateName, challenge] of issuedChallenges) {
+          const proof = gateProofs[gateName] as { number: number; salt: string } | undefined;
+          if (!proof) {
+            console.log(`[api-mock] ❌ gate "${gateName}": proof MISSING`);
+            const snapshot = actor.getSnapshot();
+            const response = trackChallenges(
+              withBranding(await identifierStep({
+                flowId: FLOW_ID,
+                sessionToken: snapshot.context.sessionToken,
+                capturedEmail: snapshot.context.capturedFields["email"],
+                iss,
+              })),
+            );
+            return {
+              ...response,
+              step: { ...response.step, error: "error.gate_failed" },
+            };
+          }
+
+          const valid = await verifyAltchaProof(challenge, proof);
+          if (!valid) {
+            console.log(`[api-mock] ❌ gate "${gateName}": proof INVALID (number=${proof.number})`);
+            const snapshot = actor.getSnapshot();
+            const response = trackChallenges(
+              withBranding(await identifierStep({
+                flowId: FLOW_ID,
+                sessionToken: snapshot.context.sessionToken,
+                capturedEmail: snapshot.context.capturedFields["email"],
+                iss,
+              })),
+            );
+            return {
+              ...response,
+              step: { ...response.step, error: "error.gate_failed" },
+            };
+          }
+
+          console.log(`[api-mock] ✅ gate "${gateName}": proof VALID (number=${proof.number})`);
+        }
+
+        // All gates verified — clear for this step.
+        issuedChallenges.clear();
+      }
+
       const fields = (body.fields ?? {}) as Record<string, string>;
       const email = fields.email;
       const snapshot = actor.getSnapshot();
@@ -158,7 +236,7 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
         body.action === "submit" &&
         email?.toLowerCase() === "wrong@example.com"
       ) {
-        const response = withBranding(identifierStep(fixtureInput));
+        const response = withBranding(await identifierStep(fixtureInput));
         return {
           ...response,
           step: { ...response.step, error: "error.invalid_credentials" },
@@ -171,7 +249,7 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
         body.action === "submit" &&
         email?.toLowerCase() === "server@example.com"
       ) {
-        const response = withBranding(identifierStep(fixtureInput));
+        const response = withBranding(await identifierStep(fixtureInput));
         return {
           ...response,
           step: { ...response.step, error: "error.sign_in_server" },

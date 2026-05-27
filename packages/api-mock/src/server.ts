@@ -243,7 +243,7 @@ export function startMockServer(port: number): Server {
   });
 
   // ─── Flow API + Platform API — reuse MSW handlers, zero duplication ──────
-  app.use(createMiddleware(...setupMockHandlers({ iss }).handlers, ...setupPlatformHandlers()));
+  app.use(createMiddleware(...setupMockHandlers({ iss, verifyGates: true }).handlers, ...setupPlatformHandlers()));
 
   return app.listen(port, () => {
     console.log(`\napi-mock server listening on http://localhost:${port}`);

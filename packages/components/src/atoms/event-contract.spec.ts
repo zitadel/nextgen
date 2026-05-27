@@ -14,6 +14,7 @@ describe("atom event contract", () => {
     "zl-button": ["zl-submit"],
     "zl-card": [],
     "zl-field": ["zl-input"],
+    "zl-gate": ["zl-gate-result", "zl-gate-error"],
     "zl-icon": [],
     "zl-page-shell": [],
     "zl-passkey": ["zl-passkey-result", "zl-passkey-error"],

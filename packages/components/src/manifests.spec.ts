@@ -5,7 +5,7 @@ import { findManifest, listKnownTags, manifestRegistry, type AtomManifest } from
 describe("manifest registry", () => {
   it("exposes the documented atom set", () => {
     expect([...listKnownTags()].sort()).toEqual(
-      ["zl-alert", "zl-button", "zl-card", "zl-field", "zl-icon", "zl-page-shell", "zl-passkey", "zl-pill"].sort(),
+      ["zl-alert", "zl-button", "zl-card", "zl-field", "zl-gate", "zl-icon", "zl-page-shell", "zl-passkey", "zl-pill"].sort(),
     );
   });
 

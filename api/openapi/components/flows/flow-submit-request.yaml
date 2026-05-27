@@ -20,9 +20,9 @@ properties:
     type: object
     description: |
       Solutions for security gates. Keys match gate names from the step's `gates` dictionary.
-      The orchestrator collects these from `<zl-captcha>` component events.
+      The orchestrator collects these from `<zl-gate>` component events.
     additionalProperties:
-      type: string
+      type: object
   challenge_response:
     type: object
     description: |
