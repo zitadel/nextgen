@@ -1,6 +1,14 @@
 import { FLOWS_DIR } from "../flows";
 import type { PlatformClient } from "../../platform/client.js";
 
+/**
+ * The contract each per-resource adapter implements. `directory` is
+ * the project-root-relative path the sync loop scans; `mutable`
+ * controls whether file-content changes trigger update or get skipped.
+ * Concrete syncers (file-private to this module) translate the
+ * generic `data: object` payload into the resource-specific envelope
+ * and dispatch to the matching `client.*` method.
+ */
 export interface ResourceSyncer {
   readonly kind: string;
   readonly directory: string;
@@ -11,7 +19,17 @@ export interface ResourceSyncer {
   fetch?(client: PlatformClient, id: string): Promise<object>;
 }
 
-export class SchemaSyncer implements ResourceSyncer {
+/**
+ * Build the syncer list with the project context every flow create
+ * needs. Callers (apply / plan) read `project_id` from
+ * `.zitadel/secret` and pass it here. The returned array is treated
+ * as read-only by the sync loop.
+ */
+export function makeSyncers(opts: { projectId: string }): ReadonlyArray<ResourceSyncer> {
+  return [new SchemaSyncer(), new FlowDefinitionSyncer(opts.projectId)];
+}
+
+class SchemaSyncer implements ResourceSyncer {
   readonly kind = "schema";
   readonly directory = ".zitadel/schemas";
   readonly mutable = false;
@@ -22,7 +40,7 @@ export class SchemaSyncer implements ResourceSyncer {
   }
 
   async update(_client: PlatformClient, _id: string, _data: object): Promise<void> {
-    // never called — mutable = false
+    // Never called — mutable = false. Schemas are immutable on the platform.
   }
 
   async delete(client: PlatformClient, id: string): Promise<void> {
@@ -34,7 +52,7 @@ export class SchemaSyncer implements ResourceSyncer {
   }
 }
 
-export class FlowDefinitionSyncer implements ResourceSyncer {
+class FlowDefinitionSyncer implements ResourceSyncer {
   readonly kind = "flow";
   readonly directory = FLOWS_DIR;
   readonly mutable = true;
@@ -42,10 +60,10 @@ export class FlowDefinitionSyncer implements ResourceSyncer {
   constructor(private readonly projectId: string) {}
 
   async create(client: PlatformClient, data: object): Promise<string> {
-    // Wrap the bare flow body in the spec envelope before sending. The flow
-    // file on disk stays the bare flow-definition object so it is editable
-    // by humans; only the wire request carries `project_id` and the
-    // surrounding envelope per
+    // Wrap the bare flow body in the spec envelope before sending.
+    // The on-disk file stays bare so it is editable by humans; only
+    // the wire request carries `project_id` and the surrounding
+    // envelope per
     // `api/openapi/components/flows/flow-definition-create-request.yaml`.
     const result = await client.createFlowDefinition({
       project_id: this.projectId,
@@ -55,8 +73,8 @@ export class FlowDefinitionSyncer implements ResourceSyncer {
   }
 
   async update(client: PlatformClient, id: string, data: object): Promise<void> {
-    // PATCH body is the bare partial flow per `flow-definition-update-request`
-    // — no envelope.
+    // PATCH body is the bare partial flow per
+    // `flow-definition-update-request` — no envelope.
     await client.updateFlowDefinition(id, data);
   }
 
@@ -65,11 +83,11 @@ export class FlowDefinitionSyncer implements ResourceSyncer {
   }
 
   async fetch(client: PlatformClient, id: string): Promise<object> {
-    // The GET /flow_definitions/:id response wraps the bare flow body in a
-    // detail envelope (`id`, `project_id`, `schema_uri`, `status`,
-    // `created_at`, `updated_at`). Strip those envelope fields before
-    // returning so the diff compares apples-to-apples against the on-disk
-    // flow file, which stores only the bare body.
+    // The GET /flow_definitions/:id response wraps the bare flow body
+    // in a detail envelope (`id`, `project_id`, `schema_uri`,
+    // `status`, `created_at`, `updated_at`). Strip those envelope
+    // fields before returning so the diff compares apples-to-apples
+    // against the on-disk flow file, which stores only the bare body.
     const {
       id: _id,
       project_id: _projectId,
@@ -81,13 +99,4 @@ export class FlowDefinitionSyncer implements ResourceSyncer {
     } = (await client.getFlowDefinition(id)) as Record<string, unknown>;
     return body;
   }
-}
-
-/**
- * Build the syncer list with the project context every flow create needs.
- * Callers (apply / plan) read `project_id` from `.zitadel/secret` and pass
- * it here.
- */
-export function makeSyncers(opts: { projectId: string }): ResourceSyncer[] {
-  return [new SchemaSyncer(), new FlowDefinitionSyncer(opts.projectId)];
 }

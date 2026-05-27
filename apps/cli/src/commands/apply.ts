@@ -7,9 +7,7 @@ import { FLOWS_DIR, validateFlows } from "../lib/flows";
 import { readJsonDir } from "../lib/json-dir";
 import { createPlatformClient } from "../platform";
 import { environmentSchema, type ZitadelEnvironment } from "../platform/schemas";
-import { buildSyncPlan, runSyncLoop } from "../lib/sync/loop";
-import { renderPlan } from "../lib/sync/plan-renderer";
-import { makeSyncers } from "../lib/sync/syncers";
+import { buildSyncPlan, makeSyncers, renderPlan, runSyncLoop } from "../lib/sync";
 import { readZitadelSecret } from "./shared";
 
 export type ApplyOptions = GlobalOptions & {

@@ -9,9 +9,11 @@
  * `apps/cli/src/lib/` — today `lib/errors` (`ZitadelError`). Reading
  * and writing local files is the caller's responsibility, served by
  * `apps/cli/src/lib/json-dir.ts` plus this module's {@link FLOWS_DIR}
- * constant and {@link validateFlows} parser. Future domain modules
- * (`lib/user-schema/`, ...) follow the same rule: sideways onto
- * `lib/<utility>/` is fine; upward into app code is not.
+ * constant and {@link validateFlows} parser. The peer `lib/sync/`
+ * orchestration module consumes {@link FLOWS_DIR} the same way.
+ * Future domain modules (`lib/user-schema/`, ...) follow the same
+ * rule: sideways onto `lib/<utility>/` is fine; upward into app code
+ * is not.
  */
 export type { FlowDefinition } from "./schema";
 export { flowDefinitionSchema } from "./schema";
