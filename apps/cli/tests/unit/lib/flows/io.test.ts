@@ -5,12 +5,12 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
+  FLOWS_DIR,
   buildFlowAndLocale,
   readLocalFlows,
   validateFlows,
   writeLocalFlow,
 } from "../../../../src/lib/flows";
-import { FLOWS_DIR } from "../../../../src/lib/flows/io";
 import { ZitadelError } from "../../../../src/lib/errors";
 
 let cwd: string;

@@ -92,13 +92,20 @@ export function defaultUserSchema(
 
 export function normalizeAuthMethods(methods?: string | string[] | AuthMethods): AuthMethods {
   if (typeof methods === "string") {
-    return { [methods]: { enabled: true, position: 0 } };
+    const trimmed = methods.trim();
+    if (!trimmed) {
+      throw new Error("auth method must not be blank");
+    }
+    return { [trimmed]: { enabled: true, position: 0 } };
   }
   if (methods && !Array.isArray(methods)) {
     return methods;
   }
 
-  const selected = methods?.length ? methods : ["passkey"];
+  const sanitized = methods
+    ?.map((method) => method.trim())
+    .filter((method) => method.length > 0);
+  const selected = sanitized?.length ? sanitized : ["passkey"];
   const out: AuthMethods = {};
   selected.forEach((method, index) => {
     out[method] = { enabled: true, position: index };
