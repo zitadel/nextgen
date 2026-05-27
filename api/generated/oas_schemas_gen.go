@@ -1955,6 +1955,51 @@ func (s *CreateSessionRequestUserAgentAdditional) init() CreateSessionRequestUse
 	return m
 }
 
+type CreateTeamBadRequest ErrorDetails
+
+func (*CreateTeamBadRequest) createTeamRes() {}
+
+type CreateTeamNotFound ErrorDetails
+
+func (*CreateTeamNotFound) createTeamRes() {}
+
+// Ref: #
+type CreateTeamRequest struct{}
+
+// Ref: #
+type CreateTeamResponse struct {
+	// The unique identifier of the team.
+	ID string `json:"id"`
+	// The time when the team was created.
+	CreatedAt time.Time `json:"createdAt"`
+}
+
+// GetID returns the value of ID.
+func (s *CreateTeamResponse) GetID() string {
+	return s.ID
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *CreateTeamResponse) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// SetID sets the value of ID.
+func (s *CreateTeamResponse) SetID(val string) {
+	s.ID = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *CreateTeamResponse) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+func (*CreateTeamResponse) createTeamRes() {}
+
+type CreateTeamTooManyRequests ErrorDetails
+
+func (*CreateTeamTooManyRequests) createTeamRes() {}
+
 // DeleteFlowDefinitionNoContent is response for DeleteFlowDefinition operation.
 type DeleteFlowDefinitionNoContent struct{}
 
@@ -2144,6 +2189,7 @@ func (*ErrorDetailsStatusCode) createFlowRes()             {}
 func (*ErrorDetailsStatusCode) createProjectRes()          {}
 func (*ErrorDetailsStatusCode) createSchemaRes()           {}
 func (*ErrorDetailsStatusCode) createSessionRes()          {}
+func (*ErrorDetailsStatusCode) createTeamRes()             {}
 func (*ErrorDetailsStatusCode) deleteFlowDefinitionRes()   {}
 func (*ErrorDetailsStatusCode) endSessionRes()             {}
 func (*ErrorDetailsStatusCode) exchangeHandoffRes()        {}
@@ -2158,6 +2204,7 @@ func (*ErrorDetailsStatusCode) getProjectRes()             {}
 func (*ErrorDetailsStatusCode) getReadyRes()               {}
 func (*ErrorDetailsStatusCode) getSchemaByIdRes()          {}
 func (*ErrorDetailsStatusCode) getSessionRes()             {}
+func (*ErrorDetailsStatusCode) getTeamRes()                {}
 func (*ErrorDetailsStatusCode) getTokenRes()               {}
 func (*ErrorDetailsStatusCode) getUserInfoRes()            {}
 func (*ErrorDetailsStatusCode) introspectRes()             {}
@@ -4382,6 +4429,57 @@ func (*GetSessionNotFound) getSessionRes() {}
 type GetSessionUnauthorized ErrorDetails
 
 func (*GetSessionUnauthorized) getSessionRes() {}
+
+type GetTeamNotFound ErrorDetails
+
+func (*GetTeamNotFound) getTeamRes() {}
+
+// The current state of a team.
+// Ref: #
+type GetTeamResponse struct {
+	// The unique identifier of the team.
+	ID string `json:"id"`
+	// The time when the team was created.
+	CreatedAt time.Time `json:"createdAt"`
+	// The time when the team was last updated.
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+// GetID returns the value of ID.
+func (s *GetTeamResponse) GetID() string {
+	return s.ID
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *GetTeamResponse) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetUpdatedAt returns the value of UpdatedAt.
+func (s *GetTeamResponse) GetUpdatedAt() time.Time {
+	return s.UpdatedAt
+}
+
+// SetID sets the value of ID.
+func (s *GetTeamResponse) SetID(val string) {
+	s.ID = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *GetTeamResponse) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetUpdatedAt sets the value of UpdatedAt.
+func (s *GetTeamResponse) SetUpdatedAt(val time.Time) {
+	s.UpdatedAt = val
+}
+
+func (*GetTeamResponse) getTeamRes() {}
+
+type GetTeamUnauthorized ErrorDetails
+
+func (*GetTeamUnauthorized) getTeamRes() {}
 
 type GetUserInfoOK struct {
 	// The unique identifier for the user.

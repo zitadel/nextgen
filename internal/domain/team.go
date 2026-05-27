@@ -7,6 +7,18 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
+const (
+	PrefixTeam ResourcePrefix = "team"
+)
+
+func ErrTeamNotFound() Error {
+	return newError(PrefixTeam.ErrorCodePrefix("not_found"), "team not found", nil, nil)
+}
+
+func ErrTeamProjectNotFound() Error {
+	return newError(PrefixTeam.ErrorCodePrefix("not_found"), "project not found", nil, nil)
+}
+
 // Team represents the object defined [here](https://github.com/zitadel/nextgen/blob/main/docs/design/api/resource-map.md#teams)
 // It is hardly ever modified but read a lot therefore it should be stored in global tables.
 type Team struct {

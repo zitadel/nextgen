@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/cookie"
@@ -13,13 +14,14 @@ type Handler struct {
 	// responses for all endpoints, so only implemented methods need to be defined.
 	api.UnimplementedHandler
 
-	sealer             *cookie.Sealer
-	flowService        service.FlowService
-	authAttemptService service.AuthAttemptService
-	sessionService     service.SessionService
-	projectService     service.ProjectService
-	schemaService      *service.SchemaService
+	sealer                *cookie.Sealer
+	flowService           service.FlowService
+	authAttemptService    service.AuthAttemptService
+	sessionService        service.SessionService
+	projectService        service.ProjectService
+	schemaService         *service.SchemaService
 	flowDefinitionService service.FlowDefinitionService
+	teamService           *service.TeamService
 }
 
 func NewHandler(
@@ -30,15 +32,17 @@ func NewHandler(
 	projectService service.ProjectService,
 	schemaService *service.SchemaService,
 	flowDefinitionService service.FlowDefinitionService,
+	teamService *service.TeamService,
 ) *Handler {
 	return &Handler{
-		sealer:             sealer,
-		flowService:        flowService,
-		authAttemptService: authAttemptService,
-		sessionService:     sessionService,
-		projectService:     projectService,
-		schemaService:      schemaService,
+		sealer:                sealer,
+		flowService:           flowService,
+		authAttemptService:    authAttemptService,
+		sessionService:        sessionService,
+		projectService:        projectService,
+		schemaService:         schemaService,
 		flowDefinitionService: flowDefinitionService,
+		teamService:           teamService,
 	}
 }
 
@@ -51,3 +55,6 @@ func (h *Handler) NewError(ctx context.Context, err error) *api.ErrorDetailsStat
 }
 
 var _ api.Handler = (*Handler)(nil)
+
+var NoProjectError = errors.New("a project must be provided")
+var NoTeamError = errors.New("a team must be provided")
