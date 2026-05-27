@@ -17,7 +17,6 @@ import (
 
 const (
 	flowCookieName          = "_zflow"
-	flowCookiePath          = "/flow"
 	flowCookieMaxAgeSeconds = 600
 )
 
@@ -195,7 +194,6 @@ func (h *Handler) sealState(state *domain.FlowState) (string, error) {
 func flowSetCookie(value string, clear bool) string {
 	c := &http.Cookie{
 		Name:     flowCookieName,
-		Path:     flowCookiePath,
 		HttpOnly: true,
 		Secure:   true,
 		SameSite: http.SameSiteStrictMode,
@@ -230,6 +228,7 @@ func toFlowStep(step *domain.FlowStep) api.FlowStep {
 	}
 	out := api.FlowStep{
 		Name:    step.Name,
+		Texts:   api.NewOptStepTexts(toStepTexts(step.Texts)),
 		Fields:  toFlowStepFields(step.Fields),
 		Actions: toFlowStepActions(step.Actions),
 		Gates:   api.FlowStepGates{},
@@ -244,6 +243,17 @@ func toFlowStep(step *domain.FlowStep) api.FlowStep {
 		if u, err := parseURI(*step.RedirectURL); err == nil {
 			out.RedirectURL = api.NewOptURI(u)
 		}
+	}
+	return out
+}
+
+func toStepTexts(t domain.FlowStepTexts) api.StepTexts {
+	out := api.StepTexts{}
+	if t.TitleKey != "" {
+		out.TitleKey = api.NewOptString(t.TitleKey)
+	}
+	if t.DescriptionKey != "" {
+		out.DescriptionKey = api.NewOptNilString(t.DescriptionKey)
 	}
 	return out
 }

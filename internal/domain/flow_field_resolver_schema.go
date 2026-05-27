@@ -49,7 +49,7 @@ var _ FlowFieldResolver = (*SchemaFieldResolver)(nil)
 func (r *SchemaFieldResolver) Resolve(
 	ctx context.Context,
 	client database.QueryExecutor,
-	projectID, userSchemaURL string,
+	projectID, userSchemaURL, stepName string,
 	fieldNames []string,
 ) (FlowResolvedFields, error) {
 	schema, err := r.schemas.Resolve(ctx, client, projectID, userSchemaURL, nil)
@@ -69,7 +69,7 @@ func (r *SchemaFieldResolver) Resolve(
 		if !ok {
 			return FlowResolvedFields{}, fmt.Errorf("%w: %q", ErrFlowFieldUnknown, name)
 		}
-		field := buildFlowField(name, propSchema, required, passwordEnabled)
+		field := buildFlowField(stepName, name, propSchema, required, passwordEnabled)
 		fields[name] = field
 		if outcomes := ImplicitOutcomesForChallenge(field.Challenge); len(outcomes) > 0 {
 			implicit[name] = append(implicit[name], outcomes...)
@@ -83,10 +83,10 @@ func (r *SchemaFieldResolver) Resolve(
 }
 
 // buildFlowField translates a user-schema property into a [FlowField].
-func buildFlowField(name string, propSchema *jsonschema.Schema, required map[string]struct{}, passwordEnabled bool) FlowField {
+func buildFlowField(stepName, name string, propSchema *jsonschema.Schema, required map[string]struct{}, passwordEnabled bool) FlowField {
 	unique := deriveUnique(propSchema)
 	field := FlowField{
-		TextKey:   "field." + name,
+		TextKey:   stepName + ".field." + name,
 		Type:      deriveFieldType(propSchema),
 		Challenge: deriveChallenge(propSchema, unique, passwordEnabled),
 		Unique:    unique,

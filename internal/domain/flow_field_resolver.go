@@ -18,8 +18,10 @@ import (
 // api/openapi/endpoints/schemas/user-schema.yaml.
 type FlowFieldResolver interface {
 	// Resolve returns the per-field metadata for fieldNames sourced
-	// from the user schema at userSchemaURL.
-	Resolve(ctx context.Context, client database.QueryExecutor, projectID, userSchemaURL string, fieldNames []string) (FlowResolvedFields, error)
+	// from the user schema at userSchemaURL. stepName is the flow
+	// step the fields are being resolved for; it prefixes each
+	// field's text_key (`<stepName>.field.<name>`).
+	Resolve(ctx context.Context, client database.QueryExecutor, projectID, userSchemaURL, stepName string, fieldNames []string) (FlowResolvedFields, error)
 
 	// Validate checks submitted values against the rules carried by a
 	// previously resolved field set.

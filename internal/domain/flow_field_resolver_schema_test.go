@@ -71,7 +71,7 @@ func newDefaultResolver(t *testing.T) *domain.SchemaFieldResolver {
 func TestSchemaFieldResolver_Resolve_DefaultFields(t *testing.T) {
 	resolver := newDefaultResolver(t)
 
-	got, err := resolver.Resolve(t.Context(), nil, testProjectID, defaultSchemaURL,
+	got, err := resolver.Resolve(t.Context(), nil, testProjectID, defaultSchemaURL, "identifier",
 		[]string{"email", "username", "password", "given_name", "family_name"})
 	if err != nil {
 		t.Fatalf("Resolve returned error: %v", err)
@@ -82,11 +82,11 @@ func TestSchemaFieldResolver_Resolve_DefaultFields(t *testing.T) {
 		wantType    domain.FlowFieldType
 		wantTextKey string
 	}{
-		{"email", domain.FlowFieldTypeEmail, "field.email"},
-		{"username", domain.FlowFieldTypeText, "field.username"},
-		{"password", domain.FlowFieldTypePassword, "field.password"},
-		{"given_name", domain.FlowFieldTypeText, "field.given_name"},
-		{"family_name", domain.FlowFieldTypeText, "field.family_name"},
+		{"email", domain.FlowFieldTypeEmail, "identifier.field.email"},
+		{"username", domain.FlowFieldTypeText, "identifier.field.username"},
+		{"password", domain.FlowFieldTypePassword, "identifier.field.password"},
+		{"given_name", domain.FlowFieldTypeText, "identifier.field.given_name"},
+		{"family_name", domain.FlowFieldTypeText, "identifier.field.family_name"},
 	}
 	for _, tc := range tests {
 		f, ok := got.Fields[tc.name]
@@ -109,7 +109,7 @@ func TestSchemaFieldResolver_Resolve_DefaultFields(t *testing.T) {
 func TestSchemaFieldResolver_Resolve_IdentifierImpliesUserNotFound(t *testing.T) {
 	resolver := newDefaultResolver(t)
 
-	got, err := resolver.Resolve(t.Context(), nil, testProjectID, defaultSchemaURL, []string{"email", "password"})
+	got, err := resolver.Resolve(t.Context(), nil, testProjectID, defaultSchemaURL, "step", []string{"email", "password"})
 	if err != nil {
 		t.Fatalf("Resolve returned error: %v", err)
 	}
@@ -131,7 +131,7 @@ func TestSchemaFieldResolver_Resolve_IdentifierImpliesUserNotFound(t *testing.T)
 func TestSchemaFieldResolver_Resolve_ChallengeSurfaces(t *testing.T) {
 	resolver := newDefaultResolver(t)
 
-	got, err := resolver.Resolve(t.Context(), nil, testProjectID, defaultSchemaURL, []string{"email", "password", "given_name"})
+	got, err := resolver.Resolve(t.Context(), nil, testProjectID, defaultSchemaURL, "step", []string{"email", "password", "given_name"})
 	if err != nil {
 		t.Fatalf("Resolve returned error: %v", err)
 	}
@@ -158,7 +158,7 @@ func TestSchemaFieldResolver_Resolve_PasswordChallengeRequiresAuthMethodEnabled(
 	}`)
 	resolver := domain.NewSchemaFieldResolver(newFakeResolver(t, map[string][]byte{url: bytes}))
 
-	got, err := resolver.Resolve(t.Context(), nil, testProjectID, url, []string{"password"})
+	got, err := resolver.Resolve(t.Context(), nil, testProjectID, url, "step", []string{"password"})
 	if err != nil {
 		t.Fatalf("Resolve returned error: %v", err)
 	}
@@ -179,7 +179,7 @@ func TestSchemaFieldResolver_Resolve_PasswordChallengeRequiresXPassword(t *testi
 	}`)
 	resolver := domain.NewSchemaFieldResolver(newFakeResolver(t, map[string][]byte{url: bytes}))
 
-	got, err := resolver.Resolve(t.Context(), nil, testProjectID, url, []string{"password"})
+	got, err := resolver.Resolve(t.Context(), nil, testProjectID, url, "step", []string{"password"})
 	if err != nil {
 		t.Fatalf("Resolve returned error: %v", err)
 	}
@@ -203,7 +203,7 @@ func TestSchemaFieldResolver_Resolve_RenamedPasswordField(t *testing.T) {
 	}`)
 	resolver := domain.NewSchemaFieldResolver(newFakeResolver(t, map[string][]byte{url: bytes}))
 
-	got, err := resolver.Resolve(t.Context(), nil, testProjectID, url, []string{"secret"})
+	got, err := resolver.Resolve(t.Context(), nil, testProjectID, url, "step", []string{"secret"})
 	if err != nil {
 		t.Fatalf("Resolve returned error: %v", err)
 	}
@@ -218,7 +218,7 @@ func TestSchemaFieldResolver_Resolve_RenamedPasswordField(t *testing.T) {
 func TestSchemaFieldResolver_Resolve_UniqueScopeSurfaces(t *testing.T) {
 	resolver := newDefaultResolver(t)
 
-	got, err := resolver.Resolve(t.Context(), nil, testProjectID, defaultSchemaURL, []string{"email", "password"})
+	got, err := resolver.Resolve(t.Context(), nil, testProjectID, defaultSchemaURL, "step", []string{"email", "password"})
 	if err != nil {
 		t.Fatalf("Resolve returned error: %v", err)
 	}
@@ -242,7 +242,7 @@ func TestSchemaFieldResolver_Resolve_UniqueScopeProject(t *testing.T) {
 	}`)
 	resolver := domain.NewSchemaFieldResolver(newFakeResolver(t, map[string][]byte{url: bytes}))
 
-	got, err := resolver.Resolve(t.Context(), nil, testProjectID, url, []string{"handle"})
+	got, err := resolver.Resolve(t.Context(), nil, testProjectID, url, "step", []string{"handle"})
 	if err != nil {
 		t.Fatalf("Resolve returned error: %v", err)
 	}
@@ -254,7 +254,7 @@ func TestSchemaFieldResolver_Resolve_UniqueScopeProject(t *testing.T) {
 func TestSchemaFieldResolver_Resolve_UnknownField(t *testing.T) {
 	resolver := newDefaultResolver(t)
 
-	_, err := resolver.Resolve(t.Context(), nil, testProjectID, defaultSchemaURL, []string{"not_in_schema"})
+	_, err := resolver.Resolve(t.Context(), nil, testProjectID, defaultSchemaURL, "step", []string{"not_in_schema"})
 	if !errors.Is(err, domain.ErrFlowFieldUnknown) {
 		t.Fatalf("Resolve err = %v, want ErrFlowFieldUnknown", err)
 	}
@@ -263,7 +263,7 @@ func TestSchemaFieldResolver_Resolve_UnknownField(t *testing.T) {
 func TestSchemaFieldResolver_Resolve_SchemaLoadFailurePropagates(t *testing.T) {
 	resolver := domain.NewSchemaFieldResolver(newFakeResolver(t, nil))
 
-	_, err := resolver.Resolve(t.Context(), nil, testProjectID, "https://example.test/missing.json", []string{"email"})
+	_, err := resolver.Resolve(t.Context(), nil, testProjectID, "https://example.test/missing.json", "step", []string{"email"})
 	if err == nil {
 		t.Fatal("Resolve err = nil, want load failure")
 	}
@@ -283,7 +283,7 @@ func TestSchemaFieldResolver_Resolve_FormatAndTypeVariants(t *testing.T) {
 	}`)
 	resolver := domain.NewSchemaFieldResolver(newFakeResolver(t, map[string][]byte{url: bytes}))
 
-	got, err := resolver.Resolve(t.Context(), nil, testProjectID, url,
+	got, err := resolver.Resolve(t.Context(), nil, testProjectID, url, "step",
 		[]string{"website", "birthday", "created", "nickname"})
 	if err != nil {
 		t.Fatalf("Resolve returned error: %v", err)

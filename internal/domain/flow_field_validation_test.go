@@ -13,7 +13,7 @@ import (
 func resolveDefaultFields(t *testing.T) domain.FlowResolvedFields {
 	t.Helper()
 	resolver := newDefaultResolver(t)
-	fields, err := resolver.Resolve(t.Context(), nil, testProjectID, defaultSchemaURL,
+	fields, err := resolver.Resolve(t.Context(), nil, testProjectID, defaultSchemaURL, "step",
 		[]string{"email", "username", "password", "given_name", "family_name"})
 	if err != nil {
 		t.Fatalf("Resolve returned error: %v", err)
