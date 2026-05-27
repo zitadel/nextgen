@@ -53,7 +53,7 @@ type UserRepository interface {
 	userChanges
 	userJoins
 
-	GetById(ctx context.Context, client database.QueryExecutor, projectID string, userID string) (*User, error)
+	GetByID(ctx context.Context, client database.QueryExecutor, projectID string, userID string) (*User, error)
 	Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*User, error)
 	List(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) ([]*User, error)
 	Create(ctx context.Context, client database.QueryExecutor, user *CreateUser) error

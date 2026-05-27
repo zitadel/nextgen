@@ -34,7 +34,7 @@ func NewUserService(
 }
 
 func (s *UserService) GetUser(ctx context.Context, input GetUserInput) ([]byte, error) {
-	user, err := s.userRepo.GetById(ctx, s.pool, input.ProjectID, input.UserID)
+	user, err := s.userRepo.GetByID(ctx, s.pool, input.ProjectID, input.UserID)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil, domain.ErrUserNotFound()
