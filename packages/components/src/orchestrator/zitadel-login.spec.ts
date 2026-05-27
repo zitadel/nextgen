@@ -342,6 +342,9 @@ describe("<zitadel-login> against the typed Flow API", () => {
       return submits.some((s) => s.body.action === "passkey") ? submits : null;
     });
 
+    // Pre-register the credential so the mock's passkey-login check passes.
+    mock.registerCredential("mock-user@example.com", "cred_mock_123");
+
     // Simulate a successful WebAuthn ceremony by dispatching zl-passkey-result
     const mockProof = {
       id: "cred_mock_123",

@@ -92,6 +92,7 @@ describe("setupMockHandlers", () => {
       session_token: setup.session_token,
       action: "submit",
       fields: {},
+      challenge_response: { proof: { id: "mock-credential-id", authenticatorAttachment: "platform" } },
     });
     expect(done.step.name).toBe("done");
     expect(done.step.complete).toBe("show");
@@ -193,6 +194,139 @@ describe("setupMockHandlers", () => {
     });
     expect(submit.step.name).toBe("identifier");
     expect(submit.step.error).toBe("error.sign_in_server");
+  });
+
+  test("passkey-login: register then sign in with same credential reaches done", async () => {
+    // Session 1 — register the passkey.
+    const s1 = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    const upsell = await submitFlowStep(s1.id, {
+      session_token: s1.session_token,
+      action: "submit",
+      fields: { email: "alice@acme.com", password: "hunter2" },
+    });
+    const setup = await submitFlowStep(upsell.id, {
+      session_token: upsell.session_token,
+      action: "setup",
+      fields: {},
+    });
+    expect(setup.step.name).toBe("passkey-setup");
+    await submitFlowStep(setup.id, {
+      session_token: setup.session_token,
+      action: "submit",
+      fields: {},
+      challenge_response: { proof: { id: "cred-alice-1", authenticatorAttachment: "platform" } },
+    });
+
+    // Session 2 — sign in with the registered passkey.
+    const s2 = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    const login = await submitFlowStep(s2.id, {
+      session_token: s2.session_token,
+      action: "passkey",
+      fields: {},
+    });
+    expect(login.step.name).toBe("passkey-login");
+    expect(login.step.challenge).toBeTruthy();
+
+    const done = await submitFlowStep(login.id, {
+      session_token: login.session_token,
+      action: "submit",
+      fields: {},
+      challenge_response: { proof: { id: "cred-alice-1" } },
+    });
+    expect(done.step.name).toBe("done");
+    expect(done.handoff_token).toBeTruthy();
+    const payload = JSON.parse(
+      Buffer.from(done.handoff_token!.split(".")[1], "base64url").toString("utf8"),
+    ) as { sub: string };
+    expect(payload.sub).toBe("alice@acme.com");
+  });
+
+  test("passkey-login: discoverable credential carries authenticated user into handoff token", async () => {
+    mock.registerCredential("bob@example.com", "cred-bob-1");
+
+    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    const login = await submitFlowStep(start.id, {
+      session_token: start.session_token,
+      action: "passkey",
+      fields: {},
+    });
+    expect(login.step.name).toBe("passkey-login");
+
+    const done = await submitFlowStep(login.id, {
+      session_token: login.session_token,
+      action: "submit",
+      fields: {},
+      challenge_response: { proof: { id: "cred-bob-1" } },
+    });
+    expect(done.step.name).toBe("done");
+    expect(done.handoff_token).toBeTruthy();
+    const payload = JSON.parse(
+      Buffer.from(done.handoff_token!.split(".")[1], "base64url").toString("utf8"),
+    ) as { sub: string };
+    expect(payload.sub).toBe("bob@example.com");
+  });
+
+  test("passkey-login: unregistered credential stays on passkey-login with error", async () => {
+    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    const login = await submitFlowStep(start.id, {
+      session_token: start.session_token,
+      action: "passkey",
+      fields: {},
+    });
+    expect(login.step.name).toBe("passkey-login");
+
+    const fail = await submitFlowStep(login.id, {
+      session_token: login.session_token,
+      action: "submit",
+      fields: {},
+      challenge_response: { proof: { id: "cred-unknown" } },
+    });
+    expect(fail.step.name).toBe("passkey-login");
+    expect(fail.step.error).toBe("error.passkey_not_registered");
+    expect(fail.step.challenge).toBeUndefined();
+  });
+
+  test("passkey-login: submit without proof stays on passkey-login with error", async () => {
+    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    const login = await submitFlowStep(start.id, {
+      session_token: start.session_token,
+      action: "passkey",
+      fields: {},
+    });
+    expect(login.step.name).toBe("passkey-login");
+
+    const fail = await submitFlowStep(login.id, {
+      session_token: login.session_token,
+      action: "submit",
+      fields: {},
+    });
+    expect(fail.step.name).toBe("passkey-login");
+    expect(fail.step.error).toBe("error.passkey_not_registered");
+    expect(fail.step.challenge).toBeUndefined();
+  });
+
+  test("passkey-setup: submit without proof stays on passkey-setup with error", async () => {
+    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    const upsell = await submitFlowStep(start.id, {
+      session_token: start.session_token,
+      action: "submit",
+      fields: { email: "alice@acme.com", password: "hunter2" },
+    });
+    const setup = await submitFlowStep(upsell.id, {
+      session_token: upsell.session_token,
+      action: "setup",
+      fields: {},
+    });
+    expect(setup.step.name).toBe("passkey-setup");
+
+    const fail = await submitFlowStep(setup.id, {
+      session_token: setup.session_token,
+      action: "submit",
+      fields: {},
+    });
+    expect(fail.step.name).toBe("passkey-setup");
+    expect(fail.step.error).toBe("error.passkey_setup_failed");
+    expect(fail.step.challenge).toBeUndefined();
   });
 
   test("merges the active branding overlay onto every response", async () => {
