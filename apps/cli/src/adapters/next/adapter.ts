@@ -1,7 +1,33 @@
 import { join } from "node:path";
 
+import { MANAGED_MARKER } from "../../lib/paths";
 import type { ScaffoldPlan } from "../../scaffolder/plan";
 import type { FrameworkAdapter, ProjectContext } from "../index";
+
+/**
+ * Next.js 16 `proxy.ts` (the renamed `middleware.ts`) at the project root.
+ * Wires `nextgenMiddleware` from `@zitadel-nextgen/sdk-next` so the scaffolded
+ * `<zitadel-login api-base="/__nextgen">` requests get same-origin-proxied to
+ * `NEXTGEN_ISSUER_URL` (the auth backend) and `/profile` is JWT-gated.
+ *
+ * Carries the managed-file marker so `doctor --fix` re-applies it.
+ */
+const proxyTemplate = `${MANAGED_MARKER}
+import { nextgenMiddleware } from "@zitadel-nextgen/sdk-next/middleware";
+import type { NextRequest } from "next/server";
+
+export function proxy(req: NextRequest) {
+  return nextgenMiddleware(req, {
+    issuerUrl: process.env.NEXTGEN_ISSUER_URL,
+    protectedRoutes: ["/profile"],
+    loginPath: "/login",
+  });
+}
+
+export const config = {
+  matcher: ["/__nextgen/:path*", "/profile/:path*"],
+};
+`;
 
 export class NextAdapter implements FrameworkAdapter {
   readonly id = "next" as const;
@@ -12,6 +38,7 @@ export class NextAdapter implements FrameworkAdapter {
       ...(await this.planAddLogin(ctx)).ops,
       ...(await this.planAddRegister(ctx)).ops,
       ...(await this.planAddProfile(ctx)).ops,
+      ...(await this.planAddProxy(ctx)).ops,
     ];
     const provider = ctx.renderer.templates.provider;
     if (provider) {
@@ -94,6 +121,27 @@ export class NextAdapter implements FrameworkAdapter {
     };
   }
 
+  async planAddProxy(ctx: ProjectContext): Promise<ScaffoldPlan> {
+    return {
+      ops: [
+        {
+          kind: "write",
+          // `..` lifts out of app/ so proxy.ts lands at the project root, the
+          // location Next.js expects for the file convention. Mirrors how
+          // custom-elements.d.ts is written alongside this.
+          path: join(ctx.framework.appDir, "../proxy.ts"),
+          contents: proxyTemplate,
+        },
+      ],
+      summary: [
+        {
+          title: "Auth proxy",
+          detail: "Created proxy.ts to forward /__nextgen/* to the backend and gate /profile.",
+        },
+      ],
+    };
+  }
+
   sdkDependency(ctx: ProjectContext): { name: string; version: string } {
     return ctx.renderer.dependency;
   }
@@ -103,7 +151,7 @@ export class NextAdapter implements FrameworkAdapter {
       "ZITADEL_PROJECT_ID",
       "ZITADEL_ENVIRONMENT",
       "ZITADEL_ISSUER",
-      "NEXT_PUBLIC_ZITADEL_API_BASE",
+      "NEXTGEN_ISSUER_URL",
       "NEXT_PUBLIC_ZITADEL_PROJECT_ID",
     ];
   }
