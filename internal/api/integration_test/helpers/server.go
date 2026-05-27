@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/require"
 	generated "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
-	"github.com/zitadel/nextgen/internal/api/integration_test/test_data"
 	"github.com/zitadel/nextgen/internal/cookie"
 )
 
