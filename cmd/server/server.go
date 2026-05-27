@@ -195,7 +195,7 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 }
 
 func loadConfig(configPath string) (Config, error) {
-	v := viper.New()
+	v := viper.NewWithOptions(viper.ExperimentalBindStruct())
 	v.SetEnvPrefix("NEXTGEN")
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	v.AutomaticEnv()
@@ -210,9 +210,11 @@ func loadConfig(configPath string) (Config, error) {
 	v.SetDefault("schema.builtin_public_base", "https://nextgen.com/api/schemas") // todo: temp, review
 
 	// AutomaticEnv only resolves nested keys viper already knows about
-	// (via default, config file, or explicit BindEnv). Anything without
-	// a default needs to be bound by hand.
-	mustBindEnv(v, "server.cookie_sealer_key")
+	// (via default, config file, fields of config struct or explicit BindEnv).
+	// We need to bind all possible env keys of fields which use `mapstructure:",remain"` to ensure they are resolved from env vars.
+	for _, key := range database.DialectKeysForEnv() {
+		mustBindEnv(v, "database."+key)
+	}
 
 	if configPath != "" {
 		v.SetConfigFile(configPath)
