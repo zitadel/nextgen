@@ -118,8 +118,8 @@ catalogs:
       specifier: ^1.30.1
       version: 1.32.0
     liquidjs:
-      specifier: ^10.25.7
-      version: 10.25.7
+      specifier: ^10.26.0
+      version: 10.27.0
     lit:
       specifier: ^3.3.2
       version: 3.3.2
@@ -256,7 +256,7 @@ importers:
         version: 3.4.2
       liquidjs:
         specifier: 'catalog:'
-        version: 10.25.7
+        version: 10.27.0
       zod:
         specifier: 'catalog:'
         version: 4.3.6
@@ -514,7 +514,7 @@ importers:
         version: 3.4.1
       liquidjs:
         specifier: 'catalog:'
-        version: 10.25.7
+        version: 10.27.0
       lit:
         specifier: 'catalog:'
         version: 3.3.2
@@ -7662,8 +7662,8 @@ packages:
   linkify-it@5.0.0:
     resolution: {integrity: sha512-5aHCbzQRADcdP+ATqnDuhhJ/MRIqDkZX5pyjFHRRysS8vZ5AbqGEoFIb6pYHPZ+L/OC2Lc+xT8uHVVR5CAK/wQ==}
 
-  liquidjs@10.25.7:
-    resolution: {integrity: sha512-rPCjJLiD4eDhQjvv964AeXFC+HbeYBbZrd7Z82Q6hqv1lX7G+5w4SJcKLn9CAAAwHI4aS3dTdo083UB79K3pDA==}
+  liquidjs@10.27.0:
+    resolution: {integrity: sha512-tw/OA59K7aIBlMKIrKlumr37fiZUheShVHXY8cVctWisgY1p9mc5hreOvlreoS0wTiwlWk14Ya7305c2a/Cg5w==}
     engines: {node: '>=16'}
     hasBin: true
 
@@ -18114,7 +18114,7 @@ snapshots:
     dependencies:
       uc.micro: 2.1.0
 
-  liquidjs@10.25.7:
+  liquidjs@10.27.0:
     dependencies:
       commander: 10.0.1
 
