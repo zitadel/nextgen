@@ -56,6 +56,13 @@ export type MockHandle = {
   reset: () => void;
   /** Return captured request bodies for test assertions. */
   getCaptured: () => readonly CapturedRequest[];
+  /**
+   * Pre-register a WebAuthn credential so that a subsequent passkey-login
+   * submission succeeds without going through the full register flow.
+   * Useful in component tests that exercise the orchestrator's auto-submit
+   * behaviour without needing a full registration ceremony first.
+   */
+  registerCredential: (userHandle: string, credentialId: string) => void;
 };
 
 const FLOW_ID = "flow_mock";
@@ -80,6 +87,10 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
     actor = startFlowActor();
     captured = [];
     authn.clear();
+  }
+
+  function registerCredential(userHandle: string, credentialId: string): void {
+    authn.register(userHandle, credentialId);
   }
 
   function getCaptured(): readonly CapturedRequest[] {
@@ -223,5 +234,5 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
     }),
   ];
 
-  return { handlers, reset, getCaptured };
+  return { handlers, reset, getCaptured, registerCredential };
 }
