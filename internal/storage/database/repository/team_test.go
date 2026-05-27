@@ -32,6 +32,24 @@ func TestTeamRepository_Create(t *testing.T) {
 		assert.WithinDuration(t, time.Now(), stored.UpdatedAt, 5*time.Second)
 	})
 
+	t.Run("empty id returns error", func(t *testing.T) {
+		tx, rollback := transactionForRollback(t)
+		defer rollback()
+
+		ensureProject(t, tx, "proj-team-empty-id")
+		team := &domain.Team{ProjectID: "proj-team-empty-id", ID: ""}
+
+		var err error
+		if isSpannerDB {
+			err = repo.Create(t.Context(), tx, team)
+		} else {
+			sp, spRollback := savepointForRollback(t, tx)
+			err = repo.Create(t.Context(), sp, team)
+			spRollback()
+		}
+		assert.Error(t, err)
+	})
+
 	t.Run("duplicate (project_id, id) returns error", func(t *testing.T) {
 		tx, rollback := transactionForRollback(t)
 		defer rollback()

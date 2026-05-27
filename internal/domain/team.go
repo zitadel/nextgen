@@ -22,8 +22,10 @@ type Team struct {
 
 // TeamRepository provides storage operations for [Team]s.
 type TeamRepository interface {
-	// Create persists a new team. The repository sets [Team.CreatedAt] and [Team.UpdatedAt]
-	// to the current time; callers should not pre-populate those fields.
+	// Create persists a new team. Callers must pre-populate [Team.ID] with a value
+	// generated via idgen.Generator (e.g. idgen.New("team")); an empty ID is rejected.
+	// The repository sets [Team.CreatedAt] and [Team.UpdatedAt] to the current time;
+	// callers should not pre-populate those fields.
 	// Returns a [database.IntegrityViolationError] (specifically [database.UniqueError])
 	// if a team with the same (project_id, id) already exists.
 	Create(ctx context.Context, client database.QueryExecutor, team *Team) error
