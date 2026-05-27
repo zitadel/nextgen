@@ -103,13 +103,11 @@ export const authFormTemplate = String.raw`
       </p>
     {% endif %}
 
-    {% if challenge and challenge.method == "passkey" %}
-      <zl-passkey
-        ceremony="{{ challenge.options.ceremony | default: 'authenticate' }}"
-        challenge-id="{{ challenge.challenge_id }}"
-        options='{{ challenge.options | json }}'
-      ></zl-passkey>
-    {% endif %}
+    <zl-passkey
+      ceremony="{{ challenge.options.ceremony | default: 'authenticate' }}"
+      challenge-id="{{ challenge.challenge_id }}"
+      options='{{ challenge.options | json }}'
+    ></zl-passkey>
 
     {% required_atoms %}
   </zl-card>

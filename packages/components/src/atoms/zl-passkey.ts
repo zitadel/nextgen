@@ -40,10 +40,11 @@ export type ZlPasskeyErrorDetail = {
 /**
  * Atom: `<zl-passkey>` — invisible WebAuthn ceremony handler.
  *
- * This component is intentionally invisible. It is mounted by the Liquid
- * template when `step.challenge.type === "passkey"`. On mount, it reads
- * the challenge options from attributes, triggers the appropriate
- * `navigator.credentials` ceremony, and emits the result.
+ * This component is intentionally invisible. It is always present in the
+ * template — no `{% if challenge %}` guard needed. When mounted without
+ * challenge data (`options` is null), it silently no-ops. Once the
+ * orchestrator sets `options` (or attributes are reflected), it starts
+ * the ceremony automatically.
  *
  * The orchestrator listens for `zl-passkey-result` to auto-submit the
  * proof via `challenge_response` on the flow submit body.
@@ -108,8 +109,12 @@ export class ZlPasskey extends LitElement {
 
   private abortController: AbortController | null = null;
 
-  override connectedCallback(): void {
-    super.connectedCallback();
+  /**
+   * Auto-start on first render. `firstUpdated` fires after Lit has reflected
+   * all initial attributes to properties, so `this.options` is populated.
+   * `connectedCallback` fires too early — attributes haven't been reflected.
+   */
+  override firstUpdated(): void {
     if (!this.manual && this.options) {
       void this.startCeremony();
     }
@@ -135,7 +140,8 @@ export class ZlPasskey extends LitElement {
    */
   async startCeremony(): Promise<void> {
     if (!this.options) {
-      this.emitError("No WebAuthn options provided.", false);
+      // Null-safe: component is always in the DOM but may not have
+      // challenge data yet. Silently wait — don't emit an error.
       return;
     }
 
