@@ -163,11 +163,11 @@ async function collectChecks(cwd: string): Promise<DoctorCheck[]> {
   );
 
   await check(
-    "managed-proxy",
-    "Next proxy.ts contains Zitadel managed marker",
-    "proxy.ts",
+    "managed-middleware",
+    "Next middleware.ts contains Zitadel managed marker",
+    "middleware.ts",
     async () => {
-      await assertManagedFile(cwd, ["proxy.ts", "src/proxy.ts"]);
+      await assertManagedFile(cwd, ["middleware.ts", "src/middleware.ts"]);
     },
     checks,
   );
