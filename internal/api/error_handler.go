@@ -40,6 +40,9 @@ func domainErrorDetails(err error) api.ErrorDetails {
 }
 
 func errorResponse(err error) *api.ErrorDetailsStatusCode {
+	if errors.Is(err, noUserIdInSessionTokenErr) {
+		return errorResponseWithStatusCode(http.StatusBadRequest, err)
+	}
 	var e domain.Error
 	if !errors.As(err, &e) {
 		return internalErrorResponse(err)
@@ -53,6 +56,8 @@ func errorResponse(err error) *api.ErrorDetailsStatusCode {
 		return sessionErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixJSONSchema.ErrorCodePrefix("")):
 		return schemaErrorResponse(e)
+	case strings.HasPrefix(e.Code, domain.PrefixUser.ErrorCodePrefix("")):
+		return userErrorResponse(e)
 	default:
 		return internalErrorResponse(err)
 	}

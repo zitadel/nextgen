@@ -181,6 +181,12 @@ type Handler interface {
 	//
 	// GET /sessions/me
 	GetMySession(ctx context.Context, params GetMySessionParams) (GetMySessionRes, error)
+	// GetMyUser implements getMyUser operation.
+	//
+	// Get my user information.
+	//
+	// GET /users/me
+	GetMyUser(ctx context.Context, params GetMyUserParams) (GetMyUserRes, error)
 	// GetOpenIDConfiguration implements getOpenIDConfiguration operation.
 	//
 	// Retrieve the OpenID Connect configuration.
@@ -261,7 +267,7 @@ type Handler interface {
 	//
 	// List users.
 	//
-	// GET /user
+	// GET /users
 	ListUsers(ctx context.Context, params ListUsersParams) (ListUsersRes, error)
 	// RevokeMySession implements revokeMySession operation.
 	//

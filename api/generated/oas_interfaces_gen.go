@@ -77,6 +77,10 @@ type GetMySessionRes interface {
 	getMySessionRes()
 }
 
+type GetMyUserRes interface {
+	getMyUserRes()
+}
+
 type GetOpenIDConfigurationRes interface {
 	getOpenIDConfigurationRes()
 }

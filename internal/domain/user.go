@@ -16,6 +16,14 @@ const (
 	AuthMethodRecoveryCodes
 )
 
+const (
+	PrefixUser ResourcePrefix = "user"
+)
+
+func ErrUserNotFound() Error {
+	return newError(PrefixUser.ErrorCodePrefix("not_found"), "user not found", nil, nil)
+}
+
 // User is a hydrated user projection (header + optional EAV joins).
 type User struct {
 	ProjectID string
@@ -45,6 +53,7 @@ type UserRepository interface {
 	userChanges
 	userJoins
 
+	GetById(ctx context.Context, client database.QueryExecutor, projectID string, userID string) (*User, error)
 	Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*User, error)
 	List(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) ([]*User, error)
 	Create(ctx context.Context, client database.QueryExecutor, user *CreateUser) error

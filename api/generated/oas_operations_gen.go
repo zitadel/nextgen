@@ -25,6 +25,7 @@ const (
 	GetKeysOperation                OperationName = "GetKeys"
 	GetLiveOperation                OperationName = "GetLive"
 	GetMySessionOperation           OperationName = "GetMySession"
+	GetMyUserOperation              OperationName = "GetMyUser"
 	GetOpenIDConfigurationOperation OperationName = "GetOpenIDConfiguration"
 	GetProjectOperation             OperationName = "GetProject"
 	GetReadyOperation               OperationName = "GetReady"

@@ -2095,6 +2095,7 @@ func (*ErrorDetails) createSessionRes()        {}
 func (*ErrorDetails) deleteFlowDefinitionRes() {}
 func (*ErrorDetails) endSessionRes()           {}
 func (*ErrorDetails) getFlowDefinitionRes()    {}
+func (*ErrorDetails) getMyUserRes()            {}
 func (*ErrorDetails) introspectRes()           {}
 func (*ErrorDetails) listFlowDefinitionsRes()  {}
 func (*ErrorDetails) submitFlowStepRes()       {}
@@ -2153,6 +2154,7 @@ func (*ErrorDetailsStatusCode) getHealthRes()              {}
 func (*ErrorDetailsStatusCode) getKeysRes()                {}
 func (*ErrorDetailsStatusCode) getLiveRes()                {}
 func (*ErrorDetailsStatusCode) getMySessionRes()           {}
+func (*ErrorDetailsStatusCode) getMyUserRes()              {}
 func (*ErrorDetailsStatusCode) getOpenIDConfigurationRes() {}
 func (*ErrorDetailsStatusCode) getProjectRes()             {}
 func (*ErrorDetailsStatusCode) getReadyRes()               {}
@@ -4259,6 +4261,19 @@ func (*GetMySessionNotFound) getMySessionRes() {}
 type GetMySessionUnauthorized ErrorDetails
 
 func (*GetMySessionUnauthorized) getMySessionRes() {}
+
+type GetMyUserOK map[string]jx.Raw
+
+func (s *GetMyUserOK) init() GetMyUserOK {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+func (*GetMyUserOK) getMyUserRes() {}
 
 type GetProjectNotFound ErrorDetails
 
