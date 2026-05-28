@@ -6,10 +6,25 @@ import { ok, skipped } from "../io/output";
 import { ZitadelError } from "../lib/errors";
 import { MANAGED_MARKER } from "../lib/paths";
 
+/**
+ * Options for {@link runEject}. `force` is required to eject in
+ * non-interactive mode, since ejecting permanently deletes managed files.
+ */
 export type EjectOptions = GlobalOptions & {
   force?: boolean;
 };
 
+/**
+ * Removes Zitadel-managed files from the project, leaving the remote project
+ * untouched.
+ *
+ * Only `.tsx` files carrying the managed marker are removed; unmarked ones
+ * are preserved to avoid clobbering user-authored pages. `.env.local` is
+ * renamed to a timestamped backup rather than deleted, and the `.zitadel`
+ * directory is removed wholesale. In `dryRun` mode it reports what would be
+ * removed without touching the filesystem, and refuses to run without `force`
+ * when non-interactive.
+ */
 export async function runEject(io: CliIO, opts: EjectOptions): Promise<void> {
   if (!opts.force && opts.nonInteractive) {
     throw new ZitadelError("E_VALIDATION", "Eject requires --force in non-interactive mode", {
@@ -38,7 +53,9 @@ export async function runEject(io: CliIO, opts: EjectOptions): Promise<void> {
   for (const rel of candidates) {
     const abs = join(opts.cwd, rel);
     const exists = await pathExists(abs);
-    if (!exists) continue;
+    if (!exists) {
+      continue;
+    }
     if (rel.endsWith(".tsx")) {
       const contents = await readFile(abs, "utf8").catch(() => "");
       if (!contents.includes(MANAGED_MARKER)) {

@@ -76,6 +76,11 @@ abstract class BaseDeployAdapter implements DeployAdapter {
   protected abstract manualSetCommand(environment: DeployEnvironment, key: string): string;
 }
 
+/**
+ * Vercel integration. Detection keys off `vercel.json` or a linked
+ * `.vercel/project.json`; env vars are pushed via `vercel env add`, removing any
+ * existing value first so the operation is idempotent.
+ */
 export class VercelDeployAdapter extends BaseDeployAdapter {
   readonly id = "vercel" as const;
   readonly displayName = "Vercel";
@@ -148,6 +153,11 @@ export class VercelDeployAdapter extends BaseDeployAdapter {
   }
 }
 
+/**
+ * Netlify integration. Detection keys off `netlify.toml` or a linked
+ * `.netlify/state.json`; env vars are pushed via `netlify env:set`, mapping the
+ * preview environment onto Netlify's `deploy-preview` context.
+ */
 export class NetlifyDeployAdapter extends BaseDeployAdapter {
   readonly id = "netlify" as const;
   readonly displayName = "Netlify";
@@ -220,6 +230,11 @@ export class NetlifyDeployAdapter extends BaseDeployAdapter {
   }
 }
 
+/**
+ * Cloudflare Pages integration via Wrangler. Both detection and link checks key
+ * off `wrangler.toml`; secrets are pushed with `wrangler pages secret put`,
+ * which is environment-agnostic, so preview and production share the same flow.
+ */
 export class CloudflareDeployAdapter extends BaseDeployAdapter {
   readonly id = "cloudflare" as const;
   readonly displayName = "Cloudflare Pages";
@@ -289,6 +304,11 @@ export class CloudflareDeployAdapter extends BaseDeployAdapter {
   }
 }
 
+/**
+ * Null-object adapter used when no platform is detected or a requested platform
+ * is unknown. Every operation is a no-op reporting `not-detected`, letting
+ * callers treat the no-platform case without special-casing `undefined`.
+ */
 export class NoDeployAdapter implements DeployAdapter {
   readonly id = "none" as const;
   readonly displayName = "No deploy platform";
@@ -324,6 +344,12 @@ export class NoDeployAdapter implements DeployAdapter {
   }
 }
 
+/**
+ * Builds the ordered list of real platform adapters to probe during detection.
+ * Order is significant: the first adapter whose signature matches wins, so more
+ * specific platforms should precede more general ones. The shared `runner` is
+ * threaded through so callers (and tests) can inject command behavior.
+ */
 export function createDeployAdapters(
   runner: CommandRunner = defaultCommandRunner,
 ): DeployAdapter[] {
@@ -340,10 +366,18 @@ function stateFrom(input: {
   auth: "authenticated" | "missing" | "unknown";
   project: "linked" | "unlinked" | "unknown";
 }): DeployState {
-  if (!input.detected) return "not-detected";
-  if (input.cli === "missing") return "missing-cli";
-  if (input.auth !== "authenticated") return "not-authenticated";
-  if (input.project !== "linked") return "not-linked";
+  if (!input.detected) {
+    return "not-detected";
+  }
+  if (input.cli === "missing") {
+    return "missing-cli";
+  }
+  if (input.auth !== "authenticated") {
+    return "not-authenticated";
+  }
+  if (input.project !== "linked") {
+    return "not-linked";
+  }
   return "ready";
 }
 

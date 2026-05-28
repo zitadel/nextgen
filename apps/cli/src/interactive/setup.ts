@@ -4,6 +4,12 @@ import { ZitadelError } from "../lib/errors";
 import type { AuthMethod } from "../lib/flows";
 import { DEFAULT_SERVER } from "../platform/resolve-server";
 
+/**
+ * The user's choices collected by the interactive setup wizard. These map
+ * directly onto the flags `setup` would otherwise receive non-interactively, so
+ * the same downstream planning code runs whether answers came from prompts or
+ * from CLI flags.
+ */
 export type InteractiveSetupAnswers = {
   userFields: string[];
   authMethod: AuthMethod;
@@ -12,6 +18,11 @@ export type InteractiveSetupAnswers = {
   deployPlatform: "vercel" | "netlify" | "cloudflare" | "none";
 };
 
+/**
+ * Auto-detected project facts seeded into the wizard as prompt defaults, so the
+ * common case is one keystroke (accept the detection) while still letting the
+ * user override the framework, deploy platform, dev port, or current server.
+ */
 export type InteractiveSetupInput = {
   detectedFramework: string;
   detectedDeployPlatform: "vercel" | "netlify" | "cloudflare" | "none";
@@ -35,6 +46,14 @@ const AUTH_METHOD_CHOICES: ReadonlyArray<{
   { value: "password", label: "password" },
 ];
 
+/**
+ * Drives the interactive setup wizard and returns the collected answers.
+ *
+ * Prompts are seeded from `input` so detected values are the defaults. Any
+ * cancellation (Ctrl-C or declining the detected framework) is converted into a
+ * thrown {@link ZitadelError} rather than a partial result, so callers never act
+ * on incomplete answers. Must only be invoked in interactive (TTY) mode.
+ */
 export async function runInteractiveSetup(
   input: InteractiveSetupInput,
 ): Promise<InteractiveSetupAnswers> {

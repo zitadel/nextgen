@@ -4,13 +4,27 @@ import { join } from "node:path";
 import { ZitadelError } from "../lib/errors";
 import { hasDependency, readPackageJson } from "./package-json";
 
+/**
+ * Frameworks the CLI knows how to wire up. V1 supports only Next.js; the type
+ * stays a union so adding frameworks later is a single-point change.
+ */
 export type FrameworkId = "next";
 
+/**
+ * Resolved framework facts the downstream adapters need. `appDir` records where
+ * the App Router lives so generated files land in the right place.
+ */
 export type FrameworkDetection = {
   id: FrameworkId;
   appDir: "app" | "src/app";
 };
 
+/**
+ * Detects a supported framework in `cwd`, throwing a {@link ZitadelError} with
+ * actionable hints when the project is missing, unsupported, or uses an
+ * unsupported shape (e.g. Pages Router). An explicit `requested` framework is
+ * validated against the supported set before any filesystem probing.
+ */
 export async function detectFramework(
   cwd: string,
   requested?: string,

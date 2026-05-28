@@ -5,6 +5,16 @@ import { ZitadelError } from "../lib/errors";
 import { parseJsonObject, stableStringify } from "../lib/json";
 import type { FileOp, ScaffoldPlan, ScaffoldResult } from "./plan";
 
+/**
+ * Applies a {@link ScaffoldPlan} to disk, executing its operations in order.
+ *
+ * Operations are idempotent: writes whose target already matches the desired
+ * contents are recorded as skipped rather than rewritten, so re-running setup
+ * is safe. With `dryRun` no filesystem changes are made but the result still
+ * reflects what would have been written. Existing files are only overwritten
+ * when `force` is set; otherwise an `E_CONFLICT` is thrown to protect
+ * user-authored content. Paths in the plan are resolved relative to `cwd`.
+ */
 export async function scaffold(
   plan: ScaffoldPlan,
   opts: { cwd: string; dryRun: boolean; force: boolean },

@@ -1,6 +1,14 @@
 import { MANAGED_MARKER } from "../../lib/paths";
 import type { RendererSpec } from "../types";
 
+/**
+ * Placeholder renderer for the `<zitadel-flow>` Lit web component. Declared
+ * so the `web-component` renderer id resolves and surfaces a clear
+ * "not yet published" error, while reserving the integration shape for when
+ * `@zitadel/ui-lit` ships. The `authPage` template emits an illustrative
+ * page only; this renderer is never selected for real scaffolding because
+ * `getRenderer` rejects any `status: "not-implemented"` spec.
+ */
 export const litRenderer: RendererSpec = {
   id: "web-component",
   displayName: "Web component (<zitadel-flow>)",

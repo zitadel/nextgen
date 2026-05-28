@@ -1,4 +1,9 @@
-
+/**
+ * Describes a single flag for help rendering and the generated `AGENTS.md`.
+ * `name` is the long form without the leading `--`; `type` drives how the value
+ * placeholder is shown. This is documentation metadata only — actual parsing
+ * lives in the arg parser, so a flag listed here must be wired up there too.
+ */
 export type FlagSpec = {
   name: string;
   alias?: string;
@@ -7,6 +12,12 @@ export type FlagSpec = {
   default?: string | boolean;
 };
 
+/**
+ * The contract for one CLI command as surfaced to humans (help) and agents
+ * (`AGENTS.md`, `help --json`). `name` must match the token the dispatcher
+ * routes on, and `agent_status` signals whether agents can rely on the command
+ * or should treat it as an experimental surface.
+ */
 export type CommandSpec = {
   name: string;
   summary: string;
@@ -49,6 +60,12 @@ const globalFlags: FlagSpec[] = [
   },
 ];
 
+/**
+ * The canonical, ordered list of public commands. This is the single source of
+ * truth for help output and the generated `AGENTS.md`; the dispatcher in
+ * `cli.ts` must stay in sync with these names. Order here is the order shown to
+ * users, so it reflects the intended golden path rather than alphabetical.
+ */
 export const COMMANDS: CommandSpec[] = [
   {
     name: "setup",
@@ -198,6 +215,11 @@ export const COMMANDS: CommandSpec[] = [
   },
 ];
 
+/**
+ * Looks up a command spec by its exact dispatch name (e.g. `"deploy status"`).
+ * Returns `undefined` for unknown names so callers can render an
+ * "unknown command" message rather than throwing.
+ */
 export function findCommandSpec(name: string): CommandSpec | undefined {
   return COMMANDS.find((spec) => spec.name === name);
 }

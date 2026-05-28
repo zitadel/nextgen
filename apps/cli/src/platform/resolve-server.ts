@@ -4,13 +4,28 @@ import { join } from "node:path";
 import { ZitadelError } from "../lib/errors";
 import { parseJsonObject } from "../lib/json";
 
+/**
+ * Server URL used when nothing else resolves. Also surfaced in hints and
+ * the interactive setup prompt as the suggested value, so it is exported
+ * rather than kept private.
+ */
 export const DEFAULT_SERVER = "https://api.zitadel.cloud";
 
+/**
+ * The resolved target server plus the source it came from. `origin` is
+ * retained (not just the value) so callers can report *why* a server was
+ * chosen and so the precedence order stays auditable.
+ */
 export type ResolvedServer = {
   value: string;
   origin: "flag" | "env" | "config-env" | "config-top" | "default";
 };
 
+/**
+ * Inputs to {@link resolveServer}. Passed explicitly (cwd, env) rather
+ * than read from globals so resolution is pure and testable. `serverFlag`
+ * and `environment` come from the parsed CLI invocation.
+ */
 export type ResolveServerInput = {
   cwd: string;
   env: NodeJS.ProcessEnv;
@@ -18,6 +33,14 @@ export type ResolveServerInput = {
   environment?: string;
 };
 
+/**
+ * Resolves which server the CLI should target, applying a fixed
+ * precedence: explicit `--server` flag, then `ZITADEL_API_BASE`, then the
+ * selected environment block in `zitadel.json`, then the config's
+ * top-level `server`, falling back to {@link DEFAULT_SERVER}. Every
+ * candidate is validated to a normalised origin; an invalid URL throws a
+ * `ZitadelError` rather than silently falling through.
+ */
 export async function resolveServer(input: ResolveServerInput): Promise<ResolvedServer> {
   if (input.serverFlag) {
     return validate({ value: input.serverFlag, origin: "flag" });
@@ -52,7 +75,9 @@ function validate(resolved: ResolvedServer): ResolvedServer {
     }
     return { value: url.origin, origin: resolved.origin };
   } catch (error) {
-    if (error instanceof ZitadelError) throw error;
+    if (error instanceof ZitadelError) {
+      throw error;
+    }
     throw new ZitadelError("E_VALIDATION", `Invalid server "${resolved.value}"`, {
       hint: `Use a URL like ${DEFAULT_SERVER}, or the literal "mock".`,
       details: { origin: resolved.origin },
@@ -81,11 +106,17 @@ function readEnvServer(
   config: Record<string, unknown>,
   environment: string | undefined,
 ): string | undefined {
-  if (!environment) return undefined;
+  if (!environment) {
+    return undefined;
+  }
   const envs = config.environments;
-  if (!isObject(envs)) return undefined;
+  if (!isObject(envs)) {
+    return undefined;
+  }
   const branch = envs[environment];
-  if (!isObject(branch)) return undefined;
+  if (!isObject(branch)) {
+    return undefined;
+  }
   return typeof branch.server === "string" ? branch.server : undefined;
 }
 

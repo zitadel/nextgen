@@ -10,6 +10,14 @@ import { environmentSchema, type ZitadelEnvironment } from "../platform/schemas"
 import { buildSyncPlan, makeSyncers, renderPlan, runSyncLoop } from "../lib/sync";
 import { readZitadelSecret } from "./shared";
 
+/**
+ * Options accepted by {@link runApply}. `planOnly` (and the global `dryRun`)
+ * short-circuit to a plan preview without mutating the remote project;
+ * `silent` suppresses the success payload so `setup` can call apply as a
+ * sub-step without emitting duplicate output. `environment` is validated but
+ * not otherwise consumed here, and `platform` is accepted for call-site
+ * symmetry with other commands.
+ */
 export type ApplyOptions = GlobalOptions & {
   silent?: boolean;
   planOnly?: boolean;
@@ -17,6 +25,15 @@ export type ApplyOptions = GlobalOptions & {
   platform?: string;
 };
 
+/**
+ * Applies the local `.zitadel/flows` definitions to the remote project.
+ *
+ * Preflights the environment name, project secret, and any `${VAR}` /
+ * `*_env` references in the flows before contacting the platform so missing
+ * configuration fails fast with `E_VALIDATION`. In plan/dry-run mode it
+ * renders the diff and returns without writing; otherwise it runs the sync
+ * loop to convergence.
+ */
 export async function runApply(io: CliIO, opts: ApplyOptions): Promise<void> {
   parseEnvironment(opts.environment);
   const secret = await readZitadelSecret(opts.cwd);
@@ -69,6 +86,13 @@ function parseEnvironment(value: string | undefined): ZitadelEnvironment {
   return result.data;
 }
 
+/**
+ * Collects the names of environment variables a flows document depends on,
+ * sorted and de-duplicated. Recognises two reference styles: inline
+ * `${VAR}` interpolations inside string values, and keys ending in `_env`
+ * whose value names a single variable. Used by {@link runApply} to fail
+ * before applying when a required variable is absent.
+ */
 export function findEnvRefs(value: unknown): string[] {
   const refs = new Set<string>();
   const visit = (node: unknown): void => {

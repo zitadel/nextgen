@@ -4,6 +4,11 @@ import { join } from "node:path";
 import { ZitadelError } from "../lib/errors";
 import { parseJsonObject } from "../lib/json";
 
+/**
+ * Shape of the project secret persisted at `.zitadel/secret`. Holds the
+ * project identity plus the credentials used to talk to the platform in
+ * preview and production. Validated structurally by {@link readZitadelSecret}.
+ */
 export type ZitadelSecret = {
   project_id: string;
   project_secret: string;
@@ -12,6 +17,11 @@ export type ZitadelSecret = {
   created_at: string;
 };
 
+/**
+ * Reads and parses `zitadel.json` into a plain object. Translates a missing
+ * file into an actionable `E_VALIDATION` error pointing at `zitadel setup`;
+ * other errors (e.g. malformed JSON) propagate unchanged.
+ */
 export async function readZitadelConfig(cwd: string): Promise<Record<string, unknown>> {
   try {
     return parseJsonObject(await readFile(join(cwd, "zitadel.json"), "utf8"), "zitadel.json");
@@ -26,6 +36,13 @@ export async function readZitadelConfig(cwd: string): Promise<Record<string, unk
   }
 }
 
+/**
+ * Reads, parses, and structurally validates `.zitadel/secret`, returning it
+ * as a {@link ZitadelSecret}. A missing file becomes an actionable
+ * `E_VALIDATION` error pointing at `zitadel setup` / `zitadel doctor --fix`;
+ * a present-but-incomplete file throws so callers never proceed with partial
+ * credentials.
+ */
 export async function readZitadelSecret(cwd: string): Promise<ZitadelSecret> {
   try {
     const secret = parseJsonObject(

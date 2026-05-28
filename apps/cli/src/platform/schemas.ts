@@ -7,4 +7,10 @@ import { z } from "zod";
  * (generated from the OpenAPI spec); see `platform/client.ts`.
  */
 export const environmentSchema = z.enum(["development", "preview", "production"]);
+
+/**
+ * The static type for a validated environment, inferred from
+ * {@link environmentSchema} so the literal union and the runtime
+ * validator can never drift apart.
+ */
 export type ZitadelEnvironment = z.infer<typeof environmentSchema>;

@@ -17,6 +17,11 @@ import type { ScaffoldPlan } from "../scaffolder/plan";
 import { validateJsonSchema } from "../lib/user-schema";
 import { readZitadelConfig, readZitadelSecret } from "./shared";
 
+/**
+ * Options for {@link runDoctor}. When `fix` is set, doctor re-applies the
+ * managed scaffold (reclaiming managed files, even locally edited ones)
+ * before running its checks.
+ */
 export type DoctorOptions = GlobalOptions & {
   fix?: boolean;
 };
@@ -28,6 +33,15 @@ type DoctorCheck = {
   path?: string;
 };
 
+/**
+ * Diagnoses a Zitadel-managed project and, with `fix`, repairs it first.
+ *
+ * Runs a battery of checks (config/secret parse, secret permissions,
+ * gitignore and env-example coverage, framework match, user schema validity,
+ * managed-file markers, deploy status, and project-id consistency) and emits
+ * the aggregate result. If any check fails it throws `E_VALIDATION` carrying
+ * the full check details so the caller can render them.
+ */
 export async function runDoctor(io: CliIO, opts: DoctorOptions): Promise<void> {
   if (opts.fix) {
     await applyFixes(opts);
@@ -321,9 +335,13 @@ function readRendererId(config: Record<string, unknown>): string {
 
 async function resolveIssuer(cwd: string, config: Record<string, unknown>): Promise<string> {
   const fromConfig = readIssuer(config);
-  if (typeof fromConfig === "string" && fromConfig.length > 0) return fromConfig;
+  if (typeof fromConfig === "string" && fromConfig.length > 0) {
+    return fromConfig;
+  }
   const state = await readState(cwd);
-  if (typeof state?.dev_port === "number") return `http://localhost:${state.dev_port}`;
+  if (typeof state?.dev_port === "number") {
+    return `http://localhost:${state.dev_port}`;
+  }
   const detected = await detectDevPort(cwd);
   return issuerFromPort(detected);
 }

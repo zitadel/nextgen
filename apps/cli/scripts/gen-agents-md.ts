@@ -86,7 +86,9 @@ function renderCommand(spec: CommandSpec): string {
 
 function flagToken(flag: FlagSpec): string {
   const parts = [`\`--${flag.name}\``];
-  if (flag.alias) parts.push(`\`-${flag.alias}\``);
+  if (flag.alias) {
+    parts.push(`\`-${flag.alias}\``);
+  }
   return parts.join(" / ");
 }
 
@@ -97,13 +99,17 @@ function escapePipe(value: string): string {
 async function writeContract(target: string, generated: string, header: string): Promise<void> {
   const existing = await readFile(target, "utf8").catch(() => "");
   const next = mergeGenerated(existing, generated, header);
-  if (next === existing) return;
+  if (next === existing) {
+    return;
+  }
   await writeFile(target, next);
   process.stderr.write(`Wrote ${target}\n`);
 }
 
 function mergeGenerated(existing: string, generated: string, header: string): string {
-  if (!existing) return `${header}\n\n${generated}\n`;
+  if (!existing) {
+    return `${header}\n\n${generated}\n`;
+  }
   if (existing.includes(BEGIN) && existing.includes(END)) {
     const after = existing.slice(existing.indexOf(END) + END.length);
     return `${header}\n\n${generated}${after}`.replace(/\n{3,}/g, "\n\n").trimEnd() + "\n";

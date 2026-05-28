@@ -21,6 +21,12 @@ import { buildUserSchema, validateJsonSchema } from "../lib/user-schema";
 import { runApply } from "./apply";
 import { runDeployConnect } from "./deploy";
 
+/**
+ * Inputs for {@link runSetup}, extending the global options with the
+ * setup-specific flags collected by the arg parser. All fields are optional
+ * because setup fills gaps interactively (when allowed) or from detection and
+ * sensible defaults, so a bare invocation with only the globals is valid.
+ */
 export type SetupOptions = GlobalOptions & {
   framework?: string;
   userFields?: string;
@@ -32,6 +38,14 @@ export type SetupOptions = GlobalOptions & {
   renderer?: string;
 };
 
+/**
+ * Scaffolds a new Zitadel project into the target directory: detects the
+ * framework, manager, and deploy target, resolves auth/schema choices (prompting
+ * interactively unless suppressed), creates the remote project, writes managed
+ * files, then optionally applies and connects the deploy platform. Idempotent at
+ * the front: it skips when already initialized and refuses to proceed on an
+ * orphaned secret to avoid clobbering partial state.
+ */
 export async function runSetup(io: CliIO, opts: SetupOptions): Promise<void> {
   if (await hasZitadelConfig(opts.cwd)) {
     skipped(io, "already-initialized", opts);

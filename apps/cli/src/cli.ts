@@ -15,6 +15,13 @@ import { resolveCwd } from "./lib/paths";
 import { CLI_VERSION } from "./lib/version";
 import { resolveServer, DEFAULT_SERVER } from "./platform/resolve-server";
 
+/**
+ * Parses argv, dispatches to the matching command, and translates any thrown
+ * error into a process exit code. This is the single entry point for both the
+ * `zitadel` binary and the test harness, so it must never throw: every failure
+ * path is funneled through {@link toZitadelError} and rendered via the supplied
+ * IO so callers only ever observe a numeric exit code.
+ */
 export async function runCli(argv = process.argv.slice(2), io: CliIO = defaultIO): Promise<number> {
   const parsed = parseArgs(argv, io);
 
@@ -221,9 +228,15 @@ function fallbackMeta(parsed: ParsedArgs, io: CliIO): GlobalOptions {
 
 function resolveCommandName(parsed: ParsedArgs): string {
   const [head, next] = parsed.positionals;
-  if (!head) return "(default)";
-  if (head === "deploy" && (next === "connect" || next === "status")) return `deploy ${next}`;
-  if (head === "help") return "help";
+  if (!head) {
+    return "(default)";
+  }
+  if (head === "deploy" && (next === "connect" || next === "status")) {
+    return `deploy ${next}`;
+  }
+  if (head === "help") {
+    return "help";
+  }
   return head;
 }
 
@@ -232,7 +245,9 @@ function isVersionRequest(parsed: ParsedArgs): boolean {
 }
 
 function isHelpRequest(parsed: ParsedArgs): boolean {
-  if (parsed.options.help) return true;
+  if (parsed.options.help) {
+    return true;
+  }
   return parsed.positionals[0] === "help";
 }
 

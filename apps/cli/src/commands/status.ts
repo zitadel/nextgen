@@ -3,6 +3,12 @@ import type { CliIO, GlobalOptions } from "../io/output";
 import { ok, skipped } from "../io/output";
 import { readZitadelConfig, readZitadelSecret } from "./shared";
 
+/**
+ * Reports the local project state by reading `zitadel.json` and its secret.
+ * A present config with a missing secret is treated as an "orphaned" install
+ * (emitted as skipped with recovery commands) rather than an error, so status
+ * stays informational and safe to run on partial or broken setups.
+ */
 export async function runStatus(io: CliIO, opts: GlobalOptions): Promise<void> {
   const config = await readZitadelConfig(opts.cwd);
 

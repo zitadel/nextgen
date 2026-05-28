@@ -3,6 +3,13 @@ import { ok, writePretty } from "../io/output";
 import { CLI_VERSION } from "../lib/version";
 import { COMMANDS, findCommandSpec } from "./registry";
 
+/**
+ * Renders help output, branching on whether a specific command was named. With
+ * no target it prints the command index; with a target it prints that command's
+ * flags and notes. Both branches honor `opts.json` so agents receive the same
+ * information as a machine-readable envelope. The command metadata is sourced
+ * from {@link COMMANDS} so help stays in sync with the dispatcher's contract.
+ */
 export async function runHelp(io: CliIO, opts: GlobalOptions, target?: string): Promise<void> {
   if (target) {
     return renderCommandHelp(io, opts, target);
@@ -101,7 +108,11 @@ async function renderCommandHelp(io: CliIO, opts: GlobalOptions, target: string)
 
 function flagDisplay(flag: { name: string; alias?: string; type: string }): string {
   const base = flag.alias ? `-${flag.alias}, --${flag.name}` : `--${flag.name}`;
-  if (flag.type === "boolean") return base;
-  if (flag.type === "string[]") return `${base} <value>`;
+  if (flag.type === "boolean") {
+    return base;
+  }
+  if (flag.type === "string[]") {
+    return `${base} <value>`;
+  }
   return `${base} <value>`;
 }

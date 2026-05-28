@@ -5,6 +5,13 @@ import { ok } from "../io/output";
 import { ZitadelError } from "../lib/errors";
 import { readZitadelConfig, readZitadelSecret } from "./shared";
 
+/**
+ * Options shared by the deploy subcommands. `platform` pins which deploy
+ * adapter to use (otherwise it is auto-detected); `environment` selects
+ * preview vs production wiring; `manual` forces emission of manual setup
+ * steps instead of configuring the platform; `silent` suppresses the
+ * success payload when invoked as a sub-step of `setup`.
+ */
 export type DeployOptions = GlobalOptions & {
   platform?: string;
   environment?: string;
@@ -12,11 +19,23 @@ export type DeployOptions = GlobalOptions & {
   silent?: boolean;
 };
 
+/**
+ * Reports the current deploy-platform status by detecting the target adapter
+ * and querying its state. Read-only; never mutates platform configuration.
+ */
 export async function runDeployStatus(io: CliIO, opts: DeployOptions): Promise<void> {
   const adapter = await detectDeployTarget(opts.cwd, opts.platform);
   ok(io, await adapter.status(opts.cwd), opts);
 }
 
+/**
+ * Wires the deploy platform with the Zitadel environment variables for the
+ * selected environment. Production requires `environments.production.issuer`
+ * in `zitadel.json` and fails with `E_VALIDATION` otherwise. With `manual` or
+ * `dryRun` it returns the manual setup steps without configuring anything.
+ * Returns the adapter result so callers (e.g. `setup`) can surface manual
+ * steps as warnings.
+ */
 export async function runDeployConnect(io: CliIO, opts: DeployOptions) {
   const secret = await readZitadelSecret(opts.cwd);
   const config = await readZitadelConfig(opts.cwd);
@@ -56,8 +75,12 @@ export async function runDeployConnect(io: CliIO, opts: DeployOptions) {
 }
 
 function parseDeployEnvironment(value: string | undefined): "preview" | "production" {
-  if (!value || value === "preview") return "preview";
-  if (value === "production") return "production";
+  if (!value || value === "preview") {
+    return "preview";
+  }
+  if (value === "production") {
+    return "production";
+  }
   throw new ZitadelError("E_VALIDATION", `Invalid deploy environment "${value}"`, {
     hint: "Use preview or production.",
   });
@@ -87,7 +110,9 @@ function productionVars(
 }
 
 function readProductionIssuer(config: Record<string, unknown>): unknown {
-  if (!isObject(config.environments) || !isObject(config.environments.production)) return undefined;
+  if (!isObject(config.environments) || !isObject(config.environments.production)) {
+    return undefined;
+  }
   return config.environments.production.issuer;
 }
 

@@ -36,6 +36,13 @@ export const config = {
 };
 `;
 
+/**
+ * {@link FrameworkAdapter} for the Next.js App Router. Builds scaffold plans
+ * that place renderer-provided page templates under the detected `appDir`
+ * and writes `middleware.ts`/`custom-elements.d.ts` at the project root.
+ * `planSetup` composes the granular `planAdd*` plans so a full setup and an
+ * incremental `doctor --fix` share one implementation.
+ */
 export class NextAdapter implements FrameworkAdapter {
   readonly id = "next" as const;
   readonly displayName = "Next.js App Router";
@@ -113,7 +120,9 @@ export class NextAdapter implements FrameworkAdapter {
 
   async planAddProfile(ctx: ProjectContext): Promise<ScaffoldPlan> {
     const page = ctx.renderer.templates.profilePage?.();
-    if (!page) return { ops: [], summary: [] };
+    if (!page) {
+      return { ops: [], summary: [] };
+    }
     return {
       ops: [
         {
@@ -152,15 +161,5 @@ export class NextAdapter implements FrameworkAdapter {
 
   sdkDependency(ctx: ProjectContext): { name: string; version: string } {
     return ctx.renderer.dependency;
-  }
-
-  envKeys(): string[] {
-    return [
-      "ZITADEL_PROJECT_ID",
-      "ZITADEL_ENVIRONMENT",
-      "ZITADEL_ISSUER",
-      "NEXTGEN_ISSUER_URL",
-      "NEXT_PUBLIC_ZITADEL_PROJECT_ID",
-    ];
   }
 }
