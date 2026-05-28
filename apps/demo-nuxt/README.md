@@ -6,6 +6,12 @@ A minimal Nuxt application demonstrating [Nextgen Auth](../../packages/sdk-nuxt)
 
 Use **Nx** from the repo root (`corepack pnpm install` first).
 
+Build the SDK (and its transitive dependencies) once before the first run:
+
+```bash
+corepack pnpm nx build @zitadel-nextgen/sdk-nuxt
+```
+
 ### 1. Configure environment
 
 Copy the example env file and adjust as needed:
