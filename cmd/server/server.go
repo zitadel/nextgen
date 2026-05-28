@@ -215,7 +215,7 @@ func loadConfig(configPath string) (Config, error) {
 	})
 	v.SetDefault("schema.lru_cache_size", 1000)                                   // todo: temp, review
 	v.SetDefault("schema.builtin_public_base", "https://nextgen.com/api/schemas") // todo: temp, review
-	v.SetDefault("session.default_ttl", time.Hour)
+	v.SetDefault("session.default_ttl", domain.SessionAnonymousTTL)
 	v.SetDefault("session.max_ttl", 720*time.Hour)
 
 	// AutomaticEnv only resolves nested keys viper already knows about

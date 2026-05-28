@@ -38,6 +38,18 @@ func ErrSessionInvalidTTL() Error {
 	return newError("sess.invalid_ttl", "The session TTL is invalid. It must be positive and not exceed the configured maximum.", nil, nil)
 }
 
+type sessionInvalidTTLDetails struct {
+	TTLSeconds    int64 `json:"ttl_seconds"`
+	MaxTTLSeconds int64 `json:"max_ttl_seconds"`
+}
+
+func sessionInvalidTTLErr(requested, maxTTL time.Duration) Error {
+	return ErrSessionInvalidTTL().WithDetails(sessionInvalidTTLDetails{
+		TTLSeconds:    int64(requested / time.Second),
+		MaxTTLSeconds: int64(maxTTL / time.Second),
+	})
+}
+
 // ResolveSessionTTL picks the effective session TTL for exchange.
 // When requested is nil, defaultTTL is used. Otherwise requested must be positive and <= maxTTL.
 func ResolveSessionTTL(requested *time.Duration, defaultTTL, maxTTL time.Duration) (time.Duration, error) {
@@ -45,10 +57,10 @@ func ResolveSessionTTL(requested *time.Duration, defaultTTL, maxTTL time.Duratio
 		return defaultTTL, nil
 	}
 	if *requested <= 0 {
-		return 0, ErrSessionInvalidTTL()
+		return 0, sessionInvalidTTLErr(*requested, maxTTL)
 	}
 	if *requested > maxTTL {
-		return 0, ErrSessionInvalidTTL()
+		return 0, sessionInvalidTTLErr(*requested, maxTTL)
 	}
 	return *requested, nil
 }

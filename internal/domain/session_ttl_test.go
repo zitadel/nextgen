@@ -1,6 +1,7 @@
 package domain_test
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -40,6 +41,7 @@ func TestResolveSessionTTL(t *testing.T) {
 		_, err := domain.ResolveSessionTTL(&override, defaultTTL, maxTTL)
 		require.Error(t, err)
 		assert.ErrorIs(t, err, domain.ErrSessionInvalidTTL())
+		assertSessionInvalidTTLDetails(t, err, 0, maxTTL)
 	})
 
 	t.Run("negative rejected", func(t *testing.T) {
@@ -47,6 +49,7 @@ func TestResolveSessionTTL(t *testing.T) {
 		_, err := domain.ResolveSessionTTL(&override, defaultTTL, maxTTL)
 		require.Error(t, err)
 		assert.ErrorIs(t, err, domain.ErrSessionInvalidTTL())
+		assertSessionInvalidTTLDetails(t, err, override, maxTTL)
 	})
 
 	t.Run("above max rejected", func(t *testing.T) {
@@ -54,5 +57,22 @@ func TestResolveSessionTTL(t *testing.T) {
 		_, err := domain.ResolveSessionTTL(&override, defaultTTL, maxTTL)
 		require.Error(t, err)
 		assert.ErrorIs(t, err, domain.ErrSessionInvalidTTL())
+		assertSessionInvalidTTLDetails(t, err, override, maxTTL)
 	})
+}
+
+func assertSessionInvalidTTLDetails(t *testing.T, err error, wantTTL, wantMax time.Duration) {
+	t.Helper()
+	var domErr domain.Error
+	require.ErrorAs(t, err, &domErr)
+	require.NotNil(t, domErr.Details)
+	b, err := json.Marshal(domErr.Details)
+	require.NoError(t, err)
+	var got struct {
+		TTLSeconds    int64 `json:"ttl_seconds"`
+		MaxTTLSeconds int64 `json:"max_ttl_seconds"`
+	}
+	require.NoError(t, json.Unmarshal(b, &got))
+	assert.Equal(t, int64(wantTTL/time.Second), got.TTLSeconds)
+	assert.Equal(t, int64(wantMax/time.Second), got.MaxTTLSeconds)
 }
