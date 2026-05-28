@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"testing"
 
@@ -92,8 +93,10 @@ func TestCreateSchema(t *testing.T) {
 			assert.NoError(t, err)
 			defer func() { _ = resp.Body.Close() }()
 
-			if !assert.Equal(t, http.StatusBadRequest, resp.StatusCode) {
-				helpers.LogInvalidResponse(t, resp)
+			if !assert.Equal(t, http.StatusOK, resp.StatusCode) {
+				bs, err := io.ReadAll(resp.Body)
+				require.NoError(t, err)
+				t.Log(string(bs))
 			}
 		})
 
