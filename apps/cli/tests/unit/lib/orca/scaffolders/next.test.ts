@@ -1,34 +1,38 @@
-import { describe, expect, it } from "vitest";
+import { spawnSync } from "node:child_process";
 
-import type { CommandRunner } from "../../../../../src/lib/orca/scaffolders/cli";
+import { describe, expect, it, vi, beforeEach } from "vitest";
+
 import { NextScaffolder } from "../../../../../src/lib/orca/scaffolders/next";
+
+vi.mock("node:child_process", () => ({ spawnSync: vi.fn() }));
+const mockSpawn = vi.mocked(spawnSync);
+
+function spawnResult(status: number, stderr = ""): ReturnType<typeof spawnSync> {
+  return { status, stderr, stdout: "", pid: 1, output: [], signal: null } as ReturnType<
+    typeof spawnSync
+  >;
+}
+
+beforeEach(() => {
+  mockSpawn.mockReset();
+});
 
 describe("NextScaffolder", () => {
   it("invokes create-next-app with the expected command and args", async () => {
-    const calls: Array<{ command: string; args: ReadonlyArray<string>; cwd: string }> = [];
-    const runner: CommandRunner = (command, args, cwd) => {
-      calls.push({ command, args, cwd });
-      return { status: 0, stderr: "" };
-    };
+    mockSpawn.mockReturnValue(spawnResult(0));
 
-    await new NextScaffolder(runner).scaffold("/tmp/proj", "next");
+    await new NextScaffolder().scaffold("/tmp/proj", "next");
 
-    expect(calls).toHaveLength(1);
-    expect(calls[0]?.command).toBe("npx");
-    expect(calls[0]?.args).toEqual([
-      "create-next-app@latest",
-      ".",
-      "--ts",
-      "--app",
-      "--no-git",
-      "--yes",
-    ]);
-    expect(calls[0]?.cwd).toBe("/tmp/proj");
+    expect(mockSpawn).toHaveBeenCalledTimes(1);
+    const [command, args, opts] = mockSpawn.mock.calls[0] ?? [];
+    expect(command).toBe("npx");
+    expect(args).toEqual(["create-next-app@latest", ".", "--ts", "--app", "--no-git", "--yes"]);
+    expect(opts).toMatchObject({ cwd: "/tmp/proj" });
   });
 
   it("throws E_VALIDATION when the command exits non-zero", async () => {
-    const runner: CommandRunner = () => ({ status: 1, stderr: "boom" });
-    await expect(new NextScaffolder(runner).scaffold("/tmp/proj", "next")).rejects.toMatchObject({
+    mockSpawn.mockReturnValue(spawnResult(1, "boom"));
+    await expect(new NextScaffolder().scaffold("/tmp/proj", "next")).rejects.toMatchObject({
       code: "E_VALIDATION",
     });
   });
