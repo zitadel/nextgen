@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/zitadel/nextgen/internal/cookie"
 	"github.com/zitadel/nextgen/internal/crypto"
 )
 
@@ -30,4 +31,14 @@ func (h *Harness) EnsureHasher(t *testing.T) *crypto.Hasher {
 		h.Hasher = hasher
 	}
 	return h.Hasher
+}
+
+func (h *Harness) EnsureSealer(t *testing.T) *cookie.Sealer {
+	t.Helper()
+	if h.Sealer == nil {
+		sealer, err := cookie.NewSealer(cookie.Key([]byte("MasterkeyNeedsToHave32Characters")))
+		require.NoError(t, err)
+		h.Sealer = sealer
+	}
+	return h.Sealer
 }

@@ -7,6 +7,7 @@ import (
 	generated "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/api/integration_test/test_data"
+	"github.com/zitadel/nextgen/internal/cookie"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
@@ -18,6 +19,7 @@ type Harness struct {
 	HttpClient *http.Client
 	TestServer *httptest.Server
 	Hasher     *crypto.Hasher
+	Sealer     *cookie.Sealer
 
 	GeneratedServer *generated.Server
 	Handler         *api.Handler

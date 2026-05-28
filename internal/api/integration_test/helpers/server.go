@@ -8,7 +8,6 @@ import (
 	generated "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/api/integration_test/test_data"
-	"github.com/zitadel/nextgen/internal/cookie"
 )
 
 func (h *Harness) EnsureTestServer(t *testing.T) *httptest.Server {
@@ -38,12 +37,9 @@ func (h *Harness) EnsureGeneratedServer(t *testing.T) *generated.Server {
 
 func (h *Harness) EnsureHandler(t *testing.T) *api.Handler {
 	t.Helper()
-	sealer, err := cookie.NewSealer(cookie.Key([]byte("MasterkeyNeedsToHave32Characters")))
-	require.NoError(t, err)
-
 	if h.Handler == nil {
 		h.Handler = api.NewHandler(
-			sealer,
+			h.EnsureSealer(t),
 			h.EnsureFlowService(t),
 			h.EnsureAuthAttemptService(t),
 			h.EnsureSessionService(t),
