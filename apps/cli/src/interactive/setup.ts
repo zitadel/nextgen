@@ -15,17 +15,15 @@ export type InteractiveSetupAnswers = {
   authMethod: AuthMethod;
   serverChoice: string;
   devPort: number;
-  deployPlatform: "vercel" | "netlify" | "cloudflare" | "none";
 };
 
 /**
  * Auto-detected project facts seeded into the wizard as prompt defaults, so the
  * common case is one keystroke (accept the detection) while still letting the
- * user override the framework, deploy platform, dev port, or current server.
+ * user override the framework, dev port, or current server.
  */
 export type InteractiveSetupInput = {
   detectedFramework: string;
-  detectedDeployPlatform: "vercel" | "netlify" | "cloudflare" | "none";
   detectedDevPort: number;
   currentServer: string;
 };
@@ -129,19 +127,6 @@ export async function runInteractiveSetup(
   bail(devPortRaw);
   const devPort = Number.parseInt(String(devPortRaw), 10);
 
-  const deployPlatform = await select({
-    message: "Deploy platform",
-    options: [
-      { value: input.detectedDeployPlatform, label: `Detected (${input.detectedDeployPlatform})` },
-      { value: "vercel", label: "Vercel" },
-      { value: "netlify", label: "Netlify" },
-      { value: "cloudflare", label: "Cloudflare Pages" },
-      { value: "none", label: "Skip" },
-    ],
-    initialValue: input.detectedDeployPlatform,
-  });
-  bail(deployPlatform);
-
   outro("Ready to scaffold.");
 
   return {
@@ -149,7 +134,6 @@ export async function runInteractiveSetup(
     authMethod: authMethod as AuthMethod,
     serverChoice: resolvedServer,
     devPort,
-    deployPlatform: deployPlatform as InteractiveSetupAnswers["deployPlatform"],
   };
 }
 

@@ -33,7 +33,6 @@ describe("Next setup integration", () => {
       cwd,
       "--non-interactive",
       "--json",
-      "--skip-deploy-platform",
     ]);
     expect(setup.exitCode).toBe(0);
     const setupJson = parseJson(setup.stdout) as {
@@ -122,7 +121,6 @@ describe("Next setup integration", () => {
       cwd,
       "--non-interactive",
       "--json",
-      "--skip-deploy-platform",
     ]);
 
     const flowWithEnvRef = {

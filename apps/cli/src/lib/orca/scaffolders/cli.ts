@@ -1,7 +1,7 @@
+import { defaultCommandRunner } from "../../command-runner";
+import type { CommandRunner } from "../../command-runner";
 import { ZitadelError } from "../../errors";
-import { defaultCommandRunner } from "../../../deploy/runner";
-import type { CommandRunner } from "../../../deploy/types";
-import type { ScaffoldOptions, Scaffolder } from "./types";
+import type { Scaffolder } from "./types";
 
 /**
  * Base for scaffolders that delegate to an external CLI (e.g. create-next-app).
@@ -20,7 +20,7 @@ export abstract class AbstractCLIScaffolder implements Scaffolder {
     return this.supportedFrameworks.includes(framework);
   }
 
-  abstract scaffold(cwd: string, framework: string, opts: ScaffoldOptions): Promise<void>;
+  abstract scaffold(cwd: string, framework: string): Promise<void>;
 
   /**
    * Runs an external command in `cwd`, throwing a typed {@link ZitadelError}

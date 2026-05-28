@@ -1,7 +1,6 @@
 import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 
-import { detectDeployTarget } from "../deploy";
 import { detectFramework } from "../detect/framework";
 import { detectDevPort, issuerFromPort } from "../detect/port";
 import type { CliIO, GlobalOptions } from "../io/output";
@@ -38,7 +37,7 @@ type DoctorCheck = {
  *
  * Runs a battery of checks (config/secret parse, secret permissions,
  * gitignore and env-example coverage, framework match, user schema validity,
- * managed-file markers, deploy status, and project-id consistency) and emits
+ * managed-file markers, and project-id consistency) and emits
  * the aggregate result. If any check fails it throws `E_VALIDATION` carrying
  * the full check details so the caller can render them.
  */
@@ -182,21 +181,6 @@ async function collectChecks(cwd: string): Promise<DoctorCheck[]> {
     "middleware.ts",
     async () => {
       await assertManagedFile(cwd, ["middleware.ts", "src/middleware.ts"]);
-    },
-    checks,
-  );
-
-  await check(
-    "deploy",
-    "Deploy platform status resolved",
-    "zitadel.json",
-    async () => {
-      const adapter = await detectDeployTarget(cwd);
-      const status = await adapter.status(cwd);
-      if (status.state !== "ready" && status.state !== "not-detected") {
-        return `deploy platform ${status.platform} is ${status.state}`;
-      }
-      return status.state;
     },
     checks,
   );

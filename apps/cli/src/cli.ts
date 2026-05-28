@@ -1,7 +1,6 @@
 import { consola } from "consola";
 
 import { runApply } from "./commands/apply";
-import { runDeployConnect, runDeployStatus } from "./commands/deploy";
 import { runDoctor } from "./commands/doctor";
 import { runEject } from "./commands/eject";
 import { runHelp } from "./commands/help";
@@ -49,7 +48,7 @@ export async function runCli(argv = process.argv.slice(2), io: CliIO = defaultIO
 }
 
 async function dispatch(parsed: ParsedArgs, io: CliIO, global: GlobalOptions): Promise<void> {
-  const [command, subcommand] = parsed.positionals;
+  const [command] = parsed.positionals;
   if (!command) {
     if (await hasZitadelConfig(global.cwd)) {
       await runStatus(io, global);
@@ -67,7 +66,6 @@ async function dispatch(parsed: ParsedArgs, io: CliIO, global: GlobalOptions): P
       await runApply(io, {
         ...global,
         environment: stringOpt(parsed, "environment"),
-        platform: stringOpt(parsed, "platform"),
       });
       return;
     case "plan":
@@ -76,32 +74,11 @@ async function dispatch(parsed: ParsedArgs, io: CliIO, global: GlobalOptions): P
         dryRun: true,
         planOnly: true,
         environment: stringOpt(parsed, "environment"),
-        platform: stringOpt(parsed, "platform"),
       });
       return;
     case "doctor":
       await runDoctor(io, { ...global, fix: boolOpt(parsed, "fix") });
       return;
-    case "deploy":
-      if (subcommand === "connect") {
-        await runDeployConnect(io, {
-          ...withSubcommand(global, "deploy connect"),
-          platform: stringOpt(parsed, "platform"),
-          environment: stringOpt(parsed, "environment"),
-          manual: boolOpt(parsed, "manual"),
-        });
-        return;
-      }
-      if (subcommand === "status") {
-        await runDeployStatus(io, {
-          ...withSubcommand(global, "deploy status"),
-          platform: stringOpt(parsed, "platform"),
-          environment: stringOpt(parsed, "environment"),
-          manual: boolOpt(parsed, "manual"),
-        });
-        return;
-      }
-      break;
     case "status":
       await runStatus(io, global);
       return;
@@ -165,10 +142,7 @@ function setupOptions(parsed: ParsedArgs, global: GlobalOptions) {
     userFields: stringOpt(parsed, "userFields"),
     authMethod: stringOpt(parsed, "authMethod"),
     renderer: stringOpt(parsed, "renderer"),
-    skipDeployPlatform: boolOpt(parsed, "skipDeployPlatform"),
-    manualDeploy: boolOpt(parsed, "manual"),
     noApply: boolOpt(parsed, "noApply"),
-    platform: stringOpt(parsed, "platform"),
   };
 }
 
@@ -227,12 +201,9 @@ function fallbackMeta(parsed: ParsedArgs, io: CliIO): GlobalOptions {
 }
 
 function resolveCommandName(parsed: ParsedArgs): string {
-  const [head, next] = parsed.positionals;
+  const [head] = parsed.positionals;
   if (!head) {
     return "(default)";
-  }
-  if (head === "deploy" && (next === "connect" || next === "status")) {
-    return `deploy ${next}`;
   }
   if (head === "help") {
     return "help";

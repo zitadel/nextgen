@@ -91,21 +91,6 @@ export const COMMANDS: CommandSpec[] = [
         description: "Renderer: react (default) or web-component (planned <zitadel-flow>).",
       },
       {
-        name: "skip-deploy-platform",
-        type: "boolean",
-        description: "Skip deploy platform detection and connect.",
-      },
-      {
-        name: "platform",
-        type: "string",
-        description: "Deploy platform override (vercel/netlify/cloudflare/none).",
-      },
-      {
-        name: "manual",
-        type: "boolean",
-        description: "Emit manual deploy steps instead of configuring the provider.",
-      },
-      {
         name: "no-apply",
         type: "boolean",
         description: "Skip the automatic apply at the end of setup.",
@@ -114,7 +99,7 @@ export const COMMANDS: CommandSpec[] = [
   },
   {
     name: "plan",
-    summary: "Validate config and deploy readiness without mutation.",
+    summary: "Validate config without mutation and preview the sync diff.",
     usage: "zitadel plan [--environment development|preview|production]",
     agent_status: "supported",
     flags: [
@@ -125,7 +110,6 @@ export const COMMANDS: CommandSpec[] = [
         type: "string",
         description: "Target environment (default: development).",
       },
-      { name: "platform", type: "string", description: "Deploy platform override." },
     ],
   },
   {
@@ -141,7 +125,6 @@ export const COMMANDS: CommandSpec[] = [
         type: "string",
         description: "Target environment (default: development).",
       },
-      { name: "platform", type: "string", description: "Deploy platform override." },
     ],
   },
   {
@@ -152,43 +135,6 @@ export const COMMANDS: CommandSpec[] = [
     flags: [
       ...globalFlags,
       { name: "fix", type: "boolean", description: "Re-apply missing managed files." },
-    ],
-  },
-  {
-    name: "deploy status",
-    summary: "Report deploy platform readiness.",
-    usage: "zitadel deploy status [--platform vercel|netlify|cloudflare]",
-    agent_status: "experimental",
-    notes:
-      "Experimental POC surface; agents should prefer setup, plan, and apply for the golden path.",
-    flags: [
-      ...globalFlags,
-      { name: "platform", type: "string", description: "Force a deploy platform adapter." },
-      {
-        name: "environment",
-        alias: "e",
-        type: "string",
-        description: "Target environment (default: preview).",
-      },
-    ],
-  },
-  {
-    name: "deploy connect",
-    summary: "Configure preview or production platform env vars.",
-    usage: "zitadel deploy connect [--environment preview|production]",
-    agent_status: "experimental",
-    notes:
-      "Experimental POC surface; agents should prefer setup, plan, and apply for the golden path.",
-    flags: [
-      ...globalFlags,
-      { name: "platform", type: "string", description: "Force a deploy platform adapter." },
-      {
-        name: "environment",
-        alias: "e",
-        type: "string",
-        description: "Target environment (default: preview).",
-      },
-      { name: "manual", type: "boolean", description: "Emit manual steps instead of configuring." },
     ],
   },
   {

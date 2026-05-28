@@ -266,17 +266,8 @@ function renderKnownSections(lines: string[], data: Record<string, unknown>): vo
     }
   }
 
-  if (typeof data.framework === "string" || typeof data.package_manager === "string") {
-    const parts: string[] = [];
-    if (typeof data.framework === "string") {
-      parts.push(`framework=${data.framework}`);
-    }
-    if (typeof data.package_manager === "string") {
-      parts.push(`pm=${data.package_manager}`);
-    }
-    if (parts.length > 0) {
-      lines.push(parts.join("  "));
-    }
+  if (typeof data.framework === "string") {
+    lines.push(`framework=${data.framework}`);
   }
 
   if (Array.isArray(data.files_written) || Array.isArray(data.files_skipped)) {

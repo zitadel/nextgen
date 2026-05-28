@@ -1,6 +1,4 @@
-import { detectDeployTarget } from "../deploy";
 import { detectFramework } from "../detect/framework";
-import { detectPackageManager } from "../detect/package-manager";
 import { detectDevPort, issuerFromPort } from "../detect/port";
 import { hasZitadelConfig, hasZitadelSecret } from "../detect/state";
 import { pickFramework, runInteractiveSetup } from "../interactive/setup";
@@ -17,7 +15,6 @@ import { buildUserSchema, validateJsonSchema } from "../lib/user-schema";
 import { createPlatformClient } from "../platform";
 import type { CreateProjectResponse } from "../platform/client";
 import { runApply } from "./apply";
-import { runDeployConnect } from "./deploy";
 
 /**
  * Inputs for {@link runSetup}, extending the global options with the
@@ -29,10 +26,7 @@ export type SetupOptions = GlobalOptions & {
   framework?: string;
   userFields?: string;
   authMethod?: string;
-  skipDeployPlatform?: boolean;
-  manualDeploy?: boolean;
   noApply?: boolean;
-  platform?: string;
   renderer?: string;
 };
 
@@ -40,9 +34,9 @@ export type SetupOptions = GlobalOptions & {
  * Scaffolds a new Zitadel project into the target directory: detects (or, for an
  * empty directory, scaffolds then re-detects) the framework, resolves auth/schema
  * choices (prompting interactively unless suppressed), creates the remote project,
- * then patches it via {@link Orca}'s framework patcher, optionally applying config
- * and connecting the deploy platform. Idempotent at the front: it skips when
- * already initialized and refuses to proceed on an orphaned secret.
+ * then patches it via {@link Orca}'s framework patcher and optionally applies the
+ * config. Idempotent at the front: it skips when already initialized and refuses
+ * to proceed on an orphaned secret.
  */
 export async function runSetup(io: CliIO, opts: SetupOptions): Promise<void> {
   if (await hasZitadelConfig(opts.cwd)) {
@@ -69,14 +63,10 @@ export async function runSetup(io: CliIO, opts: SetupOptions): Promise<void> {
       throw error;
     }
     const frameworkId = await resolveScaffoldFramework(opts, orca);
-    await orca.scaffolderFor(frameworkId).scaffold(opts.cwd, frameworkId, {});
+    await orca.scaffolderFor(frameworkId).scaffold(opts.cwd, frameworkId);
     return detectFramework(opts.cwd, frameworkId);
   });
 
-  const packageManager = await detectPackageManager(opts.cwd);
-  let deployTarget = opts.skipDeployPlatform
-    ? undefined
-    : await detectDeployTarget(opts.cwd, opts.platform);
   let detectedPort = await detectDevPort(opts.cwd);
   let effectiveServer = opts.source;
 
@@ -86,11 +76,6 @@ export async function runSetup(io: CliIO, opts: SetupOptions): Promise<void> {
   if (!opts.nonInteractive && !opts.dryRun) {
     const answers = await runInteractiveSetup({
       detectedFramework: framework.id,
-      detectedDeployPlatform: (deployTarget?.id ?? "none") as
-        | "vercel"
-        | "netlify"
-        | "cloudflare"
-        | "none",
       detectedDevPort: detectedPort,
       currentServer: opts.source,
     });
@@ -98,12 +83,8 @@ export async function runSetup(io: CliIO, opts: SetupOptions): Promise<void> {
     authMethod = authMethod ?? answers.authMethod;
     effectiveServer = answers.serverChoice;
     detectedPort = answers.devPort;
-    if (answers.deployPlatform !== (deployTarget?.id ?? "none")) {
-      deployTarget = await detectDeployTarget(opts.cwd, answers.deployPlatform);
-    }
   }
 
-  const previewOrigins = deployTarget?.previewOrigins ?? [];
   const issuer = issuerFromPort(detectedPort);
   const resolvedFields = userFields ?? ["email", "given_name", "family_name"];
   const resolvedMethod: AuthMethod = authMethod ?? "passkey";
@@ -116,8 +97,8 @@ export async function runSetup(io: CliIO, opts: SetupOptions): Promise<void> {
   }
 
   const project = opts.dryRun
-    ? dryRunProject(previewOrigins)
-    : await createPlatformClient(effectiveServer).createProject({ previewOrigins });
+    ? dryRunProject()
+    : await createPlatformClient(effectiveServer).createProject({ previewOrigins: [] });
 
   const ctx: PatchContext = {
     framework,
@@ -132,28 +113,12 @@ export async function runSetup(io: CliIO, opts: SetupOptions): Promise<void> {
   const result = await orca
     .patcherFor(framework.id)
     .patch(ctx, { cwd: opts.cwd, dryRun: opts.dryRun, force: opts.force });
-  const warnings: string[] = [];
 
   const setupOpts = { ...opts, source: effectiveServer };
   let apply: { synced: boolean } | undefined;
   if (!opts.noApply && !opts.dryRun) {
     await runApply(io, { ...setupOpts, json: true, silent: true });
     apply = { synced: true };
-  }
-  const deploy =
-    !deployTarget || deployTarget.id === "none" || opts.skipDeployPlatform || opts.dryRun
-      ? undefined
-      : await runDeployConnect(io, {
-          ...setupOpts,
-          json: true,
-          silent: true,
-          environment: "preview",
-          platform: deployTarget.id,
-          manual: opts.manualDeploy,
-        });
-
-  if (deploy && !deploy.configured && deploy.manual_steps.length > 0) {
-    warnings.push(...deploy.manual_steps);
   }
 
   ok(
@@ -165,17 +130,14 @@ export async function runSetup(io: CliIO, opts: SetupOptions): Promise<void> {
         issuer,
       },
       framework: framework.id,
-      package_manager: packageManager,
       server: effectiveServer,
       files_written: result.filesWritten.map((file) => relativeDisplay(opts.cwd, file)),
       files_skipped: result.filesSkipped.map((file) => relativeDisplay(opts.cwd, file)),
       apply,
-      deploy,
       next_actions: ["Run `zitadel doctor` to verify setup."],
       next_commands: ["zitadel doctor"],
     },
     setupOpts,
-    warnings,
   );
 }
 
@@ -229,12 +191,12 @@ function splitCsv(value: string | undefined): string[] | undefined {
 }
 
 /** A deterministic stand-in project for `--dry-run`, so no remote call is made. */
-function dryRunProject(previewOrigins: string[]): CreateProjectResponse {
+function dryRunProject(): CreateProjectResponse {
   return {
     id: "dry-run-0000",
     projectSecret: "sk_proj_dry_run_full",
     previewSecret: "sk_proj_dry_run_preview",
-    previewOrigins,
+    previewOrigins: [],
     createdAt: "2026-04-21T14:03:11.000Z",
   };
 }

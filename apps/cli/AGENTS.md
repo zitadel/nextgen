@@ -46,11 +46,9 @@ Every envelope carries `cli_version`, `command`, `source` at the top level.
 | Command | Summary | Agent status |
 |---|---|---|
 | `zitadel setup` | Create a Zitadel project and scaffold local auth. | supported-mock-default |
-| `zitadel plan` | Validate config and deploy readiness without mutation. | supported |
+| `zitadel plan` | Validate config without mutation and preview the sync diff. | supported |
 | `zitadel apply` | Validate and upload repo config to the platform. | supported-mock-default |
 | `zitadel doctor` | Verify generated files and local state. | supported |
-| `zitadel deploy status` | Report deploy platform readiness. | experimental |
-| `zitadel deploy connect` | Configure preview or production platform env vars. | experimental |
 | `zitadel help` | Show help for the CLI or a specific command. | supported |
 | `zitadel status` | Summarize the local project state. | supported |
 | `zitadel eject` | Remove managed files and local Zitadel state. | supported |
@@ -73,14 +71,11 @@ Usage: `zitadel setup [--framework next] [--user-fields ...] [--auth-method pass
 | `--user-fields` | `string` | Comma-separated list of user fields. |
 | `--auth-method` | `string` | Auth method to scaffold: `passkey` (default) or `password`. |
 | `--renderer` | `string` | Renderer: react (default) or web-component (planned <zitadel-flow>). |
-| `--skip-deploy-platform` | `boolean` | Skip deploy platform detection and connect. |
-| `--platform` | `string` | Deploy platform override (vercel/netlify/cloudflare/none). |
-| `--manual` | `boolean` | Emit manual deploy steps instead of configuring the provider. |
 | `--no-apply` | `boolean` | Skip the automatic apply at the end of setup. |
 
 ### `zitadel plan`
 
-Validate config and deploy readiness without mutation.
+Validate config without mutation and preview the sync diff.
 
 Usage: `zitadel plan [--environment development|preview|production]`
 
@@ -93,7 +88,6 @@ Usage: `zitadel plan [--environment development|preview|production]`
 | `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
 | `--server` / `-s` | `string` | Override the resolved server URL. |
 | `--environment` / `-e` | `string` | Target environment (default: development). |
-| `--platform` | `string` | Deploy platform override. |
 
 ### `zitadel apply`
 
@@ -110,7 +104,6 @@ Usage: `zitadel apply [--environment development|preview|production]`
 | `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
 | `--server` / `-s` | `string` | Override the resolved server URL. |
 | `--environment` / `-e` | `string` | Target environment (default: development). |
-| `--platform` | `string` | Deploy platform override. |
 
 ### `zitadel doctor`
 
@@ -127,45 +120,6 @@ Usage: `zitadel doctor [--fix]`
 | `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
 | `--server` / `-s` | `string` | Override the resolved server URL. |
 | `--fix` | `boolean` | Re-apply missing managed files. |
-
-### `zitadel deploy status`
-
-Report deploy platform readiness.
-
-> Experimental POC surface; agents should prefer setup, plan, and apply for the golden path.
-
-Usage: `zitadel deploy status [--platform vercel|netlify|cloudflare]`
-
-| Flag | Type | Description |
-|---|---|---|
-| `--cwd` / `-c` | `string` | Project directory to operate on. |
-| `--json` / `-j` | `boolean` | Emit the JSON envelope instead of pretty output. |
-| `--non-interactive` / `-n` | `boolean` | Disable prompts. Required when scripting or running as an agent. |
-| `--dry-run` | `boolean` | Preview the work without mutating files or hitting the platform. |
-| `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
-| `--server` / `-s` | `string` | Override the resolved server URL. |
-| `--platform` | `string` | Force a deploy platform adapter. |
-| `--environment` / `-e` | `string` | Target environment (default: preview). |
-
-### `zitadel deploy connect`
-
-Configure preview or production platform env vars.
-
-> Experimental POC surface; agents should prefer setup, plan, and apply for the golden path.
-
-Usage: `zitadel deploy connect [--environment preview|production]`
-
-| Flag | Type | Description |
-|---|---|---|
-| `--cwd` / `-c` | `string` | Project directory to operate on. |
-| `--json` / `-j` | `boolean` | Emit the JSON envelope instead of pretty output. |
-| `--non-interactive` / `-n` | `boolean` | Disable prompts. Required when scripting or running as an agent. |
-| `--dry-run` | `boolean` | Preview the work without mutating files or hitting the platform. |
-| `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
-| `--server` / `-s` | `string` | Override the resolved server URL. |
-| `--platform` | `string` | Force a deploy platform adapter. |
-| `--environment` / `-e` | `string` | Target environment (default: preview). |
-| `--manual` | `boolean` | Emit manual steps instead of configuring. |
 
 ### `zitadel help`
 

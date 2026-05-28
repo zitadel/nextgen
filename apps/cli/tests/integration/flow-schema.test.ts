@@ -37,7 +37,6 @@ async function scaffoldProject(authMethod?: "passkey" | "password"): Promise<str
     cwd,
     "--non-interactive",
     "--json",
-    "--skip-deploy-platform",
     "--no-apply",
   ];
   if (authMethod) {

@@ -37,8 +37,9 @@ describe("COMMANDS", () => {
   it("includes the known golden-path commands", () => {
     const names = COMMANDS.map((spec) => spec.name);
     expect(names).toContain("setup");
+    expect(names).toContain("plan");
     expect(names).toContain("apply");
-    expect(names).toContain("deploy status");
+    expect(names).toContain("doctor");
   });
 });
 
@@ -47,11 +48,6 @@ describe("findCommandSpec", () => {
     const spec = findCommandSpec("setup");
     expect(spec).toBeDefined();
     expect(spec?.name).toBe("setup");
-  });
-
-  it("matches multi-word command names exactly", () => {
-    const spec = findCommandSpec("deploy status");
-    expect(spec?.name).toBe("deploy status");
   });
 
   it("returns undefined for an unknown name", () => {

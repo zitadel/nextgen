@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { CommandRunner } from "../../../../../src/deploy/types";
+import type { CommandRunner } from "../../../../../src/lib/command-runner";
 import { NextScaffolder } from "../../../../../src/lib/orca/scaffolders/next";
 
 describe("NextScaffolder", () => {
@@ -11,7 +11,7 @@ describe("NextScaffolder", () => {
       return { status: 0, stdout: "", stderr: "" };
     };
 
-    await new NextScaffolder(runner).scaffold("/tmp/proj", "next", {});
+    await new NextScaffolder(runner).scaffold("/tmp/proj", "next");
 
     expect(calls).toHaveLength(1);
     expect(calls[0]?.command).toBe("npx");
@@ -28,9 +28,9 @@ describe("NextScaffolder", () => {
 
   it("throws E_VALIDATION when the command exits non-zero", async () => {
     const runner: CommandRunner = () => ({ status: 1, stdout: "", stderr: "boom" });
-    await expect(new NextScaffolder(runner).scaffold("/tmp/proj", "next", {})).rejects.toMatchObject(
-      { code: "E_VALIDATION" },
-    );
+    await expect(new NextScaffolder(runner).scaffold("/tmp/proj", "next")).rejects.toMatchObject({
+      code: "E_VALIDATION",
+    });
   });
 
   it("only supports next", () => {

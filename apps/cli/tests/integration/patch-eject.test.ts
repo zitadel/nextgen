@@ -43,7 +43,6 @@ describe("patch then eject round-trip", () => {
       cwd,
       "--non-interactive",
       "--json",
-      "--skip-deploy-platform",
       "--no-apply",
     ]);
     expect(setup.exitCode).toBe(0);

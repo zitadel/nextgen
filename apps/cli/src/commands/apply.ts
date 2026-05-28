@@ -16,14 +16,12 @@ import { readZitadelSecret } from "./shared";
  * short-circuit to a plan preview without mutating the remote project;
  * `silent` suppresses the success payload so `setup` can call apply as a
  * sub-step without emitting duplicate output. `environment` is validated but
- * not otherwise consumed here, and `platform` is accepted for call-site
- * symmetry with other commands.
+ * not otherwise consumed here.
  */
 export type ApplyOptions = GlobalOptions & {
   silent?: boolean;
   planOnly?: boolean;
   environment?: string;
-  platform?: string;
 };
 
 /**
