@@ -6,7 +6,6 @@ import { defaultIO, writeError } from "./io/output";
 import { toZitadelError } from "./lib/errors";
 import { resolveServer } from "./lib/api/resolve-server";
 import { resolveCwd } from "./lib/paths";
-import { CLI_VERSION } from "./lib/version";
 
 /**
  * Base class for every oclif command. Owns the global flags, builds the
@@ -36,7 +35,7 @@ export abstract class BaseCommand extends Command {
   /** IO sink the domain functions write the envelope to (real process streams). */
   protected io: CliIO = defaultIO;
   /** Resolved meta for the current invocation; set by {@link toMeta}. */
-  protected meta: GlobalOptions = fallbackMeta();
+  protected meta: GlobalOptions = this.fallbackMeta();
 
   /**
    * Builds {@link GlobalOptions} from parsed flags, resolving the server
@@ -59,7 +58,7 @@ export abstract class BaseCommand extends Command {
       dryRun: Boolean(flags["dry-run"]),
       force: Boolean(flags.force),
       command: this.id ?? "(default)",
-      cliVersion: CLI_VERSION,
+      cliVersion: this.config.version,
       source: source.value,
       serverFlag,
       verbose,
@@ -69,24 +68,29 @@ export abstract class BaseCommand extends Command {
   }
 
   /** Renders any thrown error as the Zitadel envelope and exits with its code. */
-  protected async catch(error: unknown): Promise<never> {
+  protected override async catch(error: unknown): Promise<never> {
     const zitadelError = toZitadelError(error);
     writeError(this.io, zitadelError, this.meta);
     return this.exit(zitadelError.exitCode);
   }
-}
 
-function fallbackMeta(): GlobalOptions {
-  return {
-    cwd: resolveCwd(undefined),
-    json: false,
-    nonInteractive: false,
-    dryRun: false,
-    force: false,
-    command: "(default)",
-    cliVersion: CLI_VERSION,
-    source: "",
-    verbose: false,
-    debug: false,
-  };
+  /**
+   * Meta used before {@link toMeta} runs, so an error thrown during flag
+   * parsing still renders a complete envelope. Version comes from oclif's
+   * resolved {@link Command.config}.
+   */
+  private fallbackMeta(): GlobalOptions {
+    return {
+      cwd: resolveCwd(undefined),
+      json: false,
+      nonInteractive: false,
+      dryRun: false,
+      force: false,
+      command: "(default)",
+      cliVersion: this.config.version,
+      source: "",
+      verbose: false,
+      debug: false,
+    };
+  }
 }

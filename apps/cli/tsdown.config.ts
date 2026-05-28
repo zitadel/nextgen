@@ -1,16 +1,4 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-
 import { defineConfig } from "tsdown";
-import { z } from "zod";
-
-const pkgSchema = z.object({
-  version: z.templateLiteral([z.coerce.number(), ".", z.coerce.number(), ".", z.coerce.number()]),
-});
-
-const pkg = pkgSchema.parse(
-  JSON.parse(readFileSync(resolve(import.meta.dirname, "package.json"), "utf8")),
-);
 
 /**
  * Unbundled, multi-entry build for oclif: each command compiles to its own
@@ -35,8 +23,5 @@ export default defineConfig({
   clean: true,
   shims: true,
   external: [/^@oclif\//],
-  define: {
-    __ZITADEL_CLI_VERSION__: JSON.stringify(pkg.version),
-  },
   target: false,
 });
