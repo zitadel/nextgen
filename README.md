@@ -6,12 +6,13 @@ Next iteration of the Zitadel identity platform.
 
 This repository is pre-release. The Go server command is wired up — `main.go`
 runs `cmd/server`, which loads config, connects and migrates the database,
-bootstraps users, and serves the ogen-generated OpenAPI/OIDC API with graceful
-shutdown — and its release path runs through GoReleaser. The server does not yet
-embed or serve the console SPA; that wiring is still follow-up work. The frontend
-workspace is managed by Nx and includes a Vite React console shell, shared
-components, SDKs, and the agent-facing CLI. CI produces installable snapshots for
-review, not official releases.
+bootstraps users, and serves the ogen-generated OpenAPI API with graceful
+shutdown. OIDC-related endpoints are not implemented yet. Its release path runs
+through GoReleaser. The server does not yet embed or serve the console SPA; that
+wiring is still follow-up work. The frontend workspace is managed by Nx and
+includes a Vite React console shell, shared components, SDKs, and the
+agent-facing CLI. CI produces installable snapshots for review, not official
+releases.
 
 ## Local checks
 
