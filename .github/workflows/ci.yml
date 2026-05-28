@@ -39,6 +39,14 @@ jobs:
           git diff --stat --exit-code -- .
           test -z "$(git status --porcelain)"
       - run: go vet ./...
+      # Persist the embedded-postgres binary (downloaded from Maven Central on a
+      # cold cache) so test runs skip the flaky network fetch. Keyed on go.sum so
+      # an embedded-postgres bump invalidates it automatically.
+      - name: Cache embedded-postgres binary
+        uses: actions/cache@v4
+        with:
+          path: ~/.embedded-postgres-go
+          key: embedded-postgres-${{ runner.os }}-${{ hashFiles('go.sum') }}
       - run: go test -v -timeout=10m ./...
 
   go-integration-test:
@@ -52,6 +60,14 @@ jobs:
           cache: true
       - name: Install embedded-postgres runtime deps
         run: sudo apt-get update -qq && sudo apt-get install -y -qq libicu-dev libssl-dev
+      # Persist the embedded-postgres binary (downloaded from Maven Central on a
+      # cold cache) so test runs skip the flaky network fetch. Keyed on go.sum so
+      # an embedded-postgres bump invalidates it automatically.
+      - name: Cache embedded-postgres binary
+        uses: actions/cache@v4
+        with:
+          path: ~/.embedded-postgres-go
+          key: embedded-postgres-${{ runner.os }}-${{ hashFiles('go.sum') }}
       - run: go test -v -tags integration -timeout=10m ./...
 
   go-integration-test-spanner:
@@ -63,6 +79,14 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+      # Persist the embedded-postgres binary (downloaded from Maven Central on a
+      # cold cache) so test runs skip the flaky network fetch. Keyed on go.sum so
+      # an embedded-postgres bump invalidates it automatically.
+      - name: Cache embedded-postgres binary
+        uses: actions/cache@v4
+        with:
+          path: ~/.embedded-postgres-go
+          key: embedded-postgres-${{ runner.os }}-${{ hashFiles('go.sum') }}
       - run: go test -v -tags spanner_integration -timeout=10m ./...
 
 

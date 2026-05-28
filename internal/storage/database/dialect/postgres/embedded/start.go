@@ -24,6 +24,26 @@ func init() {
 // the database is started on a random port and data are stored in a temporary directory
 // its used for testing purposes only
 func StartEmbedded() (connector database.Connector, stop func(), err error) {
+	// On a cold cache the embedded-postgres library downloads the binary from
+	// Maven Central. That endpoint occasionally returns a transient non-200,
+	// which the library misreports as "no version found matching <version>"
+	// (the GET succeeds but the status check fails). Retry a few times so a
+	// flaky download doesn't take down the whole test binary; startEmbeddedOnce
+	// cleans up after itself on every error path, so each attempt starts fresh.
+	const maxAttempts = 3
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		connector, stop, err = startEmbeddedOnce()
+		if err == nil {
+			return connector, stop, nil
+		}
+		if attempt < maxAttempts {
+			time.Sleep(time.Duration(attempt) * 2 * time.Second)
+		}
+	}
+	return nil, nil, fmt.Errorf("embedded postgres failed after %d attempts: %w", maxAttempts, err)
+}
+
+func startEmbeddedOnce() (connector database.Connector, stop func(), err error) {
 	path, err := os.MkdirTemp("", "zitadel-embedded-postgres-*")
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to create temp dir: %w", err)
