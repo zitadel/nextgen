@@ -1,4 +1,4 @@
-import { MANAGED_MARKER } from "../../../../../paths";
+import { MANAGED_MARKER } from "../../../../../../paths";
 import type { RendererSpec } from "../types";
 
 /**

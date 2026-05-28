@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import type { FileOp, ScaffoldPlan } from "../../../../../../src/lib/orca/file-writer/plan";
-import { NextPatcher } from "../../../../../../src/lib/orca/patchers/next";
-import type { PatchContext } from "../../../../../../src/lib/orca/patchers/types";
-import { MANAGED_MARKER } from "../../../../../../src/lib/paths";
-import { buildUserSchema } from "../../../../../../src/lib/user-schema";
+import type { FileOp, ScaffoldPlan } from "../../../../../../../src/lib/orca/file-writer/plan";
+import { NextPatcher } from "../../../../../../../src/lib/orca/patchers/rule/next";
+import type { PatchContext } from "../../../../../../../src/lib/orca/patchers/types";
+import { MANAGED_MARKER } from "../../../../../../../src/lib/paths";
+import { buildUserSchema } from "../../../../../../../src/lib/user-schema";
 
 function ctxFor(appDir: "app" | "src/app"): PatchContext {
   return {

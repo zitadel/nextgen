@@ -1,4 +1,5 @@
-import { AbstractCLIScaffolder, type ScaffoldOptions } from "./types";
+import { AbstractCLIScaffolder } from "./cli";
+import type { ScaffoldOptions } from "./types";
 
 /** Scaffolds a new Next.js App Router project with `create-next-app`. */
 export class NextScaffolder extends AbstractCLIScaffolder {

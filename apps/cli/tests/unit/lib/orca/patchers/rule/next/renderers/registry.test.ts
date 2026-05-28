@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { ZitadelError } from "../../../../../../../src/lib/errors";
-import { getRenderer, RENDERERS } from "../../../../../../../src/lib/orca/patchers/next/renderers/registry";
+import { ZitadelError } from "../../../../../../../../src/lib/errors";
+import { getRenderer, RENDERERS } from "../../../../../../../../src/lib/orca/patchers/rule/next/renderers/registry";
 
 describe("RENDERERS", () => {
   it("contains the expected renderer ids", () => {
