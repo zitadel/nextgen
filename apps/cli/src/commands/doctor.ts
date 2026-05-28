@@ -163,6 +163,16 @@ async function collectChecks(cwd: string): Promise<DoctorCheck[]> {
   );
 
   await check(
+    "managed-middleware",
+    "Next middleware.ts contains Zitadel managed marker",
+    "middleware.ts",
+    async () => {
+      await assertManagedFile(cwd, ["middleware.ts", "src/middleware.ts"]);
+    },
+    checks,
+  );
+
+  await check(
     "deploy",
     "Deploy platform status resolved",
     "zitadel.json",
@@ -218,6 +228,7 @@ async function applyFixes(opts: DoctorOptions): Promise<void> {
     },
     isInitialSetup: false,
   };
+  const recordedServer = typeof config.server === "string" ? config.server : "";
   const plan: ScaffoldPlan = {
     ops: [
       { kind: "append-gitignore", entries: [".zitadel/secret", ".env*", "!.env.example"] },
@@ -228,6 +239,7 @@ async function applyFixes(opts: DoctorOptions): Promise<void> {
           ZITADEL_PROJECT_ID: "",
           ZITADEL_ENVIRONMENT: "",
           ZITADEL_ISSUER: "",
+          NEXTGEN_ISSUER_URL: "",
         },
       },
       {
@@ -237,6 +249,7 @@ async function applyFixes(opts: DoctorOptions): Promise<void> {
           ZITADEL_PROJECT_ID: secret.project_id,
           ZITADEL_ENVIRONMENT: "development",
           ZITADEL_ISSUER: issuer,
+          NEXTGEN_ISSUER_URL: recordedServer,
         },
       },
       ...(await adapter.planSetup(ctx)).ops,

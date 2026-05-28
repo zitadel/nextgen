@@ -24,7 +24,10 @@ var (
 	colUserSchemaURL    = database.NewColumn(userTable, "schema_url")
 	colUserCreatedAt    = database.NewColumn(userTable, "created_at")
 	colUserUpdatedAt    = database.NewColumn(userTable, "updated_at")
-	colUserAttributeKey = database.NewColumn(userAttributesTable, "key")
+	colUserAttributeProjectID = database.NewColumn(userAttributesTable, "project_id")
+	colUserAttributeUserID    = database.NewColumn(userAttributesTable, "user_id")
+	colUserAttributeKey       = database.NewColumn(userAttributesTable, "key")
+	colUserAttributeValue     = database.NewColumn(userAttributesTable, "value")
 )
 
 // UserRepository implements [domain.UserRepository] backed by project-scoped tables and user EAV.
@@ -58,8 +61,15 @@ func (r *UserRepository) TeamIDCondition(teamID string) database.Condition {
 	return database.NewTextCondition(colUserTeamID, database.TextOperationEqual, teamID)
 }
 
-func (r *UserRepository) AttributesCondition(_ []domain.Attribute) database.Condition {
-	return userLiteralAlwaysTrue{}
+func (r *UserRepository) AttributesCondition(attrs []domain.Attribute) database.Condition {
+	if len(attrs) == 0 {
+		return userLiteralAlwaysTrue{}
+	}
+	conds := make([]database.Condition, 0, len(attrs))
+	for _, a := range attrs {
+		conds = append(conds, database.Exists(userAttributesTable, userAttributeMatch{key: a.Key, value: a.Value}))
+	}
+	return database.And(conds...)
 }
 
 func (r *UserRepository) SetTeam(teamID *string) database.Change {

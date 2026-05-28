@@ -1,7 +1,40 @@
 import { join } from "node:path";
 
+import { MANAGED_MARKER } from "../../lib/paths";
 import type { ScaffoldPlan } from "../../scaffolder/plan";
 import type { FrameworkAdapter, ProjectContext } from "../index";
+
+/**
+ * Next.js `middleware.ts` at the project root. Wires `nextgenMiddleware` from
+ * `@zitadel-nextgen/sdk-next` so the scaffolded `<zitadel-login api-base="/__nextgen">`
+ * requests get same-origin-proxied to `NEXTGEN_ISSUER_URL` (the auth backend)
+ * and `/profile` is JWT-gated.
+ *
+ * Filename + function name are the `middleware` form, not the Next 16 `proxy`
+ * rename. Next 15 only recognises `middleware.ts` + `function middleware()`;
+ * Next 16 accepts both (proxy is canonical, middleware is deprecated-but-working).
+ * The middleware form therefore works on every supported Next major. Next 16
+ * emits a one-time deprecation warning at boot — acceptable tradeoff for
+ * single-template universal compatibility.
+ *
+ * Carries the managed-file marker so `doctor --fix` re-applies it.
+ */
+const middlewareTemplate = `${MANAGED_MARKER}
+import { nextgenMiddleware } from "@zitadel-nextgen/sdk-next/middleware";
+import type { NextRequest } from "next/server";
+
+export function middleware(req: NextRequest) {
+  return nextgenMiddleware(req, {
+    issuerUrl: process.env.NEXTGEN_ISSUER_URL,
+    protectedRoutes: ["/profile"],
+    loginPath: "/login",
+  });
+}
+
+export const config = {
+  matcher: ["/__nextgen/:path*", "/profile/:path*"],
+};
+`;
 
 export class NextAdapter implements FrameworkAdapter {
   readonly id = "next" as const;
@@ -12,6 +45,7 @@ export class NextAdapter implements FrameworkAdapter {
       ...(await this.planAddLogin(ctx)).ops,
       ...(await this.planAddRegister(ctx)).ops,
       ...(await this.planAddProfile(ctx)).ops,
+      ...(await this.planAddMiddleware(ctx)).ops,
     ];
     const provider = ctx.renderer.templates.provider;
     if (provider) {
@@ -94,6 +128,28 @@ export class NextAdapter implements FrameworkAdapter {
     };
   }
 
+  async planAddMiddleware(ctx: ProjectContext): Promise<ScaffoldPlan> {
+    return {
+      ops: [
+        {
+          kind: "write",
+          // `..` lifts out of app/ so middleware.ts lands at the project root,
+          // the location Next.js expects for the file convention. Mirrors how
+          // custom-elements.d.ts is written alongside this.
+          path: join(ctx.framework.appDir, "../middleware.ts"),
+          contents: middlewareTemplate,
+        },
+      ],
+      summary: [
+        {
+          title: "Auth middleware",
+          detail:
+            "Created middleware.ts to forward /__nextgen/* to the backend and gate /profile.",
+        },
+      ],
+    };
+  }
+
   sdkDependency(ctx: ProjectContext): { name: string; version: string } {
     return ctx.renderer.dependency;
   }
@@ -103,7 +159,7 @@ export class NextAdapter implements FrameworkAdapter {
       "ZITADEL_PROJECT_ID",
       "ZITADEL_ENVIRONMENT",
       "ZITADEL_ISSUER",
-      "NEXT_PUBLIC_ZITADEL_API_BASE",
+      "NEXTGEN_ISSUER_URL",
       "NEXT_PUBLIC_ZITADEL_PROJECT_ID",
     ];
   }
