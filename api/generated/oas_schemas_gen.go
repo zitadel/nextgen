@@ -422,8 +422,7 @@ type AuthAttemptResponse struct {
 	// All challenges issued within this attempt, in creation order.
 	// Use this to track the state of each factor challenge (pending, verified, failed, expired).
 	Challenges []ChallengeResponse `json:"challenges"`
-	// When this attempt expires (15-minute TTL from creation).
-	ExpiresAt OptNilDateTime `json:"expires_at"`
+	ExpiresAt  OptNilDateTime      `json:"expires_at"`
 	// When this attempt was created.
 	CreatedAt time.Time `json:"created_at"`
 }
