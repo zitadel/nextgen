@@ -94,24 +94,20 @@ type testServer struct {
 	srv     *httptest.Server
 	crypter crypto.Crypter
 	fake    *fakeFlowSvc
-	now     func() time.Time
 }
 
-func newTestServer(t *testing.T, now func() time.Time) *testServer {
+func newTestServer(t *testing.T) *testServer {
 	t.Helper()
 	crypter := op.NewAES256GCMCrypto(fixedKey, "")
 	fake := &fakeFlowSvc{}
-	if now == nil {
-		now = time.Now
-	}
-	handler := api.NewHandler(crypter, fake, stubAuthAttempt{}, nil, nil, nil, nil, now)
+	handler := api.NewHandler(crypter, fake, stubAuthAttempt{}, nil, nil, nil, nil)
 	oas, err := gen.NewServer(handler, api.NewSecurityHandler(), gen.WithErrorHandler(api.OgenErrorHandler))
 	if err != nil {
 		t.Fatalf("NewServer: %v", err)
 	}
 	srv := httptest.NewServer(oas)
 	t.Cleanup(srv.Close)
-	return &testServer{srv: srv, crypter: crypter, fake: fake, now: now}
+	return &testServer{srv: srv, crypter: crypter, fake: fake}
 }
 
 // sealCookie matches what the handler emits, so tests can skip CreateFlow.
@@ -158,10 +154,10 @@ func doRequest(t *testing.T, method, url string, body any, cookieValue string) (
 }
 
 func TestCreateFlow_ReturnsCookieAndFlowID(t *testing.T) {
-	ts := newTestServer(t, nil)
+	ts := newTestServer(t)
 	ts.fake.def = &domain.FlowDefinition{ProjectID: "proj_1", ID: "def_1", Purposes: map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "identify"}}
 	ts.fake.startResult = service.FlowStepResult{
-		State: &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", SessionID: "sess_1", IssuedAt: ts.now()},
+		State: &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", SessionID: "sess_1", IssuedAt: time.Now()},
 		Step:  &domain.FlowStep{Name: "identify"},
 	}
 
@@ -188,8 +184,8 @@ func TestCreateFlow_ReturnsCookieAndFlowID(t *testing.T) {
 }
 
 func TestSubmitFlowStep_PathIDMismatchReturns404(t *testing.T) {
-	ts := newTestServer(t, nil)
-	state := &domain.FlowState{ID: "flow_real", IssuedAt: ts.now()}
+	ts := newTestServer(t)
+	state := &domain.FlowState{ID: "flow_real", IssuedAt: time.Now()}
 	cookieVal := ts.sealCookie(t, state)
 
 	resp, body := doRequest(t, http.MethodPost, ts.srv.URL+"/flow/flow_wrong/submit", map[string]any{
@@ -201,7 +197,7 @@ func TestSubmitFlowStep_PathIDMismatchReturns404(t *testing.T) {
 }
 
 func TestSubmitFlowStep_TamperedCookieReturns401(t *testing.T) {
-	ts := newTestServer(t, nil)
+	ts := newTestServer(t)
 	resp, _ := doRequest(t, http.MethodPost, ts.srv.URL+"/flow/flow_1/submit", map[string]any{
 		"action": "submit",
 	}, "garbage")
@@ -211,10 +207,9 @@ func TestSubmitFlowStep_TamperedCookieReturns401(t *testing.T) {
 }
 
 func TestSubmitFlowStep_StaleCookieReturns401(t *testing.T) {
-	now := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
-	ts := newTestServer(t, func() time.Time { return now })
+	ts := newTestServer(t)
 
-	stale := now.Add(-30 * time.Minute)
+	stale := time.Now().Add(-1 * time.Hour)
 	state := &domain.FlowState{ID: "flow_1", IssuedAt: stale}
 	cookieVal := ts.sealCookie(t, state)
 
@@ -227,11 +222,11 @@ func TestSubmitFlowStep_StaleCookieReturns401(t *testing.T) {
 }
 
 func TestSubmitFlowStep_HappyPath_RotatesCookie(t *testing.T) {
-	ts := newTestServer(t, nil)
-	state := &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", SessionID: "sess_1", IssuedAt: ts.now()}
+	ts := newTestServer(t)
+	state := &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", SessionID: "sess_1", IssuedAt: time.Now()}
 	cookieVal := ts.sealCookie(t, state)
 
-	advanced := &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", SessionID: "sess_1", IssuedAt: ts.now()}
+	advanced := &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", SessionID: "sess_1", IssuedAt: time.Now()}
 	ts.fake.submitResult = service.FlowStepResult{State: advanced, Step: &domain.FlowStep{Name: "password"}}
 
 	resp, body := doRequest(t, http.MethodPost, ts.srv.URL+"/flow/flow_1/submit", map[string]any{
@@ -250,12 +245,12 @@ func TestSubmitFlowStep_HappyPath_RotatesCookie(t *testing.T) {
 }
 
 func TestSubmitFlowStep_TerminalClearsCookie(t *testing.T) {
-	ts := newTestServer(t, nil)
-	state := &domain.FlowState{ID: "flow_1", IssuedAt: ts.now()}
+	ts := newTestServer(t)
+	state := &domain.FlowState{ID: "flow_1", IssuedAt: time.Now()}
 	cookieVal := ts.sealCookie(t, state)
 
 	complete := domain.FlowStepCompleteShow
-	terminal := &domain.FlowState{ID: "flow_1", IssuedAt: ts.now()}
+	terminal := &domain.FlowState{ID: "flow_1", IssuedAt: time.Now()}
 	ts.fake.submitResult = service.FlowStepResult{State: terminal, Step: &domain.FlowStep{Name: "done", Complete: &complete}}
 
 	resp, _ := doRequest(t, http.MethodPost, ts.srv.URL+"/flow/flow_1/submit", map[string]any{
@@ -271,14 +266,14 @@ func TestSubmitFlowStep_TerminalClearsCookie(t *testing.T) {
 }
 
 func TestSubmitFlowStep_TerminalSurfacesHandoffToken(t *testing.T) {
-	ts := newTestServer(t, nil)
-	state := &domain.FlowState{ID: "flow_1", IssuedAt: ts.now()}
+	ts := newTestServer(t)
+	state := &domain.FlowState{ID: "flow_1", IssuedAt: time.Now()}
 	cookieVal := ts.sealCookie(t, state)
 
 	complete := domain.FlowStepCompleteShow
 	expiresAt := time.Date(2026, 5, 27, 12, 0, 0, 0, time.UTC)
 	ts.fake.submitResult = service.FlowStepResult{
-		State:                 &domain.FlowState{ID: "flow_1", IssuedAt: ts.now()},
+		State:                 &domain.FlowState{ID: "flow_1", IssuedAt: time.Now()},
 		Step:                  &domain.FlowStep{Name: "done", Complete: &complete},
 		HandoffToken:          "ht_abc",
 		HandoffTokenExpiresAt: expiresAt,
@@ -303,12 +298,12 @@ func TestSubmitFlowStep_TerminalSurfacesHandoffToken(t *testing.T) {
 }
 
 func TestGetFlowStep_ReturnsCurrentStep(t *testing.T) {
-	ts := newTestServer(t, nil)
+	ts := newTestServer(t)
 	state := &domain.FlowState{
 		ID:           "flow_1",
 		ProjectID:    "proj_1",
 		SessionID:    "sess_1",
-		IssuedAt:     ts.now(),
+		IssuedAt:     time.Now(),
 		FlowProgress: domain.FlowProgress{CurrentStep: "identify"},
 	}
 	cookieVal := ts.sealCookie(t, state)
@@ -328,8 +323,8 @@ func TestGetFlowStep_ReturnsCurrentStep(t *testing.T) {
 }
 
 func TestGetFlowStep_TerminalReturns410(t *testing.T) {
-	ts := newTestServer(t, nil)
-	state := &domain.FlowState{ID: "flow_1", IssuedAt: ts.now()}
+	ts := newTestServer(t)
+	state := &domain.FlowState{ID: "flow_1", IssuedAt: time.Now()}
 	cookieVal := ts.sealCookie(t, state)
 
 	complete := domain.FlowStepCompleteShow

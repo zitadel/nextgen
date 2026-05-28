@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"time"
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/crypto"
@@ -22,7 +21,6 @@ type Handler struct {
 	schemaService         *service.SchemaService
 	flowDefinitionService service.FlowDefinitionService
 	teamService           *service.TeamService
-	now                   func() time.Time
 }
 
 func NewHandler(
@@ -34,11 +32,7 @@ func NewHandler(
 	schemaService *service.SchemaService,
 	flowDefinitionService service.FlowDefinitionService,
 	teamService *service.TeamService,
-	now func() time.Time,
 ) *Handler {
-	if now == nil {
-		now = time.Now
-	}
 	return &Handler{
 		crypter:               crypto,
 		flowService:           flowService,
@@ -48,7 +42,6 @@ func NewHandler(
 		schemaService:         schemaService,
 		flowDefinitionService: flowDefinitionService,
 		teamService:           teamService,
-		now:                   now,
 	}
 }
 

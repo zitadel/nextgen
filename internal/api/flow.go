@@ -178,7 +178,7 @@ func (h *Handler) openState(raw string) (*domain.FlowState, error) {
 	if err := json.Unmarshal([]byte(payload), &state); err != nil {
 		return nil, errFlowCookieInvalid
 	}
-	if h.now().Sub(state.IssuedAt) > flowCookieMaxAgeSeconds*time.Second {
+	if time.Since(state.IssuedAt) > flowCookieMaxAgeSeconds*time.Second {
 		return nil, errFlowCookieExpired
 	}
 	return &state, nil

@@ -3,7 +3,6 @@ package helpers
 import (
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 	generated "github.com/zitadel/nextgen/api/generated"
@@ -48,7 +47,6 @@ func (h *Harness) EnsureHandler(t *testing.T) *api.Handler {
 			h.EnsureSchemaService(t),
 			h.EnsureFlowDefinitionService(t),
 			h.EnsureTeamService(t),
-			time.Now,
 		)
 	}
 	return h.Handler

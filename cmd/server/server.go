@@ -59,15 +59,6 @@ func NewCommand() *cobra.Command {
 	return cmd
 }
 
-// mustBindEnv panics on viper's documented "this can't fail in
-// normal use" BindEnv error path. Keeps the env wiring readable
-// without sprinkling error handling at every binding.
-func mustBindEnv(v *viper.Viper, key string) {
-	if err := v.BindEnv(key); err != nil {
-		panic(fmt.Errorf("bind env %q: %w", key, err))
-	}
-}
-
 func startDatabase(ctx context.Context, config database.Config) (database.Pool, error) {
 	connector, err := config.Build()
 	if err != nil {
@@ -182,7 +173,7 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 	defer stop()
 
 	oasServer, err := oasapi.NewServer(
-		api.NewHandler(crypter, flowService, authAttemptSvc, sessionService, projectService, schemaService, flowDefinitionSvc, teamService, time.Now),
+		api.NewHandler(crypter, flowService, authAttemptSvc, sessionService, projectService, schemaService, flowDefinitionSvc, teamService),
 		api.NewSecurityHandler(),
 		oasapi.WithErrorHandler(api.OgenErrorHandler))
 	if err != nil {
@@ -266,6 +257,15 @@ func loadConfig(configPath string) (Config, error) {
 	}
 
 	return cfg, cfg.Validate()
+}
+
+// mustBindEnv panics on viper's documented "this can't fail in
+// normal use" BindEnv error path. Keeps the env wiring readable
+// without sprinkling error handling at every binding.
+func mustBindEnv(v *viper.Viper, key string) {
+	if err := v.BindEnv(key); err != nil {
+		panic(fmt.Errorf("bind env %q: %w", key, err))
+	}
 }
 
 // buildCrypter decodes a hex-encoded crypter key and constructs a
