@@ -39,14 +39,14 @@ func ErrSessionInvalidTTL() Error {
 }
 
 type sessionInvalidTTLDetails struct {
-	TTLSeconds    int64 `json:"ttl_seconds"`
-	MaxTTLSeconds int64 `json:"max_ttl_seconds"`
+	TTL    time.Duration `json:"ttl"`
+	MaxTTL time.Duration `json:"max_ttl"`
 }
 
 func sessionInvalidTTLErr(requested, maxTTL time.Duration) Error {
 	return ErrSessionInvalidTTL().WithDetails(sessionInvalidTTLDetails{
-		TTLSeconds:    int64(requested / time.Second),
-		MaxTTLSeconds: int64(maxTTL / time.Second),
+		TTL:    requested,
+		MaxTTL: maxTTL,
 	})
 }
 

@@ -69,10 +69,10 @@ func assertSessionInvalidTTLDetails(t *testing.T, err error, wantTTL, wantMax ti
 	b, err := json.Marshal(domErr.Details)
 	require.NoError(t, err)
 	var got struct {
-		TTLSeconds    int64 `json:"ttl_seconds"`
-		MaxTTLSeconds int64 `json:"max_ttl_seconds"`
+		TTL    time.Duration `json:"ttl"`
+		MaxTTL time.Duration `json:"max_ttl"`
 	}
 	require.NoError(t, json.Unmarshal(b, &got))
-	assert.Equal(t, int64(wantTTL/time.Second), got.TTLSeconds)
-	assert.Equal(t, int64(wantMax/time.Second), got.MaxTTLSeconds)
+	assert.Equal(t, wantTTL, got.TTL)
+	assert.Equal(t, wantMax, got.MaxTTL)
 }
