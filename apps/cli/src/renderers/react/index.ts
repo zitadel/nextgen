@@ -14,9 +14,11 @@ import type { RendererSpec } from "../types";
  * yarn PnP) because the user only declares `sdk-next` as a direct dep.
  * SSR is disabled because Lit's element registration needs a browser.
  *
- * Configuration is read from `NEXT_PUBLIC_*` env vars so the values reach
- * the client bundle. The CLI writes both `NEXT_PUBLIC_ZITADEL_API_BASE`
- * and `NEXT_PUBLIC_ZITADEL_PROJECT_ID` into `.env.local` during setup.
+ * `api-base` is hardcoded to `/__nextgen`: the scaffolded Next `proxy.ts`
+ * intercepts that path and forwards same-origin requests to `NEXTGEN_ISSUER_URL`
+ * (server-side only). The backend URL therefore never reaches the browser
+ * bundle. `NEXT_PUBLIC_ZITADEL_PROJECT_ID` is still public — the project ID
+ * is not sensitive and the web component needs it to start a flow.
  */
 export const reactRenderer: RendererSpec = {
   id: "react",
@@ -41,7 +43,7 @@ const ${elementName} = dynamic(
     return function ${elementName}Element() {
       return (
         <zitadel-login
-          api-base={process.env.NEXT_PUBLIC_ZITADEL_API_BASE}
+          api-base="/__nextgen"
           project-id={process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID}
           purpose="${mode}"
           post-sign-in-url="/profile"
@@ -75,7 +77,7 @@ const ZitadelLogout = dynamic(
     return function ZitadelLogoutElement() {
       return (
         <zitadel-logout
-          api-base={process.env.NEXT_PUBLIC_ZITADEL_API_BASE}
+          api-base="/__nextgen"
           post-sign-out-url="/login"
         />
       );

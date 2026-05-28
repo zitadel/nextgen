@@ -21,7 +21,7 @@ type AttributeUniqueness int
 const (
 	AttributeUniquenessUnspecified AttributeUniqueness = iota
 	AttributeUniquenessTeam
-	AttributeUniquenessGlobal
+	AttributeUniquenessProject
 )
 
 type CreateAttribute struct {

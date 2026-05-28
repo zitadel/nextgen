@@ -9,7 +9,7 @@ import (
 )
 
 // Validate checks a parsed document and password hash encoding.
-func Validate(doc *Document, hasher *crypto.Hasher) error {
+func Validate(doc *Document, hashValidator crypto.HashValidator) error {
 	if doc == nil {
 		return fmt.Errorf("document is nil")
 	}
@@ -23,7 +23,7 @@ func Validate(doc *Document, hasher *crypto.Hasher) error {
 	if err != nil {
 		return fmt.Errorf("authenticators: %w", err)
 	}
-	if err := hasher.ValidateEncodedHash(pw.EncodedHash); err != nil {
+	if err := hashValidator.ValidateHash(pw.EncodedHash); err != nil {
 		return fmt.Errorf("password encoded_hash: %w", err)
 	}
 	return nil

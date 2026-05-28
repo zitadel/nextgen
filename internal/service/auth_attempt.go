@@ -193,7 +193,7 @@ type authAttemptService struct {
 	users            userLookup
 	userPasswords    userPasswords
 	userPasskeys     userPasskeys
-	passwordVerifier *crypto.Hasher
+	passwordVerifier crypto.HashVerifier
 }
 
 func NewAuthAttemptService(
@@ -204,7 +204,7 @@ func NewAuthAttemptService(
 	users userLookup,
 	userPasswords userPasswords,
 	userPasskeys userPasskeys,
-	passwordVerifier *crypto.Hasher,
+	passwordVerifier crypto.HashVerifier,
 ) AuthAttemptService {
 	return &authAttemptService{
 		pool:             pool,
@@ -356,11 +356,13 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 		user, err := s.users.Get(
 			ctx,
 			s.pool,
-			database.WithCondition(s.users.ProjectIDCondition(attempt.ProjectID)),
-			database.WithCondition(s.users.AttributesCondition([]domain.Attribute{{
-				Key:   p.AttributeName,
-				Value: p.LoginName,
-			}})),
+			database.WithCondition(database.And(
+				s.users.ProjectIDCondition(attempt.ProjectID),
+				s.users.AttributesCondition([]domain.Attribute{{
+					Key:   p.AttributeName,
+					Value: p.LoginName,
+				}}),
+			)),
 		)
 		if err != nil {
 			return userChallenge, nil, domain.ErrAuthAttemptProofRejected(err)
@@ -375,8 +377,10 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 		password, err := s.userPasswords.Get(
 			ctx,
 			s.pool,
-			database.WithCondition(s.userPasswords.ProjectIDCondition(attempt.ProjectID)),
-			database.WithCondition(s.userPasswords.UserIDCondition(userFactor.UserID)),
+			database.WithCondition(database.And(
+				s.userPasswords.ProjectIDCondition(attempt.ProjectID),
+				s.userPasswords.UserIDCondition(userFactor.UserID),
+			)),
 		)
 		if err != nil {
 			return passwordChallenge, nil, domain.ErrAuthAttemptProofRejected(err)

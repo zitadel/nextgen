@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-faster/errors"
 	"github.com/go-faster/jx"
+	"github.com/zitadel/nextgen/internal/api/ogenx"
 )
 
 // Merged schema.
@@ -1955,59 +1956,46 @@ func (s *CreateSessionRequestUserAgentAdditional) init() CreateSessionRequestUse
 	return m
 }
 
-type CreateUserBadRequest ErrorDetails
+type CreateTeamBadRequest ErrorDetails
 
-func (*CreateUserBadRequest) createUserRes() {}
+func (*CreateTeamBadRequest) createTeamRes() {}
 
-type CreateUserForbidden ErrorDetails
-
-func (*CreateUserForbidden) createUserRes() {}
-
-// The content of this response is determined by the configured
-// schema for users.
 // Ref: #
-type CreateUserResponse struct {
-	// The unique identifier of the created user.
-	ID              string `json:"id"`
-	AdditionalProps CreateUserResponseAdditional
+type CreateTeamRequest struct{}
+
+// Ref: #
+type CreateTeamResponse struct {
+	// The unique identifier of the team.
+	ID string `json:"id"`
+	// The time when the team was created.
+	CreatedAt time.Time `json:"createdAt"`
 }
 
 // GetID returns the value of ID.
-func (s *CreateUserResponse) GetID() string {
+func (s *CreateTeamResponse) GetID() string {
 	return s.ID
 }
 
-// GetAdditionalProps returns the value of AdditionalProps.
-func (s *CreateUserResponse) GetAdditionalProps() CreateUserResponseAdditional {
-	return s.AdditionalProps
+// GetCreatedAt returns the value of CreatedAt.
+func (s *CreateTeamResponse) GetCreatedAt() time.Time {
+	return s.CreatedAt
 }
 
 // SetID sets the value of ID.
-func (s *CreateUserResponse) SetID(val string) {
+func (s *CreateTeamResponse) SetID(val string) {
 	s.ID = val
 }
 
-// SetAdditionalProps sets the value of AdditionalProps.
-func (s *CreateUserResponse) SetAdditionalProps(val CreateUserResponseAdditional) {
-	s.AdditionalProps = val
+// SetCreatedAt sets the value of CreatedAt.
+func (s *CreateTeamResponse) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
 }
 
-func (*CreateUserResponse) createUserRes() {}
+func (*CreateTeamResponse) createTeamRes() {}
 
-type CreateUserResponseAdditional map[string]jx.Raw
+type CreateTeamTooManyRequests ErrorDetails
 
-func (s *CreateUserResponseAdditional) init() CreateUserResponseAdditional {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
-
-type CreateUserUnauthorized ErrorDetails
-
-func (*CreateUserUnauthorized) createUserRes() {}
+func (*CreateTeamTooManyRequests) createTeamRes() {}
 
 // DeleteFlowDefinitionNoContent is response for DeleteFlowDefinition operation.
 type DeleteFlowDefinitionNoContent struct{}
@@ -2198,7 +2186,7 @@ func (*ErrorDetailsStatusCode) createFlowRes()             {}
 func (*ErrorDetailsStatusCode) createProjectRes()          {}
 func (*ErrorDetailsStatusCode) createSchemaRes()           {}
 func (*ErrorDetailsStatusCode) createSessionRes()          {}
-func (*ErrorDetailsStatusCode) createUserRes()             {}
+func (*ErrorDetailsStatusCode) createTeamRes()             {}
 func (*ErrorDetailsStatusCode) deleteFlowDefinitionRes()   {}
 func (*ErrorDetailsStatusCode) endSessionRes()             {}
 func (*ErrorDetailsStatusCode) exchangeHandoffRes()        {}
@@ -2213,6 +2201,7 @@ func (*ErrorDetailsStatusCode) getProjectRes()             {}
 func (*ErrorDetailsStatusCode) getReadyRes()               {}
 func (*ErrorDetailsStatusCode) getSchemaByIdRes()          {}
 func (*ErrorDetailsStatusCode) getSessionRes()             {}
+func (*ErrorDetailsStatusCode) getTeamRes()                {}
 func (*ErrorDetailsStatusCode) getTokenRes()               {}
 func (*ErrorDetailsStatusCode) getUserInfoRes()            {}
 func (*ErrorDetailsStatusCode) introspectRes()             {}
@@ -2244,6 +2233,9 @@ type ExchangeRequest struct {
 	// The one-time handoff token minted by `POST /auth_attempts/{id}/handoff`.
 	// Single-use — replaying it after a successful exchange returns `410 Gone`.
 	HandoffToken string `json:"handoff_token"`
+	// Optional session lifetime after exchange as an ISO-8601 duration. When omitted, the server
+	// uses the configured default. Must not exceed the configured maximum.
+	TTL OptDuration `json:"ttl"`
 }
 
 // GetHandoffToken returns the value of HandoffToken.
@@ -2251,9 +2243,19 @@ func (s *ExchangeRequest) GetHandoffToken() string {
 	return s.HandoffToken
 }
 
+// GetTTL returns the value of TTL.
+func (s *ExchangeRequest) GetTTL() OptDuration {
+	return s.TTL
+}
+
 // SetHandoffToken sets the value of HandoffToken.
 func (s *ExchangeRequest) SetHandoffToken(val string) {
 	s.HandoffToken = val
+}
+
+// SetTTL sets the value of TTL.
+func (s *ExchangeRequest) SetTTL(val OptDuration) {
+	s.TTL = val
 }
 
 // An authentication factor method.
@@ -4437,6 +4439,57 @@ func (*GetSessionNotFound) getSessionRes() {}
 type GetSessionUnauthorized ErrorDetails
 
 func (*GetSessionUnauthorized) getSessionRes() {}
+
+type GetTeamNotFound ErrorDetails
+
+func (*GetTeamNotFound) getTeamRes() {}
+
+// The current state of a team.
+// Ref: #
+type GetTeamResponse struct {
+	// The unique identifier of the team.
+	ID string `json:"id"`
+	// The time when the team was created.
+	CreatedAt time.Time `json:"createdAt"`
+	// The time when the team was last updated.
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+// GetID returns the value of ID.
+func (s *GetTeamResponse) GetID() string {
+	return s.ID
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *GetTeamResponse) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetUpdatedAt returns the value of UpdatedAt.
+func (s *GetTeamResponse) GetUpdatedAt() time.Time {
+	return s.UpdatedAt
+}
+
+// SetID sets the value of ID.
+func (s *GetTeamResponse) SetID(val string) {
+	s.ID = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *GetTeamResponse) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetUpdatedAt sets the value of UpdatedAt.
+func (s *GetTeamResponse) SetUpdatedAt(val time.Time) {
+	s.UpdatedAt = val
+}
+
+func (*GetTeamResponse) getTeamRes() {}
+
+type GetTeamUnauthorized ErrorDetails
+
+func (*GetTeamUnauthorized) getTeamRes() {}
 
 type GetUserInfoOK struct {
 	// The unique identifier for the user.
@@ -6953,6 +7006,52 @@ func (o OptDateTime) Or(d time.Time) time.Time {
 	return d
 }
 
+// NewOptDuration returns new OptDuration with value set to v.
+func NewOptDuration(v ogenx.ISODuration) OptDuration {
+	return OptDuration{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptDuration is optional ogenx.ISODuration.
+type OptDuration struct {
+	Value ogenx.ISODuration
+	Set   bool
+}
+
+// IsSet returns true if OptDuration was set.
+func (o OptDuration) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptDuration) Reset() {
+	var v ogenx.ISODuration
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptDuration) SetTo(v ogenx.ISODuration) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptDuration) Get() (v ogenx.ISODuration, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptDuration) Or(d ogenx.ISODuration) ogenx.ISODuration {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptErrorDetailsDetails returns new OptErrorDetailsDetails with value set to v.
 func NewOptErrorDetailsDetails(v ErrorDetailsDetails) OptErrorDetailsDetails {
 	return OptErrorDetailsDetails{
@@ -8900,52 +8999,6 @@ func (o OptPostTokenRequestGrantType) Or(d PostTokenRequestGrantType) PostTokenR
 	return d
 }
 
-// NewOptProjectID returns new OptProjectID with value set to v.
-func NewOptProjectID(v ProjectID) OptProjectID {
-	return OptProjectID{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptProjectID is optional ProjectID.
-type OptProjectID struct {
-	Value ProjectID
-	Set   bool
-}
-
-// IsSet returns true if OptProjectID was set.
-func (o OptProjectID) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptProjectID) Reset() {
-	var v ProjectID
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptProjectID) SetTo(v ProjectID) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptProjectID) Get() (v ProjectID, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptProjectID) Or(d ProjectID) ProjectID {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptSchemaURI returns new OptSchemaURI with value set to v.
 func NewOptSchemaURI(v SchemaURI) OptSchemaURI {
 	return OptSchemaURI{
@@ -10508,50 +10561,6 @@ func (*UpdateFlowDefinitionBadRequest) updateFlowDefinitionRes() {}
 type UpdateFlowDefinitionNotFound ErrorDetails
 
 func (*UpdateFlowDefinitionNotFound) updateFlowDefinitionRes() {}
-
-// A user represents an individual identity in the system. It can be used to
-// represent a human user, but also a service account or any other type of
-// identity. The content of a user is determined by the configured schema for
-// users, this is only a base schema.
-// Ref: #
-type User struct {
-	// The schema that defines the content of the user. This is determined by
-	// the configuration of the system and can be used to validate the content
-	// of the user.
-	Schema          string `json:"$schema"`
-	AdditionalProps UserAdditional
-}
-
-// GetSchema returns the value of Schema.
-func (s *User) GetSchema() string {
-	return s.Schema
-}
-
-// GetAdditionalProps returns the value of AdditionalProps.
-func (s *User) GetAdditionalProps() UserAdditional {
-	return s.AdditionalProps
-}
-
-// SetSchema sets the value of Schema.
-func (s *User) SetSchema(val string) {
-	s.Schema = val
-}
-
-// SetAdditionalProps sets the value of AdditionalProps.
-func (s *User) SetAdditionalProps(val UserAdditional) {
-	s.AdditionalProps = val
-}
-
-type UserAdditional map[string]jx.Raw
-
-func (s *UserAdditional) init() UserAdditional {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
 
 type UserID string
 

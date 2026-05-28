@@ -484,8 +484,8 @@ func (s *Server) decodeCreateSessionRequest(r *http.Request) (
 	}
 }
 
-func (s *Server) decodeCreateUserRequest(r *http.Request) (
-	req *User,
+func (s *Server) decodeCreateTeamRequest(r *http.Request) (
+	req *CreateTeamRequest,
 	rawBody []byte,
 	close func() error,
 	rerr error,
@@ -505,6 +505,9 @@ func (s *Server) decodeCreateUserRequest(r *http.Request) (
 			rerr = errors.Join(rerr, close())
 		}
 	}()
+	if _, ok := r.Header["Content-Type"]; !ok && r.ContentLength == 0 {
+		return req, rawBody, close, nil
+	}
 	ct, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
 	if err != nil {
 		return req, rawBody, close, errors.Wrap(err, "parse media type")
@@ -512,7 +515,7 @@ func (s *Server) decodeCreateUserRequest(r *http.Request) (
 	switch {
 	case ct == "application/json":
 		if r.ContentLength == 0 {
-			return req, rawBody, close, validate.ErrBodyRequired
+			return req, rawBody, close, nil
 		}
 		buf, err := io.ReadAll(r.Body)
 		defer func() {
@@ -526,17 +529,20 @@ func (s *Server) decodeCreateUserRequest(r *http.Request) (
 		r.Body = io.NopCloser(bytes.NewBuffer(buf))
 
 		if len(buf) == 0 {
-			return req, rawBody, close, validate.ErrBodyRequired
+			return req, rawBody, close, nil
 		}
 
 		rawBody = append(rawBody, buf...)
 		d := jx.DecodeBytes(buf)
 
-		var request User
+		var request *CreateTeamRequest
 		if err := func() error {
-			if err := request.Decode(d); err != nil {
+			request = nil
+			var elem CreateTeamRequest
+			if err := elem.Decode(d); err != nil {
 				return err
 			}
+			request = &elem
 			if err := d.Skip(); err != io.EOF {
 				return errors.New("unexpected trailing data")
 			}
@@ -549,7 +555,7 @@ func (s *Server) decodeCreateUserRequest(r *http.Request) (
 			}
 			return req, rawBody, close, err
 		}
-		return &request, rawBody, close, nil
+		return request, rawBody, close, nil
 	default:
 		return req, rawBody, close, validate.InvalidContentType(ct)
 	}

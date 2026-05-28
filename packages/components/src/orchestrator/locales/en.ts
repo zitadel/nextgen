@@ -44,6 +44,8 @@ export const en: Record<string, string> = {
   "passkey-upsell.action.skip": "Skip for now",
   /** Figma `6594:630` setup-passkey annotations — form-level `<zl-alert>`. */
   "error.passkey_cancelled": "Passkey setup was cancelled",
+  "error.passkey_not_registered": "This passkey is not registered. Please sign in with your email and password.",
+  "error.passkey_setup_failed": "Passkey registration did not complete. Please try again.",
   "error.passkey_unsupported": "This device does not support passkeys",
   "error.passkey_failed": "Something went wrong. Please try again.",
 

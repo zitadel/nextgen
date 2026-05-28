@@ -131,12 +131,12 @@ func (UnimplementedHandler) CreateSession(ctx context.Context, req *CreateSessio
 	return r, ht.ErrNotImplemented
 }
 
-// CreateUser implements createUser operation.
+// CreateTeam implements createTeam operation.
 //
-// Create user.
+// Create team.
 //
-// POST /user
-func (UnimplementedHandler) CreateUser(ctx context.Context, req *User, params CreateUserParams) (r CreateUserRes, _ error) {
+// POST /teams
+func (UnimplementedHandler) CreateTeam(ctx context.Context, req *CreateTeamRequest, params CreateTeamParams) (r CreateTeamRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -298,6 +298,15 @@ func (UnimplementedHandler) GetSchemaById(ctx context.Context, params GetSchemaB
 //
 // GET /sessions/{session_id}
 func (UnimplementedHandler) GetSession(ctx context.Context, params GetSessionParams) (r GetSessionRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// GetTeam implements getTeam operation.
+//
+// Returns the current state of a team.
+//
+// GET /teams/{team_id}
+func (UnimplementedHandler) GetTeam(ctx context.Context, params GetTeamParams) (r GetTeamRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

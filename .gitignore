@@ -7,6 +7,7 @@
 *.dll
 *.so
 *.dylib
+api/openapi/bundled.yaml
 
 # Test binary, built with `go test -c`
 *.test
@@ -32,6 +33,9 @@ go.work.sum
 .vscode/
 
 __debug_bin*
+
+# API clients
+.kreya/
 
 # Local agent workspace metadata (Nx writes these on update; not project-owned)
 .claude/
