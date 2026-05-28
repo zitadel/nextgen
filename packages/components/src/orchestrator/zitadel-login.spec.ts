@@ -9,7 +9,7 @@
  * `zitadel-login.browser.spec.ts` because jsdom 29 only ships a partial
  * `ElementInternals` implementation.
  */
-import { setApiBaseUrl } from "@zitadel-nextgen/api/runtime/base-url";
+import { configureZitadel, _resetConfigForTesting } from "@zitadel-nextgen/api/config";
 import {
   applyBranding,
   clearBranding,
@@ -39,11 +39,13 @@ let mock: MockHandle = setupMockHandlers();
 const server = setupServer(...mock.handlers);
 
 beforeAll(() => {
-  setApiBaseUrl(API_BASE);
+  configureZitadel({ apiBase: API_BASE, projectId: "demo-project" });
   server.listen({ onUnhandledRequest: "error" });
 });
 
 beforeEach(() => {
+  _resetConfigForTesting();
+  configureZitadel({ apiBase: API_BASE, projectId: "demo-project" });
   mock = setupMockHandlers();
   mock.reset();
   server.resetHandlers(...mock.handlers);
@@ -231,7 +233,8 @@ describe("<zitadel-login> against the typed Flow API", () => {
     );
 
     try {
-      setApiBaseUrl("/__nextgen");
+      _resetConfigForTesting();
+      configureZitadel({ apiBase: "/__nextgen", projectId: "demo-project" });
       const element = document.createElement("zitadel-login") as ZitadelLogin;
       element.purpose = "login";
       element.projectId = "demo-project";
@@ -247,7 +250,8 @@ describe("<zitadel-login> against the typed Flow API", () => {
       expect(exchangeHit).toBe(true);
       expect(assign).toHaveBeenCalledWith("/admin");
     } finally {
-      setApiBaseUrl(API_BASE);
+      _resetConfigForTesting();
+      configureZitadel({ apiBase: API_BASE, projectId: "demo-project" });
       Object.defineProperty(window, "location", {
         configurable: true,
         value: location,

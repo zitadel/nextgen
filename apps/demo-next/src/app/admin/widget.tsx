@@ -4,9 +4,10 @@ import dynamic from "next/dynamic";
 
 const ZitadelLogout = dynamic(
   async () => {
-    await import("@zitadel-nextgen/components");
+    const { demoProject } = await import("@/zitadel");
+    await import("@zitadel-nextgen/sdk-next/client");
     return function ZitadelLogoutElement() {
-      return <zitadel-logout api-base="/__nextgen" post-sign-out-url="/login" />;
+      return <zitadel-logout project={demoProject} post-sign-out-url="/login" />;
     };
   },
   { ssr: false },

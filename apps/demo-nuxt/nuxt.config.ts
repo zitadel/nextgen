@@ -12,6 +12,7 @@ export default defineNuxtConfig({
   runtimeConfig: {
     nextgenIssuerUrl: process.env.NEXTGEN_ISSUER_URL ?? "http://localhost:4000",
     public: {
+      nextgenApiBase: "/__nextgen",
       zitadelProjectId: process.env.NUXT_PUBLIC_ZITADEL_PROJECT_ID ?? "demo",
     },
   },

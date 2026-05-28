@@ -1,4 +1,10 @@
-import { defineNuxtPlugin, useRequestEvent, useState } from '#imports';
+import {
+  defineNuxtPlugin,
+  useRequestEvent,
+  useRuntimeConfig,
+  useState,
+} from '#imports';
+import { configureZitadel } from '@zitadel-nextgen/api/config';
 
 import type { ClientAuthResult } from './types';
 
@@ -26,4 +32,21 @@ export default defineNuxtPlugin(() => {
     : { isAuthenticated: false, session: null };
 
   useState<ClientAuthResult>('nextgen-auth', () => clientAuth);
+
+  // Initialise SDK-wide config so web components (<zitadel-login>,
+  // <zitadel-logout>) resolve apiBase and projectId from the shared
+  // config instead of requiring per-instance attributes.
+  const runtimeConfig = useRuntimeConfig();
+  const publicConfig = runtimeConfig.public;
+  const apiBase =
+    (publicConfig.nextgenApiBase as string | undefined) ?? '/__nextgen';
+  const projectId =
+    (publicConfig.zitadelProjectId as string | undefined) ?? '';
+  const issuerUrl =
+    (runtimeConfig.nextgenIssuerUrl as string | undefined) ??
+    'http://localhost:4000';
+
+  if (apiBase && projectId) {
+    configureZitadel({ apiBase, projectId, issuerUrl });
+  }
 });

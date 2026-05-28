@@ -33,6 +33,11 @@
       "@zitadel-nextgen/source": "./src/runtime/base-url.ts",
       "types": "./dist/runtime/base-url.d.mts",
       "import": "./dist/runtime/base-url.mjs"
+    },
+    "./config": {
+      "@zitadel-nextgen/source": "./src/runtime/config.ts",
+      "types": "./dist/runtime/config.d.mts",
+      "import": "./dist/runtime/config.mjs"
     }
   },
   "scripts": {
@@ -59,7 +64,8 @@
           "{workspaceRoot}/api/openapi/**/*.yaml",
           "{projectRoot}/package.json",
           "{projectRoot}/orval.config.ts",
-          "{projectRoot}/src/runtime/base-url.ts"
+          "{projectRoot}/src/runtime/base-url.ts",
+          "{projectRoot}/src/runtime/config.ts"
         ],
         "outputs": [
           "{projectRoot}/src/generated"

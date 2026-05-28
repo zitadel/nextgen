@@ -37,6 +37,7 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "@zitadel-nextgen/api": "workspace:*",
     "@zitadel-nextgen/components": "workspace:*"
   },
   "peerDependencies": {

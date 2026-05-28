@@ -2,6 +2,8 @@ import type { NextRequest } from 'next/server';
 
 import { NextResponse } from 'next/server';
 
+import type { ZitadelProject } from '@zitadel-nextgen/api/config';
+
 import type { NextgenMiddlewareOptions } from './types';
 
 import { verifyJwt } from './lib/jwt';
@@ -404,4 +406,64 @@ async function handleAuth(
     response.cookies.delete(cookie.name);
   }
   return response;
+}
+
+/**
+ * Options for {@link createProxy} that are separate from the shared
+ * {@link ZitadelConfig}. These configure route protection, login
+ * redirects, and JWT verification behaviour.
+ *
+ * `proxyPath` and `issuerUrl` are omitted because they come from the
+ * {@link ZitadelConfig} passed as the first argument.
+ */
+export type ProxyOptions = Omit<NextgenMiddlewareOptions, 'proxyPath' | 'issuerUrl'>;
+
+/**
+ * A pre-configured middleware handler returned by {@link createProxy}.
+ */
+export type ProxyHandler = (req: NextRequest) => Promise<NextResponse | Response>;
+
+/**
+ * Creates a pre-configured middleware handler from the SDK config
+ * returned by `configureZitadel()`. This is the derived-service
+ * derived service pattern:
+ *
+ * ```ts
+ * // src/zitadel.ts
+ * import { configureZitadel } from "@zitadel-nextgen/api/config";
+ * import { createProxy } from "@zitadel-nextgen/sdk-next/middleware";
+ *
+ * const zitadel = configureZitadel({
+ *   apiBase: "/__nextgen",
+ *   projectId: "demo",
+ *   issuerUrl: process.env.NEXTGEN_ISSUER_URL,
+ * });
+ *
+ * export const proxy = createProxy(zitadel, {
+ *   protectedRoutes: ["/admin*"],
+ *   loginPath: "/login",
+ * });
+ * ```
+ *
+ * Then in middleware.ts:
+ *
+ * ```ts
+ * import { proxy } from "./zitadel";
+ * export const middleware = proxy;
+ * ```
+ *
+ * @param config  - The SDK handle from `configureZitadel()`.
+ * @param options - Route protection and JWT options.
+ * @returns A middleware handler function.
+ */
+export function createProxy(
+  config: ZitadelProject,
+  options: ProxyOptions = {},
+): ProxyHandler {
+  const mergedOptions: NextgenMiddlewareOptions = {
+    ...options,
+    proxyPath: config.apiBase,
+    issuerUrl: config.issuerUrl,
+  };
+  return (req: NextRequest) => nextgenMiddleware(req, mergedOptions);
 }
