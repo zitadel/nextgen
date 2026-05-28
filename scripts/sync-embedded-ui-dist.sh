@@ -6,13 +6,13 @@ root="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"
 
 build_console() {
   if [ -f "$root/apps/console/package.json" ]; then
-    (cd "$root" && corepack pnpm nx build @zitadel-nextgen/console)
+    (cd "$root" && COREPACK_DEFAULT_TO_LATEST=0 corepack pnpm nx build @zitadel-nextgen/console)
   fi
 }
 
 build_login() {
   if [ -f "$root/apps/login-ui/package.json" ]; then
-    (cd "$root" && corepack pnpm nx build @zitadel-nextgen/login-ui)
+    (cd "$root" && COREPACK_DEFAULT_TO_LATEST=0 corepack pnpm nx build @zitadel-nextgen/login-ui)
   fi
 }
 

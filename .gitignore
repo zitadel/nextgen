@@ -114,3 +114,4 @@ apps/demo-next/tsconfig.tsbuildinfo
 packages/api-mock/tsconfig.tsbuildinfo
 
 .nx/polygraph
+.cursor/debug-*
