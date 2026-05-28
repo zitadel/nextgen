@@ -422,6 +422,15 @@ func (r *FlowStateMachineRuntime) terminate(ctx context.Context, client database
 		rendered.RedirectURL = &uri
 	}
 
+	// Skip handoff when no user was resolved (e.g. user_not_found →
+	// no-account). PrepareHandoff can't catch this today: attempts are
+	// started with empty RequiredChecks, so IsCompleted is vacuously
+	// true and a token would be minted. Remove once the policy engine
+	// populates RequiredChecks.
+	if _, ok := state.CollectedData[FlowCollectedUserIDKey]; !ok {
+		return rendered, FlowHandoffOutput{}, nil
+	}
+
 	if state.AuthAttemptID == "" {
 		return nil, FlowHandoffOutput{}, fmt.Errorf("%w: terminate without auth attempt id", ErrIntegrity)
 	}

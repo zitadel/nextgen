@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/go-faster/jx"
+
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
@@ -90,7 +91,7 @@ func (h *Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest) (a
 	}, nil
 }
 
-func (h *Handler)SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest, params api.SubmitFlowStepParams) (api.SubmitFlowStepRes, error) {
+func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest, params api.SubmitFlowStepParams) (api.SubmitFlowStepRes, error) {
 	state, err := h.openState(params.Zflow)
 	if err != nil {
 		return mapFlowErrorStatus(err), nil
@@ -144,7 +145,7 @@ func (h *Handler)SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest,
 	}, nil
 }
 
-func (h *Handler)GetFlowStep(ctx context.Context, params api.GetFlowStepParams) (api.GetFlowStepRes, error) {
+func (h *Handler) GetFlowStep(ctx context.Context, params api.GetFlowStepParams) (api.GetFlowStepRes, error) {
 	state, err := h.openState(params.Zflow)
 	if err != nil {
 		return mapFlowGetError(err), nil
@@ -207,7 +208,7 @@ func flowSetCookie(value string, clear bool) string {
 	return c.String()
 }
 
-func (h *Handler)buildFlowResponse(result service.FlowStepResult, terminal bool) api.FlowResponse {
+func (h *Handler) buildFlowResponse(result service.FlowStepResult, terminal bool) api.FlowResponse {
 	resp := api.FlowResponse{
 		ID:        result.State.ID,
 		SessionID: result.State.SessionID,
