@@ -11,6 +11,7 @@ get:
   tags:
     - Sessions
   parameters:
+    - $ref: ../../../components/parameters/project-id.yaml
     - $ref: ../../../components/parameters/session-id.yaml
   security:
     - oauth2:
@@ -52,6 +53,7 @@ delete:
   tags:
     - Sessions
   parameters:
+    - $ref: ../../../components/parameters/project-id.yaml
     - $ref: ../../../components/parameters/session-id.yaml
   security:
     - oauth2:
