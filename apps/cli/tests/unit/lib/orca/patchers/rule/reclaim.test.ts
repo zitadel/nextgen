@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import type { ScaffoldPlan } from "../../../../src/lib/orca/file-writer/plan";
-import { reclaimableOps } from "../../../../src/lib/orca/reclaim";
-import { MANAGED_MARKER } from "../../../../src/lib/paths";
+import type { ScaffoldPlan } from "../../../../../../src/lib/orca/file-writer/plan";
+import { reclaimableOps } from "../../../../../../src/lib/orca/patchers/rule/reclaim";
+import { MANAGED_MARKER } from "../../../../../../src/lib/paths";
 
 const plan: ScaffoldPlan = {
   ops: [

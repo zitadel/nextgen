@@ -9,10 +9,8 @@ import { ok } from "../io/output";
 import { ZitadelError } from "../lib/errors";
 import { type AuthMethod } from "../lib/flows";
 import { Orca } from "../lib/orca";
-import { scaffold } from "../lib/orca/file-writer";
 import { patchers } from "../lib/orca/patchers";
 import type { PatchContext } from "../lib/orca/patchers/types";
-import { reclaimableOps } from "../lib/orca/reclaim";
 import { scaffolders } from "../lib/orca/scaffolders";
 import { MANAGED_MARKER } from "../lib/paths";
 import { validateJsonSchema, type UserSchema } from "../lib/user-schema";
@@ -224,15 +222,12 @@ async function collectChecks(cwd: string): Promise<DoctorCheck[]> {
 async function applyFixes(opts: DoctorOptions): Promise<void> {
   const ctx = await loadPatchContext(opts.cwd);
   const orca = new Orca(scaffolders, patchers);
-  const plan = orca.patcherFor(ctx.framework.id).plan(ctx);
-  // `doctor --fix` reclaims the managed artifacts — env files, gitignore, the
-  // SDK dependency, and marker-bearing routes/middleware — even when locally
-  // edited. The user-editable `.zitadel/` resource files are filtered out by
-  // `reclaimableOps`, so they are never clobbered here.
-  await scaffold(
-    { ops: reclaimableOps(plan), summary: plan.summary },
-    { cwd: opts.cwd, dryRun: opts.dryRun, force: true },
-  );
+  // `repair` reclaims the managed artifacts — env files, gitignore, the SDK
+  // dependency, and marker-bearing routes/middleware — even when locally edited,
+  // while leaving the user-editable `.zitadel/` resource files untouched.
+  await orca
+    .patcherFor(ctx.framework.id)
+    .repair(ctx, { cwd: opts.cwd, dryRun: opts.dryRun, force: true });
 }
 
 /**

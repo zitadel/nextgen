@@ -10,7 +10,6 @@ import { ZitadelError } from "../lib/errors";
 import { AUTH_METHODS, type AuthMethod } from "../lib/flows";
 import { Orca } from "../lib/orca";
 import { detectEmptyProject } from "../lib/orca/detect";
-import { scaffold } from "../lib/orca/file-writer";
 import { patchers } from "../lib/orca/patchers";
 import type { PatchContext } from "../lib/orca/patchers/types";
 import { scaffolders } from "../lib/orca/scaffolders";
@@ -130,7 +129,9 @@ export async function runSetup(io: CliIO, opts: SetupOptions): Promise<void> {
     userSchema,
     server: effectiveServer,
   };
-  const result = await scaffold(orca.patcherFor(framework.id).plan(ctx), opts);
+  const result = await orca
+    .patcherFor(framework.id)
+    .patch(ctx, { cwd: opts.cwd, dryRun: opts.dryRun, force: opts.force });
   const warnings: string[] = [];
 
   const setupOpts = { ...opts, source: effectiveServer };

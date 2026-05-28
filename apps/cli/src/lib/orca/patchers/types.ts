@@ -2,7 +2,6 @@ import type { FrameworkDetection } from "../../../detect/framework";
 import type { CreateProjectResponse } from "../../../platform/client";
 import type { AuthMethod } from "../../flows";
 import type { UserSchema } from "../../user-schema";
-import type { ScaffoldPlan } from "../file-writer/plan";
 
 /**
  * The minimal, project-independent view a patcher needs to enumerate the files
@@ -16,9 +15,9 @@ export type PatchView = Readonly<{
 }>;
 
 /**
- * Everything a patcher needs to build the full integration plan. Extends
+ * Everything a patcher needs to integrate Zitadel into a project. Extends
  * {@link PatchView} with the resolved project, issuer, and schema/auth choices
- * that fill file *contents*. Readonly: a patcher never mutates its input.
+ * that fill file contents. Readonly: a patcher never mutates its input.
  */
 export type PatchContext = PatchView &
   Readonly<{
@@ -29,6 +28,25 @@ export type PatchContext = PatchView &
     userSchema: UserSchema;
     server: string;
   }>;
+
+/** Where and how a patch is applied. Family-neutral (no file-op coupling). */
+export type PatchExecOptions = Readonly<{
+  cwd: string;
+  dryRun: boolean;
+  force: boolean;
+}>;
+
+/**
+ * The outcome of a patch, reported in a family-neutral shape so the command
+ * layer can summarize it without knowing how the patcher works (file ops vs
+ * an LLM agent).
+ */
+export type PatchResult = Readonly<{
+  dryRun: boolean;
+  filesWritten: ReadonlyArray<string>;
+  filesSkipped: ReadonlyArray<string>;
+  depsAdded: ReadonlyArray<string>;
+}>;
 
 /**
  * The artifacts a patcher's integration owns, classified for `eject`. Freshly
@@ -51,16 +69,20 @@ export type EjectActions = Readonly<{
 
 /**
  * Integrates Zitadel into an existing project of a specific framework. The
- * single source of truth for which files an integration creates: `plan`
- * produces them (consumed by `setup` and, filtered, by `doctor --fix`) and
- * `artifacts` describes them for `eject`. Both methods are pure — no
- * filesystem or network.
+ * interface is execution-strategy-agnostic: a rule-based patcher applies file
+ * operations, while a future LLM-based patcher would drive an agent — callers
+ * only see {@link patch}/{@link repair}/{@link artifacts} and never a file-op
+ * plan. `patch` performs the full integration; `repair` re-applies the managed
+ * artifacts (`doctor --fix`); `artifacts` describes them for marker-aware
+ * ejection.
  */
 export interface Patcher {
   /** Whether this patcher integrates the given framework id. */
   canPatch(framework: string): boolean;
-  /** PURE: the complete integration plan (file operations) for the context. */
-  plan(ctx: PatchContext): ScaffoldPlan;
-  /** PURE: the files/dirs this patcher manages, for marker-aware ejection. */
+  /** Apply the full Zitadel integration to the project. */
+  patch(ctx: PatchContext, opts: PatchExecOptions): Promise<PatchResult>;
+  /** Re-apply just the managed artifacts, reclaiming locally-edited ones. */
+  repair(ctx: PatchContext, opts: PatchExecOptions): Promise<PatchResult>;
+  /** Describe the files/dirs this integration owns, for marker-aware ejection. */
   artifacts(view: PatchView): EjectActions;
 }

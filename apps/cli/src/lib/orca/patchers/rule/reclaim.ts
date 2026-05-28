@@ -1,5 +1,5 @@
-import { MANAGED_MARKER } from "../paths";
-import type { FileOp, ScaffoldPlan } from "./file-writer/plan";
+import { MANAGED_MARKER } from "../../../paths";
+import type { FileOp, ScaffoldPlan } from "../../file-writer/plan";
 
 /**
  * The subset of a patcher plan's operations that `doctor --fix` re-applies:

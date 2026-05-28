@@ -9,9 +9,10 @@ export type FrameworkChoice = Readonly<{ id: string; displayName: string }>;
 /**
  * Orchestrates project creation (scaffolders) and Zitadel integration
  * (patchers) over their respective registries. Selection only: it resolves the
- * right scaffolder/patcher for a framework; the calling command runs the
- * resulting plan via the file-writer so the plan-building stays pure and
- * unit-testable. Registries are injected so tests can supply fakes.
+ * right scaffolder/patcher for a framework and the caller invokes its methods.
+ * How a patcher applies its work (file operations vs an LLM agent) is internal
+ * to that patcher, so the orchestrator stays strategy-agnostic. Registries are
+ * injected so tests can supply fakes.
  */
 export class Orca {
   constructor(
