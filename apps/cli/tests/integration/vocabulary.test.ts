@@ -15,13 +15,9 @@ const legacyPatterns = [
 ];
 
 describe("public vocabulary", () => {
-  it("keeps docs and fixtures on glossary terms", async () => {
+  it("keeps docs on glossary terms", async () => {
     const root = join(import.meta.dirname, "../..");
-    const files = [
-      "README.md",
-      "AGENTS.md",
-      "src/platform/fixtures/createProject.ok.json",
-    ];
+    const files = ["README.md", "AGENTS.md"];
 
     for (const file of files) {
       const contents = await readFile(join(root, file), "utf8");

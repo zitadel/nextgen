@@ -1,25 +1,68 @@
 import { mkdir, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { describe, expect, it, vi } from "vitest";
 
-import { runApply } from "../../src/commands/apply";
-import type { CliIO, GlobalOptions } from "../../src/io/output";
+import { findEnvRefs, runApply } from "../../../src/commands/apply";
+import type { CliIO, GlobalOptions } from "../../../src/io/output";
 
-vi.mock("../../src/lib/sync/loop", () => ({
+vi.mock("../../../src/lib/sync/loop", () => ({
   runSyncLoop: vi.fn().mockResolvedValue(undefined),
+  buildSyncPlan: vi.fn().mockResolvedValue([]),
 }));
 
-vi.mock("../../src/platform/index", () => ({
+vi.mock("../../../src/platform/index", () => ({
   createPlatformClient: vi.fn().mockReturnValue({}),
 }));
+
+describe("findEnvRefs", () => {
+  it("detects ${VAR} placeholders inside strings", () => {
+    expect(findEnvRefs({ url: "${ZITADEL_API_BASE}/foo" })).toEqual(["ZITADEL_API_BASE"]);
+  });
+
+  it("detects *_env convention keys on nested objects", () => {
+    const resource = {
+      version: 1,
+      name: "default",
+      config: {
+        token: "abc",
+        secret_env: "ZITADEL_DEMO_SECRET",
+      },
+    };
+    expect(findEnvRefs(resource)).toEqual(["ZITADEL_DEMO_SECRET"]);
+  });
+
+  it("merges both conventions and deduplicates", () => {
+    const bundle = {
+      ".zitadel/flows/login.json": {
+        gate: { secret_env: "CAPTCHA_SECRET" },
+      },
+      ".zitadel/flows/register.json": {
+        gate: { issuer: "${GATE_ISSUER}", secret_env: "GATE_SECRET" },
+      },
+      server: "${ZITADEL_API_BASE}",
+    };
+    expect(findEnvRefs(bundle)).toEqual([
+      "CAPTCHA_SECRET",
+      "GATE_ISSUER",
+      "GATE_SECRET",
+      "ZITADEL_API_BASE",
+    ]);
+  });
+
+  it("ignores *_env keys whose value is not a plain env var name", () => {
+    const resource = { gate: { secret_env: "not a var name" } };
+    expect(findEnvRefs(resource)).toEqual([]);
+  });
+});
 
 const VALID_FLOW = {
   // Spec: `name` is a slug-pattern stable identifier; required fields are
   // [name, user_schema, purposes, initial_steps, steps].
   name: "default",
-  user_schema: "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/human-user.yaml",
+  user_schema:
+    "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/human-user.yaml",
   purposes: ["login"],
   initial_steps: { login: "identifier" },
   steps: [
@@ -43,7 +86,10 @@ const SECRET = {
   schema_version: 2,
 };
 
-function makeOpts(cwd: string, overrides: Partial<GlobalOptions> = {}): Parameters<typeof runApply>[1] {
+function makeOpts(
+  cwd: string,
+  overrides: Partial<GlobalOptions> = {},
+): Parameters<typeof runApply>[1] {
   return {
     cwd,
     json: false,
@@ -72,10 +118,7 @@ async function makeCwd(secret: object, flows: Record<string, object> = {}): Prom
   const cwd = join(tmpdir(), `zitadel-apply-test-${Math.random().toString(36).slice(2)}`);
   await mkdir(join(cwd, ".zitadel/flows"), { recursive: true });
   await mkdir(join(cwd, ".zitadel/schemas"), { recursive: true });
-  await writeFile(
-    join(cwd, ".zitadel/secret"),
-    JSON.stringify(secret),
-  );
+  await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify(secret));
   await writeFile(
     join(cwd, ".zitadel/state.json"),
     JSON.stringify({ framework: "next", resources: {} }),
@@ -86,13 +129,15 @@ async function makeCwd(secret: object, flows: Record<string, object> = {}): Prom
   return cwd;
 }
 
-describe("apply pre-flight checks", () => {
+describe("runApply pre-flight checks", () => {
   it("blocks when a flow definition is invalid", async () => {
     const cwd = await makeCwd(SECRET, {
       "bad.json": { version: 99, kind: "wrong" },
     });
     try {
-      await expect(runApply(makeIO(), makeOpts(cwd))).rejects.toMatchObject({ code: "E_VALIDATION" });
+      await expect(runApply(makeIO(), makeOpts(cwd))).rejects.toMatchObject({
+        code: "E_VALIDATION",
+      });
     } finally {
       await rm(cwd, { recursive: true, force: true });
     }
@@ -110,9 +155,9 @@ describe("apply pre-flight checks", () => {
     };
     const cwd = await makeCwd(SECRET, { "default.json": flowWithEnvRef });
     try {
-      await expect(
-        runApply(makeIO({}), makeOpts(cwd)),
-      ).rejects.toThrow("Missing environment variables");
+      await expect(runApply(makeIO({}), makeOpts(cwd))).rejects.toThrow(
+        "Missing environment variables",
+      );
     } finally {
       await rm(cwd, { recursive: true, force: true });
     }

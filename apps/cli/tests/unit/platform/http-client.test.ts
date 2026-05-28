@@ -2,7 +2,7 @@ import { resetPlatformStore, setupPlatformHandlers } from "@zitadel-nextgen/api-
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import { createPlatformClient } from "../../src/platform";
+import { createPlatformClient } from "../../../src/platform";
 
 const MOCK_SERVER_URL = "http://mock.zitadel.test";
 const server = setupServer(...setupPlatformHandlers());

@@ -4,12 +4,12 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import type { CommandRunner } from "../../src/deploy";
+import type { CommandRunner } from "../../../src/deploy";
 import {
   CloudflareDeployAdapter,
   NetlifyDeployAdapter,
   VercelDeployAdapter,
-} from "../../src/deploy/adapters";
+} from "../../../src/deploy/adapters";
 
 describe("deploy adapters", () => {
   it("configures Vercel preview env when CLI auth and project link are ready", async () => {
