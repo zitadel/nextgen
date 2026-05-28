@@ -4,8 +4,11 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { hasDependency, readPackageJson } from "../../../src/detect/package-json";
-import type { PackageJson } from "../../../src/detect";
+import {
+  hasDependency,
+  readPackageJson,
+  type PackageJson,
+} from "../../../../../src/lib/orca/detectors/package-json";
 
 let dir: string;
 

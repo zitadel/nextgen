@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { readPackageJson } from "./package-json";
+import type { PackageJson } from "./package-json";
 
 /**
  * Port assumed when no explicit dev port can be discovered. Matches Next.js's
@@ -10,14 +10,15 @@ import { readPackageJson } from "./package-json";
 export const DEFAULT_DEV_PORT = 3000;
 
 /**
- * Determines the local dev server port for `cwd`. The `dev` script is the most
+ * Determines the local dev-server port for `cwd`. The `dev` script is the most
  * authoritative source, then a `PORT` declaration in an env file, falling back
  * to {@link DEFAULT_DEV_PORT}. Used to derive the local issuer URL.
  */
-export async function detectDevPort(cwd: string): Promise<number> {
-  const fromScripts = await portFromScripts(cwd);
-  if (fromScripts) {
-    return fromScripts;
+export async function detectDevPort(cwd: string, pkg: PackageJson): Promise<number> {
+  const dev = pkg.scripts?.dev;
+  const fromScript = typeof dev === "string" ? extractPort(dev) : undefined;
+  if (fromScript) {
+    return fromScript;
   }
 
   const fromEnvFile = await portFromEnvFile(cwd);
@@ -26,15 +27,6 @@ export async function detectDevPort(cwd: string): Promise<number> {
   }
 
   return DEFAULT_DEV_PORT;
-}
-
-async function portFromScripts(cwd: string): Promise<number | undefined> {
-  const pkg = await readPackageJson(cwd).catch(() => undefined);
-  const dev = pkg?.scripts?.dev;
-  if (typeof dev !== "string") {
-    return undefined;
-  }
-  return extractPort(dev);
 }
 
 async function portFromEnvFile(cwd: string): Promise<number | undefined> {

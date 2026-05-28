@@ -1,6 +1,10 @@
-import { hasZitadelSecret } from "../../detect";
 import type { CommandResult, GlobalOptions } from "../oclif";
-import { readDevelopmentIssuer, readZitadelConfig, readZitadelSecret } from "./shared";
+import {
+  hasZitadelSecret,
+  readDevelopmentIssuer,
+  readZitadelConfig,
+  readZitadelSecret,
+} from "./shared";
 
 /**
  * Reports the local project state by reading `zitadel.json` and its secret.

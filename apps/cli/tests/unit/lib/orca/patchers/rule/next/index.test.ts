@@ -8,7 +8,7 @@ import { buildUserSchema } from "../../../../../../../src/lib/user-schema";
 
 function ctxFor(appDir: "app" | "src/app"): PatchContext {
   return {
-    framework: { id: "next", appDir },
+    framework: { id: "next", appDir, devPort: 3000, issuerUrl: "http://localhost:3000" },
     rendererId: "react",
     project: {
       id: "proj-1",
@@ -59,7 +59,7 @@ describe("NextPatcher.plan", () => {
 describe("NextPatcher.artifacts", () => {
   it("lists managed files, the config file, the dir, and the env backup", () => {
     const artifacts = new NextPatcher().artifacts({
-      framework: { id: "next", appDir: "app" },
+      framework: { id: "next", appDir: "app", devPort: 3000, issuerUrl: "http://localhost:3000" },
       rendererId: "react",
     });
     expect(artifacts.markedFiles).toEqual([

@@ -1,28 +1,109 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+
 import { ZitadelError } from "../errors";
+import { detectors } from "./detectors";
+import type { Detector, FrameworkFacts } from "./detectors/types";
 import { patchers } from "./patchers";
 import type { Patcher } from "./patchers/types";
 import { scaffolders } from "./scaffolders";
 import type { Scaffolder } from "./scaffolders/types";
 
-export { detectEmptyProject, tryDetectFramework } from "./detect";
+export type { Detector, FrameworkFacts } from "./detectors/types";
+export { issuerFromPort } from "./detectors/port";
 
 /**
  * One framework the CLI can scaffold from scratch, surfaced to the picker. */
 export type FrameworkChoice = Readonly<{ id: string; displayName: string }>;
 
 /**
- * Orchestrates project creation (scaffolders) and Zitadel integration
- * (patchers) over their respective registries. Selection only: it resolves the
- * right scaffolder/patcher for a framework and the caller invokes its methods.
- * How a patcher applies its work (file operations vs an LLM agent) is internal
- * to that patcher, so the orchestrator stays strategy-agnostic. Registries are
- * injected so tests can supply fakes.
+ * Orchestrates the three per-framework strategies — detectors (recognise an
+ * existing project and extract its facts), scaffolders (create a project), and
+ * patchers (integrate Zitadel) — over their respective registries. It resolves
+ * the right strategy for a framework and drives the detect/scaffold lifecycle;
+ * how a patcher applies its work (file operations vs an LLM agent) stays
+ * internal to that patcher. Registries are injected so tests can supply fakes.
  */
 export class Orca {
   constructor(
+    private readonly detectors: ReadonlyArray<Detector>,
     private readonly scaffolders: ReadonlyArray<Scaffolder>,
     private readonly patchers: ReadonlyArray<Patcher>,
   ) {}
+
+  /**
+   * Detects the framework in `cwd` and extracts its {@link FrameworkFacts},
+   * honouring an explicit `requested` framework. Throws
+   * `E_FRAMEWORK_NOT_DETECTED` when nothing matches; a detector's
+   * `E_UNSUPPORTED_PROJECT_SHAPE` (recognised but unsupported) propagates.
+   */
+  async detect(cwd: string, requested?: string): Promise<FrameworkFacts> {
+    const candidates = requested
+      ? this.detectors.filter((detector) => detector.framework === requested)
+      : this.detectors;
+    if (requested && candidates.length === 0) {
+      throw new ZitadelError("E_FRAMEWORK_NOT_DETECTED", `Unsupported framework "${requested}"`, {
+        hint: `Supported frameworks: ${this.frameworkIds().join(", ")}.`,
+      });
+    }
+    for (const detector of candidates) {
+      const facts = await detector.detect(cwd);
+      if (facts) {
+        return facts;
+      }
+    }
+    throw new ZitadelError("E_FRAMEWORK_NOT_DETECTED", "Could not detect a supported framework", {
+      hint: `Run this from a supported project (${this.frameworkIds().join(", ")}) or pass --cwd <path>.`,
+    });
+  }
+
+  /**
+   * Non-throwing detection: returns `undefined` instead of raising for a
+   * project that is absent, unrecognised, or recognised-but-unsupported, so
+   * callers (e.g. `eject`) can probe and degrade gracefully.
+   */
+  async tryDetect(cwd: string): Promise<FrameworkFacts | undefined> {
+    try {
+      return await this.detect(cwd);
+    } catch (error) {
+      if (
+        error instanceof ZitadelError &&
+        (error.code === "E_FRAMEWORK_NOT_DETECTED" || error.code === "E_UNSUPPORTED_PROJECT_SHAPE")
+      ) {
+        return undefined;
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Whether `cwd` has no `package.json`, i.e. it is empty (or non-Node) and
+   * should be scaffolded from scratch rather than detected/patched.
+   */
+  async isEmpty(cwd: string): Promise<boolean> {
+    try {
+      await readFile(join(cwd, "package.json"), "utf8");
+      return false;
+    } catch {
+      return true;
+    }
+  }
+
+  /**
+   * Creates a new `framework` project in `cwd`, then re-detects it to return
+   * the resulting {@link FrameworkFacts}. Throws `E_CONFLICT` when the directory
+   * already contains a project ("already scaffolded") and `E_VALIDATION` when no
+   * scaffolder supports the framework.
+   */
+  async scaffold(cwd: string, framework: string): Promise<FrameworkFacts> {
+    if (!(await this.isEmpty(cwd))) {
+      throw new ZitadelError("E_CONFLICT", `Cannot scaffold: ${cwd} already contains a project`, {
+        hint: "Run setup in an empty directory, or integrate the existing project instead.",
+      });
+    }
+    await this.scaffolderFor(framework).scaffold(cwd, framework);
+    return this.detect(cwd, framework);
+  }
 
   /**
    * Resolves the scaffolder for a framework, throwing `E_VALIDATION` (with the
@@ -59,9 +140,13 @@ export class Orca {
       displayName: scaffolder.displayName,
     }));
   }
+
+  private frameworkIds(): ReadonlyArray<string> {
+    return this.detectors.map((detector) => detector.framework);
+  }
 }
 
-/** {@link Orca} wired with the default scaffolder and patcher registries. */
+/** {@link Orca} wired with the default detector, scaffolder, and patcher registries. */
 export function createOrca(): Orca {
-  return new Orca(scaffolders, patchers);
+  return new Orca(detectors, scaffolders, patchers);
 }

@@ -4,7 +4,12 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { readZitadelConfig, readZitadelSecret } from "../../../../src/lib/commands/shared";
+import {
+  hasZitadelConfig,
+  hasZitadelSecret,
+  readZitadelConfig,
+  readZitadelSecret,
+} from "../../../../src/lib/commands/shared";
 import { ZitadelError } from "../../../../src/lib/errors";
 
 const tempDirs: string[] = [];
@@ -26,6 +31,26 @@ const VALID_SECRET = {
 afterEach(async () => {
   await Promise.all(tempDirs.map((dir) => rm(dir, { recursive: true, force: true })));
   tempDirs.length = 0;
+});
+
+describe("hasZitadelConfig", () => {
+  it("is true when zitadel.json exists, false otherwise", async () => {
+    const cwd = await makeTempDir();
+    expect(await hasZitadelConfig(cwd)).toBe(false);
+    await writeFile(join(cwd, "zitadel.json"), "{}");
+    expect(await hasZitadelConfig(cwd)).toBe(true);
+  });
+});
+
+describe("hasZitadelSecret", () => {
+  it("is true only when .zitadel/secret exists", async () => {
+    const cwd = await makeTempDir();
+    expect(await hasZitadelSecret(cwd)).toBe(false);
+    await mkdir(join(cwd, ".zitadel"), { recursive: true });
+    expect(await hasZitadelSecret(cwd)).toBe(false);
+    await writeFile(join(cwd, ".zitadel", "secret"), "shh");
+    expect(await hasZitadelSecret(cwd)).toBe(true);
+  });
 });
 
 describe("readZitadelConfig", () => {

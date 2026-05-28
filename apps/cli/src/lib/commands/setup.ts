@@ -1,19 +1,13 @@
-import {
-  detectDevPort,
-  detectFramework,
-  hasZitadelConfig,
-  hasZitadelSecret,
-  issuerFromPort,
-} from "../../detect";
 import { pickFramework, runInteractiveSetup } from "../../interactive/setup";
 import type { CommandResult, GlobalOptions } from "../oclif";
 import { ZitadelError } from "../errors";
 import { isAuthMethod, type AuthMethod } from "../flows";
-import { createOrca, detectEmptyProject, type Orca } from "../orca";
+import { createOrca, issuerFromPort, type FrameworkFacts, type Orca } from "../orca";
 import type { PatchContext } from "../orca/patchers/types";
 import { buildUserSchema, validateJsonSchema } from "../user-schema";
 import { createPlatformClient } from "../api";
 import type { CreateProjectResponse } from "../api/client";
+import { hasZitadelConfig, hasZitadelSecret } from "./shared";
 import { runApply } from "./apply";
 
 /**
@@ -51,22 +45,25 @@ export async function runSetup(opts: SetupOptions): Promise<CommandResult> {
 
   const orca = createOrca();
 
-  // When no framework is detected, an empty directory is scaffolded from
-  // scratch (prompting or via --framework) and then re-detected before patching.
-  const framework = await detectFramework(opts.cwd, opts.framework).catch(async (error: unknown) => {
+  // Detect the framework; when none is found and the directory is empty,
+  // scaffold a project from scratch (prompting or via --framework) and let
+  // Orca re-detect it. Orca.scaffold throws if the directory is not empty.
+  let framework: FrameworkFacts;
+  try {
+    framework = await orca.detect(opts.cwd, opts.framework);
+  } catch (error) {
     if (
-      !(error instanceof ZitadelError) ||
-      error.code !== "E_FRAMEWORK_NOT_DETECTED" ||
-      !(await detectEmptyProject(opts.cwd))
+      error instanceof ZitadelError &&
+      error.code === "E_FRAMEWORK_NOT_DETECTED" &&
+      (await orca.isEmpty(opts.cwd))
     ) {
+      framework = await orca.scaffold(opts.cwd, await resolveScaffoldFramework(opts, orca));
+    } else {
       throw error;
     }
-    const frameworkId = await resolveScaffoldFramework(opts, orca);
-    await orca.scaffolderFor(frameworkId).scaffold(opts.cwd, frameworkId);
-    return detectFramework(opts.cwd, frameworkId);
-  });
+  }
 
-  let detectedPort = await detectDevPort(opts.cwd);
+  let detectedPort = framework.devPort;
   let effectiveServer = opts.source;
 
   let userFields = splitCsv(opts.userFields);

@@ -1,12 +1,11 @@
 import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 
-import { detectDevPort, detectFramework, issuerFromPort } from "../../detect";
 import type { CommandResult, GlobalOptions } from "../oclif";
 import { ZitadelError } from "../errors";
 import { isAuthMethod } from "../flows";
 import { isObject } from "../json";
-import { createOrca } from "../orca";
+import { createOrca, issuerFromPort, type FrameworkFacts, type Orca } from "../orca";
 import type { PatchContext } from "../orca/patchers/types";
 import { MANAGED_MARKER } from "../paths";
 import { validateJsonSchema, type UserSchema } from "../user-schema";
@@ -38,11 +37,12 @@ type DoctorCheck = {
  * the full check details so the caller can render them.
  */
 export async function runDoctor(opts: DoctorOptions): Promise<CommandResult> {
+  const orca = createOrca();
   if (opts.fix) {
-    await applyFixes(opts);
+    await applyFixes(opts, orca);
   }
 
-  const checks = await collectChecks(opts.cwd);
+  const checks = await collectChecks(opts.cwd, orca);
   const failed = checks.filter((check) => check.status === "fail");
   const data = {
     title: failed.length === 0 ? "Zitadel doctor passed." : "Zitadel doctor found issues.",
@@ -60,7 +60,7 @@ export async function runDoctor(opts: DoctorOptions): Promise<CommandResult> {
   return { status: "ok", data };
 }
 
-async function collectChecks(cwd: string): Promise<DoctorCheck[]> {
+async function collectChecks(cwd: string, orca: Orca): Promise<DoctorCheck[]> {
   const checks: DoctorCheck[] = [];
   const config = await check(
     "config",
@@ -125,7 +125,7 @@ async function collectChecks(cwd: string): Promise<DoctorCheck[]> {
     "Detected framework matches recorded framework",
     "zitadel.json",
     async () => {
-      const detected = await detectFramework(cwd, "next");
+      const detected = await orca.detect(cwd);
       const recorded =
         isObject(config) && isObject(config.framework) ? config.framework.id : undefined;
       if (recorded !== detected.id) {
@@ -201,9 +201,8 @@ async function collectChecks(cwd: string): Promise<DoctorCheck[]> {
   return checks;
 }
 
-async function applyFixes(opts: DoctorOptions): Promise<void> {
-  const ctx = await loadPatchContext(opts.cwd);
-  const orca = createOrca();
+async function applyFixes(opts: DoctorOptions, orca: Orca): Promise<void> {
+  const ctx = await loadPatchContext(opts.cwd, orca);
   // `repair` reclaims the managed artifacts — env files, gitignore, the SDK
   // dependency, and marker-bearing routes/middleware — even when locally edited,
   // while leaving the user-editable `.zitadel/` resource files untouched.
@@ -219,10 +218,10 @@ async function applyFixes(opts: DoctorOptions): Promise<void> {
  * exact values only affect the `.zitadel/` resource contents, which `--fix`
  * filters out anyway.
  */
-async function loadPatchContext(cwd: string): Promise<PatchContext> {
+async function loadPatchContext(cwd: string, orca: Orca): Promise<PatchContext> {
   const config = await readZitadelConfig(cwd);
   const secret = await readZitadelSecret(cwd);
-  const framework = await detectFramework(cwd, "next");
+  const framework = await orca.detect(cwd);
   const raw = JSON.parse(
     await readFile(join(cwd, ".zitadel/schemas/user.json"), "utf8"),
   ) as Record<string, unknown>;
@@ -232,7 +231,7 @@ async function loadPatchContext(cwd: string): Promise<PatchContext> {
   return {
     framework,
     rendererId: readRendererId(config),
-    issuer: await resolveIssuer(cwd, config),
+    issuer: await resolveIssuer(cwd, config, framework),
     server: typeof config.server === "string" ? config.server : "",
     project: {
       id: secret.project_id,
@@ -293,17 +292,20 @@ async function assertManagedFile(cwd: string, candidates: string[]): Promise<voi
   throw new Error(`missing one of ${candidates.join(", ")}`);
 }
 
-async function resolveIssuer(cwd: string, config: Record<string, unknown>): Promise<string> {
+async function resolveIssuer(
+  cwd: string,
+  config: Record<string, unknown>,
+  facts: FrameworkFacts,
+): Promise<string> {
   const fromConfig = readDevelopmentIssuer(config);
   if (fromConfig && fromConfig.length > 0) {
     return fromConfig;
   }
   const state = await readState(cwd);
   if (typeof state?.dev_port === "number") {
-    return `http://localhost:${state.dev_port}`;
+    return issuerFromPort(state.dev_port);
   }
-  const detected = await detectDevPort(cwd);
-  return issuerFromPort(detected);
+  return facts.issuerUrl;
 }
 
 async function readState(cwd: string): Promise<{ dev_port?: number } | undefined> {

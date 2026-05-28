@@ -1,4 +1,4 @@
-import type { FrameworkDetection } from "../../../detect";
+import type { FrameworkFacts } from "../detectors/types";
 import type { CreateProjectResponse } from "../../api/client";
 import type { AuthMethod } from "../../flows";
 import type { UserSchema } from "../../user-schema";
@@ -10,7 +10,7 @@ import type { UserSchema } from "../../user-schema";
  * reconstructing project secrets or field choices.
  */
 export type PatchView = Readonly<{
-  framework: FrameworkDetection;
+  framework: FrameworkFacts;
   rendererId: string;
 }>;
 

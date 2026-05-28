@@ -9,7 +9,7 @@ import {
   detectDevPort,
   extractPort,
   issuerFromPort,
-} from "../../../src/detect/port";
+} from "../../../../../src/lib/orca/detectors/port";
 
 describe("extractPort", () => {
   it("parses the -p flag form", () => {
@@ -73,48 +73,31 @@ describe("detectDevPort", () => {
   });
 
   it("falls back to DEFAULT_DEV_PORT when nothing is configured", async () => {
-    expect(await detectDevPort(dir)).toBe(DEFAULT_DEV_PORT);
+    expect(await detectDevPort(dir, {})).toBe(DEFAULT_DEV_PORT);
   });
 
-  it("reads the port from the package.json dev script", async () => {
-    await writeFile(
-      join(dir, "package.json"),
-      JSON.stringify({ scripts: { dev: "next dev -p 4567" } }),
-    );
-    expect(await detectDevPort(dir)).toBe(4567);
+  it("reads the port from the dev script", async () => {
+    expect(await detectDevPort(dir, { scripts: { dev: "next dev -p 4567" } })).toBe(4567);
   });
 
   it("reads the port from .env.local when the dev script has none", async () => {
-    await writeFile(
-      join(dir, "package.json"),
-      JSON.stringify({ scripts: { dev: "next dev" } }),
-    );
     await writeFile(join(dir, ".env.local"), "PORT=5500\n");
-    expect(await detectDevPort(dir)).toBe(5500);
+    expect(await detectDevPort(dir, { scripts: { dev: "next dev" } })).toBe(5500);
   });
 
   it("reads the port from .env when .env.local is absent", async () => {
     await writeFile(join(dir, ".env"), "PORT=5600\n");
-    expect(await detectDevPort(dir)).toBe(5600);
+    expect(await detectDevPort(dir, {})).toBe(5600);
   });
 
   it("prefers the dev script over an env file PORT", async () => {
-    await writeFile(
-      join(dir, "package.json"),
-      JSON.stringify({ scripts: { dev: "next dev -p 7000" } }),
-    );
     await writeFile(join(dir, ".env.local"), "PORT=8000\n");
-    expect(await detectDevPort(dir)).toBe(7000);
+    expect(await detectDevPort(dir, { scripts: { dev: "next dev -p 7000" } })).toBe(7000);
   });
 
   it("prefers .env.local over .env", async () => {
     await writeFile(join(dir, ".env.local"), "PORT=5700\n");
     await writeFile(join(dir, ".env"), "PORT=5800\n");
-    expect(await detectDevPort(dir)).toBe(5700);
-  });
-
-  it("falls back to default when package.json is missing or malformed", async () => {
-    await writeFile(join(dir, "package.json"), "{not json");
-    expect(await detectDevPort(dir)).toBe(DEFAULT_DEV_PORT);
+    expect(await detectDevPort(dir, {})).toBe(5700);
   });
 });

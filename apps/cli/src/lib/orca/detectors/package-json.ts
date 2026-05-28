@@ -1,7 +1,17 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import type { PackageJson } from "./types";
+/**
+ * Minimal shape of the `package.json` fields detectors read. Intentionally
+ * partial: only the keys detection logic depends on are modeled, all optional
+ * since a project may omit any of them.
+ */
+export type PackageJson = {
+  name?: string;
+  scripts?: Record<string, string>;
+  dependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
+};
 
 /**
  * Reads and parses the `package.json` at `cwd`. Rejects if the file is absent
@@ -9,8 +19,8 @@ import type { PackageJson } from "./types";
  * catch and fall back rather than have detection swallow the error here.
  */
 export async function readPackageJson(cwd: string): Promise<PackageJson> {
-  const path = join(cwd, "package.json");
-  return JSON.parse(await readFile(path, "utf8")) as PackageJson;
+  const contents = await readFile(join(cwd, "package.json"), "utf8");
+  return JSON.parse(contents) as PackageJson;
 }
 
 /**

@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import type { CommandResult, GlobalOptions } from "../oclif";
 import { ZitadelError } from "../errors";
-import { createOrca, tryDetectFramework } from "../orca";
+import { createOrca } from "../orca";
 import type { EjectActions } from "../orca/patchers/types";
 import { MANAGED_MARKER } from "../paths";
 import { readRendererId, readZitadelConfig } from "./shared";
@@ -118,13 +118,13 @@ async function resolveEjectActions(cwd: string): Promise<EjectActions> {
     directories: [".zitadel"],
     envBackups: [".env.local"],
   };
-  const framework = await tryDetectFramework(cwd);
+  const orca = createOrca();
+  const framework = await orca.tryDetect(cwd);
   if (!framework) {
     return fallback;
   }
   try {
     const config = await readZitadelConfig(cwd).catch(() => ({}) as Record<string, unknown>);
-    const orca = createOrca();
     return orca.patcherFor(framework.id).artifacts({
       framework,
       rendererId: readRendererId(config),
