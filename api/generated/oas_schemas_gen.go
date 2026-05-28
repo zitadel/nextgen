@@ -9182,6 +9182,52 @@ func (o OptUserID) Or(d UserID) UserID {
 	return d
 }
 
+// NewOptUserNotFoundDetails returns new OptUserNotFoundDetails with value set to v.
+func NewOptUserNotFoundDetails(v UserNotFoundDetails) OptUserNotFoundDetails {
+	return OptUserNotFoundDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptUserNotFoundDetails is optional UserNotFoundDetails.
+type OptUserNotFoundDetails struct {
+	Value UserNotFoundDetails
+	Set   bool
+}
+
+// IsSet returns true if OptUserNotFoundDetails was set.
+func (o OptUserNotFoundDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptUserNotFoundDetails) Reset() {
+	var v UserNotFoundDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptUserNotFoundDetails) SetTo(v UserNotFoundDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptUserNotFoundDetails) Get() (v UserNotFoundDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptUserNotFoundDetails) Or(d UserNotFoundDetails) UserNotFoundDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptUserPropertyProperties returns new OptUserPropertyProperties with value set to v.
 func NewOptUserPropertyProperties(v UserPropertyProperties) OptUserPropertyProperties {
 	return OptUserPropertyProperties{
@@ -10470,6 +10516,61 @@ type UpdateFlowDefinitionNotFound ErrorDetails
 func (*UpdateFlowDefinitionNotFound) updateFlowDefinitionRes() {}
 
 type UserID string
+
+// Merged schema.
+// Ref: #
+type UserNotFound struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptUserNotFoundDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *UserNotFound) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *UserNotFound) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *UserNotFound) GetDetails() OptUserNotFoundDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *UserNotFound) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *UserNotFound) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *UserNotFound) SetDetails(val OptUserNotFoundDetails) {
+	s.Details = val
+}
+
+func (*UserNotFound) getMyUserRes() {}
+
+// Additional error-specific context.
+type UserNotFoundDetails map[string]jx.Raw
+
+func (s *UserNotFoundDetails) init() UserNotFoundDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
 
 // This schema is missing `"allOf": [{"$ref": "https://json-schema.org/draft/2020-12/schema"}],`.
 // This is done because a lot of code generators cannot handle that.

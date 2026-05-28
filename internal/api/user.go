@@ -10,19 +10,11 @@ import (
 )
 
 func (h *Handler) GetMyUser(ctx context.Context, params api.GetMyUserParams) (api.GetMyUserRes, error) {
-	sessionToken, err := domain.DecryptSessionTokenString(params.NextgenSession, h.sealer)
-	if err != nil {
-		return nil, err
-	}
-	if sessionToken.UserID == nil {
-		return nil, domain.ErrUserNotFound()
-	}
-	input := service.GetUserInput{
-		ProjectID: sessionToken.ProjectID,
-		UserID:    *sessionToken.UserID,
+	input := service.GetMyUserInput{
+		SessionToken: params.NextgenSession,
 	}
 
-	userbs, err := h.userService.GetUser(ctx, input)
+	userbs, err := h.userService.GetMyUser(ctx, input)
 	if err != nil {
 		return nil, err
 	}

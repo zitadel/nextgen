@@ -3,17 +3,18 @@ package service
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/ogen-go/ogen/json"
+	"github.com/zitadel/nextgen/internal/cookie"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 // ---- Inputs -------------------------------------------------------------
 
-type GetUserInput struct {
-	ProjectID string
-	UserID    string
+type GetMyUserInput struct {
+	SessionToken string
 }
 
 // ---- Implementation -------------------------------------------------------------
@@ -21,20 +22,34 @@ type GetUserInput struct {
 type UserService struct {
 	pool     database.Pool
 	userRepo domain.UserRepository
+	sealer   *cookie.Sealer
 }
 
 func NewUserService(
 	pool database.Pool,
 	userRepo domain.UserRepository,
+	sealer *cookie.Sealer,
 ) *UserService {
 	return &UserService{
-		pool,
-		userRepo,
+		pool:     pool,
+		userRepo: userRepo,
+		sealer:   sealer,
 	}
 }
 
-func (s *UserService) GetUser(ctx context.Context, input GetUserInput) ([]byte, error) {
-	user, err := s.userRepo.GetByID(ctx, s.pool, input.ProjectID, input.UserID)
+func (s *UserService) GetMyUser(ctx context.Context, input GetMyUserInput) ([]byte, error) {
+	sessionToken, err := domain.DecryptSessionTokenString(input.SessionToken, s.sealer)
+	if err != nil {
+		return nil, domain.ErrSessionTokenInvalid()
+	}
+	if sessionToken.ExpiresAt.After(time.Now()) {
+		return nil, domain.ErrSessionTokenInvalid()
+	}
+	if sessionToken.UserID == nil {
+		return nil, domain.ErrUserNotFound()
+	}
+
+	user, err := s.userRepo.GetByID(ctx, s.pool, sessionToken.ProjectID, *sessionToken.UserID)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil, domain.ErrUserNotFound()
