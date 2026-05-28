@@ -96,13 +96,6 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 		return fmt.Errorf("bootstrap users: %w", err)
 	}
 
-	if err := (service.SessionConfig{
-		DefaultTTL: cfg.Session.DefaultTTL,
-		MaxTTL:     cfg.Session.MaxTTL,
-	}).Validate(); err != nil {
-		return fmt.Errorf("session config: %w", err)
-	}
-
 	// ── Repositories ─────────────────
 	projectRepo := repository.NewProjectRepository(pool)
 	userRepo := repository.NewUserRepository()
@@ -249,7 +242,7 @@ func loadConfig(configPath string) (Config, error) {
 		return Config{}, fmt.Errorf("decode config: %w", err)
 	}
 
-	return cfg, nil
+	return cfg, cfg.Validate()
 }
 
 // mustBindEnv panics on viper's documented "this can't fail in

@@ -7,8 +7,8 @@ import (
 
 // SessionConfig holds server-wide session TTL settings for exchange.
 type SessionConfig struct {
-	DefaultTTL time.Duration
-	MaxTTL     time.Duration
+	DefaultTTL time.Duration `mapstructure:"default_ttl"`
+	MaxTTL     time.Duration `mapstructure:"max_ttl"`
 }
 
 // Validate checks session TTL configuration at startup.

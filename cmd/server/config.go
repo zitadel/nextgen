@@ -4,15 +4,27 @@ import (
 	"time"
 
 	"github.com/zitadel/nextgen/internal/crypto"
+	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 type Config struct {
-	Server         ServerConfig      `mapstructure:"server"`
-	Database       database.Config   `mapstructure:"database"`
-	PasswordHasher crypto.HashConfig `mapstructure:"password_hasher"`
-	Schema         SchemaConfig      `mapstructure:"schema"`
-	Session        SessionConfig     `mapstructure:"session"`
+	Server         ServerConfig          `mapstructure:"server"`
+	Database       database.Config       `mapstructure:"database"`
+	PasswordHasher crypto.HashConfig     `mapstructure:"password_hasher"`
+	Schema         SchemaConfig          `mapstructure:"schema"`
+	Session        service.SessionConfig `mapstructure:"session"`
+}
+
+func (c Config) Validate() error {
+	for _, validate := range []func() error{
+		c.Session.Validate,
+	} {
+		if err := validate(); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 type SessionConfig struct {
