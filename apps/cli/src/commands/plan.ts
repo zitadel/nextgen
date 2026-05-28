@@ -2,6 +2,7 @@ import { Flags } from "@oclif/core";
 
 import { BaseCommand, type JsonEnvelope } from "../lib/oclif/base";
 import { runApply } from "../lib/commands/apply";
+import { environmentSchema } from "../lib/api/schemas";
 
 /** `zitadel plan` — validate config and preview the sync diff without mutating. */
 export default class Plan extends BaseCommand {
@@ -10,6 +11,7 @@ export default class Plan extends BaseCommand {
     environment: Flags.string({
       char: "e",
       description: "Target environment (default: development).",
+      options: [...environmentSchema.options],
     }),
   };
 

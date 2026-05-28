@@ -20,11 +20,8 @@ catalog:
   '@oclif/plugin-commands': ^4.1.55
   '@oclif/plugin-help': ^6.2.49
   '@oclif/plugin-not-found': ^3.2.86
-  '@oclif/plugin-plugins': ^5.4.69
   '@oclif/plugin-search': ^1.2.50
-  '@oclif/plugin-update': ^4.7.43
   '@oclif/plugin-version': ^2.2.46
-  '@oclif/plugin-warn-if-update-available': ^3.1.65
   '@oclif/plugin-which': ^3.2.55
   oclif: ^4.17.46
   "@playwright/test": ^1.59.1

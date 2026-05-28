@@ -18,6 +18,7 @@
   "files": [
     "bin",
     "dist",
+    "oclif.manifest.json",
     "SKILLS.md"
   ],
   "oclif": {
@@ -28,9 +29,6 @@
     "plugins": [
       "@oclif/plugin-help",
       "@oclif/plugin-not-found",
-      "@oclif/plugin-plugins",
-      "@oclif/plugin-update",
-      "@oclif/plugin-warn-if-update-available",
       "@oclif/plugin-which",
       "@oclif/plugin-commands",
       "@oclif/plugin-autocomplete",
@@ -43,7 +41,9 @@
     "build": "tsdown",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "readme": "oclif readme"
+    "readme": "oclif readme",
+    "prepack": "tsdown && oclif manifest",
+    "postpack": "rm -f oclif.manifest.json"
   },
   "dependencies": {
     "@clack/prompts": "catalog:",
@@ -52,11 +52,8 @@
     "@oclif/plugin-commands": "catalog:",
     "@oclif/plugin-help": "catalog:",
     "@oclif/plugin-not-found": "catalog:",
-    "@oclif/plugin-plugins": "catalog:",
     "@oclif/plugin-search": "catalog:",
-    "@oclif/plugin-update": "catalog:",
     "@oclif/plugin-version": "catalog:",
-    "@oclif/plugin-warn-if-update-available": "catalog:",
     "@oclif/plugin-which": "catalog:",
     "@zitadel-nextgen/api": "workspace:*",
     "ajv": "catalog:",

@@ -2,16 +2,21 @@ import { Flags } from "@oclif/core";
 
 import { BaseCommand, type JsonEnvelope } from "../lib/oclif/base";
 import { runSetup } from "../lib/commands/setup";
+import { AUTH_METHODS } from "../lib/flows";
+import { RENDERER_IDS } from "../lib/orca/patchers/rule/next/renderers/registry";
 
 /** `zitadel setup` — create a project and scaffold local auth. */
 export default class Setup extends BaseCommand {
   static override description = "Create a Zitadel project and scaffold local auth.";
   static override examples = ["<%= config.bin %> setup --framework next --auth-method passkey"];
   static override flags = {
-    framework: Flags.string({ description: 'Framework to target (v1 supports "next").' }),
+    framework: Flags.string({ description: "Framework to target.", options: ["next"] }),
     "user-fields": Flags.string({ description: "Comma-separated list of user fields." }),
-    "auth-method": Flags.string({ description: "Auth method: passkey (default) or password." }),
-    renderer: Flags.string({ description: "Renderer: react (default) or web-component." }),
+    "auth-method": Flags.string({
+      description: "Auth method (default: passkey).",
+      options: [...AUTH_METHODS],
+    }),
+    renderer: Flags.string({ description: "Renderer (default: react).", options: [...RENDERER_IDS] }),
     "no-apply": Flags.boolean({ description: "Skip the automatic apply at the end of setup." }),
   };
 

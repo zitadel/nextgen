@@ -6,7 +6,6 @@ import { FLOWS_DIR, validateFlows } from "../flows";
 import { isObject } from "../json";
 import { readJsonDir } from "../json-dir";
 import { createPlatformClient } from "../api";
-import { environmentSchema, type ZitadelEnvironment } from "../api/schemas";
 import { buildSyncPlan, makeSyncers, renderPlan, runSyncLoop } from "../sync";
 import { readZitadelSecret } from "./shared";
 
@@ -30,7 +29,6 @@ export type ApplyOptions = GlobalOptions & {
  * loop to convergence.
  */
 export async function runApply(opts: ApplyOptions): Promise<CommandResult> {
-  parseEnvironment(opts.environment);
   const secret = await readZitadelSecret(opts.cwd);
 
   const flows = await readJsonDir(join(opts.cwd, FLOWS_DIR));
@@ -66,16 +64,6 @@ export async function runApply(opts: ApplyOptions): Promise<CommandResult> {
   await runSyncLoop(opts.cwd, client, syncers);
 
   return { status: "ok", data: { synced: true } };
-}
-
-function parseEnvironment(value: string | undefined): ZitadelEnvironment {
-  const result = environmentSchema.safeParse(value ?? "development");
-  if (!result.success) {
-    throw new ZitadelError("E_VALIDATION", `Invalid environment "${value}"`, {
-      hint: "Use one of: development, preview, production.",
-    });
-  }
-  return result.data;
 }
 
 /**

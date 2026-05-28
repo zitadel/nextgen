@@ -2,6 +2,7 @@ import { Flags } from "@oclif/core";
 
 import { BaseCommand, type JsonEnvelope } from "../lib/oclif/base";
 import { runApply } from "../lib/commands/apply";
+import { environmentSchema } from "../lib/api/schemas";
 
 /** `zitadel apply` — validate and upload repo config to the platform. */
 export default class Apply extends BaseCommand {
@@ -10,6 +11,7 @@ export default class Apply extends BaseCommand {
     environment: Flags.string({
       char: "e",
       description: "Target environment (default: development).",
+      options: [...environmentSchema.options],
     }),
   };
 

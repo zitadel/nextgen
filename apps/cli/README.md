@@ -42,21 +42,10 @@ npx zitadel@latest <command> --non-interactive --json
 * [`zitadel eject`](#zitadel-eject)
 * [`zitadel help [COMMAND]`](#zitadel-help-command)
 * [`zitadel plan`](#zitadel-plan)
-* [`zitadel plugins`](#zitadel-plugins)
-* [`zitadel plugins add PLUGIN`](#zitadel-plugins-add-plugin)
-* [`zitadel plugins:inspect PLUGIN...`](#zitadel-pluginsinspect-plugin)
-* [`zitadel plugins install PLUGIN`](#zitadel-plugins-install-plugin)
-* [`zitadel plugins link PATH`](#zitadel-plugins-link-path)
-* [`zitadel plugins remove [PLUGIN]`](#zitadel-plugins-remove-plugin)
-* [`zitadel plugins reset`](#zitadel-plugins-reset)
-* [`zitadel plugins uninstall [PLUGIN]`](#zitadel-plugins-uninstall-plugin)
-* [`zitadel plugins unlink [PLUGIN]`](#zitadel-plugins-unlink-plugin)
-* [`zitadel plugins update`](#zitadel-plugins-update)
 * [`zitadel search`](#zitadel-search)
 * [`zitadel setup`](#zitadel-setup)
 * [`zitadel status`](#zitadel-status)
 * [`zitadel uninstall`](#zitadel-uninstall)
-* [`zitadel update [CHANNEL]`](#zitadel-update-channel)
 * [`zitadel version`](#zitadel-version)
 * [`zitadel which`](#zitadel-which)
 
@@ -67,18 +56,21 @@ Validate and upload repo config to the platform.
 ```
 USAGE
   $ zitadel apply [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug] [-e
-    <value>]
+    development|preview|production]
 
 FLAGS
-  -c, --cwd=<value>          Project directory to operate on.
-  -e, --environment=<value>  Target environment (default: development).
-  -f, --force                Overwrite protected files on conflict.
-  -n, --non-interactive      Disable prompts. Required when scripting or running as an agent.
-  -s, --server=<value>       Override the resolved server URL.
-      --debug                Debug logging.
-      --dry-run              Preview without mutating files or the platform.
-      --json                 Emit the JSON envelope instead of pretty output.
-      --verbose              Verbose logging.
+  -c, --cwd=<value>           Project directory to operate on.
+  -e, --environment=<option>  Target environment (default: development).
+                              <options: development|preview|production>
+  -f, --force                 Overwrite protected files on conflict.
+  -n, --non-interactive       Disable prompts. Required when scripting or running as an agent.
+  -s, --server=<value>        Override the resolved server URL.
+      --debug                 Debug logging.
+      --dry-run               Preview without mutating files or the platform.
+      --verbose               Verbose logging.
+
+GLOBAL FLAGS
+  --json  Format output as json.
 
 DESCRIPTION
   Validate and upload repo config to the platform.
@@ -160,8 +152,10 @@ FLAGS
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
       --fix              Re-apply missing managed files.
-      --json             Emit the JSON envelope instead of pretty output.
       --verbose          Verbose logging.
+
+GLOBAL FLAGS
+  --json  Format output as json.
 
 DESCRIPTION
   Verify generated files and local state.
@@ -182,8 +176,10 @@ FLAGS
   -s, --server=<value>   Override the resolved server URL.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
-      --json             Emit the JSON envelope instead of pretty output.
       --verbose          Verbose logging.
+
+GLOBAL FLAGS
+  --json  Format output as json.
 
 DESCRIPTION
   Remove managed files and local Zitadel state.
@@ -219,312 +215,25 @@ Validate config without mutation and preview the sync diff.
 ```
 USAGE
   $ zitadel plan [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug] [-e
-    <value>]
+    development|preview|production]
 
 FLAGS
-  -c, --cwd=<value>          Project directory to operate on.
-  -e, --environment=<value>  Target environment (default: development).
-  -f, --force                Overwrite protected files on conflict.
-  -n, --non-interactive      Disable prompts. Required when scripting or running as an agent.
-  -s, --server=<value>       Override the resolved server URL.
-      --debug                Debug logging.
-      --dry-run              Preview without mutating files or the platform.
-      --json                 Emit the JSON envelope instead of pretty output.
-      --verbose              Verbose logging.
+  -c, --cwd=<value>           Project directory to operate on.
+  -e, --environment=<option>  Target environment (default: development).
+                              <options: development|preview|production>
+  -f, --force                 Overwrite protected files on conflict.
+  -n, --non-interactive       Disable prompts. Required when scripting or running as an agent.
+  -s, --server=<value>        Override the resolved server URL.
+      --debug                 Debug logging.
+      --dry-run               Preview without mutating files or the platform.
+      --verbose               Verbose logging.
+
+GLOBAL FLAGS
+  --json  Format output as json.
 
 DESCRIPTION
   Validate config without mutation and preview the sync diff.
 ```
-
-## `zitadel plugins`
-
-List installed plugins.
-
-```
-USAGE
-  $ zitadel plugins [--json] [--core]
-
-FLAGS
-  --core  Show core plugins.
-
-GLOBAL FLAGS
-  --json  Format output as json.
-
-DESCRIPTION
-  List installed plugins.
-
-EXAMPLES
-  $ zitadel plugins
-```
-
-_See code: [@oclif/plugin-plugins](https://github.com/oclif/plugin-plugins/blob/5.4.69/src/commands/plugins/index.ts)_
-
-## `zitadel plugins add PLUGIN`
-
-Installs a plugin into zitadel.
-
-```
-USAGE
-  $ zitadel plugins add PLUGIN... [--json] [-f] [-h] [-s | -v]
-
-ARGUMENTS
-  PLUGIN...  Plugin to install.
-
-FLAGS
-  -f, --force    Force npm to fetch remote resources even if a local copy exists on disk.
-  -h, --help     Show CLI help.
-  -s, --silent   Silences npm output.
-  -v, --verbose  Show verbose npm output.
-
-GLOBAL FLAGS
-  --json  Format output as json.
-
-DESCRIPTION
-  Installs a plugin into zitadel.
-
-  Uses npm to install plugins.
-
-  Installation of a user-installed plugin will override a core plugin.
-
-  Use the ZITADEL_NPM_LOG_LEVEL environment variable to set the npm loglevel.
-  Use the ZITADEL_NPM_REGISTRY environment variable to set the npm registry.
-
-ALIASES
-  $ zitadel plugins add
-
-EXAMPLES
-  Install a plugin from npm registry.
-
-    $ zitadel plugins add myplugin
-
-  Install a plugin from a github url.
-
-    $ zitadel plugins add https://github.com/someuser/someplugin
-
-  Install a plugin from a github slug.
-
-    $ zitadel plugins add someuser/someplugin
-```
-
-## `zitadel plugins:inspect PLUGIN...`
-
-Displays installation properties of a plugin.
-
-```
-USAGE
-  $ zitadel plugins inspect PLUGIN...
-
-ARGUMENTS
-  PLUGIN...  [default: .] Plugin to inspect.
-
-FLAGS
-  -h, --help     Show CLI help.
-  -v, --verbose
-
-GLOBAL FLAGS
-  --json  Format output as json.
-
-DESCRIPTION
-  Displays installation properties of a plugin.
-
-EXAMPLES
-  $ zitadel plugins inspect myplugin
-```
-
-_See code: [@oclif/plugin-plugins](https://github.com/oclif/plugin-plugins/blob/5.4.69/src/commands/plugins/inspect.ts)_
-
-## `zitadel plugins install PLUGIN`
-
-Installs a plugin into zitadel.
-
-```
-USAGE
-  $ zitadel plugins install PLUGIN... [--json] [-f] [-h] [-s | -v]
-
-ARGUMENTS
-  PLUGIN...  Plugin to install.
-
-FLAGS
-  -f, --force    Force npm to fetch remote resources even if a local copy exists on disk.
-  -h, --help     Show CLI help.
-  -s, --silent   Silences npm output.
-  -v, --verbose  Show verbose npm output.
-
-GLOBAL FLAGS
-  --json  Format output as json.
-
-DESCRIPTION
-  Installs a plugin into zitadel.
-
-  Uses npm to install plugins.
-
-  Installation of a user-installed plugin will override a core plugin.
-
-  Use the ZITADEL_NPM_LOG_LEVEL environment variable to set the npm loglevel.
-  Use the ZITADEL_NPM_REGISTRY environment variable to set the npm registry.
-
-ALIASES
-  $ zitadel plugins add
-
-EXAMPLES
-  Install a plugin from npm registry.
-
-    $ zitadel plugins install myplugin
-
-  Install a plugin from a github url.
-
-    $ zitadel plugins install https://github.com/someuser/someplugin
-
-  Install a plugin from a github slug.
-
-    $ zitadel plugins install someuser/someplugin
-```
-
-_See code: [@oclif/plugin-plugins](https://github.com/oclif/plugin-plugins/blob/5.4.69/src/commands/plugins/install.ts)_
-
-## `zitadel plugins link PATH`
-
-Links a plugin into the CLI for development.
-
-```
-USAGE
-  $ zitadel plugins link PATH [-h] [--install] [-v]
-
-ARGUMENTS
-  PATH  [default: .] path to plugin
-
-FLAGS
-  -h, --help          Show CLI help.
-  -v, --verbose
-      --[no-]install  Install dependencies after linking the plugin.
-
-DESCRIPTION
-  Links a plugin into the CLI for development.
-
-  Installation of a linked plugin will override a user-installed or core plugin.
-
-  e.g. If you have a user-installed or core plugin that has a 'hello' command, installing a linked plugin with a 'hello'
-  command will override the user-installed or core plugin implementation. This is useful for development work.
-
-
-EXAMPLES
-  $ zitadel plugins link myplugin
-```
-
-_See code: [@oclif/plugin-plugins](https://github.com/oclif/plugin-plugins/blob/5.4.69/src/commands/plugins/link.ts)_
-
-## `zitadel plugins remove [PLUGIN]`
-
-Removes a plugin from the CLI.
-
-```
-USAGE
-  $ zitadel plugins remove [PLUGIN...] [-h] [-v]
-
-ARGUMENTS
-  [PLUGIN...]  plugin to uninstall
-
-FLAGS
-  -h, --help     Show CLI help.
-  -v, --verbose
-
-DESCRIPTION
-  Removes a plugin from the CLI.
-
-ALIASES
-  $ zitadel plugins unlink
-  $ zitadel plugins remove
-
-EXAMPLES
-  $ zitadel plugins remove myplugin
-```
-
-## `zitadel plugins reset`
-
-Remove all user-installed and linked plugins.
-
-```
-USAGE
-  $ zitadel plugins reset [--hard] [--reinstall]
-
-FLAGS
-  --hard       Delete node_modules and package manager related files in addition to uninstalling plugins.
-  --reinstall  Reinstall all plugins after uninstalling.
-```
-
-_See code: [@oclif/plugin-plugins](https://github.com/oclif/plugin-plugins/blob/5.4.69/src/commands/plugins/reset.ts)_
-
-## `zitadel plugins uninstall [PLUGIN]`
-
-Removes a plugin from the CLI.
-
-```
-USAGE
-  $ zitadel plugins uninstall [PLUGIN...] [-h] [-v]
-
-ARGUMENTS
-  [PLUGIN...]  plugin to uninstall
-
-FLAGS
-  -h, --help     Show CLI help.
-  -v, --verbose
-
-DESCRIPTION
-  Removes a plugin from the CLI.
-
-ALIASES
-  $ zitadel plugins unlink
-  $ zitadel plugins remove
-
-EXAMPLES
-  $ zitadel plugins uninstall myplugin
-```
-
-_See code: [@oclif/plugin-plugins](https://github.com/oclif/plugin-plugins/blob/5.4.69/src/commands/plugins/uninstall.ts)_
-
-## `zitadel plugins unlink [PLUGIN]`
-
-Removes a plugin from the CLI.
-
-```
-USAGE
-  $ zitadel plugins unlink [PLUGIN...] [-h] [-v]
-
-ARGUMENTS
-  [PLUGIN...]  plugin to uninstall
-
-FLAGS
-  -h, --help     Show CLI help.
-  -v, --verbose
-
-DESCRIPTION
-  Removes a plugin from the CLI.
-
-ALIASES
-  $ zitadel plugins unlink
-  $ zitadel plugins remove
-
-EXAMPLES
-  $ zitadel plugins unlink myplugin
-```
-
-## `zitadel plugins update`
-
-Update installed plugins.
-
-```
-USAGE
-  $ zitadel plugins update [-h] [-v]
-
-FLAGS
-  -h, --help     Show CLI help.
-  -v, --verbose
-
-DESCRIPTION
-  Update installed plugins.
-```
-
-_See code: [@oclif/plugin-plugins](https://github.com/oclif/plugin-plugins/blob/5.4.69/src/commands/plugins/update.ts)_
 
 ## `zitadel search`
 
@@ -549,22 +258,28 @@ Create a Zitadel project and scaffold local auth.
 ```
 USAGE
   $ zitadel setup [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug]
-    [--framework <value>] [--user-fields <value>] [--auth-method <value>] [--renderer <value>] [--no-apply]
+    [--framework next] [--user-fields <value>] [--auth-method passkey|password] [--renderer react|web-component]
+    [--no-apply]
 
 FLAGS
-  -c, --cwd=<value>          Project directory to operate on.
-  -f, --force                Overwrite protected files on conflict.
-  -n, --non-interactive      Disable prompts. Required when scripting or running as an agent.
-  -s, --server=<value>       Override the resolved server URL.
-      --auth-method=<value>  Auth method: passkey (default) or password.
-      --debug                Debug logging.
-      --dry-run              Preview without mutating files or the platform.
-      --framework=<value>    Framework to target (v1 supports "next").
-      --json                 Emit the JSON envelope instead of pretty output.
-      --no-apply             Skip the automatic apply at the end of setup.
-      --renderer=<value>     Renderer: react (default) or web-component.
-      --user-fields=<value>  Comma-separated list of user fields.
-      --verbose              Verbose logging.
+  -c, --cwd=<value>           Project directory to operate on.
+  -f, --force                 Overwrite protected files on conflict.
+  -n, --non-interactive       Disable prompts. Required when scripting or running as an agent.
+  -s, --server=<value>        Override the resolved server URL.
+      --auth-method=<option>  Auth method (default: passkey).
+                              <options: passkey|password>
+      --debug                 Debug logging.
+      --dry-run               Preview without mutating files or the platform.
+      --framework=<option>    Framework to target.
+                              <options: next>
+      --no-apply              Skip the automatic apply at the end of setup.
+      --renderer=<option>     Renderer (default: react).
+                              <options: react|web-component>
+      --user-fields=<value>   Comma-separated list of user fields.
+      --verbose               Verbose logging.
+
+GLOBAL FLAGS
+  --json  Format output as json.
 
 DESCRIPTION
   Create a Zitadel project and scaffold local auth.
@@ -588,8 +303,10 @@ FLAGS
   -s, --server=<value>   Override the resolved server URL.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
-      --json             Emit the JSON envelope instead of pretty output.
       --verbose          Verbose logging.
+
+GLOBAL FLAGS
+  --json  Format output as json.
 
 DESCRIPTION
   Summarize the local project state.
@@ -610,8 +327,10 @@ FLAGS
   -s, --server=<value>   Override the resolved server URL.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
-      --json             Emit the JSON envelope instead of pretty output.
       --verbose          Verbose logging.
+
+GLOBAL FLAGS
+  --json  Format output as json.
 
 DESCRIPTION
   Remove managed files and local Zitadel state.
@@ -619,44 +338,6 @@ DESCRIPTION
 ALIASES
   $ zitadel uninstall
 ```
-
-## `zitadel update [CHANNEL]`
-
-update the zitadel CLI
-
-```
-USAGE
-  $ zitadel update [CHANNEL] [--force |  | [-a | -v <value> | -i]] [-b ]
-
-FLAGS
-  -a, --available        See available versions.
-  -b, --verbose          Show more details about the available versions.
-  -i, --interactive      Interactively select version to install. This is ignored if a channel is provided.
-  -v, --version=<value>  Install a specific version.
-      --force            Force a re-download of the requested version.
-
-DESCRIPTION
-  update the zitadel CLI
-
-EXAMPLES
-  Update to the stable channel:
-
-    $ zitadel update stable
-
-  Update to a specific version:
-
-    $ zitadel update --version 1.0.0
-
-  Interactively select version:
-
-    $ zitadel update --interactive
-
-  See available versions:
-
-    $ zitadel update --available
-```
-
-_See code: [@oclif/plugin-update](https://github.com/oclif/plugin-update/blob/4.7.43/src/commands/update.ts)_
 
 ## `zitadel version`
 

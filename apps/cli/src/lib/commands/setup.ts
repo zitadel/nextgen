@@ -4,7 +4,7 @@ import { hasZitadelConfig, hasZitadelSecret } from "../../detect/state";
 import { pickFramework, runInteractiveSetup } from "../../interactive/setup";
 import type { CommandResult, GlobalOptions } from "../oclif/base";
 import { ZitadelError } from "../errors";
-import { AUTH_METHODS, type AuthMethod } from "../flows";
+import { type AuthMethod } from "../flows";
 import { Orca } from "../orca";
 import { detectEmptyProject } from "../orca/detect";
 import { patchers } from "../orca/patchers";
@@ -69,7 +69,9 @@ export async function runSetup(opts: SetupOptions): Promise<CommandResult> {
   let effectiveServer = opts.source;
 
   let userFields = splitCsv(opts.userFields);
-  let authMethod: AuthMethod | undefined = parseAuthMethod(opts.authMethod);
+  // The `--auth-method` flag is validated against AUTH_METHODS by oclif, so the
+  // value is already a valid AuthMethod (or undefined when omitted).
+  let authMethod: AuthMethod | undefined = opts.authMethod as AuthMethod | undefined;
 
   if (!opts.nonInteractive && !opts.dryRun) {
     const answers = await runInteractiveSetup({
@@ -153,27 +155,6 @@ async function resolveScaffoldFramework(opts: SetupOptions, orca: Orca): Promise
     });
   }
   return pickFramework(orca.availableFrameworks());
-}
-
-/**
- * Validates and narrows the `--auth-method` flag to an {@link AuthMethod},
- * returning `undefined` when unset so the caller can fall back to a default.
- */
-function parseAuthMethod(value: string | undefined): AuthMethod | undefined {
-  if (value === undefined) {
-    return undefined;
-  }
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return undefined;
-  }
-  if (!(AUTH_METHODS as ReadonlyArray<string>).includes(trimmed)) {
-    throw new ZitadelError(
-      "E_VALIDATION",
-      `Unknown auth method "${trimmed}". Allowed: ${AUTH_METHODS.join(", ")}.`,
-    );
-  }
-  return trimmed as AuthMethod;
 }
 
 /** Splits a comma-separated flag into trimmed, non-empty entries (or undefined). */

@@ -179,9 +179,12 @@ export abstract class BaseCommand extends Command {
 
   /** Renders any thrown error as the failure envelope and exits with its code. */
   protected override async catch(error: unknown): Promise<never> {
+    // A flag-parse error fires before `toMeta`, so refresh `command` from the
+    // now-resolved command id to keep the envelope's `command` accurate.
+    const meta: GlobalOptions = { ...this.meta, command: this.id ?? this.meta.command };
     const zitadelError = toZitadelError(error);
     if (this.jsonEnabled()) {
-      this.logJson(toErrorEnvelope(zitadelError, this.meta));
+      this.logJson(toErrorEnvelope(zitadelError, meta));
     } else {
       this.logToStderr(renderError(zitadelError));
     }
