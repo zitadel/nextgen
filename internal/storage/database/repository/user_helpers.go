@@ -40,6 +40,45 @@ func (c userUnsupportedChange) IsOnColumn(col database.Column) bool {
 
 var _ database.Change = userUnsupportedChange{}
 
+type userAttributeMatch struct {
+	key   string
+	value any
+}
+
+func (c userAttributeMatch) Write(b *database.StatementBuilder) {
+	raw, err := json.Marshal(c.value)
+	if err != nil {
+		b.WriteString("FALSE")
+		return
+	}
+	colUserAttributeProjectID.WriteQualified(b)
+	b.WriteString(" = ")
+	colUserProjectID.WriteQualified(b)
+	b.WriteString(" AND ")
+	colUserAttributeUserID.WriteQualified(b)
+	b.WriteString(" = ")
+	colUserID.WriteQualified(b)
+	b.WriteString(" AND ")
+	colUserAttributeKey.WriteQualified(b)
+	b.WriteString(" = ")
+	b.WriteArg(c.key)
+	b.WriteString(" AND ")
+	colUserAttributeValue.WriteQualified(b)
+	b.WriteString(" = ")
+	b.WriteArg(string(raw))
+	b.WriteString("::jsonb AND jsonb_typeof(")
+	colUserAttributeValue.WriteQualified(b)
+	b.WriteString(") IN ('string','number','boolean')")
+}
+
+func (userAttributeMatch) Matches(any) bool { return true }
+
+func (userAttributeMatch) String() string { return "userAttributeMatch" }
+
+func (userAttributeMatch) IsRestrictingColumn(database.Column) bool { return false }
+
+var _ database.Condition = userAttributeMatch{}
+
 func uniquenessScopeLiteral(scope domain.AttributeUniqueness) string {
 	switch scope {
 	case domain.AttributeUniquenessUnspecified:
