@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-faster/jx"
 	api "github.com/zitadel/nextgen/api/generated"
+	"github.com/zitadel/nextgen/internal/api/ogenx"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
@@ -32,19 +33,29 @@ func (h Handler) CreateSession(ctx context.Context, req *api.CreateSessionReques
 
 func (h Handler) ExchangeHandoff(ctx context.Context, req *api.ExchangeRequest, params api.ExchangeHandoffParams) (api.ExchangeHandoffRes, error) {
 	scopeCtx, _ := GetScopeContext(ctx)
-
-	input := service.ExchangeInput{
-		ProjectID:    scopeCtx.ProjectID,
-		HandoffToken: req.HandoffToken,
-	}
-	if key, ok := params.IdempotencyKey.Get(); ok {
-		input.IdempotencyKey = new(key)
+	input, err := exchangeInputFromRequest(scopeCtx.ProjectID, req, params)
+	if err != nil {
+		return nil, err
 	}
 	session, err := h.sessionService.Exchange(ctx, input)
 	if err != nil {
 		return nil, err
 	}
 	return sessionWithTokenToAPI(session, h.crypter)
+}
+
+func exchangeInputFromRequest(projectID string, req *api.ExchangeRequest, params api.ExchangeHandoffParams) (service.ExchangeInput, error) {
+	input := service.ExchangeInput{
+		ProjectID:    projectID,
+		HandoffToken: req.HandoffToken,
+	}
+	if key, ok := params.IdempotencyKey.Get(); ok {
+		input.IdempotencyKey = new(key)
+	}
+	if ttl, ok := req.TTL.Get(); ok {
+		input.TTL = new(time.Duration(ttl))
+	}
+	return input, nil
 }
 
 func (h Handler) GetSession(ctx context.Context, params api.GetSessionParams) (api.GetSessionRes, error) {
@@ -123,10 +134,7 @@ func (h Handler) RevokeMySession(ctx context.Context, params api.RevokeMySession
 		SessionID: sessionToken.SessionID,
 	}
 
-	session, err := h.sessionService.Get(ctx, service.GetSessionInput{
-		ProjectID: input.ProjectID,
-		SessionID: input.SessionID,
-	})
+	session, err := h.sessionService.Get(ctx, service.GetSessionInput(input))
 	if err != nil {
 		return nil, err
 	}
@@ -246,10 +254,7 @@ func sessionsToAPI(sessions []*domain.Session) *api.SessionListResponse {
 }
 
 func setSessionCookie(token string, expiresAt time.Time) string {
-	maxAge := int(time.Until(expiresAt).Seconds())
-	if maxAge < 0 {
-		maxAge = 0
-	}
+	maxAge := max(int(time.Until(expiresAt).Seconds()), 0)
 	return sessionCookie(token, maxAge)
 }
 
@@ -323,6 +328,36 @@ func sessionErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
 	case domain.ErrSessionTokenInvalid().Code:
 		return errorResponseWithStatusCode(http.StatusUnauthorized, err)
+	case domain.ErrSessionInvalidTTL().Code:
+		apiErr := &api.ErrorDetailsStatusCode{
+			StatusCode: http.StatusBadRequest,
+		}
+
+		details, ok := err.Details.(domain.SessionInvalidTTLDetails)
+		if !ok {
+			apiErr.Response = domainErrorDetails(err)
+			return apiErr
+		}
+
+		encoder := jx.GetEncoder()
+		defer jx.PutEncoder(encoder)
+
+		encoder.ObjStart()
+		encoder.Field("ttl", ogenx.ISODuration(details.TTL).Encode)
+		encoder.Field("max_ttl", ogenx.ISODuration(details.MaxTTL).Encode)
+		encoder.ObjEnd()
+
+		apiErr.Response = api.ErrorDetails{
+			Code:    api.ErrorCode(err.Code),
+			Message: err.Message,
+			Details: api.OptErrorDetailsDetails{
+				Set: true,
+				Value: api.ErrorDetailsDetails{
+					"details": jx.Raw(encoder.Bytes()),
+				},
+			},
+		}
+		return apiErr
 	default:
 		return internalErrorResponse(err)
 
