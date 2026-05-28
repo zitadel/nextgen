@@ -1,5 +1,6 @@
 name: project_id
 in: query
 description: The unique identifier of the project
+required: true
 schema:
   $ref: '../schemas/project-id.yaml'

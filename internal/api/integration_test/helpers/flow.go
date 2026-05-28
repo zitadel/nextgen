@@ -2,8 +2,10 @@ package helpers
 
 import (
 	"testing"
+	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/domain/idgen"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database/repository"
 )
@@ -14,9 +16,23 @@ func (h *Harness) EnsureFlowService(t *testing.T) service.FlowService {
 		h.FlowService = service.NewFlowService(
 			h.EnsureDBPool(t),
 			h.EnsureFlowDefinitionRepo(t),
+			h.EnsureFlowStateMachine(t),
+			idgen.NewULID(),
 		)
 	}
 	return h.FlowService
+}
+
+func (h *Harness) EnsureFlowStateMachine(t *testing.T) *domain.FlowStateMachineRuntime {
+	t.Helper()
+	if h.FlowStateMachine == nil {
+		fields := domain.NewSchemaFieldResolver(h.EnsureSchemaResolver(t))
+		authAdapter := service.NewFlowAuthAttemptAdapter(h.EnsureAuthAttemptService(t))
+		// create_user handler stays nil — registration flows fail with
+		// ErrIntegrity until the argon2id wiring PR lands.
+		h.FlowStateMachine = domain.NewFlowStateMachine(fields, nil, authAdapter, time.Now)
+	}
+	return h.FlowStateMachine
 }
 
 func (h *Harness) EnsureFlowDefinitionRepo(t *testing.T) domain.FlowDefinitionRepository {
