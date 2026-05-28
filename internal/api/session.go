@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"regexp"
+	"strconv"
 	"time"
 
 	"github.com/go-faster/jx"
@@ -16,6 +18,8 @@ import (
 const (
 	sessionCookieName = "__nextgen_session"
 )
+
+var iso8601Duration = regexp.MustCompile(`^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?$`)
 
 func (h Handler) CreateSession(ctx context.Context, req *api.CreateSessionRequest) (api.CreateSessionRes, error) {
 	input := service.CreateSessionInput{
@@ -32,7 +36,10 @@ func (h Handler) CreateSession(ctx context.Context, req *api.CreateSessionReques
 
 func (h Handler) ExchangeHandoff(ctx context.Context, req *api.ExchangeRequest, params api.ExchangeHandoffParams) (api.ExchangeHandoffRes, error) {
 	scopeCtx, _ := GetScopeContext(ctx)
-	input := exchangeInputFromRequest(scopeCtx.ProjectID, req, params)
+	input, err := exchangeInputFromRequest(scopeCtx.ProjectID, req, params)
+	if err != nil {
+		return nil, err
+	}
 	session, err := h.sessionService.Exchange(ctx, input)
 	if err != nil {
 		return nil, err
@@ -40,7 +47,7 @@ func (h Handler) ExchangeHandoff(ctx context.Context, req *api.ExchangeRequest, 
 	return sessionWithTokenToAPI(session, h.sealer)
 }
 
-func exchangeInputFromRequest(projectID string, req *api.ExchangeRequest, params api.ExchangeHandoffParams) service.ExchangeInput {
+func exchangeInputFromRequest(projectID string, req *api.ExchangeRequest, params api.ExchangeHandoffParams) (service.ExchangeInput, error) {
 	input := service.ExchangeInput{
 		ProjectID:    projectID,
 		HandoffToken: req.HandoffToken,
@@ -48,10 +55,57 @@ func exchangeInputFromRequest(projectID string, req *api.ExchangeRequest, params
 	if key, ok := params.IdempotencyKey.Get(); ok {
 		input.IdempotencyKey = new(key)
 	}
-	if ttl, ok := req.TTL.Get(); ok {
+	if ttlRaw, ok := req.TTL.Get(); ok {
+		ttl, err := parseISO8601Duration(ttlRaw)
+		if err != nil {
+			return service.ExchangeInput{}, domain.ErrSessionInvalidTTL().WithDetails(map[string]any{
+				"ttl":   ttlRaw,
+				"error": err.Error(),
+			})
+		}
 		input.TTL = &ttl
 	}
-	return input
+	return input, nil
+}
+
+func parseISO8601Duration(raw string) (time.Duration, error) {
+	m := iso8601Duration.FindStringSubmatch(raw)
+	if m == nil {
+		return 0, fmt.Errorf("must be an ISO-8601 duration like PT3H")
+	}
+	if m[1] == "" && m[2] == "" && m[3] == "" && m[4] == "" {
+		return 0, fmt.Errorf("duration must include at least one unit")
+	}
+	total := time.Duration(0)
+	if m[1] != "" {
+		days, err := strconv.ParseInt(m[1], 10, 64)
+		if err != nil {
+			return 0, fmt.Errorf("invalid day component")
+		}
+		total += time.Duration(days) * 24 * time.Hour
+	}
+	if m[2] != "" {
+		hours, err := strconv.ParseInt(m[2], 10, 64)
+		if err != nil {
+			return 0, fmt.Errorf("invalid hour component")
+		}
+		total += time.Duration(hours) * time.Hour
+	}
+	if m[3] != "" {
+		minutes, err := strconv.ParseInt(m[3], 10, 64)
+		if err != nil {
+			return 0, fmt.Errorf("invalid minute component")
+		}
+		total += time.Duration(minutes) * time.Minute
+	}
+	if m[4] != "" {
+		seconds, err := strconv.ParseFloat(m[4], 64)
+		if err != nil {
+			return 0, fmt.Errorf("invalid second component")
+		}
+		total += time.Duration(seconds * float64(time.Second))
+	}
+	return total, nil
 }
 
 func (h Handler) GetSession(ctx context.Context, params api.GetSessionParams) (api.GetSessionRes, error) {

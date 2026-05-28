@@ -2191,7 +2191,7 @@ type ExchangeRequest struct {
 	HandoffToken string `json:"handoff_token"`
 	// Optional session lifetime after exchange as an ISO-8601 duration. When omitted, the server
 	// uses the configured default. Must not exceed the configured maximum.
-	TTL OptDuration `json:"ttl"`
+	TTL OptString `json:"ttl"`
 }
 
 // GetHandoffToken returns the value of HandoffToken.
@@ -2200,7 +2200,7 @@ func (s *ExchangeRequest) GetHandoffToken() string {
 }
 
 // GetTTL returns the value of TTL.
-func (s *ExchangeRequest) GetTTL() OptDuration {
+func (s *ExchangeRequest) GetTTL() OptString {
 	return s.TTL
 }
 
@@ -2210,7 +2210,7 @@ func (s *ExchangeRequest) SetHandoffToken(val string) {
 }
 
 // SetTTL sets the value of TTL.
-func (s *ExchangeRequest) SetTTL(val OptDuration) {
+func (s *ExchangeRequest) SetTTL(val OptString) {
 	s.TTL = val
 }
 
@@ -6905,52 +6905,6 @@ func (o OptDateTime) Get() (v time.Time, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptDateTime) Or(d time.Time) time.Time {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptDuration returns new OptDuration with value set to v.
-func NewOptDuration(v time.Duration) OptDuration {
-	return OptDuration{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptDuration is optional time.Duration.
-type OptDuration struct {
-	Value time.Duration
-	Set   bool
-}
-
-// IsSet returns true if OptDuration was set.
-func (o OptDuration) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptDuration) Reset() {
-	var v time.Duration
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptDuration) SetTo(v time.Duration) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptDuration) Get() (v time.Duration, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptDuration) Or(d time.Duration) time.Duration {
 	if v, ok := o.Get(); ok {
 		return v
 	}

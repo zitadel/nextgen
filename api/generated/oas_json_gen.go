@@ -13728,41 +13728,6 @@ func (s *OptDateTime) UnmarshalJSON(data []byte) error {
 	return s.Decode(d, json.DecodeDateTime)
 }
 
-// Encode encodes time.Duration as json.
-func (o OptDuration) Encode(e *jx.Encoder) {
-	if !o.Set {
-		return
-	}
-	json.EncodeDuration(e, o.Value)
-}
-
-// Decode decodes time.Duration from json.
-func (o *OptDuration) Decode(d *jx.Decoder) error {
-	if o == nil {
-		return errors.New("invalid: unable to decode OptDuration to nil")
-	}
-	o.Set = true
-	v, err := json.DecodeDuration(d)
-	if err != nil {
-		return err
-	}
-	o.Value = v
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s OptDuration) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *OptDuration) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
 // Encode encodes ErrorDetailsDetails as json.
 func (o OptErrorDetailsDetails) Encode(e *jx.Encoder) {
 	if !o.Set {
