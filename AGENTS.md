@@ -71,9 +71,13 @@ default `run-many -t lint,typecheck,build,test` invocation because they
 boot real dev servers and need browsers installed:
 
 ```sh
-corepack pnpm exec playwright install
+corepack pnpm --filter @zitadel-nextgen/demo-next-e2e exec playwright install
 corepack pnpm nx run-many -t e2e
 ```
+
+`@playwright/test` is a dependency of the e2e packages only, not of the
+workspace root, so a bare `corepack pnpm exec playwright install` can't find the
+binary on a clean checkout — scope it with `--filter` (same as CI does).
 
 In CI the dedicated `node-e2e` job (in `.github/workflows/ci.yml`) gates
 merges on the e2e suites, so changes that break the demo integrations
@@ -181,9 +185,16 @@ missing-library errors.
 ### Playwright browser install gotcha
 
 Playwright was bumped (PR #173) specifically to fix a browser-install hang, so
-the standard `corepack pnpm exec playwright install` should now succeed. If an
-install still hangs during zip extraction in the Cloud Agent VM, download and
-extract manually as a fallback:
+the standard install should now succeed. Scope the exec with `--filter` (the
+`playwright` binary lives in the e2e packages, not at the workspace root):
+
+```sh
+corepack pnpm --filter @zitadel-nextgen/demo-next-e2e \
+  exec playwright install --with-deps chromium
+```
+
+If an install still hangs during zip extraction in the Cloud Agent VM, download
+and extract manually as a fallback:
 
 ```sh
 curl -fsSL -o /tmp/chrome-linux64.zip \
