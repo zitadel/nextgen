@@ -9,7 +9,7 @@ import (
 	"github.com/go-faster/jx"
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api/ogenx"
-	"github.com/zitadel/nextgen/internal/cookie"
+	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 )
@@ -28,7 +28,7 @@ func (h Handler) CreateSession(ctx context.Context, req *api.CreateSessionReques
 	if err != nil {
 		return nil, err
 	}
-	return sessionWithTokenToAPI(session, h.sealer)
+	return sessionWithTokenToAPI(session, h.crypter)
 }
 
 func (h Handler) ExchangeHandoff(ctx context.Context, req *api.ExchangeRequest, params api.ExchangeHandoffParams) (api.ExchangeHandoffRes, error) {
@@ -41,7 +41,7 @@ func (h Handler) ExchangeHandoff(ctx context.Context, req *api.ExchangeRequest, 
 	if err != nil {
 		return nil, err
 	}
-	return sessionWithTokenToAPI(session, h.sealer)
+	return sessionWithTokenToAPI(session, h.crypter)
 }
 
 func exchangeInputFromRequest(projectID string, req *api.ExchangeRequest, params api.ExchangeHandoffParams) (service.ExchangeInput, error) {
@@ -74,7 +74,7 @@ func (h Handler) GetSession(ctx context.Context, params api.GetSessionParams) (a
 }
 
 func (h Handler) GetMySession(ctx context.Context, params api.GetMySessionParams) (api.GetMySessionRes, error) {
-	sessionToken, err := domain.DecryptSessionTokenString(params.NextgenSession, h.sealer)
+	sessionToken, err := domain.DecryptSessionTokenString(params.NextgenSession, h.crypter)
 	if err != nil {
 		return nil, err
 	}
@@ -125,7 +125,7 @@ func (h Handler) RevokeSession(ctx context.Context, params api.RevokeSessionPara
 }
 
 func (h Handler) RevokeMySession(ctx context.Context, params api.RevokeMySessionParams) (api.RevokeMySessionRes, error) {
-	sessionToken, err := domain.DecryptSessionTokenString(params.NextgenSession, h.sealer)
+	sessionToken, err := domain.DecryptSessionTokenString(params.NextgenSession, h.crypter)
 	if err != nil {
 		return nil, err
 	}
@@ -177,8 +177,8 @@ func userAgentToDomain(agent api.OptCreateSessionRequestUserAgent) *domain.UserA
 	}
 }
 
-func sessionWithTokenToAPI(session *domain.Session, sealer *cookie.Sealer) (*api.SessionWithTokenResponseHeaders, error) {
-	token, err := session.Token(sealer)
+func sessionWithTokenToAPI(session *domain.Session, encrypter crypto.Encrypter) (*api.SessionWithTokenResponseHeaders, error) {
+	token, err := session.Token(encrypter)
 	if err != nil {
 		return nil, err
 	}

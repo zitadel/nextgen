@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/zitadel/nextgen/internal/cookie"
+	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -110,7 +110,7 @@ func NewSession(projectID string, agent *UserAgent) (*Session, error) {
 	}, nil
 }
 
-func (s *Session) Token(sealer *cookie.Sealer) (string, error) {
+func (s *Session) Token(encrypter crypto.Encrypter) (string, error) {
 	payload, err := json.Marshal(&SessionToken{
 		ProjectID: s.ProjectID,
 		SessionID: s.ID,
@@ -122,23 +122,23 @@ func (s *Session) Token(sealer *cookie.Sealer) (string, error) {
 	if err != nil {
 		return "", ErrSessionTokenCreationFailed()
 	}
-	token, err := sealer.Seal(payload)
+	token, err := encrypter.Encrypt(string(payload))
 	if err != nil {
 		return "", ErrSessionTokenCreationFailed()
 	}
 	return token, nil
 }
 
-func DecryptSessionTokenString(tokenString string, sealer *cookie.Sealer) (*SessionToken, error) {
+func DecryptSessionTokenString(tokenString string, decrypter crypto.Decrypter) (*SessionToken, error) {
 	if tokenString == "" {
 		return nil, ErrSessionTokenInvalid()
 	}
-	payload, err := sealer.Open(tokenString)
+	payload, err := decrypter.Decrypt(tokenString)
 	if err != nil {
 		return nil, ErrSessionTokenInvalid()
 	}
 	var sessionToken SessionToken
-	err = json.Unmarshal(payload, &sessionToken)
+	err = json.Unmarshal([]byte(payload), &sessionToken)
 	if err != nil {
 		return nil, ErrSessionTokenInvalid()
 	}
