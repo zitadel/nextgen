@@ -42,9 +42,10 @@ Bot detection is a **first-class, composable subsystem** — not an afterthought
 
 ### Platform / edge signals
 
-Apps deployed behind an edge platform (Vercel, Cloudflare) often already run bot
-management there — Vercel BotID, Cloudflare managed challenge / WAF — producing a
-**server-side verdict with no widget**. That verdict is a first-class signal:
+Apps deployed behind an edge platform (e.g. Cloudflare, Vercel, Netlify) often already
+run bot management there — Cloudflare managed challenge / WAF, Vercel BotID, etc. —
+producing a **server-side verdict with no widget**. The provider list is open; the
+contract is provider-agnostic. That verdict is a first-class signal:
 
 - **Capture:** the SDK Edge proxy (`/__nextgen`, running in the customer's deployment)
   reads the platform verdict server-side and stamps it on the proxied flow request as the

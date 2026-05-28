@@ -10,23 +10,32 @@ Captcha is the single gate kind ([ADR 013][adr013] fixed gates as captcha-only).
 ADR formalizes the captcha gate contract that ADR 013 deferred, and adds a second,
 complementary bot-detection mechanism for apps deployed behind an edge platform.
 
-Two mechanisms, one trust rule:
+Two mechanisms, one trust rule. They are **complementary, not alternatives**, and have
+nothing to do with whether Zitadel itself is self-hosted or running on Zitadel Cloud:
+#1 is what challenges the user *when* a challenge is required; #2 is a signal that
+informs *whether* a challenge is required for a given request. A clean edge verdict
+can suppress #1; a suspicious one can require it. When a user-facing challenge is
+shown, it always comes from #1.
 
 1. **In-flow captcha gate (#1).** A step carries a `captcha` gate. The engine issues a
-   provider-specific challenge — the built-in **Altcha** proof-of-work (the one we bring
-   along, self-hosted, no third-party account) or a **third-party** provider the customer
-   already uses (Cloudflare Turnstile / hCaptcha / reCAPTCHA, with their own keys). The
-   invisible `<zl-captcha>` component solves it, the proof returns via `gate_proofs`, and
-   the engine verifies it through the existing `auth_attempts` challenge/verify path. The
-   public `site_key` lives in the client-visible gate `config`; any third-party **secret**
-   stays server-side in the project secret store ([ADR 005][adr005]).
+   provider-specific challenge — either the built-in **Altcha** proof-of-work (the one
+   we ship; no third-party account, no per-customer keys) or a **third-party** provider
+   the customer already uses (Cloudflare Turnstile / hCaptcha / reCAPTCHA, with their
+   own keys). The invisible `<zl-captcha>` component solves it, the proof returns via
+   `gate_proofs`, and the engine verifies it through the existing `auth_attempts`
+   challenge/verify path. The public `site_key` lives in the client-visible gate
+   `config`; any third-party **secret** stays server-side in the project secret store
+   ([ADR 005][adr005]).
 
-2. **Edge/platform bot signal (#2).** When the app runs behind Vercel or Cloudflare,
-   their edge bot-management already produces a server-side verdict (Vercel BotID,
-   Cloudflare managed challenge / WAF) with **no widget**. The SDK Edge proxy reads that
-   verdict server-side and stamps it as an authenticated inline header on the proxied flow
-   request. The risk evaluator consumes it to **suppress** an otherwise-required captcha
-   (the edge already cleared the request) or **inject** one (the edge flagged it).
+2. **Edge / platform bot signal (#2).** When the customer's *app* runs behind an edge
+   platform with bot management — e.g. Cloudflare (managed challenge / WAF), Vercel
+   (BotID), Netlify — the edge already produces a server-side verdict with **no
+   widget**. The SDK Edge proxy reads that verdict server-side and stamps it as an
+   authenticated inline header on the proxied flow request, tagging the source via the
+   header's `provider` field (an open identifier — the contract is provider-agnostic,
+   not tied to any specific vendor). The risk evaluator consumes it to **suppress** an
+   otherwise-required captcha (the edge already cleared the request) or **inject** one
+   (the edge flagged it).
 
 **Trust boundary (shared rule).** Only server-injected, authenticated signals count;
 browser-relayed signals never do. This is the same principle as [ADR 005][adr005]: the
