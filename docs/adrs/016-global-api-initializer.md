@@ -66,7 +66,7 @@ instead of silently using empty defaults.
 
 ## Decision
 
-Introduce a write-once `configureNextgen()` function that sets app-wide
+Introduce a write-once `configureZitadel()` function that sets app-wide
 SDK configuration once at application startup. Web components and
 generated API functions read from this shared config instead of relying
 on per-instance attributes for app-wide values.
@@ -75,7 +75,7 @@ on per-instance attributes for app-wide values.
 
 ```ts
 // @zitadel-nextgen/api/config (new entry point)
-export interface NextgenConfig {
+export interface ZitadelConfig {
   /** Proxy path for API requests (e.g. "/__nextgen"). */
   apiBase: string;
 
@@ -95,21 +95,21 @@ export interface NextgenConfig {
  * and are ignored. This prevents accidental overwrites while remaining
  * safe for HMR and framework double-mounts.
  */
-export function configureNextgen(config: NextgenConfig): void;
+export function configureZitadel(config: ZitadelConfig): void;
 
 /**
- * Returns the current config, or `null` if `configureNextgen()` has
+ * Returns the current config, or `null` if `configureZitadel()` has
  * not been called yet.
  */
-export function getNextgenConfig(): Readonly<NextgenConfig> | null;
+export function getZitadelConfig(): Readonly<ZitadelConfig> | null;
 ```
 
 ### Write-once semantics
 
 ```ts
-let currentConfig: NextgenConfig | null = null;
+let currentConfig: ZitadelConfig | null = null;
 
-export function configureNextgen(config: NextgenConfig): void {
+export function configureZitadel(config: ZitadelConfig): void {
   if (currentConfig !== null) {
     // Same values → no-op (safe for HMR / React strict mode double-mount)
     if (currentConfig.apiBase === config.apiBase &&
@@ -117,7 +117,7 @@ export function configureNextgen(config: NextgenConfig): void {
       return;
     }
     console.warn(
-      `[nextgen] configureNextgen() already called with different values. ` +
+      `[zitadel] configureZitadel() already called with different values. ` +
       `Ignoring: ${JSON.stringify(config)}`
     );
     return;
@@ -129,7 +129,7 @@ export function configureNextgen(config: NextgenConfig): void {
 
 ### Usage in framework adapters
 
-The framework SDKs (`sdk-next`, `sdk-nuxt`) call `configureNextgen()`
+The framework SDKs (`sdk-next`, `sdk-nuxt`) call `configureZitadel()`
 internally from their middleware/plugin setup, so end users configure
 once and everything downstream just works:
 
@@ -137,9 +137,9 @@ once and everything downstream just works:
 
 ```ts
 // sdk-next — client-side initializer called from the SDK's client entry
-import { configureNextgen } from "@zitadel-nextgen/api/config";
+import { configureZitadel } from "@zitadel-nextgen/api/config";
 
-configureNextgen({
+configureZitadel({
   apiBase: "/__nextgen",
   projectId: runtimeConfig.projectId,
 });
@@ -149,11 +149,11 @@ configureNextgen({
 
 ```ts
 // sdk-nuxt/src/runtime/plugin.ts
-import { configureNextgen } from "@zitadel-nextgen/api/config";
+import { configureZitadel } from "@zitadel-nextgen/api/config";
 
 export default defineNuxtPlugin(() => {
   const config = useRuntimeConfig().public.nextgen;
-  configureNextgen({
+  configureZitadel({
     apiBase: config.apiBase,
     projectId: config.projectId,
   });
@@ -162,13 +162,13 @@ export default defineNuxtPlugin(() => {
 
 ### Web component changes
 
-Once `configureNextgen()` exists, web components read app-wide config
+Once `configureZitadel()` exists, web components read app-wide config
 from the shared config and only use attributes as per-instance overrides:
 
 ```ts
 // zitadel-login.ts — simplified connectedCallback
 override firstUpdated(): void {
-  const config = getNextgenConfig();
+  const config = getZitadelConfig();
 
   // App-wide values: config takes precedence, attribute is a fallback
   const apiBase = config?.apiBase ?? this.apiBase;
@@ -182,12 +182,12 @@ override firstUpdated(): void {
 This means:
 
 1. **`api-base` and `project-id` attributes become optional** — when
-   `configureNextgen()` was called, components read from the shared
+   `configureZitadel()` was called, components read from the shared
    config. Attributes still work as overrides for edge cases.
 2. **`connectedCallback` no longer mutates global state** — removing
    the `setApiBaseUrl()` side-effect from component lifecycle.
 3. **Clear error if not configured** — `getApiBaseUrl()` throws
-   (or `console.error`s) if neither `configureNextgen()` nor the
+   (or `console.error`s) if neither `configureZitadel()` nor the
    component's `api-base` attribute was set.
 
 ### What stays on the component
@@ -203,9 +203,9 @@ are not app-wide config:
 
 ### Migration path
 
-1. `configureNextgen()` is introduced; `setApiBaseUrl()` is deprecated
+1. `configureZitadel()` is introduced; `setApiBaseUrl()` is deprecated
    but continues to work.
-2. Web components check `getNextgenConfig()` — if present, use it for
+2. Web components check `getZitadelConfig()` — if present, use it for
    `apiBase` and `projectId`; if absent, fall back to attributes
    (current behaviour).
 3. After one release cycle, `setApiBaseUrl()` is removed and bare
@@ -231,10 +231,10 @@ are not app-wide config:
 
 ## Open questions
 
-- Should `configureNextgen()` accept additional config (e.g. default
+- Should `configureZitadel()` accept additional config (e.g. default
   `credentials` mode, custom `fetch` implementation, locale)?
 - How does this interact with SSR? The middleware runs server-side, but
-  `getNextgenConfig()` is needed client-side. The config needs to be
+  `getZitadelConfig()` is needed client-side. The config needs to be
   serialized to the client (e.g. via Nuxt's `useRuntimeConfig` or a
   `<script>` tag injected by the middleware).
 
