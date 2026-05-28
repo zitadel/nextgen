@@ -112,7 +112,7 @@ func buildCreateAttributes(attrs map[string]json.RawMessage) ([]*domain.CreateAt
 		}
 		scope := domain.AttributeUniquenessUnspecified
 		if key == attrKeyUsername {
-			scope = domain.AttributeUniquenessGlobal
+			scope = domain.AttributeUniquenessProject
 		}
 		attr, err := domain.NewCreateAttribute(key, value, scope)
 		if err != nil {
