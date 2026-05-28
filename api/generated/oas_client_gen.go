@@ -1545,11 +1545,8 @@ func (c *Client) sendCreateSchema(ctx context.Context, request CreateSchemaReq, 
 		}
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if val, ok := params.ProjectID.Get(); ok {
-				if unwrapped := string(val); true {
-					return e.EncodeValue(conv.StringToString(unwrapped))
-				}
-				return nil
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
 			}
 			return nil
 		}); err != nil {
@@ -1827,11 +1824,8 @@ func (c *Client) sendCreateTeam(ctx context.Context, request *CreateTeamRequest,
 		}
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if val, ok := params.ProjectID.Get(); ok {
-				if unwrapped := string(val); true {
-					return e.EncodeValue(conv.StringToString(unwrapped))
-				}
-				return nil
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
 			}
 			return nil
 		}); err != nil {
@@ -3382,11 +3376,8 @@ func (c *Client) sendGetSchemaById(ctx context.Context, params GetSchemaByIdPara
 		}
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if val, ok := params.ProjectID.Get(); ok {
-				if unwrapped := string(val); true {
-					return e.EncodeValue(conv.StringToString(unwrapped))
-				}
-				return nil
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
 			}
 			return nil
 		}); err != nil {
@@ -3686,11 +3677,8 @@ func (c *Client) sendGetTeam(ctx context.Context, params GetTeamParams) (res Get
 		}
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if val, ok := params.ProjectID.Get(); ok {
-				if unwrapped := string(val); true {
-					return e.EncodeValue(conv.StringToString(unwrapped))
-				}
-				return nil
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
 			}
 			return nil
 		}); err != nil {
@@ -4336,11 +4324,8 @@ func (c *Client) sendListFlowDefinitions(ctx context.Context, params ListFlowDef
 		}
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if val, ok := params.ProjectID.Get(); ok {
-				if unwrapped := string(val); true {
-					return e.EncodeValue(conv.StringToString(unwrapped))
-				}
-				return nil
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
 			}
 			return nil
 		}); err != nil {
@@ -4522,11 +4507,8 @@ func (c *Client) sendListSessions(ctx context.Context, params ListSessionsParams
 		}
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if val, ok := params.ProjectID.Get(); ok {
-				if unwrapped := string(val); true {
-					return e.EncodeValue(conv.StringToString(unwrapped))
-				}
-				return nil
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
 			}
 			return nil
 		}); err != nil {

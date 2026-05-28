@@ -80,7 +80,7 @@ func (h *Harness) CreateUserSchema(t *testing.T, projectID string, schema string
 		UserSchema: apiSchema,
 	}
 	params := api.CreateSchemaParams{
-		ProjectID: api.OptProjectID{Set: true, Value: api.ProjectID(projectID)},
+		ProjectID: api.ProjectID(projectID),
 	}
 
 	resp, err := client.CreateSchema(t.Context(), req, params)

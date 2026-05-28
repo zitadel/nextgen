@@ -31,13 +31,13 @@ func NewTeamService(
 	}
 }
 
-func (s *TeamService) CreateTeam(ctx context.Context, input CreateTeamInput) (*domain.Team, error) {
+func (s *TeamService) CreateTeam(ctx context.Context, input CreateTeamInput) (team *domain.Team, err error) {
 	tx, txErr := s.pool.Begin(ctx, nil)
 	if txErr != nil {
 		return nil, domain.ErrInternal(txErr).WithMessage("failed to start transaction")
 	}
 	defer func() {
-		if txErr == nil {
+		if err != nil {
 			_ = tx.Rollback(ctx)
 		}
 	}()

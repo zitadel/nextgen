@@ -21,7 +21,7 @@ func TestCreateTeam(t *testing.T) {
 
 		req := &api.CreateTeamRequest{}
 		params := api.CreateTeamParams{
-			ProjectID: api.OptProjectID{Set: true, Value: api.ProjectID(project.ID)},
+			ProjectID: api.ProjectID(project.ID),
 		}
 
 		resp, err := client.CreateTeam(t.Context(), req, params)
@@ -40,7 +40,7 @@ func TestCreateTeam(t *testing.T) {
 			resp, err := client.CreateTeam(t.Context(), req, params)
 			require.NoError(t, err)
 
-			if !assert.IsType(t, &api.CreateTeamNotFound{}, resp) {
+			if !assert.IsType(t, &api.CreateTeamBadRequest{}, resp) {
 				helpers.LogInvalidResponse(t, resp)
 			}
 		})
@@ -59,7 +59,7 @@ func TestGetTeam(t *testing.T) {
 		require.NoError(t, err)
 
 		params := api.GetTeamParams{
-			ProjectID: api.OptProjectID{Set: true, Value: api.ProjectID(project.ID)},
+			ProjectID: api.ProjectID(project.ID),
 			TeamID:    api.TeamID(team.ID),
 		}
 
@@ -77,7 +77,7 @@ func TestGetTeam(t *testing.T) {
 			require.NoError(t, err)
 
 			params := api.GetTeamParams{
-				ProjectID: api.OptProjectID{Set: true, Value: api.ProjectID(project.ID)},
+				ProjectID: api.ProjectID(project.ID),
 				TeamID:    api.TeamID("does-not-exist"),
 			}
 

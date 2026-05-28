@@ -8943,52 +8943,6 @@ func (o OptPostTokenRequestGrantType) Or(d PostTokenRequestGrantType) PostTokenR
 	return d
 }
 
-// NewOptProjectID returns new OptProjectID with value set to v.
-func NewOptProjectID(v ProjectID) OptProjectID {
-	return OptProjectID{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptProjectID is optional ProjectID.
-type OptProjectID struct {
-	Value ProjectID
-	Set   bool
-}
-
-// IsSet returns true if OptProjectID was set.
-func (o OptProjectID) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptProjectID) Reset() {
-	var v ProjectID
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptProjectID) SetTo(v ProjectID) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptProjectID) Get() (v ProjectID, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptProjectID) Or(d ProjectID) ProjectID {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptSchemaURI returns new OptSchemaURI with value set to v.
 func NewOptSchemaURI(v SchemaURI) OptSchemaURI {
 	return OptSchemaURI{

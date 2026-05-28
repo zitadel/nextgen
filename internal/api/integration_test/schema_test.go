@@ -49,7 +49,7 @@ func TestCreateSchema(t *testing.T) {
 					UserSchema: apiSchema,
 				}
 				params := api.CreateSchemaParams{
-					ProjectID: api.OptProjectID{Set: true, Value: api.ProjectID(project.ID)},
+					ProjectID: api.ProjectID(project.ID),
 				}
 
 				resp, err := client.CreateSchema(t.Context(), req, params)
@@ -113,7 +113,7 @@ func TestCreateSchema(t *testing.T) {
 				UserSchema: apiSchema,
 			}
 			params := api.CreateSchemaParams{
-				ProjectID: api.OptProjectID{Set: true, Value: api.ProjectID(project.ID)},
+				ProjectID: api.ProjectID(project.ID),
 			}
 
 			resp, err := client.CreateSchema(t.Context(), req, params)
@@ -137,7 +137,7 @@ func TestGetSchema(t *testing.T) {
 
 			resp, err := client.GetSchemaById(t.Context(), api.GetSchemaByIdParams{
 				ID:        schemaID,
-				ProjectID: api.OptProjectID{Set: true, Value: api.ProjectID(project.ID)},
+				ProjectID: api.ProjectID(project.ID),
 			})
 
 			assert.NoError(t, err)
@@ -154,7 +154,7 @@ func TestGetSchema(t *testing.T) {
 
 			resp, err := client.GetSchemaById(t.Context(), api.GetSchemaByIdParams{
 				ID:        "does-not-exist",
-				ProjectID: api.OptProjectID{Set: true, Value: api.ProjectID(project.ID)},
+				ProjectID: api.ProjectID(project.ID),
 			})
 
 			assert.NoError(t, err)
