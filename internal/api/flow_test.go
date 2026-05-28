@@ -12,9 +12,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/zitadel/oidc/v3/pkg/op"
+
 	gen "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
-	"github.com/zitadel/nextgen/internal/cookie"
+	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 )
@@ -80,8 +82,8 @@ func (stubAuthAttempt) Handoff(context.Context, service.HandoffInput) (*domain.A
 
 var _ service.AuthAttemptService = stubAuthAttempt{}
 
-// fixedKey is a deterministic cookie sealer key for tests.
-var fixedKey = cookie.Key{
+// fixedKey is a deterministic crypter key for tests.
+var fixedKey = [32]byte{
 	0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
 	0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
 	0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
@@ -89,30 +91,27 @@ var fixedKey = cookie.Key{
 }
 
 type testServer struct {
-	srv    *httptest.Server
-	sealer *cookie.Sealer
-	fake   *fakeFlowSvc
-	now    func() time.Time
+	srv     *httptest.Server
+	crypter crypto.Crypter
+	fake    *fakeFlowSvc
+	now     func() time.Time
 }
 
 func newTestServer(t *testing.T, now func() time.Time) *testServer {
 	t.Helper()
-	sealer, err := cookie.NewSealer(fixedKey)
-	if err != nil {
-		t.Fatalf("NewSealer: %v", err)
-	}
+	crypter := op.NewAES256GCMCrypto(fixedKey, "")
 	fake := &fakeFlowSvc{}
 	if now == nil {
 		now = time.Now
 	}
-	handler := api.NewHandler(sealer, fake, stubAuthAttempt{}, nil, nil, nil, nil, now)
+	handler := api.NewHandler(crypter, fake, stubAuthAttempt{}, nil, nil, nil, nil, now)
 	oas, err := gen.NewServer(handler, api.NewSecurityHandler(), gen.WithErrorHandler(api.OgenErrorHandler))
 	if err != nil {
 		t.Fatalf("NewServer: %v", err)
 	}
 	srv := httptest.NewServer(oas)
 	t.Cleanup(srv.Close)
-	return &testServer{srv: srv, sealer: sealer, fake: fake, now: now}
+	return &testServer{srv: srv, crypter: crypter, fake: fake, now: now}
 }
 
 // sealCookie matches what the handler emits, so tests can skip CreateFlow.
@@ -122,9 +121,9 @@ func (ts *testServer) sealCookie(t *testing.T, state *domain.FlowState) string {
 	if err != nil {
 		t.Fatalf("marshal state: %v", err)
 	}
-	value, err := ts.sealer.Seal(payload)
+	value, err := ts.crypter.Encrypt(string(payload))
 	if err != nil {
-		t.Fatalf("seal: %v", err)
+		t.Fatalf("encrypt: %v", err)
 	}
 	return value
 }
