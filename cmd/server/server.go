@@ -249,9 +249,9 @@ func mustBindEnv(v *viper.Viper, key string) {
 	}
 }
 
-// buildCookieSealer decodes a hex-encoded sealer key and constructs
-// the [cookie.Sealer]. The key must be exactly [cookie.KeySize] bytes
-// after decoding; anything else is a configuration error.
+// buildCrypter decodes a hex-encoded crypter key and constructs a
+// [crypto.Crypter]. The key must decode to exactly 32 bytes;
+// anything else is a configuration error.
 func buildCrypter(hexKey string) (crypto.Crypter, error) {
 	if hexKey == "" {
 		return nil, errors.New("server: cookie_sealer_key is required (set NEXTGEN_SERVER_COOKIE_SEALER_KEY)")
