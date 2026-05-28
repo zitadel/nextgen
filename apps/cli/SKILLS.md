@@ -47,7 +47,7 @@ layer, not the envelope.
 
 - `setup` — create a Zitadel project and scaffold local auth (routes,
   middleware, `.zitadel/**`, env templates). Flags: `--framework`,
-  `--auth-method`, `--user-fields`, `--renderer`, `--no-apply`.
+  `--auth-method`, `--renderer`, `--no-apply`.
 - `plan` — validate config and preview the sync diff without mutating anything.
 - `apply` — validate and upload repo config to the platform.
 - `doctor` — verify generated files and local state; `--fix` re-applies missing

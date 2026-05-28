@@ -258,8 +258,7 @@ Create a Zitadel project and scaffold local auth.
 ```
 USAGE
   $ zitadel setup [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug]
-    [--framework next] [--user-fields <value>] [--auth-method passkey|password] [--renderer react|web-component]
-    [--no-apply]
+    [--framework next] [--auth-method passkey|password] [--renderer react|web-component] [--no-apply]
 
 FLAGS
   -c, --cwd=<value>           Project directory to operate on.
@@ -275,7 +274,6 @@ FLAGS
       --no-apply              Skip the automatic apply at the end of setup.
       --renderer=<option>     Renderer (default: react).
                               <options: react|web-component>
-      --user-fields=<value>   Comma-separated list of user fields.
       --verbose               Verbose logging.
 
 GLOBAL FLAGS

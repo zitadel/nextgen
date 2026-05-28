@@ -18,11 +18,13 @@ import { runApply } from "./apply";
  */
 export type SetupOptions = GlobalOptions & {
   framework?: string;
-  userFields?: string;
   authMethod?: string;
   noApply?: boolean;
   renderer?: string;
 };
+
+/** The user-schema fields scaffolded for every project. */
+const DEFAULT_USER_FIELDS = ["email", "given_name", "family_name"] as const;
 
 /**
  * Scaffolds a new Zitadel project into the target directory: detects (or, for an
@@ -66,7 +68,6 @@ export async function runSetup(opts: SetupOptions): Promise<CommandResult> {
   let detectedPort = framework.devPort;
   let effectiveServer = opts.source;
 
-  let userFields = splitCsv(opts.userFields);
   // The `--auth-method` flag is validated against AUTH_METHODS by oclif; guard
   // anyway so an out-of-band caller can't smuggle an invalid value through.
   let authMethod: AuthMethod | undefined = isAuthMethod(opts.authMethod)
@@ -79,14 +80,13 @@ export async function runSetup(opts: SetupOptions): Promise<CommandResult> {
       detectedDevPort: detectedPort,
       currentServer: opts.source,
     });
-    userFields = userFields ?? answers.userFields;
     authMethod = authMethod ?? answers.authMethod;
     effectiveServer = answers.serverChoice;
     detectedPort = answers.devPort;
   }
 
   const issuer = issuerFromPort(detectedPort);
-  const resolvedFields = userFields ?? ["email", "given_name", "family_name"];
+  const resolvedFields = [...DEFAULT_USER_FIELDS];
   const resolvedMethod: AuthMethod = authMethod ?? "passkey";
   const userSchema = buildUserSchema(resolvedMethod, resolvedFields);
   const schemaValidation = validateJsonSchema(userSchema);
@@ -155,17 +155,6 @@ async function resolveScaffoldFramework(opts: SetupOptions, orca: Orca): Promise
     });
   }
   return pickFramework(orca.availableFrameworks());
-}
-
-/** Splits a comma-separated flag into trimmed, non-empty entries (or undefined). */
-function splitCsv(value: string | undefined): string[] | undefined {
-  if (!value) {
-    return undefined;
-  }
-  return value
-    .split(",")
-    .map((entry) => entry.trim())
-    .filter(Boolean);
 }
 
 /** A deterministic stand-in project for `--dry-run`, so no remote call is made. */

@@ -1,4 +1,4 @@
-import { cancel, confirm, intro, isCancel, multiselect, outro, select, text } from "@clack/prompts";
+import { cancel, confirm, intro, isCancel, outro, select, text } from "@clack/prompts";
 
 import { ZitadelError } from "../lib/errors";
 import type { AuthMethod } from "../lib/flows";
@@ -11,7 +11,6 @@ import { DEFAULT_SERVER } from "../lib/api/resolve-server";
  * from CLI flags.
  */
 export type InteractiveSetupAnswers = {
-  userFields: string[];
   authMethod: AuthMethod;
   serverChoice: string;
   devPort: number;
@@ -27,13 +26,6 @@ export type InteractiveSetupInput = {
   detectedDevPort: number;
   currentServer: string;
 };
-
-const USER_FIELD_CHOICES = [
-  { value: "email", label: "email", hint: "required identifier" },
-  { value: "given_name", label: "given_name" },
-  { value: "family_name", label: "family_name" },
-  { value: "phone", label: "phone", hint: "enables SMS MFA" },
-];
 
 const AUTH_METHOD_CHOICES: ReadonlyArray<{
   value: AuthMethod;
@@ -67,14 +59,6 @@ export async function runInteractiveSetup(
       hint: "Re-run with --framework next when ready.",
     });
   }
-
-  const userFields = await multiselect({
-    message: "User schema fields",
-    options: USER_FIELD_CHOICES,
-    initialValues: ["email", "given_name", "family_name"],
-    required: true,
-  });
-  bail(userFields);
 
   const authMethod = await select<AuthMethod>({
     message: "Auth method",
@@ -130,7 +114,6 @@ export async function runInteractiveSetup(
   outro("Ready to scaffold.");
 
   return {
-    userFields: userFields as string[],
     authMethod: authMethod as AuthMethod,
     serverChoice: resolvedServer,
     devPort,
