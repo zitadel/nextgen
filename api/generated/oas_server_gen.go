@@ -105,6 +105,12 @@ type Handler interface {
 	//
 	// POST /teams
 	CreateTeam(ctx context.Context, req *CreateTeamRequest, params CreateTeamParams) (CreateTeamRes, error)
+	// CreateUser implements createUser operation.
+	//
+	// Create user.
+	//
+	// POST /user
+	CreateUser(ctx context.Context, req *User, params CreateUserParams) (CreateUserRes, error)
 	// DeleteFlowDefinition implements deleteFlowDefinition operation.
 	//
 	// Delete a flow definition by id.

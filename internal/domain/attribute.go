@@ -105,7 +105,7 @@ func FlattenMapToCreateAttributes(m map[string]any, schema map[string]any, nameP
 			strUnique, _ := maputil.GetNested[string](schema, "properties."+key+".x-unique")
 			switch strUnique {
 			case "project":
-				unique = AttributeUniquenessGlobal
+				unique = AttributeUniquenessProject
 			case "team":
 				unique = AttributeUniquenessTeam
 			}

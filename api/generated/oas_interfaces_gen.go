@@ -41,6 +41,10 @@ type CreateTeamRes interface {
 	createTeamRes()
 }
 
+type CreateUserRes interface {
+	createUserRes()
+}
+
 type DeleteFlowDefinitionRes interface {
 	deleteFlowDefinitionRes()
 }

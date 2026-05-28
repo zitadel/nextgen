@@ -8,8 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	api "github.com/zitadel/nextgen/api/generated"
-	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
-	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
 )
 
 func TestCreateUser(t *testing.T) {
@@ -20,8 +19,9 @@ func TestCreateUser(t *testing.T) {
 			project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
 			require.NoError(t, err)
 
-			// TODO create team
-			var team *domain.Team
+			team, err := harness.EnsureTeamService(t).CreateTeam(t.Context(), service.CreateTeamInput{
+				ProjectID: project.ID,
+			})
 
 			harness.CreateUserSchema(t, project.ID, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
 			userBs := []byte(harness.TestData.Users.CreateUserRequest)
@@ -31,16 +31,14 @@ func TestCreateUser(t *testing.T) {
 			require.NoError(t, err)
 
 			params := api.CreateUserParams{
-				ProjectID: api.OptProjectID{Set: true, Value: api.ProjectID(project.ID)},
+				ProjectID: api.ProjectID(project.ID),
 				TeamID:    api.OptTeamID{Set: true, Value: api.TeamID(team.ID)},
 			}
 
 			resp, err := client.CreateUser(t.Context(), user, params)
 			assert.NoError(t, err)
 
-			if !assert.IsType(t, &api.CreateUserResponse{}, resp) {
-				helpers.LogInvalidResponse(t, resp)
-			}
+			assert.IsType(t, &api.CreateUserResponse{}, resp, mustMarshal(t, resp))
 		})
 	})
 }

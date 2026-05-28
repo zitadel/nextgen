@@ -140,6 +140,15 @@ func (UnimplementedHandler) CreateTeam(ctx context.Context, req *CreateTeamReque
 	return r, ht.ErrNotImplemented
 }
 
+// CreateUser implements createUser operation.
+//
+// Create user.
+//
+// POST /user
+func (UnimplementedHandler) CreateUser(ctx context.Context, req *User, params CreateUserParams) (r CreateUserRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // DeleteFlowDefinition implements deleteFlowDefinition operation.
 //
 // Delete a flow definition by id.

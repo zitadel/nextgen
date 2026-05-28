@@ -9,9 +9,6 @@ import (
 )
 
 func (h *Handler) CreateUser(ctx context.Context, req *api.User, params api.CreateUserParams) (api.CreateUserRes, error) {
-	if !params.ProjectID.IsSet() {
-		return nil, NoProjectError
-	}
 	var teamID *string
 	if params.TeamID.IsSet() {
 		teamID = new(string(params.TeamID.Value))
@@ -23,7 +20,7 @@ func (h *Handler) CreateUser(ctx context.Context, req *api.User, params api.Crea
 	}
 
 	u, err := h.userService.CreateUser(ctx, service.CreateUserInput{
-		ProjectID: string(params.ProjectID.Value),
+		ProjectID: string(params.ProjectID),
 		TeamID:    teamID,
 		User:      user,
 	})
