@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	api "github.com/zitadel/nextgen/api/generated"
+	"github.com/zitadel/nextgen/internal/api/ogenx"
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
@@ -41,7 +42,7 @@ func TestExchangeInputFromRequest(t *testing.T) {
 			"proj-1",
 			&api.ExchangeRequest{
 				HandoffToken: "token-1",
-				TTL:          api.NewOptString("PT2H"),
+				TTL:          api.NewOptDuration(ogenx.ISODuration(2 * time.Hour)),
 			},
 			api.ExchangeHandoffParams{
 				IdempotencyKey: api.NewOptString(key),
@@ -68,42 +69,4 @@ func TestExchangeInputFromRequest(t *testing.T) {
 		require.Nil(t, input.TTL)
 		require.Nil(t, input.IdempotencyKey)
 	})
-
-	t.Run("malformed iso duration is rejected", func(t *testing.T) {
-		_, err := exchangeInputFromRequest(
-			"proj-1",
-			&api.ExchangeRequest{
-				HandoffToken: "token-1",
-				TTL:          api.NewOptString("not-a-duration"),
-			},
-			api.ExchangeHandoffParams{},
-		)
-		require.Error(t, err)
-	})
-}
-
-func TestParseISO8601Duration(t *testing.T) {
-	t.Parallel()
-	for _, tc := range []struct {
-		name    string
-		raw     string
-		want    time.Duration
-		wantErr bool
-	}{
-		{name: "hours", raw: "PT3H", want: 3 * time.Hour},
-		{name: "minutes", raw: "PT45M", want: 45 * time.Minute},
-		{name: "composite", raw: "P1DT2H3M4S", want: 24*time.Hour + 2*time.Hour + 3*time.Minute + 4*time.Second},
-		{name: "invalid", raw: "3h", wantErr: true},
-		{name: "empty payload", raw: "P", wantErr: true},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			got, err := parseISO8601Duration(tc.raw)
-			if tc.wantErr {
-				require.Error(t, err)
-				return
-			}
-			require.NoError(t, err)
-			require.Equal(t, tc.want, got)
-		})
-	}
 }

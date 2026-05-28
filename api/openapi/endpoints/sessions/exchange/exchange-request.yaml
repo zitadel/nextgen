@@ -11,6 +11,8 @@ properties:
     example: handoff_abc123def456xyz
   ttl:
     type: string
+    format: duration
+    x-ogen-type: github.com/zitadel/nextgen/internal/api/ogenx.ISODuration
     description: |
       Optional session lifetime after exchange as an ISO-8601 duration. When omitted, the server
       uses the configured default. Must not exceed the configured maximum.

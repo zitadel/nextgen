@@ -12,6 +12,7 @@ import (
 	"github.com/go-faster/jx"
 	"github.com/ogen-go/ogen/json"
 	"github.com/ogen-go/ogen/validate"
+	"github.com/zitadel/nextgen/internal/api/ogenx"
 )
 
 // Encode implements json.Marshaler.
@@ -4986,7 +4987,7 @@ func (s *ExchangeRequest) encodeFields(e *jx.Encoder) {
 	{
 		if s.TTL.Set {
 			e.FieldStart("ttl")
-			s.TTL.Encode(e)
+			s.TTL.Encode(e, json.EncodeNative)
 		}
 	}
 }
@@ -5020,7 +5021,7 @@ func (s *ExchangeRequest) Decode(d *jx.Decoder) error {
 		case "ttl":
 			if err := func() error {
 				s.TTL.Reset()
-				if err := s.TTL.Decode(d); err != nil {
+				if err := s.TTL.Decode(d, json.DecodeNative[ogenx.ISODuration]); err != nil {
 					return err
 				}
 				return nil
@@ -13726,6 +13727,41 @@ func (s OptDateTime) MarshalJSON() ([]byte, error) {
 func (s *OptDateTime) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d, json.DecodeDateTime)
+}
+
+// Encode encodes ogenx.ISODuration as json.
+func (o OptDuration) Encode(e *jx.Encoder, format func(*jx.Encoder, ogenx.ISODuration)) {
+	if !o.Set {
+		return
+	}
+	format(e, o.Value)
+}
+
+// Decode decodes ogenx.ISODuration from json.
+func (o *OptDuration) Decode(d *jx.Decoder, format func(*jx.Decoder) (ogenx.ISODuration, error)) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptDuration to nil")
+	}
+	o.Set = true
+	v, err := format(d)
+	if err != nil {
+		return err
+	}
+	o.Value = v
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptDuration) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e, json.EncodeNative)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptDuration) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d, json.DecodeNative[ogenx.ISODuration])
 }
 
 // Encode encodes ErrorDetailsDetails as json.
