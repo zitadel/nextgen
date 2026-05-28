@@ -100,7 +100,7 @@ func newTestServer(t *testing.T) *testServer {
 	t.Helper()
 	crypter := op.NewAES256GCMCrypto(fixedKey, "")
 	fake := &fakeFlowSvc{}
-	handler := api.NewHandler(crypter, fake, stubAuthAttempt{}, nil, nil, nil, nil, nil)
+	handler := api.NewHandler(crypter, fake, stubAuthAttempt{}, nil, nil, nil, nil, nil, nil)
 	oas, err := gen.NewServer(handler, api.NewSecurityHandler(), gen.WithErrorHandler(api.OgenErrorHandler))
 	if err != nil {
 		t.Fatalf("NewServer: %v", err)
@@ -338,4 +338,3 @@ func TestGetFlowStep_TerminalReturns410(t *testing.T) {
 		t.Fatalf("status = %d, want 410", resp.StatusCode)
 	}
 }
-
