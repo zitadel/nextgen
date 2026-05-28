@@ -40,7 +40,7 @@ catalog:
   eslint-plugin-playwright: ^2.10.2
   express: ^4.18.2
   jsdom: ^29.0.2
-  liquidjs: ^10.25.7
+  liquidjs: ^10.26.0
   lit: ^3.3.2
   lucide: ^1.16.0
   lucide-react: ^1.16.0
