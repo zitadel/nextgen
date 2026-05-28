@@ -9,7 +9,18 @@ Run Zitadel nextgen with PostgreSQL using Docker Compose and a pre-built image f
 
 ## Steps
 
-1. Fetch the compose and env templates from the `main` branch:
+1. Prepare the compose and env templates:
+
+   Temporary workaround for private or unmerged branches (assumes this repository and branch are already checked out, and you run the commands from the repository root):
+
+   ```sh
+   mkdir -p .tmp/nextgen_quickstart
+   cp docs/operations/docker-compose.yaml .tmp/nextgen_quickstart/docker-compose.yaml
+   cp docs/operations/env.example .tmp/nextgen_quickstart/env.example
+   cd .tmp
+   ```
+
+   Default flow (for public repository access): fetch the templates from the `main` branch:
 
    ```sh
    mkdir -p nextgen_quickstart
@@ -24,6 +35,10 @@ Run Zitadel nextgen with PostgreSQL using Docker Compose and a pre-built image f
    cp env.example .env
    docker compose up -d
    ```
+
+   If `docker compose up -d` fails with `manifest unknown` for `ghcr.io/zitadel/nextgen:latest`, set `NEXTGEN_IMAGE` in `.env` to a published tag or locally built image (see [docker-compose.md](./docker-compose.md)).
+   If Postgres is `unhealthy` with the `in 18+, these Docker images are configured ...` error, remove the old local data volume and retry with `docker compose down -v && docker compose up -d`.
+   For the PostgreSQL 18+ mount-path detail (`/var/lib/postgresql`), see [docker-compose.md](./docker-compose.md).
 
 3. Open the bundled UIs (same origin as the API):
 
