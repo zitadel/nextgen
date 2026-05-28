@@ -29,12 +29,16 @@ func (h *Harness) EnsureAPIClient(t *testing.T, projectID string) *api.Client {
 
 func (h *Harness) EnsureFakeSecuritySource(t *testing.T, projectID string) *FakeSecuritySource {
 	t.Helper()
-	if h.FakeSecuritySource == nil {
-		h.FakeSecuritySource = &FakeSecuritySource{
-			projectID: projectID,
-		}
+	if h.fakeSecuritySources == nil {
+		h.fakeSecuritySources = make(map[string]*FakeSecuritySource)
 	}
-	return h.FakeSecuritySource
+	if source, ok := h.fakeSecuritySources[projectID]; ok {
+		return source
+	}
+	h.fakeSecuritySources[projectID] = &FakeSecuritySource{
+		projectID: projectID,
+	}
+	return h.fakeSecuritySources[projectID]
 }
 
 type FakeSecuritySource struct {

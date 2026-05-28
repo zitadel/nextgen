@@ -86,6 +86,7 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 	if err != nil {
 		return err
 	}
+
 	passwordHasher, err := cfg.PasswordHasher.NewHasher()
 	if err != nil {
 		return fmt.Errorf("build password hasher: %w", err)

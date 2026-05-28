@@ -12,7 +12,6 @@ import (
 )
 
 func TestCreateTeam(t *testing.T) {
-	// client := harness.EnsureAPIClient(t)
 
 	t.Run("ok", func(t *testing.T) {
 		project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
