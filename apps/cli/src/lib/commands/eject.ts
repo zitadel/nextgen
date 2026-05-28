@@ -69,7 +69,11 @@ export async function runEject(opts: EjectOptions): Promise<CommandResult> {
 
   for (const rel of actions.envBackups) {
     const abs = join(opts.cwd, rel);
-    if (!(await pathExists(abs)) || opts.dryRun) {
+    if (!(await pathExists(abs))) {
+      continue;
+    }
+    if (opts.dryRun) {
+      backedUp.push(`${rel} -> ${rel}.ejected-<timestamp>`);
       continue;
     }
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
@@ -93,6 +97,10 @@ export async function runEject(opts: EjectOptions): Promise<CommandResult> {
     return { status: "skipped", reason: "nothing-to-eject", data: { cwd: opts.cwd } };
   }
 
+  // Only suggest deleting the env backups, and only when some were made; the
+  // backups are dotfiles named `<file>.ejected-<stamp>`.
+  const nextCommands = backedUp.length > 0 ? ["rm -f .env.local.ejected-*"] : [];
+
   return {
     status: "ok",
     data: {
@@ -100,7 +108,7 @@ export async function runEject(opts: EjectOptions): Promise<CommandResult> {
       files_removed: removed,
       files_preserved: preserved,
       backed_up: backedUp,
-      next_commands: ["rm -rf .zitadel.* (optional cleanup of backups)"],
+      next_commands: nextCommands,
     },
   };
 }

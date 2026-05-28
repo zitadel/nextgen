@@ -120,8 +120,10 @@ describe("runEject", () => {
     const result = await runEject(makeOpts(cwd, { force: true, dryRun: true }));
 
     expect(result.status).toBe("ok");
-    const data = result.data as { files_removed: string[] };
+    const data = result.data as { files_removed: string[]; backed_up: string[] };
     expect(data.files_removed).toContain("zitadel.json");
+    // Dry-run must still preview the .env.local backup, not silently omit it.
+    expect(data.backed_up.some((entry) => entry.startsWith(".env.local"))).toBe(true);
 
     // Dry-run leaves everything in place.
     expect(await exists(join(cwd, "zitadel.json"))).toBe(true);
