@@ -10,9 +10,14 @@
  * catalog the builder dispatches into — the counterpart of `flows`'
  * `methods.ts`. `presets.ts` is internal; only `build.ts` consumes it.
  *
- * **Dependency rule.** No upward imports into `commands/`, `sync/`,
- * `platform/`. Depends sideways only on `lib/json` (`sortValue`) and on
- * `ajv` for JSON-Schema validation.
+ * **Dependency rule.** This module has no upward dependencies (it never
+ * imports from `commands/`, `sync/`, `platform/`, etc.) and no
+ * filesystem code. Its only external dependency is `ajv` for
+ * JSON-Schema validation. Reading and writing local files is the
+ * caller's responsibility, served by `apps/cli/src/lib/json-dir.ts` plus
+ * this module's {@link SCHEMAS_DIR} constant. The peer `lib/sync/`
+ * orchestration module consumes {@link SCHEMAS_DIR} the same way it
+ * consumes `lib/flows`' `FLOWS_DIR`.
  */
 export type { UserSchema } from "./schema";
 export {
@@ -23,3 +28,12 @@ export {
 } from "./schema";
 export { buildUserSchema } from "./build";
 export { validateJsonSchema } from "./validate";
+
+/**
+ * Relative directory (from the project root) where local user-schema
+ * files live. Owned here so callers (`commands/*`, `sync/syncers.ts`)
+ * and tests share a single source of truth for the path; the runtime
+ * never depends on it directly because `lib/user-schema` does not touch
+ * the filesystem. The counterpart of `lib/flows`' `FLOWS_DIR`.
+ */
+export const SCHEMAS_DIR = ".zitadel/schemas";

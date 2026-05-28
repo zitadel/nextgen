@@ -1,4 +1,5 @@
 import { FLOWS_DIR } from "../flows";
+import { SCHEMAS_DIR } from "../user-schema";
 import type { PlatformClient } from "../../platform/client.js";
 
 /**
@@ -31,7 +32,7 @@ export function makeSyncers(opts: { projectId: string }): ReadonlyArray<Resource
 
 class SchemaSyncer implements ResourceSyncer {
   readonly kind = "schema";
-  readonly directory = ".zitadel/schemas";
+  readonly directory = SCHEMAS_DIR;
   readonly mutable = false;
 
   async create(client: PlatformClient, data: object): Promise<string> {
