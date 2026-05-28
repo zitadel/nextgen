@@ -139,7 +139,10 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 		userPasskeyRepo,
 		passwordHasher,
 	)
-	sessionService := service.NewSessionService(pool, sessionRepo)
+	sessionService := service.NewSessionService(pool, sessionRepo, service.SessionConfig{
+		DefaultTTL: cfg.Session.DefaultTTL,
+		MaxTTL:     cfg.Session.MaxTTL,
+	})
 	projectService := service.NewProjectService(pool, projectRepo, idgen.NewULID())
 	schemaService := service.NewSchemaService(pool, schemaRepo, schemaResolverWithHTTP, schemaValidator)
 	flowDefinitionSvc := service.NewFlowDefinitionService(
@@ -208,6 +211,8 @@ func loadConfig(configPath string) (Config, error) {
 	})
 	v.SetDefault("schema.lru_cache_size", 1000)                                   // todo: temp, review
 	v.SetDefault("schema.builtin_public_base", "https://nextgen.com/api/schemas") // todo: temp, review
+	v.SetDefault("session.default_ttl", domain.SessionAnonymousTTL)
+	v.SetDefault("session.max_ttl", 720*time.Hour)
 
 	// AutomaticEnv only resolves nested keys viper already knows about
 	// (via default, config file, fields of config struct or explicit BindEnv).
@@ -237,7 +242,7 @@ func loadConfig(configPath string) (Config, error) {
 		return Config{}, fmt.Errorf("decode config: %w", err)
 	}
 
-	return cfg, nil
+	return cfg, cfg.Validate()
 }
 
 // mustBindEnv panics on viper's documented "this can't fail in

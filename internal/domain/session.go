@@ -34,6 +34,37 @@ func ErrSessionTokenInvalid() Error {
 	return newError("sess.token_invalid", "The session token is invalid (either malformed or expired).", nil, nil)
 }
 
+func ErrSessionInvalidTTL() Error {
+	return newError("sess.invalid_ttl", "The session TTL is invalid. It must be positive and not exceed the configured maximum.", nil, nil)
+}
+
+type SessionInvalidTTLDetails struct {
+	TTL    time.Duration `json:"ttl"`
+	MaxTTL time.Duration `json:"max_ttl"`
+}
+
+func sessionInvalidTTLErr(requested, maxTTL time.Duration) Error {
+	return ErrSessionInvalidTTL().WithDetails(SessionInvalidTTLDetails{
+		TTL:    requested,
+		MaxTTL: maxTTL,
+	})
+}
+
+// ResolveSessionTTL picks the effective session TTL for exchange.
+// When requested is nil, defaultTTL is used. Otherwise requested must be positive and <= maxTTL.
+func ResolveSessionTTL(requested *time.Duration, defaultTTL, maxTTL time.Duration) (time.Duration, error) {
+	if requested == nil {
+		return defaultTTL, nil
+	}
+	if *requested <= 0 {
+		return 0, sessionInvalidTTLErr(*requested, maxTTL)
+	}
+	if *requested > maxTTL {
+		return 0, sessionInvalidTTLErr(*requested, maxTTL)
+	}
+	return *requested, nil
+}
+
 // Session represents the object defined [here](https://github.com/zitadel/nextgen/blob/main/docs/design/api/resource-map.md#sessions-durable-post-auth-only)
 type Session struct {
 	// ProjectID links to [Project].
