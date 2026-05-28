@@ -1,4 +1,3 @@
-import { EXIT_CODES, type ZitadelErrorCode } from "../lib/errors";
 
 export type FlagSpec = {
   name: string;
@@ -301,10 +300,6 @@ export const COMMANDS: CommandSpec[] = [
     flags: globalFlags,
   },
 ];
-
-export function listErrorCodes(): ZitadelErrorCode[] {
-  return Object.keys(EXIT_CODES) as ZitadelErrorCode[];
-}
 
 export function findCommandSpec(name: string): CommandSpec | undefined {
   return COMMANDS.find((spec) => spec.name === name);

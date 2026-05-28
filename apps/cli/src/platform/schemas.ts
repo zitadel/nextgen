@@ -3,9 +3,6 @@ import { z } from "zod";
 export const environmentSchema = z.enum(["development", "preview", "production"]);
 export type ZitadelEnvironment = z.infer<typeof environmentSchema>;
 
-export const serverSchema = z.union([z.literal("mock"), z.string().url()]);
-export type ZitadelServer = z.infer<typeof serverSchema>;
-
 export const createProjectRequestSchema = z.object({
   previewOrigins: z.array(z.string()).default([]),
 });
@@ -26,11 +23,3 @@ export const projectResponseSchema = z.object({
   updatedAt: z.string(),
 });
 export type GetProjectResponse = z.infer<typeof projectResponseSchema>;
-
-export type CreateSchemaResponse = {
-  id: string;
-};
-
-export type CreateFlowDefinitionResponse = {
-  id: string;
-};

@@ -58,8 +58,6 @@ export const appResourceSchema = z
     message: "OIDC app needs an `oidc` block; SAML app needs a `saml` block.",
   });
 
-export type AppResource = z.infer<typeof appResourceSchema>;
-
 export type AppPreset = "spa" | "web" | "native" | "machine";
 
 export function buildAppPreset(

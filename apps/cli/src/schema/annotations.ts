@@ -21,16 +21,6 @@ export const KNOWN_VERIFY_VALUES = ["email", "phone"] as const;
 export const KNOWN_MFA_VALUES = ["sms", "email", "push", "totp"] as const;
 export const KNOWN_UNIQUE_VALUES = ["project", "team"] as const;
 
-export const schemaFieldAnnotationSchema = z.object({
-  "x-identifier": z.boolean().optional(),
-  "x-verify": z.enum(KNOWN_VERIFY_VALUES).optional(),
-  "x-mfa": z.enum(KNOWN_MFA_VALUES).optional(),
-  "x-sensitive": z.boolean().optional(),
-  "x-editable": z.boolean().optional(),
-  "x-unique": z.enum(KNOWN_UNIQUE_VALUES).optional(),
-  "x-claim": z.string().optional(),
-});
-
 export type AuthMethods = z.infer<typeof authMethodsSchema>;
 
 export type AnnotationWarning = {
@@ -89,8 +79,4 @@ export function validateFieldAnnotations(
     }
   }
   return warnings;
-}
-
-export function isKnownFieldAnnotation(key: string): boolean {
-  return (KNOWN_FIELD_ANNOTATIONS as readonly string[]).includes(key);
 }
