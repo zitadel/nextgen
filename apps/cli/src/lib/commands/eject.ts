@@ -1,7 +1,7 @@
 import { readFile, rename, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
 
-import type { CommandResult, GlobalOptions } from "../oclif/base";
+import type { CommandResult, GlobalOptions } from "../oclif";
 import { ZitadelError } from "../errors";
 import { Orca } from "../orca";
 import { tryDetectFramework } from "../orca/detect";

@@ -1,4 +1,4 @@
-import type { FrameworkDetection } from "../../../detect/framework";
+import type { FrameworkDetection } from "../../../detect";
 import type { CreateProjectResponse } from "../../api/client";
 import type { AuthMethod } from "../../flows";
 import type { UserSchema } from "../../user-schema";

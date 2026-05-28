@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
 import { findEnvRefs, runApply } from "../../../../src/lib/commands/apply";
-import type { GlobalOptions } from "../../../../src/lib/oclif/base";
+import type { GlobalOptions } from "../../../../src/lib/oclif";
 
 vi.mock("../../../../src/lib/sync/loop", () => ({
   runSyncLoop: vi.fn().mockResolvedValue(undefined),

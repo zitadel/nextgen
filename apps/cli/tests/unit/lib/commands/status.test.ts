@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { runStatus } from "../../../../src/lib/commands/status";
-import type { GlobalOptions } from "../../../../src/lib/oclif/base";
+import type { GlobalOptions } from "../../../../src/lib/oclif";
 
 const SECRET = {
   project_id: "proj-001",

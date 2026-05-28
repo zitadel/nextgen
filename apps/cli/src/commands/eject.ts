@@ -1,4 +1,4 @@
-import { BaseCommand, type JsonEnvelope } from "../lib/oclif/base";
+import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
 import { runEject } from "../lib/commands/eject";
 
 /** `zitadel eject` — remove managed files and local Zitadel state. */

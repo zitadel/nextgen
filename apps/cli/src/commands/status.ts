@@ -1,4 +1,4 @@
-import { BaseCommand, type JsonEnvelope } from "../lib/oclif/base";
+import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
 import { runStatus } from "../lib/commands/status";
 
 /** `zitadel status` — summarize the local project state. */

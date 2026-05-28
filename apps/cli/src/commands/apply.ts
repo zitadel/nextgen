@@ -1,6 +1,6 @@
 import { Flags } from "@oclif/core";
 
-import { BaseCommand, type JsonEnvelope } from "../lib/oclif/base";
+import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
 import { runApply } from "../lib/commands/apply";
 import { environmentSchema } from "../lib/api/schemas";
 

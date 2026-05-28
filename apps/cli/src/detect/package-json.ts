@@ -1,17 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-/**
- * Minimal shape of the `package.json` fields the CLI reads. Intentionally
- * partial: only the keys detection logic depends on are modeled, all optional
- * since a project may omit any of them.
- */
-export type PackageJson = {
-  name?: string;
-  scripts?: Record<string, string>;
-  dependencies?: Record<string, string>;
-  devDependencies?: Record<string, string>;
-};
+import type { PackageJson } from "./types";
 
 /**
  * Reads and parses the `package.json` at `cwd`. Rejects if the file is absent

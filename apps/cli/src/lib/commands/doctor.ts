@@ -1,9 +1,8 @@
 import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 
-import { detectFramework } from "../../detect/framework";
-import { detectDevPort, issuerFromPort } from "../../detect/port";
-import type { CommandResult, GlobalOptions } from "../oclif/base";
+import { detectDevPort, detectFramework, issuerFromPort } from "../../detect";
+import type { CommandResult, GlobalOptions } from "../oclif";
 import { ZitadelError } from "../errors";
 import { type AuthMethod } from "../flows";
 import { isObject } from "../json";

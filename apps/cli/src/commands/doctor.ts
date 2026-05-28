@@ -1,6 +1,6 @@
 import { Flags } from "@oclif/core";
 
-import { BaseCommand, type JsonEnvelope } from "../lib/oclif/base";
+import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
 import { runDoctor } from "../lib/commands/doctor";
 
 /** `zitadel doctor` — verify generated files and local state. */

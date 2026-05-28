@@ -1,5 +1,5 @@
-import { hasZitadelSecret } from "../../detect/state";
-import type { CommandResult, GlobalOptions } from "../oclif/base";
+import { hasZitadelSecret } from "../../detect";
+import type { CommandResult, GlobalOptions } from "../oclif";
 import { isObject } from "../json";
 import { readZitadelConfig, readZitadelSecret } from "./shared";
 

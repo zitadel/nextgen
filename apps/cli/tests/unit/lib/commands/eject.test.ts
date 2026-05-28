@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { runEject } from "../../../../src/lib/commands/eject";
-import type { GlobalOptions } from "../../../../src/lib/oclif/base";
+import type { GlobalOptions } from "../../../../src/lib/oclif";
 import { MANAGED_MARKER } from "../../../../src/lib/paths";
 
 function makeOpts(cwd: string, overrides: Partial<GlobalOptions> = {}): GlobalOptions {

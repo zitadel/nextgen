@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { detectFramework, type FrameworkDetection } from "../../detect/framework";
+import { detectFramework, type FrameworkDetection } from "../../detect";
 
 /**
  * Returns true when the directory has no `package.json`, i.e. it is empty (or

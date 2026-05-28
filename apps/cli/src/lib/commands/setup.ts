@@ -1,8 +1,12 @@
-import { detectFramework } from "../../detect/framework";
-import { detectDevPort, issuerFromPort } from "../../detect/port";
-import { hasZitadelConfig, hasZitadelSecret } from "../../detect/state";
+import {
+  detectDevPort,
+  detectFramework,
+  hasZitadelConfig,
+  hasZitadelSecret,
+  issuerFromPort,
+} from "../../detect";
 import { pickFramework, runInteractiveSetup } from "../../interactive/setup";
-import type { CommandResult, GlobalOptions } from "../oclif/base";
+import type { CommandResult, GlobalOptions } from "../oclif";
 import { ZitadelError } from "../errors";
 import { type AuthMethod } from "../flows";
 import { Orca } from "../orca";

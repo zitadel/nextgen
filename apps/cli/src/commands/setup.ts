@@ -1,6 +1,6 @@
 import { Flags } from "@oclif/core";
 
-import { BaseCommand, type JsonEnvelope } from "../lib/oclif/base";
+import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
 import { runSetup } from "../lib/commands/setup";
 import { AUTH_METHODS } from "../lib/flows";
 import { RENDERER_IDS } from "../lib/orca/patchers/rule/next/renderers/registry";

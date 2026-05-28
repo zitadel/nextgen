@@ -1,6 +1,6 @@
 import { join } from "node:path";
 
-import type { CommandResult, GlobalOptions } from "../oclif/base";
+import type { CommandResult, GlobalOptions } from "../oclif";
 import { ZitadelError } from "../errors";
 import { FLOWS_DIR, validateFlows } from "../flows";
 import { isObject } from "../json";
