@@ -7,8 +7,9 @@ import (
 )
 
 // version, commit, and date are populated at build time via -ldflags
-// (see .goreleaser.yaml) and consumed by the cobra root command that
-// will be wired up together with the cmd/server subcommand.
+// (see .goreleaser.yaml). cmd/server currently runs as the root command
+// (below); these will feed the cobra root command once the root + `server`
+// subcommand split lands.
 var (
 	version = "dev"
 	commit  = "none"

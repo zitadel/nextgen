@@ -4,16 +4,19 @@ Next iteration of the Zitadel identity platform.
 
 ## Current status
 
-This repository is pre-release. The Go server release path is wired through
-GoReleaser, but `main.go` is still a placeholder. The frontend workspace is now
-managed by Nx and includes a Vite React console shell, shared components, SDKs,
-and the agent-facing CLI. CI produces installable snapshots for review, not
-official releases.
+This repository is pre-release. The Go server command is wired up — `main.go`
+runs `cmd/server`, which loads config, connects and migrates the database,
+bootstraps users, and serves the ogen-generated OpenAPI/OIDC API with graceful
+shutdown — and its release path runs through GoReleaser. The server does not yet
+embed or serve the console SPA; that wiring is still follow-up work. The frontend
+workspace is managed by Nx and includes a Vite React console shell, shared
+components, SDKs, and the agent-facing CLI. CI produces installable snapshots for
+review, not official releases.
 
 ## Local checks
 
-Use Node.js from [.nvmrc](.nvmrc) and the pinned pnpm 10 workspace manager from
-`package.json`.
+Use Node.js from [.nvmrc](.nvmrc) and the pnpm version pinned in `package.json`
+(`packageManager`).
 
 ```sh
 corepack pnpm --version
@@ -21,13 +24,20 @@ corepack pnpm install --frozen-lockfile
 corepack pnpm nx run-many -t lint,typecheck,build,test
 
 go vet ./...
-go test ./...
+go test -timeout=10m ./...
 ```
 
-To seed demo users for local login testing, pass bootstrap JSON files when starting the server (see [examples/bootstrap-users/](examples/bootstrap-users/)):
+The Go tests use `embedded-postgres`, which downloads PostgreSQL (the version it
+pins, currently 18) on first run; on Linux it also needs `libicu-dev` and
+`libssl-dev`. See [AGENTS.md](AGENTS.md) for the authoritative command reference.
+
+To seed demo users for local login testing, pass bootstrap JSON files when
+starting the server (see [examples/bootstrap-users/](examples/bootstrap-users/)).
+`main.go` runs the server command directly — the root + `server` subcommand
+split is still pending — so there is no `server` word yet:
 
 ```sh
-go run . server -c <config.yaml> --user-file examples/bootstrap-users/demo-admin.json
+go run . -c <config.yaml> --user-file examples/bootstrap-users/demo-admin.json
 ```
 
 Package smoke checks:
@@ -45,11 +55,13 @@ node apps/cli/dist/zitadel.mjs capabilities --json
 
 Pull requests and pushes to `main` run:
 
-- Go vet and tests.
-- pnpm install and Nx lint/typecheck/build/test targets.
-- Built CLI smoke checks.
-- npm package dry-run/pack checks.
-- A non-publishing GoReleaser snapshot.
+- Go vet, unit tests, and generated-code verification (`go-test`).
+- Go integration tests against embedded PostgreSQL (`go-integration-test`) and
+  the Spanner emulator (`go-integration-test-spanner`).
+- pnpm install and Nx lint/typecheck/build/test targets (`node-check`).
+- Playwright end-to-end suites, which gate merges (`node-e2e`).
+- Built CLI smoke checks and npm package dry-run/pack checks (`npm-pack-smoke`).
+- A non-publishing GoReleaser snapshot (`goreleaser-snapshot`).
 
 CI uploads short-lived workflow artifacts for review: GoReleaser snapshot output
 and npm package tarballs. These artifacts expire after 7 days and are not
@@ -66,15 +78,15 @@ package artifacts. The full rationale lives in
 GoReleaser builds the React console SPA through Nx before packaging snapshots:
 `corepack pnpm nx build @zitadel-nextgen/console`. Server-side console serving
 and Go `//go:embed` wiring are still follow-up work, so snapshot builds verify
-that the console can be produced but do not yet expose it from the placeholder
-server.
+that the console can be produced but the server does not yet expose it.
 
 ```sh
 # Local snapshot (no publish, no signing)
 goreleaser release --snapshot --clean --skip=publish,sign
 
-# Run a snapshot Docker image. The image's default CMD is `--help` while
-# the `server` subcommand is being wired up in cmd/server (PR #17).
+# Run a snapshot Docker image. The image's default CMD is `--help` until the
+# root + `server` subcommand split lands; pass server flags (e.g. `-c <config>`)
+# to run it instead.
 docker run --rm ghcr.io/zitadel/nextgen:<snapshot-tag>-amd64
 ```
 

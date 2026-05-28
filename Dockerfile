@@ -9,6 +9,7 @@ COPY $TARGETPLATFORM/nextgen /usr/local/bin/nextgen
 USER nonroot:nonroot
 EXPOSE 8080
 ENTRYPOINT ["/usr/local/bin/nextgen"]
-# Placeholder default until cmd/server lands (see PR #17).
-# Switches to ["server"] once the subcommand exists.
+# cmd/server has landed and currently runs as the root command (see main.go),
+# so the binary starts the server when given config flags. The default CMD
+# stays ["--help"] until the root + `server` subcommand split lands.
 CMD ["--help"]

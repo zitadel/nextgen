@@ -60,7 +60,7 @@ corepack pnpm install --frozen-lockfile
 corepack pnpm nx run-many -t lint,typecheck,build,test
 
 go vet ./...
-go test ./...
+go test -timeout=10m ./...
 ```
 
 Prefer Nx project targets for narrow package work, for example
@@ -180,9 +180,10 @@ missing-library errors.
 
 ### Playwright browser install gotcha
 
-The standard `playwright install --with-deps chromium` may hang during zip
-extraction in the Cloud Agent VM. If that happens, download and extract
-manually:
+Playwright was bumped (PR #173) specifically to fix a browser-install hang, so
+the standard `corepack pnpm exec playwright install` should now succeed. If an
+install still hangs during zip extraction in the Cloud Agent VM, download and
+extract manually as a fallback:
 
 ```sh
 curl -fsSL -o /tmp/chrome-linux64.zip \
@@ -192,10 +193,12 @@ unzip -q /tmp/chrome-linux64.zip -d ~/.cache/ms-playwright/chromium-<rev>
 ```
 
 Repeat for `chrome-headless-shell-linux64.zip` into `chromium_headless_shell-<rev>`.
-Look up `<version>` (browserVersion) and `<rev>` (revision) in the installed
-package's `browsers.json` at
-`node_modules/.pnpm/playwright-core@<pkg>/node_modules/playwright-core/browsers.json`.
-For the currently pinned `playwright-core@1.59.1` these are `147.0.7727.15` / `1217`.
+The Playwright version is pinned in `pnpm-workspace.yaml` (the `playwright` and
+`@playwright/test` catalog entries). Look up the matching `<version>`
+(browserVersion) and `<rev>` (revision) for that pin in
+`node_modules/.pnpm/playwright-core@<pinned>/node_modules/playwright-core/browsers.json`.
+These values change on every Playwright bump, so read them from `browsers.json`
+rather than hard-coding them here.
 
 ### Running commands
 
