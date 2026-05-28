@@ -261,6 +261,9 @@ importers:
         specifier: 'catalog:'
         version: 4.3.6
     devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 25.6.0
       '@zitadel-nextgen/api-mock':
         specifier: workspace:*
         version: link:../../packages/api-mock
