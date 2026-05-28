@@ -91,10 +91,7 @@ func FlattenMapToCreateAttributes(m map[string]any, schema map[string]any, nameP
 
 		switch vv := v.(type) {
 		case map[string]any:
-			props, ok := maputil.GetNested[map[string]any](schema, "properties."+key)
-			if !ok {
-				props = nil
-			}
+			props, _ := maputil.GetNested[map[string]any](schema, "properties."+key)
 			newAttrs, err := FlattenMapToCreateAttributes(vv, props, fullKey)
 			if err != nil {
 				return nil, err
