@@ -19,6 +19,8 @@ import (
 type FlowStateMachine interface {
 	Start(ctx context.Context, client database.QueryExecutor, in FlowStartInput) (FlowStepResult, error)
 	Process(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState, in FlowSubmitInput) (FlowStepResult, error)
+	// Render re-emits the current step without advancing. Backs GET /flow/{id}.
+	Render(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState) (FlowStepResult, error)
 }
 
 // FlowStartInput carries everything the state machine needs to
@@ -28,6 +30,7 @@ type FlowStartInput struct {
 	Purpose       FlowDefinitionPurpose
 	Session       FlowSessionRef
 	AuthRequest   *FlowAuthRequestRef
+	RedirectURI   *string
 	UserSchemaURL string
 }
 
@@ -61,12 +64,20 @@ type FlowStepResult struct {
 // It mirrors the OpenAPI `flow-step` component in domain terms.
 type FlowStep struct {
 	Name         string
+	Texts        FlowStepTexts
 	Error        *string
 	Complete     *FlowStepComplete
 	RedirectURL  *string
 	Fields       map[string]FlowField
 	Actions      map[string]FlowAction
 	SSOProviders []FlowSSOProvider
+}
+
+// FlowStepTexts holds the step-level localization keys (`<step>.title`,
+// `<step>.description`) the template resolves via the `| t` filter.
+type FlowStepTexts struct {
+	TitleKey       string
+	DescriptionKey string
 }
 
 // FlowAction is a single user action surfaced on [FlowStep.Actions].
@@ -90,7 +101,6 @@ type FlowSessionRef struct {
 // is fulfilling.
 type FlowAuthRequestRef struct {
 	ID           string
-	RedirectURI  string
 	RequestedACR *string
 }
 
@@ -149,8 +159,11 @@ func (r *FlowStateMachineRuntime) Start(ctx context.Context, client database.Que
 	}
 	if in.AuthRequest != nil {
 		state.AuthRequestID = &in.AuthRequest.ID
-		state.RedirectURI = &in.AuthRequest.RedirectURI
 		state.RequestedACR = in.AuthRequest.RequestedACR
+	}
+	if in.RedirectURI != nil {
+		uri := *in.RedirectURI
+		state.RedirectURI = &uri
 	}
 
 	if r.authAttempts == nil {
@@ -166,6 +179,20 @@ func (r *FlowStateMachineRuntime) Start(ctx context.Context, client database.Que
 	if err != nil {
 		return FlowStepResult{}, err
 	}
+	return FlowStepResult{State: state, Step: step}, nil
+}
+
+// Render re-emits the current step without advancing. Refreshes IssuedAt
+// so the cookie max-age window slides while the user is on the step.
+func (r *FlowStateMachineRuntime) Render(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState) (FlowStepResult, error) {
+	if def == nil || state == nil {
+		return FlowStepResult{}, fmt.Errorf("%w: render without definition or state", ErrIntegrity)
+	}
+	step, err := r.renderStep(ctx, client, def, state, state.UserSchemaURL, nil)
+	if err != nil {
+		return FlowStepResult{}, err
+	}
+	state.IssuedAt = r.now()
 	return FlowStepResult{State: state, Step: step}, nil
 }
 
@@ -395,6 +422,15 @@ func (r *FlowStateMachineRuntime) terminate(ctx context.Context, client database
 		rendered.RedirectURL = &uri
 	}
 
+	// Skip handoff when no user was resolved (e.g. user_not_found →
+	// no-account). PrepareHandoff can't catch this today: attempts are
+	// started with empty RequiredChecks, so IsCompleted is vacuously
+	// true and a token would be minted. Remove once the policy engine
+	// populates RequiredChecks.
+	if _, ok := state.CollectedData[FlowCollectedUserIDKey]; !ok {
+		return rendered, FlowHandoffOutput{}, nil
+	}
+
 	if state.AuthAttemptID == "" {
 		return nil, FlowHandoffOutput{}, fmt.Errorf("%w: terminate without auth attempt id", ErrIntegrity)
 	}
@@ -428,7 +464,7 @@ func (r *FlowStateMachineRuntime) resolveStepFields(ctx context.Context, client 
 	if len(step.Fields) == 0 {
 		return FlowResolvedFields{}, nil
 	}
-	resolved, err := r.fields.Resolve(ctx, client, projectID, userSchemaURL, step.Fields)
+	resolved, err := r.fields.Resolve(ctx, client, projectID, userSchemaURL, step.Name, step.Fields)
 	if err != nil {
 		return FlowResolvedFields{}, fmt.Errorf("flow state machine: resolve fields on step %q: %w", step.Name, err)
 	}
@@ -436,15 +472,23 @@ func (r *FlowStateMachineRuntime) resolveStepFields(ctx context.Context, client 
 }
 
 func (r *FlowStateMachineRuntime) buildStep(step *FlowDefinitionStep, resolved FlowResolvedFields, errorKey *string, complete *FlowStepComplete, redirectURL *string) *FlowStep {
-	actions := make(map[string]FlowAction, len(step.Transitions))
-	for outcome := range step.Transitions {
-		actions[outcome] = FlowAction{
-			TextKey: "action." + outcome,
-			Primary: outcome == FlowActionSubmit,
+	// Surface only user-selectable actions declared on the step.
+	// Implicit outcomes (e.g. user_not_found) live in step.Transitions
+	// but are engine-emitted routing keys, not buttons for the client.
+	actions := make(map[string]FlowAction, len(step.Actions))
+	for name, a := range step.Actions {
+		textKey := a.TextKey
+		if textKey == "" {
+			textKey = step.Name + ".action." + name
+		}
+		actions[name] = FlowAction{
+			TextKey: textKey,
+			Primary: a.Primary,
 		}
 	}
 	return &FlowStep{
 		Name:         step.Name,
+		Texts:        FlowStepTexts{TitleKey: step.Name + ".title", DescriptionKey: step.Name + ".description"},
 		Error:        errorKey,
 		Complete:     complete,
 		RedirectURL:  redirectURL,

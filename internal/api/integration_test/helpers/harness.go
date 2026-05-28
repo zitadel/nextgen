@@ -33,6 +33,7 @@ type Harness struct {
 	AuthAttemptService    service.AuthAttemptService
 	ProjectService        service.ProjectService
 	FlowDefinitionService service.FlowDefinitionService
+	FlowStateMachine      *domain.FlowStateMachineRuntime
 	TeamService           *service.TeamService
 
 	SchemaRepo         domain.JSONSchemaRepository

@@ -129,7 +129,6 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 	}
 
 	// ── Services ─────────────────────
-	flowService := service.NewFlowService(pool, flowDefinitionRepo)
 	authAttemptSvc := service.NewAuthAttemptService(
 		pool,
 		attemptRepo,
@@ -155,22 +154,21 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 	)
 	teamService := service.NewTeamService(pool, teamRepo)
 
+	// ── Flow engine ──────────────────
+	ids := idgen.NewULID()
+	fields := domain.NewSchemaFieldResolver(storageSchemaResolver)
+	flowAuth := service.NewFlowAuthAttemptAdapter(authAttemptSvc)
+	stateMachine := domain.NewFlowStateMachine(fields, nil, flowAuth, time.Now)
+
+	flowService := service.NewFlowService(pool, flowDefinitionRepo, stateMachine, ids)
+
 	// ── HTTP Server ─────────────────
 
 	ctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
 	oasServer, err := oasapi.NewServer(
-		api.NewHandler(
-			crypter,
-			flowService,
-			authAttemptSvc,
-			sessionService,
-			projectService,
-			schemaService,
-			flowDefinitionSvc,
-			teamService,
-		),
+		api.NewHandler(crypter, flowService, authAttemptSvc, sessionService, projectService, schemaService, flowDefinitionSvc, teamService),
 		api.NewSecurityHandler(),
 		oasapi.WithErrorHandler(api.OgenErrorHandler))
 	if err != nil {
@@ -270,14 +268,14 @@ func mustBindEnv(v *viper.Viper, key string) {
 // anything else is a configuration error.
 func buildCrypter(hexKey string) (crypto.Crypter, error) {
 	if hexKey == "" {
-		return nil, errors.New("server: cookie_sealer_key is required (set NEXTGEN_SERVER_COOKIE_SEALER_KEY)")
+		return nil, errors.New("server: encryption_key is required (set NEXTGEN_SERVER_ENCRYPTION_KEY)")
 	}
 	key, err := hex.DecodeString(hexKey)
 	if err != nil {
-		return nil, fmt.Errorf("server: decode cookie_sealer_key: %w", err)
+		return nil, fmt.Errorf("server: decode encryption_key: %w", err)
 	}
 	if len(key) != 32 {
-		return nil, fmt.Errorf("server: cookie_sealer_key must decode to %d bytes, got %d", 32, len(key))
+		return nil, fmt.Errorf("server: encryption_key must decode to %d bytes, got %d", 32, len(key))
 	}
 	crypter := op.NewAES256GCMCrypto([32]byte(key), "")
 	return crypter, nil

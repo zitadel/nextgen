@@ -103,16 +103,13 @@ func findPasswordField(resolved map[string]FlowField, submitted map[string]any) 
 	return "", nil, false
 }
 
-// attributeUniquenessFor maps a [FlowFieldUniqueScope] to the
-// [AttributeUniqueness] the user repository understands. The
-// identifier field defaults to team-level uniqueness so two users
-// can't share the same login.
-func attributeUniquenessFor(name, identifierName string, scope FlowFieldUniqueScope) AttributeUniqueness {
-	switch scope {
-	case FlowFieldUniqueScopeInstance:
-		return AttributeUniquenessProject
-	case FlowFieldUniqueScopeOrganization:
-		return AttributeUniquenessTeam
+// attributeUniquenessFor picks the [AttributeUniqueness] the user
+// repository writes for a given field. The field's own scope passes
+// through; the identifier field falls back to team-level when the
+// schema didn't pin it, so two users can't share the same login.
+func attributeUniquenessFor(name, identifierName string, scope AttributeUniqueness) AttributeUniqueness {
+	if scope != AttributeUniquenessUnspecified {
+		return scope
 	}
 	if name == identifierName {
 		return AttributeUniquenessTeam
