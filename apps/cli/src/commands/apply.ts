@@ -6,8 +6,8 @@ import { ZitadelError } from "../lib/errors";
 import { FLOWS_DIR, validateFlows } from "../lib/flows";
 import { isObject } from "../lib/json";
 import { readJsonDir } from "../lib/json-dir";
-import { createPlatformClient } from "../platform";
-import { environmentSchema, type ZitadelEnvironment } from "../platform/schemas";
+import { createPlatformClient } from "../lib/api";
+import { environmentSchema, type ZitadelEnvironment } from "../lib/api/schemas";
 import { buildSyncPlan, makeSyncers, renderPlan, runSyncLoop } from "../lib/sync";
 import { readZitadelSecret } from "./shared";
 

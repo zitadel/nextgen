@@ -12,7 +12,7 @@ vi.mock("../../../src/lib/sync/loop", () => ({
   buildSyncPlan: vi.fn().mockResolvedValue([]),
 }));
 
-vi.mock("../../../src/platform/index", () => ({
+vi.mock("../../../src/lib/api/index", () => ({
   createPlatformClient: vi.fn().mockReturnValue({}),
 }));
 

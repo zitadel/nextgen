@@ -12,7 +12,7 @@
  * `build.ts` consumes it.
  *
  * **Dependency rule.** This module has no upward dependencies (it
- * never imports from `commands/`, `sync/`, `platform/`, etc.) and no
+ * never imports from `commands/`, `sync/`, `api/`, etc.) and no
  * filesystem code. It depends sideways only on shared utilities under
  * `apps/cli/src/lib/` — today `lib/errors` (`ZitadelError`). Reading
  * and writing local files is the caller's responsibility, served by

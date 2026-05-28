@@ -11,7 +11,7 @@
  * `methods.ts`. `presets.ts` is internal; only `build.ts` consumes it.
  *
  * **Dependency rule.** This module has no upward dependencies (it never
- * imports from `commands/`, `sync/`, `platform/`, etc.) and no
+ * imports from `commands/`, `sync/`, `api/`, etc.) and no
  * filesystem code. Its only external dependency is `ajv` for
  * JSON-Schema validation. Reading and writing local files is the
  * caller's responsibility, served by `apps/cli/src/lib/json-dir.ts` plus

@@ -1,6 +1,6 @@
 import { buildFlow } from "../../../flows";
 import { stableStringify } from "../../../json";
-import { DEFAULT_SERVER } from "../../../../platform/resolve-server";
+import { DEFAULT_SERVER } from "../../../api/resolve-server";
 import type { FileOp } from "./file-writer/plan";
 import type { PatchContext } from "../types";
 

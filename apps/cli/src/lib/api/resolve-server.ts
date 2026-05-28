@@ -1,8 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { ZitadelError } from "../lib/errors";
-import { isObject, parseJsonObject } from "../lib/json";
+import { ZitadelError } from "../errors";
+import { isObject, parseJsonObject } from "../json";
 
 /**
  * Server URL used when nothing else resolves. Also surfaced in hints and

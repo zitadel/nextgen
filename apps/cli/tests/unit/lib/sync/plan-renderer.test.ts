@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { SyncAction } from "../../../../src/lib/sync/loop";
 import { renderPlan } from "../../../../src/lib/sync/plan-renderer";
 import type { ResourceSyncer } from "../../../../src/lib/sync/syncers";
-import type { PlatformClient } from "../../../../src/platform/client";
+import type { PlatformClient } from "../../../../src/lib/api/client";
 
 function makeSyncer(kind: string, directory: string, mutable = false): ResourceSyncer {
   return {

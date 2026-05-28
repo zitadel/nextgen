@@ -12,7 +12,7 @@ import { defaultIO, skipped, writeError } from "./io/output";
 import { toZitadelError, ZitadelError } from "./lib/errors";
 import { resolveCwd } from "./lib/paths";
 import { CLI_VERSION } from "./lib/version";
-import { resolveServer, DEFAULT_SERVER } from "./platform/resolve-server";
+import { resolveServer, DEFAULT_SERVER } from "./lib/api/resolve-server";
 
 /**
  * Parses argv, dispatches to the matching command, and translates any thrown

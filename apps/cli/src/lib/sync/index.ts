@@ -8,7 +8,7 @@
  * Zitadel API. It depends sideways on shared utilities under
  * `apps/cli/src/lib/` (today `lib/flows` and `lib/user-schema` for
  * their `FLOWS_DIR` / `SCHEMAS_DIR` path constants) and on
- * `apps/cli/src/platform/` for the typed HTTP
+ * `apps/cli/src/lib/api/` for the typed HTTP
  * client. The platform dependency is intentional and documented:
  * the sync engine cannot do its job without it. It does NOT import
  * domain shapes (e.g. `FlowDefinition`) — payloads are opaque

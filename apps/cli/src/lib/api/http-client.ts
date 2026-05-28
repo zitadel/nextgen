@@ -15,7 +15,7 @@ import type {
 } from "@zitadel-nextgen/api/generated/model";
 import { setApiBaseUrl } from "@zitadel-nextgen/api/runtime/base-url";
 
-import { ZitadelError } from "../lib/errors";
+import { ZitadelError } from "../errors";
 import type { PlatformClient } from "./client";
 
 /**

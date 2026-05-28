@@ -12,8 +12,8 @@ import { patchers } from "../lib/orca/patchers";
 import type { PatchContext } from "../lib/orca/patchers/types";
 import { scaffolders } from "../lib/orca/scaffolders";
 import { buildUserSchema, validateJsonSchema } from "../lib/user-schema";
-import { createPlatformClient } from "../platform";
-import type { CreateProjectResponse } from "../platform/client";
+import { createPlatformClient } from "../lib/api";
+import type { CreateProjectResponse } from "../lib/api/client";
 import { runApply } from "./apply";
 
 /**

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { environmentSchema } from "../../../src/platform/schemas";
+import { environmentSchema } from "../../../../src/lib/api/schemas";
 
 describe("environmentSchema", () => {
   it.each(["development", "preview", "production"])("parses the valid environment %s", (value) => {

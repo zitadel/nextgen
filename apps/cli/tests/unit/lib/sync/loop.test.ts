@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { buildSyncPlan, runSyncLoop } from "../../../../src/lib/sync/loop";
 import type { ResourceSyncer } from "../../../../src/lib/sync/syncers";
-import type { PlatformClient } from "../../../../src/platform/client";
+import type { PlatformClient } from "../../../../src/lib/api/client";
 
 function makeCwd(): string {
   return join(tmpdir(), `zitadel-test-${Math.random().toString(36).slice(2)}`);

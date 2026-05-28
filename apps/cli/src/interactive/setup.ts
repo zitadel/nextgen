@@ -2,7 +2,7 @@ import { cancel, confirm, intro, isCancel, multiselect, outro, select, text } fr
 
 import { ZitadelError } from "../lib/errors";
 import type { AuthMethod } from "../lib/flows";
-import { DEFAULT_SERVER } from "../platform/resolve-server";
+import { DEFAULT_SERVER } from "../lib/api/resolve-server";
 
 /**
  * The user's choices collected by the interactive setup wizard. These map

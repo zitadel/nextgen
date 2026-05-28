@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { FLOWS_DIR } from "../../../../src/lib/flows";
 import { SCHEMAS_DIR } from "../../../../src/lib/user-schema";
 import { makeSyncers } from "../../../../src/lib/sync/syncers";
-import type { PlatformClient } from "../../../../src/platform/client";
+import type { PlatformClient } from "../../../../src/lib/api/client";
 
 /**
  * Build a literal fake PlatformClient. Each method records the args it

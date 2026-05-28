@@ -1,6 +1,6 @@
 import { FLOWS_DIR } from "../flows";
 import { SCHEMAS_DIR } from "../user-schema";
-import type { PlatformClient } from "../../platform/client.js";
+import type { PlatformClient } from "../api/client.js";
 
 /**
  * The contract each per-resource adapter implements. `directory` is
