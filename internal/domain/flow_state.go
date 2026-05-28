@@ -11,6 +11,10 @@ import "time"
 // live on PivotStack. The remaining fields are session/OIDC context
 // that only makes sense at the top level.
 type FlowState struct {
+	// ID is the flow handle minted at Start. The handler verifies it
+	// matches the path (`/flow/{id}/...`) to reject path/cookie mismatches.
+	ID string
+
 	// ProjectID scopes the flow to a single tenant.
 	ProjectID string
 
