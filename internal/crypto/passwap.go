@@ -28,31 +28,21 @@ var (
 	ErrInvalidHash           = errors.New("the hash is invalid")
 )
 
-type Hasher struct {
+type PasswapHasher struct {
 	*passwap.Swapper
 	Prefixes     []string
 	HexSupported bool
 }
 
-func (h *Hasher) EncodingSupported(encodedHash string) bool {
-	for _, prefix := range h.Prefixes {
-		if strings.HasPrefix(encodedHash, prefix) {
-			return true
-		}
-	}
-	if h.HexSupported {
-		_, err := hex.DecodeString(encodedHash)
-		if err == nil {
-			return true
-		}
-	}
-	return false
+func (h *PasswapHasher) VerifyHash(encoded string, target string) error {
+	_, err := h.Swapper.Verify(encoded, target)
+	return err
 }
 
-// ValidateEncodedHash checks that encoded is parseable by a configured verifier
+// ValidateHash checks that encoded is parseable by a configured verifier
 // and that its cost parameters are within configured bounds.
 // Use when accepting pre-encoded hashes from untrusted sources (import, create with hash).
-func (h *Hasher) ValidateEncodedHash(encoded string) error {
+func (h *PasswapHasher) ValidateHash(encoded string) error {
 	if encoded == "" {
 		return nil
 	}
@@ -67,6 +57,21 @@ func (h *Hasher) ValidateEncodedHash(encoded string) error {
 		return ErrBoundsError
 	}
 	return ErrInvalidHash
+}
+
+func (h *PasswapHasher) EncodingSupported(encodedHash string) bool {
+	for _, prefix := range h.Prefixes {
+		if strings.HasPrefix(encodedHash, prefix) {
+			return true
+		}
+	}
+	if h.HexSupported {
+		_, err := hex.DecodeString(encodedHash)
+		if err == nil {
+			return true
+		}
+	}
+	return false
 }
 
 type HashName string
@@ -218,7 +223,7 @@ func (l Drupal7LimitsConfig) validationOpts() *drupal7.ValidationOpts {
 	}
 }
 
-func (c *HashConfig) NewHasher() (*Hasher, error) {
+func (c *HashConfig) NewHasher() (*PasswapHasher, error) {
 	verifiers, vPrefixes, err := c.buildVerifiers()
 	if err != nil {
 		return nil, fmt.Errorf("password hash config invalid: %w", err)
@@ -227,7 +232,7 @@ func (c *HashConfig) NewHasher() (*Hasher, error) {
 	if err != nil {
 		return nil, fmt.Errorf("password hash config invalid: %w", err)
 	}
-	return &Hasher{
+	return &PasswapHasher{
 		Swapper:      passwap.NewSwapper(hasher, verifiers...),
 		Prefixes:     append(hPrefixes, vPrefixes...),
 		HexSupported: slices.Contains(c.Verifiers, HashNameMd5Plain),

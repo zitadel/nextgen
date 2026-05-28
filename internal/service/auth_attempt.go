@@ -193,7 +193,7 @@ type authAttemptService struct {
 	users            userLookup
 	userPasswords    userPasswords
 	userPasskeys     userPasskeys
-	passwordVerifier *crypto.Hasher
+	passwordVerifier crypto.HashVerifier
 }
 
 func NewAuthAttemptService(
@@ -204,7 +204,7 @@ func NewAuthAttemptService(
 	users userLookup,
 	userPasswords userPasswords,
 	userPasskeys userPasskeys,
-	passwordVerifier *crypto.Hasher,
+	passwordVerifier crypto.HashVerifier,
 ) AuthAttemptService {
 	return &authAttemptService{
 		pool:             pool,

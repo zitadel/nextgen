@@ -28,7 +28,7 @@ func newTestServer(t *testing.T) *httptest.Server {
 	repo := repository.NewProjectRepository(testPool)
 	projectSvc := service.NewProjectService(testPool, repo, idgen.NewULID())
 
-	handler := internalapi.NewHandler(nil, stubFlowService{}, &stubAuthAttemptService{}, nil, projectSvc, nil, nil)
+	handler := internalapi.NewHandler(nil, stubFlowService{}, &stubAuthAttemptService{}, nil, projectSvc, nil, nil, nil)
 	secHandler := internalapi.NewSecurityHandler()
 
 	srv, err := generatedapi.NewServer(handler, secHandler)
@@ -44,6 +44,18 @@ type stubFlowService struct{}
 
 func (stubFlowService) Resolve(_ context.Context, _ service.ResolveFlowRequest) (*domain.FlowDefinition, error) {
 	return nil, nil
+}
+
+func (stubFlowService) Start(_ context.Context, _ service.StartFlowRequest) (service.FlowStepResult, error) {
+	return service.FlowStepResult{}, nil
+}
+
+func (stubFlowService) Submit(_ context.Context, _ service.SubmitFlowRequest) (service.FlowStepResult, error) {
+	return service.FlowStepResult{}, nil
+}
+
+func (stubFlowService) GetStep(_ context.Context, _ service.GetFlowStepRequest) (service.FlowStepResult, error) {
+	return service.FlowStepResult{}, nil
 }
 
 // stubAuthAttemptService satisfies [service.AuthAttemptService] while doing nothing.

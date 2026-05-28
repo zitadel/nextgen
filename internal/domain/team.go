@@ -7,6 +7,18 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
+const (
+	PrefixTeam ResourcePrefix = "team"
+)
+
+func ErrTeamNotFound() Error {
+	return newError(PrefixTeam.ErrorCodePrefix("team_not_found"), "team not found", nil, nil)
+}
+
+func ErrTeamProjectNotFound() Error {
+	return newError(PrefixTeam.ErrorCodePrefix("project_not_found"), "project not found", nil, nil)
+}
+
 // Team represents the object defined [here](https://github.com/zitadel/nextgen/blob/main/docs/design/api/resource-map.md#teams)
 // It is hardly ever modified but read a lot therefore it should be stored in global tables.
 type Team struct {
@@ -16,6 +28,18 @@ type Team struct {
 	ID        string
 	CreatedAt time.Time
 	UpdatedAt time.Time
+}
+
+func NewTeam(projectID string) (*Team, error) {
+	id, err := newID(PrefixTeam)
+	if err != nil {
+		return nil, ErrInternal(err).WithMessage("failed to create team id")
+	}
+
+	return &Team{
+		ProjectID: projectID,
+		ID:        id,
+	}, nil
 }
 
 //go:generate go tool mockgen -typed -package domainmock -destination ./mock/team.mock.go . TeamRepository

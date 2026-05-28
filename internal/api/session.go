@@ -9,7 +9,8 @@ import (
 
 	"github.com/go-faster/jx"
 	api "github.com/zitadel/nextgen/api/generated"
-	"github.com/zitadel/nextgen/internal/cookie"
+	"github.com/zitadel/nextgen/internal/api/ogenx"
+	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 )
@@ -28,11 +29,24 @@ func (h Handler) CreateSession(ctx context.Context, req *api.CreateSessionReques
 	if err != nil {
 		return nil, err
 	}
-	return sessionWithTokenToAPI(session, h.sealer)
+	return sessionWithTokenToAPI(session, h.crypter)
 }
 
 func (h Handler) ExchangeHandoff(ctx context.Context, req *api.ExchangeRequest, params api.ExchangeHandoffParams) (api.ExchangeHandoffRes, error) {
-	projectID, ok := params.ProjectID.Get()
+	scopeCtx, _ := GetScopeContext(ctx)
+	input, err := exchangeInputFromRequest(scopeCtx.ProjectID, req, params)
+	if err != nil {
+		return nil, err
+	}
+	session, err := h.sessionService.Exchange(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+	return sessionWithTokenToAPI(session, h.crypter)
+}
+
+func exchangeInputFromRequest(projectID string, req *api.ExchangeRequest, params api.ExchangeHandoffParams) (service.ExchangeInput, error) {
+  projectID, ok := params.ProjectID.Get()
 	if !ok {
 		return nil, domain.ErrSessionMissingProjectID()
 	}
@@ -43,11 +57,10 @@ func (h Handler) ExchangeHandoff(ctx context.Context, req *api.ExchangeRequest, 
 	if key, ok := params.IdempotencyKey.Get(); ok {
 		input.IdempotencyKey = new(key)
 	}
-	session, err := h.sessionService.Exchange(ctx, input)
-	if err != nil {
-		return nil, err
+	if ttl, ok := req.TTL.Get(); ok {
+		input.TTL = new(time.Duration(ttl))
 	}
-	return sessionWithTokenToAPI(session, h.sealer)
+	return input, nil
 }
 
 func (h Handler) GetSession(ctx context.Context, params api.GetSessionParams) (api.GetSessionRes, error) {
@@ -68,7 +81,7 @@ func (h Handler) GetSession(ctx context.Context, params api.GetSessionParams) (a
 }
 
 func (h Handler) GetMySession(ctx context.Context, params api.GetMySessionParams) (api.GetMySessionRes, error) {
-	sessionToken, err := domain.DecryptSessionTokenString(params.NextgenSession, h.sealer)
+	sessionToken, err := domain.DecryptSessionTokenString(params.NextgenSession, h.crypter)
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +136,7 @@ func (h Handler) RevokeSession(ctx context.Context, params api.RevokeSessionPara
 }
 
 func (h Handler) RevokeMySession(ctx context.Context, params api.RevokeMySessionParams) (api.RevokeMySessionRes, error) {
-	sessionToken, err := domain.DecryptSessionTokenString(params.NextgenSession, h.sealer)
+	sessionToken, err := domain.DecryptSessionTokenString(params.NextgenSession, h.crypter)
 	if err != nil {
 		return nil, err
 	}
@@ -175,8 +188,8 @@ func userAgentToDomain(agent api.OptCreateSessionRequestUserAgent) *domain.UserA
 	}
 }
 
-func sessionWithTokenToAPI(session *domain.Session, sealer *cookie.Sealer) (*api.SessionWithTokenResponseHeaders, error) {
-	token, err := session.Token(sealer)
+func sessionWithTokenToAPI(session *domain.Session, encrypter crypto.Encrypter) (*api.SessionWithTokenResponseHeaders, error) {
+	token, err := session.Token(encrypter)
 	if err != nil {
 		return nil, err
 	}
@@ -337,6 +350,36 @@ func sessionErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 	case domain.ErrNotImplemented().Code,
 		domain.ErrSessionMissingProjectID().Code:
 		return errorResponseWithStatusCode(http.StatusNotImplemented, err)
+	case domain.ErrSessionInvalidTTL().Code:
+		apiErr := &api.ErrorDetailsStatusCode{
+			StatusCode: http.StatusBadRequest,
+		}
+
+		details, ok := err.Details.(domain.SessionInvalidTTLDetails)
+		if !ok {
+			apiErr.Response = domainErrorDetails(err)
+			return apiErr
+		}
+
+		encoder := jx.GetEncoder()
+		defer jx.PutEncoder(encoder)
+
+		encoder.ObjStart()
+		encoder.Field("ttl", ogenx.ISODuration(details.TTL).Encode)
+		encoder.Field("max_ttl", ogenx.ISODuration(details.MaxTTL).Encode)
+		encoder.ObjEnd()
+
+		apiErr.Response = api.ErrorDetails{
+			Code:    api.ErrorCode(err.Code),
+			Message: err.Message,
+			Details: api.OptErrorDetailsDetails{
+				Set: true,
+				Value: api.ErrorDetailsDetails{
+					"details": jx.Raw(encoder.Bytes()),
+				},
+			},
+		}
+		return apiErr
 	default:
 		return internalErrorResponse(err)
 

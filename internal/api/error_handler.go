@@ -55,6 +55,8 @@ func errorResponse(err error) *api.ErrorDetailsStatusCode {
 		return schemaErrorResponse(e)
 	case e.Code == domain.ErrNotImplemented().Code:
 		return errorResponseWithStatusCode(http.StatusNotImplemented, e)
+	case strings.HasPrefix(e.Code, domain.PrefixTeam.ErrorCodePrefix("")):
+		return teamErrorResponse(e)
 	default:
 		return internalErrorResponse(err)
 	}

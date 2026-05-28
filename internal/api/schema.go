@@ -21,7 +21,7 @@ func (h *Handler) CreateSchema(ctx context.Context, req api.CreateSchemaReq, par
 		}
 		schema, err = h.schemaService.CreateSchema(ctx,
 			service.CreateSchemaInput{
-				ProjectID: string(params.ProjectID.Value),
+				ProjectID: string(params.ProjectID),
 				TeamID:    string(params.TeamID.Value),
 				SchemaID:  req.UserSchema.ID.String(),
 				Schema:    schemabs,
@@ -33,7 +33,7 @@ func (h *Handler) CreateSchema(ctx context.Context, req api.CreateSchemaReq, par
 	case api.SchemaURLCreateSchemaReq:
 		schema, err := h.schemaService.CreateSchemaByUrl(ctx,
 			service.CreateSchemaByURLInput{
-				ProjectID: string(params.ProjectID.Value),
+				ProjectID: string(params.ProjectID),
 				TeamID:    string(params.TeamID.Value),
 				URL:       req.SchemaURL.URL,
 			})
@@ -47,7 +47,7 @@ func (h *Handler) CreateSchema(ctx context.Context, req api.CreateSchemaReq, par
 }
 
 func (h *Handler) GetSchemaById(ctx context.Context, params api.GetSchemaByIdParams) (api.GetSchemaByIdRes, error) {
-	schema, err := h.schemaService.GetSchema(ctx, string(params.ProjectID.Value), string(params.TeamID.Value), params.ID)
+	schema, err := h.schemaService.GetSchema(ctx, string(params.ProjectID), string(params.TeamID.Value), params.ID)
 	if err != nil {
 		return nil, err
 	}

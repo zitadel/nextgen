@@ -159,3 +159,63 @@ Agent scripts should pass `--non-interactive --json` and prefer structured
 
 
 <!-- nx configuration end-->
+
+## Cursor Cloud specific instructions
+
+### Node.js version
+
+The `/exec-daemon/node` binary shipped in the VM is v22; the repo requires
+Node 24 (`.nvmrc`). The update script prepends the nvm-managed v24 binary to
+`$PATH`. If you open a fresh shell, ensure
+`/home/ubuntu/.nvm/versions/node/v24.16.0/bin` is on `$PATH` before running
+any `corepack` or `pnpm` commands.
+
+### System dependencies for Go tests
+
+`libicu-dev` and `libssl-dev` are required at runtime by `embedded-postgres`
+(the Go test helper that auto-downloads PostgreSQL 18). These are not installed
+by default in the Cloud Agent VM; install them once with
+`sudo apt-get install -y -qq libicu-dev libssl-dev` if Go tests fail with
+missing-library errors.
+
+### Playwright browser install gotcha
+
+The standard `playwright install --with-deps chromium` may hang during zip
+extraction in the Cloud Agent VM. If that happens, download and extract
+manually:
+
+```sh
+curl -fsSL -o /tmp/chrome-linux64.zip \
+  "https://cdn.playwright.dev/builds/cft/<version>/linux64/chrome-linux64.zip"
+mkdir -p ~/.cache/ms-playwright/chromium-<rev>
+unzip -q /tmp/chrome-linux64.zip -d ~/.cache/ms-playwright/chromium-<rev>
+```
+
+Repeat for `chrome-headless-shell-linux64.zip` into `chromium_headless_shell-<rev>`.
+Look up `<version>` (browserVersion) and `<rev>` (revision) in the installed
+package's `browsers.json` at
+`node_modules/.pnpm/playwright-core@<pkg>/node_modules/playwright-core/browsers.json`.
+For the currently pinned `playwright-core@1.59.1` these are `147.0.7727.15` / `1217`.
+
+### Running commands
+
+Standard commands are documented in root `AGENTS.md` → **Local Checks** and
+**README.md**. Key quick-reference:
+
+- **TS lint + typecheck + build + test:** `corepack pnpm nx run-many -t lint,typecheck,build,test`
+- **Go vet + test:** `go vet ./... && go test -timeout=10m ./...`
+- **E2E:** `corepack pnpm nx run-many -t e2e -p @zitadel-nextgen/demo-next-e2e,@zitadel-nextgen/demo-nuxt-e2e`
+
+### Running demo apps manually
+
+To test the sign-in flow interactively (two terminals):
+
+1. Start the mock auth server: `corepack pnpm nx start @zitadel-nextgen/api-mock`
+2. Start demo-next: `NEXTGEN_ISSUER_URL=http://localhost:4000 corepack pnpm nx dev @zitadel-nextgen/demo-next` (port 3002)
+3. Or demo-nuxt: `NEXTGEN_ISSUER_URL=http://localhost:4000 corepack pnpm nx dev @zitadel-nextgen/demo-nuxt` (port 3001)
+
+### Stale Nuxt lock files
+
+If a Nuxt e2e test or dev server was killed ungracefully, a stale lock file at
+`apps/demo-nuxt/.nuxt/dev/.lock` may block the next startup. Remove it and
+the `.nuxt` directory if you see "Another Nuxt dev server is already running".
