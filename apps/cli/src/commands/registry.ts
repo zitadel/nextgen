@@ -175,13 +175,6 @@ export const COMMANDS: CommandSpec[] = [
     ],
   },
   {
-    name: "capabilities",
-    summary: "Describe the CLI contract (commands, flags, exit codes). Agent introspection target.",
-    usage: "zitadel capabilities [--json]",
-    agent_status: "supported",
-    flags: globalFlags,
-  },
-  {
     name: "help",
     summary: "Show help for the CLI or a specific command.",
     usage: "zitadel help [command]",

@@ -20,12 +20,6 @@
  * consumes `lib/flows`' `FLOWS_DIR`.
  */
 export type { UserSchema } from "./schema";
-export {
-  KNOWN_FIELD_ANNOTATIONS,
-  KNOWN_MFA_VALUES,
-  KNOWN_UNIQUE_VALUES,
-  KNOWN_VERIFY_VALUES,
-} from "./schema";
 export { buildUserSchema } from "./build";
 export { validateJsonSchema } from "./validate";
 

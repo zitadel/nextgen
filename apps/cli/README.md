@@ -28,7 +28,7 @@ Agents should use the generated contract in `AGENTS.md` and call commands with
 `--non-interactive --json`:
 
 ```sh
-npx zitadel@latest capabilities --json
+npx zitadel@latest help --json
 npx zitadel@latest <command> --non-interactive --json
 ```
 

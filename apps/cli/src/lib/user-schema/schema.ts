@@ -16,27 +16,6 @@ const authMethodsSchema = z.record(z.string(), authMethodSchema);
 export type AuthMethods = z.infer<typeof authMethodsSchema>;
 
 /**
- * The `x-*` annotations a user-schema property may carry. `capabilities`
- * advertises this list as the schema vocabulary.
- */
-export const KNOWN_FIELD_ANNOTATIONS = [
-  "x-identifier",
-  "x-verify",
-  "x-mfa",
-  "x-sensitive",
-  "x-editable",
-  "x-unique",
-  "x-claim",
-] as const;
-
-/** Allowed values for `x-verify`. */
-export const KNOWN_VERIFY_VALUES = ["email", "phone"] as const;
-/** Allowed values for `x-mfa`. */
-export const KNOWN_MFA_VALUES = ["sms", "email", "push", "totp"] as const;
-/** Allowed values for `x-unique`. */
-export const KNOWN_UNIQUE_VALUES = ["project", "team"] as const;
-
-/**
  * Canonical `$id` for the default human-user schema the CLI emits. The
  * platform stores schemas keyed by this URI; a stable repo-rooted URL
  * means projects pointing at the same default share one record instead

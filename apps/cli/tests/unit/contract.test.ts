@@ -30,18 +30,12 @@ function assertEnvelopeMeta(envelope: Record<string, unknown>): void {
 }
 
 describe("envelope contract", () => {
-  it("capabilities carries meta and matches the registry", async () => {
-    const result = await runCliForTest(["capabilities", "--json"]);
+  it("help lists every registry command in JSON mode", async () => {
+    const result = await runCliForTest(["help", "--json"]);
     expect(result.exitCode).toBe(0);
     const envelope = parseJson(result.stdout) as Record<string, unknown>;
     assertEnvelopeMeta(envelope);
-    const data = envelope.data as {
-      commands: { name: string }[];
-      exit_codes: Record<string, number>;
-      envelope_schema_version: number;
-    };
-    expect(data.envelope_schema_version).toBe(1);
-    expect(data.exit_codes).toEqual(EXIT_CODES);
+    const data = envelope.data as { commands: { name: string }[] };
     const names = data.commands.map((c) => c.name).sort();
     const registryNames = COMMANDS.map((c) => c.name).sort();
     expect(names).toEqual(registryNames);
@@ -105,7 +99,7 @@ describe("envelope contract", () => {
 
   it("version-only resolution defaults to real server, not mock", async () => {
     const cwd = await mkdtemp(join(tmpdir(), "zitadel-contract-default-"));
-    const result = await runCliForTest(["capabilities", "--json", "--cwd", cwd]);
+    const result = await runCliForTest(["help", "--json", "--cwd", cwd]);
     const envelope = parseJson(result.stdout) as Record<string, unknown>;
     expect(envelope.source).toBe("https://api.zitadel.cloud");
   });

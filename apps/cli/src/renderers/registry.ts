@@ -26,17 +26,3 @@ export function getRenderer(id: string): RendererSpec {
   }
   return renderer;
 }
-
-export function listRenderers(): Array<{
-  id: RendererId;
-  status: string;
-  frameworks: string[];
-  displayName: string;
-}> {
-  return Object.values(RENDERERS).map((renderer) => ({
-    id: renderer.id,
-    status: renderer.status,
-    frameworks: renderer.frameworks,
-    displayName: renderer.displayName,
-  }));
-}

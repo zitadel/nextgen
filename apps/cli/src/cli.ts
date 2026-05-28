@@ -1,7 +1,6 @@
 import { consola } from "consola";
 
 import { runApply } from "./commands/apply";
-import { runCapabilities } from "./commands/capabilities";
 import { runDeployConnect, runDeployStatus } from "./commands/deploy";
 import { runDoctor } from "./commands/doctor";
 import { runEject } from "./commands/eject";
@@ -96,9 +95,6 @@ async function dispatch(parsed: ParsedArgs, io: CliIO, global: GlobalOptions): P
         return;
       }
       break;
-    case "capabilities":
-      await runCapabilities(io, global);
-      return;
     case "status":
       await runStatus(io, global);
       return;

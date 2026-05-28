@@ -45,7 +45,7 @@ async function renderRootHelp(io: CliIO, opts: GlobalOptions): Promise<void> {
   }
   writePretty(io, "");
   writePretty(io, "Flags are documented per command. Run `zitadel help <command>` for details.");
-  writePretty(io, "Agents: run `zitadel capabilities --json` to introspect the full contract.");
+  writePretty(io, "Agents: run `zitadel help --json` to introspect commands, or read `AGENTS.md`.");
 }
 
 async function renderCommandHelp(io: CliIO, opts: GlobalOptions, target: string): Promise<void> {
