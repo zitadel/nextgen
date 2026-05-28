@@ -157,13 +157,8 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 	// ── Flow engine ──────────────────
 	ids := idgen.NewULID()
 	fields := domain.NewSchemaFieldResolver(storageSchemaResolver)
-
-	// TODO: argon2id wiring lands in a follow-up PR. Until then registration
-	// flows fail with ErrIntegrity; login is unaffected.
-	var createUser *domain.FlowCreateUserHandler
-
 	flowAuth := service.NewFlowAuthAttemptAdapter(authAttemptSvc)
-	stateMachine := domain.NewFlowStateMachine(fields, createUser, flowAuth, time.Now)
+	stateMachine := domain.NewFlowStateMachine(fields, nil, flowAuth, time.Now)
 
 	flowService := service.NewFlowService(pool, flowDefinitionRepo, stateMachine, ids)
 
