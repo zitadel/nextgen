@@ -1,6 +1,5 @@
 import { consola } from "consola";
 
-import { runAddSchema } from "./commands/add-schema";
 import { runApply } from "./commands/apply";
 import { runCapabilities } from "./commands/capabilities";
 import { runDeployConnect, runDeployStatus } from "./commands/deploy";
@@ -93,30 +92,6 @@ async function dispatch(parsed: ParsedArgs, io: CliIO, global: GlobalOptions): P
           platform: stringOpt(parsed, "platform"),
           environment: stringOpt(parsed, "environment"),
           manual: boolOpt(parsed, "manual"),
-        });
-        return;
-      }
-      break;
-    case "add":
-      if (subcommand === "schema") {
-        await runAddSchema(io, {
-          ...withSubcommand(global, "add schema"),
-          addField: multiOpt(parsed, "addField"),
-          addFieldJson: multiOpt(parsed, "addFieldJson"),
-          removeField: multiOpt(parsed, "removeField"),
-          preset: multiOpt(parsed, "preset"),
-        });
-        return;
-      }
-      break;
-    case "schema":
-      if (subcommand === "add") {
-        await runAddSchema(io, {
-          ...withSubcommand(global, "schema add"),
-          addField: multiOpt(parsed, "addField"),
-          addFieldJson: multiOpt(parsed, "addFieldJson"),
-          removeField: multiOpt(parsed, "removeField"),
-          preset: multiOpt(parsed, "preset"),
         });
         return;
       }
@@ -252,8 +227,6 @@ function resolveCommandName(parsed: ParsedArgs): string {
   const [head, next] = parsed.positionals;
   if (!head) return "(default)";
   if (head === "deploy" && (next === "connect" || next === "status")) return `deploy ${next}`;
-  if (head === "add" && next === "schema") return "add schema";
-  if (head === "schema" && next === "add") return "schema add";
   if (head === "help") return "help";
   return head;
 }
@@ -342,12 +315,6 @@ function stringOpt(parsed: ParsedArgs, key: string): string | undefined {
 
 function boolOpt(parsed: ParsedArgs, key: string): boolean | undefined {
   return parsed.options[key] === undefined ? undefined : Boolean(parsed.options[key]);
-}
-
-function multiOpt(parsed: ParsedArgs, key: string): string[] {
-  const value = parsed.options[key];
-  if (!value) return [];
-  return Array.isArray(value) ? value : [String(value)];
 }
 
 function toCamel(value: string): string {

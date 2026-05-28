@@ -24,7 +24,7 @@ function cli(args: string[], env: NodeJS.ProcessEnv = {}) {
 }
 
 describe("Next setup integration", () => {
-  it("sets up, verifies, edits schema, applies, and preserves idempotency", async () => {
+  it("sets up, verifies, plans, applies, and preserves idempotency", async () => {
     const cwd = await createNextProject();
 
     const setup = await cli([
@@ -106,18 +106,6 @@ describe("Next setup integration", () => {
     expect(planJson.status).toBe("ok");
     expect(typeof planJson.data.total).toBe("number");
     expect(await readFile(join(cwd, ".zitadel/state.json"), "utf8")).toBe(stateBeforePlan);
-
-    const addSchema = await cli([
-      "add",
-      "schema",
-      "--cwd",
-      cwd,
-      "--json",
-      "--add-field",
-      "phone:string:format=phone,x-mfa=sms",
-    ]);
-    expect(addSchema.exitCode).toBe(0);
-    expect(await readFile(join(cwd, ".zitadel/schemas/user.json"), "utf8")).toContain('"phone"');
 
     const apply = await cli(["apply", "--cwd", cwd, "--json"]);
     expect(apply.exitCode).toBe(0);

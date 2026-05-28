@@ -16,9 +16,8 @@ export const authMethodsSchema = z.record(z.string(), authMethodSchema);
 export type AuthMethods = z.infer<typeof authMethodsSchema>;
 
 /**
- * The `x-*` annotations a user-schema property may carry. The CLI warns
- * on anything outside this set (see `validateFieldAnnotations` in
- * `validate.ts`); `capabilities` advertises the list.
+ * The `x-*` annotations a user-schema property may carry. `capabilities`
+ * advertises this list as the schema vocabulary.
  */
 export const KNOWN_FIELD_ANNOTATIONS = [
   "x-identifier",

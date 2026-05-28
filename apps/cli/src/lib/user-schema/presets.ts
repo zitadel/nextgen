@@ -1,8 +1,7 @@
 /**
- * Built-in field and named presets for `zitadel schema add`. This is a
- * user-schema-only concern (flows have no preset catalog). `build.ts`
- * and `merge.ts` both resolve individual fields through
- * {@link fieldPreset}.
+ * Built-in JSON-Schema bodies for the user-schema fields `buildUserSchema`
+ * knows about. {@link fieldPreset} resolves a field name to its body
+ * (or a generic string property for unknown names).
  */
 
 const FIELD_PRESETS: Record<string, Record<string, unknown>> = {
@@ -43,78 +42,12 @@ const FIELD_PRESETS: Record<string, Record<string, unknown>> = {
 };
 
 /**
- * One field a named preset contributes: its property name, JSON-Schema
- * body, and whether it lands in the schema's `required` list.
- */
-export type NamedPreset = {
-  name: string;
-  schema: Record<string, unknown>;
-  required: boolean;
-};
-
-const NAMED_PRESETS: Record<string, NamedPreset[]> = {
-  email: [{ name: "email", schema: { ...FIELD_PRESETS.email }, required: true }],
-  "phone-mfa-sms": [
-    {
-      name: "phone",
-      schema: {
-        ...FIELD_PRESETS.phone,
-        "x-mfa": "sms",
-      },
-      required: false,
-    },
-  ],
-  "phone-mfa-required": [
-    {
-      name: "phone",
-      schema: {
-        ...FIELD_PRESETS.phone,
-        "x-mfa": "sms",
-      },
-      required: true,
-    },
-  ],
-  "full-name": [
-    { name: "given_name", schema: { ...FIELD_PRESETS.given_name }, required: true },
-    { name: "family_name", schema: { ...FIELD_PRESETS.family_name }, required: true },
-  ],
-  "date-of-birth": [
-    {
-      name: "date_of_birth",
-      schema: {
-        type: "string",
-        format: "date",
-        title: "Date of birth",
-        "x-sensitive": true,
-        "x-editable": true,
-      },
-      required: false,
-    },
-  ],
-};
-
-/**
  * Resolve a single field's JSON-Schema body: a built-in preset if one
  * exists for `name`, otherwise a generic editable string property.
  * Returns a fresh object so callers may mutate it safely.
  */
 export function fieldPreset(name: string): Record<string, unknown> {
   return { ...(FIELD_PRESETS[name] ?? genericField(name)) };
-}
-
-/** Names of the available multi-field presets, sorted. */
-export function listNamedPresets(): string[] {
-  return Object.keys(NAMED_PRESETS).sort();
-}
-
-/**
- * Resolve a named preset to its field list, or `undefined` if unknown.
- * Entries (and their schema bodies) are deep-copied so callers can't
- * mutate the catalog.
- */
-export function resolveNamedPreset(name: string): NamedPreset[] | undefined {
-  const preset = NAMED_PRESETS[name];
-  return preset ? preset.map((entry) => ({ ...entry, schema: { ...entry.schema } })) : undefined;
 }
 
 function genericField(name: string): Record<string, unknown> {

@@ -175,33 +175,6 @@ export const COMMANDS: CommandSpec[] = [
     ],
   },
   {
-    name: "schema add",
-    summary: "Add or remove fields on the user schema.",
-    usage:
-      "zitadel schema add [--preset name] [--add-field-json '{...}' | --add-field name:type:attrs] [--remove-field name]",
-    agent_status: "supported",
-    notes: "Aliased as `zitadel add schema`.",
-    flags: [
-      ...globalFlags,
-      {
-        name: "preset",
-        type: "string[]",
-        description: "Apply a named field preset (run `zitadel capabilities` for the list).",
-      },
-      {
-        name: "add-field",
-        type: "string[]",
-        description: "Add a field using the colon-DSL (name:type:key=value,...).",
-      },
-      {
-        name: "add-field-json",
-        type: "string[]",
-        description: "Add a field using a JSON object. Preferred for agents.",
-      },
-      { name: "remove-field", type: "string[]", description: "Remove a field by name." },
-    ],
-  },
-  {
     name: "capabilities",
     summary: "Describe the CLI contract (commands, flags, exit codes). Agent introspection target.",
     usage: "zitadel capabilities [--json]",

@@ -51,7 +51,6 @@ Envelope schema version: `1`. Every envelope carries `cli_version`, `command`, `
 | `zitadel doctor` | Verify generated files and local state. | supported |
 | `zitadel deploy status` | Report deploy platform readiness. | experimental |
 | `zitadel deploy connect` | Configure preview or production platform env vars. | experimental |
-| `zitadel schema add` | Add or remove fields on the user schema. | supported |
 | `zitadel capabilities` | Describe the CLI contract (commands, flags, exit codes). Agent introspection target. | supported |
 | `zitadel help` | Show help for the CLI or a specific command. | supported |
 | `zitadel status` | Summarize the local project state. | supported |
@@ -168,27 +167,6 @@ Usage: `zitadel deploy connect [--environment preview|production]`
 | `--platform` | `string` | Force a deploy platform adapter. |
 | `--environment` / `-e` | `string` | Target environment (default: preview). |
 | `--manual` | `boolean` | Emit manual steps instead of configuring. |
-
-### `zitadel schema add`
-
-Add or remove fields on the user schema.
-
-> Aliased as `zitadel add schema`.
-
-Usage: `zitadel schema add [--preset name] [--add-field-json '{...}' | --add-field name:type:attrs] [--remove-field name]`
-
-| Flag | Type | Description |
-|---|---|---|
-| `--cwd` / `-c` | `string` | Project directory to operate on. |
-| `--json` / `-j` | `boolean` | Emit the JSON envelope instead of pretty output. |
-| `--non-interactive` / `-n` | `boolean` | Disable prompts. Required when scripting or running as an agent. |
-| `--dry-run` | `boolean` | Preview the work without mutating files or hitting the platform. |
-| `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
-| `--server` / `-s` | `string` | Override the resolved server URL. |
-| `--preset` | `string[]` | Apply a named field preset (run `zitadel capabilities` for the list). |
-| `--add-field` | `string[]` | Add a field using the colon-DSL (name:type:key=value,...). |
-| `--add-field-json` | `string[]` | Add a field using a JSON object. Preferred for agents. |
-| `--remove-field` | `string[]` | Remove a field by name. |
 
 ### `zitadel capabilities`
 

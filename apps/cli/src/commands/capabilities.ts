@@ -7,7 +7,6 @@ import {
   KNOWN_MFA_VALUES,
   KNOWN_UNIQUE_VALUES,
   KNOWN_VERIFY_VALUES,
-  listNamedPresets,
 } from "../lib/user-schema";
 import { COMMANDS } from "./registry";
 
@@ -59,7 +58,6 @@ export async function runCapabilities(io: CliIO, opts: GlobalOptions): Promise<v
         x_verify_values: KNOWN_VERIFY_VALUES,
         x_mfa_values: KNOWN_MFA_VALUES,
         x_unique_values: KNOWN_UNIQUE_VALUES,
-        presets: listNamedPresets(),
       },
     },
     opts,
