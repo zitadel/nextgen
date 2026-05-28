@@ -85,8 +85,8 @@ func uniquenessScopeLiteral(scope domain.AttributeUniqueness) string {
 		return "unspecified"
 	case domain.AttributeUniquenessTeam:
 		return "team"
-	case domain.AttributeUniquenessGlobal:
-		return "global"
+	case domain.AttributeUniquenessProject:
+		return "project"
 	default:
 		return "unspecified"
 	}

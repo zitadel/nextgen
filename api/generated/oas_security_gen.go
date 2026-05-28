@@ -73,6 +73,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	GetSessionOperation: []string{
 		"session.read",
 	},
+	GetTeamOperation: []string{
+		"teams.read",
+	},
 	GetUserInfoOperation: []string{},
 	IntrospectOperation:  []string{},
 	IssueChallengeOperation: []string{

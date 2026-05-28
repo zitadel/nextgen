@@ -17,7 +17,8 @@ type Harness struct {
 	DBPool     database.Pool
 	HttpClient *http.Client
 	TestServer *httptest.Server
-	Hasher     *crypto.Hasher
+	Hasher     *crypto.PasswapHasher
+	Crypter    crypto.Crypter
 
 	GeneratedServer *generated.Server
 	Handler         *api.Handler
@@ -26,12 +27,14 @@ type Harness struct {
 	APIClient          *generated.Client
 	FakeSecuritySource *FakeSecuritySource
 
-	SchemaService      *service.SchemaService
-	SessionService     service.SessionService
-	FlowService        service.FlowService
-	AuthAttemptService service.AuthAttemptService
-	ProjectService     service.ProjectService
+	SchemaService         *service.SchemaService
+	SessionService        service.SessionService
+	FlowService           service.FlowService
+	AuthAttemptService    service.AuthAttemptService
+	ProjectService        service.ProjectService
 	FlowDefinitionService service.FlowDefinitionService
+	FlowStateMachine      *domain.FlowStateMachineRuntime
+	TeamService           *service.TeamService
 
 	SchemaRepo         domain.JSONSchemaRepository
 	SchemaResolver     *domain.JSONSchemaResolver
@@ -43,6 +46,7 @@ type Harness struct {
 	UserRepo           domain.UserRepository
 	UserPasswordRepo   domain.UserPasswordRepository
 	UserPasskeyRepo    domain.UserPasskeyRepository
+	TeamRepo           domain.TeamRepository
 
 	Schemas test_data.Schemas
 }
