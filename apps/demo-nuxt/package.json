@@ -20,6 +20,7 @@
     "typecheck": "NUXT_BUILD_DIR=.nuxt nuxt prepare && vue-tsc --noEmit -p .nuxt/tsconfig.json"
   },
   "dependencies": {
+    "@zitadel-nextgen/api": "workspace:*",
     "@zitadel-nextgen/sdk-nuxt": "workspace:*",
     "@zitadel-nextgen/components": "workspace:*",
     "@zitadel-nextgen/design-tokens": "workspace:*",

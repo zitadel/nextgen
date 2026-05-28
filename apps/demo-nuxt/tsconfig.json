@@ -2,6 +2,9 @@
   "extends": "./.nuxt/tsconfig.json",
   "references": [
     {
+      "path": "../../packages/api"
+    },
+    {
       "path": "../../packages/shared-component-styles"
     },
     {

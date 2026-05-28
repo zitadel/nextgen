@@ -8,6 +8,7 @@
  *
  * Custom-only routes added on top:
  *   POST   /sessions/exchange     — exchange handoff_token for session cookie
+ *   GET    /sessions/me           — get current session state from cookie
  *   DELETE /sessions/me           — revoke current session, clears cookies
  *   GET    /.well-known/jwks.json — JWKS for JWT verification (dev convenience)
  *   GET    /auth/keys             — JWKS, spec-defined endpoint (operation `getKeys`)
@@ -32,7 +33,7 @@ import express from "express";
 import { createMiddleware } from "@mswjs/http-middleware";
 
 import { applyBranding } from "./branding.js";
-import { HandoffError, JWK, signSessionToken, verifyHandoffToken } from "./crypto.js";
+import { HandoffError, JWK, decodeSessionToken, signSessionToken, verifyHandoffToken } from "./crypto.js";
 import { defaultDevBranding } from "./default-dev-branding.js";
 import { setupMockHandlers } from "./handlers.js";
 import { errorBody, setupPlatformHandlers } from "./platform-handlers.js";
@@ -179,6 +180,37 @@ export function startMockServer(port: number): Server {
       res.json(body);
     },
   );
+
+  app.get("/sessions/me", (req: express.Request, res: express.Response) => {
+    const cookieHeader = req.headers.cookie ?? "";
+    const match = cookieHeader.match(/(?:^|;\s*)__nextgen_session=([^;]+)/);
+    if (!match?.[1]) {
+      res.status(401).json(errorBody("missing_session", "__nextgen_session cookie is required"));
+      return;
+    }
+    const claims = decodeSessionToken(match[1]);
+    if (!claims) {
+      res.status(401).json(errorBody("invalid_session", "session token is invalid or expired"));
+      return;
+    }
+    const iatDate = new Date(claims.iat * 1000);
+    const expDate = new Date(claims.exp * 1000);
+    res.json({
+      session_id: `sess_${claims.sub.replace(/[^a-zA-Z0-9]/g, "").slice(0, 12)}`,
+      project_id: "proj_mock",
+      state: "active",
+      user_id: claims.sub,
+      factors: [
+        {
+          method: "password",
+          verified_at: iatDate.toISOString(),
+        },
+      ],
+      assurance_levels: ["urn:nist:aal:1"],
+      created_at: iatDate.toISOString(),
+      expires_at: expDate.toISOString(),
+    });
+  });
 
   app.delete("/sessions/me", (_req: express.Request, res: express.Response) => {
     res.setHeader("Set-Cookie", [

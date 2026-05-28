@@ -180,3 +180,27 @@ export async function verifyHandoffToken(
   }
   return { sub: payload.sub, iss: payload.iss, jti: payload.jti };
 }
+
+/**
+ * Decodes a session token issued by `signSessionToken` without re-verifying
+ * the signature. The mock is a single process — it only ever sees tokens it
+ * signed itself, so a full cryptographic verify is unnecessary overhead.
+ *
+ * @param token - Raw JWT string from the `__nextgen_session` cookie.
+ * @returns The decoded claims, or `null` when the token is malformed.
+ */
+export function decodeSessionToken(
+  token: string,
+): { sub: string; email: string; iss: string; iat: number; exp: number } | null {
+  const parts = token.split(".");
+  if (parts.length !== 3) return null;
+  try {
+    const payload = JSON.parse(dec.decode(fromBase64url(parts[1]!)));
+    if (!payload.sub || !payload.exp) return null;
+    if (payload.exp < Math.floor(Date.now() / 1000)) return null;
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
