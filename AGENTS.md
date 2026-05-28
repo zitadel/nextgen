@@ -192,8 +192,10 @@ unzip -q /tmp/chrome-linux64.zip -d ~/.cache/ms-playwright/chromium-<rev>
 ```
 
 Repeat for `chrome-headless-shell-linux64.zip` into `chromium_headless_shell-<rev>`.
-Check the Playwright version in `pnpm-lock.yaml` for the correct `<version>` and
-`<rev>` values (e.g. `147.0.7727.15` / `1217`).
+Look up `<version>` (browserVersion) and `<rev>` (revision) in the installed
+package's `browsers.json` at
+`node_modules/.pnpm/playwright-core@<pkg>/node_modules/playwright-core/browsers.json`.
+For the currently pinned `playwright-core@1.59.1` these are `147.0.7727.15` / `1217`.
 
 ### Running commands
 
@@ -206,11 +208,11 @@ Standard commands are documented in root `AGENTS.md` → **Local Checks** and
 
 ### Running demo apps manually
 
-To test the sign-in flow interactively:
+To test the sign-in flow interactively (two terminals):
 
-1. Start the mock auth server: `PORT=4000 corepack pnpm --filter @zitadel-nextgen/api-mock start`
-2. Start demo-next: `NEXTGEN_ISSUER_URL=http://localhost:4000 corepack pnpm --filter @zitadel-nextgen/demo-next dev` (port 3002)
-3. Or demo-nuxt: `NEXTGEN_ISSUER_URL=http://localhost:4001 corepack pnpm --filter @zitadel-nextgen/demo-nuxt dev` (port 3001; use `PORT=4001` for api-mock)
+1. Start the mock auth server: `corepack pnpm nx start @zitadel-nextgen/api-mock`
+2. Start demo-next: `NEXTGEN_ISSUER_URL=http://localhost:4000 corepack pnpm nx dev @zitadel-nextgen/demo-next` (port 3002)
+3. Or demo-nuxt: `NEXTGEN_ISSUER_URL=http://localhost:4000 corepack pnpm nx dev @zitadel-nextgen/demo-nuxt` (port 3001)
 
 ### Stale Nuxt lock files
 
