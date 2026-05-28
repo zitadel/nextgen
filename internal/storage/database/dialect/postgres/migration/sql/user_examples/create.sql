@@ -26,7 +26,7 @@ _registry AS (
     )
     SELECT
         $1, $3,
-        CASE WHEN unique_scope = 'global' THEN ''::text ELSE $4 END,
+        CASE WHEN unique_scope = 'project' THEN ''::text ELSE $4 END,
         key, value_hash
     FROM _input_data
     WHERE unique_scope <> 'unspecified'
@@ -51,8 +51,8 @@ EXECUTE insert_user(
     , 'usr_99999999'
     , 'team_0001'
 , ARRAY[
-        ROW('username'::TEXT,           '"tester_alpha"'::JSONB,        digest('"tester_alpha"'::text, 'md5'),          'global'::TEXT)::zitadel_nextgen.incoming_user_attribute
-        , ROW('email'::TEXT,            '"tester@zitadel.com"'::JSONB,  digest('"tester@zitadel.com"'::text, 'md5'),    'global'::TEXT)::zitadel_nextgen.incoming_user_attribute
+        ROW('username'::TEXT,           '"tester_alpha"'::JSONB,        digest('"tester_alpha"'::text, 'md5'),          'project'::TEXT)::zitadel_nextgen.incoming_user_attribute
+        , ROW('email'::TEXT,            '"tester@zitadel.com"'::JSONB,  digest('"tester@zitadel.com"'::text, 'md5'),    'project'::TEXT)::zitadel_nextgen.incoming_user_attribute
         , ROW('email_verified'::TEXT,   'true'::JSONB,                  null,                                              'unspecified'::TEXT)::zitadel_nextgen.incoming_user_attribute
         , ROW('nickname'::TEXT,         '"TheAlpha"'::JSONB,            digest('"TheAlpha"'::text, 'md5'),              'organization'::TEXT)::zitadel_nextgen.incoming_user_attribute
         , ROW('address.country'::TEXT,  '"Netherlands"'::JSONB,         null,                                              'unspecified'::TEXT)::zitadel_nextgen.incoming_user_attribute

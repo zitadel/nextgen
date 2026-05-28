@@ -40,7 +40,7 @@ WITH _header AS (
         h.project_id
         , h.id AS user_id
         , CASE
-            WHEN d.unique_scope = 'global'::zitadel_nextgen.uniqueness_scope THEN ''::text
+            WHEN d.unique_scope = 'project'::zitadel_nextgen.uniqueness_scope THEN ''::text
             ELSE COALESCE(h.team_id, '')::text
           END AS team_id
         , d.key
@@ -49,7 +49,7 @@ WITH _header AS (
     CROSS JOIN _header h
     WHERE d.unique_scope IN (
             'team'::zitadel_nextgen.uniqueness_scope
-            , 'global'::zitadel_nextgen.uniqueness_scope
+            , 'project'::zitadel_nextgen.uniqueness_scope
         )
       AND d.value_hash IS NOT NULL
 )

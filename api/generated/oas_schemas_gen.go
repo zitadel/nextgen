@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-faster/errors"
 	"github.com/go-faster/jx"
+	"github.com/zitadel/nextgen/internal/api/ogenx"
 )
 
 // Merged schema.
@@ -1955,6 +1956,47 @@ func (s *CreateSessionRequestUserAgentAdditional) init() CreateSessionRequestUse
 	return m
 }
 
+type CreateTeamBadRequest ErrorDetails
+
+func (*CreateTeamBadRequest) createTeamRes() {}
+
+// Ref: #
+type CreateTeamRequest struct{}
+
+// Ref: #
+type CreateTeamResponse struct {
+	// The unique identifier of the team.
+	ID string `json:"id"`
+	// The time when the team was created.
+	CreatedAt time.Time `json:"createdAt"`
+}
+
+// GetID returns the value of ID.
+func (s *CreateTeamResponse) GetID() string {
+	return s.ID
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *CreateTeamResponse) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// SetID sets the value of ID.
+func (s *CreateTeamResponse) SetID(val string) {
+	s.ID = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *CreateTeamResponse) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+func (*CreateTeamResponse) createTeamRes() {}
+
+type CreateTeamTooManyRequests ErrorDetails
+
+func (*CreateTeamTooManyRequests) createTeamRes() {}
+
 // DeleteFlowDefinitionNoContent is response for DeleteFlowDefinition operation.
 type DeleteFlowDefinitionNoContent struct{}
 
@@ -2144,6 +2186,7 @@ func (*ErrorDetailsStatusCode) createFlowRes()             {}
 func (*ErrorDetailsStatusCode) createProjectRes()          {}
 func (*ErrorDetailsStatusCode) createSchemaRes()           {}
 func (*ErrorDetailsStatusCode) createSessionRes()          {}
+func (*ErrorDetailsStatusCode) createTeamRes()             {}
 func (*ErrorDetailsStatusCode) deleteFlowDefinitionRes()   {}
 func (*ErrorDetailsStatusCode) endSessionRes()             {}
 func (*ErrorDetailsStatusCode) exchangeHandoffRes()        {}
@@ -2158,6 +2201,7 @@ func (*ErrorDetailsStatusCode) getProjectRes()             {}
 func (*ErrorDetailsStatusCode) getReadyRes()               {}
 func (*ErrorDetailsStatusCode) getSchemaByIdRes()          {}
 func (*ErrorDetailsStatusCode) getSessionRes()             {}
+func (*ErrorDetailsStatusCode) getTeamRes()                {}
 func (*ErrorDetailsStatusCode) getTokenRes()               {}
 func (*ErrorDetailsStatusCode) getUserInfoRes()            {}
 func (*ErrorDetailsStatusCode) introspectRes()             {}
@@ -2189,6 +2233,9 @@ type ExchangeRequest struct {
 	// The one-time handoff token minted by `POST /auth_attempts/{id}/handoff`.
 	// Single-use — replaying it after a successful exchange returns `410 Gone`.
 	HandoffToken string `json:"handoff_token"`
+	// Optional session lifetime after exchange as an ISO-8601 duration. When omitted, the server
+	// uses the configured default. Must not exceed the configured maximum.
+	TTL OptDuration `json:"ttl"`
 }
 
 // GetHandoffToken returns the value of HandoffToken.
@@ -2196,9 +2243,19 @@ func (s *ExchangeRequest) GetHandoffToken() string {
 	return s.HandoffToken
 }
 
+// GetTTL returns the value of TTL.
+func (s *ExchangeRequest) GetTTL() OptDuration {
+	return s.TTL
+}
+
 // SetHandoffToken sets the value of HandoffToken.
 func (s *ExchangeRequest) SetHandoffToken(val string) {
 	s.HandoffToken = val
+}
+
+// SetTTL sets the value of TTL.
+func (s *ExchangeRequest) SetTTL(val OptDuration) {
+	s.TTL = val
 }
 
 // An authentication factor method.
@@ -3255,14 +3312,15 @@ func (s *FlowDefinitionUpdateRequestPurposes) init() FlowDefinitionUpdateRequest
 
 // Ref: #
 type FlowEventRequest struct {
-	SessionToken string               `json:"session_token"`
+	// Reserved for future rotation. The sealed `_zflow` cookie carries the flow state today.
+	SessionToken OptString            `json:"session_token"`
 	Type         FlowEventRequestType `json:"type"`
 	// Event payload (fingerprint hash, timing data, etc.).
 	Payload OptFlowEventRequestPayload `json:"payload"`
 }
 
 // GetSessionToken returns the value of SessionToken.
-func (s *FlowEventRequest) GetSessionToken() string {
+func (s *FlowEventRequest) GetSessionToken() OptString {
 	return s.SessionToken
 }
 
@@ -3277,7 +3335,7 @@ func (s *FlowEventRequest) GetPayload() OptFlowEventRequestPayload {
 }
 
 // SetSessionToken sets the value of SessionToken.
-func (s *FlowEventRequest) SetSessionToken(val string) {
+func (s *FlowEventRequest) SetSessionToken(val OptString) {
 	s.SessionToken = val
 }
 
@@ -3404,9 +3462,9 @@ type FlowResponse struct {
 	ID string `json:"id"`
 	// Underlying session ID. Stable across all stacked flows.
 	SessionID string `json:"session_id"`
-	// Rotated on every response. Required for the next request.
-	SessionToken string   `json:"session_token"`
-	Step         FlowStep `json:"step"`
+	// Reserved for future rotation. The sealed `_zflow` cookie carries the flow state today.
+	SessionToken OptString `json:"session_token"`
+	Step         FlowStep  `json:"step"`
 	// Resolved branding inherited from the app → team → project hierarchy.
 	// Determined at flow creation based on audience context. Does not change between steps.
 	Branding OptBranding `json:"branding"`
@@ -3432,7 +3490,7 @@ func (s *FlowResponse) GetSessionID() string {
 }
 
 // GetSessionToken returns the value of SessionToken.
-func (s *FlowResponse) GetSessionToken() string {
+func (s *FlowResponse) GetSessionToken() OptString {
 	return s.SessionToken
 }
 
@@ -3472,7 +3530,7 @@ func (s *FlowResponse) SetSessionID(val string) {
 }
 
 // SetSessionToken sets the value of SessionToken.
-func (s *FlowResponse) SetSessionToken(val string) {
+func (s *FlowResponse) SetSessionToken(val OptString) {
 	s.SessionToken = val
 }
 
@@ -3857,7 +3915,8 @@ func (s *FlowStepGates) init() FlowStepGates {
 
 // Ref: #
 type FlowSubmitRequest struct {
-	SessionToken string `json:"session_token"`
+	// Reserved for future rotation. The sealed `_zflow` cookie carries the flow state today.
+	SessionToken OptString `json:"session_token"`
 	// Which action to take. Must be a key from the step's `actions` dictionary:
 	// - A regular action (e.g., "submit", "register", "back")
 	// - The reserved value "sso" — triggers SSO redirect (requires `sso_provider_id`).
@@ -3877,7 +3936,7 @@ type FlowSubmitRequest struct {
 }
 
 // GetSessionToken returns the value of SessionToken.
-func (s *FlowSubmitRequest) GetSessionToken() string {
+func (s *FlowSubmitRequest) GetSessionToken() OptString {
 	return s.SessionToken
 }
 
@@ -3907,7 +3966,7 @@ func (s *FlowSubmitRequest) GetSSOProviderID() OptString {
 }
 
 // SetSessionToken sets the value of SessionToken.
-func (s *FlowSubmitRequest) SetSessionToken(val string) {
+func (s *FlowSubmitRequest) SetSessionToken(val OptString) {
 	s.SessionToken = val
 }
 
@@ -4382,6 +4441,57 @@ func (*GetSessionNotFound) getSessionRes() {}
 type GetSessionUnauthorized ErrorDetails
 
 func (*GetSessionUnauthorized) getSessionRes() {}
+
+type GetTeamNotFound ErrorDetails
+
+func (*GetTeamNotFound) getTeamRes() {}
+
+// The current state of a team.
+// Ref: #
+type GetTeamResponse struct {
+	// The unique identifier of the team.
+	ID string `json:"id"`
+	// The time when the team was created.
+	CreatedAt time.Time `json:"createdAt"`
+	// The time when the team was last updated.
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+// GetID returns the value of ID.
+func (s *GetTeamResponse) GetID() string {
+	return s.ID
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *GetTeamResponse) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetUpdatedAt returns the value of UpdatedAt.
+func (s *GetTeamResponse) GetUpdatedAt() time.Time {
+	return s.UpdatedAt
+}
+
+// SetID sets the value of ID.
+func (s *GetTeamResponse) SetID(val string) {
+	s.ID = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *GetTeamResponse) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetUpdatedAt sets the value of UpdatedAt.
+func (s *GetTeamResponse) SetUpdatedAt(val time.Time) {
+	s.UpdatedAt = val
+}
+
+func (*GetTeamResponse) getTeamRes() {}
+
+type GetTeamUnauthorized ErrorDetails
+
+func (*GetTeamUnauthorized) getTeamRes() {}
 
 type GetUserInfoOK struct {
 	// The unique identifier for the user.
@@ -6898,6 +7008,52 @@ func (o OptDateTime) Or(d time.Time) time.Time {
 	return d
 }
 
+// NewOptDuration returns new OptDuration with value set to v.
+func NewOptDuration(v ogenx.ISODuration) OptDuration {
+	return OptDuration{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptDuration is optional ogenx.ISODuration.
+type OptDuration struct {
+	Value ogenx.ISODuration
+	Set   bool
+}
+
+// IsSet returns true if OptDuration was set.
+func (o OptDuration) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptDuration) Reset() {
+	var v ogenx.ISODuration
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptDuration) SetTo(v ogenx.ISODuration) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptDuration) Get() (v ogenx.ISODuration, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptDuration) Or(d ogenx.ISODuration) ogenx.ISODuration {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptErrorDetailsDetails returns new OptErrorDetailsDetails with value set to v.
 func NewOptErrorDetailsDetails(v ErrorDetailsDetails) OptErrorDetailsDetails {
 	return OptErrorDetailsDetails{
@@ -8839,52 +8995,6 @@ func (o OptPostTokenRequestGrantType) Get() (v PostTokenRequestGrantType, ok boo
 
 // Or returns value if set, or given parameter if does not.
 func (o OptPostTokenRequestGrantType) Or(d PostTokenRequestGrantType) PostTokenRequestGrantType {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptProjectID returns new OptProjectID with value set to v.
-func NewOptProjectID(v ProjectID) OptProjectID {
-	return OptProjectID{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptProjectID is optional ProjectID.
-type OptProjectID struct {
-	Value ProjectID
-	Set   bool
-}
-
-// IsSet returns true if OptProjectID was set.
-func (o OptProjectID) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptProjectID) Reset() {
-	var v ProjectID
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptProjectID) SetTo(v ProjectID) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptProjectID) Get() (v ProjectID, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptProjectID) Or(d ProjectID) ProjectID {
 	if v, ok := o.Get(); ok {
 		return v
 	}

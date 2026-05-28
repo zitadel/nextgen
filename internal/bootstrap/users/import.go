@@ -15,7 +15,7 @@ import (
 
 // Import loads bootstrap users from JSON files into the database.
 // dialect is the configured database dialect name (e.g. "postgres"); used to reject unsupported backends.
-func Import(ctx context.Context, pool database.Pool, hasher *crypto.Hasher, dialect string, paths []string) error {
+func Import(ctx context.Context, pool database.Pool, hashValidator crypto.HashValidator, dialect string, paths []string) error {
 	if len(paths) == 0 {
 		return nil
 	}
@@ -27,7 +27,7 @@ func Import(ctx context.Context, pool database.Pool, hasher *crypto.Hasher, dial
 	passwordRepo := repository.NewUserPasswordRepository()
 
 	for _, path := range paths {
-		if err := importFile(ctx, pool, hasher, userRepo, passwordRepo, path); err != nil {
+		if err := importFile(ctx, pool, hashValidator, userRepo, passwordRepo, path); err != nil {
 			return fmt.Errorf("user file %q: %w", path, err)
 		}
 	}
@@ -37,7 +37,7 @@ func Import(ctx context.Context, pool database.Pool, hasher *crypto.Hasher, dial
 func importFile(
 	ctx context.Context,
 	pool database.Pool,
-	hasher *crypto.Hasher,
+	hashValidator crypto.HashValidator,
 	userRepo *repository.UserRepository,
 	passwordRepo *repository.UserPasswordRepository,
 	path string,
@@ -46,7 +46,7 @@ func importFile(
 	if err != nil {
 		return err
 	}
-	if err := Validate(doc, hasher); err != nil {
+	if err := Validate(doc, hashValidator); err != nil {
 		return err
 	}
 	pw, err := parsePasswordAuthenticator(doc.Authenticators)
@@ -112,7 +112,7 @@ func buildCreateAttributes(attrs map[string]json.RawMessage) ([]*domain.CreateAt
 		}
 		scope := domain.AttributeUniquenessUnspecified
 		if key == attrKeyUsername {
-			scope = domain.AttributeUniquenessGlobal
+			scope = domain.AttributeUniquenessProject
 		}
 		attr, err := domain.NewCreateAttribute(key, value, scope)
 		if err != nil {
