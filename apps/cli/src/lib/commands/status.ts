@@ -1,7 +1,6 @@
 import { hasZitadelSecret } from "../../detect";
 import type { CommandResult, GlobalOptions } from "../oclif";
-import { isObject } from "../json";
-import { readZitadelConfig, readZitadelSecret } from "./shared";
+import { readDevelopmentIssuer, readZitadelConfig, readZitadelSecret } from "./shared";
 
 /**
  * Reports the local project state by reading `zitadel.json` and its secret.
@@ -32,10 +31,7 @@ export async function runStatus(opts: GlobalOptions): Promise<CommandResult> {
       title: "Zitadel project detected.",
       project: {
         project_id: String(config.project ?? secret.project_id ?? ""),
-        issuer:
-          isObject(config.environments) && isObject(config.environments.development)
-            ? config.environments.development.issuer
-            : undefined,
+        issuer: readDevelopmentIssuer(config),
       },
       server: opts.source,
       next_actions: ["Run `zitadel doctor`.", "Run `zitadel apply` after config changes."],

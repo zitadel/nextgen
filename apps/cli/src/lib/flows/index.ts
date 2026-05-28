@@ -25,7 +25,7 @@
  */
 export type { AuthMethod, FlowDefinition } from "./schema";
 export { flowDefinitionSchema } from "./schema";
-export { AUTH_METHODS, buildFlow } from "./build";
+export { AUTH_METHODS, buildFlow, isAuthMethod } from "./build";
 export { validateFlows } from "./validate";
 
 /**

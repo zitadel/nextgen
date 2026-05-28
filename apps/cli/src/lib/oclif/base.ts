@@ -305,9 +305,6 @@ function renderKnownSections(lines: string[], data: Record<string, unknown>): vo
 }
 
 function sourceSuffix(opts: GlobalOptions): string {
-  if (opts.source === "mock") {
-    return "(using mock platform)";
-  }
   try {
     const url = new URL(opts.source);
     if (url.host === "api.zitadel.cloud") {

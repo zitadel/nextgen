@@ -8,12 +8,9 @@ import {
 import { pickFramework, runInteractiveSetup } from "../../interactive/setup";
 import type { CommandResult, GlobalOptions } from "../oclif";
 import { ZitadelError } from "../errors";
-import { type AuthMethod } from "../flows";
-import { Orca } from "../orca";
-import { detectEmptyProject } from "../orca/detect";
-import { patchers } from "../orca/patchers";
+import { isAuthMethod, type AuthMethod } from "../flows";
+import { createOrca, detectEmptyProject, type Orca } from "../orca";
 import type { PatchContext } from "../orca/patchers/types";
-import { scaffolders } from "../orca/scaffolders";
 import { buildUserSchema, validateJsonSchema } from "../user-schema";
 import { createPlatformClient } from "../api";
 import type { CreateProjectResponse } from "../api/client";
@@ -52,7 +49,7 @@ export async function runSetup(opts: SetupOptions): Promise<CommandResult> {
     });
   }
 
-  const orca = new Orca(scaffolders, patchers);
+  const orca = createOrca();
 
   // When no framework is detected, an empty directory is scaffolded from
   // scratch (prompting or via --framework) and then re-detected before patching.
@@ -73,9 +70,11 @@ export async function runSetup(opts: SetupOptions): Promise<CommandResult> {
   let effectiveServer = opts.source;
 
   let userFields = splitCsv(opts.userFields);
-  // The `--auth-method` flag is validated against AUTH_METHODS by oclif, so the
-  // value is already a valid AuthMethod (or undefined when omitted).
-  let authMethod: AuthMethod | undefined = opts.authMethod as AuthMethod | undefined;
+  // The `--auth-method` flag is validated against AUTH_METHODS by oclif; guard
+  // anyway so an out-of-band caller can't smuggle an invalid value through.
+  let authMethod: AuthMethod | undefined = isAuthMethod(opts.authMethod)
+    ? opts.authMethod
+    : undefined;
 
   if (!opts.nonInteractive && !opts.dryRun) {
     const answers = await runInteractiveSetup({

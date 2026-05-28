@@ -44,6 +44,56 @@ describe("envelope contract", () => {
     expect(result.stdout.trim()).toBe("");
   });
 
+  it("a failing command emits the error envelope in JSON mode", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "zitadel-contract-err-"));
+    const result = await runCliForTest(["apply", "--cwd", cwd, "--json"]);
+    expect(result.exitCode).toBe(3);
+    const envelope = parseJson(result.stdout) as {
+      status: string;
+      code: string;
+      message: string;
+      next_commands?: string[];
+    } & Record<string, unknown>;
+    assertEnvelopeMeta(envelope);
+    expect(envelope.status).toBe("error");
+    expect(envelope.code).toBe("E_VALIDATION");
+    expect(envelope.message).toBeTypeOf("string");
+    expect(envelope.next_commands).toContain("zitadel setup");
+  });
+
+  it("renders a human-readable summary (and server suffix) without --json", async () => {
+    const cwd = await scaffoldNextProject();
+    await writeFile(
+      join(cwd, "zitadel.json"),
+      JSON.stringify({
+        project: "proj-001",
+        server: "https://self.example",
+        environments: { development: { issuer: "http://localhost:3000" } },
+      }),
+    );
+    await mkdir(join(cwd, ".zitadel"), { recursive: true });
+    await writeFile(
+      join(cwd, ".zitadel/secret"),
+      JSON.stringify({
+        project_id: "proj-001",
+        project_secret: "sk",
+        preview_secret: "sk",
+        preview_origins: [],
+        created_at: "2026-01-01T00:00:00.000Z",
+      }),
+    );
+
+    const result = await runCliForTest(["status", "--cwd", cwd, "--server", "https://self.example"]);
+    expect(result.exitCode).toBe(0);
+    // Pretty (non-JSON) rendering: the title, the project section, the source
+    // suffix for a non-default server, and the next-steps block.
+    expect(result.stdout).toContain("Zitadel project detected.");
+    expect(result.stdout).toContain("project=proj-001");
+    expect(result.stdout).toContain("(server: self.example)");
+    expect(result.stdout).toContain("Next:");
+    expect(result.stdout.trim().startsWith("{")).toBe(false);
+  });
+
   it("SKILLS.md is the canonical agent contract", async () => {
     const root = join(import.meta.dirname, "../..");
     const skills = await readFile(join(root, "SKILLS.md"), "utf8");

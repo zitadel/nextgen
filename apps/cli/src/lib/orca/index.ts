@@ -1,6 +1,10 @@
 import { ZitadelError } from "../errors";
+import { patchers } from "./patchers";
 import type { Patcher } from "./patchers/types";
+import { scaffolders } from "./scaffolders";
 import type { Scaffolder } from "./scaffolders/types";
+
+export { detectEmptyProject, tryDetectFramework } from "./detect";
 
 /**
  * One framework the CLI can scaffold from scratch, surfaced to the picker. */
@@ -55,4 +59,9 @@ export class Orca {
       displayName: scaffolder.displayName,
     }));
   }
+}
+
+/** {@link Orca} wired with the default scaffolder and patcher registries. */
+export function createOrca(): Orca {
+  return new Orca(scaffolders, patchers);
 }

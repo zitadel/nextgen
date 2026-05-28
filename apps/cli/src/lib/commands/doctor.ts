@@ -4,15 +4,13 @@ import { join } from "node:path";
 import { detectDevPort, detectFramework, issuerFromPort } from "../../detect";
 import type { CommandResult, GlobalOptions } from "../oclif";
 import { ZitadelError } from "../errors";
-import { type AuthMethod } from "../flows";
+import { isAuthMethod } from "../flows";
 import { isObject } from "../json";
-import { Orca } from "../orca";
-import { patchers } from "../orca/patchers";
+import { createOrca } from "../orca";
 import type { PatchContext } from "../orca/patchers/types";
-import { scaffolders } from "../orca/scaffolders";
 import { MANAGED_MARKER } from "../paths";
 import { validateJsonSchema, type UserSchema } from "../user-schema";
-import { readZitadelConfig, readZitadelSecret } from "./shared";
+import { readDevelopmentIssuer, readRendererId, readZitadelConfig, readZitadelSecret } from "./shared";
 
 /**
  * Options for {@link runDoctor}. When `fix` is set, doctor re-applies the
@@ -183,7 +181,8 @@ async function collectChecks(cwd: string): Promise<DoctorCheck[]> {
     checks,
   );
 
-  if (secret && config && secret.project_id !== config.project) {
+  const configProject = typeof config?.project === "string" ? config.project : undefined;
+  if (secret && config && secret.project_id !== configProject) {
     checks.push({
       name: "project-match",
       status: "fail",
@@ -204,7 +203,7 @@ async function collectChecks(cwd: string): Promise<DoctorCheck[]> {
 
 async function applyFixes(opts: DoctorOptions): Promise<void> {
   const ctx = await loadPatchContext(opts.cwd);
-  const orca = new Orca(scaffolders, patchers);
+  const orca = createOrca();
   // `repair` reclaims the managed artifacts — env files, gitignore, the SDK
   // dependency, and marker-bearing routes/middleware — even when locally edited,
   // while leaving the user-editable `.zitadel/` resource files untouched.
@@ -229,6 +228,7 @@ async function loadPatchContext(cwd: string): Promise<PatchContext> {
   ) as Record<string, unknown>;
   const properties = isObject(raw.properties) ? raw.properties : {};
   const authMethods = isObject(raw["x-auth-methods"]) ? raw["x-auth-methods"] : {};
+  const recordedMethod = Object.keys(authMethods)[0];
   return {
     framework,
     rendererId: readRendererId(config),
@@ -242,7 +242,7 @@ async function loadPatchContext(cwd: string): Promise<PatchContext> {
       createdAt: secret.created_at,
     },
     userFields: Object.keys(properties),
-    authMethod: (Object.keys(authMethods)[0] ?? "passkey") as AuthMethod,
+    authMethod: isAuthMethod(recordedMethod) ? recordedMethod : "passkey",
     userSchema: raw as UserSchema,
   };
 }
@@ -293,21 +293,9 @@ async function assertManagedFile(cwd: string, candidates: string[]): Promise<voi
   throw new Error(`missing one of ${candidates.join(", ")}`);
 }
 
-function readIssuer(config: Record<string, unknown>): unknown {
-  return isObject(config.environments) && isObject(config.environments.development)
-    ? config.environments.development.issuer
-    : undefined;
-}
-
-function readRendererId(config: Record<string, unknown>): string {
-  const branding = isObject(config.branding) ? config.branding : undefined;
-  const value = branding && typeof branding.renderer === "string" ? branding.renderer : "react";
-  return value === "default" ? "react" : value;
-}
-
 async function resolveIssuer(cwd: string, config: Record<string, unknown>): Promise<string> {
-  const fromConfig = readIssuer(config);
-  if (typeof fromConfig === "string" && fromConfig.length > 0) {
+  const fromConfig = readDevelopmentIssuer(config);
+  if (fromConfig && fromConfig.length > 0) {
     return fromConfig;
   }
   const state = await readState(cwd);

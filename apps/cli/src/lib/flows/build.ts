@@ -20,6 +20,11 @@ const BUILDERS = {
  */
 export const AUTH_METHODS = ["passkey", "password"] as const satisfies ReadonlyArray<AuthMethod>;
 
+/** Narrows an unknown value to a supported {@link AuthMethod}. */
+export function isAuthMethod(value: unknown): value is AuthMethod {
+  return typeof value === "string" && (AUTH_METHODS as ReadonlyArray<string>).includes(value);
+}
+
 /**
  * Build a flow_definition body for the chosen authentication method.
  * Pure: touches no filesystem or network. The returned object is newly

@@ -70,7 +70,7 @@ function validate(resolved: ResolvedServer): ResolvedServer {
     const url = new URL(resolved.value);
     if (url.protocol !== "https:" && url.protocol !== "http:") {
       throw new ZitadelError("E_VALIDATION", `Server URL must use http(s): ${resolved.value}`, {
-        hint: `Set "server" in zitadel.json to a URL like ${DEFAULT_SERVER}, or "mock" for offline development.`,
+        hint: `Set "server" in zitadel.json to a URL like ${DEFAULT_SERVER}.`,
       });
     }
     return { value: url.origin, origin: resolved.origin };
@@ -79,7 +79,7 @@ function validate(resolved: ResolvedServer): ResolvedServer {
       throw error;
     }
     throw new ZitadelError("E_VALIDATION", `Invalid server "${resolved.value}"`, {
-      hint: `Use a URL like ${DEFAULT_SERVER}, or the literal "mock".`,
+      hint: `Use a URL like ${DEFAULT_SERVER}.`,
       details: { origin: resolved.origin },
     });
   }

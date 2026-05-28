@@ -3,13 +3,10 @@ import { join } from "node:path";
 
 import type { CommandResult, GlobalOptions } from "../oclif";
 import { ZitadelError } from "../errors";
-import { Orca } from "../orca";
-import { tryDetectFramework } from "../orca/detect";
-import { patchers } from "../orca/patchers";
+import { createOrca, tryDetectFramework } from "../orca";
 import type { EjectActions } from "../orca/patchers/types";
-import { scaffolders } from "../orca/scaffolders";
 import { MANAGED_MARKER } from "../paths";
-import { readZitadelConfig } from "./shared";
+import { readRendererId, readZitadelConfig } from "./shared";
 
 /**
  * Options for {@link runEject}. `force` is required to eject in non-interactive
@@ -126,34 +123,15 @@ async function resolveEjectActions(cwd: string): Promise<EjectActions> {
     return fallback;
   }
   try {
-    const orca = new Orca(scaffolders, patchers);
+    const config = await readZitadelConfig(cwd).catch(() => ({}) as Record<string, unknown>);
+    const orca = createOrca();
     return orca.patcherFor(framework.id).artifacts({
       framework,
-      rendererId: await readRendererId(cwd),
+      rendererId: readRendererId(config),
     });
   } catch {
     return fallback;
   }
-}
-
-/** Reads the configured renderer id from `zitadel.json`, defaulting to `react`. */
-async function readRendererId(cwd: string): Promise<string> {
-  try {
-    const config = await readZitadelConfig(cwd);
-    const branding = config.branding;
-    if (
-      branding !== null &&
-      typeof branding === "object" &&
-      "renderer" in branding &&
-      typeof (branding as { renderer?: unknown }).renderer === "string"
-    ) {
-      const renderer = (branding as { renderer: string }).renderer;
-      return renderer === "default" ? "react" : renderer;
-    }
-  } catch {
-    // No (or unreadable) zitadel.json — fall through to the default renderer.
-  }
-  return "react";
 }
 
 async function pathExists(path: string): Promise<boolean> {

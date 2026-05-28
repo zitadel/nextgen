@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { ZitadelError } from "../errors";
-import { parseJsonObject } from "../json";
+import { isObject, parseJsonObject } from "../json";
 
 /**
  * Shape of the project secret persisted at `.zitadel/secret`. Holds the
@@ -67,6 +67,26 @@ export async function readZitadelSecret(cwd: string): Promise<ZitadelSecret> {
     }
     throw error;
   }
+}
+
+/**
+ * Reads the configured renderer id from a parsed `zitadel.json`, normalising the
+ * legacy `default` alias to `react` and falling back to `react` when unset. The
+ * value is validated downstream by `getRenderer`, so callers need not re-check.
+ */
+export function readRendererId(config: Record<string, unknown>): string {
+  const branding = isObject(config.branding) ? config.branding : undefined;
+  const value = branding && typeof branding.renderer === "string" ? branding.renderer : "react";
+  return value === "default" ? "react" : value;
+}
+
+/** Reads `environments.development.issuer` from a parsed `zitadel.json`, if present. */
+export function readDevelopmentIssuer(config: Record<string, unknown>): string | undefined {
+  if (isObject(config.environments) && isObject(config.environments.development)) {
+    const issuer = config.environments.development.issuer;
+    return typeof issuer === "string" ? issuer : undefined;
+  }
+  return undefined;
 }
 
 function isNotFound(error: unknown): boolean {
