@@ -1,18 +1,22 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { setApiBaseUrl } from "@zitadel-nextgen/api/runtime/base-url";
 import { getMySession } from "@zitadel-nextgen/api/generated/endpoints/zitadelNextGen";
 
 /**
  * Client component that fetches session state using the generated
- * `getMySession` operation. The `<zitadel-logout>` component on the same
- * page calls `setApiBaseUrl("/__nextgen")` in its `connectedCallback`,
- * so the generated client already points at the proxy.
+ * `getMySession` operation. Sets `apiBase` defensively — the logout
+ * widget may not have connected yet when this effect runs.
+ *
+ * This defensive `setApiBaseUrl` call will be unnecessary once
+ * ADR 016 (global API initializer) is implemented.
  */
 export function SessionDisplay() {
   const [sessionState, setSessionState] = useState<Record<string, unknown> | null>(null);
 
   useEffect(() => {
+    setApiBaseUrl("/__nextgen");
     getMySession({ credentials: "include" })
       .then((data) => setSessionState(data as unknown as Record<string, unknown>))
       .catch(() => setSessionState(null));

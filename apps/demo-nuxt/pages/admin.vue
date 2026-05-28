@@ -28,12 +28,14 @@
 
 <script setup lang="ts">
 import type { ClientAuthResult } from "@zitadel-nextgen/sdk-nuxt";
+import { setApiBaseUrl } from "@zitadel-nextgen/api/runtime/base-url";
 import { getMySession } from "@zitadel-nextgen/api/generated/endpoints/zitadelNextGen";
 
 const auth = useState<ClientAuthResult>("nextgen-auth");
 const sessionState = ref<Record<string, unknown> | null>(null);
 
 onMounted(async () => {
+  setApiBaseUrl("/__nextgen");
   try {
     const data = await getMySession({ credentials: "include" });
     sessionState.value = data as unknown as Record<string, unknown>;
