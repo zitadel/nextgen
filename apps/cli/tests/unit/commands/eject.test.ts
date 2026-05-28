@@ -69,6 +69,10 @@ async function makeManagedProject(): Promise<string> {
   await mkdir(join(cwd, "app/login"), { recursive: true });
   await mkdir(join(cwd, "app/register"), { recursive: true });
 
+  await writeFile(
+    join(cwd, "package.json"),
+    JSON.stringify({ name: "demo", dependencies: { next: "^15" } }),
+  );
   await writeFile(join(cwd, "zitadel.json"), JSON.stringify({ project: "proj-001" }));
   await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify({ project_id: "proj-001" }));
   await writeFile(join(cwd, ".zitadel/state.json"), JSON.stringify({ framework: "next" }));

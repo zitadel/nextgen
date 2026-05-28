@@ -1,8 +1,8 @@
 import { chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
-import { ZitadelError } from "../lib/errors";
-import { parseJsonObject, stableStringify } from "../lib/json";
+import { ZitadelError } from "../../errors";
+import { parseJsonObject, stableStringify } from "../../json";
 import type { FileOp, ScaffoldPlan, ScaffoldResult } from "./plan";
 
 /**

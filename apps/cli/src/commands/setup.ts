@@ -1,23 +1,22 @@
-import type { ProjectContext } from "../adapters";
-import { getAdapter } from "../adapters/registry";
 import { detectDeployTarget } from "../deploy";
 import { detectFramework } from "../detect/framework";
 import { detectPackageManager } from "../detect/package-manager";
 import { detectDevPort, issuerFromPort } from "../detect/port";
 import { hasZitadelConfig, hasZitadelSecret } from "../detect/state";
-import { runInteractiveSetup } from "../interactive/setup";
+import { pickFramework, runInteractiveSetup } from "../interactive/setup";
 import type { CliIO, GlobalOptions } from "../io/output";
 import { ok, skipped } from "../io/output";
 import { ZitadelError } from "../lib/errors";
-import { AUTH_METHODS, type AuthMethod, buildFlow } from "../lib/flows";
-import { stableStringify } from "../lib/json";
-import { createPlatformClient } from "../platform";
-import { DEFAULT_SERVER } from "../platform/resolve-server";
-import type { CreateProjectResponse } from "../platform/client";
-import { getRenderer } from "../renderers/registry";
-import { scaffold } from "../scaffolder";
-import type { ScaffoldPlan } from "../scaffolder/plan";
+import { AUTH_METHODS, type AuthMethod } from "../lib/flows";
+import { Orca } from "../lib/orca";
+import { detectEmptyProject } from "../lib/orca/detect";
+import { scaffold } from "../lib/orca/file-writer";
+import { patchers } from "../lib/orca/patchers";
+import type { PatchContext } from "../lib/orca/patchers/types";
+import { scaffolders } from "../lib/orca/scaffolders";
 import { buildUserSchema, validateJsonSchema } from "../lib/user-schema";
+import { createPlatformClient } from "../platform";
+import type { CreateProjectResponse } from "../platform/client";
 import { runApply } from "./apply";
 import { runDeployConnect } from "./deploy";
 
@@ -39,12 +38,12 @@ export type SetupOptions = GlobalOptions & {
 };
 
 /**
- * Scaffolds a new Zitadel project into the target directory: detects the
- * framework, manager, and deploy target, resolves auth/schema choices (prompting
- * interactively unless suppressed), creates the remote project, writes managed
- * files, then optionally applies and connects the deploy platform. Idempotent at
- * the front: it skips when already initialized and refuses to proceed on an
- * orphaned secret to avoid clobbering partial state.
+ * Scaffolds a new Zitadel project into the target directory: detects (or, for an
+ * empty directory, scaffolds then re-detects) the framework, resolves auth/schema
+ * choices (prompting interactively unless suppressed), creates the remote project,
+ * then patches it via {@link Orca}'s framework patcher, optionally applying config
+ * and connecting the deploy platform. Idempotent at the front: it skips when
+ * already initialized and refuses to proceed on an orphaned secret.
  */
 export async function runSetup(io: CliIO, opts: SetupOptions): Promise<void> {
   if (await hasZitadelConfig(opts.cwd)) {
@@ -58,7 +57,23 @@ export async function runSetup(io: CliIO, opts: SetupOptions): Promise<void> {
     });
   }
 
-  const framework = await detectFramework(opts.cwd, opts.framework);
+  const orca = new Orca(scaffolders, patchers);
+
+  // When no framework is detected, an empty directory is scaffolded from
+  // scratch (prompting or via --framework) and then re-detected before patching.
+  const framework = await detectFramework(opts.cwd, opts.framework).catch(async (error: unknown) => {
+    if (
+      !(error instanceof ZitadelError) ||
+      error.code !== "E_FRAMEWORK_NOT_DETECTED" ||
+      !(await detectEmptyProject(opts.cwd))
+    ) {
+      throw error;
+    }
+    const frameworkId = await resolveScaffoldFramework(opts, orca);
+    await orca.scaffolderFor(frameworkId).scaffold(opts.cwd, frameworkId, {});
+    return detectFramework(opts.cwd, frameworkId);
+  });
+
   const packageManager = await detectPackageManager(opts.cwd);
   let deployTarget = opts.skipDeployPlatform
     ? undefined
@@ -90,11 +105,10 @@ export async function runSetup(io: CliIO, opts: SetupOptions): Promise<void> {
   }
 
   const previewOrigins = deployTarget?.previewOrigins ?? [];
-  const devPort = detectedPort;
-  const issuer = issuerFromPort(devPort);
-  userFields = userFields ?? ["email", "given_name", "family_name"];
+  const issuer = issuerFromPort(detectedPort);
+  const resolvedFields = userFields ?? ["email", "given_name", "family_name"];
   const resolvedMethod: AuthMethod = authMethod ?? "passkey";
-  const userSchema = buildUserSchema(resolvedMethod, userFields);
+  const userSchema = buildUserSchema(resolvedMethod, resolvedFields);
   const schemaValidation = validateJsonSchema(userSchema);
   if (!schemaValidation.valid) {
     throw new ZitadelError("E_VALIDATION", "Generated user schema is invalid", {
@@ -104,43 +118,19 @@ export async function runSetup(io: CliIO, opts: SetupOptions): Promise<void> {
 
   const project = opts.dryRun
     ? dryRunProject(previewOrigins)
-    : await createPlatformClient(effectiveServer).createProject({
-        previewOrigins: previewOrigins,
-      });
+    : await createPlatformClient(effectiveServer).createProject({ previewOrigins });
 
-  const rendererId = opts.renderer ?? "react";
-  const renderer = getRenderer(rendererId);
-  const config = projectConfig(project, issuer, framework.id, effectiveServer, rendererId);
-  const flow = buildFlow(resolvedMethod, userFields);
-  const adapter = getAdapter(framework.id);
-  const ctx: ProjectContext = {
-    cwd: opts.cwd,
-    packageManager,
+  const ctx: PatchContext = {
     framework,
-    renderer,
-    config: {
-      project_id: project.id,
-      issuer,
-      preview_origins: project.previewOrigins,
-      userSchemaPath: ".zitadel/schemas/user.json",
-    },
-    isInitialSetup: true,
+    rendererId: opts.renderer ?? "react",
+    project,
+    issuer,
+    userFields: resolvedFields,
+    authMethod: resolvedMethod,
+    userSchema,
+    server: effectiveServer,
   };
-  const plan = mergePlans(
-    basePlan({
-      project,
-      config,
-      userSchema,
-      flow,
-      packageManager,
-      framework: framework.id,
-      issuer,
-      devPort,
-      server: effectiveServer,
-    }),
-    await adapter.planSetup(ctx),
-  );
-  const result = await scaffold(plan, opts);
+  const result = await scaffold(orca.patcherFor(framework.id).plan(ctx), opts);
   const warnings: string[] = [];
 
   const setupOpts = { ...opts, source: effectiveServer };
@@ -188,123 +178,27 @@ export async function runSetup(io: CliIO, opts: SetupOptions): Promise<void> {
   );
 }
 
-function basePlan(input: {
-  project: CreateProjectResponse;
-  config: Record<string, unknown>;
-  userSchema: unknown;
-  flow: unknown;
-  packageManager: string;
-  framework: string;
-  issuer: string;
-  devPort: number;
-  server: string;
-}): ScaffoldPlan {
-  return {
-    ops: [
-      { kind: "mkdir", path: ".zitadel", mode: 0o700 },
-      { kind: "mkdir", path: ".zitadel/flows" },
-      { kind: "mkdir", path: ".zitadel/schemas" },
-      { kind: "append-gitignore", entries: [".zitadel/secret", ".env*", "!.env.example"] },
-      {
-        kind: "write",
-        path: ".zitadel/secret",
-        mode: 0o600,
-        contents: `${stableStringify({
-          project_id: input.project.id,
-          project_secret: input.project.projectSecret,
-          preview_secret: input.project.previewSecret,
-          preview_origins: input.project.previewOrigins,
-          created_at: input.project.createdAt,
-        })}\n`,
-      },
-      { kind: "write", path: "zitadel.json", contents: `${stableStringify(input.config)}\n` },
-      {
-        kind: "write",
-        path: ".zitadel/schemas/user.json",
-        contents: `${stableStringify(input.userSchema)}\n`,
-      },
-      {
-        kind: "write",
-        path: ".zitadel/flows/default.json",
-        contents: `${stableStringify(input.flow)}\n`,
-      },
-      {
-        kind: "merge-env",
-        path: ".env.example",
-        entries: {
-          ZITADEL_PROJECT_ID: "",
-          ZITADEL_ENVIRONMENT: "",
-          ZITADEL_ISSUER: "",
-          NEXTGEN_ISSUER_URL: "",
-          NEXT_PUBLIC_ZITADEL_PROJECT_ID: "",
-        },
-      },
-      {
-        kind: "merge-env",
-        path: ".env.local",
-        entries: {
-          ZITADEL_PROJECT_ID: input.project.id,
-          ZITADEL_ENVIRONMENT: "development",
-          ZITADEL_ISSUER: input.issuer,
-          NEXTGEN_ISSUER_URL: input.server,
-          NEXT_PUBLIC_ZITADEL_PROJECT_ID: input.project.id,
-        },
-      },
-      {
-        kind: "write",
-        path: ".zitadel/state.json",
-        contents: `${stableStringify({
-          framework: input.framework,
-          resources: {},
-        })}\n`,
-      },
-    ],
-    summary: [
-      {
-        title: "Zitadel config",
-        detail: "Created local config, schema, flows, env, and secret files.",
-      },
-    ],
-  };
-}
-
-function projectConfig(
-  project: CreateProjectResponse,
-  issuer: string,
-  framework: string,
-  source: string,
-  renderer: string,
-): Record<string, unknown> {
-  const environments: Record<string, unknown> = {
-    development: { issuer },
-  };
-  if (project.previewOrigins.length > 0) {
-    environments.preview = {
-      issuer_pattern: project.previewOrigins.map((origin) => `https://${origin}`),
-    };
+/**
+ * Resolves which framework to scaffold into an empty directory: the explicit
+ * `--framework`, else an interactive pick, else a hard error in non-interactive
+ * mode (an agent must pass `--framework`).
+ */
+async function resolveScaffoldFramework(opts: SetupOptions, orca: Orca): Promise<string> {
+  if (opts.framework) {
+    return opts.framework;
   }
-
-  return {
-    $schema: "https://schemas.zitadel.com/v2/project.schema.json",
-    project: project.id,
-    server: projectDefaultServer(source),
-    framework: { id: framework },
-    branding: {
-      renderer,
-      attribution: "visible",
-    },
-    environments,
-  };
-}
-
-function projectDefaultServer(source: string): string {
-  try {
-    return new URL(source).origin;
-  } catch {
-    return DEFAULT_SERVER;
+  if (opts.nonInteractive) {
+    throw new ZitadelError("E_FRAMEWORK_NOT_DETECTED", "Empty directory — pass --framework", {
+      hint: "Example: --framework next",
+    });
   }
+  return pickFramework(orca.availableFrameworks());
 }
 
+/**
+ * Validates and narrows the `--auth-method` flag to an {@link AuthMethod},
+ * returning `undefined` when unset so the caller can fall back to a default.
+ */
 function parseAuthMethod(value: string | undefined): AuthMethod | undefined {
   if (value === undefined) {
     return undefined;
@@ -322,13 +216,7 @@ function parseAuthMethod(value: string | undefined): AuthMethod | undefined {
   return trimmed as AuthMethod;
 }
 
-function mergePlans(...plans: ScaffoldPlan[]): ScaffoldPlan {
-  return {
-    ops: plans.flatMap((plan) => plan.ops),
-    summary: plans.flatMap((plan) => plan.summary),
-  };
-}
-
+/** Splits a comma-separated flag into trimmed, non-empty entries (or undefined). */
 function splitCsv(value: string | undefined): string[] | undefined {
   if (!value) {
     return undefined;
@@ -339,6 +227,7 @@ function splitCsv(value: string | undefined): string[] | undefined {
     .filter(Boolean);
 }
 
+/** A deterministic stand-in project for `--dry-run`, so no remote call is made. */
 function dryRunProject(previewOrigins: string[]): CreateProjectResponse {
   return {
     id: "dry-run-0000",
@@ -349,6 +238,7 @@ function dryRunProject(previewOrigins: string[]): CreateProjectResponse {
   };
 }
 
+/** Renders an absolute path relative to `cwd` for human-readable output. */
 function relativeDisplay(cwd: string, path: string): string {
   return path.startsWith(cwd) ? path.slice(cwd.length + 1) : path;
 }

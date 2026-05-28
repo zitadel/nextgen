@@ -4,9 +4,9 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { ZitadelError } from "../../../src/lib/errors";
-import { scaffold } from "../../../src/scaffolder/index";
-import type { ScaffoldPlan } from "../../../src/scaffolder/plan";
+import { ZitadelError } from "../../../../../src/lib/errors";
+import { scaffold } from "../../../../../src/lib/orca/file-writer/index";
+import type { ScaffoldPlan } from "../../../../../src/lib/orca/file-writer/plan";
 
 let dir: string;
 

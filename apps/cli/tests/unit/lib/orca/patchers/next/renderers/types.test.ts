@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isRendererId, RENDERER_IDS } from "../../../src/renderers/types";
+import { isRendererId, RENDERER_IDS } from "../../../../../../../src/lib/orca/patchers/next/renderers/types";
 
 describe("RENDERER_IDS", () => {
   it("lists exactly the supported renderer ids", () => {

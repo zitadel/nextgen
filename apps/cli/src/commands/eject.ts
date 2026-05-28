@@ -4,11 +4,17 @@ import { join } from "node:path";
 import type { CliIO, GlobalOptions } from "../io/output";
 import { ok, skipped } from "../io/output";
 import { ZitadelError } from "../lib/errors";
+import { Orca } from "../lib/orca";
+import { tryDetectFramework } from "../lib/orca/detect";
+import { patchers } from "../lib/orca/patchers";
+import type { EjectActions } from "../lib/orca/patchers/types";
+import { scaffolders } from "../lib/orca/scaffolders";
 import { MANAGED_MARKER } from "../lib/paths";
+import { readZitadelConfig } from "./shared";
 
 /**
- * Options for {@link runEject}. `force` is required to eject in
- * non-interactive mode, since ejecting permanently deletes managed files.
+ * Options for {@link runEject}. `force` is required to eject in non-interactive
+ * mode, since ejecting permanently deletes managed files.
  */
 export type EjectOptions = GlobalOptions & {
   force?: boolean;
@@ -16,14 +22,15 @@ export type EjectOptions = GlobalOptions & {
 
 /**
  * Removes Zitadel-managed files from the project, leaving the remote project
- * untouched.
+ * untouched. The set of files comes from the framework patcher's
+ * {@link import("../lib/orca/patchers/types").Patcher.artifacts}, so the patcher
+ * is the single source of truth for what its integration owns.
  *
- * Only `.tsx` files carrying the managed marker are removed; unmarked ones
- * are preserved to avoid clobbering user-authored pages. `.env.local` is
- * renamed to a timestamped backup rather than deleted, and the `.zitadel`
- * directory is removed wholesale. In `dryRun` mode it reports what would be
- * removed without touching the filesystem, and refuses to run without `force`
- * when non-interactive.
+ * Marked code files are removed only when they still carry the managed marker
+ * (user-replaced files are preserved); `zitadel.json` is removed; `.env.local`
+ * is renamed to a timestamped backup; and `.zitadel/` is removed wholesale.
+ * `dryRun` reports without touching the filesystem; non-interactive runs require
+ * `force`.
  */
 export async function runEject(io: CliIO, opts: EjectOptions): Promise<void> {
   if (!opts.force && opts.nonInteractive) {
@@ -32,56 +39,58 @@ export async function runEject(io: CliIO, opts: EjectOptions): Promise<void> {
     });
   }
 
+  const actions = await resolveEjectActions(opts.cwd);
   const removed: string[] = [];
   const preserved: string[] = [];
   const backedUp: string[] = [];
 
-  const candidates = [
-    "zitadel.json",
-    ".zitadel/schemas/user.json",
-    ".zitadel/flows/default.json",
-    ".zitadel/state.json",
-    ".zitadel/secret",
-    "app/login/page.tsx",
-    "app/register/page.tsx",
-    "app/zitadel-provider.tsx",
-    "src/app/login/page.tsx",
-    "src/app/register/page.tsx",
-    "src/app/zitadel-provider.tsx",
-  ];
-
-  for (const rel of candidates) {
+  for (const rel of actions.markedFiles) {
     const abs = join(opts.cwd, rel);
-    const exists = await pathExists(abs);
-    if (!exists) {
+    if (!(await pathExists(abs))) {
       continue;
     }
-    if (rel.endsWith(".tsx")) {
-      const contents = await readFile(abs, "utf8").catch(() => "");
-      if (!contents.includes(MANAGED_MARKER)) {
-        preserved.push(rel);
-        continue;
-      }
-    }
-    if (opts.dryRun) {
-      removed.push(rel);
+    const contents = await readFile(abs, "utf8").catch(() => "");
+    if (!contents.includes(MANAGED_MARKER)) {
+      preserved.push(rel);
       continue;
     }
-    await rm(abs, { recursive: true, force: true });
+    if (!opts.dryRun) {
+      await rm(abs, { force: true });
+    }
     removed.push(rel);
   }
 
-  const envLocal = join(opts.cwd, ".env.local");
-  if ((await pathExists(envLocal)) && !opts.dryRun) {
-    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const backup = join(opts.cwd, `.env.local.ejected-${stamp}`);
-    await rename(envLocal, backup);
-    backedUp.push(`.env.local -> ${backup.slice(opts.cwd.length + 1)}`);
+  for (const rel of actions.rootConfigFiles) {
+    const abs = join(opts.cwd, rel);
+    if (!(await pathExists(abs))) {
+      continue;
+    }
+    if (!opts.dryRun) {
+      await rm(abs, { force: true });
+    }
+    removed.push(rel);
   }
 
-  const zitadelDir = join(opts.cwd, ".zitadel");
-  if ((await pathExists(zitadelDir)) && !opts.dryRun) {
-    await rm(zitadelDir, { recursive: true, force: true });
+  for (const rel of actions.envBackups) {
+    const abs = join(opts.cwd, rel);
+    if (!(await pathExists(abs)) || opts.dryRun) {
+      continue;
+    }
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const backup = `${abs}.ejected-${stamp}`;
+    await rename(abs, backup);
+    backedUp.push(`${rel} -> ${backup.slice(opts.cwd.length + 1)}`);
+  }
+
+  for (const rel of actions.directories) {
+    const abs = join(opts.cwd, rel);
+    if (!(await pathExists(abs))) {
+      continue;
+    }
+    if (!opts.dryRun) {
+      await rm(abs, { recursive: true, force: true });
+    }
+    removed.push(rel);
   }
 
   if (removed.length === 0 && backedUp.length === 0) {
@@ -100,6 +109,54 @@ export async function runEject(io: CliIO, opts: EjectOptions): Promise<void> {
     },
     opts,
   );
+}
+
+/**
+ * Asks the framework patcher which artifacts it owns. Falls back to the
+ * framework-agnostic set (`zitadel.json`, `.zitadel/`, `.env.local`) when the
+ * framework or its patcher cannot be resolved, so an orphaned/partial project
+ * can still be cleaned up.
+ */
+async function resolveEjectActions(cwd: string): Promise<EjectActions> {
+  const fallback: EjectActions = {
+    markedFiles: [],
+    rootConfigFiles: ["zitadel.json"],
+    directories: [".zitadel"],
+    envBackups: [".env.local"],
+  };
+  const framework = await tryDetectFramework(cwd);
+  if (!framework) {
+    return fallback;
+  }
+  try {
+    const orca = new Orca(scaffolders, patchers);
+    return orca.patcherFor(framework.id).artifacts({
+      framework,
+      rendererId: await readRendererId(cwd),
+    });
+  } catch {
+    return fallback;
+  }
+}
+
+/** Reads the configured renderer id from `zitadel.json`, defaulting to `react`. */
+async function readRendererId(cwd: string): Promise<string> {
+  try {
+    const config = await readZitadelConfig(cwd);
+    const branding = config.branding;
+    if (
+      branding !== null &&
+      typeof branding === "object" &&
+      "renderer" in branding &&
+      typeof (branding as { renderer?: unknown }).renderer === "string"
+    ) {
+      const renderer = (branding as { renderer: string }).renderer;
+      return renderer === "default" ? "react" : renderer;
+    }
+  } catch {
+    // No (or unreadable) zitadel.json — fall through to the default renderer.
+  }
+  return "react";
 }
 
 async function pathExists(path: string): Promise<boolean> {

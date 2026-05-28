@@ -153,6 +153,22 @@ export async function runInteractiveSetup(
   };
 }
 
+/**
+ * Prompts for a framework to scaffold when the directory is empty and nothing
+ * could be auto-detected. Choices come from `Orca.availableFrameworks`.
+ */
+export async function pickFramework(
+  choices: ReadonlyArray<{ id: string; displayName: string }>,
+): Promise<string> {
+  intro("Zitadel setup — new project");
+  const picked = await select({
+    message: "Choose a framework to scaffold",
+    options: choices.map((choice) => ({ value: choice.id, label: choice.displayName })),
+  });
+  bail(picked);
+  return picked as string;
+}
+
 function bail<T>(value: T | symbol): asserts value is T {
   if (isCancel(value)) {
     cancel("Setup cancelled.");

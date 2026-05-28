@@ -1,20 +1,21 @@
 import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 
-import type { ProjectContext } from "../adapters";
-import { getAdapter } from "../adapters/registry";
 import { detectDeployTarget } from "../deploy";
 import { detectFramework } from "../detect/framework";
-import { detectPackageManager } from "../detect/package-manager";
 import { detectDevPort, issuerFromPort } from "../detect/port";
 import type { CliIO, GlobalOptions } from "../io/output";
 import { ok } from "../io/output";
 import { ZitadelError } from "../lib/errors";
+import { type AuthMethod } from "../lib/flows";
+import { Orca } from "../lib/orca";
+import { scaffold } from "../lib/orca/file-writer";
+import { patchers } from "../lib/orca/patchers";
+import type { PatchContext } from "../lib/orca/patchers/types";
+import { reclaimableOps } from "../lib/orca/reclaim";
+import { scaffolders } from "../lib/orca/scaffolders";
 import { MANAGED_MARKER } from "../lib/paths";
-import { getRenderer } from "../renderers/registry";
-import { scaffold } from "../scaffolder";
-import type { ScaffoldPlan } from "../scaffolder/plan";
-import { validateJsonSchema } from "../lib/user-schema";
+import { validateJsonSchema, type UserSchema } from "../lib/user-schema";
 import { readZitadelConfig, readZitadelSecret } from "./shared";
 
 /**
@@ -221,58 +222,51 @@ async function collectChecks(cwd: string): Promise<DoctorCheck[]> {
 }
 
 async function applyFixes(opts: DoctorOptions): Promise<void> {
-  const config = await readZitadelConfig(opts.cwd);
-  const secret = await readZitadelSecret(opts.cwd);
-  const framework = await detectFramework(opts.cwd, "next");
-  const packageManager = await detectPackageManager(opts.cwd);
-  const adapter = getAdapter(framework.id);
-  const issuer = await resolveIssuer(opts.cwd, config);
-  const rendererId = readRendererId(config);
-  const renderer = getRenderer(rendererId);
-  const ctx: ProjectContext = {
-    cwd: opts.cwd,
-    packageManager,
+  const ctx = await loadPatchContext(opts.cwd);
+  const orca = new Orca(scaffolders, patchers);
+  const plan = orca.patcherFor(ctx.framework.id).plan(ctx);
+  // `doctor --fix` reclaims the managed artifacts — env files, gitignore, the
+  // SDK dependency, and marker-bearing routes/middleware — even when locally
+  // edited. The user-editable `.zitadel/` resource files are filtered out by
+  // `reclaimableOps`, so they are never clobbered here.
+  await scaffold(
+    { ops: reclaimableOps(plan), summary: plan.summary },
+    { cwd: opts.cwd, dryRun: opts.dryRun, force: true },
+  );
+}
+
+/**
+ * Reconstructs a {@link PatchContext} from the on-disk project (config, secret,
+ * user schema) plus fresh framework detection, so `doctor --fix` can rebuild the
+ * patcher plan. Auth method and fields are read back from the user schema; their
+ * exact values only affect the `.zitadel/` resource contents, which `--fix`
+ * filters out anyway.
+ */
+async function loadPatchContext(cwd: string): Promise<PatchContext> {
+  const config = await readZitadelConfig(cwd);
+  const secret = await readZitadelSecret(cwd);
+  const framework = await detectFramework(cwd, "next");
+  const raw = JSON.parse(
+    await readFile(join(cwd, ".zitadel/schemas/user.json"), "utf8"),
+  ) as Record<string, unknown>;
+  const properties = isObject(raw.properties) ? raw.properties : {};
+  const authMethods = isObject(raw["x-auth-methods"]) ? raw["x-auth-methods"] : {};
+  return {
     framework,
-    renderer,
-    config: {
-      project_id: secret.project_id,
-      issuer,
-      preview_origins: secret.preview_origins,
-      userSchemaPath: ".zitadel/schemas/user.json",
+    rendererId: readRendererId(config),
+    issuer: await resolveIssuer(cwd, config),
+    server: typeof config.server === "string" ? config.server : "",
+    project: {
+      id: secret.project_id,
+      projectSecret: secret.project_secret,
+      previewSecret: secret.preview_secret,
+      previewOrigins: secret.preview_origins,
+      createdAt: secret.created_at,
     },
-    isInitialSetup: false,
+    userFields: Object.keys(properties),
+    authMethod: (Object.keys(authMethods)[0] ?? "passkey") as AuthMethod,
+    userSchema: raw as UserSchema,
   };
-  const recordedServer = typeof config.server === "string" ? config.server : "";
-  const plan: ScaffoldPlan = {
-    ops: [
-      { kind: "append-gitignore", entries: [".zitadel/secret", ".env*", "!.env.example"] },
-      {
-        kind: "merge-env",
-        path: ".env.example",
-        entries: {
-          ZITADEL_PROJECT_ID: "",
-          ZITADEL_ENVIRONMENT: "",
-          ZITADEL_ISSUER: "",
-          NEXTGEN_ISSUER_URL: "",
-        },
-      },
-      {
-        kind: "merge-env",
-        path: ".env.local",
-        entries: {
-          ZITADEL_PROJECT_ID: secret.project_id,
-          ZITADEL_ENVIRONMENT: "development",
-          ZITADEL_ISSUER: issuer,
-          NEXTGEN_ISSUER_URL: recordedServer,
-        },
-      },
-      ...(await adapter.planSetup(ctx)).ops,
-    ],
-    summary: [{ title: "Doctor fix", detail: "Re-applied missing managed files." }],
-  };
-  // Managed files carry a marker; `doctor --fix` is expected to reclaim them
-  // even if they have local edits. Unmanaged files stay protected by the conflict guard.
-  await scaffold(plan, { cwd: opts.cwd, dryRun: opts.dryRun, force: true });
 }
 
 async function check<T>(
