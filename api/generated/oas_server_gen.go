@@ -99,6 +99,12 @@ type Handler interface {
 	//
 	// POST /sessions
 	CreateSession(ctx context.Context, req *CreateSessionRequest) (CreateSessionRes, error)
+	// CreateTeam implements createTeam operation.
+	//
+	// Create team.
+	//
+	// POST /teams
+	CreateTeam(ctx context.Context, req *CreateTeamRequest, params CreateTeamParams) (CreateTeamRes, error)
 	// DeleteFlowDefinition implements deleteFlowDefinition operation.
 	//
 	// Delete a flow definition by id.
@@ -221,6 +227,12 @@ type Handler interface {
 	//
 	// GET /sessions/{session_id}
 	GetSession(ctx context.Context, params GetSessionParams) (GetSessionRes, error)
+	// GetTeam implements getTeam operation.
+	//
+	// Returns the current state of a team.
+	//
+	// GET /teams/{team_id}
+	GetTeam(ctx context.Context, params GetTeamParams) (GetTeamRes, error)
 	// GetToken implements getToken operation.
 	//
 	// Get accesstoken.

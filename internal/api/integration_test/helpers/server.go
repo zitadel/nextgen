@@ -47,6 +47,7 @@ func (h *Harness) EnsureHandler(t *testing.T) *api.Handler {
 			h.EnsureUserService(t),
 			h.EnsureSchemaService(t),
 			h.EnsureFlowDefinitionService(t),
+			h.EnsureTeamService(t),
 		)
 	}
 	return h.Handler
