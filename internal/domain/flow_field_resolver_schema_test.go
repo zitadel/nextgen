@@ -223,11 +223,11 @@ func TestSchemaFieldResolver_Resolve_UniqueScopeSurfaces(t *testing.T) {
 		t.Fatalf("Resolve returned error: %v", err)
 	}
 
-	if got.Fields["email"].Unique != domain.FlowFieldUniqueScopeTeam {
-		t.Errorf("Resolve email Unique = %q, want %q", got.Fields["email"].Unique, domain.FlowFieldUniqueScopeTeam)
+	if got.Fields["email"].Unique != domain.AttributeUniquenessTeam {
+		t.Errorf("Resolve email Unique = %v, want %v", got.Fields["email"].Unique, domain.AttributeUniquenessTeam)
 	}
-	if got.Fields["password"].Unique != domain.FlowFieldUniqueScopeNone {
-		t.Errorf("Resolve password Unique = %q, want %q", got.Fields["password"].Unique, domain.FlowFieldUniqueScopeNone)
+	if got.Fields["password"].Unique != domain.AttributeUniquenessUnspecified {
+		t.Errorf("Resolve password Unique = %v, want %v", got.Fields["password"].Unique, domain.AttributeUniquenessUnspecified)
 	}
 }
 
@@ -246,8 +246,8 @@ func TestSchemaFieldResolver_Resolve_UniqueScopeProject(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Resolve returned error: %v", err)
 	}
-	if got.Fields["handle"].Unique != domain.FlowFieldUniqueScopeProject {
-		t.Errorf("Resolve handle Unique = %q, want %q", got.Fields["handle"].Unique, domain.FlowFieldUniqueScopeProject)
+	if got.Fields["handle"].Unique != domain.AttributeUniquenessProject {
+		t.Errorf("Resolve handle Unique = %v, want %v", got.Fields["handle"].Unique, domain.AttributeUniquenessProject)
 	}
 }
 

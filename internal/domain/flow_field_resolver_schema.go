@@ -123,8 +123,8 @@ func deriveFieldType(propSchema *jsonschema.Schema) FlowFieldType {
 // surfaces as Password when the schema-level `x-auth-methods.password`
 // is enabled. Other credential kinds (passkey, magic_link, sso, otp)
 // have no user-property-shaped proof and are never surfaced here.
-func deriveChallenge(propSchema *jsonschema.Schema, unique FlowFieldUniqueScope, passwordEnabled bool) FlowFieldChallenge {
-	if unique != FlowFieldUniqueScopeNone {
+func deriveChallenge(propSchema *jsonschema.Schema, unique AttributeUniqueness, passwordEnabled bool) FlowFieldChallenge {
+	if unique != AttributeUniquenessUnspecified {
 		return FlowFieldChallengeIdentifier
 	}
 	if isPassword(propSchema) && passwordEnabled {
@@ -133,14 +133,14 @@ func deriveChallenge(propSchema *jsonschema.Schema, unique FlowFieldUniqueScope,
 	return FlowFieldChallengeNone
 }
 
-func deriveUnique(propSchema *jsonschema.Schema) FlowFieldUniqueScope {
+func deriveUnique(propSchema *jsonschema.Schema) AttributeUniqueness {
 	switch lookupString(propSchema, "x-unique") {
 	case "project":
-		return FlowFieldUniqueScopeProject
+		return AttributeUniquenessProject
 	case "team":
-		return FlowFieldUniqueScopeTeam
+		return AttributeUniquenessTeam
 	}
-	return FlowFieldUniqueScopeNone
+	return AttributeUniquenessUnspecified
 }
 
 func buildValidation(propSchema *jsonschema.Schema) *FlowFieldValidation {

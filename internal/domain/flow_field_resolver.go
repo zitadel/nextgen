@@ -64,15 +64,15 @@ type FlowField struct {
 	Validation *FlowFieldValidation
 
 	// Unique mirrors the property's `x-unique` annotation: the scope at
-	// which the value must be unique, or [FlowFieldUniqueScopeNone] when
-	// absent. The user-creation path consults it to set the per-attribute
-	// uniqueness scope on storage.
-	Unique FlowFieldUniqueScope
+	// which the value must be unique, or [AttributeUniquenessUnspecified]
+	// when absent. The user-creation path consults it to set the
+	// per-attribute uniqueness scope on storage.
+	Unique AttributeUniqueness
 
 	// Challenge names the auth-attempt challenge the field maps to, or
 	// [FlowFieldChallengeNone] when the field carries neither an
 	// identifier nor a credential proof. Derivation paths: a non-empty
-	// `x-unique` scope on the property surfaces as
+	// `x-unique` annotation on the property surfaces as
 	// [FlowFieldChallengeIdentifier] (any uniquely-keyed property can
 	// identify a user); `x-password: true` combined with schema-level
 	// `x-auth-methods.password.enabled = true` surfaces as
@@ -106,16 +106,6 @@ const (
 	FlowFieldChallengeMagicLink  FlowFieldChallenge = "magic_link"
 	FlowFieldChallengeSSO        FlowFieldChallenge = "sso"
 	FlowFieldChallengeOTP        FlowFieldChallenge = "otp"
-)
-
-// FlowFieldUniqueScope mirrors the `x-unique` enum in the user
-// meta-schema (api/openapi/endpoints/schemas/user-property.yaml).
-type FlowFieldUniqueScope string
-
-const (
-	FlowFieldUniqueScopeNone    FlowFieldUniqueScope = ""
-	FlowFieldUniqueScopeProject FlowFieldUniqueScope = "project"
-	FlowFieldUniqueScopeTeam    FlowFieldUniqueScope = "team"
 )
 
 // FlowFieldValidation carries the validation rules the resolver
