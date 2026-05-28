@@ -1,6 +1,6 @@
-import { scaffold } from "../../file-writer";
-import type { FileOp, ScaffoldPlan } from "../../file-writer/plan";
-import { zitadelBaseOps } from "../base-files";
+import { scaffold } from "./file-writer";
+import type { FileOp, ScaffoldPlan } from "./file-writer/plan";
+import { zitadelBaseOps } from "./base-files";
 import type {
   EjectActions,
   Patcher,

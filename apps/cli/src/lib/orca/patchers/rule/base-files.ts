@@ -1,8 +1,8 @@
-import { buildFlow } from "../../flows";
-import { stableStringify } from "../../json";
-import { DEFAULT_SERVER } from "../../../platform/resolve-server";
-import type { FileOp } from "../file-writer/plan";
-import type { PatchContext } from "./types";
+import { buildFlow } from "../../../flows";
+import { stableStringify } from "../../../json";
+import { DEFAULT_SERVER } from "../../../../platform/resolve-server";
+import type { FileOp } from "./file-writer/plan";
+import type { PatchContext } from "../types";
 
 /**
  * The framework-agnostic `.zitadel/` base files every patcher writes,

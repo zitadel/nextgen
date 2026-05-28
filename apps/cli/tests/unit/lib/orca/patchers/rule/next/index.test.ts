@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { FileOp, ScaffoldPlan } from "../../../../../../../src/lib/orca/file-writer/plan";
+import type { FileOp, ScaffoldPlan } from "../../../../../../../src/lib/orca/patchers/rule/file-writer/plan";
 import { NextPatcher } from "../../../../../../../src/lib/orca/patchers/rule/next";
 import type { PatchContext } from "../../../../../../../src/lib/orca/patchers/types";
 import { MANAGED_MARKER } from "../../../../../../../src/lib/paths";
