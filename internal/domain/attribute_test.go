@@ -76,7 +76,8 @@ func TestFlattenMapToCreateAttributes(t *testing.T) {
 									"type": "string",
 								},
 								"zipCode": map[string]any{
-									"type": "string",
+									"type":     "string",
+									"x-unique": "project",
 								},
 								"country": map[string]any{
 									"type": "string",
@@ -92,7 +93,7 @@ func TestFlattenMapToCreateAttributes(t *testing.T) {
 					mustNewCreateAttribute(t, "address.houseNumber", "32b", AttributeUniquenessUnspecified),
 					mustNewCreateAttribute(t, "address.country", "madeupia", AttributeUniquenessUnspecified),
 					mustNewCreateAttribute(t, "address.city", "examplus", AttributeUniquenessUnspecified),
-					mustNewCreateAttribute(t, "address.zipCode", "1234AB", AttributeUniquenessUnspecified),
+					mustNewCreateAttribute(t, "address.zipCode", "1234AB", AttributeUniquenessProject),
 				},
 			},
 		}

@@ -91,14 +91,15 @@ func FlattenMapToCreateAttributes(m map[string]any, schema map[string]any, nameP
 
 		switch vv := v.(type) {
 		case map[string]any:
-			props, ok := maputil.GetNested[map[string]any](schema, key)
-			if !ok || props == nil {
-				newAttrs, err := FlattenMapToCreateAttributes(vv, props, fullKey)
-				if err != nil {
-					return nil, err
-				}
-				attrs = append(attrs, newAttrs...)
+			props, ok := maputil.GetNested[map[string]any](schema, "properties."+key)
+			if !ok {
+				props = nil
 			}
+			newAttrs, err := FlattenMapToCreateAttributes(vv, props, fullKey)
+			if err != nil {
+				return nil, err
+			}
+			attrs = append(attrs, newAttrs...)
 
 		default:
 			var unique AttributeUniqueness
