@@ -19,6 +19,11 @@
     "dist",
     "AGENTS.md"
   ],
+  "oclif": {
+    "bin": "zitadel",
+    "dirname": "zitadel",
+    "commands": "./dist/commands"
+  },
   "type": "module",
   "scripts": {
     "build": "tsdown",
@@ -28,6 +33,17 @@
   },
   "dependencies": {
     "@clack/prompts": "catalog:",
+    "@oclif/core": "catalog:",
+    "@oclif/plugin-autocomplete": "catalog:",
+    "@oclif/plugin-commands": "catalog:",
+    "@oclif/plugin-help": "catalog:",
+    "@oclif/plugin-not-found": "catalog:",
+    "@oclif/plugin-plugins": "catalog:",
+    "@oclif/plugin-search": "catalog:",
+    "@oclif/plugin-update": "catalog:",
+    "@oclif/plugin-version": "catalog:",
+    "@oclif/plugin-warn-if-update-available": "catalog:",
+    "@oclif/plugin-which": "catalog:",
     "@zitadel-nextgen/api": "workspace:*",
     "ajv": "catalog:",
     "consola": "^3.4.2",
