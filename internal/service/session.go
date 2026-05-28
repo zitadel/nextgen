@@ -26,6 +26,8 @@ type ExchangeInput struct {
 	ProjectID      string
 	HandoffToken   string
 	IdempotencyKey *string
+	// TTL is optional; nil uses the configured default.
+	TTL *time.Duration
 }
 
 type GetSessionInput struct {
@@ -44,6 +46,7 @@ type DeleteSessionInput struct {
 type sessionService struct {
 	pool database.Pool
 	repo domain.SessionRepository
+	cfg  SessionConfig
 }
 
 func (s *sessionService) Create(ctx context.Context, input CreateSessionInput) (*domain.Session, error) {
@@ -59,7 +62,11 @@ func (s *sessionService) Create(ctx context.Context, input CreateSessionInput) (
 }
 
 func (s *sessionService) Exchange(ctx context.Context, input ExchangeInput) (*domain.Session, error) {
-	session, err := s.repo.Exchange(ctx, s.pool, input.ProjectID, input.HandoffToken, input.IdempotencyKey, time.Duration(0)) // TODO: configured TTL
+	ttl, err := domain.ResolveSessionTTL(input.TTL, s.cfg.DefaultTTL, s.cfg.MaxTTL)
+	if err != nil {
+		return nil, err
+	}
+	session, err := s.repo.Exchange(ctx, s.pool, input.ProjectID, input.HandoffToken, input.IdempotencyKey, ttl)
 	if err != nil {
 		if errors.Is(err, domain.ErrSessionExchangeConflict()) || errors.Is(err, domain.ErrSessionInvalidHandoffToken()) {
 			return nil, err
@@ -96,9 +103,10 @@ func (s *sessionService) Delete(ctx context.Context, input DeleteSessionInput) e
 	return nil
 }
 
-func NewSessionService(pool database.Pool, repo domain.SessionRepository) SessionService {
+func NewSessionService(pool database.Pool, repo domain.SessionRepository, cfg SessionConfig) SessionService {
 	return &sessionService{
 		pool: pool,
 		repo: repo,
+		cfg:  cfg,
 	}
 }

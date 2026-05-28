@@ -39,7 +39,7 @@ func (h *Harness) EnsureHandler(t *testing.T) *api.Handler {
 	t.Helper()
 	if h.Handler == nil {
 		h.Handler = api.NewHandler(
-			h.EnsureSealer(t),
+			h.EnsureCrypter(t),
 			h.EnsureFlowService(t),
 			h.EnsureAuthAttemptService(t),
 			h.EnsureSessionService(t),

@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-faster/errors"
 	"github.com/go-faster/jx"
+	"github.com/zitadel/nextgen/internal/api/ogenx"
 )
 
 // Merged schema.
@@ -2191,6 +2192,9 @@ type ExchangeRequest struct {
 	// The one-time handoff token minted by `POST /auth_attempts/{id}/handoff`.
 	// Single-use — replaying it after a successful exchange returns `410 Gone`.
 	HandoffToken string `json:"handoff_token"`
+	// Optional session lifetime after exchange as an ISO-8601 duration. When omitted, the server
+	// uses the configured default. Must not exceed the configured maximum.
+	TTL OptDuration `json:"ttl"`
 }
 
 // GetHandoffToken returns the value of HandoffToken.
@@ -2198,9 +2202,19 @@ func (s *ExchangeRequest) GetHandoffToken() string {
 	return s.HandoffToken
 }
 
+// GetTTL returns the value of TTL.
+func (s *ExchangeRequest) GetTTL() OptDuration {
+	return s.TTL
+}
+
 // SetHandoffToken sets the value of HandoffToken.
 func (s *ExchangeRequest) SetHandoffToken(val string) {
 	s.HandoffToken = val
+}
+
+// SetTTL sets the value of TTL.
+func (s *ExchangeRequest) SetTTL(val OptDuration) {
+	s.TTL = val
 }
 
 // An authentication factor method.
@@ -6907,6 +6921,52 @@ func (o OptDateTime) Get() (v time.Time, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptDateTime) Or(d time.Time) time.Time {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptDuration returns new OptDuration with value set to v.
+func NewOptDuration(v ogenx.ISODuration) OptDuration {
+	return OptDuration{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptDuration is optional ogenx.ISODuration.
+type OptDuration struct {
+	Value ogenx.ISODuration
+	Set   bool
+}
+
+// IsSet returns true if OptDuration was set.
+func (o OptDuration) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptDuration) Reset() {
+	var v ogenx.ISODuration
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptDuration) SetTo(v ogenx.ISODuration) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptDuration) Get() (v ogenx.ISODuration, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptDuration) Or(d ogenx.ISODuration) ogenx.ISODuration {
 	if v, ok := o.Get(); ok {
 		return v
 	}

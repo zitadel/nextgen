@@ -2,6 +2,7 @@ package helpers
 
 import (
 	"testing"
+	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
@@ -14,6 +15,7 @@ func (h *Harness) EnsureSessionService(t *testing.T) service.SessionService {
 		h.SessionService = service.NewSessionService(
 			h.EnsureDBPool(t),
 			h.EnsureSessionRepo(t),
+			service.SessionConfig{DefaultTTL: time.Hour, MaxTTL: 24 * time.Hour},
 		)
 	}
 	return h.SessionService
