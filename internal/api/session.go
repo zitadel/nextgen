@@ -32,8 +32,12 @@ func (h Handler) CreateSession(ctx context.Context, req *api.CreateSessionReques
 }
 
 func (h Handler) ExchangeHandoff(ctx context.Context, req *api.ExchangeRequest, params api.ExchangeHandoffParams) (api.ExchangeHandoffRes, error) {
+	projectID, ok := params.ProjectID.Get()
+	if !ok {
+		return nil, domain.ErrSessionMissingProjectID()
+	}
 	input := service.ExchangeInput{
-		ProjectID:    string(params.ProjectID.Value),
+		ProjectID:    string(projectID),
 		HandoffToken: req.HandoffToken,
 	}
 	if key, ok := params.IdempotencyKey.Get(); ok {
@@ -47,8 +51,12 @@ func (h Handler) ExchangeHandoff(ctx context.Context, req *api.ExchangeRequest, 
 }
 
 func (h Handler) GetSession(ctx context.Context, params api.GetSessionParams) (api.GetSessionRes, error) {
+	projectID, ok := params.ProjectID.Get()
+	if !ok {
+		return nil, domain.ErrSessionMissingProjectID()
+	}
 	input := service.GetSessionInput{
-		ProjectID: string(params.ProjectID.Value),
+		ProjectID: string(projectID),
 		SessionID: string(params.SessionID),
 	}
 
@@ -80,8 +88,12 @@ func (h Handler) GetMySession(ctx context.Context, params api.GetMySessionParams
 }
 
 func (h Handler) ListSessions(ctx context.Context, params api.ListSessionsParams) (api.ListSessionsRes, error) {
+	projectID, ok := params.ProjectID.Get()
+	if !ok {
+		return nil, domain.ErrSessionMissingProjectID()
+	}
 	input := service.ListSessionInput{
-		ProjectID: string(params.ProjectID.Value),
+		ProjectID: string(projectID),
 		// TODO: handle params
 	}
 	sessions, err := h.sessionService.List(ctx, input)
@@ -92,8 +104,12 @@ func (h Handler) ListSessions(ctx context.Context, params api.ListSessionsParams
 }
 
 func (h Handler) RevokeSession(ctx context.Context, params api.RevokeSessionParams) (api.RevokeSessionRes, error) {
+	projectID, ok := params.ProjectID.Get()
+	if !ok {
+		return nil, domain.ErrSessionMissingProjectID()
+	}
 	input := service.DeleteSessionInput{
-		ProjectID: string(params.ProjectID.Value),
+		ProjectID: string(projectID),
 		SessionID: string(params.SessionID),
 	}
 
@@ -318,7 +334,8 @@ func sessionErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
 	case domain.ErrSessionTokenInvalid().Code:
 		return errorResponseWithStatusCode(http.StatusUnauthorized, err)
-	case domain.ErrNotImplemented().Code:
+	case domain.ErrNotImplemented().Code,
+		domain.ErrSessionMissingProjectID().Code:
 		return errorResponseWithStatusCode(http.StatusNotImplemented, err)
 	default:
 		return internalErrorResponse(err)

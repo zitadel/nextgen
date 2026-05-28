@@ -22,6 +22,14 @@ func ErrSessionInvalidHandoffToken() Error {
 	return newError("sess.invalid_handoff_token", "The handoff token is invalid. Either the token does not exists, was already consumed or has expired", nil, nil)
 }
 
+// ErrSessionMissingProjectID is returned when the project_id query parameter is missing in a session API request.
+// This is currently required to fulfill requests, but is objective to change later when the project id is part of the token.
+//
+// TODO(adlerhurst): remove this error and the requirement for the project_id query parameter once the project id is part of the token.
+func ErrSessionMissingProjectID() Error {
+	return newError("sess.project_id_missing", "The session API currently requires the project_id query parameter to fulfill requests. This is objective to change later when the project id is part of the token.", nil, nil)
+}
+
 func ErrSessionExchangeConflict() Error {
 	return newError("sess.exchange_conflict", "The exchange resulted in a conflict. Either the target session was revoked or verified factors could not be promoted consistently.", nil, nil)
 }
