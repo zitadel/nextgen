@@ -40,6 +40,10 @@ func (h Handler) ExchangeHandoff(ctx context.Context, req *api.ExchangeRequest, 
 	if key, ok := params.IdempotencyKey.Get(); ok {
 		input.IdempotencyKey = new(key)
 	}
+	if ttlSeconds, ok := req.TTLSeconds.Get(); ok {
+		ttl := time.Duration(ttlSeconds) * time.Second
+		input.TTL = &ttl
+	}
 	session, err := h.sessionService.Exchange(ctx, input)
 	if err != nil {
 		return nil, err
@@ -319,7 +323,8 @@ func sessionErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 	case domain.ErrSessionTokenCreationFailed().Code:
 		return errorResponseWithStatusCode(http.StatusInternalServerError, err)
 	case domain.ErrSessionExchangeConflict().Code,
-		domain.ErrSessionInvalidHandoffToken().Code:
+		domain.ErrSessionInvalidHandoffToken().Code,
+		domain.ErrSessionInvalidTTL().Code:
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
 	case domain.ErrSessionTokenInvalid().Code:
 		return errorResponseWithStatusCode(http.StatusUnauthorized, err)

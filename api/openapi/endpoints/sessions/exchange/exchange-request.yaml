@@ -9,4 +9,12 @@ properties:
       The one-time handoff token minted by `POST /auth_attempts/{id}/handoff`.
       Single-use — replaying it after a successful exchange returns `410 Gone`.
     example: handoff_abc123def456xyz
+  ttl_seconds:
+    type: integer
+    format: int64
+    minimum: 1
+    description: |
+      Optional session lifetime in seconds after exchange. When omitted, the server
+      uses the configured default. Must not exceed the configured maximum.
+    example: 3600
 

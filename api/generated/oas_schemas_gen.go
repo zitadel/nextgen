@@ -2189,6 +2189,9 @@ type ExchangeRequest struct {
 	// The one-time handoff token minted by `POST /auth_attempts/{id}/handoff`.
 	// Single-use — replaying it after a successful exchange returns `410 Gone`.
 	HandoffToken string `json:"handoff_token"`
+	// Optional session lifetime in seconds after exchange. When omitted, the server
+	// uses the configured default. Must not exceed the configured maximum.
+	TTLSeconds OptInt64 `json:"ttl_seconds"`
 }
 
 // GetHandoffToken returns the value of HandoffToken.
@@ -2196,9 +2199,19 @@ func (s *ExchangeRequest) GetHandoffToken() string {
 	return s.HandoffToken
 }
 
+// GetTTLSeconds returns the value of TTLSeconds.
+func (s *ExchangeRequest) GetTTLSeconds() OptInt64 {
+	return s.TTLSeconds
+}
+
 // SetHandoffToken sets the value of HandoffToken.
 func (s *ExchangeRequest) SetHandoffToken(val string) {
 	s.HandoffToken = val
+}
+
+// SetTTLSeconds sets the value of TTLSeconds.
+func (s *ExchangeRequest) SetTTLSeconds(val OptInt64) {
+	s.TTLSeconds = val
 }
 
 // An authentication factor method.
@@ -7858,6 +7871,52 @@ func (o OptInt) Get() (v int, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptInt) Or(d int) int {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptInt64 returns new OptInt64 with value set to v.
+func NewOptInt64(v int64) OptInt64 {
+	return OptInt64{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptInt64 is optional int64.
+type OptInt64 struct {
+	Value int64
+	Set   bool
+}
+
+// IsSet returns true if OptInt64 was set.
+func (o OptInt64) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptInt64) Reset() {
+	var v int64
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptInt64) SetTo(v int64) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptInt64) Get() (v int64, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptInt64) Or(d int64) int64 {
 	if v, ok := o.Get(); ok {
 		return v
 	}
