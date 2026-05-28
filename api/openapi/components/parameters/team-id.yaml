@@ -1,0 +1,5 @@
+name: team_id
+in: query
+description: The unique identifier of the team
+schema:
+  $ref: '../schemas/team-id.yaml'

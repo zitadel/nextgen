@@ -43,7 +43,7 @@ export function resolveZitadelRuntime(input: ZitadelRuntimeInput): ZitadelRuntim
   if (environment === "production" && !input.issuer) {
     throw new ZitadelRuntimeError(
       "E_ZITADEL_CONFIG",
-      "ZITADEL_ISSUER is required in production. Run `npx zitadel@latest claim` before production deploys.",
+      "ZITADEL_ISSUER is required in production.",
     );
   }
   return {

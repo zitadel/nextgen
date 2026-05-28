@@ -21,8 +21,11 @@ func (s SecurityHandler) HandleOAuth2(ctx context.Context, operationName api.Ope
 		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
 	}
 	// TODO: add proper token validation
-	projectID, ok := strings.CutPrefix(t.Token, "sk_proj_")
+	projectID, ok := strings.CutPrefix(t.Token, "sk_")
 	if !ok {
+		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+	}
+	if !strings.HasPrefix(projectID, "proj_") {
 		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
 	}
 	return WithScopeContext(ctx, ScopeContext{ProjectID: projectID}), nil

@@ -2,7 +2,6 @@ import type { ProjectContext } from "../adapters";
 import { getAdapter } from "../adapters/registry";
 import { detectDeployTarget } from "../deploy";
 import { detectFramework } from "../detect/framework";
-import { readPackageJson } from "../detect/package-json";
 import { detectPackageManager } from "../detect/package-manager";
 import { detectDevPort, issuerFromPort } from "../detect/port";
 import { hasZitadelConfig, hasZitadelSecret } from "../detect/state";
@@ -10,10 +9,9 @@ import { runInteractiveSetup } from "../interactive/setup";
 import type { CliIO, GlobalOptions } from "../io/output";
 import { ok, skipped } from "../io/output";
 import { ZitadelError } from "../lib/errors";
-import { sha256 } from "../lib/hash";
 import { stableStringify } from "../lib/json";
 import { createPlatformClient } from "../platform";
-import { DEFAULT_SERVER, MOCK_SENTINEL } from "../platform/resolve-server";
+import { DEFAULT_SERVER } from "../platform/resolve-server";
 import type { CreateProjectResponse } from "../platform/schemas";
 import { getRenderer } from "../renderers/registry";
 import { scaffold } from "../scaffolder";
@@ -22,6 +20,15 @@ import { defaultUserSchema } from "../schema/default";
 import { validateJsonSchema } from "../schema/validate";
 import { runApply } from "./apply";
 import { runDeployConnect } from "./deploy";
+
+/**
+ * Canonical URI for the human-user schema flow definitions reference by
+ * default. The schema body the CLI writes locally (`.zitadel/schemas/user.json`)
+ * is derived from this same shape; the URI is the spec-required pointer the
+ * platform stores against the flow.
+ */
+const DEFAULT_USER_SCHEMA_URI =
+  "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/human-user.yaml";
 
 export type SetupOptions = GlobalOptions & {
   framework?: string;
@@ -51,7 +58,6 @@ export async function runSetup(io: CliIO, opts: SetupOptions): Promise<void> {
   let deployTarget = opts.skipDeployPlatform
     ? undefined
     : await detectDeployTarget(opts.cwd, opts.platform);
-  const pkg = await readPackageJson(opts.cwd);
   let detectedPort = await detectDevPort(opts.cwd);
   let effectiveServer = opts.source;
 
@@ -94,13 +100,7 @@ export async function runSetup(io: CliIO, opts: SetupOptions): Promise<void> {
   const project = opts.dryRun
     ? dryRunProject(previewOrigins)
     : await createPlatformClient(effectiveServer).createProject({
-        preview_origins: previewOrigins,
-        slug_preference: pkg.name,
-        client_metadata: {
-          framework: framework.id,
-          package_manager: packageManager,
-          cli: "zitadel",
-        },
+        previewOrigins: previewOrigins,
       });
 
   const rendererId = opts.renderer ?? "react";
@@ -115,9 +115,9 @@ export async function runSetup(io: CliIO, opts: SetupOptions): Promise<void> {
     framework,
     renderer,
     config: {
-      project_id: project.project_id,
+      project_id: project.id,
       issuer,
-      preview_origins: project.preview_origins,
+      preview_origins: project.previewOrigins,
       userSchemaPath: ".zitadel/schemas/user.json",
     },
     isInitialSetup: true,
@@ -141,10 +141,11 @@ export async function runSetup(io: CliIO, opts: SetupOptions): Promise<void> {
   const warnings: string[] = [];
 
   const setupOpts = { ...opts, source: effectiveServer };
-  const apply =
-    opts.noApply || opts.dryRun
-      ? undefined
-      : await runApply(io, { ...setupOpts, json: true, silent: true });
+  let apply: { synced: boolean } | undefined;
+  if (!opts.noApply && !opts.dryRun) {
+    await runApply(io, { ...setupOpts, json: true, silent: true });
+    apply = { synced: true };
+  }
   const deploy =
     !deployTarget || deployTarget.id === "none" || opts.skipDeployPlatform || opts.dryRun
       ? undefined
@@ -164,12 +165,10 @@ export async function runSetup(io: CliIO, opts: SetupOptions): Promise<void> {
   ok(
     io,
     {
-      title: "Zitadel is ready in pre-claim mode.",
+      title: "Zitadel is ready.",
       project: {
-        project_id: project.project_id,
-        lifecycle: "pre-claim",
+        project_id: project.id,
         issuer,
-        scratch_dashboard_url: project.scratch_dashboard_url,
       },
       framework: framework.id,
       package_manager: packageManager,
@@ -178,11 +177,8 @@ export async function runSetup(io: CliIO, opts: SetupOptions): Promise<void> {
       files_skipped: result.filesSkipped.map((file) => relativeDisplay(opts.cwd, file)),
       apply,
       deploy,
-      next_actions: [
-        "Run `zitadel doctor` to verify setup.",
-        "Run `zitadel claim` before production.",
-      ],
-      next_commands: ["zitadel doctor", "zitadel claim"],
+      next_actions: ["Run `zitadel doctor` to verify setup."],
+      next_commands: ["zitadel doctor"],
     },
     setupOpts,
     warnings,
@@ -213,12 +209,11 @@ function basePlan(input: {
         path: ".zitadel/secret",
         mode: 0o600,
         contents: `${stableStringify({
-          project_id: input.project.project_id,
-          project_secret: input.project.project_secret,
-          preview_secret: input.project.preview_secret,
-          preview_origins: input.project.preview_origins,
-          created_at: input.project.created_at,
-          schema_version: input.project.schema_version,
+          project_id: input.project.id,
+          project_secret: input.project.projectSecret,
+          preview_secret: input.project.previewSecret,
+          preview_origins: input.project.previewOrigins,
+          created_at: input.project.createdAt,
         })}\n`,
       },
       { kind: "write", path: "zitadel.json", contents: `${stableStringify(input.config)}\n` },
@@ -244,7 +239,7 @@ function basePlan(input: {
           ZITADEL_PROJECT_ID: "",
           ZITADEL_ENVIRONMENT: "",
           ZITADEL_ISSUER: "",
-          NEXT_PUBLIC_ZITADEL_API_BASE: "",
+          NEXTGEN_ISSUER_URL: "",
           NEXT_PUBLIC_ZITADEL_PROJECT_ID: "",
         },
       },
@@ -252,10 +247,10 @@ function basePlan(input: {
         kind: "merge-env",
         path: ".env.local",
         entries: {
-          ZITADEL_PROJECT_ID: input.project.project_id,
+          ZITADEL_PROJECT_ID: input.project.id,
           ZITADEL_ENVIRONMENT: "development",
           ZITADEL_ISSUER: input.issuer,
-          NEXT_PUBLIC_ZITADEL_API_BASE: input.server,
+          NEXTGEN_ISSUER_URL: input.server,
           NEXT_PUBLIC_ZITADEL_PROJECT_ID: input.project.id,
         },
       },
@@ -264,10 +259,7 @@ function basePlan(input: {
         path: ".zitadel/state.json",
         contents: `${stableStringify({
           framework: input.framework,
-          package_manager: input.packageManager,
-          setup_version: 1,
-          config_hash: sha256(input.config),
-          dev_port: input.devPort,
+          resources: {},
         })}\n`,
       },
     ],
@@ -290,15 +282,15 @@ function projectConfig(
   const environments: Record<string, unknown> = {
     development: { issuer },
   };
-  if (project.preview_origins.length > 0) {
+  if (project.previewOrigins.length > 0) {
     environments.preview = {
-      issuer_pattern: project.preview_origins.map((origin) => `https://${origin}`),
+      issuer_pattern: project.previewOrigins.map((origin) => `https://${origin}`),
     };
   }
 
   return {
     $schema: "https://schemas.zitadel.com/v2/project.schema.json",
-    project: project.project_id,
+    project: project.id,
     server: projectDefaultServer(source),
     framework: { id: framework },
     branding: {
@@ -310,7 +302,6 @@ function projectConfig(
 }
 
 function projectDefaultServer(source: string): string {
-  if (source === MOCK_SENTINEL) return MOCK_SENTINEL;
   try {
     return new URL(source).origin;
   } catch {
@@ -336,12 +327,14 @@ function defaultFlowDefinition(fields: string[], authMethods: string[]): Record<
   }
 
   return {
-    version: 1,
-    kind: "flow-definition",
-    slug: "default",
-    name: "Default login & registration",
+    // Spec: `flow-definition.yaml` requires [name, user_schema, purposes,
+    // initial_steps, steps]. `name` is a slug (pattern `^[a-z][a-z0-9-]*$`)
+    // that doubles as the display label — there is no separate `slug` or
+    // `display_name` field. `version` / `kind` / `template_name` are NOT in
+    // the spec and have been dropped.
+    name: "default",
+    user_schema: DEFAULT_USER_SCHEMA_URI,
     purposes: ["login", "register"],
-    template_name: "default",
     initial_steps: {
       login: "identifier",
       register: "register_profile",
@@ -484,13 +477,11 @@ function splitCsv(value: string | undefined): string[] | undefined {
 
 function dryRunProject(previewOrigins: string[]): CreateProjectResponse {
   return {
-    project_id: "dry-run-0000",
-    project_secret: "sk_proj_dry_run_full",
-    preview_secret: "sk_proj_dry_run_preview",
-    preview_origins: previewOrigins,
-    created_at: "2026-04-21T14:03:11.000Z",
-    scratch_dashboard_url: "https://zitadel.dev/scratch/dry-run-0000",
-    schema_version: 2,
+    id: "dry-run-0000",
+    projectSecret: "sk_proj_dry_run_full",
+    previewSecret: "sk_proj_dry_run_preview",
+    previewOrigins,
+    createdAt: "2026-04-21T14:03:11.000Z",
   };
 }
 

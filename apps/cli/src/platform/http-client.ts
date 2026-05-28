@@ -1,16 +1,9 @@
 import { ZitadelError } from "../lib/errors";
-import type { PlatformClient } from "./client";
+import type { CreateFlowDefinitionRequest, PlatformClient } from "./client";
 import type {
-  CapabilitiesResponse,
-  ClaimStatusResponse,
   CreateProjectRequest,
   CreateProjectResponse,
   GetProjectResponse,
-  InitClaimRequest,
-  InitClaimResponse,
-  UploadConfigRequest,
-  UploadConfigResponse,
-  ZitadelEnvironment,
 } from "./schemas";
 
 export class HttpPlatformClient implements PlatformClient {
@@ -27,38 +20,32 @@ export class HttpPlatformClient implements PlatformClient {
     return this.request("GET", `/projects/${encodeURIComponent(projectId)}`);
   }
 
-  async uploadConfig(
-    projectId: string,
-    environment: ZitadelEnvironment,
-    req: UploadConfigRequest,
-  ): Promise<UploadConfigResponse> {
-    return this.request(
-      "PUT",
-      `/projects/${encodeURIComponent(projectId)}/config?environment=${encodeURIComponent(environment)}`,
-      req,
-    );
+  async createSchema(data: object): Promise<{ id: string }> {
+    return this.request("POST", "/schemas", data);
   }
 
-  async getConfig(projectId: string, environment: ZitadelEnvironment): Promise<unknown> {
-    return this.request(
-      "GET",
-      `/projects/${encodeURIComponent(projectId)}/config?environment=${encodeURIComponent(environment)}`,
-    );
+  async getSchema(id: string): Promise<object> {
+    return this.request("GET", `/schemas/${encodeURIComponent(id)}`);
   }
 
-  async initClaim(projectId: string, req: InitClaimRequest): Promise<InitClaimResponse> {
-    return this.request("POST", `/projects/${encodeURIComponent(projectId)}/claim/init`, req);
+  async deleteSchema(id: string): Promise<void> {
+    return this.request("DELETE", `/schemas/${encodeURIComponent(id)}`);
   }
 
-  async getClaimStatus(projectId: string, challengeId: string): Promise<ClaimStatusResponse> {
-    return this.request(
-      "GET",
-      `/projects/${encodeURIComponent(projectId)}/claim/status?challenge_id=${encodeURIComponent(challengeId)}`,
-    );
+  async createFlowDefinition(req: CreateFlowDefinitionRequest): Promise<{ id: string }> {
+    return this.request("POST", "/flow_definitions", req);
   }
 
-  async getCapabilities(): Promise<CapabilitiesResponse> {
-    return this.request("GET", "/capabilities");
+  async getFlowDefinition(id: string): Promise<object> {
+    return this.request("GET", `/flow_definitions/${encodeURIComponent(id)}`);
+  }
+
+  async updateFlowDefinition(id: string, data: object): Promise<void> {
+    return this.request("PATCH", `/flow_definitions/${encodeURIComponent(id)}`, data);
+  }
+
+  async deleteFlowDefinition(id: string): Promise<void> {
+    return this.request("DELETE", `/flow_definitions/${encodeURIComponent(id)}`);
   }
 
   private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -81,6 +68,9 @@ export class HttpPlatformClient implements PlatformClient {
       );
     }
 
+    if (response.status === 204 || response.headers.get("content-length") === "0") {
+      return undefined as T;
+    }
     return (await response.json()) as T;
   }
 }

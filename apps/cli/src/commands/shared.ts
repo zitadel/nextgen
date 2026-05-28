@@ -10,9 +10,6 @@ export type ZitadelSecret = {
   preview_secret: string;
   preview_origins: string[];
   created_at: string;
-  schema_version: number;
-  claimed_at?: string;
-  team_id?: string;
 };
 
 export async function readZitadelConfig(cwd: string): Promise<Record<string, unknown>> {
@@ -47,7 +44,7 @@ export async function readZitadelSecret(cwd: string): Promise<ZitadelSecret> {
   } catch (error) {
     if (isNotFound(error)) {
       throw new ZitadelError("E_VALIDATION", ".zitadel/secret was not found", {
-        hint: "Run `zitadel setup` first, or restore the project secret after claim.",
+        hint: "Run `zitadel setup` first, or restore the project secret with `zitadel doctor --fix`.",
         nextCommands: ["zitadel setup", "zitadel doctor --fix"],
       });
     }

@@ -2,7 +2,7 @@
 
 > **Status:** Draft — plan + two concept docs for team feedback before implementation.
 > **Date:** 2026-04-23
-> **Context:** The [POC CLI](../../../apps/cli) (`client-cli` branch) has strong foundations — JSON envelope, pre-claim/claim split, capabilities registry — but needs to align with the [flow engine](../flowengine/README.md) design and gain the identity-management surface that the product vision requires.
+> **Context:** The [POC CLI](../../../apps/cli) (`client-cli` branch) has strong foundations — JSON envelope, capabilities registry — but needs to align with the [flow engine](../flowengine/README.md) design and gain the identity-management surface that the product vision requires.
 
 ## What needs feedback
 
@@ -52,7 +52,6 @@ The gap analysis against the product vision is tracked in [PLAN.md](PLAN.md). Or
 3. Build the identity surface commands.
 4. Introduce the renderer abstraction and the Lit plug-in point.
 5. Add the diff/plan/apply reconciliation loop.
-6. Harden the claim lifecycle + agent ergonomics.
 
 ## Related
 

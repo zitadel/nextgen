@@ -1,14 +1,7 @@
 import type {
-  CapabilitiesResponse,
-  ClaimStatusResponse,
   CreateProjectRequest,
   CreateProjectResponse,
   GetProjectResponse,
-  InitClaimRequest,
-  InitClaimResponse,
-  UploadConfigRequest,
-  UploadConfigResponse,
-  ZitadelEnvironment,
 } from "./schemas";
 
 export interface ProjectClient {
@@ -16,22 +9,28 @@ export interface ProjectClient {
   getProject(projectId: string): Promise<GetProjectResponse>;
 }
 
-export interface ConfigClient {
-  uploadConfig(
-    projectId: string,
-    environment: ZitadelEnvironment,
-    req: UploadConfigRequest,
-  ): Promise<UploadConfigResponse>;
-  getConfig(projectId: string, environment: ZitadelEnvironment): Promise<unknown>;
+export interface SchemaClient {
+  createSchema(data: object): Promise<{ id: string }>;
+  getSchema(id: string): Promise<object>;
+  deleteSchema(id: string): Promise<void>;
 }
 
-export interface ClaimClient {
-  initClaim(projectId: string, req: InitClaimRequest): Promise<InitClaimResponse>;
-  getClaimStatus(projectId: string, challengeId: string): Promise<ClaimStatusResponse>;
+/**
+ * Request envelope for `POST /flow_definitions` per the OpenAPI spec
+ * (`api/openapi/components/flows/flow-definition-create-request.yaml`).
+ * The flow body itself goes under `flow_definition`.
+ */
+export interface CreateFlowDefinitionRequest {
+  readonly project_id: string;
+  readonly schema_uri?: string;
+  readonly flow_definition: object;
 }
 
-export interface CapabilitiesClient {
-  getCapabilities(): Promise<CapabilitiesResponse>;
+export interface FlowDefinitionClient {
+  createFlowDefinition(req: CreateFlowDefinitionRequest): Promise<{ id: string }>;
+  getFlowDefinition(id: string): Promise<object>;
+  updateFlowDefinition(id: string, data: object): Promise<void>;
+  deleteFlowDefinition(id: string): Promise<void>;
 }
 
-export type PlatformClient = ProjectClient & ConfigClient & ClaimClient & CapabilitiesClient;
+export type PlatformClient = ProjectClient & SchemaClient & FlowDefinitionClient;

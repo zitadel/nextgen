@@ -1,8 +1,9 @@
+import { consola } from "consola";
+
 import { runAddSchema } from "./commands/add-schema";
 import { runAppAdd, runAppList, runAppRemove, runAppShow } from "./commands/app";
 import { runApply } from "./commands/apply";
 import { runCapabilities } from "./commands/capabilities";
-import { runClaim, runClaimStatus } from "./commands/claim";
 import { runDeployConnect, runDeployStatus } from "./commands/deploy";
 import { runDoctor } from "./commands/doctor";
 import { runEject } from "./commands/eject";
@@ -99,18 +100,6 @@ async function dispatch(parsed: ParsedArgs, io: CliIO, global: GlobalOptions): P
         return;
       }
       break;
-    case "claim":
-      if (subcommand === "status") {
-        await runClaimStatus(io, {
-          ...withSubcommand(global, "claim status"),
-          challengeId: stringOpt(parsed, "challengeId"),
-          mockCompleteClaim: boolOpt(parsed, "mockCompleteClaim"),
-          mockAdvanceClaim: boolOpt(parsed, "mockAdvanceClaim"),
-        });
-        return;
-      }
-      await runClaim(io, global);
-      return;
     case "add":
       if (subcommand === "schema") {
         await runAddSchema(io, {
@@ -297,15 +286,17 @@ async function buildGlobalOptions(parsed: ParsedArgs, io: CliIO): Promise<Global
   const command = resolveCommandName(parsed);
   const environment = stringOpt(parsed, "environment") ?? "development";
   const serverFlag = typeof parsed.options.server === "string" ? parsed.options.server : undefined;
-  const mockFlag = Boolean(parsed.options.mock);
 
   const source = await resolveServer({
     cwd,
     env: io.env,
     serverFlag,
     environment,
-    mockFlag,
   });
+
+  const verbose = Boolean(parsed.options.verbose);
+  const debug = Boolean(parsed.options.debug);
+  consola.level = debug ? 4 : verbose ? 3 : 2;
 
   return {
     cwd,
@@ -318,6 +309,8 @@ async function buildGlobalOptions(parsed: ParsedArgs, io: CliIO): Promise<Global
     cliVersion: CLI_VERSION,
     source: source.value,
     serverFlag,
+    verbose,
+    debug,
   };
 }
 
@@ -333,6 +326,8 @@ function fallbackMeta(parsed: ParsedArgs, io: CliIO): GlobalOptions {
     command: resolveCommandName(parsed),
     cliVersion: CLI_VERSION,
     source: DEFAULT_SERVER,
+    verbose: Boolean(parsed.options.verbose),
+    debug: Boolean(parsed.options.debug),
   };
 }
 
@@ -340,7 +335,6 @@ function resolveCommandName(parsed: ParsedArgs): string {
   const [head, next] = parsed.positionals;
   if (!head) return "(default)";
   if (head === "deploy" && (next === "connect" || next === "status")) return `deploy ${next}`;
-  if (head === "claim" && next === "status") return "claim status";
   if (head === "add" && next === "schema") return "add schema";
   if (head === "schema" && next === "add") return "schema add";
   if (

@@ -9,7 +9,7 @@ const ZitadelLogin = dynamic(
       return (
         <zitadel-login
           api-base="/__nextgen"
-          project-id="demo"
+          project-id={process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID ?? "demo"}
           post-sign-in-url="/admin"
         />
       );

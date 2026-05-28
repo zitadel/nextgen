@@ -67,7 +67,7 @@ properties:
       
       A factor appears here once its challenge reaches `verified` state.
     items:
-      $ref: ./completed-factor.yaml
+      $ref: ../../components/checks/completed-factor.yaml
   challenges:
     type: array
     description: |

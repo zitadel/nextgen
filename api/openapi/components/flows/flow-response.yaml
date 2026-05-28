@@ -1,5 +1,5 @@
 type: object
-required: [id, session_id, session_token, step]
+required: [id, session_id, step]
 properties:
   id:
     type: string
@@ -13,7 +13,7 @@ properties:
     description: Underlying session ID. Stable across all stacked flows.
   session_token:
     type: string
-    description: Rotated on every response. Required for the next request.
+    description: Reserved for future rotation. The sealed `_zflow` cookie carries the flow state today.
   step:
     $ref: flow-step.yaml
   branding:

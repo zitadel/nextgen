@@ -46,9 +46,6 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	CreateHandoffOperation: []string{
 		"auth_attempts.write",
 	},
-	CreateProjectOperation: []string{
-		"projects.write",
-	},
 	CreateSchemaOperation: []string{
 		"schema.write",
 	},
@@ -75,6 +72,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	GetSessionOperation: []string{
 		"session.read",
+	},
+	GetTeamOperation: []string{
+		"teams.read",
 	},
 	GetUserInfoOperation: []string{},
 	IntrospectOperation:  []string{},
