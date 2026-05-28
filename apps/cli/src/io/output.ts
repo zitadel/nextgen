@@ -1,4 +1,5 @@
 import type { ZitadelError } from "../lib/errors";
+import { isObject } from "../lib/json";
 
 /**
  * Fields present on every JSON envelope regardless of status. Agents key off
@@ -351,8 +352,4 @@ function sourceSuffix(opts: GlobalOptions): string {
 function suffixBlock(opts: GlobalOptions): string {
   const suffix = sourceSuffix(opts);
   return suffix ? ` ${suffix}` : "";
-}
-
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
 }

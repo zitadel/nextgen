@@ -22,8 +22,8 @@ export type FileOp =
  * report intent before touching the disk.
  */
 export type ScaffoldPlan = {
-  ops: FileOp[];
-  summary: { title: string; detail: string }[];
+  ops: ReadonlyArray<FileOp>;
+  summary: ReadonlyArray<{ title: string; detail: string }>;
 };
 
 /**
@@ -34,7 +34,7 @@ export type ScaffoldPlan = {
  */
 export type ScaffoldResult = {
   dryRun: boolean;
-  filesWritten: string[];
-  filesSkipped: string[];
-  depsAdded: string[];
+  filesWritten: ReadonlyArray<string>;
+  filesSkipped: ReadonlyArray<string>;
+  depsAdded: ReadonlyArray<string>;
 };

@@ -1,7 +1,22 @@
 import { ZitadelError } from "../../../../../errors";
 import { litRenderer } from "./lit";
 import { reactRenderer } from "./react";
-import { isRendererId, type RendererId, type RendererSpec } from "./types";
+import type { RendererId, RendererSpec } from "./types";
+
+/**
+ * Runtime mirror of the {@link RendererId} union, used by {@link isRendererId}
+ * to validate untrusted strings (a TS union has no runtime presence). Must stay
+ * in sync with the {@link RendererId} type.
+ */
+export const RENDERER_IDS: RendererId[] = ["react", "web-component"];
+
+/**
+ * Type guard narrowing an arbitrary value to a {@link RendererId}, used to
+ * validate renderer ids read from config before indexing {@link RENDERERS}.
+ */
+export function isRendererId(value: unknown): value is RendererId {
+  return typeof value === "string" && (RENDERER_IDS as string[]).includes(value);
+}
 
 /**
  * The single source of truth mapping each {@link RendererId} to its spec.

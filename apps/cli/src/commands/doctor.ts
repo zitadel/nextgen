@@ -8,6 +8,7 @@ import type { CliIO, GlobalOptions } from "../io/output";
 import { ok } from "../io/output";
 import { ZitadelError } from "../lib/errors";
 import { type AuthMethod } from "../lib/flows";
+import { isObject } from "../lib/json";
 import { Orca } from "../lib/orca";
 import { patchers } from "../lib/orca/patchers";
 import type { PatchContext } from "../lib/orca/patchers/types";
@@ -342,8 +343,4 @@ async function readState(cwd: string): Promise<{ dev_port?: number } | undefined
   } catch {
     return undefined;
   }
-}
-
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

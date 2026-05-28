@@ -4,6 +4,7 @@ import type { CliIO, GlobalOptions } from "../io/output";
 import { ok, writePretty } from "../io/output";
 import { ZitadelError } from "../lib/errors";
 import { FLOWS_DIR, validateFlows } from "../lib/flows";
+import { isObject } from "../lib/json";
 import { readJsonDir } from "../lib/json-dir";
 import { createPlatformClient } from "../platform";
 import { environmentSchema, type ZitadelEnvironment } from "../platform/schemas";
@@ -119,8 +120,4 @@ export function findEnvRefs(value: unknown): string[] {
   };
   visit(value);
   return [...refs].sort();
-}
-
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

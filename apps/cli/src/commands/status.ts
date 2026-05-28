@@ -1,6 +1,7 @@
 import { hasZitadelSecret } from "../detect/state";
 import type { CliIO, GlobalOptions } from "../io/output";
 import { ok, skipped } from "../io/output";
+import { isObject } from "../lib/json";
 import { readZitadelConfig, readZitadelSecret } from "./shared";
 
 /**
@@ -45,8 +46,4 @@ export async function runStatus(io: CliIO, opts: GlobalOptions): Promise<void> {
     },
     opts,
   );
-}
-
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

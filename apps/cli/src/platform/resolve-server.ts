@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { ZitadelError } from "../lib/errors";
-import { parseJsonObject } from "../lib/json";
+import { isObject, parseJsonObject } from "../lib/json";
 
 /**
  * Server URL used when nothing else resolves. Also surfaced in hints and
@@ -122,8 +122,4 @@ function readEnvServer(
 
 function readTopServer(config: Record<string, unknown>): string | undefined {
   return typeof config.server === "string" ? config.server : undefined;
-}
-
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

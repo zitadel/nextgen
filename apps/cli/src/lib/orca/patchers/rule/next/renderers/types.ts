@@ -1,16 +1,9 @@
 /**
  * The closed set of renderer identifiers the CLI supports. Persisted into
- * config and matched against {@link RENDERER_IDS} at runtime, so adding a
- * member here requires extending that array too.
+ * config and validated at runtime by `isRendererId` (in `registry.ts`), so
+ * adding a member here requires extending that runtime list too.
  */
 export type RendererId = "react" | "web-component";
-
-/**
- * Runtime mirror of {@link RendererId} used by {@link isRendererId} to
- * validate untrusted strings, since a TS union has no runtime presence.
- * Must stay in sync with the {@link RendererId} union.
- */
-export const RENDERER_IDS: RendererId[] = ["react", "web-component"];
 
 /**
  * Whether a renderer can actually scaffold (`available`) or is only
@@ -69,12 +62,3 @@ export type RendererSpec = {
   dependency: { name: string; version: string };
   templates: RendererTemplates;
 };
-
-/**
- * Type guard narrowing an arbitrary value to a {@link RendererId}, used to
- * validate renderer ids read from config before indexing the renderer
- * registry.
- */
-export function isRendererId(value: unknown): value is RendererId {
-  return typeof value === "string" && (RENDERER_IDS as string[]).includes(value);
-}

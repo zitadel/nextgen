@@ -1,11 +1,38 @@
 import { describe, expect, it } from "vitest";
 
 import { ZitadelError } from "../../../../../../../../src/lib/errors";
-import { getRenderer, RENDERERS } from "../../../../../../../../src/lib/orca/patchers/rule/next/renderers/registry";
+import {
+  getRenderer,
+  isRendererId,
+  RENDERER_IDS,
+  RENDERERS,
+} from "../../../../../../../../src/lib/orca/patchers/rule/next/renderers/registry";
 
 describe("RENDERERS", () => {
   it("contains the expected renderer ids", () => {
     expect(Object.keys(RENDERERS).sort()).toEqual(["react", "web-component"]);
+  });
+});
+
+describe("RENDERER_IDS", () => {
+  it("lists exactly the supported renderer ids", () => {
+    expect(RENDERER_IDS).toEqual(["react", "web-component"]);
+  });
+});
+
+describe("isRendererId", () => {
+  for (const id of RENDERER_IDS) {
+    it(`returns true for the valid id ${id}`, () => {
+      expect(isRendererId(id)).toBe(true);
+    });
+  }
+
+  it("returns false for unknown or non-string values", () => {
+    expect(isRendererId("vue")).toBe(false);
+    expect(isRendererId(123)).toBe(false);
+    expect(isRendererId(undefined)).toBe(false);
+    expect(isRendererId(null)).toBe(false);
+    expect(isRendererId({ id: "react" })).toBe(false);
   });
 });
 

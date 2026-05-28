@@ -3,6 +3,7 @@ import type { DeployEnvVars } from "../deploy";
 import type { CliIO, GlobalOptions } from "../io/output";
 import { ok } from "../io/output";
 import { ZitadelError } from "../lib/errors";
+import { isObject } from "../lib/json";
 import { readZitadelConfig, readZitadelSecret } from "./shared";
 
 /**
@@ -114,8 +115,4 @@ function readProductionIssuer(config: Record<string, unknown>): unknown {
     return undefined;
   }
   return config.environments.production.issuer;
-}
-
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

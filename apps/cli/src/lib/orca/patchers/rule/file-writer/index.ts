@@ -2,8 +2,20 @@ import { chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import { ZitadelError } from "../../../../errors";
-import { parseJsonObject, stableStringify } from "../../../../json";
+import { isObject, parseJsonObject, stableStringify } from "../../../../json";
 import type { FileOp, ScaffoldPlan, ScaffoldResult } from "./plan";
+
+/**
+ * The executor's private, mutable accumulator. Handlers push into it as each
+ * op is applied; {@link scaffold} returns it as the readonly
+ * {@link ScaffoldResult} so the public result stays immutable.
+ */
+type ScaffoldAccumulator = {
+  dryRun: boolean;
+  filesWritten: string[];
+  filesSkipped: string[];
+  depsAdded: string[];
+};
 
 /**
  * Applies a {@link ScaffoldPlan} to disk, executing its operations in order.
@@ -19,7 +31,7 @@ export async function scaffold(
   plan: ScaffoldPlan,
   opts: { cwd: string; dryRun: boolean; force: boolean },
 ): Promise<ScaffoldResult> {
-  const result: ScaffoldResult = {
+  const result: ScaffoldAccumulator = {
     dryRun: opts.dryRun,
     filesWritten: [],
     filesSkipped: [],
@@ -36,7 +48,7 @@ export async function scaffold(
 async function applyOp(
   op: FileOp,
   opts: { cwd: string; dryRun: boolean; force: boolean },
-  result: ScaffoldResult,
+  result: ScaffoldAccumulator,
 ): Promise<void> {
   switch (op.kind) {
     case "mkdir":
@@ -72,7 +84,7 @@ async function ensureDir(
   path: string,
   mode: number | undefined,
   dryRun: boolean,
-  result: ScaffoldResult,
+  result: ScaffoldAccumulator,
 ): Promise<void> {
   if (dryRun) {
     result.filesWritten.push(path);
@@ -89,7 +101,7 @@ async function writeText(
   path: string,
   contents: string,
   opts: { mode?: number; force: boolean; dryRun: boolean },
-  result: ScaffoldResult,
+  result: ScaffoldAccumulator,
 ): Promise<void> {
   const existing = await readIfExists(path);
   if (existing === contents) {
@@ -124,7 +136,7 @@ async function appendText(
   contents: string,
   ifMissing: string | undefined,
   dryRun: boolean,
-  result: ScaffoldResult,
+  result: ScaffoldAccumulator,
 ): Promise<void> {
   const existing = (await readIfExists(path)) ?? "";
   if (ifMissing && existing.includes(ifMissing)) {
@@ -151,7 +163,7 @@ async function mergeEnv(
   path: string,
   entries: Record<string, string>,
   dryRun: boolean,
-  result: ScaffoldResult,
+  result: ScaffoldAccumulator,
 ): Promise<void> {
   const existing = (await readIfExists(path)) ?? "";
   const present = new Set(
@@ -181,7 +193,7 @@ async function mergeJson(
   path: string,
   patch: Record<string, unknown>,
   dryRun: boolean,
-  result: ScaffoldResult,
+  result: ScaffoldAccumulator,
 ): Promise<void> {
   const existing = await readIfExists(path);
   const current = existing ? parseJsonObject(existing, path) : {};
@@ -204,7 +216,7 @@ async function appendGitignore(
   path: string,
   entries: string[],
   dryRun: boolean,
-  result: ScaffoldResult,
+  result: ScaffoldAccumulator,
 ): Promise<void> {
   const existing = (await readIfExists(path)) ?? "";
   const lines = new Set(existing.split(/\r?\n/g).map((line) => line.trim()));
@@ -226,7 +238,7 @@ async function addDependency(
   path: string,
   op: { name: string; version: string; dev?: boolean },
   dryRun: boolean,
-  result: ScaffoldResult,
+  result: ScaffoldAccumulator,
 ): Promise<void> {
   const existing = await readIfExists(path);
   if (!existing) {
@@ -279,10 +291,6 @@ function deepMerge(
     }
   }
   return out;
-}
-
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function isNotFound(error: unknown): boolean {

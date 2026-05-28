@@ -43,3 +43,12 @@ export function parseJsonObject(contents: string, path: string): Record<string, 
   }
   return value as Record<string, unknown>;
 }
+
+/**
+ * Narrows an unknown value to a plain (non-array, non-null) object. Shared by
+ * the commands and the file-writer that walk parsed JSON, so the predicate
+ * isn't reimplemented per call site.
+ */
+export function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
