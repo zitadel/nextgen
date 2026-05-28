@@ -44,12 +44,12 @@ describe("envelope contract", () => {
     expect(result.stdout.trim()).toBe("");
   });
 
-  it("AGENTS.md is the canonical generated contract", async () => {
+  it("SKILLS.md is the canonical agent contract", async () => {
     const root = join(import.meta.dirname, "../..");
-    const agents = await readFile(join(root, "AGENTS.md"), "utf8");
-    expect(agents).toContain("Zitadel CLI Agent Contract");
-    expect(agents).toContain("zitadel setup");
-    expect(agents).not.toContain("Compatibility note");
+    const skills = await readFile(join(root, "SKILLS.md"), "utf8");
+    expect(skills).toContain("name: zitadel-cli");
+    expect(skills).toContain("## Golden path");
+    expect(skills).toContain("--non-interactive --json");
   });
 
   it("version-only resolution defaults to real server, not mock", async () => {

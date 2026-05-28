@@ -20,8 +20,8 @@ parse the result rather than scraping human output.
 - Always pass `--non-interactive --json`. The envelope is the contract.
 - Add `--cwd <path>` when operating outside the current working directory.
 - Never run interactive prompts; `--non-interactive` (and `--json`) disable them.
-- Read `AGENTS.md` (generated from the CLI's own metadata) for the full
-  per-command flag list and exit-code table.
+- See `README.md` (its commands section is generated from the CLI's own
+  metadata) or run `zitadel <command> --help` for the full per-command flag list.
 
 ```sh
 npx zitadel@latest <command> --non-interactive --json

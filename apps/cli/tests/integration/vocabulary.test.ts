@@ -20,7 +20,7 @@ const legacyPatterns = [
 describe("public vocabulary", () => {
   it("keeps docs on glossary terms", async () => {
     const root = join(import.meta.dirname, "../..");
-    const files = ["README.md", "AGENTS.md"];
+    const files = ["README.md", "SKILLS.md"];
 
     for (const file of files) {
       const contents = await readFile(join(root, file), "utf8");

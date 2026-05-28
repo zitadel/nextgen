@@ -17,8 +17,7 @@ export type ZitadelErrorCode =
 /**
  * Maps each {@link ZitadelErrorCode} to the process exit code the CLI
  * returns. The table is the single source of truth for exit semantics so
- * scripts and CI can branch on stable, documented numbers; `gen-agents-md`
- * renders it into the generated docs.
+ * scripts and CI can branch on stable, documented numbers.
  */
 export const EXIT_CODES: Record<ZitadelErrorCode, number> = {
   E_ALREADY_INIT: 0,

@@ -24,7 +24,7 @@ npx zitadel@latest plan
 npx zitadel@latest apply
 ```
 
-Agents should use the generated contract in `AGENTS.md` and call commands with
+Agents should use the skill in `SKILLS.md` and call commands with
 `--non-interactive --json`:
 
 ```sh

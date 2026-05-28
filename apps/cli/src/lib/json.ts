@@ -1,33 +1,16 @@
+import { stringify } from "safe-stable-stringify";
+
 /**
  * Serialise a value to pretty-printed JSON with object keys sorted at every
  * depth. Determinism is the point: managed files written by the CLI must be
  * byte-stable across runs so diffs stay clean and content hashes don't churn
- * when only key ordering would otherwise differ.
+ * when only key ordering would otherwise differ. Delegates the deterministic
+ * sort to `safe-stable-stringify`, matching `JSON.stringify(value, null, 2)`
+ * formatting. The `?? "null"` only applies to `undefined`/function inputs,
+ * which the CLI never serialises.
  */
 export function stableStringify(value: unknown): string {
-  return JSON.stringify(sortValue(value), null, 2);
-}
-
-/**
- * Recursively return a structural copy of `value` with every object's keys
- * sorted lexicographically; arrays keep their order, primitives pass through.
- * Extracted from {@link stableStringify} so it can be reused (or tested)
- * wherever a canonical key ordering is needed before hashing or comparison.
- */
-export function sortValue(value: unknown): unknown {
-  if (Array.isArray(value)) {
-    return value.map(sortValue);
-  }
-
-  if (!value || typeof value !== "object") {
-    return value;
-  }
-
-  const out: Record<string, unknown> = {};
-  for (const key of Object.keys(value as Record<string, unknown>).sort()) {
-    out[key] = sortValue((value as Record<string, unknown>)[key]);
-  }
-  return out;
+  return stringify(value, null, 2) ?? "null";
 }
 
 /**
