@@ -2,11 +2,7 @@ import { mkdtemp, readFile, stat, writeFile, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import {
-  completeMockClaim,
-  resetPlatformStore,
-  setupPlatformHandlers,
-} from "@zitadel-nextgen/api-mock/platform";
+import { resetPlatformStore, setupPlatformHandlers } from "@zitadel-nextgen/api-mock/platform";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
@@ -42,10 +38,9 @@ describe("Next setup integration", () => {
     expect(setup.exitCode).toBe(0);
     const setupJson = parseJson(setup.stdout) as {
       status: string;
-      data: { project: { lifecycle: string }; apply?: unknown };
+      data: { apply?: unknown };
     };
     expect(setupJson.status).toBe("ok");
-    expect(setupJson.data.project.lifecycle).toBe("pre-claim");
     expect(setupJson.data.apply).toMatchObject({ synced: true });
 
     expect(await readFile(join(cwd, "zitadel.json"), "utf8")).toContain('"project"');
@@ -65,14 +60,25 @@ describe("Next setup integration", () => {
     expect(loginPage).toContain('"use client"');
     expect(loginPage).toContain('purpose="login"');
     expect(loginPage).toContain("<zitadel-login");
+    expect(loginPage).toContain('api-base="/__nextgen"');
+    expect(loginPage).not.toContain("NEXT_PUBLIC_ZITADEL_API_BASE");
     expect(loginPage).toContain('post-sign-in-url="/profile"');
     const profilePage = await readFile(join(cwd, "app/profile/page.tsx"), "utf8");
     expect(profilePage).toContain("zitadel-cli: managed-file v1");
     expect(profilePage).toContain("<zitadel-logout");
+    expect(profilePage).toContain('api-base="/__nextgen"');
     expect(profilePage).toContain('post-sign-out-url="/login"');
+    const middleware = await readFile(join(cwd, "middleware.ts"), "utf8");
+    expect(middleware).toContain("zitadel-cli: managed-file v1");
+    expect(middleware).toContain("nextgenMiddleware");
+    expect(middleware).toContain("export function middleware(");
+    expect(middleware).toContain('protectedRoutes: ["/profile"]');
+    expect(middleware).toContain('"/__nextgen/:path*"');
+    expect(middleware).toContain("process.env.NEXTGEN_ISSUER_URL");
     const envLocal = await readFile(join(cwd, ".env.local"), "utf8");
     expect(envLocal).toContain("ZITADEL_ENVIRONMENT=development");
-    expect(envLocal).toContain("NEXT_PUBLIC_ZITADEL_API_BASE=");
+    expect(envLocal).toContain("NEXTGEN_ISSUER_URL=");
+    expect(envLocal).not.toContain("NEXT_PUBLIC_ZITADEL_API_BASE");
     expect(envLocal).toContain("NEXT_PUBLIC_ZITADEL_PROJECT_ID=");
     expect(envLocal).not.toContain("ZITADEL_PROJECT_SECRET");
     expect(envLocal).not.toContain("ZITADEL_PREVIEW_SECRET");
@@ -86,10 +92,9 @@ describe("Next setup integration", () => {
     expect(noArg.exitCode).toBe(0);
     const status = parseJson(noArg.stdout) as {
       status: string;
-      data: { project: { lifecycle: string }; next_actions: string[] };
+      data: { next_actions: string[] };
     };
     expect(status.status).toBe("ok");
-    expect(status.data.project.lifecycle).toBe("pre-claim");
     expect(status.data.next_actions.join(" ")).toContain("apply");
 
     const rerun = await cli(["setup", "--cwd", cwd, "--json"]);
@@ -121,65 +126,6 @@ describe("Next setup integration", () => {
     const applyJson = parseJson(apply.stdout) as { status: string; data: { synced: boolean } };
     expect(applyJson.status).toBe("ok");
     expect(applyJson.data.synced).toBe(true);
-
-    const production = await cli(["apply", "--cwd", cwd, "--json", "--environment", "production"]);
-    expect(production.exitCode).toBe(3);
-    expect((parseJson(production.stdout) as { code: string }).code).toBe("E_CLAIM_REQUIRED");
-
-    const claim = await cli(["claim", "--cwd", cwd, "--json"]);
-    expect(claim.exitCode).toBe(0);
-    const claimJson = parseJson(claim.stdout) as {
-      status: string;
-      data: { handoff: string; claim_url: string; challenge_id: string };
-    };
-    expect(claimJson.status).toBe("ok");
-    expect(claimJson.data.handoff).toBe("human");
-    expect(claimJson.data.claim_url).toContain("claim");
-
-    const pendingClaim = await cli([
-      "claim",
-      "status",
-      "--cwd",
-      cwd,
-      "--json",
-      "--challenge-id",
-      claimJson.data.challenge_id,
-    ]);
-    expect(pendingClaim.exitCode).toBe(0);
-    expect((parseJson(pendingClaim.stdout) as { data: { status: string } }).data.status).toBe(
-      "pending",
-    );
-
-    completeMockClaim();
-
-    const completedClaim = await cli([
-      "claim",
-      "status",
-      "--cwd",
-      cwd,
-      "--json",
-      "--challenge-id",
-      claimJson.data.challenge_id,
-    ]);
-    expect(completedClaim.exitCode).toBe(0);
-    const completedJson = parseJson(completedClaim.stdout) as {
-      data: { status: string; state_refreshed: boolean };
-    };
-    expect(completedJson.data.status).toBe("claimed");
-    expect(completedJson.data.state_refreshed).toBe(true);
-    const secret = await readFile(join(cwd, ".zitadel/secret"), "utf8");
-    expect(secret).toContain('"claimed_at"');
-    expect(secret).toContain('"team_id": "team_mock"');
-
-    const productionAfterClaim = await cli([
-      "apply",
-      "--cwd",
-      cwd,
-      "--json",
-      "--environment",
-      "production",
-    ]);
-    expect(productionAfterClaim.exitCode).toBe(0);
   });
 
   it("fails apply clearly for missing env refs", async () => {

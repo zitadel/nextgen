@@ -127,3 +127,11 @@ func snapshotDialects() map[string]DialectDecoder {
 	maps.Copy(out, dialectRegistry)
 	return out
 }
+
+func DialectKeysForEnv() []string {
+	dialectRegistryMu.RLock()
+	defer dialectRegistryMu.RUnlock()
+
+	keys := maps.Keys(dialectRegistry)
+	return slices.Collect(keys)
+}

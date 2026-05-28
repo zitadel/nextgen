@@ -31,7 +31,7 @@ _ins_registry AS (
     INSERT INTO zitadel_nextgen.user_unique_attributes (
         project_id, user_id, team_id, key, value_hash
     )
-    SELECT $1, $2, CASE WHEN unique_scope = 'global' THEN '' ELSE COALESCE(h.team_id, '')::text END, key, value_hash
+    SELECT $1, $2, CASE WHEN unique_scope = 'project' THEN '' ELSE COALESCE(h.team_id, '')::text END, key, value_hash
     FROM _input_upsert, _header h
     WHERE unique_scope <> 'unspecified'
 ),
