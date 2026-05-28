@@ -14,10 +14,6 @@ var iso8601Duration = regexp.MustCompile(`^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)
 // ISODuration is an ogen-compatible JSON type for ISO-8601 durations.
 type ISODuration time.Duration
 
-func (d ISODuration) Duration() time.Duration {
-	return time.Duration(d)
-}
-
 func (d ISODuration) Encode(e *jx.Encoder) {
 	e.Str(formatISODuration(time.Duration(d)))
 }

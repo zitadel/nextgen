@@ -38,13 +38,13 @@ func ErrSessionInvalidTTL() Error {
 	return newError("sess.invalid_ttl", "The session TTL is invalid. It must be positive and not exceed the configured maximum.", nil, nil)
 }
 
-type sessionInvalidTTLDetails struct {
+type SessionInvalidTTLDetails struct {
 	TTL    time.Duration `json:"ttl"`
 	MaxTTL time.Duration `json:"max_ttl"`
 }
 
 func sessionInvalidTTLErr(requested, maxTTL time.Duration) Error {
-	return ErrSessionInvalidTTL().WithDetails(sessionInvalidTTLDetails{
+	return ErrSessionInvalidTTL().WithDetails(SessionInvalidTTLDetails{
 		TTL:    requested,
 		MaxTTL: maxTTL,
 	})

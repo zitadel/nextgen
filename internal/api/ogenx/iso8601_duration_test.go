@@ -37,5 +37,14 @@ func TestISODurationDecode(t *testing.T) {
 	var d ISODuration
 	dec := jx.DecodeStr(`"PT2H"`)
 	require.NoError(t, d.Decode(dec))
-	require.Equal(t, 2*time.Hour, d.Duration())
+	require.EqualValues(t, 2*time.Hour, d)
+}
+
+func TestISODurationEncode(t *testing.T) {
+	var d = ISODuration(2 * time.Hour)
+	encoder := jx.GetEncoder()
+	defer jx.PutEncoder(encoder)
+
+	d.Encode(encoder)
+	require.Equal(t, `"PT2H"`, encoder.String())
 }
