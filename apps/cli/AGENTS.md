@@ -35,7 +35,7 @@ Generated routes use `ZitadelFlow({ purpose, projectId, issuer, environment })` 
 
 ## CLI vs. Runtime API
 
-This CLI manages the dev-owned shape of a Zitadel deployment: app definitions, schemas, flows, templates. For per-customer-org configuration (e.g. a B2B customer's own SSO), end-user CRUD, or any unbounded set, route to the runtime Admin/Org API instead — not `zitadel` commands or `.zitadel/` files. Subordinate config (claim mappings, redirect URIs, role bindings) lives wherever its parent resource lives. See `docs/design/cli/README.md` § *What lives in `.zitadel/`* for the ownership rule and the resource-by-resource split.
+This CLI manages the dev-owned shape of a Zitadel deployment: schemas, flows, templates. For per-customer-org configuration (e.g. a B2B customer's own SSO), end-user CRUD, or any unbounded set, route to the runtime Admin/Org API instead — not `zitadel` commands or `.zitadel/` files. Subordinate config (claim mappings, redirect URIs, role bindings) lives wherever its parent resource lives. See `docs/design/cli/README.md` § *What lives in `.zitadel/`* for the ownership rule and the resource-by-resource split.
 
 <!-- generated:capabilities:begin -->
 
@@ -52,10 +52,6 @@ Envelope schema version: `1`. Every envelope carries `cli_version`, `command`, `
 | `zitadel deploy status` | Report deploy platform readiness. | experimental |
 | `zitadel deploy connect` | Configure preview or production platform env vars. | experimental |
 | `zitadel schema add` | Add or remove fields on the user schema. | supported |
-| `zitadel app add` | Add or update an app resource (.zitadel/apps/<slug>.json). Apps consume Zitadel's OIDC/SAML server. | experimental |
-| `zitadel app list` | List local app resources. | experimental |
-| `zitadel app show` | Show a single app resource by slug. | experimental |
-| `zitadel app remove` | Remove an app resource by slug. | experimental |
 | `zitadel capabilities` | Describe the CLI contract (commands, flags, exit codes). Agent introspection target. | supported |
 | `zitadel help` | Show help for the CLI or a specific command. | supported |
 | `zitadel status` | Summarize the local project state. | supported |
@@ -193,85 +189,6 @@ Usage: `zitadel schema add [--preset name] [--add-field-json '{...}' | --add-fie
 | `--add-field` | `string[]` | Add a field using the colon-DSL (name:type:key=value,...). |
 | `--add-field-json` | `string[]` | Add a field using a JSON object. Preferred for agents. |
 | `--remove-field` | `string[]` | Remove a field by name. |
-
-### `zitadel app add`
-
-Add or update an app resource (.zitadel/apps/<slug>.json). Apps consume Zitadel's OIDC/SAML server.
-
-> Experimental POC surface.
-
-Usage: `zitadel app add (--preset spa|web|native|machine | --protocol oidc|saml) [--slug <slug>] [--redirect-uri ...]`
-
-| Flag | Type | Description |
-|---|---|---|
-| `--cwd` / `-c` | `string` | Project directory to operate on. |
-| `--json` / `-j` | `boolean` | Emit the JSON envelope instead of pretty output. |
-| `--non-interactive` / `-n` | `boolean` | Disable prompts. Required when scripting or running as an agent. |
-| `--dry-run` | `boolean` | Preview the work without mutating files or hitting the platform. |
-| `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
-| `--server` / `-s` | `string` | Override the resolved server URL. |
-| `--slug` | `string` | Local slug (filename). |
-| `--display-name` | `string` | Human-readable app name. |
-| `--protocol` | `string` | Protocol: oidc or saml. |
-| `--preset` | `string` | Preset: spa, web, native, machine. |
-| `--client-type` | `string` | OIDC client_type: web, spa, native, machine (default: spa). Use with --protocol oidc. |
-| `--role` | `string` | SAML role: client (default) or server (Zitadel-as-IdP). Rejected for OIDC — use --client-type. |
-| `--redirect-uri` | `string[]` | Redirect URI (repeatable). OIDC only. |
-| `--post-logout-redirect-uri` | `string[]` | Post-logout redirect URI (repeatable). OIDC only. |
-| `--metadata-url` | `string` | SAML metadata URL. |
-| `--entity-id` | `string` | SAML entity ID. |
-| `--from-file` | `string` | Path to an existing app resource JSON file. |
-
-### `zitadel app list`
-
-List local app resources.
-
-> Experimental POC surface.
-
-Usage: `zitadel app list`
-
-| Flag | Type | Description |
-|---|---|---|
-| `--cwd` / `-c` | `string` | Project directory to operate on. |
-| `--json` / `-j` | `boolean` | Emit the JSON envelope instead of pretty output. |
-| `--non-interactive` / `-n` | `boolean` | Disable prompts. Required when scripting or running as an agent. |
-| `--dry-run` | `boolean` | Preview the work without mutating files or hitting the platform. |
-| `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
-| `--server` / `-s` | `string` | Override the resolved server URL. |
-
-### `zitadel app show`
-
-Show a single app resource by slug.
-
-> Experimental POC surface.
-
-Usage: `zitadel app show <slug>`
-
-| Flag | Type | Description |
-|---|---|---|
-| `--cwd` / `-c` | `string` | Project directory to operate on. |
-| `--json` / `-j` | `boolean` | Emit the JSON envelope instead of pretty output. |
-| `--non-interactive` / `-n` | `boolean` | Disable prompts. Required when scripting or running as an agent. |
-| `--dry-run` | `boolean` | Preview the work without mutating files or hitting the platform. |
-| `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
-| `--server` / `-s` | `string` | Override the resolved server URL. |
-
-### `zitadel app remove`
-
-Remove an app resource by slug.
-
-> Experimental POC surface.
-
-Usage: `zitadel app remove <slug>`
-
-| Flag | Type | Description |
-|---|---|---|
-| `--cwd` / `-c` | `string` | Project directory to operate on. |
-| `--json` / `-j` | `boolean` | Emit the JSON envelope instead of pretty output. |
-| `--non-interactive` / `-n` | `boolean` | Disable prompts. Required when scripting or running as an agent. |
-| `--dry-run` | `boolean` | Preview the work without mutating files or hitting the platform. |
-| `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
-| `--server` / `-s` | `string` | Override the resolved server URL. |
 
 ### `zitadel capabilities`
 

@@ -1,7 +1,6 @@
 import { consola } from "consola";
 
 import { runAddSchema } from "./commands/add-schema";
-import { runAppAdd, runAppList, runAppRemove, runAppShow } from "./commands/app";
 import { runApply } from "./commands/apply";
 import { runCapabilities } from "./commands/capabilities";
 import { runDeployConnect, runDeployStatus } from "./commands/deploy";
@@ -122,39 +121,6 @@ async function dispatch(parsed: ParsedArgs, io: CliIO, global: GlobalOptions): P
         return;
       }
       break;
-    case "app": {
-      const appGlobal = withSubcommand(global, `app ${subcommand ?? ""}`.trim());
-      if (subcommand === "add") {
-        await runAppAdd(io, {
-          ...appGlobal,
-          slug: stringOpt(parsed, "slug"),
-          displayName: stringOpt(parsed, "displayName"),
-          protocol: stringOpt(parsed, "protocol"),
-          preset: stringOpt(parsed, "preset"),
-          clientType: stringOpt(parsed, "clientType"),
-          role: stringOpt(parsed, "role"),
-          redirectUri: multiOpt(parsed, "redirectUri"),
-          postLogoutRedirectUri: multiOpt(parsed, "postLogoutRedirectUri"),
-          metadataUrl: stringOpt(parsed, "metadataUrl"),
-          entityId: stringOpt(parsed, "entityId"),
-          fromFile: stringOpt(parsed, "fromFile"),
-        });
-        return;
-      }
-      if (subcommand === "list") {
-        await runAppList(io, appGlobal);
-        return;
-      }
-      if (subcommand === "show") {
-        await runAppShow(io, appGlobal, parsed.positionals[2]);
-        return;
-      }
-      if (subcommand === "remove") {
-        await runAppRemove(io, appGlobal, parsed.positionals[2]);
-        return;
-      }
-      break;
-    }
     case "capabilities":
       await runCapabilities(io, global);
       return;
@@ -288,12 +254,6 @@ function resolveCommandName(parsed: ParsedArgs): string {
   if (head === "deploy" && (next === "connect" || next === "status")) return `deploy ${next}`;
   if (head === "add" && next === "schema") return "add schema";
   if (head === "schema" && next === "add") return "schema add";
-  if (
-    head === "app" &&
-    (next === "add" || next === "list" || next === "show" || next === "remove")
-  ) {
-    return `app ${next}`;
-  }
   if (head === "help") return "help";
   return head;
 }
