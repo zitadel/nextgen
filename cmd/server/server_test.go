@@ -24,5 +24,5 @@ func TestLoadConfigReadsPostgresDatabaseEnv(t *testing.T) {
 	require.True(t, ok)
 
 	assert.Equal(t, "postgresql://postgres@localhost:5432/nextgen?sslmode=disable", postgresConfig)
-	assert.Equal(t, "4D61737465726B65794E65656473546F48617665333243686172616374657273", cfg.Server.CookieSealerKey)
+	assert.Equal(t, "4D61737465726B65794E65656473546F48617665333243686172616374657273", cfg.Server.EncryptionKey)
 }

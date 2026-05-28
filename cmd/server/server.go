@@ -82,7 +82,7 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 		}
 	}()
 
-	crypter, err := buildCrypter(cfg.Server.CookieSealerKey)
+	crypter, err := buildCrypter(cfg.Server.EncryptionKey)
 	if err != nil {
 		return err
 	}
