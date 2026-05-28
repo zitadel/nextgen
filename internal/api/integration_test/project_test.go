@@ -28,7 +28,7 @@ func newTestServer(t *testing.T) *httptest.Server {
 	repo := repository.NewProjectRepository(testPool)
 	projectSvc := service.NewProjectService(testPool, repo, idgen.NewULID())
 
-	handler := internalapi.NewHandler(nil, stubFlowService{}, &stubAuthAttemptService{}, nil, projectSvc, nil, nil)
+	handler := internalapi.NewHandler(nil, stubFlowService{}, &stubAuthAttemptService{}, nil, projectSvc, nil, nil, nil)
 	secHandler := internalapi.NewSecurityHandler()
 
 	srv, err := generatedapi.NewServer(handler, secHandler)

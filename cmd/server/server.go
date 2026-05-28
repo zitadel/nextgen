@@ -105,6 +105,7 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 	flowDefinitionRepo := repository.NewFlowDefinitionRepository(pool)
 	attemptRepo := repository.NewAuthAttemptRepository(pool)
 	schemaRepo := repository.NewJSONSchemaRepository(pool)
+	teamRepo := repository.NewTeamRepository(pool)
 
 	// ── Schema Stuff ─────────────────
 	schemaCache, err := lru.New2Q[string, *jsonschema.Schema](cfg.Schema.LRUCacheSize)
@@ -152,6 +153,7 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 		nil,
 		flowDefinitionRepo,
 	)
+	teamService := service.NewTeamService(pool, teamRepo)
 
 	// ── HTTP Server ─────────────────
 
@@ -159,7 +161,16 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 	defer stop()
 
 	oasServer, err := oasapi.NewServer(
-		api.NewHandler(crypter, flowService, authAttemptSvc, sessionService, projectService, schemaService, flowDefinitionSvc),
+		api.NewHandler(
+			crypter,
+			flowService,
+			authAttemptSvc,
+			sessionService,
+			projectService,
+			schemaService,
+			flowDefinitionSvc,
+			teamService,
+		),
 		api.NewSecurityHandler(),
 		oasapi.WithErrorHandler(api.OgenErrorHandler))
 	if err != nil {

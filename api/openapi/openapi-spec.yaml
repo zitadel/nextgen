@@ -80,6 +80,10 @@ paths:
     $ref: endpoints/flow_definitions/methods.yaml
   /flow_definitions/{id}:
     $ref: endpoints/flow_definitions/by_id/methods.yaml
+  /teams:
+    $ref: endpoints/teams/methods.yaml
+  /teams/{team_id}:
+    $ref: endpoints/teams/by_id/methods.yaml
 
 components:
   securitySchemes:
