@@ -46,6 +46,10 @@ func (s *sessionRepoStub) Delete(context.Context, database.QueryExecutor, string
 	panic("unexpected Delete call")
 }
 
+func sessionConfigForTest() service.SessionConfig {
+	return service.SessionConfig{DefaultTTL: time.Hour, MaxTTL: 24 * time.Hour}
+}
+
 func TestSessionService_Create(t *testing.T) {
 	userAgent := &domain.UserAgent{
 		ID: "ua-1",
@@ -100,7 +104,7 @@ func TestSessionService_Create(t *testing.T) {
 				},
 			}
 
-			got, err := service.NewSessionService(stubPool(), repo, service.TestSessionConfig()).Create(t.Context(), tt.input)
+			got, err := service.NewSessionService(stubPool(), repo, sessionConfigForTest()).Create(t.Context(), tt.input)
 			if tt.wantErr != nil {
 				assertSessionResult(t, "Create", got, err, nil, tt.wantErr)
 				return
@@ -119,7 +123,7 @@ func TestSessionService_Create(t *testing.T) {
 }
 
 func TestSessionService_Exchange(t *testing.T) {
-	cfg := service.TestSessionConfig()
+	cfg := sessionConfigForTest()
 	idempotencyKey := "retry-1"
 	exchangedSession := &domain.Session{ProjectID: "proj", ID: "sess"}
 	overrideTTL := 2 * time.Hour
@@ -286,7 +290,7 @@ func TestSessionService_Get(t *testing.T) {
 				},
 			}
 
-			got, err := service.NewSessionService(stubPool(), repo, service.TestSessionConfig()).Get(t.Context(), tt.input)
+			got, err := service.NewSessionService(stubPool(), repo, sessionConfigForTest()).Get(t.Context(), tt.input)
 			assertSessionResult(t, "Get", got, err, tt.want, tt.wantErr)
 		})
 	}

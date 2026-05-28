@@ -18,7 +18,7 @@ func newSessionServiceForIntegration(t *testing.T) (service.SessionService, serv
 	t.Helper()
 	pool := integrationPoolOrFail(t)
 	sessRepo := repository.NewSessionRepository(pool)
-	cfg := service.TestSessionConfig()
+	cfg := service.SessionConfig{DefaultTTL: time.Hour, MaxTTL: 24 * time.Hour}
 	return service.NewSessionService(pool, sessRepo, cfg), cfg
 }
 

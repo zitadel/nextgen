@@ -24,11 +24,3 @@ func (c SessionConfig) Validate() error {
 	}
 	return nil
 }
-
-// TestSessionConfig returns fixed TTL bounds for unit and integration tests.
-func TestSessionConfig() SessionConfig {
-	return SessionConfig{
-		DefaultTTL: time.Hour,
-		MaxTTL:     24 * time.Hour,
-	}
-}

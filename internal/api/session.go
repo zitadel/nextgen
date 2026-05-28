@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"fmt"
+	"math"
 	"net/http"
 	"time"
 
@@ -41,6 +42,13 @@ func (h Handler) ExchangeHandoff(ctx context.Context, req *api.ExchangeRequest, 
 		input.IdempotencyKey = new(key)
 	}
 	if ttlSeconds, ok := req.TTLSeconds.Get(); ok {
+		maxTTLSeconds := int64(math.MaxInt64 / int64(time.Second))
+		if ttlSeconds > maxTTLSeconds {
+			return nil, domain.ErrSessionInvalidTTL().WithDetails(map[string]any{
+				"ttl_seconds": ttlSeconds,
+				"max_ttl":     time.Duration(math.MaxInt64),
+			})
+		}
 		ttl := time.Duration(ttlSeconds) * time.Second
 		input.TTL = &ttl
 	}

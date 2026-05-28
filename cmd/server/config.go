@@ -1,7 +1,6 @@
 package server
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/crypto"
@@ -19,19 +18,6 @@ type Config struct {
 type SessionConfig struct {
 	DefaultTTL time.Duration `mapstructure:"default_ttl"`
 	MaxTTL     time.Duration `mapstructure:"max_ttl"`
-}
-
-func (c SessionConfig) Validate() error {
-	if c.DefaultTTL <= 0 {
-		return fmt.Errorf("session default_ttl must be positive")
-	}
-	if c.MaxTTL <= 0 {
-		return fmt.Errorf("session max_ttl must be positive")
-	}
-	if c.DefaultTTL > c.MaxTTL {
-		return fmt.Errorf("session default_ttl must not exceed max_ttl")
-	}
-	return nil
 }
 
 type ServerConfig struct {
