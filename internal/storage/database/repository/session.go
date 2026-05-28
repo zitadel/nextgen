@@ -118,10 +118,12 @@ func withTransaction(ctx context.Context, q database.QueryExecutor, fn func(ctx 
 	return tx.End(ctx, err)
 }
 
+// Create implements [domain.SessionRepository].
 func (r *SessionRepository) Create(ctx context.Context, q database.QueryExecutor, session *domain.Session) error {
 	return r.insertSession(ctx, q, session)
 }
 
+// Get implements [domain.SessionRepository].
 func (r *SessionRepository) Get(ctx context.Context, q database.QueryExecutor, projectID, sessionID string) (*domain.Session, error) {
 	sessions, err := r.querySessions(ctx, q, projectID, sessionID)
 	if err != nil {
@@ -133,6 +135,7 @@ func (r *SessionRepository) Get(ctx context.Context, q database.QueryExecutor, p
 	return sessions[0], nil
 }
 
+// List implements [domain.SessionRepository].
 func (r *SessionRepository) List(ctx context.Context, q database.QueryExecutor, projectID string) ([]*domain.Session, error) {
 	sessions, err := r.querySessions(ctx, q, projectID, "")
 	if err != nil {
@@ -144,6 +147,7 @@ func (r *SessionRepository) List(ctx context.Context, q database.QueryExecutor, 
 	return sessions, nil
 }
 
+// Delete implements [domain.SessionRepository].
 func (r *SessionRepository) Delete(ctx context.Context, q database.QueryExecutor, projectID, sessionID string) error {
 	cond := database.And(
 		database.NewTextCondition(database.NewColumn(r.meta.tableName, "project_id"), database.TextOperationEqual, projectID),
@@ -159,6 +163,7 @@ func (r *SessionRepository) Delete(ctx context.Context, q database.QueryExecutor
 	return nil
 }
 
+// Exchange implements [domain.SessionRepository].
 func (r *SessionRepository) Exchange(ctx context.Context, q database.QueryExecutor, projectID, handoffToken string, _ *string, ttl time.Duration) (*domain.Session, error) {
 	var result *domain.Session
 	err := withTransaction(ctx, q, func(ctx context.Context, tx database.QueryExecutor) (err error) {
