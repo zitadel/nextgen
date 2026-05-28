@@ -239,6 +239,12 @@ type Handler interface {
 	//
 	// POST /auth/token
 	GetToken(ctx context.Context, req *PostTokenRequest) (GetTokenRes, error)
+	// GetUserByID implements GetUserByID operation.
+	//
+	// Get user by ID.
+	//
+	// GET /user/{user_id}
+	GetUserByID(ctx context.Context, params GetUserByIDParams) (GetUserByIDRes, error)
 	// GetUserInfo implements getUserInfo operation.
 	//
 	// Get user info.

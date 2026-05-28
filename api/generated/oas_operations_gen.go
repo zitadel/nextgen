@@ -34,6 +34,7 @@ const (
 	GetSessionOperation             OperationName = "GetSession"
 	GetTeamOperation                OperationName = "GetTeam"
 	GetTokenOperation               OperationName = "GetToken"
+	GetUserByIDOperation            OperationName = "GetUserByID"
 	GetUserInfoOperation            OperationName = "GetUserInfo"
 	IntrospectOperation             OperationName = "Introspect"
 	IssueChallengeOperation         OperationName = "IssueChallenge"

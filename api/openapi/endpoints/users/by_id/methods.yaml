@@ -1,0 +1,40 @@
+get:
+  operationId: GetUserByID
+  summary: Get user by ID
+  tags:
+    - User
+  parameters:
+    - $ref: ../../../components/parameters/project-id.yaml
+    - $ref: ../../../components/parameters/team-id.yaml
+    - name: user_id
+      in: path
+      required: true
+      schema:
+        $ref: ../../../components/schemas/user-id.yaml
+  security: []
+  responses:
+    '200':
+      description: Current user information retrieved successfully
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+    '401':
+      description: Client was not authorized or the session is anonymous
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '404':
+      description: User referenced by the current session was not found
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    default:
+      description: Unexpected error response.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml

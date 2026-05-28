@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	api "github.com/zitadel/nextgen/api/generated"
+	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 )
 
 func TestCreateSchema(t *testing.T) {
@@ -55,7 +56,7 @@ func TestCreateSchema(t *testing.T) {
 				resp, err := client.CreateSchema(t.Context(), req, params)
 				assert.NoError(t, err)
 
-				assert.IsType(t, &api.CreateSchemaResponse{}, resp, mustMarshal(t, resp))
+				assert.IsType(t, &api.CreateSchemaResponse{}, resp, helpers.MustMarshal(t, resp))
 			})
 		}
 	})
@@ -119,7 +120,7 @@ func TestCreateSchema(t *testing.T) {
 			resp, err := client.CreateSchema(t.Context(), req, params)
 			assert.NoError(t, err)
 
-			assert.IsType(t, &api.CreateSchemaConflict{}, resp, mustMarshal(t, resp))
+			assert.IsType(t, &api.CreateSchemaConflict{}, resp, helpers.MustMarshal(t, resp))
 		})
 	})
 }
@@ -139,7 +140,7 @@ func TestGetSchema(t *testing.T) {
 			})
 			assert.NoError(t, err)
 
-			assert.IsType(t, &api.GetSchemaByIdOK{}, resp, mustMarshal(t, resp))
+			assert.IsType(t, &api.GetSchemaByIdOK{}, resp, helpers.MustMarshal(t, resp))
 		})
 	})
 
@@ -154,13 +155,7 @@ func TestGetSchema(t *testing.T) {
 			})
 			assert.NoError(t, err)
 
-			assert.IsType(t, &api.GetSchemaByIdNotFound{}, resp, mustMarshal(t, resp))
+			assert.IsType(t, &api.GetSchemaByIdNotFound{}, resp, helpers.MustMarshal(t, resp))
 		})
 	})
-}
-
-func mustMarshal(t *testing.T, v any) string {
-	m, err := json.Marshal(v)
-	require.NoError(t, err)
-	return string(m)
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	api "github.com/zitadel/nextgen/api/generated"
+	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
@@ -26,7 +27,7 @@ func TestCreateTeam(t *testing.T) {
 		resp, err := client.CreateTeam(t.Context(), req, params)
 		require.NoError(t, err)
 
-		assert.IsType(t, &api.CreateTeamResponse{}, resp, mustMarshal(t, resp))
+		assert.IsType(t, &api.CreateTeamResponse{}, resp, helpers.MustMarshal(t, resp))
 	})
 
 	t.Run("error", func(t *testing.T) {
@@ -37,7 +38,7 @@ func TestCreateTeam(t *testing.T) {
 			resp, err := client.CreateTeam(t.Context(), req, params)
 			require.NoError(t, err)
 
-			assert.IsType(t, &api.CreateTeamBadRequest{}, resp, mustMarshal(t, resp))
+			assert.IsType(t, &api.CreateTeamBadRequest{}, resp, helpers.MustMarshal(t, resp))
 		})
 	})
 }
@@ -61,7 +62,7 @@ func TestGetTeam(t *testing.T) {
 		resp, err := client.GetTeam(t.Context(), params)
 		require.NoError(t, err)
 
-		assert.IsType(t, &api.GetTeamResponse{}, resp, mustMarshal(t, resp))
+		assert.IsType(t, &api.GetTeamResponse{}, resp, helpers.MustMarshal(t, resp))
 	})
 
 	t.Run("error", func(t *testing.T) {
@@ -77,7 +78,7 @@ func TestGetTeam(t *testing.T) {
 			resp, err := client.GetTeam(t.Context(), params)
 			require.NoError(t, err)
 
-			assert.IsType(t, &api.GetTeamNotFound{}, resp, mustMarshal(t, resp))
+			assert.IsType(t, &api.GetTeamNotFound{}, resp, helpers.MustMarshal(t, resp))
 		})
 	})
 }

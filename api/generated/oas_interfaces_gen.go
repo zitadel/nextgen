@@ -113,6 +113,10 @@ type GetTokenRes interface {
 	getTokenRes()
 }
 
+type GetUserByIDRes interface {
+	getUserByIDRes()
+}
+
 type GetUserInfoRes interface {
 	getUserInfoRes()
 }

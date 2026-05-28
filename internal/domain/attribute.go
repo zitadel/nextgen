@@ -47,7 +47,7 @@ func NewCreateAttribute(key string, value any, unique AttributeUniqueness) (*Cre
 	return attr, nil
 }
 
-func buildAttributeTree(attributes []Attribute) (map[string]any, error) {
+func BuildAttributeTree(attributes []Attribute) (map[string]any, error) {
 	tree := make(map[string]any)
 	for i, a := range attributes {
 		keyNodes := strings.Split(a.Key, ".")

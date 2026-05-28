@@ -18,12 +18,12 @@ const (
 )
 
 var (
-	colUserProjectID    = database.NewColumn(userTable, "project_id")
-	colUserID           = database.NewColumn(userTable, "id")
-	colUserTeamID       = database.NewColumn(userTable, "team_id")
-	colUserSchemaURL    = database.NewColumn(userTable, "schema_url")
-	colUserCreatedAt    = database.NewColumn(userTable, "created_at")
-	colUserUpdatedAt    = database.NewColumn(userTable, "updated_at")
+	colUserProjectID          = database.NewColumn(userTable, "project_id")
+	colUserID                 = database.NewColumn(userTable, "id")
+	colUserTeamID             = database.NewColumn(userTable, "team_id")
+	colUserSchemaURL          = database.NewColumn(userTable, "schema_url")
+	colUserCreatedAt          = database.NewColumn(userTable, "created_at")
+	colUserUpdatedAt          = database.NewColumn(userTable, "updated_at")
 	colUserAttributeProjectID = database.NewColumn(userAttributesTable, "project_id")
 	colUserAttributeUserID    = database.NewColumn(userAttributesTable, "user_id")
 	colUserAttributeKey       = database.NewColumn(userAttributesTable, "key")
@@ -221,6 +221,14 @@ func userHydrationExpressions(rowQualifier, attrKeysPlaceholder, authPlaceholder
     CASE WHEN ` + authPlaceholder + ` THEN EXISTS(SELECT 1 FROM zitadel_nextgen.user_totp p WHERE p.project_id = ` + rowQualifier + `.project_id AND p.user_id = ` + rowQualifier + `.id) ELSE FALSE END AS has_totp,
     CASE WHEN ` + authPlaceholder + ` THEN EXISTS(SELECT 1 FROM zitadel_nextgen.user_recovery_codes p WHERE p.project_id = ` + rowQualifier + `.project_id AND p.user_id = ` + rowQualifier + `.id) ELSE FALSE END AS has_rc,
     CASE WHEN ` + authPlaceholder + ` THEN EXISTS(SELECT 1 FROM zitadel_nextgen.user_passkeys p WHERE p.project_id = ` + rowQualifier + `.project_id AND p.user_id = ` + rowQualifier + `.id) ELSE FALSE END AS has_pk`
+}
+
+func (r *UserRepository) GetByID(ctx context.Context, client database.QueryExecutor, projectID string, teamID *string, userID string) (*domain.User, error) {
+	condition := r.PrimaryKeyCondition(projectID, userID)
+	if teamID == nil {
+		condition = database.And(condition, r.PrimaryKeyCondition(projectID, userID))
+	}
+	return r.Get(ctx, client, database.WithCondition(condition))
 }
 
 func (r *UserRepository) Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*domain.User, error) {

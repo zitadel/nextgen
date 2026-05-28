@@ -62,14 +62,16 @@ var _ api.Handler = (*Handler)(nil)
 
 // ---- Converters -------------------------------------------------------------
 
-func convertUsingJson(source any, target any) error {
+func convertUsingJson[T any](source any) (*T, error) {
 	// unmarshalling and unmarshalling is not performant, but I don't want to write a custom converter using reflection.
 	// as long https://github.com/ogen-go/ogen/issues/1313 is open, I don't see another way.
 	bs, err := json.Marshal(source)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return json.Unmarshal(bs, target)
+	target := new(T)
+	err = json.Unmarshal(bs, target)
+	return target, err
 }
 
 // ------------------ Errors ---------------

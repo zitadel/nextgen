@@ -20,6 +20,12 @@ type CreateUserInput struct {
 	User      map[string]any
 }
 
+type GetUserInput struct {
+	ProjectID string
+	TeamID    *string
+	UserID    string
+}
+
 // ---- Implementation -------------------------------------------------------------
 
 type UserService struct {
@@ -112,4 +118,22 @@ func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (ma
 
 	input.User["id"] = createUser.ID
 	return input.User, nil
+}
+
+func (s *UserService) GetUserByID(ctx context.Context, input GetUserInput) (map[string]any, error) {
+	flatUser, err := s.userRepo.GetByID(ctx, s.pool, input.ProjectID, input.TeamID, input.UserID)
+	if err != nil {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+			return nil, domain.ErrUserNotFound()
+		}
+		return nil, domain.ErrInternal(err).WithMessage("failed to get user from database")
+	}
+
+	user, err := domain.BuildAttributeTree(flatUser.Attributes)
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to parse user attributes")
+	}
+
+	user["id"] = flatUser.ID
+	return user, nil
 }

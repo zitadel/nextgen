@@ -2258,6 +2258,7 @@ func (*ErrorDetailsStatusCode) getSchemaByIdRes()          {}
 func (*ErrorDetailsStatusCode) getSessionRes()             {}
 func (*ErrorDetailsStatusCode) getTeamRes()                {}
 func (*ErrorDetailsStatusCode) getTokenRes()               {}
+func (*ErrorDetailsStatusCode) getUserByIDRes()            {}
 func (*ErrorDetailsStatusCode) getUserInfoRes()            {}
 func (*ErrorDetailsStatusCode) introspectRes()             {}
 func (*ErrorDetailsStatusCode) listFlowDefinitionsRes()    {}
@@ -4545,6 +4546,27 @@ func (*GetTeamResponse) getTeamRes() {}
 type GetTeamUnauthorized ErrorDetails
 
 func (*GetTeamUnauthorized) getTeamRes() {}
+
+type GetUserByIDNotFound ErrorDetails
+
+func (*GetUserByIDNotFound) getUserByIDRes() {}
+
+type GetUserByIDOK map[string]jx.Raw
+
+func (s *GetUserByIDOK) init() GetUserByIDOK {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+func (*GetUserByIDOK) getUserByIDRes() {}
+
+type GetUserByIDUnauthorized ErrorDetails
+
+func (*GetUserByIDUnauthorized) getUserByIDRes() {}
 
 type GetUserInfoOK struct {
 	// The unique identifier for the user.

@@ -328,6 +328,15 @@ func (UnimplementedHandler) GetToken(ctx context.Context, req *PostTokenRequest)
 	return r, ht.ErrNotImplemented
 }
 
+// GetUserByID implements GetUserByID operation.
+//
+// Get user by ID.
+//
+// GET /user/{user_id}
+func (UnimplementedHandler) GetUserByID(ctx context.Context, params GetUserByIDParams) (r GetUserByIDRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // GetUserInfo implements getUserInfo operation.
 //
 // Get user info.
