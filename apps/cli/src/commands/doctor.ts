@@ -14,7 +14,7 @@ import { MANAGED_MARKER } from "../lib/paths";
 import { getRenderer } from "../renderers/registry";
 import { scaffold } from "../scaffolder";
 import type { ScaffoldPlan } from "../scaffolder/plan";
-import { validateJsonSchema } from "../schema/validate";
+import { validateJsonSchema } from "../lib/user-schema";
 import { readZitadelConfig, readZitadelSecret } from "./shared";
 
 export type DoctorOptions = GlobalOptions & {

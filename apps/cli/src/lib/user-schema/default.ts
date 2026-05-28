@@ -1,4 +1,4 @@
-import { sortValue } from "../lib/json";
+import { sortValue } from "../json";
 import type { AuthMethods } from "./annotations";
 
 /**

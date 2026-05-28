@@ -1,4 +1,4 @@
-import { sortValue } from "../lib/json";
+import { sortValue } from "../json";
 import { fieldPreset } from "./default";
 
 export type AddFieldSpec = {

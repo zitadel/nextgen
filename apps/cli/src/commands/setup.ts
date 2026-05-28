@@ -17,8 +17,7 @@ import type { CreateProjectResponse } from "../platform/client";
 import { getRenderer } from "../renderers/registry";
 import { scaffold } from "../scaffolder";
 import type { ScaffoldPlan } from "../scaffolder/plan";
-import { defaultUserSchema } from "../schema/default";
-import { validateJsonSchema } from "../schema/validate";
+import { defaultUserSchema, validateJsonSchema } from "../lib/user-schema";
 import { runApply } from "./apply";
 import { runDeployConnect } from "./deploy";
 

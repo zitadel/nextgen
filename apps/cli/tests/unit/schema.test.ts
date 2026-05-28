@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { defaultUserSchema } from "../../src/schema/default";
-import { addFields, parseAddFieldSpec, removeFields } from "../../src/schema/merge";
+import {
+  addFields,
+  defaultUserSchema,
+  parseAddFieldSpec,
+  removeFields,
+} from "../../src/lib/user-schema";
 
 describe("user schema", () => {
   it("uses project-scoped uniqueness for email", () => {

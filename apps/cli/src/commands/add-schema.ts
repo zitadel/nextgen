@@ -5,16 +5,17 @@ import type { CliIO, GlobalOptions } from "../io/output";
 import { ok } from "../io/output";
 import { ZitadelError } from "../lib/errors";
 import { parseJsonObject, stableStringify } from "../lib/json";
-import { validateFieldAnnotations } from "../schema/annotations";
-import { listNamedPresets, resolveNamedPreset } from "../schema/default";
 import {
   addFields,
   addFieldFromJson,
+  listNamedPresets,
   parseAddFieldSpec,
   removeFields,
+  resolveNamedPreset,
+  validateFieldAnnotations,
+  validateJsonSchema,
   type AddFieldSpec,
-} from "../schema/merge";
-import { validateJsonSchema } from "../schema/validate";
+} from "../lib/user-schema";
 
 export type AddSchemaOptions = GlobalOptions & {
   addField?: string | string[];

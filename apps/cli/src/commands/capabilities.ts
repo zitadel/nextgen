@@ -7,8 +7,8 @@ import {
   KNOWN_MFA_VALUES,
   KNOWN_UNIQUE_VALUES,
   KNOWN_VERIFY_VALUES,
-} from "../schema/annotations";
-import { listNamedPresets } from "../schema/default";
+  listNamedPresets,
+} from "../lib/user-schema";
 import { COMMANDS } from "./registry";
 
 export const ENVELOPE_SCHEMA_VERSION = 1;
