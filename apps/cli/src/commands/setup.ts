@@ -13,7 +13,7 @@ import { AUTH_METHODS, type AuthMethod, buildFlow } from "../lib/flows";
 import { stableStringify } from "../lib/json";
 import { createPlatformClient } from "../platform";
 import { DEFAULT_SERVER } from "../platform/resolve-server";
-import type { CreateProjectResponse } from "../platform/schemas";
+import type { CreateProjectResponse } from "../platform/client";
 import { getRenderer } from "../renderers/registry";
 import { scaffold } from "../scaffolder";
 import type { ScaffoldPlan } from "../scaffolder/plan";

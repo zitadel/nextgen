@@ -28,9 +28,9 @@
   },
   "dependencies": {
     "@clack/prompts": "catalog:",
+    "@zitadel-nextgen/api": "workspace:*",
     "ajv": "catalog:",
     "consola": "^3.4.2",
-    "liquidjs": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
