@@ -6,26 +6,7 @@ import { consola } from "consola";
 
 import type { PlatformClient } from "../api/client.js";
 import { readState, removeFromState, updateState } from "./state.js";
-import type { ResourceSyncer } from "./syncers.js";
-
-/**
- * One unit of work in a sync plan. The engine emits exactly one
- * `SyncAction` per resource file (or per state-only entry, for
- * deletes). Discriminated by `kind`.
- */
-export type SyncAction =
-  | { kind: "create"; path: string; syncer: ResourceSyncer; content: object; hash: string }
-  | {
-      kind: "update";
-      path: string;
-      syncer: ResourceSyncer;
-      id: string;
-      content: object;
-      hash: string;
-      oldContent: object | null;
-    }
-  | { kind: "delete"; path: string; syncer: ResourceSyncer; id: string; oldContent: object | null }
-  | { kind: "skip"; path: string; reason: "immutable" | "no-change" };
+import type { ResourceSyncer, SyncAction } from "./types.js";
 
 /**
  * Compute the sync plan for `cwd` against the state file and (when
@@ -166,7 +147,8 @@ async function readJsonDir(dirPath: string): Promise<Map<string, object>> {
   try {
     entries = await readdir(dirPath);
   } catch (err) {
-    if (isErrnoCode(err, "ENOENT")) {
+    // A missing resource directory just means nothing to sync for it.
+    if (typeof err === "object" && err !== null && "code" in err && err.code === "ENOENT") {
       return result;
     }
     throw err;
@@ -181,13 +163,4 @@ async function readJsonDir(dirPath: string): Promise<Map<string, object>> {
 
 function sha256(data: object): string {
   return createHash("sha256").update(JSON.stringify(data)).digest("hex");
-}
-
-function isErrnoCode(error: unknown, code: string): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as { code?: string }).code === code
-  );
 }

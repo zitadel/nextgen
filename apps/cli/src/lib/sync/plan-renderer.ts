@@ -1,4 +1,4 @@
-import type { SyncAction } from "./loop.js";
+import type { SyncAction } from "./types.js";
 
 /**
  * Render a {@link buildSyncPlan} result as a human-readable Terraform-style

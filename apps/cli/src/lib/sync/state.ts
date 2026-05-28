@@ -1,25 +1,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-/**
- * One row in the local state file: the platform `id` returned at
- * create time and the content `hash` last successfully synced. Both
- * fields are optional so the engine can recover from partial writes.
- */
-type ResourceEntry = {
-  id?: string;
-  hash?: string;
-};
-
-/**
- * The persisted contents of `.zitadel/state.json`. Maps each managed
- * file path (relative to the project root) to its sync entry, plus
- * the framework id captured during `zitadel setup`.
- */
-export type ZitadelState = {
-  framework: string;
-  resources: Record<string, ResourceEntry>;
-};
+import type { ResourceEntry, ZitadelState } from "./types.js";
 
 /**
  * Read and parse `.zitadel/state.json`. Throws if the file is

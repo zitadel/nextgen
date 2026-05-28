@@ -1,24 +1,7 @@
 import { FLOWS_DIR } from "../flows";
 import { SCHEMAS_DIR } from "../user-schema";
 import type { PlatformClient } from "../api/client.js";
-
-/**
- * The contract each per-resource adapter implements. `directory` is
- * the project-root-relative path the sync loop scans; `mutable`
- * controls whether file-content changes trigger update or get skipped.
- * Concrete syncers (file-private to this module) translate the
- * generic `data: object` payload into the resource-specific envelope
- * and dispatch to the matching `client.*` method.
- */
-export interface ResourceSyncer {
-  readonly kind: string;
-  readonly directory: string;
-  readonly mutable: boolean;
-  create(client: PlatformClient, data: object): Promise<string>;
-  update(client: PlatformClient, id: string, data: object): Promise<void>;
-  delete(client: PlatformClient, id: string): Promise<void>;
-  fetch?(client: PlatformClient, id: string): Promise<object>;
-}
+import type { ResourceSyncer } from "./types.js";
 
 /**
  * Build the syncer list with the project context every flow create
