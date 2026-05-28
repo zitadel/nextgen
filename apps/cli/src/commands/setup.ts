@@ -17,7 +17,7 @@ import type { CreateProjectResponse } from "../platform/client";
 import { getRenderer } from "../renderers/registry";
 import { scaffold } from "../scaffolder";
 import type { ScaffoldPlan } from "../scaffolder/plan";
-import { defaultUserSchema, validateJsonSchema } from "../lib/user-schema";
+import { buildUserSchema, validateJsonSchema } from "../lib/user-schema";
 import { runApply } from "./apply";
 import { runDeployConnect } from "./deploy";
 
@@ -80,7 +80,7 @@ export async function runSetup(io: CliIO, opts: SetupOptions): Promise<void> {
   const issuer = issuerFromPort(devPort);
   userFields = userFields ?? ["email", "given_name", "family_name"];
   const resolvedMethod: AuthMethod = authMethod ?? "passkey";
-  const userSchema = defaultUserSchema({ fields: userFields, authMethods: resolvedMethod });
+  const userSchema = buildUserSchema({ fields: userFields, authMethods: resolvedMethod });
   const schemaValidation = validateJsonSchema(userSchema);
   if (!schemaValidation.valid) {
     throw new ZitadelError("E_VALIDATION", "Generated user schema is invalid", {

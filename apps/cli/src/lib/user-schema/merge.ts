@@ -1,5 +1,5 @@
 import { sortValue } from "../json";
-import { fieldPreset } from "./default";
+import { fieldPreset } from "./presets";
 
 export type AddFieldSpec = {
   name: string;

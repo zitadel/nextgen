@@ -2,20 +2,20 @@ import { describe, expect, it } from "vitest";
 
 import {
   addFields,
-  defaultUserSchema,
+  buildUserSchema,
   parseAddFieldSpec,
   removeFields,
 } from "../../src/lib/user-schema";
 
 describe("user schema", () => {
   it("uses project-scoped uniqueness for email", () => {
-    const schema = defaultUserSchema();
+    const schema = buildUserSchema();
     expect(schema.properties.email?.["x-unique"]).toBe("project");
     expect(schema.required).toEqual(["email", "family_name", "given_name"]);
   });
 
   it("adds and removes fields with stable output", () => {
-    const schema = defaultUserSchema();
+    const schema = buildUserSchema();
     const withPhone = addFields(schema, [parseAddFieldSpec("phone:string:format=phone,x-mfa=sms")]);
     expect((withPhone.properties as Record<string, Record<string, unknown>>).phone?.["x-mfa"]).toBe(
       "sms",
