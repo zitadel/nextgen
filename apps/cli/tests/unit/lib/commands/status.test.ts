@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { runStatus } from "../../../../src/lib/commands/status";
-import type { CliIO, GlobalOptions } from "../../../../src/io/output";
+import type { GlobalOptions } from "../../../../src/lib/oclif/base";
 
 const SECRET = {
   project_id: "proj-001",
@@ -15,27 +15,9 @@ const SECRET = {
   created_at: "2026-01-01T00:00:00.000Z",
 };
 
-let captured = "";
-
-function makeIO(env: Record<string, string> = {}): CliIO {
-  captured = "";
-  return {
-    stdout: {
-      write: (chunk: string): boolean => {
-        captured += chunk;
-        return true;
-      },
-    } as never,
-    stderr: { write: (): boolean => true } as never,
-    env,
-    isTTY: false,
-  };
-}
-
 function makeOpts(cwd: string, overrides: Partial<GlobalOptions> = {}): GlobalOptions {
   return {
     cwd,
-    json: true,
     nonInteractive: true,
     dryRun: false,
     force: false,
@@ -44,12 +26,10 @@ function makeOpts(cwd: string, overrides: Partial<GlobalOptions> = {}): GlobalOp
     source: "mock",
     verbose: false,
     debug: false,
+    env: {},
+    isTTY: false,
     ...overrides,
   };
-}
-
-function parseEnvelope(): Record<string, unknown> {
-  return JSON.parse(captured) as Record<string, unknown>;
 }
 
 const tempDirs: string[] = [];
@@ -71,7 +51,7 @@ afterEach(async () => {
 });
 
 describe("runStatus", () => {
-  it("emits an ok envelope for a healthy project with config and secret", async () => {
+  it("returns an ok result for a healthy project with config and secret", async () => {
     const cwd = await makeProject();
     await writeFile(
       join(cwd, "zitadel.json"),
@@ -83,13 +63,13 @@ describe("runStatus", () => {
     );
     await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify(SECRET));
 
-    const io = makeIO();
-    await runStatus(io, makeOpts(cwd, { source: "https://api.zitadel.cloud" }));
+    const result = await runStatus(makeOpts(cwd, { source: "https://api.zitadel.cloud" }));
 
-    const envelope = parseEnvelope();
-    expect(envelope.status).toBe("ok");
-    expect(envelope.command).toBe("status");
-    const data = envelope.data as {
+    expect(result.status).toBe("ok");
+    if (result.status !== "ok") {
+      throw new Error("expected ok");
+    }
+    const data = result.data as {
       project: { project_id: string; issuer?: string };
       next_commands: string[];
     };
@@ -105,22 +85,22 @@ describe("runStatus", () => {
       JSON.stringify({ project: "orphan", server: "https://api.zitadel.cloud" }),
     );
 
-    const io = makeIO();
-    await runStatus(io, makeOpts(cwd));
+    const result = await runStatus(makeOpts(cwd));
 
-    const envelope = parseEnvelope();
-    expect(envelope.status).toBe("skipped");
-    expect(envelope.reason).toBe("orphaned-config");
-    const data = envelope.data as { project_id?: string; lifecycle: string };
+    expect(result.status).toBe("skipped");
+    if (result.status !== "skipped") {
+      throw new Error("expected skipped");
+    }
+    expect(result.reason).toBe("orphaned-config");
+    expect(result.nextCommands).toContain("zitadel setup --force");
+    const data = result.data as { project_id?: string; lifecycle: string };
     expect(data.project_id).toBe("orphan");
     expect(data.lifecycle).toBe("orphaned-config");
-    expect(envelope.next_commands).toContain("zitadel setup --force");
   });
 
   it("throws E_VALIDATION when zitadel.json is missing entirely", async () => {
     const cwd = await makeProject();
-    const io = makeIO();
-    await expect(runStatus(io, makeOpts(cwd))).rejects.toMatchObject({
+    await expect(runStatus(makeOpts(cwd))).rejects.toMatchObject({
       code: "E_VALIDATION",
     });
   });
@@ -133,12 +113,13 @@ describe("runStatus", () => {
     );
     await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify(SECRET));
 
-    const io = makeIO();
-    await runStatus(io, makeOpts(cwd));
+    const result = await runStatus(makeOpts(cwd));
 
-    const envelope = parseEnvelope();
-    expect(envelope.status).toBe("ok");
-    const data = envelope.data as { project: { project_id: string; issuer?: string } };
+    expect(result.status).toBe("ok");
+    if (result.status !== "ok") {
+      throw new Error("expected ok");
+    }
+    const data = result.data as { project: { project_id: string; issuer?: string } };
     expect(data.project.project_id).toBe("proj-001");
     expect(data.project.issuer).toBeUndefined();
   });

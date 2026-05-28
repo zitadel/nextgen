@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
 import { findEnvRefs, runApply } from "../../../../src/lib/commands/apply";
-import type { CliIO, GlobalOptions } from "../../../../src/io/output";
+import type { GlobalOptions } from "../../../../src/lib/oclif/base";
 
 vi.mock("../../../../src/lib/sync/loop", () => ({
   runSyncLoop: vi.fn().mockResolvedValue(undefined),
@@ -89,10 +89,9 @@ const SECRET = {
 function makeOpts(
   cwd: string,
   overrides: Partial<GlobalOptions> = {},
-): Parameters<typeof runApply>[1] {
+): Parameters<typeof runApply>[0] {
   return {
     cwd,
-    json: false,
     nonInteractive: true,
     dryRun: false,
     force: false,
@@ -101,16 +100,9 @@ function makeOpts(
     source: "mock",
     verbose: false,
     debug: false,
-    ...overrides,
-  };
-}
-
-function makeIO(env: Record<string, string> = {}): CliIO {
-  return {
-    stdout: { write: vi.fn() } as never,
-    stderr: { write: vi.fn() } as never,
-    env,
+    env: {},
     isTTY: false,
+    ...overrides,
   };
 }
 
@@ -135,7 +127,7 @@ describe("runApply pre-flight checks", () => {
       "bad.json": { version: 99, kind: "wrong" },
     });
     try {
-      await expect(runApply(makeIO(), makeOpts(cwd))).rejects.toMatchObject({
+      await expect(runApply(makeOpts(cwd))).rejects.toMatchObject({
         code: "E_VALIDATION",
       });
     } finally {
@@ -155,7 +147,7 @@ describe("runApply pre-flight checks", () => {
     };
     const cwd = await makeCwd(SECRET, { "default.json": flowWithEnvRef });
     try {
-      await expect(runApply(makeIO({}), makeOpts(cwd))).rejects.toThrow(
+      await expect(runApply(makeOpts(cwd))).rejects.toThrow(
         "Missing environment variables",
       );
     } finally {
@@ -176,7 +168,7 @@ describe("runApply pre-flight checks", () => {
     const cwd = await makeCwd(SECRET, { "default.json": flowWithEnvRef });
     try {
       await expect(
-        runApply(makeIO({ MY_SECRET: "hunter2" }), makeOpts(cwd)),
+        runApply(makeOpts(cwd, { env: { MY_SECRET: "hunter2" } })),
       ).resolves.not.toThrow();
     } finally {
       await rm(cwd, { recursive: true, force: true });

@@ -5,30 +5,12 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { runEject } from "../../../../src/lib/commands/eject";
-import type { CliIO, GlobalOptions } from "../../../../src/io/output";
+import type { GlobalOptions } from "../../../../src/lib/oclif/base";
 import { MANAGED_MARKER } from "../../../../src/lib/paths";
-
-let captured = "";
-
-function makeIO(env: Record<string, string> = {}): CliIO {
-  captured = "";
-  return {
-    stdout: {
-      write: (chunk: string): boolean => {
-        captured += chunk;
-        return true;
-      },
-    } as never,
-    stderr: { write: (): boolean => true } as never,
-    env,
-    isTTY: false,
-  };
-}
 
 function makeOpts(cwd: string, overrides: Partial<GlobalOptions> = {}): GlobalOptions {
   return {
     cwd,
-    json: true,
     nonInteractive: true,
     dryRun: false,
     force: false,
@@ -37,12 +19,10 @@ function makeOpts(cwd: string, overrides: Partial<GlobalOptions> = {}): GlobalOp
     source: "mock",
     verbose: false,
     debug: false,
+    env: {},
+    isTTY: false,
     ...overrides,
   };
-}
-
-function parseEnvelope(): Record<string, unknown> {
-  return JSON.parse(captured) as Record<string, unknown>;
 }
 
 async function exists(path: string): Promise<boolean> {
@@ -97,8 +77,7 @@ afterEach(async () => {
 describe("runEject", () => {
   it("refuses to run without --force in non-interactive mode", async () => {
     const cwd = await makeManagedProject();
-    const io = makeIO();
-    await expect(runEject(io, makeOpts(cwd, { force: false }))).rejects.toMatchObject({
+    await expect(runEject(makeOpts(cwd, { force: false }))).rejects.toMatchObject({
       code: "E_VALIDATION",
     });
     // Nothing should have been removed.
@@ -108,12 +87,10 @@ describe("runEject", () => {
 
   it("removes managed files and the .zitadel dir when forced", async () => {
     const cwd = await makeManagedProject();
-    const io = makeIO();
-    await runEject(io, makeOpts(cwd, { force: true }));
+    const result = await runEject(makeOpts(cwd, { force: true }));
 
-    const envelope = parseEnvelope();
-    expect(envelope.status).toBe("ok");
-    const data = envelope.data as {
+    expect(result.status).toBe("ok");
+    const data = result.data as {
       files_removed: string[];
       files_preserved: string[];
       backed_up: string[];
@@ -140,12 +117,10 @@ describe("runEject", () => {
 
   it("reports what would be removed in dry-run without touching the filesystem", async () => {
     const cwd = await makeManagedProject();
-    const io = makeIO();
-    await runEject(io, makeOpts(cwd, { force: true, dryRun: true }));
+    const result = await runEject(makeOpts(cwd, { force: true, dryRun: true }));
 
-    const envelope = parseEnvelope();
-    expect(envelope.status).toBe("ok");
-    const data = envelope.data as { files_removed: string[] };
+    expect(result.status).toBe("ok");
+    const data = result.data as { files_removed: string[] };
     expect(data.files_removed).toContain("zitadel.json");
 
     // Dry-run leaves everything in place.
@@ -158,11 +133,12 @@ describe("runEject", () => {
     const cwd = await mkdtemp(join(tmpdir(), "zitadel-eject-empty-"));
     tempDirs.push(cwd);
 
-    const io = makeIO();
-    await runEject(io, makeOpts(cwd, { force: true }));
+    const result = await runEject(makeOpts(cwd, { force: true }));
 
-    const envelope = parseEnvelope();
-    expect(envelope.status).toBe("skipped");
-    expect(envelope.reason).toBe("nothing-to-eject");
+    expect(result.status).toBe("skipped");
+    if (result.status !== "skipped") {
+      throw new Error("expected skipped");
+    }
+    expect(result.reason).toBe("nothing-to-eject");
   });
 });

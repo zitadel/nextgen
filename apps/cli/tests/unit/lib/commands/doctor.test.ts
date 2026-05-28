@@ -5,26 +5,9 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { runDoctor } from "../../../../src/lib/commands/doctor";
-import type { CliIO, GlobalOptions } from "../../../../src/io/output";
+import type { GlobalOptions } from "../../../../src/lib/oclif/base";
 import { ZitadelError } from "../../../../src/lib/errors";
 import { MANAGED_MARKER } from "../../../../src/lib/paths";
-
-let captured = "";
-
-function makeIO(env: Record<string, string> = {}): CliIO {
-  captured = "";
-  return {
-    stdout: {
-      write: (chunk: string): boolean => {
-        captured += chunk;
-        return true;
-      },
-    } as never,
-    stderr: { write: (): boolean => true } as never,
-    env,
-    isTTY: false,
-  };
-}
 
 function makeOpts(
   cwd: string,
@@ -32,7 +15,6 @@ function makeOpts(
 ): GlobalOptions & { fix?: boolean } {
   return {
     cwd,
-    json: true,
     nonInteractive: true,
     dryRun: false,
     force: false,
@@ -41,12 +23,10 @@ function makeOpts(
     source: "mock",
     verbose: false,
     debug: false,
+    env: {},
+    isTTY: false,
     ...overrides,
   };
-}
-
-function parseEnvelope(): Record<string, unknown> {
-  return JSON.parse(captured) as Record<string, unknown>;
 }
 
 type Check = { name: string; status: "pass" | "fail"; message: string; path?: string };
@@ -132,12 +112,10 @@ afterEach(async () => {
 describe("runDoctor", () => {
   it("passes every check for a well-formed managed project", async () => {
     const cwd = await makeHealthyProject();
-    const io = makeIO();
-    await runDoctor(io, makeOpts(cwd));
+    const result = await runDoctor(makeOpts(cwd));
 
-    const envelope = parseEnvelope();
-    expect(envelope.status).toBe("ok");
-    const data = envelope.data as { ok: boolean; checks: Check[] };
+    expect(result.status).toBe("ok");
+    const data = result.data as { ok: boolean; checks: Check[] };
     expect(data.ok).toBe(true);
     expect(data.checks.every((check) => check.status === "pass")).toBe(true);
     // Sanity: the full battery actually ran.
@@ -151,9 +129,8 @@ describe("runDoctor", () => {
     const cwd = await makeHealthyProject();
     await rm(join(cwd, "app/login/page.tsx"));
 
-    const io = makeIO();
     let thrown: unknown;
-    await runDoctor(io, makeOpts(cwd)).catch((error: unknown) => {
+    await runDoctor(makeOpts(cwd)).catch((error: unknown) => {
       thrown = error;
     });
 
@@ -178,9 +155,8 @@ describe("runDoctor", () => {
     );
     await chmod(join(cwd, ".zitadel/secret"), 0o600);
 
-    const io = makeIO();
     let thrown: unknown;
-    await runDoctor(io, makeOpts(cwd)).catch((error: unknown) => {
+    await runDoctor(makeOpts(cwd)).catch((error: unknown) => {
       thrown = error;
     });
 
@@ -194,9 +170,8 @@ describe("runDoctor", () => {
     // `type` must be a string/array of strings; a number makes the schema invalid.
     await writeFile(join(cwd, ".zitadel/schemas/user.json"), JSON.stringify({ type: 123 }));
 
-    const io = makeIO();
     let thrown: unknown;
-    await runDoctor(io, makeOpts(cwd)).catch((error: unknown) => {
+    await runDoctor(makeOpts(cwd)).catch((error: unknown) => {
       thrown = error;
     });
 
@@ -209,12 +184,10 @@ describe("runDoctor", () => {
     const cwd = await makeHealthyProject();
     await rm(join(cwd, "app/login/page.tsx"));
 
-    const io = makeIO();
-    await runDoctor(io, makeOpts(cwd, { fix: true }));
+    const result = await runDoctor(makeOpts(cwd, { fix: true }));
 
-    const envelope = parseEnvelope();
-    expect(envelope.status).toBe("ok");
-    const data = envelope.data as { ok: boolean; checks: Check[] };
+    expect(result.status).toBe("ok");
+    const data = result.data as { ok: boolean; checks: Check[] };
     expect(data.ok).toBe(true);
     const login = data.checks.find((check) => check.name === "managed-login");
     expect(login?.status).toBe("pass");

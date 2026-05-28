@@ -2,8 +2,7 @@ import { detectFramework } from "../../detect/framework";
 import { detectDevPort, issuerFromPort } from "../../detect/port";
 import { hasZitadelConfig, hasZitadelSecret } from "../../detect/state";
 import { pickFramework, runInteractiveSetup } from "../../interactive/setup";
-import type { CliIO, GlobalOptions } from "../../io/output";
-import { ok, skipped } from "../../io/output";
+import type { CommandResult, GlobalOptions } from "../oclif/base";
 import { ZitadelError } from "../errors";
 import { AUTH_METHODS, type AuthMethod } from "../flows";
 import { Orca } from "../orca";
@@ -38,10 +37,9 @@ export type SetupOptions = GlobalOptions & {
  * config. Idempotent at the front: it skips when already initialized and refuses
  * to proceed on an orphaned secret.
  */
-export async function runSetup(io: CliIO, opts: SetupOptions): Promise<void> {
+export async function runSetup(opts: SetupOptions): Promise<CommandResult> {
   if (await hasZitadelConfig(opts.cwd)) {
-    skipped(io, "already-initialized", opts);
-    return;
+    return { status: "skipped", reason: "already-initialized" };
   }
 
   if (await hasZitadelSecret(opts.cwd)) {
@@ -117,13 +115,13 @@ export async function runSetup(io: CliIO, opts: SetupOptions): Promise<void> {
   const setupOpts = { ...opts, source: effectiveServer };
   let apply: { synced: boolean } | undefined;
   if (!opts.noApply && !opts.dryRun) {
-    await runApply(io, { ...setupOpts, json: true, silent: true });
+    await runApply(setupOpts);
     apply = { synced: true };
   }
 
-  ok(
-    io,
-    {
+  return {
+    status: "ok",
+    data: {
       title: "Zitadel is ready.",
       project: {
         project_id: project.id,
@@ -137,8 +135,7 @@ export async function runSetup(io: CliIO, opts: SetupOptions): Promise<void> {
       next_actions: ["Run `zitadel doctor` to verify setup."],
       next_commands: ["zitadel doctor"],
     },
-    setupOpts,
-  );
+  };
 }
 
 /**

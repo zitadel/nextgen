@@ -1,3 +1,4 @@
+import { format } from "node:util";
 import { fileURLToPath } from "node:url";
 
 import { run } from "@oclif/core";
@@ -17,10 +18,14 @@ export async function runCliForTest(argv: string[], env: NodeJS.ProcessEnv = {})
   let stderr = "";
   const originalOut = process.stdout.write.bind(process.stdout);
   const originalErr = process.stderr.write.bind(process.stderr);
+  const originalLog = console.log;
+  const originalConsoleError = console.error;
   const overlaid = Object.keys(env);
   const previous = new Map(overlaid.map((key) => [key, process.env[key]]));
   Object.assign(process.env, env);
 
+  // Capture both direct stream writes (e.g. consola) and oclif's `ux.stdout`/
+  // `ux.stderr`, which go through `console.log`/`console.error`.
   process.stdout.write = ((chunk: string | Uint8Array): boolean => {
     stdout += typeof chunk === "string" ? chunk : Buffer.from(chunk).toString();
     return true;
@@ -29,6 +34,12 @@ export async function runCliForTest(argv: string[], env: NodeJS.ProcessEnv = {})
     stderr += typeof chunk === "string" ? chunk : Buffer.from(chunk).toString();
     return true;
   }) as typeof process.stderr.write;
+  console.log = (...args: unknown[]): void => {
+    stdout += `${format(...args)}\n`;
+  };
+  console.error = (...args: unknown[]): void => {
+    stderr += `${format(...args)}\n`;
+  };
 
   let exitCode = 0;
   try {
@@ -38,6 +49,8 @@ export async function runCliForTest(argv: string[], env: NodeJS.ProcessEnv = {})
   } finally {
     process.stdout.write = originalOut;
     process.stderr.write = originalErr;
+    console.log = originalLog;
+    console.error = originalConsoleError;
     for (const key of overlaid) {
       const prior = previous.get(key);
       if (prior === undefined) {

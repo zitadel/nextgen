@@ -1,6 +1,6 @@
 import { Flags } from "@oclif/core";
 
-import { BaseCommand } from "../base";
+import { BaseCommand, type JsonEnvelope } from "../lib/oclif/base";
 import { runApply } from "../lib/commands/apply";
 
 /** `zitadel plan` — validate config and preview the sync diff without mutating. */
@@ -13,14 +13,16 @@ export default class Plan extends BaseCommand {
     }),
   };
 
-  async run(): Promise<void> {
+  async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(Plan);
     await this.toMeta(flags);
-    await runApply(this.io, {
-      ...this.meta,
-      dryRun: true,
-      planOnly: true,
-      environment: flags.environment,
-    });
+    return this.emit(
+      await runApply({
+        ...this.meta,
+        dryRun: true,
+        planOnly: true,
+        environment: flags.environment,
+      }),
+    );
   }
 }

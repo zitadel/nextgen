@@ -3,8 +3,7 @@ import { join } from "node:path";
 
 import { detectFramework } from "../../detect/framework";
 import { detectDevPort, issuerFromPort } from "../../detect/port";
-import type { CliIO, GlobalOptions } from "../../io/output";
-import { ok } from "../../io/output";
+import type { CommandResult, GlobalOptions } from "../oclif/base";
 import { ZitadelError } from "../errors";
 import { type AuthMethod } from "../flows";
 import { isObject } from "../json";
@@ -41,7 +40,7 @@ type DoctorCheck = {
  * the aggregate result. If any check fails it throws `E_VALIDATION` carrying
  * the full check details so the caller can render them.
  */
-export async function runDoctor(io: CliIO, opts: DoctorOptions): Promise<void> {
+export async function runDoctor(opts: DoctorOptions): Promise<CommandResult> {
   if (opts.fix) {
     await applyFixes(opts);
   }
@@ -61,7 +60,7 @@ export async function runDoctor(io: CliIO, opts: DoctorOptions): Promise<void> {
     });
   }
 
-  ok(io, data, opts);
+  return { status: "ok", data };
 }
 
 async function collectChecks(cwd: string): Promise<DoctorCheck[]> {

@@ -1,6 +1,6 @@
 import { Flags } from "@oclif/core";
 
-import { BaseCommand } from "../base";
+import { BaseCommand, type JsonEnvelope } from "../lib/oclif/base";
 import { runDoctor } from "../lib/commands/doctor";
 
 /** `zitadel doctor` — verify generated files and local state. */
@@ -10,9 +10,9 @@ export default class Doctor extends BaseCommand {
     fix: Flags.boolean({ description: "Re-apply missing managed files." }),
   };
 
-  async run(): Promise<void> {
+  async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(Doctor);
     await this.toMeta(flags);
-    await runDoctor(this.io, { ...this.meta, fix: flags.fix });
+    return this.emit(await runDoctor({ ...this.meta, fix: flags.fix }));
   }
 }

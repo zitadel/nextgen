@@ -1,6 +1,6 @@
 import { Flags } from "@oclif/core";
 
-import { BaseCommand } from "../base";
+import { BaseCommand, type JsonEnvelope } from "../lib/oclif/base";
 import { runApply } from "../lib/commands/apply";
 
 /** `zitadel apply` — validate and upload repo config to the platform. */
@@ -13,9 +13,9 @@ export default class Apply extends BaseCommand {
     }),
   };
 
-  async run(): Promise<void> {
+  async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(Apply);
     await this.toMeta(flags);
-    await runApply(this.io, { ...this.meta, environment: flags.environment });
+    return this.emit(await runApply({ ...this.meta, environment: flags.environment }));
   }
 }

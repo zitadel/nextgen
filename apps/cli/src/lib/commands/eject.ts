@@ -1,8 +1,7 @@
 import { readFile, rename, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
 
-import type { CliIO, GlobalOptions } from "../../io/output";
-import { ok, skipped } from "../../io/output";
+import type { CommandResult, GlobalOptions } from "../oclif/base";
 import { ZitadelError } from "../errors";
 import { Orca } from "../orca";
 import { tryDetectFramework } from "../orca/detect";
@@ -32,7 +31,7 @@ export type EjectOptions = GlobalOptions & {
  * `dryRun` reports without touching the filesystem; non-interactive runs require
  * `force`.
  */
-export async function runEject(io: CliIO, opts: EjectOptions): Promise<void> {
+export async function runEject(opts: EjectOptions): Promise<CommandResult> {
   if (!opts.force && opts.nonInteractive) {
     throw new ZitadelError("E_VALIDATION", "Eject requires --force in non-interactive mode", {
       hint: "Re-run with --force to confirm deletion of managed files.",
@@ -94,21 +93,19 @@ export async function runEject(io: CliIO, opts: EjectOptions): Promise<void> {
   }
 
   if (removed.length === 0 && backedUp.length === 0) {
-    skipped(io, "nothing-to-eject", opts, { cwd: opts.cwd });
-    return;
+    return { status: "skipped", reason: "nothing-to-eject", data: { cwd: opts.cwd } };
   }
 
-  ok(
-    io,
-    {
+  return {
+    status: "ok",
+    data: {
       title: "Zitadel ejected. Remote project is untouched.",
       files_removed: removed,
       files_preserved: preserved,
       backed_up: backedUp,
       next_commands: ["rm -rf .zitadel.* (optional cleanup of backups)"],
     },
-    opts,
-  );
+  };
 }
 
 /**

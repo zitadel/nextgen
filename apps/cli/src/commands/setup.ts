@@ -1,6 +1,6 @@
 import { Flags } from "@oclif/core";
 
-import { BaseCommand } from "../base";
+import { BaseCommand, type JsonEnvelope } from "../lib/oclif/base";
 import { runSetup } from "../lib/commands/setup";
 
 /** `zitadel setup` — create a project and scaffold local auth. */
@@ -15,16 +15,18 @@ export default class Setup extends BaseCommand {
     "no-apply": Flags.boolean({ description: "Skip the automatic apply at the end of setup." }),
   };
 
-  async run(): Promise<void> {
+  async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(Setup);
     await this.toMeta(flags);
-    await runSetup(this.io, {
-      ...this.meta,
-      framework: flags.framework,
-      userFields: flags["user-fields"],
-      authMethod: flags["auth-method"],
-      renderer: flags.renderer,
-      noApply: flags["no-apply"],
-    });
+    return this.emit(
+      await runSetup({
+        ...this.meta,
+        framework: flags.framework,
+        userFields: flags["user-fields"],
+        authMethod: flags["auth-method"],
+        renderer: flags.renderer,
+        noApply: flags["no-apply"],
+      }),
+    );
   }
 }

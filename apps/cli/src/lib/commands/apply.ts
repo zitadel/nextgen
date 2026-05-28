@@ -1,7 +1,6 @@
 import { join } from "node:path";
 
-import type { CliIO, GlobalOptions } from "../../io/output";
-import { ok, writePretty } from "../../io/output";
+import type { CommandResult, GlobalOptions } from "../oclif/base";
 import { ZitadelError } from "../errors";
 import { FLOWS_DIR, validateFlows } from "../flows";
 import { isObject } from "../json";
@@ -13,13 +12,10 @@ import { readZitadelSecret } from "./shared";
 
 /**
  * Options accepted by {@link runApply}. `planOnly` (and the global `dryRun`)
- * short-circuit to a plan preview without mutating the remote project;
- * `silent` suppresses the success payload so `setup` can call apply as a
- * sub-step without emitting duplicate output. `environment` is validated but
- * not otherwise consumed here.
+ * short-circuit to a plan preview without mutating the remote project.
+ * `environment` is validated but not otherwise consumed here.
  */
 export type ApplyOptions = GlobalOptions & {
-  silent?: boolean;
   planOnly?: boolean;
   environment?: string;
 };
@@ -33,7 +29,7 @@ export type ApplyOptions = GlobalOptions & {
  * renders the diff and returns without writing; otherwise it runs the sync
  * loop to convergence.
  */
-export async function runApply(io: CliIO, opts: ApplyOptions): Promise<void> {
+export async function runApply(opts: ApplyOptions): Promise<CommandResult> {
   parseEnvironment(opts.environment);
   const secret = await readZitadelSecret(opts.cwd);
 
@@ -41,7 +37,7 @@ export async function runApply(io: CliIO, opts: ApplyOptions): Promise<void> {
   validateFlows(flows);
 
   const envRefs = findEnvRefs(flows);
-  const missing = envRefs.filter((name) => !io.env[name]);
+  const missing = envRefs.filter((name) => !opts.env[name]);
   if (missing.length > 0) {
     throw new ZitadelError(
       "E_VALIDATION",
@@ -54,25 +50,22 @@ export async function runApply(io: CliIO, opts: ApplyOptions): Promise<void> {
 
   if (opts.planOnly || opts.dryRun) {
     const plan = await buildSyncPlan(opts.cwd, syncers, client);
-    if (opts.json) {
-      const active = plan.filter((a) => a.kind !== "skip");
-      ok(io, {
+    const active = plan.filter((a) => a.kind !== "skip");
+    return {
+      status: "ok",
+      data: {
         creates: active.filter((a) => a.kind === "create").length,
         updates: active.filter((a) => a.kind === "update").length,
         deletes: active.filter((a) => a.kind === "delete").length,
         total: active.length,
-      }, opts);
-    } else {
-      writePretty(io, renderPlan(plan, io.isTTY));
-    }
-    return;
+      },
+      pretty: renderPlan(plan, opts.isTTY),
+    };
   }
 
   await runSyncLoop(opts.cwd, client, syncers);
 
-  if (!opts.silent) {
-    ok(io, { synced: true }, opts);
-  }
+  return { status: "ok", data: { synced: true } };
 }
 
 function parseEnvironment(value: string | undefined): ZitadelEnvironment {
