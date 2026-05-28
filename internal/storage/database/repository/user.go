@@ -225,7 +225,7 @@ func userHydrationExpressions(rowQualifier, attrKeysPlaceholder, authPlaceholder
 
 func (r *UserRepository) GetByID(ctx context.Context, client database.QueryExecutor, projectID string, teamID *string, userID string) (*domain.User, error) {
 	condition := r.PrimaryKeyCondition(projectID, userID)
-	if teamID == nil {
+	if teamID != nil {
 		condition = database.And(condition, r.PrimaryKeyCondition(projectID, userID))
 	}
 	return r.Get(ctx, client, database.WithCondition(condition))
