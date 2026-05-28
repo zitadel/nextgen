@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { ScaffoldPlan } from "../../../../../../src/lib/orca/patchers/rule/file-writer/plan";
+import type { ScaffoldPlan } from "../../../../../../src/lib/orca/patchers/rule/file-writer/types";
 import { reclaimableOps } from "../../../../../../src/lib/orca/patchers/rule/reclaim";
 import { MANAGED_MARKER } from "../../../../../../src/lib/paths";
 

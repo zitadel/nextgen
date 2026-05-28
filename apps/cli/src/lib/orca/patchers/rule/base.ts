@@ -2,7 +2,7 @@ import { buildFlow } from "../../../flows";
 import { stableStringify } from "../../../json";
 import { DEFAULT_SERVER } from "../../../api/resolve-server";
 import { scaffold } from "./file-writer";
-import type { FileOp, ScaffoldPlan } from "./file-writer/plan";
+import type { FileOp, ScaffoldPlan } from "./file-writer/types";
 import type {
   EjectActions,
   Patcher,

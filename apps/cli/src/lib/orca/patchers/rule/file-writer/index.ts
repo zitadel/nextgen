@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 
 import { ZitadelError } from "../../../../errors";
 import { isObject, parseJsonObject, stableStringify } from "../../../../json";
-import type { FileOp, ScaffoldPlan, ScaffoldResult } from "./plan";
+import type { FileOp, ScaffoldPlan, ScaffoldResult } from "./types";
 
 /**
  * The executor's private, mutable accumulator. Handlers push into it as each

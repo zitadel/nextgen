@@ -1,7 +1,7 @@
 import { join } from "node:path";
 
 import { MANAGED_MARKER } from "../../../../paths";
-import type { FileOp } from "../file-writer/plan";
+import type { FileOp } from "../file-writer/types";
 import type { PatchContext, PatchView } from "../../types";
 import { AbstractRulePatcher } from "../base";
 import { getRenderer } from "./renderers/registry";
