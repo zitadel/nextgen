@@ -152,7 +152,7 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 		nil,
 		flowDefinitionRepo,
 	)
-	userService := service.NewUserService(pool, userRepo, sealer)
+	userService := service.NewUserService(pool, userRepo, crypter)
 
 	// ── HTTP Server ─────────────────
 

@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/ogen-go/ogen/json"
-	"github.com/zitadel/nextgen/internal/cookie"
+	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
@@ -20,25 +20,25 @@ type GetMyUserInput struct {
 // ---- Implementation -------------------------------------------------------------
 
 type UserService struct {
-	pool     database.Pool
-	userRepo domain.UserRepository
-	sealer   *cookie.Sealer
+	pool      database.Pool
+	userRepo  domain.UserRepository
+	decrypter crypto.Decrypter
 }
 
 func NewUserService(
 	pool database.Pool,
 	userRepo domain.UserRepository,
-	sealer *cookie.Sealer,
+	sealer crypto.Decrypter,
 ) *UserService {
 	return &UserService{
-		pool:     pool,
-		userRepo: userRepo,
-		sealer:   sealer,
+		pool:      pool,
+		userRepo:  userRepo,
+		decrypter: sealer,
 	}
 }
 
 func (s *UserService) GetMyUser(ctx context.Context, input GetMyUserInput) ([]byte, error) {
-	sessionToken, err := domain.DecryptSessionTokenString(input.SessionToken, s.sealer)
+	sessionToken, err := domain.DecryptSessionTokenString(input.SessionToken, s.decrypter)
 	if err != nil {
 		return nil, domain.ErrSessionTokenInvalid()
 	}
