@@ -10,7 +10,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 )
 
-func (h Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest) (api.CreateFlowRes, error) {
+func (h *Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest) (api.CreateFlowRes, error) {
 	purpose, err := domain.FlowDefinitionPurposeString(string(req.Purpose))
 	if err != nil {
 		return &api.ErrorDetails{
@@ -70,6 +70,8 @@ func flowDefinitionErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 	case domain.ErrFlowDefinitionNotFound().Code:
 		return errorResponseWithStatusCode(http.StatusNotFound, err)
 	case domain.ErrFlowDefinitionPurposeMismatch().Code:
+		return errorResponseWithStatusCode(http.StatusBadRequest, err)
+	case domain.ErrFlowDefinitionInvalid(err.Details, err.Parent).Code:
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
 	default:
 		return internalErrorResponse(err)

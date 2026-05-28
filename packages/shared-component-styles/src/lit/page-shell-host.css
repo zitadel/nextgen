@@ -1,0 +1,19 @@
+/* Lit-only: <zl-page-shell> host background; layout lives on .zr-page-shell. */
+:host {
+  display: block;
+  min-height: 100vh;
+  background: var(--zl-color-surface-default-black, #0f0f11);
+  color: var(--zl-color-text-primary-white, #f4f4f6);
+}
+/* Playground / embed preview — parent sets height (e.g. `.page-shell-frame`). */
+:host([data-embedded]) {
+  min-height: 100%;
+  height: 100%;
+}
+:host([data-embedded]) .zr-page-shell {
+  min-height: 100%;
+}
+.zr-page-shell ::slotted([slot="header"]),
+.zr-page-shell ::slotted([slot="footer"]) {
+  margin: 0;
+}

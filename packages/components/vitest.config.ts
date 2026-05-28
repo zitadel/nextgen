@@ -1,3 +1,4 @@
+import { nxViteTsPaths } from "@nx/vite/plugins/nx-tsconfig-paths.plugin";
 import { playwright } from "@vitest/browser-playwright";
 import { defineConfig } from "vitest/config";
 
@@ -15,6 +16,7 @@ import { defineConfig } from "vitest/config";
  * `pnpm test:browser` runs the browser project. `pnpm test:all` runs both.
  */
 export default defineConfig({
+  plugins: [nxViteTsPaths()],
   resolve: { conditions: ["@zitadel-nextgen/source"] },
   test: {
     name: "@zitadel-nextgen/components",

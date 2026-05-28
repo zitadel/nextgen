@@ -1,114 +1,138 @@
 /**
  * Bundled `default.liquid` master template.
  *
- * Branches on `branding.layout` (`centered` | `split`) per
- * `docs/design/branding/templates.md` "Built-in set". The `auth_form`
- * partial holds the actual atom emission so both layouts share the same
- * field/action plumbing.
+ * Renders the four target Figma auth screens (Sign in, Sign up, Passkey
+ * upsell, Signed in) by including the appropriate partial based on
+ * `step.name`. Tenant-specific layouts (`branding.layout`) replace the
+ * outer chrome only — the per-step partials stay shared so atom output
+ * tracks the design system without each tenant re-implementing it.
+ *
+ * Spec: docs/design/branding/templates.md.
  */
 export const defaultTemplate = String.raw`
-{% if branding.layout == 'split' %}
-  <div class="zl-layout zl-layout--split">
-    <aside class="zl-layout-hero" {% if branding.hero_url %}style="background-image: url('{{ branding.hero_url }}');"{% endif %}>
-      {% if branding.logo_url %}
-        <img class="zl-layout-hero-logo" src="{{ branding.logo_url }}" alt="" />
-      {% endif %}
-    </aside>
-    <main class="zl-layout-body">
-      {% include 'auth_form' %}
-    </main>
-  </div>
-{% else %}
-  <div class="zl-layout zl-layout--centered">
-    {% include 'auth_form' %}
-  </div>
-{% endif %}
-
-<style></style>
+{%- if step.name == 'signed-in' or step.complete == 'show' -%}
+  {%- include 'signed-in' -%}
+{%- elsif step.name == 'passkey' or step.name == 'passkey-upsell' or step.name == 'passkey-setup' or step.name == 'passkey-login' -%}
+  {%- include 'passkey-upsell' -%}
+{%- else -%}
+  {%- include 'auth-form' -%}
+{%- endif -%}
 `;
 
 /**
- * Layout chrome that lives outside the atoms but is owned by the package.
- * Applied as an `adoptedStyleSheet` alongside the branding tokens so the
- * `centered` and `split` layouts get their structural styling without each
- * tenant having to redefine it.
+ * Layout chrome injected as an `adoptedStyleSheet` on the orchestrator's
+ * shadow root. Provides the page background and the attribution-footer
+ * positioning that lives *outside* any template — the rest of the visual
+ * surface is owned by the `<zl-page-shell>` / `<zl-card>` atoms the
+ * templates render. Token references resolve against the
+ * `@zitadel-nextgen/design-tokens` CSS variables that are present on
+ * `:host` via the branding stylesheet.
  */
 export const layoutChromeCss = `
-.zl-layout {
-  display: flex;
-  width: 100%;
+:host {
+  display: block;
   min-height: 100%;
-  font-family: var(--zl-font-family, 'Inter', system-ui, sans-serif);
-  background: var(--zl-color-background, #FFFFFF);
-  color: var(--zl-color-text, #0F172A);
+  background: var(--zl-color-surface-default-black, #0f0f11);
+  color: var(--zl-color-text-primary-white, #f4f4f6);
+  font-family: var(--zl-font-family-sans, system-ui, sans-serif);
 }
-.zl-layout--centered {
-  align-items: center;
-  justify-content: center;
-  padding: var(--zl-space-7, 2rem);
-  min-height: 100vh;
-}
-.zl-layout--split {
-  align-items: stretch;
-  min-height: 100vh;
-}
-.zl-layout--split .zl-layout-hero {
-  flex: 1 1 0;
-  display: none;
-  background-color: var(--zl-color-muted, #F1F4F9);
-  background-size: cover;
-  background-position: center;
-  position: relative;
-}
-.zl-layout--split .zl-layout-hero-logo {
-  position: absolute;
-  top: var(--zl-space-7, 2rem);
-  left: var(--zl-space-7, 2rem);
-  width: 96px;
-  height: auto;
-}
-.zl-layout--split .zl-layout-body {
-  flex: 1 1 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--zl-space-7, 2rem);
-}
-@media (min-width: 768px) {
-  .zl-layout--split .zl-layout-hero {
-    display: block;
-  }
-}
-.zl-shell {
-  width: 100%;
-  max-width: 28rem;
-  margin: 0 auto;
-}
-.zl-card {
+.zl-mount {
   display: flex;
   flex-direction: column;
-  gap: var(--zl-space-5, 1.25rem);
-  background: var(--zl-color-surface, #FFFFFF);
-  border: var(--zl-border-width, 1px) solid var(--zl-color-border, #D8DEE6);
-  border-radius: var(--zl-radius-lg, 0.75rem);
-  box-shadow: var(--zl-shadow-md, 0 4px 16px rgba(15, 23, 42, 0.08));
-  padding: var(--zl-space-7, 2rem);
+  min-height: 100vh;
+  background: inherit;
+  color: inherit;
 }
-.zl-logo {
-  width: 96px;
-  height: auto;
+.zl-mount > zl-page-shell,
+.zl-mount > [data-zl-template-root] {
+  flex: 1 1 auto;
 }
-.zl-heading {
+.zl-attribution {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: transparent;
+}
+.zl-attribution[hidden] {
+  display: none;
+}
+/* Card header typography — Figma "Desktop/Headings/Small" + "Body Small
+   Regular" pattern shared by sign-in (6593:141740), passkey upsell
+   (6594:89142 / 6594:12796), and signed-in (6596:132845). Templates
+   slot raw <h1>/<p> elements into <zl-card>, which keeps them in the
+   light DOM where the orchestrator's stylesheet can reach them — the
+   atom intentionally doesn't dictate typography. */
+.zl-card-title {
   margin: 0;
-  font-size: var(--zl-font-size-xl, 1.5rem);
-  font-weight: var(--zl-font-weight-bold, 600);
-  line-height: var(--zl-line-height-tight, 1.2);
-  color: var(--zl-color-text, #0F172A);
+  font-family: var(--zl-font-family-heading, var(--zl-font-family-sans, system-ui, sans-serif));
+  font-size: 2rem;
+  font-weight: 400;
+  line-height: 2.5rem;
+  letter-spacing: -0.02em;
+  color: var(--zl-color-text-primary-white, #f4f4f6);
+  text-align: left;
 }
-.zl-description {
+.zl-card-subtitle {
   margin: 0;
-  font-size: var(--zl-font-size-sm, 0.875rem);
-  color: var(--zl-color-text-muted, #64748B);
-  line-height: var(--zl-line-height-normal, 1.5);
+  font-family: var(--zl-font-family-sans, system-ui, sans-serif);
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-weight: 400;
+  color: var(--zl-color-text-primary-white, #f4f4f6);
+}
+/* Figma 6593:141989 / 6594:12882 — left-aligned in Field+CTAs (x=0, items-start). */
+.zl-card-nav {
+  margin: 0;
+  font-family: var(--zl-font-family-sans, system-ui, sans-serif);
+  font-size: 1rem;
+  line-height: 1.5rem;
+  font-weight: 400;
+  color: var(--zl-color-text-primary-white, #f4f4f6);
+  text-align: left;
+}
+.zl-card-nav__link {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font: inherit;
+  line-height: inherit;
+  color: var(--zl-color-icon-default-purple, #bba5e4);
+  text-decoration: none;
+  cursor: pointer;
+}
+.zl-card-nav__link:hover {
+  text-decoration: underline;
+}
+.zl-card-nav__link:focus-visible {
+  outline: var(--zl-focus-width, 2px) solid var(--zl-focus-color, #f4f4f6);
+  outline-offset: var(--zl-focus-offset, 2px);
+}
+/* Figma 6593:141989 — forgot password row (left-aligned, before CTAs). */
+.zl-card-forgot {
+  margin: 0;
+  text-align: left;
+}
+.zl-card-forgot__link {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-family: var(--zl-font-family-sans, system-ui, sans-serif);
+  font-size: 1rem;
+  line-height: 1.5rem;
+  font-weight: 400;
+  color: var(--zl-color-icon-default-purple, #bba5e4);
+  text-decoration: none;
+  cursor: pointer;
+}
+.zl-card-forgot__link:hover {
+  text-decoration: underline;
+}
+.zl-card-forgot__link:focus-visible {
+  outline: var(--zl-focus-width, 2px) solid var(--zl-focus-color, #f4f4f6);
+  outline-offset: var(--zl-focus-offset, 2px);
 }
 `;

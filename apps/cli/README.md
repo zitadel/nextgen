@@ -11,8 +11,8 @@ npx zitadel@latest
 The CLI is still pre-release. It supports the mock-backed golden path for Next.js
 App Router projects, but it is not yet a complete live platform client.
 
-V1 creates a pre-claim local Zitadel setup with mock-backed login and
-registration routes. Repo config is the source of truth: edit `zitadel.json` or
+V1 creates a local Zitadel setup with mock-backed login and registration
+routes. Repo config is the source of truth: edit `zitadel.json` or
 `.zitadel/**`, then run `zitadel plan` or `zitadel apply`.
 
 ## Golden path
@@ -22,8 +22,6 @@ npx zitadel@latest setup --framework next
 npx zitadel@latest doctor
 npx zitadel@latest plan
 npx zitadel@latest apply
-npx zitadel@latest claim
-npx zitadel@latest claim status --challenge-id <id>
 ```
 
 Agents should use the generated contract in `AGENTS.md` and call commands with

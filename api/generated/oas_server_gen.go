@@ -53,7 +53,7 @@ type Handler interface {
 	// audience, and the steps involved.
 	//
 	// POST /flow_definitions
-	CreateFlowDefinition(ctx context.Context, req *FlowDefinitionCreateRequest) (CreateFlowDefinitionRes, error)
+	CreateFlowDefinition(ctx context.Context, req *CreateFlowDefinitionRequest) (CreateFlowDefinitionRes, error)
 	// CreateHandoff implements createHandoff operation.
 	//
 	// Completes the authentication attempt and mints a `handoff_token`.
@@ -83,7 +83,7 @@ type Handler interface {
 	// schema-url which will be resolved by the server.
 	//
 	// POST /schemas
-	CreateSchema(ctx context.Context, req CreateSchemaReq) (CreateSchemaRes, error)
+	CreateSchema(ctx context.Context, req CreateSchemaReq, params CreateSchemaParams) (CreateSchemaRes, error)
 	// CreateSession implements createSession operation.
 	//
 	// Creates an anonymous session shell with no user and no factors (`state: building`).

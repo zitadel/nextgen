@@ -13,6 +13,7 @@
 import type { CreateFlow201, CreateFlow201Step } from "@zitadel-nextgen/api/generated/model";
 
 import { signHandoffToken } from "../crypto.js";
+import type { StoredCredential } from "../lib/authn/index.js";
 
 export type StepFixtureInput = {
   flowId: string;
@@ -25,10 +26,39 @@ export type StepFixtureInput = {
    * (e.g. SSO flows that skip the identifier step).
    */
   capturedEmail?: string;
+  /**
+   * Credentials registered for this user, looked up from {@link AuthnStore}
+   * by email before each response. Used by `passkeyLoginStep` to build
+   * `allowCredentials` with the correct transports so the browser can match
+   * and surface the enrolled authenticator. An empty list omits the
+   * `allowCredentials` field entirely, falling back to discoverable-credential
+   * mode — which is correct when the user has no credentials yet, or after a
+   * server restart that wipes the in-memory store.
+   *
+   * All other step builders ignore this field; it is safe to always populate
+   * it regardless of which step is being rendered.
+   */
+  registeredCredentials?: readonly Pick<StoredCredential, "credentialId" | "transports">[];
 };
 
-const submitContinue = { submit: { text_key: "submit.continue", primary: true } };
+/**
+ * Derive a stable base64url user handle from an email address.
+ *
+ * In a real RP, `user.id` is an opaque, unique identifier stored by the
+ * authenticator alongside the credential — it must never be the email itself
+ * (to avoid leaking PII to the platform authenticator). A deterministic
+ * encoding of the email is sufficient for the mock: it is stable across
+ * registrations for the same address, unique per address, and keeps the
+ * browser's keychain from conflating credentials belonging to different users.
+ */
+function emailToUserHandle(email: string): string {
+  return Buffer.from(email).toString("base64url");
+}
 
+/**
+ * Wrap a step shape in the standard {@link CreateFlow201} envelope.
+ * All fixtures delegate to this helper so the session fields stay consistent.
+ */
 function wrap(input: StepFixtureInput, step: CreateFlow201Step, extras?: Partial<CreateFlow201>): CreateFlow201 {
   return {
     id: input.flowId,
@@ -39,132 +69,153 @@ function wrap(input: StepFixtureInput, step: CreateFlow201Step, extras?: Partial
   };
 }
 
+/**
+ * Combined sign-in card — Figma 2xl `6593:141983`, card `6593:141985`,
+ * stack `6593:141989` (email + password + forgot + CTAs on one step).
+ *
+ * Matches the Flow API shape in `docs/design/flowengine/flow-engine.md`
+ * (single `login` step with `fields: [email, password]`).
+ */
 export function identifierStep(input: StepFixtureInput): CreateFlow201 {
   return wrap(input, {
     name: "identifier",
-    texts: { title_key: "identifier.title", description_key: "identifier.description" },
-    fields: { email: { type: "email", text_key: "identifier.field.email", required: true } },
+    texts: { title_key: "identifier.title" },
+    fields: {
+      email: {
+        type: "email",
+        text_key: "identifier.field.email",
+        required: true,
+      },
+      password: {
+        type: "password",
+        text_key: "identifier.field.password",
+        required: true,
+      },
+    },
     actions: {
-      ...submitContinue,
-      passkey: { text_key: "action.passkey.signin" },
+      submit: { text_key: "submit.signin", primary: true },
+      passkey: { text_key: "identifier.action.passkey" },
+      register: { text_key: "identifier.action.register.link" },
+      recover: { text_key: "action.forgot_password" },
     },
     gates: {},
   });
 }
 
+/** Sign-up 2xl frame `6593:141741`, card `6593:141743`, stack `6593:141747`. */
 export function registerStep(input: StepFixtureInput): CreateFlow201 {
   return wrap(input, {
     name: "register",
-    texts: { title_key: "register.title", description_key: "register.description" },
+    texts: { title_key: "register.title" },
     fields: {
-      email: { type: "email", text_key: "register.field.email", required: true },
-      given_name: { type: "text", text_key: "register.field.given_name", required: true },
-      family_name: { type: "text", text_key: "register.field.family_name", required: true },
+      email: {
+        type: "email",
+        text_key: "register.field.email",
+        required: true,
+      },
+      password: {
+        type: "password",
+        text_key: "register.field.password",
+        required: true,
+        validation: { min_length: 8 },
+      },
     },
     actions: {
-      ...submitContinue,
-      passkey: { text_key: "action.passkey.register" },
+      submit: { text_key: "register.action.submit", primary: true },
     },
     gates: {},
   });
 }
 
+/**
+ * Password-only step — legacy split-credential screen kept for tests that
+ * target it directly. Not reachable from any `START` transition in the normal
+ * flow; the happy path goes `identifier → passkey-upsell` directly.
+ */
 export function passwordStep(input: StepFixtureInput): CreateFlow201 {
   return wrap(input, {
     name: "password",
-    texts: { title_key: "password.title", description_key: "password.description" },
-    fields: { password: { type: "password", text_key: "password.field.password", required: true } },
-    actions: { submit: { text_key: "submit.signin", primary: true } },
-    gates: {},
-  });
-}
-
-export function ssoRedirectStep(
-  input: StepFixtureInput & { redirectUrl?: string },
-): CreateFlow201 {
-  return wrap(input, {
-    name: "sso-redirect",
-    texts: { title_key: "sso.redirect.title" },
-    fields: {},
-    actions: {},
-    gates: {},
-    redirect_url: input.redirectUrl ?? "https://idp.mock.invalid/authorize",
-  });
-}
-
-export async function doneStep(input: StepFixtureInput): Promise<CreateFlow201> {
-  const { iss, capturedEmail } = input;
-  return wrap(
-    input,
-    {
-      name: "done",
-      texts: { title_key: "complete.title" },
-      complete: "show",
-      fields: {},
-      actions: {},
-      gates: {},
-    },
-    {
-      handoff_token: await signHandoffToken({
-        sub: capturedEmail ?? "mock-user@example.com",
-        iss,
-      }),
-      handoff_token_expires_at: new Date(Date.now() + 60_000).toISOString(),
-    },
-  );
-}
-
-/**
- * Mock passkey challenge step. Contains a synthetic
- * `PublicKeyCredentialRequestOptions` that the `<zl-passkey>` atom will
- * try to pass to `navigator.credentials.get()`. In a browser without a
- * virtual authenticator this will fail — which is fine for verifying the
- * wiring (the error flow fires `zl-passkey-error`).
- */
-export function passkeyChallenge(input: StepFixtureInput): CreateFlow201 {
-  return wrap(input, {
-    name: "passkey-challenge",
-    texts: { title_key: "passkey.challenge.title", description_key: "passkey.challenge.description" },
-    fields: {},
-    actions: { submit: { text_key: "submit.verify", primary: true } },
-    gates: {},
-    challenge: {
-      method: "passkey",
-      challenge_id: "ch_mock_001",
-      options: {
-        challenge: "dGVzdC1jaGFsbGVuZ2UtZnJvbS1tb2Nr",
-        rpId: "localhost",
-        timeout: 60000,
-        userVerification: "preferred",
-        allowCredentials: [],
+    texts: { title_key: "password.title" },
+    fields: {
+      password: {
+        type: "password",
+        text_key: "password.field.password",
+        required: true,
       },
     },
+    actions: {
+      submit: { text_key: "submit.signin", primary: true },
+      passkey: { text_key: "password.action.passkey" },
+      register: { text_key: "password.action.register.link" },
+    },
+    gates: {},
   });
 }
 
 /**
- * Mock passkey enrollment step for registration. Uses `ceremony: "register"`
- * so the `<zl-passkey>` atom calls `navigator.credentials.create()` instead
- * of `get()`. The options contain a synthetic `PublicKeyCredentialCreationOptions`.
+ * Password recovery step — shown when the user clicks "Forgot password?" on
+ * the identifier screen. Tells the user to check their email and offers a
+ * "Back to sign in" action (simulating the recovery pivot return).
  */
-export function passkeyEnroll(input: StepFixtureInput): CreateFlow201 {
+export function recoverStep(input: StepFixtureInput): CreateFlow201 {
   return wrap(input, {
-    name: "passkey-enroll",
-    texts: { title_key: "passkey.enroll.title", description_key: "passkey.enroll.description" },
+    name: "recover",
+    texts: {
+      title_key: "recover.title",
+      description_key: "recover.description",
+    },
     fields: {},
-    actions: { submit: { text_key: "submit.verify", primary: true } },
+    actions: {
+      submit: { text_key: "recover.action.back", primary: true },
+    },
+    gates: {},
+  });
+}
+
+/**
+ * Passkey enrolment upsell — prompts the user to set up a passkey after a
+ * successful credential sign-in. Figma `6594:630`.
+ */
+export function passkeyUpsellStep(input: StepFixtureInput): CreateFlow201 {
+  return wrap(input, {
+    name: "passkey-upsell",
+    texts: { title_key: "passkey-upsell.title" },
+    fields: {},
+    actions: {
+      setup: { text_key: "passkey-upsell.action.setup", primary: true },
+      skip: { text_key: "passkey-upsell.action.skip" },
+    },
+    gates: {},
+  });
+}
+
+/**
+ * Passkey setup step — returned after the user clicks "Set up passkey" on the
+ * upsell screen. Contains a mock `challenge` with WebAuthn registration
+ * options so `<zl-passkey ceremony="register">` can trigger
+ * `navigator.credentials.create()`. Follows the two-submit model from ADR 013.
+ */
+export function passkeySetupStep(input: StepFixtureInput): CreateFlow201 {
+  const userEmail = input.capturedEmail ?? "mock-user@example.com";
+  return wrap(input, {
+    name: "passkey-setup",
+    texts: { title_key: "passkey-upsell.title" },
+    fields: {},
+    actions: {
+      submit: { text_key: "submit.continue", primary: true },
+    },
     gates: {},
     challenge: {
       method: "passkey",
-      challenge_id: "ch_mock_enroll_001",
+      challenge_id: "ch_mock_passkey_setup",
       options: {
         ceremony: "register",
-        challenge: "cmVnaXN0ZXItY2hhbGxlbmdlLW1vY2s",
-        rp: { id: "localhost", name: "Zitadel Dev" },
+        challenge: "AAAAAAAAAAAAAAAAAAAAAA",
+        rp: { name: "Mock RP", id: "localhost" },
         user: {
-          id: "dXNlcl9tb2NrXzAx",
-          name: "user@example.com",
-          displayName: "Mock User",
+          id: emailToUserHandle(userEmail),
+          name: userEmail,
+          displayName: userEmail,
         },
         pubKeyCredParams: [
           { type: "public-key", alg: -7 },
@@ -180,4 +231,108 @@ export function passkeyEnroll(input: StepFixtureInput): CreateFlow201 {
       },
     },
   });
+}
+
+/**
+ * Passkey login step — returned when the user clicks "Sign in with passkey"
+ * on the identifier screen. Contains a mock `challenge` with WebAuthn
+ * authentication options so `<zl-passkey ceremony="authenticate">` can
+ * trigger `navigator.credentials.get()`. The browser prompts for an
+ * existing credential (Touch ID / Windows Hello / security key).
+ *
+ * When `input.registeredCredentials` is non-empty, `allowCredentials` is
+ * populated so the browser targets exactly the enrolled authenticator. An
+ * empty list omits the field, triggering discoverable-credential mode.
+ */
+export function passkeyLoginStep(input: StepFixtureInput): CreateFlow201 {
+  const allowCredentials = (input.registeredCredentials ?? []).map((c) => ({
+    type: "public-key",
+    id: c.credentialId,
+    transports: c.transports,
+  }));
+
+  return wrap(input, {
+    name: "passkey-login",
+    texts: { title_key: "passkey-login.title" },
+    fields: {},
+    actions: {
+      submit: { text_key: "submit.continue", primary: true },
+      cancel: { text_key: "action.cancel" },
+    },
+    gates: {},
+    challenge: {
+      method: "passkey",
+      challenge_id: "ch_mock_passkey_login",
+      options: {
+        ceremony: "authenticate",
+        challenge: "BBBBBBBBBBBBBBBBBBBBBB",
+        rpId: "localhost",
+        timeout: 60000,
+        userVerification: "preferred",
+        ...(allowCredentials.length > 0 ? { allowCredentials } : {}),
+      },
+    },
+  });
+}
+
+/**
+ * SSO redirect step — tells the orchestrator to navigate to the identity
+ * provider's authorisation endpoint.
+ *
+ * `redirectUrl` is optional so callers can supply a provider-specific URL in
+ * future; today `handlers.ts` does not pass one, so the hardcoded mock URL is
+ * always used.
+ *
+ * TODO: thread `ssoProviderId` from the machine context through to a computed
+ * redirect URL so each provider gets a distinct mock destination.
+ */
+export function ssoRedirectStep(
+  input: StepFixtureInput & { redirectUrl?: string },
+): CreateFlow201 {
+  return wrap(input, {
+    name: "sso-redirect",
+    texts: { title_key: "sso.redirect.title" },
+    fields: {},
+    actions: {},
+    gates: {},
+    redirect_url: input.redirectUrl ?? "https://idp.mock.invalid/authorize",
+  });
+}
+
+/**
+ * Signed-in confirmation step — includes a short-lived handoff token the
+ * client exchanges for a session cookie via `POST /sessions/exchange`.
+ *
+ * `handoff_token_expires_at` is set to 60 seconds from the time this function
+ * is called, matching the `exp` claim inside the JWT. Tests that assert on
+ * this value should treat it as approximate rather than exact.
+ *
+ * The `sub` claim falls back to `"mock-user@example.com"` when `capturedEmail`
+ * is absent or an empty string. The `||` operator (rather than `??`) is
+ * intentional: an empty-string email is not a valid JWT subject, so it should
+ * also fall back to the placeholder.
+ */
+export async function doneStep(input: StepFixtureInput): Promise<CreateFlow201> {
+  const { iss, capturedEmail } = input;
+  return wrap(
+    input,
+    {
+      name: "done",
+      texts: { title_key: "complete.title" },
+      complete: "show",
+      fields: {},
+      actions: {
+        continue: { text_key: "signed-in.continue", primary: true },
+        logout: { text_key: "signed-in.logout" },
+      },
+      gates: {},
+    },
+    {
+      handoff_token: await signHandoffToken({
+        sub: capturedEmail || "mock-user@example.com",
+        iss,
+      }),
+      handoff_token_expires_at: new Date(Date.now() + 60_000).toISOString(),
+    },
+  );
 }

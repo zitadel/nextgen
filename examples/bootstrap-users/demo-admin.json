@@ -1,0 +1,20 @@
+{
+  "header": {
+    "project_id": "proj_demo",
+    "team_id": "team_demo",
+    "schema_url": "https://schemas.zitadel.dev/demo/user/v1.json",
+    "id": "usr_demo_admin"
+  },
+  "attributes": {
+    "username": "admin",
+    "email": "admin@demo.local",
+    "zitadel.source": "cli",
+    "zitadel.default_user": true
+  },
+  "authenticators": {
+    "password": {
+      "encoded_hash": "$2a$10$n0iK.MdnhoKlMKk.sFZofeQSTKxcGnsssJD9WvPiXHvo.X/.P/t6m",
+      "change_required": false
+    }
+  }
+}

@@ -260,6 +260,16 @@ func NewNumberCondition[V Number](col Column, op NumberOperation, value V) Condi
 	}
 }
 
+// NewIdentityEqualCondition compares an ephemeral BIGINT/INT64 column with a decimal string id.
+func NewIdentityEqualCondition(col Column, id string) Condition {
+	return valueCondition{
+		col: col,
+		write: func(builder *StatementBuilder) {
+			writeOperation[any](builder, col, "=", Identity(id))
+		},
+	}
+}
+
 // NewBooleanCondition creates a condition that compares a boolean column with a value.
 func NewBooleanCondition[V Boolean](col Column, value V) Condition {
 	return valueCondition{

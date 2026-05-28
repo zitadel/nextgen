@@ -1,7 +1,7 @@
 /**
- * xstate machine that walks a happy-path login flow.
+ * XState machine that walks a happy-path login flow.
  *
- * The mock backend's job is just to advance through the canonical Zitadel
+ * The mock backend's job is to advance through the canonical Zitadel
  * authentication flow without performing any real authentication work.
  * State names are deliberately the canonical wire step names (matching
  * `CreateFlow201Step.name`) so handlers can use the snapshot value directly
@@ -9,29 +9,38 @@
  *
  * State graph:
  *
- *   idle --START(login)----> identifier --SUBMIT--> password
- *                                       --SUBMIT(action:passkey)--> passkey-challenge
+ *   idle --START(login)----> identifier (email+password, Figma 6593:141985)
+ *                                       --SUBMIT(submit)--> passkey-upsell
+ *                                       --SUBMIT(recover)--> recover --SUBMIT--> identifier
+ *                                       --SUBMIT(register)--> register
+ *                                       --SUBMIT(passkey)--> passkey-login
  *                                       --SUBMIT(sso_provider_id)--> sso-redirect
- *      \--START(register)--> register --SUBMIT--> password
- *                                     --SUBMIT(action:passkey)--> passkey-enroll
+ *      \--START(register)--> register --SUBMIT--> passkey-upsell
  *
- *   password / sso-redirect / passkey-challenge / passkey-enroll --SUBMIT--> done
- *   anything                                                     --RESET--> idle
+ *   password -- legacy split step; not reachable from any START transition;
+ *               kept so tests can target it directly via actor injection
+ *   passkey-upsell --SUBMIT(skip)--> done
+ *   passkey-upsell --SUBMIT(*)----> passkey-setup --SUBMIT--> done
+ *   passkey-login --SUBMIT--> done
+ *   passkey-login --SUBMIT(cancel)--> identifier
+ *   sso-redirect --SUBMIT--> done
+ *   anything --RESET--> .idle  (root on: uses child-relative target syntax)
  */
 import type { CreateFlowBodyPurpose } from "@zitadel-nextgen/api/generated/model";
-import { createMachine, type AnyActorRef, assign, createActor } from "xstate";
+import { createMachine, type Actor, assign, createActor } from "xstate";
 
 export type FlowStepName =
   | "identifier"
   | "register"
   | "password"
-  | "passkey-challenge"
-  | "passkey-enroll"
+  | "recover"
+  | "passkey-upsell"
+  | "passkey-setup"
+  | "passkey-login"
   | "sso-redirect"
   | "done";
 
 export type FlowMachineContext = {
-  flowId: string;
   tokenSeq: number;
   sessionToken: string;
   purpose: CreateFlowBodyPurpose | null;
@@ -49,14 +58,13 @@ export type FlowMachineEvent =
     }
   | { type: "RESET" };
 
-const initialContext: FlowMachineContext = {
-  flowId: "flow_mock",
+const initialContext = {
   tokenSeq: 0,
   sessionToken: "tok_mock_0",
   purpose: null,
   capturedFields: {},
   ssoProviderId: null,
-};
+} satisfies FlowMachineContext;
 
 const rotateToken = assign<FlowMachineContext, FlowMachineEvent, undefined, FlowMachineEvent, never>({
   tokenSeq: ({ context }) => context.tokenSeq + 1,
@@ -115,12 +123,22 @@ export const flowMachine = createMachine({
             ],
           },
           {
-            guard: ({ event }) => event.action === "passkey",
-            target: "passkey-challenge",
+            guard: ({ event }) => event.action === "register",
+            target: "register",
             actions: [captureFields, rotateToken],
           },
           {
-            target: "password",
+            guard: ({ event }) => event.action === "passkey",
+            target: "passkey-login",
+            actions: [captureFields, rotateToken],
+          },
+          {
+            guard: ({ event }) => event.action === "recover",
+            target: "recover",
+            actions: [captureFields, rotateToken],
+          },
+          {
+            target: "passkey-upsell",
             actions: [captureFields, rotateToken],
           },
         ],
@@ -128,22 +146,52 @@ export const flowMachine = createMachine({
     },
     register: {
       on: {
-        SUBMIT: [
-          {
-            guard: ({ event }) => event.action === "passkey",
-            target: "passkey-enroll",
-            actions: [captureFields, rotateToken],
-          },
-          {
-            target: "password",
-            actions: [captureFields, rotateToken],
-          },
-        ],
+        SUBMIT: { target: "passkey-upsell", actions: [captureFields, rotateToken] },
+      },
+    },
+    recover: {
+      on: {
+        SUBMIT: { target: "identifier", actions: [rotateToken] },
       },
     },
     password: {
       on: {
-        SUBMIT: { target: "done", actions: [captureFields, rotateToken] },
+        SUBMIT: { target: "passkey-upsell", actions: [captureFields, rotateToken] },
+      },
+    },
+    "passkey-upsell": {
+      on: {
+        SUBMIT: [
+          {
+            guard: ({ event }) => event.action === "skip",
+            target: "done",
+            actions: [rotateToken],
+          },
+          {
+            target: "passkey-setup",
+            actions: [rotateToken],
+          },
+        ],
+      },
+    },
+    "passkey-setup": {
+      on: {
+        SUBMIT: { target: "done", actions: [rotateToken] },
+      },
+    },
+    "passkey-login": {
+      on: {
+        SUBMIT: [
+          {
+            guard: ({ event }) => event.action === "cancel",
+            target: "identifier",
+            actions: [rotateToken],
+          },
+          {
+            target: "done",
+            actions: [captureFields, rotateToken],
+          },
+        ],
       },
     },
     "sso-redirect": {
@@ -151,22 +199,23 @@ export const flowMachine = createMachine({
         SUBMIT: { target: "done", actions: [rotateToken] },
       },
     },
-    "passkey-challenge": {
-      on: {
-        SUBMIT: { target: "done", actions: [captureFields, rotateToken] },
-      },
-    },
-    "passkey-enroll": {
-      on: {
-        SUBMIT: { target: "done", actions: [captureFields, rotateToken] },
-      },
-    },
     done: { type: "final" },
   },
 });
 
-export type FlowActor = AnyActorRef;
+/** The concrete actor type produced by {@link startFlowActor}. */
+export type FlowActor = Actor<typeof flowMachine>;
 
+/**
+ * Create and start a new actor for {@link flowMachine}.
+ *
+ * The actor begins in the `idle` state with a fresh context. Callers in
+ * `setupMockHandlers()` replace the actor reference on every `createFlow`
+ * request rather than resetting it, because the `done` state is final and
+ * cannot be exited via an event.
+ *
+ * @returns A running actor ready to receive `START` and `SUBMIT` events.
+ */
 export function startFlowActor(): FlowActor {
   const actor = createActor(flowMachine);
   actor.start();

@@ -1,14 +1,31 @@
 import { sortValue } from "../lib/json";
 import type { AuthMethods } from "./annotations";
 
+/**
+ * Shape per `api/openapi/endpoints/schemas/user-schema.yaml`. Required:
+ * $schema, $id, kind, title, x-auth-methods. `kind` is the discriminator
+ * the platform reads (`POST /schemas` is `oneOf [user-schema, schema-url]`
+ * keyed on `kind`).
+ */
 export type UserSchema = {
   $schema: string;
+  $id: string;
+  kind: "user-schema";
   type: "object";
   title: string;
   "x-auth-methods": AuthMethods;
   required: string[];
   properties: Record<string, Record<string, unknown>>;
 };
+
+/**
+ * Canonical $id for the default human-user schema the CLI emits. The
+ * platform stores schemas keyed by this URI; using a stable repo-rooted
+ * URL means multiple projects pointing at the same default share one
+ * record instead of every project minting its own.
+ */
+export const DEFAULT_USER_SCHEMA_ID =
+  "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/human-user.yaml";
 
 const FIELD_PRESETS: Record<string, Record<string, unknown>> = {
   email: {
@@ -63,6 +80,8 @@ export function defaultUserSchema(
 
   return sortValue({
     $schema: "https://json-schema.org/draft/2020-12/schema",
+    $id: DEFAULT_USER_SCHEMA_ID,
+    kind: "user-schema",
     type: "object",
     title: "Human User",
     "x-auth-methods": authMethods,

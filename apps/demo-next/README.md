@@ -4,17 +4,67 @@ A minimal Next.js application demonstrating [Nextgen Auth](../../packages/sdk-ne
 
 ## Running locally
 
-Start the mock auth backend and the demo in separate terminals:
+Use **Nx** from the repo root (`corepack pnpm install` first).
+
+Build the SDK (and its transitive dependencies) once before the first run:
+
+```bash
+corepack pnpm nx build @zitadel-nextgen/sdk-next
+```
+
+### 1. Configure environment
+
+Copy the example env file and adjust as needed:
+
+```bash
+cp apps/demo-next/.env.example apps/demo-next/.env.local
+```
+
+Or pass them inline when starting the dev server (step 2).
+
+| Variable                          | Default                 | Description                                        |
+| --------------------------------- | ----------------------- | -------------------------------------------------- |
+| `NEXTGEN_ISSUER_URL`              | `http://localhost:4000` | URL of the Nextgen auth server                     |
+| `NEXT_PUBLIC_ZITADEL_PROJECT_ID`  | `demo`                  | Project ID passed to `<zitadel-login project-id>`  |
+
+### 2. Start
+
+Two terminals:
 
 ```bash
 # Terminal 1 — mock auth server on port 4000
-pnpm --filter @zitadel-nextgen/api-mock start
+corepack pnpm nx start @zitadel-nextgen/api-mock
 
-# Terminal 2 — Next.js app on port 3002
-NEXTGEN_ISSUER_URL=http://localhost:4000 pnpm --filter @nextgen/demo-next dev
+# Terminal 2 — Next.js on port 3002
+corepack pnpm nx dev @zitadel-nextgen/demo-next
+
+# …or with inline env overrides:
+# NEXTGEN_ISSUER_URL=https://my-instance.zitadel.cloud NEXT_PUBLIC_ZITADEL_PROJECT_ID=abc123 \
+#   corepack pnpm nx dev @zitadel-nextgen/demo-next
 ```
 
 Open [http://localhost:3002/login](http://localhost:3002/login). Any email/password combination is accepted by the mock server.
+
+**UI-only iteration** (no Next.js, no TCP mock): MSW runs in the browser on these dev servers:
+
+```bash
+# Lit atoms + <zitadel-login> (source from packages/components/src)
+corepack pnpm nx dev @zitadel-nextgen/components
+# → http://localhost:5173/?route=login
+# → http://localhost:5173/?route=atoms
+
+# React paired atoms (@zitadel-nextgen/ui-react) — compare Lit matrices in another tab
+corepack pnpm nx dev @zitadel-nextgen/console
+# → http://localhost:5174
+```
+
+After changing `@zitadel-nextgen/components`, rebuild before refreshing:
+
+```bash
+corepack pnpm nx build @zitadel-nextgen/components
+```
+
+The demo imports the package from `dist/`, not source.
 
 ## What it shows
 
@@ -31,8 +81,6 @@ Open [http://localhost:3002/login](http://localhost:3002/login). Any email/passw
 
 **Admin page** calls `auth()` on the server to read the verified session and display the signed-in user's email, with the `<zitadel-logout>` component in the header.
 
-## Environment variables
+**Login widget** (`src/app/login/widget.tsx`) dynamically imports `@zitadel-nextgen/components` with `ssr: false` so custom elements register only in the browser.
 
-| Variable             | Default                   | Description                    |
-| -------------------- | ------------------------- | ------------------------------ |
-| `NEXTGEN_ISSUER_URL` | `http://localhost:4000`   | URL of the Nextgen auth server |
+**Fonts and branding** — the mock server ships a default `font_url` (Arimo via Google Fonts) on every flow response. `<zitadel-login>` injects it into its shadow root. Root `layout.tsx` sets `body { margin: 0; font-family: sans-serif; }`. **APK Futural** in heading tokens still needs a tenant font URL when you brand beyond the mock baseline.

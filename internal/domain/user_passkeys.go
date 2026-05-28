@@ -41,6 +41,11 @@ type CreateUserPasskey struct {
 	VerifiedAt      *time.Time
 }
 
+type PasskeyChallenge struct {
+	Challenge string
+	// TODO: define struct
+}
+
 type UserPasskeyRepository interface {
 	Repository
 

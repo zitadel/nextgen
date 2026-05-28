@@ -2,6 +2,7 @@ package repository_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -11,6 +12,7 @@ import (
 )
 
 func TestUserRepository_CreateGetListDelete(t *testing.T) {
+	skipIfSpanner(t)
 	repo := repository.NewUserRepository()
 	tx, rollback := transactionForRollback(t)
 	defer rollback()
@@ -23,12 +25,12 @@ func TestUserRepository_CreateGetListDelete(t *testing.T) {
 		userID    = "usr_aaa"
 	)
 
-	_, err := tx.Exec(ctx, `INSERT INTO zitadel_nextgen.projects (id) VALUES ($1)`, pid)
+	_, err := tx.Exec(ctx, fmt.Sprintf(`INSERT INTO %s (id) VALUES ($1)`, dbTable("projects")), pid)
 	require.NoError(t, err)
-	_, err = tx.Exec(ctx, `INSERT INTO zitadel_nextgen.teams (project_id, id) VALUES ($1,$2)`, pid, tid)
+	_, err = tx.Exec(ctx, fmt.Sprintf(`INSERT INTO %s (project_id, id) VALUES ($1,$2)`, dbTable("teams")), pid, tid)
 	require.NoError(t, err)
 	_, err = tx.Exec(ctx,
-		`INSERT INTO zitadel_nextgen.json_schemas (project_id, url, payload) VALUES ($1,$2,$3::json)`,
+		fmt.Sprintf(`INSERT INTO %s (project_id, url, payload) VALUES ($1,$2,$3%s)`, dbTable("json_schemas"), jsonCast()),
 		pid, schemaURL, []byte("{}"),
 	)
 	require.NoError(t, err)
@@ -40,10 +42,10 @@ func TestUserRepository_CreateGetListDelete(t *testing.T) {
 
 	teamCopy := tid
 	create := &domain.CreateUser{
-		ProjectID: pid,
-		SchemaURL: schemaURL,
-		ID:        userID,
-		TeamID:    &teamCopy,
+		ProjectID:  pid,
+		SchemaURL:  schemaURL,
+		ID:         userID,
+		TeamID:     &teamCopy,
 		Attributes: []*domain.CreateAttribute{attr1, attr2},
 	}
 	require.NoError(t, repo.Create(ctx, tx, create))
@@ -85,4 +87,107 @@ func TestUserRepository_CreateGetListDelete(t *testing.T) {
 		database.WithCondition(repo.PrimaryKeyCondition(pid, userID)),
 	)
 	require.ErrorIs(t, err, new(database.NoRowFoundError))
+}
+
+func TestUserRepository_AttributesCondition(t *testing.T) {
+	skipIfSpanner(t)
+	repo := repository.NewUserRepository()
+	tx, rollback := transactionForRollback(t)
+	defer rollback()
+	ctx := t.Context()
+
+	const (
+		pid       = "proj-attr-cond"
+		tid       = "team-attr-cond"
+		schemaURL = "https://schemas.test/users-attr-cond/v1.json"
+	)
+
+	_, err := tx.Exec(ctx, fmt.Sprintf(`INSERT INTO %s (id) VALUES ($1)`, dbTable("projects")), pid)
+	require.NoError(t, err)
+	_, err = tx.Exec(ctx, fmt.Sprintf(`INSERT INTO %s (project_id, id) VALUES ($1,$2)`, dbTable("teams")), pid, tid)
+	require.NoError(t, err)
+	_, err = tx.Exec(ctx,
+		fmt.Sprintf(`INSERT INTO %s (project_id, url, payload) VALUES ($1,$2,$3%s)`, dbTable("json_schemas"), jsonCast()),
+		pid, schemaURL, []byte("{}"),
+	)
+	require.NoError(t, err)
+
+	mkUser := func(id, country, nickname string) {
+		t.Helper()
+		a1, err := domain.NewCreateAttribute("country", country, domain.AttributeUniquenessUnspecified)
+		require.NoError(t, err)
+		a2, err := domain.NewCreateAttribute("nickname", nickname, domain.AttributeUniquenessUnspecified)
+		require.NoError(t, err)
+		teamCopy := tid
+		require.NoError(t, repo.Create(ctx, tx, &domain.CreateUser{
+			ProjectID:  pid,
+			SchemaURL:  schemaURL,
+			ID:         id,
+			TeamID:     &teamCopy,
+			Attributes: []*domain.CreateAttribute{a1, a2},
+		}))
+	}
+	mkUser("u1", "CH", "alice")
+	mkUser("u2", "CH", "bob")
+	mkUser("u3", "DE", "charlie")
+
+	// 1) Get by a single attribute that pinpoints one user; also confirms attributes are hydrated.
+	got, err := repo.Get(ctx, tx,
+		database.WithCondition(database.And(
+			repo.ProjectIDCondition(pid),
+			repo.AttributesCondition([]domain.Attribute{{Key: "nickname", Value: "bob"}}),
+		)),
+		repo.WithAttributes(),
+	)
+	require.NoError(t, err)
+	require.Equal(t, "u2", got.ID)
+	require.Len(t, got.Attributes, 2)
+
+	// 2) List by a single attribute matching multiple users.
+	users, err := repo.List(ctx, tx,
+		database.WithCondition(database.And(
+			repo.ProjectIDCondition(pid),
+			repo.AttributesCondition([]domain.Attribute{{Key: "country", Value: "CH"}}),
+		)),
+	)
+	require.NoError(t, err)
+	gotIDs := make([]string, 0, len(users))
+	for _, u := range users {
+		gotIDs = append(gotIDs, u.ID)
+	}
+	require.ElementsMatch(t, []string{"u1", "u2"}, gotIDs)
+
+	// 3) List with two ANDed attributes resolves to a single user.
+	users, err = repo.List(ctx, tx,
+		database.WithCondition(database.And(
+			repo.ProjectIDCondition(pid),
+			repo.AttributesCondition([]domain.Attribute{
+				{Key: "country", Value: "CH"},
+				{Key: "nickname", Value: "alice"},
+			}),
+		)),
+	)
+	require.NoError(t, err)
+	require.Len(t, users, 1)
+	require.Equal(t, "u1", users[0].ID)
+
+	// 4) Non-matching value yields empty result.
+	users, err = repo.List(ctx, tx,
+		database.WithCondition(database.And(
+			repo.ProjectIDCondition(pid),
+			repo.AttributesCondition([]domain.Attribute{{Key: "country", Value: "ZZ"}}),
+		)),
+	)
+	require.NoError(t, err)
+	require.Empty(t, users)
+
+	// 5) Empty attribute slice acts as the AND identity (no narrowing).
+	users, err = repo.List(ctx, tx,
+		database.WithCondition(database.And(
+			repo.ProjectIDCondition(pid),
+			repo.AttributesCondition(nil),
+		)),
+	)
+	require.NoError(t, err)
+	require.Len(t, users, 3)
 }

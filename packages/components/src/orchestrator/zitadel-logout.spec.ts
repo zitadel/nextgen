@@ -149,7 +149,7 @@ describe("<zitadel-logout>", () => {
     await element.updateComplete;
 
     const signoutEvents: CustomEvent[] = [];
-    element.addEventListener("zitadel-signout", (event) => {
+    element.addEventListener("zitadel-signout", (event: Event) => {
       signoutEvents.push(event as CustomEvent);
     });
 
@@ -180,7 +180,9 @@ describe("<zitadel-logout>", () => {
     await new Promise((resolve) => setTimeout(resolve, 16));
 
     expect(requestLog).toHaveLength(1);
-    const url = new URL(requestLog[0]!.url);
+    const first = requestLog[0];
+    if (!first) throw new Error("expected at least one captured request");
+    const url = new URL(first.url);
     expect(url.searchParams.get("client_id")).toBe("console-app");
     expect(url.searchParams.get("post_logout_redirect_uri")).toBe(
       "https://app.test/done",

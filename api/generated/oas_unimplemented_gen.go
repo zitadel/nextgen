@@ -70,7 +70,7 @@ func (UnimplementedHandler) CreateFlow(ctx context.Context, req *CreateFlowReque
 // audience, and the steps involved.
 //
 // POST /flow_definitions
-func (UnimplementedHandler) CreateFlowDefinition(ctx context.Context, req *FlowDefinitionCreateRequest) (r CreateFlowDefinitionRes, _ error) {
+func (UnimplementedHandler) CreateFlowDefinition(ctx context.Context, req *CreateFlowDefinitionRequest) (r CreateFlowDefinitionRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -109,7 +109,7 @@ func (UnimplementedHandler) CreateProject(ctx context.Context, req *CreateProjec
 // schema-url which will be resolved by the server.
 //
 // POST /schemas
-func (UnimplementedHandler) CreateSchema(ctx context.Context, req CreateSchemaReq) (r CreateSchemaRes, _ error) {
+func (UnimplementedHandler) CreateSchema(ctx context.Context, req CreateSchemaReq, params CreateSchemaParams) (r CreateSchemaRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

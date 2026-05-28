@@ -925,7 +925,7 @@ func (s *Server) handleCreateFlowDefinitionRequest(args [0]string, argsEscaped b
 		}
 
 		type (
-			Request  = *FlowDefinitionCreateRequest
+			Request  = *CreateFlowDefinitionRequest
 			Params   = struct{}
 			Response = CreateFlowDefinitionRes
 		)
@@ -1234,50 +1234,6 @@ func (s *Server) handleCreateProjectRequest(args [0]string, argsEscaped bool, w 
 			ID:   "createProject",
 		}
 	)
-	{
-		type bitset = [1]uint8
-		var satisfied bitset
-		{
-			sctx, ok, err := s.securityOAuth2(ctx, CreateProjectOperation, r)
-			if err != nil {
-				err = &ogenerrors.SecurityError{
-					OperationContext: opErrContext,
-					Security:         "OAuth2",
-					Err:              err,
-				}
-				defer recordError("Security:OAuth2", err)
-				s.cfg.ErrorHandler(ctx, w, r, err)
-				return
-			}
-			if ok {
-				satisfied[0] |= 1 << 0
-				ctx = sctx
-			}
-		}
-
-		if ok := func() bool {
-		nextRequirement:
-			for _, requirement := range []bitset{
-				{0b00000001},
-			} {
-				for i, mask := range requirement {
-					if satisfied[i]&mask != mask {
-						continue nextRequirement
-					}
-				}
-				return true
-			}
-			return false
-		}(); !ok {
-			err = &ogenerrors.SecurityError{
-				OperationContext: opErrContext,
-				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
-			}
-			defer recordError("Security", err)
-			s.cfg.ErrorHandler(ctx, w, r, err)
-			return
-		}
-	}
 
 	var rawBody []byte
 	request, rawBody, close, err := s.decodeCreateProjectRequest(r)
@@ -1470,6 +1426,16 @@ func (s *Server) handleCreateSchemaRequest(args [0]string, argsEscaped bool, w h
 			return
 		}
 	}
+	params, err := decodeCreateSchemaParams(args, argsEscaped, r)
+	if err != nil {
+		err = &ogenerrors.DecodeParamsError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeParams", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
 
 	var rawBody []byte
 	request, rawBody, close, err := s.decodeCreateSchemaRequest(r)
@@ -1497,13 +1463,22 @@ func (s *Server) handleCreateSchemaRequest(args [0]string, argsEscaped bool, w h
 			OperationID:      "createSchema",
 			Body:             request,
 			RawBody:          rawBody,
-			Params:           middleware.Parameters{},
-			Raw:              r,
+			Params: middleware.Parameters{
+				{
+					Name: "project_id",
+					In:   "query",
+				}: params.ProjectID,
+				{
+					Name: "team_id",
+					In:   "query",
+				}: params.TeamID,
+			},
+			Raw: r,
 		}
 
 		type (
 			Request  = CreateSchemaReq
-			Params   = struct{}
+			Params   = CreateSchemaParams
 			Response = CreateSchemaRes
 		)
 		response, err = middleware.HookMiddleware[
@@ -1513,14 +1488,14 @@ func (s *Server) handleCreateSchemaRequest(args [0]string, argsEscaped bool, w h
 		](
 			m,
 			mreq,
-			nil,
+			unpackCreateSchemaParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.CreateSchema(ctx, request)
+				response, err = s.h.CreateSchema(ctx, request, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.CreateSchema(ctx, request)
+		response, err = s.h.CreateSchema(ctx, request, params)
 	}
 	if err != nil {
 		defer recordError("Internal", err)
@@ -3969,6 +3944,14 @@ func (s *Server) handleGetSchemaByIdRequest(args [1]string, argsEscaped bool, w 
 					Name: "id",
 					In:   "path",
 				}: params.ID,
+				{
+					Name: "project_id",
+					In:   "query",
+				}: params.ProjectID,
+				{
+					Name: "team_id",
+					In:   "query",
+				}: params.TeamID,
 			},
 			Raw: r,
 		}

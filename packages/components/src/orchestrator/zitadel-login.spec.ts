@@ -68,6 +68,42 @@ async function waitFor<T>(probe: () => T | null | undefined, timeout = 1500): Pr
   throw new Error("waitFor timed out");
 }
 
+/** Walks the api-mock login path: combined sign-in → passkey-upsell → done. */
+async function advanceMockLoginFlow(element: ZitadelLogin, email = "alice@acme.com"): Promise<void> {
+  element.shadowRoot?.dispatchEvent(
+    new CustomEvent("zl-input", {
+      bubbles: true,
+      composed: true,
+      detail: { name: "email", value: email },
+    }),
+  );
+  element.shadowRoot?.dispatchEvent(
+    new CustomEvent("zl-input", {
+      bubbles: true,
+      composed: true,
+      detail: { name: "password", value: "hunter2" },
+    }),
+  );
+  element.shadowRoot?.dispatchEvent(
+    new CustomEvent("zl-submit", {
+      bubbles: true,
+      composed: true,
+      detail: { action: "submit" },
+    }),
+  );
+  await waitFor(() => {
+    const title = element.shadowRoot?.querySelector(".zl-card-title");
+    return title?.textContent?.includes("Sign in faster") ? title : null;
+  });
+  element.shadowRoot?.dispatchEvent(
+    new CustomEvent("zl-submit", {
+      bubbles: true,
+      composed: true,
+      detail: { action: "skip" },
+    }),
+  );
+}
+
 async function mount(host: HTMLElement): Promise<ZitadelLogin> {
   const element = document.createElement("zitadel-login") as ZitadelLogin;
   element.purpose = "login";
@@ -94,8 +130,9 @@ describe("<zitadel-login> against the typed Flow API", () => {
     const root = element.shadowRoot;
     expect(root).toBeTruthy();
     const fields = root?.querySelectorAll("zl-field") ?? [];
-    expect(fields.length).toBe(1);
+    expect(fields.length).toBe(2);
     expect(fields[0]?.getAttribute("name")).toBe("email");
+    expect(fields[1]?.getAttribute("name")).toBe("password");
   });
 
   it("submits with {session_token, action, fields} and applies the next step", async () => {
@@ -113,6 +150,13 @@ describe("<zitadel-login> against the typed Flow API", () => {
         detail: { name: "email", value: "alice@acme.com" },
       }),
     );
+    element.shadowRoot?.dispatchEvent(
+      new CustomEvent("zl-input", {
+        bubbles: true,
+        composed: true,
+        detail: { name: "password", value: "hunter2" },
+      }),
+    );
 
     element.shadowRoot?.dispatchEvent(
       new CustomEvent("zl-submit", {
@@ -123,8 +167,8 @@ describe("<zitadel-login> against the typed Flow API", () => {
     );
 
     await waitFor(() => {
-      const next = element.shadowRoot?.querySelector("zl-field");
-      return next?.getAttribute("name") === "password" ? next : null;
+      const title = element.shadowRoot?.querySelector(".zl-card-title");
+      return title?.textContent?.includes("Sign in faster") ? title : null;
     });
 
     const submits = mock.getCaptured().filter(
@@ -134,7 +178,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
     expect(submits).toHaveLength(1);
     expect(submits[0]?.body).toMatchObject({
       action: "submit",
-      fields: { email: "alice@acme.com" },
+      fields: { email: "alice@acme.com", password: "hunter2" },
     });
     expect(typeof submits[0]?.body.session_token).toBe("string");
   });
@@ -142,28 +186,11 @@ describe("<zitadel-login> against the typed Flow API", () => {
   it("emits zitadel-flow-complete when the step ends with `complete: show`", async () => {
     const element = await mount(host);
     const completeEvents: CustomEvent[] = [];
-    element.addEventListener("zitadel-flow-complete", (event) =>
+    element.addEventListener("zitadel-flow-complete", (event: Event) =>
       completeEvents.push(event as CustomEvent),
     );
 
-    element.shadowRoot?.dispatchEvent(
-      new CustomEvent("zl-submit", {
-        bubbles: true,
-        composed: true,
-        detail: { action: "submit" },
-      }),
-    );
-    await waitFor(() => {
-      const next = element.shadowRoot?.querySelector("zl-field");
-      return next?.getAttribute("name") === "password" ? next : null;
-    });
-    element.shadowRoot?.dispatchEvent(
-      new CustomEvent("zl-submit", {
-        bubbles: true,
-        composed: true,
-        detail: { action: "submit" },
-      }),
-    );
+    await advanceMockLoginFlow(element);
     await waitFor(() => (completeEvents.length > 0 ? completeEvents : null));
     expect(completeEvents[0]?.detail).toEqual(
       expect.objectContaining({ behavior: "show" }),
@@ -214,24 +241,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
       host.appendChild(element);
       await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
 
-      element.shadowRoot?.dispatchEvent(
-        new CustomEvent("zl-submit", {
-          bubbles: true,
-          composed: true,
-          detail: { action: "submit" },
-        }),
-      );
-      await waitFor(() => {
-        const next = element.shadowRoot?.querySelector("zl-field");
-        return next?.getAttribute("name") === "password" ? next : null;
-      });
-      element.shadowRoot?.dispatchEvent(
-        new CustomEvent("zl-submit", {
-          bubbles: true,
-          composed: true,
-          detail: { action: "submit" },
-        }),
-      );
+      await advanceMockLoginFlow(element);
 
       await waitFor(() => (assign.mock.calls.length > 0 ? assign : null));
       expect(exchangeHit).toBe(true);
@@ -261,24 +271,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
       host.appendChild(element);
       await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
 
-      element.shadowRoot?.dispatchEvent(
-        new CustomEvent("zl-submit", {
-          bubbles: true,
-          composed: true,
-          detail: { action: "submit" },
-        }),
-      );
-      await waitFor(() => {
-        const next = element.shadowRoot?.querySelector("zl-field");
-        return next?.getAttribute("name") === "password" ? next : null;
-      });
-      element.shadowRoot?.dispatchEvent(
-        new CustomEvent("zl-submit", {
-          bubbles: true,
-          composed: true,
-          detail: { action: "submit" },
-        }),
-      );
+      await advanceMockLoginFlow(element);
 
       await waitFor(() => (assign.mock.calls.length > 0 ? assign : null));
       expect(assign).toHaveBeenCalledWith("/admin");
@@ -309,7 +302,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
     const element = document.createElement("zitadel-login") as ZitadelLogin;
     element.purpose = "login";
     element.projectId = "demo-project";
-    element.addEventListener("zitadel-flow-error", (event) =>
+    element.addEventListener("zitadel-flow-error", (event: Event) =>
       errorEvents.push(event as CustomEvent),
     );
     host.appendChild(element);
@@ -326,5 +319,132 @@ describe("<zitadel-login> against the typed Flow API", () => {
       kind: "createFlow",
       body: { purpose: "login", project_id: "demo-project" },
     });
+  });
+
+  it("auto-submits challenge_response when zl-passkey-result is dispatched", async () => {
+    const element = await mount(host);
+
+    // Navigate to the passkey-login step by submitting action: "passkey"
+    element.shadowRoot?.dispatchEvent(
+      new CustomEvent("zl-submit", {
+        bubbles: true,
+        composed: true,
+        detail: { action: "passkey" },
+      }),
+    );
+
+    // Wait for the passkey-login step (which contains a challenge)
+    await waitFor(() => {
+      const submits = mock.getCaptured().filter(
+        (req): req is Extract<CapturedRequest, { kind: "submitFlowStep" }> =>
+          req.kind === "submitFlowStep",
+      );
+      return submits.some((s) => s.body.action === "passkey") ? submits : null;
+    });
+
+    // Pre-register the credential so the mock's passkey-login check passes.
+    mock.registerCredential("mock-user@example.com", "cred_mock_123");
+
+    // Simulate a successful WebAuthn ceremony by dispatching zl-passkey-result
+    const mockProof = {
+      id: "cred_mock_123",
+      rawId: "Y3JlZF9tb2NrXzEyMw",
+      type: "public-key",
+      response: {
+        authenticatorData: "AAAA",
+        clientDataJSON: "BBBB",
+        signature: "CCCC",
+      },
+    };
+    element.shadowRoot?.dispatchEvent(
+      new CustomEvent("zl-passkey-result", {
+        bubbles: true,
+        composed: true,
+        detail: {
+          challenge_id: "ch_mock_passkey_login",
+          method: "passkey",
+          proof: mockProof,
+        },
+      }),
+    );
+
+    // Wait for the flow to complete (done step)
+    const completeEvents: CustomEvent[] = [];
+    element.addEventListener("zitadel-flow-complete", (event: Event) =>
+      completeEvents.push(event as CustomEvent),
+    );
+    await waitFor(() => (completeEvents.length > 0 ? completeEvents : null));
+
+    // Assert the submit body includes challenge_response
+    const submits = mock.getCaptured().filter(
+      (req): req is Extract<CapturedRequest, { kind: "submitFlowStep" }> =>
+        req.kind === "submitFlowStep",
+    );
+    // Two submits: passkey action + challenge_response submit
+    expect(submits.length).toBeGreaterThanOrEqual(2);
+    const proofSubmit = submits.find((s) => s.body.challenge_response);
+    expect(proofSubmit).toBeDefined();
+    expect(proofSubmit?.body.action).toBe("submit");
+    expect(proofSubmit?.body.challenge_response).toEqual({
+      challenge_id: "ch_mock_passkey_login",
+      method: "passkey",
+      proof: mockProof,
+    });
+  });
+
+  it("re-renders with error and strips challenge on zl-passkey-error", async () => {
+    const element = await mount(host);
+
+    // Navigate to the passkey-login step
+    element.shadowRoot?.dispatchEvent(
+      new CustomEvent("zl-submit", {
+        bubbles: true,
+        composed: true,
+        detail: { action: "passkey" },
+      }),
+    );
+
+    // Wait for the passkey-login step
+    await waitFor(() => {
+      const submits = mock.getCaptured().filter(
+        (req): req is Extract<CapturedRequest, { kind: "submitFlowStep" }> =>
+          req.kind === "submitFlowStep",
+      );
+      return submits.some((s) => s.body.action === "passkey") ? submits : null;
+    });
+
+    // Allow the Lit render cycle to complete before dispatching the error
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    // Simulate a cancelled WebAuthn ceremony
+    element.shadowRoot?.dispatchEvent(
+      new CustomEvent("zl-passkey-error", {
+        bubbles: true,
+        composed: true,
+        detail: {
+          challenge_id: "ch_mock_passkey_login",
+          error: "The operation was cancelled.",
+          aborted: true,
+        },
+      }),
+    );
+
+    // Wait for the error to be applied to the step
+    await waitFor(() => {
+      // Access the internal response — the step should have the error key
+      // and the challenge should be stripped
+      const root = element.shadowRoot;
+      const alert = root?.querySelector("zl-alert");
+      return alert ? alert : null;
+    });
+
+    // The step should still be passkey-login (no additional submits from the error)
+    const postErrorSubmits = mock.getCaptured().filter(
+      (req): req is Extract<CapturedRequest, { kind: "submitFlowStep" }> =>
+        req.kind === "submitFlowStep",
+    );
+    // Only the initial "passkey" action submit — no extra submit from the error handler
+    expect(postErrorSubmits).toHaveLength(1);
+    expect(postErrorSubmits[0]?.body.action).toBe("passkey");
   });
 });

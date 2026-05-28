@@ -8,14 +8,17 @@ import { defineConfig } from "vite";
 
 export default defineConfig(() => ({
   root: import.meta.dirname,
+  server: {
+    port: 5174,
+    strictPort: true,
+    watch: {
+      // Playground chrome lives outside `apps/console`; ensure CSS edits propagate.
+      ignored: ["**/.git/**", "**/node_modules/**", "**/dist/**"],
+    },
+  },
   cacheDir: "../../node_modules/.vite/apps/console",
-  // Serve `mockServiceWorker.js` from `@zitadel-nextgen/api-mock`'s public
-  // folder so the home-route MSW bootstrap finds it at /mockServiceWorker.js
-  // without copying the file into this app.
-  publicDir: apiMockPublicDir,
   // Resolve workspace `@zitadel-nextgen/*` packages straight from `.ts`
-  // source for hot dev iteration. Production builds (CI / `nuxt build`
-  // and friends) do not set this condition and pick up the pre-built
+  // source for hot dev iteration. Production builds pick up pre-built
   // `dist/*.mjs` via the default `import` condition instead.
   resolve: { conditions: ["@zitadel-nextgen/source"] },
   plugins: [

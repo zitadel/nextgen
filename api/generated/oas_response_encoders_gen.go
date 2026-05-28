@@ -547,10 +547,7 @@ func encodeCreateSessionResponse(response CreateSessionRes, w http.ResponseWrite
 					Explode: false,
 				}
 				if err := h.EncodeParam(cfg, func(e uri.Encoder) error {
-					if val, ok := response.SetCookie.Get(); ok {
-						return e.EncodeValue(conv.StringToString(val))
-					}
-					return nil
+					return e.EncodeValue(conv.StringToString(response.SetCookie))
 				}); err != nil {
 					return errors.Wrap(err, "encode Set-Cookie header")
 				}
@@ -735,10 +732,7 @@ func encodeExchangeHandoffResponse(response ExchangeHandoffRes, w http.ResponseW
 					Explode: false,
 				}
 				if err := h.EncodeParam(cfg, func(e uri.Encoder) error {
-					if val, ok := response.SetCookie.Get(); ok {
-						return e.EncodeValue(conv.StringToString(val))
-					}
-					return nil
+					return e.EncodeValue(conv.StringToString(response.SetCookie))
 				}); err != nil {
 					return errors.Wrap(err, "encode Set-Cookie header")
 				}
@@ -1434,10 +1428,23 @@ func encodeGetSchemaByIdResponse(response GetSchemaByIdRes, w http.ResponseWrite
 
 		return nil
 
-	case *ErrorDetails:
+	case *GetSchemaByIdBadRequest:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
 		span.SetStatus(codes.Error, http.StatusText(400))
+
+		e := new(jx.Encoder)
+		response.Encode(e)
+		if _, err := e.WriteTo(w); err != nil {
+			return errors.Wrap(err, "write")
+		}
+
+		return nil
+
+	case *GetSchemaByIdNotFound:
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.WriteHeader(404)
+		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -2016,10 +2023,7 @@ func encodeRevokeMySessionResponse(response RevokeMySessionRes, w http.ResponseW
 					Explode: false,
 				}
 				if err := h.EncodeParam(cfg, func(e uri.Encoder) error {
-					if val, ok := response.SetCookie.Get(); ok {
-						return e.EncodeValue(conv.StringToString(val))
-					}
-					return nil
+					return e.EncodeValue(conv.StringToString(response.SetCookie))
 				}); err != nil {
 					return errors.Wrap(err, "encode Set-Cookie header")
 				}
@@ -2113,10 +2117,7 @@ func encodeRevokeSessionResponse(response RevokeSessionRes, w http.ResponseWrite
 					Explode: false,
 				}
 				if err := h.EncodeParam(cfg, func(e uri.Encoder) error {
-					if val, ok := response.SetCookie.Get(); ok {
-						return e.EncodeValue(conv.StringToString(val))
-					}
-					return nil
+					return e.EncodeValue(conv.StringToString(response.SetCookie))
 				}); err != nil {
 					return errors.Wrap(err, "encode Set-Cookie header")
 				}

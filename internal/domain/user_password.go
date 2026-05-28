@@ -4,8 +4,13 @@ import (
 	"context"
 	"time"
 
+	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
+
+func ErrUserPasswordInvalid() Error {
+	return newError("user.password_invalid", "The password provided is invalid.", nil, nil)
+}
 
 type UserPassword struct {
 	ID                  int64
@@ -19,6 +24,14 @@ type UserPassword struct {
 	FailedAttempts      int16
 	CreatedAt           time.Time
 	UpdatedAt           time.Time
+}
+
+func (u *UserPassword) Verify(password string, verifier *crypto.Hasher) error {
+	_, err := verifier.Verify(u.EncodedHash, password)
+	if err != nil {
+		return ErrUserPasswordInvalid()
+	}
+	return nil
 }
 
 type CreateUserPassword struct {
