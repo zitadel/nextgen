@@ -4,9 +4,9 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { runEject } from "../../../src/commands/eject";
-import type { CliIO, GlobalOptions } from "../../../src/io/output";
-import { MANAGED_MARKER } from "../../../src/lib/paths";
+import { runEject } from "../../../../src/lib/commands/eject";
+import type { CliIO, GlobalOptions } from "../../../../src/io/output";
+import { MANAGED_MARKER } from "../../../../src/lib/paths";
 
 let captured = "";
 

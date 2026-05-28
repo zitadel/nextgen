@@ -13,16 +13,30 @@
     "directory": "apps/cli"
   },
   "bin": {
-    "zitadel": "dist/zitadel.mjs"
+    "zitadel": "./bin/run.js"
   },
   "files": [
+    "bin",
     "dist",
     "AGENTS.md"
   ],
   "oclif": {
     "bin": "zitadel",
     "dirname": "zitadel",
-    "commands": "./dist/commands"
+    "commands": "./dist/commands",
+    "topicSeparator": " ",
+    "plugins": [
+      "@oclif/plugin-help",
+      "@oclif/plugin-not-found",
+      "@oclif/plugin-plugins",
+      "@oclif/plugin-update",
+      "@oclif/plugin-warn-if-update-available",
+      "@oclif/plugin-which",
+      "@oclif/plugin-commands",
+      "@oclif/plugin-autocomplete",
+      "@oclif/plugin-search",
+      "@oclif/plugin-version"
+    ]
   },
   "type": "module",
   "scripts": {
@@ -79,8 +93,7 @@
         ],
         "dependsOn": [
           "^build",
-          "^typecheck",
-          "gen:agents-md"
+          "^typecheck"
         ]
       }
     }

@@ -4,8 +4,8 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { runStatus } from "../../../src/commands/status";
-import type { CliIO, GlobalOptions } from "../../../src/io/output";
+import { runStatus } from "../../../../src/lib/commands/status";
+import type { CliIO, GlobalOptions } from "../../../../src/io/output";
 
 const SECRET = {
   project_id: "proj-001",

@@ -4,8 +4,8 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { readZitadelConfig, readZitadelSecret } from "../../../src/commands/shared";
-import { ZitadelError } from "../../../src/lib/errors";
+import { readZitadelConfig, readZitadelSecret } from "../../../../src/lib/commands/shared";
+import { ZitadelError } from "../../../../src/lib/errors";
 
 const tempDirs: string[] = [];
 

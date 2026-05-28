@@ -2,36 +2,72 @@ import { readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { COMMANDS, type CommandSpec, type FlagSpec } from "../src/commands/registry";
+import { Config, type Command } from "@oclif/core";
+
 import { EXIT_CODES } from "../src/lib/errors";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const agentsTarget = join(here, "..", "AGENTS.md");
+const root = join(here, "..");
+const agentsTarget = join(root, "AGENTS.md");
+const PKG_NAME = "@zitadel-nextgen/cli";
 const BEGIN = "<!-- generated:contract:begin -->";
 const END = "<!-- generated:contract:end -->";
 
-async function main() {
-  const generated = renderGeneratedBlock();
+/**
+ * Golden-path ordering for the commands table. Anything not listed here is
+ * appended alphabetically, so adding a command never breaks generation — it
+ * just lands at the end until someone slots it into the intended order.
+ */
+const COMMAND_ORDER = ["setup", "plan", "apply", "doctor", "status", "eject"];
+
+async function main(): Promise<void> {
+  const config = await Config.load(root);
+  const commands = ourCommands(config);
+  const generated = renderGeneratedBlock(commands);
   await writeContract(agentsTarget, generated, handwrittenHeader());
 }
 
-function renderGeneratedBlock(): string {
+/**
+ * The CLI's own commands, with alias entries (e.g. `uninstall` for `eject`) and
+ * hidden commands removed, sorted by the golden path. oclif surfaces each alias
+ * as its own loadable, so we drop any command whose id is another command's
+ * alias to avoid listing the same command twice.
+ */
+function ourCommands(config: Config): Command.Loadable[] {
+  const mine = config.commands.filter((c) => c.pluginName === PKG_NAME && !c.hidden);
+  const aliases = new Set(mine.flatMap((c) => c.aliases));
+  const canonical = mine.filter((c) => !aliases.has(c.id));
+  return canonical.sort((a, b) => {
+    const ai = COMMAND_ORDER.indexOf(a.id);
+    const bi = COMMAND_ORDER.indexOf(b.id);
+    if (ai === -1 && bi === -1) {
+      return a.id.localeCompare(b.id);
+    }
+    if (ai === -1) {
+      return 1;
+    }
+    if (bi === -1) {
+      return -1;
+    }
+    return ai - bi;
+  });
+}
+
+function renderGeneratedBlock(commands: Command.Loadable[]): string {
   const lines: string[] = [BEGIN];
   lines.push("");
-  lines.push(
-    "Every envelope carries `cli_version`, `command`, `source` at the top level.",
-  );
+  lines.push("Every envelope carries `cli_version`, `command`, `source` at the top level.");
   lines.push("");
   lines.push("## Commands");
   lines.push("");
-  lines.push("| Command | Summary | Agent status |");
-  lines.push("|---|---|---|");
-  for (const spec of COMMANDS) {
-    lines.push(`| \`zitadel ${spec.name}\` | ${escapePipe(spec.summary)} | ${spec.agent_status} |`);
+  lines.push("| Command | Summary |");
+  lines.push("|---|---|");
+  for (const command of commands) {
+    lines.push(`| \`zitadel ${command.id}\` | ${escapePipe(summaryOf(command))} |`);
   }
   lines.push("");
-  for (const spec of COMMANDS) {
-    lines.push(renderCommand(spec));
+  for (const command of commands) {
+    lines.push(renderCommand(command));
     lines.push("");
   }
   lines.push("## Exit codes");
@@ -64,30 +100,51 @@ function renderGeneratedBlock(): string {
   return lines.join("\n");
 }
 
-function renderCommand(spec: CommandSpec): string {
+function renderCommand(command: Command.Loadable): string {
   const lines: string[] = [];
-  lines.push(`### \`zitadel ${spec.name}\``);
+  lines.push(`### \`zitadel ${command.id}\``);
   lines.push("");
-  lines.push(spec.summary);
-  if (spec.notes) {
+  lines.push(summaryOf(command));
+  if (command.aliases.length > 0) {
     lines.push("");
-    lines.push(`> ${spec.notes}`);
+    lines.push(`Aliases: ${command.aliases.map((a) => `\`zitadel ${a}\``).join(", ")}`);
   }
-  lines.push("");
-  lines.push(`Usage: \`${spec.usage}\``);
   lines.push("");
   lines.push("| Flag | Type | Description |");
   lines.push("|---|---|---|");
-  for (const flag of spec.flags) {
-    lines.push(`| ${flagToken(flag)} | \`${flag.type}\` | ${escapePipe(flag.description)} |`);
+  for (const flag of sortedFlags(command)) {
+    lines.push(
+      `| ${flagToken(flag)} | \`${flagType(flag)}\` | ${escapePipe(flag.description ?? "")} |`,
+    );
   }
   return lines.join("\n");
 }
 
-function flagToken(flag: FlagSpec): string {
+function summaryOf(command: Command.Loadable): string {
+  return command.summary ?? command.description ?? "";
+}
+
+/**
+ * Visible flags for a command, alphabetised by long name. Hidden flags are
+ * dropped so the contract only documents the public surface.
+ */
+function sortedFlags(command: Command.Loadable): Command.Flag.Cached[] {
+  return Object.values(command.flags)
+    .filter((flag) => !flag.hidden)
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function flagType(flag: Command.Flag.Cached): string {
+  if (flag.type === "boolean") {
+    return "boolean";
+  }
+  return flag.multiple ? "string[]" : "string";
+}
+
+function flagToken(flag: Command.Flag.Cached): string {
   const parts = [`\`--${flag.name}\``];
-  if (flag.alias) {
-    parts.push(`\`-${flag.alias}\``);
+  if (flag.char) {
+    parts.push(`\`-${flag.char}\``);
   }
   return parts.join(" / ");
 }
@@ -120,7 +177,7 @@ function mergeGenerated(existing: string, generated: string, header: string): st
 function handwrittenHeader(): string {
   return `# Zitadel CLI Agent Contract
 
-Agents should run \`zitadel <command> --non-interactive --json\` and read the JSON envelope. This file is generated by \`apps/cli/scripts/gen-agents-md.ts\`; do not edit it by hand. The contract block below is generated from the CLI registry at build time.
+Agents should run \`zitadel <command> --non-interactive --json\` and read the JSON envelope. This file is generated by \`apps/cli/scripts/gen-agents-md.ts\` from the oclif command metadata; do not edit it by hand.
 
 ## Required Agent Flags
 
@@ -131,17 +188,17 @@ npx zitadel@latest <command> --non-interactive --json
 Use \`--cwd <path>\` when acting outside the current working directory. Discover commands and flags with:
 
 \`\`\`sh
-npx zitadel@latest help --json
-npx zitadel@latest help <command> --json
+npx zitadel@latest --help
+npx zitadel@latest <command> --help
 \`\`\`
 
 Agents should prefer \`next_commands\` over free-text hints.
 
 ## Maintainer Notes
 
-This file is packaged with the CLI and is generated from the command registry. When changing commands, flags, envelope fields, agent support status, server resolution, or renderer behavior, update the registry and tests first, then run \`corepack pnpm nx run @zitadel-nextgen/cli:gen:agents-md\`.
+This file is packaged with the CLI and is generated from the oclif command metadata. When changing commands, flags, envelope fields, server resolution, or renderer behavior, update the command classes and tests first, then run \`corepack pnpm nx run @zitadel-nextgen/cli:gen:agents-md\`.
 
-Do not edit the generated contract block in this file by hand. Keep \`zitadel help --json\` and this contract in sync.
+Do not edit the generated contract block in this file by hand.
 
 ## Golden Path
 

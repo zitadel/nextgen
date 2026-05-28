@@ -17,7 +17,7 @@ afterAll(() => server.close());
 afterEach(() => { server.resetHandlers(); resetPlatformStore(); });
 
 function cli(args: string[]) {
-  return runCliForTest(["--server", MOCK_SERVER_URL, ...args]);
+  return runCliForTest([...args, "--server", MOCK_SERVER_URL]);
 }
 
 async function scaffoldProject(authMethod?: "passkey" | "password"): Promise<string> {

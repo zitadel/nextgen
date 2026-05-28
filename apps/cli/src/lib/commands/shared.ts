@@ -1,8 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { ZitadelError } from "../lib/errors";
-import { parseJsonObject } from "../lib/json";
+import { ZitadelError } from "../errors";
+import { parseJsonObject } from "../json";
 
 /**
  * Shape of the project secret persisted at `.zitadel/secret`. Holds the

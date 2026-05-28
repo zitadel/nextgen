@@ -4,8 +4,6 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { COMMANDS } from "../../src/commands/registry";
-import { EXIT_CODES } from "../../src/lib/errors";
 import { parseJson, runCliForTest } from "../helpers/run-cli";
 
 async function scaffoldNextProject(): Promise<string> {
@@ -30,48 +28,20 @@ function assertEnvelopeMeta(envelope: Record<string, unknown>): void {
 }
 
 describe("envelope contract", () => {
-  it("help lists every registry command in JSON mode", async () => {
-    const result = await runCliForTest(["help", "--json"]);
-    expect(result.exitCode).toBe(0);
-    const envelope = parseJson(result.stdout) as Record<string, unknown>;
-    assertEnvelopeMeta(envelope);
-    const data = envelope.data as { commands: { name: string }[] };
-    const names = data.commands.map((c) => c.name).sort();
-    const registryNames = COMMANDS.map((c) => c.name).sort();
-    expect(names).toEqual(registryNames);
-  });
-
-  it("help emits meta in JSON mode", async () => {
-    const result = await runCliForTest(["help", "--json"]);
-    expect(result.exitCode).toBe(0);
+  it("a domain command emits envelope meta in JSON mode", async () => {
+    const cwd = await scaffoldNextProject();
+    const result = await runCliForTest(["status", "--cwd", cwd, "--json"]);
+    // Whatever the outcome (a pre-setup project yields an error envelope), the
+    // command must speak the envelope — meta fields and a known status.
     assertEnvelopeMeta(parseJson(result.stdout) as Record<string, unknown>);
   });
 
-  it("help for a specific command emits meta and command details", async () => {
-    const result = await runCliForTest(["help", "setup", "--json"]);
-    expect(result.exitCode).toBe(0);
-    const envelope = parseJson(result.stdout) as { data: { command: { name: string } } } & Record<
-      string,
-      unknown
-    >;
-    assertEnvelopeMeta(envelope);
-    expect(envelope.data.command.name).toBe("setup");
-  });
-
-  it("unknown command errors with meta and next_commands", async () => {
+  it("unknown command is handled by oclif, not the envelope", async () => {
     const result = await runCliForTest(["bogus", "--json"]);
-    expect(result.exitCode).toBe(EXIT_CODES.E_VALIDATION);
-    expect(result.stderr).toBe("");
-    expect(result.stdout.trim()).toMatch(/^\{[\s\S]*\}$/);
-    const envelope = parseJson(result.stdout) as {
-      status: string;
-      code: string;
-      next_commands: string[];
-    } & Record<string, unknown>;
-    assertEnvelopeMeta(envelope);
-    expect(envelope.status).toBe("error");
-    expect(envelope.code).toBe("E_VALIDATION");
-    expect(envelope.next_commands).toContain("zitadel help");
+    // oclif's plugin-not-found owns this path: a 127 exit, and crucially no
+    // JSON envelope on stdout (the envelope is only for real commands).
+    expect(result.exitCode).toBe(127);
+    expect(result.stdout.trim()).toBe("");
   });
 
   it("AGENTS.md is the canonical generated contract", async () => {
@@ -82,24 +52,9 @@ describe("envelope contract", () => {
     expect(agents).not.toContain("Compatibility note");
   });
 
-  it("bare command in empty dir returns skipped, not error", async () => {
-    const cwd = await mkdtemp(join(tmpdir(), "zitadel-contract-empty-"));
-    const result = await runCliForTest(["--cwd", cwd, "--json"]);
-    expect(result.exitCode).toBe(0);
-    const envelope = parseJson(result.stdout) as {
-      status: string;
-      reason: string;
-      next_commands: string[];
-    } & Record<string, unknown>;
-    assertEnvelopeMeta(envelope);
-    expect(envelope.status).toBe("skipped");
-    expect(envelope.reason).toBe("no-framework-detected");
-    expect(envelope.next_commands?.length).toBeGreaterThan(0);
-  });
-
   it("version-only resolution defaults to real server, not mock", async () => {
     const cwd = await mkdtemp(join(tmpdir(), "zitadel-contract-default-"));
-    const result = await runCliForTest(["help", "--json", "--cwd", cwd]);
+    const result = await runCliForTest(["status", "--json", "--cwd", cwd]);
     const envelope = parseJson(result.stdout) as Record<string, unknown>;
     expect(envelope.source).toBe("https://api.zitadel.cloud");
   });
@@ -118,7 +73,7 @@ describe("envelope contract", () => {
         2,
       ),
     );
-    const result = await runCliForTest(["help", "--json", "--cwd", cwd]);
+    const result = await runCliForTest(["status", "--json", "--cwd", cwd]);
     const envelope = parseJson(result.stdout) as Record<string, unknown>;
     expect(envelope.source).toBe("https://self.example");
   });

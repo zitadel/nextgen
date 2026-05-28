@@ -20,7 +20,7 @@ afterEach(() => {
 });
 
 function cli(args: string[], env: NodeJS.ProcessEnv = {}) {
-  return runCliForTest(["--server", MOCK_SERVER_URL, ...args], env);
+  return runCliForTest([...args, "--server", MOCK_SERVER_URL], env);
 }
 
 describe("Next setup integration", () => {
@@ -85,7 +85,7 @@ describe("Next setup integration", () => {
     expect(doctor.exitCode).toBe(0);
     expect((parseJson(doctor.stdout) as { status: string }).status).toBe("ok");
 
-    const noArg = await cli(["--cwd", cwd, "--json"]);
+    const noArg = await cli(["status", "--cwd", cwd, "--json"]);
     expect(noArg.exitCode).toBe(0);
     const status = parseJson(noArg.stdout) as {
       status: string;
