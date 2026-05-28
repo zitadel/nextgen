@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import type { CommandRunner } from "../../../../../src/lib/command-runner";
+import type { CommandRunner } from "../../../../../src/lib/orca/scaffolders/cli";
 import { NextScaffolder } from "../../../../../src/lib/orca/scaffolders/next";
 
 describe("NextScaffolder", () => {
   it("invokes create-next-app with the expected command and args", async () => {
-    const calls: Array<{ command: string; args: string[]; cwd?: string }> = [];
-    const runner: CommandRunner = (command, args, opts) => {
-      calls.push({ command, args, cwd: opts?.cwd });
-      return { status: 0, stdout: "", stderr: "" };
+    const calls: Array<{ command: string; args: ReadonlyArray<string>; cwd: string }> = [];
+    const runner: CommandRunner = (command, args, cwd) => {
+      calls.push({ command, args, cwd });
+      return { status: 0, stderr: "" };
     };
 
     await new NextScaffolder(runner).scaffold("/tmp/proj", "next");
@@ -27,7 +27,7 @@ describe("NextScaffolder", () => {
   });
 
   it("throws E_VALIDATION when the command exits non-zero", async () => {
-    const runner: CommandRunner = () => ({ status: 1, stdout: "", stderr: "boom" });
+    const runner: CommandRunner = () => ({ status: 1, stderr: "boom" });
     await expect(new NextScaffolder(runner).scaffold("/tmp/proj", "next")).rejects.toMatchObject({
       code: "E_VALIDATION",
     });

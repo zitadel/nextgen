@@ -5,8 +5,8 @@ import { runDoctor } from "../lib/commands/doctor";
 
 /** `zitadel doctor` — verify generated files and local state. */
 export default class Doctor extends BaseCommand {
-  static description = "Verify generated files and local state.";
-  static flags = {
+  static override description = "Verify generated files and local state.";
+  static override flags = {
     fix: Flags.boolean({ description: "Re-apply missing managed files." }),
   };
 

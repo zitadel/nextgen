@@ -5,8 +5,8 @@ import { runApply } from "../lib/commands/apply";
 
 /** `zitadel apply` — validate and upload repo config to the platform. */
 export default class Apply extends BaseCommand {
-  static description = "Validate and upload repo config to the platform.";
-  static flags = {
+  static override description = "Validate and upload repo config to the platform.";
+  static override flags = {
     environment: Flags.string({
       char: "e",
       description: "Target environment (default: development).",

@@ -5,9 +5,9 @@ import { runSetup } from "../lib/commands/setup";
 
 /** `zitadel setup` — create a project and scaffold local auth. */
 export default class Setup extends BaseCommand {
-  static description = "Create a Zitadel project and scaffold local auth.";
-  static examples = ["<%= config.bin %> setup --framework next --auth-method passkey"];
-  static flags = {
+  static override description = "Create a Zitadel project and scaffold local auth.";
+  static override examples = ["<%= config.bin %> setup --framework next --auth-method passkey"];
+  static override flags = {
     framework: Flags.string({ description: 'Framework to target (v1 supports "next").' }),
     "user-fields": Flags.string({ description: "Comma-separated list of user fields." }),
     "auth-method": Flags.string({ description: "Auth method: passkey (default) or password." }),

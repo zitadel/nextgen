@@ -3,8 +3,8 @@ import { runEject } from "../lib/commands/eject";
 
 /** `zitadel eject` — remove managed files and local Zitadel state. */
 export default class Eject extends BaseCommand {
-  static description = "Remove managed files and local Zitadel state.";
-  static aliases = ["uninstall"];
+  static override description = "Remove managed files and local Zitadel state.";
+  static override aliases = ["uninstall"];
 
   async run(): Promise<void> {
     const { flags } = await this.parse(Eject);

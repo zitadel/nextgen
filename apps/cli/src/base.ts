@@ -19,7 +19,7 @@ import { CLI_VERSION } from "./lib/version";
  */
 export abstract class BaseCommand extends Command {
   /** Flags shared by every command, inherited via oclif `baseFlags`. */
-  static baseFlags = {
+  static override baseFlags = {
     json: Flags.boolean({ description: "Emit the JSON envelope instead of pretty output." }),
     cwd: Flags.string({ char: "c", description: "Project directory to operate on." }),
     server: Flags.string({ char: "s", description: "Override the resolved server URL." }),
