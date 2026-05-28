@@ -479,7 +479,7 @@ func (r *FlowStateMachineRuntime) buildStep(step *FlowDefinitionStep, resolved F
 	for name, a := range step.Actions {
 		textKey := a.TextKey
 		if textKey == "" {
-			textKey = "action." + name
+			textKey = step.Name + ".action." + name
 		}
 		actions[name] = FlowAction{
 			TextKey: textKey,
