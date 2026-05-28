@@ -143,7 +143,7 @@ _registry AS (
         project_id, user_id, team_id, key, value_hash
     )
     SELECT h.project_id, h.id,
-           CASE WHEN d.unique_scope = 'global'::zitadel_nextgen.uniqueness_scope
+           CASE WHEN d.unique_scope = 'project'::zitadel_nextgen.uniqueness_scope
                 THEN ''
                 ELSE COALESCE(h.team_id, '')::text
            END,

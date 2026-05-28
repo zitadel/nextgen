@@ -110,7 +110,7 @@ func findPasswordField(resolved map[string]FlowField, submitted map[string]any) 
 func attributeUniquenessFor(name, identifierName string, scope FlowFieldUniqueScope) AttributeUniqueness {
 	switch scope {
 	case FlowFieldUniqueScopeInstance:
-		return AttributeUniquenessGlobal
+		return AttributeUniquenessProject
 	case FlowFieldUniqueScopeOrganization:
 		return AttributeUniquenessTeam
 	}
