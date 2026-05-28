@@ -70,7 +70,7 @@ func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (ma
 	schemaEntity, err := s.schemaRepo.GetByID(ctx, tx, input.ProjectID, strSchemaURL)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
-			return nil, domain.ErrUserInvalid().WithDetails("$schema no known to the system. First create a schema, then create users.")
+			return nil, domain.ErrUserInvalid().WithDetails("$schema is not known to the system. First create a schema, then create users.")
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to get schema from database")
 	}

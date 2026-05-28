@@ -9,8 +9,8 @@ flows:
       email: Access to the user's email address
       schema.read: Permission to read schemas
       schema.write: Permission to create and manage schemas
-      user.create: Permission to create users
-      user.list: Permission to list users
+      user.write: Permission to create users
+      user.read: Permission to read users
   clientCredentials: 
     tokenUrl: https://acc.nextgen.zitadel.com/oauth/token
     scopes: 

@@ -58,7 +58,7 @@ func NewCreateUser(projectID string, teamID *string, schemaURL string, attribute
 
 	attrs, err := FlattenMapToCreateAttributes(attributes, schema, "")
 	if err != nil {
-		return nil, ErrInternal(err).WithMessage("failed flatten user attributes")
+		return nil, ErrInternal(err).WithMessage("failed to flatten user attributes")
 	}
 
 	return &CreateUser{

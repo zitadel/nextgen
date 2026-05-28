@@ -60,7 +60,7 @@ get:
     - $ref: ../../components/parameters/limit.yaml
   security:
     - oauth2:
-        - user.list
+        - user.read
   responses:
     '200':
       description: A list of users was returned

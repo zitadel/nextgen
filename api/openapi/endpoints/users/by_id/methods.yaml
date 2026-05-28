@@ -11,7 +11,9 @@ get:
       required: true
       schema:
         $ref: ../../../components/schemas/user-id.yaml
-  security: []
+  security:
+    - oauth2:
+        - users.read
   responses:
     '200':
       description: Current user information retrieved successfully

@@ -65,6 +65,7 @@ func TestGetUser(t *testing.T) {
 			TeamID:    &team.ID,
 			User:      *helpers.MustUnmarshal[map[string]any](t, userBs),
 		})
+		require.NoError(t, err)
 
 		params := api.GetUserByIDParams{
 			ProjectID: api.ProjectID(project.ID),
