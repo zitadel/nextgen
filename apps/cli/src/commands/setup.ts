@@ -80,7 +80,7 @@ export async function runSetup(io: CliIO, opts: SetupOptions): Promise<void> {
   const issuer = issuerFromPort(devPort);
   userFields = userFields ?? ["email", "given_name", "family_name"];
   const resolvedMethod: AuthMethod = authMethod ?? "passkey";
-  const userSchema = buildUserSchema({ fields: userFields, authMethods: resolvedMethod });
+  const userSchema = buildUserSchema(resolvedMethod, userFields);
   const schemaValidation = validateJsonSchema(userSchema);
   if (!schemaValidation.valid) {
     throw new ZitadelError("E_VALIDATION", "Generated user schema is invalid", {

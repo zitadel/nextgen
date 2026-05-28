@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { AUTH_METHODS, buildFlow } from "../../../../src/lib/flows";
-import { buildPasskeyFlow } from "../../../../src/lib/flows/passkey";
-import { buildPasswordFlow } from "../../../../src/lib/flows/password";
+import { buildPasskeyFlow, buildPasswordFlow } from "../../../../src/lib/flows/methods";
 
 describe("AUTH_METHODS", () => {
   it("lists exactly passkey and password, in that order", () => {

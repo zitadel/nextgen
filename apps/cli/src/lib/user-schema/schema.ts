@@ -4,13 +4,13 @@ import { z } from "zod";
  * One entry in a user schema's `x-auth-methods` map: whether the method
  * is enabled and its display order.
  */
-export const authMethodSchema = z.object({
+const authMethodSchema = z.object({
   enabled: z.boolean(),
   position: z.number().int().nonnegative(),
 });
 
 /** The `x-auth-methods` map — method name → {@link authMethodSchema}. */
-export const authMethodsSchema = z.record(z.string(), authMethodSchema);
+const authMethodsSchema = z.record(z.string(), authMethodSchema);
 
 /** Parsed `x-auth-methods` value. */
 export type AuthMethods = z.infer<typeof authMethodsSchema>;

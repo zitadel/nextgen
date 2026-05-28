@@ -3,6 +3,14 @@
  * imports from here (not from individual files) so the package
  * boundary stays observable.
  *
+ * **Layout mirrors `lib/user-schema/` file-for-file:** `schema.ts` is
+ * the shape + vocabulary, `build.ts` is the builder (`buildFlow`,
+ * paralleling `buildUserSchema`, same `(method, fields)` signature),
+ * `validate.ts` holds validation, and `methods.ts` is the per-method
+ * catalog the builder dispatches into — the counterpart of
+ * `user-schema`'s `presets.ts`. `methods.ts` is internal; only
+ * `build.ts` consumes it.
+ *
  * **Dependency rule.** This module has no upward dependencies (it
  * never imports from `commands/`, `sync/`, `platform/`, etc.) and no
  * filesystem code. It depends sideways only on shared utilities under
@@ -15,10 +23,9 @@
  * rule: sideways onto `lib/<utility>/` is fine; upward into app code
  * is not.
  */
-export type { FlowDefinition } from "./schema";
+export type { AuthMethod, FlowDefinition } from "./schema";
 export { flowDefinitionSchema } from "./schema";
-export type { AuthMethod } from "./types";
-export { AUTH_METHODS, buildFlow } from "./registry";
+export { AUTH_METHODS, buildFlow } from "./build";
 export { validateFlows } from "./validate";
 
 /**
