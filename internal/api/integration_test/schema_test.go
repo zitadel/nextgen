@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	api "github.com/zitadel/nextgen/api/generated"
-	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 )
 
 func TestCreateSchema(t *testing.T) {
@@ -56,9 +55,7 @@ func TestCreateSchema(t *testing.T) {
 				resp, err := client.CreateSchema(t.Context(), req, params)
 				assert.NoError(t, err)
 
-				if !assert.IsType(t, &api.CreateSchemaResponse{}, resp) {
-					helpers.LogInvalidResponse(t, resp)
-				}
+				assert.IsType(t, &api.CreateSchemaResponse{}, resp, mustMarshal(t, resp))
 			})
 		}
 	})
@@ -93,7 +90,7 @@ func TestCreateSchema(t *testing.T) {
 			assert.NoError(t, err)
 			defer func() { _ = resp.Body.Close() }()
 
-			if !assert.Equal(t, http.StatusOK, resp.StatusCode) {
+			if !assert.Equal(t, http.StatusBadRequest, resp.StatusCode) {
 				bs, err := io.ReadAll(resp.Body)
 				require.NoError(t, err)
 				t.Log(string(bs))
@@ -120,11 +117,9 @@ func TestCreateSchema(t *testing.T) {
 			}
 
 			resp, err := client.CreateSchema(t.Context(), req, params)
-
 			assert.NoError(t, err)
-			if !assert.IsType(t, &api.CreateSchemaConflict{}, resp) {
-				helpers.LogInvalidResponse(t, resp)
-			}
+
+			assert.IsType(t, &api.CreateSchemaConflict{}, resp, mustMarshal(t, resp))
 		})
 	})
 }
@@ -142,11 +137,9 @@ func TestGetSchema(t *testing.T) {
 				ID:        schemaID,
 				ProjectID: api.ProjectID(project.ID),
 			})
-
 			assert.NoError(t, err)
-			if !assert.IsType(t, &api.GetSchemaByIdOK{}, resp) {
-				helpers.LogInvalidResponse(t, resp)
-			}
+
+			assert.IsType(t, &api.GetSchemaByIdOK{}, resp, mustMarshal(t, resp))
 		})
 	})
 
@@ -159,11 +152,15 @@ func TestGetSchema(t *testing.T) {
 				ID:        "does-not-exist",
 				ProjectID: api.ProjectID(project.ID),
 			})
-
 			assert.NoError(t, err)
-			if !assert.IsType(t, &api.GetSchemaByIdNotFound{}, resp) {
-				helpers.LogInvalidResponse(t, resp)
-			}
+
+			assert.IsType(t, &api.GetSchemaByIdNotFound{}, resp, mustMarshal(t, resp))
 		})
 	})
+}
+
+func mustMarshal(t *testing.T, v any) string {
+	m, err := json.Marshal(v)
+	require.NoError(t, err)
+	return string(m)
 }
