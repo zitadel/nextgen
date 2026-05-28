@@ -6,7 +6,6 @@ import (
 	"errors"
 
 	"github.com/ianlancetaylor/jsonschema"
-	"github.com/jackc/pgx/v5"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
@@ -16,7 +15,6 @@ import (
 type CreateUserInput struct {
 	ProjectID string
 	TeamID    *string
-	SchemaUrl string
 	User      map[string]any
 }
 
@@ -47,12 +45,12 @@ func NewUserService(
 }
 
 func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (map[string]any, error) {
-	tx, txErr := s.pool.Begin(ctx, nil)
-	if txErr != nil {
-		return nil, domain.ErrInternal(txErr).WithMessage("failed to create transaction")
+	tx, err := s.pool.Begin(ctx, nil)
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to create transaction")
 	}
 	defer func() {
-		if txErr != nil {
+		if err != nil {
 			_ = tx.Rollback(ctx)
 		}
 	}()
@@ -71,7 +69,7 @@ func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (ma
 
 	schemaEntity, err := s.schemaRepo.GetByID(ctx, tx, input.ProjectID, strSchemaURL)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil, domain.ErrUserInvalid().WithDetails("$schema no known to the system. First create a schema, then create users.")
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to get schema from database")

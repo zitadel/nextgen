@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"encoding/json"
-	"errors"
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/crypto"
@@ -73,7 +72,3 @@ func convertUsingJson[T any](source any) (*T, error) {
 	err = json.Unmarshal(bs, target)
 	return target, err
 }
-
-// ------------------ Errors ---------------
-
-var NoProjectError = errors.New("a project must be provided")

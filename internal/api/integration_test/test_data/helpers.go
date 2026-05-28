@@ -3,12 +3,11 @@ package test_data
 import (
 	_ "embed"
 	"encoding/json"
+	"math/rand/v2"
 	"testing"
-	"time"
 
 	"github.com/go-faker/faker/v4"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/exp/rand"
 )
 
 //go:embed create-schema-request-user-schema.json
@@ -49,9 +48,7 @@ type Users struct {
 	CreateUserRequest string
 }
 
-type DataGenerator struct {
-	CreateUserRequest string
-}
+type DataGenerator struct{}
 
 // GenerateUser generates a user according to the [createSchemaRequestUserSchema]
 func (g *DataGenerator) GenerateUser(t *testing.T) []byte {
@@ -70,7 +67,7 @@ func (g *DataGenerator) GenerateUser(t *testing.T) []byte {
 		addr := faker.GetRealAddress()
 		u["address"] = map[string]any{
 			"street":      addr.Address,
-			"houseNumber": rand.Intn(100) + 1,
+			"houseNumber": rand.IntN(100) + 1,
 			"city":        addr.City,
 			"postalCode":  addr.PostalCode,
 			"country":     faker.GetCountryInfo().Name,
@@ -83,6 +80,5 @@ func (g *DataGenerator) GenerateUser(t *testing.T) []byte {
 }
 
 func randBool() bool {
-	rand.Seed(uint64(time.Now().UnixNano()))
-	return rand.Intn(2) == 1
+	return rand.IntN(2) == 1
 }

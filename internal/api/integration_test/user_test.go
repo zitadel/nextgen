@@ -63,7 +63,6 @@ func TestGetUser(t *testing.T) {
 		user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
 			ProjectID: project.ID,
 			TeamID:    &team.ID,
-			SchemaUrl: "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml",
 			User:      *helpers.MustUnmarshal[map[string]any](t, userBs),
 		})
 
