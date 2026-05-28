@@ -65,6 +65,6 @@ func (h *Harness) EnsureCrypter(t *testing.T) crypto.Crypter {
 func (h *Harness) EnsureEncrypter(t *testing.T) crypto.Encrypter {
 	return h.EnsureCrypter(t)
 }
-func (h *Harness) EnsureDecrypter(t *testing.T) crypto.Encrypter {
+func (h *Harness) EnsureDecrypter(t *testing.T) crypto.Decrypter {
 	return h.EnsureCrypter(t)
 }
