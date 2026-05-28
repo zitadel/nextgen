@@ -11,7 +11,10 @@ const legacyPatterns = [
   /\bplatform_user\b/i,
   /\bzp_/i,
   /\bzpp_/i,
-  /\/v1\b/i,
+  // Legacy API path prefix (e.g. `/v1/users`). Requires the trailing slash so
+  // it targets real paths, not unrelated `v1` version tags in generated docs
+  // (the README embeds oclif plugin `_See code:` links like `blob/v1.2.50`).
+  /\/v1\//i,
 ];
 
 describe("public vocabulary", () => {

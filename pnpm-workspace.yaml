@@ -26,6 +26,7 @@ catalog:
   '@oclif/plugin-version': ^2.2.46
   '@oclif/plugin-warn-if-update-available': ^3.1.65
   '@oclif/plugin-which': ^3.2.55
+  oclif: ^4.17.46
   "@playwright/test": ^1.59.1
   "@tailwindcss/vite": ^4.2.4
   "@tanstack/devtools-vite": ^0.6.0
