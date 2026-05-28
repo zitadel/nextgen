@@ -56,9 +56,8 @@ export async function resolveServer(input: ResolveServerInput): Promise<Resolved
     if (envBranch) {
       return validate({ value: envBranch, origin: "config-env" });
     }
-    const top = readTopServer(config);
-    if (top) {
-      return validate({ value: top, origin: "config-top" });
+    if (typeof config.server === "string") {
+      return validate({ value: config.server, origin: "config-top" });
     }
   }
 
@@ -118,8 +117,4 @@ function readEnvServer(
     return undefined;
   }
   return typeof branch.server === "string" ? branch.server : undefined;
-}
-
-function readTopServer(config: Record<string, unknown>): string | undefined {
-  return typeof config.server === "string" ? config.server : undefined;
 }

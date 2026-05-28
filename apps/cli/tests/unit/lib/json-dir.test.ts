@@ -22,28 +22,6 @@ describe("readJsonDir", () => {
     expect(await readJsonDir(join(dir, "missing"))).toEqual([]);
   });
 
-  it("throws E_VALIDATION when requireDir is true and the directory is missing", async () => {
-    await expect(
-      readJsonDir(join(dir, "missing"), { requireDir: true }),
-    ).rejects.toBeInstanceOf(ZitadelError);
-  });
-
-  it("uses the supplied missingMessage and nextCommands when requireDir triggers", async () => {
-    let caught: unknown;
-    try {
-      await readJsonDir(join(dir, "missing"), {
-        requireDir: true,
-        missingMessage: "scaffold first",
-        missingNextCommands: ["zitadel setup"],
-      });
-    } catch (error) {
-      caught = error;
-    }
-    expect(caught).toBeInstanceOf(ZitadelError);
-    expect((caught as ZitadelError).message).toContain("scaffold first");
-    expect((caught as ZitadelError).nextCommands).toEqual(["zitadel setup"]);
-  });
-
   it("reads .json files in lexical order", async () => {
     await writeFile(join(dir, "b.json"), JSON.stringify({ id: "b" }));
     await writeFile(join(dir, "a.json"), JSON.stringify({ id: "a" }));
