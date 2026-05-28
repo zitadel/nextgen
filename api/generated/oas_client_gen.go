@@ -2273,11 +2273,8 @@ func (c *Client) sendExchangeHandoff(ctx context.Context, request *ExchangeReque
 		}
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if val, ok := params.ProjectID.Get(); ok {
-				if unwrapped := string(val); true {
-					return e.EncodeValue(conv.StringToString(unwrapped))
-				}
-				return nil
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
 			}
 			return nil
 		}); err != nil {
@@ -3573,11 +3570,8 @@ func (c *Client) sendGetSession(ctx context.Context, params GetSessionParams) (r
 		}
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if val, ok := params.ProjectID.Get(); ok {
-				if unwrapped := string(val); true {
-					return e.EncodeValue(conv.StringToString(unwrapped))
-				}
-				return nil
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
 			}
 			return nil
 		}); err != nil {
@@ -4982,11 +4976,8 @@ func (c *Client) sendRevokeSession(ctx context.Context, params RevokeSessionPara
 		}
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if val, ok := params.ProjectID.Get(); ok {
-				if unwrapped := string(val); true {
-					return e.EncodeValue(conv.StringToString(unwrapped))
-				}
-				return nil
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
 			}
 			return nil
 		}); err != nil {

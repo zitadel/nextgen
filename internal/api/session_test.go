@@ -66,17 +66,17 @@ func TestExchangeInputFromRequest(t *testing.T) {
 	t.Run("maps duration ttl", func(t *testing.T) {
 		key := "idem-1"
 		input, err := exchangeInputFromRequest(
-			"proj-1",
 			&api.ExchangeRequest{
 				HandoffToken: "token-1",
 				TTL:          api.NewOptDuration(ogenx.ISODuration(2 * time.Hour)),
 			},
 			api.ExchangeHandoffParams{
+				ProjectID:      "proj-1",
 				IdempotencyKey: api.NewOptString(key),
 			},
 		)
 		require.NoError(t, err)
-		require.Equal(t, "proj-1", input.ProjectID)
+		require.EqualValues(t, "proj-1", input.ProjectID)
 		require.Equal(t, "token-1", input.HandoffToken)
 		require.NotNil(t, input.TTL)
 		require.Equal(t, 2*time.Hour, *input.TTL)
@@ -86,11 +86,12 @@ func TestExchangeInputFromRequest(t *testing.T) {
 
 	t.Run("omitted ttl remains nil", func(t *testing.T) {
 		input, err := exchangeInputFromRequest(
-			"proj-1",
 			&api.ExchangeRequest{
 				HandoffToken: "token-1",
 			},
-			api.ExchangeHandoffParams{},
+			api.ExchangeHandoffParams{
+				ProjectID: "proj-1",
+			},
 		)
 		require.NoError(t, err)
 		require.Nil(t, input.TTL)
