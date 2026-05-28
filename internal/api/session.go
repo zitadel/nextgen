@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"fmt"
-	"math"
 	"net/http"
 	"time"
 
@@ -33,30 +32,26 @@ func (h Handler) CreateSession(ctx context.Context, req *api.CreateSessionReques
 
 func (h Handler) ExchangeHandoff(ctx context.Context, req *api.ExchangeRequest, params api.ExchangeHandoffParams) (api.ExchangeHandoffRes, error) {
 	scopeCtx, _ := GetScopeContext(ctx)
-
-	input := service.ExchangeInput{
-		ProjectID:    scopeCtx.ProjectID,
-		HandoffToken: req.HandoffToken,
-	}
-	if key, ok := params.IdempotencyKey.Get(); ok {
-		input.IdempotencyKey = new(key)
-	}
-	if ttlSeconds, ok := req.TTLSeconds.Get(); ok {
-		maxTTLSeconds := int64(math.MaxInt64 / int64(time.Second))
-		if ttlSeconds > maxTTLSeconds {
-			return nil, domain.ErrSessionInvalidTTL().WithDetails(map[string]any{
-				"ttl_seconds": ttlSeconds,
-				"max_ttl":     time.Duration(math.MaxInt64),
-			})
-		}
-		ttl := time.Duration(ttlSeconds) * time.Second
-		input.TTL = &ttl
-	}
+	input := exchangeInputFromRequest(scopeCtx.ProjectID, req, params)
 	session, err := h.sessionService.Exchange(ctx, input)
 	if err != nil {
 		return nil, err
 	}
 	return sessionWithTokenToAPI(session, h.sealer)
+}
+
+func exchangeInputFromRequest(projectID string, req *api.ExchangeRequest, params api.ExchangeHandoffParams) service.ExchangeInput {
+	input := service.ExchangeInput{
+		ProjectID:    projectID,
+		HandoffToken: req.HandoffToken,
+	}
+	if key, ok := params.IdempotencyKey.Get(); ok {
+		input.IdempotencyKey = new(key)
+	}
+	if ttl, ok := req.TTL.Get(); ok {
+		input.TTL = &ttl
+	}
+	return input
 }
 
 func (h Handler) GetSession(ctx context.Context, params api.GetSessionParams) (api.GetSessionRes, error) {

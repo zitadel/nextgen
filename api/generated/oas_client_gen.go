@@ -2115,15 +2115,6 @@ func (c *Client) ExchangeHandoff(ctx context.Context, request *ExchangeRequest, 
 }
 
 func (c *Client) sendExchangeHandoff(ctx context.Context, request *ExchangeRequest, params ExchangeHandoffParams) (res ExchangeHandoffRes, err error) {
-	// Validate request before sending.
-	if err := func() error {
-		if err := request.Validate(); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return res, errors.Wrap(err, "validate")
-	}
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("exchangeHandoff"),
 		semconv.HTTPRequestMethodKey.String("POST"),

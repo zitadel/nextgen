@@ -4984,16 +4984,16 @@ func (s *ExchangeRequest) encodeFields(e *jx.Encoder) {
 		e.Str(s.HandoffToken)
 	}
 	{
-		if s.TTLSeconds.Set {
-			e.FieldStart("ttl_seconds")
-			s.TTLSeconds.Encode(e)
+		if s.TTL.Set {
+			e.FieldStart("ttl")
+			s.TTL.Encode(e)
 		}
 	}
 }
 
 var jsonFieldsNameOfExchangeRequest = [2]string{
 	0: "handoff_token",
-	1: "ttl_seconds",
+	1: "ttl",
 }
 
 // Decode decodes ExchangeRequest from json.
@@ -5017,15 +5017,15 @@ func (s *ExchangeRequest) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"handoff_token\"")
 			}
-		case "ttl_seconds":
+		case "ttl":
 			if err := func() error {
-				s.TTLSeconds.Reset()
-				if err := s.TTLSeconds.Decode(d); err != nil {
+				s.TTL.Reset()
+				if err := s.TTL.Decode(d); err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"ttl_seconds\"")
+				return errors.Wrap(err, "decode field \"ttl\"")
 			}
 		default:
 			return d.Skip()
@@ -13728,6 +13728,41 @@ func (s *OptDateTime) UnmarshalJSON(data []byte) error {
 	return s.Decode(d, json.DecodeDateTime)
 }
 
+// Encode encodes time.Duration as json.
+func (o OptDuration) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	json.EncodeDuration(e, o.Value)
+}
+
+// Decode decodes time.Duration from json.
+func (o *OptDuration) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptDuration to nil")
+	}
+	o.Set = true
+	v, err := json.DecodeDuration(d)
+	if err != nil {
+		return err
+	}
+	o.Value = v
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptDuration) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptDuration) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes ErrorDetailsDetails as json.
 func (o OptErrorDetailsDetails) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -14430,41 +14465,6 @@ func (s OptInt) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *OptInt) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes int64 as json.
-func (o OptInt64) Encode(e *jx.Encoder) {
-	if !o.Set {
-		return
-	}
-	e.Int64(int64(o.Value))
-}
-
-// Decode decodes int64 from json.
-func (o *OptInt64) Decode(d *jx.Decoder) error {
-	if o == nil {
-		return errors.New("invalid: unable to decode OptInt64 to nil")
-	}
-	o.Set = true
-	v, err := d.Int64()
-	if err != nil {
-		return err
-	}
-	o.Value = int64(v)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s OptInt64) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *OptInt64) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
