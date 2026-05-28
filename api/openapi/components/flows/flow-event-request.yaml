@@ -1,8 +1,9 @@
 type: object
-required: [session_token, type]
+required: [type]
 properties:
   session_token:
     type: string
+    description: Reserved for future rotation. The sealed `_zflow` cookie carries the flow state today.
   type:
     type: string
     enum: [fingerprint, telemetry]

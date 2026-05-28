@@ -17,11 +17,11 @@ import (
 	"github.com/ianlancetaylor/jsonschema"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/zitadel/oidc/v3/pkg/op"
 
 	oasapi "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/bootstrap/users"
-	"github.com/zitadel/nextgen/internal/cookie"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/domain/idgen"
@@ -82,7 +82,7 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 		}
 	}()
 
-	sealer, err := buildCookieSealer(cfg.Server.CookieSealerKey)
+	crypter, err := buildCrypter(cfg.Server.EncryptionKey)
 	if err != nil {
 		return err
 	}
@@ -105,6 +105,7 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 	flowDefinitionRepo := repository.NewFlowDefinitionRepository(pool)
 	attemptRepo := repository.NewAuthAttemptRepository(pool)
 	schemaRepo := repository.NewJSONSchemaRepository(pool)
+	teamRepo := repository.NewTeamRepository(pool)
 
 	// ── Schema Stuff ─────────────────
 	schemaCache, err := lru.New2Q[string, *jsonschema.Schema](cfg.Schema.LRUCacheSize)
@@ -128,7 +129,6 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 	}
 
 	// ── Services ─────────────────────
-	flowService := service.NewFlowService(pool, flowDefinitionRepo)
 	authAttemptSvc := service.NewAuthAttemptService(
 		pool,
 		attemptRepo,
@@ -139,7 +139,10 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 		userPasskeyRepo,
 		passwordHasher,
 	)
-	sessionService := service.NewSessionService(pool, sessionRepo)
+	sessionService := service.NewSessionService(pool, sessionRepo, service.SessionConfig{
+		DefaultTTL: cfg.Session.DefaultTTL,
+		MaxTTL:     cfg.Session.MaxTTL,
+	})
 	projectService := service.NewProjectService(pool, projectRepo, idgen.NewULID())
 	schemaService := service.NewSchemaService(pool, schemaRepo, schemaResolverWithHTTP, schemaValidator)
 	flowDefinitionSvc := service.NewFlowDefinitionService(
@@ -149,6 +152,15 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 		nil,
 		flowDefinitionRepo,
 	)
+	teamService := service.NewTeamService(pool, teamRepo)
+
+	// ── Flow engine ──────────────────
+	ids := idgen.NewULID()
+	fields := domain.NewSchemaFieldResolver(storageSchemaResolver)
+	flowAuth := service.NewFlowAuthAttemptAdapter(authAttemptSvc)
+	stateMachine := domain.NewFlowStateMachine(fields, nil, flowAuth, time.Now)
+
+	flowService := service.NewFlowService(pool, flowDefinitionRepo, stateMachine, ids)
 
 	// ── HTTP Server ─────────────────
 
@@ -156,7 +168,7 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 	defer stop()
 
 	oasServer, err := oasapi.NewServer(
-		api.NewHandler(sealer, flowService, authAttemptSvc, sessionService, projectService, schemaService, flowDefinitionSvc),
+		api.NewHandler(crypter, flowService, authAttemptSvc, sessionService, projectService, schemaService, flowDefinitionSvc, teamService),
 		api.NewSecurityHandler(),
 		oasapi.WithErrorHandler(api.OgenErrorHandler))
 	if err != nil {
@@ -208,6 +220,8 @@ func loadConfig(configPath string) (Config, error) {
 	})
 	v.SetDefault("schema.lru_cache_size", 1000)                                   // todo: temp, review
 	v.SetDefault("schema.builtin_public_base", "https://nextgen.com/api/schemas") // todo: temp, review
+	v.SetDefault("session.default_ttl", domain.SessionAnonymousTTL)
+	v.SetDefault("session.max_ttl", 720*time.Hour)
 
 	// AutomaticEnv only resolves nested keys viper already knows about
 	// (via default, config file, fields of config struct or explicit BindEnv).
@@ -237,7 +251,7 @@ func loadConfig(configPath string) (Config, error) {
 		return Config{}, fmt.Errorf("decode config: %w", err)
 	}
 
-	return cfg, nil
+	return cfg, cfg.Validate()
 }
 
 // mustBindEnv panics on viper's documented "this can't fail in
@@ -249,25 +263,20 @@ func mustBindEnv(v *viper.Viper, key string) {
 	}
 }
 
-// buildCookieSealer decodes a hex-encoded sealer key and constructs
-// the [cookie.Sealer]. The key must be exactly [cookie.KeySize] bytes
-// after decoding; anything else is a configuration error.
-func buildCookieSealer(hexKey string) (*cookie.Sealer, error) {
+// buildCrypter decodes a hex-encoded crypter key and constructs a
+// [crypto.Crypter]. The key must decode to exactly 32 bytes;
+// anything else is a configuration error.
+func buildCrypter(hexKey string) (crypto.Crypter, error) {
 	if hexKey == "" {
-		return nil, errors.New("server: cookie_sealer_key is required (set NEXTGEN_SERVER_COOKIE_SEALER_KEY)")
+		return nil, errors.New("server: encryption_key is required (set NEXTGEN_SERVER_ENCRYPTION_KEY)")
 	}
-	raw, err := hex.DecodeString(hexKey)
+	key, err := hex.DecodeString(hexKey)
 	if err != nil {
-		return nil, fmt.Errorf("server: decode cookie_sealer_key: %w", err)
+		return nil, fmt.Errorf("server: decode encryption_key: %w", err)
 	}
-	if len(raw) != cookie.KeySize {
-		return nil, fmt.Errorf("server: cookie_sealer_key must decode to %d bytes, got %d", cookie.KeySize, len(raw))
+	if len(key) != 32 {
+		return nil, fmt.Errorf("server: encryption_key must decode to %d bytes, got %d", 32, len(key))
 	}
-	var key cookie.Key
-	copy(key[:], raw)
-	sealer, err := cookie.NewSealer(key)
-	if err != nil {
-		return nil, fmt.Errorf("server: build cookie sealer: %w", err)
-	}
-	return sealer, nil
+	crypter := op.NewAES256GCMCrypto([32]byte(key), "")
+	return crypter, nil
 }

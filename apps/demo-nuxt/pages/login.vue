@@ -11,7 +11,7 @@
     <ClientOnly>
       <zitadel-login
         api-base="/__nextgen"
-        project-id="demo"
+        :project-id="projectId"
         post-sign-in-url="/admin"
       />
     </ClientOnly>
@@ -20,6 +20,8 @@
 
 <script setup lang="ts">
 import type { ClientAuthResult } from "@zitadel-nextgen/sdk-nuxt";
+
+const { public: { zitadelProjectId: projectId } } = useRuntimeConfig();
 
 const auth = useState<ClientAuthResult>("nextgen-auth");
 if (auth.value?.isAuthenticated) {

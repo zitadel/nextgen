@@ -131,6 +131,15 @@ func (UnimplementedHandler) CreateSession(ctx context.Context, req *CreateSessio
 	return r, ht.ErrNotImplemented
 }
 
+// CreateTeam implements createTeam operation.
+//
+// Create team.
+//
+// POST /teams
+func (UnimplementedHandler) CreateTeam(ctx context.Context, req *CreateTeamRequest, params CreateTeamParams) (r CreateTeamRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // DeleteFlowDefinition implements deleteFlowDefinition operation.
 //
 // Delete a flow definition by id.
@@ -289,6 +298,15 @@ func (UnimplementedHandler) GetSchemaById(ctx context.Context, params GetSchemaB
 //
 // GET /sessions/{session_id}
 func (UnimplementedHandler) GetSession(ctx context.Context, params GetSessionParams) (r GetSessionRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// GetTeam implements getTeam operation.
+//
+// Returns the current state of a team.
+//
+// GET /teams/{team_id}
+func (UnimplementedHandler) GetTeam(ctx context.Context, params GetTeamParams) (r GetTeamRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

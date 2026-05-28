@@ -13,7 +13,7 @@ import (
 
 type sessionRepoStub struct {
 	createFunc   func(context.Context, database.QueryExecutor, *domain.Session) error
-	exchangeFunc func(context.Context, database.QueryExecutor, string, string, *string) (*domain.Session, error)
+	exchangeFunc func(context.Context, database.QueryExecutor, string, string, *string, time.Duration) (*domain.Session, error)
 	getFunc      func(context.Context, database.QueryExecutor, string, string) (*domain.Session, error)
 }
 
@@ -28,7 +28,7 @@ func (s *sessionRepoStub) Exchange(ctx context.Context, q database.QueryExecutor
 	if s.exchangeFunc == nil {
 		panic("unexpected Exchange call")
 	}
-	return s.exchangeFunc(ctx, q, projectID, handoffToken, idempotencyKey)
+	return s.exchangeFunc(ctx, q, projectID, handoffToken, idempotencyKey, ttl)
 }
 
 func (s *sessionRepoStub) Get(ctx context.Context, q database.QueryExecutor, projectID, sessionID string) (*domain.Session, error) {
@@ -44,6 +44,10 @@ func (s *sessionRepoStub) List(context.Context, database.QueryExecutor, string) 
 
 func (s *sessionRepoStub) Delete(context.Context, database.QueryExecutor, string, string) error {
 	panic("unexpected Delete call")
+}
+
+func sessionConfigForTest() service.SessionConfig {
+	return service.SessionConfig{DefaultTTL: time.Hour, MaxTTL: 24 * time.Hour}
 }
 
 func TestSessionService_Create(t *testing.T) {
@@ -100,7 +104,7 @@ func TestSessionService_Create(t *testing.T) {
 				},
 			}
 
-			got, err := service.NewSessionService(stubPool(), repo).Create(t.Context(), tt.input)
+			got, err := service.NewSessionService(stubPool(), repo, sessionConfigForTest()).Create(t.Context(), tt.input)
 			if tt.wantErr != nil {
 				assertSessionResult(t, "Create", got, err, nil, tt.wantErr)
 				return
@@ -119,26 +123,61 @@ func TestSessionService_Create(t *testing.T) {
 }
 
 func TestSessionService_Exchange(t *testing.T) {
+	cfg := sessionConfigForTest()
 	idempotencyKey := "retry-1"
 	exchangedSession := &domain.Session{ProjectID: "proj", ID: "sess"}
+	overrideTTL := 2 * time.Hour
+	invalidZero := time.Duration(0)
+	invalidAboveMax := cfg.MaxTTL + time.Second
 
 	for _, tt := range []struct {
 		name       string
 		input      service.ExchangeInput
+		wantTTL    time.Duration
 		repoResult *domain.Session
 		repoErr    error
 		want       *domain.Session
 		wantErr    error
 	}{
 		{
-			name: "returns exchanged session",
+			name: "returns exchanged session with default ttl",
 			input: service.ExchangeInput{
 				ProjectID:      "proj",
 				HandoffToken:   "handoff-token",
 				IdempotencyKey: &idempotencyKey,
 			},
+			wantTTL:    cfg.DefaultTTL,
 			repoResult: exchangedSession,
 			want:       exchangedSession,
+		},
+		{
+			name: "passes explicit ttl",
+			input: service.ExchangeInput{
+				ProjectID:    "proj",
+				HandoffToken: "handoff-token",
+				TTL:          &overrideTTL,
+			},
+			wantTTL:    overrideTTL,
+			repoResult: exchangedSession,
+			want:       exchangedSession,
+		},
+		{
+			name: "rejects zero ttl",
+			input: service.ExchangeInput{
+				ProjectID:    "proj",
+				HandoffToken: "handoff-token",
+				TTL:          &invalidZero,
+			},
+			wantErr: domain.ErrSessionInvalidTTL(),
+		},
+		{
+			name: "rejects ttl above max",
+			input: service.ExchangeInput{
+				ProjectID:    "proj",
+				HandoffToken: "handoff-token",
+				TTL:          &invalidAboveMax,
+			},
+			wantErr: domain.ErrSessionInvalidTTL(),
 		},
 		{
 			name: "passes through invalid handoff token",
@@ -170,7 +209,7 @@ func TestSessionService_Exchange(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			repo := &sessionRepoStub{
-				exchangeFunc: func(_ context.Context, q database.QueryExecutor, projectID, handoffToken string, gotIdempotencyKey *string) (*domain.Session, error) {
+				exchangeFunc: func(_ context.Context, q database.QueryExecutor, projectID, handoffToken string, gotIdempotencyKey *string, gotTTL time.Duration) (*domain.Session, error) {
 					if q != stubPool() {
 						t.Fatalf("Exchange q = %v, want service pool", q)
 					}
@@ -183,11 +222,14 @@ func TestSessionService_Exchange(t *testing.T) {
 					if gotIdempotencyKey != tt.input.IdempotencyKey {
 						t.Fatalf("Exchange idempotencyKey = %p, want %p", gotIdempotencyKey, tt.input.IdempotencyKey)
 					}
+					if tt.wantErr == nil && gotTTL != tt.wantTTL {
+						t.Fatalf("Exchange ttl = %v, want %v", gotTTL, tt.wantTTL)
+					}
 					return tt.repoResult, tt.repoErr
 				},
 			}
 
-			got, err := service.NewSessionService(stubPool(), repo).Exchange(t.Context(), tt.input)
+			got, err := service.NewSessionService(stubPool(), repo, cfg).Exchange(t.Context(), tt.input)
 			assertSessionResult(t, "Exchange", got, err, tt.want, tt.wantErr)
 		})
 	}
@@ -248,7 +290,7 @@ func TestSessionService_Get(t *testing.T) {
 				},
 			}
 
-			got, err := service.NewSessionService(stubPool(), repo).Get(t.Context(), tt.input)
+			got, err := service.NewSessionService(stubPool(), repo, sessionConfigForTest()).Get(t.Context(), tt.input)
 			assertSessionResult(t, "Get", got, err, tt.want, tt.wantErr)
 		})
 	}
