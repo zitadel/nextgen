@@ -1,8 +1,8 @@
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import {
-  endSession,
-  getEndSessionUrl,
+  getRevokeMySessionUrl,
+  revokeMySession,
 } from "@zitadel-nextgen/api/generated/endpoints/zitadelNextGen";
 import { setApiBaseUrl } from "@zitadel-nextgen/api/runtime/base-url";
 
@@ -29,8 +29,8 @@ const DISPLAY_COOKIE_NAME = "__nextgen_display";
  * Reads the user's display name + email from the `__nextgen_display` cookie
  * (set by the auth backend on sign-in), renders an avatar trigger with a
  * dropdown that exposes a "Sign out" action, and calls the typed
- * `endSession` operation in `@zitadel-nextgen/api`
- * (`GET /auth/end-session`). The server clears the session cookie via
+ * `revokeMySession` operation in `@zitadel-nextgen/api`
+ * (`DELETE /sessions/me`). The server clears the session cookie via
  * `Set-Cookie: Max-Age=0`; on success the element fires `zitadel-signout`
  * and optionally navigates to `post-sign-out-url`.
  *
@@ -193,20 +193,12 @@ export class ZitadelLogout extends LitElement {
    * Base URL (or path prefix) for all API calls, e.g. `"/__nextgen"` when
    * the SDK is proxied through the app server. Equivalent to calling
    * `setApiBaseUrl()` from `@zitadel-nextgen/api`. Must be set before the
-   * component connects so the first `endSession` call uses the right origin.
+   * component connects so the first `revokeMySession` call uses the right origin.
    */
   @property({ type: String, attribute: "api-base" }) accessor apiBase = "";
 
   /** URL to navigate to after a successful sign-out. */
   @property({ type: String, attribute: "post-sign-out-url" }) accessor postSignOutUrl = "";
-
-  /**
-   * OIDC `client_id` to forward as a query parameter on the end-session
-   * request, mirroring the standard end-session contract. Optional —
-   * leaving this empty is fine when the backend can resolve the client
-   * from the session cookie alone.
-   */
-  @property({ type: String, attribute: "client-id" }) accessor clientId = "";
 
   @state() private accessor displayName = "";
 
@@ -322,7 +314,7 @@ export class ZitadelLogout extends LitElement {
   }
 
   /**
-   * Calls the typed `endSession` operation (`GET /auth/end-session`) with
+   * Calls the typed `revokeMySession` operation (`DELETE /sessions/me`) with
    * `credentials: "include"`. The server clears the session cookie via
    * `Set-Cookie: Max-Age=0`; on success this element fires `zitadel-signout`
    * and optionally navigates to `postSignOutUrl`.
@@ -331,13 +323,8 @@ export class ZitadelLogout extends LitElement {
     this.loading = true;
     this.errorMessage = "";
 
-    const params = {
-      ...(this.clientId ? { client_id: this.clientId } : {}),
-      ...(this.postSignOutUrl ? { post_logout_redirect_uri: this.postSignOutUrl } : {}),
-    };
-
     try {
-      await endSession(params, { credentials: "include" });
+      await revokeMySession({ credentials: "include" });
     } catch (error) {
       const message = error instanceof Error ? error.message : "";
       this.errorMessage = message || "Sign-out failed. Please try again.";
@@ -363,17 +350,11 @@ export class ZitadelLogout extends LitElement {
   }
 
   /**
-   * Returns the absolute URL the end-session request will hit. Useful for
-   * test assertions and for consumers that prefer to navigate the browser
-   * directly (instead of fetching) so the OIDC session-end redirect is
-   * driven by the user agent.
+   * Returns the absolute URL the revoke-session request will hit. Useful for
+   * test assertions.
    */
-  getEndSessionUrl(): string {
-    const params = {
-      ...(this.clientId ? { client_id: this.clientId } : {}),
-      ...(this.postSignOutUrl ? { post_logout_redirect_uri: this.postSignOutUrl } : {}),
-    };
-    return getEndSessionUrl(params);
+  getLogoutUrl(): string {
+    return getRevokeMySessionUrl();
   }
 
   private handleSignOutClick(event: Event): void {

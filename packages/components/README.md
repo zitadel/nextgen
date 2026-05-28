@@ -193,7 +193,7 @@ Events: `zitadel-flow-input`, `zitadel-flow-action`, `zitadel-flow-step`,
 ### `<zitadel-logout>`
 
 Session menu / sign-out control for embedded apps. Reads the
-`__nextgen_display` cookie set during sign-in, calls `GET /auth/end-session`
+`__nextgen_display` cookie set during sign-in, calls `DELETE /sessions/me`
 through `api-base`, and clears the session. Uses the same token adoption as
 `<zitadel-login>` (`applyBaseTokens` + optional `font_url` when hosted on a
 page without global tokens).
@@ -202,7 +202,6 @@ page without global tokens).
 | --- | --- | --- |
 | `apiBase` / `api-base` | `string` | Proxied auth API prefix (e.g. `/__nextgen`) |
 | `postSignOutUrl` / `post-sign-out-url` | `string` | Navigate here after sign-out |
-| `clientId` / `client-id` | `string` | Optional OIDC client id forwarded to end-session |
 
 Supports a light-DOM `<template>` slot for a fully custom menu; default UI is
 the avatar trigger + dropdown.

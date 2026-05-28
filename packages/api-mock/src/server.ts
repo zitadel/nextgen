@@ -8,7 +8,7 @@
  *
  * Custom-only routes added on top:
  *   POST   /sessions/exchange     — exchange handoff_token for session cookie
- *   GET    /auth/end-session      — OIDC-style end-session, clears cookies
+ *   DELETE /sessions/me           — revoke current session, clears cookies
  *   GET    /.well-known/jwks.json — JWKS for JWT verification (dev convenience)
  *   GET    /auth/keys             — JWKS, spec-defined endpoint (operation `getKeys`)
  *
@@ -180,7 +180,7 @@ export function startMockServer(port: number): Server {
     },
   );
 
-  app.get("/auth/end-session", (_req: express.Request, res: express.Response) => {
+  app.delete("/sessions/me", (_req: express.Request, res: express.Response) => {
     res.setHeader("Set-Cookie", [
       `__nextgen_session=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
       `__nextgen_display=; Path=/; SameSite=Lax; Max-Age=0`,
