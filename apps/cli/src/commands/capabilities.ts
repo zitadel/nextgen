@@ -9,7 +9,6 @@ import {
   KNOWN_VERIFY_VALUES,
 } from "../schema/annotations";
 import { listNamedPresets } from "../schema/default";
-import { BANNED_ATTRIBUTE_PREFIX, BANNED_FILTERS, BANNED_TAGS } from "../templates/validate";
 import { COMMANDS } from "./registry";
 
 export const ENVELOPE_SCHEMA_VERSION = 1;
@@ -53,14 +52,8 @@ export async function runCapabilities(io: CliIO, opts: GlobalOptions): Promise<v
       resource_directories: [
         { kind: "schema", dir: ".zitadel/schemas" },
         { kind: "flow-definition", dir: ".zitadel/flows" },
-        { kind: "template", dir: ".zitadel/templates" },
       ],
       renderers: listRenderers(),
-      template_security: {
-        banned_filters: BANNED_FILTERS,
-        banned_tags: BANNED_TAGS,
-        banned_attribute_prefix: BANNED_ATTRIBUTE_PREFIX,
-      },
       schema_vocabulary: {
         field_annotations: KNOWN_FIELD_ANNOTATIONS,
         x_verify_values: KNOWN_VERIFY_VALUES,

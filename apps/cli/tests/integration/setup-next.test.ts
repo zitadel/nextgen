@@ -167,25 +167,6 @@ describe("Next setup integration", () => {
     expect(applyWithEnv.exitCode).toBe(0);
   });
 
-  it("applies successfully when liquid templates are present (templates are not synced)", async () => {
-    const cwd = await createNextProject();
-    await cli([
-      "setup",
-      "--cwd",
-      cwd,
-      "--non-interactive",
-      "--json",
-      "--skip-deploy-platform",
-    ]);
-    await mkdir(join(cwd, ".zitadel/templates"), { recursive: true });
-    await writeFile(join(cwd, ".zitadel/templates/bad.liquid"), "<div>{{ value | raw }}</div>\n");
-
-    const apply = await cli(["apply", "--cwd", cwd, "--json"]);
-    expect(apply.exitCode).toBe(0);
-    const envelope = parseJson(apply.stdout) as { status: string; data: { synced: boolean } };
-    expect(envelope.status).toBe("ok");
-    expect(envelope.data.synced).toBe(true);
-  });
 });
 
 async function createNextProject(): Promise<string> {
