@@ -26,6 +26,18 @@ jobs:
       - name: Run OpenAPI linting
         run: npx --yes @redocly/cli@1.34.5 lint api/openapi/openapi-spec.yaml --format=github-actions
 
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.2
+          run_install: false
+
+      - name: Install Node dependencies
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Sync embedded UI assets for Go embed
+        run: sh scripts/sync-embedded-ui-dist.sh all
+
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod

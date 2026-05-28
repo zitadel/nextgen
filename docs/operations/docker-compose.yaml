@@ -1,0 +1,40 @@
+services:
+  postgres:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: zitadel
+      POSTGRES_PASSWORD: zitadel
+      POSTGRES_DB: nextgen
+    volumes:
+      - nextgen-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zitadel -d nextgen"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  nextgen:
+    image: ${NEXTGEN_IMAGE:-ghcr.io/zitadel/nextgen:latest}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${NEXTGEN_PORT:-8080}:8080"
+    env_file:
+      - path: .env
+        required: true
+    environment:
+      NEXTGEN_SERVER_ADDRESS: ":8080"
+      NEXTGEN_DATABASE_POSTGRES: postgres://zitadel:zitadel@postgres:5432/nextgen?sslmode=disable
+    # Optional: mount bootstrap users (see examples/bootstrap-users/)
+    # volumes:
+    #   - ../../examples/bootstrap-users:/bootstrap:ro
+    # command:
+    #   - server
+    #   - --user-file
+    #   - /bootstrap/demo-admin.json
+
+volumes:
+  nextgen-data:

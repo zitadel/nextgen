@@ -26,6 +26,8 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/domain/idgen"
 	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/nextgen/internal/staticui/console"
+	"github.com/zitadel/nextgen/internal/staticui/login"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	_ "github.com/zitadel/nextgen/internal/storage/database/dialect/all"
 	"github.com/zitadel/nextgen/internal/storage/database/repository"
@@ -163,9 +165,14 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 		return fmt.Errorf("build api server: %w", err)
 	}
 
+	mux, err := buildHTTPMux(cfg.Server, oasServer)
+	if err != nil {
+		return err
+	}
+
 	httpServer := &http.Server{
 		Addr:              cfg.Server.Address,
-		Handler:           oasServer,
+		Handler:           mux,
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      30 * time.Second,
@@ -201,6 +208,10 @@ func loadConfig(configPath string) (Config, error) {
 	v.AutomaticEnv()
 
 	v.SetDefault("server.address", ":8080")
+	v.SetDefault("server.console_enabled", true)
+	v.SetDefault("server.console_path", "/ui/console")
+	v.SetDefault("server.login_enabled", true)
+	v.SetDefault("server.login_path", "/ui/login")
 	v.SetDefault("password_hasher.hasher.algorithm", crypto.HashNameBcrypt)
 	v.SetDefault("password_hasher.hasher.cost", 10)
 	v.SetDefault("password_hasher.limits", crypto.HashLimitsConfig{
@@ -252,6 +263,47 @@ func mustBindEnv(v *viper.Viper, key string) {
 // buildCookieSealer decodes a hex-encoded sealer key and constructs
 // the [cookie.Sealer]. The key must be exactly [cookie.KeySize] bytes
 // after decoding; anything else is a configuration error.
+func registerTrailingSlashRedirect(mux *http.ServeMux, prefix string) {
+	mux.HandleFunc(prefix, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != prefix {
+			http.NotFound(w, r)
+			return
+		}
+		http.Redirect(w, r, prefix+"/", http.StatusPermanentRedirect)
+	})
+}
+
+func buildHTTPMux(cfg ServerConfig, apiHandler http.Handler) (*http.ServeMux, error) {
+	mux := http.NewServeMux()
+
+	if cfg.LoginEnabled {
+		if err := login.ValidateDist(); err != nil {
+			return nil, err
+		}
+		loginHandler, err := login.Handler(cfg.LoginPath)
+		if err != nil {
+			return nil, fmt.Errorf("build login UI handler: %w", err)
+		}
+		mux.Handle(cfg.LoginPath+"/", loginHandler)
+		registerTrailingSlashRedirect(mux, cfg.LoginPath)
+	}
+
+	if cfg.ConsoleEnabled {
+		if err := console.ValidateDist(); err != nil {
+			return nil, err
+		}
+		consoleHandler, err := console.Handler(cfg.ConsolePath)
+		if err != nil {
+			return nil, fmt.Errorf("build console UI handler: %w", err)
+		}
+		mux.Handle(cfg.ConsolePath+"/", consoleHandler)
+		registerTrailingSlashRedirect(mux, cfg.ConsolePath)
+	}
+
+	mux.Handle("/", apiHandler)
+	return mux, nil
+}
+
 func buildCookieSealer(hexKey string) (*cookie.Sealer, error) {
 	if hexKey == "" {
 		return nil, errors.New("server: cookie_sealer_key is required (set NEXTGEN_SERVER_COOKIE_SEALER_KEY)")
