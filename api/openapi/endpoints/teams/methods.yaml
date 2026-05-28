@@ -24,12 +24,6 @@ post:
         application/json:
           schema:
             $ref: ../../components/error-details.yaml
-    '404':
-      description: The project could not be found
-      content:
-        application/json:
-          schema:
-            $ref: ../../components/error-details.yaml
     '429':
       description: |
         Too many requests, the client has sent too many requests in a given

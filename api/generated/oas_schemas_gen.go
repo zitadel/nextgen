@@ -1959,10 +1959,6 @@ type CreateTeamBadRequest ErrorDetails
 
 func (*CreateTeamBadRequest) createTeamRes() {}
 
-type CreateTeamNotFound ErrorDetails
-
-func (*CreateTeamNotFound) createTeamRes() {}
-
 // Ref: #
 type CreateTeamRequest struct{}
 
