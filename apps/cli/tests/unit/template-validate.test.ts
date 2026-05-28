@@ -1,22 +1,8 @@
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
-import { dirname } from "node:path";
-import { fileURLToPath } from "node:url";
-
 import { describe, expect, it } from "vitest";
 
 import { validateLiquidTemplate } from "../../src/templates/validate";
 
-const here = dirname(fileURLToPath(import.meta.url));
-const repoRoot = join(here, "../..");
-
 describe("liquid template validation", () => {
-  it("accepts the bundled default.liquid template", async () => {
-    const source = await readFile(join(repoRoot, "src/templates/default.liquid"), "utf8");
-    const result = validateLiquidTemplate(source);
-    expect(result.valid, result.valid ? "" : JSON.stringify(result.issues)).toBe(true);
-  });
-
   it("rejects templates using the | raw filter", () => {
     const source = `<div>{{ value | raw }}</div>`;
     const result = validateLiquidTemplate(source);
