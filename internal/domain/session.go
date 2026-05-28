@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/zitadel/nextgen/internal/cookie"
+	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -32,6 +32,37 @@ func ErrSessionTokenCreationFailed() Error {
 
 func ErrSessionTokenInvalid() Error {
 	return newError("sess.token_invalid", "The session token is invalid (either malformed or expired).", nil, nil)
+}
+
+func ErrSessionInvalidTTL() Error {
+	return newError("sess.invalid_ttl", "The session TTL is invalid. It must be positive and not exceed the configured maximum.", nil, nil)
+}
+
+type SessionInvalidTTLDetails struct {
+	TTL    time.Duration `json:"ttl"`
+	MaxTTL time.Duration `json:"max_ttl"`
+}
+
+func sessionInvalidTTLErr(requested, maxTTL time.Duration) Error {
+	return ErrSessionInvalidTTL().WithDetails(SessionInvalidTTLDetails{
+		TTL:    requested,
+		MaxTTL: maxTTL,
+	})
+}
+
+// ResolveSessionTTL picks the effective session TTL for exchange.
+// When requested is nil, defaultTTL is used. Otherwise requested must be positive and <= maxTTL.
+func ResolveSessionTTL(requested *time.Duration, defaultTTL, maxTTL time.Duration) (time.Duration, error) {
+	if requested == nil {
+		return defaultTTL, nil
+	}
+	if *requested <= 0 {
+		return 0, sessionInvalidTTLErr(*requested, maxTTL)
+	}
+	if *requested > maxTTL {
+		return 0, sessionInvalidTTLErr(*requested, maxTTL)
+	}
+	return *requested, nil
 }
 
 // Session represents the object defined [here](https://github.com/zitadel/nextgen/blob/main/docs/design/api/resource-map.md#sessions-durable-post-auth-only)
@@ -79,7 +110,7 @@ func NewSession(projectID string, agent *UserAgent) (*Session, error) {
 	}, nil
 }
 
-func (s *Session) Token(sealer *cookie.Sealer) (string, error) {
+func (s *Session) Token(encrypter crypto.Encrypter) (string, error) {
 	payload, err := json.Marshal(&SessionToken{
 		ProjectID: s.ProjectID,
 		SessionID: s.ID,
@@ -91,23 +122,23 @@ func (s *Session) Token(sealer *cookie.Sealer) (string, error) {
 	if err != nil {
 		return "", ErrSessionTokenCreationFailed()
 	}
-	token, err := sealer.Seal(payload)
+	token, err := encrypter.Encrypt(string(payload))
 	if err != nil {
 		return "", ErrSessionTokenCreationFailed()
 	}
 	return token, nil
 }
 
-func DecryptSessionTokenString(tokenString string, sealer *cookie.Sealer) (*SessionToken, error) {
+func DecryptSessionTokenString(tokenString string, decrypter crypto.Decrypter) (*SessionToken, error) {
 	if tokenString == "" {
 		return nil, ErrSessionTokenInvalid()
 	}
-	payload, err := sealer.Open(tokenString)
+	payload, err := decrypter.Decrypt(tokenString)
 	if err != nil {
 		return nil, ErrSessionTokenInvalid()
 	}
 	var sessionToken SessionToken
-	err = json.Unmarshal(payload, &sessionToken)
+	err = json.Unmarshal([]byte(payload), &sessionToken)
 	if err != nil {
 		return nil, ErrSessionTokenInvalid()
 	}

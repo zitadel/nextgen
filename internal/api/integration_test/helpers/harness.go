@@ -17,7 +17,8 @@ type Harness struct {
 	DBPool     database.Pool
 	HttpClient *http.Client
 	TestServer *httptest.Server
-	Hasher     *crypto.Hasher
+	Hasher     *crypto.PasswapHasher
+	Crypter    crypto.Crypter
 
 	GeneratedServer *generated.Server
 	Handler         *api.Handler

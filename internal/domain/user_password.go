@@ -26,8 +26,8 @@ type UserPassword struct {
 	UpdatedAt           time.Time
 }
 
-func (u *UserPassword) Verify(password string, verifier *crypto.Hasher) error {
-	_, err := verifier.Verify(u.EncodedHash, password)
+func (u *UserPassword) Verify(password string, verifier crypto.HashVerifier) error {
+	err := verifier.VerifyHash(u.EncodedHash, password)
 	if err != nil {
 		return ErrUserPasswordInvalid()
 	}
