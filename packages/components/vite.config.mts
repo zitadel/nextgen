@@ -5,7 +5,7 @@ import { apiMockPublicDir } from "@zitadel-nextgen/api-mock/public-dir";
 import { defineConfig } from "vite";
 import { hmrPlugin, presets } from "vite-plugin-web-components-hmr";
 
-import { workspaceStylesFullReload } from "./vite/lit-dev-hmr.ts";
+import { workspaceStylesFullReload } from "./vite/lit-dev-hmr";
 
 const workspaceRoot = resolve(import.meta.dirname, "../..");
 const packageRoot = resolve(import.meta.dirname, ".");
