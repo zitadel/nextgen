@@ -1,4 +1,4 @@
-//go:build integration
+//go:build postgres_integration
 
 // Run: go test -tags=integration ./internal/service/... -run SessionService_Exchange_integration -count=1
 
