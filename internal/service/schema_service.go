@@ -50,13 +50,13 @@ func NewSchemaService(
 	}
 }
 
-func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInput) (*domain.JSONSchema, error) {
-	tx, txErr := s.pool.Begin(ctx, nil)
-	if txErr != nil {
-		return nil, domain.ErrInternal(txErr).WithMessage("failed to start transaction")
+func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInput) (_ *domain.JSONSchema, err error) {
+	tx, err := s.pool.Begin(ctx, nil)
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to start transaction")
 	}
 	defer func() {
-		if txErr != nil {
+		if err != nil {
 			_ = tx.Rollback(ctx)
 		}
 	}()
@@ -72,7 +72,7 @@ func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInpu
 		CreatedAt: time.Now().UTC(),
 		Schema:    input.Schema,
 	}
-	err := s.schemaValidator.ValidateAgainstMetaSchema(input.Schema)
+	err = s.schemaValidator.ValidateAgainstMetaSchema(input.Schema)
 	if err != nil {
 		return nil, domain.ErrJSONSchemaInvalid().WithParent(err)
 	}

@@ -45,7 +45,7 @@ func NewUserService(
 	}
 }
 
-func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (map[string]any, error) {
+func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (_ map[string]any, err error) {
 	tx, err := s.pool.Begin(ctx, nil)
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to create transaction")
