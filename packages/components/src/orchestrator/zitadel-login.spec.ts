@@ -216,6 +216,8 @@ describe("<zitadel-login> against the typed Flow API", () => {
     server.use(
       http.post(exchangeUrl, async ({ request }) => {
         exchangeHit = true;
+        const url = new URL(request.url);
+        expect(url.searchParams.get("project_id")).toBe("demo-project");
         const body = (await request.json()) as { handoff_token?: string };
         expect(body.handoff_token).toBeTruthy();
         return HttpResponse.json({
@@ -285,6 +287,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
       );
       expect(exchanges).toHaveLength(1);
       expect(exchanges[0]?.body.handoff_token).toBeTruthy();
+      expect(exchanges[0]?.projectId).toBe("demo-project");
     } finally {
       Object.defineProperty(window, "location", {
         configurable: true,
