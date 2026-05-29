@@ -12,20 +12,21 @@ import { buildSyncPlan, makeSyncers, renderPlan, runSyncLoop } from "../lib/sync
 import { readZitadelSecret } from "../lib/project";
 
 /**
- * Options accepted by {@link runApply} / {@link runPlan}. `environment` is
- * validated by the flag layer but not otherwise consumed here.
+ * Options accepted by {@link runApply}. `environment` is validated by the flag
+ * layer but not otherwise consumed here.
  */
 export type ApplyOptions = GlobalOptions & {
   environment?: string;
 };
 
 /**
- * Shared preflight for `plan` and `apply`: load the project secret, read and
- * validate the local flows, fail fast (`E_VALIDATION`) on any missing `${VAR}`
- * / `*_env` reference, and build the platform client + syncers. Both verbs run
- * this identically; they only differ in what they do with the result.
+ * Validates the local flows against the remote project, then either previews
+ * the sync diff (`dryRun` — backs `zitadel plan` and `apply --dry-run`) or runs
+ * the sync loop to convergence (`zitadel apply`). The project secret and any
+ * `${VAR}` / `*_env` references are checked up front so missing configuration
+ * fails fast with `E_VALIDATION` before the platform is contacted.
  */
-async function prepare(opts: ApplyOptions) {
+export async function runApply(opts: ApplyOptions): Promise<CommandResult> {
   const secret = await readZitadelSecret(opts.cwd);
 
   const flows = await readJsonDir(join(opts.cwd, FLOWS_DIR));
@@ -38,16 +39,12 @@ async function prepare(opts: ApplyOptions) {
 
   const client = createPlatformClient(opts.source, secret.project_secret);
   const syncers = makeSyncers({ projectId: secret.project_id });
-  return { client, syncers };
-}
 
-/**
- * Proposes the change set without mutating the platform: builds the sync plan
- * and returns its counts plus a rendered diff. Backs `zitadel plan` (and
- * `apply --dry-run`).
- */
-export async function runPlan(opts: ApplyOptions): Promise<CommandResult> {
-  const { client, syncers } = await prepare(opts);
+  if (!opts.dryRun) {
+    await runSyncLoop(opts.cwd, client, syncers);
+    return { status: "ok", data: { synced: true } };
+  }
+
   const plan = await buildSyncPlan(opts.cwd, syncers, client);
   const active = plan.filter((action) => action.kind !== "skip");
   return {
@@ -60,20 +57,6 @@ export async function runPlan(opts: ApplyOptions): Promise<CommandResult> {
     },
     pretty: renderPlan(plan, opts.isTTY),
   };
-}
-
-/**
- * Applies the local `.zitadel/flows` definitions to the remote project, running
- * the sync loop to convergence. In dry-run it defers to {@link runPlan} — same
- * preflight, just propose instead of execute.
- */
-export async function runApply(opts: ApplyOptions): Promise<CommandResult> {
-  if (opts.dryRun) {
-    return runPlan(opts);
-  }
-  const { client, syncers } = await prepare(opts);
-  await runSyncLoop(opts.cwd, client, syncers);
-  return { status: "ok", data: { synced: true } };
 }
 
 /** `zitadel apply` — validate and upload repo config to the platform. */
