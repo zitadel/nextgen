@@ -125,7 +125,7 @@ export class ZitadelLogin extends LitElement {
    * to a built-in locale dictionary. Falls back to auto-detection from
    * `document.documentElement.lang` or `navigator.language` when empty.
    */
-  @property({ type: String }) override accessor lang: string = "";
+  @property({ type: String }) override accessor lang = "";
 
   /**
    * Custom locale dictionaries keyed by language code. When set, these take
