@@ -27,6 +27,7 @@ export type { AuthMethod, FlowDefinition } from "./schema";
 export { flowDefinitionSchema } from "./schema";
 export { AUTH_METHODS, buildFlow, isAuthMethod } from "./build";
 export { validateFlows } from "./validate";
+export { flowEnvRefs } from "./env-refs";
 
 /**
  * Relative directory (from the project root) where local flow files
