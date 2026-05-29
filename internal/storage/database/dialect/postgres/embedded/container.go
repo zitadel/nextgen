@@ -6,6 +6,8 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
+	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib" // registers "pgx" driver for wait.ForSQL
 	"github.com/testcontainers/testcontainers-go"
@@ -37,9 +39,13 @@ func StartContainer(ctx context.Context) (database.Connector, func(), error) {
 		},
 		// ForSQL opens a real connection until it succeeds, which rides out the
 		// transient restart the postgres image performs at the end of initdb.
+		// testcontainers passes the mapped port as "<port>/tcp"; strip the proto
+		// so it doesn't leak into the DSN path (which would make the database name
+		// "tcp/postgres"). The generous timeout covers slow initdb on cold CI disks.
 		WaitingFor: wait.ForSQL("5432/tcp", "pgx", func(host, port string) string {
-			return fmt.Sprintf("postgresql://postgres:postgres@%s:%s/postgres?sslmode=disable", host, port)
-		}),
+			mapped, _, _ := strings.Cut(port, "/")
+			return fmt.Sprintf("postgresql://postgres:postgres@%s:%s/postgres?sslmode=disable", host, mapped)
+		}).WithStartupTimeout(120 * time.Second),
 	}
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: req,
