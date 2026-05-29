@@ -3,7 +3,7 @@ import {
   getFlowStep,
   submitFlowStep,
 } from "@zitadel-nextgen/api/generated/endpoints/zitadelNextGen";
-import { setApiBaseUrl } from "@zitadel-nextgen/api/runtime/base-url";
+import { configureZitadel } from "@zitadel-nextgen/api/config";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "vitest";
 
@@ -38,7 +38,7 @@ let mock: MockHandle = setupMockHandlers();
 beforeAll(() => {
   // Any absolute URL works — the orval-generated handlers match `*/flow*`
   // with a wildcard prefix.
-  setApiBaseUrl("http://localhost");
+  configureZitadel({ apiBase: "http://localhost", projectId: PROJECT_ID });
   server.listen({ onUnhandledRequest: "error" });
 });
 

@@ -17,12 +17,7 @@
  * orchestrator stores them as `CreateFlow201` because that is the alias
  * orval gives the start-of-flow response.
  */
-import { getApiBaseUrl } from "@zitadel-nextgen/api/runtime/base-url";
-import {
-  createFlow,
-  getFlowStep,
-  submitFlowStep,
-} from "@zitadel-nextgen/api/generated/endpoints/zitadelNextGen";
+import type { ZitadelApi } from "@zitadel-nextgen/api/config";
 import type {
   CreateFlow201,
   CreateFlowBody,
@@ -39,13 +34,14 @@ const apiRequestInit: RequestInit = { credentials: "include" };
 /**
  * Resolve the URL for `POST …/sessions/exchange` (or a host override).
  *
- * - Default path (`/sessions/exchange`): prefixed with `getApiBaseUrl()` so
+ * - Default path (`/sessions/exchange`): prefixed with `apiBase` so
  *   `api-base="/__nextgen"` continues to hit `/__nextgen/sessions/exchange`.
  * - Any other path: resolved from `location.origin`, independent of
  *   `api-base`, for SPAs that rewrite exchange under a separate prefix
  *   (e.g. `/api/auth/exchange`).
  */
 export function resolveSessionExchangeUrl(
+  apiBase: string,
   sessionExchangePath = DEFAULT_SESSION_EXCHANGE_PATH,
 ): string {
   const path = sessionExchangePath.startsWith("/")
@@ -61,23 +57,24 @@ export function resolveSessionExchangeUrl(
     return new URL(path, origin).href;
   }
 
-  const apiBase = getApiBaseUrl().replace(/\/$/, "");
-  return apiBase ? `${apiBase}${path}` : path;
+  const base = apiBase.replace(/\/$/, "");
+  return base ? `${base}${path}` : path;
 }
 
-export async function startFlow(input: CreateFlowBody): Promise<CreateFlow201> {
-  return createFlow(input, apiRequestInit);
+export async function startFlow(api: ZitadelApi, input: CreateFlowBody): Promise<CreateFlow201> {
+  return api.createFlow(input, apiRequestInit);
 }
 
 export async function submitStep(
+  api: ZitadelApi,
   id: string,
   body: SubmitFlowStepBody,
 ): Promise<CreateFlow201> {
-  return submitFlowStep(id, body, apiRequestInit);
+  return api.submitFlowStep(id, body, apiRequestInit);
 }
 
-export async function getCurrentStep(id: string): Promise<CreateFlow201> {
-  return getFlowStep(id, apiRequestInit);
+export async function getCurrentStep(api: ZitadelApi, id: string): Promise<CreateFlow201> {
+  return api.getFlowStep(id, apiRequestInit);
 }
 
 /**
@@ -85,10 +82,11 @@ export async function getCurrentStep(id: string): Promise<CreateFlow201> {
  * The server sets the `__nextgen_session` HttpOnly cookie on success.
  */
 export async function exchangeSession(
+  apiBase: string,
   body: ExchangeHandoffBody,
   sessionExchangePath?: string,
 ): Promise<ExchangeHandoff200> {
-  const res = await fetch(resolveSessionExchangeUrl(sessionExchangePath), {
+  const res = await fetch(resolveSessionExchangeUrl(apiBase, sessionExchangePath), {
     ...apiRequestInit,
     method: "POST",
     headers: { "Content-Type": "application/json" },
