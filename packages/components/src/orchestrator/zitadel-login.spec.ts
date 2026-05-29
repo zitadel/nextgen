@@ -38,14 +38,15 @@ const API_BASE = "https://flow.test.invalid";
 let mock: MockHandle = setupMockHandlers();
 const server = setupServer(...mock.handlers);
 
+let testProject = configureZitadel({ apiBase: API_BASE, projectId: "demo-project" });
+
 beforeAll(() => {
-  configureZitadel({ apiBase: API_BASE, projectId: "demo-project" });
   server.listen({ onUnhandledRequest: "error" });
 });
 
 beforeEach(() => {
   _resetConfigForTesting();
-  configureZitadel({ apiBase: API_BASE, projectId: "demo-project" });
+  testProject = configureZitadel({ apiBase: API_BASE, projectId: "demo-project" });
   mock = setupMockHandlers();
   mock.reset();
   server.resetHandlers(...mock.handlers);
@@ -109,7 +110,7 @@ async function advanceMockLoginFlow(element: ZitadelLogin, email = "alice@acme.c
 async function mount(host: HTMLElement): Promise<ZitadelLogin> {
   const element = document.createElement("zitadel-login") as ZitadelLogin;
   element.purpose = "login";
-  element.projectId = "demo-project";
+  element.project = testProject;
   host.appendChild(element);
   await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
   return element;
@@ -234,11 +235,10 @@ describe("<zitadel-login> against the typed Flow API", () => {
 
     try {
       _resetConfigForTesting();
-      configureZitadel({ apiBase: "/__nextgen", projectId: "demo-project" });
+      const localProject = configureZitadel({ apiBase: "/__nextgen", projectId: "demo-project" });
       const element = document.createElement("zitadel-login") as ZitadelLogin;
       element.purpose = "login";
-      element.projectId = "demo-project";
-      element.apiBase = "/__nextgen";
+      element.project = localProject;
       element.sessionExchangePath = customExchangePath;
       element.postSignInUrl = "/admin";
       host.appendChild(element);
@@ -251,7 +251,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
       expect(assign).toHaveBeenCalledWith("/admin");
     } finally {
       _resetConfigForTesting();
-      configureZitadel({ apiBase: API_BASE, projectId: "demo-project" });
+      testProject = configureZitadel({ apiBase: API_BASE, projectId: "demo-project" });
       Object.defineProperty(window, "location", {
         configurable: true,
         value: location,
@@ -270,7 +270,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
     try {
       const element = document.createElement("zitadel-login") as ZitadelLogin;
       element.purpose = "login";
-      element.projectId = "demo-project";
+      element.project = testProject;
       element.postSignInUrl = "/admin";
       host.appendChild(element);
       await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
@@ -305,7 +305,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
     const errorEvents: CustomEvent[] = [];
     const element = document.createElement("zitadel-login") as ZitadelLogin;
     element.purpose = "login";
-    element.projectId = "demo-project";
+    element.project = testProject;
     element.addEventListener("zitadel-flow-error", (event: Event) =>
       errorEvents.push(event as CustomEvent),
     );
