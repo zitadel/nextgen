@@ -1,7 +1,7 @@
 import { Flags } from "@oclif/core";
 import { cancel, confirm, intro, isCancel, outro, select, text } from "@clack/prompts";
 
-import { BaseCommand, type CommandResult, type GlobalOptions, type JsonEnvelope } from "../lib/oclif";
+import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
 import { ZitadelError } from "../lib/errors";
 import { AUTH_METHODS, isAuthMethod, type AuthMethod } from "../lib/flows";
 import { createOrca, issuerFromPort, type FrameworkFacts, type Orca } from "../lib/orca";
@@ -14,139 +14,142 @@ import { DEFAULT_SERVER } from "../lib/api/resolve-server";
 import { makeSyncers, runSyncLoop } from "../lib/sync";
 import { hasZitadelConfig, hasZitadelSecret, readZitadelSecret } from "../lib/project";
 
-/**
- * Inputs for {@link runSetup}, extending the global options with the
- * setup-specific flags collected by the arg parser. All fields are optional
- * because setup fills gaps interactively (when allowed) or from detection and
- * sensible defaults, so a bare invocation with only the globals is valid.
- */
-export type SetupOptions = GlobalOptions & {
-  framework?: string;
-  authMethod?: string;
-  noApply?: boolean;
-  renderer?: string;
-};
-
 /** The user-schema fields scaffolded for every project. */
 const DEFAULT_USER_FIELDS = ["email", "given_name", "family_name"] as const;
 
-/**
- * Scaffolds a new Zitadel project into the target directory: detects (or, for an
- * empty directory, scaffolds then re-detects) the framework, resolves auth/schema
- * choices (prompting interactively unless suppressed), creates the remote project,
- * then patches it via {@link Orca}'s framework patcher and optionally applies the
- * config. Idempotent at the front: it skips when already initialized and refuses
- * to proceed on an orphaned secret.
- */
-export async function runSetup(opts: SetupOptions): Promise<CommandResult> {
-  if (await hasZitadelConfig(opts.cwd)) {
-    return { status: "skipped", reason: "already-initialized" };
-  }
+/** `zitadel setup` — create a project and scaffold local auth. */
+export default class Setup extends BaseCommand {
+  static override description = "Create a Zitadel project and scaffold local auth.";
+  static override examples = ["<%= config.bin %> setup --framework next --auth-method passkey"];
+  static override flags = {
+    framework: Flags.string({ description: "Framework to target.", options: ["next"] }),
+    "auth-method": Flags.string({
+      description: "Auth method (default: passkey).",
+      options: [...AUTH_METHODS],
+    }),
+    renderer: Flags.string({ description: "Renderer (default: react).", options: [...RENDERER_IDS] }),
+    "no-apply": Flags.boolean({ description: "Skip the automatic apply at the end of setup." }),
+  };
 
-  if (await hasZitadelSecret(opts.cwd)) {
-    throw new ZitadelError("E_CONFLICT", ".zitadel/secret exists without zitadel.json", {
-      hint: "Move the secret aside or restore zitadel.json before running setup.",
-    });
-  }
+  /**
+   * Scaffolds a new Zitadel project into the target directory: detect (or, for
+   * an empty directory, scaffold then re-detect) the framework, resolve
+   * auth/schema choices (prompting interactively unless suppressed), create the
+   * remote project, patch it via {@link Orca}'s framework patcher, then
+   * optionally apply the config. Idempotent at the front: skips when already
+   * initialized and refuses to proceed on an orphaned secret.
+   *
+   * Every interactive question lives in {@link runInteractiveSetup} (the main
+   * wizard) and {@link pickFramework} (the empty-directory framework choice) —
+   * the two calls below are the only places this command prompts.
+   */
+  async run(): Promise<JsonEnvelope> {
+    const { flags } = await this.parse(Setup);
+    await this.toMeta(flags);
+    const { cwd, env, nonInteractive, dryRun, force } = this.meta;
 
-  const orca = createOrca();
-
-  // Detect the framework; when none is found and the directory is empty,
-  // scaffold a project from scratch (prompting or via --framework) and let
-  // Orca re-detect it. Orca.scaffold throws if the directory is not empty.
-  let framework: FrameworkFacts;
-  try {
-    framework = await orca.detect(opts.cwd, opts.framework);
-  } catch (error) {
-    if (
-      error instanceof ZitadelError &&
-      error.code === "E_FRAMEWORK_NOT_DETECTED" &&
-      (await orca.isEmpty(opts.cwd))
-    ) {
-      framework = await orca.scaffold(opts.cwd, await resolveScaffoldFramework(opts, orca));
-    } else {
-      throw error;
+    if (await hasZitadelConfig(cwd)) {
+      return this.emit({ status: "skipped", reason: "already-initialized" });
     }
-  }
+    if (await hasZitadelSecret(cwd)) {
+      throw new ZitadelError("E_CONFLICT", ".zitadel/secret exists without zitadel.json", {
+        hint: "Move the secret aside or restore zitadel.json before running setup.",
+      });
+    }
 
-  let detectedPort = framework.devPort;
-  let effectiveServer = opts.source;
+    const orca = createOrca();
 
-  // The `--auth-method` flag is validated against AUTH_METHODS by oclif; guard
-  // anyway so an out-of-band caller can't smuggle an invalid value through.
-  let authMethod: AuthMethod | undefined = isAuthMethod(opts.authMethod)
-    ? opts.authMethod
-    : undefined;
+    // Detect the framework; when none is found and the directory is empty,
+    // scaffold a project from scratch (PROMPT: pickFramework, unless
+    // --framework) and let Orca re-detect it. Orca.scaffold throws if the
+    // directory is not empty.
+    let framework: FrameworkFacts;
+    try {
+      framework = await orca.detect(cwd, flags.framework);
+    } catch (error) {
+      if (
+        error instanceof ZitadelError &&
+        error.code === "E_FRAMEWORK_NOT_DETECTED" &&
+        (await orca.isEmpty(cwd))
+      ) {
+        framework = await orca.scaffold(cwd, await resolveScaffoldFramework(flags.framework, nonInteractive, orca));
+      } else {
+        throw error;
+      }
+    }
 
-  if (!opts.nonInteractive && !opts.dryRun) {
-    const answers = await runInteractiveSetup({
-      detectedFramework: framework.id,
-      detectedDevPort: detectedPort,
-      currentServer: opts.source,
-    });
-    authMethod = authMethod ?? answers.authMethod;
-    effectiveServer = answers.serverChoice;
-    detectedPort = answers.devPort;
-  }
+    // Resolve auth method, server, and dev port. In interactive mode the
+    // wizard (PROMPTS: runInteractiveSetup) fills them; otherwise flags +
+    // detection + defaults do.
+    let authMethod: AuthMethod | undefined = isAuthMethod(flags["auth-method"])
+      ? flags["auth-method"]
+      : undefined;
+    let server = this.meta.source;
+    let devPort = framework.devPort;
+    if (!nonInteractive && !dryRun) {
+      const answers = await runInteractiveSetup({
+        detectedFramework: framework.id,
+        detectedDevPort: devPort,
+        currentServer: server,
+      });
+      authMethod = authMethod ?? answers.authMethod;
+      server = answers.serverChoice;
+      devPort = answers.devPort;
+    }
 
-  const issuer = issuerFromPort(detectedPort);
-  const resolvedFields = [...DEFAULT_USER_FIELDS];
-  const resolvedMethod: AuthMethod = authMethod ?? "passkey";
-  const userSchema = buildUserSchema(resolvedMethod, resolvedFields);
-  const schemaValidation = validateJsonSchema(userSchema);
-  if (!schemaValidation.valid) {
-    throw new ZitadelError("E_VALIDATION", "Generated user schema is invalid", {
-      details: schemaValidation.errors,
-    });
-  }
+    const issuer = issuerFromPort(devPort);
+    const userFields = [...DEFAULT_USER_FIELDS];
+    const resolvedMethod: AuthMethod = authMethod ?? "passkey";
+    const userSchema = buildUserSchema(resolvedMethod, userFields);
+    const schemaValidation = validateJsonSchema(userSchema);
+    if (!schemaValidation.valid) {
+      throw new ZitadelError("E_VALIDATION", "Generated user schema is invalid", {
+        details: schemaValidation.errors,
+      });
+    }
 
-  const project = opts.dryRun
-    ? dryRunProject()
-    : await createPlatformClient(effectiveServer).createProject({ previewOrigins: [] });
+    const project = dryRun
+      ? dryRunProject()
+      : await createPlatformClient(server).createProject({ previewOrigins: [] });
 
-  const ctx: PatchContext = {
-    framework,
-    rendererId: opts.renderer ?? "react",
-    project,
-    issuer,
-    userFields: resolvedFields,
-    authMethod: resolvedMethod,
-    userSchema,
-    server: effectiveServer,
-  };
-  const result = await orca
-    .patcherFor(framework.id)
-    .patch(ctx, { cwd: opts.cwd, dryRun: opts.dryRun, force: opts.force });
+    const ctx: PatchContext = {
+      framework,
+      rendererId: flags.renderer ?? "react",
+      project,
+      issuer,
+      userFields,
+      authMethod: resolvedMethod,
+      userSchema,
+      server,
+    };
+    const result = await orca.patcherFor(framework.id).patch(ctx, { cwd, dryRun, force });
 
-  // Apply the freshly-written config to the platform (same sync the `apply`
-  // command runs; the engine validates every file). Skipped in dry-run or
-  // with --no-apply.
-  let apply: { synced: boolean } | undefined;
-  if (!opts.noApply && !opts.dryRun) {
-    const secret = await readZitadelSecret(opts.cwd);
-    const client = createPlatformClient(effectiveServer, secret.project_secret);
-    const syncers = makeSyncers({ projectId: secret.project_id, env: opts.env });
-    await runSyncLoop(opts.cwd, client, syncers);
-    apply = { synced: true };
-  }
+    // Apply the freshly-written config to the platform (same sync the `apply`
+    // command runs; the engine validates every file). Skipped in dry-run or
+    // with --no-apply.
+    let apply: { synced: boolean } | undefined;
+    if (!flags["no-apply"] && !dryRun) {
+      const secret = await readZitadelSecret(cwd);
+      const client = createPlatformClient(server, secret.project_secret);
+      await runSyncLoop(cwd, client, makeSyncers({ projectId: secret.project_id, env }));
+      apply = { synced: true };
+    }
 
-  return {
-    status: "ok",
-    data: {
-      title: "Zitadel is ready.",
-      project: {
-        project_id: project.id,
-        issuer,
+    return this.emit({
+      status: "ok",
+      data: {
+        title: "Zitadel is ready.",
+        project: { project_id: project.id, issuer },
+        framework: framework.id,
+        server,
+        files_written: result.filesWritten.map((file) => relativeDisplay(cwd, file)),
+        files_skipped: result.filesSkipped.map((file) => relativeDisplay(cwd, file)),
+        apply,
+        next_actions: ["Run `zitadel doctor` to verify setup."],
+        next_commands: ["zitadel doctor"],
       },
-      framework: framework.id,
-      server: effectiveServer,
-      files_written: result.filesWritten.map((file) => relativeDisplay(opts.cwd, file)),
-      files_skipped: result.filesSkipped.map((file) => relativeDisplay(opts.cwd, file)),
-      apply,
-      next_actions: ["Run `zitadel doctor` to verify setup."],
-      next_commands: ["zitadel doctor"],
-    },
-  };
+    });
+  }
 }
 
 /**
@@ -154,11 +157,15 @@ export async function runSetup(opts: SetupOptions): Promise<CommandResult> {
  * `--framework`, else an interactive pick, else a hard error in non-interactive
  * mode (an agent must pass `--framework`).
  */
-async function resolveScaffoldFramework(opts: SetupOptions, orca: Orca): Promise<string> {
-  if (opts.framework) {
-    return opts.framework;
+async function resolveScaffoldFramework(
+  framework: string | undefined,
+  nonInteractive: boolean,
+  orca: Orca,
+): Promise<string> {
+  if (framework) {
+    return framework;
   }
-  if (opts.nonInteractive) {
+  if (nonInteractive) {
     throw new ZitadelError("E_FRAMEWORK_NOT_DETECTED", "Empty directory — pass --framework", {
       hint: "Example: --framework next",
     });
@@ -210,7 +217,15 @@ const AUTH_METHOD_CHOICES: ReadonlyArray<{ value: AuthMethod; label: string; hin
 ];
 
 /**
- * Drives the interactive setup wizard and returns the collected answers.
+ * Drives the interactive setup wizard and returns the collected answers. This
+ * is the single home of the main `setup` prompts, in ask order:
+ *
+ *   1. confirm  — "Detected <framework>. Proceed?"
+ *   2. select   — "Auth method" (passkey / password)
+ *   3. select   — "Which server should zitadel.json point to?" (cloud / custom)
+ *   4. text     — "Server URL" (only when "custom" was chosen)
+ *   5. text     — "Dev server port"
+ *
  * Prompts are seeded from `input` so detected values are the defaults; any
  * cancellation is converted into a thrown {@link ZitadelError} rather than a
  * partial result. Only invoked in interactive (TTY) mode.
@@ -218,6 +233,7 @@ const AUTH_METHOD_CHOICES: ReadonlyArray<{ value: AuthMethod; label: string; hin
 async function runInteractiveSetup(input: InteractiveSetupInput): Promise<InteractiveSetupAnswers> {
   intro("Zitadel setup");
 
+  // PROMPT 1 — confirm the detected framework.
   const frameworkAck = await confirm({
     message: `Detected ${input.detectedFramework}. Proceed?`,
     initialValue: true,
@@ -229,6 +245,7 @@ async function runInteractiveSetup(input: InteractiveSetupInput): Promise<Intera
     });
   }
 
+  // PROMPT 2 — choose the auth method.
   const authMethod = await select<AuthMethod>({
     message: "Auth method",
     options: AUTH_METHOD_CHOICES.map(({ value, label, hint }) => ({ value, label, hint })),
@@ -236,6 +253,7 @@ async function runInteractiveSetup(input: InteractiveSetupInput): Promise<Intera
   });
   bail(authMethod);
 
+  // PROMPT 3 — choose the server (cloud or self-hosted).
   const serverChoice = await select({
     message: "Which server should zitadel.json point to?",
     options: [
@@ -252,6 +270,7 @@ async function runInteractiveSetup(input: InteractiveSetupInput): Promise<Intera
 
   let resolvedServer = serverChoice as string;
   if (serverChoice === "__custom__") {
+    // PROMPT 4 — the custom server URL (only when "custom" was chosen above).
     const custom = await text({
       message: "Server URL",
       placeholder: "https://zitadel.internal",
@@ -268,6 +287,7 @@ async function runInteractiveSetup(input: InteractiveSetupInput): Promise<Intera
     resolvedServer = custom as string;
   }
 
+  // PROMPT 5 — the dev server port.
   const devPortRaw = await text({
     message: "Dev server port",
     placeholder: String(input.detectedDevPort),
@@ -287,12 +307,14 @@ async function runInteractiveSetup(input: InteractiveSetupInput): Promise<Intera
 
 /**
  * Prompts for a framework to scaffold when the directory is empty and nothing
- * could be auto-detected. Choices come from `Orca.availableFrameworks`.
+ * could be auto-detected. Choices come from `Orca.availableFrameworks`. This is
+ * the only `setup` prompt outside {@link runInteractiveSetup}.
  */
 async function pickFramework(
   choices: ReadonlyArray<{ id: string; displayName: string }>,
 ): Promise<string> {
   intro("Zitadel setup — new project");
+  // PROMPT — choose a framework to scaffold into the empty directory.
   const picked = await select({
     message: "Choose a framework to scaffold",
     options: choices.map((choice) => ({ value: choice.id, label: choice.displayName })),
@@ -306,34 +328,5 @@ function bail<T>(value: T | symbol): asserts value is T {
   if (isCancel(value)) {
     cancel("Setup cancelled.");
     throw new ZitadelError("E_VALIDATION", "Setup cancelled by user");
-  }
-}
-
-/** `zitadel setup` — create a project and scaffold local auth. */
-export default class Setup extends BaseCommand {
-  static override description = "Create a Zitadel project and scaffold local auth.";
-  static override examples = ["<%= config.bin %> setup --framework next --auth-method passkey"];
-  static override flags = {
-    framework: Flags.string({ description: "Framework to target.", options: ["next"] }),
-    "auth-method": Flags.string({
-      description: "Auth method (default: passkey).",
-      options: [...AUTH_METHODS],
-    }),
-    renderer: Flags.string({ description: "Renderer (default: react).", options: [...RENDERER_IDS] }),
-    "no-apply": Flags.boolean({ description: "Skip the automatic apply at the end of setup." }),
-  };
-
-  async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(Setup);
-    await this.toMeta(flags);
-    return this.emit(
-      await runSetup({
-        ...this.meta,
-        framework: flags.framework,
-        authMethod: flags["auth-method"],
-        renderer: flags.renderer,
-        noApply: flags["no-apply"],
-      }),
-    );
   }
 }
