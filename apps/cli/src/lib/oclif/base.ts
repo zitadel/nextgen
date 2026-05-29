@@ -16,7 +16,7 @@ import type {
 /**
  * Base class for every oclif command. Owns the global flags, builds the
  * {@link GlobalOptions} context (including server `source` resolution) that the
- * domain `run*` functions in `lib/commands` consume, and turns the
+ * domain `run*` functions in `commands/` consume, and turns the
  * {@link CommandResult} they return into the JSON envelope (oclif serialises it
  * natively in `--json` mode) or human-facing text. Errors are translated into
  * the failure envelope and the mapped process exit code. Commands stay thin:

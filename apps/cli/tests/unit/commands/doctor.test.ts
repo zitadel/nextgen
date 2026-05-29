@@ -4,10 +4,10 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { runDoctor } from "../../../../src/lib/commands/doctor";
-import type { GlobalOptions } from "../../../../src/lib/oclif";
-import { ZitadelError } from "../../../../src/lib/errors";
-import { MANAGED_MARKER } from "../../../../src/lib/paths";
+import { runDoctor } from "../../../src/commands/doctor";
+import type { GlobalOptions } from "../../../src/lib/oclif";
+import { ZitadelError } from "../../../src/lib/errors";
+import { MANAGED_MARKER } from "../../../src/lib/paths";
 
 function makeOpts(
   cwd: string,

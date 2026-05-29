@@ -1,8 +1,8 @@
 import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 
-import { ZitadelError } from "../errors";
-import { isObject, parseJsonObject } from "../json";
+import { ZitadelError } from "./errors";
+import { isObject, parseJsonObject } from "./json";
 
 /**
  * Reports whether `cwd` has already been initialized, i.e. a committed

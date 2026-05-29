@@ -9,8 +9,8 @@ import {
   hasZitadelSecret,
   readZitadelConfig,
   readZitadelSecret,
-} from "../../../../src/lib/commands/shared";
-import { ZitadelError } from "../../../../src/lib/errors";
+} from "../../../src/lib/project";
+import { ZitadelError } from "../../../src/lib/errors";
 
 const tempDirs: string[] = [];
 

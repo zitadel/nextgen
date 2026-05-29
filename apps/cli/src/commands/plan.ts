@@ -1,7 +1,7 @@
 import { Flags } from "@oclif/core";
 
 import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
-import { runApply } from "../lib/commands/apply";
+import { runApply } from "./apply";
 import { environmentSchema } from "../lib/api/schemas";
 
 /** `zitadel plan` — validate config and preview the sync diff without mutating. */

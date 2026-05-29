@@ -4,8 +4,8 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { runSetup } from "../../../../src/lib/commands/setup";
-import type { SetupOptions } from "../../../../src/lib/commands/setup";
+import { runSetup } from "../../../src/commands/setup";
+import type { SetupOptions } from "../../../src/commands/setup";
 
 function makeOpts(cwd: string, overrides: Partial<SetupOptions> = {}): SetupOptions {
   return {

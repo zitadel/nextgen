@@ -1,7 +1,328 @@
+import { readFile, stat } from "node:fs/promises";
+import { join } from "node:path";
+
 import { Flags } from "@oclif/core";
 
-import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
-import { runDoctor } from "../lib/commands/doctor";
+import { BaseCommand, type CommandResult, type GlobalOptions, type JsonEnvelope } from "../lib/oclif";
+import { ZitadelError } from "../lib/errors";
+import { isAuthMethod } from "../lib/flows";
+import { isObject } from "../lib/json";
+import { createOrca, issuerFromPort, type FrameworkFacts, type Orca } from "../lib/orca";
+import type { PatchContext } from "../lib/orca/patchers/types";
+import { MANAGED_MARKER } from "../lib/paths";
+import { validateJsonSchema, type UserSchema } from "../lib/user-schema";
+import {
+  readDevelopmentIssuer,
+  readRendererId,
+  readZitadelConfig,
+  readZitadelSecret,
+} from "../lib/project";
+
+/**
+ * Options for {@link runDoctor}. When `fix` is set, doctor re-applies the
+ * managed scaffold (reclaiming managed files, even locally edited ones)
+ * before running its checks.
+ */
+export type DoctorOptions = GlobalOptions & {
+  fix?: boolean;
+};
+
+type DoctorCheck = {
+  name: string;
+  status: "pass" | "fail";
+  message: string;
+  path?: string;
+};
+
+/**
+ * Diagnoses a Zitadel-managed project and, with `fix`, repairs it first.
+ *
+ * Runs a battery of checks (config/secret parse, secret permissions,
+ * gitignore and env-example coverage, framework match, user schema validity,
+ * managed-file markers, and project-id consistency) and emits the aggregate
+ * result. If any check fails it throws `E_VALIDATION` carrying the full check
+ * details so the caller can render them.
+ */
+export async function runDoctor(opts: DoctorOptions): Promise<CommandResult> {
+  const orca = createOrca();
+  if (opts.fix) {
+    await applyFixes(opts, orca);
+  }
+
+  const checks = await collectChecks(opts.cwd, orca);
+  const failed = checks.filter((check) => check.status === "fail");
+  const data = {
+    title: failed.length === 0 ? "Zitadel doctor passed." : "Zitadel doctor found issues.",
+    ok: failed.length === 0,
+    checks,
+  };
+
+  if (failed.length > 0) {
+    throw new ZitadelError("E_VALIDATION", "Zitadel doctor found issues", {
+      hint: "Run `npx zitadel@latest doctor --fix` to re-apply missing managed files.",
+      details: data,
+    });
+  }
+
+  return { status: "ok", data };
+}
+
+async function collectChecks(cwd: string, orca: Orca): Promise<DoctorCheck[]> {
+  const checks: DoctorCheck[] = [];
+  const config = await check(
+    "config",
+    "zitadel.json parses",
+    "zitadel.json",
+    async () => readZitadelConfig(cwd),
+    checks,
+  );
+  const secret = await check(
+    "secret",
+    ".zitadel/secret parses",
+    ".zitadel/secret",
+    async () => readZitadelSecret(cwd),
+    checks,
+  );
+
+  await check(
+    "secret-permissions",
+    ".zitadel/secret has 0600 permissions",
+    ".zitadel/secret",
+    async () => {
+      const mode = (await stat(join(cwd, ".zitadel/secret"))).mode & 0o777;
+      if (mode !== 0o600) {
+        throw new Error(`expected 0600, got ${mode.toString(8)}`);
+      }
+    },
+    checks,
+  );
+
+  await check(
+    "gitignore",
+    ".gitignore protects local secret/env files",
+    ".gitignore",
+    async () => {
+      const contents = await readFile(join(cwd, ".gitignore"), "utf8");
+      for (const entry of [".zitadel/secret", ".env*", "!.env.example"]) {
+        if (!contents.split(/\r?\n/g).includes(entry)) {
+          throw new Error(`missing ${entry}`);
+        }
+      }
+    },
+    checks,
+  );
+
+  await check(
+    "env-example",
+    ".env.example references required keys",
+    ".env.example",
+    async () => {
+      const contents = await readFile(join(cwd, ".env.example"), "utf8");
+      for (const key of ["ZITADEL_PROJECT_ID", "ZITADEL_ENVIRONMENT", "ZITADEL_ISSUER"]) {
+        if (!contents.includes(`${key}=`)) {
+          throw new Error(`missing ${key}`);
+        }
+      }
+    },
+    checks,
+  );
+
+  await check(
+    "framework",
+    "Detected framework matches recorded framework",
+    "zitadel.json",
+    async () => {
+      const detected = await orca.detect(cwd);
+      const recorded =
+        isObject(config) && isObject(config.framework) ? config.framework.id : undefined;
+      if (recorded !== detected.id) {
+        throw new Error(`expected ${String(recorded)}, detected ${detected.id}`);
+      }
+    },
+    checks,
+  );
+
+  await check(
+    "schema",
+    "User schema is a valid JSON Schema",
+    ".zitadel/schemas/user.json",
+    async () => {
+      const schema = JSON.parse(
+        await readFile(join(cwd, ".zitadel/schemas/user.json"), "utf8"),
+      ) as unknown;
+      const result = validateJsonSchema(schema);
+      if (!result.valid) {
+        throw new Error(result.errors.join(", "));
+      }
+    },
+    checks,
+  );
+
+  await check(
+    "managed-login",
+    "Login page contains Zitadel managed marker",
+    "app/login/page.tsx",
+    async () => {
+      await assertManagedFile(cwd, ["app/login/page.tsx", "src/app/login/page.tsx"]);
+    },
+    checks,
+  );
+
+  await check(
+    "managed-register",
+    "Register page contains Zitadel managed marker",
+    "app/register/page.tsx",
+    async () => {
+      await assertManagedFile(cwd, ["app/register/page.tsx", "src/app/register/page.tsx"]);
+    },
+    checks,
+  );
+
+  await check(
+    "managed-middleware",
+    "Next middleware.ts contains Zitadel managed marker",
+    "middleware.ts",
+    async () => {
+      await assertManagedFile(cwd, ["middleware.ts", "src/middleware.ts"]);
+    },
+    checks,
+  );
+
+  const configProject = typeof config?.project === "string" ? config.project : undefined;
+  if (secret && config && secret.project_id !== configProject) {
+    checks.push({
+      name: "project-match",
+      status: "fail",
+      message: ".zitadel/secret project_id does not match zitadel.json project",
+      path: ".zitadel/secret",
+    });
+  } else {
+    checks.push({
+      name: "project-match",
+      status: "pass",
+      message: ".zitadel/secret project_id matches zitadel.json project",
+      path: ".zitadel/secret",
+    });
+  }
+
+  return checks;
+}
+
+async function applyFixes(opts: DoctorOptions, orca: Orca): Promise<void> {
+  const ctx = await loadPatchContext(opts.cwd, orca);
+  // `repair` reclaims the managed artifacts — env files, gitignore, the SDK
+  // dependency, and marker-bearing routes/middleware — even when locally edited,
+  // while leaving the user-editable `.zitadel/` resource files untouched.
+  await orca
+    .patcherFor(ctx.framework.id)
+    .repair(ctx, { cwd: opts.cwd, dryRun: opts.dryRun, force: true });
+}
+
+/**
+ * Reconstructs a {@link PatchContext} from the on-disk project (config, secret,
+ * user schema) plus fresh framework detection, so `doctor --fix` can rebuild the
+ * patcher plan. Auth method and fields are read back from the user schema; their
+ * exact values only affect the `.zitadel/` resource contents, which `--fix`
+ * filters out anyway.
+ */
+async function loadPatchContext(cwd: string, orca: Orca): Promise<PatchContext> {
+  const config = await readZitadelConfig(cwd);
+  const secret = await readZitadelSecret(cwd);
+  const framework = await orca.detect(cwd);
+  const raw = JSON.parse(
+    await readFile(join(cwd, ".zitadel/schemas/user.json"), "utf8"),
+  ) as Record<string, unknown>;
+  const properties = isObject(raw.properties) ? raw.properties : {};
+  const authMethods = isObject(raw["x-auth-methods"]) ? raw["x-auth-methods"] : {};
+  const recordedMethod = Object.keys(authMethods)[0];
+  return {
+    framework,
+    rendererId: readRendererId(config),
+    issuer: await resolveIssuer(cwd, config, framework),
+    server: typeof config.server === "string" ? config.server : "",
+    project: {
+      id: secret.project_id,
+      projectSecret: secret.project_secret,
+      previewSecret: secret.preview_secret,
+      previewOrigins: secret.preview_origins,
+      createdAt: secret.created_at,
+    },
+    userFields: Object.keys(properties),
+    authMethod: isAuthMethod(recordedMethod) ? recordedMethod : "passkey",
+    userSchema: raw as UserSchema,
+  };
+}
+
+async function check<T>(
+  name: string,
+  successMessage: string,
+  path: string,
+  fn: () => Promise<T>,
+  checks: DoctorCheck[],
+): Promise<T | undefined> {
+  try {
+    const value = await fn();
+    checks.push({ name, status: "pass", message: successMessage, path });
+    return value;
+  } catch (error) {
+    checks.push({
+      name,
+      status: "fail",
+      message: error instanceof Error ? error.message : String(error),
+      path,
+    });
+    return undefined;
+  }
+}
+
+async function assertManagedFile(cwd: string, candidates: string[]): Promise<void> {
+  for (const candidate of candidates) {
+    try {
+      const contents = await readFile(join(cwd, candidate), "utf8");
+      if (!contents.includes(MANAGED_MARKER)) {
+        throw new Error(`${candidate} is missing managed marker`);
+      }
+      return;
+    } catch (error) {
+      if (
+        !(
+          typeof error === "object" &&
+          error !== null &&
+          "code" in error &&
+          (error as { code?: string }).code === "ENOENT"
+        )
+      ) {
+        throw error;
+      }
+    }
+  }
+  throw new Error(`missing one of ${candidates.join(", ")}`);
+}
+
+async function resolveIssuer(
+  cwd: string,
+  config: Record<string, unknown>,
+  facts: FrameworkFacts,
+): Promise<string> {
+  const fromConfig = readDevelopmentIssuer(config);
+  if (fromConfig && fromConfig.length > 0) {
+    return fromConfig;
+  }
+  const state = await readState(cwd);
+  if (typeof state?.dev_port === "number") {
+    return issuerFromPort(state.dev_port);
+  }
+  return facts.issuerUrl;
+}
+
+async function readState(cwd: string): Promise<{ dev_port?: number } | undefined> {
+  try {
+    const contents = await readFile(join(cwd, ".zitadel/state.json"), "utf8");
+    return JSON.parse(contents) as { dev_port?: number };
+  } catch {
+    return undefined;
+  }
+}
 
 /** `zitadel doctor` — verify generated files and local state. */
 export default class Doctor extends BaseCommand {

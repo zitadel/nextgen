@@ -4,15 +4,15 @@ import { join } from "node:path";
 
 import { describe, expect, it, vi } from "vitest";
 
-import { findEnvRefs, runApply } from "../../../../src/lib/commands/apply";
-import type { GlobalOptions } from "../../../../src/lib/oclif";
+import { findEnvRefs, runApply } from "../../../src/commands/apply";
+import type { GlobalOptions } from "../../../src/lib/oclif";
 
-vi.mock("../../../../src/lib/sync/loop", () => ({
+vi.mock("../../../src/lib/sync/loop", () => ({
   runSyncLoop: vi.fn().mockResolvedValue(undefined),
   buildSyncPlan: vi.fn().mockResolvedValue([]),
 }));
 
-vi.mock("../../../../src/lib/api/index", () => ({
+vi.mock("../../../src/lib/api/index", () => ({
   createPlatformClient: vi.fn().mockReturnValue({}),
 }));
 
