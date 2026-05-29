@@ -48,7 +48,7 @@ export type CapturedRequest =
   | { kind: "createFlow"; body: CreateFlowBody }
   | { kind: "submitFlowStep"; flowId: string; body: SubmitFlowStepBody }
   | { kind: "getFlowStep"; flowId: string }
-  | { kind: "exchangeHandoff"; body: ExchangeHandoffBody };
+  | { kind: "exchangeHandoff"; body: ExchangeHandoffBody; projectId?: string };
 
 export type MockHandle = {
   handlers: RequestHandler[];
@@ -230,7 +230,9 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
     }),
     getExchangeHandoffMockHandler(async ({ request }) => {
       const body = (await request.clone().json()) as ExchangeHandoffBody;
-      captured.push({ kind: "exchangeHandoff", body });
+      const url = new URL(request.url);
+      const projectId = url.searchParams.get("project_id") ?? undefined;
+      captured.push({ kind: "exchangeHandoff", body, projectId });
       return getExchangeHandoffResponseMock();
     }),
   ];

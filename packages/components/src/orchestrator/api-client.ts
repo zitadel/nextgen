@@ -80,13 +80,22 @@ export async function getCurrentStep(api: ZitadelApi, id: string): Promise<Creat
 /**
  * Exchange a terminal-flow `handoff_token` for an authenticated session.
  * The server sets the `__nextgen_session` HttpOnly cookie on success.
+ *
+ * The OpenAPI spec requires `project_id` as a query parameter on
+ * `POST /sessions/exchange` so the server can scope the session to the
+ * correct project.
  */
 export async function exchangeSession(
   apiBase: string,
   body: ExchangeHandoffBody,
+  projectId: string,
   sessionExchangePath?: string,
 ): Promise<ExchangeHandoff200> {
-  const res = await fetch(resolveSessionExchangeUrl(apiBase, sessionExchangePath), {
+  const base = resolveSessionExchangeUrl(apiBase, sessionExchangePath);
+  const url = new URL(base, globalThis.location?.origin);
+  url.searchParams.set("project_id", projectId);
+
+  const res = await fetch(url.href, {
     ...apiRequestInit,
     method: "POST",
     headers: { "Content-Type": "application/json" },
