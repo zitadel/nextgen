@@ -32,7 +32,6 @@ func NewProjectService(
 	secretGenerator secrets.Generator,
 	serverURL string,
 	schemaValidator *domain.SchemaValidator,
-	schemaResolver domain.SchemaResolver,
 ) ProjectService {
 	return &projectService{
 		pool:               pool,
@@ -42,7 +41,6 @@ func NewProjectService(
 		secretGenerator:    secretGenerator,
 		serverURL:          serverURL,
 		schemaValidator:    schemaValidator,
-		schemaResolver:     schemaResolver,
 	}
 }
 
@@ -54,7 +52,6 @@ type projectService struct {
 	secretGenerator    secrets.Generator
 	serverURL          string
 	schemaValidator    *domain.SchemaValidator
-	schemaResolver     domain.SchemaResolver
 }
 
 var _ ProjectService = (*projectService)(nil)
