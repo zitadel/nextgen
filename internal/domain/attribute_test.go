@@ -97,7 +97,7 @@ func TestFlattenMapToCreateAttributes(t *testing.T) {
 				},
 			},
 			{
-				name: "simple direct field",
+				name: "simple direct unique field",
 				mapValue: map[string]any{
 					"email": "test@example.com",
 				},
