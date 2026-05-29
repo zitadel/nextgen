@@ -1,11 +1,9 @@
-import { join } from "node:path";
-
 import { Flags } from "@oclif/core";
 import { cancel, confirm, intro, isCancel, outro, select, text } from "@clack/prompts";
 
 import { BaseCommand, type CommandResult, type GlobalOptions, type JsonEnvelope } from "../lib/oclif";
 import { ZitadelError } from "../lib/errors";
-import { AUTH_METHODS, FLOWS_DIR, flowEnvRefs, isAuthMethod, type AuthMethod } from "../lib/flows";
+import { AUTH_METHODS, isAuthMethod, type AuthMethod } from "../lib/flows";
 import { createOrca, issuerFromPort, type FrameworkFacts, type Orca } from "../lib/orca";
 import type { PatchContext } from "../lib/orca/patchers/types";
 import { RENDERER_IDS } from "../lib/orca/patchers/rule/next/renderers/registry";
@@ -13,7 +11,6 @@ import { buildUserSchema, validateJsonSchema } from "../lib/user-schema";
 import { createPlatformClient } from "../lib/api";
 import type { CreateProjectResponse } from "../lib/api/client";
 import { DEFAULT_SERVER } from "../lib/api/resolve-server";
-import { readJsonDir } from "../lib/json-dir";
 import { makeSyncers, runSyncLoop } from "../lib/sync";
 import { hasZitadelConfig, hasZitadelSecret, readZitadelSecret } from "../lib/project";
 
@@ -122,20 +119,14 @@ export async function runSetup(opts: SetupOptions): Promise<CommandResult> {
     .patch(ctx, { cwd: opts.cwd, dryRun: opts.dryRun, force: opts.force });
 
   // Apply the freshly-written config to the platform (same sync the `apply`
-  // command runs). Skipped in dry-run or with --no-apply.
+  // command runs; the engine validates every file). Skipped in dry-run or
+  // with --no-apply.
   let apply: { synced: boolean } | undefined;
   if (!opts.noApply && !opts.dryRun) {
     const secret = await readZitadelSecret(opts.cwd);
-    const flows = await readJsonDir(join(opts.cwd, FLOWS_DIR));
-    const missing = flowEnvRefs(flows).filter((name) => !opts.env[name]);
-    if (missing.length > 0) {
-      throw new ZitadelError(
-        "E_VALIDATION",
-        `Missing environment variables: ${missing.join(", ")}`,
-      );
-    }
     const client = createPlatformClient(effectiveServer, secret.project_secret);
-    await runSyncLoop(opts.cwd, client, makeSyncers({ projectId: secret.project_id }));
+    const syncers = makeSyncers({ projectId: secret.project_id, env: opts.env });
+    await runSyncLoop(opts.cwd, client, syncers);
     apply = { synced: true };
   }
 

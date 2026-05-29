@@ -1,23 +1,46 @@
-import { FLOWS_DIR, validateFlows } from "../flows";
+import { FLOWS_DIR, flowEnvRefs, validateFlows } from "../flows";
 import { SCHEMAS_DIR, validateJsonSchema } from "../user-schema";
 import { ZitadelError } from "../errors";
 import type { PlatformClient } from "../api/client.js";
 import type { ResourceSyncer } from "./types.js";
 
+/** Runtime environment lookup used to resolve `${VAR}` / `*_env` references. */
+type EnvLookup = Record<string, string | undefined>;
+
 /**
- * Build the syncer list with the project context every flow create
- * needs. Callers (apply / plan) read `project_id` from
- * `.zitadel/secret` and pass it here. The returned array is treated
- * as read-only by the sync loop.
+ * Build the syncer list with the context every syncer needs: the
+ * `project_id` flow creates carry, and the runtime `env` against which
+ * each file's `${VAR}` / `*_env` references are checked. Callers
+ * (apply / plan / setup) read `project_id` from `.zitadel/secret` and
+ * pass the process environment. The returned array is treated as
+ * read-only by the sync loop.
  */
-export function makeSyncers(opts: { projectId: string }): ReadonlyArray<ResourceSyncer> {
-  return [new SchemaSyncer(), new FlowDefinitionSyncer(opts.projectId)];
+export function makeSyncers(opts: {
+  projectId: string;
+  env: EnvLookup;
+}): ReadonlyArray<ResourceSyncer> {
+  return [new SchemaSyncer(opts.env), new FlowDefinitionSyncer(opts.projectId, opts.env)];
+}
+
+/**
+ * Assert that every env var a resource references — `${VAR}` placeholders and
+ * the `*_env` convention — is present in `env`, throwing `E_VALIDATION` listing
+ * the missing names. Shared by every syncer so the check is identical for
+ * schemas and flows, and runs in the sync engine before any platform call.
+ */
+function assertEnvRefs(data: object, env: EnvLookup): void {
+  const missing = flowEnvRefs(data).filter((name) => !env[name]);
+  if (missing.length > 0) {
+    throw new ZitadelError("E_VALIDATION", `Missing environment variables: ${missing.join(", ")}`);
+  }
 }
 
 class SchemaSyncer implements ResourceSyncer {
   readonly kind = "schema";
   readonly directory = SCHEMAS_DIR;
   readonly mutable = false;
+
+  constructor(private readonly env: EnvLookup) {}
 
   validate(data: object): void {
     const result = validateJsonSchema(data);
@@ -26,6 +49,7 @@ class SchemaSyncer implements ResourceSyncer {
         details: { errors: result.errors },
       });
     }
+    assertEnvRefs(data, this.env);
   }
 
   async create(client: PlatformClient, data: object): Promise<string> {
@@ -51,12 +75,16 @@ class FlowDefinitionSyncer implements ResourceSyncer {
   readonly directory = FLOWS_DIR;
   readonly mutable = true;
 
-  constructor(private readonly projectId: string) {}
+  constructor(
+    private readonly projectId: string,
+    private readonly env: EnvLookup,
+  ) {}
 
   validate(data: object): void {
     // `validateFlows` takes a batch and throws `E_VALIDATION` on the
     // first invalid entry; a single-element array validates one file.
     validateFlows([data]);
+    assertEnvRefs(data, this.env);
   }
 
   async create(client: PlatformClient, data: object): Promise<string> {

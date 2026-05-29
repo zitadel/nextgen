@@ -1,11 +1,6 @@
-import { join } from "node:path";
-
 import { Flags } from "@oclif/core";
 
 import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
-import { ZitadelError } from "../lib/errors";
-import { FLOWS_DIR, flowEnvRefs } from "../lib/flows";
-import { readJsonDir } from "../lib/json-dir";
 import { createPlatformClient } from "../lib/api";
 import { environmentSchema } from "../lib/api/schemas";
 import { buildSyncPlan, makeSyncers, renderPlan, runSyncLoop } from "../lib/sync";
@@ -15,10 +10,10 @@ import { readZitadelSecret } from "../lib/project";
  * `zitadel apply` — validate and upload repo config to the platform.
  *
  * Runs the sync loop to convergence, or (with `--dry-run`) previews the diff
- * without mutating. The only preflight here is the `${VAR}` / `*_env` reference
- * check, which needs the runtime environment; structural validation of every
- * schema and flow happens inside the sync engine ({@link buildSyncPlan}), so an
- * invalid file fails with `E_VALIDATION` before any platform call.
+ * without mutating. All validation — structural shape and `${VAR}` / `*_env`
+ * reference presence — happens inside the sync engine ({@link buildSyncPlan}),
+ * so an invalid or under-configured file fails with `E_VALIDATION` before any
+ * platform call.
  */
 export default class Apply extends BaseCommand {
   static override description = "Validate and upload repo config to the platform.";
@@ -36,14 +31,8 @@ export default class Apply extends BaseCommand {
     const { cwd, source, env, dryRun, isTTY } = this.meta;
 
     const secret = await readZitadelSecret(cwd);
-    const flows = await readJsonDir(join(cwd, FLOWS_DIR));
-    const missing = flowEnvRefs(flows).filter((name) => !env[name]);
-    if (missing.length > 0) {
-      throw new ZitadelError("E_VALIDATION", `Missing environment variables: ${missing.join(", ")}`);
-    }
-
     const client = createPlatformClient(source, secret.project_secret);
-    const syncers = makeSyncers({ projectId: secret.project_id });
+    const syncers = makeSyncers({ projectId: secret.project_id, env });
 
     if (!dryRun) {
       await runSyncLoop(cwd, client, syncers);

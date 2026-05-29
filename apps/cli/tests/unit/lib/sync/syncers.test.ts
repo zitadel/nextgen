@@ -71,14 +71,14 @@ function makeFakeClient(): {
 
 describe("makeSyncers", () => {
   it("returns the schema and flow syncers in order", () => {
-    const syncers = makeSyncers({ projectId: "proj-1" });
+    const syncers = makeSyncers({ projectId: "proj-1", env: {} });
 
     expect(syncers).toHaveLength(2);
     expect(syncers.map((s) => s.kind)).toEqual(["schema", "flow"]);
   });
 
   it("configures the schema syncer (immutable, SCHEMAS_DIR)", () => {
-    const [schema] = makeSyncers({ projectId: "proj-1" });
+    const [schema] = makeSyncers({ projectId: "proj-1", env: {} });
 
     expect(schema.kind).toBe("schema");
     expect(schema.directory).toBe(SCHEMAS_DIR);
@@ -87,7 +87,7 @@ describe("makeSyncers", () => {
   });
 
   it("configures the flow syncer (mutable, FLOWS_DIR)", () => {
-    const [, flow] = makeSyncers({ projectId: "proj-1" });
+    const [, flow] = makeSyncers({ projectId: "proj-1", env: {} });
 
     expect(flow.kind).toBe("flow");
     expect(flow.directory).toBe(FLOWS_DIR);
@@ -98,19 +98,19 @@ describe("makeSyncers", () => {
 
 describe("SchemaSyncer", () => {
   it("validate accepts a structurally valid JSON Schema", () => {
-    const [schema] = makeSyncers({ projectId: "proj-1" });
+    const [schema] = makeSyncers({ projectId: "proj-1", env: {} });
 
     expect(() => schema.validate({ type: "object" })).not.toThrow();
   });
 
   it("validate throws E_VALIDATION on a malformed JSON Schema", () => {
-    const [schema] = makeSyncers({ projectId: "proj-1" });
+    const [schema] = makeSyncers({ projectId: "proj-1", env: {} });
 
     expect(() => schema.validate({ type: 123 })).toThrow(ZitadelError);
   });
 
   it("create passes the bare data through and returns the platform id", async () => {
-    const [schema] = makeSyncers({ projectId: "proj-1" });
+    const [schema] = makeSyncers({ projectId: "proj-1", env: {} });
     const { client, calls } = makeFakeClient();
     const data = { kind: "user-schema", version: 1 };
 
@@ -121,7 +121,7 @@ describe("SchemaSyncer", () => {
   });
 
   it("update is a no-op and does not call the client", async () => {
-    const [schema] = makeSyncers({ projectId: "proj-1" });
+    const [schema] = makeSyncers({ projectId: "proj-1", env: {} });
     const { client, calls } = makeFakeClient();
 
     await expect(schema.update(client, "schema-id-1", { a: 1 })).resolves.toBeUndefined();
@@ -129,7 +129,7 @@ describe("SchemaSyncer", () => {
   });
 
   it("delete dispatches to deleteSchema with the id", async () => {
-    const [schema] = makeSyncers({ projectId: "proj-1" });
+    const [schema] = makeSyncers({ projectId: "proj-1", env: {} });
     const { client, calls } = makeFakeClient();
 
     await schema.delete(client, "schema-id-1");
@@ -138,7 +138,7 @@ describe("SchemaSyncer", () => {
   });
 
   it("fetch dispatches to getSchema and returns its body verbatim", async () => {
-    const [schema] = makeSyncers({ projectId: "proj-1" });
+    const [schema] = makeSyncers({ projectId: "proj-1", env: {} });
     const { client, calls } = makeFakeClient();
 
     const body = await schema.fetch?.(client, "schema-id-1");
@@ -161,19 +161,41 @@ const VALID_FLOW = {
 
 describe("FlowDefinitionSyncer", () => {
   it("validate accepts a well-formed flow definition", () => {
-    const [, flow] = makeSyncers({ projectId: "proj-1" });
+    const [, flow] = makeSyncers({ projectId: "proj-1", env: {} });
 
     expect(() => flow.validate(VALID_FLOW)).not.toThrow();
   });
 
   it("validate throws E_VALIDATION on a malformed flow definition", () => {
-    const [, flow] = makeSyncers({ projectId: "proj-1" });
+    const [, flow] = makeSyncers({ projectId: "proj-1", env: {} });
 
     expect(() => flow.validate({ version: 99, kind: "wrong" })).toThrow(ZitadelError);
   });
 
+  const FLOW_WITH_ENV_REF = {
+    ...VALID_FLOW,
+    steps: [
+      {
+        ...VALID_FLOW.steps[0],
+        gates: { captcha: { type: "captcha", config: { client_secret_env: "MY_SECRET" } } },
+      },
+    ],
+  };
+
+  it("validate throws E_VALIDATION when a referenced env var is missing", () => {
+    const [, flow] = makeSyncers({ projectId: "proj-1", env: {} });
+
+    expect(() => flow.validate(FLOW_WITH_ENV_REF)).toThrow(ZitadelError);
+  });
+
+  it("validate passes when the referenced env var is present", () => {
+    const [, flow] = makeSyncers({ projectId: "proj-1", env: { MY_SECRET: "hunter2" } });
+
+    expect(() => flow.validate(FLOW_WITH_ENV_REF)).not.toThrow();
+  });
+
   it("create wraps the body in the spec envelope with project_id", async () => {
-    const [, flow] = makeSyncers({ projectId: "proj-1" });
+    const [, flow] = makeSyncers({ projectId: "proj-1", env: {} });
     const { client, calls } = makeFakeClient();
     const data = { name: "Default", version: 2 };
 
@@ -186,7 +208,7 @@ describe("FlowDefinitionSyncer", () => {
   });
 
   it("update sends the bare partial body with no envelope", async () => {
-    const [, flow] = makeSyncers({ projectId: "proj-1" });
+    const [, flow] = makeSyncers({ projectId: "proj-1", env: {} });
     const { client, calls } = makeFakeClient();
     const patch = { version: 3 };
 
@@ -196,7 +218,7 @@ describe("FlowDefinitionSyncer", () => {
   });
 
   it("delete dispatches to deleteFlowDefinition with the id", async () => {
-    const [, flow] = makeSyncers({ projectId: "proj-1" });
+    const [, flow] = makeSyncers({ projectId: "proj-1", env: {} });
     const { client, calls } = makeFakeClient();
 
     await flow.delete(client, "flow-id-1");
@@ -205,7 +227,7 @@ describe("FlowDefinitionSyncer", () => {
   });
 
   it("fetch strips the detail envelope and returns only the bare body", async () => {
-    const [, flow] = makeSyncers({ projectId: "proj-1" });
+    const [, flow] = makeSyncers({ projectId: "proj-1", env: {} });
     const { client, calls } = makeFakeClient();
 
     const body = await flow.fetch?.(client, "flow-id-1");

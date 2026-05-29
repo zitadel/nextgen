@@ -220,7 +220,7 @@ describe("buildSyncPlan validation (real syncers)", () => {
       await writeResource(cwd, ".zitadel/schemas", "user.json", { type: 123 });
 
       await expect(
-        buildSyncPlan(cwd, makeSyncers({ projectId: "proj-1" })),
+        buildSyncPlan(cwd, makeSyncers({ projectId: "proj-1", env: {} })),
       ).rejects.toMatchObject({ code: "E_VALIDATION" });
     } finally {
       await rm(cwd, { recursive: true, force: true });
@@ -234,7 +234,7 @@ describe("buildSyncPlan validation (real syncers)", () => {
       await writeResource(cwd, ".zitadel/flows", "default.json", { version: 99, kind: "wrong" });
 
       await expect(
-        buildSyncPlan(cwd, makeSyncers({ projectId: "proj-1" })),
+        buildSyncPlan(cwd, makeSyncers({ projectId: "proj-1", env: {} })),
       ).rejects.toMatchObject({ code: "E_VALIDATION" });
     } finally {
       await rm(cwd, { recursive: true, force: true });
