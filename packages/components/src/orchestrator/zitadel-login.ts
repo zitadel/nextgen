@@ -670,11 +670,18 @@ export class ZitadelLogin extends LitElement {
   }
 }
 
+// Empty/unset values are skipped so the merge in `applyResponse` can't
+// overwrite what the user just typed. A step re-rendered after a
+// validation error carries the same field shape with no `value` set;
+// spreading `{ email: "" }` over `formValues` would silently wipe the
+// user's input and make a re-submit feel like nothing changed.
 function collectInitialValues(step: CreateFlow201Step): Record<string, string> {
   const values: Record<string, string> = {};
   if (!step.fields) return values;
   for (const [name, field] of Object.entries(step.fields)) {
-    values[name] = typeof field.value === "string" ? field.value : "";
+    if (typeof field.value === "string" && field.value !== "") {
+      values[name] = field.value;
+    }
   }
   return values;
 }
