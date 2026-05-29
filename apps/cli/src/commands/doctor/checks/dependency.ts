@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
+import { loadPatchContext } from "../patch-context";
 import { AbstractSanityCheck, type CheckContext } from "./types";
 
 /**
@@ -26,5 +27,18 @@ export class DependencyCheck extends AbstractSanityCheck {
     if (!names.some((name) => name.startsWith("@zitadel"))) {
       throw new Error("no @zitadel* dependency found in package.json");
     }
+  }
+
+  override async fix(ctx: CheckContext): Promise<void> {
+    // The exact SDK package is framework/renderer-specific and known only to
+    // the patcher, which deliberately hides its file-op plan. So rebuild the
+    // patch context and let the patcher reclaim its managed artifacts — that
+    // re-adds the dependency via its `add-dep` op.
+    const patchCtx = await loadPatchContext(ctx.cwd, ctx.orca);
+    await ctx.orca.patcherFor(patchCtx.framework.id).repair(patchCtx, {
+      cwd: ctx.cwd,
+      dryRun: ctx.dryRun,
+      force: true,
+    });
   }
 }

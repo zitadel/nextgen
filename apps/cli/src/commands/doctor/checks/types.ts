@@ -8,19 +8,25 @@ export type CheckOutcome = {
   path?: string;
 };
 
-/** Everything a check needs to inspect a project. */
+/** Everything a check needs to inspect or repair a project. */
 export type CheckContext = {
   readonly cwd: string;
   readonly orca: Orca;
+  /** When true, {@link SanityCheck.fix} must preview without writing. */
+  readonly dryRun: boolean;
 };
 
 /**
  * One diagnostic the `doctor` command runs. Each concrete check is a small
- * standalone class; the command simply executes every registered check and
- * aggregates the {@link CheckOutcome}s.
+ * standalone class that both verifies its concern ({@link run}) and knows how
+ * to repair it ({@link fix}); the command executes every registered check,
+ * aggregates the {@link CheckOutcome}s, and (under `--fix`) repairs the ones
+ * that failed.
  */
 export interface SanityCheck {
   run(ctx: CheckContext): Promise<CheckOutcome>;
+  /** Repair what this check verifies. A no-op when there is no safe auto-fix. */
+  fix(ctx: CheckContext): Promise<void>;
 }
 
 /**
@@ -28,6 +34,9 @@ export interface SanityCheck {
  * `summary`, and implement the single {@link verify} method that throws on
  * failure. {@link run} wraps it so a thrown error becomes a `fail` outcome
  * carrying the error message, and success becomes a `pass` with `summary`.
+ *
+ * {@link fix} defaults to a no-op: checks whose failure has no safe automatic
+ * remedy (a missing secret, an invalid user schema) simply do not override it.
  */
 export abstract class AbstractSanityCheck implements SanityCheck {
   abstract readonly name: string;
@@ -49,5 +58,9 @@ export abstract class AbstractSanityCheck implements SanityCheck {
         path: this.path,
       };
     }
+  }
+
+  async fix(_ctx: CheckContext): Promise<void> {
+    // Default: nothing to repair. Fixable checks override.
   }
 }

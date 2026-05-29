@@ -169,6 +169,19 @@ describe("doctor command", () => {
     expect(schema?.status).toBe("fail");
   });
 
+  it("re-locks loose secret permissions via --fix and then passes", async () => {
+    const cwd = await makeHealthyProject();
+    await chmod(join(cwd, ".zitadel/secret"), 0o644);
+
+    const res = await doctor(cwd, ["--fix"]);
+
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as { status: string; data: { ok: boolean; checks: Check[] } };
+    expect(json.status).toBe("ok");
+    const perms = json.data.checks.find((check) => check.name === "secret-permissions");
+    expect(perms?.status).toBe("pass");
+  });
+
   it("re-applies a missing Zitadel dependency via --fix and then passes", async () => {
     const cwd = await makeHealthyProject();
     // Drop the SDK dependency; repair re-adds it via its `add-dep` op.
