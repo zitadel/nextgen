@@ -370,7 +370,7 @@ export class ZitadelLogin extends LitElement {
       this.loading = true;
       try {
         const cfg = this.project ?? getZitadelConfig();
-        await exchangeSession(cfg?.apiBase ?? "", { handoff_token: handoffToken }, this.sessionExchangePath);
+        await exchangeSession(cfg?.apiBase ?? "", { handoff_token: handoffToken }, cfg?.projectId ?? "", this.sessionExchangePath);
         window.location.assign(this.postSignInUrl);
       } catch (error) {
         this.handleTransportError(error);
