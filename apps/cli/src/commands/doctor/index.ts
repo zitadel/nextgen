@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { Flags } from "@oclif/core";
 
-import { BaseCommand, type CommandResult, type GlobalOptions, type JsonEnvelope } from "../../lib/oclif";
+import { BaseCommand, type JsonEnvelope } from "../../lib/oclif";
 import { ZitadelError } from "../../lib/errors";
 import { isAuthMethod } from "../../lib/flows";
 import { isObject } from "../../lib/json";
@@ -13,54 +13,14 @@ import type { UserSchema } from "../../lib/user-schema";
 import { readDevelopmentIssuer, readRendererId, readZitadelConfig, readZitadelSecret } from "../../lib/project";
 import { SANITY_CHECKS } from "./checks";
 
-/**
- * Options for {@link runDoctor}. When `fix` is set, doctor re-applies the
- * managed scaffold (reclaiming managed files, even locally edited ones)
- * before running its checks.
- */
-export type DoctorOptions = GlobalOptions & {
-  fix?: boolean;
-};
-
-/**
- * Diagnoses a Zitadel-managed project and, with `fix`, repairs it first.
- *
- * Runs every registered {@link SANITY_CHECKS} entry and emits the aggregate
- * result. If any check fails it throws `E_VALIDATION` carrying the full check
- * details so the caller can render them.
- */
-export async function runDoctor(opts: DoctorOptions): Promise<CommandResult> {
-  const orca = createOrca();
-  if (opts.fix) {
-    await applyFixes(opts, orca);
-  }
-
-  const checks = await Promise.all(SANITY_CHECKS.map((check) => check.run({ cwd: opts.cwd, orca })));
-  const failed = checks.filter((check) => check.status === "fail");
-  const data = {
-    title: failed.length === 0 ? "Zitadel doctor passed." : "Zitadel doctor found issues.",
-    ok: failed.length === 0,
-    checks,
-  };
-
-  if (failed.length > 0) {
-    throw new ZitadelError("E_VALIDATION", "Zitadel doctor found issues", {
-      hint: "Run `npx zitadel@latest doctor --fix` to re-apply missing managed files.",
-      details: data,
-    });
-  }
-
-  return { status: "ok", data };
-}
-
-async function applyFixes(opts: DoctorOptions, orca: Orca): Promise<void> {
-  const ctx = await loadPatchContext(opts.cwd, orca);
+async function applyFixes(cwd: string, dryRun: boolean, orca: Orca): Promise<void> {
+  const ctx = await loadPatchContext(cwd, orca);
   // `repair` reclaims the managed artifacts — env files, gitignore, the SDK
   // dependency, and marker-bearing routes/middleware — even when locally edited,
   // while leaving the user-editable `.zitadel/` resource files untouched.
   await orca
     .patcherFor(ctx.framework.id)
-    .repair(ctx, { cwd: opts.cwd, dryRun: opts.dryRun, force: true });
+    .repair(ctx, { cwd, dryRun, force: true });
 }
 
 /**
@@ -123,7 +83,14 @@ async function readState(cwd: string): Promise<{ dev_port?: number } | undefined
   }
 }
 
-/** `zitadel doctor` — verify generated files and local state. */
+/**
+ * `zitadel doctor` — verify generated files and local state.
+ *
+ * Runs every registered {@link SANITY_CHECKS} entry and emits the aggregate
+ * result; if any check fails it throws `E_VALIDATION` carrying the full check
+ * details. With `--fix`, it re-applies the managed scaffold first (reclaiming
+ * managed files, even locally edited ones) before running the checks.
+ */
 export default class Doctor extends BaseCommand {
   static override description = "Verify generated files and local state.";
   static override flags = {
@@ -133,6 +100,28 @@ export default class Doctor extends BaseCommand {
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(Doctor);
     await this.toMeta(flags);
-    return this.emit(await runDoctor({ ...this.meta, fix: flags.fix }));
+    const { cwd, dryRun } = this.meta;
+
+    const orca = createOrca();
+    if (flags.fix) {
+      await applyFixes(cwd, dryRun, orca);
+    }
+
+    const checks = await Promise.all(SANITY_CHECKS.map((check) => check.run({ cwd, orca })));
+    const failed = checks.filter((check) => check.status === "fail");
+    const data = {
+      title: failed.length === 0 ? "Zitadel doctor passed." : "Zitadel doctor found issues.",
+      ok: failed.length === 0,
+      checks,
+    };
+
+    if (failed.length > 0) {
+      throw new ZitadelError("E_VALIDATION", "Zitadel doctor found issues", {
+        hint: "Run `npx zitadel@latest doctor --fix` to re-apply missing managed files.",
+        details: data,
+      });
+    }
+
+    return this.emit({ status: "ok", data });
   }
 }

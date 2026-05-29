@@ -4,30 +4,8 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { runDoctor } from "../../../src/commands/doctor";
-import type { GlobalOptions } from "../../../src/lib/oclif";
-import { ZitadelError } from "../../../src/lib/errors";
+import { parseJson, runCliForTest } from "../../helpers/run-cli";
 import { MANAGED_MARKER } from "../../../src/lib/paths";
-
-function makeOpts(
-  cwd: string,
-  overrides: Partial<GlobalOptions & { fix?: boolean }> = {},
-): GlobalOptions & { fix?: boolean } {
-  return {
-    cwd,
-    nonInteractive: true,
-    dryRun: false,
-    force: false,
-    command: "doctor",
-    cliVersion: "0.0.0",
-    source: "mock",
-    verbose: false,
-    debug: false,
-    env: {},
-    isTTY: false,
-    ...overrides,
-  };
-}
 
 type Check = { name: string; status: "pass" | "fail"; message: string; path?: string };
 
@@ -38,6 +16,18 @@ const VALID_USER_SCHEMA = {
   type: "object",
   properties: { email: { type: "string" } },
 };
+
+function doctor(cwd: string, extra: string[] = []) {
+  return runCliForTest([
+    "doctor",
+    "--cwd",
+    cwd,
+    "--json",
+    "--server",
+    "https://api.zitadel.cloud",
+    ...extra,
+  ]);
+}
 
 /**
  * Builds a well-formed managed project that should pass every doctor check
@@ -97,12 +87,6 @@ async function makeHealthyProject(): Promise<string> {
   return cwd;
 }
 
-function checksFromError(error: unknown): Check[] {
-  expect(error).toBeInstanceOf(ZitadelError);
-  const details = (error as ZitadelError).details as { checks: Check[] };
-  return details.checks;
-}
-
 afterEach(async () => {
   while (tempDirs.length > 0) {
     const dir = tempDirs.pop();
@@ -112,17 +96,18 @@ afterEach(async () => {
   }
 });
 
-describe("runDoctor", () => {
+describe("doctor command", () => {
   it("passes every check for a well-formed managed project", async () => {
     const cwd = await makeHealthyProject();
-    const result = await runDoctor(makeOpts(cwd));
+    const res = await doctor(cwd);
 
-    expect(result.status).toBe("ok");
-    const data = result.data as { ok: boolean; checks: Check[] };
-    expect(data.ok).toBe(true);
-    expect(data.checks.every((check) => check.status === "pass")).toBe(true);
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as { status: string; data: { ok: boolean; checks: Check[] } };
+    expect(json.status).toBe("ok");
+    expect(json.data.ok).toBe(true);
+    expect(json.data.checks.every((check) => check.status === "pass")).toBe(true);
     // Sanity: the full battery actually ran, and the page checks are gone.
-    const names = data.checks.map((check) => check.name);
+    const names = json.data.checks.map((check) => check.name);
     expect(names).toContain("config");
     expect(names).toContain("secret");
     expect(names).toContain("dependency");
@@ -139,15 +124,13 @@ describe("runDoctor", () => {
       JSON.stringify({ name: "demo", dependencies: { next: "^15" } }),
     );
 
-    let thrown: unknown;
-    await runDoctor(makeOpts(cwd)).catch((error: unknown) => {
-      thrown = error;
-    });
+    const res = await doctor(cwd);
 
-    expect(thrown).toBeInstanceOf(ZitadelError);
-    expect((thrown as ZitadelError).code).toBe("E_VALIDATION");
-    const checks = checksFromError(thrown);
-    const dependency = checks.find((check) => check.name === "dependency");
+    expect(res.exitCode).toBe(3);
+    const json = parseJson(res.stdout) as { status: string; code: string; details: { checks: Check[] } };
+    expect(json.status).toBe("error");
+    expect(json.code).toBe("E_VALIDATION");
+    const dependency = json.details.checks.find((check) => check.name === "dependency");
     expect(dependency?.status).toBe("fail");
   });
 
@@ -165,13 +148,11 @@ describe("runDoctor", () => {
     );
     await chmod(join(cwd, ".zitadel/secret"), 0o600);
 
-    let thrown: unknown;
-    await runDoctor(makeOpts(cwd)).catch((error: unknown) => {
-      thrown = error;
-    });
+    const res = await doctor(cwd);
 
-    const checks = checksFromError(thrown);
-    const match = checks.find((check) => check.name === "project-match");
+    expect(res.exitCode).toBe(3);
+    const json = parseJson(res.stdout) as { details: { checks: Check[] } };
+    const match = json.details.checks.find((check) => check.name === "project-match");
     expect(match?.status).toBe("fail");
   });
 
@@ -180,13 +161,11 @@ describe("runDoctor", () => {
     // `type` must be a string/array of strings; a number makes the schema invalid.
     await writeFile(join(cwd, ".zitadel/schemas/user.json"), JSON.stringify({ type: 123 }));
 
-    let thrown: unknown;
-    await runDoctor(makeOpts(cwd)).catch((error: unknown) => {
-      thrown = error;
-    });
+    const res = await doctor(cwd);
 
-    const checks = checksFromError(thrown);
-    const schema = checks.find((check) => check.name === "schema");
+    expect(res.exitCode).toBe(3);
+    const json = parseJson(res.stdout) as { details: { checks: Check[] } };
+    const schema = json.details.checks.find((check) => check.name === "schema");
     expect(schema?.status).toBe("fail");
   });
 
@@ -198,12 +177,13 @@ describe("runDoctor", () => {
       JSON.stringify({ name: "demo", dependencies: { next: "^15" } }),
     );
 
-    const result = await runDoctor(makeOpts(cwd, { fix: true }));
+    const res = await doctor(cwd, ["--fix"]);
 
-    expect(result.status).toBe("ok");
-    const data = result.data as { ok: boolean; checks: Check[] };
-    expect(data.ok).toBe(true);
-    const dependency = data.checks.find((check) => check.name === "dependency");
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as { status: string; data: { ok: boolean; checks: Check[] } };
+    expect(json.status).toBe("ok");
+    expect(json.data.ok).toBe(true);
+    const dependency = json.data.checks.find((check) => check.name === "dependency");
     expect(dependency?.status).toBe("pass");
   });
 });
