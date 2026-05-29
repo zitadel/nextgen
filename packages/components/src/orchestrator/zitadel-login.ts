@@ -356,11 +356,13 @@ export class ZitadelLogin extends LitElement {
     if (issues.length > 0) {
       console.warn("[zitadel-login] branding payload has issues:", issues);
     }
-    // Preserve carry-over fields (email captured on the identifier step
-    // is the identity we greet on the signed-in screen) by merging the
-    // next step's defaults *into* the existing values rather than
-    // replacing wholesale.
-    this.formValues = { ...this.formValues, ...collectInitialValues(wire.step) };
+    // Seed formValues with the step's defaults so every declared field
+    // has an entry — submit() only forwards keys present in formValues,
+    // so a missing entry would drop the field from the wire and let the
+    // backend skip required-checks and challenge dispatch. Existing
+    // entries (the user's typed input on this step, plus carry-over
+    // from previous steps like email-for-greeting) win over defaults.
+    this.formValues = { ...collectInitialValues(wire.step), ...this.formValues };
     void this.maybeCompleteFlow(wire);
   }
 
@@ -670,18 +672,11 @@ export class ZitadelLogin extends LitElement {
   }
 }
 
-// Empty/unset values are skipped so the merge in `applyResponse` can't
-// overwrite what the user just typed. A step re-rendered after a
-// validation error carries the same field shape with no `value` set;
-// spreading `{ email: "" }` over `formValues` would silently wipe the
-// user's input and make a re-submit feel like nothing changed.
 function collectInitialValues(step: CreateFlow201Step): Record<string, string> {
   const values: Record<string, string> = {};
   if (!step.fields) return values;
   for (const [name, field] of Object.entries(step.fields)) {
-    if (typeof field.value === "string" && field.value !== "") {
-      values[name] = field.value;
-    }
+    values[name] = typeof field.value === "string" ? field.value : "";
   }
   return values;
 }

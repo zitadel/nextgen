@@ -521,4 +521,34 @@ describe("<zitadel-login> against the typed Flow API", () => {
     >('zl-field[name="email"]');
     expect(emailField?.value).toBe("bad-email");
   });
+
+  it("sends declared step fields on submit even when the user typed nothing", async () => {
+    const element = await mount(host);
+
+    // Submit immediately without dispatching any zl-input. The wire body
+    // must still include every field the current step declares — empty
+    // strings if necessary — otherwise the backend skips required-checks
+    // and challenge dispatch and silently advances on an empty payload.
+    element.shadowRoot?.dispatchEvent(
+      new CustomEvent("zl-submit", {
+        bubbles: true,
+        composed: true,
+        detail: { action: "submit" },
+      }),
+    );
+
+    await waitFor(() => {
+      const submits = mock.getCaptured().filter(
+        (req): req is Extract<CapturedRequest, { kind: "submitFlowStep" }> =>
+          req.kind === "submitFlowStep",
+      );
+      return submits.length > 0 ? submits : null;
+    });
+
+    const submits = mock.getCaptured().filter(
+      (req): req is Extract<CapturedRequest, { kind: "submitFlowStep" }> =>
+        req.kind === "submitFlowStep",
+    );
+    expect(submits[0]?.body.fields).toEqual({ email: "", password: "" });
+  });
 });
