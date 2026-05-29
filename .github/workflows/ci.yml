@@ -57,7 +57,7 @@ jobs:
       # cold cache) so test runs skip the flaky network fetch. Keyed on go.sum so
       # an embedded-postgres bump invalidates it automatically.
       - name: Cache embedded-postgres binary
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.embedded-postgres-go
           key: embedded-postgres-${{ runner.os }}-${{ hashFiles('go.sum') }}
@@ -125,7 +125,7 @@ jobs:
       # Browsers live under ~/.cache/ms-playwright on Linux.
       - name: Restore Playwright browsers
         id: playwright-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
