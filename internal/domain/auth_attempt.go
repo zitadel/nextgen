@@ -108,8 +108,14 @@ func WithSession(sessionID *string, authFactors ...AuthFactor) AuthAttemptOption
 }
 
 func NewAuthAttempt(projectID string, requiredChecks []AuthCheckType, opts ...AuthAttemptOption) (*AuthAttempt, error) {
+	id, err := newID(PrefixAuthAttempt)
+	if err != nil {
+		return nil, err
+	}
+
 	attempt := &AuthAttempt{
 		ProjectID:      projectID,
+		ID:             id,
 		RequiredChecks: requiredChecks,
 		TimeToLive:     new(AuthAttemptTTL),
 	}
@@ -249,6 +255,19 @@ func (a *AuthAttempt) PreparePasswordChallenge() error {
 	return nil
 }
 
+// PreparePasskeyChallenge validates that a passkey challenge can be issued
+// and returns the user ID if the user was already identified.
+func (a *AuthAttempt) PreparePasskeyChallenge() (string, error) {
+	if err := a.PrepareChallenge(AuthCheckTypePasskey); err != nil {
+		return "", err
+	}
+	userCheck, ok := CheckAs[*AuthFactorUser](a, AuthCheckTypeUser)
+	if !ok {
+		return "", nil
+	}
+	return userCheck.UserID, nil
+}
+
 // SetUserChallenge registers a new user challenge on the attempt, replacing any existing challenge of the same type.
 func (a *AuthAttempt) SetUserChallenge() *AuthChallengeUser {
 	challenge := &AuthChallengeUser{}
@@ -259,6 +278,14 @@ func (a *AuthAttempt) SetUserChallenge() *AuthChallengeUser {
 // SetPasswordChallenge registers a new password challenge on the attempt, replacing any existing challenge of the same type.
 func (a *AuthAttempt) SetPasswordChallenge() *AuthChallengePassword {
 	challenge := &AuthChallengePassword{}
+	a.SetCheck(challenge)
+	return challenge
+}
+
+func (a *AuthAttempt) SetPasskeyChallenge(passkeyChallenge *PasskeyChallenge) *AuthChallengePasskey {
+	challenge := &AuthChallengePasskey{
+		PasskeyChallenge: passkeyChallenge,
+	}
 	a.SetCheck(challenge)
 	return challenge
 }
@@ -313,6 +340,21 @@ func (a *AuthAttempt) PreparePasswordVerification(challengeID string) (AuthChall
 	return challenge, userCheck, nil
 }
 
+// PreparePasskeyVerification validates that a passkey proof can be submitted
+// and returns the user ID to verify against if there was a user identified already.
+func (a *AuthAttempt) PreparePasskeyVerification(challengeID string) (AuthChallenge, *AuthFactorUser, error) {
+	challenge, err := a.PrepareVerification(challengeID, AuthCheckTypePasskey)
+	if err != nil {
+		return nil, nil, err
+	}
+	// TODO(adlerhurst): we might want to allow passkey verification without a user identified, but for now we'll require it to simplify the implementation and prevent potential security issues.
+	userCheck, ok := CheckAs[*AuthFactorUser](a, AuthCheckTypeUser)
+	if !ok {
+		return nil, nil, ErrAuthAttemptInvalidRequest()
+	}
+	return challenge, userCheck, nil
+}
+
 // SetUserFactor registers a verified user factor on the attempt, overwriting existing factors of the same type and clearing any associated challenges.
 func (a *AuthAttempt) SetUserFactor(user *User) *AuthFactorUser {
 	factor := &AuthFactorUser{
@@ -325,6 +367,15 @@ func (a *AuthAttempt) SetUserFactor(user *User) *AuthFactorUser {
 // SetPasswordFactor registers a verified password factor on the attempt, overwriting existing factors of the same type and clearing any associated challenges.
 func (a *AuthAttempt) SetPasswordFactor() *AuthFactorPassword {
 	factor := &AuthFactorPassword{}
+	a.SetCheck(factor)
+	return factor
+}
+
+func (a *AuthAttempt) SetPasskeyFactor(passkeyVerification *PasskeyVerification) *AuthFactorPasskey {
+	factor := &AuthFactorPasskey{
+		UserVerified: passkeyVerification.UserVerified,
+		UserID:       passkeyVerification.UserID,
+	}
 	a.SetCheck(factor)
 	return factor
 }

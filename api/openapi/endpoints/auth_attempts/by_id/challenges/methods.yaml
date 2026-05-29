@@ -30,4 +30,3 @@ post:
             $ref: challenge-response.yaml
     default:
       $ref: issueChallenge-error-response.yaml
-
