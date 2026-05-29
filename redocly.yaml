@@ -1,0 +1,15 @@
+extends:
+  - recommended
+
+rules:
+  info-license: error
+  info-license-strict: error
+  no-ambiguous-paths: error
+  no-invalid-media-type-examples: error
+  no-schema-type-mismatch: error
+  no-server-example.com: error
+  no-unused-components: error
+  operation-2xx-response: error
+  operation-4xx-response: off
+  operation-operationId: error
+  tag-description: error
