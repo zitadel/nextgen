@@ -1,6 +1,6 @@
 //go:build postgres_integration
 
-// Run: go test -tags=integration ./internal/service/... -run SessionService_Exchange_integration -count=1
+// Run: go test -tags=postgres_integration ./internal/service/... -run SessionService_Exchange_integration -count=1
 
 package service_test
 
@@ -77,7 +77,7 @@ func runPostgresIntegrationTests(m *testing.M) int {
 func integrationPoolOrFail(t *testing.T) database.Pool {
 	t.Helper()
 	if integrationPool == nil {
-		t.Fatal(fmt.Sprintf("integration pool not initialized; run with -tags=integration"))
+		t.Fatal(fmt.Sprintf("integration pool not initialized; run with -tags=postgres_integration"))
 	}
 	return integrationPool
 }

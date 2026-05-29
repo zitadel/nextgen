@@ -112,11 +112,11 @@ docker info
 Run the integration tests (same commands as CI):
 
 ```sh
-# Postgres (all packages)
+# Postgres
 go test -v -tags postgres_integration -timeout=10m ./...
 
-# Spanner (repository suite)
-go test -v -tags spanner_integration -timeout=10m ./internal/storage/database/repository/...
+# Spanner
+go test -v -tags spanner_integration -timeout=10m ./...
 ```
 
 If `docker info` fails and the host uses **rootless Docker**, override the socket mount in [`.devcontainer/devcontainer.json`](.devcontainer/devcontainer.json) per the [docker-outside-of-docker feature docs](https://github.com/devcontainers/features/tree/main/src/docker-outside-of-docker#rootless-docker-support), for example bind `/run/user/<uid>/docker.sock` to `/var/run/docker-host.sock` (use `id -u` on the host for `<uid>`).

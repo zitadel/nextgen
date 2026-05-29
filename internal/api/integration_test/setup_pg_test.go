@@ -35,12 +35,14 @@ func runTests(m *testing.M) int {
 		stop = func() {}
 	} else {
 		connector, stop, err = embedded.StartContainer(ctx)
-		helpers.Connector = connector
 	}
 	if err != nil {
 		log.Printf("setup: failed to start database: %v", err)
 		return 1
 	}
+	// Set after both branches so the ZITADEL_TEST_POSTGRES_URL path also wires
+	// up the connector that helpers.EnsureDBPool dials.
+	helpers.Connector = connector
 	defer stop()
 
 	pool, err := connector.Connect(ctx)

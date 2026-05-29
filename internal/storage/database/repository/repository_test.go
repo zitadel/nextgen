@@ -79,13 +79,13 @@ func newEmbeddedDB(ctx context.Context) (pool database.PoolTest, stop func(), er
 		log.Println("using database provided by env")
 		connector, err = postgres.DecodeConfig(url)
 		if err != nil {
-			return nil, nil, fmt.Errorf("unable to connect to provided postgres: %w", err)
+			return nil, func() {}, fmt.Errorf("unable to connect to provided postgres: %w", err)
 		}
 		stop = func() {}
 	} else {
 		connector, stop, err = embedded.StartContainer(ctx)
 		if err != nil {
-			return nil, nil, fmt.Errorf("unable to start postgres container: %w", err)
+			return nil, func() {}, fmt.Errorf("unable to start postgres container: %w", err)
 		}
 	}
 
