@@ -1,8 +1,7 @@
+import type { ZitadelProject } from '@zitadel-nextgen/api/config';
 import type { NextRequest } from 'next/server';
 
 import { NextResponse } from 'next/server';
-
-import type { ZitadelProject } from '@zitadel-nextgen/api/config';
 
 import type { NextgenMiddlewareOptions } from './types';
 
@@ -416,12 +415,17 @@ async function handleAuth(
  * `proxyPath` and `issuerUrl` are omitted because they come from the
  * {@link ZitadelConfig} passed as the first argument.
  */
-export type ProxyOptions = Omit<NextgenMiddlewareOptions, 'proxyPath' | 'issuerUrl'>;
+export type ProxyOptions = Omit<
+  NextgenMiddlewareOptions,
+  'proxyPath' | 'issuerUrl'
+>;
 
 /**
  * A pre-configured middleware handler returned by {@link createProxy}.
  */
-export type ProxyHandler = (req: NextRequest) => Promise<NextResponse | Response>;
+export type ProxyHandler = (
+  req: NextRequest,
+) => Promise<NextResponse | Response>;
 
 /**
  * Creates a pre-configured middleware handler from the SDK config

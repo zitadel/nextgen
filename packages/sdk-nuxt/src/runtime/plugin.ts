@@ -40,8 +40,7 @@ export default defineNuxtPlugin(() => {
   const publicConfig = runtimeConfig.public;
   const apiBase =
     (publicConfig.nextgenApiBase as string | undefined) ?? '/__nextgen';
-  const projectId =
-    (publicConfig.zitadelProjectId as string | undefined) ?? '';
+  const projectId = (publicConfig.zitadelProjectId as string | undefined) ?? '';
   const issuerUrl =
     (runtimeConfig.nextgenIssuerUrl as string | undefined) ??
     'http://localhost:4000';

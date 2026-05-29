@@ -1,4 +1,7 @@
-import { getZitadelConfig, type ZitadelProject } from '@zitadel-nextgen/api/config';
+import {
+  getZitadelConfig,
+  type ZitadelProject,
+} from '@zitadel-nextgen/api/config';
 
 /**
  * Returns the current Zitadel project handle.
