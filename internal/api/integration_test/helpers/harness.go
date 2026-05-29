@@ -9,16 +9,18 @@ import (
 	"github.com/zitadel/nextgen/internal/api/integration_test/test_data"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/secrets"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 type Harness struct {
-	DBPool     database.Pool
-	HttpClient *http.Client
-	TestServer *httptest.Server
-	Hasher     *crypto.PasswapHasher
-	Crypter    crypto.Crypter
+	DBPool          database.Pool
+	HttpClient      *http.Client
+	TestServer      *httptest.Server
+	Hasher          *crypto.PasswapHasher
+	Crypter         crypto.Crypter
+	SecretGenerator secrets.Generator
 
 	GeneratedServer *generated.Server
 	Handler         *api.Handler

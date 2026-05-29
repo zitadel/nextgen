@@ -2,14 +2,11 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/ianlancetaylor/jsonschema"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/domain/idgen"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -89,27 +86,20 @@ func (fd *flowDefinitionService) Create(ctx context.Context, req CreateFlowDefin
 		return nil, "", domain.ErrFlowDefinitionAlreadyExists()
 	}
 
-	ulidGen := idgen.NewULID()
-	flowDefID, err := ulidGen.New(string(domain.PrefixFlowDefinition))
-	if err != nil {
-		return nil, "", domain.ErrInternal(err)
-	}
-
 	purposes, err := mapPurposesToDomain(req.Purposes)
 	if err != nil {
 		return nil, "", err
 	}
 
-	flowDefinition := domain.FlowDefinition{
-		ID:            flowDefID,
-		ProjectID:     req.ProjectID,
-		Name:          req.Name,
-		SchemaVersion: req.SchemaVersion,
-		UserSchema:    req.UserSchema,
-		Purposes:      purposes,
-		Audience:      req.Audience,
-		Steps:         req.Steps,
-	}
+	flowDefinition, err := domain.NewFlowDefinition(
+		req.ProjectID,
+		req.Name,
+		req.SchemaVersion,
+		req.UserSchema,
+		purposes,
+		req.Audience,
+		req.Steps,
+	)
 	// if req.FlowSchemaURI is empty, use the latest flow definition schema from the builtin schema provider
 	flowSchemaURI := req.FlowSchemaURI
 	if flowSchemaURI == "" {
@@ -118,36 +108,27 @@ func (fd *flowDefinitionService) Create(ctx context.Context, req CreateFlowDefin
 			return nil, "", domain.ErrSchemaFetchFailed("failed to get latest flow definition schema URI", err)
 		}
 	}
-	err = fd.Validate(ctx, flowDefinition, flowSchemaURI, req.RawFlowDefinition)
+	err = fd.Validate(ctx, flowDefinition)
 	if err != nil {
 		return nil, "", err
 	}
-	now := time.Now()
-	flowDefinition.CreatedAt = now
-	flowDefinition.UpdatedAt = now
-	flowDefinition.Status = domain.FlowDefinitionStatusActive
-	err = fd.flowDefinitionRepo.CreateFlowDefinition(ctx, fd.db, &flowDefinition)
+	err = fd.flowDefinitionRepo.CreateFlowDefinition(ctx, fd.db, flowDefinition)
 	if err != nil {
 		return nil, "", err
 	}
-	return &flowDefinition, flowSchemaURI, nil
+	return flowDefinition, flowSchemaURI, nil
 }
 
 // Validate validates the flow definition steps and transitions
-func (fd *flowDefinitionService) Validate(ctx context.Context, flowDefinition domain.FlowDefinition, flowSchemaURI string, flowDefinitionRaw []byte) error {
-	// 1. structural validation against the flow definition schema
-	if err := fd.validateAgainstSchema(flowSchemaURI, flowDefinitionRaw); err != nil {
-		return err
-	}
-
+func (fd *flowDefinitionService) Validate(ctx context.Context, flowDefinition *domain.FlowDefinition) error {
 	// resolve the user schema from the user schema URI
 	userSchema, err := fd.schemaResolver.Resolve(ctx, fd.db, flowDefinition.ProjectID, flowDefinition.UserSchema, nil)
 	if err != nil {
-		return domain.ErrSchemaFetchFailed("failed to resolve tenant user schema", err)
+		return domain.ErrSchemaFetchFailed("failed to resolve user schema", err)
 	}
 
 	// validate the flow steps, fields against the user schema, transitions, reachability, trapped cycles, etc.
-	pivotingTargets, err := fd.validateFlowDefinition(userSchema, flowDefinition)
+	pivotingTargets, err := fd.validateFlowDefinition(userSchema, *flowDefinition)
 	if err != nil {
 		return err
 	}
@@ -155,27 +136,6 @@ func (fd *flowDefinitionService) Validate(ctx context.Context, flowDefinition do
 	// validate that the pivoting targets returned by the flow definition validator are valid flow definitions in the same project
 	return fd.validatePivotingTargets(ctx, pivotingTargets, flowDefinition.ProjectID)
 
-}
-
-// validateAgainstSchema validates the flow definition against the flow definition schema.
-// If wantFlowSchemaURI is empty, the latest flow definition schema is used.
-func (fd *flowDefinitionService) validateAgainstSchema(flowSchemaURI string, flowDefinition []byte) (err error) {
-	flowDefinitionSchema, err := fd.builtinSchemaProvider.GetBuiltinSchema(flowSchemaURI)
-	if err != nil {
-		return domain.ErrSchemaFetchFailed("failed to fetch flow definition schema", err)
-	}
-
-	var instance any
-	err = json.Unmarshal(flowDefinition, &instance)
-	if err != nil {
-		return domain.ErrFlowDefinitionInvalid("invalid flow definition JSON", err)
-	}
-	err = flowDefinitionSchema.Validate(instance)
-	if err != nil {
-		// domain.FlattenValidationErrors(err) can be used to get individual errors
-		return domain.ErrFlowDefinitionInvalid(fmt.Sprintf("flow definition does not conform to schema %q", flowSchemaURI), err)
-	}
-	return nil
 }
 
 // validatePivotingTargets validates that the pivoting targets are a valid flow definition in the same project.
