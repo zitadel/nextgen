@@ -2,19 +2,9 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
-import { runApply } from "../../../src/commands/apply";
-import type { GlobalOptions } from "../../../src/lib/oclif";
-
-vi.mock("../../../src/lib/sync/loop", () => ({
-  runSyncLoop: vi.fn().mockResolvedValue(undefined),
-  buildSyncPlan: vi.fn().mockResolvedValue([]),
-}));
-
-vi.mock("../../../src/lib/api/index", () => ({
-  createPlatformClient: vi.fn().mockReturnValue({}),
-}));
+import { parseJson, runCliForTest } from "../../helpers/run-cli";
 
 const VALID_FLOW = {
   // Spec: `name` is a slug-pattern stable identifier; required fields are
@@ -30,7 +20,7 @@ const VALID_FLOW = {
       type: "identifier",
       fields: {},
       actions: {},
-      gates: {},
+      gates: { captcha: { type: "captcha", config: { client_secret_env: "MY_SECRET" } } },
       transitions: {},
     },
   ],
@@ -45,31 +35,14 @@ const SECRET = {
   schema_version: 2,
 };
 
-function makeOpts(
-  cwd: string,
-  overrides: Partial<GlobalOptions> = {},
-): Parameters<typeof runApply>[0] {
-  return {
-    cwd,
-    nonInteractive: true,
-    dryRun: false,
-    force: false,
-    command: "apply",
-    cliVersion: "0.0.0",
-    source: "mock",
-    verbose: false,
-    debug: false,
-    env: {},
-    isTTY: false,
-    ...overrides,
-  };
-}
+const tempDirs: string[] = [];
 
-async function makeCwd(secret: object, flows: Record<string, object> = {}): Promise<string> {
+async function makeCwd(flows: Record<string, object>): Promise<string> {
   const cwd = join(tmpdir(), `zitadel-apply-test-${Math.random().toString(36).slice(2)}`);
+  tempDirs.push(cwd);
   await mkdir(join(cwd, ".zitadel/flows"), { recursive: true });
   await mkdir(join(cwd, ".zitadel/schemas"), { recursive: true });
-  await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify(secret));
+  await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify(SECRET));
   await writeFile(
     join(cwd, ".zitadel/state.json"),
     JSON.stringify({ framework: "next", resources: {} }),
@@ -80,44 +53,32 @@ async function makeCwd(secret: object, flows: Record<string, object> = {}): Prom
   return cwd;
 }
 
-describe("runApply pre-flight checks", () => {
-  it("blocks when a referenced env var is missing", async () => {
-    const flowWithEnvRef = {
-      ...VALID_FLOW,
-      steps: [
-        {
-          ...VALID_FLOW.steps[0],
-          gates: { captcha: { type: "captcha", config: { client_secret_env: "MY_SECRET" } } },
-        },
-      ],
-    };
-    const cwd = await makeCwd(SECRET, { "default.json": flowWithEnvRef });
-    try {
-      await expect(runApply(makeOpts(cwd))).rejects.toThrow(
-        "Missing environment variables",
-      );
-    } finally {
-      await rm(cwd, { recursive: true, force: true });
+afterEach(async () => {
+  while (tempDirs.length > 0) {
+    const dir = tempDirs.pop();
+    if (dir) {
+      await rm(dir, { recursive: true, force: true });
     }
-  });
+  }
+});
 
-  it("passes when all referenced env vars are present", async () => {
-    const flowWithEnvRef = {
-      ...VALID_FLOW,
-      steps: [
-        {
-          ...VALID_FLOW.steps[0],
-          gates: { captcha: { type: "captcha", config: { client_secret_env: "MY_SECRET" } } },
-        },
-      ],
-    };
-    const cwd = await makeCwd(SECRET, { "default.json": flowWithEnvRef });
-    try {
-      await expect(
-        runApply(makeOpts(cwd, { env: { MY_SECRET: "hunter2" } })),
-      ).resolves.not.toThrow();
-    } finally {
-      await rm(cwd, { recursive: true, force: true });
-    }
+describe("apply command pre-flight", () => {
+  it("errors with E_VALIDATION when a referenced env var is missing", async () => {
+    const cwd = await makeCwd({ "default.json": VALID_FLOW });
+
+    const res = await runCliForTest([
+      "apply",
+      "--cwd",
+      cwd,
+      "--json",
+      "--server",
+      "https://api.zitadel.cloud",
+    ]);
+
+    expect(res.exitCode).toBe(3);
+    const json = parseJson(res.stdout) as { status: string; code: string; message: string };
+    expect(json.status).toBe("error");
+    expect(json.code).toBe("E_VALIDATION");
+    expect(json.message).toContain("Missing environment variables");
   });
 });
