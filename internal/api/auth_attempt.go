@@ -151,27 +151,28 @@ func verifyRequestToProof(req *api.VerifyChallengeRequest) (service.Proof, error
 	}
 }
 
-func factorMethodToCheckType(method api.FactorMethod) (domain.AuthCheckType, error) {
-	switch method {
-	case api.FactorMethodIdentifier:
-		return domain.AuthCheckTypeUser, nil
-	case api.FactorMethodPassword:
-		return domain.AuthCheckTypePassword, nil
-	case api.FactorMethodPasskey:
-		return domain.AuthCheckTypePasskey, nil
-	default:
-		return domain.AuthCheckTypeUnspecified, domain.ErrAuthAttemptInvalidRequest()
-	}
+var methodChecks = map[api.FactorMethod]domain.AuthCheckType{
+	api.FactorMethodIdentifier: domain.AuthCheckTypeUser,
+	api.FactorMethodPassword:   domain.AuthCheckTypePassword,
+	api.FactorMethodPasskey:    domain.AuthCheckTypePasskey,
 }
 
-func challengeToAPI(challeng domain.AuthChallenge) *api.ChallengeResponse {
+func factorMethodToCheckType(method api.FactorMethod) (domain.AuthCheckType, error) {
+	check, ok := methodChecks[method]
+	if !ok {
+		return domain.AuthCheckTypeUnspecified, domain.ErrAuthAttemptInvalidRequest()
+	}
+	return check, nil
+}
+
+func challengeToAPI(challenge domain.AuthChallenge) *api.ChallengeResponse {
 	return &api.ChallengeResponse{
-		ChallengeID: api.ChallengeID(challeng.GetID()),
-		Method:      checkTypeToAPI(challeng.Type()),
+		ChallengeID: api.ChallengeID(challenge.GetID()),
+		Method:      checkTypeToAPI(challenge.Type()),
 		State:       api.ChallengeResponseStatePending,
-		CreatedAt:   challeng.GetLastChallengedAt(),
+		CreatedAt:   challenge.GetLastChallengedAt(),
 		ExpiresAt:   api.OptNilDateTime{},
-		Payload:     challengePayloadToAPI(challeng),
+		Payload:     challengePayloadToAPI(challenge),
 	}
 }
 
@@ -211,7 +212,7 @@ func authAttemptToAPI(attempt *domain.AuthAttempt) *api.AuthAttemptResponse {
 		resp.SessionID = api.NewOptNilSessionID(api.SessionID(*attempt.SessionID))
 	}
 	if !attempt.ExpiresAt().IsZero() {
-		resp.ExpiresAt = api.NewOptNilDateTime(attempt.ExpiresAt())
+		resp.ExpiresAt = api.NewOptDateTime(attempt.ExpiresAt())
 	}
 	return resp
 }

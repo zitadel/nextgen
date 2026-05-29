@@ -422,7 +422,8 @@ type AuthAttemptResponse struct {
 	// All challenges issued within this attempt, in creation order.
 	// Use this to track the state of each factor challenge (pending, verified, failed, expired).
 	Challenges []ChallengeResponse `json:"challenges"`
-	ExpiresAt  OptNilDateTime      `json:"expires_at"`
+	// When this attempt expires (15-minute TTL from creation).
+	ExpiresAt OptDateTime `json:"expires_at"`
 	// When this attempt was created.
 	CreatedAt time.Time `json:"created_at"`
 }
@@ -468,7 +469,7 @@ func (s *AuthAttemptResponse) GetChallenges() []ChallengeResponse {
 }
 
 // GetExpiresAt returns the value of ExpiresAt.
-func (s *AuthAttemptResponse) GetExpiresAt() OptNilDateTime {
+func (s *AuthAttemptResponse) GetExpiresAt() OptDateTime {
 	return s.ExpiresAt
 }
 
@@ -518,7 +519,7 @@ func (s *AuthAttemptResponse) SetChallenges(val []ChallengeResponse) {
 }
 
 // SetExpiresAt sets the value of ExpiresAt.
-func (s *AuthAttemptResponse) SetExpiresAt(val OptNilDateTime) {
+func (s *AuthAttemptResponse) SetExpiresAt(val OptDateTime) {
 	s.ExpiresAt = val
 }
 

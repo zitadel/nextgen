@@ -76,12 +76,10 @@ properties:
     items:
       $ref: by_id/challenges/challenge-response.yaml
   expires_at:
-    oneOf:
-      - type: 'null'
-      - type: string
-        format: date-time
-        description: When this attempt expires (15-minute TTL from creation)
-        example: '2026-04-28T15:45:00Z'
+    type: string
+    format: date-time
+    description: When this attempt expires (15-minute TTL from creation)
+    example: '2026-04-28T15:45:00Z'
   created_at:
     type: string
     format: date-time
