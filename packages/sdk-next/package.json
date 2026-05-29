@@ -44,6 +44,7 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "@zitadel-nextgen/api": "workspace:*",
     "@zitadel-nextgen/components": "workspace:*",
     "@zitadel-nextgen/sdk-core": "workspace:*",
     "server-only": "^0.0.1"

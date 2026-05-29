@@ -2,12 +2,16 @@
  * Re-exports the `<zitadel-login>` and `<zitadel-logout>` Lit web components
  * for use in Next.js apps.
  *
- * Import this inside a `"use client"` boundary to register the custom
- * elements with the global registry:
+ * Import this inside a `"use client"` boundary (e.g. a dynamic import
+ * with `{ ssr: false }`) to register the custom elements with the
+ * browser's global registry:
  *
  * ```ts
- * "use client";
- * import "@zitadel-nextgen/sdk-next/client";
+ * await import("@zitadel-nextgen/sdk-next/client");
  * ```
+ *
+ * SDK configuration is handled separately via `configureZitadel()`
+ * from `@zitadel-nextgen/api/config` — typically in a shared
+ * `zitadel.ts` init file.
  */
 export { ZitadelLogin, ZitadelLogout } from '@zitadel-nextgen/components';

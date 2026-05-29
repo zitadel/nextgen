@@ -15,6 +15,9 @@
   "exclude": ["node_modules"],
   "references": [
     {
+      "path": "../../packages/api"
+    },
+    {
       "path": "../../packages/sdk-next"
     },
     {

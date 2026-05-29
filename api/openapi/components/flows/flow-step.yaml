@@ -28,10 +28,8 @@ example:
       text_key: login.action.recover
   gates:
     captcha:
-      type: captcha
+      kind: captcha
       provider: altcha
-      required: true
-      satisfied: false
       config:
         algorithm: SHA-256
         challenge: abc123

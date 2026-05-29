@@ -9,7 +9,7 @@
  * `zitadel-login.browser.spec.ts` because jsdom 29 only ships a partial
  * `ElementInternals` implementation.
  */
-import { setApiBaseUrl } from "@zitadel-nextgen/api/runtime/base-url";
+import { configureZitadel, _resetConfigForTesting } from "@zitadel-nextgen/api/config";
 import {
   applyBranding,
   clearBranding,
@@ -38,12 +38,15 @@ const API_BASE = "https://flow.test.invalid";
 let mock: MockHandle = setupMockHandlers();
 const server = setupServer(...mock.handlers);
 
+let testProject = configureZitadel({ apiBase: API_BASE, projectId: "demo-project" });
+
 beforeAll(() => {
-  setApiBaseUrl(API_BASE);
   server.listen({ onUnhandledRequest: "error" });
 });
 
 beforeEach(() => {
+  _resetConfigForTesting();
+  testProject = configureZitadel({ apiBase: API_BASE, projectId: "demo-project" });
   mock = setupMockHandlers();
   mock.reset();
   server.resetHandlers(...mock.handlers);
@@ -107,7 +110,7 @@ async function advanceMockLoginFlow(element: ZitadelLogin, email = "alice@acme.c
 async function mount(host: HTMLElement): Promise<ZitadelLogin> {
   const element = document.createElement("zitadel-login") as ZitadelLogin;
   element.purpose = "login";
-  element.projectId = "demo-project";
+  element.project = testProject;
   host.appendChild(element);
   await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
   return element;
@@ -213,6 +216,8 @@ describe("<zitadel-login> against the typed Flow API", () => {
     server.use(
       http.post(exchangeUrl, async ({ request }) => {
         exchangeHit = true;
+        const url = new URL(request.url);
+        expect(url.searchParams.get("project_id")).toBe("demo-project");
         const body = (await request.json()) as { handoff_token?: string };
         expect(body.handoff_token).toBeTruthy();
         return HttpResponse.json({
@@ -231,11 +236,11 @@ describe("<zitadel-login> against the typed Flow API", () => {
     );
 
     try {
-      setApiBaseUrl("/__nextgen");
+      _resetConfigForTesting();
+      const localProject = configureZitadel({ apiBase: "/__nextgen", projectId: "demo-project" });
       const element = document.createElement("zitadel-login") as ZitadelLogin;
       element.purpose = "login";
-      element.projectId = "demo-project";
-      element.apiBase = "/__nextgen";
+      element.project = localProject;
       element.sessionExchangePath = customExchangePath;
       element.postSignInUrl = "/admin";
       host.appendChild(element);
@@ -247,7 +252,8 @@ describe("<zitadel-login> against the typed Flow API", () => {
       expect(exchangeHit).toBe(true);
       expect(assign).toHaveBeenCalledWith("/admin");
     } finally {
-      setApiBaseUrl(API_BASE);
+      _resetConfigForTesting();
+      testProject = configureZitadel({ apiBase: API_BASE, projectId: "demo-project" });
       Object.defineProperty(window, "location", {
         configurable: true,
         value: location,
@@ -266,7 +272,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
     try {
       const element = document.createElement("zitadel-login") as ZitadelLogin;
       element.purpose = "login";
-      element.projectId = "demo-project";
+      element.project = testProject;
       element.postSignInUrl = "/admin";
       host.appendChild(element);
       await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
@@ -281,6 +287,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
       );
       expect(exchanges).toHaveLength(1);
       expect(exchanges[0]?.body.handoff_token).toBeTruthy();
+      expect(exchanges[0]?.projectId).toBe("demo-project");
     } finally {
       Object.defineProperty(window, "location", {
         configurable: true,
@@ -301,7 +308,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
     const errorEvents: CustomEvent[] = [];
     const element = document.createElement("zitadel-login") as ZitadelLogin;
     element.purpose = "login";
-    element.projectId = "demo-project";
+    element.project = testProject;
     element.addEventListener("zitadel-flow-error", (event: Event) =>
       errorEvents.push(event as CustomEvent),
     );

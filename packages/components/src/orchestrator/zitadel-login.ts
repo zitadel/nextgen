@@ -1,4 +1,4 @@
-import { setApiBaseUrl } from "@zitadel-nextgen/api/runtime/base-url";
+import { getZitadelConfig, getApi, type ZitadelProject } from "@zitadel-nextgen/api/config";
 import type {
   CreateFlow201,
   CreateFlow201Step,
@@ -24,7 +24,7 @@ import { applyBaseTokens, applyBrandingTokens } from "./branding-to-tokens.js";
 import { validateBranding } from "./branding-validator.js";
 import { applyFontUrl } from "./font-loader.js";
 import { createLiquidEngine, TEMPLATE_NAMES } from "./liquid.js";
-import { en, type Locale } from "./locales/en.js";
+import { en, builtinLocales, type Locale } from "./locales/index.js";
 import { patchMandatoryGates } from "./mandatory-gates.js";
 import { zitadelAttributionPillInnerHtml } from "@zitadel-nextgen/shared-component-styles/attribution-markup";
 import { createSanitiser } from "./sanitiser.js";
@@ -86,17 +86,11 @@ export class ZitadelLogin extends LitElement {
 
   @property({ type: String }) accessor purpose: CreateFlowBodyPurpose = "login";
 
-  @property({ type: String, attribute: "project-id" }) accessor projectId = "";
-
-  @property({ type: String }) accessor issuer = "";
-
   /**
-   * Override the API base URL for tests / dev playgrounds. Setting this is
-   * equivalent to calling `setApiBaseUrl()` from `@zitadel-nextgen/api`
-   * before the orchestrator runs; we apply it on first use so consumers can
-   * configure it declaratively.
+   * SDK project handle returned by `configureZitadel()`. When set, takes
+   * precedence over the global singleton from `getZitadelConfig()`.
    */
-  @property({ type: String, attribute: "api-base" }) accessor apiBase = "";
+  @property({ attribute: false }) accessor project: ZitadelProject | undefined;
 
   /**
    * Path for the handoff exchange request. Defaults to `/sessions/exchange`
@@ -126,8 +120,26 @@ export class ZitadelLogin extends LitElement {
    */
   @property({ type: String, attribute: "resume-flow-id" }) accessor resumeFlowId = "";
 
-  /** Override locale dict. Defaults to bundled `en`. */
-  @property({ attribute: false }) accessor locale: Locale = en;
+  /**
+   * BCP 47 language tag (e.g. `"de"`, `"en-US"`). The widget resolves this
+   * to a built-in locale dictionary. Falls back to auto-detection from
+   * `document.documentElement.lang` or `navigator.language` when empty.
+   */
+  @property({ type: String }) override accessor lang = "";
+
+  /**
+   * Custom locale dictionaries keyed by language code. When set, these take
+   * precedence over the built-in dictionaries for matching language codes.
+   *
+   * ```ts
+   * import { en } from "@zitadel-nextgen/components";
+   * const locales = {
+   *   en: { ...en, "identifier.title": "Welcome" },
+   *   de: myGermanDict,
+   * };
+   * ```
+   */
+  @property({ attribute: false }) accessor locales: Record<string, Locale> | undefined;
 
   @state() private accessor response: CreateFlow201 | null = null;
 
@@ -200,9 +212,25 @@ export class ZitadelLogin extends LitElement {
     queueMicrotask(() => void this.startFlow());
   }
 
+  /**
+   * Resolves the effective locale dictionary. The built-in dictionary for the
+   * resolved language is used as the base; entries from the `locales` map (if
+   * set) are spread on top so partial overrides work without importing and
+   * spreading the full base dictionary.
+   */
+  private resolveLocale(): Locale {
+    const code = this.lang
+      || (typeof document !== "undefined" ? document.documentElement.lang : "")
+      || (typeof navigator !== "undefined" ? navigator.language : "");
+    const primary = (code.split("-")[0] ?? "").toLowerCase();
+    const builtin = builtinLocales[primary] ?? en;
+    const custom = this.locales?.[primary];
+    return custom ? { ...builtin, ...custom } : builtin;
+  }
+
   override willUpdate(changed: PropertyValues<this>): void {
-    if (!this.engine) {
-      this.engine = createLiquidEngine({ locale: this.locale });
+    if (!this.engine || changed.has("locales") || changed.has("lang")) {
+      this.engine = createLiquidEngine({ locale: this.resolveLocale() });
     }
     const root = this.shadowRoot;
     if (root) {
@@ -290,20 +318,27 @@ export class ZitadelLogin extends LitElement {
   }
 
   private async startFlow(): Promise<void> {
-    if (this.apiBase) {
-      setApiBaseUrl(this.apiBase);
+    const cfg = this.project ?? getZitadelConfig();
+
+    // Resolve project ID from handle.
+    const projectId = cfg?.projectId || "";
+
+    if (!cfg) {
+      throw new Error("<zitadel-login> requires a `config` prop (from configureZitadel()) or configureZitadel() must be called before use.");
     }
+    const api = getApi(cfg);
+
     this.loading = true;
     this.startupError = null;
     try {
       let wire: CreateFlow201;
       if (this.resumeFlowId) {
-        wire = await getCurrentStep(this.resumeFlowId);
+        wire = await getCurrentStep(api, this.resumeFlowId);
       } else {
-        if (!this.projectId) {
-          throw new Error("<zitadel-login> requires a `project-id` attribute to start a flow.");
+        if (!projectId) {
+          throw new Error("<zitadel-login> requires a `project-id` attribute (or configureZitadel()) to start a flow.");
         }
-        wire = await apiStartFlow({ project_id: this.projectId, purpose: this.purpose });
+        wire = await apiStartFlow(api, { project_id: projectId, purpose: this.purpose });
       }
       this.applyResponse(wire);
     } catch (error) {
@@ -368,7 +403,8 @@ export class ZitadelLogin extends LitElement {
     if (behavior === "show" && handoffToken && this.postSignInUrl) {
       this.loading = true;
       try {
-        await exchangeSession({ handoff_token: handoffToken }, this.sessionExchangePath);
+        const cfg = this.project ?? getZitadelConfig();
+        await exchangeSession(cfg?.apiBase ?? "", { handoff_token: handoffToken }, cfg?.projectId ?? "", this.sessionExchangePath);
         window.location.assign(this.postSignInUrl);
       } catch (error) {
         this.handleTransportError(error);
@@ -430,7 +466,7 @@ export class ZitadelLogin extends LitElement {
       }
     }
 
-    const patched = patchMandatoryGates(raw, step, this.locale);
+    const patched = patchMandatoryGates(raw, step, this.resolveLocale());
     return this.sanitise(patched);
   }
 
@@ -600,7 +636,10 @@ export class ZitadelLogin extends LitElement {
         fields,
         ...(challengeResponse ? { challenge_response: challengeResponse } : {}),
       };
-      const wire = await apiSubmitStep(id, body);
+      const cfg = this.project ?? getZitadelConfig();
+      if (!cfg) throw new Error("<zitadel-login> config is required for submit.");
+      const api = getApi(cfg);
+      const wire = await apiSubmitStep(api, id, body);
       this.applyResponse(wire);
       this.dispatchEvent(
         new CustomEvent("zitadel-flow-step", {

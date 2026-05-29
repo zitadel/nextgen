@@ -4,15 +4,11 @@ import dynamic from "next/dynamic";
 
 const ZitadelLogin = dynamic(
   async () => {
+    const { demoProject } = await import("@/zitadel");
     await import("@zitadel-nextgen/components");
     return function ZitadelLoginElement() {
-      return (
-        <zitadel-login
-          api-base="/__nextgen"
-          project-id={process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID ?? "demo"}
-          post-sign-in-url="/admin"
-        />
-      );
+      return <zitadel-login project={demoProject} post-sign-in-url="/admin" locales={{ en: { "identifier.title": "Howdy!" } }}
+      />;
     };
   },
   { ssr: false },

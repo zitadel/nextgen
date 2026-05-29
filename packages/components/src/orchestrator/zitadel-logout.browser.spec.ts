@@ -1,6 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { setApiBaseUrl } from "@zitadel-nextgen/api/runtime/base-url";
+import { configureZitadel } from "@zitadel-nextgen/api/config";
 
 import "./zitadel-logout.js";
 import type { ZitadelLogout } from "./zitadel-logout.js";
@@ -18,7 +18,7 @@ import type { ZitadelLogout } from "./zitadel-logout.js";
 const API_BASE = "https://logout.test.invalid";
 
 beforeAll(() => {
-  setApiBaseUrl(API_BASE);
+  configureZitadel({ apiBase: API_BASE, projectId: "test" });
 });
 
 function setDisplayCookie(name: string, email: string): void {
