@@ -105,6 +105,19 @@ export function startMockServer(port: number): Server {
     "/sessions/exchange",
     jsonBodyParser,
     async (req: express.Request, res: express.Response) => {
+      const projectId = req.query.project_id;
+      if (!projectId || typeof projectId !== "string") {
+        res
+          .status(400)
+          .json(
+            errorBody(
+              "sess.project_id_missing",
+              "The session API currently requires the project_id query parameter to fulfill requests.",
+            ),
+          );
+        return;
+      }
+
       const idempotencyKey = req.header("Idempotency-Key");
       if (idempotencyKey) {
         const cached = idempotencyCache.get(idempotencyKey);
@@ -161,7 +174,7 @@ export function startMockServer(port: number): Server {
       const body: ExchangeHandoff200 = {
         session: {
           session_id: `sess_${randomUUID().replaceAll("-", "").slice(0, 12)}`,
-          project_id: "proj_mock",
+          project_id: projectId,
           state: "active",
           factors: [],
           assurance_levels: [],
