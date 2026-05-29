@@ -17,12 +17,22 @@ import { hasZitadelConfig, hasZitadelSecret, readZitadelSecret } from "../lib/pr
 /** The user-schema fields scaffolded for every project. */
 const DEFAULT_USER_FIELDS = ["email", "given_name", "family_name"] as const;
 
+/**
+ * The frameworks `--framework` accepts, derived from Orca's registry so the
+ * flag can't drift from what the CLI can actually scaffold. `createOrca` is
+ * pure (it only builds the in-memory registries), so this is safe at module
+ * load.
+ */
+const FRAMEWORK_OPTIONS = createOrca()
+  .availableFrameworks()
+  .map((framework) => framework.id);
+
 /** `zitadel setup` — create a project and scaffold local auth. */
 export default class Setup extends BaseCommand {
   static override description = "Create a Zitadel project and scaffold local auth.";
   static override examples = ["<%= config.bin %> setup --framework next --auth-method passkey"];
   static override flags = {
-    framework: Flags.string({ description: "Framework to target.", options: ["next"] }),
+    framework: Flags.string({ description: "Framework to target.", options: FRAMEWORK_OPTIONS }),
     "auth-method": Flags.string({
       description: "Auth method (default: passkey).",
       options: [...AUTH_METHODS],

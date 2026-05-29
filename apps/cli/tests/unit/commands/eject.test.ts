@@ -4,25 +4,19 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { runEject } from "../../../src/commands/eject";
-import type { GlobalOptions } from "../../../src/lib/oclif";
+import { parseJson, runCliForTest } from "../../helpers/run-cli";
 import { MANAGED_MARKER } from "../../../src/lib/paths";
 
-function makeOpts(cwd: string, overrides: Partial<GlobalOptions> = {}): GlobalOptions {
-  return {
+function eject(cwd: string, extra: string[] = []) {
+  return runCliForTest([
+    "eject",
+    "--cwd",
     cwd,
-    nonInteractive: true,
-    dryRun: false,
-    force: false,
-    command: "eject",
-    cliVersion: "0.0.0",
-    source: "mock",
-    verbose: false,
-    debug: false,
-    env: {},
-    isTTY: false,
-    ...overrides,
-  };
+    "--json",
+    "--server",
+    "https://api.zitadel.cloud",
+    ...extra,
+  ]);
 }
 
 async function exists(path: string): Promise<boolean> {
@@ -74,12 +68,16 @@ afterEach(async () => {
   }
 });
 
-describe("runEject", () => {
+describe("eject command", () => {
   it("refuses to run without --force in non-interactive mode", async () => {
     const cwd = await makeManagedProject();
-    await expect(runEject(makeOpts(cwd, { force: false }))).rejects.toMatchObject({
-      code: "E_VALIDATION",
-    });
+
+    const res = await eject(cwd);
+
+    expect(res.exitCode).toBe(3);
+    const json = parseJson(res.stdout) as { status: string; code: string };
+    expect(json.status).toBe("error");
+    expect(json.code).toBe("E_VALIDATION");
     // Nothing should have been removed.
     expect(await exists(join(cwd, "zitadel.json"))).toBe(true);
     expect(await exists(join(cwd, ".zitadel"))).toBe(true);
@@ -87,29 +85,30 @@ describe("runEject", () => {
 
   it("removes managed files and the .zitadel dir when forced", async () => {
     const cwd = await makeManagedProject();
-    const result = await runEject(makeOpts(cwd, { force: true }));
 
-    expect(result.status).toBe("ok");
-    const data = result.data as {
-      files_removed: string[];
-      files_preserved: string[];
-      backed_up: string[];
+    const res = await eject(cwd, ["--force"]);
+
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as {
+      status: string;
+      data: { files_removed: string[]; files_preserved: string[]; backed_up: string[] };
     };
+    expect(json.status).toBe("ok");
 
     // Managed files and config/state are gone.
-    expect(data.files_removed).toContain("zitadel.json");
-    expect(data.files_removed).toContain("app/login/page.tsx");
+    expect(json.data.files_removed).toContain("zitadel.json");
+    expect(json.data.files_removed).toContain("app/login/page.tsx");
     expect(await exists(join(cwd, "zitadel.json"))).toBe(false);
     expect(await exists(join(cwd, "app/login/page.tsx"))).toBe(false);
     // The whole .zitadel directory is removed wholesale.
     expect(await exists(join(cwd, ".zitadel"))).toBe(false);
 
     // The unmanaged register page is preserved.
-    expect(data.files_preserved).toContain("app/register/page.tsx");
+    expect(json.data.files_preserved).toContain("app/register/page.tsx");
     expect(await exists(join(cwd, "app/register/page.tsx"))).toBe(true);
 
     // .env.local is renamed to a timestamped backup, not deleted.
-    expect(data.backed_up.length).toBe(1);
+    expect(json.data.backed_up.length).toBe(1);
     expect(await exists(join(cwd, ".env.local"))).toBe(false);
     const entries = await readdir(cwd);
     expect(entries.some((name) => name.startsWith(".env.local.ejected-"))).toBe(true);
@@ -117,13 +116,16 @@ describe("runEject", () => {
 
   it("reports what would be removed in dry-run without touching the filesystem", async () => {
     const cwd = await makeManagedProject();
-    const result = await runEject(makeOpts(cwd, { force: true, dryRun: true }));
 
-    expect(result.status).toBe("ok");
-    const data = result.data as { files_removed: string[]; backed_up: string[] };
-    expect(data.files_removed).toContain("zitadel.json");
+    const res = await eject(cwd, ["--force", "--dry-run"]);
+
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as {
+      data: { files_removed: string[]; backed_up: string[] };
+    };
+    expect(json.data.files_removed).toContain("zitadel.json");
     // Dry-run must still preview the .env.local backup, not silently omit it.
-    expect(data.backed_up.some((entry) => entry.startsWith(".env.local"))).toBe(true);
+    expect(json.data.backed_up.some((entry) => entry.startsWith(".env.local"))).toBe(true);
 
     // Dry-run leaves everything in place.
     expect(await exists(join(cwd, "zitadel.json"))).toBe(true);
@@ -135,12 +137,11 @@ describe("runEject", () => {
     const cwd = await mkdtemp(join(tmpdir(), "zitadel-eject-empty-"));
     tempDirs.push(cwd);
 
-    const result = await runEject(makeOpts(cwd, { force: true }));
+    const res = await eject(cwd, ["--force"]);
 
-    expect(result.status).toBe("skipped");
-    if (result.status !== "skipped") {
-      throw new Error("expected skipped");
-    }
-    expect(result.reason).toBe("nothing-to-eject");
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as { status: string; reason: string };
+    expect(json.status).toBe("skipped");
+    expect(json.reason).toBe("nothing-to-eject");
   });
 });

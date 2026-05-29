@@ -1,117 +1,12 @@
 import { readFile, rename, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
 
-import { BaseCommand, type CommandResult, type GlobalOptions, type JsonEnvelope } from "../lib/oclif";
+import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
 import { ZitadelError } from "../lib/errors";
 import { createOrca } from "../lib/orca";
 import type { EjectActions } from "../lib/orca/patchers/types";
 import { MANAGED_MARKER } from "../lib/paths";
 import { readRendererId, readZitadelConfig } from "../lib/project";
-
-/**
- * Options for {@link runEject}. `force` is required to eject in non-interactive
- * mode, since ejecting permanently deletes managed files.
- */
-export type EjectOptions = GlobalOptions & {
-  force?: boolean;
-};
-
-/**
- * Removes Zitadel-managed files from the project, leaving the remote project
- * untouched. The set of files comes from the framework patcher's
- * {@link import("../lib/orca/patchers/types").Patcher.artifacts}, so the patcher
- * is the single source of truth for what its integration owns.
- *
- * Marked code files are removed only when they still carry the managed marker
- * (user-replaced files are preserved); `zitadel.json` is removed; `.env.local`
- * is renamed to a timestamped backup; and `.zitadel/` is removed wholesale.
- * `dryRun` reports without touching the filesystem; non-interactive runs require
- * `force`.
- */
-export async function runEject(opts: EjectOptions): Promise<CommandResult> {
-  if (!opts.force && opts.nonInteractive) {
-    throw new ZitadelError("E_VALIDATION", "Eject requires --force in non-interactive mode", {
-      hint: "Re-run with --force to confirm deletion of managed files.",
-    });
-  }
-
-  const actions = await resolveEjectActions(opts.cwd);
-  const removed: string[] = [];
-  const preserved: string[] = [];
-  const backedUp: string[] = [];
-
-  for (const rel of actions.markedFiles) {
-    const abs = join(opts.cwd, rel);
-    if (!(await pathExists(abs))) {
-      continue;
-    }
-    const contents = await readFile(abs, "utf8").catch(() => "");
-    if (!contents.includes(MANAGED_MARKER)) {
-      preserved.push(rel);
-      continue;
-    }
-    if (!opts.dryRun) {
-      await rm(abs, { force: true });
-    }
-    removed.push(rel);
-  }
-
-  for (const rel of actions.rootConfigFiles) {
-    const abs = join(opts.cwd, rel);
-    if (!(await pathExists(abs))) {
-      continue;
-    }
-    if (!opts.dryRun) {
-      await rm(abs, { force: true });
-    }
-    removed.push(rel);
-  }
-
-  for (const rel of actions.envBackups) {
-    const abs = join(opts.cwd, rel);
-    if (!(await pathExists(abs))) {
-      continue;
-    }
-    if (opts.dryRun) {
-      backedUp.push(`${rel} -> ${rel}.ejected-<timestamp>`);
-      continue;
-    }
-    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const backup = `${abs}.ejected-${stamp}`;
-    await rename(abs, backup);
-    backedUp.push(`${rel} -> ${backup.slice(opts.cwd.length + 1)}`);
-  }
-
-  for (const rel of actions.directories) {
-    const abs = join(opts.cwd, rel);
-    if (!(await pathExists(abs))) {
-      continue;
-    }
-    if (!opts.dryRun) {
-      await rm(abs, { recursive: true, force: true });
-    }
-    removed.push(rel);
-  }
-
-  if (removed.length === 0 && backedUp.length === 0) {
-    return { status: "skipped", reason: "nothing-to-eject", data: { cwd: opts.cwd } };
-  }
-
-  // Only suggest deleting the env backups, and only when some were made; the
-  // backups are dotfiles named `<file>.ejected-<stamp>`.
-  const nextCommands = backedUp.length > 0 ? ["rm -f .env.local.ejected-*"] : [];
-
-  return {
-    status: "ok",
-    data: {
-      title: "Zitadel ejected. Remote project is untouched.",
-      files_removed: removed,
-      files_preserved: preserved,
-      backed_up: backedUp,
-      next_commands: nextCommands,
-    },
-  };
-}
 
 /**
  * Asks the framework patcher which artifacts it owns. Falls back to the
@@ -151,7 +46,20 @@ async function pathExists(path: string): Promise<boolean> {
   }
 }
 
-/** `zitadel eject` — remove managed files and local Zitadel state. */
+/**
+ * `zitadel eject` — remove managed files and local Zitadel state.
+ *
+ * Removes Zitadel-managed files from the project, leaving the remote project
+ * untouched. The set of files comes from the framework patcher's
+ * {@link import("../lib/orca/patchers/types").Patcher.artifacts}, so the patcher
+ * is the single source of truth for what its integration owns.
+ *
+ * Marked code files are removed only when they still carry the managed marker
+ * (user-replaced files are preserved); `zitadel.json` is removed; `.env.local`
+ * is renamed to a timestamped backup; and `.zitadel/` is removed wholesale.
+ * `--dry-run` reports without touching the filesystem; non-interactive runs
+ * require `--force`.
+ */
 export default class Eject extends BaseCommand {
   static override description = "Remove managed files and local Zitadel state.";
   static override aliases = ["uninstall"];
@@ -159,6 +67,89 @@ export default class Eject extends BaseCommand {
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(Eject);
     await this.toMeta(flags);
-    return this.emit(await runEject({ ...this.meta, force: this.meta.force }));
+    const { cwd, force, nonInteractive, dryRun } = this.meta;
+
+    if (!force && nonInteractive) {
+      throw new ZitadelError("E_VALIDATION", "Eject requires --force in non-interactive mode", {
+        hint: "Re-run with --force to confirm deletion of managed files.",
+      });
+    }
+
+    const actions = await resolveEjectActions(cwd);
+    const removed: string[] = [];
+    const preserved: string[] = [];
+    const backedUp: string[] = [];
+
+    for (const rel of actions.markedFiles) {
+      const abs = join(cwd, rel);
+      if (!(await pathExists(abs))) {
+        continue;
+      }
+      const contents = await readFile(abs, "utf8").catch(() => "");
+      if (!contents.includes(MANAGED_MARKER)) {
+        preserved.push(rel);
+        continue;
+      }
+      if (!dryRun) {
+        await rm(abs, { force: true });
+      }
+      removed.push(rel);
+    }
+
+    for (const rel of actions.rootConfigFiles) {
+      const abs = join(cwd, rel);
+      if (!(await pathExists(abs))) {
+        continue;
+      }
+      if (!dryRun) {
+        await rm(abs, { force: true });
+      }
+      removed.push(rel);
+    }
+
+    for (const rel of actions.envBackups) {
+      const abs = join(cwd, rel);
+      if (!(await pathExists(abs))) {
+        continue;
+      }
+      if (dryRun) {
+        backedUp.push(`${rel} -> ${rel}.ejected-<timestamp>`);
+        continue;
+      }
+      const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+      const backup = `${abs}.ejected-${stamp}`;
+      await rename(abs, backup);
+      backedUp.push(`${rel} -> ${backup.slice(cwd.length + 1)}`);
+    }
+
+    for (const rel of actions.directories) {
+      const abs = join(cwd, rel);
+      if (!(await pathExists(abs))) {
+        continue;
+      }
+      if (!dryRun) {
+        await rm(abs, { recursive: true, force: true });
+      }
+      removed.push(rel);
+    }
+
+    if (removed.length === 0 && backedUp.length === 0) {
+      return this.emit({ status: "skipped", reason: "nothing-to-eject", data: { cwd } });
+    }
+
+    // Only suggest deleting the env backups, and only when some were made; the
+    // backups are dotfiles named `<file>.ejected-<stamp>`.
+    const nextCommands = backedUp.length > 0 ? ["rm -f .env.local.ejected-*"] : [];
+
+    return this.emit({
+      status: "ok",
+      data: {
+        title: "Zitadel ejected. Remote project is untouched.",
+        files_removed: removed,
+        files_preserved: preserved,
+        backed_up: backedUp,
+        next_commands: nextCommands,
+      },
+    });
   }
 }
