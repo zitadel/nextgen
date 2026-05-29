@@ -7,6 +7,7 @@ import (
 
 	"github.com/ianlancetaylor/jsonschema"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/maputil"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -57,17 +58,13 @@ func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (ma
 
 	// FETCH SCHEMA
 
-	schemaURL, ok := input.User["$schema"]
+	schemaURL, ok := maputil.Get[string](input.User, "$schema")
 	if !ok {
 		return nil, domain.ErrUserInvalid().
 			WithDetails("No $schema provided for the user. A schema must be provided when creating a new user. Against this schema, the user will be validated")
 	}
-	strSchemaURL, ok := schemaURL.(string)
-	if !ok {
-		return nil, domain.ErrUserInvalid().WithDetails("$schema must be a string, preferably in a uri format")
-	}
 
-	schemaEntity, err := s.schemaRepo.GetByID(ctx, tx, input.ProjectID, strSchemaURL)
+	schemaEntity, err := s.schemaRepo.GetByID(ctx, tx, input.ProjectID, schemaURL)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil, domain.ErrUserInvalid().WithDetails("$schema is not known to the system. First create a schema, then create users.")
@@ -98,7 +95,7 @@ func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (ma
 		return nil, domain.ErrInternal(err).WithMessage("failed to unmarshal schema map")
 	}
 
-	createUser, err := domain.NewCreateUser(input.ProjectID, input.TeamID, strSchemaURL, input.User, schemaMap)
+	createUser, err := domain.NewCreateUser(input.ProjectID, input.TeamID, schemaURL, input.User, schemaMap)
 	if err != nil {
 		return nil, err
 	}
