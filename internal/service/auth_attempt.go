@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"net/url"
+	"time"
 
+	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -119,7 +121,7 @@ func (PasswordChallenge) ChallengeCheckType() domain.AuthCheckType {
 
 // PasskeyChallenge carries the raw WebAuthn assertion response bytes.
 type PasskeyChallenge struct {
-	UserVerification string
+	UserVerification protocol.UserVerificationRequirement
 	RPID             string
 	RPOrigins        []url.URL
 }
@@ -157,32 +159,44 @@ func (PasskeyProof) proofCheckType() domain.AuthCheckType { return domain.AuthCh
 
 // ---- Secondary ports -------------------------------------------------------------
 
-type sessionResolver interface {
+//go:generate go tool mockgen -typed -package mocks -destination ./mocks/auth_attempt.mock.go . SessionResolver,ProjectLoader,UserLookup,UserPasswords,UserPasskeys
+
+type SessionResolver interface {
 	Get(ctx context.Context, q database.QueryExecutor, projectID, sessionID string) (*domain.Session, error)
 }
 
-type projectLoader interface {
+type ProjectLoader interface {
 	Get(ctx context.Context, client database.QueryExecutor, id string) (*domain.Project, error)
 }
 
-type userLookup interface {
+type UserLookup interface {
 	Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*domain.User, error)
 	ProjectIDCondition(projectID string) database.Condition
 	IDCondition(id string) database.Condition
 	AttributesCondition(attributes []domain.Attribute) database.Condition
 }
 
-type userPasswords interface {
+type UserPasswords interface {
 	Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*domain.UserPassword, error)
 	UserIDCondition(userID string) database.Condition
 	ProjectIDCondition(pid string) database.Condition
 }
 
-type userPasskeys interface {
+type UserPasskeys interface {
+	userPasskeyConditions
+
 	Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*domain.UserPasskey, error)
 	List(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) ([]*domain.UserPasskey, error)
+	Update(ctx context.Context, client database.QueryExecutor, condition database.Condition, changes ...database.Change) error
+}
+
+type userPasskeyConditions interface {
 	UserIDCondition(userID string) database.Condition
 	ProjectIDCondition(pid string) database.Condition
+	UniqueCondition(projectID, userID, credentialID string) database.Condition
+	SetSignCount(int64) database.Change
+	SetBackupState(bool) database.Change
+	SetLastUsedAt(time.Time) database.Change
 }
 
 // ---- Implementation ----------------------------------------------------------
@@ -190,22 +204,22 @@ type userPasskeys interface {
 type authAttemptService struct {
 	pool             database.Pool
 	attempts         domain.AuthAttemptRepository
-	sessions         sessionResolver
-	projects         projectLoader
-	users            userLookup
-	userPasswords    userPasswords
-	userPasskeys     userPasskeys
+	sessions         SessionResolver
+	projects         ProjectLoader
+	users            UserLookup
+	userPasswords    UserPasswords
+	userPasskeys     UserPasskeys
 	passwordVerifier crypto.HashVerifier
 }
 
 func NewAuthAttemptService(
 	pool database.Pool,
 	attempts domain.AuthAttemptRepository,
-	sessions sessionResolver,
-	projects projectLoader,
-	users userLookup,
-	userPasswords userPasswords,
-	userPasskeys userPasskeys,
+	sessions SessionResolver,
+	projects ProjectLoader,
+	users UserLookup,
+	userPasswords UserPasswords,
+	userPasskeys UserPasskeys,
 	passwordVerifier crypto.HashVerifier,
 ) AuthAttemptService {
 	return &authAttemptService{
@@ -425,9 +439,15 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 			return nil, nil, err
 		}
 		passkeyChallenge := challenge.(*domain.AuthChallengePasskey)
-		var passkeys []*domain.UserPasskey
+		// userID is empty for a discoverable (usernameless) login; the user is then resolved
+		// from the assertion's user handle inside VerifyPasskeyChallenge.
+		var (
+			userID   string
+			passkeys []*domain.UserPasskey
+		)
 		if userFactor != nil {
-			passkeys, err = s.listUserPasskeys(ctx, attempt.ProjectID, userFactor.UserID)
+			userID = userFactor.UserID
+			passkeys, err = s.listUserPasskeys(ctx, attempt.ProjectID, userID)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -435,7 +455,7 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 		verification, err := domain.VerifyPasskeyChallenge(
 			passkeyChallenge.PasskeyChallenge,
 			p.AssertionResponse,
-			userFactor.UserID,
+			userID,
 			passkeys,
 			func(userID string) ([]*domain.UserPasskey, error) {
 				return s.listUserPasskeys(ctx, attempt.ProjectID, userID)
@@ -444,11 +464,30 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 		if err != nil {
 			return passkeyChallenge, nil, domain.ErrAuthAttemptProofRejected(err)
 		}
+		// Use the verified user as the source of truth: it is set for both identified and
+		// discoverable logins, whereas userFactor is nil in the discoverable case.
+		s.recordPasskeyUsage(ctx, attempt.ProjectID, verification)
 		return passkeyChallenge, attempt.SetPasskeyFactor(verification), nil
 
 	default:
 		return nil, nil, domain.ErrAuthAttemptInvalidRequest().WithDetails("unsupported proof type")
 	}
+}
+
+// recordPasskeyUsage persists the authenticator's advanced sign count, backup state and
+// last-used time after a successful assertion. It is best-effort: a write failure must not
+// turn an otherwise valid proof into a rejection (the verify dispatch treats post-challenge
+// errors as proof rejections), and the stored sign count is a clone-detection signal rather
+// than an auth gate.
+func (s *authAttemptService) recordPasskeyUsage(ctx context.Context, projectID string, v *domain.PasskeyVerification) {
+	_ = s.userPasskeys.Update(
+		ctx,
+		s.pool,
+		s.userPasskeys.UniqueCondition(projectID, v.UserID, string(v.CredentialID)),
+		s.userPasskeys.SetSignCount(int64(v.SignCount)),
+		s.userPasskeys.SetBackupState(v.BackupState),
+		s.userPasskeys.SetLastUsedAt(time.Now()),
+	)
 }
 
 func (s *authAttemptService) listUserPasskeys(ctx context.Context, projectID, userID string) ([]*domain.UserPasskey, error) {
