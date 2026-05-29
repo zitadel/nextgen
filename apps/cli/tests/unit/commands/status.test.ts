@@ -4,8 +4,7 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { runStatus } from "../../../src/commands/status";
-import type { GlobalOptions } from "../../../src/lib/oclif";
+import { parseJson, runCliForTest } from "../../helpers/run-cli";
 
 const SECRET = {
   project_id: "proj-001",
@@ -15,23 +14,6 @@ const SECRET = {
   created_at: "2026-01-01T00:00:00.000Z",
 };
 
-function makeOpts(cwd: string, overrides: Partial<GlobalOptions> = {}): GlobalOptions {
-  return {
-    cwd,
-    nonInteractive: true,
-    dryRun: false,
-    force: false,
-    command: "status",
-    cliVersion: "0.0.0",
-    source: "mock",
-    verbose: false,
-    debug: false,
-    env: {},
-    isTTY: false,
-    ...overrides,
-  };
-}
-
 const tempDirs: string[] = [];
 
 async function makeProject(): Promise<string> {
@@ -39,6 +21,17 @@ async function makeProject(): Promise<string> {
   tempDirs.push(cwd);
   await mkdir(join(cwd, ".zitadel"), { recursive: true });
   return cwd;
+}
+
+function status(cwd: string) {
+  return runCliForTest([
+    "status",
+    "--cwd",
+    cwd,
+    "--json",
+    "--server",
+    "https://api.zitadel.cloud",
+  ]);
 }
 
 afterEach(async () => {
@@ -50,8 +43,8 @@ afterEach(async () => {
   }
 });
 
-describe("runStatus", () => {
-  it("returns an ok result for a healthy project with config and secret", async () => {
+describe("status command", () => {
+  it("returns an ok envelope for a healthy project with config and secret", async () => {
     const cwd = await makeProject();
     await writeFile(
       join(cwd, "zitadel.json"),
@@ -63,19 +56,17 @@ describe("runStatus", () => {
     );
     await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify(SECRET));
 
-    const result = await runStatus(makeOpts(cwd, { source: "https://api.zitadel.cloud" }));
+    const res = await status(cwd);
 
-    expect(result.status).toBe("ok");
-    if (result.status !== "ok") {
-      throw new Error("expected ok");
-    }
-    const data = result.data as {
-      project: { project_id: string; issuer?: string };
-      next_commands: string[];
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as {
+      status: string;
+      data: { project: { project_id: string; issuer?: string }; next_commands: string[] };
     };
-    expect(data.project.project_id).toBe("proj-001");
-    expect(data.project.issuer).toBe("http://localhost:3000");
-    expect(data.next_commands).toContain("zitadel doctor");
+    expect(json.status).toBe("ok");
+    expect(json.data.project.project_id).toBe("proj-001");
+    expect(json.data.project.issuer).toBe("http://localhost:3000");
+    expect(json.data.next_commands).toContain("zitadel doctor");
   });
 
   it("reports orphaned-config when zitadel.json exists but secret is missing", async () => {
@@ -85,24 +76,31 @@ describe("runStatus", () => {
       JSON.stringify({ project: "orphan", server: "https://api.zitadel.cloud" }),
     );
 
-    const result = await runStatus(makeOpts(cwd));
+    const res = await status(cwd);
 
-    expect(result.status).toBe("skipped");
-    if (result.status !== "skipped") {
-      throw new Error("expected skipped");
-    }
-    expect(result.reason).toBe("orphaned-config");
-    expect(result.nextCommands).toContain("zitadel setup --force");
-    const data = result.data as { project_id?: string; lifecycle: string };
-    expect(data.project_id).toBe("orphan");
-    expect(data.lifecycle).toBe("orphaned-config");
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as {
+      status: string;
+      reason: string;
+      next_commands: string[];
+      data: { project_id?: string; lifecycle: string };
+    };
+    expect(json.status).toBe("skipped");
+    expect(json.reason).toBe("orphaned-config");
+    expect(json.next_commands).toContain("zitadel setup --force");
+    expect(json.data.project_id).toBe("orphan");
+    expect(json.data.lifecycle).toBe("orphaned-config");
   });
 
-  it("throws E_VALIDATION when zitadel.json is missing entirely", async () => {
+  it("errors with E_VALIDATION when zitadel.json is missing entirely", async () => {
     const cwd = await makeProject();
-    await expect(runStatus(makeOpts(cwd))).rejects.toMatchObject({
-      code: "E_VALIDATION",
-    });
+
+    const res = await status(cwd);
+
+    expect(res.exitCode).toBe(3);
+    const json = parseJson(res.stdout) as { status: string; code: string };
+    expect(json.status).toBe("error");
+    expect(json.code).toBe("E_VALIDATION");
   });
 
   it("falls back to the secret project_id when config.project is absent", async () => {
@@ -113,14 +111,15 @@ describe("runStatus", () => {
     );
     await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify(SECRET));
 
-    const result = await runStatus(makeOpts(cwd));
+    const res = await status(cwd);
 
-    expect(result.status).toBe("ok");
-    if (result.status !== "ok") {
-      throw new Error("expected ok");
-    }
-    const data = result.data as { project: { project_id: string; issuer?: string } };
-    expect(data.project.project_id).toBe("proj-001");
-    expect(data.project.issuer).toBeUndefined();
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as {
+      status: string;
+      data: { project: { project_id: string; issuer?: string } };
+    };
+    expect(json.status).toBe("ok");
+    expect(json.data.project.project_id).toBe("proj-001");
+    expect(json.data.project.issuer).toBeUndefined();
   });
 });
