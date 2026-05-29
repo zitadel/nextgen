@@ -1,4 +1,6 @@
 import type { CreateFlow201 } from "@zitadel-nextgen/api/generated/model";
+import { configureZitadel, _resetConfigForTesting } from "@zitadel-nextgen/api/config";
+import type { ZitadelProject } from "@zitadel-nextgen/api/config";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import "./zitadel-login.js";
@@ -133,8 +135,11 @@ function installFlowFetchStub(responses: readonly CreateFlow201[]): {
 describe("<zitadel-login> form + focus (chromium)", () => {
   let host: HTMLDivElement;
   let stub: ReturnType<typeof installFlowFetchStub>;
+  let testProject: ZitadelProject;
 
   beforeEach(() => {
+    _resetConfigForTesting();
+    testProject = configureZitadel({ apiBase: "/__nextgen", projectId: "test-project", issuerUrl: "http://localhost:4000" });
     host = document.createElement("div");
     document.body.appendChild(host);
     stub = installFlowFetchStub([identifierStep, passkeyUpsellStep]);
@@ -148,7 +153,7 @@ describe("<zitadel-login> form + focus (chromium)", () => {
   async function mount(): Promise<ZitadelLogin> {
     const element = document.createElement("zitadel-login") as ZitadelLogin;
     element.purpose = "login";
-    element.projectId = "test-project";
+    element.project = testProject;
     host.appendChild(element);
     await waitFor(() => {
       const root = element.shadowRoot;
@@ -226,12 +231,12 @@ describe("<zitadel-login> form + focus (chromium)", () => {
   // Regression: frameworks like @lit/react attach the element first and
   // assign object properties (`branding`, `locale`) afterwards. The
   // orchestrator must defer flow-start until properties have been applied.
-  it("starts the flow when projectId is set after attach (React-style)", async () => {
+  it("starts the flow when project is set after attach (React-style)", async () => {
     const element = document.createElement("zitadel-login") as ZitadelLogin;
     element.purpose = "login";
     host.appendChild(element);
     // Property assigned after the element is in the DOM, simulating @lit/react.
-    element.projectId = "test-project";
+    element.project = testProject;
     await waitFor(() => element.shadowRoot?.querySelectorAll("zl-field").length === 2);
     const fields = element.shadowRoot?.querySelectorAll("zl-field");
     expect(fields?.[0]?.getAttribute("name")).toBe("email");
