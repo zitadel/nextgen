@@ -1,4 +1,9 @@
 export default defineNuxtConfig({
+  modules: ["@zitadel-nextgen/sdk-nuxt/module"],
+  nextgen: {
+    protectedRoutes: ["/admin", "/admin/*"],
+    loginPath: "/login",
+  },
   compatibilityDate: "2026-04-30",
   css: ["~/assets/css/demo-host.css"],
   ssr: true,

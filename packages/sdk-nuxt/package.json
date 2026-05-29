@@ -18,6 +18,9 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./module": {
+      "import": "./dist/module.js"
+    },
     "./server": {
       "types": "./dist/server.d.ts",
       "import": "./dist/server.js"
