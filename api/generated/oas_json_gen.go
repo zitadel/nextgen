@@ -5591,12 +5591,6 @@ func (s *FieldValidation) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
-		if s.Pattern.Set {
-			e.FieldStart("pattern")
-			s.Pattern.Encode(e)
-		}
-	}
-	{
 		if s.MinLength.Set {
 			e.FieldStart("min_length")
 			s.MinLength.Encode(e)
@@ -5610,11 +5604,10 @@ func (s *FieldValidation) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfFieldValidation = [4]string{
+var jsonFieldsNameOfFieldValidation = [3]string{
 	0: "format",
-	1: "pattern",
-	2: "min_length",
-	3: "max_length",
+	1: "min_length",
+	2: "max_length",
 }
 
 // Decode decodes FieldValidation from json.
@@ -5634,16 +5627,6 @@ func (s *FieldValidation) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"format\"")
-			}
-		case "pattern":
-			if err := func() error {
-				s.Pattern.Reset()
-				if err := s.Pattern.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"pattern\"")
 			}
 		case "min_length":
 			if err := func() error {
@@ -5685,6 +5668,50 @@ func (s *FieldValidation) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *FieldValidation) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes FieldValidationFormat as json.
+func (s FieldValidationFormat) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes FieldValidationFormat from json.
+func (s *FieldValidationFormat) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode FieldValidationFormat to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch FieldValidationFormat(v) {
+	case FieldValidationFormatEmail:
+		*s = FieldValidationFormatEmail
+	case FieldValidationFormatDateTime:
+		*s = FieldValidationFormatDateTime
+	case FieldValidationFormatUUID:
+		*s = FieldValidationFormatUUID
+	case FieldValidationFormatURI:
+		*s = FieldValidationFormatURI
+	default:
+		*s = FieldValidationFormat(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s FieldValidationFormat) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *FieldValidationFormat) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -14266,6 +14293,39 @@ func (s OptFieldValidation) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *OptFieldValidation) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes FieldValidationFormat as json.
+func (o OptFieldValidationFormat) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	e.Str(string(o.Value))
+}
+
+// Decode decodes FieldValidationFormat from json.
+func (o *OptFieldValidationFormat) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptFieldValidationFormat to nil")
+	}
+	o.Set = true
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptFieldValidationFormat) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptFieldValidationFormat) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
