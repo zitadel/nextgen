@@ -95,6 +95,9 @@ var (
 		"GET":  "Authorization",
 		"POST": "Authorization,Content-Type",
 	}
+	rn40AllowedHeaders = map[string]string{
+		"GET": "Authorization",
+	}
 )
 
 func (s *Server) cutPrefix(path string) (string, bool) {
@@ -1242,7 +1245,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 						default:
 							s.notAllowed(w, r, notAllowedParams{
 								allowedMethods: "GET",
-								allowedHeaders: nil,
+								allowedHeaders: rn40AllowedHeaders,
 								acceptPost:     "",
 								acceptPatch:    "",
 							})

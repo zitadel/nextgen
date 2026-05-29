@@ -79,6 +79,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	GetTeamOperation: []string{
 		"teams.read",
 	},
+	GetUserByIDOperation: []string{
+		"users.read",
+	},
 	GetUserInfoOperation: []string{},
 	IntrospectOperation:  []string{},
 	IssueChallengeOperation: []string{
@@ -91,7 +94,7 @@ var oauth2ScopesOAuth2 = map[string][]string{
 		"sessions.read",
 	},
 	ListUsersOperation: []string{
-		"user.list",
+		"user.read",
 	},
 	RevokeSessionOperation: []string{
 		"session.delete",
