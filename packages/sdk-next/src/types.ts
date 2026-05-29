@@ -177,6 +177,24 @@ export type NextgenMiddlewareOptions = {
    *   return response;
    * },
    * ```
+   *
+   * @example Modify existing cookies (e.g. tighten the session cookie path)
+   * ```ts
+   * onExchangeResponse: async (response) => {
+   *   const headers = new Headers();
+   *   for (const [key, value] of response.headers.entries()) {
+   *     if (key.toLowerCase() !== "set-cookie") headers.set(key, value);
+   *   }
+   *   for (const cookie of response.headers.getSetCookie()) {
+   *     if (cookie.startsWith("__nextgen_session=")) {
+   *       headers.append("set-cookie", cookie.replace("Path=/", "Path=/app"));
+   *     } else {
+   *       headers.append("set-cookie", cookie);
+   *     }
+   *   }
+   *   return new Response(response.body, { status: response.status, headers });
+   * },
+   * ```
    */
   onExchangeResponse?: (response: Response) => Response | Promise<Response>;
 };

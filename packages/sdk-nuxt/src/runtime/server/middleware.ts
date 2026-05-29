@@ -272,8 +272,9 @@ async function proxyRequest(
     signal: AbortSignal.timeout(proxyTimeoutMs),
   });
 
-  event.node.res.statusCode = upstream.status;
-
+  // Build a web-standard Response with filtered headers. This is the
+  // canonical representation — we write it to event.node.res at the end.
+  const responseHeaders = new Headers();
   for (const [key, value] of upstream.headers.entries()) {
     if (
       !HOP_BY_HOP.has(key.toLowerCase()) &&
@@ -282,7 +283,7 @@ async function proxyRequest(
       // browser — this proxy is a pure API proxy and never issues redirects.
       key.toLowerCase() !== 'location'
     ) {
-      event.node.res.setHeader(key, value);
+      responseHeaders.set(key, value);
     }
   }
 
@@ -292,47 +293,37 @@ async function proxyRequest(
   const isSecure = proto === 'https';
   const setCookieHeaders = upstream.headers.getSetCookie?.() ?? [];
   for (const cookie of setCookieHeaders) {
-    event.node.res.appendHeader(
+    responseHeaders.append(
       'set-cookie',
       upgradeSessionCookie(cookie, isSecure),
     );
   }
 
+  let response = new Response(upstream.body, {
+    status: upstream.status,
+    headers: responseHeaders,
+  });
+
   // Call the exchange hook when the proxied request is POST /sessions/exchange.
   const isExchange =
     method === 'POST' && suffix.startsWith('/sessions/exchange');
   if (isExchange && onExchangeResponse) {
-    // Build a web-standard Response from the already-processed headers so the
-    // hook receives the same contract as sdk-next (a plain Response object).
-    const proxyHeaders = new Headers();
-    const rawHeaders = event.node.res.getHeaders();
-    for (const [key, value] of Object.entries(rawHeaders)) {
-      if (value == null) continue;
-      if (Array.isArray(value)) {
-        for (const v of value) proxyHeaders.append(key, v);
-      } else {
-        proxyHeaders.set(key, String(value));
-      }
-    }
-    const original = new Response(upstream.body, {
-      status: event.node.res.statusCode,
-      headers: proxyHeaders,
-    });
-    const modified = await onExchangeResponse(original);
-
-    // Re-apply the (potentially modified) response.
-    event.node.res.statusCode = modified.status;
-    // Clear existing headers and re-apply from the modified response.
-    for (const key of Object.keys(event.node.res.getHeaders())) {
-      event.node.res.removeHeader(key);
-    }
-    for (const [key, value] of modified.headers.entries()) {
-      event.node.res.appendHeader(key, value);
-    }
-    return modified.body;
+    response = await onExchangeResponse(response);
   }
 
-  return upstream.body;
+  // Write the (potentially modified) response to the H3 event.
+  event.node.res.statusCode = response.status;
+  for (const [key, value] of response.headers.entries()) {
+    if (key.toLowerCase() === 'set-cookie') continue;
+    event.node.res.setHeader(key, value);
+  }
+  // Use getSetCookie() so multiple Set-Cookie values aren't collapsed.
+  const finalCookies = response.headers.getSetCookie?.() ?? [];
+  for (const cookie of finalCookies) {
+    event.node.res.appendHeader('set-cookie', cookie);
+  }
+
+  return response.body;
 }
 
 /**
