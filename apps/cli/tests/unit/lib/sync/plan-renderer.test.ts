@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { renderPlan } from "../../../../src/lib/sync/plan-renderer";
+import { renderPlan, summarizePlan } from "../../../../src/lib/sync/plan-renderer";
 import type { ResourceSyncer, SyncAction } from "../../../../src/lib/sync/types";
 import type { PlatformClient } from "../../../../src/lib/api/client";
 
@@ -9,6 +9,7 @@ function makeSyncer(kind: string, directory: string, mutable = false): ResourceS
     kind,
     directory,
     mutable,
+    validate() { /* no-op: renderer tests do not exercise validation */ },
     async create(_c: PlatformClient, _d: object) { return "id"; },
     async update() { /* no-op: renderer tests do not exercise update */ },
     async delete() { /* no-op: renderer tests do not exercise delete */ },
@@ -17,6 +18,30 @@ function makeSyncer(kind: string, directory: string, mutable = false): ResourceS
 
 const schema = makeSyncer("schema", ".zitadel/schemas");
 const flow = makeSyncer("flow", ".zitadel/flows", true);
+
+describe("summarizePlan", () => {
+  it("counts each action kind and ignores skips", () => {
+    const actions: SyncAction[] = [
+      { kind: "create", path: "a", syncer: schema, content: {}, hash: "h" },
+      { kind: "create", path: "b", syncer: schema, content: {}, hash: "h" },
+      { kind: "update", path: "c", syncer: flow, id: "1", content: {}, hash: "h", oldContent: null },
+      { kind: "delete", path: "d", syncer: schema, id: "2", oldContent: null },
+      { kind: "skip", path: "e", reason: "no-change" },
+    ];
+
+    expect(summarizePlan(actions)).toEqual({ creates: 2, updates: 1, deletes: 1, total: 4 });
+  });
+
+  it("returns all-zero for an empty or skip-only plan", () => {
+    expect(summarizePlan([])).toEqual({ creates: 0, updates: 0, deletes: 0, total: 0 });
+    expect(summarizePlan([{ kind: "skip", path: "a", reason: "immutable" }])).toEqual({
+      creates: 0,
+      updates: 0,
+      deletes: 0,
+      total: 0,
+    });
+  });
+});
 
 describe("renderPlan — no changes", () => {
   it("prints no-changes message when all actions are skips", () => {

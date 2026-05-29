@@ -1,4 +1,19 @@
-import type { SyncAction } from "./types.js";
+import type { SyncAction, SyncPlanSummary } from "./types.js";
+
+/**
+ * Count the non-`skip` actions in a {@link buildSyncPlan} result. Pure; the
+ * single source of truth for the plan counts shared by the `plan` /
+ * `apply --dry-run` JSON payload and {@link renderPlan}'s summary line.
+ */
+export function summarizePlan(actions: ReadonlyArray<SyncAction>): SyncPlanSummary {
+  const active = actions.filter((a) => a.kind !== "skip");
+  return {
+    creates: active.filter((a) => a.kind === "create").length,
+    updates: active.filter((a) => a.kind === "update").length,
+    deletes: active.filter((a) => a.kind === "delete").length,
+    total: active.length,
+  };
+}
 
 /**
  * Render a {@link buildSyncPlan} result as a human-readable Terraform-style
@@ -30,9 +45,7 @@ export function renderPlan(actions: ReadonlyArray<SyncAction>, tty: boolean): st
 
   out.push("");
 
-  const creates = active.filter((a) => a.kind === "create").length;
-  const updates = active.filter((a) => a.kind === "update").length;
-  const deletes = active.filter((a) => a.kind === "delete").length;
+  const { creates, updates, deletes } = summarizePlan(actions);
 
   const parts: string[] = [];
   if (creates > 0) {

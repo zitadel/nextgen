@@ -47,6 +47,17 @@ export interface ResourceSyncer {
 }
 
 /**
+ * Counts of the non-`skip` actions in a sync plan, used for the `plan` /
+ * `apply --dry-run` JSON payload. Produced by `summarizePlan`.
+ */
+export type SyncPlanSummary = {
+  creates: number;
+  updates: number;
+  deletes: number;
+  total: number;
+};
+
+/**
  * One unit of work in a sync plan. The engine emits exactly one `SyncAction`
  * per resource file (or per state-only entry, for deletes). Discriminated by
  * `kind`; `oldContent` carries the platform's current value for diff rendering.

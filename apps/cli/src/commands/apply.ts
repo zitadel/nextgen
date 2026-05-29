@@ -3,7 +3,7 @@ import { Flags } from "@oclif/core";
 import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
 import { createPlatformClient } from "../lib/api";
 import { environmentSchema } from "../lib/api/schemas";
-import { buildSyncPlan, makeSyncers, renderPlan, runSyncLoop } from "../lib/sync";
+import { buildSyncPlan, makeSyncers, renderPlan, runSyncLoop, summarizePlan } from "../lib/sync";
 import { readZitadelSecret } from "../lib/project";
 
 /**
@@ -40,15 +40,9 @@ export default class Apply extends BaseCommand {
     }
 
     const plan = await buildSyncPlan(cwd, syncers, client);
-    const active = plan.filter((action) => action.kind !== "skip");
     return this.emit({
       status: "ok",
-      data: {
-        creates: active.filter((action) => action.kind === "create").length,
-        updates: active.filter((action) => action.kind === "update").length,
-        deletes: active.filter((action) => action.kind === "delete").length,
-        total: active.length,
-      },
+      data: summarizePlan(plan),
       pretty: renderPlan(plan, isTTY),
     });
   }
