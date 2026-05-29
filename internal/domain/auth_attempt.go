@@ -373,8 +373,11 @@ func (a *AuthAttempt) SetPasswordFactor() *AuthFactorPassword {
 
 func (a *AuthAttempt) SetPasskeyFactor(passkeyVerification *PasskeyVerification) *AuthFactorPasskey {
 	factor := &AuthFactorPasskey{
-		UserVerified: passkeyVerification.UserVerified,
-		UserID:       passkeyVerification.UserID,
+		UserVerified:   passkeyVerification.UserVerified,
+		UserID:         passkeyVerification.UserID,
+		CredentialID:   passkeyVerification.CredentialID,
+		BackupEligible: passkeyVerification.BackupEligible,
+		BackupState:    passkeyVerification.BackupState,
 	}
 	a.SetCheck(factor)
 	return factor
@@ -430,6 +433,8 @@ func (a *AuthAttempt) SetCheck(check AuthCheck) {
 	}
 	a.Checks = append(a.Checks, check)
 }
+
+//go:generate go tool mockgen -typed -package domainmock -destination ./mock/auth_attempt.mock.go . AuthAttemptRepository
 
 type AuthAttemptRepository interface {
 	// GetByID retrieves a single AuthAttempt by its ID and project ID.
