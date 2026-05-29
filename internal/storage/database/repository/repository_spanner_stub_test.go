@@ -1,4 +1,4 @@
-//go:build !spanner_integration
+//go:build integration && !spanner_integration
 
 package repository_test
 

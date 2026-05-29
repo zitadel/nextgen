@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  go-test:
+  go-unit-test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -31,25 +31,18 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - name: Install embedded-postgres runtime deps
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq libicu-dev libssl-dev
       - run: go generate ./...
       - name: Verify generated code is up to date
         run: |
           git diff --stat --exit-code -- .
           test -z "$(git status --porcelain)"
       - run: go vet ./...
-      # Persist the embedded-postgres binary (downloaded from Maven Central on a
-      # cold cache) so test runs skip the flaky network fetch. Keyed on go.sum so
-      # an embedded-postgres bump invalidates it automatically.
-      - name: Cache embedded-postgres binary
-        uses: actions/cache@v4
-        with:
-          path: ~/.embedded-postgres-go
-          key: embedded-postgres-${{ runner.os }}-${{ hashFiles('go.sum') }}
+      # Unit tests only. The DB-backed tests live behind the `integration` /
+      # `spanner_integration` build tags and run in the dedicated jobs below, so
+      # this job needs neither the postgres runtime deps nor the binary cache.
       - run: go test -v -timeout=10m ./...
 
-  go-integration-test:
+  go-integration-test-postgres:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -79,14 +72,8 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      # Persist the embedded-postgres binary (downloaded from Maven Central on a
-      # cold cache) so test runs skip the flaky network fetch. Keyed on go.sum so
-      # an embedded-postgres bump invalidates it automatically.
-      - name: Cache embedded-postgres binary
-        uses: actions/cache@v4
-        with:
-          path: ~/.embedded-postgres-go
-          key: embedded-postgres-${{ runner.os }}-${{ hashFiles('go.sum') }}
+      # Spanner tests use a Docker testcontainer emulator, not the embedded
+      # postgres binary, so no Maven binary cache is needed here.
       - run: go test -v -tags spanner_integration -timeout=10m ./...
 
 
@@ -238,7 +225,7 @@ jobs:
   goreleaser-snapshot:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: [go-test, go-integration-test, go-integration-test-spanner, node-check]
+    needs: [go-unit-test, go-integration-test-postgres, go-integration-test-spanner, node-check]
     steps:
       - name: Checkout
         uses: actions/checkout@v6
