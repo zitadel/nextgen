@@ -12,7 +12,6 @@ import { GitignoreCheck } from "./gitignore";
 import { EnvExampleCheck } from "./env-example";
 import { FrameworkCheck } from "./framework";
 import { SchemaCheck } from "./schema";
-import { ManagedMiddlewareCheck } from "./managed-middleware";
 import { DependencyCheck } from "./dependency";
 import { ProjectMatchCheck } from "./project-match";
 
@@ -25,7 +24,6 @@ export { GitignoreCheck } from "./gitignore";
 export { EnvExampleCheck } from "./env-example";
 export { FrameworkCheck } from "./framework";
 export { SchemaCheck } from "./schema";
-export { ManagedMiddlewareCheck } from "./managed-middleware";
 export { DependencyCheck } from "./dependency";
 export { ProjectMatchCheck } from "./project-match";
 
@@ -38,7 +36,6 @@ export const SANITY_CHECKS: ReadonlyArray<SanityCheck> = [
   new EnvExampleCheck(),
   new FrameworkCheck(),
   new SchemaCheck(),
-  new ManagedMiddlewareCheck(),
   new DependencyCheck(),
   new ProjectMatchCheck(),
 ];

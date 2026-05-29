@@ -43,8 +43,7 @@ const VALID_USER_SCHEMA = {
  * Builds a well-formed managed project that should pass every doctor check
  * runnable without the platform: config/secret parse + match, 0600 secret,
  * gitignore + env.example coverage, a Next.js framework signature, a valid
- * user schema, a managed middleware file carrying the marker, and a Zitadel
- * SDK dependency.
+ * user schema, and a Zitadel SDK dependency.
  */
 async function makeHealthyProject(): Promise<string> {
   const cwd = await mkdtemp(join(tmpdir(), "zitadel-doctor-"));
@@ -130,6 +129,7 @@ describe("runDoctor", () => {
     expect(names).toContain("project-match");
     expect(names).not.toContain("managed-login");
     expect(names).not.toContain("managed-register");
+    expect(names).not.toContain("managed-middleware");
   });
 
   it("fails the dependency check when no @zitadel package is present", async () => {
@@ -190,16 +190,20 @@ describe("runDoctor", () => {
     expect(schema?.status).toBe("fail");
   });
 
-  it("re-applies a missing managed middleware via --fix and then passes", async () => {
+  it("re-applies a missing Zitadel dependency via --fix and then passes", async () => {
     const cwd = await makeHealthyProject();
-    await rm(join(cwd, "middleware.ts"));
+    // Drop the SDK dependency; repair re-adds it via its `add-dep` op.
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({ name: "demo", dependencies: { next: "^15" } }),
+    );
 
     const result = await runDoctor(makeOpts(cwd, { fix: true }));
 
     expect(result.status).toBe("ok");
     const data = result.data as { ok: boolean; checks: Check[] };
     expect(data.ok).toBe(true);
-    const middleware = data.checks.find((check) => check.name === "managed-middleware");
-    expect(middleware?.status).toBe("pass");
+    const dependency = data.checks.find((check) => check.name === "dependency");
+    expect(dependency?.status).toBe("pass");
   });
 });
