@@ -43,7 +43,8 @@ const VALID_USER_SCHEMA = {
  * Builds a well-formed managed project that should pass every doctor check
  * runnable without the platform: config/secret parse + match, 0600 secret,
  * gitignore + env.example coverage, a Next.js framework signature, a valid
- * user schema, and managed login/register/middleware files carrying the marker.
+ * user schema, a managed middleware file carrying the marker, and a Zitadel
+ * SDK dependency.
  */
 async function makeHealthyProject(): Promise<string> {
   const cwd = await mkdtemp(join(tmpdir(), "zitadel-doctor-"));
@@ -54,7 +55,10 @@ async function makeHealthyProject(): Promise<string> {
 
   await writeFile(
     join(cwd, "package.json"),
-    JSON.stringify({ name: "demo", dependencies: { next: "^15" } }),
+    JSON.stringify({
+      name: "demo",
+      dependencies: { next: "^15", "@zitadel-nextgen/sdk-next": "latest" },
+    }),
   );
   await writeFile(
     join(cwd, "zitadel.json"),
@@ -118,16 +122,22 @@ describe("runDoctor", () => {
     const data = result.data as { ok: boolean; checks: Check[] };
     expect(data.ok).toBe(true);
     expect(data.checks.every((check) => check.status === "pass")).toBe(true);
-    // Sanity: the full battery actually ran.
+    // Sanity: the full battery actually ran, and the page checks are gone.
     const names = data.checks.map((check) => check.name);
     expect(names).toContain("config");
     expect(names).toContain("secret");
+    expect(names).toContain("dependency");
     expect(names).toContain("project-match");
+    expect(names).not.toContain("managed-login");
+    expect(names).not.toContain("managed-register");
   });
 
-  it("fails the managed-login check when the login page is missing", async () => {
+  it("fails the dependency check when no @zitadel package is present", async () => {
     const cwd = await makeHealthyProject();
-    await rm(join(cwd, "app/login/page.tsx"));
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({ name: "demo", dependencies: { next: "^15" } }),
+    );
 
     let thrown: unknown;
     await runDoctor(makeOpts(cwd)).catch((error: unknown) => {
@@ -137,8 +147,8 @@ describe("runDoctor", () => {
     expect(thrown).toBeInstanceOf(ZitadelError);
     expect((thrown as ZitadelError).code).toBe("E_VALIDATION");
     const checks = checksFromError(thrown);
-    const login = checks.find((check) => check.name === "managed-login");
-    expect(login?.status).toBe("fail");
+    const dependency = checks.find((check) => check.name === "dependency");
+    expect(dependency?.status).toBe("fail");
   });
 
   it("fails the project-match check when secret and config disagree", async () => {
@@ -180,16 +190,16 @@ describe("runDoctor", () => {
     expect(schema?.status).toBe("fail");
   });
 
-  it("re-applies a missing managed login page via --fix and then passes", async () => {
+  it("re-applies a missing managed middleware via --fix and then passes", async () => {
     const cwd = await makeHealthyProject();
-    await rm(join(cwd, "app/login/page.tsx"));
+    await rm(join(cwd, "middleware.ts"));
 
     const result = await runDoctor(makeOpts(cwd, { fix: true }));
 
     expect(result.status).toBe("ok");
     const data = result.data as { ok: boolean; checks: Check[] };
     expect(data.ok).toBe(true);
-    const login = data.checks.find((check) => check.name === "managed-login");
-    expect(login?.status).toBe("pass");
+    const middleware = data.checks.find((check) => check.name === "managed-middleware");
+    expect(middleware?.status).toBe("pass");
   });
 });

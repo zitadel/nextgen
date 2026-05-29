@@ -12,7 +12,7 @@ export default defineConfig({
     "commands/setup": "src/commands/setup.ts",
     "commands/apply": "src/commands/apply.ts",
     "commands/plan": "src/commands/plan.ts",
-    "commands/doctor": "src/commands/doctor.ts",
+    "commands/doctor": "src/commands/doctor/index.ts",
     "commands/eject": "src/commands/eject.ts",
     "commands/status": "src/commands/status.ts",
   },
