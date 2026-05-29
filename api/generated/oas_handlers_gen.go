@@ -2638,6 +2638,10 @@ func (s *Server) handleExchangeHandoffRequest(args [0]string, argsEscaped bool, 
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
 				{
+					Name: "project_id",
+					In:   "query",
+				}: params.ProjectID,
+				{
 					Name: "Idempotency-Key",
 					In:   "header",
 				}: params.IdempotencyKey,
@@ -4503,6 +4507,10 @@ func (s *Server) handleGetSessionRequest(args [1]string, argsEscaped bool, w htt
 			Body:             nil,
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
+				{
+					Name: "project_id",
+					In:   "query",
+				}: params.ProjectID,
 				{
 					Name: "session_id",
 					In:   "path",
@@ -6528,6 +6536,10 @@ func (s *Server) handleRevokeSessionRequest(args [1]string, argsEscaped bool, w 
 			Body:             nil,
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
+				{
+					Name: "project_id",
+					In:   "query",
+				}: params.ProjectID,
 				{
 					Name: "session_id",
 					In:   "path",
