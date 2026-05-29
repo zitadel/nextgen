@@ -16,6 +16,9 @@
   "references": [
     {
       "path": "../components"
+    },
+    {
+      "path": "../api"
     }
   ]
 }

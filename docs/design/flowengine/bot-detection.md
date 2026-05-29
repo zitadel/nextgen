@@ -1,7 +1,7 @@
 # Bot Detection & Captcha
 
-> **Status:** Contract decided in [ADR 016](../../adrs/016-captcha-gate-and-bot-signals.md); risk-based activation still depends on policy engine design
-> **See also:** [Overview](README.md) · [Flow Engine](flow-engine.md) · [Session API](session-api.md) · [ADR 016](../../adrs/016-captcha-gate-and-bot-signals.md)
+> **Status:** Contract decided in [ADR 019](../../adrs/019-captcha-gate-and-bot-signals.md); risk-based activation still depends on policy engine design
+> **See also:** [Overview](README.md) · [Flow Engine](flow-engine.md) · [Session API](session-api.md) · [ADR 019](../../adrs/019-captcha-gate-and-bot-signals.md)
 > **POC ADRs:** [021](https://github.com/zitadel/oxidel/blob/main/docs/adr/021-login-flow-schema.md) Bot Detection & Telemetry, [024](https://github.com/zitadel/oxidel/blob/main/docs/adr/024-risk-evaluation-policy-consumers.md) Risk Evaluation
 
 Bot detection is a **first-class, composable subsystem** — not an afterthought bolted onto login.
@@ -58,7 +58,7 @@ contract is provider-agnostic. That verdict is a first-class signal:
 - **Effect:** the risk evaluator fuses it like any other signal — a `clean` verdict can
   suppress an otherwise-required captcha; a `suspicious` verdict can inject one.
 
-Full contract and trust model: [ADR 016](../../adrs/016-captcha-gate-and-bot-signals.md).
+Full contract and trust model: [ADR 019](../../adrs/019-captcha-gate-and-bot-signals.md).
 
 ## Captcha Providers
 

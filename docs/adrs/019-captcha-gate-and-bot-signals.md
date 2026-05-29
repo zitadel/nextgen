@@ -1,4 +1,4 @@
-# ADR 016: Captcha Gate Contract & Bot-Detection Signals
+# ADR 019: Captcha Gate Contract & Bot-Detection Signals
 
 > **Status:** Proposed
 > **Date:** 2026-05-26

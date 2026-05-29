@@ -25,4 +25,3 @@ get:
             $ref: ../auth-attempt-response.yaml
     default:
       $ref: getAuthAttempt-error-response.yaml
-
