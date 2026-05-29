@@ -32,6 +32,14 @@ export interface ResourceSyncer {
   readonly kind: string;
   readonly directory: string;
   readonly mutable: boolean;
+  /**
+   * Assert that a single on-disk file body is valid for this resource.
+   * Throws `E_VALIDATION` (a `ZitadelError`) on the first invalid input.
+   * The sync engine calls this for every file it reads, so a malformed
+   * schema or flow fails the run before any platform mutation — `plan`
+   * and `apply` both go through here.
+   */
+  validate(data: object): void;
   create(client: PlatformClient, data: object): Promise<string>;
   update(client: PlatformClient, id: string, data: object): Promise<void>;
   delete(client: PlatformClient, id: string): Promise<void>;

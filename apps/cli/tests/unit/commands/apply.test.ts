@@ -81,19 +81,6 @@ async function makeCwd(secret: object, flows: Record<string, object> = {}): Prom
 }
 
 describe("runApply pre-flight checks", () => {
-  it("blocks when a flow definition is invalid", async () => {
-    const cwd = await makeCwd(SECRET, {
-      "bad.json": { version: 99, kind: "wrong" },
-    });
-    try {
-      await expect(runApply(makeOpts(cwd))).rejects.toMatchObject({
-        code: "E_VALIDATION",
-      });
-    } finally {
-      await rm(cwd, { recursive: true, force: true });
-    }
-  });
-
   it("blocks when a referenced env var is missing", async () => {
     const flowWithEnvRef = {
       ...VALID_FLOW,

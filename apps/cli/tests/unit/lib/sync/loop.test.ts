@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { describe, expect, it, vi } from "vitest";
 
 import { buildSyncPlan, runSyncLoop } from "../../../../src/lib/sync/loop";
+import { makeSyncers } from "../../../../src/lib/sync/syncers";
 import type { ResourceSyncer } from "../../../../src/lib/sync/syncers";
 import type { PlatformClient } from "../../../../src/lib/api/client";
 
@@ -40,6 +41,7 @@ function makeSyncer(overrides: Partial<ResourceSyncer> = {}): ResourceSyncer {
     kind: "schema",
     directory: ".zitadel/schemas",
     mutable: false,
+    validate: vi.fn(),
     create: vi.fn().mockResolvedValue("created-id"),
     update: vi.fn().mockResolvedValue(undefined),
     delete: vi.fn().mockResolvedValue(undefined),
@@ -204,6 +206,36 @@ describe("buildSyncPlan", () => {
       if (actions[0].kind === "delete") {
         expect(actions[0].oldContent).toBeNull();
       }
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("buildSyncPlan validation (real syncers)", () => {
+  it("fails the run when an on-disk schema is not a valid JSON Schema", async () => {
+    const cwd = makeCwd();
+    try {
+      await writeState(cwd, { framework: "next", resources: {} });
+      await writeResource(cwd, ".zitadel/schemas", "user.json", { type: 123 });
+
+      await expect(
+        buildSyncPlan(cwd, makeSyncers({ projectId: "proj-1" })),
+      ).rejects.toMatchObject({ code: "E_VALIDATION" });
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("fails the run when an on-disk flow definition is malformed", async () => {
+    const cwd = makeCwd();
+    try {
+      await writeState(cwd, { framework: "next", resources: {} });
+      await writeResource(cwd, ".zitadel/flows", "default.json", { version: 99, kind: "wrong" });
+
+      await expect(
+        buildSyncPlan(cwd, makeSyncers({ projectId: "proj-1" })),
+      ).rejects.toMatchObject({ code: "E_VALIDATION" });
     } finally {
       await rm(cwd, { recursive: true, force: true });
     }

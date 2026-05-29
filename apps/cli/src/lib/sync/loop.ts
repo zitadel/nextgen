@@ -32,6 +32,13 @@ export async function buildSyncPlan(
     consola.debug(`scanning ${syncer.directory}`);
     const onDisk = await readJsonDir(dirPath);
 
+    // Validate every file before planning any work: a single malformed
+    // schema or flow aborts the whole run (`E_VALIDATION`) before any
+    // platform mutation. Both `plan` and `apply` reach this code path.
+    for (const content of onDisk.values()) {
+      syncer.validate(content);
+    }
+
     // Delete pass: in state but no longer on disk.
     for (const [filePath, entry] of Object.entries(state.resources)) {
       if (!filePath.startsWith(syncer.directory)) {

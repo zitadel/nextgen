@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { FLOWS_DIR } from "../../../../src/lib/flows";
 import { SCHEMAS_DIR } from "../../../../src/lib/user-schema";
 import { makeSyncers } from "../../../../src/lib/sync/syncers";
+import { ZitadelError } from "../../../../src/lib/errors";
 import type { PlatformClient } from "../../../../src/lib/api/client";
 
 /**
@@ -96,6 +97,18 @@ describe("makeSyncers", () => {
 });
 
 describe("SchemaSyncer", () => {
+  it("validate accepts a structurally valid JSON Schema", () => {
+    const [schema] = makeSyncers({ projectId: "proj-1" });
+
+    expect(() => schema.validate({ type: "object" })).not.toThrow();
+  });
+
+  it("validate throws E_VALIDATION on a malformed JSON Schema", () => {
+    const [schema] = makeSyncers({ projectId: "proj-1" });
+
+    expect(() => schema.validate({ type: 123 })).toThrow(ZitadelError);
+  });
+
   it("create passes the bare data through and returns the platform id", async () => {
     const [schema] = makeSyncers({ projectId: "proj-1" });
     const { client, calls } = makeFakeClient();
@@ -135,7 +148,30 @@ describe("SchemaSyncer", () => {
   });
 });
 
+const VALID_FLOW = {
+  name: "default",
+  user_schema:
+    "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/human-user.yaml",
+  purposes: ["login"],
+  initial_steps: { login: "identifier" },
+  steps: [
+    { name: "identifier", type: "identifier", fields: {}, actions: {}, gates: {}, transitions: {} },
+  ],
+};
+
 describe("FlowDefinitionSyncer", () => {
+  it("validate accepts a well-formed flow definition", () => {
+    const [, flow] = makeSyncers({ projectId: "proj-1" });
+
+    expect(() => flow.validate(VALID_FLOW)).not.toThrow();
+  });
+
+  it("validate throws E_VALIDATION on a malformed flow definition", () => {
+    const [, flow] = makeSyncers({ projectId: "proj-1" });
+
+    expect(() => flow.validate({ version: 99, kind: "wrong" })).toThrow(ZitadelError);
+  });
+
   it("create wraps the body in the spec envelope with project_id", async () => {
     const [, flow] = makeSyncers({ projectId: "proj-1" });
     const { client, calls } = makeFakeClient();

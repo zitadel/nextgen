@@ -4,7 +4,7 @@ import { Flags } from "@oclif/core";
 
 import { BaseCommand, type CommandResult, type GlobalOptions, type JsonEnvelope } from "../lib/oclif";
 import { ZitadelError } from "../lib/errors";
-import { FLOWS_DIR, flowEnvRefs, validateFlows } from "../lib/flows";
+import { FLOWS_DIR, flowEnvRefs } from "../lib/flows";
 import { readJsonDir } from "../lib/json-dir";
 import { createPlatformClient } from "../lib/api";
 import { environmentSchema } from "../lib/api/schemas";
@@ -20,18 +20,17 @@ export type ApplyOptions = GlobalOptions & {
 };
 
 /**
- * Validates the local flows against the remote project, then either previews
- * the sync diff (`dryRun` — backs `zitadel plan` and `apply --dry-run`) or runs
- * the sync loop to convergence (`zitadel apply`). The project secret and any
- * `${VAR}` / `*_env` references are checked up front so missing configuration
- * fails fast with `E_VALIDATION` before the platform is contacted.
+ * Either previews the sync diff (`dryRun` — backs `zitadel plan` and
+ * `apply --dry-run`) or runs the sync loop to convergence (`zitadel apply`).
+ * The only preflight done here is the `${VAR}` / `*_env` reference check, which
+ * needs the runtime environment (`opts.env`); structural validation of every
+ * schema and flow happens inside the sync engine ({@link buildSyncPlan}), so an
+ * invalid file fails both verbs with `E_VALIDATION` before any platform call.
  */
 export async function runApply(opts: ApplyOptions): Promise<CommandResult> {
   const secret = await readZitadelSecret(opts.cwd);
 
   const flows = await readJsonDir(join(opts.cwd, FLOWS_DIR));
-  validateFlows(flows);
-
   const missing = flowEnvRefs(flows).filter((name) => !opts.env[name]);
   if (missing.length > 0) {
     throw new ZitadelError("E_VALIDATION", `Missing environment variables: ${missing.join(", ")}`);

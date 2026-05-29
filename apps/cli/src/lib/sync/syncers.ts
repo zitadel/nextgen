@@ -1,5 +1,6 @@
-import { FLOWS_DIR } from "../flows";
-import { SCHEMAS_DIR } from "../user-schema";
+import { FLOWS_DIR, validateFlows } from "../flows";
+import { SCHEMAS_DIR, validateJsonSchema } from "../user-schema";
+import { ZitadelError } from "../errors";
 import type { PlatformClient } from "../api/client.js";
 import type { ResourceSyncer } from "./types.js";
 
@@ -17,6 +18,15 @@ class SchemaSyncer implements ResourceSyncer {
   readonly kind = "schema";
   readonly directory = SCHEMAS_DIR;
   readonly mutable = false;
+
+  validate(data: object): void {
+    const result = validateJsonSchema(data);
+    if (!result.valid) {
+      throw new ZitadelError("E_VALIDATION", "User schema is not a valid JSON Schema", {
+        details: { errors: result.errors },
+      });
+    }
+  }
 
   async create(client: PlatformClient, data: object): Promise<string> {
     const result = await client.createSchema(data);
@@ -42,6 +52,12 @@ class FlowDefinitionSyncer implements ResourceSyncer {
   readonly mutable = true;
 
   constructor(private readonly projectId: string) {}
+
+  validate(data: object): void {
+    // `validateFlows` takes a batch and throws `E_VALIDATION` on the
+    // first invalid entry; a single-element array validates one file.
+    validateFlows([data]);
+  }
 
   async create(client: PlatformClient, data: object): Promise<string> {
     // Wrap the bare flow body in the spec envelope before sending.
