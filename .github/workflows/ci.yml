@@ -73,7 +73,7 @@ jobs:
       # postgres binary, so no Maven binary cache is needed here.
       - run: go test -v -tags spanner_integration -timeout=10m ./...
 
-  go-test-embedded-postgres:
+  go-smoke-test-embedded-postgres:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -82,11 +82,12 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      # Smoke-tests the embedded-postgres binary path that backs the zero-config
-      # / single-binary server (run zitadel without standing up Postgres). Unlike
-      # the testcontainer jobs this downloads the PG binary from Maven, so it
-      # carries the postgres runtime libs and the binary cache (keyed on go.sum);
-      # the StartEmbedded retry tolerates a flaky cold-cache fetch.
+      # Builds the server and boots it on the embedded-postgres default connector:
+      # the zero-config / single-binary path (run zitadel without standing up
+      # Postgres). Asserts the binary starts, runs migrations, and shuts down
+      # cleanly (exit 0); we test the start, not the integration suites. The
+      # embedded binary is fetched from Maven on a cold cache, so this job keeps
+      # the postgres runtime libs and the binary cache (StartEmbedded retries the fetch).
       - name: Install embedded-postgres runtime deps
         run: sudo apt-get update -qq && sudo apt-get install -y -qq libicu-dev libssl-dev
       - name: Cache embedded-postgres binary
@@ -94,7 +95,32 @@ jobs:
         with:
           path: ~/.embedded-postgres-go
           key: embedded-postgres-${{ runner.os }}-${{ hashFiles('go.sum') }}
-      - run: go test -v -tags embedded_integration -timeout=10m ./internal/storage/database/dialect/postgres/embedded/...
+      - name: Build server
+        run: go build -o ./nextgen .
+      - name: Smoke test (start, migrate, graceful exit 0)
+        run: |
+          export NEXTGEN_SERVER_ENCRYPTION_KEY=4D61737465726B65794E65656473546F48617665333243686172616374657273
+          ./nextgen > server.log 2>&1 &
+          pid=$!
+          # "server listening" is logged only after embedded PG is up, migrations
+          # ran, and services wired; the generous timeout covers a cold Maven download.
+          ready=0
+          for i in $(seq 1 240); do
+            if grep -q "server listening on" server.log; then ready=1; break; fi
+            if ! kill -0 "$pid" 2>/dev/null; then
+              echo "::error::server exited before becoming ready"; cat server.log; exit 1
+            fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then
+            echo "::error::timed out waiting for server readiness"; cat server.log
+            kill -TERM "$pid" 2>/dev/null || true; exit 1
+          fi
+          kill -TERM "$pid"
+          code=0; wait "$pid" || code=$?
+          cat server.log
+          [ "$code" -eq 0 ] || { echo "::error::non-zero exit after SIGTERM: $code"; exit 1; }
+          echo "embedded-postgres smoke test passed (start, migrate, graceful exit 0)"
 
 
   node-check:
@@ -245,7 +271,7 @@ jobs:
   goreleaser-snapshot:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: [go-unit-test, go-integration-test-postgres, go-integration-test-spanner, go-test-embedded-postgres, node-check]
+    needs: [go-unit-test, go-integration-test-postgres, go-integration-test-spanner, go-smoke-test-embedded-postgres, node-check]
     steps:
       - name: Checkout
         uses: actions/checkout@v6
