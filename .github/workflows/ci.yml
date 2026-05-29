@@ -73,6 +73,29 @@ jobs:
       # postgres binary, so no Maven binary cache is needed here.
       - run: go test -v -tags spanner_integration -timeout=10m ./...
 
+  go-test-embedded-postgres:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      # Smoke-tests the embedded-postgres binary path that backs the zero-config
+      # / single-binary server (run zitadel without standing up Postgres). Unlike
+      # the testcontainer jobs this downloads the PG binary from Maven, so it
+      # carries the postgres runtime libs and the binary cache (keyed on go.sum);
+      # the StartEmbedded retry tolerates a flaky cold-cache fetch.
+      - name: Install embedded-postgres runtime deps
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq libicu-dev libssl-dev
+      - name: Cache embedded-postgres binary
+        uses: actions/cache@v5
+        with:
+          path: ~/.embedded-postgres-go
+          key: embedded-postgres-${{ runner.os }}-${{ hashFiles('go.sum') }}
+      - run: go test -v -tags embedded_integration -timeout=10m ./internal/storage/database/dialect/postgres/embedded/...
+
 
   node-check:
     runs-on: ubuntu-latest
@@ -222,7 +245,7 @@ jobs:
   goreleaser-snapshot:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: [go-unit-test, go-integration-test-postgres, go-integration-test-spanner, node-check]
+    needs: [go-unit-test, go-integration-test-postgres, go-integration-test-spanner, go-test-embedded-postgres, node-check]
     steps:
       - name: Checkout
         uses: actions/checkout@v6
