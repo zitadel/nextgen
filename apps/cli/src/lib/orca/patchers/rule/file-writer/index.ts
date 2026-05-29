@@ -161,7 +161,7 @@ async function appendText(
 
 async function mergeEnv(
   path: string,
-  entries: Record<string, string>,
+  entries: Readonly<Record<string, string>>,
   dryRun: boolean,
   result: ScaffoldAccumulator,
 ): Promise<void> {
@@ -191,7 +191,7 @@ async function mergeEnv(
 
 async function mergeJson(
   path: string,
-  patch: Record<string, unknown>,
+  patch: Readonly<Record<string, unknown>>,
   dryRun: boolean,
   result: ScaffoldAccumulator,
 ): Promise<void> {
@@ -214,7 +214,7 @@ async function mergeJson(
 
 async function appendGitignore(
   path: string,
-  entries: string[],
+  entries: ReadonlyArray<string>,
   dryRun: boolean,
   result: ScaffoldAccumulator,
 ): Promise<void> {
@@ -267,7 +267,7 @@ async function readIfExists(path: string): Promise<string | undefined> {
   try {
     return await readFile(path, "utf8");
   } catch (error) {
-    if (isNotFound(error)) {
+    if (typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT") {
       return undefined;
     }
     throw error;
@@ -280,7 +280,7 @@ function abs(cwd: string, path: string): string {
 
 function deepMerge(
   target: Record<string, unknown>,
-  patch: Record<string, unknown>,
+  patch: Readonly<Record<string, unknown>>,
 ): Record<string, unknown> {
   const out = { ...target };
   for (const [key, value] of Object.entries(patch)) {
@@ -291,13 +291,4 @@ function deepMerge(
     }
   }
   return out;
-}
-
-function isNotFound(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as { code?: string }).code === "ENOENT"
-  );
 }

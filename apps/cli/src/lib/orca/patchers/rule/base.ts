@@ -68,7 +68,7 @@ export abstract class AbstractRulePatcher implements Patcher {
    * templates, and sync state. Flow content comes from {@link buildFlow}; the
    * schema is the caller's already-built object. Pure: no filesystem or network.
    */
-  private baseOps(ctx: PatchContext): FileOp[] {
+  private baseOps(ctx: PatchContext): ReadonlyArray<FileOp> {
     return [
       { kind: "mkdir", path: ".zitadel", mode: 0o700 },
       { kind: "mkdir", path: ".zitadel/flows" },
@@ -128,7 +128,7 @@ export abstract class AbstractRulePatcher implements Patcher {
   }
 
   /** Framework-specific route/middleware write ops plus the SDK dependency. */
-  protected abstract routeOps(ctx: PatchContext): FileOp[];
+  protected abstract routeOps(ctx: PatchContext): ReadonlyArray<FileOp>;
   /** Framework-specific managed (marker-bearing) file paths, for ejection. */
   protected abstract routeFiles(view: PatchView): ReadonlyArray<string>;
   /** One-line summary of what the integration scaffolded. */
