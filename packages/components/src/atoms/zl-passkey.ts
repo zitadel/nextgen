@@ -176,7 +176,8 @@ export class ZlPasskey extends LitElement {
    * `navigator.credentials.get()` — authentication ceremony.
    */
   private async getCredential(): Promise<PublicKeyCredential | null> {
-    const opts = this.options!;
+    const opts = this.options;
+    if (!opts) throw new Error("getCredential called without options");
 
     const publicKeyOptions: PublicKeyCredentialRequestOptions = {
       challenge: base64UrlToBuffer(opts.challenge as string),
@@ -190,7 +191,7 @@ export class ZlPasskey extends LitElement {
 
     const result = await navigator.credentials.get({
       publicKey: publicKeyOptions,
-      signal: this.abortController!.signal,
+      signal: this.abortController?.signal,
     });
 
     return result as PublicKeyCredential | null;
@@ -200,7 +201,8 @@ export class ZlPasskey extends LitElement {
    * `navigator.credentials.create()` — registration ceremony.
    */
   private async createCredential(): Promise<PublicKeyCredential | null> {
-    const opts = this.options!;
+    const opts = this.options;
+    if (!opts) throw new Error("createCredential called without options");
 
     const rp = opts.rp as { id?: string; name: string };
     const user = opts.user as Record<string, unknown>;
@@ -233,7 +235,7 @@ export class ZlPasskey extends LitElement {
 
     const result = await navigator.credentials.create({
       publicKey: publicKeyOptions,
-      signal: this.abortController!.signal,
+      signal: this.abortController?.signal,
     });
 
     return result as PublicKeyCredential | null;

@@ -18,6 +18,9 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./module": {
+      "import": "./dist/module.js"
+    },
     "./server": {
       "types": "./dist/server.d.ts",
       "import": "./dist/server.js"
@@ -30,13 +33,14 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsup src/index.ts src/server.ts src/runtime/types.ts src/runtime/server/middleware.ts --format esm --dts --clean && tsup src/runtime/plugin.ts src/runtime/composables/useAuth.ts src/module.ts --format esm --no-clean --external @nuxt/kit --external '#imports'",
+    "build": "tsup src/index.ts src/server.ts src/runtime/types.ts src/runtime/server/middleware.ts src/runtime/server/handler.ts --format esm --dts --clean && tsup src/runtime/plugin.ts src/runtime/composables/useAuth.ts src/module.ts --format esm --no-clean --external @nuxt/kit --external '#imports'",
     "dev": "tsup src/index.ts src/server.ts --format esm --dts --watch",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
     "lint": "eslint ."
   },
   "dependencies": {
+    "@zitadel-nextgen/api": "workspace:*",
     "@zitadel-nextgen/components": "workspace:*"
   },
   "peerDependencies": {

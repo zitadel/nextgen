@@ -20,6 +20,9 @@
     },
     {
       "path": "../components/tsconfig.lib.json"
+    },
+    {
+      "path": "../api/tsconfig.lib.json"
     }
   ]
 }
