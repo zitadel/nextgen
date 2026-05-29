@@ -182,6 +182,25 @@ describe("doctor command", () => {
     expect(perms?.status).toBe("pass");
   });
 
+  it("reports E_VALIDATION (not a crash) when --fix cannot repair a broken project", async () => {
+    const cwd = await makeHealthyProject();
+    // Remove the user schema: schema check fails outright, and dependency's
+    // repair can't rebuild its context — --fix must stay best-effort.
+    await rm(join(cwd, ".zitadel/schemas/user.json"));
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({ name: "demo", dependencies: { next: "^15" } }),
+    );
+
+    const res = await doctor(cwd, ["--fix"]);
+
+    expect(res.exitCode).toBe(3);
+    const json = parseJson(res.stdout) as { status: string; code: string; details: { checks: Check[] } };
+    expect(json.status).toBe("error");
+    expect(json.code).toBe("E_VALIDATION");
+    expect(json.details.checks.find((check) => check.name === "schema")?.status).toBe("fail");
+  });
+
   it("re-applies a missing Zitadel dependency via --fix and then passes", async () => {
     const cwd = await makeHealthyProject();
     // Drop the SDK dependency; repair re-adds it via its `add-dep` op.

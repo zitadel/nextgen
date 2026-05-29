@@ -1,4 +1,5 @@
 import { Flags } from "@oclif/core";
+import consola from "consola";
 
 import { BaseCommand, type JsonEnvelope } from "../../lib/oclif";
 import { ZitadelError } from "../../lib/errors";
@@ -28,8 +29,16 @@ export default class Doctor extends BaseCommand {
     if (flags.fix) {
       const before = await Promise.all(SANITY_CHECKS.map((check) => check.run(ctx)));
       for (const [index, check] of SANITY_CHECKS.entries()) {
-        if (before[index].status === "fail") {
+        if (before[index].status !== "fail") {
+          continue;
+        }
+        try {
           await check.fix(ctx);
+        } catch (error) {
+          // Best-effort: a repair that can't run (e.g. a missing prerequisite
+          // file) must not abort doctor — the re-verify below still reports
+          // whatever remains broken.
+          consola.debug(`doctor --fix: ${check.name} repair failed`, error);
         }
       }
     }
