@@ -2,7 +2,9 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 
+	"github.com/ianlancetaylor/jsonschema"
 	"github.com/zitadel/nextgen/api/openapi/endpoints/flow_definitions"
 	"github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -30,6 +32,7 @@ func NewProjectService(
 	secretGenerator secrets.Generator,
 	serverURL string,
 	schemaValidator *domain.SchemaValidator,
+	schemaResolver domain.SchemaResolver,
 ) ProjectService {
 	return &projectService{
 		pool:               pool,
@@ -39,6 +42,7 @@ func NewProjectService(
 		secretGenerator:    secretGenerator,
 		serverURL:          serverURL,
 		schemaValidator:    schemaValidator,
+		schemaResolver:     schemaResolver,
 	}
 }
 
@@ -50,6 +54,7 @@ type projectService struct {
 	secretGenerator    secrets.Generator
 	serverURL          string
 	schemaValidator    *domain.SchemaValidator
+	schemaResolver     domain.SchemaResolver
 }
 
 var _ ProjectService = (*projectService)(nil)
@@ -74,10 +79,16 @@ func (s *projectService) Create(ctx context.Context, previewOrigins []string) (_
 		return nil, domain.ErrInternal(err).WithMessage("failed to create project in the database")
 	}
 
-	if err := s.createDefaultUserSchema(ctx, tx, project.ID); err != nil {
+	userschema, err := s.createDefaultUserSchema(ctx, tx, project.ID)
+	if err != nil {
 		return nil, err
 	}
-	if err := s.createDefaultLoginFlowDefinition(ctx, tx, project.ID); err != nil {
+	var userSchema *jsonschema.Schema
+	err = json.Unmarshal(userschema.Schema, &userSchema)
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to parse default user schema")
+	}
+	if err := s.createDefaultLoginFlowDefinition(ctx, tx, project.ID, userSchema); err != nil {
 		return nil, err
 	}
 
@@ -89,26 +100,32 @@ func (s *projectService) Create(ctx context.Context, previewOrigins []string) (_
 	return project, nil
 }
 
-func (s *projectService) createDefaultUserSchema(ctx context.Context, client database.QueryExecutor, projectID string) error {
-	schemabs := schemas.DefaultHumanUserSchema(s.serverURL, projectID)
+func (s *projectService) createDefaultUserSchema(ctx context.Context, client database.QueryExecutor, projectID string) (*domain.JSONSchema, error) {
+	schemabs := schemas.DefaultHumanUserSchema(s.serverURL)
 	schema, err := domain.NewJSONSchema(projectID, schemabs)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if err = s.schemaValidator.ValidateAgainstMetaSchema(schemabs); err != nil {
-		return domain.ErrInternal(err).WithMessage("default human user schema invalid")
+		return nil, domain.ErrInternal(err).WithMessage("default human user schema invalid")
 	}
 	if err := s.schemaRepo.Create(ctx, client, schema); err != nil {
-		return domain.ErrInternal(err).WithMessage("failed to save default human schema to project")
+		return nil, domain.ErrInternal(err).WithMessage("failed to save default human schema to project")
 	}
-	return nil
+	return schema, nil
 }
 
-func (s *projectService) createDefaultLoginFlowDefinition(ctx context.Context, client database.QueryExecutor, projectID string) error {
+func (s *projectService) createDefaultLoginFlowDefinition(ctx context.Context, client database.QueryExecutor, projectID string, userSchema *jsonschema.Schema) error {
 	flowDef, err := flow_definitions.DefaultLoginFlowDefinition(s.serverURL, projectID)
 	if err != nil {
 		return domain.ErrInternal(err).WithMessage("failed to retrieve default flow definition")
 	}
+
+	_, err = domain.ValidateFlowDefinition(userSchema, *flowDef)
+	if err != nil {
+		return domain.ErrInternal(err).WithMessage("default login flow definition is invalid")
+	}
+
 	err = s.flowDefinitionRepo.CreateFlowDefinition(ctx, client, flowDef)
 	if err != nil {
 		return domain.ErrInternal(err).WithMessage("failed to save default login flow definition to project")

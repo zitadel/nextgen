@@ -37,13 +37,13 @@ func TestCreateProject(t *testing.T) {
 				resp, err := client.CreateProject(t.Context(), tc.req)
 
 				assert.NoError(t, err)
-				assert.IsType(t, &api.CreateProjectResponse{}, resp, mustMarshal(t, resp))
-
-				got := resp.(*api.CreateProjectResponse)
-				assert.NotEmpty(t, got.ID)
-				assert.NotEmpty(t, got.ProjectSecret)
-				assert.NotEmpty(t, got.PreviewSecret)
-				assert.Equal(t, tc.req.PreviewOrigins, got.PreviewOrigins)
+				if (assert.IsType(t, &api.CreateProjectResponse{}, resp, mustMarshal(t, resp))) {
+					got := resp.(*api.CreateProjectResponse)
+					assert.NotEmpty(t, got.ID)
+					assert.NotEmpty(t, got.ProjectSecret)
+					assert.NotEmpty(t, got.PreviewSecret)
+					assert.Equal(t, tc.req.PreviewOrigins, got.PreviewOrigins)
+				}
 			})
 		}
 	})
@@ -62,12 +62,12 @@ func TestGetProject(t *testing.T) {
 		resp, err := client.GetProject(t.Context(), params)
 
 		assert.NoError(t, err)
-		assert.IsType(t, &api.GetProjectResponse{}, resp, mustMarshal(t, resp))
-
-		got := resp.(*api.GetProjectResponse)
-		assert.NotEmpty(t, got.CreatedAt)
-		assert.NotEmpty(t, got.UpdatedAt)
-		assert.Equal(t, project.ID, got.ID)
+		if assert.IsType(t, &api.GetProjectResponse{}, resp, mustMarshal(t, resp)) {
+			got := resp.(*api.GetProjectResponse)
+			assert.NotEmpty(t, got.CreatedAt)
+			assert.NotEmpty(t, got.UpdatedAt)
+			assert.Equal(t, project.ID, got.ID)
+		}
 	})
 
 	t.Run("error", func(t *testing.T) {

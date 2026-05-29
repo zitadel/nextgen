@@ -14,9 +14,8 @@ var FS embed.FS
 //go:embed examples/default-human-user-schema.json
 var defaultHumanUserSchema []byte
 
-func DefaultHumanUserSchema(serverURL string, projectID string) []byte {
+func DefaultHumanUserSchema(serverURL string) []byte {
 	json := string(defaultHumanUserSchema)
-	json = strings.ReplaceAll(json, "${PROJECT_ID}", projectID)
 	json = strings.ReplaceAll(json, "${SERVER_URL}", serverURL)
 
 	return []byte(json)

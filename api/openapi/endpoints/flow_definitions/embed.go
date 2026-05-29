@@ -21,6 +21,9 @@ func DefaultLoginFlowDefinition(serverURL string, projectID string) (*domain.Flo
 
 	req := &api.CreateFlowDefinitionRequest{}
 	err := req.UnmarshalJSON([]byte(jscontent))
+	if err != nil {
+		return nil, err
+	}
 
 	if err = req.Validate(); err != nil {
 		return nil, err
@@ -32,6 +35,9 @@ func DefaultLoginFlowDefinition(serverURL string, projectID string) (*domain.Flo
 	}
 
 	steps, err := convertSteps(req.FlowDefinition.GetSteps())
+	if err != nil {
+		return nil, err
+	}
 
 	return domain.NewFlowDefinition(
 		projectID,
@@ -67,7 +73,7 @@ func convertSteps(steps []api.FlowDefinitionStep) ([]domain.FlowDefinitionStep, 
 			return nil, err
 		}
 
-		onSuccess, err := convertSOnSuccess(step.GetOnSuccess())
+		onSuccess, err := convertOnSuccess(step.GetOnSuccess())
 		if err != nil {
 			return nil, err
 		}
@@ -118,7 +124,7 @@ func convertStepTransitions(transitions api.OptFlowDefinitionStepTransitions) (m
 }
 
 func convertStepTransitionAction(action api.OptNilFlowDefinitionStepTransitionsItemAction) (*domain.FlowDefinitionTransitionAction, error) {
-	if action.IsSet() {
+	if !action.IsSet() {
 		return nil, nil
 	}
 
@@ -141,7 +147,7 @@ func convertComplete(complete api.OptFlowDefinitionStepComplete) (*domain.FlowSt
 	return &ret, nil
 }
 
-func convertSOnSuccess(success api.OptFlowDefinitionStepOnSuccess) (*domain.FlowOnSuccess, error) {
+func convertOnSuccess(success api.OptFlowDefinitionStepOnSuccess) (*domain.FlowOnSuccess, error) {
 	if !success.IsSet() {
 		return nil, nil
 	}

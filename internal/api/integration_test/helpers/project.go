@@ -30,6 +30,7 @@ func (h *Harness) EnsureProjectService(t *testing.T) service.ProjectService {
 			h.EnsureSecretGenerator(t),
 			BuiltinSchemaBaseURL,
 			h.EnsureSchemaValidator(t),
+			h.EnsureSchemaResolver(t),
 		)
 	}
 	return h.ProjectService

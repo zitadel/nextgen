@@ -100,6 +100,10 @@ func (fd *flowDefinitionService) Create(ctx context.Context, req CreateFlowDefin
 		req.Audience,
 		req.Steps,
 	)
+	if err != nil {
+		return nil, "", err
+	}
+
 	// if req.FlowSchemaURI is empty, use the latest flow definition schema from the builtin schema provider
 	flowSchemaURI := req.FlowSchemaURI
 	if flowSchemaURI == "" {
