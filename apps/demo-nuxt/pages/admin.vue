@@ -3,7 +3,7 @@
     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px">
       <h1 style="font-size: 24px; font-weight: 700; margin: 0">Admin</h1>
       <ClientOnly>
-        <zitadel-logout api-base="/__nextgen" post-sign-out-url="/login" />
+        <zitadel-logout :project="project" post-sign-out-url="/login" />
       </ClientOnly>
     </div>
     <p style="color: #6b7280">
@@ -14,6 +14,8 @@
 
 <script setup lang="ts">
 import type { ClientAuthResult } from "@zitadel-nextgen/sdk-nuxt";
+import { useZitadelProject } from "@zitadel-nextgen/sdk-nuxt";
 
 const auth = useState<ClientAuthResult>("nextgen-auth");
+const project = useZitadelProject();
 </script>
