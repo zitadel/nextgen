@@ -34,7 +34,7 @@ func runTests(m *testing.M) int {
 		connector, err = postgres.DecodeConfig(url)
 		stop = func() {}
 	} else {
-		connector, stop, err = embedded.StartEmbedded()
+		connector, stop, err = embedded.StartContainer(ctx)
 		helpers.Connector = connector
 	}
 	if err != nil {

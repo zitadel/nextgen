@@ -83,9 +83,9 @@ func newEmbeddedDB(ctx context.Context) (pool database.PoolTest, stop func(), er
 		}
 		stop = func() {}
 	} else {
-		connector, stop, err = embedded.StartEmbedded()
+		connector, stop, err = embedded.StartContainer(ctx)
 		if err != nil {
-			return nil, nil, fmt.Errorf("unable to start embedded postgres: %w", err)
+			return nil, nil, fmt.Errorf("unable to start postgres container: %w", err)
 		}
 	}
 

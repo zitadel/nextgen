@@ -42,7 +42,7 @@ func runPostgresIntegrationTests(m *testing.M) int {
 		}
 	} else {
 		var connector database.Connector
-		connector, stop, err = embedded.StartEmbedded()
+		connector, stop, err = embedded.StartContainer(ctx)
 		if err == nil {
 			var pool_ database.Pool
 			pool_, err = connector.Connect(ctx)

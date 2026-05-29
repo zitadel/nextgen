@@ -19,7 +19,7 @@ import (
 
 func TestMain(m *testing.M) {
 	ctx := context.Background()
-	connector, stop, err := embedded.StartEmbedded()
+	connector, stop, err := embedded.StartContainer(ctx)
 	if err != nil {
 		panic(err)
 	}
