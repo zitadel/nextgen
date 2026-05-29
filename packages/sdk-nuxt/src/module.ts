@@ -29,6 +29,11 @@ export default defineNuxtModule<NextgenMiddlewareOptions>({
       jwtKey: options.jwtKey,
     };
 
+    // Expose SDK-initializer values to the client-side plugin so it can
+    // call `configureZitadel()` without hardcoding paths.
+    nuxt.options.runtimeConfig.public.nextgenApiBase =
+      options.proxyPath ?? '/__nextgen';
+
     addPlugin(resolve('./runtime/plugin'));
     addServerHandler({
       middleware: true,

@@ -53,6 +53,8 @@ export {
   signedInTemplate,
   TEMPLATE_NAMES,
   en,
+  de,
+  builtinLocales,
   startFlow,
   submitStep,
   getCurrentStep,
