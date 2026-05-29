@@ -139,4 +139,72 @@ export type NextgenMiddlewareOptions = {
    * @default 5000
    */
   proxyTimeoutMs?: number;
+
+  /**
+   * Optional hook called when a `POST /sessions/exchange` response is
+   * proxied back to the browser. Receives the upstream `Response` after
+   * hop-by-hop stripping and cookie upgrading. Return a modified
+   * `Response` to add custom headers, extra `Set-Cookie` values, or
+   * transform the body.
+   *
+   * The callback runs on the server — it has access to the full response
+   * including `Set-Cookie` headers that are `HttpOnly` and invisible to
+   * client-side JavaScript. It fires **after** the upstream has processed
+   * the exchange; it cannot prevent the exchange itself (return a 403
+   * `Response` to block the browser from receiving it).
+   *
+   * **Capabilities:**
+   *
+   * - **Add or modify cookies** — append `Set-Cookie` headers for
+   *   user-preferences, analytics IDs, or any server-side state.
+   * - **Make additional fetch calls** — enrich the session by calling
+   *   your own backend, a profile service, or any external API. The
+   *   response body can be read with `response.json()` to extract
+   *   session details like `user_id`.
+   * - **Map or transform response properties** — reshape the JSON body
+   *   before it reaches the browser (e.g. strip internal fields, add
+   *   computed properties).
+   * - **Logging and auditing** — clone the response, read its body for
+   *   audit trails, and return the original unchanged.
+   *
+   * @example Add a cookie
+   * ```ts
+   * onExchangeResponse: async (response) => {
+   *   const headers = new Headers(response.headers);
+   *   headers.append("Set-Cookie", "theme=dark; Path=/; SameSite=Lax");
+   *   return new Response(response.body, {
+   *     status: response.status,
+   *     headers,
+   *   });
+   * },
+   * ```
+   *
+   * @example Fetch additional data and set a cookie from it
+   * ```ts
+   * onExchangeResponse: async (response) => {
+   *   const body = await response.json();
+   *   const profile = await fetch(
+   *     `https://api.example.com/users/${body.session.user_id}`,
+   *   );
+   *   const { locale } = await profile.json();
+   *   const headers = new Headers(response.headers);
+   *   headers.append("Set-Cookie", `locale=${locale}; Path=/; SameSite=Lax`);
+   *   return new Response(JSON.stringify(body), {
+   *     status: response.status,
+   *     headers,
+   *   });
+   * },
+   * ```
+   *
+   * @example Log the exchange for auditing (pass-through)
+   * ```ts
+   * onExchangeResponse: async (response) => {
+   *   const cloned = response.clone();
+   *   const body = await cloned.json();
+   *   await auditLog.record("session_exchange", body.session.session_id);
+   *   return response;
+   * },
+   * ```
+   */
+  onExchangeResponse?: (response: Response) => Response | Promise<Response>;
 };

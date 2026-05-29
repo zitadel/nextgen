@@ -164,6 +164,7 @@ export async function nextgenMiddleware(
     allowedTokenTypes = ['JWT', 'at+JWT'],
     jwksTimeoutMs,
     proxyTimeoutMs = 5000,
+    onExchangeResponse,
   } = options;
 
   // Guard against open-redirect: loginPath must be a relative path. An absolute
@@ -188,7 +189,7 @@ export async function nextgenMiddleware(
   }
 
   if (pathname === proxyPath || pathname.startsWith(`${proxyPath}/`)) {
-    return proxyRequest(req, issuerUrl, proxyPath, proxyTimeoutMs);
+    return proxyRequest(req, issuerUrl, proxyPath, proxyTimeoutMs, onExchangeResponse);
   }
 
   return handleAuth(req, {
@@ -225,6 +226,7 @@ async function proxyRequest(
   issuerUrl: string,
   proxyPath: string,
   proxyTimeoutMs: number,
+  onExchangeResponse?: (response: Response) => Response | Promise<Response>,
 ): Promise<Response> {
   const url = new URL(req.url);
   const suffix = url.pathname.slice(proxyPath.length);
@@ -295,10 +297,19 @@ async function proxyRequest(
     );
   }
 
-  return new Response(upstream.body, {
+  let response = new Response(upstream.body, {
     status: upstream.status,
     headers: responseHeaders,
   });
+
+  // Call the exchange hook when the proxied request is POST /sessions/exchange.
+  const isExchange =
+    req.method === 'POST' && suffix.startsWith('/sessions/exchange');
+  if (isExchange && onExchangeResponse) {
+    response = await onExchangeResponse(response);
+  }
+
+  return response;
 }
 
 /**

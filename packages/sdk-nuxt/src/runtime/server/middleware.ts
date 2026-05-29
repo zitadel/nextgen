@@ -191,6 +191,7 @@ export function createNextgenMiddleware(
     allowedTokenTypes = ['JWT', 'at+JWT'],
     jwksTimeoutMs,
     proxyTimeoutMs = 5000,
+    onExchangeResponse,
   } = options;
 
   // Guard against open-redirect: loginPath must be a relative path. An absolute
@@ -219,7 +220,7 @@ export function createNextgenMiddleware(
     }
 
     if (pathname === proxyPath || pathname.startsWith(`${proxyPath}/`)) {
-      return proxyRequest(event, issuerUrl, proxyPath, url, proxyTimeoutMs);
+      return proxyRequest(event, issuerUrl, proxyPath, url, proxyTimeoutMs, onExchangeResponse);
     }
 
     return handleAuth(event, {
@@ -253,6 +254,7 @@ async function proxyRequest(
   proxyPath: string,
   url: URL,
   proxyTimeoutMs: number,
+  onExchangeResponse?: (response: Response) => Response | Promise<Response>,
 ): Promise<ReadableStream<Uint8Array> | null> {
   const suffix = url.pathname.slice(proxyPath.length);
   const target = `${issuerUrl}${suffix}${url.search}`;
@@ -294,6 +296,40 @@ async function proxyRequest(
       'set-cookie',
       upgradeSessionCookie(cookie, isSecure),
     );
+  }
+
+  // Call the exchange hook when the proxied request is POST /sessions/exchange.
+  const isExchange =
+    method === 'POST' && suffix.startsWith('/sessions/exchange');
+  if (isExchange && onExchangeResponse) {
+    // Build a web-standard Response from the already-processed headers so the
+    // hook receives the same contract as sdk-next (a plain Response object).
+    const proxyHeaders = new Headers();
+    const rawHeaders = event.node.res.getHeaders();
+    for (const [key, value] of Object.entries(rawHeaders)) {
+      if (value == null) continue;
+      if (Array.isArray(value)) {
+        for (const v of value) proxyHeaders.append(key, v);
+      } else {
+        proxyHeaders.set(key, String(value));
+      }
+    }
+    const original = new Response(upstream.body, {
+      status: event.node.res.statusCode,
+      headers: proxyHeaders,
+    });
+    const modified = await onExchangeResponse(original);
+
+    // Re-apply the (potentially modified) response.
+    event.node.res.statusCode = modified.status;
+    // Clear existing headers and re-apply from the modified response.
+    for (const key of Object.keys(event.node.res.getHeaders())) {
+      event.node.res.removeHeader(key);
+    }
+    for (const [key, value] of modified.headers.entries()) {
+      event.node.res.appendHeader(key, value);
+    }
+    return modified.body;
   }
 
   return upstream.body;
