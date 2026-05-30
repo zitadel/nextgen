@@ -14,19 +14,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  openapi-lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set up node
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+      - name: Lint OpenAPI spec
+        run: npx --yes @redocly/cli@2.31.5 lint api/openapi/openapi-spec.yaml --format=github-actions
+
   go-test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
-      # lint openapi
-      - name: Set up node
-        uses: actions/setup-node@v6
-        with:
-          node-version-file: .nvmrc
-      - name: Run OpenAPI linting
-        run: npx --yes @redocly/cli@1.34.5 lint api/openapi/openapi-spec.yaml --format=github-actions
-
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
