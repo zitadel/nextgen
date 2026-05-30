@@ -1,4 +1,5 @@
 import { resetPlatformStore, setupPlatformHandlers } from "@zitadel-nextgen/api-mock/platform";
+import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
@@ -58,6 +59,30 @@ describe("platform client", () => {
       client.updateFlowDefinition(id, { name: "default", purposes: ["login", "register"] }),
     ).resolves.toMatchObject({ id, project_id: "proj_test", status: "active" });
     await expect(client.deleteFlowDefinition(id)).resolves.toBeUndefined();
+  });
+
+  it("maps 401 responses to E_AUTH", async () => {
+    server.use(http.get(/.*/, () => new HttpResponse(null, { status: 401 })));
+    const client = createPlatformClient(MOCK_SERVER_URL);
+    await expect(client.getProject("any")).rejects.toMatchObject({ code: "E_AUTH" });
+  });
+
+  it("maps 403 responses to E_AUTH", async () => {
+    server.use(http.get(/.*/, () => new HttpResponse(null, { status: 403 })));
+    const client = createPlatformClient(MOCK_SERVER_URL);
+    await expect(client.getProject("any")).rejects.toMatchObject({ code: "E_AUTH" });
+  });
+
+  it("maps 5xx responses to E_NETWORK", async () => {
+    server.use(http.get(/.*/, () => new HttpResponse(null, { status: 503 })));
+    const client = createPlatformClient(MOCK_SERVER_URL);
+    await expect(client.getProject("any")).rejects.toMatchObject({ code: "E_NETWORK" });
+  });
+
+  it("maps other 4xx responses to E_VALIDATION", async () => {
+    server.use(http.get(/.*/, () => new HttpResponse(null, { status: 404 })));
+    const client = createPlatformClient(MOCK_SERVER_URL);
+    await expect(client.getProject("any")).rejects.toMatchObject({ code: "E_VALIDATION" });
   });
 
   it("getFlowDefinition returns the created flow definition", async () => {

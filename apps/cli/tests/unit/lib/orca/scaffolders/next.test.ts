@@ -37,6 +37,25 @@ describe("NextScaffolder", () => {
     });
   });
 
+  it("surfaces 'Command not found' when the binary is not on PATH (ENOENT)", async () => {
+    const enoent = Object.assign(new Error("spawn npx ENOENT"), { code: "ENOENT" });
+    mockSpawn.mockReturnValue({
+      status: null,
+      stderr: "",
+      stdout: "",
+      pid: 0,
+      output: [],
+      signal: null,
+      error: enoent,
+    } as unknown as ReturnType<typeof spawnSync>);
+
+    await expect(new NextScaffolder().scaffold("/tmp/proj", "next")).rejects.toMatchObject({
+      code: "E_VALIDATION",
+      message: expect.stringContaining("Command not found"),
+      hint: expect.stringContaining("PATH"),
+    });
+  });
+
   it("only supports next", () => {
     const scaffolder = new NextScaffolder();
     expect(scaffolder.canScaffold("next")).toBe(true);

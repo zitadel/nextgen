@@ -15,8 +15,25 @@ import type {
 } from "@zitadel-nextgen/api/generated/model";
 import { setApiBaseUrl } from "@zitadel-nextgen/api/runtime/base-url";
 
-import { ZitadelError } from "../errors";
+import { ZitadelError, type ZitadelErrorCode } from "../errors";
 import type { PlatformClient } from "./client";
+
+/**
+ * Maps an HTTP status to a {@link ZitadelErrorCode}:
+ * `401` / `403` → `E_AUTH` (bad or missing project secret), `5xx` →
+ * `E_NETWORK` (server-side or transport), every other non-`ok` status
+ * → `E_VALIDATION` (the client sent something the platform rejected,
+ * e.g. `400`, `404`, `409`).
+ */
+function statusToCode(status: number): ZitadelErrorCode {
+  if (status === 401 || status === 403) {
+    return "E_AUTH";
+  }
+  if (status >= 500) {
+    return "E_NETWORK";
+  }
+  return "E_VALIDATION";
+}
 
 /**
  * HTTP implementation of {@link PlatformClient}. Paths come from the
@@ -84,7 +101,7 @@ export class HttpPlatformClient implements PlatformClient {
 
     if (!response.ok) {
       throw new ZitadelError(
-        response.status >= 500 ? "E_NETWORK" : "E_VALIDATION",
+        statusToCode(response.status),
         `Zitadel API returned ${response.status}`,
         {
           details: await safeJson(response),
