@@ -12,8 +12,7 @@ import type { Scaffolder } from "./scaffolders/types";
 export type { Detector, FrameworkFacts } from "./detectors/types";
 export { issuerFromPort } from "./detectors/port";
 
-/**
- * One framework the CLI can scaffold from scratch, surfaced to the picker. */
+/** One framework the CLI can scaffold from scratch, surfaced to the picker. */
 export type FrameworkChoice = Readonly<{ id: string; displayName: string }>;
 
 /**

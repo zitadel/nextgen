@@ -15,14 +15,14 @@ import type {
 
 /**
  * Base class for every oclif command. Owns the global flags, builds the
- * {@link GlobalOptions} context (including server `source` resolution) that the
- * domain `run*` functions in `commands/` consume, and turns the
- * {@link CommandResult} they return into the JSON envelope (oclif serialises it
- * natively in `--json` mode) or human-facing text. Errors are translated into
- * the failure envelope and the mapped process exit code. Commands stay thin:
- * parse flags, build meta via {@link toMeta}, and `return this.emit(await runX(...))`.
- * The agent contract (ADR 004) is preserved — oclif only replaces parsing,
- * dispatch, help, and JSON emission.
+ * {@link GlobalOptions} context (including server `source` resolution) the
+ * subclass's `run` reads via `this.meta`, and turns the {@link CommandResult}
+ * it returns into the JSON envelope (oclif serialises it natively in `--json`
+ * mode) or human-facing text. Errors are translated into the failure envelope
+ * and the mapped process exit code. Subclasses stay thin: parse flags, call
+ * {@link toMeta}, do their work, and `return this.emit(...)`. The agent
+ * contract (ADR 004) is preserved — oclif only replaces parsing, dispatch,
+ * help, and JSON emission.
  */
 export abstract class BaseCommand extends Command {
   /** Opt into oclif's native `--json` flag and JSON serialisation of the result. */

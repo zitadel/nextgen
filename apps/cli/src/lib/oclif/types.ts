@@ -53,11 +53,10 @@ export type ErrorEnvelope = EnvelopeMeta & {
 export type JsonEnvelope = OkEnvelope | SkippedEnvelope | ErrorEnvelope;
 
 /**
- * Resolved invocation-wide context threaded through every domain `run*`
- * function: the parsed global flags (interactivity, dry-run/force), the
- * envelope metadata (`command`, `cliVersion`, `source`), and the process
- * inputs (`env`, `isTTY`) passed as data rather than read from globals so the
- * functions stay pure and unit-testable.
+ * Resolved invocation-wide context every command reads via `this.meta`: the
+ * parsed global flags (interactivity, dry-run/force), the envelope metadata
+ * (`command`, `cliVersion`, `source`), and the process inputs (`env`, `isTTY`)
+ * surfaced as data so command bodies stay testable.
  */
 export type GlobalOptions = {
   cwd: string;
@@ -75,10 +74,11 @@ export type GlobalOptions = {
 };
 
 /**
- * What a domain `run*` function returns: a success or a deliberate skip. The
- * optional `pretty` string lets a command supply a bespoke human rendering
- * (e.g. the `apply` plan diff); otherwise the generic renderer formats `data`.
- * Failures are thrown as `ZitadelError`, never returned.
+ * What a command body returns to {@link import("./base").BaseCommand.emit}: a
+ * success or a deliberate skip. The optional `pretty` string lets a command
+ * supply a bespoke human rendering (e.g. the `apply` plan diff); otherwise the
+ * generic renderer formats `data`. Failures are thrown as `ZitadelError`,
+ * never returned.
  */
 export type CommandResult =
   | {
