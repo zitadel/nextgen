@@ -9,7 +9,7 @@ import { defineConfig } from "tsdown";
  */
 export default defineConfig({
   entry: {
-    "commands/setup": "src/commands/setup.ts",
+    "commands/setup": "src/commands/setup/index.ts",
     "commands/apply": "src/commands/apply.ts",
     "commands/plan": "src/commands/plan.ts",
     "commands/doctor": "src/commands/doctor/index.ts",
