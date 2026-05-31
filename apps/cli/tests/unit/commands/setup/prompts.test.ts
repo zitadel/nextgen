@@ -10,6 +10,13 @@ vi.mock("@clack/prompts", () => ({
   outro: vi.fn(),
   cancel: vi.fn(),
   isCancel: vi.fn().mockReturnValue(false),
+  // `spinner()` returns a tiny stateful handle — the tests don't assert on
+  // its frames, just that calling it doesn't break the prompt flow.
+  spinner: vi.fn(() => ({
+    start: vi.fn(),
+    stop: vi.fn(),
+    message: vi.fn(),
+  })),
 }));
 
 // Stub the prober so ServerPrompt tests stay focused on the choice wiring,

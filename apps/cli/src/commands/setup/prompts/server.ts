@@ -1,4 +1,4 @@
-import { select, text } from "@clack/prompts";
+import { select, spinner, text } from "@clack/prompts";
 
 import { DEFAULT_SERVER } from "../../../lib/api/resolve-server";
 import { listListeningPorts, probeUrls } from "../../../lib/prober";
@@ -73,33 +73,40 @@ export class ServerPrompt implements SetupPrompt {
  * etc. also surface and the user picks the right one.
  */
 async function discoverLocalOidc(): Promise<ReadonlyArray<string>> {
-  const ports = await listListeningPorts();
-  if (ports.length === 0) {
-    return [];
+  const s = spinner();
+  s.start("Scanning localhost for OIDC servers");
+  try {
+    const ports = await listListeningPorts();
+    if (ports.length === 0) {
+      s.stop("No local servers detected.");
+      return [];
+    }
+    const matches = await probeUrls(
+      ports.map((port) => `http://localhost:${port}/.well-known/openid-configuration`),
+      async (response) => {
+        if (!response.ok) {
+          return null;
+        }
+        try {
+          const body = (await response.json()) as { issuer?: unknown };
+          return typeof body.issuer === "string" ? body.issuer : null;
+        } catch {
+          return null;
+        }
+      },
+      { timeoutMs: OIDC_PROBE_TIMEOUT_MS },
+    );
+    // Map each matched discovery URL back to its bare origin — that's what
+    // ends up in `zitadel.json`'s `server` field.
+    const origins = matches.map((match) => new URL(match.url).origin);
+    s.stop(
+      origins.length === 0
+        ? "No local OIDC servers found."
+        : `Found ${origins.length} local OIDC server${origins.length === 1 ? "" : "s"}.`,
+    );
+    return origins;
+  } catch (error) {
+    s.stop("Discovery skipped.");
+    throw error;
   }
-  const discoveryUrls = ports.map((port) => ({
-    origin: `http://localhost:${port}`,
-    discovery: `http://localhost:${port}/.well-known/openid-configuration`,
-  }));
-  const matches = await probeUrls(
-    discoveryUrls.map((u) => u.discovery),
-    async (response) => {
-      if (!response.ok) {
-        return null;
-      }
-      try {
-        const body = (await response.json()) as { issuer?: unknown };
-        return typeof body.issuer === "string" ? body.issuer : null;
-      } catch {
-        return null;
-      }
-    },
-    { timeoutMs: OIDC_PROBE_TIMEOUT_MS },
-  );
-  // Map each matched discovery URL back to its bare origin — that's what
-  // ends up in `zitadel.json`'s `server` field.
-  const matchedOrigins = new Set(matches.map((match) => match.url));
-  return discoveryUrls
-    .filter((u) => matchedOrigins.has(u.discovery))
-    .map((u) => u.origin);
 }

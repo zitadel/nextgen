@@ -1,5 +1,5 @@
 import { Flags } from "@oclif/core";
-import { intro, outro } from "@clack/prompts";
+import { intro, outro, spinner } from "@clack/prompts";
 
 import { BaseCommand, type JsonEnvelope } from "../../lib/oclif";
 import { ZitadelError } from "../../lib/errors";
@@ -112,6 +112,13 @@ export default class Setup extends BaseCommand {
       });
     }
 
+    // Spinner runs only when we have a real TTY (otherwise --json output
+    // would be polluted by the spinner frames going to stdout). `clack`'s
+    // spinner is a stateful object we keep around to update its `.message()`
+    // through the execution phases.
+    const sp = !nonInteractive && !dryRun ? spinner() : null;
+
+    sp?.start("Creating project on the platform");
     const project = dryRun
       ? dryRunProject()
       : await createPlatformClient(answers.server).createProject({ previewOrigins: [] });
@@ -126,6 +133,7 @@ export default class Setup extends BaseCommand {
       userSchema,
       server: answers.server,
     };
+    sp?.message("Writing project files");
     const result = await orca.patcherFor(framework.id).patch(ctx, { cwd, dryRun, force });
 
     // Apply the freshly-written config to the platform (same sync the `apply`
@@ -133,11 +141,13 @@ export default class Setup extends BaseCommand {
     // with --no-apply.
     let apply: { synced: boolean } | undefined;
     if (!flags["no-apply"] && !dryRun) {
+      sp?.message("Syncing config to the platform");
       const secret = await readZitadelSecret(cwd);
       const client = createPlatformClient(answers.server, secret.project_secret);
       await runSyncLoop(cwd, client, makeSyncers({ projectId: secret.project_id, env }));
       apply = { synced: true };
     }
+    sp?.stop("Zitadel is ready.");
 
     return this.emit({
       status: "ok",
