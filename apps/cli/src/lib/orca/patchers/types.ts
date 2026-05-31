@@ -59,12 +59,17 @@ export type PatchResult = Readonly<{
  *   `zitadel.json`); deleted unconditionally when present.
  * - `directories` — directories removed wholesale (e.g. `.zitadel`).
  * - `envBackups` — env files renamed to a timestamped backup rather than deleted.
+ * - `dependencies` — package-manager dependencies the integration added.
+ *   `eject` does NOT modify `package.json` (the lockfile and other deps might
+ *   conflict), but surfaces an `npm uninstall <name>` line in `next_commands`
+ *   so the user can finish the revert manually.
  */
 export type EjectActions = Readonly<{
   markedFiles: ReadonlyArray<string>;
   rootConfigFiles: ReadonlyArray<string>;
   directories: ReadonlyArray<string>;
   envBackups: ReadonlyArray<string>;
+  dependencies: ReadonlyArray<string>;
 }>;
 
 /**

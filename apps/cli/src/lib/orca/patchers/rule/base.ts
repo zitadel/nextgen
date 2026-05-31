@@ -47,6 +47,7 @@ export abstract class AbstractRulePatcher implements Patcher {
       rootConfigFiles: ["zitadel.json"],
       directories: [".zitadel"],
       envBackups: [".env.local"],
+      dependencies: this.routeDeps(view),
     };
   }
 
@@ -131,6 +132,11 @@ export abstract class AbstractRulePatcher implements Patcher {
   protected abstract routeOps(ctx: PatchContext): ReadonlyArray<FileOp>;
   /** Framework-specific managed (marker-bearing) file paths, for ejection. */
   protected abstract routeFiles(view: PatchView): ReadonlyArray<string>;
+  /**
+   * The package-manager dependencies the integration added, surfaced in
+   * `eject`'s `next_commands` so the user can uninstall them themselves.
+   */
+  protected abstract routeDeps(view: PatchView): ReadonlyArray<string>;
   /** One-line summary of what the integration scaffolded. */
   protected abstract summary(ctx: PatchContext): { title: string; detail: string };
 }

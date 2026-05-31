@@ -20,6 +20,8 @@ async function resolveEjectActions(cwd: string): Promise<EjectActions> {
     rootConfigFiles: ["zitadel.json"],
     directories: [".zitadel"],
     envBackups: [".env.local"],
+    // No framework → we can't know which SDK package to suggest uninstalling.
+    dependencies: [],
   };
   const orca = createOrca();
   const framework = await orca.tryDetect(cwd);
@@ -137,9 +139,17 @@ export default class Eject extends BaseCommand {
       return this.emit({ status: "skipped", reason: "nothing-to-eject", data: { cwd } });
     }
 
-    // Only suggest deleting the env backups, and only when some were made; the
-    // backups are dotfiles named `<file>.ejected-<stamp>`.
-    const nextCommands = backedUp.length > 0 ? ["rm -f .env.local.ejected-*"] : [];
+    // next_commands assembles the manual follow-ups eject can't safely do
+    // itself: deleting the env backups (only when some were made), and
+    // uninstalling the SDK packages the patcher added (we don't touch the
+    // user's package.json + lockfile + node_modules; we just suggest it).
+    const nextCommands: string[] = [];
+    if (backedUp.length > 0) {
+      nextCommands.push("rm -f .env.local.ejected-*");
+    }
+    for (const dep of actions.dependencies) {
+      nextCommands.push(`npm uninstall ${dep}`);
+    }
 
     return this.emit({
       status: "ok",

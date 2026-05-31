@@ -50,6 +50,10 @@ export class NextPatcher extends AbstractRulePatcher {
     return nextCodeFilePaths(view.framework.appDir, getRenderer(view.rendererId));
   }
 
+  protected routeDeps(view: PatchView): ReadonlyArray<string> {
+    return [getRenderer(view.rendererId).dependency.name];
+  }
+
   protected summary(ctx: PatchContext): { title: string; detail: string } {
     return {
       title: "Next.js integration",
