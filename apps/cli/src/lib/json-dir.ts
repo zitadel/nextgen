@@ -22,7 +22,6 @@ export async function readJsonDir(absDir: string): Promise<ReadonlyArray<Record<
   try {
     entries = await readdir(absDir);
   } catch (error) {
-    // A missing directory just means there are no resources to read.
     if (typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT") {
       return [];
     }

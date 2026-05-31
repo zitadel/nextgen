@@ -87,10 +87,13 @@ export abstract class BaseCommand extends Command {
     return toEnvelope(result, this.meta);
   }
 
-  /** Renders any thrown error as the failure envelope and exits with its code. */
+  /**
+   * Renders any thrown error as the failure envelope and exits with its code.
+   * A flag-parse error fires before {@link toMeta} runs, so the local `meta`
+   * here refreshes `command` from the now-resolved command id to keep the
+   * envelope's `command` field accurate.
+   */
   protected override async catch(error: unknown): Promise<never> {
-    // A flag-parse error fires before `toMeta`, so refresh `command` from the
-    // now-resolved command id to keep the envelope's `command` accurate.
     const meta: GlobalOptions = { ...this.meta, command: this.id ?? this.meta.command };
     const zitadelError = toZitadelError(error);
     if (this.jsonEnabled()) {

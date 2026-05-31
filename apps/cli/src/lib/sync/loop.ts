@@ -14,6 +14,11 @@ import type { ResourceSyncer, SyncAction } from "./types.js";
  * decides what create/update/delete operations need to happen but
  * performs none of them. Pass it to {@link runSyncLoop} to execute.
  *
+ * Validates every on-disk file (via `syncer.validate`) before planning any
+ * work — a single malformed schema or flow aborts the whole run with
+ * `E_VALIDATION` before any platform mutation. Both `plan` and `apply`
+ * reach this code path.
+ *
  * @param cwd     - Project root.
  * @param syncers - Per-resource adapters. Order is preserved in the output.
  * @param client  - Optional platform client; required only to populate
@@ -32,14 +37,10 @@ export async function buildSyncPlan(
     consola.debug(`scanning ${syncer.directory}`);
     const onDisk = await readJsonDir(dirPath);
 
-    // Validate every file before planning any work: a single malformed
-    // schema or flow aborts the whole run (`E_VALIDATION`) before any
-    // platform mutation. Both `plan` and `apply` reach this code path.
     for (const content of onDisk.values()) {
       syncer.validate(content);
     }
 
-    // Delete pass: in state but no longer on disk.
     for (const [filePath, entry] of Object.entries(state.resources)) {
       if (!filePath.startsWith(syncer.directory)) {
         continue;
@@ -59,7 +60,6 @@ export async function buildSyncPlan(
       actions.push({ kind: "delete", path: filePath, syncer, id: entry.id, oldContent });
     }
 
-    // Create / update pass.
     for (const [absPath, content] of onDisk.entries()) {
       const relPath = absPath.slice(cwd.length + 1);
       const entry = state.resources[relPath];
@@ -154,7 +154,6 @@ async function readJsonDir(dirPath: string): Promise<Map<string, object>> {
   try {
     entries = await readdir(dirPath);
   } catch (err) {
-    // A missing resource directory just means nothing to sync for it.
     if (typeof err === "object" && err !== null && "code" in err && err.code === "ENOENT") {
       return result;
     }

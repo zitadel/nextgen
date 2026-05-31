@@ -28,9 +28,6 @@ export abstract class AbstractCLIScaffolder implements Scaffolder {
    */
   protected runCommand(command: string, args: ReadonlyArray<string>, cwd: string): void {
     const result = spawnSync(command, [...args], { cwd, encoding: "utf8" });
-    // `result.error` is set when the spawn itself failed (e.g. ENOENT for a
-    // missing binary). `result.status` is null in that case, so the old
-    // `status ?? 1` path reported a confusing generic non-zero exit.
     if (result.error) {
       const err = result.error as NodeJS.ErrnoException;
       const notFound = err.code === "ENOENT";

@@ -175,6 +175,12 @@ function renderFields(
   }
 }
 
+/**
+ * Renders the items of an array. Unlike {@link renderFields}, primitive
+ * elements never get a trailing ` -> null` suffix even under `deleteMode` —
+ * Terraform only annotates scalar object-field removals that way, not array
+ * items.
+ */
 function renderArrayItems(
   arr: ReadonlyArray<unknown>,
   prefix: ChangePrefix,
@@ -189,8 +195,6 @@ function renderArrayItems(
   for (const item of arr) {
     if (isPrimitive(item)) {
       const formatted = fmtPrimitive(item);
-      // Terraform never appends " -> null" to array elements — only to
-      // scalar object-field removals. Strip deleteMode here regardless.
       lines.push(col(`${pad}${prefix} ${formatted},`));
     } else if (Array.isArray(item)) {
       if (item.length === 0) {
@@ -215,6 +219,13 @@ function renderArrayItems(
 /**
  * Walks both old and new objects, emitting Terraform-style change lines.
  * Returns true if any actual change line (+ / - / ~) was emitted.
+ *
+ * Edge cases:
+ * - Changed arrays render as a full remove + full add (no LCS diff).
+ * - Nested objects recurse, and the outer key is only marked `~` if a child
+ *   actually changed; unchanged children render with the neutral prefix.
+ * - A value whose type changed (e.g. string → object) also renders as a
+ *   remove + add pair.
  */
 function renderDiff(
   oldObj: Record<string, unknown>,
@@ -281,7 +292,6 @@ function renderDiff(
           lines.push(`${" ".repeat(prefixCol + 2)}]`);
         }
       } else {
-        // Changed — show full remove then full add (LCS diff is out of scope)
         hasChanges = true;
         const colR = (s: string) => paint(s, A.red, tty);
         const colA = (s: string) => paint(s, A.green, tty);
@@ -301,7 +311,6 @@ function renderDiff(
         }
       }
     } else if (isPlainObject(oldVal) && isPlainObject(newVal)) {
-      // Recurse into nested object diff; only mark as ~ if a child actually changed
       const childLines: string[] = [];
       const childHasChanges = renderDiff(oldVal, newVal, prefixCol + 4, tty, childLines);
       if (childHasChanges) {
@@ -318,7 +327,6 @@ function renderDiff(
         lines.push(`${pad}  ${pk} = {}`);
       }
     } else {
-      // Type changed (e.g. string → object) — show as remove + add
       hasChanges = true;
       const colR = (s: string) => paint(s, A.red, tty);
       const colA = (s: string) => paint(s, A.green, tty);
@@ -347,6 +355,20 @@ function resourceName(path: string): string {
   return path.split("/").pop() ?? path;
 }
 
+/**
+ * Renders one Terraform-style resource block for a single `SyncAction`.
+ *
+ * Per-case notes:
+ * - **create**: a synthetic `id = (known after apply)` is injected into the
+ *   rendered fields so it sorts alphabetically alongside the real keys.
+ * - **delete**: when `oldContent` is null (the fetch failed), the body
+ *   collapses to a single `- id = "<id>" -> null` line.
+ * - **update**: when `oldContent` is null (no read endpoint for this
+ *   resource kind), the field diff is replaced with a placeholder
+ *   "field diff unavailable" line.
+ * - **skip**: omitted from the output entirely, matching Terraform's
+ *   default of not showing no-change resources.
+ */
 function renderBlock(action: SyncAction, tty: boolean): string[] {
   const lines: string[] = [];
   const blkPad = " ".repeat(BLOCK_COL);
@@ -359,7 +381,6 @@ function renderBlock(action: SyncAction, tty: boolean): string[] {
       lines.push(paint(header, A.bold, tty));
       lines.push(paint(opening, A.green, tty));
 
-      // Inject id = (known after apply) so it sorts alphabetically with the rest
       const display: Record<string, unknown> = {
         id: KNOWN_AFTER_APPLY,
         ...(action.content as Record<string, unknown>),
@@ -382,7 +403,6 @@ function renderBlock(action: SyncAction, tty: boolean): string[] {
         };
         renderFields(display, "-", FIELD_COL, { tty, deleteMode: true }, lines);
       } else {
-        // Couldn't fetch from API — show only the id
         lines.push(paint(`${" ".repeat(FIELD_COL)}- id = "${action.id}" -> null`, A.red, tty));
       }
       lines.push(`${closePad}}`);
@@ -404,7 +424,6 @@ function renderBlock(action: SyncAction, tty: boolean): string[] {
           lines,
         );
       } else {
-        // No GET endpoint for this resource type — can't show field diff
         lines.push(
           `${" ".repeat(FIELD_COL)}  # (field diff unavailable — no read endpoint for ${action.syncer.kind})`,
         );
@@ -414,7 +433,6 @@ function renderBlock(action: SyncAction, tty: boolean): string[] {
     }
 
     case "skip":
-      // Skips are not shown — matches Terraform's default behaviour
       break;
   }
 

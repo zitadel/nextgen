@@ -20,7 +20,6 @@ async function resolveEjectActions(cwd: string): Promise<EjectActions> {
     rootConfigFiles: ["zitadel.json"],
     directories: [".zitadel"],
     envBackups: [".env.local"],
-    // No framework → we can't know which SDK package to suggest uninstalling.
     dependencies: [],
   };
   const orca = createOrca();
@@ -37,6 +36,27 @@ async function resolveEjectActions(cwd: string): Promise<EjectActions> {
   } catch {
     return fallback;
   }
+}
+
+/**
+ * Builds the `next_commands` envelope field — manual follow-ups `eject` can't
+ * safely run itself: deleting the `.env.local.ejected-*` backups it created
+ * (only when some were made), and uninstalling the SDK packages the patcher
+ * added (the CLI never modifies the user's `package.json` + lockfile +
+ * `node_modules` directly; it just suggests the command).
+ */
+function assembleNextCommands(
+  backedUp: ReadonlyArray<unknown>,
+  dependencies: ReadonlyArray<string>,
+): ReadonlyArray<string> {
+  const commands: string[] = [];
+  if (backedUp.length > 0) {
+    commands.push("rm -f .env.local.ejected-*");
+  }
+  for (const dep of dependencies) {
+    commands.push(`npm uninstall ${dep}`);
+  }
+  return commands;
 }
 
 async function pathExists(path: string): Promise<boolean> {
@@ -139,17 +159,7 @@ export default class Eject extends BaseCommand {
       return this.emit({ status: "skipped", reason: "nothing-to-eject", data: { cwd } });
     }
 
-    // next_commands assembles the manual follow-ups eject can't safely do
-    // itself: deleting the env backups (only when some were made), and
-    // uninstalling the SDK packages the patcher added (we don't touch the
-    // user's package.json + lockfile + node_modules; we just suggest it).
-    const nextCommands: string[] = [];
-    if (backedUp.length > 0) {
-      nextCommands.push("rm -f .env.local.ejected-*");
-    }
-    for (const dep of actions.dependencies) {
-      nextCommands.push(`npm uninstall ${dep}`);
-    }
+    const nextCommands = assembleNextCommands(backedUp, actions.dependencies);
 
     return this.emit({
       status: "ok",

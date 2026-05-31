@@ -29,11 +29,15 @@ export class DependencyCheck extends AbstractSanityCheck {
     }
   }
 
+  /**
+   * Repairs by reclaiming the patcher's managed artifacts: rebuilds the
+   * `PatchContext` from disk and calls `patcher.repair`, which re-adds the
+   * SDK dependency via its `add-dep` op. The exact package name is framework
+   * + renderer specific and known only to the patcher (which deliberately
+   * hides its file-op plan behind the family-neutral `Patcher` interface),
+   * so going through `repair` is the only sanctioned path.
+   */
   override async fix(ctx: CheckContext): Promise<void> {
-    // The exact SDK package is framework/renderer-specific and known only to
-    // the patcher, which deliberately hides its file-op plan. So rebuild the
-    // patch context and let the patcher reclaim its managed artifacts — that
-    // re-adds the dependency via its `add-dep` op.
     const patchCtx = await loadPatchContext(ctx.cwd, ctx.orca);
     await ctx.orca.patcherFor(patchCtx.framework.id).repair(patchCtx, {
       cwd: ctx.cwd,

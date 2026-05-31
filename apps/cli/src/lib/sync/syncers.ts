@@ -57,8 +57,9 @@ class SchemaSyncer implements ResourceSyncer {
     return result.id;
   }
 
+  /** Never called — schemas are immutable on the platform, so `mutable = false`. */
   async update(_client: PlatformClient, _id: string, _data: object): Promise<void> {
-    // Never called — mutable = false. Schemas are immutable on the platform.
+    return;
   }
 
   async delete(client: PlatformClient, id: string): Promise<void> {
@@ -80,19 +81,24 @@ class FlowDefinitionSyncer implements ResourceSyncer {
     private readonly env: EnvLookup,
   ) {}
 
+  /**
+   * Validates one flow file. `validateFlows` takes a batch and throws
+   * `E_VALIDATION` on the first invalid entry; passing a single-element array
+   * lets us reuse the batch validator for one file.
+   */
   validate(data: object): void {
-    // `validateFlows` takes a batch and throws `E_VALIDATION` on the
-    // first invalid entry; a single-element array validates one file.
     validateFlows([data]);
     assertEnvRefs(data, this.env);
   }
 
+  /**
+   * Wraps the bare on-disk flow body in the spec's create-envelope
+   * (`api/openapi/components/flows/flow-definition-create-request.yaml`)
+   * before sending. The file on disk stays bare so it is human-editable;
+   * only the wire request carries `project_id` and the surrounding
+   * envelope.
+   */
   async create(client: PlatformClient, data: object): Promise<string> {
-    // Wrap the bare flow body in the spec envelope before sending.
-    // The on-disk file stays bare so it is editable by humans; only
-    // the wire request carries `project_id` and the surrounding
-    // envelope per
-    // `api/openapi/components/flows/flow-definition-create-request.yaml`.
     const result = await client.createFlowDefinition({
       project_id: this.projectId,
       flow_definition: data,
@@ -100,9 +106,8 @@ class FlowDefinitionSyncer implements ResourceSyncer {
     return result.id;
   }
 
+  /** PATCH body is the bare partial flow per `flow-definition-update-request` — no envelope. */
   async update(client: PlatformClient, id: string, data: object): Promise<void> {
-    // PATCH body is the bare partial flow per
-    // `flow-definition-update-request` — no envelope.
     await client.updateFlowDefinition(id, data);
   }
 
@@ -110,12 +115,14 @@ class FlowDefinitionSyncer implements ResourceSyncer {
     await client.deleteFlowDefinition(id);
   }
 
+  /**
+   * `GET /flow_definitions/:id` wraps the bare flow body in a detail envelope
+   * (`id`, `project_id`, `schema_uri`, `status`, `created_at`, `updated_at`).
+   * Strip those envelope fields here so the diff renderer compares
+   * apples-to-apples against the on-disk file, which stores only the bare
+   * body.
+   */
   async fetch(client: PlatformClient, id: string): Promise<object> {
-    // The GET /flow_definitions/:id response wraps the bare flow body
-    // in a detail envelope (`id`, `project_id`, `schema_uri`,
-    // `status`, `created_at`, `updated_at`). Strip those envelope
-    // fields before returning so the diff compares apples-to-apples
-    // against the on-disk flow file, which stores only the bare body.
     const {
       id: _id,
       project_id: _projectId,

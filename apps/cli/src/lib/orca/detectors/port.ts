@@ -39,7 +39,7 @@ async function portFromEnvFile(cwd: string): Promise<number | undefined> {
         return Number.parseInt(rawPort, 10);
       }
     } catch {
-      // ignore
+      continue;
     }
   }
   return undefined;

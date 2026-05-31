@@ -61,6 +61,6 @@ export abstract class AbstractSanityCheck implements SanityCheck {
   }
 
   async fix(_ctx: CheckContext): Promise<void> {
-    // Default: nothing to repair. Fixable checks override.
+    return;
   }
 }

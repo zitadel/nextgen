@@ -45,9 +45,12 @@ function statusToCode(status: number): ZitadelErrorCode {
  * has to live here.
  */
 export class HttpPlatformClient implements PlatformClient {
+  /**
+   * The generated URL builders read a module-global base URL. A CLI
+   * process targets one server per run, so setting it from the constructor
+   * is safe and matches the generated client's contract.
+   */
   constructor(baseUrl: string, private readonly secret?: string) {
-    // The generated URL builders read a module-global base URL. A CLI
-    // process targets one server per run, so setting it here is safe.
     setApiBaseUrl(baseUrl.replace(/\/+$/, ""));
   }
 
@@ -67,9 +70,11 @@ export class HttpPlatformClient implements PlatformClient {
     return this.request("GET", getGetSchemaByIdUrl(id));
   }
 
+  /**
+   * The spec has no dedicated delete-schema URL builder; the resource path
+   * is the same as get-by-id, so we reuse that URL with the DELETE verb.
+   */
   async deleteSchema(id: string): Promise<void> {
-    // No dedicated delete-schema endpoint in the spec; the resource path
-    // is the same as get-by-id, so reuse that URL with DELETE.
     return this.request("DELETE", getGetSchemaByIdUrl(id));
   }
 

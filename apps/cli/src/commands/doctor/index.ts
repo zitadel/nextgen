@@ -13,6 +13,11 @@ import { SANITY_CHECKS, type CheckContext } from "./checks";
  * result; if any check fails it throws `E_VALIDATION` carrying the full check
  * details. With `--fix`, each failing check first attempts its own repair (a
  * no-op for checks with no safe automatic remedy), then the battery re-runs.
+ *
+ * The `--fix` loop is best-effort: a repair that throws (e.g. a missing
+ * prerequisite file the check itself would also flag) is logged at debug
+ * level and skipped, not propagated — the post-fix re-verify still reports
+ * whatever remains broken.
  */
 export default class Doctor extends BaseCommand {
   static override description = "Verify generated files and local state.";
@@ -35,9 +40,6 @@ export default class Doctor extends BaseCommand {
         try {
           await check.fix(ctx);
         } catch (error) {
-          // Best-effort: a repair that can't run (e.g. a missing prerequisite
-          // file) must not abort doctor — the re-verify below still reports
-          // whatever remains broken.
           consola.debug(`doctor --fix: ${check.name} repair failed`, error);
         }
       }
