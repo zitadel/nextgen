@@ -1,3 +1,16 @@
+/**
+ * HTTP implementation of the {@link PlatformClient} surface, the only piece
+ * of the CLI that talks directly to the Zitadel platform. The generated
+ * `client: "fetch"` output in `@zitadel-nextgen/api` returns parsed bodies
+ * without checking `res.ok`, so this layer adds the two concerns the
+ * generated client deliberately omits — bearer authentication and the
+ * status → {@link ZitadelError} mapping (`401`/`403` → `E_AUTH`, `5xx` →
+ * `E_NETWORK`, everything else → `E_VALIDATION`).
+ *
+ * URLs are built by the generated builders so they stay in lockstep with
+ * the OpenAPI spec; this module never hand-crafts a path.
+ */
+
 import {
   getCreateFlowDefinitionUrl,
   getCreateProjectUrl,
@@ -35,15 +48,7 @@ function statusToCode(status: number): ZitadelErrorCode {
   return "E_VALIDATION";
 }
 
-/**
- * HTTP implementation of {@link PlatformClient}. Paths come from the
- * generated URL builders in `@zitadel-nextgen/api` (single source of
- * truth with the OpenAPI spec); this class adds the two concerns the
- * generated fetch client deliberately omits — bearer auth and
- * status→`ZitadelError` mapping. The generated `client: "fetch"` output
- * returns parsed bodies without checking `res.ok`, so error handling
- * has to live here.
- */
+/** The only concrete {@link PlatformClient} this CLI ships. */
 export class HttpPlatformClient implements PlatformClient {
   /**
    * The generated URL builders read a module-global base URL. A CLI
