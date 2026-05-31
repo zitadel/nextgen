@@ -12,7 +12,16 @@ vi.mock("@clack/prompts", () => ({
   isCancel: vi.fn().mockReturnValue(false),
 }));
 
+// Stub the prober so ServerPrompt tests stay focused on the choice wiring,
+// not the actual lsof/fetch discovery (which has its own tests under
+// tests/unit/lib/prober/).
+vi.mock("../../../../src/lib/prober", () => ({
+  listListeningPorts: vi.fn().mockResolvedValue([]),
+  probeUrls: vi.fn().mockResolvedValue([]),
+}));
+
 import { confirm, isCancel, select, text } from "@clack/prompts";
+import { listListeningPorts, probeUrls } from "../../../../src/lib/prober";
 
 import {
   AuthMethodPrompt,
@@ -40,7 +49,24 @@ const ctx: PromptContext = { framework: FRAMEWORK };
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(isCancel).mockReturnValue(false);
+  // Default: nothing listening on localhost. Each ServerPrompt test that
+  // exercises the discovery path overrides via mockResolvedValueOnce.
+  vi.mocked(listListeningPorts).mockResolvedValue([]);
+  vi.mocked(probeUrls).mockResolvedValue([]);
 });
+
+/**
+ * Reads the `options` array off the first `select(...)` call so we can assert
+ * what choices `ServerPrompt` presented. Throws if `select` was never called
+ * (rather than returning a misleading empty list).
+ */
+function selectOptionsFromFirstCall(): ReadonlyArray<{ value: string }> {
+  const [firstCall] = vi.mocked(select).mock.calls;
+  if (!firstCall) {
+    throw new Error("expected `select` to have been called");
+  }
+  return (firstCall[0] as { options: ReadonlyArray<{ value: string }> }).options;
+}
 
 describe("FrameworkConfirmPrompt", () => {
   it("returns answers unchanged when the user confirms", async () => {
@@ -108,6 +134,45 @@ describe("ServerPrompt", () => {
 
     expect(out.server).toBe("https://zitadel.internal");
     expect(text).toHaveBeenCalledOnce();
+  });
+
+  it("offers discovered localhost OIDC servers as additional options", async () => {
+    // Two listening ports; the prober finds OIDC discovery docs on both.
+    vi.mocked(listListeningPorts).mockResolvedValueOnce([4000, 8080]);
+    vi.mocked(probeUrls).mockResolvedValueOnce([
+      { url: "http://localhost:4000/.well-known/openid-configuration", value: "http://localhost:4000" },
+      { url: "http://localhost:8080/.well-known/openid-configuration", value: "http://localhost:8080" },
+    ]);
+    vi.mocked(select).mockResolvedValueOnce("http://localhost:4000" as never);
+
+    const out = await new ServerPrompt().ask(baseAnswers(), ctx);
+
+    expect(out.server).toBe("http://localhost:4000");
+    // The text prompt must not fire when the user picks a discovered URL.
+    expect(text).not.toHaveBeenCalled();
+
+    // Confirm the discovered URLs were injected as select options, between
+    // the Cloud row and the "Custom URL" sentinel.
+    const opts = selectOptionsFromFirstCall();
+    const values = opts.map((option) => option.value);
+    expect(values).toEqual([
+      "https://api.zitadel.cloud",
+      "http://localhost:4000",
+      "http://localhost:8080",
+      "__custom__",
+    ]);
+  });
+
+  it("behaves like before when nothing is listening locally", async () => {
+    // Default mocks (listListeningPorts → []) already simulate this; assert
+    // explicitly that no discovered URLs leak into the options.
+    vi.mocked(select).mockResolvedValueOnce("https://api.zitadel.cloud" as never);
+
+    await new ServerPrompt().ask(baseAnswers(), ctx);
+
+    const opts = selectOptionsFromFirstCall();
+    const values = opts.map((option) => option.value);
+    expect(values).toEqual(["https://api.zitadel.cloud", "__custom__"]);
   });
 });
 
