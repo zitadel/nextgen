@@ -17,6 +17,7 @@ const SECRET = {
 
 const VALID_USER_SCHEMA = {
   $schema: "https://json-schema.org/draft/2020-12/schema",
+  kind: "user-schema",
   type: "object",
   properties: { email: { type: "string" } },
 };

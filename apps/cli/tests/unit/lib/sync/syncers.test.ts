@@ -97,16 +97,22 @@ describe("makeSyncers", () => {
 });
 
 describe("SchemaSyncer", () => {
-  it("validate accepts a structurally valid JSON Schema", () => {
+  it("validate accepts a structurally valid JSON Schema with the kind discriminator", () => {
     const [schema] = makeSyncers({ projectId: "proj-1", env: {} });
 
-    expect(() => schema.validate({ type: "object" })).not.toThrow();
+    expect(() => schema.validate({ kind: "user-schema", type: "object" })).not.toThrow();
   });
 
   it("validate throws E_VALIDATION on a malformed JSON Schema", () => {
     const [schema] = makeSyncers({ projectId: "proj-1", env: {} });
 
     expect(() => schema.validate({ type: 123 })).toThrow(ZitadelError);
+  });
+
+  it("validate throws E_VALIDATION when the kind discriminator is missing", () => {
+    const [schema] = makeSyncers({ projectId: "proj-1", env: {} });
+
+    expect(() => schema.validate({ type: "object" })).toThrow(ZitadelError);
   });
 
   it("create passes the bare data through and returns the platform id", async () => {

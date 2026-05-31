@@ -24,6 +24,7 @@ const tempDirs: string[] = [];
 
 const VALID_USER_SCHEMA = {
   $schema: "https://json-schema.org/draft/2020-12/schema",
+  kind: "user-schema",
   type: "object",
   properties: { email: { type: "string" } },
 };
@@ -222,6 +223,19 @@ describe("SchemaCheck", () => {
     const cwd = await makeProject();
     await writeFile(join(cwd, ".zitadel/schemas/user.json"), JSON.stringify({ type: 123 }));
     expect((await new SchemaCheck().run(ctxFor(cwd))).status).toBe("fail");
+  });
+
+  it("fails when the kind discriminator is missing", async () => {
+    const cwd = await makeProject();
+    // Valid JSON Schema, but no `kind: "user-schema" | "schema-url"` —
+    // the platform would reject this at apply; doctor must catch it locally.
+    await writeFile(
+      join(cwd, ".zitadel/schemas/user.json"),
+      JSON.stringify({ type: "object", properties: { email: { type: "string" } } }),
+    );
+    const outcome = await new SchemaCheck().run(ctxFor(cwd));
+    expect(outcome.status).toBe("fail");
+    expect(outcome.message).toContain("kind");
   });
 });
 

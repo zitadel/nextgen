@@ -21,7 +21,7 @@
  */
 export type { UserSchema } from "./schema";
 export { buildUserSchema } from "./build";
-export { validateJsonSchema } from "./validate";
+export { validateJsonSchema, validateUserSchema } from "./validate";
 
 /**
  * Relative directory (from the project root) where local user-schema

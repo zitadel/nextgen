@@ -1,5 +1,5 @@
 import { FLOWS_DIR, flowEnvRefs, validateFlows } from "../flows";
-import { SCHEMAS_DIR, validateJsonSchema } from "../user-schema";
+import { SCHEMAS_DIR, validateUserSchema } from "../user-schema";
 import { ZitadelError } from "../errors";
 import type { PlatformClient } from "../api/client.js";
 import type { ResourceSyncer } from "./types.js";
@@ -43,9 +43,9 @@ class SchemaSyncer implements ResourceSyncer {
   constructor(private readonly env: EnvLookup) {}
 
   validate(data: object): void {
-    const result = validateJsonSchema(data);
+    const result = validateUserSchema(data);
     if (!result.valid) {
-      throw new ZitadelError("E_VALIDATION", "User schema is not a valid JSON Schema", {
+      throw new ZitadelError("E_VALIDATION", "Schema file is not a valid Zitadel schema body", {
         details: { errors: result.errors },
       });
     }
