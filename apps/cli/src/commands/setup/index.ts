@@ -67,8 +67,6 @@ export default class Setup extends BaseCommand {
 
     const orca = createOrca();
 
-    // Resolve the framework — detect, or scaffold into an empty dir using
-    // PickFrameworkPrompt unless --framework was passed.
     let framework: FrameworkFacts;
     try {
       framework = await orca.detect(cwd, flags.framework);
@@ -84,15 +82,12 @@ export default class Setup extends BaseCommand {
       }
     }
 
-    // Seed wizard answers from flags + detection + defaults.
     let answers: SetupAnswers = {
       authMethod: isAuthMethod(flags["auth-method"]) ? flags["auth-method"] : undefined,
       server: this.meta.source,
       devPort: framework.devPort,
     };
 
-    // Run every registered prompt (each decides whether to actually ask based
-    // on what's already in `answers`).
     if (!nonInteractive && !dryRun) {
       intro("Zitadel setup");
       for (const prompt of SETUP_PROMPTS) {
@@ -112,11 +107,7 @@ export default class Setup extends BaseCommand {
       });
     }
 
-    // Spinner runs only when we have a real TTY (otherwise --json output
-    // would be polluted by the spinner frames going to stdout). `clack`'s
-    // spinner is a stateful object we keep around to update its `.message()`
-    // through the execution phases.
-    const sp = !nonInteractive && !dryRun ? spinner() : null;
+    const sp = interactiveSpinner(!nonInteractive && !dryRun);
 
     sp?.start("Creating project on the platform");
     const project = dryRun
@@ -136,9 +127,6 @@ export default class Setup extends BaseCommand {
     sp?.message("Writing project files");
     const result = await orca.patcherFor(framework.id).patch(ctx, { cwd, dryRun, force });
 
-    // Apply the freshly-written config to the platform (same sync the `apply`
-    // command runs; the engine validates every file). Skipped in dry-run or
-    // with --no-apply.
     let apply: { synced: boolean } | undefined;
     if (!flags["no-apply"] && !dryRun) {
       sp?.message("Syncing config to the platform");
@@ -201,4 +189,15 @@ function dryRunProject(): CreateProjectResponse {
 /** Renders an absolute path relative to `cwd` for human-readable output. */
 function relativeDisplay(cwd: string, path: string): string {
   return path.startsWith(cwd) ? path.slice(cwd.length + 1) : path;
+}
+
+/**
+ * Returns a `clack` spinner only when the caller is running interactively
+ * (`--non-interactive`, `--json`, `--dry-run`, and no-TTY all suppress it).
+ * Setup's post-wizard execution uses one to thread `.message()` across the
+ * create-project / patch / apply phases without polluting machine-readable
+ * output with spinner frames.
+ */
+function interactiveSpinner(visible: boolean): ReturnType<typeof spinner> | null {
+  return visible ? spinner() : null;
 }

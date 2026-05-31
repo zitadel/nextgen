@@ -39,9 +39,9 @@ export async function probeUrls<T>(
 ): Promise<ReadonlyArray<ProbeMatch<T>>> {
   const list = [...urls];
   const results = await Promise.all(
-    list.map(async (url) => {
+    list.map(async (url): Promise<ProbeMatch<T> | null> => {
       const value = await probeUrl(url, predicate, opts);
-      return value === null ? null : ({ url, value } as ProbeMatch<T>);
+      return value === null ? null : { url, value };
     }),
   );
   return results.filter((match): match is ProbeMatch<T> => match !== null);

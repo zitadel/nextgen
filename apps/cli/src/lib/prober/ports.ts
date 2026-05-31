@@ -24,10 +24,10 @@ export async function listListeningPorts(opts?: {
 }
 
 /**
- * Spawn `lsof` with the canned argv and return its stdout. Hand-rolled rather
- * than `util.promisify` so the mock used by `ports.test.ts` only has to wire
- * the plain `(err, stdout, stderr)` callback semantics, not the custom
- * `{stdout, stderr}` resolution shape promisify uses for `execFile`.
+ * Spawn `lsof` with the canned argv and resolve to its stdout. Hand-rolled
+ * rather than `util.promisify(execFile)` because the latter resolves with a
+ * `{stdout, stderr}` object via its custom-promisify symbol — a heavier shape
+ * to mock and worse to read at the call site, where we only ever want stdout.
  */
 function runLsof(timeoutMs: number): Promise<string> {
   return new Promise<string>((resolve, reject) => {

@@ -96,8 +96,6 @@ async function discoverLocalOidc(): Promise<ReadonlyArray<string>> {
       },
       { timeoutMs: OIDC_PROBE_TIMEOUT_MS },
     );
-    // Map each matched discovery URL back to its bare origin — that's what
-    // ends up in `zitadel.json`'s `server` field.
     const origins = matches.map((match) => new URL(match.url).origin);
     s.stop(
       origins.length === 0
