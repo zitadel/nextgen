@@ -52,6 +52,8 @@ func TestPasskeyFlowLogin(t *testing.T) {
 		UserHandle: []byte(userID),
 	})
 	cred := virtualwebauthn.NewCredential(virtualwebauthn.KeyTypeEC2)
+	// Use an ASCII credential ID so string(cred.ID) is valid UTF-8 for Postgres TEXT.
+	cred.ID = []byte("pk-flow-test-cred-01")
 	cred.Counter = 1
 	auth.AddCredential(cred)
 
