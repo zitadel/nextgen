@@ -43,6 +43,29 @@ type FlowSubmitInput struct {
 	Fields      map[string]any
 	GateProofs  map[string]string
 	SSOProvider *FlowSSOProviderRef
+	// ChallengeResponse carries the client's answer to a pending ceremony
+	// (e.g. a passkey assertion). Present on the verify leg of a two-phase
+	// challenge; nil otherwise.
+	ChallengeResponse *FlowChallengeResponse
+	// PasskeyRP carries the WebAuthn relying-party parameters the API
+	// derived from the request. Required on the passkey issue leg.
+	PasskeyRP *FlowPasskeyRP
+}
+
+// FlowChallengeResponse is the client's answer to a [FlowPendingChallenge].
+type FlowChallengeResponse struct {
+	ChallengeID string
+	Method      string
+	// Proof is the method-specific payload (for passkey, the WebAuthn
+	// PublicKeyCredential assertion JSON).
+	Proof []byte
+}
+
+// FlowPasskeyRP is the relying-party context for issuing a passkey
+// challenge, derived from the HTTP request at the API edge.
+type FlowPasskeyRP struct {
+	RPID    string
+	Origins []string
 }
 
 type FlowSSOProviderRef struct {
@@ -71,6 +94,20 @@ type FlowStep struct {
 	Fields       map[string]FlowField
 	Actions      map[string]FlowAction
 	SSOProviders []FlowSSOProvider
+	// Challenge is a pending authentication ceremony the client must
+	// satisfy before re-submitting (e.g. a passkey assertion). Nil unless
+	// the engine just issued one.
+	Challenge *FlowStepChallenge
+}
+
+// FlowStepChallenge mirrors the OpenAPI `flow-step.challenge`: a pending
+// ceremony the client runs (passkey today) before re-submitting the proof.
+type FlowStepChallenge struct {
+	Method      string
+	ChallengeID string
+	// Options is the protocol-specific options JSON the client passes to
+	// the ceremony API (for passkey, PublicKeyCredentialRequestOptions).
+	Options []byte
 }
 
 // FlowStepTexts holds the step-level localization keys (`<step>.title`,
@@ -89,6 +126,20 @@ type FlowAction struct {
 // FlowActionSubmit is the conventional outcome name for the primary
 // "advance forward" action on a step.
 const FlowActionSubmit = "submit"
+
+// FlowActionPasskey is the action a step declares to offer passkey
+// authentication. Selecting it issues a WebAuthn challenge; the matching
+// transition fires once the returned assertion verifies.
+const FlowActionPasskey = "passkey"
+
+// FlowChallengeMethodPasskey is the [FlowStepChallenge.Method] /
+// [FlowPendingChallenge.Method] value for the WebAuthn passkey ceremony.
+const FlowChallengeMethodPasskey = "passkey"
+
+// flowPasskeyDefaultUserVerification is the WebAuthn user-verification
+// requirement used when issuing a passkey challenge from a flow. The RP
+// origin/id come from the request; user verification is defaulted.
+const flowPasskeyDefaultUserVerification = "preferred"
 
 // FlowSessionRef pins the session row this flow runs on top of. A
 // version mismatch surfaces as [ErrSessionConflict].
@@ -192,6 +243,8 @@ func (r *FlowStateMachineRuntime) Render(ctx context.Context, client database.Qu
 	if err != nil {
 		return FlowStepResult{}, err
 	}
+	// Re-emit an in-flight ceremony so a page reload can resume it.
+	attachPendingChallenge(step, state.PendingChallenge)
 	state.IssuedAt = r.now()
 	return FlowStepResult{State: state, Step: step}, nil
 }
@@ -232,32 +285,44 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 	mergeCollected(state, in.Fields)
 
 	routeOutcome := in.Action
-	dispatch, err := r.dispatchChallenges(ctx, state, currentStep, resolved, in.Fields)
+
+	// Two-phase passkey ceremony (issue → client signs → verify) runs
+	// before the field-shaped dispatch and short-circuits it when engaged.
+	pk, err := r.processPasskey(ctx, state, currentStep, resolved, in)
 	if err != nil {
 		return FlowStepResult{}, err
 	}
-	if dispatch.StepError != nil {
-		step := r.buildStep(currentStep, resolved, dispatch.StepError, nil, nil)
-		state.IssuedAt = r.now()
-		return FlowStepResult{State: state, Step: step}, nil
+	if pk.halt != nil {
+		return *pk.halt, nil
 	}
-	if dispatch.Outcome != "" {
-		routeOutcome = dispatch.Outcome
-	} else if currentStep.OnSuccess != nil {
-		result, err := r.runOnSuccess(ctx, client, def, state, userSchemaURL, currentStep, in.Fields, resolved)
+	if !pk.handled {
+		dispatch, err := r.dispatchChallenges(ctx, state, currentStep, resolved, in.Fields)
 		if err != nil {
 			return FlowStepResult{}, err
 		}
-		if result.UserID != "" {
-			recordResolvedUser(state, result.UserID)
-		}
-		if result.StepError != nil {
-			step := r.buildStep(currentStep, resolved, result.StepError, nil, nil)
+		if dispatch.StepError != nil {
+			step := r.buildStep(currentStep, resolved, dispatch.StepError, nil, nil)
 			state.IssuedAt = r.now()
 			return FlowStepResult{State: state, Step: step}, nil
 		}
-		if result.Outcome != "" {
-			routeOutcome = result.Outcome
+		if dispatch.Outcome != "" {
+			routeOutcome = dispatch.Outcome
+		} else if currentStep.OnSuccess != nil {
+			result, err := r.runOnSuccess(ctx, client, def, state, userSchemaURL, currentStep, in.Fields, resolved)
+			if err != nil {
+				return FlowStepResult{}, err
+			}
+			if result.UserID != "" {
+				recordResolvedUser(state, result.UserID)
+			}
+			if result.StepError != nil {
+				step := r.buildStep(currentStep, resolved, result.StepError, nil, nil)
+				state.IssuedAt = r.now()
+				return FlowStepResult{State: state, Step: step}, nil
+			}
+			if result.Outcome != "" {
+				routeOutcome = result.Outcome
+			}
 		}
 	}
 
@@ -380,6 +445,107 @@ func fieldValueByChallenge(resolved FlowResolvedFields, fields map[string]any, t
 		return n, s, true
 	}
 	return "", "", false
+}
+
+// passkeyPhaseResult reports how the two-phase passkey handler interacted
+// with a submission. handled is true when a passkey leg ran (so the
+// field-shaped dispatch must be skipped); halt, when non-nil, is the result
+// to return immediately (challenge issued and awaiting proof, or a
+// verification error rendered on the step).
+type passkeyPhaseResult struct {
+	handled bool
+	halt    *FlowStepResult
+}
+
+// processPasskey runs the passkey ceremony for the current step:
+//   - verify leg: a challenge is pending (or a ChallengeResponse arrived) →
+//     verify the assertion, record the resolved user, clear the pending
+//     challenge, and let Process route via the submitted action.
+//   - issue leg: the step offers a `passkey` action and it was selected →
+//     mint a challenge, stash it as pending, and re-render the step carrying
+//     the ceremony options for the browser.
+//
+// Discoverable (usernameless) entry needs no prior identifier step: the issue
+// leg runs against the attempt created at Start, and the verify leg resolves
+// and records the user from the assertion.
+func (r *FlowStateMachineRuntime) processPasskey(ctx context.Context, state *FlowState, step *FlowDefinitionStep, resolved FlowResolvedFields, in FlowSubmitInput) (passkeyPhaseResult, error) {
+	switch {
+	case state.PendingChallenge != nil || in.ChallengeResponse != nil:
+		// Verify leg. Without a proof yet, re-emit the pending challenge.
+		if in.ChallengeResponse == nil {
+			rendered := r.buildStep(step, resolved, nil, nil, nil)
+			attachPendingChallenge(rendered, state.PendingChallenge)
+			state.IssuedAt = r.now()
+			return passkeyPhaseResult{handled: true, halt: &FlowStepResult{State: state, Step: rendered}}, nil
+		}
+		// The server-issued id is authoritative; never trust a client-supplied
+		// one to rebind the proof to a different challenge.
+		challengeID := in.ChallengeResponse.ChallengeID
+		if state.PendingChallenge != nil {
+			challengeID = state.PendingChallenge.ID
+		}
+		userID, err := r.authAttempts.SubmitPasskey(ctx, FlowSubmitPasskeyInput{
+			ProjectID:   state.ProjectID,
+			AttemptID:   state.AuthAttemptID,
+			ChallengeID: challengeID,
+			Assertion:   in.ChallengeResponse.Proof,
+		})
+		if errors.Is(err, ErrAuthAttemptProofRejected(nil)) {
+			state.PendingChallenge = nil
+			msg := "auth_attempt.passkey_invalid"
+			rendered := r.buildStep(step, resolved, &msg, nil, nil)
+			state.IssuedAt = r.now()
+			return passkeyPhaseResult{handled: true, halt: &FlowStepResult{State: state, Step: rendered}}, nil
+		}
+		if err != nil {
+			return passkeyPhaseResult{}, fmt.Errorf("flow state machine: submit passkey: %w", err)
+		}
+		recordResolvedUser(state, userID)
+		state.PendingChallenge = nil
+		return passkeyPhaseResult{handled: true}, nil
+
+	case in.Action == FlowActionPasskey:
+		if _, ok := step.Actions[FlowActionPasskey]; !ok {
+			return passkeyPhaseResult{}, nil
+		}
+		if in.PasskeyRP == nil {
+			return passkeyPhaseResult{}, fmt.Errorf("%w: passkey relying-party params missing", ErrIntegrity)
+		}
+		out, err := r.authAttempts.IssuePasskeyChallenge(ctx, FlowIssuePasskeyChallengeInput{
+			ProjectID:        state.ProjectID,
+			AttemptID:        state.AuthAttemptID,
+			RPID:             in.PasskeyRP.RPID,
+			RPOrigins:        in.PasskeyRP.Origins,
+			UserVerification: flowPasskeyDefaultUserVerification,
+		})
+		if err != nil {
+			return passkeyPhaseResult{}, fmt.Errorf("flow state machine: issue passkey: %w", err)
+		}
+		state.PendingChallenge = &FlowPendingChallenge{
+			ID:       out.ChallengeID,
+			Method:   FlowChallengeMethodPasskey,
+			Options:  out.Options,
+			IssuedAt: r.now(),
+		}
+		rendered := r.buildStep(step, resolved, nil, nil, nil)
+		attachPendingChallenge(rendered, state.PendingChallenge)
+		state.IssuedAt = r.now()
+		return passkeyPhaseResult{handled: true, halt: &FlowStepResult{State: state, Step: rendered}}, nil
+	}
+	return passkeyPhaseResult{}, nil
+}
+
+// attachPendingChallenge surfaces a pending ceremony on a rendered step so the
+// client can run it (and re-run it on a plain GET re-render).
+func attachPendingChallenge(step *FlowStep, pc *FlowPendingChallenge) {
+	if step == nil || pc == nil {
+		return
+	}
+	step.Challenge = &FlowStepChallenge{
+		Method:      pc.Method,
+		ChallengeID: pc.ID,
+		Options:     pc.Options,
+	}
 }
 
 // runOnSuccess dispatches the step's on_success mutation. Add a case

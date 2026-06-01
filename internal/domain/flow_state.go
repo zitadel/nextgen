@@ -87,21 +87,28 @@ type FlowState struct {
 }
 
 // FlowPendingChallenge records the server-issued challenge the next
-// submit must satisfy. The challenge body itself (WebAuthn options,
-// etc.) lives in the ChallengeService's store, keyed by ID — this
-// struct just threads the binding through the cookie so the verify
-// step can locate it.
+// submit must satisfy. The binding (id + method) is threaded through the
+// cookie so the verify step can locate it; Options carries the
+// client-facing ceremony options so a GET /flow re-render can re-emit
+// them without re-issuing.
 type FlowPendingChallenge struct {
-	// ID is the challenge identifier returned by the ChallengeService
-	// at issue time. The client echoes it back in ChallengeResponse.
+	// ID is the challenge identifier returned by the auth-attempt
+	// service at issue time. The client echoes it back in
+	// ChallengeResponse.
 	ID string
 
 	// Method names the ceremony kind (e.g. "passkey"). The state
 	// machine uses it to route verification to the right service.
 	Method string
 
-	// IssuedAt is when the challenge was minted. The ChallengeService
-	// enforces its own freshness window; this field is kept for
+	// Options is the client-facing ceremony options JSON (for passkey,
+	// the PublicKeyCredentialRequestOptions). Surfaced on the rendered
+	// step's challenge so the browser can run the ceremony; persisted in
+	// the cookie so a re-render re-emits it.
+	Options []byte
+
+	// IssuedAt is when the challenge was minted. The auth-attempt
+	// service enforces its own freshness window; this field is kept for
 	// diagnostics and for the state machine to short-circuit obviously
 	// stale challenges before calling Verify.
 	IssuedAt time.Time
