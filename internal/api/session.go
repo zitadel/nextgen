@@ -268,57 +268,6 @@ func sessionCookie(token string, maxAge int) string {
 	return fmt.Sprintf("%s=%s; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=%d", sessionCookieName, token, maxAge)
 }
 
-func factorToAPI(factor domain.AuthFactor) api.CompletedFactor {
-	resp := api.CompletedFactor{
-		Method:     checkTypeToAPI(factor.Type()),
-		VerifiedAt: factor.GetLastVerifiedAt(),
-		Payload:    factorPayloadToAPI(factor),
-	}
-	return resp
-}
-
-func factorPayloadToAPI(factor domain.AuthFactor) api.OptCompletedFactorPayload {
-	switch f := factor.(type) {
-	case *domain.AuthFactorUser:
-		return api.NewOptCompletedFactorPayload(api.CompletedFactorPayload{
-			Type: api.IdentifierFactorPayloadCompletedFactorPayload,
-			IdentifierFactorPayload: api.IdentifierFactorPayload{
-				UserID: api.UserID(f.UserID),
-			},
-		})
-	case *domain.AuthFactorPassword:
-		return api.NewOptCompletedFactorPayload(api.CompletedFactorPayload{
-			Type:                  api.PasswordFactorPayloadCompletedFactorPayload,
-			PasswordFactorPayload: api.PasswordFactorPayload{},
-		})
-	case *domain.AuthFactorPasskey:
-		return api.NewOptCompletedFactorPayload(api.CompletedFactorPayload{
-			Type: api.PasskeyFactorPayloadCompletedFactorPayload,
-			PasskeyFactorPayload: api.PasskeyFactorPayload{
-				CredentialID:            "",
-				UserVerified:            f.UserVerified,
-				BackupEligible:          api.OptBool{},
-				BackupState:             api.OptBool{},
-				AuthenticatorAttachment: api.OptPasskeyFactorPayloadAuthenticatorAttachment{},
-			},
-		})
-	}
-	return api.OptCompletedFactorPayload{}
-}
-
-func checkTypeToAPI(check domain.AuthCheckType) api.FactorMethod {
-	switch check {
-	case domain.AuthCheckTypeUser:
-		return api.FactorMethodIdentifier
-	case domain.AuthCheckTypePassword:
-		return api.FactorMethodPassword
-	case domain.AuthCheckTypePasskey:
-		return api.FactorMethodPasskey
-	default:
-		return ""
-	}
-}
-
 func sessionErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 	switch err.Code {
 	case domain.ErrSessionNotFound().Code:

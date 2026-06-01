@@ -35,6 +35,13 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+      - name: Verify gofmt formatting
+        run: |
+          unformatted="$(git ls-files -z -- '*.go' | xargs -0 -r gofmt -l)"
+          if [ -n "$unformatted" ]; then
+            printf '%s\n' "$unformatted"
+            exit 1
+          fi
       - name: Install embedded-postgres runtime deps
         run: sudo apt-get update -qq && sudo apt-get install -y -qq libicu-dev libssl-dev
       - run: go generate ./...

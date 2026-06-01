@@ -12,7 +12,6 @@ import (
 )
 
 func TestCreateTeam(t *testing.T) {
-	client := harness.EnsureAPIClient(t)
 
 	t.Run("ok", func(t *testing.T) {
 		project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
@@ -23,7 +22,7 @@ func TestCreateTeam(t *testing.T) {
 			ProjectID: api.ProjectID(project.ID),
 		}
 
-		resp, err := client.CreateTeam(t.Context(), req, params)
+		resp, err := harness.EnsureAPIClient(t, project.ID).CreateTeam(t.Context(), req, params)
 		require.NoError(t, err)
 
 		assert.IsType(t, &api.CreateTeamResponse{}, resp, mustMarshal(t, resp))
@@ -34,7 +33,7 @@ func TestCreateTeam(t *testing.T) {
 			req := &api.CreateTeamRequest{}
 			params := api.CreateTeamParams{}
 
-			resp, err := client.CreateTeam(t.Context(), req, params)
+			resp, err := harness.EnsureAPIClient(t, "").CreateTeam(t.Context(), req, params)
 			require.NoError(t, err)
 
 			assert.IsType(t, &api.CreateTeamBadRequest{}, resp, mustMarshal(t, resp))
@@ -43,8 +42,6 @@ func TestCreateTeam(t *testing.T) {
 }
 
 func TestGetTeam(t *testing.T) {
-	client := harness.EnsureAPIClient(t)
-
 	t.Run("ok", func(t *testing.T) {
 		project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
 		require.NoError(t, err)
@@ -58,7 +55,7 @@ func TestGetTeam(t *testing.T) {
 			TeamID:    api.TeamID(team.ID),
 		}
 
-		resp, err := client.GetTeam(t.Context(), params)
+		resp, err := harness.EnsureAPIClient(t, project.ID).GetTeam(t.Context(), params)
 		require.NoError(t, err)
 
 		assert.IsType(t, &api.GetTeamResponse{}, resp, mustMarshal(t, resp))
@@ -74,7 +71,7 @@ func TestGetTeam(t *testing.T) {
 				TeamID:    api.TeamID("does-not-exist"),
 			}
 
-			resp, err := client.GetTeam(t.Context(), params)
+			resp, err := harness.EnsureAPIClient(t, project.ID).GetTeam(t.Context(), params)
 			require.NoError(t, err)
 
 			assert.IsType(t, &api.GetTeamNotFound{}, resp, mustMarshal(t, resp))

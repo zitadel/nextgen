@@ -2312,12 +2312,25 @@ func (s *FactorMethod) UnmarshalText(data []byte) error {
 // Does not contain display text — only a `text_key` resolved client-side.
 // Ref: #
 type Field struct {
+	// The input kind the client should render. Encodes the formats that
+	// have a matching HTML input type (email, url, date). For other
+	// formats (e.g. uuid) the type is `text` and `validation.format`
+	// carries the rule.
 	Type FieldType `json:"type"`
 	// Localization key for the field label.
-	TextKey  string  `json:"text_key"`
+	TextKey string `json:"text_key"`
+	// The field MUST be present and non-empty on submit. Mirrors the
+	// schema's top-level `required` array.
 	Required OptBool `json:"required"`
-	// Pre-filled value (e.g., email carried over from a pivot).
-	Value      jx.Raw             `json:"value"`
+	// Pre-filled value (e.g., an identifier carried over from a pivot).
+	Value jx.Raw `json:"value"`
+	// Schema-derived rules the frontend SHOULD apply at input time. The
+	// server runs the same rules on submit and is the only authority on
+	// whether the step advances — these rules are a UX hint to reduce
+	// round trips, not a contract guarantee.
+	// Omitted entirely when the field has no rules beyond its `type`.
+	// Each key mirrors a JSON Schema keyword on the underlying user
+	// property; absent keys mean no rule.
 	Validation OptFieldValidation `json:"validation"`
 }
 
@@ -2371,6 +2384,10 @@ func (s *Field) SetValidation(val OptFieldValidation) {
 	s.Validation = val
 }
 
+// The input kind the client should render. Encodes the formats that
+// have a matching HTML input type (email, url, date). For other
+// formats (e.g. uuid) the type is `text` and `validation.format`
+// carries the rule.
 type FieldType string
 
 const (
@@ -2454,21 +2471,29 @@ func (s *FieldType) UnmarshalText(data []byte) error {
 	}
 }
 
+// Schema-derived rules the frontend SHOULD apply at input time. The
+// server runs the same rules on submit and is the only authority on
+// whether the step advances — these rules are a UX hint to reduce
+// round trips, not a contract guarantee.
+// Omitted entirely when the field has no rules beyond its `type`.
+// Each key mirrors a JSON Schema keyword on the underlying user
+// property; absent keys mean no rule.
 type FieldValidation struct {
-	Format    OptString `json:"format"`
-	Pattern   OptString `json:"pattern"`
-	MinLength OptInt    `json:"min_length"`
-	MaxLength OptInt    `json:"max_length"`
+	// Semantic format the value must match. Values mirror the user
+	// meta-schema. When `type` already encodes the format (email,
+	// url, date), this key is informative and the input type is
+	// sufficient for client-side validation. When `type` is `text`
+	// (e.g. `format: uuid`), this key is the only signal.
+	Format OptFieldValidationFormat `json:"format"`
+	// Minimum length in characters (inclusive). Mirrors `minLength`.
+	MinLength OptInt `json:"min_length"`
+	// Maximum length in characters (inclusive). Mirrors `maxLength`.
+	MaxLength OptInt `json:"max_length"`
 }
 
 // GetFormat returns the value of Format.
-func (s *FieldValidation) GetFormat() OptString {
+func (s *FieldValidation) GetFormat() OptFieldValidationFormat {
 	return s.Format
-}
-
-// GetPattern returns the value of Pattern.
-func (s *FieldValidation) GetPattern() OptString {
-	return s.Pattern
 }
 
 // GetMinLength returns the value of MinLength.
@@ -2482,13 +2507,8 @@ func (s *FieldValidation) GetMaxLength() OptInt {
 }
 
 // SetFormat sets the value of Format.
-func (s *FieldValidation) SetFormat(val OptString) {
+func (s *FieldValidation) SetFormat(val OptFieldValidationFormat) {
 	s.Format = val
-}
-
-// SetPattern sets the value of Pattern.
-func (s *FieldValidation) SetPattern(val OptString) {
-	s.Pattern = val
 }
 
 // SetMinLength sets the value of MinLength.
@@ -2499,6 +2519,66 @@ func (s *FieldValidation) SetMinLength(val OptInt) {
 // SetMaxLength sets the value of MaxLength.
 func (s *FieldValidation) SetMaxLength(val OptInt) {
 	s.MaxLength = val
+}
+
+// Semantic format the value must match. Values mirror the user
+// meta-schema. When `type` already encodes the format (email,
+// url, date), this key is informative and the input type is
+// sufficient for client-side validation. When `type` is `text`
+// (e.g. `format: uuid`), this key is the only signal.
+type FieldValidationFormat string
+
+const (
+	FieldValidationFormatEmail    FieldValidationFormat = "email"
+	FieldValidationFormatDateTime FieldValidationFormat = "date-time"
+	FieldValidationFormatUUID     FieldValidationFormat = "uuid"
+	FieldValidationFormatURI      FieldValidationFormat = "uri"
+)
+
+// AllValues returns all FieldValidationFormat values.
+func (FieldValidationFormat) AllValues() []FieldValidationFormat {
+	return []FieldValidationFormat{
+		FieldValidationFormatEmail,
+		FieldValidationFormatDateTime,
+		FieldValidationFormatUUID,
+		FieldValidationFormatURI,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FieldValidationFormat) MarshalText() ([]byte, error) {
+	switch s {
+	case FieldValidationFormatEmail:
+		return []byte(s), nil
+	case FieldValidationFormatDateTime:
+		return []byte(s), nil
+	case FieldValidationFormatUUID:
+		return []byte(s), nil
+	case FieldValidationFormatURI:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FieldValidationFormat) UnmarshalText(data []byte) error {
+	switch FieldValidationFormat(data) {
+	case FieldValidationFormatEmail:
+		*s = FieldValidationFormatEmail
+		return nil
+	case FieldValidationFormatDateTime:
+		*s = FieldValidationFormatDateTime
+		return nil
+	case FieldValidationFormatUUID:
+		*s = FieldValidationFormatUUID
+		return nil
+	case FieldValidationFormatURI:
+		*s = FieldValidationFormatURI
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
 }
 
 // Scopes which teams or apps this flow definition applies to. Empty or
@@ -7140,6 +7220,52 @@ func (o OptFieldValidation) Get() (v FieldValidation, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptFieldValidation) Or(d FieldValidation) FieldValidation {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptFieldValidationFormat returns new OptFieldValidationFormat with value set to v.
+func NewOptFieldValidationFormat(v FieldValidationFormat) OptFieldValidationFormat {
+	return OptFieldValidationFormat{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFieldValidationFormat is optional FieldValidationFormat.
+type OptFieldValidationFormat struct {
+	Value FieldValidationFormat
+	Set   bool
+}
+
+// IsSet returns true if OptFieldValidationFormat was set.
+func (o OptFieldValidationFormat) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFieldValidationFormat) Reset() {
+	var v FieldValidationFormat
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFieldValidationFormat) SetTo(v FieldValidationFormat) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFieldValidationFormat) Get() (v FieldValidationFormat, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFieldValidationFormat) Or(d FieldValidationFormat) FieldValidationFormat {
 	if v, ok := o.Get(); ok {
 		return v
 	}

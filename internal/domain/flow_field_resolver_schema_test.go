@@ -304,4 +304,3 @@ func TestSchemaFieldResolver_Resolve_FormatAndTypeVariants(t *testing.T) {
 		t.Errorf("Resolve nickname Validation = %+v, want nil (no rules)", got.Fields["nickname"].Validation)
 	}
 }
-
