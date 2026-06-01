@@ -8,9 +8,14 @@ export default defineConfig(() => ({
   cacheDir: "../../node_modules/.vite/packages/sdk-core",
   plugins: [nxViteTsPaths()],
   build: {
+    emptyOutDir: false,
     lib: {
-      entry: resolve(import.meta.dirname, "src/index.ts"),
-      fileName: "index",
+      entry: {
+        index: resolve(import.meta.dirname, "src/index.ts"),
+        types: resolve(import.meta.dirname, "src/types.ts"),
+        jwt: resolve(import.meta.dirname, "src/jwt.ts"),
+        "middleware": resolve(import.meta.dirname, "src/middleware.ts"),
+      },
       formats: ["es" as const],
     },
   },
