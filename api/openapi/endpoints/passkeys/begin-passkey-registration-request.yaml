@@ -1,0 +1,13 @@
+type: object
+required:
+  - project_id
+  - session_id
+properties:
+  project_id:
+    type: string
+    description: The project in which the session and user reside.
+    example: 'my-project'
+  session_id:
+    type: string
+    description: The authenticated session ID for the user registering a passkey.
+    example: 'sess_01J0Z9KX7Y0Q2Y7JX5M9K2YF3C'

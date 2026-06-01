@@ -9,6 +9,10 @@ type AuthorizeGetRes interface {
 	authorizeGetRes()
 }
 
+type BeginPasskeyRegistrationRes interface {
+	beginPasskeyRegistrationRes()
+}
+
 type CreateAuthAttemptRes interface {
 	createAuthAttemptRes()
 }
@@ -55,6 +59,10 @@ type EndSessionRes interface {
 
 type ExchangeHandoffRes interface {
 	exchangeHandoffRes()
+}
+
+type FinishPasskeyRegistrationRes interface {
+	finishPasskeyRegistrationRes()
 }
 
 type GetAuthAttemptRes interface {

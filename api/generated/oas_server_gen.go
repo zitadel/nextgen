@@ -20,6 +20,16 @@ type Handler interface {
 	//
 	// GET /auth/authorize
 	AuthorizeGet(ctx context.Context, params AuthorizeGetParams) (AuthorizeGetRes, error)
+	// BeginPasskeyRegistration implements beginPasskeyRegistration operation.
+	//
+	// Starts a WebAuthn registration ceremony for an already-authenticated user.
+	// Returns a registration ID and the PublicKeyCredentialCreationOptions to pass
+	// to navigator.credentials.create().
+	// The client must complete the ceremony by calling
+	// POST /passkeys/{registration_id}/finish with the attestation.
+	//
+	// POST /passkeys
+	BeginPasskeyRegistration(ctx context.Context, req *BeginPasskeyRegistrationRequest, params BeginPasskeyRegistrationParams) (BeginPasskeyRegistrationRes, error)
 	// CreateAuthAttempt implements createAuthAttempt operation.
 	//
 	// Starts a new authentication attempt. This is the entry point for the auth_attempts state machine.
@@ -142,6 +152,14 @@ type Handler interface {
 	//
 	// POST /sessions/exchange
 	ExchangeHandoff(ctx context.Context, req *ExchangeRequest, params ExchangeHandoffParams) (ExchangeHandoffRes, error)
+	// FinishPasskeyRegistration implements finishPasskeyRegistration operation.
+	//
+	// Completes the WebAuthn registration ceremony. The client posts the
+	// PublicKeyCredential returned by navigator.credentials.create() as attestation.
+	// On success, the passkey is stored and can be used for future authentication.
+	//
+	// POST /passkeys/{registration_id}
+	FinishPasskeyRegistration(ctx context.Context, req *FinishPasskeyRegistrationRequest, params FinishPasskeyRegistrationParams) (FinishPasskeyRegistrationRes, error)
 	// GetAuthAttempt implements getAuthAttempt operation.
 	//
 	// Polls the current state of an authentication attempt.

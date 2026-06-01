@@ -31,6 +31,19 @@ func (UnimplementedHandler) AuthorizeGet(ctx context.Context, params AuthorizeGe
 	return r, ht.ErrNotImplemented
 }
 
+// BeginPasskeyRegistration implements beginPasskeyRegistration operation.
+//
+// Starts a WebAuthn registration ceremony for an already-authenticated user.
+// Returns a registration ID and the PublicKeyCredentialCreationOptions to pass
+// to navigator.credentials.create().
+// The client must complete the ceremony by calling
+// POST /passkeys/{registration_id}/finish with the attestation.
+//
+// POST /passkeys
+func (UnimplementedHandler) BeginPasskeyRegistration(ctx context.Context, req *BeginPasskeyRegistrationRequest, params BeginPasskeyRegistrationParams) (r BeginPasskeyRegistrationRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // CreateAuthAttempt implements createAuthAttempt operation.
 //
 // Starts a new authentication attempt. This is the entry point for the auth_attempts state machine.
@@ -186,6 +199,17 @@ func (UnimplementedHandler) EndSession(ctx context.Context, params EndSessionPar
 //
 // POST /sessions/exchange
 func (UnimplementedHandler) ExchangeHandoff(ctx context.Context, req *ExchangeRequest, params ExchangeHandoffParams) (r ExchangeHandoffRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// FinishPasskeyRegistration implements finishPasskeyRegistration operation.
+//
+// Completes the WebAuthn registration ceremony. The client posts the
+// PublicKeyCredential returned by navigator.credentials.create() as attestation.
+// On success, the passkey is stored and can be used for future authentication.
+//
+// POST /passkeys/{registration_id}
+func (UnimplementedHandler) FinishPasskeyRegistration(ctx context.Context, req *FinishPasskeyRegistrationRequest, params FinishPasskeyRegistrationParams) (r FinishPasskeyRegistrationRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
