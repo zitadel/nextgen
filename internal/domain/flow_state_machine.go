@@ -132,9 +132,18 @@ const FlowActionSubmit = "submit"
 // transition fires once the returned assertion verifies.
 const FlowActionPasskey = "passkey"
 
+// FlowActionPasskeyRegister is the action a step declares to offer passkey
+// enrollment. Selecting it issues a registration challenge; the matching
+// transition fires once the returned attestation verifies.
+const FlowActionPasskeyRegister = "passkey_register"
+
 // FlowChallengeMethodPasskey is the [FlowStepChallenge.Method] /
 // [FlowPendingChallenge.Method] value for the WebAuthn passkey ceremony.
 const FlowChallengeMethodPasskey = "passkey"
+
+// FlowChallengeMethodPasskeyRegister is the [FlowStepChallenge.Method] /
+// [FlowPendingChallenge.Method] value for the WebAuthn registration ceremony.
+const FlowChallengeMethodPasskeyRegister = "passkey_register"
 
 // flowPasskeyDefaultUserVerification is the WebAuthn user-verification
 // requirement used when issuing a passkey challenge from a flow. The RP
@@ -169,19 +178,20 @@ var (
 
 // FlowStateMachineRuntime is the production [FlowStateMachine].
 type FlowStateMachineRuntime struct {
-	fields       FlowFieldResolver
-	createUser   *FlowCreateUserHandler
-	authAttempts FlowAuthAttemptService
-	now          func() time.Time
+	fields               FlowFieldResolver
+	createUser           *FlowCreateUserHandler
+	authAttempts         FlowAuthAttemptService
+	passkeyRegistration  FlowPasskeyRegistrationService
+	now                  func() time.Time
 }
 
 // NewFlowStateMachine wires the runtime. The now hook is injectable so
 // tests can produce deterministic [FlowState.IssuedAt] values.
-func NewFlowStateMachine(fields FlowFieldResolver, createUser *FlowCreateUserHandler, authAttempts FlowAuthAttemptService, now func() time.Time) *FlowStateMachineRuntime {
+func NewFlowStateMachine(fields FlowFieldResolver, createUser *FlowCreateUserHandler, authAttempts FlowAuthAttemptService, passkeyRegistration FlowPasskeyRegistrationService, now func() time.Time) *FlowStateMachineRuntime {
 	if now == nil {
 		now = time.Now
 	}
-	return &FlowStateMachineRuntime{fields: fields, createUser: createUser, authAttempts: authAttempts, now: now}
+	return &FlowStateMachineRuntime{fields: fields, createUser: createUser, authAttempts: authAttempts, passkeyRegistration: passkeyRegistration, now: now}
 }
 
 var _ FlowStateMachine = (*FlowStateMachineRuntime)(nil)
@@ -503,17 +513,16 @@ type passkeyPhaseResult struct {
 	halt    *FlowStepResult
 }
 
-// processPasskey runs the passkey ceremony for the current step:
+// processPasskey runs all two-phase WebAuthn ceremonies (authentication and
+// registration) for the current step:
 //   - verify leg: a challenge is pending (or a ChallengeResponse arrived) →
-//     verify the assertion, record the resolved user, clear the pending
-//     challenge, and let Process route via the submitted action.
-//   - issue leg: the step offers a `passkey` action and it was selected →
-//     mint a challenge, stash it as pending, and re-render the step carrying
-//     the ceremony options for the browser.
-//
-// Discoverable (usernameless) entry needs no prior identifier step: the issue
-// leg runs against the attempt created at Start, and the verify leg resolves
-// and records the user from the assertion.
+//     dispatch to the right service based on PendingChallenge.Method, clear
+//     the pending challenge, and let Process route via the submitted action.
+//   - issue leg (auth): step offers a `passkey` action and it was selected →
+//     mint an assertion challenge; discoverable login allowed when no user is
+//     yet identified.
+//   - issue leg (register): step offers a `passkey_register` action and it
+//     was selected → user must already be identified; mint a creation challenge.
 func (r *FlowStateMachineRuntime) processPasskey(ctx context.Context, state *FlowState, step *FlowDefinitionStep, resolved FlowResolvedFields, in FlowSubmitInput) (passkeyPhaseResult, error) {
 	switch {
 	case state.PendingChallenge != nil || in.ChallengeResponse != nil:
@@ -527,28 +536,55 @@ func (r *FlowStateMachineRuntime) processPasskey(ctx context.Context, state *Flo
 		// The server-issued id is authoritative; never trust a client-supplied
 		// one to rebind the proof to a different challenge.
 		challengeID := in.ChallengeResponse.ChallengeID
+		method := in.ChallengeResponse.Method
 		if state.PendingChallenge != nil {
 			challengeID = state.PendingChallenge.ID
+			method = state.PendingChallenge.Method
 		}
-		userID, err := r.authAttempts.SubmitPasskey(ctx, FlowSubmitPasskeyInput{
-			ProjectID:   state.ProjectID,
-			AttemptID:   state.AuthAttemptID,
-			ChallengeID: challengeID,
-			Assertion:   in.ChallengeResponse.Proof,
-		})
-		if errors.Is(err, ErrAuthAttemptProofRejected(nil)) {
+
+		switch method {
+		case FlowChallengeMethodPasskeyRegister:
+			userID, _ := state.CollectedData[FlowCollectedUserIDKey].(string)
+			err := r.passkeyRegistration.SubmitPasskeyRegistration(ctx, FlowSubmitPasskeyRegistrationInput{
+				ProjectID:   state.ProjectID,
+				UserID:      userID,
+				ChallengeID: challengeID,
+				Attestation: in.ChallengeResponse.Proof,
+			})
+			if errors.Is(err, ErrAuthAttemptProofRejected(nil)) {
+				state.PendingChallenge = nil
+				msg := "auth_attempt.passkey_registration_invalid"
+				rendered := r.buildStep(step, resolved, &msg, nil, nil)
+				state.IssuedAt = r.now()
+				return passkeyPhaseResult{handled: true, halt: &FlowStepResult{State: state, Step: rendered}}, nil
+			}
+			if err != nil {
+				return passkeyPhaseResult{}, fmt.Errorf("flow state machine: submit passkey registration: %w", err)
+			}
 			state.PendingChallenge = nil
-			msg := "auth_attempt.passkey_invalid"
-			rendered := r.buildStep(step, resolved, &msg, nil, nil)
-			state.IssuedAt = r.now()
-			return passkeyPhaseResult{handled: true, halt: &FlowStepResult{State: state, Step: rendered}}, nil
+			return passkeyPhaseResult{handled: true}, nil
+
+		default: // FlowChallengeMethodPasskey
+			userID, err := r.authAttempts.SubmitPasskey(ctx, FlowSubmitPasskeyInput{
+				ProjectID:   state.ProjectID,
+				AttemptID:   state.AuthAttemptID,
+				ChallengeID: challengeID,
+				Assertion:   in.ChallengeResponse.Proof,
+			})
+			if errors.Is(err, ErrAuthAttemptProofRejected(nil)) {
+				state.PendingChallenge = nil
+				msg := "auth_attempt.passkey_invalid"
+				rendered := r.buildStep(step, resolved, &msg, nil, nil)
+				state.IssuedAt = r.now()
+				return passkeyPhaseResult{handled: true, halt: &FlowStepResult{State: state, Step: rendered}}, nil
+			}
+			if err != nil {
+				return passkeyPhaseResult{}, fmt.Errorf("flow state machine: submit passkey: %w", err)
+			}
+			recordResolvedUser(state, userID)
+			state.PendingChallenge = nil
+			return passkeyPhaseResult{handled: true}, nil
 		}
-		if err != nil {
-			return passkeyPhaseResult{}, fmt.Errorf("flow state machine: submit passkey: %w", err)
-		}
-		recordResolvedUser(state, userID)
-		state.PendingChallenge = nil
-		return passkeyPhaseResult{handled: true}, nil
 
 	case in.Action == FlowActionPasskey:
 		if _, ok := step.Actions[FlowActionPasskey]; !ok {
@@ -570,6 +606,40 @@ func (r *FlowStateMachineRuntime) processPasskey(ctx context.Context, state *Flo
 		state.PendingChallenge = &FlowPendingChallenge{
 			ID:       out.ChallengeID,
 			Method:   FlowChallengeMethodPasskey,
+			Options:  out.Options,
+			IssuedAt: r.now(),
+		}
+		rendered := r.buildStep(step, resolved, nil, nil, nil)
+		attachPendingChallenge(rendered, state.PendingChallenge)
+		state.IssuedAt = r.now()
+		return passkeyPhaseResult{handled: true, halt: &FlowStepResult{State: state, Step: rendered}}, nil
+
+	case in.Action == FlowActionPasskeyRegister:
+		if _, ok := step.Actions[FlowActionPasskeyRegister]; !ok {
+			return passkeyPhaseResult{}, nil
+		}
+		if in.PasskeyRP == nil {
+			return passkeyPhaseResult{}, fmt.Errorf("%w: passkey relying-party params missing", ErrIntegrity)
+		}
+		if r.passkeyRegistration == nil {
+			return passkeyPhaseResult{}, fmt.Errorf("%w: passkey registration service not wired", ErrIntegrity)
+		}
+		userID, ok := state.CollectedData[FlowCollectedUserIDKey].(string)
+		if !ok || userID == "" {
+			return passkeyPhaseResult{}, fmt.Errorf("%w: passkey_register requires an identified user", ErrIntegrity)
+		}
+		out, err := r.passkeyRegistration.IssuePasskeyRegistrationChallenge(ctx, FlowIssuePasskeyRegistrationChallengeInput{
+			ProjectID: state.ProjectID,
+			UserID:    userID,
+			RPID:      in.PasskeyRP.RPID,
+			RPOrigins: in.PasskeyRP.Origins,
+		})
+		if err != nil {
+			return passkeyPhaseResult{}, fmt.Errorf("flow state machine: issue passkey registration: %w", err)
+		}
+		state.PendingChallenge = &FlowPendingChallenge{
+			ID:       out.ChallengeID,
+			Method:   FlowChallengeMethodPasskeyRegister,
 			Options:  out.Options,
 			IssuedAt: r.now(),
 		}
