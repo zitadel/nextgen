@@ -28,9 +28,16 @@ func (h *Harness) EnsureFlowStateMachine(t *testing.T) *domain.FlowStateMachineR
 	if h.FlowStateMachine == nil {
 		fields := domain.NewSchemaFieldResolver(h.EnsureSchemaResolver(t))
 		authAdapter := service.NewFlowAuthAttemptAdapter(h.EnsureAuthAttemptService(t))
+		passkeyRegSvc := service.NewPasskeyRegistrationService(
+			h.EnsureDBPool(t),
+			repository.NewPasskeyRegistrationRepository(),
+			h.EnsureUserPasskeyRepo(t),
+			h.EnsureSessionRepo(t),
+			idgen.NewULID(),
+		)
 		// create_user handler stays nil — registration flows fail with
 		// ErrIntegrity until the argon2id wiring PR lands.
-		h.FlowStateMachine = domain.NewFlowStateMachine(fields, nil, authAdapter, time.Now)
+		h.FlowStateMachine = domain.NewFlowStateMachine(fields, nil, authAdapter, passkeyRegSvc, time.Now)
 	}
 	return h.FlowStateMachine
 }
