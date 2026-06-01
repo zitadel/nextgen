@@ -250,8 +250,8 @@ jobs:
 
       - name: Smoke test built CLI
         run: |
-          node apps/cli/dist/zitadel.mjs --version
-          node apps/cli/dist/zitadel.mjs capabilities --json
+          node apps/cli/bin/run.js --version
+          node apps/cli/bin/run.js commands
 
       - name: Dry-run npm packs
         run: |

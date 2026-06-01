@@ -34,6 +34,21 @@
       "types": "./dist/runtime/base-url.d.mts",
       "import": "./dist/runtime/base-url.mjs"
     },
+    "./runtime/auth": {
+      "@zitadel-nextgen/source": "./src/runtime/auth.ts",
+      "types": "./dist/runtime/auth.d.mts",
+      "import": "./dist/runtime/auth.mjs"
+    },
+    "./runtime/fetch": {
+      "@zitadel-nextgen/source": "./src/runtime/fetch.ts",
+      "types": "./dist/runtime/fetch.d.mts",
+      "import": "./dist/runtime/fetch.mjs"
+    },
+    "./client": {
+      "@zitadel-nextgen/source": "./src/runtime/api-factory.ts",
+      "types": "./dist/runtime/api-factory.d.mts",
+      "import": "./dist/runtime/api-factory.mjs"
+    },
     "./config": {
       "@zitadel-nextgen/source": "./src/runtime/config.ts",
       "types": "./dist/runtime/config.d.mts",
@@ -65,6 +80,9 @@
           "{projectRoot}/package.json",
           "{projectRoot}/orval.config.ts",
           "{projectRoot}/src/runtime/base-url.ts",
+          "{projectRoot}/src/runtime/auth.ts",
+          "{projectRoot}/src/runtime/fetch.ts",
+          "{projectRoot}/src/runtime/api-factory.ts",
           "{projectRoot}/src/runtime/config.ts"
         ],
         "outputs": [
