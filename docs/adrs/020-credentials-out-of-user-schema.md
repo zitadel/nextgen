@@ -1,6 +1,6 @@
 # ADR 020: Credentials Out of the User Schema
 
-> **Status:** Draft
+> **Status:** Proposed
 > **Date:** 2026-06-01
 > **Context:** User schema, flow engine credential references
 
@@ -42,6 +42,13 @@ back to `x-auth-methods.<kind>`:
 
 The validator cross-checks every reference against the user schema's
 `x-auth-methods` and rejects references to disabled methods.
+
+> **Follow-up — token naming.** `x-auth-methods-password` mirrors the
+> schema-root key but reuses the JSON-Schema `x-` annotation convention
+> outside its native context. Alternatives such as `auth-method:password`,
+> `credential:password`, or bare reserved names are worth revisiting
+> before implementation; the decision above does not depend on which
+> spelling is picked.
 
 ## Before / After
 
@@ -127,11 +134,6 @@ picks; the wiring is on the descriptor.
 
 ## Open questions
 
-- **Token naming.** `x-auth-methods-password` mirrors the schema-root
-  key but reuses the `x-` JSON-Schema convention outside its native
-  context. Alternatives worth considering: `auth-method:password`,
-  `credential:password`, bare reserved names. Pick one before promoting
-  this ADR out of Draft.
 - **`sso_providers[]` overlap.** SSO buttons today live on
   `step.sso_providers[]`, not under `actions{}`. With the action-side
   `auth_method` mechanism, an SSO button could equivalently be an action
