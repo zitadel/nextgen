@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { DEFAULT_SERVER, resolveServer } from "../../../../src/lib/api/resolve-server";
+import { DEFAULT_SERVER, resolveServer } from "../../../src/lib/server";
 
 let dir: string;
 
