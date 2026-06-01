@@ -1,80 +1,55 @@
-# zitadel
+# @zitadel-nextgen/cli
 
-Agent-friendly Zitadel CLI for the next generation Zitadel project.
-
-```sh
-npx zitadel@latest
-```
-
-## Status
-
-The CLI is still pre-release. It supports the mock-backed golden path for Next.js
-App Router projects, but it is not yet a complete live platform client.
-
-V1 creates a local Zitadel setup with mock-backed login and registration
-routes. Repo config is the source of truth: edit `zitadel.json` or
-`.zitadel/**`, then run `zitadel plan` or `zitadel apply`.
-
-## Golden path
+Scaffolds Zitadel auth (login, register, profile, middleware) into a Next.js app.
 
 ```sh
-npx zitadel@latest setup --framework next
-npx zitadel@latest doctor
-npx zitadel@latest plan
-npx zitadel@latest apply
+npx @zitadel-nextgen/cli@latest setup --framework next --server <your-zitadel-instance>
 ```
 
-Agents should use the skill in `SKILLS.md` and call commands with
-`--non-interactive --json`:
+> **Beta.** This is the **next-generation Zitadel**, a ground-up rewrite of the platform. It is distinct from the established Zitadel at [github.com/zitadel/zitadel](https://github.com/zitadel/zitadel). APIs and CLI flags will change.
+
+## Requirements
+
+- Node 20+
+- A Next.js project created with `create-next-app`
+- A running next-generation Zitadel instance to point at:
+  - **Zitadel Cloud** — coming soon
+  - **Self-hosted** — grab a binary from [github.com/zitadel/nextgen/releases](https://github.com/zitadel/nextgen/releases) and run it locally
+
+## Quickstart
 
 ```sh
-npx zitadel@latest --help
-npx zitadel@latest <command> --non-interactive --json
+npx create-next-app@latest my-app
+cd my-app
+npx @zitadel-nextgen/cli@latest setup --framework next --server http://localhost:8080
+npm run dev
 ```
 
-## Commands
+`setup` creates a project on the Zitadel server, scaffolds `app/login`, `app/register`, `app/profile`, and `middleware.ts`, writes `.env.local` and `.zitadel/`, then applies the config to the server. Open `http://localhost:3000/login` to see the login page.
+
+## Other commands
+
+- `zitadel doctor` — verify the generated files and local state
+- `zitadel status` — summarise the local project
+- `zitadel eject` — remove what setup wrote (alias: `zitadel uninstall`)
+
+## Reference
+
+<details>
+<summary>Full command reference</summary>
 
 <!-- commands -->
-* [`zitadel apply`](#zitadel-apply)
 * [`zitadel autocomplete [SHELL]`](#zitadel-autocomplete-shell)
 * [`zitadel commands`](#zitadel-commands)
 * [`zitadel doctor`](#zitadel-doctor)
 * [`zitadel eject`](#zitadel-eject)
 * [`zitadel help [COMMAND]`](#zitadel-help-command)
-* [`zitadel plan`](#zitadel-plan)
 * [`zitadel search`](#zitadel-search)
 * [`zitadel setup`](#zitadel-setup)
 * [`zitadel status`](#zitadel-status)
 * [`zitadel uninstall`](#zitadel-uninstall)
 * [`zitadel version`](#zitadel-version)
 * [`zitadel which`](#zitadel-which)
-
-## `zitadel apply`
-
-Validate and upload repo config to the platform.
-
-```
-USAGE
-  $ zitadel apply [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug] [-e
-    development|preview|production]
-
-FLAGS
-  -c, --cwd=<value>           Project directory to operate on.
-  -e, --environment=<option>  Target environment (default: development).
-                              <options: development|preview|production>
-  -f, --force                 Overwrite protected files on conflict.
-  -n, --non-interactive       Disable prompts. Required when scripting or running as an agent.
-  -s, --server=<value>        Override the resolved server URL.
-      --debug                 Debug logging.
-      --dry-run               Preview without mutating files or the platform.
-      --verbose               Verbose logging.
-
-GLOBAL FLAGS
-  --json  Format output as json.
-
-DESCRIPTION
-  Validate and upload repo config to the platform.
-```
 
 ## `zitadel autocomplete [SHELL]`
 
@@ -208,33 +183,6 @@ DESCRIPTION
 
 _See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/6.2.49/src/commands/help.ts)_
 
-## `zitadel plan`
-
-Validate config without mutation and preview the sync diff.
-
-```
-USAGE
-  $ zitadel plan [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug] [-e
-    development|preview|production]
-
-FLAGS
-  -c, --cwd=<value>           Project directory to operate on.
-  -e, --environment=<option>  Target environment (default: development).
-                              <options: development|preview|production>
-  -f, --force                 Overwrite protected files on conflict.
-  -n, --non-interactive       Disable prompts. Required when scripting or running as an agent.
-  -s, --server=<value>        Override the resolved server URL.
-      --debug                 Debug logging.
-      --dry-run               Preview without mutating files or the platform.
-      --verbose               Verbose logging.
-
-GLOBAL FLAGS
-  --json  Format output as json.
-
-DESCRIPTION
-  Validate config without mutation and preview the sync diff.
-```
-
 ## `zitadel search`
 
 Search for a command.
@@ -258,23 +206,21 @@ Create a Zitadel project and scaffold local auth.
 ```
 USAGE
   $ zitadel setup [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug]
-    [--framework next] [--auth-method passkey|password] [--renderer react|web-component] [--no-apply]
+    [--framework next] [--renderer react|web-component] [--no-apply]
 
 FLAGS
-  -c, --cwd=<value>           Project directory to operate on.
-  -f, --force                 Overwrite protected files on conflict.
-  -n, --non-interactive       Disable prompts. Required when scripting or running as an agent.
-  -s, --server=<value>        Override the resolved server URL.
-      --auth-method=<option>  Auth method (default: passkey).
-                              <options: passkey|password>
-      --debug                 Debug logging.
-      --dry-run               Preview without mutating files or the platform.
-      --framework=<option>    Framework to target.
-                              <options: next>
-      --no-apply              Skip the automatic apply at the end of setup.
-      --renderer=<option>     Renderer (default: react).
-                              <options: react|web-component>
-      --verbose               Verbose logging.
+  -c, --cwd=<value>         Project directory to operate on.
+  -f, --force               Overwrite protected files on conflict.
+  -n, --non-interactive     Disable prompts. Required when scripting or running as an agent.
+  -s, --server=<value>      Override the resolved server URL.
+      --debug               Debug logging.
+      --dry-run             Preview without mutating files or the platform.
+      --framework=<option>  Framework to target.
+                            <options: next>
+      --no-apply            Skip the automatic apply at the end of setup.
+      --renderer=<option>   Renderer (default: react).
+                            <options: react|web-component>
+      --verbose             Verbose logging.
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -283,7 +229,7 @@ DESCRIPTION
   Create a Zitadel project and scaffold local auth.
 
 EXAMPLES
-  $ zitadel setup --framework next --auth-method passkey
+  $ zitadel setup --framework next
 ```
 
 ## `zitadel status`
@@ -392,9 +338,9 @@ EXAMPLES
 _See code: [@oclif/plugin-which](https://github.com/oclif/plugin-which/blob/3.2.55/src/commands/which.ts)_
 <!-- commandsstop -->
 
-## Release readiness
+</details>
 
-Before npm publishing is enabled, the package still needs the CI smoke checks to
-stay green, live API coverage to catch up with the mock contract, and the
-changesets publishing workflow to be enabled with confirmed npm ownership and
-tokens. CI package tarballs are review artifacts only.
+## Links
+
+- Repository: [github.com/zitadel/nextgen](https://github.com/zitadel/nextgen)
+- Issues: [github.com/zitadel/nextgen/issues](https://github.com/zitadel/nextgen/issues)
