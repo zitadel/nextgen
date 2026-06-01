@@ -20,6 +20,14 @@ export default defineConfig({
         fetch: {
           includeHttpResponseReturnType: false,
         },
+        mutator: {
+          // Every generated operation routes through `customFetch` so
+          // bearer auth, non-2xx → throw, and JSON body parsing happen
+          // in one place. Callers consume the orval functions directly
+          // — no hand-written HTTP wrapper.
+          path: "./src/runtime/fetch.ts",
+          name: "customFetch",
+        },
       },
     },
   },

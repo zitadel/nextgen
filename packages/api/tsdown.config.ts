@@ -20,6 +20,8 @@ import { defineConfig } from "tsdown";
 export default defineConfig({
   entry: {
     "runtime/base-url": "src/runtime/base-url.ts",
+    "runtime/auth": "src/runtime/auth.ts",
+    "runtime/fetch": "src/runtime/fetch.ts",
     "runtime/config": "src/runtime/config.ts",
     "generated/model/index": "src/generated/model/index.ts",
     "generated/endpoints/zitadelNextGen": "src/generated/endpoints/zitadelNextGen.ts",
