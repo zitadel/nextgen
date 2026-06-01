@@ -52,7 +52,33 @@ func (a *AuthFactorPasskey) Payload() any {
 	return a
 }
 
+type AuthChallengePasskeyRegistration struct {
+	*PasskeyRegistrationChallenge
+	authChallenge
+}
+
+func (a *AuthChallengePasskeyRegistration) Type() AuthCheckType {
+	return AuthCheckTypePasskeyRegistration
+}
+
+func (a *AuthChallengePasskeyRegistration) Payload() any {
+	return a
+}
+
+func SetAuthChallengePasskeyRegistration(id string, lastChallengedAt, lastFailedAt time.Time, failureCount uint16) *AuthChallengePasskeyRegistration {
+	return &AuthChallengePasskeyRegistration{
+		PasskeyRegistrationChallenge: new(PasskeyRegistrationChallenge),
+		authChallenge: authChallenge{
+			ID:               id,
+			LastChallengedAt: lastChallengedAt,
+			LastFailedAt:     lastFailedAt,
+			FailureCount:     failureCount,
+		},
+	}
+}
+
 var (
 	_ AuthChallenge = (*AuthChallengePasskey)(nil)
 	_ AuthFactor    = (*AuthFactorPasskey)(nil)
+	_ AuthChallenge = (*AuthChallengePasskeyRegistration)(nil)
 )

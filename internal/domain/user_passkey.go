@@ -156,7 +156,7 @@ func PasskeysToCredentials(passkeys []*UserPasskey) []webauthn.Credential {
 
 	for _, pkey := range passkeys {
 		creds = append(creds, webauthn.Credential{
-			ID:              []byte(pkey.CredentialID),
+			ID:              decodeCredentialID(pkey.CredentialID),
 			PublicKey:       pkey.PublicKey,
 			AttestationType: gu.Value(pkey.AttestationType),
 			Authenticator: webauthn.Authenticator{
@@ -189,8 +189,9 @@ func webAuthNConfig(rpID string, origins ...url.URL) (*webauthn.WebAuthn, error)
 		rpOrigins[i] = origin.String()
 	}
 	c := &webauthn.Config{
-		RPID:      rpID,
-		RPOrigins: rpOrigins,
+		RPID:          rpID,
+		RPDisplayName: rpID, // display name required for BeginRegistration; RPID is a valid default
+		RPOrigins:     rpOrigins,
 	}
 	return webauthn.New(c)
 }
@@ -247,6 +248,121 @@ func VerifyPasskeyChallenge(challenge *PasskeyChallenge, response []byte, userID
 	}, nil
 }
 
+// PasskeyRegistrationChallenge holds server-side state for a BeginRegistration call.
+// It must be persisted between the issue and verify legs of the registration ceremony.
+type PasskeyRegistrationChallenge struct {
+	Challenge   string
+	RPID        string
+	RPOrigins   []url.URL
+	UserID      string
+	Username    string
+	DisplayName string
+	ExcludeIDs  [][]byte // existing credential IDs excluded from this registration
+	Expires     time.Time
+	CredParams  []protocol.CredentialParameter
+	Extensions  protocol.AuthenticationExtensions
+}
+
+// CreatePasskeyRegistrationChallenge calls webauthn.BeginRegistration and maps
+// the returned SessionData to a PasskeyRegistrationChallenge.
+func CreatePasskeyRegistrationChallenge(userID, username, displayName string, existing []*UserPasskey, rpID string, origins []url.URL) (*PasskeyRegistrationChallenge, error) {
+	w, err := webAuthNConfig(rpID, origins...)
+	if err != nil {
+		return nil, err
+	}
+	user := &webAuthNUser{
+		userID:      userID,
+		username:    username,
+		displayName: displayName,
+		creds:       PasskeysToCredentials(existing),
+	}
+	_, sessionData, err := w.BeginRegistration(user)
+	if err != nil {
+		return nil, err
+	}
+	excludeIDs := make([][]byte, len(existing))
+	for i, pk := range existing {
+		excludeIDs[i] = decodeCredentialID(pk.CredentialID)
+	}
+	return &PasskeyRegistrationChallenge{
+		Challenge:   sessionData.Challenge,
+		RPID:        sessionData.RelyingPartyID,
+		RPOrigins:   origins,
+		UserID:      userID,
+		Username:    username,
+		DisplayName: displayName,
+		ExcludeIDs:  excludeIDs,
+		Expires:     sessionData.Expires,
+		CredParams:  sessionData.CredParams,
+		Extensions:  sessionData.Extensions,
+	}, nil
+}
+
+// VerifyPasskeyRegistration parses the attestation response and calls
+// webauthn.CreateCredential. Returns a CreateUserPasskey ready for storage.
+// CredentialID is base64url-encoded to ensure valid UTF-8 in the TEXT column
+// (valid for both Postgres and Spanner).
+func VerifyPasskeyRegistration(challenge *PasskeyRegistrationChallenge, attestation []byte) (*CreateUserPasskey, error) {
+	w, err := webAuthNConfig(challenge.RPID, challenge.RPOrigins...)
+	if err != nil {
+		return nil, err
+	}
+	parsedResponse, err := protocol.ParseCredentialCreationResponseBytes(attestation)
+	if err != nil {
+		return nil, err
+	}
+	user := &webAuthNUser{
+		userID:      challenge.UserID,
+		username:    challenge.Username,
+		displayName: challenge.DisplayName,
+	}
+	credential, err := w.CreateCredential(user, registrationSessionData(challenge), parsedResponse)
+	if err != nil {
+		return nil, err
+	}
+	attestationType := credential.AttestationType
+	transports := make([]string, len(credential.Transport))
+	for i, t := range credential.Transport {
+		transports[i] = string(t)
+	}
+	now := time.Now()
+	return &CreateUserPasskey{
+		UserID:          challenge.UserID,
+		CredentialID:    base64.RawURLEncoding.EncodeToString(credential.ID),
+		PublicKey:       credential.PublicKey,
+		AAGUID:          credential.Authenticator.AAGUID,
+		AttestationType: &attestationType,
+		Transports:      transports,
+		SignCount:        int64(credential.Authenticator.SignCount),
+		BackupEligible:  credential.Flags.BackupEligible,
+		BackupState:     credential.Flags.BackupState,
+		VerifiedAt:      &now,
+	}, nil
+}
+
+// registrationSessionData reconstructs a webauthn.SessionData from a stored
+// PasskeyRegistrationChallenge for use with CreateCredential.
+func registrationSessionData(c *PasskeyRegistrationChallenge) webauthn.SessionData {
+	return webauthn.SessionData{
+		Challenge:      c.Challenge,
+		RelyingPartyID: c.RPID,
+		UserID:         []byte(c.UserID),
+		Expires:        c.Expires,
+		CredParams:     c.CredParams,
+		Extensions:     c.Extensions,
+	}
+}
+
+// decodeCredentialID reverses the base64url encoding used when storing a
+// credential ID. Falls back to a raw byte cast for legacy ASCII test fixtures.
+func decodeCredentialID(s string) []byte {
+	decoded, err := base64.RawURLEncoding.DecodeString(s)
+	if err != nil {
+		return []byte(s)
+	}
+	return decoded
+}
+
 // BuildPasskeyRequestOptions renders the stored passkey challenge as the
 // WebAuthn PublicKeyCredentialRequestOptions JSON (wrapped in the standard
 // `{"publicKey": ...}` envelope) that the browser passes to
@@ -274,4 +390,39 @@ func BuildPasskeyRequestOptions(c *AuthChallengePasskey) ([]byte, error) {
 		Extensions:         c.Extensions,
 	}
 	return json.Marshal(assertion)
+}
+
+// BuildPasskeyCreationOptions renders the stored registration challenge as the
+// WebAuthn PublicKeyCredentialCreationOptions JSON the browser passes to
+// navigator.credentials.create(). Mirrors BuildPasskeyRequestOptions for the
+// registration ceremony.
+func BuildPasskeyCreationOptions(c *AuthChallengePasskeyRegistration) ([]byte, error) {
+	challenge, err := base64.RawURLEncoding.DecodeString(c.Challenge)
+	if err != nil {
+		return nil, err
+	}
+	excluded := make([]protocol.CredentialDescriptor, 0, len(c.ExcludeIDs))
+	for _, id := range c.ExcludeIDs {
+		excluded = append(excluded, protocol.CredentialDescriptor{
+			Type:         protocol.PublicKeyCredentialType,
+			CredentialID: protocol.URLEncodedBase64(id),
+		})
+	}
+	opts := protocol.PublicKeyCredentialCreationOptions{
+		RelyingParty: protocol.RelyingPartyEntity{
+			CredentialEntity: protocol.CredentialEntity{Name: c.RPID},
+			ID:               c.RPID,
+		},
+		User: protocol.UserEntity{
+			CredentialEntity: protocol.CredentialEntity{Name: c.Username},
+			DisplayName:      c.DisplayName,
+			ID:               protocol.URLEncodedBase64([]byte(c.UserID)),
+		},
+		Challenge:             protocol.URLEncodedBase64(challenge),
+		Parameters:            c.CredParams,
+		CredentialExcludeList: excluded,
+		Attestation:           protocol.PreferNoAttestation,
+		Extensions:            c.Extensions,
+	}
+	return json.Marshal(opts)
 }
