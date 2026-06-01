@@ -1,7 +1,7 @@
 import { Command, Flags } from "@oclif/core";
 import consola from "consola";
 
-import { resolveServer } from "../api/resolve-server";
+import { resolveServer } from "../server";
 import { toZitadelError, type ZitadelError } from "../errors";
 import { isObject } from "../json";
 import { resolveCwd } from "../paths";

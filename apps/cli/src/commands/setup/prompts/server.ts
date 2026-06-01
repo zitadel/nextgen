@@ -1,6 +1,6 @@
 import { select, spinner, text } from "@clack/prompts";
 
-import { DEFAULT_SERVER } from "../../../lib/api/resolve-server";
+import { DEFAULT_SERVER } from "../../../lib/server";
 import { listListeningPorts, probeUrls } from "../../../lib/prober";
 import { bail } from "./cancel";
 import type { PromptContext, SetupAnswers, SetupPrompt } from "./types";
