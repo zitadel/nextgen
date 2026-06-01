@@ -21,7 +21,7 @@ func TestCreateSchema(t *testing.T) {
 		}{
 			{
 				name:   "user-schema in body",
-				schema: harness.Schemas.CreateSchemaRequestUserSchema,
+				schema: harness.TestData.Schemas.CreateSchemaRequestUserSchema,
 			},
 			// TODO: add this test case once we have a public github-repo from which to get a schema
 			//{
@@ -95,10 +95,10 @@ func TestCreateSchema(t *testing.T) {
 		t.Run("duplicates are not allowed", func(t *testing.T) {
 			project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
 			require.NoError(t, err)
-			harness.CreateUserSchema(t, project.ID, harness.Schemas.CreateSchemaRequestUserSchema)
+			harness.CreateUserSchema(t, project.ID, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
 
 			apiSchema := api.UserSchema{}
-			err = apiSchema.UnmarshalJSON([]byte(harness.Schemas.CreateSchemaRequestUserSchema))
+			err = apiSchema.UnmarshalJSON([]byte(harness.TestData.Schemas.CreateSchemaRequestUserSchema))
 			require.NoError(t, err)
 
 			req := api.CreateSchemaReq{
@@ -123,7 +123,7 @@ func TestGetSchema(t *testing.T) {
 		t.Run("simple", func(t *testing.T) {
 			project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
 			require.NoError(t, err)
-			schemaID := harness.CreateUserSchema(t, project.ID, harness.Schemas.CreateSchemaRequestUserSchema)
+			schemaID := harness.CreateUserSchema(t, project.ID, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
 
 			resp, err := harness.EnsureAPIClient(t, project.ID).GetSchemaById(t.Context(), api.GetSchemaByIdParams{
 				ID:        schemaID,

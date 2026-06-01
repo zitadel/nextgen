@@ -64,24 +64,21 @@ func (s *UserService) SetPassword(ctx context.Context, input SetPasswordInput) e
 	pwd, err := s.passwordRepo.GetByUserID(ctx, tx, input.ProjectID, input.TeamID, input.UserID)
 
 	if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
-		return s.createPassword(ctx, tx, input.ProjectID, input.TeamID, input.UserID, hash, input.IsPasswordChangeRequired)
+		err = s.createPassword(ctx, tx, input.ProjectID, input.TeamID, input.UserID, hash, input.IsPasswordChangeRequired)
+	} else if err != nil {
+		err = domain.ErrInternal(err).WithMessage("failed to get current password from database")
+	} else {
+		err = s.updatePassword(ctx, tx, pwd, hash, input.IsPasswordChangeRequired)
 	}
 
-	pwd.Update(hash)
-	if input.IsPasswordChangeRequired {
-		pwd.RequireChange()
-	}
-
-	err = s.passwordRepo.Update(ctx, tx, pwd)
 	if err != nil {
-		return domain.ErrInternal(err).WithMessage("failed to update password in database")
+		return err
 	}
 
 	err = tx.Commit(ctx)
 	if err != nil {
-		return domain.ErrInternal(err).WithMessage("failed to commit transaction while updating password")
+		return domain.ErrInternal(err).WithMessage("failed to commit transaction while setting password")
 	}
-
 	return nil
 }
 
@@ -97,10 +94,25 @@ func (s *UserService) createPassword(ctx context.Context, client database.QueryE
 	})
 
 	if err != nil {
-		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+		if _, ok := errors.AsType[*database.IntegrityViolationError](err); ok {
 			return domain.ErrUserNotFound()
 		}
 		return domain.ErrInternal(err).WithMessage("failed to set initial password")
+	}
+
+	return nil
+}
+
+func (s *UserService) updatePassword(ctx context.Context, client database.QueryExecutor,
+	pwd *domain.UserPassword, pwdHash string, isPasswordChangeRequired bool) error {
+	pwd.Update(pwdHash)
+	if isPasswordChangeRequired {
+		pwd.RequireChange()
+	}
+
+	err := s.passwordRepo.Update(ctx, client, pwd)
+	if err != nil {
+		return domain.ErrInternal(err).WithMessage("failed to update password in database")
 	}
 
 	return nil

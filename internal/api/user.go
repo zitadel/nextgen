@@ -2,8 +2,10 @@ package api
 
 import (
 	"context"
+	"net/http"
 
 	api "github.com/zitadel/nextgen/api/generated"
+	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
@@ -25,4 +27,15 @@ func (h *Handler) SetUserPassword(ctx context.Context, req *api.SetUserPasswordR
 	}
 
 	return &api.SetUserPasswordNoContent{}, nil
+}
+
+// ------------------ Errors ---------------
+
+func userErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
+	switch err.Code {
+	case domain.ErrUserNotFound().Code:
+		return errorResponseWithStatusCode(http.StatusNotFound, err)
+	default:
+		return internalErrorResponse(err)
+	}
 }
