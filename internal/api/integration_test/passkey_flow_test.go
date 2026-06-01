@@ -85,6 +85,7 @@ func TestPasskeyFlowLogin(t *testing.T) {
 		CredentialID: string(cred.ID),
 		PublicKey:    cred.Key.AttestationData(),
 		AAGUID:       auth.Aaguid[:],
+		Transports:   []string{},
 		SignCount:    1,
 	}))
 
