@@ -1,0 +1,38 @@
+post:
+  operationId: beginPasskeyRegistration
+  summary: Begin passkey registration
+  description: |
+    Starts a WebAuthn registration ceremony for an already-authenticated user.
+    Returns a registration ID and the PublicKeyCredentialCreationOptions to pass
+    to navigator.credentials.create().
+
+    The client must complete the ceremony by calling
+    POST /passkeys/{registration_id}/finish with the attestation.
+  tags:
+    - Passkeys
+  security:
+    - oauth2:
+        - passkeys.write
+  parameters:
+    - name: Origin
+      in: header
+      required: true
+      description: The browser origin, used to derive the WebAuthn RP ID and allowed origins.
+      schema:
+        type: string
+        example: 'https://example.com'
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: begin-passkey-registration-request.yaml
+  responses:
+    '201':
+      description: Registration session created — client should call navigator.credentials.create() with the returned options
+      content:
+        application/json:
+          schema:
+            $ref: begin-passkey-registration-response.yaml
+    default:
+      $ref: error-response.yaml

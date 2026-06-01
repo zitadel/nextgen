@@ -1,0 +1,15 @@
+type: object
+required:
+  - registration_id
+  - options
+properties:
+  registration_id:
+    type: string
+    description: Opaque ID binding this session; pass to POST /passkeys/{registration_id}/finish.
+    example: 'pkreg_01J0Z9KX7Y0Q2Y7JX5M9K2YF3C'
+  options:
+    type: object
+    description: |
+      PublicKeyCredentialCreationOptions to pass directly to navigator.credentials.create().
+      See https://www.w3.org/TR/webauthn/#dictionary-makecredentialoptions
+    additionalProperties: true

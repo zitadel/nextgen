@@ -86,6 +86,10 @@ paths:
     $ref: endpoints/teams/methods.yaml
   /teams/{team_id}:
     $ref: endpoints/teams/by_id/methods.yaml
+  /passkeys:
+    $ref: endpoints/passkeys/methods.yaml
+  /passkeys/{registration_id}:
+    $ref: endpoints/passkeys/by_id/methods.yaml
 
 components:
   securitySchemes:
