@@ -28,6 +28,10 @@ func ErrUserNotFound() Error {
 	return newError(PrefixUser.ErrorCodePrefix("not_found"), "user not found", nil, nil)
 }
 
+func ErrUserAlreadyExists() Error {
+	return newError(PrefixUser.ErrorCodePrefix("already_exists"), "a user already exists with the given unique attributes", nil, nil)
+}
+
 // User is a hydrated user projection (header + optional EAV joins).
 type User struct {
 	ProjectID string

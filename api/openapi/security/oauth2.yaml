@@ -17,6 +17,5 @@ flows:
       openid: OpenID Connect scope
       schema.read: Permission to read schemas
       schema.write: Permission to create and manage schemas
+      user.read: Permission to read users
       user.create: Permission to create users
-      user.list: Permission to list users
-    

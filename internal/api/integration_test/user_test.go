@@ -3,6 +3,7 @@
 package integration_test
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,34 +14,100 @@ import (
 )
 
 func TestCreateUser(t *testing.T) {
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+	require.NoError(t, err)
+
+	team, err := harness.EnsureTeamService(t).CreateTeam(t.Context(), service.CreateTeamInput{
+		ProjectID: project.ID,
+	})
+	require.NoError(t, err)
+
+	harness.CreateUserSchema(t, project.ID, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
+
+	client := harness.EnsureAPIClient(t, project.ID)
+
+	params := api.CreateUserParams{
+		ProjectID: api.ProjectID(project.ID),
+		TeamID:    api.OptTeamID{Set: true, Value: api.TeamID(team.ID)},
+	}
 
 	t.Run("ok", func(t *testing.T) {
 		t.Run("simple", func(t *testing.T) {
-			project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
-			client := harness.EnsureAPIClient(t, project.ID)
-			require.NoError(t, err)
-
-			team, err := harness.EnsureTeamService(t).CreateTeam(t.Context(), service.CreateTeamInput{
-				ProjectID: project.ID,
-			})
-			require.NoError(t, err)
-
-			harness.CreateUserSchema(t, project.ID, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
 			userBs := []byte(harness.TestData.Users.CreateUserRequest)
 
 			user := &api.User{}
 			err = user.UnmarshalJSON(userBs)
 			require.NoError(t, err)
 
-			params := api.CreateUserParams{
-				ProjectID: api.ProjectID(project.ID),
-				TeamID:    api.OptTeamID{Set: true, Value: api.TeamID(team.ID)},
-			}
-
 			resp, err := client.CreateUser(t.Context(), user, params)
 			assert.NoError(t, err)
 
 			assert.IsType(t, &api.CreateUserResponse{}, resp, helpers.MustMarshal(t, resp))
+		})
+	})
+
+	t.Run("error", func(t *testing.T) {
+		t.Run("invalid user data according to schema", func(t *testing.T) {
+			tcs := []struct {
+				name    string
+				usermap map[string]any
+			}{
+				{
+					name: "missing required email property",
+					usermap: map[string]any{
+						"$schema":   "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml",
+						"firstName": "john",
+						"lastName":  "doe",
+					},
+				},
+				{
+					name: "first name too long",
+					usermap: map[string]any{
+						"$schema":   "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml",
+						"email":     "john.withawaytolongname@example.com",
+						"firstName": "john with a waaaaaaaaaaaaaaaaaaaaaaaaaaaaay too long name",
+						"lastName":  "doe",
+					},
+				},
+			}
+
+			for _, tc := range tcs {
+				userbs, err := json.Marshal(tc.usermap)
+				require.NoError(t, err)
+
+				user := &api.User{}
+				err = user.UnmarshalJSON(userbs)
+				require.NoError(t, err)
+
+				resp, err := client.CreateUser(t.Context(), user, params)
+				assert.NoError(t, err)
+
+				assert.IsType(t, &api.CreateUserBadRequest{}, resp, helpers.MustMarshal(t, resp))
+			}
+		})
+
+		t.Run("duplicate mail address", func(t *testing.T) {
+			usermap := map[string]any{
+				"$schema":   "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml",
+				"email":     "john.withaduplicatemailaddress@example.com",
+				"firstName": "john",
+				"lastName":  "doe",
+			}
+
+			userbs, err := json.Marshal(usermap)
+			require.NoError(t, err)
+
+			user := &api.User{}
+			err = user.UnmarshalJSON(userbs)
+			require.NoError(t, err)
+
+			resp, err := client.CreateUser(t.Context(), user, params)
+			require.NoError(t, err)
+			require.IsType(t, &api.CreateUserResponse{}, resp, helpers.MustMarshal(t, resp))
+
+			resp, err = client.CreateUser(t.Context(), user, params)
+			assert.NoError(t, err)
+			assert.IsType(t, &api.CreateUserConflict{}, resp, helpers.MustMarshal(t, resp))
 		})
 	})
 }

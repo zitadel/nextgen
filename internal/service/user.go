@@ -84,7 +84,7 @@ func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (_ 
 	if err != nil {
 		return nil, domain.ErrUserInvalid().
 			WithParent(err).
-			WithMessage("user does is not valid according to schema")
+			WithMessage("user is not valid according to schema")
 	}
 
 	// PREPARE DOMAIN USER
@@ -104,6 +104,9 @@ func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (_ 
 
 	err = s.userRepo.Create(ctx, tx, createUser)
 	if err != nil {
+		if _, ok := errors.AsType[*database.IntegrityViolationError](err); ok {
+			return nil, domain.ErrUserAlreadyExists().WithParent(err)
+		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to create user in the database")
 	}
 

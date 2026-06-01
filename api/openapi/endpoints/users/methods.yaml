@@ -5,7 +5,7 @@ post:
     - User
   security:
     - oauth2:
-        - users.write
+        - user.write
   parameters:
     - $ref: ../../components/parameters/project-id.yaml
     - $ref: ../../components/parameters/team-id.yaml
@@ -36,6 +36,16 @@ post:
             $ref: ../../components/error-details.yaml
     '403':
       description: You do not have permission to create a user.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '409':
+      description: |
+        A user already exists with one of the unique values. E.g.: when the
+        schema indicates that the email field should be unique across the team,
+        only one user can have a given `email` attribute. See the body for more
+        details.
       content:
         application/json:
           schema:

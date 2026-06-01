@@ -2001,6 +2001,10 @@ type CreateUserBadRequest ErrorDetails
 
 func (*CreateUserBadRequest) createUserRes() {}
 
+type CreateUserConflict ErrorDetails
+
+func (*CreateUserConflict) createUserRes() {}
+
 type CreateUserForbidden ErrorDetails
 
 func (*CreateUserForbidden) createUserRes() {}
@@ -10773,9 +10777,10 @@ func (*UpdateFlowDefinitionNotFound) updateFlowDefinitionRes() {}
 // users, this is only a base schema.
 // Ref: #
 type User struct {
-	// The schema that defines the content of the user. This is determined by
-	// the configuration of the system and can be used to validate the content
-	// of the user.
+	// The schema that defines the content of the user. These schemas can be
+	// created using the `/schemas` endpoint. A default schema is provided.
+	// This schema can be retrieved using the same endpoint. The schema will
+	// be used to validate the user's properties.
 	Schema          string `json:"$schema"`
 	AdditionalProps UserAdditional
 }
