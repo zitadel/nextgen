@@ -31,6 +31,13 @@ func NewFlowCreateUserHandler(ids idgen.Generator, users flowUserWriter, passwor
 
 var _ FlowOnSuccessHandler = (*FlowCreateUserHandler)(nil)
 
+// EstablishedKinds reports the credential kinds create_user owns:
+// the identifier (made unique on creation) and the password (hashed
+// and persisted).
+func (h *FlowCreateUserHandler) EstablishedKinds() []FlowFieldChallenge {
+	return []FlowFieldChallenge{FlowFieldChallengeIdentifier, FlowFieldChallengePassword}
+}
+
 func (h *FlowCreateUserHandler) Handle(ctx context.Context, client database.QueryExecutor, in FlowOnSuccessInput) (FlowOnSuccessResult, error) {
 	identifierName, _, ok := findIdentifierField(in.Resolved.Fields, in.Fields)
 	if !ok {

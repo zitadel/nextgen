@@ -14,6 +14,13 @@ import (
 // in their own file (e.g. flow_on_success_create_user.go).
 type FlowOnSuccessHandler interface {
 	Handle(ctx context.Context, client database.QueryExecutor, in FlowOnSuccessInput) (FlowOnSuccessResult, error)
+	// EstablishedKinds reports the credential kinds this mutation
+	// establishes when it runs. The dispatch loop unions the manifests
+	// of every on_success handler reachable upstream from the current
+	// step to decide whether a collected credential should be verified
+	// (kind absent — verify) or skipped (kind present — the mutation
+	// owns it).
+	EstablishedKinds() []FlowFieldChallenge
 }
 
 // FlowOnSuccessInput is the per-call context the state machine threads

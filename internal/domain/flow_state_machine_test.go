@@ -254,8 +254,13 @@ func TestFlowStateMachine_Process_RegistrationHappyPath(t *testing.T) {
 
 	assert.Equal(t, wantUserID, result.State.CollectedData[domain.FlowCollectedUserIDKey])
 
-	assert.Empty(t, w.attempts.identifyCalls, "create_user must not dispatch identifier challenge")
-	assert.Empty(t, w.attempts.passwordCalls, "create_user must not dispatch password challenge")
+	// Register mode dispatches identifier (the email is x-unique, so it
+	// always routes through auth-attempt to emit user_already_exists when
+	// the name is taken). It must not dispatch password — create_user
+	// establishes the credential per its manifest.
+	require.Len(t, w.attempts.identifyCalls, 1)
+	assert.Equal(t, "alice@example.com", w.attempts.identifyCalls[0].Value)
+	assert.Empty(t, w.attempts.passwordCalls, "register mode skips password dispatch")
 }
 
 func TestFlowStateMachine_Process_LoginHappyPath(t *testing.T) {
