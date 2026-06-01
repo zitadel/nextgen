@@ -26,7 +26,8 @@ describe("platform client", () => {
   it("getProject returns the created project", async () => {
     const client = createPlatformClient(MOCK_SERVER_URL);
     const created = await client.createProject({ preview_origins: [] });
-    const fetched = await client.getProject(created.project_id);
+    const authedClient = createPlatformClient(MOCK_SERVER_URL, created.project_secret);
+    const fetched = await authedClient.getProject(created.project_id);
     expect(fetched.project_id).toBe(created.project_id);
     expect(fetched.lifecycle).toBe("unclaimed");
     expect(fetched.created_at).toBeTruthy();

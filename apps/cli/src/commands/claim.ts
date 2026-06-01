@@ -1,5 +1,5 @@
 import type { CliIO, GlobalOptions } from "../io/output";
-import { ok } from "../io/output";
+import { ok, skipped } from "../io/output";
 import { ZitadelError } from "../lib/errors";
 import { createPlatformClient } from "../platform";
 import { readZitadelSecret, writeZitadelSecret } from "./shared";
@@ -12,6 +12,22 @@ export type ClaimOptions = GlobalOptions & {
 
 export async function runClaim(io: CliIO, opts: ClaimOptions): Promise<void> {
   const secret = await readZitadelSecret(opts.cwd);
+  if (opts.dryRun) {
+    const action = opts.challengeId ? "poll_claim_status" : "init_claim";
+    skipped(
+      io,
+      "dry run: claim flow not started and .zitadel/secret unchanged",
+      opts,
+      {
+        project_id: secret.project_id,
+        challenge_id: opts.challengeId,
+        action,
+      },
+      opts.challengeId ? [`zitadel claim --challenge-id ${opts.challengeId}`] : ["zitadel claim"],
+    );
+    return;
+  }
+
   const client = createPlatformClient(opts.source, secret.project_secret);
 
   if (opts.challengeId) {

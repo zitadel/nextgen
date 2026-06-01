@@ -225,6 +225,13 @@ function readBearer(request: Request): string | undefined {
   return authorization.toLowerCase().startsWith("bearer ") ? authorization.slice(7) : undefined;
 }
 
+function projectSecretAuthError(request: Request, project: ProjectRecord): Response | undefined {
+  if (readBearer(request) === project.project_secret) return undefined;
+  return HttpResponse.json(errorBody("auth.unauthorized", "missing or invalid credentials"), {
+    status: 401,
+  });
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -276,11 +283,13 @@ export function setupPlatformHandlers() {
       return HttpResponse.json(createProjectResponse(project), { status: 201 });
     }),
 
-    http.get("*/projects/:id", ({ params }) => {
+    http.get("*/projects/:id", ({ params, request }) => {
       const project = store.projects.get(params.id as string);
       if (!project) {
         return HttpResponse.json(errorBody("proj.not_found", "resource not found"), { status: 404 });
       }
+      const authError = projectSecretAuthError(request, project);
+      if (authError) return authError;
       return HttpResponse.json(getProjectResponse(project));
     }),
 
@@ -289,6 +298,8 @@ export function setupPlatformHandlers() {
       if (!project) {
         return HttpResponse.json(errorBody("proj.not_found", "resource not found"), { status: 404 });
       }
+      const authError = projectSecretAuthError(request, project);
+      if (authError) return authError;
       const environment = new URL(request.url).searchParams.get("environment") ?? "development";
       if (
         (environment === "preview" || environment === "production") &&
@@ -316,6 +327,8 @@ export function setupPlatformHandlers() {
       if (!project) {
         return HttpResponse.json(errorBody("proj.not_found", "resource not found"), { status: 404 });
       }
+      const authError = projectSecretAuthError(request, project);
+      if (authError) return authError;
       if (project.lifecycle === "claimed") {
         return HttpResponse.json(errorBody("proj.already_claimed", "project is already claimed"), {
           status: 409,
@@ -406,6 +419,11 @@ export function setupPlatformHandlers() {
       if (!challenge || challenge.project_id !== project.project_id) {
         return HttpResponse.json(errorBody("proj.claim_not_found", "claim challenge not found"), {
           status: 404,
+        });
+      }
+      if (readBearer(request) !== challenge.initiating_secret) {
+        return HttpResponse.json(errorBody("auth.unauthorized", "missing or invalid credentials"), {
+          status: 401,
         });
       }
       if (challenge.status === "pending" && Date.parse(challenge.expires_at) < Date.now()) {

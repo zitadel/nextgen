@@ -27,7 +27,7 @@ func (h *Handler) CreateProject(ctx context.Context, req *api.CreateProjectReque
 }
 
 func (h *Handler) GetProject(ctx context.Context, params api.GetProjectParams) (api.GetProjectRes, error) {
-	project, err := h.projectService.Get(ctx, string(params.ProjectID))
+	project, err := h.getProjectForBearer(ctx, string(params.ProjectID))
 	if err != nil {
 		return h.NewError(ctx, err), nil
 	}
@@ -35,7 +35,12 @@ func (h *Handler) GetProject(ctx context.Context, params api.GetProjectParams) (
 }
 
 func (h *Handler) ApplyProjectConfig(ctx context.Context, _ api.OptApplyProjectConfigReq, params api.ApplyProjectConfigParams) (api.ApplyProjectConfigRes, error) {
-	applied, err := h.projectService.ApplyConfig(ctx, string(params.ProjectID), service.ProjectEnvironment(params.Environment))
+	scopeCtx, _ := GetScopeContext(ctx)
+	applied, err := h.projectService.ApplyConfig(ctx, service.ApplyProjectConfigInput{
+		ProjectID:     string(params.ProjectID),
+		ProjectSecret: scopeCtx.ProjectSecret,
+		Environment:   service.ProjectEnvironment(params.Environment),
+	})
 	if err != nil {
 		return h.NewError(ctx, err), nil
 	}
@@ -129,6 +134,18 @@ func (h *Handler) GetProjectClaimStatus(ctx context.Context, params api.GetProje
 		resp.RotatedProjectSecret = api.NewOptString(status.RotatedProjectSecret)
 	}
 	return resp, nil
+}
+
+func (h *Handler) getProjectForBearer(ctx context.Context, projectID string) (*domain.Project, error) {
+	project, err := h.projectService.Get(ctx, projectID)
+	if err != nil {
+		return nil, err
+	}
+	scopeCtx, ok := GetScopeContext(ctx)
+	if !ok || scopeCtx.ProjectSecret != project.ProjectSecret {
+		return nil, domain.ErrAuthUnauthorized(nil)
+	}
+	return project, nil
 }
 
 func getProjectResponse(project *domain.Project) *api.GetProjectResponse {

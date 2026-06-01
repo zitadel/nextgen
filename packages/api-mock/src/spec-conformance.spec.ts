@@ -140,8 +140,13 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       headers: { "content-type": "application/json" },
       body: JSON.stringify({}),
     });
-    const { project_id } = (await create.json()) as { project_id: string };
-    const res = await fetch(`${BASE}/projects/${project_id}`);
+    const { project_id, project_secret } = (await create.json()) as {
+      project_id: string;
+      project_secret: string;
+    };
+    const res = await fetch(`${BASE}/projects/${project_id}`, {
+      headers: { authorization: `Bearer ${project_secret}` },
+    });
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(() => GetProjectResponse.parse(body)).not.toThrow();

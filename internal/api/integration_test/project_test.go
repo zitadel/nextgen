@@ -176,6 +176,36 @@ func TestGetProject(t *testing.T) {
 		assert.NotEmpty(t, got["updated_at"])
 	})
 
+	t.Run("unauthorized — token for another project", func(t *testing.T) {
+		resp, err := http.Post(ts.URL+"/projects", "application/json", bytes.NewReader([]byte("{}")))
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		require.Equal(t, http.StatusCreated, resp.StatusCode)
+
+		var first map[string]any
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&first))
+		id := first["project_id"].(string)
+
+		resp, err = http.Post(ts.URL+"/projects", "application/json", bytes.NewReader([]byte("{}")))
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		require.Equal(t, http.StatusCreated, resp.StatusCode)
+
+		var second map[string]any
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&second))
+
+		req, err := http.NewRequest(http.MethodGet, ts.URL+"/projects/"+id, nil)
+		require.NoError(t, err)
+		req.Header.Set("Authorization", "Bearer "+second["project_secret"].(string))
+
+		client := &http.Client{}
+		getResp, err := client.Do(req)
+		require.NoError(t, err)
+		defer getResp.Body.Close()
+
+		assert.Equal(t, http.StatusUnauthorized, getResp.StatusCode)
+	})
+
 	t.Run("not found", func(t *testing.T) {
 		req, err := http.NewRequest(http.MethodGet, ts.URL+"/projects/proj_doesnotexist", nil)
 		require.NoError(t, err)
@@ -252,6 +282,15 @@ func TestProjectClaimFlow(t *testing.T) {
 	require.NoError(t, err)
 	defer rejected.Body.Close()
 	assert.Equal(t, http.StatusConflict, rejected.StatusCode)
+
+	req, err = http.NewRequest(http.MethodPatch, ts.URL+"/projects/"+projectID+"/config?environment=development", bytes.NewReader([]byte("{}")))
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "Bearer sk_proj_wrong")
+	req.Header.Set("Content-Type", "application/json")
+	unauthorized, err := client.Do(req)
+	require.NoError(t, err)
+	defer unauthorized.Body.Close()
+	assert.Equal(t, http.StatusUnauthorized, unauthorized.StatusCode)
 
 	req, err = http.NewRequest(http.MethodPost, ts.URL+"/projects/"+projectID+"/claim/init", bytes.NewReader([]byte("{}")))
 	require.NoError(t, err)

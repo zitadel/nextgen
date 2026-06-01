@@ -27,7 +27,7 @@ type ProjectService interface {
 	// Returns [database.NoRowFoundError] when no project with the given ID exists.
 	Get(ctx context.Context, id string) (*domain.Project, error)
 
-	ApplyConfig(ctx context.Context, projectID string, environment ProjectEnvironment) (*ProjectConfigApplyResult, error)
+	ApplyConfig(ctx context.Context, input ApplyProjectConfigInput) (*ProjectConfigApplyResult, error)
 	InitClaim(ctx context.Context, input InitProjectClaimInput) (*ProjectClaimChallenge, error)
 	CompleteClaim(ctx context.Context, input CompleteProjectClaimInput) (*domain.Project, error)
 	GetClaimStatus(ctx context.Context, input GetProjectClaimStatusInput) (*ProjectClaimStatus, error)
@@ -42,7 +42,8 @@ func NewProjectService(pool database.Pool, repo domain.ProjectRepository, ids id
 		now:                  func() time.Time { return time.Now().UTC() },
 		claimBaseURL:         "https://zitadel.cloud/claim",
 		claimChallengeTTL:    10 * time.Minute,
-		idempotentProjectIDs: make(map[string]idempotentProjectCreate),
+		idempotencyTTL:       24 * time.Hour,
+		idempotentProjectIDs: make(map[string]*idempotentProjectCreate),
 		claimChallenges:      make(map[string]*ProjectClaimChallenge),
 	}
 }
@@ -54,9 +55,10 @@ type projectService struct {
 	now               func() time.Time
 	claimBaseURL      string
 	claimChallengeTTL time.Duration
+	idempotencyTTL    time.Duration
 
 	mu                   sync.Mutex
-	idempotentProjectIDs map[string]idempotentProjectCreate
+	idempotentProjectIDs map[string]*idempotentProjectCreate
 	claimChallenges      map[string]*ProjectClaimChallenge
 }
 
@@ -74,6 +76,12 @@ type ProjectConfigApplyResult struct {
 	Project     *domain.Project
 	Environment ProjectEnvironment
 	AppliedAt   time.Time
+}
+
+type ApplyProjectConfigInput struct {
+	ProjectID     string
+	ProjectSecret string
+	Environment   ProjectEnvironment
 }
 
 type InitProjectClaimInput struct {
@@ -127,6 +135,9 @@ type ProjectClaimStatus struct {
 type idempotentProjectCreate struct {
 	requestHash string
 	projectID   string
+	expiresAt   time.Time
+	done        chan struct{}
+	err         error
 }
 
 func (s *projectService) Create(ctx context.Context, previewOrigins []string) (*domain.Project, error) {
@@ -138,27 +149,45 @@ func (s *projectService) CreateWithIdempotency(ctx context.Context, previewOrigi
 		return s.create(ctx, previewOrigins)
 	}
 	requestHash := projectCreateHash(previewOrigins)
+	now := s.now()
 	s.mu.Lock()
+	s.cleanupTransientStateLocked(now)
 	if existing, ok := s.idempotentProjectIDs[idempotencyKey]; ok {
-		s.mu.Unlock()
 		if existing.requestHash != requestHash {
+			s.mu.Unlock()
 			return nil, domain.ErrProjectIdempotencyConflict()
 		}
-		return s.Get(ctx, existing.projectID)
+		done := existing.done
+		s.mu.Unlock()
+		select {
+		case <-done:
+			if existing.err != nil {
+				return nil, existing.err
+			}
+			return s.Get(ctx, existing.projectID)
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
 	}
+	entry := &idempotentProjectCreate{
+		requestHash: requestHash,
+		expiresAt:   now.Add(s.idempotencyTTL),
+		done:        make(chan struct{}),
+	}
+	s.idempotentProjectIDs[idempotencyKey] = entry
 	s.mu.Unlock()
 
 	project, err := s.create(ctx, previewOrigins)
-	if err != nil {
-		return nil, err
-	}
 	s.mu.Lock()
-	s.idempotentProjectIDs[idempotencyKey] = idempotentProjectCreate{
-		requestHash: requestHash,
-		projectID:   project.ID,
+	if err != nil {
+		delete(s.idempotentProjectIDs, idempotencyKey)
+		entry.err = err
+	} else {
+		entry.projectID = project.ID
 	}
+	close(entry.done)
 	s.mu.Unlock()
-	return project, nil
+	return project, err
 }
 
 func (s *projectService) create(ctx context.Context, previewOrigins []string) (*domain.Project, error) {
@@ -196,20 +225,23 @@ func (s *projectService) Get(ctx context.Context, id string) (*domain.Project, e
 	return s.get(ctx, id)
 }
 
-func (s *projectService) ApplyConfig(ctx context.Context, projectID string, environment ProjectEnvironment) (*ProjectConfigApplyResult, error) {
-	project, err := s.get(ctx, projectID)
+func (s *projectService) ApplyConfig(ctx context.Context, input ApplyProjectConfigInput) (*ProjectConfigApplyResult, error) {
+	project, err := s.get(ctx, input.ProjectID)
 	if err != nil {
 		return nil, err
 	}
-	if requiresClaim(environment) && project.Lifecycle != domain.ProjectLifecycleClaimed {
+	if project.ProjectSecret != input.ProjectSecret {
+		return nil, domain.ErrAuthUnauthorized(nil)
+	}
+	if requiresClaim(input.Environment) && project.Lifecycle != domain.ProjectLifecycleClaimed {
 		return nil, domain.ErrProjectClaimRequired().WithDetails(map[string]string{
-			"project_id":  projectID,
-			"environment": string(environment),
+			"project_id":  input.ProjectID,
+			"environment": string(input.Environment),
 		})
 	}
 	return &ProjectConfigApplyResult{
 		Project:     project,
-		Environment: environment,
+		Environment: input.Environment,
 		AppliedAt:   s.now(),
 	}, nil
 }
@@ -239,6 +271,7 @@ func (s *projectService) InitClaim(ctx context.Context, input InitProjectClaimIn
 		InitiatingSecret: input.ProjectSecret,
 	}
 	s.mu.Lock()
+	s.cleanupTransientStateLocked(s.now())
 	s.claimChallenges[challengeID] = challenge
 	s.mu.Unlock()
 	return challenge, nil
@@ -293,6 +326,7 @@ func (s *projectService) CompleteClaim(ctx context.Context, input CompleteProjec
 
 func (s *projectService) GetClaimStatus(ctx context.Context, input GetProjectClaimStatusInput) (*ProjectClaimStatus, error) {
 	s.mu.Lock()
+	s.cleanupTransientStateLocked(s.now())
 	challenge, ok := s.claimChallenges[input.ChallengeID]
 	if !ok || challenge.ProjectID != input.ProjectID {
 		s.mu.Unlock()
@@ -302,6 +336,10 @@ func (s *projectService) GetClaimStatus(ctx context.Context, input GetProjectCla
 		s.mu.Unlock()
 		return nil, domain.ErrProjectClaimExpired()
 	}
+	if input.ProjectSecret != challenge.InitiatingSecret {
+		s.mu.Unlock()
+		return nil, domain.ErrAuthUnauthorized(nil)
+	}
 	status := &ProjectClaimStatus{
 		ProjectID:   challenge.ProjectID,
 		ChallengeID: challenge.ChallengeID,
@@ -310,10 +348,6 @@ func (s *projectService) GetClaimStatus(ctx context.Context, input GetProjectCla
 		ClaimedAt:   challenge.ClaimedAt,
 	}
 	if challenge.Status == ProjectClaimStatusCompleted {
-		if input.ProjectSecret != challenge.InitiatingSecret {
-			s.mu.Unlock()
-			return nil, domain.ErrAuthUnauthorized(nil)
-		}
 		if challenge.RotatedSecretConsumed {
 			s.mu.Unlock()
 			return nil, domain.ErrProjectSecretConsumed()
@@ -323,6 +357,24 @@ func (s *projectService) GetClaimStatus(ctx context.Context, input GetProjectCla
 	}
 	s.mu.Unlock()
 	return status, nil
+}
+
+func (s *projectService) cleanupTransientStateLocked(now time.Time) {
+	for key, entry := range s.idempotentProjectIDs {
+		if !now.After(entry.expiresAt) {
+			continue
+		}
+		select {
+		case <-entry.done:
+			delete(s.idempotentProjectIDs, key)
+		default:
+		}
+	}
+	for key, challenge := range s.claimChallenges {
+		if now.After(challenge.ExpiresAt.Add(s.claimChallengeTTL)) {
+			delete(s.claimChallenges, key)
+		}
+	}
 }
 
 func requiresClaim(environment ProjectEnvironment) bool {
