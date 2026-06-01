@@ -108,8 +108,7 @@ export function createNextgenMiddleware(
   options: NextgenMiddlewareOptions = {},
 ): EventHandler {
   const {
-    url = process.env.ZITADEL_URL ??
-      'http://localhost:8080',
+    url = process.env.ZITADEL_URL ?? 'http://localhost:8080',
     proxyPath = '/__nextgen',
     protectedRoutes = [],
     ignoredRoutes = [],

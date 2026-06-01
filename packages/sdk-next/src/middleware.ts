@@ -78,8 +78,7 @@ export async function nextgenMiddleware(
   options: NextgenMiddlewareOptions = {},
 ): Promise<NextResponse | Response> {
   const {
-    url = process.env.ZITADEL_URL ??
-      'http://localhost:8080',
+    url = process.env.ZITADEL_URL ?? 'http://localhost:8080',
     proxyPath = '/__nextgen',
     protectedRoutes = [],
     ignoredRoutes = [],

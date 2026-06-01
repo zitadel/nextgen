@@ -14,9 +14,7 @@ export default defineNuxtModule<NextgenMiddlewareOptions>({
     configKey: 'nextgen',
   },
   defaults: {
-    url:
-      process.env.ZITADEL_URL ??
-      'http://localhost:8080',
+    url: process.env.ZITADEL_URL ?? 'http://localhost:8080',
     proxyPath: '/__nextgen',
     protectedRoutes: [],
     loginPath: '/login',
