@@ -54,6 +54,14 @@ type fakeAuthAttempts struct {
 	passwordErrs     map[string]error
 	handoffOutput    domain.FlowHandoffOutput
 	handoffErr       error
+
+	// passkey
+	issueCalls    []domain.FlowIssuePasskeyChallengeInput
+	issueOut      domain.FlowPasskeyChallengeOutput
+	issueErr      error
+	passkeyCalls  []domain.FlowSubmitPasskeyInput
+	passkeyUserID string
+	passkeyErr    error
 }
 
 func (f *fakeAuthAttempts) Start(_ context.Context, in domain.FlowCreateAttemptInput) (string, error) {
@@ -83,6 +91,16 @@ func (f *fakeAuthAttempts) SubmitPassword(_ context.Context, in domain.FlowSubmi
 func (f *fakeAuthAttempts) Handoff(_ context.Context, in domain.FlowHandoffInput) (domain.FlowHandoffOutput, error) {
 	f.handoffCalls = append(f.handoffCalls, in)
 	return f.handoffOutput, f.handoffErr
+}
+
+func (f *fakeAuthAttempts) IssuePasskeyChallenge(_ context.Context, in domain.FlowIssuePasskeyChallengeInput) (domain.FlowPasskeyChallengeOutput, error) {
+	f.issueCalls = append(f.issueCalls, in)
+	return f.issueOut, f.issueErr
+}
+
+func (f *fakeAuthAttempts) SubmitPasskey(_ context.Context, in domain.FlowSubmitPasskeyInput) (string, error) {
+	f.passkeyCalls = append(f.passkeyCalls, in)
+	return f.passkeyUserID, f.passkeyErr
 }
 
 // flowTestWorld is the wiring a flow test exercises: resolver +
@@ -451,4 +469,108 @@ func TestFlowStateMachine_Process_SSOSubmissionUnsupported(t *testing.T) {
 		SSOProvider: &domain.FlowSSOProviderRef{ID: "google"},
 	})
 	require.ErrorIs(t, err, domain.ErrUnsupported)
+}
+
+// passkeyLoginDefinition builds a single-step passkey login: an
+// `authenticate` step offering the `passkey` action, transitioning to the
+// `done` terminal once the assertion verifies.
+func passkeyLoginDefinition() *domain.FlowDefinition {
+	show := domain.FlowStepCompleteShow
+	return &domain.FlowDefinition{
+		ProjectID:  testProjectID,
+		ID:         "def-passkey",
+		UserSchema: defaultSchemaURL,
+		Purposes: map[domain.FlowDefinitionPurpose]string{
+			domain.FlowDefinitionPurposeLogin: "authenticate",
+		},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name: "authenticate",
+				Actions: map[string]domain.FlowStepAction{
+					domain.FlowActionPasskey: {Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					domain.FlowActionPasskey: {Target: "done"},
+				},
+			},
+			{Name: "done", Complete: &show},
+		},
+	}
+}
+
+func TestFlowStateMachine_Process_PasskeyIssueThenVerify(t *testing.T) {
+	w := newFlowTestWorld(t)
+	w.attempts.issueOut = domain.FlowPasskeyChallengeOutput{ChallengeID: "ch-1", Options: []byte(`{"publicKey":{}}`)}
+	w.attempts.passkeyUserID = "user_alice"
+	def := passkeyLoginDefinition()
+
+	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	// Issue leg: selecting the passkey action mints a challenge and halts on the
+	// same step, surfacing the ceremony options.
+	issued, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+		Action:    domain.FlowActionPasskey,
+		PasskeyRP: &domain.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, issued.Step.Challenge)
+	assert.Equal(t, "ch-1", issued.Step.Challenge.ChallengeID)
+	assert.Equal(t, domain.FlowChallengeMethodPasskey, issued.Step.Challenge.Method)
+	assert.Equal(t, []byte(`{"publicKey":{}}`), issued.Step.Challenge.Options)
+	require.NotNil(t, issued.State.PendingChallenge)
+	assert.Equal(t, "authenticate", issued.State.CurrentStep)
+	require.Len(t, w.attempts.issueCalls, 1)
+	assert.Equal(t, "example.com", w.attempts.issueCalls[0].RPID)
+
+	// Verify leg: the signed assertion clears the challenge and advances.
+	verified, err := w.sm.Process(t.Context(), nil, def, issued.State, domain.FlowSubmitInput{
+		Action:            domain.FlowActionPasskey,
+		ChallengeResponse: &domain.FlowChallengeResponse{ChallengeID: "ch-1", Method: "passkey", Proof: []byte(`{"id":"x"}`)},
+	})
+	require.NoError(t, err)
+	assert.Nil(t, verified.State.PendingChallenge)
+	require.Len(t, w.attempts.passkeyCalls, 1)
+	assert.Equal(t, "ch-1", w.attempts.passkeyCalls[0].ChallengeID)
+	assert.Equal(t, []byte(`{"id":"x"}`), w.attempts.passkeyCalls[0].Assertion)
+	require.NotNil(t, verified.Step.Complete)
+	assert.Equal(t, "handoff_01TEST", verified.HandoffToken)
+	assert.Equal(t, "user_alice", verified.State.CollectedData[domain.FlowCollectedUserIDKey])
+}
+
+func TestFlowStateMachine_Process_PasskeyProofRejectedKeepsStep(t *testing.T) {
+	w := newFlowTestWorld(t)
+	w.attempts.issueOut = domain.FlowPasskeyChallengeOutput{ChallengeID: "ch-1", Options: []byte(`{"publicKey":{}}`)}
+	w.attempts.passkeyErr = domain.ErrAuthAttemptProofRejected(nil)
+	def := passkeyLoginDefinition()
+
+	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	issued, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+		Action:    domain.FlowActionPasskey,
+		PasskeyRP: &domain.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, issued.State.PendingChallenge)
+
+	rejected, err := w.sm.Process(t.Context(), nil, def, issued.State, domain.FlowSubmitInput{
+		Action:            domain.FlowActionPasskey,
+		ChallengeResponse: &domain.FlowChallengeResponse{ChallengeID: "ch-1", Proof: []byte(`{}`)},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, rejected.Step.Error)
+	assert.Equal(t, "auth_attempt.passkey_invalid", *rejected.Step.Error)
+	assert.Nil(t, rejected.State.PendingChallenge)
+	assert.Equal(t, "authenticate", rejected.State.CurrentStep)
 }
