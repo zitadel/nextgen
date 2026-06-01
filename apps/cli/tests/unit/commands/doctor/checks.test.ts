@@ -287,6 +287,5 @@ describe("loadPatchContext", () => {
     expect(ctx.project.id).toBe("proj-001");
     expect(ctx.issuer).toBe("http://localhost:3000");
     expect(ctx.userFields).toEqual(["email"]);
-    expect(ctx.authMethod).toBe("passkey");
   });
 });

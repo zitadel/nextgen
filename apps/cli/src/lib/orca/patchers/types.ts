@@ -1,7 +1,7 @@
+import type { CreateSchemaBody } from "@zitadel-nextgen/api/generated/model";
+
 import type { FrameworkFacts } from "../detectors/types";
 import type { CreateProjectResponse } from "../../api/client";
-import type { AuthMethod } from "../../flows";
-import type { UserSchema } from "../../user-schema";
 
 /**
  * The minimal, project-independent view a patcher needs to enumerate the files
@@ -24,8 +24,7 @@ export type PatchContext = PatchView &
     project: CreateProjectResponse;
     issuer: string;
     userFields: ReadonlyArray<string>;
-    authMethod: AuthMethod;
-    userSchema: UserSchema;
+    userSchema: CreateSchemaBody;
     server: string;
   }>;
 

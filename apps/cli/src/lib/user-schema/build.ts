@@ -26,32 +26,21 @@ export const DEFAULT_USER_META_SCHEMA =
   "https://nextgen.com/api/schemas/user-schema.json";
 
 /**
- * Build the default human-user schema for the chosen auth method and
- * fields. Pure: returns a freshly-allocated object in authored key
- * order; callers that persist it canonicalize at the write boundary via
+ * Build the default human-user schema. The CLI scaffolds a single
+ * password-only schema today: `x-auth-methods.password` is enabled, the
+ * `password` property carries `x-credential: "password"` so the flow
+ * engine knows how to verify it, and the caller-supplied fields are
+ * collected on the register-profile step.
+ *
+ * Pure: returns a freshly-allocated object in authored key order;
+ * callers that persist it canonicalize at the write boundary via
  * `stableStringify`, exactly as flow files do.
  *
- * The resulting `x-auth-methods` map carries exactly one entry, the
- * method the CLI prompt selected. Each field resolves through
- * {@link fieldPreset}.
- *
- * @param method - The auth method to enable (e.g. `"passkey"`). Becomes
- *   the sole key of `x-auth-methods`.
- * @param fields - Property names to include, in display order.
+ * @param fields - Property names to include, in display order. The
+ *   `password` property is appended automatically.
  */
-export function buildUserSchema(
-  method: string,
-  fields: ReadonlyArray<string>,
-): UserSchemaBody {
-  /*
-   * The password credential is a property on the user schema, not a
-   * flow concept. The engine resolves credential verification by
-   * walking the user schema for `x-credential: "password"`, so the
-   * `credential` step's `fields: ["password"]` only works if this
-   * property is present here. `passkey` flows use `x-credential:
-   * "passkey"` on a non-secret property and need no extra entry.
-   */
-  const allFields = method === "password" ? [...fields, "password"] : [...fields];
+export function buildUserSchema(fields: ReadonlyArray<string>): UserSchemaBody {
+  const allFields = [...fields, "password"];
 
   const properties: Record<string, Record<string, unknown>> = {};
   for (const field of allFields) {
@@ -65,7 +54,7 @@ export function buildUserSchema(
     metaSchema: DEFAULT_USER_META_SCHEMA,
     type: "object",
     title: "Human User",
-    "x-auth-methods": { [method]: { enabled: true, position: 0 } },
+    "x-auth-methods": { password: { enabled: true, position: 0 } },
     required: [...allFields].sort(),
     properties,
   } as UserSchemaBody;

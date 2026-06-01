@@ -1,4 +1,3 @@
-import type { AuthMethod } from "../../../lib/flows";
 import type { FrameworkFacts } from "../../../lib/orca";
 
 /**
@@ -12,7 +11,6 @@ import type { FrameworkFacts } from "../../../lib/orca";
  * value, otherwise prompt and write).
  */
 export type SetupAnswers = {
-  authMethod: AuthMethod | undefined;
   server: string;
   devPort: number;
 };

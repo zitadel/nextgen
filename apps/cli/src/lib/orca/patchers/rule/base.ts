@@ -96,7 +96,7 @@ export abstract class AbstractRulePatcher implements Patcher {
       {
         kind: "write",
         path: ".zitadel/flows/default.json",
-        contents: `${stableStringify(buildFlow(ctx.authMethod, ctx.userFields))}\n`,
+        contents: `${stableStringify(buildFlow(ctx.userFields))}\n`,
       },
       {
         kind: "merge-env",

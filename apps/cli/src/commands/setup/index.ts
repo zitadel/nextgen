@@ -3,7 +3,6 @@ import { intro, outro, spinner } from "@clack/prompts";
 
 import { BaseCommand, type JsonEnvelope } from "../../lib/oclif";
 import { ZitadelError } from "../../lib/errors";
-import { AUTH_METHODS, isAuthMethod, type AuthMethod } from "../../lib/flows";
 import { createOrca, issuerFromPort, type FrameworkFacts, type Orca } from "../../lib/orca";
 import type { PatchContext } from "../../lib/orca/patchers/types";
 import { RENDERER_IDS } from "../../lib/orca/patchers/rule/next/renderers/registry";
@@ -42,13 +41,9 @@ const FRAMEWORK_OPTIONS = createOrca()
  */
 export default class Setup extends BaseCommand {
   static override description = "Create a Zitadel project and scaffold local auth.";
-  static override examples = ["<%= config.bin %> setup --framework next --auth-method passkey"];
+  static override examples = ["<%= config.bin %> setup --framework next"];
   static override flags = {
     framework: Flags.string({ description: "Framework to target.", options: FRAMEWORK_OPTIONS }),
-    "auth-method": Flags.string({
-      description: "Auth method (default: passkey).",
-      options: [...AUTH_METHODS],
-    }),
     renderer: Flags.string({ description: "Renderer (default: react).", options: [...RENDERER_IDS] }),
     "no-apply": Flags.boolean({ description: "Skip the automatic apply at the end of setup." }),
   };
@@ -85,7 +80,6 @@ export default class Setup extends BaseCommand {
     }
 
     let answers: SetupAnswers = {
-      authMethod: isAuthMethod(flags["auth-method"]) ? flags["auth-method"] : undefined,
       server: this.meta.source,
       devPort: framework.devPort,
     };
@@ -100,8 +94,7 @@ export default class Setup extends BaseCommand {
 
     const issuer = issuerFromPort(answers.devPort);
     const userFields = [...DEFAULT_USER_FIELDS];
-    const resolvedMethod: AuthMethod = answers.authMethod ?? "passkey";
-    const userSchema = buildUserSchema(resolvedMethod, userFields);
+    const userSchema = buildUserSchema(userFields);
     const schemaValidation = CreateSchemaBody.safeParse(userSchema);
     if (!schemaValidation.success) {
       throw new ZitadelError("E_VALIDATION", "Generated user schema is invalid", {
@@ -122,7 +115,6 @@ export default class Setup extends BaseCommand {
       project,
       issuer,
       userFields,
-      authMethod: resolvedMethod,
       userSchema,
       server: answers.server,
     };

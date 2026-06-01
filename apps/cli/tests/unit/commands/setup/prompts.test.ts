@@ -31,7 +31,6 @@ import { confirm, isCancel, select, text } from "@clack/prompts";
 import { listListeningPorts, probeUrls } from "../../../../src/lib/prober";
 
 import {
-  AuthMethodPrompt,
   DevPortPrompt,
   FrameworkConfirmPrompt,
   PickFrameworkPrompt,
@@ -48,7 +47,7 @@ const FRAMEWORK = {
 };
 
 function baseAnswers(over: Partial<SetupAnswers> = {}): SetupAnswers {
-  return { authMethod: undefined, server: "https://api.zitadel.cloud", devPort: 3000, ...over };
+  return { server: "https://api.zitadel.cloud", devPort: 3000, ...over };
 }
 
 const ctx: PromptContext = { framework: FRAMEWORK };
@@ -102,24 +101,6 @@ describe("FrameworkConfirmPrompt", () => {
     await expect(new FrameworkConfirmPrompt().ask(baseAnswers(), ctx)).rejects.toMatchObject({
       code: "E_VALIDATION",
     });
-  });
-});
-
-describe("AuthMethodPrompt", () => {
-  it("skips the prompt when answers.authMethod is already set", async () => {
-    const out = await new AuthMethodPrompt().ask(baseAnswers({ authMethod: "password" }), ctx);
-
-    expect(out.authMethod).toBe("password");
-    expect(select).not.toHaveBeenCalled();
-  });
-
-  it("asks and writes the chosen method when undefined", async () => {
-    vi.mocked(select).mockResolvedValueOnce("passkey" as never);
-
-    const out = await new AuthMethodPrompt().ask(baseAnswers(), ctx);
-
-    expect(out.authMethod).toBe("passkey");
-    expect(select).toHaveBeenCalledOnce();
   });
 });
 

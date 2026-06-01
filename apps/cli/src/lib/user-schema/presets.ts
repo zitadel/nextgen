@@ -41,15 +41,17 @@ const FIELD_PRESETS: Record<string, Record<string, unknown>> = {
   },
   /**
    * The password credential property. The platform identifies password
-   * properties by the `x-credential: "password"` annotation; a flow's
-   * credential step references this property by name in its `fields`
-   * array, and the engine derives the credential-verify behaviour from
-   * the annotation rather than from the step.
+   * properties by `x-password: true` (see
+   * `internal/domain/flow_field_resolver_schema.go`): combined with the
+   * schema-level `x-auth-methods.password.enabled = true`, the engine
+   * classifies the field as a password challenge and the
+   * `create_user` `on_success` handler uses its value to set the
+   * initial password.
    */
   password: {
     type: "string",
     title: "Password",
-    "x-credential": "password",
+    "x-password": true,
     "x-sensitive": true,
     "x-editable": true,
     minLength: 1,

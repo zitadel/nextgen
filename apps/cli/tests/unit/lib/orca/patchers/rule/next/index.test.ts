@@ -19,8 +19,7 @@ function ctxFor(appDir: "app" | "src/app"): PatchContext {
     },
     issuer: "http://localhost:3000",
     userFields: ["email", "given_name"],
-    authMethod: "password",
-    userSchema: buildUserSchema("password", ["email", "given_name"]),
+    userSchema: buildUserSchema(["email", "given_name"]),
     server: "https://api.zitadel.cloud",
   };
 }
