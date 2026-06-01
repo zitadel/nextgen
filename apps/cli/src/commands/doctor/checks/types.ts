@@ -24,6 +24,8 @@ export type CheckContext = {
  * that failed.
  */
 export interface SanityCheck {
+  /** Stable identifier surfaced in logs and the JSON envelope. */
+  readonly name: string;
   run(ctx: CheckContext): Promise<CheckOutcome>;
   /** Repair what this check verifies. A no-op when there is no safe auto-fix. */
   fix(ctx: CheckContext): Promise<void>;

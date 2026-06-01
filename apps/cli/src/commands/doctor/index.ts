@@ -34,7 +34,7 @@ export default class Doctor extends BaseCommand {
     if (flags.fix) {
       const before = await Promise.all(SANITY_CHECKS.map((check) => check.run(ctx)));
       for (const [index, check] of SANITY_CHECKS.entries()) {
-        if (before[index].status !== "fail") {
+        if (before[index]?.status !== "fail") {
           continue;
         }
         try {

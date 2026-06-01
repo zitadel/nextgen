@@ -53,7 +53,8 @@ describe("NextPatcher.plan", () => {
   it("password flow's credential step references the password property", () => {
     const plan = new NextPatcher().plan(ctxFor("app"));
     const flowJson = writeContents(plan, ".zitadel/flows/default.json");
-    const flow = JSON.parse(flowJson) as {
+    expect(flowJson).toBeDefined();
+    const flow = JSON.parse(flowJson ?? "{}") as {
       steps: ReadonlyArray<{ name: string; fields: ReadonlyArray<string> }>;
     };
     const credential = flow.steps.find((step) => step.name === "credential");

@@ -52,7 +52,7 @@ import {
   UpdateFlowDefinitionResponse,
 } from "@zitadel-nextgen/api/generated/endpoints/zitadelNextGen.zod";
 import { http, HttpResponse } from "msw";
-import type { ZodIssue, ZodType } from "zod";
+import type { z } from "zod";
 
 function shortId(): string {
   return randomUUID().replaceAll("-", "").slice(0, 12);
@@ -102,11 +102,11 @@ const INVALID_JSON = errorBody("invalid_json", "request body must be valid JSON"
  * circuit cleanly. One pattern, used uniformly for path params, query
  * params, request bodies, and responses-on-the-way-out.
  */
-function parse<T>(
-  schema: ZodType<T>,
+function parse<S extends z.ZodTypeAny>(
+  schema: S,
   value: unknown,
   code: string,
-): { ok: true; data: T } | { ok: false; response: HttpResponse } {
+): { ok: true; data: z.output<S> } | { ok: false; response: HttpResponse<ErrorBody> } {
   const result = schema.safeParse(value);
   if (result.success) {
     return { ok: true, data: result.data };
@@ -115,7 +115,7 @@ function parse<T>(
     ok: false,
     response: HttpResponse.json(
       errorBody(code, "request does not conform to spec", {
-        issues: result.error.issues as ZodIssue[],
+        issues: result.error.issues,
       }),
       { status: 400 },
     ),

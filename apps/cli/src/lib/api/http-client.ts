@@ -77,11 +77,11 @@ export class HttpPlatformClient implements PlatformClient {
   }
 
   async createSchema(data: CreateSchemaBody, projectId: string): Promise<{ id: string }> {
-    return this.request("POST", withQuery(getCreateSchemaUrl(), { project_id: projectId }), data);
+    return this.request("POST", getCreateSchemaUrl({ project_id: projectId }), data);
   }
 
   async getSchema(id: string, projectId: string): Promise<CreateSchemaBody> {
-    return this.request("GET", withQuery(getGetSchemaByIdUrl(id), { project_id: projectId }));
+    return this.request("GET", getGetSchemaByIdUrl(id, { project_id: projectId }));
   }
 
   /**
@@ -89,7 +89,7 @@ export class HttpPlatformClient implements PlatformClient {
    * is the same as get-by-id, so we reuse that URL with the DELETE verb.
    */
   async deleteSchema(id: string, projectId: string): Promise<void> {
-    return this.request("DELETE", withQuery(getGetSchemaByIdUrl(id), { project_id: projectId }));
+    return this.request("DELETE", getGetSchemaByIdUrl(id, { project_id: projectId }));
   }
 
   async createFlowDefinition(req: CreateFlowDefinitionRequest): Promise<{ id: string }> {
@@ -144,19 +144,4 @@ async function safeJson(response: Response): Promise<unknown> {
   } catch {
     return undefined;
   }
-}
-
-/**
- * Appends query parameters to a URL the generated builders emit. The orval
- * client we consume does not include `parameters:` block entries in the
- * builders themselves — for spec-required query strings like
- * `project_id` on `/schemas`, this helper is what stops the request from
- * reaching the platform without them.
- */
-function withQuery(url: string, params: Record<string, string>): string {
-  const u = new URL(url);
-  for (const [key, value] of Object.entries(params)) {
-    u.searchParams.set(key, value);
-  }
-  return u.toString();
 }

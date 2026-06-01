@@ -5,7 +5,7 @@ import { isAuthMethod } from "../../lib/flows";
 import { isObject } from "../../lib/json";
 import { issuerFromPort, type FrameworkFacts, type Orca } from "../../lib/orca";
 import type { PatchContext } from "../../lib/orca/patchers/types";
-import type { UserSchema } from "../../lib/user-schema";
+import type { CreateSchemaBody } from "@zitadel-nextgen/api/generated/model";
 import { readDevelopmentIssuer, readRendererId, readZitadelConfig, readZitadelSecret } from "../../lib/project";
 
 /**
@@ -40,7 +40,7 @@ export async function loadPatchContext(cwd: string, orca: Orca): Promise<PatchCo
     },
     userFields: Object.keys(properties),
     authMethod: isAuthMethod(recordedMethod) ? recordedMethod : "passkey",
-    userSchema: raw as UserSchema,
+    userSchema: raw as CreateSchemaBody,
   };
 }
 
