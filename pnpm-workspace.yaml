@@ -15,7 +15,16 @@ catalog:
   "@nx/react": ^22.7.0
   "@nx/vite": ^22.7.0
   "@nx/vitest": ^22.7.0
-  "@playwright/test": ^1.59.1
+  '@oclif/core': ^4.11.4
+  '@oclif/plugin-autocomplete': ^3.2.50
+  '@oclif/plugin-commands': ^4.1.55
+  '@oclif/plugin-help': ^6.2.49
+  '@oclif/plugin-not-found': ^3.2.86
+  '@oclif/plugin-search': ^1.2.50
+  '@oclif/plugin-version': ^2.2.46
+  '@oclif/plugin-which': ^3.2.55
+  oclif: ^4.17.46
+  "@playwright/test": ^1.60.0
   "@tailwindcss/vite": ^4.2.4
   "@tanstack/devtools-vite": ^0.6.0
   "@tanstack/eslint-plugin-router": ^1.161.6
@@ -27,20 +36,22 @@ catalog:
   "@testing-library/jest-dom": ^6.9.1
   "@testing-library/react": ^16.3.2
   "@testing-library/user-event": ^14.6.1
+  "@tsdown/css": ^0.21.10
   "@types/express": ^4.17.21
   "@types/node": ^25.6.0
   "@types/react": ^19.2.14
   "@types/react-dom": ^19.2.3
   "@typescript/native-preview": 7.0.0-dev.20260421.2
   "@vitejs/plugin-react": ^6.0.1
-  "@vitest/browser": ^4.1.5
-  "@vitest/browser-playwright": ^4.1.5
+  "@vitest/browser": ^4.1.7
+  "@vitest/browser-playwright": ^4.1.7
   ajv: ^8.20.0
   dompurify: ^3.2.6
   eslint-plugin-playwright: ^2.10.2
   express: ^4.18.2
   jsdom: ^29.0.2
-  liquidjs: ^10.25.7
+  lightningcss: ^1.30.1
+  liquidjs: ^10.26.0
   lit: ^3.3.2
   lucide: ^1.16.0
   lucide-react: ^1.16.0
@@ -49,21 +60,20 @@ catalog:
   orval: ^8.10.0
   oxfmt: ^0.46.0
   oxlint: ^1.61.0
-  playwright: ^1.59.1
+  playwright: ^1.60.0
   react: ^19.2.5
   react-dom: ^19.2.5
+  safe-stable-stringify: ^2.5.0
   sharp: ^0.34.5
   tailwindcss: ^4.2.4
   ts-lit-plugin: ^2.0.2
-  "@tsdown/css": ^0.21.10
-  lightningcss: ^1.30.1
   tsdown: ^0.21.10
   tslib: ^2.8.1
   tsx: ^4.21.0
   typescript: ^6.0.3
-  vite: ^8.0.9
+  vite: ^8.0.14
   vite-plugin-web-components-hmr: ^0.1.3
-  vitest: ^4.1.5
+  vitest: ^4.1.7
   vue-tsc: ^3.2.8
   xstate: ^5.31.1
   zod: ^4.3.6

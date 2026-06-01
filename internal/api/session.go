@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -32,8 +33,7 @@ func (h Handler) CreateSession(ctx context.Context, req *api.CreateSessionReques
 }
 
 func (h Handler) ExchangeHandoff(ctx context.Context, req *api.ExchangeRequest, params api.ExchangeHandoffParams) (api.ExchangeHandoffRes, error) {
-	scopeCtx, _ := GetScopeContext(ctx)
-	input, err := exchangeInputFromRequest(scopeCtx.ProjectID, req, params)
+	input, err := exchangeInputFromRequest(req, params)
 	if err != nil {
 		return nil, err
 	}
@@ -44,9 +44,9 @@ func (h Handler) ExchangeHandoff(ctx context.Context, req *api.ExchangeRequest, 
 	return sessionWithTokenToAPI(session, h.crypter)
 }
 
-func exchangeInputFromRequest(projectID string, req *api.ExchangeRequest, params api.ExchangeHandoffParams) (service.ExchangeInput, error) {
+func exchangeInputFromRequest(req *api.ExchangeRequest, params api.ExchangeHandoffParams) (service.ExchangeInput, error) {
 	input := service.ExchangeInput{
-		ProjectID:    projectID,
+		ProjectID:    string(params.ProjectID),
 		HandoffToken: req.HandoffToken,
 	}
 	if key, ok := params.IdempotencyKey.Get(); ok {
@@ -59,10 +59,8 @@ func exchangeInputFromRequest(projectID string, req *api.ExchangeRequest, params
 }
 
 func (h Handler) GetSession(ctx context.Context, params api.GetSessionParams) (api.GetSessionRes, error) {
-	scopeCtx, _ := GetScopeContext(ctx)
-
 	input := service.GetSessionInput{
-		ProjectID: scopeCtx.ProjectID,
+		ProjectID: string(params.ProjectID),
 		SessionID: string(params.SessionID),
 	}
 
@@ -94,10 +92,8 @@ func (h Handler) GetMySession(ctx context.Context, params api.GetMySessionParams
 }
 
 func (h Handler) ListSessions(ctx context.Context, params api.ListSessionsParams) (api.ListSessionsRes, error) {
-	scopeCtx, _ := GetScopeContext(ctx)
-
 	input := service.ListSessionInput{
-		ProjectID: scopeCtx.ProjectID,
+		ProjectID: string(params.ProjectID),
 		// TODO: handle params
 	}
 	sessions, err := h.sessionService.List(ctx, input)
@@ -108,10 +104,8 @@ func (h Handler) ListSessions(ctx context.Context, params api.ListSessionsParams
 }
 
 func (h Handler) RevokeSession(ctx context.Context, params api.RevokeSessionParams) (api.RevokeSessionRes, error) {
-	scopeCtx, _ := GetScopeContext(ctx)
-
 	input := service.DeleteSessionInput{
-		ProjectID: scopeCtx.ProjectID,
+		ProjectID: string(params.ProjectID),
 		SessionID: string(params.SessionID),
 	}
 
@@ -219,7 +213,15 @@ func userAgentToAPI(agent *domain.UserAgent) api.OptNilSessionResponseUserAgent 
 	}
 	info := make(map[string]jx.Raw)
 	for key, value := range agent.Info {
-		info[key] = jx.Raw(fmt.Sprintf("%v", value))
+		switch key {
+		case "fingerprint", "ip":
+			continue
+		}
+		raw, err := json.Marshal(value)
+		if err != nil {
+			raw = []byte("null")
+		}
+		info[key] = jx.Raw(raw)
 	}
 	return api.NewOptNilSessionResponseUserAgent(api.SessionResponseUserAgent{
 		Fingerprint:     api.NewOptString(agent.ID),
@@ -266,57 +268,6 @@ func sessionCookie(token string, maxAge int) string {
 	return fmt.Sprintf("%s=%s; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=%d", sessionCookieName, token, maxAge)
 }
 
-func factorToAPI(factor domain.AuthFactor) api.CompletedFactor {
-	resp := api.CompletedFactor{
-		Method:     checkTypeToAPI(factor.Type()),
-		VerifiedAt: factor.GetLastVerifiedAt(),
-		Payload:    factorPayloadToAPI(factor),
-	}
-	return resp
-}
-
-func factorPayloadToAPI(factor domain.AuthFactor) api.OptCompletedFactorPayload {
-	switch f := factor.(type) {
-	case *domain.AuthFactorUser:
-		return api.NewOptCompletedFactorPayload(api.CompletedFactorPayload{
-			Type: api.IdentifierFactorPayloadCompletedFactorPayload,
-			IdentifierFactorPayload: api.IdentifierFactorPayload{
-				UserID: api.UserID(f.UserID),
-			},
-		})
-	case *domain.AuthFactorPassword:
-		return api.NewOptCompletedFactorPayload(api.CompletedFactorPayload{
-			Type:                  api.PasswordFactorPayloadCompletedFactorPayload,
-			PasswordFactorPayload: api.PasswordFactorPayload{},
-		})
-	case *domain.AuthFactorPasskey:
-		return api.NewOptCompletedFactorPayload(api.CompletedFactorPayload{
-			Type: api.PasskeyFactorPayloadCompletedFactorPayload,
-			PasskeyFactorPayload: api.PasskeyFactorPayload{
-				CredentialID:            "",
-				UserVerified:            f.UserVerified,
-				BackupEligible:          api.OptBool{},
-				BackupState:             api.OptBool{},
-				AuthenticatorAttachment: api.OptPasskeyFactorPayloadAuthenticatorAttachment{},
-			},
-		})
-	}
-	return api.OptCompletedFactorPayload{}
-}
-
-func checkTypeToAPI(check domain.AuthCheckType) api.FactorMethod {
-	switch check {
-	case domain.AuthCheckTypeUser:
-		return api.FactorMethodIdentifier
-	case domain.AuthCheckTypePassword:
-		return api.FactorMethodPassword
-	case domain.AuthCheckTypePasskey:
-		return api.FactorMethodPasskey
-	default:
-		return ""
-	}
-}
-
 func sessionErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 	switch err.Code {
 	case domain.ErrSessionNotFound().Code:
@@ -328,6 +279,8 @@ func sessionErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
 	case domain.ErrSessionTokenInvalid().Code:
 		return errorResponseWithStatusCode(http.StatusUnauthorized, err)
+	case domain.ErrNotImplemented().Code:
+		return errorResponseWithStatusCode(http.StatusNotImplemented, err)
 	case domain.ErrSessionInvalidTTL().Code:
 		apiErr := &api.ErrorDetailsStatusCode{
 			StatusCode: http.StatusBadRequest,

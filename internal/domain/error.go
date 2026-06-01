@@ -77,6 +77,10 @@ func newError(code string, message string, details any, parent error) Error {
 	}
 }
 
+func ErrNotImplemented() Error {
+	return newError("not_implemented", "This feature is not implemented yet.", nil, nil)
+}
+
 // ErrInternal is the catch-all for unexpected errors that have no specific domain code.
 func ErrInternal(err error) Error {
 	return newError("internal", "An unexpected error occurred. Check the details for more information.", nil, err)

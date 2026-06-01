@@ -140,6 +140,9 @@ func loginDefinition() *domain.FlowDefinition {
 			{
 				Name:   "credentials",
 				Fields: []string{"email", "password"},
+				Actions: map[string]domain.FlowStepAction{
+					domain.FlowActionSubmit: {Primary: true},
+				},
 				Transitions: map[string]domain.FlowStepTransition{
 					domain.FlowActionSubmit:                {Target: "done"},
 					domain.FlowImplicitOutcomeUserNotFound: {Target: "not_found"},
@@ -175,6 +178,9 @@ func signupDefinition() *domain.FlowDefinition {
 				Name:      "credentials",
 				Fields:    []string{"email", "password"},
 				OnSuccess: &createUser,
+				Actions: map[string]domain.FlowStepAction{
+					domain.FlowActionSubmit: {Primary: true},
+				},
 				Transitions: map[string]domain.FlowStepTransition{
 					domain.FlowActionSubmit: {Target: "done"},
 				},
@@ -318,6 +324,8 @@ func TestFlowStateMachine_Process_LoginUserNotFound(t *testing.T) {
 	require.Equal(t, "not_found", result.Step.Name)
 
 	assert.Empty(t, w.attempts.passwordCalls, "password must not be submitted when identifier is unknown")
+	assert.Empty(t, w.attempts.handoffCalls, "handoff must not run for an informational terminal reached without an identity")
+	assert.Empty(t, result.HandoffToken, "informational terminal must not surface a handoff token")
 }
 
 func TestFlowStateMachine_Process_LoginInvalidPassword(t *testing.T) {
