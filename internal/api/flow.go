@@ -280,7 +280,41 @@ func toFlowField(f domain.FlowField) api.Field {
 	if f.Value != nil {
 		out.Value = jx.Raw(jsonQuoted(*f.Value))
 	}
+	if v := toFlowFieldValidation(f.Validation); v != nil {
+		out.Validation = api.NewOptFieldValidation(*v)
+	}
 	return out
+}
+
+// flowFieldValidationFormats maps the resolver's pass-through format
+// strings (sourced from the user meta-schema's `format` enum) to the
+// generated OpenAPI enum. Strings not in this map are dropped at the
+// mapper rather than violating the regenerated enum.
+var flowFieldValidationFormats = map[string]api.FieldValidationFormat{
+	"email":     api.FieldValidationFormatEmail,
+	"date-time": api.FieldValidationFormatDateTime,
+	"uuid":      api.FieldValidationFormatUUID,
+	"uri":       api.FieldValidationFormatURI,
+}
+
+func toFlowFieldValidation(v *domain.FlowFieldValidation) *api.FieldValidation {
+	if v == nil {
+		return nil
+	}
+	out := api.FieldValidation{}
+	if format, ok := flowFieldValidationFormats[v.Format]; ok {
+		out.Format = api.NewOptFieldValidationFormat(format)
+	}
+	if v.MinLength > 0 {
+		out.MinLength = api.NewOptInt(v.MinLength)
+	}
+	if v.MaxLength > 0 {
+		out.MaxLength = api.NewOptInt(v.MaxLength)
+	}
+	if !out.Format.Set && !out.MinLength.Set && !out.MaxLength.Set {
+		return nil
+	}
+	return &out
 }
 
 func toFlowStepActions(actions map[string]domain.FlowAction) api.FlowStepActions {
