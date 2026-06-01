@@ -104,4 +104,3 @@ func deleteUser(t *testing.T, client database.QueryExecutor, projectID, userID s
 	userRepo := repository.NewUserRepository()
 	require.NoError(t, userRepo.Delete(ctx, client, userRepo.PrimaryKeyCondition(projectID, userID)))
 }
-

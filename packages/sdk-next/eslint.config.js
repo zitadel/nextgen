@@ -46,7 +46,15 @@ export default tseslint.config(
     settings: {
       react: { version: 'detect' },
       'import/resolver': {
-        typescript: { alwaysTryTypes: true },
+        typescript: {
+          alwaysTryTypes: true,
+          conditionNames: [
+            '@zitadel-nextgen/source',
+            'types',
+            'import',
+            'default',
+          ],
+        },
         node: true,
       },
     },
