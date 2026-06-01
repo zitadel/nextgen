@@ -91,6 +91,24 @@ export function startMockServer(port: number): Server {
   app.get("/auth/keys", (_req: express.Request, res: express.Response) => {
     res.json({ keys: [JWK] });
   });
+  // Minimal OIDC discovery document — every real Zitadel server publishes
+  // one. The CLI's setup prompt uses this to auto-discover localhost OIDC
+  // servers (see lib/prober).
+  app.get(
+    "/.well-known/openid-configuration",
+    (_req: express.Request, res: express.Response) => {
+      res.json({
+        issuer: iss,
+        jwks_uri: `${iss}/.well-known/jwks.json`,
+        authorization_endpoint: `${iss}/auth`,
+        token_endpoint: `${iss}/auth/token`,
+        end_session_endpoint: `${iss}/auth/end-session`,
+        response_types_supported: ["code"],
+        subject_types_supported: ["public"],
+        id_token_signing_alg_values_supported: ["RS256"],
+      });
+    },
+  );
 
   const jsonBodyParser: express.RequestHandler = (req, res, next) => {
     express.json()(req, res, (err) => {
