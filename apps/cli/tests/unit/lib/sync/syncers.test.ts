@@ -4,7 +4,15 @@ import { FLOWS_DIR } from "../../../../src/lib/flows";
 import { SCHEMAS_DIR } from "../../../../src/lib/user-schema";
 import { makeSyncers } from "../../../../src/lib/sync/syncers";
 import { ZitadelError } from "../../../../src/lib/errors";
-import type { PlatformClient } from "../../../../src/lib/api/client";
+import type {
+  CreateFlowDefinitionRequest,
+  FlowDefinitionDetailResponse,
+  PlatformClient,
+} from "../../../../src/lib/api/client";
+import type {
+  CreateFlowDefinitionBodyFlowDefinition as FlowDefinition,
+  CreateSchemaBody as UserSchema,
+} from "@zitadel-nextgen/api/generated/model";
 
 /**
  * Build a literal fake PlatformClient. Each method records the args it
@@ -30,18 +38,18 @@ function makeFakeClient(): {
       record("getProject", [id]);
       return {} as never;
     },
-    async createSchema(data: object, projectId: string) {
+    async createSchema(data: UserSchema, projectId: string) {
       record("createSchema", [data, projectId]);
       return { id: "schema-id-1" };
     },
     async getSchema(id: string, projectId: string) {
       record("getSchema", [id, projectId]);
-      return { kind: "user-schema", version: 1 };
+      return { kind: "user-schema", version: 1 } as unknown as UserSchema;
     },
     async deleteSchema(id: string, projectId: string) {
       record("deleteSchema", [id, projectId]);
     },
-    async createFlowDefinition(req: object) {
+    async createFlowDefinition(req: CreateFlowDefinitionRequest) {
       record("createFlowDefinition", [req]);
       return { id: "flow-id-1" };
     },
@@ -56,9 +64,9 @@ function makeFakeClient(): {
         updated_at: "2026-01-02",
         name: "Default",
         version: 2,
-      };
+      } as unknown as FlowDefinitionDetailResponse;
     },
-    async updateFlowDefinition(id: string, data: object) {
+    async updateFlowDefinition(id: string, data: Partial<FlowDefinition>) {
       record("updateFlowDefinition", [id, data]);
     },
     async deleteFlowDefinition(id: string) {
@@ -97,10 +105,17 @@ describe("makeSyncers", () => {
 });
 
 describe("SchemaSyncer", () => {
-  it("validate accepts a structurally valid JSON Schema with the kind discriminator", () => {
+  it("validate accepts a user-schema body with the required spec fields", () => {
     const [schema] = makeSyncers({ projectId: "proj-1", env: {} });
 
-    expect(() => schema.validate({ kind: "user-schema", type: "object" })).not.toThrow();
+    expect(() =>
+      schema.validate({
+        kind: "user-schema",
+        metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
+        "x-auth-methods": { password: { enabled: true, position: 0 } },
+        properties: { email: { type: "string" } },
+      }),
+    ).not.toThrow();
   });
 
   it("validate throws E_VALIDATION on a malformed JSON Schema", () => {
@@ -158,10 +173,9 @@ const VALID_FLOW = {
   name: "default",
   user_schema:
     "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/human-user.yaml",
-  purposes: ["login"],
-  initial_steps: { login: "identifier" },
+  purposes: { login: "identifier" },
   steps: [
-    { name: "identifier", type: "identifier", fields: {}, actions: {}, gates: {}, transitions: {} },
+    { name: "identifier", fields: [], actions: {}, gates: {} },
   ],
 };
 
@@ -183,7 +197,13 @@ describe("FlowDefinitionSyncer", () => {
     steps: [
       {
         ...VALID_FLOW.steps[0],
-        gates: { captcha: { type: "captcha", config: { client_secret_env: "MY_SECRET" } } },
+        gates: {
+          captcha: {
+            kind: "captcha",
+            provider: "altcha",
+            config: { client_secret_env: "MY_SECRET" },
+          },
+        },
       },
     ],
   };

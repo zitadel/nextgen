@@ -3,25 +3,25 @@
  * module imports from here (not from individual files), the same
  * discipline as `lib/flows/`.
  *
- * **Layout mirrors `lib/flows/` file-for-file:** `schema.ts` is the
- * shape + vocabulary, `build.ts` is the builder (`buildUserSchema`,
- * paralleling `buildFlow`, same `(method, fields)` signature),
- * `validate.ts` holds validation, and `presets.ts` is the per-field
- * catalog the builder dispatches into — the counterpart of `flows`'
- * `methods.ts`. `presets.ts` is internal; only `build.ts` consumes it.
+ * **Source of truth.** The wire shape lives in
+ * `@zitadel-nextgen/api/generated/model` (orval-generated from the
+ * OpenAPI spec). Callers that need the type import `CreateSchemaBody`
+ * from there directly; callers that need the runtime validator import
+ * the matching Zod schema from
+ * `@zitadel-nextgen/api/generated/endpoints/zitadelNextGen.zod`. This
+ * module owns only CLI-specific concerns: the builder, the per-field
+ * preset catalog, and the two `DEFAULT_*` URI constants.
  *
- * **Dependency rule.** This module has no upward dependencies (it never
- * imports from `commands/`, `sync/`, `api/`, etc.) and no
- * filesystem code. Its only external dependency is `ajv` for
- * JSON-Schema validation. Reading and writing local files is the
- * caller's responsibility, served by `apps/cli/src/lib/json-dir.ts` plus
- * this module's {@link SCHEMAS_DIR} constant. The peer `lib/sync/`
- * orchestration module consumes {@link SCHEMAS_DIR} the same way it
- * consumes `lib/flows`' `FLOWS_DIR`.
+ * **Dependency rule.** No upward imports (`commands/`, `sync/`, etc.)
+ * and no filesystem I/O. Reading and writing local files is the
+ * caller's responsibility, served by `apps/cli/src/lib/json-dir.ts`
+ * plus this module's {@link SCHEMAS_DIR} constant.
  */
-export type { UserSchema } from "./schema";
-export { buildUserSchema } from "./build";
-export { validateJsonSchema, validateUserSchema } from "./validate";
+export {
+  DEFAULT_USER_META_SCHEMA,
+  DEFAULT_USER_SCHEMA_ID,
+  buildUserSchema,
+} from "./build";
 
 /**
  * Relative directory (from the project root) where local user-schema

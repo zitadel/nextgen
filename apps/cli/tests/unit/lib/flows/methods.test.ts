@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { flowDefinitionSchema } from "../../../../src/lib/flows";
+import { CreateFlowDefinitionBody } from "@zitadel-nextgen/api/generated/endpoints/zitadelNextGen.zod";
+
 import { buildPasskeyFlow, buildPasswordFlow } from "../../../../src/lib/flows/methods";
+
+/** The inner flow-definition shape from the generated envelope. */
+const flowDefinitionSchema = CreateFlowDefinitionBody.shape.flow_definition;
 
 describe("buildPasswordFlow", () => {
   it("emits a flow that round-trips through flowDefinitionSchema", () => {
@@ -10,15 +14,13 @@ describe("buildPasswordFlow", () => {
     expect(parsed.success, parsed.success ? "" : JSON.stringify(parsed.error.issues)).toBe(true);
   });
 
-  it("adds a password field and a forgot action on the credential step", () => {
+  it("references the password property on the credential step", () => {
     const flow = buildPasswordFlow(["email"]);
     const credential = flow.steps.find((step) => step.name === "credential");
-    expect(credential?.fields.password?.type).toBe("password");
-    expect(credential?.fields.password?.text_key).toBe("credential.field.password");
-    expect(credential?.actions.forgot?.text_key).toBe("credential.action.forgot");
-    expect(credential?.transitions).toMatchObject({
-      submit: "complete",
-      forgot: { pivot: "recovery" },
+    expect(credential?.fields).toEqual(["password"]);
+    expect(credential?.actions.submit?.primary).toBe(true);
+    expect(credential?.transitions).toEqual({
+      submit: { target: "complete" },
     });
   });
 
@@ -40,10 +42,10 @@ describe("buildPasskeyFlow", () => {
   it("emits a credential step with no fields and no forgot action", () => {
     const flow = buildPasskeyFlow(["email"]);
     const credential = flow.steps.find((step) => step.name === "credential");
-    expect(credential?.fields).toEqual({});
+    expect(credential?.fields).toEqual([]);
     expect(credential?.actions.forgot).toBeUndefined();
     expect(credential?.actions.submit?.primary).toBe(true);
-    expect(credential?.transitions).toEqual({ submit: "complete" });
+    expect(credential?.transitions).toEqual({ submit: { target: "complete" } });
   });
 
   it("returns a freshly allocated object on every call", () => {

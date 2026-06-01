@@ -39,6 +39,21 @@ const FIELD_PRESETS: Record<string, Record<string, unknown>> = {
     "x-sensitive": true,
     "x-editable": true,
   },
+  /**
+   * The password credential property. The platform identifies password
+   * properties by the `x-credential: "password"` annotation; a flow's
+   * credential step references this property by name in its `fields`
+   * array, and the engine derives the credential-verify behaviour from
+   * the annotation rather than from the step.
+   */
+  password: {
+    type: "string",
+    title: "Password",
+    "x-credential": "password",
+    "x-sensitive": true,
+    "x-editable": true,
+    minLength: 1,
+  },
 };
 
 /**

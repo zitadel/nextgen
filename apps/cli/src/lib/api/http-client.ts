@@ -28,8 +28,17 @@ import type {
 } from "@zitadel-nextgen/api/generated/model";
 import { setApiBaseUrl } from "@zitadel-nextgen/api/runtime/base-url";
 
+import type {
+  CreateFlowDefinitionBodyFlowDefinition,
+  CreateSchemaBody,
+} from "@zitadel-nextgen/api/generated/model";
+
 import { ZitadelError, type ZitadelErrorCode } from "../errors";
-import type { PlatformClient } from "./client";
+import type {
+  CreateFlowDefinitionRequest,
+  FlowDefinitionDetailResponse,
+  PlatformClient,
+} from "./client";
 
 /**
  * Maps an HTTP status to a {@link ZitadelErrorCode}:
@@ -67,11 +76,11 @@ export class HttpPlatformClient implements PlatformClient {
     return this.request("GET", getGetProjectUrl(projectId));
   }
 
-  async createSchema(data: object, projectId: string): Promise<{ id: string }> {
+  async createSchema(data: CreateSchemaBody, projectId: string): Promise<{ id: string }> {
     return this.request("POST", withQuery(getCreateSchemaUrl(), { project_id: projectId }), data);
   }
 
-  async getSchema(id: string, projectId: string): Promise<object> {
+  async getSchema(id: string, projectId: string): Promise<CreateSchemaBody> {
     return this.request("GET", withQuery(getGetSchemaByIdUrl(id), { project_id: projectId }));
   }
 
@@ -83,15 +92,18 @@ export class HttpPlatformClient implements PlatformClient {
     return this.request("DELETE", withQuery(getGetSchemaByIdUrl(id), { project_id: projectId }));
   }
 
-  async createFlowDefinition(req: object): Promise<{ id: string }> {
+  async createFlowDefinition(req: CreateFlowDefinitionRequest): Promise<{ id: string }> {
     return this.request("POST", getCreateFlowDefinitionUrl(), req);
   }
 
-  async getFlowDefinition(id: string): Promise<object> {
+  async getFlowDefinition(id: string): Promise<FlowDefinitionDetailResponse> {
     return this.request("GET", getGetFlowDefinitionUrl(id));
   }
 
-  async updateFlowDefinition(id: string, data: object): Promise<void> {
+  async updateFlowDefinition(
+    id: string,
+    data: Partial<CreateFlowDefinitionBodyFlowDefinition>,
+  ): Promise<void> {
     return this.request("PATCH", getUpdateFlowDefinitionUrl(id), data);
   }
 

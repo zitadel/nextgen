@@ -8,20 +8,24 @@ import { parseJson, runCliForTest } from "../../helpers/run-cli";
 
 const VALID_FLOW = {
   // Spec: `name` is a slug-pattern stable identifier; required fields are
-  // [name, user_schema, purposes, initial_steps, steps].
+  // [name, user_schema, purposes, steps]. `purposes` is a map from
+  // purpose name to entry-point step name.
   name: "default",
   user_schema:
     "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/human-user.yaml",
-  purposes: ["login"],
-  initial_steps: { login: "identifier" },
+  purposes: { login: "identifier" },
   steps: [
     {
       name: "identifier",
-      type: "identifier",
-      fields: {},
+      fields: [],
       actions: {},
-      gates: { captcha: { type: "captcha", config: { client_secret_env: "MY_SECRET" } } },
-      transitions: {},
+      gates: {
+        captcha: {
+          kind: "captcha",
+          provider: "altcha",
+          config: { client_secret_env: "MY_SECRET" },
+        },
+      },
     },
   ],
 };

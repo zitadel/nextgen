@@ -7,7 +7,10 @@ import { resetPlatformStore, setupPlatformHandlers } from "@zitadel-nextgen/api-
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import { flowDefinitionSchema } from "../../src/lib/flows";
+import { CreateFlowDefinitionBody } from "@zitadel-nextgen/api/generated/endpoints/zitadelNextGen.zod";
+
+/** The inner flow-definition shape; the envelope is `CreateFlowDefinitionBody`. */
+const flowDefinitionSchema = CreateFlowDefinitionBody.shape.flow_definition;
 import { runCliForTest } from "../helpers/run-cli";
 
 const MOCK_SERVER_URL = "http://mock.zitadel.test";
@@ -60,36 +63,25 @@ describe("flow definition schema", () => {
     if (!parsed.success) return;
 
     const flow = parsed.data;
-    // Spec: `name` is the slug-pattern stable identifier — there is no
-    // separate `slug` or `template_name`.
     expect(flow.name).toBe("default");
     expect(flow.user_schema).toMatch(/^https?:\/\//);
-    expect(flow.purposes).toContain("login");
-    expect(flow.purposes).toContain("register");
+    expect(Object.keys(flow.purposes)).toEqual(expect.arrayContaining(["login", "register"]));
+    expect(flow.purposes.login).toBe("identifier");
+    expect(flow.purposes.register).toBe("register-profile");
 
     const identifier = flow.steps.find((s) => s.name === "identifier");
     expect(identifier).toBeDefined();
     if (!identifier) return;
 
-    expect(Array.isArray(identifier.fields)).toBe(false);
-    expect(typeof identifier.fields).toBe("object");
-    const emailField = identifier.fields.email;
-    expect(emailField).toBeDefined();
-    if (!emailField) return;
-    expect(emailField.text_key).toBe("identifier.field.email");
+    // Spec: step.fields is a `string[]` of property names from the
+    // user schema (not a rich per-field config — that lives on the
+    // user schema itself).
+    expect(Array.isArray(identifier.fields)).toBe(true);
+    expect(identifier.fields).toContain("email");
+
     const submitAction = identifier.actions.submit;
     expect(submitAction).toBeDefined();
-    if (!submitAction) return;
-    expect(submitAction.primary).toBe(true);
-    expect(submitAction.text_key).toBe("identifier.action.submit");
-
-    for (const step of flow.steps) {
-      for (const [name, field] of Object.entries(step.fields)) {
-        expect(field.text_key, `field ${step.name}.${name} missing text_key`).toMatch(
-          /^[a-z][a-z0-9_.]+$/,
-        );
-      }
-    }
+    expect(submitAction?.primary).toBe(true);
   });
 
   it("emits a passkey-shaped credential step when --auth-method=passkey", async () => {
@@ -100,9 +92,9 @@ describe("flow definition schema", () => {
     expect(parsed.success, parsed.success ? "" : JSON.stringify(parsed.error.issues)).toBe(true);
     if (!parsed.success) return;
     const credential = parsed.data.steps.find((step) => step.name === "credential");
-    expect(credential?.fields).toEqual({});
+    expect(credential?.fields).toEqual([]);
     expect(credential?.actions.forgot).toBeUndefined();
-    expect(credential?.transitions).toEqual({ submit: "complete" });
+    expect(credential?.transitions).toEqual({ submit: { target: "complete" } });
 
     const userSchema = JSON.parse(
       await readFile(join(cwd, ".zitadel/schemas/user.json"), "utf8"),
@@ -118,8 +110,11 @@ describe("flow definition schema", () => {
     expect(parsed.success).toBe(true);
     if (!parsed.success) return;
     const credential = parsed.data.steps.find((step) => step.name === "credential");
-    expect(credential?.fields.password?.type).toBe("password");
-    expect(credential?.actions.forgot?.text_key).toBe("credential.action.forgot");
+    expect(credential?.fields).toEqual(["password"]);
+    expect(credential?.actions.submit?.primary).toBe(true);
+    expect(credential?.transitions).toEqual({
+      submit: { target: "complete" },
+    });
 
     const userSchema = JSON.parse(
       await readFile(join(cwd, ".zitadel/schemas/user.json"), "utf8"),
@@ -127,18 +122,16 @@ describe("flow definition schema", () => {
     expect(Object.keys(userSchema["x-auth-methods"])).toEqual(["password"]);
   });
 
-  it("rejects flow definitions with array-shaped fields (legacy)", () => {
+  it("rejects flow definitions with object-shaped fields (spec says fields is string[])", () => {
     const legacy = {
       name: "legacy",
       user_schema: "https://example.com/user.yaml",
-      purposes: ["login"],
-      initial_steps: { login: "identifier" },
+      purposes: { login: "identifier" },
       steps: [
         {
           name: "identifier",
-          type: "identifier",
-          fields: [{ name: "email", type: "email" }],
-          actions: [],
+          fields: { email: { type: "email" } },
+          actions: {},
         },
       ],
     };

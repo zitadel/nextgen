@@ -244,14 +244,14 @@ describe("renderPlan — nested structures", () => {
         kind: "create",
         path: ".zitadel/flows/default.json",
         syncer: flow,
-        content: { purposes: ["login", "register"] },
+        content: { team_ids: ["alpha", "beta"] },
         hash: "y",
       },
     ];
     const out = renderPlan(actions, false);
-    expect(out).toContain("+ purposes = [");
-    expect(out).toContain('+ "login",');
-    expect(out).toContain('+ "register",');
+    expect(out).toContain("+ team_ids = [");
+    expect(out).toContain('+ "alpha",');
+    expect(out).toContain('+ "beta",');
   });
 });
 

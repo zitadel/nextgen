@@ -1,12 +1,24 @@
+import type { CreateFlowDefinitionBodyFlowDefinition } from "@zitadel-nextgen/api/generated/model";
+import { CreateFlowDefinitionBody } from "@zitadel-nextgen/api/generated/endpoints/zitadelNextGen.zod";
+
 import { ZitadelError } from "../errors";
-import { type FlowDefinition, flowDefinitionSchema } from "./schema";
 
 /**
- * Validate raw JSON bodies against {@link flowDefinitionSchema} and
- * return the parsed shapes. Errors from every input are collected
- * and rethrown as a single `E_VALIDATION` `ZitadelError` so callers
- * see the full picture at once rather than failing on the first
- * malformed entry.
+ * The generated `CreateFlowDefinitionBody` Zod schema describes the
+ * full envelope (`{project_id, flow_definition, schema_uri?}`); the
+ * on-disk flow body is just the inner `flow_definition` shape. Pull
+ * that out via `.shape` so on-disk validation runs against exactly the
+ * same schema the wire request validates against.
+ */
+const flowDefinitionBodySchema = CreateFlowDefinitionBody.shape.flow_definition;
+
+/**
+ * Validate raw JSON bodies against the generated flow-definition Zod
+ * schema (the orval-emitted equivalent of
+ * `api/openapi/components/flows/flow-definition.yaml`). Errors from
+ * every input are collected and rethrown as a single `E_VALIDATION`
+ * `ZitadelError` so callers see the full picture at once rather than
+ * failing on the first malformed entry.
  *
  * Pure: does not touch the filesystem or network. The input array
  * is read-only; the returned array is freshly allocated.
@@ -16,16 +28,16 @@ import { type FlowDefinition, flowDefinitionSchema } from "./schema";
  */
 export function validateFlows(
   flows: ReadonlyArray<unknown>,
-): ReadonlyArray<FlowDefinition> {
+): ReadonlyArray<CreateFlowDefinitionBodyFlowDefinition> {
   const issues: Array<{ index: number; issues: unknown }> = [];
-  const parsed: FlowDefinition[] = [];
+  const parsed: CreateFlowDefinitionBodyFlowDefinition[] = [];
   for (let i = 0; i < flows.length; i += 1) {
-    const result = flowDefinitionSchema.safeParse(flows[i]);
+    const result = flowDefinitionBodySchema.safeParse(flows[i]);
     if (!result.success) {
       issues.push({ index: i, issues: result.error.issues });
       continue;
     }
-    parsed.push(result.data);
+    parsed.push(result.data as CreateFlowDefinitionBodyFlowDefinition);
   }
   if (issues.length > 0) {
     throw new ZitadelError("E_VALIDATION", "One or more flow definitions are invalid", {

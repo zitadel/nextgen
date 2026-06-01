@@ -1,17 +1,28 @@
+import type { CreateFlowDefinitionBodyFlowDefinition } from "@zitadel-nextgen/api/generated/model";
+
 import { buildPasskeyFlow, buildPasswordFlow } from "./methods";
-import type { AuthMethod, FlowDefinition } from "./schema";
+
+/**
+ * The authentication methods the CLI can scaffold for the MVP.
+ * Backend support today is limited to password and identifier
+ * challenges; passkey is accepted by the OAS spec via
+ * `x-credential: "passkey"` on a user-schema property but is not yet
+ * executed by the Go flow engine. Other spec-allowed values
+ * (`magic_link`, `sso`, `otp`) are deliberately omitted until they
+ * have a defined step shape.
+ */
+export type AuthMethod = "password" | "passkey";
 
 /**
  * Per-method builders, indexed by auth method. The `satisfies` clause
  * forces an exhaustive entry per {@link AuthMethod} so adding a new
- * member of the union without a builder fails to compile. Mirrors
- * `lib/user-schema`'s preset lookup in its `build.ts`.
+ * member of the union without a builder fails to compile.
  */
 const BUILDERS = {
   password: buildPasswordFlow,
   passkey: buildPasskeyFlow,
 } as const satisfies Readonly<
-  Record<AuthMethod, (fields: ReadonlyArray<string>) => FlowDefinition>
+  Record<AuthMethod, (fields: ReadonlyArray<string>) => CreateFlowDefinitionBodyFlowDefinition>
 >;
 
 /**
@@ -29,8 +40,7 @@ export function isAuthMethod(value: unknown): value is AuthMethod {
  * Build a flow_definition body for the chosen authentication method.
  * Pure: touches no filesystem or network. The returned object is newly
  * allocated; callers may retain references without risk of internal
- * mutation. The single entry point that constructs the resource,
- * paralleling `lib/user-schema`'s `buildUserSchema`.
+ * mutation.
  *
  * @param method - The auth method to scaffold. Must be a member of
  *   {@link AUTH_METHODS}; values outside this set are a type error.
@@ -40,6 +50,6 @@ export function isAuthMethod(value: unknown): value is AuthMethod {
 export function buildFlow(
   method: AuthMethod,
   fields: ReadonlyArray<string>,
-): FlowDefinition {
+): CreateFlowDefinitionBodyFlowDefinition {
   return BUILDERS[method](fields);
 }

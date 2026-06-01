@@ -16,9 +16,9 @@ const SECRET = {
 };
 
 const VALID_USER_SCHEMA = {
-  $schema: "https://json-schema.org/draft/2020-12/schema",
   kind: "user-schema",
-  type: "object",
+  metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
+  "x-auth-methods": { password: { enabled: true, position: 0 } },
   properties: { email: { type: "string" } },
 };
 
@@ -26,10 +26,9 @@ const VALID_FLOW = {
   name: "default",
   user_schema:
     "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/human-user.yaml",
-  purposes: ["login"],
-  initial_steps: { login: "identifier" },
+  purposes: { login: "identifier" },
   steps: [
-    { name: "identifier", type: "identifier", fields: {}, actions: {}, gates: {}, transitions: {} },
+    { name: "identifier", fields: [], actions: {}, gates: {} },
   ],
 };
 

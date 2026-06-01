@@ -1,6 +1,8 @@
 import type {
+  CreateFlowDefinitionBodyFlowDefinition,
   CreateProject201,
   CreateProjectBody,
+  CreateSchemaBody,
   GetProject200,
 } from "@zitadel-nextgen/api/generated/model";
 
@@ -14,10 +16,9 @@ export interface ProjectClient {
 }
 
 /**
- * Schema operations. The sync layer feeds opaque JSON bodies read from
- * `.zitadel/schemas/`, so request/response payloads stay `object` — the
- * generated `CreateSchemaBody` / `GetSchemaById200` shapes are
- * deliberately not imposed here (the sync layer is shape-agnostic).
+ * Schema operations. Request bodies are the spec's
+ * {@link CreateSchemaBody} discriminated union (`user-schema` or
+ * `schema-url`), pulled directly from `@zitadel-nextgen/api`.
  *
  * Every method takes `projectId` as a required argument: the platform's
  * `/schemas` endpoints declare `project_id` as a required query
@@ -29,20 +30,51 @@ export interface ProjectClient {
  * by-id URL with the DELETE method.
  */
 export interface SchemaClient {
-  createSchema(data: object, projectId: string): Promise<{ id: string }>;
-  getSchema(id: string, projectId: string): Promise<object>;
+  createSchema(data: CreateSchemaBody, projectId: string): Promise<{ id: string }>;
+  getSchema(id: string, projectId: string): Promise<CreateSchemaBody>;
   deleteSchema(id: string, projectId: string): Promise<void>;
 }
 
 /**
- * Flow-definition operations. Like schemas, bodies are opaque `object`
- * payloads supplied by the sync layer (the create envelope
- * `{ project_id, flow_definition }` is assembled by the syncer).
+ * Envelope POSTed to `/flow_definitions`, per
+ * `api/openapi/components/flows/flow-definition-create-request.yaml`.
+ * The CLI's syncer wraps the bare on-disk flow body in this shape
+ * before sending.
+ */
+export type CreateFlowDefinitionRequest = {
+  project_id: string;
+  flow_definition: CreateFlowDefinitionBodyFlowDefinition;
+  schema_uri?: string;
+};
+
+/**
+ * Detail envelope returned by `GET /flow_definitions/:id` and
+ * `POST /flow_definitions`, per
+ * `api/openapi/components/flows/flow-definition-detail-response.yaml`:
+ * wrapper fields plus the bare flow body merged in.
+ */
+export type FlowDefinitionDetailResponse = CreateFlowDefinitionBodyFlowDefinition & {
+  id: string;
+  project_id: string;
+  schema_uri: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+};
+
+/**
+ * Flow-definition operations. The create envelope is the spec's
+ * {@link CreateFlowDefinitionRequest}; the PATCH body is a partial of
+ * the same flow shape (per `flow-definition-update-request.yaml`,
+ * which permits any subset of the flow's mutable fields).
  */
 export interface FlowDefinitionClient {
-  createFlowDefinition(req: object): Promise<{ id: string }>;
-  getFlowDefinition(id: string): Promise<object>;
-  updateFlowDefinition(id: string, data: object): Promise<void>;
+  createFlowDefinition(req: CreateFlowDefinitionRequest): Promise<{ id: string }>;
+  getFlowDefinition(id: string): Promise<FlowDefinitionDetailResponse>;
+  updateFlowDefinition(
+    id: string,
+    data: Partial<CreateFlowDefinitionBodyFlowDefinition>,
+  ): Promise<void>;
   deleteFlowDefinition(id: string): Promise<void>;
 }
 

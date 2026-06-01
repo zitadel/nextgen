@@ -50,9 +50,14 @@ describe("NextPatcher.plan", () => {
     expect(writeContents(plan, "src/app/login/page.tsx")).toContain(MANAGED_MARKER);
   });
 
-  it("password flow carries a password credential field", () => {
+  it("password flow's credential step references the password property", () => {
     const plan = new NextPatcher().plan(ctxFor("app"));
-    expect(writeContents(plan, ".zitadel/flows/default.json")).toContain("credential.field.password");
+    const flowJson = writeContents(plan, ".zitadel/flows/default.json");
+    const flow = JSON.parse(flowJson) as {
+      steps: ReadonlyArray<{ name: string; fields: ReadonlyArray<string> }>;
+    };
+    const credential = flow.steps.find((step) => step.name === "credential");
+    expect(credential?.fields).toEqual(["password"]);
   });
 });
 

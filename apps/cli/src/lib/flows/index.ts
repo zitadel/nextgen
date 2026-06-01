@@ -3,29 +3,24 @@
  * imports from here (not from individual files) so the package
  * boundary stays observable.
  *
- * **Layout mirrors `lib/user-schema/` file-for-file:** `schema.ts` is
- * the shape + vocabulary, `build.ts` is the builder (`buildFlow`,
- * paralleling `buildUserSchema`, same `(method, fields)` signature),
- * `validate.ts` holds validation, and `methods.ts` is the per-method
- * catalog the builder dispatches into — the counterpart of
- * `user-schema`'s `presets.ts`. `methods.ts` is internal; only
- * `build.ts` consumes it.
+ * **Source of truth.** The wire shape lives in
+ * `@zitadel-nextgen/api/generated/model` (orval-generated from the
+ * OpenAPI spec). Callers that need the type import
+ * `CreateFlowDefinitionBodyFlowDefinition` from there directly;
+ * callers that need the runtime validator import
+ * `CreateFlowDefinitionBody` from
+ * `@zitadel-nextgen/api/generated/endpoints/zitadelNextGen.zod`. This
+ * module owns only CLI-specific concerns: the builder catalog, the
+ * `AuthMethod` enum, env-var reference scanning, and the file-level
+ * `validateFlows` helper that surfaces `E_VALIDATION` errors against
+ * the generated Zod.
  *
- * **Dependency rule.** This module has no upward dependencies (it
- * never imports from `commands/`, `sync/`, `api/`, etc.) and no
- * filesystem code. It depends sideways only on shared utilities under
- * `apps/cli/src/lib/` — today `lib/errors` (`ZitadelError`). Reading
- * and writing local files is the caller's responsibility, served by
- * `apps/cli/src/lib/json-dir.ts` plus this module's {@link FLOWS_DIR}
- * constant and {@link validateFlows} parser. The peer `lib/sync/`
- * orchestration module consumes {@link FLOWS_DIR} the same way.
- * Future domain modules (`lib/user-schema/`, ...) follow the same
- * rule: sideways onto `lib/<utility>/` is fine; upward into app code
- * is not.
+ * **Dependency rule.** No upward imports (`commands/`, `sync/`, etc.)
+ * and no filesystem I/O. It depends sideways only on shared utilities
+ * under `apps/cli/src/lib/` — today `lib/errors` (`ZitadelError`).
  */
-export type { AuthMethod, FlowDefinition } from "./schema";
-export { flowDefinitionSchema } from "./schema";
 export { AUTH_METHODS, buildFlow, isAuthMethod } from "./build";
+export type { AuthMethod } from "./build";
 export { validateFlows } from "./validate";
 export { flowEnvRefs } from "./env-refs";
 

@@ -4,6 +4,29 @@ import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { createPlatformClient } from "../../../../src/lib/api";
+import type {
+  CreateFlowDefinitionBodyFlowDefinition as FlowDefinition,
+  CreateSchemaBody as UserSchema,
+} from "@zitadel-nextgen/api/generated/model";
+
+/**
+ * Minimal-but-spec-valid bodies the wire-round-trip tests post. The mock
+ * validates every request against the generated Zod, so these need
+ * every required field (`metaSchema`, `x-auth-methods` for schemas;
+ * `user_schema`, `steps` for flow definitions).
+ */
+const VALID_USER_SCHEMA: UserSchema = {
+  kind: "user-schema",
+  metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
+  "x-auth-methods": { password: { enabled: true, position: 0 } },
+};
+
+const VALID_FLOW_DEFINITION: FlowDefinition = {
+  name: "default",
+  user_schema: "https://example.com/user.yaml",
+  purposes: { login: "identifier" },
+  steps: [{ name: "identifier", fields: [], actions: {}, gates: {} }],
+};
 
 const MOCK_SERVER_URL = "http://mock.zitadel.test";
 const server = setupServer(...setupPlatformHandlers());
@@ -33,28 +56,23 @@ describe("platform client", () => {
 
   it("createSchema and deleteSchema round-trip", async () => {
     const client = createPlatformClient(MOCK_SERVER_URL);
-    // Spec: POST /schemas requires the `kind` discriminator
-    // (`oneOf [user-schema, schema-url]`) and the `project_id` query param.
-    const { id } = await client.createSchema(
-      { kind: "user-schema", type: "object" },
-      "proj_test",
-    );
+    const { id } = await client.createSchema(VALID_USER_SCHEMA, "proj_test");
     expect(id).toBeTruthy();
     await expect(client.deleteSchema(id, "proj_test")).resolves.toBeUndefined();
   });
 
   it("createSchema rejects bodies missing the kind discriminator", async () => {
     const client = createPlatformClient(MOCK_SERVER_URL);
-    await expect(client.createSchema({ type: "object" }, "proj_test")).rejects.toThrow(/400/);
+    await expect(
+      client.createSchema({ type: "object" } as unknown as UserSchema, "proj_test"),
+    ).rejects.toThrow(/400/);
   });
 
   it("createSchema rejects when the project_id query is missing (mirrors real backend)", async () => {
     const client = createPlatformClient(MOCK_SERVER_URL);
-    // Passing the empty string forces the mock's project_id check to trip,
-    // matching the real backend's required-query-param contract.
-    await expect(
-      client.createSchema({ kind: "user-schema", type: "object" }, ""),
-    ).rejects.toThrow(/400/);
+    // Passing the empty string forces the mock's query-param check to
+    // trip, matching the real backend's required-query-param contract.
+    await expect(client.createSchema(VALID_USER_SCHEMA, "")).rejects.toThrow(/400/);
   });
 
   it("createSchema sends project_id as a query parameter on the URL", async () => {
@@ -66,7 +84,7 @@ describe("platform client", () => {
       }),
     );
     const client = createPlatformClient(MOCK_SERVER_URL);
-    await client.createSchema({ kind: "user-schema", type: "object" }, "proj_query_check");
+    await client.createSchema(VALID_USER_SCHEMA, "proj_query_check");
     expect(new URL(observedUrl).searchParams.get("project_id")).toBe("proj_query_check");
   });
 
@@ -74,14 +92,14 @@ describe("platform client", () => {
     const client = createPlatformClient(MOCK_SERVER_URL);
     const { id } = await client.createFlowDefinition({
       project_id: "proj_test",
-      flow_definition: { name: "default", purposes: ["login"] },
+      flow_definition: VALID_FLOW_DEFINITION,
     });
     expect(id).toBeTruthy();
     // PATCH now returns 200 + flow-definition-detail-response per the spec
     // (was 204). The CLI client's typed return is `Promise<void>` and
     // discards the body, but the runtime value is the parsed envelope.
     await expect(
-      client.updateFlowDefinition(id, { name: "default", purposes: ["login", "register"] }),
+      client.updateFlowDefinition(id, { name: "default" }),
     ).resolves.toMatchObject({ id, project_id: "proj_test", status: "active" });
     await expect(client.deleteFlowDefinition(id)).resolves.toBeUndefined();
   });
@@ -114,7 +132,7 @@ describe("platform client", () => {
     const client = createPlatformClient(MOCK_SERVER_URL);
     const { id } = await client.createFlowDefinition({
       project_id: "proj_test",
-      flow_definition: { name: "default" },
+      flow_definition: VALID_FLOW_DEFINITION,
     });
 
     const flow = await client.getFlowDefinition(id);

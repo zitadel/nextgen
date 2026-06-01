@@ -1,4 +1,6 @@
-import type { FlowDefinition } from "./schema";
+import type { CreateFlowDefinitionBodyFlowDefinition } from "@zitadel-nextgen/api/generated/model";
+
+type FlowDefinition = CreateFlowDefinitionBodyFlowDefinition;
 
 /**
  * Per-method flow builders, the flow domain's catalog. Mirrors
@@ -6,6 +8,14 @@ import type { FlowDefinition } from "./schema";
  * `build.ts` entry point dispatches into. Each builder is pure and
  * returns a freshly-allocated {@link FlowDefinition} so callers may
  * retain references without risk of internal mutation.
+ *
+ * The shapes here match `api/openapi/components/flows/flow-definition.yaml`
+ * exactly — no CLI-side extensions. The spec is intentionally lean:
+ * steps reference user-schema properties by name (`fields: string[]`),
+ * actions are just `{ primary?, text_key? }`, transitions are
+ * `{ target, action? }` where `action ∈ {null, "switch", "pivot"}`.
+ * Display text is resolved client-side from a locale dictionary at
+ * runtime; the engine does not see it.
  */
 
 /**
@@ -21,11 +31,9 @@ const USER_SCHEMA_URI =
  * Build the password-authentication flow.
  *
  * Scaffolds the four canonical steps a login + register journey needs
- * (identifier, credential, register_profile, complete) with a
+ * (identifier, credential, register-profile, complete) with a
  * `password` field on the credential step and a `forgot` action that
- * pivots into the recovery purpose. Display text is resolved
- * client-side from the rendering layer; the flow only carries
- * `text_key` references.
+ * pivots into the recovery purpose.
  *
  * @param fields - User-schema property names to collect on the
  *   register step, in display order (e.g. `["email", "given_name"]`).
@@ -34,52 +42,37 @@ export function buildPasswordFlow(fields: ReadonlyArray<string>): FlowDefinition
   return {
     name: "default",
     user_schema: USER_SCHEMA_URI,
-    purposes: ["login", "register"],
-    initial_steps: {
+    purposes: {
       login: "identifier",
-      register: "register_profile",
+      register: "register-profile",
     },
     steps: [
       {
         name: "identifier",
-        type: "identifier",
-        texts: { title_key: "identifier.title" },
-        fields: {
-          email: {
-            type: "email",
-            text_key: "identifier.field.email",
-            required: true,
-          },
-        },
+        fields: ["email"],
         actions: {
-          submit: { text_key: "identifier.action.submit", primary: true },
-          register: { text_key: "identifier.action.register", primary: false },
+          submit: { primary: true },
+          register: {},
         },
         gates: {},
         transitions: {
-          submit: "credential",
-          register: { pivot: "register" },
+          submit: { target: "credential" },
+          register: { target: "register-profile" },
         },
       },
       {
         name: "credential",
-        type: "credential",
-        texts: { title_key: "credential.title" },
-        fields: {
-          password: {
-            type: "password",
-            text_key: "credential.field.password",
-            required: true,
-          },
-        },
+        fields: ["password"],
         actions: {
-          submit: { text_key: "credential.action.submit", primary: true },
-          forgot: { text_key: "credential.action.forgot", primary: false },
+          submit: { primary: true },
         },
         gates: {},
+        // No `forgot` action: recovery is a separate flow definition,
+        // and the CLI scaffolds only the login + register flow today.
+        // Adding a `pivot` here would point at a non-existent flow and
+        // the engine rejects that at create time.
         transitions: {
-          submit: "complete",
-          forgot: { pivot: "recovery" },
+          submit: { target: "complete" },
         },
       },
       registerProfileStep(fields),
@@ -92,13 +85,10 @@ export function buildPasswordFlow(fields: ReadonlyArray<string>): FlowDefinition
  * Build the passkey-authentication flow.
  *
  * Scaffolds the four canonical steps a login + register journey needs
- * (identifier, credential, register_profile, complete). The credential
+ * (identifier, credential, register-profile, complete). The credential
  * step has no input fields — the WebAuthn ceremony is driven by the
  * client and the OAS spec models passkey verification via
- * `x-credential: "passkey"` on the referenced user-schema property (see
- * `api/openapi/endpoints/schemas/flow-definition.json`). Display text is
- * resolved client-side from the rendering layer; the flow only carries
- * `text_key` references.
+ * `x-credential: "passkey"` on the referenced user-schema property.
  *
  * @param fields - User-schema property names to collect on the
  *   register step, in display order (e.g. `["email", "given_name"]`).
@@ -107,44 +97,33 @@ export function buildPasskeyFlow(fields: ReadonlyArray<string>): FlowDefinition 
   return {
     name: "default",
     user_schema: USER_SCHEMA_URI,
-    purposes: ["login", "register"],
-    initial_steps: {
+    purposes: {
       login: "identifier",
-      register: "register_profile",
+      register: "register-profile",
     },
     steps: [
       {
         name: "identifier",
-        type: "identifier",
-        texts: { title_key: "identifier.title" },
-        fields: {
-          email: {
-            type: "email",
-            text_key: "identifier.field.email",
-            required: true,
-          },
-        },
+        fields: ["email"],
         actions: {
-          submit: { text_key: "identifier.action.submit", primary: true },
-          register: { text_key: "identifier.action.register", primary: false },
+          submit: { primary: true },
+          register: {},
         },
         gates: {},
         transitions: {
-          submit: "credential",
-          register: { pivot: "register" },
+          submit: { target: "credential" },
+          register: { target: "register-profile" },
         },
       },
       {
         name: "credential",
-        type: "credential",
-        texts: { title_key: "credential.title" },
-        fields: {},
+        fields: [],
         actions: {
-          submit: { text_key: "credential.action.submit", primary: true },
+          submit: { primary: true },
         },
         gates: {},
         transitions: {
-          submit: "complete",
+          submit: { target: "complete" },
         },
       },
       registerProfileStep(fields),
@@ -155,64 +134,41 @@ export function buildPasskeyFlow(fields: ReadonlyArray<string>): FlowDefinition 
 
 /**
  * The register-profile step is identical across methods: a form that
- * collects the chosen user-schema fields and offers a pivot back to
- * login. Shared so the two flows cannot drift.
+ * collects the chosen user-schema fields, creates the user on submit,
+ * and offers a switch back to login. Shared so the two flows cannot
+ * drift.
  */
 function registerProfileStep(fields: ReadonlyArray<string>): FlowDefinition["steps"][number] {
   return {
-    name: "register_profile",
-    type: "form",
-    texts: { title_key: "register_profile.title" },
-    fields: Object.fromEntries(
-      fields.map((field) => [
-        field,
-        {
-          type: fieldType(field),
-          text_key: `register_profile.field.${field}`,
-          required: true,
-        },
-      ]),
-    ),
+    name: "register-profile",
+    // Spec ($defs/Step.name) restricts step names to ^[a-z][a-z0-9-]*$ —
+    // hyphens, not underscores. The engine matches `purposes` values
+    // against this same name.
+    fields: [...fields],
     actions: {
-      submit: { text_key: "register_profile.action.submit", primary: true },
-      login: { text_key: "register_profile.action.login", primary: false },
+      submit: { primary: true },
+      login: {},
     },
     gates: {},
+    on_success: "create_user",
     transitions: {
-      submit: "complete",
-      login: { pivot: "login" },
+      submit: { target: "complete" },
+      login: { target: "identifier" },
     },
-  };
-}
-
-/** The terminal step shared by both flows. */
-function completeStep(): FlowDefinition["steps"][number] {
-  return {
-    name: "complete",
-    type: "complete",
-    texts: { title_key: "complete.title" },
-    fields: {},
-    actions: {},
-    gates: {},
   };
 }
 
 /**
- * Map a user-schema property name to the renderer input `type` for the
- * register step. Unknown names fall back to `text`.
+ * The terminal step shared by both flows. The `complete: "redirect"`
+ * marker tells the frontend to navigate to the OIDC/SAML callback URI
+ * (the alternative, `show`, would render a success screen instead).
  */
-function fieldType(field: string): "text" | "email" | "password" | "tel" | "date" {
-  if (field === "email") {
-    return "email";
-  }
-  if (field === "phone") {
-    return "tel";
-  }
-  if (field === "password") {
-    return "password";
-  }
-  if (field === "date_of_birth" || field === "birthdate") {
-    return "date";
-  }
-  return "text";
+function completeStep(): FlowDefinition["steps"][number] {
+  return {
+    name: "complete",
+    fields: [],
+    actions: {},
+    gates: {},
+    complete: "redirect",
+  };
 }

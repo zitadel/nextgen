@@ -1,5 +1,11 @@
+import type {
+  CreateFlowDefinitionBodyFlowDefinition,
+  CreateSchemaBody,
+} from "@zitadel-nextgen/api/generated/model";
+import { CreateSchemaBody as createSchemaBodySchema } from "@zitadel-nextgen/api/generated/endpoints/zitadelNextGen.zod";
+
 import { FLOWS_DIR, flowEnvRefs, validateFlows } from "../flows";
-import { SCHEMAS_DIR, validateUserSchema } from "../user-schema";
+import { SCHEMAS_DIR } from "../user-schema";
 import { ZitadelError } from "../errors";
 import type { PlatformClient } from "../api/client.js";
 import type { ResourceSyncer } from "./types.js";
@@ -48,18 +54,24 @@ class SchemaSyncer implements ResourceSyncer {
     private readonly env: EnvLookup,
   ) {}
 
+  /**
+   * Parse against the generated `CreateSchemaBody` Zod (the orval-emitted
+   * equivalent of `api/openapi/endpoints/schemas/user-schema.yaml`). The
+   * generated schema is a union of `user-schema` and `schema-url`
+   * discriminated on `kind`; both are valid on-disk bodies.
+   */
   validate(data: object): void {
-    const result = validateUserSchema(data);
-    if (!result.valid) {
+    const result = createSchemaBodySchema.safeParse(data);
+    if (!result.success) {
       throw new ZitadelError("E_VALIDATION", "Schema file is not a valid Zitadel schema body", {
-        details: { errors: result.errors },
+        details: { issues: result.error.issues },
       });
     }
     assertEnvRefs(data, this.env);
   }
 
   async create(client: PlatformClient, data: object): Promise<string> {
-    const result = await client.createSchema(data, this.projectId);
+    const result = await client.createSchema(data as CreateSchemaBody, this.projectId);
     return result.id;
   }
 
@@ -107,14 +119,14 @@ class FlowDefinitionSyncer implements ResourceSyncer {
   async create(client: PlatformClient, data: object): Promise<string> {
     const result = await client.createFlowDefinition({
       project_id: this.projectId,
-      flow_definition: data,
+      flow_definition: data as CreateFlowDefinitionBodyFlowDefinition,
     });
     return result.id;
   }
 
   /** PATCH body is the bare partial flow per `flow-definition-update-request` — no envelope. */
   async update(client: PlatformClient, id: string, data: object): Promise<void> {
-    await client.updateFlowDefinition(id, data);
+    await client.updateFlowDefinition(id, data as Partial<CreateFlowDefinitionBodyFlowDefinition>);
   }
 
   async delete(client: PlatformClient, id: string): Promise<void> {
@@ -137,7 +149,7 @@ class FlowDefinitionSyncer implements ResourceSyncer {
       created_at: _createdAt,
       updated_at: _updatedAt,
       ...body
-    } = (await client.getFlowDefinition(id)) as Record<string, unknown>;
+    } = await client.getFlowDefinition(id);
     return body;
   }
 }

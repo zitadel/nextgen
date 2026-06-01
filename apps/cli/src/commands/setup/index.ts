@@ -7,7 +7,9 @@ import { AUTH_METHODS, isAuthMethod, type AuthMethod } from "../../lib/flows";
 import { createOrca, issuerFromPort, type FrameworkFacts, type Orca } from "../../lib/orca";
 import type { PatchContext } from "../../lib/orca/patchers/types";
 import { RENDERER_IDS } from "../../lib/orca/patchers/rule/next/renderers/registry";
-import { buildUserSchema, validateUserSchema } from "../../lib/user-schema";
+import { CreateSchemaBody } from "@zitadel-nextgen/api/generated/endpoints/zitadelNextGen.zod";
+
+import { buildUserSchema } from "../../lib/user-schema";
 import { createPlatformClient } from "../../lib/api";
 import type { CreateProjectResponse } from "../../lib/api/client";
 import { makeSyncers, runSyncLoop } from "../../lib/sync";
@@ -100,10 +102,10 @@ export default class Setup extends BaseCommand {
     const userFields = [...DEFAULT_USER_FIELDS];
     const resolvedMethod: AuthMethod = answers.authMethod ?? "passkey";
     const userSchema = buildUserSchema(resolvedMethod, userFields);
-    const schemaValidation = validateUserSchema(userSchema);
-    if (!schemaValidation.valid) {
+    const schemaValidation = CreateSchemaBody.safeParse(userSchema);
+    if (!schemaValidation.success) {
       throw new ZitadelError("E_VALIDATION", "Generated user schema is invalid", {
-        details: schemaValidation.errors,
+        details: { issues: schemaValidation.error.issues },
       });
     }
 

@@ -12,9 +12,9 @@ type Check = { name: string; status: "pass" | "fail"; message: string; path?: st
 const tempDirs: string[] = [];
 
 const VALID_USER_SCHEMA = {
-  $schema: "https://json-schema.org/draft/2020-12/schema",
   kind: "user-schema",
-  type: "object",
+  metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
+  "x-auth-methods": { password: { enabled: true, position: 0 } },
   properties: { email: { type: "string" } },
 };
 

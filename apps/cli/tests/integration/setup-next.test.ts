@@ -48,10 +48,11 @@ describe("Next setup integration", () => {
     );
     const flowRaw = await readFile(join(cwd, ".zitadel/flows/default.json"), "utf8");
     // Spec: `name` is the slug-pattern stable identifier; `template_name`
-    // was a non-spec field the CLI used to emit.
+    // was a non-spec field the CLI used to emit. `step.fields` is a
+    // string[] of property names referencing the user schema.
     expect(flowRaw).toContain('"name": "default"');
     expect(flowRaw).toContain('"user_schema":');
-    expect(flowRaw).toContain('"text_key": "identifier.field.email"');
+    expect(flowRaw).toContain('"email"');
     const loginPage = await readFile(join(cwd, "app/login/page.tsx"), "utf8");
     expect(loginPage).toContain("zitadel-cli: managed-file v1");
     expect(loginPage).toContain('"use client"');
@@ -125,19 +126,23 @@ describe("Next setup integration", () => {
 
     const flowWithEnvRef = {
       // Spec: `name` is the slug-pattern stable identifier; required fields
-      // are [name, user_schema, purposes, initial_steps, steps].
+      // are [name, user_schema, purposes, steps]. `purposes` is a map
+      // from purpose name to entry-point step name.
       name: "default",
       user_schema: "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/human-user.yaml",
-      purposes: ["login"],
-      initial_steps: { login: "identifier" },
+      purposes: { login: "identifier" },
       steps: [
         {
           name: "identifier",
-          type: "identifier",
-          fields: {},
+          fields: [],
           actions: {},
-          gates: { captcha: { type: "captcha", config: { client_secret_env: "MY_CAPTCHA_SECRET" } } },
-          transitions: {},
+          gates: {
+            captcha: {
+              kind: "captcha",
+              provider: "altcha",
+              config: { client_secret_env: "MY_CAPTCHA_SECRET" },
+            },
+          },
         },
       ],
     };

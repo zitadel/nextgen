@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildUserSchema } from "../../../../src/lib/user-schema";
-import { DEFAULT_USER_META_SCHEMA } from "../../../../src/lib/user-schema/schema";
+import { DEFAULT_USER_META_SCHEMA, buildUserSchema } from "../../../../src/lib/user-schema";
 
 describe("buildUserSchema", () => {
   it("uses project-scoped uniqueness for email and sorts required", () => {

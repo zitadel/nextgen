@@ -22,10 +22,12 @@ import { MANAGED_MARKER } from "../../../../src/lib/paths";
 
 const tempDirs: string[] = [];
 
+// Matches the generated `CreateSchemaBody` zod (the `user-schema` branch):
+// required keys are `kind`, `metaSchema`, `x-auth-methods`.
 const VALID_USER_SCHEMA = {
-  $schema: "https://json-schema.org/draft/2020-12/schema",
   kind: "user-schema",
-  type: "object",
+  metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
+  "x-auth-methods": { passkey: { enabled: true, position: 0 } },
   properties: { email: { type: "string" } },
 };
 
@@ -235,7 +237,6 @@ describe("SchemaCheck", () => {
     );
     const outcome = await new SchemaCheck().run(ctxFor(cwd));
     expect(outcome.status).toBe("fail");
-    expect(outcome.message).toContain("kind");
   });
 });
 
