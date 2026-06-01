@@ -37,8 +37,11 @@ jobs:
           cache: true
       - name: Verify gofmt formatting
         run: |
-          gofmt -l .
-          test -z "$(gofmt -l .)"
+          unformatted="$(gofmt -l .)"
+          if [ -n "$unformatted" ]; then
+            printf '%s\n' "$unformatted"
+            exit 1
+          fi
       - name: Install embedded-postgres runtime deps
         run: sudo apt-get update -qq && sudo apt-get install -y -qq libicu-dev libssl-dev
       - run: go generate ./...
