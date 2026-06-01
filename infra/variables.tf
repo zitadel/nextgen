@@ -14,6 +14,60 @@ variable "region" {
   default     = "us-central1"
 }
 
+variable "postgres_instance_name" {
+  description = "Cloud SQL PostgreSQL instance name"
+  type        = string
+  default     = "zitadel"
+}
+
+variable "postgres_database_name" {
+  description = "PostgreSQL database name"
+  type        = string
+  default     = "zitadel"
+}
+
+variable "postgres_database_version" {
+  description = "Cloud SQL PostgreSQL engine version"
+  type        = string
+  default     = "POSTGRES_17"
+}
+
+variable "postgres_tier" {
+  description = "Cloud SQL machine tier"
+  type        = string
+  default     = "db-f1-micro"
+}
+
+variable "postgres_availability_type" {
+  description = "Cloud SQL availability type (ZONAL or REGIONAL)"
+  type        = string
+  default     = "ZONAL"
+}
+
+variable "postgres_disk_size_gb" {
+  description = "Initial Cloud SQL disk size in GB"
+  type        = number
+  default     = 20
+}
+
+variable "postgres_disk_type" {
+  description = "Cloud SQL disk type"
+  type        = string
+  default     = "PD_SSD"
+}
+
+variable "postgres_backup_start_time" {
+  description = "UTC start time for automated Cloud SQL backups (HH:MM)"
+  type        = string
+  default     = "03:00"
+}
+
+variable "postgres_point_in_time_recovery_enabled" {
+  description = "Enable PostgreSQL point-in-time recovery"
+  type        = bool
+  default     = true
+}
+
 variable "environment" {
   description = "Environment name (dev, prod)"
   type        = string

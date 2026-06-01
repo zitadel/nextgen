@@ -10,7 +10,8 @@ zitadel-ops (mgmt)            zitadel-dev / prod / ...
 ├── Artifact Registry         ├── External ALB + CDN
 ├── infra-apply SA + WIF      ├── Certificate Map
 ├── github-deploy SA + WIF    ├── Cloud DNS
-└── cross-project IAM         └── IAM (runtime + migrator SAs)
+└── cross-project IAM         ├── Cloud SQL for PostgreSQL
+                              └── IAM (runtime + migrator SAs)
 ```
 
 ## Directory layout
@@ -35,6 +36,7 @@ infra/
 | `load-balancer`   | External ALB + CDN + serverless NEG             |
 | `certificate-map` | Certificate Manager map (runtime-populated)     |
 | `dns`             | Cloud DNS zone + A records                      |
+| `postgres`        | Cloud SQL PostgreSQL instance + database        |
 
 ## Resource ownership
 
@@ -42,6 +44,7 @@ infra/
 | ----------------------------------- | ------------------------------ | ----------------- |
 | AR, state bucket, CI SAs, WIF       | `infra/mgmt/` (OpenTofu)       | Rare changes      |
 | LB, CDN, IAM, DNS                   | `infra/` (OpenTofu, per env)   | Infra changes     |
+| Cloud SQL instance + database       | `infra/` (OpenTofu, per env)   | Infra changes     |
 | Cloud Run runtime env + secret refs | `infra/` (OpenTofu, per env)   | Infra changes     |
 | Cloud Run image, command, probes    | GitHub Actions deploy workflow | App releases      |
 | Customer certs + host rules         | Zitadel runtime (`infra.rs`)   | Tenant onboarding |
@@ -87,6 +90,12 @@ See `.github/workflows/infra.yml`.
 OpenTofu owns only the Secret Manager containers and the Cloud Run version pins.
 Create or rotate secret values directly in Google Secret Manager, then update
 the matching `*_secret_version` value in the environment tfvars file.
+
+OpenTofu also creates the Cloud SQL PostgreSQL instance and empty database, but
+database credentials and the `NEXTGEN_DATABASE_POSTGRES` connection-string
+secret value are managed outside OpenTofu so credentials never enter OpenTofu
+state. Cloud Run connects over private IP using the `postgres_private_ip` and
+`postgres_database_name` outputs as DSN inputs.
 
 The runtime secrets are:
 

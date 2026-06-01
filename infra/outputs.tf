@@ -1,3 +1,23 @@
+output "postgres_instance_name" {
+  description = "Cloud SQL PostgreSQL instance name"
+  value       = module.postgres.instance_name
+}
+
+output "postgres_connection_name" {
+  description = "Cloud SQL PostgreSQL instance connection name"
+  value       = module.postgres.connection_name
+}
+
+output "postgres_database_name" {
+  description = "PostgreSQL database name"
+  value       = module.postgres.database_name
+}
+
+output "postgres_private_ip" {
+  description = "Private IP for direct VPC PostgreSQL connections"
+  value       = module.postgres.private_ip_address
+}
+
 output "cloud_run_service_name" {
   description = "Cloud Run service name"
   value       = module.cloud_run.service_name

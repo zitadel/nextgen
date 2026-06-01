@@ -41,6 +41,26 @@ module "network" {
   depends_on = [module.project]
 }
 
+module "postgres" {
+  source = "./modules/postgres"
+
+  instance_name                  = var.postgres_instance_name
+  database_name                  = var.postgres_database_name
+  database_version               = var.postgres_database_version
+  tier                           = var.postgres_tier
+  region                         = var.region
+  environment                    = var.environment
+  network_id                     = module.network.network_id
+  availability_type              = var.postgres_availability_type
+  disk_size_gb                   = var.postgres_disk_size_gb
+  disk_type                      = var.postgres_disk_type
+  backup_start_time              = var.postgres_backup_start_time
+  point_in_time_recovery_enabled = var.postgres_point_in_time_recovery_enabled
+  deletion_protection            = var.deletion_protection
+
+  depends_on = [module.project]
+}
+
 module "certificate_map" {
   source      = "./modules/certificate-map"
   environment = var.environment

@@ -9,6 +9,8 @@ resource "google_project_service" "apis" {
     "cloudresourcemanager.googleapis.com",
     "vpcaccess.googleapis.com",
     "secretmanager.googleapis.com",
+    "servicenetworking.googleapis.com",
+    "sqladmin.googleapis.com",
     "cloudtrace.googleapis.com",
     "telemetry.googleapis.com",
   ])
