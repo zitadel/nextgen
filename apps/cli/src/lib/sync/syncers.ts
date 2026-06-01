@@ -87,11 +87,12 @@ class SchemaSyncer implements ResourceSyncer {
   }
 
   async delete(id: string): Promise<void> {
-    // The spec has no dedicated delete-schema operation in the generated
-    // client today; the resource path is the same as get-by-id, so we
-    // hand-build a DELETE through orval's URL helper would have been the
-    // alternative. For now schemas are immutable (mutable = false), so
-    // delete is unreachable via the sync engine — keep a fail-loud stub.
+    // Schemas are immutable on the platform: no PATCH, no DELETE in the
+    // generated client. The sync loop's delete branch (`loop.ts`) still
+    // schedules a delete action when a state entry exists and the
+    // on-disk file is gone — `mutable` only gates updates, not deletes.
+    // We deliberately fail loud here so the user notices that removing
+    // a schema file is not a supported way to retire it.
     throw new ZitadelError("E_NOT_IMPLEMENTED", `schema delete is not supported (${id})`);
   }
 
