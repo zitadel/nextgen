@@ -9,8 +9,12 @@ export default defineConfig(() => ({
   plugins: [nxViteTsPaths()],
   build: {
     lib: {
-      entry: resolve(import.meta.dirname, "src/index.ts"),
-      fileName: "index",
+      entry: {
+        index: resolve(import.meta.dirname, "src/index.ts"),
+        types: resolve(import.meta.dirname, "src/types.ts"),
+        jwt: resolve(import.meta.dirname, "src/jwt.ts"),
+        "middleware-utils": resolve(import.meta.dirname, "src/middleware-utils.ts"),
+      },
       formats: ["es" as const],
     },
   },

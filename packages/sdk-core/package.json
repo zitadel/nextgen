@@ -1,7 +1,7 @@
 {
   "name": "@zitadel-nextgen/sdk-core",
   "version": "0.0.0",
-  "description": "Core types and mock runtime helpers for Zitadel",
+  "description": "Core types and shared utilities for Zitadel SDKs",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-core#readme",
   "bugs": {
     "url": "https://github.com/zitadel/nextgen/issues"
@@ -20,6 +20,18 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./types": {
+      "types": "./dist/types.d.ts",
+      "import": "./dist/types.js"
+    },
+    "./jwt": {
+      "types": "./dist/jwt.d.ts",
+      "import": "./dist/jwt.js"
+    },
+    "./middleware": {
+      "types": "./dist/middleware-utils.d.ts",
+      "import": "./dist/middleware-utils.js"
     }
   },
   "publishConfig": {
