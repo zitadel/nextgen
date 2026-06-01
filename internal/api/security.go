@@ -12,16 +12,27 @@ import (
 )
 
 type SecurityHandler struct {
-	pool     database.Pool
-	projects domain.ProjectRepository
+	pool               database.Pool
+	projects           domain.ProjectRepository
+	claimStatusSecrets ClaimStatusSecretResolver
 }
 
 type SecurityHandlerOption func(*SecurityHandler)
+
+type ClaimStatusSecretResolver interface {
+	ProjectIDByClaimStatusSecret(ctx context.Context, secret string) (string, error)
+}
 
 func WithProjectRepository(pool database.Pool, projects domain.ProjectRepository) SecurityHandlerOption {
 	return func(s *SecurityHandler) {
 		s.pool = pool
 		s.projects = projects
+	}
+}
+
+func WithClaimStatusSecretResolver(resolver ClaimStatusSecretResolver) SecurityHandlerOption {
+	return func(s *SecurityHandler) {
+		s.claimStatusSecrets = resolver
 	}
 }
 
@@ -38,18 +49,29 @@ func (s SecurityHandler) HandleOAuth2(ctx context.Context, operationName api.Ope
 		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
 	}
 	scopeCtx := ScopeContext{ProjectSecret: t.Token}
-	if s.projects != nil && s.pool != nil {
-		project, err := s.projects.GetBySecret(ctx, s.pool, t.Token)
-		if err != nil {
-			var noRow *database.NoRowFoundError
-			if errors.As(err, &noRow) {
-				return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
-			}
+	if s.projects == nil || s.pool == nil {
+		return WithScopeContext(ctx, scopeCtx), nil
+	}
+	project, err := s.projects.GetBySecret(ctx, s.pool, t.Token)
+	if err == nil {
+		scopeCtx.ProjectID = project.ID
+		return WithScopeContext(ctx, scopeCtx), nil
+	}
+	var noRow *database.NoRowFoundError
+	if !errors.As(err, &noRow) {
+		return nil, err
+	}
+	if operationName == api.GetProjectClaimStatusOperation && s.claimStatusSecrets != nil {
+		projectID, err := s.claimStatusSecrets.ProjectIDByClaimStatusSecret(ctx, t.Token)
+		if err == nil {
+			scopeCtx.ProjectID = projectID
+			return WithScopeContext(ctx, scopeCtx), nil
+		}
+		if !errors.As(err, &noRow) {
 			return nil, err
 		}
-		scopeCtx.ProjectID = project.ID
 	}
-	return WithScopeContext(ctx, scopeCtx), nil
+	return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
 }
 
 var _ api.SecurityHandler = (*SecurityHandler)(nil)

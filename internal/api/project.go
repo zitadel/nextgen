@@ -27,15 +27,26 @@ func (h *Handler) CreateProject(ctx context.Context, req *api.CreateProjectReque
 }
 
 func (h *Handler) GetProject(ctx context.Context, params api.GetProjectParams) (api.GetProjectRes, error) {
-	project, err := h.getProjectForBearer(ctx, string(params.ProjectID))
+	projectID := string(params.ProjectID)
+	scopeCtx, err := h.requireBearerProject(ctx, projectID)
 	if err != nil {
 		return h.NewError(ctx, err), nil
+	}
+	project, err := h.projectService.Get(ctx, projectID)
+	if err != nil {
+		return h.NewError(ctx, err), nil
+	}
+	if scopeCtx.ProjectSecret != project.ProjectSecret {
+		return h.NewError(ctx, domain.ErrAuthUnauthorized(nil)), nil
 	}
 	return getProjectResponse(project), nil
 }
 
 func (h *Handler) ApplyProjectConfig(ctx context.Context, _ api.OptApplyProjectConfigReq, params api.ApplyProjectConfigParams) (api.ApplyProjectConfigRes, error) {
 	scopeCtx, _ := GetScopeContext(ctx)
+	if _, err := h.requireBearerProject(ctx, string(params.ProjectID)); err != nil {
+		return h.NewError(ctx, err), nil
+	}
 	applied, err := h.projectService.ApplyConfig(ctx, service.ApplyProjectConfigInput{
 		ProjectID:     string(params.ProjectID),
 		ProjectSecret: scopeCtx.ProjectSecret,
@@ -54,6 +65,9 @@ func (h *Handler) ApplyProjectConfig(ctx context.Context, _ api.OptApplyProjectC
 
 func (h *Handler) InitProjectClaim(ctx context.Context, req api.OptInitProjectClaimReq, params api.InitProjectClaimParams) (api.InitProjectClaimRes, error) {
 	scopeCtx, _ := GetScopeContext(ctx)
+	if _, err := h.requireBearerProject(ctx, string(params.ProjectID)); err != nil {
+		return h.NewError(ctx, err), nil
+	}
 	body, _ := req.Get()
 	returnURL := ""
 	if u, ok := body.ReturnURL.Get(); ok {
@@ -83,6 +97,9 @@ func (h *Handler) InitProjectClaim(ctx context.Context, req api.OptInitProjectCl
 }
 
 func (h *Handler) CompleteProjectClaim(ctx context.Context, req *api.CompleteProjectClaimReq, params api.CompleteProjectClaimParams) (api.CompleteProjectClaimRes, error) {
+	if _, err := h.requireBearerProject(ctx, string(params.ProjectID)); err != nil {
+		return h.NewError(ctx, err), nil
+	}
 	teamID := ""
 	createTeamName := ""
 	if choice, ok := req.TeamChoice.Get(); ok {
@@ -113,6 +130,9 @@ func (h *Handler) CompleteProjectClaim(ctx context.Context, req *api.CompletePro
 
 func (h *Handler) GetProjectClaimStatus(ctx context.Context, params api.GetProjectClaimStatusParams) (api.GetProjectClaimStatusRes, error) {
 	scopeCtx, _ := GetScopeContext(ctx)
+	if _, err := h.requireBearerProject(ctx, string(params.ProjectID)); err != nil {
+		return h.NewError(ctx, err), nil
+	}
 	status, err := h.projectService.GetClaimStatus(ctx, service.GetProjectClaimStatusInput{
 		ProjectID:     string(params.ProjectID),
 		ChallengeID:   params.ChallengeID,
@@ -136,16 +156,12 @@ func (h *Handler) GetProjectClaimStatus(ctx context.Context, params api.GetProje
 	return resp, nil
 }
 
-func (h *Handler) getProjectForBearer(ctx context.Context, projectID string) (*domain.Project, error) {
-	project, err := h.projectService.Get(ctx, projectID)
-	if err != nil {
-		return nil, err
-	}
+func (h *Handler) requireBearerProject(ctx context.Context, projectID string) (ScopeContext, error) {
 	scopeCtx, ok := GetScopeContext(ctx)
-	if !ok || scopeCtx.ProjectSecret != project.ProjectSecret {
-		return nil, domain.ErrAuthUnauthorized(nil)
+	if !ok || scopeCtx.ProjectID != projectID {
+		return ScopeContext{}, domain.ErrAuthUnauthorized(nil)
 	}
-	return project, nil
+	return scopeCtx, nil
 }
 
 func getProjectResponse(project *domain.Project) *api.GetProjectResponse {

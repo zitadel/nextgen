@@ -326,6 +326,10 @@ func TestProjectService_ClaimLifecycleReturnsRotatedSecretOnce(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, domain.ProjectLifecycleClaimed, claimed.Lifecycle)
 
+	projectID, err := svc.ProjectIDByClaimStatusSecret(context.Background(), "sk_proj_old")
+	require.NoError(t, err)
+	assert.Equal(t, "proj_aaa", projectID)
+
 	status, err := svc.GetClaimStatus(context.Background(), service.GetProjectClaimStatusInput{
 		ProjectID:     "proj_aaa",
 		ChallengeID:   "claim_aaa",
@@ -342,6 +346,10 @@ func TestProjectService_ClaimLifecycleReturnsRotatedSecretOnce(t *testing.T) {
 	})
 	require.Nil(t, status)
 	require.ErrorIs(t, err, domain.ErrProjectSecretConsumed())
+
+	projectID, err = svc.ProjectIDByClaimStatusSecret(context.Background(), "sk_proj_old")
+	require.NoError(t, err)
+	assert.Equal(t, "proj_aaa", projectID)
 }
 
 type sequenceIDGenerator struct {

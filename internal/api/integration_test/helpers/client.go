@@ -2,11 +2,12 @@ package helpers
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	api "github.com/zitadel/nextgen/api/generated"
+	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 func (h *Harness) EnsureAPIClient(t *testing.T, projectID string) *api.Client {
@@ -37,17 +38,29 @@ func (h *Harness) EnsureFakeSecuritySource(t *testing.T, projectID string) *Fake
 	}
 	h.fakeSecuritySources[projectID] = &FakeSecuritySource{
 		projectID: projectID,
+		pool:      h.EnsureDBPool(t),
+		projects:  h.EnsureProjectRepo(t),
 	}
 	return h.fakeSecuritySources[projectID]
 }
 
 type FakeSecuritySource struct {
 	projectID string
+	pool      database.Pool
+	projects  domain.ProjectRepository
 }
 
 func (f FakeSecuritySource) OAuth2(ctx context.Context, operationName api.OperationName) (api.OAuth2, error) {
+	token := "sk_proj_missing"
+	if f.projectID != "" {
+		project, err := f.projects.Get(ctx, f.pool, f.projectID)
+		if err != nil {
+			return api.OAuth2{}, err
+		}
+		token = project.ProjectSecret
+	}
 	return api.OAuth2{
-		Token:  fmt.Sprintf("sk_%s", f.projectID),
+		Token:  token,
 		Scopes: []string{"all"},
 	}, nil
 }

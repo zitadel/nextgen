@@ -31,6 +31,11 @@ type ProjectService interface {
 	InitClaim(ctx context.Context, input InitProjectClaimInput) (*ProjectClaimChallenge, error)
 	CompleteClaim(ctx context.Context, input CompleteProjectClaimInput) (*domain.Project, error)
 	GetClaimStatus(ctx context.Context, input GetProjectClaimStatusInput) (*ProjectClaimStatus, error)
+
+	// ProjectIDByClaimStatusSecret resolves the original project secret used to
+	// initiate a claim, so claim status polling can retrieve the rotated secret
+	// after the project row has been updated with that rotated secret.
+	ProjectIDByClaimStatusSecret(ctx context.Context, secret string) (string, error)
 }
 
 // NewProjectService returns a [ProjectService] backed by the given repository.
@@ -360,6 +365,19 @@ func (s *projectService) GetClaimStatus(ctx context.Context, input GetProjectCla
 	}
 	s.mu.Unlock()
 	return status, nil
+}
+
+func (s *projectService) ProjectIDByClaimStatusSecret(_ context.Context, secret string) (string, error) {
+	now := s.now()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.cleanupTransientStateLocked(now)
+	for _, challenge := range s.claimChallenges {
+		if challenge.InitiatingSecret == secret {
+			return challenge.ProjectID, nil
+		}
+	}
+	return "", database.NewNoRowFoundError(nil)
 }
 
 func (s *projectService) cleanupTransientStateLocked(now time.Time) {

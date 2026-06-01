@@ -29,7 +29,10 @@ func newTestServer(t *testing.T) *httptest.Server {
 	projectSvc := service.NewProjectService(testPool, repo, idgen.NewULID())
 
 	handler := internalapi.NewHandler(nil, stubFlowService{}, &stubAuthAttemptService{}, nil, projectSvc, nil, nil, nil)
-	secHandler := internalapi.NewSecurityHandler(internalapi.WithProjectRepository(testPool, repo))
+	secHandler := internalapi.NewSecurityHandler(
+		internalapi.WithProjectRepository(testPool, repo),
+		internalapi.WithClaimStatusSecretResolver(projectSvc),
+	)
 
 	srv, err := generatedapi.NewServer(handler, secHandler)
 	require.NoError(t, err)
@@ -206,7 +209,7 @@ func TestGetProject(t *testing.T) {
 		assert.Equal(t, http.StatusUnauthorized, getResp.StatusCode)
 	})
 
-	t.Run("not found", func(t *testing.T) {
+	t.Run("unauthorized — token for missing project", func(t *testing.T) {
 		req, err := http.NewRequest(http.MethodGet, ts.URL+"/projects/proj_doesnotexist", nil)
 		require.NoError(t, err)
 		req.Header.Set("Authorization", "Bearer sk_proj_doesnotexist")
@@ -216,7 +219,7 @@ func TestGetProject(t *testing.T) {
 		require.NoError(t, err)
 		defer resp.Body.Close()
 
-		assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	})
 
 	t.Run("unauthorized — missing token", func(t *testing.T) {
