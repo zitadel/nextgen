@@ -1,3 +1,9 @@
+/**
+ * Closed set of failure categories the CLI can surface. Every error the
+ * user sees is funnelled into one of these so messaging, exit codes, and
+ * machine-readable output stay consistent regardless of where the failure
+ * originated.
+ */
 export type ZitadelErrorCode =
   | "E_ALREADY_INIT"
   | "E_FRAMEWORK_NOT_DETECTED"
@@ -8,6 +14,11 @@ export type ZitadelErrorCode =
   | "E_VALIDATION"
   | "E_NOT_IMPLEMENTED";
 
+/**
+ * Maps each {@link ZitadelErrorCode} to the process exit code the CLI
+ * returns. The table is the single source of truth for exit semantics so
+ * scripts and CI can branch on stable, documented numbers.
+ */
 export const EXIT_CODES: Record<ZitadelErrorCode, number> = {
   E_ALREADY_INIT: 0,
   E_FRAMEWORK_NOT_DETECTED: 3,
@@ -19,12 +30,24 @@ export const EXIT_CODES: Record<ZitadelErrorCode, number> = {
   E_NOT_IMPLEMENTED: 2,
 };
 
+/**
+ * Optional, user-facing extras attached to a {@link ZitadelError}. Kept
+ * separate from the message so the renderer can present a hint, suggested
+ * follow-up commands, and structured details independently (e.g. as JSON
+ * fields) rather than concatenating everything into one string.
+ */
 export type ZitadelErrorOptions = {
   hint?: string;
   nextCommands?: string[];
   details?: unknown;
 };
 
+/**
+ * The CLI's single error type. Carries a {@link ZitadelErrorCode} so the
+ * top-level handler can derive an exit code and structured output without
+ * pattern-matching on messages. Throwing this anywhere guarantees the user
+ * gets a categorised, hint-bearing failure instead of a raw stack trace.
+ */
 export class ZitadelError extends Error {
   readonly code: ZitadelErrorCode;
   readonly hint?: string;
@@ -45,6 +68,15 @@ export class ZitadelError extends Error {
   }
 }
 
+/**
+ * Normalises any thrown value into a {@link ZitadelError}. Inspection is
+ * ordered most-specific-first (already-normalised, then errno/filesystem,
+ * network, Zod-like, generic `Error`, then a catch-all) so the most
+ * actionable category and hint win. This is the boundary that lets the rest
+ * of the CLI `throw` plain errors yet still produce consistent, categorised
+ * output. The original error shape is preserved under `details` for
+ * debugging without leaking it into the user-facing message.
+ */
 export function toZitadelError(error: unknown): ZitadelError {
   if (error instanceof ZitadelError) {
     return error;
@@ -99,12 +131,15 @@ function isErrnoException(error: unknown): error is NodeJS.ErrnoException {
 }
 
 function isNetworkError(error: unknown): boolean {
-  if (!(error instanceof Error)) return false;
+  if (!(error instanceof Error)) {
+    return false;
+  }
   if (
     error.name === "TypeError" &&
     /fetch failed|network|ECONNREFUSED|ENOTFOUND/i.test(error.message)
-  )
+  ) {
     return true;
+  }
   const cause = (error as { cause?: unknown }).cause;
   if (cause && typeof cause === "object" && "code" in cause) {
     const code = String((cause as { code: unknown }).code);
@@ -123,8 +158,12 @@ function isZodLikeError(error: unknown): boolean {
 }
 
 function errorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  if (typeof error === "string") return error;
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (typeof error === "string") {
+    return error;
+  }
   return String(error);
 }
 
