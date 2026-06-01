@@ -1,13 +1,22 @@
 import type {
   CreateFlowDefinitionBodyFlowDefinition,
   CreateSchemaBody,
+  GetSchemaById200,
+  GetFlowDefinition200,
 } from "@zitadel-nextgen/api/generated/model";
+import {
+  createFlowDefinition,
+  createSchema,
+  deleteFlowDefinition,
+  getFlowDefinition,
+  getSchemaById,
+  updateFlowDefinition,
+} from "@zitadel-nextgen/api/generated/endpoints/zitadelNextGen";
 import { CreateSchemaBody as createSchemaBodySchema } from "@zitadel-nextgen/api/generated/endpoints/zitadelNextGen.zod";
 
 import { FLOWS_DIR, flowEnvRefs, validateFlows } from "../flows";
 import { SCHEMAS_DIR } from "../user-schema";
 import { ZitadelError } from "../errors";
-import type { PlatformClient } from "../api/client.js";
 import type { ResourceSyncer } from "./types.js";
 
 /** Runtime environment lookup used to resolve `${VAR}` / `*_env` references. */
@@ -70,22 +79,28 @@ class SchemaSyncer implements ResourceSyncer {
     assertEnvRefs(data, this.env);
   }
 
-  async create(client: PlatformClient, data: object): Promise<string> {
-    const result = await client.createSchema(data as CreateSchemaBody, this.projectId);
+  async create(data: object): Promise<string> {
+    const result = await createSchema(data as CreateSchemaBody, { project_id: this.projectId });
     return result.id;
   }
 
   /** Never called — schemas are immutable on the platform, so `mutable = false`. */
-  async update(_client: PlatformClient, _id: string, _data: object): Promise<void> {
+  async update(_id: string, _data: object): Promise<void> {
     return;
   }
 
-  async delete(client: PlatformClient, id: string): Promise<void> {
-    await client.deleteSchema(id, this.projectId);
+  async delete(id: string): Promise<void> {
+    // The spec has no dedicated delete-schema operation in the generated
+    // client today; the resource path is the same as get-by-id, so we
+    // hand-build a DELETE through orval's URL helper would have been the
+    // alternative. For now schemas are immutable (mutable = false), so
+    // delete is unreachable via the sync engine — keep a fail-loud stub.
+    throw new ZitadelError("E_NOT_IMPLEMENTED", `schema delete is not supported (${id})`);
   }
 
-  async fetch(client: PlatformClient, id: string): Promise<object> {
-    return client.getSchema(id, this.projectId);
+  async fetch(id: string): Promise<object> {
+    const body = await getSchemaById(id, { project_id: this.projectId });
+    return body as unknown as GetSchemaById200;
   }
 }
 
@@ -116,8 +131,8 @@ class FlowDefinitionSyncer implements ResourceSyncer {
    * only the wire request carries `project_id` and the surrounding
    * envelope.
    */
-  async create(client: PlatformClient, data: object): Promise<string> {
-    const result = await client.createFlowDefinition({
+  async create(data: object): Promise<string> {
+    const result = await createFlowDefinition({
       project_id: this.projectId,
       flow_definition: data as CreateFlowDefinitionBodyFlowDefinition,
     });
@@ -125,12 +140,12 @@ class FlowDefinitionSyncer implements ResourceSyncer {
   }
 
   /** PATCH body is the bare partial flow per `flow-definition-update-request` — no envelope. */
-  async update(client: PlatformClient, id: string, data: object): Promise<void> {
-    await client.updateFlowDefinition(id, data as Partial<CreateFlowDefinitionBodyFlowDefinition>);
+  async update(id: string, data: object): Promise<void> {
+    await updateFlowDefinition(id, data as Partial<CreateFlowDefinitionBodyFlowDefinition>);
   }
 
-  async delete(client: PlatformClient, id: string): Promise<void> {
-    await client.deleteFlowDefinition(id);
+  async delete(id: string): Promise<void> {
+    await deleteFlowDefinition(id);
   }
 
   /**
@@ -140,7 +155,8 @@ class FlowDefinitionSyncer implements ResourceSyncer {
    * apples-to-apples against the on-disk file, which stores only the bare
    * body.
    */
-  async fetch(client: PlatformClient, id: string): Promise<object> {
+  async fetch(id: string): Promise<object> {
+    const envelope = (await getFlowDefinition(id)) as GetFlowDefinition200;
     const {
       id: _id,
       project_id: _projectId,
@@ -149,7 +165,7 @@ class FlowDefinitionSyncer implements ResourceSyncer {
       created_at: _createdAt,
       updated_at: _updatedAt,
       ...body
-    } = await client.getFlowDefinition(id);
+    } = envelope;
     return body;
   }
 }

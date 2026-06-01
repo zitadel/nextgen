@@ -7,7 +7,6 @@ import { describe, expect, it, vi } from "vitest";
 import { buildSyncPlan, runSyncLoop } from "../../../../src/lib/sync/loop";
 import { makeSyncers } from "../../../../src/lib/sync/syncers";
 import type { ResourceSyncer } from "../../../../src/lib/sync/syncers";
-import type { PlatformClient } from "../../../../src/lib/api/client";
 
 function makeCwd(): string {
   return join(tmpdir(), `zitadel-test-${Math.random().toString(36).slice(2)}`);
@@ -21,19 +20,6 @@ async function writeState(cwd: string, state: object): Promise<void> {
 async function writeResource(cwd: string, dir: string, name: string, contents: object): Promise<void> {
   await mkdir(join(cwd, dir), { recursive: true });
   await writeFile(join(cwd, dir, name), JSON.stringify(contents));
-}
-
-function makeClient(): PlatformClient {
-  return {
-    createProject: vi.fn(),
-    getProject: vi.fn(),
-    createSchema: vi.fn().mockResolvedValue({ id: "schema-001" }),
-    deleteSchema: vi.fn().mockResolvedValue(undefined),
-    createFlowDefinition: vi.fn().mockResolvedValue({ id: "flow-001" }),
-    getFlowDefinition: vi.fn().mockResolvedValue({}),
-    updateFlowDefinition: vi.fn().mockResolvedValue(undefined),
-    deleteFlowDefinition: vi.fn().mockResolvedValue(undefined),
-  } as unknown as PlatformClient;
 }
 
 function makeSyncer(overrides: Partial<ResourceSyncer> = {}): ResourceSyncer {
@@ -163,7 +149,7 @@ describe("buildSyncPlan", () => {
     }
   });
 
-  it("fetches oldContent via syncer.fetch when client is provided", async () => {
+  it("fetches oldContent via syncer.fetch when fetchOld is enabled", async () => {
     const cwd = makeCwd();
     try {
       await writeState(cwd, {
@@ -175,10 +161,9 @@ describe("buildSyncPlan", () => {
       const fetchedContent = { kind: "user-schema", version: 1 };
       const fetchFn = vi.fn().mockResolvedValue(fetchedContent);
       const syncer = makeSyncer({ fetch: fetchFn });
-      const client = makeClient();
-      const actions = await buildSyncPlan(cwd, [syncer], client);
+      const actions = await buildSyncPlan(cwd, [syncer], true);
 
-      expect(fetchFn).toHaveBeenCalledWith(client, "old-id");
+      expect(fetchFn).toHaveBeenCalledWith("old-id");
       expect(actions[0].kind).toBe("delete");
       if (actions[0].kind === "delete") {
         expect(actions[0].oldContent).toEqual(fetchedContent);
@@ -199,8 +184,7 @@ describe("buildSyncPlan", () => {
 
       const fetchFn = vi.fn().mockRejectedValue(new Error("network error"));
       const syncer = makeSyncer({ fetch: fetchFn });
-      const client = makeClient();
-      const actions = await buildSyncPlan(cwd, [syncer], client);
+      const actions = await buildSyncPlan(cwd, [syncer], true);
 
       expect(actions[0].kind).toBe("delete");
       if (actions[0].kind === "delete") {
@@ -250,8 +234,8 @@ describe("runSyncLoop", () => {
       await writeResource(cwd, ".zitadel/schemas", "user.json", { kind: "user-schema" });
 
       const syncer = makeSyncer();
-      const client = makeClient();
-      await runSyncLoop(cwd, client, [syncer]);
+      
+      await runSyncLoop(cwd, [syncer]);
 
       expect(syncer.create).toHaveBeenCalledOnce();
     } finally {
@@ -272,8 +256,8 @@ describe("runSyncLoop", () => {
       await writeResource(cwd, ".zitadel/schemas", "user.json", data);
 
       const syncer = makeSyncer({ mutable: false });
-      const client = makeClient();
-      await runSyncLoop(cwd, client, [syncer]);
+      
+      await runSyncLoop(cwd, [syncer]);
 
       expect(syncer.create).not.toHaveBeenCalled();
       expect(syncer.update).not.toHaveBeenCalled();
@@ -295,8 +279,8 @@ describe("runSyncLoop", () => {
       await writeResource(cwd, ".zitadel/flows", "default.json", data);
 
       const syncer = makeSyncer({ directory: ".zitadel/flows", mutable: true });
-      const client = makeClient();
-      await runSyncLoop(cwd, client, [syncer]);
+      
+      await runSyncLoop(cwd, [syncer]);
 
       expect(syncer.update).not.toHaveBeenCalled();
     } finally {
@@ -316,8 +300,8 @@ describe("runSyncLoop", () => {
       await writeResource(cwd, ".zitadel/flows", "default.json", { kind: "flow-definition", version: 2 });
 
       const syncer = makeSyncer({ directory: ".zitadel/flows", mutable: true });
-      const client = makeClient();
-      await runSyncLoop(cwd, client, [syncer]);
+      
+      await runSyncLoop(cwd, [syncer]);
 
       expect(syncer.update).toHaveBeenCalledOnce();
     } finally {
@@ -337,10 +321,10 @@ describe("runSyncLoop", () => {
       await mkdir(join(cwd, ".zitadel/schemas"), { recursive: true });
 
       const syncer = makeSyncer();
-      const client = makeClient();
-      await runSyncLoop(cwd, client, [syncer]);
+      
+      await runSyncLoop(cwd, [syncer]);
 
-      expect(syncer.delete).toHaveBeenCalledWith(client, "old-schema-id");
+      expect(syncer.delete).toHaveBeenCalledWith("old-schema-id");
     } finally {
       await rm(cwd, { recursive: true, force: true });
     }

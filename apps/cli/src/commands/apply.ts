@@ -1,7 +1,9 @@
 import { Flags } from "@oclif/core";
 
+import { setApiBaseUrl } from "@zitadel-nextgen/api/runtime/base-url";
+import { setApiAuthToken } from "@zitadel-nextgen/api/runtime/auth";
+
 import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
-import { createPlatformClient } from "../lib/api";
 import { environmentSchema } from "../lib/api/schemas";
 import { buildSyncPlan, makeSyncers, renderPlan, runSyncLoop, summarizePlan } from "../lib/sync";
 import { readZitadelSecret } from "../lib/project";
@@ -35,15 +37,16 @@ export default class Apply extends BaseCommand {
     const { cwd, source, env, dryRun, isTTY } = this.meta;
 
     const secret = await readZitadelSecret(cwd);
-    const client = createPlatformClient(source, secret.project_secret);
+    setApiBaseUrl(source.replace(/\/+$/, ""));
+    setApiAuthToken(secret.project_secret);
     const syncers = makeSyncers({ projectId: secret.project_id, env });
 
     if (!dryRun) {
-      await runSyncLoop(cwd, client, syncers);
+      await runSyncLoop(cwd, syncers);
       return this.emit({ status: "ok", data: { synced: true } });
     }
 
-    const plan = await buildSyncPlan(cwd, syncers, client);
+    const plan = await buildSyncPlan(cwd, syncers, true);
     return this.emit({
       status: "ok",
       data: summarizePlan(plan),

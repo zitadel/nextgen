@@ -7,10 +7,12 @@ import { createOrca, issuerFromPort, type FrameworkFacts, type Orca } from "../.
 import type { PatchContext } from "../../lib/orca/patchers/types";
 import { RENDERER_IDS } from "../../lib/orca/patchers/rule/next/renderers/registry";
 import { CreateSchemaBody } from "@zitadel-nextgen/api/generated/endpoints/zitadelNextGen.zod";
+import { createProject } from "@zitadel-nextgen/api/generated/endpoints/zitadelNextGen";
+import type { CreateProject201 } from "@zitadel-nextgen/api/generated/model";
+import { setApiBaseUrl } from "@zitadel-nextgen/api/runtime/base-url";
+import { setApiAuthToken } from "@zitadel-nextgen/api/runtime/auth";
 
 import { buildUserSchema } from "../../lib/user-schema";
-import { createPlatformClient } from "../../lib/api";
-import type { CreateProjectResponse } from "../../lib/api/client";
 import { makeSyncers, runSyncLoop } from "../../lib/sync";
 import { hasZitadelConfig, hasZitadelSecret, readZitadelSecret } from "../../lib/project";
 import { PickFrameworkPrompt, SETUP_PROMPTS, type SetupAnswers } from "./prompts";
@@ -105,9 +107,16 @@ export default class Setup extends BaseCommand {
     const sp = interactiveSpinner(!nonInteractive && !dryRun);
 
     sp?.start("Creating project on the platform");
+    if (!dryRun) {
+      setApiBaseUrl(answers.server.replace(/\/+$/, ""));
+      // No bearer token yet — POST /projects is unauthenticated; the
+      // returned `projectSecret` is what authorises every subsequent
+      // call below.
+      setApiAuthToken(undefined);
+    }
     const project = dryRun
       ? dryRunProject()
-      : await createPlatformClient(answers.server).createProject({ previewOrigins: [] });
+      : await createProject({ previewOrigins: [] });
 
     const ctx: PatchContext = {
       framework,
@@ -125,8 +134,8 @@ export default class Setup extends BaseCommand {
     if (!flags["no-apply"] && !dryRun) {
       sp?.message("Syncing config to the platform");
       const secret = await readZitadelSecret(cwd);
-      const client = createPlatformClient(answers.server, secret.project_secret);
-      await runSyncLoop(cwd, client, makeSyncers({ projectId: secret.project_id, env }));
+      setApiAuthToken(secret.project_secret);
+      await runSyncLoop(cwd, makeSyncers({ projectId: secret.project_id, env }));
       apply = { synced: true };
     }
     sp?.stop("Zitadel is ready.");
@@ -170,7 +179,7 @@ async function resolveScaffoldFramework(
 }
 
 /** A deterministic stand-in project for `--dry-run`, so no remote call is made. */
-function dryRunProject(): CreateProjectResponse {
+function dryRunProject(): CreateProject201 {
   return {
     id: "dry-run-0000",
     projectSecret: "sk_proj_dry_run_full",
