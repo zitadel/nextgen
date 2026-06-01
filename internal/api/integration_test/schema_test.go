@@ -89,7 +89,7 @@ func TestCreateSchema(t *testing.T) {
 
 			resp, err := harness.EnsureAPIClient(t, project.ID).CreateSchema(t.Context(), req, params)
 			assert.NoError(t, err)
-			assert.IsType(t, &api.CreateSchemaBadRequest{}, resp, mustMarshal(t, resp))
+			assert.IsType(t, &api.CreateSchemaBadRequest{}, resp, helpers.MustMarshal(t, resp))
 
 		})
 

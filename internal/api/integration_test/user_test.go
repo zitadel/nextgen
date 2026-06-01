@@ -13,11 +13,11 @@ import (
 )
 
 func TestCreateUser(t *testing.T) {
-	client := harness.EnsureAPIClient(t)
 
 	t.Run("ok", func(t *testing.T) {
 		t.Run("simple", func(t *testing.T) {
 			project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+			client := harness.EnsureAPIClient(t, project.ID)
 			require.NoError(t, err)
 
 			team, err := harness.EnsureTeamService(t).CreateTeam(t.Context(), service.CreateTeamInput{
@@ -46,10 +46,9 @@ func TestCreateUser(t *testing.T) {
 }
 
 func TestGetUser(t *testing.T) {
-	client := harness.EnsureAPIClient(t)
-
 	t.Run("ok", func(t *testing.T) {
 		project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+		client := harness.EnsureAPIClient(t, project.ID)
 		require.NoError(t, err)
 
 		team, err := harness.EnsureTeamService(t).CreateTeam(t.Context(), service.CreateTeamInput{
