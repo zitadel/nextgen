@@ -174,16 +174,10 @@ func (e FlowFieldValidationErrors) Error() string {
 	return strings.Join(parts, "; ")
 }
 
-// FlowImplicitOutcomeUserNotFound is the implicit transition outcome
-// the resolver surfaces for any [FlowFieldChallengeIdentifier] field
-// when the submitted identifier resolves to no user. Drives the
-// login → register flip when wired.
+// FlowImplicitOutcomeUserNotFound drives the login → register flip.
 const FlowImplicitOutcomeUserNotFound = "user_not_found"
 
-// FlowImplicitOutcomeUserAlreadyExists is the implicit transition
-// outcome surfaced for any [FlowFieldChallengeIdentifier] field when the
-// submitted identifier resolves to an existing user during a register
-// flow. Drives the register → login flip when wired.
+// FlowImplicitOutcomeUserAlreadyExists drives the register → login flip.
 const FlowImplicitOutcomeUserAlreadyExists = "user_already_exists"
 
 // implicitOutcomesByChallenge lists the transition outcomes a field

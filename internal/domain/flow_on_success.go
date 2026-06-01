@@ -14,26 +14,20 @@ import (
 // in their own file (e.g. flow_on_success_create_user.go).
 type FlowOnSuccessHandler interface {
 	Handle(ctx context.Context, client database.QueryExecutor, in FlowOnSuccessInput) (FlowOnSuccessResult, error)
-	// EstablishedKinds reports the credential kinds this mutation
-	// establishes when it runs. The dispatch loop unions the manifests
-	// of every on_success handler reachable upstream from the current
-	// step to decide whether a collected credential should be verified
-	// (kind absent — verify) or skipped (kind present — the mutation
-	// owns it).
+	// EstablishedKinds reports the credential kinds this mutation owns.
+	// Dispatch skips verification of any kind in the union of these
+	// across the current step and its history.
 	EstablishedKinds() []FlowFieldChallenge
 }
 
 // onSuccessManifests is the single source of truth for each mutation's
-// established credential kinds. Handlers return a copy via
-// EstablishedKinds; the definition validator looks up the same table to
-// cross-check that the kinds the mutation will establish are collected
-// upstream. Add a row when a new on_success is wired.
+// established kinds. Handlers and the validator both read it.
 var onSuccessManifests = map[FlowOnSuccess][]FlowFieldChallenge{
 	FlowOnSuccessCreateUser: {FlowFieldChallengeIdentifier, FlowFieldChallengePassword},
 }
 
-// ManifestForOnSuccess returns the credential kinds the named mutation
-// establishes, or nil if the value is unknown.
+// ManifestForOnSuccess returns the kinds the mutation establishes,
+// or nil if unknown.
 func ManifestForOnSuccess(o FlowOnSuccess) []FlowFieldChallenge {
 	src := onSuccessManifests[o]
 	if src == nil {

@@ -322,10 +322,8 @@ var challengeDispatchOrder = []FlowFieldChallenge{
 	FlowFieldChallengePassword,
 }
 
-// purposeFlipTable maps an identifier outcome to the [FlowDefinitionPurpose]
-// the engine flips [FlowProgress.CurrentPurpose] to when the entry purpose
-// matches. login + user_not_found → register; register + user_already_exists
-// → login. Recovery never flips.
+// purposeFlipTable maps (CurrentPurpose, outcome) → new CurrentPurpose.
+// Recovery never flips.
 var purposeFlipTable = map[FlowDefinitionPurpose]map[string]FlowDefinitionPurpose{
 	FlowDefinitionPurposeLogin: {
 		FlowImplicitOutcomeUserNotFound: FlowDefinitionPurposeRegister,
@@ -335,9 +333,7 @@ var purposeFlipTable = map[FlowDefinitionPurpose]map[string]FlowDefinitionPurpos
 	},
 }
 
-// applyOutcomeFlip flips state.CurrentPurpose when (CurrentPurpose, outcome)
-// matches an entry in [purposeFlipTable]. No-op for outcomes that do not flip
-// or purposes that have no flip target.
+// applyOutcomeFlip flips CurrentPurpose per [purposeFlipTable].
 func applyOutcomeFlip(state *FlowState, outcome string) {
 	if outcome == "" {
 		return
@@ -351,18 +347,9 @@ func applyOutcomeFlip(state *FlowState, outcome string) {
 	}
 }
 
-// dispatchChallenges submits each field-shaped challenge in
-// [challengeDispatchOrder]. Mode + manifest decide verify-vs-skip:
-//   - Identifier always dispatches when no user is pinned yet (the
-//     resolver only flags identifier on x-unique properties). The
-//     outcome interpretation depends on CurrentPurpose: login + miss
-//     emits user_not_found (which the engine flips to register), register
-//     + hit emits user_already_exists (flipped to login), register + miss
-//     and login + hit proceed normally.
-//   - Password skips when CurrentPurpose != login, or when the password
-//     kind appears in the union of [FlowOnSuccessHandler.EstablishedKinds]
-//     across the current step plus its history (so a credential a
-//     downstream mutation will establish is never verified upstream).
+// dispatchChallenges submits field-shaped challenges in
+// [challengeDispatchOrder]. CurrentPurpose + the union of
+// [FlowOnSuccessHandler.EstablishedKinds] decide verify-vs-skip.
 func (r *FlowStateMachineRuntime) dispatchChallenges(ctx context.Context, def *FlowDefinition, state *FlowState, step *FlowDefinitionStep, resolved FlowResolvedFields, fields map[string]any) (flowDispatchResult, error) {
 	established := r.establishedKinds(def, state, step)
 
@@ -384,7 +371,6 @@ func (r *FlowStateMachineRuntime) dispatchChallenges(ctx context.Context, def *F
 			})
 			if errors.Is(err, ErrAuthAttemptProofRejected(nil)) {
 				if state.CurrentPurpose == FlowDefinitionPurposeRegister {
-					// Expected for a register-mode collecting step.
 					continue
 				}
 				return flowDispatchResult{Outcome: FlowImplicitOutcomeUserNotFound}, nil
@@ -420,11 +406,8 @@ func (r *FlowStateMachineRuntime) dispatchChallenges(ctx context.Context, def *F
 	return flowDispatchResult{}, nil
 }
 
-// establishedKinds returns the union of [FlowOnSuccessHandler.EstablishedKinds]
-// across the current step and its history within the active progress. A
-// credential whose kind appears in the set is owned by a mutation
-// (either upstream and already run, or on the current step about to
-// run) and must not be verified by dispatch.
+// establishedKinds unions [FlowOnSuccessHandler.EstablishedKinds]
+// across the current step and its history.
 func (r *FlowStateMachineRuntime) establishedKinds(def *FlowDefinition, state *FlowState, current *FlowDefinitionStep) map[FlowFieldChallenge]struct{} {
 	set := map[FlowFieldChallenge]struct{}{}
 	addFromStep := func(s *FlowDefinitionStep) {
@@ -450,9 +433,8 @@ func (r *FlowStateMachineRuntime) establishedKinds(def *FlowDefinition, state *F
 	return set
 }
 
-// handlerFor returns the wired [FlowOnSuccessHandler] for a given
-// [FlowOnSuccess] value, or nil when no handler is registered. Used
-// both by dispatch (to read EstablishedKinds) and by runOnSuccess.
+// handlerFor returns the wired [FlowOnSuccessHandler] or nil. Shared by
+// dispatch (manifest lookup) and runOnSuccess.
 func (r *FlowStateMachineRuntime) handlerFor(o FlowOnSuccess) FlowOnSuccessHandler {
 	switch o {
 	case FlowOnSuccessCreateUser:
@@ -479,9 +461,7 @@ func fieldValueByChallenge(resolved FlowResolvedFields, fields map[string]any, t
 	return "", "", false
 }
 
-// runOnSuccess dispatches the step's on_success mutation. Resolution
-// goes through [handlerFor] so the dispatch loop (which reads
-// EstablishedKinds) and the mutation execution share one wiring point.
+// runOnSuccess dispatches the step's on_success mutation via [handlerFor].
 func (r *FlowStateMachineRuntime) runOnSuccess(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState, userSchemaURL string, step *FlowDefinitionStep, fields map[string]any, resolved FlowResolvedFields) (FlowOnSuccessResult, error) {
 	handler := r.handlerFor(*step.OnSuccess)
 	if handler == nil {

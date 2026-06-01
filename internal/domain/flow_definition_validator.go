@@ -41,8 +41,7 @@ func ValidateFlowDefinition(userSchema *jsonschema.Schema, flowDefinition FlowDe
 		return nil, err
 	}
 
-	// 5. cross-checks introduced with ADR 017: flip-table coverage on
-	// entry steps and the on_success manifest.
+	// 5. flip-table coverage + on_success manifest cross-check
 	if err := validateFlipTableCoverage(flowDefinition); err != nil {
 		return nil, err
 	}
@@ -313,13 +312,9 @@ func stepFieldsInUserSchema(stepName string, stepFields []string, userProperties
 	return nil
 }
 
-// validateFlipTableCoverage enforces that every entry step (a value in
-// `purposes`) wires the counter-outcome of its purpose iff another
-// purpose's entry step is wired on the same definition. Concretely: a
-// login entry only needs `user_not_found` when the same definition also
-// serves `register`; a register entry only needs `user_already_exists`
-// when the same definition also serves `login`. Solo flows never need
-// the counter outcome.
+// validateFlipTableCoverage requires the counter-outcome transition on
+// an entry step iff the partner purpose is also wired (e.g. login entry
+// needs user_not_found only when register is also a purpose).
 func validateFlipTableCoverage(def FlowDefinition) error {
 	purposes := def.Purposes
 	for purpose, entryStepName := range purposes {
@@ -345,9 +340,8 @@ func validateFlipTableCoverage(def FlowDefinition) error {
 	return nil
 }
 
-// purposeFlipTargets mirrors the engine's outcome → purpose flip table.
-// Kept here (rather than imported from flow_state_machine.go) so the
-// validator stays a pure function of the definition.
+// purposeFlipTargets mirrors the engine's flip table. Kept separate so
+// the validator stays pure.
 var purposeFlipTargets = map[FlowDefinitionPurpose]map[string]FlowDefinitionPurpose{
 	FlowDefinitionPurposeLogin: {
 		FlowImplicitOutcomeUserNotFound: FlowDefinitionPurposeRegister,
@@ -357,11 +351,8 @@ var purposeFlipTargets = map[FlowDefinitionPurpose]map[string]FlowDefinitionPurp
 	},
 }
 
-// validateOnSuccessManifests cross-checks each step that runs an
-// on_success mutation: every credential kind the mutation establishes
-// must be reachable (collected, or in the case of passkey, ceremony-shaped)
-// upstream from the step or on the step itself. The walk is a BFS over
-// reverse-adjacency from the on_success step.
+// validateOnSuccessManifests verifies that every kind in each step's
+// on_success manifest is collected on the step itself or upstream.
 func validateOnSuccessManifests(def FlowDefinition, userSchema *jsonschema.Schema) error {
 	if len(def.Steps) == 0 {
 		return nil
@@ -399,9 +390,7 @@ func validateOnSuccessManifests(def FlowDefinition, userSchema *jsonschema.Schem
 	return nil
 }
 
-// reachableSteps returns the set of step names from which `start` is
-// reachable (i.e. `start` and every ancestor), traversing the
-// reverse-adjacency map.
+// reachableSteps returns `start` plus every ancestor in `reverse`.
 func reachableSteps(start string, reverse map[string][]string) map[string]struct{} {
 	out := map[string]struct{}{start: {}}
 	queue := []string{start}
@@ -419,8 +408,8 @@ func reachableSteps(start string, reverse map[string][]string) map[string]struct
 	return out
 }
 
-// someStepEstablishesKind reports whether any step in the candidate set
-// collects a field whose schema-derived challenge matches kind.
+// someStepEstablishesKind reports whether any candidate step collects
+// a field whose schema-derived challenge matches kind.
 func someStepEstablishesKind(candidates map[string]struct{}, byName map[string]*FlowDefinitionStep, kind FlowFieldChallenge, userSchema *jsonschema.Schema) bool {
 	for name := range candidates {
 		s, ok := byName[name]
@@ -436,10 +425,7 @@ func someStepEstablishesKind(candidates map[string]struct{}, byName map[string]*
 	return false
 }
 
-// challengeForField mirrors [deriveChallenge] in the field resolver: a
-// non-empty x-unique scope → identifier; x-password combined with
-// schema-level x-auth-methods.password.enabled → password; otherwise
-// None.
+// challengeForField mirrors [deriveChallenge] in the field resolver.
 func challengeForField(userSchema *jsonschema.Schema, fieldName string) FlowFieldChallenge {
 	if userSchema == nil {
 		return FlowFieldChallengeNone
@@ -458,8 +444,7 @@ func challengeForField(userSchema *jsonschema.Schema, fieldName string) FlowFiel
 	return FlowFieldChallengeNone
 }
 
-// authMethodEnabled reports whether the root schema declares
-// `x-auth-methods.<method>.enabled = true`.
+// authMethodEnabled reads `x-auth-methods.<method>.enabled` off the root schema.
 func authMethodEnabled(schema *jsonschema.Schema, method string) bool {
 	if schema == nil {
 		return false
