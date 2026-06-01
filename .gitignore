@@ -87,6 +87,7 @@ coverage
 ## Next.js / Nuxt build outputs
 .next/
 .nuxt/
+.nuxt-typecheck/
 .output/
 
 ## Go build cache
@@ -105,3 +106,5 @@ apps/demo-next/tsconfig.tsbuildinfo
 packages/api-mock/tsconfig.tsbuildinfo
 
 .nx/polygraph
+# Root TS incremental build info (generated)
+tsconfig.tsbuildinfo

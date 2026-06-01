@@ -15,6 +15,9 @@
   ],
   "references": [
     {
+      "path": "../sdk-core"
+    },
+    {
       "path": "../components"
     },
     {

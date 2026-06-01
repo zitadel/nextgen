@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/zitadel/nextgen/internal/storage/database"
-	spannerEmbedded "github.com/zitadel/nextgen/internal/storage/database/dialect/spanner/embedded"
+	"github.com/zitadel/nextgen/internal/storage/database/dbtest"
 )
 
 var testPool database.PoolTest
@@ -21,9 +21,9 @@ func TestMain(m *testing.M) {
 func runTests(m *testing.M) int {
 	ctx := context.Background()
 
-	connector, stop, err := spannerEmbedded.StartEmbedded(ctx)
+	connector, stop, err := dbtest.Spanner(ctx)
 	if err != nil {
-		log.Printf("setup: failed to start Spanner emulator: %v", err)
+		log.Printf("setup: failed to start Spanner database: %v", err)
 		return 1
 	}
 	defer stop()
