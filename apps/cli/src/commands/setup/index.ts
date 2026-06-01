@@ -108,11 +108,9 @@ export default class Setup extends BaseCommand {
 
     sp?.start("Creating project on the platform");
     if (!dryRun) {
+      // POST /projects is unauthenticated; the returned `projectSecret`
+      // is what authorises every subsequent call (set further down).
       setApiBaseUrl(answers.server.replace(/\/+$/, ""));
-      // No bearer token yet — POST /projects is unauthenticated; the
-      // returned `projectSecret` is what authorises every subsequent
-      // call below.
-      setApiAuthToken(undefined);
     }
     const project = dryRun
       ? dryRunProject()

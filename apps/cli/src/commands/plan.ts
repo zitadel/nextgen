@@ -4,7 +4,7 @@ import { setApiBaseUrl } from "@zitadel-nextgen/api/runtime/base-url";
 import { setApiAuthToken } from "@zitadel-nextgen/api/runtime/auth";
 
 import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
-import { environmentSchema } from "../lib/api/schemas";
+import { environmentSchema } from "../lib/environment";
 import { buildSyncPlan, makeSyncers, renderPlan, summarizePlan } from "../lib/sync";
 import { readZitadelSecret } from "../lib/project";
 
