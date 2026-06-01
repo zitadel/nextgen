@@ -42,14 +42,14 @@ type flowDefinitionAudienceJSON struct {
 }
 
 type flowDefinitionStepJSON struct {
-	Name         string                             `json:"name"`
-	Fields       []string                           `json:"fields,omitempty"`
-	Actions      map[string]flowStepActionJSON      `json:"actions,omitempty"`
-	Gates        map[string]flowStepGateJSON        `json:"gates,omitempty"`
-	SSOProviders []flowSSOProviderJSON              `json:"sso_providers,omitempty"`
-	OnSuccess    *string                            `json:"on_success,omitempty"`
-	Complete     *string                            `json:"complete,omitempty"`
-	Transitions  map[string]flowStepTransitionJSON  `json:"transitions,omitempty"`
+	Name         string                            `json:"name"`
+	Fields       []string                          `json:"fields,omitempty"`
+	Actions      map[string]flowStepActionJSON     `json:"actions,omitempty"`
+	Gates        map[string]flowStepGateJSON       `json:"gates,omitempty"`
+	SSOProviders []flowSSOProviderJSON             `json:"sso_providers,omitempty"`
+	OnSuccess    *string                           `json:"on_success,omitempty"`
+	Complete     *string                           `json:"complete,omitempty"`
+	Transitions  map[string]flowStepTransitionJSON `json:"transitions,omitempty"`
 }
 
 type flowStepActionJSON struct {

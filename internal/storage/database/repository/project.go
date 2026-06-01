@@ -15,11 +15,11 @@ const pgTableProjects = "zitadel_nextgen.projects"
 const spannerTableProjects = "projects"
 
 type projectRow struct {
-	ID             string         `db:"id"`
-	CreatedAt      time.Time      `db:"created_at"`
-	UpdatedAt      time.Time      `db:"updated_at"`
-	ProjectSecret  string         `db:"project_secret"`
-	PreviewSecret  string         `db:"preview_secret"`
+	ID             string            `db:"id"`
+	CreatedAt      time.Time         `db:"created_at"`
+	UpdatedAt      time.Time         `db:"updated_at"`
+	ProjectSecret  string            `db:"project_secret"`
+	PreviewSecret  string            `db:"preview_secret"`
 	PreviewOrigins JSONArray[string] `db:"preview_origins"`
 }
 

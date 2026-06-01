@@ -35,6 +35,13 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+      - name: Verify gofmt formatting
+        run: |
+          unformatted="$(git ls-files -z -- '*.go' | xargs -0 -r gofmt -l)"
+          if [ -n "$unformatted" ]; then
+            printf '%s\n' "$unformatted"
+            exit 1
+          fi
       - run: go generate ./...
       - name: Verify generated code is up to date
         run: |
