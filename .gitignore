@@ -87,6 +87,7 @@ coverage
 ## Next.js / Nuxt build outputs
 .next/
 .nuxt/
+.nuxt-typecheck/
 .output/
 
 ## Go build cache
