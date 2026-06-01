@@ -48,7 +48,7 @@ var (
 		"POST": "Content-Type",
 	}
 	rn46AllowedHeaders = map[string]string{
-		"POST": "Content-Type",
+		"POST": "Content-Type,Origin",
 	}
 	rn48AllowedHeaders = map[string]string{
 		"POST": "Content-Type,Origin",
