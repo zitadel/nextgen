@@ -1,7 +1,6 @@
 import { Flags } from "@oclif/core";
 
-import { setApiBaseUrl } from "@zitadel-nextgen/api/runtime/base-url";
-import { setApiAuthToken } from "@zitadel-nextgen/api/runtime/auth";
+import { createZitadelClient } from "@zitadel-nextgen/api/client";
 
 import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
 import { environmentSchema } from "../lib/environment";
@@ -37,9 +36,11 @@ export default class Apply extends BaseCommand {
     const { cwd, source, env, dryRun, isTTY } = this.meta;
 
     const secret = await readZitadelSecret(cwd);
-    setApiBaseUrl(source.replace(/\/+$/, ""));
-    setApiAuthToken(secret.project_secret);
-    const syncers = makeSyncers({ projectId: secret.project_id, env });
+    const client = createZitadelClient({
+      baseUrl: source,
+      token: secret.project_secret,
+    });
+    const syncers = makeSyncers({ client, projectId: secret.project_id, env });
 
     if (!dryRun) {
       await runSyncLoop(cwd, syncers);

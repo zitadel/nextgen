@@ -4,14 +4,7 @@ import type {
   GetSchemaById200,
   GetFlowDefinition200,
 } from "@zitadel-nextgen/api/generated/model";
-import {
-  createFlowDefinition,
-  createSchema,
-  deleteFlowDefinition,
-  getFlowDefinition,
-  getSchemaById,
-  updateFlowDefinition,
-} from "@zitadel-nextgen/api/generated/endpoints/zitadelNextGen";
+import type { ZitadelClient } from "@zitadel-nextgen/api/client";
 import { CreateSchemaBody as createSchemaBodySchema } from "@zitadel-nextgen/api/generated/endpoints/zitadelNextGen.zod";
 
 import { FLOWS_DIR, flowEnvRefs, validateFlows } from "../flows";
@@ -31,12 +24,13 @@ type EnvLookup = Record<string, string | undefined>;
  * read-only by the sync loop.
  */
 export function makeSyncers(opts: {
+  client: ZitadelClient;
   projectId: string;
   env: EnvLookup;
 }): ReadonlyArray<ResourceSyncer> {
   return [
-    new SchemaSyncer(opts.projectId, opts.env),
-    new FlowDefinitionSyncer(opts.projectId, opts.env),
+    new SchemaSyncer(opts.client, opts.projectId, opts.env),
+    new FlowDefinitionSyncer(opts.client, opts.projectId, opts.env),
   ];
 }
 
@@ -59,6 +53,7 @@ class SchemaSyncer implements ResourceSyncer {
   readonly mutable = false;
 
   constructor(
+    private readonly client: ZitadelClient,
     private readonly projectId: string,
     private readonly env: EnvLookup,
   ) {}
@@ -80,7 +75,9 @@ class SchemaSyncer implements ResourceSyncer {
   }
 
   async create(data: object): Promise<string> {
-    const result = await createSchema(data as CreateSchemaBody, { project_id: this.projectId });
+    const result = await this.client.createSchema(data as CreateSchemaBody, {
+      project_id: this.projectId,
+    });
     return result.id;
   }
 
@@ -99,7 +96,7 @@ class SchemaSyncer implements ResourceSyncer {
   }
 
   async fetch(id: string): Promise<object> {
-    const body = await getSchemaById(id, { project_id: this.projectId });
+    const body = await this.client.getSchemaById(id, { project_id: this.projectId });
     return body as unknown as GetSchemaById200;
   }
 }
@@ -110,6 +107,7 @@ class FlowDefinitionSyncer implements ResourceSyncer {
   readonly mutable = true;
 
   constructor(
+    private readonly client: ZitadelClient,
     private readonly projectId: string,
     private readonly env: EnvLookup,
   ) {}
@@ -132,7 +130,7 @@ class FlowDefinitionSyncer implements ResourceSyncer {
    * envelope.
    */
   async create(data: object): Promise<string> {
-    const result = await createFlowDefinition({
+    const result = await this.client.createFlowDefinition({
       project_id: this.projectId,
       flow_definition: data as CreateFlowDefinitionBodyFlowDefinition,
     });
@@ -141,11 +139,14 @@ class FlowDefinitionSyncer implements ResourceSyncer {
 
   /** PATCH body is the bare partial flow per `flow-definition-update-request` — no envelope. */
   async update(id: string, data: object): Promise<void> {
-    await updateFlowDefinition(id, data as Partial<CreateFlowDefinitionBodyFlowDefinition>);
+    await this.client.updateFlowDefinition(
+      id,
+      data as Partial<CreateFlowDefinitionBodyFlowDefinition>,
+    );
   }
 
   async delete(id: string): Promise<void> {
-    await deleteFlowDefinition(id);
+    await this.client.deleteFlowDefinition(id);
   }
 
   /**
@@ -156,7 +157,7 @@ class FlowDefinitionSyncer implements ResourceSyncer {
    * body.
    */
   async fetch(id: string): Promise<object> {
-    const envelope = (await getFlowDefinition(id)) as GetFlowDefinition200;
+    const envelope = (await this.client.getFlowDefinition(id)) as GetFlowDefinition200;
     const {
       id: _id,
       project_id: _projectId,

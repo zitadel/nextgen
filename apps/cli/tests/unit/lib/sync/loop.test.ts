@@ -4,9 +4,13 @@ import { tmpdir } from "node:os";
 
 import { describe, expect, it, vi } from "vitest";
 
+import { createZitadelClient } from "@zitadel-nextgen/api/client";
+
 import { buildSyncPlan, runSyncLoop } from "../../../../src/lib/sync/loop";
 import { makeSyncers } from "../../../../src/lib/sync/syncers";
 import type { ResourceSyncer } from "../../../../src/lib/sync/syncers";
+
+const client = createZitadelClient({ baseUrl: "http://test.local" });
 
 function makeCwd(): string {
   return join(tmpdir(), `zitadel-test-${Math.random().toString(36).slice(2)}`);
@@ -204,7 +208,7 @@ describe("buildSyncPlan validation (real syncers)", () => {
       await writeResource(cwd, ".zitadel/schemas", "user.json", { type: 123 });
 
       await expect(
-        buildSyncPlan(cwd, makeSyncers({ projectId: "proj-1", env: {} })),
+        buildSyncPlan(cwd, makeSyncers({ client, projectId: "proj-1", env: {} })),
       ).rejects.toMatchObject({ code: "E_VALIDATION" });
     } finally {
       await rm(cwd, { recursive: true, force: true });
@@ -218,7 +222,7 @@ describe("buildSyncPlan validation (real syncers)", () => {
       await writeResource(cwd, ".zitadel/flows", "default.json", { version: 99, kind: "wrong" });
 
       await expect(
-        buildSyncPlan(cwd, makeSyncers({ projectId: "proj-1", env: {} })),
+        buildSyncPlan(cwd, makeSyncers({ client, projectId: "proj-1", env: {} })),
       ).rejects.toMatchObject({ code: "E_VALIDATION" });
     } finally {
       await rm(cwd, { recursive: true, force: true });

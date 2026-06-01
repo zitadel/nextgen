@@ -7,10 +7,8 @@ import { createOrca, issuerFromPort, type FrameworkFacts, type Orca } from "../.
 import type { PatchContext } from "../../lib/orca/patchers/types";
 import { RENDERER_IDS } from "../../lib/orca/patchers/rule/next/renderers/registry";
 import { CreateSchemaBody } from "@zitadel-nextgen/api/generated/endpoints/zitadelNextGen.zod";
-import { createProject } from "@zitadel-nextgen/api/generated/endpoints/zitadelNextGen";
 import type { CreateProject201 } from "@zitadel-nextgen/api/generated/model";
-import { setApiBaseUrl } from "@zitadel-nextgen/api/runtime/base-url";
-import { setApiAuthToken } from "@zitadel-nextgen/api/runtime/auth";
+import { createZitadelClient } from "@zitadel-nextgen/api/client";
 
 import { buildUserSchema } from "../../lib/user-schema";
 import { makeSyncers, runSyncLoop } from "../../lib/sync";
@@ -107,14 +105,13 @@ export default class Setup extends BaseCommand {
     const sp = interactiveSpinner(!nonInteractive && !dryRun);
 
     sp?.start("Creating project on the platform");
-    if (!dryRun) {
-      // POST /projects is unauthenticated; the returned `projectSecret`
-      // is what authorises every subsequent call (set further down).
-      setApiBaseUrl(answers.server.replace(/\/+$/, ""));
-    }
+    // `POST /projects` is unauthenticated; the returned `projectSecret`
+    // authorises every subsequent call (we build a second, token-bound
+    // client further down for the sync loop).
+    const unauthClient = createZitadelClient({ baseUrl: answers.server });
     const project = dryRun
       ? dryRunProject()
-      : await createProject({ previewOrigins: [] });
+      : await unauthClient.createProject({ previewOrigins: [] });
 
     const ctx: PatchContext = {
       framework,
@@ -132,8 +129,14 @@ export default class Setup extends BaseCommand {
     if (!flags["no-apply"] && !dryRun) {
       sp?.message("Syncing config to the platform");
       const secret = await readZitadelSecret(cwd);
-      setApiAuthToken(secret.project_secret);
-      await runSyncLoop(cwd, makeSyncers({ projectId: secret.project_id, env }));
+      const client = createZitadelClient({
+        baseUrl: answers.server,
+        token: secret.project_secret,
+      });
+      await runSyncLoop(
+        cwd,
+        makeSyncers({ client, projectId: secret.project_id, env }),
+      );
       apply = { synced: true };
     }
     sp?.stop("Zitadel is ready.");
