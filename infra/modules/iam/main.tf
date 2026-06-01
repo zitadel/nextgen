@@ -7,14 +7,6 @@ resource "google_service_account" "run" {
   description  = "Cloud Run service identity for the Zitadel runtime"
 }
 
-# Spanner access (read/write, no DDL)
-resource "google_spanner_database_iam_member" "run_spanner" {
-  instance = var.spanner_instance_name
-  database = var.spanner_database_name
-  role     = "roles/spanner.databaseUser"
-  member   = "serviceAccount:${google_service_account.run.email}"
-}
-
 # Logging
 resource "google_project_iam_member" "run_logging" {
   project = var.project_id
@@ -66,14 +58,6 @@ resource "google_service_account" "migrator" {
   description  = "Cloud Run Job identity for schema migrations"
 }
 
-# Spanner DDL access (migrate.rs uses admin API for DDL statements)
-resource "google_spanner_database_iam_member" "migrator_spanner" {
-  instance = var.spanner_instance_name
-  database = var.spanner_database_name
-  role     = "roles/spanner.databaseAdmin"
-  member   = "serviceAccount:${google_service_account.migrator.email}"
-}
-
 # Logging for migration output
 resource "google_project_iam_member" "migrator_logging" {
   project = var.project_id
@@ -85,35 +69,26 @@ resource "google_project_iam_member" "migrator_logging" {
 # Secret Manager: runtime + migrator SAs can read secrets at container start
 # ─────────────────────────────────────────────────────────────────────────────
 resource "google_secret_manager_secret_iam_member" "run_secret_access" {
-  for_each  = var.secret_ids
+  for_each  = var.secret_refs
   project   = var.project_id
-  secret_id = each.value
+  secret_id = each.value.secret_id
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.run.email}"
 }
 
 resource "google_secret_manager_secret_iam_member" "migrator_secret_access" {
-  for_each  = var.secret_ids
+  for_each  = var.secret_refs
   project   = var.project_id
-  secret_id = each.value
+  secret_id = each.value.secret_id
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.migrator.email}"
 }
 
-# Deploy SA can push new secret versions (1Password → Secret Manager sync)
-resource "google_secret_manager_secret_iam_member" "deploy_secret_version" {
-  for_each  = var.secret_ids
-  project   = var.project_id
-  secret_id = each.value
-  role      = "roles/secretmanager.secretVersionManager"
-  member    = "serviceAccount:${var.github_deploy_sa_email}"
-}
-
-# Deploy SA can read current secret values (idempotent sync comparison)
+# Deploy SA can attach Secret Manager references to Cloud Run revisions.
 resource "google_secret_manager_secret_iam_member" "deploy_secret_access" {
-  for_each  = var.secret_ids
+  for_each  = var.secret_refs
   project   = var.project_id
-  secret_id = each.value
+  secret_id = each.value.secret_id
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${var.github_deploy_sa_email}"
 }

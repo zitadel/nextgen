@@ -6,12 +6,11 @@ Two-tier OpenTofu layout: a **management project** for shared resources and **en
 
 ```
 zitadel-ops (mgmt)            zitadel-dev / prod / ...
-├── GCS state bucket          ├── Spanner
-├── Artifact Registry         ├── Cloud Run (service + migrate job)
-├── infra-apply SA + WIF      ├── External ALB + CDN
-├── github-deploy SA + WIF    ├── Certificate Map
-└── cross-project IAM         ├── Cloud DNS
-                              └── IAM (runtime + migrator SAs)
+├── GCS state bucket          ├── Cloud Run (service + migrate job)
+├── Artifact Registry         ├── External ALB + CDN
+├── infra-apply SA + WIF      ├── Certificate Map
+├── github-deploy SA + WIF    ├── Cloud DNS
+└── cross-project IAM         └── IAM (runtime + migrator SAs)
 ```
 
 ## Directory layout
@@ -27,24 +26,25 @@ infra/
 
 ## Modules (environment)
 
-| Module | Purpose |
-|--------|---------|
-| `project` | Enable required GCP APIs |
-| `spanner` | Spanner instance + database shell |
-| `iam` | Runtime + migrator SAs, deploy SA impersonation |
-| `cloud-run` | Service (runtime) + Job (migrations) |
-| `load-balancer` | External ALB + CDN + serverless NEG |
-| `certificate-map` | Certificate Manager map (runtime-populated) |
-| `dns` | Cloud DNS zone + A records |
+| Module            | Purpose                                         |
+| ----------------- | ----------------------------------------------- |
+| `project`         | Enable required GCP APIs                        |
+| `secrets`         | Secret Manager containers for runtime secrets   |
+| `iam`             | Runtime + migrator SAs, deploy SA impersonation |
+| `cloud-run`       | Service (runtime) + Job (migrations)            |
+| `load-balancer`   | External ALB + CDN + serverless NEG             |
+| `certificate-map` | Certificate Manager map (runtime-populated)     |
+| `dns`             | Cloud DNS zone + A records                      |
 
 ## Resource ownership
 
-| Resource | Owner | Lifecycle |
-|----------|-------|-----------|
-| AR, state bucket, CI SAs, WIF | `infra/mgmt/` (OpenTofu) | Rare changes |
-| Spanner, LB, CDN, IAM, DNS | `infra/` (OpenTofu, per env) | Infra changes |
-| Cloud Run image + secret env vars | GitHub Actions deploy workflow | App releases |
-| Customer certs + host rules | Zitadel runtime (`infra.rs`) | Tenant onboarding |
+| Resource                            | Owner                          | Lifecycle         |
+| ----------------------------------- | ------------------------------ | ----------------- |
+| AR, state bucket, CI SAs, WIF       | `infra/mgmt/` (OpenTofu)       | Rare changes      |
+| LB, CDN, IAM, DNS                   | `infra/` (OpenTofu, per env)   | Infra changes     |
+| Cloud Run runtime env + secret refs | `infra/` (OpenTofu, per env)   | Infra changes     |
+| Cloud Run image, command, probes    | GitHub Actions deploy workflow | App releases      |
+| Customer certs + host rules         | Zitadel runtime (`infra.rs`)   | Tenant onboarding |
 
 ## Getting started
 
@@ -84,4 +84,13 @@ See `.github/workflows/infra.yml`.
 
 ## Secrets
 
-Secrets flow from 1Password at deploy time, not through OpenTofu.
+OpenTofu owns only the Secret Manager containers and the Cloud Run version pins.
+Create or rotate secret values directly in Google Secret Manager, then update
+the matching `*_secret_version` value in the environment tfvars file.
+
+The runtime secrets are:
+
+| Cloud Run env var                 | Secret Manager ID                                  |
+| --------------------------------- | -------------------------------------------------- |
+| `NEXTGEN_SERVER_ENCRYPTION_KEY`   | `zitadel-encryption-key-secret-<environment>`      |
+| `NEXTGEN_DATABASE_POSTGRES`       | `zitadel-database-postgres-secret-<environment>`   |

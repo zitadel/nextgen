@@ -1,6 +1,5 @@
 resource "google_project_service" "apis" {
   for_each = toset([
-    "spanner.googleapis.com",
     "run.googleapis.com",
     "certificatemanager.googleapis.com",
     "compute.googleapis.com",

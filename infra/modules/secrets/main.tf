@@ -1,29 +1,33 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # Secret Manager secrets for Zitadel runtime configuration.
 #
-# These are empty shells — actual values are written by the deploy workflow
-# (1Password → Secret Manager) on every deploy.
+# OpenTofu owns the secret containers only. Secret values are created and
+# rotated directly in Google Secret Manager so values never enter source
+# control or OpenTofu state.
 # ─────────────────────────────────────────────────────────────────────────────
 
-locals {
-  # The runtime reads the active encryption key id from the literal env var
-  # `ZITADEL_ENCRYPTION__ACTIVE_KEY_ID=k0` set by the deploy workflow, so we
-  # do not provision a shell for it here — the key id is a non-secret label,
-  # not a secret.
-  secret_names = [
-    "zitadel-cookie-secrets",
-    "zitadel-encryption-key-secret",
-    "zitadel-bootstrap-admin-password",
-    "zitadel-management-secret",
-  ]
-}
-
-resource "google_secret_manager_secret" "secrets" {
-  for_each  = toset(local.secret_names)
-  secret_id = "${each.value}-${var.environment}"
+resource "google_secret_manager_secret" "server_encryption_key" {
+  secret_id = "zitadel-encryption-key-secret-${var.environment}"
   project   = var.project_id
 
   replication {
     auto {}
+  }
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+resource "google_secret_manager_secret" "database_postgres" {
+  secret_id = "zitadel-database-postgres-secret-${var.environment}"
+  project   = var.project_id
+
+  replication {
+    auto {}
+  }
+
+  lifecycle {
+    prevent_destroy = true
   }
 }

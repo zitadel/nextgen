@@ -79,13 +79,6 @@ resource "google_project_iam_member" "infra_apply_iam" {
   member   = "serviceAccount:${google_service_account.infra_apply.email}"
 }
 
-resource "google_project_iam_member" "infra_apply_spanner" {
-  for_each = var.env_project_ids
-  project  = each.value
-  role     = "roles/spanner.admin"
-  member   = "serviceAccount:${google_service_account.infra_apply.email}"
-}
-
 # Mgmt project: read Artifact Registry. Terraform needs this to update
 # Cloud Run services in env projects whose image lives in the mgmt AR repo —
 # Cloud Run validates cross-project image pull permission for the caller on

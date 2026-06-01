@@ -2,11 +2,6 @@ project_id  = "zitadel-dev-492704"
 region      = "us-central1"
 environment = "dev"
 
-spanner_config           = "regional-us-central1"
-spanner_processing_units = 100
-spanner_instance_name    = "zitadel-dev"
-spanner_database_name    = "zitadel"
-
 base_domain         = "dev.zitadel.io"
 dns_zone_name       = "zitadel-dev"
 cdn_enabled         = false

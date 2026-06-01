@@ -26,13 +26,28 @@ resource "google_cloud_run_v2_service" "zitadel" {
 
     containers {
       # Placeholder — the deploy workflow replaces image, command, args,
-      # env, secrets, and probes via gcloud. Secrets are pinned to
-      # specific Secret Manager versions by the workflow (--set-secrets)
-      # so every instance of a revision sees identical key material.
+      # and probes via gcloud. Runtime env and Secret Manager version pins
+      # are owned by OpenTofu so every instance of a revision sees identical
+      # key material.
       image = "us-docker.pkg.dev/cloudrun/container/hello"
 
       ports {
         container_port = 8080
+      }
+
+      dynamic "env" {
+        for_each = var.secret_env
+
+        content {
+          name = env.key
+
+          value_source {
+            secret_key_ref {
+              secret  = env.value.secret_id
+              version = env.value.version
+            }
+          }
+        }
       }
 
       resources {
@@ -46,11 +61,10 @@ resource "google_cloud_run_v2_service" "zitadel" {
 
   lifecycle {
     ignore_changes = [
-      # Deploy workflow owns image + runtime config via `gcloud run services update`.
+      # Deploy workflow owns release-specific fields via `gcloud run services update`.
       template[0].containers[0].image,
       template[0].containers[0].command,
       template[0].containers[0].args,
-      template[0].containers[0].env,
       template[0].containers[0].startup_probe,
       template[0].containers[0].liveness_probe,
       # gcloud stamps these metadata fields on every update; Terraform should
@@ -90,7 +104,22 @@ resource "google_cloud_run_v2_job" "migrate" {
       }
 
       containers {
-        image = "us-docker.pkg.dev/cloudrun/container/hello"
+        image = "us-docker.pkg.dev/cloudrun/container/hello-job"
+
+        dynamic "env" {
+          for_each = var.secret_env
+
+          content {
+            name = env.key
+
+            value_source {
+              secret_key_ref {
+                secret  = env.value.secret_id
+                version = env.value.version
+              }
+            }
+          }
+        }
 
         resources {
           limits = {
@@ -104,11 +133,10 @@ resource "google_cloud_run_v2_job" "migrate" {
 
   lifecycle {
     ignore_changes = [
-      # Deploy workflow owns image + args via `gcloud run jobs update`.
+      # Deploy workflow owns release-specific fields via `gcloud run jobs update`.
       template[0].template[0].containers[0].image,
       template[0].template[0].containers[0].command,
       template[0].template[0].containers[0].args,
-      template[0].template[0].containers[0].env,
       # Same reasoning as the service above — gcloud stamps these fields
       # on every update; Terraform should not fight them.
       client,

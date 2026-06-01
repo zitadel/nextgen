@@ -1,8 +1,3 @@
-output "spanner_database" {
-  description = "Full Spanner database resource name"
-  value       = module.spanner.database_id
-}
-
 output "cloud_run_service_name" {
   description = "Cloud Run service name"
   value       = module.cloud_run.service_name

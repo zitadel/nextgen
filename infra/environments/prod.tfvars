@@ -2,11 +2,6 @@ project_id  = "REPLACE_GCP_PROJECT"
 region      = "us-central1"
 environment = "prod"
 
-spanner_config           = "regional-us-central1"
-spanner_processing_units = 300
-spanner_instance_name    = "zitadel-prod"
-spanner_database_name    = "zitadel"
-
 base_domain   = "zitadel.example.com"
 dns_zone_name = "zitadel-prod"
 cdn_enabled   = true

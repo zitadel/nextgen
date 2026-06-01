@@ -14,30 +14,6 @@ variable "region" {
   default     = "us-central1"
 }
 
-variable "spanner_config" {
-  description = "Spanner instance configuration (e.g. regional-us-central1)"
-  type        = string
-  default     = "regional-us-central1"
-}
-
-variable "spanner_processing_units" {
-  description = "Spanner processing units (100 = minimum, 1000 = 1 node)"
-  type        = number
-  default     = 100
-}
-
-variable "spanner_instance_name" {
-  description = "Spanner instance name"
-  type        = string
-  default     = "zitadel"
-}
-
-variable "spanner_database_name" {
-  description = "Spanner database name"
-  type        = string
-  default     = "zitadel"
-}
-
 variable "environment" {
   description = "Environment name (dev, prod)"
   type        = string
@@ -62,6 +38,18 @@ variable "github_deploy_sa_email" {
     condition     = !can(regex("REPLACE", var.github_deploy_sa_email))
     error_message = "Replace the placeholder github_deploy_sa_email in your tfvars file."
   }
+}
+
+variable "server_encryption_key_secret_version" {
+  description = "Secret Manager version for NEXTGEN_SERVER_ENCRYPTION_KEY."
+  type        = string
+  default     = "latest"
+}
+
+variable "database_postgres_secret_version" {
+  description = "Secret Manager version for NEXTGEN_DATABASE_POSTGRES."
+  type        = string
+  default     = "latest"
 }
 
 variable "cloud_run_cpu" {
@@ -95,7 +83,7 @@ variable "cdn_enabled" {
 }
 
 variable "deletion_protection" {
-  description = "Prevent accidental deletion of stateful resources (Cloud Run service)"
+  description = "Prevent accidental deletion of stateful resources"
   type        = bool
   default     = true
 }

@@ -1,7 +1,13 @@
-output "secret_ids" {
-  description = "Map of secret short name to full resource ID"
+output "secret_refs" {
+  description = "Map of secret short name to Cloud Run Secret Manager reference"
   value = {
-    for name in local.secret_names :
-    name => google_secret_manager_secret.secrets[name].secret_id
+    server_encryption_key = {
+      secret_id = google_secret_manager_secret.server_encryption_key.secret_id
+      version   = var.server_encryption_key_version
+    }
+    database_postgres = {
+      secret_id = google_secret_manager_secret.database_postgres.secret_id
+      version   = var.database_postgres_version
+    }
   }
 }
