@@ -1,5 +1,5 @@
 import { fieldPreset } from "./presets";
-import { DEFAULT_USER_SCHEMA_ID, type UserSchema } from "./schema";
+import { DEFAULT_USER_META_SCHEMA, DEFAULT_USER_SCHEMA_ID, type UserSchema } from "./schema";
 
 /**
  * Build the default human-user schema for the chosen auth method and
@@ -30,6 +30,7 @@ export function buildUserSchema(
     $schema: "https://json-schema.org/draft/2020-12/schema",
     $id: DEFAULT_USER_SCHEMA_ID,
     kind: "user-schema",
+    metaSchema: DEFAULT_USER_META_SCHEMA,
     type: "object",
     title: "Human User",
     "x-auth-methods": { [method]: { enabled: true, position: 0 } },

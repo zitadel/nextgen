@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { buildUserSchema } from "../../../../src/lib/user-schema";
+import { DEFAULT_USER_META_SCHEMA } from "../../../../src/lib/user-schema/schema";
 
 describe("buildUserSchema", () => {
   it("uses project-scoped uniqueness for email and sorts required", () => {
@@ -20,5 +21,10 @@ describe("buildUserSchema", () => {
     const b = buildUserSchema("password", ["email"]);
     expect(a).not.toBe(b);
     expect(a).toEqual(b);
+  });
+
+  it("emits the metaSchema field required by POST /schemas", () => {
+    const schema = buildUserSchema("passkey", ["email"]);
+    expect(schema.metaSchema).toBe(DEFAULT_USER_META_SCHEMA);
   });
 });
