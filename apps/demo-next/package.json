@@ -20,6 +20,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@zitadel-nextgen/api": "workspace:*",
     "@zitadel-nextgen/components": "workspace:*",
     "@zitadel-nextgen/design-tokens": "workspace:*",
     "@zitadel-nextgen/shared-component-styles": "workspace:*",

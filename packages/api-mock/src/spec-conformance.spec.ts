@@ -93,7 +93,7 @@ function validFlowDefinitionBody(): Record<string, unknown> {
 describe("api-mock spec conformance — responses match orval-generated zod", () => {
   test("POST /sessions/exchange returns body parseable by ExchangeHandoffResponse", async () => {
     const handoff = await signHandoffToken({ sub: "proj_test", iss: BASE });
-    const res = await fetch(`${BASE}/sessions/exchange`, {
+    const res = await fetch(`${BASE}/sessions/exchange?project_id=proj_test`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ handoff_token: handoff }),
@@ -101,6 +101,18 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(() => ExchangeHandoffResponse.parse(body)).not.toThrow();
+  });
+
+  test("POST /sessions/exchange without project_id returns 400", async () => {
+    const handoff = await signHandoffToken({ sub: "proj_test", iss: BASE });
+    const res = await fetch(`${BASE}/sessions/exchange`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ handoff_token: handoff }),
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.code).toBe("sess.project_id_missing");
   });
 
   test("POST /projects returns the spec-defined project shape", async () => {

@@ -17,7 +17,7 @@ export {
 export { ThemeController, type ResolvedTheme } from "./theme-controller.js";
 export { applyFontUrl } from "./font-loader.js";
 export { createLiquidEngine, TEMPLATE_NAMES } from "./liquid.js";
-export { en, type Locale } from "./locales/en.js";
+export { en, de, builtinLocales, type Locale } from "./locales/index.js";
 export {
   patchMandatoryGates,
   mandatoryGatesMarkerComment,

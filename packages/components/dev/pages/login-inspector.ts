@@ -26,13 +26,17 @@ export function initInspector(
   updateFlowResponse: (detail: unknown) => void;
   logEvent: (name: string, detail: unknown) => void;
 } {
-  const templateEditor = root.querySelector<HTMLTextAreaElement>("#template-editor")!;
-  const applyBtn = root.querySelector<HTMLButtonElement>("#apply-template")!;
-  const resetTplBtn = root.querySelector<HTMLButtonElement>("#reset-template")!;
-  const statusEl = root.querySelector<HTMLSpanElement>("#template-status")!;
-  const presetSelect = root.querySelector<HTMLSelectElement>("#preset")!;
-  const flowResponseEl = root.querySelector<HTMLTextAreaElement>("#flow-response")!;
-  const eventsEl = root.querySelector<HTMLPreElement>("#events")!;
+  const templateEditor = root.querySelector<HTMLTextAreaElement>("#template-editor");
+  const applyBtn = root.querySelector<HTMLButtonElement>("#apply-template");
+  const resetTplBtn = root.querySelector<HTMLButtonElement>("#reset-template");
+  const statusEl = root.querySelector<HTMLSpanElement>("#template-status");
+  const presetSelect = root.querySelector<HTMLSelectElement>("#preset");
+  const flowResponseEl = root.querySelector<HTMLTextAreaElement>("#flow-response");
+  const eventsEl = root.querySelector<HTMLPreElement>("#events");
+
+  if (!templateEditor || !applyBtn || !resetTplBtn || !statusEl || !presetSelect || !flowResponseEl || !eventsEl) {
+    throw new Error("Inspector panel is missing required DOM elements.");
+  }
 
   const bundledTemplate = authFormTemplate;
   let customTemplate: string | null = null;

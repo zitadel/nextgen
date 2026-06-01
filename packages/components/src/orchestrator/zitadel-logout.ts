@@ -1,10 +1,6 @@
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import {
-  endSession,
-  getEndSessionUrl,
-} from "@zitadel-nextgen/api/generated/endpoints/zitadelNextGen";
-import { setApiBaseUrl } from "@zitadel-nextgen/api/runtime/base-url";
+import { getZitadelConfig, getApi, type ZitadelProject } from "@zitadel-nextgen/api/config";
 
 import { applyBaseTokens } from "./branding-to-tokens.js";
 import { baseHostStyles, focusVisibleStyles, t } from "../styles/index.js";
@@ -190,12 +186,10 @@ export class ZitadelLogout extends LitElement {
   ];
 
   /**
-   * Base URL (or path prefix) for all API calls, e.g. `"/__nextgen"` when
-   * the SDK is proxied through the app server. Equivalent to calling
-   * `setApiBaseUrl()` from `@zitadel-nextgen/api`. Must be set before the
-   * component connects so the first `endSession` call uses the right origin.
+   * SDK project handle returned by `configureZitadel()`. When set, takes
+   * precedence over the global singleton from `getZitadelConfig()`.
    */
-  @property({ type: String, attribute: "api-base" }) accessor apiBase = "";
+  @property({ attribute: false }) accessor project: ZitadelProject | undefined;
 
   /** URL to navigate to after a successful sign-out. */
   @property({ type: String, attribute: "post-sign-out-url" }) accessor postSignOutUrl = "";
@@ -226,9 +220,6 @@ export class ZitadelLogout extends LitElement {
   override connectedCallback(): void {
     super.connectedCallback();
     this.dataset.theme = "dark";
-    if (this.apiBase) {
-      setApiBaseUrl(this.apiBase);
-    }
     this.readDisplayCookie();
 
     const tmpl = this.querySelector("template");
@@ -337,7 +328,9 @@ export class ZitadelLogout extends LitElement {
     };
 
     try {
-      await endSession(params, { credentials: "include" });
+      const cfg = this.project ?? getZitadelConfig();
+      if (!cfg) throw new Error("<zitadel-logout> requires a `config` prop (from configureZitadel()).");
+      await getApi(cfg).endSession(params, { credentials: "include" });
     } catch (error) {
       const message = error instanceof Error ? error.message : "";
       this.errorMessage = message || "Sign-out failed. Please try again.";
@@ -373,7 +366,9 @@ export class ZitadelLogout extends LitElement {
       ...(this.clientId ? { client_id: this.clientId } : {}),
       ...(this.postSignOutUrl ? { post_logout_redirect_uri: this.postSignOutUrl } : {}),
     };
-    return getEndSessionUrl(params);
+    const cfg = this.project ?? getZitadelConfig();
+    if (!cfg) throw new Error("<zitadel-logout> requires a `config` prop (from configureZitadel()).");
+    return getApi(cfg).getEndSessionUrl(params);
   }
 
   private handleSignOutClick(event: Event): void {

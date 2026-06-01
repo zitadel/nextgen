@@ -7,23 +7,49 @@ properties:
   type:
     type: string
     enum: [text, email, password, tel, number, url, date, hidden]
+    description: |
+      The input kind the client should render. Encodes the formats that
+      have a matching HTML input type (email, url, date). For other
+      formats (e.g. uuid) the type is `text` and `validation.format`
+      carries the rule.
   text_key:
     type: string
     description: Localization key for the field label.
-    example: identifier.field.email
+    example: login.field.email
   required:
     type: boolean
     default: false
+    description: |
+      The field MUST be present and non-empty on submit. Mirrors the
+      schema's top-level `required` array.
   value:
-    description: Pre-filled value (e.g., email carried over from a pivot).
+    description: Pre-filled value (e.g., an identifier carried over from a pivot).
   validation:
     type: object
+    description: |
+      Schema-derived rules the frontend SHOULD apply at input time. The
+      server runs the same rules on submit and is the only authority on
+      whether the step advances — these rules are a UX hint to reduce
+      round trips, not a contract guarantee.
+
+      Omitted entirely when the field has no rules beyond its `type`.
+      Each key mirrors a JSON Schema keyword on the underlying user
+      property; absent keys mean no rule.
     properties:
       format:
         type: string
-      pattern:
-        type: string
+        enum: [email, date-time, uuid, uri]
+        description: |
+          Semantic format the value must match. Values mirror the user
+          meta-schema. When `type` already encodes the format (email,
+          url, date), this key is informative and the input type is
+          sufficient for client-side validation. When `type` is `text`
+          (e.g. `format: uuid`), this key is the only signal.
       min_length:
         type: integer
+        minimum: 0
+        description: Minimum length in characters (inclusive). Mirrors `minLength`.
       max_length:
         type: integer
+        minimum: 0
+        description: Maximum length in characters (inclusive). Mirrors `maxLength`.
