@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
 )
 
 // TestPasskeyFlowLogin exercises the full two-phase passkey ceremony through the
@@ -55,6 +56,12 @@ func TestPasskeyFlowLogin(t *testing.T) {
 	auth.AddCredential(cred)
 
 	// --- Seed user + passkey into DB ------------------------------------------
+	// user_attributes is partitioned by team; a team is required.
+	team, err := harness.EnsureTeamService(t).CreateTeam(t.Context(), service.CreateTeamInput{
+		ProjectID: project.ID,
+	})
+	require.NoError(t, err)
+
 	db := harness.EnsureDBPool(t)
 
 	emailAttr, err := domain.NewCreateAttribute("email", "pk-flow-test@example.com", domain.AttributeUniquenessUnspecified)
@@ -65,6 +72,7 @@ func TestPasskeyFlowLogin(t *testing.T) {
 		ProjectID:  project.ID,
 		SchemaURL:  userSchemaURL.String(),
 		ID:         userID,
+		TeamID:     &team.ID,
 		Attributes: []*domain.CreateAttribute{emailAttr},
 	}))
 
