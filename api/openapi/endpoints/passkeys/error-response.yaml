@@ -1,0 +1,5 @@
+description: Error response
+content:
+  application/json:
+    schema:
+      $ref: '../../components/error-details.yaml'

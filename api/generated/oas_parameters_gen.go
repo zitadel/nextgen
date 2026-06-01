@@ -1006,6 +1006,62 @@ func decodeAuthorizeGetParams(args [0]string, argsEscaped bool, r *http.Request)
 	return params, nil
 }
 
+// BeginPasskeyRegistrationParams is parameters of beginPasskeyRegistration operation.
+type BeginPasskeyRegistrationParams struct {
+	// The browser origin, used to derive the WebAuthn RP ID and allowed origins.
+	Origin string
+}
+
+func unpackBeginPasskeyRegistrationParams(packed middleware.Parameters) (params BeginPasskeyRegistrationParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "Origin",
+			In:   "header",
+		}
+		params.Origin = packed[key].(string)
+	}
+	return params
+}
+
+func decodeBeginPasskeyRegistrationParams(args [0]string, argsEscaped bool, r *http.Request) (params BeginPasskeyRegistrationParams, _ error) {
+	h := uri.NewHeaderDecoder(r.Header)
+	// Decode header: Origin.
+	if err := func() error {
+		cfg := uri.HeaderParameterDecodingConfig{
+			Name:    "Origin",
+			Explode: false,
+		}
+		if err := h.HasParam(cfg); err == nil {
+			if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
+				val, err := d.DecodeValue()
+				if err != nil {
+					return err
+				}
+
+				c, err := conv.ToString(val)
+				if err != nil {
+					return err
+				}
+
+				params.Origin = c
+				return nil
+			}); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "Origin",
+			In:   "header",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
 // CreateHandoffParams is parameters of createHandoff operation.
 type CreateHandoffParams struct {
 	// The unique identifier of the authentication attempt.
@@ -2035,6 +2091,72 @@ func decodeExchangeHandoffParams(args [0]string, argsEscaped bool, r *http.Reque
 		return params, &ogenerrors.DecodeParamError{
 			Name: "Idempotency-Key",
 			In:   "header",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
+// FinishPasskeyRegistrationParams is parameters of finishPasskeyRegistration operation.
+type FinishPasskeyRegistrationParams struct {
+	// The registration session ID returned by POST /passkeys.
+	RegistrationID string
+}
+
+func unpackFinishPasskeyRegistrationParams(packed middleware.Parameters) (params FinishPasskeyRegistrationParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "registration_id",
+			In:   "path",
+		}
+		params.RegistrationID = packed[key].(string)
+	}
+	return params
+}
+
+func decodeFinishPasskeyRegistrationParams(args [1]string, argsEscaped bool, r *http.Request) (params FinishPasskeyRegistrationParams, _ error) {
+	// Decode path: registration_id.
+	if err := func() error {
+		param := args[0]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[0])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "registration_id",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				val, err := d.DecodeValue()
+				if err != nil {
+					return err
+				}
+
+				c, err := conv.ToString(val)
+				if err != nil {
+					return err
+				}
+
+				params.RegistrationID = c
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "registration_id",
+			In:   "path",
 			Err:  err,
 		}
 	}

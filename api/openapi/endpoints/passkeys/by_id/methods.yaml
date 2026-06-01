@@ -1,0 +1,36 @@
+post:
+  operationId: finishPasskeyRegistration
+  summary: Finish passkey registration
+  description: |
+    Completes the WebAuthn registration ceremony. The client posts the
+    PublicKeyCredential returned by navigator.credentials.create() as attestation.
+
+    On success, the passkey is stored and can be used for future authentication.
+  tags:
+    - Passkeys
+  security:
+    - oauth2:
+        - passkeys.write
+  parameters:
+    - name: registration_id
+      in: path
+      required: true
+      description: The registration session ID returned by POST /passkeys.
+      schema:
+        type: string
+        example: 'pkreg_01J0Z9KX7Y0Q2Y7JX5M9K2YF3C'
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: finish-passkey-registration-request.yaml
+  responses:
+    '201':
+      description: Passkey registered successfully
+      content:
+        application/json:
+          schema:
+            $ref: finish-passkey-registration-response.yaml
+    default:
+      $ref: ../error-response.yaml
