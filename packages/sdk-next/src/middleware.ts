@@ -7,7 +7,6 @@ import {
   INTERNAL_HEADERS,
   filterResponseHeaders,
   matchesRoutes,
-  upgradeSessionCookie,
 } from '@zitadel-nextgen/sdk-core/middleware';
 import { NextResponse } from 'next/server';
 
@@ -207,15 +206,9 @@ async function proxyRequest(
 
   const responseHeaders = filterResponseHeaders(upstream.headers);
 
-  const isSecure =
-    url.protocol === 'https:' ||
-    req.headers.get('x-forwarded-proto') === 'https';
   const setCookies = upstream.headers.getSetCookie?.() ?? [];
   for (const cookie of setCookies) {
-    responseHeaders.append(
-      'set-cookie',
-      upgradeSessionCookie(cookie, isSecure),
-    );
+    responseHeaders.append('set-cookie', cookie);
   }
 
   let response = new Response(upstream.body, {

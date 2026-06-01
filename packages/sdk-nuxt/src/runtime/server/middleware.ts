@@ -5,11 +5,10 @@ import type {
 import type { EventHandler, H3Event } from 'h3';
 
 import {
-  filterResponseHeaders,
-  matchesRoutes,
-  upgradeSessionCookie,
   HOP_BY_HOP,
   INTERNAL_HEADERS,
+  filterResponseHeaders,
+  matchesRoutes,
 } from '@zitadel-nextgen/sdk-core/middleware';
 import {
   defineEventHandler,
@@ -212,16 +211,9 @@ async function proxyRequest(
   // canonical representation — we write it to event.node.res at the end.
   const responseHeaders = filterResponseHeaders(upstream.headers);
 
-  const proto =
-    getRequestHeader(event, 'x-forwarded-proto') ??
-    url.protocol.replace(':', '');
-  const isSecure = proto === 'https';
   const setCookieHeaders = upstream.headers.getSetCookie?.() ?? [];
   for (const cookie of setCookieHeaders) {
-    responseHeaders.append(
-      'set-cookie',
-      upgradeSessionCookie(cookie, isSecure),
-    );
+    responseHeaders.append('set-cookie', cookie);
   }
 
   let response = new Response(upstream.body, {

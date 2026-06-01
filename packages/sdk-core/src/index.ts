@@ -1,5 +1,5 @@
 export type { NextgenSession, AuthState, UnauthState, AuthResult, NextgenMiddlewareOptions } from "./types.js";
-export { HOP_BY_HOP, INTERNAL_HEADERS, upgradeSessionCookie, matchesRoutes, filterResponseHeaders } from "./middleware.js";
+export { HOP_BY_HOP, INTERNAL_HEADERS, matchesRoutes, filterResponseHeaders } from "./middleware.js";
 export { verifyJwt, decodeJwt, base64UrlDecode, JWKS_TTL_MS } from "./jwt.js";
 export type { JwtPayload, JwtHeader, DecodedJwt, VerifyJwtOptions } from "./jwt.js";
 
