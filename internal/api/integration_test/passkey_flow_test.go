@@ -57,11 +57,15 @@ func TestPasskeyFlowLogin(t *testing.T) {
 	// --- Seed user + passkey into DB ------------------------------------------
 	db := harness.EnsureDBPool(t)
 
+	emailAttr, err := domain.NewCreateAttribute("email", "pk-flow-test@example.com", domain.AttributeUniquenessUnspecified)
+	require.NoError(t, err)
+
 	userRepo := harness.EnsureUserRepo(t)
 	require.NoError(t, userRepo.Create(t.Context(), db, &domain.CreateUser{
-		ProjectID: project.ID,
-		SchemaURL: userSchemaURL.String(),
-		ID:        userID,
+		ProjectID:  project.ID,
+		SchemaURL:  userSchemaURL.String(),
+		ID:         userID,
+		Attributes: []*domain.CreateAttribute{emailAttr},
 	}))
 
 	passkeyRepo := harness.EnsureUserPasskeyRepo(t)
