@@ -1,3 +1,5 @@
+import { ApiError } from "@zitadel-nextgen/api/runtime/fetch";
+
 /**
  * Closed set of failure categories the CLI can surface. Every error the
  * user sees is funnelled into one of these so messaging, exit codes, and
@@ -82,8 +84,17 @@ export function toZitadelError(error: unknown): ZitadelError {
     return error;
   }
 
-  if (isApiError(error)) {
-    return new ZitadelError(httpStatusToCode(error.status), error.message, {
+  if (error instanceof ApiError) {
+    // `401`/`403` → bad or missing project secret; `5xx` → transport or
+    // server fault; everything else 4xx → the body the CLI sent was
+    // rejected (validation, conflict, not-found, …).
+    const code: ZitadelErrorCode =
+      error.status === 401 || error.status === 403
+        ? "E_AUTH"
+        : error.status >= 500
+          ? "E_NETWORK"
+          : "E_VALIDATION";
+    return new ZitadelError(code, error.message, {
       details: { status: error.status, url: error.url, body: error.body },
     });
   }
@@ -134,40 +145,6 @@ export function toZitadelError(error: unknown): ZitadelError {
 
 function isErrnoException(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && typeof (error as NodeJS.ErrnoException).code === "string";
-}
-
-/**
- * Structural check for the orval-mutator `ApiError` thrown by the
- * generated client on any non-2xx response. Detected by name+shape
- * (rather than `instanceof`) so this module doesn't have to import
- * `@zitadel-nextgen/api/runtime/fetch` and inherit its types — keeps
- * the api package free to evolve without dragging the CLI.
- */
-function isApiError(
-  error: unknown,
-): error is { name: string; message: string; status: number; url: string; body: unknown } {
-  if (!(error instanceof Error) || error.name !== "ApiError") {
-    return false;
-  }
-  const e = error as { status?: unknown; url?: unknown };
-  return typeof e.status === "number" && typeof e.url === "string";
-}
-
-/**
- * Map an HTTP status to a {@link ZitadelErrorCode}: `401`/`403` →
- * `E_AUTH` (bad or missing project secret), `5xx` → `E_NETWORK`
- * (server-side or transport), every other non-`ok` status →
- * `E_VALIDATION` (the client sent something the platform rejected,
- * e.g. `400`, `404`, `409`).
- */
-function httpStatusToCode(status: number): ZitadelErrorCode {
-  if (status === 401 || status === 403) {
-    return "E_AUTH";
-  }
-  if (status >= 500) {
-    return "E_NETWORK";
-  }
-  return "E_VALIDATION";
 }
 
 function isNetworkError(error: unknown): boolean {
