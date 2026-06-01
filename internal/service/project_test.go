@@ -228,7 +228,7 @@ func TestProjectService_CreateWithIdempotencySerializesConcurrentCreates(t *test
 	results := make(chan *domain.Project, workers)
 	errs := make(chan error, workers)
 	var wg sync.WaitGroup
-	for range workers {
+	for i := 0; i < workers; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -394,6 +394,17 @@ func (r *fakeProjectRepository) Get(_ context.Context, _ database.QueryExecutor,
 		return nil, database.NewNoRowFoundError(nil)
 	}
 	return cloneProject(project), nil
+}
+
+func (r *fakeProjectRepository) GetBySecret(_ context.Context, _ database.QueryExecutor, secret string) (*domain.Project, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, project := range r.projects {
+		if project.ProjectSecret == secret || project.PreviewSecret == secret {
+			return cloneProject(project), nil
+		}
+	}
+	return nil, database.NewNoRowFoundError(nil)
 }
 
 func (r *fakeProjectRepository) Update(_ context.Context, _ database.QueryExecutor, project *domain.Project) error {

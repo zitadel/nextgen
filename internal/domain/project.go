@@ -90,6 +90,10 @@ type ProjectRepository interface {
 	// Returns a [database.NoRowFoundError] when no project with the given ID exists.
 	Get(ctx context.Context, client database.QueryExecutor, id string) (*Project, error)
 
+	// GetBySecret retrieves a project by a full-access or preview project secret.
+	// Returns a [database.NoRowFoundError] when no project with the given secret exists.
+	GetBySecret(ctx context.Context, client database.QueryExecutor, secret string) (*Project, error)
+
 	// Update persists mutable project lifecycle fields.
 	Update(ctx context.Context, client database.QueryExecutor, project *Project) error
 }

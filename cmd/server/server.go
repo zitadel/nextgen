@@ -169,7 +169,7 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 
 	oasServer, err := oasapi.NewServer(
 		api.NewHandler(crypter, flowService, authAttemptSvc, sessionService, projectService, schemaService, flowDefinitionSvc, teamService),
-		api.NewSecurityHandler(),
+		api.NewSecurityHandler(api.WithProjectRepository(pool, projectRepo)),
 		oasapi.WithErrorHandler(api.OgenErrorHandler))
 	if err != nil {
 		return fmt.Errorf("build api server: %w", err)

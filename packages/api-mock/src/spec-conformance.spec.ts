@@ -160,6 +160,55 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(typeof body.message).toBe("string");
   });
 
+  test("PATCH /projects/:id/config requires a valid environment", async () => {
+    const create = await fetch(`${BASE}/projects`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    const { project_id, project_secret } = (await create.json()) as {
+      project_id: string;
+      project_secret: string;
+    };
+    const headers = {
+      authorization: `Bearer ${project_secret}`,
+      "content-type": "application/json",
+    };
+
+    const missing = await fetch(`${BASE}/projects/${project_id}/config`, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({}),
+    });
+    expect(missing.status).toBe(400);
+
+    const invalid = await fetch(`${BASE}/projects/${project_id}/config?environment=staging`, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({}),
+    });
+    expect(invalid.status).toBe(400);
+  });
+
+  test("GET /projects/:id/claim/status requires challenge_id", async () => {
+    const create = await fetch(`${BASE}/projects`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    const { project_id, project_secret } = (await create.json()) as {
+      project_id: string;
+      project_secret: string;
+    };
+
+    const res = await fetch(`${BASE}/projects/${project_id}/claim/status`, {
+      headers: { authorization: `Bearer ${project_secret}` },
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.code).toBe("invalid_request");
+  });
+
   test("POST /schemas returns 201 with a schema id", async () => {
     const res = await fetch(`${BASE}/schemas`, {
       method: "POST",

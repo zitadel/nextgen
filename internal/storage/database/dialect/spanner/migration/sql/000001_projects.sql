@@ -11,7 +11,7 @@ CREATE TABLE projects (
     lifecycle       STRING(MAX) NOT NULL DEFAULT ('unclaimed'),
     team_id         STRING(MAX),
     tier            STRING(MAX),
-    claimed_at      TIMESTAMP,
+    claimed_at      TIMESTAMP
 ) PRIMARY KEY (id)
 -- +goose StatementEnd
 

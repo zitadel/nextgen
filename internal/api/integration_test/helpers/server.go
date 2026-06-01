@@ -55,7 +55,9 @@ func (h *Harness) EnsureHandler(t *testing.T) *api.Handler {
 func (h *Harness) EnsureSecurityHandler(t *testing.T) *api.SecurityHandler {
 	t.Helper()
 	if h.SecurityHandler == nil {
-		h.SecurityHandler = api.NewSecurityHandler()
+		h.SecurityHandler = api.NewSecurityHandler(
+			api.WithProjectRepository(h.EnsureDBPool(t), h.EnsureProjectRepo(t)),
+		)
 	}
 	return h.SecurityHandler
 }

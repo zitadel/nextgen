@@ -110,6 +110,24 @@ func (r *ProjectRepository) Get(ctx context.Context, client database.QueryExecut
 	if err != nil {
 		return nil, err
 	}
+	return projectFromRow(row), nil
+}
+
+func (r *ProjectRepository) GetBySecret(ctx context.Context, client database.QueryExecutor, secret string) (*domain.Project, error) {
+	b := database.NewStatementBuilder("SELECT id, created_at, updated_at, project_secret, preview_secret, preview_origins, lifecycle, team_id, tier, claimed_at FROM ")
+	b.WriteString(r.meta.tableName)
+	b.WriteString(" WHERE project_secret = ")
+	b.WriteArg(secret)
+	b.WriteString(" OR preview_secret = ")
+	b.WriteArg(secret)
+	row, err := getOne[projectRow](ctx, client, b)
+	if err != nil {
+		return nil, err
+	}
+	return projectFromRow(row), nil
+}
+
+func projectFromRow(row *projectRow) *domain.Project {
 	lifecycle := domain.ProjectLifecycle(row.Lifecycle)
 	if lifecycle == "" {
 		lifecycle = domain.ProjectLifecycleUnclaimed
@@ -130,7 +148,7 @@ func (r *ProjectRepository) Get(ctx context.Context, client database.QueryExecut
 	if row.Tier != nil {
 		project.Tier = domain.ProjectTier(*row.Tier)
 	}
-	return project, nil
+	return project
 }
 
 func (r *ProjectRepository) Update(ctx context.Context, client database.QueryExecutor, project *domain.Project) error {

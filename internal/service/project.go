@@ -57,7 +57,10 @@ type projectService struct {
 	claimChallengeTTL time.Duration
 	idempotencyTTL    time.Duration
 
-	mu                   sync.Mutex
+	mu sync.Mutex
+	// MVP process-local stores. Entries are TTL-pruned to prevent unbounded
+	// growth, but durable multi-replica idempotency and claim polling need a
+	// repository-backed store before the cloud control plane is horizontally run.
 	idempotentProjectIDs map[string]*idempotentProjectCreate
 	claimChallenges      map[string]*ProjectClaimChallenge
 }

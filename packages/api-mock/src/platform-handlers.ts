@@ -300,7 +300,20 @@ export function setupPlatformHandlers() {
       }
       const authError = projectSecretAuthError(request, project);
       if (authError) return authError;
-      const environment = new URL(request.url).searchParams.get("environment") ?? "development";
+      const environment = new URL(request.url).searchParams.get("environment");
+      if (
+        environment !== "development" &&
+        environment !== "preview" &&
+        environment !== "production"
+      ) {
+        return HttpResponse.json(
+          errorBody(
+            "invalid_request",
+            "environment query parameter is required and must be one of development, preview, production",
+          ),
+          { status: 400 },
+        );
+      }
       if (
         (environment === "preview" || environment === "production") &&
         project.lifecycle !== "claimed"
@@ -415,7 +428,13 @@ export function setupPlatformHandlers() {
         return HttpResponse.json(errorBody("proj.not_found", "resource not found"), { status: 404 });
       }
       const challengeId = new URL(request.url).searchParams.get("challenge_id");
-      const challenge = challengeId ? store.claimChallenges.get(challengeId) : undefined;
+      if (!challengeId) {
+        return HttpResponse.json(
+          errorBody("invalid_request", "challenge_id query parameter is required"),
+          { status: 400 },
+        );
+      }
+      const challenge = store.claimChallenges.get(challengeId);
       if (!challenge || challenge.project_id !== project.project_id) {
         return HttpResponse.json(errorBody("proj.claim_not_found", "claim challenge not found"), {
           status: 404,

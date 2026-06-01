@@ -2,13 +2,27 @@ package api
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	"github.com/ogen-go/ogen/ogenerrors"
 	api "github.com/zitadel/nextgen/api/generated"
+	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 type SecurityHandler struct {
+	pool     database.Pool
+	projects domain.ProjectRepository
+}
+
+type SecurityHandlerOption func(*SecurityHandler)
+
+func WithProjectRepository(pool database.Pool, projects domain.ProjectRepository) SecurityHandlerOption {
+	return func(s *SecurityHandler) {
+		s.pool = pool
+		s.projects = projects
+	}
 }
 
 func (s SecurityHandler) HandleUsernamePassword(ctx context.Context, operationName api.OperationName, t api.UsernamePassword) (context.Context, error) {
@@ -20,24 +34,32 @@ func (s SecurityHandler) HandleOAuth2(ctx context.Context, operationName api.Ope
 	if t.Token == "" {
 		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
 	}
-	// TODO: add proper token validation
-	projectID, ok := strings.CutPrefix(t.Token, "sk_")
-	if !ok {
+	if !strings.HasPrefix(t.Token, "sk_proj_") {
 		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
 	}
-	if !strings.HasPrefix(projectID, "proj_") {
-		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+	scopeCtx := ScopeContext{ProjectSecret: t.Token}
+	if s.projects != nil && s.pool != nil {
+		project, err := s.projects.GetBySecret(ctx, s.pool, t.Token)
+		if err != nil {
+			var noRow *database.NoRowFoundError
+			if errors.As(err, &noRow) {
+				return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+			}
+			return nil, err
+		}
+		scopeCtx.ProjectID = project.ID
 	}
-	return WithScopeContext(ctx, ScopeContext{
-		ProjectID:     projectID,
-		ProjectSecret: t.Token,
-	}), nil
+	return WithScopeContext(ctx, scopeCtx), nil
 }
 
 var _ api.SecurityHandler = (*SecurityHandler)(nil)
 
-func NewSecurityHandler() *SecurityHandler {
-	return &SecurityHandler{}
+func NewSecurityHandler(options ...SecurityHandlerOption) *SecurityHandler {
+	handler := &SecurityHandler{}
+	for _, option := range options {
+		option(handler)
+	}
+	return handler
 }
 
 type contextKey struct{}

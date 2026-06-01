@@ -119,6 +119,45 @@ func (c *MockProjectRepositoryGetCall) DoAndReturn(f func(context.Context, datab
 	return c
 }
 
+// GetBySecret mocks base method.
+func (m *MockProjectRepository) GetBySecret(ctx context.Context, client database.QueryExecutor, secret string) (*domain.Project, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetBySecret", ctx, client, secret)
+	ret0, _ := ret[0].(*domain.Project)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetBySecret indicates an expected call of GetBySecret.
+func (mr *MockProjectRepositoryMockRecorder) GetBySecret(ctx, client, secret any) *MockProjectRepositoryGetBySecretCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBySecret", reflect.TypeOf((*MockProjectRepository)(nil).GetBySecret), ctx, client, secret)
+	return &MockProjectRepositoryGetBySecretCall{Call: call}
+}
+
+// MockProjectRepositoryGetBySecretCall wrap *gomock.Call
+type MockProjectRepositoryGetBySecretCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockProjectRepositoryGetBySecretCall) Return(arg0 *domain.Project, arg1 error) *MockProjectRepositoryGetBySecretCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockProjectRepositoryGetBySecretCall) Do(f func(context.Context, database.QueryExecutor, string) (*domain.Project, error)) *MockProjectRepositoryGetBySecretCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockProjectRepositoryGetBySecretCall) DoAndReturn(f func(context.Context, database.QueryExecutor, string) (*domain.Project, error)) *MockProjectRepositoryGetBySecretCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // Update mocks base method.
 func (m *MockProjectRepository) Update(ctx context.Context, client database.QueryExecutor, project *domain.Project) error {
 	m.ctrl.T.Helper()
