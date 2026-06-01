@@ -3,7 +3,7 @@ import {
   getFlowStep,
   submitFlowStep,
 } from "@zitadel-nextgen/api/generated/endpoints/zitadelNextGen";
-import { setApiBaseUrl } from "@zitadel-nextgen/api/runtime/base-url";
+import { configureZitadel } from "@zitadel-nextgen/api/config";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "vitest";
 
@@ -15,13 +15,30 @@ import {
 import type { MockHandle } from "./handlers.js";
 
 const PROJECT_ID = "demo-project";
+
+/**
+ * Decode the payload of a JWT without verifying its signature. Used by the
+ * handoff-token assertions below to inspect the `sub` claim — the standalone
+ * `/sessions/exchange` endpoint already verifies the signature elsewhere.
+ */
+function decodeJwtPayload(token: string): { sub: string } {
+  const parts = token.split(".");
+  if (parts.length !== 3) {
+    throw new Error(`expected three JWT parts, got ${parts.length}`);
+  }
+  const [, payload] = parts as [string, string, string];
+  return JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as {
+    sub: string;
+  };
+}
+
 const server = setupServer();
 let mock: MockHandle = setupMockHandlers();
 
 beforeAll(() => {
   // Any absolute URL works — the orval-generated handlers match `*/flow*`
   // with a wildcard prefix.
-  setApiBaseUrl("http://localhost");
+  configureZitadel({ apiBase: "http://localhost", projectId: PROJECT_ID });
   server.listen({ onUnhandledRequest: "error" });
 });
 
@@ -92,6 +109,7 @@ describe("setupMockHandlers", () => {
       session_token: setup.session_token,
       action: "submit",
       fields: {},
+      challenge_response: { proof: { id: "mock-credential-id", authenticatorAttachment: "platform" } },
     });
     expect(done.step.name).toBe("done");
     expect(done.step.complete).toBe("show");
@@ -193,6 +211,133 @@ describe("setupMockHandlers", () => {
     });
     expect(submit.step.name).toBe("identifier");
     expect(submit.step.error).toBe("error.sign_in_server");
+  });
+
+  test("passkey-login: register then sign in with same credential reaches done", async () => {
+    // Session 1 — register the passkey.
+    const s1 = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    const upsell = await submitFlowStep(s1.id, {
+      session_token: s1.session_token,
+      action: "submit",
+      fields: { email: "alice@acme.com", password: "hunter2" },
+    });
+    const setup = await submitFlowStep(upsell.id, {
+      session_token: upsell.session_token,
+      action: "setup",
+      fields: {},
+    });
+    expect(setup.step.name).toBe("passkey-setup");
+    await submitFlowStep(setup.id, {
+      session_token: setup.session_token,
+      action: "submit",
+      fields: {},
+      challenge_response: { proof: { id: "cred-alice-1", authenticatorAttachment: "platform" } },
+    });
+
+    // Session 2 — sign in with the registered passkey.
+    const s2 = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    const login = await submitFlowStep(s2.id, {
+      session_token: s2.session_token,
+      action: "passkey",
+      fields: {},
+    });
+    expect(login.step.name).toBe("passkey-login");
+    expect(login.step.challenge).toBeTruthy();
+
+    const done = await submitFlowStep(login.id, {
+      session_token: login.session_token,
+      action: "submit",
+      fields: {},
+      challenge_response: { proof: { id: "cred-alice-1" } },
+    });
+    expect(done.step.name).toBe("done");
+    expect(done.handoff_token).toBeTruthy();
+    expect(decodeJwtPayload(done.handoff_token ?? "").sub).toBe("alice@acme.com");
+  });
+
+  test("passkey-login: discoverable credential carries authenticated user into handoff token", async () => {
+    mock.registerCredential("bob@example.com", "cred-bob-1");
+
+    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    const login = await submitFlowStep(start.id, {
+      session_token: start.session_token,
+      action: "passkey",
+      fields: {},
+    });
+    expect(login.step.name).toBe("passkey-login");
+
+    const done = await submitFlowStep(login.id, {
+      session_token: login.session_token,
+      action: "submit",
+      fields: {},
+      challenge_response: { proof: { id: "cred-bob-1" } },
+    });
+    expect(done.step.name).toBe("done");
+    expect(done.handoff_token).toBeTruthy();
+    expect(decodeJwtPayload(done.handoff_token ?? "").sub).toBe("bob@example.com");
+  });
+
+  test("passkey-login: unregistered credential stays on passkey-login with error", async () => {
+    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    const login = await submitFlowStep(start.id, {
+      session_token: start.session_token,
+      action: "passkey",
+      fields: {},
+    });
+    expect(login.step.name).toBe("passkey-login");
+
+    const fail = await submitFlowStep(login.id, {
+      session_token: login.session_token,
+      action: "submit",
+      fields: {},
+      challenge_response: { proof: { id: "cred-unknown" } },
+    });
+    expect(fail.step.name).toBe("passkey-login");
+    expect(fail.step.error).toBe("error.passkey_not_registered");
+    expect(fail.step.challenge).toBeUndefined();
+  });
+
+  test("passkey-login: submit without proof stays on passkey-login with error", async () => {
+    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    const login = await submitFlowStep(start.id, {
+      session_token: start.session_token,
+      action: "passkey",
+      fields: {},
+    });
+    expect(login.step.name).toBe("passkey-login");
+
+    const fail = await submitFlowStep(login.id, {
+      session_token: login.session_token,
+      action: "submit",
+      fields: {},
+    });
+    expect(fail.step.name).toBe("passkey-login");
+    expect(fail.step.error).toBe("error.passkey_not_registered");
+    expect(fail.step.challenge).toBeUndefined();
+  });
+
+  test("passkey-setup: submit without proof stays on passkey-setup with error", async () => {
+    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    const upsell = await submitFlowStep(start.id, {
+      session_token: start.session_token,
+      action: "submit",
+      fields: { email: "alice@acme.com", password: "hunter2" },
+    });
+    const setup = await submitFlowStep(upsell.id, {
+      session_token: upsell.session_token,
+      action: "setup",
+      fields: {},
+    });
+    expect(setup.step.name).toBe("passkey-setup");
+
+    const fail = await submitFlowStep(setup.id, {
+      session_token: setup.session_token,
+      action: "submit",
+      fields: {},
+    });
+    expect(fail.step.name).toBe("passkey-setup");
+    expect(fail.step.error).toBe("error.passkey_setup_failed");
+    expect(fail.step.challenge).toBeUndefined();
   });
 
   test("merges the active branding overlay onto every response", async () => {

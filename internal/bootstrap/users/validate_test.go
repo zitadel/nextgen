@@ -9,7 +9,7 @@ import (
 	"github.com/zitadel/nextgen/internal/crypto"
 )
 
-func testHasher(t *testing.T) *crypto.Hasher {
+func testHasher(t *testing.T) *crypto.PasswapHasher {
 	t.Helper()
 	h, err := (&crypto.HashConfig{
 		Hasher: crypto.HasherConfig{

@@ -37,6 +37,10 @@ type CreateSessionRes interface {
 	createSessionRes()
 }
 
+type CreateTeamRes interface {
+	createTeamRes()
+}
+
 type DeleteFlowDefinitionRes interface {
 	deleteFlowDefinitionRes()
 }
@@ -95,6 +99,10 @@ type GetSchemaByIdRes interface {
 
 type GetSessionRes interface {
 	getSessionRes()
+}
+
+type GetTeamRes interface {
+	getTeamRes()
 }
 
 type GetTokenRes interface {

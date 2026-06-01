@@ -181,6 +181,8 @@ type userPasswords interface {
 type userPasskeys interface {
 	Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*domain.UserPasskey, error)
 	List(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) ([]*domain.UserPasskey, error)
+	UserIDCondition(userID string) database.Condition
+	ProjectIDCondition(pid string) database.Condition
 }
 
 // ---- Implementation ----------------------------------------------------------
@@ -193,7 +195,7 @@ type authAttemptService struct {
 	users            userLookup
 	userPasswords    userPasswords
 	userPasskeys     userPasskeys
-	passwordVerifier *crypto.Hasher
+	passwordVerifier crypto.HashVerifier
 }
 
 func NewAuthAttemptService(
@@ -204,7 +206,7 @@ func NewAuthAttemptService(
 	users userLookup,
 	userPasswords userPasswords,
 	userPasskeys userPasskeys,
-	passwordVerifier *crypto.Hasher,
+	passwordVerifier crypto.HashVerifier,
 ) AuthAttemptService {
 	return &authAttemptService{
 		pool:             pool,
@@ -222,6 +224,16 @@ func NewAuthAttemptService(
 // If input.SessionID is set, the existing session's verified checks are copied
 // into the attempt for step-up auth — no new session is created.
 func (s *authAttemptService) Create(ctx context.Context, input CreateAuthAttemptInput) (res *domain.AuthAttempt, err error) {
+	requiredChecks := input.RequiredChecks
+	if requiredChecks == nil {
+		// TODO: implement this
+		//project, err := s.projects.Get(ctx, s.pool, input.ProjectID)
+		//if err != nil {
+		//	return nil, domain.ErrInternal(err).WithMessage("failed to load project config")
+		//}
+		// requiredChecks = project.DefaultRequiredChecks
+	}
+
 	opts := make([]domain.AuthAttemptOption, 0, 1)
 	if input.SessionID != nil {
 		session, err := s.sessions.Get(ctx, s.pool, input.ProjectID, *input.SessionID)
@@ -234,7 +246,7 @@ func (s *authAttemptService) Create(ctx context.Context, input CreateAuthAttempt
 		opts = append(opts, domain.WithSession(input.SessionID, session.Factors...))
 	}
 
-	attempt, err := domain.NewAuthAttempt(input.ProjectID, input.RequiredChecks, opts...)
+	attempt, err := domain.NewAuthAttempt(input.ProjectID, requiredChecks, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -289,14 +301,18 @@ func (s *authAttemptService) VerifyProof(ctx context.Context, input VerifyProofI
 
 	challenge, factor, err := s.verify(ctx, attempt, input.Proof, input.ChallengeID)
 	if err != nil {
-		// Record the failure for rate-limiting — best effort, don't shadow the original error
-		_ = s.attempts.ChallengeFailed(ctx, s.pool, input.ProjectID, input.AttemptID, challenge)
+		// Record the failure for rate-limiting — best effort, don't shadow
+		// the original error. Skip when verify couldn't identify a challenge row.
+		if challenge != nil {
+			_ = s.attempts.ChallengeFailed(ctx, s.pool, input.ProjectID, input.AttemptID, challenge)
+		}
 		return nil, err
 	}
 
 	if err = s.attempts.ChallengeSucceeded(ctx, s.pool, input.ProjectID, input.AttemptID, factor, challenge.GetID()); err != nil {
 		return nil, err
 	}
+	attempt.SetCheck(factor) // Update the attempt with the successful factor for accurate state in the response
 
 	return attempt, nil
 }
@@ -321,7 +337,7 @@ func (s *authAttemptService) Handoff(ctx context.Context, input HandoffInput) (*
 
 // buildChallenge constructs the challenge for the given check type.
 func (s *authAttemptService) buildChallenge(ctx context.Context, attempt *domain.AuthAttempt, challenge Challenge) (domain.AuthChallenge, error) {
-	switch challenge.(type) {
+	switch typ := challenge.(type) {
 	case UserChallenge:
 		if err := attempt.PrepareUserChallenge(); err != nil {
 			return nil, err
@@ -334,7 +350,23 @@ func (s *authAttemptService) buildChallenge(ctx context.Context, attempt *domain
 		}
 		return attempt.SetPasswordChallenge(), nil
 
-	// TODO: passkey challenge
+	case PasskeyChallenge:
+		userID, err := attempt.PreparePasskeyChallenge()
+		if err != nil {
+			return nil, err
+		}
+		var passkeys []*domain.UserPasskey
+		if userID != "" {
+			passkeys, err = s.listUserPasskeys(ctx, attempt.ProjectID, userID)
+			if err != nil {
+				return nil, domain.ErrInternal(err).WithMessage("failed to load user passkeys")
+			}
+		}
+		passkeyChallenge, err := domain.CreatePasskeyChallenge(userID, passkeys, typ.UserVerification, typ.RPID, typ.RPOrigins)
+		if err != nil {
+			return nil, err
+		}
+		return attempt.SetPasskeyChallenge(passkeyChallenge), nil
 
 	default:
 		return nil, domain.ErrAuthAttemptInvalidRequest()
@@ -353,14 +385,16 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 		user, err := s.users.Get(
 			ctx,
 			s.pool,
-			database.WithCondition(s.users.ProjectIDCondition(attempt.ProjectID)),
-			database.WithCondition(s.users.AttributesCondition([]domain.Attribute{{
-				Key:   p.AttributeName,
-				Value: p.LoginName,
-			}})),
+			database.WithCondition(database.And(
+				s.users.ProjectIDCondition(attempt.ProjectID),
+				s.users.AttributesCondition([]domain.Attribute{{
+					Key:   p.AttributeName,
+					Value: p.LoginName,
+				}}),
+			)),
 		)
 		if err != nil {
-			return nil, nil, domain.ErrAuthAttemptProofRejected(err)
+			return userChallenge, nil, domain.ErrAuthAttemptProofRejected(err)
 		}
 		return userChallenge, attempt.SetUserFactor(user), nil
 
@@ -372,22 +406,58 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 		password, err := s.userPasswords.Get(
 			ctx,
 			s.pool,
-			database.WithCondition(s.userPasswords.ProjectIDCondition(attempt.ProjectID)),
-			database.WithCondition(s.userPasswords.UserIDCondition(userFactor.UserID)),
+			database.WithCondition(database.And(
+				s.userPasswords.ProjectIDCondition(attempt.ProjectID),
+				s.userPasswords.UserIDCondition(userFactor.UserID),
+			)),
 		)
 		if err != nil {
-			return nil, nil, domain.ErrAuthAttemptProofRejected(err)
+			return passwordChallenge, nil, domain.ErrAuthAttemptProofRejected(err)
 		}
 		if err := password.Verify(p.Password, s.passwordVerifier); err != nil {
-			return nil, nil, domain.ErrAuthAttemptProofRejected(err)
+			return passwordChallenge, nil, domain.ErrAuthAttemptProofRejected(err)
 		}
 		return passwordChallenge, attempt.SetPasswordFactor(), nil
 
-	// TODO: passkey challenge
+	case PasskeyProof:
+		challenge, userFactor, err := attempt.PreparePasskeyVerification(challengeID)
+		if err != nil {
+			return nil, nil, err
+		}
+		passkeyChallenge := challenge.(*domain.AuthChallengePasskey)
+		var passkeys []*domain.UserPasskey
+		if userFactor != nil {
+			passkeys, err = s.listUserPasskeys(ctx, attempt.ProjectID, userFactor.UserID)
+			if err != nil {
+				return nil, nil, err
+			}
+		}
+		verification, err := domain.VerifyPasskeyChallenge(
+			passkeyChallenge.PasskeyChallenge,
+			p.AssertionResponse,
+			userFactor.UserID,
+			passkeys,
+			func(userID string) ([]*domain.UserPasskey, error) {
+				return s.listUserPasskeys(ctx, attempt.ProjectID, userID)
+			},
+		)
+		if err != nil {
+			return passkeyChallenge, nil, domain.ErrAuthAttemptProofRejected(err)
+		}
+		return passkeyChallenge, attempt.SetPasskeyFactor(verification), nil
 
 	default:
 		return nil, nil, domain.ErrAuthAttemptInvalidRequest().WithDetails("unsupported proof type")
 	}
+}
+
+func (s *authAttemptService) listUserPasskeys(ctx context.Context, projectID, userID string) ([]*domain.UserPasskey, error) {
+	return s.userPasskeys.List(
+		ctx,
+		s.pool,
+		database.WithCondition(s.userPasskeys.ProjectIDCondition(projectID)),
+		database.WithCondition(s.userPasskeys.UserIDCondition(userID)),
+	)
 }
 
 var _ AuthAttemptService = (*authAttemptService)(nil)

@@ -81,8 +81,7 @@ export async function runCapabilities(io: CliIO, opts: GlobalOptions): Promise<v
   );
 }
 
-function agentSupport(status: string): "supported" | "handoff" | "experimental" | "unsupported" {
-  if (status === "handoff") return "handoff";
+function agentSupport(status: string): "supported" | "experimental" | "unsupported" {
   if (status === "experimental") return "experimental";
   if (status.startsWith("supported")) return "supported";
   return "unsupported";
@@ -90,7 +89,6 @@ function agentSupport(status: string): "supported" | "handoff" | "experimental" 
 
 function mockBehavior(status: string): "complete" | "partial" | "none" {
   if (status === "supported-mock-default") return "partial";
-  if (status === "handoff") return "partial";
   if (status === "supported") return "none";
   return "none";
 }

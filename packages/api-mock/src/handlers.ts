@@ -31,6 +31,7 @@ import type { RequestHandler } from "msw";
 
 import { withBranding } from "./branding.js";
 import { startFlowActor, type FlowActor, type FlowStepName } from "./flow-machine.js";
+import { AuthnStore, type PasskeyProof } from "./lib/authn/index.js";
 import {
   doneStep,
   identifierStep,
@@ -47,7 +48,7 @@ export type CapturedRequest =
   | { kind: "createFlow"; body: CreateFlowBody }
   | { kind: "submitFlowStep"; flowId: string; body: SubmitFlowStepBody }
   | { kind: "getFlowStep"; flowId: string }
-  | { kind: "exchangeHandoff"; body: ExchangeHandoffBody };
+  | { kind: "exchangeHandoff"; body: ExchangeHandoffBody; projectId?: string };
 
 export type MockHandle = {
   handlers: RequestHandler[];
@@ -55,6 +56,13 @@ export type MockHandle = {
   reset: () => void;
   /** Return captured request bodies for test assertions. */
   getCaptured: () => readonly CapturedRequest[];
+  /**
+   * Pre-register a WebAuthn credential so that a subsequent passkey-login
+   * submission succeeds without going through the full register flow.
+   * Useful in component tests that exercise the orchestrator's auto-submit
+   * behaviour without needing a full registration ceremony first.
+   */
+  registerCredential: (userHandle: string, credentialId: string) => void;
 };
 
 const FLOW_ID = "flow_mock";
@@ -73,22 +81,37 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
   const iss = options.iss ?? "http://localhost:4000";
   let actor: FlowActor = startFlowActor();
   let captured: CapturedRequest[] = [];
+  const authn = new AuthnStore();
 
   function reset(): void {
     actor = startFlowActor();
     captured = [];
+    authn.clear();
+  }
+
+  function registerCredential(userHandle: string, credentialId: string): void {
+    authn.register(userHandle, credentialId);
   }
 
   function getCaptured(): readonly CapturedRequest[] {
     return captured;
   }
 
+  /**
+   * Build the response shape for the current machine state.
+   *
+   * Reads `capturedFields.email` from the actor snapshot to look up the user's
+   * registered credentials in `authn`, then selects and renders the matching
+   * step fixture. Called after every state transition and on `GET /flow/{id}`.
+   */
   async function currentResponse(): Promise<CreateFlow201> {
     const snapshot = actor.getSnapshot();
+    const userHandle = snapshot.context.capturedFields["email"] ?? "";
     const input = {
       flowId: FLOW_ID,
       sessionToken: snapshot.context.sessionToken,
       capturedEmail: snapshot.context.capturedFields["email"],
+      registeredCredentials: authn.getByUser(userHandle),
       iss,
     };
     const step = snapshot.value as FlowStepName | "idle";
@@ -118,12 +141,6 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
     getCreateFlowMockHandler(async ({ request }) => {
       const body = (await request.clone().json()) as CreateFlowBody;
       captured.push({ kind: "createFlow", body });
-      // Replace the actor outright. The flow machine's `done` state is a
-      // final (absorbing) state, so sending RESET to an actor that has
-      // already reached `done` is a no-op — reusing it would replay the
-      // previous session's captured email on the next createFlow call,
-      // which made logout+login appear to re-authenticate as the prior
-      // user without any user input.
       actor = startFlowActor();
       actor.send({ type: "START", purpose: body.purpose });
       return currentResponse();
@@ -143,82 +160,82 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
         iss,
       };
 
-      // Figma sign-up `6593:141741`: duplicate email → inline error on email field.
-      if (before === "register" && body.action === "submit" && email === "exists@example.com") {
-        const response = withBranding(registerStep(fixtureInput));
-        return {
-          ...response,
-          step: { ...response.step, error: "error.email_exists" },
-        };
+      const registrationErrorKey = before === "register" && body.action === "submit" && email
+        ? authn.registrationError(email)
+        : null;
+      if (registrationErrorKey) {
+        const base = withBranding(registerStep(fixtureInput));
+        return { ...base, step: { ...base.step, error: registrationErrorKey } };
       }
 
-      // Figma sign-in `6602:180268`: failed auth → inline error on password field.
-      if (
-        before === "identifier" &&
-        body.action === "submit" &&
-        email?.toLowerCase() === "wrong@example.com"
-      ) {
-        const response = withBranding(identifierStep(fixtureInput));
-        return {
-          ...response,
-          step: { ...response.step, error: "error.invalid_credentials" },
-        };
+      const loginErrorKey = before === "identifier" && body.action === "submit" && email
+        ? authn.loginError(email)
+        : null;
+      if (loginErrorKey) {
+        const base = withBranding(identifierStep(fixtureInput));
+        return { ...base, step: { ...base.step, error: loginErrorKey } };
       }
 
-      // Figma sign-in `6594:125237`: server-side failure → form-level alert.
-      if (
-        before === "identifier" &&
-        body.action === "submit" &&
-        email?.toLowerCase() === "server@example.com"
-      ) {
-        const response = withBranding(identifierStep(fixtureInput));
-        return {
-          ...response,
-          step: { ...response.step, error: "error.sign_in_server" },
-        };
+      const contextEmail = snapshot.context.capturedFields.email;
+      const passkeyUpsellInput = { ...fixtureInput, capturedEmail: contextEmail };
+
+      const upsellErrorKey = before === "passkey-upsell" && body.action !== "skip" && contextEmail
+        ? authn.passkeyUpsellError(contextEmail)
+        : null;
+      if (upsellErrorKey) {
+        const base = withBranding(passkeyUpsellStep(passkeyUpsellInput));
+        return { ...base, step: { ...base.step, error: upsellErrorKey } };
       }
 
-      const capturedEmail = snapshot.context.capturedFields.email?.toLowerCase();
-      const passkeyUpsellInput = {
-        ...fixtureInput,
-        capturedEmail: snapshot.context.capturedFields.email,
-      };
+      const proof = body.challenge_response?.proof as PasskeyProof | undefined;
 
-      // Figma passkey upsell `6594:630` — setup failures stay on step with alert.
-      if (before === "passkey-upsell" && body.action !== "skip") {
-        const passkeyErrorByEmail: Record<string, string> = {
-          "passkey-cancel@example.com": "error.passkey_cancelled",
-          "passkey-unsupported@example.com": "error.passkey_unsupported",
-          "passkey-fail@example.com": "error.passkey_failed",
-        };
-        const errorKey = capturedEmail ? passkeyErrorByEmail[capturedEmail] : undefined;
-        if (errorKey) {
-          const response = withBranding(passkeyUpsellStep(passkeyUpsellInput));
-          return {
-            ...response,
-            step: { ...response.step, error: errorKey },
-          };
-        }
+      const setupCred = before === "passkey-setup" && proof
+        ? authn.registerFromProof(contextEmail ?? "mock-user@example.com", proof)
+        : null;
+      const setupErrorKey = before === "passkey-setup" && !setupCred
+        ? "error.passkey_setup_failed"
+        : null;
+      if (setupErrorKey) {
+        const base = withBranding(passkeySetupStep(passkeyUpsellInput));
+        const { challenge: _c, ...step } = base.step;
+        return { ...base, step: { ...step, error: setupErrorKey } };
       }
 
+      const loginCred = before === "passkey-login" && body.action !== "cancel" && proof
+        ? authn.authenticateFromProof(proof)
+        : null;
+      const passkeyLoginErrorKey = before === "passkey-login" && body.action !== "cancel" && !loginCred
+        ? "error.passkey_not_registered"
+        : null;
+      if (passkeyLoginErrorKey) {
+        const registeredCredentials = authn.getByUser(contextEmail ?? "");
+        const loginInput = { flowId: FLOW_ID, sessionToken: snapshot.context.sessionToken, capturedEmail: contextEmail, registeredCredentials, iss };
+        const base = withBranding(passkeyLoginStep(loginInput));
+        const { challenge: _c, ...step } = base.step;
+        return { ...base, step: { ...step, error: passkeyLoginErrorKey } };
+      }
+
+      const baseFields = (body.fields ?? {}) as Record<string, string>;
       actor.send({
         type: "SUBMIT",
         action: body.action,
-        fields: (body.fields ?? {}) as Record<string, string>,
+        fields: loginCred ? { ...baseFields, email: loginCred.userHandle } : baseFields,
         sso_provider_id: body.sso_provider_id ?? null,
       });
       return currentResponse();
     }),
-    getGetFlowStepMockHandler(({ params }) => {
+    getGetFlowStepMockHandler(async ({ params }) => {
       captured.push({ kind: "getFlowStep", flowId: String(params.id) });
       return currentResponse();
     }),
     getExchangeHandoffMockHandler(async ({ request }) => {
       const body = (await request.clone().json()) as ExchangeHandoffBody;
-      captured.push({ kind: "exchangeHandoff", body });
+      const url = new URL(request.url);
+      const projectId = url.searchParams.get("project_id") ?? undefined;
+      captured.push({ kind: "exchangeHandoff", body, projectId });
       return getExchangeHandoffResponseMock();
     }),
   ];
 
-  return { handlers, reset, getCaptured };
+  return { handlers, reset, getCaptured, registerCredential };
 }

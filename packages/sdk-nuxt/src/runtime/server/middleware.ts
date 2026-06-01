@@ -412,6 +412,7 @@ async function handleAuth(
     const loginUrl = new URL(loginPath, getRequestURL(event));
     loginUrl.searchParams.set('next', pathname);
     await sendRedirect(event, loginUrl.toString(), 302);
+    return;
   }
 }
 

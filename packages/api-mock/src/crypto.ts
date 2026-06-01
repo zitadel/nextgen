@@ -18,14 +18,13 @@ const dec = new TextDecoder();
 
 function toBase64url(buf: ArrayBuffer | Uint8Array): string {
   const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
-  let s = "";
-  for (const b of bytes) s += String.fromCharCode(b);
-  return btoa(s).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+  const s = Array.from(bytes, (b) => String.fromCharCode(b)).join("");
+  return btoa(s).replaceAll("=", "").replaceAll("+", "-").replaceAll("/", "_");
 }
 
-function fromBase64url(s: string): Uint8Array<ArrayBuffer> {
+function fromBase64url(s: string): Uint8Array {
   const pad = s.length % 4 === 0 ? "" : "=".repeat(4 - (s.length % 4));
-  return Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/") + pad), (c) =>
+  return Uint8Array.from(atob(s.replaceAll("-", "+").replaceAll("_", "/") + pad), (c) =>
     c.charCodeAt(0),
   );
 }
@@ -81,8 +80,9 @@ export class HandoffError extends Error {
   constructor(
     public readonly kind: HandoffErrorKind,
     message: string,
+    options?: ErrorOptions,
   ) {
-    super(message);
+    super(message, options);
     this.name = "HandoffError";
   }
 }
@@ -151,7 +151,7 @@ export async function verifyHandoffToken(
   const ok = await globalThis.crypto.subtle.verify(
     ALG.name,
     publicKey,
-    fromBase64url(s),
+    new Uint8Array(fromBase64url(s)),
     enc.encode(signing),
   );
   if (!ok) {

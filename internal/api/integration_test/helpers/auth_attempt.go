@@ -19,7 +19,7 @@ func (h *Harness) EnsureAuthAttemptService(t *testing.T) service.AuthAttemptServ
 			h.EnsureUserRepo(t),
 			h.EnsureUserPasswordRepo(t),
 			h.EnsureUserPasskeyRepo(t),
-			h.EnsureHasher(t),
+			h.EnsureHashVerifier(t),
 		)
 	}
 	return h.AuthAttemptService

@@ -8,9 +8,9 @@ import (
 
 // Document is the on-disk shape for a single bootstrap user (one file per user).
 type Document struct {
-	Header         Header                      `json:"header"`
-	Attributes     map[string]json.RawMessage  `json:"attributes"`
-	Authenticators map[string]json.RawMessage  `json:"authenticators"`
+	Header         Header                     `json:"header"`
+	Attributes     map[string]json.RawMessage `json:"attributes"`
+	Authenticators map[string]json.RawMessage `json:"authenticators"`
 }
 
 // Header holds users-table metadata.
