@@ -356,8 +356,8 @@ func (a *AuthAttempt) PreparePasskeyVerification(challengeID string) (AuthChalle
 	if err != nil {
 		return nil, nil, err
 	}
-	// userCheck is nil for a discoverable login; the caller resolves and binds
-	// the user from the verified assertion in that case.
+	// passkey: userCheck is nil for a discoverable login; the caller resolves
+	// and binds the user from the verified assertion in that case.
 	userCheck, _ := CheckAs[*AuthFactorUser](a, AuthCheckTypeUser)
 	return challenge, userCheck, nil
 }

@@ -248,12 +248,13 @@ func VerifyPasskeyChallenge(challenge *PasskeyChallenge, response []byte, userID
 }
 
 // BuildPasskeyRequestOptions renders the stored passkey challenge as the
-// WebAuthn PublicKeyCredentialRequestOptions JSON (wrapped in the standard
-// `{"publicKey": ...}` envelope) that the browser passes to
-// navigator.credentials.get(). It reconstructs the options from the persisted
-// challenge fields rather than the discarded ceremony output (see
-// CreatePasskeyChallenge), so the flow engine and the auth-attempt REST API can
-// share one mapping.
+// WebAuthn PublicKeyCredentialRequestOptions JSON that the browser's
+// navigator.credentials.get() call expects as its `publicKey` field.
+// The caller is responsible for wrapping it (e.g. { publicKey: <these options> })
+// if needed; the frontend zl-passkey component reads the fields directly.
+// It reconstructs the options from the persisted challenge fields rather than
+// the discarded ceremony output (see CreatePasskeyChallenge), so the flow
+// engine and the auth-attempt REST API can share one mapping.
 func BuildPasskeyRequestOptions(c *AuthChallengePasskey) ([]byte, error) {
 	challenge, err := base64.RawURLEncoding.DecodeString(c.Challenge)
 	if err != nil {
@@ -266,14 +267,12 @@ func BuildPasskeyRequestOptions(c *AuthChallengePasskey) ([]byte, error) {
 			CredentialID: protocol.URLEncodedBase64(id),
 		})
 	}
-	assertion := protocol.CredentialAssertion{
-		Response: protocol.PublicKeyCredentialRequestOptions{
-			Challenge:          protocol.URLEncodedBase64(challenge),
-			RelyingPartyID:     c.RPID,
-			AllowedCredentials: allowed,
-			UserVerification:   c.UserVerification,
-			Extensions:         c.Extensions,
-		},
+	opts := protocol.PublicKeyCredentialRequestOptions{
+		Challenge:          protocol.URLEncodedBase64(challenge),
+		RelyingPartyID:     c.RPID,
+		AllowedCredentials: allowed,
+		UserVerification:   c.UserVerification,
+		Extensions:         c.Extensions,
 	}
-	return json.Marshal(assertion)
+	return json.Marshal(opts)
 }
