@@ -14,10 +14,11 @@ func (h *Handler) SetUserPassword(ctx context.Context, req *api.SetUserPasswordR
 	}
 
 	err := h.userService.SetPassword(ctx, service.SetPasswordInput{
-		ProjectID: string(params.ProjectID),
-		TeamID:    teamID,
-		UserID:    string(params.UserID),
-		Password:  req.Password,
+		ProjectID:                string(params.ProjectID),
+		TeamID:                   teamID,
+		UserID:                   string(params.UserID),
+		Password:                 req.Password,
+		IsPasswordChangeRequired: req.IsChangeRequired.Value,
 	})
 	if err != nil {
 		return nil, err

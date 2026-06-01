@@ -153,6 +153,7 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 		flowDefinitionRepo,
 	)
 	teamService := service.NewTeamService(pool, teamRepo)
+	userService := service.NewUserService(pool, userRepo, userPasswordRepo, schemaRepo, passwordHasher)
 
 	// ── Flow engine ──────────────────
 	ids := idgen.NewULID()
@@ -168,7 +169,17 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 	defer stop()
 
 	oasServer, err := oasapi.NewServer(
-		api.NewHandler(crypter, flowService, authAttemptSvc, sessionService, projectService, schemaService, flowDefinitionSvc, teamService),
+		api.NewHandler(
+			crypter,
+			flowService,
+			authAttemptSvc,
+			sessionService,
+			projectService,
+			schemaService,
+			flowDefinitionSvc,
+			teamService,
+			userService,
+		),
 		api.NewSecurityHandler(),
 		oasapi.WithErrorHandler(api.OgenErrorHandler))
 	if err != nil {
