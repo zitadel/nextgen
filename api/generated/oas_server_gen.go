@@ -8,6 +8,14 @@ import (
 
 // Handler handles operations described by OpenAPI v3 specification.
 type Handler interface {
+	// ApplyProjectConfig implements applyProjectConfig operation.
+	//
+	// Records that repo-owned configuration was applied for an environment.
+	// Development applies are allowed before claim. Preview and production
+	// applies require a claimed project.
+	//
+	// PATCH /projects/{project_id}/config
+	ApplyProjectConfig(ctx context.Context, req OptApplyProjectConfigReq, params ApplyProjectConfigParams) (ApplyProjectConfigRes, error)
 	// AuthorizeDevice implements authorizeDevice operation.
 	//
 	// Authorize a device.
@@ -20,6 +28,14 @@ type Handler interface {
 	//
 	// GET /auth/authorize
 	AuthorizeGet(ctx context.Context, params AuthorizeGetParams) (AuthorizeGetRes, error)
+	// CompleteProjectClaim implements completeProjectClaim operation.
+	//
+	// Completes a pending claim challenge after a human signs in and selects a
+	// team. The project secret is rotated during this operation but is not
+	// returned here; the CLI retrieves it once through claim status.
+	//
+	// POST /projects/{project_id}/claim/complete
+	CompleteProjectClaim(ctx context.Context, req *CompleteProjectClaimReq, params CompleteProjectClaimParams) (CompleteProjectClaimRes, error)
 	// CreateAuthAttempt implements createAuthAttempt operation.
 	//
 	// Starts a new authentication attempt. This is the entry point for the auth_attempts state machine.
@@ -72,7 +88,7 @@ type Handler interface {
 	// Create project.
 	//
 	// POST /projects
-	CreateProject(ctx context.Context, req *CreateProjectRequest) (CreateProjectRes, error)
+	CreateProject(ctx context.Context, req *CreateProjectRequest, params CreateProjectParams) (CreateProjectRes, error)
 	// CreateSchema implements createSchema operation.
 	//
 	// Create a new schema. The schema definition must include a unique $id field,
@@ -199,6 +215,14 @@ type Handler interface {
 	//
 	// GET /projects/{project_id}
 	GetProject(ctx context.Context, params GetProjectParams) (GetProjectRes, error)
+	// GetProjectClaimStatus implements getProjectClaimStatus operation.
+	//
+	// Returns the status of a claim challenge. When the challenge has completed,
+	// the rotated project secret is returned exactly once to the holder of the
+	// original project secret so `.zitadel/secret` can be atomically rewritten.
+	//
+	// GET /projects/{project_id}/claim/status
+	GetProjectClaimStatus(ctx context.Context, params GetProjectClaimStatusParams) (GetProjectClaimStatusRes, error)
 	// GetReady implements getReady operation.
 	//
 	// Check whether the server is ready to accept requests.
@@ -239,6 +263,15 @@ type Handler interface {
 	//
 	// GET /auth/userinfo
 	GetUserInfo(ctx context.Context) (GetUserInfoRes, error)
+	// InitProjectClaim implements initProjectClaim operation.
+	//
+	// Creates a short-lived human claim challenge for an unclaimed project.
+	// The caller keeps using the current `.zitadel/secret` while a browser
+	// completes the challenge. Completing the challenge rotates the project
+	// secret, which can be retrieved exactly once through claim status.
+	//
+	// POST /projects/{project_id}/claim/init
+	InitProjectClaim(ctx context.Context, req OptInitProjectClaimReq, params InitProjectClaimParams) (InitProjectClaimRes, error)
 	// Introspect implements introspect operation.
 	//
 	// Introspect a token.

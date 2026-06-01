@@ -168,3 +168,106 @@ func TestProjectService_Get(t *testing.T) {
 		})
 	}
 }
+
+func TestProjectService_ApplyConfigRequiresClaimForPreview(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	ids := idgenmock.NewMockGenerator(ctrl)
+	repo := domainmock.NewMockProjectRepository(ctrl)
+	repo.EXPECT().
+		Get(gomock.Any(), gomock.Any(), "proj_aaa").
+		Return(&domain.Project{
+			ID:        "proj_aaa",
+			Lifecycle: domain.ProjectLifecycleUnclaimed,
+		}, nil)
+
+	svc := service.NewProjectService(stubPool(), repo, ids)
+	got, err := svc.ApplyConfig(context.Background(), "proj_aaa", service.ProjectEnvironmentPreview)
+
+	require.Nil(t, got)
+	require.ErrorIs(t, err, domain.ErrProjectClaimRequired())
+}
+
+func TestProjectService_ClaimLifecycleReturnsRotatedSecretOnce(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Second)
+	ctrl := gomock.NewController(t)
+	ids := idgenmock.NewMockGenerator(ctrl)
+	repo := domainmock.NewMockProjectRepository(ctrl)
+
+	repo.EXPECT().
+		Get(gomock.Any(), gomock.Any(), "proj_aaa").
+		Return(&domain.Project{
+			ID:            "proj_aaa",
+			ProjectSecret: "sk_proj_old",
+			Lifecycle:     domain.ProjectLifecycleUnclaimed,
+			CreatedAt:     now,
+			UpdatedAt:     now,
+		}, nil)
+	ids.EXPECT().New("claim").Return("claim_aaa", nil)
+
+	svc := service.NewProjectService(stubPool(), repo, ids)
+	challenge, err := svc.InitClaim(context.Background(), service.InitProjectClaimInput{
+		ProjectID:     "proj_aaa",
+		ProjectSecret: "sk_proj_old",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "claim_aaa", challenge.ChallengeID)
+	require.NotEmpty(t, challenge.ClaimURL)
+
+	repo.EXPECT().
+		Get(gomock.Any(), gomock.Any(), "proj_aaa").
+		Return(&domain.Project{
+			ID:            "proj_aaa",
+			ProjectSecret: "sk_proj_old",
+			Lifecycle:     domain.ProjectLifecycleUnclaimed,
+			CreatedAt:     now,
+			UpdatedAt:     now,
+		}, nil)
+	ids.EXPECT().New("sk_proj").Return("sk_proj_new", nil)
+	ids.EXPECT().New("team").Return("team_aaa", nil)
+	repo.EXPECT().
+		Update(gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, _ database.QueryExecutor, p *domain.Project) error {
+			assert.Equal(t, "sk_proj_new", p.ProjectSecret)
+			assert.Equal(t, domain.ProjectLifecycleClaimed, p.Lifecycle)
+			assert.Equal(t, "team_aaa", p.TeamID)
+			assert.Equal(t, domain.ProjectTierFree, p.Tier)
+			require.NotNil(t, p.ClaimedAt)
+			return nil
+		})
+	repo.EXPECT().
+		Get(gomock.Any(), gomock.Any(), "proj_aaa").
+		Return(&domain.Project{
+			ID:            "proj_aaa",
+			ProjectSecret: "sk_proj_new",
+			Lifecycle:     domain.ProjectLifecycleClaimed,
+			TeamID:        "team_aaa",
+			Tier:          domain.ProjectTierFree,
+			ClaimedAt:     &now,
+			CreatedAt:     now,
+			UpdatedAt:     now,
+		}, nil)
+
+	claimed, err := svc.CompleteClaim(context.Background(), service.CompleteProjectClaimInput{
+		ProjectID:   "proj_aaa",
+		ChallengeID: "claim_aaa",
+	})
+	require.NoError(t, err)
+	require.Equal(t, domain.ProjectLifecycleClaimed, claimed.Lifecycle)
+
+	status, err := svc.GetClaimStatus(context.Background(), service.GetProjectClaimStatusInput{
+		ProjectID:     "proj_aaa",
+		ChallengeID:   "claim_aaa",
+		ProjectSecret: "sk_proj_old",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, service.ProjectClaimStatusCompleted, status.Status)
+	assert.Equal(t, "sk_proj_new", status.RotatedProjectSecret)
+
+	status, err = svc.GetClaimStatus(context.Background(), service.GetProjectClaimStatusInput{
+		ProjectID:     "proj_aaa",
+		ChallengeID:   "claim_aaa",
+		ProjectSecret: "sk_proj_old",
+	})
+	require.Nil(t, status)
+	require.ErrorIs(t, err, domain.ErrProjectSecretConsumed())
+}

@@ -13,9 +13,9 @@ The platform design described in this folder questions it.
 
 Three concepts that are usually bundled are separated:
 
-**Creation** — "can I build auth into my app?" — requires no account, no tenant, no signup, no email verification, no plan selection. A developer or an agent goes from `npx @zitadel/setup` to a working passkey flow in under ninety seconds on a laptop.
+**Creation** — "can I build auth into my app?" — requires no account, no tenant, no signup, no email verification, no plan selection. A developer or an agent goes from `npx zitadel setup` to a working passkey flow in under ninety seconds on a laptop.
 
-**Ownership** — "who is accountable for this project?" — is established when attribution matters: a production deploy is imminent, a teammate needs governance, billing needs to begin. Claim is free because attribution is mutually beneficial — the developer gets persistence and governance, Zitadel gets identified signal.
+**Ownership** — "who is accountable for this project?" — is established when attribution matters: a preview is about to be shared, a production deploy is imminent, a teammate needs governance, billing needs to begin. Claim is free because attribution is mutually beneficial — the developer gets persistence and governance, Zitadel gets identified signal.
 
 **Payment** — "which production-trust capabilities am I using?" — attaches to operational cost (outbound delivery), enterprise value (SSO, SCIM, SAML), support burden (compliance), or contractual commitment (SLA, residency, MSA). Users are never the monetization boundary. Trust boundaries are.
 
@@ -26,30 +26,35 @@ The following walkthrough is illustrative. Numbers and timings are indicative.
 **Monday afternoon.** A developer at a small startup is building a side-project dashboard. They run:
 
 ```
-npx @zitadel/setup
+npx zitadel setup
 ```
 
-The CLI detects Next.js (or Remix, Astro, Nuxt, SvelteKit, …), installs the SDK, scaffolds the auth web component at `/login`, and writes `.zitadel/secret` containing the project secret and a preview secret. If `vercel` or `netlify` or `wrangler` is installed, the preview secret is uploaded to the deploy platform's env store automatically. The CLI boots `npm run dev` on `localhost:3000`, the developer registers with a passkey, and is looking at their app's authenticated home screen. Seventy seconds elapsed. Zero signup, zero email verification, zero tenant, zero dashboard — and zero Zitadel-owned URLs in the browser bar.
+The CLI detects Next.js (or Remix, Astro, Nuxt, SvelteKit, …), installs the SDK, scaffolds the auth web component at `/login`, and writes `.zitadel/secret` containing the project secret and a preview secret. The CLI boots `npm run dev` on `localhost:3000`, the developer registers with a passkey, and is looking at their app's authenticated home screen. Seventy seconds elapsed. Zero signup, zero email verification, zero tenant, zero dashboard — and zero Zitadel-owned URLs in the browser bar.
 
-OIDC proxy routes (`/authorize`, `/token`, `/userinfo`, `/.well-known/*`) are not scaffolded yet. They are scaffolded later, when `npx zitadel push` detects one of two signals: an `idps.*` entry in `zitadel.json` (federated login needs a callback route on the customer's origin), or the server-side "OIDC client" capability switching on after the first client is added via API / MCP. See [Configuration Surface — Proxy endpoints](configuration-surface.md#proxy-endpoints-scaffolded-on-demand).
+OIDC proxy routes (`/authorize`, `/token`, `/userinfo`, `/.well-known/*`) are not scaffolded yet. They are scaffolded later, when `npx zitadel apply` detects one of two signals: an `idps.*` entry in `zitadel.json` (federated login needs a callback route on the customer's origin), or the server-side "OIDC client" capability switching on after the first client is added via API / MCP. See [Configuration Surface — Proxy endpoints](configuration-surface.md#proxy-endpoints-scaffolded-on-demand).
 
 The setup CLI also prints a **scratch dashboard** URL (`https://zitadel.dev/scratch/river-8421`) — a pre-claim inspection surface where the developer can see their config, their registered users, and the dev inbox without running a local UI. See [The scratch dashboard](#the-scratch-dashboard) below.
 
-**Tuesday morning.** They push a branch to Vercel to share with a designer. The preview just works — the preview secret is already in the Vercel env, the auth web component renders on the preview origin, magic-link emails route to the dev inbox. No claim prompt.
+**Tuesday morning.** They push a branch to Vercel to share with a designer. `zitadel deploy connect --environment preview` refuses because the project is still unclaimed:
 
-**Wednesday.** The developer pushes to `main` with a production `vercel.json`. On first production deploy, the SDK sees a production-environment signal with no claim on record and refuses to start:
+> Preview deploys require a claimed Zitadel project.
+> Claim this project now: `npx zitadel claim`
+
+They run `npx zitadel claim`. Browser opens at `https://zitadel.cloud/claim/river-8421`, GitHub/Google/email. One click on GitHub. Dashboard loads; the project is now owned by a newly-created "Acme" team. Forty seconds. No credit card. The preview secret can now be handed to Vercel, and the designer can use the preview.
+
+**Wednesday.** The developer pushes to `main` with a production `vercel.json`. Production uses the same rule: the SDK sees a production-environment signal with no claim on record and refuses to start:
 
 > Production deploys require a claimed Zitadel project.
 > Claim this project now: `npx zitadel claim`
 
-They run `npx zitadel claim`. Browser opens at `https://zitadel.cloud/claim/river-8421`, GitHub/Google/email. One click on GitHub. Dashboard loads; the project is now owned by a newly-created "Acme" team. Forty seconds. No credit card.
+Because they already claimed for preview, this production deploy does not need another ownership step.
 
 **Two weeks later.** They want password-reset emails in production instead of the dev inbox. The dashboard offers Dev Inbox (default), Bring Your Own Provider, or Zitadel Managed. They pick BYO, connect their existing Resend account, and password-reset emails start flowing from `noreply@acme.com`. Magic-link URLs in the emails render the declared production issuer — `https://acme.com` — because that's what the developer declared in `zitadel.json`'s `environments.production.issuer`.
 
 **Month three.** A customer of Acme (call them Bigco) requires SAML SSO to sign in — Acme will act as a SAML **Service Provider** to Bigco's IdP. The developer adds the capability to `zitadel.json` and runs:
 
 ```
-npx zitadel push
+npx zitadel apply
 ```
 
 The linter flags:
@@ -61,15 +66,15 @@ The linter flags:
 
 They enable the Pro-gated capability, add a card, configure the SP metadata from Bigco's IdP. Issuer is still `https://acme.com` — no new domain, no cert change, no migration. Nothing in Acme's app or Bigco's IdP breaks.
 
-**The shape to notice.** No signup form anywhere in this story. The first identified moment is claim, triggered by the first production deploy. The first payment is three months later, triggered by a concrete customer need. Every friction point in the current industry standard — signup, email verify, plan selection, card upfront, tenant-first provisioning — has been either deleted or deferred to the moment it pays for itself.
+**The shape to notice.** No signup form anywhere in this story. The first identified moment is claim, triggered by the first sharing or deploy boundary. The first payment is three months later, triggered by a concrete customer need. Every friction point in the current industry standard — signup, email verify, plan selection, card upfront, tenant-first provisioning — has been either deleted or deferred to the moment it pays for itself.
 
 ## The scratch dashboard
 
-Before claim, the project has no accountable owner — so it cannot have a "logged-in dashboard" in the usual sense. Instead, `npx @zitadel/setup` prints a **scratch dashboard** URL: `https://zitadel.dev/scratch/<slug>` (e.g. `https://zitadel.dev/scratch/river-8421`). This is the only piece of Zitadel-hosted UI the developer touches in the MVP.
+Before claim, the project has no accountable owner — so it cannot have a "logged-in dashboard" in the usual sense. Instead, `npx zitadel setup` prints a **scratch dashboard** URL: `https://zitadel.dev/scratch/<slug>` (e.g. `https://zitadel.dev/scratch/river-8421`). This is the only piece of Zitadel-hosted UI the developer touches in the MVP.
 
 **What it is.** A browser-session-keyed inspection surface. The first visit drops a signed cookie bound to the project slug; subsequent visits from the same browser see the same view. It is not authenticated against a human identity — there isn't one yet — and it is not shareable in a persistent sense (a teammate opening the URL on their laptop gets a fresh session and sees only what a stranger would see).
 
-**What it shows.** The project's current config (as last uploaded by `npx zitadel push`), recently registered users, the dev inbox (magic-link and OTP payloads that would otherwise have been emailed), config version history with hashes, declared issuer origins per environment, and capability warnings from the most recent upload. Pre-claim, outbound delivery is always dev-inbox-only, so the scratch dashboard *is* where magic links land.
+**What it shows.** The project's current config (as last uploaded by `npx zitadel apply`), recently registered users, the dev inbox (magic-link and OTP payloads that would otherwise have been emailed), config version history with hashes, declared issuer origins per environment, and capability warnings from the most recent upload. Pre-claim, outbound delivery is always dev-inbox-only, so the scratch dashboard *is* where magic links land.
 
 **What it is not.** A multi-member surface (no sharing, no roles — teams do not exist pre-claim). A persistence guarantee (scratch sessions expire; loss of browser state means loss of inspection access, though the underlying project is unaffected as long as `.zitadel/secret` is intact). A production tool.
 
@@ -92,7 +97,7 @@ Combinations that matter:
 | Combination | Supported? | Notes |
 |---|---|---|
 | Unclaimed × Development | Yes | Default first-run state. `.zitadel/secret` written locally. Dev inbox only. UI and OIDC routes run on `localhost:3000`. |
-| Unclaimed × Preview | Yes, via preview secret | Preview secret is origin-scoped to the patterns declared at project creation. No outbound delivery. |
+| Unclaimed × Preview | No | Preview deploys are a sharing boundary and force claim before the origin-scoped secret is handed to the deploy platform. |
 | Unclaimed × Production | No | Production deploys force claim. First attempt blocks with a clear banner. |
 | Claimed × Free × Development | Yes | Typical dev loop post-claim. |
 | Claimed × Free × Preview | Yes | Preview hibernation applies after 14 days idle (deferred spec). |
@@ -104,7 +109,7 @@ The invariants:
 - **Zitadel is a backend API.** The customer's app serves every user-visible surface on its own origin. Always.
 - **Declared issuers are the browser/runtime security boundary.** Browser and origin-bound runtime API requests must present an `Origin` that matches a declared issuer for the active environment. The same allowlist is used for token `iss` claims and magic-link hostname rendering.
 - **Unclaimed projects cannot send real email or SMS**, regardless of environment or (hypothetical) tier. Dev inbox only.
-- **Previews work without claim**, via the preview secret minted at project creation.
+- **Preview and production require claim.** Local development is the only unclaimed environment.
 - **Users are free across all tiers.** Identity count is never the monetization boundary.
 
 ## Relationship to the flow engine
@@ -113,7 +118,7 @@ The [flow engine](../flowengine/README.md) runs the state machine that drives lo
 
 This folder owns the outer scope. It describes how the project came to exist, how it is configured, how it transitions from anonymous capability to owned-by-a-team, and how the customer's app talks to Zitadel's backend. The two meet at three seams:
 
-- **Configuration.** Flow definitions live in `zitadel.json` or the `.zitadel/flows/` directory. `npx zitadel push` uploads them to the server. The flow engine resolves them at runtime.
+- **Configuration.** Flow definitions live in `zitadel.json` or the `.zitadel/flows/` directory. `npx zitadel apply` uploads them to the server. The flow engine resolves them at runtime.
 - **Runtime transport.** The flow engine runs server-side; the auth web component renders on the customer's origin and talks to the flow engine via the customer's own proxy routes. See [Configuration Surface — Proxy endpoints](configuration-surface.md#proxy-endpoints-scaffolded-on-demand).
 - **Claim.** Claim attaches ownership to a project. Users, factors, sessions, and uploaded config have been bound to `project_id` from creation — they don't move at claim. Only the project secret rotates.
 
@@ -125,7 +130,7 @@ graph LR
     Storage["**Sessions & Users**<br>(shared storage,<br>keyed by project_id)"]
 
     CustomerApp -- "proxies OIDC,<br>renders Flow v1 nodes" --> FlowEngine
-    CustomerApp -- "npx zitadel push,<br>claim, inspect" --> Platform
+    CustomerApp -- "npx zitadel apply,<br>claim, inspect" --> Platform
     FlowEngine -- "creates" --> Storage
     Platform -- "attaches ownership<br>at claim" --> Storage
 ```
@@ -182,7 +187,7 @@ The following topics are referenced in the principles and cross-linked from the 
 - **Flow v1 protocol spec.** The named, versioned protocol between UI components and the flow engine — node types, state transitions, `ContinueWith` semantics, dual transport (browser / api / agent). Lives alongside the flow engine docs.
 - **Component surface + eject path.** The auth web component library, `npx zitadel add <component>` scaffolding, the protocol-version pin that keeps ejected source compatible with the backend.
 - **Proxy-pattern scaffolding.** How per-framework SDK packages (`@zitadel/sdk-next`, `@zitadel/sdk-remix`, etc.) expose `createZitadelProxy()` / `createZitadelHandlers()` helpers that generate OIDC routes on the customer's origin.
-- **Lint rules for `npx zitadel push`.** The full list of capability checks, config-reference validations, and reachability hints.
+- **Lint rules for `npx zitadel apply`.** The full list of capability checks, config-reference validations, and reachability hints.
 
 ### Level 2, 3, 4 follow-up specs
 

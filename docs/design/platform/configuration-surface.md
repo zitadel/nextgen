@@ -3,7 +3,7 @@
 > **Status:** Draft
 > **See also:** [README](README.md) · [Overview](overview.md) · [Project Secret](secret.md) · [Claim Flow](claim-flow.md) · [Config API](api/config-api.yaml) · [Flow Engine](../flowengine/flow-engine.md)
 
-The configuration surface is the set of artifacts a developer checks into source control to describe what their Zitadel project does: flow definitions, identity providers, user schemas, branding, environment-specific issuer origins. The server is **not** the source of truth for any of this; the repo is. `npx zitadel push` uploads the server-behavior subset on demand; the dev-server hook runs it automatically when the config hash changes.
+The configuration surface is the set of artifacts a developer checks into source control to describe what their Zitadel project does: flow definitions, identity providers, user schemas, branding, environment-specific issuer origins. The server is **not** the source of truth for any of this; the repo is. `npx zitadel apply` uploads the server-behavior subset on demand; the dev-server hook runs it automatically for local development when the config hash changes.
 
 This document specifies the file format, directory layout, versioning mechanism, environment-override model, secrets handling, and the config-versus-resource boundary.
 
@@ -38,7 +38,7 @@ The boundary is explicit, not aspirational:
 | Fallback flows for legacy clients | Machine-to-machine credentials (secrets) |
 | `branding.renderer` mode + attribution preference | Rendered HTML output (runtime, per request) |
 
-**Declared issuers serve a double purpose.** They are both a *security allowlist* (the server validates every request's `Origin` against this list) and *context data* (the matched issuer is rendered into the `iss` claim of issued tokens and into the hostname of magic-link URLs). Getting that list wrong breaks integrations silently; the linter built into `npx zitadel push` flags declared issuers that do not look reachable.
+**Declared issuers serve a double purpose.** They are both a *security allowlist* (the server validates every request's `Origin` against this list) and *context data* (the matched issuer is rendered into the `iss` claim of issued tokens and into the hostname of magic-link URLs). Getting that list wrong breaks integrations silently; the linter built into `npx zitadel apply` flags declared issuers that do not look reachable.
 
 When the boundary is ambiguous, apply the test: *does this artifact describe how the system behaves, or is it data the system produces?* The former is config. The latter is a resource.
 
@@ -345,9 +345,9 @@ Declared issuers serve three purposes simultaneously:
 |---|---|
 | `development` | Auto-derived from the dev-server origin (`http://localhost:3000` and similar). Explicit declaration overrides. |
 | `preview` | Typically declared as `issuer_pattern` because preview URLs are dynamic. The CLI infers a default pattern from detected deploy tooling. |
-| `production` | **Must be declared explicitly.** The `npx zitadel push` linter rejects production configs without an explicit `issuer`. Third-party integrations pin to the production issuer; getting it wrong silently breaks downstream consumers. |
+| `production` | **Must be declared explicitly.** The `npx zitadel apply` linter rejects production configs without an explicit `issuer`. Third-party integrations pin to the production issuer; getting it wrong silently breaks downstream consumers. |
 
-The resolved config for an environment is computed by deep-merging the top-level config with `environments[env]`. Arrays replace (do not concatenate); objects merge field-by-field. The merged config is what `npx zitadel push` uploads to the server, keyed by `(project_id, environment)`.
+The resolved config for an environment is computed by deep-merging the top-level config with `environments[env]`. Arrays replace (do not concatenate); objects merge field-by-field. The merged config is what `npx zitadel apply` uploads to the server, keyed by `(project_id, environment)`.
 
 ### Multi-tenant white-label is a different problem (deferred)
 
@@ -357,10 +357,10 @@ A B2B customer whose own customers each get their own hostname (`customer-a.auth
 
 The customer's app serves the OIDC and discovery endpoints on its own origin. These routes are **not scaffolded at `npx @zitadel/setup` time** — the initial scaffold is a passkey-only login component on `/login`, which does not need the OIDC routes to exist.
 
-Scaffolding is triggered on either of two signals, both detected by `npx zitadel push`:
+Scaffolding is triggered on either of two signals, both detected by `npx zitadel apply`:
 
-1. **An entry appears under `idps.*` in `zitadel.json`.** Federated IDPs need a callback route on the customer's origin for the OAuth / OIDC return leg. Adding `idps.google` (for example) and running `npx zitadel push` prompts the CLI to scaffold the proxy routes if they are not already present.
-2. **The server-side "OIDC client" capability is enabled.** OIDC clients (third-party apps that authenticate *against* this Zitadel project — e.g. Grafana, an internal admin tool) are resources, not config — they live in the API / MCP surface (see the [config-vs-resources split](#the-split-config-vs-resources)). When the first client is added via API or MCP, the server records the capability; the next `npx zitadel push` sees the flag and offers to scaffold.
+1. **An entry appears under `idps.*` in `zitadel.json`.** Federated IDPs need a callback route on the customer's origin for the OAuth / OIDC return leg. Adding `idps.google` (for example) and running `npx zitadel apply` prompts the CLI to scaffold the proxy routes if they are not already present.
+2. **The server-side "OIDC client" capability is enabled.** OIDC clients (third-party apps that authenticate *against* this Zitadel project — e.g. Grafana, an internal admin tool) are resources, not config — they live in the API / MCP surface (see the [config-vs-resources split](#the-split-config-vs-resources)). When the first client is added via API or MCP, the server records the capability; the next `npx zitadel apply` sees the flag and offers to scaffold.
 
 An explicit escape hatch — `npx zitadel proxy add` — lets developers scaffold on demand without either signal, for cases where they want the routes in place before adding an IDP or registering a client.
 
@@ -375,14 +375,14 @@ An explicit escape hatch — `npx zitadel proxy add` — lets developers scaffol
 
 Per-framework SDK packages (`@zitadel/sdk-next`, `@zitadel/sdk-remix`, `@zitadel/sdk-astro`, `@zitadel/sdk-express`, …) export `createZitadelProxy()` / `createZitadelHandlers()` helpers so the customer does not hand-write HTTP forwarding. The detailed per-framework scaffold is specified in a follow-up doc.
 
-## `npx zitadel push` — the canonical config sync
+## `npx zitadel apply` — the canonical config sync
 
-`npx zitadel push` is how configuration gets from the repo to the server. There is no ambient "auto-upload on SDK boot" — everything goes through this command.
+`npx zitadel apply` is how configuration gets from the repo to the server. There is no ambient "auto-upload on SDK boot" — everything goes through this command.
 
 ```
-npx zitadel push                         # Push the resolved config for the current environment
-npx zitadel push --environment preview   # Force a specific environment
-npx zitadel push --dry-run               # Lint + print what would change, don't upload
+npx zitadel apply                         # Apply the resolved config for the current environment
+npx zitadel apply --environment preview   # Force a specific environment
+npx zitadel plan --environment preview    # Lint + print what would change, don't upload
 ```
 
 What it does:
@@ -398,22 +398,22 @@ What it does:
 4. **Uploads the server-behavior subset** (see [What uploads to the server](#what-uploads-to-the-server-what-stays-local)).
 5. **Reports capability warnings** from the server's capabilities handshake.
 
-The dev-server hook calls `npx zitadel push` automatically when `zitadel.json` changes during `npm run dev`. Customers can disable the hook if they prefer explicit invocation. CI pipelines always call it explicitly (after tests, before deploy).
+The dev-server hook calls `npx zitadel apply --environment development` automatically when `zitadel.json` changes during `npm run dev`. Customers can disable the hook if they prefer explicit invocation. CI pipelines always call it explicitly (after tests, before deploy).
 
 Full lint-rule spec is deferred to a follow-up doc.
 
 ## Drift
 
-The repo wins. On the next `npx zitadel push`, dashboard edits that diverge from the uploaded config are overwritten silently — same model Vercel uses when a repo push supersedes a dashboard change. No merge UX, no banner, no prompt. If a customer wants dashboard-only config (no GitOps), they remove `zitadel.json` from the repo and operate entirely through the dashboard; the server stops expecting pushes.
+The repo wins. On the next `npx zitadel apply`, dashboard edits that diverge from the uploaded config are overwritten silently — same model Vercel uses when a repo push supersedes a dashboard change. No merge UX, no banner, no prompt. If a customer wants dashboard-only config (no GitOps), they remove `zitadel.json` from the repo and operate entirely through the dashboard; the server stops expecting applies.
 
 ## Preview deploys
 
-Preview deploys work before claim via the **preview secret** minted at project creation and handed to the deploy platform's environment store automatically by the setup CLI. The preview secret is origin-scoped to the patterns declared at mint time (`["*.vercel.app"]` and similar). Full specification is in [Project Secret](secret.md#preview-secret-handoff).
+Preview deploys require claim. The **preview secret** is minted at project creation and stored in `.zitadel/secret`, but `zitadel deploy connect --environment preview` refuses to upload it to the deploy platform until the project is claimed. The preview secret is origin-scoped to the patterns declared at mint time (`["*.vercel.app"]` and similar). Full specification is in [Project Secret](secret.md#preview-secret-handoff).
 
-On production deployment (non-preview origin, first push to `main` → production hostname), the SDK refuses to start and prints:
+On preview or production deployment, the CLI/SDK refuses to proceed while the project is unclaimed and prints:
 
 ```
-⚠ Production deploys require a claimed Zitadel project.
+⚠ Preview and production deploys require a claimed Zitadel project.
   Claim this project now: npx zitadel claim
 ```
 

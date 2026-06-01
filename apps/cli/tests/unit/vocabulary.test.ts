@@ -4,7 +4,6 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const legacyPatterns = [
-  /\bunclaimed\b/i,
   /\borganization\b/i,
   /\btenant\b/i,
   /\binstance\b/i,

@@ -4,6 +4,7 @@ import { runAddSchema } from "./commands/add-schema";
 import { runAppAdd, runAppList, runAppRemove, runAppShow } from "./commands/app";
 import { runApply } from "./commands/apply";
 import { runCapabilities } from "./commands/capabilities";
+import { runClaim } from "./commands/claim";
 import { runDeployConnect, runDeployStatus } from "./commands/deploy";
 import { runDoctor } from "./commands/doctor";
 import { runEject } from "./commands/eject";
@@ -75,6 +76,14 @@ async function dispatch(parsed: ParsedArgs, io: CliIO, global: GlobalOptions): P
         planOnly: true,
         environment: stringOpt(parsed, "environment"),
         platform: stringOpt(parsed, "platform"),
+      });
+      return;
+    case "claim":
+      await runClaim(io, {
+        ...global,
+        challengeId: stringOpt(parsed, "challengeId"),
+        returnUrl: stringOpt(parsed, "returnUrl"),
+        teamName: stringOpt(parsed, "teamName"),
       });
       return;
     case "doctor":

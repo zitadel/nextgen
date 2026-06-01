@@ -3,7 +3,7 @@
 > **Status:** Draft
 > **See also:** [README](README.md) · [Overview](overview.md) · [Project Secret](secret.md) · [Configuration Surface](configuration-surface.md) · [Claim API](api/claim-api.yaml) · [Glossary](../glossary.md)
 
-Claim is the transaction that attaches ownership and accountability to a project. Before claim, the project exists but has no accountable owner. After claim, it belongs to a **team** with at least one accountable human. The transition is atomic — nothing partial.
+Claim is the transaction that attaches ownership and accountability to a project. Before claim, the project exists but has no accountable owner and is limited to local development. Preview and production are sharing/deploy boundaries and require claim. After claim, the project belongs to a **team** with at least one accountable human. The transition is atomic — nothing partial.
 
 > **Vocabulary note.** Claim attaches a customer project to a **team in the platform project** — the account that pays Zitadel. Teams also appear inside customer projects (as B2B end-customer tenants). Same resource kind, different project context. See [`../glossary.md`](../glossary.md).
 
@@ -99,7 +99,7 @@ Notably absent from this list: anything that touches `project_id`, users, factor
 - **Recovery options.** Strong — tied to the auth provider used at claim (and any later-linked providers). Pre-claim, recovery was best-effort.
 - **Project secret.** Rotated from the pre-claim `sk_proj_…` value to a new claimed credential. Everything else — origin-scoped secret, `project_id`, config, resources — untouched.
 
-**Nothing in the developer's code should need to change as a result of claim.** OIDC client IDs, redirect URIs, declared issuers, SDK configuration, `.env` entries — all stable across the transition. The running preview deploy keeps serving requests; the next request after commit is served by a claimed project without interruption.
+**Nothing in the developer's code should need to change as a result of claim.** OIDC client IDs, redirect URIs, declared issuers, SDK configuration, `.env` entries — all stable across the transition. Preview deploy configuration is unblocked after claim; the next apply or deploy-connect uses the same project id and preview secret.
 
 ## Team resolution
 
@@ -212,6 +212,7 @@ The boundary is about **accountability**, not aesthetics. Agents are first-class
 - **Claim.** The claim endpoint requires an interactive human-authenticable method (GitHub OAuth, Google OAuth, or email magic link). An agent cannot programmatically claim on behalf of a user without impersonating the user's session — a bridge we explicitly do not build.
 - **Enable paid features.** A token issued to an agent cannot activate managed delivery, upgrade tier, add payment methods, add custom domains, or enable hosted mode for production (hosted for dev/preview is fine). Prevents runaway costs from an agent loop that accidentally sends ten thousand OTP SMS messages in a debug session.
 - **Send real email or SMS** while the project is unclaimed. Dev inbox only, regardless of configuration.
+- **Share preview or production deploys before claim.** `zitadel plan`, `zitadel apply`, and `zitadel deploy connect` all return a claim-required error for preview and production environments until a human claims the project.
 
 **The handoff pattern:** when an agent produces code that includes Zitadel, it produces as part of its output:
 

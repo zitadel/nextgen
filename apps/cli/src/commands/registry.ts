@@ -129,6 +129,30 @@ export const COMMANDS: CommandSpec[] = [
     ],
   },
   {
+    name: "claim",
+    summary: "Claim an anonymous local project into a team.",
+    usage: "zitadel claim [--challenge-id claim_...]",
+    agent_status: "supported",
+    flags: [
+      ...globalFlags,
+      {
+        name: "challenge-id",
+        type: "string",
+        description: "Poll a claim challenge and rewrite .zitadel/secret after completion.",
+      },
+      {
+        name: "return-url",
+        type: "string",
+        description: "URL the browser claim flow should return to.",
+      },
+      {
+        name: "team-name",
+        type: "string",
+        description: "Suggested team name for the browser claim flow.",
+      },
+    ],
+  },
+  {
     name: "doctor",
     summary: "Verify generated files and local state.",
     usage: "zitadel doctor [--fix]",

@@ -28,7 +28,10 @@ func (s SecurityHandler) HandleOAuth2(ctx context.Context, operationName api.Ope
 	if !strings.HasPrefix(projectID, "proj_") {
 		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
 	}
-	return WithScopeContext(ctx, ScopeContext{ProjectID: projectID}), nil
+	return WithScopeContext(ctx, ScopeContext{
+		ProjectID:     projectID,
+		ProjectSecret: t.Token,
+	}), nil
 }
 
 var _ api.SecurityHandler = (*SecurityHandler)(nil)
@@ -40,7 +43,8 @@ func NewSecurityHandler() *SecurityHandler {
 type contextKey struct{}
 
 type ScopeContext struct {
-	ProjectID string
+	ProjectID     string
+	ProjectSecret string
 }
 
 func WithScopeContext(ctx context.Context, scopeCtx ScopeContext) context.Context {

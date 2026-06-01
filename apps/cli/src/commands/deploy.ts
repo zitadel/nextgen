@@ -3,6 +3,9 @@ import type { DeployEnvVars } from "../deploy";
 import type { CliIO, GlobalOptions } from "../io/output";
 import { ok } from "../io/output";
 import { ZitadelError } from "../lib/errors";
+import { createPlatformClient } from "../platform";
+import type { ZitadelEnvironment } from "../platform/schemas";
+import { ensureClaimedForEnvironment } from "./claim-gate";
 import { readZitadelConfig, readZitadelSecret } from "./shared";
 
 export type DeployOptions = GlobalOptions & {
@@ -22,6 +25,8 @@ export async function runDeployConnect(io: CliIO, opts: DeployOptions) {
   const config = await readZitadelConfig(opts.cwd);
   const adapter = await detectDeployTarget(opts.cwd, opts.platform);
   const environment = parseDeployEnvironment(opts.environment);
+  const client = createPlatformClient(opts.source, secret.project_secret);
+  await ensureClaimedForEnvironment(client, secret.project_id, environment);
 
   if (environment === "production" && !readProductionIssuer(config)) {
     throw new ZitadelError(
@@ -55,7 +60,7 @@ export async function runDeployConnect(io: CliIO, opts: DeployOptions) {
   return result;
 }
 
-function parseDeployEnvironment(value: string | undefined): "preview" | "production" {
+function parseDeployEnvironment(value: string | undefined): Extract<ZitadelEnvironment, "preview" | "production"> {
   if (!value || value === "preview") return "preview";
   if (value === "production") return "production";
   throw new ZitadelError("E_VALIDATION", `Invalid deploy environment "${value}"`, {

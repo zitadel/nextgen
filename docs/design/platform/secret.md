@@ -3,7 +3,7 @@
 > **Status:** Draft
 > **See also:** [README](README.md) · [Overview](overview.md) · [Configuration Surface](configuration-surface.md) · [Claim Flow](claim-flow.md) · [Claim API](api/claim-api.yaml) · [Glossary](../glossary.md) · [Credentials (canonical taxonomy)](../api/credentials.md)
 
-The project secret is a server-issued bearer token that authenticates SDK and CLI calls against a project. Before claim, it is the only authentication on the project. After claim, it is rotated to a **claimed credential** bound to the team that claimed the project. The same file on disk (`.zitadel/secret`) also carries an **origin-scoped project secret** (historically called the "preview secret") — a companion token that the setup CLI hands to the customer's deploy platform (Vercel, Netlify, Cloudflare) so preview builds work before the project is claimed.
+The project secret is a server-issued bearer token that authenticates SDK and CLI calls against a project. Before claim, it is the only authentication on the project. After claim, it is rotated to a **claimed credential** bound to the team that claimed the project. The same file on disk (`.zitadel/secret`) also carries an **origin-scoped project secret** (historically called the "preview secret") — a companion token that the setup CLI can hand to the customer's deploy platform (Vercel, Netlify, Cloudflare) after claim.
 
 This document specifies how the secrets are generated, stored, validated, and rotated — and what each one can and cannot do. For the full credential taxonomy across the API, see [`../api/credentials.md`](../api/credentials.md).
 
@@ -66,7 +66,7 @@ my-app/
 
 ### Preview secret handoff
 
-After the file is written, the setup CLI looks for a supported deploy platform and uploads the origin-scoped secret to that platform's environment store automatically:
+After the file is written, the setup CLI looks for a supported deploy platform and reports whether the project can be connected. The origin-scoped preview secret is not uploaded while the project is unclaimed because a preview deployment is a sharing boundary. Once `zitadel claim` completes, `zitadel deploy connect --environment preview` uploads the origin-scoped secret to the platform's environment store:
 
 | Detected tool | Command the CLI runs |
 |---|---|
@@ -96,8 +96,8 @@ Revocation is through rotation: `npx zitadel secret rotate` (post-claim only) is
 | Action | Project secret (`sk_proj_…`, pre-claim) | Origin-scoped secret (`sk_proj_…`) | Claimed credential (`sk_proj_…`, post-claim) |
 |---|---|---|---|
 | Read the project's own configuration | Yes | No | Yes |
-| `npx zitadel push` — upload config | Yes | **No** | Yes |
-| Read users this project has created | Yes | Yes (scoped to preview environments) | Yes |
+| `npx zitadel apply` — upload config | Yes for development only | **No** | Yes |
+| Read users this project has created | Yes | Yes (scoped to claimed preview environments) | Yes |
 | Register new users, authenticate sessions | Yes | Yes (scoped origins) | Yes |
 | Send magic links / OTP to the dev inbox | Yes | Yes | Yes |
 | Send real email / SMS | **No** | **No** | Yes (Pro for managed; Free with BYO) |
@@ -169,7 +169,7 @@ sequenceDiagram
     Srv->>Srv: generate sk_proj_ secrets server-side
     Srv-->>CLI: { project_id, secret, preview_secret, preview_origins }
     CLI->>Secret: write file (0600, gitignored)
-    CLI->>Deploy: upload preview_secret to env store<br>(if deploy tool detected)
+    CLI->>Dev: print claim-required warning<br>for preview/production deploys
     CLI->>Dev: print project slug + scratch URL + dev inbox
 
     Note over Dev,Srv: Days/weeks of development.<br>Every API request carries a bearer secret.
@@ -189,12 +189,13 @@ Full CLI spec is deferred. The commands that touch `.zitadel/secret`:
 
 | Command | Purpose |
 |---|---|
-| `npx @zitadel/setup` | Create project, write `.zitadel/secret`, upload preview secret to deploy platform. |
+| `npx zitadel setup` | Create project, write `.zitadel/secret`, and scaffold local development. |
 | `npx zitadel secret show` | Print project slug, claim state, declared issuer origins. Never prints the secret values. |
 | `npx zitadel secret restore` | Post-claim only. Authenticate as a human; refresh both secrets. |
 | `npx zitadel secret new` | Create a fresh pre-claim project, replacing the current secret file. Prompts if one exists. |
 | `npx zitadel secret rotate` | Post-claim only. Rotate the project secret without touching `project_id`. Use after a suspected leak. |
 | `npx zitadel claim` | See [claim-flow.md](claim-flow.md). |
+| `npx zitadel deploy connect --environment preview` | Post-claim only. Upload the origin-scoped preview secret to the deploy platform. |
 
 ## See also
 

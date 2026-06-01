@@ -1,18 +1,48 @@
 type: object
-description: The current state of a project.
+description: The current state of a project. Secret material is never returned.
 required:
-  - id
-  - createdAt
-  - updatedAt
+  - project_id
+  - lifecycle
+  - preview_origins
+  - claim_required_for
+  - created_at
+  - updated_at
 properties:
-  id:
+  project_id:
+    $ref: ../../components/schemas/project-id.yaml
+  lifecycle:
     type: string
-    description: The unique identifier of the project.
-  createdAt:
+    enum:
+      - unclaimed
+      - claimed
+  preview_origins:
+    type: array
+    items:
+      type: string
+  claim_required_for:
+    type: array
+    items:
+      type: string
+      enum:
+        - preview
+        - production
+  team_id:
+    type: string
+    description: Present after claim.
+  tier:
+    type: string
+    enum:
+      - free
+      - pro
+      - enterprise
+    description: Present after claim.
+  created_at:
     type: string
     format: date-time
-    description: The time when the project was created.
-  updatedAt:
+  updated_at:
     type: string
     format: date-time
-    description: The time when the project was last updated.
+  claimed_at:
+    type: string
+    format: date-time
+    description: Present after claim.

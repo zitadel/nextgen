@@ -13,21 +13,24 @@ afterEach(() => { server.resetHandlers(); resetPlatformStore(); });
 describe("platform client", () => {
   it("createProject returns a valid project with id and secrets", async () => {
     const client = createPlatformClient(MOCK_SERVER_URL);
-    const project = await client.createProject({ previewOrigins: ["*.vercel.app"] });
-    expect(project.id).toBeTruthy();
-    expect(project.projectSecret).toMatch(/^sk_proj_/);
-    expect(project.previewSecret).toMatch(/^sk_proj_/);
-    expect(project.previewOrigins).toEqual(["*.vercel.app"]);
-    expect(project.createdAt).toBeTruthy();
+    const project = await client.createProject({ preview_origins: ["*.vercel.app"] });
+    expect(project.project_id).toBeTruthy();
+    expect(project.project_secret).toMatch(/^sk_proj_/);
+    expect(project.preview_secret).toMatch(/^sk_proj_/);
+    expect(project.preview_origins).toEqual(["*.vercel.app"]);
+    expect(project.lifecycle).toBe("unclaimed");
+    expect(project.claim_required_for).toEqual(["preview", "production"]);
+    expect(project.created_at).toBeTruthy();
   });
 
   it("getProject returns the created project", async () => {
     const client = createPlatformClient(MOCK_SERVER_URL);
-    const created = await client.createProject({ previewOrigins: [] });
-    const fetched = await client.getProject(created.id);
-    expect(fetched.id).toBe(created.id);
-    expect(fetched.createdAt).toBeTruthy();
-    expect(fetched.updatedAt).toBeTruthy();
+    const created = await client.createProject({ preview_origins: [] });
+    const fetched = await client.getProject(created.project_id);
+    expect(fetched.project_id).toBe(created.project_id);
+    expect(fetched.lifecycle).toBe("unclaimed");
+    expect(fetched.created_at).toBeTruthy();
+    expect(fetched.updated_at).toBeTruthy();
   });
 
   it("createSchema and deleteSchema round-trip", async () => {

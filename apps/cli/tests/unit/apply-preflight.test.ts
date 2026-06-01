@@ -12,7 +12,14 @@ vi.mock("../../src/sync/loop", () => ({
 }));
 
 vi.mock("../../src/platform/index", () => ({
-  createPlatformClient: vi.fn().mockReturnValue({}),
+  createPlatformClient: vi.fn().mockReturnValue({
+    applyProjectConfig: vi.fn().mockResolvedValue({
+      project_id: "proj-001",
+      environment: "development",
+      lifecycle: "unclaimed",
+      applied_at: "2026-01-01T00:00:00.000Z",
+    }),
+  }),
 }));
 
 const VALID_FLOW = {

@@ -105,7 +105,7 @@ func TestCreateProject(t *testing.T) {
 		},
 		{
 			name:        "with preview origins",
-			body:        map[string]any{"previewOrigins": []string{"*.vercel.app", "*.netlify.app"}},
+			body:        map[string]any{"preview_origins": []string{"*.vercel.app", "*.netlify.app"}},
 			wantStatus:  http.StatusCreated,
 			wantOrigins: []string{"*.vercel.app", "*.netlify.app"},
 		},
@@ -125,12 +125,14 @@ func TestCreateProject(t *testing.T) {
 			var got map[string]any
 			require.NoError(t, json.NewDecoder(resp.Body).Decode(&got))
 
-			assert.NotEmpty(t, got["id"], "id should be non-empty")
-			assert.NotEmpty(t, got["projectSecret"], "projectSecret should be non-empty")
-			assert.NotEmpty(t, got["previewSecret"], "previewSecret should be non-empty")
+			assert.NotEmpty(t, got["project_id"], "project_id should be non-empty")
+			assert.NotEmpty(t, got["project_secret"], "project_secret should be non-empty")
+			assert.NotEmpty(t, got["preview_secret"], "preview_secret should be non-empty")
+			assert.Equal(t, "unclaimed", got["lifecycle"])
+			assert.Equal(t, []any{"preview", "production"}, got["claim_required_for"])
 
-			originsRaw, ok := got["previewOrigins"].([]any)
-			require.True(t, ok, "previewOrigins should be an array")
+			originsRaw, ok := got["preview_origins"].([]any)
+			require.True(t, ok, "preview_origins should be an array")
 			origins := make([]string, len(originsRaw))
 			for i, o := range originsRaw {
 				origins[i] = o.(string)
@@ -152,12 +154,12 @@ func TestGetProject(t *testing.T) {
 
 		var created map[string]any
 		require.NoError(t, json.NewDecoder(resp.Body).Decode(&created))
-		id := created["id"].(string)
+		id := created["project_id"].(string)
 
 		// GET the project using the project secret as bearer token.
 		req, err := http.NewRequest(http.MethodGet, ts.URL+"/projects/"+id, nil)
 		require.NoError(t, err)
-		req.Header.Set("Authorization", "Bearer "+created["projectSecret"].(string))
+		req.Header.Set("Authorization", "Bearer "+created["project_secret"].(string))
 
 		client := &http.Client{}
 		getResp, err := client.Do(req)
@@ -168,9 +170,10 @@ func TestGetProject(t *testing.T) {
 
 		var got map[string]any
 		require.NoError(t, json.NewDecoder(getResp.Body).Decode(&got))
-		assert.Equal(t, id, got["id"])
-		assert.NotEmpty(t, got["createdAt"])
-		assert.NotEmpty(t, got["updatedAt"])
+		assert.Equal(t, id, got["project_id"])
+		assert.Equal(t, "unclaimed", got["lifecycle"])
+		assert.NotEmpty(t, got["created_at"])
+		assert.NotEmpty(t, got["updated_at"])
 	})
 
 	t.Run("not found", func(t *testing.T) {
@@ -193,4 +196,104 @@ func TestGetProject(t *testing.T) {
 
 		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	})
+}
+
+func TestCreateProject_IdempotencyKey(t *testing.T) {
+	ts := newTestServer(t)
+
+	body := []byte(`{"preview_origins":["*.vercel.app"]}`)
+	req, err := http.NewRequest(http.MethodPost, ts.URL+"/projects", bytes.NewReader(body))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Idempotency-Key", "same-key")
+
+	client := &http.Client{}
+	first, err := client.Do(req)
+	require.NoError(t, err)
+	defer first.Body.Close()
+	require.Equal(t, http.StatusCreated, first.StatusCode)
+
+	var firstBody map[string]any
+	require.NoError(t, json.NewDecoder(first.Body).Decode(&firstBody))
+
+	req, err = http.NewRequest(http.MethodPost, ts.URL+"/projects", bytes.NewReader(body))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Idempotency-Key", "same-key")
+	second, err := client.Do(req)
+	require.NoError(t, err)
+	defer second.Body.Close()
+	require.Equal(t, http.StatusCreated, second.StatusCode)
+
+	var secondBody map[string]any
+	require.NoError(t, json.NewDecoder(second.Body).Decode(&secondBody))
+	assert.Equal(t, firstBody["project_id"], secondBody["project_id"])
+}
+
+func TestProjectClaimFlow(t *testing.T) {
+	ts := newTestServer(t)
+	client := &http.Client{}
+
+	resp, err := http.Post(ts.URL+"/projects", "application/json", bytes.NewReader([]byte("{}")))
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+
+	var created map[string]any
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&created))
+	projectID := created["project_id"].(string)
+	projectSecret := created["project_secret"].(string)
+
+	req, err := http.NewRequest(http.MethodPatch, ts.URL+"/projects/"+projectID+"/config?environment=preview", bytes.NewReader([]byte("{}")))
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "Bearer "+projectSecret)
+	req.Header.Set("Content-Type", "application/json")
+	rejected, err := client.Do(req)
+	require.NoError(t, err)
+	defer rejected.Body.Close()
+	assert.Equal(t, http.StatusConflict, rejected.StatusCode)
+
+	req, err = http.NewRequest(http.MethodPost, ts.URL+"/projects/"+projectID+"/claim/init", bytes.NewReader([]byte("{}")))
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "Bearer "+projectSecret)
+	req.Header.Set("Content-Type", "application/json")
+	initResp, err := client.Do(req)
+	require.NoError(t, err)
+	defer initResp.Body.Close()
+	require.Equal(t, http.StatusCreated, initResp.StatusCode)
+
+	var initBody map[string]any
+	require.NoError(t, json.NewDecoder(initResp.Body).Decode(&initBody))
+	challengeID := initBody["challenge_id"].(string)
+
+	completeBody := []byte(`{"challenge_id":"` + challengeID + `","team_choice":{"create_team_name":"Acme"}}`)
+	req, err = http.NewRequest(http.MethodPost, ts.URL+"/projects/"+projectID+"/claim/complete", bytes.NewReader(completeBody))
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "Bearer "+projectSecret)
+	req.Header.Set("Content-Type", "application/json")
+	completeResp, err := client.Do(req)
+	require.NoError(t, err)
+	defer completeResp.Body.Close()
+	require.Equal(t, http.StatusOK, completeResp.StatusCode)
+
+	req, err = http.NewRequest(http.MethodGet, ts.URL+"/projects/"+projectID+"/claim/status?challenge_id="+challengeID, nil)
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "Bearer "+projectSecret)
+	statusResp, err := client.Do(req)
+	require.NoError(t, err)
+	defer statusResp.Body.Close()
+	require.Equal(t, http.StatusOK, statusResp.StatusCode)
+
+	var statusBody map[string]any
+	require.NoError(t, json.NewDecoder(statusResp.Body).Decode(&statusBody))
+	assert.Equal(t, "completed", statusBody["status"])
+	assert.NotEmpty(t, statusBody["rotated_project_secret"])
+
+	req, err = http.NewRequest(http.MethodGet, ts.URL+"/projects/"+projectID+"/claim/status?challenge_id="+challengeID, nil)
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "Bearer "+projectSecret)
+	consumedResp, err := client.Do(req)
+	require.NoError(t, err)
+	defer consumedResp.Body.Close()
+	assert.Equal(t, http.StatusGone, consumedResp.StatusCode)
 }

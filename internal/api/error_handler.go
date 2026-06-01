@@ -53,6 +53,10 @@ func errorResponse(err error) *api.ErrorDetailsStatusCode {
 		return sessionErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixJSONSchema.ErrorCodePrefix("")):
 		return schemaErrorResponse(e)
+	case strings.HasPrefix(e.Code, domain.PrefixProject.ErrorCodePrefix("")):
+		return projectErrorResponse(e)
+	case e.Code == domain.ErrAuthUnauthorized(nil).Code:
+		return errorResponseWithStatusCode(http.StatusUnauthorized, e)
 	case e.Code == domain.ErrNotImplemented().Code:
 		return errorResponseWithStatusCode(http.StatusNotImplemented, e)
 	case strings.HasPrefix(e.Code, domain.PrefixTeam.ErrorCodePrefix("")):
@@ -74,6 +78,23 @@ func errorResponseWithStatusCode(status int, err error) *api.ErrorDetailsStatusC
 // internalErrorResponse returns a 500 for unexpected errors.
 func internalErrorResponse(err error) *api.ErrorDetailsStatusCode {
 	return errorResponseWithStatusCode(http.StatusInternalServerError, err)
+}
+
+func projectErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
+	switch err.Code {
+	case domain.ErrProjectNotFound().Code,
+		domain.ErrProjectClaimNotFound().Code:
+		return errorResponseWithStatusCode(http.StatusNotFound, err)
+	case domain.ErrProjectClaimRequired().Code,
+		domain.ErrProjectAlreadyClaimed().Code,
+		domain.ErrProjectIdempotencyConflict().Code:
+		return errorResponseWithStatusCode(http.StatusConflict, err)
+	case domain.ErrProjectClaimExpired().Code,
+		domain.ErrProjectSecretConsumed().Code:
+		return errorResponseWithStatusCode(http.StatusGone, err)
+	default:
+		return internalErrorResponse(err)
+	}
 }
 
 // OgenErrorHandler is a custom ogen ErrorHandler that maps ogen's structural

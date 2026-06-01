@@ -64,6 +64,14 @@ paths:
     $ref: endpoints/projects/methods.yaml
   /projects/{project_id}:
     $ref: endpoints/projects/by_id/methods.yaml
+  /projects/{project_id}/config:
+    $ref: endpoints/projects/by_id/config/methods.yaml
+  /projects/{project_id}/claim/init:
+    $ref: endpoints/projects/by_id/claim/init/methods.yaml
+  /projects/{project_id}/claim/complete:
+    $ref: endpoints/projects/by_id/claim/complete/methods.yaml
+  /projects/{project_id}/claim/status:
+    $ref: endpoints/projects/by_id/claim/status/methods.yaml
   /sessions:
     $ref: endpoints/sessions/methods.yaml
   /sessions/exchange:

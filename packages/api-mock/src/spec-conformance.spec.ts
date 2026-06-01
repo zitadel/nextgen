@@ -22,7 +22,7 @@
  * Endpoints covered structurally (orval emits no `*Response` zod for these
  * because they have no static response schema — POSTs that return only an
  * `id`, or out-of-spec routes):
- *   - POST /projects                    → { id, projectSecret, … }
+ *   - POST /projects                    → { project_id, project_secret, … }
  *   - POST /schemas                     → { id }
  *   - POST /flow_definitions            → flow detail envelope
  *
@@ -119,17 +119,19 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     const res = await fetch(`${BASE}/projects`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ previewOrigins: ["http://localhost:3000"] }),
+      body: JSON.stringify({ preview_origins: ["http://localhost:3000"] }),
     });
     expect(res.status).toBe(201);
     const body = (await res.json()) as Record<string, unknown>;
     // No CreateProjectResponse zod schema is emitted by orval. Validate
     // structurally against the fields create-project-response.yaml requires.
-    expect(typeof body.id).toBe("string");
-    expect(typeof body.projectSecret).toBe("string");
-    expect(typeof body.previewSecret).toBe("string");
-    expect(Array.isArray(body.previewOrigins)).toBe(true);
-    expect(typeof body.createdAt).toBe("string");
+    expect(typeof body.project_id).toBe("string");
+    expect(typeof body.project_secret).toBe("string");
+    expect(typeof body.preview_secret).toBe("string");
+    expect(Array.isArray(body.preview_origins)).toBe(true);
+    expect(body.lifecycle).toBe("unclaimed");
+    expect(body.claim_required_for).toEqual(["preview", "production"]);
+    expect(typeof body.created_at).toBe("string");
   });
 
   test("GET /projects/:id matches GetProjectResponse", async () => {
@@ -138,8 +140,8 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       headers: { "content-type": "application/json" },
       body: JSON.stringify({}),
     });
-    const { id } = (await create.json()) as { id: string };
-    const res = await fetch(`${BASE}/projects/${id}`);
+    const { project_id } = (await create.json()) as { project_id: string };
+    const res = await fetch(`${BASE}/projects/${project_id}`);
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(() => GetProjectResponse.parse(body)).not.toThrow();
@@ -149,7 +151,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     const res = await fetch(`${BASE}/projects/proj-does-not-exist`);
     expect(res.status).toBe(404);
     const body = (await res.json()) as Record<string, unknown>;
-    expect(body.code).toBe("not_found");
+    expect(body.code).toBe("proj.not_found");
     expect(typeof body.message).toBe("string");
   });
 

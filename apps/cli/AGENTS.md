@@ -48,6 +48,7 @@ Envelope schema version: `1`. Every envelope carries `cli_version`, `command`, `
 | `zitadel setup` | Create a Zitadel project and scaffold local auth. | supported-mock-default |
 | `zitadel plan` | Validate config and deploy readiness without mutation. | supported |
 | `zitadel apply` | Validate and upload repo config to the platform. | supported-mock-default |
+| `zitadel claim` | Claim an anonymous local project into a team. | supported |
 | `zitadel doctor` | Verify generated files and local state. | supported |
 | `zitadel deploy status` | Report deploy platform readiness. | experimental |
 | `zitadel deploy connect` | Configure preview or production platform env vars. | experimental |
@@ -123,6 +124,24 @@ Usage: `zitadel apply [--environment development|preview|production]`
 | `--server` / `-s` | `string` | Override the resolved server URL. |
 | `--environment` / `-e` | `string` | Target environment (default: development). |
 | `--platform` | `string` | Deploy platform override. |
+
+### `zitadel claim`
+
+Claim an anonymous local project into a team.
+
+Usage: `zitadel claim [--challenge-id claim_...]`
+
+| Flag | Type | Description |
+|---|---|---|
+| `--cwd` / `-c` | `string` | Project directory to operate on. |
+| `--json` / `-j` | `boolean` | Emit the JSON envelope instead of pretty output. |
+| `--non-interactive` / `-n` | `boolean` | Disable prompts. Required when scripting or running as an agent. |
+| `--dry-run` | `boolean` | Preview the work without mutating files or hitting the platform. |
+| `--force` / `-f` | `boolean` | Overwrite protected files when conflicts are detected. |
+| `--server` / `-s` | `string` | Override the resolved server URL. |
+| `--challenge-id` | `string` | Poll a claim challenge and rewrite .zitadel/secret after completion. |
+| `--return-url` | `string` | URL the browser claim flow should return to. |
+| `--team-name` | `string` | Suggested team name for the browser claim flow. |
 
 ### `zitadel doctor`
 
@@ -462,6 +481,7 @@ Usage: `zitadel eject [--force]`
 | 3 | `E_FRAMEWORK_NOT_DETECTED`, `E_UNSUPPORTED_PROJECT_SHAPE`, `E_VALIDATION` |
 | 4 | `E_NETWORK` |
 | 5 | `E_CONFLICT` |
+| 6 | `E_CLAIM_REQUIRED` |
 
 ## Server resolution
 

@@ -1,29 +1,47 @@
 type: object
 required:
-  - id
-  - projectSecret
-  - previewSecret
-  - previewOrigins
-  - createdAt
+  - project_id
+  - project_secret
+  - preview_secret
+  - preview_origins
+  - lifecycle
+  - claim_required_for
+  - created_at
 properties:
-  id:
-    type: string
-    description: The unique identifier of the project.
-  projectSecret:
-    type: string
-    description: |
-      Secret which can be used for authentication when modifying the project.
-  previewSecret:
+  project_id:
+    $ref: ../../components/schemas/project-id.yaml
+  project_secret:
     type: string
     description: |
-      Secret which can be used for previewing and testing the project.
-  previewOrigins:
+      Full-access project bearer secret. Returned once and stored in
+      `.zitadel/secret`.
+  preview_secret:
+    type: string
+    description: |
+      Origin-scoped project bearer secret. Preserved across claim and handed
+      to deploy platforms only after claim.
+  preview_origins:
     type: array
     items:
       type: string
-    description: |
-      Origins which are allowed for previewing and testing the project.
-  createdAt:
+    description: Origin patterns the preview secret is scoped to.
+  lifecycle:
+    type: string
+    enum:
+      - unclaimed
+      - claimed
+  claim_required_for:
+    type: array
+    items:
+      type: string
+      enum:
+        - preview
+        - production
+    description: Environments that require claim before apply/deploy.
+  created_at:
     type: string
     format: date-time
-    description: The time when the project was created.
+  scratch_dashboard_url:
+    type: string
+    format: uri
+    description: Browser-session-keyed inspection URL for unclaimed projects.

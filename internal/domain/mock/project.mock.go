@@ -118,3 +118,41 @@ func (c *MockProjectRepositoryGetCall) DoAndReturn(f func(context.Context, datab
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
+
+// Update mocks base method.
+func (m *MockProjectRepository) Update(ctx context.Context, client database.QueryExecutor, project *domain.Project) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Update", ctx, client, project)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Update indicates an expected call of Update.
+func (mr *MockProjectRepositoryMockRecorder) Update(ctx, client, project any) *MockProjectRepositoryUpdateCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockProjectRepository)(nil).Update), ctx, client, project)
+	return &MockProjectRepositoryUpdateCall{Call: call}
+}
+
+// MockProjectRepositoryUpdateCall wrap *gomock.Call
+type MockProjectRepositoryUpdateCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockProjectRepositoryUpdateCall) Return(arg0 error) *MockProjectRepositoryUpdateCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockProjectRepositoryUpdateCall) Do(f func(context.Context, database.QueryExecutor, *domain.Project) error) *MockProjectRepositoryUpdateCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockProjectRepositoryUpdateCall) DoAndReturn(f func(context.Context, database.QueryExecutor, *domain.Project) error) *MockProjectRepositoryUpdateCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}

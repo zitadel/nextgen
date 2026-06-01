@@ -1,8 +1,20 @@
 type: object
 properties:
-  previewOrigins:
+  preview_origins:
     type: array
     items:
       type: string
     description: |
-      Origins which are allowed for previewing and testing the project.
+      Origin patterns that may receive the origin-scoped preview secret after
+      the project is claimed.
+  slug_preference:
+    type: string
+    description: |
+      Optional project slug preference. The server may ignore it when it is
+      unavailable or unsafe.
+  client_metadata:
+    type: object
+    additionalProperties: true
+    description: |
+      Unauthenticated hints from the CLI, such as framework, package manager,
+      SDK version, or deploy provider.

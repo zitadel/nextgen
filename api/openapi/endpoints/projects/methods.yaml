@@ -4,6 +4,15 @@ post:
   tags:
     - Project
   security: []
+  parameters:
+    - name: Idempotency-Key
+      in: header
+      required: false
+      schema:
+        type: string
+      description: |
+        Client retry key. Replaying the same key with the same request body
+        returns the original project instead of creating another one.
   requestBody:
     required: true
     content:
@@ -17,6 +26,12 @@ post:
         application/json:
           schema:
             $ref: create-project-response.yaml
+    '409':
+      description: Idempotency key was reused with a different request body.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
     '429':
       description: |
         Too many requests, the client has sent too many requests in a given

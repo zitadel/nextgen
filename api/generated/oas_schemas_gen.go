@@ -12,6 +12,215 @@ import (
 	"github.com/zitadel/nextgen/internal/api/ogenx"
 )
 
+type ApplyProjectConfigConflict ErrorDetails
+
+func (*ApplyProjectConfigConflict) applyProjectConfigRes() {}
+
+type ApplyProjectConfigEnvironment string
+
+const (
+	ApplyProjectConfigEnvironmentDevelopment ApplyProjectConfigEnvironment = "development"
+	ApplyProjectConfigEnvironmentPreview     ApplyProjectConfigEnvironment = "preview"
+	ApplyProjectConfigEnvironmentProduction  ApplyProjectConfigEnvironment = "production"
+)
+
+// AllValues returns all ApplyProjectConfigEnvironment values.
+func (ApplyProjectConfigEnvironment) AllValues() []ApplyProjectConfigEnvironment {
+	return []ApplyProjectConfigEnvironment{
+		ApplyProjectConfigEnvironmentDevelopment,
+		ApplyProjectConfigEnvironmentPreview,
+		ApplyProjectConfigEnvironmentProduction,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ApplyProjectConfigEnvironment) MarshalText() ([]byte, error) {
+	switch s {
+	case ApplyProjectConfigEnvironmentDevelopment:
+		return []byte(s), nil
+	case ApplyProjectConfigEnvironmentPreview:
+		return []byte(s), nil
+	case ApplyProjectConfigEnvironmentProduction:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ApplyProjectConfigEnvironment) UnmarshalText(data []byte) error {
+	switch ApplyProjectConfigEnvironment(data) {
+	case ApplyProjectConfigEnvironmentDevelopment:
+		*s = ApplyProjectConfigEnvironmentDevelopment
+		return nil
+	case ApplyProjectConfigEnvironmentPreview:
+		*s = ApplyProjectConfigEnvironmentPreview
+		return nil
+	case ApplyProjectConfigEnvironmentProduction:
+		*s = ApplyProjectConfigEnvironmentProduction
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+type ApplyProjectConfigNotFound ErrorDetails
+
+func (*ApplyProjectConfigNotFound) applyProjectConfigRes() {}
+
+type ApplyProjectConfigOK struct {
+	ProjectID   ProjectID                       `json:"project_id"`
+	Environment ApplyProjectConfigOKEnvironment `json:"environment"`
+	Lifecycle   ApplyProjectConfigOKLifecycle   `json:"lifecycle"`
+	AppliedAt   time.Time                       `json:"applied_at"`
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *ApplyProjectConfigOK) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetEnvironment returns the value of Environment.
+func (s *ApplyProjectConfigOK) GetEnvironment() ApplyProjectConfigOKEnvironment {
+	return s.Environment
+}
+
+// GetLifecycle returns the value of Lifecycle.
+func (s *ApplyProjectConfigOK) GetLifecycle() ApplyProjectConfigOKLifecycle {
+	return s.Lifecycle
+}
+
+// GetAppliedAt returns the value of AppliedAt.
+func (s *ApplyProjectConfigOK) GetAppliedAt() time.Time {
+	return s.AppliedAt
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *ApplyProjectConfigOK) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetEnvironment sets the value of Environment.
+func (s *ApplyProjectConfigOK) SetEnvironment(val ApplyProjectConfigOKEnvironment) {
+	s.Environment = val
+}
+
+// SetLifecycle sets the value of Lifecycle.
+func (s *ApplyProjectConfigOK) SetLifecycle(val ApplyProjectConfigOKLifecycle) {
+	s.Lifecycle = val
+}
+
+// SetAppliedAt sets the value of AppliedAt.
+func (s *ApplyProjectConfigOK) SetAppliedAt(val time.Time) {
+	s.AppliedAt = val
+}
+
+func (*ApplyProjectConfigOK) applyProjectConfigRes() {}
+
+type ApplyProjectConfigOKEnvironment string
+
+const (
+	ApplyProjectConfigOKEnvironmentDevelopment ApplyProjectConfigOKEnvironment = "development"
+	ApplyProjectConfigOKEnvironmentPreview     ApplyProjectConfigOKEnvironment = "preview"
+	ApplyProjectConfigOKEnvironmentProduction  ApplyProjectConfigOKEnvironment = "production"
+)
+
+// AllValues returns all ApplyProjectConfigOKEnvironment values.
+func (ApplyProjectConfigOKEnvironment) AllValues() []ApplyProjectConfigOKEnvironment {
+	return []ApplyProjectConfigOKEnvironment{
+		ApplyProjectConfigOKEnvironmentDevelopment,
+		ApplyProjectConfigOKEnvironmentPreview,
+		ApplyProjectConfigOKEnvironmentProduction,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ApplyProjectConfigOKEnvironment) MarshalText() ([]byte, error) {
+	switch s {
+	case ApplyProjectConfigOKEnvironmentDevelopment:
+		return []byte(s), nil
+	case ApplyProjectConfigOKEnvironmentPreview:
+		return []byte(s), nil
+	case ApplyProjectConfigOKEnvironmentProduction:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ApplyProjectConfigOKEnvironment) UnmarshalText(data []byte) error {
+	switch ApplyProjectConfigOKEnvironment(data) {
+	case ApplyProjectConfigOKEnvironmentDevelopment:
+		*s = ApplyProjectConfigOKEnvironmentDevelopment
+		return nil
+	case ApplyProjectConfigOKEnvironmentPreview:
+		*s = ApplyProjectConfigOKEnvironmentPreview
+		return nil
+	case ApplyProjectConfigOKEnvironmentProduction:
+		*s = ApplyProjectConfigOKEnvironmentProduction
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+type ApplyProjectConfigOKLifecycle string
+
+const (
+	ApplyProjectConfigOKLifecycleUnclaimed ApplyProjectConfigOKLifecycle = "unclaimed"
+	ApplyProjectConfigOKLifecycleClaimed   ApplyProjectConfigOKLifecycle = "claimed"
+)
+
+// AllValues returns all ApplyProjectConfigOKLifecycle values.
+func (ApplyProjectConfigOKLifecycle) AllValues() []ApplyProjectConfigOKLifecycle {
+	return []ApplyProjectConfigOKLifecycle{
+		ApplyProjectConfigOKLifecycleUnclaimed,
+		ApplyProjectConfigOKLifecycleClaimed,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ApplyProjectConfigOKLifecycle) MarshalText() ([]byte, error) {
+	switch s {
+	case ApplyProjectConfigOKLifecycleUnclaimed:
+		return []byte(s), nil
+	case ApplyProjectConfigOKLifecycleClaimed:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ApplyProjectConfigOKLifecycle) UnmarshalText(data []byte) error {
+	switch ApplyProjectConfigOKLifecycle(data) {
+	case ApplyProjectConfigOKLifecycleUnclaimed:
+		*s = ApplyProjectConfigOKLifecycleUnclaimed
+		return nil
+	case ApplyProjectConfigOKLifecycleClaimed:
+		*s = ApplyProjectConfigOKLifecycleClaimed
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+type ApplyProjectConfigReq map[string]jx.Raw
+
+func (s *ApplyProjectConfigReq) init() ApplyProjectConfigReq {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+type ApplyProjectConfigUnauthorized ErrorDetails
+
+func (*ApplyProjectConfigUnauthorized) applyProjectConfigRes() {}
+
 // Merged schema.
 // Ref: #
 type AttAlreadyCompleted struct {
@@ -1044,6 +1253,216 @@ func (s *ChallengeResponseState) UnmarshalText(data []byte) error {
 	}
 }
 
+type CompleteProjectClaimConflict ErrorDetails
+
+func (*CompleteProjectClaimConflict) completeProjectClaimRes() {}
+
+type CompleteProjectClaimGone ErrorDetails
+
+func (*CompleteProjectClaimGone) completeProjectClaimRes() {}
+
+type CompleteProjectClaimNotFound ErrorDetails
+
+func (*CompleteProjectClaimNotFound) completeProjectClaimRes() {}
+
+type CompleteProjectClaimOK struct {
+	ProjectID ProjectID                       `json:"project_id"`
+	Lifecycle CompleteProjectClaimOKLifecycle `json:"lifecycle"`
+	TeamID    string                          `json:"team_id"`
+	Tier      CompleteProjectClaimOKTier      `json:"tier"`
+	ClaimedAt time.Time                       `json:"claimed_at"`
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *CompleteProjectClaimOK) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetLifecycle returns the value of Lifecycle.
+func (s *CompleteProjectClaimOK) GetLifecycle() CompleteProjectClaimOKLifecycle {
+	return s.Lifecycle
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *CompleteProjectClaimOK) GetTeamID() string {
+	return s.TeamID
+}
+
+// GetTier returns the value of Tier.
+func (s *CompleteProjectClaimOK) GetTier() CompleteProjectClaimOKTier {
+	return s.Tier
+}
+
+// GetClaimedAt returns the value of ClaimedAt.
+func (s *CompleteProjectClaimOK) GetClaimedAt() time.Time {
+	return s.ClaimedAt
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *CompleteProjectClaimOK) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetLifecycle sets the value of Lifecycle.
+func (s *CompleteProjectClaimOK) SetLifecycle(val CompleteProjectClaimOKLifecycle) {
+	s.Lifecycle = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *CompleteProjectClaimOK) SetTeamID(val string) {
+	s.TeamID = val
+}
+
+// SetTier sets the value of Tier.
+func (s *CompleteProjectClaimOK) SetTier(val CompleteProjectClaimOKTier) {
+	s.Tier = val
+}
+
+// SetClaimedAt sets the value of ClaimedAt.
+func (s *CompleteProjectClaimOK) SetClaimedAt(val time.Time) {
+	s.ClaimedAt = val
+}
+
+func (*CompleteProjectClaimOK) completeProjectClaimRes() {}
+
+type CompleteProjectClaimOKLifecycle string
+
+const (
+	CompleteProjectClaimOKLifecycleClaimed CompleteProjectClaimOKLifecycle = "claimed"
+)
+
+// AllValues returns all CompleteProjectClaimOKLifecycle values.
+func (CompleteProjectClaimOKLifecycle) AllValues() []CompleteProjectClaimOKLifecycle {
+	return []CompleteProjectClaimOKLifecycle{
+		CompleteProjectClaimOKLifecycleClaimed,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s CompleteProjectClaimOKLifecycle) MarshalText() ([]byte, error) {
+	switch s {
+	case CompleteProjectClaimOKLifecycleClaimed:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *CompleteProjectClaimOKLifecycle) UnmarshalText(data []byte) error {
+	switch CompleteProjectClaimOKLifecycle(data) {
+	case CompleteProjectClaimOKLifecycleClaimed:
+		*s = CompleteProjectClaimOKLifecycleClaimed
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+type CompleteProjectClaimOKTier string
+
+const (
+	CompleteProjectClaimOKTierFree       CompleteProjectClaimOKTier = "free"
+	CompleteProjectClaimOKTierPro        CompleteProjectClaimOKTier = "pro"
+	CompleteProjectClaimOKTierEnterprise CompleteProjectClaimOKTier = "enterprise"
+)
+
+// AllValues returns all CompleteProjectClaimOKTier values.
+func (CompleteProjectClaimOKTier) AllValues() []CompleteProjectClaimOKTier {
+	return []CompleteProjectClaimOKTier{
+		CompleteProjectClaimOKTierFree,
+		CompleteProjectClaimOKTierPro,
+		CompleteProjectClaimOKTierEnterprise,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s CompleteProjectClaimOKTier) MarshalText() ([]byte, error) {
+	switch s {
+	case CompleteProjectClaimOKTierFree:
+		return []byte(s), nil
+	case CompleteProjectClaimOKTierPro:
+		return []byte(s), nil
+	case CompleteProjectClaimOKTierEnterprise:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *CompleteProjectClaimOKTier) UnmarshalText(data []byte) error {
+	switch CompleteProjectClaimOKTier(data) {
+	case CompleteProjectClaimOKTierFree:
+		*s = CompleteProjectClaimOKTierFree
+		return nil
+	case CompleteProjectClaimOKTierPro:
+		*s = CompleteProjectClaimOKTierPro
+		return nil
+	case CompleteProjectClaimOKTierEnterprise:
+		*s = CompleteProjectClaimOKTierEnterprise
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+type CompleteProjectClaimReq struct {
+	ChallengeID string                               `json:"challenge_id"`
+	TeamChoice  OptCompleteProjectClaimReqTeamChoice `json:"team_choice"`
+}
+
+// GetChallengeID returns the value of ChallengeID.
+func (s *CompleteProjectClaimReq) GetChallengeID() string {
+	return s.ChallengeID
+}
+
+// GetTeamChoice returns the value of TeamChoice.
+func (s *CompleteProjectClaimReq) GetTeamChoice() OptCompleteProjectClaimReqTeamChoice {
+	return s.TeamChoice
+}
+
+// SetChallengeID sets the value of ChallengeID.
+func (s *CompleteProjectClaimReq) SetChallengeID(val string) {
+	s.ChallengeID = val
+}
+
+// SetTeamChoice sets the value of TeamChoice.
+func (s *CompleteProjectClaimReq) SetTeamChoice(val OptCompleteProjectClaimReqTeamChoice) {
+	s.TeamChoice = val
+}
+
+type CompleteProjectClaimReqTeamChoice struct {
+	// Existing team to attach the project to.
+	TeamID OptString `json:"team_id"`
+	// Team name to create when no existing team is selected.
+	CreateTeamName OptString `json:"create_team_name"`
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *CompleteProjectClaimReqTeamChoice) GetTeamID() OptString {
+	return s.TeamID
+}
+
+// GetCreateTeamName returns the value of CreateTeamName.
+func (s *CompleteProjectClaimReqTeamChoice) GetCreateTeamName() OptString {
+	return s.CreateTeamName
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *CompleteProjectClaimReqTeamChoice) SetTeamID(val OptString) {
+	s.TeamID = val
+}
+
+// SetCreateTeamName sets the value of CreateTeamName.
+func (s *CompleteProjectClaimReqTeamChoice) SetCreateTeamName(val OptString) {
+	s.CreateTeamName = val
+}
+
+type CompleteProjectClaimUnauthorized ErrorDetails
+
+func (*CompleteProjectClaimUnauthorized) completeProjectClaimRes() {}
+
 // A successfully verified authentication factor with verification metadata.
 // Method-specific details are included in the `payload` field.
 // Ref: #
@@ -1702,10 +2121,21 @@ func (s *CreateHandoffErrorResponseStatusCode) SetResponse(val CreateHandoffErro
 
 func (*CreateHandoffErrorResponseStatusCode) createHandoffRes() {}
 
+type CreateProjectConflict ErrorDetails
+
+func (*CreateProjectConflict) createProjectRes() {}
+
 // Ref: #
 type CreateProjectRequest struct {
-	// Origins which are allowed for previewing and testing the project.
-	PreviewOrigins []string `json:"previewOrigins"`
+	// Origin patterns that may receive the origin-scoped preview secret after
+	// the project is claimed.
+	PreviewOrigins []string `json:"preview_origins"`
+	// Optional project slug preference. The server may ignore it when it is
+	// unavailable or unsafe.
+	SlugPreference OptString `json:"slug_preference"`
+	// Unauthenticated hints from the CLI, such as framework, package manager,
+	// SDK version, or deploy provider.
+	ClientMetadata OptCreateProjectRequestClientMetadata `json:"client_metadata"`
 }
 
 // GetPreviewOrigins returns the value of PreviewOrigins.
@@ -1713,28 +2143,66 @@ func (s *CreateProjectRequest) GetPreviewOrigins() []string {
 	return s.PreviewOrigins
 }
 
+// GetSlugPreference returns the value of SlugPreference.
+func (s *CreateProjectRequest) GetSlugPreference() OptString {
+	return s.SlugPreference
+}
+
+// GetClientMetadata returns the value of ClientMetadata.
+func (s *CreateProjectRequest) GetClientMetadata() OptCreateProjectRequestClientMetadata {
+	return s.ClientMetadata
+}
+
 // SetPreviewOrigins sets the value of PreviewOrigins.
 func (s *CreateProjectRequest) SetPreviewOrigins(val []string) {
 	s.PreviewOrigins = val
 }
 
-// Ref: #
-type CreateProjectResponse struct {
-	// The unique identifier of the project.
-	ID string `json:"id"`
-	// Secret which can be used for authentication when modifying the project.
-	ProjectSecret string `json:"projectSecret"`
-	// Secret which can be used for previewing and testing the project.
-	PreviewSecret string `json:"previewSecret"`
-	// Origins which are allowed for previewing and testing the project.
-	PreviewOrigins []string `json:"previewOrigins"`
-	// The time when the project was created.
-	CreatedAt time.Time `json:"createdAt"`
+// SetSlugPreference sets the value of SlugPreference.
+func (s *CreateProjectRequest) SetSlugPreference(val OptString) {
+	s.SlugPreference = val
 }
 
-// GetID returns the value of ID.
-func (s *CreateProjectResponse) GetID() string {
-	return s.ID
+// SetClientMetadata sets the value of ClientMetadata.
+func (s *CreateProjectRequest) SetClientMetadata(val OptCreateProjectRequestClientMetadata) {
+	s.ClientMetadata = val
+}
+
+// Unauthenticated hints from the CLI, such as framework, package manager,
+// SDK version, or deploy provider.
+type CreateProjectRequestClientMetadata map[string]jx.Raw
+
+func (s *CreateProjectRequestClientMetadata) init() CreateProjectRequestClientMetadata {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Ref: #
+type CreateProjectResponse struct {
+	ProjectID ProjectID `json:"project_id"`
+	// Full-access project bearer secret. Returned once and stored in
+	// `.zitadel/secret`.
+	ProjectSecret string `json:"project_secret"`
+	// Origin-scoped project bearer secret. Preserved across claim and handed
+	// to deploy platforms only after claim.
+	PreviewSecret string `json:"preview_secret"`
+	// Origin patterns the preview secret is scoped to.
+	PreviewOrigins []string                       `json:"preview_origins"`
+	Lifecycle      CreateProjectResponseLifecycle `json:"lifecycle"`
+	// Environments that require claim before apply/deploy.
+	ClaimRequiredFor []CreateProjectResponseClaimRequiredForItem `json:"claim_required_for"`
+	CreatedAt        time.Time                                   `json:"created_at"`
+	// Browser-session-keyed inspection URL for unclaimed projects.
+	ScratchDashboardURL OptURI `json:"scratch_dashboard_url"`
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *CreateProjectResponse) GetProjectID() ProjectID {
+	return s.ProjectID
 }
 
 // GetProjectSecret returns the value of ProjectSecret.
@@ -1752,14 +2220,29 @@ func (s *CreateProjectResponse) GetPreviewOrigins() []string {
 	return s.PreviewOrigins
 }
 
+// GetLifecycle returns the value of Lifecycle.
+func (s *CreateProjectResponse) GetLifecycle() CreateProjectResponseLifecycle {
+	return s.Lifecycle
+}
+
+// GetClaimRequiredFor returns the value of ClaimRequiredFor.
+func (s *CreateProjectResponse) GetClaimRequiredFor() []CreateProjectResponseClaimRequiredForItem {
+	return s.ClaimRequiredFor
+}
+
 // GetCreatedAt returns the value of CreatedAt.
 func (s *CreateProjectResponse) GetCreatedAt() time.Time {
 	return s.CreatedAt
 }
 
-// SetID sets the value of ID.
-func (s *CreateProjectResponse) SetID(val string) {
-	s.ID = val
+// GetScratchDashboardURL returns the value of ScratchDashboardURL.
+func (s *CreateProjectResponse) GetScratchDashboardURL() OptURI {
+	return s.ScratchDashboardURL
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *CreateProjectResponse) SetProjectID(val ProjectID) {
+	s.ProjectID = val
 }
 
 // SetProjectSecret sets the value of ProjectSecret.
@@ -1777,12 +2260,113 @@ func (s *CreateProjectResponse) SetPreviewOrigins(val []string) {
 	s.PreviewOrigins = val
 }
 
+// SetLifecycle sets the value of Lifecycle.
+func (s *CreateProjectResponse) SetLifecycle(val CreateProjectResponseLifecycle) {
+	s.Lifecycle = val
+}
+
+// SetClaimRequiredFor sets the value of ClaimRequiredFor.
+func (s *CreateProjectResponse) SetClaimRequiredFor(val []CreateProjectResponseClaimRequiredForItem) {
+	s.ClaimRequiredFor = val
+}
+
 // SetCreatedAt sets the value of CreatedAt.
 func (s *CreateProjectResponse) SetCreatedAt(val time.Time) {
 	s.CreatedAt = val
 }
 
+// SetScratchDashboardURL sets the value of ScratchDashboardURL.
+func (s *CreateProjectResponse) SetScratchDashboardURL(val OptURI) {
+	s.ScratchDashboardURL = val
+}
+
 func (*CreateProjectResponse) createProjectRes() {}
+
+type CreateProjectResponseClaimRequiredForItem string
+
+const (
+	CreateProjectResponseClaimRequiredForItemPreview    CreateProjectResponseClaimRequiredForItem = "preview"
+	CreateProjectResponseClaimRequiredForItemProduction CreateProjectResponseClaimRequiredForItem = "production"
+)
+
+// AllValues returns all CreateProjectResponseClaimRequiredForItem values.
+func (CreateProjectResponseClaimRequiredForItem) AllValues() []CreateProjectResponseClaimRequiredForItem {
+	return []CreateProjectResponseClaimRequiredForItem{
+		CreateProjectResponseClaimRequiredForItemPreview,
+		CreateProjectResponseClaimRequiredForItemProduction,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s CreateProjectResponseClaimRequiredForItem) MarshalText() ([]byte, error) {
+	switch s {
+	case CreateProjectResponseClaimRequiredForItemPreview:
+		return []byte(s), nil
+	case CreateProjectResponseClaimRequiredForItemProduction:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *CreateProjectResponseClaimRequiredForItem) UnmarshalText(data []byte) error {
+	switch CreateProjectResponseClaimRequiredForItem(data) {
+	case CreateProjectResponseClaimRequiredForItemPreview:
+		*s = CreateProjectResponseClaimRequiredForItemPreview
+		return nil
+	case CreateProjectResponseClaimRequiredForItemProduction:
+		*s = CreateProjectResponseClaimRequiredForItemProduction
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+type CreateProjectResponseLifecycle string
+
+const (
+	CreateProjectResponseLifecycleUnclaimed CreateProjectResponseLifecycle = "unclaimed"
+	CreateProjectResponseLifecycleClaimed   CreateProjectResponseLifecycle = "claimed"
+)
+
+// AllValues returns all CreateProjectResponseLifecycle values.
+func (CreateProjectResponseLifecycle) AllValues() []CreateProjectResponseLifecycle {
+	return []CreateProjectResponseLifecycle{
+		CreateProjectResponseLifecycleUnclaimed,
+		CreateProjectResponseLifecycleClaimed,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s CreateProjectResponseLifecycle) MarshalText() ([]byte, error) {
+	switch s {
+	case CreateProjectResponseLifecycleUnclaimed:
+		return []byte(s), nil
+	case CreateProjectResponseLifecycleClaimed:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *CreateProjectResponseLifecycle) UnmarshalText(data []byte) error {
+	switch CreateProjectResponseLifecycle(data) {
+	case CreateProjectResponseLifecycleUnclaimed:
+		*s = CreateProjectResponseLifecycleUnclaimed
+		return nil
+	case CreateProjectResponseLifecycleClaimed:
+		*s = CreateProjectResponseLifecycleClaimed
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+type CreateProjectTooManyRequests ErrorDetails
+
+func (*CreateProjectTooManyRequests) createProjectRes() {}
 
 type CreateSchemaBadRequest ErrorDetails
 
@@ -2132,7 +2716,6 @@ func (s *ErrorDetails) SetDetails(val OptErrorDetailsDetails) {
 func (*ErrorDetails) authorizeDeviceRes()      {}
 func (*ErrorDetails) authorizeGetRes()         {}
 func (*ErrorDetails) createFlowRes()           {}
-func (*ErrorDetails) createProjectRes()        {}
 func (*ErrorDetails) createSessionRes()        {}
 func (*ErrorDetails) deleteFlowDefinitionRes() {}
 func (*ErrorDetails) endSessionRes()           {}
@@ -2179,8 +2762,10 @@ func (s *ErrorDetailsStatusCode) SetResponse(val ErrorDetails) {
 	s.Response = val
 }
 
+func (*ErrorDetailsStatusCode) applyProjectConfigRes()     {}
 func (*ErrorDetailsStatusCode) authorizeDeviceRes()        {}
 func (*ErrorDetailsStatusCode) authorizeGetRes()           {}
+func (*ErrorDetailsStatusCode) completeProjectClaimRes()   {}
 func (*ErrorDetailsStatusCode) createFlowDefinitionRes()   {}
 func (*ErrorDetailsStatusCode) createFlowRes()             {}
 func (*ErrorDetailsStatusCode) createProjectRes()          {}
@@ -2197,6 +2782,7 @@ func (*ErrorDetailsStatusCode) getKeysRes()                {}
 func (*ErrorDetailsStatusCode) getLiveRes()                {}
 func (*ErrorDetailsStatusCode) getMySessionRes()           {}
 func (*ErrorDetailsStatusCode) getOpenIDConfigurationRes() {}
+func (*ErrorDetailsStatusCode) getProjectClaimStatusRes()  {}
 func (*ErrorDetailsStatusCode) getProjectRes()             {}
 func (*ErrorDetailsStatusCode) getReadyRes()               {}
 func (*ErrorDetailsStatusCode) getSchemaByIdRes()          {}
@@ -2204,6 +2790,7 @@ func (*ErrorDetailsStatusCode) getSessionRes()             {}
 func (*ErrorDetailsStatusCode) getTeamRes()                {}
 func (*ErrorDetailsStatusCode) getTokenRes()               {}
 func (*ErrorDetailsStatusCode) getUserInfoRes()            {}
+func (*ErrorDetailsStatusCode) initProjectClaimRes()       {}
 func (*ErrorDetailsStatusCode) introspectRes()             {}
 func (*ErrorDetailsStatusCode) listFlowDefinitionsRes()    {}
 func (*ErrorDetailsStatusCode) listSessionsRes()           {}
@@ -4399,24 +4986,180 @@ type GetMySessionUnauthorized ErrorDetails
 
 func (*GetMySessionUnauthorized) getMySessionRes() {}
 
+type GetProjectClaimStatusGone ErrorDetails
+
+func (*GetProjectClaimStatusGone) getProjectClaimStatusRes() {}
+
+type GetProjectClaimStatusNotFound ErrorDetails
+
+func (*GetProjectClaimStatusNotFound) getProjectClaimStatusRes() {}
+
+type GetProjectClaimStatusOK struct {
+	ProjectID   ProjectID                     `json:"project_id"`
+	ChallengeID string                        `json:"challenge_id"`
+	Status      GetProjectClaimStatusOKStatus `json:"status"`
+	ExpiresAt   time.Time                     `json:"expires_at"`
+	ClaimedAt   OptDateTime                   `json:"claimed_at"`
+	// Returned once after completion, then discarded.
+	RotatedProjectSecret OptString `json:"rotated_project_secret"`
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *GetProjectClaimStatusOK) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetChallengeID returns the value of ChallengeID.
+func (s *GetProjectClaimStatusOK) GetChallengeID() string {
+	return s.ChallengeID
+}
+
+// GetStatus returns the value of Status.
+func (s *GetProjectClaimStatusOK) GetStatus() GetProjectClaimStatusOKStatus {
+	return s.Status
+}
+
+// GetExpiresAt returns the value of ExpiresAt.
+func (s *GetProjectClaimStatusOK) GetExpiresAt() time.Time {
+	return s.ExpiresAt
+}
+
+// GetClaimedAt returns the value of ClaimedAt.
+func (s *GetProjectClaimStatusOK) GetClaimedAt() OptDateTime {
+	return s.ClaimedAt
+}
+
+// GetRotatedProjectSecret returns the value of RotatedProjectSecret.
+func (s *GetProjectClaimStatusOK) GetRotatedProjectSecret() OptString {
+	return s.RotatedProjectSecret
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *GetProjectClaimStatusOK) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetChallengeID sets the value of ChallengeID.
+func (s *GetProjectClaimStatusOK) SetChallengeID(val string) {
+	s.ChallengeID = val
+}
+
+// SetStatus sets the value of Status.
+func (s *GetProjectClaimStatusOK) SetStatus(val GetProjectClaimStatusOKStatus) {
+	s.Status = val
+}
+
+// SetExpiresAt sets the value of ExpiresAt.
+func (s *GetProjectClaimStatusOK) SetExpiresAt(val time.Time) {
+	s.ExpiresAt = val
+}
+
+// SetClaimedAt sets the value of ClaimedAt.
+func (s *GetProjectClaimStatusOK) SetClaimedAt(val OptDateTime) {
+	s.ClaimedAt = val
+}
+
+// SetRotatedProjectSecret sets the value of RotatedProjectSecret.
+func (s *GetProjectClaimStatusOK) SetRotatedProjectSecret(val OptString) {
+	s.RotatedProjectSecret = val
+}
+
+func (*GetProjectClaimStatusOK) getProjectClaimStatusRes() {}
+
+type GetProjectClaimStatusOKStatus string
+
+const (
+	GetProjectClaimStatusOKStatusPending   GetProjectClaimStatusOKStatus = "pending"
+	GetProjectClaimStatusOKStatusCompleted GetProjectClaimStatusOKStatus = "completed"
+)
+
+// AllValues returns all GetProjectClaimStatusOKStatus values.
+func (GetProjectClaimStatusOKStatus) AllValues() []GetProjectClaimStatusOKStatus {
+	return []GetProjectClaimStatusOKStatus{
+		GetProjectClaimStatusOKStatusPending,
+		GetProjectClaimStatusOKStatusCompleted,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s GetProjectClaimStatusOKStatus) MarshalText() ([]byte, error) {
+	switch s {
+	case GetProjectClaimStatusOKStatusPending:
+		return []byte(s), nil
+	case GetProjectClaimStatusOKStatusCompleted:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *GetProjectClaimStatusOKStatus) UnmarshalText(data []byte) error {
+	switch GetProjectClaimStatusOKStatus(data) {
+	case GetProjectClaimStatusOKStatusPending:
+		*s = GetProjectClaimStatusOKStatusPending
+		return nil
+	case GetProjectClaimStatusOKStatusCompleted:
+		*s = GetProjectClaimStatusOKStatusCompleted
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+type GetProjectClaimStatusUnauthorized ErrorDetails
+
+func (*GetProjectClaimStatusUnauthorized) getProjectClaimStatusRes() {}
+
 type GetProjectNotFound ErrorDetails
 
 func (*GetProjectNotFound) getProjectRes() {}
 
-// The current state of a project.
+// The current state of a project. Secret material is never returned.
 // Ref: #
 type GetProjectResponse struct {
-	// The unique identifier of the project.
-	ID string `json:"id"`
-	// The time when the project was created.
-	CreatedAt time.Time `json:"createdAt"`
-	// The time when the project was last updated.
-	UpdatedAt time.Time `json:"updatedAt"`
+	ProjectID        ProjectID                                `json:"project_id"`
+	Lifecycle        GetProjectResponseLifecycle              `json:"lifecycle"`
+	PreviewOrigins   []string                                 `json:"preview_origins"`
+	ClaimRequiredFor []GetProjectResponseClaimRequiredForItem `json:"claim_required_for"`
+	// Present after claim.
+	TeamID OptString `json:"team_id"`
+	// Present after claim.
+	Tier      OptGetProjectResponseTier `json:"tier"`
+	CreatedAt time.Time                 `json:"created_at"`
+	UpdatedAt time.Time                 `json:"updated_at"`
+	// Present after claim.
+	ClaimedAt OptDateTime `json:"claimed_at"`
 }
 
-// GetID returns the value of ID.
-func (s *GetProjectResponse) GetID() string {
-	return s.ID
+// GetProjectID returns the value of ProjectID.
+func (s *GetProjectResponse) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetLifecycle returns the value of Lifecycle.
+func (s *GetProjectResponse) GetLifecycle() GetProjectResponseLifecycle {
+	return s.Lifecycle
+}
+
+// GetPreviewOrigins returns the value of PreviewOrigins.
+func (s *GetProjectResponse) GetPreviewOrigins() []string {
+	return s.PreviewOrigins
+}
+
+// GetClaimRequiredFor returns the value of ClaimRequiredFor.
+func (s *GetProjectResponse) GetClaimRequiredFor() []GetProjectResponseClaimRequiredForItem {
+	return s.ClaimRequiredFor
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *GetProjectResponse) GetTeamID() OptString {
+	return s.TeamID
+}
+
+// GetTier returns the value of Tier.
+func (s *GetProjectResponse) GetTier() OptGetProjectResponseTier {
+	return s.Tier
 }
 
 // GetCreatedAt returns the value of CreatedAt.
@@ -4429,9 +5172,39 @@ func (s *GetProjectResponse) GetUpdatedAt() time.Time {
 	return s.UpdatedAt
 }
 
-// SetID sets the value of ID.
-func (s *GetProjectResponse) SetID(val string) {
-	s.ID = val
+// GetClaimedAt returns the value of ClaimedAt.
+func (s *GetProjectResponse) GetClaimedAt() OptDateTime {
+	return s.ClaimedAt
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *GetProjectResponse) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetLifecycle sets the value of Lifecycle.
+func (s *GetProjectResponse) SetLifecycle(val GetProjectResponseLifecycle) {
+	s.Lifecycle = val
+}
+
+// SetPreviewOrigins sets the value of PreviewOrigins.
+func (s *GetProjectResponse) SetPreviewOrigins(val []string) {
+	s.PreviewOrigins = val
+}
+
+// SetClaimRequiredFor sets the value of ClaimRequiredFor.
+func (s *GetProjectResponse) SetClaimRequiredFor(val []GetProjectResponseClaimRequiredForItem) {
+	s.ClaimRequiredFor = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *GetProjectResponse) SetTeamID(val OptString) {
+	s.TeamID = val
+}
+
+// SetTier sets the value of Tier.
+func (s *GetProjectResponse) SetTier(val OptGetProjectResponseTier) {
+	s.Tier = val
 }
 
 // SetCreatedAt sets the value of CreatedAt.
@@ -4444,7 +5217,143 @@ func (s *GetProjectResponse) SetUpdatedAt(val time.Time) {
 	s.UpdatedAt = val
 }
 
+// SetClaimedAt sets the value of ClaimedAt.
+func (s *GetProjectResponse) SetClaimedAt(val OptDateTime) {
+	s.ClaimedAt = val
+}
+
 func (*GetProjectResponse) getProjectRes() {}
+
+type GetProjectResponseClaimRequiredForItem string
+
+const (
+	GetProjectResponseClaimRequiredForItemPreview    GetProjectResponseClaimRequiredForItem = "preview"
+	GetProjectResponseClaimRequiredForItemProduction GetProjectResponseClaimRequiredForItem = "production"
+)
+
+// AllValues returns all GetProjectResponseClaimRequiredForItem values.
+func (GetProjectResponseClaimRequiredForItem) AllValues() []GetProjectResponseClaimRequiredForItem {
+	return []GetProjectResponseClaimRequiredForItem{
+		GetProjectResponseClaimRequiredForItemPreview,
+		GetProjectResponseClaimRequiredForItemProduction,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s GetProjectResponseClaimRequiredForItem) MarshalText() ([]byte, error) {
+	switch s {
+	case GetProjectResponseClaimRequiredForItemPreview:
+		return []byte(s), nil
+	case GetProjectResponseClaimRequiredForItemProduction:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *GetProjectResponseClaimRequiredForItem) UnmarshalText(data []byte) error {
+	switch GetProjectResponseClaimRequiredForItem(data) {
+	case GetProjectResponseClaimRequiredForItemPreview:
+		*s = GetProjectResponseClaimRequiredForItemPreview
+		return nil
+	case GetProjectResponseClaimRequiredForItemProduction:
+		*s = GetProjectResponseClaimRequiredForItemProduction
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+type GetProjectResponseLifecycle string
+
+const (
+	GetProjectResponseLifecycleUnclaimed GetProjectResponseLifecycle = "unclaimed"
+	GetProjectResponseLifecycleClaimed   GetProjectResponseLifecycle = "claimed"
+)
+
+// AllValues returns all GetProjectResponseLifecycle values.
+func (GetProjectResponseLifecycle) AllValues() []GetProjectResponseLifecycle {
+	return []GetProjectResponseLifecycle{
+		GetProjectResponseLifecycleUnclaimed,
+		GetProjectResponseLifecycleClaimed,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s GetProjectResponseLifecycle) MarshalText() ([]byte, error) {
+	switch s {
+	case GetProjectResponseLifecycleUnclaimed:
+		return []byte(s), nil
+	case GetProjectResponseLifecycleClaimed:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *GetProjectResponseLifecycle) UnmarshalText(data []byte) error {
+	switch GetProjectResponseLifecycle(data) {
+	case GetProjectResponseLifecycleUnclaimed:
+		*s = GetProjectResponseLifecycleUnclaimed
+		return nil
+	case GetProjectResponseLifecycleClaimed:
+		*s = GetProjectResponseLifecycleClaimed
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Present after claim.
+type GetProjectResponseTier string
+
+const (
+	GetProjectResponseTierFree       GetProjectResponseTier = "free"
+	GetProjectResponseTierPro        GetProjectResponseTier = "pro"
+	GetProjectResponseTierEnterprise GetProjectResponseTier = "enterprise"
+)
+
+// AllValues returns all GetProjectResponseTier values.
+func (GetProjectResponseTier) AllValues() []GetProjectResponseTier {
+	return []GetProjectResponseTier{
+		GetProjectResponseTierFree,
+		GetProjectResponseTierPro,
+		GetProjectResponseTierEnterprise,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s GetProjectResponseTier) MarshalText() ([]byte, error) {
+	switch s {
+	case GetProjectResponseTierFree:
+		return []byte(s), nil
+	case GetProjectResponseTierPro:
+		return []byte(s), nil
+	case GetProjectResponseTierEnterprise:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *GetProjectResponseTier) UnmarshalText(data []byte) error {
+	switch GetProjectResponseTier(data) {
+	case GetProjectResponseTierFree:
+		*s = GetProjectResponseTierFree
+		return nil
+	case GetProjectResponseTierPro:
+		*s = GetProjectResponseTierPro
+		return nil
+	case GetProjectResponseTierEnterprise:
+		*s = GetProjectResponseTierEnterprise
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
 
 type GetProjectUnauthorized ErrorDetails
 
@@ -4739,6 +5648,139 @@ func (s *IdentifierProof) GetLoginName() string {
 func (s *IdentifierProof) SetLoginName(val string) {
 	s.LoginName = val
 }
+
+type InitProjectClaimConflict ErrorDetails
+
+func (*InitProjectClaimConflict) initProjectClaimRes() {}
+
+type InitProjectClaimCreated struct {
+	ProjectID   ProjectID                     `json:"project_id"`
+	ChallengeID string                        `json:"challenge_id"`
+	ClaimURL    url.URL                       `json:"claim_url"`
+	ExpiresAt   time.Time                     `json:"expires_at"`
+	Status      InitProjectClaimCreatedStatus `json:"status"`
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *InitProjectClaimCreated) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetChallengeID returns the value of ChallengeID.
+func (s *InitProjectClaimCreated) GetChallengeID() string {
+	return s.ChallengeID
+}
+
+// GetClaimURL returns the value of ClaimURL.
+func (s *InitProjectClaimCreated) GetClaimURL() url.URL {
+	return s.ClaimURL
+}
+
+// GetExpiresAt returns the value of ExpiresAt.
+func (s *InitProjectClaimCreated) GetExpiresAt() time.Time {
+	return s.ExpiresAt
+}
+
+// GetStatus returns the value of Status.
+func (s *InitProjectClaimCreated) GetStatus() InitProjectClaimCreatedStatus {
+	return s.Status
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *InitProjectClaimCreated) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetChallengeID sets the value of ChallengeID.
+func (s *InitProjectClaimCreated) SetChallengeID(val string) {
+	s.ChallengeID = val
+}
+
+// SetClaimURL sets the value of ClaimURL.
+func (s *InitProjectClaimCreated) SetClaimURL(val url.URL) {
+	s.ClaimURL = val
+}
+
+// SetExpiresAt sets the value of ExpiresAt.
+func (s *InitProjectClaimCreated) SetExpiresAt(val time.Time) {
+	s.ExpiresAt = val
+}
+
+// SetStatus sets the value of Status.
+func (s *InitProjectClaimCreated) SetStatus(val InitProjectClaimCreatedStatus) {
+	s.Status = val
+}
+
+func (*InitProjectClaimCreated) initProjectClaimRes() {}
+
+type InitProjectClaimCreatedStatus string
+
+const (
+	InitProjectClaimCreatedStatusPending InitProjectClaimCreatedStatus = "pending"
+)
+
+// AllValues returns all InitProjectClaimCreatedStatus values.
+func (InitProjectClaimCreatedStatus) AllValues() []InitProjectClaimCreatedStatus {
+	return []InitProjectClaimCreatedStatus{
+		InitProjectClaimCreatedStatusPending,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s InitProjectClaimCreatedStatus) MarshalText() ([]byte, error) {
+	switch s {
+	case InitProjectClaimCreatedStatusPending:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *InitProjectClaimCreatedStatus) UnmarshalText(data []byte) error {
+	switch InitProjectClaimCreatedStatus(data) {
+	case InitProjectClaimCreatedStatusPending:
+		*s = InitProjectClaimCreatedStatusPending
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+type InitProjectClaimNotFound ErrorDetails
+
+func (*InitProjectClaimNotFound) initProjectClaimRes() {}
+
+type InitProjectClaimReq struct {
+	// URL to return to after the human claim is complete.
+	ReturnURL OptURI `json:"return_url"`
+	// Optional team name hint shown in the claim UI.
+	SuggestedTeamName OptString `json:"suggested_team_name"`
+}
+
+// GetReturnURL returns the value of ReturnURL.
+func (s *InitProjectClaimReq) GetReturnURL() OptURI {
+	return s.ReturnURL
+}
+
+// GetSuggestedTeamName returns the value of SuggestedTeamName.
+func (s *InitProjectClaimReq) GetSuggestedTeamName() OptString {
+	return s.SuggestedTeamName
+}
+
+// SetReturnURL sets the value of ReturnURL.
+func (s *InitProjectClaimReq) SetReturnURL(val OptURI) {
+	s.ReturnURL = val
+}
+
+// SetSuggestedTeamName sets the value of SuggestedTeamName.
+func (s *InitProjectClaimReq) SetSuggestedTeamName(val OptString) {
+	s.SuggestedTeamName = val
+}
+
+type InitProjectClaimUnauthorized ErrorDetails
+
+func (*InitProjectClaimUnauthorized) initProjectClaimRes() {}
 
 // Merged schema.
 // Ref: #
@@ -6352,6 +7394,52 @@ func (s *OpenidConfigurationTokenEndpointAuthMethodsSupportedItem) UnmarshalText
 	}
 }
 
+// NewOptApplyProjectConfigReq returns new OptApplyProjectConfigReq with value set to v.
+func NewOptApplyProjectConfigReq(v ApplyProjectConfigReq) OptApplyProjectConfigReq {
+	return OptApplyProjectConfigReq{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptApplyProjectConfigReq is optional ApplyProjectConfigReq.
+type OptApplyProjectConfigReq struct {
+	Value ApplyProjectConfigReq
+	Set   bool
+}
+
+// IsSet returns true if OptApplyProjectConfigReq was set.
+func (o OptApplyProjectConfigReq) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptApplyProjectConfigReq) Reset() {
+	var v ApplyProjectConfigReq
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptApplyProjectConfigReq) SetTo(v ApplyProjectConfigReq) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptApplyProjectConfigReq) Get() (v ApplyProjectConfigReq, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptApplyProjectConfigReq) Or(d ApplyProjectConfigReq) ApplyProjectConfigReq {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptAttAlreadyCompletedDetails returns new OptAttAlreadyCompletedDetails with value set to v.
 func NewOptAttAlreadyCompletedDetails(v AttAlreadyCompletedDetails) OptAttAlreadyCompletedDetails {
 	return OptAttAlreadyCompletedDetails{
@@ -6950,6 +8038,52 @@ func (o OptChallengeResponsePayload) Or(d ChallengeResponsePayload) ChallengeRes
 	return d
 }
 
+// NewOptCompleteProjectClaimReqTeamChoice returns new OptCompleteProjectClaimReqTeamChoice with value set to v.
+func NewOptCompleteProjectClaimReqTeamChoice(v CompleteProjectClaimReqTeamChoice) OptCompleteProjectClaimReqTeamChoice {
+	return OptCompleteProjectClaimReqTeamChoice{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptCompleteProjectClaimReqTeamChoice is optional CompleteProjectClaimReqTeamChoice.
+type OptCompleteProjectClaimReqTeamChoice struct {
+	Value CompleteProjectClaimReqTeamChoice
+	Set   bool
+}
+
+// IsSet returns true if OptCompleteProjectClaimReqTeamChoice was set.
+func (o OptCompleteProjectClaimReqTeamChoice) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptCompleteProjectClaimReqTeamChoice) Reset() {
+	var v CompleteProjectClaimReqTeamChoice
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptCompleteProjectClaimReqTeamChoice) SetTo(v CompleteProjectClaimReqTeamChoice) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptCompleteProjectClaimReqTeamChoice) Get() (v CompleteProjectClaimReqTeamChoice, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptCompleteProjectClaimReqTeamChoice) Or(d CompleteProjectClaimReqTeamChoice) CompleteProjectClaimReqTeamChoice {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptCompletedFactorPayload returns new OptCompletedFactorPayload with value set to v.
 func NewOptCompletedFactorPayload(v CompletedFactorPayload) OptCompletedFactorPayload {
 	return OptCompletedFactorPayload{
@@ -6990,6 +8124,52 @@ func (o OptCompletedFactorPayload) Get() (v CompletedFactorPayload, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptCompletedFactorPayload) Or(d CompletedFactorPayload) CompletedFactorPayload {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptCreateProjectRequestClientMetadata returns new OptCreateProjectRequestClientMetadata with value set to v.
+func NewOptCreateProjectRequestClientMetadata(v CreateProjectRequestClientMetadata) OptCreateProjectRequestClientMetadata {
+	return OptCreateProjectRequestClientMetadata{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptCreateProjectRequestClientMetadata is optional CreateProjectRequestClientMetadata.
+type OptCreateProjectRequestClientMetadata struct {
+	Value CreateProjectRequestClientMetadata
+	Set   bool
+}
+
+// IsSet returns true if OptCreateProjectRequestClientMetadata was set.
+func (o OptCreateProjectRequestClientMetadata) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptCreateProjectRequestClientMetadata) Reset() {
+	var v CreateProjectRequestClientMetadata
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptCreateProjectRequestClientMetadata) SetTo(v CreateProjectRequestClientMetadata) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptCreateProjectRequestClientMetadata) Get() (v CreateProjectRequestClientMetadata, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptCreateProjectRequestClientMetadata) Or(d CreateProjectRequestClientMetadata) CreateProjectRequestClientMetadata {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -8094,6 +9274,98 @@ func (o OptGateConfig) Get() (v GateConfig, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptGateConfig) Or(d GateConfig) GateConfig {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptGetProjectResponseTier returns new OptGetProjectResponseTier with value set to v.
+func NewOptGetProjectResponseTier(v GetProjectResponseTier) OptGetProjectResponseTier {
+	return OptGetProjectResponseTier{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptGetProjectResponseTier is optional GetProjectResponseTier.
+type OptGetProjectResponseTier struct {
+	Value GetProjectResponseTier
+	Set   bool
+}
+
+// IsSet returns true if OptGetProjectResponseTier was set.
+func (o OptGetProjectResponseTier) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptGetProjectResponseTier) Reset() {
+	var v GetProjectResponseTier
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptGetProjectResponseTier) SetTo(v GetProjectResponseTier) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptGetProjectResponseTier) Get() (v GetProjectResponseTier, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptGetProjectResponseTier) Or(d GetProjectResponseTier) GetProjectResponseTier {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptInitProjectClaimReq returns new OptInitProjectClaimReq with value set to v.
+func NewOptInitProjectClaimReq(v InitProjectClaimReq) OptInitProjectClaimReq {
+	return OptInitProjectClaimReq{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptInitProjectClaimReq is optional InitProjectClaimReq.
+type OptInitProjectClaimReq struct {
+	Value InitProjectClaimReq
+	Set   bool
+}
+
+// IsSet returns true if OptInitProjectClaimReq was set.
+func (o OptInitProjectClaimReq) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptInitProjectClaimReq) Reset() {
+	var v InitProjectClaimReq
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptInitProjectClaimReq) SetTo(v InitProjectClaimReq) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptInitProjectClaimReq) Get() (v InitProjectClaimReq, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptInitProjectClaimReq) Or(d InitProjectClaimReq) InitProjectClaimReq {
 	if v, ok := o.Get(); ok {
 		return v
 	}

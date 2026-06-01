@@ -1,0 +1,78 @@
+get:
+  operationId: getProjectClaimStatus
+  summary: Get project claim status
+  description: |
+    Returns the status of a claim challenge. When the challenge has completed,
+    the rotated project secret is returned exactly once to the holder of the
+    original project secret so `.zitadel/secret` can be atomically rewritten.
+  tags:
+    - Project
+  parameters:
+    - name: project_id
+      in: path
+      required: true
+      schema:
+        $ref: ../../../../../components/schemas/project-id.yaml
+    - name: challenge_id
+      in: query
+      required: true
+      schema:
+        type: string
+  security:
+    - oauth2:
+        - projects.write
+  responses:
+    '200':
+      description: Claim challenge status.
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - project_id
+              - challenge_id
+              - status
+              - expires_at
+            properties:
+              project_id:
+                $ref: ../../../../../components/schemas/project-id.yaml
+              challenge_id:
+                type: string
+              status:
+                type: string
+                enum:
+                  - pending
+                  - completed
+              expires_at:
+                type: string
+                format: date-time
+              claimed_at:
+                type: string
+                format: date-time
+              rotated_project_secret:
+                type: string
+                description: Returned once after completion, then discarded.
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../components/error-details.yaml
+    '404':
+      description: Project or claim challenge not found.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../components/error-details.yaml
+    '410':
+      description: Claim challenge expired or rotated secret was already retrieved.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../components/error-details.yaml
+    default:
+      description: Unexpected error response.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../components/error-details.yaml

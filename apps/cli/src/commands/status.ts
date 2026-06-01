@@ -28,6 +28,7 @@ export async function runStatus(io: CliIO, opts: GlobalOptions): Promise<void> {
       title: "Zitadel project detected.",
       project: {
         project_id: String(config.project ?? secret.project_id ?? ""),
+        lifecycle: secret.lifecycle ?? "unclaimed",
         issuer:
           isObject(config.environments) && isObject(config.environments.development)
             ? config.environments.development.issuer

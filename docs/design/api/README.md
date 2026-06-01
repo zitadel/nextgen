@@ -36,7 +36,7 @@ Individual decisions are marked inline in each doc:
 ## Sibling doc sets
 
 - [`../glossary.md`](../glossary.md) — canonical vocabulary.
-- [`../platform/`](../platform/README.md) — platform lifecycle: claim, configuration surface, setup-CLI secret storage, `npx zitadel push`.
+- [`../platform/`](../platform/README.md) — platform lifecycle: claim, configuration surface, setup-CLI secret storage, `npx zitadel apply`.
 - [`../flowengine/`](../flowengine/README.md) — flow engine (UI orchestration), session API, user schema, bot detection.
 
 ## Relationship to the other doc sets

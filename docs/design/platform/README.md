@@ -11,7 +11,7 @@
 
 The [flow engine](../flowengine/README.md) runs the state machine that drives login, registration, and recovery — steps, factors, policy decisions, the resulting session. This folder describes what sits around that: how a Zitadel project comes into being without a signup form, how it is configured from source control, how the customer's app talks to Zitadel's backend, and how a project transitions from anonymous capability to owned-by-a-team.
 
-Both sets of documents are siblings. The flow engine docs can be read standalone if you only care about login/registration internals. The platform docs can be read standalone if you only care about setup, config, and claim. The two meet at `configuration-surface.md` (flow definitions are uploaded via `npx zitadel push`) and at `claim-flow.md` (claim attaches ownership; it does not move anything the flow engine cares about).
+Both sets of documents are siblings. The flow engine docs can be read standalone if you only care about login/registration internals. The platform docs can be read standalone if you only care about setup, config, and claim. The two meet at `configuration-surface.md` (flow definitions are uploaded via `npx zitadel apply`) and at `claim-flow.md` (claim attaches ownership; it does not move anything the flow engine cares about).
 
 ## Documents
 
@@ -19,11 +19,11 @@ Both sets of documents are siblings. The flow engine docs can be read standalone
 |---|---|---|
 | [Overview](overview.md) | Revised (pass 3) | Thesis, three orthogonal axes, condensed walkthrough, deferred capability tiers, relationship to the flow engine. |
 | [Project Secret](secret.md) | Revised (pass 3) | The server-issued bearer token that authenticates SDK/CLI calls. Dual-secret model (project + preview), storage in `.zitadel/secret`, rotation at claim. |
-| [Configuration Surface](configuration-surface.md) | Revised (pass 3) | `zitadel.json` specification. Declared-issuer model, renderer modes, `npx zitadel push`, what uploads and what stays local, silent repo-wins drift. |
+| [Configuration Surface](configuration-surface.md) | Revised (pass 3) | `zitadel.json` specification. Declared-issuer model, renderer modes, `npx zitadel apply`, what uploads and what stays local, silent repo-wins drift. |
 | [Claim Flow](claim-flow.md) | Revised (pass 3) | The transaction that attaches ownership to a project. Auth methods, team resolution, what changes at claim, failure modes, agent boundary. |
 | **API specs** | | |
 | [Claim API OpenAPI](api/claim-api.yaml) | Revised (pass 3) | Anonymous project create with `preview_origins`, dual-secret response, claim init/complete, team domain-match. |
-| [Config API OpenAPI](api/config-api.yaml) | Revised (pass 3) | `npx zitadel push` upload, capability manifest, drift query. |
+| [Config API OpenAPI](api/config-api.yaml) | Revised (pass 3) | `npx zitadel apply` upload, capability manifest, drift query. |
 
 ## Glossary
 
@@ -49,7 +49,7 @@ The canonical vocabulary for all design docs lives in [`../glossary.md`](../glos
 The platform design is built on four primitives:
 
 1. **Project Secret** — a bearer token. Authenticates SDK/CLI calls to Zitadel's backend. Pre-claim, the only authentication. Post-claim, rotated and bound to the team that claimed. Not a user identity, not an account — just a secret.
-2. **Configuration Surface** — `zitadel.json` plus `.zitadel/` subdirectories. Flow definitions, IDPs, schemas, branding, policies, per-environment declared issuers. Source-controlled, versioned by the repo. `npx zitadel push` is the canonical sync.
+2. **Configuration Surface** — `zitadel.json` plus `.zitadel/` subdirectories. Flow definitions, IDPs, schemas, branding, policies, per-environment declared issuers. Source-controlled, versioned by the repo. `npx zitadel apply` is the canonical sync.
 3. **Claim** — an atomic transaction that attaches ownership and capabilities. `project_id` has been stable since creation; users, factors, sessions, config are bound to it from day one. Claim does not move them. It attaches a team, rotates the project secret, and unlocks the post-claim capability surface.
 4. **Declared Issuers** — per-environment origin declarations (`"issuer": "https://acme.com"` or `"issuer_pattern": "https://*.vercel.app"`). Both a security allowlist (Origin validation on every request) and context (`iss` in tokens, hostnames in magic-link emails). Zitadel does not manage domains as infrastructure — only as context.
 
@@ -64,7 +64,7 @@ graph TD
     Backend["**Zitadel backend**<br>flow engine, policy,<br>storage, claim"]
 
     Secret -- "authenticates API calls" --> Backend
-    Config -- "npx zitadel push" --> Backend
+    Config -- "npx zitadel apply" --> Backend
     Secret -- "rotates" --> Claim
     Claim -- "attaches team" --> Backend
     CustomerApp -- "proxies OIDC,<br>renders Flow v1 nodes" --> Backend
@@ -73,13 +73,13 @@ graph TD
 | Concern | Owned By | Decides |
 |---|---|---|
 | How does a project come into existence without a signup form? | **Project Secret** | Server creates `project_id` on first `POST /projects`. Returns two `sk_proj_…` keys: a full-access pre-claim secret and an origin-scoped variant for preview deploys. |
-| What configures login, IDPs, schemas, branding? | **Configuration Surface** (`zitadel.json`) | Source of truth is the repo; `npx zitadel push` uploads the server-behavior subset. |
+| What configures login, IDPs, schemas, branding? | **Configuration Surface** (`zitadel.json`) | Source of truth is the repo; `npx zitadel apply` uploads the server-behavior subset. |
 | What origins may this project be authenticated from? | **Declared Issuers** | `environments.*.issuer` — allowlist for Origin validation; same value rendered into tokens and magic-link emails. |
 | What are the resources of the system? | **API / MCP** | Users, sessions, tokens, grants, audit — never in config. |
 | What turns an anonymous project into an owned one? | **Claim** | Single atomic transaction; human-authenticated; agents cannot claim. |
 | Which environment (development / preview / production) is the SDK running in? | **SDK runtime detection** | Chooses the right `environments` overrides from `zitadel.json`. |
-| How does a preview deploy work before claim? | **Preview Secret** | Minted at project creation, uploaded to the deploy platform's env store by the setup CLI. Origin-scoped. |
-| What happens if the dashboard edits something the repo also defines? | **Silent repo-wins** | The next `npx zitadel push` overwrites dashboard state. Same model as Vercel source-control-wins. |
+| How does a preview deploy work? | **Preview Secret + Claim** | Minted at project creation but handed to the deploy platform only after claim. Origin-scoped. |
+| What happens if the dashboard edits something the repo also defines? | **Silent repo-wins** | The next `npx zitadel apply` overwrites dashboard state. Same model as Vercel source-control-wins. |
 
 ## Design principles
 
@@ -97,9 +97,9 @@ graph TD
 
 7. **Agents configure; humans claim.** Agents are first-class consumers of the setup CLI and the configuration surface. They can build and modify `zitadel.json`, scaffold flows, eject components, author templates, add tracking. They cannot claim, enable paid features, or send real email. This boundary is enforced at the protocol level.
 
-8. **Previews work without claim via the preview secret.** The setup CLI mints both secrets at project creation and uploads the preview secret to the deploy platform automatically. Preview deploys just work. Claim is forced at *first production deploy*, not at first preview.
+8. **Preview and production require claim.** The setup CLI mints both secrets at project creation, but the preview secret is not handed to the deploy platform until a human claims the project. Local development is the only unclaimed runtime.
 
-9. **Drift resolves silently in favor of the repo.** `npx zitadel push` overwrites dashboard edits. No banner, no prompt. The Vercel model: the repo is the source of truth, the dashboard is a mutable view. Customers who want dashboard-only config remove `zitadel.json` from the repo.
+9. **Drift resolves silently in favor of the repo.** `npx zitadel apply` overwrites dashboard edits. No banner, no prompt. The Vercel model: the repo is the source of truth, the dashboard is a mutable view. Customers who want dashboard-only config remove `zitadel.json` from the repo.
 
 ## Integration levels (MVP vs. deferred)
 

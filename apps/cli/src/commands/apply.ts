@@ -10,6 +10,7 @@ import { flowDefinitionSchema } from "../resources/flow";
 import { buildSyncPlan, runSyncLoop } from "../sync/loop";
 import { renderPlan } from "../sync/plan-renderer";
 import { makeSyncers } from "../sync/syncers";
+import { ensureClaimedForEnvironment } from "./claim-gate";
 import { readZitadelSecret } from "./shared";
 
 export type ApplyOptions = GlobalOptions & {
@@ -20,7 +21,7 @@ export type ApplyOptions = GlobalOptions & {
 };
 
 export async function runApply(io: CliIO, opts: ApplyOptions): Promise<void> {
-  parseEnvironment(opts.environment);
+  const environment = parseEnvironment(opts.environment);
   const secret = await readZitadelSecret(opts.cwd);
 
   const flows = await readFlowFiles(opts.cwd);
@@ -37,6 +38,7 @@ export async function runApply(io: CliIO, opts: ApplyOptions): Promise<void> {
   }
 
   const client = createPlatformClient(opts.source, secret.project_secret);
+  await ensureClaimedForEnvironment(client, secret.project_id, environment);
   const syncers = makeSyncers({ projectId: secret.project_id });
 
   if (opts.planOnly || opts.dryRun) {
@@ -56,9 +58,12 @@ export async function runApply(io: CliIO, opts: ApplyOptions): Promise<void> {
   }
 
   await runSyncLoop(opts.cwd, client, syncers);
+  const applied = await client.applyProjectConfig(secret.project_id, environment, {
+    source: "cli",
+  });
 
   if (!opts.silent) {
-    ok(io, { synced: true }, opts);
+    ok(io, { synced: true, apply: applied }, opts);
   }
 }
 

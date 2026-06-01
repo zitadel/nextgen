@@ -148,7 +148,7 @@ POST /flows/{session_id}/submit
 POST /flows/{session_id}/event
 ```
 
-Flow definition management (uploaded via `npx zitadel push`):
+Flow definition management (uploaded via `npx zitadel apply`):
 
 ```http
 POST   /flow-definitions
@@ -260,7 +260,7 @@ Quick lookup for which project a given use case targets.
 Draft request/response sketches for this design PR:
 
 - [`../platform/api/claim-api.yaml`](../platform/api/claim-api.yaml) — projects, claim, team domain-match.
-- [`../platform/api/config-api.yaml`](../platform/api/config-api.yaml) — `npx zitadel push` upload, capability manifest, drift.
+- [`../platform/api/config-api.yaml`](../platform/api/config-api.yaml) — `npx zitadel apply` upload, capability manifest, drift.
 - [`../flowengine/api/flow-api.yaml`](../flowengine/api/flow-api.yaml) — flow engine runtime.
 - [`../flowengine/api/session-api.yaml`](../flowengine/api/session-api.yaml) — sessions.
 

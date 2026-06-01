@@ -1,7 +1,9 @@
 {
-  "id": "river-8421",
-  "projectSecret": "sk_proj_mock_river8421_full",
-  "previewSecret": "sk_proj_mock_river8421_preview",
-  "previewOrigins": ["*.vercel.app"],
-  "createdAt": "2026-04-21T14:03:11.000Z"
+  "project_id": "river-8421",
+  "project_secret": "sk_proj_mock_river8421_full",
+  "preview_secret": "sk_proj_mock_river8421_preview",
+  "preview_origins": ["*.vercel.app"],
+  "lifecycle": "unclaimed",
+  "claim_required_for": ["preview", "production"],
+  "created_at": "2026-04-21T14:03:11.000Z"
 }

@@ -5,6 +5,7 @@ export type ZitadelErrorCode =
   | "E_NETWORK"
   | "E_AUTH"
   | "E_CONFLICT"
+  | "E_CLAIM_REQUIRED"
   | "E_VALIDATION"
   | "E_NOT_IMPLEMENTED";
 
@@ -15,6 +16,7 @@ export const EXIT_CODES: Record<ZitadelErrorCode, number> = {
   E_NETWORK: 4,
   E_AUTH: 1,
   E_CONFLICT: 5,
+  E_CLAIM_REQUIRED: 6,
   E_VALIDATION: 3,
   E_NOT_IMPLEMENTED: 2,
 };

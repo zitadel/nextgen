@@ -13,6 +13,17 @@ type UnimplementedHandler struct{}
 
 var _ Handler = UnimplementedHandler{}
 
+// ApplyProjectConfig implements applyProjectConfig operation.
+//
+// Records that repo-owned configuration was applied for an environment.
+// Development applies are allowed before claim. Preview and production
+// applies require a claimed project.
+//
+// PATCH /projects/{project_id}/config
+func (UnimplementedHandler) ApplyProjectConfig(ctx context.Context, req OptApplyProjectConfigReq, params ApplyProjectConfigParams) (r ApplyProjectConfigRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // AuthorizeDevice implements authorizeDevice operation.
 //
 // Authorize a device.
@@ -28,6 +39,17 @@ func (UnimplementedHandler) AuthorizeDevice(ctx context.Context, params Authoriz
 //
 // GET /auth/authorize
 func (UnimplementedHandler) AuthorizeGet(ctx context.Context, params AuthorizeGetParams) (r AuthorizeGetRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// CompleteProjectClaim implements completeProjectClaim operation.
+//
+// Completes a pending claim challenge after a human signs in and selects a
+// team. The project secret is rotated during this operation but is not
+// returned here; the CLI retrieves it once through claim status.
+//
+// POST /projects/{project_id}/claim/complete
+func (UnimplementedHandler) CompleteProjectClaim(ctx context.Context, req *CompleteProjectClaimReq, params CompleteProjectClaimParams) (r CompleteProjectClaimRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -95,7 +117,7 @@ func (UnimplementedHandler) CreateHandoff(ctx context.Context, params CreateHand
 // Create project.
 //
 // POST /projects
-func (UnimplementedHandler) CreateProject(ctx context.Context, req *CreateProjectRequest) (r CreateProjectRes, _ error) {
+func (UnimplementedHandler) CreateProject(ctx context.Context, req *CreateProjectRequest, params CreateProjectParams) (r CreateProjectRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -270,6 +292,17 @@ func (UnimplementedHandler) GetProject(ctx context.Context, params GetProjectPar
 	return r, ht.ErrNotImplemented
 }
 
+// GetProjectClaimStatus implements getProjectClaimStatus operation.
+//
+// Returns the status of a claim challenge. When the challenge has completed,
+// the rotated project secret is returned exactly once to the holder of the
+// original project secret so `.zitadel/secret` can be atomically rewritten.
+//
+// GET /projects/{project_id}/claim/status
+func (UnimplementedHandler) GetProjectClaimStatus(ctx context.Context, params GetProjectClaimStatusParams) (r GetProjectClaimStatusRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // GetReady implements getReady operation.
 //
 // Check whether the server is ready to accept requests.
@@ -325,6 +358,18 @@ func (UnimplementedHandler) GetToken(ctx context.Context, req *PostTokenRequest)
 //
 // GET /auth/userinfo
 func (UnimplementedHandler) GetUserInfo(ctx context.Context) (r GetUserInfoRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// InitProjectClaim implements initProjectClaim operation.
+//
+// Creates a short-lived human claim challenge for an unclaimed project.
+// The caller keeps using the current `.zitadel/secret` while a browser
+// completes the challenge. Completing the challenge rotates the project
+// secret, which can be retrieved exactly once through claim status.
+//
+// POST /projects/{project_id}/claim/init
+func (UnimplementedHandler) InitProjectClaim(ctx context.Context, req OptInitProjectClaimReq, params InitProjectClaimParams) (r InitProjectClaimRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

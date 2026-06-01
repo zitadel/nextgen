@@ -6,8 +6,10 @@ package api
 type OperationName = string
 
 const (
+	ApplyProjectConfigOperation     OperationName = "ApplyProjectConfig"
 	AuthorizeDeviceOperation        OperationName = "AuthorizeDevice"
 	AuthorizeGetOperation           OperationName = "AuthorizeGet"
+	CompleteProjectClaimOperation   OperationName = "CompleteProjectClaim"
 	CreateAuthAttemptOperation      OperationName = "CreateAuthAttempt"
 	CreateFlowOperation             OperationName = "CreateFlow"
 	CreateFlowDefinitionOperation   OperationName = "CreateFlowDefinition"
@@ -28,12 +30,14 @@ const (
 	GetMySessionOperation           OperationName = "GetMySession"
 	GetOpenIDConfigurationOperation OperationName = "GetOpenIDConfiguration"
 	GetProjectOperation             OperationName = "GetProject"
+	GetProjectClaimStatusOperation  OperationName = "GetProjectClaimStatus"
 	GetReadyOperation               OperationName = "GetReady"
 	GetSchemaByIdOperation          OperationName = "GetSchemaById"
 	GetSessionOperation             OperationName = "GetSession"
 	GetTeamOperation                OperationName = "GetTeam"
 	GetTokenOperation               OperationName = "GetToken"
 	GetUserInfoOperation            OperationName = "GetUserInfo"
+	InitProjectClaimOperation       OperationName = "InitProjectClaim"
 	IntrospectOperation             OperationName = "Introspect"
 	IssueChallengeOperation         OperationName = "IssueChallenge"
 	ListFlowDefinitionsOperation    OperationName = "ListFlowDefinitions"

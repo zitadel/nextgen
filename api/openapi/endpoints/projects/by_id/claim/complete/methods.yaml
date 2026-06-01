@@ -1,0 +1,99 @@
+post:
+  operationId: completeProjectClaim
+  summary: Complete project claim
+  description: |
+    Completes a pending claim challenge after a human signs in and selects a
+    team. The project secret is rotated during this operation but is not
+    returned here; the CLI retrieves it once through claim status.
+  tags:
+    - Project
+  parameters:
+    - name: project_id
+      in: path
+      required: true
+      schema:
+        $ref: ../../../../../components/schemas/project-id.yaml
+  security:
+    - oauth2:
+        - projects.claim
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          required:
+            - challenge_id
+          properties:
+            challenge_id:
+              type: string
+            team_choice:
+              type: object
+              properties:
+                team_id:
+                  type: string
+                  description: Existing team to attach the project to.
+                create_team_name:
+                  type: string
+                  description: Team name to create when no existing team is selected.
+  responses:
+    '200':
+      description: Project claimed.
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - project_id
+              - lifecycle
+              - team_id
+              - tier
+              - claimed_at
+            properties:
+              project_id:
+                $ref: ../../../../../components/schemas/project-id.yaml
+              lifecycle:
+                type: string
+                enum:
+                  - claimed
+              team_id:
+                type: string
+              tier:
+                type: string
+                enum:
+                  - free
+                  - pro
+                  - enterprise
+              claimed_at:
+                type: string
+                format: date-time
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../components/error-details.yaml
+    '404':
+      description: Project or claim challenge not found.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../components/error-details.yaml
+    '409':
+      description: Project has already been claimed.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../components/error-details.yaml
+    '410':
+      description: Claim challenge expired.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../components/error-details.yaml
+    default:
+      description: Unexpected error response.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../components/error-details.yaml

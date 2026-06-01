@@ -1,12 +1,29 @@
 import type {
+  ApplyProjectConfigResponse,
   CreateProjectRequest,
   CreateProjectResponse,
+  GetProjectClaimStatusResponse,
   GetProjectResponse,
+  InitProjectClaimResponse,
+  ZitadelEnvironment,
 } from "./schemas";
 
 export interface ProjectClient {
   createProject(req: CreateProjectRequest): Promise<CreateProjectResponse>;
   getProject(projectId: string): Promise<GetProjectResponse>;
+  applyProjectConfig(
+    projectId: string,
+    environment: ZitadelEnvironment,
+    data?: object,
+  ): Promise<ApplyProjectConfigResponse>;
+  initProjectClaim(
+    projectId: string,
+    req?: { return_url?: string; suggested_team_name?: string },
+  ): Promise<InitProjectClaimResponse>;
+  getProjectClaimStatus(
+    projectId: string,
+    challengeId: string,
+  ): Promise<GetProjectClaimStatusResponse>;
 }
 
 export interface SchemaClient {

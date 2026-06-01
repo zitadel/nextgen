@@ -1,0 +1,87 @@
+patch:
+  operationId: applyProjectConfig
+  summary: Apply project config for an environment
+  description: |
+    Records that repo-owned configuration was applied for an environment.
+    Development applies are allowed before claim. Preview and production
+    applies require a claimed project.
+  tags:
+    - Project
+  parameters:
+    - name: project_id
+      in: path
+      required: true
+      schema:
+        $ref: ../../../../components/schemas/project-id.yaml
+    - name: environment
+      in: query
+      required: true
+      schema:
+        type: string
+        enum:
+          - development
+          - preview
+          - production
+  security:
+    - oauth2:
+        - projects.write
+  requestBody:
+    required: false
+    content:
+      application/json:
+        schema:
+          type: object
+          additionalProperties: true
+  responses:
+    '200':
+      description: Config apply accepted.
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - project_id
+              - environment
+              - lifecycle
+              - applied_at
+            properties:
+              project_id:
+                $ref: ../../../../components/schemas/project-id.yaml
+              environment:
+                type: string
+                enum:
+                  - development
+                  - preview
+                  - production
+              lifecycle:
+                type: string
+                enum:
+                  - unclaimed
+                  - claimed
+              applied_at:
+                type: string
+                format: date-time
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
+    '404':
+      description: Project not found.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
+    '409':
+      description: Project must be claimed before this environment can be applied.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
+    default:
+      description: Unexpected error response.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml

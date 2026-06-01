@@ -9,6 +9,10 @@ CREATE TABLE IF NOT EXISTS zitadel_nextgen.projects(
     , project_secret TEXT     NOT NULL DEFAULT ''
     , preview_secret TEXT     NOT NULL DEFAULT ''
     , preview_origins TEXT    NOT NULL DEFAULT '[]'
+    , lifecycle TEXT          NOT NULL DEFAULT 'unclaimed'
+    , team_id TEXT
+    , tier TEXT
+    , claimed_at TIMESTAMPTZ
 
     , PRIMARY KEY (id)
 );

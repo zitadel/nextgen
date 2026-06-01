@@ -9,7 +9,9 @@ export type ZitadelSecret = {
   project_secret: string;
   preview_secret: string;
   preview_origins: string[];
+  lifecycle?: "unclaimed" | "claimed";
   created_at: string;
+  claimed_at?: string;
 };
 
 export async function readZitadelConfig(cwd: string): Promise<Record<string, unknown>> {
