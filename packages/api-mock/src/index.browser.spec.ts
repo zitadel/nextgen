@@ -16,7 +16,7 @@ import { beforeAll, beforeEach, describe, expect } from "vitest";
 import { clearBranding, resetFlow, setupMock } from "./index.js";
 import { test } from "./msw-test.js";
 
-const PROJECT_ID = "demo-project";
+const PROJECT_ID = "proj_demo";
 
 beforeAll(() => {
   configureZitadel({ proxyPath: window.location.origin, projectId: PROJECT_ID });

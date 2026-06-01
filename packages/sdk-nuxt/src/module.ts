@@ -16,7 +16,7 @@ export default defineNuxtModule<NextgenMiddlewareOptions>({
   defaults: {
     url:
       process.env.ZITADEL_URL ??
-      'http://localhost:4000',
+      'http://localhost:8080',
     proxyPath: '/__nextgen',
     protectedRoutes: [],
     loginPath: '/login',
@@ -33,6 +33,8 @@ export default defineNuxtModule<NextgenMiddlewareOptions>({
 
     // Expose SDK-initializer values to the client-side plugin so it can
     // call `configureZitadel()` without hardcoding paths.
+    nuxt.options.runtimeConfig.public.zitadelProxyPath =
+      options.proxyPath ?? '/__nextgen';
     nuxt.options.runtimeConfig.public.nextgenProxyPath =
       options.proxyPath ?? '/__nextgen';
 

@@ -36,7 +36,7 @@ export type AuthResult = AuthState | UnauthState;
 export type NextgenMiddlewareOptions = {
   /**
    * Full URL of the Zitadel auth backend.
-   * @default process.env.ZITADEL_URL ?? "http://localhost:4000"
+   * @default process.env.ZITADEL_URL ?? "http://localhost:8080"
    */
   url?: string;
 

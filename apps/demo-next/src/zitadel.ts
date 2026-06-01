@@ -11,8 +11,8 @@ import { configureZitadel, getApi } from "@zitadel-nextgen/api/config";
 import { createProxy } from "@zitadel-nextgen/sdk-next/middleware";
 
 export const demoProject = configureZitadel({
-  projectId: process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID ?? "demo",
-  url: process.env.ZITADEL_URL ?? "http://localhost:4000",
+  projectId: process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID ?? "proj_demo",
+  url: process.env.ZITADEL_URL ?? "http://localhost:8080",
 });
 
 export const api = getApi(demoProject);

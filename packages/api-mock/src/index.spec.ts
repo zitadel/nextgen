@@ -14,7 +14,7 @@ import {
 } from "./index.js";
 import type { MockHandle } from "./handlers.js";
 
-const PROJECT_ID = "demo-project";
+const PROJECT_ID = "proj_demo";
 
 /**
  * Decode the payload of a JWT without verifying its signature. Used by the

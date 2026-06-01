@@ -39,6 +39,7 @@ export default defineNuxtPlugin(() => {
   const runtimeConfig = useRuntimeConfig();
   const publicConfig = runtimeConfig.public;
   const proxyPath =
+    (publicConfig.zitadelProxyPath as string | undefined) ??
     (publicConfig.nextgenProxyPath as string | undefined) ??
     (publicConfig.nextgenApiBase as string | undefined) ??
     '/__nextgen';

@@ -12,7 +12,7 @@ export interface ZitadelConfig {
   projectId: string;
 
   /**
-   * Full URL of the Zitadel auth backend (e.g. `"http://localhost:4000"`).
+   * Full URL of the Zitadel auth backend (e.g. `"http://localhost:8080"`).
    * Used by server-side middleware for proxying and JWT verification.
    * Optional — not needed in client-only setups.
    */
