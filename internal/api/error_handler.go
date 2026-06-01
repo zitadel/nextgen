@@ -59,6 +59,8 @@ func errorResponse(err error) *api.ErrorDetailsStatusCode {
 		return teamErrorResponse(e)
 	case e.Code == domain.ErrNotImplemented().Code:
 		return errorResponseWithStatusCode(http.StatusNotImplemented, e)
+	case strings.HasPrefix(e.Code, domain.PrefixPasskeyRegistration.ErrorCodePrefix("")):
+		return passkeyRegistrationErrorResponse(e)
 	default:
 		return internalErrorResponse(err)
 	}
