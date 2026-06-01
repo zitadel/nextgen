@@ -1,6 +1,8 @@
 package domain
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"net/url"
 	"time"
 
@@ -243,4 +245,35 @@ func VerifyPasskeyChallenge(challenge *PasskeyChallenge, response []byte, userID
 		BackupState:    credential.Flags.BackupState,
 		UserID:         discoveredUser,
 	}, nil
+}
+
+// BuildPasskeyRequestOptions renders the stored passkey challenge as the
+// WebAuthn PublicKeyCredentialRequestOptions JSON (wrapped in the standard
+// `{"publicKey": ...}` envelope) that the browser passes to
+// navigator.credentials.get(). It reconstructs the options from the persisted
+// challenge fields rather than the discarded ceremony output (see
+// CreatePasskeyChallenge), so the flow engine and the auth-attempt REST API can
+// share one mapping.
+func BuildPasskeyRequestOptions(c *AuthChallengePasskey) ([]byte, error) {
+	challenge, err := base64.RawURLEncoding.DecodeString(c.Challenge)
+	if err != nil {
+		return nil, err
+	}
+	allowed := make([]protocol.CredentialDescriptor, 0, len(c.AllowedCredentialIDs))
+	for _, id := range c.AllowedCredentialIDs {
+		allowed = append(allowed, protocol.CredentialDescriptor{
+			Type:         protocol.PublicKeyCredentialType,
+			CredentialID: protocol.URLEncodedBase64(id),
+		})
+	}
+	assertion := protocol.CredentialAssertion{
+		Response: protocol.PublicKeyCredentialRequestOptions{
+			Challenge:          protocol.URLEncodedBase64(challenge),
+			RelyingPartyID:     c.RPID,
+			AllowedCredentials: allowed,
+			UserVerification:   c.UserVerification,
+			Extensions:         c.Extensions,
+		},
+	}
+	return json.Marshal(assertion)
 }
