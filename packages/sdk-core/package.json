@@ -18,20 +18,24 @@
   "type": "module",
   "exports": {
     ".": {
+      "@zitadel-nextgen/source": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
     "./types": {
+      "@zitadel-nextgen/source": "./src/types.ts",
       "types": "./dist/types.d.ts",
       "import": "./dist/types.js"
     },
     "./jwt": {
+      "@zitadel-nextgen/source": "./src/jwt.ts",
       "types": "./dist/jwt.d.ts",
       "import": "./dist/jwt.js"
     },
     "./middleware": {
-      "types": "./dist/middleware-utils.d.ts",
-      "import": "./dist/middleware-utils.js"
+      "@zitadel-nextgen/source": "./src/middleware.ts",
+      "types": "./dist/middleware.d.ts",
+      "import": "./dist/middleware.js"
     }
   },
   "publishConfig": {

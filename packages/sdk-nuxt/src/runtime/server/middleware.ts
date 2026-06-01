@@ -1,3 +1,7 @@
+import type {
+  AuthResult,
+  NextgenMiddlewareOptions,
+} from '@zitadel-nextgen/sdk-core/types';
 import type { EventHandler, H3Event } from 'h3';
 
 import {
@@ -7,7 +11,6 @@ import {
   HOP_BY_HOP,
   INTERNAL_HEADERS,
 } from '@zitadel-nextgen/sdk-core/middleware';
-import type { AuthResult, NextgenMiddlewareOptions } from '@zitadel-nextgen/sdk-core/types';
 import {
   defineEventHandler,
   getCookie,
@@ -146,7 +149,14 @@ export function createNextgenMiddleware(
     }
 
     if (pathname === proxyPath || pathname.startsWith(`${proxyPath}/`)) {
-      return proxyRequest(event, issuerUrl, proxyPath, url, proxyTimeoutMs, onExchangeResponse);
+      return proxyRequest(
+        event,
+        issuerUrl,
+        proxyPath,
+        url,
+        proxyTimeoutMs,
+        onExchangeResponse,
+      );
     }
 
     return handleAuth(event, {

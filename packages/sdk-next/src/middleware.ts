@@ -115,7 +115,13 @@ export async function nextgenMiddleware(
   }
 
   if (pathname === proxyPath || pathname.startsWith(`${proxyPath}/`)) {
-    return proxyRequest(req, issuerUrl, proxyPath, proxyTimeoutMs, onExchangeResponse);
+    return proxyRequest(
+      req,
+      issuerUrl,
+      proxyPath,
+      proxyTimeoutMs,
+      onExchangeResponse,
+    );
   }
 
   return handleAuth(req, {
