@@ -154,10 +154,14 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
   });
 
   test("POST /schemas returns 201 with a schema id", async () => {
-    const res = await fetch(`${BASE}/schemas`, {
+    const res = await fetch(`${BASE}/schemas?project_id=proj_conformance`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ kind: "user-schema", title: "x" }),
+      body: JSON.stringify({
+        kind: "user-schema",
+        metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
+        "x-auth-methods": { password: { enabled: true, position: 0 } },
+      }),
     });
     expect(res.status).toBe(201);
     const body = (await res.json()) as Record<string, unknown>;
@@ -166,7 +170,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
   });
 
   test("POST /schemas with invalid kind returns spec-compliant 400 envelope", async () => {
-    const res = await fetch(`${BASE}/schemas`, {
+    const res = await fetch(`${BASE}/schemas?project_id=proj_conformance`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ kind: "not-a-real-kind" }),
@@ -202,7 +206,8 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
         flow_definition: validFlowDefinitionBody(),
       }),
     });
-    const res = await fetch(`${BASE}/flow_definitions`);
+    // Spec: `ListFlowDefinitionsQueryParams` requires `project_id`.
+    const res = await fetch(`${BASE}/flow_definitions?project_id=proj_conformance_list`);
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(() => ListFlowDefinitionsResponse.parse(body)).not.toThrow();
