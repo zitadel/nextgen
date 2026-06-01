@@ -24,8 +24,12 @@ type Harness struct {
 	Handler         *api.Handler
 	SecurityHandler *api.SecurityHandler
 
-	APIClient          *generated.Client
-	FakeSecuritySource *FakeSecuritySource
+	// apiClients is a map of API clients, keyed by project ID.
+	// This allows tests to have multiple clients with different credentials if needed.
+	// Use [harness.EnsureAPIClient] to get a client for a specific project ID, which will create and cache the client as needed.
+	apiClients map[string]*generated.Client
+	// fakeSecuritySources is a map of fake security sources, keyed by project ID, to support multiple clients with different credentials if needed.
+	fakeSecuritySources map[string]*FakeSecuritySource
 
 	SchemaService         *service.SchemaService
 	SessionService        service.SessionService

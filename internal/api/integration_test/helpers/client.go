@@ -2,40 +2,52 @@ package helpers
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	api "github.com/zitadel/nextgen/api/generated"
 )
 
-func (h *Harness) EnsureAPIClient(t *testing.T) *api.Client {
+func (h *Harness) EnsureAPIClient(t *testing.T, projectID string) *api.Client {
 	t.Helper()
-	if h.APIClient == nil {
-		serv := h.EnsureTestServer(t)
-		client, err := api.NewClient(
-			serv.URL,
-			h.EnsureFakeSecuritySource(t),
-		)
-		require.NoError(t, err)
-		h.APIClient = client
+	serv := h.EnsureTestServer(t)
+	if h.apiClients == nil {
+		h.apiClients = make(map[string]*api.Client)
 	}
-	return h.APIClient
+	if client, ok := h.apiClients[projectID]; ok {
+		return client
+	}
+	client, err := api.NewClient(
+		serv.URL,
+		h.EnsureFakeSecuritySource(t, projectID),
+	)
+	require.NoError(t, err)
+	h.apiClients[projectID] = client
+	return h.apiClients[projectID]
 }
 
-func (h *Harness) EnsureFakeSecuritySource(t *testing.T) *FakeSecuritySource {
+func (h *Harness) EnsureFakeSecuritySource(t *testing.T, projectID string) *FakeSecuritySource {
 	t.Helper()
-	if h.FakeSecuritySource == nil {
-		h.FakeSecuritySource = &FakeSecuritySource{}
+	if h.fakeSecuritySources == nil {
+		h.fakeSecuritySources = make(map[string]*FakeSecuritySource)
 	}
-	return h.FakeSecuritySource
+	if source, ok := h.fakeSecuritySources[projectID]; ok {
+		return source
+	}
+	h.fakeSecuritySources[projectID] = &FakeSecuritySource{
+		projectID: projectID,
+	}
+	return h.fakeSecuritySources[projectID]
 }
 
 type FakeSecuritySource struct {
+	projectID string
 }
 
 func (f FakeSecuritySource) OAuth2(ctx context.Context, operationName api.OperationName) (api.OAuth2, error) {
 	return api.OAuth2{
-		Token:  "this_is_a_fake_token__once_we_have_proper_auth__replace_this_with_a_proper_one",
+		Token:  fmt.Sprintf("sk_%s", f.projectID),
 		Scopes: []string{"all"},
 	}, nil
 }

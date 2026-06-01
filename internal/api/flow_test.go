@@ -338,4 +338,3 @@ func TestGetFlowStep_TerminalReturns410(t *testing.T) {
 		t.Fatalf("status = %d, want 410", resp.StatusCode)
 	}
 }
-

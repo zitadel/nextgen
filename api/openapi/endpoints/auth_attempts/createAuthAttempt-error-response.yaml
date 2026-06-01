@@ -21,4 +21,4 @@ content:
         summary: internal
         value:
           code: internal
-          message: an unexpected error occurred
+          message: An unexpected error occurred. Check the details for more information.
