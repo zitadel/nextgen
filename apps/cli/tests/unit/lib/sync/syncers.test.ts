@@ -30,16 +30,16 @@ function makeFakeClient(): {
       record("getProject", [id]);
       return {} as never;
     },
-    async createSchema(data: object) {
-      record("createSchema", [data]);
+    async createSchema(data: object, projectId: string) {
+      record("createSchema", [data, projectId]);
       return { id: "schema-id-1" };
     },
-    async getSchema(id: string) {
-      record("getSchema", [id]);
+    async getSchema(id: string, projectId: string) {
+      record("getSchema", [id, projectId]);
       return { kind: "user-schema", version: 1 };
     },
-    async deleteSchema(id: string) {
-      record("deleteSchema", [id]);
+    async deleteSchema(id: string, projectId: string) {
+      record("deleteSchema", [id, projectId]);
     },
     async createFlowDefinition(req: object) {
       record("createFlowDefinition", [req]);
@@ -115,7 +115,7 @@ describe("SchemaSyncer", () => {
     expect(() => schema.validate({ type: "object" })).toThrow(ZitadelError);
   });
 
-  it("create passes the bare data through and returns the platform id", async () => {
+  it("create passes the bare data + project id and returns the platform id", async () => {
     const [schema] = makeSyncers({ projectId: "proj-1", env: {} });
     const { client, calls } = makeFakeClient();
     const data = { kind: "user-schema", version: 1 };
@@ -123,7 +123,7 @@ describe("SchemaSyncer", () => {
     const id = await schema.create(client, data);
 
     expect(id).toBe("schema-id-1");
-    expect(calls.createSchema).toEqual([data]);
+    expect(calls.createSchema).toEqual([data, "proj-1"]);
   });
 
   it("update is a no-op and does not call the client", async () => {
@@ -134,22 +134,22 @@ describe("SchemaSyncer", () => {
     expect(Object.keys(calls)).toHaveLength(0);
   });
 
-  it("delete dispatches to deleteSchema with the id", async () => {
+  it("delete dispatches to deleteSchema with the id and project id", async () => {
     const [schema] = makeSyncers({ projectId: "proj-1", env: {} });
     const { client, calls } = makeFakeClient();
 
     await schema.delete(client, "schema-id-1");
 
-    expect(calls.deleteSchema).toEqual(["schema-id-1"]);
+    expect(calls.deleteSchema).toEqual(["schema-id-1", "proj-1"]);
   });
 
-  it("fetch dispatches to getSchema and returns its body verbatim", async () => {
+  it("fetch dispatches to getSchema with the id and project id and returns its body", async () => {
     const [schema] = makeSyncers({ projectId: "proj-1", env: {} });
     const { client, calls } = makeFakeClient();
 
     const body = await schema.fetch?.(client, "schema-id-1");
 
-    expect(calls.getSchema).toEqual(["schema-id-1"]);
+    expect(calls.getSchema).toEqual(["schema-id-1", "proj-1"]);
     expect(body).toEqual({ kind: "user-schema", version: 1 });
   });
 });

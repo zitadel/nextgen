@@ -19,7 +19,10 @@ export function makeSyncers(opts: {
   projectId: string;
   env: EnvLookup;
 }): ReadonlyArray<ResourceSyncer> {
-  return [new SchemaSyncer(opts.env), new FlowDefinitionSyncer(opts.projectId, opts.env)];
+  return [
+    new SchemaSyncer(opts.projectId, opts.env),
+    new FlowDefinitionSyncer(opts.projectId, opts.env),
+  ];
 }
 
 /**
@@ -40,7 +43,10 @@ class SchemaSyncer implements ResourceSyncer {
   readonly directory = SCHEMAS_DIR;
   readonly mutable = false;
 
-  constructor(private readonly env: EnvLookup) {}
+  constructor(
+    private readonly projectId: string,
+    private readonly env: EnvLookup,
+  ) {}
 
   validate(data: object): void {
     const result = validateUserSchema(data);
@@ -53,7 +59,7 @@ class SchemaSyncer implements ResourceSyncer {
   }
 
   async create(client: PlatformClient, data: object): Promise<string> {
-    const result = await client.createSchema(data);
+    const result = await client.createSchema(data, this.projectId);
     return result.id;
   }
 
@@ -63,11 +69,11 @@ class SchemaSyncer implements ResourceSyncer {
   }
 
   async delete(client: PlatformClient, id: string): Promise<void> {
-    await client.deleteSchema(id);
+    await client.deleteSchema(id, this.projectId);
   }
 
   async fetch(client: PlatformClient, id: string): Promise<object> {
-    return client.getSchema(id);
+    return client.getSchema(id, this.projectId);
   }
 }
 

@@ -34,15 +34,40 @@ describe("platform client", () => {
   it("createSchema and deleteSchema round-trip", async () => {
     const client = createPlatformClient(MOCK_SERVER_URL);
     // Spec: POST /schemas requires the `kind` discriminator
-    // (`oneOf [user-schema, schema-url]`).
-    const { id } = await client.createSchema({ kind: "user-schema", type: "object" });
+    // (`oneOf [user-schema, schema-url]`) and the `project_id` query param.
+    const { id } = await client.createSchema(
+      { kind: "user-schema", type: "object" },
+      "proj_test",
+    );
     expect(id).toBeTruthy();
-    await expect(client.deleteSchema(id)).resolves.toBeUndefined();
+    await expect(client.deleteSchema(id, "proj_test")).resolves.toBeUndefined();
   });
 
   it("createSchema rejects bodies missing the kind discriminator", async () => {
     const client = createPlatformClient(MOCK_SERVER_URL);
-    await expect(client.createSchema({ type: "object" })).rejects.toThrow(/400/);
+    await expect(client.createSchema({ type: "object" }, "proj_test")).rejects.toThrow(/400/);
+  });
+
+  it("createSchema rejects when the project_id query is missing (mirrors real backend)", async () => {
+    const client = createPlatformClient(MOCK_SERVER_URL);
+    // Passing the empty string forces the mock's project_id check to trip,
+    // matching the real backend's required-query-param contract.
+    await expect(
+      client.createSchema({ kind: "user-schema", type: "object" }, ""),
+    ).rejects.toThrow(/400/);
+  });
+
+  it("createSchema sends project_id as a query parameter on the URL", async () => {
+    let observedUrl = "";
+    server.use(
+      http.post(/\/schemas/, ({ request }) => {
+        observedUrl = request.url;
+        return HttpResponse.json({ id: "schema_x" }, { status: 201 });
+      }),
+    );
+    const client = createPlatformClient(MOCK_SERVER_URL);
+    await client.createSchema({ kind: "user-schema", type: "object" }, "proj_query_check");
+    expect(new URL(observedUrl).searchParams.get("project_id")).toBe("proj_query_check");
   });
 
   it("createFlowDefinition, updateFlowDefinition, deleteFlowDefinition round-trip", async () => {

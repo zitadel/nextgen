@@ -17,14 +17,21 @@ export interface ProjectClient {
  * Schema operations. The sync layer feeds opaque JSON bodies read from
  * `.zitadel/schemas/`, so request/response payloads stay `object` — the
  * generated `CreateSchemaBody` / `GetSchemaById200` shapes are
- * deliberately not imposed here (the sync layer is shape-agnostic). The
- * platform has no delete-schema endpoint; `deleteSchema` reuses the
+ * deliberately not imposed here (the sync layer is shape-agnostic).
+ *
+ * Every method takes `projectId` as a required argument: the platform's
+ * `/schemas` endpoints declare `project_id` as a required query
+ * parameter (`api/openapi/components/parameters/project-id.yaml`).
+ * The generated URL builders don't emit it, so the implementation
+ * appends `?project_id=…` itself; callers must supply it.
+ *
+ * The platform has no delete-schema endpoint; `deleteSchema` reuses the
  * by-id URL with the DELETE method.
  */
 export interface SchemaClient {
-  createSchema(data: object): Promise<{ id: string }>;
-  getSchema(id: string): Promise<object>;
-  deleteSchema(id: string): Promise<void>;
+  createSchema(data: object, projectId: string): Promise<{ id: string }>;
+  getSchema(id: string, projectId: string): Promise<object>;
+  deleteSchema(id: string, projectId: string): Promise<void>;
 }
 
 /**

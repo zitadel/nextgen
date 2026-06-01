@@ -90,6 +90,24 @@ async function readJson(request: Request): Promise<Record<string, unknown> | nul
 const INVALID_JSON = errorBody("invalid_json", "request body must be valid JSON");
 
 /**
+ * Mirrors the real backend's contract: `/schemas` endpoints declare
+ * `project_id` as a required query parameter
+ * (`api/openapi/components/parameters/project-id.yaml`). The mock rejects
+ * any schema request that omits it so the CLI can't regress past a
+ * working state by accidentally dropping the query string again.
+ */
+function requireProjectIdQuery(request: Request): HttpResponse | null {
+  const projectId = new URL(request.url).searchParams.get("project_id");
+  if (projectId && projectId.length > 0 && projectId !== "undefined" && projectId !== "null") {
+    return null;
+  }
+  return HttpResponse.json(
+    errorBody("invalid_request", "project_id query parameter is required"),
+    { status: 400 },
+  );
+}
+
+/**
  * Server-side record for a project. Strict superset of the spec response
  * types (`CreateProject201`, `GetProject200`): includes the server-only
  * secrets and `updatedAt`. Handlers project from this record to the right
@@ -208,6 +226,10 @@ export function setupPlatformHandlers() {
     }),
 
     http.post("*/schemas", async ({ request }) => {
+      const projectIdError = requireProjectIdQuery(request);
+      if (projectIdError) {
+        return projectIdError;
+      }
       const body = await readJson(request);
       if (body === null) {
         return HttpResponse.json(INVALID_JSON, { status: 400 });
@@ -228,7 +250,11 @@ export function setupPlatformHandlers() {
       return HttpResponse.json(responseBody, { status: 201 });
     }),
 
-    http.get("*/schemas/:id", ({ params }) => {
+    http.get("*/schemas/:id", ({ params, request }) => {
+      const projectIdError = requireProjectIdQuery(request);
+      if (projectIdError) {
+        return projectIdError;
+      }
       const schema = store.schemas.get(params.id as string);
       if (!schema) {
         return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
@@ -236,7 +262,11 @@ export function setupPlatformHandlers() {
       return HttpResponse.json(schema);
     }),
 
-    http.delete("*/schemas/:id", ({ params }) => {
+    http.delete("*/schemas/:id", ({ params, request }) => {
+      const projectIdError = requireProjectIdQuery(request);
+      if (projectIdError) {
+        return projectIdError;
+      }
       const existed = store.schemas.delete(params.id as string);
       if (!existed) {
         return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
