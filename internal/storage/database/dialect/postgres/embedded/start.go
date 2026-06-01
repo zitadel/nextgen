@@ -6,6 +6,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"runtime"
 	"time"
 
 	embeddedpostgres "github.com/fergusstrange/embedded-postgres"
@@ -36,7 +37,7 @@ func StartEmbedded() (connector database.Connector, stop func(), err error) {
 	}
 
 	config := embeddedpostgres.DefaultConfig().
-		Version(embeddedpostgres.V18).
+		Version(embeddedPostgresVersion()).
 		Port(uint32(port)).
 		RuntimePath(path).
 		// CI runners (GitHub Actions ubuntu) have throttled disk I/O; the
@@ -80,6 +81,19 @@ func StartEmbedded() (connector database.Connector, stop func(), err error) {
 		}
 		_ = os.RemoveAll(path)
 	}, nil
+}
+
+func embeddedPostgresVersion() embeddedpostgres.PostgresVersion {
+	return embeddedPostgresVersionFor(runtime.GOOS)
+}
+
+func embeddedPostgresVersionFor(goos string) embeddedpostgres.PostgresVersion {
+	// embedded-postgres v1.34 defaults to 18.3.0, but the upstream zonky
+	// binary repository currently lacks the Linux artifact CI needs.
+	if goos == "linux" {
+		return embeddedpostgres.V17
+	}
+	return embeddedpostgres.V18
 }
 
 // getPort returns a free port and locks it until close is called

@@ -4,7 +4,16 @@ import (
 	"fmt"
 	"net"
 	"testing"
+
+	embeddedpostgres "github.com/fergusstrange/embedded-postgres"
+	"github.com/stretchr/testify/assert"
 )
+
+func TestEmbeddedPostgresVersionFor(t *testing.T) {
+	assert.Equal(t, embeddedpostgres.V17, embeddedPostgresVersionFor("linux"))
+	assert.Equal(t, embeddedpostgres.V18, embeddedPostgresVersionFor("darwin"))
+	assert.Equal(t, embeddedpostgres.V18, embeddedPostgresVersionFor("windows"))
+}
 
 func TestGetPortReleasesReservedTCP4Port(t *testing.T) {
 	port, releasePort, err := getPort()

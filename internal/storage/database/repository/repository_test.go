@@ -36,15 +36,18 @@ func runTests(m *testing.M) int {
 		pool, stop, err = newEmbeddedDB(ctx)
 	}
 
-	defer stop()
 	if err != nil {
 		log.Printf("error setting up test database: %v", err)
 		return 1
 	}
 	defer func() {
 		r := recover()
-		pool.Close(ctx)
-		stop()
+		if pool != nil {
+			pool.Close(ctx)
+		}
+		if stop != nil {
+			stop()
+		}
 		if r != nil {
 			panic(r)
 		}
