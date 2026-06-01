@@ -8,8 +8,9 @@ import (
 )
 
 var reservedOutcomes = map[string]struct{}{
-	"user_not_found": {},
-	"callback":       {},
+	"user_not_found":      {},
+	"user_already_exists": {},
+	"callback":            {},
 }
 
 type PivotingTarget struct {
@@ -127,7 +128,7 @@ func validateSteps(steps []FlowDefinitionStep, userSchema *jsonschema.Schema) er
 			_, isReserved := reservedOutcomes[transitionKey]
 			if !isAction && !isReserved {
 				return ErrFlowDefinitionInvalid(fmt.Sprintf(
-					"step %q: transition key %q is not an action name or reserved outcome (user_not_found, callback)", step.Name, transitionKey), nil)
+					"step %q: transition key %q is not an action name or reserved outcome (user_not_found, user_already_exists, callback)", step.Name, transitionKey), nil)
 			}
 		}
 

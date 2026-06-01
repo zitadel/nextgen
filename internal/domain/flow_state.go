@@ -123,6 +123,14 @@ type FlowProgress struct {
 	// the definition.
 	Purpose FlowDefinitionPurpose
 
+	// CurrentPurpose is the engine's dynamic dispatch mode. It is
+	// initialised from Purpose and may flip on identifier outcomes
+	// (login + user_not_found → register; register + user_already_exists
+	// → login). Credential dispatch reads CurrentPurpose: login verifies,
+	// register and recovery skip. Purpose stays pinned for telemetry,
+	// policy, and ACR.
+	CurrentPurpose FlowDefinitionPurpose
+
 	// CurrentStep is the name of the step the user is currently on
 	// within DefinitionID. The next submit is interpreted against this
 	// step.

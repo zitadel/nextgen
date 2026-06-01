@@ -147,11 +147,12 @@ func (r *FlowStateMachineRuntime) Start(ctx context.Context, client database.Que
 		ProjectID:     in.Definition.ProjectID,
 		UserSchemaURL: in.UserSchemaURL,
 		FlowProgress: FlowProgress{
-			DefinitionID:  in.Definition.ID,
-			Purpose:       in.Purpose,
-			CurrentStep:   initialStepName,
-			History:       nil,
-			CollectedData: map[string]any{},
+			DefinitionID:   in.Definition.ID,
+			Purpose:        in.Purpose,
+			CurrentPurpose: in.Purpose,
+			CurrentStep:    initialStepName,
+			History:        nil,
+			CollectedData:  map[string]any{},
 		},
 		IssuedAt:       r.now(),
 		SessionID:      in.Session.ID,
@@ -243,6 +244,7 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 	}
 	if dispatch.Outcome != "" {
 		routeOutcome = dispatch.Outcome
+		applyOutcomeFlip(state, routeOutcome)
 	} else if currentStep.OnSuccess != nil {
 		result, err := r.runOnSuccess(ctx, client, def, state, userSchemaURL, currentStep, in.Fields, resolved)
 		if err != nil {
@@ -318,6 +320,35 @@ type flowDispatchResult struct {
 var challengeDispatchOrder = []FlowFieldChallenge{
 	FlowFieldChallengeIdentifier,
 	FlowFieldChallengePassword,
+}
+
+// purposeFlipTable maps an identifier outcome to the [FlowDefinitionPurpose]
+// the engine flips [FlowProgress.CurrentPurpose] to when the entry purpose
+// matches. login + user_not_found → register; register + user_already_exists
+// → login. Recovery never flips.
+var purposeFlipTable = map[FlowDefinitionPurpose]map[string]FlowDefinitionPurpose{
+	FlowDefinitionPurposeLogin: {
+		FlowImplicitOutcomeUserNotFound: FlowDefinitionPurposeRegister,
+	},
+	FlowDefinitionPurposeRegister: {
+		FlowImplicitOutcomeUserAlreadyExists: FlowDefinitionPurposeLogin,
+	},
+}
+
+// applyOutcomeFlip flips state.CurrentPurpose when (CurrentPurpose, outcome)
+// matches an entry in [purposeFlipTable]. No-op for outcomes that do not flip
+// or purposes that have no flip target.
+func applyOutcomeFlip(state *FlowState, outcome string) {
+	if outcome == "" {
+		return
+	}
+	flips, ok := purposeFlipTable[state.CurrentPurpose]
+	if !ok {
+		return
+	}
+	if next, ok := flips[outcome]; ok {
+		state.CurrentPurpose = next
+	}
 }
 
 // dispatchChallenges submits each field-shaped challenge in
