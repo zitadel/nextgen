@@ -132,9 +132,17 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 		}
 	}
 	// The browser Origin header drives the WebAuthn relying-party params when a
-	// step issues a passkey challenge.
+	// step issues a passkey challenge. Validate it against the project's allowlist.
 	if origin, ok := params.Origin.Get(); ok {
 		if rp := passkeyRPFromOrigin(origin); rp != nil {
+			project, err := h.projectService.Get(ctx, state.ProjectID)
+			if err != nil {
+				return internalErrorResponse(err), nil
+			}
+			if err := validateOriginAgainstProject(origin.String(), project); err != nil {
+				return errorResponseWithStatusCode(http.StatusBadRequest,
+					domain.ErrRequestInvalid().WithMessage(err.Error())), nil
+			}
 			submitReq.PasskeyRP = rp
 		}
 	}
