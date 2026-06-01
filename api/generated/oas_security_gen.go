@@ -94,6 +94,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 		"session.delete",
 	},
 	RevokeTokenOperation: []string{},
+	SetUserPasswordOperation: []string{
+		"user.write",
+	},
 	UpdateFlowDefinitionOperation: []string{
 		"flow_definitions.write",
 	},

@@ -412,6 +412,15 @@ func (UnimplementedHandler) RevokeToken(ctx context.Context, req *RevokeRequest)
 	return r, ht.ErrNotImplemented
 }
 
+// SetUserPassword implements setUserPassword operation.
+//
+// Set user password.
+//
+// PUT /user/{user_id}/password
+func (UnimplementedHandler) SetUserPassword(ctx context.Context, req *SetUserPasswordRequest, params SetUserPasswordParams) (r SetUserPasswordRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // SubmitFlowEvent implements submitFlowEvent operation.
 //
 // Submits telemetry or fingerprint data from the frontend.

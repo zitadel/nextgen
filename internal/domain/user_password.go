@@ -12,6 +12,14 @@ func ErrUserPasswordInvalid() Error {
 	return newError("user.password_invalid", "The password provided is invalid.", nil, nil)
 }
 
+func HashPassword(password string, hasher crypto.Hasher) (string, error) {
+	hash, err := hasher.Hash(password)
+	if err != nil {
+		return "", ErrInternal(err).WithMessage("failed to has password")
+	}
+	return hash, nil
+}
+
 type UserPassword struct {
 	ID                  int64
 	ProjectID           string
@@ -50,6 +58,7 @@ type UserPasswordRepository interface {
 
 	Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*UserPassword, error)
 	List(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) ([]*UserPassword, error)
+	Upsert(ctx context.Context, client database.QueryExecutor, projectID string, teamID *string, userID string, encodedHash string) error
 	Create(ctx context.Context, client database.QueryExecutor, user *CreateUserPassword) error
 	Delete(ctx context.Context, client database.QueryExecutor, condition database.Condition) error
 }

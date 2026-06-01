@@ -16,6 +16,14 @@ const (
 	AuthMethodRecoveryCodes
 )
 
+const (
+	PrefixUser ResourcePrefix = "user"
+)
+
+func ErrUserNotFound() Error {
+	return newError(PrefixUser.ErrorCodePrefix("not_found"), "user not found", nil, nil)
+}
+
 // User is a hydrated user projection (header + optional EAV joins).
 type User struct {
 	ProjectID string

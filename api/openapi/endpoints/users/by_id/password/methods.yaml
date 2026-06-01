@@ -1,0 +1,49 @@
+put:
+  operationId: setUserPassword
+  summary: Set user password
+  tags:
+    - User
+  parameters:
+    - $ref: ../../../../components/parameters/project-id.yaml
+    - $ref: ../../../../components/parameters/team-id.yaml
+    - name: user_id
+      in: path
+      required: true
+      schema:
+        $ref: ../../../../components/schemas/user-id.yaml
+  security:
+    - oauth2:
+        - user.write
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: set-user-password-request.yaml
+  responses:
+    '204':
+      description: The user password was set successfully
+    '400':
+      description: The provided input was not valid
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
+    '404':
+      description: No user was found for the provided user ID
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
+    '500':
+      description: Something went wrong on the server. This was not your fault.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
+    default:
+      description: Unexpected error response.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
