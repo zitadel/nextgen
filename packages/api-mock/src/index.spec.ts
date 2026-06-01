@@ -38,7 +38,7 @@ let mock: MockHandle = setupMockHandlers();
 beforeAll(() => {
   // Any absolute URL works — the orval-generated handlers match `*/flow*`
   // with a wildcard prefix.
-  configureZitadel({ apiBase: "http://localhost", projectId: PROJECT_ID });
+  configureZitadel({ proxyPath: "http://localhost", projectId: PROJECT_ID });
   server.listen({ onUnhandledRequest: "error" });
 });
 

@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 
-import { getApiBaseUrl } from "./base-url";
+import { getProxyPath } from "./base-url";
 
-test("getApiBaseUrl returns empty string by default", () => {
-  expect(getApiBaseUrl()).toBe("");
+test("getProxyPath returns empty string by default", () => {
+  expect(getProxyPath()).toBe("");
 });

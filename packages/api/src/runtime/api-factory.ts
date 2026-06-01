@@ -7,7 +7,7 @@
  */
 import * as endpoints from "../generated/endpoints/zitadelNextGen";
 
-import { setApiBaseUrl } from "./base-url";
+import { setProxyPath } from "./base-url";
 
 /**
  * Typed API client returned by {@link createApi}. Every property mirrors
@@ -26,13 +26,13 @@ export type ZitadelApi = typeof endpoints;
  * Uses a {@link Proxy} so new generated endpoints are available
  * automatically without manual wiring.
  */
-export function createApi(apiBase: string): ZitadelApi {
+export function createApi(proxyPath: string): ZitadelApi {
   return new Proxy(endpoints as ZitadelApi, {
     get(target, prop, receiver) {
       const value = Reflect.get(target, prop, receiver);
       if (typeof value !== "function") return value;
       return (...args: unknown[]) => {
-        setApiBaseUrl(apiBase);
+        setProxyPath(proxyPath);
         return (value as (...a: unknown[]) => unknown)(...args);
       };
     },

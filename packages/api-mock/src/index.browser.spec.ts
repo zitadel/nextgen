@@ -19,7 +19,7 @@ import { test } from "./msw-test.js";
 const PROJECT_ID = "demo-project";
 
 beforeAll(() => {
-  configureZitadel({ apiBase: window.location.origin, projectId: PROJECT_ID });
+  configureZitadel({ proxyPath: window.location.origin, projectId: PROJECT_ID });
 });
 
 beforeEach(() => {

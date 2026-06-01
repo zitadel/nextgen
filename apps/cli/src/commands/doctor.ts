@@ -239,7 +239,7 @@ async function applyFixes(opts: DoctorOptions): Promise<void> {
           ZITADEL_PROJECT_ID: "",
           ZITADEL_ENVIRONMENT: "",
           ZITADEL_ISSUER: "",
-          NEXTGEN_ISSUER_URL: "",
+          ZITADEL_URL: "",
         },
       },
       {
@@ -249,7 +249,7 @@ async function applyFixes(opts: DoctorOptions): Promise<void> {
           ZITADEL_PROJECT_ID: secret.project_id,
           ZITADEL_ENVIRONMENT: "development",
           ZITADEL_ISSUER: issuer,
-          NEXTGEN_ISSUER_URL: recordedServer,
+          ZITADEL_URL: recordedServer,
         },
       },
       ...(await adapter.planSetup(ctx)).ops,

@@ -7,7 +7,7 @@ import type { FrameworkAdapter, ProjectContext } from "../index";
 /**
  * Next.js `middleware.ts` at the project root. Wires `nextgenMiddleware` from
  * `@zitadel-nextgen/sdk-next` so the scaffolded `<zitadel-login api-base="/__nextgen">`
- * requests get same-origin-proxied to `NEXTGEN_ISSUER_URL` (the auth backend)
+ * requests get same-origin-proxied to `ZITADEL_URL` (the auth backend)
  * and `/profile` is JWT-gated.
  *
  * Filename + function name are the `middleware` form, not the Next 16 `proxy`
@@ -25,7 +25,7 @@ import type { NextRequest } from "next/server";
 
 export function middleware(req: NextRequest) {
   return nextgenMiddleware(req, {
-    issuerUrl: process.env.NEXTGEN_ISSUER_URL,
+    url: process.env.ZITADEL_URL,
     protectedRoutes: ["/profile"],
     loginPath: "/login",
   });
@@ -159,7 +159,7 @@ export class NextAdapter implements FrameworkAdapter {
       "ZITADEL_PROJECT_ID",
       "ZITADEL_ENVIRONMENT",
       "ZITADEL_ISSUER",
-      "NEXTGEN_ISSUER_URL",
+      "ZITADEL_URL",
       "NEXT_PUBLIC_ZITADEL_PROJECT_ID",
     ];
   }

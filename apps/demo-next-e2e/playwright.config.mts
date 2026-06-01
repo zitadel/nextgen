@@ -47,7 +47,7 @@ export default defineConfig({
       stderr: "pipe",
       timeout: 60_000,
       env: {
-        NEXTGEN_ISSUER_URL: "http://localhost:4000",
+        ZITADEL_URL: "http://localhost:4000",
       },
     },
   ],
