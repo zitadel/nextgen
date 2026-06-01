@@ -17,6 +17,10 @@ import { readZitadelSecret } from "../lib/project";
  */
 export default class Apply extends BaseCommand {
   static override description = "Validate and upload repo config to the platform.";
+  // Temporarily hidden while we collapse the dev workflow around `setup`'s
+  // auto-apply. The logic stays wired up so re-exposing this command is a
+  // one-line flip when we settle on the surface area.
+  static override hidden = true;
   static override flags = {
     environment: Flags.string({
       char: "e",
