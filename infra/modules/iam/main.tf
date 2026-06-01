@@ -66,34 +66,6 @@ resource "google_project_iam_member" "migrator_logging" {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Secret Manager: runtime + migrator SAs can read secrets at container start
-# ─────────────────────────────────────────────────────────────────────────────
-resource "google_secret_manager_secret_iam_member" "run_secret_access" {
-  for_each  = var.secret_refs
-  project   = var.project_id
-  secret_id = each.value.secret_id
-  role      = "roles/secretmanager.secretAccessor"
-  member    = "serviceAccount:${google_service_account.run.email}"
-}
-
-resource "google_secret_manager_secret_iam_member" "migrator_secret_access" {
-  for_each  = var.secret_refs
-  project   = var.project_id
-  secret_id = each.value.secret_id
-  role      = "roles/secretmanager.secretAccessor"
-  member    = "serviceAccount:${google_service_account.migrator.email}"
-}
-
-# Deploy SA can attach Secret Manager references to Cloud Run revisions.
-resource "google_secret_manager_secret_iam_member" "deploy_secret_access" {
-  for_each  = var.secret_refs
-  project   = var.project_id
-  secret_id = each.value.secret_id
-  role      = "roles/secretmanager.secretAccessor"
-  member    = "serviceAccount:${var.github_deploy_sa_email}"
-}
-
-# ─────────────────────────────────────────────────────────────────────────────
 # Cross-project: allow github-deploy SA (from mgmt) to impersonate local SAs
 # ─────────────────────────────────────────────────────────────────────────────
 resource "google_service_account_iam_member" "deploy_impersonate_run" {

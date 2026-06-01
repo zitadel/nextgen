@@ -4,13 +4,6 @@
 # Run once locally: tofu apply -var-file=mgmt.tfvars
 # ──���──────────────────────────────────────────────────────────────────────────
 
-locals {
-  all_project_ids = merge(
-    { mgmt = var.mgmt_project_id },
-    var.env_project_ids,
-  )
-}
-
 # ─── APIs ────────────────────────────────────────────────────────────────────
 
 resource "google_project_service" "apis" {

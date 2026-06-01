@@ -49,12 +49,3 @@ variable "vpc_subnet_id" {
   description = "Subnet ID for Direct VPC Egress"
   type        = string
 }
-
-variable "secret_env" {
-  description = "Secret-backed environment variables for Cloud Run"
-  type = map(object({
-    secret_id = string
-    version   = string
-  }))
-  default = {}
-}

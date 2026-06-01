@@ -30,7 +30,6 @@ infra/
 | Module            | Purpose                                         |
 | ----------------- | ----------------------------------------------- |
 | `project`         | Enable required GCP APIs                        |
-| `secrets`         | Secret Manager containers for runtime secrets   |
 | `iam`             | Runtime + migrator SAs, deploy SA impersonation |
 | `cloud-run`       | Service (runtime) + Job (migrations)            |
 | `load-balancer`   | External ALB + CDN + serverless NEG             |
@@ -45,8 +44,8 @@ infra/
 | AR, state bucket, CI SAs, WIF       | `infra/mgmt/` (OpenTofu)       | Rare changes      |
 | LB, CDN, IAM, DNS                   | `infra/` (OpenTofu, per env)   | Infra changes     |
 | Cloud SQL instance + database       | `infra/` (OpenTofu, per env)   | Infra changes     |
-| Cloud Run runtime env + secret refs | `infra/` (OpenTofu, per env)   | Infra changes     |
-| Cloud Run image, command, probes    | GitHub Actions deploy workflow | App releases      |
+| Cloud Run image, command, env, probes | GitHub Actions deploy workflow | App releases    |
+| Runtime secrets + secret access     | Manual Secret Manager ops      | Secret rotations  |
 | Customer certs + host rules         | Zitadel runtime (`infra.rs`)   | Tenant onboarding |
 
 ## Getting started
@@ -87,17 +86,16 @@ See `.github/workflows/infra.yml`.
 
 ## Secrets
 
-OpenTofu owns only the Secret Manager containers and the Cloud Run version pins.
-Create or rotate secret values directly in Google Secret Manager, then update
-the matching `*_secret_version` value in the environment tfvars file.
+OpenTofu does not manage Secret Manager containers, secret values, secret IAM
+bindings, or Cloud Run secret references. Runtime secrets are created, rotated,
+granted, and attached outside OpenTofu so credentials never enter OpenTofu
+state.
 
-OpenTofu also creates the Cloud SQL PostgreSQL instance and empty database, but
-database credentials and the `NEXTGEN_DATABASE_POSTGRES` connection-string
-secret value are managed outside OpenTofu so credentials never enter OpenTofu
-state. Cloud Run connects over private IP using the `postgres_private_ip` and
-`postgres_database_name` outputs as DSN inputs.
+OpenTofu creates the Cloud SQL PostgreSQL instance and empty database. The
+manually managed `NEXTGEN_DATABASE_POSTGRES` connection string uses the
+`postgres_private_ip` and `postgres_database_name` outputs as DSN inputs.
 
-The runtime secrets are:
+The runtime secret values are:
 
 | Cloud Run env var                 | Secret Manager ID                                  |
 | --------------------------------- | -------------------------------------------------- |

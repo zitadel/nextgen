@@ -94,18 +94,6 @@ variable "github_deploy_sa_email" {
   }
 }
 
-variable "server_encryption_key_secret_version" {
-  description = "Secret Manager version for NEXTGEN_SERVER_ENCRYPTION_KEY."
-  type        = string
-  default     = "latest"
-}
-
-variable "database_postgres_secret_version" {
-  description = "Secret Manager version for NEXTGEN_DATABASE_POSTGRES."
-  type        = string
-  default     = "latest"
-}
-
 variable "cloud_run_cpu" {
   description = "Cloud Run CPU allocation (e.g. 1, 2, 4)"
   type        = string

@@ -11,23 +11,11 @@ module "project" {
   project_id = var.project_id
 }
 
-module "secrets" {
-  source = "./modules/secrets"
-
-  project_id                    = var.project_id
-  environment                   = var.environment
-  server_encryption_key_version = var.server_encryption_key_secret_version
-  database_postgres_version     = var.database_postgres_secret_version
-
-  depends_on = [module.project]
-}
-
 module "iam" {
   source = "./modules/iam"
 
   project_id             = var.project_id
   github_deploy_sa_email = var.github_deploy_sa_email
-  secret_refs            = module.secrets.secret_refs
 
   depends_on = [module.project]
 }
@@ -83,10 +71,6 @@ module "cloud_run" {
   deletion_protection = var.deletion_protection
   vpc_network_id      = module.network.network_id
   vpc_subnet_id       = module.network.subnet_id
-  secret_env = {
-    NEXTGEN_SERVER_ENCRYPTION_KEY = module.secrets.secret_refs.server_encryption_key
-    NEXTGEN_DATABASE_POSTGRES     = module.secrets.secret_refs.database_postgres
-  }
 
   depends_on = [module.project]
 }

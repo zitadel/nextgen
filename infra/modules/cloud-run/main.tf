@@ -26,28 +26,12 @@ resource "google_cloud_run_v2_service" "zitadel" {
 
     containers {
       # Placeholder — the deploy workflow replaces image, command, args,
-      # and probes via gcloud. Runtime env and Secret Manager version pins
-      # are owned by OpenTofu so every instance of a revision sees identical
-      # key material.
+      # env, secret references, and probes via gcloud/manual release
+      # operations.
       image = "us-docker.pkg.dev/cloudrun/container/hello"
 
       ports {
         container_port = 8080
-      }
-
-      dynamic "env" {
-        for_each = var.secret_env
-
-        content {
-          name = env.key
-
-          value_source {
-            secret_key_ref {
-              secret  = env.value.secret_id
-              version = env.value.version
-            }
-          }
-        }
       }
 
       resources {
@@ -65,6 +49,7 @@ resource "google_cloud_run_v2_service" "zitadel" {
       template[0].containers[0].image,
       template[0].containers[0].command,
       template[0].containers[0].args,
+      template[0].containers[0].env,
       template[0].containers[0].startup_probe,
       template[0].containers[0].liveness_probe,
       # gcloud stamps these metadata fields on every update; Terraform should
@@ -106,21 +91,6 @@ resource "google_cloud_run_v2_job" "migrate" {
       containers {
         image = "us-docker.pkg.dev/cloudrun/container/hello-job"
 
-        dynamic "env" {
-          for_each = var.secret_env
-
-          content {
-            name = env.key
-
-            value_source {
-              secret_key_ref {
-                secret  = env.value.secret_id
-                version = env.value.version
-              }
-            }
-          }
-        }
-
         resources {
           limits = {
             cpu    = "1"
@@ -137,6 +107,7 @@ resource "google_cloud_run_v2_job" "migrate" {
       template[0].template[0].containers[0].image,
       template[0].template[0].containers[0].command,
       template[0].template[0].containers[0].args,
+      template[0].template[0].containers[0].env,
       # Same reasoning as the service above — gcloud stamps these fields
       # on every update; Terraform should not fight them.
       client,
