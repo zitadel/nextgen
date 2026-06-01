@@ -35,7 +35,7 @@ var _ FlowOnSuccessHandler = (*FlowCreateUserHandler)(nil)
 // the identifier (made unique on creation) and the password (hashed
 // and persisted).
 func (h *FlowCreateUserHandler) EstablishedKinds() []FlowFieldChallenge {
-	return []FlowFieldChallenge{FlowFieldChallengeIdentifier, FlowFieldChallengePassword}
+	return ManifestForOnSuccess(FlowOnSuccessCreateUser)
 }
 
 func (h *FlowCreateUserHandler) Handle(ctx context.Context, client database.QueryExecutor, in FlowOnSuccessInput) (FlowOnSuccessResult, error) {

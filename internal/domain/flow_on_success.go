@@ -23,6 +23,27 @@ type FlowOnSuccessHandler interface {
 	EstablishedKinds() []FlowFieldChallenge
 }
 
+// onSuccessManifests is the single source of truth for each mutation's
+// established credential kinds. Handlers return a copy via
+// EstablishedKinds; the definition validator looks up the same table to
+// cross-check that the kinds the mutation will establish are collected
+// upstream. Add a row when a new on_success is wired.
+var onSuccessManifests = map[FlowOnSuccess][]FlowFieldChallenge{
+	FlowOnSuccessCreateUser: {FlowFieldChallengeIdentifier, FlowFieldChallengePassword},
+}
+
+// ManifestForOnSuccess returns the credential kinds the named mutation
+// establishes, or nil if the value is unknown.
+func ManifestForOnSuccess(o FlowOnSuccess) []FlowFieldChallenge {
+	src := onSuccessManifests[o]
+	if src == nil {
+		return nil
+	}
+	out := make([]FlowFieldChallenge, len(src))
+	copy(out, src)
+	return out
+}
+
 // FlowOnSuccessInput is the per-call context the state machine threads
 // into a handler.
 type FlowOnSuccessInput struct {
