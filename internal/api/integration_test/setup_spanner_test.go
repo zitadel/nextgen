@@ -8,6 +8,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	spannerEmbedded "github.com/zitadel/nextgen/internal/storage/database/dialect/spanner/embedded"
 )
@@ -22,6 +23,7 @@ func runTests(m *testing.M) int {
 	ctx := context.Background()
 
 	connector, stop, err := spannerEmbedded.StartEmbedded(ctx)
+	helpers.Connector = connector
 	if err != nil {
 		log.Printf("setup: failed to start Spanner emulator: %v", err)
 		return 1
