@@ -3,6 +3,7 @@
 package integration_test
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/url"
@@ -82,11 +83,11 @@ func TestPasskeyFlowLogin(t *testing.T) {
 	require.NoError(t, passkeyRepo.Create(t.Context(), db, &domain.CreateUserPasskey{
 		ProjectID:    project.ID,
 		UserID:       userID,
-		CredentialID: string(cred.ID),
+		CredentialID: base64.RawURLEncoding.EncodeToString(cred.ID),
 		PublicKey:    cred.Key.AttestationData(),
 		AAGUID:       auth.Aaguid[:],
 		Transports:   []string{},
-		SignCount:    1,
+		SignCount:     1,
 	}))
 
 	// --- Create passkey login flow definition ---------------------------------
