@@ -14,43 +14,51 @@ import (
 //go:embed examples/default-login-flow-definition.json
 var defaultLoginFlowDefinition []byte
 
-func DefaultLoginFlowDefinition(serverURL string, projectID string) (*domain.FlowDefinition, error) {
-	jscontent := string(defaultLoginFlowDefinition)
-	jscontent = strings.ReplaceAll(jscontent, "${PROJECT_ID}", projectID)
-	jscontent = strings.ReplaceAll(jscontent, "${SERVER_URL}", serverURL)
+func DefaultLoginFlowDefinitions(serverURL string, projectID string) ([]*domain.FlowDefinition, error) {
+	bss := [][]byte{defaultLoginFlowDefinition}
 
-	req := &api.CreateFlowDefinitionRequest{}
-	err := req.UnmarshalJSON([]byte(jscontent))
-	if err != nil {
-		return nil, err
+	defs := make([]*domain.FlowDefinition, len(bss))
+
+	for i, bs := range bss {
+		jscontent := string(bs)
+		jscontent = strings.ReplaceAll(jscontent, "${PROJECT_ID}", projectID)
+		jscontent = strings.ReplaceAll(jscontent, "${SERVER_URL}", serverURL)
+
+		req := &api.CreateFlowDefinitionRequest{}
+		err := req.UnmarshalJSON([]byte(jscontent))
+		if err != nil {
+			return nil, err
+		}
+
+		if err = req.Validate(); err != nil {
+			return nil, err
+		}
+
+		purposes, err := convertPurposes(req.FlowDefinition.GetPurposes())
+		if err != nil {
+			return nil, err
+		}
+
+		steps, err := convertSteps(req.FlowDefinition.GetSteps())
+		if err != nil {
+			return nil, err
+		}
+
+		defs[i], err = domain.NewFlowDefinition(
+			projectID,
+			req.FlowDefinition.GetName(),
+			new(url.URL(req.GetSchemaURI().Value)).String(),
+			new(req.FlowDefinition.GetUserSchema()).String(),
+			purposes,
+			domain.FlowDefinitionAudience{
+				AppIDs:  req.FlowDefinition.GetAudience().Value.AppIds,
+				TeamIDs: req.FlowDefinition.GetAudience().Value.TeamIds,
+			},
+			steps,
+		)
 	}
 
-	if err = req.Validate(); err != nil {
-		return nil, err
-	}
-
-	purposes, err := convertPurposes(req.FlowDefinition.GetPurposes())
-	if err != nil {
-		return nil, err
-	}
-
-	steps, err := convertSteps(req.FlowDefinition.GetSteps())
-	if err != nil {
-		return nil, err
-	}
-
-	return domain.NewFlowDefinition(
-		projectID,
-		req.FlowDefinition.GetName(),
-		new(url.URL(req.GetSchemaURI().Value)).String(),
-		new(req.FlowDefinition.GetUserSchema()).String(),
-		purposes,
-		domain.FlowDefinitionAudience{
-			AppIDs:  req.FlowDefinition.GetAudience().Value.AppIds,
-			TeamIDs: req.FlowDefinition.GetAudience().Value.TeamIds,
-		},
-		steps,
-	)
+	return defs, nil
 }
 
 func convertPurposes(purposes api.FlowDefinitionPurposes) (map[domain.FlowDefinitionPurpose]string, error) {

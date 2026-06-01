@@ -76,7 +76,7 @@ func (s *projectService) Create(ctx context.Context, previewOrigins []string) (_
 		return nil, domain.ErrInternal(err).WithMessage("failed to create project in the database")
 	}
 
-	userschema, err := s.createDefaultUserSchema(ctx, tx, project.ID)
+	userschema, err := s.createDefaultUserSchemas(ctx, tx, project.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +85,7 @@ func (s *projectService) Create(ctx context.Context, previewOrigins []string) (_
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to parse default user schema")
 	}
-	if err := s.createDefaultLoginFlowDefinition(ctx, tx, project.ID, userSchema); err != nil {
+	if err := s.createDefaultLoginFlowDefinitions(ctx, tx, project.ID, userSchema); err != nil {
 		return nil, err
 	}
 
@@ -97,7 +97,7 @@ func (s *projectService) Create(ctx context.Context, previewOrigins []string) (_
 	return project, nil
 }
 
-func (s *projectService) createDefaultUserSchema(ctx context.Context, client database.QueryExecutor, projectID string) (*domain.JSONSchema, error) {
+func (s *projectService) createDefaultUserSchemas(ctx context.Context, client database.QueryExecutor, projectID string) (*domain.JSONSchema, error) {
 	schemabs := schemas.DefaultHumanUserSchema(s.serverURL)
 	schema, err := domain.NewJSONSchema(projectID, schemabs)
 	if err != nil {
@@ -112,20 +112,22 @@ func (s *projectService) createDefaultUserSchema(ctx context.Context, client dat
 	return schema, nil
 }
 
-func (s *projectService) createDefaultLoginFlowDefinition(ctx context.Context, client database.QueryExecutor, projectID string, userSchema *jsonschema.Schema) error {
-	flowDef, err := flow_definitions.DefaultLoginFlowDefinition(s.serverURL, projectID)
-	if err != nil {
-		return domain.ErrInternal(err).WithMessage("failed to retrieve default flow definition")
-	}
+func (s *projectService) createDefaultLoginFlowDefinitions(ctx context.Context, client database.QueryExecutor, projectID string, userSchema *jsonschema.Schema) error {
+	flowDefs, err := flow_definitions.DefaultLoginFlowDefinitions(s.serverURL, projectID)
+	for _, flowDef := range flowDefs {
+		if err != nil {
+			return domain.ErrInternal(err).WithMessage("failed to retrieve default flow definition")
+		}
 
-	_, err = domain.ValidateFlowDefinition(userSchema, *flowDef)
-	if err != nil {
-		return domain.ErrInternal(err).WithMessage("default login flow definition is invalid")
-	}
+		_, err = domain.ValidateFlowDefinition(userSchema, *flowDef)
+		if err != nil {
+			return domain.ErrInternal(err).WithMessage("default login flow definition is invalid")
+		}
 
-	err = s.flowDefinitionRepo.CreateFlowDefinition(ctx, client, flowDef)
-	if err != nil {
-		return domain.ErrInternal(err).WithMessage("failed to save default login flow definition to project")
+		err = s.flowDefinitionRepo.CreateFlowDefinition(ctx, client, flowDef)
+		if err != nil {
+			return domain.ErrInternal(err).WithMessage("failed to save default login flow definition to project")
+		}
 	}
 	return err
 }
