@@ -17,19 +17,18 @@ import (
 	"github.com/ianlancetaylor/jsonschema"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/zitadel/nextgen/internal/secrets"
-	"github.com/zitadel/oidc/v3/pkg/op"
-
 	oasapi "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/bootstrap/users"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/domain/idgen"
+	"github.com/zitadel/nextgen/internal/secrets"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	_ "github.com/zitadel/nextgen/internal/storage/database/dialect/all"
 	"github.com/zitadel/nextgen/internal/storage/database/repository"
+	"github.com/zitadel/oidc/v3/pkg/op"
 )
 
 func NewCommand() *cobra.Command {
@@ -102,6 +101,7 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 	userRepo := repository.NewUserRepository()
 	userPasswordRepo := repository.NewUserPasswordRepository()
 	userPasskeyRepo := repository.NewUserPasskeyRepository()
+	passkeyRegRepo := repository.NewPasskeyRegistrationRepository()
 	sessionRepo := repository.NewSessionRepository(pool)
 	flowDefinitionRepo := repository.NewFlowDefinitionRepository(pool)
 	attemptRepo := repository.NewAuthAttemptRepository(pool)
@@ -168,7 +168,8 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 	ids := idgen.NewULID()
 	fields := domain.NewSchemaFieldResolver(storageSchemaResolver)
 	flowAuth := service.NewFlowAuthAttemptAdapter(authAttemptSvc)
-	stateMachine := domain.NewFlowStateMachine(fields, nil, flowAuth, time.Now)
+	passkeyRegSvc := service.NewPasskeyRegistrationService(pool, passkeyRegRepo, userPasskeyRepo, sessionRepo, ids)
+	stateMachine := domain.NewFlowStateMachine(fields, nil, flowAuth, passkeyRegSvc, time.Now)
 
 	flowService := service.NewFlowService(pool, flowDefinitionRepo, stateMachine, ids)
 
@@ -188,7 +189,7 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 			schemaService,
 			flowDefinitionSvc,
 			teamService,
-		),
+			passkeyRegSvc),
 		api.NewSecurityHandler(),
 		oasapi.WithErrorHandler(api.OgenErrorHandler))
 	if err != nil {
