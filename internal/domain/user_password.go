@@ -42,6 +42,15 @@ func (u *UserPassword) Verify(password string, verifier crypto.HashVerifier) err
 	return nil
 }
 
+func (u *UserPassword) Update(hashedPassword string) {
+	u.EncodedHash = hashedPassword
+	u.ChangedAt = time.Now().UTC()
+}
+
+func (u *UserPassword) RequireChange() {
+	u.ChangeRequired = true
+}
+
 type CreateUserPassword struct {
 	ProjectID      string
 	TeamID         *string // TODO: this field is currently not used by the repo
@@ -61,6 +70,7 @@ type UserPasswordRepository interface {
 	Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*UserPassword, error)
 	List(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) ([]*UserPassword, error)
 	Create(ctx context.Context, client database.QueryExecutor, user *CreateUserPassword) error
+	Update(ctx context.Context, client database.QueryExecutor, pw *UserPassword) error
 	Delete(ctx context.Context, client database.QueryExecutor, condition database.Condition) error
 }
 

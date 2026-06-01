@@ -89,6 +89,14 @@ func (r *UserPasswordRepository) ResetFailedAttempts() database.Change {
 	return database.NewChange(colPasswordFailedAttempts, int16(0))
 }
 
+func (r *UserPasswordRepository) GetByUserID(ctx context.Context, client database.QueryExecutor, projectID string, teamID *string, userID string) (*domain.UserPassword, error) {
+	// TODO teamID is currently not used. Should it?
+	condition := database.And(
+		r.ProjectIDCondition(projectID),
+		r.UserIDCondition(userID))
+	return r.Get(ctx, client, database.WithCondition(condition))
+}
+
 func (r *UserPasswordRepository) Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*domain.UserPassword, error) {
 	builder := database.NewStatementBuilder("SELECT ")
 	database.Columns{
@@ -166,6 +174,23 @@ func (r *UserPasswordRepository) Create(ctx context.Context, client database.Que
 	builder.WriteArgs(pw.ProjectID, pw.UserID, pw.EncodedHash, pw.ChangeRequired, pw.VerificationID)
 	builder.WriteString(")")
 	_, err := client.Exec(ctx, builder.String(), builder.Args()...)
+	return err
+}
+
+func (r *UserPasswordRepository) Update(ctx context.Context, client database.QueryExecutor, pw *domain.UserPassword) error {
+	_, err := updateOne(
+		ctx,
+		client,
+		r,
+		r.PrimaryKeyCondition(pw.ID),
+		r.SetEncodedHash(pw.EncodedHash),
+		r.SetChangeRequired(pw.ChangeRequired),
+		r.SetChangedAt(pw.ChangedAt),
+		database.NewChangePtr(colPasswordVerificationID, pw.VerificationID),
+		database.NewChangePtr(colPasswordLastSuccessful, pw.LastSuccessfulCheck),
+		database.NewChange(colPasswordFailedAttempts, pw.FailedAttempts),
+		database.NewChange(colPasswordUpdatedAt, database.NowInstruction),
+	)
 	return err
 }
 

@@ -66,6 +66,27 @@ func TestUserPasswordRepository_CRUD(t *testing.T) {
 	require.NotNil(t, got.VerificationID)
 	require.Equal(t, vid, *got.VerificationID)
 
+	changedAt := time.Now().UTC().Truncate(time.Microsecond)
+	lastSuccessful := changedAt.Add(10 * time.Minute)
+	got.EncodedHash = "argon2id$v=19$m=65536,t=3,p=4$updated"
+	got.ChangeRequired = false
+	got.ChangedAt = changedAt
+	got.VerificationID = nil
+	got.LastSuccessfulCheck = &lastSuccessful
+	got.FailedAttempts = 3
+	require.NoError(t, repo.Update(ctx, tx, got))
+
+	updated, err := repo.Get(ctx, tx, database.WithCondition(repo.PrimaryKeyCondition(got.ID)))
+	require.NoError(t, err)
+	require.Equal(t, got.ID, updated.ID)
+	require.Equal(t, "argon2id$v=19$m=65536,t=3,p=4$updated", updated.EncodedHash)
+	require.False(t, updated.ChangeRequired)
+	require.WithinDuration(t, changedAt, updated.ChangedAt, time.Second)
+	require.Nil(t, updated.VerificationID)
+	require.NotNil(t, updated.LastSuccessfulCheck)
+	require.WithinDuration(t, lastSuccessful, *updated.LastSuccessfulCheck, time.Second)
+	require.Equal(t, int16(3), updated.FailedAttempts)
+
 	byID, err := repo.Get(ctx, tx, database.WithCondition(repo.PrimaryKeyCondition(got.ID)))
 	require.NoError(t, err)
 	require.Equal(t, got.ID, byID.ID)

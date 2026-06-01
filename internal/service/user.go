@@ -66,7 +66,23 @@ func (s *UserService) SetPassword(ctx context.Context, input SetPasswordInput) e
 	if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 		return s.createPassword(ctx, tx, input.ProjectID, input.TeamID, input.UserID, hash, input.IsPasswordChangeRequired)
 	}
-	return s.updatePassword(ctx, tx, pwd, input.ProjectID, input.TeamID, input.UserID, hash, input.IsPasswordChangeRequired)
+
+	pwd.Update(hash)
+	if input.IsPasswordChangeRequired {
+		pwd.RequireChange()
+	}
+
+	err = s.passwordRepo.Update(ctx, tx, pwd)
+	if err != nil {
+		return domain.ErrInternal(err).WithMessage("failed to update password in database")
+	}
+
+	err = tx.Commit(ctx)
+	if err != nil {
+		return domain.ErrInternal(err).WithMessage("failed to commit transaction while updating password")
+	}
+
+	return nil
 }
 
 func (s *UserService) createPassword(ctx context.Context, client database.QueryExecutor,
@@ -88,8 +104,4 @@ func (s *UserService) createPassword(ctx context.Context, client database.QueryE
 	}
 
 	return nil
-}
-
-func (s *UserService) updatePassword(ctx context.Context, client database.QueryExecutor, pwd *domain.UserPassword,
-	projectID string, teamID *string, userID, pwdHash string, isPasswordChangeRequired bool) error {
 }
