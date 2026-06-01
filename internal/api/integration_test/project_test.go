@@ -176,7 +176,7 @@ func TestGetProject(t *testing.T) {
 	t.Run("not found", func(t *testing.T) {
 		req, err := http.NewRequest(http.MethodGet, ts.URL+"/projects/proj_doesnotexist", nil)
 		require.NoError(t, err)
-		req.Header.Set("Authorization", "Bearer test-token")
+		req.Header.Set("Authorization", "Bearer sk_proj_doesnotexist")
 
 		client := &http.Client{}
 		resp, err := client.Do(req)

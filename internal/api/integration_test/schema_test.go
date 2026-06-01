@@ -3,11 +3,7 @@
 package integration_test
 
 import (
-	"bytes"
 	"encoding/json"
-	"fmt"
-	"io"
-	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -17,8 +13,7 @@ import (
 )
 
 func TestCreateSchema(t *testing.T) {
-	serv := harness.EnsureTestServer(t)
-	client := harness.EnsureAPIClient(t)
+	harness.EnsureTestServer(t)
 
 	t.Run("ok", func(t *testing.T) {
 		testCases := []struct {
@@ -53,7 +48,7 @@ func TestCreateSchema(t *testing.T) {
 					ProjectID: api.ProjectID(project.ID),
 				}
 
-				resp, err := client.CreateSchema(t.Context(), req, params)
+				resp, err := harness.EnsureAPIClient(t, project.ID).CreateSchema(t.Context(), req, params)
 				assert.NoError(t, err)
 
 				assert.IsType(t, &api.CreateSchemaResponse{}, resp, helpers.MustMarshal(t, resp))
@@ -80,27 +75,25 @@ func TestCreateSchema(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			uri := fmt.Sprintf("%s/schemas?project_id=%s", serv.URL, project.ID)
-			req, err := http.NewRequest("POST", uri, bytes.NewReader(body))
+			apiSchema := api.UserSchema{}
+			err = apiSchema.UnmarshalJSON(body)
 			require.NoError(t, err)
-			req.Header.Set("Content-Type", "application/json")
-			req.Header.Set("Authorization", "Bearer this_is_a_fake_token__once_we_have_proper_auth__replace_this_with_a_proper_one") // TODO
 
-			httpClient := harness.EnsureHttpClient(t)
-			resp, err := httpClient.Do(req)
-			assert.NoError(t, err)
-			defer func() { _ = resp.Body.Close() }()
-
-			if !assert.Equal(t, http.StatusBadRequest, resp.StatusCode) {
-				bs, err := io.ReadAll(resp.Body)
-				require.NoError(t, err)
-				t.Log(string(bs))
+			req := api.CreateSchemaReq{
+				Type:       api.UserSchemaCreateSchemaReq,
+				UserSchema: apiSchema,
 			}
+			params := api.CreateSchemaParams{
+				ProjectID: api.ProjectID(project.ID),
+			}
+
+			resp, err := harness.EnsureAPIClient(t, project.ID).CreateSchema(t.Context(), req, params)
+			assert.NoError(t, err)
+			assert.IsType(t, &api.CreateSchemaBadRequest{}, resp, mustMarshal(t, resp))
+
 		})
 
 		t.Run("duplicates are not allowed", func(t *testing.T) {
-			client := harness.EnsureAPIClient(t)
-
 			project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
 			require.NoError(t, err)
 			harness.CreateUserSchema(t, project.ID, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
@@ -117,7 +110,7 @@ func TestCreateSchema(t *testing.T) {
 				ProjectID: api.ProjectID(project.ID),
 			}
 
-			resp, err := client.CreateSchema(t.Context(), req, params)
+			resp, err := harness.EnsureAPIClient(t, project.ID).CreateSchema(t.Context(), req, params)
 			assert.NoError(t, err)
 
 			assert.IsType(t, &api.CreateSchemaConflict{}, resp, helpers.MustMarshal(t, resp))
@@ -126,7 +119,6 @@ func TestCreateSchema(t *testing.T) {
 }
 
 func TestGetSchema(t *testing.T) {
-	client := harness.EnsureAPIClient(t)
 
 	t.Run("ok", func(t *testing.T) {
 		t.Run("simple", func(t *testing.T) {
@@ -134,7 +126,7 @@ func TestGetSchema(t *testing.T) {
 			require.NoError(t, err)
 			schemaID := harness.CreateUserSchema(t, project.ID, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
 
-			resp, err := client.GetSchemaById(t.Context(), api.GetSchemaByIdParams{
+			resp, err := harness.EnsureAPIClient(t, project.ID).GetSchemaById(t.Context(), api.GetSchemaByIdParams{
 				ID:        schemaID,
 				ProjectID: api.ProjectID(project.ID),
 			})
@@ -149,7 +141,7 @@ func TestGetSchema(t *testing.T) {
 			project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
 			require.NoError(t, err)
 
-			resp, err := client.GetSchemaById(t.Context(), api.GetSchemaByIdParams{
+			resp, err := harness.EnsureAPIClient(t, project.ID).GetSchemaById(t.Context(), api.GetSchemaByIdParams{
 				ID:        "does-not-exist",
 				ProjectID: api.ProjectID(project.ID),
 			})
