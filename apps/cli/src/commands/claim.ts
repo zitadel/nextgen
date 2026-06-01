@@ -1,92 +1,122 @@
-import type { CliIO, GlobalOptions } from "../io/output";
-import { ok, skipped } from "../io/output";
+import { Flags } from "@oclif/core";
+
+import { createZitadelClient } from "@zitadel-nextgen/api/client";
+
+import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
 import { ZitadelError } from "../lib/errors";
-import { createPlatformClient } from "../platform";
-import { readZitadelSecret, writeZitadelSecret } from "./shared";
+import { readZitadelSecret, writeZitadelSecret } from "../lib/project";
 
-export type ClaimOptions = GlobalOptions & {
-  challengeId?: string;
-  returnUrl?: string;
-  teamName?: string;
-};
+/**
+ * `zitadel claim` — hand an anonymous local project to a human owner.
+ *
+ * The CLI can start the claim challenge and later poll it, but the browser
+ * claim ceremony owns the human sign-in/team choice. When status returns the
+ * one-shot rotated project secret, this command atomically rewrites
+ * `.zitadel/secret`.
+ */
+export default class Claim extends BaseCommand {
+  static override description = "Claim an anonymous local project into a team.";
+  static override flags = {
+    "challenge-id": Flags.string({
+      description: "Poll a claim challenge and rewrite .zitadel/secret after completion.",
+    }),
+    "return-url": Flags.string({
+      description: "URL the browser claim flow should return to.",
+    }),
+    "team-name": Flags.string({
+      description: "Suggested team name for the browser claim flow.",
+    }),
+  };
 
-export async function runClaim(io: CliIO, opts: ClaimOptions): Promise<void> {
-  const secret = await readZitadelSecret(opts.cwd);
-  if (opts.dryRun) {
-    const action = opts.challengeId ? "poll_claim_status" : "init_claim";
-    skipped(
-      io,
-      "dry run: claim flow not started and .zitadel/secret unchanged",
-      opts,
-      {
-        project_id: secret.project_id,
-        challenge_id: opts.challengeId,
-        action,
-      },
-      opts.challengeId ? [`zitadel claim --challenge-id ${opts.challengeId}`] : ["zitadel claim"],
-    );
-    return;
-  }
+  async run(): Promise<JsonEnvelope> {
+    const { flags } = await this.parse(Claim);
+    await this.toMeta(flags);
+    const { cwd, source, dryRun } = this.meta;
+    const secret = await readZitadelSecret(cwd);
 
-  const client = createPlatformClient(opts.source, secret.project_secret);
-
-  if (opts.challengeId) {
-    const status = await client.getProjectClaimStatus(secret.project_id, opts.challengeId);
-    if (status.status !== "completed" || !status.rotated_project_secret) {
-      ok(
-        io,
-        {
+    if (dryRun) {
+      return this.emit({
+        status: "skipped",
+        reason: "dry-run",
+        data: {
           project_id: secret.project_id,
-          challenge_id: status.challenge_id,
-          status: status.status,
-          expires_at: status.expires_at,
-          next_commands: [`zitadel claim --challenge-id ${status.challenge_id}`],
+          challenge_id: flags["challenge-id"],
+          action: flags["challenge-id"] ? "poll_claim_status" : "init_claim",
+          message: "claim flow not started and .zitadel/secret unchanged",
         },
-        opts,
-      );
-      return;
+        nextCommands: flags["challenge-id"]
+          ? [`zitadel claim --challenge-id ${flags["challenge-id"]}`]
+          : ["zitadel claim"],
+      });
     }
 
-    await writeZitadelSecret(opts.cwd, {
-      ...secret,
-      project_secret: status.rotated_project_secret,
-      lifecycle: "claimed",
-      claimed_at: status.claimed_at,
+    const client = createZitadelClient({
+      baseUrl: source,
+      token: secret.project_secret,
     });
-    ok(
-      io,
-      {
-        project_id: secret.project_id,
-        challenge_id: status.challenge_id,
-        status: "claimed",
-        secret_rotated: true,
-        next_commands: ["zitadel status", "zitadel deploy connect --environment preview"],
-      },
-      opts,
+
+    if (flags["challenge-id"]) {
+      const status = await client.getProjectClaimStatus(secret.project_id, {
+        challenge_id: flags["challenge-id"],
+      });
+      if (status.status !== "completed" || !status.rotated_project_secret) {
+        return this.emit({
+          status: "ok",
+          data: {
+            project_id: secret.project_id,
+            challenge_id: status.challenge_id,
+            status: status.status,
+            expires_at: status.expires_at,
+            next_commands: [`zitadel claim --challenge-id ${status.challenge_id}`],
+          },
+        });
+      }
+
+      await writeZitadelSecret(cwd, {
+        ...secret,
+        project_secret: status.rotated_project_secret,
+        lifecycle: "claimed",
+        claimed_at: status.claimed_at,
+      });
+      return this.emit({
+        status: "ok",
+        data: {
+          project_id: secret.project_id,
+          challenge_id: status.challenge_id,
+          status: "claimed",
+          secret_rotated: true,
+          next_commands: ["zitadel status"],
+        },
+      });
+    }
+
+    const claim = await client.initProjectClaim(
+      secret.project_id,
+      claimInitBody(flags["return-url"], flags["team-name"]),
     );
-    return;
+
+    if (!claim.claim_url) {
+      throw new ZitadelError("E_VALIDATION", "Claim endpoint did not return a claim URL");
+    }
+
+    return this.emit({
+      status: "ok",
+      data: {
+        project_id: secret.project_id,
+        challenge_id: claim.challenge_id,
+        claim_url: claim.claim_url,
+        expires_at: claim.expires_at,
+        status: claim.status,
+        next_actions: ["Open the claim URL, then rerun claim with the challenge id."],
+        next_commands: [`zitadel claim --challenge-id ${claim.challenge_id}`],
+      },
+    });
   }
+}
 
-  const claim = await client.initProjectClaim(secret.project_id, {
-    return_url: opts.returnUrl,
-    suggested_team_name: opts.teamName,
-  });
-
-  if (!claim.claim_url) {
-    throw new ZitadelError("E_VALIDATION", "Claim endpoint did not return a claim URL");
-  }
-
-  ok(
-    io,
-    {
-      project_id: secret.project_id,
-      challenge_id: claim.challenge_id,
-      claim_url: claim.claim_url,
-      expires_at: claim.expires_at,
-      status: claim.status,
-      next_actions: ["Open the claim URL, then rerun claim with the challenge id."],
-      next_commands: [`zitadel claim --challenge-id ${claim.challenge_id}`],
-    },
-    opts,
-  );
+function claimInitBody(returnUrl: string | undefined, teamName: string | undefined) {
+  return {
+    ...(returnUrl ? { return_url: returnUrl } : {}),
+    ...(teamName ? { suggested_team_name: teamName } : {}),
+  };
 }

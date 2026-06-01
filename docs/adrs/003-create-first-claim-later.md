@@ -113,9 +113,9 @@ development.
 project is claimed. Production behaves the same way. Local development remains
 unblocked so agents can build auth before the human signs up.
 
-`zitadel deploy connect --environment preview` also fails while unclaimed. A
-preview deploy is a sharing boundary, so it needs a human owner before the
-origin-scoped secret is handed to the deploy platform.
+Deploy-platform secret handoff remains future work for this PR. The invariant
+is still enforced at the API and CLI config boundary: preview and production
+cannot be planned or applied while the project is unclaimed.
 
 `zitadel claim` starts the challenge, opens the browser in interactive mode, and
 polls for completion. In `--non-interactive --json` mode it returns the

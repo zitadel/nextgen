@@ -1,144 +1,63 @@
-import { readdir, readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { Flags } from "@oclif/core";
 
-import type { CliIO, GlobalOptions } from "../io/output";
-import { ok, writePretty } from "../io/output";
-import { ZitadelError } from "../lib/errors";
-import { createPlatformClient } from "../platform";
-import { environmentSchema, type ZitadelEnvironment } from "../platform/schemas";
-import { flowDefinitionSchema } from "../resources/flow";
-import { buildSyncPlan, runSyncLoop } from "../sync/loop";
-import { renderPlan } from "../sync/plan-renderer";
-import { makeSyncers } from "../sync/syncers";
+import { createZitadelClient } from "@zitadel-nextgen/api/client";
+
+import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
+import { environmentSchema, type ZitadelEnvironment } from "../lib/environment";
+import { buildSyncPlan, makeSyncers, renderPlan, runSyncLoop, summarizePlan } from "../lib/sync";
+import { readZitadelSecret } from "../lib/project";
 import { ensureClaimedForEnvironment } from "./claim-gate";
-import { readZitadelSecret } from "./shared";
 
-export type ApplyOptions = GlobalOptions & {
-  silent?: boolean;
-  planOnly?: boolean;
-  environment?: string;
-  platform?: string;
-};
+/**
+ * `zitadel apply` — validate and upload repo config to the platform.
+ *
+ * Runs the sync loop to convergence, or (with `--dry-run`) previews the diff
+ * without mutating. All validation — structural shape and `${VAR}` / `*_env`
+ * reference presence — happens inside the sync engine ({@link buildSyncPlan}),
+ * so an invalid or under-configured file fails with `E_VALIDATION` before any
+ * platform call.
+ */
+export default class Apply extends BaseCommand {
+  static override description = "Validate and upload repo config to the platform.";
+  static override flags = {
+    environment: Flags.string({
+      char: "e",
+      description: "Target environment (default: development).",
+      options: [...environmentSchema.options],
+    }),
+  };
 
-export async function runApply(io: CliIO, opts: ApplyOptions): Promise<void> {
-  const environment = parseEnvironment(opts.environment);
-  const secret = await readZitadelSecret(opts.cwd);
+  async run(): Promise<JsonEnvelope> {
+    const { flags } = await this.parse(Apply);
+    await this.toMeta(flags);
+    const { cwd, source, env, dryRun, isTTY } = this.meta;
+    const environment = parseEnvironment(flags.environment);
 
-  const flows = await readFlowFiles(opts.cwd);
+    const secret = await readZitadelSecret(cwd);
+    const client = createZitadelClient({
+      baseUrl: source,
+      token: secret.project_secret,
+    });
 
-  validateFlowDefinitions(flows);
+    await ensureClaimedForEnvironment(client, secret.project_id, environment);
 
-  const envRefs = findEnvRefs(flows);
-  const missing = envRefs.filter((name) => !io.env[name]);
-  if (missing.length > 0) {
-    throw new ZitadelError(
-      "E_VALIDATION",
-      `Missing environment variables: ${missing.join(", ")}`,
-    );
-  }
+    const syncers = makeSyncers({ client, projectId: secret.project_id, env });
 
-  const client = createPlatformClient(opts.source, secret.project_secret);
-  await ensureClaimedForEnvironment(client, secret.project_id, environment);
-  const syncers = makeSyncers({ projectId: secret.project_id });
-
-  if (opts.planOnly || opts.dryRun) {
-    const plan = await buildSyncPlan(opts.cwd, syncers, client);
-    if (opts.json) {
-      const active = plan.filter((a) => a.kind !== "skip");
-      ok(io, {
-        creates: active.filter((a) => a.kind === "create").length,
-        updates: active.filter((a) => a.kind === "update").length,
-        deletes: active.filter((a) => a.kind === "delete").length,
-        total: active.length,
-      }, opts);
-    } else {
-      writePretty(io, renderPlan(plan, io.isTTY));
+    if (!dryRun) {
+      await runSyncLoop(cwd, syncers);
+      const apply = await client.applyProjectConfig(secret.project_id, { environment }, { source: "cli" });
+      return this.emit({ status: "ok", data: { synced: true, apply } });
     }
-    return;
-  }
 
-  await runSyncLoop(opts.cwd, client, syncers);
-  const applied = await client.applyProjectConfig(secret.project_id, environment, {
-    source: "cli",
-  });
-
-  if (!opts.silent) {
-    ok(io, { synced: true, apply: applied }, opts);
-  }
-}
-
-async function readFlowFiles(cwd: string): Promise<Record<string, unknown>[]> {
-  const dir = join(cwd, ".zitadel/flows");
-  let entries: string[];
-  try {
-    entries = await readdir(dir);
-  } catch {
-    return [];
-  }
-  const results: Record<string, unknown>[] = [];
-  for (const entry of entries.filter((e) => e.endsWith(".json"))) {
-    try {
-      results.push(JSON.parse(await readFile(join(dir, entry), "utf8")) as Record<string, unknown>);
-    } catch {
-      throw new ZitadelError("E_VALIDATION", `Flow definition ${entry} is not valid JSON`);
-    }
-  }
-  return results;
-}
-
-function validateFlowDefinitions(flows: Record<string, unknown>[]): void {
-  const issues: Array<{ issues: unknown }> = [];
-  for (const flow of flows) {
-    const parsed = flowDefinitionSchema.safeParse(flow);
-    if (!parsed.success) {
-      issues.push({ issues: parsed.error.issues });
-    }
-  }
-  if (issues.length > 0) {
-    throw new ZitadelError("E_VALIDATION", "One or more flow definitions are invalid", {
-      details: { issues },
+    const plan = await buildSyncPlan(cwd, syncers, true);
+    return this.emit({
+      status: "ok",
+      data: summarizePlan(plan),
+      pretty: renderPlan(plan, isTTY),
     });
   }
 }
 
 function parseEnvironment(value: string | undefined): ZitadelEnvironment {
-  const result = environmentSchema.safeParse(value ?? "development");
-  if (!result.success) {
-    throw new ZitadelError("E_VALIDATION", `Invalid environment "${value}"`, {
-      hint: "Use one of: development, preview, production.",
-    });
-  }
-  return result.data;
-}
-
-export function findEnvRefs(value: unknown): string[] {
-  const refs = new Set<string>();
-  const visit = (node: unknown): void => {
-    if (typeof node === "string") {
-      for (const match of node.matchAll(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g)) {
-        const ref = match[1];
-        if (ref) { refs.add(ref); }
-      }
-    } else if (Array.isArray(node)) {
-      node.forEach(visit);
-    } else if (isObject(node)) {
-      for (const [key, child] of Object.entries(node)) {
-        if (
-          key.endsWith("_env") &&
-          typeof child === "string" &&
-          /^[A-Za-z_][A-Za-z0-9_]*$/.test(child)
-        ) {
-          refs.add(child);
-        } else {
-          visit(child);
-        }
-      }
-    }
-  };
-  visit(value);
-  return [...refs].sort();
-}
-
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+  return environmentSchema.parse(value ?? "development");
 }

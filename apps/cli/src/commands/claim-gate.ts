@@ -1,9 +1,10 @@
+import type { ZitadelClient } from "@zitadel-nextgen/api/client";
+
 import { ZitadelError } from "../lib/errors";
-import type { PlatformClient } from "../platform/client";
-import type { ZitadelEnvironment } from "../platform/schemas";
+import type { ZitadelEnvironment } from "../lib/environment";
 
 export async function ensureClaimedForEnvironment(
-  client: PlatformClient,
+  client: ZitadelClient,
   projectId: string,
   environment: ZitadelEnvironment,
 ): Promise<void> {

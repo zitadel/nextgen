@@ -260,7 +260,7 @@ The schema version corresponds to the installed `@zitadel/sdk` version. A develo
 
 ### Capabilities handshake
 
-On every `PATCH /projects/{projectId}/config`, the server responds with:
+On every `PATCH /projects/{project_id}/config`, the server responds with:
 
 ```json
 {
@@ -355,7 +355,7 @@ A B2B customer whose own customers each get their own hostname (`customer-a.auth
 
 ## Proxy endpoints (scaffolded on demand)
 
-The customer's app serves the OIDC and discovery endpoints on its own origin. These routes are **not scaffolded at `npx @zitadel/setup` time** — the initial scaffold is a passkey-only login component on `/login`, which does not need the OIDC routes to exist.
+The customer's app serves the OIDC and discovery endpoints on its own origin. These routes are **not scaffolded at `npx zitadel setup` time** — the initial scaffold is a passkey-only login component on `/login`, which does not need the OIDC routes to exist.
 
 Scaffolding is triggered on either of two signals, both detected by `npx zitadel apply`:
 
@@ -408,7 +408,7 @@ The repo wins. On the next `npx zitadel apply`, dashboard edits that diverge fro
 
 ## Preview deploys
 
-Preview deploys require claim. The **preview secret** is minted at project creation and stored in `.zitadel/secret`, but `zitadel deploy connect --environment preview` refuses to upload it to the deploy platform until the project is claimed. The preview secret is origin-scoped to the patterns declared at mint time (`["*.vercel.app"]` and similar). Full specification is in [Project Secret](secret.md#preview-secret-handoff).
+Preview deploys require claim. The **preview secret** is minted at project creation and stored in `.zitadel/secret`, but preview config is rejected until the project is claimed. Future deploy-platform handoff will follow the same rule before uploading the origin-scoped secret. The preview secret is origin-scoped to the patterns declared at mint time (`["*.vercel.app"]` and similar). Full specification is in [Project Secret](secret.md#preview-secret-handoff).
 
 On preview or production deployment, the CLI/SDK refuses to proceed while the project is unclaimed and prints:
 

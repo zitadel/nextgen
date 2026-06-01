@@ -1,21 +1,14 @@
 /**
  * MSW handlers for the Zitadel platform API used by the CLI.
  *
- * Covers (in sync with `api/openapi/openapi-spec.yaml` on main):
- *   - POST   /projects
- *   - GET    /projects/:id
- *   - PATCH  /projects/:id/config
- *   - POST   /projects/:id/claim/init
- *   - POST   /projects/:id/claim/complete
- *   - GET    /projects/:id/claim/status
- *   - POST   /schemas
- *   - GET    /schemas/:id
- *   - DELETE /schemas/:id           (CLI uses; spec-gap follow-up issue filed)
- *   - POST   /flow_definitions      (returns flow-definition-detail-response)
- *   - GET    /flow_definitions      (list)
- *   - GET    /flow_definitions/:id
- *   - PATCH  /flow_definitions/:id  (returns 200 + flow-definition-detail-response)
- *   - DELETE /flow_definitions/:id  (returns 204)
+ * Every mutating endpoint validates its request (path params, query
+ * params, body) against the generated Zod schemas from
+ * `@zitadel-nextgen/api/generated/endpoints/zitadelNextGen.zod` — the
+ * same source of truth the real server's OpenAPI spec generates. Every
+ * read endpoint validates its response on the way out, so the mock
+ * cannot lie about its own outputs. Wire-shape drift in either
+ * direction fails fast in `vitest run` instead of surfacing only
+ * against a live Zitadel.
  *
  * Usage (Node / vitest):
  *
@@ -43,6 +36,38 @@ import type {
   ListFlowDefinitions200,
   UpdateFlowDefinition200,
 } from "@zitadel-nextgen/api/generated/model";
+import {
+  ApplyProjectConfigBody,
+  ApplyProjectConfigParams,
+  ApplyProjectConfigQueryParams,
+  ApplyProjectConfigResponse,
+  CompleteProjectClaimBody,
+  CompleteProjectClaimParams,
+  CompleteProjectClaimResponse,
+  CreateFlowDefinitionBody,
+  CreateProjectBody,
+  CreateProjectHeader,
+  CreateSchemaBody,
+  CreateSchemaQueryParams,
+  DeleteFlowDefinitionParams,
+  GetFlowDefinitionParams,
+  GetFlowDefinitionResponse,
+  GetProjectClaimStatusParams,
+  GetProjectClaimStatusQueryParams,
+  GetProjectClaimStatusResponse,
+  GetProjectParams,
+  GetProjectResponse,
+  GetSchemaByIdParams,
+  GetSchemaByIdQueryParams,
+  GetSchemaByIdResponse,
+  InitProjectClaimBody,
+  InitProjectClaimParams,
+  ListFlowDefinitionsQueryParams,
+  ListFlowDefinitionsResponse,
+  UpdateFlowDefinitionBody,
+  UpdateFlowDefinitionParams,
+  UpdateFlowDefinitionResponse,
+} from "@zitadel-nextgen/api/generated/endpoints/zitadelNextGen.zod";
 import { http, HttpResponse } from "msw";
 
 function shortId(): string {
@@ -56,8 +81,7 @@ function nowIso(): string {
 /**
  * Spec-defined error envelope. Matches `api/openapi/components/error-details.yaml`
  * and the structural shape of every per-endpoint `*Default`/`*4xx` error type
- * orval emits. Exported so callers can type their own error-payload variables
- * (e.g. `server.ts` uses this for the `/sessions/exchange` JSON-parse 400).
+ * orval emits.
  */
 export type ErrorBody = {
   code: string;
@@ -65,10 +89,6 @@ export type ErrorBody = {
   details?: Record<string, unknown>;
 };
 
-/**
- * Build an error body matching `api/openapi/components/error-details.yaml`:
- * `{ code, message, details? }`. Use everywhere we return a non-2xx status.
- */
 export function errorBody(
   code: string,
   message: string,
@@ -77,12 +97,6 @@ export function errorBody(
   return details === undefined ? { code, message } : { code, message, details };
 }
 
-/**
- * Safely read a JSON request body. Returns the parsed object on success,
- * `null` on parse failure or non-object payload. Handlers map `null` to a
- * 400 with `errorBody("invalid_json", ...)` so malformed requests never
- * surface as an opaque 500 from inside the runtime.
- */
 async function readJson(request: Request): Promise<Record<string, unknown> | null> {
   try {
     const parsed = (await request.json()) as unknown;
@@ -96,6 +110,44 @@ async function readJson(request: Request): Promise<Record<string, unknown> | nul
 }
 
 const INVALID_JSON = errorBody("invalid_json", "request body must be valid JSON");
+
+/**
+ * Run `safeParse` against the generated Zod and return either the
+ * parsed (and defaulted) value or a 400 `HttpResponse` carrying the
+ * Zod issue list. The discriminant key (`ok`) lets the caller short-
+ * circuit cleanly. One pattern, used uniformly for path params, query
+ * params, request bodies, and responses-on-the-way-out.
+ */
+type SafeParseSchema<T> = {
+  safeParse(value: unknown):
+    | { success: true; data: T }
+    | { success: false; error: { issues: unknown } };
+};
+
+function parse<T>(
+  schema: SafeParseSchema<T>,
+  value: unknown,
+  code: string,
+): { ok: true; data: T } | { ok: false; response: HttpResponse<ErrorBody> } {
+  const result = schema.safeParse(value);
+  if (result.success) {
+    return { ok: true, data: result.data };
+  }
+  return {
+    ok: false,
+    response: HttpResponse.json(
+      errorBody(code, "request does not conform to spec", {
+        issues: result.error.issues,
+      }),
+      { status: 400 },
+    ),
+  };
+}
+
+/** Build a query-string record msw can hand to the generated `QueryParams` zod. */
+function queryRecord(request: Request): Record<string, string> {
+  return Object.fromEntries(new URL(request.url).searchParams);
+}
 
 /**
  * Server-side record for a project. Strict superset of the spec response
@@ -167,13 +219,6 @@ const DEFAULT_SCHEMA_URI =
 /**
  * Build a `flow-definition-detail-response` envelope around a stored body, as
  * specified by `api/openapi/components/flows/flow-definition-detail-response.yaml`.
- *
- * The wrapper fields (`id`, `project_id`, `schema_uri`, `status`, `created_at`,
- * `updated_at`) are owned by the mock and match the spec. The flow-definition
- * body is whatever the caller POSTed — the mock stores it verbatim and trusts
- * it to be a valid `flow-definition.yaml`. The `as unknown as` cast at the
- * boundary acknowledges that trust: the mock doesn't re-validate the body,
- * but the wrapper fields ARE typecheck-enforced.
  */
 function flowDetailResponse(r: FlowDefinitionRecord): GetFlowDefinition200 {
   return {
@@ -239,13 +284,26 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 export function setupPlatformHandlers() {
   return [
     http.post("*/projects", async ({ request }) => {
+      const header = parse(
+        CreateProjectHeader,
+        { "Idempotency-Key": request.headers.get("Idempotency-Key") ?? undefined },
+        "invalid_header",
+      );
+      if (!header.ok) {
+        return header.response;
+      }
+
       const raw = await readJson(request);
       if (raw === null) {
         return HttpResponse.json(INVALID_JSON, { status: 400 });
       }
-      const body = raw as { preview_origins?: string[] };
-      const requestHash = JSON.stringify({ preview_origins: body.preview_origins ?? [] });
-      const idempotencyKey = request.headers.get("Idempotency-Key");
+      const body = parse(CreateProjectBody, raw, "invalid_request");
+      if (!body.ok) {
+        return body.response;
+      }
+
+      const requestHash = JSON.stringify(body.data);
+      const idempotencyKey = header.data["Idempotency-Key"];
       if (idempotencyKey) {
         const existing = store.idempotency.get(idempotencyKey);
         if (existing) {
@@ -264,13 +322,14 @@ export function setupPlatformHandlers() {
           }
         }
       }
+
       const id = `proj_${shortId()}`;
       const createdAt = nowIso();
       const project: ProjectRecord = {
         project_id: id,
         project_secret: `sk_proj_${id.replaceAll("_", "")}_full`,
         preview_secret: `sk_proj_${id.replaceAll("_", "")}_preview`,
-        preview_origins: body.preview_origins ?? [],
+        preview_origins: body.data.preview_origins ?? [],
         lifecycle: "unclaimed",
         claim_required_for: ["preview", "production"],
         created_at: createdAt,
@@ -283,60 +342,79 @@ export function setupPlatformHandlers() {
       return HttpResponse.json(createProjectResponse(project), { status: 201 });
     }),
 
-    http.get("*/projects/:id", ({ params, request }) => {
-      const project = store.projects.get(params.id as string);
+    http.get("*/projects/:project_id", ({ params, request }) => {
+      const path = parse(GetProjectParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+
+      const project = store.projects.get(path.data.project_id);
       if (!project) {
         return HttpResponse.json(errorBody("proj.not_found", "resource not found"), { status: 404 });
       }
       const authError = projectSecretAuthError(request, project);
       if (authError) return authError;
-      return HttpResponse.json(getProjectResponse(project));
+
+      const responseBody = getProjectResponse(project);
+      const out = parse(GetProjectResponse, responseBody, "mock_response_invalid");
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data);
     }),
 
-    http.patch("*/projects/:id/config", ({ params, request }) => {
-      const project = store.projects.get(params.id as string);
+    http.patch("*/projects/:project_id/config", async ({ params, request }) => {
+      const path = parse(ApplyProjectConfigParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const query = parse(ApplyProjectConfigQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+
+      const project = store.projects.get(path.data.project_id);
       if (!project) {
         return HttpResponse.json(errorBody("proj.not_found", "resource not found"), { status: 404 });
       }
       const authError = projectSecretAuthError(request, project);
       if (authError) return authError;
-      const environment = new URL(request.url).searchParams.get("environment");
-      if (
-        environment !== "development" &&
-        environment !== "preview" &&
-        environment !== "production"
-      ) {
-        return HttpResponse.json(
-          errorBody(
-            "invalid_request",
-            "environment query parameter is required and must be one of development, preview, production",
-          ),
-          { status: 400 },
-        );
+
+      const raw = await readJson(request);
+      const body = parse(ApplyProjectConfigBody, raw ?? {}, "invalid_request");
+      if (!body.ok) {
+        return body.response;
       }
-      if (
-        (environment === "preview" || environment === "production") &&
-        project.lifecycle !== "claimed"
-      ) {
+
+      if (query.data.environment !== "development" && project.lifecycle !== "claimed") {
         return HttpResponse.json(
           errorBody("proj.claim_required", "project must be claimed before this operation", {
             project_id: project.project_id,
-            environment,
+            environment: query.data.environment,
           }),
           { status: 409 },
         );
       }
       const responseBody: ApplyProjectConfig200 = {
         project_id: project.project_id,
-        environment: environment as ApplyProjectConfig200["environment"],
+        environment: query.data.environment,
         lifecycle: project.lifecycle,
         applied_at: nowIso(),
       };
-      return HttpResponse.json(responseBody);
+      const out = parse(ApplyProjectConfigResponse, responseBody, "mock_response_invalid");
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data);
     }),
 
-    http.post("*/projects/:id/claim/init", async ({ params, request }) => {
-      const project = store.projects.get(params.id as string);
+    http.post("*/projects/:project_id/claim/init", async ({ params, request }) => {
+      const path = parse(InitProjectClaimParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+
+      const project = store.projects.get(path.data.project_id);
       if (!project) {
         return HttpResponse.json(errorBody("proj.not_found", "resource not found"), { status: 404 });
       }
@@ -347,6 +425,13 @@ export function setupPlatformHandlers() {
           status: 409,
         });
       }
+
+      const raw = (await readJson(request)) ?? {};
+      const body = parse(InitProjectClaimBody, raw, "invalid_request");
+      if (!body.ok) {
+        return body.response;
+      }
+
       const challengeId = `claim_${shortId()}`;
       const expiresAt = new Date(Date.now() + 10 * 60_000).toISOString();
       const claimUrl = `https://zitadel.cloud/claim?project_id=${encodeURIComponent(project.project_id)}&challenge_id=${encodeURIComponent(challengeId)}`;
@@ -370,18 +455,26 @@ export function setupPlatformHandlers() {
       return HttpResponse.json(responseBody, { status: 201 });
     }),
 
-    http.post("*/projects/:id/claim/complete", async ({ params, request }) => {
-      const project = store.projects.get(params.id as string);
+    http.post("*/projects/:project_id/claim/complete", async ({ params, request }) => {
+      const path = parse(CompleteProjectClaimParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+
+      const project = store.projects.get(path.data.project_id);
       if (!project) {
         return HttpResponse.json(errorBody("proj.not_found", "resource not found"), { status: 404 });
       }
-      const body = await readJson(request);
-      if (body === null || typeof body.challenge_id !== "string") {
-        return HttpResponse.json(errorBody("invalid_json", "challenge_id is required"), {
-          status: 400,
-        });
+      const raw = await readJson(request);
+      if (raw === null) {
+        return HttpResponse.json(INVALID_JSON, { status: 400 });
       }
-      const challenge = store.claimChallenges.get(body.challenge_id);
+      const body = parse(CompleteProjectClaimBody, raw, "invalid_request");
+      if (!body.ok) {
+        return body.response;
+      }
+
+      const challenge = store.claimChallenges.get(body.data.challenge_id);
       if (!challenge || challenge.project_id !== project.project_id) {
         return HttpResponse.json(errorBody("proj.claim_not_found", "claim challenge not found"), {
           status: 404,
@@ -397,7 +490,8 @@ export function setupPlatformHandlers() {
           status: 410,
         });
       }
-      const teamChoice = isRecord(body.team_choice) ? body.team_choice : {};
+
+      const teamChoice = isRecord(body.data.team_choice) ? body.data.team_choice : {};
       const claimedAt = nowIso();
       const teamId =
         typeof teamChoice.team_id === "string" ? teamChoice.team_id : `team_${shortId()}`;
@@ -412,6 +506,7 @@ export function setupPlatformHandlers() {
       challenge.status = "completed";
       challenge.claimed_at = claimedAt;
       challenge.rotated_project_secret = rotatedProjectSecret;
+
       const responseBody: CompleteProjectClaim200 = {
         project_id: project.project_id,
         lifecycle: "claimed",
@@ -419,22 +514,32 @@ export function setupPlatformHandlers() {
         tier: "free",
         claimed_at: claimedAt,
       };
-      return HttpResponse.json(responseBody);
+      const out = parse(CompleteProjectClaimResponse, responseBody, "mock_response_invalid");
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data);
     }),
 
-    http.get("*/projects/:id/claim/status", ({ params, request }) => {
-      const project = store.projects.get(params.id as string);
+    http.get("*/projects/:project_id/claim/status", ({ params, request }) => {
+      const path = parse(GetProjectClaimStatusParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const query = parse(
+        GetProjectClaimStatusQueryParams,
+        queryRecord(request),
+        "invalid_query",
+      );
+      if (!query.ok) {
+        return query.response;
+      }
+
+      const project = store.projects.get(path.data.project_id);
       if (!project) {
         return HttpResponse.json(errorBody("proj.not_found", "resource not found"), { status: 404 });
       }
-      const challengeId = new URL(request.url).searchParams.get("challenge_id");
-      if (!challengeId) {
-        return HttpResponse.json(
-          errorBody("invalid_request", "challenge_id query parameter is required"),
-          { status: 400 },
-        );
-      }
-      const challenge = store.claimChallenges.get(challengeId);
+      const challenge = store.claimChallenges.get(query.data.challenge_id);
       if (!challenge || challenge.project_id !== project.project_id) {
         return HttpResponse.json(errorBody("proj.claim_not_found", "claim challenge not found"), {
           status: 404,
@@ -450,6 +555,7 @@ export function setupPlatformHandlers() {
           status: 410,
         });
       }
+
       const responseBody: GetProjectClaimStatus200 = {
         project_id: challenge.project_id,
         challenge_id: challenge.challenge_id,
@@ -467,40 +573,67 @@ export function setupPlatformHandlers() {
         responseBody.rotated_project_secret = challenge.rotated_project_secret;
         challenge.rotated_secret_consumed = true;
       }
-      return HttpResponse.json(responseBody);
+
+      const out = parse(GetProjectClaimStatusResponse, responseBody, "mock_response_invalid");
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data);
     }),
 
     http.post("*/schemas", async ({ request }) => {
-      const body = await readJson(request);
-      if (body === null) {
+      const query = parse(CreateSchemaQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+
+      const raw = await readJson(request);
+      if (raw === null) {
         return HttpResponse.json(INVALID_JSON, { status: 400 });
       }
-      const kind = body.kind;
-      if (kind !== "user-schema" && kind !== "schema-url") {
-        return HttpResponse.json(
-          errorBody(
-            "invalid_schema",
-            'schema body must include kind: "user-schema" or "schema-url"',
-          ),
-          { status: 400 },
-        );
+      const body = parse(CreateSchemaBody, raw, "invalid_schema");
+      if (!body.ok) {
+        return body.response;
       }
+
       const id = `schema_${shortId()}`;
-      store.schemas.set(id, body as unknown as GetSchemaById200);
+      store.schemas.set(id, body.data as unknown as GetSchemaById200);
       const responseBody: CreateSchema201 = { id };
       return HttpResponse.json(responseBody, { status: 201 });
     }),
 
-    http.get("*/schemas/:id", ({ params }) => {
-      const schema = store.schemas.get(params.id as string);
+    http.get("*/schemas/:id", ({ params, request }) => {
+      const path = parse(GetSchemaByIdParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const query = parse(GetSchemaByIdQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+
+      const schema = store.schemas.get(path.data.id);
       if (!schema) {
         return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
       }
-      return HttpResponse.json(schema);
+      const out = parse(GetSchemaByIdResponse, schema, "mock_response_invalid");
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data);
     }),
 
-    http.delete("*/schemas/:id", ({ params }) => {
-      const existed = store.schemas.delete(params.id as string);
+    http.delete("*/schemas/:id", ({ params, request }) => {
+      const path = parse(GetSchemaByIdParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const query = parse(GetSchemaByIdQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+
+      const existed = store.schemas.delete(path.data.id);
       if (!existed) {
         return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
       }
@@ -512,74 +645,102 @@ export function setupPlatformHandlers() {
       if (raw === null) {
         return HttpResponse.json(INVALID_JSON, { status: 400 });
       }
-      const hasEnvelope =
-        typeof raw.project_id === "string" &&
-        typeof raw.flow_definition === "object" &&
-        raw.flow_definition !== null;
-      if (!hasEnvelope) {
-        return HttpResponse.json(
-          errorBody(
-            "invalid_request",
-            "POST /flow_definitions requires {project_id, flow_definition, schema_uri?} envelope",
-          ),
-          { status: 400 },
-        );
+      const body = parse(CreateFlowDefinitionBody, raw, "invalid_request");
+      if (!body.ok) {
+        return body.response;
       }
-
-      const projectId = raw.project_id as string;
-      const schemaUri = typeof raw.schema_uri === "string" ? raw.schema_uri : DEFAULT_SCHEMA_URI;
-      const body = raw.flow_definition as Record<string, unknown>;
 
       const id = `flow_${shortId()}`;
       const now = nowIso();
       const record: FlowDefinitionRecord = {
         id,
-        projectId,
-        schemaUri,
+        projectId: body.data.project_id,
+        schemaUri: body.data.schema_uri ?? DEFAULT_SCHEMA_URI,
         status: "active",
         createdAt: now,
         updatedAt: now,
-        body,
+        body: body.data.flow_definition as unknown as Record<string, unknown>,
       };
       store.flowDefinitions.set(id, record);
       const responseBody: CreateFlowDefinition201 = flowDetailResponse(record);
       return HttpResponse.json(responseBody, { status: 201 });
     }),
 
-    http.get("*/flow_definitions", () => {
+    http.get("*/flow_definitions", ({ request }) => {
+      const query = parse(
+        ListFlowDefinitionsQueryParams,
+        queryRecord(request),
+        "invalid_query",
+      );
+      if (!query.ok) {
+        return query.response;
+      }
+
       const responseBody: ListFlowDefinitions200 = {
         flow_definitions: [...store.flowDefinitions.values()].map(flowDetailResponse),
         next_page_token: null,
       };
-      return HttpResponse.json(responseBody);
+      const out = parse(ListFlowDefinitionsResponse, responseBody, "mock_response_invalid");
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data);
     }),
 
     http.get("*/flow_definitions/:id", ({ params }) => {
-      const record = store.flowDefinitions.get(params.id as string);
+      const path = parse(GetFlowDefinitionParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+
+      const record = store.flowDefinitions.get(path.data.id);
       if (!record) {
         return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
       }
       const responseBody: GetFlowDefinition200 = flowDetailResponse(record);
-      return HttpResponse.json(responseBody);
+      const out = parse(GetFlowDefinitionResponse, responseBody, "mock_response_invalid");
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data);
     }),
 
     http.patch("*/flow_definitions/:id", async ({ params, request }) => {
-      const record = store.flowDefinitions.get(params.id as string);
+      const path = parse(UpdateFlowDefinitionParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+
+      const record = store.flowDefinitions.get(path.data.id);
       if (!record) {
         return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
       }
-      const patch = await readJson(request);
-      if (patch === null) {
+      const raw = await readJson(request);
+      if (raw === null) {
         return HttpResponse.json(INVALID_JSON, { status: 400 });
       }
-      record.body = { ...record.body, ...patch };
+      const body = parse(UpdateFlowDefinitionBody, raw, "invalid_request");
+      if (!body.ok) {
+        return body.response;
+      }
+
+      record.body = { ...record.body, ...(body.data as unknown as Record<string, unknown>) };
       record.updatedAt = nowIso();
       const responseBody: UpdateFlowDefinition200 = flowDetailResponse(record);
-      return HttpResponse.json(responseBody, { status: 200 });
+      const out = parse(UpdateFlowDefinitionResponse, responseBody, "mock_response_invalid");
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data, { status: 200 });
     }),
 
     http.delete("*/flow_definitions/:id", ({ params }) => {
-      const existed = store.flowDefinitions.delete(params.id as string);
+      const path = parse(DeleteFlowDefinitionParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+
+      const existed = store.flowDefinitions.delete(path.data.id);
       if (!existed) {
         return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
       }

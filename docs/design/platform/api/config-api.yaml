@@ -8,7 +8,7 @@ info:
     The developer's `zitadel.json` (and companion files in `.zitadel/`) are
     the source of truth for flow definitions, IDP configs, user schemas,
     branding, policies, and per-environment declared issuers. `npx zitadel
-    push` uploads the server-behavior subset; branding markup, ejected
+    apply` uploads the server-behavior subset; branding markup, ejected
     component source, and translation bundles are referenced by path and
     remain client-side (Level 1: SSR + in-app). Deferred levels will
     extend the upload surface — see docs/design/platform/overview.md.
@@ -39,16 +39,16 @@ paths:
 
   # ── Config upload / retrieval ─────────────────────────────────
 
-  /projects/{projectId}/config:
+  /projects/{project_id}/config:
     parameters:
-      - $ref: "#/components/parameters/projectId"
+      - $ref: "#/components/parameters/project_id"
       - $ref: "#/components/parameters/environment"
 
     patch:
       operationId: uploadConfig
       summary: Upload resolved configuration for an environment
       description: |
-        Called by `npx zitadel push`. Uploads the server-behavior subset of
+        Called by `npx zitadel apply`. Uploads the server-behavior subset of
         the resolved configuration for the specified environment. Content
         is hashed server-side; if the hash matches the currently active
         config, the response is a no-op 200 (idempotent).
@@ -90,7 +90,7 @@ paths:
         Returns the active config blob and hash for the specified
         environment. Used by drift detection (the SDK compares this hash
         to the `config_hash_<env>` entry cached locally from the last
-        push).
+        apply).
       tags: [Config]
       security:
         - secretAuth: []
@@ -106,9 +106,9 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
-  /projects/{projectId}/config/versions:
+  /projects/{project_id}/config/versions:
     parameters:
-      - $ref: "#/components/parameters/projectId"
+      - $ref: "#/components/parameters/project_id"
       - $ref: "#/components/parameters/environment"
     get:
       operationId: listConfigVersions
@@ -140,19 +140,19 @@ paths:
 
   # ── Drift detection ───────────────────────────────────────────
 
-  /projects/{projectId}/config/drift:
+  /projects/{project_id}/config/drift:
     parameters:
-      - $ref: "#/components/parameters/projectId"
+      - $ref: "#/components/parameters/project_id"
       - $ref: "#/components/parameters/environment"
     get:
       operationId: getConfigDrift
-      summary: Report whether the dashboard has edited config since the last push
+      summary: Report whether the dashboard has edited config since the last apply
       description: |
         Returns a minimal drift summary. The repo always wins; this
         endpoint exists so the dashboard UI can show a timestamp of the
-        last dashboard edit and the last `npx zitadel push`, for
+        last dashboard edit and the last `npx zitadel apply`, for
         informational display only. No diff, no merge, no prompt — the
-        next push overwrites dashboard edits silently.
+        next apply overwrites dashboard edits silently.
       tags: [Drift]
       security:
         - secretAuth: []
@@ -167,8 +167,8 @@ paths:
 components:
 
   parameters:
-    projectId:
-      name: projectId
+    project_id:
+      name: project_id
       in: path
       required: true
       description: Project identifier (e.g. `river-8421`).
@@ -307,11 +307,11 @@ components:
           format: date-time
         source:
           type: string
-          enum: [sdk_push, dashboard_edit]
+          enum: [sdk_apply, dashboard_edit]
           description: |
             Which surface applied this version. Dashboard edits produce
             entries with `source: dashboard_edit`; they are overwritten
-            silently on the next `sdk_push`.
+            silently on the next `sdk_apply`.
 
     ConfigVersionList:
       type: object
@@ -337,23 +337,23 @@ components:
           format: date-time
         source:
           type: string
-          enum: [sdk_push, dashboard_edit]
+          enum: [sdk_apply, dashboard_edit]
         author:
           type: string
           description: |
             For `dashboard_edit` entries: the user ID of the editor. For
-            `sdk_push` entries: the project secret identifier used.
+            `sdk_apply` entries: the project secret identifier used.
 
     ConfigDriftResponse:
       type: object
-      required: [push_wins]
+      required: [apply_wins]
       properties:
-        push_wins:
+        apply_wins:
           type: boolean
           description: |
             Always `true` in the MVP. Documents the behavior: the next
-            `npx zitadel push` overwrites dashboard edits silently.
-        last_push_at:
+            `npx zitadel apply` overwrites dashboard edits silently.
+        last_apply_at:
           type: string
           format: date-time
         last_dashboard_edit_at:

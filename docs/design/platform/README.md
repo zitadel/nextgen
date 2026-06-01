@@ -34,13 +34,13 @@ The canonical vocabulary for all design docs lives in [`../glossary.md`](../glos
 - **Project** — the top-level tenant/deployment; what used to be called an "instance" in older design notes. Identified by a stable `project_id` minted by the server at `POST /projects` (e.g. `river-8421`), drawn from a curated dictionary so it is also human-pronounceable. Vocabulary:
   - `project_id` — the canonical identifier used in API paths, response bodies, and dashboard URLs.
   - **slug** — informal synonym for `project_id`, used when emphasizing its human-friendly dictionary shape.
-  - `"project"` — the JSON field name in `zitadel.json` and `.zitadel/secret` that holds the `project_id` value.
+  - `"project"` — the JSON field name in `zitadel.json`; `.zitadel/secret` stores the same value as `project_id`.
 
   The `project_id` is never a user-facing origin; user-facing URLs are the customer's declared issuers per environment.
 - **Team** — a tenant-grouping inside any project. A team in the **platform project** is the entity a customer project is attached to at claim (holds billing, user memberships, project ownership). A team in a **customer project** is a B2B end-customer tenant. Same resource, different project context. See [`../glossary.md`](../glossary.md).
 - **Project secret** — the server-issued bearer token authenticating SDK/CLI calls against a project. Format `sk_proj_<base62>`. Stored in `.zitadel/secret`. Rotated at claim. Full taxonomy in [`../api/credentials.md`](../api/credentials.md).
-- **Preview secret** — a companion `sk_proj_<base62>` scoped to origin patterns declared at project creation (`*.vercel.app`, etc.). Uploaded to the deploy platform's env store by the setup CLI.
-- **Claim** — the transaction that attaches a **Team** (and an accountable human) to a project. Free. Forced at first production deploy.
+- **Preview secret** — a companion `sk_proj_<base62>` scoped to origin patterns declared at project creation (`*.vercel.app`, etc.). Preserved across claim and reserved for preview-runtime handoff.
+- **Claim** — the transaction that attaches a **Team** (and an accountable human) to a project. Free. Forced before preview or production config is accepted.
 - **Issuer** — the customer-owned origin on which the auth UI and OIDC endpoints run, declared per environment in `zitadel.json`. Serves as security allowlist, token `iss` claim, and magic-link hostname context.
 - **Renderer** — the client-side surface that turns server-sent Flow v1 nodes into HTML. One of `default` (published auth web component), `template` (LiquidJS), or `ejected` (customer's own Lit components).
 
@@ -78,12 +78,12 @@ graph TD
 | What are the resources of the system? | **API / MCP** | Users, sessions, tokens, grants, audit — never in config. |
 | What turns an anonymous project into an owned one? | **Claim** | Single atomic transaction; human-authenticated; agents cannot claim. |
 | Which environment (development / preview / production) is the SDK running in? | **SDK runtime detection** | Chooses the right `environments` overrides from `zitadel.json`. |
-| How does a preview deploy work? | **Preview Secret + Claim** | Minted at project creation but handed to the deploy platform only after claim. Origin-scoped. |
+| How does a preview deploy work? | **Preview Secret + Claim** | Minted at project creation but usable for sharing boundaries only after claim. Deploy-platform handoff is future work. |
 | What happens if the dashboard edits something the repo also defines? | **Silent repo-wins** | The next `npx zitadel apply` overwrites dashboard state. Same model as Vercel source-control-wins. |
 
 ## Design principles
 
-1. **Create before sign up.** A developer or an agent goes from `npx @zitadel/setup` to a working passkey flow in under ninety seconds on a laptop. No account, no tenant, no email verification, no plan selection. Everything that traditionally gates creation is either deleted or deferred until it pays for itself.
+1. **Create before sign up.** A developer or an agent goes from `npx zitadel setup` to a working passkey flow in under ninety seconds on a laptop. No account, no tenant, no email verification, no plan selection. Everything that traditionally gates creation is either deleted or deferred until it pays for itself.
 
 2. **Config lives with code; resources live on the server.** Flow definitions, IDP configs, user schemas, branding, policies, declared issuers — all in `zitadel.json` and `.zitadel/` directories, source-controlled. Users, sessions, tokens, audit events — all on the server, managed via API and MCP. The boundary is explicit and documented.
 
@@ -97,7 +97,7 @@ graph TD
 
 7. **Agents configure; humans claim.** Agents are first-class consumers of the setup CLI and the configuration surface. They can build and modify `zitadel.json`, scaffold flows, eject components, author templates, add tracking. They cannot claim, enable paid features, or send real email. This boundary is enforced at the protocol level.
 
-8. **Preview and production require claim.** The setup CLI mints both secrets at project creation, but the preview secret is not handed to the deploy platform until a human claims the project. Local development is the only unclaimed runtime.
+8. **Preview and production require claim.** The setup CLI mints both secrets at project creation, but preview and production config is rejected until a human claims the project. Local development is the only unclaimed runtime.
 
 9. **Drift resolves silently in favor of the repo.** `npx zitadel apply` overwrites dashboard edits. No banner, no prompt. The Vercel model: the repo is the source of truth, the dashboard is a mutable view. Customers who want dashboard-only config remove `zitadel.json` from the repo.
 

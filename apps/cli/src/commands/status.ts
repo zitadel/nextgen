@@ -1,47 +1,56 @@
-import { hasZitadelSecret } from "../detect/state";
-import type { CliIO, GlobalOptions } from "../io/output";
-import { ok, skipped } from "../io/output";
-import { readZitadelConfig, readZitadelSecret } from "./shared";
+import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
+import {
+  hasZitadelSecret,
+  readDevelopmentIssuer,
+  readZitadelConfig,
+  readZitadelSecret,
+} from "../lib/project";
 
-export async function runStatus(io: CliIO, opts: GlobalOptions): Promise<void> {
-  const config = await readZitadelConfig(opts.cwd);
+/**
+ * `zitadel status` — summarize the local project state.
+ *
+ * Reads `zitadel.json` and its secret. A present config with a missing secret
+ * is treated as an "orphaned" install (returned as skipped with recovery
+ * commands) rather than an error, so status stays informational and safe to
+ * run on partial or broken setups.
+ */
+export default class Status extends BaseCommand {
+  static override description = "Summarize the local project state.";
 
-  if (!(await hasZitadelSecret(opts.cwd))) {
-    skipped(
-      io,
-      "orphaned-config",
-      opts,
-      {
-        project_id: typeof config.project === "string" ? config.project : undefined,
-        lifecycle: "orphaned-config",
-        message: "zitadel.json exists but .zitadel/secret is missing.",
+  async run(): Promise<JsonEnvelope> {
+    const { flags } = await this.parse(Status);
+    await this.toMeta(flags);
+    const { cwd, source } = this.meta;
+
+    const config = await readZitadelConfig(cwd);
+
+    if (!(await hasZitadelSecret(cwd))) {
+      return this.emit({
+        status: "skipped",
+        reason: "orphaned-config",
+        data: {
+          project_id: typeof config.project === "string" ? config.project : undefined,
+          lifecycle: "orphaned-config",
+          message: "zitadel.json exists but .zitadel/secret is missing.",
+        },
+        nextCommands: ["zitadel setup --force", "zitadel doctor --fix"],
+      });
+    }
+
+    const secret = await readZitadelSecret(cwd);
+    return this.emit({
+      status: "ok",
+      data: {
+        title: "Zitadel project detected.",
+        project: {
+          project_id: String(config.project ?? secret.project_id ?? ""),
+          lifecycle: secret.lifecycle ?? "unclaimed",
+          issuer: readDevelopmentIssuer(config),
+        },
+        server: source,
+        next_actions: ["Run `zitadel doctor`.", "Run `zitadel apply` after config changes."],
+        next_commands: ["zitadel doctor", "zitadel apply"],
       },
-      ["zitadel setup --force", "zitadel doctor --fix"],
-    );
-    return;
+    });
   }
-
-  const secret = await readZitadelSecret(opts.cwd);
-  ok(
-    io,
-    {
-      title: "Zitadel project detected.",
-      project: {
-        project_id: String(config.project ?? secret.project_id ?? ""),
-        lifecycle: secret.lifecycle ?? "unclaimed",
-        issuer:
-          isObject(config.environments) && isObject(config.environments.development)
-            ? config.environments.development.issuer
-            : undefined,
-      },
-      server: opts.source,
-      next_actions: ["Run `zitadel doctor`.", "Run `zitadel apply` after config changes."],
-      next_commands: ["zitadel doctor", "zitadel apply"],
-    },
-    opts,
-  );
-}
-
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

@@ -35,12 +35,12 @@ OIDC proxy routes (`/authorize`, `/token`, `/userinfo`, `/.well-known/*`) are no
 
 The setup CLI also prints a **scratch dashboard** URL (`https://zitadel.dev/scratch/river-8421`) — a pre-claim inspection surface where the developer can see their config, their registered users, and the dev inbox without running a local UI. See [The scratch dashboard](#the-scratch-dashboard) below.
 
-**Tuesday morning.** They push a branch to Vercel to share with a designer. `zitadel deploy connect --environment preview` refuses because the project is still unclaimed:
+**Tuesday morning.** They push a branch to Vercel to share with a designer. `zitadel apply --environment preview` refuses because the project is still unclaimed:
 
 > Preview deploys require a claimed Zitadel project.
 > Claim this project now: `npx zitadel claim`
 
-They run `npx zitadel claim`. Browser opens at `https://zitadel.cloud/claim/river-8421`, GitHub/Google/email. One click on GitHub. Dashboard loads; the project is now owned by a newly-created "Acme" team. Forty seconds. No credit card. The preview secret can now be handed to Vercel, and the designer can use the preview.
+They run `npx zitadel claim`. Browser opens at `https://zitadel.cloud/claim/river-8421`, GitHub/Google/email. One click on GitHub. Dashboard loads; the project is now owned by a newly-created "Acme" team. Forty seconds. No credit card. Preview config can now be applied, and future deploy integrations can hand the origin-scoped secret to Vercel.
 
 **Wednesday.** The developer pushes to `main` with a production `vercel.json`. Production uses the same rule: the SDK sees a production-environment signal with no claim on record and refuses to start:
 
@@ -97,7 +97,7 @@ Combinations that matter:
 | Combination | Supported? | Notes |
 |---|---|---|
 | Unclaimed × Development | Yes | Default first-run state. `.zitadel/secret` written locally. Dev inbox only. UI and OIDC routes run on `localhost:3000`. |
-| Unclaimed × Preview | No | Preview deploys are a sharing boundary and force claim before the origin-scoped secret is handed to the deploy platform. |
+| Unclaimed × Preview | No | Preview deploys are a sharing boundary and force claim before preview config or origin-scoped secret handoff. |
 | Unclaimed × Production | No | Production deploys force claim. First attempt blocks with a clear banner. |
 | Claimed × Free × Development | Yes | Typical dev loop post-claim. |
 | Claimed × Free × Preview | Yes | Preview hibernation applies after 14 days idle (deferred spec). |
