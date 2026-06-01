@@ -1,5 +1,6 @@
 //go:build postgres_integration || spanner_integration
 
+// The spanner_integration tag is included because shared repository tests run under both backend tags and call dbtest.Postgres.
 package dbtest
 
 import (

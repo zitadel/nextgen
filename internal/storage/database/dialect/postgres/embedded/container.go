@@ -55,7 +55,7 @@ func StartContainer(ctx context.Context) (database.Connector, func(), error) {
 		return nil, nil, fmt.Errorf("unable to start postgres container: %w", err)
 	}
 
-	stop := func() { _ = container.Terminate(ctx) }
+	stop := func() { _ = container.Terminate(context.Background()) }
 
 	host, err := container.Host(ctx)
 	if err != nil {

@@ -1,4 +1,3 @@
-// embedded is used for testing purposes
 package embedded
 
 import (
@@ -22,7 +21,7 @@ func init() {
 
 // StartEmbedded starts an embedded postgres v18 instance and returns a database connector and a stop function
 // the database is started on a random port and data are stored in a temporary directory
-// its used for testing purposes only
+// it is used by the zero-config default connector and embedded-postgres smoke tests.
 func StartEmbedded() (connector database.Connector, stop func(), err error) {
 	// On a cold cache the embedded-postgres library downloads the binary from
 	// Maven Central. That endpoint occasionally returns a transient non-200,
