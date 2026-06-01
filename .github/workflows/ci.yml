@@ -37,7 +37,7 @@ jobs:
           cache: true
       - name: Verify gofmt formatting
         run: |
-          unformatted="$(gofmt -l .)"
+          unformatted="$(git ls-files -z -- '*.go' | xargs -0 -r gofmt -l)"
           if [ -n "$unformatted" ]; then
             printf '%s\n' "$unformatted"
             exit 1
