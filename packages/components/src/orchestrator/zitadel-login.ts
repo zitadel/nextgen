@@ -345,12 +345,8 @@ export class ZitadelLogin extends LitElement {
     if (issues.length > 0) {
       console.warn("[zitadel-login] branding payload has issues:", issues);
     }
-    // Seed formValues with the step's defaults so every declared field
-    // has an entry — submit() only forwards keys present in formValues,
-    // so a missing entry would drop the field from the wire and let the
-    // backend skip required-checks and challenge dispatch. Existing
-    // entries (the user's typed input on this step, plus carry-over
-    // from previous steps like email-for-greeting) win over defaults.
+    // Defaults seed every declared field; existing entries (typed input,
+    // carry-over from prior steps) win on conflict.
     this.formValues = { ...collectInitialValues(wire.step), ...this.formValues };
     void this.maybeCompleteFlow(wire);
   }
