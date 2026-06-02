@@ -4,7 +4,12 @@ import (
 	"context"
 	"time"
 
+	"github.com/zitadel/nextgen/internal/secrets"
 	"github.com/zitadel/nextgen/internal/storage/database"
+)
+
+const (
+	PrefixProject ResourcePrefix = "proj"
 )
 
 // Project is a minimal representation of the object defined [here](https://github.com/zitadel/nextgen/blob/main/docs/design/api/resource-map.md#projects)
@@ -25,6 +30,32 @@ type Project struct {
 	PreviewOrigins []string
 }
 
+func NewProject(previewOrigins []string, secretGenerator secrets.Generator) (*Project, error) {
+	id, err := newID(PrefixProject)
+	if err != nil {
+		return nil, ErrInternal(err).WithMessage("failed to create project id")
+	}
+	projectSecret, err := secretGenerator.New()
+	if err != nil {
+		return nil, ErrInternal(err).WithMessage("failed to generate project secret")
+	}
+	previewSecret, err := secretGenerator.New()
+	if err != nil {
+		return nil, ErrInternal(err).WithMessage("failed to generate preview secret")
+	}
+
+	if previewOrigins == nil {
+		previewOrigins = []string{}
+	}
+
+	return &Project{
+		ID:             id,
+		ProjectSecret:  projectSecret,
+		PreviewSecret:  previewSecret,
+		PreviewOrigins: previewOrigins,
+	}, nil
+}
+
 //go:generate go tool mockgen -typed -package domainmock -destination ./mock/project.mock.go . ProjectRepository
 
 // ProjectRepository provides storage operations for [Project]s.
@@ -33,7 +64,7 @@ type ProjectRepository interface {
 	// [Project.UpdatedAt] to the current time; callers should not pre-populate
 	// those fields. Callers MUST pre-populate [Project.ProjectSecret],
 	// [Project.PreviewSecret], and [Project.PreviewOrigins].
-	// Returns an [database.IntegrityViolationError] (specifically [database.UniqueError])
+	// Returns a [database.IntegrityViolationError] (specifically [database.UniqueError])
 	// if a project with the same ID already exists.
 	Create(ctx context.Context, client database.QueryExecutor, project *Project) error
 
