@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/domain/idgen"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database/repository"
 )
@@ -26,7 +25,11 @@ func (h *Harness) EnsureProjectService(t *testing.T) service.ProjectService {
 		h.ProjectService = service.NewProjectService(
 			h.EnsureDBPool(t),
 			h.EnsureProjectRepo(t),
-			idgen.NewULID(),
+			h.EnsureSchemaRepo(t),
+			h.EnsureFlowDefinitionRepo(t),
+			h.EnsureSecretGenerator(t),
+			BuiltinSchemaBaseURL,
+			h.EnsureSchemaValidator(t),
 		)
 	}
 	return h.ProjectService
