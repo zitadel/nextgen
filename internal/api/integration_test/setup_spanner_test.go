@@ -8,6 +8,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/database/dbtest"
 )
@@ -27,6 +28,7 @@ func runTests(m *testing.M) int {
 		return 1
 	}
 	defer stop()
+	helpers.Connector = connector
 
 	pool, err := connector.Connect(ctx)
 	if err != nil {

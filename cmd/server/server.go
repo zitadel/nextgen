@@ -152,7 +152,7 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 		nil,
 		flowDefinitionRepo,
 	)
-	userService := service.NewUserService(pool, userRepo, crypter)
+	userService := service.NewUserService(pool, userRepo, schemaRepo, crypter)
 	teamService := service.NewTeamService(pool, teamRepo)
 
 	// ── Flow engine ──────────────────

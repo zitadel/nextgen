@@ -14,6 +14,7 @@ func (h *Harness) EnsureUserService(t *testing.T) *service.UserService {
 		h.UserService = service.NewUserService(
 			h.EnsureDBPool(t),
 			h.EnsureUserRepo(t),
+			h.EnsureSchemaRepo(t),
 			h.EnsureDecrypter(t),
 		)
 	}

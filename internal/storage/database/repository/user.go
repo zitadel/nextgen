@@ -34,6 +34,7 @@ var (
 type UserRepository struct{}
 
 func NewUserRepository() *UserRepository {
+	// TODO: add spanner integration
 	return &UserRepository{}
 }
 
@@ -223,8 +224,12 @@ func userHydrationExpressions(rowQualifier, attrKeysPlaceholder, authPlaceholder
     CASE WHEN ` + authPlaceholder + ` THEN EXISTS(SELECT 1 FROM zitadel_nextgen.user_passkeys p WHERE p.project_id = ` + rowQualifier + `.project_id AND p.user_id = ` + rowQualifier + `.id) ELSE FALSE END AS has_pk`
 }
 
-func (r *UserRepository) GetByID(ctx context.Context, client database.QueryExecutor, projectID string, userID string) (*domain.User, error) {
-	return r.Get(ctx, client, database.WithCondition(r.PrimaryKeyCondition(projectID, userID)))
+func (r *UserRepository) GetByID(ctx context.Context, client database.QueryExecutor, projectID string, teamID *string, userID string) (*domain.User, error) {
+	condition := r.PrimaryKeyCondition(projectID, userID)
+	if teamID != nil {
+		condition = database.And(condition, r.TeamIDCondition(*teamID))
+	}
+	return r.Get(ctx, client, database.WithCondition(condition))
 }
 
 func (r *UserRepository) Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*domain.User, error) {

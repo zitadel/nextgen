@@ -7,7 +7,6 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
@@ -50,13 +49,13 @@ func NewSchemaService(
 	}
 }
 
-func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInput) (*domain.JSONSchema, error) {
-	tx, txErr := s.pool.Begin(ctx, nil)
-	if txErr != nil {
-		return nil, domain.ErrInternal(txErr).WithMessage("failed to start transaction")
+func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInput) (_ *domain.JSONSchema, err error) {
+	tx, err := s.pool.Begin(ctx, nil)
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to start transaction")
 	}
 	defer func() {
-		if txErr != nil {
+		if err != nil {
 			_ = tx.Rollback(ctx)
 		}
 	}()
@@ -72,7 +71,7 @@ func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInpu
 		CreatedAt: time.Now().UTC(),
 		Schema:    input.Schema,
 	}
-	err := s.schemaValidator.ValidateAgainstMetaSchema(input.Schema)
+	err = s.schemaValidator.ValidateAgainstMetaSchema(input.Schema)
 	if err != nil {
 		return nil, domain.ErrJSONSchemaInvalid().WithParent(err)
 	}
@@ -126,7 +125,7 @@ func (s *SchemaService) CreateSchemaByUrl(ctx context.Context, input CreateSchem
 func (s *SchemaService) GetSchema(ctx context.Context, projectID string, teamID string, schemaID string) (*domain.JSONSchema, error) {
 	schema, err := s.schemaRepo.GetByID(ctx, s.pool, projectID, schemaID)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil, domain.ErrJSONSchemaNotFound()
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to get schema from database")

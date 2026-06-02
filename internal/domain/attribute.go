@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+
+	"github.com/zitadel/nextgen/internal/maputil"
 )
 
 type Attribute struct {
@@ -45,7 +47,7 @@ func NewCreateAttribute(key string, value any, unique AttributeUniqueness) (*Cre
 	return attr, nil
 }
 
-func buildAttributeTree(attributes []Attribute) (map[string]any, error) {
+func BuildAttributeTree(attributes []Attribute) (map[string]any, error) {
 	tree := make(map[string]any)
 	for i, a := range attributes {
 		keyNodes := strings.Split(a.Key, ".")
@@ -75,4 +77,43 @@ func setAttribute(keyNodes []string, value any, tree map[string]any) {
 		tree[keyNodes[0]] = subTree
 	}
 	setAttribute(keyNodes[1:], value, subTree)
+}
+
+func FlattenMapToCreateAttributes(m map[string]any, schema map[string]any, namePrefix string) ([]*CreateAttribute, error) {
+	attrs := make([]*CreateAttribute, 0, len(m))
+	for key, v := range m {
+		var fullKey string
+		if namePrefix != "" {
+			fullKey = namePrefix + "." + key
+		} else {
+			fullKey = key
+		}
+
+		switch vv := v.(type) {
+		case map[string]any:
+			props, _ := maputil.GetNested[map[string]any](schema, "properties."+key)
+			newAttrs, err := FlattenMapToCreateAttributes(vv, props, fullKey)
+			if err != nil {
+				return nil, err
+			}
+			attrs = append(attrs, newAttrs...)
+
+		default:
+			var unique AttributeUniqueness
+			strUnique, _ := maputil.GetNested[string](schema, "properties."+key+".x-unique")
+			switch strUnique {
+			case "project":
+				unique = AttributeUniquenessProject
+			case "team":
+				unique = AttributeUniquenessTeam
+			}
+
+			attr, err := NewCreateAttribute(fullKey, v, unique)
+			if err != nil {
+				return nil, err
+			}
+			attrs = append(attrs, attr)
+		}
+	}
+	return attrs, nil
 }
