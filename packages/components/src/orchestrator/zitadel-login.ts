@@ -547,7 +547,7 @@ export class ZitadelLogin extends LitElement {
   ): void => {
     if (this.loading) return;
     const { challenge_id, method, proof } = event.detail;
-    void this.submit("submit", {
+    void this.submit(method, {
       challenge_id,
       method,
       proof,

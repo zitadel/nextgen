@@ -81,6 +81,19 @@ export const authFormTemplate = String.raw`
       {% endif %}
     {% endfor %}
 
+    {% for entry in actions %}
+      {% unless entry[1].primary or entry[0] == 'passkey' or entry[0] == 'register' or entry[0] == 'sign_in' %}
+        <zl-button
+          hierarchy="secondary"
+          size="medium"
+          type="button"
+          block
+          action="{{ entry[0] }}"
+          label="{{ entry[1].text_key | t }}"
+        ></zl-button>
+      {% endunless %}
+    {% endfor %}
+
     {% if actions.passkey %}
       <zl-button
         hierarchy="secondary"
@@ -103,12 +116,17 @@ export const authFormTemplate = String.raw`
       </p>
     {% endif %}
 
-    {% if challenge and challenge.method == "passkey" %}
-      <zl-passkey
-        ceremony="{{ challenge.options.ceremony | default: 'authenticate' }}"
-        challenge-id="{{ challenge.challenge_id }}"
-        options='{{ challenge.options | json }}'
-      ></zl-passkey>
+    {% if challenge %}
+      {% if challenge.method == "passkey" or challenge.method == "passkey_register" %}
+        {% assign ceremony = "authenticate" %}
+        {% if challenge.method == "passkey_register" %}{% assign ceremony = "register" %}{% endif %}
+        <zl-passkey
+          ceremony="{{ ceremony }}"
+          method="{{ challenge.method }}"
+          challenge-id="{{ challenge.challenge_id }}"
+          options='{{ challenge.options | json }}'
+        ></zl-passkey>
+      {% endif %}
     {% endif %}
 
     {% mandatory_gates %}
