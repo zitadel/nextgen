@@ -124,12 +124,16 @@ func TestGetUser(t *testing.T) {
 		require.NoError(t, err)
 
 		harness.CreateUserSchema(t, project.ID, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
-		userBs := []byte(harness.TestData.Users.CreateUserRequest)
 
 		user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
 			ProjectID: project.ID,
 			TeamID:    &team.ID,
-			User:      *helpers.MustUnmarshal[map[string]any](t, userBs),
+			User: map[string]any{
+				"$schema":   "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml",
+				"email":     "john.testgetuser@example.com",
+				"firstName": "john",
+				"lastName":  "doe",
+			},
 		})
 		require.NoError(t, err)
 
