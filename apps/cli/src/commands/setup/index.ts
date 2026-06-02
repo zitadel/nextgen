@@ -5,7 +5,7 @@ import { consola } from "consola";
 import { BaseCommand, type JsonEnvelope } from "../../lib/oclif";
 import { ZitadelError } from "../../lib/errors";
 import { createOrca, issuerFromPort, type FrameworkFacts, type Orca } from "../../lib/orca";
-import type { PatchContext } from "../../lib/orca/patchers/types";
+import type { PatchContext, PatcherNarration } from "../../lib/orca/patchers/types";
 import { RENDERER_IDS } from "../../lib/orca/patchers/rule/next/renderers/registry";
 import { CreateSchemaBody } from "@zitadel-nextgen/api/generated/endpoints/zitadelNextGen.zod";
 import type { CreateProject201 } from "@zitadel-nextgen/api/generated/model";
@@ -142,10 +142,19 @@ export default class Setup extends BaseCommand {
       server: answers.server,
     };
     consola.start(`Patching project files${dryRun ? " (dry run)" : ""}`);
-    const result = await orca.patcherFor(framework.id).patch(ctx, { cwd, dryRun, force });
+    const patcher = orca.patcherFor(framework.id);
+    const result = await patcher.patch(ctx, { cwd, dryRun, force });
+    const narration = patcher.narration(ctx);
+    const verb = dryRun ? "Would write" : "Wrote";
     for (const file of result.filesWritten) {
-      const sentence = describeWrittenFile(relativeDisplay(cwd, file), dryRun);
-      if (sentence) consola.info(sentence);
+      const rel = relativeDisplay(cwd, file);
+      if (narration.silent.includes(rel)) continue;
+      const sentence = narration.sentences.find((s) => rel === s.path || rel.endsWith(`/${s.path}`));
+      consola.info(
+        sentence
+          ? `${verb} ${sentence.subject} (${stylePath(rel)})`
+          : `${verb} ${stylePath(rel)}`,
+      );
     }
     for (const file of result.filesSkipped) {
       consola.info(`Left ${relativeDisplay(cwd, file)} unchanged (already matches target)`);
@@ -185,6 +194,7 @@ export default class Setup extends BaseCommand {
       const sections = buildSummary({
         projectFacts,
         writtenRel,
+        narration,
         project,
         server: answers.server,
         issuer,
@@ -278,72 +288,12 @@ function shortPath(absolute: string): string {
   return absolute;
 }
 
-/**
- * Picks one written file by suffix so the corresponding INSTALLED row can
- * reference it without hard-coding the path the patcher chose. Returns
- * the first match; falls back to `undefined` when the patcher didn't
- * write that artifact (e.g. `--no-apply` would still write everything,
- * but a user opting out of, say, register pages would not).
- */
-function pickWrittenFile(written: string[], suffix: string): string | undefined {
-  return written.find((file) => file.endsWith(suffix));
-}
-
-/**
- * Translates a patcher-written path into a single sentence the user can
- * read at narration speed. Returns `null` for directories and other
- * scaffolding artefacts that aren't worth narrating individually — the
- * file count in the closing `success(...)` and the summary's INSTALLED
- * section already cover them. The verb tense flips for `--dry-run` so
- * the user sees a preview ("Would write ...") instead of a claim that
- * something happened.
- */
-function describeWrittenFile(relPath: string, dryRun: boolean): string | null {
-  // Mkdir ops surface in `filesWritten` alongside actual file writes.
-  // They're noise at the per-step layer (the files inside them get
-  // narrated on their own lines), so swallow them here.
-  if (
-    relPath === ".zitadel" ||
-    relPath === ".zitadel/flows" ||
-    relPath === ".zitadel/schemas"
-  ) {
-    return null;
-  }
-  const verb = dryRun ? "Would write" : "Wrote";
-  const sentence = SENTENCE_BY_PATH[relPath];
-  if (sentence) {
-    return `${verb} ${sentence.subject} (${stylePath(relPath)})`;
-  }
-  return `${verb} ${stylePath(relPath)}`;
-}
-
-/**
- * Map from the patcher's deterministic output paths to a short noun
- * phrase describing what the file is for. Anything not in the map falls
- * back to the bare path in the narration; add an entry here when a new
- * scaffolded file deserves a clearer label.
- */
-const SENTENCE_BY_PATH: Record<string, { subject: string }> = {
-  ".gitignore": { subject: "the project's .gitignore additions" },
-  ".zitadel/secret": { subject: "the local project secret" },
-  "zitadel.json": { subject: "the Zitadel project configuration" },
-  ".zitadel/schemas/user.json": { subject: "the user schema definition" },
-  ".zitadel/flows/default.json": { subject: "the default authentication flow" },
-  ".env.example": { subject: "the .env example template" },
-  ".env.local": { subject: "the local development environment variables" },
-  ".zitadel/state.json": { subject: "the empty sync state file" },
-  "app/login/page.tsx": { subject: "the login page" },
-  "app/register/page.tsx": { subject: "the registration page" },
-  "app/profile/page.tsx": { subject: "the profile page" },
-  "middleware.ts": { subject: "the Next.js middleware" },
-  "custom-elements.d.ts": { subject: "the web-component type declarations" },
-  "package.json": { subject: "package.json with the SDK dependency" },
-};
-
 /** Builds the section list driving {@link renderSummary} for the setup command. */
 function buildSummary(opts: {
   projectFacts: Awaited<ReturnType<typeof detectProjectFacts>>;
   writtenRel: string[];
+  /** Narration from the patcher — provides the framework-specific INSTALLED rows. */
+  narration: PatcherNarration;
   project: CreateProject201;
   server: string;
   issuer: string;
@@ -351,9 +301,7 @@ function buildSummary(opts: {
   synced: boolean;
   scaffoldedFramework: boolean;
 }): Section[] {
-  const { projectFacts, writtenRel, project, server, issuer, userFields, synced, scaffoldedFramework } = opts;
-  const sdkPackage = "@zitadel-nextgen/sdk-next";
-  const packageJsonHit = pickWrittenFile(writtenRel, "package.json");
+  const { projectFacts, writtenRel, narration, project, server, issuer, userFields, synced, scaffoldedFramework } = opts;
 
   const detected: Row[] = [
     { label: "Framework", value: formatFrameworkLine(projectFacts) },
@@ -363,22 +311,25 @@ function buildSummary(opts: {
   }
 
   const installedRows: Row[] = [];
-  if (packageJsonHit) {
-    installedRows.push({
-      label: "Package",
-      value: sdkPackage,
-      secondary: stylePath(fileNameOf(packageJsonHit)),
-    });
-  }
-  for (const [label, suffix] of [
-    ["Login page", "app/login/page.tsx"],
-    ["Register page", "app/register/page.tsx"],
-    ["Profile page", "app/profile/page.tsx"],
-    ["Middleware", "middleware.ts"],
-    ["Env vars", ".env.local"],
-  ] as const) {
-    const hit = pickWrittenFile(writtenRel, suffix);
-    if (hit) installedRows.push({ label, value: stylePath(hit) });
+  for (const row of narration.installedRows) {
+    const hit = writtenRel.find((file) => file === row.path || file.endsWith(`/${row.path}`));
+    if (!hit) continue;
+    // The "Package" row is the special one: its value is the SDK name
+    // (provided by the patcher), and the secondary text points at the
+    // manifest filename. Every other row's value is the cyan path.
+    if (row.label === "Package") {
+      installedRows.push({
+        label: row.label,
+        value: narration.sdkPackage,
+        secondary: stylePath(fileNameOf(hit)),
+      });
+    } else {
+      installedRows.push({
+        label: row.label,
+        value: stylePath(hit),
+        secondary: row.secondary,
+      });
+    }
   }
 
   const configuredRows: Row[] = [

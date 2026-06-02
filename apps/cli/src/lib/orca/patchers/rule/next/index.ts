@@ -2,10 +2,23 @@ import { join } from "node:path";
 
 import { MANAGED_MARKER } from "../../../../paths";
 import type { FileOp } from "../file-writer/types";
-import type { PatchContext, PatchView } from "../../types";
+import type {
+  NarrationRow,
+  NarrationSentence,
+  PatchContext,
+  PatchView,
+} from "../../types";
 import { AbstractRulePatcher } from "../base";
 import { getRenderer } from "./renderers/registry";
 import type { RendererSpec } from "./renderers/types";
+
+/**
+ * Fixed name shown in the INSTALLED "Package" row. The Next patcher
+ * always adds the same SDK regardless of renderer; deviation from this
+ * (e.g. a future Lit-only renderer with a different SDK) would override
+ * {@link NextPatcher.sdkPackageFor}.
+ */
+const NEXT_SDK_PACKAGE = "@zitadel-nextgen/sdk-next";
 
 /**
  * Next.js `middleware.ts` at the project root. Wires `nextgenMiddleware` so the
@@ -59,6 +72,58 @@ export class NextPatcher extends AbstractRulePatcher {
       title: "Next.js integration",
       detail: `Scaffolded login/register/profile routes with renderer "${ctx.rendererId}".`,
     };
+  }
+
+  protected sdkPackageFor(_view: PatchView): string {
+    return NEXT_SDK_PACKAGE;
+  }
+
+  /**
+   * INSTALLED rows in display order: login, register, profile (when the
+   * renderer ships one), then middleware. Each row's `path` is taken
+   * straight from {@link nextCodeFilePaths} so the row only shows when
+   * the file was actually written — opt-out renderers (no profile page)
+   * silently drop their row.
+   */
+  protected frameworkInstalledRows(view: PatchView): ReadonlyArray<NarrationRow> {
+    const appDir = view.framework.appDir;
+    const renderer = getRenderer(view.rendererId);
+    const rows: NarrationRow[] = [
+      { label: "Login page", path: join(appDir, "login/page.tsx") },
+      { label: "Register page", path: join(appDir, "register/page.tsx") },
+    ];
+    if (renderer.templates.profilePage) {
+      rows.push({ label: "Profile page", path: join(appDir, "profile/page.tsx") });
+    }
+    rows.push({ label: "Middleware", path: join(appDir, "../middleware.ts") });
+    return rows;
+  }
+
+  /**
+   * Per-file narration subjects for the Next-specific managed files.
+   * Mirrors the path list from {@link nextCodeFilePaths} so the two
+   * cannot drift; paths returned by the abstract base (`.zitadel/*`,
+   * `package.json`, `.env.local`) are narrated by `BASE_SENTENCES` and
+   * deliberately omitted here.
+   */
+  protected frameworkSentences(view: PatchView): ReadonlyArray<NarrationSentence> {
+    const appDir = view.framework.appDir;
+    const renderer = getRenderer(view.rendererId);
+    const sentences: NarrationSentence[] = [
+      { path: join(appDir, "login/page.tsx"), subject: "the login page" },
+      { path: join(appDir, "register/page.tsx"), subject: "the registration page" },
+    ];
+    if (renderer.templates.profilePage) {
+      sentences.push({ path: join(appDir, "profile/page.tsx"), subject: "the profile page" });
+    }
+    sentences.push({ path: join(appDir, "../middleware.ts"), subject: "the Next.js middleware" });
+    if (renderer.templates.customElementsDts) {
+      sentences.push({
+        path: join(appDir, "../custom-elements.d.ts"),
+        subject: "the web-component type declarations",
+      });
+    }
+    return sentences;
   }
 }
 
