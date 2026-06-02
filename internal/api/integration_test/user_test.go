@@ -34,18 +34,77 @@ func TestCreateUser(t *testing.T) {
 	}
 
 	t.Run("ok", func(t *testing.T) {
-		t.Run("simple", func(t *testing.T) {
-			userBs := []byte(harness.TestData.Users.CreateUserRequest)
+		tcs := []struct {
+			name    string
+			params  api.CreateUserParams
+			usermap map[string]any
+		}{
+			{
+				name: "user with all optional properties",
+				params: api.CreateUserParams{
+					ProjectID: api.ProjectID(project.ID),
+				},
+				usermap: map[string]any{
+					"$schema":   "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml",
+					"email":     "john.doe.withalloptionalproperties@example.com",
+					"firstName": "john",
+					"lastName":  "doe",
+					"address": map[string]any{
+						"street":      "Main Street",
+						"houseNumber": "42a",
+						"city":        "Lake town",
+						"postalCode":  "6699",
+						"country":     "Madeupia",
+					},
+				},
+			},
+			{
+				name: "user with no optional properties",
+				params: api.CreateUserParams{
+					ProjectID: api.ProjectID(project.ID),
+				},
+				usermap: map[string]any{
+					"$schema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml",
+					"email":   "john.doe.withoutoptionalproperties@example.com",
+				},
+			},
+			{
+				name: "user without team membership",
+				params: api.CreateUserParams{
+					ProjectID: api.ProjectID(project.ID),
+				},
+				usermap: map[string]any{
+					"$schema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml",
+					"email":   "john.doe.withoutteammembership@example.com",
+				},
+			},
+			{
+				name: "user with team membership",
+				params: api.CreateUserParams{
+					ProjectID: api.ProjectID(project.ID),
+					TeamID:    api.OptTeamID{Set: true, Value: api.TeamID(team.ID)},
+				},
+				usermap: map[string]any{
+					"$schema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml",
+					"email":   "john.doe.withteammembermship@example.com",
+				},
+			},
+		}
+		for _, tc := range tcs {
+			t.Run(tc.name, func(t *testing.T) {
+				userbs, err := json.Marshal(tc.usermap)
+				require.NoError(t, err)
 
-			user := &api.User{}
-			err = user.UnmarshalJSON(userBs)
-			require.NoError(t, err)
+				user := &api.User{}
+				err = user.UnmarshalJSON(userbs)
+				require.NoError(t, err)
 
-			resp, err := client.CreateUser(t.Context(), user, params)
-			assert.NoError(t, err)
+				resp, err := client.CreateUser(t.Context(), user, params)
+				assert.NoError(t, err)
 
-			assert.IsType(t, &api.CreateUserResponse{}, resp, helpers.MustMarshal(t, resp))
-		})
+				assert.IsType(t, &api.CreateUserResponse{}, resp, helpers.MustMarshal(t, resp))
+			})
+		}
 	})
 
 	t.Run("error", func(t *testing.T) {

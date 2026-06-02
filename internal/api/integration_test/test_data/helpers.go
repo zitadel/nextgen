@@ -16,12 +16,8 @@ var createSchemaRequestUserSchema []byte
 //go:embed create-schema-request-user-schema-by-url.json
 var createSchemaRequestUserSchemaByUrl []byte
 
-//go:embed create-user-request.json
-var createUserRequest []byte
-
 type TestData struct {
 	Schemas Schemas
-	Users   Users
 
 	Generator DataGenerator
 }
@@ -32,9 +28,6 @@ func BuildTestData() TestData {
 			CreateSchemaRequestUserSchema:      string(createSchemaRequestUserSchema),
 			CreateSchemaRequestUserSchemaByUrl: string(createSchemaRequestUserSchemaByUrl),
 		},
-		Users: Users{
-			CreateUserRequest: string(createUserRequest),
-		},
 		Generator: DataGenerator{},
 	}
 }
@@ -42,10 +35,6 @@ func BuildTestData() TestData {
 type Schemas struct {
 	CreateSchemaRequestUserSchema      string
 	CreateSchemaRequestUserSchemaByUrl string
-}
-
-type Users struct {
-	CreateUserRequest string
 }
 
 type DataGenerator struct{}
