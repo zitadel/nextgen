@@ -175,20 +175,6 @@ var flowDefRaw = []byte(`{
   ]
 }`)
 
-var invalidFlowDefRaw = []byte(`{
-  "name": "Invalid_Flow_Name_With_Caps",
-  "user_schema": "just-a-random-string",
-  "purposes": {
-    "login": "step_1"
-  },
-  "steps": [
-    {
-      "name": "step_1",
-      "complete": "redirect"
-    }
-  ]
-}`)
-
 type mockSchemaResolver struct {
 	resolveFunc func(
 		ctx context.Context,
