@@ -333,7 +333,7 @@ func VerifyPasskeyRegistration(challenge *PasskeyRegistrationChallenge, attestat
 		AAGUID:          credential.Authenticator.AAGUID,
 		AttestationType: &attestationType,
 		Transports:      transports,
-		SignCount:        int64(credential.Authenticator.SignCount),
+		SignCount:       int64(credential.Authenticator.SignCount),
 		BackupEligible:  credential.Flags.BackupEligible,
 		BackupState:     credential.Flags.BackupState,
 		VerifiedAt:      &now,
@@ -386,7 +386,7 @@ func BuildPasskeyRequestOptions(c *AuthChallengePasskey) ([]byte, error) {
 		Challenge:          protocol.URLEncodedBase64(challenge),
 		RelyingPartyID:     c.RPID,
 		AllowedCredentials: allowed,
-		UserVerification:   protocol.UserVerificationRequirement(protocol.UserVerificationRequirement(c.UserVerification)),
+		UserVerification:   protocol.UserVerificationRequirement(c.UserVerification),
 		Extensions:         c.Extensions,
 	}
 	return json.Marshal(assertion)

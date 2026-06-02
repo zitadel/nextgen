@@ -17,9 +17,9 @@ import (
 // --- fakes ---
 
 type fakePasskeyRegRepo struct {
-	created *domain.CreatePasskeyRegistration
-	stored  map[string]*domain.PasskeyRegistration // id → row
-	deleted []string
+	created   *domain.CreatePasskeyRegistration
+	stored    map[string]*domain.PasskeyRegistration // id → row
+	deleted   []string
 	createErr error
 	getErr    error
 }
@@ -102,10 +102,12 @@ func (f *fakePasskeyRepo) SetBackupState(bool) database.Change       { return ni
 func (f *fakePasskeyRepo) SetVerifiedAt(time.Time) database.Change   { return nil }
 func (f *fakePasskeyRepo) SetLastUsedAt(time.Time) database.Change   { return nil }
 
-func (f *fakePasskeyRepo) PrimaryKeyColumns() []database.Column   { return nil }
-func (f *fakePasskeyRepo) UniqueKeyColumns() []database.Column     { return nil }
-func (f *fakePasskeyRepo) UpdatedAtColumn() database.Column        { return database.NewColumn("t", "updated_at") }
-func (f *fakePasskeyRepo) qualifiedTableName() string              { return "t" }
+func (f *fakePasskeyRepo) PrimaryKeyColumns() []database.Column { return nil }
+func (f *fakePasskeyRepo) UniqueKeyColumns() []database.Column  { return nil }
+func (f *fakePasskeyRepo) UpdatedAtColumn() database.Column {
+	return database.NewColumn("t", "updated_at")
+}
+func (f *fakePasskeyRepo) qualifiedTableName() string { return "t" }
 
 type fakeIDGen struct{ next string }
 

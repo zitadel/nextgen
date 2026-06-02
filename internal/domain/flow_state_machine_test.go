@@ -126,13 +126,13 @@ func (f *fakePasskeyRegistration) SubmitPasskeyRegistration(_ context.Context, i
 // registry + handlers + state machine, sharing the fakes the test
 // inspects after a run.
 type flowTestWorld struct {
-	users        *fakeUserRepo
-	pws          *fakeUserPasswordRepo
-	ids          *idgenmock.MockGenerator
-	hasher       fakeHasher
-	attempts     *fakeAuthAttempts
-	passkeyReg   *fakePasskeyRegistration
-	sm           *domain.FlowStateMachineRuntime
+	users      *fakeUserRepo
+	pws        *fakeUserPasswordRepo
+	ids        *idgenmock.MockGenerator
+	hasher     fakeHasher
+	attempts   *fakeAuthAttempts
+	passkeyReg *fakePasskeyRegistration
+	sm         *domain.FlowStateMachineRuntime
 }
 
 func newFlowTestWorld(t *testing.T) *flowTestWorld {
