@@ -121,7 +121,6 @@ func TestUserRepository_CreateWithoutTeam(t *testing.T) {
 		ProjectID:  pid,
 		SchemaURL:  schemaURL,
 		ID:         userID,
-		TeamID:     nil,
 		Attributes: []*domain.CreateAttribute{plain, unique},
 	}))
 
