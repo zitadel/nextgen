@@ -51,14 +51,8 @@ func (h *Handler) GetUserByID(ctx context.Context, params api.GetUserByIDParams)
 }
 
 func (h *Handler) SetUserPassword(ctx context.Context, req *api.SetUserPasswordRequest, params api.SetUserPasswordParams) (api.SetUserPasswordRes, error) {
-	var teamID *string
-	if params.TeamID.IsSet() {
-		teamID = new(string(params.TeamID.Value))
-	}
-
 	err := h.userService.SetPassword(ctx, service.SetPasswordInput{
 		ProjectID:                string(params.ProjectID),
-		TeamID:                   teamID,
 		UserID:                   string(params.UserID),
 		Password:                 req.Password,
 		IsPasswordChangeRequired: req.IsChangeRequired.Value,

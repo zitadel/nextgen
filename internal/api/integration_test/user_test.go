@@ -155,16 +155,10 @@ func TestSetUserPassword(t *testing.T) {
 		project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
 		require.NoError(t, err)
 
-		team, err := harness.EnsureTeamService(t).CreateTeam(t.Context(), service.CreateTeamInput{
-			ProjectID: project.ID,
-		})
-		require.NoError(t, err)
-
 		usermap := harness.TestData.Generator.GenerateUser(t, "testsetuserpassword.ok@example.com")
 
 		user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
 			ProjectID: project.ID,
-			TeamID:    &team.ID,
 			User:      usermap,
 		})
 		require.NoError(t, err)
@@ -181,7 +175,6 @@ func TestSetUserPassword(t *testing.T) {
 		}
 		params := api.SetUserPasswordParams{
 			ProjectID: api.ProjectID(project.ID),
-			TeamID:    api.NewOptTeamID(api.TeamID(team.ID)),
 			UserID:    api.UserID(userID),
 		}
 
@@ -262,11 +255,6 @@ func TestSetUserPassword(t *testing.T) {
 			project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
 			require.NoError(t, err)
 
-			team, err := harness.EnsureTeamService(t).CreateTeam(t.Context(), service.CreateTeamInput{
-				ProjectID: project.ID,
-			})
-			require.NoError(t, err)
-
 			client := harness.EnsureAPIClient(t, project.ID)
 
 			request := &api.SetUserPasswordRequest{
@@ -274,7 +262,6 @@ func TestSetUserPassword(t *testing.T) {
 			}
 			params := api.SetUserPasswordParams{
 				ProjectID: api.ProjectID(project.ID),
-				TeamID:    api.NewOptTeamID(api.TeamID(team.ID)),
 				UserID:    api.UserID("user_does-not-exist"),
 			}
 
@@ -292,21 +279,14 @@ func TestGetUser(t *testing.T) {
 		client := harness.EnsureAPIClient(t, project.ID)
 		require.NoError(t, err)
 
-		team, err := harness.EnsureTeamService(t).CreateTeam(t.Context(), service.CreateTeamInput{
-			ProjectID: project.ID,
-		})
-		require.NoError(t, err)
-
 		user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
 			ProjectID: project.ID,
-			TeamID:    &team.ID,
 			User:      harness.TestData.Generator.GenerateUser(t, "testgetuser@example.com"),
 		})
 		require.NoError(t, err)
 
 		params := api.GetUserByIDParams{
 			ProjectID: api.ProjectID(project.ID),
-			TeamID:    api.OptTeamID{Set: true, Value: api.TeamID(team.ID)},
 			UserID:    api.UserID(user["id"].(string)),
 		}
 

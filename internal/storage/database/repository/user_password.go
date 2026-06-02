@@ -89,8 +89,7 @@ func (r *UserPasswordRepository) ResetFailedAttempts() database.Change {
 	return database.NewChange(colPasswordFailedAttempts, int16(0))
 }
 
-func (r *UserPasswordRepository) GetByUserID(ctx context.Context, client database.QueryExecutor, projectID string, teamID *string, userID string) (*domain.UserPassword, error) {
-	// TODO teamID is currently not used. Should it?
+func (r *UserPasswordRepository) GetByUserID(ctx context.Context, client database.QueryExecutor, projectID string, userID string) (*domain.UserPassword, error) {
 	condition := database.And(
 		r.ProjectIDCondition(projectID),
 		r.UserIDCondition(userID))

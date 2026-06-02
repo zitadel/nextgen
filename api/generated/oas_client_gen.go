@@ -5582,26 +5582,6 @@ func (c *Client) sendSetUserPassword(ctx context.Context, request *SetUserPasswo
 			return res, errors.Wrap(err, "encode query")
 		}
 	}
-	{
-		// Encode "team_id" parameter.
-		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "team_id",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if val, ok := params.TeamID.Get(); ok {
-				if unwrapped := string(val); true {
-					return e.EncodeValue(conv.StringToString(unwrapped))
-				}
-				return nil
-			}
-			return nil
-		}); err != nil {
-			return res, errors.Wrap(err, "encode query")
-		}
-	}
 	u.RawQuery = q.Values().Encode()
 
 	stage = "EncodeRequest"

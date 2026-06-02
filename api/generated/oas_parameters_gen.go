@@ -4243,9 +4243,7 @@ func decodeRevokeSessionParams(args [1]string, argsEscaped bool, r *http.Request
 type SetUserPasswordParams struct {
 	// The unique identifier of the project.
 	ProjectID ProjectID
-	// The unique identifier of the team.
-	TeamID OptTeamID `json:",omitempty,omitzero"`
-	UserID UserID
+	UserID    UserID
 }
 
 func unpackSetUserPasswordParams(packed middleware.Parameters) (params SetUserPasswordParams) {
@@ -4255,15 +4253,6 @@ func unpackSetUserPasswordParams(packed middleware.Parameters) (params SetUserPa
 			In:   "query",
 		}
 		params.ProjectID = packed[key].(ProjectID)
-	}
-	{
-		key := middleware.ParameterKey{
-			Name: "team_id",
-			In:   "query",
-		}
-		if v, ok := packed[key]; ok {
-			params.TeamID = v.(OptTeamID)
-		}
 	}
 	{
 		key := middleware.ParameterKey{
@@ -4324,69 +4313,6 @@ func decodeSetUserPasswordParams(args [1]string, argsEscaped bool, r *http.Reque
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
 			Name: "project_id",
-			In:   "query",
-			Err:  err,
-		}
-	}
-	// Decode query: team_id.
-	if err := func() error {
-		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "team_id",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.HasParam(cfg); err == nil {
-			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
-				var paramsDotTeamIDVal TeamID
-				if err := func() error {
-					var paramsDotTeamIDValVal string
-					if err := func() error {
-						val, err := d.DecodeValue()
-						if err != nil {
-							return err
-						}
-
-						c, err := conv.ToString(val)
-						if err != nil {
-							return err
-						}
-
-						paramsDotTeamIDValVal = c
-						return nil
-					}(); err != nil {
-						return err
-					}
-					paramsDotTeamIDVal = TeamID(paramsDotTeamIDValVal)
-					return nil
-				}(); err != nil {
-					return err
-				}
-				params.TeamID.SetTo(paramsDotTeamIDVal)
-				return nil
-			}); err != nil {
-				return err
-			}
-			if err := func() error {
-				if value, ok := params.TeamID.Get(); ok {
-					if err := func() error {
-						if err := value.Validate(); err != nil {
-							return err
-						}
-						return nil
-					}(); err != nil {
-						return err
-					}
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "team_id",
 			In:   "query",
 			Err:  err,
 		}

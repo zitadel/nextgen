@@ -22,7 +22,6 @@ type CreateUserInput struct {
 
 type SetPasswordInput struct {
 	ProjectID                string
-	TeamID                   *string
 	UserID                   string
 	Password                 string
 	IsPasswordChangeRequired bool
@@ -153,10 +152,10 @@ func (s *UserService) SetPassword(ctx context.Context, input SetPasswordInput) e
 		}
 	}()
 
-	pwd, err := s.passwordRepo.GetByUserID(ctx, tx, input.ProjectID, input.TeamID, input.UserID)
+	pwd, err := s.passwordRepo.GetByUserID(ctx, tx, input.ProjectID, input.UserID)
 
 	if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
-		err = s.createPassword(ctx, tx, input.ProjectID, input.TeamID, input.UserID, hash, input.IsPasswordChangeRequired)
+		err = s.createPassword(ctx, tx, input.ProjectID, input.UserID, hash, input.IsPasswordChangeRequired)
 	} else if err != nil {
 		err = domain.ErrInternal(err).WithMessage("failed to get current password from database")
 	} else {
@@ -175,10 +174,9 @@ func (s *UserService) SetPassword(ctx context.Context, input SetPasswordInput) e
 }
 
 func (s *UserService) createPassword(ctx context.Context, client database.QueryExecutor,
-	projectID string, teamID *string, userID string, pwdHash string, isPasswordChangeRequired bool) error {
+	projectID string, userID string, pwdHash string, isPasswordChangeRequired bool) error {
 	err := s.passwordRepo.Create(ctx, client, &domain.CreateUserPassword{
 		ProjectID:      projectID,
-		TeamID:         teamID,
 		UserID:         userID,
 		EncodedHash:    pwdHash,
 		ChangeRequired: isPasswordChangeRequired,

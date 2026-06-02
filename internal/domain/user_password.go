@@ -53,7 +53,6 @@ func (u *UserPassword) RequireChange() {
 
 type CreateUserPassword struct {
 	ProjectID      string
-	TeamID         *string // TODO: this field is currently not used by the repo
 	UserID         string
 	EncodedHash    string
 	ChangeRequired bool
@@ -66,7 +65,7 @@ type UserPasswordRepository interface {
 	userPasswordConditions
 	userPasswordChanges
 
-	GetByUserID(ctx context.Context, client database.QueryExecutor, projectID string, teamID *string, userID string) (*UserPassword, error)
+	GetByUserID(ctx context.Context, client database.QueryExecutor, projectID string, userID string) (*UserPassword, error)
 	Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*UserPassword, error)
 	List(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) ([]*UserPassword, error)
 	Create(ctx context.Context, client database.QueryExecutor, user *CreateUserPassword) error

@@ -6978,10 +6978,6 @@ func (s *Server) handleSetUserPasswordRequest(args [1]string, argsEscaped bool, 
 					In:   "query",
 				}: params.ProjectID,
 				{
-					Name: "team_id",
-					In:   "query",
-				}: params.TeamID,
-				{
 					Name: "user_id",
 					In:   "path",
 				}: params.UserID,
