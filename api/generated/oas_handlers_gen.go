@@ -1870,14 +1870,14 @@ func (s *Server) handleCreateTeamRequest(args [0]string, argsEscaped bool, w htt
 //
 // Create user.
 //
-// POST /user
+// POST /users
 func (s *Server) handleCreateUserRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("createUser"),
 		semconv.HTTPRequestMethodKey.String("POST"),
-		semconv.HTTPRouteKey.String("/user"),
+		semconv.HTTPRouteKey.String("/users"),
 	}
 	// Add attributes from config.
 	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
@@ -4937,14 +4937,14 @@ func (s *Server) handleGetTokenRequest(args [0]string, argsEscaped bool, w http.
 //
 // Get user by ID.
 //
-// GET /user/{user_id}
+// GET /users/{user_id}
 func (s *Server) handleGetUserByIDRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("GetUserByID"),
 		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.HTTPRouteKey.String("/user/{user_id}"),
+		semconv.HTTPRouteKey.String("/users/{user_id}"),
 	}
 	// Add attributes from config.
 	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
@@ -6101,14 +6101,14 @@ func (s *Server) handleListSessionsRequest(args [0]string, argsEscaped bool, w h
 //
 // List users.
 //
-// GET /user
+// GET /users
 func (s *Server) handleListUsersRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("listUsers"),
 		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.HTTPRouteKey.String("/user"),
+		semconv.HTTPRouteKey.String("/users"),
 	}
 	// Add attributes from config.
 	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
@@ -6819,14 +6819,14 @@ func (s *Server) handleRevokeTokenRequest(args [0]string, argsEscaped bool, w ht
 //
 // Set user password.
 //
-// PUT /user/{user_id}/password
+// PUT /users/{user_id}/password
 func (s *Server) handleSetUserPasswordRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("setUserPassword"),
 		semconv.HTTPRequestMethodKey.String("PUT"),
-		semconv.HTTPRouteKey.String("/user/{user_id}/password"),
+		semconv.HTTPRouteKey.String("/users/{user_id}/password"),
 	}
 	// Add attributes from config.
 	otelAttrs = append(otelAttrs, s.cfg.Attributes...)

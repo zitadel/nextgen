@@ -40,11 +40,11 @@ paths:
     $ref: endpoints/livez/methods.yaml
   /readyz:
     $ref: endpoints/readyz/methods.yaml
-  /user:
+  /users:
     $ref: endpoints/users/methods.yaml
-  /user/{user_id}:
+  /users/{user_id}:
     $ref: endpoints/users/by_id/methods.yaml
-  /user/{user_id}/password:
+  /users/{user_id}/password:
     $ref: endpoints/users/by_id/password/methods.yaml
   /flow:
     $ref: endpoints/flow/methods.yaml

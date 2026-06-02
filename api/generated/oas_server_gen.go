@@ -109,7 +109,7 @@ type Handler interface {
 	//
 	// Create user.
 	//
-	// POST /user
+	// POST /users
 	CreateUser(ctx context.Context, req *User, params CreateUserParams) (CreateUserRes, error)
 	// DeleteFlowDefinition implements deleteFlowDefinition operation.
 	//
@@ -243,7 +243,7 @@ type Handler interface {
 	//
 	// Get user by ID.
 	//
-	// GET /user/{user_id}
+	// GET /users/{user_id}
 	GetUserByID(ctx context.Context, params GetUserByIDParams) (GetUserByIDRes, error)
 	// GetUserInfo implements getUserInfo operation.
 	//
@@ -285,7 +285,7 @@ type Handler interface {
 	//
 	// List users.
 	//
-	// GET /user
+	// GET /users
 	ListUsers(ctx context.Context, params ListUsersParams) (ListUsersRes, error)
 	// RevokeMySession implements revokeMySession operation.
 	//
@@ -314,7 +314,7 @@ type Handler interface {
 	//
 	// Set user password.
 	//
-	// PUT /user/{user_id}/password
+	// PUT /users/{user_id}/password
 	SetUserPassword(ctx context.Context, req *SetUserPasswordRequest, params SetUserPasswordParams) (SetUserPasswordRes, error)
 	// SubmitFlowEvent implements submitFlowEvent operation.
 	//
