@@ -46,7 +46,7 @@ func NewSchemaService(
 	}
 }
 
-func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInput) (*domain.JSONSchema, error) {
+func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInput) (_ *domain.JSONSchema, err error) {
 	tx, err := s.pool.Begin(ctx, nil)
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to start transaction")

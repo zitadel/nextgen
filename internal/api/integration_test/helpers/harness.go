@@ -41,6 +41,7 @@ type Harness struct {
 	AuthAttemptService    service.AuthAttemptService
 	ProjectService        service.ProjectService
 	FlowDefinitionService service.FlowDefinitionService
+	UserService           *service.UserService
 	FlowStateMachine      *domain.FlowStateMachineRuntime
 	TeamService           *service.TeamService
 
@@ -56,5 +57,5 @@ type Harness struct {
 	UserPasskeyRepo    domain.UserPasskeyRepository
 	TeamRepo           domain.TeamRepository
 
-	Schemas test_data.Schemas
+	TestData test_data.TestData
 }

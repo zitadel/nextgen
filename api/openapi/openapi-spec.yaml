@@ -42,6 +42,8 @@ paths:
     $ref: endpoints/readyz/methods.yaml
   /user:
     $ref: endpoints/users/methods.yaml
+  /user/{user_id}:
+    $ref: endpoints/users/by_id/methods.yaml
   /flow:
     $ref: endpoints/flow/methods.yaml
   /flow/{id}:
