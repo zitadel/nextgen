@@ -142,6 +142,16 @@ func mapCreateRequestToService(req *api.CreateFlowDefinitionRequest) (service.Cr
 			complete, _ := domain.FlowStepCompleteString(string(step.GetComplete().Value))
 			s.Complete = &complete
 		}
+
+		// on_success
+		if step.GetOnSuccess().IsSet() {
+			onSuccess, err := domain.FlowOnSuccessString(string(step.GetOnSuccess().Value))
+			if err != nil {
+				return svcReq, fmt.Errorf("invalid on_success %q: %w", step.GetOnSuccess().Value, err)
+			}
+			s.OnSuccess = &onSuccess
+		}
+
 		steps = append(steps, s)
 	}
 	svcReq.Steps = steps
@@ -265,7 +275,12 @@ func mapDomainStepsToAPI(domainSteps []domain.FlowDefinitionStep) []api.FlowDefi
 				Value: api.FlowDefinitionStepComplete(complete),
 				Set:   step.Complete != nil,
 			},
-			//OnSuccess: // todo: review
+			OnSuccess: func() api.OptFlowDefinitionStepOnSuccess {
+				if step.OnSuccess == nil {
+					return api.OptFlowDefinitionStepOnSuccess{}
+				}
+				return api.NewOptFlowDefinitionStepOnSuccess(api.FlowDefinitionStepOnSuccess(step.OnSuccess.String()))
+			}(),
 		}
 		steps = append(steps, apiStep)
 	}

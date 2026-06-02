@@ -227,6 +227,11 @@ func flowSetCookie(value string, clear bool) string {
 		HttpOnly: true,
 		Secure:   true,
 		SameSite: http.SameSiteStrictMode,
+		// Path=/ ensures that each Set-Cookie replaces the previous one in
+		// the browser's cookie jar rather than accumulating — without an
+		// explicit path the browser derives the path from the request URI,
+		// which differs across /flow and /flow/{id}/submit endpoints.
+		Path: "/",
 	}
 	if clear {
 		c.MaxAge = -1 // emits "Max-Age=0", instructing browsers to delete
