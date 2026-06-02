@@ -39,12 +39,19 @@ func runTests(m *testing.M) int {
 
 	if err != nil {
 		log.Printf("error setting up test database: %v", err)
+		if stop != nil {
+			stop()
+		}
 		return 1
 	}
 	defer func() {
 		r := recover()
-		pool.Close(ctx)
-		stop()
+		if pool != nil {
+			pool.Close(ctx)
+		}
+		if stop != nil {
+			stop()
+		}
 		if r != nil {
 			panic(r)
 		}
@@ -85,7 +92,10 @@ func newEmbeddedDB(ctx context.Context) (pool database.PoolTest, stop func(), er
 
 	err = pool.MigrateTest(ctx)
 	if err != nil {
-		return nil, stop, fmt.Errorf("unable to migrate database: %w", err)
+		return nil, func() {
+			pool.Close(ctx)
+			stop()
+		}, fmt.Errorf("unable to migrate database: %w", err)
 	}
 	return pool, stop, err
 }
