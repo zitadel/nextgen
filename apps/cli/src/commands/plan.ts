@@ -1,8 +1,9 @@
 import { Flags } from "@oclif/core";
 
+import { createZitadelClient } from "@zitadel-nextgen/api/client";
+
 import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
-import { createPlatformClient } from "../lib/api";
-import { environmentSchema } from "../lib/api/schemas";
+import { environmentSchema } from "../lib/environment";
 import { buildSyncPlan, makeSyncers, renderPlan, summarizePlan } from "../lib/sync";
 import { readZitadelSecret } from "../lib/project";
 
@@ -34,10 +35,13 @@ export default class Plan extends BaseCommand {
     const { cwd, source, env, isTTY } = this.meta;
 
     const secret = await readZitadelSecret(cwd);
-    const client = createPlatformClient(source, secret.project_secret);
-    const syncers = makeSyncers({ projectId: secret.project_id, env });
+    const client = createZitadelClient({
+      baseUrl: source,
+      token: secret.project_secret,
+    });
+    const syncers = makeSyncers({ client, projectId: secret.project_id, env });
 
-    const plan = await buildSyncPlan(cwd, syncers, client);
+    const plan = await buildSyncPlan(cwd, syncers, true);
     return this.emit({
       status: "ok",
       data: summarizePlan(plan),

@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import { renderPlan, summarizePlan } from "../../../../src/lib/sync/plan-renderer";
 import type { ResourceSyncer, SyncAction } from "../../../../src/lib/sync/types";
-import type { PlatformClient } from "../../../../src/lib/api/client";
 
 function makeSyncer(kind: string, directory: string, mutable = false): ResourceSyncer {
   return {
@@ -10,7 +9,7 @@ function makeSyncer(kind: string, directory: string, mutable = false): ResourceS
     directory,
     mutable,
     validate() { /* no-op: renderer tests do not exercise validation */ },
-    async create(_c: PlatformClient, _d: object) { return "id"; },
+    async create(_d: object) { return "id"; },
     async update() { /* no-op: renderer tests do not exercise update */ },
     async delete() { /* no-op: renderer tests do not exercise delete */ },
   };

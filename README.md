@@ -103,18 +103,22 @@ The devcontainer at [.devcontainer/](.devcontainer/) pins Go 1.26 and a PostgreS
 
 After changing devcontainer configuration, use **Dev Containers: Rebuild Container** so features and volume mounts apply.
 
-**Docker (Spanner integration tests)** — the devcontainer reuses the host Docker daemon (Docker-outside-of-Docker) so testcontainers can start the Cloud Spanner emulator. Verify inside the container:
+**Docker (integration tests)** — both the Postgres and Spanner integration tests use [testcontainers](https://golang.testcontainers.org/) to start their databases (a Postgres container and the Cloud Spanner emulator), so a running Docker daemon is required. The devcontainer reuses the host Docker daemon (Docker-outside-of-Docker). Verify inside the container:
 
 ```sh
 docker info
 ```
 
-Run Spanner repository tests (same command as CI):
+Run the integration tests (same commands as CI):
 
 ```sh
-go test -v -tags spanner_integration -timeout=10m ./internal/storage/database/repository/...
+# Postgres
+go test -v -tags postgres_integration -timeout=10m ./...
+
+# Spanner
+go test -v -tags spanner_integration -timeout=10m ./...
 ```
 
 If `docker info` fails and the host uses **rootless Docker**, override the socket mount in [`.devcontainer/devcontainer.json`](.devcontainer/devcontainer.json) per the [docker-outside-of-docker feature docs](https://github.com/devcontainers/features/tree/main/src/docker-outside-of-docker#rootless-docker-support), for example bind `/run/user/<uid>/docker.sock` to `/var/run/docker-host.sock` (use `id -u` on the host for `<uid>`).
 
-To use an emulator you start yourself instead of testcontainers, set `ZITADEL_TEST_SPANNER_URL` to the Spanner DSN; tests skip container startup when that variable is set.
+To run the integration tests against a database you manage instead of testcontainers, set `ZITADEL_TEST_POSTGRES_URL` (Postgres DSN) or `ZITADEL_TEST_SPANNER_URL` (Spanner DSN); every integration suite honors these and connects to your database instead of starting a container, so `go test -tags … ./...` needs no Docker. Point it at a throwaway database — the suites run migrations that create the `zitadel_nextgen` schema.

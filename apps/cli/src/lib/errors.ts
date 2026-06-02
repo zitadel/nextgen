@@ -1,3 +1,5 @@
+import { ApiError } from "@zitadel-nextgen/api/runtime/fetch";
+
 /**
  * Closed set of failure categories the CLI can surface. Every error the
  * user sees is funnelled into one of these so messaging, exit codes, and
@@ -80,6 +82,21 @@ export class ZitadelError extends Error {
 export function toZitadelError(error: unknown): ZitadelError {
   if (error instanceof ZitadelError) {
     return error;
+  }
+
+  if (error instanceof ApiError) {
+    // `401`/`403` → bad or missing project secret; `5xx` → transport or
+    // server fault; everything else 4xx → the body the CLI sent was
+    // rejected (validation, conflict, not-found, …).
+    const code: ZitadelErrorCode =
+      error.status === 401 || error.status === 403
+        ? "E_AUTH"
+        : error.status >= 500
+          ? "E_NETWORK"
+          : "E_VALIDATION";
+    return new ZitadelError(code, error.message, {
+      details: { status: error.status, url: error.url, body: error.body },
+    });
   }
 
   if (isErrnoException(error)) {
