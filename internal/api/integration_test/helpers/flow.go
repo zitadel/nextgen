@@ -10,6 +10,16 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database/repository"
 )
 
+func (h *Harness) EnsureCreateUserHandler(t *testing.T) *domain.FlowCreateUserHandler {
+	t.Helper()
+	return domain.NewFlowCreateUserHandler(
+		idgen.NewULID(),
+		h.EnsureUserRepo(t),
+		h.EnsureUserPasswordRepo(t),
+		h.EnsureHasher(t),
+	)
+}
+
 func (h *Harness) EnsureFlowService(t *testing.T) service.FlowService {
 	t.Helper()
 	if h.FlowService == nil {
@@ -35,9 +45,7 @@ func (h *Harness) EnsureFlowStateMachine(t *testing.T) *domain.FlowStateMachineR
 			h.EnsureSessionRepo(t),
 			idgen.NewULID(),
 		)
-		// create_user handler stays nil — registration flows fail with
-		// ErrIntegrity until the argon2id wiring PR lands.
-		h.FlowStateMachine = domain.NewFlowStateMachine(fields, nil, authAdapter, passkeyRegSvc, time.Now)
+		h.FlowStateMachine = domain.NewFlowStateMachine(fields, h.EnsureCreateUserHandler(t), authAdapter, passkeyRegSvc, time.Now)
 	}
 	return h.FlowStateMachine
 }
