@@ -40,7 +40,6 @@ type Harness struct {
 	UserService           *service.UserService
 	FlowStateMachine      *domain.FlowStateMachineRuntime
 	TeamService           *service.TeamService
-	UserService           *service.UserService
 
 	SchemaRepo         domain.JSONSchemaRepository
 	SchemaResolver     *domain.JSONSchemaResolver

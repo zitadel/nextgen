@@ -3,11 +3,9 @@ package test_data
 import (
 	_ "embed"
 	"math/rand/v2"
-	"strings"
 	"testing"
 
 	"github.com/go-faker/faker/v4"
-	"github.com/stretchr/testify/require"
 )
 
 //go:embed create-schema-request-user-schema.json
@@ -39,47 +37,13 @@ type Schemas struct {
 
 type DataGenerator struct{}
 
-// GenerateUser generates a user according to the [createSchemaRequestUserSchema]
-func (g *DataGenerator) GenerateUser(t *testing.T) []byte {
-	t.Helper()
-
-	u := map[string]any{
-		"email": faker.Email(),
-	}
-	if randBool() {
-		u["firstName"] = faker.FirstName()
-	}
-	if randBool() {
-		u["lastName"] = faker.LastName()
-	}
-	if randBool() {
-		addr := faker.GetRealAddress()
-		u["address"] = map[string]any{
-			"street":      addr.Address,
-			"houseNumber": rand.IntN(100) + 1,
-			"city":        addr.City,
-			"postalCode":  addr.PostalCode,
-			"country":     faker.GetCountryInfo().Name,
-		}
-	}
-
-	bs, err := json.Marshal(u)
-	require.NoError(t, err)
-	return bs
-}
-
-func randBool() bool {
-	return rand.IntN(2) == 1
-}
-
-type DataGenerator struct{}
-
 // GenerateUser generates a user according to the [default-human-user-schema.json]
-func (g *DataGenerator) GenerateUser(t *testing.T) map[string]any {
+func (g *DataGenerator) GenerateUser(t *testing.T, email string) map[string]any {
 	t.Helper()
 
 	u := map[string]any{
-		"email": faker.Email(),
+		"$schema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml",
+		"email":   email,
 	}
 	if randBool() {
 		u["name"] = faker.FirstName()

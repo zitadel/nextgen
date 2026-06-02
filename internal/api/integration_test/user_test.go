@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
+	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
@@ -181,17 +182,18 @@ func TestSetUserPassword(t *testing.T) {
 		})
 		require.NoError(t, err)
 
+		harness.CreateUserSchema(t, project.ID, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
+
 		// TODO: user schema and flow definition should be created according to https://github.com/zitadel/nextgen/pull/183
 
-		user := harness.TestData.Generator.GenerateUser(t)
+		usermap := harness.TestData.Generator.GenerateUser(t, "john.testsetuserpassword@example.com")
 
-		// TODO: need to be able to create users before adding a password for them https://github.com/zitadel/nextgen/pull/170
-		//user, err = harness.EnsureUserService(t).Create(ctx, service.CreateUserInput{
-		//	ProjectID: project.ID,
-		//	TeamID:    team.ID,
-		//	User:      user,
-		//})
-		//require.NoError(t, err)
+		user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
+			ProjectID: project.ID,
+			TeamID:    &team.ID,
+			User:      usermap,
+		})
+		require.NoError(t, err)
 		userID := user["id"].(string)
 		userEmail := user["email"].(string)
 
@@ -320,10 +322,7 @@ func TestGetUser(t *testing.T) {
 		user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
 			ProjectID: project.ID,
 			TeamID:    &team.ID,
-			User: map[string]any{
-				"$schema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml",
-				"email":   "john.testgetuser11@example.com",
-			},
+			User:      harness.TestData.Generator.GenerateUser(t, "testgetuser@example.com"),
 		})
 		require.NoError(t, err)
 
