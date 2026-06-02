@@ -65,7 +65,19 @@ jobs:
       # Postgres integration tests run against a Docker testcontainer (mirroring
       # the spanner job); ubuntu-latest ships Docker, so no embedded-postgres
       # runtime deps or Maven binary cache are needed here.
-      - run: go test -v -tags postgres_integration -timeout=10m ./...
+      - name: Postgres integration tests
+        run: |
+          mkdir -p test-output/go
+          set -o pipefail
+          go test -json -v -tags postgres_integration -timeout=10m ./... | tee test-output/go/postgres-integration.json
+      - name: Upload Postgres test log on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: postgres-integration-test-log
+          path: test-output/go/postgres-integration.json
+          if-no-files-found: ignore
+          retention-days: 7
 
   go-integration-test-spanner:
     runs-on: ubuntu-latest
