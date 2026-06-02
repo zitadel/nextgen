@@ -14,6 +14,7 @@ import { createZitadelClient } from "@zitadel-nextgen/api/client";
 import { buildUserSchema } from "../../lib/user-schema";
 import { makeSyncers, runSyncLoop } from "../../lib/sync";
 import { hasZitadelConfig, hasZitadelSecret, readZitadelSecret } from "../../lib/project";
+import { PickFrameworkPrompt, SETUP_PROMPTS, type SetupAnswers } from "./prompts";
 import {
   detectProjectFacts,
   fileNameOf,
@@ -24,8 +25,7 @@ import {
   url as styleUrl,
   type Row,
   type Section,
-} from "../../lib/summary";
-import { PickFrameworkPrompt, SETUP_PROMPTS, type SetupAnswers } from "./prompts";
+} from "./summary";
 
 /** The user-schema fields scaffolded for every project. */
 const DEFAULT_USER_FIELDS = ["email", "given_name", "family_name"] as const;
