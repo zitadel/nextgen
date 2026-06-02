@@ -168,9 +168,9 @@ func (r *JSONSchemaRepository) Delete(ctx context.Context, client database.Query
 }
 
 type jsonSchemaRow struct {
-	ProjectID string               `db:"project_id"`
-	URL       string               `db:"url"`
-	CreatedAt time.Time            `db:"created_at"`
+	ProjectID string                `db:"project_id"`
+	URL       string                `db:"url"`
+	CreatedAt time.Time             `db:"created_at"`
 	Payload   JSON[json.RawMessage] `db:"payload"`
 }
 

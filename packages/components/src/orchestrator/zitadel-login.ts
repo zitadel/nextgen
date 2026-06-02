@@ -13,7 +13,6 @@ import type { Liquid, Template } from "liquidjs";
 
 import "../atoms/index.js";
 import {
-  DEFAULT_SESSION_EXCHANGE_PATH,
   exchangeSession,
   getCurrentStep,
   startFlow as apiStartFlow,
@@ -24,7 +23,7 @@ import { applyBaseTokens, applyBrandingTokens } from "./branding-to-tokens.js";
 import { validateBranding } from "./branding-validator.js";
 import { applyFontUrl } from "./font-loader.js";
 import { createLiquidEngine, TEMPLATE_NAMES } from "./liquid.js";
-import { en, type Locale } from "./locales/en.js";
+import { en, builtinLocales, type Locale } from "./locales/index.js";
 import { patchMandatoryGates } from "./mandatory-gates.js";
 import { zitadelAttributionPillInnerHtml } from "@zitadel-nextgen/shared-component-styles/attribution-markup";
 import { createSanitiser } from "./sanitiser.js";
@@ -93,20 +92,10 @@ export class ZitadelLogin extends LitElement {
   @property({ attribute: false }) accessor project: ZitadelProject | undefined;
 
   /**
-   * Path for the handoff exchange request. Defaults to `/sessions/exchange`
-   * and is prefixed with `api-base` when that attribute is set (so
-   * `api-base="/__nextgen"` → `/__nextgen/sessions/exchange`). Any other
-   * value is resolved from `location.origin` instead, so SPAs can route
-   * exchange separately from the flow API (e.g. `/api/auth/exchange`).
-   */
-  @property({ type: String, attribute: "session-exchange-path" })
-  accessor sessionExchangePath = DEFAULT_SESSION_EXCHANGE_PATH;
-
-  /**
    * URL to navigate to after a successful embedded sign-in. When set, the
-   * orchestrator exchanges the terminal `handoff_token` at the configured
-   * `session-exchange-path` (setting the session cookie) and then performs
-   * a full navigation to this URL so host middleware can observe the cookie.
+   * orchestrator exchanges the terminal `handoff_token` via the generated
+   * API client (setting the session cookie) and then performs a full
+   * navigation to this URL so host middleware can observe the cookie.
    * For `complete: "redirect"` the orchestrator follows `redirect_uri`
    * instead and does not run the exchange.
    */
@@ -120,8 +109,26 @@ export class ZitadelLogin extends LitElement {
    */
   @property({ type: String, attribute: "resume-flow-id" }) accessor resumeFlowId = "";
 
-  /** Override locale dict. Defaults to bundled `en`. */
-  @property({ attribute: false }) accessor locale: Locale = en;
+  /**
+   * BCP 47 language tag (e.g. `"de"`, `"en-US"`). The widget resolves this
+   * to a built-in locale dictionary. Falls back to auto-detection from
+   * `document.documentElement.lang` or `navigator.language` when empty.
+   */
+  @property({ type: String }) override accessor lang = "";
+
+  /**
+   * Custom locale dictionaries keyed by language code. When set, these take
+   * precedence over the built-in dictionaries for matching language codes.
+   *
+   * ```ts
+   * import { en } from "@zitadel-nextgen/components";
+   * const locales = {
+   *   en: { ...en, "identifier.title": "Welcome" },
+   *   de: myGermanDict,
+   * };
+   * ```
+   */
+  @property({ attribute: false }) accessor locales: Record<string, Locale> | undefined;
 
   @state() private accessor response: CreateFlow201 | null = null;
 
@@ -194,9 +201,25 @@ export class ZitadelLogin extends LitElement {
     queueMicrotask(() => void this.startFlow());
   }
 
+  /**
+   * Resolves the effective locale dictionary. The built-in dictionary for the
+   * resolved language is used as the base; entries from the `locales` map (if
+   * set) are spread on top so partial overrides work without importing and
+   * spreading the full base dictionary.
+   */
+  private resolveLocale(): Locale {
+    const code = this.lang
+      || (typeof document !== "undefined" ? document.documentElement.lang : "")
+      || (typeof navigator !== "undefined" ? navigator.language : "");
+    const primary = (code.split("-")[0] ?? "").toLowerCase();
+    const builtin = builtinLocales[primary] ?? en;
+    const custom = this.locales?.[primary];
+    return custom ? { ...builtin, ...custom } : builtin;
+  }
+
   override willUpdate(changed: PropertyValues<this>): void {
-    if (!this.engine) {
-      this.engine = createLiquidEngine({ locale: this.locale });
+    if (!this.engine || changed.has("locales") || changed.has("lang")) {
+      this.engine = createLiquidEngine({ locale: this.resolveLocale() });
     }
     const root = this.shadowRoot;
     if (root) {
@@ -370,7 +393,9 @@ export class ZitadelLogin extends LitElement {
       this.loading = true;
       try {
         const cfg = this.project ?? getZitadelConfig();
-        await exchangeSession(cfg?.apiBase ?? "", { handoff_token: handoffToken }, this.sessionExchangePath);
+        if (!cfg) throw new Error("<zitadel-login> config is required for exchange.");
+        const api = getApi(cfg);
+        await exchangeSession(api, { handoff_token: handoffToken }, { project_id: cfg.projectId });
         window.location.assign(this.postSignInUrl);
       } catch (error) {
         this.handleTransportError(error);
@@ -432,7 +457,7 @@ export class ZitadelLogin extends LitElement {
       }
     }
 
-    const patched = patchMandatoryGates(raw, step, this.locale);
+    const patched = patchMandatoryGates(raw, step, this.resolveLocale());
     return this.sanitise(patched);
   }
 
