@@ -9,16 +9,18 @@ import (
 	"github.com/zitadel/nextgen/internal/api/integration_test/test_data"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/secrets"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 type Harness struct {
-	DBPool     database.Pool
-	HttpClient *http.Client
-	TestServer *httptest.Server
-	Hasher     *crypto.PasswapHasher
-	Crypter    crypto.Crypter
+	DBPool          database.Pool
+	HttpClient      *http.Client
+	TestServer      *httptest.Server
+	Hasher          *crypto.PasswapHasher
+	Crypter         crypto.Crypter
+	SecretGenerator secrets.Generator
 
 	GeneratedServer *generated.Server
 	Handler         *api.Handler
@@ -27,9 +29,11 @@ type Harness struct {
 	// apiClients is a map of API clients, keyed by project ID.
 	// This allows tests to have multiple clients with different credentials if needed.
 	// Use [harness.EnsureAPIClient] to get a client for a specific project ID, which will create and cache the client as needed.
-	apiClients map[string]*generated.Client
+	apiClients      map[string]*generated.Client
+	anonymousClient *generated.Client
 	// fakeSecuritySources is a map of fake security sources, keyed by project ID, to support multiple clients with different credentials if needed.
-	fakeSecuritySources map[string]*FakeSecuritySource
+	fakeSecuritySources     map[string]*FakeSecuritySource
+	anonymousSecuritySource *FakeSecuritySource
 
 	SchemaService         *service.SchemaService
 	SessionService        service.SessionService

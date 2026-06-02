@@ -2,10 +2,8 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"net/url"
-	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -16,7 +14,6 @@ import (
 type CreateSchemaInput struct {
 	ProjectID string
 	TeamID    string
-	SchemaID  string
 	Schema    []byte
 }
 
@@ -60,17 +57,11 @@ func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInpu
 		}
 	}()
 
-	var tenantSchema map[string]any
-	if err := json.Unmarshal(input.Schema, &tenantSchema); err != nil {
-		return nil, domain.ErrJSONSchemaInvalid().WithParent(err)
+	model, err := domain.NewJSONSchema(input.ProjectID, input.Schema)
+	if err != nil {
+		return nil, err
 	}
 
-	model := &domain.JSONSchema{
-		ProjectID: input.ProjectID,
-		URL:       input.SchemaID,
-		CreatedAt: time.Now().UTC(),
-		Schema:    input.Schema,
-	}
 	err = s.schemaValidator.ValidateAgainstMetaSchema(input.Schema)
 	if err != nil {
 		return nil, domain.ErrJSONSchemaInvalid().WithParent(err)
@@ -84,7 +75,7 @@ func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInpu
 		return nil, domain.ErrInternal(err).WithMessage("failed to create schema in database")
 	}
 
-	_, err = s.schemaResolver.Resolve(ctx, tx, input.ProjectID, input.SchemaID, nil)
+	_, err = s.schemaResolver.Resolve(ctx, tx, input.ProjectID, model.URL, nil)
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to resolve schema when creating")
 	}
