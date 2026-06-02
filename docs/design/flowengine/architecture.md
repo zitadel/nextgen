@@ -121,7 +121,7 @@ Interface (`Resolve` + `Validate`) plus a schema-backed implementation in `flow_
 
 Interface every `on_success` mutation satisfies. One implementation today:
 
-- `FlowCreateUserHandler` (`flow_on_success_create_user.go`) — reads the identifier and password fields from the submission, hashes the password via `FlowPasswordHasher`, writes the user via the user repository, writes the credential via the password repository. Returns the resolved `UserID` so the state machine can stash it on `CollectedData[_user_id]`.
+- `FlowCreateUserHandler` (`flow_on_success_create_user.go`) — reads the identifier and password fields from the collected data, hashes the password via `FlowPasswordHasher`, writes the user via the user repository, writes the credential via the password repository. The handler is a pure side effect: it does not authenticate the new user, so the engine does not mint a handoff just because `create_user` ran.
 
 ### `FlowAuthAttemptService` (`internal/domain/flow_auth_attempt.go`)
 
@@ -136,7 +136,7 @@ or re-renders (step error) accordingly.
 - `FlowDefinition` / `FlowDefinitionStep` — the immutable graph (`flow_definition.go`). Steps don't have a `type`; behavior derives from `Fields`, `Actions`, `Gates`, `SSOProviders`, `OnSuccess`, `Complete`, and `Transitions`.
 - `FlowState` / `FlowProgress` — the cookie payload (`flow_state.go`). `FlowState` wraps `FlowProgress` (current step, history, collected data, `Purpose`, and the dispatch-mode `CurrentPurpose`) and adds session/OIDC context plus a reserved `PivotStack`.
 - `FlowStep` — the capability payload returned to the client (`flow_state_machine.go`).
-- Reserved key `FlowCollectedUserIDKey` (`_user_id`) — where on-success handlers stash the resolved user id.
+- Reserved key `FlowCollectedUserIDKey` (`_user_id`) — set by the dispatch loop when the auth-attempt identifies the user; gates whether the terminal step mints a handoff.
 
 ## Upstream dependencies (what calls into the engine)
 

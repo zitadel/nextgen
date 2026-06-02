@@ -262,7 +262,11 @@ func TestFlowStateMachine_Process_RegistrationHappyPath(t *testing.T) {
 	require.Len(t, w.pws.created, 1)
 	assert.Equal(t, "hashed:correct-horse-battery-staple", w.pws.created[0].EncodedHash)
 
-	assert.Equal(t, wantUserID, result.State.CollectedData[domain.FlowCollectedUserIDKey])
+	// on_success is a side effect: no _user_id pin, no handoff.
+	_, pinned := result.State.CollectedData[domain.FlowCollectedUserIDKey]
+	assert.False(t, pinned, "create_user must not pin _user_id")
+	assert.Empty(t, w.attempts.handoffCalls)
+	assert.Empty(t, result.HandoffToken)
 
 	// Register mode dispatches identifier (the email is x-unique, so it
 	// always routes through auth-attempt to emit user_already_exists when

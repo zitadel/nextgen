@@ -86,7 +86,7 @@ func (h *FlowCreateUserHandler) Handle(ctx context.Context, client database.Quer
 		return FlowOnSuccessResult{}, fmt.Errorf("flow on_success create_user: insert password: %w", err)
 	}
 
-	return FlowOnSuccessResult{UserID: userID}, nil
+	return FlowOnSuccessResult{}, nil
 }
 
 // findCollectedFieldByChallenge looks up a field whose resolved Challenge

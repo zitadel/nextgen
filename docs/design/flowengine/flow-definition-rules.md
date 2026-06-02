@@ -95,7 +95,7 @@ Transition values:
 - **Steps don't have a kind.** Don't try to encode "this is the password step" in the name — encode it in the fields, the `on_success`, and the transitions.
 - **Reserved transition outcomes are part of the contract.** If the engine emits `user_not_found` on a step you didn't wire for it, the step errors instead of routing. Wire it explicitly even when the route is a same-target anti-enumeration redirect.
 - **Schema annotations drive behavior.** `x-unique` makes a field an identifier (and contributes `user_not_found`). `x-password` combined with `x-auth-methods.password.enabled` makes a field a password challenge. Adding annotations to the schema can change how every flow that references the field behaves.
-- **`on_success` is a side effect, not a decision.** It can stash a user id and short-circuit a step error, but routing comes from transitions.
+- **`on_success` is a side effect, not a decision.** It can short-circuit a step error, but routing comes from transitions and it never authenticates the user — a terminal step after `create_user` mints no handoff unless an identifier dispatch happens later in the graph.
 
 ## Open questions
 

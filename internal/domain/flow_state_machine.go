@@ -104,8 +104,9 @@ type FlowAuthRequestRef struct {
 	RequestedACR *string
 }
 
-// FlowCollectedUserIDKey is the reserved key under which on_success
-// handlers stash the resolved user id on [FlowProgress.CollectedData].
+// FlowCollectedUserIDKey is the reserved key under which the dispatch
+// loop records the identified user on [FlowProgress.CollectedData]. The
+// terminal step uses its presence to decide whether to mint a handoff.
 const FlowCollectedUserIDKey = "_user_id"
 
 var (
@@ -256,9 +257,6 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 		result, err := r.runOnSuccess(ctx, client, def, state, userSchemaURL, currentStep, in.Fields, visitedResolved)
 		if err != nil {
 			return FlowStepResult{}, err
-		}
-		if result.UserID != "" {
-			recordResolvedUser(state, result.UserID)
 		}
 		if result.StepError != nil {
 			step := r.buildStep(currentStep, resolved, result.StepError, nil, nil)

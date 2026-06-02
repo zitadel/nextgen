@@ -40,12 +40,10 @@ type FlowOnSuccessInput struct {
 
 // FlowOnSuccessResult is what a handler returns. Outcome overrides the
 // transition key (empty = use the submitted action). StepError keeps
-// the user on the current step. UserID, when set, is recorded on the
-// flow state.
+// the user on the current step.
 type FlowOnSuccessResult struct {
 	Outcome   string
 	StepError *string
-	UserID    string
 }
 
 // FlowPasswordHasher hashes plaintext passwords into the PHC string
