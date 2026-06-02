@@ -5,7 +5,6 @@
 package integration_test
 
 import (
-	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -25,8 +24,6 @@ func TestCreateUser(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	harness.CreateUserSchema(t, project.ID, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
-
 	client := harness.EnsureAPIClient(t, project.ID)
 
 	params := api.CreateUserParams{
@@ -36,48 +33,41 @@ func TestCreateUser(t *testing.T) {
 
 	t.Run("ok", func(t *testing.T) {
 		tcs := []struct {
-			name    string
-			params  api.CreateUserParams
-			usermap map[string]any
+			name     string
+			params   api.CreateUserParams
+			userjson string
 		}{
 			{
 				name: "user with all optional properties",
 				params: api.CreateUserParams{
 					ProjectID: api.ProjectID(project.ID),
 				},
-				usermap: map[string]any{
-					"$schema":   "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml",
-					"email":     "john.doe.withalloptionalproperties@example.com",
-					"firstName": "john",
-					"lastName":  "doe",
-					"address": map[string]any{
-						"street":      "Main Street",
-						"houseNumber": "42a",
-						"city":        "Lake town",
-						"postalCode":  "6699",
-						"country":     "Madeupia",
-					},
-				},
+				userjson: helpers.MustMarshal(t, map[string]any{
+					"$schema":     "https://test.example.schemas.com/schemas/user.json",
+					"email":       "john.doe.withalloptionalproperties@example.com",
+					"name":        "john doe",
+					"phoneNumber": "0384902938",
+				}),
 			},
 			{
 				name: "user with no optional properties",
 				params: api.CreateUserParams{
 					ProjectID: api.ProjectID(project.ID),
 				},
-				usermap: map[string]any{
-					"$schema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml",
+				userjson: helpers.MustMarshal(t, map[string]any{
+					"$schema": "https://test.example.schemas.com/schemas/user.json",
 					"email":   "john.doe.withoutoptionalproperties@example.com",
-				},
+				}),
 			},
 			{
 				name: "user without team membership",
 				params: api.CreateUserParams{
 					ProjectID: api.ProjectID(project.ID),
 				},
-				usermap: map[string]any{
-					"$schema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml",
+				userjson: helpers.MustMarshal(t, map[string]any{
+					"$schema": "https://test.example.schemas.com/schemas/user.json",
 					"email":   "john.doe.withoutteammembership@example.com",
-				},
+				}),
 			},
 			{
 				name: "user with team membership",
@@ -85,19 +75,16 @@ func TestCreateUser(t *testing.T) {
 					ProjectID: api.ProjectID(project.ID),
 					TeamID:    api.OptTeamID{Set: true, Value: api.TeamID(team.ID)},
 				},
-				usermap: map[string]any{
-					"$schema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml",
+				userjson: helpers.MustMarshal(t, map[string]any{
+					"$schema": "https://test.example.schemas.com/schemas/user.json",
 					"email":   "john.doe.withteammembermship@example.com",
-				},
+				}),
 			},
 		}
 		for _, tc := range tcs {
 			t.Run(tc.name, func(t *testing.T) {
-				userbs, err := json.Marshal(tc.usermap)
-				require.NoError(t, err)
-
 				user := &api.User{}
-				err = user.UnmarshalJSON(userbs)
+				err = user.UnmarshalJSON([]byte(tc.userjson))
 				require.NoError(t, err)
 
 				resp, err := client.CreateUser(t.Context(), user, params)
@@ -111,34 +98,29 @@ func TestCreateUser(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
 		t.Run("invalid user data according to schema", func(t *testing.T) {
 			tcs := []struct {
-				name    string
-				usermap map[string]any
+				name     string
+				userjson string
 			}{
 				{
 					name: "missing required email property",
-					usermap: map[string]any{
-						"$schema":   "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml",
-						"firstName": "john",
-						"lastName":  "doe",
-					},
+					userjson: helpers.MustMarshal(t, map[string]any{
+						"$schema": "https://test.example.schemas.com/schemas/user.json",
+						"name":    "john doe",
+					}),
 				},
 				{
 					name: "first name too long",
-					usermap: map[string]any{
-						"$schema":   "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml",
-						"email":     "john.withawaytolongname@example.com",
-						"firstName": "john with a waaaaaaaaaaaaaaaaaaaaaaaaaaaaay too long name",
-						"lastName":  "doe",
-					},
+					userjson: helpers.MustMarshal(t, map[string]any{
+						"$schema": "https://test.example.schemas.com/schemas/user.json",
+						"email":   "john.withawaytolongname@example.com",
+						"name":    "john doe with a waaaaaaaaaaaaaaaaaaaaaaaaaaaaay too long name",
+					}),
 				},
 			}
 
 			for _, tc := range tcs {
-				userbs, err := json.Marshal(tc.usermap)
-				require.NoError(t, err)
-
 				user := &api.User{}
-				err = user.UnmarshalJSON(userbs)
+				err = user.UnmarshalJSON([]byte(tc.userjson))
 				require.NoError(t, err)
 
 				resp, err := client.CreateUser(t.Context(), user, params)
@@ -149,16 +131,10 @@ func TestCreateUser(t *testing.T) {
 		})
 
 		t.Run("duplicate mail address", func(t *testing.T) {
-			usermap := map[string]any{
-				"$schema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml",
-				"email":   "john.withaduplicatemailaddress@example.com",
-			}
-
-			userbs, err := json.Marshal(usermap)
-			require.NoError(t, err)
+			usermap := harness.TestData.Generator.GenerateUser(t, "testcreateuser.error.duplicatemailaddress@example.com")
 
 			user := &api.User{}
-			err = user.UnmarshalJSON(userbs)
+			err = user.UnmarshalJSON([]byte(helpers.MustMarshal(t, usermap)))
 			require.NoError(t, err)
 
 			resp, err := client.CreateUser(t.Context(), user, params)
@@ -174,6 +150,8 @@ func TestCreateUser(t *testing.T) {
 
 func TestSetUserPassword(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
+		// ARRANGE
+
 		project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
 		require.NoError(t, err)
 
@@ -182,7 +160,7 @@ func TestSetUserPassword(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		usermap := harness.TestData.Generator.GenerateUser(t, "john.testsetuserpassword@example.com")
+		usermap := harness.TestData.Generator.GenerateUser(t, "testsetuserpassword.ok@example.com")
 
 		user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
 			ProjectID: project.ID,
@@ -194,6 +172,8 @@ func TestSetUserPassword(t *testing.T) {
 		userEmail := user["email"].(string)
 
 		client := harness.EnsureAPIClient(t, project.ID)
+
+		// ACT
 
 		const password = "fake-password"
 		request := &api.SetUserPasswordRequest{
@@ -208,7 +188,11 @@ func TestSetUserPassword(t *testing.T) {
 		resp, err := client.SetUserPassword(t.Context(), request, params)
 		require.NoError(t, err)
 
-		require.IsType(t, &api.SetUserPasswordNoContent{}, resp, helpers.MustMarshal(t, resp))
+		// ASSERT
+
+		assert.IsType(t, &api.SetUserPasswordNoContent{}, resp, helpers.MustMarshal(t, resp))
+
+		// ENSURE USER CAN SIGN IN USING THEIR PASSWORD
 
 		authAttempts := harness.EnsureAuthAttemptService(t)
 		attempt, err := authAttempts.Create(t.Context(), service.CreateAuthAttemptInput{
