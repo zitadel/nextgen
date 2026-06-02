@@ -246,7 +246,14 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 		routeOutcome = dispatch.Outcome
 		applyOutcomeFlip(state, routeOutcome)
 	} else if currentStep.OnSuccess != nil {
-		result, err := r.runOnSuccess(ctx, client, def, state, userSchemaURL, currentStep, in.Fields, resolved)
+		// Resolve the union of fields collected so far so the handler
+		// can read the identifier (and any other attributes) from
+		// state.CollectedData rather than only the current step.
+		visitedResolved, err := r.resolveVisitedFields(ctx, client, state.ProjectID, userSchemaURL, def, state, currentStep)
+		if err != nil {
+			return FlowStepResult{}, err
+		}
+		result, err := r.runOnSuccess(ctx, client, def, state, userSchemaURL, currentStep, in.Fields, visitedResolved)
 		if err != nil {
 			return FlowStepResult{}, err
 		}
@@ -506,6 +513,40 @@ func (r *FlowStateMachineRuntime) resolveStepFields(ctx context.Context, client 
 	resolved, err := r.fields.Resolve(ctx, client, projectID, userSchemaURL, step.Name, step.Fields)
 	if err != nil {
 		return FlowResolvedFields{}, fmt.Errorf("flow state machine: resolve fields on step %q: %w", step.Name, err)
+	}
+	return resolved, nil
+}
+
+// resolveVisitedFields resolves the union of fields collected by every
+// step the user has passed through (history plus current). on_success
+// handlers read this to find attributes by challenge across the full
+// progress, not just the current step.
+func (r *FlowStateMachineRuntime) resolveVisitedFields(ctx context.Context, client database.QueryExecutor, projectID, userSchemaURL string, def *FlowDefinition, state *FlowState, current *FlowDefinitionStep) (FlowResolvedFields, error) {
+	seen := map[string]struct{}{}
+	collect := func(s *FlowDefinitionStep) {
+		if s == nil {
+			return
+		}
+		for _, f := range s.Fields {
+			seen[f] = struct{}{}
+		}
+	}
+	for _, name := range state.History {
+		if s, ok := def.FindStep(name); ok {
+			collect(s)
+		}
+	}
+	collect(current)
+	if len(seen) == 0 {
+		return FlowResolvedFields{}, nil
+	}
+	names := make([]string, 0, len(seen))
+	for n := range seen {
+		names = append(names, n)
+	}
+	resolved, err := r.fields.Resolve(ctx, client, projectID, userSchemaURL, current.Name, names)
+	if err != nil {
+		return FlowResolvedFields{}, fmt.Errorf("flow state machine: resolve visited fields: %w", err)
 	}
 	return resolved, nil
 }

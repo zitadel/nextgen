@@ -20,6 +20,15 @@ type fakeHasher struct{}
 
 func (fakeHasher) Hash(plain string) (string, error) { return "hashed:" + plain, nil }
 
+func findAttribute(attrs []*domain.CreateAttribute, key string) *domain.CreateAttribute {
+	for _, a := range attrs {
+		if a.Key == key {
+			return a
+		}
+	}
+	return nil
+}
+
 // fakeUserRepo records the users create_user persists.
 type fakeUserRepo struct {
 	created []*domain.CreateUser
@@ -625,7 +634,6 @@ func multiStepSignupDefinition() *domain.FlowDefinition {
 			},
 			{
 				Name:      "create",
-				Fields:    []string{"email", "password"},
 				OnSuccess: &createUser,
 				Actions: map[string]domain.FlowStepAction{
 					domain.FlowActionSubmit: {Primary: true},
@@ -676,7 +684,7 @@ func combinedSigninSignupDefinition() *domain.FlowDefinition {
 			},
 			{
 				Name:      "register-password",
-				Fields:    []string{"email", "password"},
+				Fields:    []string{"password"},
 				OnSuccess: &createUser,
 				Actions: map[string]domain.FlowStepAction{
 					domain.FlowActionSubmit: {Primary: true},
@@ -761,11 +769,14 @@ func TestFlowDispatch_RegisterMultiStep_HappyPath(t *testing.T) {
 
 	done, err := w.sm.Process(t.Context(), nil, def, afterPassword.State, domain.FlowSubmitInput{
 		Action: domain.FlowActionSubmit,
-		Fields: map[string]any{"email": "fresh@example.com", "password": "correct-horse-battery-staple"},
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "done", done.State.CurrentStep)
 	require.Len(t, w.users.created, 1)
+	// create_user reads identifier from CollectedData; email isn't re-sent.
+	emailAttr := findAttribute(w.users.created[0].Attributes, "email")
+	require.NotNil(t, emailAttr)
+	assert.Equal(t, "fresh@example.com", emailAttr.Value)
 }
 
 // Register entry, identifier already exists → user_already_exists +
@@ -815,12 +826,16 @@ func TestFlowDispatch_CombinedFlow_LoginUnknownEmail_FlipsAndCreates(t *testing.
 
 	done, err := w.sm.Process(t.Context(), nil, def, afterIdentify.State, domain.FlowSubmitInput{
 		Action: domain.FlowActionSubmit,
-		Fields: map[string]any{"email": "ghost@example.com", "password": "correct-horse-battery-staple"},
+		Fields: map[string]any{"password": "correct-horse-battery-staple"},
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "done", done.State.CurrentStep)
 	require.Len(t, w.users.created, 1)
 	assert.Empty(t, w.attempts.passwordCalls)
+	// Email collected on the identify step survives into create_user.
+	emailAttr := findAttribute(w.users.created[0].Attributes, "email")
+	require.NotNil(t, emailAttr)
+	assert.Equal(t, "ghost@example.com", emailAttr.Value)
 }
 
 // Worked example C variant: register entry, identifier exists → flip
