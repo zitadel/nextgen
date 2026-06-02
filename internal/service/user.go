@@ -114,7 +114,7 @@ func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (_ 
 }
 
 func (s *UserService) GetUserByID(ctx context.Context, input GetUserInput) (map[string]any, error) {
-	flatUser, err := s.userRepo.GetByID(ctx, s.pool, input.ProjectID, nil, input.UserID)
+	flatUser, err := s.userRepo.GetByID(ctx, s.pool, input.ProjectID, input.TeamID, input.UserID)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil, domain.ErrUserNotFound()
