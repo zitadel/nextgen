@@ -59,7 +59,22 @@ export abstract class BaseCommand extends Command {
     const isTTY = Boolean(process.stdout.isTTY && process.stdin.isTTY);
     const verbose = Boolean(flags.verbose);
     const debug = Boolean(flags.debug);
-    consola.level = debug ? 4 : verbose ? 3 : 2;
+    // Default to `info` (3) so users see step-by-step narration (start/info/
+    // success/box). `--json` silences consola entirely so the structured
+    // envelope is the only thing on stdout. `--debug` raises to 4 (debug);
+    // `--verbose` is reserved for richer per-step detail and currently maps
+    // to the same level as default.
+    consola.level = json ? -999 : debug ? 4 : 3;
+    // Drop the right-aligned timestamp the FancyReporter adds by default.
+    // Timestamps add no value in a one-off CLI run, wrap awkwardly on long
+    // lines (e.g. created-schema URL), and clutter the visual rhythm of the
+    // ◐/✔/ℹ glyphs that anchor each step.
+    consola.options.formatOptions = {
+      ...consola.options.formatOptions,
+      date: false,
+      colors: true,
+      compact: true,
+    };
     this.meta = {
       cwd,
       nonInteractive: Boolean(flags["non-interactive"]) || !isTTY || json,
