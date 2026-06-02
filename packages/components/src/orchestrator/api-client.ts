@@ -26,6 +26,7 @@ import type {
   ExchangeHandoffParams,
   SubmitFlowStepBody,
 } from "@zitadel-nextgen/api/generated/model";
+import { ApiError } from "@zitadel-nextgen/api/runtime/fetch";
 
 const apiRequestInit: RequestInit = { credentials: "include" };
 
@@ -33,12 +34,28 @@ export async function startFlow(api: ZitadelApi, input: CreateFlowBody): Promise
   return api.createFlow(input, apiRequestInit);
 }
 
+// `POST /flow/{id}/submit` returns 400 for field validation errors with the
+// step echoed back and `step.error` set — the orchestrator drives the UX off
+// that body the same way it does a 200. The shared `customFetch` throws on
+// any non-2xx, so we unwrap that one shape back into the typed response and
+// let everything else (cookie/auth/conflict/etc.) bubble as a real error.
 export async function submitStep(
   api: ZitadelApi,
   id: string,
   body: SubmitFlowStepBody,
 ): Promise<CreateFlow201> {
-  return api.submitFlowStep(id, body, apiRequestInit);
+  try {
+    return await api.submitFlowStep(id, body, apiRequestInit);
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 400 && isFlowResponse(error.body)) {
+      return error.body;
+    }
+    throw error;
+  }
+}
+
+function isFlowResponse(body: unknown): body is CreateFlow201 {
+  return typeof body === "object" && body !== null && "step" in body;
 }
 
 export async function getCurrentStep(api: ZitadelApi, id: string): Promise<CreateFlow201> {
