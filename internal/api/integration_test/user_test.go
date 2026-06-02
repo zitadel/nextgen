@@ -182,10 +182,6 @@ func TestSetUserPassword(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		harness.CreateUserSchema(t, project.ID, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
-
-		// TODO: user schema and flow definition should be created according to https://github.com/zitadel/nextgen/pull/183
-
 		usermap := harness.TestData.Generator.GenerateUser(t, "john.testsetuserpassword@example.com")
 
 		user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
@@ -316,8 +312,6 @@ func TestGetUser(t *testing.T) {
 			ProjectID: project.ID,
 		})
 		require.NoError(t, err)
-
-		harness.CreateUserSchema(t, project.ID, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
 
 		user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
 			ProjectID: project.ID,

@@ -42,7 +42,7 @@ func (g *DataGenerator) GenerateUser(t *testing.T, email string) map[string]any 
 	t.Helper()
 
 	u := map[string]any{
-		"$schema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml",
+		"$schema": "https://test.example.schemas.com/schemas/user.json",
 		"email":   email,
 	}
 	if randBool() {
