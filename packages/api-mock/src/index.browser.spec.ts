@@ -9,8 +9,8 @@
 import {
   createFlow,
   submitFlowStep,
-} from "@zitadel-nextgen/api/generated/endpoints/zitadelNextGen";
-import { configureZitadel } from "@zitadel-nextgen/api/config";
+} from "@zitadel/api-client/generated/endpoints/zitadelNextGen";
+import { configureZitadel } from "@zitadel/api-client/config";
 import { beforeAll, beforeEach, describe, expect } from "vitest";
 
 import { clearBranding, resetFlow, setupMock } from "./index.js";

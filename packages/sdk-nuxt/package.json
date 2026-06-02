@@ -1,5 +1,5 @@
 {
-  "name": "@zitadel-nextgen/sdk-nuxt",
+  "name": "@zitadel/sdk-nuxt",
   "version": "0.0.0",
   "description": "Nuxt proxy middleware and helpers for Nextgen Auth",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-nuxt#readme",
@@ -40,9 +40,9 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "@zitadel-nextgen/api": "workspace:*",
-    "@zitadel-nextgen/components": "workspace:*",
-    "@zitadel-nextgen/sdk-core": "workspace:*"
+    "@zitadel/api-client": "workspace:*",
+    "@zitadel/components": "workspace:*",
+    "@zitadel/sdk-core": "workspace:*"
   },
   "peerDependencies": {
     "h3": ">=1",

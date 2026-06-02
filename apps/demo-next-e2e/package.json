@@ -5,7 +5,7 @@
   "devDependencies": {
     "@playwright/test": "catalog:",
     "@zitadel-nextgen/api-mock": "workspace:*",
-    "@zitadel-nextgen/sdk-next": "workspace:*",
+    "@zitadel/sdk-next": "workspace:*",
     "eslint-plugin-playwright": "catalog:"
   }
 }

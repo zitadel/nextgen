@@ -7,6 +7,7 @@ import { defineConfig } from "vite";
 
 export default defineConfig(() => ({
   root: import.meta.dirname,
+  base: "/console/",
   server: {
     port: 5174,
     strictPort: true,
@@ -19,7 +20,7 @@ export default defineConfig(() => ({
   // Resolve workspace `@zitadel-nextgen/*` packages straight from `.ts`
   // source for hot dev iteration. Production builds pick up pre-built
   // `dist/*.mjs` via the default `import` condition instead.
-  resolve: { conditions: ["@zitadel-nextgen/source"] },
+  resolve: { conditions: ["@zitadel/source"] },
   plugins: [
     tailwindcss(),
     devtools(),

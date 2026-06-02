@@ -1,6 +1,9 @@
 name: release
 
 on:
+  push:
+    tags:
+      - "v*"
   workflow_dispatch:
     inputs:
       ref:
@@ -25,7 +28,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.ref }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.ref }}
           fetch-depth: 0
 
       - name: Set up Go
@@ -52,7 +55,7 @@ jobs:
         uses: docker/setup-buildx-action@v4
 
       - name: Login to GHCR
-        if: ${{ ! inputs.snapshot }}
+        if: ${{ github.event_name == 'push' || inputs.snapshot == false }}
         uses: docker/login-action@v4
         with:
           registry: ghcr.io
@@ -60,7 +63,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run GoReleaser (snapshot)
-        if: ${{ inputs.snapshot }}
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.snapshot == true }}
         uses: goreleaser/goreleaser-action@v7
         with:
           distribution: goreleaser
@@ -70,7 +73,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run GoReleaser
-        if: ${{ ! inputs.snapshot }}
+        if: ${{ github.event_name == 'push' || inputs.snapshot == false }}
         uses: goreleaser/goreleaser-action@v7
         with:
           distribution: goreleaser

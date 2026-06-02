@@ -1,4 +1,4 @@
-import type { CreateSchemaBody } from "@zitadel-nextgen/api/generated/model";
+import type { CreateSchemaBody } from "@zitadel/api-client/generated/model";
 
 import { fieldPreset } from "./presets";
 

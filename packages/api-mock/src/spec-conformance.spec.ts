@@ -6,7 +6,7 @@
  * server, POSTs / GETs every mocked endpoint, and validates the response
  * against the corresponding **zod** schema orval generates from the OAS.
  *
- * The TypeScript types from `@zitadel-nextgen/api/generated/model` give
+ * The TypeScript types from `@zitadel/api-client/generated/model` give
  * compile-time guarantees about shape; zod validation gives **runtime**
  * guarantees about regex patterns, enum values, min/max constraints, and
  * required-vs-optional. Together they're the "golden" guarantee: if this
@@ -39,7 +39,7 @@ import {
   GetProjectResponse,
   ListFlowDefinitionsResponse,
   UpdateFlowDefinitionResponse,
-} from "@zitadel-nextgen/api/generated/endpoints/zitadelNextGen.zod";
+} from "@zitadel/api-client/generated/endpoints/zitadelNextGen.zod";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 import { signHandoffToken } from "./crypto.js";

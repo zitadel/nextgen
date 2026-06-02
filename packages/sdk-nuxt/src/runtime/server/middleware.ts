@@ -1,7 +1,7 @@
 import type {
   AuthResult,
   NextgenMiddlewareOptions,
-} from '@zitadel-nextgen/sdk-core/types';
+} from '@zitadel/sdk-core/types';
 import type { EventHandler, H3Event } from 'h3';
 
 import {
@@ -9,7 +9,7 @@ import {
   INTERNAL_HEADERS,
   filterResponseHeaders,
   matchesRoutes,
-} from '@zitadel-nextgen/sdk-core/middleware';
+} from '@zitadel/sdk-core/middleware';
 import {
   defineEventHandler,
   getCookie,
@@ -92,7 +92,7 @@ function buildUpstreamHeaders(event: H3Event): Headers {
  * Register it as a Nitro server middleware in `server/middleware/auth.ts`:
  *
  * ```ts
- * import { createNextgenMiddleware } from "@zitadel-nextgen/sdk-nuxt/server";
+ * import { createNextgenMiddleware } from "@zitadel/sdk-nuxt/server";
  *
  * export default createNextgenMiddleware({
  *   issuerUrl: process.env.NEXTGEN_ISSUER_URL,
@@ -366,7 +366,7 @@ async function handleAuth(
  * Call this inside any server route or API handler after the middleware has run:
  *
  * ```ts
- * import { getAuth } from "@zitadel-nextgen/sdk-nuxt/server";
+ * import { getAuth } from "@zitadel/sdk-nuxt/server";
  *
  * export default defineEventHandler((event) => {
  *   const auth = getAuth(event);

@@ -47,13 +47,13 @@ export default defineConfig({
     }),
     workspaceStylesFullReload(),
   ],
-  resolve: { conditions: ["@zitadel-nextgen/source"] },
+  resolve: { conditions: ["@zitadel/source"] },
   optimizeDeps: {
     exclude: [
-      "@zitadel-nextgen/components",
-      "@zitadel-nextgen/shared-component-styles",
-      "@zitadel-nextgen/design-tokens",
-      "@zitadel-nextgen/api",
+      "@zitadel/components",
+      "@zitadel/shared-component-styles",
+      "@zitadel/design-tokens",
+      "@zitadel/api-client",
       "@zitadel-nextgen/api-mock",
     ],
   },

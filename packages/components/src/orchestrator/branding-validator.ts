@@ -13,7 +13,7 @@
  * return a sanitised payload with the offending fields stripped (set to
  * `undefined`) so the orchestrator falls back to the bundled defaults.
  */
-import { CreateFlow201BrandingLayout } from "@zitadel-nextgen/api/generated/model";
+import { CreateFlow201BrandingLayout } from "@zitadel/api-client/generated/model";
 
 import type { Branding } from "./branding.js";
 

@@ -1,5 +1,5 @@
 {
-  "name": "@zitadel-nextgen/design-tokens",
+  "name": "@zitadel/design-tokens",
   "version": "0.0.0",
   "description": "Figma-driven design tokens for ZITADEL NextGen — CSS variables, typed TypeScript constants, and a Tailwind v4 @theme block built from the published Zitadel Design System library.",
   "license": "MIT",
@@ -14,10 +14,13 @@
     "src/generated",
     "src/overrides.ts"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "exports": {
     "./package.json": "./package.json",
     ".": {
-      "@zitadel-nextgen/source": "./src/generated/tokens.ts",
+      "@zitadel/source": "./src/generated/tokens.ts",
       "types": "./dist/tokens.d.mts",
       "import": "./dist/tokens.mjs"
     },

@@ -3,7 +3,7 @@
  *
  * Every mutating endpoint validates its request (path params, query
  * params, body) against the generated Zod schemas from
- * `@zitadel-nextgen/api/generated/endpoints/zitadelNextGen.zod` — the
+ * `@zitadel/api-client/generated/endpoints/zitadelNextGen.zod` — the
  * same source of truth the real server's OpenAPI spec generates. Every
  * read endpoint validates its response on the way out, so the mock
  * cannot lie about its own outputs. Wire-shape drift in either
@@ -31,7 +31,7 @@ import type {
   GetSchemaById200,
   ListFlowDefinitions200,
   UpdateFlowDefinition200,
-} from "@zitadel-nextgen/api/generated/model";
+} from "@zitadel/api-client/generated/model";
 import {
   CreateFlowDefinitionBody,
   CreateProjectBody,
@@ -50,7 +50,7 @@ import {
   UpdateFlowDefinitionBody,
   UpdateFlowDefinitionParams,
   UpdateFlowDefinitionResponse,
-} from "@zitadel-nextgen/api/generated/endpoints/zitadelNextGen.zod";
+} from "@zitadel/api-client/generated/endpoints/zitadelNextGen.zod";
 import { http, HttpResponse } from "msw";
 import type { z } from "zod";
 

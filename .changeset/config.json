@@ -7,5 +7,14 @@
   "access": "public",
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
-  "ignore": []
+  "ignore": [
+    "@zitadel-nextgen/api-mock",
+    "@zitadel-nextgen/console",
+    "@zitadel-nextgen/console-e2e",
+    "@zitadel-nextgen/demo-next",
+    "@zitadel-nextgen/demo-next-e2e",
+    "@zitadel-nextgen/demo-nuxt",
+    "@zitadel-nextgen/demo-nuxt-e2e",
+    "@zitadel-nextgen/lint"
+  ]
 }

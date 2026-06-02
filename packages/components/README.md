@@ -1,4 +1,4 @@
-# @zitadel-nextgen/components
+# @zitadel/components
 
 Lit-based atomic web components and the `<zitadel-login>` orchestrator for the
 Zitadel auth UI.
@@ -31,7 +31,7 @@ for the form-association / accessibility decisions baked into every input atom.
 ## Install
 
 ```sh
-corepack pnpm add @zitadel-nextgen/components
+corepack pnpm add @zitadel/components@next
 ```
 
 `lit`, `liquidjs`, and `dompurify` are peer/runtime deps and are intentionally
@@ -43,12 +43,12 @@ The 90% case: render the element, point the typed Flow API client at your
 backend, set a locale.
 
 ```html
-<script type="module" src="@zitadel-nextgen/components"></script>
+<script type="module" src="@zitadel/components"></script>
 
 <zitadel-login id="login" purpose="login" project-id="proj_123"></zitadel-login>
 
 <script type="module">
-  import { setApiBaseUrl } from '@zitadel-nextgen/api/runtime/base-url';
+  import { setApiBaseUrl } from '@zitadel/api-client/runtime/base-url';
 
   setApiBaseUrl('https://api.tenant.com');
 
@@ -78,8 +78,8 @@ attributes (web component properties are typed objects, not stringified
 attributes).
 
 ```tsx
-import '@zitadel-nextgen/components';
-import { setApiBaseUrl } from '@zitadel-nextgen/api/runtime/base-url';
+import '@zitadel/components';
+import { setApiBaseUrl } from '@zitadel/api-client/runtime/base-url';
 
 setApiBaseUrl(import.meta.env.VITE_ZITADEL_API_BASE);
 
@@ -99,7 +99,7 @@ export function Login({ locale }: Props) {
 
 ### Mocking for offline demos and tests
 
-The orchestrator calls the typed `@zitadel-nextgen/api` fetch client
+The orchestrator calls the typed `@zitadel/api-client` fetch client
 directly — there is no transport abstraction to swap. Intercept at the
 network layer via the workspace-internal `@zitadel-nextgen/api-mock`
 package, which walks an xstate flow machine through identifier →
@@ -125,20 +125,20 @@ have different jobs — keep both:
 
 | Surface | Nx command | URLs | What it gives you |
 | --- | --- | --- | --- |
-| **Lit playground** | `corepack pnpm nx dev @zitadel-nextgen/components` | [login](http://localhost:5173/?route=login) · [atoms](http://localhost:5173/?route=atoms) | Component author surface: branding presets, event log, source TS from `src/`. MSW runs in the browser — no TCP mock server. |
-| **React console playground** | `corepack pnpm nx dev @zitadel-nextgen/console` | [http://localhost:5174](http://localhost:5174) | `@zitadel-nextgen/ui-react` atom matrices in the pre-release console shell. MSW in `import.meta.env.DEV`. Compare against Lit `:5173/?route=atoms` in a second tab. |
+| **Lit playground** | `corepack pnpm nx dev @zitadel/components` | [login](http://localhost:5173/?route=login) · [atoms](http://localhost:5173/?route=atoms) | Component author surface: branding presets, event log, source TS from `src/`. MSW runs in the browser — no TCP mock server. |
+| **React console playground** | `corepack pnpm nx dev @zitadel-nextgen/console` | [http://localhost:5174](http://localhost:5174) | `@zitadel/ui-react` atom matrices in the pre-release console shell. MSW in `import.meta.env.DEV`. Compare against Lit `:5173/?route=atoms` in a second tab. |
 | **demo-next** | `corepack pnpm nx start @zitadel-nextgen/api-mock` + `NEXTGEN_ISSUER_URL=http://localhost:4000 corepack pnpm nx dev @zitadel-nextgen/demo-next` | [http://localhost:3002/login](http://localhost:3002/login) (mock on `:4000`) | Next.js SDK, middleware, cookies, built `dist/`. See [`apps/demo-next`](../../apps/demo-next/README.md). |
 | **demo-nuxt** | mock on `:4000`, then `NEXTGEN_ISSUER_URL=http://localhost:4000 corepack pnpm nx dev @zitadel-nextgen/demo-nuxt` | [http://localhost:3001/login](http://localhost:3001/login) | Nuxt SDK, middleware, cookies, built `dist/`. See [`apps/demo-nuxt`](../../apps/demo-nuxt/README.md). |
 
 The Lit dev playground iterates on `<zl-*>` source; the React console
-playground exercises `@zitadel-nextgen/ui-react` in the internal shell.
+playground exercises `@zitadel/ui-react` in the internal shell.
 When tweaking Lit visuals or shadow-DOM behaviour, use `:5173` first —
 it round-trips faster. For React pair tweaks, use `:5174`.
 
 **Stale Lit styles on `:5173`?** Atom `.ts` changes use
 `vite-plugin-web-components-hmr` (Lit HMR). Edits to `shared-component-styles`
 CSS alone trigger a full reload. If it still looks old, run
-`corepack pnpm nx dev:clean @zitadel-nextgen/components` and hard-refresh.
+`corepack pnpm nx dev:clean @zitadel/components` and hard-refresh.
 Console (`:5174`) will not pick up Lit-only edits until you rebuild or
 change the paired React/CSS path.
 
@@ -159,7 +159,7 @@ form-associated inputs.
 
 | Tier | Surface | Use when |
 | --- | --- | --- |
-| API base | `setApiBaseUrl()` from `@zitadel-nextgen/api` | every consumer — points at your backend |
+| API base | `setApiBaseUrl()` from `@zitadel/api-client` | every consumer — points at your backend |
 | Tokens | branding payload returned from the server | tenant colour / logo / font |
 | CSS hooks | `zitadel-login::part(form)`, `zl-field::part(input)` | targeted overrides from the host page |
 | Locale | `el.locale = { ... }` | i18n / custom copy |
@@ -271,7 +271,7 @@ packages/components/
 │   ├── orchestrator/      <zitadel-login>, <zitadel-logout>, api-client, liquid, branding
 │   │   ├── locales/       bundled English fallback
 │   │   └── templates/     auth-form / passkey-upsell / signed-in liquid partials
-│   ├── tokens/            re-export of @zitadel-nextgen/design-tokens
+│   ├── tokens/            re-export of @zitadel/design-tokens
 │   ├── styles/            shared host styles, focus ring, t() css-var bridge
 │   ├── manifests.ts       per-atom attribute / part / event manifests
 │   └── index.ts           barrel
@@ -293,7 +293,7 @@ corepack pnpm install
 # --- Playgrounds (two terminals) ---
 
 # Lit: atoms + login, in-browser MSW
-corepack pnpm nx dev @zitadel-nextgen/components
+corepack pnpm nx dev @zitadel/components
 # → http://localhost:5173/?route=login
 # → http://localhost:5173/?route=atoms
 
@@ -308,10 +308,10 @@ corepack pnpm nx dev @zitadel-nextgen/console
 
 # --- Package checks ---
 
-corepack pnpm nx test @zitadel-nextgen/components
-corepack pnpm nx test:browser @zitadel-nextgen/components
-corepack pnpm nx typecheck @zitadel-nextgen/components
-corepack pnpm nx build @zitadel-nextgen/components
+corepack pnpm nx test @zitadel/components
+corepack pnpm nx test:browser @zitadel/components
+corepack pnpm nx typecheck @zitadel/components
+corepack pnpm nx build @zitadel/components
 ```
 
 The components dev server imports source TS from `src/` and hot-reloads on edits.

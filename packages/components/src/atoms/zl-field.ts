@@ -1,9 +1,9 @@
-import type { CreateFlow201StepFieldsType } from "@zitadel-nextgen/api/generated/model";
+import type { CreateFlow201StepFieldsType } from "@zitadel/api-client/generated/model";
 import { LitElement, html, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 
-import fieldHost from "@zitadel-nextgen/shared-component-styles/lit/text-field-host.css?inline";
-import fieldSurface from "@zitadel-nextgen/shared-component-styles/text-field.css?inline";
+import fieldHost from "@zitadel/shared-component-styles/lit/text-field-host.css?inline";
+import fieldSurface from "@zitadel/shared-component-styles/text-field.css?inline";
 
 import { nextUid } from "../internal/unique-id.js";
 import type { AtomManifest } from "../manifest.js";

@@ -1,20 +1,20 @@
 import { defineConfig } from "tsdown";
 
 /**
- * Library build for `@zitadel-nextgen/api`.
+ * Library build for `@zitadel/api-client`.
  *
  * The orval-generated client is consumed two ways:
  *
  * - Workspace dev — Vite/Vitest with `resolve.conditions` set to
- *   `@zitadel-nextgen/source` resolves the `exports` map straight to
+ *   `@zitadel/source` resolves the `exports` map straight to
  *   `src/**\/*.ts`, so iteration is hot and no rebuild is needed.
  * - External production builds (e.g. `nuxt build` consuming the
- *   built `@zitadel-nextgen/components` dist) get the default
+ *   built `@zitadel/components` dist) get the default
  *   `import` condition and load these `.mjs` files instead.
  *
  * Each subpath the components package imports gets its own entry so
- * Rollup can resolve `@zitadel-nextgen/api/runtime/base-url`,
- * `@zitadel-nextgen/api/generated/endpoints/zitadelNextGen`, etc.
+ * Rollup can resolve `@zitadel/api-client/runtime/base-url`,
+ * `@zitadel/api-client/generated/endpoints/zitadelNextGen`, etc.
  * directly.
  */
 export default defineConfig({

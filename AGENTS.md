@@ -64,7 +64,7 @@ go test ./...
 ```
 
 Prefer Nx project targets for narrow package work, for example
-`corepack pnpm nx test @zitadel-nextgen/cli`.
+`corepack pnpm nx test @zitadel/cli`.
 
 End-to-end tests are **opt-in locally** — they're not part of the
 default `run-many -t lint,typecheck,build,test` invocation because they
@@ -116,7 +116,7 @@ changes.
   let the TanStack Router plugin regenerate it.
 - Do not hand-edit the generated section of `apps/cli/AGENTS.md`; update the CLI
   registry or `apps/cli/scripts/gen-agents-md.ts`, then run
-  `corepack pnpm nx run @zitadel-nextgen/cli:gen:agents-md`.
+  `corepack pnpm nx run @zitadel/cli:gen:agents-md`.
 
 ## CLI Contract
 

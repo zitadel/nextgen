@@ -15,7 +15,7 @@ import type { RendererSpec } from "./renderers/types";
  * Carries the managed marker so `doctor --fix` reclaims it and `eject` removes it.
  */
 const middlewareTemplate = `${MANAGED_MARKER}
-import { nextgenMiddleware } from "@zitadel-nextgen/sdk-next/middleware";
+import { nextgenMiddleware } from "@zitadel/sdk-next/middleware";
 import type { NextRequest } from "next/server";
 
 export function middleware(req: NextRequest) {

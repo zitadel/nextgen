@@ -4,7 +4,7 @@ import {
   useRuntimeConfig,
   useState,
 } from '#imports';
-import { configureZitadel } from '@zitadel-nextgen/api/config';
+import { configureZitadel } from '@zitadel/api-client/config';
 
 import type { ClientAuthResult } from './types';
 

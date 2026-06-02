@@ -7,8 +7,8 @@ import type { RendererSpec } from "../types";
  * Lit web components.
  *
  * Each page is a single client component (`"use client"`) that imports
- * `@zitadel-nextgen/sdk-next/client` via `next/dynamic({ ssr: false })`.
- * That subpath re-exports from `@zitadel-nextgen/components`, so the
+ * `@zitadel/sdk-next/client` via `next/dynamic({ ssr: false })`.
+ * That subpath re-exports from `@zitadel/components`, so the
  * `customElements.define` side-effect fires; importing components
  * directly would fail on strict-resolution package managers (pnpm,
  * yarn PnP) because the user only declares `sdk-next` as a direct dep.
@@ -25,7 +25,7 @@ export const reactRenderer: RendererSpec = {
   displayName: "React (Next.js App Router)",
   status: "available",
   frameworks: ["next"],
-  dependency: { name: "@zitadel-nextgen/sdk-next", version: "latest" },
+  dependency: { name: "@zitadel/sdk-next", version: "latest" },
   templates: {
     authPage(mode) {
       const componentName = mode === "login" ? "LoginPage" : "RegisterPage";
@@ -39,7 +39,7 @@ import dynamic from "next/dynamic";
 
 const ${elementName} = dynamic(
   async () => {
-    await import("@zitadel-nextgen/sdk-next/client");
+    await import("@zitadel/sdk-next/client");
     return function ${elementName}Element() {
       return (
         <zitadel-login
@@ -73,7 +73,7 @@ import dynamic from "next/dynamic";
 
 const ZitadelLogout = dynamic(
   async () => {
-    await import("@zitadel-nextgen/sdk-next/client");
+    await import("@zitadel/sdk-next/client");
     return function ZitadelLogoutElement() {
       return (
         <zitadel-logout

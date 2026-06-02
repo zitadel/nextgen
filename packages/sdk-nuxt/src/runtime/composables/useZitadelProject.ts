@@ -1,7 +1,7 @@
 import {
   getZitadelConfig,
   type ZitadelProject,
-} from '@zitadel-nextgen/api/config';
+} from '@zitadel/api-client/config';
 
 /**
  * Returns the current Zitadel project handle.
@@ -12,7 +12,7 @@ import {
  *
  * ```vue
  * <script setup lang="ts">
- * import { useZitadelProject } from '@zitadel-nextgen/sdk-nuxt';
+ * import { useZitadelProject } from '@zitadel/sdk-nuxt';
  *
  * const project = useZitadelProject();
  * </script>

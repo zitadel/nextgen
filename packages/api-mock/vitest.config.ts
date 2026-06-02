@@ -18,7 +18,7 @@ import { defineConfig } from "vitest/config";
  * browser project. `pnpm test:all` runs both.
  */
 export default defineConfig({
-  resolve: { conditions: ["@zitadel-nextgen/source"] },
+  resolve: { conditions: ["@zitadel/source"] },
   test: {
     name: "@zitadel-nextgen/api-mock",
     watch: false,

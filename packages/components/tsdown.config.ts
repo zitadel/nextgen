@@ -1,17 +1,17 @@
 import { defineConfig } from "tsdown";
 
 /**
- * Library build for `@zitadel-nextgen/components`.
+ * Library build for `@zitadel/components`.
  *
  * Each subpath in `package.json` `exports` has its own entry so consumers can
- * `import { ... } from "@zitadel-nextgen/components/atoms"` without dragging
+ * `import { ... } from "@zitadel/components/atoms"` without dragging
  * in the orchestrator (and its `liquidjs` + `dompurify` dependencies).
  *
- * Internal `@zitadel-nextgen/*` workspace packages (`api`, `design-tokens`,
- * `shared-component-styles`) are inlined into the dist so consumers only
- * need to install `@zitadel-nextgen/components` itself — no transitive
- * registry deps. `@zitadel-nextgen/api-mock` stays external because it's a
- * test-only helper consumers never import.
+ * Public `@zitadel/*` workspace packages (`api-client`, `design-tokens`,
+ * `shared-component-styles`) are inlined into the dist chunks so published
+ * subpaths do not leak workspace-only CSS or source imports.
+ * `@zitadel-nextgen/api-mock` stays external because it's a test-only helper
+ * consumers never import.
  */
 export default defineConfig({
   entry: {
@@ -45,8 +45,8 @@ export default defineConfig({
   ],
   /** Inline internal workspace deps so the published package is self-contained. */
   noExternal: [
-    /^@zitadel-nextgen\/api(\/|$)/,
-    /^@zitadel-nextgen\/design-tokens(\/|$)/,
-    /^@zitadel-nextgen\/shared-component-styles(\/|$)/,
+    /^@zitadel\/api-client(\/|$)/,
+    /^@zitadel\/design-tokens(\/|$)/,
+    /^@zitadel\/shared-component-styles(\/|$)/,
   ],
 });

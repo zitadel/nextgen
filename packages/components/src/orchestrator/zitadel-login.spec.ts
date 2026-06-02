@@ -1,6 +1,6 @@
 /**
  * jsdom-friendly integration tests for `<zitadel-login>`. Network calls go
- * through the typed `@zitadel-nextgen/api` fetch client; we intercept them
+ * through the typed `@zitadel/api-client` fetch client; we intercept them
  * with `msw/node` driven by the shared xstate flow walker in
  * `@zitadel-nextgen/api-mock`.
  *
@@ -9,7 +9,7 @@
  * `zitadel-login.browser.spec.ts` because jsdom 29 only ships a partial
  * `ElementInternals` implementation.
  */
-import { configureZitadel, _resetConfigForTesting } from "@zitadel-nextgen/api/config";
+import { configureZitadel, _resetConfigForTesting } from "@zitadel/api-client/config";
 import {
   applyBranding,
   clearBranding,

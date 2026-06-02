@@ -3,8 +3,11 @@ import ReactDOM from "react-dom/client";
 
 import { routeTree } from "./routeTree.gen";
 
+const routerBasepath = import.meta.env.BASE_URL === "/" ? "/" : import.meta.env.BASE_URL.replace(/\/$/, "");
+
 const router = createRouter({
   routeTree,
+  basepath: routerBasepath,
   defaultPreload: "intent",
   scrollRestoration: true,
 });

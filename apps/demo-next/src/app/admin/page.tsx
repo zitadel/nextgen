@@ -1,4 +1,4 @@
-import { auth } from "@zitadel-nextgen/sdk-next/server";
+import { auth } from "@zitadel/sdk-next/server";
 import { LogoutWidget } from "./widget";
 
 export default async function AdminPage() {

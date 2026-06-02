@@ -1,5 +1,5 @@
-import type { ZitadelProject } from '@zitadel-nextgen/api/config';
-import type { NextgenMiddlewareOptions } from '@zitadel-nextgen/sdk-core/types';
+import type { ZitadelProject } from '@zitadel/api-client/config';
+import type { NextgenMiddlewareOptions } from '@zitadel/sdk-core/types';
 import type { NextRequest } from 'next/server';
 
 import {
@@ -7,7 +7,7 @@ import {
   INTERNAL_HEADERS,
   filterResponseHeaders,
   matchesRoutes,
-} from '@zitadel-nextgen/sdk-core/middleware';
+} from '@zitadel/sdk-core/middleware';
 import { NextResponse } from 'next/server';
 
 import { verifyJwt } from './lib/jwt';
@@ -359,8 +359,8 @@ export type ProxyHandler = (
  *
  * ```ts
  * // src/zitadel.ts
- * import { configureZitadel } from "@zitadel-nextgen/api/config";
- * import { createProxy } from "@zitadel-nextgen/sdk-next/middleware";
+ * import { configureZitadel } from "@zitadel/api-client/config";
+ * import { createProxy } from "@zitadel/sdk-next/middleware";
  *
  * const zitadel = configureZitadel({
  *   apiBase: "/__nextgen",

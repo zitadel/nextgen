@@ -12,9 +12,9 @@ function RootComponent() {
   return (
     <>
       <header>
-        <h1>@zitadel-nextgen/ui-react</h1>
+        <h1>@zitadel/ui-react</h1>
         <nav aria-label="Playground">
-          <a href="/" aria-current="page">
+          <a href={import.meta.env.BASE_URL} aria-current="page">
             Atoms
           </a>
         </nav>

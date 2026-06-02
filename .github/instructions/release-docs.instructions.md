@@ -9,8 +9,9 @@ state of the repo.
 
 - CI should continue to cover Go vet/tests, pnpm install/typecheck/test/build,
   CLI smoke checks, npm pack dry runs, and non-publishing GoReleaser snapshots.
-- The release workflow is manual and draft-oriented while the repo is
-  pre-release. Do not imply official npm publishing is enabled.
+- The server release workflow publishes from `v*` tags and keeps a manual
+  snapshot path for pre-release validation. npm publishing is enabled through
+  Changesets once `NPM_TOKEN` is configured.
 - npm package changes use changesets; Go server releases use GoReleaser.
 - Keep licensing text aligned with `LICENSING.md`: AGPL-3.0-only by default,
   MIT exceptions for CLI, SDKs, API contracts, and docs.

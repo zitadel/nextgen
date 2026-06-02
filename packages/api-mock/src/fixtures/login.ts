@@ -10,7 +10,7 @@
  * — fixtures themselves never embed branding so playground / test consumers
  * can swap it without rebuilding the fixture.
  */
-import type { CreateFlow201, CreateFlow201Step } from "@zitadel-nextgen/api/generated/model";
+import type { CreateFlow201, CreateFlow201Step } from "@zitadel/api-client/generated/model";
 
 import { signHandoffToken } from "../crypto.js";
 import type { StoredCredential } from "../lib/authn/index.js";

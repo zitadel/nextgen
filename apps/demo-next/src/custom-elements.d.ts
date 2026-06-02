@@ -1,6 +1,6 @@
 import type React from "react";
-import type { ZitadelProject } from "@zitadel-nextgen/api/config";
-import type { Locale } from "@zitadel-nextgen/components";
+import type { ZitadelProject } from "@zitadel/api-client/config";
+import type { Locale } from "@zitadel/components";
 
 declare module "react" {
   namespace JSX {

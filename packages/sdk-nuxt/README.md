@@ -1,11 +1,11 @@
-# @zitadel-nextgen/sdk-nuxt
+# @zitadel/sdk-nuxt
 
 Nuxt middleware and helpers for Nextgen Auth.
 
 ## Installation
 
 ```bash
-pnpm add @zitadel-nextgen/sdk-nuxt
+pnpm add @zitadel/sdk-nuxt@next
 ```
 
 ## Setup
@@ -15,7 +15,7 @@ pnpm add @zitadel-nextgen/sdk-nuxt
 Create `server/middleware/auth.ts`:
 
 ```ts
-import { createNextgenMiddleware } from '@zitadel-nextgen/sdk-nuxt/server';
+import { createNextgenMiddleware } from '@zitadel/sdk-nuxt/server';
 
 const { nextgenIssuerUrl } = useRuntimeConfig();
 
@@ -77,10 +77,10 @@ if (auth.value?.isAuthenticated) {
 ### 4. Register components (client only)
 
 Create `plugins/zitadel-components.client.ts` — do **not** import
-`@zitadel-nextgen/components` from page `<script setup>` (that runs during SSR):
+`@zitadel/components` from page `<script setup>` (that runs during SSR):
 
 ```ts
-import "@zitadel-nextgen/components";
+import "@zitadel/components";
 
 export default defineNuxtPlugin(() => {});
 ```
@@ -106,7 +106,7 @@ Render `<zitadel-login>` inside `<ClientOnly>`:
 ### 6. Reading auth in a server route
 
 ```ts
-import { getAuth } from '@zitadel-nextgen/sdk-nuxt/server';
+import { getAuth } from '@zitadel/sdk-nuxt/server';
 
 export default defineEventHandler((event) => {
   const auth = getAuth(event);

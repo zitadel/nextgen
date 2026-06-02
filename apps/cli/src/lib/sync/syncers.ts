@@ -3,9 +3,9 @@ import type {
   CreateSchemaBody,
   GetSchemaById200,
   GetFlowDefinition200,
-} from "@zitadel-nextgen/api/generated/model";
-import type { ZitadelClient } from "@zitadel-nextgen/api/client";
-import { CreateSchemaBody as createSchemaBodySchema } from "@zitadel-nextgen/api/generated/endpoints/zitadelNextGen.zod";
+} from "@zitadel/api-client/generated/model";
+import type { ZitadelClient } from "@zitadel/api-client/client";
+import { CreateSchemaBody as createSchemaBodySchema } from "@zitadel/api-client/generated/endpoints/zitadelNextGen.zod";
 
 import { FLOWS_DIR, flowEnvRefs, validateFlows } from "../flows";
 import { SCHEMAS_DIR } from "../user-schema";

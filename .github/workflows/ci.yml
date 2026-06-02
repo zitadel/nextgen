@@ -153,6 +153,17 @@ jobs:
       - name: Node checks
         run: corepack pnpm nx run-many -t lint,typecheck,build,test
 
+  changeset-required:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Check publishable package changes
+        run: node scripts/check-changeset-required.mjs --base origin/${{ github.base_ref }}
+
   node-e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -200,7 +211,7 @@ jobs:
           exec playwright install-deps chromium
 
       # Boots the demo dev servers + api-mock through Playwright's webServer
-      # config; Nx rebuilds @zitadel-nextgen/components first via ^build.
+      # config; Nx rebuilds @zitadel/components first via ^build.
       # console-e2e has no specs yet — it's intentionally excluded until
       # Playwright would otherwise fail with "no tests found".
       #
@@ -255,14 +266,14 @@ jobs:
 
       - name: Dry-run npm packs
         run: |
-          for dir in apps/cli packages/sdk-core packages/sdk-next; do
+          for dir in apps/cli packages/api packages/components packages/design-tokens packages/shared-component-styles packages/ui-react packages/sdk-core packages/sdk-next packages/sdk-nuxt; do
             (cd "$dir" && npm pack --dry-run)
           done
 
       - name: Create npm package artifacts
         run: |
           mkdir -p "$RUNNER_TEMP/zitadel-npm-packages"
-          for dir in apps/cli packages/sdk-core packages/sdk-next; do
+          for dir in apps/cli packages/api packages/components packages/design-tokens packages/shared-component-styles packages/ui-react packages/sdk-core packages/sdk-next packages/sdk-nuxt; do
             (cd "$dir" && npm pack --pack-destination "$RUNNER_TEMP/zitadel-npm-packages")
           done
           ls -lh "$RUNNER_TEMP/zitadel-npm-packages"

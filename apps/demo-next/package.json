@@ -20,11 +20,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@zitadel-nextgen/api": "workspace:*",
-    "@zitadel-nextgen/components": "workspace:*",
-    "@zitadel-nextgen/design-tokens": "workspace:*",
-    "@zitadel-nextgen/shared-component-styles": "workspace:*",
-    "@zitadel-nextgen/sdk-next": "workspace:*",
+    "@zitadel/api-client": "workspace:*",
+    "@zitadel/components": "workspace:*",
+    "@zitadel/design-tokens": "workspace:*",
+    "@zitadel/shared-component-styles": "workspace:*",
+    "@zitadel/sdk-next": "workspace:*",
     "next": "^16.2.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"

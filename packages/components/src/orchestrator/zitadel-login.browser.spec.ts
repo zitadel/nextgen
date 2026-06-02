@@ -1,6 +1,6 @@
-import type { CreateFlow201 } from "@zitadel-nextgen/api/generated/model";
-import { configureZitadel, _resetConfigForTesting } from "@zitadel-nextgen/api/config";
-import type { ZitadelProject } from "@zitadel-nextgen/api/config";
+import type { CreateFlow201 } from "@zitadel/api-client/generated/model";
+import { configureZitadel, _resetConfigForTesting } from "@zitadel/api-client/config";
+import type { ZitadelProject } from "@zitadel/api-client/config";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import "./zitadel-login.js";
@@ -11,7 +11,7 @@ import type { ZitadelLogin } from "./zitadel-login.js";
  * contract. Tests that need the FACE platform live here; the unit suite
  * keeps the rendering / Liquid / sanitiser specs that work in jsdom.
  *
- * The orchestrator calls the typed `@zitadel-nextgen/api` client
+ * The orchestrator calls the typed `@zitadel/api-client` client
  * directly. This suite swaps `globalThis.fetch` for a queue of pre-baked
  * `CreateFlow201` payloads — equivalent to swapping the previous
  * `transport` property, one level lower in the stack. Fetch is stubbed

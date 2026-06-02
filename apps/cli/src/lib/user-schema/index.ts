@@ -4,11 +4,11 @@
  * discipline as `lib/flows/`.
  *
  * **Source of truth.** The wire shape lives in
- * `@zitadel-nextgen/api/generated/model` (orval-generated from the
+ * `@zitadel/api-client/generated/model` (orval-generated from the
  * OpenAPI spec). Callers that need the type import `CreateSchemaBody`
  * from there directly; callers that need the runtime validator import
  * the matching Zod schema from
- * `@zitadel-nextgen/api/generated/endpoints/zitadelNextGen.zod`. This
+ * `@zitadel/api-client/generated/endpoints/zitadelNextGen.zod`. This
  * module owns only CLI-specific concerns: the builder, the per-field
  * preset catalog, and the two `DEFAULT_*` URI constants.
  *

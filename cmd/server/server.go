@@ -23,6 +23,7 @@ import (
 	oasapi "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/bootstrap/users"
+	"github.com/zitadel/nextgen/internal/consoleassets"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/domain/idgen"
@@ -195,9 +196,14 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 		return fmt.Errorf("build api server: %w", err)
 	}
 
+	httpHandler := http.Handler(oasServer)
+	if consoleFS, ok := consoleassets.FileSystem(); ok {
+		httpHandler = withConsoleHandler(httpHandler, consoleFS)
+	}
+
 	httpServer := &http.Server{
 		Addr:              cfg.Server.Address,
-		Handler:           oasServer,
+		Handler:           httpHandler,
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      30 * time.Second,

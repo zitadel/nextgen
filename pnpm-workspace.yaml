@@ -4,6 +4,8 @@ packages:
   - "packages/*"
 
 catalog:
+  '@changesets/changelog-github': ^0.7.0
+  '@changesets/cli': ^2.31.0
   "@clack/prompts": ^1.2.0
   "@faker-js/faker": ^10.4.0
   "@mswjs/http-middleware": ^0.10.3
@@ -23,7 +25,6 @@ catalog:
   '@oclif/plugin-search': ^1.2.50
   '@oclif/plugin-version': ^2.2.46
   '@oclif/plugin-which': ^3.2.55
-  oclif: ^4.17.46
   "@playwright/test": ^1.60.0
   "@tailwindcss/vite": ^4.2.4
   "@tanstack/devtools-vite": ^0.6.0
@@ -57,6 +58,7 @@ catalog:
   lucide-react: ^1.16.0
   msw: ^2.14.6
   nx: ^22.7.0
+  oclif: ^4.17.46
   orval: ^8.10.0
   oxfmt: ^0.46.0
   oxlint: ^1.61.0

@@ -5,12 +5,17 @@ before:
   hooks:
     - sh -c 'if [ -f pnpm-workspace.yaml ]; then corepack pnpm install --frozen-lockfile; fi'
     - sh -c 'if [ -f apps/console/package.json ]; then corepack pnpm nx build @zitadel-nextgen/console; fi'
+    - rm -rf internal/consoleassets/dist
+    - mkdir -p internal/consoleassets/dist
+    - cp -R apps/console/dist/. internal/consoleassets/dist/
     - go mod download
 
 builds:
   - id: nextgen
     main: .
     binary: nextgen
+    tags:
+      - embed_console
     env:
       - CGO_ENABLED=0
     flags:
@@ -69,4 +74,4 @@ changelog:
   use: github
 
 release:
-  draft: true
+  draft: false

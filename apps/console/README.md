@@ -1,7 +1,7 @@
 # console
 
 Pre-release Vite + React shell for the internal console: paired atoms from
-`@zitadel-nextgen/ui-react` and design tokens on the page. Lit atoms live in the
+`@zitadel/ui-react` and design tokens on the page. Lit atoms live in the
 components playground (`:5173`); compare visuals across two tabs, not on this app.
 
 ## Run locally
@@ -22,7 +22,7 @@ In development, MSW intercepts flow API calls in the browser (same handlers as
 
 | Surface | Command | URL |
 | ------- | ------- | --- |
-| Lit atoms + login (MSW in browser) | `corepack pnpm nx dev @zitadel-nextgen/components` | [http://localhost:5173/?route=atoms](http://localhost:5173/?route=atoms) · [login](http://localhost:5173/?route=login) |
+| Lit atoms + login (MSW in browser) | `corepack pnpm nx dev @zitadel/components` | [http://localhost:5173/?route=atoms](http://localhost:5173/?route=atoms) · [login](http://localhost:5173/?route=login) |
 | React atoms (this app, MSW in browser) | `corepack pnpm nx dev @zitadel-nextgen/console` | [http://localhost:5174](http://localhost:5174) |
 | Next.js SDK (cookies, middleware, built `dist/`) | `corepack pnpm nx start @zitadel-nextgen/api-mock` then `NEXTGEN_ISSUER_URL=http://localhost:4000 corepack pnpm nx dev @zitadel-nextgen/demo-next` | mock [http://localhost:4000](http://localhost:4000) · app [http://localhost:3002/login](http://localhost:3002/login) |
 | Nuxt SDK (cookies, middleware, built `dist/`) | mock as above, then `NEXTGEN_ISSUER_URL=http://localhost:4000 corepack pnpm nx dev @zitadel-nextgen/demo-nuxt` | mock `:4000` · app [http://localhost:3001/login](http://localhost:3001/login) |
@@ -32,7 +32,7 @@ When you change **Lit-only** atom or orchestrator source, prefer the components 
 to pick up `dist/` changes:
 
 ```bash
-corepack pnpm nx build @zitadel-nextgen/components
+corepack pnpm nx build @zitadel/components
 ```
 
 ## Other tasks

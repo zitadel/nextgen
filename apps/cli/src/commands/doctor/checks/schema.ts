@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { CreateSchemaBody } from "@zitadel-nextgen/api/generated/endpoints/zitadelNextGen.zod";
+import { CreateSchemaBody } from "@zitadel/api-client/generated/endpoints/zitadelNextGen.zod";
 
 import { AbstractSanityCheck, type CheckContext } from "./types";
 

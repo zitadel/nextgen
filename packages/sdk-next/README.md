@@ -1,11 +1,11 @@
-# @zitadel-nextgen/sdk-next
+# @zitadel/sdk-next
 
 Next.js middleware and helpers for Nextgen Auth.
 
 ## Installation
 
 ```bash
-pnpm add @zitadel/sdk-next
+pnpm add @zitadel/sdk-next@next
 ```
 
 ## Setup
@@ -82,7 +82,7 @@ export function UserBadge() {
 
 ### 4. Login page
 
-The `<zitadel-login>` web component (from `@zitadel-nextgen/components`) must be rendered client-side only. Split it into a server wrapper and a client widget:
+The `<zitadel-login>` web component (from `@zitadel/components`) must be rendered client-side only. Split it into a server wrapper and a client widget:
 
 ```tsx
 // app/login/page.tsx (server)
@@ -104,7 +104,7 @@ import dynamic from 'next/dynamic';
 
 const ZitadelLogin = dynamic(
   async () => {
-    await import('@zitadel-nextgen/components');
+    await import('@zitadel/components');
     return function ZitadelLoginElement() {
       return (
         <zitadel-login

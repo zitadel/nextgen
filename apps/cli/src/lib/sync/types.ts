@@ -23,7 +23,7 @@ export type ZitadelState = {
  * project-root-relative path the sync loop scans; `mutable` controls whether
  * file-content changes trigger an update or get skipped. Concrete syncers
  * call the orval-generated operations directly; bearer auth and base URL
- * come from `@zitadel-nextgen/api/runtime/{auth,base-url}` module-globals
+ * come from `@zitadel/api-client/runtime/{auth,base-url}` module-globals
  * the command layer sets at boot.
  */
 export interface ResourceSyncer {

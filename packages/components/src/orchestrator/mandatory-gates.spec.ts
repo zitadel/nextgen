@@ -1,4 +1,4 @@
-import type { CreateFlow201Step } from "@zitadel-nextgen/api/generated/model";
+import type { CreateFlow201Step } from "@zitadel/api-client/generated/model";
 import { describe, expect, it } from "vitest";
 
 import { mandatoryGatesMarkerComment, patchMandatoryGates } from "./mandatory-gates.js";

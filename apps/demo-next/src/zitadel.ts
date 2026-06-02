@@ -7,8 +7,8 @@
  *
  * Both the server middleware and client widgets import from this file.
  */
-import { configureZitadel, getApi } from "@zitadel-nextgen/api/config";
-import { createProxy } from "@zitadel-nextgen/sdk-next/middleware";
+import { configureZitadel, getApi } from "@zitadel/api-client/config";
+import { createProxy } from "@zitadel/sdk-next/middleware";
 
 export const demoProject = configureZitadel({
   apiBase: "/__nextgen",

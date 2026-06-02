@@ -1,15 +1,20 @@
 {
-  "name": "@zitadel-nextgen/source",
+  "name": "@zitadel/source",
   "version": "0.0.0",
   "private": true,
   "license": "MIT",
   "scripts": {
     "build": "corepack pnpm -r build",
+    "changeset": "changeset",
+    "changeset:version": "changeset version",
+    "release:npm": "corepack pnpm nx run-many -t build -p @zitadel/cli,@zitadel/api-client,@zitadel/components,@zitadel/design-tokens,@zitadel/shared-component-styles,@zitadel/ui-react,@zitadel/sdk-core,@zitadel/sdk-next,@zitadel/sdk-nuxt && changeset publish --tag next",
     "typecheck": "corepack pnpm -r typecheck",
     "test": "corepack pnpm -r test",
     "zitadel": "node scripts/zitadel-dev.mjs"
   },
   "devDependencies": {
+    "@changesets/changelog-github": "catalog:",
+    "@changesets/cli": "catalog:",
     "@nx/devkit": "catalog:",
     "@nx/eslint-plugin": "catalog:",
     "@nx/js": "catalog:",

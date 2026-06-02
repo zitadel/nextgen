@@ -7,7 +7,7 @@ import { resetPlatformStore, setupPlatformHandlers } from "@zitadel-nextgen/api-
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import { CreateFlowDefinitionBody } from "@zitadel-nextgen/api/generated/endpoints/zitadelNextGen.zod";
+import { CreateFlowDefinitionBody } from "@zitadel/api-client/generated/endpoints/zitadelNextGen.zod";
 
 /** The inner flow-definition shape; the envelope is `CreateFlowDefinitionBody`. */
 const flowDefinitionSchema = CreateFlowDefinitionBody.shape.flow_definition;

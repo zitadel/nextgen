@@ -5,10 +5,10 @@ Next iteration of the Zitadel identity platform.
 ## Current status
 
 This repository is pre-release. The Go server release path is wired through
-GoReleaser, but `main.go` is still a placeholder. The frontend workspace is now
-managed by Nx and includes a Vite React console shell, shared components, SDKs,
-and the agent-facing CLI. CI produces installable snapshots for review, not
-official releases.
+GoReleaser, with the Vite React console embedded into tagged server builds.
+The frontend workspace is managed by Nx and includes shared components, SDKs,
+and the agent-facing CLI. npm packages publish through Changesets once the
+Version Packages PR lands and npm credentials are configured.
 
 ## Local checks
 
@@ -64,28 +64,26 @@ package artifacts. The full rationale lives in
 ### Go server binary + console build (`goreleaser`)
 
 GoReleaser builds the React console SPA through Nx before packaging snapshots:
-`corepack pnpm nx build @zitadel-nextgen/console`. Server-side console serving
-and Go `//go:embed` wiring are still follow-up work, so snapshot builds verify
-that the console can be produced but do not yet expose it from the placeholder
-server.
+`corepack pnpm nx build @zitadel-nextgen/console`, copies the built files into
+the Go embed package, and compiles release builds with the `embed_console` tag.
+The server serves that SPA at `/console/`; API routes continue to be handled by
+the generated OpenAPI server.
 
 ```sh
 # Local snapshot (no publish, no signing)
 goreleaser release --snapshot --clean --skip=publish,sign
 
-# Run a snapshot Docker image. The image's default CMD is `--help` while
-# the `server` subcommand is being wired up in cmd/server (PR #17).
+# Run a snapshot Docker image.
 docker run --rm ghcr.io/zitadel/nextgen:<snapshot-tag>-amd64
 ```
 
-The publish-capable release workflow is currently manual-only via
-`.github/workflows/release.yml` (`workflow_dispatch`). It can run a dry snapshot
-or, when intentionally invoked for a release tag, produce multi-arch tarballs and
-push a multi-arch image manifest to `ghcr.io/zitadel/nextgen`.
+Server releases publish from `v*` tags via `.github/workflows/release.yml`.
+The same workflow still supports manual non-publishing snapshots through
+`workflow_dispatch`.
 
 ### npm packages (`changesets`)
 
-`apps/cli` and `packages/sdk-*` are intended to be published to npm via
+The public runtime packages publish under the `@zitadel/*` scope via
 [changesets](https://github.com/changesets/changesets). On any user-visible
 change to those packages:
 
@@ -93,9 +91,9 @@ change to those packages:
 corepack pnpm changeset
 ```
 
-The future changesets workflow should open a "Version Packages" PR; merging it
-will tag and publish the affected packages once npm ownership and tokens are in
-place. No npm publishing workflow is enabled yet.
+The `npm-release` workflow opens a "Version Packages" PR on `main` when pending
+changesets exist. Merging that PR publishes changed packages to npm with the
+`next` dist-tag when `NPM_TOKEN` is available.
 
 ### Local development
 
