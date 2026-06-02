@@ -157,7 +157,7 @@ _attributes AS (
     INSERT INTO zitadel_nextgen.user_attributes (
         project_id, team_id, user_id, key, value
     )
-    SELECT h.project_id, h.team_id, h.id, d.key, d.value
+    SELECT h.project_id, COALESCE(h.team_id, ''), h.id, d.key, d.value
     FROM _input_data d CROSS JOIN _user_header h
 )
 SELECT 1;
