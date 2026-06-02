@@ -41,7 +41,8 @@
   },
   "dependencies": {
     "@zitadel-nextgen/api": "workspace:*",
-    "@zitadel-nextgen/components": "workspace:*"
+    "@zitadel-nextgen/components": "workspace:*",
+    "@zitadel-nextgen/sdk-core": "workspace:*"
   },
   "peerDependencies": {
     "h3": ">=1",
