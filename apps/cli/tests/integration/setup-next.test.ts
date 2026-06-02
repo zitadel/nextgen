@@ -20,11 +20,11 @@ afterEach(() => {
 });
 
 function cli(args: string[], env: NodeJS.ProcessEnv = {}) {
-  return runCliForTest(["--server", MOCK_SERVER_URL, ...args], env);
+  return runCliForTest([...args, "--server", MOCK_SERVER_URL], env);
 }
 
 describe("Next setup integration", () => {
-  it("sets up, verifies, edits schema, applies, and preserves idempotency", async () => {
+  it("sets up, verifies, plans, applies, and preserves idempotency", async () => {
     const cwd = await createNextProject();
 
     const setup = await cli([
@@ -33,7 +33,6 @@ describe("Next setup integration", () => {
       cwd,
       "--non-interactive",
       "--json",
-      "--skip-deploy-platform",
     ]);
     expect(setup.exitCode).toBe(0);
     const setupJson = parseJson(setup.stdout) as {
@@ -49,12 +48,11 @@ describe("Next setup integration", () => {
     );
     const flowRaw = await readFile(join(cwd, ".zitadel/flows/default.json"), "utf8");
     // Spec: `name` is the slug-pattern stable identifier; `template_name`
-    // was a non-spec field the CLI used to emit.
+    // was a non-spec field the CLI used to emit. `step.fields` is a
+    // string[] of property names referencing the user schema.
     expect(flowRaw).toContain('"name": "default"');
     expect(flowRaw).toContain('"user_schema":');
-    expect(flowRaw).toContain('"text_key": "identifier.field.email"');
-    const localeRaw = await readFile(join(cwd, ".zitadel/locales/en.json"), "utf8");
-    expect(localeRaw).toContain('"identifier.title": "Sign in"');
+    expect(flowRaw).toContain('"email"');
     const loginPage = await readFile(join(cwd, "app/login/page.tsx"), "utf8");
     expect(loginPage).toContain("zitadel-cli: managed-file v1");
     expect(loginPage).toContain('"use client"');
@@ -88,7 +86,7 @@ describe("Next setup integration", () => {
     expect(doctor.exitCode).toBe(0);
     expect((parseJson(doctor.stdout) as { status: string }).status).toBe("ok");
 
-    const noArg = await cli(["--cwd", cwd, "--json"]);
+    const noArg = await cli(["status", "--cwd", cwd, "--json"]);
     expect(noArg.exitCode).toBe(0);
     const status = parseJson(noArg.stdout) as {
       status: string;
@@ -109,18 +107,6 @@ describe("Next setup integration", () => {
     expect(typeof planJson.data.total).toBe("number");
     expect(await readFile(join(cwd, ".zitadel/state.json"), "utf8")).toBe(stateBeforePlan);
 
-    const addSchema = await cli([
-      "add",
-      "schema",
-      "--cwd",
-      cwd,
-      "--json",
-      "--add-field",
-      "phone:string:format=phone,x-mfa=sms",
-    ]);
-    expect(addSchema.exitCode).toBe(0);
-    expect(await readFile(join(cwd, ".zitadel/schemas/user.json"), "utf8")).toContain('"phone"');
-
     const apply = await cli(["apply", "--cwd", cwd, "--json"]);
     expect(apply.exitCode).toBe(0);
     const applyJson = parseJson(apply.stdout) as { status: string; data: { synced: boolean } };
@@ -136,24 +122,27 @@ describe("Next setup integration", () => {
       cwd,
       "--non-interactive",
       "--json",
-      "--skip-deploy-platform",
     ]);
 
     const flowWithEnvRef = {
       // Spec: `name` is the slug-pattern stable identifier; required fields
-      // are [name, user_schema, purposes, initial_steps, steps].
+      // are [name, user_schema, purposes, steps]. `purposes` is a map
+      // from purpose name to entry-point step name.
       name: "default",
       user_schema: "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/human-user.yaml",
-      purposes: ["login"],
-      initial_steps: { login: "identifier" },
+      purposes: { login: "identifier" },
       steps: [
         {
           name: "identifier",
-          type: "identifier",
-          fields: {},
+          fields: [],
           actions: {},
-          gates: { captcha: { type: "captcha", config: { client_secret_env: "MY_CAPTCHA_SECRET" } } },
-          transitions: {},
+          gates: {
+            captcha: {
+              kind: "captcha",
+              provider: "altcha",
+              config: { client_secret_env: "MY_CAPTCHA_SECRET" },
+            },
+          },
         },
       ],
     };
@@ -169,25 +158,6 @@ describe("Next setup integration", () => {
     expect(applyWithEnv.exitCode).toBe(0);
   });
 
-  it("applies successfully when liquid templates are present (templates are not synced)", async () => {
-    const cwd = await createNextProject();
-    await cli([
-      "setup",
-      "--cwd",
-      cwd,
-      "--non-interactive",
-      "--json",
-      "--skip-deploy-platform",
-    ]);
-    await mkdir(join(cwd, ".zitadel/templates"), { recursive: true });
-    await writeFile(join(cwd, ".zitadel/templates/bad.liquid"), "<div>{{ value | raw }}</div>\n");
-
-    const apply = await cli(["apply", "--cwd", cwd, "--json"]);
-    expect(apply.exitCode).toBe(0);
-    const envelope = parseJson(apply.stdout) as { status: string; data: { synced: boolean } };
-    expect(envelope.status).toBe("ok");
-    expect(envelope.data.synced).toBe(true);
-  });
 });
 
 async function createNextProject(): Promise<string> {

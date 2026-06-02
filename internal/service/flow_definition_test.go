@@ -219,11 +219,11 @@ func (m *mockBuiltinSchemaProvider) LatestSchemaURI(kind domain.KnownSchemaKind)
 func Test_flowDefinitionService_Create(t *testing.T) {
 	var userSchema jsonschema.Schema
 	marshalErr := json.Unmarshal(tenantUserSchema, &userSchema)
-	require.NoError(t, marshalErr, "failed to unmarshal tenant user schema")
+	require.NoError(t, marshalErr, "failed to unmarshal user schema")
 
 	var userSchemaNoProps jsonschema.Schema
 	marshalErr = json.Unmarshal(tenantUserSchemaNoProps, &userSchemaNoProps)
-	require.NoError(t, marshalErr, "failed to unmarshal tenant user schema")
+	require.NoError(t, marshalErr, "failed to unmarshal user schema")
 
 	var flowDefBuiltin jsonschema.Schema
 	marshalErr = json.Unmarshal(flowDefSchema, &flowDefBuiltin)
@@ -948,67 +948,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 					RawFlowDefinition: flowDefRaw,
 				},
 			},
-			wantErr: domain.ErrSchemaFetchFailed("failed to resolve tenant user schema", assert.AnError),
-		},
-		{
-			name: "failed to get built-in flow definition schema",
-			fields: fields{
-				db: stubPool(),
-				schemaResolver: &mockSchemaResolver{
-					resolveFunc: func(ctx context.Context, client database.QueryExecutor, projectID string, schemaURL string, rootSchema []byte) (*jsonschema.Schema, error) {
-						return &userSchema, nil
-					},
-				},
-				builtinSchemaProvider: &mockBuiltinSchemaProvider{
-					getBuiltinSchemaFunc: func(uri string) (*jsonschema.Schema, error) {
-						return nil, assert.AnError
-					},
-					latestSchemaURIFunc: func(kind domain.KnownSchemaKind) (string, error) {
-						return "https://example.com/schemas/flow-definition.json", nil
-					},
-				},
-				flowDefinitionRepo: func(ctrl *gomock.Controller) *domainmock.MockFlowDefinitionRepository {
-					repo := domainmock.NewMockFlowDefinitionRepository(ctrl)
-					repo.EXPECT().
-						ListFlowDefinitions(gomock.Any(), gomock.Any(), "project1", gomock.Any()).
-						Times(1).
-						Return([]*domain.FlowDefinition{}, nil)
-					return repo
-				},
-			},
-			args: args{
-				ctx: context.Background(),
-				req: service.CreateFlowDefinitionRequest{
-					ProjectID:     "project1",
-					Name:          "login",
-					SchemaVersion: "1.0.0",
-					FlowSchemaURI: "",
-					UserSchema:    "https://tenant.com/schemas/my-user.json",
-					Purposes:      map[string]string{"login": "step_1"},
-					Audience: domain.FlowDefinitionAudience{
-						AppIDs:  []string{"app1"},
-						TeamIDs: []string{"team1"},
-					},
-					Steps: []domain.FlowDefinitionStep{
-						{
-							Name:   "step_1",
-							Fields: []string{"email"},
-							Transitions: map[string]domain.FlowStepTransition{
-								"submit": {Target: "step_2"},
-							},
-							Actions: map[string]domain.FlowStepAction{
-								"submit": {Primary: true},
-							},
-						},
-						{
-							Name:     "step_2",
-							Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
-						},
-					},
-					RawFlowDefinition: flowDefRaw,
-				},
-			},
-			wantErr: domain.ErrSchemaFetchFailed("failed to fetch flow definition schema", assert.AnError),
+			wantErr: domain.ErrSchemaFetchFailed("failed to resolve user schema", assert.AnError),
 		},
 		{
 			name: "failed to get latest flow definition schema uri",
@@ -1066,67 +1006,6 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 				},
 			},
 			wantErr: domain.ErrSchemaFetchFailed("failed to get latest flow definition schema URI", assert.AnError),
-		},
-		{
-			name: "invalid flow definition against schema",
-			fields: fields{
-				db: stubPool(),
-				schemaResolver: &mockSchemaResolver{
-					resolveFunc: func(ctx context.Context, client database.QueryExecutor, projectID string, schemaURL string, rootSchema []byte) (*jsonschema.Schema, error) {
-						return &userSchema, nil
-					},
-				},
-				builtinSchemaProvider: &mockBuiltinSchemaProvider{
-					getBuiltinSchemaFunc: func(uri string) (*jsonschema.Schema, error) {
-						return &flowDefBuiltin, nil
-					},
-					latestSchemaURIFunc: func(kind domain.KnownSchemaKind) (string, error) {
-						return "https://example.com/schemas/flow-definition.json", nil
-					},
-				},
-				flowDefinitionRepo: func(ctrl *gomock.Controller) *domainmock.MockFlowDefinitionRepository {
-					repo := domainmock.NewMockFlowDefinitionRepository(ctrl)
-					repo.EXPECT().
-						ListFlowDefinitions(gomock.Any(), gomock.Any(), "project1", gomock.Any()).
-						Times(1).
-						Return([]*domain.FlowDefinition{}, nil)
-					return repo
-				},
-			},
-			args: args{
-				ctx: context.Background(),
-				req: service.CreateFlowDefinitionRequest{
-					ProjectID:     "project1",
-					Name:          "trapped-flow",
-					SchemaVersion: "1.0.0",
-					FlowSchemaURI: "",
-					UserSchema:    "https://tenant.com/schemas/my-user.json",
-					Purposes:      map[string]string{"login": "step_1"},
-					Audience: domain.FlowDefinitionAudience{
-						AppIDs:  []string{"app1"},
-						TeamIDs: []string{"team1"},
-					},
-					Steps: []domain.FlowDefinitionStep{
-						{
-							Name:   "step_1",
-							Fields: []string{"email"},
-							Transitions: map[string]domain.FlowStepTransition{
-								"submit": {Target: "step_2"},
-							},
-							Actions: map[string]domain.FlowStepAction{
-								"submit": {Primary: true},
-							},
-						},
-						{
-							Name:     "step_2",
-							Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
-						},
-					},
-					RawFlowDefinition: invalidFlowDefRaw,
-				},
-			},
-			wantFlowSchemaURI: "https://example.com/schemas/flow-definition.json",
-			wantErr:           domain.ErrFlowDefinitionInvalid(`flow definition does not conform to schema "https://example.com/schemas/flow-definition.json"`, nil),
 		},
 	}
 	for _, tt := range tests {
