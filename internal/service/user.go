@@ -136,7 +136,7 @@ func (s *UserService) GetUserByID(ctx context.Context, input GetUserInput) (map[
 	return user, nil
 }
 
-func (s *UserService) SetPassword(ctx context.Context, input SetPasswordInput) error {
+func (s *UserService) SetPassword(ctx context.Context, input SetPasswordInput) (err error) {
 	hash, err := domain.HashPassword(input.Password, s.hasher)
 	if err != nil {
 		return err
@@ -152,58 +152,41 @@ func (s *UserService) SetPassword(ctx context.Context, input SetPasswordInput) e
 		}
 	}()
 
+	// REMOVE OLD PASSWORD IF ONE EXISTS
+
 	pwd, err := s.passwordRepo.GetByUserID(ctx, tx, input.ProjectID, input.UserID)
 
-	if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
-		err = s.createPassword(ctx, tx, input.ProjectID, input.UserID, hash, input.IsPasswordChangeRequired)
-	} else if err != nil {
-		err = domain.ErrInternal(err).WithMessage("failed to get current password from database")
-	} else {
-		err = s.updatePassword(ctx, tx, pwd, hash, input.IsPasswordChangeRequired)
+	if err != nil {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); !ok {
+			return domain.ErrInternal(err).WithMessage("failed to get current password from database")
+		}
+	}
+	if err == nil {
+		err := s.passwordRepo.DeleteByID(ctx, tx, pwd.ID)
+		if err != nil {
+			return domain.ErrInternal(err).WithMessage("failed to remove old password from database")
+		}
 	}
 
+	// CREATE NEW PASSWORD
+
+	err = s.passwordRepo.Create(ctx, tx, &domain.CreateUserPassword{
+		ProjectID:      input.ProjectID,
+		UserID:         input.UserID,
+		EncodedHash:    hash,
+		ChangeRequired: input.IsPasswordChangeRequired,
+		VerificationID: nil, // TODO what should I do with this?
+	})
 	if err != nil {
-		return err
+		if _, ok := errors.AsType[*database.ForeignKeyError](err); ok {
+			return domain.ErrUserNotFound()
+		}
+		return domain.ErrInternal(err).WithMessage("failed to set initial password")
 	}
 
 	err = tx.Commit(ctx)
 	if err != nil {
 		return domain.ErrInternal(err).WithMessage("failed to commit transaction while setting password")
 	}
-	return nil
-}
-
-func (s *UserService) createPassword(ctx context.Context, client database.QueryExecutor,
-	projectID string, userID string, pwdHash string, isPasswordChangeRequired bool) error {
-	err := s.passwordRepo.Create(ctx, client, &domain.CreateUserPassword{
-		ProjectID:      projectID,
-		UserID:         userID,
-		EncodedHash:    pwdHash,
-		ChangeRequired: isPasswordChangeRequired,
-		VerificationID: nil, // TODO what should I do with this?
-	})
-
-	if err != nil {
-		if _, ok := errors.AsType[*database.IntegrityViolationError](err); ok {
-			return domain.ErrUserNotFound()
-		}
-		return domain.ErrInternal(err).WithMessage("failed to set initial password")
-	}
-
-	return nil
-}
-
-func (s *UserService) updatePassword(ctx context.Context, client database.QueryExecutor,
-	pwd *domain.UserPassword, pwdHash string, isPasswordChangeRequired bool) error {
-	pwd.Update(pwdHash)
-	if isPasswordChangeRequired {
-		pwd.RequireChange()
-	}
-
-	err := s.passwordRepo.Update(ctx, client, pwd)
-	if err != nil {
-		return domain.ErrInternal(err).WithMessage("failed to update password in database")
-	}
-
 	return nil
 }

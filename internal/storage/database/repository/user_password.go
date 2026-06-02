@@ -193,6 +193,10 @@ func (r *UserPasswordRepository) Update(ctx context.Context, client database.Que
 	return err
 }
 
+func (r *UserPasswordRepository) DeleteByID(ctx context.Context, client database.QueryExecutor, passwordID int64) error {
+	return r.Delete(ctx, client, r.PrimaryKeyCondition(passwordID))
+}
+
 func (r *UserPasswordRepository) Delete(ctx context.Context, client database.QueryExecutor, condition database.Condition) error {
 	_, err := deleteOne(ctx, client, r, condition)
 	return err

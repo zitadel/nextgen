@@ -149,105 +149,77 @@ func TestCreateUser(t *testing.T) {
 }
 
 func TestSetUserPassword(t *testing.T) {
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+	require.NoError(t, err)
+
+	user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
+		ProjectID: project.ID,
+		User:      harness.TestData.Generator.GenerateUser(t, "testsetuserpassword@example.com"),
+	})
+	require.NoError(t, err)
+	userID := user["id"].(string)
+	userEmail := user["email"].(string)
+
+	params := api.SetUserPasswordParams{
+		ProjectID: api.ProjectID(project.ID),
+		UserID:    api.UserID(userID),
+	}
+
+	client := harness.EnsureAPIClient(t, project.ID)
+
 	t.Run("ok", func(t *testing.T) {
-		// ARRANGE
+		t.Run("create initial password", func(t *testing.T) {
+			const password = "fake-password"
+			request := &api.SetUserPasswordRequest{
+				Password: password,
+			}
 
-		project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
-		require.NoError(t, err)
+			resp, err := client.SetUserPassword(t.Context(), request, params)
+			assert.NoError(t, err)
+			assert.IsType(t, &api.SetUserPasswordNoContent{}, resp, helpers.MustMarshal(t, resp))
 
-		usermap := harness.TestData.Generator.GenerateUser(t, "testsetuserpassword.ok@example.com")
-
-		user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
-			ProjectID: project.ID,
-			User:      usermap,
+			// ensure we can create a session using the credentials
+			_, err = helpers.CreateSessionUsingPassword(t,
+				harness.EnsureAuthAttemptService(t),
+				harness.EnsureSessionService(t),
+				project.ID, userEmail, password)
+			assert.NoError(t, err)
 		})
-		require.NoError(t, err)
-		userID := user["id"].(string)
-		userEmail := user["email"].(string)
 
-		client := harness.EnsureAPIClient(t, project.ID)
+		t.Run("update password", func(t *testing.T) {
+			const originalPassword = "fake-password"
+			request := &api.SetUserPasswordRequest{
+				Password: originalPassword,
+			}
 
-		// ACT
+			resp, err := client.SetUserPassword(t.Context(), request, params)
+			assert.NoError(t, err)
+			assert.IsType(t, &api.SetUserPasswordNoContent{}, resp, helpers.MustMarshal(t, resp))
 
-		const password = "fake-password"
-		request := &api.SetUserPasswordRequest{
-			Password: password,
-		}
-		params := api.SetUserPasswordParams{
-			ProjectID: api.ProjectID(project.ID),
-			UserID:    api.UserID(userID),
-		}
+			const newPassword = "new-password"
 
-		resp, err := client.SetUserPassword(t.Context(), request, params)
-		require.NoError(t, err)
+			request = &api.SetUserPasswordRequest{
+				Password: newPassword,
+			}
 
-		// ASSERT
+			resp, err = client.SetUserPassword(t.Context(), request, params)
+			assert.NoError(t, err)
+			assert.IsType(t, &api.SetUserPasswordNoContent{}, resp, helpers.MustMarshal(t, resp))
 
-		assert.IsType(t, &api.SetUserPasswordNoContent{}, resp, helpers.MustMarshal(t, resp))
+			// ensure we can create a session using the new password
+			_, err = helpers.CreateSessionUsingPassword(t,
+				harness.EnsureAuthAttemptService(t),
+				harness.EnsureSessionService(t),
+				project.ID, userEmail, newPassword)
+			assert.NoError(t, err)
 
-		// ENSURE USER CAN SIGN IN USING THEIR PASSWORD
-
-		authAttempts := harness.EnsureAuthAttemptService(t)
-		attempt, err := authAttempts.Create(t.Context(), service.CreateAuthAttemptInput{
-			ProjectID:      project.ID,
-			RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypeUser, domain.AuthCheckTypePassword},
+			// ensure we cannot create a session using the original password
+			_, err = helpers.CreateSessionUsingPassword(t,
+				harness.EnsureAuthAttemptService(t),
+				harness.EnsureSessionService(t),
+				project.ID, userEmail, originalPassword)
+			assert.ErrorAs(t, err, new(domain.ErrAuthAttemptProofRejected(nil)))
 		})
-		require.NoError(t, err)
-
-		attempt, err = authAttempts.IssueChallenge(t.Context(), service.IssueChallengeInput{
-			ProjectID: project.ID,
-			AttemptID: attempt.ID,
-			Challenge: service.UserChallenge{},
-		})
-		require.NoError(t, err)
-		userChallenge, ok := attempt.ChallengeByType(domain.AuthCheckTypeUser)
-		require.True(t, ok)
-
-		attempt, err = authAttempts.VerifyProof(t.Context(), service.VerifyProofInput{
-			ProjectID:   project.ID,
-			AttemptID:   attempt.ID,
-			ChallengeID: userChallenge.GetID(),
-			Proof: service.UserProof{
-				AttributeName: "email",
-				LoginName:     userEmail,
-			},
-		})
-		require.NoError(t, err)
-
-		attempt, err = authAttempts.IssueChallenge(t.Context(), service.IssueChallengeInput{
-			ProjectID: project.ID,
-			AttemptID: attempt.ID,
-			Challenge: service.PasswordChallenge{},
-		})
-		require.NoError(t, err)
-		passwordChallenge, ok := attempt.ChallengeByType(domain.AuthCheckTypePassword)
-		require.True(t, ok)
-
-		attempt, err = authAttempts.VerifyProof(t.Context(), service.VerifyProofInput{
-			ProjectID:   project.ID,
-			AttemptID:   attempt.ID,
-			ChallengeID: passwordChallenge.GetID(),
-			Proof:       service.PasswordProof{Password: password},
-		})
-		require.NoError(t, err)
-		assert.True(t, attempt.IsCompleted())
-
-		attempt, err = authAttempts.Handoff(t.Context(), service.HandoffInput{
-			ProjectID: project.ID,
-			AttemptID: attempt.ID,
-		})
-		require.NoError(t, err)
-		require.NotNil(t, attempt.HandoffToken)
-
-		session, err := harness.EnsureSessionService(t).Exchange(t.Context(), service.ExchangeInput{
-			ProjectID:    project.ID,
-			HandoffToken: attempt.HandoffToken.Plain(),
-		})
-		require.NoError(t, err)
-		require.NotNil(t, session.UserID)
-		assert.Equal(t, userID, *session.UserID)
-		assert.Len(t, session.Factors, 2)
-
 	})
 
 	t.Run("error", func(t *testing.T) {
