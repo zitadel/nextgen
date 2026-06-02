@@ -1,4 +1,5 @@
 import { Flags } from "@oclif/core";
+import { consola } from "consola";
 
 import { createZitadelClient } from "@zitadel-nextgen/api/client";
 
@@ -36,6 +37,8 @@ export default class Apply extends BaseCommand {
     const { cwd, source, env, dryRun, isTTY } = this.meta;
 
     const secret = await readZitadelSecret(cwd);
+    consola.info(`Project   ${secret.project_id}`);
+    consola.info(`Server    ${source}`);
     const client = createZitadelClient({
       baseUrl: source,
       token: secret.project_secret,
@@ -43,14 +46,23 @@ export default class Apply extends BaseCommand {
     const syncers = makeSyncers({ client, projectId: secret.project_id, env });
 
     if (!dryRun) {
+      consola.start("Syncing schemas and flows to Zitadel");
       await runSyncLoop(cwd, syncers);
+      consola.success("Sync complete");
       return this.emit({ status: "ok", data: { synced: true } });
     }
 
+    consola.start("Building plan (dry run)");
     const plan = await buildSyncPlan(cwd, syncers, true);
+    const summary = summarizePlan(plan);
+    consola.success(
+      `Plan: ${summary.creates} create${summary.creates === 1 ? "" : "s"}, ` +
+        `${summary.updates} update${summary.updates === 1 ? "" : "s"}, ` +
+        `${summary.deletes} delete${summary.deletes === 1 ? "" : "s"}`,
+    );
     return this.emit({
       status: "ok",
-      data: summarizePlan(plan),
+      data: summary,
       pretty: renderPlan(plan, isTTY),
     });
   }

@@ -59,7 +59,8 @@
     "ajv": "catalog:",
     "consola": "^3.4.2",
     "safe-stable-stringify": "catalog:",
-    "zod": "catalog:"
+    "zod": "catalog:",
+    "picocolors": "^1.1.1"
   },
   "devDependencies": {
     "@types/node": "catalog:",
