@@ -176,23 +176,6 @@ func (r *UserPasswordRepository) Create(ctx context.Context, client database.Que
 	return err
 }
 
-func (r *UserPasswordRepository) Update(ctx context.Context, client database.QueryExecutor, pw *domain.UserPassword) error {
-	_, err := updateOne(
-		ctx,
-		client,
-		r,
-		r.PrimaryKeyCondition(pw.ID),
-		r.SetEncodedHash(pw.EncodedHash),
-		r.SetChangeRequired(pw.ChangeRequired),
-		r.SetChangedAt(pw.ChangedAt),
-		database.NewChangePtr(colPasswordVerificationID, pw.VerificationID),
-		database.NewChangePtr(colPasswordLastSuccessful, pw.LastSuccessfulCheck),
-		database.NewChange(colPasswordFailedAttempts, pw.FailedAttempts),
-		database.NewChange(colPasswordUpdatedAt, database.NowInstruction),
-	)
-	return err
-}
-
 func (r *UserPasswordRepository) DeleteByID(ctx context.Context, client database.QueryExecutor, passwordID int64) error {
 	return r.Delete(ctx, client, r.PrimaryKeyCondition(passwordID))
 }
