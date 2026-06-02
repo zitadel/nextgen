@@ -1,4 +1,4 @@
-//go:build integration
+//go:build postgres_integration
 
 package integration_test
 
@@ -30,7 +30,7 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
 	require.NoError(t, err)
 
-	harness.CreateUserSchema(t, project.ID, harness.Schemas.CreateSchemaRequestUserSchema)
+	harness.CreateUserSchema(t, project.ID, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
 
 	userSchemaURL, err := url.Parse(
 		"https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml",
@@ -88,7 +88,7 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 		PublicKey:    credExisting.Key.AttestationData(),
 		AAGUID:       authExisting.Aaguid[:],
 		Transports:   []string{},
-		SignCount:     1,
+		SignCount:    1,
 	}))
 
 	client := harness.EnsureAPIClient(t, project.ID)
