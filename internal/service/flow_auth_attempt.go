@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
@@ -124,7 +123,7 @@ func (a *FlowAuthAttemptAdapter) IssuePasskeyChallenge(ctx context.Context, in d
 		ProjectID: in.ProjectID,
 		AttemptID: in.AttemptID,
 		Challenge: PasskeyChallenge{
-			UserVerification: protocol.UserVerificationRequirement(in.UserVerification),
+			UserVerification: in.UserVerification,
 			RPID:             in.RPID,
 			RPOrigins:        origins,
 		},

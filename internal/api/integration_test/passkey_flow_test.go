@@ -31,7 +31,7 @@ func TestPasskeyFlowLogin(t *testing.T) {
 
 	// Create the user schema so the resolver can look it up from the DB.  The
 	// schema's $id becomes the URL that the flow definition references.
-	harness.CreateUserSchema(t, project.ID, harness.Schemas.CreateSchemaRequestUserSchema)
+	harness.CreateUserSchema(t, project.ID, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
 
 	userSchemaURL, err := url.Parse(
 		"https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml",

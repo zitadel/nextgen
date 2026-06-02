@@ -271,7 +271,7 @@ func BuildPasskeyRequestOptions(c *AuthChallengePasskey) ([]byte, error) {
 		Challenge:          protocol.URLEncodedBase64(challenge),
 		RelyingPartyID:     c.RPID,
 		AllowedCredentials: allowed,
-		UserVerification:   c.UserVerification,
+		UserVerification:   protocol.UserVerificationRequirement(c.UserVerification),
 		Extensions:         c.Extensions,
 	}
 	return json.Marshal(opts)
