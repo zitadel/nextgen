@@ -42,7 +42,8 @@
     "@vitest/browser-playwright": "catalog:",
     "msw": "catalog:",
     "playwright": "catalog:",
-    "tsx": "catalog:"
+    "tsx": "catalog:",
+    "zod": "catalog:"
   },
   "nx": {
     "targets": {

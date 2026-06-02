@@ -16,7 +16,7 @@ The CLI is part of the product surface for AI coding agents. Agents need stable 
 
 ## Consequences
 
-- `zitadel capabilities --json` remains the source of truth.
+- `apps/cli/AGENTS.md`, generated from the command registry, is the source of truth; `zitadel help --json` exposes the same registry at runtime.
 - Golden-path commands are marked supported.
 - Half-built surfaces stay callable only when marked experimental.
 - Failed commands must emit parseable JSON on stdout without stray text.

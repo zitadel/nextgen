@@ -1,91 +1,16 @@
 import type { ZitadelProject } from '@zitadel-nextgen/api/config';
+import type { NextgenMiddlewareOptions } from '@zitadel-nextgen/sdk-core/types';
 import type { NextRequest } from 'next/server';
 
+import {
+  HOP_BY_HOP,
+  INTERNAL_HEADERS,
+  filterResponseHeaders,
+  matchesRoutes,
+} from '@zitadel-nextgen/sdk-core/middleware';
 import { NextResponse } from 'next/server';
 
-import type { NextgenMiddlewareOptions } from './types';
-
 import { verifyJwt } from './lib/jwt';
-
-/**
- * Headers that must never be forwarded to an upstream service.
- * These are connection-level headers that are meaningful only between
- * two directly connected peers and become invalid when proxied.
- */
-const HOP_BY_HOP: ReadonlySet<string> = new Set([
-  'connection',
-  // host is not a hop-by-hop header per RFC 7230, but it must be stripped so
-  // the fetch implementation derives the correct Host from the upstream URL
-  // rather than forwarding the client's Host and causing SNI/vhost mismatches.
-  'host',
-  'keep-alive',
-  'proxy-authenticate',
-  'proxy-authorization',
-  'te',
-  'trailer',
-  'transfer-encoding',
-  'upgrade',
-]);
-
-/**
- * SDK-internal headers that must never be forwarded to the upstream backend.
- * These headers carry session data between the middleware and server components;
- * forwarding them upstream would expose internal state and allow header injection.
- */
-const INTERNAL_HEADERS: ReadonlySet<string> = new Set(['x-nextgen-auth-token']);
-
-/**
- * Conditionally adds the `Secure` flag to any cookie whose name starts with
- * `__nextgen`, but only when the client-facing connection is HTTPS.
- *
- * The edge proxy may terminate TLS — the upstream auth server cannot know
- * whether the browser-facing connection is HTTPS. When `secure` is `true`
- * (i.e. the original request arrived over HTTPS), `Secure` is added so that
- * `__nextgen*` session cookies are never sent over plain HTTP on subsequent
- * requests. When `secure` is `false` (plain HTTP), the flag is intentionally
- * omitted: browsers refuse to store cookies with `Secure` on non-TLS
- * connections, which would break the auth flow entirely.
- *
- * Non-`__nextgen*` cookies are returned unchanged. We trust the upstream for
- * `HttpOnly` and `SameSite`, which are set correctly by the auth server and
- * do not depend on whether TLS is terminated at the edge.
- *
- * @param cookie - The raw `Set-Cookie` header value.
- * @param secure - `true` when the client-facing connection is HTTPS.
- */
-function upgradeSessionCookie(cookie: string, secure: boolean): string {
-  const name = cookie.split('=')[0]?.trim() ?? '';
-  if (!name.startsWith('__nextgen') || !secure) {
-    return cookie;
-  }
-  // Case-insensitive check to avoid doubling an existing Secure flag.
-  if (/;\s*Secure\b/i.test(cookie)) {
-    return cookie;
-  }
-  return `${cookie}; Secure`;
-}
-
-/**
- * Returns `true` when `pathname` matches at least one entry in `routes`.
- *
- * An entry ending with `*` matches any path that starts with the prefix
- * before the `*`. All other entries require an exact match.
- *
- * @param pathname - The URL pathname to test.
- * @param routes   - The list of route patterns to match against.
- * @returns `true` if at least one pattern matches.
- */
-function matchesRoutes(pathname: string, routes: readonly string[]): boolean {
-  if (routes.length === 0) {
-    return false;
-  }
-  return routes.some((pattern) => {
-    if (pattern.endsWith('*')) {
-      return pathname.startsWith(pattern.slice(0, -1));
-    }
-    return pathname === pattern;
-  });
-}
 
 /**
  * Clones the incoming request headers, injects `extra` key/value pairs,
@@ -164,6 +89,7 @@ export async function nextgenMiddleware(
     allowedTokenTypes = ['JWT', 'at+JWT'],
     jwksTimeoutMs,
     proxyTimeoutMs = 5000,
+    onExchangeResponse,
   } = options;
 
   // Guard against open-redirect: loginPath must be a relative path. An absolute
@@ -188,7 +114,13 @@ export async function nextgenMiddleware(
   }
 
   if (pathname === proxyPath || pathname.startsWith(`${proxyPath}/`)) {
-    return proxyRequest(req, issuerUrl, proxyPath, proxyTimeoutMs);
+    return proxyRequest(
+      req,
+      issuerUrl,
+      proxyPath,
+      proxyTimeoutMs,
+      onExchangeResponse,
+    );
   }
 
   return handleAuth(req, {
@@ -225,6 +157,7 @@ async function proxyRequest(
   issuerUrl: string,
   proxyPath: string,
   proxyTimeoutMs: number,
+  onExchangeResponse?: (response: Response) => Response | Promise<Response>,
 ): Promise<Response> {
   const url = new URL(req.url);
   const suffix = url.pathname.slice(proxyPath.length);
@@ -271,34 +204,26 @@ async function proxyRequest(
     ...(hasBody ? { duplex: 'half' } : {}),
   } as RequestInit);
 
-  const responseHeaders = new Headers();
-  for (const [key, value] of upstream.headers.entries()) {
-    if (
-      !HOP_BY_HOP.has(key.toLowerCase()) &&
-      key.toLowerCase() !== 'set-cookie' &&
-      // location is stripped to prevent leaking internal upstream URLs to the
-      // browser — this proxy is a pure API proxy and never issues redirects.
-      key.toLowerCase() !== 'location'
-    ) {
-      responseHeaders.set(key, value);
-    }
-  }
+  const responseHeaders = filterResponseHeaders(upstream.headers);
 
-  const isSecure =
-    url.protocol === 'https:' ||
-    req.headers.get('x-forwarded-proto') === 'https';
   const setCookies = upstream.headers.getSetCookie?.() ?? [];
   for (const cookie of setCookies) {
-    responseHeaders.append(
-      'set-cookie',
-      upgradeSessionCookie(cookie, isSecure),
-    );
+    responseHeaders.append('set-cookie', cookie);
   }
 
-  return new Response(upstream.body, {
+  let response = new Response(upstream.body, {
     status: upstream.status,
     headers: responseHeaders,
   });
+
+  // Call the exchange hook when the proxied request is POST /sessions/exchange.
+  const isExchange =
+    req.method === 'POST' && suffix.startsWith('/sessions/exchange');
+  if (isExchange && onExchangeResponse) {
+    response = await onExchangeResponse(response);
+  }
+
+  return response;
 }
 
 /**

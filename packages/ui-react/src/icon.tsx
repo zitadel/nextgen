@@ -54,7 +54,7 @@ export type IconSize = "16" | "24";
 
 export type IconTone = "default" | "error" | "success" | "disabled";
 
-export interface IconProps extends Omit<SVGAttributes<SVGSVGElement>, "name"> {
+export interface IconProps extends Omit<SVGAttributes<SVGSVGElement>, "children" | "name"> {
   name: IconName;
   size?: IconSize;
   tone?: IconTone;

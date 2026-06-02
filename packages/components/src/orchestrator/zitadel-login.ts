@@ -13,7 +13,6 @@ import type { Liquid, Template } from "liquidjs";
 
 import "../atoms/index.js";
 import {
-  DEFAULT_SESSION_EXCHANGE_PATH,
   exchangeSession,
   getCurrentStep,
   startFlow as apiStartFlow,
@@ -93,20 +92,10 @@ export class ZitadelLogin extends LitElement {
   @property({ attribute: false }) accessor project: ZitadelProject | undefined;
 
   /**
-   * Path for the handoff exchange request. Defaults to `/sessions/exchange`
-   * and is prefixed with `api-base` when that attribute is set (so
-   * `api-base="/__nextgen"` → `/__nextgen/sessions/exchange`). Any other
-   * value is resolved from `location.origin` instead, so SPAs can route
-   * exchange separately from the flow API (e.g. `/api/auth/exchange`).
-   */
-  @property({ type: String, attribute: "session-exchange-path" })
-  accessor sessionExchangePath = DEFAULT_SESSION_EXCHANGE_PATH;
-
-  /**
    * URL to navigate to after a successful embedded sign-in. When set, the
-   * orchestrator exchanges the terminal `handoff_token` at the configured
-   * `session-exchange-path` (setting the session cookie) and then performs
-   * a full navigation to this URL so host middleware can observe the cookie.
+   * orchestrator exchanges the terminal `handoff_token` via the generated
+   * API client (setting the session cookie) and then performs a full
+   * navigation to this URL so host middleware can observe the cookie.
    * For `complete: "redirect"` the orchestrator follows `redirect_uri`
    * instead and does not run the exchange.
    */
@@ -406,7 +395,9 @@ export class ZitadelLogin extends LitElement {
       this.loading = true;
       try {
         const cfg = this.project ?? getZitadelConfig();
-        await exchangeSession(cfg?.apiBase ?? "", { handoff_token: handoffToken }, cfg?.projectId ?? "", this.sessionExchangePath);
+        if (!cfg) throw new Error("<zitadel-login> config is required for exchange.");
+        const api = getApi(cfg);
+        await exchangeSession(api, { handoff_token: handoffToken }, { project_id: cfg.projectId });
         window.location.assign(this.postSignInUrl);
       } catch (error) {
         this.handleTransportError(error);

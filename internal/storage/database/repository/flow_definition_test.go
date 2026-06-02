@@ -1,3 +1,5 @@
+//go:build postgres_integration || spanner_integration
+
 package repository_test
 
 import (

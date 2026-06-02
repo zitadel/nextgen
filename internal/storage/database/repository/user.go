@@ -18,12 +18,12 @@ const (
 )
 
 var (
-	colUserProjectID    = database.NewColumn(userTable, "project_id")
-	colUserID           = database.NewColumn(userTable, "id")
-	colUserTeamID       = database.NewColumn(userTable, "team_id")
-	colUserSchemaURL    = database.NewColumn(userTable, "schema_url")
-	colUserCreatedAt    = database.NewColumn(userTable, "created_at")
-	colUserUpdatedAt    = database.NewColumn(userTable, "updated_at")
+	colUserProjectID          = database.NewColumn(userTable, "project_id")
+	colUserID                 = database.NewColumn(userTable, "id")
+	colUserTeamID             = database.NewColumn(userTable, "team_id")
+	colUserSchemaURL          = database.NewColumn(userTable, "schema_url")
+	colUserCreatedAt          = database.NewColumn(userTable, "created_at")
+	colUserUpdatedAt          = database.NewColumn(userTable, "updated_at")
 	colUserAttributeProjectID = database.NewColumn(userAttributesTable, "project_id")
 	colUserAttributeUserID    = database.NewColumn(userAttributesTable, "user_id")
 	colUserAttributeKey       = database.NewColumn(userAttributesTable, "key")

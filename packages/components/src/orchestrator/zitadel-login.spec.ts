@@ -201,65 +201,6 @@ describe("<zitadel-login> against the typed Flow API", () => {
     expect(completeEvents[0]?.detail.handoff_token).toBeTruthy();
   });
 
-  it("exchanges at session-exchange-path from origin when it diverges from api-base", async () => {
-    const assign = vi.fn();
-    const { location } = window;
-    Object.defineProperty(window, "location", {
-      configurable: true,
-      value: { ...location, assign },
-    });
-
-    const customExchangePath = "/api/auth/exchange";
-    const exchangeUrl = `${window.location.origin}${customExchangePath}`;
-    let exchangeHit = false;
-
-    server.use(
-      http.post(exchangeUrl, async ({ request }) => {
-        exchangeHit = true;
-        const url = new URL(request.url);
-        expect(url.searchParams.get("project_id")).toBe("demo-project");
-        const body = (await request.json()) as { handoff_token?: string };
-        expect(body.handoff_token).toBeTruthy();
-        return HttpResponse.json({
-          session: {
-            session_id: "sess_mock",
-            project_id: "demo-project",
-            user_id: "user_mock",
-            factors: [],
-            assurance_levels: [],
-            created_at: new Date().toISOString(),
-            expires_at: new Date(Date.now() + 3600_000).toISOString(),
-          },
-          session_token: "st_mock",
-        });
-      }),
-    );
-
-    try {
-      _resetConfigForTesting();
-      const localProject = configureZitadel({ apiBase: "/__nextgen", projectId: "demo-project" });
-      const element = document.createElement("zitadel-login") as ZitadelLogin;
-      element.purpose = "login";
-      element.project = localProject;
-      element.sessionExchangePath = customExchangePath;
-      element.postSignInUrl = "/admin";
-      host.appendChild(element);
-      await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
-
-      await advanceMockLoginFlow(element);
-
-      await waitFor(() => (assign.mock.calls.length > 0 ? assign : null));
-      expect(exchangeHit).toBe(true);
-      expect(assign).toHaveBeenCalledWith("/admin");
-    } finally {
-      _resetConfigForTesting();
-      testProject = configureZitadel({ apiBase: API_BASE, projectId: "demo-project" });
-      Object.defineProperty(window, "location", {
-        configurable: true,
-        value: location,
-      });
-    }
-  });
 
   it("exchanges the handoff token and navigates when post-sign-in-url is set", async () => {
     const assign = vi.fn();

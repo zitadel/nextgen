@@ -1,0 +1,93 @@
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
+import { NextDetector } from "../../../../../src/lib/orca/detectors/next";
+import { ZitadelError } from "../../../../../src/lib/errors";
+
+const detector = new NextDetector();
+let dir: string;
+
+beforeEach(async () => {
+  dir = await mkdtemp(join(tmpdir(), "zitadel-next-detector-"));
+});
+
+afterEach(async () => {
+  await rm(dir, { recursive: true, force: true });
+});
+
+async function writeNextPackageJson(extra: Record<string, unknown> = {}): Promise<void> {
+  await writeFile(
+    join(dir, "package.json"),
+    JSON.stringify({ name: "demo", dependencies: { next: "14.0.0" }, ...extra }),
+  );
+}
+
+describe("NextDetector", () => {
+  it("declares the next framework id", () => {
+    expect(detector.framework).toBe("next");
+  });
+
+  it("detects a top-level app/ project with default port and issuer", async () => {
+    await writeNextPackageJson();
+    await mkdir(join(dir, "app"));
+    expect(await detector.detect(dir)).toEqual({
+      id: "next",
+      appDir: "app",
+      devPort: 3000,
+      issuerUrl: "http://localhost:3000",
+    });
+  });
+
+  it("detects a src/app/ project", async () => {
+    await writeNextPackageJson();
+    await mkdir(join(dir, "src", "app"), { recursive: true });
+    expect(await detector.detect(dir)).toMatchObject({ id: "next", appDir: "src/app" });
+  });
+
+  it("prefers top-level app/ over src/app/ when both exist", async () => {
+    await writeNextPackageJson();
+    await mkdir(join(dir, "app"));
+    await mkdir(join(dir, "src", "app"), { recursive: true });
+    expect(await detector.detect(dir)).toMatchObject({ appDir: "app" });
+  });
+
+  it("recognizes next as a devDependency", async () => {
+    await writeFile(join(dir, "package.json"), JSON.stringify({ devDependencies: { next: "14.0.0" } }));
+    await mkdir(join(dir, "app"));
+    expect(await detector.detect(dir)).toMatchObject({ id: "next" });
+  });
+
+  it("extracts the dev-script port into devPort and issuerUrl", async () => {
+    await writeNextPackageJson({ scripts: { dev: "next dev -p 4567" } });
+    await mkdir(join(dir, "app"));
+    expect(await detector.detect(dir)).toMatchObject({
+      devPort: 4567,
+      issuerUrl: "http://localhost:4567",
+    });
+  });
+
+  it("returns null when package.json is missing", async () => {
+    expect(await detector.detect(dir)).toBeNull();
+  });
+
+  it("returns null when next is not a dependency", async () => {
+    await writeFile(join(dir, "package.json"), JSON.stringify({ dependencies: { react: "18.0.0" } }));
+    await mkdir(join(dir, "app"));
+    expect(await detector.detect(dir)).toBeNull();
+  });
+
+  it("throws E_UNSUPPORTED_PROJECT_SHAPE for a Next project with no app router", async () => {
+    await writeNextPackageJson();
+    let caught: unknown;
+    try {
+      await detector.detect(dir);
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(ZitadelError);
+    expect((caught as ZitadelError).code).toBe("E_UNSUPPORTED_PROJECT_SHAPE");
+  });
+});
