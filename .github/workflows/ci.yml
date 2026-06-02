@@ -69,7 +69,7 @@ jobs:
         run: |
           mkdir -p test-output/go
           set -o pipefail
-          go test -json -v -p 1 -tags postgres_integration -timeout=10m ./... | tee test-output/go/postgres-integration.json
+          go test -json -v -tags postgres_integration -timeout=10m ./... | tee test-output/go/postgres-integration.json
       - name: Upload Postgres test log on failure
         if: failure()
         uses: actions/upload-artifact@v7
