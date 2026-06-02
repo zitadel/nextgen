@@ -34,6 +34,7 @@ var (
 type UserRepository struct{}
 
 func NewUserRepository() *UserRepository {
+	// TODO: add spanner integration
 	return &UserRepository{}
 }
 
