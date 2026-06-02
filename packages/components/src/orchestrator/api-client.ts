@@ -26,6 +26,7 @@ import type {
   ExchangeHandoffParams,
   SubmitFlowStepBody,
 } from "@zitadel-nextgen/api/generated/model";
+import { ApiError } from "@zitadel-nextgen/api/runtime/fetch";
 
 const apiRequestInit: RequestInit = { credentials: "include" };
 
@@ -33,12 +34,26 @@ export async function startFlow(api: ZitadelApi, input: CreateFlowBody): Promise
   return api.createFlow(input, apiRequestInit);
 }
 
+// Field validation errors come back as 400 with the step echoed and
+// `step.error` set. Unwrap that shape so it flows through like a 200;
+// everything else bubbles.
 export async function submitStep(
   api: ZitadelApi,
   id: string,
   body: SubmitFlowStepBody,
 ): Promise<CreateFlow201> {
-  return api.submitFlowStep(id, body, apiRequestInit);
+  try {
+    return await api.submitFlowStep(id, body, apiRequestInit);
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 400 && isFlowResponse(error.body)) {
+      return error.body;
+    }
+    throw error;
+  }
+}
+
+function isFlowResponse(body: unknown): body is CreateFlow201 {
+  return typeof body === "object" && body !== null && "step" in body;
 }
 
 export async function getCurrentStep(api: ZitadelApi, id: string): Promise<CreateFlow201> {

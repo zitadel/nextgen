@@ -345,11 +345,9 @@ export class ZitadelLogin extends LitElement {
     if (issues.length > 0) {
       console.warn("[zitadel-login] branding payload has issues:", issues);
     }
-    // Preserve carry-over fields (email captured on the identifier step
-    // is the identity we greet on the signed-in screen) by merging the
-    // next step's defaults *into* the existing values rather than
-    // replacing wholesale.
-    this.formValues = { ...this.formValues, ...collectInitialValues(wire.step) };
+    // Defaults seed every declared field; existing entries (typed input,
+    // carry-over from prior steps) win on conflict.
+    this.formValues = { ...collectInitialValues(wire.step), ...this.formValues };
     void this.maybeCompleteFlow(wire);
   }
 
