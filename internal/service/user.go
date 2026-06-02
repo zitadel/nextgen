@@ -46,16 +46,6 @@ func NewUserService(
 }
 
 func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (_ map[string]any, err error) {
-	tx, err := s.pool.Begin(ctx, nil)
-	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to create transaction")
-	}
-	defer func() {
-		if err != nil {
-			_ = tx.Rollback(ctx)
-		}
-	}()
-
 	// FETCH SCHEMA
 
 	schemaURL, ok := maputil.Get[string](input.User, "$schema")
@@ -64,7 +54,7 @@ func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (_ 
 			WithDetails("No $schema provided for the user. A schema must be provided when creating a new user. Against this schema, the user will be validated")
 	}
 
-	schemaEntity, err := s.schemaRepo.GetByID(ctx, tx, input.ProjectID, schemaURL)
+	schemaEntity, err := s.schemaRepo.GetByID(ctx, s.pool, input.ProjectID, schemaURL)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil, domain.ErrUserInvalid().WithDetails("$schema is not known to the system. First create a schema, then create users.")
@@ -102,16 +92,12 @@ func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (_ 
 
 	// SAVE USER
 
-	err = s.userRepo.Create(ctx, tx, createUser)
+	err = s.userRepo.Create(ctx, s.pool, createUser)
 	if err != nil {
 		if _, ok := errors.AsType[*database.UniqueError](err); ok {
 			return nil, domain.ErrUserAlreadyExists().WithParent(err)
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to create user in the database")
-	}
-
-	if err = tx.Commit(ctx); err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to commit transaction")
 	}
 
 	input.User["id"] = createUser.ID
