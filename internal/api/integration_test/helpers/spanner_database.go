@@ -1,4 +1,4 @@
-//go:build !spanner_integration
+//go:build spanner_integration
 
 package helpers
 
