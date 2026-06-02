@@ -88,10 +88,8 @@ func TestCreateUser(t *testing.T) {
 
 		t.Run("duplicate mail address", func(t *testing.T) {
 			usermap := map[string]any{
-				"$schema":   "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml",
-				"email":     "john.withaduplicatemailaddress@example.com",
-				"firstName": "john",
-				"lastName":  "doe",
+				"$schema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml",
+				"email":   "john.withaduplicatemailaddress@example.com",
 			}
 
 			userbs, err := json.Marshal(usermap)
@@ -129,10 +127,8 @@ func TestGetUser(t *testing.T) {
 			ProjectID: project.ID,
 			TeamID:    &team.ID,
 			User: map[string]any{
-				"$schema":   "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml",
-				"email":     "john.testgetuser@example.com",
-				"firstName": "john",
-				"lastName":  "doe",
+				"$schema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml",
+				"email":   "john.testgetuser11@example.com",
 			},
 		})
 		require.NoError(t, err)
