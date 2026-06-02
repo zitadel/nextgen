@@ -34,11 +34,9 @@ export async function startFlow(api: ZitadelApi, input: CreateFlowBody): Promise
   return api.createFlow(input, apiRequestInit);
 }
 
-// `POST /flow/{id}/submit` returns 400 for field validation errors with the
-// step echoed back and `step.error` set — the orchestrator drives the UX off
-// that body the same way it does a 200. The shared `customFetch` throws on
-// any non-2xx, so we unwrap that one shape back into the typed response and
-// let everything else (cookie/auth/conflict/etc.) bubble as a real error.
+// Field validation errors come back as 400 with the step echoed and
+// `step.error` set. Unwrap that shape so it flows through like a 200;
+// everything else bubbles.
 export async function submitStep(
   api: ZitadelApi,
   id: string,
