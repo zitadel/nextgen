@@ -94,7 +94,9 @@ func (s *PasskeyRegistrationService) IssuePasskeyRegistrationChallenge(ctx conte
 
 // SubmitPasskeyRegistration implements [domain.FlowPasskeyRegistrationService].
 // Called by the flow state machine when the attestation is posted.
-func (s *PasskeyRegistrationService) SubmitPasskeyRegistration(ctx context.Context, in domain.FlowSubmitPasskeyRegistrationInput) error {
+// client is the flow's DB transaction; passkey save shares that transaction
+// so it is atomic with user creation.
+func (s *PasskeyRegistrationService) SubmitPasskeyRegistration(ctx context.Context, client database.QueryExecutor, in domain.FlowSubmitPasskeyRegistrationInput) error {
 	reg, err := s.registrations.Get(ctx, s.pool, in.ProjectID, in.ChallengeID)
 	if err != nil {
 		return domain.ErrAuthAttemptProofRejected(err)
@@ -107,7 +109,7 @@ func (s *PasskeyRegistrationService) SubmitPasskeyRegistration(ctx context.Conte
 	newPasskey.ProjectID = in.ProjectID
 	newPasskey.UserID = in.UserID
 
-	if err := s.passkeys.Create(ctx, s.pool, newPasskey); err != nil {
+	if err := s.passkeys.Create(ctx, client, newPasskey); err != nil {
 		return fmt.Errorf("passkey registration: store credential: %w", err)
 	}
 

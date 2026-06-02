@@ -169,7 +169,8 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 	fields := domain.NewSchemaFieldResolver(storageSchemaResolver)
 	flowAuth := service.NewFlowAuthAttemptAdapter(authAttemptSvc)
 	passkeyRegSvc := service.NewPasskeyRegistrationService(pool, passkeyRegRepo, userPasskeyRepo, sessionRepo, ids)
-	stateMachine := domain.NewFlowStateMachine(fields, nil, flowAuth, passkeyRegSvc, time.Now)
+	createUserHandler := domain.NewFlowCreateUserHandler(ids, userRepo, userPasswordRepo, passwordHasher)
+	stateMachine := domain.NewFlowStateMachine(fields, createUserHandler, flowAuth, passkeyRegSvc, time.Now)
 
 	flowService := service.NewFlowService(pool, flowDefinitionRepo, stateMachine, ids)
 

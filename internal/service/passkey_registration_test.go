@@ -155,7 +155,7 @@ func TestPasskeyRegistrationService_Submit_NotFoundReturnsProofRejected(t *testi
 	pkRepo := &fakePasskeyRepo{}
 	svc := buildTestRegistrationSvc(regRepo, pkRepo)
 
-	err := svc.SubmitPasskeyRegistration(context.Background(), domain.FlowSubmitPasskeyRegistrationInput{
+	err := svc.SubmitPasskeyRegistration(context.Background(), nil, domain.FlowSubmitPasskeyRegistrationInput{
 		ProjectID:   "proj-1",
 		UserID:      "user-1",
 		ChallengeID: "pkreg_missing",
@@ -180,7 +180,7 @@ func TestPasskeyRegistrationService_Submit_InvalidAttestationReturnsProofRejecte
 	require.NoError(t, err)
 
 	// Submit a garbage attestation — the domain should reject it.
-	err = svc.SubmitPasskeyRegistration(context.Background(), domain.FlowSubmitPasskeyRegistrationInput{
+	err = svc.SubmitPasskeyRegistration(context.Background(), nil, domain.FlowSubmitPasskeyRegistrationInput{
 		ProjectID:   "proj-1",
 		UserID:      "user-1",
 		ChallengeID: out.ChallengeID,

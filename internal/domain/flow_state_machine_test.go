@@ -117,7 +117,7 @@ func (f *fakePasskeyRegistration) IssuePasskeyRegistrationChallenge(_ context.Co
 	return f.issueOut, f.issueErr
 }
 
-func (f *fakePasskeyRegistration) SubmitPasskeyRegistration(_ context.Context, in domain.FlowSubmitPasskeyRegistrationInput) error {
+func (f *fakePasskeyRegistration) SubmitPasskeyRegistration(_ context.Context, _ database.QueryExecutor, in domain.FlowSubmitPasskeyRegistrationInput) error {
 	f.submitCalls = append(f.submitCalls, in)
 	return f.submitErr
 }
@@ -708,8 +708,15 @@ func TestFlowStateMachine_Process_PasskeyRegisterRejectedKeepsStep(t *testing.T)
 	assert.Equal(t, "register", rejected.State.CurrentStep)
 }
 
-func TestFlowStateMachine_Process_PasskeyRegisterRequiresIdentifiedUser(t *testing.T) {
+// TestFlowStateMachine_Process_PasskeyRegisterGeneratesUserID verifies that
+// when no user is identified yet (passkey-only registration path), the state
+// machine generates a provisional user ID and issues the challenge successfully.
+func TestFlowStateMachine_Process_PasskeyRegisterGeneratesUserID(t *testing.T) {
 	w := newFlowTestWorld(t)
+	w.passkeyReg.issueOut = domain.FlowPasskeyRegistrationChallengeOutput{
+		ChallengeID: "reg-1",
+		Options:     []byte(`{"rp":{"id":"example.com"}}`),
+	}
 	def := passkeyRegisterDefinition()
 
 	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
@@ -719,12 +726,17 @@ func TestFlowStateMachine_Process_PasskeyRegisterRequiresIdentifiedUser(t *testi
 		UserSchemaURL: defaultSchemaURL,
 	})
 	require.NoError(t, err)
-	// Do NOT seed a user ID — registration must fail.
+	// No user ID seeded — the state machine should generate one.
 
-	_, err = w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+	issued, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
 		Action:    domain.FlowActionPasskeyRegister,
 		PasskeyRP: &domain.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
 	})
-	require.Error(t, err)
-	assert.ErrorIs(t, err, domain.ErrIntegrity)
+	require.NoError(t, err)
+	require.NotNil(t, issued.Step.Challenge)
+	// The provisional user ID should have been generated and passed to the service.
+	require.Len(t, w.passkeyReg.issueCalls, 1)
+	assert.NotEmpty(t, w.passkeyReg.issueCalls[0].UserID)
+	// The generated ID should be stored in CollectedData for use in the verify phase.
+	assert.Equal(t, w.passkeyReg.issueCalls[0].UserID, issued.State.CollectedData[domain.FlowCollectedUserIDKey])
 }

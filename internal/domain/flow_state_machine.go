@@ -280,6 +280,7 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 	if err != nil {
 		return FlowStepResult{}, err
 	}
+	prefillFromCollected(&resolved, state.CollectedData)
 
 	if validationErr := r.fields.Validate(resolved, in.Fields); validationErr != nil {
 		var errs FlowFieldValidationErrors
@@ -296,16 +297,12 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 
 	routeOutcome := in.Action
 
-	// Two-phase passkey ceremony (issue → client signs → verify) runs
-	// before the field-shaped dispatch and short-circuits it when engaged.
-	pk, err := r.processPasskey(ctx, state, currentStep, resolved, in)
-	if err != nil {
-		return FlowStepResult{}, err
-	}
-	if pk.halt != nil {
-		return *pk.halt, nil
-	}
-	if !pk.handled {
+	// For passkey Phase 1 (issue challenge, no proof yet), identify the user first
+	// so that IssuePasskeyChallenge can populate allowCredentials. Without this,
+	// PreparePasskeyChallenge finds no AuthFactorUser and falls back to a discoverable
+	// login with an empty allowCredentials list — non-discoverable credentials won't
+	// be found by the browser.
+	if in.Action == FlowActionPasskey && in.ChallengeResponse == nil {
 		dispatch, err := r.dispatchChallenges(ctx, state, currentStep, resolved, in.Fields)
 		if err != nil {
 			return FlowStepResult{}, err
@@ -316,22 +313,51 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 			return FlowStepResult{State: state, Step: step}, nil
 		}
 		if dispatch.Outcome != "" {
+			// User not found (or similar) — skip the passkey challenge and advance
+			// normally (e.g. transition to choose-register).
 			routeOutcome = dispatch.Outcome
-		} else if currentStep.OnSuccess != nil {
-			result, err := r.runOnSuccess(ctx, client, def, state, userSchemaURL, currentStep, in.Fields, resolved)
+		}
+	}
+
+	// Two-phase passkey ceremony (issue → client signs → verify) runs before the
+	// field-shaped dispatch and short-circuits it when engaged. Only proceed into
+	// processPasskey when no dispatch outcome already overrode the route.
+	if routeOutcome == in.Action {
+		pk, err := r.processPasskey(ctx, client, state, currentStep, resolved, in)
+		if err != nil {
+			return FlowStepResult{}, err
+		}
+		if pk.halt != nil {
+			return *pk.halt, nil
+		}
+		if !pk.handled {
+			dispatch, err := r.dispatchChallenges(ctx, state, currentStep, resolved, in.Fields)
 			if err != nil {
 				return FlowStepResult{}, err
 			}
-			if result.UserID != "" {
-				recordResolvedUser(state, result.UserID)
-			}
-			if result.StepError != nil {
-				step := r.buildStep(currentStep, resolved, result.StepError, nil, nil)
+			if dispatch.StepError != nil {
+				step := r.buildStep(currentStep, resolved, dispatch.StepError, nil, nil)
 				state.IssuedAt = r.now()
 				return FlowStepResult{State: state, Step: step}, nil
 			}
-			if result.Outcome != "" {
-				routeOutcome = result.Outcome
+			if dispatch.Outcome != "" {
+				routeOutcome = dispatch.Outcome
+			} else if currentStep.OnSuccess != nil {
+				result, err := r.runOnSuccess(ctx, client, def, state, userSchemaURL, currentStep, in.Fields, resolved)
+				if err != nil {
+					return FlowStepResult{}, err
+				}
+				if result.UserID != "" {
+					recordResolvedUser(state, result.UserID)
+				}
+				if result.StepError != nil {
+					step := r.buildStep(currentStep, resolved, result.StepError, nil, nil)
+					state.IssuedAt = r.now()
+					return FlowStepResult{State: state, Step: step}, nil
+				}
+				if result.Outcome != "" {
+					routeOutcome = result.Outcome
+				}
 			}
 		}
 	}
@@ -411,6 +437,12 @@ func (r *FlowStateMachineRuntime) dispatchChallenges(ctx context.Context, state 
 		}
 		switch challenge {
 		case FlowFieldChallengeIdentifier:
+			// Skip when the step has no user_not_found transition: the step is
+			// collecting data for registration (e.g. collect-passkey-email), not
+			// authenticating an existing user.
+			if _, hasTransition := step.Transitions[FlowImplicitOutcomeUserNotFound]; !hasTransition {
+				continue
+			}
 			userID, err := r.authAttempts.SubmitIdentifier(ctx, FlowSubmitIdentifierInput{
 				ProjectID:     state.ProjectID,
 				AttemptID:     state.AuthAttemptID,
@@ -477,7 +509,7 @@ type passkeyPhaseResult struct {
 //     yet identified.
 //   - issue leg (register): step offers a `passkey_register` action and it
 //     was selected → user must already be identified; mint a creation challenge.
-func (r *FlowStateMachineRuntime) processPasskey(ctx context.Context, state *FlowState, step *FlowDefinitionStep, resolved FlowResolvedFields, in FlowSubmitInput) (passkeyPhaseResult, error) {
+func (r *FlowStateMachineRuntime) processPasskey(ctx context.Context, client database.QueryExecutor, state *FlowState, step *FlowDefinitionStep, resolved FlowResolvedFields, in FlowSubmitInput) (passkeyPhaseResult, error) {
 	switch {
 	case state.PendingChallenge != nil || in.ChallengeResponse != nil:
 		// Verify leg. Without a proof yet, re-emit the pending challenge.
@@ -499,7 +531,10 @@ func (r *FlowStateMachineRuntime) processPasskey(ctx context.Context, state *Flo
 		switch method {
 		case FlowChallengeMethodPasskeyRegister:
 			userID, _ := state.CollectedData[FlowCollectedUserIDKey].(string)
-			err := r.passkeyRegistration.SubmitPasskeyRegistration(ctx, FlowSubmitPasskeyRegistrationInput{
+			if err := r.createUser.HandleProvisional(ctx, client, userID, state); err != nil {
+				return passkeyPhaseResult{}, fmt.Errorf("flow state machine: ensure user exists: %w", err)
+			}
+			err := r.passkeyRegistration.SubmitPasskeyRegistration(ctx, client, FlowSubmitPasskeyRegistrationInput{
 				ProjectID:   state.ProjectID,
 				UserID:      userID,
 				ChallengeID: challengeID,
@@ -578,9 +613,14 @@ func (r *FlowStateMachineRuntime) processPasskey(ctx context.Context, state *Flo
 		if r.passkeyRegistration == nil {
 			return passkeyPhaseResult{}, fmt.Errorf("%w: passkey registration service not wired", ErrIntegrity)
 		}
-		userID, ok := state.CollectedData[FlowCollectedUserIDKey].(string)
-		if !ok || userID == "" {
-			return passkeyPhaseResult{}, fmt.Errorf("%w: passkey_register requires an identified user", ErrIntegrity)
+		userID, _ := state.CollectedData[FlowCollectedUserIDKey].(string)
+		if userID == "" {
+			newID, err := r.createUser.GenerateUserID()
+			if err != nil {
+				return passkeyPhaseResult{}, fmt.Errorf("flow state machine: generate user id: %w", err)
+			}
+			userID = newID
+			state.CollectedData[FlowCollectedUserIDKey] = userID
 		}
 		out, err := r.passkeyRegistration.IssuePasskeyRegistrationChallenge(ctx, FlowIssuePasskeyRegistrationChallengeInput{
 			ProjectID: state.ProjectID,
@@ -693,6 +733,7 @@ func (r *FlowStateMachineRuntime) renderStep(ctx context.Context, client databas
 	if err != nil {
 		return nil, err
 	}
+	prefillFromCollected(&resolved, state.CollectedData)
 	return r.buildStep(step, resolved, nil, nil, nil), nil
 }
 
@@ -739,6 +780,22 @@ func recordResolvedUser(state *FlowState, userID string) {
 		state.CollectedData = map[string]any{}
 	}
 	state.CollectedData[FlowCollectedUserIDKey] = userID
+}
+
+// prefillFromCollected sets FlowField.Value from collectedData for any field
+// that doesn't already carry a pre-fill value. This carries identifiers
+// (e.g. email entered in a prior step) into subsequent steps that collect the
+// same field, so the user doesn't have to retype them.
+func prefillFromCollected(resolved *FlowResolvedFields, collected map[string]any) {
+	for name, field := range resolved.Fields {
+		if field.Value != nil {
+			continue
+		}
+		if v, ok := collected[name].(string); ok && v != "" {
+			field.Value = &v
+			resolved.Fields[name] = field
+		}
+	}
 }
 
 func mergeCollected(state *FlowState, fields map[string]any) {

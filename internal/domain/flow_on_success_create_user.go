@@ -2,6 +2,7 @@ package domain
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/zitadel/nextgen/internal/domain/idgen"
@@ -71,6 +72,11 @@ func (h *FlowCreateUserHandler) Handle(ctx context.Context, client database.Quer
 		ID:         userID,
 		Attributes: attrs,
 	}); err != nil {
+		var uniqueErr *database.UniqueError
+		if errors.As(err, &uniqueErr) {
+			msg := "user_already_exists"
+			return FlowOnSuccessResult{StepError: &msg}, nil
+		}
 		return FlowOnSuccessResult{}, fmt.Errorf("flow on_success create_user: insert user: %w", err)
 	}
 
@@ -83,6 +89,36 @@ func (h *FlowCreateUserHandler) Handle(ctx context.Context, client database.Quer
 	}
 
 	return FlowOnSuccessResult{UserID: userID}, nil
+}
+
+// GenerateUserID mints a new user ID. Used by the state machine to assign an
+// ID before a passkey registration challenge is issued for a new user.
+func (h *FlowCreateUserHandler) GenerateUserID() (string, error) {
+	return h.ids.New("user")
+}
+
+// HandleProvisional creates a passwordless user with a pre-assigned ID from
+// state.CollectedData. If the user already exists (UniqueError from a prior
+// on_success handler), the call succeeds silently. Intended to be called
+// within the passkey verify phase, sharing the same client transaction as
+// the passkey save for atomicity.
+func (h *FlowCreateUserHandler) HandleProvisional(ctx context.Context, client database.QueryExecutor, userID string, state *FlowState) error {
+	email, _ := state.CollectedData["email"].(string)
+	attr, err := NewCreateAttribute("email", email, AttributeUniquenessTeam)
+	if err != nil {
+		return fmt.Errorf("flow create provisional user: build attribute: %w", err)
+	}
+	err = h.users.Create(ctx, client, &CreateUser{
+		ProjectID:  state.ProjectID,
+		SchemaURL:  state.UserSchemaURL,
+		ID:         userID,
+		Attributes: []*CreateAttribute{attr},
+	})
+	var uniqueErr *database.UniqueError
+	if errors.As(err, &uniqueErr) {
+		return nil
+	}
+	return err
 }
 
 func findIdentifierField(resolved map[string]FlowField, submitted map[string]any) (name string, value any, ok bool) {
