@@ -1870,14 +1870,14 @@ func (s *Server) handleCreateTeamRequest(args [0]string, argsEscaped bool, w htt
 //
 // Create user.
 //
-// POST /users
+// POST /user
 func (s *Server) handleCreateUserRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("createUser"),
 		semconv.HTTPRequestMethodKey.String("POST"),
-		semconv.HTTPRouteKey.String("/users"),
+		semconv.HTTPRouteKey.String("/user"),
 	}
 	// Add attributes from config.
 	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
@@ -6244,14 +6244,14 @@ func (s *Server) handleListSessionsRequest(args [0]string, argsEscaped bool, w h
 //
 // List users.
 //
-// GET /users
+// GET /user
 func (s *Server) handleListUsersRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("listUsers"),
 		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.HTTPRouteKey.String("/users"),
+		semconv.HTTPRouteKey.String("/user"),
 	}
 	// Add attributes from config.
 	otelAttrs = append(otelAttrs, s.cfg.Attributes...)

@@ -40,7 +40,7 @@ paths:
     $ref: endpoints/livez/methods.yaml
   /readyz:
     $ref: endpoints/readyz/methods.yaml
-  /users:
+  /user:
     $ref: endpoints/users/methods.yaml
   /user/{user_id}:
     $ref: endpoints/users/by_id/methods.yaml

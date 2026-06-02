@@ -144,7 +144,7 @@ func (UnimplementedHandler) CreateTeam(ctx context.Context, req *CreateTeamReque
 //
 // Create user.
 //
-// POST /users
+// POST /user
 func (UnimplementedHandler) CreateUser(ctx context.Context, req *User, params CreateUserParams) (r CreateUserRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
@@ -401,7 +401,7 @@ func (UnimplementedHandler) ListSessions(ctx context.Context, params ListSession
 //
 // List users.
 //
-// GET /users
+// GET /user
 func (UnimplementedHandler) ListUsers(ctx context.Context, params ListUsersParams) (r ListUsersRes, _ error) {
 	return r, ht.ErrNotImplemented
 }

@@ -129,7 +129,7 @@ type Invoker interface {
 	//
 	// Create user.
 	//
-	// POST /users
+	// POST /user
 	CreateUser(ctx context.Context, request *User, params CreateUserParams) (CreateUserRes, error)
 	// DeleteFlowDefinition invokes deleteFlowDefinition operation.
 	//
@@ -311,7 +311,7 @@ type Invoker interface {
 	//
 	// List users.
 	//
-	// GET /users
+	// GET /user
 	ListUsers(ctx context.Context, params ListUsersParams) (ListUsersRes, error)
 	// RevokeMySession invokes revokeMySession operation.
 	//
@@ -1882,7 +1882,7 @@ func (c *Client) sendCreateTeam(ctx context.Context, request *CreateTeamRequest,
 //
 // Create user.
 //
-// POST /users
+// POST /user
 func (c *Client) CreateUser(ctx context.Context, request *User, params CreateUserParams) (CreateUserRes, error) {
 	res, err := c.sendCreateUser(ctx, request, params)
 	return res, err
@@ -1892,7 +1892,7 @@ func (c *Client) sendCreateUser(ctx context.Context, request *User, params Creat
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("createUser"),
 		semconv.HTTPRequestMethodKey.String("POST"),
-		semconv.URLTemplateKey.String("/users"),
+		semconv.URLTemplateKey.String("/user"),
 	}
 	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
 
@@ -1926,7 +1926,7 @@ func (c *Client) sendCreateUser(ctx context.Context, request *User, params Creat
 	stage = "BuildURL"
 	u := uri.Clone(c.requestURL(ctx))
 	var pathParts [1]string
-	pathParts[0] = "/users"
+	pathParts[0] = "/user"
 	uri.AddPathParts(u, pathParts[:]...)
 
 	stage = "EncodeQueryParams"
@@ -5084,7 +5084,7 @@ func (c *Client) sendListSessions(ctx context.Context, params ListSessionsParams
 //
 // List users.
 //
-// GET /users
+// GET /user
 func (c *Client) ListUsers(ctx context.Context, params ListUsersParams) (ListUsersRes, error) {
 	res, err := c.sendListUsers(ctx, params)
 	return res, err
@@ -5094,7 +5094,7 @@ func (c *Client) sendListUsers(ctx context.Context, params ListUsersParams) (res
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("listUsers"),
 		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.URLTemplateKey.String("/users"),
+		semconv.URLTemplateKey.String("/user"),
 	}
 	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
 
@@ -5128,7 +5128,7 @@ func (c *Client) sendListUsers(ctx context.Context, params ListUsersParams) (res
 	stage = "BuildURL"
 	u := uri.Clone(c.requestURL(ctx))
 	var pathParts [1]string
-	pathParts[0] = "/users"
+	pathParts[0] = "/user"
 	uri.AddPathParts(u, pathParts[:]...)
 
 	stage = "EncodeQueryParams"
