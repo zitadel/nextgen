@@ -311,6 +311,9 @@ importers:
       consola:
         specifier: ^3.4.2
         version: 3.4.2
+      picocolors:
+        specifier: ^1.1.1
+        version: 1.1.1
       safe-stable-stringify:
         specifier: 'catalog:'
         version: 2.5.0
@@ -575,6 +578,12 @@ importers:
 
   packages/components:
     dependencies:
+      '@zitadel-nextgen/design-tokens':
+        specifier: workspace:*
+        version: link:../design-tokens
+      '@zitadel-nextgen/shared-component-styles':
+        specifier: workspace:*
+        version: link:../shared-component-styles
       dompurify:
         specifier: 'catalog:'
         version: 3.4.1
@@ -603,12 +612,6 @@ importers:
       '@zitadel-nextgen/api-mock':
         specifier: workspace:*
         version: link:../api-mock
-      '@zitadel-nextgen/design-tokens':
-        specifier: workspace:*
-        version: link:../design-tokens
-      '@zitadel-nextgen/shared-component-styles':
-        specifier: workspace:*
-        version: link:../shared-component-styles
       jsdom:
         specifier: 'catalog:'
         version: 29.0.2
