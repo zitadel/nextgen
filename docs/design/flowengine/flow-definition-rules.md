@@ -48,8 +48,10 @@ A transition key is one of:
 
 - **Action name** declared in the step's `actions` map.
 - **Engine-emitted outcome.** Reserved keys produced by the engine, not the
-  client. Today: `user_not_found` (from identifier-shaped fields), `callback`
-  (SSO callback). More may follow — see [ADR 017](../../adrs/017-flow-engine-auth-attempt-dispatch.md).
+  client. Today: `user_not_found` and `user_already_exists` (from
+  identifier-shaped fields, depending on the active `CurrentPurpose`),
+  `callback` (SSO callback). More may follow — see
+  [ADR 017](../../adrs/017-flow-engine-auth-attempt-dispatch.md).
 
 Transition values:
 
@@ -67,6 +69,8 @@ Transition values:
 - Every key in `purposes` is a supported `FlowDefinitionPurpose`.
 - Every value in `purposes` matches a step `name`.
 - `user_schema` URL resolves to a user-type schema. May be deferred until promotion to runtime use.
+- **Flip-table coverage.** A definition that serves both `login` and `register` must wire `user_not_found` (login entry) and `user_already_exists` (register entry) on the entry step. Solo-purpose flows don't need the counter outcome. See [ADR 017](../../adrs/017-flow-engine-auth-attempt-dispatch.md).
+- **`on_success` manifest cross-check.** Every credential kind a mutation establishes (per `ManifestForOnSuccess`) must be collected on the step itself or on some upstream step in the graph. `create_user` establishes `{identifier, password}` — both must appear in `fields` somewhere reachable.
 
 ### Step
 
@@ -99,4 +103,3 @@ Transition values:
 - **Uniqueness key.** `(project_id, name)` or `(project_id, name, schema_version)`? The latter lets revisions coexist; recommended.
 - **Cross-project pivots.** Out of scope — pivots and switches resolve within the same `project_id` when implemented.
 - **Built-in default flow.** Should the project-wide default ship embedded (`go:embed`) and be exempt from the uniqueness check on `name`?
-- **Explicit dispatch intent on steps.** Whether identifier / credential dispatch should be opted into by an explicit step property instead of being implied by transition presence — see [ADR 017](../../adrs/017-flow-engine-auth-attempt-dispatch.md).
