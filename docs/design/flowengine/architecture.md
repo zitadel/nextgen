@@ -89,8 +89,10 @@ Process(in):
   │     └─ on error: return same step with Error set
   ├── merge fields into state.CollectedData
   ├── dispatchChallenges (identifier, then password)
-  │     └─ on user_not_found:   route via outcome
-  │     └─ on password reject:  return same step with Error set
+  │     ├─ verify-vs-skip keyed on state.CurrentPurpose + visited on_success
+  │     ├─ on user_not_found / user_already_exists: route via outcome
+  │     │   (and flip CurrentPurpose per the engine's flip rule)
+  │     └─ on password reject: return same step with Error set
   ├── if step.OnSuccess set: run handler (create_user today)
   ├── look up routeOutcome in step.Transitions
   ├── advance state (push to history, set CurrentStep)
@@ -111,7 +113,7 @@ Errors that surface from `Process`:
 Interface (`Resolve` + `Validate`) plus a schema-backed implementation in `flow_field_resolver_schema.go`. Given a user schema URL and a list of property names, it returns:
 
 - `FlowField` per property — UI input `Type`, `TextKey`, `Required`, optional `Validation`, the field's uniqueness scope, and the `FlowFieldChallenge` it maps to (derived from `x-unique` and `x-password` annotations).
-- `ImplicitOutcomes` per field — the engine-emitted routing outcomes the field contributes (today: `user_not_found` from identifier-shaped fields).
+- `ImplicitOutcomes` per field — the engine-emitted routing outcomes the field contributes (today: `user_not_found` and `user_already_exists` from identifier-shaped fields).
 
 `Validate` walks the resolved fields and returns `FlowFieldValidationErrors` on rule violations — the state machine surfaces those as step errors.
 
@@ -132,7 +134,7 @@ or re-renders (step error) accordingly.
 ### Domain types worth knowing
 
 - `FlowDefinition` / `FlowDefinitionStep` — the immutable graph (`flow_definition.go`). Steps don't have a `type`; behavior derives from `Fields`, `Actions`, `Gates`, `SSOProviders`, `OnSuccess`, `Complete`, and `Transitions`.
-- `FlowState` / `FlowProgress` — the cookie payload (`flow_state.go`). `FlowState` wraps `FlowProgress` (current step, history, collected data) and adds session/OIDC context plus a reserved `PivotStack`.
+- `FlowState` / `FlowProgress` — the cookie payload (`flow_state.go`). `FlowState` wraps `FlowProgress` (current step, history, collected data, `Purpose`, and the dispatch-mode `CurrentPurpose`) and adds session/OIDC context plus a reserved `PivotStack`.
 - `FlowStep` — the capability payload returned to the client (`flow_state_machine.go`).
 - Reserved key `FlowCollectedUserIDKey` (`_user_id`) — where on-success handlers stash the resolved user id.
 
