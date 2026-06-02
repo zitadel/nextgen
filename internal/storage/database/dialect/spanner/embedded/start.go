@@ -46,7 +46,7 @@ func StartEmbedded(ctx context.Context) (database.Connector, func(), error) {
 		return nil, nil, fmt.Errorf("unable to start Spanner emulator container: %w", err)
 	}
 
-	stop := func() { _ = container.Terminate(ctx) }
+	stop := func() { _ = container.Terminate(context.Background()) }
 
 	host, err := container.Host(ctx)
 	if err != nil {
