@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"net/http"
 
-	"github.com/go-webauthn/webauthn/protocol"
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
@@ -116,7 +115,7 @@ func challengeRequestToChallenge(req *api.IssueChallengeRequest) (service.Challe
 		}
 		userVerification, _ := opts.GetUserVerification().Get()
 		return service.PasskeyChallenge{
-			UserVerification: protocol.UserVerificationRequirement(userVerification),
+			UserVerification: string(userVerification),
 			RPID:             opts.GetRpID().Value,
 			RPOrigins:        opts.GetRpOrigins(),
 		}, nil
@@ -218,7 +217,7 @@ func allowedCredentialsToAPI(ids [][]byte) []api.PasskeyChallengePayloadPublicKe
 
 // userVerificationToAPI maps the challenge's WebAuthn user verification requirement into the
 // response. An empty requirement (none set when issuing) yields an unset optional.
-func userVerificationToAPI(uv protocol.UserVerificationRequirement) api.OptPasskeyChallengePayloadPublicKeyUserVerification {
+func userVerificationToAPI(uv string) api.OptPasskeyChallengePayloadPublicKeyUserVerification {
 	if uv == "" {
 		return api.OptPasskeyChallengePayloadPublicKeyUserVerification{}
 	}

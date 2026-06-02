@@ -6,7 +6,6 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -121,7 +120,7 @@ func (PasswordChallenge) ChallengeCheckType() domain.AuthCheckType {
 
 // PasskeyChallenge carries the raw WebAuthn assertion response bytes.
 type PasskeyChallenge struct {
-	UserVerification protocol.UserVerificationRequirement
+	UserVerification string
 	RPID             string
 	RPOrigins        []url.URL
 }

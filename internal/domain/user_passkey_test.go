@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/descope/virtualwebauthn"
-	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -90,13 +89,13 @@ func TestCreatePasskeyChallenge(t *testing.T) {
 	t.Run("identified login populates the challenge", func(t *testing.T) {
 		s := newPasskeyTestSetup(t)
 
-		challenge, err := domain.CreatePasskeyChallenge(testUserID, []*domain.UserPasskey{s.passkey}, protocol.VerificationPreferred, testRPID, s.origins)
+		challenge, err := domain.CreatePasskeyChallenge(testUserID, []*domain.UserPasskey{s.passkey}, "preferred", testRPID, s.origins)
 		require.NoError(t, err)
 
 		assert.NotEmpty(t, challenge.Challenge)
 		assert.Equal(t, testRPID, challenge.RPID)
 		assert.Equal(t, s.origins, challenge.RPOrigins)
-		assert.Equal(t, protocol.VerificationPreferred, challenge.UserVerification)
+		assert.Equal(t, "preferred", challenge.UserVerification)
 		require.Len(t, challenge.AllowedCredentialIDs, 1)
 		assert.Equal(t, s.cred.ID, challenge.AllowedCredentialIDs[0])
 		assert.Equal(t, []byte(testUserID), challenge.UserID)
@@ -117,7 +116,7 @@ func TestVerifyPasskeyChallenge(t *testing.T) {
 	t.Run("verifies a valid assertion", func(t *testing.T) {
 		s := newPasskeyTestSetup(t)
 
-		challenge, err := domain.CreatePasskeyChallenge(testUserID, []*domain.UserPasskey{s.passkey}, protocol.VerificationPreferred, testRPID, s.origins)
+		challenge, err := domain.CreatePasskeyChallenge(testUserID, []*domain.UserPasskey{s.passkey}, "preferred", testRPID, s.origins)
 		require.NoError(t, err)
 
 		assertion := s.assertionFor(t, challenge)
@@ -174,7 +173,7 @@ func TestVerifyPasskeyChallenge(t *testing.T) {
 	t.Run("rejects garbage assertion bytes", func(t *testing.T) {
 		s := newPasskeyTestSetup(t)
 
-		challenge, err := domain.CreatePasskeyChallenge(testUserID, []*domain.UserPasskey{s.passkey}, protocol.VerificationPreferred, testRPID, s.origins)
+		challenge, err := domain.CreatePasskeyChallenge(testUserID, []*domain.UserPasskey{s.passkey}, "preferred", testRPID, s.origins)
 		require.NoError(t, err)
 
 		_, err = domain.VerifyPasskeyChallenge(challenge, []byte("not-a-valid-assertion"), testUserID, []*domain.UserPasskey{s.passkey}, nil)
@@ -184,7 +183,7 @@ func TestVerifyPasskeyChallenge(t *testing.T) {
 	t.Run("rejects assertion with mismatched origin", func(t *testing.T) {
 		s := newPasskeyTestSetup(t)
 
-		challenge, err := domain.CreatePasskeyChallenge(testUserID, []*domain.UserPasskey{s.passkey}, protocol.VerificationPreferred, testRPID, s.origins)
+		challenge, err := domain.CreatePasskeyChallenge(testUserID, []*domain.UserPasskey{s.passkey}, "preferred", testRPID, s.origins)
 		require.NoError(t, err)
 
 		// Sign the assertion against a different origin than the one the challenge was issued for.

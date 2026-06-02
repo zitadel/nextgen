@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/go-webauthn/webauthn/protocol"
+	"github.com/go-webauthn/webauthn/protocol/webauthncose"
 	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/muhlemmer/gu"
 )
@@ -12,16 +13,29 @@ import (
 type PasskeyChallenge struct {
 	Challenge            string
 	AllowedCredentialIDs [][]byte
-	UserVerification     protocol.UserVerificationRequirement
-	RPID                 string
-	RPOrigins            []url.URL
+	// UserVerification mirrors the WebAuthn UserVerificationRequirement enum:
+	// "required", "preferred" or "discouraged" (or empty for unset).
+	UserVerification string
+	RPID             string
+	// TODO: RPOrigins must be a subset of the project's allowed origins
+	// once a unified project-level origin config (prod + preview) exists.
+	RPOrigins []url.URL
 
 	UserID  []byte    `json:"user_id,omitempty" msg:"u,omitempty"`
 	Expires time.Time `json:"expires" msg:"exp"`
 
-	Extensions protocol.AuthenticationExtensions       `json:"extensions,omitempty" msg:"exts,omitempty"`
-	CredParams []protocol.CredentialParameter          `json:"credParams,omitempty" msg:"params,omitempty"`
-	Mediation  protocol.CredentialMediationRequirement `json:"mediation,omitempty" msg:"cmr,omitempty"`
+	Extensions map[string]any               `json:"extensions,omitempty" msg:"exts,omitempty"`
+	CredParams []PasskeyCredentialParameter `json:"credParams,omitempty" msg:"params,omitempty"`
+	// Mediation mirrors the WebAuthn CredentialMediationRequirement enum.
+	Mediation string `json:"mediation,omitempty" msg:"cmr,omitempty"`
+}
+
+// PasskeyCredentialParameter mirrors a WebAuthn PublicKeyCredentialParameters
+// entry as a plain-Go type so the persisted/transmitted domain model stays
+// independent of go-webauthn. JSON shape matches the WebAuthn spec.
+type PasskeyCredentialParameter struct {
+	Type      string `json:"type"`
+	Algorithm int    `json:"alg"`
 }
 
 type PasskeyVerification struct {
@@ -67,7 +81,7 @@ func (w *webAuthNUser) WebAuthnName() string {
 
 var _ webauthn.User = (*webAuthNUser)(nil)
 
-func CreatePasskeyChallenge(id string, keys []*UserPasskey, verification protocol.UserVerificationRequirement, rpID string, origins []url.URL) (*PasskeyChallenge, error) {
+func CreatePasskeyChallenge(id string, keys []*UserPasskey, verification string, rpID string, origins []url.URL) (*PasskeyChallenge, error) {
 	w, err := webAuthNConfig(rpID, origins...)
 	if err != nil {
 		return nil, err
@@ -75,7 +89,7 @@ func CreatePasskeyChallenge(id string, keys []*UserPasskey, verification protoco
 	var sessionData *webauthn.SessionData
 	opts := make([]webauthn.LoginOption, 0)
 	if verification != "" {
-		opts = append(opts, webauthn.WithUserVerification(verification))
+		opts = append(opts, webauthn.WithUserVerification(protocol.UserVerificationRequirement(verification)))
 	}
 	// The discarded first return value is the *protocol.CredentialAssertion — the client-facing
 	// "publicKey" options for navigator.credentials.get(). We don't persist it: the API rebuilds
@@ -99,15 +113,40 @@ func CreatePasskeyChallenge(id string, keys []*UserPasskey, verification protoco
 	return &PasskeyChallenge{
 		Challenge:            sessionData.Challenge,
 		AllowedCredentialIDs: sessionData.AllowedCredentialIDs,
-		UserVerification:     sessionData.UserVerification,
+		UserVerification:     string(sessionData.UserVerification),
 		RPID:                 sessionData.RelyingPartyID,
 		RPOrigins:            origins,
 		UserID:               sessionData.UserID,
 		Expires:              sessionData.Expires,
-		Extensions:           sessionData.Extensions,
-		CredParams:           sessionData.CredParams,
-		Mediation:            sessionData.Mediation,
+		Extensions:           map[string]any(sessionData.Extensions),
+		CredParams:           credParamsFromProtocol(sessionData.CredParams),
+		Mediation:            string(sessionData.Mediation),
 	}, nil
+}
+
+func credParamsFromProtocol(in []protocol.CredentialParameter) []PasskeyCredentialParameter {
+	if in == nil {
+		return nil
+	}
+	out := make([]PasskeyCredentialParameter, len(in))
+	for i, p := range in {
+		out[i] = PasskeyCredentialParameter{Type: string(p.Type), Algorithm: int(p.Algorithm)}
+	}
+	return out
+}
+
+func credParamsToProtocol(in []PasskeyCredentialParameter) []protocol.CredentialParameter {
+	if in == nil {
+		return nil
+	}
+	out := make([]protocol.CredentialParameter, len(in))
+	for i, p := range in {
+		out[i] = protocol.CredentialParameter{
+			Type:      protocol.CredentialType(p.Type),
+			Algorithm: webauthncose.COSEAlgorithmIdentifier(p.Algorithm),
+		}
+	}
+	return out
 }
 
 func PasskeysToCredentials(passkeys []*UserPasskey) []webauthn.Credential {
@@ -135,10 +174,10 @@ func sessionDataFromChallenge(challenge *PasskeyChallenge) webauthn.SessionData 
 		UserID:               challenge.UserID,
 		AllowedCredentialIDs: challenge.AllowedCredentialIDs,
 		Expires:              challenge.Expires,
-		UserVerification:     challenge.UserVerification,
-		Extensions:           challenge.Extensions,
-		CredParams:           challenge.CredParams,
-		Mediation:            challenge.Mediation,
+		UserVerification:     protocol.UserVerificationRequirement(challenge.UserVerification),
+		Extensions:           protocol.AuthenticationExtensions(challenge.Extensions),
+		CredParams:           credParamsToProtocol(challenge.CredParams),
+		Mediation:            protocol.CredentialMediationRequirement(challenge.Mediation),
 	}
 }
 
