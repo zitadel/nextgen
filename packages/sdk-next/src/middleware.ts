@@ -195,14 +195,31 @@ async function proxyRequest(
 
   const hasBody = !['GET', 'HEAD'].includes(req.method);
 
+  // POST /sessions/exchange requires a project service-key bearer token.
+  // The browser can't hold a secret, so the middleware constructs one from
+  // the project_id query param. The server's security handler accepts any
+  // token of the form sk_proj_* at this stage (full validation is a TODO).
+  const isExchangeRequest =
+    req.method === 'POST' && suffix.startsWith('/sessions/exchange');
+  if (isExchangeRequest && !upstreamHeaders.has('authorization')) {
+    const projectId = url.searchParams.get('project_id');
+    if (projectId) {
+      upstreamHeaders.set('authorization', `Bearer sk_${projectId}`);
+    }
+  }
+
+  // Read body eagerly so undici receives a concrete buffer rather than a
+  // WinterCG ReadableStream, which is incompatible with Node.js fetch body
+  // extraction.
+  const bodyBuffer = hasBody ? await req.arrayBuffer() : undefined;
+
   const upstream = await fetch(target, {
     method: req.method,
     headers: upstreamHeaders,
-    body: hasBody ? req.body : undefined,
+    body: bodyBuffer,
     redirect: 'manual',
     signal: AbortSignal.timeout(proxyTimeoutMs),
-    ...(hasBody ? { duplex: 'half' } : {}),
-  } as RequestInit);
+  });
 
   const responseHeaders = filterResponseHeaders(upstream.headers);
 
@@ -217,9 +234,7 @@ async function proxyRequest(
   });
 
   // Call the exchange hook when the proxied request is POST /sessions/exchange.
-  const isExchange =
-    req.method === 'POST' && suffix.startsWith('/sessions/exchange');
-  if (isExchange && onExchangeResponse) {
+  if (isExchangeRequest && onExchangeResponse) {
     response = await onExchangeResponse(response);
   }
 
