@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	api "github.com/zitadel/nextgen/api/generated"
+	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 )
 
 func TestCreateProject(t *testing.T) {
@@ -37,7 +38,7 @@ func TestCreateProject(t *testing.T) {
 				resp, err := client.CreateProject(t.Context(), tc.req)
 
 				assert.NoError(t, err)
-				if (assert.IsType(t, &api.CreateProjectResponse{}, resp, mustMarshal(t, resp))) {
+				if (assert.IsType(t, &api.CreateProjectResponse{}, resp, helpers.MustMarshal(t, resp))) {
 					got := resp.(*api.CreateProjectResponse)
 					assert.NotEmpty(t, got.ID)
 					assert.NotEmpty(t, got.ProjectSecret)
@@ -62,7 +63,7 @@ func TestGetProject(t *testing.T) {
 		resp, err := client.GetProject(t.Context(), params)
 
 		assert.NoError(t, err)
-		if assert.IsType(t, &api.GetProjectResponse{}, resp, mustMarshal(t, resp)) {
+		if assert.IsType(t, &api.GetProjectResponse{}, resp, helpers.MustMarshal(t, resp)) {
 			got := resp.(*api.GetProjectResponse)
 			assert.NotEmpty(t, got.CreatedAt)
 			assert.NotEmpty(t, got.UpdatedAt)
@@ -83,7 +84,7 @@ func TestGetProject(t *testing.T) {
 			resp, err := client.GetProject(t.Context(), params)
 
 			assert.NoError(t, err)
-			assert.IsType(t, &api.GetProjectNotFound{}, resp, mustMarshal(t, resp))
+			assert.IsType(t, &api.GetProjectNotFound{}, resp, helpers.MustMarshal(t, resp))
 		})
 	})
 }
