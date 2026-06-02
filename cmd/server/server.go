@@ -184,10 +184,10 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 			authAttemptSvc,
 			sessionService,
 			projectService,
+			userService,
 			schemaService,
 			flowDefinitionSvc,
 			teamService,
-			userService,
 		),
 		api.NewSecurityHandler(),
 		oasapi.WithErrorHandler(api.OgenErrorHandler))
