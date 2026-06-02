@@ -15,7 +15,7 @@ func ErrUserPasswordInvalid() Error {
 func HashPassword(password string, hasher crypto.Hasher) (string, error) {
 	hash, err := hasher.Hash(password)
 	if err != nil {
-		return "", ErrInternal(err).WithMessage("failed to has password")
+		return "", ErrInternal(err).WithMessage("failed to hash password")
 	}
 	return hash, nil
 }
