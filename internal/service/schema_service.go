@@ -7,7 +7,6 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
@@ -126,7 +125,7 @@ func (s *SchemaService) CreateSchemaByUrl(ctx context.Context, input CreateSchem
 func (s *SchemaService) GetSchema(ctx context.Context, projectID string, teamID string, schemaID string) (*domain.JSONSchema, error) {
 	schema, err := s.schemaRepo.GetByID(ctx, s.pool, projectID, schemaID)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil, domain.ErrJSONSchemaNotFound()
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to get schema from database")
