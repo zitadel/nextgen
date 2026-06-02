@@ -8,13 +8,13 @@
  * - `appDir` — where routes/managed files live (`app` | `src/app` for Next).
  * - `devPort` — the dev-server port parsed from the project, else the framework
  *   default.
- * - `issuerUrl` — the local OIDC issuer derived from `devPort`.
+ * - `url` — the local OIDC issuer derived from `devPort`.
  */
 export type FrameworkFacts = Readonly<{
   id: string;
   appDir: string;
   devPort: number;
-  issuerUrl: string;
+  url: string;
 }>;
 
 /**

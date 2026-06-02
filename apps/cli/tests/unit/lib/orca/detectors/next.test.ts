@@ -37,7 +37,7 @@ describe("NextDetector", () => {
       id: "next",
       appDir: "app",
       devPort: 3000,
-      issuerUrl: "http://localhost:3000",
+      url: "http://localhost:3000",
     });
   });
 
@@ -60,12 +60,12 @@ describe("NextDetector", () => {
     expect(await detector.detect(dir)).toMatchObject({ id: "next" });
   });
 
-  it("extracts the dev-script port into devPort and issuerUrl", async () => {
+  it("extracts the dev-script port into devPort and url", async () => {
     await writeNextPackageJson({ scripts: { dev: "next dev -p 4567" } });
     await mkdir(join(dir, "app"));
     expect(await detector.detect(dir)).toMatchObject({
       devPort: 4567,
-      issuerUrl: "http://localhost:4567",
+      url: "http://localhost:4567",
     });
   });
 

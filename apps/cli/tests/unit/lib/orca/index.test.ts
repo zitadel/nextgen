@@ -53,7 +53,7 @@ describe("Orca detection", () => {
       id: "next",
       appDir: "app",
       devPort: 4321,
-      issuerUrl: "http://localhost:4321",
+      url: "http://localhost:4321",
     });
   });
 
@@ -88,7 +88,7 @@ describe("Orca.scaffold", () => {
     async detect(cwd) {
       try {
         await readFile(join(cwd, "package.json"), "utf8");
-        return { id: "fake", appDir: "app", devPort: 3000, issuerUrl: "http://localhost:3000" };
+        return { id: "fake", appDir: "app", devPort: 3000, url: "http://localhost:3000" };
       } catch {
         return null;
       }
