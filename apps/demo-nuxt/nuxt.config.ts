@@ -1,4 +1,5 @@
 export default defineNuxtConfig({
+  buildDir: process.env.NEXTGEN_NUXT_BUILD_DIR ?? ".nuxt",
   modules: ["@zitadel-nextgen/sdk-nuxt/module"],
   nextgen: {
     protectedRoutes: ["/admin", "/admin/*"],
