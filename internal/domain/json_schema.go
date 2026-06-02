@@ -240,7 +240,9 @@ func (r *JSONSchemaResolver) loadSchemaPayload(ctx context.Context, client datab
 	if r.builtinPublicBase != "" {
 		relPath, ok := builtinSchemaURLPathAfterBase(r.builtinPublicBase, schemaURL)
 		if ok {
-			return loadBuiltinSchemaBytes(relPath, schemaURL)
+			if _, isBuiltin := builtinSchemas[relPath]; isBuiltin {
+				return loadBuiltinSchemaBytes(relPath, schemaURL)
+			}
 		}
 	}
 	return r.getFromDatabase(ctx, client, projectID, schemaURL)
