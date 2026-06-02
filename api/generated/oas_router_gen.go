@@ -1192,9 +1192,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 				}
 
-			case 'u': // Prefix: "user"
+			case 'u': // Prefix: "users"
 
-				if l := len("user"); len(elem) >= l && elem[0:l] == "user" {
+				if l := len("users"); len(elem) >= l && elem[0:l] == "users" {
 					elem = elem[l:]
 				} else {
 					break
@@ -2439,9 +2439,9 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 
 				}
 
-			case 'u': // Prefix: "user"
+			case 'u': // Prefix: "users"
 
-				if l := len("user"); len(elem) >= l && elem[0:l] == "user" {
+				if l := len("users"); len(elem) >= l && elem[0:l] == "users" {
 					elem = elem[l:]
 				} else {
 					break
@@ -2454,7 +2454,7 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 						r.summary = "List users"
 						r.operationID = "listUsers"
 						r.operationGroup = ""
-						r.pathPattern = "/user"
+						r.pathPattern = "/users"
 						r.args = args
 						r.count = 0
 						return r, true
@@ -2463,7 +2463,7 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 						r.summary = "Create user"
 						r.operationID = "createUser"
 						r.operationGroup = ""
-						r.pathPattern = "/user"
+						r.pathPattern = "/users"
 						r.args = args
 						r.count = 0
 						return r, true
@@ -2500,7 +2500,7 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 								r.summary = "Get my user information"
 								r.operationID = "getMyUser"
 								r.operationGroup = ""
-								r.pathPattern = "/user/me"
+								r.pathPattern = "/users/me"
 								r.args = args
 								r.count = 0
 								return r, true
@@ -2528,7 +2528,7 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 							r.summary = "Get user by ID"
 							r.operationID = "GetUserByID"
 							r.operationGroup = ""
-							r.pathPattern = "/user/{user_id}"
+							r.pathPattern = "/users/{user_id}"
 							r.args = args
 							r.count = 1
 							return r, true

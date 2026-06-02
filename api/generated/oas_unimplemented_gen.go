@@ -144,7 +144,7 @@ func (UnimplementedHandler) CreateTeam(ctx context.Context, req *CreateTeamReque
 //
 // Create user.
 //
-// POST /user
+// POST /users
 func (UnimplementedHandler) CreateUser(ctx context.Context, req *User, params CreateUserParams) (r CreateUserRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
@@ -265,7 +265,7 @@ func (UnimplementedHandler) GetMySession(ctx context.Context, params GetMySessio
 //
 // Get my user information.
 //
-// GET /user/me
+// GET /users/me
 func (UnimplementedHandler) GetMyUser(ctx context.Context, params GetMyUserParams) (r GetMyUserRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
@@ -341,7 +341,7 @@ func (UnimplementedHandler) GetToken(ctx context.Context, req *PostTokenRequest)
 //
 // Get user by ID.
 //
-// GET /user/{user_id}
+// GET /users/{user_id}
 func (UnimplementedHandler) GetUserByID(ctx context.Context, params GetUserByIDParams) (r GetUserByIDRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
@@ -401,7 +401,7 @@ func (UnimplementedHandler) ListSessions(ctx context.Context, params ListSession
 //
 // List users.
 //
-// GET /user
+// GET /users
 func (UnimplementedHandler) ListUsers(ctx context.Context, params ListUsersParams) (r ListUsersRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
