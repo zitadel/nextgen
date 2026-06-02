@@ -322,37 +322,22 @@ var challengeDispatchOrder = []FlowFieldChallenge{
 	FlowFieldChallengePassword,
 }
 
-// purposeFlipTable maps (CurrentPurpose, outcome) → new CurrentPurpose.
+// applyOutcomeFlip flips CurrentPurpose on identifier outcomes:
+// login + user_not_found → register; register + user_already_exists → login.
 // Recovery never flips.
-var purposeFlipTable = map[FlowDefinitionPurpose]map[string]FlowDefinitionPurpose{
-	FlowDefinitionPurposeLogin: {
-		FlowImplicitOutcomeUserNotFound: FlowDefinitionPurposeRegister,
-	},
-	FlowDefinitionPurposeRegister: {
-		FlowImplicitOutcomeUserAlreadyExists: FlowDefinitionPurposeLogin,
-	},
-}
-
-// applyOutcomeFlip flips CurrentPurpose per [purposeFlipTable].
 func applyOutcomeFlip(state *FlowState, outcome string) {
-	if outcome == "" {
-		return
-	}
-	flips, ok := purposeFlipTable[state.CurrentPurpose]
-	if !ok {
-		return
-	}
-	if next, ok := flips[outcome]; ok {
-		state.CurrentPurpose = next
+	switch {
+	case state.CurrentPurpose == FlowDefinitionPurposeLogin && outcome == FlowImplicitOutcomeUserNotFound:
+		state.CurrentPurpose = FlowDefinitionPurposeRegister
+	case state.CurrentPurpose == FlowDefinitionPurposeRegister && outcome == FlowImplicitOutcomeUserAlreadyExists:
+		state.CurrentPurpose = FlowDefinitionPurposeLogin
 	}
 }
 
 // dispatchChallenges submits field-shaped challenges in
-// [challengeDispatchOrder]. CurrentPurpose + the union of
-// [FlowOnSuccessHandler.EstablishedKinds] decide verify-vs-skip.
+// [challengeDispatchOrder]. CurrentPurpose + visited on_success decide
+// verify-vs-skip.
 func (r *FlowStateMachineRuntime) dispatchChallenges(ctx context.Context, def *FlowDefinition, state *FlowState, step *FlowDefinitionStep, resolved FlowResolvedFields, fields map[string]any) (flowDispatchResult, error) {
-	established := r.establishedKinds(def, state, step)
-
 	for _, challenge := range challengeDispatchOrder {
 		name, value, ok := fieldValueByChallenge(resolved, fields, challenge)
 		if !ok {
@@ -386,7 +371,10 @@ func (r *FlowStateMachineRuntime) dispatchChallenges(ctx context.Context, def *F
 			if state.CurrentPurpose != FlowDefinitionPurposeLogin {
 				continue
 			}
-			if _, owned := established[FlowFieldChallengePassword]; owned {
+			// Skip if any visited step runs an on_success — today the only
+			// one (create_user) establishes the password kind, and the
+			// validator enforces password-collected-upstream for it.
+			if anyVisitedStepOnSuccess(def, state, step) {
 				continue
 			}
 			err := r.authAttempts.SubmitPassword(ctx, FlowSubmitPasswordInput{
@@ -406,44 +394,18 @@ func (r *FlowStateMachineRuntime) dispatchChallenges(ctx context.Context, def *F
 	return flowDispatchResult{}, nil
 }
 
-// establishedKinds unions [FlowOnSuccessHandler.EstablishedKinds]
-// across the current step and its history.
-func (r *FlowStateMachineRuntime) establishedKinds(def *FlowDefinition, state *FlowState, current *FlowDefinitionStep) map[FlowFieldChallenge]struct{} {
-	set := map[FlowFieldChallenge]struct{}{}
-	addFromStep := func(s *FlowDefinitionStep) {
-		if s == nil || s.OnSuccess == nil {
-			return
-		}
-		h := r.handlerFor(*s.OnSuccess)
-		if h == nil {
-			return
-		}
-		for _, k := range h.EstablishedKinds() {
-			set[k] = struct{}{}
-		}
+// anyVisitedStepOnSuccess reports whether any step in (history ∪ current)
+// runs an on_success mutation.
+func anyVisitedStepOnSuccess(def *FlowDefinition, state *FlowState, current *FlowDefinitionStep) bool {
+	if current.OnSuccess != nil {
+		return true
 	}
 	for _, name := range state.History {
-		s, ok := def.FindStep(name)
-		if !ok {
-			continue
+		if s, ok := def.FindStep(name); ok && s.OnSuccess != nil {
+			return true
 		}
-		addFromStep(s)
 	}
-	addFromStep(current)
-	return set
-}
-
-// handlerFor returns the wired [FlowOnSuccessHandler] or nil. Shared by
-// dispatch (manifest lookup) and runOnSuccess.
-func (r *FlowStateMachineRuntime) handlerFor(o FlowOnSuccess) FlowOnSuccessHandler {
-	switch o {
-	case FlowOnSuccessCreateUser:
-		if r.createUser == nil {
-			return nil
-		}
-		return r.createUser
-	}
-	return nil
+	return false
 }
 
 func fieldValueByChallenge(resolved FlowResolvedFields, fields map[string]any, target FlowFieldChallenge) (name, value string, ok bool) {
@@ -461,9 +423,13 @@ func fieldValueByChallenge(resolved FlowResolvedFields, fields map[string]any, t
 	return "", "", false
 }
 
-// runOnSuccess dispatches the step's on_success mutation via [handlerFor].
+// runOnSuccess dispatches the step's on_success mutation.
 func (r *FlowStateMachineRuntime) runOnSuccess(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState, userSchemaURL string, step *FlowDefinitionStep, fields map[string]any, resolved FlowResolvedFields) (FlowOnSuccessResult, error) {
-	handler := r.handlerFor(*step.OnSuccess)
+	var handler FlowOnSuccessHandler
+	switch *step.OnSuccess {
+	case FlowOnSuccessCreateUser:
+		handler = r.createUser
+	}
 	if handler == nil {
 		return FlowOnSuccessResult{}, fmt.Errorf("%w: on_success %s not wired", ErrIntegrity, *step.OnSuccess)
 	}

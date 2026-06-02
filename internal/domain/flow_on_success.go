@@ -14,28 +14,17 @@ import (
 // in their own file (e.g. flow_on_success_create_user.go).
 type FlowOnSuccessHandler interface {
 	Handle(ctx context.Context, client database.QueryExecutor, in FlowOnSuccessInput) (FlowOnSuccessResult, error)
-	// EstablishedKinds reports the credential kinds this mutation owns.
-	// Dispatch skips verification of any kind in the union of these
-	// across the current step and its history.
-	EstablishedKinds() []FlowFieldChallenge
 }
 
-// onSuccessManifests is the single source of truth for each mutation's
-// established kinds. Handlers and the validator both read it.
-var onSuccessManifests = map[FlowOnSuccess][]FlowFieldChallenge{
-	FlowOnSuccessCreateUser: {FlowFieldChallengeIdentifier, FlowFieldChallengePassword},
-}
-
-// ManifestForOnSuccess returns the kinds the mutation establishes,
-// or nil if unknown.
+// ManifestForOnSuccess returns the credential kinds a mutation establishes.
+// Dispatch (verify-vs-skip) and the validator (upstream-collects check)
+// both read this table.
 func ManifestForOnSuccess(o FlowOnSuccess) []FlowFieldChallenge {
-	src := onSuccessManifests[o]
-	if src == nil {
-		return nil
+	switch o {
+	case FlowOnSuccessCreateUser:
+		return []FlowFieldChallenge{FlowFieldChallengeIdentifier, FlowFieldChallengePassword}
 	}
-	out := make([]FlowFieldChallenge, len(src))
-	copy(out, src)
-	return out
+	return nil
 }
 
 // FlowOnSuccessInput is the per-call context the state machine threads
