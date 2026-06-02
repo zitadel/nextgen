@@ -129,7 +129,7 @@ type Invoker interface {
 	//
 	// Create user.
 	//
-	// POST /user
+	// POST /users
 	CreateUser(ctx context.Context, request *User, params CreateUserParams) (CreateUserRes, error)
 	// DeleteFlowDefinition invokes deleteFlowDefinition operation.
 	//
@@ -217,7 +217,7 @@ type Invoker interface {
 	//
 	// Get my user information.
 	//
-	// GET /users/me
+	// GET /user/me
 	GetMyUser(ctx context.Context, params GetMyUserParams) (GetMyUserRes, error)
 	// GetOpenIDConfiguration invokes getOpenIDConfiguration operation.
 	//
@@ -1882,7 +1882,7 @@ func (c *Client) sendCreateTeam(ctx context.Context, request *CreateTeamRequest,
 //
 // Create user.
 //
-// POST /user
+// POST /users
 func (c *Client) CreateUser(ctx context.Context, request *User, params CreateUserParams) (CreateUserRes, error) {
 	res, err := c.sendCreateUser(ctx, request, params)
 	return res, err
@@ -1892,7 +1892,7 @@ func (c *Client) sendCreateUser(ctx context.Context, request *User, params Creat
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("createUser"),
 		semconv.HTTPRequestMethodKey.String("POST"),
-		semconv.URLTemplateKey.String("/user"),
+		semconv.URLTemplateKey.String("/users"),
 	}
 	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
 
@@ -1926,7 +1926,7 @@ func (c *Client) sendCreateUser(ctx context.Context, request *User, params Creat
 	stage = "BuildURL"
 	u := uri.Clone(c.requestURL(ctx))
 	var pathParts [1]string
-	pathParts[0] = "/user"
+	pathParts[0] = "/users"
 	uri.AddPathParts(u, pathParts[:]...)
 
 	stage = "EncodeQueryParams"
@@ -3214,7 +3214,7 @@ func (c *Client) sendGetMySession(ctx context.Context, params GetMySessionParams
 //
 // Get my user information.
 //
-// GET /users/me
+// GET /user/me
 func (c *Client) GetMyUser(ctx context.Context, params GetMyUserParams) (GetMyUserRes, error) {
 	res, err := c.sendGetMyUser(ctx, params)
 	return res, err
@@ -3224,7 +3224,7 @@ func (c *Client) sendGetMyUser(ctx context.Context, params GetMyUserParams) (res
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("getMyUser"),
 		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.URLTemplateKey.String("/users/me"),
+		semconv.URLTemplateKey.String("/user/me"),
 	}
 	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
 
@@ -3258,7 +3258,7 @@ func (c *Client) sendGetMyUser(ctx context.Context, params GetMyUserParams) (res
 	stage = "BuildURL"
 	u := uri.Clone(c.requestURL(ctx))
 	var pathParts [1]string
-	pathParts[0] = "/users/me"
+	pathParts[0] = "/user/me"
 	uri.AddPathParts(u, pathParts[:]...)
 
 	stage = "EncodeRequest"

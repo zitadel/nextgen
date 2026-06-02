@@ -109,7 +109,7 @@ type Handler interface {
 	//
 	// Create user.
 	//
-	// POST /user
+	// POST /users
 	CreateUser(ctx context.Context, req *User, params CreateUserParams) (CreateUserRes, error)
 	// DeleteFlowDefinition implements deleteFlowDefinition operation.
 	//
@@ -197,7 +197,7 @@ type Handler interface {
 	//
 	// Get my user information.
 	//
-	// GET /users/me
+	// GET /user/me
 	GetMyUser(ctx context.Context, params GetMyUserParams) (GetMyUserRes, error)
 	// GetOpenIDConfiguration implements getOpenIDConfiguration operation.
 	//

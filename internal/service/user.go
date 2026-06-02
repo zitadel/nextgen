@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/ianlancetaylor/jsonschema"
-	"github.com/ogen-go/ogen/json"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/maputil"
@@ -35,23 +34,23 @@ type GetMyUserInput struct {
 // ---- Implementation -------------------------------------------------------------
 
 type UserService struct {
-	pool      database.Pool
-	userRepo  domain.UserRepository
-	decrypter crypto.Decrypter
+	pool       database.Pool
+	userRepo   domain.UserRepository
 	schemaRepo domain.JSONSchemaRepository
+	decrypter  crypto.Decrypter
 }
 
 func NewUserService(
 	pool database.Pool,
 	userRepo domain.UserRepository,
-	sealer crypto.Decrypter,
 	schemaRepo domain.JSONSchemaRepository,
+	sealer crypto.Decrypter,
 ) *UserService {
 	return &UserService{
-		pool:      pool,
-		userRepo:  userRepo,
-		decrypter: sealer,
+		pool:       pool,
+		userRepo:   userRepo,
 		schemaRepo: schemaRepo,
+		decrypter:  sealer,
 	}
 }
 
@@ -115,7 +114,7 @@ func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (_ 
 }
 
 func (s *UserService) GetUserByID(ctx context.Context, input GetUserInput) (map[string]any, error) {
-	flatUser, err := s.userRepo.GetByID(ctx, s.pool, input.ProjectID, input.TeamID, input.UserID)
+	flatUser, err := s.userRepo.GetByID(ctx, s.pool, input.ProjectID, nil, input.UserID)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil, domain.ErrUserNotFound()
@@ -144,7 +143,7 @@ func (s *UserService) GetMyUser(ctx context.Context, input GetMyUserInput) ([]by
 		return nil, domain.ErrUserNotFound()
 	}
 
-	user, err := s.userRepo.GetByID(ctx, s.pool, sessionToken.ProjectID, *sessionToken.UserID)
+	user, err := s.userRepo.GetByID(ctx, s.pool, sessionToken.ProjectID, nil, *sessionToken.UserID)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil, domain.ErrUserNotFound()
