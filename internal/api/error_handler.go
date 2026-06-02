@@ -53,10 +53,12 @@ func errorResponse(err error) *api.ErrorDetailsStatusCode {
 		return sessionErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixJSONSchema.ErrorCodePrefix("")):
 		return schemaErrorResponse(e)
-	case e.Code == domain.ErrNotImplemented().Code:
-		return errorResponseWithStatusCode(http.StatusNotImplemented, e)
+	case strings.HasPrefix(e.Code, domain.PrefixUser.ErrorCodePrefix("")):
+		return userErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixTeam.ErrorCodePrefix("")):
 		return teamErrorResponse(e)
+	case e.Code == domain.ErrNotImplemented().Code:
+		return errorResponseWithStatusCode(http.StatusNotImplemented, e)
 	default:
 		return internalErrorResponse(err)
 	}

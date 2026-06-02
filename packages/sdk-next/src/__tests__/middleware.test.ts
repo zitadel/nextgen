@@ -476,34 +476,8 @@ describe('nextgenMiddleware', () => {
     expect(authToken).toBe('');
   });
 
-  describe('proxy: Cookie Secure upgrade (C-3)', () => {
-    it('adds Secure flag to __nextgen* cookies when request is HTTPS', async () => {
-      const upstreamHeaders = new Headers();
-      upstreamHeaders.set('content-type', 'application/json');
-      upstreamHeaders.append(
-        'set-cookie',
-        '__nextgen_session=abc; HttpOnly; SameSite=Lax',
-      );
-      vi.stubGlobal(
-        'fetch',
-        vi
-          .fn()
-          .mockResolvedValue(
-            new Response('{}', { status: 200, headers: upstreamHeaders }),
-          ),
-      );
-
-      const req = new NextRequest('https://example.com/__nextgen/v1/flow');
-      const res = await nextgenMiddleware(req, {
-        issuerUrl: 'http://localhost:4000',
-      });
-
-      const setCookie = res.headers.get('set-cookie') ?? '';
-      expect(setCookie).toContain('__nextgen_session=abc');
-      expect(setCookie).toMatch(/;\s*Secure\b/i);
-    });
-
-    it('does not add Secure flag to __nextgen* cookies when request is HTTP', async () => {
+  describe('proxy: cookie forwarding', () => {
+    it('forwards upstream Set-Cookie headers as-is', async () => {
       const upstreamHeaders = new Headers();
       upstreamHeaders.append(
         'set-cookie',
@@ -524,83 +498,7 @@ describe('nextgenMiddleware', () => {
       });
 
       const setCookie = res.headers.get('set-cookie') ?? '';
-      expect(setCookie).toContain('__nextgen_session=abc');
-      expect(setCookie).not.toMatch(/;\s*Secure\b/i);
-    });
-
-    it('adds Secure flag when x-forwarded-proto is https on an HTTP request', async () => {
-      const upstreamHeaders = new Headers();
-      upstreamHeaders.append(
-        'set-cookie',
-        '__nextgen_session=abc; HttpOnly; SameSite=Lax',
-      );
-      vi.stubGlobal(
-        'fetch',
-        vi
-          .fn()
-          .mockResolvedValue(
-            new Response('{}', { status: 200, headers: upstreamHeaders }),
-          ),
-      );
-
-      const req = new NextRequest('http://localhost:3000/__nextgen/v1/flow', {
-        headers: { 'x-forwarded-proto': 'https' },
-      });
-      const res = await nextgenMiddleware(req, {
-        issuerUrl: 'http://localhost:4000',
-      });
-
-      const setCookie = res.headers.get('set-cookie') ?? '';
-      expect(setCookie).toContain('__nextgen_session=abc');
-      expect(setCookie).toMatch(/;\s*Secure\b/i);
-    });
-
-    it('does not add Secure to non-__nextgen cookies from upstream', async () => {
-      const upstreamHeaders = new Headers();
-      upstreamHeaders.append('set-cookie', 'vendor_session=xyz; HttpOnly');
-      vi.stubGlobal(
-        'fetch',
-        vi
-          .fn()
-          .mockResolvedValue(
-            new Response('{}', { status: 200, headers: upstreamHeaders }),
-          ),
-      );
-
-      const req = new NextRequest('https://example.com/__nextgen/v1/flow');
-      const res = await nextgenMiddleware(req, {
-        issuerUrl: 'http://localhost:4000',
-      });
-
-      const setCookie = res.headers.get('set-cookie') ?? '';
-      expect(setCookie).toContain('vendor_session=xyz');
-      expect(setCookie).not.toMatch(/;\s*Secure\b/i);
-    });
-
-    it('does not duplicate Secure when upstream already sets it on __nextgen* cookies', async () => {
-      const upstreamHeaders = new Headers();
-      upstreamHeaders.append(
-        'set-cookie',
-        '__nextgen_session=abc; HttpOnly; Secure; SameSite=Lax',
-      );
-      vi.stubGlobal(
-        'fetch',
-        vi
-          .fn()
-          .mockResolvedValue(
-            new Response('{}', { status: 200, headers: upstreamHeaders }),
-          ),
-      );
-
-      const req = new NextRequest('https://example.com/__nextgen/v1/flow');
-      const res = await nextgenMiddleware(req, {
-        issuerUrl: 'http://localhost:4000',
-      });
-
-      const setCookie = res.headers.get('set-cookie') ?? '';
-      expect(setCookie).toContain('__nextgen_session=abc');
-      const secureCount = (setCookie.match(/;\s*Secure\b/gi) ?? []).length;
-      expect(secureCount).toBe(1);
+      expect(setCookie).toBe('__nextgen_session=abc; HttpOnly; SameSite=Lax');
     });
   });
 

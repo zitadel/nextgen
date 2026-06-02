@@ -24,7 +24,21 @@ func (h *Harness) EnsureAPIClient(t *testing.T, projectID string) *api.Client {
 	)
 	require.NoError(t, err)
 	h.apiClients[projectID] = client
-	return h.apiClients[projectID]
+	return client
+}
+
+func (h *Harness) EnsureAnonymousAPIClient(t *testing.T) *api.Client {
+	t.Helper()
+	serv := h.EnsureTestServer(t)
+	if h.anonymousClient == nil {
+		client, err := api.NewClient(
+			serv.URL,
+			h.EnsureAnonymousSecuritySource(t),
+		)
+		require.NoError(t, err)
+		h.anonymousClient = client
+	}
+	return h.anonymousClient
 }
 
 func (h *Harness) EnsureFakeSecuritySource(t *testing.T, projectID string) *FakeSecuritySource {
@@ -39,6 +53,14 @@ func (h *Harness) EnsureFakeSecuritySource(t *testing.T, projectID string) *Fake
 		projectID: projectID,
 	}
 	return h.fakeSecuritySources[projectID]
+}
+
+func (h *Harness) EnsureAnonymousSecuritySource(t *testing.T) *FakeSecuritySource {
+	t.Helper()
+	if h.anonymousSecuritySource == nil {
+		h.anonymousSecuritySource = &FakeSecuritySource{}
+	}
+	return h.anonymousSecuritySource
 }
 
 type FakeSecuritySource struct {
@@ -58,6 +80,19 @@ func (f FakeSecuritySource) UsernamePassword(ctx context.Context, operationName 
 		Password: "TEST_PASSWORD",
 		Roles:    []string{"all"},
 	}, nil
+}
+
+var _ api.SecuritySource = (*FakeSecuritySource)(nil)
+
+type AnonymousSecuritySource struct {
+}
+
+func (f AnonymousSecuritySource) OAuth2(ctx context.Context, operationName api.OperationName) (api.OAuth2, error) {
+	return api.OAuth2{}, nil
+}
+
+func (f AnonymousSecuritySource) UsernamePassword(ctx context.Context, operationName api.OperationName) (api.UsernamePassword, error) {
+	return api.UsernamePassword{}, nil
 }
 
 var _ api.SecuritySource = (*FakeSecuritySource)(nil)

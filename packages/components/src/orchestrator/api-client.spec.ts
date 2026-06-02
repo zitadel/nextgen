@@ -1,31 +1,20 @@
-import { describe, expect, it } from "vitest";
+/**
+ * api-client.ts no longer exports `resolveSessionExchangeUrl` or
+ * `DEFAULT_SESSION_EXCHANGE_PATH`. The exchange call now uses the
+ * generated `exchangeHandoff` client via the thin `exchangeSession`
+ * wrapper. URL resolution tests are no longer needed.
+ *
+ * This file is kept as a placeholder for future api-client unit tests.
+ */
+import { describe, it, expect } from "vitest";
 
-import {
-  DEFAULT_SESSION_EXCHANGE_PATH,
-  resolveSessionExchangeUrl,
-} from "./api-client.js";
+import { exchangeSession, startFlow, submitStep, getCurrentStep } from "./api-client.js";
 
-describe("resolveSessionExchangeUrl", () => {
-  it("prefixes the default path with api-base", () => {
-    expect(resolveSessionExchangeUrl("/__nextgen")).toBe("/__nextgen/sessions/exchange");
-    expect(resolveSessionExchangeUrl("/__nextgen", DEFAULT_SESSION_EXCHANGE_PATH)).toBe(
-      "/__nextgen/sessions/exchange",
-    );
-  });
-
-  it("returns the default path alone when api-base is empty", () => {
-    expect(resolveSessionExchangeUrl("")).toBe("/sessions/exchange");
-  });
-
-  it("resolves a custom path from location.origin, ignoring api-base", () => {
-    expect(resolveSessionExchangeUrl("/__nextgen", "/api/auth/exchange")).toBe(
-      `${window.location.origin}/api/auth/exchange`,
-    );
-  });
-
-  it("normalises a custom path without a leading slash", () => {
-    expect(resolveSessionExchangeUrl("/__nextgen", "api/auth/exchange")).toBe(
-      `${window.location.origin}/api/auth/exchange`,
-    );
+describe("api-client exports", () => {
+  it("exports the four expected wrapper functions", () => {
+    expect(typeof startFlow).toBe("function");
+    expect(typeof submitStep).toBe("function");
+    expect(typeof getCurrentStep).toBe("function");
+    expect(typeof exchangeSession).toBe("function");
   });
 });

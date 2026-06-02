@@ -1,4 +1,4 @@
-//go:build integration
+//go:build postgres_integration || spanner_integration
 
 package integration_test
 
@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	api "github.com/zitadel/nextgen/api/generated"
+	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 )
 
 func TestCreateSchema(t *testing.T) {
@@ -21,7 +22,7 @@ func TestCreateSchema(t *testing.T) {
 		}{
 			{
 				name:   "user-schema in body",
-				schema: harness.Schemas.CreateSchemaRequestUserSchema,
+				schema: harness.TestData.Schemas.CreateSchemaRequestUserSchema,
 			},
 			// TODO: add this test case once we have a public github-repo from which to get a schema
 			//{
@@ -50,7 +51,7 @@ func TestCreateSchema(t *testing.T) {
 				resp, err := harness.EnsureAPIClient(t, project.ID).CreateSchema(t.Context(), req, params)
 				assert.NoError(t, err)
 
-				assert.IsType(t, &api.CreateSchemaResponse{}, resp, mustMarshal(t, resp))
+				assert.IsType(t, &api.CreateSchemaResponse{}, resp, helpers.MustMarshal(t, resp))
 			})
 		}
 	})
@@ -88,17 +89,17 @@ func TestCreateSchema(t *testing.T) {
 
 			resp, err := harness.EnsureAPIClient(t, project.ID).CreateSchema(t.Context(), req, params)
 			assert.NoError(t, err)
-			assert.IsType(t, &api.CreateSchemaBadRequest{}, resp, mustMarshal(t, resp))
+			assert.IsType(t, &api.CreateSchemaBadRequest{}, resp, helpers.MustMarshal(t, resp))
 
 		})
 
 		t.Run("duplicates are not allowed", func(t *testing.T) {
 			project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
 			require.NoError(t, err)
-			harness.CreateUserSchema(t, project.ID, harness.Schemas.CreateSchemaRequestUserSchema)
+			harness.CreateUserSchema(t, project.ID, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
 
 			apiSchema := api.UserSchema{}
-			err = apiSchema.UnmarshalJSON([]byte(harness.Schemas.CreateSchemaRequestUserSchema))
+			err = apiSchema.UnmarshalJSON([]byte(harness.TestData.Schemas.CreateSchemaRequestUserSchema))
 			require.NoError(t, err)
 
 			req := api.CreateSchemaReq{
@@ -112,7 +113,7 @@ func TestCreateSchema(t *testing.T) {
 			resp, err := harness.EnsureAPIClient(t, project.ID).CreateSchema(t.Context(), req, params)
 			assert.NoError(t, err)
 
-			assert.IsType(t, &api.CreateSchemaConflict{}, resp, mustMarshal(t, resp))
+			assert.IsType(t, &api.CreateSchemaConflict{}, resp, helpers.MustMarshal(t, resp))
 		})
 	})
 }
@@ -123,7 +124,7 @@ func TestGetSchema(t *testing.T) {
 		t.Run("simple", func(t *testing.T) {
 			project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
 			require.NoError(t, err)
-			schemaID := harness.CreateUserSchema(t, project.ID, harness.Schemas.CreateSchemaRequestUserSchema)
+			schemaID := harness.CreateUserSchema(t, project.ID, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
 
 			resp, err := harness.EnsureAPIClient(t, project.ID).GetSchemaById(t.Context(), api.GetSchemaByIdParams{
 				ID:        schemaID,
@@ -131,7 +132,7 @@ func TestGetSchema(t *testing.T) {
 			})
 			assert.NoError(t, err)
 
-			assert.IsType(t, &api.GetSchemaByIdOK{}, resp, mustMarshal(t, resp))
+			assert.IsType(t, &api.GetSchemaByIdOK{}, resp, helpers.MustMarshal(t, resp))
 		})
 	})
 
@@ -146,13 +147,7 @@ func TestGetSchema(t *testing.T) {
 			})
 			assert.NoError(t, err)
 
-			assert.IsType(t, &api.GetSchemaByIdNotFound{}, resp, mustMarshal(t, resp))
+			assert.IsType(t, &api.GetSchemaByIdNotFound{}, resp, helpers.MustMarshal(t, resp))
 		})
 	})
-}
-
-func mustMarshal(t *testing.T, v any) string {
-	m, err := json.Marshal(v)
-	require.NoError(t, err)
-	return string(m)
 }

@@ -7,6 +7,7 @@ require (
 	github.com/descope/virtualwebauthn v1.0.5
 	github.com/fergusstrange/embedded-postgres v1.34.0
 	github.com/georgysavva/scany/v2 v2.1.4
+	github.com/go-faker/faker/v4 v4.7.0
 	github.com/go-faster/errors v0.7.1
 	github.com/go-faster/jx v1.2.0
 	github.com/go-webauthn/webauthn v0.17.3

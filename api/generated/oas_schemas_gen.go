@@ -1997,6 +1997,64 @@ type CreateTeamTooManyRequests ErrorDetails
 
 func (*CreateTeamTooManyRequests) createTeamRes() {}
 
+type CreateUserBadRequest ErrorDetails
+
+func (*CreateUserBadRequest) createUserRes() {}
+
+type CreateUserConflict ErrorDetails
+
+func (*CreateUserConflict) createUserRes() {}
+
+type CreateUserForbidden ErrorDetails
+
+func (*CreateUserForbidden) createUserRes() {}
+
+// The content of this response is determined by the configured
+// schema for users.
+// Ref: #
+type CreateUserResponse struct {
+	// The unique identifier of the created user.
+	ID              string `json:"id"`
+	AdditionalProps CreateUserResponseAdditional
+}
+
+// GetID returns the value of ID.
+func (s *CreateUserResponse) GetID() string {
+	return s.ID
+}
+
+// GetAdditionalProps returns the value of AdditionalProps.
+func (s *CreateUserResponse) GetAdditionalProps() CreateUserResponseAdditional {
+	return s.AdditionalProps
+}
+
+// SetID sets the value of ID.
+func (s *CreateUserResponse) SetID(val string) {
+	s.ID = val
+}
+
+// SetAdditionalProps sets the value of AdditionalProps.
+func (s *CreateUserResponse) SetAdditionalProps(val CreateUserResponseAdditional) {
+	s.AdditionalProps = val
+}
+
+func (*CreateUserResponse) createUserRes() {}
+
+type CreateUserResponseAdditional map[string]jx.Raw
+
+func (s *CreateUserResponseAdditional) init() CreateUserResponseAdditional {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+type CreateUserUnauthorized ErrorDetails
+
+func (*CreateUserUnauthorized) createUserRes() {}
+
 // DeleteFlowDefinitionNoContent is response for DeleteFlowDefinition operation.
 type DeleteFlowDefinitionNoContent struct{}
 
@@ -2187,6 +2245,7 @@ func (*ErrorDetailsStatusCode) createProjectRes()          {}
 func (*ErrorDetailsStatusCode) createSchemaRes()           {}
 func (*ErrorDetailsStatusCode) createSessionRes()          {}
 func (*ErrorDetailsStatusCode) createTeamRes()             {}
+func (*ErrorDetailsStatusCode) createUserRes()             {}
 func (*ErrorDetailsStatusCode) deleteFlowDefinitionRes()   {}
 func (*ErrorDetailsStatusCode) endSessionRes()             {}
 func (*ErrorDetailsStatusCode) exchangeHandoffRes()        {}
@@ -2203,6 +2262,7 @@ func (*ErrorDetailsStatusCode) getSchemaByIdRes()          {}
 func (*ErrorDetailsStatusCode) getSessionRes()             {}
 func (*ErrorDetailsStatusCode) getTeamRes()                {}
 func (*ErrorDetailsStatusCode) getTokenRes()               {}
+func (*ErrorDetailsStatusCode) getUserByIDRes()            {}
 func (*ErrorDetailsStatusCode) getUserInfoRes()            {}
 func (*ErrorDetailsStatusCode) introspectRes()             {}
 func (*ErrorDetailsStatusCode) listFlowDefinitionsRes()    {}
@@ -2312,12 +2372,25 @@ func (s *FactorMethod) UnmarshalText(data []byte) error {
 // Does not contain display text — only a `text_key` resolved client-side.
 // Ref: #
 type Field struct {
+	// The input kind the client should render. Encodes the formats that
+	// have a matching HTML input type (email, url, date). For other
+	// formats (e.g. uuid) the type is `text` and `validation.format`
+	// carries the rule.
 	Type FieldType `json:"type"`
 	// Localization key for the field label.
-	TextKey  string  `json:"text_key"`
+	TextKey string `json:"text_key"`
+	// The field MUST be present and non-empty on submit. Mirrors the
+	// schema's top-level `required` array.
 	Required OptBool `json:"required"`
-	// Pre-filled value (e.g., email carried over from a pivot).
-	Value      jx.Raw             `json:"value"`
+	// Pre-filled value (e.g., an identifier carried over from a pivot).
+	Value jx.Raw `json:"value"`
+	// Schema-derived rules the frontend SHOULD apply at input time. The
+	// server runs the same rules on submit and is the only authority on
+	// whether the step advances — these rules are a UX hint to reduce
+	// round trips, not a contract guarantee.
+	// Omitted entirely when the field has no rules beyond its `type`.
+	// Each key mirrors a JSON Schema keyword on the underlying user
+	// property; absent keys mean no rule.
 	Validation OptFieldValidation `json:"validation"`
 }
 
@@ -2371,6 +2444,10 @@ func (s *Field) SetValidation(val OptFieldValidation) {
 	s.Validation = val
 }
 
+// The input kind the client should render. Encodes the formats that
+// have a matching HTML input type (email, url, date). For other
+// formats (e.g. uuid) the type is `text` and `validation.format`
+// carries the rule.
 type FieldType string
 
 const (
@@ -2454,21 +2531,29 @@ func (s *FieldType) UnmarshalText(data []byte) error {
 	}
 }
 
+// Schema-derived rules the frontend SHOULD apply at input time. The
+// server runs the same rules on submit and is the only authority on
+// whether the step advances — these rules are a UX hint to reduce
+// round trips, not a contract guarantee.
+// Omitted entirely when the field has no rules beyond its `type`.
+// Each key mirrors a JSON Schema keyword on the underlying user
+// property; absent keys mean no rule.
 type FieldValidation struct {
-	Format    OptString `json:"format"`
-	Pattern   OptString `json:"pattern"`
-	MinLength OptInt    `json:"min_length"`
-	MaxLength OptInt    `json:"max_length"`
+	// Semantic format the value must match. Values mirror the user
+	// meta-schema. When `type` already encodes the format (email,
+	// url, date), this key is informative and the input type is
+	// sufficient for client-side validation. When `type` is `text`
+	// (e.g. `format: uuid`), this key is the only signal.
+	Format OptFieldValidationFormat `json:"format"`
+	// Minimum length in characters (inclusive). Mirrors `minLength`.
+	MinLength OptInt `json:"min_length"`
+	// Maximum length in characters (inclusive). Mirrors `maxLength`.
+	MaxLength OptInt `json:"max_length"`
 }
 
 // GetFormat returns the value of Format.
-func (s *FieldValidation) GetFormat() OptString {
+func (s *FieldValidation) GetFormat() OptFieldValidationFormat {
 	return s.Format
-}
-
-// GetPattern returns the value of Pattern.
-func (s *FieldValidation) GetPattern() OptString {
-	return s.Pattern
 }
 
 // GetMinLength returns the value of MinLength.
@@ -2482,13 +2567,8 @@ func (s *FieldValidation) GetMaxLength() OptInt {
 }
 
 // SetFormat sets the value of Format.
-func (s *FieldValidation) SetFormat(val OptString) {
+func (s *FieldValidation) SetFormat(val OptFieldValidationFormat) {
 	s.Format = val
-}
-
-// SetPattern sets the value of Pattern.
-func (s *FieldValidation) SetPattern(val OptString) {
-	s.Pattern = val
 }
 
 // SetMinLength sets the value of MinLength.
@@ -2499,6 +2579,66 @@ func (s *FieldValidation) SetMinLength(val OptInt) {
 // SetMaxLength sets the value of MaxLength.
 func (s *FieldValidation) SetMaxLength(val OptInt) {
 	s.MaxLength = val
+}
+
+// Semantic format the value must match. Values mirror the user
+// meta-schema. When `type` already encodes the format (email,
+// url, date), this key is informative and the input type is
+// sufficient for client-side validation. When `type` is `text`
+// (e.g. `format: uuid`), this key is the only signal.
+type FieldValidationFormat string
+
+const (
+	FieldValidationFormatEmail    FieldValidationFormat = "email"
+	FieldValidationFormatDateTime FieldValidationFormat = "date-time"
+	FieldValidationFormatUUID     FieldValidationFormat = "uuid"
+	FieldValidationFormatURI      FieldValidationFormat = "uri"
+)
+
+// AllValues returns all FieldValidationFormat values.
+func (FieldValidationFormat) AllValues() []FieldValidationFormat {
+	return []FieldValidationFormat{
+		FieldValidationFormatEmail,
+		FieldValidationFormatDateTime,
+		FieldValidationFormatUUID,
+		FieldValidationFormatURI,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FieldValidationFormat) MarshalText() ([]byte, error) {
+	switch s {
+	case FieldValidationFormatEmail:
+		return []byte(s), nil
+	case FieldValidationFormatDateTime:
+		return []byte(s), nil
+	case FieldValidationFormatUUID:
+		return []byte(s), nil
+	case FieldValidationFormatURI:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FieldValidationFormat) UnmarshalText(data []byte) error {
+	switch FieldValidationFormat(data) {
+	case FieldValidationFormatEmail:
+		*s = FieldValidationFormatEmail
+		return nil
+	case FieldValidationFormatDateTime:
+		*s = FieldValidationFormatDateTime
+		return nil
+	case FieldValidationFormatUUID:
+		*s = FieldValidationFormatUUID
+		return nil
+	case FieldValidationFormatURI:
+		*s = FieldValidationFormatURI
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
 }
 
 // Scopes which teams or apps this flow definition applies to. Empty or
@@ -4492,6 +4632,27 @@ func (*GetTeamResponse) getTeamRes() {}
 type GetTeamUnauthorized ErrorDetails
 
 func (*GetTeamUnauthorized) getTeamRes() {}
+
+type GetUserByIDNotFound ErrorDetails
+
+func (*GetUserByIDNotFound) getUserByIDRes() {}
+
+type GetUserByIDOK map[string]jx.Raw
+
+func (s *GetUserByIDOK) init() GetUserByIDOK {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+func (*GetUserByIDOK) getUserByIDRes() {}
+
+type GetUserByIDUnauthorized ErrorDetails
+
+func (*GetUserByIDUnauthorized) getUserByIDRes() {}
 
 type GetUserInfoOK struct {
 	// The unique identifier for the user.
@@ -7140,6 +7301,52 @@ func (o OptFieldValidation) Get() (v FieldValidation, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptFieldValidation) Or(d FieldValidation) FieldValidation {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptFieldValidationFormat returns new OptFieldValidationFormat with value set to v.
+func NewOptFieldValidationFormat(v FieldValidationFormat) OptFieldValidationFormat {
+	return OptFieldValidationFormat{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFieldValidationFormat is optional FieldValidationFormat.
+type OptFieldValidationFormat struct {
+	Value FieldValidationFormat
+	Set   bool
+}
+
+// IsSet returns true if OptFieldValidationFormat was set.
+func (o OptFieldValidationFormat) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFieldValidationFormat) Reset() {
+	var v FieldValidationFormat
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFieldValidationFormat) SetTo(v FieldValidationFormat) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFieldValidationFormat) Get() (v FieldValidationFormat, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFieldValidationFormat) Or(d FieldValidationFormat) FieldValidationFormat {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -10563,6 +10770,51 @@ func (*UpdateFlowDefinitionBadRequest) updateFlowDefinitionRes() {}
 type UpdateFlowDefinitionNotFound ErrorDetails
 
 func (*UpdateFlowDefinitionNotFound) updateFlowDefinitionRes() {}
+
+// A user represents an individual identity in the system. It can be used to
+// represent a human user, but also a service account or any other type of
+// identity. The content of a user is determined by the configured schema for
+// users, this is only a base schema.
+// Ref: #
+type User struct {
+	// The schema that defines the content of the user. These schemas can be
+	// created using the `/schemas` endpoint. A default schema is provided.
+	// This schema can be retrieved using the same endpoint. The schema will
+	// be used to validate the user's properties.
+	Schema          string `json:"$schema"`
+	AdditionalProps UserAdditional
+}
+
+// GetSchema returns the value of Schema.
+func (s *User) GetSchema() string {
+	return s.Schema
+}
+
+// GetAdditionalProps returns the value of AdditionalProps.
+func (s *User) GetAdditionalProps() UserAdditional {
+	return s.AdditionalProps
+}
+
+// SetSchema sets the value of Schema.
+func (s *User) SetSchema(val string) {
+	s.Schema = val
+}
+
+// SetAdditionalProps sets the value of AdditionalProps.
+func (s *User) SetAdditionalProps(val UserAdditional) {
+	s.AdditionalProps = val
+}
+
+type UserAdditional map[string]jx.Raw
+
+func (s *UserAdditional) init() UserAdditional {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
 
 type UserID string
 
