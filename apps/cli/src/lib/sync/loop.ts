@@ -127,25 +127,29 @@ export async function runSyncLoop(
   for (const action of actions) {
     switch (action.kind) {
       case "create": {
-        consola.info(`creating ${action.path}`);
         const id = await action.syncer.create(action.content);
         await updateState(cwd, action.path, { id, hash: action.hash });
+        consola.info(
+          `Created a new ${action.syncer.kind} on Zitadel from ${action.path} (id ${id})`,
+        );
         break;
       }
       case "update": {
-        consola.info(`updating ${action.path} (hash changed)`);
         await action.syncer.update(action.id, action.content);
         await updateState(cwd, action.path, { hash: action.hash });
+        consola.info(`Updated the ${action.syncer.kind} on Zitadel from ${action.path}`);
         break;
       }
       case "delete": {
-        consola.info(`deleting ${action.path} (removed from disk)`);
         await action.syncer.delete(action.id);
         await removeFromState(cwd, action.path);
+        consola.info(
+          `Deleted the ${action.syncer.kind} on Zitadel because ${action.path} was removed locally`,
+        );
         break;
       }
       case "skip": {
-        consola.debug(`skipping ${action.path} (${action.reason})`);
+        consola.debug(`Skipped ${action.path} (${action.reason})`);
         break;
       }
     }
