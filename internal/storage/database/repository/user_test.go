@@ -91,6 +91,50 @@ func TestUserRepository_CreateGetListDelete(t *testing.T) {
 	require.ErrorIs(t, err, new(database.NoRowFoundError))
 }
 
+func TestUserRepository_CreateWithoutTeam(t *testing.T) {
+	skipIfSpanner(t)
+	repo := repository.NewUserRepository()
+	tx, rollback := transactionForRollback(t)
+	defer rollback()
+	ctx := t.Context()
+
+	const (
+		pid       = "proj-user-no-team"
+		schemaURL = "https://schemas.test/users-no-team/v1.json"
+		userID    = "usr_no_team"
+	)
+
+	_, err := tx.Exec(ctx, fmt.Sprintf(`INSERT INTO %s (id) VALUES ($1)`, dbTable("projects")), pid)
+	require.NoError(t, err)
+	_, err = tx.Exec(ctx,
+		fmt.Sprintf(`INSERT INTO %s (project_id, url, payload) VALUES ($1,$2,$3%s)`, dbTable("json_schemas"), jsonCast()),
+		pid, schemaURL, []byte("{}"),
+	)
+	require.NoError(t, err)
+
+	plain, err := domain.NewCreateAttribute("country", "CH", domain.AttributeUniquenessUnspecified)
+	require.NoError(t, err)
+	unique, err := domain.NewCreateAttribute("nickname", "n1", domain.AttributeUniquenessTeam)
+	require.NoError(t, err)
+
+	require.NoError(t, repo.Create(ctx, tx, &domain.CreateUser{
+		ProjectID:  pid,
+		SchemaURL:  schemaURL,
+		ID:         userID,
+		TeamID:     nil,
+		Attributes: []*domain.CreateAttribute{plain, unique},
+	}))
+
+	got, err := repo.Get(ctx, tx,
+		database.WithCondition(repo.PrimaryKeyCondition(pid, userID)),
+		repo.WithAttributes(),
+	)
+	require.NoError(t, err)
+	require.Equal(t, userID, got.ID)
+	require.Nil(t, got.TeamID)
+	require.Len(t, got.Attributes, 2)
+}
+
 func TestUserRepository_AttributesCondition(t *testing.T) {
 	skipIfSpanner(t)
 	repo := repository.NewUserRepository()
