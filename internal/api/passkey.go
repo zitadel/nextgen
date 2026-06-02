@@ -100,4 +100,3 @@ func passkeyRegistrationErrorResponse(err domain.Error) *api.ErrorDetailsStatusC
 		return errorResponseWithStatusCode(http.StatusInternalServerError, err)
 	}
 }
-

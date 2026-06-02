@@ -113,16 +113,35 @@ func (f *fakeAuthAttempts) SubmitPasskey(_ context.Context, in domain.FlowSubmit
 	return f.passkeyUserID, f.passkeyErr
 }
 
+type fakePasskeyRegistration struct {
+	issueOut    domain.FlowPasskeyRegistrationChallengeOutput
+	issueErr    error
+	submitErr   error
+	issueCalls  []domain.FlowIssuePasskeyRegistrationChallengeInput
+	submitCalls []domain.FlowSubmitPasskeyRegistrationInput
+}
+
+func (f *fakePasskeyRegistration) IssuePasskeyRegistrationChallenge(_ context.Context, in domain.FlowIssuePasskeyRegistrationChallengeInput) (domain.FlowPasskeyRegistrationChallengeOutput, error) {
+	f.issueCalls = append(f.issueCalls, in)
+	return f.issueOut, f.issueErr
+}
+
+func (f *fakePasskeyRegistration) SubmitPasskeyRegistration(_ context.Context, in domain.FlowSubmitPasskeyRegistrationInput) error {
+	f.submitCalls = append(f.submitCalls, in)
+	return f.submitErr
+}
+
 // flowTestWorld is the wiring a flow test exercises: resolver +
 // registry + handlers + state machine, sharing the fakes the test
 // inspects after a run.
 type flowTestWorld struct {
-	users    *fakeUserRepo
-	pws      *fakeUserPasswordRepo
-	ids      *idgenmock.MockGenerator
-	hasher   fakeHasher
-	attempts *fakeAuthAttempts
-	sm       *domain.FlowStateMachineRuntime
+	users      *fakeUserRepo
+	pws        *fakeUserPasswordRepo
+	ids        *idgenmock.MockGenerator
+	hasher     fakeHasher
+	attempts   *fakeAuthAttempts
+	passkeyReg *fakePasskeyRegistration
+	sm         *domain.FlowStateMachineRuntime
 }
 
 func newFlowTestWorld(t *testing.T) *flowTestWorld {
@@ -143,12 +162,13 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 		},
 	}
 
+	passkeyReg := &fakePasskeyRegistration{}
 	createUser := domain.NewFlowCreateUserHandler(ids, users, pws, hasher)
 	resolver := newDefaultResolver(t)
 	now := func() time.Time { return time.Unix(1700000000, 0).UTC() }
-	sm := domain.NewFlowStateMachine(resolver, createUser, attempts, now)
+	sm := domain.NewFlowStateMachine(resolver, createUser, attempts, passkeyReg, now)
 
-	return &flowTestWorld{users: users, pws: pws, ids: ids, hasher: hasher, attempts: attempts, sm: sm}
+	return &flowTestWorld{users: users, pws: pws, ids: ids, hasher: hasher, attempts: attempts, passkeyReg: passkeyReg, sm: sm}
 }
 
 // loginDefinition builds a single-step login flow: a `credentials`

@@ -68,4 +68,3 @@ func (r *PasskeyRegistrationRepository) Delete(ctx context.Context, client datab
 	)
 	return err
 }
-

@@ -178,11 +178,11 @@ var (
 
 // FlowStateMachineRuntime is the production [FlowStateMachine].
 type FlowStateMachineRuntime struct {
-	fields               FlowFieldResolver
-	createUser           *FlowCreateUserHandler
-	authAttempts         FlowAuthAttemptService
-	passkeyRegistration  FlowPasskeyRegistrationService
-	now                  func() time.Time
+	fields              FlowFieldResolver
+	createUser          *FlowCreateUserHandler
+	authAttempts        FlowAuthAttemptService
+	passkeyRegistration FlowPasskeyRegistrationService
+	now                 func() time.Time
 }
 
 // NewFlowStateMachine wires the runtime. The now hook is injectable so
