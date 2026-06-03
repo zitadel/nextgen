@@ -1,4 +1,4 @@
-import type { CreateSchemaBody } from "@zitadel-nextgen/api/generated/model";
+import type { CreateSchemaBody } from "@zitadel/api/generated/model";
 
 import type { FrameworkFacts } from "../detectors/types";
 import type { CreateProjectResponse } from "../../api/client";

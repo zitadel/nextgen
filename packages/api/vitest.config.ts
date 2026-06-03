@@ -2,7 +2,7 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
-    name: "@zitadel-nextgen/api",
+    name: "@zitadel/api",
     watch: false,
     passWithNoTests: true,
     globals: true,

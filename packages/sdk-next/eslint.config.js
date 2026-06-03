@@ -49,7 +49,7 @@ export default tseslint.config(
         typescript: {
           alwaysTryTypes: true,
           conditionNames: [
-            '@zitadel-nextgen/source',
+            '@zitadel/source',
             'types',
             'import',
             'default',

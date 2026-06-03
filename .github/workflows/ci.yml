@@ -202,17 +202,17 @@ jobs:
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: >-
-          corepack pnpm --filter @zitadel-nextgen/demo-next-e2e
+          corepack pnpm --filter @zitadel/demo-next-e2e
           exec playwright install --with-deps chromium
 
       - name: Install Playwright system deps
         if: steps.playwright-cache.outputs.cache-hit == 'true'
         run: >-
-          corepack pnpm --filter @zitadel-nextgen/demo-next-e2e
+          corepack pnpm --filter @zitadel/demo-next-e2e
           exec playwright install-deps chromium
 
       # Boots the demo dev servers + api-mock through Playwright's webServer
-      # config; Nx rebuilds @zitadel-nextgen/components first via ^build.
+      # config; Nx rebuilds @zitadel/components first via ^build.
       # console-e2e has no specs yet — it's intentionally excluded until
       # Playwright would otherwise fail with "no tests found".
       #
@@ -221,7 +221,7 @@ jobs:
       - name: End-to-end tests
         run: >-
           corepack pnpm nx run-many -t e2e
-          -p @zitadel-nextgen/demo-next-e2e,@zitadel-nextgen/demo-nuxt-e2e
+          -p @zitadel/demo-next-e2e,@zitadel/demo-nuxt-e2e
 
       - name: Upload Playwright reports on failure
         if: failure()
@@ -267,14 +267,14 @@ jobs:
 
       - name: Dry-run npm packs
         run: |
-          for dir in apps/cli packages/sdk-core packages/sdk-next; do
+          for dir in apps/cli packages/api packages/components packages/sdk-core packages/sdk-next packages/sdk-nuxt; do
             (cd "$dir" && npm pack --dry-run)
           done
 
       - name: Create npm package artifacts
         run: |
           mkdir -p "$RUNNER_TEMP/zitadel-npm-packages"
-          for dir in apps/cli packages/sdk-core packages/sdk-next; do
+          for dir in apps/cli packages/api packages/components packages/sdk-core packages/sdk-next packages/sdk-nuxt; do
             (cd "$dir" && npm pack --pack-destination "$RUNNER_TEMP/zitadel-npm-packages")
           done
           ls -lh "$RUNNER_TEMP/zitadel-npm-packages"

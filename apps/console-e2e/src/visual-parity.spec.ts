@@ -1,7 +1,7 @@
 /**
- * Visual parity sweep — the paired React components in `@zitadel-nextgen/ui-react`
+ * Visual parity sweep — the paired React components in `@zitadel/ui-react`
  * must render identical visuals to the Lit atoms in
- * `@zitadel-nextgen/components`.
+ * `@zitadel/components`.
  *
  * Strategy: the console mirrors `packages/components/dev/pages/atoms.ts`.
  * We assert structural shape (counts, presence) on each atom matrix.

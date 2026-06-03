@@ -1,8 +1,8 @@
 import { LitElement, html } from "lit";
 import { customElement, property } from "lit/decorators.js";
 
-import alertHost from "@zitadel-nextgen/shared-component-styles/lit/alert-host.css?inline";
-import alertSurface from "@zitadel-nextgen/shared-component-styles/alert.css?inline";
+import alertHost from "@zitadel/shared-component-styles/lit/alert-host.css?inline";
+import alertSurface from "@zitadel/shared-component-styles/alert.css?inline";
 
 import type { AtomManifest } from "../manifest.js";
 import { baseHostStyles, surfaceStyles } from "../styles/index.js";

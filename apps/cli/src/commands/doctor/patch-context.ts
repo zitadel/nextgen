@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import type { CreateSchemaBody } from "@zitadel-nextgen/api/generated/model";
+import type { CreateSchemaBody } from "@zitadel/api/generated/model";
 
 import { isObject } from "../../lib/json";
 import { issuerFromPort, type FrameworkFacts, type Orca } from "../../lib/orca";

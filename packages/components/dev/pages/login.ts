@@ -47,7 +47,7 @@
  *
  * Restart the dev server after changing `handlers.ts` so the MSW worker reloads.
  */
-import { applyBranding } from "@zitadel-nextgen/api-mock";
+import { applyBranding } from "@zitadel/api-mock";
 
 import type { ZitadelLogin } from "../../src/orchestrator/index.js";
 import { brandingPresets, type BrandingPresetId } from "../branding-presets.js";
@@ -217,8 +217,8 @@ export function renderLoginPage(host: HTMLElement): void {
       <aside class="controls">
         <p class="preview-note">
           <strong>MSW flow walk</strong>
-          Typed <code>@zitadel-nextgen/api</code> client; responses from
-          <code>@zitadel-nextgen/api-mock</code>.<br />
+          Typed <code>@zitadel/api</code> client; responses from
+          <code>@zitadel/api-mock</code>.<br />
           Fixture emails below are handled in <code>handlers.ts</code>.<br />
           Recovery / MFA need a real backend.
         </p>
@@ -288,7 +288,7 @@ export function renderLoginPage(host: HTMLElement): void {
           </section>
 
           <p class="demo-footnote">
-            Restart <code>pnpm --filter @zitadel-nextgen/components dev</code> after editing <code>handlers.ts</code>.
+            Restart <code>pnpm --filter @zitadel/components dev</code> after editing <code>handlers.ts</code>.
           </p>
         </div>
         <h2>Branding</h2>

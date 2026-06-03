@@ -7,11 +7,11 @@
  * browser's global registry:
  *
  * ```ts
- * await import("@zitadel-nextgen/sdk-next/client");
+ * await import("@zitadel/sdk-next/client");
  * ```
  *
  * SDK configuration is handled separately via `configureZitadel()`
- * from `@zitadel-nextgen/api/config` — typically in a shared
+ * from `@zitadel/api/config` — typically in a shared
  * `zitadel.ts` init file.
  */
-export { ZitadelLogin, ZitadelLogout } from '@zitadel-nextgen/components';
+export { ZitadelLogin, ZitadelLogout } from '@zitadel/components';

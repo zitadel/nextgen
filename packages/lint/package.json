@@ -1,5 +1,5 @@
 {
-  "name": "@zitadel-nextgen/lint",
+  "name": "@zitadel/lint",
   "version": "0.0.1",
   "private": true,
   "main": "./src/index.ts",

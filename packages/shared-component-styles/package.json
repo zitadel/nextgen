@@ -1,6 +1,7 @@
 {
-  "name": "@zitadel-nextgen/shared-component-styles",
+  "name": "@zitadel/shared-component-styles",
   "version": "0.0.0",
+  "private": true,
   "description": "Shared surface CSS for paired Lit atoms and React components that ship the same Figma look. Opt-in per component — Lit-only and React-only UI do not live here.",
   "license": "MIT",
   "repository": {
@@ -25,7 +26,7 @@
     "./alert.css": "./src/alert.css",
     "./pill.css": "./src/pill.css",
     "./attribution-markup": {
-      "@zitadel-nextgen/source": "./src/attribution-markup.ts",
+      "@zitadel/source": "./src/attribution-markup.ts",
       "types": "./dist/attribution-markup.d.mts",
       "import": "./dist/attribution-markup.mjs",
       "default": "./dist/attribution-markup.mjs"

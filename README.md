@@ -64,7 +64,7 @@ package artifacts. The full rationale lives in
 ### Go server binary + console build (`goreleaser`)
 
 GoReleaser builds the React console SPA through Nx before packaging snapshots:
-`corepack pnpm nx build @zitadel-nextgen/console`. Server-side console serving
+`corepack pnpm nx build @zitadel/console`. Server-side console serving
 and Go `//go:embed` wiring are still follow-up work, so snapshot builds verify
 that the console can be produced but do not yet expose it from the placeholder
 server.

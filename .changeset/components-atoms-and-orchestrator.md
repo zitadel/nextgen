@@ -1,8 +1,8 @@
 ---
-"@zitadel-nextgen/components": minor
+"@zitadel/components": minor
 ---
 
-Add the first publishable surface of `@zitadel-nextgen/components`:
+Add the first publishable surface of `@zitadel/components`:
 
 - The Lit-based atom substrate (`<zl-field>`, `<zl-submit>`, `<zl-action>`, `<zl-error>`) with manifests, parts, slots and the `zl-input` / `zl-submit` / `zl-action` CustomEvents that the orchestrator listens for.
 - A `--zl-*` token catalogue, base shadow-host styles and a focus-ring helper consumed by all atoms.
