@@ -1,14 +1,14 @@
 services:
   postgres:
-    #  
     image: postgres:18
     restart: unless-stopped
     environment:
       POSTGRES_USER: zitadel
       POSTGRES_PASSWORD: zitadel
       POSTGRES_DB: nextgen
+      PGDATA: /var/lib/postgresql/data
     volumes:
-      - nextgen-data:/var/lib/postgresql
+      - nextgen-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U zitadel -d nextgen"]
       interval: 5s

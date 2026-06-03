@@ -99,6 +99,8 @@ jobs:
 
   quickstart-smoke:
     runs-on: ubuntu-latest
+    env:
+      GHCR_READONLY_TOKEN: ${{ secrets.GHCR_READONLY_TOKEN }}
     steps:
       - uses: actions/checkout@v6
 
@@ -119,16 +121,15 @@ jobs:
         run: docker compose -f nextgen_quickstart/docker-compose.yaml --env-file nextgen_quickstart/.env config >/dev/null
 
       - name: Optional GHCR auth-path smoke check
-        if: ${{ secrets.GHCR_READONLY_TOKEN != '' }}
+        if: ${{ env.GHCR_READONLY_TOKEN != '' }}
         env:
-          GHCR_READONLY_TOKEN: ${{ secrets.GHCR_READONLY_TOKEN }}
           GH_USER: ${{ github.repository_owner }}
         run: |
           echo "$GHCR_READONLY_TOKEN" | docker login ghcr.io -u "$GH_USER" --password-stdin
           docker logout ghcr.io
 
       - name: GHCR auth-path smoke check skipped
-        if: ${{ secrets.GHCR_READONLY_TOKEN == '' }}
+        if: ${{ env.GHCR_READONLY_TOKEN == '' }}
         run: echo "Skipping GHCR login smoke check because GHCR_READONLY_TOKEN is not configured."
 
   node-e2e:
