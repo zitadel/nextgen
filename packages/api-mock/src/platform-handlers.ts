@@ -1,19 +1,14 @@
 /**
  * MSW handlers for the Zitadel platform API used by the CLI.
  *
- * Covers (in sync with `api/openapi/openapi-spec.yaml` on main):
- *   - POST   /projects
- *   - GET    /projects/:id
- *   - POST   /projects/:id/claim/init   (CLI-only, no spec yet)
- *   - GET    /projects/:id/claim/status (CLI-only, no spec yet)
- *   - POST   /schemas
- *   - GET    /schemas/:id
- *   - DELETE /schemas/:id           (CLI uses; spec-gap follow-up issue filed)
- *   - POST   /flow_definitions      (returns flow-definition-detail-response)
- *   - GET    /flow_definitions      (list)
- *   - GET    /flow_definitions/:id
- *   - PATCH  /flow_definitions/:id  (returns 200 + flow-definition-detail-response)
- *   - DELETE /flow_definitions/:id  (returns 204)
+ * Every mutating endpoint validates its request (path params, query
+ * params, body) against the generated Zod schemas from
+ * `@zitadel-nextgen/api/generated/endpoints/zitadelNextGen.zod` — the
+ * same source of truth the real server's OpenAPI spec generates. Every
+ * read endpoint validates its response on the way out, so the mock
+ * cannot lie about its own outputs. Wire-shape drift in either
+ * direction fails fast in `vitest run` instead of surfacing only
+ * against a live Zitadel.
  *
  * Usage (Node / vitest):
  *
@@ -37,10 +32,30 @@ import type {
   ListFlowDefinitions200,
   UpdateFlowDefinition200,
 } from "@zitadel-nextgen/api/generated/model";
+import {
+  CreateFlowDefinitionBody,
+  CreateProjectBody,
+  CreateSchemaBody,
+  CreateSchemaQueryParams,
+  DeleteFlowDefinitionParams,
+  GetFlowDefinitionParams,
+  GetFlowDefinitionResponse,
+  GetProjectParams,
+  GetProjectResponse,
+  GetSchemaByIdParams,
+  GetSchemaByIdQueryParams,
+  GetSchemaByIdResponse,
+  ListFlowDefinitionsQueryParams,
+  ListFlowDefinitionsResponse,
+  UpdateFlowDefinitionBody,
+  UpdateFlowDefinitionParams,
+  UpdateFlowDefinitionResponse,
+} from "@zitadel-nextgen/api/generated/endpoints/zitadelNextGen.zod";
 import { http, HttpResponse } from "msw";
+import type { z } from "zod";
 
 function shortId(): string {
-  return randomUUID().replace(/-/g, "").slice(0, 12);
+  return randomUUID().replaceAll("-", "").slice(0, 12);
 }
 
 function nowIso(): string {
@@ -50,8 +65,7 @@ function nowIso(): string {
 /**
  * Spec-defined error envelope. Matches `api/openapi/components/error-details.yaml`
  * and the structural shape of every per-endpoint `*Default`/`*4xx` error type
- * orval emits. Exported so callers can type their own error-payload variables
- * (e.g. `server.ts` uses this for the `/sessions/exchange` JSON-parse 400).
+ * orval emits.
  */
 export type ErrorBody = {
   code: string;
@@ -59,10 +73,6 @@ export type ErrorBody = {
   details?: Record<string, unknown>;
 };
 
-/**
- * Build an error body matching `api/openapi/components/error-details.yaml`:
- * `{ code, message, details? }`. Use everywhere we return a non-2xx status.
- */
 export function errorBody(
   code: string,
   message: string,
@@ -71,12 +81,6 @@ export function errorBody(
   return details === undefined ? { code, message } : { code, message, details };
 }
 
-/**
- * Safely read a JSON request body. Returns the parsed object on success,
- * `null` on parse failure or non-object payload. Handlers map `null` to a
- * 400 with `errorBody("invalid_json", ...)` so malformed requests never
- * surface as an opaque 500 from inside the runtime.
- */
 async function readJson(request: Request): Promise<Record<string, unknown> | null> {
   try {
     const parsed = (await request.json()) as unknown;
@@ -92,10 +96,42 @@ async function readJson(request: Request): Promise<Record<string, unknown> | nul
 const INVALID_JSON = errorBody("invalid_json", "request body must be valid JSON");
 
 /**
+ * Run `safeParse` against the generated Zod and return either the
+ * parsed (and defaulted) value or a 400 `HttpResponse` carrying the
+ * Zod issue list. The discriminant key (`ok`) lets the caller short-
+ * circuit cleanly. One pattern, used uniformly for path params, query
+ * params, request bodies, and responses-on-the-way-out.
+ */
+function parse<S extends z.ZodTypeAny>(
+  schema: S,
+  value: unknown,
+  code: string,
+): { ok: true; data: z.output<S> } | { ok: false; response: HttpResponse<ErrorBody> } {
+  const result = schema.safeParse(value);
+  if (result.success) {
+    return { ok: true, data: result.data };
+  }
+  return {
+    ok: false,
+    response: HttpResponse.json(
+      errorBody(code, "request does not conform to spec", {
+        issues: result.error.issues,
+      }),
+      { status: 400 },
+    ),
+  };
+}
+
+/** Build a query-string record msw can hand to the generated `QueryParams` zod. */
+function queryRecord(request: Request): Record<string, string> {
+  return Object.fromEntries(new URL(request.url).searchParams);
+}
+
+/**
  * Server-side record for a project. Strict superset of the spec response
  * types (`CreateProject201`, `GetProject200`): includes the server-only
- * secrets, `updatedAt`, and the in-flight `challengeId` from claim/init.
- * Handlers project from this record to the right wire shape at the boundary.
+ * secrets and `updatedAt`. Handlers project from this record to the right
+ * wire shape at the boundary.
  */
 type ProjectRecord = {
   id: string;
@@ -104,10 +140,7 @@ type ProjectRecord = {
   previewOrigins: string[];
   createdAt: string;
   updatedAt: string;
-  challengeId?: string;
 };
-
-type ClaimState = "pending" | "claimed" | "expired";
 
 /**
  * Server-side metadata wrapped around the flow body so the mock can answer
@@ -127,7 +160,6 @@ type Store = {
   projects: Map<string, ProjectRecord>;
   schemas: Map<string, GetSchemaById200>;
   flowDefinitions: Map<string, FlowDefinitionRecord>;
-  claimState: ClaimState;
 };
 
 function makeStore(): Store {
@@ -135,7 +167,6 @@ function makeStore(): Store {
     projects: new Map(),
     schemas: new Map(),
     flowDefinitions: new Map(),
-    claimState: "pending",
   };
 }
 
@@ -145,13 +176,6 @@ const DEFAULT_SCHEMA_URI =
 /**
  * Build a `flow-definition-detail-response` envelope around a stored body, as
  * specified by `api/openapi/components/flows/flow-definition-detail-response.yaml`.
- *
- * The wrapper fields (`id`, `project_id`, `schema_uri`, `status`, `created_at`,
- * `updated_at`) are owned by the mock and match the spec. The flow-definition
- * body is whatever the caller POSTed — the mock stores it verbatim and trusts
- * it to be a valid `flow-definition.yaml`. The `as unknown as` cast at the
- * boundary acknowledges that trust: the mock doesn't re-validate the body,
- * but the wrapper fields ARE typecheck-enforced.
  */
 function flowDetailResponse(r: FlowDefinitionRecord): GetFlowDefinition200 {
   return {
@@ -172,27 +196,25 @@ export function resetPlatformStore(): void {
   store = makeStore();
 }
 
-/** Advance the claim status to "claimed" — call this in tests that exercise the claim flow. */
-export function completeMockClaim(): void {
-  store.claimState = "claimed";
-}
-
 export function setupPlatformHandlers() {
   return [
-    // POST /projects
     http.post("*/projects", async ({ request }) => {
       const raw = await readJson(request);
       if (raw === null) {
         return HttpResponse.json(INVALID_JSON, { status: 400 });
       }
-      const body = raw as { previewOrigins?: string[] };
+      const body = parse(CreateProjectBody, raw, "invalid_request");
+      if (!body.ok) {
+        return body.response;
+      }
+
       const id = `proj-${shortId()}`;
       const createdAt = nowIso();
       const project: ProjectRecord = {
         id,
-        projectSecret: `sk_proj_${id.replace(/-/g, "")}_full`,
-        previewSecret: `sk_proj_${id.replace(/-/g, "")}_preview`,
-        previewOrigins: body.previewOrigins ?? [],
+        projectSecret: `sk_proj_${id.replaceAll("-", "")}_full`,
+        previewSecret: `sk_proj_${id.replaceAll("-", "")}_preview`,
+        previewOrigins: body.data.previewOrigins ?? [],
         createdAt,
         updatedAt: createdAt,
       };
@@ -207,9 +229,13 @@ export function setupPlatformHandlers() {
       return HttpResponse.json(responseBody, { status: 201 });
     }),
 
-    // GET /projects/:id
-    http.get("*/projects/:id", ({ params }) => {
-      const project = store.projects.get(params.id as string);
+    http.get("*/projects/:project_id", ({ params }) => {
+      const path = parse(GetProjectParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+
+      const project = store.projects.get(path.data.project_id);
       if (!project) {
         return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
       }
@@ -218,190 +244,173 @@ export function setupPlatformHandlers() {
         createdAt: project.createdAt,
         updatedAt: project.updatedAt,
       };
-      return HttpResponse.json(responseBody);
-    }),
-
-    // POST /projects/:id/claim/init
-    http.post("*/projects/:id/claim/init", ({ params }) => {
-      const projectId = params.id as string;
-      const challengeId = `chal_${shortId()}`;
-      const project = store.projects.get(projectId);
-      if (project) {
-        project.challengeId = challengeId;
+      const out = parse(GetProjectResponse, responseBody, "mock_response_invalid");
+      if (!out.ok) {
+        return out.response;
       }
-      return HttpResponse.json({
-        claim_url: `https://zitadel.cloud/claim/${projectId}/${challengeId}`,
-        challenge_id: challengeId,
-        expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
-      });
+      return HttpResponse.json(out.data);
     }),
 
-    // GET /projects/:id/claim/status
-    http.get("*/projects/:id/claim/status", ({ params }) => {
-      const project = store.projects.get(params.id as string);
-      if (store.claimState === "claimed") {
-        return HttpResponse.json({
-          status: "claimed",
-          new_project_secret: `${project?.projectSecret ?? "sk"}_claimed`,
-          team_id: "team_mock",
-          claimed_at: nowIso(),
-          dashboard_url: `https://zitadel.cloud/projects/${params.id as string}`,
-          tier: "free",
-        });
-      }
-      return HttpResponse.json({ status: store.claimState });
-    }),
-
-    // POST /schemas
-    //
-    // Spec: `api/openapi/endpoints/schemas/methods.yaml` defines the request
-    // as `oneOf [user-schema, schema-url]` keyed on the `kind` discriminator.
-    // We accept either; anything else is 400 invalid_schema.
     http.post("*/schemas", async ({ request }) => {
-      const body = await readJson(request);
-      if (body === null) {
+      const query = parse(CreateSchemaQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+
+      const raw = await readJson(request);
+      if (raw === null) {
         return HttpResponse.json(INVALID_JSON, { status: 400 });
       }
-      const kind = body.kind;
-      if (kind !== "user-schema" && kind !== "schema-url") {
-        return HttpResponse.json(
-          errorBody(
-            "invalid_schema",
-            'schema body must include kind: "user-schema" or "schema-url"',
-          ),
-          { status: 400 },
-        );
+      const body = parse(CreateSchemaBody, raw, "invalid_schema");
+      if (!body.ok) {
+        return body.response;
       }
+
       const id = `schema_${shortId()}`;
-      // The mock stores whatever the user POSTed and serves it back unchanged.
-      // The cast acknowledges we trust the body; we don't re-validate it
-      // against `user-schema.yaml` / `schema-url.yaml` schemas at runtime.
-      store.schemas.set(id, body as unknown as GetSchemaById200);
+      store.schemas.set(id, body.data as unknown as GetSchemaById200);
       const responseBody: CreateSchema201 = { id };
       return HttpResponse.json(responseBody, { status: 201 });
     }),
 
-    // GET /schemas/:id
-    http.get("*/schemas/:id", ({ params }) => {
-      const schema = store.schemas.get(params.id as string);
+    http.get("*/schemas/:id", ({ params, request }) => {
+      const path = parse(GetSchemaByIdParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const query = parse(GetSchemaByIdQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+
+      const schema = store.schemas.get(path.data.id);
       if (!schema) {
         return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
       }
-      return HttpResponse.json(schema);
+      const out = parse(GetSchemaByIdResponse, schema, "mock_response_invalid");
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data);
     }),
 
-    // DELETE /schemas/:id
-    //
-    // Spec includes a 404 not-found response — callers must be able to
-    // distinguish "deleted" from "id didn't exist". `Map.delete()`
-    // returns `true` only when the key was present.
-    http.delete("*/schemas/:id", ({ params }) => {
-      const existed = store.schemas.delete(params.id as string);
+    http.delete("*/schemas/:id", ({ params, request }) => {
+      const path = parse(GetSchemaByIdParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const query = parse(GetSchemaByIdQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+
+      const existed = store.schemas.delete(path.data.id);
       if (!existed) {
         return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
       }
       return new HttpResponse(null, { status: 204 });
     }),
 
-    // POST /flow_definitions
-    //
-    // Spec: requestBody is the `flow-definition-create-request` envelope
-    // (`{ project_id, schema_uri?, flow_definition }`). The mock validates
-    // the envelope and 400s if `project_id` or `flow_definition` is missing,
-    // matching the contract any real backend would enforce.
     http.post("*/flow_definitions", async ({ request }) => {
       const raw = await readJson(request);
       if (raw === null) {
         return HttpResponse.json(INVALID_JSON, { status: 400 });
       }
-      const hasEnvelope =
-        typeof raw.project_id === "string" &&
-        typeof raw.flow_definition === "object" &&
-        raw.flow_definition !== null;
-      if (!hasEnvelope) {
-        return HttpResponse.json(
-          errorBody(
-            "invalid_request",
-            "POST /flow_definitions requires {project_id, flow_definition, schema_uri?} envelope",
-          ),
-          { status: 400 },
-        );
+      const body = parse(CreateFlowDefinitionBody, raw, "invalid_request");
+      if (!body.ok) {
+        return body.response;
       }
-
-      const projectId = raw.project_id as string;
-      const schemaUri = typeof raw.schema_uri === "string" ? raw.schema_uri : DEFAULT_SCHEMA_URI;
-      const body = raw.flow_definition as Record<string, unknown>;
 
       const id = `flow_${shortId()}`;
       const now = nowIso();
       const record: FlowDefinitionRecord = {
         id,
-        projectId,
-        schemaUri,
+        projectId: body.data.project_id,
+        schemaUri: body.data.schema_uri ?? DEFAULT_SCHEMA_URI,
         status: "active",
         createdAt: now,
         updatedAt: now,
-        body,
+        body: body.data.flow_definition as unknown as Record<string, unknown>,
       };
       store.flowDefinitions.set(id, record);
       const responseBody: CreateFlowDefinition201 = flowDetailResponse(record);
       return HttpResponse.json(responseBody, { status: 201 });
     }),
 
-    // GET /flow_definitions (list)
-    //
-    // Spec `flow-definition-list-response.yaml` defines an optional
-    // `next_page_token` field that may be `null` when there is no next
-    // page. The mock never paginates (in-memory store), so we always emit
-    // explicit null — spec-strict consumers iterating with cursors can rely
-    // on its presence to detect end-of-list rather than `undefined`.
-    http.get("*/flow_definitions", () => {
+    http.get("*/flow_definitions", ({ request }) => {
+      const query = parse(
+        ListFlowDefinitionsQueryParams,
+        queryRecord(request),
+        "invalid_query",
+      );
+      if (!query.ok) {
+        return query.response;
+      }
+
       const responseBody: ListFlowDefinitions200 = {
-        flow_definitions: Array.from(store.flowDefinitions.values()).map(flowDetailResponse),
+        flow_definitions: [...store.flowDefinitions.values()].map(flowDetailResponse),
         next_page_token: null,
       };
-      return HttpResponse.json(responseBody);
+      const out = parse(ListFlowDefinitionsResponse, responseBody, "mock_response_invalid");
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data);
     }),
 
-    // GET /flow_definitions/:id
     http.get("*/flow_definitions/:id", ({ params }) => {
-      const record = store.flowDefinitions.get(params.id as string);
+      const path = parse(GetFlowDefinitionParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+
+      const record = store.flowDefinitions.get(path.data.id);
       if (!record) {
         return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
       }
       const responseBody: GetFlowDefinition200 = flowDetailResponse(record);
-      return HttpResponse.json(responseBody);
+      const out = parse(GetFlowDefinitionResponse, responseBody, "mock_response_invalid");
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data);
     }),
 
-    // PATCH /flow_definitions/:id
-    //
-    // Spec: partial update — only supplied fields are replaced; arrays/objects
-    // are replaced atomically when supplied. The mock merges top-level keys
-    // shallowly (sufficient for the CLI's "send full body" pattern and good
-    // enough for partial spec-correct patches). Returns 200 + detail response
-    // per `flow-definition-detail-response`.
     http.patch("*/flow_definitions/:id", async ({ params, request }) => {
-      const record = store.flowDefinitions.get(params.id as string);
+      const path = parse(UpdateFlowDefinitionParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+
+      const record = store.flowDefinitions.get(path.data.id);
       if (!record) {
         return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
       }
-      const patch = await readJson(request);
-      if (patch === null) {
+      const raw = await readJson(request);
+      if (raw === null) {
         return HttpResponse.json(INVALID_JSON, { status: 400 });
       }
-      record.body = { ...record.body, ...patch };
+      const body = parse(UpdateFlowDefinitionBody, raw, "invalid_request");
+      if (!body.ok) {
+        return body.response;
+      }
+
+      record.body = { ...record.body, ...(body.data as unknown as Record<string, unknown>) };
       record.updatedAt = nowIso();
       const responseBody: UpdateFlowDefinition200 = flowDetailResponse(record);
-      return HttpResponse.json(responseBody, { status: 200 });
+      const out = parse(UpdateFlowDefinitionResponse, responseBody, "mock_response_invalid");
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data, { status: 200 });
     }),
 
-    // DELETE /flow_definitions/:id
-    //
-    // Spec includes a 404 not-found response — callers must be able to
-    // distinguish "deleted" from "id didn't exist". `Map.delete()`
-    // returns `true` only when the key was present.
     http.delete("*/flow_definitions/:id", ({ params }) => {
-      const existed = store.flowDefinitions.delete(params.id as string);
+      const path = parse(DeleteFlowDefinitionParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+
+      const existed = store.flowDefinitions.delete(path.data.id);
       if (!existed) {
         return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
       }

@@ -7,6 +7,7 @@
 *.dll
 *.so
 *.dylib
+api/openapi/bundled.yaml
 
 # Test binary, built with `go test -c`
 *.test
@@ -24,14 +25,18 @@ profile.cov
 go.work
 go.work.sum
 
-# env file
-.env
+# env files (keep .env.example tracked)
+.env*
+!.env.example
 
 # Editor/IDE
 .idea/
 .vscode/
 
 __debug_bin*
+
+# API clients
+.kreya/
 
 # Local agent workspace metadata (Nx writes these on update; not project-owned)
 .claude/
@@ -83,6 +88,7 @@ coverage
 ## Next.js / Nuxt build outputs
 .next/
 .nuxt/
+.nuxt-typecheck/
 .output/
 
 ## Go build cache
@@ -101,3 +107,5 @@ apps/demo-next/tsconfig.tsbuildinfo
 packages/api-mock/tsconfig.tsbuildinfo
 
 .nx/polygraph
+# Root TS incremental build info (generated)
+tsconfig.tsbuildinfo

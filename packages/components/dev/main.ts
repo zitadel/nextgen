@@ -6,7 +6,7 @@
 import "@zitadel-nextgen/design-tokens/css/tokens.css";
 
 import "../src/index.js";
-import { setApiBaseUrl } from "@zitadel-nextgen/api/runtime/base-url";
+import { configureZitadel } from "@zitadel-nextgen/api/config";
 import { applyBranding, setupMock } from "@zitadel-nextgen/api-mock";
 import { setupWorker } from "msw/browser";
 
@@ -49,7 +49,10 @@ async function bootstrap(): Promise<void> {
   // Point the orval client at any same-origin host so the MSW worker has
   // an absolute URL to intercept. The host doesn't have to resolve — the
   // generated handlers match against `*/flow*` regardless.
-  setApiBaseUrl(window.location.origin);
+  configureZitadel({
+    proxyPath: window.location.origin,
+    projectId: "dev",
+  });
 
   const worker = setupWorker();
   setupMock(worker);

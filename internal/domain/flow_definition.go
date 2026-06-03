@@ -1,6 +1,12 @@
 package domain
 
-import "time"
+import (
+	"time"
+)
+
+const (
+	FlowDefinitionPrefix ResourcePrefix = "flowdef"
+)
 
 //go:generate go tool enumer -type FlowDefinitionStatus -transform snake -trimprefix FlowDefinitionStatus -sql
 type FlowDefinitionStatus uint8
@@ -24,17 +30,14 @@ const (
 	FlowDefinitionPurposeLinkAccount
 )
 
-// FlowOnSuccess names the server-side mutation that runs after a step's
-// fields validate and before its transition fires. Empty (pointer nil
-// on [FlowDefinitionStep.OnSuccess]) means no side effect — advance
-// directly on the submitted action.
+// FlowOnSuccess names the server-side mutation that runs after a
+// step's fields validate, before its transition fires. Nil on
+// [FlowDefinitionStep.OnSuccess] means no side effect.
 //
 //go:generate go tool enumer -type FlowOnSuccess -transform snake -trimprefix FlowOnSuccess -sql
 type FlowOnSuccess uint8
 
 const (
-	// FlowOnSuccessCreateUser materializes the user record from the
-	// step's collected fields. Used by register flows.
 	FlowOnSuccessCreateUser FlowOnSuccess = iota
 )
 
@@ -90,6 +93,52 @@ type FlowDefinition struct {
 	Purposes map[FlowDefinitionPurpose]string
 	Audience FlowDefinitionAudience
 	Steps    []FlowDefinitionStep
+}
+
+func NewFlowDefinition(
+	projectID string,
+	name string,
+	schemaVersion string,
+	userSchema string,
+	purposes map[FlowDefinitionPurpose]string,
+	audience FlowDefinitionAudience,
+	steps []FlowDefinitionStep,
+) (*FlowDefinition, error) {
+	id, err := newID(FlowDefinitionPrefix)
+	if err != nil {
+		return nil, ErrInternal(err).WithMessage("failed to generate flow-definition id")
+	}
+	return &FlowDefinition{
+		ProjectID:     projectID,
+		ID:            id,
+		Name:          name,
+		SchemaVersion: schemaVersion,
+		Status:        FlowDefinitionStatusActive,
+		CreatedAt:     time.Now().UTC(),
+		UpdatedAt:     time.Now().UTC(),
+		UserSchema:    userSchema,
+		Purposes:      purposes,
+		Audience:      audience,
+		Steps:         steps,
+	}, nil
+}
+
+// InitialStepFor returns the entry-point step name for purpose, or
+// false if the definition does not serve it.
+func (d *FlowDefinition) InitialStepFor(purpose FlowDefinitionPurpose) (string, bool) {
+	step, ok := d.Purposes[purpose]
+	return step, ok
+}
+
+// FindStep returns a pointer into d.Steps for the step named name, or
+// false if no such step exists.
+func (d *FlowDefinition) FindStep(name string) (*FlowDefinitionStep, bool) {
+	for i := range d.Steps {
+		if d.Steps[i].Name == name {
+			return &d.Steps[i], true
+		}
+	}
+	return nil, false
 }
 
 // FlowDefinitionAudience describes which requests this definition should be selected for.

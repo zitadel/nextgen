@@ -13,11 +13,12 @@
 import type { CreateFlow201, CreateFlow201Step } from "@zitadel-nextgen/api/generated/model";
 
 import { signHandoffToken } from "../crypto.js";
+import type { StoredCredential } from "../lib/authn/index.js";
 
 export type StepFixtureInput = {
   flowId: string;
   sessionToken: string;
-  /** Issuer URL embedded in signed tokens (e.g. `"http://localhost:4000"`). */
+  /** Issuer URL embedded in signed tokens (e.g. `"http://localhost:8080"`). */
   iss: string;
   /**
    * Email captured from the identifier step, used as the JWT `sub` claim in
@@ -25,8 +26,39 @@ export type StepFixtureInput = {
    * (e.g. SSO flows that skip the identifier step).
    */
   capturedEmail?: string;
+  /**
+   * Credentials registered for this user, looked up from {@link AuthnStore}
+   * by email before each response. Used by `passkeyLoginStep` to build
+   * `allowCredentials` with the correct transports so the browser can match
+   * and surface the enrolled authenticator. An empty list omits the
+   * `allowCredentials` field entirely, falling back to discoverable-credential
+   * mode — which is correct when the user has no credentials yet, or after a
+   * server restart that wipes the in-memory store.
+   *
+   * All other step builders ignore this field; it is safe to always populate
+   * it regardless of which step is being rendered.
+   */
+  registeredCredentials?: readonly Pick<StoredCredential, "credentialId" | "transports">[];
 };
 
+/**
+ * Derive a stable base64url user handle from an email address.
+ *
+ * In a real RP, `user.id` is an opaque, unique identifier stored by the
+ * authenticator alongside the credential — it must never be the email itself
+ * (to avoid leaking PII to the platform authenticator). A deterministic
+ * encoding of the email is sufficient for the mock: it is stable across
+ * registrations for the same address, unique per address, and keeps the
+ * browser's keychain from conflating credentials belonging to different users.
+ */
+function emailToUserHandle(email: string): string {
+  return Buffer.from(email).toString("base64url");
+}
+
+/**
+ * Wrap a step shape in the standard {@link CreateFlow201} envelope.
+ * All fixtures delegate to this helper so the session fields stay consistent.
+ */
 function wrap(input: StepFixtureInput, step: CreateFlow201Step, extras?: Partial<CreateFlow201>): CreateFlow201 {
   return {
     id: input.flowId,
@@ -95,6 +127,11 @@ export function registerStep(input: StepFixtureInput): CreateFlow201 {
   });
 }
 
+/**
+ * Password-only step — legacy split-credential screen kept for tests that
+ * target it directly. Not reachable from any `START` transition in the normal
+ * flow; the happy path goes `identifier → passkey-upsell` directly.
+ */
 export function passwordStep(input: StepFixtureInput): CreateFlow201 {
   return wrap(input, {
     name: "password",
@@ -135,6 +172,10 @@ export function recoverStep(input: StepFixtureInput): CreateFlow201 {
   });
 }
 
+/**
+ * Passkey enrolment upsell — prompts the user to set up a passkey after a
+ * successful credential sign-in. Figma `6594:630`.
+ */
 export function passkeyUpsellStep(input: StepFixtureInput): CreateFlow201 {
   return wrap(input, {
     name: "passkey-upsell",
@@ -155,6 +196,7 @@ export function passkeyUpsellStep(input: StepFixtureInput): CreateFlow201 {
  * `navigator.credentials.create()`. Follows the two-submit model from ADR 013.
  */
 export function passkeySetupStep(input: StepFixtureInput): CreateFlow201 {
+  const userEmail = input.capturedEmail ?? "mock-user@example.com";
   return wrap(input, {
     name: "passkey-setup",
     texts: { title_key: "passkey-upsell.title" },
@@ -171,9 +213,9 @@ export function passkeySetupStep(input: StepFixtureInput): CreateFlow201 {
         challenge: "AAAAAAAAAAAAAAAAAAAAAA",
         rp: { name: "Mock RP", id: "localhost" },
         user: {
-          id: "dXNlcl9tb2Nr",
-          name: input.capturedEmail ?? "mock-user@example.com",
-          displayName: input.capturedEmail ?? "Mock User",
+          id: emailToUserHandle(userEmail),
+          name: userEmail,
+          displayName: userEmail,
         },
         pubKeyCredParams: [
           { type: "public-key", alg: -7 },
@@ -197,8 +239,18 @@ export function passkeySetupStep(input: StepFixtureInput): CreateFlow201 {
  * authentication options so `<zl-passkey ceremony="authenticate">` can
  * trigger `navigator.credentials.get()`. The browser prompts for an
  * existing credential (Touch ID / Windows Hello / security key).
+ *
+ * When `input.registeredCredentials` is non-empty, `allowCredentials` is
+ * populated so the browser targets exactly the enrolled authenticator. An
+ * empty list omits the field, triggering discoverable-credential mode.
  */
 export function passkeyLoginStep(input: StepFixtureInput): CreateFlow201 {
+  const allowCredentials = (input.registeredCredentials ?? []).map((c) => ({
+    type: "public-key",
+    id: c.credentialId,
+    transports: c.transports,
+  }));
+
   return wrap(input, {
     name: "passkey-login",
     texts: { title_key: "passkey-login.title" },
@@ -217,18 +269,23 @@ export function passkeyLoginStep(input: StepFixtureInput): CreateFlow201 {
         rpId: "localhost",
         timeout: 60000,
         userVerification: "preferred",
-        allowCredentials: [
-          {
-            type: "public-key",
-            id: "Y3JlZF9tb2Nr",
-            transports: ["internal"],
-          },
-        ],
+        ...(allowCredentials.length > 0 ? { allowCredentials } : {}),
       },
     },
   });
 }
 
+/**
+ * SSO redirect step — tells the orchestrator to navigate to the identity
+ * provider's authorisation endpoint.
+ *
+ * `redirectUrl` is optional so callers can supply a provider-specific URL in
+ * future; today `handlers.ts` does not pass one, so the hardcoded mock URL is
+ * always used.
+ *
+ * TODO: thread `ssoProviderId` from the machine context through to a computed
+ * redirect URL so each provider gets a distinct mock destination.
+ */
 export function ssoRedirectStep(
   input: StepFixtureInput & { redirectUrl?: string },
 ): CreateFlow201 {
@@ -242,6 +299,19 @@ export function ssoRedirectStep(
   });
 }
 
+/**
+ * Signed-in confirmation step — includes a short-lived handoff token the
+ * client exchanges for a session cookie via `POST /sessions/exchange`.
+ *
+ * `handoff_token_expires_at` is set to 60 seconds from the time this function
+ * is called, matching the `exp` claim inside the JWT. Tests that assert on
+ * this value should treat it as approximate rather than exact.
+ *
+ * The `sub` claim falls back to `"mock-user@example.com"` when `capturedEmail`
+ * is absent or an empty string. The `||` operator (rather than `??`) is
+ * intentional: an empty-string email is not a valid JWT subject, so it should
+ * also fall back to the placeholder.
+ */
 export async function doneStep(input: StepFixtureInput): Promise<CreateFlow201> {
   const { iss, capturedEmail } = input;
   return wrap(
@@ -259,7 +329,7 @@ export async function doneStep(input: StepFixtureInput): Promise<CreateFlow201> 
     },
     {
       handoff_token: await signHandoffToken({
-        sub: capturedEmail ?? "mock-user@example.com",
+        sub: capturedEmail || "mock-user@example.com",
         iss,
       }),
       handoff_token_expires_at: new Date(Date.now() + 60_000).toISOString(),

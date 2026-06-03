@@ -1,9 +1,0 @@
-title: IdentifierFactorPayload
-type: object
-description: Identifier-specific factor metadata
-required:
-  - user_id
-properties:
-  user_id:
-    $ref: ../../components/schemas/user-id.yaml
-    description: The identified user ID

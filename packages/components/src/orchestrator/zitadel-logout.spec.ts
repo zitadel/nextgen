@@ -2,7 +2,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
-import { setApiBaseUrl } from "@zitadel-nextgen/api/runtime/base-url";
+import { configureZitadel, _resetConfigForTesting } from "@zitadel-nextgen/api/config";
 
 import "./zitadel-logout.js";
 import type { ZitadelLogout } from "./zitadel-logout.js";
@@ -28,7 +28,7 @@ const okHandler = http.get(`${API_BASE}/auth/end-session`, ({ request }) => {
 const server = setupServer(okHandler);
 
 beforeAll(() => {
-  setApiBaseUrl(API_BASE);
+  configureZitadel({ proxyPath: API_BASE, projectId: "test" });
   server.listen({ onUnhandledRequest: "error" });
 });
 
@@ -180,7 +180,9 @@ describe("<zitadel-logout>", () => {
     await new Promise((resolve) => setTimeout(resolve, 16));
 
     expect(requestLog).toHaveLength(1);
-    const url = new URL(requestLog[0]!.url);
+    const first = requestLog[0];
+    if (!first) throw new Error("expected at least one captured request");
+    const url = new URL(first.url);
     expect(url.searchParams.get("client_id")).toBe("console-app");
     expect(url.searchParams.get("post_logout_redirect_uri")).toBe(
       "https://app.test/done",

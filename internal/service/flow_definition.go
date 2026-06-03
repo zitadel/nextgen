@@ -1,0 +1,176 @@
+package service
+
+import (
+	"context"
+	"errors"
+	"fmt"
+
+	"github.com/ianlancetaylor/jsonschema"
+	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/storage/database"
+)
+
+type FlowDefinitionService interface {
+	Create(ctx context.Context, req CreateFlowDefinitionRequest) (*domain.FlowDefinition, string, error)
+}
+
+type SchemaResolver interface {
+	Resolve(
+		ctx context.Context,
+		client database.QueryExecutor,
+		projectID string,
+		schemaURL string,
+		rootSchema []byte,
+	) (*jsonschema.Schema, error)
+}
+
+type BuiltinSchemaProvider interface {
+	GetBuiltinSchema(uri string) (*jsonschema.Schema, error)
+	LatestSchemaURI(kind domain.KnownSchemaKind) (string, error)
+}
+
+type flowDefinitionValidatorFunc func(userSchema *jsonschema.Schema, flowDefinition domain.FlowDefinition) ([]domain.PivotingTarget, error)
+
+type CreateFlowDefinitionRequest struct {
+	ProjectID         string
+	Name              string
+	SchemaVersion     string // todo (grvijayan): currently empty as the request does not contain schema version
+	FlowSchemaURI     string // todo (grvijayan): schema_version (semver) stored in the db vs schema_uri needed for validation
+	UserSchema        string
+	Purposes          map[string]string
+	Audience          domain.FlowDefinitionAudience
+	Steps             []domain.FlowDefinitionStep
+	RawFlowDefinition []byte
+}
+
+type flowDefinitionService struct {
+	db                     database.Pool
+	schemaResolver         SchemaResolver
+	builtinSchemaProvider  BuiltinSchemaProvider
+	validateFlowDefinition flowDefinitionValidatorFunc
+	flowDefinitionRepo     domain.FlowDefinitionRepository
+}
+
+func NewFlowDefinitionService(
+	db database.Pool,
+	schemaResolver SchemaResolver,
+	schemaProvider BuiltinSchemaProvider,
+	flowDefinitionValidatorFn flowDefinitionValidatorFunc,
+	flowDefinitionRepo domain.FlowDefinitionRepository,
+) FlowDefinitionService {
+	if flowDefinitionValidatorFn == nil {
+		flowDefinitionValidatorFn = domain.ValidateFlowDefinition
+	}
+	return &flowDefinitionService{
+		db:                     db,
+		schemaResolver:         schemaResolver,
+		builtinSchemaProvider:  schemaProvider,
+		validateFlowDefinition: flowDefinitionValidatorFn,
+		flowDefinitionRepo:     flowDefinitionRepo,
+	}
+}
+
+func (fd *flowDefinitionService) Create(ctx context.Context, req CreateFlowDefinitionRequest) (*domain.FlowDefinition, string, error) {
+	// check if a flow definition (name + schema version) already exists in the project
+	opts := []domain.FlowDefinitionListOption{
+		domain.WithFlowDefinitionName(req.Name),
+		domain.WithSchemaVersion(req.SchemaVersion),
+	}
+	defs, err := fd.flowDefinitionRepo.ListFlowDefinitions(ctx, fd.db, req.ProjectID, opts...)
+	if err != nil {
+		if !errors.Is(err, &database.NoRowFoundError{}) {
+			return nil, "", err
+		}
+	}
+	if len(defs) > 0 {
+		return nil, "", domain.ErrFlowDefinitionAlreadyExists()
+	}
+
+	purposes, err := mapPurposesToDomain(req.Purposes)
+	if err != nil {
+		return nil, "", err
+	}
+
+	flowDefinition, err := domain.NewFlowDefinition(
+		req.ProjectID,
+		req.Name,
+		req.SchemaVersion,
+		req.UserSchema,
+		purposes,
+		req.Audience,
+		req.Steps,
+	)
+	if err != nil {
+		return nil, "", err
+	}
+
+	// if req.FlowSchemaURI is empty, use the latest flow definition schema from the builtin schema provider
+	flowSchemaURI := req.FlowSchemaURI
+	if flowSchemaURI == "" {
+		flowSchemaURI, err = fd.builtinSchemaProvider.LatestSchemaURI(domain.SchemaKindFlowDefinition)
+		if err != nil {
+			return nil, "", domain.ErrSchemaFetchFailed("failed to get latest flow definition schema URI", err)
+		}
+	}
+	err = fd.Validate(ctx, flowDefinition)
+	if err != nil {
+		return nil, "", err
+	}
+	err = fd.flowDefinitionRepo.CreateFlowDefinition(ctx, fd.db, flowDefinition)
+	if err != nil {
+		return nil, "", err
+	}
+	return flowDefinition, flowSchemaURI, nil
+}
+
+// Validate validates the flow definition steps and transitions
+func (fd *flowDefinitionService) Validate(ctx context.Context, flowDefinition *domain.FlowDefinition) error {
+	// resolve the user schema from the user schema URI
+	userSchema, err := fd.schemaResolver.Resolve(ctx, fd.db, flowDefinition.ProjectID, flowDefinition.UserSchema, nil)
+	if err != nil {
+		return domain.ErrSchemaFetchFailed("failed to resolve user schema", err)
+	}
+
+	// validate the flow steps, fields against the user schema, transitions, reachability, trapped cycles, etc.
+	pivotingTargets, err := fd.validateFlowDefinition(userSchema, *flowDefinition)
+	if err != nil {
+		return err
+	}
+
+	// validate that the pivoting targets returned by the flow definition validator are valid flow definitions in the same project
+	return fd.validatePivotingTargets(ctx, pivotingTargets, flowDefinition.ProjectID)
+
+}
+
+// validatePivotingTargets validates that the pivoting targets are a valid flow definition in the same project.
+func (fd *flowDefinitionService) validatePivotingTargets(ctx context.Context, pivotingTargets []domain.PivotingTarget, projectID string) error {
+	if len(pivotingTargets) == 0 {
+		return nil
+	}
+	for _, target := range pivotingTargets {
+		defs, err := fd.flowDefinitionRepo.ListFlowDefinitions(ctx, fd.db, projectID,
+			domain.WithFlowDefinitionName(target.Name),
+			domain.WithFlowDefinitionStatus(domain.FlowDefinitionStatusActive),
+		)
+		if err != nil {
+			return err
+		}
+		if len(defs) == 0 {
+			return domain.ErrFlowDefinitionInvalid(fmt.Sprintf(
+				"step %q: transition %q targets unknown or inactive flow %q", target.Step, target.Transition, target.Name), nil)
+		}
+	}
+	return nil
+}
+
+func mapPurposesToDomain(reqPurposes map[string]string) (map[domain.FlowDefinitionPurpose]string, error) {
+	purposes := make(map[domain.FlowDefinitionPurpose]string, len(reqPurposes))
+	for p, entryStep := range reqPurposes {
+		purpose, err := domain.FlowDefinitionPurposeString(p)
+		if err != nil {
+			return nil, domain.ErrFlowDefinitionInvalid("invalid purpose", nil)
+		}
+		purposes[purpose] = entryStep
+	}
+	return purposes, nil
+}

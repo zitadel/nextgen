@@ -14,44 +14,137 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  go-test:
+  openapi-lint:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v6
-      # lint openapi
       - name: Set up node
         uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
-      - name: Run OpenAPI linting
-        run: npx --yes @redocly/cli@1.34.5 lint api/openapi/openapi-spec.yaml --format=github-actions
+      - name: Lint OpenAPI spec
+        run: npx --yes @redocly/cli@2.31.5 lint api/openapi/openapi-spec.yaml --format=github-actions
 
+  go-unit-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
           cache: true
-      - name: Install embedded-postgres runtime deps
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq libicu-dev libssl-dev
+      - name: Verify gofmt formatting
+        run: |
+          unformatted="$(git ls-files -z -- '*.go' | xargs -0 -r gofmt -l)"
+          if [ -n "$unformatted" ]; then
+            printf '%s\n' "$unformatted"
+            exit 1
+          fi
       - run: go generate ./...
       - name: Verify generated code is up to date
         run: |
           git diff --stat --exit-code -- .
           test -z "$(git status --porcelain)"
       - run: go vet ./...
+      # Unit tests only. The DB-backed tests live behind the `postgres_integration` /
+      # `spanner_integration` build tags and run in the dedicated jobs below, so
+      # this job needs neither the postgres runtime deps nor the binary cache.
       - run: go test -v -timeout=10m ./...
 
-  go-test-spanner:
+  go-integration-test-postgres:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
           cache: true
-      - run: go test -v -tags spanner_integration -timeout=10m ./internal/storage/database/repository/...
+      # Postgres integration tests run against a Docker testcontainer (mirroring
+      # the spanner job); ubuntu-latest ships Docker, so no embedded-postgres
+      # runtime deps or Maven binary cache are needed here.
+      - name: Postgres integration tests
+        run: |
+          mkdir -p test-output/go
+          set -o pipefail
+          go test -json -v -tags postgres_integration -timeout=10m ./... | tee test-output/go/postgres-integration.json
+      - name: Upload Postgres test log on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: postgres-integration-test-log
+          path: test-output/go/postgres-integration.json
+          if-no-files-found: ignore
+          retention-days: 7
+
+  go-integration-test-spanner:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      # Spanner tests use a Docker testcontainer emulator, not the embedded
+      # postgres binary, so no Maven binary cache is needed here.
+      - run: go test -v -tags spanner_integration -timeout=10m ./...
+
+  go-smoke-test-embedded-postgres:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      # Builds the server and boots it on the embedded-postgres default connector:
+      # the zero-config / single-binary path (run zitadel without standing up
+      # Postgres). Asserts the binary starts, runs migrations, and shuts down
+      # cleanly (exit 0); we test the start, not the integration suites. The
+      # embedded binary is fetched from Maven on a cold cache, so this job keeps
+      # the postgres runtime libs and the binary cache (StartEmbedded retries the fetch).
+      - name: Install embedded-postgres runtime deps
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq libicu-dev libssl-dev
+      - name: Cache embedded-postgres binary
+        uses: actions/cache@v5
+        with:
+          path: ~/.embedded-postgres-go
+          key: embedded-postgres-${{ runner.os }}-${{ hashFiles('go.sum') }}
+      - name: Build server
+        run: go build -o ./nextgen .
+      - name: Smoke test (start, migrate, graceful exit 0)
+        run: |
+          export NEXTGEN_SERVER_ENCRYPTION_KEY=4D61737465726B65794E65656473546F48617665333243686172616374657273
+          ./nextgen > server.log 2>&1 &
+          pid=$!
+          # "server listening" is logged only after embedded PG is up, migrations
+          # ran, and services wired; the generous timeout covers a cold Maven download.
+          ready=0
+          for i in $(seq 1 240); do
+            if grep -q "server listening on" server.log; then ready=1; break; fi
+            if ! kill -0 "$pid" 2>/dev/null; then
+              echo "::error::server exited before becoming ready"; cat server.log; exit 1
+            fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then
+            echo "::error::timed out waiting for server readiness"; cat server.log
+            kill -TERM "$pid" 2>/dev/null || true; exit 1
+          fi
+          kill -TERM "$pid"
+          code=0; wait "$pid" || code=$?
+          cat server.log
+          [ "$code" -eq 0 ] || { echo "::error::non-zero exit after SIGTERM: $code"; exit 1; }
+          echo "embedded-postgres smoke test passed (start, migrate, graceful exit 0)"
+
 
   node-check:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
 
@@ -74,6 +167,7 @@ jobs:
 
   node-e2e:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
 
@@ -96,7 +190,7 @@ jobs:
       # Browsers live under ~/.cache/ms-playwright on Linux.
       - name: Restore Playwright browsers
         id: playwright-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
@@ -144,6 +238,7 @@ jobs:
 
   npm-pack-smoke:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: node-check
     steps:
       - uses: actions/checkout@v6
@@ -167,8 +262,8 @@ jobs:
 
       - name: Smoke test built CLI
         run: |
-          node apps/cli/dist/zitadel.mjs --version
-          node apps/cli/dist/zitadel.mjs capabilities --json
+          node apps/cli/bin/run.js --version
+          node apps/cli/bin/run.js commands
 
       - name: Dry-run npm packs
         run: |
@@ -194,7 +289,8 @@ jobs:
 
   goreleaser-snapshot:
     runs-on: ubuntu-latest
-    needs: [go-test, go-test-spanner, node-check]
+    timeout-minutes: 15
+    needs: [go-unit-test, go-integration-test-postgres, go-integration-test-spanner, go-smoke-test-embedded-postgres, node-check]
     steps:
       - name: Checkout
         uses: actions/checkout@v6

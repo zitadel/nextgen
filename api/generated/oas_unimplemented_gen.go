@@ -70,7 +70,7 @@ func (UnimplementedHandler) CreateFlow(ctx context.Context, req *CreateFlowReque
 // audience, and the steps involved.
 //
 // POST /flow_definitions
-func (UnimplementedHandler) CreateFlowDefinition(ctx context.Context, req *FlowDefinitionCreateRequest) (r CreateFlowDefinitionRes, _ error) {
+func (UnimplementedHandler) CreateFlowDefinition(ctx context.Context, req *CreateFlowDefinitionRequest) (r CreateFlowDefinitionRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -109,7 +109,7 @@ func (UnimplementedHandler) CreateProject(ctx context.Context, req *CreateProjec
 // schema-url which will be resolved by the server.
 //
 // POST /schemas
-func (UnimplementedHandler) CreateSchema(ctx context.Context, req CreateSchemaReq) (r CreateSchemaRes, _ error) {
+func (UnimplementedHandler) CreateSchema(ctx context.Context, req CreateSchemaReq, params CreateSchemaParams) (r CreateSchemaRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -128,6 +128,24 @@ func (UnimplementedHandler) CreateSchema(ctx context.Context, req CreateSchemaRe
 //
 // POST /sessions
 func (UnimplementedHandler) CreateSession(ctx context.Context, req *CreateSessionRequest) (r CreateSessionRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// CreateTeam implements createTeam operation.
+//
+// Create team.
+//
+// POST /teams
+func (UnimplementedHandler) CreateTeam(ctx context.Context, req *CreateTeamRequest, params CreateTeamParams) (r CreateTeamRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// CreateUser implements createUser operation.
+//
+// Create user.
+//
+// POST /user
+func (UnimplementedHandler) CreateUser(ctx context.Context, req *User, params CreateUserParams) (r CreateUserRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -292,12 +310,30 @@ func (UnimplementedHandler) GetSession(ctx context.Context, params GetSessionPar
 	return r, ht.ErrNotImplemented
 }
 
+// GetTeam implements getTeam operation.
+//
+// Returns the current state of a team.
+//
+// GET /teams/{team_id}
+func (UnimplementedHandler) GetTeam(ctx context.Context, params GetTeamParams) (r GetTeamRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // GetToken implements getToken operation.
 //
 // Get accesstoken.
 //
 // POST /auth/token
 func (UnimplementedHandler) GetToken(ctx context.Context, req *PostTokenRequest) (r GetTokenRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// GetUserByID implements GetUserByID operation.
+//
+// Get user by ID.
+//
+// GET /user/{user_id}
+func (UnimplementedHandler) GetUserByID(ctx context.Context, params GetUserByIDParams) (r GetUserByIDRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

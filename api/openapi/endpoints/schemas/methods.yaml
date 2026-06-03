@@ -11,6 +11,9 @@ post:
     schema-url which will be resolved by the server.
   tags:
     - Schema
+  parameters:
+    - $ref: ../../components/parameters/project-id.yaml
+    - $ref: ../../components/parameters/team-id.yaml
   security:
     - oauth2:
         - schema.write
@@ -20,12 +23,12 @@ post:
       application/json:
         schema:
           oneOf:
-            - $ref: user-schema.json
+            - $ref: user-schema.yaml
             - $ref: schema-url.yaml
           discriminator:
             propertyName: kind
             mapping:
-              user-schema: user-schema.json
+              user-schema: user-schema.yaml
               schema-url:  schema-url.yaml
         examples:
           userSchema:
@@ -36,6 +39,9 @@ post:
               An example of a schema definition that references an external 
               schema URL.
             externalValue: examples/schema-url-example.yaml
+          defaultHumanUserSchema:
+            summary: The default human user schema provided by the server.
+            externalValue: examples/default-human-user-schema-example.json
   responses:
     '201':
       description: The schema was created successfully

@@ -24,6 +24,12 @@ go vet ./...
 go test ./...
 ```
 
+To seed demo users for local login testing, pass bootstrap JSON files when starting the server (see [examples/bootstrap-users/](examples/bootstrap-users/)):
+
+```sh
+go run . server -c <config.yaml> --user-file examples/bootstrap-users/demo-admin.json
+```
+
 Package smoke checks:
 
 ```sh
@@ -94,3 +100,25 @@ place. No npm publishing workflow is enabled yet.
 ### Local development
 
 The devcontainer at [.devcontainer/](.devcontainer/) pins Go 1.26 and a PostgreSQL sidecar.
+
+After changing devcontainer configuration, use **Dev Containers: Rebuild Container** so features and volume mounts apply.
+
+**Docker (integration tests)** — both the Postgres and Spanner integration tests use [testcontainers](https://golang.testcontainers.org/) to start their databases (a Postgres container and the Cloud Spanner emulator), so a running Docker daemon is required. The devcontainer reuses the host Docker daemon (Docker-outside-of-Docker). Verify inside the container:
+
+```sh
+docker info
+```
+
+Run the integration tests (same commands as CI):
+
+```sh
+# Postgres
+go test -v -tags postgres_integration -timeout=10m ./...
+
+# Spanner
+go test -v -tags spanner_integration -timeout=10m ./...
+```
+
+If `docker info` fails and the host uses **rootless Docker**, override the socket mount in [`.devcontainer/devcontainer.json`](.devcontainer/devcontainer.json) per the [docker-outside-of-docker feature docs](https://github.com/devcontainers/features/tree/main/src/docker-outside-of-docker#rootless-docker-support), for example bind `/run/user/<uid>/docker.sock` to `/var/run/docker-host.sock` (use `id -u` on the host for `<uid>`).
+
+To run the integration tests against a database you manage instead of testcontainers, set `ZITADEL_TEST_POSTGRES_URL` (Postgres DSN) or `ZITADEL_TEST_SPANNER_URL` (Spanner DSN); every integration suite honors these and connects to your database instead of starting a container, so `go test -tags … ./...` needs no Docker. Point it at a throwaway database — the suites run migrations that create the `zitadel_nextgen` schema.

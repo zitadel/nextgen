@@ -17,14 +17,14 @@
     "dev": "nuxt dev --port 3001",
     "build": "nuxt build",
     "start": "nuxt start",
-    "typecheck": "NUXT_BUILD_DIR=.nuxt nuxt prepare && vue-tsc --noEmit -p .nuxt/tsconfig.json"
+    "typecheck": "NEXTGEN_NUXT_BUILD_DIR=.nuxt-typecheck nuxt prepare && vue-tsc --noEmit -p .nuxt-typecheck/tsconfig.json"
   },
   "dependencies": {
     "@zitadel-nextgen/sdk-nuxt": "workspace:*",
     "@zitadel-nextgen/components": "workspace:*",
     "@zitadel-nextgen/design-tokens": "workspace:*",
     "@zitadel-nextgen/shared-component-styles": "workspace:*",
-    "nuxt": "^4.4.2"
+    "nuxt": "^4.4.6"
   },
   "devDependencies": {
     "typescript": "^5.7.3",

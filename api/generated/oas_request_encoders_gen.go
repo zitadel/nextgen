@@ -43,7 +43,7 @@ func encodeCreateFlowRequest(
 }
 
 func encodeCreateFlowDefinitionRequest(
-	req *FlowDefinitionCreateRequest,
+	req *CreateFlowDefinitionRequest,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"
@@ -86,6 +86,36 @@ func encodeCreateSchemaRequest(
 
 func encodeCreateSessionRequest(
 	req *CreateSessionRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeCreateTeamRequest(
+	req *CreateTeamRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		if req != nil {
+			req.Encode(e)
+		}
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeCreateUserRequest(
+	req *User,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"

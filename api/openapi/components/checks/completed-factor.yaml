@@ -1,0 +1,32 @@
+type: object
+description: |
+  A successfully verified authentication factor with verification metadata.
+  Method-specific details are included in the `payload` field.
+required:
+  - method
+  - verified_at
+properties:
+  method:
+    $ref: ../../components/schemas/factor-method.yaml
+    description: The authentication method that was verified
+  verified_at:
+    type: string
+    format: date-time
+    description: When this factor was successfully verified
+    example: '2026-04-28T15:32:00Z'
+  payload:
+    description: |
+      Method-specific factor metadata. Structure depends on the `method` field.
+      - `identifier`: includes user_id
+      - `password`: no additional data
+      - `passkey`: includes credential details and verification flags
+    oneOf:
+      - $ref: ./identifier-factor-payload.yaml
+      - $ref: ./password-factor-payload.yaml
+      - $ref: ./passkey-factor-payload.yaml
+    discriminator:
+      propertyName: method
+      mapping:
+        identifier: ./identifier-factor-payload.yaml
+        password: ./password-factor-payload.yaml
+        passkey: ./passkey-factor-payload.yaml

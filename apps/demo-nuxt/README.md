@@ -4,14 +4,43 @@ A minimal Nuxt application demonstrating [Nextgen Auth](../../packages/sdk-nuxt)
 
 ## Running locally
 
-Use **Nx** from the repo root (`corepack pnpm install` first). Two terminals:
+Use **Nx** from the repo root (`corepack pnpm install` first).
+
+Build the SDK (and its transitive dependencies) once before the first run:
+
+```bash
+corepack pnpm nx build @zitadel-nextgen/sdk-nuxt
+```
+
+### 1. Configure environment
+
+Copy the example env file and adjust as needed:
+
+```bash
+cp apps/demo-nuxt/.env.example apps/demo-nuxt/.env
+```
+
+Or pass them inline when starting the dev server (step 2).
+
+| Variable                          | Default                 | Description                                        |
+| --------------------------------- | ----------------------- | -------------------------------------------------- |
+| `ZITADEL_URL`                      | `http://localhost:4000` | URL of the Zitadel auth server                     |
+| `NUXT_PUBLIC_ZITADEL_PROJECT_ID`  | `demo`                  | Project ID passed to `<zitadel-login project-id>`  |
+
+### 2. Start
+
+Two terminals:
 
 ```bash
 # Terminal 1 — mock auth server on port 4000
 corepack pnpm nx start @zitadel-nextgen/api-mock
 
 # Terminal 2 — Nuxt on port 3001
-NEXTGEN_ISSUER_URL=http://localhost:4000 corepack pnpm nx dev @zitadel-nextgen/demo-nuxt
+corepack pnpm nx dev @zitadel-nextgen/demo-nuxt
+
+# …or with inline env overrides:
+# ZITADEL_URL=https://my-instance.zitadel.cloud NUXT_PUBLIC_ZITADEL_PROJECT_ID=abc123 \
+#   corepack pnpm nx dev @zitadel-nextgen/demo-nuxt
 ```
 
 Open [http://localhost:3001/login](http://localhost:3001/login). Any email/password combination is accepted by the mock server.
@@ -60,9 +89,3 @@ The demo imports the package from `dist/`, not source.
 | `plugins/auth.server.ts` | Seeds `useState('nextgen-auth')` from verified middleware context |
 
 **Fonts and branding** — same as demo-next: the mock server applies `defaultDevBranding` (Arimo `font_url`), and `<zitadel-login>` injects it into its shadow root. `assets/css/demo-host.css` sets host `body` styles to match Next's `layout.tsx`. Heading tokens may still list **APK Futural** first — that face needs a tenant CDN URL in branding.
-
-## Environment variables
-
-| Variable             | Default                 | Description                    |
-| -------------------- | ----------------------- | ------------------------------ |
-| `NEXTGEN_ISSUER_URL` | `http://localhost:4000` | URL of the Nextgen auth server |

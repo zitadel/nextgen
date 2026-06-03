@@ -9,7 +9,13 @@
   "include": ["src/**/*.ts"],
   "references": [
     {
+      "path": "../../packages/api/tsconfig.lib.json"
+    },
+    {
       "path": "../../packages/sdk-next/tsconfig.lib.json"
+    },
+    {
+      "path": "../../packages/api-mock/tsconfig.lib.json"
     }
   ]
 }

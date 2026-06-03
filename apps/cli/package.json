@@ -13,28 +13,63 @@
     "directory": "apps/cli"
   },
   "bin": {
-    "zitadel": "dist/zitadel.mjs"
+    "zitadel": "./bin/run.js"
   },
   "files": [
+    "bin",
     "dist",
-    "AGENTS.md"
+    "oclif.manifest.json",
+    "SKILLS.md"
   ],
+  "oclif": {
+    "bin": "zitadel",
+    "dirname": "zitadel",
+    "commands": "./dist/commands",
+    "topicSeparator": " ",
+    "plugins": [
+      "@oclif/plugin-help",
+      "@oclif/plugin-not-found",
+      "@oclif/plugin-which",
+      "@oclif/plugin-commands",
+      "@oclif/plugin-autocomplete",
+      "@oclif/plugin-search",
+      "@oclif/plugin-version"
+    ]
+  },
   "type": "module",
   "scripts": {
     "build": "tsdown",
     "typecheck": "tsc --noEmit",
-    "gen:agents-md": "tsx scripts/gen-agents-md.ts"
+    "test": "vitest run",
+    "readme": "oclif readme",
+    "prepack": "tsdown && oclif manifest",
+    "postpack": "rm -f oclif.manifest.json"
   },
   "dependencies": {
     "@clack/prompts": "catalog:",
+    "@oclif/core": "catalog:",
+    "@oclif/plugin-autocomplete": "catalog:",
+    "@oclif/plugin-commands": "catalog:",
+    "@oclif/plugin-help": "catalog:",
+    "@oclif/plugin-not-found": "catalog:",
+    "@oclif/plugin-search": "catalog:",
+    "@oclif/plugin-version": "catalog:",
+    "@oclif/plugin-which": "catalog:",
+    "@zitadel-nextgen/api": "workspace:*",
     "ajv": "catalog:",
-    "liquidjs": "catalog:",
-    "zod": "catalog:"
+    "consola": "^3.4.2",
+    "safe-stable-stringify": "catalog:",
+    "zod": "catalog:",
+    "picocolors": "^1.1.1"
   },
   "devDependencies": {
+    "@types/node": "catalog:",
+    "@zitadel-nextgen/api-mock": "workspace:*",
     "@zitadel-nextgen/sdk-next": "workspace:*",
+    "msw": "catalog:",
+    "oclif": "catalog:",
     "tsdown": "^0.21.10",
-    "tsx": "catalog:"
+    "vitest": "^3.0.0"
   },
   "nx": {
     "targets": {
@@ -57,8 +92,19 @@
         ],
         "dependsOn": [
           "^build",
-          "^typecheck",
-          "gen:agents-md"
+          "^typecheck"
+        ]
+      },
+      "readme": {
+        "dependsOn": [
+          "build"
+        ],
+        "inputs": [
+          "{projectRoot}/dist/**/*.mjs",
+          "{projectRoot}/README.md"
+        ],
+        "outputs": [
+          "{projectRoot}/README.md"
         ]
       }
     }

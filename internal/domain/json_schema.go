@@ -18,17 +18,55 @@ import (
 	"github.com/ianlancetaylor/jsonschema"
 	apischemas "github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
 	"github.com/zitadel/nextgen/internal/httputil"
+	"github.com/zitadel/nextgen/internal/maputil"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
+const (
+	PrefixJSONSchema ResourcePrefix = "sch"
+)
+
+func ErrJSONSchemaNotFound() Error {
+	return newError(PrefixJSONSchema.ErrorCodePrefix("not_found"), "schema not found", nil, nil)
+}
+
+func ErrJSONSchemaInvalid() Error {
+	return newError(PrefixJSONSchema.ErrorCodePrefix("invalid_request"), "invalid request", nil, nil)
+}
+
+func ErrJSONSchemaAlreadyExists() Error {
+	return newError(PrefixJSONSchema.ErrorCodePrefix("already_exists"), "a schema with the given id already exists", nil, nil)
+}
+
 var absoluteScheme = regexp.MustCompile(`^https?://`)
 
-// JSONSchema represent a JSON schema which can be used to validate JSON data.
 type JSONSchema struct {
 	ProjectID string
 	URL       string
 	CreatedAt time.Time
 	Schema    []byte
+}
+
+func NewJSONSchema(projectID string, schemabs []byte) (_ *JSONSchema, err error) {
+	var schema map[string]any
+	if err := json.Unmarshal(schemabs, &schema); err != nil {
+		return nil, ErrJSONSchemaInvalid().WithParent(err)
+	}
+
+	schemaID, _ := maputil.Get[string](schema, "$id")
+	if schemaID == "" {
+		schemaID, err = newID(PrefixJSONSchema)
+		if err != nil {
+			return nil, ErrInternal(err).WithMessage("failed to generate schema id")
+		}
+	}
+
+	return &JSONSchema{
+		ProjectID: projectID,
+		URL:       schemaID,
+		CreatedAt: time.Now().UTC(),
+		Schema:    schemabs,
+	}, nil
 }
 
 //go:generate go tool mockgen -typed -package domainmock -destination ./mock/json_schema.mock.go . JSONSchemaRepository
@@ -43,6 +81,7 @@ type JSONSchemaRepository interface {
 	jsonSchemaColumns
 	jsonSchemaConditions
 
+	GetByID(ctx context.Context, client database.QueryExecutor, projectID string, schemaID string) (*JSONSchema, error)
 	Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*JSONSchema, error)
 	List(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) ([]*JSONSchema, error)
 	Create(ctx context.Context, client database.QueryExecutor, schema *JSONSchema) error

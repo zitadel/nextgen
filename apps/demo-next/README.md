@@ -4,14 +4,43 @@ A minimal Next.js application demonstrating [Nextgen Auth](../../packages/sdk-ne
 
 ## Running locally
 
-Use **Nx** from the repo root (`corepack pnpm install` first). Two terminals:
+Use **Nx** from the repo root (`corepack pnpm install` first).
+
+Build the SDK (and its transitive dependencies) once before the first run:
+
+```bash
+corepack pnpm nx build @zitadel-nextgen/sdk-next
+```
+
+### 1. Configure environment
+
+Copy the example env file and adjust as needed:
+
+```bash
+cp apps/demo-next/.env.example apps/demo-next/.env.local
+```
+
+Or pass them inline when starting the dev server (step 2).
+
+| Variable                          | Default                 | Description                                        |
+| --------------------------------- | ----------------------- | -------------------------------------------------- |
+| `ZITADEL_URL`                      | `http://localhost:4000` | URL of the Zitadel auth server                     |
+| `NEXT_PUBLIC_ZITADEL_PROJECT_ID`  | `demo`                  | Project ID passed to `<zitadel-login project-id>`  |
+
+### 2. Start
+
+Two terminals:
 
 ```bash
 # Terminal 1 — mock auth server on port 4000
 corepack pnpm nx start @zitadel-nextgen/api-mock
 
 # Terminal 2 — Next.js on port 3002
-NEXTGEN_ISSUER_URL=http://localhost:4000 corepack pnpm nx dev @zitadel-nextgen/demo-next
+corepack pnpm nx dev @zitadel-nextgen/demo-next
+
+# …or with inline env overrides:
+# ZITADEL_URL=https://my-instance.zitadel.cloud NEXT_PUBLIC_ZITADEL_PROJECT_ID=abc123 \
+#   corepack pnpm nx dev @zitadel-nextgen/demo-next
 ```
 
 Open [http://localhost:3002/login](http://localhost:3002/login). Any email/password combination is accepted by the mock server.
@@ -55,9 +84,3 @@ The demo imports the package from `dist/`, not source.
 **Login widget** (`src/app/login/widget.tsx`) dynamically imports `@zitadel-nextgen/components` with `ssr: false` so custom elements register only in the browser.
 
 **Fonts and branding** — the mock server ships a default `font_url` (Arimo via Google Fonts) on every flow response. `<zitadel-login>` injects it into its shadow root. Root `layout.tsx` sets `body { margin: 0; font-family: sans-serif; }`. **APK Futural** in heading tokens still needs a tenant font URL when you brand beyond the mock baseline.
-
-## Environment variables
-
-| Variable             | Default                   | Description                    |
-| -------------------- | ------------------------- | ------------------------------ |
-| `NEXTGEN_ISSUER_URL` | `http://localhost:4000`   | URL of the Nextgen auth server |

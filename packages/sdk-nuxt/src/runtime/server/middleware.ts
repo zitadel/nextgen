@@ -1,5 +1,15 @@
+import type {
+  AuthResult,
+  NextgenMiddlewareOptions,
+} from '@zitadel-nextgen/sdk-core/types';
 import type { EventHandler, H3Event } from 'h3';
 
+import {
+  HOP_BY_HOP,
+  INTERNAL_HEADERS,
+  filterResponseHeaders,
+  matchesRoutes,
+} from '@zitadel-nextgen/sdk-core/middleware';
 import {
   defineEventHandler,
   getCookie,
@@ -11,94 +21,12 @@ import {
   readRawBody,
 } from 'h3';
 
-import type { AuthResult, NextgenMiddlewareOptions } from '../types';
-
 import { verifyJwt } from '../lib/jwt';
 
 declare module 'h3' {
   interface H3EventContext {
     nextgenAuth: AuthResult;
   }
-}
-
-/**
- * Headers that must never be forwarded to an upstream service.
- * These are connection-level headers that are meaningful only between
- * two directly connected peers and become invalid when proxied.
- */
-const HOP_BY_HOP: ReadonlySet<string> = new Set([
-  'connection',
-  // host is not a hop-by-hop header per RFC 7230, but it must be stripped so
-  // the fetch implementation derives the correct Host from the upstream URL
-  // rather than forwarding the client's Host and causing SNI/vhost mismatches.
-  'host',
-  'keep-alive',
-  'proxy-authenticate',
-  'proxy-authorization',
-  'te',
-  'trailer',
-  'transfer-encoding',
-  'upgrade',
-]);
-
-/**
- * SDK-internal headers that must never be forwarded to the upstream backend.
- * These headers carry session data between the middleware and server components;
- * forwarding them upstream would expose internal state and allow header injection.
- */
-const INTERNAL_HEADERS: ReadonlySet<string> = new Set(['x-nextgen-auth-token']);
-
-/**
- * Conditionally adds the `Secure` flag to any cookie whose name starts with
- * `__nextgen`, but only when the client-facing connection is HTTPS.
- *
- * The proxy may terminate TLS — the upstream auth server cannot know whether
- * the browser-facing connection is HTTPS. When `secure` is `true` (i.e. the
- * original request arrived over HTTPS), `Secure` is added so that `__nextgen*`
- * session cookies are never sent over plain HTTP on subsequent requests. When
- * `secure` is `false` (plain HTTP), the flag is intentionally omitted: browsers
- * refuse to store cookies with `Secure` on non-TLS connections, which would
- * break the auth flow entirely.
- *
- * Non-`__nextgen*` cookies are returned unchanged. We trust the upstream for
- * `HttpOnly` and `SameSite`, which are set correctly by the auth server and
- * do not depend on whether TLS is terminated at the edge.
- *
- * @param cookie - The raw `Set-Cookie` header value.
- * @param secure - `true` when the client-facing connection is HTTPS.
- */
-function upgradeSessionCookie(cookie: string, secure: boolean): string {
-  const name = cookie.split('=')[0]?.trim() ?? '';
-  if (!name.startsWith('__nextgen') || !secure) {
-    return cookie;
-  }
-  // Case-insensitive check to avoid doubling an existing Secure flag.
-  if (/;\s*Secure\b/i.test(cookie)) {
-    return cookie;
-  }
-  return `${cookie}; Secure`;
-}
-
-/**
- * Returns `true` when `pathname` matches at least one entry in `routes`.
- *
- * An entry ending with `*` matches any path that starts with the prefix
- * before the `*`. All other entries require an exact match.
- *
- * @param pathname - The URL pathname to test.
- * @param routes   - The list of route patterns to match against.
- * @returns `true` if at least one pattern matches.
- */
-function matchesRoutes(pathname: string, routes: readonly string[]): boolean {
-  if (routes.length === 0) {
-    return false;
-  }
-  return routes.some((pattern) => {
-    if (pattern.endsWith('*')) {
-      return pathname.startsWith(pattern.slice(0, -1));
-    }
-    return pathname === pattern;
-  });
 }
 
 /**
@@ -167,7 +95,7 @@ function buildUpstreamHeaders(event: H3Event): Headers {
  * import { createNextgenMiddleware } from "@zitadel-nextgen/sdk-nuxt/server";
  *
  * export default createNextgenMiddleware({
- *   issuerUrl: process.env.NEXTGEN_ISSUER_URL,
+ *   url: process.env.ZITADEL_URL,
  *   protectedRoutes: ["/admin*", "/dashboard*"],
  *   loginPath: "/login",
  * });
@@ -180,7 +108,7 @@ export function createNextgenMiddleware(
   options: NextgenMiddlewareOptions = {},
 ): EventHandler {
   const {
-    issuerUrl = process.env.NEXTGEN_ISSUER_URL ?? 'http://localhost:4000',
+    url = process.env.ZITADEL_URL ?? 'http://localhost:8080',
     proxyPath = '/__nextgen',
     protectedRoutes = [],
     ignoredRoutes = [],
@@ -191,6 +119,7 @@ export function createNextgenMiddleware(
     allowedTokenTypes = ['JWT', 'at+JWT'],
     jwksTimeoutMs,
     proxyTimeoutMs = 5000,
+    onExchangeResponse,
   } = options;
 
   // Guard against open-redirect: loginPath must be a relative path. An absolute
@@ -205,8 +134,8 @@ export function createNextgenMiddleware(
   }
 
   return defineEventHandler(async (event: H3Event) => {
-    const url = getRequestURL(event);
-    const { pathname } = url;
+    const urlObj = getRequestURL(event);
+    const { pathname } = urlObj;
 
     if (matchesRoutes(pathname, ignoredRoutes)) {
       // Neutralise any client-supplied x-nextgen-auth-token on ignored routes.
@@ -219,11 +148,18 @@ export function createNextgenMiddleware(
     }
 
     if (pathname === proxyPath || pathname.startsWith(`${proxyPath}/`)) {
-      return proxyRequest(event, issuerUrl, proxyPath, url, proxyTimeoutMs);
+      return proxyRequest(
+        event,
+        url,
+        proxyPath,
+        urlObj,
+        proxyTimeoutMs,
+        onExchangeResponse,
+      );
     }
 
     return handleAuth(event, {
-      issuerUrl,
+      url,
       protectedRoutes,
       loginPath,
       allowedAlgorithms,
@@ -242,20 +178,21 @@ export function createNextgenMiddleware(
  * Hop-by-hop headers are stripped in both directions.
  *
  * @param event      - The current H3 event.
- * @param issuerUrl  - Base URL of the auth backend.
+ * @param authUrl    - Base URL of the auth backend.
  * @param proxyPath  - The path prefix being proxied (e.g. `"/__nextgen"`).
  * @param url        - The parsed request URL.
  * @returns The upstream response body stream.
  */
 async function proxyRequest(
   event: H3Event,
-  issuerUrl: string,
+  authUrl: string,
   proxyPath: string,
   url: URL,
   proxyTimeoutMs: number,
+  onExchangeResponse?: (response: Response) => Response | Promise<Response>,
 ): Promise<ReadableStream<Uint8Array> | null> {
   const suffix = url.pathname.slice(proxyPath.length);
-  const target = `${issuerUrl}${suffix}${url.search}`;
+  const target = `${authUrl}${suffix}${url.search}`;
 
   const method = event.node.req.method ?? 'GET';
   const hasBody = !['GET', 'HEAD'].includes(method);
@@ -270,33 +207,40 @@ async function proxyRequest(
     signal: AbortSignal.timeout(proxyTimeoutMs),
   });
 
-  event.node.res.statusCode = upstream.status;
+  // Build a web-standard Response with filtered headers. This is the
+  // canonical representation — we write it to event.node.res at the end.
+  const responseHeaders = filterResponseHeaders(upstream.headers);
 
-  for (const [key, value] of upstream.headers.entries()) {
-    if (
-      !HOP_BY_HOP.has(key.toLowerCase()) &&
-      key.toLowerCase() !== 'set-cookie' &&
-      // location is stripped to prevent leaking internal upstream URLs to the
-      // browser — this proxy is a pure API proxy and never issues redirects.
-      key.toLowerCase() !== 'location'
-    ) {
-      event.node.res.setHeader(key, value);
-    }
-  }
-
-  const proto =
-    getRequestHeader(event, 'x-forwarded-proto') ??
-    url.protocol.replace(':', '');
-  const isSecure = proto === 'https';
   const setCookieHeaders = upstream.headers.getSetCookie?.() ?? [];
   for (const cookie of setCookieHeaders) {
-    event.node.res.appendHeader(
-      'set-cookie',
-      upgradeSessionCookie(cookie, isSecure),
-    );
+    responseHeaders.append('set-cookie', cookie);
   }
 
-  return upstream.body;
+  let response = new Response(upstream.body, {
+    status: upstream.status,
+    headers: responseHeaders,
+  });
+
+  // Call the exchange hook when the proxied request is POST /sessions/exchange.
+  const isExchange =
+    method === 'POST' && suffix.startsWith('/sessions/exchange');
+  if (isExchange && onExchangeResponse) {
+    response = await onExchangeResponse(response);
+  }
+
+  // Write the (potentially modified) response to the H3 event.
+  event.node.res.statusCode = response.status;
+  for (const [key, value] of response.headers.entries()) {
+    if (key.toLowerCase() === 'set-cookie') continue;
+    event.node.res.setHeader(key, value);
+  }
+  // Use getSetCookie() so multiple Set-Cookie values aren't collapsed.
+  const finalCookies = response.headers.getSetCookie?.() ?? [];
+  for (const cookie of finalCookies) {
+    event.node.res.appendHeader('set-cookie', cookie);
+  }
+
+  return response.body;
 }
 
 /**
@@ -304,7 +248,7 @@ async function proxyRequest(
  * public-facing {@link NextgenMiddlewareOptions}.
  */
 interface AuthHandlerOptions {
-  readonly issuerUrl: string;
+  readonly url: string;
   readonly protectedRoutes: readonly string[];
   readonly loginPath: string;
   /**
@@ -345,7 +289,7 @@ async function handleAuth(
   opts: AuthHandlerOptions,
 ): Promise<void> {
   const {
-    issuerUrl,
+    url,
     protectedRoutes,
     loginPath,
     allowedAlgorithms,
@@ -378,7 +322,7 @@ async function handleAuth(
 
   const payload = token
     ? await verifyJwt(token, {
-        issuerUrl,
+        issuerUrl: url,
         allowedAlgorithms,
         clockSkewMs,
         audience,
@@ -412,6 +356,7 @@ async function handleAuth(
     const loginUrl = new URL(loginPath, getRequestURL(event));
     loginUrl.searchParams.set('next', pathname);
     await sendRedirect(event, loginUrl.toString(), 302);
+    return;
   }
 }
 

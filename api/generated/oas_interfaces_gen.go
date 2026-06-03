@@ -37,6 +37,14 @@ type CreateSessionRes interface {
 	createSessionRes()
 }
 
+type CreateTeamRes interface {
+	createTeamRes()
+}
+
+type CreateUserRes interface {
+	createUserRes()
+}
+
 type DeleteFlowDefinitionRes interface {
 	deleteFlowDefinitionRes()
 }
@@ -97,8 +105,16 @@ type GetSessionRes interface {
 	getSessionRes()
 }
 
+type GetTeamRes interface {
+	getTeamRes()
+}
+
 type GetTokenRes interface {
 	getTokenRes()
+}
+
+type GetUserByIDRes interface {
+	getUserByIDRes()
 }
 
 type GetUserInfoRes interface {

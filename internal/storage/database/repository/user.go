@@ -18,19 +18,23 @@ const (
 )
 
 var (
-	colUserProjectID    = database.NewColumn(userTable, "project_id")
-	colUserID           = database.NewColumn(userTable, "id")
-	colUserTeamID       = database.NewColumn(userTable, "team_id")
-	colUserSchemaURL    = database.NewColumn(userTable, "schema_url")
-	colUserCreatedAt    = database.NewColumn(userTable, "created_at")
-	colUserUpdatedAt    = database.NewColumn(userTable, "updated_at")
-	colUserAttributeKey = database.NewColumn(userAttributesTable, "key")
+	colUserProjectID          = database.NewColumn(userTable, "project_id")
+	colUserID                 = database.NewColumn(userTable, "id")
+	colUserTeamID             = database.NewColumn(userTable, "team_id")
+	colUserSchemaURL          = database.NewColumn(userTable, "schema_url")
+	colUserCreatedAt          = database.NewColumn(userTable, "created_at")
+	colUserUpdatedAt          = database.NewColumn(userTable, "updated_at")
+	colUserAttributeProjectID = database.NewColumn(userAttributesTable, "project_id")
+	colUserAttributeUserID    = database.NewColumn(userAttributesTable, "user_id")
+	colUserAttributeKey       = database.NewColumn(userAttributesTable, "key")
+	colUserAttributeValue     = database.NewColumn(userAttributesTable, "value")
 )
 
 // UserRepository implements [domain.UserRepository] backed by project-scoped tables and user EAV.
 type UserRepository struct{}
 
 func NewUserRepository() *UserRepository {
+	// TODO: add spanner integration
 	return &UserRepository{}
 }
 
@@ -58,8 +62,15 @@ func (r *UserRepository) TeamIDCondition(teamID string) database.Condition {
 	return database.NewTextCondition(colUserTeamID, database.TextOperationEqual, teamID)
 }
 
-func (r *UserRepository) AttributesCondition(_ []domain.Attribute) database.Condition {
-	return userLiteralAlwaysTrue{}
+func (r *UserRepository) AttributesCondition(attrs []domain.Attribute) database.Condition {
+	if len(attrs) == 0 {
+		return userLiteralAlwaysTrue{}
+	}
+	conds := make([]database.Condition, 0, len(attrs))
+	for _, a := range attrs {
+		conds = append(conds, database.Exists(userAttributesTable, userAttributeMatch{key: a.Key, value: a.Value}))
+	}
+	return database.And(conds...)
 }
 
 func (r *UserRepository) SetTeam(teamID *string) database.Change {
@@ -133,7 +144,7 @@ _registry AS (
         project_id, user_id, team_id, key, value_hash
     )
     SELECT h.project_id, h.id,
-           CASE WHEN d.unique_scope = 'global'::zitadel_nextgen.uniqueness_scope
+           CASE WHEN d.unique_scope = 'project'::zitadel_nextgen.uniqueness_scope
                 THEN ''
                 ELSE COALESCE(h.team_id, '')::text
            END,
@@ -146,7 +157,7 @@ _attributes AS (
     INSERT INTO zitadel_nextgen.user_attributes (
         project_id, team_id, user_id, key, value
     )
-    SELECT h.project_id, h.team_id, h.id, d.key, d.value
+    SELECT h.project_id, COALESCE(h.team_id, ''), h.id, d.key, d.value
     FROM _input_data d CROSS JOIN _user_header h
 )
 SELECT 1;
@@ -211,6 +222,14 @@ func userHydrationExpressions(rowQualifier, attrKeysPlaceholder, authPlaceholder
     CASE WHEN ` + authPlaceholder + ` THEN EXISTS(SELECT 1 FROM zitadel_nextgen.user_totp p WHERE p.project_id = ` + rowQualifier + `.project_id AND p.user_id = ` + rowQualifier + `.id) ELSE FALSE END AS has_totp,
     CASE WHEN ` + authPlaceholder + ` THEN EXISTS(SELECT 1 FROM zitadel_nextgen.user_recovery_codes p WHERE p.project_id = ` + rowQualifier + `.project_id AND p.user_id = ` + rowQualifier + `.id) ELSE FALSE END AS has_rc,
     CASE WHEN ` + authPlaceholder + ` THEN EXISTS(SELECT 1 FROM zitadel_nextgen.user_passkeys p WHERE p.project_id = ` + rowQualifier + `.project_id AND p.user_id = ` + rowQualifier + `.id) ELSE FALSE END AS has_pk`
+}
+
+func (r *UserRepository) GetByID(ctx context.Context, client database.QueryExecutor, projectID string, teamID *string, userID string) (*domain.User, error) {
+	condition := r.PrimaryKeyCondition(projectID, userID)
+	if teamID != nil {
+		condition = database.And(condition, r.TeamIDCondition(*teamID))
+	}
+	return r.Get(ctx, client, database.WithCondition(condition))
 }
 
 func (r *UserRepository) Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*domain.User, error) {

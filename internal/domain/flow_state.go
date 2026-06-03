@@ -11,6 +11,18 @@ import "time"
 // live on PivotStack. The remaining fields are session/OIDC context
 // that only makes sense at the top level.
 type FlowState struct {
+	// ID is the flow handle minted at Start. The handler verifies it
+	// matches the path (`/flow/{id}/...`) to reject path/cookie mismatches.
+	ID string
+
+	// ProjectID scopes the flow to a single tenant.
+	ProjectID string
+
+	// UserSchemaURL is the user schema this flow validates against,
+	// captured at Start time so a mid-flow default change doesn't
+	// reshape in-flight data.
+	UserSchemaURL string
+
 	// FlowProgress is the user's current progress: which definition is
 	// running, which step is being shown, and what's been collected so
 	// far. Promoted to the top level so callers read e.g.
@@ -66,6 +78,12 @@ type FlowState struct {
 	// once the matching ChallengeResponse verifies. Nil when no
 	// ceremony is in flight.
 	PendingChallenge *FlowPendingChallenge
+
+	// AuthAttemptID names the auth_attempts row this flow is collecting
+	// factors against. Created at Start; completed intrinsically by the
+	// last successful Submit* call; handed off by the API handler at
+	// the OIDC redirect boundary.
+	AuthAttemptID string
 }
 
 // FlowPendingChallenge records the server-issued challenge the next
@@ -104,6 +122,10 @@ type FlowProgress struct {
 	// handler uses it to surface a coarse classification without parsing
 	// the definition.
 	Purpose FlowDefinitionPurpose
+
+	// CurrentPurpose is the dynamic dispatch mode. Flips on identifier
+	// outcomes; Purpose stays pinned for telemetry / ACR.
+	CurrentPurpose FlowDefinitionPurpose
 
 	// CurrentStep is the name of the step the user is currently on
 	// within DefinitionID. The next submit is interpreted against this

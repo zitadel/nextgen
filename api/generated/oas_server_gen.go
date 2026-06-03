@@ -53,7 +53,7 @@ type Handler interface {
 	// audience, and the steps involved.
 	//
 	// POST /flow_definitions
-	CreateFlowDefinition(ctx context.Context, req *FlowDefinitionCreateRequest) (CreateFlowDefinitionRes, error)
+	CreateFlowDefinition(ctx context.Context, req *CreateFlowDefinitionRequest) (CreateFlowDefinitionRes, error)
 	// CreateHandoff implements createHandoff operation.
 	//
 	// Completes the authentication attempt and mints a `handoff_token`.
@@ -83,7 +83,7 @@ type Handler interface {
 	// schema-url which will be resolved by the server.
 	//
 	// POST /schemas
-	CreateSchema(ctx context.Context, req CreateSchemaReq) (CreateSchemaRes, error)
+	CreateSchema(ctx context.Context, req CreateSchemaReq, params CreateSchemaParams) (CreateSchemaRes, error)
 	// CreateSession implements createSession operation.
 	//
 	// Creates an anonymous session shell with no user and no factors (`state: building`).
@@ -99,6 +99,18 @@ type Handler interface {
 	//
 	// POST /sessions
 	CreateSession(ctx context.Context, req *CreateSessionRequest) (CreateSessionRes, error)
+	// CreateTeam implements createTeam operation.
+	//
+	// Create team.
+	//
+	// POST /teams
+	CreateTeam(ctx context.Context, req *CreateTeamRequest, params CreateTeamParams) (CreateTeamRes, error)
+	// CreateUser implements createUser operation.
+	//
+	// Create user.
+	//
+	// POST /user
+	CreateUser(ctx context.Context, req *User, params CreateUserParams) (CreateUserRes, error)
 	// DeleteFlowDefinition implements deleteFlowDefinition operation.
 	//
 	// Delete a flow definition by id.
@@ -215,12 +227,24 @@ type Handler interface {
 	//
 	// GET /sessions/{session_id}
 	GetSession(ctx context.Context, params GetSessionParams) (GetSessionRes, error)
+	// GetTeam implements getTeam operation.
+	//
+	// Returns the current state of a team.
+	//
+	// GET /teams/{team_id}
+	GetTeam(ctx context.Context, params GetTeamParams) (GetTeamRes, error)
 	// GetToken implements getToken operation.
 	//
 	// Get accesstoken.
 	//
 	// POST /auth/token
 	GetToken(ctx context.Context, req *PostTokenRequest) (GetTokenRes, error)
+	// GetUserByID implements GetUserByID operation.
+	//
+	// Get user by ID.
+	//
+	// GET /user/{user_id}
+	GetUserByID(ctx context.Context, params GetUserByIDParams) (GetUserByIDRes, error)
 	// GetUserInfo implements getUserInfo operation.
 	//
 	// Get user info.

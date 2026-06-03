@@ -25,6 +25,7 @@ post:
     - oauth2:
         - sessions.write
   parameters:
+    - $ref: ../../../components/parameters/project-id.yaml
     - $ref: ../../../components/parameters/idempotency-key.yaml
       description: |
         Optional retry key for safe retries of the handoff exchange (Category B idempotency).

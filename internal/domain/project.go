@@ -4,7 +4,12 @@ import (
 	"context"
 	"time"
 
+	"github.com/zitadel/nextgen/internal/secrets"
 	"github.com/zitadel/nextgen/internal/storage/database"
+)
+
+const (
+	PrefixProject ResourcePrefix = "proj"
 )
 
 // Project is a minimal representation of the object defined [here](https://github.com/zitadel/nextgen/blob/main/docs/design/api/resource-map.md#projects)
@@ -13,6 +18,42 @@ type Project struct {
 	ID        string
 	CreatedAt time.Time
 	UpdatedAt time.Time
+	// ProjectSecret is a bearer token that authenticates API calls for this project.
+	// Callers of [ProjectRepository.Create] must pre-populate this field; the
+	// repository does not generate it.
+	ProjectSecret string
+	// PreviewSecret is an origin-scoped bearer token for preview/testing.
+	// Callers of [ProjectRepository.Create] must pre-populate this field.
+	PreviewSecret string
+	// PreviewOrigins are the allowed origins for the preview secret.
+	// Callers of [ProjectRepository.Create] must pre-populate this field.
+	PreviewOrigins []string
+}
+
+func NewProject(previewOrigins []string, secretGenerator secrets.Generator) (*Project, error) {
+	id, err := newID(PrefixProject)
+	if err != nil {
+		return nil, ErrInternal(err).WithMessage("failed to create project id")
+	}
+	projectSecret, err := secretGenerator.New()
+	if err != nil {
+		return nil, ErrInternal(err).WithMessage("failed to generate project secret")
+	}
+	previewSecret, err := secretGenerator.New()
+	if err != nil {
+		return nil, ErrInternal(err).WithMessage("failed to generate preview secret")
+	}
+
+	if previewOrigins == nil {
+		previewOrigins = []string{}
+	}
+
+	return &Project{
+		ID:             id,
+		ProjectSecret:  projectSecret,
+		PreviewSecret:  previewSecret,
+		PreviewOrigins: previewOrigins,
+	}, nil
 }
 
 //go:generate go tool mockgen -typed -package domainmock -destination ./mock/project.mock.go . ProjectRepository
@@ -21,8 +62,9 @@ type Project struct {
 type ProjectRepository interface {
 	// Create persists a new project. The repository sets [Project.CreatedAt] and
 	// [Project.UpdatedAt] to the current time; callers should not pre-populate
-	// those fields.
-	// Returns an [database.IntegrityViolationError] (specifically [database.UniqueError])
+	// those fields. Callers MUST pre-populate [Project.ProjectSecret],
+	// [Project.PreviewSecret], and [Project.PreviewOrigins].
+	// Returns a [database.IntegrityViolationError] (specifically [database.UniqueError])
 	// if a project with the same ID already exists.
 	Create(ctx context.Context, client database.QueryExecutor, project *Project) error
 
