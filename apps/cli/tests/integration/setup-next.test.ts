@@ -35,36 +35,32 @@ describe("Next setup integration", () => {
       "--json",
     ]);
     expect(setup.exitCode).toBe(0);
-    const setupJson = parseJson(setup.stdout) as {
-      status: string;
-      data: { apply?: unknown };
-    };
+    const setupJson = parseJson(setup.stdout) as { status: string };
     expect(setupJson.status).toBe("ok");
-    expect(setupJson.data.apply).toMatchObject({ synced: true });
 
+    // The user schema and flow are provisioned server-side when the project
+    // is created, so setup does not write `.zitadel/schemas` or
+    // `.zitadel/flows`; only the framework files and project config are
+    // scaffolded locally.
     expect(await readFile(join(cwd, "zitadel.json"), "utf8")).toContain('"project"');
-    expect(await readFile(join(cwd, ".zitadel/schemas/user.json"), "utf8")).toContain(
-      '"x-unique": "project"',
-    );
-    const flowRaw = await readFile(join(cwd, ".zitadel/flows/default.json"), "utf8");
-    // Spec: `name` is the slug-pattern stable identifier; `template_name`
-    // was a non-spec field the CLI used to emit. `step.fields` is a
-    // string[] of property names referencing the user schema.
-    expect(flowRaw).toContain('"name": "default"');
-    expect(flowRaw).toContain('"user_schema":');
-    expect(flowRaw).toContain('"email"');
     const loginPage = await readFile(join(cwd, "app/login/page.tsx"), "utf8");
     expect(loginPage).toContain("zitadel-cli: managed-file v1");
     expect(loginPage).toContain('"use client"');
     expect(loginPage).toContain('purpose="login"');
     expect(loginPage).toContain("<zitadel-login");
-    expect(loginPage).toContain('api-base="/__nextgen"');
+    // The SDK handle is built (proxy path + project id from the public env
+    // var) and passed to the component via the `project` prop; the backend URL
+    // stays server-side.
+    expect(loginPage).toContain("configureZitadel");
+    expect(loginPage).toContain('proxyPath: "/__nextgen"');
+    expect(loginPage).toContain("project={project}");
     expect(loginPage).not.toContain("NEXT_PUBLIC_ZITADEL_API_BASE");
     expect(loginPage).toContain('post-sign-in-url="/profile"');
     const profilePage = await readFile(join(cwd, "app/profile/page.tsx"), "utf8");
     expect(profilePage).toContain("zitadel-cli: managed-file v1");
     expect(profilePage).toContain("<zitadel-logout");
-    expect(profilePage).toContain('api-base="/__nextgen"');
+    expect(profilePage).toContain("configureZitadel");
+    expect(profilePage).toContain("project={project}");
     expect(profilePage).toContain('post-sign-out-url="/login"');
     const middleware = await readFile(join(cwd, "middleware.ts"), "utf8");
     expect(middleware).toContain("zitadel-cli: managed-file v1");
@@ -72,10 +68,10 @@ describe("Next setup integration", () => {
     expect(middleware).toContain("export function middleware(");
     expect(middleware).toContain('protectedRoutes: ["/profile"]');
     expect(middleware).toContain('"/__nextgen/:path*"');
-    expect(middleware).toContain("process.env.NEXTGEN_ISSUER_URL");
+    expect(middleware).toContain("process.env.ZITADEL_URL");
     const envLocal = await readFile(join(cwd, ".env.local"), "utf8");
     expect(envLocal).toContain("ZITADEL_ENVIRONMENT=development");
-    expect(envLocal).toContain("NEXTGEN_ISSUER_URL=");
+    expect(envLocal).toContain("ZITADEL_URL=");
     expect(envLocal).not.toContain("NEXT_PUBLIC_ZITADEL_API_BASE");
     expect(envLocal).toContain("NEXT_PUBLIC_ZITADEL_PROJECT_ID=");
     expect(envLocal).not.toContain("ZITADEL_PROJECT_SECRET");

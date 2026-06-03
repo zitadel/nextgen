@@ -25,8 +25,9 @@ profile.cov
 go.work
 go.work.sum
 
-# env file
-.env
+# env files (keep .env.example tracked)
+.env*
+!.env.example
 
 # Editor/IDE
 .idea/
@@ -102,9 +103,19 @@ nextgen.yaml
 !/apps/console/dist/
 /apps/console/dist/*
 !/apps/console/dist/.gitkeep
+!/apps/login-ui/dist/
+/apps/login-ui/dist/*
+!/apps/login-ui/dist/.gitkeep
+!/internal/staticui/console/dist/
+/internal/staticui/console/dist/*
+!/internal/staticui/console/dist/.gitkeep
+!/internal/staticui/login/dist/
+/internal/staticui/login/dist/*
+!/internal/staticui/login/dist/.gitkeep
 apps/demo-next/tsconfig.tsbuildinfo
 packages/api-mock/tsconfig.tsbuildinfo
 
 .nx/polygraph
+.cursor/debug-*
 # Root TS incremental build info (generated)
 tsconfig.tsbuildinfo

@@ -2,6 +2,7 @@ package domain_test
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -18,6 +19,15 @@ import (
 type fakeHasher struct{}
 
 func (fakeHasher) Hash(plain string) (string, error) { return "hashed:" + plain, nil }
+
+func findAttribute(attrs []*domain.CreateAttribute, key string) *domain.CreateAttribute {
+	for _, a := range attrs {
+		if a.Key == key {
+			return a
+		}
+	}
+	return nil
+}
 
 // fakeUserRepo records the users create_user persists.
 type fakeUserRepo struct {
@@ -157,7 +167,6 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 		},
 	}
 	passkeyReg := &fakePasskeyRegistration{}
-
 	createUser := domain.NewFlowCreateUserHandler(ids, users, pws, hasher)
 	resolver := newDefaultResolver(t)
 	now := func() time.Time { return time.Unix(1700000000, 0).UTC() }
@@ -295,10 +304,19 @@ func TestFlowStateMachine_Process_RegistrationHappyPath(t *testing.T) {
 	require.Len(t, w.pws.created, 1)
 	assert.Equal(t, "hashed:correct-horse-battery-staple", w.pws.created[0].EncodedHash)
 
-	assert.Equal(t, wantUserID, result.State.CollectedData[domain.FlowCollectedUserIDKey])
+	// on_success is a side effect: no _user_id pin, no handoff.
+	_, pinned := result.State.CollectedData[domain.FlowCollectedUserIDKey]
+	assert.False(t, pinned, "create_user must not pin _user_id")
+	assert.Empty(t, w.attempts.handoffCalls)
+	assert.Empty(t, result.HandoffToken)
 
-	assert.Empty(t, w.attempts.identifyCalls, "create_user must not dispatch identifier challenge")
-	assert.Empty(t, w.attempts.passwordCalls, "create_user must not dispatch password challenge")
+	// Register mode dispatches identifier (the email is x-unique, so it
+	// always routes through auth-attempt to emit user_already_exists when
+	// the name is taken). It must not dispatch password — create_user
+	// establishes the credential per its manifest.
+	require.Len(t, w.attempts.identifyCalls, 1)
+	assert.Equal(t, "alice@example.com", w.attempts.identifyCalls[0].Value)
+	assert.Empty(t, w.attempts.passwordCalls, "register mode skips password dispatch")
 }
 
 func TestFlowStateMachine_Process_LoginHappyPath(t *testing.T) {
@@ -598,6 +616,439 @@ func TestFlowStateMachine_Process_PasskeyProofRejectedKeepsStep(t *testing.T) {
 	assert.Equal(t, "auth_attempt.passkey_invalid", *rejected.Step.Error)
 	assert.Nil(t, rejected.State.PendingChallenge)
 	assert.Equal(t, "authenticate", rejected.State.CurrentStep)
+}
+
+// ---- CurrentPurpose + outcome flip ----
+
+func TestFlowStateMachine_Start_InitializesCurrentPurpose(t *testing.T) {
+	tests := []struct {
+		name    string
+		purpose domain.FlowDefinitionPurpose
+	}{
+		{"login", domain.FlowDefinitionPurposeLogin},
+		{"register", domain.FlowDefinitionPurposeRegister},
+		{"recovery", domain.FlowDefinitionPurposeRecovery},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			w := newFlowTestWorld(t)
+			def := signupDefinition()
+			// signupDefinition only declares Register; register the other purposes
+			// so Start can resolve an entry step.
+			def.Purposes[domain.FlowDefinitionPurposeLogin] = "credentials"
+			def.Purposes[domain.FlowDefinitionPurposeRecovery] = "credentials"
+
+			result, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+				Definition:    def,
+				Purpose:       tc.purpose,
+				Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+				UserSchemaURL: defaultSchemaURL,
+			})
+			require.NoError(t, err)
+			assert.Equal(t, tc.purpose, result.State.Purpose)
+			assert.Equal(t, tc.purpose, result.State.CurrentPurpose)
+		})
+	}
+}
+
+func TestFlowStateMachine_FlipTable_LoginUserNotFoundFlipsToRegister(t *testing.T) {
+	w := newFlowTestWorld(t)
+	def := loginDefinition()
+
+	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, domain.FlowDefinitionPurposeLogin, start.State.CurrentPurpose)
+
+	result, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{"email": "ghost@example.com", "password": "irrelevant"},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, domain.FlowDefinitionPurposeLogin, result.State.Purpose, "Purpose stays pinned")
+	assert.Equal(t, domain.FlowDefinitionPurposeRegister, result.State.CurrentPurpose)
+}
+
+func TestFlowStateMachine_FlipTable_RecoveryPassthrough(t *testing.T) {
+	w := newFlowTestWorld(t)
+	def := loginDefinition()
+	delete(def.Purposes, domain.FlowDefinitionPurposeLogin)
+	def.Purposes[domain.FlowDefinitionPurposeRecovery] = "credentials"
+
+	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeRecovery,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	result, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{"email": "ghost@example.com", "password": "irrelevant"},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, domain.FlowDefinitionPurposeRecovery, result.State.CurrentPurpose)
+}
+
+func TestFlowState_JSONRoundTrip_PreservesCurrentPurpose(t *testing.T) {
+	state := domain.FlowState{
+		ID:        "flow-1",
+		ProjectID: "proj-1",
+		FlowProgress: domain.FlowProgress{
+			DefinitionID:   "def-1",
+			Purpose:        domain.FlowDefinitionPurposeLogin,
+			CurrentPurpose: domain.FlowDefinitionPurposeRegister,
+			CurrentStep:    "credentials",
+			CollectedData:  map[string]any{},
+		},
+	}
+	payload, err := json.Marshal(state)
+	require.NoError(t, err)
+
+	var decoded domain.FlowState
+	require.NoError(t, json.Unmarshal(payload, &decoded))
+	assert.Equal(t, domain.FlowDefinitionPurposeLogin, decoded.Purpose)
+	assert.Equal(t, domain.FlowDefinitionPurposeRegister, decoded.CurrentPurpose)
+}
+
+func TestFlowState_JSONRoundTrip_PivotPushPopPreservesCurrentPurpose(t *testing.T) {
+	parent := domain.FlowProgress{
+		DefinitionID:   "def-parent",
+		Purpose:        domain.FlowDefinitionPurposeLogin,
+		CurrentPurpose: domain.FlowDefinitionPurposeRegister,
+		CurrentStep:    "parent-step",
+		CollectedData:  map[string]any{},
+	}
+	state := domain.FlowState{
+		ID:        "flow-1",
+		ProjectID: "proj-1",
+		FlowProgress: domain.FlowProgress{
+			DefinitionID:   "def-child",
+			Purpose:        domain.FlowDefinitionPurposeLogin,
+			CurrentPurpose: domain.FlowDefinitionPurposeLogin,
+			CurrentStep:    "child-step",
+			CollectedData:  map[string]any{},
+		},
+		PivotStack: []domain.FlowProgress{parent},
+	}
+
+	payload, err := json.Marshal(state)
+	require.NoError(t, err)
+	var decoded domain.FlowState
+	require.NoError(t, json.Unmarshal(payload, &decoded))
+
+	require.Len(t, decoded.PivotStack, 1)
+	assert.Equal(t, domain.FlowDefinitionPurposeRegister, decoded.PivotStack[0].CurrentPurpose)
+	assert.Equal(t, domain.FlowDefinitionPurposeLogin, decoded.CurrentPurpose)
+}
+
+// ---- Dispatch worked examples ----
+
+// multiStepSignupDefinition is worked example A.
+func multiStepSignupDefinition() *domain.FlowDefinition {
+	createUser := domain.FlowOnSuccessCreateUser
+	show := domain.FlowStepCompleteShow
+	return &domain.FlowDefinition{
+		ProjectID:  testProjectID,
+		ID:         "def-multi-signup",
+		UserSchema: defaultSchemaURL,
+		Purposes: map[domain.FlowDefinitionPurpose]string{
+			domain.FlowDefinitionPurposeRegister: "profile",
+		},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name:   "profile",
+				Fields: []string{"email"},
+				Actions: map[string]domain.FlowStepAction{
+					domain.FlowActionSubmit: {Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					domain.FlowActionSubmit:                     {Target: "set-password"},
+					domain.FlowImplicitOutcomeUserAlreadyExists: {Target: "done"},
+				},
+			},
+			{
+				Name:   "set-password",
+				Fields: []string{"password"},
+				Actions: map[string]domain.FlowStepAction{
+					domain.FlowActionSubmit: {Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					domain.FlowActionSubmit: {Target: "create"},
+				},
+			},
+			{
+				Name:      "create",
+				OnSuccess: &createUser,
+				Actions: map[string]domain.FlowStepAction{
+					domain.FlowActionSubmit: {Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					domain.FlowActionSubmit: {Target: "done"},
+				},
+			},
+			{Name: "done", Complete: &show},
+		},
+	}
+}
+
+// combinedSigninSignupDefinition is worked example C.
+func combinedSigninSignupDefinition() *domain.FlowDefinition {
+	createUser := domain.FlowOnSuccessCreateUser
+	show := domain.FlowStepCompleteShow
+	return &domain.FlowDefinition{
+		ProjectID:  testProjectID,
+		ID:         "def-combined",
+		UserSchema: defaultSchemaURL,
+		Purposes: map[domain.FlowDefinitionPurpose]string{
+			domain.FlowDefinitionPurposeLogin:    "identify",
+			domain.FlowDefinitionPurposeRegister: "identify",
+		},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name:   "identify",
+				Fields: []string{"email"},
+				Actions: map[string]domain.FlowStepAction{
+					domain.FlowActionSubmit: {Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					domain.FlowActionSubmit:                     {Target: "signin-password"},
+					domain.FlowImplicitOutcomeUserNotFound:      {Target: "register-password"},
+					domain.FlowImplicitOutcomeUserAlreadyExists: {Target: "signin-password"},
+				},
+			},
+			{
+				Name:   "signin-password",
+				Fields: []string{"password"},
+				Actions: map[string]domain.FlowStepAction{
+					domain.FlowActionSubmit: {Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					domain.FlowActionSubmit: {Target: "done"},
+				},
+			},
+			{
+				Name:      "register-password",
+				Fields:    []string{"password"},
+				OnSuccess: &createUser,
+				Actions: map[string]domain.FlowStepAction{
+					domain.FlowActionSubmit: {Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					domain.FlowActionSubmit: {Target: "done"},
+				},
+			},
+			{Name: "done", Complete: &show},
+		},
+	}
+}
+
+// recoveryDefinition is worked example D.
+func recoveryDefinition() *domain.FlowDefinition {
+	show := domain.FlowStepCompleteShow
+	return &domain.FlowDefinition{
+		ProjectID:  testProjectID,
+		ID:         "def-recovery",
+		UserSchema: defaultSchemaURL,
+		Purposes: map[domain.FlowDefinitionPurpose]string{
+			domain.FlowDefinitionPurposeRecovery: "identify",
+		},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name:   "identify",
+				Fields: []string{"email"},
+				Actions: map[string]domain.FlowStepAction{
+					domain.FlowActionSubmit: {Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					domain.FlowActionSubmit:                {Target: "new-password"},
+					domain.FlowImplicitOutcomeUserNotFound: {Target: "done"},
+				},
+			},
+			{
+				Name:   "new-password",
+				Fields: []string{"password"},
+				Actions: map[string]domain.FlowStepAction{
+					domain.FlowActionSubmit: {Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					domain.FlowActionSubmit: {Target: "done"},
+				},
+			},
+			{Name: "done", Complete: &show},
+		},
+	}
+}
+
+// Worked example A: register-mode multi-step; identifier on profile,
+// password on set-password, create_user on `create`.
+func TestFlowDispatch_RegisterMultiStep_HappyPath(t *testing.T) {
+	w := newFlowTestWorld(t)
+	def := multiStepSignupDefinition()
+
+	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeRegister,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	afterProfile, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{"email": "fresh@example.com"},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "set-password", afterProfile.State.CurrentStep)
+	assert.Equal(t, domain.FlowDefinitionPurposeRegister, afterProfile.State.CurrentPurpose)
+	require.Len(t, w.attempts.identifyCalls, 1)
+	assert.Empty(t, w.attempts.passwordCalls)
+
+	afterPassword, err := w.sm.Process(t.Context(), nil, def, afterProfile.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{"password": "correct-horse-battery-staple"},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "create", afterPassword.State.CurrentStep)
+	assert.Empty(t, w.attempts.passwordCalls, "register mode never verifies password")
+
+	done, err := w.sm.Process(t.Context(), nil, def, afterPassword.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "done", done.State.CurrentStep)
+	require.Len(t, w.users.created, 1)
+	// create_user reads identifier from CollectedData; email isn't re-sent.
+	emailAttr := findAttribute(w.users.created[0].Attributes, "email")
+	require.NotNil(t, emailAttr)
+	assert.Equal(t, "fresh@example.com", emailAttr.Value)
+}
+
+// Register entry, identifier already exists → user_already_exists +
+// flip to login.
+func TestFlowDispatch_RegisterEntry_IdentifierAlreadyExists_Flips(t *testing.T) {
+	w := newFlowTestWorld(t)
+	w.attempts.identifierResult = map[string]string{"taken@example.com": "user_existing"}
+	def := multiStepSignupDefinition()
+
+	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeRegister,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	result, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{"email": "taken@example.com"},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, domain.FlowDefinitionPurposeLogin, result.State.CurrentPurpose)
+	assert.Equal(t, "done", result.State.CurrentStep)
+}
+
+// Worked example C: login entry, unknown email → flip + create_user runs.
+func TestFlowDispatch_CombinedFlow_LoginUnknownEmail_FlipsAndCreates(t *testing.T) {
+	w := newFlowTestWorld(t)
+	def := combinedSigninSignupDefinition()
+
+	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	afterIdentify, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{"email": "ghost@example.com"},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "register-password", afterIdentify.State.CurrentStep)
+	assert.Equal(t, domain.FlowDefinitionPurposeRegister, afterIdentify.State.CurrentPurpose)
+
+	done, err := w.sm.Process(t.Context(), nil, def, afterIdentify.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{"password": "correct-horse-battery-staple"},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "done", done.State.CurrentStep)
+	require.Len(t, w.users.created, 1)
+	assert.Empty(t, w.attempts.passwordCalls)
+	// Email collected on the identify step survives into create_user.
+	emailAttr := findAttribute(w.users.created[0].Attributes, "email")
+	require.NotNil(t, emailAttr)
+	assert.Equal(t, "ghost@example.com", emailAttr.Value)
+}
+
+// Worked example C variant: register entry, identifier exists → flip
+// to login + signin-password verifies.
+func TestFlowDispatch_CombinedFlow_RegisterKnownEmail_FlipsToSignin(t *testing.T) {
+	w := newFlowTestWorld(t)
+	w.attempts.identifierResult = map[string]string{"alice@example.com": "user_alice"}
+	def := combinedSigninSignupDefinition()
+
+	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeRegister,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	afterIdentify, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{"email": "alice@example.com"},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "signin-password", afterIdentify.State.CurrentStep)
+	assert.Equal(t, domain.FlowDefinitionPurposeLogin, afterIdentify.State.CurrentPurpose)
+
+	done, err := w.sm.Process(t.Context(), nil, def, afterIdentify.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{"password": "correct-horse-battery-staple"},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "done", done.State.CurrentStep)
+	require.Len(t, w.attempts.passwordCalls, 1)
+}
+
+// Worked example D: recovery identifies but never verifies password.
+func TestFlowDispatch_Recovery_IdentifierResolvedPasswordNotDispatched(t *testing.T) {
+	w := newFlowTestWorld(t)
+	w.attempts.identifierResult = map[string]string{"alice@example.com": "user_alice"}
+	def := recoveryDefinition()
+
+	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeRecovery,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	afterIdentify, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{"email": "alice@example.com"},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "new-password", afterIdentify.State.CurrentStep)
+	assert.Equal(t, domain.FlowDefinitionPurposeRecovery, afterIdentify.State.CurrentPurpose)
+	require.Len(t, w.attempts.identifyCalls, 1)
+
+	_, err = w.sm.Process(t.Context(), nil, def, afterIdentify.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{"password": "fresh-secret"},
+	})
+	require.NoError(t, err)
+	assert.Empty(t, w.attempts.passwordCalls)
 }
 
 // passkeyRegisterDefinition builds a two-step registration flow:

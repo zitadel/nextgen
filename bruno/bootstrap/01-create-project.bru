@@ -1,0 +1,42 @@
+meta {
+  name: 01 - Create Project
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{base_url}}/projects
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "previewOrigins": ["{{frontend_url}}"]
+  }
+}
+
+script:post-response {
+  bru.setEnvVar("project_id", res.body.id);
+  bru.setEnvVar("project_secret", res.body.projectSecret);
+}
+
+docs {
+  Creates a new project and captures its ID and project secret into the environment.
+
+  The `frontend_url` env var (default: http://localhost:3002) must match the origin
+  from which the browser submits flow steps — the server validates the Origin header
+  against this allowlist. If demo-next is running on a different port, update
+  `frontend_url` in the Local environment before running this request.
+
+  After this runs:
+  1. Copy `project_id` into apps/demo-next/.env.local as NEXT_PUBLIC_ZITADEL_PROJECT_ID.
+  2. Run 02 and 03 to upload the schema and flow definition for this project.
+
+  The `project_secret` is the Bearer token used to authenticate the admin API calls
+  (schema and flow definition creation) that follow.
+}

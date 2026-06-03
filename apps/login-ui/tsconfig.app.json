@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "types": ["vite/client"],
+    "lib": ["ES2022", "DOM", "DOM.Iterable"]
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["**/*.spec.ts"],
+  "references": [
+    {
+      "path": "../../packages/components/tsconfig.lib.json"
+    },
+    {
+      "path": "../../packages/design-tokens/tsconfig.lib.json"
+    }
+  ]
+}

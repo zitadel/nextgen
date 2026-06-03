@@ -147,15 +147,21 @@ func mapCreateRequestToService(req *api.CreateFlowDefinitionRequest) (service.Cr
 		if step.GetOnSuccess().IsSet() {
 			onSuccess, err := domain.FlowOnSuccessString(string(step.GetOnSuccess().Value))
 			if err != nil {
-				return svcReq, fmt.Errorf("invalid on_success %q: %w", step.GetOnSuccess().Value, err)
+				return svcReq, fmt.Errorf("step %q: invalid on_success %q: %w", step.GetName(), step.GetOnSuccess().Value, err)
 			}
 			s.OnSuccess = &onSuccess
 		}
-
 		steps = append(steps, s)
 	}
 	svcReq.Steps = steps
 	return svcReq, nil
+}
+
+func onSuccessString(o *domain.FlowOnSuccess) string {
+	if o == nil {
+		return ""
+	}
+	return o.String()
 }
 
 func flowDefinitionSuccessResponse(flowDefinition *domain.FlowDefinition, schemaURI string) *api.FlowDefinitionDetailResponse {
@@ -275,12 +281,10 @@ func mapDomainStepsToAPI(domainSteps []domain.FlowDefinitionStep) []api.FlowDefi
 				Value: api.FlowDefinitionStepComplete(complete),
 				Set:   step.Complete != nil,
 			},
-			OnSuccess: func() api.OptFlowDefinitionStepOnSuccess {
-				if step.OnSuccess == nil {
-					return api.OptFlowDefinitionStepOnSuccess{}
-				}
-				return api.NewOptFlowDefinitionStepOnSuccess(api.FlowDefinitionStepOnSuccess(step.OnSuccess.String()))
-			}(),
+			OnSuccess: api.OptFlowDefinitionStepOnSuccess{
+				Value: api.FlowDefinitionStepOnSuccess(onSuccessString(step.OnSuccess)),
+				Set:   step.OnSuccess != nil,
+			},
 		}
 		steps = append(steps, apiStep)
 	}

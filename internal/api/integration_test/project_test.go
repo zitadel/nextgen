@@ -65,6 +65,7 @@ func (s *stubAuthAttemptService) RegisterCreatedUser(ctx context.Context, projec
 	return nil
 }
 
+
 var _ service.AuthAttemptService = (*stubAuthAttemptService)(nil)
 
 func TestCreateProject(t *testing.T) {

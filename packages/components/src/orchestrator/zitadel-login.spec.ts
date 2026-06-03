@@ -38,7 +38,7 @@ const API_BASE = "https://flow.test.invalid";
 let mock: MockHandle = setupMockHandlers();
 const server = setupServer(...mock.handlers);
 
-let testProject = configureZitadel({ apiBase: API_BASE, projectId: "demo-project" });
+let testProject = configureZitadel({ proxyPath: API_BASE, projectId: "demo-project" });
 
 beforeAll(() => {
   server.listen({ onUnhandledRequest: "error" });
@@ -46,7 +46,7 @@ beforeAll(() => {
 
 beforeEach(() => {
   _resetConfigForTesting();
-  testProject = configureZitadel({ apiBase: API_BASE, projectId: "demo-project" });
+  testProject = configureZitadel({ proxyPath: API_BASE, projectId: "demo-project" });
   mock = setupMockHandlers();
   mock.reset();
   server.resetHandlers(...mock.handlers);

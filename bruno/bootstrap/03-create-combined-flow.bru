@@ -1,0 +1,188 @@
+meta {
+  name: 03 - Create Combined Flow Definition
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{base_url}}/flow_definitions
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{project_secret}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "project_id": "{{project_id}}",
+    "flow_definition": {
+      "name": "demo-combined",
+      "user_schema": "{{schema_id}}",
+      "purposes": {
+        "login": "identifier"
+      },
+      "steps": [
+        {
+          "name": "identifier",
+          "fields": ["email"],
+          "actions": {
+            "submit": { "primary": true },
+            "passkey": {}
+          },
+          "transitions": {
+            "submit": { "target": "authenticate" },
+            "passkey": { "target": "done" },
+            "user_not_found": { "target": "choose-register" }
+          }
+        },
+        {
+          "name": "authenticate",
+          "fields": ["password"],
+          "actions": {
+            "submit": { "primary": true }
+          },
+          "transitions": {
+            "submit": { "target": "done" }
+          }
+        },
+        {
+          "name": "choose-register",
+          "fields": [],
+          "actions": {
+            "register-with-password": { "primary": true },
+            "register-with-passkey": {}
+          },
+          "transitions": {
+            "register-with-password": { "target": "collect-credentials" },
+            "register-with-passkey": { "target": "collect-passkey-email" }
+          }
+        },
+        {
+          "name": "collect-credentials",
+          "fields": ["email", "password"],
+          "on_success": "create_user",
+          "actions": {
+            "submit": { "primary": true }
+          },
+          "transitions": {
+            "submit": { "target": "passkey-upsell" }
+          }
+        },
+        {
+          "name": "passkey-upsell",
+          "fields": [],
+          "actions": {
+            "passkey_register": { "primary": true },
+            "skip": {}
+          },
+          "transitions": {
+            "passkey_register": { "target": "done" },
+            "skip": { "target": "done" }
+          }
+        },
+        {
+          "name": "collect-passkey-email",
+          "fields": ["email"],
+          "actions": {
+            "submit": { "primary": true }
+          },
+          "transitions": {
+            "submit": { "target": "passkey-enroll" }
+          }
+        },
+        {
+          "name": "passkey-enroll",
+          "fields": [],
+          "actions": {
+            "passkey_register": { "primary": true }
+          },
+          "transitions": {
+            "passkey_register": { "target": "done" }
+          }
+        },
+        {
+          "name": "done",
+          "complete": "show"
+        }
+      ]
+    }
+  }
+}
+
+script:post-response {
+  if (res.status === 201) {
+    bru.setEnvVar("flow_def_id", res.body.id);
+  }
+}
+
+docs {
+  Creates the single combined flow definition that the demo-next login page uses
+  for all five flows. The login page always starts with purpose="login", which
+  enters at the "identifier" step.
+
+  STEP GRAPH
+  ==========
+
+  identifier (email)
+    - submit → authenticate           existing user → password login
+    - passkey → done                  discoverable passkey login (two-phase on same step)
+    - user_not_found → choose-register  unknown email → offer registration
+
+  authenticate (password)
+    - submit → done                   password verified, flow complete
+
+  choose-register  (no fields — choice screen)
+    - register-with-password → collect-credentials
+    - register-with-passkey  → collect-passkey-email
+
+  collect-credentials  (email + password, on_success: create_user)
+    - submit → passkey-upsell         user created, offer passkey enrollment
+
+  passkey-upsell  (no fields — upsell screen)
+    - passkey_register → done         enroll passkey then finish (two-phase on same step)
+    - skip → done                     skip passkey, finish
+
+  collect-passkey-email  (email only, on_success: create_user)
+    - submit → passkey-enroll         user created (no password), start passkey enroll
+
+  passkey-enroll  (no fields — mandatory passkey ceremony)
+    - passkey_register → done         enroll passkey then finish
+
+  done  (complete: show — success screen)
+
+  PASSKEY TWO-PHASE CEREMONY
+  ==========================
+  The `passkey` and `passkey_register` actions each require two submit calls:
+    Phase 1:  POST /flow/{id}/submit  { "action": "passkey" }
+              Server issues a WebAuthn challenge; step stays the same but
+              response includes step.challenge with options.
+    Phase 2:  POST /flow/{id}/submit  { "action": "passkey", "challenge_response": { ... } }
+              Server verifies the WebAuthn response, then fires the transition.
+
+  The <zl-passkey> web component in demo-next handles both phases automatically
+  when it detects step.challenge in the response.
+
+  WHICH FLOWS THIS ENABLES IN DEMO-NEXT
+  ======================================
+  1. Register user + password:
+     identifier(unknown email) → choose-register → collect-credentials → passkey-upsell → skip → done
+
+  2. Register passkey for that user:
+     identifier(unknown email) → choose-register → collect-credentials → passkey-upsell → passkey_register → done
+
+  3. Register anonymous user with passkey only:
+     identifier(unknown email) → choose-register → collect-passkey-email → passkey-enroll → passkey_register → done
+
+  4. Login with passkey (non-anonymous user):
+     identifier → passkey action → WebAuthn discoverable ceremony → done
+
+  5. Login with passkey (anonymous user):
+     identifier → passkey action → WebAuthn discoverable ceremony → done
+     (credential's userHandle identifies the user regardless of whether they have a password)
+}

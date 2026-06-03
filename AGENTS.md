@@ -211,8 +211,8 @@ Standard commands are documented in root `AGENTS.md` → **Local Checks** and
 To test the sign-in flow interactively (two terminals):
 
 1. Start the mock auth server: `corepack pnpm nx start @zitadel-nextgen/api-mock`
-2. Start demo-next: `NEXTGEN_ISSUER_URL=http://localhost:4000 corepack pnpm nx dev @zitadel-nextgen/demo-next` (port 3002)
-3. Or demo-nuxt: `NEXTGEN_ISSUER_URL=http://localhost:4000 corepack pnpm nx dev @zitadel-nextgen/demo-nuxt` (port 3001)
+2. Start demo-next: `ZITADEL_URL=http://localhost:4000 corepack pnpm nx dev @zitadel-nextgen/demo-next` (port 3002)
+3. Or demo-nuxt: `ZITADEL_URL=http://localhost:4000 corepack pnpm nx dev @zitadel-nextgen/demo-nuxt` (port 3001)
 
 ### Stale Nuxt lock files
 

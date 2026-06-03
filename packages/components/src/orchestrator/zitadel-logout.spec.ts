@@ -28,7 +28,7 @@ const okHandler = http.delete(`${API_BASE}/sessions/me`, ({ request }) => {
 const server = setupServer(okHandler);
 
 beforeAll(() => {
-  configureZitadel({ apiBase: API_BASE, projectId: "test" });
+  configureZitadel({ proxyPath: API_BASE, projectId: "test" });
   server.listen({ onUnhandledRequest: "error" });
 });
 

@@ -58,14 +58,14 @@ function tunnelHeaders(
  *
  * export function middleware(req: NextRequest) {
  *   return nextgenMiddleware(req, {
- *     issuerUrl: process.env.NEXTGEN_ISSUER_URL,
- *     protectedRoutes: ["/admin*", "/dashboard*"],
+ *     url: process.env.ZITADEL_URL,
+ *     protectedRoutes: ["/profile"],
  *     loginPath: "/login",
  *   });
  * }
  *
  * export const config = {
- *   matcher: ["/__nextgen/:path*", "/admin/:path*", "/login"],
+ *   matcher: ["/__nextgen/:path*", "/profile/:path*"],
  * };
  * ```
  *
@@ -78,7 +78,7 @@ export async function nextgenMiddleware(
   options: NextgenMiddlewareOptions = {},
 ): Promise<NextResponse | Response> {
   const {
-    issuerUrl = process.env.NEXTGEN_ISSUER_URL ?? 'http://localhost:4000',
+    url = process.env.ZITADEL_URL ?? 'http://localhost:8080',
     proxyPath = '/__nextgen',
     protectedRoutes = [],
     ignoredRoutes = [],
@@ -116,7 +116,7 @@ export async function nextgenMiddleware(
   if (pathname === proxyPath || pathname.startsWith(`${proxyPath}/`)) {
     return proxyRequest(
       req,
-      issuerUrl,
+      url,
       proxyPath,
       proxyTimeoutMs,
       onExchangeResponse,
@@ -124,7 +124,7 @@ export async function nextgenMiddleware(
   }
 
   return handleAuth(req, {
-    issuerUrl,
+    url,
     protectedRoutes,
     loginPath,
     allowedAlgorithms,
@@ -203,20 +203,20 @@ async function validateOpaqueSessionToken(
  * are set only when absent, preserving values injected by an upstream CDN.
  *
  * @param req        - The incoming edge request.
- * @param issuerUrl  - Base URL of the auth backend.
+ * @param authUrl    - Base URL of the auth backend.
  * @param proxyPath  - The path prefix being proxied (e.g. `"/__nextgen"`).
  * @returns The proxied upstream `Response`.
  */
 async function proxyRequest(
   req: NextRequest,
-  issuerUrl: string,
+  authUrl: string,
   proxyPath: string,
   proxyTimeoutMs: number,
   onExchangeResponse?: (response: Response) => Response | Promise<Response>,
 ): Promise<Response> {
   const url = new URL(req.url);
   const suffix = url.pathname.slice(proxyPath.length);
-  const target = `${issuerUrl}${suffix}${url.search}`;
+  const target = `${authUrl}${suffix}${url.search}`;
 
   const upstreamHeaders = new Headers();
   for (const [key, value] of req.headers.entries()) {
@@ -301,7 +301,7 @@ async function proxyRequest(
  * public-facing {@link NextgenMiddlewareOptions}.
  */
 interface AuthHandlerOptions {
-  readonly issuerUrl: string;
+  readonly url: string;
   readonly protectedRoutes: readonly string[];
   readonly loginPath: string;
   /**
@@ -343,7 +343,7 @@ async function handleAuth(
   opts: AuthHandlerOptions,
 ): Promise<NextResponse> {
   const {
-    issuerUrl,
+    url,
     protectedRoutes,
     loginPath,
     allowedAlgorithms,
@@ -366,7 +366,7 @@ async function handleAuth(
 
   const payload = token
     ? await verifyJwt(token, {
-        issuerUrl,
+        issuerUrl: url,
         allowedAlgorithms,
         clockSkewMs,
         audience,
@@ -424,13 +424,10 @@ async function handleAuth(
  * {@link ZitadelConfig}. These configure route protection, login
  * redirects, and JWT verification behaviour.
  *
- * `proxyPath` and `issuerUrl` are omitted because they come from the
+ * `proxyPath` and `url` are omitted because they come from the
  * {@link ZitadelConfig} passed as the first argument.
  */
-export type ProxyOptions = Omit<
-  NextgenMiddlewareOptions,
-  'proxyPath' | 'issuerUrl'
->;
+export type ProxyOptions = Omit<NextgenMiddlewareOptions, 'proxyPath' | 'url'>;
 
 /**
  * A pre-configured middleware handler returned by {@link createProxy}.
@@ -450,9 +447,8 @@ export type ProxyHandler = (
  * import { createProxy } from "@zitadel-nextgen/sdk-next/middleware";
  *
  * const zitadel = configureZitadel({
- *   apiBase: "/__nextgen",
  *   projectId: "demo",
- *   issuerUrl: process.env.NEXTGEN_ISSUER_URL,
+ *   url: process.env.ZITADEL_URL,
  * });
  *
  * export const proxy = createProxy(zitadel, {
@@ -478,8 +474,8 @@ export function createProxy(
 ): ProxyHandler {
   const mergedOptions: NextgenMiddlewareOptions = {
     ...options,
-    proxyPath: config.apiBase,
-    issuerUrl: config.issuerUrl,
+    proxyPath: config.proxyPath,
+    url: config.url,
   };
   return (req: NextRequest) => nextgenMiddleware(req, mergedOptions);
 }

@@ -8,8 +8,9 @@ import (
 )
 
 var reservedOutcomes = map[string]struct{}{
-	"user_not_found": {},
-	"callback":       {},
+	"user_not_found":      {},
+	"user_already_exists": {},
+	"callback":            {},
 }
 
 type PivotingTarget struct {
@@ -37,6 +38,14 @@ func ValidateFlowDefinition(userSchema *jsonschema.Schema, flowDefinition FlowDe
 
 	// 4. validate the cycle of steps: every cycle of steps has at least one exit transition to a terminal step or another flow
 	if err := validateCycles(flowDefinition); err != nil {
+		return nil, err
+	}
+
+	// 5. flip-table coverage + on_success manifest cross-check
+	if err := validateFlipTableCoverage(flowDefinition); err != nil {
+		return nil, err
+	}
+	if err := validateOnSuccessManifests(flowDefinition, userSchema); err != nil {
 		return nil, err
 	}
 
@@ -127,7 +136,7 @@ func validateSteps(steps []FlowDefinitionStep, userSchema *jsonschema.Schema) er
 			_, isReserved := reservedOutcomes[transitionKey]
 			if !isAction && !isReserved {
 				return ErrFlowDefinitionInvalid(fmt.Sprintf(
-					"step %q: transition key %q is not an action name or reserved outcome (user_not_found, callback)", step.Name, transitionKey), nil)
+					"step %q: transition key %q is not an action name or reserved outcome (user_not_found, user_already_exists, callback)", step.Name, transitionKey), nil)
 			}
 		}
 
@@ -301,6 +310,163 @@ func stepFieldsInUserSchema(stepName string, stepFields []string, userProperties
 		}
 	}
 	return nil
+}
+
+// validateFlipTableCoverage requires the counter-outcome transition on
+// an entry step iff the partner purpose is also wired (e.g. login entry
+// needs user_not_found only when register is also a purpose).
+func validateFlipTableCoverage(def FlowDefinition) error {
+	purposes := def.Purposes
+	for purpose, entryStepName := range purposes {
+		flipTargets, ok := purposeFlipTargets[purpose]
+		if !ok {
+			continue
+		}
+		entry, found := def.FindStep(entryStepName)
+		if !found {
+			continue
+		}
+		for outcome, targetPurpose := range flipTargets {
+			if _, partnerWired := purposes[targetPurpose]; !partnerWired {
+				continue
+			}
+			if _, ok := entry.Transitions[outcome]; !ok {
+				return ErrFlowDefinitionInvalid(fmt.Sprintf(
+					"step %q: entry step for purpose %q must wire %q transition because %q is also a purpose",
+					entry.Name, purpose, outcome, targetPurpose), nil)
+			}
+		}
+	}
+	return nil
+}
+
+// purposeFlipTargets mirrors the engine's flip table. Kept separate so
+// the validator stays pure.
+var purposeFlipTargets = map[FlowDefinitionPurpose]map[string]FlowDefinitionPurpose{
+	FlowDefinitionPurposeLogin: {
+		FlowImplicitOutcomeUserNotFound: FlowDefinitionPurposeRegister,
+	},
+	FlowDefinitionPurposeRegister: {
+		FlowImplicitOutcomeUserAlreadyExists: FlowDefinitionPurposeLogin,
+	},
+}
+
+// validateOnSuccessManifests verifies that every kind in each step's
+// on_success manifest is collected on the step itself or upstream.
+func validateOnSuccessManifests(def FlowDefinition, userSchema *jsonschema.Schema) error {
+	if len(def.Steps) == 0 {
+		return nil
+	}
+	stepsByName := make(map[string]*FlowDefinitionStep, len(def.Steps))
+	for i := range def.Steps {
+		stepsByName[def.Steps[i].Name] = &def.Steps[i]
+	}
+	reverse := make(map[string][]string, len(def.Steps))
+	for _, s := range def.Steps {
+		for _, t := range s.Transitions {
+			if t.IsCurrentFlow() {
+				reverse[t.Target] = append(reverse[t.Target], s.Name)
+			}
+		}
+	}
+
+	for i := range def.Steps {
+		step := &def.Steps[i]
+		if step.OnSuccess == nil {
+			continue
+		}
+		manifest := ManifestForOnSuccess(*step.OnSuccess)
+		if manifest == nil {
+			continue
+		}
+		reachable := reachableSteps(step.Name, reverse)
+		for _, kind := range manifest {
+			if !someStepEstablishesKind(reachable, stepsByName, kind, userSchema) {
+				return ErrFlowDefinitionInvalid(fmt.Sprintf(
+					"step %q: on_success %s requires %q to be collected upstream", step.Name, *step.OnSuccess, kind), nil)
+			}
+		}
+	}
+	return nil
+}
+
+// reachableSteps returns `start` plus every ancestor in `reverse`.
+func reachableSteps(start string, reverse map[string][]string) map[string]struct{} {
+	out := map[string]struct{}{start: {}}
+	queue := []string{start}
+	for len(queue) > 0 {
+		cur := queue[0]
+		queue = queue[1:]
+		for _, pred := range reverse[cur] {
+			if _, seen := out[pred]; seen {
+				continue
+			}
+			out[pred] = struct{}{}
+			queue = append(queue, pred)
+		}
+	}
+	return out
+}
+
+// someStepEstablishesKind reports whether any candidate step collects
+// a field whose schema-derived challenge matches kind.
+func someStepEstablishesKind(candidates map[string]struct{}, byName map[string]*FlowDefinitionStep, kind FlowFieldChallenge, userSchema *jsonschema.Schema) bool {
+	for name := range candidates {
+		s, ok := byName[name]
+		if !ok {
+			continue
+		}
+		for _, fieldName := range s.Fields {
+			if challengeForField(userSchema, fieldName) == kind {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// challengeForField mirrors [deriveChallenge] in the field resolver.
+func challengeForField(userSchema *jsonschema.Schema, fieldName string) FlowFieldChallenge {
+	if userSchema == nil {
+		return FlowFieldChallengeNone
+	}
+	properties := lookupProperties(userSchema)
+	prop, ok := properties[fieldName]
+	if !ok {
+		return FlowFieldChallengeNone
+	}
+	if deriveUnique(prop) != AttributeUniquenessUnspecified {
+		return FlowFieldChallengeIdentifier
+	}
+	if isPassword(prop) && authMethodEnabled(userSchema, "password") {
+		return FlowFieldChallengePassword
+	}
+	return FlowFieldChallengeNone
+}
+
+// authMethodEnabled reads `x-auth-methods.<method>.enabled` off the root schema.
+func authMethodEnabled(schema *jsonschema.Schema, method string) bool {
+	if schema == nil {
+		return false
+	}
+	v, ok := schema.LookupKeyword("x-auth-methods")
+	if !ok {
+		return false
+	}
+	raw, ok := v.(types.PartAny)
+	if !ok {
+		return false
+	}
+	methods, ok := raw.V.(map[string]any)
+	if !ok {
+		return false
+	}
+	entry, ok := methods[method].(map[string]any)
+	if !ok {
+		return false
+	}
+	enabled, _ := entry["enabled"].(bool)
+	return enabled
 }
 
 // a map of step names for a quick lookup of all the steps in a flow definition

@@ -23,12 +23,38 @@ import (
 // reintroduce the transient pull failures this testcontainer migration removes.
 const containerImage = "public.ecr.aws/docker/library/postgres:18.3"
 
+const containerStartAttempts = 3
+
 // StartContainer starts a Postgres testcontainer and returns a connector plus a
 // stop function, mirroring the Spanner emulator bring-up in dialect/spanner/embedded.
 // It is used by the postgres integration tests; the server's zero-config default
 // connector still uses the embedded binary in start.go. This file is build-tagged
 // so testcontainers-go never enters the production server binary.
 func StartContainer(ctx context.Context) (database.Connector, func(), error) {
+	var err error
+	for attempt := 1; attempt <= containerStartAttempts; attempt++ {
+		var connector database.Connector
+		var stop func()
+		connector, stop, err = startContainerOnce(ctx)
+		if err == nil {
+			return connector, stop, nil
+		}
+		if attempt == containerStartAttempts {
+			break
+		}
+
+		delay := time.Duration(attempt) * 2 * time.Second
+		slog.Info("postgres testcontainer start failed, retrying", "attempt", attempt, "max_attempts", containerStartAttempts, "delay", delay, "err", err)
+		select {
+		case <-ctx.Done():
+			return nil, nil, fmt.Errorf("postgres container start interrupted: %w", ctx.Err())
+		case <-time.After(delay):
+		}
+	}
+	return nil, nil, fmt.Errorf("postgres container failed after %d attempts: %w", containerStartAttempts, err)
+}
+
+func startContainerOnce(ctx context.Context) (database.Connector, func(), error) {
 	req := testcontainers.ContainerRequest{
 		Image:        containerImage,
 		ExposedPorts: []string{"5432/tcp"},
@@ -52,6 +78,9 @@ func StartContainer(ctx context.Context) (database.Connector, func(), error) {
 		Started:          true,
 	})
 	if err != nil {
+		if container != nil {
+			_ = container.Terminate(context.Background())
+		}
 		return nil, nil, fmt.Errorf("unable to start postgres container: %w", err)
 	}
 

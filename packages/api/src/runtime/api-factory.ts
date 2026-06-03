@@ -5,7 +5,7 @@
  * generated function sees the right base URL and (optionally) the
  * right bearer token at call time — without the caller having to
  * thread either through every operation, and without exposing the
- * module-globals (`setApiBaseUrl` / `setApiAuthToken`) as part of the
+ * module-globals (`setProxyPath` / `setApiAuthToken`) as part of the
  * public API.
  *
  * Per-instance isolation: multiple clients can coexist in one process
@@ -19,7 +19,7 @@
 import * as endpoints from "../generated/endpoints/zitadelNextGen";
 
 import { setApiAuthToken } from "./auth";
-import { setApiBaseUrl } from "./base-url";
+import { setProxyPath } from "./base-url";
 
 /**
  * Typed Zitadel client returned by {@link createZitadelClient}.
@@ -61,7 +61,7 @@ export function createZitadelClient(opts: ZitadelClientOptions): ZitadelClient {
         return value;
       }
       return (...args: unknown[]) => {
-        setApiBaseUrl(baseUrl);
+        setProxyPath(baseUrl);
         setApiAuthToken(opts.token);
         return (value as (...a: unknown[]) => unknown)(...args);
       };
