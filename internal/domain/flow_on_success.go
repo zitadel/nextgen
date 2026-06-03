@@ -16,6 +16,17 @@ type FlowOnSuccessHandler interface {
 	Handle(ctx context.Context, client database.QueryExecutor, in FlowOnSuccessInput) (FlowOnSuccessResult, error)
 }
 
+// ManifestForOnSuccess returns the credential kinds a mutation establishes.
+// Dispatch (verify-vs-skip) and the validator (upstream-collects check)
+// both read this table.
+func ManifestForOnSuccess(o FlowOnSuccess) []FlowFieldChallenge {
+	switch o {
+	case FlowOnSuccessCreateUser:
+		return []FlowFieldChallenge{FlowFieldChallengeIdentifier, FlowFieldChallengePassword}
+	}
+	return nil
+}
+
 // FlowOnSuccessInput is the per-call context the state machine threads
 // into a handler.
 type FlowOnSuccessInput struct {
@@ -29,12 +40,10 @@ type FlowOnSuccessInput struct {
 
 // FlowOnSuccessResult is what a handler returns. Outcome overrides the
 // transition key (empty = use the submitted action). StepError keeps
-// the user on the current step. UserID, when set, is recorded on the
-// flow state.
+// the user on the current step.
 type FlowOnSuccessResult struct {
 	Outcome   string
 	StepError *string
-	UserID    string
 }
 
 // FlowPasswordHasher hashes plaintext passwords into the PHC string
