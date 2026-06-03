@@ -10,8 +10,13 @@
  * await import("@zitadel/sdk-next/client");
  * ```
  *
- * SDK configuration is handled separately via `configureZitadel()`
- * from `@zitadel/api/config` — typically in a shared
- * `zitadel.ts` init file.
+ * SDK configuration is done via `configureZitadel()`, re-exported here so
+ * a consuming app that only declares `@zitadel/sdk-next` as a direct
+ * dependency can configure the SDK without reaching into
+ * `@zitadel/api/config` (which strict package managers would not
+ * resolve). Call it inside the same `"use client"` boundary before the
+ * components mount.
  */
 export { ZitadelLogin, ZitadelLogout } from '@zitadel/components';
+export { configureZitadel, getApi } from '@zitadel/api/config';
+export type { ZitadelConfig, ZitadelProject } from '@zitadel/api/config';

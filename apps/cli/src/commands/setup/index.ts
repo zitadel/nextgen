@@ -7,13 +7,10 @@ import { ZitadelError } from "../../lib/errors";
 import { createOrca, issuerFromPort, type FrameworkFacts, type Orca } from "../../lib/orca";
 import type { PatchContext } from "../../lib/orca/patchers/types";
 import { RENDERER_IDS } from "../../lib/orca/patchers/rule/next/renderers/registry";
-import { CreateSchemaBody } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import type { CreateProject201 } from "@zitadel/api/generated/model";
 import { createZitadelClient } from "@zitadel/api/client";
 
-import { buildUserSchema } from "../../lib/user-schema";
-import { makeSyncers, runSyncLoop } from "../../lib/sync";
-import { hasZitadelConfig, hasZitadelSecret, readZitadelSecret } from "../../lib/project";
+import { hasZitadelConfig, hasZitadelSecret } from "../../lib/project";
 import { PickFrameworkPrompt, SETUP_PROMPTS, type SetupAnswers } from "./prompts";
 import {
   detectProjectFacts,
@@ -26,9 +23,6 @@ import {
   type Row,
   type Section,
 } from "./summary";
-
-/** The user-schema fields scaffolded for every project. */
-const DEFAULT_USER_FIELDS = ["email", "given_name", "family_name"] as const;
 
 /**
  * The frameworks `--framework` accepts, derived from Orca's registry so the
@@ -44,8 +38,9 @@ const FRAMEWORK_OPTIONS = createOrca()
  *
  * Detects (or, for an empty directory, scaffolds then re-detects) the
  * framework, runs the wizard prompts to fill in any answers not pre-supplied
- * by flags, creates the remote project, patches the local files via
- * `Orca`'s framework patcher, and optionally applies the config.
+ * by flags, creates the remote project (whose default user schema and login
+ * flow are provisioned server-side), and patches the local files via
+ * `Orca`'s framework patcher.
  *
  * Every interactive question lives in {@link SETUP_PROMPTS} (the main wizard
  * — each entry is a small class) and {@link PickFrameworkPrompt} (the
@@ -57,13 +52,12 @@ export default class Setup extends BaseCommand {
   static override flags = {
     framework: Flags.string({ description: "Framework to target.", options: FRAMEWORK_OPTIONS }),
     renderer: Flags.string({ description: "Renderer (default: react).", options: [...RENDERER_IDS] }),
-    "no-apply": Flags.boolean({ description: "Skip the automatic apply at the end of setup." }),
   };
 
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(Setup);
     await this.toMeta(flags);
-    const { cwd, env, nonInteractive, dryRun, force } = this.meta;
+    const { cwd, nonInteractive, dryRun, force } = this.meta;
 
     if (await hasZitadelConfig(cwd)) {
       return this.emit({ status: "skipped", reason: "already-initialized" });
@@ -112,19 +106,10 @@ export default class Setup extends BaseCommand {
     }
 
     const issuer = issuerFromPort(answers.devPort);
-    const userFields = [...DEFAULT_USER_FIELDS];
-    const userSchema = buildUserSchema(userFields);
-    const schemaValidation = CreateSchemaBody.safeParse(userSchema);
-    if (!schemaValidation.success) {
-      throw new ZitadelError("E_VALIDATION", "Generated user schema is invalid", {
-        details: { issues: schemaValidation.error.issues },
-      });
-    }
-    consola.info(`User schema: ${userFields.length} fields (${userFields.join(", ")})`);
 
-    // `POST /projects` is unauthenticated; the returned `projectSecret`
-    // authorises every subsequent call (we build a second, token-bound
-    // client further down for the sync loop).
+    // `POST /projects` is unauthenticated. Creating the project also
+    // provisions its default user schema and login flow server-side, so the
+    // CLI no longer builds, scaffolds, or uploads those resources here.
     consola.start(`Creating project on ${answers.server}${dryRun ? " (dry run)" : ""}`);
     const unauthClient = createZitadelClient({ baseUrl: answers.server });
     const project = dryRun
@@ -137,8 +122,6 @@ export default class Setup extends BaseCommand {
       rendererId: flags.renderer ?? "react",
       project,
       issuer,
-      userFields,
-      userSchema,
       server: answers.server,
     };
     consola.start(`Patching project files${dryRun ? " (dry run)" : ""}`);
@@ -155,27 +138,6 @@ export default class Setup extends BaseCommand {
         (result.filesSkipped.length > 0 ? ` (${result.filesSkipped.length} unchanged)` : ""),
     );
 
-    let apply: { synced: boolean } | undefined;
-    if (!flags["no-apply"] && !dryRun) {
-      consola.start("Syncing schemas and flows to Zitadel");
-      const secret = await readZitadelSecret(cwd);
-      const client = createZitadelClient({
-        baseUrl: answers.server,
-        token: secret.project_secret,
-      });
-      // `runSyncLoop` emits one `consola.info` line per resource action.
-      await runSyncLoop(
-        cwd,
-        makeSyncers({ client, projectId: secret.project_id, env }),
-      );
-      apply = { synced: true };
-      consola.success("Sync complete");
-    } else if (flags["no-apply"]) {
-      consola.info("Skipping apply (--no-apply); run `zitadel apply` later to sync");
-    } else if (dryRun) {
-      consola.info("Skipping apply (--dry-run)");
-    }
-
     const writtenRel = result.filesWritten.map((file) => relativeDisplay(cwd, file));
     // The structured report is human-only. Under `--json` we let the
     // envelope returned from `this.emit(...)` be the sole stdout
@@ -188,8 +150,6 @@ export default class Setup extends BaseCommand {
         project,
         server: answers.server,
         issuer,
-        userFields,
-        synced: Boolean(apply?.synced),
         scaffoldedFramework,
       });
       // Frame the report in a consola box so it reads as a distinct
@@ -221,7 +181,6 @@ export default class Setup extends BaseCommand {
         server: answers.server,
         files_written: result.filesWritten.map((file) => relativeDisplay(cwd, file)),
         files_skipped: result.filesSkipped.map((file) => relativeDisplay(cwd, file)),
-        apply,
         next_actions: [`Start your project: npm install && npm run dev (then open ${issuer}/login)`],
         next_commands: ["npm install", "npm run dev"],
       },
@@ -282,8 +241,7 @@ function shortPath(absolute: string): string {
  * Picks one written file by suffix so the corresponding INSTALLED row can
  * reference it without hard-coding the path the patcher chose. Returns
  * the first match; falls back to `undefined` when the patcher didn't
- * write that artifact (e.g. `--no-apply` would still write everything,
- * but a user opting out of, say, register pages would not).
+ * write that artifact (e.g. a renderer without a register page).
  */
 function pickWrittenFile(written: string[], suffix: string): string | undefined {
   return written.find((file) => file.endsWith(suffix));
@@ -327,8 +285,6 @@ const SENTENCE_BY_PATH: Record<string, { subject: string }> = {
   ".gitignore": { subject: "the project's .gitignore additions" },
   ".zitadel/secret": { subject: "the local project secret" },
   "zitadel.json": { subject: "the Zitadel project configuration" },
-  ".zitadel/schemas/user.json": { subject: "the user schema definition" },
-  ".zitadel/flows/default.json": { subject: "the default authentication flow" },
   ".env.example": { subject: "the .env example template" },
   ".env.local": { subject: "the local development environment variables" },
   ".zitadel/state.json": { subject: "the empty sync state file" },
@@ -347,11 +303,9 @@ function buildSummary(opts: {
   project: CreateProject201;
   server: string;
   issuer: string;
-  userFields: string[];
-  synced: boolean;
   scaffoldedFramework: boolean;
 }): Section[] {
-  const { projectFacts, writtenRel, project, server, issuer, userFields, synced, scaffoldedFramework } = opts;
+  const { projectFacts, writtenRel, project, server, issuer, scaffoldedFramework } = opts;
   const sdkPackage = "@zitadel/sdk-next";
   const packageJsonHit = pickWrittenFile(writtenRel, "package.json");
 
@@ -381,25 +335,15 @@ function buildSummary(opts: {
     if (hit) installedRows.push({ label, value: stylePath(hit) });
   }
 
-  const configuredRows: Row[] = [
-    {
-      label: "User schema",
-      value: `${userFields.length} fields (${userFields.join(", ")})`,
-    },
-    { label: "Auth method", value: "Password" },
-  ];
-
   const projectRows: Row[] = [
     { label: "Project id", value: styleId(project.id) },
     { label: "Server", value: styleUrl(server) },
     { label: "App will run", value: styleUrl(issuer) },
-    { label: "Synced", value: synced ? "yes" : "no" },
   ];
 
   return [
     { title: "Detected", rows: detected },
     { title: "Installed", rows: installedRows },
-    { title: "Configured", rows: configuredRows },
     { title: "Project", rows: projectRows },
   ];
 }
