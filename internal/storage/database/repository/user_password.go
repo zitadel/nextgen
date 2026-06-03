@@ -176,6 +176,12 @@ func (r *UserPasswordRepository) Create(ctx context.Context, client database.Que
 	return err
 }
 
+func (r *UserPasswordRepository) DeleteByUserID(ctx context.Context, client database.QueryExecutor, projectID string, userID string) error {
+	condition := database.And(
+		r.ProjectIDCondition(projectID),
+		r.UserIDCondition(userID))
+	return r.Delete(ctx, client, condition)
+}
 func (r *UserPasswordRepository) DeleteByID(ctx context.Context, client database.QueryExecutor, passwordID int64) error {
 	return r.Delete(ctx, client, r.PrimaryKeyCondition(passwordID))
 }

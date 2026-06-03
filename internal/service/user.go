@@ -154,18 +154,9 @@ func (s *UserService) SetPassword(ctx context.Context, input SetPasswordInput) (
 
 	// REMOVE OLD PASSWORD IF ONE EXISTS
 
-	pwd, err := s.passwordRepo.GetByUserID(ctx, tx, input.ProjectID, input.UserID)
-
+	err = s.passwordRepo.DeleteByUserID(ctx, tx, input.ProjectID, input.UserID)
 	if err != nil {
-		if _, ok := errors.AsType[*database.NoRowFoundError](err); !ok {
-			return domain.ErrInternal(err).WithMessage("failed to get current password from database")
-		}
-	}
-	if err == nil {
-		err := s.passwordRepo.DeleteByID(ctx, tx, pwd.ID)
-		if err != nil {
-			return domain.ErrInternal(err).WithMessage("failed to remove old password from database")
-		}
+		return domain.ErrInternal(err).WithMessage("failed to remove old password from database")
 	}
 
 	// CREATE NEW PASSWORD

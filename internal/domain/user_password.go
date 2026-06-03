@@ -61,7 +61,7 @@ type UserPasswordRepository interface {
 	List(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) ([]*UserPassword, error)
 	Create(ctx context.Context, client database.QueryExecutor, user *CreateUserPassword) error
 	Delete(ctx context.Context, client database.QueryExecutor, condition database.Condition) error
-	DeleteByID(ctx context.Context, client database.QueryExecutor, passwordID int64) error
+	DeleteByUserID(ctx context.Context, client database.QueryExecutor, projectID string, userID string) error
 }
 
 type userPasswordConditions interface {
