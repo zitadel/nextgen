@@ -7,10 +7,10 @@ import { decodeJwt } from './lib/jwt';
 /**
  * Reads the auth state in a React Server Component or Next.js Route Handler.
  *
- * The middleware verifies the JWT and tunnels it to the RSC runtime via
- * `x-nextgen-auth-token`. This function decodes the tunnelled token without
- * re-verifying the signature — verification has already been done by the
- * middleware on every request.
+ * The middleware validates the session and tunnels it to the RSC runtime via
+ * `x-nextgen-auth-token` and `x-nextgen-auth-user-id`. Cookie session tokens are
+ * opaque; explicit Bearer JWTs still carry profile claims and are decoded here
+ * after the middleware has verified them.
  *
  * ```ts
  * import { auth } from "@zitadel/sdk-next";
@@ -28,9 +28,22 @@ export async function auth(): Promise<AuthResult> {
   try {
     const headerStore = await headers();
     const token = headerStore.get('x-nextgen-auth-token');
+    const userId = headerStore.get('x-nextgen-auth-user-id');
 
     if (!token) {
       return { isAuthenticated: false, session: null };
+    }
+
+    if (userId) {
+      return {
+        isAuthenticated: true,
+        session: {
+          userId,
+          email: null,
+          name: null,
+          token,
+        },
+      };
     }
 
     const { payload } = decodeJwt(token);

@@ -72,6 +72,27 @@ function mockJwks(kid: string): ReturnType<typeof vi.fn> {
     .mockResolvedValue(new Response(JSON.stringify(jwks), { status: 200 }));
 }
 
+function mockSessionMe(
+  status = 200,
+  overrides: Record<string, unknown> = {},
+): ReturnType<typeof vi.fn> {
+  const body = {
+    session_id: 'sess_123',
+    project_id: 'proj_123',
+    state: 'active',
+    user_id: 'user-123',
+    factors: [],
+    created_at: new Date().toISOString(),
+    expires_at: new Date(Date.now() + 3600_000).toISOString(),
+    ...overrides,
+  };
+  return vi
+    .fn()
+    .mockResolvedValue(
+      new Response(status === 204 ? null : JSON.stringify(body), { status }),
+    );
+}
+
 describe('nextgenMiddleware', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -120,20 +141,10 @@ describe('nextgenMiddleware', () => {
     expect(parsed.searchParams.get('next')).toBe('/admin');
   });
 
-  it('protected route with valid cookie passes through with token tunnelled', async () => {
-    const kid = nextKid();
-    const exp = Math.floor(Date.now() / 1000) + 3600;
-    const token = makeJwt(
-      {
-        sub: 'user-123',
-        email: 'user@example.com',
-        iss: 'http://localhost:4000',
-        exp,
-      },
-      kid,
-    );
-
-    vi.stubGlobal('fetch', mockJwks(kid));
+  it('protected route with valid session cookie passes through with token tunnelled', async () => {
+    const token = 'opaque-session-token';
+    const upstreamFetch = mockSessionMe();
+    vi.stubGlobal('fetch', upstreamFetch);
 
     const req = makeRequest(
       'http://localhost:3000/admin',
@@ -149,7 +160,18 @@ describe('nextgenMiddleware', () => {
     const tunnelledToken = res.headers.get(
       'x-middleware-request-x-nextgen-auth-token',
     );
+    const tunnelledUser = res.headers.get(
+      'x-middleware-request-x-nextgen-auth-user-id',
+    );
     expect(tunnelledToken).toBe(token);
+    expect(tunnelledUser).toBe('user-123');
+    expect(upstreamFetch).toHaveBeenCalledWith(
+      'http://localhost:4000/sessions/me',
+      expect.objectContaining({
+        headers: { cookie: `__nextgen_session=${token}` },
+        method: 'GET',
+      }),
+    );
   });
 
   it('protected route with valid Bearer token passes through', async () => {
@@ -182,7 +204,11 @@ describe('nextgenMiddleware', () => {
     const tunnelledToken = res.headers.get(
       'x-middleware-request-x-nextgen-auth-token',
     );
+    const tunnelledUser = res.headers.get(
+      'x-middleware-request-x-nextgen-auth-user-id',
+    );
     expect(tunnelledToken).toBe(token);
+    expect(tunnelledUser).toBe('user-123');
   });
 
   it('Bearer token takes precedence over session cookie when both are present (R-1)', async () => {
@@ -228,20 +254,12 @@ describe('nextgenMiddleware', () => {
   });
 
   it('redirect response includes Set-Cookie to clear stale session cookie', async () => {
-    const kid = nextKid();
-    const exp = Math.floor(Date.now() / 1000) + 3600;
-    const validToken = makeJwt(
-      { sub: 'user-123', email: 'user@example.com', exp },
-      kid,
-    );
-    const parts = validToken.split('.');
-    const tamperedToken = `${parts[0]}.${parts[1]}.invalidsignatureXXX`;
-
-    vi.stubGlobal('fetch', mockJwks(kid));
+    const staleToken = 'stale-session-token';
+    vi.stubGlobal('fetch', mockSessionMe(401));
 
     const req = makeRequest(
       'http://localhost:3000/admin',
-      `__nextgen_session=${tamperedToken}`,
+      `__nextgen_session=${staleToken}`,
     );
     const res = await nextgenMiddleware(req, {
       url: 'http://localhost:4000',
@@ -268,7 +286,8 @@ describe('nextgenMiddleware', () => {
 
     const req = makeRequest(
       'http://localhost:3000/admin',
-      `__nextgen_session=${token}`,
+      undefined,
+      `Bearer ${token}`,
     );
     const res = await nextgenMiddleware(req, {
       url: 'http://localhost:4000',
@@ -291,7 +310,8 @@ describe('nextgenMiddleware', () => {
 
     const req = makeRequest(
       'http://localhost:3000/admin',
-      `__nextgen_session=${token}`,
+      undefined,
+      `Bearer ${token}`,
     );
     const res = await nextgenMiddleware(req, {
       url: 'http://localhost:4000',
@@ -330,7 +350,7 @@ describe('nextgenMiddleware', () => {
     );
   });
 
-  it('accepts RS256 tokens by default (allowedAlgorithms defaults to RS256/ES256)', async () => {
+  it('accepts RS256 Bearer tokens by default (allowedAlgorithms defaults to RS256/ES256)', async () => {
     const kid = nextKid();
     const exp = Math.floor(Date.now() / 1000) + 3600;
     const token = makeJwt(
@@ -347,7 +367,8 @@ describe('nextgenMiddleware', () => {
 
     const req = makeRequest(
       'http://localhost:3000/admin',
-      `__nextgen_session=${token}`,
+      undefined,
+      `Bearer ${token}`,
     );
     // No allowedAlgorithms specified — defaults to ['RS256', 'ES256']
     const res = await nextgenMiddleware(req, {
@@ -359,20 +380,12 @@ describe('nextgenMiddleware', () => {
   });
 
   it('protected route with invalid token clears cookie and redirects', async () => {
-    const kid = nextKid();
-    const exp = Math.floor(Date.now() / 1000) + 3600;
-    const validToken = makeJwt(
-      { sub: 'user-123', email: 'user@example.com', exp },
-      kid,
-    );
-    const parts = validToken.split('.');
-    const tamperedToken = `${parts[0]}.${parts[1]}.invalidsignatureXXX`;
-
-    vi.stubGlobal('fetch', mockJwks(kid));
+    const staleToken = 'stale-session-token';
+    vi.stubGlobal('fetch', mockSessionMe(401));
 
     const req = makeRequest(
       'http://localhost:3000/admin',
-      `__nextgen_session=${tamperedToken}`,
+      `__nextgen_session=${staleToken}`,
     );
     const res = await nextgenMiddleware(req, {
       url: 'http://localhost:4000',
@@ -383,6 +396,25 @@ describe('nextgenMiddleware', () => {
     expect(res.status).toBe(302);
     const location = res.headers.get('location') ?? '';
     expect(location).toContain('/login');
+  });
+
+  it('protected route with inactive session cookie clears cookie and redirects', async () => {
+    vi.stubGlobal('fetch', mockSessionMe(200, { state: 'building' }));
+
+    const req = makeRequest(
+      'http://localhost:3000/admin',
+      '__nextgen_session=building-session-token',
+    );
+    const res = await nextgenMiddleware(req, {
+      url: 'http://localhost:4000',
+      protectedRoutes: ['/admin'],
+      loginPath: '/login',
+    });
+
+    expect(res.status).toBe(302);
+    const setCookie = res.headers.get('set-cookie') ?? '';
+    expect(setCookie).toMatch(/__nextgen_session=/);
+    expect(setCookie).toMatch(/Max-Age=0|expires=.*1970/i);
   });
 
   it('token with alg "none" is rejected on a protected route', async () => {
@@ -404,7 +436,8 @@ describe('nextgenMiddleware', () => {
 
     const req = makeRequest(
       'http://localhost:3000/admin',
-      `__nextgen_session=${token}`,
+      undefined,
+      `Bearer ${token}`,
     );
     const res = await nextgenMiddleware(req, {
       url: 'http://localhost:4000',
@@ -432,7 +465,8 @@ describe('nextgenMiddleware', () => {
 
     const req = makeRequest(
       'http://localhost:3000/admin',
-      `__nextgen_session=${token}`,
+      undefined,
+      `Bearer ${token}`,
     );
     const res = await nextgenMiddleware(req, {
       url: 'http://localhost:4000',
@@ -461,7 +495,8 @@ describe('nextgenMiddleware', () => {
 
     const req = makeRequest(
       'http://localhost:3000/',
-      `__nextgen_session=${token}`,
+      undefined,
+      `Bearer ${token}`,
     );
     const res = await nextgenMiddleware(req, {
       url: 'http://localhost:4000',
@@ -721,18 +756,8 @@ describe('nextgenMiddleware', () => {
     });
 
     it('overwrites client-supplied x-nextgen-auth-token with the real token when authenticated', async () => {
-      const kid = nextKid();
-      const exp = Math.floor(Date.now() / 1000) + 3600;
-      const token = makeJwt(
-        {
-          sub: 'user-123',
-          email: 'user@example.com',
-          iss: 'http://localhost:4000',
-          exp,
-        },
-        kid,
-      );
-      vi.stubGlobal('fetch', mockJwks(kid));
+      const token = 'opaque-session-token';
+      vi.stubGlobal('fetch', mockSessionMe());
 
       const req = makeRequest(
         'http://localhost:3000/admin',

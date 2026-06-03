@@ -16,7 +16,7 @@ export type NextgenSession = {
   email: string | null;
   /** The user's display name, or `null` if not present in the token. */
   name: string | null;
-  /** The raw verified JWT. */
+  /** The raw verified auth token. Browser session tokens are opaque. */
   token: string;
 };
 
@@ -55,7 +55,7 @@ export type NextgenMiddlewareOptions = {
   protectedRoutes?: string[];
 
   /**
-   * Pathnames that are completely skipped by the middleware — no JWT
+   * Pathnames that are completely skipped by the middleware — no session
    * verification, no protection check, no header tunnelling.
    * Useful for webhooks, health-check endpoints, or any route where
    * running auth logic is undesirable.
@@ -77,8 +77,8 @@ export type NextgenMiddlewareOptions = {
   jwtKey?: string;
 
   /**
-   * Restrict accepted JWT `alg` header values. Tokens whose algorithm is not
-   * in this list are rejected before JWKS is fetched.
+   * Restrict accepted JWT `alg` header values for explicit Bearer tokens.
+   * Browser session cookies are opaque and validated through the session API.
    * @default ["RS256", "ES256"]
    */
   allowedAlgorithms?: string[];
@@ -106,9 +106,9 @@ export type NextgenMiddlewareOptions = {
   allowedTokenTypes?: string[];
 
   /**
-   * Timeout in milliseconds for JWKS endpoint requests.
-   * Requests that do not complete within this window are aborted and the
-   * token is rejected, treating the request as unauthenticated.
+   * Timeout in milliseconds for JWKS endpoint requests and session-cookie
+   * validation requests. Requests that do not complete within this window are
+   * aborted and the token is rejected, treating the request as unauthenticated.
    * @default 5000
    */
   jwksTimeoutMs?: number;

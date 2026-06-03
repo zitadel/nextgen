@@ -10,7 +10,7 @@ import {
 } from '@zitadel/sdk-core/middleware';
 import { NextResponse } from 'next/server';
 
-import { verifyJwt } from './lib/jwt';
+import { verifyJwt, type JwtPayload } from './lib/jwt';
 
 /**
  * Clones the incoming request headers, injects `extra` key/value pairs,
@@ -47,7 +47,7 @@ function tunnelHeaders(
 }
 
 /**
- * Next.js Edge middleware that handles proxying, JWT verification, and route
+ * Next.js Edge middleware that handles proxying, session validation, and route
  * protection in a single pass.
  *
  * Place this in your `middleware.ts` file:
@@ -259,10 +259,72 @@ interface AuthHandlerOptions {
   readonly pathname: string;
 }
 
+type ValidatedSession = {
+  readonly token: string;
+  readonly userId: string;
+};
+
+type SessionMeResponse = {
+  readonly state?: string;
+  readonly user_id?: string | null;
+};
+
+function authUrlWithPath(authUrl: string, pathname: string): string {
+  const base = authUrl.endsWith('/') ? authUrl.slice(0, -1) : authUrl;
+  return `${base}${pathname}`;
+}
+
+function sessionFromJwt(
+  token: string,
+  payload: JwtPayload,
+): ValidatedSession | null {
+  if (!payload.sub) {
+    return null;
+  }
+  return {
+    token,
+    userId: payload.sub,
+  };
+}
+
+async function sessionFromCookie(
+  authUrl: string,
+  token: string,
+  timeoutMs: number,
+): Promise<ValidatedSession | null> {
+  try {
+    const response = await fetch(authUrlWithPath(authUrl, '/sessions/me'), {
+      method: 'GET',
+      headers: {
+        cookie: `__nextgen_session=${token}`,
+      },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const body = (await response.json()) as SessionMeResponse;
+    if (body.state !== 'active' || !body.user_id) {
+      return null;
+    }
+
+    return {
+      token,
+      userId: body.user_id,
+    };
+  } catch (err) {
+    console.error('[nextgen] session validation unexpected error:', err);
+    return null;
+  }
+}
+
 /**
- * Verifies the session token and tunnels the result to server components via
- * a request header. Redirects to the login page when the token is absent or
- * invalid on a protected route.
+ * Validates the session token and tunnels the result to server components via
+ * request headers. Cookie sessions are validated by the auth backend; explicit
+ * Bearer tokens are verified locally as JWTs. Redirects to the login page when
+ * the token is absent or invalid on a protected route.
  *
  * @param req  - The incoming edge request.
  * @param opts - Auth handler options.
@@ -292,25 +354,32 @@ async function handleAuth(
   // Bearer token takes explicit precedence over the session cookie. API clients
   // (e.g. mobile apps, CLIs) use Authorization headers while browsers use
   // cookies; when both are present the caller clearly intended the Bearer token.
-  const token = bearerToken ?? cookieToken;
-
-  const payload = token
-    ? await verifyJwt(token, {
-        issuerUrl: url,
+  const session = bearerToken
+    ? await verifyJwtSession(bearerToken, {
+        url,
         allowedAlgorithms,
         clockSkewMs,
         audience,
         allowedTokenTypes,
         jwksTimeoutMs,
       })
-    : null;
+    : cookieToken
+      ? await sessionFromCookie(url, cookieToken, jwksTimeoutMs ?? 5000)
+      : null;
 
-  if (payload && token && payload.sub) {
-    const tunnelled = tunnelHeaders(req, { 'x-nextgen-auth-token': token });
+  if (session) {
+    const tunnelled = tunnelHeaders(req, {
+      'x-nextgen-auth-token': session.token,
+      'x-nextgen-auth-user-id': session.userId,
+    });
     return NextResponse.next({ request: { headers: tunnelled } });
   }
 
-  const tunnelled = tunnelHeaders(req, { 'x-nextgen-auth-token': '' });
+  const tunnelled = tunnelHeaders(req, {
+    'x-nextgen-auth-token': '',
+    'x-nextgen-auth-user-id': '',
+  });
+
   const staleNextgenCookies = req.cookies
     .getAll()
     .filter((c: { name: string }) => c.name.startsWith('__nextgen'));
@@ -330,6 +399,29 @@ async function handleAuth(
     response.cookies.delete(cookie.name);
   }
   return response;
+}
+
+async function verifyJwtSession(
+  token: string,
+  opts: Pick<
+    AuthHandlerOptions,
+    | 'url'
+    | 'allowedAlgorithms'
+    | 'clockSkewMs'
+    | 'audience'
+    | 'allowedTokenTypes'
+    | 'jwksTimeoutMs'
+  >,
+): Promise<ValidatedSession | null> {
+  const payload = await verifyJwt(token, {
+    issuerUrl: opts.url,
+    allowedAlgorithms: opts.allowedAlgorithms,
+    clockSkewMs: opts.clockSkewMs,
+    audience: opts.audience,
+    allowedTokenTypes: opts.allowedTokenTypes,
+    jwksTimeoutMs: opts.jwksTimeoutMs,
+  });
+  return payload ? sessionFromJwt(token, payload) : null;
 }
 
 /**

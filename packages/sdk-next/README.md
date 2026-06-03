@@ -34,7 +34,7 @@ export const config = {
 The middleware runs on every matched route and does three things in one pass:
 
 1. **Proxies** `/__nextgen/*` requests to the auth backend
-2. **Verifies** the session JWT via JWKS using the Web Crypto API
+2. **Validates** the browser session cookie with the auth backend, or verifies explicit Bearer JWTs via JWKS
 3. **Redirects** unauthenticated requests to `loginPath` for protected routes
 
 ### 2. Reading auth in a Server Component
@@ -130,23 +130,18 @@ export function LoginWidget() {
 | `url`                 | `string`             | `ZITADEL_URL` env        | Full URL of the Zitadel auth backend                                                                                       |
 | `proxyPath`         | `string`             | `"/__nextgen"`           | Path prefix proxied to the auth backend                                                                                    |
 | `protectedRoutes`   | `string[]`           | `[]`                     | Paths requiring a valid session. Trailing `*` matches sub-paths                                                            |
-| `ignoredRoutes`     | `string[]`           | `[]`                     | Paths skipped entirely — no JWT check, no tunnelling. Useful for webhooks or health checks. Trailing `*` matches sub-paths |
+| `ignoredRoutes`     | `string[]`           | `[]`                     | Paths skipped entirely — no session check, no tunnelling. Useful for webhooks or health checks. Trailing `*` matches sub-paths |
 | `loginPath`         | `string`             | `"/login"`               | Where to redirect unauthenticated users                                                                                    |
-| `allowedAlgorithms` | `string[]`           | `["RS256", "ES256"]`     | JWT `alg` values to accept. Tokens with any other algorithm are rejected before JWKS is fetched                            |
+| `allowedAlgorithms` | `string[]`           | `["RS256", "ES256"]`     | JWT `alg` values to accept for explicit Bearer tokens. Browser session cookies are opaque                                 |
 | `allowedTokenTypes` | `string[]`           | `["JWT", "at+JWT"]`      | Accepted `typ` header values (case-insensitive). Set to `[]` to disable this check                                         |
 | `clockSkewMs`       | `number`             | `5000`                   | Clock skew tolerance in ms for `exp`, `nbf`, `iat`                                                                         |
-| `jwksTimeoutMs`     | `number`             | `5000`                   | Timeout in ms for JWKS endpoint requests. Token is rejected if the fetch exceeds this window                               |
+| `jwksTimeoutMs`     | `number`             | `5000`                   | Timeout in ms for JWKS and session-cookie validation requests. Token is rejected if the fetch exceeds this window          |
 | `audience`          | `string \| string[]` | not validated            | Expected `aud` claim value(s). When omitted, audience is not checked                                                       |
 
-## How JWT verification works
+## How Session Validation Works
 
-1. Bearer token from `Authorization` header is checked first; `__nextgen_session` cookie is the fallback
-2. The JWT header is decoded to extract `kid` and `alg`
-3. Tokens with an `alg` not in `allowedAlgorithms` (`RS256`, `ES256` by default) are rejected immediately — no JWKS fetch
-4. Tokens with a `typ` not in `allowedTokenTypes` are rejected immediately
-5. The public key is fetched from `{url}/oauth/v2/keys` (JWKS) using the Web Crypto API, with a 5 s timeout, and cached for 5 minutes per `kid`
-6. The signature is verified **before** any claim checks
-7. `iss` must be present and must equal `url` — tokens without an issuer are rejected
-8. `exp` must be present and must be in the future (with `clockSkewMs` tolerance) — tokens without an expiry are rejected
-9. `nbf` and `iat` are validated with `clockSkewMs` tolerance when present
-10. The `x-nextgen-auth-token` header is stripped from all proxied requests to prevent internal state leakage
+1. Bearer token from `Authorization` header is checked first; `__nextgen_session` cookie is the browser fallback
+2. Bearer tokens are verified as JWTs: `alg`/`typ` are checked, the public key is fetched from `{url}/oauth/v2/keys`, and issuer/expiry claims are validated
+3. Browser session cookies are opaque and validated with `GET {url}/sessions/me`
+4. A cookie session must return `state: "active"` and a `user_id`
+5. The `x-nextgen-auth-token` header is stripped from all proxied requests to prevent internal state leakage

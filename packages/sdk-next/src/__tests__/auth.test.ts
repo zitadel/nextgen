@@ -64,6 +64,25 @@ describe('auth()', () => {
     });
   });
 
+  it('returns authenticated session from opaque session headers', async () => {
+    const token = 'opaque-session-token';
+    mockHeadersMap.set('x-nextgen-auth-token', token);
+    mockHeadersMap.set('x-nextgen-auth-user-id', 'user-opaque');
+
+    const { auth } = await import('../auth.js');
+    const result = await auth();
+
+    expect(result).toEqual({
+      isAuthenticated: true,
+      session: {
+        userId: 'user-opaque',
+        email: null,
+        name: null,
+        token,
+      },
+    });
+  });
+
   it('returns unauthenticated when token has no sub claim', async () => {
     const token = makeFakeJwt({
       email: 'alice@example.com',
