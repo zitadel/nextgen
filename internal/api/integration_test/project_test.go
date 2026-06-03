@@ -61,6 +61,10 @@ func (s *stubAuthAttemptService) VerifyProof(ctx context.Context, input service.
 	return nil, nil
 }
 
+func (s *stubAuthAttemptService) RegisterCreatedUser(ctx context.Context, projectID, attemptID, userID string) error {
+	return nil
+}
+
 var _ service.AuthAttemptService = (*stubAuthAttemptService)(nil)
 
 func TestCreateProject(t *testing.T) {
