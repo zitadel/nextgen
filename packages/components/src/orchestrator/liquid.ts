@@ -22,13 +22,7 @@ import { authFormTemplate } from "./templates/auth-form.liquid.js";
 import { defaultTemplate } from "./templates/default.liquid.js";
 import { passkeyUpsellTemplate } from "./templates/passkey-upsell.liquid.js";
 import { signedInTemplate } from "./templates/signed-in.liquid.js";
-
-export const TEMPLATE_NAMES = {
-  default: "default",
-  authForm: "auth-form",
-  passkeyUpsell: "passkey-upsell",
-  signedIn: "signed-in",
-} as const;
+import { TEMPLATE_NAMES } from "./template-names.js";
 
 export type CreateLiquidOptions = {
   locale: Locale;

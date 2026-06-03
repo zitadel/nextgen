@@ -42,7 +42,6 @@ export {
   resolveTheme,
   ThemeController,
   applyFontUrl,
-  createLiquidEngine,
   createSanitiser,
   validateBranding,
   patchMandatoryGates,
