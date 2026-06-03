@@ -18,7 +18,7 @@ import type { ZitadelLogout } from "./zitadel-logout.js";
 const API_BASE = "https://logout.test.invalid";
 
 beforeAll(() => {
-  configureZitadel({ apiBase: API_BASE, projectId: "test" });
+  configureZitadel({ proxyPath: API_BASE, projectId: "test" });
 });
 
 function setDisplayCookie(name: string, email: string): void {

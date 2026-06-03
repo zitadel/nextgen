@@ -12,8 +12,8 @@ export default defineConfig({
       mode: "split",
       mock: true,
       baseUrl: {
-        runtime: "getApiBaseUrl()",
-        imports: [{ name: "getApiBaseUrl", importPath: "../../runtime/base-url" }],
+        runtime: "getProxyPath()",
+        imports: [{ name: "getProxyPath", importPath: "../../runtime/base-url" }],
       },
       formatter: "oxfmt",
       override: {
