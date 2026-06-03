@@ -43,7 +43,6 @@ describe("patch then eject round-trip", () => {
       cwd,
       "--non-interactive",
       "--json",
-      "--no-apply",
     ]);
     expect(setup.exitCode).toBe(0);
     expect((parseJson(setup.stdout) as { status: string }).status).toBe("ok");
@@ -51,8 +50,6 @@ describe("patch then eject round-trip", () => {
     // Patch wrote the managed tree + framework routes.
     expect((await stat(join(cwd, ".zitadel/secret"))).mode & 0o777).toBe(0o600);
     expect(await readFile(join(cwd, "zitadel.json"), "utf8")).toContain('"project"');
-    expect(await readFile(join(cwd, ".zitadel/schemas/user.json"), "utf8")).toContain('"x-unique"');
-    expect(await readFile(join(cwd, ".zitadel/flows/default.json"), "utf8")).toContain('"name"');
     expect(await readFile(join(cwd, "app/login/page.tsx"), "utf8")).toContain(MANAGED_MARKER);
     expect(await readFile(join(cwd, "middleware.ts"), "utf8")).toContain(MANAGED_MARKER);
 

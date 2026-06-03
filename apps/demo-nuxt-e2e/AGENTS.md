@@ -53,7 +53,7 @@ The api-mock listens on `:4001` here (not the default `:4000`) so this
 project can run in parallel with `apps/demo-next-e2e/` under
 `nx run-many -t e2e` without `EADDRINUSE`. The `PORT` override is
 plumbed through via Playwright's `webServer.env` and matched by the
-`NEXTGEN_ISSUER_URL` passed to the Nuxt dev server. Both knobs are
+`ZITADEL_URL` passed to the Nuxt dev server. Both knobs are
 existing env contracts — no application code changes.
 
 Cold-start for Nuxt + Vite optimiser is noticeably slower than Next; the
