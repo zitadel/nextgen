@@ -26,17 +26,6 @@ jobs:
       - name: Lint OpenAPI spec
         run: npx --yes @redocly/cli@2.31.5 lint api/openapi/openapi-spec.yaml --format=github-actions
 
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v5
-        with:
-          run_install: false
-
-      - name: Install Node dependencies
-        run: corepack pnpm install --frozen-lockfile
-
-      - name: Sync embedded UI assets for Go embed
-        run: sh scripts/sync-embedded-ui-dist.sh all
-
   go-unit-test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -103,21 +92,78 @@ jobs:
       # postgres binary, so no Maven binary cache is needed here.
       - run: go test -v -tags spanner_integration -timeout=10m ./...
 
-  go-smoke-test-embedded-postgres:
+  goreleaser-snapshot:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
+    needs: [go-unit-test, go-integration-test-postgres, go-integration-test-spanner, node-check]
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-go@v6
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
           cache: true
-      # Builds the server and boots it on the embedded-postgres default connector:
-      # the zero-config / single-binary path (run zitadel without standing up
-      # Postgres). Asserts the binary starts, runs migrations, and shuts down
-      # cleanly (exit 0); we test the start, not the integration suites. The
-      # embedded binary is fetched from Maven on a cold cache, so this job keeps
-      # the postgres runtime libs and the binary cache (StartEmbedded retries the fetch).
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v5
+        with:
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Run GoReleaser (snapshot)
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --snapshot --clean --skip=publish,sign
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Export Docker image for smoke tests
+        run: |
+          IMAGE="$(docker image ls --format '{{.Repository}}:{{.Tag}}' ghcr.io/zitadel/nextgen | grep snapshot | head -1)"
+          if [ -z "$IMAGE" ]; then
+            IMAGE="$(docker image ls --format '{{.Repository}}:{{.Tag}}' ghcr.io/zitadel/nextgen | head -1)"
+          fi
+          test -n "$IMAGE"
+          echo "$IMAGE" > dist/nextgen-image.tag
+          docker save "$IMAGE" -o dist/nextgen-image.tar
+
+      - name: Upload GoReleaser snapshot artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: goreleaser-snapshot
+          path: dist/**
+          if-no-files-found: error
+          retention-days: 7
+
+  go-smoke-test-embedded-postgres:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [goreleaser-snapshot]
+    steps:
+      - name: Download GoReleaser snapshot
+        uses: actions/download-artifact@v6
+        with:
+          name: goreleaser-snapshot
+          path: goreleaser-dist
+      # Boots the Goreleaser-built binary on the embedded-postgres default connector:
+      # zero-config / single-binary path. UI is already embedded by GoReleaser hooks.
       - name: Install embedded-postgres runtime deps
         run: sudo apt-get update -qq && sudo apt-get install -y -qq libicu-dev libssl-dev
       - name: Cache embedded-postgres binary
@@ -125,8 +171,13 @@ jobs:
         with:
           path: ~/.embedded-postgres-go
           key: embedded-postgres-${{ runner.os }}-${{ hashFiles('go.sum') }}
-      - name: Build server
-        run: go build -o ./nextgen .
+      - name: Extract linux/amd64 server binary
+        run: |
+          TARBALL="$(find goreleaser-dist -name 'nextgen_*_linux_amd64.tar.gz' | head -1)"
+          test -n "$TARBALL"
+          tar -xzf "$TARBALL" -C .
+          test -x ./nextgen
+          chmod +x ./nextgen
       - name: Smoke test (start, migrate, graceful exit 0)
         run: |
           export NEXTGEN_SERVER_ENCRYPTION_KEY=4D61737465726B65794E65656473546F48617665333243686172616374657273
@@ -178,26 +229,36 @@ jobs:
 
   quickstart-smoke:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [goreleaser-snapshot]
     env:
       GHCR_READONLY_TOKEN: ${{ secrets.GHCR_READONLY_TOKEN }}
     steps:
       - uses: actions/checkout@v6
 
-      - name: Prepare quick-start files from checked-out repository
+      - name: Download GoReleaser snapshot
+        uses: actions/download-artifact@v6
+        with:
+          name: goreleaser-snapshot
+          path: goreleaser-dist
+
+      - name: Load snapshot Docker image
+        run: |
+          test -f goreleaser-dist/nextgen-image.tar
+          test -f goreleaser-dist/nextgen-image.tag
+          docker load -i goreleaser-dist/nextgen-image.tar
+
+      - name: Prepare quick-start compose stack
         run: |
           mkdir -p nextgen_quickstart
           cp docs/operations/docker-compose.yaml nextgen_quickstart/docker-compose.yaml
-          cp docs/operations/env.example nextgen_quickstart/env.example
-          test -s nextgen_quickstart/docker-compose.yaml
-          test -s nextgen_quickstart/env.example
-
-      - name: Verify quick-start step 2 pre-compose setup
-        run: |
-          cp nextgen_quickstart/env.example nextgen_quickstart/.env
-          test -s nextgen_quickstart/.env
-
-      - name: Validate compose configuration
-        run: docker compose -f nextgen_quickstart/docker-compose.yaml --env-file nextgen_quickstart/.env config >/dev/null
+          IMAGE="$(cat goreleaser-dist/nextgen-image.tag)"
+          {
+            echo "NEXTGEN_IMAGE=${IMAGE}"
+            echo "NEXTGEN_PORT=8080"
+            echo "NEXTGEN_SERVER_ENCRYPTION_KEY=4d61737465726b65794e65656473546f48617665333243686172616374657273"
+          } > nextgen_quickstart/.env
+          docker compose -f nextgen_quickstart/docker-compose.yaml --env-file nextgen_quickstart/.env config >/dev/null
 
       - name: Optional GHCR auth-path smoke check
         if: ${{ env.GHCR_READONLY_TOKEN != '' }}
@@ -210,6 +271,18 @@ jobs:
       - name: GHCR auth-path smoke check skipped
         if: ${{ env.GHCR_READONLY_TOKEN == '' }}
         run: echo "Skipping GHCR login smoke check because GHCR_READONLY_TOKEN is not configured."
+
+      - name: Start stack and verify HTTP endpoints
+        run: |
+          docker compose -f nextgen_quickstart/docker-compose.yaml --env-file nextgen_quickstart/.env up -d --wait
+          curl -fsS http://localhost:8080/healthz
+          curl -fsS -o /dev/null -w "%{http_code}\n" http://localhost:8080/ui/console/ | grep -q '^200$'
+          curl -fsS -o /dev/null -w "%{http_code}\n" http://localhost:8080/ui/login/ | grep -q '^200$'
+          echo "quickstart compose smoke test passed"
+
+      - name: Tear down compose stack
+        if: always()
+        run: docker compose -f nextgen_quickstart/docker-compose.yaml --env-file nextgen_quickstart/.env down -v
 
   node-e2e:
     runs-on: ubuntu-latest
@@ -330,55 +403,5 @@ jobs:
         with:
           name: npm-packages
           path: ${{ runner.temp }}/zitadel-npm-packages/*.tgz
-          if-no-files-found: error
-          retention-days: 7
-
-  goreleaser-snapshot:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    needs: [go-unit-test, go-integration-test-postgres, go-integration-test-spanner, go-smoke-test-embedded-postgres, node-check]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - name: Set up Go
-        uses: actions/setup-go@v6
-        with:
-          go-version-file: go.mod
-          cache: true
-
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v5
-        with:
-          run_install: false
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
-      - name: Run GoReleaser (snapshot)
-        uses: goreleaser/goreleaser-action@v7
-        with:
-          distribution: goreleaser
-          version: "~> v2"
-          args: release --snapshot --clean --skip=publish,sign
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload GoReleaser snapshot artifacts
-        uses: actions/upload-artifact@v7
-        with:
-          name: goreleaser-snapshot
-          path: dist/**
           if-no-files-found: error
           retention-days: 7

@@ -28,7 +28,7 @@ Copy [`env.example`](../operations/env.example) to `.env` in the same directory 
 Required variables:
 
 - `NEXTGEN_DATABASE_POSTGRES` — connection URL (set in compose for the bundled Postgres)
-- `NEXTGEN_SERVER_COOKIE_SEALER_KEY` — 32-byte hex key for flow cookies (**dev example only**)
+- `NEXTGEN_SERVER_ENCRYPTION_KEY` — 32-byte hex key for flow cookies (**dev example only**)
 
 ## Bootstrap users
 

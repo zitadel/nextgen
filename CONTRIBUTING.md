@@ -33,7 +33,7 @@ This runs `pnpm nx build` for `@zitadel-nextgen/console` and `@zitadel-nextgen/l
 ### 2. Configure and start
 
 ```sh
-export NEXTGEN_SERVER_COOKIE_SEALER_KEY=4d61737465726b65794e65656473546f48617665333243686172616374657273
+export NEXTGEN_SERVER_ENCRYPTION_KEY=4D61737465726B65794E65656473546F48617665333243686172616374657273
 export NEXTGEN_DATABASE_POSTGRES='postgres://zitadel:zitadel@localhost:5432/nextgen?sslmode=disable'
 
 go run . server -c docs/operations/nextgen.example.yaml
@@ -65,7 +65,7 @@ After a snapshot build, binaries are under `dist/`:
 ```sh
 docker build -t nextgen:local .
 docker run --rm -p 8080:8080 \
-  -e NEXTGEN_SERVER_COOKIE_SEALER_KEY=4d61737465726b65794e65656473546f48617665333243686172616374657273 \
+  -e NEXTGEN_SERVER_ENCRYPTION_KEY=4D61737465726B65794E65656473546F48617665333243686172616374657273 \
   -e NEXTGEN_DATABASE_POSTGRES='postgres://...' \
   nextgen:local server
 ```

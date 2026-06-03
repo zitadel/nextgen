@@ -9,7 +9,7 @@ Example file: [`docs/operations/nextgen.example.yaml`](../operations/nextgen.exa
 | YAML key | Environment | Default | Description |
 | -------- | ----------- | ------- | ----------- |
 | `server.address` | `NEXTGEN_SERVER_ADDRESS` | `:8080` | Listen address |
-| `server.cookie_sealer_key` | `NEXTGEN_SERVER_COOKIE_SEALER_KEY` | *(required)* | 64-char hex (32 bytes) for sealing flow cookies |
+| `server.encryption_key` | `NEXTGEN_SERVER_ENCRYPTION_KEY` | *(required)* | 64-char hex (32 bytes) for sealing flow cookies |
 | `server.console_enabled` | `NEXTGEN_SERVER_CONSOLE_ENABLED` | `true` | Serve embedded management console |
 | `server.console_path` | `NEXTGEN_SERVER_CONSOLE_PATH` | `/ui/console` | Console URL prefix |
 | `server.login_enabled` | `NEXTGEN_SERVER_LOGIN_ENABLED` | `true` | Serve embedded login shell |

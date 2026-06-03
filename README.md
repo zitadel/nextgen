@@ -88,7 +88,7 @@ goreleaser release --snapshot --clean --skip=publish,sign
 
 # Run a snapshot Docker image (defaults to `nextgen server`)
 docker run --rm -p 8080:8080 \
-  -e NEXTGEN_SERVER_COOKIE_SEALER_KEY=4d61737465726b65794e65656473546f48617665333243686172616374657273 \
+  -e NEXTGEN_SERVER_ENCRYPTION_KEY=4D61737465726B65794E65656473546F48617665333243686172616374657273 \
   -e NEXTGEN_DATABASE_POSTGRES='postgres://...' \
   ghcr.io/zitadel/nextgen:<snapshot-tag>-amd64
 ```

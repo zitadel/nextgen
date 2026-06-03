@@ -1,7 +1,7 @@
 server:
   address: ":8080"
   # Dev-only example — generate a unique 32-byte key for real deployments.
-  cookie_sealer_key: "4d61737465726b65794e65656473546f48617665333243686172616374657273"
+  encryption_key: "4d61737465726b65794e65656473546f48617665333243686172616374657273"
   console_enabled: true
   console_path: /ui/console
   login_enabled: true
