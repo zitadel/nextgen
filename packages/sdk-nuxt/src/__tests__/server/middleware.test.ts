@@ -81,7 +81,7 @@ describe('createNextgenMiddleware (H3)', () => {
     const app = createApp();
     app.use(
       createNextgenMiddleware({
-        issuerUrl: 'http://localhost:4000',
+        url: 'http://localhost:4000',
         protectedRoutes: ['/admin'],
         loginPath: '/login',
       }),
@@ -103,7 +103,7 @@ describe('createNextgenMiddleware (H3)', () => {
     const app = createApp();
     app.use(
       createNextgenMiddleware({
-        issuerUrl: 'http://localhost:4000',
+        url: 'http://localhost:4000',
         protectedRoutes: ['/admin'],
         loginPath: '/login',
       }),
@@ -136,7 +136,7 @@ describe('createNextgenMiddleware (H3)', () => {
     const app = createApp();
     app.use(
       createNextgenMiddleware({
-        issuerUrl: 'http://localhost:4000',
+        url: 'http://localhost:4000',
         protectedRoutes: ['/admin'],
         loginPath: '/login',
       }),
@@ -185,7 +185,7 @@ describe('createNextgenMiddleware (H3)', () => {
     const app = createApp();
     app.use(
       createNextgenMiddleware({
-        issuerUrl: 'http://localhost:4000',
+        url: 'http://localhost:4000',
         protectedRoutes: ['/admin'],
         loginPath: '/login',
       }),
@@ -244,7 +244,7 @@ describe('createNextgenMiddleware (H3)', () => {
     const app = createApp();
     app.use(
       createNextgenMiddleware({
-        issuerUrl: 'http://localhost:4000',
+        url: 'http://localhost:4000',
         protectedRoutes: [],
       }),
     );
@@ -283,7 +283,7 @@ describe('createNextgenMiddleware (H3)', () => {
     const app = createApp();
     app.use(
       createNextgenMiddleware({
-        issuerUrl: 'http://localhost:4000',
+        url: 'http://localhost:4000',
         protectedRoutes: ['/admin'],
         loginPath: '/login',
       }),
@@ -319,7 +319,7 @@ describe('createNextgenMiddleware (H3)', () => {
     const app = createApp();
     app.use(
       createNextgenMiddleware({
-        issuerUrl: 'http://localhost:4000',
+        url: 'http://localhost:4000',
         protectedRoutes: ['/admin'],
         loginPath: '/login',
       }),
@@ -354,7 +354,7 @@ describe('createNextgenMiddleware (H3)', () => {
     const app = createApp();
     app.use(
       createNextgenMiddleware({
-        issuerUrl: 'http://localhost:4000',
+        url: 'http://localhost:4000',
         protectedRoutes: ['/admin'],
         allowedTokenTypes: ['JWT', 'at+JWT'],
       }),
@@ -384,7 +384,7 @@ describe('createNextgenMiddleware (H3)', () => {
     const app = createApp();
     app.use(
       createNextgenMiddleware({
-        issuerUrl: 'http://localhost:4000',
+        url: 'http://localhost:4000',
         protectedRoutes: ['/admin'],
         allowedAlgorithms: ['ES256'],
       }),
@@ -420,7 +420,7 @@ describe('createNextgenMiddleware (H3)', () => {
     // No allowedAlgorithms specified — defaults to ['RS256', 'ES256']
     app.use(
       createNextgenMiddleware({
-        issuerUrl: 'http://localhost:4000',
+        url: 'http://localhost:4000',
         protectedRoutes: ['/admin'],
       }),
     );
@@ -448,7 +448,7 @@ describe('createNextgenMiddleware (H3)', () => {
     const app = createApp();
     app.use(
       createNextgenMiddleware({
-        issuerUrl: 'http://localhost:4000',
+        url: 'http://localhost:4000',
         protectedRoutes: ['/admin'],
         loginPath: '/login?tab=sso',
       }),
@@ -479,7 +479,7 @@ describe('createNextgenMiddleware (H3)', () => {
     const app = createApp();
     app.use(
       createNextgenMiddleware({
-        issuerUrl: 'http://localhost:4000',
+        url: 'http://localhost:4000',
         protectedRoutes: ['/admin'],
         loginPath: '/login',
       }),
@@ -513,7 +513,7 @@ describe('createNextgenMiddleware (H3)', () => {
     const app = createApp();
     app.use(
       createNextgenMiddleware({
-        issuerUrl: 'http://localhost:4000',
+        url: 'http://localhost:4000',
         protectedRoutes: ['/admin'],
         loginPath: '/login',
       }),
@@ -554,7 +554,7 @@ describe('createNextgenMiddleware (H3)', () => {
     const app = createApp();
     app.use(
       createNextgenMiddleware({
-        issuerUrl: 'http://localhost:4000',
+        url: 'http://localhost:4000',
         protectedRoutes: ['/admin'],
         loginPath: '/login',
       }),
@@ -583,7 +583,7 @@ describe('createNextgenMiddleware (H3)', () => {
     );
 
     const app = createApp();
-    app.use(createNextgenMiddleware({ issuerUrl: 'http://localhost:4000' }));
+    app.use(createNextgenMiddleware({ url: 'http://localhost:4000' }));
 
     const handler = toWebHandler(app);
     await handler(
@@ -622,7 +622,7 @@ describe('createNextgenMiddleware (H3)', () => {
       );
 
       const app = createApp();
-      app.use(createNextgenMiddleware({ issuerUrl: 'http://localhost:4000' }));
+      app.use(createNextgenMiddleware({ url: 'http://localhost:4000' }));
 
       const handler = toWebHandler(app);
       const res = await handler(
@@ -652,7 +652,7 @@ describe('createNextgenMiddleware (H3)', () => {
       );
 
       const app = createApp();
-      app.use(createNextgenMiddleware({ issuerUrl: 'http://localhost:4000' }));
+      app.use(createNextgenMiddleware({ url: 'http://localhost:4000' }));
 
       const handler = toWebHandler(app);
       const res = await handler(
@@ -668,7 +668,7 @@ describe('createNextgenMiddleware (H3)', () => {
     it('throws synchronously when loginPath is an absolute URL', () => {
       expect(() =>
         createNextgenMiddleware({
-          issuerUrl: 'http://localhost:4000',
+          url: 'http://localhost:4000',
           protectedRoutes: ['/admin'],
           loginPath: 'https://evil.example.com/phish',
         }),
@@ -678,7 +678,7 @@ describe('createNextgenMiddleware (H3)', () => {
     it('throws synchronously when loginPath is a protocol-relative URL', () => {
       expect(() =>
         createNextgenMiddleware({
-          issuerUrl: 'http://localhost:4000',
+          url: 'http://localhost:4000',
           protectedRoutes: ['/admin'],
           loginPath: '//evil.example.com/phish',
         }),
@@ -689,7 +689,7 @@ describe('createNextgenMiddleware (H3)', () => {
       const app = createApp();
       app.use(
         createNextgenMiddleware({
-          issuerUrl: 'http://localhost:4000',
+          url: 'http://localhost:4000',
           protectedRoutes: ['/admin'],
           loginPath: '/custom-login',
         }),
@@ -724,7 +724,7 @@ describe('createNextgenMiddleware (H3)', () => {
           remoteAddress: '10.0.0.2',
         };
       });
-      app.use(createNextgenMiddleware({ issuerUrl: 'http://localhost:4000' }));
+      app.use(createNextgenMiddleware({ url: 'http://localhost:4000' }));
 
       const handler = toWebHandler(app);
       await handler(
@@ -758,7 +758,7 @@ describe('createNextgenMiddleware (H3)', () => {
           remoteAddress: '10.0.0.2',
         };
       });
-      app.use(createNextgenMiddleware({ issuerUrl: 'http://localhost:4000' }));
+      app.use(createNextgenMiddleware({ url: 'http://localhost:4000' }));
 
       const handler = toWebHandler(app);
       await handler(makeWebRequest('http://localhost:3000/__nextgen/v1/flow'));
@@ -780,7 +780,7 @@ describe('createNextgenMiddleware (H3)', () => {
 
       const app = createApp();
       // No socket-patching middleware — socket.remoteAddress will be undefined
-      app.use(createNextgenMiddleware({ issuerUrl: 'http://localhost:4000' }));
+      app.use(createNextgenMiddleware({ url: 'http://localhost:4000' }));
 
       const handler = toWebHandler(app);
       await handler(makeWebRequest('http://localhost:3000/__nextgen/v1/flow'));
@@ -799,7 +799,7 @@ describe('createNextgenMiddleware (H3)', () => {
 
       // "/__nextgen-evil" starts with "/__nextgen" but the next char is "-", not "/"
       const app = createApp();
-      app.use(createNextgenMiddleware({ issuerUrl: 'http://localhost:4000' }));
+      app.use(createNextgenMiddleware({ url: 'http://localhost:4000' }));
 
       const handler = toWebHandler(app);
       await handler(
@@ -817,7 +817,7 @@ describe('createNextgenMiddleware (H3)', () => {
       );
 
       const app = createApp();
-      app.use(createNextgenMiddleware({ issuerUrl: 'http://localhost:4000' }));
+      app.use(createNextgenMiddleware({ url: 'http://localhost:4000' }));
 
       const handler = toWebHandler(app);
       const res = await handler(
@@ -835,7 +835,7 @@ describe('createNextgenMiddleware (H3)', () => {
       );
 
       const app = createApp();
-      app.use(createNextgenMiddleware({ issuerUrl: 'http://localhost:4000' }));
+      app.use(createNextgenMiddleware({ url: 'http://localhost:4000' }));
 
       const handler = toWebHandler(app);
       const res = await handler(
@@ -852,7 +852,7 @@ describe('createNextgenMiddleware (H3)', () => {
       const app = createApp();
       app.use(
         createNextgenMiddleware({
-          issuerUrl: 'http://localhost:4000',
+          url: 'http://localhost:4000',
           protectedRoutes: [],
         }),
       );
@@ -891,7 +891,7 @@ describe('createNextgenMiddleware (H3)', () => {
       const app = createApp();
       app.use(
         createNextgenMiddleware({
-          issuerUrl: 'http://localhost:4000',
+          url: 'http://localhost:4000',
           protectedRoutes: [],
         }),
       );
@@ -920,7 +920,7 @@ describe('createNextgenMiddleware (H3)', () => {
       const app = createApp();
       app.use(
         createNextgenMiddleware({
-          issuerUrl: 'http://localhost:4000',
+          url: 'http://localhost:4000',
           ignoredRoutes: ['/health'],
         }),
       );

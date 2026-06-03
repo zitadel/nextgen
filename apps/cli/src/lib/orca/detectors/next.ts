@@ -42,7 +42,7 @@ export class NextDetector implements Detector {
     }
 
     const devPort = await detectDevPort(cwd, pkg);
-    return { id: "next", appDir, devPort, issuerUrl: issuerFromPort(devPort) };
+    return { id: "next", appDir, devPort, url: issuerFromPort(devPort) };
   }
 }
 

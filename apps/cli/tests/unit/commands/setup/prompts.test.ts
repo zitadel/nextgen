@@ -43,7 +43,7 @@ const FRAMEWORK = {
   id: "next",
   appDir: "app" as const,
   devPort: 3000,
-  issuerUrl: "http://localhost:3000",
+  url: "http://localhost:3000",
 };
 
 function baseAnswers(over: Partial<SetupAnswers> = {}): SetupAnswers {

@@ -14,7 +14,7 @@ import {
 } from "./index.js";
 import type { MockHandle } from "./handlers.js";
 
-const PROJECT_ID = "demo-project";
+const PROJECT_ID = "proj_demo";
 
 /**
  * Decode the payload of a JWT without verifying its signature. Used by the
@@ -38,7 +38,7 @@ let mock: MockHandle = setupMockHandlers();
 beforeAll(() => {
   // Any absolute URL works — the orval-generated handlers match `*/flow*`
   // with a wildcard prefix.
-  configureZitadel({ apiBase: "http://localhost", projectId: PROJECT_ID });
+  configureZitadel({ proxyPath: "http://localhost", projectId: PROJECT_ID });
   server.listen({ onUnhandledRequest: "error" });
 });
 

@@ -80,7 +80,7 @@ describe('nextgenMiddleware', () => {
   it('public route with no token passes through with empty x-nextgen-auth-token', async () => {
     const req = makeRequest('http://localhost:3000/');
     const res = await nextgenMiddleware(req, {
-      issuerUrl: 'http://localhost:4000',
+      url: 'http://localhost:4000',
       protectedRoutes: ['/admin'],
     });
 
@@ -94,7 +94,7 @@ describe('nextgenMiddleware', () => {
   it('protected route with no token redirects to /login?next=/admin', async () => {
     const req = makeRequest('http://localhost:3000/admin');
     const res = await nextgenMiddleware(req, {
-      issuerUrl: 'http://localhost:4000',
+      url: 'http://localhost:4000',
       protectedRoutes: ['/admin'],
       loginPath: '/login',
     });
@@ -108,7 +108,7 @@ describe('nextgenMiddleware', () => {
   it('redirect preserves existing query params in loginPath', async () => {
     const req = makeRequest('http://localhost:3000/admin');
     const res = await nextgenMiddleware(req, {
-      issuerUrl: 'http://localhost:4000',
+      url: 'http://localhost:4000',
       protectedRoutes: ['/admin'],
       loginPath: '/login?tab=sso',
     });
@@ -140,7 +140,7 @@ describe('nextgenMiddleware', () => {
       `__nextgen_session=${token}`,
     );
     const res = await nextgenMiddleware(req, {
-      issuerUrl: 'http://localhost:4000',
+      url: 'http://localhost:4000',
       protectedRoutes: ['/admin'],
       loginPath: '/login',
     });
@@ -173,7 +173,7 @@ describe('nextgenMiddleware', () => {
       `Bearer ${token}`,
     );
     const res = await nextgenMiddleware(req, {
-      issuerUrl: 'http://localhost:4000',
+      url: 'http://localhost:4000',
       protectedRoutes: ['/admin'],
       loginPath: '/login',
     });
@@ -216,7 +216,7 @@ describe('nextgenMiddleware', () => {
       },
     });
     const res = await nextgenMiddleware(req, {
-      issuerUrl: 'http://localhost:4000',
+      url: 'http://localhost:4000',
       protectedRoutes: ['/admin'],
     });
 
@@ -244,7 +244,7 @@ describe('nextgenMiddleware', () => {
       `__nextgen_session=${tamperedToken}`,
     );
     const res = await nextgenMiddleware(req, {
-      issuerUrl: 'http://localhost:4000',
+      url: 'http://localhost:4000',
       protectedRoutes: ['/admin'],
       loginPath: '/login',
     });
@@ -271,7 +271,7 @@ describe('nextgenMiddleware', () => {
       `__nextgen_session=${token}`,
     );
     const res = await nextgenMiddleware(req, {
-      issuerUrl: 'http://localhost:4000',
+      url: 'http://localhost:4000',
       protectedRoutes: ['/admin'],
       allowedTokenTypes: ['JWT', 'at+JWT'],
     });
@@ -294,7 +294,7 @@ describe('nextgenMiddleware', () => {
       `__nextgen_session=${token}`,
     );
     const res = await nextgenMiddleware(req, {
-      issuerUrl: 'http://localhost:4000',
+      url: 'http://localhost:4000',
       protectedRoutes: ['/admin'],
       allowedAlgorithms: ['ES256'],
     });
@@ -319,7 +319,7 @@ describe('nextgenMiddleware', () => {
         'content-type': 'application/json',
       },
     });
-    await nextgenMiddleware(req, { issuerUrl: 'http://localhost:4000' });
+    await nextgenMiddleware(req, { url: 'http://localhost:4000' });
 
     expect(capturedHeaders).toBeDefined();
     expect((capturedHeaders as Headers).has('x-nextgen-auth-token')).toBe(
@@ -351,7 +351,7 @@ describe('nextgenMiddleware', () => {
     );
     // No allowedAlgorithms specified — defaults to ['RS256', 'ES256']
     const res = await nextgenMiddleware(req, {
-      issuerUrl: 'http://localhost:4000',
+      url: 'http://localhost:4000',
       protectedRoutes: ['/admin'],
     });
 
@@ -375,7 +375,7 @@ describe('nextgenMiddleware', () => {
       `__nextgen_session=${tamperedToken}`,
     );
     const res = await nextgenMiddleware(req, {
-      issuerUrl: 'http://localhost:4000',
+      url: 'http://localhost:4000',
       protectedRoutes: ['/admin'],
       loginPath: '/login',
     });
@@ -407,7 +407,7 @@ describe('nextgenMiddleware', () => {
       `__nextgen_session=${token}`,
     );
     const res = await nextgenMiddleware(req, {
-      issuerUrl: 'http://localhost:4000',
+      url: 'http://localhost:4000',
       protectedRoutes: ['/admin'],
       loginPath: '/login',
     });
@@ -435,7 +435,7 @@ describe('nextgenMiddleware', () => {
       `__nextgen_session=${token}`,
     );
     const res = await nextgenMiddleware(req, {
-      issuerUrl: 'http://localhost:4000',
+      url: 'http://localhost:4000',
       protectedRoutes: ['/admin'],
       loginPath: '/login',
     });
@@ -464,7 +464,7 @@ describe('nextgenMiddleware', () => {
       `__nextgen_session=${token}`,
     );
     const res = await nextgenMiddleware(req, {
-      issuerUrl: 'http://localhost:4000',
+      url: 'http://localhost:4000',
       protectedRoutes: ['/admin'],
       loginPath: '/login',
     });
@@ -494,7 +494,7 @@ describe('nextgenMiddleware', () => {
 
       const req = new NextRequest('http://localhost:3000/__nextgen/v1/flow');
       const res = await nextgenMiddleware(req, {
-        issuerUrl: 'http://localhost:4000',
+        url: 'http://localhost:4000',
       });
 
       const setCookie = res.headers.get('set-cookie') ?? '';
@@ -521,7 +521,7 @@ describe('nextgenMiddleware', () => {
 
       const req = new NextRequest('http://localhost:3000/__nextgen/v1/flow');
       const res = await nextgenMiddleware(req, {
-        issuerUrl: 'http://localhost:4000',
+        url: 'http://localhost:4000',
       });
 
       expect(res.headers.get('location')).toBeNull();
@@ -537,7 +537,7 @@ describe('nextgenMiddleware', () => {
         },
       });
       const res = await nextgenMiddleware(req, {
-        issuerUrl: 'http://localhost:4000',
+        url: 'http://localhost:4000',
         protectedRoutes: ['/admin'],
       });
 
@@ -555,7 +555,7 @@ describe('nextgenMiddleware', () => {
     it('throws when loginPath is an absolute URL', async () => {
       await expect(
         nextgenMiddleware(makeRequest('http://localhost:3000/admin'), {
-          issuerUrl: 'http://localhost:4000',
+          url: 'http://localhost:4000',
           protectedRoutes: ['/admin'],
           loginPath: 'https://evil.example.com/phish',
         }),
@@ -565,7 +565,7 @@ describe('nextgenMiddleware', () => {
     it('throws when loginPath is a protocol-relative URL', async () => {
       await expect(
         nextgenMiddleware(makeRequest('http://localhost:3000/admin'), {
-          issuerUrl: 'http://localhost:4000',
+          url: 'http://localhost:4000',
           protectedRoutes: ['/admin'],
           loginPath: '//evil.example.com/phish',
         }),
@@ -575,7 +575,7 @@ describe('nextgenMiddleware', () => {
     it('accepts a relative loginPath and redirects correctly', async () => {
       const req = makeRequest('http://localhost:3000/admin');
       const res = await nextgenMiddleware(req, {
-        issuerUrl: 'http://localhost:4000',
+        url: 'http://localhost:4000',
         protectedRoutes: ['/admin'],
         loginPath: '/custom-login',
       });
@@ -602,7 +602,7 @@ describe('nextgenMiddleware', () => {
           'x-real-ip': '192.168.1.1',
         },
       });
-      await nextgenMiddleware(req, { issuerUrl: 'http://localhost:4000' });
+      await nextgenMiddleware(req, { url: 'http://localhost:4000' });
 
       expect(capturedHeaders).toBeDefined();
       const xff = (capturedHeaders as Headers).get('x-forwarded-for') ?? '';
@@ -625,7 +625,7 @@ describe('nextgenMiddleware', () => {
         method: 'GET',
         headers: { 'x-real-ip': '192.168.1.1' },
       });
-      await nextgenMiddleware(req, { issuerUrl: 'http://localhost:4000' });
+      await nextgenMiddleware(req, { url: 'http://localhost:4000' });
 
       expect((capturedHeaders as Headers).get('x-forwarded-for')).toBe(
         '192.168.1.1',
@@ -646,7 +646,7 @@ describe('nextgenMiddleware', () => {
         method: 'GET',
         // No x-forwarded-for, no x-real-ip
       });
-      await nextgenMiddleware(req, { issuerUrl: 'http://localhost:4000' });
+      await nextgenMiddleware(req, { url: 'http://localhost:4000' });
 
       expect((capturedHeaders as Headers).has('x-forwarded-for')).toBe(false);
     });
@@ -663,7 +663,7 @@ describe('nextgenMiddleware', () => {
       const req = new NextRequest(
         'http://localhost:3000/__nextgen-evil/resource',
       );
-      await nextgenMiddleware(req, { issuerUrl: 'http://localhost:4000' });
+      await nextgenMiddleware(req, { url: 'http://localhost:4000' });
 
       // With no token on a public route, fetch is never called (not proxied, no JWKS)
       expect(vi.mocked(fetch)).not.toHaveBeenCalled();
@@ -677,7 +677,7 @@ describe('nextgenMiddleware', () => {
 
       const req = new NextRequest('http://localhost:3000/__nextgen');
       const res = await nextgenMiddleware(req, {
-        issuerUrl: 'http://localhost:4000',
+        url: 'http://localhost:4000',
       });
 
       expect(vi.mocked(fetch)).toHaveBeenCalledOnce();
@@ -692,7 +692,7 @@ describe('nextgenMiddleware', () => {
 
       const req = new NextRequest('http://localhost:3000/__nextgen/v1/flow');
       const res = await nextgenMiddleware(req, {
-        issuerUrl: 'http://localhost:4000',
+        url: 'http://localhost:4000',
       });
 
       expect(vi.mocked(fetch)).toHaveBeenCalledOnce();
@@ -706,7 +706,7 @@ describe('nextgenMiddleware', () => {
         headers: { 'x-nextgen-auth-token': 'forged-session-token' },
       });
       const res = await nextgenMiddleware(req, {
-        issuerUrl: 'http://localhost:4000',
+        url: 'http://localhost:4000',
         protectedRoutes: ['/admin'],
       });
 
@@ -748,7 +748,7 @@ describe('nextgenMiddleware', () => {
       });
 
       const res = await nextgenMiddleware(req, {
-        issuerUrl: 'http://localhost:4000',
+        url: 'http://localhost:4000',
         protectedRoutes: ['/admin'],
       });
 
@@ -765,7 +765,7 @@ describe('nextgenMiddleware', () => {
         headers: { 'x-nextgen-auth-token': 'forged-session-token' },
       });
       const res = await nextgenMiddleware(req, {
-        issuerUrl: 'http://localhost:4000',
+        url: 'http://localhost:4000',
         ignoredRoutes: ['/health'],
       });
 

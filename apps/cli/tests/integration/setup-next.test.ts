@@ -72,10 +72,10 @@ describe("Next setup integration", () => {
     expect(middleware).toContain("export function middleware(");
     expect(middleware).toContain('protectedRoutes: ["/profile"]');
     expect(middleware).toContain('"/__nextgen/:path*"');
-    expect(middleware).toContain("process.env.NEXTGEN_ISSUER_URL");
+    expect(middleware).toContain("process.env.ZITADEL_URL");
     const envLocal = await readFile(join(cwd, ".env.local"), "utf8");
     expect(envLocal).toContain("ZITADEL_ENVIRONMENT=development");
-    expect(envLocal).toContain("NEXTGEN_ISSUER_URL=");
+    expect(envLocal).toContain("ZITADEL_URL=");
     expect(envLocal).not.toContain("NEXT_PUBLIC_ZITADEL_API_BASE");
     expect(envLocal).toContain("NEXT_PUBLIC_ZITADEL_PROJECT_ID=");
     expect(envLocal).not.toContain("ZITADEL_PROJECT_SECRET");

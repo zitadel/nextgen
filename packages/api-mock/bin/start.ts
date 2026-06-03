@@ -1,7 +1,7 @@
 import { startMockServer } from "../src/server.js";
 
 const rawPort = process.env.PORT;
-const port = rawPort !== undefined ? parseInt(rawPort, 10) : 4000;
+const port = rawPort !== undefined ? parseInt(rawPort, 10) : 8080;
 
 if (!Number.isFinite(port) || port < 1 || port > 65535) {
   console.error(
