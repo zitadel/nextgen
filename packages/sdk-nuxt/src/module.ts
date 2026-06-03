@@ -10,11 +10,11 @@ import type { NextgenMiddlewareOptions } from './runtime/types';
 
 export default defineNuxtModule<NextgenMiddlewareOptions>({
   meta: {
-    name: '@zitadel-nextgen/sdk-nuxt',
+    name: '@zitadel/sdk-nuxt',
     configKey: 'nextgen',
   },
   defaults: {
-    issuerUrl: process.env.NEXTGEN_ISSUER_URL ?? 'http://localhost:4000',
+    url: process.env.ZITADEL_URL ?? 'http://localhost:8080',
     proxyPath: '/__nextgen',
     protectedRoutes: [],
     loginPath: '/login',
@@ -23,7 +23,7 @@ export default defineNuxtModule<NextgenMiddlewareOptions>({
     const { resolve } = createResolver(import.meta.url);
 
     nuxt.options.runtimeConfig.nextgen = {
-      issuerUrl: options.issuerUrl ?? 'http://localhost:4000',
+      url: options.url ?? 'http://localhost:4000',
       loginPath: options.loginPath ?? '/login',
       protectedRoutes: options.protectedRoutes ?? [],
       jwtKey: options.jwtKey,
@@ -31,7 +31,9 @@ export default defineNuxtModule<NextgenMiddlewareOptions>({
 
     // Expose SDK-initializer values to the client-side plugin so it can
     // call `configureZitadel()` without hardcoding paths.
-    nuxt.options.runtimeConfig.public.nextgenApiBase =
+    nuxt.options.runtimeConfig.public.zitadelProxyPath =
+      options.proxyPath ?? '/__nextgen';
+    nuxt.options.runtimeConfig.public.nextgenProxyPath =
       options.proxyPath ?? '/__nextgen';
 
     addPlugin(resolve('./runtime/plugin'));

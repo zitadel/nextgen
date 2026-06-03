@@ -1,7 +1,7 @@
 import type {
   AuthResult,
   NextgenMiddlewareOptions,
-} from '@zitadel-nextgen/sdk-core/types';
+} from '@zitadel/sdk-core/types';
 import type { EventHandler, H3Event } from 'h3';
 
 import {
@@ -9,7 +9,7 @@ import {
   INTERNAL_HEADERS,
   filterResponseHeaders,
   matchesRoutes,
-} from '@zitadel-nextgen/sdk-core/middleware';
+} from '@zitadel/sdk-core/middleware';
 import {
   defineEventHandler,
   getCookie,
@@ -92,10 +92,10 @@ function buildUpstreamHeaders(event: H3Event): Headers {
  * Register it as a Nitro server middleware in `server/middleware/auth.ts`:
  *
  * ```ts
- * import { createNextgenMiddleware } from "@zitadel-nextgen/sdk-nuxt/server";
+ * import { createNextgenMiddleware } from "@zitadel/sdk-nuxt/server";
  *
  * export default createNextgenMiddleware({
- *   issuerUrl: process.env.NEXTGEN_ISSUER_URL,
+ *   url: process.env.ZITADEL_URL,
  *   protectedRoutes: ["/admin*", "/dashboard*"],
  *   loginPath: "/login",
  * });
@@ -108,7 +108,7 @@ export function createNextgenMiddleware(
   options: NextgenMiddlewareOptions = {},
 ): EventHandler {
   const {
-    issuerUrl = process.env.NEXTGEN_ISSUER_URL ?? 'http://localhost:4000',
+    url = process.env.ZITADEL_URL ?? 'http://localhost:8080',
     proxyPath = '/__nextgen',
     protectedRoutes = [],
     ignoredRoutes = [],
@@ -134,8 +134,8 @@ export function createNextgenMiddleware(
   }
 
   return defineEventHandler(async (event: H3Event) => {
-    const url = getRequestURL(event);
-    const { pathname } = url;
+    const urlObj = getRequestURL(event);
+    const { pathname } = urlObj;
 
     if (matchesRoutes(pathname, ignoredRoutes)) {
       // Neutralise any client-supplied x-nextgen-auth-token on ignored routes.
@@ -150,16 +150,16 @@ export function createNextgenMiddleware(
     if (pathname === proxyPath || pathname.startsWith(`${proxyPath}/`)) {
       return proxyRequest(
         event,
-        issuerUrl,
-        proxyPath,
         url,
+        proxyPath,
+        urlObj,
         proxyTimeoutMs,
         onExchangeResponse,
       );
     }
 
     return handleAuth(event, {
-      issuerUrl,
+      url,
       protectedRoutes,
       loginPath,
       allowedAlgorithms,
@@ -178,21 +178,21 @@ export function createNextgenMiddleware(
  * Hop-by-hop headers are stripped in both directions.
  *
  * @param event      - The current H3 event.
- * @param issuerUrl  - Base URL of the auth backend.
+ * @param authUrl    - Base URL of the auth backend.
  * @param proxyPath  - The path prefix being proxied (e.g. `"/__nextgen"`).
  * @param url        - The parsed request URL.
  * @returns The upstream response body stream.
  */
 async function proxyRequest(
   event: H3Event,
-  issuerUrl: string,
+  authUrl: string,
   proxyPath: string,
   url: URL,
   proxyTimeoutMs: number,
   onExchangeResponse?: (response: Response) => Response | Promise<Response>,
 ): Promise<ReadableStream<Uint8Array> | null> {
   const suffix = url.pathname.slice(proxyPath.length);
-  const target = `${issuerUrl}${suffix}${url.search}`;
+  const target = `${authUrl}${suffix}${url.search}`;
 
   const method = event.node.req.method ?? 'GET';
   const hasBody = !['GET', 'HEAD'].includes(method);
@@ -248,7 +248,7 @@ async function proxyRequest(
  * public-facing {@link NextgenMiddlewareOptions}.
  */
 interface AuthHandlerOptions {
-  readonly issuerUrl: string;
+  readonly url: string;
   readonly protectedRoutes: readonly string[];
   readonly loginPath: string;
   /**
@@ -289,7 +289,7 @@ async function handleAuth(
   opts: AuthHandlerOptions,
 ): Promise<void> {
   const {
-    issuerUrl,
+    url,
     protectedRoutes,
     loginPath,
     allowedAlgorithms,
@@ -322,7 +322,7 @@ async function handleAuth(
 
   const payload = token
     ? await verifyJwt(token, {
-        issuerUrl,
+        issuerUrl: url,
         allowedAlgorithms,
         clockSkewMs,
         audience,
@@ -366,7 +366,7 @@ async function handleAuth(
  * Call this inside any server route or API handler after the middleware has run:
  *
  * ```ts
- * import { getAuth } from "@zitadel-nextgen/sdk-nuxt/server";
+ * import { getAuth } from "@zitadel/sdk-nuxt/server";
  *
  * export default defineEventHandler((event) => {
  *   const auth = getAuth(event);

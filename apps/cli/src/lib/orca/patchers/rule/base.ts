@@ -1,4 +1,3 @@
-import { buildFlow } from "../../../flows";
 import { stableStringify } from "../../../json";
 import { DEFAULT_SERVER } from "../../../server";
 import { scaffold } from "./file-writer";
@@ -65,9 +64,11 @@ export abstract class AbstractRulePatcher implements Patcher {
 
   /**
    * The framework-agnostic `.zitadel/` base files every rule patcher writes:
-   * the project secret, `zitadel.json`, user schema, flow definition, env
-   * templates, and sync state. Flow content comes from {@link buildFlow}; the
-   * schema is the caller's already-built object. Pure: no filesystem or network.
+   * the project secret, `zitadel.json`, env templates, and an empty sync
+   * state. The `schemas/` and `flows/` directories are created empty — the
+   * server provisions the default user schema and flow definition when the
+   * project is created, so nothing is scaffolded into them here. Pure: no
+   * filesystem or network.
    */
   private baseOps(ctx: PatchContext): ReadonlyArray<FileOp> {
     return [
@@ -89,23 +90,13 @@ export abstract class AbstractRulePatcher implements Patcher {
       },
       { kind: "write", path: "zitadel.json", contents: `${stableStringify(projectConfig(ctx))}\n` },
       {
-        kind: "write",
-        path: ".zitadel/schemas/user.json",
-        contents: `${stableStringify(ctx.userSchema)}\n`,
-      },
-      {
-        kind: "write",
-        path: ".zitadel/flows/default.json",
-        contents: `${stableStringify(buildFlow(ctx.userFields))}\n`,
-      },
-      {
         kind: "merge-env",
         path: ".env.example",
         entries: {
           ZITADEL_PROJECT_ID: "",
           ZITADEL_ENVIRONMENT: "",
           ZITADEL_ISSUER: "",
-          NEXTGEN_ISSUER_URL: "",
+          ZITADEL_URL: "",
           NEXT_PUBLIC_ZITADEL_PROJECT_ID: "",
         },
       },
@@ -116,7 +107,7 @@ export abstract class AbstractRulePatcher implements Patcher {
           ZITADEL_PROJECT_ID: ctx.project.id,
           ZITADEL_ENVIRONMENT: "development",
           ZITADEL_ISSUER: ctx.issuer,
-          NEXTGEN_ISSUER_URL: ctx.server,
+          ZITADEL_URL: ctx.server,
           NEXT_PUBLIC_ZITADEL_PROJECT_ID: ctx.project.id,
         },
       },

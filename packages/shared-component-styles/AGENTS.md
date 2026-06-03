@@ -1,7 +1,7 @@
 # Agent Instructions — `packages/shared-component-styles`
 
 Optional **surface CSS** for components that exist as both a Lit atom and a paired
-React implementation. Values always come from `@zitadel-nextgen/design-tokens`;
+React implementation. Values always come from `@zitadel/design-tokens`;
 this package owns **rules** (selectors, states, layout) once.
 
 ## Layout
@@ -21,7 +21,7 @@ pairs.json           # registry of paired components (docs / tooling)
 - **Lit atoms** import surface + host CSS with `?inline` (see
   `packages/components/src/atoms/*.ts`). `@tsdown/css` inlines the strings when
   `components` is built; Vite handles the same in dev and vitest.
-- **Paired React components** import `@zitadel-nextgen/shared-component-styles/styles.css`
+- **Paired React components** import `@zitadel/shared-component-styles/styles.css`
   once, or the per-component CSS export.
 - **Class names are public API** (`.zr-btn`, `.zr-field__wrap`, …). Lit inner
   nodes and React DOM must use the same classes.

@@ -1,10 +1,14 @@
-Flow orchestrates UI; primitives       Client orchestrates its own UI;
-below come from auth_attempts.         calls auth_attempts + Session API.
-  → manages registration, profiling      → server verifies, re-evaluates assurance
-  → handles SSO redirects
-  ...                                  Check assurance against requested acr_values
-complete → redirect                      → build native UI, step-up if needed
-                                       request satisfied → exchange / handoff
+# Flow Engine
+
+The flow engine is a server-driven state machine that produces semantic
+capability payloads (fields, actions, gates) alongside a LiquidJS template.
+This directory holds its design and architecture docs.
+
+**Start here:**
+- [Architecture](architecture.md) — components, request path, upstream and downstream dependencies.
+- [Flow Engine](flow-engine.md) — design overview: definitions, steps, resolution, completion.
+- [Definition Rules](flow-definition-rules.md) — definition shape and engine-checked rules.
+- [Capabilities](capabilities.md) — what works today, what's stubbed, what's missing.
 
 ## Relevant POC ADRs
 
@@ -20,7 +24,10 @@ complete → redirect                      → build native UI, step-up if neede
 
 | Document | Status | Description |
 |---|---|---|
-| [Flow Engine](flow-engine.md) | In Review | Server-side state machine producing Capability payloads. Step types, flow definitions, resolution. |
+| [Architecture](architecture.md) | Current | Components, request path, upstream / downstream dependencies. Code-anchored. |
+| [Flow Engine](flow-engine.md) | In Review | Design overview: definitions, resolution, step shape, completion semantics. |
+| [Definition Rules](flow-definition-rules.md) | Current | Definition shape, transitions, engine-checked validation rules. |
+| [Capabilities](capabilities.md) | Current | What works today, what's stubbed (`ErrUnsupported`), what's missing. |
 | [Flow Engine — Step Response Shape](flow-engine-nodes.md) | In Review (frontend) | Capability mapping: Fields, Actions, Gates, and LiquidJS templates. |
 | [Component Capability Map](../branding/component-capability-map.md) | Design reference | Maps schema fields, actions, gates, and supporting capabilities to reusable UI components. |
 | [Flow Engine — Storage](flow-engine-storage.md) | In Review | Encrypted cookie model, session/flow separation, optimistic locking, DB I/O analysis. |
@@ -29,6 +36,9 @@ complete → redirect                      → build native UI, step-up if neede
 | [User Schema Integration](user-schema.md) | Preliminary | How the flow engine and policy engine consume user schema annotations. |
 | [Bot Detection](bot-detection.md) | Preliminary | Composable captcha, fingerprinting, and risk evaluation. Depends on policy engine. |
 | [Template Security](template-security.md) | In Review | XSS attack vectors, trust boundaries, and defense-in-depth for LiquidJS + innerHTML rendering. |
+| **Research / Proposals** | | |
+| [External Auth Factors](flow-engine-external-auth-factors.md) | Research | Generic extensibility for third-party MFA providers (Duo, Futurae, …). Not a design decision. |
+| [Capability Handshake](capability-handshake.md) | Research | Client/SDK ↔ server SemVer negotiation. Not implemented. |
 | **Design API sketches** | | |
 | [Session API sketch](api/session-api.yaml) | Preliminary | Design-facing OpenAPI sketch; implementation source of truth lives under `api/openapi/`. |
 | [Flow API sketch](api/flow-api.yaml) | In Review | Design-facing OpenAPI sketch; implementation source of truth lives under `api/openapi/`. |

@@ -1,7 +1,7 @@
 # Agent Instructions — `apps/demo-nuxt-e2e/`
 
 Playwright project that exercises `apps/demo-nuxt/` end-to-end against
-the standalone `@zitadel-nextgen/api-mock` TCP server. Defer to root
+the standalone `@zitadel/api-mock` TCP server. Defer to root
 [`AGENTS.md`](../../AGENTS.md) for repo-wide rules.
 
 ## Scope
@@ -10,7 +10,7 @@ This project covers the boundary that Vitest cannot reach:
 
 - `<zitadel-login>` mounted inside Nuxt's `<ClientOnly>` after the SSR pass.
 - The Lit orchestrator's internal `POST /sessions/exchange` traversing
-  the Nitro `/__nextgen` proxy installed by `@zitadel-nextgen/sdk-nuxt`.
+  the Nitro `/__nextgen` proxy installed by `@zitadel/sdk-nuxt`.
 - The `__nextgen_session` cookie being set on the demo origin and
   surviving the full-page navigation triggered by `post-sign-in-url`.
 - The Nitro auth middleware accepting that cookie on the next request
@@ -40,10 +40,10 @@ belong in this project.
 
 ```sh
 corepack pnpm exec playwright install        # one-time, browsers
-corepack pnpm exec nx run @zitadel-nextgen/demo-nuxt-e2e:e2e
+corepack pnpm exec nx run @zitadel/demo-nuxt-e2e:e2e
 ```
 
-Nx rebuilds `@zitadel-nextgen/components` first via `^build`, then
+Nx rebuilds `@zitadel/components` first via `^build`, then
 Playwright boots `api-mock` (`:4001`) and `demo-nuxt` (`:3001`) through
 direct `pnpm --filter` commands. Using `nx run …` inside
 `webServer.command` makes `@nx/playwright/plugin` treat the dev servers
@@ -53,7 +53,7 @@ The api-mock listens on `:4001` here (not the default `:4000`) so this
 project can run in parallel with `apps/demo-next-e2e/` under
 `nx run-many -t e2e` without `EADDRINUSE`. The `PORT` override is
 plumbed through via Playwright's `webServer.env` and matched by the
-`NEXTGEN_ISSUER_URL` passed to the Nuxt dev server. Both knobs are
+`ZITADEL_URL` passed to the Nuxt dev server. Both knobs are
 existing env contracts — no application code changes.
 
 Cold-start for Nuxt + Vite optimiser is noticeably slower than Next; the

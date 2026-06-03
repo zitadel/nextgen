@@ -4,7 +4,7 @@ import {
   useRuntimeConfig,
   useState,
 } from '#imports';
-import { configureZitadel } from '@zitadel-nextgen/api/config';
+import { configureZitadel } from '@zitadel/api/config';
 
 import type { ClientAuthResult } from './types';
 
@@ -34,18 +34,22 @@ export default defineNuxtPlugin(() => {
   useState<ClientAuthResult>('nextgen-auth', () => clientAuth);
 
   // Initialise SDK-wide config so web components (<zitadel-login>,
-  // <zitadel-logout>) resolve apiBase and projectId from the shared
+  // <zitadel-logout>) resolve proxyPath and projectId from the shared
   // config instead of requiring per-instance attributes.
   const runtimeConfig = useRuntimeConfig();
   const publicConfig = runtimeConfig.public;
-  const apiBase =
-    (publicConfig.nextgenApiBase as string | undefined) ?? '/__nextgen';
+  const proxyPath =
+    (publicConfig.zitadelProxyPath as string | undefined) ??
+    (publicConfig.nextgenProxyPath as string | undefined) ??
+    (publicConfig.nextgenApiBase as string | undefined) ??
+    '/__nextgen';
   const projectId = (publicConfig.zitadelProjectId as string | undefined) ?? '';
-  const issuerUrl =
-    (runtimeConfig.nextgenIssuerUrl as string | undefined) ??
+  const url =
+    (runtimeConfig.nextgen?.url as string | undefined) ??
+    (runtimeConfig.nextgen?.issuerUrl as string | undefined) ??
     'http://localhost:4000';
 
-  if (apiBase && projectId) {
-    configureZitadel({ apiBase, projectId, issuerUrl });
+  if (proxyPath && projectId) {
+    configureZitadel({ proxyPath, projectId, url });
   }
 });

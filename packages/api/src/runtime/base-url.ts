@@ -1,9 +1,9 @@
-let apiBaseUrl = "";
+let proxyPath = "";
 
-export function getApiBaseUrl(): string {
-  return apiBaseUrl;
+export function getProxyPath(): string {
+  return proxyPath;
 }
 
-export function setApiBaseUrl(baseUrl: string): void {
-  apiBaseUrl = baseUrl;
+export function setProxyPath(path: string): void {
+  proxyPath = path;
 }

@@ -2,8 +2,8 @@ import {
   createFlow,
   getFlowStep,
   submitFlowStep,
-} from "@zitadel-nextgen/api/generated/endpoints/zitadelNextGen";
-import { configureZitadel } from "@zitadel-nextgen/api/config";
+} from "@zitadel/api/generated/endpoints/zitadelNextGen";
+import { configureZitadel } from "@zitadel/api/config";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "vitest";
 
@@ -14,7 +14,7 @@ import {
 } from "./index.js";
 import type { MockHandle } from "./handlers.js";
 
-const PROJECT_ID = "demo-project";
+const PROJECT_ID = "proj_demo";
 
 /**
  * Decode the payload of a JWT without verifying its signature. Used by the
@@ -38,7 +38,7 @@ let mock: MockHandle = setupMockHandlers();
 beforeAll(() => {
   // Any absolute URL works — the orval-generated handlers match `*/flow*`
   // with a wildcard prefix.
-  configureZitadel({ apiBase: "http://localhost", projectId: PROJECT_ID });
+  configureZitadel({ proxyPath: "http://localhost", projectId: PROJECT_ID });
   server.listen({ onUnhandledRequest: "error" });
 });
 

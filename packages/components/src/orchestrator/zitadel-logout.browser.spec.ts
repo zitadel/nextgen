@@ -1,6 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { configureZitadel } from "@zitadel-nextgen/api/config";
+import { configureZitadel } from "@zitadel/api/config";
 
 import "./zitadel-logout.js";
 import type { ZitadelLogout } from "./zitadel-logout.js";
@@ -11,14 +11,14 @@ import type { ZitadelLogout } from "./zitadel-logout.js";
  * covers cookie parsing, template-slot mode, and aria attributes.
  *
  * Network calls go through the typed `endSession` operation in
- * `@zitadel-nextgen/api`. We swap `globalThis.fetch` for a lightweight stub
+ * `@zitadel/api`. We swap `globalThis.fetch` for a lightweight stub
  * (rather than running `msw/browser`) because vitest's browser provider
  * does not register a service worker out of the box.
  */
 const API_BASE = "https://logout.test.invalid";
 
 beforeAll(() => {
-  configureZitadel({ apiBase: API_BASE, projectId: "test" });
+  configureZitadel({ proxyPath: API_BASE, projectId: "test" });
 });
 
 function setDisplayCookie(name: string, email: string): void {

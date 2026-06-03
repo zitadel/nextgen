@@ -1,5 +1,5 @@
 /**
- * Thin wrappers around the orval-generated `@zitadel-nextgen/api` fetch
+ * Thin wrappers around the orval-generated `@zitadel/api` fetch
  * functions for the API operations the orchestrator drives:
  *
  * - `POST /flow`              — `createFlow`
@@ -11,13 +11,13 @@
  * `credentials: "include"` so the stateless `_zflow` HttpOnly cookie
  * round-trips. Centralising that here keeps every call site honest.
  *
- * Types come straight from `@zitadel-nextgen/api/generated/model`. Orval
+ * Types come straight from `@zitadel/api/generated/model`. Orval
  * emits per-operation aliases (`CreateFlow201`, `GetFlowStep200`,
  * `SubmitFlowStep200`) for what is structurally the same response; the
  * orchestrator stores them as `CreateFlow201` because that is the alias
  * orval gives the start-of-flow response.
  */
-import type { ZitadelApi } from "@zitadel-nextgen/api/config";
+import type { ZitadelApi } from "@zitadel/api/config";
 import type {
   CreateFlow201,
   CreateFlowBody,
@@ -25,7 +25,8 @@ import type {
   ExchangeHandoffBody,
   ExchangeHandoffParams,
   SubmitFlowStepBody,
-} from "@zitadel-nextgen/api/generated/model";
+} from "@zitadel/api/generated/model";
+import { ApiError } from "@zitadel/api/runtime/fetch";
 
 const apiRequestInit: RequestInit = { credentials: "include" };
 
@@ -33,12 +34,26 @@ export async function startFlow(api: ZitadelApi, input: CreateFlowBody): Promise
   return api.createFlow(input, apiRequestInit);
 }
 
+// Field validation errors come back as 400 with the step echoed and
+// `step.error` set. Unwrap that shape so it flows through like a 200;
+// everything else bubbles.
 export async function submitStep(
   api: ZitadelApi,
   id: string,
   body: SubmitFlowStepBody,
 ): Promise<CreateFlow201> {
-  return api.submitFlowStep(id, body, apiRequestInit);
+  try {
+    return await api.submitFlowStep(id, body, apiRequestInit);
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 400 && isFlowResponse(error.body)) {
+      return error.body;
+    }
+    throw error;
+  }
+}
+
+function isFlowResponse(body: unknown): body is CreateFlow201 {
+  return typeof body === "object" && body !== null && "step" in body;
 }
 
 export async function getCurrentStep(api: ZitadelApi, id: string): Promise<CreateFlow201> {

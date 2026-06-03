@@ -1,0 +1,80 @@
+name: release-npm
+
+# Publishes the public npm packages (@zitadel/cli, @zitadel/api,
+# @zitadel/components, @zitadel/sdk-core, @zitadel/sdk-next, @zitadel/sdk-nuxt)
+# via changesets. Pushing changesets to main opens a "Version Packages" PR;
+# merging that PR publishes to npm.
+#
+# The repo is in changesets PRERELEASE mode (.changeset/pre.json, tag "alpha"),
+# so versions are cut as X.Y.Z-alpha.N and published under the `alpha` npm
+# dist-tag — `npm install @zitadel/cli` keeps resolving the last stable
+# `latest`; consumers opt into prereleases with `@zitadel/cli@alpha`. Run
+# `pnpm changeset pre exit` to leave alpha and cut a stable `latest` release.
+#
+# Authentication uses npm trusted publishing (OIDC) — there is no NPM_TOKEN.
+# A maintainer must configure the trusted publisher for each public package
+# once on npmjs.com (provider: GitHub Actions, repo: zitadel/nextgen, workflow
+# filename: release-npm.yml). See .changeset/README.md.
+
+on:
+  push:
+    branches: [main]
+
+# id-token: write is required for OIDC trusted publishing.
+# contents/pull-requests: write let the changesets action open the
+# "Version Packages" PR and push version-bump commits.
+permissions:
+  contents: write
+  pull-requests: write
+  id-token: write
+
+concurrency:
+  group: release-npm-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.2
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          registry-url: "https://registry.npmjs.org"
+          cache: pnpm
+
+      # Trusted publishing requires npm >= 11.5.1; the pinned pnpm delegates
+      # the actual publish to the npm CLI, so the runner's npm must be current.
+      - name: Update npm for trusted publishing (OIDC)
+        run: npm install -g npm@latest
+
+      - name: Install dependencies
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Build packages
+        run: corepack pnpm nx run-many -t build
+
+      - name: Create release PR or publish to npm
+        uses: changesets/action@v1
+        with:
+          version: corepack pnpm changeset version
+          publish: corepack pnpm changeset publish
+          title: "chore: version packages"
+          commit: "chore: version packages"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Empty so the action does not pass an undefined token; OIDC handles auth.
+          NPM_TOKEN: ""
+          # GitHub-hosted runners support provenance attestations.
+          NPM_CONFIG_PROVENANCE: "true"

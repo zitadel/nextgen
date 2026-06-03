@@ -10,8 +10,8 @@ import { defineConfig, devices } from "@playwright/test";
  *                    → /admin (server-rendered, authenticated)
  *
  * The Vue / Nitro story is structurally similar to demo-next-e2e but the
- * proxy and route-protection layers come from `@zitadel-nextgen/sdk-nuxt`'s Nitro
- * middleware rather than `@zitadel-nextgen/sdk-next`'s edge middleware.
+ * proxy and route-protection layers come from `@zitadel/sdk-nuxt`'s Nitro
+ * middleware rather than `@zitadel/sdk-next`'s edge middleware.
  * Running the same scenario on both demos is the only way to catch a
  * regression in one SDK without the other.
  *
@@ -32,22 +32,22 @@ export default defineConfig({
   // The api-mock listens on PORT 4001 here so this project can run in
   // parallel with `apps/demo-next-e2e/` (which uses the default 4000)
   // under `nx run-many`. Both api-mock (`bin/start.ts` reads PORT) and
-  // the SDKs (NEXTGEN_ISSUER_URL) already accept the override; no
+  // the SDKs (ZITADEL_URL) already accept the override; no
   // application code changes.
   webServer: [
     {
-      command: "pnpm --filter @zitadel-nextgen/api-mock start",
-      url: "http://localhost:4001/.well-known/jwks.json",
+      command: "pnpm --filter @zitadel/api-mock start",
+      url: "http://localhost:8081/.well-known/jwks.json",
       reuseExistingServer: true,
       cwd: workspaceRoot,
       stdout: "pipe",
       stderr: "pipe",
       env: {
-        PORT: "4001",
+        PORT: "8081",
       },
     },
     {
-      command: "pnpm --filter @zitadel-nextgen/demo-nuxt dev",
+      command: "pnpm --filter @zitadel/demo-nuxt dev",
       url: "http://localhost:3001/login",
       reuseExistingServer: true,
       cwd: workspaceRoot,
@@ -55,7 +55,7 @@ export default defineConfig({
       stderr: "pipe",
       timeout: 120_000,
       env: {
-        NEXTGEN_ISSUER_URL: "http://localhost:4001",
+        ZITADEL_URL: "http://localhost:8081",
       },
     },
   ],

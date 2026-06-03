@@ -9,7 +9,7 @@ Use **Nx** from the repo root (`corepack pnpm install` first).
 Build the SDK (and its transitive dependencies) once before the first run:
 
 ```bash
-corepack pnpm nx build @zitadel-nextgen/sdk-nuxt
+corepack pnpm nx build @zitadel/sdk-nuxt
 ```
 
 ### 1. Configure environment
@@ -24,7 +24,7 @@ Or pass them inline when starting the dev server (step 2).
 
 | Variable                          | Default                 | Description                                        |
 | --------------------------------- | ----------------------- | -------------------------------------------------- |
-| `NEXTGEN_ISSUER_URL`              | `http://localhost:4000` | URL of the Nextgen auth server                     |
+| `ZITADEL_URL`                      | `http://localhost:4000` | URL of the Zitadel auth server                     |
 | `NUXT_PUBLIC_ZITADEL_PROJECT_ID`  | `demo`                  | Project ID passed to `<zitadel-login project-id>`  |
 
 ### 2. Start
@@ -33,14 +33,14 @@ Two terminals:
 
 ```bash
 # Terminal 1 — mock auth server on port 4000
-corepack pnpm nx start @zitadel-nextgen/api-mock
+corepack pnpm nx start @zitadel/api-mock
 
 # Terminal 2 — Nuxt on port 3001
-corepack pnpm nx dev @zitadel-nextgen/demo-nuxt
+corepack pnpm nx dev @zitadel/demo-nuxt
 
 # …or with inline env overrides:
-# NEXTGEN_ISSUER_URL=https://my-instance.zitadel.cloud NUXT_PUBLIC_ZITADEL_PROJECT_ID=abc123 \
-#   corepack pnpm nx dev @zitadel-nextgen/demo-nuxt
+# ZITADEL_URL=https://my-instance.zitadel.cloud NUXT_PUBLIC_ZITADEL_PROJECT_ID=abc123 \
+#   corepack pnpm nx dev @zitadel/demo-nuxt
 ```
 
 Open [http://localhost:3001/login](http://localhost:3001/login). Any email/password combination is accepted by the mock server.
@@ -48,18 +48,18 @@ Open [http://localhost:3001/login](http://localhost:3001/login). Any email/passw
 **UI-only iteration** (no Nuxt, no TCP mock):
 
 ```bash
-corepack pnpm nx dev @zitadel-nextgen/components
+corepack pnpm nx dev @zitadel/components
 # → http://localhost:5173/?route=login
 # → http://localhost:5173/?route=atoms
 
-corepack pnpm nx dev @zitadel-nextgen/console
+corepack pnpm nx dev @zitadel/console
 # → http://localhost:5174
 ```
 
-After changing `@zitadel-nextgen/components`, rebuild before refreshing:
+After changing `@zitadel/components`, rebuild before refreshing:
 
 ```bash
-corepack pnpm nx build @zitadel-nextgen/components
+corepack pnpm nx build @zitadel/components
 ```
 
 The demo imports the package from `dist/`, not source.
@@ -73,15 +73,15 @@ The demo imports the package from `dist/`, not source.
 
 ## How it works
 
-**Server middleware** (`server/middleware/auth.ts`) uses `createNextgenMiddleware` from `@zitadel-nextgen/sdk-nuxt` to proxy `/__nextgen/*` requests to the auth backend, verify the session JWT on every request, and redirect unauthenticated users away from `/admin`.
+**Server middleware** (`server/middleware/auth.ts`) uses `createNextgenMiddleware` from `@zitadel/sdk-nuxt` to proxy `/__nextgen/*` requests to the auth backend, verify the session JWT on every request, and redirect unauthenticated users away from `/admin`.
 
 **Plugin** (`plugins/auth.server.ts`) reads the verified auth context from the server event and writes it into Nuxt's shared `nextgen-auth` state so pages can access it without additional fetches.
 
-**Login page** renders the `<zitadel-login>` web component (from `@zitadel-nextgen/components`) inside `<ClientOnly>` to avoid SSR.
+**Login page** renders the `<zitadel-login>` web component (from `@zitadel/components`) inside `<ClientOnly>` to avoid SSR.
 
 **Admin page** reads `useState('nextgen-auth')` to display the signed-in user's email, with the `<zitadel-logout>` component in the header.
 
-**Client plugins** (do not import `@zitadel-nextgen/components` from page `<script setup>` — that runs during SSR and breaks hydration/fonts):
+**Client plugins** (do not import `@zitadel/components` from page `<script setup>` — that runs during SSR and breaks hydration/fonts):
 
 | Plugin | Role |
 | ------ | ---- |

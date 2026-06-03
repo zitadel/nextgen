@@ -1,7 +1,7 @@
 import { defineConfig } from "tsdown";
 
 /**
- * Library build for `@zitadel-nextgen/ui-react`.
+ * Library build for `@zitadel/ui-react`.
  *
  * Paired React components compile to ESM. Styles ship via shared-component-styles
  * plus a `styles.css` barrel; consumers import the barrel (or pick up side
@@ -24,7 +24,7 @@ export default defineConfig({
     /^react-dom\//,
     "lucide-react",
     /^lucide-react\//,
-    "@zitadel-nextgen/design-tokens",
-    /^@zitadel-nextgen\/design-tokens\//,
+    "@zitadel/design-tokens",
+    /^@zitadel\/design-tokens\//,
   ],
 });

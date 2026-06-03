@@ -1,10 +1,10 @@
-import { cssVars as raw } from "@zitadel-nextgen/design-tokens";
+import { cssVars as raw } from "@zitadel/design-tokens";
 import { unsafeCSS, type CSSResult } from "lit";
 
 /**
  * Lit-friendly token bridge.
  *
- * `@zitadel-nextgen/design-tokens` exports two parallel trees:
+ * `@zitadel/design-tokens` exports two parallel trees:
  *   - `tokens.color.text.primaryWhite === "#f4f4f6"` (resolved values)
  *   - `cssVars.color.text.primaryWhite === "var(--zl-color-text-primary-white)"`
  *

@@ -10,7 +10,7 @@
  * — fixtures themselves never embed branding so playground / test consumers
  * can swap it without rebuilding the fixture.
  */
-import type { CreateFlow201, CreateFlow201Step } from "@zitadel-nextgen/api/generated/model";
+import type { CreateFlow201, CreateFlow201Step } from "@zitadel/api/generated/model";
 
 import { signHandoffToken } from "../crypto.js";
 import type { StoredCredential } from "../lib/authn/index.js";
@@ -18,7 +18,7 @@ import type { StoredCredential } from "../lib/authn/index.js";
 export type StepFixtureInput = {
   flowId: string;
   sessionToken: string;
-  /** Issuer URL embedded in signed tokens (e.g. `"http://localhost:4000"`). */
+  /** Issuer URL embedded in signed tokens (e.g. `"http://localhost:8080"`). */
   iss: string;
   /**
    * Email captured from the identifier step, used as the JWT `sub` claim in

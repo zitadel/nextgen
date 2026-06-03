@@ -11,10 +11,10 @@
  * `logo_url`, `font_url`, `hero_url`), and the open record allows the
  * orchestrator-side v2 extension fields (`palette`, `typography`, `shape`,
  * `assets`, `theme`) without making this package depend on the
- * `@zitadel-nextgen/components` type surface. The orchestrator's branding
+ * `@zitadel/components` type surface. The orchestrator's branding
  * validator strips anything the OpenAPI doesn't model.
  */
-import type { CreateFlow201, CreateFlow201Branding } from "@zitadel-nextgen/api/generated/model";
+import type { CreateFlow201, CreateFlow201Branding } from "@zitadel/api/generated/model";
 
 export type MockBranding = CreateFlow201Branding & Record<string, unknown>;
 

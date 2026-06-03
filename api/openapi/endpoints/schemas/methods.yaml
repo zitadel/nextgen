@@ -39,6 +39,9 @@ post:
               An example of a schema definition that references an external 
               schema URL.
             externalValue: examples/schema-url-example.yaml
+          defaultHumanUserSchema:
+            summary: The default human user schema provided by the server.
+            externalValue: examples/default-human-user-schema-example.json
   responses:
     '201':
       description: The schema was created successfully

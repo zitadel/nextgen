@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
 
 import { nxViteTsPaths } from "@nx/vite/plugins/nx-tsconfig-paths.plugin";
-import { apiMockPublicDir } from "@zitadel-nextgen/api-mock/public-dir";
+import { apiMockPublicDir } from "@zitadel/api-mock/public-dir";
 import { defineConfig } from "vite";
 import { hmrPlugin, presets } from "vite-plugin-web-components-hmr";
 
@@ -19,7 +19,7 @@ const packageRoot = resolve(import.meta.dirname, ".");
  * is a self-contained static page — open it directly in a browser, no dev
  * server required.
  *
- * `publicDir` is pointed at `@zitadel-nextgen/api-mock`'s public folder so
+ * `publicDir` is pointed at `@zitadel/api-mock`'s public folder so
  * the canonical MSW worker shim (`mockServiceWorker.js`) is served from
  * `/mockServiceWorker.js`. Keeping the worker file inside the api-mock
  * package means MSW's postinstall hook only manages one copy in the
@@ -47,14 +47,14 @@ export default defineConfig({
     }),
     workspaceStylesFullReload(),
   ],
-  resolve: { conditions: ["@zitadel-nextgen/source"] },
+  resolve: { conditions: ["@zitadel/source"] },
   optimizeDeps: {
     exclude: [
-      "@zitadel-nextgen/components",
-      "@zitadel-nextgen/shared-component-styles",
-      "@zitadel-nextgen/design-tokens",
-      "@zitadel-nextgen/api",
-      "@zitadel-nextgen/api-mock",
+      "@zitadel/components",
+      "@zitadel/shared-component-styles",
+      "@zitadel/design-tokens",
+      "@zitadel/api",
+      "@zitadel/api-mock",
     ],
   },
 });

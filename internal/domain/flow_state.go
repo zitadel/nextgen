@@ -123,6 +123,10 @@ type FlowProgress struct {
 	// the definition.
 	Purpose FlowDefinitionPurpose
 
+	// CurrentPurpose is the dynamic dispatch mode. Flips on identifier
+	// outcomes; Purpose stays pinned for telemetry / ACR.
+	CurrentPurpose FlowDefinitionPurpose
+
 	// CurrentStep is the name of the step the user is currently on
 	// within DefinitionID. The next submit is interpreted against this
 	// step.

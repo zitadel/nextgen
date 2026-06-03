@@ -1,0 +1,17 @@
+{
+  "name": "@zitadel/login-ui",
+  "version": "0.0.1",
+  "private": true,
+  "dependencies": {
+    "@zitadel/components": "workspace:*",
+    "@zitadel/design-tokens": "workspace:*"
+  },
+  "devDependencies": {
+    "@nx/vite": "catalog:",
+    "@types/node": "catalog:",
+    "vite": "catalog:"
+  },
+  "nx": {
+    "projectType": "application"
+  }
+}

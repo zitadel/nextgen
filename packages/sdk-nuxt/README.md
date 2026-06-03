@@ -1,11 +1,11 @@
-# @zitadel-nextgen/sdk-nuxt
+# @zitadel/sdk-nuxt
 
 Nuxt middleware and helpers for Nextgen Auth.
 
 ## Installation
 
 ```bash
-pnpm add @zitadel-nextgen/sdk-nuxt
+pnpm add @zitadel/sdk-nuxt
 ```
 
 ## Setup
@@ -15,12 +15,12 @@ pnpm add @zitadel-nextgen/sdk-nuxt
 Create `server/middleware/auth.ts`:
 
 ```ts
-import { createNextgenMiddleware } from '@zitadel-nextgen/sdk-nuxt/server';
+import { createNextgenMiddleware } from '@zitadel/sdk-nuxt/server';
 
-const { nextgenIssuerUrl } = useRuntimeConfig();
+const { nextgen } = useRuntimeConfig();
 
 export default createNextgenMiddleware({
-  issuerUrl: nextgenIssuerUrl as string,
+  url: nextgen.url,
   protectedRoutes: ['/admin', '/dashboard*'],
   loginPath: '/login',
 });
@@ -37,7 +37,9 @@ Add the issuer URL to `nuxt.config.ts`:
 ```ts
 export default defineNuxtConfig({
   runtimeConfig: {
-    nextgenIssuerUrl: process.env.NEXTGEN_ISSUER_URL ?? 'http://localhost:4000',
+    nextgen: {
+      url: process.env.ZITADEL_URL ?? 'http://localhost:4000',
+    },
   },
 });
 ```
@@ -77,10 +79,10 @@ if (auth.value?.isAuthenticated) {
 ### 4. Register components (client only)
 
 Create `plugins/zitadel-components.client.ts` — do **not** import
-`@zitadel-nextgen/components` from page `<script setup>` (that runs during SSR):
+`@zitadel/components` from page `<script setup>` (that runs during SSR):
 
 ```ts
-import "@zitadel-nextgen/components";
+import "@zitadel/components";
 
 export default defineNuxtPlugin(() => {});
 ```
@@ -106,7 +108,7 @@ Render `<zitadel-login>` inside `<ClientOnly>`:
 ### 6. Reading auth in a server route
 
 ```ts
-import { getAuth } from '@zitadel-nextgen/sdk-nuxt/server';
+import { getAuth } from '@zitadel/sdk-nuxt/server';
 
 export default defineEventHandler((event) => {
   const auth = getAuth(event);
@@ -119,7 +121,7 @@ export default defineEventHandler((event) => {
 
 | Option              | Type                 | Default                  | Description                                                                                                                |
 | ------------------- | -------------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
-| `issuerUrl`         | `string`             | `NEXTGEN_ISSUER_URL` env | Full URL of the Nextgen auth backend                                                                                       |
+| `url`                 | `string`             | `ZITADEL_URL` env        | Full URL of the Zitadel auth backend                                                                                       |
 | `proxyPath`         | `string`             | `"/__nextgen"`           | Path prefix proxied to the auth backend                                                                                    |
 | `protectedRoutes`   | `string[]`           | `[]`                     | Paths requiring a valid session. Trailing `*` matches sub-paths                                                            |
 | `ignoredRoutes`     | `string[]`           | `[]`                     | Paths skipped entirely — no JWT check, no tunnelling. Useful for webhooks or health checks. Trailing `*` matches sub-paths |
@@ -136,9 +138,9 @@ export default defineEventHandler((event) => {
 2. The JWT header is decoded to extract `kid` and `alg`
 3. Tokens with an `alg` not in `allowedAlgorithms` (`RS256`, `ES256` by default) are rejected immediately — no JWKS fetch
 4. Tokens with a `typ` not in `allowedTokenTypes` are rejected immediately
-5. The public key is fetched from `{issuerUrl}/auth/keys` (JWKS) using the Web Crypto API, with a 5 s timeout, and cached for 5 minutes per `kid`
+5. The public key is fetched from `{url}/auth/keys` (JWKS) using the Web Crypto API, with a 5 s timeout, and cached for 5 minutes per `kid`
 6. The signature is verified **before** any claim checks
-7. `iss` must be present and must equal `issuerUrl` — tokens without an issuer are rejected
+7. `iss` must be present and must equal `url` — tokens without an issuer are rejected
 8. `exp` must be present and must be in the future (with `clockSkewMs` tolerance) — tokens without an expiry are rejected
 9. `nbf` and `iat` are validated with `clockSkewMs` tolerance when present
 10. The `x-nextgen-auth-token` header is stripped from all proxied requests to prevent internal state leakage

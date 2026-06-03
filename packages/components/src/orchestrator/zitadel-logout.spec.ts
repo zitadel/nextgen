@@ -2,7 +2,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
-import { configureZitadel, _resetConfigForTesting } from "@zitadel-nextgen/api/config";
+import { configureZitadel, _resetConfigForTesting } from "@zitadel/api/config";
 
 import "./zitadel-logout.js";
 import type { ZitadelLogout } from "./zitadel-logout.js";
@@ -28,7 +28,7 @@ const okHandler = http.get(`${API_BASE}/auth/end-session`, ({ request }) => {
 const server = setupServer(okHandler);
 
 beforeAll(() => {
-  configureZitadel({ apiBase: API_BASE, projectId: "test" });
+  configureZitadel({ proxyPath: API_BASE, projectId: "test" });
   server.listen({ onUnhandledRequest: "error" });
 });
 

@@ -20,13 +20,13 @@ import {
   getExchangeHandoffResponseMock,
   getGetFlowStepMockHandler,
   getSubmitFlowStepMockHandler,
-} from "@zitadel-nextgen/api/generated/endpoints/zitadelNextGen.msw";
+} from "@zitadel/api/generated/endpoints/zitadelNextGen.msw";
 import type {
   CreateFlow201,
   CreateFlowBody,
   ExchangeHandoffBody,
   SubmitFlowStepBody,
-} from "@zitadel-nextgen/api/generated/model";
+} from "@zitadel/api/generated/model";
 import type { RequestHandler } from "msw";
 
 import { withBranding } from "./branding.js";
@@ -78,7 +78,7 @@ const FLOW_ID = "flow_mock";
  *   `verifyHandoffToken` can enforce issuer consistency.
  */
 export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
-  const iss = options.iss ?? "http://localhost:4000";
+  const iss = options.iss ?? "http://localhost:8080";
   let actor: FlowActor = startFlowActor();
   let captured: CapturedRequest[] = [];
   const authn = new AuthnStore();

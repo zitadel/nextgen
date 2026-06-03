@@ -4,6 +4,10 @@ import (
 	"time"
 )
 
+const (
+	FlowDefinitionPrefix ResourcePrefix = "flowdef"
+)
+
 //go:generate go tool enumer -type FlowDefinitionStatus -transform snake -trimprefix FlowDefinitionStatus -sql
 type FlowDefinitionStatus uint8
 
@@ -89,6 +93,34 @@ type FlowDefinition struct {
 	Purposes map[FlowDefinitionPurpose]string
 	Audience FlowDefinitionAudience
 	Steps    []FlowDefinitionStep
+}
+
+func NewFlowDefinition(
+	projectID string,
+	name string,
+	schemaVersion string,
+	userSchema string,
+	purposes map[FlowDefinitionPurpose]string,
+	audience FlowDefinitionAudience,
+	steps []FlowDefinitionStep,
+) (*FlowDefinition, error) {
+	id, err := newID(FlowDefinitionPrefix)
+	if err != nil {
+		return nil, ErrInternal(err).WithMessage("failed to generate flow-definition id")
+	}
+	return &FlowDefinition{
+		ProjectID:     projectID,
+		ID:            id,
+		Name:          name,
+		SchemaVersion: schemaVersion,
+		Status:        FlowDefinitionStatusActive,
+		CreatedAt:     time.Now().UTC(),
+		UpdatedAt:     time.Now().UTC(),
+		UserSchema:    userSchema,
+		Purposes:      purposes,
+		Audience:      audience,
+		Steps:         steps,
+	}, nil
 }
 
 // InitialStepFor returns the entry-point step name for purpose, or
