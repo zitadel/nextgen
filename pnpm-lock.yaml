@@ -603,12 +603,6 @@ importers:
 
   packages/components:
     dependencies:
-      '@zitadel/design-tokens':
-        specifier: workspace:*
-        version: link:../design-tokens
-      '@zitadel/shared-component-styles':
-        specifier: workspace:*
-        version: link:../shared-component-styles
       dompurify:
         specifier: 'catalog:'
         version: 3.4.1
@@ -637,6 +631,12 @@ importers:
       '@zitadel/api-mock':
         specifier: workspace:*
         version: link:../api-mock
+      '@zitadel/design-tokens':
+        specifier: workspace:*
+        version: link:../design-tokens
+      '@zitadel/shared-component-styles':
+        specifier: workspace:*
+        version: link:../shared-component-styles
       jsdom:
         specifier: 'catalog:'
         version: 29.0.2

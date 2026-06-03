@@ -58,9 +58,7 @@
     "dompurify": "catalog:",
     "liquidjs": "catalog:",
     "lit": "catalog:",
-    "lucide": "catalog:",
-    "@zitadel/design-tokens": "workspace:*",
-    "@zitadel/shared-component-styles": "workspace:*"
+    "lucide": "catalog:"
   },
   "nx": {
     "targets": {
