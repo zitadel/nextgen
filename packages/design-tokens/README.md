@@ -1,4 +1,4 @@
-# @zitadel-nextgen/design-tokens
+# @zitadel/design-tokens
 
 The single source of truth for ZITADEL NextGen visual design. Pulls
 Variables from the published [Zitadel Design System — External][figma]
@@ -8,9 +8,9 @@ widths), and emits three artifacts consumers can rely on:
 
 | Surface              | Path                                          | Consumer                                                |
 | -------------------- | --------------------------------------------- | ------------------------------------------------------- |
-| CSS variables        | `@zitadel-nextgen/design-tokens/css/tokens.css` | Lit atoms, orchestrator chrome, tenant CSS              |
-| Tailwind v4 `@theme` | `@zitadel-nextgen/design-tokens/css/tailwind.css` | `apps/console`, any React/Vue consumer using Tailwind v4 |
-| Typed TS constants   | `@zitadel-nextgen/design-tokens`              | Paired React components in `packages/ui-react`, any TS consumer |
+| CSS variables        | `@zitadel/design-tokens/css/tokens.css` | Lit atoms, orchestrator chrome, tenant CSS              |
+| Tailwind v4 `@theme` | `@zitadel/design-tokens/css/tailwind.css` | `apps/console`, any React/Vue consumer using Tailwind v4 |
+| Typed TS constants   | `@zitadel/design-tokens`              | Paired React components in `packages/ui-react`, any TS consumer |
 
 Every token is namespaced with `--zl-*` (and `--*-zl-*` in the Tailwind
 block) so it never collides with consumer tokens.
@@ -31,9 +31,9 @@ contract is one rebuild away, never a copy-paste.
 only knob that controls what gets pulled.
 
 ```sh
-FIGMA_TOKEN=… pnpm nx run @zitadel-nextgen/design-tokens:sync
-pnpm nx run @zitadel-nextgen/design-tokens:generate
-pnpm nx run @zitadel-nextgen/design-tokens:test       # snapshot guard
+FIGMA_TOKEN=… pnpm nx run @zitadel/design-tokens:sync
+pnpm nx run @zitadel/design-tokens:generate
+pnpm nx run @zitadel/design-tokens:test       # snapshot guard
 ```
 
 In CI, [`.github/workflows/sync-design-tokens.yml`](../../.github/workflows/sync-design-tokens.yml)

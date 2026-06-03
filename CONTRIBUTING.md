@@ -28,7 +28,7 @@ The Go binary embeds production builds from `internal/staticui/console/dist` and
 sh scripts/sync-embedded-ui-dist.sh all
 ```
 
-This runs `pnpm nx build` for `@zitadel-nextgen/console` and `@zitadel-nextgen/login-ui`, then `cp -r` into the internal embed folders.
+This runs `pnpm nx build` for `@zitadel/console` and `@zitadel/login-ui`, then `cp -r` into the internal embed folders.
 
 ### 2. Configure and start
 
@@ -44,8 +44,8 @@ Open http://localhost:8080/ui/console/ and http://localhost:8080/ui/login/
 ### Frontends only (without Go)
 
 ```sh
-corepack pnpm nx dev @zitadel-nextgen/console   # http://localhost:5174
-corepack pnpm nx dev @zitadel-nextgen/login-ui  # http://localhost:5175
+corepack pnpm nx dev @zitadel/console   # http://localhost:5174
+corepack pnpm nx dev @zitadel/login-ui  # http://localhost:5175
 ```
 
 Dev servers use `/` as the Vite base; production embeds use `/ui/console/` and `/ui/login/`.

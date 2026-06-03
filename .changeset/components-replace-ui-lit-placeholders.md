@@ -1,11 +1,11 @@
 ---
-"@zitadel-nextgen/components": minor
-"@zitadel-nextgen/sdk-next": patch
-"@zitadel-nextgen/sdk-nuxt": patch
+"@zitadel/components": minor
+"@zitadel/sdk-next": patch
+"@zitadel/sdk-nuxt": patch
 ---
 
 Replace the `@nextgen/ui-lit` placeholder web components with the real
-`@zitadel-nextgen/components` library across the demos and SDK packages.
+`@zitadel/components` library across the demos and SDK packages.
 
 - Add `<zitadel-logout>`: an orchestrator-tier element built on the same
   design-token system as `<zitadel-login>`. It reads the `__nextgen_display`
@@ -23,9 +23,9 @@ Replace the `@nextgen/ui-lit` placeholder web components with the real
   `feat/sdk-packages` mock server / SDK proxy. Synthesises a single-step
   `FlowResponse` with `email` + `password` fields so the existing
   orchestrator + atom pipeline renders against it unchanged.
-- Drop the `@nextgen/ui-lit` package and switch `@zitadel-nextgen/sdk-next`,
-  `@zitadel-nextgen/sdk-nuxt`, and the `apps/demo-next` / `apps/demo-nuxt` apps to
-  re-export and consume `@zitadel-nextgen/components` instead. Existing
+- Drop the `@nextgen/ui-lit` package and switch `@zitadel/sdk-next`,
+  `@zitadel/sdk-nuxt`, and the `apps/demo-next` / `apps/demo-nuxt` apps to
+  re-export and consume `@zitadel/components` instead. Existing
   `<nextgen-login>` / `<nextgen-logout>` tags become `<zitadel-login>` /
   `<zitadel-logout>` with the same `proxy-base` and post-sign-{in,out}-url
   attributes.

@@ -1,11 +1,11 @@
-import { getZitadelConfig, getApi, type ZitadelProject } from "@zitadel-nextgen/api/config";
+import { getZitadelConfig, getApi, type ZitadelProject } from "@zitadel/api/config";
 import type {
   CreateFlow201,
   CreateFlow201Step,
   CreateFlowBodyPurpose,
   SubmitFlowStepBody,
   SubmitFlowStepBodyChallengeResponse,
-} from "@zitadel-nextgen/api/generated/model";
+} from "@zitadel/api/generated/model";
 import { css, html, LitElement, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
@@ -22,10 +22,11 @@ import type { Branding } from "./branding.js";
 import { applyBaseTokens, applyBrandingTokens } from "./branding-to-tokens.js";
 import { validateBranding } from "./branding-validator.js";
 import { applyFontUrl } from "./font-loader.js";
-import { createLiquidEngine, TEMPLATE_NAMES } from "./liquid.js";
+import { createLiquidEngine } from "./liquid.js";
+import { TEMPLATE_NAMES } from "./template-names.js";
 import { en, builtinLocales, type Locale } from "./locales/index.js";
 import { patchMandatoryGates } from "./mandatory-gates.js";
-import { zitadelAttributionPillInnerHtml } from "@zitadel-nextgen/shared-component-styles/attribution-markup";
+import { zitadelAttributionPillInnerHtml } from "@zitadel/shared-component-styles/attribution-markup";
 import { createSanitiser } from "./sanitiser.js";
 import type { FlowError, LiquidContext } from "./template-context.js";
 import { layoutChromeCss } from "./templates/default.liquid.js";
@@ -34,7 +35,7 @@ import { ThemeController } from "./theme-controller.js";
 /**
  * `<zitadel-login>` — the auth-UI orchestrator.
  *
- * Drives the typed `@zitadel-nextgen/api` Flow API directly: `POST /flow`
+ * Drives the typed `@zitadel/api` Flow API directly: `POST /flow`
  * starts a flow, `POST /flow/{id}/submit` advances it. Renders each step
  * through LiquidJS, sanitises the output via DOMPurify, and mounts the
  * result inside a real `<form>` element in its Shadow DOM via Lit's
@@ -121,7 +122,7 @@ export class ZitadelLogin extends LitElement {
    * precedence over the built-in dictionaries for matching language codes.
    *
    * ```ts
-   * import { en } from "@zitadel-nextgen/components";
+   * import { en } from "@zitadel/components";
    * const locales = {
    *   en: { ...en, "identifier.title": "Welcome" },
    *   de: myGermanDict,

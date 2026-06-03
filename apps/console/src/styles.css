@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
-@import "@zitadel-nextgen/design-tokens/css/tokens.css";
-@import "@zitadel-nextgen/design-tokens/css/tailwind.css";
-@import "@zitadel-nextgen/ui-react/styles.css";
+@import "@zitadel/design-tokens/css/tokens.css";
+@import "@zitadel/design-tokens/css/tailwind.css";
+@import "@zitadel/ui-react/styles.css";
 
 /* Shared with Lit dev playground — keep in sync via packages/components/dev/playground-chrome.css */
 @import "../../packages/components/dev/playground-chrome.css";

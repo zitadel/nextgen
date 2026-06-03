@@ -7,19 +7,16 @@
  * browser's global registry:
  *
  * ```ts
- * await import("@zitadel-nextgen/sdk-next/client");
+ * await import("@zitadel/sdk-next/client");
  * ```
  *
  * SDK configuration is done via `configureZitadel()`, re-exported here so
- * a consuming app that only declares `@zitadel-nextgen/sdk-next` as a direct
+ * a consuming app that only declares `@zitadel/sdk-next` as a direct
  * dependency can configure the SDK without reaching into
- * `@zitadel-nextgen/api/config` (which strict package managers would not
+ * `@zitadel/api/config` (which strict package managers would not
  * resolve). Call it inside the same `"use client"` boundary before the
  * components mount.
  */
-export { ZitadelLogin, ZitadelLogout } from '@zitadel-nextgen/components';
-export { configureZitadel, getApi } from '@zitadel-nextgen/api/config';
-export type {
-  ZitadelConfig,
-  ZitadelProject,
-} from '@zitadel-nextgen/api/config';
+export { ZitadelLogin, ZitadelLogout } from '@zitadel/components';
+export { configureZitadel, getApi } from '@zitadel/api/config';
+export type { ZitadelConfig, ZitadelProject } from '@zitadel/api/config';

@@ -1,4 +1,4 @@
-import type { IconName, IconSize, IconTone } from "@zitadel-nextgen/ui-react";
+import type { IconName, IconSize, IconTone } from "@zitadel/ui-react";
 import {
   Alert,
   Button,
@@ -8,7 +8,7 @@ import {
   Pill,
   TextField,
   ZitadelAttributionPillLabel,
-} from "@zitadel-nextgen/ui-react";
+} from "@zitadel/ui-react";
 import { Fragment, type JSX, type ReactNode } from "react";
 
 const GLYPHS: IconName[] = [

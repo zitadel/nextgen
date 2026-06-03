@@ -16,7 +16,9 @@ more than polish.
   not complete account ownership or hide production-apply requirements.
 - Watch for secret leakage. Project, preview, token, and `.zitadel/secret` style
   values must not enter source control or browser-safe env metadata.
-- User-visible changes under `apps/cli/` or `packages/sdk-*` need a changeset.
-  npm package manifests must keep `"license": "MIT"`.
+- User-visible changes to a public npm package need a changeset; author the
+  `.changeset/<slug>.md` file directly rather than via the interactive prompt.
+  See `AGENTS.md` for the package list and file format. npm package manifests
+  must keep `"license": "MIT"`.
 - Server and embedded console changes are AGPL-3.0-only by default; public API,
   docs, CLI, and SDK paths are MIT exceptions per `LICENSING.md`.

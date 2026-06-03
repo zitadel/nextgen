@@ -14,7 +14,7 @@
  * Vite example:
  *
  * ```ts
- * import { apiMockPublicDir } from "@zitadel-nextgen/api-mock/public-dir";
+ * import { apiMockPublicDir } from "@zitadel/api-mock/public-dir";
  *
  * export default defineConfig({
  *   publicDir: apiMockPublicDir,

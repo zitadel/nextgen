@@ -1,5 +1,5 @@
 {
-  "name": "@zitadel-nextgen/source",
+  "name": "@zitadel/source",
   "version": "0.0.0",
   "private": true,
   "license": "MIT",
@@ -10,6 +10,8 @@
     "zitadel": "node scripts/zitadel-dev.mjs"
   },
   "devDependencies": {
+    "@changesets/changelog-github": "^0.7.0",
+    "@changesets/cli": "^2.31.0",
     "@nx/devkit": "catalog:",
     "@nx/eslint-plugin": "catalog:",
     "@nx/js": "catalog:",

@@ -1,8 +1,8 @@
 import { LitElement, html } from "lit";
 import { customElement } from "lit/decorators.js";
 
-import pageShellHost from "@zitadel-nextgen/shared-component-styles/lit/page-shell-host.css?inline";
-import pageShellSurface from "@zitadel-nextgen/shared-component-styles/page-shell.css?inline";
+import pageShellHost from "@zitadel/shared-component-styles/lit/page-shell-host.css?inline";
+import pageShellSurface from "@zitadel/shared-component-styles/page-shell.css?inline";
 
 import type { AtomManifest } from "../manifest.js";
 import { baseHostStyles, surfaceStyles } from "../styles/index.js";
