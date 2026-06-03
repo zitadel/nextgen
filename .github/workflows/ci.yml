@@ -454,16 +454,19 @@ jobs:
       - name: Dry-run npm packs
         run: |
           for dir in apps/cli packages/api packages/components packages/sdk-core packages/sdk-next packages/sdk-nuxt; do
-            (cd "$dir" && npm pack --dry-run)
+            corepack pnpm --dir "$dir" pack --dry-run
           done
 
       - name: Create npm package artifacts
         run: |
           mkdir -p "$RUNNER_TEMP/zitadel-npm-packages"
           for dir in apps/cli packages/api packages/components packages/sdk-core packages/sdk-next packages/sdk-nuxt; do
-            (cd "$dir" && npm pack --pack-destination "$RUNNER_TEMP/zitadel-npm-packages")
+            corepack pnpm --dir "$dir" pack --pack-destination "$RUNNER_TEMP/zitadel-npm-packages"
           done
           ls -lh "$RUNNER_TEMP/zitadel-npm-packages"
+
+      - name: Verify npm package artifacts
+        run: node apps/cli-journey-e2e/scripts/verify-tarballs.mjs "$RUNNER_TEMP/zitadel-npm-packages"
 
       - name: Upload npm package artifacts
         uses: actions/upload-artifact@v7
