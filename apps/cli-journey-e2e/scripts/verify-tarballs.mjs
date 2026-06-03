@@ -10,7 +10,7 @@ if (!tarballsDir) {
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, "../../..");
-const packageDirs = [
+const requiredPackageDirs = [
   "apps/cli",
   "packages/api",
   "packages/components",
@@ -18,7 +18,14 @@ const packageDirs = [
   "packages/sdk-next",
   "packages/sdk-nuxt",
 ];
-const expectedPackageNames = new Set(await Promise.all(packageDirs.map(packageName)));
+const supportPackageDirs = ["packages/design-tokens", "packages/shared-component-styles"];
+const requiredPackageNames = new Set(
+  await Promise.all(requiredPackageDirs.map(packageName)),
+);
+const expectedPackageNames = new Set([
+  ...requiredPackageNames,
+  ...(await Promise.all(supportPackageDirs.map(packageName))),
+]);
 const dependencyFields = [
   "dependencies",
   "devDependencies",
@@ -49,14 +56,14 @@ for (const file of tarballs) {
   manifests.set(manifest.name, manifest);
 }
 
-for (const expectedName of expectedPackageNames) {
+for (const expectedName of requiredPackageNames) {
   if (!manifests.has(expectedName)) {
     throw new Error(`missing tarball for ${expectedName}`);
   }
 }
 
 console.log(
-  `verified ${manifests.size} installable tarballs: ${[...manifests.keys()].sort().join(", ")}`,
+  `verified ${manifests.size} installable tarballs; required packages present: ${[...requiredPackageNames].sort().join(", ")}`,
 );
 
 function readManifest(tarball) {
