@@ -50,6 +50,7 @@ type UserPasskeyRepository interface {
 	Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*UserPasskey, error)
 	List(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) ([]*UserPasskey, error)
 	Create(ctx context.Context, client database.QueryExecutor, passkey *CreateUserPasskey) error
+	Update(ctx context.Context, client database.QueryExecutor, condition database.Condition, changes ...database.Change) error
 	Delete(ctx context.Context, client database.QueryExecutor, condition database.Condition) error
 }
 
@@ -64,6 +65,7 @@ type userPasskeyConditions interface {
 type userPasskeyChanges interface {
 	SetAttestationType(string) database.Change
 	SetTransports([]string) database.Change
+	SetSignCount(int64) database.Change
 	IncrementSignCount(diff int64) database.Change
 	SetBackupEligible(bool) database.Change
 	SetBackupState(bool) database.Change

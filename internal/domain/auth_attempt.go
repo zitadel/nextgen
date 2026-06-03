@@ -341,17 +341,15 @@ func (a *AuthAttempt) PreparePasswordVerification(challengeID string) (AuthChall
 }
 
 // PreparePasskeyVerification validates that a passkey proof can be submitted
-// and returns the user ID to verify against if there was a user identified already.
+// and returns the user factor if one was already identified. The factor is nil
+// for discoverable (usernameless) logins; the user is then resolved from the
+// assertion's user handle during validation.
 func (a *AuthAttempt) PreparePasskeyVerification(challengeID string) (AuthChallenge, *AuthFactorUser, error) {
 	challenge, err := a.PrepareVerification(challengeID, AuthCheckTypePasskey)
 	if err != nil {
 		return nil, nil, err
 	}
-	// TODO(adlerhurst): we might want to allow passkey verification without a user identified, but for now we'll require it to simplify the implementation and prevent potential security issues.
-	userCheck, ok := CheckAs[*AuthFactorUser](a, AuthCheckTypeUser)
-	if !ok {
-		return nil, nil, ErrAuthAttemptInvalidRequest()
-	}
+	userCheck, _ := CheckAs[*AuthFactorUser](a, AuthCheckTypeUser)
 	return challenge, userCheck, nil
 }
 
@@ -373,8 +371,11 @@ func (a *AuthAttempt) SetPasswordFactor() *AuthFactorPassword {
 
 func (a *AuthAttempt) SetPasskeyFactor(passkeyVerification *PasskeyVerification) *AuthFactorPasskey {
 	factor := &AuthFactorPasskey{
-		UserVerified: passkeyVerification.UserVerified,
-		UserID:       passkeyVerification.UserID,
+		UserVerified:   passkeyVerification.UserVerified,
+		UserID:         passkeyVerification.UserID,
+		CredentialID:   passkeyVerification.CredentialID,
+		BackupEligible: passkeyVerification.BackupEligible,
+		BackupState:    passkeyVerification.BackupState,
 	}
 	a.SetCheck(factor)
 	return factor
@@ -430,6 +431,8 @@ func (a *AuthAttempt) SetCheck(check AuthCheck) {
 	}
 	a.Checks = append(a.Checks, check)
 }
+
+//go:generate go tool mockgen -typed -package domainmock -destination ./mock/auth_attempt.mock.go . AuthAttemptRepository
 
 type AuthAttemptRepository interface {
 	// GetByID retrieves a single AuthAttempt by its ID and project ID.

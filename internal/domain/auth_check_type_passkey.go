@@ -28,8 +28,11 @@ func SetAuthChallengePasskey(id string, lastChallengedAt, lastFailedAt time.Time
 }
 
 type AuthFactorPasskey struct {
-	UserVerified bool
-	UserID       string
+	UserVerified   bool
+	UserID         string
+	CredentialID   []byte
+	BackupEligible bool
+	BackupState    bool
 	authFactor
 }
 
