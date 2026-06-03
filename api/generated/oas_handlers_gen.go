@@ -2481,7 +2481,9 @@ func (s *Server) handleEndSessionRequest(args [0]string, argsEscaped bool, w htt
 // The response shape is identical in all three cases.
 // The `session_token` supersedes any previously issued `session_token` for the same session.
 // Clients must replace their stored token at this point.
-// Requires a project service key (OAuth2 client credentials).
+// This endpoint is intentionally public: the one-time `handoff_token` is the
+// credential being exchanged. Clients must treat the token as a bearer secret
+// and send it only through the configured first-party proxy.
 //
 // POST /sessions/exchange
 func (s *Server) handleExchangeHandoffRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -2555,50 +2557,6 @@ func (s *Server) handleExchangeHandoffRequest(args [0]string, argsEscaped bool, 
 			ID:   "exchangeHandoff",
 		}
 	)
-	{
-		type bitset = [1]uint8
-		var satisfied bitset
-		{
-			sctx, ok, err := s.securityOAuth2(ctx, ExchangeHandoffOperation, r)
-			if err != nil {
-				err = &ogenerrors.SecurityError{
-					OperationContext: opErrContext,
-					Security:         "OAuth2",
-					Err:              err,
-				}
-				defer recordError("Security:OAuth2", err)
-				s.cfg.ErrorHandler(ctx, w, r, err)
-				return
-			}
-			if ok {
-				satisfied[0] |= 1 << 0
-				ctx = sctx
-			}
-		}
-
-		if ok := func() bool {
-		nextRequirement:
-			for _, requirement := range []bitset{
-				{0b00000001},
-			} {
-				for i, mask := range requirement {
-					if satisfied[i]&mask != mask {
-						continue nextRequirement
-					}
-				}
-				return true
-			}
-			return false
-		}(); !ok {
-			err = &ogenerrors.SecurityError{
-				OperationContext: opErrContext,
-				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
-			}
-			defer recordError("Security", err)
-			s.cfg.ErrorHandler(ctx, w, r, err)
-			return
-		}
-	}
 	params, err := decodeExchangeHandoffParams(args, argsEscaped, r)
 	if err != nil {
 		err = &ogenerrors.DecodeParamsError{

@@ -2,9 +2,14 @@ title: PasskeyFactorPayload
 type: object
 description: Passkey-specific factor metadata including credential and verification details
 required:
+  - method
   - credential_id
   - user_verified
 properties:
+  method:
+    type: string
+    enum: [passkey]
+    description: Discriminator for passkey factor payloads.
   credential_id:
     type: string
     description: The credential ID that was used

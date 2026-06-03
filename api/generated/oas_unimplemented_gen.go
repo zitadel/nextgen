@@ -182,7 +182,9 @@ func (UnimplementedHandler) EndSession(ctx context.Context, params EndSessionPar
 // The response shape is identical in all three cases.
 // The `session_token` supersedes any previously issued `session_token` for the same session.
 // Clients must replace their stored token at this point.
-// Requires a project service key (OAuth2 client credentials).
+// This endpoint is intentionally public: the one-time `handoff_token` is the
+// credential being exchanged. Clients must treat the token as a bearer secret
+// and send it only through the configured first-party proxy.
 //
 // POST /sessions/exchange
 func (UnimplementedHandler) ExchangeHandoff(ctx context.Context, req *ExchangeRequest, params ExchangeHandoffParams) (r ExchangeHandoffRes, _ error) {

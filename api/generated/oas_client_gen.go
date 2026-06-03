@@ -158,7 +158,9 @@ type Invoker interface {
 	// The response shape is identical in all three cases.
 	// The `session_token` supersedes any previously issued `session_token` for the same session.
 	// Clients must replace their stored token at this point.
-	// Requires a project service key (OAuth2 client credentials).
+	// This endpoint is intentionally public: the one-time `handoff_token` is the
+	// credential being exchanged. Clients must treat the token as a bearer secret
+	// and send it only through the configured first-party proxy.
 	//
 	// POST /sessions/exchange
 	ExchangeHandoff(ctx context.Context, request *ExchangeRequest, params ExchangeHandoffParams) (ExchangeHandoffRes, error)
@@ -2376,7 +2378,9 @@ func (c *Client) sendEndSession(ctx context.Context, params EndSessionParams) (r
 // The response shape is identical in all three cases.
 // The `session_token` supersedes any previously issued `session_token` for the same session.
 // Clients must replace their stored token at this point.
-// Requires a project service key (OAuth2 client credentials).
+// This endpoint is intentionally public: the one-time `handoff_token` is the
+// credential being exchanged. Clients must treat the token as a bearer secret
+// and send it only through the configured first-party proxy.
 //
 // POST /sessions/exchange
 func (c *Client) ExchangeHandoff(ctx context.Context, request *ExchangeRequest, params ExchangeHandoffParams) (ExchangeHandoffRes, error) {
@@ -2469,39 +2473,6 @@ func (c *Client) sendExchangeHandoff(ctx context.Context, request *ExchangeReque
 			return nil
 		}); err != nil {
 			return res, errors.Wrap(err, "encode header")
-		}
-	}
-
-	{
-		type bitset = [1]uint8
-		var satisfied bitset
-		{
-			stage = "Security:OAuth2"
-			switch err := c.securityOAuth2(ctx, ExchangeHandoffOperation, r); {
-			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
-			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
-				// Skip this security.
-			default:
-				return res, errors.Wrap(err, "security \"OAuth2\"")
-			}
-		}
-
-		if ok := func() bool {
-		nextRequirement:
-			for _, requirement := range []bitset{
-				{0b00000001},
-			} {
-				for i, mask := range requirement {
-					if satisfied[i]&mask != mask {
-						continue nextRequirement
-					}
-				}
-				return true
-			}
-			return false
-		}(); !ok {
-			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
 		}
 	}
 

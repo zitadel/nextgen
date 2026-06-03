@@ -65,6 +65,20 @@ func TestCreateProjectDefaultLoginFlowRegistrationHandoff(t *testing.T) {
 	assert.Equal(t, "done", done.Response.Step.Name)
 	assert.NotEmpty(t, done.Response.HandoffToken.Value)
 	assert.True(t, done.Response.HandoffTokenExpiresAt.Set)
+
+	exchangeResp, err := client.ExchangeHandoff(t.Context(), &api.ExchangeRequest{
+		HandoffToken: done.Response.HandoffToken.Value,
+	}, api.ExchangeHandoffParams{
+		ProjectID: api.ProjectID(project.ID),
+	})
+	require.NoError(t, err)
+	exchanged, ok := exchangeResp.(*api.SessionWithTokenResponseHeaders)
+	require.True(t, ok, helpers.MustMarshal(t, exchangeResp))
+	assert.Contains(t, exchanged.SetCookie, "__nextgen_session=")
+	assert.NotEmpty(t, exchanged.Response.SessionToken)
+	assert.Equal(t, api.ProjectID(project.ID), exchanged.Response.Session.ProjectID)
+	assert.Equal(t, api.SessionResponseStateActive, exchanged.Response.Session.State)
+	assert.NotEmpty(t, exchanged.Response.Session.UserID.Value)
 }
 
 func zflowCookieValue(t *testing.T, setCookie string) string {

@@ -144,6 +144,7 @@ func TestSession_Get(t *testing.T) {
 		stored, err := repo.Get(t.Context(), tx, session.ProjectID, session.ID)
 		require.NoError(t, err)
 		assert.Empty(t, stored.Factors)
+		assert.Equal(t, domain.SessionStateBuilding, stored.State)
 	})
 
 	t.Run("loads factors after exchange", func(t *testing.T) {
@@ -161,6 +162,7 @@ func TestSession_Get(t *testing.T) {
 
 		stored, err := repo.Get(t.Context(), tx, projectID, exchanged.ID)
 		require.NoError(t, err)
+		assert.Equal(t, domain.SessionStateActive, stored.State)
 		factors := sessionFactorsByType(stored)
 		require.Contains(t, factors, domain.AuthCheckTypePassword)
 		assert.False(t, factors[domain.AuthCheckTypePassword].GetLastVerifiedAt().IsZero())
@@ -220,6 +222,8 @@ func TestSession_List(t *testing.T) {
 			byID[s.ID] = s
 		}
 		assert.Empty(t, byID[anonymous.ID].Factors)
+		assert.Equal(t, domain.SessionStateBuilding, byID[anonymous.ID].State)
+		assert.Equal(t, domain.SessionStateActive, byID[exchanged.ID].State)
 		factors := sessionFactorsByType(byID[exchanged.ID])
 		require.Contains(t, factors, domain.AuthCheckTypePassword)
 	})

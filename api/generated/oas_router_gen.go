@@ -79,7 +79,7 @@ var (
 		"POST": "Authorization,Content-Type",
 	}
 	rn21AllowedHeaders = map[string]string{
-		"POST": "Authorization,Content-Type,Idempotency-Key",
+		"POST": "Content-Type,Idempotency-Key",
 	}
 	rn35AllowedHeaders = map[string]string{
 		"DELETE": "Authorization",

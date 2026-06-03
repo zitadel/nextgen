@@ -492,9 +492,23 @@ func (r *SessionRepository) scanSessions(rows database.Rows) ([]*domain.Session,
 
 	out := make([]*domain.Session, 0, len(order))
 	for _, id := range order {
-		out = append(out, byID[id])
+		session := byID[id]
+		session.State = deriveSessionState(session, time.Now())
+		out = append(out, session)
 	}
 	return out, nil
+}
+
+func deriveSessionState(session *domain.Session, now time.Time) domain.SessionState {
+	if now.After(session.ExpiresAt) {
+		return domain.SessionStateExpired
+	}
+	for _, factor := range session.Factors {
+		if factor.Type() != domain.AuthCheckTypeUser && !factor.GetLastVerifiedAt().IsZero() {
+			return domain.SessionStateActive
+		}
+	}
+	return domain.SessionStateBuilding
 }
 
 func appendSessionFactor(session *domain.Session, factor domain.AuthFactor) {

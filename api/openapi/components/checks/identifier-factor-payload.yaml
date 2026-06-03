@@ -2,8 +2,13 @@ title: IdentifierFactorPayload
 type: object
 description: Identifier-specific factor metadata
 required:
+  - method
   - user_id
 properties:
+  method:
+    type: string
+    enum: [identifier]
+    description: Discriminator for identifier factor payloads.
   user_id:
     $ref: ../../components/schemas/user-id.yaml
     description: The identified user ID
