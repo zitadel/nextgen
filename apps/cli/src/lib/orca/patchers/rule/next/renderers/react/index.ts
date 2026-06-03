@@ -6,19 +6,23 @@ import type { RendererSpec } from "../types";
  * `/profile` pages that drive the `<zitadel-login>` and `<zitadel-logout>`
  * Lit web components.
  *
- * Each page is a single client component (`"use client"`) that imports
- * `@zitadel-nextgen/sdk-next/client` via `next/dynamic({ ssr: false })`.
- * That subpath re-exports from `@zitadel-nextgen/components`, so the
- * `customElements.define` side-effect fires; importing components
- * directly would fail on strict-resolution package managers (pnpm,
- * yarn PnP) because the user only declares `sdk-next` as a direct dep.
- * SSR is disabled because Lit's element registration needs a browser.
+ * Each page is a single client component (`"use client"`) that, inside a
+ * `next/dynamic({ ssr: false })` loader, builds the SDK project handle with
+ * `configureZitadel({ projectId, proxyPath: "/__nextgen" })` and passes it to
+ * the widget via `project={...}`. It also imports
+ * `@zitadel-nextgen/sdk-next/client` for its `customElements.define`
+ * side-effect — importing `@zitadel-nextgen/components` directly would fail on
+ * strict-resolution package managers (pnpm, yarn PnP) because the app only
+ * declares `sdk-next` as a direct dep. SSR is disabled because Lit's element
+ * registration needs a browser.
  *
- * `api-base` is hardcoded to `/__nextgen`: the scaffolded Next `middleware.ts`
- * intercepts that path and forwards same-origin requests to `ZITADEL_URL`
- * (server-side only). The backend URL therefore never reaches the browser
- * bundle. `NEXT_PUBLIC_ZITADEL_PROJECT_ID` is still public — the project ID
- * is not sensitive and the web component needs it to start a flow.
+ * The handle is passed as the `project` DOM property, which relies on React
+ * 19's custom-element property binding (the scaffold targets the latest Next /
+ * React). The backend URL never reaches the browser: the client talks to the
+ * same-origin `/__nextgen` proxy path, and the scaffolded `middleware.ts`
+ * forwards it to `ZITADEL_URL` server-side. `NEXT_PUBLIC_ZITADEL_PROJECT_ID` is
+ * public — the project id is not sensitive and the widget needs it to start a
+ * flow.
  */
 export const reactRenderer: RendererSpec = {
   id: "react",

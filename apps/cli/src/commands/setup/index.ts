@@ -241,8 +241,7 @@ function shortPath(absolute: string): string {
  * Picks one written file by suffix so the corresponding INSTALLED row can
  * reference it without hard-coding the path the patcher chose. Returns
  * the first match; falls back to `undefined` when the patcher didn't
- * write that artifact (e.g. `--no-apply` would still write everything,
- * but a user opting out of, say, register pages would not).
+ * write that artifact (e.g. a renderer without a register page).
  */
 function pickWrittenFile(written: string[], suffix: string): string | undefined {
   return written.find((file) => file.endsWith(suffix));
