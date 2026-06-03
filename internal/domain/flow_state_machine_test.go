@@ -103,6 +103,10 @@ func (f *fakeAuthAttempts) SubmitPasskey(_ context.Context, in domain.FlowSubmit
 	return f.passkeyUserID, f.passkeyErr
 }
 
+func (f *fakeAuthAttempts) RegisterCreatedUser(_ context.Context, _ domain.FlowRegisterCreatedUserInput) error {
+	return nil
+}
+
 // fakePasskeyRegistration is a test double for [domain.FlowPasskeyRegistrationService].
 type fakePasskeyRegistration struct {
 	issueCalls  []domain.FlowIssuePasskeyRegistrationChallengeInput

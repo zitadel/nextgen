@@ -166,3 +166,10 @@ func (a *FlowAuthAttemptAdapter) SubmitPasskey(ctx context.Context, in domain.Fl
 	}
 	return factor.UserID, nil
 }
+
+// RegisterCreatedUser registers a newly-created user's ID as a verified user
+// factor on the auth attempt. Delegates to the service layer which issues a
+// synthetic challenge and immediately marks it succeeded.
+func (a *FlowAuthAttemptAdapter) RegisterCreatedUser(ctx context.Context, in domain.FlowRegisterCreatedUserInput) error {
+	return a.attempts.RegisterCreatedUser(ctx, in.ProjectID, in.AttemptID, in.UserID)
+}

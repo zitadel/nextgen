@@ -349,6 +349,13 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 				}
 				if result.UserID != "" {
 					recordResolvedUser(state, result.UserID)
+					if err := r.authAttempts.RegisterCreatedUser(ctx, FlowRegisterCreatedUserInput{
+						ProjectID: state.ProjectID,
+						AttemptID: state.AuthAttemptID,
+						UserID:    result.UserID,
+					}); err != nil {
+						return FlowStepResult{}, fmt.Errorf("flow state machine: register created user on attempt: %w", err)
+					}
 				}
 				if result.StepError != nil {
 					step := r.buildStep(currentStep, resolved, result.StepError, nil, nil)
@@ -549,6 +556,13 @@ func (r *FlowStateMachineRuntime) processPasskey(ctx context.Context, client dat
 			}
 			if err != nil {
 				return passkeyPhaseResult{}, fmt.Errorf("flow state machine: submit passkey registration: %w", err)
+			}
+			if err := r.authAttempts.RegisterCreatedUser(ctx, FlowRegisterCreatedUserInput{
+				ProjectID: state.ProjectID,
+				AttemptID: state.AuthAttemptID,
+				UserID:    userID,
+			}); err != nil {
+				return passkeyPhaseResult{}, fmt.Errorf("flow state machine: register passkey user on attempt: %w", err)
 			}
 			state.PendingChallenge = nil
 			return passkeyPhaseResult{handled: true}, nil
