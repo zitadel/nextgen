@@ -169,6 +169,13 @@ type FlowAuthRequestRef struct {
 // terminal step uses its presence to decide whether to mint a handoff.
 const FlowCollectedUserIDKey = "_user_id"
 
+// flowCollectedPasskeyProvisionalKey marks that the _user_id stored in
+// CollectedData was generated provisionally by the passkey issue leg (user
+// doesn't exist in the DB yet). The passkey verify leg reads this to decide
+// whether to call HandleProvisional and RegisterCreatedUser. Not set when
+// _user_id was established by an on_success handler (e.g. create_user).
+const flowCollectedPasskeyProvisionalKey = "_passkey_provisional"
+
 var (
 	ErrInvalidAction   = errors.New("flow state machine: action not allowed on current step")
 	ErrSessionConflict = errors.New("flow state machine: session version conflict")
@@ -364,6 +371,16 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 				}
 				if result.Outcome != "" {
 					routeOutcome = result.Outcome
+				}
+				if result.UserID != "" {
+					recordResolvedUser(state, result.UserID)
+					if err := r.authAttempts.RegisterCreatedUser(ctx, FlowRegisterCreatedUserInput{
+						ProjectID: state.ProjectID,
+						AttemptID: state.AuthAttemptID,
+						UserID:    result.UserID,
+					}); err != nil {
+						return FlowStepResult{}, fmt.Errorf("flow state machine: register created user on attempt: %w", err)
+					}
 				}
 			}
 		}
@@ -571,8 +588,14 @@ func (r *FlowStateMachineRuntime) processPasskey(ctx context.Context, client dat
 		switch method {
 		case FlowChallengeMethodPasskeyRegister:
 			userID, _ := state.CollectedData[FlowCollectedUserIDKey].(string)
-			if err := r.createUser.HandleProvisional(ctx, client, userID, state); err != nil {
-				return passkeyPhaseResult{}, fmt.Errorf("flow state machine: ensure user exists: %w", err)
+			// Only create the user provisionally when this passkey flow generated
+			// the ID (no prior on_success handler already created the user row).
+			_, provisional := state.CollectedData[flowCollectedPasskeyProvisionalKey]
+			if provisional {
+				delete(state.CollectedData, flowCollectedPasskeyProvisionalKey)
+				if err := r.createUser.HandleProvisional(ctx, client, userID, state); err != nil {
+					return passkeyPhaseResult{}, fmt.Errorf("flow state machine: ensure user exists: %w", err)
+				}
 			}
 			err := r.passkeyRegistration.SubmitPasskeyRegistration(ctx, client, FlowSubmitPasskeyRegistrationInput{
 				ProjectID:   state.ProjectID,
@@ -590,12 +613,17 @@ func (r *FlowStateMachineRuntime) processPasskey(ctx context.Context, client dat
 			if err != nil {
 				return passkeyPhaseResult{}, fmt.Errorf("flow state machine: submit passkey registration: %w", err)
 			}
-			if err := r.authAttempts.RegisterCreatedUser(ctx, FlowRegisterCreatedUserInput{
-				ProjectID: state.ProjectID,
-				AttemptID: state.AuthAttemptID,
-				UserID:    userID,
-			}); err != nil {
-				return passkeyPhaseResult{}, fmt.Errorf("flow state machine: register passkey user on attempt: %w", err)
+			// Only register the created user on the attempt when the passkey
+			// flow itself created the user. If an on_success handler already
+			// created and registered the user, don't call it again.
+			if provisional {
+				if err := r.authAttempts.RegisterCreatedUser(ctx, FlowRegisterCreatedUserInput{
+					ProjectID: state.ProjectID,
+					AttemptID: state.AuthAttemptID,
+					UserID:    userID,
+				}); err != nil {
+					return passkeyPhaseResult{}, fmt.Errorf("flow state machine: register passkey user on attempt: %w", err)
+				}
 			}
 			state.PendingChallenge = nil
 			return passkeyPhaseResult{handled: true}, nil
@@ -668,6 +696,9 @@ func (r *FlowStateMachineRuntime) processPasskey(ctx context.Context, client dat
 			}
 			userID = newID
 			state.CollectedData[FlowCollectedUserIDKey] = userID
+			// Mark as provisional: user doesn't exist in the DB yet.
+			// The verify leg will call HandleProvisional + RegisterCreatedUser.
+			state.CollectedData[flowCollectedPasskeyProvisionalKey] = true
 		}
 		out, err := r.passkeyRegistration.IssuePasskeyRegistrationChallenge(ctx, FlowIssuePasskeyRegistrationChallengeInput{
 			ProjectID: state.ProjectID,

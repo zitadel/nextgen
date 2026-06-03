@@ -92,7 +92,7 @@ func (h *FlowCreateUserHandler) Handle(ctx context.Context, client database.Quer
 		return FlowOnSuccessResult{}, fmt.Errorf("flow on_success create_user: insert password: %w", err)
 	}
 
-	return FlowOnSuccessResult{}, nil
+	return FlowOnSuccessResult{UserID: userID}, nil
 }
 
 // GenerateUserID mints a new user ID. Used by the state machine to assign an

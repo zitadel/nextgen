@@ -72,6 +72,8 @@ type fakeAuthAttempts struct {
 	passkeyCalls  []domain.FlowSubmitPasskeyInput
 	passkeyUserID string
 	passkeyErr    error
+
+	registerCreatedCalls []domain.FlowRegisterCreatedUserInput
 }
 
 func (f *fakeAuthAttempts) Start(_ context.Context, in domain.FlowCreateAttemptInput) (string, error) {
@@ -113,7 +115,8 @@ func (f *fakeAuthAttempts) SubmitPasskey(_ context.Context, in domain.FlowSubmit
 	return f.passkeyUserID, f.passkeyErr
 }
 
-func (f *fakeAuthAttempts) RegisterCreatedUser(_ context.Context, _ domain.FlowRegisterCreatedUserInput) error {
+func (f *fakeAuthAttempts) RegisterCreatedUser(_ context.Context, in domain.FlowRegisterCreatedUserInput) error {
+	f.registerCreatedCalls = append(f.registerCreatedCalls, in)
 	return nil
 }
 
@@ -304,11 +307,15 @@ func TestFlowStateMachine_Process_RegistrationHappyPath(t *testing.T) {
 	require.Len(t, w.pws.created, 1)
 	assert.Equal(t, "hashed:correct-horse-battery-staple", w.pws.created[0].EncodedHash)
 
-	// on_success is a side effect: no _user_id pin, no handoff.
-	_, pinned := result.State.CollectedData[domain.FlowCollectedUserIDKey]
-	assert.False(t, pinned, "create_user must not pin _user_id")
-	assert.Empty(t, w.attempts.handoffCalls)
-	assert.Empty(t, result.HandoffToken)
+	// create_user pins the user ID and registers them on the attempt so the
+	// terminal step can issue a handoff token and auto-sign-in the new user.
+	gotUserID, pinned := result.State.CollectedData[domain.FlowCollectedUserIDKey]
+	assert.True(t, pinned, "create_user must pin _user_id")
+	assert.Equal(t, wantUserID, gotUserID)
+	require.Len(t, w.attempts.registerCreatedCalls, 1)
+	assert.Equal(t, wantUserID, w.attempts.registerCreatedCalls[0].UserID)
+	require.Len(t, w.attempts.handoffCalls, 1)
+	assert.Equal(t, "handoff_01TEST", result.HandoffToken)
 
 	// Register mode dispatches identifier (the email is x-unique, so it
 	// always routes through auth-attempt to emit user_already_exists when
