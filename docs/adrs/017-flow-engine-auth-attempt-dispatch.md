@@ -1,284 +1,302 @@
 # ADR 017: Flow Engine Auth-Attempt Dispatch for Signin vs Signup
 
 > **Status:** Draft
-> **Date:** 2026-05-29
-> **Context:** Flow engine, auth-attempts, signup/signin/recovery/SSO flows
+> **Date:** 2026-06-01
+> **Context:** Flow engine, auth-attempts, signup/signin/recovery flows
 
 ## Context
 
-The flow engine drives the auth-attempt service for two purposes:
+The flow engine drives the auth-attempt service to either *verify* existing
+identifiers and credentials (signin) or *establish* new ones (signup,
+recovery, link). Today the engine assumes verify by default and only suppresses
+dispatch when the current step's `on_success` is exactly `create_user` — the
+single signup mutation that exists. That heuristic handles two shapes: pure
+signin (everything verifies) and single-step signup where the identifier and
+the password are collected on the same step that runs `create_user`.
 
-* **Verify** existing identifiers and credentials (signin path).
-* **Establish** new identifiers and credentials (signup / recovery / link path).
+It breaks for the shapes we want next:
 
-Today the [`FlowStateMachineRuntime.dispatchChallenges`][dispatch] loop runs each
-field-shaped challenge (`identifier`, `password`) whenever the corresponding
-field is present in the submission, with a single carve-out:
+1. **Multi-step signup, identifier collected before `create_user`.** The
+   collecting step runs identifier resolution, gets `user_not_found`, and has
+   no route for that outcome because it isn't supposed to fork — it's
+   supposed to keep collecting.
+2. **Multi-step signup, credential collected before `create_user`.** The
+   suppression rule fires only on the step that owns `on_success`. An earlier
+   `set-password` step still tries to verify the password against a user that
+   doesn't yet exist.
+3. **Mutations other than `create_user`.** Passkey signup and password reset
+   are different mutations, but the suppression rule only knows one name.
+
+The engine needs two separate answers, derived from per-flow rather than
+per-step state: *should this collected field be verified or just collected*,
+and *which credential kinds will the eventual mutation produce*.
+
+## Decision
+
+Two mechanisms cover verify-vs-establish for every shape.
+
+### 1. Dynamic dispatch mode (`CurrentPurpose`)
+
+`FlowState` gains `CurrentPurpose`, distinct from the authoring `Purpose`
+(`Purpose` records what the client / OIDC asked for and is read by telemetry,
+policy, and ACR — it stays pinned at start). `CurrentPurpose` is initialised
+from `Purpose` and updated by the engine on identifier outcomes:
+
+| From | Outcome | To |
+|---|---|---|
+| `login` | `user_not_found` | `register` |
+| `register` | `user_already_exists` | `login` |
+| `recovery` | — | (no flip) |
+
+The flip is automatic; the author must still wire the outcome's transition,
+otherwise the engine errors. The UI is responsible for any copy change when
+mode flips (e.g. "This email is already registered — sign in to continue"
+on a `signin-password` step reached via `user_already_exists`).
+
+Credential dispatch reads `CurrentPurpose`:
+
+| `CurrentPurpose` | Credential dispatch |
+|---|---|
+| `login` | verify |
+| `register` | skip — mutation establishes |
+| `recovery` | skip — mutation establishes |
+
+Identifier dispatch is not gated by `CurrentPurpose`; it runs whenever a field
+has `x-unique` and the attempt has no user check yet, in order to emit routing
+outcomes.
+
+### 2. Mutation manifest
+
+`CurrentPurpose` decides *whether* the engine verifies a collected credential.
+It doesn't say *what* a given mutation consumes when it runs — that's a
+property of the mutation, not the flow. Each `FlowOnSuccessHandler` declares
+its manifest:
 
 ```go
-if step.OnSuccess != nil && *step.OnSuccess == FlowOnSuccessCreateUser {
-    return flowDispatchResult{}, nil
+type FlowOnSuccessHandler interface {
+    Handle(ctx, ...) (FlowOnSuccessResult, error)
+    EstablishedKinds() []FlowFieldChallenge
 }
 ```
 
-This works for the flows we have today:
-
-* **Pure signin** — identifier field on one step, password field on the next. Both dispatch as verification.
-* **Combined signin/signup with an `identify` step** — `user_not_found` is wired on `identify`, so the identifier challenge routes correctly. The `set_password` step that creates the user has `on_success: create_user` and is skipped wholesale.
-
-It does **not** work in two cases we want to support:
-
-1. **Multi-step signup where the identifier is collected before the `create_user` step.** Example: `profile(email, given_name)` → `set_password(password, on_success: create_user)`. The `profile` step would call `SubmitIdentifier(email)`, get `user_not_found`, and fail to route because `profile` doesn't declare a `user_not_found` transition. There is no signin branch — this is a registration-only flow.
-2. **Non-password credentials.** Passkey, magic link, OTP, and SSO are not field-shaped. Their proofs travel through `PendingChallenge` or SSO callbacks, not `data.field`. The `create_user`-keyed skip also doesn't generalize to writers that establish those credentials (`create_user_with_passkey`, `link_sso`, `reset_credential`, …).
-
-## Problem statement
-
-Decide how a step opts in or out of:
-
-* **Identifier resolution** — does the engine call `SubmitIdentifier` and route on `user_not_found` / other resolution outcomes, or is the field collected as plain data?
-* **Credential verification** — does the engine verify the submitted credential against an existing one, or is the value handed to an `on_success` writer that establishes it?
-
-The control signal must work for:
-
-* Signin-only flows.
-* Signup-only flows (single-step and multi-step).
-* Combined-purpose flows (a single definition serving `login` and `register`).
-* Recovery flows that establish a new credential without verifying the old one.
-* SSO flows where identity resolution is a mandatory side-effect of the IdP exchange.
-* Future credential kinds (passkey, magic link, OTP) without re-touching the dispatch loop.
-
-## Options considered
-
-### Option 1 — Purpose-based gating
-
-Skip auth-attempt verification when `flow.purpose == register`.
-
-* **Pros:** Trivial to implement.
-* **Cons:** Purpose is set once at flow start. A combined-purpose flow (`["login", "register"]`) has a single purpose for the whole lifetime, so identifier resolution either always runs or never runs. Kills the combined-flow pattern.
-
-**Rejected.**
-
-### Option 2 — Implicit graph reading (`user_not_found` transition)
-
-Dispatch the identifier challenge if and only if the current step declares a
-`user_not_found` transition. Absence of the transition means "collect-only".
-
-* **Pros:** Author writes nothing extra — the routing intent and dispatch intent are the same edge. Symmetric with the existing `implicitOutcomesByChallenge` map. Combined flows fall out naturally.
-* **Cons:** **The dispatch behavior is hidden in a transition key.** A reader who removes or renames the `user_not_found` transition does not realize they are also turning off identifier resolution. The control signal is buried in a routing table and is not discoverable from the step shape. Also: SSO needs lookup to *always* run, so this rule only applies to field-shaped identifiers (see Option 5 below).
-
-**Concern raised: implicitness.** Not preferred as the source of truth.
-
-### Option 3 — Explicit step property
-
-Add a step-level property that names the step's intent for each challenge kind:
-
-```json
-{
-  "name": "profile",
-  "fields": ["email", "given_name"],
-  "identifier": "collect",       // "verify" | "collect"
-  "transitions": { "submit": { "target": "set_password" } }
-}
-```
-
-```json
-{
-  "name": "identify",
-  "fields": ["email"],
-  "identifier": "verify",
-  "transitions": {
-    "submit":         { "target": "signin" },
-    "user_not_found": { "target": "profile" }
-  }
-}
-```
-
-* **Pros:** Dispatch behavior is local to the step and visible at a glance. Renaming or removing a transition does not silently change dispatch. Generalizes per challenge kind (e.g., `credential: "verify" | "establish"`) without depending on a writer manifest.
-* **Cons:** Two sources of truth — the property must agree with what the transitions allow (`identifier: "verify"` without a `user_not_found` transition is a definition-validation error). One more knob the author has to set.
-
-**Preferred direction for the identifier-side decision.**
-
-### Option 4 — `on_success` writer manifest (credential side)
-
-Each `FlowOnSuccess` value carries a manifest of which credential kinds it
-establishes:
-
-```
-create_user              → { identifier, password }
-create_user_with_passkey → { identifier, passkey }
-create_user_with_sso     → { identifier, sso }
-link_sso                 → { sso }
-reset_credential         → { password }
-```
-
-The dispatch loop, for any challenge kind on a step, asks: "does the step's
-`on_success` establish this kind?" If yes, the handler owns it — skip
-verification. If no, run as verification.
-
-* **Pros:** Generalizes the existing `create_user` carve-out to any writer. The writer is the natural place to declare what it produces. New credential kinds (passkey, OTP) need only register their writer — no change to the dispatch loop. Explicit at the registry level, even if not at the step level.
-* **Cons:** Manifest must stay in sync with the writer's actual behavior. Slightly indirect — to know what a step does with a credential, the reader has to look up the `on_success` value's manifest.
-
-**Preferred direction for the credential-side decision.**
-
-### Option 5 — Split rules by identifier shape (SSO refinement)
-
-Identifier resolution behaves differently depending on whether the identifier
-arrives as a form field or as a ceremony output (SSO claims, future federated):
-
-* **Field-shaped identifier** — lookup is optional. The author opts in via Option 3's explicit `identifier: "verify"` (or the implicit Option 2 if we keep it).
-* **Ceremony-shaped identifier** — lookup is mandatory because the verified claims must bind to a user (existing or new) before the flow can proceed. The step's transitions select route-vs-error for each engine-emitted outcome (`user_not_found`, `user_link_required`, etc.).
-
-* **Pros:** Acknowledges that SSO is not optional — you can't "collect" a verified IdP identity and defer resolution. Keeps the same vocabulary (`user_not_found` transition, etc.) but with different defaults per shape.
-* **Cons:** Two sub-rules instead of one. Author has to know which shape they're dealing with.
-
-**Required regardless of which other options win.**
-
-### Option 6 — Expand identifier-resolution outcomes
-
-The engine emits more than `user_not_found`. Today the binary find / not-found
-is enough; SSO surfaces a third case:
-
-| Outcome | Meaning |
+| Mutation | Manifest |
 |---|---|
-| (success) | Identifier resolved to a user |
-| `user_not_found` | No user matches |
-| `user_link_required` | User exists by email but no external-identity link (SSO only) |
-| `user_locked` (future) | User found but disabled |
+| `create_user` | `{identifier, password}` |
+| `create_user_with_passkey` | `{identifier, passkey}` |
+| `reset_credential` | `{password}` |
 
-Each is a routing outcome. Wired → route. Unwired → error.
+The manifest enumerates *credential kinds* — the things the engine has a
+verify-or-establish opinion about (`identifier`, `password`, future
+`passkey`). Plain user attributes (`given_name`, `family_name`, …) are not
+in scope: they have no auth-attempt dispatch, are validated against the user
+schema directly, and reach the mutation through `CollectedData` keyed by
+schema property. `identifier` appears in the manifest when the mutation
+binds a new one (so `create_user` has it; `reset_credential` does not).
 
-* **Pros:** Avoids silent auto-link takeover (a takeover vector if `user_link_required` were merged with success). Scales to future cases.
-* **Cons:** More outcome names for authors to learn. Definition validation should warn on unwired outcomes for SSO steps so authors don't accidentally fall through to an error.
+Three things rely on this declaration:
 
-**Required for SSO.**
+* **Mutation consumption.** The mutation pulls collected credentials per its
+  manifest (per ADR 020, `CollectedCredentials` keyed by kind) and reads
+  whatever attributes it needs from `CollectedData`.
+* **Definition validator.** A flow running `create_user` must collect both
+  manifest entries upstream — identifier and password. Required schema
+  attributes (`given_name`, etc.) are checked separately against the user
+  schema, not the manifest.
+* **Extending the engine.** New credential kinds add a mutation with its
+  manifest. The dispatch loop and validator are untouched; no name-based
+  carve-outs accumulate.
+
+Together with `CurrentPurpose`, this removes the hard-coded `create_user` skip
+in today's `dispatchChallenges`: mode decides verify-or-skip, the manifest
+decides what the mutation will consume.
 
 ## Worked examples
 
-These flows illustrate Options 3 + 4 + 5 + 6 acting together. Where Option 3's
-`identifier` property is shown, it is the explicit replacement for Option 2's
-implicit transition-based gating.
+### A. Multi-step signup, user created after the password
 
-### A. Multi-step password signup
-
-```json
-{
-  "slug": "signup-password",
-  "purposes": ["register"],
-  "initial_steps": { "register": "profile" },
-  "steps": [
-    {
-      "name": "profile",
-      "fields": ["email", "given_name"],
-      "identifier": "collect",
-      "transitions": { "submit": { "target": "set_password" } }
-    },
-    {
-      "name": "set_password",
-      "fields": ["password"],
-      "on_success": "create_user",
-      "transitions": { "submit": { "target": "done" } }
-    },
-    { "name": "done", "complete": "show" }
-  ]
-}
+```yaml
+purposes:
+  register: profile
+steps:
+  - name: profile
+    fields: [email, given_name]
+    transitions:
+      submit: { target: set-password }
+  - name: set-password
+    fields: [password]
+    transitions:
+      submit: { target: confirm-email }
+  - name: confirm-email
+    fields: [otp]
+    on_success: create_user
+    transitions:
+      submit: { target: done }
+  - name: done
+    complete: show
 ```
 
-* `profile`: `identifier: "collect"` → no identifier dispatch. Email is collected for the writer.
-* `set_password`: `on_success: create_user` manifest establishes `{identifier, password}` → password dispatch skipped. Writer reads `email + password` from `CollectedData`, persists, reports factors.
+`CurrentPurpose=register` from start. `profile` runs `SubmitIdentifier`, gets
+`user_not_found` (expected for a register entry). `set-password` collects
+without dispatching — mode is register. `confirm-email` runs `create_user`,
+which reads from collected state per its manifest. User lives on a different
+step from the password.
 
-### B. Multi-step passkey signup
+### B. Multi-step signup, user created on the password step
 
-```json
-{
-  "name": "register_passkey",
-  "gates": { "passkey": { "type": "passkey", "mode": "register" } },
-  "on_success": "create_user_with_passkey",
-  "transitions": { "submit": { "target": "done" } }
-}
+```yaml
+purposes:
+  register: profile
+steps:
+  - name: profile
+    fields: [email, given_name]
+    transitions:
+      submit: { target: set-password }
+  - name: set-password
+    fields: [password]
+    on_success: create_user
+    transitions:
+      submit: { target: done }
+  - name: done
+    complete: show
 ```
 
-The same manifest mechanism decides ceremony mode: `create_user_with_passkey`
-establishes `{passkey}`, so the WebAuthn ceremony is `register`, not `verify`.
+Same mode behaviour; the mutation just happens to ride on the password step.
 
 ### C. Combined signin/signup
 
-```json
-{
-  "name": "identify",
-  "fields": ["email"],
-  "identifier": "verify",
-  "transitions": {
-    "submit":         { "target": "signin" },
-    "user_not_found": { "target": "profile" }
-  }
-}
+```yaml
+purposes:
+  login: identify
+  register: identify
+steps:
+  - name: identify
+    fields: [email]
+    transitions:
+      submit:              { target: signin-password }
+      user_not_found:      { target: register-password }
+      user_already_exists: { target: signin-password }
+  - name: signin-password
+    fields: [password]
+    transitions:
+      submit: { target: done }
+  - name: register-password
+    fields: [password]
+    on_success: create_user
+    transitions:
+      submit: { target: done }
+  - name: done
+    complete: redirect
 ```
 
-`identifier: "verify"` requires a wired resolution outcome (`user_not_found`) at
-definition-validation time. The signin and signup branches share an entry step.
+Login entry, known email → identifier verifies → `signin-password` verifies.
+Login entry, unknown email → `user_not_found` → engine flips
+`CurrentPurpose=register` → `register-password` collects without dispatch →
+`create_user` runs. Register entry, existing email → `user_already_exists` →
+engine flips `CurrentPurpose=login` → `signin-password` verifies normally.
 
-### D. SSO with auto-provision and link prompt
+### D. Recovery
 
-```json
-{
-  "name": "login",
-  "sso_providers": [{ "id": "google", "name": "Google" }],
-  "transitions": {
-    "google":             { "target": "sso_redirect" },
-    "callback":           { "target": "done" },
-    "user_not_found":     { "target": "provision" },
-    "user_link_required": { "target": "verify_existing" }
-  }
-}
+```yaml
+purposes:
+  recovery: identify
+steps:
+  - name: identify
+    fields: [email]
+    transitions:
+      submit: { target: new-password }
+  - name: new-password
+    fields: [password]
+    on_success: reset_credential
+    transitions:
+      submit: { target: done }
+  - name: done
+    complete: show
 ```
 
-Ceremony-shaped identifier (Option 5): lookup always runs after the IdP
-exchange. Each emitted outcome must be wired or the engine errors (Option 6).
-The `provision` step pre-fills from verified claims, has `on_success:
-create_user_with_sso`, and is `identifier: "collect"` because the IdP already
-verified the identity.
+`CurrentPurpose=recovery` throughout. Identifier verifies; credential dispatch
+skipped. `reset_credential` rewrites the credential.
 
-### E. Recovery
+## Alternatives considered
 
-```json
-{
-  "name": "new_password",
-  "fields": ["password"],
-  "on_success": "reset_credential",
-  "transitions": { "submit": { "target": "done" } }
-}
-```
-
-Manifest entry `reset_credential → {password}` skips password verification —
-the writer rewrites the credential without comparing it against the old one.
-Different writer from `create_user`, same rule.
+* **Static purpose gating.** `Purpose` is pinned at start, so combined-purpose flows would either always verify or never verify. Resolved by making the dispatch flag dynamic and separate from authoring intent.
+* **Implicit transition reading** (dispatch iff `user_not_found` is wired). Hides the control signal in a routing edge.
+* **Per-kind step properties** (`identifier: "verify" | "collect"`, `credential: "verify" | "establish"`). Explicit but verbose. Held in reserve if the outcome → flip table grows or authors frequently need per-step exceptions.
 
 ## Open questions
 
-* **Is the explicit step property per challenge kind (`identifier`, `credential`) or a single intent enum (`step_role: "verify" | "collect" | "establish"`)?** Per-kind is more flexible (a step could verify an identifier while establishing a credential). Single enum is shorter and disallows ambiguous shapes by construction. Lean: per-kind, paired with definition-validation that rejects nonsensical combinations.
-* **Should Option 2 (implicit transition reading) survive as a *default* with Option 3 as the override?** That is, "if no `identifier` property is set, infer from `user_not_found` presence." Concern: defeats the explicitness goal. Lean: no — require the property and have the validator reject ambiguous steps.
-* **Where does the writer manifest live?** Options: (a) a Go-side map next to `FlowOnSuccess` enums, (b) a method on each `FlowOnSuccessHandler` (`EstablishedKinds() []FlowFieldChallenge`), (c) a registry the state machine builds at wiring time. Lean: (b) — the writer owns the truth about what it produces.
-* **Definition validation surface.** Adding `identifier: "verify"` without a `user_not_found` transition, or `identifier: "collect"` on a step whose `on_success` does not consume the field — both should be caught at activation, not at runtime. Belongs in [`flow_definition_validator.go`][validator].
-* **Anti-enumeration in recovery.** Flow D in the discussion routed both `submit` and `user_not_found` to the same `verify_link` target on the `identify` step. The explicit property still applies (`identifier: "verify"`), and the writer's behavior is unchanged. Worth a test in the validator to make sure same-target outcomes aren't flagged as dead.
-* **`AuthAttempt` and the no-user terminate path.** The current `terminate` skips handoff when `_user_id` isn't in `CollectedData` (see `flow_state_machine.go:430`). Once writers always report their established factors, the policy engine populates `RequiredChecks` and that special case goes away. Track separately.
-
-## Direction (not a decision)
-
-Lean toward:
-
-* **Option 3** (explicit `identifier` step property) — replaces Option 2's implicit transition reading. Authors declare intent locally; validators enforce consistency with transitions.
-* **Option 4** (writer manifest via handler method) — generalizes the `create_user` carve-out to every writer; new credential kinds extend via new writers without touching dispatch.
-* **Options 5 and 6** apply on top regardless — SSO needs them and they don't conflict with 3 + 4.
-
-To be confirmed before promoting from Draft.
+* **Outcome → flip table location.** Engine-hard-coded is discoverable but each addition is a code change. Per-transition (`set_mode: register`) is data-driven but reintroduces implicitness. Lean: hard-coded.
+* **Telemetry purpose.** A login flow that flipped to register reports completion under which? Lean: `Purpose` for requested intent, separate metric for `CurrentPurpose` at completion.
 
 ## Consequences
 
-* **`FlowDefinitionStep`** gains an `Identifier` (and likely `Credential`) property; OpenAPI schema in `api/openapi/components/flows/` mirrors it.
-* **`FlowOnSuccessHandler`** grows a method declaring established credential kinds; runtime `dispatchChallenges` consults it.
-* **`flow_definition_validator.go`** gains rules cross-checking the new properties against transitions and `on_success`.
-* **Identifier-resolution outcome set** grows beyond `user_not_found`; `implicitOutcomesByChallenge` and the runtime's emission paths track the additions.
-* **No purpose-based branching is introduced.** All control flows from the graph and the writer manifest.
+* `FlowState` gains `CurrentPurpose`, persisted in the `_zflow` cookie.
+* `FlowOnSuccessHandler` grows `EstablishedKinds() []FlowFieldChallenge`; the `FlowOnSuccessCreateUser` carve-out is removed.
+* `dispatchChallenges` keys on `(CurrentPurpose, challengeKind)` plus the current step's mutation manifest.
+* Identifier outcomes grow: `user_already_exists`, future `user_locked`.
+* `flow_definition_validator.go` cross-checks entry purposes against the flip table and mutation manifests against fields actually collected upstream.
+* No new step properties.
+
+## Passkey
+
+Passkey is on the MVP track. It composes with the two mechanisms above with
+specifics worth recording.
+
+**Action-shaped, not field-shaped.** Per ADR 020, a passkey step triggers the
+ceremony through `actions.<name>.auth_method: passkey`, not via a token in
+`fields[]`. The flow's `PendingChallenge` threads the WebAuthn challenge ID
+through the encrypted cookie; the matching submit routes to the passkey
+service for verification (login mode) or enrolment (register mode). The
+action descriptor's `auth_method` is what links the button back to
+`x-auth-methods.passkey` in the user schema. `fields: [x-auth-methods-passkey]`
+is invalid and the validator rejects it.
+
+**Two shapes with different identifier semantics.**
+
+* *Identifier-then-passkey.* User collects an identifier first (typically
+  email); the passkey ceremony runs against the resolved user. `SubmitIdentifier`
+  fires as usual; `CurrentPurpose` decides whether the ceremony is
+  `webauthn.get` (login mode) or `webauthn.create` (register mode). No new
+  mechanism — fits the existing model directly.
+* *Identifier-less passkey* (conditional UI / discoverable credentials). No
+  identifier is collected up front; the assertion's `userHandle` identifies
+  the user retroactively. Identifier resolution is folded into ceremony
+  verification — `SubmitIdentifier` does not run, no `user_not_found` outcome
+  is emitted, and no flip signal exists. Entry `Purpose` must match the
+  user's intent from the start; combined `login`/`register` on an
+  identifier-less entry step is not expressible under the current model and
+  the validator rejects it.
+
+**Mutation manifest.** `create_user_with_passkey` carries
+`{identifier, passkey}`. The identifier (usually email) is still required —
+schema-required attributes don't disappear because the credential kind
+changed. A flow that wants pure passkey-only signup must collect or generate
+an identifier on an earlier step; the schema's `required[]` is unchanged.
+
+**Validator rules added for passkey:**
+
+* An action with `auth_method: passkey` requires the user schema's
+  `x-auth-methods.passkey.enabled: true`.
+* `fields[]` may not contain `x-auth-methods-passkey` (passkey is action-shaped
+  per ADR 020).
+* An identifier-less entry step with combined purposes is rejected.
+* A step running `create_user_with_passkey` must have an identifier collected
+  somewhere upstream (manifest cross-check).
+
+**Deferred: combined "Sign in or Register with passkey".** A single
+identifier-less entry that handles both directions would need a
+`credential_unknown` outcome on the ceremony to flip
+`CurrentPurpose=login` → `register`, analogous to `user_not_found` on
+identifier resolution. Out of scope for the initial passkey landing;
+revisit when discoverable-credentials UX is in scope.
+
+## Note: SSO
+
+SSO ceremonies are out of MVP scope. When they land, the model extends without
+reshaping: ceremony-shaped identifiers (IdP callbacks) always run resolution;
+the engine emits an additional outcome (`user_link_required`) that authors
+wire; the manifest gains `create_user_with_sso` and `link_sso`; the `purposes`
+enum gains `link_account` (with `user_not_found` flipping it to `register`).
+The two mechanisms decided above accommodate this without change.
 
 [dispatch]: ../../internal/domain/flow_state_machine.go
 [validator]: ../../internal/domain/flow_definition_validator.go

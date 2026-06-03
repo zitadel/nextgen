@@ -36,7 +36,7 @@ to be a fast answer to "can I build flow X right now?"
 
 - Schema-driven `fields`: type, validation, `required`, uniqueness scope, challenge mapping from `x-unique` / `x-password` annotations.
 - `actions` — user-selectable, surfaced on the capability payload.
-- `on_success: create_user` — hashes the password, writes the user and credential rows, stashes `_user_id` on `CollectedData`.
+- `on_success: create_user` — hashes the password, writes the user and credential rows. Pure side effect: does not authenticate the new user, so the engine keeps walking the graph and does not mint a handoff.
 - `complete: redirect` and `complete: show` — terminal step classifiers.
 - Implicit identifier resolution from any identifier-shaped field; routes via `user_not_found` when wired, errors otherwise.
 - Implicit password verification when a password-shaped field is present and `on_success` is not `create_user`.
