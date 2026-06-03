@@ -1046,6 +1046,7 @@ func TestFlowDispatch_Recovery_IdentifierResolvedPasswordNotDispatched(t *testin
 	require.NoError(t, err)
 	assert.Empty(t, w.attempts.passwordCalls)
 }
+
 // passkeyRegisterDefinition builds a two-step registration flow:
 // an `identify` step (identifier field) followed by a `register` step
 // offering the `passkey_register` action, transitioning to `done`.
