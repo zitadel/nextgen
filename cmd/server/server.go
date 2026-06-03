@@ -183,6 +183,8 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 	oasServer, err := oasapi.NewServer(
 		api.NewHandler(
 			crypter,
+			opaqueTokenGenerator,
+			opaqueTokenGenerator,
 			flowService,
 			authAttemptSvc,
 			sessionService,
