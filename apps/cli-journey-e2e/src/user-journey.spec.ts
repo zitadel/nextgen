@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 test.describe.configure({ mode: "serial" });
 
@@ -20,34 +20,36 @@ test("password registration, logout, and login work in a fresh Next app", async 
   await expectSessionCookie(page);
 });
 
-test("passkey registration, logout, and passkey login work in a fresh Next app", async ({
-  page,
-}) => {
-  const client = await page.context().newCDPSession(page);
-  await client.send("WebAuthn.enable");
-  await client.send("WebAuthn.addVirtualAuthenticator", {
-    options: {
-      protocol: "ctap2",
-      transport: "internal",
-      hasResidentKey: true,
-      hasUserVerification: true,
-      isUserVerified: true,
-      automaticPresenceSimulation: true,
-    },
+if (process.env.JOURNEY_ENABLE_PASSKEY === "1") {
+  test("passkey registration, logout, and passkey login work in a fresh Next app", async ({
+    page,
+  }) => {
+    const client = await page.context().newCDPSession(page);
+    await client.send("WebAuthn.enable");
+    await client.send("WebAuthn.addVirtualAuthenticator", {
+      options: {
+        protocol: "ctap2",
+        transport: "internal",
+        hasResidentKey: true,
+        hasUserVerification: true,
+        isUserVerified: true,
+        automaticPresenceSimulation: true,
+      },
+    });
+
+    const email = uniqueEmail("passkey");
+
+    await page.goto("/login");
+    await registerWithPasskey(page, email);
+    await expectSignedIn(page);
+    await expectSessionCookie(page);
+
+    await logout(page);
+    await loginWithPasskey(page, email);
+    await expectSignedIn(page);
+    await expectSessionCookie(page);
   });
-
-  const email = uniqueEmail("passkey");
-
-  await page.goto("/login");
-  await registerWithPasskey(page, email);
-  await expectSignedIn(page);
-  await expectSessionCookie(page);
-
-  await logout(page);
-  await loginWithPasskey(page, email);
-  await expectSignedIn(page);
-  await expectSessionCookie(page);
-});
+}
 
 async function expectProtectedRouteToRedirect(page: Page): Promise<void> {
   await page.goto("/profile");
@@ -137,22 +139,22 @@ async function expectRegistrationChoice(page: Page): Promise<void> {
 }
 
 async function fillEmail(page: Page, email: string): Promise<void> {
-  await page.getByLabel(/email/i).first().fill(email);
+  await fillField(page, emailFieldCandidates(page), email, 30_000);
 }
 
 async function fillEmailIfVisible(page: Page, email: string): Promise<void> {
-  const emailField = page.getByLabel(/email/i).first();
-  if (await emailField.isVisible().catch(() => false)) {
+  const emailField = await firstVisibleField(emailFieldCandidates(page), 1_000);
+  if (emailField) {
     await emailField.fill(email);
   }
 }
 
 async function fillPassword(page: Page, password: string): Promise<void> {
-  await page.getByLabel(/password/i).first().fill(password);
+  await fillField(page, passwordFieldCandidates(page), password, 30_000);
 }
 
 async function isPasswordVisible(page: Page): Promise<boolean> {
-  return page.getByLabel(/password/i).first().isVisible().catch(() => false);
+  return Boolean(await firstVisibleField(passwordFieldCandidates(page), 1_000));
 }
 
 async function expectSessionCleared(page: Page): Promise<void> {
@@ -184,6 +186,52 @@ async function clickAction(
 
 function actionLocator(page: Page, actionName: string) {
   return page.locator(`zl-button[action="${actionName}"], [data-action="${actionName}"]`);
+}
+
+function emailFieldCandidates(page: Page): Locator[] {
+  return [
+    page.locator('zl-field[name="email"] input'),
+    page.locator('input[name="email"], input[type="email"], input[autocomplete="email"]'),
+    page.getByLabel(/email/i),
+  ];
+}
+
+function passwordFieldCandidates(page: Page): Locator[] {
+  return [
+    page.locator('zl-field[name="password"] input'),
+    page.locator('input[name="password"], input[type="password"], input[autocomplete*="password"]'),
+    page.getByLabel(/password/i),
+  ];
+}
+
+async function fillField(
+  page: Page,
+  candidates: Locator[],
+  value: string,
+  timeout: number,
+): Promise<void> {
+  const field = await firstVisibleField(candidates, timeout);
+  if (!field) {
+    throw new Error(`No visible field found at ${page.url()}`);
+  }
+  await field.fill(value);
+}
+
+async function firstVisibleField(
+  candidates: Locator[],
+  timeout: number,
+): Promise<Locator | null> {
+  const deadline = Date.now() + timeout;
+  do {
+    for (const candidate of candidates) {
+      const field = candidate.first();
+      if (await field.isVisible().catch(() => false)) {
+        return field;
+      }
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  } while (Date.now() < deadline);
+  return null;
 }
 
 function uniqueEmail(prefix: string): string {

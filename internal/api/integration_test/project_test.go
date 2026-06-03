@@ -9,6 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
+	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
 )
 
 func TestCreateProject(t *testing.T) {
@@ -48,6 +50,44 @@ func TestCreateProject(t *testing.T) {
 			})
 		}
 	})
+}
+
+func TestCreateProjectProvisionsDefaultLoginFlow(t *testing.T) {
+	client := harness.EnsureAnonymousAPIClient(t)
+
+	projectResp, err := client.CreateProject(t.Context(), &api.CreateProjectRequest{
+		PreviewOrigins: make([]string, 0),
+	})
+	require.NoError(t, err)
+	project, ok := projectResp.(*api.CreateProjectResponse)
+	require.True(t, ok, helpers.MustMarshal(t, projectResp))
+
+	flowService := harness.EnsureFlowService(t)
+	definition, err := flowService.Resolve(t.Context(), service.ResolveFlowRequest{
+		ProjectID: project.ID,
+		Purpose:   domain.FlowDefinitionPurposeLogin,
+	})
+	require.NoError(t, err)
+	_, err = flowService.Start(t.Context(), service.StartFlowRequest{
+		Definition: definition,
+		Purpose:    domain.FlowDefinitionPurposeLogin,
+	})
+	require.NoError(t, err)
+
+	flowResp, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{
+		ProjectID: api.ProjectID(project.ID),
+		Purpose:   api.CreateFlowRequestPurposeLogin,
+	})
+	require.NoError(t, err)
+	flow, ok := flowResp.(*api.FlowResponseHeaders)
+	require.True(t, ok, helpers.MustMarshal(t, flowResp))
+
+	assert.NotEmpty(t, flow.SetCookie.Value)
+	assert.NotEmpty(t, flow.Response.ID)
+	assert.NotEmpty(t, flow.Response.SessionID)
+	assert.Equal(t, "identifier", flow.Response.Step.Name)
+	assert.Contains(t, flow.Response.Step.Fields, "email")
+	assert.Contains(t, flow.Response.Step.Actions, "submit")
 }
 
 func TestGetProject(t *testing.T) {
