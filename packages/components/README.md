@@ -48,9 +48,9 @@ backend, set a locale.
 <zitadel-login id="login" purpose="login" project-id="proj_123"></zitadel-login>
 
 <script type="module">
-  import { setApiBaseUrl } from '@zitadel/api/runtime/base-url';
+  import { setProxyPath } from '@zitadel/api/runtime/base-url';
 
-  setApiBaseUrl('https://api.tenant.com');
+  setProxyPath('https://api.tenant.com');
 
   const el = document.getElementById('login');
   el.locale = await fetch('/i18n/en.json').then((r) => r.json());
@@ -79,9 +79,9 @@ attributes).
 
 ```tsx
 import '@zitadel/components';
-import { setApiBaseUrl } from '@zitadel/api/runtime/base-url';
+import { setProxyPath } from '@zitadel/api/runtime/base-url';
 
-setApiBaseUrl(import.meta.env.VITE_ZITADEL_API_BASE);
+setProxyPath(import.meta.env.VITE_ZITADEL_API_BASE);
 
 export function Login({ locale }: Props) {
   return (
@@ -159,7 +159,7 @@ form-associated inputs.
 
 | Tier | Surface | Use when |
 | --- | --- | --- |
-| API base | `setApiBaseUrl()` from `@zitadel/api` | every consumer — points at your backend |
+| API base | `setProxyPath()` from `@zitadel/api/runtime/base-url` | every consumer — points at your backend |
 | Tokens | branding payload returned from the server | tenant colour / logo / font |
 | CSS hooks | `zitadel-login::part(form)`, `zl-field::part(input)` | targeted overrides from the host page |
 | Locale | `el.locale = { ... }` | i18n / custom copy |
@@ -179,7 +179,7 @@ follow-up.
 | --- | --- | --- |
 | `purpose` | `'login' \| 'register' \| 'reset_password' \| string` | Which flow purpose to drive |
 | `projectId` / `project-id` | `string` | Project / tenant id sent with `POST /flow` |
-| `apiBase` / `api-base` | `string` | Optional declarative override for `setApiBaseUrl()` |
+| `apiBase` / `api-base` | `string` | Optional declarative override for `setProxyPath()` |
 | `sessionExchangePath` / `session-exchange-path` | `string` | Handoff exchange path (default `/sessions/exchange`, prefixed with `api-base`). Any other value is resolved from `location.origin` instead — use when exchange is rewritten separately (e.g. `/api/auth/exchange`) |
 | `postSignInUrl` / `post-sign-in-url` | `string` | After `complete: "show"`, exchange the `handoff_token` at the configured exchange path and navigate here |
 | `resumeFlowId` / `resume-flow-id` | `string` | Resume an existing flow handle instead of starting fresh |

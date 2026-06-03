@@ -19,7 +19,7 @@ and the Liquid renderer reads it through the `LiquidContext` projection.
 Tests intercept at the network layer with MSW. The dev playground and the
 unit tests both source their handlers from `@zitadel/api-mock`
 (`setupMock(worker)` for the browser, `setupMockHandlers()` for
-`msw/node`). Configure the API base URL with `setApiBaseUrl()` from
+`msw/node`). Configure the API base URL with `setProxyPath()` from
 `@zitadel/api/runtime/base-url`, or via the `api-base` attribute
 on `<zitadel-login>` for declarative setups.
 
