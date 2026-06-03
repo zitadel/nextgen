@@ -32,7 +32,7 @@ func (s SecurityHandler) HandleOAuth2(ctx context.Context, operationName api.Ope
 
 	payload, err := s.tokenVerifier.Verify(t.Token)
 	if err != nil {
-		return nil, err
+		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
 	}
 
 	var scope ScopeContext

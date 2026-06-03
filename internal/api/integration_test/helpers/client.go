@@ -32,19 +32,6 @@ func (f FakeSecuritySource) UsernamePassword(ctx context.Context, operationName 
 
 var _ api.SecuritySource = (*FakeSecuritySource)(nil)
 
-type AnonymousSecuritySource struct {
-}
-
-func (f AnonymousSecuritySource) OAuth2(ctx context.Context, operationName api.OperationName) (api.OAuth2, error) {
-	return api.OAuth2{}, nil
-}
-
-func (f AnonymousSecuritySource) UsernamePassword(ctx context.Context, operationName api.OperationName) (api.UsernamePassword, error) {
-	return api.UsernamePassword{}, nil
-}
-
-var _ api.SecuritySource = (*FakeSecuritySource)(nil)
-
 type ApiClient struct {
 	*api.Client
 	securitySource *FakeSecuritySource

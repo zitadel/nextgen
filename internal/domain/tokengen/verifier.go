@@ -38,8 +38,8 @@ func (v *AnyTokenTypeVerifier) Verify(token string) (payload map[string]any, err
 	}
 
 	var errs []error
-	for _, v := range verifiers {
-		payload, err := v.Verify(token)
+	for _, verifier := range verifiers {
+		payload, err := verifier.Verify(token)
 		if err != nil {
 			errs = append(errs, err)
 			continue
