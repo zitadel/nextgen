@@ -122,6 +122,7 @@ export function registerStep(input: StepFixtureInput): CreateFlow201 {
     },
     actions: {
       submit: { text_key: "register.action.submit", primary: true },
+      back: { text_key: "action.back" },
     },
     gates: {},
   });
@@ -147,6 +148,7 @@ export function passwordStep(input: StepFixtureInput): CreateFlow201 {
       submit: { text_key: "submit.signin", primary: true },
       passkey: { text_key: "password.action.passkey" },
       register: { text_key: "password.action.register.link" },
+      back: { text_key: "action.back" },
     },
     gates: {},
   });
@@ -184,6 +186,7 @@ export function passkeyUpsellStep(input: StepFixtureInput): CreateFlow201 {
     actions: {
       setup: { text_key: "passkey-upsell.action.setup", primary: true },
       skip: { text_key: "passkey-upsell.action.skip" },
+      back: { text_key: "action.back" },
     },
     gates: {},
   });

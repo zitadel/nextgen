@@ -142,6 +142,7 @@ export const en: Record<string, string> = {
   "submit.signin": "Sign in",
   "action.forgot_password": "Forgot password?",
   "action.cancel": "Cancel",
+  "action.back": "Back",
 
   // --- SSO ---
   "sso.redirect.title": "Redirecting to your provider…",

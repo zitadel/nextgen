@@ -141,6 +141,7 @@ export const de: Locale = {
   "submit.signin": "Anmelden",
   "action.forgot_password": "Passwort vergessen?",
   "action.cancel": "Abbrechen",
+  "action.back": "Zurück",
 
   // --- SSO ---
   "sso.redirect.title": "Weiterleitung zum Anbieter…",

@@ -123,7 +123,7 @@ identical to clicking an in-UI back button.
 | Scenario | Behavior |
 |---|---|
 | User presses back on the initial step | No `back` action → browser navigates the host page (leaves the flow) — correct behavior |
-| User presses forward after going back | `popstate` fires with a forward state — orchestrator calls `history.back()` to undo the traversal and keep the URL aligned with the displayed step. The flow state is server-authoritative; the browser cannot skip ahead. |
+| User presses forward after going back | `popstate` fires with a forward state — orchestrator ignores it (no-op). The displayed step does not change; the URL fragment may drift but carries no semantic meaning. |
 | Multiple rapid back presses | Each `popstate` triggers a sequential `submit("back")` — the session token rotation prevents race conditions |
 | Embedded in a SPA with its own router | The host router and the flow's fragment entries coexist — fragments are scoped and don't conflict with path-based routing |
 

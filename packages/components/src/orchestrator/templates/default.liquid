@@ -104,17 +104,18 @@
       </p>
     {% endif %}
 
-    {% if challenge %}
-      {% if challenge.method == "passkey" or challenge.method == "passkey_register" %}
-        {% assign ceremony = "authenticate" %}
-        {% if challenge.method == "passkey_register" %}{% assign ceremony = "register" %}{% endif %}
-        <zl-passkey
-          ceremony="{{ ceremony }}"
-          method="{{ challenge.method }}"
-          challenge-id="{{ challenge.challenge_id }}"
-          options='{{ challenge.options | json }}'
-        ></zl-passkey>
-      {% endif %}
+    {% if actions.back %}
+      <p class="zl-card-nav">
+        <a href="#" class="zl-card-nav__link" data-action="back">{{ actions.back.text_key | t }}</a>
+      </p>
+    {% endif %}
+
+    {% if challenge and challenge.method == "passkey" %}
+      <zl-passkey
+        ceremony="{{ challenge.options.ceremony | default: 'authenticate' }}"
+        challenge-id="{{ challenge.challenge_id }}"
+        options='{{ challenge.options | json }}'
+      ></zl-passkey>
     {% endif %}
 
     {% mandatory_gates %}

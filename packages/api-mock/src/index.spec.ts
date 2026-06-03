@@ -357,4 +357,64 @@ describe("setupMockHandlers", () => {
     });
     expect(next.branding).toBeUndefined();
   });
+
+  describe("back-navigation (ADR 016)", () => {
+    test("passkey-upsell → back → identifier", async () => {
+      const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+      expect(start.step.name).toBe("identifier");
+
+      const upsell = await submitFlowStep(start.id, {
+        session_token: start.session_token,
+        action: "submit",
+        fields: { email: "alice@acme.com", password: "hunter2" },
+      });
+      expect(upsell.step.name).toBe("passkey-upsell");
+      expect(upsell.step.actions?.back).toBeTruthy();
+
+      const back = await submitFlowStep(upsell.id, {
+        session_token: upsell.session_token,
+        action: "back",
+        fields: {},
+      });
+      expect(back.step.name).toBe("identifier");
+    });
+
+    test("register → back → identifier", async () => {
+      const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+      const reg = await submitFlowStep(start.id, {
+        session_token: start.session_token,
+        action: "register",
+        fields: {},
+      });
+      expect(reg.step.name).toBe("register");
+      expect(reg.step.actions?.back).toBeTruthy();
+
+      const back = await submitFlowStep(reg.id, {
+        session_token: reg.session_token,
+        action: "back",
+        fields: {},
+      });
+      expect(back.step.name).toBe("identifier");
+    });
+
+    test("back rotates the session token", async () => {
+      const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+      const upsell = await submitFlowStep(start.id, {
+        session_token: start.session_token,
+        action: "submit",
+        fields: { email: "alice@acme.com", password: "hunter2" },
+      });
+      const back = await submitFlowStep(upsell.id, {
+        session_token: upsell.session_token,
+        action: "back",
+        fields: {},
+      });
+      expect(back.session_token).not.toBe(upsell.session_token);
+    });
+
+    test("identifier step has no back action", async () => {
+      const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+      expect(start.step.actions?.back).toBeUndefined();
+    });
+  });
 });

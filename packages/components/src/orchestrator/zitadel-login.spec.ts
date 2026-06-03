@@ -492,4 +492,120 @@ describe("<zitadel-login> against the typed Flow API", () => {
     );
     expect(submits[0]?.body.fields).toEqual({ email: "", password: "" });
   });
+
+  describe("back-navigation (ADR 016)", () => {
+    it("renders a back link when the step has a back action", async () => {
+      const element = await mount(host);
+
+      // Navigate to register (which has a back action)
+      element.shadowRoot?.dispatchEvent(
+        new CustomEvent("zl-submit", {
+          bubbles: true,
+          composed: true,
+          detail: { action: "register" },
+        }),
+      );
+
+      const backLink = await waitFor(() =>
+        element.shadowRoot?.querySelector<HTMLElement>('[data-action="back"]'),
+      );
+      expect(backLink).toBeTruthy();
+      expect(backLink?.classList.contains("zl-card-nav__link")).toBe(true);
+    });
+
+    it("does not render a back link on the identifier step", async () => {
+      const element = await mount(host);
+
+      // Identifier is the initial step — no back action
+      const backLink = element.shadowRoot?.querySelector('[data-action="back"]');
+      expect(backLink).toBeNull();
+    });
+
+    it("clicking the back link submits action: back", async () => {
+      const element = await mount(host);
+
+      // Navigate to register
+      element.shadowRoot?.dispatchEvent(
+        new CustomEvent("zl-submit", {
+          bubbles: true,
+          composed: true,
+          detail: { action: "register" },
+        }),
+      );
+      await waitFor(() =>
+        element.shadowRoot?.querySelector('[data-action="back"]'),
+      );
+
+      // Click the back link
+      const backLink = element.shadowRoot?.querySelector<HTMLElement>('[data-action="back"]');
+      backLink?.click();
+
+      // Wait for the submit to go through and step to change back to identifier
+      await waitFor(() => {
+        const title = element.shadowRoot?.querySelector(".zl-card-title");
+        return title?.textContent?.includes("Sign in") ? title : null;
+      });
+
+      // Verify the back action was submitted
+      const submits = mock.getCaptured().filter(
+        (req): req is Extract<CapturedRequest, { kind: "submitFlowStep" }> =>
+          req.kind === "submitFlowStep",
+      );
+      const backSubmit = submits.find((s) => s.body.action === "back");
+      expect(backSubmit).toBeDefined();
+    });
+
+    it("calls history.pushState when step has back action", async () => {
+      const pushState = vi.spyOn(history, "pushState");
+      try {
+        const element = await mount(host);
+
+        // Navigate to register (has back action)
+        element.shadowRoot?.dispatchEvent(
+          new CustomEvent("zl-submit", {
+            bubbles: true,
+            composed: true,
+            detail: { action: "register" },
+          }),
+        );
+        await waitFor(() =>
+          element.shadowRoot?.querySelector('[data-action="back"]'),
+        );
+
+        // pushState should have been called for the register step (has back)
+        expect(pushState).toHaveBeenCalled();
+        const lastCall = pushState.mock.calls.at(-1);
+        expect(lastCall?.[2]).toMatch(/^#s\d+$/);
+      } finally {
+        pushState.mockRestore();
+      }
+    });
+
+    it("calls history.replaceState when step has no back action", async () => {
+      const replaceState = vi.spyOn(history, "replaceState");
+      try {
+        await mount(host);
+
+        // Identifier step has no back action — replaceState should have been called
+        expect(replaceState).toHaveBeenCalled();
+      } finally {
+        replaceState.mockRestore();
+      }
+    });
+
+    it("removes the popstate listener on disconnect", async () => {
+      const removeSpy = vi.spyOn(window, "removeEventListener");
+      try {
+        const element = await mount(host);
+        element.remove();
+
+        const popstateCalls = removeSpy.mock.calls.filter(
+          ([event]) => event === "popstate",
+        );
+        expect(popstateCalls.length).toBeGreaterThanOrEqual(1);
+      } finally {
+        removeSpy.mockRestore();
+      }
+    });
+  });
 });

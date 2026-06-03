@@ -146,7 +146,14 @@ export const flowMachine = createMachine({
     },
     register: {
       on: {
-        SUBMIT: { target: "passkey-upsell", actions: [captureFields, rotateToken] },
+        SUBMIT: [
+          {
+            guard: ({ event }) => event.action === "back",
+            target: "identifier",
+            actions: [rotateToken],
+          },
+          { target: "passkey-upsell", actions: [captureFields, rotateToken] },
+        ],
       },
     },
     recover: {
@@ -156,12 +163,24 @@ export const flowMachine = createMachine({
     },
     password: {
       on: {
-        SUBMIT: { target: "passkey-upsell", actions: [captureFields, rotateToken] },
+        SUBMIT: [
+          {
+            guard: ({ event }) => event.action === "back",
+            target: "identifier",
+            actions: [rotateToken],
+          },
+          { target: "passkey-upsell", actions: [captureFields, rotateToken] },
+        ],
       },
     },
     "passkey-upsell": {
       on: {
         SUBMIT: [
+          {
+            guard: ({ event }) => event.action === "back",
+            target: "identifier",
+            actions: [rotateToken],
+          },
           {
             guard: ({ event }) => event.action === "skip",
             target: "done",

@@ -153,6 +153,17 @@ export class ZitadelLogin extends LitElement {
    */
   private tenantTemplateCache: { source: string; template: Template[] } | null = null;
 
+  /**
+   * Incrementing counter for opaque, fragment-based history entries
+   * (`#s0`, `#s1`, …). The fragment has no semantic meaning — it exists
+   * only to create same-document navigation entries so the browser's back
+   * gesture fires `popstate` without reloading the page.
+   */
+  private stepSeq = 0;
+
+  /** Bound `popstate` handler stored for cleanup in `disconnectedCallback`. */
+  private readonly handlePopState = this.onPopState.bind(this);
+
   override createRenderRoot(): HTMLElement | DocumentFragment {
     const root = super.createRenderRoot();
     if (root instanceof ShadowRoot) {
@@ -184,6 +195,20 @@ export class ZitadelLogin extends LitElement {
       root.addEventListener("zl-passkey-error", this.handlePasskeyError as EventListener);
     }
     return root;
+  }
+
+  override connectedCallback(): void {
+    super.connectedCallback();
+    if (typeof window !== "undefined") {
+      window.addEventListener("popstate", this.handlePopState);
+    }
+  }
+
+  override disconnectedCallback(): void {
+    super.disconnectedCallback();
+    if (typeof window !== "undefined") {
+      window.removeEventListener("popstate", this.handlePopState);
+    }
   }
 
   /**
@@ -356,6 +381,20 @@ export class ZitadelLogin extends LitElement {
     // Defaults seed every declared field; existing entries (typed input,
     // carry-over from prior steps) win on conflict.
     this.formValues = { ...collectInitialValues(wire.step), ...this.formValues };
+
+    // History API: push a new entry when the step supports back-navigation
+    // so the browser's back gesture fires `popstate`. Steps without a `back`
+    // action replace the current entry — the browser's back button then
+    // navigates the host page (leaves the flow), which is correct.
+    if (typeof window !== "undefined") {
+      const hasBack = Boolean(wire.step.actions && "back" in wire.step.actions);
+      if (hasBack) {
+        history.pushState({ zl: true }, "", `#s${this.stepSeq++}`);
+      } else {
+        history.replaceState({ zl: true }, "");
+      }
+    }
+
     void this.maybeCompleteFlow(wire);
   }
 
@@ -651,6 +690,19 @@ export class ZitadelLogin extends LitElement {
       this.handleTransportError(error);
     } finally {
       this.loading = false;
+    }
+  }
+
+  /**
+   * Handle the browser's back gesture. When `popstate` fires and the current
+   * step declares a `back` action, submit it to the flow API. Forward
+   * navigation and steps without `back` are silently ignored (no-op) —
+   * the displayed step does not change (ADR 016 §Edge cases).
+   */
+  private onPopState(_event: PopStateEvent): void {
+    if (!this.response?.step?.actions) return;
+    if ("back" in this.response.step.actions) {
+      void this.submit("back");
     }
   }
 
