@@ -33,7 +33,7 @@ func (v *AnyTokenTypeVerifier) Verify(token string) (payload map[string]any, err
 		// encoding `{"` as base64 starts with `ey`. If  the token starts with it, we prioritize jwt
 		verifiers = []Verifier{v.jwtVerifier, v.opaqueVerifier}
 	} else {
-		// otherwise prioritise according to performance
+		// otherwise prioritize according to performance
 		verifiers = []Verifier{v.opaqueVerifier, v.jwtVerifier}
 	}
 
