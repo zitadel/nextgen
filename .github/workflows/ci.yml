@@ -136,13 +136,27 @@ jobs:
 
       - name: Export Docker image for smoke tests
         run: |
-          IMAGE="$(docker image ls --format '{{.Repository}}:{{.Tag}}' ghcr.io/zitadel/nextgen | grep snapshot | head -1)"
-          if [ -z "$IMAGE" ]; then
-            IMAGE="$(docker image ls --format '{{.Repository}}:{{.Tag}}' ghcr.io/zitadel/nextgen | head -1)"
+          # Goreleaser builds linux/amd64 and linux/arm64 with the same tag; pin amd64
+          # for ubuntu-latest smoke jobs (see quickstart-smoke).
+          IMAGE_ID=""
+          IMAGE_REF=""
+          for id in $(docker images ghcr.io/zitadel/nextgen --format '{{.ID}}' | sort -u); do
+            arch=$(docker image inspect -f '{{.Architecture}}' "$id")
+            ref=$(docker image inspect -f '{{index .RepoTags 0}}' "$id")
+            case "$ref" in *snapshot*) ;; *) continue ;; esac
+            if [ "$arch" = "amd64" ]; then
+              IMAGE_ID="$id"
+              IMAGE_REF="$ref"
+              break
+            fi
+          done
+          if [ -z "$IMAGE_ID" ]; then
+            echo "::error::no linux/amd64 snapshot image found for ghcr.io/zitadel/nextgen"
+            docker images ghcr.io/zitadel/nextgen
+            exit 1
           fi
-          test -n "$IMAGE"
-          echo "$IMAGE" > dist/nextgen-image.tag
-          docker save "$IMAGE" -o dist/nextgen-image.tar
+          echo "$IMAGE_REF" > dist/nextgen-image.tag
+          docker save "$IMAGE_ID" -o dist/nextgen-image.tar
 
       - name: Upload GoReleaser snapshot artifacts
         uses: actions/upload-artifact@v7
@@ -247,6 +261,7 @@ jobs:
           test -f goreleaser-dist/nextgen-image.tar
           test -f goreleaser-dist/nextgen-image.tag
           docker load -i goreleaser-dist/nextgen-image.tar
+          docker image inspect -f '{{.Os}}/{{.Architecture}}' "$(cat goreleaser-dist/nextgen-image.tag)" | grep -q '^linux/amd64$'
 
       - name: Prepare quick-start compose stack
         run: |
@@ -274,10 +289,33 @@ jobs:
 
       - name: Start stack and verify HTTP endpoints
         run: |
-          docker compose -f nextgen_quickstart/docker-compose.yaml --env-file nextgen_quickstart/.env up -d --wait
-          curl -fsS http://localhost:8080/healthz
-          curl -fsS -o /dev/null -w "%{http_code}\n" http://localhost:8080/ui/console/ | grep -q '^200$'
-          curl -fsS -o /dev/null -w "%{http_code}\n" http://localhost:8080/ui/login/ | grep -q '^200$'
+          set -euo pipefail
+          COMPOSE=(docker compose -f nextgen_quickstart/docker-compose.yaml --env-file nextgen_quickstart/.env)
+          "${COMPOSE[@]}" up -d --wait
+          ready=0
+          for _ in $(seq 1 60); do
+            if curl -fsS http://localhost:8080/healthz >/dev/null; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then
+            echo "::error::timed out waiting for /healthz"
+            docker image inspect -f 'platform={{.Os}}/{{.Architecture}}' "$(cat goreleaser-dist/nextgen-image.tag)" || true
+            "${COMPOSE[@]}" logs nextgen || true
+            exit 1
+          fi
+          if ! curl -fsS -o /dev/null -w "%{http_code}\n" http://localhost:8080/ui/console/ | grep -q '^200$'; then
+            echo "::error::/ui/console/ did not return 200"
+            "${COMPOSE[@]}" logs nextgen || true
+            exit 1
+          fi
+          if ! curl -fsS -o /dev/null -w "%{http_code}\n" http://localhost:8080/ui/login/ | grep -q '^200$'; then
+            echo "::error::/ui/login/ did not return 200"
+            "${COMPOSE[@]}" logs nextgen || true
+            exit 1
+          fi
           echo "quickstart compose smoke test passed"
 
       - name: Tear down compose stack
