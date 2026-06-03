@@ -22,7 +22,7 @@ import type {
   CreateFlow201StepFields,
   CreateFlow201StepGates,
   CreateFlow201StepSsoProvidersItem,
-} from "@zitadel-nextgen/api/generated/model";
+} from "@zitadel/api/generated/model";
 
 import type { Branding } from "./branding.js";
 

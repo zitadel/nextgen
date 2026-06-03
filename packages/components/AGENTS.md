@@ -10,17 +10,17 @@ auth flow API. Consumed directly by tenant pages and indirectly by the
 `apps/console` shell. See [`README.md`](README.md) for consumer-facing
 docs.
 
-The orchestrator calls `@zitadel-nextgen/api` (orval-generated typed fetch
+The orchestrator calls `@zitadel/api` (orval-generated typed fetch
 client) through the wrappers in `src/orchestrator/api-client.ts`. There is
 no transport abstraction, no wire-vs-internal type split, and no shadow
 types — the orchestrator stores the orval `CreateFlow201` shape directly
 and the Liquid renderer reads it through the `LiquidContext` projection.
 
 Tests intercept at the network layer with MSW. The dev playground and the
-unit tests both source their handlers from `@zitadel-nextgen/api-mock`
+unit tests both source their handlers from `@zitadel/api-mock`
 (`setupMock(worker)` for the browser, `setupMockHandlers()` for
-`msw/node`). Configure the API base URL with `setApiBaseUrl()` from
-`@zitadel-nextgen/api/runtime/base-url`, or via the `api-base` attribute
+`msw/node`). Configure the API base URL with `setProxyPath()` from
+`@zitadel/api/runtime/base-url`, or via the `api-base` attribute
 on `<zitadel-login>` for declarative setups.
 
 ## Type boundaries
@@ -28,7 +28,7 @@ on `<zitadel-login>` for declarative setups.
 There are exactly three places types live in this package:
 
 - **Wire shapes** — never declared here; imported from
-  `@zitadel-nextgen/api/generated/model` (`CreateFlow201`,
+  `@zitadel/api/generated/model` (`CreateFlow201`,
   `CreateFlow201Step`, `CreateFlowBody`, `SubmitFlowStepBody`, …).
 - **Branding** — `src/orchestrator/branding.ts` carries the client-side
   branding extensions (`Branding`, `BrandingPalette`, `BrandingShape`,
@@ -119,7 +119,7 @@ in the browser project. Anything markup-only (aria attributes, classes, slot
 projection) belongs in the unit project for speed.
 
 When a test needs the Flow API, prefer `setupMockHandlers()` from
-`@zitadel-nextgen/api-mock` over hand-rolled handlers — it walks the same
+`@zitadel/api-mock` over hand-rolled handlers — it walks the same
 xstate machine the dev playground uses, so step fixtures and step routing
 stay consistent.
 
@@ -139,7 +139,7 @@ how a regression in one framework slips past the other.
 When iterating against a long-running demo dev server, remember the demo
 loads this package's built `dist/` (not source). The Nx `e2e` target has
 `dependsOn: ["^build"]` so CI is safe; manual loops need a fresh
-`nx build @zitadel-nextgen/components` after orchestrator changes.
+`nx build @zitadel/components` after orchestrator changes.
 
 ### Lit dev playground (`:5173`) and caching
 
@@ -152,7 +152,7 @@ Atom `.ts` hot reload uses [`vite-plugin-web-components-hmr`](https://github.com
 If the playground still looks stale after save:
 
 ```sh
-corepack pnpm --filter @zitadel-nextgen/components dev:clean
+corepack pnpm --filter @zitadel/components dev:clean
 ```
 
 Then hard-refresh the browser. `apps/console` (`:5174`) does not pick up Lit-only
@@ -161,7 +161,7 @@ source edits — use `:5173` for atom work.
 ## Build
 
 `tsdown.config.ts` produces ESM + `.d.mts` and externalises `lit`, `liquidjs`,
-`dompurify`, and the `@zitadel-nextgen/api*` packages so npm consumers dedupe
+`dompurify`, and the `@zitadel/api*` packages so npm consumers dedupe
 with their own copies. Do not bundle those in by default — that breaks shared
 instances and bloats the package.
 

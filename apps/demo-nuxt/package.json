@@ -1,5 +1,5 @@
 {
-  "name": "@zitadel-nextgen/demo-nuxt",
+  "name": "@zitadel/demo-nuxt",
   "version": "0.0.0",
   "description": "Nuxt demo app for Nextgen Auth",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/apps/demo-nuxt#readme",
@@ -20,10 +20,10 @@
     "typecheck": "NEXTGEN_NUXT_BUILD_DIR=.nuxt-typecheck nuxt prepare && vue-tsc --noEmit -p .nuxt-typecheck/tsconfig.json"
   },
   "dependencies": {
-    "@zitadel-nextgen/sdk-nuxt": "workspace:*",
-    "@zitadel-nextgen/components": "workspace:*",
-    "@zitadel-nextgen/design-tokens": "workspace:*",
-    "@zitadel-nextgen/shared-component-styles": "workspace:*",
+    "@zitadel/sdk-nuxt": "workspace:*",
+    "@zitadel/components": "workspace:*",
+    "@zitadel/design-tokens": "workspace:*",
+    "@zitadel/shared-component-styles": "workspace:*",
     "nuxt": "^4.4.6"
   },
   "devDependencies": {

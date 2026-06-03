@@ -39,13 +39,13 @@ export type { ZitadelApi };
 /**
  * The app-wide project handle lives on `globalThis` under a registered symbol,
  * not in a module-local variable. Bundlers can emit more than one copy of this
- * module — `@zitadel-nextgen/components`, for instance, bundles its own copy —
+ * module — `@zitadel/components`, for instance, bundles its own copy —
  * and a module-local `let` gives each copy its own slot, so `configureZitadel()`
  * in the app and `getZitadelConfig()` inside the web component would read
  * different values. A `Symbol.for(...)` key on `globalThis` is shared across
  * every copy in the realm, so all of them observe the one handle.
  */
-const PROJECT_KEY = Symbol.for("@zitadel-nextgen/api#currentProject");
+const PROJECT_KEY = Symbol.for("@zitadel/api#currentProject");
 
 type ProjectStore = Record<symbol, ZitadelProject | null | undefined>;
 

@@ -9,10 +9,10 @@
   "exclude": ["**/*.spec.ts"],
   "references": [
     {
-      "path": "../../packages/components/tsconfig.lib.json"
+      "path": "../../packages/design-tokens/tsconfig.lib.json"
     },
     {
-      "path": "../../packages/design-tokens/tsconfig.lib.json"
+      "path": "../../packages/components/tsconfig.lib.json"
     }
   ]
 }

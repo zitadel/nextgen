@@ -28,8 +28,9 @@ proposals and implementations with recorded decisions.
 ## Project Shape
 
 This repo is the pre-release next generation of Zitadel. The Go server ships
-through GoReleaser. The TypeScript workspace is managed by pnpm and Nx; the CLI
-and SDK packages will publish through future changesets automation.
+through GoReleaser. The TypeScript workspace is managed by pnpm and Nx; the
+public npm packages publish through changesets (see "Release, Licensing, And
+Secrets").
 
 - `internal/` contains Go server implementation code.
 - `cmd/` is reserved for Go command wiring.
@@ -64,7 +65,7 @@ go test ./...
 ```
 
 Prefer Nx project targets for narrow package work, for example
-`corepack pnpm nx test @zitadel-nextgen/cli`.
+`corepack pnpm nx test @zitadel/cli`.
 
 End-to-end tests are **opt-in locally** — they're not part of the
 default `run-many -t lint,typecheck,build,test` invocation because they
@@ -116,7 +117,7 @@ changes.
   let the TanStack Router plugin regenerate it.
 - Do not hand-edit the generated section of `apps/cli/AGENTS.md`; update the CLI
   registry or `apps/cli/scripts/gen-agents-md.ts`, then run
-  `corepack pnpm nx run @zitadel-nextgen/cli:gen:agents-md`.
+  `corepack pnpm nx run @zitadel/cli:gen:agents-md`.
 
 ## CLI Contract
 
@@ -128,7 +129,28 @@ Agent scripts should pass `--non-interactive --json` and prefer structured
 
 ## Release, Licensing, And Secrets
 
-- User-visible changes to `apps/cli/` or `packages/sdk-*` need a changeset.
+- User-visible changes to a public npm package need a changeset. The public
+  packages are `@zitadel/cli` (`apps/cli/`), `@zitadel/api`,
+  `@zitadel/components`, `@zitadel/sdk-core`, `@zitadel/sdk-next`, and
+  `@zitadel/sdk-nuxt`. CI fails a PR that touches them without one
+  (`changeset-check` in `.github/workflows/ci.yml`).
+- Add a changeset by writing the file directly — do not depend on the
+  interactive `pnpm changeset` prompt. Create `.changeset/<short-slug>.md`:
+
+  ```md
+  ---
+  "@zitadel/cli": minor
+  ---
+
+  One-line, user-facing summary of the change.
+  ```
+
+  List only public package names; pick `patch` (fixes), `minor` (features), or
+  `major` (breaking). The repo is in `alpha` prerelease mode
+  (`.changeset/pre.json`), so versions cut as `X.Y.Z-alpha.N` automatically — no
+  extra action needed.
+- For changes that release nothing (docs, tests, CI, chores), add an empty
+  changeset: `corepack pnpm changeset --empty`.
 - npm packages under `apps/cli/` and `packages/*` must stay MIT-licensed.
 - Server and console application paths are AGPL-3.0-only by default.
 - Keep local secrets, private keys, tokens, and `.zitadel/secret`-style files out
@@ -204,15 +226,15 @@ Standard commands are documented in root `AGENTS.md` → **Local Checks** and
 
 - **TS lint + typecheck + build + test:** `corepack pnpm nx run-many -t lint,typecheck,build,test`
 - **Go vet + test:** `go vet ./... && go test -timeout=10m ./...`
-- **E2E:** `corepack pnpm nx run-many -t e2e -p @zitadel-nextgen/demo-next-e2e,@zitadel-nextgen/demo-nuxt-e2e`
+- **E2E:** `corepack pnpm nx run-many -t e2e -p @zitadel/demo-next-e2e,@zitadel/demo-nuxt-e2e`
 
 ### Running demo apps manually
 
 To test the sign-in flow interactively (two terminals):
 
-1. Start the mock auth server: `corepack pnpm nx start @zitadel-nextgen/api-mock`
-2. Start demo-next: `ZITADEL_URL=http://localhost:4000 corepack pnpm nx dev @zitadel-nextgen/demo-next` (port 3002)
-3. Or demo-nuxt: `ZITADEL_URL=http://localhost:4000 corepack pnpm nx dev @zitadel-nextgen/demo-nuxt` (port 3001)
+1. Start the mock auth server: `corepack pnpm nx start @zitadel/api-mock`
+2. Start demo-next: `ZITADEL_URL=http://localhost:4000 corepack pnpm nx dev @zitadel/demo-next` (port 3002)
+3. Or demo-nuxt: `ZITADEL_URL=http://localhost:4000 corepack pnpm nx dev @zitadel/demo-nuxt` (port 3001)
 
 ### Stale Nuxt lock files
 

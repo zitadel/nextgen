@@ -8,7 +8,7 @@ Accepted — 2026-05-19
 
 The Zitadel NextGen auth surface ships as two parallel renderers:
 
-1. **`@zitadel-nextgen/components`** — Lit web components plus the
+1. **`@zitadel/components`** — Lit web components plus the
    `<zitadel-login>` orchestrator. Embedded by tenants on their own pages
    and by the demo SDK adapters.
 2. **`apps/console`** — the internal Zitadel console, a pure React app
@@ -28,13 +28,13 @@ We needed to answer three coupled questions:
 
 ## Decision
 
-### 1. A standalone `@zitadel-nextgen/design-tokens` package
+### 1. A standalone `@zitadel/design-tokens` package
 
 The package is the only producer of `--zl-*` CSS variables, the typed
 `tokens` / `cssVars` constants, and the Tailwind v4 `@theme` block:
 
 ```
-@zitadel-nextgen/design-tokens
+@zitadel/design-tokens
 ├── figma-tokens.lock              # pinned Figma library version
 ├── scripts/sync-from-figma.ts     # Figma REST API → figma.tokens.json
 ├── scripts/build.ts               # JSON + overrides → CSS/TS/Tailwind
@@ -79,9 +79,9 @@ The console is the only React surface that hosts the actual
 `<zitadel-login>` orchestrator (so reviewers can see the end-to-end
 flow). It does so through a 12-line `React.createElement("zitadel-login",
 …)` wrapper, not `@lit/react`. This keeps the dependency story honest:
-the console depends on `@zitadel-nextgen/components` (the Lit element
-package) for the orchestrator side effect, on `@zitadel-nextgen/ui-react`
-for chrome and previews, and on `@zitadel-nextgen/design-tokens` for the
+the console depends on `@zitadel/components` (the Lit element
+package) for the orchestrator side effect, on `@zitadel/ui-react`
+for chrome and previews, and on `@zitadel/design-tokens` for the
 shared variable layer.
 
 ### 4. Branding attribution is a first-class branding flag
@@ -108,7 +108,7 @@ matching `[data-theme="light"]` block in `tokens.css`.
 - Designers can rename or restructure tokens; the snapshot test catches
   it before the sync PR merges.
 - Tenants can't ship custom React without consuming
-  `@zitadel-nextgen/ui-react`; that's a deliberate constraint to keep
+  `@zitadel/ui-react`; that's a deliberate constraint to keep
   the visual contract stable.
 - The console gives up the `@lit/react` typed-prop ergonomics; that's
   fine — the `createElement` wrapper is one line per attribute and the

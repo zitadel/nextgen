@@ -2,7 +2,7 @@ import { mkdtemp, readFile, stat, writeFile, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { resetPlatformStore, setupPlatformHandlers } from "@zitadel-nextgen/api-mock/platform";
+import { resetPlatformStore, setupPlatformHandlers } from "@zitadel/api-mock/platform";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
@@ -49,7 +49,7 @@ describe("Next setup integration", () => {
     expect(loginPage).toContain('purpose="login"');
     // The page renders the React wrapper component (not the raw custom element),
     // imported from the SDK; it is SSR-safe and needs no `custom-elements.d.ts`.
-    expect(loginPage).toContain('from "@zitadel-nextgen/sdk-next/react"');
+    expect(loginPage).toContain('from "@zitadel/sdk-next/react"');
     expect(loginPage).toContain("<ZitadelLogin");
     // The SDK handle is built (proxy path + project id from the public env
     // var) and passed to the component via the `project` prop; the backend URL

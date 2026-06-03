@@ -1,5 +1,5 @@
 import { defineNuxtPlugin, useRequestEvent, useState } from "#imports";
-import type { ClientAuthResult } from "@zitadel-nextgen/sdk-nuxt";
+import type { ClientAuthResult } from "@zitadel/sdk-nuxt";
 
 export default defineNuxtPlugin(() => {
   const event = useRequestEvent();

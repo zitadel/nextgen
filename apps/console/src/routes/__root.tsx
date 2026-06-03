@@ -12,7 +12,7 @@ function RootComponent() {
   return (
     <>
       <header>
-        <h1>@zitadel-nextgen/ui-react</h1>
+        <h1>@zitadel/ui-react</h1>
         <nav aria-label="Playground">
           <Link to="/" activeOptions={{ exact: true }}>
             Atoms

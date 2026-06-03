@@ -4,7 +4,7 @@ import type { RendererSpec } from "../types";
 /**
  * The Next.js App Router renderer scaffolds `/login`, `/register`, and
  * `/profile` pages that render the `<ZitadelLogin>` / `<ZitadelLogout>` React
- * components from `@zitadel-nextgen/sdk-next/react`.
+ * components from `@zitadel/sdk-next/react`.
  *
  * Those components wrap the Lit web components (via `@lit/react`): the server
  * renders the inert tag and the client upgrades it, and the SDK `project`
@@ -30,7 +30,7 @@ export const reactRenderer: RendererSpec = {
   displayName: "React (Next.js App Router)",
   status: "available",
   frameworks: ["next"],
-  dependency: { name: "@zitadel-nextgen/sdk-next", version: "latest" },
+  dependency: { name: "@zitadel/sdk-next", version: "latest" },
   templates: {
     authPage(mode) {
       const componentName = mode === "login" ? "LoginPage" : "RegisterPage";
@@ -38,8 +38,8 @@ export const reactRenderer: RendererSpec = {
         mode,
         contents: `${MANAGED_MARKER}
 "use client";
-import { ZitadelLogin } from "@zitadel-nextgen/sdk-next/react";
-import { configureZitadel } from "@zitadel-nextgen/sdk-next/client";
+import { ZitadelLogin } from "@zitadel/sdk-next/react";
+import { configureZitadel } from "@zitadel/sdk-next/client";
 
 const project = configureZitadel({
   projectId: process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID ?? "",
@@ -60,8 +60,8 @@ export default function ${componentName}() {
       return {
         contents: `${MANAGED_MARKER}
 "use client";
-import { ZitadelLogout } from "@zitadel-nextgen/sdk-next/react";
-import { configureZitadel } from "@zitadel-nextgen/sdk-next/client";
+import { ZitadelLogout } from "@zitadel/sdk-next/react";
+import { configureZitadel } from "@zitadel/sdk-next/client";
 
 const project = configureZitadel({
   projectId: process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID ?? "",

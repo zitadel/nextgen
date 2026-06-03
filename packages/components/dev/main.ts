@@ -3,11 +3,11 @@
 // `--zl-*` on `:root` so the atoms-only page paints correctly. Inside the
 // orchestrator, `applyBaseTokens` adopts the same layer into the shadow
 // root, so the `<zitadel-login>` route doesn't depend on this import.
-import "@zitadel-nextgen/design-tokens/css/tokens.css";
+import "@zitadel/design-tokens/css/tokens.css";
 
 import "../src/index.js";
-import { configureZitadel } from "@zitadel-nextgen/api/config";
-import { applyBranding, setupMock } from "@zitadel-nextgen/api-mock";
+import { configureZitadel } from "@zitadel/api/config";
+import { applyBranding, setupMock } from "@zitadel/api-mock";
 import { setupWorker } from "msw/browser";
 
 import { brandingPresets } from "./branding-presets.js";

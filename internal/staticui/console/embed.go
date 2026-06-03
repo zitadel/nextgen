@@ -25,7 +25,7 @@ func Handler(prefix string) (http.Handler, error) {
 func ValidateDist() error {
 	if _, err := fs.Stat(dist, "dist/index.html"); err != nil {
 		return fmt.Errorf(
-			"console UI not embedded: run `pnpm nx build @zitadel-nextgen/console` and `scripts/sync-embedded-ui-dist.sh` (see CONTRIBUTING.md): %w",
+			"console UI not embedded: run `pnpm nx build @zitadel/console` and `scripts/sync-embedded-ui-dist.sh` (see CONTRIBUTING.md): %w",
 			err,
 		)
 	}
