@@ -10,7 +10,7 @@ import {
 } from '@zitadel-nextgen/sdk-core/middleware';
 import { NextResponse } from 'next/server';
 
-import { verifyJwt } from './lib/jwt';
+import { verifyJwt, base64UrlDecode } from './lib/jwt';
 
 /**
  * Clones the incoming request headers, injects `extra` key/value pairs,
@@ -134,6 +134,30 @@ export async function nextgenMiddleware(
     jwksTimeoutMs,
     pathname,
   });
+}
+
+const DECODER = new TextDecoder();
+
+/**
+ * Returns `true` when `token` looks structurally like a JWT — three
+ * dot-separated segments where the first decodes to JSON with an `alg` field.
+ *
+ * This is a structural check only, NOT a security check. It lets the
+ * middleware distinguish an opaque encrypted token (backend-issued AES-GCM
+ * blob, non-JSON segments) from a JWT that failed verification (valid
+ * structure but bad signature/typ/alg). A JWT that fails verification must
+ * be rejected outright; only tokens that are definitively not JWTs should
+ * fall through to opaque validation.
+ */
+function isJwtShaped(token: string): boolean {
+  const parts = token.split('.');
+  if (parts.length < 3 || !parts[0]) return false;
+  try {
+    const header = JSON.parse(DECODER.decode(base64UrlDecode(parts[0])));
+    return typeof (header as Record<string, unknown>)?.alg === 'string';
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -351,10 +375,11 @@ async function handleAuth(
   }
 
   // The backend issues opaque encrypted session tokens rather than JWTs.
-  // When JWT verification returns null, try validating the cookie against
-  // the backend's /sessions/me endpoint. A 200 response means the session
-  // is live; forward the raw token so server components can use it.
-  if (!payload && cookieToken) {
+  // Only fall back to /sessions/me validation when the token is definitively
+  // not a JWT (non-JSON segments). A token with a valid JWT structure that
+  // failed verification (bad sig, wrong typ/alg) must be rejected — never
+  // accepted by a backend call that doesn't re-check the JWT claims.
+  if (!payload && cookieToken && !isJwtShaped(cookieToken)) {
     const isValid = await validateOpaqueSessionToken(
       cookieToken,
       issuerUrl,
