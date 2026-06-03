@@ -505,6 +505,7 @@ jobs:
         env:
           VERDACCIO_CONFIG: ${{ runner.temp }}/verdaccio/config.yaml
           VERDACCIO_LOG: ${{ runner.temp }}/verdaccio.log
+          VERDACCIO_NPMRC: ${{ runner.temp }}/verdaccio.npmrc
           VERDACCIO_STORAGE: ${{ runner.temp }}/verdaccio/storage
         run: |
           mkdir -p "$(dirname "$VERDACCIO_CONFIG")" "$VERDACCIO_STORAGE"
@@ -529,19 +530,29 @@ jobs:
           EOF
           npm exec --yes verdaccio@6.2.2 -- --config "$VERDACCIO_CONFIG" --listen 127.0.0.1:4873 > "$VERDACCIO_LOG" 2>&1 &
           echo "VERDACCIO_PID=$!" >> "$GITHUB_ENV"
+          ready=0
           for _ in $(seq 1 60); do
             if curl -fsS http://127.0.0.1:4873/-/ping >/dev/null; then
-              exit 0
+              ready=1
+              break
             fi
             sleep 1
           done
-          echo "::error::timed out waiting for Verdaccio"
-          cat "$VERDACCIO_LOG"
-          exit 1
+          if [ "$ready" -ne 1 ]; then
+            echo "::error::timed out waiting for Verdaccio"
+            cat "$VERDACCIO_LOG"
+            exit 1
+          fi
+          {
+            echo "registry=http://127.0.0.1:4873/"
+            echo "//127.0.0.1:4873/:_authToken=journey-token"
+            echo "always-auth=true"
+          } > "$VERDACCIO_NPMRC"
 
       - name: Publish current npm packages to temporary registry
         env:
           JOURNEY_REGISTRY_URL: http://127.0.0.1:4873
+          NPM_CONFIG_USERCONFIG: ${{ runner.temp }}/verdaccio.npmrc
         run: >-
           node apps/cli-journey-e2e/scripts/publish-tarballs.mjs
           "$RUNNER_TEMP/zitadel-npm-packages"
