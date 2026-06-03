@@ -12,9 +12,12 @@ Vitest.
 - Keep public SDK exports stable and deliberate. Changes to exported types,
   renderer props, or package entry points should include tests and README or
   contract updates when user-facing.
-- `apps/cli`, `packages/sdk-core`, and `packages/sdk-next` are publishable npm
-  packages and must keep `"license": "MIT"`.
-- User-visible package changes need a changeset under `.changeset/`.
+- The public npm packages (`apps/cli`, `packages/api`, `packages/components`,
+  `packages/sdk-core`, `packages/sdk-next`, `packages/sdk-nuxt`) must keep
+  `"license": "MIT"`.
+- User-visible changes to those packages need a changeset; write the
+  `.changeset/<slug>.md` file directly rather than via the interactive prompt.
+  See `AGENTS.md` for the package list and file format.
 - Avoid committing generated `dist/**` churn unless the release or package smoke
   check explicitly requires it.
 - Respect peer dependencies in `packages/sdk-next`; do not bundle React, Next,

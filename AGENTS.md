@@ -28,8 +28,9 @@ proposals and implementations with recorded decisions.
 ## Project Shape
 
 This repo is the pre-release next generation of Zitadel. The Go server ships
-through GoReleaser. The TypeScript workspace is managed by pnpm and Nx; the CLI
-and SDK packages will publish through future changesets automation.
+through GoReleaser. The TypeScript workspace is managed by pnpm and Nx; the
+public npm packages publish through changesets (see "Release, Licensing, And
+Secrets").
 
 - `internal/` contains Go server implementation code.
 - `cmd/` is reserved for Go command wiring.
@@ -128,7 +129,28 @@ Agent scripts should pass `--non-interactive --json` and prefer structured
 
 ## Release, Licensing, And Secrets
 
-- User-visible changes to `apps/cli/` or `packages/sdk-*` need a changeset.
+- User-visible changes to a public npm package need a changeset. The public
+  packages are `@zitadel/cli` (`apps/cli/`), `@zitadel/api`,
+  `@zitadel/components`, `@zitadel/sdk-core`, `@zitadel/sdk-next`, and
+  `@zitadel/sdk-nuxt`. CI fails a PR that touches them without one
+  (`changeset-check` in `.github/workflows/ci.yml`).
+- Add a changeset by writing the file directly — do not depend on the
+  interactive `pnpm changeset` prompt. Create `.changeset/<short-slug>.md`:
+
+  ```md
+  ---
+  "@zitadel/cli": minor
+  ---
+
+  One-line, user-facing summary of the change.
+  ```
+
+  List only public package names; pick `patch` (fixes), `minor` (features), or
+  `major` (breaking). The repo is in `alpha` prerelease mode
+  (`.changeset/pre.json`), so versions cut as `X.Y.Z-alpha.N` automatically — no
+  extra action needed.
+- For changes that release nothing (docs, tests, CI, chores), add an empty
+  changeset: `corepack pnpm changeset --empty`.
 - npm packages under `apps/cli/` and `packages/*` must stay MIT-licensed.
 - Server and console application paths are AGPL-3.0-only by default.
 - Keep local secrets, private keys, tokens, and `.zitadel/secret`-style files out
