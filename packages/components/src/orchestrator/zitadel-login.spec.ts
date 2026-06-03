@@ -38,7 +38,7 @@ const API_BASE = "https://flow.test.invalid";
 let mock: MockHandle = setupMockHandlers();
 const server = setupServer(...mock.handlers);
 
-let testProject = configureZitadel({ apiBase: API_BASE, projectId: "demo-project" });
+let testProject = configureZitadel({ proxyPath: API_BASE, projectId: "demo-project" });
 
 beforeAll(() => {
   server.listen({ onUnhandledRequest: "error" });
@@ -46,7 +46,7 @@ beforeAll(() => {
 
 beforeEach(() => {
   _resetConfigForTesting();
-  testProject = configureZitadel({ apiBase: API_BASE, projectId: "demo-project" });
+  testProject = configureZitadel({ proxyPath: API_BASE, projectId: "demo-project" });
   mock = setupMockHandlers();
   mock.reset();
   server.resetHandlers(...mock.handlers);
@@ -394,5 +394,102 @@ describe("<zitadel-login> against the typed Flow API", () => {
     // Only the initial "passkey" action submit — no extra submit from the error handler
     expect(postErrorSubmits).toHaveLength(1);
     expect(postErrorSubmits[0]?.body.action).toBe("passkey");
+  });
+
+  it("preserves typed input when the server rejects a submit with a step-level error", async () => {
+    const element = await mount(host);
+
+    // Real backend behaviour on a validation error: 400 carrying the same
+    // step shape with `fields.value` unset and `step.error` populated. We
+    // override the mock's submit handler to mirror that wire shape.
+    server.use(
+      http.post("*/flow/*/submit", () =>
+        HttpResponse.json(
+          {
+            id: "flow_test",
+            session_token: "st_test",
+            step: {
+              name: "identifier",
+              texts: { title_key: "identifier.title" },
+              fields: {
+                email: {
+                  type: "email",
+                  text_key: "identifier.field.email",
+                  required: true,
+                },
+                password: {
+                  type: "password",
+                  text_key: "identifier.field.password",
+                  required: true,
+                },
+              },
+              actions: { submit: { text_key: "submit.signin", primary: true } },
+              gates: {},
+              error: "flow field email: format",
+            },
+            branding: {},
+          },
+          { status: 400 },
+        ),
+      ),
+    );
+
+    element.shadowRoot?.dispatchEvent(
+      new CustomEvent("zl-input", {
+        bubbles: true,
+        composed: true,
+        detail: { name: "email", value: "bad-email" },
+      }),
+    );
+    element.shadowRoot?.dispatchEvent(
+      new CustomEvent("zl-submit", {
+        bubbles: true,
+        composed: true,
+        detail: { action: "submit" },
+      }),
+    );
+
+    // Wait until the error alert renders — confirms applyResponse ran.
+    await waitFor(() => element.shadowRoot?.querySelector("zl-alert"));
+    // One more frame so the post-render applyValuesToFields callback fires.
+    await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+
+    // Regression: empty defaults from the re-rendered step used to wipe
+    // formValues, which then propagated back to the field via
+    // applyValuesToFields. The typed input must survive.
+    const emailField = element.shadowRoot?.querySelector<
+      HTMLElement & { value?: string }
+    >('zl-field[name="email"]');
+    expect(emailField?.value).toBe("bad-email");
+  });
+
+  it("sends declared step fields on submit even when the user typed nothing", async () => {
+    const element = await mount(host);
+
+    // Submit immediately without dispatching any zl-input. The wire body
+    // must still include every field the current step declares — empty
+    // strings if necessary — otherwise the backend skips required-checks
+    // and challenge dispatch and silently advances on an empty payload.
+    element.shadowRoot?.dispatchEvent(
+      new CustomEvent("zl-submit", {
+        bubbles: true,
+        composed: true,
+        detail: { action: "submit" },
+      }),
+    );
+
+    await waitFor(() => {
+      const submits = mock.getCaptured().filter(
+        (req): req is Extract<CapturedRequest, { kind: "submitFlowStep" }> =>
+          req.kind === "submitFlowStep",
+      );
+      return submits.length > 0 ? submits : null;
+    });
+
+    const submits = mock.getCaptured().filter(
+      (req): req is Extract<CapturedRequest, { kind: "submitFlowStep" }> =>
+        req.kind === "submitFlowStep",
+    );
+    expect(submits[0]?.body.fields).toEqual({ email: "", password: "" });
   });
 });

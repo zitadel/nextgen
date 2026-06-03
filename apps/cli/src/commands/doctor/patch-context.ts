@@ -54,7 +54,7 @@ async function resolveIssuer(
   if (typeof state?.dev_port === "number") {
     return issuerFromPort(state.dev_port);
   }
-  return facts.issuerUrl;
+  return facts.url;
 }
 
 async function readState(cwd: string): Promise<{ dev_port?: number } | undefined> {

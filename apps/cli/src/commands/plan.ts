@@ -1,8 +1,10 @@
 import { Flags } from "@oclif/core";
+import { consola } from "consola";
+
+import { createZitadelClient } from "@zitadel-nextgen/api/client";
 
 import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
-import { createPlatformClient } from "../lib/api";
-import { environmentSchema } from "../lib/api/schemas";
+import { environmentSchema } from "../lib/environment";
 import { buildSyncPlan, makeSyncers, renderPlan, summarizePlan } from "../lib/sync";
 import { readZitadelSecret } from "../lib/project";
 
@@ -34,13 +36,26 @@ export default class Plan extends BaseCommand {
     const { cwd, source, env, isTTY } = this.meta;
 
     const secret = await readZitadelSecret(cwd);
-    const client = createPlatformClient(source, secret.project_secret);
-    const syncers = makeSyncers({ projectId: secret.project_id, env });
+    consola.info(`Project   ${secret.project_id}`);
+    consola.info(`Server    ${source}`);
+    const client = createZitadelClient({
+      baseUrl: source,
+      token: secret.project_secret,
+    });
+    const syncers = makeSyncers({ client, projectId: secret.project_id, env });
 
-    const plan = await buildSyncPlan(cwd, syncers, client);
+    consola.start("Building plan");
+    const plan = await buildSyncPlan(cwd, syncers, true);
+    const summary = summarizePlan(plan);
+    consola.success(
+      `Plan: ${summary.creates} create${summary.creates === 1 ? "" : "s"}, ` +
+        `${summary.updates} update${summary.updates === 1 ? "" : "s"}, ` +
+        `${summary.deletes} delete${summary.deletes === 1 ? "" : "s"}, ` +
+        `${summary.total - summary.creates - summary.updates - summary.deletes} unchanged`,
+    );
     return this.emit({
       status: "ok",
-      data: summarizePlan(plan),
+      data: summary,
       pretty: renderPlan(plan, isTTY),
     });
   }

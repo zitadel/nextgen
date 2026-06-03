@@ -1,6 +1,6 @@
 import { buildFlow } from "../../../flows";
 import { stableStringify } from "../../../json";
-import { DEFAULT_SERVER } from "../../../api/resolve-server";
+import { DEFAULT_SERVER } from "../../../server";
 import { scaffold } from "./file-writer";
 import type { FileOp, ScaffoldPlan } from "./file-writer/types";
 import type {
@@ -105,7 +105,7 @@ export abstract class AbstractRulePatcher implements Patcher {
           ZITADEL_PROJECT_ID: "",
           ZITADEL_ENVIRONMENT: "",
           ZITADEL_ISSUER: "",
-          NEXTGEN_ISSUER_URL: "",
+          ZITADEL_URL: "",
           NEXT_PUBLIC_ZITADEL_PROJECT_ID: "",
         },
       },
@@ -116,7 +116,7 @@ export abstract class AbstractRulePatcher implements Patcher {
           ZITADEL_PROJECT_ID: ctx.project.id,
           ZITADEL_ENVIRONMENT: "development",
           ZITADEL_ISSUER: ctx.issuer,
-          NEXTGEN_ISSUER_URL: ctx.server,
+          ZITADEL_URL: ctx.server,
           NEXT_PUBLIC_ZITADEL_PROJECT_ID: ctx.project.id,
         },
       },

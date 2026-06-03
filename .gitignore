@@ -25,8 +25,9 @@ profile.cov
 go.work
 go.work.sum
 
-# env file
-.env
+# env files (keep .env.example tracked)
+.env*
+!.env.example
 
 # Editor/IDE
 .idea/
@@ -87,6 +88,7 @@ coverage
 ## Next.js / Nuxt build outputs
 .next/
 .nuxt/
+.nuxt-typecheck/
 .output/
 
 ## Go build cache

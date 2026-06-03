@@ -17,6 +17,7 @@ import (
 	"github.com/ianlancetaylor/jsonschema"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/zitadel/nextgen/internal/secrets"
 	"github.com/zitadel/oidc/v3/pkg/op"
 
 	oasapi "github.com/zitadel/nextgen/api/generated"
@@ -143,7 +144,15 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 		DefaultTTL: cfg.Session.DefaultTTL,
 		MaxTTL:     cfg.Session.MaxTTL,
 	})
-	projectService := service.NewProjectService(pool, projectRepo, idgen.NewULID())
+	projectService := service.NewProjectService(
+		pool,
+		projectRepo,
+		schemaRepo,
+		flowDefinitionRepo,
+		secrets.NewRandomSecretGenerator(),
+		builtinPublicBase.String(),
+		schemaValidator,
+	)
 	schemaService := service.NewSchemaService(pool, schemaRepo, schemaResolverWithHTTP, schemaValidator)
 	flowDefinitionSvc := service.NewFlowDefinitionService(
 		pool,
@@ -152,13 +161,15 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 		nil,
 		flowDefinitionRepo,
 	)
+	userService := service.NewUserService(pool, userRepo, schemaRepo)
 	teamService := service.NewTeamService(pool, teamRepo)
 
 	// ── Flow engine ──────────────────
 	ids := idgen.NewULID()
 	fields := domain.NewSchemaFieldResolver(storageSchemaResolver)
 	flowAuth := service.NewFlowAuthAttemptAdapter(authAttemptSvc)
-	stateMachine := domain.NewFlowStateMachine(fields, nil, flowAuth, time.Now)
+	createUserHandler := domain.NewFlowCreateUserHandler(ids, userRepo, userPasswordRepo, passwordHasher)
+	stateMachine := domain.NewFlowStateMachine(fields, createUserHandler, flowAuth, time.Now)
 
 	flowService := service.NewFlowService(pool, flowDefinitionRepo, stateMachine, ids)
 
@@ -168,7 +179,17 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 	defer stop()
 
 	oasServer, err := oasapi.NewServer(
-		api.NewHandler(crypter, flowService, authAttemptSvc, sessionService, projectService, schemaService, flowDefinitionSvc, teamService),
+		api.NewHandler(
+			crypter,
+			flowService,
+			authAttemptSvc,
+			sessionService,
+			projectService,
+			userService,
+			schemaService,
+			flowDefinitionSvc,
+			teamService,
+		),
 		api.NewSecurityHandler(),
 		oasapi.WithErrorHandler(api.OgenErrorHandler))
 	if err != nil {

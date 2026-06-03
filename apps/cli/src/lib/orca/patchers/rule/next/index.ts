@@ -10,7 +10,7 @@ import type { RendererSpec } from "./renderers/types";
 /**
  * Next.js `middleware.ts` at the project root. Wires `nextgenMiddleware` so the
  * scaffolded `<zitadel-login api-base="/__nextgen">` requests are same-origin
- * proxied to `NEXTGEN_ISSUER_URL` and `/profile` is gated. The `middleware`
+ * proxied to `ZITADEL_URL` and `/profile` is gated. The `middleware`
  * form (not the Next 16 `proxy` rename) works on every supported Next major.
  * Carries the managed marker so `doctor --fix` reclaims it and `eject` removes it.
  */
@@ -20,7 +20,7 @@ import type { NextRequest } from "next/server";
 
 export function middleware(req: NextRequest) {
   return nextgenMiddleware(req, {
-    issuerUrl: process.env.NEXTGEN_ISSUER_URL,
+    url: process.env.ZITADEL_URL,
     protectedRoutes: ["/profile"],
     loginPath: "/login",
   });

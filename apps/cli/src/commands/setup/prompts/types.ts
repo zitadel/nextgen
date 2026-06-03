@@ -18,6 +18,16 @@ export type SetupAnswers = {
 /** Read-only facts a prompt may need (today only the resolved framework). */
 export type PromptContext = {
   readonly framework: FrameworkFacts;
+  /**
+   * The raw `--server` flag value as the user passed it, or `undefined`
+   * when not provided. Prompts use this to skip themselves when the flag
+   * already pinned the answer (the docstring on `SetupPrompt` says
+   * prompts should return unchanged answers in that case). Distinct from
+   * `answers.server`, which is *always* populated by the base command's
+   * server-resolution chain — checking that alone can't distinguish "user
+   * passed a flag" from "we fell back to the cloud default".
+   */
+  readonly serverFlag?: string;
 };
 
 /**

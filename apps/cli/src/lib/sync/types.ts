@@ -1,5 +1,3 @@
-import type { PlatformClient } from "../api/client.js";
-
 /**
  * One row in the local state file: the platform `id` returned at create time
  * and the content `hash` last successfully synced. Both fields are optional so
@@ -24,9 +22,9 @@ export type ZitadelState = {
  * The contract each per-resource adapter implements. `directory` is the
  * project-root-relative path the sync loop scans; `mutable` controls whether
  * file-content changes trigger an update or get skipped. Concrete syncers
- * (file-private to the module) translate the generic `data: object` payload
- * into the resource-specific envelope and dispatch to the matching `client.*`
- * method.
+ * call the orval-generated operations directly; bearer auth and base URL
+ * come from `@zitadel-nextgen/api/runtime/{auth,base-url}` module-globals
+ * the command layer sets at boot.
  */
 export interface ResourceSyncer {
   readonly kind: string;
@@ -40,10 +38,10 @@ export interface ResourceSyncer {
    * and `apply` both go through here.
    */
   validate(data: object): void;
-  create(client: PlatformClient, data: object): Promise<string>;
-  update(client: PlatformClient, id: string, data: object): Promise<void>;
-  delete(client: PlatformClient, id: string): Promise<void>;
-  fetch?(client: PlatformClient, id: string): Promise<object>;
+  create(data: object): Promise<string>;
+  update(id: string, data: object): Promise<void>;
+  delete(id: string): Promise<void>;
+  fetch?(id: string): Promise<object>;
 }
 
 /**

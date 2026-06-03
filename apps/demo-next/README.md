@@ -24,7 +24,7 @@ Or pass them inline when starting the dev server (step 2).
 
 | Variable                          | Default                 | Description                                        |
 | --------------------------------- | ----------------------- | -------------------------------------------------- |
-| `NEXTGEN_ISSUER_URL`              | `http://localhost:4000` | URL of the Nextgen auth server                     |
+| `ZITADEL_URL`                      | `http://localhost:4000` | URL of the Zitadel auth server                     |
 | `NEXT_PUBLIC_ZITADEL_PROJECT_ID`  | `demo`                  | Project ID passed to `<zitadel-login project-id>`  |
 
 ### 2. Start
@@ -39,7 +39,7 @@ corepack pnpm nx start @zitadel-nextgen/api-mock
 corepack pnpm nx dev @zitadel-nextgen/demo-next
 
 # …or with inline env overrides:
-# NEXTGEN_ISSUER_URL=https://my-instance.zitadel.cloud NEXT_PUBLIC_ZITADEL_PROJECT_ID=abc123 \
+# ZITADEL_URL=https://my-instance.zitadel.cloud NEXT_PUBLIC_ZITADEL_PROJECT_ID=abc123 \
 #   corepack pnpm nx dev @zitadel-nextgen/demo-next
 ```
 

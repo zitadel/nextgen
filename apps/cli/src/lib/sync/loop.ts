@@ -4,13 +4,12 @@ import { join } from "node:path";
 
 import { consola } from "consola";
 
-import type { PlatformClient } from "../api/client.js";
 import { readState, removeFromState, updateState } from "./state.js";
 import type { ResourceSyncer, SyncAction } from "./types.js";
 
 /**
  * Compute the sync plan for `cwd` against the state file and (when
- * `client` is supplied) the platform API. The plan is read-only: it
+ * `fetchOld` is true) the platform API. The plan is read-only: it
  * decides what create/update/delete operations need to happen but
  * performs none of them. Pass it to {@link runSyncLoop} to execute.
  *
@@ -19,15 +18,19 @@ import type { ResourceSyncer, SyncAction } from "./types.js";
  * `E_VALIDATION` before any platform mutation. Both `plan` and `apply`
  * reach this code path.
  *
- * @param cwd     - Project root.
- * @param syncers - Per-resource adapters. Order is preserved in the output.
- * @param client  - Optional platform client; required only to populate
- *   `oldContent` on update/delete actions (for diff rendering).
+ * Bearer auth + base URL live in the api package's runtime registries
+ * (`runtime/{auth,base-url}`). Callers set them once at command boot;
+ * the sync engine doesn't carry a client.
+ *
+ * @param cwd      - Project root.
+ * @param syncers  - Per-resource adapters. Order is preserved in the output.
+ * @param fetchOld - When true, the planner fetches each delete/update target
+ *   from the platform to populate `oldContent` for diff rendering.
  */
 export async function buildSyncPlan(
   cwd: string,
   syncers: ReadonlyArray<ResourceSyncer>,
-  client?: PlatformClient,
+  fetchOld = false,
 ): Promise<ReadonlyArray<SyncAction>> {
   const state = await readState(cwd);
   const actions: SyncAction[] = [];
@@ -50,9 +53,9 @@ export async function buildSyncPlan(
       }
 
       let oldContent: object | null = null;
-      if (client && syncer.fetch) {
+      if (fetchOld && syncer.fetch) {
         try {
-          oldContent = await syncer.fetch(client, entry.id);
+          oldContent = await syncer.fetch(entry.id);
         } catch (err) {
           consola.debug(`fetch ${syncer.kind} ${entry.id} failed:`, err);
         }
@@ -81,9 +84,9 @@ export async function buildSyncPlan(
       }
 
       let oldContent: object | null = null;
-      if (client && syncer.fetch) {
+      if (fetchOld && syncer.fetch) {
         try {
-          oldContent = await syncer.fetch(client, entry.id);
+          oldContent = await syncer.fetch(entry.id);
         } catch (err) {
           consola.debug(`fetch ${syncer.kind} ${entry.id} failed:`, err);
         }
@@ -108,14 +111,15 @@ export async function buildSyncPlan(
  * platform. Updates the local state file (`.zitadel/state.json`) as
  * each action completes so an interrupted run can resume.
  *
+ * The platform target (base URL + bearer auth) lives in the api
+ * package's runtime registries; callers set them before invoking this.
+ *
  * @param cwd     - Project root.
- * @param client  - The platform client used for create/update/delete.
  * @param syncers - Per-resource adapters; same list passed to
  *   `buildSyncPlan`.
  */
 export async function runSyncLoop(
   cwd: string,
-  client: PlatformClient,
   syncers: ReadonlyArray<ResourceSyncer>,
 ): Promise<void> {
   const actions = await buildSyncPlan(cwd, syncers);
@@ -123,25 +127,29 @@ export async function runSyncLoop(
   for (const action of actions) {
     switch (action.kind) {
       case "create": {
-        consola.info(`creating ${action.path}`);
-        const id = await action.syncer.create(client, action.content);
+        const id = await action.syncer.create(action.content);
         await updateState(cwd, action.path, { id, hash: action.hash });
+        consola.info(
+          `Created a new ${action.syncer.kind} on Zitadel from ${action.path} (id ${id})`,
+        );
         break;
       }
       case "update": {
-        consola.info(`updating ${action.path} (hash changed)`);
-        await action.syncer.update(client, action.id, action.content);
+        await action.syncer.update(action.id, action.content);
         await updateState(cwd, action.path, { hash: action.hash });
+        consola.info(`Updated the ${action.syncer.kind} on Zitadel from ${action.path}`);
         break;
       }
       case "delete": {
-        consola.info(`deleting ${action.path} (removed from disk)`);
-        await action.syncer.delete(client, action.id);
+        await action.syncer.delete(action.id);
         await removeFromState(cwd, action.path);
+        consola.info(
+          `Deleted the ${action.syncer.kind} on Zitadel because ${action.path} was removed locally`,
+        );
         break;
       }
       case "skip": {
-        consola.debug(`skipping ${action.path} (${action.reason})`);
+        consola.debug(`Skipped ${action.path} (${action.reason})`);
         break;
       }
     }

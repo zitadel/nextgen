@@ -18,6 +18,10 @@ post:
       application/json:
         schema:
           $ref: ../../components/flows/create-flow-definition-request.yaml
+        examples:
+          defaultLoginFlow:
+            summary: The default login flow provided by the server.
+            externalValue: examples/default-login-flow-example.json
   responses:
     '201':
       description: Flow definition created successfully.

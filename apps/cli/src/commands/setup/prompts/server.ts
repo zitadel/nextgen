@@ -1,6 +1,6 @@
 import { select, spinner, text } from "@clack/prompts";
 
-import { DEFAULT_SERVER } from "../../../lib/api/resolve-server";
+import { DEFAULT_SERVER } from "../../../lib/server";
 import { listListeningPorts, probeUrls } from "../../../lib/prober";
 import { bail } from "./cancel";
 import type { PromptContext, SetupAnswers, SetupPrompt } from "./types";
@@ -23,7 +23,15 @@ const OIDC_PROBE_TIMEOUT_MS = 300;
  * validated URL exactly as before.
  */
 export class ServerPrompt implements SetupPrompt {
-  async ask(answers: SetupAnswers, _ctx: PromptContext): Promise<SetupAnswers> {
+  async ask(answers: SetupAnswers, ctx: PromptContext): Promise<SetupAnswers> {
+    // `--server <url>` overrides the wizard entirely. The base command
+    // already validated and resolved the URL into `answers.server`;
+    // asking the user to re-pick from a fixed select list when their
+    // flag isn't in the list (Cloud / discovered / Custom) was a bug —
+    // clack would silently default back to Cloud.
+    if (ctx.serverFlag) {
+      return answers;
+    }
     const discovered = await discoverLocalOidc();
 
     const choice = await select({

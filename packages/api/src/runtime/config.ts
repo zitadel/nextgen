@@ -1,22 +1,22 @@
-import { setApiBaseUrl } from "./base-url";
+import { setProxyPath } from "./base-url";
 import { createApi, type ZitadelApi } from "./api-factory";
 
 /**
  * Input options for {@link configureZitadel}.
  */
 export interface ZitadelConfig {
-  /** Proxy path for API requests (e.g. `"/__nextgen"`). */
-  apiBase: string;
+  /** Proxy path for API requests (e.g. `"/__nextgen"`). Optional — defaults to `"/__nextgen"`. */
+  proxyPath?: string;
 
   /** Project ID passed to flow creation. */
   projectId: string;
 
   /**
-   * Full URL of the Zitadel auth backend (e.g. `"http://localhost:4000"`).
+   * Full URL of the Zitadel auth backend (e.g. `"http://localhost:8080"`).
    * Used by server-side middleware for proxying and JWT verification.
    * Optional — not needed in client-only setups.
    */
-  issuerUrl?: string;
+  url?: string;
 }
 
 /**
@@ -25,13 +25,13 @@ export interface ZitadelConfig {
  */
 export interface ZitadelProject {
   /** Proxy path for API requests. */
-  readonly apiBase: string;
+  readonly proxyPath: string;
 
   /** Project ID passed to flow creation. */
   readonly projectId: string;
 
   /** Full URL of the Zitadel auth backend. */
-  readonly issuerUrl?: string;
+  readonly url?: string;
 }
 
 export type { ZitadelApi };
@@ -54,12 +54,14 @@ const apiCache = new WeakMap<ZitadelProject, ZitadelApi>();
  * for HMR and framework double-mounts.
  */
 export function configureZitadel(config: ZitadelConfig): ZitadelProject {
+  const resolvedProxyPath = config.proxyPath ?? "/__nextgen";
+
   if (currentProject !== null) {
     // Same values → no-op (safe for HMR / React strict mode double-mount)
     if (
-      currentProject.apiBase === config.apiBase &&
+      currentProject.proxyPath === resolvedProxyPath &&
       currentProject.projectId === config.projectId &&
-      currentProject.issuerUrl === config.issuerUrl
+      currentProject.url === config.url
     ) {
       return currentProject;
     }
@@ -71,13 +73,13 @@ export function configureZitadel(config: ZitadelConfig): ZitadelProject {
   }
 
   currentProject = Object.freeze({
-    apiBase: config.apiBase,
+    proxyPath: resolvedProxyPath,
     projectId: config.projectId,
-    issuerUrl: config.issuerUrl,
+    url: config.url,
   });
 
   // Keep the global in sync for the generated code's internal use
-  setApiBaseUrl(config.apiBase);
+  setProxyPath(resolvedProxyPath);
 
   return currentProject;
 }
@@ -94,7 +96,7 @@ export function configureZitadel(config: ZitadelConfig): ZitadelProject {
 export function getApi(project: ZitadelProject): ZitadelApi {
   let api = apiCache.get(project);
   if (!api) {
-    api = createApi(project.apiBase);
+    api = createApi(project.proxyPath);
     apiCache.set(project, api);
   }
   return api;
@@ -115,5 +117,5 @@ export function getZitadelConfig(): ZitadelProject | null {
  */
 export function _resetConfigForTesting(): void {
   currentProject = null;
-  setApiBaseUrl("");
+  setProxyPath("");
 }

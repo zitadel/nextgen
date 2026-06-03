@@ -1,3 +1,5 @@
+//go:build postgres_integration
+
 package users_test
 
 import (
@@ -10,14 +12,14 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/bootstrap/users"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/database/dbtest"
 	"github.com/zitadel/nextgen/internal/storage/database/dialect/postgres"
-	"github.com/zitadel/nextgen/internal/storage/database/dialect/postgres/embedded"
 	"github.com/zitadel/nextgen/internal/storage/database/repository"
 )
 
 func TestMain(m *testing.M) {
 	ctx := context.Background()
-	connector, stop, err := embedded.StartEmbedded()
+	connector, stop, err := dbtest.Postgres(ctx)
 	if err != nil {
 		panic(err)
 	}
