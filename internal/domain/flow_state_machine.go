@@ -265,6 +265,10 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 		}
 		if result.Outcome != "" {
 			routeOutcome = result.Outcome
+		} else if *currentStep.OnSuccess == FlowOnSuccessCreateUser {
+			if err := r.authenticateCreatedUser(ctx, state, visitedResolved); err != nil {
+				return FlowStepResult{}, err
+			}
 		}
 	}
 
@@ -446,6 +450,41 @@ func (r *FlowStateMachineRuntime) runOnSuccess(ctx context.Context, client datab
 		State:         state,
 		ResolvedFlow:  def,
 	})
+}
+
+func (r *FlowStateMachineRuntime) authenticateCreatedUser(ctx context.Context, state *FlowState, resolved FlowResolvedFields) error {
+	if r.authAttempts == nil {
+		return fmt.Errorf("%w: auth-attempt service not wired", ErrIntegrity)
+	}
+	if state == nil {
+		return fmt.Errorf("%w: authenticate created user without state", ErrIntegrity)
+	}
+	identifierName, identifierValue, ok := findCollectedFieldByChallenge(resolved.Fields, state.CollectedData, FlowFieldChallengeIdentifier)
+	if !ok {
+		return fmt.Errorf("%w: create_user completed without identifier in collected data", ErrIntegrity)
+	}
+	_, passwordValue, ok := findCollectedFieldByChallenge(resolved.Fields, state.CollectedData, FlowFieldChallengePassword)
+	if !ok {
+		return fmt.Errorf("%w: create_user completed without password in collected data", ErrIntegrity)
+	}
+	userID, err := r.authAttempts.SubmitIdentifier(ctx, FlowSubmitIdentifierInput{
+		ProjectID:     state.ProjectID,
+		AttemptID:     state.AuthAttemptID,
+		AttributeName: identifierName,
+		Value:         asString(identifierValue),
+	})
+	if err != nil {
+		return fmt.Errorf("flow state machine: authenticate created user identifier: %w", err)
+	}
+	recordResolvedUser(state, userID)
+	if err := r.authAttempts.SubmitPassword(ctx, FlowSubmitPasswordInput{
+		ProjectID: state.ProjectID,
+		AttemptID: state.AuthAttemptID,
+		Plain:     asString(passwordValue),
+	}); err != nil {
+		return fmt.Errorf("flow state machine: authenticate created user password: %w", err)
+	}
+	return nil
 }
 
 func (r *FlowStateMachineRuntime) advance(state *FlowState, prev *FlowDefinitionStep, nextStepName string) {

@@ -31,11 +31,18 @@ func findAttribute(attrs []*domain.CreateAttribute, key string) *domain.CreateAt
 
 // fakeUserRepo records the users create_user persists.
 type fakeUserRepo struct {
-	created []*domain.CreateUser
+	created         []*domain.CreateUser
+	identifierIndex map[string]string
 }
 
 func (f *fakeUserRepo) Create(_ context.Context, _ database.QueryExecutor, user *domain.CreateUser) error {
 	f.created = append(f.created, user)
+	for _, attr := range user.Attributes {
+		value, ok := attr.Value.(string)
+		if ok && f.identifierIndex != nil {
+			f.identifierIndex[value] = user.ID
+		}
+	}
 	return nil
 }
 
@@ -60,6 +67,7 @@ type fakeAuthAttempts struct {
 
 	nextAttemptID    string
 	identifierResult map[string]string // value → resolved user id
+	identifierIndex  map[string]string
 	identifierErrs   map[string]error
 	passwordErrs     map[string]error
 	handoffOutput    domain.FlowHandoffOutput
@@ -77,6 +85,9 @@ func (f *fakeAuthAttempts) SubmitIdentifier(_ context.Context, in domain.FlowSub
 		return "", err
 	}
 	if uid, ok := f.identifierResult[in.Value]; ok {
+		return uid, nil
+	}
+	if uid, ok := f.identifierIndex[in.Value]; ok {
 		return uid, nil
 	}
 	return "", domain.ErrAuthAttemptProofRejected(nil)
@@ -109,7 +120,8 @@ type flowTestWorld struct {
 
 func newFlowTestWorld(t *testing.T) *flowTestWorld {
 	t.Helper()
-	users := &fakeUserRepo{}
+	identifierIndex := map[string]string{}
+	users := &fakeUserRepo{identifierIndex: identifierIndex}
 	pws := &fakeUserPasswordRepo{}
 	ids := idgenmock.NewMockGenerator(gomock.NewController(t))
 	ids.EXPECT().
@@ -118,7 +130,8 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 		AnyTimes()
 	hasher := fakeHasher{}
 	attempts := &fakeAuthAttempts{
-		nextAttemptID: "att_01TEST",
+		nextAttemptID:   "att_01TEST",
+		identifierIndex: identifierIndex,
 		handoffOutput: domain.FlowHandoffOutput{
 			Token:     "handoff_01TEST",
 			ExpiresAt: time.Unix(1700000060, 0).UTC(),
@@ -262,19 +275,23 @@ func TestFlowStateMachine_Process_RegistrationHappyPath(t *testing.T) {
 	require.Len(t, w.pws.created, 1)
 	assert.Equal(t, "hashed:correct-horse-battery-staple", w.pws.created[0].EncodedHash)
 
-	// on_success is a side effect: no _user_id pin, no handoff.
-	_, pinned := result.State.CollectedData[domain.FlowCollectedUserIDKey]
-	assert.False(t, pinned, "create_user must not pin _user_id")
-	assert.Empty(t, w.attempts.handoffCalls)
-	assert.Empty(t, result.HandoffToken)
+	assert.Equal(t, wantUserID, result.State.CollectedData[domain.FlowCollectedUserIDKey])
+	require.Len(t, w.attempts.handoffCalls, 1)
+	assert.Equal(t, "att_01TEST", w.attempts.handoffCalls[0].AttemptID)
+	assert.Equal(t, "handoff_01TEST", result.HandoffToken)
+	assert.Equal(t, time.Unix(1700000060, 0).UTC(), result.HandoffTokenExpiresAt)
 
 	// Register mode dispatches identifier (the email is x-unique, so it
 	// always routes through auth-attempt to emit user_already_exists when
 	// the name is taken). It must not dispatch password — create_user
-	// establishes the credential per its manifest.
-	require.Len(t, w.attempts.identifyCalls, 1)
+	// establishes the credential per its manifest. After create_user, the
+	// flow authenticates the new user so the terminal handoff creates a
+	// user-bound session.
+	require.Len(t, w.attempts.identifyCalls, 2)
 	assert.Equal(t, "alice@example.com", w.attempts.identifyCalls[0].Value)
-	assert.Empty(t, w.attempts.passwordCalls, "register mode skips password dispatch")
+	assert.Equal(t, "alice@example.com", w.attempts.identifyCalls[1].Value)
+	require.Len(t, w.attempts.passwordCalls, 1)
+	assert.Equal(t, "correct-horse-battery-staple", w.attempts.passwordCalls[0].Plain)
 }
 
 func TestFlowStateMachine_Process_LoginHappyPath(t *testing.T) {
@@ -781,6 +798,13 @@ func TestFlowDispatch_RegisterMultiStep_HappyPath(t *testing.T) {
 	emailAttr := findAttribute(w.users.created[0].Attributes, "email")
 	require.NotNil(t, emailAttr)
 	assert.Equal(t, "fresh@example.com", emailAttr.Value)
+	assert.Equal(t, "user_01TEST", done.State.CollectedData[domain.FlowCollectedUserIDKey])
+	require.Len(t, w.attempts.identifyCalls, 2)
+	assert.Equal(t, "fresh@example.com", w.attempts.identifyCalls[1].Value)
+	require.Len(t, w.attempts.passwordCalls, 1)
+	assert.Equal(t, "correct-horse-battery-staple", w.attempts.passwordCalls[0].Plain)
+	require.Len(t, w.attempts.handoffCalls, 1)
+	assert.Equal(t, "handoff_01TEST", done.HandoffToken)
 }
 
 // Register entry, identifier already exists → user_already_exists +
@@ -835,11 +859,17 @@ func TestFlowDispatch_CombinedFlow_LoginUnknownEmail_FlipsAndCreates(t *testing.
 	require.NoError(t, err)
 	assert.Equal(t, "done", done.State.CurrentStep)
 	require.Len(t, w.users.created, 1)
-	assert.Empty(t, w.attempts.passwordCalls)
 	// Email collected on the identify step survives into create_user.
 	emailAttr := findAttribute(w.users.created[0].Attributes, "email")
 	require.NotNil(t, emailAttr)
 	assert.Equal(t, "ghost@example.com", emailAttr.Value)
+	assert.Equal(t, "user_01TEST", done.State.CollectedData[domain.FlowCollectedUserIDKey])
+	require.Len(t, w.attempts.identifyCalls, 2)
+	assert.Equal(t, "ghost@example.com", w.attempts.identifyCalls[1].Value)
+	require.Len(t, w.attempts.passwordCalls, 1)
+	assert.Equal(t, "correct-horse-battery-staple", w.attempts.passwordCalls[0].Plain)
+	require.Len(t, w.attempts.handoffCalls, 1)
+	assert.Equal(t, "handoff_01TEST", done.HandoffToken)
 }
 
 // Worked example C variant: register entry, identifier exists → flip
