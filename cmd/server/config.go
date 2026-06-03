@@ -38,6 +38,11 @@ type ServerConfig struct {
 	// key used to seal flow cookies. Required — the server refuses to
 	// boot without it. Bind via NEXTGEN_SERVER_ENCRYPTION_KEY.
 	EncryptionKey string `mapstructure:"encryption_key"`
+
+	ConsoleEnabled bool   `mapstructure:"console_enabled"`
+	ConsolePath    string `mapstructure:"console_path"`
+	LoginEnabled   bool   `mapstructure:"login_enabled"`
+	LoginPath      string `mapstructure:"login_path"`
 }
 
 type SchemaConfig struct {
