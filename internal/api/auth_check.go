@@ -1,6 +1,8 @@
 package api
 
 import (
+	"encoding/base64"
+
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
 )
@@ -46,10 +48,10 @@ func factorPayloadToAPI(factor domain.AuthFactor) api.OptCompletedFactorPayload 
 		return api.NewOptCompletedFactorPayload(api.CompletedFactorPayload{
 			Type: api.PasskeyFactorPayloadCompletedFactorPayload,
 			PasskeyFactorPayload: api.PasskeyFactorPayload{
-				CredentialID:            "",
+				CredentialID:            base64.RawURLEncoding.EncodeToString(f.CredentialID),
 				UserVerified:            f.UserVerified,
-				BackupEligible:          api.OptBool{},
-				BackupState:             api.OptBool{},
+				BackupEligible:          api.NewOptBool(f.BackupEligible),
+				BackupState:             api.NewOptBool(f.BackupState),
 				AuthenticatorAttachment: api.OptPasskeyFactorPayloadAuthenticatorAttachment{},
 			},
 		})

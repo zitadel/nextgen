@@ -2,112 +2,108 @@ package service_test
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
+	"net/url"
 	"testing"
 	"time"
 
+	"github.com/descope/virtualwebauthn"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
+
 	"github.com/zitadel/nextgen/internal/domain"
+	domainmock "github.com/zitadel/nextgen/internal/domain/mock"
 	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/nextgen/internal/service/mocks"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-type fakeAuthAttemptRepo struct {
-	getByIDAttempt *domain.AuthAttempt
-	getByIDErr     error
-
-	createErr      error
-	createdAttempt *domain.AuthAttempt
-
-	setChallengeErr      error
-	setChallengeProject  string
-	setChallengeAttempt  string
-	setChallengeValue    domain.AuthChallenge
-	challengeFailedErr   error
-	challengeFailedValue domain.AuthChallenge
-	challengeFailedCalls int
-
-	challengeSucceededErr       error
-	challengeSucceededFactor    domain.AuthFactor
-	challengeSucceededChallenge string
-
-	handoffErr     error
-	handoffAttempt *domain.AuthAttempt
+// newUserPasskeysMock returns a mock that resolves a passkey List lookup to the given keys.
+// The project/user condition builders are exercised by listUserPasskeys, so they are stubbed
+// to accept any number of calls.
+func newUserPasskeysMock(ctrl *gomock.Controller, keys []*domain.UserPasskey) *mocks.MockUserPasskeys {
+	m := mocks.NewMockUserPasskeys(ctrl)
+	m.EXPECT().ProjectIDCondition(gomock.Any()).Return(nil).AnyTimes()
+	m.EXPECT().UserIDCondition(gomock.Any()).Return(nil).AnyTimes()
+	m.EXPECT().List(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(keys, nil)
+	return m
 }
 
-func (f *fakeAuthAttemptRepo) GetByID(_ context.Context, _ database.QueryExecutor, _, _ string) (*domain.AuthAttempt, error) {
-	if f.getByIDErr != nil {
-		return nil, f.getByIDErr
+const (
+	passkeyRPID   = "example.com"
+	passkeyOrigin = "https://example.com"
+	passkeyUserID = "user-1"
+)
+
+// passkeyFixture wires a virtual authenticator and its matching stored passkey so service
+// tests can drive a real challenge -> signed assertion -> verify round-trip.
+type passkeyFixture struct {
+	rp      virtualwebauthn.RelyingParty
+	auth    virtualwebauthn.Authenticator
+	cred    virtualwebauthn.Credential
+	passkey *domain.UserPasskey
+	origins []url.URL
+}
+
+func newPasskeyFixture(t *testing.T) passkeyFixture {
+	t.Helper()
+
+	rp := virtualwebauthn.RelyingParty{ID: passkeyRPID, Name: "Example", Origin: passkeyOrigin}
+	auth := virtualwebauthn.NewAuthenticatorWithOptions(virtualwebauthn.AuthenticatorOptions{
+		UserHandle: []byte(passkeyUserID),
+	})
+	cred := virtualwebauthn.NewCredential(virtualwebauthn.KeyTypeEC2)
+	cred.Counter = 1
+	auth.AddCredential(cred)
+
+	origin, err := url.Parse(passkeyOrigin)
+	require.NoError(t, err)
+
+	return passkeyFixture{
+		rp:   rp,
+		auth: auth,
+		cred: cred,
+		passkey: &domain.UserPasskey{
+			ProjectID:    "proj",
+			UserID:       passkeyUserID,
+			CredentialID: string(cred.ID),
+			PublicKey:    cred.Key.AttestationData(),
+			AAGUID:       auth.Aaguid[:],
+		},
+		origins: []url.URL{*origin},
 	}
-	return f.getByIDAttempt, nil
 }
 
-func (f *fakeAuthAttemptRepo) GetByHandoffToken(_ context.Context, _ database.QueryExecutor, _ string, _ []byte) (*domain.AuthAttempt, error) {
-	panic("GetByHandoffToken not expected in service tests")
-}
+// challengeAttempt returns an attempt carrying a verified user factor and an issued passkey
+// challenge with the given ID, plus the signed assertion bytes for that challenge.
+func (f passkeyFixture) challengeAttempt(t *testing.T, challengeID string) (*domain.AuthAttempt, []byte) {
+	t.Helper()
 
-func (f *fakeAuthAttemptRepo) Create(_ context.Context, _ database.QueryExecutor, attempt *domain.AuthAttempt) error {
-	f.createdAttempt = attempt
-	return f.createErr
-}
+	challenge, err := domain.CreatePasskeyChallenge(passkeyUserID, []*domain.UserPasskey{f.passkey}, "preferred", passkeyRPID, f.origins)
+	require.NoError(t, err)
+	check := domain.SetAuthChallengePasskey(challengeID, time.Now(), time.Time{}, 0)
+	check.PasskeyChallenge = challenge
 
-func (f *fakeAuthAttemptRepo) Delete(_ context.Context, _ database.QueryExecutor, _, _ string) error {
-	panic("Delete not expected in service tests")
-}
-
-func (f *fakeAuthAttemptRepo) Handoff(_ context.Context, _ database.QueryExecutor, attempt *domain.AuthAttempt) error {
-	f.handoffAttempt = attempt
-	return f.handoffErr
-}
-
-func (f *fakeAuthAttemptRepo) SetChallenge(_ context.Context, _ database.QueryExecutor, projectID, authAttemptID string, challenge domain.AuthChallenge) error {
-	f.setChallengeProject = projectID
-	f.setChallengeAttempt = authAttemptID
-	f.setChallengeValue = challenge
-	return f.setChallengeErr
-}
-
-func (f *fakeAuthAttemptRepo) ChallengeSucceeded(_ context.Context, _ database.QueryExecutor, _, _ string, factor domain.AuthFactor, challengeID string) error {
-	f.challengeSucceededFactor = factor
-	f.challengeSucceededChallenge = challengeID
-	return f.challengeSucceededErr
-}
-
-func (f *fakeAuthAttemptRepo) ChallengeFailed(_ context.Context, _ database.QueryExecutor, _, _ string, challenge domain.AuthChallenge) error {
-	f.challengeFailedCalls++
-	f.challengeFailedValue = challenge
-	return f.challengeFailedErr
-}
-
-type fakeSessionResolver struct {
-	session *domain.Session
-	err     error
-	calls   int
-}
-
-func (f *fakeSessionResolver) Get(_ context.Context, _ database.QueryExecutor, _, _ string) (*domain.Session, error) {
-	f.calls++
-	if f.err != nil {
-		return nil, f.err
+	attempt := &domain.AuthAttempt{
+		ProjectID: "proj",
+		ID:        "att-1",
+		Checks:    []domain.AuthCheck{&domain.AuthFactorUser{UserID: passkeyUserID}, check},
 	}
-	return f.session, nil
-}
 
-type fakeUserLookup struct {
-	user *domain.User
-	err  error
-}
-
-func (f *fakeUserLookup) Get(_ context.Context, _ database.QueryExecutor, _ ...database.QueryOption) (*domain.User, error) {
-	if f.err != nil {
-		return nil, f.err
+	rawChallenge, err := base64.RawURLEncoding.DecodeString(challenge.Challenge)
+	require.NoError(t, err)
+	allowed := make([]string, 0, len(challenge.AllowedCredentialIDs))
+	for _, id := range challenge.AllowedCredentialIDs {
+		allowed = append(allowed, base64.RawURLEncoding.EncodeToString(id))
 	}
-	return f.user, nil
-}
-
-func (f *fakeUserLookup) ProjectIDCondition(_ string) database.Condition { return nil }
-func (f *fakeUserLookup) IDCondition(_ string) database.Condition        { return nil }
-func (f *fakeUserLookup) AttributesCondition(_ []domain.Attribute) database.Condition {
-	return nil
+	assertion := virtualwebauthn.CreateAssertionResponse(f.rp, f.auth, f.cred, virtualwebauthn.AssertionOptions{
+		Challenge:        rawChallenge,
+		RelyingPartyID:   challenge.RPID,
+		AllowCredentials: allowed,
+	})
+	return attempt, []byte(assertion)
 }
 
 func TestAuthAttemptService_Create(t *testing.T) {
@@ -115,186 +111,149 @@ func TestAuthAttemptService_Create(t *testing.T) {
 	createErr := errors.New("create failed")
 	unexpectedSessionErr := errors.New("session lookup failed")
 
-	tests := []struct {
-		name   string
-		input  service.CreateAuthAttemptInput
-		repo   *fakeAuthAttemptRepo
-		sess   *fakeSessionResolver
-		assert func(t *testing.T, got *domain.AuthAttempt, err error, repo *fakeAuthAttemptRepo, sess *fakeSessionResolver)
-	}{
-		{
-			name:  "creates attempt without session",
-			input: service.CreateAuthAttemptInput{ProjectID: "proj", RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypeUser}},
-			repo:  &fakeAuthAttemptRepo{},
-			sess:  &fakeSessionResolver{},
-			assert: func(t *testing.T, got *domain.AuthAttempt, err error, repo *fakeAuthAttemptRepo, sess *fakeSessionResolver) {
-				t.Helper()
-				if err != nil {
-					t.Fatalf("Create returned error: %v", err)
-				}
-				if got == nil {
-					t.Fatal("Create returned nil attempt")
-				}
-				if repo.createdAttempt != got {
-					t.Fatal("Create must persist and return the same attempt instance")
-				}
-				if sess.calls != 0 {
-					t.Fatalf("session resolver called %d times, want 0", sess.calls)
-				}
-			},
-		},
-		{
-			name: "copies session factors for step-up",
-			input: service.CreateAuthAttemptInput{
-				ProjectID:      "proj",
-				SessionID:      &sessionID,
-				RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypePassword},
-			},
-			repo: &fakeAuthAttemptRepo{},
-			sess: &fakeSessionResolver{session: &domain.Session{Factors: []domain.AuthFactor{&domain.AuthFactorUser{UserID: "user-1"}}}},
-			assert: func(t *testing.T, got *domain.AuthAttempt, err error, _ *fakeAuthAttemptRepo, sess *fakeSessionResolver) {
-				t.Helper()
-				if err != nil {
-					t.Fatalf("Create returned error: %v", err)
-				}
-				if sess.calls != 1 {
-					t.Fatalf("session resolver called %d times, want 1", sess.calls)
-				}
-				if got.SessionID == nil || *got.SessionID != sessionID {
-					t.Fatalf("SessionID = %v, want %q", got.SessionID, sessionID)
-				}
-				if _, ok := got.FactorByType(domain.AuthCheckTypeUser); !ok {
-					t.Fatal("expected copied user factor from session")
-				}
-			},
-		},
-		{
-			name: "maps session not found to invalid request",
-			input: service.CreateAuthAttemptInput{
-				ProjectID:      "proj",
-				SessionID:      &sessionID,
-				RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypePassword},
-			},
-			repo: &fakeAuthAttemptRepo{},
-			sess: &fakeSessionResolver{err: domain.ErrSessionNotFound()},
-			assert: func(t *testing.T, got *domain.AuthAttempt, err error, repo *fakeAuthAttemptRepo, _ *fakeSessionResolver) {
-				t.Helper()
-				if got != nil {
-					t.Fatalf("Create returned attempt = %v, want nil", got)
-				}
-				if !errors.Is(err, domain.ErrAuthAttemptInvalidRequest()) {
-					t.Fatalf("Create err = %v, want ErrAuthAttemptInvalidRequest", err)
-				}
-				if repo.createdAttempt != nil {
-					t.Fatal("Create must not persist attempt when session lookup fails")
-				}
-			},
-		},
-		{
-			name:  "maps create repository failure to internal error",
-			input: service.CreateAuthAttemptInput{ProjectID: "proj", RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypeUser}},
-			repo:  &fakeAuthAttemptRepo{createErr: createErr},
-			sess:  &fakeSessionResolver{},
-			assert: func(t *testing.T, got *domain.AuthAttempt, err error, _ *fakeAuthAttemptRepo, _ *fakeSessionResolver) {
-				t.Helper()
-				if got != nil {
-					t.Fatalf("Create returned attempt = %v, want nil", got)
-				}
-				if !errors.Is(err, domain.ErrInternal(nil)) {
-					t.Fatalf("Create err = %v, want ErrInternal", err)
-				}
-			},
-		},
-		{
-			name: "maps unexpected session error to internal",
-			input: service.CreateAuthAttemptInput{
-				ProjectID:      "proj",
-				SessionID:      &sessionID,
-				RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypePassword},
-			},
-			repo: &fakeAuthAttemptRepo{},
-			sess: &fakeSessionResolver{err: unexpectedSessionErr},
-			assert: func(t *testing.T, got *domain.AuthAttempt, err error, repo *fakeAuthAttemptRepo, _ *fakeSessionResolver) {
-				t.Helper()
-				if got != nil {
-					t.Fatalf("Create returned attempt = %v, want nil", got)
-				}
-				if !errors.Is(err, domain.ErrInternal(nil)) {
-					t.Fatalf("Create err = %v, want ErrInternal", err)
-				}
-				if repo.createdAttempt != nil {
-					t.Fatal("Create must not persist attempt when session lookup fails")
-				}
-			},
-		},
-	}
+	t.Run("creates attempt without session", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		repo := domainmock.NewMockAuthAttemptRepository(ctrl)
+		// A nil session resolver mock with no expectations asserts it is never consulted.
+		sessions := mocks.NewMockSessionResolver(ctrl)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			svc := service.NewAuthAttemptService(nil, tt.repo, tt.sess, nil, nil, nil, nil, nil)
-			got, err := svc.Create(t.Context(), tt.input)
-			tt.assert(t, got, err, tt.repo, tt.sess)
+		var created *domain.AuthAttempt
+		repo.EXPECT().Create(gomock.Any(), gomock.Any(), gomock.Any()).
+			DoAndReturn(func(_ context.Context, _ database.QueryExecutor, a *domain.AuthAttempt) error {
+				created = a
+				return nil
+			})
+
+		svc := service.NewAuthAttemptService(nil, repo, sessions, nil, nil, nil, nil, nil)
+		got, err := svc.Create(t.Context(), service.CreateAuthAttemptInput{
+			ProjectID:      "proj",
+			RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypeUser},
 		})
-	}
+
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		assert.Same(t, got, created, "Create must persist and return the same attempt instance")
+	})
+
+	t.Run("copies session factors for step-up", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		repo := domainmock.NewMockAuthAttemptRepository(ctrl)
+		sessions := mocks.NewMockSessionResolver(ctrl)
+
+		sessions.EXPECT().Get(gomock.Any(), gomock.Any(), "proj", sessionID).
+			Return(&domain.Session{Factors: []domain.AuthFactor{&domain.AuthFactorUser{UserID: "user-1"}}}, nil)
+		repo.EXPECT().Create(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+
+		svc := service.NewAuthAttemptService(nil, repo, sessions, nil, nil, nil, nil, nil)
+		got, err := svc.Create(t.Context(), service.CreateAuthAttemptInput{
+			ProjectID:      "proj",
+			SessionID:      &sessionID,
+			RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypePassword},
+		})
+
+		require.NoError(t, err)
+		require.NotNil(t, got.SessionID)
+		assert.Equal(t, sessionID, *got.SessionID)
+		_, ok := got.FactorByType(domain.AuthCheckTypeUser)
+		assert.True(t, ok, "expected copied user factor from session")
+	})
+
+	t.Run("maps session not found to invalid request", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		repo := domainmock.NewMockAuthAttemptRepository(ctrl)
+		sessions := mocks.NewMockSessionResolver(ctrl)
+
+		sessions.EXPECT().Get(gomock.Any(), gomock.Any(), "proj", sessionID).
+			Return(nil, domain.ErrSessionNotFound())
+		// repo.Create has no expectation: gomock fails if it is called when session lookup fails.
+
+		svc := service.NewAuthAttemptService(nil, repo, sessions, nil, nil, nil, nil, nil)
+		got, err := svc.Create(t.Context(), service.CreateAuthAttemptInput{
+			ProjectID:      "proj",
+			SessionID:      &sessionID,
+			RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypePassword},
+		})
+
+		assert.Nil(t, got)
+		assert.ErrorIs(t, err, domain.ErrAuthAttemptInvalidRequest())
+	})
+
+	t.Run("maps create repository failure to internal error", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		repo := domainmock.NewMockAuthAttemptRepository(ctrl)
+
+		repo.EXPECT().Create(gomock.Any(), gomock.Any(), gomock.Any()).Return(createErr)
+
+		svc := service.NewAuthAttemptService(nil, repo, nil, nil, nil, nil, nil, nil)
+		got, err := svc.Create(t.Context(), service.CreateAuthAttemptInput{
+			ProjectID:      "proj",
+			RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypeUser},
+		})
+
+		assert.Nil(t, got)
+		assert.ErrorIs(t, err, domain.ErrInternal(nil))
+	})
+
+	t.Run("maps unexpected session error to internal", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		repo := domainmock.NewMockAuthAttemptRepository(ctrl)
+		sessions := mocks.NewMockSessionResolver(ctrl)
+
+		sessions.EXPECT().Get(gomock.Any(), gomock.Any(), "proj", sessionID).
+			Return(nil, unexpectedSessionErr)
+
+		svc := service.NewAuthAttemptService(nil, repo, sessions, nil, nil, nil, nil, nil)
+		got, err := svc.Create(t.Context(), service.CreateAuthAttemptInput{
+			ProjectID:      "proj",
+			SessionID:      &sessionID,
+			RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypePassword},
+		})
+
+		assert.Nil(t, got)
+		assert.ErrorIs(t, err, domain.ErrInternal(nil))
+	})
 }
 
 func TestAuthAttemptService_GetByID(t *testing.T) {
 	attempt := &domain.AuthAttempt{ProjectID: "proj", ID: "att-1"}
 	repoErr := errors.New("repo get failed")
 
-	tests := []struct {
-		name   string
-		repo   *fakeAuthAttemptRepo
-		assert func(t *testing.T, got *domain.AuthAttempt, err error)
-	}{
-		{
-			name: "returns repository attempt",
-			repo: &fakeAuthAttemptRepo{getByIDAttempt: attempt},
-			assert: func(t *testing.T, got *domain.AuthAttempt, err error) {
-				t.Helper()
-				if err != nil {
-					t.Fatalf("GetByID returned error: %v", err)
-				}
-				if got != attempt {
-					t.Fatalf("GetByID = %v, want %v", got, attempt)
-				}
-			},
-		},
-		{
-			name: "propagates repository auth attempt not found error",
-			repo: &fakeAuthAttemptRepo{getByIDErr: domain.ErrAuthAttemptNotFound()},
-			assert: func(t *testing.T, got *domain.AuthAttempt, err error) {
-				t.Helper()
-				if got != nil {
-					t.Fatalf("GetByID returned attempt = %v, want nil", got)
-				}
-				if !errors.Is(err, domain.ErrAuthAttemptNotFound()) {
-					t.Fatalf("GetByID err = %v, want %v", err, repoErr)
-				}
-			},
-		},
-		{
-			name: "maps repository error to internal error",
-			repo: &fakeAuthAttemptRepo{getByIDErr: repoErr},
-			assert: func(t *testing.T, got *domain.AuthAttempt, err error) {
-				t.Helper()
-				if got != nil {
-					t.Fatalf("GetByID returned attempt = %v, want nil", got)
-				}
-				if !errors.Is(err, domain.ErrInternal(repoErr)) {
-					t.Fatalf("GetByID err = %v, want %v", err, repoErr)
-				}
-			},
-		},
-	}
+	t.Run("returns repository attempt", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		repo := domainmock.NewMockAuthAttemptRepository(ctrl)
+		repo.EXPECT().GetByID(gomock.Any(), gomock.Any(), "proj", "att-1").Return(attempt, nil)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			svc := service.NewAuthAttemptService(nil, tt.repo, nil, nil, nil, nil, nil, nil)
-			got, err := svc.GetByID(t.Context(), "proj", "att-1")
-			tt.assert(t, got, err)
-		})
-	}
+		svc := service.NewAuthAttemptService(nil, repo, nil, nil, nil, nil, nil, nil)
+		got, err := svc.GetByID(t.Context(), "proj", "att-1")
+
+		require.NoError(t, err)
+		assert.Same(t, attempt, got)
+	})
+
+	t.Run("propagates repository auth attempt not found error", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		repo := domainmock.NewMockAuthAttemptRepository(ctrl)
+		repo.EXPECT().GetByID(gomock.Any(), gomock.Any(), "proj", "att-1").
+			Return(nil, domain.ErrAuthAttemptNotFound())
+
+		svc := service.NewAuthAttemptService(nil, repo, nil, nil, nil, nil, nil, nil)
+		got, err := svc.GetByID(t.Context(), "proj", "att-1")
+
+		assert.Nil(t, got)
+		assert.ErrorIs(t, err, domain.ErrAuthAttemptNotFound())
+	})
+
+	t.Run("maps repository error to internal error", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		repo := domainmock.NewMockAuthAttemptRepository(ctrl)
+		repo.EXPECT().GetByID(gomock.Any(), gomock.Any(), "proj", "att-1").Return(nil, repoErr)
+
+		svc := service.NewAuthAttemptService(nil, repo, nil, nil, nil, nil, nil, nil)
+		got, err := svc.GetByID(t.Context(), "proj", "att-1")
+
+		assert.Nil(t, got)
+		assert.ErrorIs(t, err, domain.ErrInternal(repoErr))
+	})
 }
 
 type unsupportedChallenge struct{}
@@ -306,105 +265,87 @@ func (unsupportedChallenge) ChallengeCheckType() domain.AuthCheckType {
 func TestAuthAttemptService_IssueChallenge(t *testing.T) {
 	repoErr := errors.New("set challenge failed")
 
-	tests := []struct {
-		name    string
-		attempt *domain.AuthAttempt
-		input   service.IssueChallengeInput
-		repo    *fakeAuthAttemptRepo
-		assert  func(t *testing.T, got *domain.AuthAttempt, err error, repo *fakeAuthAttemptRepo)
-	}{
-		{
-			name: "issues user challenge",
-			attempt: &domain.AuthAttempt{
-				ProjectID: "proj",
-				ID:        "att-1",
-			},
-			input: service.IssueChallengeInput{ProjectID: "proj", AttemptID: "att-1", Challenge: service.UserChallenge{}},
-			repo:  &fakeAuthAttemptRepo{},
-			assert: func(t *testing.T, got *domain.AuthAttempt, err error, repo *fakeAuthAttemptRepo) {
-				t.Helper()
-				if err != nil {
-					t.Fatalf("IssueChallenge returned error: %v", err)
-				}
-				if got == nil {
-					t.Fatal("IssueChallenge returned nil attempt")
-				}
-				if _, ok := repo.setChallengeValue.(*domain.AuthChallengeUser); !ok {
-					t.Fatalf("SetChallenge check type = %T, want *domain.AuthChallengeUser", repo.setChallengeValue)
-				}
-			},
-		},
-		{
-			name: "issues password challenge when user factor exists",
-			attempt: &domain.AuthAttempt{
-				ProjectID: "proj",
-				ID:        "att-1",
-				Checks:    []domain.AuthCheck{&domain.AuthFactorUser{UserID: "user-1"}},
-			},
-			input: service.IssueChallengeInput{ProjectID: "proj", AttemptID: "att-1", Challenge: service.PasswordChallenge{}},
-			repo:  &fakeAuthAttemptRepo{},
-			assert: func(t *testing.T, got *domain.AuthAttempt, err error, repo *fakeAuthAttemptRepo) {
-				t.Helper()
-				if err != nil {
-					t.Fatalf("IssueChallenge returned error: %v", err)
-				}
-				if _, ok := repo.setChallengeValue.(*domain.AuthChallengePassword); !ok {
-					t.Fatalf("SetChallenge check type = %T, want *domain.AuthChallengePassword", repo.setChallengeValue)
-				}
-				if got != repo.getByIDAttempt {
-					t.Fatal("IssueChallenge must return loaded attempt")
-				}
-			},
-		},
-		{
-			name: "returns invalid request for unsupported challenge type",
-			attempt: &domain.AuthAttempt{
-				ProjectID: "proj",
-				ID:        "att-1",
-			},
-			input: service.IssueChallengeInput{ProjectID: "proj", AttemptID: "att-1", Challenge: unsupportedChallenge{}},
-			repo:  &fakeAuthAttemptRepo{},
-			assert: func(t *testing.T, got *domain.AuthAttempt, err error, repo *fakeAuthAttemptRepo) {
-				t.Helper()
-				if got != nil {
-					t.Fatalf("IssueChallenge returned attempt = %v, want nil", got)
-				}
-				if !errors.Is(err, domain.ErrAuthAttemptInvalidRequest()) {
-					t.Fatalf("IssueChallenge err = %v, want ErrAuthAttemptInvalidRequest", err)
-				}
-				if repo.setChallengeValue != nil {
-					t.Fatal("SetChallenge must not be called for unsupported challenge type")
-				}
-			},
-		},
-		{
-			name: "propagates set challenge error",
-			attempt: &domain.AuthAttempt{
-				ProjectID: "proj",
-				ID:        "att-1",
-			},
-			input: service.IssueChallengeInput{ProjectID: "proj", AttemptID: "att-1", Challenge: service.UserChallenge{}},
-			repo:  &fakeAuthAttemptRepo{setChallengeErr: repoErr},
-			assert: func(t *testing.T, got *domain.AuthAttempt, err error, _ *fakeAuthAttemptRepo) {
-				t.Helper()
-				if got != nil {
-					t.Fatalf("IssueChallenge returned attempt = %v, want nil", got)
-				}
-				if !errors.Is(err, repoErr) {
-					t.Fatalf("IssueChallenge err = %v, want %v", err, repoErr)
-				}
-			},
-		},
-	}
+	t.Run("issues user challenge", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		repo := domainmock.NewMockAuthAttemptRepository(ctrl)
+		attempt := &domain.AuthAttempt{ProjectID: "proj", ID: "att-1"}
+		repo.EXPECT().GetByID(gomock.Any(), gomock.Any(), "proj", "att-1").Return(attempt, nil)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tt.repo.getByIDAttempt = tt.attempt
-			svc := service.NewAuthAttemptService(nil, tt.repo, nil, nil, nil, nil, nil, nil)
-			got, err := svc.IssueChallenge(t.Context(), tt.input)
-			tt.assert(t, got, err, tt.repo)
+		var setChallenge domain.AuthChallenge
+		repo.EXPECT().SetChallenge(gomock.Any(), gomock.Any(), "proj", "att-1", gomock.Any()).
+			DoAndReturn(func(_ context.Context, _ database.QueryExecutor, _, _ string, c domain.AuthChallenge) error {
+				setChallenge = c
+				return nil
+			})
+
+		svc := service.NewAuthAttemptService(nil, repo, nil, nil, nil, nil, nil, nil)
+		got, err := svc.IssueChallenge(t.Context(), service.IssueChallengeInput{
+			ProjectID: "proj", AttemptID: "att-1", Challenge: service.UserChallenge{},
 		})
-	}
+
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		assert.IsType(t, &domain.AuthChallengeUser{}, setChallenge)
+	})
+
+	t.Run("issues password challenge when user factor exists", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		repo := domainmock.NewMockAuthAttemptRepository(ctrl)
+		attempt := &domain.AuthAttempt{
+			ProjectID: "proj",
+			ID:        "att-1",
+			Checks:    []domain.AuthCheck{&domain.AuthFactorUser{UserID: "user-1"}},
+		}
+		repo.EXPECT().GetByID(gomock.Any(), gomock.Any(), "proj", "att-1").Return(attempt, nil)
+
+		var setChallenge domain.AuthChallenge
+		repo.EXPECT().SetChallenge(gomock.Any(), gomock.Any(), "proj", "att-1", gomock.Any()).
+			DoAndReturn(func(_ context.Context, _ database.QueryExecutor, _, _ string, c domain.AuthChallenge) error {
+				setChallenge = c
+				return nil
+			})
+
+		svc := service.NewAuthAttemptService(nil, repo, nil, nil, nil, nil, nil, nil)
+		got, err := svc.IssueChallenge(t.Context(), service.IssueChallengeInput{
+			ProjectID: "proj", AttemptID: "att-1", Challenge: service.PasswordChallenge{},
+		})
+
+		require.NoError(t, err)
+		assert.IsType(t, &domain.AuthChallengePassword{}, setChallenge)
+		assert.Same(t, attempt, got, "IssueChallenge must return loaded attempt")
+	})
+
+	t.Run("returns invalid request for unsupported challenge type", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		repo := domainmock.NewMockAuthAttemptRepository(ctrl)
+		attempt := &domain.AuthAttempt{ProjectID: "proj", ID: "att-1"}
+		repo.EXPECT().GetByID(gomock.Any(), gomock.Any(), "proj", "att-1").Return(attempt, nil)
+		// SetChallenge has no expectation: it must not be called for an unsupported type.
+
+		svc := service.NewAuthAttemptService(nil, repo, nil, nil, nil, nil, nil, nil)
+		got, err := svc.IssueChallenge(t.Context(), service.IssueChallengeInput{
+			ProjectID: "proj", AttemptID: "att-1", Challenge: unsupportedChallenge{},
+		})
+
+		assert.Nil(t, got)
+		assert.ErrorIs(t, err, domain.ErrAuthAttemptInvalidRequest())
+	})
+
+	t.Run("propagates set challenge error", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		repo := domainmock.NewMockAuthAttemptRepository(ctrl)
+		attempt := &domain.AuthAttempt{ProjectID: "proj", ID: "att-1"}
+		repo.EXPECT().GetByID(gomock.Any(), gomock.Any(), "proj", "att-1").Return(attempt, nil)
+		repo.EXPECT().SetChallenge(gomock.Any(), gomock.Any(), "proj", "att-1", gomock.Any()).Return(repoErr)
+
+		svc := service.NewAuthAttemptService(nil, repo, nil, nil, nil, nil, nil, nil)
+		got, err := svc.IssueChallenge(t.Context(), service.IssueChallengeInput{
+			ProjectID: "proj", AttemptID: "att-1", Challenge: service.UserChallenge{},
+		})
+
+		assert.Nil(t, got)
+		assert.ErrorIs(t, err, repoErr)
+	})
 }
 
 func TestAuthAttemptService_VerifyProof(t *testing.T) {
@@ -420,111 +361,102 @@ func TestAuthAttemptService_VerifyProof(t *testing.T) {
 		}
 	}
 
-	tests := []struct {
-		name   string
-		repo   *fakeAuthAttemptRepo
-		users  *fakeUserLookup
-		input  service.VerifyProofInput
-		assert func(t *testing.T, got *domain.AuthAttempt, err error, repo *fakeAuthAttemptRepo)
-	}{
-		{
-			name:  "verifies user proof and persists success",
-			repo:  &fakeAuthAttemptRepo{getByIDAttempt: newUserChallengeAttempt()},
-			users: &fakeUserLookup{user: &domain.User{ID: "user-1"}},
-			input: service.VerifyProofInput{ProjectID: "proj", AttemptID: "att-1", ChallengeID: "ch-1", Proof: service.UserProof{AttributeName: "email", LoginName: "u@example.com"}},
-			assert: func(t *testing.T, got *domain.AuthAttempt, err error, repo *fakeAuthAttemptRepo) {
-				t.Helper()
-				if err != nil {
-					t.Fatalf("VerifyProof returned error: %v", err)
-				}
-				if got == nil {
-					t.Fatal("VerifyProof returned nil attempt")
-				}
-				if repo.challengeSucceededFactor == nil {
-					t.Fatal("ChallengeSucceeded was not called")
-				}
-				userFactor, ok := repo.challengeSucceededFactor.(*domain.AuthFactorUser)
-				if !ok {
-					t.Fatalf("ChallengeSucceeded factor type = %T, want *domain.AuthFactorUser", repo.challengeSucceededFactor)
-				}
-				if userFactor.UserID != "user-1" {
-					t.Fatalf("UserID = %q, want %q", userFactor.UserID, "user-1")
-				}
-				if repo.challengeSucceededChallenge != "ch-1" {
-					t.Fatalf("ChallengeSucceeded challengeID = %q, want %q", repo.challengeSucceededChallenge, "ch-1")
-				}
-				if repo.challengeFailedCalls != 0 {
-					t.Fatalf("ChallengeFailed called %d times, want 0", repo.challengeFailedCalls)
-				}
-			},
-		},
-		{
-			name:  "stale challenge returns error without recording failure",
-			repo:  &fakeAuthAttemptRepo{getByIDAttempt: newUserChallengeAttempt()},
-			users: &fakeUserLookup{user: &domain.User{ID: "user-1"}},
-			input: service.VerifyProofInput{ProjectID: "proj", AttemptID: "att-1", ChallengeID: "different", Proof: service.UserProof{AttributeName: "email", LoginName: "u@example.com"}},
-			assert: func(t *testing.T, got *domain.AuthAttempt, err error, repo *fakeAuthAttemptRepo) {
-				t.Helper()
-				if got != nil {
-					t.Fatalf("VerifyProof returned attempt = %v, want nil", got)
-				}
-				if !errors.Is(err, domain.ErrAuthAttemptStaleChallenge()) {
-					t.Fatalf("VerifyProof err = %v, want ErrAuthAttemptStaleChallenge", err)
-				}
-				// Prepare-phase failure: no challenge row to update, skip ChallengeFailed.
-				if repo.challengeFailedCalls != 0 {
-					t.Fatalf("ChallengeFailed called %d times, want 0", repo.challengeFailedCalls)
-				}
-			},
-		},
-		{
-			name:  "user lookup rejection returns proof rejected and records failure",
-			repo:  &fakeAuthAttemptRepo{getByIDAttempt: newUserChallengeAttempt()},
-			users: &fakeUserLookup{err: rejectErr},
-			input: service.VerifyProofInput{ProjectID: "proj", AttemptID: "att-1", ChallengeID: "ch-1", Proof: service.UserProof{AttributeName: "email", LoginName: "u@example.com"}},
-			assert: func(t *testing.T, got *domain.AuthAttempt, err error, repo *fakeAuthAttemptRepo) {
-				t.Helper()
-				if got != nil {
-					t.Fatalf("VerifyProof returned attempt = %v, want nil", got)
-				}
-				if !errors.Is(err, domain.ErrAuthAttemptProofRejected(rejectErr)) {
-					t.Fatalf("VerifyProof err = %v, want ErrAuthAttemptProofRejected", err)
-				}
-				if repo.challengeFailedCalls != 1 {
-					t.Fatalf("ChallengeFailed called %d times, want 1", repo.challengeFailedCalls)
-				}
-				if _, ok := repo.challengeFailedValue.(*domain.AuthChallengeUser); !ok {
-					t.Fatalf("ChallengeFailed challenge = %T, want *domain.AuthChallengeUser", repo.challengeFailedValue)
-				}
-			},
-		},
-		{
-			name:  "propagates challenge succeeded persistence error",
-			repo:  &fakeAuthAttemptRepo{getByIDAttempt: newUserChallengeAttempt(), challengeSucceededErr: succeedErr},
-			users: &fakeUserLookup{user: &domain.User{ID: "user-1"}},
-			input: service.VerifyProofInput{ProjectID: "proj", AttemptID: "att-1", ChallengeID: "ch-1", Proof: service.UserProof{AttributeName: "email", LoginName: "u@example.com"}},
-			assert: func(t *testing.T, got *domain.AuthAttempt, err error, repo *fakeAuthAttemptRepo) {
-				t.Helper()
-				if got != nil {
-					t.Fatalf("VerifyProof returned attempt = %v, want nil", got)
-				}
-				if !errors.Is(err, succeedErr) {
-					t.Fatalf("VerifyProof err = %v, want %v", err, succeedErr)
-				}
-				if repo.challengeFailedCalls != 0 {
-					t.Fatalf("ChallengeFailed called %d times, want 0", repo.challengeFailedCalls)
-				}
-			},
-		},
-	}
+	userProof := service.UserProof{AttributeName: "email", LoginName: "u@example.com"}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			svc := service.NewAuthAttemptService(nil, tt.repo, nil, nil, tt.users, nil, nil, nil)
-			got, err := svc.VerifyProof(t.Context(), tt.input)
-			tt.assert(t, got, err, tt.repo)
+	t.Run("verifies user proof and persists success", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		repo := domainmock.NewMockAuthAttemptRepository(ctrl)
+		users := mocks.NewMockUserLookup(ctrl)
+
+		repo.EXPECT().GetByID(gomock.Any(), gomock.Any(), "proj", "att-1").Return(newUserChallengeAttempt(), nil)
+		users.EXPECT().ProjectIDCondition(gomock.Any()).Return(nil).AnyTimes()
+		users.EXPECT().AttributesCondition(gomock.Any()).Return(nil).AnyTimes()
+		users.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(&domain.User{ID: "user-1"}, nil)
+
+		var succeededFactor domain.AuthFactor
+		repo.EXPECT().ChallengeSucceeded(gomock.Any(), gomock.Any(), "proj", "att-1", gomock.Any(), "ch-1").
+			DoAndReturn(func(_ context.Context, _ database.QueryExecutor, _, _ string, factor domain.AuthFactor, _ string) error {
+				succeededFactor = factor
+				return nil
+			})
+
+		svc := service.NewAuthAttemptService(nil, repo, nil, nil, users, nil, nil, nil)
+		got, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{
+			ProjectID: "proj", AttemptID: "att-1", ChallengeID: "ch-1", Proof: userProof,
 		})
-	}
+
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		userFactor, ok := succeededFactor.(*domain.AuthFactorUser)
+		require.True(t, ok, "ChallengeSucceeded factor must be *domain.AuthFactorUser")
+		assert.Equal(t, "user-1", userFactor.UserID)
+	})
+
+	t.Run("stale challenge returns error without recording failure", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		repo := domainmock.NewMockAuthAttemptRepository(ctrl)
+		users := mocks.NewMockUserLookup(ctrl)
+
+		repo.EXPECT().GetByID(gomock.Any(), gomock.Any(), "proj", "att-1").Return(newUserChallengeAttempt(), nil)
+		// Prepare-phase failure: no challenge row identified, so neither the user lookup nor
+		// ChallengeFailed must be reached. Their absence of expectations enforces that.
+
+		svc := service.NewAuthAttemptService(nil, repo, nil, nil, users, nil, nil, nil)
+		got, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{
+			ProjectID: "proj", AttemptID: "att-1", ChallengeID: "different", Proof: userProof,
+		})
+
+		assert.Nil(t, got)
+		assert.ErrorIs(t, err, domain.ErrAuthAttemptStaleChallenge())
+	})
+
+	t.Run("user lookup rejection returns proof rejected and records failure", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		repo := domainmock.NewMockAuthAttemptRepository(ctrl)
+		users := mocks.NewMockUserLookup(ctrl)
+
+		repo.EXPECT().GetByID(gomock.Any(), gomock.Any(), "proj", "att-1").Return(newUserChallengeAttempt(), nil)
+		users.EXPECT().ProjectIDCondition(gomock.Any()).Return(nil).AnyTimes()
+		users.EXPECT().AttributesCondition(gomock.Any()).Return(nil).AnyTimes()
+		users.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, rejectErr)
+
+		var failedChallenge domain.AuthChallenge
+		repo.EXPECT().ChallengeFailed(gomock.Any(), gomock.Any(), "proj", "att-1", gomock.Any()).
+			DoAndReturn(func(_ context.Context, _ database.QueryExecutor, _, _ string, c domain.AuthChallenge) error {
+				failedChallenge = c
+				return nil
+			}).Times(1)
+
+		svc := service.NewAuthAttemptService(nil, repo, nil, nil, users, nil, nil, nil)
+		got, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{
+			ProjectID: "proj", AttemptID: "att-1", ChallengeID: "ch-1", Proof: userProof,
+		})
+
+		assert.Nil(t, got)
+		assert.ErrorIs(t, err, domain.ErrAuthAttemptProofRejected(rejectErr))
+		assert.IsType(t, &domain.AuthChallengeUser{}, failedChallenge)
+	})
+
+	t.Run("propagates challenge succeeded persistence error", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		repo := domainmock.NewMockAuthAttemptRepository(ctrl)
+		users := mocks.NewMockUserLookup(ctrl)
+
+		repo.EXPECT().GetByID(gomock.Any(), gomock.Any(), "proj", "att-1").Return(newUserChallengeAttempt(), nil)
+		users.EXPECT().ProjectIDCondition(gomock.Any()).Return(nil).AnyTimes()
+		users.EXPECT().AttributesCondition(gomock.Any()).Return(nil).AnyTimes()
+		users.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(&domain.User{ID: "user-1"}, nil)
+		// ChallengeFailed must not be called: a persistence failure is not a proof rejection.
+		repo.EXPECT().ChallengeSucceeded(gomock.Any(), gomock.Any(), "proj", "att-1", gomock.Any(), "ch-1").Return(succeedErr)
+
+		svc := service.NewAuthAttemptService(nil, repo, nil, nil, users, nil, nil, nil)
+		got, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{
+			ProjectID: "proj", AttemptID: "att-1", ChallengeID: "ch-1", Proof: userProof,
+		})
+
+		assert.Nil(t, got)
+		assert.ErrorIs(t, err, succeedErr)
+	})
 }
 
 func TestAuthAttemptService_Handoff(t *testing.T) {
@@ -539,74 +471,158 @@ func TestAuthAttemptService_Handoff(t *testing.T) {
 		}
 	}
 
-	tests := []struct {
-		name   string
-		repo   *fakeAuthAttemptRepo
-		input  service.HandoffInput
-		assert func(t *testing.T, got *domain.AuthAttempt, err error, repo *fakeAuthAttemptRepo)
-	}{
-		{
-			name:  "creates and persists handoff for completed attempt",
-			repo:  &fakeAuthAttemptRepo{getByIDAttempt: completedAttempt()},
-			input: service.HandoffInput{ProjectID: "proj", AttemptID: "att-1"},
-			assert: func(t *testing.T, got *domain.AuthAttempt, err error, repo *fakeAuthAttemptRepo) {
-				t.Helper()
-				if err != nil {
-					t.Fatalf("Handoff returned error: %v", err)
-				}
-				if got == nil {
-					t.Fatal("Handoff returned nil attempt")
-				}
-				if got.HandoffToken == nil {
-					t.Fatal("HandoffToken must be generated")
-				}
-				if repo.handoffAttempt != got {
-					t.Fatal("Handoff must persist the mutated attempt")
-				}
-			},
-		},
-		{
-			name: "returns not completed when required factors are missing",
-			repo: &fakeAuthAttemptRepo{getByIDAttempt: &domain.AuthAttempt{
-				ProjectID:      "proj",
-				ID:             "att-1",
-				RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypePassword},
-			}},
-			input: service.HandoffInput{ProjectID: "proj", AttemptID: "att-1"},
-			assert: func(t *testing.T, got *domain.AuthAttempt, err error, repo *fakeAuthAttemptRepo) {
-				t.Helper()
-				if got != nil {
-					t.Fatalf("Handoff returned attempt = %v, want nil", got)
-				}
-				if !errors.Is(err, domain.ErrAuthAttemptNotCompleted()) {
-					t.Fatalf("Handoff err = %v, want ErrAuthAttemptNotCompleted", err)
-				}
-				if repo.handoffAttempt != nil {
-					t.Fatal("repo.Handoff must not be called on invalid state")
-				}
-			},
-		},
-		{
-			name:  "propagates repository handoff failure",
-			repo:  &fakeAuthAttemptRepo{getByIDAttempt: completedAttempt(), handoffErr: repoErr},
-			input: service.HandoffInput{ProjectID: "proj", AttemptID: "att-1"},
-			assert: func(t *testing.T, got *domain.AuthAttempt, err error, _ *fakeAuthAttemptRepo) {
-				t.Helper()
-				if got != nil {
-					t.Fatalf("Handoff returned attempt = %v, want nil", got)
-				}
-				if !errors.Is(err, repoErr) {
-					t.Fatalf("Handoff err = %v, want %v", err, repoErr)
-				}
-			},
-		},
-	}
+	t.Run("creates and persists handoff for completed attempt", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		repo := domainmock.NewMockAuthAttemptRepository(ctrl)
+		repo.EXPECT().GetByID(gomock.Any(), gomock.Any(), "proj", "att-1").Return(completedAttempt(), nil)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			svc := service.NewAuthAttemptService(nil, tt.repo, nil, nil, nil, nil, nil, nil)
-			got, err := svc.Handoff(t.Context(), tt.input)
-			tt.assert(t, got, err, tt.repo)
-		})
+		var handed *domain.AuthAttempt
+		repo.EXPECT().Handoff(gomock.Any(), gomock.Any(), gomock.Any()).
+			DoAndReturn(func(_ context.Context, _ database.QueryExecutor, a *domain.AuthAttempt) error {
+				handed = a
+				return nil
+			})
+
+		svc := service.NewAuthAttemptService(nil, repo, nil, nil, nil, nil, nil, nil)
+		got, err := svc.Handoff(t.Context(), service.HandoffInput{ProjectID: "proj", AttemptID: "att-1"})
+
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		assert.NotNil(t, got.HandoffToken, "HandoffToken must be generated")
+		assert.Same(t, got, handed, "Handoff must persist the mutated attempt")
+	})
+
+	t.Run("returns not completed when required factors are missing", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		repo := domainmock.NewMockAuthAttemptRepository(ctrl)
+		repo.EXPECT().GetByID(gomock.Any(), gomock.Any(), "proj", "att-1").Return(&domain.AuthAttempt{
+			ProjectID:      "proj",
+			ID:             "att-1",
+			RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypePassword},
+		}, nil)
+		// repo.Handoff has no expectation: it must not run on an incomplete attempt.
+
+		svc := service.NewAuthAttemptService(nil, repo, nil, nil, nil, nil, nil, nil)
+		got, err := svc.Handoff(t.Context(), service.HandoffInput{ProjectID: "proj", AttemptID: "att-1"})
+
+		assert.Nil(t, got)
+		assert.ErrorIs(t, err, domain.ErrAuthAttemptNotCompleted())
+	})
+
+	t.Run("propagates repository handoff failure", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		repo := domainmock.NewMockAuthAttemptRepository(ctrl)
+		repo.EXPECT().GetByID(gomock.Any(), gomock.Any(), "proj", "att-1").Return(completedAttempt(), nil)
+		repo.EXPECT().Handoff(gomock.Any(), gomock.Any(), gomock.Any()).Return(repoErr)
+
+		svc := service.NewAuthAttemptService(nil, repo, nil, nil, nil, nil, nil, nil)
+		got, err := svc.Handoff(t.Context(), service.HandoffInput{ProjectID: "proj", AttemptID: "att-1"})
+
+		assert.Nil(t, got)
+		assert.ErrorIs(t, err, repoErr)
+	})
+}
+
+func TestAuthAttemptService_IssuePasskeyChallenge(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	f := newPasskeyFixture(t)
+
+	attempt := &domain.AuthAttempt{
+		ProjectID: "proj",
+		ID:        "att-1",
+		Checks:    []domain.AuthCheck{&domain.AuthFactorUser{UserID: passkeyUserID}},
 	}
+	repo := domainmock.NewMockAuthAttemptRepository(ctrl)
+	repo.EXPECT().GetByID(gomock.Any(), gomock.Any(), "proj", "att-1").Return(attempt, nil)
+
+	var setChallenge domain.AuthChallenge
+	repo.EXPECT().SetChallenge(gomock.Any(), gomock.Any(), "proj", "att-1", gomock.Any()).
+		DoAndReturn(func(_ context.Context, _ database.QueryExecutor, _, _ string, c domain.AuthChallenge) error {
+			setChallenge = c
+			return nil
+		})
+	passkeys := newUserPasskeysMock(ctrl, []*domain.UserPasskey{f.passkey})
+
+	svc := service.NewAuthAttemptService(nil, repo, nil, nil, nil, nil, passkeys, nil)
+	_, err := svc.IssueChallenge(t.Context(), service.IssueChallengeInput{
+		ProjectID: "proj",
+		AttemptID: "att-1",
+		Challenge: service.PasskeyChallenge{UserVerification: "preferred", RPID: passkeyRPID, RPOrigins: f.origins},
+	})
+	require.NoError(t, err)
+
+	challenge, ok := setChallenge.(*domain.AuthChallengePasskey)
+	require.True(t, ok, "SetChallenge must receive a *domain.AuthChallengePasskey")
+	assert.NotEmpty(t, challenge.Challenge, "issued passkey challenge must carry a WebAuthn challenge")
+	assert.Equal(t, passkeyRPID, challenge.RPID)
+}
+
+func TestAuthAttemptService_VerifyPasskeyProof(t *testing.T) {
+	t.Run("verifies assertion and persists success", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		f := newPasskeyFixture(t)
+		attempt, assertion := f.challengeAttempt(t, "ch-1")
+
+		repo := domainmock.NewMockAuthAttemptRepository(ctrl)
+		repo.EXPECT().GetByID(gomock.Any(), gomock.Any(), "proj", "att-1").Return(attempt, nil)
+
+		var succeededFactor domain.AuthFactor
+		repo.EXPECT().ChallengeSucceeded(gomock.Any(), gomock.Any(), "proj", "att-1", gomock.Any(), "ch-1").
+			DoAndReturn(func(_ context.Context, _ database.QueryExecutor, _, _ string, factor domain.AuthFactor, _ string) error {
+				succeededFactor = factor
+				return nil
+			})
+
+		passkeys := newUserPasskeysMock(ctrl, []*domain.UserPasskey{f.passkey})
+		// A successful assertion must persist the authenticator's advanced sign count and backup
+		// state. gomock enforces that Update is called exactly once.
+		var persistedSignCount int64
+		passkeys.EXPECT().UniqueCondition(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+		passkeys.EXPECT().SetSignCount(gomock.Any()).DoAndReturn(func(c int64) database.Change {
+			persistedSignCount = c
+			return nil
+		})
+		passkeys.EXPECT().SetBackupState(gomock.Any()).Return(nil)
+		passkeys.EXPECT().SetLastUsedAt(gomock.Any()).Return(nil)
+		passkeys.EXPECT().Update(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+
+		svc := service.NewAuthAttemptService(nil, repo, nil, nil, nil, nil, passkeys, nil)
+		got, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{
+			ProjectID:   "proj",
+			AttemptID:   "att-1",
+			ChallengeID: "ch-1",
+			Proof:       service.PasskeyProof{AssertionResponse: assertion},
+		})
+
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		factor, ok := succeededFactor.(*domain.AuthFactorPasskey)
+		require.True(t, ok, "ChallengeSucceeded factor must be *domain.AuthFactorPasskey")
+		assert.Equal(t, passkeyUserID, factor.UserID, "verified passkey factor must carry the user")
+		assert.Equal(t, []byte(f.cred.ID), factor.CredentialID)
+		// The fixture's authenticator reports counter 1, so the advanced sign count is persisted.
+		assert.Equal(t, int64(1), persistedSignCount)
+	})
+
+	t.Run("rejects invalid assertion and records failure", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		f := newPasskeyFixture(t)
+		attempt, _ := f.challengeAttempt(t, "ch-1")
+
+		repo := domainmock.NewMockAuthAttemptRepository(ctrl)
+		repo.EXPECT().GetByID(gomock.Any(), gomock.Any(), "proj", "att-1").Return(attempt, nil)
+		repo.EXPECT().ChallengeFailed(gomock.Any(), gomock.Any(), "proj", "att-1", gomock.Any()).Return(nil).Times(1)
+		// No Update expectation on passkeys: a rejected proof must not reach sign-count persistence.
+		passkeys := newUserPasskeysMock(ctrl, []*domain.UserPasskey{f.passkey})
+
+		svc := service.NewAuthAttemptService(nil, repo, nil, nil, nil, nil, passkeys, nil)
+		_, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{
+			ProjectID:   "proj",
+			AttemptID:   "att-1",
+			ChallengeID: "ch-1",
+			Proof:       service.PasskeyProof{AssertionResponse: []byte("not-a-valid-assertion")},
+		})
+
+		assert.ErrorIs(t, err, domain.ErrAuthAttemptProofRejected(nil))
+	})
 }
