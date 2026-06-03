@@ -165,6 +165,35 @@ jobs:
       - name: Node checks
         run: corepack pnpm nx run-many -t lint,typecheck,build,test
 
+  changeset-check:
+    # Gate PRs: fail when a PR adds no changeset, so no change merges without a
+    # release note. Skipped on pushes to main (publishing runs in
+    # release-npm.yml). For PRs that intentionally release nothing (docs, tests,
+    # CI, chores), add an empty changeset: `corepack pnpm changeset --empty`.
+    #
+    # We diff the PR for a newly-added .changeset/*.md rather than using
+    # `changeset status`, because `changeset status` reports the whole repo's
+    # pending changesets and so cannot tell whether *this* PR added one.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # Full history so we can diff against the PR base branch.
+          fetch-depth: 0
+
+      - name: Require a changeset
+        run: |
+          git fetch --no-tags origin "${{ github.base_ref }}"
+          added="$(git diff --name-only --diff-filter=A "origin/${{ github.base_ref }}...HEAD" -- '.changeset/*.md' | grep -viE '(^|/)README\.md$' || true)"
+          if [ -z "$added" ]; then
+            echo "::error::No changeset found in this PR. Run 'pnpm changeset' to describe the release, or 'pnpm changeset --empty' for changes that release nothing (docs/tests/CI/chores)."
+            exit 1
+          fi
+          echo "Changeset(s) added by this PR:"
+          echo "$added"
+
   node-e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 15
