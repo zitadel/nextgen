@@ -441,6 +441,9 @@ jobs:
           done
           ls -lh "$RUNNER_TEMP/zitadel-npm-packages"
 
+      - name: Verify npm package artifacts
+        run: node apps/cli-journey-e2e/scripts/verify-tarballs.mjs "$RUNNER_TEMP/zitadel-npm-packages"
+
       - name: Upload npm package artifacts
         uses: actions/upload-artifact@v7
         with:
