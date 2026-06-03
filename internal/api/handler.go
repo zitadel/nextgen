@@ -6,7 +6,7 @@ import (
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/crypto"
-	"github.com/zitadel/nextgen/internal/domain/tokengen"
+	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
@@ -16,8 +16,8 @@ type Handler struct {
 	api.UnimplementedHandler
 
 	crypter               crypto.Crypter
-	sessionTokenVerifier  tokengen.Verifier
-	sessionTokenGenerator tokengen.Generator
+	sessionTokenVerifier  domain.TokenVerifier
+	sessionTokenGenerator domain.TokenGenerator
 	flowService           service.FlowService
 	authAttemptService    service.AuthAttemptService
 	sessionService        service.SessionService
@@ -30,8 +30,8 @@ type Handler struct {
 
 func NewHandler(
 	crypter crypto.Crypter,
-	sessionTokenVerifier tokengen.Verifier,
-	sessionTokenGenerator tokengen.Generator,
+	sessionTokenVerifier domain.TokenVerifier,
+	sessionTokenGenerator domain.TokenGenerator,
 	flowService service.FlowService,
 	authAttemptService service.AuthAttemptService,
 	sessionService service.SessionService,

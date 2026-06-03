@@ -6,15 +6,15 @@ import (
 
 	"github.com/ogen-go/ogen/ogenerrors"
 	api "github.com/zitadel/nextgen/api/generated"
-	"github.com/zitadel/nextgen/internal/domain/tokengen"
+	"github.com/zitadel/nextgen/internal/domain"
 )
 
 type SecurityHandler struct {
-	tokenVerifier tokengen.Verifier
+	tokenVerifier domain.TokenVerifier
 }
 
 func NewSecurityHandler(
-	tokenVerifier tokengen.Verifier,
+	tokenVerifier domain.TokenVerifier,
 ) *SecurityHandler {
 	return &SecurityHandler{
 		tokenVerifier: tokenVerifier,
@@ -36,12 +36,8 @@ func (s SecurityHandler) HandleOAuth2(ctx context.Context, operationName api.Ope
 		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
 	}
 
-	var scope ScopeContext
-	if projectID, ok := payload["projectID"].(string); ok {
-		scope.ProjectID = projectID
-	}
-	if teamID, ok := payload["teamID"].(string); ok {
-		scope.TeamID = teamID
+	scope := ScopeContext{
+		ProjectID: payload.ProjectID,
 	}
 
 	ctx = WithScopeContext(ctx, scope)
@@ -91,7 +87,6 @@ func requestOriginFromContext(ctx context.Context) (string, bool) {
 
 type ScopeContext struct {
 	ProjectID string
-	TeamID    string
 }
 
 func WithScopeContext(ctx context.Context, scopeCtx ScopeContext) context.Context {

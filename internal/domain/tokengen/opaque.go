@@ -5,6 +5,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/zitadel/nextgen/internal/crypto"
+	"github.com/zitadel/nextgen/internal/domain"
 )
 
 func NewOpaqueTokenGenerator(
@@ -19,10 +20,7 @@ type OpaqueTokenGenerator struct {
 	crypter crypto.Crypter
 }
 
-func (g *OpaqueTokenGenerator) Generate(data map[string]any) (string, error) {
-	if data == nil {
-		data = make(map[string]any)
-	}
+func (g *OpaqueTokenGenerator) Generate(data *domain.Token) (string, error) {
 	payload, err := json.Marshal(data)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to serialize token payload")
@@ -36,14 +34,14 @@ func (g *OpaqueTokenGenerator) Generate(data map[string]any) (string, error) {
 	return token, nil
 }
 
-func (g *OpaqueTokenGenerator) Verify(token string) (map[string]any, error) {
+func (g *OpaqueTokenGenerator) Verify(token string) (*domain.Token, error) {
 	decrypted, err := g.crypter.Decrypt(token)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to decrypt token")
 	}
 
-	payload := make(map[string]any)
-	err = json.Unmarshal([]byte(decrypted), &payload)
+	payload := new(domain.Token)
+	err = json.Unmarshal([]byte(decrypted), payload)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to unmarshal token payload")
 	}

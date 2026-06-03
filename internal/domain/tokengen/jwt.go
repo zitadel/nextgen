@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-jose/go-jose/v4"
 	pkgerrs "github.com/pkg/errors"
+	"github.com/zitadel/nextgen/internal/domain"
 )
 
 func NewJWTGenerator(
@@ -27,10 +28,7 @@ type JWTGenerator struct {
 	webkey           jose.JSONWebKey
 }
 
-func (g *JWTGenerator) Generate(data map[string]any) (string, error) {
-	if data == nil {
-		data = make(map[string]any)
-	}
+func (g *JWTGenerator) Generate(data *domain.Token) (string, error) {
 	payload, err := json.Marshal(data)
 	if err != nil {
 		return "", pkgerrs.Wrap(err, "failed to marshal token payload")
@@ -48,7 +46,7 @@ func (g *JWTGenerator) Generate(data map[string]any) (string, error) {
 	return token, nil
 }
 
-func (g *JWTGenerator) Verify(token string) (map[string]any, error) {
+func (g *JWTGenerator) Verify(token string) (*domain.Token, error) {
 	jws, err := jose.ParseSigned(token, g.supportedSigAlgs)
 	if err != nil {
 		if _, isUnexpected := errors.AsType[*jose.ErrUnexpectedSignatureAlgorithm](err); isUnexpected ||
@@ -69,8 +67,8 @@ func (g *JWTGenerator) Verify(token string) (map[string]any, error) {
 		return nil, pkgerrs.Wrap(err, "failed to verify signature")
 	}
 
-	payload := make(map[string]any)
-	err = json.Unmarshal(signedPayload, &payload)
+	payload := new(domain.Token)
+	err = json.Unmarshal(signedPayload, payload)
 	if err != nil {
 		return nil, pkgerrs.Wrap(err, "failed to unmarshal token payload")
 	}

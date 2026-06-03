@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/go-faster/jx"
+	"github.com/muhlemmer/gu"
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api/ogenx"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/domain/tokengen"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
@@ -78,7 +78,7 @@ func (h Handler) GetMySession(ctx context.Context, params api.GetMySessionParams
 	}
 	input := service.GetSessionInput{
 		ProjectID: sessionToken.ProjectID,
-		SessionID: sessionToken.SessionID,
+		SessionID: gu.Value(sessionToken.SessionID),
 	}
 
 	session, err := h.sessionService.Get(ctx, input)
@@ -125,7 +125,7 @@ func (h Handler) RevokeMySession(ctx context.Context, params api.RevokeMySession
 	}
 	input := service.DeleteSessionInput{
 		ProjectID: sessionToken.ProjectID,
-		SessionID: sessionToken.SessionID,
+		SessionID: gu.Value(sessionToken.SessionID),
 	}
 
 	session, err := h.sessionService.Get(ctx, service.GetSessionInput(input))
@@ -145,7 +145,7 @@ func (h Handler) RevokeMySession(ctx context.Context, params api.RevokeMySession
 	}, nil
 }
 
-func validateSessionToken(session *domain.Session, token *domain.SessionToken) error {
+func validateSessionToken(session *domain.Session, token *domain.Token) error {
 	if session.TokenID != token.TokenID {
 		return domain.ErrSessionTokenInvalid()
 	}
@@ -171,7 +171,7 @@ func userAgentToDomain(agent api.OptCreateSessionRequestUserAgent) *domain.UserA
 	}
 }
 
-func sessionWithTokenToAPI(session *domain.Session, tokenGenerator tokengen.Generator) (*api.SessionWithTokenResponseHeaders, error) {
+func sessionWithTokenToAPI(session *domain.Session, tokenGenerator domain.TokenGenerator) (*api.SessionWithTokenResponseHeaders, error) {
 	token, err := session.Token(tokenGenerator)
 	if err != nil {
 		return nil, err

@@ -4,8 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/zitadel/nextgen/internal/domain/tokengen"
-	"github.com/zitadel/nextgen/internal/maputil"
+	"github.com/muhlemmer/gu"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -118,28 +117,34 @@ func (s *Session) State() SessionState {
 	return SessionStateActive
 }
 
-func (s *Session) Token(generator tokengen.Generator) (string, error) {
-	payload := sessionTokenToMap(SessionToken{
+func (s *Session) Token(generator TokenGenerator) (string, error) {
+	token, err := generator.Generate(&Token{
 		ProjectID: s.ProjectID,
-		SessionID: s.ID,
 		TokenID:   s.TokenID,
-		UserID:    s.UserID,
-		CreatedAt: s.UpdatedAt,
-		ExpiresAt: s.ExpiresAt,
+		UserID:    gu.Value(s.UserID),
+		Type:      TokenTypeSessionToken,
+		SessionID: new(s.ID),
+		CreatedAt: s.CreatedAt,
+		ExpiresAt: new(s.ExpiresAt),
 	})
-	token, err := generator.Generate(payload)
 	if err != nil {
 		return "", ErrSessionTokenCreationFailed()
 	}
 	return token, nil
 }
 
-func DecryptSessionTokenString(tokenString string, verifier tokengen.Verifier) (*SessionToken, error) {
+func DecryptSessionTokenString(tokenString string, verifier TokenVerifier) (*Token, error) {
 	payload, err := verifier.Verify(tokenString)
 	if err != nil {
 		return nil, ErrSessionTokenInvalid()
 	}
-	return new(mapToSessionToken(payload)), nil
+	if payload.Type != TokenTypeSessionToken {
+		return nil, ErrSessionTokenInvalid()
+	}
+	if payload.SessionID == nil {
+		return nil, ErrSessionTokenInvalid()
+	}
+	return payload, nil
 }
 
 type SessionState uint8
@@ -156,47 +161,6 @@ type UserAgent struct {
 	ID   string
 	IP   string
 	Info map[string]any
-}
-
-type SessionToken struct {
-	ProjectID string
-	SessionID string
-	TokenID   string
-	UserID    *string
-	CreatedAt time.Time
-	ExpiresAt time.Time
-}
-
-func sessionTokenToMap(t SessionToken) map[string]any {
-	return map[string]any{
-		"projectID": t.ProjectID,
-		"sessionID": t.SessionID,
-		"tokenID":   t.TokenID,
-		"sub":       t.UserID,
-		"exp":       t.ExpiresAt,
-		"iat":       t.CreatedAt,
-	}
-}
-
-func mapToSessionToken(m map[string]any) SessionToken {
-	projectID, _ := maputil.Get[string](m, "projectID")
-	userID, ok := maputil.Get[string](m, "sub")
-	var userIDp *string
-	if ok {
-		userIDp = &userID
-	}
-	sessionID, _ := maputil.Get[string](m, "sessionID")
-	tokenID, _ := maputil.Get[string](m, "tokenID")
-	createdAt, _ := maputil.Get[time.Time](m, "iat")
-	expiresAt, _ := maputil.Get[time.Time](m, "exp")
-	return SessionToken{
-		ProjectID: projectID,
-		UserID:    userIDp,
-		SessionID: sessionID,
-		TokenID:   tokenID,
-		ExpiresAt: expiresAt,
-		CreatedAt: createdAt,
-	}
 }
 
 type SessionRepository interface {

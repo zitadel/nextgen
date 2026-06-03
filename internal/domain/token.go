@@ -12,6 +12,18 @@ import (
 // ErrInvalidTokenIdentifiers is returned when session identifier fields do not match [Token.Type].
 var ErrInvalidTokenIdentifiers = errors.New("token identifiers do not match token type")
 
+//go:generate go tool mockgen -typed -package tokengenmock -destination ./mock/token_verifier.mock.go . TokenVerifier
+
+type TokenVerifier interface {
+	Verify(token string) (payload *Token, err error)
+}
+
+//go:generate go tool mockgen -typed -package tokengenmock -destination ./mock/token_generator.mock.go . TokenGenerator
+
+type TokenGenerator interface {
+	Generate(token *Token) (string, error)
+}
+
 // Token is a persisted token record (access, session, PAT, etc.).
 // Revocation is modeled as deletion from storage.
 type Token struct {

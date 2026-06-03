@@ -8,7 +8,6 @@ import (
 	"github.com/zitadel/nextgen/api/openapi/endpoints/flow_definitions"
 	"github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/domain/tokengen"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -29,7 +28,7 @@ func NewProjectService(
 	repo domain.ProjectRepository,
 	schemaRepo domain.JSONSchemaRepository,
 	flowDefinitionRepo domain.FlowDefinitionRepository,
-	tokenGenerator tokengen.Generator,
+	tokenGenerator domain.TokenGenerator,
 	serverURL string,
 	schemaValidator *domain.SchemaValidator,
 ) ProjectService {
@@ -49,7 +48,7 @@ type projectService struct {
 	projectRepo        domain.ProjectRepository
 	schemaRepo         domain.JSONSchemaRepository
 	flowDefinitionRepo domain.FlowDefinitionRepository
-	tokenGenerator     tokengen.Generator
+	tokenGenerator     domain.TokenGenerator
 	serverURL          string
 	schemaValidator    *domain.SchemaValidator
 }

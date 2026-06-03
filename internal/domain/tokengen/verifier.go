@@ -3,13 +3,9 @@ package tokengen
 import (
 	"fmt"
 	"strings"
+
+	"github.com/zitadel/nextgen/internal/domain"
 )
-
-//go:generate go tool mockgen -typed -package tokengenmock -destination ./mock/verifier.mock.go . Verifier
-
-type Verifier interface {
-	Verify(token string) (payload map[string]any, err error)
-}
 
 type AnyTokenTypeVerifier struct {
 	jwtVerifier    *JWTGenerator
@@ -26,15 +22,15 @@ func NewAnyTokenTypeVerifier(
 	}
 }
 
-func (v *AnyTokenTypeVerifier) Verify(token string) (payload map[string]any, err error) {
-	var verifiers []Verifier
+func (v *AnyTokenTypeVerifier) Verify(token string) (payload *domain.Token, err error) {
+	var verifiers []domain.TokenVerifier
 
 	if strings.HasPrefix(token, "ey") {
 		// encoding `{"` as base64 starts with `ey`. If  the token starts with it, we prioritize jwt
-		verifiers = []Verifier{v.jwtVerifier, v.opaqueVerifier}
+		verifiers = []domain.TokenVerifier{v.jwtVerifier, v.opaqueVerifier}
 	} else {
 		// otherwise prioritize according to performance
-		verifiers = []Verifier{v.opaqueVerifier, v.jwtVerifier}
+		verifiers = []domain.TokenVerifier{v.opaqueVerifier, v.jwtVerifier}
 	}
 
 	var errs []error
