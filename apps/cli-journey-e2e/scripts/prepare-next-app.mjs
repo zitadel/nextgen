@@ -5,8 +5,7 @@ import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const projectRoot = resolve(here, "..");
-const repoRoot = resolve(projectRoot, "../..");
+const repoRoot = resolve(here, "../../..");
 
 const registryUrl = process.env.JOURNEY_REGISTRY_URL ?? "http://127.0.0.1:4873";
 const backendUrl = process.env.JOURNEY_BACKEND_URL ?? "http://localhost:8080";
