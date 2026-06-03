@@ -47,7 +47,10 @@ describe("Next setup integration", () => {
     expect(loginPage).toContain("zitadel-cli: managed-file v1");
     expect(loginPage).toContain('"use client"');
     expect(loginPage).toContain('purpose="login"');
-    expect(loginPage).toContain("<zitadel-login");
+    // The page renders the React wrapper component (not the raw custom element),
+    // imported from the SDK; it is SSR-safe and needs no `custom-elements.d.ts`.
+    expect(loginPage).toContain('from "@zitadel-nextgen/sdk-next/react"');
+    expect(loginPage).toContain("<ZitadelLogin");
     // The SDK handle is built (proxy path + project id from the public env
     // var) and passed to the component via the `project` prop; the backend URL
     // stays server-side.
@@ -55,13 +58,14 @@ describe("Next setup integration", () => {
     expect(loginPage).toContain('proxyPath: "/__nextgen"');
     expect(loginPage).toContain("project={project}");
     expect(loginPage).not.toContain("NEXT_PUBLIC_ZITADEL_API_BASE");
-    expect(loginPage).toContain('post-sign-in-url="/profile"');
+    expect(loginPage).toContain('postSignInUrl="/profile"');
     const profilePage = await readFile(join(cwd, "app/profile/page.tsx"), "utf8");
     expect(profilePage).toContain("zitadel-cli: managed-file v1");
-    expect(profilePage).toContain("<zitadel-logout");
+    expect(profilePage).toContain('"use client"');
+    expect(profilePage).toContain("<ZitadelLogout");
     expect(profilePage).toContain("configureZitadel");
     expect(profilePage).toContain("project={project}");
-    expect(profilePage).toContain('post-sign-out-url="/login"');
+    expect(profilePage).toContain('postSignOutUrl="/login"');
     const middleware = await readFile(join(cwd, "middleware.ts"), "utf8");
     expect(middleware).toContain("zitadel-cli: managed-file v1");
     expect(middleware).toContain("nextgenMiddleware");
