@@ -2,13 +2,29 @@
 
 Next iteration of the Zitadel identity platform.
 
+## Quick start (Docker)
+
+Run the API and embedded UIs with PostgreSQL:
+
+```sh
+cd docs/operations
+cp env.example .env
+docker compose up -d
+```
+
+| Surface | URL |
+| ------- | --- |
+| Management console | http://localhost:8080/ui/console/ |
+| Sign-in shell | http://localhost:8080/ui/login/ |
+| Health | http://localhost:8080/healthz |
+
+Details: [docs/quick-start/index.md](docs/quick-start/index.md). To build from source: [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## Current status
 
-This repository is pre-release. The Go server release path is wired through
-GoReleaser, but `main.go` is still a placeholder. The frontend workspace is now
-managed by Nx and includes a Vite React console shell, shared components, SDKs,
-and the agent-facing CLI. CI produces installable snapshots for review, not
-official releases.
+This repository is pre-release. The Go `server` command serves the OpenAPI
+surface and embeds the console and login UIs at `/ui/console/` and `/ui/login/`.
+CI produces installable snapshots for review, not official releases.
 
 ## Local checks
 
@@ -61,21 +77,20 @@ This monorepo separates Go release artifacts, console build output, and npm
 package artifacts. The full rationale lives in
 [docs/adrs/002-multi-package-release-strategy.md](docs/adrs/002-multi-package-release-strategy.md).
 
-### Go server binary + console build (`goreleaser`)
+### Go server binary + embedded UIs (`goreleaser`)
 
-GoReleaser builds the React console SPA through Nx before packaging snapshots:
-`corepack pnpm nx build @zitadel-nextgen/console`. Server-side console serving
-and Go `//go:embed` wiring are still follow-up work, so snapshot builds verify
-that the console can be produced but do not yet expose it from the placeholder
-server.
+GoReleaser builds the console and login-ui SPAs, syncs them into `internal/*/dist`,
+and embeds them into the `nextgen` binary (`scripts/sync-embedded-ui-dist.sh`).
 
 ```sh
 # Local snapshot (no publish, no signing)
 goreleaser release --snapshot --clean --skip=publish,sign
 
-# Run a snapshot Docker image. The image's default CMD is `--help` while
-# the `server` subcommand is being wired up in cmd/server (PR #17).
-docker run --rm ghcr.io/zitadel/nextgen:<snapshot-tag>-amd64
+# Run a snapshot Docker image (defaults to `nextgen server`)
+docker run --rm -p 8080:8080 \
+  -e NEXTGEN_SERVER_ENCRYPTION_KEY=4D61737465726B65794E65656473546F48617665333243686172616374657273 \
+  -e NEXTGEN_DATABASE_POSTGRES='postgres://...' \
+  ghcr.io/zitadel/nextgen:<snapshot-tag>-amd64
 ```
 
 The publish-capable release workflow is currently manual-only via
