@@ -26,7 +26,11 @@ for (const file of tarballs) {
     registryUrl,
     "--tag",
     "alpha",
+    "--access",
+    "public",
     "--ignore-scripts",
+    "--loglevel",
+    "error",
   ]);
   run("npm", [
     "dist-tag",
@@ -35,6 +39,8 @@ for (const file of tarballs) {
     "latest",
     "--registry",
     registryUrl,
+    "--loglevel",
+    "error",
   ]);
   console.log(`published ${manifest.name}@${manifest.version} as alpha and latest`);
 }
@@ -55,14 +61,13 @@ function readManifest(tarball) {
 
 function run(command, args) {
   const result = spawnSync(command, args, {
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"],
+    stdio: "inherit",
   });
-  if (result.status !== 0) {
-    throw new Error(
-      `${command} ${args.join(" ")} exited ${result.status}\nSTDOUT:\n${result.stdout}\nSTDERR:\n${result.stderr}`,
-    );
+  if (result.error) {
+    throw new Error(`${command} ${args.join(" ")} failed: ${result.error.message}`);
   }
-  process.stdout.write(result.stdout);
-  process.stderr.write(result.stderr);
+  if (result.status !== 0) {
+    const detail = result.signal ?? result.status ?? "unknown status";
+    throw new Error(`${command} ${args.join(" ")} failed with ${detail}`);
+  }
 }
