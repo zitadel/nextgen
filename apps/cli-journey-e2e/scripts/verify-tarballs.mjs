@@ -1,5 +1,6 @@
-import { readdir } from "node:fs/promises";
-import { join } from "node:path";
+import { readdir, readFile } from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
 const tarballsDir = process.argv[2];
@@ -7,14 +8,17 @@ if (!tarballsDir) {
   throw new Error("usage: node scripts/verify-tarballs.mjs <tarballs-dir>");
 }
 
-const expectedPackageNames = new Set([
-  "@zitadel/cli",
-  "@zitadel/api",
-  "@zitadel/components",
-  "@zitadel/sdk-core",
-  "@zitadel/sdk-next",
-  "@zitadel/sdk-nuxt",
-]);
+const here = dirname(fileURLToPath(import.meta.url));
+const repoRoot = resolve(here, "../../..");
+const packageDirs = [
+  "apps/cli",
+  "packages/api",
+  "packages/components",
+  "packages/sdk-core",
+  "packages/sdk-next",
+  "packages/sdk-nuxt",
+];
+const expectedPackageNames = new Set(await Promise.all(packageDirs.map(packageName)));
 const dependencyFields = [
   "dependencies",
   "devDependencies",
@@ -85,4 +89,14 @@ function assertInstallableManifest(tarball, manifest) {
       }
     }
   }
+}
+
+async function packageName(relativePath) {
+  const pkg = JSON.parse(
+    await readFile(join(repoRoot, relativePath, "package.json"), "utf8"),
+  );
+  if (typeof pkg.name !== "string" || pkg.name.length === 0) {
+    throw new Error(`${relativePath}/package.json has no name`);
+  }
+  return pkg.name;
 }
