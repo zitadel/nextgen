@@ -19,4 +19,7 @@
  */
 export { ZitadelLogin, ZitadelLogout } from '@zitadel-nextgen/components';
 export { configureZitadel, getApi } from '@zitadel-nextgen/api/config';
-export type { ZitadelConfig, ZitadelProject } from '@zitadel-nextgen/api/config';
+export type {
+  ZitadelConfig,
+  ZitadelProject,
+} from '@zitadel-nextgen/api/config';
