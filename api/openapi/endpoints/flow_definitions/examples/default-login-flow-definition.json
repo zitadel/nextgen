@@ -3,9 +3,10 @@
   "schema_uri": "https://nextgen.com/flow-definition.json",
   "flow_definition": {
     "name": "default-login",
-    "user_schema": "${SERVER_URL}/user.json",
+    "user_schema": "${USER_SCHEMA_URL}",
     "purposes": {
-      "login": "identifier"
+      "login": "identifier",
+      "register": "register"
     },
     "steps": [
       {
@@ -15,26 +16,28 @@
         ],
         "actions": {
           "submit": {
-            "primary": true
+            "primary": true,
+            "text_key": "identifier.action.continue"
           }
         },
         "transitions": {
           "submit": {
-            "target": "authenticate"
+            "target": "password"
           },
           "user_not_found": {
-            "target": "no-account"
+            "target": "register"
           }
         }
       },
       {
-        "name": "authenticate",
+        "name": "password",
         "fields": [
           "password"
         ],
         "actions": {
           "submit": {
-            "primary": true
+            "primary": true,
+            "text_key": "password.action.signin"
           }
         },
         "transitions": {
@@ -44,11 +47,29 @@
         }
       },
       {
-        "name": "done",
-        "complete": "show"
+        "name": "register",
+        "fields": [
+          "email",
+          "password"
+        ],
+        "actions": {
+          "submit": {
+            "primary": true,
+            "text_key": "register.action.submit"
+          }
+        },
+        "on_success": "create_user",
+        "transitions": {
+          "submit": {
+            "target": "done"
+          },
+          "user_already_exists": {
+            "target": "password"
+          }
+        }
       },
       {
-        "name": "no-account",
+        "name": "done",
         "complete": "show"
       }
     ]
