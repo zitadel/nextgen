@@ -18,9 +18,12 @@ func New(prefix string, root fs.FS) http.Handler {
 		prefix = "/"
 	}
 	mount := prefix + "/"
+	if prefix == "/" {
+		mount = "/"
+	}
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == prefix {
+		if prefix != "/" && r.URL.Path == prefix {
 			http.Redirect(w, r, mount, http.StatusPermanentRedirect)
 			return
 		}

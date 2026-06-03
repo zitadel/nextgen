@@ -306,6 +306,7 @@ func buildHTTPMux(cfg ServerConfig, apiHandler http.Handler) (*http.ServeMux, er
 		if err != nil {
 			return nil, fmt.Errorf("build login UI handler: %w", err)
 		}
+		mux.Handle(cfg.LoginPath, loginHandler)
 		mux.Handle(cfg.LoginPath+"/", loginHandler)
 	}
 
@@ -317,6 +318,7 @@ func buildHTTPMux(cfg ServerConfig, apiHandler http.Handler) (*http.ServeMux, er
 		if err != nil {
 			return nil, fmt.Errorf("build console UI handler: %w", err)
 		}
+		mux.Handle(cfg.ConsolePath, consoleHandler)
 		mux.Handle(cfg.ConsolePath+"/", consoleHandler)
 	}
 
