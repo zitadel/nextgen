@@ -9,6 +9,4 @@ COPY $TARGETPLATFORM/nextgen /usr/local/bin/nextgen
 USER nonroot:nonroot
 EXPOSE 8080
 ENTRYPOINT ["/usr/local/bin/nextgen"]
-# Placeholder default until cmd/server lands (see PR #17).
-# Switches to ["server"] once the subcommand exists.
-CMD ["--help"]
+# Root cobra command is already `server` (see main.go); no extra argv.
