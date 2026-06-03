@@ -137,6 +137,31 @@ export async function nextgenMiddleware(
 }
 
 /**
+ * Validates an opaque (non-JWT) session token by calling the backend's
+ * `/sessions/me` endpoint. Returns `true` when the backend confirms the
+ * session is live (HTTP 200), `false` otherwise.
+ *
+ * This is the fallback path for backends that issue encrypted opaque tokens
+ * rather than self-contained JWTs.
+ */
+async function validateOpaqueSessionToken(
+  token: string,
+  issuerUrl: string,
+  timeoutMs: number,
+): Promise<boolean> {
+  try {
+    const res = await fetch(`${issuerUrl}/sessions/me`, {
+      method: 'GET',
+      headers: { cookie: `__nextgen_session=${token}` },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Forwards a `/__nextgen/*` request to the upstream auth backend and streams
  * the response back verbatim, stripping hop-by-hop headers in both directions.
  *
@@ -323,6 +348,22 @@ async function handleAuth(
   if (payload && token && payload.sub) {
     const tunnelled = tunnelHeaders(req, { 'x-nextgen-auth-token': token });
     return NextResponse.next({ request: { headers: tunnelled } });
+  }
+
+  // The backend issues opaque encrypted session tokens rather than JWTs.
+  // When JWT verification returns null, try validating the cookie against
+  // the backend's /sessions/me endpoint. A 200 response means the session
+  // is live; forward the raw token so server components can use it.
+  if (!payload && cookieToken) {
+    const isValid = await validateOpaqueSessionToken(
+      cookieToken,
+      issuerUrl,
+      jwksTimeoutMs ?? 5000,
+    );
+    if (isValid) {
+      const tunnelled = tunnelHeaders(req, { 'x-nextgen-auth-token': cookieToken });
+      return NextResponse.next({ request: { headers: tunnelled } });
+    }
   }
 
   const tunnelled = tunnelHeaders(req, { 'x-nextgen-auth-token': '' });
