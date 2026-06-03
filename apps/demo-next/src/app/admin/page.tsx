@@ -11,7 +11,7 @@ export default async function AdminPage() {
         <LogoutWidget />
       </div>
       <p style={{ color: "#6b7280" }}>
-        Signed in as {session.isAuthenticated ? session.session.email : "unknown"}
+        Signed in as {session.isAuthenticated ? (session.session.email ?? session.session.userId) : "unknown"}
       </p>
     </main>
   );
