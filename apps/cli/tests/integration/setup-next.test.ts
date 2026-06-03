@@ -48,13 +48,19 @@ describe("Next setup integration", () => {
     expect(loginPage).toContain('"use client"');
     expect(loginPage).toContain('purpose="login"');
     expect(loginPage).toContain("<zitadel-login");
-    expect(loginPage).toContain('api-base="/__nextgen"');
+    // The SDK handle is built (proxy path + project id from the public env
+    // var) and passed to the component via the `project` prop; the backend URL
+    // stays server-side.
+    expect(loginPage).toContain("configureZitadel");
+    expect(loginPage).toContain('proxyPath: "/__nextgen"');
+    expect(loginPage).toContain("project={project}");
     expect(loginPage).not.toContain("NEXT_PUBLIC_ZITADEL_API_BASE");
     expect(loginPage).toContain('post-sign-in-url="/profile"');
     const profilePage = await readFile(join(cwd, "app/profile/page.tsx"), "utf8");
     expect(profilePage).toContain("zitadel-cli: managed-file v1");
     expect(profilePage).toContain("<zitadel-logout");
-    expect(profilePage).toContain('api-base="/__nextgen"');
+    expect(profilePage).toContain("configureZitadel");
+    expect(profilePage).toContain("project={project}");
     expect(profilePage).toContain('post-sign-out-url="/login"');
     const middleware = await readFile(join(cwd, "middleware.ts"), "utf8");
     expect(middleware).toContain("zitadel-cli: managed-file v1");

@@ -39,12 +39,20 @@ import dynamic from "next/dynamic";
 
 const ${elementName} = dynamic(
   async () => {
-    await import("@zitadel-nextgen/sdk-next/client");
+    const { configureZitadel } = await import("@zitadel-nextgen/sdk-next/client");
+    // Build the SDK project handle and pass it to the component via the
+    // \`project\` prop. The component reads config from this prop directly, so
+    // it works regardless of how the SDK packages are bundled. The backend URL
+    // stays server-side — requests go through the proxy path "/__nextgen",
+    // which the scaffolded middleware forwards to the Zitadel server.
+    const project = configureZitadel({
+      projectId: process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID ?? "",
+      proxyPath: "/__nextgen",
+    });
     return function ${elementName}Element() {
       return (
         <zitadel-login
-          api-base="/__nextgen"
-          project-id={process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID}
+          project={project}
           purpose="${mode}"
           post-sign-in-url="/profile"
         />
@@ -73,11 +81,15 @@ import dynamic from "next/dynamic";
 
 const ZitadelLogout = dynamic(
   async () => {
-    await import("@zitadel-nextgen/sdk-next/client");
+    const { configureZitadel } = await import("@zitadel-nextgen/sdk-next/client");
+    const project = configureZitadel({
+      projectId: process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID ?? "",
+      proxyPath: "/__nextgen",
+    });
     return function ZitadelLogoutElement() {
       return (
         <zitadel-logout
-          api-base="/__nextgen"
+          project={project}
           post-sign-out-url="/login"
         />
       );
@@ -104,20 +116,19 @@ export default function ProfilePage() {
       return {
         contents: `${MANAGED_MARKER}
 import type React from "react";
+import type { ZitadelProject } from "@zitadel-nextgen/sdk-next/client";
 
 declare module "react" {
   namespace JSX {
     interface IntrinsicElements {
       "zitadel-login": React.HTMLAttributes<HTMLElement> & {
-        "api-base"?: string;
+        project?: ZitadelProject;
         "session-exchange-path"?: string;
         "post-sign-in-url"?: string;
         purpose?: string;
-        "project-id"?: string;
-        issuer?: string;
       };
       "zitadel-logout": React.HTMLAttributes<HTMLElement> & {
-        "api-base"?: string;
+        project?: ZitadelProject;
         "post-sign-out-url"?: string;
       };
     }
