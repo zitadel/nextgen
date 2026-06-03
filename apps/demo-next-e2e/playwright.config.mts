@@ -32,7 +32,7 @@ export default defineConfig({
   webServer: [
     {
       command: "pnpm --filter @zitadel-nextgen/api-mock start",
-      url: "http://localhost:4000/.well-known/jwks.json",
+      url: "http://localhost:8080/.well-known/jwks.json",
       reuseExistingServer: true,
       cwd: workspaceRoot,
       stdout: "pipe",
@@ -47,7 +47,7 @@ export default defineConfig({
       stderr: "pipe",
       timeout: 60_000,
       env: {
-        NEXTGEN_ISSUER_URL: "http://localhost:4000",
+        ZITADEL_URL: "http://localhost:8080",
       },
     },
   ],

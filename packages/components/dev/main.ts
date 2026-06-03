@@ -50,7 +50,7 @@ async function bootstrap(): Promise<void> {
   // an absolute URL to intercept. The host doesn't have to resolve — the
   // generated handlers match against `*/flow*` regardless.
   configureZitadel({
-    apiBase: window.location.origin,
+    proxyPath: window.location.origin,
     projectId: "dev",
   });
 
