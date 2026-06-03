@@ -18,7 +18,7 @@ import type { StoredCredential } from "../lib/authn/index.js";
 export type StepFixtureInput = {
   flowId: string;
   sessionToken: string;
-  /** Issuer URL embedded in signed tokens (e.g. `"http://localhost:4000"`). */
+  /** Issuer URL embedded in signed tokens (e.g. `"http://localhost:8080"`). */
   iss: string;
   /**
    * Email captured from the identifier step, used as the JWT `sub` claim in

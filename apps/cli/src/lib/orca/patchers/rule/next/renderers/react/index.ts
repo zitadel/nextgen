@@ -15,7 +15,7 @@ import type { RendererSpec } from "../types";
  * SSR is disabled because Lit's element registration needs a browser.
  *
  * `api-base` is hardcoded to `/__nextgen`: the scaffolded Next `middleware.ts`
- * intercepts that path and forwards same-origin requests to `NEXTGEN_ISSUER_URL`
+ * intercepts that path and forwards same-origin requests to `ZITADEL_URL`
  * (server-side only). The backend URL therefore never reaches the browser
  * bundle. `NEXT_PUBLIC_ZITADEL_PROJECT_ID` is still public — the project ID
  * is not sensitive and the web component needs it to start a flow.

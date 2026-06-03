@@ -4,6 +4,7 @@ go 1.26
 
 require (
 	cloud.google.com/go/spanner v1.91.0
+	github.com/descope/virtualwebauthn v1.0.5
 	github.com/fergusstrange/embedded-postgres v1.34.0
 	github.com/georgysavva/scany/v2 v2.1.4
 	github.com/go-faker/faker/v4 v4.7.0

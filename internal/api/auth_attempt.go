@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/base64"
 	"net/http"
 
 	api "github.com/zitadel/nextgen/api/generated"
@@ -183,8 +184,8 @@ func challengePayloadToAPI(check domain.AuthChallenge) api.OptChallengeResponseP
 			PasskeyChallengePayload: api.PasskeyChallengePayload{
 				PublicKey: api.PasskeyChallengePayloadPublicKey{
 					Challenge:          passkey.Challenge,
-					AllowedCredentials: nil,
-					UserVerification:   api.OptPasskeyChallengePayloadPublicKeyUserVerification{},
+					AllowedCredentials: allowedCredentialsToAPI(passkey.AllowedCredentialIDs),
+					UserVerification:   userVerificationToAPI(passkey.UserVerification),
 					RpID: api.OptString{
 						Value: passkey.RPID,
 						Set:   true,
@@ -194,6 +195,36 @@ func challengePayloadToAPI(check domain.AuthChallenge) api.OptChallengeResponseP
 		})
 	}
 	return api.OptChallengeResponsePayload{}
+}
+
+// allowedCredentialsToAPI maps the challenge's allowed credential IDs into the WebAuthn
+// allowCredentials list the browser needs for an identified login. The IDs are base64url
+// encoded, matching the encoding the browser expects for PublicKeyCredentialDescriptor.id.
+// A discoverable (usernameless) login has no allowed credentials and yields nil.
+func allowedCredentialsToAPI(ids [][]byte) []api.PasskeyChallengePayloadPublicKeyAllowedCredentialsItem {
+	if len(ids) == 0 {
+		return nil
+	}
+	out := make([]api.PasskeyChallengePayloadPublicKeyAllowedCredentialsItem, 0, len(ids))
+	for _, id := range ids {
+		out = append(out, api.PasskeyChallengePayloadPublicKeyAllowedCredentialsItem{
+			ID:   base64.RawURLEncoding.EncodeToString(id),
+			Type: api.PasskeyChallengePayloadPublicKeyAllowedCredentialsItemTypePublicKey,
+		})
+	}
+	return out
+}
+
+// userVerificationToAPI maps the challenge's WebAuthn user verification requirement into the
+// response. An empty requirement (none set when issuing) yields an unset optional.
+func userVerificationToAPI(uv string) api.OptPasskeyChallengePayloadPublicKeyUserVerification {
+	if uv == "" {
+		return api.OptPasskeyChallengePayloadPublicKeyUserVerification{}
+	}
+	return api.OptPasskeyChallengePayloadPublicKeyUserVerification{
+		Value: api.PasskeyChallengePayloadPublicKeyUserVerification(uv),
+		Set:   true,
+	}
 }
 
 func authAttemptToAPI(attempt *domain.AuthAttempt) *api.AuthAttemptResponse {

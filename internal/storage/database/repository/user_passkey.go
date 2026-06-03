@@ -79,6 +79,10 @@ func (r *UserPasskeyRepository) SetTransports(v []string) database.Change {
 	return database.NewChange(colPasskeyTransports, v)
 }
 
+func (r *UserPasskeyRepository) SetSignCount(v int64) database.Change {
+	return database.NewChange(colPasskeySignCount, v)
+}
+
 func (r *UserPasskeyRepository) IncrementSignCount(diff int64) database.Change {
 	return database.NewChangeToStatement(colPasskeySignCount, func(b *database.StatementBuilder) {
 		colPasskeySignCount.WriteQualified(b)
@@ -161,6 +165,11 @@ func (r *UserPasskeyRepository) Create(ctx context.Context, client database.Quer
 		p.Transports, p.SignCount, p.BackupEligible, p.BackupState, p.Name, p.VerifiedAt)
 	builder.WriteString(")")
 	_, err := client.Exec(ctx, builder.String(), builder.Args()...)
+	return err
+}
+
+func (r *UserPasskeyRepository) Update(ctx context.Context, client database.QueryExecutor, cond database.Condition, changes ...database.Change) error {
+	_, err := updateOne(ctx, client, r, cond, changes...)
 	return err
 }
 

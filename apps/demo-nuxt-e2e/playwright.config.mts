@@ -32,18 +32,18 @@ export default defineConfig({
   // The api-mock listens on PORT 4001 here so this project can run in
   // parallel with `apps/demo-next-e2e/` (which uses the default 4000)
   // under `nx run-many`. Both api-mock (`bin/start.ts` reads PORT) and
-  // the SDKs (NEXTGEN_ISSUER_URL) already accept the override; no
+  // the SDKs (ZITADEL_URL) already accept the override; no
   // application code changes.
   webServer: [
     {
       command: "pnpm --filter @zitadel-nextgen/api-mock start",
-      url: "http://localhost:4001/.well-known/jwks.json",
+      url: "http://localhost:8081/.well-known/jwks.json",
       reuseExistingServer: true,
       cwd: workspaceRoot,
       stdout: "pipe",
       stderr: "pipe",
       env: {
-        PORT: "4001",
+        PORT: "8081",
       },
     },
     {
@@ -55,7 +55,7 @@ export default defineConfig({
       stderr: "pipe",
       timeout: 120_000,
       env: {
-        NEXTGEN_ISSUER_URL: "http://localhost:4001",
+        ZITADEL_URL: "http://localhost:8081",
       },
     },
   ],
