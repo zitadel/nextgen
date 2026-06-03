@@ -78,7 +78,7 @@ const FLOW_ID = "flow_mock";
  *   `verifyHandoffToken` can enforce issuer consistency.
  */
 export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
-  const iss = options.iss ?? "http://localhost:4000";
+  const iss = options.iss ?? "http://localhost:8080";
   let actor: FlowActor = startFlowActor();
   let captured: CapturedRequest[] = [];
   const authn = new AuthnStore();

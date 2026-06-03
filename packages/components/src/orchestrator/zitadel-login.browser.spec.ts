@@ -139,7 +139,7 @@ describe("<zitadel-login> form + focus (chromium)", () => {
 
   beforeEach(() => {
     _resetConfigForTesting();
-    testProject = configureZitadel({ apiBase: "/__nextgen", projectId: "test-project", issuerUrl: "http://localhost:4000" });
+    testProject = configureZitadel({ proxyPath: "/__nextgen", projectId: "test-project", url: "http://localhost:4000" });
     host = document.createElement("div");
     document.body.appendChild(host);
     stub = installFlowFetchStub([identifierStep, passkeyUpsellStep]);

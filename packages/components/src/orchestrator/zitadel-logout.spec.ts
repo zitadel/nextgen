@@ -28,7 +28,7 @@ const okHandler = http.get(`${API_BASE}/auth/end-session`, ({ request }) => {
 const server = setupServer(okHandler);
 
 beforeAll(() => {
-  configureZitadel({ apiBase: API_BASE, projectId: "test" });
+  configureZitadel({ proxyPath: API_BASE, projectId: "test" });
   server.listen({ onUnhandledRequest: "error" });
 });
 
