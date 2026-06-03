@@ -250,7 +250,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 				},
 				builtinSchemaProvider: &mockBuiltinSchemaProvider{
 					getBuiltinSchemaFunc: func(uri string) (*jsonschema.Schema, error) {
-						return &jsonschema.Schema{}, nil
+						return &flowDefBuiltin, nil
 					},
 					latestSchemaURIFunc: func(kind domain.KnownSchemaKind) (string, error) {
 						return "https://example.com/schemas/flow-definition.json", nil
