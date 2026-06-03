@@ -388,7 +388,7 @@ async function handleAuth(
   if (!payload && cookieToken && !isJwtShaped(cookieToken)) {
     const isValid = await validateOpaqueSessionToken(
       cookieToken,
-      issuerUrl,
+      url,
       jwksTimeoutMs ?? 5000,
     );
     if (isValid) {
