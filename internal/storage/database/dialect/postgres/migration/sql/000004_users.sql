@@ -77,7 +77,7 @@ CREATE TABLE zitadel_nextgen.user_attributes_part_3 PARTITION OF zitadel_nextgen
 CREATE TABLE zitadel_nextgen.user_unique_attributes (
     project_id TEXT NOT NULL COLLATE "C"
     , user_id TEXT NOT NULL COLLATE "C"
-    , team_id TEXT NOT NULL COLLATE "C" -- empty string if global
+    , team_id TEXT NOT NULL COLLATE "C" -- empty string if project-scoped
     , key TEXT NOT NULL COLLATE "C"
     , value_hash BYTEA NOT NULL -- raw binary SHA-256
     , PRIMARY KEY (project_id, team_id, key, value_hash)
@@ -172,7 +172,7 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE TYPE zitadel_nextgen.uniqueness_scope AS ENUM (
     'unspecified',
     'team',
-    'global'
+    'project'
 );
 
 CREATE TYPE zitadel_nextgen.incoming_user_attribute AS (

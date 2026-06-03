@@ -20,19 +20,19 @@ content:
         summary: att.not_found
         value:
           code: att.not_found
-          message: auth attempt not found
+          message: The auth attempt was not found.
       att.invalid_state:
         summary: att.invalid_state
         value:
           code: att.invalid_state
-          message: invalid attempt state
+          message: The auth attempt is in an invalid state for the intended change.
       att.not_completed:
         summary: att.not_completed
         value:
           code: att.not_completed
-          message: attempt not in completed state
+          message: The auth attempt must be completed for any further action.
       internal:
         summary: internal
         value:
           code: internal
-          message: an unexpected error occurred
+          message: An unexpected error occurred. Check the details for more information.

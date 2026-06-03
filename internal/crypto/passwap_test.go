@@ -52,7 +52,7 @@ func TestPasswordHasher_EncodingSupported(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := &Hasher{
+			h := &PasswapHasher{
 				Prefixes: []string{bcrypt.Prefix, argon2.Prefix},
 			}
 			got := h.EncodingSupported(tt.encodedHash)
@@ -502,7 +502,7 @@ func TestHasher_ValidateEncodedHash(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err = hasher.ValidateEncodedHash(tt.hash)
+			err = hasher.ValidateHash(tt.hash)
 			require.ErrorIs(t, err, tt.wantErr)
 		})
 	}

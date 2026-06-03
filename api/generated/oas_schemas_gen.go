@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-faster/errors"
 	"github.com/go-faster/jx"
+	"github.com/zitadel/nextgen/internal/api/ogenx"
 )
 
 // Merged schema.
@@ -1955,6 +1956,105 @@ func (s *CreateSessionRequestUserAgentAdditional) init() CreateSessionRequestUse
 	return m
 }
 
+type CreateTeamBadRequest ErrorDetails
+
+func (*CreateTeamBadRequest) createTeamRes() {}
+
+// Ref: #
+type CreateTeamRequest struct{}
+
+// Ref: #
+type CreateTeamResponse struct {
+	// The unique identifier of the team.
+	ID string `json:"id"`
+	// The time when the team was created.
+	CreatedAt time.Time `json:"createdAt"`
+}
+
+// GetID returns the value of ID.
+func (s *CreateTeamResponse) GetID() string {
+	return s.ID
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *CreateTeamResponse) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// SetID sets the value of ID.
+func (s *CreateTeamResponse) SetID(val string) {
+	s.ID = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *CreateTeamResponse) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+func (*CreateTeamResponse) createTeamRes() {}
+
+type CreateTeamTooManyRequests ErrorDetails
+
+func (*CreateTeamTooManyRequests) createTeamRes() {}
+
+type CreateUserBadRequest ErrorDetails
+
+func (*CreateUserBadRequest) createUserRes() {}
+
+type CreateUserConflict ErrorDetails
+
+func (*CreateUserConflict) createUserRes() {}
+
+type CreateUserForbidden ErrorDetails
+
+func (*CreateUserForbidden) createUserRes() {}
+
+// The content of this response is determined by the configured
+// schema for users.
+// Ref: #
+type CreateUserResponse struct {
+	// The unique identifier of the created user.
+	ID              string `json:"id"`
+	AdditionalProps CreateUserResponseAdditional
+}
+
+// GetID returns the value of ID.
+func (s *CreateUserResponse) GetID() string {
+	return s.ID
+}
+
+// GetAdditionalProps returns the value of AdditionalProps.
+func (s *CreateUserResponse) GetAdditionalProps() CreateUserResponseAdditional {
+	return s.AdditionalProps
+}
+
+// SetID sets the value of ID.
+func (s *CreateUserResponse) SetID(val string) {
+	s.ID = val
+}
+
+// SetAdditionalProps sets the value of AdditionalProps.
+func (s *CreateUserResponse) SetAdditionalProps(val CreateUserResponseAdditional) {
+	s.AdditionalProps = val
+}
+
+func (*CreateUserResponse) createUserRes() {}
+
+type CreateUserResponseAdditional map[string]jx.Raw
+
+func (s *CreateUserResponseAdditional) init() CreateUserResponseAdditional {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+type CreateUserUnauthorized ErrorDetails
+
+func (*CreateUserUnauthorized) createUserRes() {}
+
 // DeleteFlowDefinitionNoContent is response for DeleteFlowDefinition operation.
 type DeleteFlowDefinitionNoContent struct{}
 
@@ -2144,6 +2244,8 @@ func (*ErrorDetailsStatusCode) createFlowRes()             {}
 func (*ErrorDetailsStatusCode) createProjectRes()          {}
 func (*ErrorDetailsStatusCode) createSchemaRes()           {}
 func (*ErrorDetailsStatusCode) createSessionRes()          {}
+func (*ErrorDetailsStatusCode) createTeamRes()             {}
+func (*ErrorDetailsStatusCode) createUserRes()             {}
 func (*ErrorDetailsStatusCode) deleteFlowDefinitionRes()   {}
 func (*ErrorDetailsStatusCode) endSessionRes()             {}
 func (*ErrorDetailsStatusCode) exchangeHandoffRes()        {}
@@ -2158,7 +2260,9 @@ func (*ErrorDetailsStatusCode) getProjectRes()             {}
 func (*ErrorDetailsStatusCode) getReadyRes()               {}
 func (*ErrorDetailsStatusCode) getSchemaByIdRes()          {}
 func (*ErrorDetailsStatusCode) getSessionRes()             {}
+func (*ErrorDetailsStatusCode) getTeamRes()                {}
 func (*ErrorDetailsStatusCode) getTokenRes()               {}
+func (*ErrorDetailsStatusCode) getUserByIDRes()            {}
 func (*ErrorDetailsStatusCode) getUserInfoRes()            {}
 func (*ErrorDetailsStatusCode) introspectRes()             {}
 func (*ErrorDetailsStatusCode) listFlowDefinitionsRes()    {}
@@ -2189,6 +2293,9 @@ type ExchangeRequest struct {
 	// The one-time handoff token minted by `POST /auth_attempts/{id}/handoff`.
 	// Single-use — replaying it after a successful exchange returns `410 Gone`.
 	HandoffToken string `json:"handoff_token"`
+	// Optional session lifetime after exchange as an ISO-8601 duration. When omitted, the server
+	// uses the configured default. Must not exceed the configured maximum.
+	TTL OptDuration `json:"ttl"`
 }
 
 // GetHandoffToken returns the value of HandoffToken.
@@ -2196,9 +2303,19 @@ func (s *ExchangeRequest) GetHandoffToken() string {
 	return s.HandoffToken
 }
 
+// GetTTL returns the value of TTL.
+func (s *ExchangeRequest) GetTTL() OptDuration {
+	return s.TTL
+}
+
 // SetHandoffToken sets the value of HandoffToken.
 func (s *ExchangeRequest) SetHandoffToken(val string) {
 	s.HandoffToken = val
+}
+
+// SetTTL sets the value of TTL.
+func (s *ExchangeRequest) SetTTL(val OptDuration) {
+	s.TTL = val
 }
 
 // An authentication factor method.
@@ -2255,12 +2372,25 @@ func (s *FactorMethod) UnmarshalText(data []byte) error {
 // Does not contain display text — only a `text_key` resolved client-side.
 // Ref: #
 type Field struct {
+	// The input kind the client should render. Encodes the formats that
+	// have a matching HTML input type (email, url, date). For other
+	// formats (e.g. uuid) the type is `text` and `validation.format`
+	// carries the rule.
 	Type FieldType `json:"type"`
 	// Localization key for the field label.
-	TextKey  string  `json:"text_key"`
+	TextKey string `json:"text_key"`
+	// The field MUST be present and non-empty on submit. Mirrors the
+	// schema's top-level `required` array.
 	Required OptBool `json:"required"`
-	// Pre-filled value (e.g., email carried over from a pivot).
-	Value      jx.Raw             `json:"value"`
+	// Pre-filled value (e.g., an identifier carried over from a pivot).
+	Value jx.Raw `json:"value"`
+	// Schema-derived rules the frontend SHOULD apply at input time. The
+	// server runs the same rules on submit and is the only authority on
+	// whether the step advances — these rules are a UX hint to reduce
+	// round trips, not a contract guarantee.
+	// Omitted entirely when the field has no rules beyond its `type`.
+	// Each key mirrors a JSON Schema keyword on the underlying user
+	// property; absent keys mean no rule.
 	Validation OptFieldValidation `json:"validation"`
 }
 
@@ -2314,6 +2444,10 @@ func (s *Field) SetValidation(val OptFieldValidation) {
 	s.Validation = val
 }
 
+// The input kind the client should render. Encodes the formats that
+// have a matching HTML input type (email, url, date). For other
+// formats (e.g. uuid) the type is `text` and `validation.format`
+// carries the rule.
 type FieldType string
 
 const (
@@ -2397,21 +2531,29 @@ func (s *FieldType) UnmarshalText(data []byte) error {
 	}
 }
 
+// Schema-derived rules the frontend SHOULD apply at input time. The
+// server runs the same rules on submit and is the only authority on
+// whether the step advances — these rules are a UX hint to reduce
+// round trips, not a contract guarantee.
+// Omitted entirely when the field has no rules beyond its `type`.
+// Each key mirrors a JSON Schema keyword on the underlying user
+// property; absent keys mean no rule.
 type FieldValidation struct {
-	Format    OptString `json:"format"`
-	Pattern   OptString `json:"pattern"`
-	MinLength OptInt    `json:"min_length"`
-	MaxLength OptInt    `json:"max_length"`
+	// Semantic format the value must match. Values mirror the user
+	// meta-schema. When `type` already encodes the format (email,
+	// url, date), this key is informative and the input type is
+	// sufficient for client-side validation. When `type` is `text`
+	// (e.g. `format: uuid`), this key is the only signal.
+	Format OptFieldValidationFormat `json:"format"`
+	// Minimum length in characters (inclusive). Mirrors `minLength`.
+	MinLength OptInt `json:"min_length"`
+	// Maximum length in characters (inclusive). Mirrors `maxLength`.
+	MaxLength OptInt `json:"max_length"`
 }
 
 // GetFormat returns the value of Format.
-func (s *FieldValidation) GetFormat() OptString {
+func (s *FieldValidation) GetFormat() OptFieldValidationFormat {
 	return s.Format
-}
-
-// GetPattern returns the value of Pattern.
-func (s *FieldValidation) GetPattern() OptString {
-	return s.Pattern
 }
 
 // GetMinLength returns the value of MinLength.
@@ -2425,13 +2567,8 @@ func (s *FieldValidation) GetMaxLength() OptInt {
 }
 
 // SetFormat sets the value of Format.
-func (s *FieldValidation) SetFormat(val OptString) {
+func (s *FieldValidation) SetFormat(val OptFieldValidationFormat) {
 	s.Format = val
-}
-
-// SetPattern sets the value of Pattern.
-func (s *FieldValidation) SetPattern(val OptString) {
-	s.Pattern = val
 }
 
 // SetMinLength sets the value of MinLength.
@@ -2442,6 +2579,66 @@ func (s *FieldValidation) SetMinLength(val OptInt) {
 // SetMaxLength sets the value of MaxLength.
 func (s *FieldValidation) SetMaxLength(val OptInt) {
 	s.MaxLength = val
+}
+
+// Semantic format the value must match. Values mirror the user
+// meta-schema. When `type` already encodes the format (email,
+// url, date), this key is informative and the input type is
+// sufficient for client-side validation. When `type` is `text`
+// (e.g. `format: uuid`), this key is the only signal.
+type FieldValidationFormat string
+
+const (
+	FieldValidationFormatEmail    FieldValidationFormat = "email"
+	FieldValidationFormatDateTime FieldValidationFormat = "date-time"
+	FieldValidationFormatUUID     FieldValidationFormat = "uuid"
+	FieldValidationFormatURI      FieldValidationFormat = "uri"
+)
+
+// AllValues returns all FieldValidationFormat values.
+func (FieldValidationFormat) AllValues() []FieldValidationFormat {
+	return []FieldValidationFormat{
+		FieldValidationFormatEmail,
+		FieldValidationFormatDateTime,
+		FieldValidationFormatUUID,
+		FieldValidationFormatURI,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FieldValidationFormat) MarshalText() ([]byte, error) {
+	switch s {
+	case FieldValidationFormatEmail:
+		return []byte(s), nil
+	case FieldValidationFormatDateTime:
+		return []byte(s), nil
+	case FieldValidationFormatUUID:
+		return []byte(s), nil
+	case FieldValidationFormatURI:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FieldValidationFormat) UnmarshalText(data []byte) error {
+	switch FieldValidationFormat(data) {
+	case FieldValidationFormatEmail:
+		*s = FieldValidationFormatEmail
+		return nil
+	case FieldValidationFormatDateTime:
+		*s = FieldValidationFormatDateTime
+		return nil
+	case FieldValidationFormatUUID:
+		*s = FieldValidationFormatUUID
+		return nil
+	case FieldValidationFormatURI:
+		*s = FieldValidationFormatURI
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
 }
 
 // Scopes which teams or apps this flow definition applies to. Empty or
@@ -3255,14 +3452,15 @@ func (s *FlowDefinitionUpdateRequestPurposes) init() FlowDefinitionUpdateRequest
 
 // Ref: #
 type FlowEventRequest struct {
-	SessionToken string               `json:"session_token"`
+	// Reserved for future rotation. The sealed `_zflow` cookie carries the flow state today.
+	SessionToken OptString            `json:"session_token"`
 	Type         FlowEventRequestType `json:"type"`
 	// Event payload (fingerprint hash, timing data, etc.).
 	Payload OptFlowEventRequestPayload `json:"payload"`
 }
 
 // GetSessionToken returns the value of SessionToken.
-func (s *FlowEventRequest) GetSessionToken() string {
+func (s *FlowEventRequest) GetSessionToken() OptString {
 	return s.SessionToken
 }
 
@@ -3277,7 +3475,7 @@ func (s *FlowEventRequest) GetPayload() OptFlowEventRequestPayload {
 }
 
 // SetSessionToken sets the value of SessionToken.
-func (s *FlowEventRequest) SetSessionToken(val string) {
+func (s *FlowEventRequest) SetSessionToken(val OptString) {
 	s.SessionToken = val
 }
 
@@ -3404,9 +3602,9 @@ type FlowResponse struct {
 	ID string `json:"id"`
 	// Underlying session ID. Stable across all stacked flows.
 	SessionID string `json:"session_id"`
-	// Rotated on every response. Required for the next request.
-	SessionToken string   `json:"session_token"`
-	Step         FlowStep `json:"step"`
+	// Reserved for future rotation. The sealed `_zflow` cookie carries the flow state today.
+	SessionToken OptString `json:"session_token"`
+	Step         FlowStep  `json:"step"`
 	// Resolved branding inherited from the app → team → project hierarchy.
 	// Determined at flow creation based on audience context. Does not change between steps.
 	Branding OptBranding `json:"branding"`
@@ -3432,7 +3630,7 @@ func (s *FlowResponse) GetSessionID() string {
 }
 
 // GetSessionToken returns the value of SessionToken.
-func (s *FlowResponse) GetSessionToken() string {
+func (s *FlowResponse) GetSessionToken() OptString {
 	return s.SessionToken
 }
 
@@ -3472,7 +3670,7 @@ func (s *FlowResponse) SetSessionID(val string) {
 }
 
 // SetSessionToken sets the value of SessionToken.
-func (s *FlowResponse) SetSessionToken(val string) {
+func (s *FlowResponse) SetSessionToken(val OptString) {
 	s.SessionToken = val
 }
 
@@ -3857,7 +4055,8 @@ func (s *FlowStepGates) init() FlowStepGates {
 
 // Ref: #
 type FlowSubmitRequest struct {
-	SessionToken string `json:"session_token"`
+	// Reserved for future rotation. The sealed `_zflow` cookie carries the flow state today.
+	SessionToken OptString `json:"session_token"`
 	// Which action to take. Must be a key from the step's `actions` dictionary:
 	// - A regular action (e.g., "submit", "register", "back")
 	// - The reserved value "sso" — triggers SSO redirect (requires `sso_provider_id`).
@@ -3877,7 +4076,7 @@ type FlowSubmitRequest struct {
 }
 
 // GetSessionToken returns the value of SessionToken.
-func (s *FlowSubmitRequest) GetSessionToken() string {
+func (s *FlowSubmitRequest) GetSessionToken() OptString {
 	return s.SessionToken
 }
 
@@ -3907,7 +4106,7 @@ func (s *FlowSubmitRequest) GetSSOProviderID() OptString {
 }
 
 // SetSessionToken sets the value of SessionToken.
-func (s *FlowSubmitRequest) SetSessionToken(val string) {
+func (s *FlowSubmitRequest) SetSessionToken(val OptString) {
 	s.SessionToken = val
 }
 
@@ -4382,6 +4581,78 @@ func (*GetSessionNotFound) getSessionRes() {}
 type GetSessionUnauthorized ErrorDetails
 
 func (*GetSessionUnauthorized) getSessionRes() {}
+
+type GetTeamNotFound ErrorDetails
+
+func (*GetTeamNotFound) getTeamRes() {}
+
+// The current state of a team.
+// Ref: #
+type GetTeamResponse struct {
+	// The unique identifier of the team.
+	ID string `json:"id"`
+	// The time when the team was created.
+	CreatedAt time.Time `json:"createdAt"`
+	// The time when the team was last updated.
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+// GetID returns the value of ID.
+func (s *GetTeamResponse) GetID() string {
+	return s.ID
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *GetTeamResponse) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetUpdatedAt returns the value of UpdatedAt.
+func (s *GetTeamResponse) GetUpdatedAt() time.Time {
+	return s.UpdatedAt
+}
+
+// SetID sets the value of ID.
+func (s *GetTeamResponse) SetID(val string) {
+	s.ID = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *GetTeamResponse) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetUpdatedAt sets the value of UpdatedAt.
+func (s *GetTeamResponse) SetUpdatedAt(val time.Time) {
+	s.UpdatedAt = val
+}
+
+func (*GetTeamResponse) getTeamRes() {}
+
+type GetTeamUnauthorized ErrorDetails
+
+func (*GetTeamUnauthorized) getTeamRes() {}
+
+type GetUserByIDNotFound ErrorDetails
+
+func (*GetUserByIDNotFound) getUserByIDRes() {}
+
+type GetUserByIDOK map[string]jx.Raw
+
+func (s *GetUserByIDOK) init() GetUserByIDOK {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+func (*GetUserByIDOK) getUserByIDRes() {}
+
+type GetUserByIDUnauthorized ErrorDetails
+
+func (*GetUserByIDUnauthorized) getUserByIDRes() {}
 
 type GetUserInfoOK struct {
 	// The unique identifier for the user.
@@ -6898,6 +7169,52 @@ func (o OptDateTime) Or(d time.Time) time.Time {
 	return d
 }
 
+// NewOptDuration returns new OptDuration with value set to v.
+func NewOptDuration(v ogenx.ISODuration) OptDuration {
+	return OptDuration{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptDuration is optional ogenx.ISODuration.
+type OptDuration struct {
+	Value ogenx.ISODuration
+	Set   bool
+}
+
+// IsSet returns true if OptDuration was set.
+func (o OptDuration) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptDuration) Reset() {
+	var v ogenx.ISODuration
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptDuration) SetTo(v ogenx.ISODuration) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptDuration) Get() (v ogenx.ISODuration, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptDuration) Or(d ogenx.ISODuration) ogenx.ISODuration {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptErrorDetailsDetails returns new OptErrorDetailsDetails with value set to v.
 func NewOptErrorDetailsDetails(v ErrorDetailsDetails) OptErrorDetailsDetails {
 	return OptErrorDetailsDetails{
@@ -6984,6 +7301,52 @@ func (o OptFieldValidation) Get() (v FieldValidation, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptFieldValidation) Or(d FieldValidation) FieldValidation {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptFieldValidationFormat returns new OptFieldValidationFormat with value set to v.
+func NewOptFieldValidationFormat(v FieldValidationFormat) OptFieldValidationFormat {
+	return OptFieldValidationFormat{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFieldValidationFormat is optional FieldValidationFormat.
+type OptFieldValidationFormat struct {
+	Value FieldValidationFormat
+	Set   bool
+}
+
+// IsSet returns true if OptFieldValidationFormat was set.
+func (o OptFieldValidationFormat) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFieldValidationFormat) Reset() {
+	var v FieldValidationFormat
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFieldValidationFormat) SetTo(v FieldValidationFormat) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFieldValidationFormat) Get() (v FieldValidationFormat, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFieldValidationFormat) Or(d FieldValidationFormat) FieldValidationFormat {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -8845,52 +9208,6 @@ func (o OptPostTokenRequestGrantType) Or(d PostTokenRequestGrantType) PostTokenR
 	return d
 }
 
-// NewOptProjectID returns new OptProjectID with value set to v.
-func NewOptProjectID(v ProjectID) OptProjectID {
-	return OptProjectID{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptProjectID is optional ProjectID.
-type OptProjectID struct {
-	Value ProjectID
-	Set   bool
-}
-
-// IsSet returns true if OptProjectID was set.
-func (o OptProjectID) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptProjectID) Reset() {
-	var v ProjectID
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptProjectID) SetTo(v ProjectID) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptProjectID) Get() (v ProjectID, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptProjectID) Or(d ProjectID) ProjectID {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptSchemaURI returns new OptSchemaURI with value set to v.
 func NewOptSchemaURI(v SchemaURI) OptSchemaURI {
 	return OptSchemaURI{
@@ -10453,6 +10770,51 @@ func (*UpdateFlowDefinitionBadRequest) updateFlowDefinitionRes() {}
 type UpdateFlowDefinitionNotFound ErrorDetails
 
 func (*UpdateFlowDefinitionNotFound) updateFlowDefinitionRes() {}
+
+// A user represents an individual identity in the system. It can be used to
+// represent a human user, but also a service account or any other type of
+// identity. The content of a user is determined by the configured schema for
+// users, this is only a base schema.
+// Ref: #
+type User struct {
+	// The schema that defines the content of the user. These schemas can be
+	// created using the `/schemas` endpoint. A default schema is provided.
+	// This schema can be retrieved using the same endpoint. The schema will
+	// be used to validate the user's properties.
+	Schema          string `json:"$schema"`
+	AdditionalProps UserAdditional
+}
+
+// GetSchema returns the value of Schema.
+func (s *User) GetSchema() string {
+	return s.Schema
+}
+
+// GetAdditionalProps returns the value of AdditionalProps.
+func (s *User) GetAdditionalProps() UserAdditional {
+	return s.AdditionalProps
+}
+
+// SetSchema sets the value of Schema.
+func (s *User) SetSchema(val string) {
+	s.Schema = val
+}
+
+// SetAdditionalProps sets the value of AdditionalProps.
+func (s *User) SetAdditionalProps(val UserAdditional) {
+	s.AdditionalProps = val
+}
+
+type UserAdditional map[string]jx.Raw
+
+func (s *UserAdditional) init() UserAdditional {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
 
 type UserID string
 

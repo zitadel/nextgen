@@ -18,6 +18,7 @@ import (
 	"github.com/ianlancetaylor/jsonschema"
 	apischemas "github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
 	"github.com/zitadel/nextgen/internal/httputil"
+	"github.com/zitadel/nextgen/internal/maputil"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -44,6 +45,28 @@ type JSONSchema struct {
 	URL       string
 	CreatedAt time.Time
 	Schema    []byte
+}
+
+func NewJSONSchema(projectID string, schemabs []byte) (_ *JSONSchema, err error) {
+	var schema map[string]any
+	if err := json.Unmarshal(schemabs, &schema); err != nil {
+		return nil, ErrJSONSchemaInvalid().WithParent(err)
+	}
+
+	schemaID, _ := maputil.Get[string](schema, "$id")
+	if schemaID == "" {
+		schemaID, err = newID(PrefixJSONSchema)
+		if err != nil {
+			return nil, ErrInternal(err).WithMessage("failed to generate schema id")
+		}
+	}
+
+	return &JSONSchema{
+		ProjectID: projectID,
+		URL:       schemaID,
+		CreatedAt: time.Now().UTC(),
+		Schema:    schemabs,
+	}, nil
 }
 
 //go:generate go tool mockgen -typed -package domainmock -destination ./mock/json_schema.mock.go . JSONSchemaRepository

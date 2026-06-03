@@ -1,0 +1,56 @@
+{
+  "project_id": "${PROJECT_ID}",
+  "schema_uri": "https://nextgen.com/flow-definition.json",
+  "flow_definition": {
+    "name": "default-login",
+    "user_schema": "${SERVER_URL}/user.json",
+    "purposes": {
+      "login": "identifier"
+    },
+    "steps": [
+      {
+        "name": "identifier",
+        "fields": [
+          "email"
+        ],
+        "actions": {
+          "submit": {
+            "primary": true
+          }
+        },
+        "transitions": {
+          "submit": {
+            "target": "authenticate"
+          },
+          "user_not_found": {
+            "target": "no-account"
+          }
+        }
+      },
+      {
+        "name": "authenticate",
+        "fields": [
+          "password"
+        ],
+        "actions": {
+          "submit": {
+            "primary": true
+          }
+        },
+        "transitions": {
+          "submit": {
+            "target": "done"
+          }
+        }
+      },
+      {
+        "name": "done",
+        "complete": "show"
+      },
+      {
+        "name": "no-account",
+        "complete": "show"
+      }
+    ]
+  }
+}

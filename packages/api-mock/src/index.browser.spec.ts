@@ -10,7 +10,7 @@ import {
   createFlow,
   submitFlowStep,
 } from "@zitadel-nextgen/api/generated/endpoints/zitadelNextGen";
-import { setApiBaseUrl } from "@zitadel-nextgen/api/runtime/base-url";
+import { configureZitadel } from "@zitadel-nextgen/api/config";
 import { beforeAll, beforeEach, describe, expect } from "vitest";
 
 import { clearBranding, resetFlow, setupMock } from "./index.js";
@@ -19,7 +19,7 @@ import { test } from "./msw-test.js";
 const PROJECT_ID = "demo-project";
 
 beforeAll(() => {
-  setApiBaseUrl(window.location.origin);
+  configureZitadel({ apiBase: window.location.origin, projectId: PROJECT_ID });
 });
 
 beforeEach(() => {

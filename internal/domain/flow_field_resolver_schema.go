@@ -49,7 +49,7 @@ var _ FlowFieldResolver = (*SchemaFieldResolver)(nil)
 func (r *SchemaFieldResolver) Resolve(
 	ctx context.Context,
 	client database.QueryExecutor,
-	projectID, userSchemaURL string,
+	projectID, userSchemaURL, stepName string,
 	fieldNames []string,
 ) (FlowResolvedFields, error) {
 	schema, err := r.schemas.Resolve(ctx, client, projectID, userSchemaURL, nil)
@@ -69,7 +69,7 @@ func (r *SchemaFieldResolver) Resolve(
 		if !ok {
 			return FlowResolvedFields{}, fmt.Errorf("%w: %q", ErrFlowFieldUnknown, name)
 		}
-		field := buildFlowField(name, propSchema, required, passwordEnabled)
+		field := buildFlowField(stepName, name, propSchema, required, passwordEnabled)
 		fields[name] = field
 		if outcomes := ImplicitOutcomesForChallenge(field.Challenge); len(outcomes) > 0 {
 			implicit[name] = append(implicit[name], outcomes...)
@@ -83,10 +83,10 @@ func (r *SchemaFieldResolver) Resolve(
 }
 
 // buildFlowField translates a user-schema property into a [FlowField].
-func buildFlowField(name string, propSchema *jsonschema.Schema, required map[string]struct{}, passwordEnabled bool) FlowField {
+func buildFlowField(stepName, name string, propSchema *jsonschema.Schema, required map[string]struct{}, passwordEnabled bool) FlowField {
 	unique := deriveUnique(propSchema)
 	field := FlowField{
-		TextKey:   "field." + name,
+		TextKey:   stepName + ".field." + name,
 		Type:      deriveFieldType(propSchema),
 		Challenge: deriveChallenge(propSchema, unique, passwordEnabled),
 		Unique:    unique,
@@ -123,8 +123,8 @@ func deriveFieldType(propSchema *jsonschema.Schema) FlowFieldType {
 // surfaces as Password when the schema-level `x-auth-methods.password`
 // is enabled. Other credential kinds (passkey, magic_link, sso, otp)
 // have no user-property-shaped proof and are never surfaced here.
-func deriveChallenge(propSchema *jsonschema.Schema, unique FlowFieldUniqueScope, passwordEnabled bool) FlowFieldChallenge {
-	if unique != FlowFieldUniqueScopeNone {
+func deriveChallenge(propSchema *jsonschema.Schema, unique AttributeUniqueness, passwordEnabled bool) FlowFieldChallenge {
+	if unique != AttributeUniquenessUnspecified {
 		return FlowFieldChallengeIdentifier
 	}
 	if isPassword(propSchema) && passwordEnabled {
@@ -133,14 +133,14 @@ func deriveChallenge(propSchema *jsonschema.Schema, unique FlowFieldUniqueScope,
 	return FlowFieldChallengeNone
 }
 
-func deriveUnique(propSchema *jsonschema.Schema) FlowFieldUniqueScope {
+func deriveUnique(propSchema *jsonschema.Schema) AttributeUniqueness {
 	switch lookupString(propSchema, "x-unique") {
-	case "organization":
-		return FlowFieldUniqueScopeOrganization
-	case "instance":
-		return FlowFieldUniqueScopeInstance
+	case "project":
+		return AttributeUniquenessProject
+	case "team":
+		return AttributeUniquenessTeam
 	}
-	return FlowFieldUniqueScopeNone
+	return AttributeUniquenessUnspecified
 }
 
 func buildValidation(propSchema *jsonschema.Schema) *FlowFieldValidation {

@@ -2,13 +2,15 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/go-faster/jx"
 	api "github.com/zitadel/nextgen/api/generated"
-	"github.com/zitadel/nextgen/internal/cookie"
+	"github.com/zitadel/nextgen/internal/api/ogenx"
+	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 )
@@ -27,31 +29,38 @@ func (h Handler) CreateSession(ctx context.Context, req *api.CreateSessionReques
 	if err != nil {
 		return nil, err
 	}
-	return sessionWithTokenToAPI(session, h.sealer)
+	return sessionWithTokenToAPI(session, h.crypter)
 }
 
 func (h Handler) ExchangeHandoff(ctx context.Context, req *api.ExchangeRequest, params api.ExchangeHandoffParams) (api.ExchangeHandoffRes, error) {
-	scopeCtx, _ := GetScopeContext(ctx)
-
-	input := service.ExchangeInput{
-		ProjectID:    scopeCtx.ProjectID,
-		HandoffToken: req.HandoffToken,
-	}
-	if key, ok := params.IdempotencyKey.Get(); ok {
-		input.IdempotencyKey = new(key)
+	input, err := exchangeInputFromRequest(req, params)
+	if err != nil {
+		return nil, err
 	}
 	session, err := h.sessionService.Exchange(ctx, input)
 	if err != nil {
 		return nil, err
 	}
-	return sessionWithTokenToAPI(session, h.sealer)
+	return sessionWithTokenToAPI(session, h.crypter)
+}
+
+func exchangeInputFromRequest(req *api.ExchangeRequest, params api.ExchangeHandoffParams) (service.ExchangeInput, error) {
+	input := service.ExchangeInput{
+		ProjectID:    string(params.ProjectID),
+		HandoffToken: req.HandoffToken,
+	}
+	if key, ok := params.IdempotencyKey.Get(); ok {
+		input.IdempotencyKey = new(key)
+	}
+	if ttl, ok := req.TTL.Get(); ok {
+		input.TTL = new(time.Duration(ttl))
+	}
+	return input, nil
 }
 
 func (h Handler) GetSession(ctx context.Context, params api.GetSessionParams) (api.GetSessionRes, error) {
-	scopeCtx, _ := GetScopeContext(ctx)
-
 	input := service.GetSessionInput{
-		ProjectID: scopeCtx.ProjectID,
+		ProjectID: string(params.ProjectID),
 		SessionID: string(params.SessionID),
 	}
 
@@ -63,7 +72,7 @@ func (h Handler) GetSession(ctx context.Context, params api.GetSessionParams) (a
 }
 
 func (h Handler) GetMySession(ctx context.Context, params api.GetMySessionParams) (api.GetMySessionRes, error) {
-	sessionToken, err := domain.DecryptSessionTokenString(params.NextgenSession, h.sealer)
+	sessionToken, err := domain.DecryptSessionTokenString(params.NextgenSession, h.crypter)
 	if err != nil {
 		return nil, err
 	}
@@ -83,10 +92,8 @@ func (h Handler) GetMySession(ctx context.Context, params api.GetMySessionParams
 }
 
 func (h Handler) ListSessions(ctx context.Context, params api.ListSessionsParams) (api.ListSessionsRes, error) {
-	scopeCtx, _ := GetScopeContext(ctx)
-
 	input := service.ListSessionInput{
-		ProjectID: scopeCtx.ProjectID,
+		ProjectID: string(params.ProjectID),
 		// TODO: handle params
 	}
 	sessions, err := h.sessionService.List(ctx, input)
@@ -97,10 +104,8 @@ func (h Handler) ListSessions(ctx context.Context, params api.ListSessionsParams
 }
 
 func (h Handler) RevokeSession(ctx context.Context, params api.RevokeSessionParams) (api.RevokeSessionRes, error) {
-	scopeCtx, _ := GetScopeContext(ctx)
-
 	input := service.DeleteSessionInput{
-		ProjectID: scopeCtx.ProjectID,
+		ProjectID: string(params.ProjectID),
 		SessionID: string(params.SessionID),
 	}
 
@@ -114,7 +119,7 @@ func (h Handler) RevokeSession(ctx context.Context, params api.RevokeSessionPara
 }
 
 func (h Handler) RevokeMySession(ctx context.Context, params api.RevokeMySessionParams) (api.RevokeMySessionRes, error) {
-	sessionToken, err := domain.DecryptSessionTokenString(params.NextgenSession, h.sealer)
+	sessionToken, err := domain.DecryptSessionTokenString(params.NextgenSession, h.crypter)
 	if err != nil {
 		return nil, err
 	}
@@ -123,10 +128,7 @@ func (h Handler) RevokeMySession(ctx context.Context, params api.RevokeMySession
 		SessionID: sessionToken.SessionID,
 	}
 
-	session, err := h.sessionService.Get(ctx, service.GetSessionInput{
-		ProjectID: input.ProjectID,
-		SessionID: input.SessionID,
-	})
+	session, err := h.sessionService.Get(ctx, service.GetSessionInput(input))
 	if err != nil {
 		return nil, err
 	}
@@ -169,8 +171,8 @@ func userAgentToDomain(agent api.OptCreateSessionRequestUserAgent) *domain.UserA
 	}
 }
 
-func sessionWithTokenToAPI(session *domain.Session, sealer *cookie.Sealer) (*api.SessionWithTokenResponseHeaders, error) {
-	token, err := session.Token(sealer)
+func sessionWithTokenToAPI(session *domain.Session, encrypter crypto.Encrypter) (*api.SessionWithTokenResponseHeaders, error) {
+	token, err := session.Token(encrypter)
 	if err != nil {
 		return nil, err
 	}
@@ -211,7 +213,15 @@ func userAgentToAPI(agent *domain.UserAgent) api.OptNilSessionResponseUserAgent 
 	}
 	info := make(map[string]jx.Raw)
 	for key, value := range agent.Info {
-		info[key] = jx.Raw(fmt.Sprintf("%v", value))
+		switch key {
+		case "fingerprint", "ip":
+			continue
+		}
+		raw, err := json.Marshal(value)
+		if err != nil {
+			raw = []byte("null")
+		}
+		info[key] = jx.Raw(raw)
 	}
 	return api.NewOptNilSessionResponseUserAgent(api.SessionResponseUserAgent{
 		Fingerprint:     api.NewOptString(agent.ID),
@@ -246,10 +256,7 @@ func sessionsToAPI(sessions []*domain.Session) *api.SessionListResponse {
 }
 
 func setSessionCookie(token string, expiresAt time.Time) string {
-	maxAge := int(time.Until(expiresAt).Seconds())
-	if maxAge < 0 {
-		maxAge = 0
-	}
+	maxAge := max(int(time.Until(expiresAt).Seconds()), 0)
 	return sessionCookie(token, maxAge)
 }
 
@@ -259,57 +266,6 @@ func deleteSessionCookie() string {
 
 func sessionCookie(token string, maxAge int) string {
 	return fmt.Sprintf("%s=%s; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=%d", sessionCookieName, token, maxAge)
-}
-
-func factorToAPI(factor domain.AuthFactor) api.CompletedFactor {
-	resp := api.CompletedFactor{
-		Method:     checkTypeToAPI(factor.Type()),
-		VerifiedAt: factor.GetLastVerifiedAt(),
-		Payload:    factorPayloadToAPI(factor),
-	}
-	return resp
-}
-
-func factorPayloadToAPI(factor domain.AuthFactor) api.OptCompletedFactorPayload {
-	switch f := factor.(type) {
-	case *domain.AuthFactorUser:
-		return api.NewOptCompletedFactorPayload(api.CompletedFactorPayload{
-			Type: api.IdentifierFactorPayloadCompletedFactorPayload,
-			IdentifierFactorPayload: api.IdentifierFactorPayload{
-				UserID: api.UserID(f.UserID),
-			},
-		})
-	case *domain.AuthFactorPassword:
-		return api.NewOptCompletedFactorPayload(api.CompletedFactorPayload{
-			Type:                  api.PasswordFactorPayloadCompletedFactorPayload,
-			PasswordFactorPayload: api.PasswordFactorPayload{},
-		})
-	case *domain.AuthFactorPasskey:
-		return api.NewOptCompletedFactorPayload(api.CompletedFactorPayload{
-			Type: api.PasskeyFactorPayloadCompletedFactorPayload,
-			PasskeyFactorPayload: api.PasskeyFactorPayload{
-				CredentialID:            "",
-				UserVerified:            f.UserVerified,
-				BackupEligible:          api.OptBool{},
-				BackupState:             api.OptBool{},
-				AuthenticatorAttachment: api.OptPasskeyFactorPayloadAuthenticatorAttachment{},
-			},
-		})
-	}
-	return api.OptCompletedFactorPayload{}
-}
-
-func checkTypeToAPI(check domain.AuthCheckType) api.FactorMethod {
-	switch check {
-	case domain.AuthCheckTypeUser:
-		return api.FactorMethodIdentifier
-	case domain.AuthCheckTypePassword:
-		return api.FactorMethodPassword
-	case domain.AuthCheckTypePasskey:
-		return api.FactorMethodPasskey
-	default:
-		return ""
-	}
 }
 
 func sessionErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
@@ -323,6 +279,38 @@ func sessionErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
 	case domain.ErrSessionTokenInvalid().Code:
 		return errorResponseWithStatusCode(http.StatusUnauthorized, err)
+	case domain.ErrNotImplemented().Code:
+		return errorResponseWithStatusCode(http.StatusNotImplemented, err)
+	case domain.ErrSessionInvalidTTL().Code:
+		apiErr := &api.ErrorDetailsStatusCode{
+			StatusCode: http.StatusBadRequest,
+		}
+
+		details, ok := err.Details.(domain.SessionInvalidTTLDetails)
+		if !ok {
+			apiErr.Response = domainErrorDetails(err)
+			return apiErr
+		}
+
+		encoder := jx.GetEncoder()
+		defer jx.PutEncoder(encoder)
+
+		encoder.ObjStart()
+		encoder.Field("ttl", ogenx.ISODuration(details.TTL).Encode)
+		encoder.Field("max_ttl", ogenx.ISODuration(details.MaxTTL).Encode)
+		encoder.ObjEnd()
+
+		apiErr.Response = api.ErrorDetails{
+			Code:    api.ErrorCode(err.Code),
+			Message: err.Message,
+			Details: api.OptErrorDetailsDetails{
+				Set: true,
+				Value: api.ErrorDetailsDetails{
+					"details": jx.Raw(encoder.Bytes()),
+				},
+			},
+		}
+		return apiErr
 	default:
 		return internalErrorResponse(err)
 

@@ -131,6 +131,24 @@ func (UnimplementedHandler) CreateSession(ctx context.Context, req *CreateSessio
 	return r, ht.ErrNotImplemented
 }
 
+// CreateTeam implements createTeam operation.
+//
+// Create team.
+//
+// POST /teams
+func (UnimplementedHandler) CreateTeam(ctx context.Context, req *CreateTeamRequest, params CreateTeamParams) (r CreateTeamRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// CreateUser implements createUser operation.
+//
+// Create user.
+//
+// POST /user
+func (UnimplementedHandler) CreateUser(ctx context.Context, req *User, params CreateUserParams) (r CreateUserRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // DeleteFlowDefinition implements deleteFlowDefinition operation.
 //
 // Delete a flow definition by id.
@@ -292,12 +310,30 @@ func (UnimplementedHandler) GetSession(ctx context.Context, params GetSessionPar
 	return r, ht.ErrNotImplemented
 }
 
+// GetTeam implements getTeam operation.
+//
+// Returns the current state of a team.
+//
+// GET /teams/{team_id}
+func (UnimplementedHandler) GetTeam(ctx context.Context, params GetTeamParams) (r GetTeamRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // GetToken implements getToken operation.
 //
 // Get accesstoken.
 //
 // POST /auth/token
 func (UnimplementedHandler) GetToken(ctx context.Context, req *PostTokenRequest) (r GetTokenRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// GetUserByID implements GetUserByID operation.
+//
+// Get user by ID.
+//
+// GET /user/{user_id}
+func (UnimplementedHandler) GetUserByID(ctx context.Context, params GetUserByIDParams) (r GetUserByIDRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

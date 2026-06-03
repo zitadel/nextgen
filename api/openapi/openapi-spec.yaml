@@ -42,6 +42,8 @@ paths:
     $ref: endpoints/readyz/methods.yaml
   /user:
     $ref: endpoints/users/methods.yaml
+  /user/{user_id}:
+    $ref: endpoints/users/by_id/methods.yaml
   /flow:
     $ref: endpoints/flow/methods.yaml
   /flow/{id}:
@@ -80,6 +82,10 @@ paths:
     $ref: endpoints/flow_definitions/methods.yaml
   /flow_definitions/{id}:
     $ref: endpoints/flow_definitions/by_id/methods.yaml
+  /teams:
+    $ref: endpoints/teams/methods.yaml
+  /teams/{team_id}:
+    $ref: endpoints/teams/by_id/methods.yaml
 
 components:
   securitySchemes:

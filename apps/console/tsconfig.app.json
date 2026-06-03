@@ -17,10 +17,10 @@
   "include": ["src/**/*.ts", "src/**/*.tsx"],
   "references": [
     {
-      "path": "../../packages/design-tokens/tsconfig.lib.json"
+      "path": "../../packages/ui-react/tsconfig.lib.json"
     },
     {
-      "path": "../../packages/ui-react/tsconfig.lib.json"
+      "path": "../../packages/design-tokens/tsconfig.lib.json"
     }
   ]
 }

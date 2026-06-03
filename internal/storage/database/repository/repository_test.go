@@ -1,3 +1,5 @@
+//go:build postgres_integration || spanner_integration
+
 package repository_test
 
 import (
@@ -9,8 +11,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/storage/database"
-	"github.com/zitadel/nextgen/internal/storage/database/dialect/postgres"
-	"github.com/zitadel/nextgen/internal/storage/database/dialect/postgres/embedded"
+	"github.com/zitadel/nextgen/internal/storage/database/dbtest"
 	spannerDialect "github.com/zitadel/nextgen/internal/storage/database/dialect/spanner"
 )
 
@@ -36,15 +37,21 @@ func runTests(m *testing.M) int {
 		pool, stop, err = newEmbeddedDB(ctx)
 	}
 
-	defer stop()
 	if err != nil {
 		log.Printf("error setting up test database: %v", err)
+		if stop != nil {
+			stop()
+		}
 		return 1
 	}
 	defer func() {
 		r := recover()
-		pool.Close(ctx)
-		stop()
+		if pool != nil {
+			pool.Close(ctx)
+		}
+		if stop != nil {
+			stop()
+		}
 		if r != nil {
 			panic(r)
 		}
@@ -72,30 +79,23 @@ func newSpannerURLDB(ctx context.Context, url string) (database.PoolTest, func()
 }
 
 func newEmbeddedDB(ctx context.Context) (pool database.PoolTest, stop func(), err error) {
-	var connector database.Connector
-	if url := os.Getenv("ZITADEL_TEST_POSTGRES_URL"); url != "" {
-		log.Println("using database provided by env")
-		connector, err = postgres.DecodeConfig(url)
-		if err != nil {
-			return nil, nil, fmt.Errorf("unable to connect to provided postgres: %w", err)
-		}
-		stop = func() {}
-	} else {
-		connector, stop, err = embedded.StartEmbedded()
-		if err != nil {
-			return nil, nil, fmt.Errorf("unable to start embedded postgres: %w", err)
-		}
+	connector, stop, err := dbtest.Postgres(ctx)
+	if err != nil {
+		return nil, stop, fmt.Errorf("unable to start postgres: %w", err)
 	}
 
 	pool_, err := connector.Connect(ctx)
 	if err != nil {
-		return nil, stop, fmt.Errorf("unable to connect to embedded postgres: %w", err)
+		return nil, stop, fmt.Errorf("unable to connect to postgres: %w", err)
 	}
 	pool = pool_.(database.PoolTest)
 
 	err = pool.MigrateTest(ctx)
 	if err != nil {
-		return nil, stop, fmt.Errorf("unable to migrate database: %w", err)
+		return nil, func() {
+			pool.Close(ctx)
+			stop()
+		}, fmt.Errorf("unable to migrate database: %w", err)
 	}
 	return pool, stop, err
 }

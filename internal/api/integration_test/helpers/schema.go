@@ -45,7 +45,7 @@ func (h *Harness) EnsureSchemaResolver(t *testing.T) *domain.JSONSchemaResolver 
 		require.NoError(t, err)
 
 		h.SchemaResolver = domain.NewJSONSchemaResolver(
-			h.SchemaRepo,
+			h.EnsureSchemaRepo(t),
 			cache,
 			0,
 			0,
@@ -69,7 +69,7 @@ func (h *Harness) EnsureSchemaValidator(t *testing.T) *domain.SchemaValidator {
 
 func (h *Harness) CreateUserSchema(t *testing.T, projectID string, schema string) string {
 	t.Helper()
-	client := h.EnsureAPIClient(t)
+	client := h.EnsureAPIClient(t, projectID)
 
 	apiSchema := api.UserSchema{}
 	err := apiSchema.UnmarshalJSON([]byte(schema))
@@ -80,7 +80,7 @@ func (h *Harness) CreateUserSchema(t *testing.T, projectID string, schema string
 		UserSchema: apiSchema,
 	}
 	params := api.CreateSchemaParams{
-		ProjectID: api.OptProjectID{Set: true, Value: api.ProjectID(projectID)},
+		ProjectID: api.ProjectID(projectID),
 	}
 
 	resp, err := client.CreateSchema(t.Context(), req, params)

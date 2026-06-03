@@ -7,8 +7,6 @@ import (
 	"github.com/stretchr/testify/require"
 	generated "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
-	"github.com/zitadel/nextgen/internal/api/integration_test/test_data"
-	"github.com/zitadel/nextgen/internal/cookie"
 )
 
 func (h *Harness) EnsureTestServer(t *testing.T) *httptest.Server {
@@ -17,7 +15,6 @@ func (h *Harness) EnsureTestServer(t *testing.T) *httptest.Server {
 		h.TestServer = httptest.NewServer(
 			h.EnsureGeneratedServer(t),
 		)
-		h.Schemas = test_data.BuildSchemas(h.TestServer.URL)
 	}
 	return h.TestServer
 }
@@ -38,18 +35,17 @@ func (h *Harness) EnsureGeneratedServer(t *testing.T) *generated.Server {
 
 func (h *Harness) EnsureHandler(t *testing.T) *api.Handler {
 	t.Helper()
-	sealer, err := cookie.NewSealer(cookie.Key([]byte("MasterkeyNeedsToHave32Characters")))
-	require.NoError(t, err)
-
 	if h.Handler == nil {
 		h.Handler = api.NewHandler(
-			sealer,
+			h.EnsureCrypter(t),
 			h.EnsureFlowService(t),
 			h.EnsureAuthAttemptService(t),
 			h.EnsureSessionService(t),
 			h.EnsureProjectService(t),
+			h.EnsureUserService(t),
 			h.EnsureSchemaService(t),
 			h.EnsureFlowDefinitionService(t),
+			h.EnsureTeamService(t),
 		)
 	}
 	return h.Handler
