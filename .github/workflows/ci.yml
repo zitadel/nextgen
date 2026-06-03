@@ -155,8 +155,11 @@ jobs:
             docker images ghcr.io/zitadel/nextgen
             exit 1
           fi
-          echo "$IMAGE_REF" > dist/nextgen-image.tag
-          docker save "$IMAGE_ID" -o dist/nextgen-image.tar
+          # Save by a stable local tag: docker save by ID drops repo tags from the tarball.
+          CI_IMAGE="ghcr.io/zitadel/nextgen:ci-snapshot-smoke-amd64"
+          docker tag "$IMAGE_ID" "$CI_IMAGE"
+          echo "$CI_IMAGE" > dist/nextgen-image.tag
+          docker save "$CI_IMAGE" -o dist/nextgen-image.tar
 
       - name: Upload GoReleaser snapshot artifacts
         uses: actions/upload-artifact@v7
