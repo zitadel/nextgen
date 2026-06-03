@@ -35,24 +35,14 @@ describe("Next setup integration", () => {
       "--json",
     ]);
     expect(setup.exitCode).toBe(0);
-    const setupJson = parseJson(setup.stdout) as {
-      status: string;
-      data: { apply?: unknown };
-    };
+    const setupJson = parseJson(setup.stdout) as { status: string };
     expect(setupJson.status).toBe("ok");
-    expect(setupJson.data.apply).toMatchObject({ synced: true });
 
+    // The user schema and flow are provisioned server-side when the project
+    // is created, so setup does not write `.zitadel/schemas` or
+    // `.zitadel/flows`; only the framework files and project config are
+    // scaffolded locally.
     expect(await readFile(join(cwd, "zitadel.json"), "utf8")).toContain('"project"');
-    expect(await readFile(join(cwd, ".zitadel/schemas/user.json"), "utf8")).toContain(
-      '"x-unique": "project"',
-    );
-    const flowRaw = await readFile(join(cwd, ".zitadel/flows/default.json"), "utf8");
-    // Spec: `name` is the slug-pattern stable identifier; `template_name`
-    // was a non-spec field the CLI used to emit. `step.fields` is a
-    // string[] of property names referencing the user schema.
-    expect(flowRaw).toContain('"name": "default"');
-    expect(flowRaw).toContain('"user_schema":');
-    expect(flowRaw).toContain('"email"');
     const loginPage = await readFile(join(cwd, "app/login/page.tsx"), "utf8");
     expect(loginPage).toContain("zitadel-cli: managed-file v1");
     expect(loginPage).toContain('"use client"');

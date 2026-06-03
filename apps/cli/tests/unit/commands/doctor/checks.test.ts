@@ -286,6 +286,5 @@ describe("loadPatchContext", () => {
     expect(ctx.framework.id).toBe("next");
     expect(ctx.project.id).toBe("proj-001");
     expect(ctx.issuer).toBe("http://localhost:3000");
-    expect(ctx.userFields).toEqual(["email"]);
   });
 });
