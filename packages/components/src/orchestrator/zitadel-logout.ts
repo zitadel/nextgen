@@ -313,24 +313,19 @@ export class ZitadelLogout extends LitElement {
   }
 
   /**
-   * Calls the typed `endSession` operation (`GET /auth/end-session`) with
-   * `credentials: "include"`. The server clears the session cookie via
-   * `Set-Cookie: Max-Age=0`; on success this element fires `zitadel-signout`
-   * and optionally navigates to `postSignOutUrl`.
+   * Calls `DELETE /sessions/me` (`revokeMySession`) with `credentials: "include"`.
+   * The server validates the `__nextgen_session` cookie, deletes the session, and
+   * clears the cookie via `Set-Cookie: Max-Age=0`. On success this element fires
+   * `zitadel-signout` and optionally navigates to `postSignOutUrl`.
    */
   private async doLogout(): Promise<void> {
     this.loading = true;
     this.errorMessage = "";
 
-    const params = {
-      ...(this.clientId ? { client_id: this.clientId } : {}),
-      ...(this.postSignOutUrl ? { post_logout_redirect_uri: this.postSignOutUrl } : {}),
-    };
-
     try {
       const cfg = this.project ?? getZitadelConfig();
       if (!cfg) throw new Error("<zitadel-logout> requires a `config` prop (from configureZitadel()).");
-      await getApi(cfg).endSession(params, { credentials: "include" });
+      await getApi(cfg).revokeMySession({ credentials: "include" });
     } catch (error) {
       const message = error instanceof Error ? error.message : "";
       this.errorMessage = message || "Sign-out failed. Please try again.";
