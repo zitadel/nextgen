@@ -5,8 +5,11 @@ import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
-export default defineConfig(() => ({
+const consoleBase = "/ui/console/";
+
+export default defineConfig(({ command }) => ({
   root: import.meta.dirname,
+  base: command === "build" ? consoleBase : "/",
   server: {
     port: 5174,
     strictPort: true,

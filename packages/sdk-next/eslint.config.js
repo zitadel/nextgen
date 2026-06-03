@@ -48,12 +48,7 @@ export default tseslint.config(
       'import/resolver': {
         typescript: {
           alwaysTryTypes: true,
-          conditionNames: [
-            '@zitadel/source',
-            'types',
-            'import',
-            'default',
-          ],
+          conditionNames: ['@zitadel/source', 'types', 'import', 'default'],
         },
         node: true,
       },

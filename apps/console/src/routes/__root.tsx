@@ -1,5 +1,5 @@
 import { TanStackDevtools } from "@tanstack/react-devtools";
-import { Outlet, createRootRoute } from "@tanstack/react-router";
+import { Link, Outlet, createRootRoute } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 
 import "../styles.css";
@@ -14,9 +14,9 @@ function RootComponent() {
       <header>
         <h1>@zitadel/ui-react</h1>
         <nav aria-label="Playground">
-          <a href="/" aria-current="page">
+          <Link to="/" activeOptions={{ exact: true }}>
             Atoms
-          </a>
+          </Link>
         </nav>
       </header>
       <main>
