@@ -47,6 +47,9 @@
     },
     {
       "path": "./apps/demo-nuxt-e2e"
+    },
+    {
+      "path": "./apps/login-ui"
     }
   ]
 }
