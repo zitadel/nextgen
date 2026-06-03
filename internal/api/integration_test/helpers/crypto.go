@@ -1,40 +1,14 @@
 package helpers
 
 import (
-	"bytes"
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/x509"
-	"encoding/pem"
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/oidc/v3/pkg/op"
 )
-
-var exampleRsaPrivateKey *rsa.PrivateKey
-var exampleRsaPublicKeyBs []byte
-
-func init() {
-	var err error
-
-	exampleRsaPrivateKey, err = rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		panic(fmt.Sprintf("failed to generate RSA private key: %v", err))
-	}
-	publicBs, err := x509.MarshalPKIXPublicKey(&exampleRsaPrivateKey.PublicKey)
-	if err != nil {
-		panic(fmt.Sprintf("failed to marshal RSA public key: %v", err))
-	}
-	writer := &bytes.Buffer{}
-	err = pem.Encode(writer, &pem.Block{Type: "PUBLIC KEY", Bytes: publicBs})
-	if err != nil {
-		panic(fmt.Sprintf("failed to PEM-encode RSA public key: %v", err))
-	}
-	exampleRsaPublicKeyBs = writer.Bytes()
-}
 
 func (h *Harness) EnsureEncryptionKey(t *testing.T) [32]byte {
 	t.Helper()
