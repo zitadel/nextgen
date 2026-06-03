@@ -392,7 +392,9 @@ async function handleAuth(
       jwksTimeoutMs ?? 5000,
     );
     if (isValid) {
-      const tunnelled = tunnelHeaders(req, { 'x-nextgen-auth-token': cookieToken });
+      const tunnelled = tunnelHeaders(req, {
+        'x-nextgen-auth-token': cookieToken,
+      });
       return NextResponse.next({ request: { headers: tunnelled } });
     }
   }

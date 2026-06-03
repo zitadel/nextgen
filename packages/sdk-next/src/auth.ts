@@ -51,8 +51,7 @@ export async function auth(): Promise<AuthResult> {
   }
 
   // Opaque token path: ask the backend to validate the session.
-  const issuerUrl =
-    process.env.NEXTGEN_ISSUER_URL ?? 'http://localhost:4000';
+  const issuerUrl = process.env.NEXTGEN_ISSUER_URL ?? 'http://localhost:4000';
   try {
     const res = await fetch(`${issuerUrl}/sessions/me`, {
       method: 'GET',
