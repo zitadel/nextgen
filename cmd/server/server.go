@@ -85,7 +85,9 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 		}
 	}()
 
-	crypter, err := buildCrypter(cfg.Server.EncryptionKey)
+	key := make([]byte, 64)
+	hex.Encode(key, []byte(cfg.Server.EncryptionKey))
+	crypter, err := buildCrypter(string(key))
 	if err != nil {
 		return err
 	}

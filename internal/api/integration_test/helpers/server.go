@@ -1,6 +1,7 @@
 package helpers
 
 import (
+	"net"
 	"net/http/httptest"
 	"testing"
 
@@ -9,12 +10,31 @@ import (
 	"github.com/zitadel/nextgen/internal/api"
 )
 
+const TestServerAddress = "127.0.0.1:8081"
+
+func (h *Harness) EnsureTestListener(t *testing.T) net.Listener {
+	t.Helper()
+	if h.testListener == nil {
+		var err error
+		h.testListener, err = net.Listen("tcp", TestServerAddress)
+		require.NoError(t, err)
+	}
+	return h.testListener
+}
+
 func (h *Harness) EnsureTestServer(t *testing.T) *httptest.Server {
 	t.Helper()
 	if h.TestServer == nil {
-		h.TestServer = httptest.NewServer(
-			h.EnsureGeneratedServer(t),
-		)
+		srv := httptest.NewUnstartedServer(h.EnsureGeneratedServer(t))
+
+		// replace the default listener so that we can specify the exact address to which is listened. This is needed
+		// for the schema resolver. It requires a `BuiltinSchemaBase`.
+		err := srv.Listener.Close()
+		require.NoError(t, err)
+
+		srv.Listener = h.EnsureTestListener(t)
+		srv.Start()
+		h.TestServer = srv
 	}
 	return h.TestServer
 }

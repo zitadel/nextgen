@@ -13,7 +13,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database/repository"
 )
 
-const BuiltinSchemaBaseURL = "https://test.example.schemas.com/schemas"
+const BuiltinSchemaBaseURL = "http://" + TestServerAddress + "/schema"
 
 func (h *Harness) EnsureSchemaService(t *testing.T) *service.SchemaService {
 	t.Helper()

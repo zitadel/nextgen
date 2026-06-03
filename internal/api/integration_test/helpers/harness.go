@@ -1,6 +1,7 @@
 package helpers
 
 import (
+	"net"
 	"net/http"
 	"net/http/httptest"
 
@@ -18,6 +19,7 @@ type Harness struct {
 	DBPool          database.Pool
 	HttpClient      *http.Client
 	TestServer      *httptest.Server
+	testListener    net.Listener
 	Hasher          *crypto.PasswapHasher
 	Crypter         crypto.Crypter
 	SecretGenerator secrets.Generator
