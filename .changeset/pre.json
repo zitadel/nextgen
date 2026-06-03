@@ -1,0 +1,24 @@
+{
+  "mode": "pre",
+  "tag": "alpha",
+  "initialVersions": {
+    "@zitadel/cli": "0.0.0",
+    "@zitadel/console": "0.0.1",
+    "@zitadel/console-e2e": "0.0.1",
+    "@zitadel/demo-next": "0.0.0",
+    "@zitadel/demo-next-e2e": "0.0.1",
+    "@zitadel/demo-nuxt": "0.0.0",
+    "@zitadel/demo-nuxt-e2e": "0.0.1",
+    "@zitadel/api": "0.0.0",
+    "@zitadel/api-mock": "0.0.0",
+    "@zitadel/components": "0.0.1",
+    "@zitadel/design-tokens": "0.0.0",
+    "@zitadel/lint": "0.0.1",
+    "@zitadel/sdk-core": "0.0.0",
+    "@zitadel/sdk-next": "0.0.0",
+    "@zitadel/sdk-nuxt": "0.0.0",
+    "@zitadel/shared-component-styles": "0.0.0",
+    "@zitadel/ui-react": "0.0.0"
+  },
+  "changesets": []
+}

@@ -1,6 +1,6 @@
 /**
- * `@zitadel-nextgen/ui-react` — paired React implementations of the
- * `@zitadel-nextgen/components` Lit atoms. These exist for the internal Zitadel
+ * `@zitadel/ui-react` — paired React implementations of the
+ * `@zitadel/components` Lit atoms. These exist for the internal Zitadel
  * console, which is a pure React app and so cannot use the Lit-only `<zl-*>`
  * custom elements without an adapter. We deliberately avoid `@lit/react` so the
  * console ships zero Lit runtime; both layers share visuals through the

@@ -26,7 +26,7 @@
  *   sso-redirect --SUBMIT--> done
  *   anything --RESET--> .idle  (root on: uses child-relative target syntax)
  */
-import type { CreateFlowBodyPurpose } from "@zitadel-nextgen/api/generated/model";
+import type { CreateFlowBodyPurpose } from "@zitadel/api/generated/model";
 import { createMachine, type Actor, assign, createActor } from "xstate";
 
 export type FlowStepName =

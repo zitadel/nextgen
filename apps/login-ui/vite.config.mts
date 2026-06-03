@@ -11,7 +11,7 @@ export default defineConfig(({ command }) => ({
     strictPort: true,
   },
   cacheDir: "../../node_modules/.vite/apps/login-ui",
-  resolve: { conditions: ["@zitadel-nextgen/source"] },
+  resolve: { conditions: ["@zitadel/source"] },
   plugins: [nxViteTsPaths()],
   build: {
     outDir: "./dist",

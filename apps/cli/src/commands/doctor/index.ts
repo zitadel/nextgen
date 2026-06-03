@@ -55,7 +55,7 @@ export default class Doctor extends BaseCommand {
 
     if (failed.length > 0) {
       throw new ZitadelError("E_VALIDATION", "Zitadel doctor found issues", {
-        hint: "Run `npx zitadel@latest doctor --fix` to re-apply missing managed files.",
+        hint: "Run `npx @zitadel/cli@latest doctor --fix` to re-apply missing managed files.",
         details: data,
       });
     }

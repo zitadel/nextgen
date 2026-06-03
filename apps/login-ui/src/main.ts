@@ -1,4 +1,4 @@
-import "@zitadel-nextgen/components";
+import "@zitadel/components";
 
 import "./styles.css";
 
