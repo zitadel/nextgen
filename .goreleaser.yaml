@@ -3,8 +3,8 @@ project_name: nextgen
 
 before:
   hooks:
-    - sh -c 'if [ -f pnpm-workspace.yaml ]; then corepack pnpm install --frozen-lockfile; fi'
-    - sh -c 'if [ -f apps/console/package.json ]; then corepack pnpm nx build @zitadel-nextgen/console; fi'
+    - sh -c 'if [ -f pnpm-workspace.yaml ]; then COREPACK_DEFAULT_TO_LATEST=0 corepack pnpm install --frozen-lockfile; fi'
+    - sh -c 'if [ -f scripts/sync-embedded-ui-dist.sh ]; then sh scripts/sync-embedded-ui-dist.sh all; fi'
     - go mod download
 
 builds:

@@ -1,0 +1,20 @@
+server:
+  address: ":8080"
+  # Dev-only example — generate a unique 32-byte key for real deployments.
+  encryption_key: "4d61737465726b65794e65656473546f48617665333243686172616374657273"
+  console_enabled: true
+  console_path: /ui/console
+  login_enabled: true
+  login_path: /ui/login
+
+database:
+  postgres: postgres://zitadel:zitadel@localhost:5432/nextgen?sslmode=disable
+
+password_hasher:
+  hasher:
+    algorithm: bcrypt
+    cost: 10
+
+schema:
+  lru_cache_size: 1000
+  builtin_public_base: https://nextgen.com/api/schemas
