@@ -24,9 +24,11 @@ func TestCreateUser(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	harness.CreateUserSchema(t, project.ID, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
+	harness.CreateUserSchema(t, project, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
 
-	client := harness.EnsureAPIClient(t, project.ID)
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	client.SetToken(project.ProjectSecret)
 
 	params := api.CreateUserParams{
 		ProjectID: api.ProjectID(project.ID),
@@ -172,18 +174,21 @@ func TestCreateUser(t *testing.T) {
 }
 
 func TestGetUser(t *testing.T) {
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+	require.NoError(t, err)
+
+	team, err := harness.EnsureTeamService(t).CreateTeam(t.Context(), service.CreateTeamInput{
+		ProjectID: project.ID,
+	})
+	require.NoError(t, err)
+
+	harness.CreateUserSchema(t, project, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	client.SetToken(project.ProjectSecret)
+
 	t.Run("ok", func(t *testing.T) {
-		project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
-		client := harness.EnsureAPIClient(t, project.ID)
-		require.NoError(t, err)
-
-		team, err := harness.EnsureTeamService(t).CreateTeam(t.Context(), service.CreateTeamInput{
-			ProjectID: project.ID,
-		})
-		require.NoError(t, err)
-
-		harness.CreateUserSchema(t, project.ID, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
-
 		user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
 			ProjectID: project.ID,
 			TeamID:    &team.ID,

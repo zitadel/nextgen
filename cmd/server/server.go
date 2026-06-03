@@ -17,7 +17,7 @@ import (
 	"github.com/ianlancetaylor/jsonschema"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/zitadel/nextgen/internal/secrets"
+	"github.com/zitadel/nextgen/internal/domain/tokengen"
 	"github.com/zitadel/oidc/v3/pkg/op"
 
 	oasapi "github.com/zitadel/nextgen/api/generated"
@@ -97,6 +97,8 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 		return fmt.Errorf("bootstrap users: %w", err)
 	}
 
+	opaqueTokenGenerator := tokengen.NewOpaqueTokenGenerator(crypter)
+
 	// ── Repositories ─────────────────
 	projectRepo := repository.NewProjectRepository(pool)
 	userRepo := repository.NewUserRepository()
@@ -149,7 +151,7 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 		projectRepo,
 		schemaRepo,
 		flowDefinitionRepo,
-		secrets.NewRandomSecretGenerator(),
+		opaqueTokenGenerator,
 		builtinPublicBase.String(),
 		schemaValidator,
 	)
@@ -189,7 +191,7 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 			flowDefinitionSvc,
 			teamService,
 		),
-		api.NewSecurityHandler(),
+		api.NewSecurityHandler(opaqueTokenGenerator),
 		oasapi.WithErrorHandler(api.OgenErrorHandler))
 	if err != nil {
 		return fmt.Errorf("build api server: %w", err)

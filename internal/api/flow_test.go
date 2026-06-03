@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/zitadel/nextgen/internal/domain/tokengen"
 	"github.com/zitadel/oidc/v3/pkg/op"
 
 	gen "github.com/zitadel/nextgen/api/generated"
@@ -99,9 +100,14 @@ type testServer struct {
 func newTestServer(t *testing.T) *testServer {
 	t.Helper()
 	crypter := op.NewAES256GCMCrypto(fixedKey, "")
+	opaqueTokenGenerator := tokengen.NewOpaqueTokenGenerator(crypter)
 	fake := &fakeFlowSvc{}
 	handler := api.NewHandler(crypter, fake, stubAuthAttempt{}, nil, nil, nil, nil, nil, nil)
-	oas, err := gen.NewServer(handler, api.NewSecurityHandler(), gen.WithErrorHandler(api.OgenErrorHandler))
+	oas, err := gen.NewServer(
+		handler,
+		api.NewSecurityHandler(opaqueTokenGenerator),
+		gen.WithErrorHandler(api.OgenErrorHandler),
+	)
 	if err != nil {
 		t.Fatalf("NewServer: %v", err)
 	}

@@ -67,12 +67,14 @@ func (h *Harness) EnsureSchemaValidator(t *testing.T) *domain.SchemaValidator {
 	return h.SchemaValidator
 }
 
-func (h *Harness) CreateUserSchema(t *testing.T, projectID string, schema string) string {
+func (h *Harness) CreateUserSchema(t *testing.T, project *domain.Project, schema string) string {
 	t.Helper()
-	client := h.EnsureAPIClient(t, projectID)
+	client, err := NewApiClient(h.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	client.SetToken(project.ProjectSecret)
 
 	apiSchema := api.UserSchema{}
-	err := apiSchema.UnmarshalJSON([]byte(schema))
+	err = apiSchema.UnmarshalJSON([]byte(schema))
 	require.NoError(t, err)
 
 	req := api.CreateSchemaReq{
@@ -80,7 +82,7 @@ func (h *Harness) CreateUserSchema(t *testing.T, projectID string, schema string
 		UserSchema: apiSchema,
 	}
 	params := api.CreateSchemaParams{
-		ProjectID: api.ProjectID(projectID),
+		ProjectID: api.ProjectID(project.ID),
 	}
 
 	resp, err := client.CreateSchema(t.Context(), req, params)

@@ -13,17 +13,20 @@ import (
 )
 
 func TestCreateTeam(t *testing.T) {
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+	require.NoError(t, err)
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	client.SetToken(project.ProjectSecret)
 
 	t.Run("ok", func(t *testing.T) {
-		project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
-		require.NoError(t, err)
-
 		req := &api.CreateTeamRequest{}
 		params := api.CreateTeamParams{
 			ProjectID: api.ProjectID(project.ID),
 		}
 
-		resp, err := harness.EnsureAPIClient(t, project.ID).CreateTeam(t.Context(), req, params)
+		resp, err := client.CreateTeam(t.Context(), req, params)
 		require.NoError(t, err)
 
 		assert.IsType(t, &api.CreateTeamResponse{}, resp, helpers.MustMarshal(t, resp))
@@ -34,7 +37,7 @@ func TestCreateTeam(t *testing.T) {
 			req := &api.CreateTeamRequest{}
 			params := api.CreateTeamParams{}
 
-			resp, err := harness.EnsureAPIClient(t, "").CreateTeam(t.Context(), req, params)
+			resp, err := client.CreateTeam(t.Context(), req, params)
 			require.NoError(t, err)
 
 			assert.IsType(t, &api.CreateTeamBadRequest{}, resp, helpers.MustMarshal(t, resp))
@@ -43,9 +46,14 @@ func TestCreateTeam(t *testing.T) {
 }
 
 func TestGetTeam(t *testing.T) {
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+	require.NoError(t, err)
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	client.SetToken(project.ProjectSecret)
+
 	t.Run("ok", func(t *testing.T) {
-		project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
-		require.NoError(t, err)
 		team, err := harness.EnsureTeamService(t).CreateTeam(t.Context(), service.CreateTeamInput{
 			ProjectID: project.ID,
 		})
@@ -56,7 +64,7 @@ func TestGetTeam(t *testing.T) {
 			TeamID:    api.TeamID(team.ID),
 		}
 
-		resp, err := harness.EnsureAPIClient(t, project.ID).GetTeam(t.Context(), params)
+		resp, err := client.GetTeam(t.Context(), params)
 		require.NoError(t, err)
 
 		assert.IsType(t, &api.GetTeamResponse{}, resp, helpers.MustMarshal(t, resp))
@@ -64,15 +72,12 @@ func TestGetTeam(t *testing.T) {
 
 	t.Run("error", func(t *testing.T) {
 		t.Run("non existing team", func(t *testing.T) {
-			project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
-			require.NoError(t, err)
-
 			params := api.GetTeamParams{
 				ProjectID: api.ProjectID(project.ID),
 				TeamID:    api.TeamID("does-not-exist"),
 			}
 
-			resp, err := harness.EnsureAPIClient(t, project.ID).GetTeam(t.Context(), params)
+			resp, err := client.GetTeam(t.Context(), params)
 			require.NoError(t, err)
 
 			assert.IsType(t, &api.GetTeamNotFound{}, resp, helpers.MustMarshal(t, resp))

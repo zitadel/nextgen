@@ -2,83 +2,31 @@ package helpers
 
 import (
 	"context"
-	"fmt"
-	"testing"
 
-	"github.com/stretchr/testify/require"
 	api "github.com/zitadel/nextgen/api/generated"
 )
 
-func (h *Harness) EnsureAPIClient(t *testing.T, projectID string) *api.Client {
-	t.Helper()
-	serv := h.EnsureTestServer(t)
-	if h.apiClients == nil {
-		h.apiClients = make(map[string]*api.Client)
-	}
-	if client, ok := h.apiClients[projectID]; ok {
-		return client
-	}
-	client, err := api.NewClient(
-		serv.URL,
-		h.EnsureFakeSecuritySource(t, projectID),
-	)
-	require.NoError(t, err)
-	h.apiClients[projectID] = client
-	return client
-}
-
-func (h *Harness) EnsureAnonymousAPIClient(t *testing.T) *api.Client {
-	t.Helper()
-	serv := h.EnsureTestServer(t)
-	if h.anonymousClient == nil {
-		client, err := api.NewClient(
-			serv.URL,
-			h.EnsureAnonymousSecuritySource(t),
-		)
-		require.NoError(t, err)
-		h.anonymousClient = client
-	}
-	return h.anonymousClient
-}
-
-func (h *Harness) EnsureFakeSecuritySource(t *testing.T, projectID string) *FakeSecuritySource {
-	t.Helper()
-	if h.fakeSecuritySources == nil {
-		h.fakeSecuritySources = make(map[string]*FakeSecuritySource)
-	}
-	if source, ok := h.fakeSecuritySources[projectID]; ok {
-		return source
-	}
-	h.fakeSecuritySources[projectID] = &FakeSecuritySource{
-		projectID: projectID,
-	}
-	return h.fakeSecuritySources[projectID]
-}
-
-func (h *Harness) EnsureAnonymousSecuritySource(t *testing.T) *FakeSecuritySource {
-	t.Helper()
-	if h.anonymousSecuritySource == nil {
-		h.anonymousSecuritySource = &FakeSecuritySource{}
-	}
-	return h.anonymousSecuritySource
-}
-
 type FakeSecuritySource struct {
-	projectID string
+	Token  string
+	Scopes []string
+
+	Username string
+	Password string
+	Roles    []string
 }
 
 func (f FakeSecuritySource) OAuth2(ctx context.Context, operationName api.OperationName) (api.OAuth2, error) {
 	return api.OAuth2{
-		Token:  fmt.Sprintf("sk_%s", f.projectID),
-		Scopes: []string{"all"},
+		Token:  f.Token,
+		Scopes: f.Scopes,
 	}, nil
 }
 
 func (f FakeSecuritySource) UsernamePassword(ctx context.Context, operationName api.OperationName) (api.UsernamePassword, error) {
 	return api.UsernamePassword{
-		Username: "TEST_USER",
-		Password: "TEST_PASSWORD",
-		Roles:    []string{"all"},
+		Username: f.Username,
+		Password: f.Password,
+		Roles:    f.Roles,
 	}, nil
 }
 
@@ -96,3 +44,38 @@ func (f AnonymousSecuritySource) UsernamePassword(ctx context.Context, operation
 }
 
 var _ api.SecuritySource = (*FakeSecuritySource)(nil)
+
+type ApiClient struct {
+	*api.Client
+	securitySource *FakeSecuritySource
+}
+
+func NewApiClient(
+	serverURL string,
+) (*ApiClient, error) {
+	securitySource := &FakeSecuritySource{}
+	client, err := api.NewClient(serverURL, securitySource)
+	if err != nil {
+		return nil, err
+	}
+	return &ApiClient{
+		Client:         client,
+		securitySource: securitySource,
+	}, nil
+}
+
+func (c *ApiClient) SetToken(token string) {
+	c.securitySource.Token = token
+}
+func (c *ApiClient) SetScopes(scopes []string) {
+	c.securitySource.Scopes = scopes
+}
+func (c *ApiClient) SetUsername(username string) {
+	c.securitySource.Username = username
+}
+func (c *ApiClient) SetPassword(password string) {
+	c.securitySource.Password = password
+}
+func (c *ApiClient) SetRoles(roles []string) {
+	c.securitySource.Roles = roles
+}
