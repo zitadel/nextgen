@@ -685,78 +685,6 @@ type AuthorizeGetFound struct{}
 
 func (*AuthorizeGetFound) authorizeGetRes() {}
 
-// Ref: #
-type BeginPasskeyRegistrationRequest struct {
-	// The project in which the session and user reside.
-	ProjectID string `json:"project_id"`
-	// The authenticated session ID for the user registering a passkey.
-	SessionID string `json:"session_id"`
-}
-
-// GetProjectID returns the value of ProjectID.
-func (s *BeginPasskeyRegistrationRequest) GetProjectID() string {
-	return s.ProjectID
-}
-
-// GetSessionID returns the value of SessionID.
-func (s *BeginPasskeyRegistrationRequest) GetSessionID() string {
-	return s.SessionID
-}
-
-// SetProjectID sets the value of ProjectID.
-func (s *BeginPasskeyRegistrationRequest) SetProjectID(val string) {
-	s.ProjectID = val
-}
-
-// SetSessionID sets the value of SessionID.
-func (s *BeginPasskeyRegistrationRequest) SetSessionID(val string) {
-	s.SessionID = val
-}
-
-// Ref: #
-type BeginPasskeyRegistrationResponse struct {
-	// Opaque ID binding this session; pass to POST /passkeys/{registration_id}/finish.
-	RegistrationID string `json:"registration_id"`
-	// PublicKeyCredentialCreationOptions to pass directly to navigator.credentials.create().
-	// See https://www.w3.org/TR/webauthn/#dictionary-makecredentialoptions.
-	Options BeginPasskeyRegistrationResponseOptions `json:"options"`
-}
-
-// GetRegistrationID returns the value of RegistrationID.
-func (s *BeginPasskeyRegistrationResponse) GetRegistrationID() string {
-	return s.RegistrationID
-}
-
-// GetOptions returns the value of Options.
-func (s *BeginPasskeyRegistrationResponse) GetOptions() BeginPasskeyRegistrationResponseOptions {
-	return s.Options
-}
-
-// SetRegistrationID sets the value of RegistrationID.
-func (s *BeginPasskeyRegistrationResponse) SetRegistrationID(val string) {
-	s.RegistrationID = val
-}
-
-// SetOptions sets the value of Options.
-func (s *BeginPasskeyRegistrationResponse) SetOptions(val BeginPasskeyRegistrationResponseOptions) {
-	s.Options = val
-}
-
-func (*BeginPasskeyRegistrationResponse) beginPasskeyRegistrationRes() {}
-
-// PublicKeyCredentialCreationOptions to pass directly to navigator.credentials.create().
-// See https://www.w3.org/TR/webauthn/#dictionary-makecredentialoptions.
-type BeginPasskeyRegistrationResponseOptions map[string]jx.Raw
-
-func (s *BeginPasskeyRegistrationResponseOptions) init() BeginPasskeyRegistrationResponseOptions {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
-
 // Resolved branding configuration. Inherited from the app → team → project
 // hierarchy at flow creation time (most specific wins). Read-only projection —
 // branding is configured via the Team/App Branding API, not the Flow API.
@@ -2347,35 +2275,6 @@ func (*ErrorDetailsStatusCode) submitFlowEventRes()        {}
 func (*ErrorDetailsStatusCode) submitFlowStepRes()         {}
 func (*ErrorDetailsStatusCode) updateFlowDefinitionRes()   {}
 
-// ErrorResponseStatusCode wraps ErrorDetails with StatusCode.
-type ErrorResponseStatusCode struct {
-	StatusCode int
-	Response   ErrorDetails
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *ErrorResponseStatusCode) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// GetResponse returns the value of Response.
-func (s *ErrorResponseStatusCode) GetResponse() ErrorDetails {
-	return s.Response
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *ErrorResponseStatusCode) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-// SetResponse sets the value of Response.
-func (s *ErrorResponseStatusCode) SetResponse(val ErrorDetails) {
-	s.Response = val
-}
-
-func (*ErrorResponseStatusCode) beginPasskeyRegistrationRes()  {}
-func (*ErrorResponseStatusCode) finishPasskeyRegistrationRes() {}
-
 type ExchangeHandoffBadRequest ErrorDetails
 
 func (*ExchangeHandoffBadRequest) exchangeHandoffRes() {}
@@ -2741,80 +2640,6 @@ func (s *FieldValidationFormat) UnmarshalText(data []byte) error {
 		return errors.Errorf("invalid value: %q", data)
 	}
 }
-
-// Ref: #
-type FinishPasskeyRegistrationRequest struct {
-	// The project in which the registration session was created.
-	ProjectID string `json:"project_id"`
-	// The PublicKeyCredential returned by navigator.credentials.create(),
-	// serialized with ArrayBuffer fields base64url-encoded.
-	// Matches the output of the zl-passkey web component's zl-passkey-result event.
-	Attestation FinishPasskeyRegistrationRequestAttestation `json:"attestation"`
-}
-
-// GetProjectID returns the value of ProjectID.
-func (s *FinishPasskeyRegistrationRequest) GetProjectID() string {
-	return s.ProjectID
-}
-
-// GetAttestation returns the value of Attestation.
-func (s *FinishPasskeyRegistrationRequest) GetAttestation() FinishPasskeyRegistrationRequestAttestation {
-	return s.Attestation
-}
-
-// SetProjectID sets the value of ProjectID.
-func (s *FinishPasskeyRegistrationRequest) SetProjectID(val string) {
-	s.ProjectID = val
-}
-
-// SetAttestation sets the value of Attestation.
-func (s *FinishPasskeyRegistrationRequest) SetAttestation(val FinishPasskeyRegistrationRequestAttestation) {
-	s.Attestation = val
-}
-
-// The PublicKeyCredential returned by navigator.credentials.create(),
-// serialized with ArrayBuffer fields base64url-encoded.
-// Matches the output of the zl-passkey web component's zl-passkey-result event.
-type FinishPasskeyRegistrationRequestAttestation map[string]jx.Raw
-
-func (s *FinishPasskeyRegistrationRequestAttestation) init() FinishPasskeyRegistrationRequestAttestation {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
-
-// Ref: #
-type FinishPasskeyRegistrationResponse struct {
-	// Opaque identifier for the newly registered passkey credential.
-	PasskeyID string `json:"passkey_id"`
-	// When the passkey was registered.
-	CreatedAt time.Time `json:"created_at"`
-}
-
-// GetPasskeyID returns the value of PasskeyID.
-func (s *FinishPasskeyRegistrationResponse) GetPasskeyID() string {
-	return s.PasskeyID
-}
-
-// GetCreatedAt returns the value of CreatedAt.
-func (s *FinishPasskeyRegistrationResponse) GetCreatedAt() time.Time {
-	return s.CreatedAt
-}
-
-// SetPasskeyID sets the value of PasskeyID.
-func (s *FinishPasskeyRegistrationResponse) SetPasskeyID(val string) {
-	s.PasskeyID = val
-}
-
-// SetCreatedAt sets the value of CreatedAt.
-func (s *FinishPasskeyRegistrationResponse) SetCreatedAt(val time.Time) {
-	s.CreatedAt = val
-}
-
-func (*FinishPasskeyRegistrationResponse) finishPasskeyRegistrationRes() {}
 
 // Scopes which teams or apps this flow definition applies to. Empty or
 // omitted fields mean "no restriction"; when both are empty the definition
