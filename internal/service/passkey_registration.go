@@ -14,13 +14,12 @@ import (
 const passkeyRegistrationTTL = 5 * time.Minute
 
 // PasskeyRegistrationService is the authoritative service for the passkey registration
-// ceremony. It exposes [Begin] and [Finish] for direct callers (e.g. the REST handler)
-// and is wrapped by [FlowPasskeyRegistrationAdapter] for the flow engine.
+// ceremony. It exposes [Begin] and [Finish] for direct callers and is wrapped by
+// [FlowPasskeyRegistrationAdapter] for the flow engine.
 type PasskeyRegistrationService struct {
 	pool          database.Pool
 	registrations domain.PasskeyRegistrationRepository
 	passkeys      domain.UserPasskeyRepository
-	sessions      domain.SessionRepository
 	ids           idgen.Generator
 }
 
@@ -28,14 +27,12 @@ func NewPasskeyRegistrationService(
 	pool database.Pool,
 	registrations domain.PasskeyRegistrationRepository,
 	passkeys domain.UserPasskeyRepository,
-	sessions domain.SessionRepository,
 	ids idgen.Generator,
 ) *PasskeyRegistrationService {
 	return &PasskeyRegistrationService{
 		pool:          pool,
 		registrations: registrations,
 		passkeys:      passkeys,
-		sessions:      sessions,
 		ids:           ids,
 	}
 }
@@ -133,57 +130,6 @@ func (s *PasskeyRegistrationService) Finish(ctx context.Context, in FinishRegist
 	// Best-effort cleanup; don't shadow the success.
 	_ = s.registrations.Delete(ctx, s.pool, in.ProjectID, in.RegistrationID)
 	return nil
-}
-
-// --- Standalone /passkeys API (session-authenticated) ---
-
-// BeginPasskeyRegistrationInput is the input for the standalone begin endpoint.
-type BeginPasskeyRegistrationInput struct {
-	ProjectID string
-	SessionID string
-	RPID      string
-	RPOrigins []string
-}
-
-// BeginPasskeyRegistrationOutput is the response from the standalone begin endpoint.
-type BeginPasskeyRegistrationOutput struct {
-	RegistrationID string
-	Options        []byte // PublicKeyCredentialCreationOptions JSON
-}
-
-// BeginPasskeyRegistration starts a registration ceremony for an already-authenticated user.
-// The user is resolved from the active session.
-func (s *PasskeyRegistrationService) BeginPasskeyRegistration(ctx context.Context, in BeginPasskeyRegistrationInput) (BeginPasskeyRegistrationOutput, error) {
-	session, err := s.sessions.Get(ctx, s.pool, in.ProjectID, in.SessionID)
-	if err != nil {
-		return BeginPasskeyRegistrationOutput{}, err
-	}
-	if session.UserID == nil {
-		return BeginPasskeyRegistrationOutput{}, fmt.Errorf("passkey registration: session has no associated user")
-	}
-
-	out, err := s.Begin(ctx, BeginRegistrationInput{
-		ProjectID: in.ProjectID,
-		UserID:    *session.UserID,
-		RPID:      in.RPID,
-		RPOrigins: in.RPOrigins,
-	})
-	if err != nil {
-		return BeginPasskeyRegistrationOutput{}, err
-	}
-	return BeginPasskeyRegistrationOutput{RegistrationID: out.RegistrationID, Options: out.Options}, nil
-}
-
-// FinishPasskeyRegistrationInput is the input for the standalone finish endpoint.
-type FinishPasskeyRegistrationInput struct {
-	ProjectID      string
-	RegistrationID string
-	Attestation    []byte
-}
-
-// FinishPasskeyRegistration completes the registration ceremony and persists the credential.
-func (s *PasskeyRegistrationService) FinishPasskeyRegistration(ctx context.Context, in FinishPasskeyRegistrationInput) error {
-	return s.Finish(ctx, FinishRegistrationInput(in))
 }
 
 func (s *PasskeyRegistrationService) listPasskeys(ctx context.Context, projectID, userID string) ([]*domain.UserPasskey, error) {

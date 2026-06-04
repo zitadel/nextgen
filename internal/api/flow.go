@@ -308,6 +308,21 @@ func toFlowStepChallenge(c domain.FlowStepChallenge) api.FlowStepChallenge {
 	return out
 }
 
+// validateOriginAgainstProject returns an error if the origin is not in the
+// project's PreviewOrigins allowlist. An empty allowlist means allow all
+// (development/test mode).
+func validateOriginAgainstProject(originStr string, project *domain.Project) error {
+	if len(project.PreviewOrigins) == 0 {
+		return nil
+	}
+	for _, allowed := range project.PreviewOrigins {
+		if allowed == originStr {
+			return nil
+		}
+	}
+	return fmt.Errorf("origin %q is not allowed for this project", originStr)
+}
+
 // passkeyRPFromOrigin derives the WebAuthn relying-party id (the origin host,
 // without port) and the allowed origin from the browser Origin header. Returns
 // nil when the origin has no host.

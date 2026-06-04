@@ -116,7 +116,7 @@ func (f *fakeIDGen) New(_ string) (string, error) { return f.next, nil }
 // --- helpers ---
 
 func buildTestRegistrationSvc(regRepo *fakePasskeyRegRepo, pkRepo *fakePasskeyRepo) *service.PasskeyRegistrationService {
-	return service.NewPasskeyRegistrationService(nil, regRepo, pkRepo, nil, &fakeIDGen{next: "pkreg_test01"})
+	return service.NewPasskeyRegistrationService(nil, regRepo, pkRepo, &fakeIDGen{next: "pkreg_test01"})
 }
 
 // --- tests ---
