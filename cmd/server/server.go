@@ -17,21 +17,20 @@ import (
 	"github.com/ianlancetaylor/jsonschema"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/zitadel/nextgen/internal/secrets"
-	"github.com/zitadel/oidc/v3/pkg/op"
-
 	oasapi "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/bootstrap/users"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/domain/idgen"
+	"github.com/zitadel/nextgen/internal/secrets"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/staticui/console"
 	"github.com/zitadel/nextgen/internal/staticui/login"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	_ "github.com/zitadel/nextgen/internal/storage/database/dialect/all"
 	"github.com/zitadel/nextgen/internal/storage/database/repository"
+	"github.com/zitadel/oidc/v3/pkg/op"
 )
 
 func NewCommand() *cobra.Command {
@@ -104,6 +103,7 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 	userRepo := repository.NewUserRepository()
 	userPasswordRepo := repository.NewUserPasswordRepository()
 	userPasskeyRepo := repository.NewUserPasskeyRepository()
+	passkeyRegRepo := repository.NewPasskeyRegistrationRepository()
 	sessionRepo := repository.NewSessionRepository(pool)
 	flowDefinitionRepo := repository.NewFlowDefinitionRepository(pool)
 	attemptRepo := repository.NewAuthAttemptRepository(pool)
@@ -171,7 +171,9 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 	fields := domain.NewSchemaFieldResolver(storageSchemaResolver)
 	flowAuth := service.NewFlowAuthAttemptAdapter(authAttemptSvc)
 	createUserHandler := domain.NewFlowCreateUserHandler(ids, userRepo, userPasswordRepo, passwordHasher)
-	stateMachine := domain.NewFlowStateMachine(fields, createUserHandler, flowAuth, time.Now)
+	passkeyRegSvc := service.NewPasskeyRegistrationService(pool, passkeyRegRepo, userPasskeyRepo, ids)
+	passkeyRegAdapter := service.NewFlowPasskeyRegistrationAdapter(passkeyRegSvc)
+	stateMachine := domain.NewFlowStateMachine(fields, createUserHandler, flowAuth, passkeyRegAdapter, time.Now)
 
 	flowService := service.NewFlowService(pool, flowDefinitionRepo, stateMachine, ids)
 
@@ -190,8 +192,7 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 			userService,
 			schemaService,
 			flowDefinitionSvc,
-			teamService,
-		),
+			teamService),
 		api.NewSecurityHandler(),
 		oasapi.WithErrorHandler(api.OgenErrorHandler))
 	if err != nil {

@@ -132,9 +132,17 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 		}
 	}
 	// The browser Origin header drives the WebAuthn relying-party params when a
-	// step issues a passkey challenge.
+	// step issues a passkey challenge. Validate it against the project's allowlist.
 	if origin, ok := params.Origin.Get(); ok {
 		if rp := passkeyRPFromOrigin(origin); rp != nil {
+			project, err := h.projectService.Get(ctx, state.ProjectID)
+			if err != nil {
+				return internalErrorResponse(err), nil
+			}
+			if err := validateOriginAgainstProject(origin.String(), project); err != nil {
+				return errorResponseWithStatusCode(http.StatusBadRequest,
+					domain.ErrRequestInvalid().WithMessage(err.Error())), nil
+			}
 			submitReq.PasskeyRP = rp
 		}
 	}
@@ -282,7 +290,11 @@ func toFlowStep(step *domain.FlowStep) api.FlowStep {
 func toFlowStepChallenge(c domain.FlowStepChallenge) api.FlowStepChallenge {
 	out := api.FlowStepChallenge{}
 	if c.Method != "" {
-		out.Method = api.NewOptFlowStepChallengeMethod(api.FlowStepChallengeMethod(c.Method))
+		// All challenge ceremonies are exposed as "passkey" to the client; the
+		// distinction between authentication and registration is implicit in the
+		// shape of the options JSON (request vs creation options). The internal
+		// FlowChallengeMethodPasskeyRegister constant remains server-side only.
+		out.Method = api.NewOptFlowStepChallengeMethod(api.FlowStepChallengeMethodPasskey)
 	}
 	if c.ChallengeID != "" {
 		out.ChallengeID = api.NewOptString(c.ChallengeID)
@@ -294,6 +306,21 @@ func toFlowStepChallenge(c domain.FlowStepChallenge) api.FlowStepChallenge {
 		}
 	}
 	return out
+}
+
+// validateOriginAgainstProject returns an error if the origin is not in the
+// project's PreviewOrigins allowlist. An empty allowlist means allow all
+// (development/test mode).
+func validateOriginAgainstProject(originStr string, project *domain.Project) error {
+	if len(project.PreviewOrigins) == 0 {
+		return nil
+	}
+	for _, allowed := range project.PreviewOrigins {
+		if allowed == originStr {
+			return nil
+		}
+	}
+	return fmt.Errorf("origin %q is not allowed for this project", originStr)
 }
 
 // passkeyRPFromOrigin derives the WebAuthn relying-party id (the origin host,

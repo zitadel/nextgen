@@ -113,16 +113,35 @@ func (f *fakeAuthAttempts) SubmitPasskey(_ context.Context, in domain.FlowSubmit
 	return f.passkeyUserID, f.passkeyErr
 }
 
+type fakePasskeyRegistration struct {
+	issueOut    domain.FlowPasskeyRegistrationChallengeOutput
+	issueErr    error
+	submitErr   error
+	issueCalls  []domain.FlowIssuePasskeyRegistrationChallengeInput
+	submitCalls []domain.FlowSubmitPasskeyRegistrationInput
+}
+
+func (f *fakePasskeyRegistration) IssuePasskeyRegistrationChallenge(_ context.Context, in domain.FlowIssuePasskeyRegistrationChallengeInput) (domain.FlowPasskeyRegistrationChallengeOutput, error) {
+	f.issueCalls = append(f.issueCalls, in)
+	return f.issueOut, f.issueErr
+}
+
+func (f *fakePasskeyRegistration) SubmitPasskeyRegistration(_ context.Context, in domain.FlowSubmitPasskeyRegistrationInput) error {
+	f.submitCalls = append(f.submitCalls, in)
+	return f.submitErr
+}
+
 // flowTestWorld is the wiring a flow test exercises: resolver +
 // registry + handlers + state machine, sharing the fakes the test
 // inspects after a run.
 type flowTestWorld struct {
-	users    *fakeUserRepo
-	pws      *fakeUserPasswordRepo
-	ids      *idgenmock.MockGenerator
-	hasher   fakeHasher
-	attempts *fakeAuthAttempts
-	sm       *domain.FlowStateMachineRuntime
+	users      *fakeUserRepo
+	pws        *fakeUserPasswordRepo
+	ids        *idgenmock.MockGenerator
+	hasher     fakeHasher
+	attempts   *fakeAuthAttempts
+	passkeyReg *fakePasskeyRegistration
+	sm         *domain.FlowStateMachineRuntime
 }
 
 func newFlowTestWorld(t *testing.T) *flowTestWorld {
@@ -143,12 +162,13 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 		},
 	}
 
+	passkeyReg := &fakePasskeyRegistration{}
 	createUser := domain.NewFlowCreateUserHandler(ids, users, pws, hasher)
 	resolver := newDefaultResolver(t)
 	now := func() time.Time { return time.Unix(1700000000, 0).UTC() }
-	sm := domain.NewFlowStateMachine(resolver, createUser, attempts, now)
+	sm := domain.NewFlowStateMachine(resolver, createUser, attempts, passkeyReg, now)
 
-	return &flowTestWorld{users: users, pws: pws, ids: ids, hasher: hasher, attempts: attempts, sm: sm}
+	return &flowTestWorld{users: users, pws: pws, ids: ids, hasher: hasher, attempts: attempts, passkeyReg: passkeyReg, sm: sm}
 }
 
 // loginDefinition builds a single-step login flow: a `credentials`
@@ -1025,4 +1045,137 @@ func TestFlowDispatch_Recovery_IdentifierResolvedPasswordNotDispatched(t *testin
 	})
 	require.NoError(t, err)
 	assert.Empty(t, w.attempts.passwordCalls)
+}
+
+// passkeyRegisterDefinition builds a two-step registration flow:
+// an `identify` step (identifier field) followed by a `register` step
+// offering the `passkey_register` action, transitioning to `done`.
+func passkeyRegisterDefinition() *domain.FlowDefinition {
+	show := domain.FlowStepCompleteShow
+	return &domain.FlowDefinition{
+		ProjectID:  testProjectID,
+		ID:         "def-passkey-reg",
+		UserSchema: defaultSchemaURL,
+		Purposes: map[domain.FlowDefinitionPurpose]string{
+			domain.FlowDefinitionPurposeLogin: "register",
+		},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name: "register",
+				Actions: map[string]domain.FlowStepAction{
+					domain.FlowActionPasskeyRegister: {Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					domain.FlowActionPasskeyRegister: {Target: "done"},
+				},
+			},
+			{Name: "done", Complete: &show},
+		},
+	}
+}
+
+func TestFlowStateMachine_Process_PasskeyRegisterIssueThenVerify(t *testing.T) {
+	w := newFlowTestWorld(t)
+	w.passkeyReg.issueOut = domain.FlowPasskeyRegistrationChallengeOutput{
+		ChallengeID: "reg-1",
+		Options:     []byte(`{"rp":{"id":"example.com"}}`),
+	}
+	def := passkeyRegisterDefinition()
+
+	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+	// Pre-seed a resolved user so passkey_register can proceed.
+	start.State.CollectedData[domain.FlowCollectedUserIDKey] = "user_alice"
+
+	// Issue leg: passkey_register action mints a creation challenge.
+	issued, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+		Action:    domain.FlowActionPasskeyRegister,
+		PasskeyRP: &domain.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, issued.Step.Challenge)
+	assert.Equal(t, "reg-1", issued.Step.Challenge.ChallengeID)
+	assert.Equal(t, domain.FlowChallengeMethodPasskeyRegister, issued.Step.Challenge.Method)
+	require.NotNil(t, issued.State.PendingChallenge)
+	require.Len(t, w.passkeyReg.issueCalls, 1)
+	assert.Equal(t, "user_alice", w.passkeyReg.issueCalls[0].UserID)
+
+	// Verify leg: attestation clears the challenge and advances to done.
+	verified, err := w.sm.Process(t.Context(), nil, def, issued.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionPasskeyRegister,
+		ChallengeResponse: &domain.FlowChallengeResponse{
+			ChallengeID: "reg-1",
+			Method:      domain.FlowChallengeMethodPasskeyRegister,
+			Proof:       []byte(`{"attestation":"fake"}`),
+		},
+	})
+	require.NoError(t, err)
+	assert.Nil(t, verified.State.PendingChallenge)
+	require.Len(t, w.passkeyReg.submitCalls, 1)
+	assert.Equal(t, "reg-1", w.passkeyReg.submitCalls[0].ChallengeID)
+	assert.Equal(t, []byte(`{"attestation":"fake"}`), w.passkeyReg.submitCalls[0].Attestation)
+	require.NotNil(t, verified.Step.Complete)
+}
+
+func TestFlowStateMachine_Process_PasskeyRegisterRejectedKeepsStep(t *testing.T) {
+	w := newFlowTestWorld(t)
+	w.passkeyReg.issueOut = domain.FlowPasskeyRegistrationChallengeOutput{ChallengeID: "reg-1", Options: []byte(`{}`)}
+	w.passkeyReg.submitErr = domain.ErrAuthAttemptProofRejected(nil)
+	def := passkeyRegisterDefinition()
+
+	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+	start.State.CollectedData[domain.FlowCollectedUserIDKey] = "user_alice"
+
+	issued, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+		Action:    domain.FlowActionPasskeyRegister,
+		PasskeyRP: &domain.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, issued.State.PendingChallenge)
+
+	rejected, err := w.sm.Process(t.Context(), nil, def, issued.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionPasskeyRegister,
+		ChallengeResponse: &domain.FlowChallengeResponse{
+			ChallengeID: "reg-1",
+			Method:      domain.FlowChallengeMethodPasskeyRegister,
+			Proof:       []byte(`{}`),
+		},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, rejected.Step.Error)
+	assert.Equal(t, "auth_attempt.passkey_registration_invalid", *rejected.Step.Error)
+	assert.Nil(t, rejected.State.PendingChallenge)
+	assert.Equal(t, "register", rejected.State.CurrentStep)
+}
+
+func TestFlowStateMachine_Process_PasskeyRegisterRequiresIdentifiedUser(t *testing.T) {
+	w := newFlowTestWorld(t)
+	def := passkeyRegisterDefinition()
+
+	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+	// Do NOT seed a user ID — registration must fail.
+
+	_, err = w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+		Action:    domain.FlowActionPasskeyRegister,
+		PasskeyRP: &domain.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
+	})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, domain.ErrIntegrity)
 }
