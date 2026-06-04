@@ -1,16 +1,3 @@
-/**
- * `auth-form` partial — Sign in and Sign up screens (Figma screens file).
- *
- * Sign up 2xl frame: `6593:141741` (card `6593:141743`, attribution `6593:141767`).
- * Sign in 2xl frame: `6593:141983`, card `6593:141985`, stack `6593:141989`
- * (email + password + forgot link + CTAs on one step).
- * Sign-in errors: wrong credentials `6602:180268`, server alert `6594:125237`.
- *
- * Figma `Field+CTAs` stacks fields + CTAs in one column at 16px (`spacing-03`).
- * Primary/secondary are 48px buttons; register / sign_in are body copy with a
- * purple text link (24px row) — not `<zl-button hierarchy="text">`.
- */
-export const authFormTemplate = String.raw`
 <zl-page-shell data-zl-template-root>
   {% if branding.logo_url %}
     <img slot="header" class="zl-card-logo" src="{{ branding.logo_url }}" alt="" />
@@ -104,6 +91,7 @@ export const authFormTemplate = String.raw`
       ></zl-button>
     {% endif %}
 
+
     {% if actions.register %}
       <p class="zl-card-nav">
         {{ 'identifier.action.register.lead' | t }}<a href="#" class="zl-card-nav__link" data-action="register">{{ 'identifier.action.register.link' | t }}</a>
@@ -132,4 +120,3 @@ export const authFormTemplate = String.raw`
     {% mandatory_gates %}
   </zl-card>
 </zl-page-shell>
-`;
