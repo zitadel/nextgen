@@ -1,6 +1,6 @@
 export default defineNuxtConfig({
   buildDir: process.env.NEXTGEN_NUXT_BUILD_DIR ?? ".nuxt",
-  modules: ["@zitadel-nextgen/sdk-nuxt/module"],
+  modules: ["@zitadel/sdk-nuxt/module"],
   nextgen: {
     protectedRoutes: ["/admin", "/admin/*"],
     loginPath: "/login",
@@ -10,9 +10,9 @@ export default defineNuxtConfig({
   ssr: true,
   build: {
     transpile: [
-      "@zitadel-nextgen/components",
-      "@zitadel-nextgen/shared-component-styles",
-      "@zitadel-nextgen/design-tokens",
+      "@zitadel/components",
+      "@zitadel/shared-component-styles",
+      "@zitadel/design-tokens",
     ],
   },
   runtimeConfig: {

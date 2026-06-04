@@ -51,7 +51,7 @@ async function makeProject(): Promise<string> {
     join(cwd, "package.json"),
     JSON.stringify({
       name: "demo",
-      dependencies: { next: "^15", "@zitadel-nextgen/sdk-next": "latest" },
+      dependencies: { next: "^15", "@zitadel/sdk-next": "latest" },
     }),
   );
   await writeFile(

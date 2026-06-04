@@ -7,8 +7,8 @@ import { ZitadelError } from "../../lib/errors";
 import { createOrca, issuerFromPort, type FrameworkFacts, type Orca } from "../../lib/orca";
 import type { PatchContext } from "../../lib/orca/patchers/types";
 import { RENDERER_IDS } from "../../lib/orca/patchers/rule/next/renderers/registry";
-import type { CreateProject201 } from "@zitadel-nextgen/api/generated/model";
-import { createZitadelClient } from "@zitadel-nextgen/api/client";
+import type { CreateProject201 } from "@zitadel/api/generated/model";
+import { createZitadelClient } from "@zitadel/api/client";
 
 import { hasZitadelConfig, hasZitadelSecret } from "../../lib/project";
 import { PickFrameworkPrompt, SETUP_PROMPTS, type SetupAnswers } from "./prompts";
@@ -306,7 +306,7 @@ function buildSummary(opts: {
   scaffoldedFramework: boolean;
 }): Section[] {
   const { projectFacts, writtenRel, project, server, issuer, scaffoldedFramework } = opts;
-  const sdkPackage = "@zitadel-nextgen/sdk-next";
+  const sdkPackage = "@zitadel/sdk-next";
   const packageJsonHit = pickWrittenFile(writtenRel, "package.json");
 
   const detected: Row[] = [

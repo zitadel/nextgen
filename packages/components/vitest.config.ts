@@ -17,9 +17,9 @@ import { defineConfig } from "vitest/config";
  */
 export default defineConfig({
   plugins: [nxViteTsPaths()],
-  resolve: { conditions: ["@zitadel-nextgen/source"] },
+  resolve: { conditions: ["@zitadel/source"] },
   test: {
-    name: "@zitadel-nextgen/components",
+    name: "@zitadel/components",
     watch: false,
     coverage: {
       reportsDirectory: "./test-output/vitest/coverage",

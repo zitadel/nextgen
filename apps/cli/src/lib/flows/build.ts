@@ -1,4 +1,4 @@
-import type { CreateFlowDefinitionBodyFlowDefinition } from "@zitadel-nextgen/api/generated/model";
+import type { CreateFlowDefinitionBodyFlowDefinition } from "@zitadel/api/generated/model";
 
 /**
  * Canonical URI for the human-user JSON Schema the default flow

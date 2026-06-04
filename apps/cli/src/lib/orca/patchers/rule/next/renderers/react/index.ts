@@ -10,8 +10,8 @@ import type { RendererSpec } from "../types";
  * `next/dynamic({ ssr: false })` loader, builds the SDK project handle with
  * `configureZitadel({ projectId, proxyPath: "/__nextgen" })` and passes it to
  * the widget via `project={...}`. It also imports
- * `@zitadel-nextgen/sdk-next/client` for its `customElements.define`
- * side-effect — importing `@zitadel-nextgen/components` directly would fail on
+ * `@zitadel/sdk-next/client` for its `customElements.define`
+ * side-effect — importing `@zitadel/components` directly would fail on
  * strict-resolution package managers (pnpm, yarn PnP) because the app only
  * declares `sdk-next` as a direct dep. SSR is disabled because Lit's element
  * registration needs a browser.
@@ -29,7 +29,7 @@ export const reactRenderer: RendererSpec = {
   displayName: "React (Next.js App Router)",
   status: "available",
   frameworks: ["next"],
-  dependency: { name: "@zitadel-nextgen/sdk-next", version: "latest" },
+  dependency: { name: "@zitadel/sdk-next", version: "latest" },
   templates: {
     authPage(mode) {
       const componentName = mode === "login" ? "LoginPage" : "RegisterPage";
@@ -43,7 +43,7 @@ import dynamic from "next/dynamic";
 
 const ${elementName} = dynamic(
   async () => {
-    const { configureZitadel } = await import("@zitadel-nextgen/sdk-next/client");
+    const { configureZitadel } = await import("@zitadel/sdk-next/client");
     // Build the SDK project handle and pass it to the component via the
     // \`project\` prop. The component reads config from this prop directly, so
     // it works regardless of how the SDK packages are bundled. The backend URL
@@ -85,7 +85,7 @@ import dynamic from "next/dynamic";
 
 const ZitadelLogout = dynamic(
   async () => {
-    const { configureZitadel } = await import("@zitadel-nextgen/sdk-next/client");
+    const { configureZitadel } = await import("@zitadel/sdk-next/client");
     const project = configureZitadel({
       projectId: process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID ?? "",
       proxyPath: "/__nextgen",
@@ -120,7 +120,7 @@ export default function ProfilePage() {
       return {
         contents: `${MANAGED_MARKER}
 import type React from "react";
-import type { ZitadelProject } from "@zitadel-nextgen/sdk-next/client";
+import type { ZitadelProject } from "@zitadel/sdk-next/client";
 
 declare module "react" {
   namespace JSX {

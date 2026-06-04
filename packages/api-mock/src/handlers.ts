@@ -20,13 +20,13 @@ import {
   getExchangeHandoffResponseMock,
   getGetFlowStepMockHandler,
   getSubmitFlowStepMockHandler,
-} from "@zitadel-nextgen/api/generated/endpoints/zitadelNextGen.msw";
+} from "@zitadel/api/generated/endpoints/zitadelNextGen.msw";
 import type {
   CreateFlow201,
   CreateFlowBody,
   ExchangeHandoffBody,
   SubmitFlowStepBody,
-} from "@zitadel-nextgen/api/generated/model";
+} from "@zitadel/api/generated/model";
 import type { RequestHandler } from "msw";
 
 import { withBranding } from "./branding.js";
