@@ -21,12 +21,12 @@ func (h Handler) CreateFlowDefinition(ctx context.Context, req *api.CreateFlowDe
 		}, nil
 	}
 
-	create, flowSchemaURI, err := h.flowDefinitionService.Create(ctx, svcReq)
+	flowDefinition, err := h.flowDefinitionService.Create(ctx, svcReq)
 	if err != nil {
 		return errorResponse(err), nil // todo (grvijayan): review
 	}
 
-	return flowDefinitionDetailResponse(create, flowSchemaURI), nil
+	return flowDefinitionDetailResponse(flowDefinition), nil
 }
 
 func mapCreateRequestToService(req *api.CreateFlowDefinitionRequest) (service.CreateFlowDefinitionRequest, error) {
@@ -40,12 +40,6 @@ func mapCreateRequestToService(req *api.CreateFlowDefinitionRequest) (service.Cr
 		SchemaVersion: "1.0.0.", // todo (grvijayan): find a way to set this based on the schema URI or the request (currently not set in the request)
 	}
 
-	rawFlowDefinition, err := definition.MarshalJSON()
-	if err != nil {
-		return svcReq, fmt.Errorf("failed to marshal flow definition: %w", err)
-	}
-	svcReq.RawFlowDefinition = rawFlowDefinition
-
 	purposes := make(map[string]string, len(definition.GetPurposes()))
 	for purpose, entryStep := range definition.GetPurposes() {
 		purposes[purpose] = entryStep
@@ -58,10 +52,10 @@ func mapCreateRequestToService(req *api.CreateFlowDefinitionRequest) (service.Cr
 		svcReq.FlowSchemaURI = u.String()
 	}
 
-	if reqAudience, ok := definition.GetAudience().Get(); ok {
+	if definition.GetAudience().IsSet() {
 		svcReq.Audience = domain.FlowDefinitionAudience{
-			AppIDs:  reqAudience.GetAppIds(),
-			TeamIDs: reqAudience.GetTeamIds(),
+			AppIDs:  definition.Audience.Value.AppIds,
+			TeamIDs: definition.Audience.Value.TeamIds,
 		}
 	}
 
@@ -139,7 +133,10 @@ func mapCreateRequestToService(req *api.CreateFlowDefinitionRequest) (service.Cr
 
 		// complete
 		if step.GetComplete().IsSet() {
-			complete, _ := domain.FlowStepCompleteString(string(step.GetComplete().Value))
+			complete, err := domain.FlowStepCompleteString(string(step.GetComplete().Value))
+			if err != nil {
+				return svcReq, fmt.Errorf("step %q: invalid complete %q: %w", step.GetName(), step.GetComplete().Value, err)
+			}
 			s.Complete = &complete
 		}
 
@@ -169,7 +166,7 @@ func (h Handler) GetFlowDefinition(ctx context.Context, params api.GetFlowDefini
 	if err != nil {
 		return errorResponse(err), nil
 	}
-	return flowDefinitionDetailResponse(definition, ""), nil
+	return flowDefinitionDetailResponse(definition), nil
 }
 
 func (h Handler) ListFlowDefinitions(ctx context.Context, params api.ListFlowDefinitionsParams) (api.ListFlowDefinitionsRes, error) {
@@ -216,7 +213,7 @@ func flowDefinitionResponse(flowDefinition *domain.FlowDefinition) api.FlowDefin
 	}
 }
 
-func flowDefinitionDetailResponse(flowDefinition *domain.FlowDefinition, schemaURI string) *api.FlowDefinitionDetailResponse {
+func flowDefinitionDetailResponse(flowDefinition *domain.FlowDefinition) *api.FlowDefinitionDetailResponse {
 	purposes := mapDomainPurposesToAPI(flowDefinition.Purposes)
 	audience := api.OptFlowAudience{
 		Value: api.FlowAudience{
@@ -227,26 +224,27 @@ func flowDefinitionDetailResponse(flowDefinition *domain.FlowDefinition, schemaU
 	}
 	steps := mapDomainStepsToAPI(flowDefinition.Steps)
 
-	parsedSchemaURI, _ := url.Parse(schemaURI)
 	userSchemaURI, _ := url.Parse(flowDefinition.UserSchema)
 
 	return &api.FlowDefinitionDetailResponse{
-		Name:       flowDefinition.Name,
-		UserSchema: gu.Value(userSchemaURI),
-		Purposes:   purposes,
-		Audience:   audience,
-		Steps:      steps,
-		ID:         flowDefinition.ID,
-		ProjectID:  flowDefinition.ProjectID,
-		SchemaURI:  gu.Value(parsedSchemaURI),
-		Status:     flowDefinition.Status.String(),
-		CreatedAt:  flowDefinition.CreatedAt,
-		UpdatedAt:  flowDefinition.UpdatedAt,
+		ID:        flowDefinition.ID,
+		ProjectID: flowDefinition.ProjectID,
+		Status:    flowDefinition.Status.String(),
+		FlowDefinition: api.NewOptFlowDefinition(
+			api.FlowDefinition{
+				Name:       flowDefinition.Name,
+				Steps:      steps,
+				Purposes:   purposes,
+				Audience:   audience,
+				UserSchema: gu.Value(userSchemaURI),
+			}),
+		CreatedAt: flowDefinition.CreatedAt,
+		UpdatedAt: flowDefinition.UpdatedAt,
 	}
 }
 
-func mapDomainPurposesToAPI(domainPurposes map[domain.FlowDefinitionPurpose]string) api.FlowDefinitionDetailResponsePurposes {
-	purposes := make(api.FlowDefinitionDetailResponsePurposes, len(domainPurposes))
+func mapDomainPurposesToAPI(domainPurposes map[domain.FlowDefinitionPurpose]string) api.FlowDefinitionPurposes {
+	purposes := make(api.FlowDefinitionPurposes, len(domainPurposes))
 	for purpose, entry := range domainPurposes {
 		purposes[purpose.String()] = entry
 	}
@@ -257,57 +255,13 @@ func mapDomainStepsToAPI(domainSteps []domain.FlowDefinitionStep) []api.FlowDefi
 	steps := make([]api.FlowDefinitionStep, 0, len(domainSteps))
 	for _, step := range domainSteps {
 		// actions
-		actions := make(map[string]api.StepAction, len(step.Actions))
-		for name, action := range step.Actions {
-			actions[name] = api.StepAction{
-				Primary: api.NewOptBool(action.Primary),
-				TextKey: api.NewOptString(action.TextKey),
-			}
-		}
+		actions := mapActionsToAPI(step.Actions)
 		// gates
-		gates := make(map[string]api.Gate, len(step.Gates))
-		for name, gate := range step.Gates {
-			gateConfig := make(api.GateConfig, len(gate.Config))
-			for k, v := range gate.Config {
-				val, err := json.Marshal(v)
-				if err == nil {
-					gateConfig[k] = val
-				}
-			}
-			gates[name] = api.Gate{
-				Kind:     api.GateKind(gate.Kind.String()),
-				Provider: gate.Provider,
-				Config: api.OptGateConfig{
-					Value: gateConfig,
-					Set:   true,
-				},
-			}
-		}
+		gates := mapGatesToAPI(step.Gates)
 		// sso providers
-		ssoProviders := make([]api.SSOProvider, 0, len(step.SSOProviders))
-		for _, ssoProvider := range step.SSOProviders {
-			ssoProviders = append(ssoProviders, api.SSOProvider{
-				ID:       ssoProvider.ID,
-				Name:     ssoProvider.Name,
-				Template: ssoProvider.Template,
-			})
-		}
+		ssoProviders := mapSSOProvidersToAPI(step.SSOProviders)
 		// transitions
-		transitions := make(map[string]api.FlowDefinitionStepTransitionsItem, len(step.Transitions))
-		for n, transition := range step.Transitions {
-			var action string
-			if transition.Action != nil {
-				action = transition.Action.String()
-			}
-			transitions[n] = api.FlowDefinitionStepTransitionsItem{
-				Target: transition.Target,
-				Action: api.OptNilFlowDefinitionStepTransitionsItemAction{
-					Value: api.FlowDefinitionStepTransitionsItemAction(action),
-					Set:   transition.Action != nil, // todo: review
-					Null:  transition.Action == nil,
-				},
-			}
-		}
+		transitions := mapTransitionsToAPI(step.Transitions)
 
 		var complete string
 		if step.Complete != nil {
@@ -318,16 +272,16 @@ func mapDomainStepsToAPI(domainSteps []domain.FlowDefinitionStep) []api.FlowDefi
 			Fields: step.Fields,
 			Actions: api.OptFlowDefinitionStepActions{
 				Value: actions,
-				Set:   true,
+				Set:   actions != nil,
 			},
 			Gates: api.OptFlowDefinitionStepGates{
 				Value: gates,
-				Set:   true,
+				Set:   gates != nil,
 			},
 			SSOProviders: ssoProviders,
 			Transitions: api.OptFlowDefinitionStepTransitions{
 				Value: transitions,
-				Set:   true,
+				Set:   transitions != nil,
 			},
 			Complete: api.OptFlowDefinitionStepComplete{
 				Value: api.FlowDefinitionStepComplete(complete),
@@ -341,4 +295,86 @@ func mapDomainStepsToAPI(domainSteps []domain.FlowDefinitionStep) []api.FlowDefi
 		steps = append(steps, apiStep)
 	}
 	return steps
+}
+
+func mapActionsToAPI(domainActions map[string]domain.FlowStepAction) map[string]api.StepAction {
+	if len(domainActions) == 0 {
+		return nil
+	}
+	actions := make(map[string]api.StepAction, len(domainActions))
+	for name, action := range domainActions {
+		actions[name] = api.StepAction{
+			Primary: api.OptBool{
+				Value: action.Primary,
+				Set:   action.Primary,
+			},
+			TextKey: api.OptString{
+				Value: action.TextKey,
+				Set:   action.TextKey != "",
+			},
+		}
+	}
+	return actions
+}
+
+func mapTransitionsToAPI(domainTransitions map[string]domain.FlowStepTransition) map[string]api.FlowDefinitionStepTransitionsItem {
+	if len(domainTransitions) == 0 {
+		return nil
+	}
+	transitions := make(map[string]api.FlowDefinitionStepTransitionsItem, len(domainTransitions))
+	for n, transition := range domainTransitions {
+		var action string
+		if transition.Action != nil {
+			action = transition.Action.String()
+		}
+		transitions[n] = api.FlowDefinitionStepTransitionsItem{
+			Target: transition.Target,
+			Action: api.OptNilFlowDefinitionStepTransitionsItemAction{
+				Value: api.FlowDefinitionStepTransitionsItemAction(action),
+				Set:   transition.Action != nil, // todo: review
+				Null:  transition.Action == nil,
+			},
+		}
+	}
+	return transitions
+}
+
+func mapSSOProvidersToAPI(domainSSOProviders []domain.FlowSSOProvider) []api.SSOProvider {
+	if len(domainSSOProviders) == 0 {
+		return nil
+	}
+	ssoProviders := make([]api.SSOProvider, 0, len(domainSSOProviders))
+	for _, ssoProvider := range domainSSOProviders {
+		ssoProviders = append(ssoProviders, api.SSOProvider{
+			ID:       ssoProvider.ID,
+			Name:     ssoProvider.Name,
+			Template: ssoProvider.Template,
+		})
+	}
+	return ssoProviders
+}
+
+func mapGatesToAPI(domainGates map[string]domain.FlowStepGate) map[string]api.Gate {
+	if len(domainGates) == 0 {
+		return nil
+	}
+	gates := make(map[string]api.Gate, len(domainGates))
+	for name, gate := range domainGates {
+		gateConfig := make(api.GateConfig, len(gate.Config))
+		for k, v := range gate.Config {
+			val, err := json.Marshal(v)
+			if err == nil {
+				gateConfig[k] = val
+			}
+		}
+		gates[name] = api.Gate{
+			Kind:     api.GateKind(gate.Kind.String()),
+			Provider: gate.Provider,
+			Config: api.OptGateConfig{
+				Value: gateConfig,
+				Set:   true,
+			},
+		}
+	}
+	return gates
 }
