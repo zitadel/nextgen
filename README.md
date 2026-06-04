@@ -57,6 +57,17 @@ node apps/cli/dist/zitadel.mjs capabilities --json
 (cd packages/sdk-next && npm pack --dry-run)
 ```
 
+Fresh-app consumer journey check:
+
+```sh
+corepack pnpm nx run @zitadel/cli-journey-e2e:e2e-local
+```
+
+This opt-in check builds the local npm packages, publishes them to a temporary
+Verdaccio registry, starts a source backend with embedded Postgres, scaffolds a
+new Next.js app outside the repo, and verifies registration/login journeys
+against the generated app.
+
 ## CI
 
 Pull requests and pushes to `main` run:
@@ -66,10 +77,14 @@ Pull requests and pushes to `main` run:
 - Built CLI smoke checks.
 - npm package dry-run/pack checks.
 - A non-publishing GoReleaser snapshot.
+- `consumer-journey-e2e`, which downloads the current workflow's GoReleaser
+  snapshot image and npm package tarballs, installs them through a temporary
+  npm registry into a fresh Next.js app, and runs the Playwright user journey.
 
 CI uploads short-lived workflow artifacts for review: GoReleaser snapshot output
-and npm package tarballs. These artifacts expire after 7 days and are not
-release artifacts.
+and npm package tarballs. On consumer journey failures it also uploads focused
+diagnostics such as Playwright traces, setup JSON, package lock metadata, and
+service logs. These artifacts expire after 7 days and are not release artifacts.
 
 ## Build & release
 

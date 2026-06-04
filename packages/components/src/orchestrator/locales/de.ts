@@ -60,8 +60,7 @@ export const de: Locale = {
   "passkey-upsell.title": "Nächstes Mal schneller anmelden",
   "passkey-upsell.description": "Kein Passwort mehr nötig.",
   "passkey-upsell.description.line1": "Kein Passwort mehr nötig.",
-  "passkey-upsell.description.line2":
-    "Melde dich mit Face ID, Touch ID oder PIN an.",
+  "passkey-upsell.description.line2": "Melde dich mit Face ID, Touch ID oder PIN an.",
   "passkey-upsell.action.passkey_register": "Passkey einrichten",
   "passkey-upsell.action.skip": "Vorerst überspringen",
   "passkey-upsell.action.setup": "Passkey einrichten",
@@ -93,6 +92,7 @@ export const de: Locale = {
   // --- Ältere Step-Name-Aliase (alte geteilte Flows) ---
   "password.title": "Anmelden",
   "password.field.password": "Passwort",
+  "password.action.signin": "Anmelden",
   "password.action.passkey": "Mit Passkey anmelden",
   "password.action.register.lead": "Noch kein Konto? ",
   "password.action.register.link": "Registrieren",
@@ -103,6 +103,8 @@ export const de: Locale = {
   "register.field.password": "Passwort",
   "register.field.password.help":
     "Mindestens 8 Zeichen, einschließlich eines Sonderzeichens und einer Zahl.",
+  "register.action.password": "Mit Passwort fortfahren",
+  "register.action.passkey": "Mit Passkey registrieren",
   "register.action.submit": "Registrieren",
   "register.action.sign_in.lead": "Bereits ein Konto? ",
   "register.action.sign_in.link": "Anmelden",
@@ -135,8 +137,7 @@ export const de: Locale = {
     "Dieser Passkey ist nicht registriert. Bitte melde dich mit E-Mail und Passwort an.",
   "error.passkey_setup_failed":
     "Passkey-Registrierung wurde nicht abgeschlossen. Bitte versuche es erneut.",
-  "error.passkey_unsupported":
-    "Dieses Gerät unterstützt keine Passkeys",
+  "error.passkey_unsupported": "Dieses Gerät unterstützt keine Passkeys",
   "error.passkey_failed": "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
 
   // --- Feld- / Formularfehler ---

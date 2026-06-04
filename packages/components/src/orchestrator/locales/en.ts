@@ -82,8 +82,7 @@ export const en: Record<string, string> = {
   // Step: passkey-enroll (mandatory passkey ceremony — passkey-only path)
   // ═══════════════════════════════════════════════════════════════════════════
   "passkey-enroll.title": "Set up your passkey",
-  "passkey-enroll.description":
-    "Use Face ID, Touch ID, or your device PIN to create a passkey.",
+  "passkey-enroll.description": "Use Face ID, Touch ID, or your device PIN to create a passkey.",
   "passkey-enroll.action.passkey_register": "Set up passkey",
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -96,6 +95,7 @@ export const en: Record<string, string> = {
   // --- Legacy step-name aliases (old split-step flows) ---
   "password.title": "Sign in",
   "password.field.password": "Password",
+  "password.action.signin": "Sign in",
   "password.action.passkey": "Sign in with a passkey",
   "password.action.register.lead": "Don't have an account? ",
   "password.action.register.link": "Sign up",
@@ -104,8 +104,9 @@ export const en: Record<string, string> = {
   "register.field.email": "Work email",
   "register.field.email.placeholder": "you@company.com",
   "register.field.password": "Password",
-  "register.field.password.help":
-    "At least 8 characters, including a symbol and number.",
+  "register.field.password.help": "At least 8 characters, including a symbol and number.",
+  "register.action.password": "Continue with password",
+  "register.action.passkey": "Register with a passkey",
   "register.action.submit": "Sign up",
   "register.action.sign_in.lead": "Already have an account? ",
   "register.action.sign_in.link": "Sign in",
@@ -119,8 +120,7 @@ export const en: Record<string, string> = {
 
   // --- Password recovery ---
   "recover.title": "Check your email",
-  "recover.description":
-    "We sent a password reset link to your email address.",
+  "recover.description": "We sent a password reset link to your email address.",
   "recover.action.back": "Back to sign in",
 
   // --- Shared actions ---
@@ -136,8 +136,7 @@ export const en: Record<string, string> = {
   "error.passkey_cancelled": "Passkey setup was cancelled",
   "error.passkey_not_registered":
     "This passkey is not registered. Please sign in with your email and password.",
-  "error.passkey_setup_failed":
-    "Passkey registration did not complete. Please try again.",
+  "error.passkey_setup_failed": "Passkey registration did not complete. Please try again.",
   "error.passkey_unsupported": "This device does not support passkeys",
   "error.passkey_failed": "Something went wrong. Please try again.",
 

@@ -1,0 +1,45 @@
+services:
+  verdaccio:
+    image: verdaccio/verdaccio:6.2.2
+    user: "0"
+    ports:
+      - "127.0.0.1:${JOURNEY_REGISTRY_PORT:-4873}:4873"
+    volumes:
+      - "${JOURNEY_VERDACCIO_CONFIG:?JOURNEY_VERDACCIO_CONFIG is required}:/verdaccio/conf/config.yaml:ro"
+      - "${JOURNEY_VERDACCIO_STORAGE:?JOURNEY_VERDACCIO_STORAGE is required}:/verdaccio/storage"
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:4873/-/ping').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  postgres:
+    profiles: ["backend-image"]
+    image: postgres:18
+    environment:
+      POSTGRES_USER: zitadel
+      POSTGRES_PASSWORD: zitadel
+      POSTGRES_DB: nextgen
+      PGDATA: /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zitadel -d nextgen"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  nextgen:
+    profiles: ["backend-image"]
+    image: "${JOURNEY_BACKEND_IMAGE:?JOURNEY_BACKEND_IMAGE is required}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${JOURNEY_BACKEND_PORT:-8080}:8080"
+    environment:
+      NEXTGEN_SERVER_ADDRESS: ":8080"
+      NEXTGEN_DATABASE_POSTGRES: postgres://zitadel:zitadel@postgres:5432/nextgen?sslmode=disable
+      NEXTGEN_SERVER_ENCRYPTION_KEY: "${NEXTGEN_SERVER_ENCRYPTION_KEY:?NEXTGEN_SERVER_ENCRYPTION_KEY is required}"

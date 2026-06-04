@@ -46,6 +46,9 @@
       "path": "./apps/demo-next-e2e"
     },
     {
+      "path": "./apps/cli-journey-e2e"
+    },
+    {
       "path": "./apps/demo-nuxt-e2e"
     },
     {
