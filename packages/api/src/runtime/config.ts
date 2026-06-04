@@ -36,7 +36,26 @@ export interface ZitadelProject {
 
 export type { ZitadelApi };
 
-let currentProject: ZitadelProject | null = null;
+/**
+ * The app-wide project handle lives on `globalThis` under a registered symbol,
+ * not in a module-local variable. Bundlers can emit more than one copy of this
+ * module — `@zitadel/components`, for instance, bundles its own copy —
+ * and a module-local `let` gives each copy its own slot, so `configureZitadel()`
+ * in the app and `getZitadelConfig()` inside the web component would read
+ * different values. A `Symbol.for(...)` key on `globalThis` is shared across
+ * every copy in the realm, so all of them observe the one handle.
+ */
+const PROJECT_KEY = Symbol.for("@zitadel/api#currentProject");
+
+type ProjectStore = Record<symbol, ZitadelProject | null | undefined>;
+
+function getCurrentProject(): ZitadelProject | null {
+  return (globalThis as ProjectStore)[PROJECT_KEY] ?? null;
+}
+
+function setCurrentProject(project: ZitadelProject | null): void {
+  (globalThis as ProjectStore)[PROJECT_KEY] = project;
+}
 
 /**
  * Per-project API client cache. Ensures `getApi(project)` returns the
@@ -56,32 +75,34 @@ const apiCache = new WeakMap<ZitadelProject, ZitadelApi>();
 export function configureZitadel(config: ZitadelConfig): ZitadelProject {
   const resolvedProxyPath = config.proxyPath ?? "/__nextgen";
 
-  if (currentProject !== null) {
+  const existing = getCurrentProject();
+  if (existing !== null) {
     // Same values → no-op (safe for HMR / React strict mode double-mount)
     if (
-      currentProject.proxyPath === resolvedProxyPath &&
-      currentProject.projectId === config.projectId &&
-      currentProject.url === config.url
+      existing.proxyPath === resolvedProxyPath &&
+      existing.projectId === config.projectId &&
+      existing.url === config.url
     ) {
-      return currentProject;
+      return existing;
     }
     console.warn(
       `[zitadel] configureZitadel() already called with different values. ` +
         `Ignoring: ${JSON.stringify(config)}`,
     );
-    return currentProject;
+    return existing;
   }
 
-  currentProject = Object.freeze({
+  const project = Object.freeze({
     proxyPath: resolvedProxyPath,
     projectId: config.projectId,
     url: config.url,
   });
+  setCurrentProject(project);
 
   // Keep the global in sync for the generated code's internal use
   setProxyPath(resolvedProxyPath);
 
-  return currentProject;
+  return project;
 }
 
 /**
@@ -107,7 +128,7 @@ export function getApi(project: ZitadelProject): ZitadelApi {
  * has not been called yet.
  */
 export function getZitadelConfig(): ZitadelProject | null {
-  return currentProject;
+  return getCurrentProject();
 }
 
 /**
@@ -116,6 +137,6 @@ export function getZitadelConfig(): ZitadelProject | null {
  * across isolated test cases without the write-once guard rejecting them.
  */
 export function _resetConfigForTesting(): void {
-  currentProject = null;
+  setCurrentProject(null);
   setProxyPath("");
 }

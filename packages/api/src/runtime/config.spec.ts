@@ -54,6 +54,18 @@ describe("configureZitadel", () => {
     const project = configureZitadel({ proxyPath: "/__nextgen", projectId: "proj_1" });
     expect(getZitadelConfig()).toBe(project);
   });
+
+  test("handle is stored on globalThis so a duplicated module copy reads it", () => {
+    // `@zitadel/components` bundles its own copy of this module. That
+    // copy can't see this module's locals, but it CAN see globalThis. Simulate
+    // the other copy by reading the shared symbol slot directly — it must hold
+    // the very handle configureZitadel() returned here.
+    const project = configureZitadel({ proxyPath: "/__nextgen", projectId: "proj_1" });
+    const sharedSlot = (
+      globalThis as Record<symbol, unknown>
+    )[Symbol.for("@zitadel/api#currentProject")];
+    expect(sharedSlot).toBe(project);
+  });
 });
 
 describe("getApi", () => {
