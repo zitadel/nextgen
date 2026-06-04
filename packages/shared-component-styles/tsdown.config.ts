@@ -1,7 +1,7 @@
 import { defineConfig } from "tsdown";
 
 /**
- * Library build for `@zitadel-nextgen/shared-component-styles`.
+ * Library build for `@zitadel/shared-component-styles`.
  *
  * Only the typed attribution markup ships through tsdown. CSS surfaces are plain
  * stylesheets served from `src/` via the package `exports` map.

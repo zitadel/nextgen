@@ -7,7 +7,7 @@ import { AbstractSanityCheck, type CheckContext } from "./types";
 /**
  * Verifies the project still declares a Zitadel SDK dependency in
  * `package.json`. The patcher adds a scoped package (e.g.
- * `@zitadel-nextgen/sdk-next`); the check is generic over the `@zitadel*`
+ * `@zitadel/sdk-next`); the check is generic over the `@zitadel*`
  * scope so any framework renderer's dependency satisfies it.
  */
 export class DependencyCheck extends AbstractSanityCheck {

@@ -1,11 +1,11 @@
 {
-  "name": "@zitadel-nextgen/demo-next-e2e",
+  "name": "@zitadel/demo-next-e2e",
   "version": "0.0.1",
   "private": true,
   "devDependencies": {
     "@playwright/test": "catalog:",
-    "@zitadel-nextgen/api-mock": "workspace:*",
-    "@zitadel-nextgen/sdk-next": "workspace:*",
+    "@zitadel/api-mock": "workspace:*",
+    "@zitadel/sdk-next": "workspace:*",
     "eslint-plugin-playwright": "catalog:"
   }
 }

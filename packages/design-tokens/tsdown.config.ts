@@ -1,10 +1,10 @@
 import { defineConfig } from "tsdown";
 
 /**
- * Library build for `@zitadel-nextgen/design-tokens`.
+ * Library build for `@zitadel/design-tokens`.
  *
  * Only the typed TypeScript surface ships through tsdown:
- *   `import { tokens } from "@zitadel-nextgen/design-tokens"`
+ *   `import { tokens } from "@zitadel/design-tokens"`
  *
  * The CSS surfaces (`./css/tokens.css`, `./css/tailwind.css`) are plain
  * stylesheets emitted by Style Dictionary and served straight out of

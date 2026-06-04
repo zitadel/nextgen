@@ -25,7 +25,7 @@ export const defaultTemplate = String.raw`
  * positioning that lives *outside* any template — the rest of the visual
  * surface is owned by the `<zl-page-shell>` / `<zl-card>` atoms the
  * templates render. Token references resolve against the
- * `@zitadel-nextgen/design-tokens` CSS variables that are present on
+ * `@zitadel/design-tokens` CSS variables that are present on
  * `:host` via the branding stylesheet.
  */
 export const layoutChromeCss = `

@@ -31,7 +31,7 @@ export default defineConfig({
   // processes as e2e dependencies that must complete first.
   webServer: [
     {
-      command: "pnpm --filter @zitadel-nextgen/api-mock start",
+      command: "pnpm --filter @zitadel/api-mock start",
       url: "http://localhost:8080/.well-known/jwks.json",
       reuseExistingServer: true,
       cwd: workspaceRoot,
@@ -39,7 +39,7 @@ export default defineConfig({
       stderr: "pipe",
     },
     {
-      command: "pnpm --filter @zitadel-nextgen/demo-next dev",
+      command: "pnpm --filter @zitadel/demo-next dev",
       url: "http://localhost:3002/login",
       reuseExistingServer: true,
       cwd: workspaceRoot,

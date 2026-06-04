@@ -1,8 +1,8 @@
 import { LitElement, html } from "lit";
 import { customElement, property } from "lit/decorators.js";
 
-import cardHost from "@zitadel-nextgen/shared-component-styles/lit/card-host.css?inline";
-import cardSurface from "@zitadel-nextgen/shared-component-styles/card.css?inline";
+import cardHost from "@zitadel/shared-component-styles/lit/card-host.css?inline";
+import cardSurface from "@zitadel/shared-component-styles/card.css?inline";
 
 import type { AtomManifest } from "../manifest.js";
 import { baseHostStyles, surfaceStyles } from "../styles/index.js";

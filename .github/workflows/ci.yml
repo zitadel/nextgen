@@ -246,6 +246,30 @@ jobs:
       - name: Node checks
         run: corepack pnpm nx run-many -t lint,typecheck,build,test
 
+  changeset-check:
+    # Gate PRs: fail when a PR changes a public npm package without adding a
+    # changeset, so no consumer-visible change merges without a release note.
+    # Private packages (apps, demos, mocks, lint, design-tokens, ui-react, ...)
+    # are never published and so do not require a changeset. Publishing itself
+    # runs on pushes to main in release-npm.yml.
+    #
+    # The check lives in scripts/check-changeset-required.mjs so the publishable
+    # package list and rules are testable and shared, rather than duplicated in
+    # inline shell.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # Full history so we can diff against the PR base branch.
+          fetch-depth: 0
+
+      - name: Require a changeset for public package changes
+        run: |
+          git fetch --no-tags origin "${{ github.base_ref }}"
+          node scripts/check-changeset-required.mjs --base "origin/${{ github.base_ref }}"
+
   quickstart-smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -364,17 +388,17 @@ jobs:
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: >-
-          corepack pnpm --filter @zitadel-nextgen/demo-next-e2e
+          corepack pnpm --filter @zitadel/demo-next-e2e
           exec playwright install --with-deps chromium
 
       - name: Install Playwright system deps
         if: steps.playwright-cache.outputs.cache-hit == 'true'
         run: >-
-          corepack pnpm --filter @zitadel-nextgen/demo-next-e2e
+          corepack pnpm --filter @zitadel/demo-next-e2e
           exec playwright install-deps chromium
 
       # Boots the demo dev servers + api-mock through Playwright's webServer
-      # config; Nx rebuilds @zitadel-nextgen/components first via ^build.
+      # config; Nx rebuilds @zitadel/components first via ^build.
       # console-e2e has no specs yet — it's intentionally excluded until
       # Playwright would otherwise fail with "no tests found".
       #
@@ -383,7 +407,7 @@ jobs:
       - name: End-to-end tests
         run: >-
           corepack pnpm nx run-many -t e2e
-          -p @zitadel-nextgen/demo-next-e2e,@zitadel-nextgen/demo-nuxt-e2e
+          -p @zitadel/demo-next-e2e,@zitadel/demo-nuxt-e2e
 
       - name: Upload Playwright reports on failure
         if: failure()
@@ -429,14 +453,14 @@ jobs:
 
       - name: Dry-run npm packs
         run: |
-          for dir in apps/cli packages/sdk-core packages/sdk-next; do
+          for dir in apps/cli packages/api packages/components packages/sdk-core packages/sdk-next packages/sdk-nuxt; do
             (cd "$dir" && npm pack --dry-run)
           done
 
       - name: Create npm package artifacts
         run: |
           mkdir -p "$RUNNER_TEMP/zitadel-npm-packages"
-          for dir in apps/cli packages/sdk-core packages/sdk-next; do
+          for dir in apps/cli packages/api packages/components packages/sdk-core packages/sdk-next packages/sdk-nuxt; do
             (cd "$dir" && npm pack --pack-destination "$RUNNER_TEMP/zitadel-npm-packages")
           done
           ls -lh "$RUNNER_TEMP/zitadel-npm-packages"

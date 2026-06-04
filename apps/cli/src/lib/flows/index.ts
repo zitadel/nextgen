@@ -4,12 +4,12 @@
  * boundary stays observable.
  *
  * **Source of truth.** The wire shape lives in
- * `@zitadel-nextgen/api/generated/model` (orval-generated from the
+ * `@zitadel/api/generated/model` (orval-generated from the
  * OpenAPI spec). Callers that need the type import
  * `CreateFlowDefinitionBodyFlowDefinition` from there directly;
  * callers that need the runtime validator import
  * `CreateFlowDefinitionBody` from
- * `@zitadel-nextgen/api/generated/endpoints/zitadelNextGen.zod`. This
+ * `@zitadel/api/generated/endpoints/zitadelNextGen.zod`. This
  * module owns only the CLI-specific concerns: the password-flow
  * builder, env-var reference scanning, and the file-level
  * `validateFlows` helper that surfaces `E_VALIDATION` errors against
