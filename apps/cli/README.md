@@ -27,6 +27,11 @@ npm run dev
 
 `setup` creates a project on the Zitadel server, scaffolds `app/login`, `app/register`, `app/profile`, and `middleware.ts`, and writes `.env.local` and `.zitadel/`. The project's default user schema and login flow are provisioned server-side at creation time, so the CLI does not scaffold or upload them. Open `http://localhost:3000/login` to see the login page.
 
+The default project flow supports password registration/login, passkey
+registration/login, and optional passkey setup after password registration.
+Users who skip passkey setup can still sign in with password; users who add a
+passkey can sign in with either credential.
+
 ## Other commands
 
 - `zitadel doctor` — verify the generated files and local state

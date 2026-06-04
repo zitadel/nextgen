@@ -20,3 +20,7 @@ more than polish.
   npm package manifests must keep `"license": "MIT"`.
 - Server and embedded console changes are AGPL-3.0-only by default; public API,
   docs, CLI, and SDK paths are MIT exceptions per `LICENSING.md`.
+- For `consumer-journey-e2e` or `apps/cli-journey-e2e/**` changes, verify that
+  the test uses current workflow artifacts, a temporary registry for Zitadel
+  packages, the CLI JSON setup contract, required passkey coverage in CI, and
+  focused diagnostics that exclude bulky generated app directories.

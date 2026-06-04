@@ -43,6 +43,9 @@ and SDK packages will publish through future changesets automation.
 - `apps/demo-next-e2e/` and `apps/demo-nuxt-e2e/` are the Playwright projects
   that exercise each demo through real framework middleware against the
   api-mock TCP server.
+- `apps/cli-journey-e2e/` contains the fresh Next.js consumer journey
+  Playwright project. It installs local package tarballs through a temporary
+  registry and verifies CLI setup plus real registration/login flows.
 - `packages/components/` contains shared Lit components.
 - `packages/sdk-core/`, `packages/sdk-next/`, and `packages/sdk-nuxt/` contain
   public TypeScript SDKs.
@@ -72,13 +75,27 @@ boot real dev servers and need browsers installed:
 
 ```sh
 corepack pnpm exec playwright install
-corepack pnpm nx run-many -t e2e
+corepack pnpm nx run-many -t e2e -p @zitadel-nextgen/demo-next-e2e,@zitadel-nextgen/demo-nuxt-e2e
 ```
 
-In CI the dedicated `node-e2e` job (in `.github/workflows/ci.yml`) gates
-merges on the e2e suites, so changes that break the demo integrations
-fail the PR. Browsers are cached on the runner; an unrelated PR pays
-roughly one minute of wall time.
+The local reproduction command for the fresh-app consumer journey gate is:
+
+```sh
+corepack pnpm nx run @zitadel/cli-journey-e2e:e2e-local
+```
+
+This runner requires Docker for Verdaccio. By default it starts the backend from
+source with embedded Postgres, builds and packs local npm packages with pnpm,
+creates a temporary Next.js app outside the repo, runs CLI setup through npm,
+starts the generated app on `localhost`, and runs Playwright with one worker.
+Use `-- --backend image --image <docker-tag>` to run the backend through the
+local compose profile for image parity.
+
+In CI the dedicated `node-e2e` job (in `.github/workflows/ci.yml`) gates merges
+on the checked-in demo integrations. The separate `consumer-journey-e2e` job is
+the fresh-app quality gate: it consumes the current workflow's GoReleaser image
+and npm package artifacts instead of public Zitadel packages. Browsers are
+cached on the runner to reduce install cost.
 
 ## Testing Layers
 
@@ -96,6 +113,10 @@ upward**. When deciding where a new test belongs:
    and full-page navigation. Owned by `apps/<demo>-e2e/`. Each framework
    SDK (`sdk-next`, `sdk-nuxt`) has its own e2e project because the proxy
    and route-protection layers are framework-specific.
+
+The consumer journey suite is the exception to the checked-in demo ownership
+rule: it belongs in `apps/cli-journey-e2e/` and must exercise a freshly
+generated app because it protects the real CLI onboarding path.
 
 A new test belongs at e2e level only when the boundary it covers is
 exclusively the framework integration (middleware, cookie origin, full
@@ -205,6 +226,7 @@ Standard commands are documented in root `AGENTS.md` → **Local Checks** and
 - **TS lint + typecheck + build + test:** `corepack pnpm nx run-many -t lint,typecheck,build,test`
 - **Go vet + test:** `go vet ./... && go test -timeout=10m ./...`
 - **E2E:** `corepack pnpm nx run-many -t e2e -p @zitadel-nextgen/demo-next-e2e,@zitadel-nextgen/demo-nuxt-e2e`
+- **Consumer journey E2E:** `corepack pnpm nx run @zitadel/cli-journey-e2e:e2e-local`
 
 ### Running demo apps manually
 

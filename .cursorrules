@@ -9,3 +9,4 @@ Always read in this order:
 Start with:
 - [AGENTS.md](AGENTS.md)
 - [internal/storage/AGENTS.md](internal/storage/AGENTS.md)
+- [apps/cli-journey-e2e/AGENTS.md](apps/cli-journey-e2e/AGENTS.md)

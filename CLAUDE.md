@@ -1,5 +1,9 @@
 ## Agent Handoff
 
+Before changing files, read the root `AGENTS.md` and the nearest scoped
+`AGENTS.md` for the paths you touch. For consumer journey work, also read
+`apps/cli-journey-e2e/AGENTS.md`.
+
 Keep `AGENT_HANDOFF.md` continuously up to date throughout this session.
 
 **Run `/handoff` automatically:**
