@@ -290,7 +290,11 @@ func toFlowStep(step *domain.FlowStep) api.FlowStep {
 func toFlowStepChallenge(c domain.FlowStepChallenge) api.FlowStepChallenge {
 	out := api.FlowStepChallenge{}
 	if c.Method != "" {
-		out.Method = api.NewOptFlowStepChallengeMethod(api.FlowStepChallengeMethod(c.Method))
+		// All challenge ceremonies are exposed as "passkey" to the client; the
+		// distinction between authentication and registration is implicit in the
+		// shape of the options JSON (request vs creation options). The internal
+		// FlowChallengeMethodPasskeyRegister constant remains server-side only.
+		out.Method = api.NewOptFlowStepChallengeMethod(api.FlowStepChallengeMethodPasskey)
 	}
 	if c.ChallengeID != "" {
 		out.ChallengeID = api.NewOptString(c.ChallengeID)

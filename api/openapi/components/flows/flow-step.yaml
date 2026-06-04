@@ -110,7 +110,7 @@ properties:
     properties:
       method:
         type: string
-        enum: [passkey, passkey_register]
+        enum: [passkey]
         description: Challenge method. Determines which component handles the ceremony.
       challenge_id:
         type: string

@@ -121,19 +121,19 @@ func buildTestRegistrationSvc(regRepo *fakePasskeyRegRepo, pkRepo *fakePasskeyRe
 
 // --- tests ---
 
-func TestPasskeyRegistrationService_IssueChallenge_StoresSession(t *testing.T) {
+func TestPasskeyRegistrationService_Begin_StoresSession(t *testing.T) {
 	regRepo := &fakePasskeyRegRepo{}
 	pkRepo := &fakePasskeyRepo{}
 	svc := buildTestRegistrationSvc(regRepo, pkRepo)
 
-	out, err := svc.IssuePasskeyRegistrationChallenge(context.Background(), domain.FlowIssuePasskeyRegistrationChallengeInput{
+	out, err := svc.Begin(context.Background(), service.BeginRegistrationInput{
 		ProjectID: "proj-1",
 		UserID:    "user-1",
 		RPID:      "example.com",
 		RPOrigins: []string{"https://example.com"},
 	})
 	require.NoError(t, err)
-	assert.Equal(t, "pkreg_test01", out.ChallengeID)
+	assert.Equal(t, "pkreg_test01", out.RegistrationID)
 	assert.NotEmpty(t, out.Options)
 
 	// Options should be valid JSON containing creation challenge fields.
@@ -150,28 +150,26 @@ func TestPasskeyRegistrationService_IssueChallenge_StoresSession(t *testing.T) {
 	assert.True(t, regRepo.created.ExpiresAt.After(time.Now()))
 }
 
-func TestPasskeyRegistrationService_Submit_NotFoundReturnsProofRejected(t *testing.T) {
+func TestPasskeyRegistrationService_Finish_NotFoundReturnsError(t *testing.T) {
 	regRepo := &fakePasskeyRegRepo{}
 	pkRepo := &fakePasskeyRepo{}
 	svc := buildTestRegistrationSvc(regRepo, pkRepo)
 
-	err := svc.SubmitPasskeyRegistration(context.Background(), domain.FlowSubmitPasskeyRegistrationInput{
-		ProjectID:   "proj-1",
-		UserID:      "user-1",
-		ChallengeID: "pkreg_missing",
-		Attestation: []byte(`{}`),
+	err := svc.Finish(context.Background(), service.FinishRegistrationInput{
+		ProjectID:      "proj-1",
+		RegistrationID: "pkreg_missing",
+		Attestation:    []byte(`{}`),
 	})
 	require.Error(t, err)
-	assert.True(t, errors.Is(err, domain.ErrAuthAttemptProofRejected(nil)))
 }
 
-func TestPasskeyRegistrationService_Submit_InvalidAttestationReturnsProofRejected(t *testing.T) {
+func TestPasskeyRegistrationService_Finish_InvalidAttestationReturnsProofRejected(t *testing.T) {
 	regRepo := &fakePasskeyRegRepo{}
 	pkRepo := &fakePasskeyRepo{}
 	svc := buildTestRegistrationSvc(regRepo, pkRepo)
 
-	// First issue a challenge to create the session.
-	out, err := svc.IssuePasskeyRegistrationChallenge(context.Background(), domain.FlowIssuePasskeyRegistrationChallengeInput{
+	// First begin a ceremony to create the session.
+	out, err := svc.Begin(context.Background(), service.BeginRegistrationInput{
 		ProjectID: "proj-1",
 		UserID:    "user-1",
 		RPID:      "example.com",
@@ -180,11 +178,10 @@ func TestPasskeyRegistrationService_Submit_InvalidAttestationReturnsProofRejecte
 	require.NoError(t, err)
 
 	// Submit a garbage attestation — the domain should reject it.
-	err = svc.SubmitPasskeyRegistration(context.Background(), domain.FlowSubmitPasskeyRegistrationInput{
-		ProjectID:   "proj-1",
-		UserID:      "user-1",
-		ChallengeID: out.ChallengeID,
-		Attestation: []byte(`{"not":"valid-webauthn"}`),
+	err = svc.Finish(context.Background(), service.FinishRegistrationInput{
+		ProjectID:      "proj-1",
+		RegistrationID: out.RegistrationID,
+		Attestation:    []byte(`{"not":"valid-webauthn"}`),
 	})
 	require.Error(t, err)
 	// Domain wraps parse/verify errors as proof-rejected.

@@ -13,8 +13,9 @@ import (
 
 const passkeyRegistrationTTL = 5 * time.Minute
 
-// PasskeyRegistrationService implements [domain.FlowPasskeyRegistrationService]
-// for the flow engine and provides the standalone /passkeys begin/finish API.
+// PasskeyRegistrationService is the authoritative service for the passkey registration
+// ceremony. It exposes [Begin] and [Finish] for direct callers (e.g. the REST handler)
+// and is wrapped by [FlowPasskeyRegistrationAdapter] for the flow engine.
 type PasskeyRegistrationService struct {
 	pool          database.Pool
 	registrations domain.PasskeyRegistrationRepository
@@ -22,8 +23,6 @@ type PasskeyRegistrationService struct {
 	sessions      domain.SessionRepository
 	ids           idgen.Generator
 }
-
-var _ domain.FlowPasskeyRegistrationService = (*PasskeyRegistrationService)(nil)
 
 func NewPasskeyRegistrationService(
 	pool database.Pool,
@@ -41,17 +40,32 @@ func NewPasskeyRegistrationService(
 	}
 }
 
-// IssuePasskeyRegistrationChallenge implements [domain.FlowPasskeyRegistrationService].
-// Called by the flow state machine when a step's passkey_register action is selected.
-func (s *PasskeyRegistrationService) IssuePasskeyRegistrationChallenge(ctx context.Context, in domain.FlowIssuePasskeyRegistrationChallengeInput) (domain.FlowPasskeyRegistrationChallengeOutput, error) {
+// BeginRegistrationInput carries the parameters needed to start a passkey registration ceremony.
+type BeginRegistrationInput struct {
+	ProjectID string
+	UserID    string
+	RPID      string
+	RPOrigins []string
+}
+
+// BeginRegistrationOutput is returned by [PasskeyRegistrationService.Begin].
+type BeginRegistrationOutput struct {
+	RegistrationID string
+	Options        []byte // PublicKeyCredentialCreationOptions JSON
+}
+
+// Begin starts a passkey registration ceremony for the given user and relying-party
+// parameters. It mints a challenge, persists it, and returns the creation options
+// for the browser's navigator.credentials.create() call.
+func (s *PasskeyRegistrationService) Begin(ctx context.Context, in BeginRegistrationInput) (BeginRegistrationOutput, error) {
 	origins, err := parseOrigins(in.RPOrigins)
 	if err != nil {
-		return domain.FlowPasskeyRegistrationChallengeOutput{}, err
+		return BeginRegistrationOutput{}, err
 	}
 
 	existing, err := s.listPasskeys(ctx, in.ProjectID, in.UserID)
 	if err != nil {
-		return domain.FlowPasskeyRegistrationChallengeOutput{}, fmt.Errorf("passkey registration: list passkeys: %w", err)
+		return BeginRegistrationOutput{}, fmt.Errorf("passkey registration: list passkeys: %w", err)
 	}
 
 	challenge, err := domain.CreatePasskeyRegistrationChallenge(
@@ -60,12 +74,12 @@ func (s *PasskeyRegistrationService) IssuePasskeyRegistrationChallenge(ctx conte
 		in.RPID, origins,
 	)
 	if err != nil {
-		return domain.FlowPasskeyRegistrationChallengeOutput{}, fmt.Errorf("passkey registration: begin: %w", err)
+		return BeginRegistrationOutput{}, fmt.Errorf("passkey registration: begin: %w", err)
 	}
 
 	regID, err := s.ids.New(string(domain.PrefixPasskeyRegistration))
 	if err != nil {
-		return domain.FlowPasskeyRegistrationChallengeOutput{}, fmt.Errorf("passkey registration: generate id: %w", err)
+		return BeginRegistrationOutput{}, fmt.Errorf("passkey registration: generate id: %w", err)
 	}
 
 	if err := s.registrations.Create(ctx, s.pool, &domain.CreatePasskeyRegistration{
@@ -75,7 +89,7 @@ func (s *PasskeyRegistrationService) IssuePasskeyRegistrationChallenge(ctx conte
 		Challenge: challenge,
 		ExpiresAt: time.Now().Add(passkeyRegistrationTTL),
 	}); err != nil {
-		return domain.FlowPasskeyRegistrationChallengeOutput{}, fmt.Errorf("passkey registration: store challenge: %w", err)
+		return BeginRegistrationOutput{}, fmt.Errorf("passkey registration: store challenge: %w", err)
 	}
 
 	chWrapper := &domain.AuthChallengePasskeyRegistration{
@@ -83,21 +97,26 @@ func (s *PasskeyRegistrationService) IssuePasskeyRegistrationChallenge(ctx conte
 	}
 	options, err := domain.BuildPasskeyCreationOptions(chWrapper)
 	if err != nil {
-		return domain.FlowPasskeyRegistrationChallengeOutput{}, fmt.Errorf("passkey registration: build options: %w", err)
+		return BeginRegistrationOutput{}, fmt.Errorf("passkey registration: build options: %w", err)
 	}
 
-	return domain.FlowPasskeyRegistrationChallengeOutput{
-		ChallengeID: regID,
-		Options:     options,
-	}, nil
+	return BeginRegistrationOutput{RegistrationID: regID, Options: options}, nil
 }
 
-// SubmitPasskeyRegistration implements [domain.FlowPasskeyRegistrationService].
-// Called by the flow state machine when the attestation is posted.
-func (s *PasskeyRegistrationService) SubmitPasskeyRegistration(ctx context.Context, in domain.FlowSubmitPasskeyRegistrationInput) error {
-	reg, err := s.registrations.Get(ctx, s.pool, in.ProjectID, in.ChallengeID)
+// FinishRegistrationInput carries the parameters needed to complete a passkey registration.
+type FinishRegistrationInput struct {
+	ProjectID      string
+	RegistrationID string
+	Attestation    []byte
+}
+
+// Finish verifies the attestation against the stored challenge and persists the new
+// credential. The user identity is authoritative from the stored challenge record.
+// Rejection surfaces as [domain.ErrAuthAttemptProofRejected].
+func (s *PasskeyRegistrationService) Finish(ctx context.Context, in FinishRegistrationInput) error {
+	reg, err := s.registrations.Get(ctx, s.pool, in.ProjectID, in.RegistrationID)
 	if err != nil {
-		return domain.ErrAuthAttemptProofRejected(err)
+		return err
 	}
 
 	newPasskey, err := domain.VerifyPasskeyRegistration(reg.Challenge, in.Attestation)
@@ -105,14 +124,14 @@ func (s *PasskeyRegistrationService) SubmitPasskeyRegistration(ctx context.Conte
 		return domain.ErrAuthAttemptProofRejected(err)
 	}
 	newPasskey.ProjectID = in.ProjectID
-	newPasskey.UserID = in.UserID
+	newPasskey.UserID = reg.UserID
 
 	if err := s.passkeys.Create(ctx, s.pool, newPasskey); err != nil {
 		return fmt.Errorf("passkey registration: store credential: %w", err)
 	}
 
 	// Best-effort cleanup; don't shadow the success.
-	_ = s.registrations.Delete(ctx, s.pool, in.ProjectID, in.ChallengeID)
+	_ = s.registrations.Delete(ctx, s.pool, in.ProjectID, in.RegistrationID)
 	return nil
 }
 
@@ -142,18 +161,17 @@ func (s *PasskeyRegistrationService) BeginPasskeyRegistration(ctx context.Contex
 	if session.UserID == nil {
 		return BeginPasskeyRegistrationOutput{}, fmt.Errorf("passkey registration: session has no associated user")
 	}
-	userID := *session.UserID
 
-	out, err := s.IssuePasskeyRegistrationChallenge(ctx, domain.FlowIssuePasskeyRegistrationChallengeInput{
+	out, err := s.Begin(ctx, BeginRegistrationInput{
 		ProjectID: in.ProjectID,
-		UserID:    userID,
+		UserID:    *session.UserID,
 		RPID:      in.RPID,
 		RPOrigins: in.RPOrigins,
 	})
 	if err != nil {
 		return BeginPasskeyRegistrationOutput{}, err
 	}
-	return BeginPasskeyRegistrationOutput{RegistrationID: out.ChallengeID, Options: out.Options}, nil
+	return BeginPasskeyRegistrationOutput{RegistrationID: out.RegistrationID, Options: out.Options}, nil
 }
 
 // FinishPasskeyRegistrationInput is the input for the standalone finish endpoint.
@@ -165,24 +183,7 @@ type FinishPasskeyRegistrationInput struct {
 
 // FinishPasskeyRegistration completes the registration ceremony and persists the credential.
 func (s *PasskeyRegistrationService) FinishPasskeyRegistration(ctx context.Context, in FinishPasskeyRegistrationInput) error {
-	reg, err := s.registrations.Get(ctx, s.pool, in.ProjectID, in.RegistrationID)
-	if err != nil {
-		return err
-	}
-
-	newPasskey, err := domain.VerifyPasskeyRegistration(reg.Challenge, in.Attestation)
-	if err != nil {
-		return domain.ErrAuthAttemptProofRejected(err)
-	}
-	newPasskey.ProjectID = in.ProjectID
-	newPasskey.UserID = reg.UserID
-
-	if err := s.passkeys.Create(ctx, s.pool, newPasskey); err != nil {
-		return fmt.Errorf("passkey registration: store credential: %w", err)
-	}
-
-	_ = s.registrations.Delete(ctx, s.pool, in.ProjectID, in.RegistrationID)
-	return nil
+	return s.Finish(ctx, FinishRegistrationInput(in))
 }
 
 func (s *PasskeyRegistrationService) listPasskeys(ctx context.Context, projectID, userID string) ([]*domain.UserPasskey, error) {
