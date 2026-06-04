@@ -18,14 +18,9 @@ const requiredPackageDirs = [
   "packages/sdk-next",
   "packages/sdk-nuxt",
 ];
-const supportPackageDirs = ["packages/design-tokens", "packages/shared-component-styles"];
 const requiredPackageNames = new Set(
   await Promise.all(requiredPackageDirs.map(packageName)),
 );
-const expectedPackageNames = new Set([
-  ...requiredPackageNames,
-  ...(await Promise.all(supportPackageDirs.map(packageName))),
-]);
 const dependencyFields = [
   "dependencies",
   "devDependencies",
@@ -46,7 +41,10 @@ if (tarballs.length === 0) {
 for (const file of tarballs) {
   const tarball = join(tarballsDir, file);
   const manifest = readManifest(tarball);
-  if (!expectedPackageNames.has(manifest.name)) {
+  if (manifest.private === true) {
+    throw new Error(`${tarball} contains private package ${manifest.name}`);
+  }
+  if (!requiredPackageNames.has(manifest.name)) {
     throw new Error(`${tarball} contains unexpected package ${manifest.name}`);
   }
   if (manifests.has(manifest.name)) {

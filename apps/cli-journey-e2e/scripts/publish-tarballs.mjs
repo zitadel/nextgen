@@ -19,6 +19,9 @@ if (tarballs.length === 0) {
 for (const file of tarballs) {
   const tarball = join(tarballsDir, file);
   const manifest = readManifest(tarball);
+  if (manifest.private === true) {
+    throw new Error(`refusing to publish private package ${manifest.name} from ${tarball}`);
+  }
   run("npm", [
     "publish",
     tarball,

@@ -17,7 +17,7 @@ corepack pnpm nx run @zitadel/cli-journey-e2e:e2e-local
 The default mode uses Docker only for Verdaccio. The backend runs from local
 source with embedded Postgres:
 
-1. Build the publishable workspace packages.
+1. Build the six public workspace packages.
 2. Pack package tarballs with `corepack pnpm --dir <package> pack`.
 3. Verify tarballs are installable and do not contain `catalog:` or
    `workspace:` dependency specs.
@@ -56,9 +56,11 @@ Useful environment overrides:
 ## CI gate
 
 The `consumer-journey-e2e` workflow job does not use public Zitadel packages. It
-downloads the GoReleaser snapshot image and npm package tarballs produced by the
-same workflow, publishes those tarballs to Verdaccio, creates a fresh Next.js
-app, and runs the same Playwright project against the generated app.
+downloads the GoReleaser snapshot image and the six public npm package tarballs
+produced by the same workflow, publishes those tarballs to Verdaccio, creates a
+fresh Next.js app, and runs the same Playwright project against the generated
+app. Private support packages such as design tokens are bundled into the public
+packages that need them and must not be uploaded or published.
 
 Failure diagnostics intentionally stay small: Playwright report/output, setup
 JSON, setup stderr, metadata, generated app `package.json` and

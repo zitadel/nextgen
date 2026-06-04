@@ -26,8 +26,6 @@ const packageDirs = [
   "packages/sdk-core",
   "packages/sdk-next",
   "packages/sdk-nuxt",
-  "packages/design-tokens",
-  "packages/shared-component-styles",
 ];
 
 const options = parseArgs(process.argv.slice(2));
