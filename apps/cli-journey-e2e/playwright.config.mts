@@ -1,7 +1,7 @@
 import { nxE2EPreset } from "@nx/playwright/preset";
 import { defineConfig, devices } from "@playwright/test";
 
-const baseURL = process.env.JOURNEY_APP_URL ?? "http://127.0.0.1:3000";
+const baseURL = process.env.JOURNEY_APP_URL ?? "http://localhost:3000";
 
 export default defineConfig({
   ...nxE2EPreset(import.meta.filename, { testDir: "./src" }),

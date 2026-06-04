@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 test.describe.configure({ mode: "serial" });
 
-test("password registration, logout, and login work in a fresh Next app", async ({
+test("password-only registration, logout, and password login work in a fresh Next app", async ({
   page,
 }) => {
   const email = uniqueEmail("password");
@@ -10,7 +10,7 @@ test("password registration, logout, and login work in a fresh Next app", async 
 
   await expectProtectedRouteToRedirect(page);
   await page.goto("/login");
-  await registerWithPassword(page, email, password);
+  await registerWithPassword(page, email, password, { setupPasskey: false });
   await expectSignedIn(page);
   await expectSessionCookie(page);
 
@@ -20,27 +20,11 @@ test("password registration, logout, and login work in a fresh Next app", async 
   await expectSessionCookie(page);
 });
 
-test.describe("passkey journey", () => {
-  test.skip(
-    process.env.JOURNEY_ENABLE_PASSKEY !== "1",
-    "Passkey journey is opt-in until the PR 206 stack seeds a passkey registration flow.",
-  );
-
-  test("passkey registration, logout, and passkey login work in a fresh Next app", async ({
+if (process.env.JOURNEY_ENABLE_PASSKEY !== "0") {
+  test("passkey-only registration, logout, and passkey login work in a fresh Next app", async ({
     page,
   }) => {
-    const client = await page.context().newCDPSession(page);
-    await client.send("WebAuthn.enable");
-    await client.send("WebAuthn.addVirtualAuthenticator", {
-      options: {
-        protocol: "ctap2",
-        transport: "internal",
-        hasResidentKey: true,
-        hasUserVerification: true,
-        isUserVerified: true,
-        automaticPresenceSimulation: true,
-      },
-    });
+    await enableVirtualAuthenticator(page);
 
     const email = uniqueEmail("passkey");
 
@@ -54,7 +38,31 @@ test.describe("passkey journey", () => {
     await expectSignedIn(page);
     await expectSessionCookie(page);
   });
-});
+
+  test("password-plus-passkey registration supports password and passkey login", async ({
+    page,
+  }) => {
+    await enableVirtualAuthenticator(page);
+
+    const email = uniqueEmail("password-passkey");
+    const password = "Correct-Horse-43!";
+
+    await page.goto("/login");
+    await registerWithPassword(page, email, password, { setupPasskey: true });
+    await expectSignedIn(page);
+    await expectSessionCookie(page);
+
+    await logout(page);
+    await loginWithPassword(page, email, password);
+    await expectSignedIn(page);
+    await expectSessionCookie(page);
+
+    await logout(page);
+    await loginWithPasskey(page, email);
+    await expectSignedIn(page);
+    await expectSessionCookie(page);
+  });
+}
 
 async function expectProtectedRouteToRedirect(page: Page): Promise<void> {
   await page.goto("/profile");
@@ -65,17 +73,16 @@ async function registerWithPassword(
   page: Page,
   email: string,
   password: string,
+  options: { setupPasskey: boolean },
 ): Promise<void> {
   await fillEmail(page, email);
   await advanceUnknownUserToRegistration(page);
   await expectRegistrationChoice(page);
   await fillEmailIfVisible(page, email);
+  await choosePasswordRegistration(page);
   await fillPassword(page, password);
   await clickSubmit(page);
-  const skip = actionLocator(page, "skip").or(page.getByRole("button", { name: /skip for now/i }));
-  if (await skip.isVisible({ timeout: 15_000 }).catch(() => false)) {
-    await skip.click();
-  }
+  await completePasskeyUpsell(page, options.setupPasskey);
 }
 
 async function loginWithPassword(
@@ -121,6 +128,21 @@ async function expectSessionCookie(page: Page): Promise<void> {
   expect(sessionCookie?.httpOnly).toBe(true);
 }
 
+async function enableVirtualAuthenticator(page: Page): Promise<void> {
+  const client = await page.context().newCDPSession(page);
+  await client.send("WebAuthn.enable");
+  await client.send("WebAuthn.addVirtualAuthenticator", {
+    options: {
+      protocol: "ctap2",
+      transport: "internal",
+      hasResidentKey: true,
+      hasUserVerification: true,
+      isUserVerified: true,
+      automaticPresenceSimulation: true,
+    },
+  });
+}
+
 async function logout(page: Page): Promise<void> {
   const logout = logoutLocator(page);
   if (!(await logout.first().isVisible({ timeout: 1000 }).catch(() => false))) {
@@ -140,6 +162,29 @@ async function advanceUnknownUserToRegistration(page: Page): Promise<void> {
     return;
   }
   await clickSubmit(page);
+}
+
+async function choosePasswordRegistration(page: Page): Promise<void> {
+  if (await isPasswordVisible(page)) {
+    return;
+  }
+  await clickAction(page, /continue.*password|password/i, ["submit"]);
+}
+
+async function completePasskeyUpsell(
+  page: Page,
+  setupPasskey: boolean,
+): Promise<void> {
+  await expect(
+    page.getByRole("heading", { name: /sign in faster|passkey/i }),
+  ).toBeVisible({ timeout: 30_000 });
+
+  if (setupPasskey) {
+    await clickAction(page, /set up.*passkey|passkey/i, ["passkey_register"]);
+    return;
+  }
+
+  await clickAction(page, /skip/i, ["skip"]);
 }
 
 async function expectRegistrationChoice(page: Page): Promise<void> {

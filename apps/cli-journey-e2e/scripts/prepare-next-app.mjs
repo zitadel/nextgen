@@ -113,7 +113,7 @@ const metadataPath = join(outputDir, "metadata.json");
 await writeFile(metadataPath, `${JSON.stringify(metadata, null, 2)}\n`);
 
 await exportEnv("JOURNEY_APP_DIR", appDir);
-await exportEnv("JOURNEY_APP_URL", "http://127.0.0.1:3000");
+await exportEnv("JOURNEY_APP_URL", "http://localhost:3000");
 await exportEnv("JOURNEY_OUTPUT_DIR", outputDir);
 await exportOutput("app_dir", appDir);
 await exportOutput("output_dir", outputDir);

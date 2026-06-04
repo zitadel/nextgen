@@ -14,6 +14,7 @@ export const en: Record<string, string> = {
   "identifier.field.email": "Work email",
   "identifier.field.email.placeholder": "you@company.com",
   "identifier.field.password": "Password",
+  "identifier.action.continue": "Continue",
   "identifier.action.passkey": "Sign in with a passkey",
   "identifier.action.register.lead": "Don't have an account? ",
   "identifier.action.register.link": "Sign up",
@@ -21,6 +22,7 @@ export const en: Record<string, string> = {
   // --- Sign in / password step (same screen; split flow step 2) ---
   "password.title": "Sign in",
   "password.field.password": "Password",
+  "password.action.signin": "Sign in",
   "password.action.passkey": "Sign in with a passkey",
   "password.action.register.lead": "Don't have an account? ",
   "password.action.register.link": "Sign up",
@@ -32,12 +34,23 @@ export const en: Record<string, string> = {
   "register.field.password": "Password",
   "register.field.password.help":
     "At least 8 characters, including a symbol and number.",
+  "register.action.password": "Continue with password",
+  "register.action.passkey": "Register with a passkey",
   "register.action.submit": "Sign up",
   "register.action.sign_in.lead": "Already have an account? ",
   "register.action.sign_in.link": "Sign in",
 
+  // --- Sign up / password step ---
+  "register-password.title": "Create your account",
+  "register-password.description": "Choose a password for this account.",
+  "register-password.field.password": "Password",
+  "register-password.field.password.help":
+    "At least 8 characters, including a symbol and number.",
+  "register-password.action.submit": "Sign up",
+
   // --- Passkey upsell (`6594:630`, heading `6594:89142`, body `6594:12796`) ---
   "passkey-upsell.title": "Sign in faster next time",
+  "passkey-upsell.description": "Set up a passkey for faster sign in.",
   "passkey-upsell.description.line1": "No password needed ever again.",
   "passkey-upsell.description.line2": "Sign in with Face ID, Touch ID, or PIN.",
   "passkey-upsell.action.setup": "Set up passkey",

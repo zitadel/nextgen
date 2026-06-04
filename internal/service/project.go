@@ -118,11 +118,10 @@ func (s *projectService) createDefaultLoginFlowDefinitions(ctx context.Context, 
 		projectID,
 		schemas.DefaultHumanUserSchemaURL(s.serverURL),
 	)
+	if err != nil {
+		return domain.ErrInternal(err).WithMessage("failed to retrieve default flow definition")
+	}
 	for _, flowDef := range flowDefs {
-		if err != nil {
-			return domain.ErrInternal(err).WithMessage("failed to retrieve default flow definition")
-		}
-
 		_, err = domain.ValidateFlowDefinition(userSchema, *flowDef)
 		if err != nil {
 			return domain.ErrInternal(err).WithMessage("default login flow definition is invalid")
@@ -133,7 +132,7 @@ func (s *projectService) createDefaultLoginFlowDefinitions(ctx context.Context, 
 			return domain.ErrInternal(err).WithMessage("failed to save default login flow definition to project")
 		}
 	}
-	return err
+	return nil
 }
 
 func (s *projectService) Get(ctx context.Context, id string) (*domain.Project, error) {

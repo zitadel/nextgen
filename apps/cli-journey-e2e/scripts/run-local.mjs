@@ -49,7 +49,7 @@ const backendPort = await resolvePort("JOURNEY_BACKEND_PORT");
 const appPort = await resolvePort("JOURNEY_APP_PORT");
 const registryUrl = `http://127.0.0.1:${registryPort}`;
 const backendUrl = `http://127.0.0.1:${backendPort}`;
-const appUrl = `http://127.0.0.1:${appPort}`;
+const appUrl = `http://localhost:${appPort}`;
 const childProcesses = new Set();
 let composeStarted = false;
 let cleanupStarted = false;
@@ -116,7 +116,7 @@ try {
     "dev",
     "--",
     "--hostname",
-    "127.0.0.1",
+    "localhost",
     "--port",
     String(appPort),
   ], {

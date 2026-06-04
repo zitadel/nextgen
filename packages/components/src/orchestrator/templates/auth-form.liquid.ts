@@ -40,7 +40,7 @@ export const authFormTemplate = String.raw`
       {% assign autocomplete_val = '' %}
       {% if entry[0] == 'email' %}
         {% assign autocomplete_val = 'email' %}
-      {% elsif entry[1].type == 'password' and step.name == 'register' %}
+      {% elsif entry[1].type == 'password' and step.name contains 'register' %}
         {% assign autocomplete_val = 'new-password' %}
       {% elsif entry[1].type == 'password' %}
         {% assign autocomplete_val = 'current-password' %}

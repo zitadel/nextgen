@@ -135,15 +135,36 @@ func TestCreateProjectProvisionsDefaultLoginFlow(t *testing.T) {
 	assert.Equal(t, "identifier", flowDef.Purposes[domain.FlowDefinitionPurposeLogin])
 	assert.Equal(t, "register", flowDef.Purposes[domain.FlowDefinitionPurposeRegister])
 
+	identifierStep, ok := flowDef.FindStep("identifier")
+	require.True(t, ok)
+	assert.Contains(t, identifierStep.Actions, domain.FlowActionPasskey)
+	assert.Equal(t, "done", identifierStep.Transitions[domain.FlowActionPasskey].Target)
+
 	passwordStep, ok := flowDef.FindStep("password")
 	require.True(t, ok)
 	assert.Equal(t, []string{"password"}, passwordStep.Fields)
+	assert.Contains(t, passwordStep.Actions, domain.FlowActionPasskey)
+	assert.Equal(t, "done", passwordStep.Transitions[domain.FlowActionPasskey].Target)
 
 	registerStep, ok := flowDef.FindStep("register")
 	require.True(t, ok)
-	assert.Equal(t, []string{"email", "password"}, registerStep.Fields)
-	require.NotNil(t, registerStep.OnSuccess)
-	assert.Equal(t, domain.FlowOnSuccessCreateUser, *registerStep.OnSuccess)
+	assert.Equal(t, []string{"email"}, registerStep.Fields)
+	assert.Contains(t, registerStep.Actions, domain.FlowActionPasskeyRegister)
+	assert.Equal(t, "done", registerStep.Transitions[domain.FlowActionPasskeyRegister].Target)
+
+	registerPasswordStep, ok := flowDef.FindStep("register-password")
+	require.True(t, ok)
+	assert.Equal(t, []string{"password"}, registerPasswordStep.Fields)
+	require.NotNil(t, registerPasswordStep.OnSuccess)
+	assert.Equal(t, domain.FlowOnSuccessCreateUser, *registerPasswordStep.OnSuccess)
+	assert.Equal(t, "passkey-upsell", registerPasswordStep.Transitions[domain.FlowActionSubmit].Target)
+
+	passkeyUpsellStep, ok := flowDef.FindStep("passkey-upsell")
+	require.True(t, ok)
+	assert.Contains(t, passkeyUpsellStep.Actions, domain.FlowActionPasskeyRegister)
+	assert.Contains(t, passkeyUpsellStep.Actions, "skip")
+	assert.Equal(t, "done", passkeyUpsellStep.Transitions[domain.FlowActionPasskeyRegister].Target)
+	assert.Equal(t, "done", passkeyUpsellStep.Transitions["skip"].Target)
 }
 
 func TestGetProject(t *testing.T) {

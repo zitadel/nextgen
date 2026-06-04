@@ -600,10 +600,10 @@ jobs:
       - name: Start generated Next.js app
         run: |
           cd "$JOURNEY_APP_DIR"
-          npm run dev -- --hostname 127.0.0.1 --port 3000 > "$RUNNER_TEMP/next-app.log" 2>&1 &
+          npm run dev -- --hostname localhost --port 3000 > "$RUNNER_TEMP/next-app.log" 2>&1 &
           echo "NEXT_APP_PID=$!" >> "$GITHUB_ENV"
           for _ in $(seq 1 90); do
-            if curl -fsS http://127.0.0.1:3000/login >/dev/null; then
+            if curl -fsS http://localhost:3000/login >/dev/null; then
               exit 0
             fi
             sleep 1

@@ -12,6 +12,7 @@ export const de: Locale = {
   "identifier.field.email": "E-Mail",
   "identifier.field.email.placeholder": "du@unternehmen.com",
   "identifier.field.password": "Passwort",
+  "identifier.action.continue": "Weiter",
   "identifier.action.passkey": "Mit Passkey anmelden",
   "identifier.action.register.lead": "Noch kein Konto? ",
   "identifier.action.register.link": "Registrieren",
@@ -19,6 +20,7 @@ export const de: Locale = {
   // --- Anmelden / Passwort-Schritt (gleicher Bildschirm; geteilter Flow Schritt 2) ---
   "password.title": "Anmelden",
   "password.field.password": "Passwort",
+  "password.action.signin": "Anmelden",
   "password.action.passkey": "Mit Passkey anmelden",
   "password.action.register.lead": "Noch kein Konto? ",
   "password.action.register.link": "Registrieren",
@@ -30,12 +32,23 @@ export const de: Locale = {
   "register.field.password": "Passwort",
   "register.field.password.help":
     "Mindestens 8 Zeichen, einschließlich eines Sonderzeichens und einer Zahl.",
+  "register.action.password": "Mit Passwort fortfahren",
+  "register.action.passkey": "Mit Passkey registrieren",
   "register.action.submit": "Registrieren",
   "register.action.sign_in.lead": "Bereits ein Konto? ",
   "register.action.sign_in.link": "Anmelden",
 
+  // --- Registrieren / Passwort-Schritt ---
+  "register-password.title": "Konto erstellen",
+  "register-password.description": "Wähle ein Passwort für dieses Konto.",
+  "register-password.field.password": "Passwort",
+  "register-password.field.password.help":
+    "Mindestens 8 Zeichen, einschließlich eines Sonderzeichens und einer Zahl.",
+  "register-password.action.submit": "Registrieren",
+
   // --- Passkey Upsell (`6594:630`) ---
   "passkey-upsell.title": "Nächstes Mal schneller anmelden",
+  "passkey-upsell.description": "Richte einen Passkey ein, um dich schneller anzumelden.",
   "passkey-upsell.description.line1": "Kein Passwort mehr nötig.",
   "passkey-upsell.description.line2":
     "Melde dich mit Face ID, Touch ID oder PIN an.",
