@@ -28,7 +28,7 @@ import { patchMandatoryGates } from "./mandatory-gates.js";
 import { zitadelAttributionPillInnerHtml } from "@zitadel-nextgen/shared-component-styles/attribution-markup";
 import { createSanitiser } from "./sanitiser.js";
 import type { FlowError, LiquidContext } from "./template-context.js";
-import { layoutChromeCss } from "./templates/default.liquid.js";
+import layoutChromeCss from "./templates/layout-chrome.css?inline";
 import { ThemeController } from "./theme-controller.js";
 
 /**

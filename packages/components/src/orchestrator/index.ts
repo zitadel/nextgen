@@ -24,10 +24,8 @@ export {
   MANDATORY_GATES_MARKER,
 } from "./mandatory-gates.js";
 export { createSanitiser } from "./sanitiser.js";
-export { defaultTemplate, layoutChromeCss } from "./templates/default.liquid.js";
-export { authFormTemplate } from "./templates/auth-form.liquid.js";
-export { passkeyUpsellTemplate } from "./templates/passkey-upsell.liquid.js";
-export { signedInTemplate } from "./templates/signed-in.liquid.js";
+export { default as defaultTemplate } from "./templates/default.liquid";
+export { default as layoutChromeCss } from "./templates/layout-chrome.css?inline";
 export { startFlow, submitStep, getCurrentStep } from "./api-client.js";
 export { validateBranding, type BrandingValidationResult } from "./branding-validator.js";
 export type {
