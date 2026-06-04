@@ -14,16 +14,15 @@ type Handler struct {
 	// responses for all endpoints, so only implemented methods need to be defined.
 	api.UnimplementedHandler
 
-	crypter                    crypto.Crypter
-	flowService                service.FlowService
-	authAttemptService         service.AuthAttemptService
-	sessionService             service.SessionService
-	projectService             service.ProjectService
-	userService                *service.UserService
-	schemaService              *service.SchemaService
-	flowDefinitionService      service.FlowDefinitionService
-	teamService                *service.TeamService
-	passkeyRegistrationService *service.PasskeyRegistrationService
+	crypter               crypto.Crypter
+	flowService           service.FlowService
+	authAttemptService    service.AuthAttemptService
+	sessionService        service.SessionService
+	projectService        service.ProjectService
+	userService           *service.UserService
+	schemaService         *service.SchemaService
+	flowDefinitionService service.FlowDefinitionService
+	teamService           *service.TeamService
 }
 
 func NewHandler(
@@ -36,19 +35,17 @@ func NewHandler(
 	schemaService *service.SchemaService,
 	flowDefinitionService service.FlowDefinitionService,
 	teamService *service.TeamService,
-	passkeyRegistrationService *service.PasskeyRegistrationService,
 ) *Handler {
 	return &Handler{
-		crypter:                    crypto,
-		flowService:                flowService,
-		authAttemptService:         authAttemptService,
-		sessionService:             sessionService,
-		projectService:             projectService,
-		userService:                userService,
-		schemaService:              schemaService,
-		flowDefinitionService:      flowDefinitionService,
-		teamService:                teamService,
-		passkeyRegistrationService: passkeyRegistrationService,
+		crypter:               crypto,
+		flowService:           flowService,
+		authAttemptService:    authAttemptService,
+		sessionService:        sessionService,
+		projectService:        projectService,
+		userService:           userService,
+		schemaService:         schemaService,
+		flowDefinitionService: flowDefinitionService,
+		teamService:           teamService,
 	}
 }
 

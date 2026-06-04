@@ -1,9 +1,9 @@
-import { zitadelAttributionPillInnerHtml } from "@zitadel-nextgen/shared-component-styles/attribution-markup";
+import { zitadelAttributionPillInnerHtml } from "@zitadel/shared-component-styles/attribution-markup";
 
 /**
  * Atom playground. Renders each shipped `<zl-*>` atom in isolation so we can
  * verify states (default, loading, ghost, error, dark) without booting the
- * full orchestrator. Tokens come from `@zitadel-nextgen/design-tokens`; the
+ * full orchestrator. Tokens come from `@zitadel/design-tokens`; the
  * playground only adds a thin light-mode preview wrapper for atoms that ship
  * a dual-mode design.
  */

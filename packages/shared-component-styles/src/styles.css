@@ -1,6 +1,6 @@
 /*
  * Full barrel for paired components. Requires design tokens on the host page:
- *   @import "@zitadel-nextgen/design-tokens/css/tokens.css";
+ *   @import "@zitadel/design-tokens/css/tokens.css";
  */
 
 @import "./button.css";

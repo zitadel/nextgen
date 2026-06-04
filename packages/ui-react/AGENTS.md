@@ -19,7 +19,7 @@ packages/ui-react/src/styles.css                # @import shared barrel
 - **No duplicate surface CSS.** Edit `shared-component-styles`, not `ui-react`
   CSS files (there are none per atom — only `styles.css` imports shared).
 - **No new tokens.** All visual values come from
-  [`@zitadel-nextgen/design-tokens`](../design-tokens/README.md).
+  [`@zitadel/design-tokens`](../design-tokens/README.md).
 - **Class names are part of the public API** (`.zr-*`). Must match Lit inner DOM.
 - **One `<atom>.tsx` per atom.** `<Alert>` may use `<Icon>`; no bigger graphs.
 - **Unpaired components** stay local to their package when we add React-only or Lit-only UI.
@@ -27,6 +27,6 @@ packages/ui-react/src/styles.css                # @import shared barrel
 ## Local checks
 
 ```sh
-corepack pnpm nx run @zitadel-nextgen/ui-react:build
-corepack pnpm nx run @zitadel-nextgen/ui-react:typecheck
+corepack pnpm nx run @zitadel/ui-react:build
+corepack pnpm nx run @zitadel/ui-react:typecheck
 ```

@@ -2,7 +2,7 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
-    name: "@zitadel-nextgen/cli",
+    name: "@zitadel/cli",
     watch: false,
     globals: true,
     environment: "node",

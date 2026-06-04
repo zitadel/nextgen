@@ -52,9 +52,9 @@ const sharedPlugins = () => [nxViteTsPaths(), liquidRaw()];
  */
 export default defineConfig({
   plugins: sharedPlugins(),
-  resolve: { conditions: ["@zitadel-nextgen/source"] },
+  resolve: { conditions: ["@zitadel/source"] },
   test: {
-    name: "@zitadel-nextgen/components",
+    name: "@zitadel/components",
     watch: false,
     coverage: {
       reportsDirectory: "./test-output/vitest/coverage",
@@ -64,7 +64,7 @@ export default defineConfig({
     projects: [
       {
         plugins: sharedPlugins(),
-        resolve: { conditions: ["@zitadel-nextgen/source"] },
+        resolve: { conditions: ["@zitadel/source"] },
         test: {
           name: "unit",
           globals: true,
@@ -75,7 +75,7 @@ export default defineConfig({
       },
       {
         plugins: sharedPlugins(),
-        resolve: { conditions: ["@zitadel-nextgen/source"] },
+        resolve: { conditions: ["@zitadel/source"] },
         test: {
           name: "browser",
           globals: true,

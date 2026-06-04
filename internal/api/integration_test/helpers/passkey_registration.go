@@ -14,7 +14,6 @@ func (h *Harness) EnsurePasskeyRegistrationService(t *testing.T) *service.Passke
 		h.EnsureDBPool(t),
 		repository.NewPasskeyRegistrationRepository(),
 		h.EnsureUserPasskeyRepo(t),
-		h.EnsureSessionRepo(t),
 		idgen.NewULID(),
 	)
 }

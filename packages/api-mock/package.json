@@ -1,7 +1,8 @@
 {
-  "name": "@zitadel-nextgen/api-mock",
+  "name": "@zitadel/api-mock",
   "version": "0.0.0",
-  "description": "Mock support library for @zitadel-nextgen/api",
+  "description": "Mock support library for @zitadel/api",
+  "private": true,
   "type": "module",
   "exports": {
     ".": {
@@ -29,7 +30,7 @@
   },
   "dependencies": {
     "@mswjs/http-middleware": "catalog:",
-    "@zitadel-nextgen/api": "workspace:*",
+    "@zitadel/api": "workspace:*",
     "express": "catalog:",
     "xstate": "catalog:"
   },

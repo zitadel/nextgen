@@ -1,7 +1,7 @@
 # Agent Instructions — `apps/demo-next-e2e/`
 
 Playwright project that exercises `apps/demo-next/` end-to-end against
-the standalone `@zitadel-nextgen/api-mock` TCP server. Defer to root
+the standalone `@zitadel/api-mock` TCP server. Defer to root
 [`AGENTS.md`](../../AGENTS.md) for repo-wide rules.
 
 ## Scope
@@ -10,7 +10,7 @@ This project covers the boundary that Vitest cannot reach:
 
 - `<zitadel-login>` mounted inside Next.js `dynamic({ ssr: false })`.
 - The Lit orchestrator's internal `POST /sessions/exchange` traversing
-  the Next.js `/__nextgen` proxy installed by `@zitadel-nextgen/sdk-next`.
+  the Next.js `/__nextgen` proxy installed by `@zitadel/sdk-next`.
 - The `__nextgen_session` cookie being set on the demo origin and
   surviving the full-page navigation triggered by `post-sign-in-url`.
 - `nextgenMiddleware` accepting that cookie on the next request and
@@ -35,10 +35,10 @@ this project.
 
 ```sh
 corepack pnpm exec playwright install        # one-time, browsers
-corepack pnpm exec nx run @zitadel-nextgen/demo-next-e2e:e2e
+corepack pnpm exec nx run @zitadel/demo-next-e2e:e2e
 ```
 
-Nx rebuilds `@zitadel-nextgen/components` first via `^build`, then
+Nx rebuilds `@zitadel/components` first via `^build`, then
 Playwright boots `api-mock` (`:4000`) and `demo-next` (`:3002`) through
 direct `pnpm --filter` commands. Using `nx run …` inside
 `webServer.command` makes `@nx/playwright/plugin` treat the dev servers

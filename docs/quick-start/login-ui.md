@@ -1,6 +1,6 @@
 # Login UI (`/ui/login/`)
 
-The server ships a minimal static host for the `<zitadel-login>` web component from `@zitadel-nextgen/components`. It is **not** the Next.js or Nuxt demo apps.
+The server ships a minimal static host for the `<zitadel-login>` web component from `@zitadel/components`. It is **not** the Next.js or Nuxt demo apps.
 
 ## URL
 

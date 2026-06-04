@@ -17,7 +17,7 @@ declare function useRuntimeConfig(): {
 const config = useRuntimeConfig();
 
 /**
- * Default Nitro/H3 event handler registered by the `@zitadel-nextgen/sdk-nuxt` module
+ * Default Nitro/H3 event handler registered by the `@zitadel/sdk-nuxt` module
  * via {@link addServerHandler}. Reads middleware options from Nuxt runtime
  * config (`nuxt.config.ts → nextgen`) so consumers do not need to create
  * their own `server/middleware/auth.ts` when using the module.

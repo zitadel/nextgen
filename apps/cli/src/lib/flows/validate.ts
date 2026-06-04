@@ -1,5 +1,5 @@
-import type { CreateFlowDefinitionBodyFlowDefinition } from "@zitadel-nextgen/api/generated/model";
-import { CreateFlowDefinitionBody } from "@zitadel-nextgen/api/generated/endpoints/zitadelNextGen.zod";
+import type { CreateFlowDefinitionBodyFlowDefinition } from "@zitadel/api/generated/model";
+import { CreateFlowDefinitionBody } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 
 import { ZitadelError } from "../errors";
 

@@ -1,4 +1,4 @@
-import { ApiError } from "@zitadel-nextgen/api/runtime/fetch";
+import { ApiError } from "@zitadel/api/runtime/fetch";
 
 /**
  * Closed set of failure categories the CLI can surface. Every error the

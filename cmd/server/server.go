@@ -171,8 +171,9 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 	fields := domain.NewSchemaFieldResolver(storageSchemaResolver)
 	flowAuth := service.NewFlowAuthAttemptAdapter(authAttemptSvc)
 	createUserHandler := domain.NewFlowCreateUserHandler(ids, userRepo, userPasswordRepo, passwordHasher)
-	passkeyRegSvc := service.NewPasskeyRegistrationService(pool, passkeyRegRepo, userPasskeyRepo, sessionRepo, ids)
-	stateMachine := domain.NewFlowStateMachine(fields, createUserHandler, flowAuth, passkeyRegSvc, time.Now)
+	passkeyRegSvc := service.NewPasskeyRegistrationService(pool, passkeyRegRepo, userPasskeyRepo, ids)
+	passkeyRegAdapter := service.NewFlowPasskeyRegistrationAdapter(passkeyRegSvc)
+	stateMachine := domain.NewFlowStateMachine(fields, createUserHandler, flowAuth, passkeyRegAdapter, time.Now)
 
 	flowService := service.NewFlowService(pool, flowDefinitionRepo, stateMachine, ids)
 
@@ -191,8 +192,7 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 			userService,
 			schemaService,
 			flowDefinitionSvc,
-			teamService,
-			passkeyRegSvc),
+			teamService),
 		api.NewSecurityHandler(),
 		oasapi.WithErrorHandler(api.OgenErrorHandler))
 	if err != nil {
@@ -323,7 +323,7 @@ func buildHTTPMux(cfg ServerConfig, apiHandler http.Handler) (*http.ServeMux, er
 		mux.Handle(cfg.ConsolePath+"/", consoleHandler)
 	}
 
-	mux.Handle("/", apiHandler)
+	mux.Handle("/", api.WithRequestHostMiddleware(apiHandler))
 	return mux, nil
 }
 
