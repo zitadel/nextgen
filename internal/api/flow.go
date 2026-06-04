@@ -335,7 +335,6 @@ func validateOriginAgainstProject(originStr string, project *domain.Project) err
 	return fmt.Errorf("origin %q is not allowed for this project", originStr)
 }
 
-
 // passkeyRPFromOrigin derives the WebAuthn relying-party id (the origin host,
 // without port) and the allowed origin from the browser Origin header. Returns
 // nil when the origin has no host.

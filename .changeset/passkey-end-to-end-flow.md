@@ -1,12 +1,15 @@
 ---
+"@zitadel/api": minor
 "@zitadel/components": minor
-"@zitadel/sdk-next": minor
 "@zitadel/sdk-core": minor
+"@zitadel/sdk-next": minor
 ---
 
 Wire up the end-to-end passkey registration and login flow across the
-component and SDK surfaces:
+API, component, and SDK surfaces:
 
+- `@zitadel/api`: expose the passkey registration OpenAPI contract to the
+  generated TypeScript client.
 - `@zitadel/components`: refresh the `<zl-passkey>` atom and the
   `<zitadel-login>` orchestrator templates (consolidated `default.liquid` +
   `layout-chrome.css`, dropped the standalone passkey-upsell/signed-in
