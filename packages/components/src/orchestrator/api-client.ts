@@ -1,5 +1,5 @@
 /**
- * Thin wrappers around the orval-generated `@zitadel-nextgen/api` fetch
+ * Thin wrappers around the orval-generated `@zitadel/api` fetch
  * functions for the API operations the orchestrator drives:
  *
  * - `POST /flow`              — `createFlow`
@@ -11,13 +11,13 @@
  * `credentials: "include"` so the stateless `_zflow` HttpOnly cookie
  * round-trips. Centralising that here keeps every call site honest.
  *
- * Types come straight from `@zitadel-nextgen/api/generated/model`. Orval
+ * Types come straight from `@zitadel/api/generated/model`. Orval
  * emits per-operation aliases (`CreateFlow201`, `GetFlowStep200`,
  * `SubmitFlowStep200`) for what is structurally the same response; the
  * orchestrator stores them as `CreateFlow201` because that is the alias
  * orval gives the start-of-flow response.
  */
-import type { ZitadelApi } from "@zitadel-nextgen/api/config";
+import type { ZitadelApi } from "@zitadel/api/config";
 import type {
   CreateFlow201,
   CreateFlowBody,
@@ -25,8 +25,8 @@ import type {
   ExchangeHandoffBody,
   ExchangeHandoffParams,
   SubmitFlowStepBody,
-} from "@zitadel-nextgen/api/generated/model";
-import { ApiError } from "@zitadel-nextgen/api/runtime/fetch";
+} from "@zitadel/api/generated/model";
+import { ApiError } from "@zitadel/api/runtime/fetch";
 
 const apiRequestInit: RequestInit = { credentials: "include" };
 

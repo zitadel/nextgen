@@ -1,9 +1,9 @@
-# @zitadel-nextgen/cli
+# @zitadel/cli
 
 Scaffolds Zitadel auth (login, register, profile, middleware) into a Next.js app.
 
 ```sh
-npx @zitadel-nextgen/cli@latest setup --framework next --server <your-zitadel-server>
+npx @zitadel/cli@latest setup --framework next --server <your-zitadel-server>
 ```
 
 > **Beta.** This is the **next-generation Zitadel**, a ground-up rewrite of the platform. It is distinct from the established Zitadel at [github.com/zitadel/zitadel](https://github.com/zitadel/zitadel). APIs and CLI flags will change.
@@ -21,11 +21,11 @@ npx @zitadel-nextgen/cli@latest setup --framework next --server <your-zitadel-se
 ```sh
 npx create-next-app@latest my-app
 cd my-app
-npx @zitadel-nextgen/cli@latest setup --framework next --server http://localhost:8080
+npx @zitadel/cli@latest setup --framework next --server http://localhost:8080
 npm run dev
 ```
 
-`setup` creates a project on the Zitadel server, scaffolds `app/login`, `app/register`, `app/profile`, and `middleware.ts`, writes `.env.local` and `.zitadel/`, then applies the config to the server. Open `http://localhost:3000/login` to see the login page.
+`setup` creates a project on the Zitadel server, scaffolds `app/login`, `app/register`, `app/profile`, and `middleware.ts`, and writes `.env.local` and `.zitadel/`. The project's default user schema and login flow are provisioned server-side at creation time, so the CLI does not scaffold or upload them. Open `http://localhost:3000/login` to see the login page.
 
 ## Other commands
 
@@ -206,7 +206,7 @@ Create a Zitadel project and scaffold local auth.
 ```
 USAGE
   $ zitadel setup [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug]
-    [--framework next] [--renderer react|web-component] [--no-apply]
+    [--framework next] [--renderer react|web-component]
 
 FLAGS
   -c, --cwd=<value>         Project directory to operate on.
@@ -217,7 +217,6 @@ FLAGS
       --dry-run             Preview without mutating files or the platform.
       --framework=<option>  Framework to target.
                             <options: next>
-      --no-apply            Skip the automatic apply at the end of setup.
       --renderer=<option>   Renderer (default: react).
                             <options: react|web-component>
       --verbose             Verbose logging.

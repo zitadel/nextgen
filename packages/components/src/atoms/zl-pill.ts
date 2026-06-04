@@ -1,8 +1,8 @@
 import { LitElement, html, nothing } from "lit";
 import { customElement, property } from "lit/decorators.js";
 
-import pillHost from "@zitadel-nextgen/shared-component-styles/lit/pill-host.css?inline";
-import pillSurface from "@zitadel-nextgen/shared-component-styles/pill.css?inline";
+import pillHost from "@zitadel/shared-component-styles/lit/pill-host.css?inline";
+import pillSurface from "@zitadel/shared-component-styles/pill.css?inline";
 
 import type { AtomManifest } from "../manifest.js";
 import { baseHostStyles, surfaceStyles } from "../styles/index.js";

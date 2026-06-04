@@ -1,5 +1,5 @@
 /**
- * Public API for `@zitadel-nextgen/api-mock`'s authentication module.
+ * Public API for `@zitadel/api-mock`'s authentication module.
  *
  * Exports the single {@link AuthnStore} class and its associated types.
  * Internal implementation files (`authn-store.ts`) should be imported through

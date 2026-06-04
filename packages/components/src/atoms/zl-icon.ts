@@ -2,8 +2,8 @@ import { LitElement, html, nothing } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import { unsafeSVG } from "lit/directives/unsafe-svg.js";
 
-import iconHost from "@zitadel-nextgen/shared-component-styles/lit/icon-host.css?inline";
-import iconSurface from "@zitadel-nextgen/shared-component-styles/icon.css?inline";
+import iconHost from "@zitadel/shared-component-styles/lit/icon-host.css?inline";
+import iconSurface from "@zitadel/shared-component-styles/icon.css?inline";
 import {
   ArrowLeft,
   ArrowRight,

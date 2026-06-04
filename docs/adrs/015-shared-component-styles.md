@@ -13,7 +13,7 @@ Lit component will have a React pair, and vice versa.
 
 ## Decision
 
-Add `@zitadel-nextgen/shared-component-styles`:
+Add `@zitadel/shared-component-styles`:
 
 - **`src/<id>.css`** — shared surface rules using `.zr-*` classes on the
   painted element (one file per paired component).

@@ -16,7 +16,7 @@
  * paint correctly even when the host page didn't `@import` tokens.css — the
  * orchestrator is meant to drop into any page.
  */
-import { tokensCss } from "@zitadel-nextgen/design-tokens";
+import { tokensCss } from "@zitadel/design-tokens";
 
 import type { ResolvedTheme } from "./theme-controller.js";
 import type { Branding, BrandingPalette, BrandingShape, BrandingTypography } from "./branding.js";

@@ -6,7 +6,7 @@
 
 ## Context
 
-The generated API client (`@zitadel-nextgen/api`) uses a module-level
+The generated API client (`@zitadel/api`) uses a module-level
 singleton to store the API base URL:
 
 ```ts
@@ -86,7 +86,7 @@ app-wide values.
 ### Config shape
 
 ```ts
-// @zitadel-nextgen/api/config (entry point)
+// @zitadel/api/config (entry point)
 export interface ZitadelConfig {
   /** Proxy path for API requests (e.g. "/__nextgen"). */
   apiBase: string;
@@ -151,8 +151,8 @@ export function configureZitadel(config: ZitadelConfig): Readonly<ZitadelConfig>
 
 ```ts
 // src/zitadel.ts — single file, imported by server and client code
-import { configureZitadel, getApi } from "@zitadel-nextgen/api/config";
-import { createProxy } from "@zitadel-nextgen/sdk-next/middleware";
+import { configureZitadel, getApi } from "@zitadel/api/config";
+import { createProxy } from "@zitadel/sdk-next/middleware";
 
 const zitadel = configureZitadel({
   apiBase: "/__nextgen",
@@ -181,7 +181,7 @@ functions that derive typed service objects from the base config.
 `createProxy` is the first implemented derived service:
 
 ```ts
-// @zitadel-nextgen/sdk-next/middleware
+// @zitadel/sdk-next/middleware
 export type ProxyOptions = Omit<NextgenMiddlewareOptions, 'proxyPath' | 'issuerUrl'>;
 export type ProxyHandler = (req: NextRequest) => Promise<NextResponse | Response>;
 
@@ -208,8 +208,8 @@ Future derived services will follow the same pattern:
 
 ```ts
 // src/zitadel.ts
-import { configureZitadel, getApi } from "@zitadel-nextgen/api/config";
-import { createProxy } from "@zitadel-nextgen/sdk-next/middleware";
+import { configureZitadel, getApi } from "@zitadel/api/config";
+import { createProxy } from "@zitadel/sdk-next/middleware";
 
 export const zitadel = configureZitadel({
   apiBase: "/__nextgen",
@@ -235,21 +235,21 @@ export const config = { matcher: ["/__nextgen/:path*", "/admin", "/login"] };
 // src/app/login/widget.tsx (client)
 const ZitadelLogin = dynamic(async () => {
   const { zitadel } = await import("@/zitadel");       // ← explicit import
-  await import("@zitadel-nextgen/sdk-next/client");    // ← register elements
+  await import("@zitadel/sdk-next/client");    // ← register elements
   return () => <zitadel-login project={zitadel} post-sign-in-url="/admin" />;
 }, { ssr: false });
 ```
 
 No provider component needed — the layout stays a pure server component.
-`@zitadel-nextgen/sdk-next/client` only exports the web component
+`@zitadel/sdk-next/client` only exports the web component
 registrations; `configureZitadel` is imported directly from
-`@zitadel-nextgen/api/config`.
+`@zitadel/api/config`.
 
 **Nuxt** — auto-configured in the module plugin:
 
 ```ts
 // sdk-nuxt/src/runtime/plugin.ts
-import { configureZitadel } from "@zitadel-nextgen/api/config";
+import { configureZitadel } from "@zitadel/api/config";
 
 export default defineNuxtPlugin(() => {
   const runtimeConfig = useRuntimeConfig();
@@ -269,7 +269,7 @@ the API client via `getApi(config)`:
 
 ```ts
 // zitadel-login.ts — simplified
-import { getApi, type ZitadelApp } from "@zitadel-nextgen/api/config";
+import { getApi, type ZitadelApp } from "@zitadel/api/config";
 
 @property({ attribute: false }) accessor config: ZitadelApp | undefined;
 

@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 
 import { describe, expect, it, vi } from "vitest";
 
-import { createZitadelClient } from "@zitadel-nextgen/api/client";
+import { createZitadelClient } from "@zitadel/api/client";
 
 import { buildSyncPlan, runSyncLoop } from "../../../../src/lib/sync/loop";
 import { makeSyncers } from "../../../../src/lib/sync/syncers";

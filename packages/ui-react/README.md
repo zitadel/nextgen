@@ -1,6 +1,6 @@
-# @zitadel-nextgen/ui-react
+# @zitadel/ui-react
 
-Paired React implementations of the `@zitadel-nextgen/components` Lit atoms. The
+Paired React implementations of the `@zitadel/components` Lit atoms. The
 internal Zitadel console is a pure React app; rather than adapt the Lit elements
 via `@lit/react` (which would drag a Lit runtime into every page), the console
 imports these visually-identical React components.
@@ -8,15 +8,15 @@ imports these visually-identical React components.
 ## Visual contract
 
 Both the Lit atoms and these paired React components consume the same CSS
-variables from [`@zitadel-nextgen/design-tokens`](../design-tokens/README.md).
+variables from [`@zitadel/design-tokens`](../design-tokens/README.md).
 The host app is expected to import the token sheet **once**:
 
 ```ts
-import "@zitadel-nextgen/design-tokens/css/tokens.css";
-import "@zitadel-nextgen/ui-react/styles.css";
+import "@zitadel/design-tokens/css/tokens.css";
+import "@zitadel/ui-react/styles.css";
 ```
 
-Shared surface CSS lives in `@zitadel-nextgen/shared-component-styles` (see
+Shared surface CSS lives in `@zitadel/shared-component-styles` (see
 `pairs.json`). `ui-react/styles.css` only re-exports that barrel; edit surface
 CSS there, not in this package.
 
@@ -24,7 +24,7 @@ If you use Tailwind v4, also import the generated `@theme` block so the
 `bg-zl-color-…` / `rounded-zl-radius-…` utilities resolve:
 
 ```ts
-import "@zitadel-nextgen/design-tokens/css/tailwind.css";
+import "@zitadel/design-tokens/css/tailwind.css";
 ```
 
 ## Available components

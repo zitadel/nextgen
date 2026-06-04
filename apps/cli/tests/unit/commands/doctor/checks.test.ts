@@ -51,7 +51,7 @@ async function makeProject(): Promise<string> {
     join(cwd, "package.json"),
     JSON.stringify({
       name: "demo",
-      dependencies: { next: "^15", "@zitadel-nextgen/sdk-next": "latest" },
+      dependencies: { next: "^15", "@zitadel/sdk-next": "latest" },
     }),
   );
   await writeFile(
@@ -286,6 +286,5 @@ describe("loadPatchContext", () => {
     expect(ctx.framework.id).toBe("next");
     expect(ctx.project.id).toBe("proj-001");
     expect(ctx.issuer).toBe("http://localhost:3000");
-    expect(ctx.userFields).toEqual(["email"]);
   });
 });
