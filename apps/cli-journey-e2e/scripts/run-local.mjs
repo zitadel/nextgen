@@ -270,6 +270,10 @@ uplinks:
   npmjs:
     url: https://registry.npmjs.org/
 packages:
+  '@zitadel/*':
+    access: $all
+    publish: $all
+    unpublish: $all
   '@*/*':
     access: $all
     publish: $all
