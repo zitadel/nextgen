@@ -47,7 +47,7 @@ async function makeHealthyProject(): Promise<string> {
     join(cwd, "package.json"),
     JSON.stringify({
       name: "demo",
-      dependencies: { next: "^15", "@zitadel-nextgen/sdk-next": "latest" },
+      dependencies: { next: "^15", "@zitadel/sdk-next": "latest" },
     }),
   );
   await writeFile(
@@ -157,19 +157,6 @@ describe("doctor command", () => {
     expect(match?.status).toBe("fail");
   });
 
-  it("fails the schema check when the user schema is not valid JSON Schema", async () => {
-    const cwd = await makeHealthyProject();
-    // `type` must be a string/array of strings; a number makes the schema invalid.
-    await writeFile(join(cwd, ".zitadel/schemas/user.json"), JSON.stringify({ type: 123 }));
-
-    const res = await doctor(cwd);
-
-    expect(res.exitCode).toBe(3);
-    const json = parseJson(res.stdout) as { details: { checks: Check[] } };
-    const schema = json.details.checks.find((check) => check.name === "schema");
-    expect(schema?.status).toBe("fail");
-  });
-
   it("re-locks loose secret permissions via --fix and then passes", async () => {
     const cwd = await makeHealthyProject();
     await chmod(join(cwd, ".zitadel/secret"), 0o644);
@@ -185,13 +172,19 @@ describe("doctor command", () => {
 
   it("reports E_VALIDATION (not a crash) when --fix cannot repair a broken project", async () => {
     const cwd = await makeHealthyProject();
-    // Remove the user schema: schema check fails outright, and dependency's
-    // repair can't rebuild its context — --fix must stay best-effort.
-    await rm(join(cwd, ".zitadel/schemas/user.json"));
+    // project-match has no auto-repair: a secret/config project_id mismatch
+    // stays failed through --fix, so doctor must report E_VALIDATION rather
+    // than crash.
     await writeFile(
-      join(cwd, "package.json"),
-      JSON.stringify({ name: "demo", dependencies: { next: "^15" } }),
+      join(cwd, ".zitadel/secret"),
+      JSON.stringify({
+        project_id: "mismatch",
+        project_secret: "sk_proj_test",
+        preview_secret: "sk_proj_preview",
+        preview_origins: [],
+      }),
     );
+    await chmod(join(cwd, ".zitadel/secret"), 0o600);
 
     const res = await doctor(cwd, ["--fix"]);
 
@@ -199,7 +192,7 @@ describe("doctor command", () => {
     const json = parseJson(res.stdout) as { status: string; code: string; details: { checks: Check[] } };
     expect(json.status).toBe("error");
     expect(json.code).toBe("E_VALIDATION");
-    expect(json.details.checks.find((check) => check.name === "schema")?.status).toBe("fail");
+    expect(json.details.checks.find((check) => check.name === "project-match")?.status).toBe("fail");
   });
 
   it("re-applies a missing Zitadel dependency via --fix and then passes", async () => {

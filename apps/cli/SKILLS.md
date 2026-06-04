@@ -24,7 +24,7 @@ parse the result rather than scraping human output.
   metadata) or run `zitadel <command> --help` for the full per-command flag list.
 
 ```sh
-npx zitadel@latest <command> --non-interactive --json
+npx @zitadel/cli@latest <command> --non-interactive --json
 ```
 
 ## Reading the envelope
@@ -46,8 +46,9 @@ layer, not the envelope.
 ## Commands
 
 - `setup` — create a Zitadel project and scaffold local auth (routes,
-  middleware, `.zitadel/**`, env templates). Flags: `--framework`,
-  `--auth-method`, `--renderer`, `--no-apply`.
+  middleware, `.zitadel/**`, env templates). The project's default user schema
+  and login flow are provisioned server-side at creation, so setup neither
+  scaffolds nor uploads them. Flags: `--framework`, `--renderer`.
 - `plan` — validate config and preview the sync diff without mutating anything.
 - `apply` — validate and upload repo config to the platform.
 - `doctor` — verify generated files and local state; `--fix` re-applies missing
@@ -59,10 +60,10 @@ layer, not the envelope.
 ## Golden path
 
 ```sh
-npx zitadel@latest setup --framework next --non-interactive --json
-npx zitadel@latest doctor --non-interactive --json
-npx zitadel@latest plan --non-interactive --json
-npx zitadel@latest apply --non-interactive --json
+npx @zitadel/cli@latest setup --framework next --non-interactive --json
+npx @zitadel/cli@latest doctor --non-interactive --json
+npx @zitadel/cli@latest plan --non-interactive --json
+npx @zitadel/cli@latest apply --non-interactive --json
 ```
 
 Repo config is authoritative: edit `zitadel.json` or files under `.zitadel/`,

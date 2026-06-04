@@ -1,22 +1,22 @@
 /**
  * jsdom-friendly integration tests for `<zitadel-login>`. Network calls go
- * through the typed `@zitadel-nextgen/api` fetch client; we intercept them
+ * through the typed `@zitadel/api` fetch client; we intercept them
  * with `msw/node` driven by the shared xstate flow walker in
- * `@zitadel-nextgen/api-mock`.
+ * `@zitadel/api-mock`.
  *
  * Behaviour that needs the FACE platform (form participation, focus
  * delegation, real Enter-to-submit) lives in
  * `zitadel-login.browser.spec.ts` because jsdom 29 only ships a partial
  * `ElementInternals` implementation.
  */
-import { configureZitadel, _resetConfigForTesting } from "@zitadel-nextgen/api/config";
+import { configureZitadel, _resetConfigForTesting } from "@zitadel/api/config";
 import {
   applyBranding,
   clearBranding,
   setupMockHandlers,
   type CapturedRequest,
   type MockHandle,
-} from "@zitadel-nextgen/api-mock";
+} from "@zitadel/api-mock";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import {

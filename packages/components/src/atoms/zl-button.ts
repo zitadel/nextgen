@@ -1,8 +1,8 @@
 import { LitElement, html, nothing } from "lit";
 import { customElement, property } from "lit/decorators.js";
 
-import buttonHost from "@zitadel-nextgen/shared-component-styles/lit/button-host.css?inline";
-import buttonSurface from "@zitadel-nextgen/shared-component-styles/button.css?inline";
+import buttonHost from "@zitadel/shared-component-styles/lit/button-host.css?inline";
+import buttonSurface from "@zitadel/shared-component-styles/button.css?inline";
 
 import type { AtomManifest } from "../manifest.js";
 import { baseHostStyles, surfaceStyles } from "../styles/index.js";

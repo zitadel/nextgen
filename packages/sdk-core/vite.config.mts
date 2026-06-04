@@ -20,7 +20,7 @@ export default defineConfig(() => ({
     },
   },
   test: {
-    name: "@zitadel-nextgen/sdk-core",
+    name: "@zitadel/sdk-core",
     watch: false,
     globals: true,
     environment: "node",

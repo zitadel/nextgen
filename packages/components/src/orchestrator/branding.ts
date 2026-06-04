@@ -14,7 +14,7 @@
 import type {
   CreateFlow201Branding,
   CreateFlow201BrandingLayout,
-} from "@zitadel-nextgen/api/generated/model";
+} from "@zitadel/api/generated/model";
 
 export type FlowLayout = CreateFlow201BrandingLayout;
 

@@ -1,10 +1,10 @@
 {
-  "name": "@zitadel-nextgen/login-ui",
+  "name": "@zitadel/login-ui",
   "version": "0.0.1",
   "private": true,
   "dependencies": {
-    "@zitadel-nextgen/components": "workspace:*",
-    "@zitadel-nextgen/design-tokens": "workspace:*"
+    "@zitadel/components": "workspace:*",
+    "@zitadel/design-tokens": "workspace:*"
   },
   "devDependencies": {
     "@nx/vite": "catalog:",
