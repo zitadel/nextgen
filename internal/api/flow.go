@@ -132,18 +132,29 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 		}
 	}
 	// The browser Origin header drives the WebAuthn relying-party params when a
-	// step issues a passkey challenge. Validate it against the project's allowlist.
+	// step issues or verifies a passkey challenge. Same-origin browser fetches may
+	// not include Origin; fall back to the effective request host injected by the
+	// WithRequestHostMiddleware (X-Forwarded-Host or r.Host).
+	originStr := ""
 	if origin, ok := params.Origin.Get(); ok {
-		if rp := passkeyRPFromOrigin(origin); rp != nil {
-			project, err := h.projectService.Get(ctx, state.ProjectID)
-			if err != nil {
-				return internalErrorResponse(err), nil
+		originStr = origin.String()
+	} else if h, ok := requestOriginFromContext(ctx); ok {
+		originStr = h
+	}
+	if originStr != "" {
+		originURL, err := url.Parse(originStr)
+		if err == nil {
+			if rp := passkeyRPFromOrigin(*originURL); rp != nil {
+				project, err := h.projectService.Get(ctx, state.ProjectID)
+				if err != nil {
+					return internalErrorResponse(err), nil
+				}
+				if err := validateOriginAgainstProject(originStr, project); err != nil {
+					return errorResponseWithStatusCode(http.StatusBadRequest,
+						domain.ErrRequestInvalid().WithMessage(err.Error())), nil
+				}
+				submitReq.PasskeyRP = rp
 			}
-			if err := validateOriginAgainstProject(origin.String(), project); err != nil {
-				return errorResponseWithStatusCode(http.StatusBadRequest,
-					domain.ErrRequestInvalid().WithMessage(err.Error())), nil
-			}
-			submitReq.PasskeyRP = rp
 		}
 	}
 
@@ -308,6 +319,22 @@ func toFlowStepChallenge(c domain.FlowStepChallenge) api.FlowStepChallenge {
 	}
 	return out
 }
+
+// validateOriginAgainstProject returns an error if the origin is not in the
+// project's PreviewOrigins allowlist. An empty allowlist means allow all
+// (development/test mode).
+func validateOriginAgainstProject(originStr string, project *domain.Project) error {
+	if len(project.PreviewOrigins) == 0 {
+		return nil
+	}
+	for _, allowed := range project.PreviewOrigins {
+		if allowed == originStr {
+			return nil
+		}
+	}
+	return fmt.Errorf("origin %q is not allowed for this project", originStr)
+}
+
 
 // passkeyRPFromOrigin derives the WebAuthn relying-party id (the origin host,
 // without port) and the allowed origin from the browser Origin header. Returns

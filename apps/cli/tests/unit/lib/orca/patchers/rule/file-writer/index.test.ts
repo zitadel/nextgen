@@ -269,14 +269,14 @@ describe("scaffold - add-dep", () => {
   it("adds a dependency to package.json and records it in depsAdded", async () => {
     await writeFile(join(dir, "package.json"), JSON.stringify({ name: "demo" }));
     const result = await scaffold(
-      plan({ kind: "add-dep", name: "@zitadel-nextgen/sdk-next", version: "1.2.3" }),
+      plan({ kind: "add-dep", name: "@zitadel/sdk-next", version: "1.2.3" }),
       { cwd: dir, dryRun: false, force: false },
     );
-    expect(result.depsAdded).toEqual(["@zitadel-nextgen/sdk-next"]);
+    expect(result.depsAdded).toEqual(["@zitadel/sdk-next"]);
     const parsed = JSON.parse(await readFile(join(dir, "package.json"), "utf8")) as {
       dependencies: Record<string, string>;
     };
-    expect(parsed.dependencies["@zitadel-nextgen/sdk-next"]).toBe("1.2.3");
+    expect(parsed.dependencies["@zitadel/sdk-next"]).toBe("1.2.3");
   });
 
   it("adds to devDependencies when dev is set", async () => {

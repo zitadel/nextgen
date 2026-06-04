@@ -1,5 +1,5 @@
 ---
-"@zitadel-nextgen/cli": minor
+"@zitadel/cli": minor
 ---
 
 Drop unused auth methods from the `zitadel setup` prompt and consolidate flow domain logic into `apps/cli/src/lib/flows/`. The setup prompt previously offered `passkey`, `password`, and `totp` as a multiselect, but `totp` is not a valid key under `x-auth-methods` per the OAS spec (only `password|passkey|magic_link|sso|otp` are allowed with `additionalProperties: false`), so any user schema written with `totp` selected failed validation. The Go flow engine only wires `password` and `identifier` challenges today; `passkey` has a defined JSON shape but no runtime handler yet.

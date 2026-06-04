@@ -18,7 +18,7 @@
  * delegates HTML attribute escaping to the browser's serialiser — no manual
  * string-escaping in this module.
  */
-import type { CreateFlow201Step } from "@zitadel-nextgen/api/generated/model";
+import type { CreateFlow201Step } from "@zitadel/api/generated/model";
 
 import type { Locale } from "./locales/en.js";
 

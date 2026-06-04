@@ -1,5 +1,5 @@
 /**
- * Re-exports shared SDK types from `@zitadel-nextgen/sdk-core`.
+ * Re-exports shared SDK types from `@zitadel/sdk-core`.
  *
  * These types are defined once in sdk-core and shared by both sdk-next
  * and sdk-nuxt.
@@ -10,9 +10,9 @@ export type {
   UnauthState,
   AuthResult,
   NextgenMiddlewareOptions,
-} from '@zitadel-nextgen/sdk-core/types';
+} from '@zitadel/sdk-core/types';
 
-import type { UnauthState } from '@zitadel-nextgen/sdk-core/types';
+import type { UnauthState } from '@zitadel/sdk-core/types';
 
 // ─── Nuxt-specific client-safe types ─────────────────────────────────────────
 

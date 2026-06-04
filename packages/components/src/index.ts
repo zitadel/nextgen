@@ -1,10 +1,10 @@
 /**
- * `@zitadel-nextgen/components` — Lit-based atomic web components for the
+ * `@zitadel/components` — Lit-based atomic web components for the
  * Zitadel auth UI.
  *
  * Importing this module side-effect-registers every shipped `<zl-*>` atom and
  * the `<zitadel-login>` orchestrator. Tree-shake by importing the leaf
- * subpaths instead (e.g. `@zitadel-nextgen/components/atoms`).
+ * subpaths instead (e.g. `@zitadel/components/atoms`).
  */
 
 import "./atoms/index.js";
@@ -42,7 +42,6 @@ export {
   resolveTheme,
   ThemeController,
   applyFontUrl,
-  createLiquidEngine,
   createSanitiser,
   validateBranding,
   patchMandatoryGates,

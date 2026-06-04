@@ -57,17 +57,17 @@ jobs:
       - name: Pull tokens from Figma
         env:
           FIGMA_TOKEN: ${{ secrets.FIGMA_TOKEN }}
-        run: corepack pnpm nx run @zitadel-nextgen/design-tokens:sync
+        run: corepack pnpm nx run @zitadel/design-tokens:sync
 
       - name: Regenerate token artifacts
-        run: corepack pnpm nx run @zitadel-nextgen/design-tokens:generate
+        run: corepack pnpm nx run @zitadel/design-tokens:generate
 
       - name: Run snapshot test
         # Snapshot will fail if any public token name changed. That's the
         # signal the PR reviewer needs — either consumers need updating
         # before this PR can merge, or the snapshot needs an intentional
         # bump in the same PR.
-        run: corepack pnpm nx run @zitadel-nextgen/design-tokens:test
+        run: corepack pnpm nx run @zitadel/design-tokens:test
         continue-on-error: true
 
       - name: Open PR

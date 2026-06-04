@@ -1,6 +1,6 @@
 /**
- * `@zitadel-nextgen/api-mock` — shared mock for the typed
- * `@zitadel-nextgen/api` Flow API.
+ * `@zitadel/api-mock` — shared mock for the typed
+ * `@zitadel/api` Flow API.
  *
  * Three entry points:
  *

@@ -27,7 +27,7 @@
 import { randomUUID } from "node:crypto";
 import { type Server } from "node:http";
 
-import type { ExchangeHandoff200 } from "@zitadel-nextgen/api/generated/model";
+import type { ExchangeHandoff200 } from "@zitadel/api/generated/model";
 import express from "express";
 import { createMiddleware } from "@mswjs/http-middleware";
 
