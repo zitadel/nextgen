@@ -463,6 +463,12 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 		if err != nil {
 			return passkeyChallenge, nil, domain.ErrAuthAttemptProofRejected(err)
 		}
+		// Discoverable login resolves the user cryptographically from the assertion; bind it onto
+		// the attempt so the subject is pinned and the session/handoff carries the user id. For an
+		// identified login the user factor is already present and unchanged.
+		if userFactor == nil && verification.UserID != "" {
+			attempt.SetUserFactor(&domain.User{ID: verification.UserID})
+		}
 		// Use the verified user as the source of truth: it is set for both identified and
 		// discoverable logins, whereas userFactor is nil in the discoverable case.
 		s.recordPasskeyUsage(ctx, attempt.ProjectID, verification)

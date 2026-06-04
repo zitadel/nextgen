@@ -1,6 +1,8 @@
 package domain
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"net/url"
 	"time"
 
@@ -243,4 +245,34 @@ func VerifyPasskeyChallenge(challenge *PasskeyChallenge, response []byte, userID
 		BackupState:    credential.Flags.BackupState,
 		UserID:         discoveredUser,
 	}, nil
+}
+
+// BuildPasskeyRequestOptions renders the stored passkey challenge as the
+// WebAuthn PublicKeyCredentialRequestOptions JSON that the browser's
+// navigator.credentials.get() call expects as its `publicKey` field.
+// The caller is responsible for wrapping it (e.g. { publicKey: <these options> })
+// if needed; the frontend zl-passkey component reads the fields directly.
+// It reconstructs the options from the persisted challenge fields rather than
+// the discarded ceremony output (see CreatePasskeyChallenge), so the flow
+// engine and the auth-attempt REST API can share one mapping.
+func BuildPasskeyRequestOptions(c *AuthChallengePasskey) ([]byte, error) {
+	challenge, err := base64.RawURLEncoding.DecodeString(c.Challenge)
+	if err != nil {
+		return nil, err
+	}
+	allowed := make([]protocol.CredentialDescriptor, 0, len(c.AllowedCredentialIDs))
+	for _, id := range c.AllowedCredentialIDs {
+		allowed = append(allowed, protocol.CredentialDescriptor{
+			Type:         protocol.PublicKeyCredentialType,
+			CredentialID: protocol.URLEncodedBase64(id),
+		})
+	}
+	opts := protocol.PublicKeyCredentialRequestOptions{
+		Challenge:          protocol.URLEncodedBase64(challenge),
+		RelyingPartyID:     c.RPID,
+		AllowedCredentials: allowed,
+		UserVerification:   protocol.UserVerificationRequirement(c.UserVerification),
+		Extensions:         c.Extensions,
+	}
+	return json.Marshal(opts)
 }
