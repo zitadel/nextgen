@@ -16,9 +16,6 @@ import (
 
 func TestCreateFlowDefinitionUnauthenticated(t *testing.T) {
 	t.Parallel()
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
-	require.NoError(t, err)
-	harness.CreateUserSchema(t, project.ID, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
 
 	userSchema := "https://some-tenant.com/schemas/unknown-user-schema.yaml"
 	userSchemaURI, err := url.Parse(userSchema)
@@ -26,7 +23,7 @@ func TestCreateFlowDefinitionUnauthenticated(t *testing.T) {
 
 	client := harness.EnsureAnonymousAPIClient(t)
 	resp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
-		ProjectID: api.ProjectID(project.ID),
+		ProjectID: "proj_1234",
 		FlowDefinition: api.FlowDefinition{
 			Name:       "login-flow",
 			UserSchema: *userSchemaURI,
@@ -127,20 +124,19 @@ func TestCreateFlowDefinition(t *testing.T) {
 			wantResp: &api.FlowDefinitionDetailResponse{
 				ProjectID: project.ID,
 				Status:    "active",
-				FlowDefinition: api.NewOptFlowDefinition(
-					api.FlowDefinition{
-						Name:       "login-flow",
-						UserSchema: *userSchemaURI,
-						Purposes:   map[string]string{"login": "step_1"},
-						Audience: api.OptFlowAudience{
-							Value: api.FlowAudience{
-								TeamIds: []string{"team-1", "team-2"},
-								AppIds:  []string{"app-1", "app-2"},
-							},
-							Set: true,
+				FlowDefinition: api.FlowDefinition{
+					Name:       "login-flow",
+					UserSchema: *userSchemaURI,
+					Purposes:   map[string]string{"login": "step_1"},
+					Audience: api.OptFlowAudience{
+						Value: api.FlowAudience{
+							TeamIds: []string{"team-1", "team-2"},
+							AppIds:  []string{"app-1", "app-2"},
 						},
-						Steps: validSteps(),
-					}),
+						Set: true,
+					},
+					Steps: validSteps(),
+				},
 			},
 		},
 		{
@@ -303,7 +299,7 @@ func TestCreateFlowDefinition(t *testing.T) {
 	}
 }
 
-func assertFlowDefinitionResponse(t *testing.T, want, got api.CreateFlowDefinitionRes) {
+func assertFlowDefinitionResponse(t *testing.T, want, got any) {
 	t.Helper()
 	switch want.(type) {
 	case *api.FlowDefinitionDetailResponse:
@@ -333,6 +329,14 @@ func assertFlowDefinitionResponse(t *testing.T, want, got api.CreateFlowDefiniti
 
 		assert.Equal(t, expected.Code, actual.Code)
 		assert.Equal(t, expected.Message, actual.Message)
+	case *api.ErrorDetailsStatusCode:
+		expected, ok := want.(*api.ErrorDetailsStatusCode)
+		require.True(t, ok)
+		actual, ok := got.(*api.ErrorDetailsStatusCode)
+		require.True(t, ok)
+
+		assert.Equal(t, expected.StatusCode, actual.StatusCode)
+		assert.Equal(t, expected.Response, actual.Response)
 	default:
 		assert.Fail(t, "unexpected response type", helpers.MustMarshal(t, got))
 	}
@@ -358,5 +362,328 @@ func validSteps() []api.FlowDefinitionStep {
 			Name:     "step_2",
 			Complete: api.NewOptFlowDefinitionStepComplete(api.FlowDefinitionStepCompleteRedirect),
 		},
+	}
+}
+
+func TestGetFlowDefinitionUnauthenticated(t *testing.T) {
+	t.Parallel()
+	client := harness.EnsureAnonymousAPIClient(t)
+	getResp, err := client.GetFlowDefinition(t.Context(), api.GetFlowDefinitionParams{
+		ID:        "flowDef_1234",
+		ProjectID: "proj_1234",
+	})
+	require.NoError(t, err)
+	expectedResp := &api.ErrorDetailsStatusCode{
+		StatusCode: http.StatusUnauthorized,
+		Response: api.ErrorDetails{
+			Code:    "auth.unauthorized",
+			Message: `operation GetFlowDefinition: security "OAuth2": security requirement is not satisfied`,
+		},
+	}
+	require.NoError(t, err)
+	assert.Equal(t, expectedResp, getResp)
+}
+
+func TestGetFlowDefinition(t *testing.T) {
+	t.Parallel()
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+	require.NoError(t, err)
+	harness.CreateUserSchema(t, project.ID, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
+	u := "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml"
+	userSchemaURI, err := url.Parse(u)
+	require.NoError(t, err)
+
+	createResp, err := harness.EnsureAPIClient(t, project.ID).CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+		ProjectID: api.ProjectID(project.ID),
+		FlowDefinition: api.FlowDefinition{
+			Name:       "existing-flow",
+			UserSchema: *userSchemaURI,
+			Purposes:   map[string]string{"login": "step_1"},
+			Audience: api.OptFlowAudience{
+				Value: api.FlowAudience{
+					TeamIds: []string{"team-1", "team-2"},
+					AppIds:  []string{"app-1", "app-2"},
+				},
+				Set: true,
+			},
+			Steps: validSteps(),
+		},
+	})
+	flowDef, ok := createResp.(*api.FlowDefinitionDetailResponse)
+	require.True(t, ok)
+
+	tests := []struct {
+		name     string
+		req      api.GetFlowDefinitionParams
+		wantResp api.GetFlowDefinitionRes
+	}{
+		{
+			name: "get flow definition by id succeeds",
+			req: api.GetFlowDefinitionParams{
+				ProjectID: api.ProjectID(project.ID),
+				ID:        flowDef.ID,
+			},
+			wantResp: flowDef,
+		},
+		{
+			name: "non-existing flow definition",
+			req: api.GetFlowDefinitionParams{
+				ProjectID: api.ProjectID(project.ID),
+				ID:        "non-existing-id",
+			},
+			wantResp: &api.ErrorDetailsStatusCode{
+				StatusCode: http.StatusNotFound,
+				Response: api.ErrorDetails{
+					Code:    "flowdef.not_found",
+					Message: "flow definition: not found",
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			client := harness.EnsureAPIClient(t, project.ID)
+			resp, err := client.GetFlowDefinition(t.Context(), tt.req)
+			assert.NoError(t, err)
+			assertFlowDefinitionResponse(t, tt.wantResp, resp)
+		})
+	}
+}
+
+func TestListFlowDefinitionsUnauthenticated(t *testing.T) {
+	t.Parallel()
+
+	client := harness.EnsureAnonymousAPIClient(t)
+	getResp, err := client.ListFlowDefinitions(t.Context(), api.ListFlowDefinitionsParams{
+		ProjectID: "proj_1234",
+	})
+	require.NoError(t, err)
+	expectedResp := &api.ErrorDetailsStatusCode{
+		StatusCode: http.StatusUnauthorized,
+		Response: api.ErrorDetails{
+			Code:    "auth.unauthorized",
+			Message: `operation ListFlowDefinitions: security "OAuth2": security requirement is not satisfied`,
+		},
+	}
+	require.NoError(t, err)
+	assert.Equal(t, expectedResp, getResp)
+}
+
+func TestListFlowDefinitions(t *testing.T) {
+	t.Parallel()
+	project1, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+	require.NoError(t, err)
+	harness.CreateUserSchema(t, project1.ID, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
+
+	project2, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+	require.NoError(t, err)
+	harness.CreateUserSchema(t, project2.ID, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
+
+	project3, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+	require.NoError(t, err)
+
+	u := "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml"
+	userSchemaURI, err := url.Parse(u)
+	require.NoError(t, err)
+
+	resp1, err := harness.EnsureAPIClient(t, project1.ID).CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+		ProjectID: api.ProjectID(project1.ID),
+		FlowDefinition: api.FlowDefinition{
+			Name:       "flow-1",
+			UserSchema: *userSchemaURI,
+			Purposes:   map[string]string{"login": "step_1"},
+			Audience: api.OptFlowAudience{
+				Value: api.FlowAudience{
+					TeamIds: []string{"team-1", "team-2"},
+					AppIds:  []string{"app-1", "app-2"},
+				},
+				Set: true,
+			},
+			Steps: validSteps(),
+		},
+	})
+	flowDef1, ok := resp1.(*api.FlowDefinitionDetailResponse)
+	require.True(t, ok)
+
+	resp2, err := harness.EnsureAPIClient(t, project1.ID).CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+		ProjectID: api.ProjectID(project1.ID),
+		FlowDefinition: api.FlowDefinition{
+			Name:       "flow-2",
+			UserSchema: *userSchemaURI,
+			Purposes:   map[string]string{"register": "step_1"},
+			Audience: api.OptFlowAudience{
+				Value: api.FlowAudience{
+					TeamIds: []string{"team-1", "team-2"},
+					AppIds:  []string{"app-1", "app-2"},
+				},
+				Set: true,
+			},
+			Steps: validSteps(),
+		},
+	})
+	flowDef2, ok := resp2.(*api.FlowDefinitionDetailResponse)
+	require.True(t, ok)
+
+	resp3, err := harness.EnsureAPIClient(t, project2.ID).CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+		ProjectID: api.ProjectID(project2.ID),
+		FlowDefinition: api.FlowDefinition{
+			Name:       "flow-3",
+			UserSchema: *userSchemaURI,
+			Purposes:   map[string]string{"login": "step_1"},
+			Audience: api.OptFlowAudience{
+				Value: api.FlowAudience{
+					TeamIds: []string{"team-1", "team-2"},
+					AppIds:  []string{"app-1", "app-2"},
+				},
+				Set: true,
+			},
+			Steps: validSteps(),
+		},
+	})
+	flowDef3, ok := resp3.(*api.FlowDefinitionDetailResponse)
+	require.True(t, ok)
+
+	tests := []struct {
+		name     string
+		req      api.ListFlowDefinitionsParams
+		wantResp api.ListFlowDefinitionsRes
+	}{
+		{
+			name: "list all flow definitions in a project",
+			req: api.ListFlowDefinitionsParams{
+				ProjectID: api.ProjectID(project1.ID),
+			},
+			wantResp: &api.FlowDefinitionListResponse{
+				FlowDefinitions: []api.FlowDefinitionResponse{
+					{
+						Name:      "default-login",
+						ProjectID: project1.ID,
+					}, // for the default flow definition
+					{
+						ID:        flowDef1.ID,
+						Name:      flowDef1.FlowDefinition.GetName(),
+						ProjectID: flowDef1.ProjectID,
+						Status:    flowDef1.Status,
+						CreatedAt: flowDef1.CreatedAt.Local(), // todo: review tz
+						UpdatedAt: flowDef1.UpdatedAt.Local(),
+					},
+					{
+						ID:        flowDef2.ID,
+						Name:      flowDef2.FlowDefinition.GetName(),
+						ProjectID: flowDef2.ProjectID,
+						Status:    flowDef2.Status,
+						CreatedAt: flowDef2.CreatedAt.Local(),
+						UpdatedAt: flowDef2.UpdatedAt.Local(),
+					},
+				},
+			},
+		},
+		{
+			name: "list all flow definitions in project 2",
+			req: api.ListFlowDefinitionsParams{
+				ProjectID: api.ProjectID(project2.ID),
+			},
+			wantResp: &api.FlowDefinitionListResponse{
+				FlowDefinitions: []api.FlowDefinitionResponse{
+					{
+						Name:      "default-login",
+						ProjectID: project2.ID,
+					}, // for the default flow definition
+					{
+						ID:        flowDef3.ID,
+						Name:      flowDef3.FlowDefinition.GetName(),
+						ProjectID: flowDef3.ProjectID,
+						Status:    flowDef3.Status,
+						CreatedAt: flowDef3.CreatedAt.Local(), // todo: review tz
+						UpdatedAt: flowDef3.UpdatedAt.Local(),
+					},
+				},
+			},
+		},
+		{
+			name: "list all flow definitions by purpose register",
+			req: api.ListFlowDefinitionsParams{
+				ProjectID: api.ProjectID(project1.ID),
+				Purpose: api.OptListFlowDefinitionsPurpose{
+					Value: "register",
+					Set:   true,
+				},
+			},
+			wantResp: &api.FlowDefinitionListResponse{
+				FlowDefinitions: []api.FlowDefinitionResponse{
+					{
+						ID:        flowDef2.ID,
+						Name:      flowDef2.FlowDefinition.GetName(),
+						ProjectID: flowDef2.ProjectID,
+						Status:    flowDef2.Status,
+						CreatedAt: flowDef2.CreatedAt.Local(), // todo: review tz
+						UpdatedAt: flowDef2.UpdatedAt.Local(),
+					},
+				},
+			},
+		},
+		{
+			name: "list all flow definitions by purpose login",
+			req: api.ListFlowDefinitionsParams{
+				ProjectID: api.ProjectID(project1.ID),
+				Purpose: api.OptListFlowDefinitionsPurpose{
+					Value: "login",
+					Set:   true,
+				},
+			},
+			wantResp: &api.FlowDefinitionListResponse{
+				FlowDefinitions: []api.FlowDefinitionResponse{
+					{
+						Name:      "default-login",
+						ProjectID: project1.ID,
+					}, // for the default flow definition
+					{
+						ID:        flowDef1.ID,
+						Name:      flowDef1.FlowDefinition.GetName(),
+						ProjectID: flowDef1.ProjectID,
+						Status:    flowDef1.Status,
+						CreatedAt: flowDef1.CreatedAt.Local(), // todo: review tz
+						UpdatedAt: flowDef1.UpdatedAt.Local(),
+					},
+				},
+			},
+		},
+		{
+			name: "only default flow definition",
+			req: api.ListFlowDefinitionsParams{
+				ProjectID: api.ProjectID(project3.ID),
+			},
+			wantResp: &api.FlowDefinitionListResponse{
+				FlowDefinitions: []api.FlowDefinitionResponse{
+					{
+						Name:      "default-login",
+						ProjectID: project3.ID,
+					}, // for the default flow definition
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			client := harness.EnsureAPIClient(t, project1.ID)
+			resp, err := client.ListFlowDefinitions(t.Context(), tt.req)
+			assert.NoError(t, err)
+			expected, ok := tt.wantResp.(*api.FlowDefinitionListResponse)
+			require.True(t, ok)
+			actual, ok := resp.(*api.FlowDefinitionListResponse)
+			require.True(t, ok)
+			assert.Equal(t, len(expected.FlowDefinitions), len(actual.FlowDefinitions))
+			if len(expected.FlowDefinitions) > 1 {
+				assert.EqualValues(t, expected.FlowDefinitions[1:], actual.FlowDefinitions[1:]) // exclude the default flow definition
+				return
+			}
+			if expected.FlowDefinitions[0].Name == "default-login" {
+				assert.Equal(t, expected.FlowDefinitions[0].ProjectID, actual.FlowDefinitions[0].ProjectID)
+				return
+			}
+			assert.Equal(t, expected.FlowDefinitions, actual.FlowDefinitions)
+		})
 	}
 }

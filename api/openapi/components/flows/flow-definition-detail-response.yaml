@@ -1,5 +1,5 @@
 type: object
-required: [id, project_id, schema_uri, status, created_at, updated_at]
+required: [id, project_id, status, flow_definition, created_at, updated_at]
 properties:
   id:
     type: string

@@ -22,12 +22,6 @@ get:
         application/json:
           schema:
             $ref: ../../../components/flows/flow-definition-detail-response.yaml
-    '404':
-      description: Flow definition not found.
-      content:
-        application/json:
-          schema:
-            $ref: ../../../components/error-details.yaml
     default:
       description: Unexpected error.
       content:

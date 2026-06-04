@@ -230,14 +230,13 @@ func flowDefinitionDetailResponse(flowDefinition *domain.FlowDefinition) *api.Fl
 		ID:        flowDefinition.ID,
 		ProjectID: flowDefinition.ProjectID,
 		Status:    flowDefinition.Status.String(),
-		FlowDefinition: api.NewOptFlowDefinition(
-			api.FlowDefinition{
-				Name:       flowDefinition.Name,
-				Steps:      steps,
-				Purposes:   purposes,
-				Audience:   audience,
-				UserSchema: gu.Value(userSchemaURI),
-			}),
+		FlowDefinition: api.FlowDefinition{
+			Name:       flowDefinition.Name,
+			Steps:      steps,
+			Purposes:   purposes,
+			Audience:   audience,
+			UserSchema: gu.Value(userSchemaURI),
+		},
 		CreatedAt: flowDefinition.CreatedAt,
 		UpdatedAt: flowDefinition.UpdatedAt,
 	}

@@ -1063,15 +1063,8 @@ func (s *FlowDefinitionDetailResponse) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
-		if value, ok := s.FlowDefinition.Get(); ok {
-			if err := func() error {
-				if err := value.Validate(); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
+		if err := s.FlowDefinition.Validate(); err != nil {
+			return err
 		}
 		return nil
 	}(); err != nil {

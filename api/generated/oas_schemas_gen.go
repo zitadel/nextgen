@@ -2194,7 +2194,6 @@ func (*ErrorDetails) createProjectRes()        {}
 func (*ErrorDetails) createSessionRes()        {}
 func (*ErrorDetails) deleteFlowDefinitionRes() {}
 func (*ErrorDetails) endSessionRes()           {}
-func (*ErrorDetails) getFlowDefinitionRes()    {}
 func (*ErrorDetails) introspectRes()           {}
 func (*ErrorDetails) listFlowDefinitionsRes()  {}
 func (*ErrorDetails) submitFlowStepRes()       {}
@@ -2759,10 +2758,10 @@ type FlowDefinitionDetailResponse struct {
 	// Identifier of the project this flow definition belongs to.
 	ProjectID string `json:"project_id"`
 	// Status of the flow definition.
-	Status         string            `json:"status"`
-	FlowDefinition OptFlowDefinition `json:"flow_definition"`
-	CreatedAt      time.Time         `json:"created_at"`
-	UpdatedAt      time.Time         `json:"updated_at"`
+	Status         string         `json:"status"`
+	FlowDefinition FlowDefinition `json:"flow_definition"`
+	CreatedAt      time.Time      `json:"created_at"`
+	UpdatedAt      time.Time      `json:"updated_at"`
 }
 
 // GetID returns the value of ID.
@@ -2781,7 +2780,7 @@ func (s *FlowDefinitionDetailResponse) GetStatus() string {
 }
 
 // GetFlowDefinition returns the value of FlowDefinition.
-func (s *FlowDefinitionDetailResponse) GetFlowDefinition() OptFlowDefinition {
+func (s *FlowDefinitionDetailResponse) GetFlowDefinition() FlowDefinition {
 	return s.FlowDefinition
 }
 
@@ -2811,7 +2810,7 @@ func (s *FlowDefinitionDetailResponse) SetStatus(val string) {
 }
 
 // SetFlowDefinition sets the value of FlowDefinition.
-func (s *FlowDefinitionDetailResponse) SetFlowDefinition(val OptFlowDefinition) {
+func (s *FlowDefinitionDetailResponse) SetFlowDefinition(val FlowDefinition) {
 	s.FlowDefinition = val
 }
 
@@ -2885,7 +2884,7 @@ type FlowDefinitionResponse struct {
 	// URI of the flow definition schema this definition was authored against.
 	// If the schema_uri was not provided in the request, the flow definition is validated against the
 	// latest version of the schema, and the response includes the schema_uri of the latest version.
-	SchemaURI url.URL `json:"schema_uri"`
+	SchemaURI OptURI `json:"schema_uri"`
 	// Status of the flow definition.
 	Status string `json:"status"`
 	// Timestamp when the flow definition was created.
@@ -2910,7 +2909,7 @@ func (s *FlowDefinitionResponse) GetProjectID() string {
 }
 
 // GetSchemaURI returns the value of SchemaURI.
-func (s *FlowDefinitionResponse) GetSchemaURI() url.URL {
+func (s *FlowDefinitionResponse) GetSchemaURI() OptURI {
 	return s.SchemaURI
 }
 
@@ -2945,7 +2944,7 @@ func (s *FlowDefinitionResponse) SetProjectID(val string) {
 }
 
 // SetSchemaURI sets the value of SchemaURI.
-func (s *FlowDefinitionResponse) SetSchemaURI(val url.URL) {
+func (s *FlowDefinitionResponse) SetSchemaURI(val OptURI) {
 	s.SchemaURI = val
 }
 
@@ -7306,52 +7305,6 @@ func (o OptFlowAudience) Get() (v FlowAudience, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptFlowAudience) Or(d FlowAudience) FlowAudience {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptFlowDefinition returns new OptFlowDefinition with value set to v.
-func NewOptFlowDefinition(v FlowDefinition) OptFlowDefinition {
-	return OptFlowDefinition{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptFlowDefinition is optional FlowDefinition.
-type OptFlowDefinition struct {
-	Value FlowDefinition
-	Set   bool
-}
-
-// IsSet returns true if OptFlowDefinition was set.
-func (o OptFlowDefinition) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptFlowDefinition) Reset() {
-	var v FlowDefinition
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptFlowDefinition) SetTo(v FlowDefinition) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptFlowDefinition) Get() (v FlowDefinition, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptFlowDefinition) Or(d FlowDefinition) FlowDefinition {
 	if v, ok := o.Get(); ok {
 		return v
 	}
