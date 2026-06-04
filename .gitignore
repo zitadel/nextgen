@@ -8,6 +8,7 @@
 *.so
 *.dylib
 api/openapi/bundled.yaml
+bruno/
 
 # Test binary, built with `go test -c`
 *.test
