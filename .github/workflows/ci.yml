@@ -256,7 +256,11 @@ jobs:
     # The check lives in scripts/check-changeset-required.mjs so the publishable
     # package list and rules are testable and shared, rather than duplicated in
     # inline shell.
-    if: github.event_name == 'pull_request'
+    #
+    # Skip the Changesets "Version Packages" PR: it legitimately edits public
+    # package manifests/changelogs and *removes* changesets (consuming them),
+    # which would otherwise trip this gate.
+    if: github.event_name == 'pull_request' && github.head_ref != 'changeset-release/main'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
