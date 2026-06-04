@@ -1,4 +1,4 @@
-No rush, it vcname: release-npm
+name: release-npm
 
 # Publishes the public npm packages (@zitadel/cli, @zitadel/api,
 # @zitadel/components, @zitadel/sdk-core, @zitadel/sdk-next, @zitadel/sdk-nuxt)
