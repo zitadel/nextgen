@@ -122,7 +122,12 @@ async function expectSessionCookie(page: Page): Promise<void> {
 }
 
 async function logout(page: Page): Promise<void> {
-  await clickAction(page, /logout|sign out/i, ["logout"]);
+  const logout = logoutLocator(page);
+  if (!(await logout.first().isVisible({ timeout: 1000 }).catch(() => false))) {
+    await page.getByRole("button", { name: /open user menu/i }).click();
+  }
+  await expect(logout.first()).toBeVisible({ timeout: 5000 });
+  await logout.first().click();
   await expect(page).toHaveURL(/\/login(?:\?|$)/);
   await expectSessionCleared(page);
 }
@@ -191,6 +196,14 @@ async function clickAction(
 
 function actionLocator(page: Page, actionName: string) {
   return page.locator(`zl-button[action="${actionName}"], [data-action="${actionName}"]`);
+}
+
+function logoutLocator(page: Page) {
+  return page
+    .locator("zitadel-logout .signout-btn")
+    .or(actionLocator(page, "logout"))
+    .or(page.getByRole("button", { name: /logout|sign out/i }))
+    .or(page.getByRole("link", { name: /logout|sign out/i }));
 }
 
 function uniqueEmail(prefix: string): string {

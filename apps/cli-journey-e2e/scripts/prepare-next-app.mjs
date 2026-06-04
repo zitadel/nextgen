@@ -21,11 +21,7 @@ const sdkNextPackage =
 await rm(appDir, { recursive: true, force: true });
 await mkdir(outputDir, { recursive: true });
 
-const npmEnv = {
-  ...process.env,
-  npm_config_registry: registryUrl,
-  npm_config_yes: "true",
-};
+const npmEnv = npmEnvironment();
 
 await run(
   "npx",
@@ -35,7 +31,8 @@ await run(
     "myapp",
     "--ts",
     "--app",
-    "--no-git",
+    "--use-npm",
+    "--disable-git",
     "--yes",
   ],
   { cwd: outputDir, env: npmEnv },
@@ -131,6 +128,22 @@ async function packageName(relativePath) {
     throw new Error(`${relativePath}/package.json has no name`);
   }
   return pkg.name;
+}
+
+function npmEnvironment() {
+  const env = { ...process.env };
+  for (const key of Object.keys(env)) {
+    if (key.startsWith("npm_config_")) {
+      delete env[key];
+    }
+  }
+  return {
+    ...env,
+    npm_config_audit: "false",
+    npm_config_fund: "false",
+    npm_config_registry: registryUrl,
+    npm_config_yes: "true",
+  };
 }
 
 function run(command, args, options) {
