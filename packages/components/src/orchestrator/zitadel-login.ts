@@ -212,21 +212,14 @@ export class ZitadelLogin extends LitElement {
    * → `document.documentElement.lang` (page default) → English fallback.
    */
   private resolveLocale(): Locale {
-    const code = this.lang
-      || (typeof navigator !== "undefined" ? navigator.language : "")
-      || (typeof document !== "undefined" ? document.documentElement.lang : "");
+    const code =
+      this.lang ||
+      (typeof navigator !== "undefined" ? navigator.language : "") ||
+      (typeof document !== "undefined" ? document.documentElement.lang : "");
     const primary = (code.split("-")[0] ?? "").toLowerCase();
     const builtin = builtinLocales[primary] ?? en;
     const custom = this.locales?.[primary];
-    console.log("[zitadel-login] resolveLocale", {
-      lang: this.lang,
-      navigatorLang: typeof navigator !== "undefined" ? navigator.language : "N/A",
-      htmlLang: typeof document !== "undefined" ? document.documentElement.lang : "N/A",
-      code,
-      primary,
-      hasBuiltin: primary in builtinLocales,
-      availableLocales: Object.keys(builtinLocales),
-    });
+
     return custom ? { ...builtin, ...custom } : builtin;
   }
 
@@ -264,9 +257,7 @@ export class ZitadelLogin extends LitElement {
     if (!this.response || !this.engine) {
       return html`<slot name="loader"></slot>`;
     }
-    const rendered = this.injectAttribution(
-      this.renderStep(this.response.step, this.engine),
-    );
+    const rendered = this.injectAttribution(this.renderStep(this.response.step, this.engine));
     return html`<form
       class="zl-mount"
       part="form"
@@ -326,7 +317,9 @@ export class ZitadelLogin extends LitElement {
     const projectId = cfg?.projectId || "";
 
     if (!cfg) {
-      throw new Error("<zitadel-login> requires a `config` prop (from configureZitadel()) or configureZitadel() must be called before use.");
+      throw new Error(
+        "<zitadel-login> requires a `config` prop (from configureZitadel()) or configureZitadel() must be called before use.",
+      );
     }
     const api = getApi(cfg);
 
@@ -338,7 +331,9 @@ export class ZitadelLogin extends LitElement {
         wire = await getCurrentStep(api, this.resumeFlowId);
       } else {
         if (!projectId) {
-          throw new Error("<zitadel-login> requires a `project-id` attribute (or configureZitadel()) to start a flow.");
+          throw new Error(
+            "<zitadel-login> requires a `project-id` attribute (or configureZitadel()) to start a flow.",
+          );
         }
         wire = await apiStartFlow(api, { project_id: projectId, purpose: this.purpose });
       }
@@ -418,8 +413,7 @@ export class ZitadelLogin extends LitElement {
 
   private renderStep(step: CreateFlow201Step, engine: Liquid): string {
     const tenantSource =
-      typeof this.branding?.liquid_template === "string" &&
-      this.branding.liquid_template.length > 0
+      typeof this.branding?.liquid_template === "string" && this.branding.liquid_template.length > 0
         ? this.branding.liquid_template
         : null;
 
@@ -592,13 +586,16 @@ export class ZitadelLogin extends LitElement {
       ...this.response,
       step: { ...stepWithoutChallenge, error: errorKey },
     };
-    console.warn(`[zitadel-login] passkey ceremony ${aborted ? "cancelled" : "failed"}: ${message}`);
+    console.warn(
+      `[zitadel-login] passkey ceremony ${aborted ? "cancelled" : "failed"}: ${message}`,
+    );
   };
 
   private findPrimaryAction(): string | null {
     const root = this.shadowRoot;
     if (!root) return null;
-    const primary = root.querySelector('zl-button[hierarchy="primary"][type="submit"]') ??
+    const primary =
+      root.querySelector('zl-button[hierarchy="primary"][type="submit"]') ??
       root.querySelector('zl-button[hierarchy="primary"]');
     return primary?.getAttribute("action") || null;
   }
