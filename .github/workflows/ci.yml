@@ -102,6 +102,14 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Prune npm package tags for GoReleaser
+        run: |
+          # Changesets creates scoped package tags such as @zitadel/sdk-nuxt@0.1.0-alpha.0.
+          # GoReleaser should derive server versions only from server release tags.
+          git tag -l '@zitadel/*' | while read -r tag; do
+            git tag -d "$tag"
+          done
+
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
