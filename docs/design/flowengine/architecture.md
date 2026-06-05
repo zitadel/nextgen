@@ -19,8 +19,10 @@ graph TD
     FR["internal/domain/flow_field_resolver*<br>FlowFieldResolver"]
     OS["internal/domain/flow_on_success*<br>FlowOnSuccessHandler"]
     AA["internal/domain/flow_auth_attempt.go<br>FlowAuthAttemptService"]
+    PR["internal/domain/flow_passkey_registration.go<br>FlowPasskeyRegistrationService"]
 
     AAImpl["service: auth-attempt"]
+    PRImpl["service: PasskeyRegistrationService<br>(via FlowPasskeyRegistrationAdapter)"]
     Repo["repository: flow_definitions"]
     UserRepo["repository: users / passwords"]
     Schema["service: SchemaService"]
@@ -32,10 +34,12 @@ graph TD
     SM --> FR
     SM --> OS
     SM --> AA
+    SM --> PR
     Service --> Repo
     FR --> Schema
     OS --> UserRepo
     AA --> AAImpl
+    PR --> PRImpl
 ```
 
 ## Request path
@@ -150,6 +154,15 @@ machine routes (`user_not_found`) or re-renders (step error) accordingly.
 verify) so the freshly-created user counts as a verified factor for the
 terminal handoff.
 
+### `FlowPasskeyRegistrationService` (`internal/domain/flow_passkey_registration.go`)
+
+A narrow interface for the passkey-register ceremony. The state machine sees
+`IssuePasskeyRegistrationChallenge` (Phase 1 — mints a WebAuthn registration
+challenge keyed to a provisional user id) and `SubmitPasskeyRegistration`
+(Phase 2 — verifies the attestation and persists the credential inside the
+caller's `database.QueryExecutor`, so it can share the transaction that
+`HandleProvisional` uses to materialize the user row).
+
 ### Domain types worth knowing
 
 - `FlowDefinition` / `FlowDefinitionStep` — the immutable graph (`flow_definition.go`). Steps don't have a `type`; behavior derives from `Fields`, `Actions`, `Gates`, `SSOProviders`, `OnSuccess`, `Complete`, and `Transitions`.
@@ -197,6 +210,10 @@ Source of truth for the wire format. The ogen-generated types under `api/generat
 ### auth-attempt service
 
 Wired in as `FlowAuthAttemptService`. The state machine calls `Start` at `FlowService.Start`, `SubmitIdentifier` and `SubmitPassword` from `dispatchChallenges`, and `Handoff` at the terminal step when a user has been resolved. Today the production implementation is the `AuthAttemptService` in `internal/service/auth_attempt.go`.
+
+### passkey-registration service
+
+Wired in as `FlowPasskeyRegistrationService` via `FlowPasskeyRegistrationAdapter` (`internal/service/flow_passkey_registration.go`), which wraps the broader `PasskeyRegistrationService`. The state machine calls `IssuePasskeyRegistrationChallenge` on Phase 1 of a `passkey_register` action and `SubmitPasskeyRegistration` on Phase 2. The adapter is the seam that lets the engine consume only the two methods it needs without depending on the full passkey-registration service surface.
 
 ### `FlowDefinitionRepository`
 
