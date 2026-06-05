@@ -185,9 +185,9 @@ function flowDetailResponse(r: FlowDefinitionRecord): GetFlowDefinition200 {
     project_id: r.projectId,
     schema_uri: r.schemaUri,
     status: r.status,
+    flow_definition: r.body as unknown as GetFlowDefinition200['flow_definition'],
     created_at: r.createdAt,
     updated_at: r.updatedAt,
-    ...r.body,
   } as unknown as GetFlowDefinition200;
 }
 
