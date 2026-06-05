@@ -625,6 +625,70 @@ func TestFlowStateMachine_Process_PasskeyProofRejectedKeepsStep(t *testing.T) {
 	assert.Equal(t, "authenticate", rejected.State.CurrentStep)
 }
 
+// passkeyAbandonDefinition offers both a `passkey` and a generic `submit`
+// action on the same step, with separate transition targets. Lets a test
+// issue a passkey challenge and then submit `submit` to exercise the
+// abandonment path.
+func passkeyAbandonDefinition() *domain.FlowDefinition {
+	show := domain.FlowStepCompleteShow
+	return &domain.FlowDefinition{
+		ProjectID:  testProjectID,
+		ID:         "def-passkey-abandon",
+		UserSchema: defaultSchemaURL,
+		Purposes: map[domain.FlowDefinitionPurpose]string{
+			domain.FlowDefinitionPurposeLogin: "authenticate",
+		},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name: "authenticate",
+				Actions: map[string]domain.FlowStepAction{
+					domain.FlowActionPasskey: {Primary: true},
+					domain.FlowActionSubmit:  {},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					domain.FlowActionPasskey: {Target: "done"},
+					domain.FlowActionSubmit:  {Target: "fallback"},
+				},
+			},
+			{Name: "done", Complete: &show},
+			{Name: "fallback", Complete: &show},
+		},
+	}
+}
+
+// Submitting a non-passkey action while a passkey challenge is pending must
+// clear the challenge and route via the submitted action, instead of
+// re-emitting the passkey prompt and trapping the user on the ceremony.
+func TestFlowStateMachine_Process_PasskeyAbandonedOnDifferentAction(t *testing.T) {
+	w := newFlowTestWorld(t)
+	w.attempts.issueOut = domain.FlowPasskeyChallengeOutput{ChallengeID: "ch-1", Options: []byte(`{"publicKey":{}}`)}
+	def := passkeyAbandonDefinition()
+
+	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	issued, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+		Action:    domain.FlowActionPasskey,
+		PasskeyRP: &domain.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, issued.State.PendingChallenge)
+
+	abandoned, err := w.sm.Process(t.Context(), nil, def, issued.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+	})
+	require.NoError(t, err)
+	assert.Nil(t, abandoned.State.PendingChallenge, "pending challenge must be cleared when the user picks a different action")
+	assert.Nil(t, abandoned.Step.Challenge, "the rendered step must not re-attach the abandoned passkey challenge")
+	assert.Len(t, w.attempts.passkeyCalls, 0, "no passkey verification should run when no proof was submitted")
+	require.NotNil(t, abandoned.Step.Complete, "submit action should advance to the fallback terminal")
+}
+
 // ---- CurrentPurpose + outcome flip ----
 
 func TestFlowStateMachine_Start_InitializesCurrentPurpose(t *testing.T) {
