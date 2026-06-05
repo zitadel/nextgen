@@ -603,7 +603,7 @@ func (r *FlowStateMachineRuntime) processPasskey(ctx context.Context, client dat
 			_, provisional := state.CollectedData[flowCollectedPasskeyProvisionalKey]
 			if provisional {
 				delete(state.CollectedData, flowCollectedPasskeyProvisionalKey)
-				if err := r.createUser.HandleProvisional(ctx, client, userID, state); err != nil {
+				if err := r.createUser.HandleProvisional(ctx, client, userID, state, resolved); err != nil {
 					return passkeyPhaseResult{}, fmt.Errorf("flow state machine: ensure user exists: %w", err)
 				}
 			}

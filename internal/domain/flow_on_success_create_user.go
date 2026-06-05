@@ -106,17 +106,22 @@ func (h *FlowCreateUserHandler) GenerateUserID() (string, error) {
 // on_success handler), the call succeeds silently. Intended to be called
 // within the passkey verify phase, sharing the same client transaction as
 // the passkey save for atomicity.
-func (h *FlowCreateUserHandler) HandleProvisional(ctx context.Context, client database.QueryExecutor, userID string, state *FlowState) error {
-	email, _ := state.CollectedData["email"].(string)
-	attr, err := NewCreateAttribute("email", email, AttributeUniquenessTeam)
-	if err != nil {
-		return fmt.Errorf("flow create provisional user: build attribute: %w", err)
+func (h *FlowCreateUserHandler) HandleProvisional(ctx context.Context, client database.QueryExecutor, userID string, state *FlowState, resolved FlowResolvedFields) error {
+	var attrs []*CreateAttribute
+	if name, value, ok := findCollectedFieldByChallenge(resolved.Fields, state.CollectedData, FlowFieldChallengeIdentifier); ok {
+		field := resolved.Fields[name]
+		uniqueScope := attributeUniquenessFor(name, name, field.Unique)
+		attr, err := NewCreateAttribute(name, value, uniqueScope)
+		if err != nil {
+			return fmt.Errorf("flow create provisional user: build attribute: %w", err)
+		}
+		attrs = append(attrs, attr)
 	}
-	err = h.users.Create(ctx, client, &CreateUser{
+	err := h.users.Create(ctx, client, &CreateUser{
 		ProjectID:  state.ProjectID,
 		SchemaURL:  state.UserSchemaURL,
 		ID:         userID,
-		Attributes: []*CreateAttribute{attr},
+		Attributes: attrs,
 	})
 	var uniqueErr *database.UniqueError
 	if errors.As(err, &uniqueErr) {
