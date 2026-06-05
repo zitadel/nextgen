@@ -163,6 +163,13 @@ func PasskeysToCredentials(passkeys []*UserPasskey) []webauthn.Credential {
 				AAGUID:    pkey.AAGUID,
 				SignCount: uint32(pkey.SignCount),
 			},
+			Flags: webauthn.CredentialFlags{
+				BackupEligible: pkey.BackupEligible,
+				BackupState:    pkey.BackupState,
+				// TODO: what to do with the missing flags
+				//UserPresent:    false,
+				//UserVerified:   false,
+			},
 		})
 	}
 
