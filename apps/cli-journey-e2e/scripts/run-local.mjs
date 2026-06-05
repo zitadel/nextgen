@@ -67,6 +67,7 @@ try {
   await writeComposeEnv();
 
   log(`work dir: ${workDir}`);
+  await assertDockerAvailable();
   await buildPackages();
   await packPackages();
   await run("node", [
@@ -350,6 +351,45 @@ async function packageName(relativePath) {
   return manifest.name;
 }
 
+async function assertDockerAvailable() {
+  let engineVersion = "";
+  let composeVersion = "";
+
+  try {
+    const result = await runCapture("docker", ["info", "--format", "{{.ServerVersion}}"]);
+    engineVersion = result.stdout.trim();
+  } catch (error) {
+    throw new Error(
+      [
+        "Docker is required for the local journey runner because Verdaccio runs through Docker Compose.",
+        "Start Docker Desktop or another Docker daemon, wait until `docker ps` works, then rerun this command.",
+        `Docker daemon check failed: ${commandErrorDetail(error)}`,
+      ].join("\n"),
+      { cause: error },
+    );
+  }
+
+  try {
+    const result = await runCapture("docker", ["compose", "version", "--short"]);
+    composeVersion = result.stdout.trim();
+  } catch (error) {
+    throw new Error(
+      [
+        "Docker Compose is required for the local journey runner because Verdaccio runs through Docker Compose.",
+        "Install or enable the Docker Compose plugin, then rerun this command.",
+        `Docker Compose check failed: ${commandErrorDetail(error)}`,
+      ].join("\n"),
+      { cause: error },
+    );
+  }
+
+  const versionDetails = [
+    engineVersion ? `engine ${engineVersion}` : "",
+    composeVersion ? `compose ${composeVersion}` : "",
+  ].filter(Boolean);
+  log(`Docker is available${versionDetails.length > 0 ? ` (${versionDetails.join(", ")})` : ""}`);
+}
+
 async function startCompose() {
   if (options.backend === "image") {
     log(`starting Verdaccio and backend image ${options.image}`);
@@ -470,6 +510,23 @@ function runCapture(command, args, optionsForRun = {}) {
       );
     });
   });
+}
+
+function commandErrorDetail(error) {
+  const message = error instanceof Error ? error.message : String(error);
+  const lines = message
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const stderrIndex = lines.indexOf("STDERR:");
+  const stdoutIndex = lines.indexOf("STDOUT:");
+  const stderrLines = stderrIndex === -1 ? [] : lines.slice(stderrIndex + 1);
+  const stdoutLines =
+    stdoutIndex === -1
+      ? []
+      : lines.slice(stdoutIndex + 1, stderrIndex === -1 ? undefined : stderrIndex);
+  const detailLines = [...stderrLines, ...stdoutLines].filter(Boolean);
+  return (detailLines.length > 0 ? detailLines : lines).slice(-4).join("\n");
 }
 
 function composeArgs(args, includeImageProfile = false) {

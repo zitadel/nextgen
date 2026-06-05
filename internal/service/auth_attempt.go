@@ -507,7 +507,7 @@ func (s *authAttemptService) recordPasskeyUsage(ctx context.Context, projectID s
 	_ = s.userPasskeys.Update(
 		ctx,
 		s.pool,
-		s.userPasskeys.UniqueCondition(projectID, v.UserID, string(v.CredentialID)),
+		s.userPasskeys.UniqueCondition(projectID, v.UserID, domain.EncodePasskeyCredentialID(v.CredentialID)),
 		s.userPasskeys.SetSignCount(int64(v.SignCount)),
 		s.userPasskeys.SetBackupState(v.BackupState),
 		s.userPasskeys.SetLastUsedAt(time.Now()),
