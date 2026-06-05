@@ -1,6 +1,6 @@
 # ADR 021: Ordered Arrays for Step Fields, Actions, and Gates
 
-> **Status:** Proposed
+> **Status:** Draft
 > **Date:** 2026-06-05
 > **Context:** Flow engine wire contract, Liquid template rendering, flow definitions
 
