@@ -97,6 +97,7 @@ coverage
 
 ## Local runtime config
 nextgen.yaml
+nextgen-data/
 
 # Keep the embed placeholder so //go:embed all:dist works in clean checkouts.
 # `dist/` above ignores the directory entirely, so we have to un-ignore the

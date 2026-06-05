@@ -29,7 +29,7 @@ export default class Doctor extends BaseCommand {
     const { flags } = await this.parse(Doctor);
     await this.toMeta(flags);
     const { cwd, dryRun } = this.meta;
-    const ctx: CheckContext = { cwd, orca: createOrca(), dryRun };
+    const ctx: CheckContext = { cwd, orca: createOrca(), cliVersion: this.meta.cliVersion, dryRun };
 
     if (flags.fix) {
       const before = await Promise.all(SANITY_CHECKS.map((check) => check.run(ctx)));
