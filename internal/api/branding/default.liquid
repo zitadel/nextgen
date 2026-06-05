@@ -105,12 +105,16 @@
     {% endif %}
 
     {% if challenge %}
-      {% if challenge.method == "passkey" or challenge.method == "passkey_register" %}
+      {% if challenge.method == "passkey" %}
         {% assign ceremony = "authenticate" %}
-        {% if challenge.method == "passkey_register" %}{% assign ceremony = "register" %}{% endif %}
+        {% assign submit_method = "passkey" %}
+        {% if challenge.options.user %}
+          {% assign ceremony = "register" %}
+          {% assign submit_method = "passkey_register" %}
+        {% endif %}
         <zl-passkey
           ceremony="{{ ceremony }}"
-          method="{{ challenge.method }}"
+          method="{{ submit_method }}"
           challenge-id="{{ challenge.challenge_id }}"
           options='{{ challenge.options | json }}'
         ></zl-passkey>
