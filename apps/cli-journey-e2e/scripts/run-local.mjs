@@ -365,6 +365,7 @@ async function assertDockerAvailable() {
         "Start Docker Desktop or another Docker daemon, wait until `docker ps` works, then rerun this command.",
         `Docker daemon check failed: ${commandErrorDetail(error)}`,
       ].join("\n"),
+      { cause: error },
     );
   }
 
@@ -378,6 +379,7 @@ async function assertDockerAvailable() {
         "Install or enable the Docker Compose plugin, then rerun this command.",
         `Docker Compose check failed: ${commandErrorDetail(error)}`,
       ].join("\n"),
+      { cause: error },
     );
   }
 
