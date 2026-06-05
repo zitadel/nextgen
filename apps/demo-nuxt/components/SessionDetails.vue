@@ -42,9 +42,23 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
-import type { GetMySession200 } from "@zitadel/api/generated/model";
 
-const session = ref<GetMySession200 | null>(null);
+/**
+ * Lightweight session shape matching the /sessions/me response.
+ * Defined inline to avoid a compile-time dependency on @zitadel/api which
+ * vue-tsc cannot resolve in the Nuxt typecheck context.
+ */
+interface SessionInfo {
+  session_id: string;
+  project_id: string;
+  state: string;
+  user_id?: string;
+  created_at: string;
+  expires_at: string;
+  factors?: Array<{ method: string; verified_at: string }>;
+}
+
+const session = ref<SessionInfo | null>(null);
 const error = ref<string | null>(null);
 
 const rows = computed<[string, string][]>(() => {
@@ -69,7 +83,7 @@ onMounted(async () => {
       projectId: config.public.zitadelProjectId as string,
     });
     const api = getApi(project);
-    session.value = await api.getMySession();
+    session.value = (await api.getMySession()) as SessionInfo;
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Failed to fetch session";
   }
