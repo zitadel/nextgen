@@ -31,6 +31,7 @@
   "dependencies": {
     "@mswjs/http-middleware": "catalog:",
     "@zitadel/api": "workspace:*",
+    "cookie-parser": "catalog:",
     "express": "catalog:",
     "xstate": "catalog:"
   },
@@ -38,6 +39,7 @@
     "msw": "catalog:"
   },
   "devDependencies": {
+    "@types/cookie-parser": "catalog:",
     "@types/express": "catalog:",
     "@types/node": "catalog:",
     "@vitest/browser-playwright": "catalog:",

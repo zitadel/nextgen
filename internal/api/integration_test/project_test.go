@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	api "github.com/zitadel/nextgen/api/generated"
+	apischemas "github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
@@ -61,6 +62,10 @@ func (s *stubAuthAttemptService) VerifyProof(ctx context.Context, input service.
 	return nil, nil
 }
 
+func (s *stubAuthAttemptService) RegisterCreatedUser(ctx context.Context, projectID, attemptID, userID string) error {
+	return nil
+}
+
 var _ service.AuthAttemptService = (*stubAuthAttemptService)(nil)
 
 func TestCreateProject(t *testing.T) {
@@ -100,6 +105,66 @@ func TestCreateProject(t *testing.T) {
 			})
 		}
 	})
+}
+
+func TestCreateProjectProvisionsDefaultLoginFlow(t *testing.T) {
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+	require.NoError(t, err)
+
+	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
+	schema, err := harness.EnsureSchemaRepo(t).GetByID(
+		t.Context(),
+		harness.EnsureDBPool(t),
+		project.ID,
+		schemaURL,
+	)
+	require.NoError(t, err)
+	assert.Equal(t, schemaURL, schema.URL)
+
+	flowDefs, err := harness.EnsureFlowDefinitionRepo(t).ListFlowDefinitions(
+		t.Context(),
+		harness.EnsureDBPool(t),
+		project.ID,
+		domain.WithFlowDefinitionName("default-login"),
+	)
+	require.NoError(t, err)
+	require.Len(t, flowDefs, 1)
+
+	flowDef := flowDefs[0]
+	assert.Equal(t, schemaURL, flowDef.UserSchema)
+	assert.Equal(t, "identifier", flowDef.Purposes[domain.FlowDefinitionPurposeLogin])
+	assert.Equal(t, "register", flowDef.Purposes[domain.FlowDefinitionPurposeRegister])
+
+	identifierStep, ok := flowDef.FindStep("identifier")
+	require.True(t, ok)
+	assert.Contains(t, identifierStep.Actions, domain.FlowActionPasskey)
+	assert.Equal(t, "done", identifierStep.Transitions[domain.FlowActionPasskey].Target)
+
+	passwordStep, ok := flowDef.FindStep("password")
+	require.True(t, ok)
+	assert.Equal(t, []string{"password"}, passwordStep.Fields)
+	assert.Contains(t, passwordStep.Actions, domain.FlowActionPasskey)
+	assert.Equal(t, "done", passwordStep.Transitions[domain.FlowActionPasskey].Target)
+
+	registerStep, ok := flowDef.FindStep("register")
+	require.True(t, ok)
+	assert.Equal(t, []string{"email"}, registerStep.Fields)
+	assert.Contains(t, registerStep.Actions, domain.FlowActionPasskeyRegister)
+	assert.Equal(t, "done", registerStep.Transitions[domain.FlowActionPasskeyRegister].Target)
+
+	registerPasswordStep, ok := flowDef.FindStep("register-password")
+	require.True(t, ok)
+	assert.Equal(t, []string{"password"}, registerPasswordStep.Fields)
+	require.NotNil(t, registerPasswordStep.OnSuccess)
+	assert.Equal(t, domain.FlowOnSuccessCreateUser, *registerPasswordStep.OnSuccess)
+	assert.Equal(t, "passkey-upsell", registerPasswordStep.Transitions[domain.FlowActionSubmit].Target)
+
+	passkeyUpsellStep, ok := flowDef.FindStep("passkey-upsell")
+	require.True(t, ok)
+	assert.Contains(t, passkeyUpsellStep.Actions, domain.FlowActionPasskeyRegister)
+	assert.Contains(t, passkeyUpsellStep.Actions, "skip")
+	assert.Equal(t, "done", passkeyUpsellStep.Transitions[domain.FlowActionPasskeyRegister].Target)
+	assert.Equal(t, "done", passkeyUpsellStep.Transitions["skip"].Target)
 }
 
 func TestGetProject(t *testing.T) {

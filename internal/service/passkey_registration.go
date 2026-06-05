@@ -111,7 +111,14 @@ type FinishRegistrationInput struct {
 // credential. The user identity is authoritative from the stored challenge record.
 // Rejection surfaces as [domain.ErrAuthAttemptProofRejected].
 func (s *PasskeyRegistrationService) Finish(ctx context.Context, in FinishRegistrationInput) error {
-	reg, err := s.registrations.Get(ctx, s.pool, in.ProjectID, in.RegistrationID)
+	return s.FinishWith(ctx, s.pool, in)
+}
+
+// FinishWith is like [Finish] but uses the given QueryExecutor instead of the pool.
+// Used by [FlowPasskeyRegistrationAdapter] to run the credential write inside the
+// flow engine's transaction so the passkey save is atomic with user creation.
+func (s *PasskeyRegistrationService) FinishWith(ctx context.Context, client database.QueryExecutor, in FinishRegistrationInput) error {
+	reg, err := s.registrations.Get(ctx, client, in.ProjectID, in.RegistrationID)
 	if err != nil {
 		return err
 	}
@@ -123,12 +130,12 @@ func (s *PasskeyRegistrationService) Finish(ctx context.Context, in FinishRegist
 	newPasskey.ProjectID = in.ProjectID
 	newPasskey.UserID = reg.UserID
 
-	if err := s.passkeys.Create(ctx, s.pool, newPasskey); err != nil {
+	if err := s.passkeys.Create(ctx, client, newPasskey); err != nil {
 		return fmt.Errorf("passkey registration: store credential: %w", err)
 	}
 
 	// Best-effort cleanup; don't shadow the success.
-	_ = s.registrations.Delete(ctx, s.pool, in.ProjectID, in.RegistrationID)
+	_ = s.registrations.Delete(ctx, client, in.ProjectID, in.RegistrationID)
 	return nil
 }
 

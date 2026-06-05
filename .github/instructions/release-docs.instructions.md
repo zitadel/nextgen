@@ -8,7 +8,8 @@ Review documentation and release changes for consistency with the pre-release
 state of the repo.
 
 - CI should continue to cover Go vet/tests, pnpm install/typecheck/test/build,
-  CLI smoke checks, npm pack dry runs, and non-publishing GoReleaser snapshots.
+  CLI smoke checks, npm pack dry runs, non-publishing GoReleaser snapshots, and
+  the `consumer-journey-e2e` fresh-app quality gate.
 - The release workflow is manual and draft-oriented while the repo is
   pre-release. Do not imply official npm publishing is enabled.
 - npm package changes use changesets; Go server releases use GoReleaser.

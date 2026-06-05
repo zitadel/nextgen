@@ -12,7 +12,7 @@ import type { AtomManifest } from "../manifest.js";
  */
 export type ZlPasskeyResultDetail = {
   challenge_id: string;
-  method: "passkey";
+  method: string;
   proof: {
     id: string;
     rawId: string;
@@ -99,6 +99,12 @@ export class ZlPasskey extends LitElement {
     },
   })
   accessor options: Record<string, unknown> | null = null;
+
+  /**
+   * Challenge method echoed back in the result event so the orchestrator
+   * can include it in `challenge_response.method`. Defaults to `"passkey"`.
+   */
+  @property({ type: String }) accessor method = "passkey";
 
   /**
    * When true, the ceremony is not started automatically on mount.
@@ -306,7 +312,7 @@ export class ZlPasskey extends LitElement {
   private emitResult(proof: ZlPasskeyResultDetail["proof"]): void {
     const detail: ZlPasskeyResultDetail = {
       challenge_id: this.challengeId,
-      method: "passkey",
+      method: this.method,
       proof,
     };
     this.dispatchEvent(

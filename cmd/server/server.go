@@ -323,7 +323,7 @@ func buildHTTPMux(cfg ServerConfig, apiHandler http.Handler) (*http.ServeMux, er
 		mux.Handle(cfg.ConsolePath+"/", consoleHandler)
 	}
 
-	mux.Handle("/", apiHandler)
+	mux.Handle("/", api.WithRequestHostMiddleware(apiHandler))
 	return mux, nil
 }
 
