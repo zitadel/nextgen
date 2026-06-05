@@ -12,9 +12,29 @@ as **ordered arrays of `{name, ...}` objects**, not as dictionaries keyed by nam
 `transitions` stays a dictionary — it is a pure outcome→target lookup with no
 rendering-order semantics.
 
-To preserve dictionary-style lookups in the default Liquid template (`fields.email`,
-`actions.passkey`), the renderer augments the template's context with a name-keyed map
-alongside each array. That map is render-local and never crosses the wire.
+The default Liquid template needs two views of the same data: ordered iteration
+(`{% for f in fields %}`) to render the form, and lookup by name
+(`{% if fields.email and fields.password %}`, `{% if actions.passkey %}`) to decide what
+extra UI to show. Arrays cover iteration but not name lookup. So the code that invokes
+the template — the browser orchestrator today, the Go server-side renderer if/when we add
+one — builds a name-keyed map from the array at render time and passes both into the
+template's context:
+
+```ts
+// In zitadel-login.ts, before calling liquid.renderSync(template, ctx):
+const ctx = {
+  step,
+  fields:          step.fields,                                                    // array, from the API
+  fields_by_name:  Object.fromEntries(step.fields.map(f => [f.name, f])),          // built locally
+  actions:         step.actions,
+  actions_by_name: Object.fromEntries(step.actions.map(a => [a.name, a])),
+  // ...
+};
+```
+
+The template iterates `fields`, looks things up in `fields_by_name`. The `*_by_name` maps
+live only inside that render call; the JSON response on the wire still contains only the
+arrays.
 
 ### Before / after
 
