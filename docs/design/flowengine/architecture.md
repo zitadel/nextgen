@@ -44,22 +44,42 @@ graph TD
 
 ## Request path
 
-```
-POST /flow                    GET /flow/{id}                POST /flow/{id}/submit
-       │                              │                              │
-       ▼                              ▼                              ▼
- Handler.CreateFlow         Handler.GetFlowStep         Handler.SubmitFlowStep
-       │                              │                              │
-       │     (no cookie yet)          ▼ openState(_zflow)             ▼ openState(_zflow)
-       ▼                       Crypter.Decrypt                Crypter.Decrypt
- FlowService.Resolve                  │                              │
- FlowService.Start                    ▼                              ▼
-       │                       FlowService.GetStep          FlowService.Submit
-       ▼                              │                              │
- stateMachine.Start                   ▼                              ▼
-       │                       stateMachine.Render          stateMachine.Process
-       ▼                              │                              │
- sealState → Set-Cookie               └─── buildFlowResponse ◄────────┘
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant H as Handler<br/>(internal/api/flow.go)
+    participant K as Crypter
+    participant S as FlowService
+    participant SM as StateMachine
+
+    Note over C,SM: POST /flow — no cookie yet
+    C->>H: CreateFlow
+    H->>S: Resolve, then Start
+    S->>SM: Start
+    SM-->>S: *FlowState + FlowStep
+    S-->>H: FlowStepResult
+    H->>K: sealState(_zflow)
+    H-->>C: 201 + Set-Cookie
+
+    Note over C,SM: GET /flow/{id}
+    C->>H: GetFlowStep (_zflow cookie)
+    H->>K: openState(_zflow)
+    K-->>H: *FlowState
+    H->>S: GetStep
+    S->>SM: Render
+    SM-->>S: FlowStep
+    S-->>H: FlowStepResult
+    H-->>C: 200 + buildFlowResponse
+
+    Note over C,SM: POST /flow/{id}/submit
+    C->>H: SubmitFlowStep (_zflow cookie + body)
+    H->>K: openState(_zflow)
+    K-->>H: *FlowState
+    H->>S: Submit
+    S->>SM: Process
+    SM-->>S: FlowStepResult (advanced or step-error)
+    H->>K: sealState(_zflow) — rotate, or clear on terminal
+    H-->>C: 200 / 400 + Set-Cookie
 ```
 
 Cookie I/O is owned by the handler. The state machine never touches HTTP, cookies, or the encryption layer — it receives a `*FlowState` and returns one.
