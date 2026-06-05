@@ -558,9 +558,13 @@ type passkeyPhaseResult struct {
 
 // processPasskey runs all two-phase WebAuthn ceremonies (authentication and
 // registration) for the current step:
-//   - verify leg: a challenge is pending (or a ChallengeResponse arrived) →
-//     dispatch to the right service based on PendingChallenge.Method, clear
-//     the pending challenge, and let Process route via the submitted action.
+//   - resume/abandon leg: a challenge is pending and no proof has arrived. If
+//     the submission targets the same ceremony (or is action-less), re-emit
+//     the pending challenge. Otherwise the user picked a different action;
+//     drop the pending challenge and let normal routing run.
+//   - verify leg: a ChallengeResponse arrived → dispatch to the right service
+//     based on PendingChallenge.Method, clear the pending challenge, and let
+//     Process route via the submitted action.
 //   - issue leg (auth): step offers a `passkey` action and it was selected →
 //     mint an assertion challenge; discoverable login allowed when no user is
 //     yet identified.
@@ -568,14 +572,20 @@ type passkeyPhaseResult struct {
 //     was selected → user must already be identified; mint a creation challenge.
 func (r *FlowStateMachineRuntime) processPasskey(ctx context.Context, client database.QueryExecutor, state *FlowState, step *FlowDefinitionStep, resolved FlowResolvedFields, in FlowSubmitInput) (passkeyPhaseResult, error) {
 	switch {
-	case state.PendingChallenge != nil || in.ChallengeResponse != nil:
-		// Verify leg. Without a proof yet, re-emit the pending challenge.
-		if in.ChallengeResponse == nil {
-			rendered := r.buildStep(step, resolved, nil, nil, nil)
-			attachPendingChallenge(rendered, state.PendingChallenge)
-			state.IssuedAt = r.now()
-			return passkeyPhaseResult{handled: true, halt: &FlowStepResult{State: state, Step: rendered}}, nil
+	// A ceremony is in flight but no proof arrived: resume or abandon.
+	case state.PendingChallenge != nil && in.ChallengeResponse == nil:
+		if !pendingMatchesAction(state.PendingChallenge.Method, in.Action) {
+			state.PendingChallenge = nil
+			return passkeyPhaseResult{}, nil
 		}
+		rendered := r.buildStep(step, resolved, nil, nil, nil)
+		attachPendingChallenge(rendered, state.PendingChallenge)
+		state.IssuedAt = r.now()
+		return passkeyPhaseResult{handled: true, halt: &FlowStepResult{State: state, Step: rendered}}, nil
+
+	// A proof arrived: verify it (pending may be missing if the cookie
+	// was lost mid-ceremony; the DB rejects unknown challenge ids).
+	case in.ChallengeResponse != nil:
 		// The server-issued id is authoritative; never trust a client-supplied
 		// one to rebind the proof to a different challenge.
 		challengeID := in.ChallengeResponse.ChallengeID
@@ -721,6 +731,23 @@ func (r *FlowStateMachineRuntime) processPasskey(ctx context.Context, client dat
 		return passkeyPhaseResult{handled: true, halt: &FlowStepResult{State: state, Step: rendered}}, nil
 	}
 	return passkeyPhaseResult{}, nil
+}
+
+// pendingMatchesAction reports whether a no-proof POST should resume the
+// pending ceremony (vs. abandon it). An empty submitted action covers
+// passive POSTs; an explicit action only resumes when it targets the same
+// method as the pending challenge.
+func pendingMatchesAction(pendingMethod, submittedAction string) bool {
+	if submittedAction == "" {
+		return true
+	}
+	switch pendingMethod {
+	case FlowChallengeMethodPasskey:
+		return submittedAction == FlowActionPasskey
+	case FlowChallengeMethodPasskeyRegister:
+		return submittedAction == FlowActionPasskeyRegister
+	}
+	return false
 }
 
 // attachPendingChallenge surfaces a pending ceremony on a rendered step so the
