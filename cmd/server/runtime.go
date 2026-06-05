@@ -87,10 +87,25 @@ func readOrCreateEncryptionKey(path string) (key string, created bool, err error
 	if err != nil {
 		return "", false, fmt.Errorf("create server encryption key file %q: %w", path, err)
 	}
-	defer file.Close()
-
 	if _, err := file.WriteString(encoded + "\n"); err != nil {
-		return "", false, fmt.Errorf("write server encryption key file %q: %w", path, err)
+		_ = file.Close()
+		return "", false, removeIncompleteEncryptionKeyFile(
+			path,
+			fmt.Errorf("write server encryption key file %q: %w", path, err),
+		)
+	}
+	if err := file.Close(); err != nil {
+		return "", false, removeIncompleteEncryptionKeyFile(
+			path,
+			fmt.Errorf("close server encryption key file %q: %w", path, err),
+		)
 	}
 	return encoded, true, nil
+}
+
+func removeIncompleteEncryptionKeyFile(path string, cause error) error {
+	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return errors.Join(cause, fmt.Errorf("remove incomplete server encryption key file %q: %w", path, err))
+	}
+	return cause
 }

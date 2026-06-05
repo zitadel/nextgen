@@ -1,7 +1,6 @@
 package embedded
 
 import (
-	"bytes"
 	"fmt"
 	"net"
 	"os"
@@ -51,16 +50,22 @@ func TestPostgresLogStartParametersUseConfiguredLogPath(t *testing.T) {
 }
 
 func TestFileTailerStreamsAppendedLogLines(t *testing.T) {
-	logPath := filepath.Join(t.TempDir(), "postgres.log")
-	var out bytes.Buffer
+	dir := t.TempDir()
+	logPath := filepath.Join(dir, "postgres.log")
+	outPath := filepath.Join(dir, "tailer.out")
+	out, err := os.OpenFile(outPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, out.Close())
+	})
 
-	tailer := startFileTailer(logPath, &out)
+	tailer := startFileTailer(logPath, out)
 	require.NotNil(t, tailer)
-	defer tailer.Stop()
+	t.Cleanup(tailer.Stop)
 
 	require.NoError(t, os.WriteFile(logPath, []byte("first\n"), 0o600))
 	require.Eventually(t, func() bool {
-		return strings.Contains(out.String(), "first\n")
+		return fileContains(t, outPath, "first\n")
 	}, time.Second, 10*time.Millisecond)
 
 	file, err := os.OpenFile(logPath, os.O_WRONLY|os.O_APPEND, 0o600)
@@ -69,6 +74,13 @@ func TestFileTailerStreamsAppendedLogLines(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, file.Close())
 	require.Eventually(t, func() bool {
-		return strings.Contains(out.String(), "second\n")
+		return fileContains(t, outPath, "second\n")
 	}, time.Second, 10*time.Millisecond)
+}
+
+func fileContains(t *testing.T, path, needle string) bool {
+	t.Helper()
+	raw, err := os.ReadFile(path)
+	require.NoError(t, err)
+	return strings.Contains(string(raw), needle)
 }
