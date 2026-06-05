@@ -10,6 +10,7 @@ export default defineNuxtConfig({
   ssr: true,
   build: {
     transpile: [
+      "@zitadel/api",
       "@zitadel/components",
       "@zitadel/shared-component-styles",
       "@zitadel/design-tokens",
