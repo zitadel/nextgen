@@ -1,5 +1,6 @@
 import { auth } from "@zitadel/sdk-next/server";
 import { LogoutWidget } from "./widget";
+import { SessionDetails } from "./session-details";
 
 export default async function AdminPage() {
   const session = await auth();
@@ -11,7 +12,7 @@ export default async function AdminPage() {
         <LogoutWidget />
       </div>
       <p style={{ color: "#6b7280" }}>
-        Signed in as {session.isAuthenticated ? (session.session.email ?? session.session.userId) : "unknown"}
+        Signed in as {session.isAuthenticated ? <SessionDetails /> : "unknown"}
       </p>
     </main>
   );

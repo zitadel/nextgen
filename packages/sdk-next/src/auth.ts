@@ -7,10 +7,12 @@ import { decodeJwt } from './lib/jwt';
 /**
  * Reads the auth state in a React Server Component or Next.js Route Handler.
  *
- * Two paths:
- * 1. JWT token — decoded locally (no backend round-trip).
- * 2. Opaque encrypted token — validated by calling `GET /sessions/me` on the
- *    backend. The backend is the source of truth for opaque tokens.
+ * - **JWT tokens** are decoded locally (no backend round-trip).
+ * - **Opaque encrypted tokens** have already been validated by the
+ *   middleware via `GET /sessions/me`. If the `x-nextgen-auth-token`
+ *   header is set, the session is authentic. Session details (email,
+ *   name) are not available server-side for opaque tokens — use the
+ *   `/__nextgen/sessions/me` proxy from a client component to fetch them.
  *
  * ```ts
  * import { auth } from "@zitadel/sdk-next";
@@ -47,36 +49,21 @@ export async function auth(): Promise<AuthResult> {
       };
     }
   } catch {
-    // Not a JWT — fall through to opaque token validation.
+    // Not a JWT — opaque token validated by middleware.
   }
 
-  // Opaque token path: ask the backend to validate the session.
-  const issuerUrl = process.env.NEXTGEN_ISSUER_URL ?? 'http://localhost:4000';
-  try {
-    const res = await fetch(`${issuerUrl}/sessions/me`, {
-      method: 'GET',
-      headers: { cookie: `__nextgen_session=${token}` },
-      signal: AbortSignal.timeout(5000),
-      cache: 'no-store',
-    });
-    if (!res.ok) {
-      return { isAuthenticated: false, session: null };
-    }
-    const session = (await res.json()) as { user_id?: string | null };
-    const userId = session.user_id ?? null;
-    if (!userId) {
-      return { isAuthenticated: false, session: null };
-    }
-    return {
-      isAuthenticated: true,
-      session: {
-        userId,
-        email: null,
-        name: null,
-        token,
-      },
-    };
-  } catch {
-    return { isAuthenticated: false, session: null };
-  }
+  // Opaque token path: the middleware already validated this token via
+  // GET /sessions/me and only tunnelled it if the session is live.
+  // We know the user is authenticated, but session details (email, name)
+  // are not available server-side. Client components can fetch them via
+  // the /__nextgen/sessions/me proxy.
+  return {
+    isAuthenticated: true,
+    session: {
+      userId: 'unknown',
+      email: null,
+      name: null,
+      token,
+    },
+  };
 }

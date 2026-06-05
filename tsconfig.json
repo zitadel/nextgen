@@ -40,9 +40,6 @@
       "path": "./packages/api-mock"
     },
     {
-      "path": "./apps/demo-next"
-    },
-    {
       "path": "./apps/demo-next-e2e"
     },
     {
