@@ -158,7 +158,7 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 	schemaService := service.NewSchemaService(pool, schemaRepo, schemaResolverWithHTTP, schemaValidator)
 	flowDefinitionSvc := service.NewFlowDefinitionService(
 		pool,
-		storageSchemaResolver,
+		schemaService,
 		schemaValidator,
 		nil,
 		flowDefinitionRepo,
