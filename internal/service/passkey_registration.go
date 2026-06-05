@@ -118,7 +118,7 @@ func (s *PasskeyRegistrationService) Finish(ctx context.Context, in FinishRegist
 // Used by [FlowPasskeyRegistrationAdapter] to run the credential write inside the
 // flow engine's transaction so the passkey save is atomic with user creation.
 func (s *PasskeyRegistrationService) FinishWith(ctx context.Context, client database.QueryExecutor, in FinishRegistrationInput) error {
-	reg, err := s.registrations.Get(ctx, s.pool, in.ProjectID, in.RegistrationID)
+	reg, err := s.registrations.Get(ctx, client, in.ProjectID, in.RegistrationID)
 	if err != nil {
 		return err
 	}
@@ -135,7 +135,7 @@ func (s *PasskeyRegistrationService) FinishWith(ctx context.Context, client data
 	}
 
 	// Best-effort cleanup; don't shadow the success.
-	_ = s.registrations.Delete(ctx, s.pool, in.ProjectID, in.RegistrationID)
+	_ = s.registrations.Delete(ctx, client, in.ProjectID, in.RegistrationID)
 	return nil
 }
 
