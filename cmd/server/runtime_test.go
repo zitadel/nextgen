@@ -16,8 +16,7 @@ func TestLoadConfigCreatesAndReusesEncryptionKeyFile(t *testing.T) {
 	t.Setenv("NEXTGEN_SERVER_DATA_DIR", dataDir)
 
 	configPath := filepath.Join(t.TempDir(), "nextgen.yaml")
-	_, err := os.Create(configPath)
-	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(configPath, nil, 0o600))
 
 	cfg, err := loadConfig(configPath)
 	require.NoError(t, err)
@@ -48,8 +47,7 @@ func TestLoadConfigDoesNotCreateEncryptionKeyFileWhenKeyConfigured(t *testing.T)
 	t.Setenv("NEXTGEN_SERVER_ENCRYPTION_KEY", "4D61737465726B65794E65656473546F48617665333243686172616374657273")
 
 	configPath := filepath.Join(t.TempDir(), "nextgen.yaml")
-	_, err := os.Create(configPath)
-	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(configPath, nil, 0o600))
 
 	cfg, err := loadConfig(configPath)
 	require.NoError(t, err)

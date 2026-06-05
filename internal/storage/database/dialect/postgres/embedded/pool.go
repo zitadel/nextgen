@@ -25,6 +25,7 @@ func (e *Pool) Connect(ctx context.Context) (database.Pool, error) {
 	}
 	pool, err := connector.Connect(ctx)
 	if err != nil {
+		stop()
 		return nil, err
 	}
 	return &Pool{Pool: pool.(*postgres.Pool), stop: stop}, nil
