@@ -7128,6 +7128,10 @@ func (s *Server) handleSubmitFlowStepRequest(args [1]string, argsEscaped bool, w
 					Name: "_zflow",
 					In:   "cookie",
 				}: params.Zflow,
+				{
+					Name: "Origin",
+					In:   "header",
+				}: params.Origin,
 			},
 			Raw: r,
 		}

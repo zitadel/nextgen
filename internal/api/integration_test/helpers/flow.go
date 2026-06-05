@@ -34,7 +34,14 @@ func (h *Harness) EnsureFlowStateMachine(t *testing.T) *domain.FlowStateMachineR
 			h.EnsureUserPasswordRepo(t),
 			h.EnsureHasher(t),
 		)
-		h.FlowStateMachine = domain.NewFlowStateMachine(fields, createUser, authAdapter, time.Now)
+		passkeyRegSvc := service.NewPasskeyRegistrationService(
+			h.EnsureDBPool(t),
+			repository.NewPasskeyRegistrationRepository(),
+			h.EnsureUserPasskeyRepo(t),
+			idgen.NewULID(),
+		)
+		passkeyRegAdapter := service.NewFlowPasskeyRegistrationAdapter(passkeyRegSvc)
+		h.FlowStateMachine = domain.NewFlowStateMachine(fields, createUser, authAdapter, passkeyRegAdapter, time.Now)
 	}
 	return h.FlowStateMachine
 }

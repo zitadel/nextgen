@@ -1,9 +1,9 @@
-# @zitadel-nextgen/api
+# @zitadel/api
 
-## Runtime base URL
+## Runtime proxy path
 
 ```ts
-import { setApiBaseUrl } from "@zitadel-nextgen/api";
+import { setProxyPath } from "@zitadel/api/runtime/base-url";
 
-setApiBaseUrl("https://acc.nextgen.zitadel.com");
+setProxyPath("https://acc.nextgen.zitadel.com");
 ```

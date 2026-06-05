@@ -8,7 +8,7 @@ import { expect, test } from "@playwright/test";
  *    Nuxt's SSR pass.
  * 2. Form interactions reach the orchestrator across atom shadow roots.
  * 3. The terminal step's internal `POST /sessions/exchange` traverses the
- *    Nitro `/__nextgen` proxy installed by `@zitadel-nextgen/sdk-nuxt` and the
+ *    Nitro `/__nextgen` proxy installed by `@zitadel/sdk-nuxt` and the
  *    api-mock RS256 verification.
  * 4. `__nextgen_session` is set on the demo origin and `<zitadel-login>`'s
  *    full-page navigation lands on the protected `/admin` route.

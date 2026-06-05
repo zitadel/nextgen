@@ -12,13 +12,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zitadel/oidc/v3/pkg/op"
-
 	gen "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/oidc/v3/pkg/op"
 )
 
 // fakeFlowSvc lets handler tests exercise cookie + HTTP plumbing without

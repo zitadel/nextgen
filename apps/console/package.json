@@ -1,13 +1,13 @@
 {
-  "name": "@zitadel-nextgen/console",
+  "name": "@zitadel/console",
   "version": "0.0.1",
   "private": true,
   "dependencies": {
     "@tanstack/react-devtools": "catalog:",
     "@tanstack/react-router": "catalog:",
     "@tanstack/react-router-devtools": "catalog:",
-    "@zitadel-nextgen/design-tokens": "workspace:*",
-    "@zitadel-nextgen/ui-react": "workspace:*",
+    "@zitadel/design-tokens": "workspace:*",
+    "@zitadel/ui-react": "workspace:*",
     "react": "catalog:",
     "react-dom": "catalog:",
     "tailwindcss": "catalog:"

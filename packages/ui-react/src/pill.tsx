@@ -1,4 +1,4 @@
-import { ZITADEL_ATTRIBUTION_LOGOTYPE_SVG } from "@zitadel-nextgen/shared-component-styles/attribution-markup";
+import { ZITADEL_ATTRIBUTION_LOGOTYPE_SVG } from "@zitadel/shared-component-styles/attribution-markup";
 import {
   type AnchorHTMLAttributes,
   type HTMLAttributes,

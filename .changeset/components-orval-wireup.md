@@ -1,10 +1,10 @@
 ---
-"@zitadel-nextgen/components": minor
+"@zitadel/components": minor
 ---
 
 Wire `<zitadel-login>` and `<zitadel-logout>` to the orval-generated
-`@zitadel-nextgen/api` typed fetch client and consolidate flow mocking
-into the new workspace-internal `@zitadel-nextgen/api-mock` package.
+`@zitadel/api` typed fetch client and consolidate flow mocking
+into the new workspace-internal `@zitadel/api-mock` package.
 
 The previous `FlowTransport` abstraction (and its `FetchTransport` /
 `FixtureTransport` / `WalkingFixtureTransport` / `ProxyTransport`
@@ -13,7 +13,7 @@ orchestrator stores the orval `CreateFlow201` directly and the
 `adaptResponse` boundary is gone. Tests intercept at the network layer
 with MSW.
 
-Removed exports from `@zitadel-nextgen/components` (and the
+Removed exports from `@zitadel/components` (and the
 `./orchestrator` subpath barrel):
 
 - `FetchTransport`, `FixtureTransport`, `WalkingFixtureTransport`,
@@ -27,9 +27,9 @@ Removed exports from `@zitadel-nextgen/components` (and the
   `FlowStartInput`, `FlowSubmitInput`, `FlowResponse`, `FlowStep`,
   `FlowField`, `FlowAction`, `FlowGate`, `FlowSsoProvider`,
   `FlowFieldType`, `FlowPurpose`, `FlowStepComplete` — the wire shape
-  comes from `@zitadel-nextgen/api/generated/model` directly; consumers
+  comes from `@zitadel/api/generated/model` directly; consumers
   who need it should import from there.
-- The `@zitadel-nextgen/components/orchestrator/transport` subpath
+- The `@zitadel/components/orchestrator/transport` subpath
   export.
 
 Retained exports (now sourced from the dedicated `branding.ts` and
@@ -44,7 +44,7 @@ Retained exports (now sourced from the dedicated `branding.ts` and
 Removed attributes/properties on `<zitadel-login>`:
 
 - `transport`, `base-url`, `proxy-base`. Configure the API base URL
-  with `setApiBaseUrl()` from `@zitadel-nextgen/api/runtime/base-url`,
+  with `setApiBaseUrl()` from `@zitadel/api/runtime/base-url`,
   or use the new `api-base` attribute for declarative setups. A new
   `resume-flow-id` attribute resumes an existing flow handle.
 
@@ -70,7 +70,7 @@ Behaviour changes:
 Mocking workflow:
 
 - The dev playground and unit tests both consume
-  `@zitadel-nextgen/api-mock` (`setupMock` for browser worker
+  `@zitadel/api-mock` (`setupMock` for browser worker
   callers, `setupMockHandlers` for `msw/node`). The mock walks an
   `xstate` flow machine through identifier → password → done (with
   register and SSO branches) and exposes `applyBranding`,

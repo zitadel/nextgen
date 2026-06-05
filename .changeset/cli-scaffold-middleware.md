@@ -1,8 +1,8 @@
 ---
-"@zitadel-nextgen/cli": minor
+"@zitadel/cli": minor
 ---
 
-`zitadel setup` now scaffolds a `middleware.ts` at the project root that wires up `nextgenMiddleware` from `@zitadel-nextgen/sdk-next`. The middleware forwards `/__nextgen/*` same-origin to `NEXTGEN_ISSUER_URL` (the auth backend) and gates `/profile` behind a JWT check.
+`zitadel setup` now scaffolds a `middleware.ts` at the project root that wires up `nextgenMiddleware` from `@zitadel/sdk-next`. The middleware forwards `/__nextgen/*` same-origin to `NEXTGEN_ISSUER_URL` (the auth backend) and gates `/profile` behind a JWT check.
 
 The file uses the `middleware.ts` + `function middleware()` convention because Next 15 only recognises that form; Next 16 accepts it too (the `proxy.ts` rename is deprecated-but-backwards-compatible). Using the universal form means one template works on every supported Next major.
 

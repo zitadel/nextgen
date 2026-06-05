@@ -35,6 +35,18 @@ post:
   parameters:
     - $ref: ../../../components/parameters/flow-id.yaml
     - $ref: ../../../components/parameters/flow-cookie.yaml
+    - name: Origin
+      in: header
+      required: false
+      description: |
+        Standard browser `Origin` header. When a step issues a passkey
+        challenge, the server derives the WebAuthn relying-party id and the
+        allowed origin from this value. Browsers send it automatically on the
+        fetch POST; no client action is required.
+      schema:
+        type: string
+        format: uri
+        example: https://login.example.com
   requestBody:
     required: true
     content:

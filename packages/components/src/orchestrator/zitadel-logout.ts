@@ -1,6 +1,6 @@
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import { getZitadelConfig, getApi, type ZitadelProject } from "@zitadel-nextgen/api/config";
+import { getZitadelConfig, getApi, type ZitadelProject } from "@zitadel/api/config";
 
 import { applyBaseTokens } from "./branding-to-tokens.js";
 import { baseHostStyles, focusVisibleStyles, t } from "../styles/index.js";
@@ -25,7 +25,7 @@ const DISPLAY_COOKIE_NAME = "__nextgen_display";
  * Reads the user's display name + email from the `__nextgen_display` cookie
  * (set by the auth backend on sign-in), renders an avatar trigger with a
  * dropdown that exposes a "Sign out" action, and calls the typed
- * `endSession` operation in `@zitadel-nextgen/api`
+ * `endSession` operation in `@zitadel/api`
  * (`GET /auth/end-session`). The server clears the session cookie via
  * `Set-Cookie: Max-Age=0`; on success the element fires `zitadel-signout`
  * and optionally navigates to `post-sign-out-url`.

@@ -17,19 +17,20 @@ import (
 	"github.com/ianlancetaylor/jsonschema"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/zitadel/nextgen/internal/secrets"
-	"github.com/zitadel/oidc/v3/pkg/op"
-
 	oasapi "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/bootstrap/users"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/domain/idgen"
+	"github.com/zitadel/nextgen/internal/secrets"
 	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/nextgen/internal/staticui/console"
+	"github.com/zitadel/nextgen/internal/staticui/login"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	_ "github.com/zitadel/nextgen/internal/storage/database/dialect/all"
 	"github.com/zitadel/nextgen/internal/storage/database/repository"
+	"github.com/zitadel/oidc/v3/pkg/op"
 )
 
 func NewCommand() *cobra.Command {
@@ -102,6 +103,7 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 	userRepo := repository.NewUserRepository()
 	userPasswordRepo := repository.NewUserPasswordRepository()
 	userPasskeyRepo := repository.NewUserPasskeyRepository()
+	passkeyRegRepo := repository.NewPasskeyRegistrationRepository()
 	sessionRepo := repository.NewSessionRepository(pool)
 	flowDefinitionRepo := repository.NewFlowDefinitionRepository(pool)
 	attemptRepo := repository.NewAuthAttemptRepository(pool)
@@ -169,7 +171,9 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 	fields := domain.NewSchemaFieldResolver(storageSchemaResolver)
 	flowAuth := service.NewFlowAuthAttemptAdapter(authAttemptSvc)
 	createUserHandler := domain.NewFlowCreateUserHandler(ids, userRepo, userPasswordRepo, passwordHasher)
-	stateMachine := domain.NewFlowStateMachine(fields, createUserHandler, flowAuth, time.Now)
+	passkeyRegSvc := service.NewPasskeyRegistrationService(pool, passkeyRegRepo, userPasskeyRepo, ids)
+	passkeyRegAdapter := service.NewFlowPasskeyRegistrationAdapter(passkeyRegSvc)
+	stateMachine := domain.NewFlowStateMachine(fields, createUserHandler, flowAuth, passkeyRegAdapter, time.Now)
 
 	flowService := service.NewFlowService(pool, flowDefinitionRepo, stateMachine, ids)
 
@@ -188,17 +192,21 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 			userService,
 			schemaService,
 			flowDefinitionSvc,
-			teamService,
-		),
+			teamService),
 		api.NewSecurityHandler(),
 		oasapi.WithErrorHandler(api.OgenErrorHandler))
 	if err != nil {
 		return fmt.Errorf("build api server: %w", err)
 	}
 
+	mux, err := buildHTTPMux(cfg.Server, oasServer)
+	if err != nil {
+		return err
+	}
+
 	httpServer := &http.Server{
 		Addr:              cfg.Server.Address,
-		Handler:           oasServer,
+		Handler:           mux,
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      30 * time.Second,
@@ -234,6 +242,10 @@ func loadConfig(configPath string) (Config, error) {
 	v.AutomaticEnv()
 
 	v.SetDefault("server.address", ":8080")
+	v.SetDefault("server.console_enabled", true)
+	v.SetDefault("server.console_path", "/ui/console")
+	v.SetDefault("server.login_enabled", true)
+	v.SetDefault("server.login_path", "/ui/login")
 	v.SetDefault("password_hasher.hasher.algorithm", crypto.HashNameBcrypt)
 	v.SetDefault("password_hasher.hasher.cost", 10)
 	v.SetDefault("password_hasher.limits", crypto.HashLimitsConfig{
@@ -282,6 +294,37 @@ func mustBindEnv(v *viper.Viper, key string) {
 	if err := v.BindEnv(key); err != nil {
 		panic(fmt.Errorf("bind env %q: %w", key, err))
 	}
+}
+
+func buildHTTPMux(cfg ServerConfig, apiHandler http.Handler) (*http.ServeMux, error) {
+	mux := http.NewServeMux()
+
+	if cfg.LoginEnabled {
+		if err := login.ValidateDist(); err != nil {
+			return nil, err
+		}
+		loginHandler, err := login.Handler(cfg.LoginPath)
+		if err != nil {
+			return nil, fmt.Errorf("build login UI handler: %w", err)
+		}
+		mux.Handle(cfg.LoginPath, loginHandler)
+		mux.Handle(cfg.LoginPath+"/", loginHandler)
+	}
+
+	if cfg.ConsoleEnabled {
+		if err := console.ValidateDist(); err != nil {
+			return nil, err
+		}
+		consoleHandler, err := console.Handler(cfg.ConsolePath)
+		if err != nil {
+			return nil, fmt.Errorf("build console UI handler: %w", err)
+		}
+		mux.Handle(cfg.ConsolePath, consoleHandler)
+		mux.Handle(cfg.ConsolePath+"/", consoleHandler)
+	}
+
+	mux.Handle("/", apiHandler)
+	return mux, nil
 }
 
 // buildCrypter decodes a hex-encoded crypter key and constructs a

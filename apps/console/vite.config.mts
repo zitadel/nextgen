@@ -5,8 +5,11 @@ import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
-export default defineConfig(() => ({
+const consoleBase = "/ui/console/";
+
+export default defineConfig(({ command }) => ({
   root: import.meta.dirname,
+  base: command === "build" ? consoleBase : "/",
   server: {
     port: 5174,
     strictPort: true,
@@ -16,10 +19,10 @@ export default defineConfig(() => ({
     },
   },
   cacheDir: "../../node_modules/.vite/apps/console",
-  // Resolve workspace `@zitadel-nextgen/*` packages straight from `.ts`
+  // Resolve workspace `@zitadel/*` packages straight from `.ts`
   // source for hot dev iteration. Production builds pick up pre-built
   // `dist/*.mjs` via the default `import` condition instead.
-  resolve: { conditions: ["@zitadel-nextgen/source"] },
+  resolve: { conditions: ["@zitadel/source"] },
   plugins: [
     tailwindcss(),
     devtools(),
@@ -39,7 +42,7 @@ export default defineConfig(() => ({
     },
   },
   test: {
-    name: "@zitadel-nextgen/console",
+    name: "@zitadel/console",
     watch: false,
     passWithNoTests: true,
     globals: true,

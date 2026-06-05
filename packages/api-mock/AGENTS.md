@@ -5,15 +5,15 @@ Scoped instructions for `packages/api-mock/`. Read together with the
 
 ## What's in here
 
-`@zitadel-nextgen/api-mock` is a workspace-internal MSW handler library
-for the typed `@zitadel-nextgen/api` Flow API. Consumers:
+`@zitadel/api-mock` is a workspace-internal MSW handler library
+for the typed `@zitadel/api` Flow API. Consumers:
 
 - `packages/components/dev/main.ts` — boots the worker for the dev
   playground.
 - `packages/components/src/orchestrator/zitadel-login.spec.ts` — feeds
   the handlers into `msw/node`'s `setupServer`.
 - `apps/demo-next/` and `apps/demo-nuxt/` — hit the standalone TCP server
-  started by `pnpm --filter @zitadel-nextgen/api-mock start` (not an
+  started by `pnpm --filter @zitadel/api-mock start` (not an
   in-browser worker).
 
 It is **not** published. There is no built artifact; consumers import
@@ -33,7 +33,7 @@ setupMock(worker) / setupMockHandlers() (src/index.ts)
 
 Every step fixture returns the orval `CreateFlow201` shape. There are
 no shadow step types — fixtures import from
-`@zitadel-nextgen/api/generated/model` and the structural identity of
+`@zitadel/api/generated/model` and the structural identity of
 the three orval response aliases (`CreateFlow201`, `GetFlowStep200`,
 `SubmitFlowStep200`) lets a single fixture set drive all three handlers.
 
