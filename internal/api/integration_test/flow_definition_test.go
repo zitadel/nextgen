@@ -675,22 +675,22 @@ func TestListFlowDefinitions(t *testing.T) {
 			actual, ok := resp.(*api.FlowDefinitionListResponse)
 			require.True(t, ok)
 			assert.Equal(t, len(expected.FlowDefinitions), len(actual.FlowDefinitions))
-			// assert the non-default flow definitions
 			expectedFlowDefsMap := make(map[string]api.FlowDefinitionResponse, len(expected.FlowDefinitions))
 			for _, flowDef := range expected.FlowDefinitions {
-				if flowDef.Name == "default-login" {
-					continue
-				}
 				expectedFlowDefsMap[flowDef.Name] = flowDef
 			}
 			actualFlowDefsMap := make(map[string]api.FlowDefinitionResponse, len(actual.FlowDefinitions))
 			for _, flowDef := range actual.FlowDefinitions {
-				if flowDef.Name == "default-login" {
-					continue
-				}
 				actualFlowDefsMap[flowDef.Name] = flowDef
 			}
-			assert.Equal(t, expectedFlowDefsMap, actualFlowDefsMap)
+
+			for _, flowDef := range expected.FlowDefinitions {
+				if flowDef.Name == "default-login" {
+					assert.Equal(t, flowDef.ProjectID, actualFlowDefsMap[flowDef.Name].ProjectID)
+					continue
+				}
+				assert.Equal(t, expectedFlowDefsMap[flowDef.Name], actualFlowDefsMap[flowDef.Name])
+			}
 		})
 	}
 }
