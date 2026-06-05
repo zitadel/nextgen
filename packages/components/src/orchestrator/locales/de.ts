@@ -22,6 +22,7 @@ export const de: Locale = {
   "identifier.field.email": "E-Mail",
   "identifier.field.email.placeholder": "du@unternehmen.com",
   "identifier.action.submit": "Weiter",
+  "identifier.action.continue": "Weiter",
   "identifier.action.passkey": "Mit Passkey anmelden",
   "identifier.action.register.lead": "Noch kein Konto? ",
   "identifier.action.register.link": "Registrieren",
@@ -53,6 +54,17 @@ export const de: Locale = {
   "collect-credentials.field.password.help":
     "Mindestens 8 Zeichen, einschließlich eines Sonderzeichens und einer Zahl.",
   "collect-credentials.action.submit": "Registrieren",
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Step: register-password (Passwort-Eingabe — Registrierungspfad)
+  // Standard-Login-Flow: register → register-password → passkey-upsell → done
+  // ═══════════════════════════════════════════════════════════════════════════
+  "register-password.title": "Passwort erstellen",
+  "register-password.description": "Wähle ein sicheres Passwort für dein Konto",
+  "register-password.field.password": "Passwort",
+  "register-password.field.password.help":
+    "Mindestens 8 Zeichen, einschließlich eines Sonderzeichens und einer Zahl.",
+  "register-password.action.submit": "Registrieren",
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Step: passkey-upsell (Passkey-Angebot — nach Registrierung)
@@ -89,8 +101,9 @@ export const de: Locale = {
   "done.title": "Du bist angemeldet als",
   "done.description": "",
 
-  // --- Ältere Step-Name-Aliase (alte geteilte Flows) ---
+  // --- Step-Name-Aliase für den Standard-Login-Flow ---
   "password.title": "Anmelden",
+  "password.description": "Gib dein Passwort ein",
   "password.field.password": "Passwort",
   "password.action.signin": "Anmelden",
   "password.action.passkey": "Mit Passkey anmelden",
@@ -98,6 +111,7 @@ export const de: Locale = {
   "password.action.register.link": "Registrieren",
 
   "register.title": "Konto erstellen",
+  "register.description": "Gib deine E-Mail-Adresse ein, um loszulegen",
   "register.field.email": "E-Mail",
   "register.field.email.placeholder": "du@unternehmen.com",
   "register.field.password": "Passwort",

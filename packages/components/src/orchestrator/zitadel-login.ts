@@ -207,14 +207,26 @@ export class ZitadelLogin extends LitElement {
    * resolved language is used as the base; entries from the `locales` map (if
    * set) are spread on top so partial overrides work without importing and
    * spreading the full base dictionary.
+   *
+   * Priority: explicit `lang` attr → `navigator.language` (user preference)
+   * → `document.documentElement.lang` (page default) → English fallback.
    */
   private resolveLocale(): Locale {
     const code = this.lang
-      || (typeof document !== "undefined" ? document.documentElement.lang : "")
-      || (typeof navigator !== "undefined" ? navigator.language : "");
+      || (typeof navigator !== "undefined" ? navigator.language : "")
+      || (typeof document !== "undefined" ? document.documentElement.lang : "");
     const primary = (code.split("-")[0] ?? "").toLowerCase();
     const builtin = builtinLocales[primary] ?? en;
     const custom = this.locales?.[primary];
+    console.log("[zitadel-login] resolveLocale", {
+      lang: this.lang,
+      navigatorLang: typeof navigator !== "undefined" ? navigator.language : "N/A",
+      htmlLang: typeof document !== "undefined" ? document.documentElement.lang : "N/A",
+      code,
+      primary,
+      hasBuiltin: primary in builtinLocales,
+      availableLocales: Object.keys(builtinLocales),
+    });
     return custom ? { ...builtin, ...custom } : builtin;
   }
 

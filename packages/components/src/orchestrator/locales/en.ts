@@ -24,6 +24,7 @@ export const en: Record<string, string> = {
   "identifier.field.email": "Work email",
   "identifier.field.email.placeholder": "you@company.com",
   "identifier.action.submit": "Continue",
+  "identifier.action.continue": "Continue",
   "identifier.action.passkey": "Sign in with a passkey",
   "identifier.action.register.lead": "Don't have an account? ",
   "identifier.action.register.link": "Sign up",
@@ -55,6 +56,17 @@ export const en: Record<string, string> = {
   "collect-credentials.field.password.help":
     "At least 8 characters, including a symbol and number.",
   "collect-credentials.action.submit": "Sign up",
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Step: register-password (password entry — registration path)
+  // Default login flow: register → register-password → passkey-upsell → done
+  // ═══════════════════════════════════════════════════════════════════════════
+  "register-password.title": "Create your password",
+  "register-password.description": "Choose a secure password for your account",
+  "register-password.field.password": "Password",
+  "register-password.field.password.help":
+    "At least 8 characters, including a symbol and number.",
+  "register-password.action.submit": "Sign up",
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Step: passkey-upsell (passkey enrollment offer — after registration)
@@ -92,8 +104,9 @@ export const en: Record<string, string> = {
   "done.title": "You're signed in as",
   "done.description": "",
 
-  // --- Legacy step-name aliases (old split-step flows) ---
+  // --- Step-name aliases used by the default login flow ---
   "password.title": "Sign in",
+  "password.description": "Enter your password",
   "password.field.password": "Password",
   "password.action.signin": "Sign in",
   "password.action.passkey": "Sign in with a passkey",
@@ -101,6 +114,7 @@ export const en: Record<string, string> = {
   "password.action.register.link": "Sign up",
 
   "register.title": "Create your account",
+  "register.description": "Enter your email to get started",
   "register.field.email": "Work email",
   "register.field.email.placeholder": "you@company.com",
   "register.field.password": "Password",
