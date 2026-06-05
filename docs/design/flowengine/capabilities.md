@@ -17,13 +17,12 @@ to be a fast answer to "can I build flow X right now?"
 - Encrypted `_zflow` cookie (`HttpOnly`, `Secure`, `SameSite=Strict`, 600s max-age).
 - Cookie cleared on terminal step.
 - Step error mode: same step re-rendered with `Error` set; cookie rotates to prevent replay.
-- Cookie-cookie / cookie-id / cookie-expiry mismatch errors mapped to 401 / 404 / 410.
+- Cookie missing / invalid / expired → 401; cookie-id mismatch → 404; flow-already-completed (GET only) → 410.
 
 ### Resolution
 
-- Direct lookup by `name` (with optional `schema_version`).
-- Audience-based resolution by `purpose` plus active `status`.
-- Picks the highest `schema_version` when multiple matches.
+- Direct lookup by `name` (with optional `schema_version`). Multiple matches resolve via `pickLatestFlowVersion` — a lexicographic compare over `schema_version` strings (see [Missing → Resolution](#resolution-1)).
+- Audience-based resolution by `purpose` plus active `status`. The repository returns rows ordered `created_at DESC, id DESC`; the service takes the first.
 - Fails with `ErrFlowDefinitionPurposeMismatch` when a name-resolved definition doesn't serve the requested purpose.
 
 ### Definitions
@@ -38,7 +37,7 @@ to be a fast answer to "can I build flow X right now?"
 - `actions` — user-selectable, surfaced on the capability payload. `passkey` and `passkey_register` are recognized action names that drive the passkey ceremony.
 - `on_success: create_user` — hashes the password (argon2id), writes the user and credential rows, then calls `auth-attempt.RegisterCreatedUser` so the new user counts as verified for the terminal handoff.
 - `complete: redirect` and `complete: show` — terminal step classifiers.
-- Implicit identifier resolution from any identifier-shaped field; routes via `user_not_found` when wired, errors otherwise.
+- Implicit identifier resolution from any identifier-shaped field; routes via `user_not_found` (login flows) or `user_already_exists` (register flows) when wired, errors otherwise. The engine flips `CurrentPurpose` on the matching outcome to switch sub-flows.
 - Implicit password verification when a password-shaped field is present and `on_success` is not `create_user`.
 - Step error path: validation failures and password rejection re-render the current step with `Error` set; the state machine does **not** advance.
 - Terminal-step handoff: when a user has been resolved, calls `auth-attempt.Handoff` and returns the token + expiry on `FlowStepResult`.
@@ -85,7 +84,7 @@ Not implemented at any layer:
 - Pivot stack (push/pop on cross-flow transitions).
 - Dynamic step injection from the policy engine (e.g. policy demands a second factor).
 - Implicit policy evaluation at the terminal step — the design calls for it; today, completion is driven by definition transitions only.
-- Engine-emitted outcomes beyond `user_not_found` (`user_link_required`, `user_locked`, …) — see [ADR 017](../../adrs/017-flow-engine-auth-attempt-dispatch.md).
+- Engine-emitted outcomes beyond `user_not_found` and `user_already_exists` (`user_link_required`, `user_locked`, …) — see [ADR 017](../../adrs/017-flow-engine-auth-attempt-dispatch.md).
 
 ### On-success handlers
 
