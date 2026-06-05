@@ -11,9 +11,7 @@ export default async function AdminPage() {
         <h1 style={{ fontSize: "24px", fontWeight: 700, margin: 0 }}>Admin</h1>
         <LogoutWidget />
       </div>
-      <p style={{ color: "#6b7280" }}>
-        Signed in as {session.isAuthenticated ? <SessionDetails /> : "unknown"}
-      </p>
+      {session.isAuthenticated ? <SessionDetails /> : <p style={{ color: "#6b7280" }}>Not signed in</p>}
     </main>
   );
 }
