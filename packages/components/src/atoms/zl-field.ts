@@ -49,7 +49,19 @@ export class ZlField extends LitElement {
     ...surfaceStyles(fieldHost, fieldSurface),
   ];
 
-  @property() accessor name = "";
+  /**
+   * Field name — used as the key in form submission and in `zl-input` event
+   * detail. For form-associated custom elements the browser owns a native
+   * `name` property; using `@property()` would create a conflicting accessor
+   * that loses sync with the DOM attribute. We therefore manage it manually.
+   */
+  get name(): string {
+    return this.getAttribute("name") ?? "";
+  }
+
+  set name(value: string) {
+    this.setAttribute("name", value);
+  }
   @property() accessor label = "";
   @property() accessor type: ZlFieldType = "text";
   @property() accessor value = "";

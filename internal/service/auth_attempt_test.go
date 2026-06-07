@@ -11,13 +11,12 @@ import (
 	"github.com/descope/virtualwebauthn"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
-
 	"github.com/zitadel/nextgen/internal/domain"
 	domainmock "github.com/zitadel/nextgen/internal/domain/mock"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/service/mocks"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"go.uber.org/mock/gomock"
 )
 
 // newUserPasskeysMock returns a mock that resolves a passkey List lookup to the given keys.
@@ -577,7 +576,7 @@ func TestAuthAttemptService_VerifyPasskeyProof(t *testing.T) {
 		// A successful assertion must persist the authenticator's advanced sign count and backup
 		// state. gomock enforces that Update is called exactly once.
 		var persistedSignCount int64
-		passkeys.EXPECT().UniqueCondition(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+		passkeys.EXPECT().UniqueCondition("proj", passkeyUserID, domain.EncodePasskeyCredentialID(f.cred.ID)).Return(nil)
 		passkeys.EXPECT().SetSignCount(gomock.Any()).DoAndReturn(func(c int64) database.Change {
 			persistedSignCount = c
 			return nil
@@ -599,7 +598,7 @@ func TestAuthAttemptService_VerifyPasskeyProof(t *testing.T) {
 		factor, ok := succeededFactor.(*domain.AuthFactorPasskey)
 		require.True(t, ok, "ChallengeSucceeded factor must be *domain.AuthFactorPasskey")
 		assert.Equal(t, passkeyUserID, factor.UserID, "verified passkey factor must carry the user")
-		assert.Equal(t, []byte(f.cred.ID), factor.CredentialID)
+		assert.Equal(t, f.cred.ID, factor.CredentialID)
 		// The fixture's authenticator reports counter 1, so the advanced sign count is persisted.
 		assert.Equal(t, int64(1), persistedSignCount)
 	})

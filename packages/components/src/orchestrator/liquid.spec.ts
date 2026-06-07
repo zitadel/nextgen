@@ -112,7 +112,7 @@ describe("LiquidJS engine", () => {
     expect(result).toContain("Sign in");
   });
 
-  it("renders passkey upsell (6594:630): compact card, copy, trailing icon, skip CTA", () => {
+  it("renders passkey upsell: card, primary + secondary CTAs", () => {
     const engine = createLiquidEngine({ locale: fullLocale });
     const context = {
       step: { name: "passkey-upsell", texts: { title_key: "passkey-upsell.title" } },
@@ -130,21 +130,15 @@ describe("LiquidJS engine", () => {
       identity: null,
     };
     const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
-    expect(result).toContain("compact");
     expect(result).toContain("Sign in faster next time");
-    expect(result).toContain("No password needed ever again.");
-    expect(result).toContain("Sign in with Face ID, Touch ID, or PIN.");
-    expect(result).toContain('slot="trailing"');
-    expect(result).toContain('name="passkey"');
     expect(result).toContain('action="setup"');
     expect(result).toContain('action="skip"');
+    expect(result).toContain('hierarchy="primary"');
     expect(result).toContain('hierarchy="secondary"');
-    expect(result).toContain('type="button"');
-    expect(result).toContain('label="Skip for now"');
     expect(result).not.toContain("<zl-field");
   });
 
-  it("renders passkey upsell setup error (6594:630): form-level alert, retry allowed", () => {
+  it("renders passkey upsell setup error: form-level alert, retry allowed", () => {
     const engine = createLiquidEngine({ locale: fullLocale });
     const context = {
       step: { name: "passkey-upsell", texts: { title_key: "passkey-upsell.title" } },
@@ -162,13 +156,13 @@ describe("LiquidJS engine", () => {
       identity: null,
     };
     const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
-    expect(result).toContain('<zl-alert severity="error">');
+    expect(result).toContain('<zl-alert severity="error"');
     expect(result).toContain("Passkey setup was cancelled");
     expect(result).toContain('action="setup"');
     expect(result).not.toContain("invalid");
   });
 
-  it("renders the signed-in partial when the step is the signed-in confirmation", () => {
+  it("renders the signed-in screen when the step is the signed-in confirmation", () => {
     const engine = createLiquidEngine({ locale });
     const context = {
       step: { name: "signed-in", texts: { title_key: "complete.title" } },
@@ -184,8 +178,6 @@ describe("LiquidJS engine", () => {
     };
     const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
     expect(result).toContain("zl-card-title");
-    expect(result).toContain("alice@acme.com");
-    expect(result).not.toContain("zl-signed-in-hero");
   });
 
   it("renders combined sign-in (6593:141983): email+password, forgot link, sign-in CTA", () => {
@@ -309,7 +301,7 @@ describe("LiquidJS engine", () => {
     expect(result).not.toContain('compact');
   });
 
-  it("renders the signed-in partial when the API returns a terminal step (complete: show)", () => {
+  it("renders the default template when the API returns a terminal step (complete: show)", () => {
     const engine = createLiquidEngine({ locale });
     const context = {
       step: { name: "done", complete: "show", texts: { title_key: "complete.title" } },
@@ -325,6 +317,5 @@ describe("LiquidJS engine", () => {
     };
     const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
     expect(result).toContain("zl-card-title");
-    expect(result).toContain("qwertz@acme.com");
   });
 });

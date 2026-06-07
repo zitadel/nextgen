@@ -1,4 +1,22 @@
-import { defineConfig } from "tsdown";
+import { readFileSync } from "node:fs";
+
+import { defineConfig, type Plugin } from "tsdown";
+
+/**
+ * Rolldown plugin that turns `.liquid` files into default-exported strings.
+ * Mirrors what Vite does natively so `import tpl from "./file.liquid"` works
+ * in both dev (Vite) and production (tsdown/rolldown) builds.
+ */
+function liquidRaw(): Plugin {
+  return {
+    name: "liquid-raw",
+    load(id) {
+      if (!id.endsWith(".liquid")) return null;
+      const content = readFileSync(id, "utf-8");
+      return `export default ${JSON.stringify(content)};`;
+    },
+  };
+}
 
 /**
  * Library build for `@zitadel/components`.
@@ -14,6 +32,7 @@ import { defineConfig } from "tsdown";
  * test-only helper consumers never import.
  */
 export default defineConfig({
+  plugins: [liquidRaw()],
   entry: {
     index: "src/index.ts",
     "atoms/index": "src/atoms/index.ts",

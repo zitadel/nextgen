@@ -8,7 +8,9 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -17,21 +19,21 @@ import (
 	"github.com/ianlancetaylor/jsonschema"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/zitadel/nextgen/internal/secrets"
-	"github.com/zitadel/oidc/v3/pkg/op"
-
 	oasapi "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/bootstrap/users"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/domain/idgen"
+	"github.com/zitadel/nextgen/internal/secrets"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/staticui/console"
 	"github.com/zitadel/nextgen/internal/staticui/login"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	_ "github.com/zitadel/nextgen/internal/storage/database/dialect/all"
+	"github.com/zitadel/nextgen/internal/storage/database/dialect/postgres/embedded"
 	"github.com/zitadel/nextgen/internal/storage/database/repository"
+	"github.com/zitadel/oidc/v3/pkg/op"
 )
 
 func NewCommand() *cobra.Command {
@@ -47,7 +49,7 @@ func NewCommand() *cobra.Command {
 				return err
 			}
 
-			pool, err := startDatabase(cmd.Context(), cfg.Database)
+			pool, err := startDatabase(cmd.Context(), cfg)
 			if err != nil {
 				return err
 			}
@@ -62,8 +64,8 @@ func NewCommand() *cobra.Command {
 	return cmd
 }
 
-func startDatabase(ctx context.Context, config database.Config) (database.Pool, error) {
-	connector, err := config.Build()
+func startDatabase(ctx context.Context, cfg Config) (database.Pool, error) {
+	connector, err := buildDatabaseConnector(cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -76,6 +78,25 @@ func startDatabase(ctx context.Context, config database.Config) (database.Pool, 
 		return nil, err
 	}
 	return pool, nil
+}
+
+func buildDatabaseConnector(cfg Config) (database.Connector, error) {
+	if len(cfg.Database.Raw) == 0 {
+		options := embeddedPostgresOptions(cfg.Server.DataDir)
+		log.Printf("no database dialect configured, starting embedded postgres in %s", filepath.Dir(options.DataPath))
+		return embedded.NewConnector(options), nil
+	}
+	return cfg.Database.Build()
+}
+
+func embeddedPostgresOptions(dataDir string) embedded.Options {
+	root := filepath.Join(dataDir, "embedded-postgres")
+	return embedded.Options{
+		RuntimePath: filepath.Join(root, "runtime"),
+		DataPath:    filepath.Join(root, "data"),
+		LogPath:     filepath.Join(root, "postgres.log"),
+		Logger:      os.Stdout,
+	}
 }
 
 func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string) error {
@@ -104,6 +125,7 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 	userRepo := repository.NewUserRepository()
 	userPasswordRepo := repository.NewUserPasswordRepository()
 	userPasskeyRepo := repository.NewUserPasskeyRepository()
+	passkeyRegRepo := repository.NewPasskeyRegistrationRepository()
 	sessionRepo := repository.NewSessionRepository(pool)
 	flowDefinitionRepo := repository.NewFlowDefinitionRepository(pool)
 	attemptRepo := repository.NewAuthAttemptRepository(pool)
@@ -171,7 +193,9 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 	fields := domain.NewSchemaFieldResolver(storageSchemaResolver)
 	flowAuth := service.NewFlowAuthAttemptAdapter(authAttemptSvc)
 	createUserHandler := domain.NewFlowCreateUserHandler(ids, userRepo, userPasswordRepo, passwordHasher)
-	stateMachine := domain.NewFlowStateMachine(fields, createUserHandler, flowAuth, time.Now)
+	passkeyRegSvc := service.NewPasskeyRegistrationService(pool, passkeyRegRepo, userPasskeyRepo, ids)
+	passkeyRegAdapter := service.NewFlowPasskeyRegistrationAdapter(passkeyRegSvc)
+	stateMachine := domain.NewFlowStateMachine(fields, createUserHandler, flowAuth, passkeyRegAdapter, time.Now)
 
 	flowService := service.NewFlowService(pool, flowDefinitionRepo, stateMachine, ids)
 
@@ -190,8 +214,7 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 			userService,
 			schemaService,
 			flowDefinitionSvc,
-			teamService,
-		),
+			teamService),
 		api.NewSecurityHandler(),
 		oasapi.WithErrorHandler(api.OgenErrorHandler))
 	if err != nil {
@@ -240,7 +263,12 @@ func loadConfig(configPath string) (Config, error) {
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	v.AutomaticEnv()
 
+	dataDir, err := defaultServerDataDir()
+	if err != nil {
+		return Config{}, err
+	}
 	v.SetDefault("server.address", ":8080")
+	v.SetDefault("server.data_dir", dataDir)
 	v.SetDefault("server.console_enabled", true)
 	v.SetDefault("server.console_path", "/ui/console")
 	v.SetDefault("server.login_enabled", true)
@@ -282,6 +310,9 @@ func loadConfig(configPath string) (Config, error) {
 	if err := v.Unmarshal(&cfg); err != nil {
 		return Config{}, fmt.Errorf("decode config: %w", err)
 	}
+	if err := ensureServerEncryptionKey(&cfg.Server); err != nil {
+		return Config{}, err
+	}
 
 	return cfg, cfg.Validate()
 }
@@ -322,7 +353,7 @@ func buildHTTPMux(cfg ServerConfig, apiHandler http.Handler) (*http.ServeMux, er
 		mux.Handle(cfg.ConsolePath+"/", consoleHandler)
 	}
 
-	mux.Handle("/", apiHandler)
+	mux.Handle("/", api.WithRequestHostMiddleware(apiHandler))
 	return mux, nil
 }
 

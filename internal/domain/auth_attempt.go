@@ -340,15 +340,24 @@ func (a *AuthAttempt) PreparePasswordVerification(challengeID string) (AuthChall
 	return challenge, userCheck, nil
 }
 
-// PreparePasskeyVerification validates that a passkey proof can be submitted
-// and returns the user factor if one was already identified. The factor is nil
-// for discoverable (usernameless) logins; the user is then resolved from the
-// assertion's user handle during validation.
+// PreparePasskeyVerification validates that a passkey proof can be submitted.
+// It returns the already-identified user when one is pinned (identified login),
+// or a nil user factor for a discoverable/usernameless login where the user is
+// resolved cryptographically from the assertion's user handle.
+//
+// Allowing a nil user factor is safe because subject-switching is structurally
+// prevented: when a user is already pinned, verification runs the identified
+// path constrained to that user's credentials, so an assertion from any other
+// credential simply fails. A nil user factor only occurs on a clean attempt
+// (a password factor cannot exist without a user factor), so discoverable login
+// cannot override an authenticated subject.
 func (a *AuthAttempt) PreparePasskeyVerification(challengeID string) (AuthChallenge, *AuthFactorUser, error) {
 	challenge, err := a.PrepareVerification(challengeID, AuthCheckTypePasskey)
 	if err != nil {
 		return nil, nil, err
 	}
+	// userCheck is nil for a discoverable login; the caller resolves and binds
+	// the user from the verified assertion in that case.
 	userCheck, _ := CheckAs[*AuthFactorUser](a, AuthCheckTypeUser)
 	return challenge, userCheck, nil
 }

@@ -49,6 +49,12 @@ type SubmitFlowRequest struct {
 	Fields        map[string]any
 	GateProofs    map[string]string
 	SSOProviderID *string
+	// ChallengeResponse carries the client's answer to a pending ceremony
+	// (e.g. a passkey assertion). Nil unless the step issued a challenge.
+	ChallengeResponse *domain.FlowChallengeResponse
+	// PasskeyRP carries the WebAuthn relying-party params derived from the
+	// request, needed when issuing a passkey challenge.
+	PasskeyRP *domain.FlowPasskeyRP
 }
 
 type GetFlowStepRequest struct {
@@ -196,9 +202,11 @@ func (s *flowService) Submit(ctx context.Context, req SubmitFlowRequest) (FlowSt
 		return FlowStepResult{}, err
 	}
 	in := domain.FlowSubmitInput{
-		Action:     req.Action,
-		Fields:     req.Fields,
-		GateProofs: req.GateProofs,
+		Action:            req.Action,
+		Fields:            req.Fields,
+		GateProofs:        req.GateProofs,
+		ChallengeResponse: req.ChallengeResponse,
+		PasskeyRP:         req.PasskeyRP,
 	}
 	if req.SSOProviderID != nil {
 		in.SSOProvider = &domain.FlowSSOProviderRef{ID: *req.SSOProviderID}
