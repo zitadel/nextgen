@@ -36,6 +36,7 @@ module "postgres" {
   database_name                  = var.postgres_database_name
   database_version               = var.postgres_database_version
   tier                           = var.postgres_tier
+  edition                        = var.postgres_edition
   region                         = var.region
   environment                    = var.environment
   network_id                     = module.network.network_id

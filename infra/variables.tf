@@ -38,6 +38,17 @@ variable "postgres_tier" {
   default     = "db-f1-micro"
 }
 
+variable "postgres_edition" {
+  description = "Cloud SQL edition"
+  type        = string
+  default     = "ENTERPRISE"
+
+  validation {
+    condition     = contains(["ENTERPRISE", "ENTERPRISE_PLUS"], var.postgres_edition)
+    error_message = "postgres_edition must be ENTERPRISE or ENTERPRISE_PLUS."
+  }
+}
+
 variable "postgres_availability_type" {
   description = "Cloud SQL availability type (ZONAL or REGIONAL)"
   type        = string

@@ -10,6 +10,7 @@ postgres_instance_name                  = "zitadel-prod"
 postgres_database_name                  = "zitadel"
 postgres_database_version               = "POSTGRES_17"
 postgres_tier                           = "db-f1-micro"
+postgres_edition                        = "ENTERPRISE"
 postgres_availability_type              = "REGIONAL"
 postgres_disk_size_gb                   = 20
 postgres_point_in_time_recovery_enabled = true

@@ -21,6 +21,17 @@ variable "tier" {
   default     = "db-f1-micro"
 }
 
+variable "edition" {
+  description = "Cloud SQL edition"
+  type        = string
+  default     = "ENTERPRISE"
+
+  validation {
+    condition     = contains(["ENTERPRISE", "ENTERPRISE_PLUS"], var.edition)
+    error_message = "Cloud SQL edition must be ENTERPRISE or ENTERPRISE_PLUS."
+  }
+}
+
 variable "region" {
   description = "Cloud SQL region"
   type        = string
