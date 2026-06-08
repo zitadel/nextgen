@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/go-faster/jx"
-
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
@@ -117,6 +116,47 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 	if id, ok := req.SSOProviderID.Get(); ok {
 		submitReq.SSOProviderID = &id
 	}
+	if cr, ok := req.ChallengeResponse.Get(); ok {
+		var proof []byte
+		if p, ok := cr.Proof.Get(); ok {
+			b, err := json.Marshal(p)
+			if err != nil {
+				return errorResponseWithStatusCode(http.StatusBadRequest, domain.ErrRequestInvalid().WithMessage("invalid challenge_response proof")), nil
+			}
+			proof = b
+		}
+		submitReq.ChallengeResponse = &domain.FlowChallengeResponse{
+			ChallengeID: cr.ChallengeID.Value,
+			Method:      cr.Method.Value,
+			Proof:       proof,
+		}
+	}
+	// The browser Origin header drives the WebAuthn relying-party params when a
+	// step issues or verifies a passkey challenge. Same-origin browser fetches may
+	// not include Origin; fall back to the effective request host injected by the
+	// WithRequestHostMiddleware (X-Forwarded-Host or r.Host).
+	originStr := ""
+	if origin, ok := params.Origin.Get(); ok {
+		originStr = origin.String()
+	} else if h, ok := requestOriginFromContext(ctx); ok {
+		originStr = h
+	}
+	if originStr != "" {
+		originURL, err := url.Parse(originStr)
+		if err == nil {
+			if rp := passkeyRPFromOrigin(*originURL); rp != nil {
+				project, err := h.projectService.Get(ctx, state.ProjectID)
+				if err != nil {
+					return internalErrorResponse(err), nil
+				}
+				if err := validateOriginAgainstProject(originStr, project); err != nil {
+					return errorResponseWithStatusCode(http.StatusBadRequest,
+						domain.ErrRequestInvalid().WithMessage(err.Error())), nil
+				}
+				submitReq.PasskeyRP = rp
+			}
+		}
+	}
 
 	result, err := h.flowService.Submit(ctx, submitReq)
 	if err != nil {
@@ -198,6 +238,11 @@ func flowSetCookie(value string, clear bool) string {
 		HttpOnly: true,
 		Secure:   true,
 		SameSite: http.SameSiteStrictMode,
+		// Path=/ ensures that each Set-Cookie replaces the previous one in
+		// the browser's cookie jar rather than accumulating — without an
+		// explicit path the browser derives the path from the request URI,
+		// which differs across /flow and /flow/{id}/submit endpoints.
+		Path: "/",
 	}
 	if clear {
 		c.MaxAge = -1 // emits "Max-Age=0", instructing browsers to delete
@@ -249,7 +294,58 @@ func toFlowStep(step *domain.FlowStep) api.FlowStep {
 			out.RedirectURL = api.NewOptURI(u)
 		}
 	}
+	if step.Challenge != nil {
+		out.Challenge = api.NewOptFlowStepChallenge(toFlowStepChallenge(*step.Challenge))
+	}
 	return out
+}
+
+// toFlowStepChallenge maps a pending domain ceremony into the API step's
+// challenge object. Options carries the protocol options JSON (for passkey,
+// PublicKeyCredentialRequestOptions) verbatim for the browser.
+func toFlowStepChallenge(c domain.FlowStepChallenge) api.FlowStepChallenge {
+	out := api.FlowStepChallenge{}
+	if c.Method != "" {
+		out.Method = api.NewOptFlowStepChallengeMethod(api.FlowStepChallengeMethodPasskey)
+	}
+	if c.ChallengeID != "" {
+		out.ChallengeID = api.NewOptString(c.ChallengeID)
+	}
+	if len(c.Options) > 0 {
+		var opts api.FlowStepChallengeOptions
+		if err := json.Unmarshal(c.Options, &opts); err == nil {
+			out.Options = api.NewOptFlowStepChallengeOptions(opts)
+		}
+	}
+	return out
+}
+
+// validateOriginAgainstProject returns an error if the origin is not in the
+// project's PreviewOrigins allowlist. An empty allowlist means allow all
+// (development/test mode).
+func validateOriginAgainstProject(originStr string, project *domain.Project) error {
+	if len(project.PreviewOrigins) == 0 {
+		return nil
+	}
+	for _, allowed := range project.PreviewOrigins {
+		if allowed == originStr {
+			return nil
+		}
+	}
+	return fmt.Errorf("origin %q is not allowed for this project", originStr)
+}
+
+// passkeyRPFromOrigin derives the WebAuthn relying-party id (the origin host,
+// without port) and the allowed origin from the browser Origin header. Returns
+// nil when the origin has no host.
+func passkeyRPFromOrigin(origin url.URL) *domain.FlowPasskeyRP {
+	if origin.Hostname() == "" {
+		return nil
+	}
+	return &domain.FlowPasskeyRP{
+		RPID:    origin.Hostname(),
+		Origins: []string{origin.String()},
+	}
 }
 
 func toStepTexts(t domain.FlowStepTexts) api.StepTexts {

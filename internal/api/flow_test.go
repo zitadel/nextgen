@@ -12,13 +12,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zitadel/oidc/v3/pkg/op"
-
 	gen "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/oidc/v3/pkg/op"
 )
 
 // fakeFlowSvc lets handler tests exercise cookie + HTTP plumbing without
@@ -78,6 +77,10 @@ func (stubAuthAttempt) VerifyProof(context.Context, service.VerifyProofInput) (*
 }
 func (stubAuthAttempt) Handoff(context.Context, service.HandoffInput) (*domain.AuthAttempt, error) {
 	return nil, errors.New("stub auth attempt")
+}
+
+func (stubAuthAttempt) RegisterCreatedUser(context.Context, string, string, string) error {
+	return errors.New("stub auth attempt")
 }
 
 var _ service.AuthAttemptService = stubAuthAttempt{}

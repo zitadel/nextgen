@@ -38,7 +38,7 @@ var (
 	rn44AllowedHeaders = map[string]string{
 		"POST": "Authorization,Content-Type",
 	}
-	rn52AllowedHeaders = map[string]string{
+	rn51AllowedHeaders = map[string]string{
 		"POST": "Authorization,Content-Type,Idempotency-Key",
 	}
 	rn11AllowedHeaders = map[string]string{
@@ -47,11 +47,11 @@ var (
 	rn7AllowedHeaders = map[string]string{
 		"POST": "Content-Type",
 	}
-	rn47AllowedHeaders = map[string]string{
+	rn46AllowedHeaders = map[string]string{
 		"POST": "Content-Type",
 	}
-	rn49AllowedHeaders = map[string]string{
-		"POST": "Content-Type",
+	rn48AllowedHeaders = map[string]string{
+		"POST": "Content-Type,Origin",
 	}
 	rn8AllowedHeaders = map[string]string{
 		"GET":  "Authorization",
@@ -97,9 +97,6 @@ var (
 	}
 	rn40AllowedHeaders = map[string]string{
 		"GET": "Authorization",
-	}
-	rn46AllowedHeaders = map[string]string{
-		"PUT": "Authorization,Content-Type",
 	}
 )
 
@@ -542,7 +539,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 											default:
 												s.notAllowed(w, r, notAllowedParams{
 													allowedMethods: "POST",
-													allowedHeaders: rn52AllowedHeaders,
+													allowedHeaders: rn51AllowedHeaders,
 													acceptPost:     "application/json",
 													acceptPatch:    "",
 												})
@@ -679,7 +676,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 								default:
 									s.notAllowed(w, r, notAllowedParams{
 										allowedMethods: "POST",
-										allowedHeaders: rn47AllowedHeaders,
+										allowedHeaders: rn46AllowedHeaders,
 										acceptPost:     "application/json",
 										acceptPatch:    "",
 									})
@@ -706,7 +703,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 								default:
 									s.notAllowed(w, r, notAllowedParams{
 										allowedMethods: "POST",
-										allowedHeaders: rn49AllowedHeaders,
+										allowedHeaders: rn48AllowedHeaders,
 										acceptPost:     "application/json",
 										acceptPatch:    "",
 									})
@@ -1195,9 +1192,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 				}
 
-			case 'u': // Prefix: "users"
+			case 'u': // Prefix: "user"
 
-				if l := len("users"); len(elem) >= l && elem[0:l] == "users" {
+				if l := len("user"); len(elem) >= l && elem[0:l] == "user" {
 					elem = elem[l:]
 				} else {
 					break
@@ -1230,15 +1227,16 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					}
 
 					// Param: "user_id"
-					// Match until "/"
+					// Leaf parameter, slashes are prohibited
 					idx := strings.IndexByte(elem, '/')
-					if idx < 0 {
-						idx = len(elem)
+					if idx >= 0 {
+						break
 					}
-					args[0] = elem[:idx]
-					elem = elem[idx:]
+					args[0] = elem
+					elem = ""
 
 					if len(elem) == 0 {
+						// Leaf node.
 						switch r.Method {
 						case "GET":
 							s.handleGetUserByIDRequest([1]string{
@@ -1254,35 +1252,6 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 						}
 
 						return
-					}
-					switch elem[0] {
-					case '/': // Prefix: "/password"
-
-						if l := len("/password"); len(elem) >= l && elem[0:l] == "/password" {
-							elem = elem[l:]
-						} else {
-							break
-						}
-
-						if len(elem) == 0 {
-							// Leaf node.
-							switch r.Method {
-							case "PUT":
-								s.handleSetUserPasswordRequest([1]string{
-									args[0],
-								}, elemIsEscaped, w, r)
-							default:
-								s.notAllowed(w, r, notAllowedParams{
-									allowedMethods: "PUT",
-									allowedHeaders: rn46AllowedHeaders,
-									acceptPost:     "",
-									acceptPatch:    "",
-								})
-							}
-
-							return
-						}
-
 					}
 
 				}
@@ -2439,9 +2408,9 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 
 				}
 
-			case 'u': // Prefix: "users"
+			case 'u': // Prefix: "user"
 
-				if l := len("users"); len(elem) >= l && elem[0:l] == "users" {
+				if l := len("user"); len(elem) >= l && elem[0:l] == "user" {
 					elem = elem[l:]
 				} else {
 					break
@@ -2454,7 +2423,7 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 						r.summary = "List users"
 						r.operationID = "listUsers"
 						r.operationGroup = ""
-						r.pathPattern = "/users"
+						r.pathPattern = "/user"
 						r.args = args
 						r.count = 0
 						return r, true
@@ -2463,7 +2432,7 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 						r.summary = "Create user"
 						r.operationID = "createUser"
 						r.operationGroup = ""
-						r.pathPattern = "/users"
+						r.pathPattern = "/user"
 						r.args = args
 						r.count = 0
 						return r, true
@@ -2481,55 +2450,29 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 					}
 
 					// Param: "user_id"
-					// Match until "/"
+					// Leaf parameter, slashes are prohibited
 					idx := strings.IndexByte(elem, '/')
-					if idx < 0 {
-						idx = len(elem)
+					if idx >= 0 {
+						break
 					}
-					args[0] = elem[:idx]
-					elem = elem[idx:]
+					args[0] = elem
+					elem = ""
 
 					if len(elem) == 0 {
+						// Leaf node.
 						switch method {
 						case "GET":
 							r.name = GetUserByIDOperation
 							r.summary = "Get user by ID"
 							r.operationID = "GetUserByID"
 							r.operationGroup = ""
-							r.pathPattern = "/users/{user_id}"
+							r.pathPattern = "/user/{user_id}"
 							r.args = args
 							r.count = 1
 							return r, true
 						default:
 							return
 						}
-					}
-					switch elem[0] {
-					case '/': // Prefix: "/password"
-
-						if l := len("/password"); len(elem) >= l && elem[0:l] == "/password" {
-							elem = elem[l:]
-						} else {
-							break
-						}
-
-						if len(elem) == 0 {
-							// Leaf node.
-							switch method {
-							case "PUT":
-								r.name = SetUserPasswordOperation
-								r.summary = "Set user password"
-								r.operationID = "setUserPassword"
-								r.operationGroup = ""
-								r.pathPattern = "/users/{user_id}/password"
-								r.args = args
-								r.count = 1
-								return r, true
-							default:
-								return
-							}
-						}
-
 					}
 
 				}

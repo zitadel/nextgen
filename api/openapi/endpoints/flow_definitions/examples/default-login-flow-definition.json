@@ -3,9 +3,10 @@
   "schema_uri": "https://nextgen.com/flow-definition.json",
   "flow_definition": {
     "name": "default-login",
-    "user_schema": "${SERVER_URL}/user.json",
+    "user_schema": "${USER_SCHEMA_URL}",
     "purposes": {
-      "login": "identifier"
+      "login": "identifier",
+      "register": "register"
     },
     "steps": [
       {
@@ -15,40 +16,121 @@
         ],
         "actions": {
           "submit": {
-            "primary": true
+            "primary": true,
+            "text_key": "identifier.action.continue"
+          },
+          "passkey": {
+            "primary": false,
+            "text_key": "identifier.action.passkey"
           }
         },
         "transitions": {
           "submit": {
-            "target": "authenticate"
+            "target": "password"
+          },
+          "passkey": {
+            "target": "done"
           },
           "user_not_found": {
-            "target": "no-account"
+            "target": "register"
           }
         }
       },
       {
-        "name": "authenticate",
+        "name": "password",
         "fields": [
           "password"
         ],
         "actions": {
           "submit": {
-            "primary": true
+            "primary": true,
+            "text_key": "password.action.signin"
+          },
+          "passkey": {
+            "primary": false,
+            "text_key": "password.action.passkey"
           }
         },
         "transitions": {
           "submit": {
+            "target": "done"
+          },
+          "passkey": {
+            "target": "done"
+          }
+        }
+      },
+      {
+        "name": "register",
+        "fields": [
+          "email"
+        ],
+        "actions": {
+          "submit": {
+            "primary": true,
+            "text_key": "register.action.password"
+          },
+          "passkey_register": {
+            "primary": false,
+            "text_key": "register.action.passkey"
+          }
+        },
+        "transitions": {
+          "submit": {
+            "target": "register-password"
+          },
+          "passkey_register": {
+            "target": "done"
+          },
+          "user_already_exists": {
+            "target": "password"
+          }
+        }
+      },
+      {
+        "name": "register-password",
+        "fields": [
+          "password"
+        ],
+        "actions": {
+          "submit": {
+            "primary": true,
+            "text_key": "register-password.action.submit"
+          }
+        },
+        "on_success": "create_user",
+        "transitions": {
+          "submit": {
+            "target": "passkey-upsell"
+          },
+          "user_already_exists": {
+            "target": "password"
+          }
+        }
+      },
+      {
+        "name": "passkey-upsell",
+        "actions": {
+          "passkey_register": {
+            "primary": true,
+            "text_key": "passkey-upsell.action.setup"
+          },
+          "skip": {
+            "primary": false,
+            "text_key": "passkey-upsell.action.skip"
+          }
+        },
+        "transitions": {
+          "passkey_register": {
+            "target": "done"
+          },
+          "skip": {
             "target": "done"
           }
         }
       },
       {
         "name": "done",
-        "complete": "show"
-      },
-      {
-        "name": "no-account",
         "complete": "show"
       }
     ]

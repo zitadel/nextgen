@@ -91,8 +91,6 @@ type Session struct {
 	// UserAgent contains information about the user's device and browser.
 	UserAgent *UserAgent
 
-	// State is computed at runtime and therefore not stored in the database.
-	State SessionState
 	// AssuranceLevels are computed at runtime and therefore not stored in the database.
 	AssuranceLevels []string
 	// Factors contain the authentication factors that were used to verify the session.
@@ -108,6 +106,16 @@ func NewSession(projectID string, agent *UserAgent) (*Session, error) {
 		UserAgent:  agent,
 		TimeToLive: SessionAnonymousTTL,
 	}, nil
+}
+
+func (s *Session) State() SessionState {
+	if len(s.Factors) == 0 {
+		return SessionStateBuilding
+	}
+	if time.Now().After(s.ExpiresAt) {
+		return SessionStateExpired
+	}
+	return SessionStateActive
 }
 
 func (s *Session) Token(encrypter crypto.Encrypter) (string, error) {

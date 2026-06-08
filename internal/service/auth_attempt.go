@@ -62,6 +62,12 @@ type AuthAttemptService interface {
 	//
 	// errors: domain.ErrAuthAttemptNotFound, domain.ErrAuthAttemptInvalidState, domain.ErrAuthAttemptNotCompleted, domain.ErrInternal
 	Handoff(ctx context.Context, input HandoffInput) (*domain.AuthAttempt, error)
+
+	// RegisterCreatedUser registers a newly-created user's ID as a verified user
+	// factor directly on the auth attempt, bypassing the challenge/proof cycle.
+	// Used after on_success: create_user and passkey registration so the session
+	// receives user_id after exchange.
+	RegisterCreatedUser(ctx context.Context, projectID, attemptID, userID string) error
 }
 
 // ---- Input types -------------------------------------------------------------
@@ -348,6 +354,19 @@ func (s *authAttemptService) Handoff(ctx context.Context, input HandoffInput) (*
 	return attempt, nil
 }
 
+// RegisterCreatedUser registers a newly-created user's ID as a verified user
+// factor on the auth attempt without a challenge/proof cycle. It issues a
+// synthetic user challenge and immediately marks it succeeded so the exchange
+// can promote the user_id to the session.
+func (s *authAttemptService) RegisterCreatedUser(ctx context.Context, projectID, attemptID, userID string) error {
+	challenge := &domain.AuthChallengeUser{}
+	if err := s.attempts.SetChallenge(ctx, s.pool, projectID, attemptID, challenge); err != nil {
+		return err
+	}
+	factor := &domain.AuthFactorUser{UserID: userID}
+	return s.attempts.ChallengeSucceeded(ctx, s.pool, projectID, attemptID, factor, challenge.GetID())
+}
+
 // buildChallenge constructs the challenge for the given check type.
 func (s *authAttemptService) buildChallenge(ctx context.Context, attempt *domain.AuthAttempt, challenge Challenge) (domain.AuthChallenge, error) {
 	switch typ := challenge.(type) {
@@ -463,6 +482,12 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 		if err != nil {
 			return passkeyChallenge, nil, domain.ErrAuthAttemptProofRejected(err)
 		}
+		// Discoverable login resolves the user cryptographically from the assertion; bind it onto
+		// the attempt so the subject is pinned and the session/handoff carries the user id. For an
+		// identified login the user factor is already present and unchanged.
+		if userFactor == nil && verification.UserID != "" {
+			attempt.SetUserFactor(&domain.User{ID: verification.UserID})
+		}
 		// Use the verified user as the source of truth: it is set for both identified and
 		// discoverable logins, whereas userFactor is nil in the discoverable case.
 		s.recordPasskeyUsage(ctx, attempt.ProjectID, verification)
@@ -482,7 +507,7 @@ func (s *authAttemptService) recordPasskeyUsage(ctx context.Context, projectID s
 	_ = s.userPasskeys.Update(
 		ctx,
 		s.pool,
-		s.userPasskeys.UniqueCondition(projectID, v.UserID, string(v.CredentialID)),
+		s.userPasskeys.UniqueCondition(projectID, v.UserID, domain.EncodePasskeyCredentialID(v.CredentialID)),
 		s.userPasskeys.SetSignCount(int64(v.SignCount)),
 		s.userPasskeys.SetBackupState(v.BackupState),
 		s.userPasskeys.SetLastUsedAt(time.Now()),

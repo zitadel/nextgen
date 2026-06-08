@@ -205,7 +205,7 @@ func (r *FlowDefinitionRepository) ListFlowDefinitions(ctx context.Context, clie
 		b.WriteString(b.AppendArg(o.SchemaVersion))
 	}
 
-	b.WriteString(" ORDER BY created_at ASC, id ASC")
+	b.WriteString(" ORDER BY created_at DESC, id DESC")
 
 	if o.Limit > 0 {
 		b.WriteString(" LIMIT ")

@@ -56,6 +56,10 @@ func (f *fakeAuthAttempts) Handoff(_ context.Context, in service.HandoffInput) (
 	return f.handoffAttempt, f.handoffErr
 }
 
+func (f *fakeAuthAttempts) RegisterCreatedUser(_ context.Context, _, _, _ string) error {
+	return nil
+}
+
 func attemptWithUserChallenge(id string) *domain.AuthAttempt {
 	att := &domain.AuthAttempt{}
 	ch := att.SetUserChallenge()

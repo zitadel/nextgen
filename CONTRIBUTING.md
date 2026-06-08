@@ -18,6 +18,39 @@ go test ./...
 
 Before `go test`, sync embedded UI assets (see below) or run the full sync script once.
 
+## End-to-end checks
+
+End-to-end checks are opt-in locally because they start real servers and need a
+browser install. The demo suites exercise the checked-in framework demos:
+
+```sh
+corepack pnpm exec playwright install
+corepack pnpm nx run-many -t e2e -p @zitadel-nextgen/demo-next-e2e,@zitadel-nextgen/demo-nuxt-e2e
+```
+
+The consumer journey suite reproduces the CI quality gate against a fresh
+generated Next.js app:
+
+```sh
+corepack pnpm nx run @zitadel/cli-journey-e2e:e2e-local
+```
+
+The local runner needs Docker for Verdaccio, but by default it starts the
+backend from source with embedded Postgres, so no local database container is
+required. It builds and packs the local publishable packages with pnpm,
+publishes them to the temporary registry, creates a Next.js app outside the
+repo, runs CLI setup through npm, starts the generated app on localhost, and
+runs Playwright with one worker.
+
+For image parity with CI, provide a local backend image tag:
+
+```sh
+corepack pnpm nx run @zitadel/cli-journey-e2e:e2e-local -- --backend image --image nextgen:local
+```
+
+Use `--keep` to preserve the temporary work directory after success. On failure
+the runner keeps diagnostics automatically and prints the path.
+
 ## Run the server from source
 
 ### 1. Build frontends and sync embed directories
