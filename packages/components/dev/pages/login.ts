@@ -329,7 +329,9 @@ export function renderLoginPage(host: HTMLElement): void {
     frame.innerHTML = "";
     const element = document.createElement("zitadel-login") as ZitadelLogin;
     element.purpose = purposeSelect.value;
-    element.projectId = "dev-playground";
+    // The project handle is configured once globally in `dev/main.ts`
+    // (`configureZitadel({ projectId: "dev" })`); the element reads it via
+    // `getZitadelConfig()`, so nothing per-instance is needed here.
     element.addEventListener("zitadel-flow-input", (event) =>
       logEvent("zitadel-flow-input", (event as CustomEvent).detail),
     );
