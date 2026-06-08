@@ -17,6 +17,11 @@ var defaultHumanUserSchema []byte
 func DefaultHumanUserSchema(serverURL string) []byte {
 	json := string(defaultHumanUserSchema)
 	json = strings.ReplaceAll(json, "${SERVER_URL}", serverURL)
+	json = strings.ReplaceAll(json, "${USER_SCHEMA_URL}", DefaultHumanUserSchemaURL(serverURL))
 
 	return []byte(json)
+}
+
+func DefaultHumanUserSchemaURL(serverURL string) string {
+	return strings.TrimSuffix(serverURL, "/") + "/default-human-user.json"
 }

@@ -72,6 +72,8 @@ type fakeAuthAttempts struct {
 	passkeyCalls  []domain.FlowSubmitPasskeyInput
 	passkeyUserID string
 	passkeyErr    error
+
+	registerCreatedCalls []domain.FlowRegisterCreatedUserInput
 }
 
 func (f *fakeAuthAttempts) Start(_ context.Context, in domain.FlowCreateAttemptInput) (string, error) {
@@ -113,12 +115,18 @@ func (f *fakeAuthAttempts) SubmitPasskey(_ context.Context, in domain.FlowSubmit
 	return f.passkeyUserID, f.passkeyErr
 }
 
+func (f *fakeAuthAttempts) RegisterCreatedUser(_ context.Context, in domain.FlowRegisterCreatedUserInput) error {
+	f.registerCreatedCalls = append(f.registerCreatedCalls, in)
+	return nil
+}
+
+// fakePasskeyRegistration is a test double for [domain.FlowPasskeyRegistrationService].
 type fakePasskeyRegistration struct {
+	issueCalls  []domain.FlowIssuePasskeyRegistrationChallengeInput
 	issueOut    domain.FlowPasskeyRegistrationChallengeOutput
 	issueErr    error
-	submitErr   error
-	issueCalls  []domain.FlowIssuePasskeyRegistrationChallengeInput
 	submitCalls []domain.FlowSubmitPasskeyRegistrationInput
+	submitErr   error
 }
 
 func (f *fakePasskeyRegistration) IssuePasskeyRegistrationChallenge(_ context.Context, in domain.FlowIssuePasskeyRegistrationChallengeInput) (domain.FlowPasskeyRegistrationChallengeOutput, error) {
@@ -126,7 +134,7 @@ func (f *fakePasskeyRegistration) IssuePasskeyRegistrationChallenge(_ context.Co
 	return f.issueOut, f.issueErr
 }
 
-func (f *fakePasskeyRegistration) SubmitPasskeyRegistration(_ context.Context, in domain.FlowSubmitPasskeyRegistrationInput) error {
+func (f *fakePasskeyRegistration) SubmitPasskeyRegistration(_ context.Context, _ database.QueryExecutor, in domain.FlowSubmitPasskeyRegistrationInput) error {
 	f.submitCalls = append(f.submitCalls, in)
 	return f.submitErr
 }
@@ -161,7 +169,6 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 			ExpiresAt: time.Unix(1700000060, 0).UTC(),
 		},
 	}
-
 	passkeyReg := &fakePasskeyRegistration{}
 	createUser := domain.NewFlowCreateUserHandler(ids, users, pws, hasher)
 	resolver := newDefaultResolver(t)
@@ -300,11 +307,15 @@ func TestFlowStateMachine_Process_RegistrationHappyPath(t *testing.T) {
 	require.Len(t, w.pws.created, 1)
 	assert.Equal(t, "hashed:correct-horse-battery-staple", w.pws.created[0].EncodedHash)
 
-	// on_success is a side effect: no _user_id pin, no handoff.
-	_, pinned := result.State.CollectedData[domain.FlowCollectedUserIDKey]
-	assert.False(t, pinned, "create_user must not pin _user_id")
-	assert.Empty(t, w.attempts.handoffCalls)
-	assert.Empty(t, result.HandoffToken)
+	// create_user pins the user ID and registers them on the attempt so the
+	// terminal step can issue a handoff token and auto-sign-in the new user.
+	gotUserID, pinned := result.State.CollectedData[domain.FlowCollectedUserIDKey]
+	assert.True(t, pinned, "create_user must pin _user_id")
+	assert.Equal(t, wantUserID, gotUserID)
+	require.Len(t, w.attempts.registerCreatedCalls, 1)
+	assert.Equal(t, wantUserID, w.attempts.registerCreatedCalls[0].UserID)
+	require.Len(t, w.attempts.handoffCalls, 1)
+	assert.Equal(t, "handoff_01TEST", result.HandoffToken)
 
 	// Register mode dispatches identifier (the email is x-unique, so it
 	// always routes through auth-attempt to emit user_already_exists when
@@ -612,6 +623,70 @@ func TestFlowStateMachine_Process_PasskeyProofRejectedKeepsStep(t *testing.T) {
 	assert.Equal(t, "auth_attempt.passkey_invalid", *rejected.Step.Error)
 	assert.Nil(t, rejected.State.PendingChallenge)
 	assert.Equal(t, "authenticate", rejected.State.CurrentStep)
+}
+
+// passkeyAbandonDefinition offers both a `passkey` and a generic `submit`
+// action on the same step, with separate transition targets. Lets a test
+// issue a passkey challenge and then submit `submit` to exercise the
+// abandonment path.
+func passkeyAbandonDefinition() *domain.FlowDefinition {
+	show := domain.FlowStepCompleteShow
+	return &domain.FlowDefinition{
+		ProjectID:  testProjectID,
+		ID:         "def-passkey-abandon",
+		UserSchema: defaultSchemaURL,
+		Purposes: map[domain.FlowDefinitionPurpose]string{
+			domain.FlowDefinitionPurposeLogin: "authenticate",
+		},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name: "authenticate",
+				Actions: map[string]domain.FlowStepAction{
+					domain.FlowActionPasskey: {Primary: true},
+					domain.FlowActionSubmit:  {},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					domain.FlowActionPasskey: {Target: "done"},
+					domain.FlowActionSubmit:  {Target: "fallback"},
+				},
+			},
+			{Name: "done", Complete: &show},
+			{Name: "fallback", Complete: &show},
+		},
+	}
+}
+
+// Submitting a non-passkey action while a passkey challenge is pending must
+// clear the challenge and route via the submitted action, instead of
+// re-emitting the passkey prompt and trapping the user on the ceremony.
+func TestFlowStateMachine_Process_PasskeyAbandonedOnDifferentAction(t *testing.T) {
+	w := newFlowTestWorld(t)
+	w.attempts.issueOut = domain.FlowPasskeyChallengeOutput{ChallengeID: "ch-1", Options: []byte(`{"publicKey":{}}`)}
+	def := passkeyAbandonDefinition()
+
+	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	issued, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+		Action:    domain.FlowActionPasskey,
+		PasskeyRP: &domain.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, issued.State.PendingChallenge)
+
+	abandoned, err := w.sm.Process(t.Context(), nil, def, issued.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+	})
+	require.NoError(t, err)
+	assert.Nil(t, abandoned.State.PendingChallenge, "pending challenge must be cleared when the user picks a different action")
+	assert.Nil(t, abandoned.Step.Challenge, "the rendered step must not re-attach the abandoned passkey challenge")
+	assert.Len(t, w.attempts.passkeyCalls, 0, "no passkey verification should run when no proof was submitted")
+	require.NotNil(t, abandoned.Step.Complete, "submit action should advance to the fallback terminal")
 }
 
 // ---- CurrentPurpose + outcome flip ----
@@ -1159,8 +1234,15 @@ func TestFlowStateMachine_Process_PasskeyRegisterRejectedKeepsStep(t *testing.T)
 	assert.Equal(t, "register", rejected.State.CurrentStep)
 }
 
-func TestFlowStateMachine_Process_PasskeyRegisterRequiresIdentifiedUser(t *testing.T) {
+// TestFlowStateMachine_Process_PasskeyRegisterGeneratesUserID verifies that
+// when no user is identified yet (passkey-only registration path), the state
+// machine generates a provisional user ID and issues the challenge successfully.
+func TestFlowStateMachine_Process_PasskeyRegisterGeneratesUserID(t *testing.T) {
 	w := newFlowTestWorld(t)
+	w.passkeyReg.issueOut = domain.FlowPasskeyRegistrationChallengeOutput{
+		ChallengeID: "reg-1",
+		Options:     []byte(`{"rp":{"id":"example.com"}}`),
+	}
 	def := passkeyRegisterDefinition()
 
 	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
@@ -1170,12 +1252,17 @@ func TestFlowStateMachine_Process_PasskeyRegisterRequiresIdentifiedUser(t *testi
 		UserSchemaURL: defaultSchemaURL,
 	})
 	require.NoError(t, err)
-	// Do NOT seed a user ID — registration must fail.
+	// No user ID seeded — the state machine should generate one.
 
-	_, err = w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+	issued, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
 		Action:    domain.FlowActionPasskeyRegister,
 		PasskeyRP: &domain.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
 	})
-	require.Error(t, err)
-	assert.ErrorIs(t, err, domain.ErrIntegrity)
+	require.NoError(t, err)
+	require.NotNil(t, issued.Step.Challenge)
+	// The provisional user ID should have been generated and passed to the service.
+	require.Len(t, w.passkeyReg.issueCalls, 1)
+	assert.NotEmpty(t, w.passkeyReg.issueCalls[0].UserID)
+	// The generated ID should be stored in CollectedData for use in the verify phase.
+	assert.Equal(t, w.passkeyReg.issueCalls[0].UserID, issued.State.CollectedData[domain.FlowCollectedUserIDKey])
 }

@@ -6,10 +6,6 @@ CREATE TABLE zitadel_nextgen.passkey_registrations (
     , challenge   JSONB       NOT NULL
     , expires_at  TIMESTAMPTZ NOT NULL
     , created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
-
-    , FOREIGN KEY (project_id, user_id)
-        REFERENCES zitadel_nextgen.users(project_id, id)
-        ON DELETE CASCADE
 );
 
 CREATE INDEX idx_passkey_registrations_expires_at

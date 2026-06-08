@@ -21,7 +21,7 @@ import {
   readRawBody,
 } from 'h3';
 
-import { verifyJwt } from '../lib/jwt';
+import { verifyJwt, base64UrlDecode } from '../lib/jwt';
 
 declare module 'h3' {
   interface H3EventContext {
@@ -119,6 +119,7 @@ export function createNextgenMiddleware(
     allowedTokenTypes = ['JWT', 'at+JWT'],
     jwksTimeoutMs,
     proxyTimeoutMs = 5000,
+    opaqueTokenTimeoutMs = 5000,
     onExchangeResponse,
   } = options;
 
@@ -167,6 +168,7 @@ export function createNextgenMiddleware(
       audience,
       allowedTokenTypes,
       jwksTimeoutMs,
+      opaqueTokenTimeoutMs,
       pathname,
     });
   });
@@ -199,9 +201,24 @@ async function proxyRequest(
   const rawBody = hasBody ? await readRawBody(event, false) : undefined;
   const body = rawBody != null ? new Uint8Array(rawBody) : undefined;
 
+  const upstreamHeaders = buildUpstreamHeaders(event);
+
+  // POST /sessions/exchange requires a project service-key bearer token.
+  // The browser can't hold a secret, so the middleware constructs one from
+  // the project_id query param. The server's security handler accepts any
+  // token of the form sk_proj_* at this stage (full validation is a TODO).
+  const isExchangeRequest =
+    method === 'POST' && suffix.startsWith('/sessions/exchange');
+  if (isExchangeRequest && !upstreamHeaders.has('authorization')) {
+    const projectId = url.searchParams.get('project_id');
+    if (projectId) {
+      upstreamHeaders.set('authorization', `Bearer sk_${projectId}`);
+    }
+  }
+
   const upstream = await fetch(target, {
     method,
-    headers: buildUpstreamHeaders(event),
+    headers: upstreamHeaders,
     body,
     redirect: 'manual',
     signal: AbortSignal.timeout(proxyTimeoutMs),
@@ -243,6 +260,63 @@ async function proxyRequest(
   return response.body;
 }
 
+const DECODER = new TextDecoder();
+
+/**
+ * Returns `true` when `token` looks structurally like a signed JWT (JWS) —
+ * NOT an encrypted token (JWE).
+ *
+ * JWS compact: 3 dot-separated segments; header has `alg` but NOT `enc`.
+ * JWE compact: 5 dot-separated segments; header has BOTH `alg` and `enc`.
+ *
+ * Our backend issues JWE tokens (AES-256-GCM via go-jose `A256GCMKW/A256GCM`),
+ * whose compact form is `header.encrypted_key.iv.ciphertext.tag`. The header
+ * decodes to JSON with `"alg":"A256GCMKW","enc":"A256GCM"`. Checking for the
+ * absence of `enc` correctly identifies signed JWTs without false-positives on
+ * JWE tokens.
+ *
+ * This is a structural check only — not a security check.
+ */
+function isJwtShaped(token: string): boolean {
+  const parts = token.split('.');
+  if (parts.length < 3 || !parts[0]) return false;
+  try {
+    const header = JSON.parse(
+      DECODER.decode(base64UrlDecode(parts[0])),
+    ) as Record<string, unknown>;
+    return typeof header?.alg === 'string' && !('enc' in header);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Validates an opaque (non-JWT) session token by calling the backend's
+ * `/sessions/me` endpoint. Returns the response JSON when the backend
+ * confirms the session is live (HTTP 200), `null` otherwise.
+ *
+ * This is the fallback path for backends that issue encrypted opaque tokens
+ * rather than self-contained JWTs.
+ */
+async function validateOpaqueSessionToken(
+  token: string,
+  issuerUrl: string,
+  timeoutMs: number,
+): Promise<{ userId?: string } | null> {
+  try {
+    const res = await fetch(`${issuerUrl}/sessions/me`, {
+      method: 'GET',
+      headers: { cookie: `__nextgen_session=${token}` },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!res.ok) return null;
+    const body = (await res.json()) as { user_id?: string };
+    return { userId: body.user_id };
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Options passed internally to {@link handleAuth} after destructuring the
  * public-facing {@link NextgenMiddlewareOptions}.
@@ -273,6 +347,7 @@ interface AuthHandlerOptions {
    */
   readonly allowedTokenTypes: readonly string[];
   readonly jwksTimeoutMs: number | undefined;
+  readonly opaqueTokenTimeoutMs: number;
   readonly pathname: string;
 }
 
@@ -297,6 +372,7 @@ async function handleAuth(
     audience,
     allowedTokenTypes,
     jwksTimeoutMs,
+    opaqueTokenTimeoutMs,
     pathname,
   } = opts;
 
@@ -342,6 +418,31 @@ async function handleAuth(
       },
     };
     return;
+  }
+
+  // The backend issues opaque encrypted session tokens rather than JWTs.
+  // Only fall back to /sessions/me validation when the token is definitively
+  // not a JWT (non-JSON segments). A token with a valid JWT structure that
+  // failed verification (bad sig, wrong typ/alg) must be rejected — never
+  // accepted by a backend call that doesn't re-check the JWT claims.
+  if (!payload && cookieToken && !isJwtShaped(cookieToken)) {
+    const opaqueResult = await validateOpaqueSessionToken(
+      cookieToken,
+      url,
+      opaqueTokenTimeoutMs,
+    );
+    if (opaqueResult) {
+      event.context.nextgenAuth = {
+        isAuthenticated: true,
+        session: {
+          userId: opaqueResult.userId ?? 'unknown',
+          email: null,
+          name: null,
+          token: cookieToken,
+        },
+      };
+      return;
+    }
   }
 
   event.context.nextgenAuth = { isAuthenticated: false, session: null };

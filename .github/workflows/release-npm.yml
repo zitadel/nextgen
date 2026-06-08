@@ -98,5 +98,7 @@ jobs:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
           # Empty so the action does not pass an undefined token; OIDC handles auth.
           NPM_TOKEN: ""
-          # GitHub-hosted runners support provenance attestations.
-          NPM_CONFIG_PROVENANCE: "true"
+          # npm provenance is only supported for public source repositories.
+          # Keep trusted publishing via OIDC, but disable provenance until this
+          # repository is public.
+          NPM_CONFIG_PROVENANCE: "false"
