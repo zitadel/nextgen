@@ -38,6 +38,7 @@ func TestNew_servesIndex(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.Contains(t, rec.Body.String(), "index-body")
+	assert.Equal(t, "no-store", rec.Header().Get("Cache-Control"))
 }
 
 func TestNew_spaFallback(t *testing.T) {
@@ -52,6 +53,7 @@ func TestNew_spaFallback(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.Contains(t, rec.Body.String(), "spa-shell")
+	assert.Equal(t, "no-store", rec.Header().Get("Cache-Control"))
 }
 
 func TestNew_servesAsset(t *testing.T) {
@@ -67,4 +69,5 @@ func TestNew_servesAsset(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, rec.Code)
 	assert.Contains(t, rec.Body.String(), "js-content")
+	assert.Equal(t, "public, max-age=31536000, immutable", rec.Header().Get("Cache-Control"))
 }

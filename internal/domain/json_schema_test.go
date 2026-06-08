@@ -355,18 +355,34 @@ func TestJSONSchemaResolver_BuiltinEmbedded(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, schema)
 	})
-	t.Run("URL under base but unknown path errors without repository access", func(t *testing.T) {
+	t.Run("URL under base but unknown path falls back to DB and errors when not found", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		mockRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
+		mockRepo.EXPECT().PrimaryKeyCondition("proj-1", "https://example.test/app/schemas/unknown/v.json").Return(pkCond)
+		mockRepo.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, database.NewNoRowFoundError(nil))
 		r := domain.NewJSONSchemaResolver(mockRepo, mustJSONSchemaCache(t, 128), 0, 0, nil, base)
 		_, err := r.Resolve(ctx, nil, "proj-1", "https://example.test/app/schemas/unknown/v.json", nil)
 		require.Error(t, err)
 	})
-	t.Run("schema URL equals base only errors", func(t *testing.T) {
+	t.Run("schema URL equals base only falls back to DB and errors when not found", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		mockRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
+		mockRepo.EXPECT().PrimaryKeyCondition("proj-1", base.String()).Return(pkCond)
+		mockRepo.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, database.NewNoRowFoundError(nil))
 		r := domain.NewJSONSchemaResolver(mockRepo, mustJSONSchemaCache(t, 128), 0, 0, nil, base)
 		_, err := r.Resolve(ctx, nil, "proj-1", base.String(), nil)
 		require.Error(t, err)
+	})
+	t.Run("URL under base but unknown path resolves from DB when found", func(t *testing.T) {
+		const userSchemaURL = "https://example.test/app/schemas/user.json"
+		const userSchema = `{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object"}`
+		ctrl := gomock.NewController(t)
+		mockRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
+		mockRepo.EXPECT().PrimaryKeyCondition("proj-1", userSchemaURL).Return(pkCond)
+		mockRepo.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(&domain.JSONSchema{Schema: []byte(userSchema)}, nil)
+		r := domain.NewJSONSchemaResolver(mockRepo, mustJSONSchemaCache(t, 128), 0, 0, nil, base)
+		schema, err := r.Resolve(ctx, nil, "proj-1", userSchemaURL, nil)
+		require.NoError(t, err)
+		require.NotNil(t, schema)
 	})
 }

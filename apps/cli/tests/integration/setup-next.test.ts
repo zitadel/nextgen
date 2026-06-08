@@ -81,6 +81,10 @@ describe("Next setup integration", () => {
     expect(envLocal).not.toContain("ZITADEL_PROJECT_SECRET");
     expect(envLocal).not.toContain("ZITADEL_PREVIEW_SECRET");
     expect((await stat(join(cwd, ".zitadel/secret"))).mode & 0o777).toBe(0o600);
+    const packageJson = JSON.parse(await readFile(join(cwd, "package.json"), "utf8")) as {
+      dependencies?: Record<string, string>;
+    };
+    expect(packageJson.dependencies?.["@zitadel/sdk-next"]).toBe("alpha");
 
     const doctor = await cli(["doctor", "--cwd", cwd, "--json"]);
     expect(doctor.exitCode).toBe(0);

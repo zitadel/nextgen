@@ -1,0 +1,16 @@
+{
+  "name": "@zitadel/cli-journey-e2e",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "prepare-app": "node scripts/prepare-next-app.mjs",
+    "publish-tarballs": "node scripts/publish-tarballs.mjs",
+    "verify-tarballs": "node scripts/verify-tarballs.mjs",
+    "e2e-local": "node scripts/run-local.mjs",
+    "e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "catalog:",
+    "eslint-plugin-playwright": "catalog:"
+  }
+}

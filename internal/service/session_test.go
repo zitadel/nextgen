@@ -58,7 +58,7 @@ func TestSessionService_Create(t *testing.T) {
 			"user_agent": "test",
 		},
 	}
-	createdSession := &domain.Session{ProjectID: "proj", ID: "sess"}
+	createdSession := &domain.Session{ID: "sess"}
 
 	for _, tt := range []struct {
 		name    string

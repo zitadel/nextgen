@@ -25,17 +25,15 @@ export { applyFontUrl } from "./font-loader.js";
 // the same reason (re-exporting it from `liquid.js` would pull that `Liquid`
 // import back into the public declaration bundle).
 export { TEMPLATE_NAMES } from "./template-names.js";
-export { en, de, builtinLocales, type Locale } from "./locales/index.js";
+export { en, de, it, builtinLocales, type Locale } from "./locales/index.js";
 export {
   patchMandatoryGates,
   mandatoryGatesMarkerComment,
   MANDATORY_GATES_MARKER,
 } from "./mandatory-gates.js";
 export { createSanitiser } from "./sanitiser.js";
-export { defaultTemplate, layoutChromeCss } from "./templates/default.liquid.js";
-export { authFormTemplate } from "./templates/auth-form.liquid.js";
-export { passkeyUpsellTemplate } from "./templates/passkey-upsell.liquid.js";
-export { signedInTemplate } from "./templates/signed-in.liquid.js";
+export { default as defaultTemplate } from "./templates/default.liquid";
+export { default as layoutChromeCss } from "./templates/layout-chrome.css?inline";
 export { startFlow, submitStep, getCurrentStep } from "./api-client.js";
 export { validateBranding, type BrandingValidationResult } from "./branding-validator.js";
 export type {

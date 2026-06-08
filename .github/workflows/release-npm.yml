@@ -23,6 +23,18 @@ on:
 # id-token: write is required for OIDC trusted publishing.
 # contents/pull-requests: write let the changesets action open the
 # "Version Packages" PR and push version-bump commits.
+#
+# The changesets action authenticates as a GitHub App (see the
+# "Generate a token" step) rather than the default GITHUB_TOKEN. GitHub
+# deliberately does NOT trigger workflows for events caused by GITHUB_TOKEN,
+# so a GITHUB_TOKEN-authored "Version Packages" PR never runs the required
+# CI checks and stays blocked. A GitHub App is a distinct identity, so its
+# PRs/pushes DO trigger CI — the release PR then has to pass the same
+# required checks as any other PR. This keeps branch protection fully
+# enforced (nothing bypasses checks); it only stops CI being silently
+# skipped on the bot's PR. Requires repo secrets RELEASE_APP_ID and
+# RELEASE_APP_PRIVATE_KEY (a GitHub App with Contents: R/W and
+# Pull requests: R/W, installed on this repo).
 permissions:
   contents: write
   pull-requests: write
@@ -36,15 +48,24 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
+      # Mint a short-lived installation token for the release GitHub App so the
+      # changesets PR/commits trigger CI (GITHUB_TOKEN-authored ones do not).
+      - name: Generate a token for the release app
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
       - name: Checkout
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v5
         with:
-          version: 10.33.2
           run_install: false
 
       - name: Set up Node.js
@@ -73,8 +94,11 @@ jobs:
           title: "chore: version packages"
           commit: "chore: version packages"
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # App token (not GITHUB_TOKEN) so the Version Packages PR triggers CI.
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
           # Empty so the action does not pass an undefined token; OIDC handles auth.
           NPM_TOKEN: ""
-          # GitHub-hosted runners support provenance attestations.
-          NPM_CONFIG_PROVENANCE: "true"
+          # npm provenance is only supported for public source repositories.
+          # Keep trusted publishing via OIDC, but disable provenance until this
+          # repository is public.
+          NPM_CONFIG_PROVENANCE: "false"

@@ -48,6 +48,12 @@ Publishing authenticates with **npm trusted publishing (OIDC)** — there is **n
    - Workflow filename: `release-npm.yml` (exact, case-sensitive)
 3. Optionally, under **Publishing access**, require 2FA and disallow tokens so only this workflow can publish.
 
+While this repository is private, the workflow keeps npm provenance disabled
+with `NPM_CONFIG_PROVENANCE=false`. Trusted publishing still authenticates with
+short-lived OIDC credentials, but npm only accepts public provenance
+attestations from public source repositories. Re-enable provenance when
+`zitadel/nextgen` is public.
+
 The Go server binary is **not** managed by changesets — it is released with `goreleaser` through the manual [`release.yml`](../.github/workflows/release.yml) workflow while the repo is pre-release. See [docs/adrs/002-multi-package-release-strategy.md](../docs/adrs/002-multi-package-release-strategy.md).
 
 ## Licensing reminder
