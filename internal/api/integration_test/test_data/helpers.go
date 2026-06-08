@@ -42,8 +42,9 @@ func (g *DataGenerator) GenerateUser(t *testing.T, email string) map[string]any 
 	t.Helper()
 
 	u := map[string]any{
-		"$schema": "https://test.example.schemas.com/schemas/user.json",
-		"email":   email,
+		"$schema":  "https://test.example.schemas.com/schemas/default-human-user.json",
+		"email":    email,
+		"password": "my-strong-password",
 	}
 	if randBool() {
 		u["name"] = faker.FirstName()
