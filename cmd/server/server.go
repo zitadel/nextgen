@@ -216,7 +216,8 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 			flowDefinitionSvc,
 			teamService),
 		api.NewSecurityHandler(),
-		oasapi.WithErrorHandler(api.OgenErrorHandler))
+		oasapi.WithErrorHandler(api.OgenErrorHandler),
+		oasapi.WithMeterProvider())
 	if err != nil {
 		return fmt.Errorf("build api server: %w", err)
 	}
