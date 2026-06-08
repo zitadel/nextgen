@@ -11,7 +11,7 @@ can register, log out, and log in again.
 ## Local runner
 
 ```sh
-corepack pnpm nx run @zitadel/cli-journey-e2e:e2e-local
+corepack pnpm run journey
 ```
 
 The default mode uses Docker only for Verdaccio. The backend runs from local
@@ -23,7 +23,7 @@ source with embedded Postgres:
    `workspace:` dependency specs.
 4. Start Verdaccio with npmjs proxying enabled.
 5. Publish tarballs to Verdaccio with `alpha` and `latest` tags.
-6. Start `go run . server` on a free local port.
+6. Start `go run .` on a free local port.
 7. Create a pinned `create-next-app` project in a temporary directory.
 8. Run CLI setup through `npx <cli-package>@alpha`.
 9. Run `npm install` in the generated app against the temporary registry.
@@ -33,12 +33,12 @@ source with embedded Postgres:
 ### Options
 
 ```sh
-corepack pnpm nx run @zitadel/cli-journey-e2e:e2e-local -- --keep
-corepack pnpm nx run @zitadel/cli-journey-e2e:e2e-local -- --work-dir /tmp/zitadel-journey
-corepack pnpm nx run @zitadel/cli-journey-e2e:e2e-local -- --backend image --image nextgen:local
+corepack pnpm run journey -- --keep
+corepack pnpm run journey -- --work-dir /tmp/zitadel-journey
+corepack pnpm run journey -- --backend image --image nextgen:local
 ```
 
-- `--backend source` runs `go run . server` with embedded Postgres. This is the
+- `--backend source` runs `go run .` with embedded Postgres. This is the
   default.
 - `--backend image --image <docker-tag>` runs the backend through
   `docker-compose.local.yaml` for image parity.

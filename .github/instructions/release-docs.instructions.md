@@ -15,5 +15,5 @@ state of the repo.
 - npm package changes use changesets; Go server releases use GoReleaser.
 - Keep licensing text aligned with `LICENSING.md`: AGPL-3.0-only by default,
   MIT exceptions for CLI, SDKs, API contracts, and docs.
-- Docs that mention agent behavior should point to `AGENTS.md` or the generated
-  CLI contract rather than duplicating long command tables.
+- Docs that mention repo behavior should point to `AGENTS.md`; docs that mention
+  the CLI agent contract should point to `apps/cli/SKILLS.md`.
