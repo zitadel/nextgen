@@ -12,7 +12,11 @@ import { readDevelopmentIssuer, readRendererId, readZitadelConfig, readZitadelSe
  * SDK package via `patcher.repair`. The user schema and flow definition are
  * server-owned and no longer scaffolded locally, so nothing here reads them.
  */
-export async function loadPatchContext(cwd: string, orca: Orca): Promise<PatchContext> {
+export async function loadPatchContext(
+  cwd: string,
+  orca: Orca,
+  cliVersion: string,
+): Promise<PatchContext> {
   const config = await readZitadelConfig(cwd);
   const secret = await readZitadelSecret(cwd);
   const framework = await orca.detect(cwd);
@@ -21,6 +25,7 @@ export async function loadPatchContext(cwd: string, orca: Orca): Promise<PatchCo
     rendererId: readRendererId(config),
     issuer: await resolveIssuer(cwd, config, framework),
     server: typeof config.server === "string" ? config.server : "",
+    cliVersion,
     project: {
       id: secret.project_id,
       projectSecret: secret.project_secret,

@@ -4373,6 +4373,11 @@ type SubmitFlowStepParams struct {
 	// Browsers send this automatically; non-browser clients must capture the
 	// `Set-Cookie` header and resend it.
 	Zflow string
+	// Standard browser `Origin` header. When a step issues a passkey
+	// challenge, the server derives the WebAuthn relying-party id and the
+	// allowed origin from this value. Browsers send it automatically on the
+	// fetch POST; no client action is required.
+	Origin OptURI `json:",omitempty,omitzero"`
 }
 
 func unpackSubmitFlowStepParams(packed middleware.Parameters) (params SubmitFlowStepParams) {
@@ -4390,10 +4395,20 @@ func unpackSubmitFlowStepParams(packed middleware.Parameters) (params SubmitFlow
 		}
 		params.Zflow = packed[key].(string)
 	}
+	{
+		key := middleware.ParameterKey{
+			Name: "Origin",
+			In:   "header",
+		}
+		if v, ok := packed[key]; ok {
+			params.Origin = v.(OptURI)
+		}
+	}
 	return params
 }
 
 func decodeSubmitFlowStepParams(args [1]string, argsEscaped bool, r *http.Request) (params SubmitFlowStepParams, _ error) {
+	h := uri.NewHeaderDecoder(r.Header)
 	c := uri.NewCookieDecoder(r)
 	// Decode path: id.
 	if err := func() error {
@@ -4471,6 +4486,45 @@ func decodeSubmitFlowStepParams(args [1]string, argsEscaped bool, r *http.Reques
 		return params, &ogenerrors.DecodeParamError{
 			Name: "_zflow",
 			In:   "cookie",
+			Err:  err,
+		}
+	}
+	// Decode header: Origin.
+	if err := func() error {
+		cfg := uri.HeaderParameterDecodingConfig{
+			Name:    "Origin",
+			Explode: false,
+		}
+		if err := h.HasParam(cfg); err == nil {
+			if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotOriginVal url.URL
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToURL(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotOriginVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.Origin.SetTo(paramsDotOriginVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "Origin",
+			In:   "header",
 			Err:  err,
 		}
 	}

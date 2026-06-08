@@ -577,13 +577,15 @@ export async function verifyJwt(
 
     return payload;
   } catch (err) {
-    // Any unexpected error (network failure, malformed JWKS, Web Crypto
-    // exception for an unsupported algorithm, …) is treated as a failed
-    // verification: return null rather than propagate. Callers never need to
-    // handle errors from verifyJwt — only null (invalid/missing token) or a
-    // non-null payload (verified token).
-    // Log so operators can distinguish transient infrastructure failures
-    // (JWKS fetch timeout, Web Crypto error) from genuine bad tokens.
+    // SyntaxError from JSON.parse means the token segments are not JSON —
+    // this is an opaque (non-JWT) token. Return null silently; the middleware
+    // will fall back to opaque token validation via the backend.
+    if (err instanceof SyntaxError) {
+      return null;
+    }
+    // Any other unexpected error (network failure, malformed JWKS, Web Crypto
+    // exception) is worth logging so operators can distinguish infrastructure
+    // failures from genuine bad tokens.
     console.error('[nextgen] verifyJwt unexpected error:', err);
     return null;
   }
