@@ -34,10 +34,16 @@ type SessionConfig struct {
 
 type ServerConfig struct {
 	Address string `mapstructure:"address"`
+	// DataDir is the local runtime root used by zero-config server defaults.
+	// When unset, it defaults to a nextgen-data directory next to the binary.
+	DataDir string `mapstructure:"data_dir"`
 	// EncryptionKey is the 32-byte (hex-encoded, 64 chars) symmetric
-	// key used to seal flow cookies. Required — the server refuses to
-	// boot without it. Bind via NEXTGEN_SERVER_ENCRYPTION_KEY.
+	// key used to seal flow cookies. If unset, the server creates or reuses
+	// EncryptionKeyFile.
 	EncryptionKey string `mapstructure:"encryption_key"`
+	// EncryptionKeyFile stores the generated encryption key for zero-config
+	// local starts. When unset, it defaults under DataDir.
+	EncryptionKeyFile string `mapstructure:"encryption_key_file"`
 
 	ConsoleEnabled bool   `mapstructure:"console_enabled"`
 	ConsolePath    string `mapstructure:"console_path"`

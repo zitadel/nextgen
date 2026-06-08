@@ -201,9 +201,24 @@ async function proxyRequest(
   const rawBody = hasBody ? await readRawBody(event, false) : undefined;
   const body = rawBody != null ? new Uint8Array(rawBody) : undefined;
 
+  const upstreamHeaders = buildUpstreamHeaders(event);
+
+  // POST /sessions/exchange requires a project service-key bearer token.
+  // The browser can't hold a secret, so the middleware constructs one from
+  // the project_id query param. The server's security handler accepts any
+  // token of the form sk_proj_* at this stage (full validation is a TODO).
+  const isExchangeRequest =
+    method === 'POST' && suffix.startsWith('/sessions/exchange');
+  if (isExchangeRequest && !upstreamHeaders.has('authorization')) {
+    const projectId = url.searchParams.get('project_id');
+    if (projectId) {
+      upstreamHeaders.set('authorization', `Bearer sk_${projectId}`);
+    }
+  }
+
   const upstream = await fetch(target, {
     method,
-    headers: buildUpstreamHeaders(event),
+    headers: upstreamHeaders,
     body,
     redirect: 'manual',
     signal: AbortSignal.timeout(proxyTimeoutMs),

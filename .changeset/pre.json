@@ -18,7 +18,27 @@
     "@zitadel/sdk-next": "0.0.0",
     "@zitadel/sdk-nuxt": "0.0.0",
     "@zitadel/shared-component-styles": "0.0.0",
-    "@zitadel/ui-react": "0.0.0"
+    "@zitadel/ui-react": "0.0.0",
+    "@zitadel/cli-journey-e2e": "0.0.1",
+    "@zitadel/login-ui": "0.0.1",
+    "@zitadel/sdk-react": "0.0.0",
+    "@zitadel/sdk-vue": "0.0.0",
+    "@zitadel/sdk-angular": "0.0.0"
   },
-  "changesets": []
+  "changesets": [
+    "cli-drop-unused-flows",
+    "cli-remove-claim-logic",
+    "cli-scaffold-middleware",
+    "cli-server-owned-schema-flow",
+    "components-atoms-and-orchestrator",
+    "components-orval-wireup",
+    "components-replace-ui-lit-placeholders",
+    "consumer-journey-credential-flow",
+    "design-tokens-and-ui-react",
+    "fix-cli-nx-ci",
+    "fix-release-pnpm-setup",
+    "passkey-end-to-end-flow",
+    "slow-lines-grin",
+    "zitadel-scope-and-npm-publishing"
+  ]
 }

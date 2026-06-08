@@ -115,6 +115,15 @@ function nextCodeOps(ctx: PatchContext, renderer: RendererSpec): FileOp[] {
       contents: dts.contents,
     });
   }
-  ops.push({ kind: "add-dep", name: renderer.dependency.name, version: renderer.dependency.version });
+  ops.push({
+    kind: "add-dep",
+    name: renderer.dependency.name,
+    version: dependencyVersionForCli(ctx.cliVersion, renderer.dependency.version),
+  });
   return ops;
+}
+
+function dependencyVersionForCli(cliVersion: string, fallback: string): string {
+  const prerelease = cliVersion.match(/^\d+\.\d+\.\d+-([0-9A-Za-z]+)(?:[.-]|$)/)?.[1];
+  return prerelease ?? fallback;
 }

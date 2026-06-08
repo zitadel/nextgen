@@ -18,6 +18,7 @@ function ctxFor(appDir: "app" | "src/app"): PatchContext {
     },
     issuer: "http://localhost:3000",
     server: "https://api.zitadel.cloud",
+    cliVersion: "0.1.0-alpha.0",
   };
 }
 
@@ -37,6 +38,14 @@ describe("NextPatcher.plan", () => {
     expect(writeContents(plan, "app/register/page.tsx")).toContain(MANAGED_MARKER);
     expect(writeContents(plan, "middleware.ts")).toContain(MANAGED_MARKER);
     expect(plan.ops.some((op) => op.kind === "add-dep")).toBe(true);
+  });
+
+  it("uses the CLI prerelease tag for the SDK dependency", () => {
+    const plan = new NextPatcher().plan(ctxFor("app"));
+    const dep = plan.ops.find(
+      (op): op is Extract<FileOp, { kind: "add-dep" }> => op.kind === "add-dep",
+    );
+    expect(dep).toMatchObject({ name: "@zitadel/sdk-next", version: "alpha" });
   });
 
   it("does not scaffold the user schema or flow (server-provisioned)", () => {
