@@ -330,7 +330,7 @@ func mapTransitionsToAPI(domainTransitions map[string]domain.FlowStepTransition)
 			Target: transition.Target,
 			Action: api.OptNilFlowDefinitionStepTransitionsItemAction{
 				Value: api.FlowDefinitionStepTransitionsItemAction(action),
-				Set:   transition.Action != nil, // todo: review
+				Set:   transition.Action != nil,
 				Null:  transition.Action == nil,
 			},
 		}

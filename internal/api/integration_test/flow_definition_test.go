@@ -511,7 +511,7 @@ func TestListFlowDefinitions(t *testing.T) {
 		FlowDefinition: api.FlowDefinition{
 			Name:       "flow-2",
 			UserSchema: *userSchemaURI,
-			Purposes:   map[string]string{"register": "step_1"},
+			Purposes:   map[string]string{"profiling": "step_1"},
 			Audience: api.OptFlowAudience{
 				Value: api.FlowAudience{
 					TeamIds: []string{"team-1", "team-2"},
@@ -606,7 +606,7 @@ func TestListFlowDefinitions(t *testing.T) {
 			req: api.ListFlowDefinitionsParams{
 				ProjectID: api.ProjectID(project1.ID),
 				Purpose: api.OptListFlowDefinitionsPurpose{
-					Value: "register",
+					Value: "profiling",
 					Set:   true,
 				},
 			},
