@@ -4,13 +4,14 @@ import (
 	"log/slog"
 
 	"github.com/ogen-go/ogen/middleware"
+	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 )
 
-func Logging(logger *slog.Logger) middleware.Middleware {
+func Logging() middleware.Middleware {
 	return func(req middleware.Request, next middleware.Next) (middleware.Response, error) {
-		logger = logger.With(
+		logger := zlog.GetLoggingContext(req.Context).With(
 			slog.String("method", req.Raw.Method),
-			slog.String("pattern", req.Raw.Pattern),
+			slog.String("url", req.Raw.RequestURI),
 			slog.String("operation", req.OperationName),
 			slog.String("operationID", req.OperationID),
 		)

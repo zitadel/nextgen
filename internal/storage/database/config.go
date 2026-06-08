@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"maps"
 	"slices"
 	"sync"
@@ -93,7 +93,7 @@ func (c Config) Build() (Connector, error) {
 func (c Config) build(decoders map[string]DialectDecoder) (Connector, error) {
 	if len(c.Raw) == 0 {
 		if defaultConnector != nil {
-			log.Println("no database dialect configured, fallback to default connector")
+			slog.Info("no database dialect configured, fallback to default connector")
 			return defaultConnector, nil
 		}
 		return nil, fmt.Errorf("database: no dialect configured")

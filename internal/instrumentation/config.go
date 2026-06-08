@@ -7,23 +7,26 @@ import (
 
 	slogctx "github.com/veqryn/slog-context"
 	slogotel "github.com/veqryn/slog-context/otel"
+	"github.com/zitadel/nextgen/internal/instrumentation/otel"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog/extractors"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog/replacers"
 	"github.com/zitadel/sloggcp"
 )
 
-const Name = "zitadel/backend/v3/instrumentation/tracing"
+type Config struct {
+	ServiceName string    `mapstructure:"service_name"`
+	Log         LogConfig `mapstructure:"log"`
+}
 
 type LogConfig struct {
-	Level     zlog.Level
-	Streams   []zlog.Stream
-	Mask      MaskConfig
-	Format    LogFormat
-	AddSource bool
-	Errors    ErrorConfig
-	// TODO
-	//Exporter  ExporterConfig
+	Level     zlog.Level          `mapstructure:"level"`
+	Streams   []zlog.Stream       `mapstructure:"streams"`
+	Mask      MaskConfig          `mapstructure:"mask"`
+	Format    LogFormat           `mapstructure:"format"`
+	AddSource bool                `mapstructure:"add_source"`
+	Errors    ErrorConfig         `mapstructure:"errors"`
+	Exporter  otel.ExporterConfig `mapstructure:"exporter"`
 }
 
 func (cfg LogConfig) SlogHandlerOptions() *slog.HandlerOptions {
@@ -95,8 +98,8 @@ func (f LogFormat) ErrorHandler(options *slog.HandlerOptions) slog.Handler {
 }
 
 type MaskConfig struct {
-	Keys  []string
-	Value string
+	Keys  []string `mapstructure:"keys"`
+	Value string   `mapstructure:"value"`
 }
 
 func (c MaskConfig) AttributeReplacer() zlog.AttributeReplacer {
@@ -118,6 +121,6 @@ func (c MaskConfig) AttributeReplacer() zlog.AttributeReplacer {
 }
 
 type ErrorConfig struct {
-	ReportLocation bool
-	StackTrace     bool
+	ReportLocation bool `mapstructure:"report_location"`
+	StackTrace     bool `mapstructure:"stack_trace"`
 }
