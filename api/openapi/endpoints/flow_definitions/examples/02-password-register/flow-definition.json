@@ -1,0 +1,31 @@
+{
+  "project_id": "${PROJECT_ID}",
+  "schema_uri": "https://nextgen.com/flow-definition.json",
+  "flow_definition": {
+    "name": "password-register",
+    "user_schema": "${USER_SCHEMA_URL}",
+    "purposes": {
+      "register": "signup"
+    },
+    "steps": [
+      {
+        "name": "signup",
+        "fields": ["email", "password"],
+        "actions": {
+          "submit": {
+            "primary": true,
+            "text_key": "signup.action.create"
+          }
+        },
+        "on_success": "create_user",
+        "transitions": {
+          "submit": { "target": "done" }
+        }
+      },
+      {
+        "name": "done",
+        "complete": "show"
+      }
+    ]
+  }
+}

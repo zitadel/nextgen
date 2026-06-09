@@ -1,0 +1,73 @@
+{
+  "project_id": "${PROJECT_ID}",
+  "schema_uri": "https://nextgen.com/flow-definition.json",
+  "flow_definition": {
+    "name": "combined-password",
+    "user_schema": "${USER_SCHEMA_URL}",
+    "purposes": {
+      "login": "identifier",
+      "register": "register-identifier"
+    },
+    "steps": [
+      {
+        "name": "identifier",
+        "fields": ["email"],
+        "actions": {
+          "submit": {
+            "primary": true,
+            "text_key": "identifier.action.continue"
+          }
+        },
+        "transitions": {
+          "submit": { "target": "password" },
+          "user_not_found": { "target": "register-identifier" }
+        }
+      },
+      {
+        "name": "password",
+        "fields": ["password"],
+        "actions": {
+          "submit": {
+            "primary": true,
+            "text_key": "password.action.signin"
+          }
+        },
+        "transitions": {
+          "submit": { "target": "done" }
+        }
+      },
+      {
+        "name": "register-identifier",
+        "fields": ["email"],
+        "actions": {
+          "submit": {
+            "primary": true,
+            "text_key": "register.action.continue"
+          }
+        },
+        "transitions": {
+          "submit": { "target": "register-password" },
+          "user_already_exists": { "target": "password" }
+        }
+      },
+      {
+        "name": "register-password",
+        "fields": ["password"],
+        "actions": {
+          "submit": {
+            "primary": true,
+            "text_key": "register-password.action.submit"
+          }
+        },
+        "on_success": "create_user",
+        "transitions": {
+          "submit": { "target": "done" }
+        }
+      },
+      {
+        "name": "done",
+        "complete": "show"
+      }
+    ]
+  }
+}
