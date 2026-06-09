@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
   LOCAL_RUNTIME_FILE,
+  ensureContainerIdentity,
   ensureLocalState,
   localContainerName,
   localRuntimePaths,
@@ -52,6 +53,18 @@ describe("local server runtime metadata", () => {
     await expect(readRuntimeMetadata(cwd)).resolves.toEqual(metadata);
     await expect(readFile(join(cwd, LOCAL_RUNTIME_FILE), "utf8")).resolves.toContain(
       "ghcr.io/zitadel/nextgen:test",
+    );
+  });
+
+  it("writes container identity files for host-user Docker runs", async () => {
+    const identity = await ensureContainerIdentity(cwd, { uid: 501, gid: 20 });
+
+    expect(identity).toMatchObject({ uid: 501, gid: 20 });
+    await expect(readFile(localRuntimePaths(cwd).containerPasswdFile, "utf8")).resolves.toContain(
+      "zitadel-local:x:501:20:",
+    );
+    await expect(readFile(localRuntimePaths(cwd).containerGroupFile, "utf8")).resolves.toContain(
+      "zitadel-local:x:20:",
     );
   });
 

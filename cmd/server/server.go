@@ -94,6 +94,7 @@ func embeddedPostgresOptions(dataDir string) embedded.Options {
 	return embedded.Options{
 		RuntimePath: filepath.Join(root, "runtime"),
 		DataPath:    filepath.Join(root, "data"),
+		CachePath:   filepath.Join(root, "cache"),
 		LogPath:     filepath.Join(root, "postgres.log"),
 		Logger:      os.Stdout,
 	}

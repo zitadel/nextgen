@@ -25,6 +25,7 @@ func init() {
 type Options struct {
 	RuntimePath  string
 	DataPath     string
+	CachePath    string
 	LogPath      string
 	Logger       io.Writer
 	RemoveOnStop bool
@@ -74,6 +75,7 @@ func startEmbeddedOnce(options Options) (connector database.Connector, stop func
 	config := embeddedpostgres.DefaultConfig().
 		Version(embeddedpostgres.V18).
 		Port(uint32(port)).
+		CachePath(options.CachePath).
 		RuntimePath(options.RuntimePath).
 		DataPath(options.DataPath).
 		// CI runners (GitHub Actions ubuntu) have throttled disk I/O; the
@@ -153,6 +155,9 @@ func normalizeOptions(options Options) (Options, error) {
 	}
 	if options.DataPath == "" {
 		options.DataPath = filepath.Join(options.RuntimePath, "data")
+	}
+	if options.CachePath == "" {
+		options.CachePath = filepath.Join(filepath.Dir(options.RuntimePath), "cache")
 	}
 	return options, nil
 }

@@ -4,6 +4,7 @@ import { ZitadelError } from "../errors";
 import {
   CONTAINER_DATA_DIR,
   CONTAINER_HTTP_PORT,
+  type ContainerIdentity,
   type RuntimeMetadata,
 } from "./runtime";
 
@@ -18,8 +19,7 @@ export type DockerRunSpec = {
   image: string;
   port: number;
   dataDir: string;
-  uid?: number;
-  gid?: number;
+  identity?: ContainerIdentity;
 };
 
 export function dockerRunArgs(spec: DockerRunSpec): string[] {
@@ -38,8 +38,15 @@ export function dockerRunArgs(spec: DockerRunSpec): string[] {
     `NEXTGEN_SERVER_DATA_DIR=${CONTAINER_DATA_DIR}`,
   ];
 
-  if (spec.uid !== undefined && spec.uid > 0) {
-    args.push("--user", `${spec.uid}:${spec.gid ?? spec.uid}`);
+  if (spec.identity) {
+    args.push(
+      "--volume",
+      `${spec.identity.passwdFile}:/etc/passwd:ro`,
+      "--volume",
+      `${spec.identity.groupFile}:/etc/group:ro`,
+      "--user",
+      `${spec.identity.uid}:${spec.identity.gid}`,
+    );
   }
 
   args.push(spec.image);
@@ -92,6 +99,25 @@ export async function dockerAvailable(): Promise<DockerResult> {
 
 export async function pullImage(image: string): Promise<void> {
   await requireDocker(["pull", "--quiet", image], `Pull Docker image ${image}`);
+}
+
+export async function imageExists(image: string): Promise<boolean> {
+  let result: DockerResult;
+  const args = ["image", "inspect", image];
+  try {
+    result = await runDocker(args);
+  } catch (error) {
+    throw dockerError(`Inspect Docker image ${image}`, args, error);
+  }
+  return result.status === 0;
+}
+
+export async function ensureImage(image: string): Promise<"local" | "pulled"> {
+  if (await imageExists(image)) {
+    return "local";
+  }
+  await pullImage(image);
+  return "pulled";
 }
 
 export async function inspectContainer(containerName: string): Promise<{

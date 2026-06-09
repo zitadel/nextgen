@@ -104,6 +104,27 @@ describe("local runtime commands", () => {
     expect(runCall?.join(" ")).not.toContain("NEXTGEN_SERVER_ENCRYPTION_KEY");
   });
 
+  it("start uses a prebuilt local image without pulling it", async () => {
+    const cwd = await tempProject("zitadel-start-local-image-");
+    const fake = await fakeDocker({ imageExists: true });
+    const serverUrl = await startHealthServer();
+    const port = Number(new URL(serverUrl).port);
+
+    const result = await runCliForTest(
+      ["start", "--cwd", cwd, "--json", "--port", String(port), "--image", "zitadel-nextgen:test"],
+      {
+        PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
+        DOCKER_LOG: fake.logPath,
+      },
+    );
+
+    expect(result.exitCode).toBe(0);
+    const dockerCalls = await readDockerCalls(fake.logPath);
+    expect(dockerCalls).toContainEqual(["image", "inspect", "zitadel-nextgen:test"]);
+    expect(dockerCalls.some((args) => args[0] === "pull")).toBe(false);
+    expect(dockerCalls.find((args) => args[0] === "run")?.at(-1)).toBe("zitadel-nextgen:test");
+  });
+
   it("reset --force deletes local runtime data", async () => {
     const cwd = await tempProject("zitadel-reset-");
     const fake = await fakeDocker();
@@ -130,7 +151,7 @@ async function tempProject(prefix: string): Promise<string> {
 }
 
 async function fakeDocker(
-  options: { dockerAvailable?: boolean } = {},
+  options: { dockerAvailable?: boolean; imageExists?: boolean } = {},
 ): Promise<{ binDir: string; logPath: string }> {
   const binDir = await mkdtemp(join(tmpdir(), "zitadel-fake-docker-"));
   tempDirs.push(binDir);
@@ -153,6 +174,9 @@ if (args[0] === "version") {
 if (args[0] === "pull") {
   console.log(args[args.length - 1]);
   process.exit(0);
+}
+if (args[0] === "image" && args[1] === "inspect") {
+  process.exit(${options.imageExists === true ? "0" : "1"});
 }
 if (args[0] === "inspect") {
   process.exit(1);

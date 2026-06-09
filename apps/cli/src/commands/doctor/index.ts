@@ -3,7 +3,7 @@ import consola from "consola";
 
 import { BaseCommand, type JsonEnvelope } from "../../lib/oclif";
 import { ZitadelError } from "../../lib/errors";
-import { dockerAvailable, pullImage } from "../../lib/local-server/docker";
+import { dockerAvailable, ensureImage } from "../../lib/local-server/docker";
 import {
   DEFAULT_LOCAL_SERVER_IMAGE,
   DEFAULT_LOCAL_SERVER_PORT,
@@ -112,7 +112,7 @@ function failureAdvice(
   if (failedNames.has("image")) {
     return {
       hint:
-        "The local Zitadel image could not be pulled. Check Docker registry access, or pass --image / ZITADEL_LOCAL_IMAGE.",
+        "The local Zitadel image is not available. Check Docker registry access, build it locally, or pass --image / ZITADEL_LOCAL_IMAGE.",
       nextCommands: [`docker pull ${image}`, "zitadel doctor"],
     };
   }
@@ -168,9 +168,11 @@ async function runLocalRuntimeChecks(
       }
       return `Docker engine ${result.stdout.trim() || "available"}`;
     }),
-    await check("image", `Can pull ${image}`, async () => {
-      await pullImage(image);
-      return `Image ${image} is available`;
+    await check("image", `Image ${image} is available`, async () => {
+      const source = await ensureImage(image);
+      return source === "local"
+        ? `Image ${image} is available locally`
+        : `Image ${image} was pulled`;
     }),
     await check("state-dir", "Local state directory is writable", async () => {
       const paths = localRuntimePaths(cwd);

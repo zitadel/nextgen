@@ -13,6 +13,8 @@ export const DEFAULT_LOCAL_SERVER_URL = "http://localhost:8080";
 export const LOCAL_RUNTIME_DIR = ".zitadel/local";
 export const LOCAL_DATA_DIR = ".zitadel/local/nextgen-data";
 export const LOCAL_RUNTIME_FILE = ".zitadel/local/runtime.json";
+export const LOCAL_CONTAINER_PASSWD_FILE = ".zitadel/local/container-passwd";
+export const LOCAL_CONTAINER_GROUP_FILE = ".zitadel/local/container-group";
 export const CONTAINER_DATA_DIR = "/var/lib/zitadel/nextgen-data";
 export const CONTAINER_HTTP_PORT = 8080;
 
@@ -32,6 +34,15 @@ export type LocalRuntimePaths = {
   runtimeDir: string;
   dataDir: string;
   runtimeFile: string;
+  containerPasswdFile: string;
+  containerGroupFile: string;
+};
+
+export type ContainerIdentity = {
+  uid: number;
+  gid: number;
+  passwdFile: string;
+  groupFile: string;
 };
 
 export function localRuntimePaths(cwd: string): LocalRuntimePaths {
@@ -39,6 +50,8 @@ export function localRuntimePaths(cwd: string): LocalRuntimePaths {
     runtimeDir: join(cwd, LOCAL_RUNTIME_DIR),
     dataDir: join(cwd, LOCAL_DATA_DIR),
     runtimeFile: join(cwd, LOCAL_RUNTIME_FILE),
+    containerPasswdFile: join(cwd, LOCAL_CONTAINER_PASSWD_FILE),
+    containerGroupFile: join(cwd, LOCAL_CONTAINER_GROUP_FILE),
   };
 }
 
@@ -56,6 +69,44 @@ export async function ensureLocalState(cwd: string): Promise<LocalRuntimePaths> 
   await mkdir(paths.dataDir, { recursive: true, mode: 0o700 });
   await appendGitignoreEntry(cwd, `${LOCAL_RUNTIME_DIR}/`);
   return paths;
+}
+
+export async function ensureContainerIdentity(
+  cwd: string,
+  user: { uid?: number; gid?: number },
+): Promise<ContainerIdentity | undefined> {
+  if (user.uid === undefined || user.uid <= 0) {
+    return undefined;
+  }
+  const gid = user.gid ?? user.uid;
+  const paths = localRuntimePaths(cwd);
+  await mkdir(paths.runtimeDir, { recursive: true, mode: 0o700 });
+  await writeFile(
+    paths.containerPasswdFile,
+    [
+      "root:x:0:0:root:/root:/bin/sh",
+      "nonroot:x:65532:65532:nonroot:/nonexistent:/usr/sbin/nologin",
+      `zitadel-local:x:${String(user.uid)}:${String(gid)}:Zitadel local user:/tmp:/usr/sbin/nologin`,
+      "",
+    ].join("\n"),
+    { mode: 0o644 },
+  );
+  await writeFile(
+    paths.containerGroupFile,
+    [
+      "root:x:0:",
+      "nonroot:x:65532:",
+      `zitadel-local:x:${String(gid)}:`,
+      "",
+    ].join("\n"),
+    { mode: 0o644 },
+  );
+  return {
+    uid: user.uid,
+    gid,
+    passwdFile: paths.containerPasswdFile,
+    groupFile: paths.containerGroupFile,
+  };
 }
 
 export async function readRuntimeMetadata(cwd: string): Promise<RuntimeMetadata | undefined> {

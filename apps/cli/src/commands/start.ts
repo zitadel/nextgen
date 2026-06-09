@@ -6,9 +6,9 @@ import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
 import { ZitadelError } from "../lib/errors";
 import {
   currentUser,
+  ensureImage,
   inspectContainer,
   metadataFromStart,
-  pullImage,
   startContainer,
   stopAndRemoveContainer,
 } from "../lib/local-server/docker";
@@ -16,6 +16,7 @@ import {
   DEFAULT_LOCAL_SERVER_IMAGE,
   DEFAULT_LOCAL_SERVER_PORT,
   checkLocalServerHealth,
+  ensureContainerIdentity,
   ensureLocalState,
   localContainerName,
   localServerUrl,
@@ -81,13 +82,13 @@ export default class Start extends BaseCommand {
       await stopAndRemoveContainer(containerName);
     }
 
-    await pullImage(image);
+    await ensureImage(image);
     const containerId = await startContainer({
       containerName,
       image,
       port,
       dataDir: paths.dataDir,
-      ...currentUser(),
+      identity: await ensureContainerIdentity(this.meta.cwd, currentUser()),
     });
     await waitForHealth(serverUrl, containerName);
 

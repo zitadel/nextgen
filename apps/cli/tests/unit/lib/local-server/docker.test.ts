@@ -10,8 +10,12 @@ describe("local server Docker helpers", () => {
       image: "ghcr.io/zitadel/nextgen:test",
       port: 8090,
       dataDir: "/tmp/app/.zitadel/local/nextgen-data",
-      uid: 501,
-      gid: 20,
+      identity: {
+        uid: 501,
+        gid: 20,
+        passwdFile: "/tmp/app/.zitadel/local/container-passwd",
+        groupFile: "/tmp/app/.zitadel/local/container-group",
+      },
     });
 
     expect(args).toEqual([
@@ -27,6 +31,10 @@ describe("local server Docker helpers", () => {
       "NEXTGEN_SERVER_ADDRESS=:8080",
       "--env",
       `NEXTGEN_SERVER_DATA_DIR=${CONTAINER_DATA_DIR}`,
+      "--volume",
+      "/tmp/app/.zitadel/local/container-passwd:/etc/passwd:ro",
+      "--volume",
+      "/tmp/app/.zitadel/local/container-group:/etc/group:ro",
       "--user",
       "501:20",
       "ghcr.io/zitadel/nextgen:test",
