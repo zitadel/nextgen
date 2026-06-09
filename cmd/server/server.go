@@ -214,13 +214,15 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 			flowDefinitionSvc,
 			teamService),
 		api.NewSecurityHandler(),
-		oasapi.WithMiddleware(middleware.Logging()),
+		oasapi.WithMiddleware(
+			middleware.AddOperationIdToContext(),
+		),
 		oasapi.WithErrorHandler(api.OgenErrorHandler))
 	if err != nil {
 		return fmt.Errorf("failed to build api server: %w", err)
 	}
 
-	mux, err := buildHTTPMux(cfg.Server, oasServer)
+	mux, err := buildHTTPMux(cfg.Server, idgen.NewULID(), oasServer)
 	if err != nil {
 		return fmt.Errorf("failed to build http mux: %w", err)
 	}
@@ -236,7 +238,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 
 	serverErr := make(chan error, 1)
 	go func() {
-		slog.Info("server listening for requests", slog.String("string", httpServer.Addr))
+		slog.Info("server listening for requests", slog.String("address", httpServer.Addr))
 		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			serverErr <- err
 		}
@@ -346,7 +348,7 @@ func mustBindEnv(v *viper.Viper, key string) {
 
 // ----------------------------- HTTP --------------------------------------
 
-func buildHTTPMux(cfg ServerConfig, apiHandler http.Handler) (*http.ServeMux, error) {
+func buildHTTPMux(cfg ServerConfig, reqIdGen idgen.Generator, apiHandler http.Handler) (*http.ServeMux, error) {
 	mux := http.NewServeMux()
 
 	if cfg.LoginEnabled {
@@ -373,7 +375,13 @@ func buildHTTPMux(cfg ServerConfig, apiHandler http.Handler) (*http.ServeMux, er
 		mux.Handle(cfg.ConsolePath+"/", consoleHandler)
 	}
 
-	mux.Handle("/", api.WithRequestHostMiddleware(apiHandler))
+	mux.Handle("/",
+		middleware.WithRequestIdentification(reqIdGen,
+			middleware.WithLogging(
+				api.WithRequestHostMiddleware(apiHandler),
+			),
+		),
+	)
 	return mux, nil
 }
 

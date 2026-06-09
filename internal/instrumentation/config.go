@@ -124,3 +124,9 @@ type ErrorConfig struct {
 	ReportLocation bool `mapstructure:"report_location"`
 	StackTrace     bool `mapstructure:"stack_trace"`
 }
+
+type TraceConfig struct {
+	Fraction         float64
+	Exporter         otel.ExporterConfig
+	TrustRemoteSpans bool
+}
