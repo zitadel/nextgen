@@ -2,7 +2,7 @@
   "project_id": "${PROJECT_ID}",
   "schema_uri": "https://nextgen.com/flow-definition.json",
   "flow_definition": {
-    "name": "combined-all-methods",
+    "name": "combined-password-passkey",
     "user_schema": "${USER_SCHEMA_URL}",
     "purposes": {
       "login": "identifier",
@@ -13,14 +13,8 @@
         "name": "identifier",
         "fields": ["email"],
         "actions": {
-          "submit": {
-            "primary": true,
-            "text_key": "identifier.action.continue"
-          },
-          "passkey": {
-            "primary": false,
-            "text_key": "identifier.action.passkey"
-          }
+          "submit": { "primary": true },
+          "passkey": {}
         },
         "transitions": {
           "submit": { "target": "password" },
@@ -32,14 +26,8 @@
         "name": "password",
         "fields": ["password"],
         "actions": {
-          "submit": {
-            "primary": true,
-            "text_key": "password.action.signin"
-          },
-          "passkey": {
-            "primary": false,
-            "text_key": "password.action.passkey"
-          }
+          "submit": { "primary": true },
+          "passkey": {}
         },
         "transitions": {
           "submit": { "target": "done" },
@@ -50,14 +38,8 @@
         "name": "register",
         "fields": ["email"],
         "actions": {
-          "submit": {
-            "primary": true,
-            "text_key": "register.action.password"
-          },
-          "passkey_register": {
-            "primary": false,
-            "text_key": "register.action.passkey"
-          }
+          "submit": { "primary": true },
+          "passkey_register": {}
         },
         "transitions": {
           "submit": { "target": "register-password" },
@@ -69,10 +51,7 @@
         "name": "register-password",
         "fields": ["password"],
         "actions": {
-          "submit": {
-            "primary": true,
-            "text_key": "register-password.action.submit"
-          }
+          "submit": { "primary": true }
         },
         "on_success": "create_user",
         "transitions": {
@@ -82,14 +61,8 @@
       {
         "name": "passkey-upsell",
         "actions": {
-          "passkey_register": {
-            "primary": true,
-            "text_key": "passkey-upsell.action.setup"
-          },
-          "skip": {
-            "primary": false,
-            "text_key": "passkey-upsell.action.skip"
-          }
+          "passkey_register": { "primary": true },
+          "skip": {}
         },
         "transitions": {
           "passkey_register": { "target": "done" },

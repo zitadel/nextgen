@@ -12,10 +12,7 @@
         "name": "identifier",
         "fields": ["email"],
         "actions": {
-          "submit": {
-            "primary": true,
-            "text_key": "identifier.action.continue"
-          }
+          "submit": { "primary": true }
         },
         "transitions": {
           "submit": { "target": "password" }
@@ -25,10 +22,7 @@
         "name": "password",
         "fields": ["password"],
         "actions": {
-          "submit": {
-            "primary": true,
-            "text_key": "password.action.signin"
-          }
+          "submit": { "primary": true }
         },
         "transitions": {
           "submit": { "target": "done" }

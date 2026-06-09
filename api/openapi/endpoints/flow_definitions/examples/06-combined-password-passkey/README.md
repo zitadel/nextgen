@@ -1,10 +1,13 @@
-# 06 — Combined All Methods + Passkey Upsell
+# 06 — Combined Password + Passkey + Upsell
 
-The most feature-rich flow the engine supports today: combined login +
-register, password and passkey on both purposes, a post-signup passkey
-upsell, and a terminal `redirect` for OIDC-style hand-back. Mirrors the
-shipped `default-login-flow-definition.json` with a redirect terminal in
-place of `show`.
+Combined login + register with both password and passkey methods on both
+purposes, plus a post-signup passkey upsell and a terminal `redirect` for
+OIDC-style hand-back. Mirrors the shipped `default-login-flow-definition.json`
+with a redirect terminal in place of `show`.
+
+This is the most feature-rich example *today*; as new methods land (OTP,
+magic-link, SSO, …) they will live in their own examples rather than getting
+folded in here.
 
 ## Capabilities exercised
 

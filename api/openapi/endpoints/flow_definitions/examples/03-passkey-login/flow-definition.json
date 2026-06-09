@@ -11,10 +11,7 @@
       {
         "name": "signin",
         "actions": {
-          "passkey": {
-            "primary": true,
-            "text_key": "signin.action.passkey"
-          }
+          "passkey": { "primary": true }
         },
         "transitions": {
           "passkey": { "target": "done" }

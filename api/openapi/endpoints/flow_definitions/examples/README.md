@@ -21,7 +21,7 @@ For the shape and validation rules, see
 | 03 | [passkey-login](./03-passkey-login/) | `login` | Discoverable passkey login — single action, no identifier. |
 | 04 | [passkey-register](./04-passkey-register/) | `register` | Usernameless passkey signup — provisional user pattern. |
 | 05 | [combined-password](./05-combined-login-register/) | `login` + `register` | Flip-table coverage: `user_not_found` and `user_already_exists` wired on entry steps. |
-| 06 | [combined-all-methods](./06-combined-all-methods/) | `login` + `register` | Password + passkey on both purposes, passkey upsell after password signup, terminal `redirect`. |
+| 06 | [combined-password-passkey](./06-combined-password-passkey/) | `login` + `register` | Password + passkey on both purposes, passkey upsell after password signup, terminal `redirect`. |
 
 The existing `default-login-flow-definition.json` at the root of this folder is
 embedded by the server as the default project flow; it mirrors example 06 but

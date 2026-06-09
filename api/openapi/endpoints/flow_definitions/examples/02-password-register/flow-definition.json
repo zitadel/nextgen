@@ -12,10 +12,7 @@
         "name": "signup",
         "fields": ["email", "password"],
         "actions": {
-          "submit": {
-            "primary": true,
-            "text_key": "signup.action.create"
-          }
+          "submit": { "primary": true }
         },
         "on_success": "create_user",
         "transitions": {
