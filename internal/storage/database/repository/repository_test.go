@@ -63,7 +63,7 @@ func runTests(m *testing.M) int {
 
 func newSpannerURLDB(ctx context.Context, url string) (database.PoolTest, func(), error) {
 	isSpannerDB = true
-	slog.Info("using Spanner database", slog.String("databse_url", url))
+	slog.Info("using Spanner database", slog.String("database_url", url))
 	connector, err := spannerDialect.DecodeConfig(url)
 	if err != nil {
 		return nil, func() {}, fmt.Errorf("unable to decode Spanner config: %w", err)

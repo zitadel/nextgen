@@ -48,6 +48,10 @@ func WithLogging(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(lrw, r.WithContext(ctx))
 
+		if lrw.statusCode == 0 {
+			lrw.statusCode = http.StatusOK
+		}
+
 		operationID, _ := GetOperationIDContext(ctx)
 
 		if lrw.statusCode >= 400 {

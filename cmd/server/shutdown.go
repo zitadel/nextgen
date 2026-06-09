@@ -13,8 +13,8 @@ type ShutdownFuncs struct {
 
 func (sfs *ShutdownFuncs) Exec(ctx context.Context) error {
 	var err error
-	for _, sf := range sfs.funcs {
-		err = errors.Join(err, sf(ctx))
+	for i := len(sfs.funcs) - 1; i >= 0; i-- {
+		err = errors.Join(err, sfs.funcs[i](ctx))
 	}
 	return err
 }

@@ -62,7 +62,7 @@ func importFile(
 		database.WithCondition(userRepo.PrimaryKeyCondition(doc.Header.ProjectID, doc.Header.ID)),
 	)
 	if err == nil {
-		slog.Info("bootstrap user: skipped user because they already exists)", slog.String("user", path), slog.String("id", doc.Header.ID))
+		slog.Info("bootstrap user: skipped user because they already exists)", slog.String("path", path), slog.String("id", doc.Header.ID))
 		return nil
 	}
 	if !errors.Is(err, new(database.NoRowFoundError)) {
@@ -99,7 +99,7 @@ func importFile(
 		return fmt.Errorf("create password: %w", err)
 	}
 
-	slog.Info("bootstrap user: loaded user", slog.String("user", path), slog.String("id", doc.Header.ID))
+	slog.Info("bootstrap user: loaded user", slog.String("path", path), slog.String("id", doc.Header.ID))
 
 	return nil
 }

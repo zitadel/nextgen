@@ -18,23 +18,23 @@ func GetLoggingContext(ctx context.Context) *slog.Logger {
 }
 
 func Log(ctx context.Context, level slog.Level, msg string, args ...any) {
-	log(ctx, GetLoggingContext(ctx), level, msg, 1, args)
+	log(ctx, GetLoggingContext(ctx), level, msg, 1, args...)
 }
 
 func Debug(ctx context.Context, msg string, args ...any) {
-	log(ctx, GetLoggingContext(ctx), slog.LevelDebug, msg, 1, args)
+	log(ctx, GetLoggingContext(ctx), slog.LevelDebug, msg, 1, args...)
 }
 
 func Info(ctx context.Context, msg string, args ...any) {
-	log(ctx, GetLoggingContext(ctx), slog.LevelInfo, msg, 1, args)
+	log(ctx, GetLoggingContext(ctx), slog.LevelInfo, msg, 1, args...)
 }
 
 func Warn(ctx context.Context, msg string, args ...any) {
-	log(ctx, GetLoggingContext(ctx), slog.LevelWarn, msg, 1, args)
+	log(ctx, GetLoggingContext(ctx), slog.LevelWarn, msg, 1, args...)
 }
 
 func Error(ctx context.Context, msg string, args ...any) {
-	log(ctx, GetLoggingContext(ctx), slog.LevelError, msg, 1, args)
+	log(ctx, GetLoggingContext(ctx), slog.LevelError, msg, 1, args...)
 }
 
 func WithError(ctx context.Context, err error) *ErrorContextLogger {
