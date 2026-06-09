@@ -477,14 +477,6 @@ func createResource(serviceName string) (*resource.Resource, error) {
 }
 
 func setUpLogging(ctx context.Context, sfs *ShutdownFuncs, cfg instrumentation.LogConfig, rsc *resource.Resource) error {
-	// TODO refactor this out (move to param instead of global?)
-	//addSourceEnabled.Store(cfg.AddSource)
-
-	// TODO refactor this out
-	//EnableStreams(cfg.Streams...)
-	//zerrors.EnableReportLocation(cfg.Errors.ReportLocation)
-	//zerrors.EnableStackTrace(cfg.Errors.StackTrace)
-
 	provider, err := otel.NewLoggerProvider(ctx, cfg.Exporter, rsc)
 	if err != nil {
 		return err
