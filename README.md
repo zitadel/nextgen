@@ -121,10 +121,10 @@ Fresh-app consumer journey check:
 corepack pnpm run journey
 ```
 
-This opt-in check builds the local npm packages, publishes them to a temporary
-Verdaccio registry, starts a source backend with embedded Postgres, scaffolds a
-new Next.js app outside the repo, and verifies registration/login journeys
-against the generated app.
+This opt-in check ensures the Playwright Chromium browsers are installed, builds
+the local npm packages, publishes them to a temporary Verdaccio registry, starts
+a source backend with embedded Postgres, scaffolds a new Next.js app outside the
+repo, and verifies registration/login journeys against the generated app.
 
 ## CI
 
