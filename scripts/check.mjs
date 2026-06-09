@@ -103,7 +103,7 @@ async function phaseOpenApi() {
 async function phaseGo() {
   await run("sh", [
     "-c",
-    `unformatted="$(git ls-files -z -- '*.go' | xargs -0 -r gofmt -l)"
+    `unformatted="$(git ls-files -z -- '*.go' | xargs -0 gofmt -l)"
 if [ -n "$unformatted" ]; then
   printf '%s\n' "$unformatted"
   exit 1

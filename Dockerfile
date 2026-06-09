@@ -7,7 +7,7 @@ FROM debian:12-slim
 ARG TARGETPLATFORM
 
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends ca-certificates libicu-dev libssl-dev \
+  && apt-get install -y --no-install-recommends ca-certificates libicu72 libssl3 \
   && rm -rf /var/lib/apt/lists/* \
   && groupadd --system --gid 65532 nonroot \
   && useradd --system --uid 65532 --gid 65532 --home-dir /nonexistent --shell /usr/sbin/nologin nonroot \

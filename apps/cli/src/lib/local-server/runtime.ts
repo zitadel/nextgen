@@ -209,7 +209,9 @@ function normalizeRuntimeMetadata(input: Record<string, unknown>): RuntimeMetada
     typeof input.container_id !== "string" ||
     typeof input.image !== "string" ||
     typeof input.port !== "number" ||
+    !isValidPort(input.port) ||
     typeof input.server_url !== "string" ||
+    !isValidServerUrl(input.server_url) ||
     typeof input.data_dir !== "string" ||
     typeof input.created_at !== "string" ||
     typeof input.cli_version !== "string"
@@ -265,4 +267,17 @@ export function runtimeSummary(metadata: RuntimeMetadata | undefined): Record<st
 
 export function isRuntimeObject(value: unknown): value is RuntimeMetadata {
   return isObject(value) && value.schema_version === 1;
+}
+
+function isValidPort(value: number): boolean {
+  return Number.isInteger(value) && value >= 1 && value <= 65_535;
+}
+
+function isValidServerUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return (url.protocol === "http:" || url.protocol === "https:") && url.hostname.length > 0;
+  } catch {
+    return false;
+  }
 }

@@ -35,18 +35,7 @@ describe("local server runtime metadata", () => {
   });
 
   it("round-trips runtime metadata", async () => {
-    const paths = localRuntimePaths(cwd);
-    const metadata: RuntimeMetadata = {
-      schema_version: 1,
-      container_name: localContainerName(cwd),
-      container_id: "container-1",
-      image: "ghcr.io/zitadel/nextgen:test",
-      port: 8081,
-      server_url: "http://localhost:8081",
-      data_dir: paths.dataDir,
-      created_at: "2026-06-09T00:00:00.000Z",
-      cli_version: "0.0.0-test",
-    };
+    const metadata = runtimeFor(cwd);
 
     await writeRuntimeMetadata(cwd, metadata);
 
@@ -54,6 +43,23 @@ describe("local server runtime metadata", () => {
     await expect(readFile(join(cwd, LOCAL_RUNTIME_FILE), "utf8")).resolves.toContain(
       "ghcr.io/zitadel/nextgen:test",
     );
+  });
+
+  it.each([
+    ["server_url", "localhost:8080"],
+    ["port", 0],
+    ["port", 8080.5],
+  ])("rejects runtime metadata with invalid %s", async (field, value) => {
+    const paths = await ensureLocalState(cwd);
+    await writeFile(
+      paths.runtimeFile,
+      `${JSON.stringify({ ...runtimeFor(cwd), [field]: value }, null, 2)}\n`,
+    );
+
+    await expect(readRuntimeMetadata(cwd)).rejects.toMatchObject({
+      code: "E_VALIDATION",
+      message: `${LOCAL_RUNTIME_FILE} is malformed`,
+    });
   });
 
   it("writes container identity files for host-user Docker runs", async () => {
@@ -79,3 +85,18 @@ describe("local server runtime metadata", () => {
     });
   });
 });
+
+function runtimeFor(cwd: string): RuntimeMetadata {
+  const paths = localRuntimePaths(cwd);
+  return {
+    schema_version: 1,
+    container_name: localContainerName(cwd),
+    container_id: "container-1",
+    image: "ghcr.io/zitadel/nextgen:test",
+    port: 8081,
+    server_url: "http://localhost:8081",
+    data_dir: paths.dataDir,
+    created_at: "2026-06-09T00:00:00.000Z",
+    cli_version: "0.0.0-test",
+  };
+}
