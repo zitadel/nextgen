@@ -19,11 +19,11 @@ Run Zitadel nextgen with PostgreSQL using Docker Compose and a pre-built image f
 2. `cd nextgen`
 3. Prepare the compose and env templates:
 
-   Default flow (for public repository access): fetch the templates from the `main` branch:
+   Default flow (for public repository access):
 
    ```sh
    mkdir -p nextgen_quickstart
-   cp docs/operations/docker-compose.yaml -o nextgen_quickstart/
+   cp docs/operations/docker-compose.yaml nextgen_quickstart/
    cp docs/operations/env.example nextgen_quickstart/.env
    ```
 
