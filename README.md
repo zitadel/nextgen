@@ -14,7 +14,6 @@ Run Zitadel nextgen with PostgreSQL using Docker Compose and a pre-built image f
 - curl
 - pnpm
 - corepack
-- [Bruno](https://www.usebruno.com/) or Insomnia
 - some more node stuff? 🤷‍♂️
 
 ## Steps
@@ -46,7 +45,7 @@ Run Zitadel nextgen with PostgreSQL using Docker Compose and a pre-built image f
     ```
     Make sure everything boots up correctly `docker compose ps`
 
-6. Create a Project with [Bruno](https://www.usebruno.com/) or Insomnia
+6. Create a Project with with cURL
 
     ```sh
       curl --request POST \
