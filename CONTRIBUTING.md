@@ -6,17 +6,48 @@
 - Node.js from [`.nvmrc`](.nvmrc)
 - pnpm 10 from [`package.json`](package.json) (`corepack enable`)
 
+## Workflow front doors
+
+### I am contributing to Zitadel
+
+| I want to... | Run |
+| --- | --- |
+| Check my setup | `corepack pnpm run doctor` |
+| Try the local Zitadel CLI | `corepack pnpm run cli -- --help` |
+| Run the server from source | `corepack pnpm run server -- --help` |
+| Test the fresh-app onboarding path | `corepack pnpm run journey` |
+| Run normal local checks | `corepack pnpm run check` |
+| Mirror CI locally | `corepack pnpm run check -- --full` |
+| Rerun one failed phase | `corepack pnpm run check -- --only node` |
+
+### I am adding Zitadel to my app
+
+| I want to... | Run |
+| --- | --- |
+| Check local runtime prerequisites | `npx @zitadel/cli@alpha doctor` |
+| Start local Zitadel | `npx @zitadel/cli@alpha start` |
+| Add auth to Next.js | `npx @zitadel/cli@alpha setup --framework next --server local` |
+| Stop local Zitadel, keeping data | `npx @zitadel/cli@alpha stop` |
+| Delete local Zitadel data | `npx @zitadel/cli@alpha reset --force` |
+
+Nx manages TypeScript workspace targets. Go commands and long-running local
+orchestration run through repository scripts so server processes are signaled
+and cleaned up directly. Published `zitadel` runtime commands are for customers and
+agents adding Zitadel to an app; they manage a Docker-backed local runtime and
+do not require Go, Nx, or this source checkout.
+
+`corepack pnpm run server` builds and syncs the embedded console/login UI before
+startup, then runs `go run .`; help output skips the UI sync.
+
 ## Local checks
 
 ```sh
-corepack pnpm install --frozen-lockfile
-corepack pnpm nx run-many -t lint,typecheck,build,test
-
-go vet ./...
-go test ./...
+corepack pnpm run doctor
+corepack pnpm run check
 ```
 
-Before `go test`, sync embedded UI assets (see below) or run the full sync script once.
+`corepack pnpm run check -- --full` runs the slower CI-parity phases. Use
+`--only <phase>` to rerun one phase after a failure.
 
 ## End-to-end checks
 
@@ -25,14 +56,14 @@ browser install. The demo suites exercise the checked-in framework demos:
 
 ```sh
 corepack pnpm exec playwright install
-corepack pnpm nx run-many -t e2e -p @zitadel-nextgen/demo-next-e2e,@zitadel-nextgen/demo-nuxt-e2e
+corepack pnpm nx run-many -t e2e -p @zitadel/demo-next-e2e,@zitadel/demo-nuxt-e2e
 ```
 
 The consumer journey suite reproduces the CI quality gate against a fresh
 generated Next.js app:
 
 ```sh
-corepack pnpm nx run @zitadel/cli-journey-e2e:e2e-local
+corepack pnpm run journey
 ```
 
 The local runner needs Docker for Verdaccio, but by default it starts the
@@ -45,7 +76,7 @@ runs Playwright with one worker.
 For image parity with CI, provide a local backend image tag:
 
 ```sh
-corepack pnpm nx run @zitadel/cli-journey-e2e:e2e-local -- --backend image --image nextgen:local
+corepack pnpm run journey -- --backend image --image nextgen:local
 ```
 
 Use `--keep` to preserve the temporary work directory after success. On failure
@@ -53,7 +84,7 @@ the runner keeps diagnostics automatically and prints the path.
 
 ## Run the server from source
 
-### 1. Build frontends and sync embed directories
+### 1. Embedded UI assets
 
 The Go binary embeds production builds from `internal/staticui/console/dist` and `internal/staticui/login/dist`:
 
@@ -61,16 +92,21 @@ The Go binary embeds production builds from `internal/staticui/console/dist` and
 sh scripts/sync-embedded-ui-dist.sh all
 ```
 
-This runs `pnpm nx build` for `@zitadel/console` and `@zitadel/login-ui`, then `cp -r` into the internal embed folders.
+The `server` wrapper runs this automatically before startup. Run it manually
+only when bypassing the wrapper with direct `go run .`. It uses Nx for
+`@zitadel/console` and `@zitadel/login-ui`, then copies the build output into
+the internal embed folders.
 
 ### 2. Configure and start
 
 ```sh
-export NEXTGEN_SERVER_ENCRYPTION_KEY=4D61737465726B65794E65656473546F48617665333243686172616374657273
-export NEXTGEN_DATABASE_POSTGRES='postgres://zitadel:zitadel@localhost:5432/nextgen?sslmode=disable'
-
-go run . server -c docs/operations/nextgen.example.yaml
+corepack pnpm run server
 ```
+
+With no database configured, the source server starts embedded Postgres and
+stores its data plus generated encryption key under the server data directory.
+Use `-c docs/operations/nextgen.example.yaml` or `NEXTGEN_DATABASE_POSTGRES`
+when you want to point at a database you manage.
 
 Open http://localhost:8080/ui/console/ and http://localhost:8080/ui/login/
 
@@ -98,9 +134,9 @@ After a snapshot build, binaries are under `dist/`:
 ```sh
 docker build -t nextgen:local .
 docker run --rm -p 8080:8080 \
-  -e NEXTGEN_SERVER_ENCRYPTION_KEY=4D61737465726B65794E65656473546F48617665333243686172616374657273 \
-  -e NEXTGEN_DATABASE_POSTGRES='postgres://...' \
-  nextgen:local server
+  -v "$PWD/.zitadel/local/nextgen-data:/var/lib/zitadel/nextgen-data" \
+  -e NEXTGEN_SERVER_DATA_DIR=/var/lib/zitadel/nextgen-data \
+  nextgen:local
 ```
 
 Place the platform binary at `linux/amd64/nextgen` in the build context when mimicking Goreleaser layout, or build with `go build -o nextgen .` and adjust the Dockerfile for local iteration.

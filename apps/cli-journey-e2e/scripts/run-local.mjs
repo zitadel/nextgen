@@ -225,7 +225,7 @@ function printUsage() {
   console.log(`usage: node scripts/run-local.mjs [options]
 
 Options:
-  --backend source          Run go run . server with embedded Postgres (default)
+  --backend source          Run go run . with embedded Postgres (default)
   --backend image           Run the backend through docker compose
   --image <docker-tag>      Required with --backend image
   --keep                    Keep the temp work directory after success
@@ -415,7 +415,7 @@ async function startSourceBackend() {
       delete env[key];
     }
   }
-  return startChild("go", ["run", ".", "server"], {
+  return startChild("go", ["run", "."], {
     cwd: repoRoot,
     env,
     logFile: backendLogPath,

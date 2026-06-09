@@ -1,4 +1,5 @@
-import { mkdtemp, readFile, stat, writeFile, mkdir } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
+import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -82,7 +83,12 @@ describe("Next setup integration", () => {
     };
     expect(packageJson.dependencies?.["@zitadel/sdk-next"]).toBe("alpha");
 
-    const doctor = await cli(["doctor", "--cwd", cwd, "--json"]);
+    const fake = await fakeDocker();
+    const port = await freePort();
+    const doctor = await cli(["doctor", "--cwd", cwd, "--json", "--port", String(port)], {
+      PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
+      DOCKER_LOG: fake.logPath,
+    });
     expect(doctor.exitCode).toBe(0);
     expect((parseJson(doctor.stdout) as { status: string }).status).toBe("ok");
 
@@ -90,10 +96,10 @@ describe("Next setup integration", () => {
     expect(noArg.exitCode).toBe(0);
     const status = parseJson(noArg.stdout) as {
       status: string;
-      data: { next_actions: string[] };
+      data: { next_commands: string[] };
     };
     expect(status.status).toBe("ok");
-    expect(status.data.next_actions.join(" ")).toContain("apply");
+    expect(status.data.next_commands.join(" ")).toContain("apply");
 
     const rerun = await cli(["setup", "--cwd", cwd, "--json"]);
     expect(rerun.exitCode).toBe(0);
@@ -185,4 +191,40 @@ async function createNextProject(): Promise<string> {
     "export default function RootLayout({ children }: { children: React.ReactNode }) { return <html><body>{children}</body></html>; }\n",
   );
   return cwd;
+}
+
+async function fakeDocker(): Promise<{ binDir: string; logPath: string }> {
+  const binDir = await mkdtemp(join(tmpdir(), "zitadel-fake-docker-"));
+  const logPath = join(binDir, "docker.log");
+  const dockerPath = join(binDir, "docker");
+  await writeFile(
+    dockerPath,
+    `#!/usr/bin/env node
+const fs = require("node:fs");
+const args = process.argv.slice(2);
+fs.appendFileSync(process.env.DOCKER_LOG, JSON.stringify(args) + "\\n");
+if (args[0] === "version") {
+  console.log("29.0.0");
+  process.exit(0);
+}
+if (args[0] === "pull") {
+  console.log(args[args.length - 1]);
+  process.exit(0);
+}
+process.exit(0);
+`,
+  );
+  await chmod(dockerPath, 0o755);
+  return { binDir, logPath };
+}
+
+async function freePort(): Promise<number> {
+  const server = createServer();
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
+  const address = server.address();
+  await new Promise<void>((resolve) => server.close(() => resolve()));
+  if (!address || typeof address === "string") {
+    throw new Error("free port probe did not expose a TCP address");
+  }
+  return address.port;
 }
