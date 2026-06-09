@@ -15,7 +15,9 @@ Run Zitadel nextgen with PostgreSQL using Docker Compose and a pre-built image f
 
 ## Steps
 
-1. Prepare the compose and env templates:
+1. `git clone git@github.com:zitadel/nextgen.git` this repo (or use `https://github.com/zitadel/nextgen.git` you don't have ssh auth in place)
+2. `cd nextgen`
+3. Prepare the compose and env templates:
 
    Default flow (for public repository access): fetch the templates from the `main` branch:
 
@@ -25,7 +27,7 @@ Run Zitadel nextgen with PostgreSQL using Docker Compose and a pre-built image f
    cp docs/operations/env.example nextgen_quickstart/.env
    ```
 
-2. Setup the demo app (next)
+4. Setup the demo app (next)
 
     ```sh
     corepack pnpm install
@@ -33,7 +35,7 @@ Run Zitadel nextgen with PostgreSQL using Docker Compose and a pre-built image f
     cp apps/demo-next/.env.example apps/demo-next/.env.local
     ```
 
-3. Create a Project with [Bruno](https://www.usebruno.com/) or Insomnia
+5. Create a Project with [Bruno](https://www.usebruno.com/) or Insomnia
 
     ```sh
       curl --request POST \
@@ -47,8 +49,8 @@ Run Zitadel nextgen with PostgreSQL using Docker Compose and a pre-built image f
     ```
     Copy the project ID from the response and put it into `apps/demo-next/.env.local`
 
-3. Run demo app with `corepack pnpm nx dev @zitadel/demo-next`
-4. Demo on http://localhost:3002
+6. Run demo app with `corepack pnpm nx dev @zitadel/demo-next`
+7. Demo on http://localhost:3002
 
 ## OLD - Quick start (Docker)
 
