@@ -145,3 +145,16 @@ Place the platform binary at `linux/amd64/nextgen` in the build context when mim
 
 - [`AGENTS.md`](AGENTS.md) — workspace conventions
 - [`docs/adrs/`](docs/adrs/) — architecture decisions
+
+## Pull request titles
+
+Pull request titles are checked by Semantic PR. Use the conventional format
+`<type>(optional-scope): <summary>`.
+
+Allowed types and scopes live in [`.github/semantic.yml`](.github/semantic.yml).
+Scopes are optional; omit the scope instead of inventing one. For
+documentation-only changes, use the `docs` type, for example:
+
+```text
+docs: add preview status disclaimer
+```
