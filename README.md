@@ -2,7 +2,55 @@
 
 Next iteration of the Zitadel identity platform.
 
-## Quick start (Docker)
+# Quick start
+
+Run Zitadel nextgen with PostgreSQL using Docker Compose and a pre-built image from GitHub Container Registry.
+
+## Prerequisites
+
+- Docker Engine with Compose v2
+- curl
+- pnpm
+- some more node stuff? 🤷‍♂️
+
+## Steps
+
+1. Prepare the compose and env templates:
+
+   Default flow (for public repository access): fetch the templates from the `main` branch:
+
+   ```sh
+   mkdir -p nextgen_quickstart
+   cp docs/operations/docker-compose.yaml -o nextgen_quickstart/
+   cp docs/operations/env.example nextgen_quickstart/.env
+   ```
+
+2. Setup the demo app (next)
+
+    ```sh
+    corepack pnpm install
+    corepack pnpm nx build @zitadel/sdk-next
+    cp apps/demo-next/.env.example apps/demo-next/.env.local
+    ```
+
+3. Create a Project with [Bruno](https://www.usebruno.com/) or Insomnia
+
+    ```sh
+      curl --request POST \
+      --url http://localhost:8080/projects \
+      --header 'content-type: application/json' \
+      --data '{
+      "previewOrigins": [
+          "http://localhost:3002"
+      ]
+      }'
+    ```
+    Copy the project ID from the response and put it into `apps/demo-next/.env.local`
+
+3. Run demo app with `corepack pnpm nx dev @zitadel/demo-next`
+4. Demo on http://localhost:3002
+
+## OLD - Quick start (Docker)
 
 Run the API and embedded UIs with PostgreSQL:
 
