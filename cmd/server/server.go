@@ -299,8 +299,6 @@ func loadConfig(configPath string) (Config, error) {
 	v.SetDefault("instrumentation.log.add_source", true)
 	v.SetDefault("instrumentation.log.errors.report_location", true)
 	v.SetDefault("instrumentation.log.errors.stack_trace", true)
-	v.SetDefault("instrumentation.log.exporter.type", otel.ExporterTypeStdOut)
-	v.SetDefault("instrumentation.log.exporter.batch_duration", time.Second)
 
 	// AutomaticEnv only resolves nested keys viper already knows about
 	// (via default, config file, fields of config struct or explicit BindEnv).
