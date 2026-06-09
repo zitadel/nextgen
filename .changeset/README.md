@@ -8,6 +8,9 @@ This directory holds [changesets](https://github.com/changesets/changesets) for 
 - `@zitadel/sdk-core` (`packages/sdk-core`)
 - `@zitadel/sdk-next` (`packages/sdk-next`)
 - `@zitadel/sdk-nuxt` (`packages/sdk-nuxt`)
+- `@zitadel/sdk-react` (`packages/sdk-react`)
+- `@zitadel/sdk-vue` (`packages/sdk-vue`)
+- `@zitadel/sdk-angular` (`packages/sdk-angular`)
 
 Everything else (`@zitadel/api-mock`, `@zitadel/design-tokens`, `@zitadel/shared-component-styles`, `@zitadel/ui-react`, `@zitadel/lint`, the demos, the console) is marked `"private": true` and is never published.
 
