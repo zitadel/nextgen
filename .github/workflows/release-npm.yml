@@ -1,7 +1,8 @@
 name: release-npm
 
 # Publishes the public npm packages (@zitadel/cli, @zitadel/api,
-# @zitadel/components, @zitadel/sdk-core, @zitadel/sdk-next, @zitadel/sdk-nuxt)
+# @zitadel/components, @zitadel/sdk-core, @zitadel/sdk-next, @zitadel/sdk-nuxt,
+# @zitadel/sdk-react, @zitadel/sdk-vue, @zitadel/sdk-angular)
 # via changesets. Pushing changesets to main opens a "Version Packages" PR;
 # merging that PR publishes to npm.
 #
