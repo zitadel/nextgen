@@ -68,10 +68,10 @@ corepack pnpm run journey
 
 The local runner needs Docker for Verdaccio, but by default it starts the
 backend from source with embedded Postgres, so no local database container is
-required. It builds and packs the local publishable packages with pnpm,
-publishes them to the temporary registry, creates a Next.js app outside the
-repo, runs CLI setup through npm, starts the generated app on localhost, and
-runs Playwright with one worker.
+required. It ensures the Playwright Chromium browsers are installed, builds and
+packs the local publishable packages with pnpm, publishes them to the temporary
+registry, creates a Next.js app outside the repo, runs CLI setup through npm,
+starts the generated app on localhost, and runs Playwright with one worker.
 
 For image parity with CI, provide a local backend image tag:
 

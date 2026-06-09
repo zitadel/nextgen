@@ -124,11 +124,12 @@ corepack pnpm run journey
 ```
 
 This runner requires Docker for Verdaccio. By default it starts the backend from
-source with embedded Postgres, builds and packs local npm packages with pnpm,
-creates a temporary Next.js app outside the repo, runs CLI setup through npm,
-starts the generated app on `localhost`, and runs Playwright with one worker.
-Use `-- --backend image --image <docker-tag>` to run the backend through the
-local compose profile for image parity.
+source with embedded Postgres, ensures the Playwright Chromium browsers are
+installed, builds and packs local npm packages with pnpm, creates a temporary
+Next.js app outside the repo, runs CLI setup through npm, starts the generated
+app on `localhost`, and runs Playwright with one worker. Use
+`-- --backend image --image <docker-tag>` to run the backend through the local
+compose profile for image parity.
 
 In CI the dedicated `node-e2e` job (in `.github/workflows/ci.yml`) gates merges
 on the checked-in demo integrations. The separate `consumer-journey-e2e` job is
