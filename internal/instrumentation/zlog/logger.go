@@ -13,17 +13,16 @@ const (
 	ErrorAttributeKey   = sloggcp.ErrorKey
 )
 
-var noop = slog.New(slog.DiscardHandler)
-
-func New(stream Stream, args ...any) *slog.Logger {
-	if !IsStreamEnabled(stream) {
-		return noop
-	}
-
-	return slog.Default().With(append(args,
-		slog.String(StreamAttributeKey, stream.String()),
+func NewLogger(h slog.Handler) *slog.Logger {
+	return slog.New(h).With(
 		slog.String(VersionAttributeKey, build.Version()),
-	)...)
+	)
+}
+
+func WithStream(logger *slog.Logger, stream Stream) *slog.Logger {
+	return logger.
+		With(slog.String(StreamAttributeKey, stream.String())).
+		WithGroup(stream.String())
 }
 
 type AttributeReplacer func(groups []string, a slog.Attr) slog.Attr

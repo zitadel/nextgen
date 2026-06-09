@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"bytes"
+	"context"
 	"log/slog"
 	"net/http"
 	"time"
@@ -9,33 +10,31 @@ import (
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 )
 
-func WithLogger(next http.Handler) http.Handler {
+func getLoggingContext(ctx context.Context) *slog.Logger {
+	logger := zlog.GetLoggingContext(ctx)
+	logger = zlog.WithStream(logger, zlog.StreamRequest)
+	return logger
+}
+
+func WithLogging(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
+
+		// ensure context has logger with request id inside
+		logger := zlog.GetLoggingContext(ctx)
 		requestID, _ := GetRequestIDContext(ctx)
-		logger := zlog.GetLoggingContext(ctx).With( // get logger from context or create default logger
+		logger = logger.With("request_id", requestID)
+		ctx = zlog.WithLoggingContext(ctx, logger)
+		r = r.WithContext(ctx)
+
+		logger = getLoggingContext(ctx)
+		logger.Info("handling request",
 			slog.String("method", r.Method),
 			slog.String("url", r.URL.String()),
 			slog.String("uri", r.RequestURI),
-			slog.String("request_id", requestID),
 		)
-		r = r.WithContext(zlog.WithLoggingContext(ctx, logger))
-		next.ServeHTTP(w, r)
-	})
-}
 
-func WithPreRequestLogging(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		logger := zlog.GetLoggingContext(r.Context())
-		logger.Info("handling request")
-		next.ServeHTTP(w, r)
-	})
-}
-
-func WithPostRequestLogging(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
-		ctx := r.Context()
 
 		// Already set the operation id so that the value exists on the context.
 		// Since the value is wrapped, it can be set by the ogen middleware and
@@ -50,7 +49,6 @@ func WithPostRequestLogging(next http.Handler) http.Handler {
 		next.ServeHTTP(lrw, r.WithContext(ctx))
 
 		operationID, _ := GetOperationIDContext(ctx)
-		logger := zlog.GetLoggingContext(ctx)
 
 		if lrw.statusCode >= 400 {
 			logger.Error("error while handling request",
@@ -67,14 +65,6 @@ func WithPostRequestLogging(next http.Handler) http.Handler {
 			)
 		}
 	})
-}
-
-func WithLogging(next http.Handler) http.Handler {
-	return WithLogger(
-		WithPreRequestLogging(
-			WithPostRequestLogging(next),
-		),
-	)
 }
 
 // ---------------------- LOGGING RESPONSE WRITER -----------------------------
@@ -98,7 +88,6 @@ func (w *loggingResponseWriter) Write(b []byte) (int, error) {
 		w.statusCode = http.StatusOK
 	case w.statusCode >= 400:
 		w.body.Write(b)
-
 	}
 	return w.ResponseWriter.Write(b)
 }

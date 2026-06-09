@@ -17,7 +17,6 @@ import (
 
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/ianlancetaylor/jsonschema"
-	slogmulti "github.com/samber/slog-multi"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	slogctx "github.com/veqryn/slog-context"
@@ -292,7 +291,7 @@ func loadConfig(configPath string) (Config, error) {
 	v.SetDefault("instrumentation.log.streams", []zlog.Stream{
 		zlog.StreamRuntime,
 		zlog.StreamReady,
-		zlog.StreamReady,
+		zlog.StreamRequest,
 		zlog.StreamService,
 		zlog.StreamStorage,
 	})
@@ -431,7 +430,6 @@ func buildCrypter(hexKey string) (crypto.Crypter, error) {
 	if hexKey == "" {
 		return nil, errors.New("server: encryption_key is required (set NEXTGEN_SERVER_ENCRYPTION_KEY)")
 	}
-	hexKey = hex.EncodeToString([]byte(hexKey))
 	key, err := hex.DecodeString(hexKey)
 	if err != nil {
 		return nil, fmt.Errorf("server: decode encryption_key: %w", err)
@@ -489,7 +487,15 @@ func setUpLogging(ctx context.Context, sfs *ShutdownFuncs, cfg instrumentation.L
 	)
 
 	stdErrHandler := cfg.Format.ErrorHandler(cfg.SlogHandlerOptions())
-	logger := slog.New(slogmulti.Fanout(stdErrHandler, otelHandler))
+	handler := zlog.NewHandler(
+		cfg.Level,
+		cfg.Streams,
+		slog.NewMultiHandler(
+			otelHandler,
+			stdErrHandler,
+		),
+	)
+	logger := zlog.NewLogger(handler)
 	logger.Info("structured logger configured", "config_level", cfg.Level, "format", cfg.Format)
 	slog.SetDefault(logger)
 
