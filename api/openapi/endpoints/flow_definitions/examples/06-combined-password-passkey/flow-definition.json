@@ -13,12 +13,14 @@
         "name": "identifier",
         "fields": ["email"],
         "actions": {
-          "submit": { "primary": true },
-          "passkey": {}
+          "submit":   { "primary": true },
+          "passkey":  {},
+          "register": {}
         },
         "transitions": {
-          "submit": { "target": "password" },
-          "passkey": { "target": "done" },
+          "submit":         { "target": "password" },
+          "passkey":        { "target": "done" },
+          "register":       { "target": "register" },
           "user_not_found": { "target": "register" }
         }
       },
@@ -26,30 +28,32 @@
         "name": "password",
         "fields": ["password"],
         "actions": {
-          "submit": { "primary": true },
+          "submit":  { "primary": true },
           "passkey": {}
         },
         "transitions": {
-          "submit": { "target": "done" },
+          "submit":  { "target": "done" },
           "passkey": { "target": "done" }
         }
       },
       {
         "name": "register",
-        "fields": ["email"],
+        "fields": ["email", "name"],
         "actions": {
-          "submit": { "primary": true },
-          "passkey_register": {}
+          "submit":            { "primary": true },
+          "passkey_register":  {},
+          "login":             {}
         },
         "transitions": {
-          "submit": { "target": "register-password" },
-          "passkey_register": { "target": "done" },
-          "user_already_exists": { "target": "password" }
+          "submit":               { "target": "register-password" },
+          "passkey_register":     { "target": "done" },
+          "login":                { "target": "identifier" },
+          "user_already_exists":  { "target": "password" }
         }
       },
       {
         "name": "register-password",
-        "fields": ["password"],
+        "fields": ["password", "phoneNumber"],
         "actions": {
           "submit": { "primary": true }
         },
@@ -62,11 +66,11 @@
         "name": "passkey-upsell",
         "actions": {
           "passkey_register": { "primary": true },
-          "skip": {}
+          "skip":             {}
         },
         "transitions": {
           "passkey_register": { "target": "done" },
-          "skip": { "target": "done" }
+          "skip":             { "target": "done" }
         }
       },
       {

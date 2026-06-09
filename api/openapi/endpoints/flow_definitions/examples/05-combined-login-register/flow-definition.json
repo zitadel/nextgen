@@ -13,10 +13,12 @@
         "name": "identifier",
         "fields": ["email"],
         "actions": {
-          "submit": { "primary": true }
+          "submit": { "primary": true },
+          "register": {}
         },
         "transitions": {
-          "submit": { "target": "password" },
+          "submit":         { "target": "password" },
+          "register":       { "target": "register-identifier" },
           "user_not_found": { "target": "register-identifier" }
         }
       },
@@ -32,13 +34,15 @@
       },
       {
         "name": "register-identifier",
-        "fields": ["email"],
+        "fields": ["email", "name", "phoneNumber"],
         "actions": {
-          "submit": { "primary": true }
+          "submit": { "primary": true },
+          "login": {}
         },
         "transitions": {
-          "submit": { "target": "register-password" },
-          "user_already_exists": { "target": "password" }
+          "submit":               { "target": "register-password" },
+          "login":                { "target": "identifier" },
+          "user_already_exists":  { "target": "password" }
         }
       },
       {
