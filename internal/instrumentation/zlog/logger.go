@@ -23,7 +23,7 @@ func New(stream Stream, args ...any) *slog.Logger {
 	return slog.Default().With(append(args,
 		slog.String(StreamAttributeKey, stream.String()),
 		slog.String(VersionAttributeKey, build.Version()),
-	))
+	)...)
 }
 
 type AttributeReplacer func(groups []string, a slog.Attr) slog.Attr
