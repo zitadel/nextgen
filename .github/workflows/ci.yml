@@ -189,8 +189,9 @@ jobs:
         with:
           name: goreleaser-snapshot
           path: goreleaser-dist
-      # Boots the Goreleaser-built binary on the embedded-postgres default connector:
-      # zero-config / single-binary path. UI is already embedded by GoReleaser hooks.
+      # Boots the Goreleaser-built binary directly on the embedded-postgres
+      # default connector. This proves the single binary starts, migrates, and
+      # handles SIGTERM; Docker image and quick-start surfaces are covered below.
       - name: Install embedded-postgres runtime deps
         run: sudo apt-get update -qq && sudo apt-get install -y -qq libicu-dev libssl-dev
       - name: Cache embedded-postgres binary
@@ -304,17 +305,37 @@ jobs:
           docker load -i goreleaser-dist/nextgen-image.tar
           docker image inspect -f '{{.Os}}/{{.Architecture}}' "$(cat goreleaser-dist/nextgen-image.tag)" | grep -q '^linux/amd64$'
 
-      - name: Smoke test zero-config local dev image
+      - name: Smoke test CLI-style local runtime image
         run: |
           set -euo pipefail
           IMAGE="$(cat goreleaser-dist/nextgen-image.tag)"
           DATA_DIR="$RUNNER_TEMP/nextgen-dev-data"
-          mkdir -p "$DATA_DIR"
+          RUNTIME_DIR="$RUNNER_TEMP/nextgen-dev-runtime"
+          HOST_UID="$(id -u)"
+          HOST_GID="$(id -g)"
+          PASSWD_FILE="$RUNTIME_DIR/container-passwd"
+          GROUP_FILE="$RUNTIME_DIR/container-group"
+          mkdir -p "$DATA_DIR" "$RUNTIME_DIR"
+          # Mirror `zitadel start`: run the container as the host user so
+          # bind-mounted state stays editable, and provide passwd/group entries
+          # because embedded Postgres initdb refuses unknown numeric users.
+          {
+            echo "root:x:0:0:root:/root:/bin/sh"
+            echo "nonroot:x:65532:65532:nonroot:/nonexistent:/usr/sbin/nologin"
+            echo "zitadel-local:x:${HOST_UID}:${HOST_GID}:Zitadel local user:/tmp:/usr/sbin/nologin"
+          } > "$PASSWD_FILE"
+          {
+            echo "root:x:0:"
+            echo "nonroot:x:65532:"
+            echo "zitadel-local:x:${HOST_GID}:"
+          } > "$GROUP_FILE"
           CONTAINER="$(
             docker run -d \
-              --user "$(id -u):$(id -g)" \
               -p 127.0.0.1:18080:8080 \
               -v "$DATA_DIR:/var/lib/zitadel/nextgen-data" \
+              -v "$PASSWD_FILE:/etc/passwd:ro" \
+              -v "$GROUP_FILE:/etc/group:ro" \
+              --user "${HOST_UID}:${HOST_GID}" \
               -e NEXTGEN_SERVER_ADDRESS=:8080 \
               -e NEXTGEN_SERVER_DATA_DIR=/var/lib/zitadel/nextgen-data \
               "$IMAGE"
@@ -351,7 +372,7 @@ jobs:
             diagnose
             exit 1
           fi
-          echo "zero-config local dev image smoke test passed"
+          echo "CLI-style local runtime image smoke test passed"
 
       - name: Prepare quick-start compose stack
         run: |
@@ -379,6 +400,8 @@ jobs:
       - name: Start stack and verify HTTP endpoints
         run: |
           set -euo pipefail
+          # Separate from the CLI-style smoke above: this keeps the documented
+          # compose fallback valid for operators/manual quick-start usage.
           COMPOSE=(docker compose -f nextgen_quickstart/docker-compose.yaml --env-file nextgen_quickstart/.env)
           "${COMPOSE[@]}" up -d --wait
           ready=0
@@ -409,7 +432,12 @@ jobs:
 
       - name: Tear down compose stack
         if: always()
-        run: docker compose -f nextgen_quickstart/docker-compose.yaml --env-file nextgen_quickstart/.env down -v
+        run: |
+          if [ -f nextgen_quickstart/.env ]; then
+            docker compose -f nextgen_quickstart/docker-compose.yaml --env-file nextgen_quickstart/.env down -v
+          else
+            echo "Skipping compose teardown because nextgen_quickstart/.env was not created."
+          fi
 
   node-e2e:
     runs-on: ubuntu-latest
