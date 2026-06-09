@@ -27,6 +27,9 @@ more than polish.
   `.changeset/<slug>.md` file directly rather than via the interactive prompt.
   See `AGENTS.md` for the package list and file format. npm package manifests
   must keep `"license": "MIT"`.
+- PR titles must pass Semantic PR. Use `<type>(optional-scope): <summary>` and
+  verify allowed types/scopes against `.github/semantic.yml`; for docs-only
+  changes, use a title such as `docs: add preview status disclaimer`.
 - Server and embedded console changes are AGPL-3.0-only by default; public API,
   docs, CLI, and SDK paths are MIT exceptions per `LICENSING.md`.
 - For `consumer-journey-e2e` or `apps/cli-journey-e2e/**` changes, verify that
