@@ -8,9 +8,13 @@ Run Zitadel nextgen with PostgreSQL using Docker Compose and a pre-built image f
 
 ## Prerequisites
 
+- A working terminal
+- git
 - Docker Engine with Compose v2
 - curl
 - pnpm
+- corepack
+- [Bruno](https://www.usebruno.com/) or Insomnia
 - some more node stuff? 🤷‍♂️
 
 ## Steps
