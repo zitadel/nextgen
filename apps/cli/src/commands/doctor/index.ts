@@ -3,7 +3,7 @@ import consola from "consola";
 
 import { BaseCommand, type JsonEnvelope } from "../../lib/oclif";
 import { ZitadelError } from "../../lib/errors";
-import { dockerAvailable, ensureImage } from "../../lib/local-server/docker";
+import { dockerAvailable, imageAvailable } from "../../lib/local-server/docker";
 import {
   DEFAULT_LOCAL_SERVER_IMAGE,
   DEFAULT_LOCAL_SERVER_PORT,
@@ -169,10 +169,10 @@ async function runLocalRuntimeChecks(
       return `Docker engine ${result.stdout.trim() || "available"}`;
     }),
     await check("image", `Image ${image} is available`, async () => {
-      const source = await ensureImage(image);
+      const source = await imageAvailable(image);
       return source === "local"
         ? `Image ${image} is available locally`
-        : `Image ${image} was pulled`;
+        : `Image ${image} is available from the registry`;
     }),
     await check("state-dir", "Local state directory is writable", async () => {
       const paths = localRuntimePaths(cwd);

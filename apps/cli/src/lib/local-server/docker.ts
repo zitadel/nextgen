@@ -112,6 +112,24 @@ export async function imageExists(image: string): Promise<boolean> {
   return result.status === 0;
 }
 
+export async function imageAvailable(image: string): Promise<"local" | "remote"> {
+  if (await imageExists(image)) {
+    return "local";
+  }
+
+  const args = ["manifest", "inspect", image];
+  let result: DockerResult;
+  try {
+    result = await runDocker(args);
+  } catch (error) {
+    throw dockerError(`Inspect Docker image ${image}`, args, error);
+  }
+  if (result.status === 0) {
+    return "remote";
+  }
+  throw dockerError(`Inspect Docker image ${image}`, args, result);
+}
+
 export async function ensureImage(image: string): Promise<"local" | "pulled"> {
   if (await imageExists(image)) {
     return "local";

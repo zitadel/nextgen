@@ -45,6 +45,15 @@ describe("local runtime commands", () => {
     const envelope = parseJson(result.stdout) as { status: string; data: { ok: boolean } };
     expect(envelope.status).toBe("ok");
     expect(envelope.data.ok).toBe(true);
+
+    const dockerCalls = await readDockerCalls(fake.logPath);
+    expect(dockerCalls).toContainEqual(["image", "inspect", "ghcr.io/zitadel/nextgen:latest"]);
+    expect(dockerCalls).toContainEqual([
+      "manifest",
+      "inspect",
+      "ghcr.io/zitadel/nextgen:latest",
+    ]);
+    expect(dockerCalls.some((args) => args[0] === "pull")).toBe(false);
   });
 
   it("doctor reports Docker-specific guidance when runtime prerequisites fail", async () => {
@@ -68,6 +77,35 @@ describe("local runtime commands", () => {
     expect(envelope.hint).not.toContain("doctor --fix");
     expect(envelope.next_commands).toContain("docker version");
     expect(envelope.next_commands).toContain("zitadel doctor");
+  });
+
+  it("doctor reports unavailable images without pulling", async () => {
+    const cwd = await tempProject("zitadel-doctor-image-fail-");
+    const fake = await fakeDocker({ imageAvailable: false });
+    const port = await freePort();
+
+    const result = await runCliForTest(
+      ["doctor", "--cwd", cwd, "--json", "--port", String(port), "--image", "missing:test"],
+      {
+        PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
+        DOCKER_LOG: fake.logPath,
+      },
+    );
+
+    expect(result.exitCode).toBe(3);
+    const envelope = parseJson(result.stdout) as {
+      status: string;
+      hint: string;
+      next_commands: string[];
+    };
+    expect(envelope.status).toBe("error");
+    expect(envelope.hint).toContain("image is not available");
+    expect(envelope.next_commands).toContain("docker pull missing:test");
+
+    const dockerCalls = await readDockerCalls(fake.logPath);
+    expect(dockerCalls).toContainEqual(["image", "inspect", "missing:test"]);
+    expect(dockerCalls).toContainEqual(["manifest", "inspect", "missing:test"]);
+    expect(dockerCalls.some((args) => args[0] === "pull")).toBe(false);
   });
 
   it("start --json starts the single-container runtime and writes metadata", async () => {
@@ -151,7 +189,7 @@ async function tempProject(prefix: string): Promise<string> {
 }
 
 async function fakeDocker(
-  options: { dockerAvailable?: boolean; imageExists?: boolean } = {},
+  options: { dockerAvailable?: boolean; imageExists?: boolean; imageAvailable?: boolean } = {},
 ): Promise<{ binDir: string; logPath: string }> {
   const binDir = await mkdtemp(join(tmpdir(), "zitadel-fake-docker-"));
   tempDirs.push(binDir);
@@ -177,6 +215,9 @@ if (args[0] === "pull") {
 }
 if (args[0] === "image" && args[1] === "inspect") {
   process.exit(${options.imageExists === true ? "0" : "1"});
+}
+if (args[0] === "manifest" && args[1] === "inspect") {
+  process.exit(${options.imageAvailable === false ? "1" : "0"});
 }
 if (args[0] === "inspect") {
   process.exit(1);

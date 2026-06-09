@@ -45,8 +45,18 @@ describe("local server runtime metadata", () => {
     );
   });
 
+  it("accepts runtime metadata with an explicit default HTTP port", async () => {
+    const metadata = { ...runtimeFor(cwd), port: 80, server_url: "http://localhost:80" };
+
+    await writeRuntimeMetadata(cwd, metadata);
+
+    await expect(readRuntimeMetadata(cwd)).resolves.toEqual(metadata);
+  });
+
   it.each([
     ["server_url", "localhost:8080"],
+    ["server_url", "http://localhost"],
+    ["server_url", "http://localhost:8082"],
     ["port", 0],
     ["port", 8080.5],
   ])("rejects runtime metadata with invalid %s", async (field, value) => {

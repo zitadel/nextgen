@@ -211,7 +211,7 @@ function normalizeRuntimeMetadata(input: Record<string, unknown>): RuntimeMetada
     typeof input.port !== "number" ||
     !isValidPort(input.port) ||
     typeof input.server_url !== "string" ||
-    !isValidServerUrl(input.server_url) ||
+    !isValidServerUrl(input.server_url, input.port) ||
     typeof input.data_dir !== "string" ||
     typeof input.created_at !== "string" ||
     typeof input.cli_version !== "string"
@@ -273,11 +273,24 @@ function isValidPort(value: number): boolean {
   return Number.isInteger(value) && value >= 1 && value <= 65_535;
 }
 
-function isValidServerUrl(value: string): boolean {
+function isValidServerUrl(value: string, port: number): boolean {
   try {
     const url = new URL(value);
-    return (url.protocol === "http:" || url.protocol === "https:") && url.hostname.length > 0;
+    return (
+      (url.protocol === "http:" || url.protocol === "https:") &&
+      url.hostname.length > 0 &&
+      explicitUrlPort(value) === port
+    );
   } catch {
     return false;
   }
+}
+
+function explicitUrlPort(value: string): number | undefined {
+  const match = value.match(/^[a-z][a-z\d+\-.]*:\/\/(?:\[[^\]]+\]|[^/?#:]+):(\d+)(?:[/?#]|$)/i);
+  if (!match) {
+    return undefined;
+  }
+  const port = Number(match[1]);
+  return isValidPort(port) ? port : undefined;
 }
