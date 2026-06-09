@@ -2,6 +2,13 @@
 
 Next iteration of the Zitadel identity platform.
 
+> **Preview status:** This repository is a pre-release next-generation Zitadel
+> preview. The public name may change, and APIs, CLI flags, package surfaces,
+> and docs are still in flux. The checked-in CLI currently supports the local
+> Docker-backed flow documented below; create-first, claim-later is the product
+> direction, but `zitadel claim` is not shipped in this repo yet. See
+> [VISION.md](VISION.md).
+
 ## Workflow front doors
 
 ### I am contributing to Zitadel
@@ -77,6 +84,8 @@ Details: [docs/quick-start/index.md](docs/quick-start/index.md). To build from s
 This repository is pre-release. The Go `server` command serves the OpenAPI
 surface and embeds the console and login UIs at `/ui/console/` and `/ui/login/`.
 CI produces installable snapshots for review, not official releases.
+
+For product direction and public-readiness notes, see [VISION.md](VISION.md).
 
 ## Local checks
 
