@@ -1,0 +1,56 @@
+{
+  "name": "@zitadel/sdk-angular",
+  "version": "0.0.0",
+  "description": "Angular components for the Zitadel auth UI (client-side SPA).",
+  "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-angular#readme",
+  "bugs": {
+    "url": "https://github.com/zitadel/nextgen/issues"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zitadel/nextgen.git",
+    "directory": "packages/sdk-angular"
+  },
+  "publishConfig": {
+    "access": "public",
+    "directory": "dist"
+  },
+  "scripts": {
+    "build": "ng-packagr -p ng-package.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run --passWithNoTests",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@zitadel/api": "workspace:*",
+    "@zitadel/components": "workspace:*",
+    "tslib": "^2.6.0"
+  },
+  "peerDependencies": {
+    "@angular/common": ">=17",
+    "@angular/core": ">=17"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "eslint": "^9.0.0",
+    "@angular/common": "^22.0.0",
+    "@angular/compiler": "^22.0.0",
+    "@angular/compiler-cli": "^22.0.0",
+    "@angular/core": "^22.0.0",
+    "ng-packagr": "^22.0.0",
+    "typescript": "~6.0.0",
+    "jsdom": "catalog:",
+    "vitest": "^3.0.0",
+    "zone.js": "~0.16.0",
+    "@eslint/json": "^0.11.0",
+    "@eslint/markdown": "^6.0.0",
+    "eslint-config-prettier": "^10.0.0",
+    "eslint-import-resolver-typescript": "^3.7.0",
+    "eslint-plugin-import": "^2.31.0",
+    "eslint-plugin-perfectionist": "^4.0.0",
+    "eslint-plugin-prettier": "^5.0.0",
+    "prettier": "^3.0.0",
+    "typescript-eslint": "^8.0.0"
+  }
+}

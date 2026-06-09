@@ -17,13 +17,12 @@ to be a fast answer to "can I build flow X right now?"
 - Encrypted `_zflow` cookie (`HttpOnly`, `Secure`, `SameSite=Strict`, 600s max-age).
 - Cookie cleared on terminal step.
 - Step error mode: same step re-rendered with `Error` set; cookie rotates to prevent replay.
-- Cookie-cookie / cookie-id / cookie-expiry mismatch errors mapped to 401 / 404 / 410.
+- Cookie missing / invalid / expired → 401; cookie-id mismatch → 404; flow-already-completed (GET only) → 410.
 
 ### Resolution
 
-- Direct lookup by `name` (with optional `schema_version`).
-- Audience-based resolution by `purpose` plus active `status`.
-- Picks the highest `schema_version` when multiple matches.
+- Direct lookup by `name` (with optional `schema_version`). Multiple matches resolve via `pickLatestFlowVersion` — a lexicographic compare over `schema_version` strings (see [Missing → Resolution](#resolution-1)).
+- Audience-based resolution by `purpose` plus active `status`. The repository returns rows ordered `created_at DESC, id DESC`; the service takes the first.
 - Fails with `ErrFlowDefinitionPurposeMismatch` when a name-resolved definition doesn't serve the requested purpose.
 
 ### Definitions
@@ -35,19 +34,28 @@ to be a fast answer to "can I build flow X right now?"
 ### Steps & state machine
 
 - Schema-driven `fields`: type, validation, `required`, uniqueness scope, challenge mapping from `x-unique` / `x-password` annotations.
-- `actions` — user-selectable, surfaced on the capability payload.
-- `on_success: create_user` — hashes the password, writes the user and credential rows. Pure side effect: does not authenticate the new user, so the engine keeps walking the graph and does not mint a handoff.
+- `actions` — user-selectable, surfaced on the capability payload. `passkey` and `passkey_register` are recognized action names that drive the passkey ceremony.
+- `on_success: create_user` — hashes the password (argon2id), writes the user and credential rows, then calls `auth-attempt.RegisterCreatedUser` so the new user counts as verified for the terminal handoff.
 - `complete: redirect` and `complete: show` — terminal step classifiers.
-- Implicit identifier resolution from any identifier-shaped field; routes via `user_not_found` when wired, errors otherwise.
+- Implicit identifier resolution from any identifier-shaped field; routes via `user_not_found` (login flows) or `user_already_exists` (register flows) when wired, errors otherwise. The engine flips `CurrentPurpose` on the matching outcome to switch sub-flows.
 - Implicit password verification when a password-shaped field is present and `on_success` is not `create_user`.
 - Step error path: validation failures and password rejection re-render the current step with `Error` set; the state machine does **not** advance.
 - Terminal-step handoff: when a user has been resolved, calls `auth-attempt.Handoff` and returns the token + expiry on `FlowStepResult`.
+- Field pre-fill: `CollectedData` is propagated into resolved fields before every step render so re-renders carry the user's previous input.
+
+### Passkey ceremony (two-phase)
+
+- `passkey` (login) and `passkey_register` (signup) actions trigger an **issue → client signs → verify** ceremony that short-circuits the field-shaped dispatch.
+- **Phase 1 (issue)** — the step emits a `challenge` on the response (`method`, `challenge_id`, `options`). For login, identifier dispatch runs first so `PreparePasskeyChallenge` can populate `allowCredentials` with the resolved user's credential IDs. For registration, `GenerateUserID()` mints a provisional `_user_id` (marked via the reserved `_passkey_provisional` collected key) so the WebAuthn `user.id` can be stable across phases.
+- **Phase 2 (verify)** — the submit carries `challenge_response.proof`. On registration verify, `HandleProvisional` creates the user row inside the same DB transaction that persists the credential, then `RegisterCreatedUser` marks the user as verified on the auth attempt.
+- RPID derivation: `WithRequestHostMiddleware` injects effective proto+host into the request context so handlers can derive the WebAuthn RPID when the browser omits `Origin` on same-origin fetches.
 
 ### Step response shape
 
 - `name`, `texts` (`title_key`, `description_key`), optional `error`, optional `complete`.
 - `fields` map keyed by name, per-field `type` / `text_key` / `required` / optional `value` / optional `validation`.
 - `actions` map with `text_key` and `primary` flag. Actions are unordered — the LiquidJS template decides layout.
+- `challenge` populated on the issue leg of a two-phase ceremony (passkey today): `method`, `challenge_id`, ceremony-specific `options`.
 - `gates` and `sso_providers` are part of the contract but not yet emitted with content (see below).
 
 ## Stubbed (returns `ErrUnsupported`)
@@ -66,7 +74,6 @@ Not implemented at any layer:
 
 ### Auth methods
 
-- Passkey (WebAuthn) registration and verification ceremonies — see [ADR 013](../../adrs/013-passkey-gate-contract.md) for the contract direction.
 - Magic-link, email OTP, SMS OTP challenges.
 - TOTP enrollment and verification.
 - SSO redirect, callback handling, and identity linking.
@@ -77,11 +84,12 @@ Not implemented at any layer:
 - Pivot stack (push/pop on cross-flow transitions).
 - Dynamic step injection from the policy engine (e.g. policy demands a second factor).
 - Implicit policy evaluation at the terminal step — the design calls for it; today, completion is driven by definition transitions only.
-- Engine-emitted outcomes beyond `user_not_found` (`user_link_required`, `user_locked`, …) — see [ADR 017](../../adrs/017-flow-engine-auth-attempt-dispatch.md).
+- Engine-emitted outcomes beyond `user_not_found` and `user_already_exists` (`user_link_required`, `user_locked`, …) — see [ADR 017](../../adrs/017-flow-engine-auth-attempt-dispatch.md).
 
 ### On-success handlers
 
-- Only `create_user` exists today. `reset_credential`, `enroll_factor`, `create_user_with_passkey`, `create_user_with_sso`, `link_sso` are referenced in design docs but unimplemented.
+- `create_user` exists today, with a `HandleProvisional` sibling used by the passkey-register verify leg to finalize the provisional user inside the credential-save transaction.
+- `reset_credential`, `enroll_factor`, `create_user_with_sso`, `link_sso` are referenced in design docs but unimplemented.
 - The dispatch carve-out for credential establishment is `OnSuccess == create_user`; the writer-manifest generalization is open (ADR 017).
 
 ### Resolution
@@ -97,9 +105,9 @@ Not implemented at any layer:
 ### Other
 
 - Branding / template selection beyond `defaultBranding()` — the handler always returns the built-in default.
-- `step.challenge` payload (per [ADR 013](../../adrs/013-passkey-gate-contract.md)) and `challenge_response` on submit.
 - Session integration: the engine mints `sess_*` ids but does not yet read or write durable session rows.
 - `auth_request_id` and `redirect_uri` are stored on `FlowState` but the OIDC handshake that consumes them is out of scope.
+- `redirect_uri` allowlist validation at `Start` — accepted as-supplied today.
 
 ## What you can build today
 
@@ -108,5 +116,7 @@ Without writing any new code, the engine supports:
 - **Pure password signin** with identifier + password on separate steps, routing via `user_not_found`.
 - **Pure password signup** when the identifier and the password live on the same `create_user` step. Multi-step signup needs the dispatch generalization in [ADR 017](../../adrs/017-flow-engine-auth-attempt-dispatch.md).
 - **Combined login + register** when the entry step declares `user_not_found` and routes to the registration branch.
+- **Passkey login** — discoverable credentials or allow-list per resolved user; the issue leg runs identifier dispatch first so `allowCredentials` is populated.
+- **Passkey signup** — single step with the `passkey_register` action; the provisional user is finalized by `HandleProvisional` on the verify leg.
 - **Terminal `show` flows** for self-service registration without an OIDC auth request.
 - **Terminal `redirect` flows** when `redirect_uri` is set at `Start` (the OIDC handshake itself is not yet wired).

@@ -2,7 +2,71 @@
 
 Next iteration of the Zitadel identity platform.
 
-## Quick start (Docker)
+# Quick start
+
+Run Zitadel nextgen with PostgreSQL using Docker Compose and a pre-built image from GitHub Container Registry.
+
+## Prerequisites
+
+- A working terminal
+- git
+- Docker Engine with Compose v2
+- curl
+- pnpm
+- corepack
+- some more node stuff? 🤷‍♂️
+
+## Steps
+
+1. `git clone git@github.com:zitadel/nextgen.git` this repo (or use `https://github.com/zitadel/nextgen.git` you don't have ssh auth in place)
+2. `cd nextgen`
+3. Prepare the compose and env templates:
+
+   Default flow (for public repository access):
+
+   ```sh
+   mkdir -p nextgen_quickstart
+   cp docs/operations/docker-compose.yaml nextgen_quickstart/
+   cp docs/operations/env.example nextgen_quickstart/.env
+   ```
+
+4. Setup the demo app (next)
+
+    ```sh
+    corepack pnpm install
+    corepack pnpm nx build @zitadel/sdk-next
+    cp apps/demo-next/.env.example apps/demo-next/.env.local
+    ```
+5. Run docker compose
+
+    ```sh
+    cd nextgen_quickstart/
+    docker compose up -d
+    ```
+    Make sure everything boots up correctly `docker compose ps`
+
+6. Create a Project with with cURL
+
+    ```sh
+      curl --request POST \
+      --url http://localhost:8080/projects \
+      --header 'content-type: application/json' \
+      --data '{
+      "previewOrigins": [
+          "http://localhost:3002"
+      ]
+      }'
+    ```
+    Copy the project ID from the response and put it into `apps/demo-next/.env.local`
+
+7. Open a new terminal (in the root folder of the project). Run demo app with:
+    ```sh
+    cd apps/demo-next
+    corepack pnpm nx dev @zitadel/demo-next
+    ```
+8. Demo on http://localhost:3002
+
+## OLD - Quick start (Docker)
 
 Run the API and embedded UIs with PostgreSQL:
 
