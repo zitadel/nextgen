@@ -10,6 +10,9 @@ more than polish.
   `api/generated/**` or package `dist/**`.
 - Treat `apps/cli/SKILLS.md` as the current CLI agent guidance and keep it in
   sync with CLI behavior.
+- Keep the two local-development front doors separate: contributors use root
+  `corepack pnpm run ...` scripts, while customers use published
+  `zitadel ...` runtime commands and `--server local`.
 - Preserve the CLI JSON envelope. In `--json` mode stdout must stay parseable,
   with top-level `cli_version`, `command`, `source`, and `status`; diagnostics
   belong in structured fields or stderr when appropriate.
@@ -30,3 +33,6 @@ more than polish.
   the test uses current workflow artifacts, a temporary registry for Zitadel
   packages, the CLI JSON setup contract, required passkey coverage in CI, and
   focused diagnostics that exclude bulky generated app directories.
+- For local runtime command changes, verify Docker command construction, local
+  `.zitadel/local/` state handling, `--server local` resolution, and the
+  zero-config image smoke path with no `NEXTGEN_SERVER_ENCRYPTION_KEY`.

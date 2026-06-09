@@ -58,8 +58,6 @@ deletes it.
 Run the API and embedded UIs with Docker Compose when you want to inspect the
 operator-style stack directly:
 
-Run the API and embedded UIs with PostgreSQL:
-
 ```sh
 cd docs/operations
 cp env.example .env
@@ -163,8 +161,8 @@ goreleaser release --snapshot --clean --skip=publish,sign
 
 # Run a snapshot Docker image (defaults to `nextgen server`)
 docker run --rm -p 8080:8080 \
-  -e NEXTGEN_SERVER_ENCRYPTION_KEY=4D61737465726B65794E65656473546F48617665333243686172616374657273 \
-  -e NEXTGEN_DATABASE_POSTGRES='postgres://...' \
+  -v "$PWD/.zitadel/local/nextgen-data:/var/lib/zitadel/nextgen-data" \
+  -e NEXTGEN_SERVER_DATA_DIR=/var/lib/zitadel/nextgen-data \
   ghcr.io/zitadel/nextgen:<snapshot-tag>-amd64
 ```
 

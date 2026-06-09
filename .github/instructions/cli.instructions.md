@@ -14,6 +14,11 @@ The CLI is an agent-facing product surface. Review changes against
   own script prelude before CLI stdout.
 - Keep `commands --json`, help output, README command docs, and `SKILLS.md` in
   sync with behavior and tests.
+- Keep customer local runtime commands as top-level `zitadel start|stop|status|logs|reset|doctor`; do not model
+  them as root npm scripts or as the Go server command surface.
+- `--server local` must resolve through `.zitadel/local/runtime.json` only when
+  the local runtime is healthy, otherwise return a stable
+  `E_LOCAL_SERVER_NOT_RUNNING` envelope.
 - Prefer structured `next_commands` and stable error codes over prose-only
   guidance.
 - Do not reintroduce the removed pre-claim / claim lifecycle unless a real

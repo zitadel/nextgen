@@ -10,6 +10,9 @@ state of the repo.
 - CI should continue to cover Go vet/tests, pnpm install/typecheck/test/build,
   CLI smoke checks, npm pack dry runs, non-publishing GoReleaser snapshots, and
   the `consumer-journey-e2e` fresh-app quality gate.
+- Local-runtime image changes should preserve the zero-config Docker smoke:
+  mounted `nextgen-data`, generated `server-encryption-key`, embedded Postgres,
+  and no required `NEXTGEN_SERVER_ENCRYPTION_KEY`.
 - The release workflow is manual and draft-oriented while the repo is
   pre-release. Do not imply official npm publishing is enabled.
 - npm package changes use changesets; Go server releases use GoReleaser.

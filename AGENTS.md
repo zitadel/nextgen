@@ -55,6 +55,36 @@ Secrets").
 - `packages/lint/` contains the local Nx plugin that infers Oxlint targets.
 - `docs/` contains design notes and ADRs that explain product intent.
 
+## Workflow Front Doors
+
+### I am contributing to Zitadel
+
+| I want to... | Run |
+| --- | --- |
+| Check my setup | `corepack pnpm run doctor` |
+| Try the local Zitadel CLI | `corepack pnpm run cli -- --help` |
+| Run the server from source | `corepack pnpm run server -- --help` |
+| Test the fresh-app onboarding path | `corepack pnpm run journey` |
+| Run normal local checks | `corepack pnpm run check` |
+| Mirror CI locally | `corepack pnpm run check -- --full` |
+| Rerun one failed phase | `corepack pnpm run check -- --only node` |
+
+### I am adding Zitadel to my app
+
+| I want to... | Run |
+| --- | --- |
+| Check local runtime prerequisites | `npx @zitadel/cli@alpha doctor` |
+| Start local Zitadel | `npx @zitadel/cli@alpha start` |
+| Add auth to Next.js | `npx @zitadel/cli@alpha setup --framework next --server local` |
+| Check generated app files | `npx @zitadel/cli@alpha doctor` |
+| Stop local Zitadel, keeping data | `npx @zitadel/cli@alpha stop` |
+| Delete local Zitadel data | `npx @zitadel/cli@alpha reset --force` |
+
+`corepack pnpm run server` is a repository contributor command that runs the Go
+server from source. `zitadel start` is a published product CLI command that
+runs the released Docker image for app developers and agents; it must not rely
+on Go, Nx, or this source checkout.
+
 ## Local Checks
 
 Use Node.js from `.nvmrc` and the pinned pnpm version from `package.json`.
@@ -156,6 +186,10 @@ Agent scripts should pass `--non-interactive --json` and prefer structured
 `next_commands` over prose hints. When invoking the local root wrapper for JSON
 capture, use `corepack pnpm --silent run cli -- ... --json`; plain `pnpm run`
 prints its own script prelude before the CLI output.
+
+For customer-local runtime workflows, agents should prefer
+`zitadel doctor`, `zitadel start`, and `--server local` before running
+`zitadel setup`.
 
 ## Release, Licensing, And Secrets
 

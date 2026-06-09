@@ -207,7 +207,6 @@ jobs:
           chmod +x ./nextgen
       - name: Smoke test (start, migrate, graceful exit 0)
         run: |
-          export NEXTGEN_SERVER_ENCRYPTION_KEY=4D61737465726B65794E65656473546F48617665333243686172616374657273
           ./nextgen > server.log 2>&1 &
           pid=$!
           # "server listening" is logged only after embedded PG is up, migrations
@@ -224,6 +223,7 @@ jobs:
             echo "::error::timed out waiting for server readiness"; cat server.log
             kill -TERM "$pid" 2>/dev/null || true; exit 1
           fi
+          test -f nextgen-data/server-encryption-key
           kill -TERM "$pid"
           code=0; wait "$pid" || code=$?
           cat server.log
@@ -304,6 +304,55 @@ jobs:
           docker load -i goreleaser-dist/nextgen-image.tar
           docker image inspect -f '{{.Os}}/{{.Architecture}}' "$(cat goreleaser-dist/nextgen-image.tag)" | grep -q '^linux/amd64$'
 
+      - name: Smoke test zero-config local dev image
+        run: |
+          set -euo pipefail
+          IMAGE="$(cat goreleaser-dist/nextgen-image.tag)"
+          DATA_DIR="$RUNNER_TEMP/nextgen-dev-data"
+          mkdir -p "$DATA_DIR"
+          CONTAINER="$(
+            docker run -d \
+              --user "$(id -u):$(id -g)" \
+              -p 127.0.0.1:18080:8080 \
+              -v "$DATA_DIR:/var/lib/zitadel/nextgen-data" \
+              -e NEXTGEN_SERVER_ADDRESS=:8080 \
+              -e NEXTGEN_SERVER_DATA_DIR=/var/lib/zitadel/nextgen-data \
+              "$IMAGE"
+          )"
+          cleanup() {
+            docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
+          }
+          diagnose() {
+            docker logs "$CONTAINER" || true
+          }
+          trap cleanup EXIT
+
+          ready=0
+          for _ in $(seq 1 120); do
+            if curl -fsS http://localhost:18080/healthz >/dev/null; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then
+            echo "::error::timed out waiting for zero-config /healthz"
+            diagnose
+            exit 1
+          fi
+          test -f "$DATA_DIR/server-encryption-key"
+          if ! curl -fsS -o /dev/null -w "%{http_code}\n" http://localhost:18080/ui/console/ | grep -q '^200$'; then
+            echo "::error::zero-config /ui/console/ did not return 200"
+            diagnose
+            exit 1
+          fi
+          if ! curl -fsS -o /dev/null -w "%{http_code}\n" http://localhost:18080/ui/login/ | grep -q '^200$'; then
+            echo "::error::zero-config /ui/login/ did not return 200"
+            diagnose
+            exit 1
+          fi
+          echo "zero-config local dev image smoke test passed"
+
       - name: Prepare quick-start compose stack
         run: |
           mkdir -p nextgen_quickstart
@@ -312,7 +361,6 @@ jobs:
           {
             echo "NEXTGEN_IMAGE=${IMAGE}"
             echo "NEXTGEN_PORT=8080"
-            echo "NEXTGEN_SERVER_ENCRYPTION_KEY=4d61737465726b65794e65656473546f48617665333243686172616374657273"
           } > nextgen_quickstart/.env
           docker compose -f nextgen_quickstart/docker-compose.yaml --env-file nextgen_quickstart/.env config >/dev/null
 
@@ -615,7 +663,6 @@ jobs:
           {
             echo "NEXTGEN_IMAGE=${IMAGE}"
             echo "NEXTGEN_PORT=8080"
-            echo "NEXTGEN_SERVER_ENCRYPTION_KEY=4d61737465726b65794e65656473546f48617665333243686172616374657273"
           } > "$RUNNER_TEMP/nextgen-journey/.env"
           docker compose -f "$RUNNER_TEMP/nextgen-journey/docker-compose.yaml" --env-file "$RUNNER_TEMP/nextgen-journey/.env" up -d --wait
           for _ in $(seq 1 90); do

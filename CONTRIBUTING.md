@@ -6,7 +6,9 @@
 - Node.js from [`.nvmrc`](.nvmrc)
 - pnpm 10 from [`package.json`](package.json) (`corepack enable`)
 
-## Developer workflow
+## Workflow front doors
+
+### I am contributing to Zitadel
 
 | I want to... | Run |
 | --- | --- |
@@ -18,9 +20,21 @@
 | Mirror CI locally | `corepack pnpm run check -- --full` |
 | Rerun one failed phase | `corepack pnpm run check -- --only node` |
 
+### I am adding Zitadel to my app
+
+| I want to... | Run |
+| --- | --- |
+| Check local runtime prerequisites | `npx @zitadel/cli@alpha doctor` |
+| Start local Zitadel | `npx @zitadel/cli@alpha start` |
+| Add auth to Next.js | `npx @zitadel/cli@alpha setup --framework next --server local` |
+| Stop local Zitadel, keeping data | `npx @zitadel/cli@alpha stop` |
+| Delete local Zitadel data | `npx @zitadel/cli@alpha reset --force` |
+
 Nx manages TypeScript workspace targets. Go commands and long-running local
 orchestration run through repository scripts so server processes are signaled
-and cleaned up directly.
+and cleaned up directly. Published `zitadel` runtime commands are for customers and
+agents adding Zitadel to an app; they manage a Docker-backed local runtime and
+do not require Go, Nx, or this source checkout.
 
 `corepack pnpm run server` builds and syncs the embedded console/login UI before
 startup, then runs `go run .`; help output skips the UI sync.
@@ -86,11 +100,13 @@ the internal embed folders.
 ### 2. Configure and start
 
 ```sh
-export NEXTGEN_SERVER_ENCRYPTION_KEY=4D61737465726B65794E65656473546F48617665333243686172616374657273
-export NEXTGEN_DATABASE_POSTGRES='postgres://zitadel:zitadel@localhost:5432/nextgen?sslmode=disable'
-
-corepack pnpm run server -- -c docs/operations/nextgen.example.yaml
+corepack pnpm run server
 ```
+
+With no database configured, the source server starts embedded Postgres and
+stores its data plus generated encryption key under the server data directory.
+Use `-c docs/operations/nextgen.example.yaml` or `NEXTGEN_DATABASE_POSTGRES`
+when you want to point at a database you manage.
 
 Open http://localhost:8080/ui/console/ and http://localhost:8080/ui/login/
 
@@ -118,9 +134,9 @@ After a snapshot build, binaries are under `dist/`:
 ```sh
 docker build -t nextgen:local .
 docker run --rm -p 8080:8080 \
-  -e NEXTGEN_SERVER_ENCRYPTION_KEY=4D61737465726B65794E65656473546F48617665333243686172616374657273 \
-  -e NEXTGEN_DATABASE_POSTGRES='postgres://...' \
-  nextgen:local server
+  -v "$PWD/.zitadel/local/nextgen-data:/var/lib/zitadel/nextgen-data" \
+  -e NEXTGEN_SERVER_DATA_DIR=/var/lib/zitadel/nextgen-data \
+  nextgen:local
 ```
 
 Place the platform binary at `linux/amd64/nextgen` in the build context when mimicking Goreleaser layout, or build with `go build -o nextgen .` and adjust the Dockerfile for local iteration.
