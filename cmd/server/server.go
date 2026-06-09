@@ -75,7 +75,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		if err != nil {
 			slog.Error("run error", slogctx.Err(err))
 		}
-		err = sfs.Exec(ctx)
+		err = sfs.Exec(context.WithoutCancel(ctx))
 		if err != nil {
 			slog.Error("shutdown error", slogctx.Err(err))
 			os.Exit(1)
@@ -96,7 +96,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		return err
 	}
 	sfs.Add(func(ctx context.Context) error {
-		if err := pool.Close(context.Background()); err != nil {
+		if err := pool.Close(ctx); err != nil {
 			return fmt.Errorf("failed close database pool: %w", err)
 		}
 		return nil
