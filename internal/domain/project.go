@@ -34,11 +34,17 @@ func NewProject(previewOrigins []string, tokenGenerator TokenGenerator) (*Projec
 	if err != nil {
 		return nil, ErrInternal(err).WithMessage("failed to create project id")
 	}
-	projectSecret, err := tokenGenerator.Generate(&Token{ProjectID: id})
+	projectSecret, err := tokenGenerator.Generate(&Token{
+		ProjectID: id,
+		Scope:     []string{"project.write", "project.read"},
+	})
 	if err != nil {
 		return nil, ErrInternal(err).WithMessage("failed to generate project secret")
 	}
-	previewSecret, err := tokenGenerator.Generate(&Token{ProjectID: id, Scope: []string{"preview"}})
+	previewSecret, err := tokenGenerator.Generate(&Token{
+		ProjectID: id,
+		Scope:     []string{"project.read"},
+	})
 	if err != nil {
 		return nil, ErrInternal(err).WithMessage("failed to generate preview secret")
 	}
