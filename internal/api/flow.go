@@ -522,14 +522,37 @@ var (
 	codeFlowDefinitionNotFound        = domain.ErrFlowDefinitionNotFound().Code
 	codeFlowDefinitionPurposeMismatch = domain.ErrFlowDefinitionPurposeMismatch().Code
 	codeFlowDefinitionInvalid         = domain.ErrFlowDefinitionInvalid(nil, nil).Code
+	codeMissingFlowDefinitionID       = domain.ErrMissingFlowDefinitionID().Code
+	codeMissingProjectID              = domain.ErrMissingProjectID().Code
+	codeFlowDefinitionAlreadyExists   = domain.ErrFlowDefinitionAlreadyExists().Code
 )
 
 func flowDefinitionErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 	switch err.Code {
 	case codeFlowDefinitionNotFound:
 		return errorResponseWithStatusCode(http.StatusNotFound, err)
-	case codeFlowDefinitionPurposeMismatch, codeFlowDefinitionInvalid:
+	case codeFlowDefinitionPurposeMismatch,
+		codeMissingFlowDefinitionID,
+		codeMissingProjectID:
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
+	case codeFlowDefinitionInvalid:
+		errResp := errorResponseWithStatusCode(http.StatusBadRequest, err)
+		if err.Details != nil {
+			if details, ok := err.Details.(string); ok {
+				b, marshalErr := json.Marshal(details)
+				if marshalErr == nil {
+					errResp.Response.Details = api.OptErrorDetailsDetails{
+						Value: api.ErrorDetailsDetails{
+							"details": b,
+						},
+						Set: true,
+					}
+				}
+			}
+		}
+		return errResp
+	case codeFlowDefinitionAlreadyExists:
+		return errorResponseWithStatusCode(http.StatusConflict, err)
 	default:
 		return internalErrorResponse(err)
 	}

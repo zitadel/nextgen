@@ -94,6 +94,7 @@ func embeddedPostgresOptions(dataDir string) embedded.Options {
 	return embedded.Options{
 		RuntimePath: filepath.Join(root, "runtime"),
 		DataPath:    filepath.Join(root, "data"),
+		CachePath:   filepath.Join(root, "cache"),
 		LogPath:     filepath.Join(root, "postgres.log"),
 		Logger:      os.Stdout,
 	}
@@ -180,13 +181,13 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 	schemaService := service.NewSchemaService(pool, schemaRepo, schemaResolverWithHTTP, schemaValidator)
 	flowDefinitionSvc := service.NewFlowDefinitionService(
 		pool,
-		storageSchemaResolver,
+		schemaService,
 		schemaValidator,
 		nil,
 		flowDefinitionRepo,
 	)
-	userService := service.NewUserService(pool, userRepo, schemaRepo)
 	teamService := service.NewTeamService(pool, teamRepo)
+	userService := service.NewUserService(pool, userRepo, userPasswordRepo, schemaRepo, passwordHasher)
 
 	// ── Flow engine ──────────────────
 	ids := idgen.NewULID()

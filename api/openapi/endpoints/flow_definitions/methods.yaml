@@ -80,7 +80,12 @@ get:
   parameters:
     - $ref: ../../components/parameters/limit.yaml
     - $ref: ../../components/parameters/page-token.yaml
-    - $ref: ../../components/parameters/project-id.yaml
+    - name: project_id
+      in: query
+      description: The project id to filter by.
+      required: true
+      schema:
+        $ref: ../../components/schemas/project-id.yaml
     - name: purpose
       in: query
       required: false

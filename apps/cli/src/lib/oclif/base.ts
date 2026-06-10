@@ -50,11 +50,17 @@ export abstract class BaseCommand extends Command {
    * `source` by the documented precedence and storing the result on
    * `this.meta` so the error handler can render a complete envelope.
    */
-  protected async toMeta(flags: Record<string, unknown>): Promise<GlobalOptions> {
+  protected async toMeta(
+    flags: Record<string, unknown>,
+    options: { resolveServer?: boolean; source?: string } = {},
+  ): Promise<GlobalOptions> {
     const cwd = resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined);
     const serverFlag = typeof flags.server === "string" ? flags.server : undefined;
     const environment = typeof flags.environment === "string" ? flags.environment : "development";
-    const source = await resolveServer({ cwd, env: process.env, serverFlag, environment });
+    const source =
+      options.resolveServer === false
+        ? { value: options.source ?? "", origin: "default" as const }
+        : await resolveServer({ cwd, env: process.env, serverFlag, environment });
     const json = this.jsonEnabled();
     const isTTY = Boolean(process.stdout.isTTY && process.stdin.isTTY);
     const verbose = Boolean(flags.verbose);
