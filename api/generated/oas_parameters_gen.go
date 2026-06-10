@@ -2485,6 +2485,62 @@ func decodeGetMySessionParams(args [0]string, argsEscaped bool, r *http.Request)
 	return params, nil
 }
 
+// GetMyUserParams is parameters of getMyUser operation.
+type GetMyUserParams struct {
+	// The __nextgen_session cookie issued at session creation or superseding handoff exchange.
+	NextgenSession string
+}
+
+func unpackGetMyUserParams(packed middleware.Parameters) (params GetMyUserParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "__nextgen_session",
+			In:   "cookie",
+		}
+		params.NextgenSession = packed[key].(string)
+	}
+	return params
+}
+
+func decodeGetMyUserParams(args [0]string, argsEscaped bool, r *http.Request) (params GetMyUserParams, _ error) {
+	c := uri.NewCookieDecoder(r)
+	// Decode cookie: __nextgen_session.
+	if err := func() error {
+		cfg := uri.CookieParameterDecodingConfig{
+			Name:    "__nextgen_session",
+			Explode: true,
+		}
+		if err := c.HasParam(cfg); err == nil {
+			if err := c.DecodeParam(cfg, func(d uri.Decoder) error {
+				val, err := d.DecodeValue()
+				if err != nil {
+					return err
+				}
+
+				c, err := conv.ToString(val)
+				if err != nil {
+					return err
+				}
+
+				params.NextgenSession = c
+				return nil
+			}); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "__nextgen_session",
+			In:   "cookie",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
 // GetProjectParams is parameters of getProject operation.
 type GetProjectParams struct {
 	ProjectID ProjectID
@@ -4165,7 +4221,7 @@ func decodeListUsersParams(args [0]string, argsEscaped bool, r *http.Request) (p
 
 // RevokeMySessionParams is parameters of revokeMySession operation.
 type RevokeMySessionParams struct {
-	// The session_token cookie issued at session creation or superseding handoff exchange.
+	// The __nextgen_session cookie issued at session creation or superseding handoff exchange.
 	NextgenSession string
 }
 
