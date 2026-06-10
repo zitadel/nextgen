@@ -30,6 +30,7 @@ import type {
   GetProject200,
   GetSchemaById200,
   ListFlowDefinitions200,
+  ListFlowDefinitions200FlowDefinitionsItem,
   UpdateFlowDefinition200,
 } from "@zitadel/api/generated/model";
 import {
@@ -148,6 +149,7 @@ type ProjectRecord = {
  */
 type FlowDefinitionRecord = {
   id: string;
+  name: string;
   projectId: string;
   schemaUri: string;
   status: string;
@@ -183,10 +185,22 @@ function flowDetailResponse(r: FlowDefinitionRecord): GetFlowDefinition200 {
     project_id: r.projectId,
     schema_uri: r.schemaUri,
     status: r.status,
+    flow_definition: r.body as unknown as GetFlowDefinition200['flow_definition'],
     created_at: r.createdAt,
     updated_at: r.updatedAt,
-    ...r.body,
   } as unknown as GetFlowDefinition200;
+}
+
+function flowListItemResponse(r: FlowDefinitionRecord): ListFlowDefinitions200FlowDefinitionsItem {
+  return {
+    id: r.id,
+    name: r.name,
+    project_id: r.projectId,
+    schema_uri: r.schemaUri,
+    status: r.status,
+    created_at: r.createdAt,
+    updated_at: r.updatedAt,
+  };
 }
 
 let store: Store = makeStore();
@@ -322,8 +336,10 @@ export function setupPlatformHandlers() {
 
       const id = `flow_${shortId()}`;
       const now = nowIso();
+      const flowDef = body.data.flow_definition as Record<string, unknown>;
       const record: FlowDefinitionRecord = {
         id,
+        name: flowDef.name as string,
         projectId: body.data.project_id,
         schemaUri: body.data.schema_uri ?? DEFAULT_SCHEMA_URI,
         status: "active",
@@ -347,7 +363,7 @@ export function setupPlatformHandlers() {
       }
 
       const responseBody: ListFlowDefinitions200 = {
-        flow_definitions: [...store.flowDefinitions.values()].map(flowDetailResponse),
+        flow_definitions: [...store.flowDefinitions.values()].map(flowListItemResponse),
         next_page_token: null,
       };
       const out = parse(ListFlowDefinitionsResponse, responseBody, "mock_response_invalid");

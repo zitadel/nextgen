@@ -5,7 +5,6 @@ required:
   - id
   - name
   - project_id
-  - schema_uri
   - status
   - created_at
   - updated_at

@@ -2,9 +2,68 @@
 
 Next iteration of the Zitadel identity platform.
 
-## Quick start (Docker)
+> **Preview status:** This repository is a pre-release next-generation Zitadel
+> preview. The public name may change, and APIs, CLI flags, package surfaces,
+> and docs are still in flux. The checked-in CLI currently supports the local
+> Docker-backed flow documented below; create-first, claim-later is the product
+> direction, but `zitadel claim` is not shipped in this repo yet. See
+> [VISION.md](VISION.md).
 
-Run the API and embedded UIs with PostgreSQL:
+## Workflow front doors
+
+### I am contributing to Zitadel
+
+| I want to... | Run |
+| --- | --- |
+| Check my setup | `corepack pnpm run doctor` |
+| Try the local Zitadel CLI | `corepack pnpm run cli -- --help` |
+| Run the server from source | `corepack pnpm run server -- --help` |
+| Test the fresh-app onboarding path | `corepack pnpm run journey` |
+| Run normal local checks | `corepack pnpm run check` |
+| Mirror CI locally | `corepack pnpm run check -- --full` |
+| Rerun one failed phase | `corepack pnpm run check -- --only node` |
+
+### I am adding Zitadel to my app
+
+| I want to... | Run |
+| --- | --- |
+| Check local runtime prerequisites | `npx @zitadel/cli@alpha doctor` |
+| Start local Zitadel | `npx @zitadel/cli@alpha start` |
+| Add auth to a Next.js app | `npx @zitadel/cli@alpha setup --framework next --server local` |
+| Check generated app files | `npx @zitadel/cli@alpha doctor` |
+| Stop local Zitadel, keeping data | `npx @zitadel/cli@alpha stop` |
+| Delete local Zitadel data | `npx @zitadel/cli@alpha reset --force` |
+
+Nx manages TypeScript workspace targets. Go commands and long-running local
+orchestration run through repository scripts so server processes are signaled
+and cleaned up directly. The published `zitadel` runtime commands are customer
+workflow commands; they run the released container image through Docker and do
+not require Go, Nx, or a source checkout.
+
+`corepack pnpm run server` builds and syncs the embedded console/login UI before
+startup, then runs `go run .`; help output skips the UI sync.
+
+## Customer quick start
+
+```sh
+npx create-next-app@latest myapp
+cd myapp
+npx @zitadel/cli@alpha doctor
+npx @zitadel/cli@alpha start
+npx @zitadel/cli@alpha setup --framework next --server local
+npm install
+npm run dev
+```
+
+Open http://localhost:3000/login and register your first local user. The
+managed Zitadel runtime stores its container metadata and data under
+`.zitadel/local/`; `stop` preserves that data and `reset --force`
+deletes it.
+
+## Manual Docker quick start
+
+Run the API and embedded UIs with Docker Compose when you want to inspect the
+operator-style stack directly:
 
 ```sh
 cd docs/operations
@@ -26,47 +85,55 @@ This repository is pre-release. The Go `server` command serves the OpenAPI
 surface and embeds the console and login UIs at `/ui/console/` and `/ui/login/`.
 CI produces installable snapshots for review, not official releases.
 
+For product direction and public-readiness notes, see [VISION.md](VISION.md).
+
 ## Local checks
 
 Use Node.js from [.nvmrc](.nvmrc) and the pinned pnpm 10 workspace manager from
-`package.json`.
+`package.json`. Start with the local doctor, then run the fast check set:
 
 ```sh
-corepack pnpm --version
-corepack pnpm install --frozen-lockfile
-corepack pnpm nx run-many -t lint,typecheck,build,test
-
-go vet ./...
-go test ./...
+corepack pnpm run doctor
+corepack pnpm run check
 ```
+
+`corepack pnpm run check -- --full` runs the slower CI-parity phases, including
+integration tests, demo e2e, package smoke checks, GoReleaser, and the fresh-app
+journey. Use `--only <phase>` to rerun one phase after a failure.
 
 To seed demo users for local login testing, pass bootstrap JSON files when starting the server (see [examples/bootstrap-users/](examples/bootstrap-users/)):
 
 ```sh
-go run . server -c <config.yaml> --user-file examples/bootstrap-users/demo-admin.json
+corepack pnpm run server -- -c <config.yaml> --user-file examples/bootstrap-users/demo-admin.json
 ```
+
+The server wrapper runs `scripts/sync-embedded-ui-dist.sh all` before startup so
+the default embedded UI routes work from source. Run that script manually only
+when bypassing the wrapper with direct `go run .`.
 
 Package smoke checks:
 
 ```sh
-node apps/cli/dist/zitadel.mjs --version
-node apps/cli/dist/zitadel.mjs capabilities --json
-
-(cd apps/cli && npm pack --dry-run)
-(cd packages/sdk-core && npm pack --dry-run)
-(cd packages/sdk-next && npm pack --dry-run)
+corepack pnpm run cli -- --version
+corepack pnpm run cli -- commands
+corepack pnpm --silent run cli -- status --json
+corepack pnpm run check -- --only pack
 ```
+
+Use `corepack pnpm --silent run cli -- ... --json` when a script needs
+parseable CLI stdout. Plain `pnpm run` prints its own script prelude before
+the command output.
 
 Fresh-app consumer journey check:
 
 ```sh
-corepack pnpm nx run @zitadel/cli-journey-e2e:e2e-local
+corepack pnpm run journey
 ```
 
-This opt-in check builds the local npm packages, publishes them to a temporary
-Verdaccio registry, starts a source backend with embedded Postgres, scaffolds a
-new Next.js app outside the repo, and verifies registration/login journeys
-against the generated app.
+This opt-in check ensures the Playwright Chromium browsers are installed, builds
+the local npm packages, publishes them to a temporary Verdaccio registry, starts
+a source backend with embedded Postgres, scaffolds a new Next.js app outside the
+repo, and verifies registration/login journeys against the generated app.
 
 ## CI
 
@@ -103,8 +170,8 @@ goreleaser release --snapshot --clean --skip=publish,sign
 
 # Run a snapshot Docker image (defaults to `nextgen server`)
 docker run --rm -p 8080:8080 \
-  -e NEXTGEN_SERVER_ENCRYPTION_KEY=4D61737465726B65794E65656473546F48617665333243686172616374657273 \
-  -e NEXTGEN_DATABASE_POSTGRES='postgres://...' \
+  -v "$PWD/.zitadel/local/nextgen-data:/var/lib/zitadel/nextgen-data" \
+  -e NEXTGEN_SERVER_DATA_DIR=/var/lib/zitadel/nextgen-data \
   ghcr.io/zitadel/nextgen:<snapshot-tag>-amd64
 ```
 
@@ -115,7 +182,7 @@ push a multi-arch image manifest to `ghcr.io/zitadel/nextgen`.
 
 ### npm packages (`changesets`)
 
-`apps/cli` and `packages/sdk-*` are intended to be published to npm via
+`apps/cli` and the public packages under `packages/` publish to npm via
 [changesets](https://github.com/changesets/changesets). On any user-visible
 change to those packages:
 
@@ -123,9 +190,8 @@ change to those packages:
 corepack pnpm changeset
 ```
 
-The future changesets workflow should open a "Version Packages" PR; merging it
-will tag and publish the affected packages once npm ownership and tokens are in
-place. No npm publishing workflow is enabled yet.
+The changesets workflow opens a "Version Packages" PR. Merging that PR versions
+and publishes the affected packages through npm trusted publishing.
 
 ### Local development
 

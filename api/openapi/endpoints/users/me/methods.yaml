@@ -1,0 +1,34 @@
+get:
+  operationId: getMyUser
+  summary: Get my user information
+  tags:
+    - User
+  parameters:
+    - $ref: ../../../components/parameters/session-cookie.yaml
+  security: []
+  responses:
+    '200':
+      description: Current user information retrieved successfully
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+    '401':
+      description: Client was not authorized or the session is anonymous
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '404':
+      description: User referenced by the current session was not found
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/schemas/errors/user-not_found.yaml
+    default:
+      description: Unexpected error response.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml

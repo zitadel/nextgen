@@ -19,8 +19,10 @@ graph TD
     FR["internal/domain/flow_field_resolver*<br>FlowFieldResolver"]
     OS["internal/domain/flow_on_success*<br>FlowOnSuccessHandler"]
     AA["internal/domain/flow_auth_attempt.go<br>FlowAuthAttemptService"]
+    PR["internal/domain/flow_passkey_registration.go<br>FlowPasskeyRegistrationService"]
 
     AAImpl["service: auth-attempt"]
+    PRImpl["service: PasskeyRegistrationService<br>(via FlowPasskeyRegistrationAdapter)"]
     Repo["repository: flow_definitions"]
     UserRepo["repository: users / passwords"]
     Schema["service: SchemaService"]
@@ -32,30 +34,52 @@ graph TD
     SM --> FR
     SM --> OS
     SM --> AA
+    SM --> PR
     Service --> Repo
     FR --> Schema
     OS --> UserRepo
     AA --> AAImpl
+    PR --> PRImpl
 ```
 
 ## Request path
 
-```
-POST /flow                    GET /flow/{id}                POST /flow/{id}/submit
-       │                              │                              │
-       ▼                              ▼                              ▼
- Handler.CreateFlow         Handler.GetFlowStep         Handler.SubmitFlowStep
-       │                              │                              │
-       │     (no cookie yet)          ▼ openState(_zflow)             ▼ openState(_zflow)
-       ▼                       Crypter.Decrypt                Crypter.Decrypt
- FlowService.Resolve                  │                              │
- FlowService.Start                    ▼                              ▼
-       │                       FlowService.GetStep          FlowService.Submit
-       ▼                              │                              │
- stateMachine.Start                   ▼                              ▼
-       │                       stateMachine.Render          stateMachine.Process
-       ▼                              │                              │
- sealState → Set-Cookie               └─── buildFlowResponse ◄────────┘
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant H as Handler<br/>(internal/api/flow.go)
+    participant K as Crypter
+    participant S as FlowService
+    participant SM as StateMachine
+
+    Note over C,SM: POST /flow — no cookie yet
+    C->>H: CreateFlow
+    H->>S: Resolve, then Start
+    S->>SM: Start
+    SM-->>S: *FlowState + FlowStep
+    S-->>H: FlowStepResult
+    H->>K: sealState(_zflow)
+    H-->>C: 201 + Set-Cookie
+
+    Note over C,SM: GET /flow/{id}
+    C->>H: GetFlowStep (_zflow cookie)
+    H->>K: openState(_zflow)
+    K-->>H: *FlowState
+    H->>S: GetStep
+    S->>SM: Render
+    SM-->>S: FlowStep
+    S-->>H: FlowStepResult
+    H-->>C: 200 + buildFlowResponse
+
+    Note over C,SM: POST /flow/{id}/submit
+    C->>H: SubmitFlowStep (_zflow cookie + body)
+    H->>K: openState(_zflow)
+    K-->>H: *FlowState
+    H->>S: Submit
+    S->>SM: Process
+    SM-->>S: FlowStepResult (advanced or step-error)
+    H->>K: sealState(_zflow) — rotate, or clear on terminal
+    H-->>C: 200 / 400 + Set-Cookie
 ```
 
 Cookie I/O is owned by the handler. The state machine never touches HTTP, cookies, or the encryption layer — it receives a `*FlowState` and returns one.
@@ -85,10 +109,25 @@ The state machine. Three entry points (`Start`, `Process`, `Render`) and one pri
 Process(in):
   ├── find current step in definition
   ├── resolve fields via FlowFieldResolver
+  ├── prefillFromCollected: hydrate resolved fields from state.CollectedData
   ├── validate submitted values
   │     └─ on error: return same step with Error set
   ├── merge fields into state.CollectedData
-  ├── dispatchChallenges (identifier, then password)
+  ├── if action ∈ {passkey, passkey_register}:
+  │     ├─ Phase 1 (no proof yet):
+  │     │   ├─ login: run dispatchChallenges first so SubmitIdentifier
+  │     │   │   resolves the user and PreparePasskeyChallenge can
+  │     │   │   populate allowCredentials
+  │     │   └─ register: GenerateUserID → store as provisional _user_id
+  │     │       (marked _passkey_provisional in CollectedData)
+  │     └─ Phase 2 (challenge_response present):
+  │         ├─ verify the assertion / attestation
+  │         ├─ if provisional: HandleProvisional creates the user inside
+  │         │   the credential-save transaction, then RegisterCreatedUser
+  │         │   marks the user verified on the auth attempt
+  │         └─ on success, fall through to terminal handoff
+  ├── dispatchChallenges (identifier, then password) — skipped when the
+  │     passkey ceremony handled the step
   │     ├─ verify-vs-skip keyed on state.CurrentPurpose + visited on_success
   │     ├─ on user_not_found / user_already_exists: route via outcome
   │     │   (and flip CurrentPurpose per the engine's flip rule)
@@ -121,22 +160,37 @@ Interface (`Resolve` + `Validate`) plus a schema-backed implementation in `flow_
 
 Interface every `on_success` mutation satisfies. One implementation today:
 
-- `FlowCreateUserHandler` (`flow_on_success_create_user.go`) — reads the identifier and password fields from the collected data, hashes the password via `FlowPasswordHasher`, writes the user via the user repository, writes the credential via the password repository. The handler is a pure side effect: it does not authenticate the new user, so the engine does not mint a handoff just because `create_user` ran.
+- `FlowCreateUserHandler` (`flow_on_success_create_user.go`) — reads the identifier and password fields from the collected data, hashes the password (argon2id) via `FlowPasswordHasher`, writes the user via the user repository, writes the credential via the password repository, then calls `auth-attempt.RegisterCreatedUser` so the new user is treated as verified by the terminal handoff.
+- `HandleProvisional` (same type) — used by the passkey-register verify leg: creates the user row inside the same DB transaction that persists the passkey credential, using the provisional `_user_id` minted at Phase 1.
 
 ### `FlowAuthAttemptService` (`internal/domain/flow_auth_attempt.go`)
 
-A narrow interface over the auth-attempt service. The state machine sees four
-methods (`Start`, `SubmitIdentifier`, `SubmitPassword`, `Handoff`) and never
-sees challenge ids. Identifier no-match and password rejection both surface as
-`ErrAuthAttemptProofRejected`, which the state machine routes (`user_not_found`)
-or re-renders (step error) accordingly.
+A narrow interface over the auth-attempt service. The state machine sees
+`Start`, `SubmitIdentifier`, `SubmitPassword`, `RegisterCreatedUser`, and
+`Handoff`, and never sees challenge ids. Identifier no-match and password
+rejection both surface as `ErrAuthAttemptProofRejected`, which the state
+machine routes (`user_not_found`) or re-renders (step error) accordingly.
+`RegisterCreatedUser` is called after `create_user` (and after passkey-register
+verify) so the freshly-created user counts as a verified factor for the
+terminal handoff.
+
+### `FlowPasskeyRegistrationService` (`internal/domain/flow_passkey_registration.go`)
+
+A narrow interface for the passkey-register ceremony. The state machine sees
+`IssuePasskeyRegistrationChallenge` (Phase 1 — mints a WebAuthn registration
+challenge keyed to a provisional user id) and `SubmitPasskeyRegistration`
+(Phase 2 — verifies the attestation and persists the credential inside the
+caller's `database.QueryExecutor`, so it can share the transaction that
+`HandleProvisional` uses to materialize the user row).
 
 ### Domain types worth knowing
 
 - `FlowDefinition` / `FlowDefinitionStep` — the immutable graph (`flow_definition.go`). Steps don't have a `type`; behavior derives from `Fields`, `Actions`, `Gates`, `SSOProviders`, `OnSuccess`, `Complete`, and `Transitions`.
 - `FlowState` / `FlowProgress` — the cookie payload (`flow_state.go`). `FlowState` wraps `FlowProgress` (current step, history, collected data, `Purpose`, and the dispatch-mode `CurrentPurpose`) and adds session/OIDC context plus a reserved `PivotStack`.
-- `FlowStep` — the capability payload returned to the client (`flow_state_machine.go`).
+- `FlowStep` — the capability payload returned to the client (`flow_state_machine.go`). `Challenge` carries the issue-leg payload of a two-phase ceremony.
+- `FlowStepChallenge` / `FlowChallengeResponse` / `FlowPendingChallenge` — the two-phase ceremony contract: a pending challenge the client signs, and the proof it submits back.
 - Reserved key `FlowCollectedUserIDKey` (`_user_id`) — set by the dispatch loop when the auth-attempt identifies the user; gates whether the terminal step mints a handoff.
+- Reserved key `_passkey_provisional` — flags that `_user_id` was minted by the passkey-register issue leg and still needs `HandleProvisional` + `RegisterCreatedUser` on verify.
 
 ## Upstream dependencies (what calls into the engine)
 
@@ -149,6 +203,7 @@ Implements three ogen-generated method signatures: `CreateFlow`, `SubmitFlowStep
 - Seals the returned `*FlowState` into the `_zflow` cookie (`HttpOnly`, `Secure`, `SameSite=Strict`, `Max-Age=600`).
 - Translates `service.FlowStepResult` into the OpenAPI `FlowResponse` (`toFlowStep`, `toFlowField`, `toFlowStepActions`).
 - Maps domain errors to HTTP status codes (`mapFlowErrorStatus`, `mapFlowGetError`).
+- Derives the WebAuthn RPID from the effective request host injected by `WithRequestHostMiddleware` (`internal/api/security.go`) — needed because same-origin browser fetches do not send an `Origin` header.
 
 Cookie semantics:
 
@@ -175,6 +230,10 @@ Source of truth for the wire format. The ogen-generated types under `api/generat
 ### auth-attempt service
 
 Wired in as `FlowAuthAttemptService`. The state machine calls `Start` at `FlowService.Start`, `SubmitIdentifier` and `SubmitPassword` from `dispatchChallenges`, and `Handoff` at the terminal step when a user has been resolved. Today the production implementation is the `AuthAttemptService` in `internal/service/auth_attempt.go`.
+
+### passkey-registration service
+
+Wired in as `FlowPasskeyRegistrationService` via `FlowPasskeyRegistrationAdapter` (`internal/service/flow_passkey_registration.go`), which wraps the broader `PasskeyRegistrationService`. The state machine calls `IssuePasskeyRegistrationChallenge` on Phase 1 of a `passkey_register` action and `SubmitPasskeyRegistration` on Phase 2. The adapter is the seam that lets the engine consume only the two methods it needs without depending on the full passkey-registration service surface.
 
 ### `FlowDefinitionRepository`
 

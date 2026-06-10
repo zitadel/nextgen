@@ -20,9 +20,14 @@
     "@zitadel/shared-component-styles": "0.0.0",
     "@zitadel/ui-react": "0.0.0",
     "@zitadel/cli-journey-e2e": "0.0.1",
-    "@zitadel/login-ui": "0.0.1"
+    "@zitadel/login-ui": "0.0.1",
+    "@zitadel/sdk-react": "0.0.0",
+    "@zitadel/sdk-vue": "0.0.0",
+    "@zitadel/sdk-angular": "0.0.0"
   },
   "changesets": [
+    "add-spa-sdks",
+    "align-alpha-sdk-dependency",
     "cli-drop-unused-flows",
     "cli-remove-claim-logic",
     "cli-scaffold-middleware",
@@ -36,6 +41,9 @@
     "fix-release-pnpm-setup",
     "passkey-end-to-end-flow",
     "slow-lines-grin",
+    "smooth-playwright-journey",
+    "soft-local-dev",
+    "vision-public-readiness",
     "zitadel-scope-and-npm-publishing"
   ]
 }
