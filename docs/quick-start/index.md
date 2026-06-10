@@ -1,70 +1,60 @@
 # Quick start
 
-Run Zitadel nextgen with PostgreSQL using Docker Compose and a pre-built image from GitHub Container Registry.
+Add Zitadel to a local Next.js app with the published CLI and a Docker-managed
+local Zitadel runtime.
 
 ## Prerequisites
 
-- Docker Engine with Compose v2
-- curl
+- Node.js 20 or newer for `npx`
+- Docker Engine or a Docker-compatible runtime
 
 ## Steps
 
-1. Prepare the compose and env templates:
+```sh
+npx create-next-app@latest myapp
+cd myapp
 
-   Temporary workaround for private or unmerged branches (assumes this repository and branch are already checked out, and you run the commands from the repository root):
+npx @zitadel/cli@alpha doctor
+npx @zitadel/cli@alpha start
+npx @zitadel/cli@alpha setup --framework next --server local
 
-   ```sh
-   mkdir -p .tmp/nextgen_quickstart
-   cp docs/operations/docker-compose.yaml .tmp/nextgen_quickstart/docker-compose.yaml
-   cp docs/operations/env.example .tmp/nextgen_quickstart/env.example
-   cd .tmp
-   ```
+npm install
+npm run dev
+```
 
-   Default flow (for public repository access): fetch the templates from the `main` branch:
+Open:
 
-   ```sh
-   mkdir -p nextgen_quickstart
-   curl -fsSL https://raw.githubusercontent.com/zitadel/nextgen/main/docs/operations/docker-compose.yaml -o nextgen_quickstart/docker-compose.yaml
-   curl -fsSL https://raw.githubusercontent.com/zitadel/nextgen/main/docs/operations/env.example -o nextgen_quickstart/env.example
-   ```
+```text
+http://localhost:3000/login
+```
 
-2. Copy the example environment file and start the stack:
+The managed local Zitadel server listens on http://localhost:8080 by default.
+The CLI stores runtime metadata in `.zitadel/local/runtime.json` and mounts
+`.zitadel/local/nextgen-data` into the container. Stop preserves that data:
 
-   ```sh
-   cd nextgen_quickstart
-   cp env.example .env
-   docker compose up -d
-   ```
+```sh
+npx @zitadel/cli@alpha stop
+```
 
-   If `docker compose up -d` fails with `manifest unknown` for `ghcr.io/zitadel/nextgen:latest`, set `NEXTGEN_IMAGE` in `.env` to a published tag or locally built image (see [docker-compose.md](./docker-compose.md)).
-   If Postgres is `unhealthy` with the `in 18+, these Docker images are configured ...` error, remove the old local data volume and retry with `docker compose down -v && docker compose up -d`.
-   For the PostgreSQL 18+ mount-path detail (`/var/lib/postgresql`), see [docker-compose.md](./docker-compose.md).
+Delete it explicitly:
 
-3. Open the bundled UIs (same origin as the API):
+```sh
+npx @zitadel/cli@alpha reset --force
+```
 
-   | Surface | URL |
-   | ------- | --- |
-   | Management console (scaffolding) | http://localhost:8080/ui/console/ |
-   | Sign-in shell (`<zitadel-login>`) | http://localhost:8080/ui/login/ |
-   | Health check | http://localhost:8080/healthz |
+## Local Runtime URLs
 
-4. Optional: verify the API responds:
+| Surface | URL |
+| ------- | --- |
+| API | http://localhost:8080 |
+| Management console | http://localhost:8080/ui/console/ |
+| Sign-in shell (`<zitadel-login>`) | http://localhost:8080/ui/login/ |
+| Health check | http://localhost:8080/healthz |
 
-   ```sh
-   curl -sS http://localhost:8080/healthz
-   ```
+## Manual Docker Compose
 
-## What happens on first start
-
-The `server` process applies database **migrations automatically** when it connects to PostgreSQL. There is no separate migrate command.
-
-## Sign-in expectations
-
-The login page at `/ui/login/` loads the `<zitadel-login>` web component against the same-origin Flow API. End-to-end sign-in requires flow execution to be enabled on the server; until then the page proves packaging and UI wiring.
-
-See [login-ui.md](./login-ui.md) for query parameters and limitations.
-
-## Next steps
+Use Docker Compose when you want to inspect the operator-style stack directly
+or run Zitadel with a separate PostgreSQL container:
 
 - [docker-compose.md](./docker-compose.md) — image tags, volumes, bootstrap users
 - [configuration.md](./configuration.md) — `nextgen.yaml` and environment variables

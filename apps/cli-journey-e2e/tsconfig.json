@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "allowJs": true,
+    "outDir": "out-tsc/playwright",
+    "sourceMap": false,
+    "types": ["node"]
+  },
+  "include": [
+    "playwright.config.mts",
+    "src/**/*.spec.ts",
+    "src/**/*.d.ts"
+  ]
+}

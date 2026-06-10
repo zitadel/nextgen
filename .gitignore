@@ -8,6 +8,7 @@
 *.so
 *.dylib
 api/openapi/bundled.yaml
+bruno/
 
 # Test binary, built with `go test -c`
 *.test
@@ -96,6 +97,9 @@ coverage
 
 ## Local runtime config
 nextgen.yaml
+/nextgen
+nextgen-data/
+.zitadel/local/
 
 # Keep the embed placeholder so //go:embed all:dist works in clean checkouts.
 # `dist/` above ignores the directory entirely, so we have to un-ignore the

@@ -44,6 +44,9 @@ type FlowOnSuccessInput struct {
 type FlowOnSuccessResult struct {
 	Outcome   string
 	StepError *string
+	// UserID is set when a handler creates a new user. The state machine
+	// records it and registers the user on the auth attempt.
+	UserID string
 }
 
 // FlowPasswordHasher hashes plaintext passwords into the PHC string

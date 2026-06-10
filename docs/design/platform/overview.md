@@ -2,6 +2,11 @@
 
 > **Status:** Draft
 > **See also:** [README](README.md) · [Project Secret](secret.md) · [Configuration Surface](configuration-surface.md) · [Claim Flow](claim-flow.md)
+>
+> **Current implementation note:** This document describes target platform
+> design. The checked-in CLI and server do not currently expose the claim
+> lifecycle or a `zitadel claim` command; see ADR 003 for the shipped-state
+> decision.
 
 Every identity provider on the market today assumes that identity precedes everything. Before a developer can write their first line of auth code, they must have a tenant, and before a tenant can exist, they must sign up. The signup form is the gate, the tenant is the primitive, and the developer is a downstream consequence of the account.
 

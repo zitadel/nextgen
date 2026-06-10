@@ -25,3 +25,11 @@ func ErrFlowDefinitionInvalid(details any, parent error) Error {
 func ErrSchemaFetchFailed(details any, parent error) Error {
 	return newError(PrefixFlowDefinition.ErrorCodePrefix("schema_fetch_failed"), "flow definition: failed to fetch schema", details, parent)
 }
+
+func ErrMissingFlowDefinitionID() Error {
+	return newError(PrefixFlowDefinition.ErrorCodePrefix("missing_id"), "flow definition: missing id", nil, nil)
+}
+
+func ErrMissingProjectID() Error {
+	return newError(PrefixFlowDefinition.ErrorCodePrefix("missing_project_id"), "flow definition: missing project id", nil, nil)
+}

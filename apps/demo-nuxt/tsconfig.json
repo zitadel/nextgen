@@ -9,6 +9,9 @@
     },
     {
       "path": "../../packages/components"
+    },
+    {
+      "path": "../../packages/api"
     }
   ]
 }

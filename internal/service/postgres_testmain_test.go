@@ -6,7 +6,6 @@ package service_test
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"os"
 	"testing"
@@ -50,7 +49,7 @@ func runPostgresIntegrationTests(m *testing.M) int {
 func integrationPoolOrFail(t *testing.T) database.Pool {
 	t.Helper()
 	if integrationPool == nil {
-		t.Fatal(fmt.Sprintf("integration pool not initialized; run with -tags=postgres_integration"))
+		t.Fatalf("integration pool not initialized; run with -tags=postgres_integration")
 	}
 	return integrationPool
 }
