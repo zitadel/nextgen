@@ -228,12 +228,11 @@ func (fd *flowDefinitionService) List(ctx context.Context, req ListFlowDefinitio
 }
 
 func (fd *flowDefinitionService) Delete(ctx context.Context, projectID, id string) error {
-	err := fd.flowDefinitionRepo.DeleteFlowDefinition(ctx, fd.db, projectID, id)
-	if err != nil {
-		if errors.Is(err, &database.NoRowFoundError{}) {
-			return domain.ErrFlowDefinitionNotFound()
-		}
-		return err
+	if projectID == "" {
+		return domain.ErrMissingProjectID()
 	}
-	return nil
+	if id == "" {
+		return domain.ErrMissingFlowDefinitionID()
+	}
+	return fd.flowDefinitionRepo.DeleteFlowDefinition(ctx, fd.db, projectID, id)
 }

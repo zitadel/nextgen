@@ -98,12 +98,6 @@ delete:
   responses:
     '204':
       description: Flow definition deleted successfully.
-    '404':
-      description: Flow definition not found.
-      content:
-        application/json:
-          schema:
-            $ref: ../../../components/error-details.yaml
     default:
       description: Unexpected error.
       content:

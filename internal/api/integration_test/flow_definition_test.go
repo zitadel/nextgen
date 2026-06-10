@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/go-faster/jx"
 	"github.com/stretchr/testify/assert"
@@ -137,6 +138,8 @@ func TestCreateFlowDefinition(t *testing.T) {
 					},
 					Steps: validSteps(),
 				},
+				CreatedAt: time.Now().UTC(),
+				UpdatedAt: time.Now().UTC(),
 			},
 		},
 		{
@@ -312,6 +315,7 @@ func assertFlowDefinitionResponse(t *testing.T, want, got any) {
 		assert.Equal(t, expected.ProjectID, actual.ProjectID)
 		assert.Equal(t, expected.Status, actual.Status)
 		assert.Equal(t, expected.FlowDefinition, actual.FlowDefinition)
+		assert.WithinDuration(t, expected.CreatedAt, actual.CreatedAt, 5*time.Second)
 	case *api.CreateFlowDefinitionBadRequest:
 		expected, ok := want.(*api.CreateFlowDefinitionBadRequest)
 		require.True(t, ok)
@@ -689,8 +693,116 @@ func TestListFlowDefinitions(t *testing.T) {
 					assert.Equal(t, flowDef.ProjectID, actualFlowDefsMap[flowDef.Name].ProjectID)
 					continue
 				}
-				assert.Equal(t, expectedFlowDefsMap[flowDef.Name], actualFlowDefsMap[flowDef.Name])
+				assert.Equal(t, expectedFlowDefsMap[flowDef.Name].ID, actualFlowDefsMap[flowDef.Name].ID)
+				assert.Equal(t, expectedFlowDefsMap[flowDef.Name].Name, actualFlowDefsMap[flowDef.Name].Name)
+				assert.Equal(t, expectedFlowDefsMap[flowDef.Name].ProjectID, actualFlowDefsMap[flowDef.Name].ProjectID)
+				assert.Equal(t, expectedFlowDefsMap[flowDef.Name].Status, actualFlowDefsMap[flowDef.Name].Status)
+				// the spanner tests are flaky when the timestamps are asserted directly for equality, so we assert that they are within a certain duration of each other instead
+				assert.WithinDuration(t, expectedFlowDefsMap[flowDef.Name].CreatedAt, actualFlowDefsMap[flowDef.Name].CreatedAt, 5*time.Second)
+				assert.WithinDuration(t, expectedFlowDefsMap[flowDef.Name].UpdatedAt, actualFlowDefsMap[flowDef.Name].UpdatedAt, 5*time.Second)
 			}
+		})
+	}
+}
+
+func TestDeleteFlowDefinitionUnauthenticated(t *testing.T) {
+	t.Parallel()
+	client := harness.EnsureAnonymousAPIClient(t)
+	resp, err := client.DeleteFlowDefinition(t.Context(), api.DeleteFlowDefinitionParams{
+		ID:        "flowDef_1234",
+		ProjectID: "proj_1234",
+	})
+	require.NoError(t, err)
+	expectedResp := &api.ErrorDetailsStatusCode{
+		StatusCode: http.StatusUnauthorized,
+		Response: api.ErrorDetails{
+			Code:    "auth.unauthorized",
+			Message: `operation DeleteFlowDefinition: security "OAuth2": security requirement is not satisfied`,
+		},
+	}
+	assert.Equal(t, expectedResp, resp)
+}
+
+func TestDeleteFlowDefinition(t *testing.T) {
+	t.Parallel()
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+	require.NoError(t, err)
+	harness.CreateUserSchema(t, project.ID, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
+	u := "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml"
+	userSchemaURI, err := url.Parse(u)
+	require.NoError(t, err)
+
+	createResp, err := harness.EnsureAPIClient(t, project.ID).CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+		ProjectID: api.ProjectID(project.ID),
+		FlowDefinition: api.FlowDefinition{
+			Name:       "existing-flow",
+			UserSchema: *userSchemaURI,
+			Purposes:   map[string]string{"login": "step_1"},
+			Audience: api.OptFlowAudience{
+				Value: api.FlowAudience{
+					TeamIds: []string{"team-1", "team-2"},
+					AppIds:  []string{"app-1", "app-2"},
+				},
+				Set: true,
+			},
+			Steps: validSteps(),
+		},
+	})
+	flowDef, ok := createResp.(*api.FlowDefinitionDetailResponse)
+	require.True(t, ok)
+
+	tests := []struct {
+		name     string
+		req      api.DeleteFlowDefinitionParams
+		wantResp api.DeleteFlowDefinitionRes
+	}{
+		{
+			name: "delete flow definition succeeds",
+			req: api.DeleteFlowDefinitionParams{
+				ID:        flowDef.ID,
+				ProjectID: api.ProjectID(project.ID),
+			},
+			wantResp: &api.DeleteFlowDefinitionNoContent{},
+		},
+		{
+			name: "delete non-existing flow definition",
+			req: api.DeleteFlowDefinitionParams{
+				ID:        "non-existing-id",
+				ProjectID: api.ProjectID(project.ID),
+			},
+			wantResp: &api.DeleteFlowDefinitionNoContent{},
+		},
+		{
+			name: "invalid project id",
+			req: api.DeleteFlowDefinitionParams{
+				ID:        "non-existing-id",
+				ProjectID: "invalid-project-id",
+			},
+			wantResp: &api.DeleteFlowDefinitionNoContent{},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			client := harness.EnsureAPIClient(t, project.ID)
+			resp, err := client.DeleteFlowDefinition(t.Context(), tt.req)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wantResp, resp)
+
+			// if the flow definition is deleted, the get request should return a not found error
+			getResp, err := client.GetFlowDefinition(t.Context(), api.GetFlowDefinitionParams{
+				ID:        tt.req.ID,
+				ProjectID: tt.req.ProjectID,
+			})
+			assert.NoError(t, err)
+			expectedGetResp := &api.ErrorDetailsStatusCode{
+				StatusCode: http.StatusNotFound,
+				Response: api.ErrorDetails{
+					Code:    "flowdef.not_found",
+					Message: "flow definition: not found",
+				},
+			}
+			assert.Equal(t, expectedGetResp, getResp)
 		})
 	}
 }
