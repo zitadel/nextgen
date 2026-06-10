@@ -191,7 +191,7 @@ func (s *UserService) GetMyUser(ctx context.Context, input GetMyUserInput) ([]by
 	if err != nil {
 		return nil, domain.ErrSessionTokenInvalid()
 	}
-	if sessionToken.ExpiresAt.After(time.Now()) {
+	if time.Now().After(sessionToken.ExpiresAt) {
 		return nil, domain.ErrSessionTokenInvalid()
 	}
 	if sessionToken.UserID == nil {
