@@ -2,12 +2,13 @@
   "name": "@zitadel/source",
   "version": "0.0.0",
   "private": true,
-  "license": "MIT",
+  "license": "AGPL-3.0-only",
   "scripts": {
-    "build": "corepack pnpm -r build",
-    "typecheck": "corepack pnpm -r typecheck",
-    "test": "corepack pnpm -r test",
-    "zitadel": "node scripts/zitadel-dev.mjs"
+    "doctor": "node scripts/doctor.mjs",
+    "cli": "node scripts/run-cli.mjs",
+    "server": "node scripts/run-server.mjs",
+    "journey": "node scripts/run-journey.mjs",
+    "check": "node scripts/check.mjs"
   },
   "devDependencies": {
     "@changesets/changelog-github": "^0.7.0",

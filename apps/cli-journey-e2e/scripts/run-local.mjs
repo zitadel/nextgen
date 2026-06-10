@@ -68,6 +68,7 @@ try {
 
   log(`work dir: ${workDir}`);
   await assertDockerAvailable();
+  await ensurePlaywrightBrowsers();
   await buildPackages();
   await packPackages();
   await run("node", [
@@ -225,7 +226,7 @@ function printUsage() {
   console.log(`usage: node scripts/run-local.mjs [options]
 
 Options:
-  --backend source          Run go run . server with embedded Postgres (default)
+  --backend source          Run go run . with embedded Postgres (default)
   --backend image           Run the backend through docker compose
   --image <docker-tag>      Required with --backend image
   --keep                    Keep the temp work directory after success
@@ -351,6 +352,19 @@ async function packageName(relativePath) {
   return manifest.name;
 }
 
+async function ensurePlaywrightBrowsers() {
+  log("ensuring Playwright Chromium browsers are installed");
+  await run("corepack", [
+    "pnpm",
+    "--filter",
+    "@zitadel/cli-journey-e2e",
+    "exec",
+    "playwright",
+    "install",
+    "chromium",
+  ]);
+}
+
 async function assertDockerAvailable() {
   let engineVersion = "";
   let composeVersion = "";
@@ -415,7 +429,7 @@ async function startSourceBackend() {
       delete env[key];
     }
   }
-  return startChild("go", ["run", ".", "server"], {
+  return startChild("go", ["run", "."], {
     cwd: repoRoot,
     env,
     logFile: backendLogPath,

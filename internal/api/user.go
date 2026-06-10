@@ -50,6 +50,20 @@ func (h *Handler) GetUserByID(ctx context.Context, params api.GetUserByIDParams)
 	return convertUsingJson[api.GetUserByIDOK](user)
 }
 
+func (h *Handler) SetUserPassword(ctx context.Context, req *api.SetUserPasswordRequest, params api.SetUserPasswordParams) (api.SetUserPasswordRes, error) {
+	err := h.userService.SetPassword(ctx, service.SetPasswordInput{
+		ProjectID:                string(params.ProjectID),
+		UserID:                   string(params.UserID),
+		Password:                 req.Password,
+		IsPasswordChangeRequired: req.IsChangeRequired.Value,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &api.SetUserPasswordNoContent{}, nil
+}
+
 // ------------------ Errors ---------------
 
 func userErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {

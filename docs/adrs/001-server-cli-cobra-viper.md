@@ -1,4 +1,4 @@
-# ADR 001: Standardize Server CLI on Cobra and Viper
+# ADR 001: Standardize Server Command Surface on Cobra and Viper
 
 > **Status:** Proposed
 > **Date:** 2026-04-24
@@ -6,12 +6,14 @@
 
 ## Decision
 
-Use the Cobra and Viper suite as the standard foundation for the server CLI.
+Use the Cobra and Viper suite as the standard foundation for the server command
+surface.
 
 - Cobra is used for command structure, help output, argument parsing, and subcommand composition.
 - Viper is used for configuration loading, environment-variable mapping, and config file unmarshalling.
 
-This ADR establishes Cobra + Viper as the default approach for server CLI and runtime configuration integration.
+This ADR establishes Cobra + Viper as the default approach for the server
+command surface and runtime configuration integration.
 
 ## Context
 

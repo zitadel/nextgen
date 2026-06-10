@@ -11,7 +11,7 @@ func (h *Harness) EnsureFlowDefinitionService(t *testing.T) service.FlowDefiniti
 	if h.FlowDefinitionService == nil {
 		h.FlowDefinitionService = service.NewFlowDefinitionService(
 			h.EnsureDBPool(t),
-			h.EnsureSchemaResolver(t),
+			h.EnsureSchemaService(t),
 			h.EnsureSchemaValidator(t),
 			nil,
 			h.EnsureFlowDefinitionRepo(t),

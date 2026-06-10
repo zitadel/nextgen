@@ -26,6 +26,8 @@
     "@zitadel/sdk-angular": "0.0.0"
   },
   "changesets": [
+    "add-spa-sdks",
+    "align-alpha-sdk-dependency",
     "cli-drop-unused-flows",
     "cli-remove-claim-logic",
     "cli-scaffold-middleware",
@@ -39,6 +41,9 @@
     "fix-release-pnpm-setup",
     "passkey-end-to-end-flow",
     "slow-lines-grin",
+    "smooth-playwright-journey",
+    "soft-local-dev",
+    "vision-public-readiness",
     "zitadel-scope-and-npm-publishing"
   ]
 }

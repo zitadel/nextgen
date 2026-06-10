@@ -28,10 +28,12 @@ services:
         required: true
     environment:
       NEXTGEN_SERVER_ADDRESS: ":8080"
+      NEXTGEN_SERVER_DATA_DIR: /var/lib/zitadel/nextgen-data
       NEXTGEN_DATABASE_POSTGRES: postgres://zitadel:zitadel@postgres:5432/nextgen?sslmode=disable
+    volumes:
+      - nextgen-server-data:/var/lib/zitadel/nextgen-data
+      # - ../../examples/bootstrap-users:/bootstrap:ro
     # Optional: mount bootstrap users (see examples/bootstrap-users/)
-    # volumes:
-    #   - ../../examples/bootstrap-users:/bootstrap:ro
     # command:
     #   - server
     #   - --user-file
@@ -39,3 +41,4 @@ services:
 
 volumes:
   nextgen-data:
+  nextgen-server-data:
