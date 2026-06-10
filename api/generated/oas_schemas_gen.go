@@ -2272,6 +2272,7 @@ func (*ErrorDetailsStatusCode) listUsersRes()              {}
 func (*ErrorDetailsStatusCode) revokeMySessionRes()        {}
 func (*ErrorDetailsStatusCode) revokeSessionRes()          {}
 func (*ErrorDetailsStatusCode) revokeTokenRes()            {}
+func (*ErrorDetailsStatusCode) setUserPasswordRes()        {}
 func (*ErrorDetailsStatusCode) submitFlowEventRes()        {}
 func (*ErrorDetailsStatusCode) submitFlowStepRes()         {}
 func (*ErrorDetailsStatusCode) updateFlowDefinitionRes()   {}
@@ -10592,6 +10593,53 @@ func (s *SessionWithTokenResponseHeaders) SetResponse(val SessionWithTokenRespon
 
 func (*SessionWithTokenResponseHeaders) createSessionRes()   {}
 func (*SessionWithTokenResponseHeaders) exchangeHandoffRes() {}
+
+type SetUserPasswordBadRequest ErrorDetails
+
+func (*SetUserPasswordBadRequest) setUserPasswordRes() {}
+
+type SetUserPasswordInternalServerError ErrorDetails
+
+func (*SetUserPasswordInternalServerError) setUserPasswordRes() {}
+
+// SetUserPasswordNoContent is response for SetUserPassword operation.
+type SetUserPasswordNoContent struct{}
+
+func (*SetUserPasswordNoContent) setUserPasswordRes() {}
+
+type SetUserPasswordNotFound ErrorDetails
+
+func (*SetUserPasswordNotFound) setUserPasswordRes() {}
+
+// Request to update the user's password.
+// Ref: #
+type SetUserPasswordRequest struct {
+	// The new password for the user.
+	Password string `json:"password"`
+	// Whether the user is required to change their password on the next login.
+	// If not provided, it will default to false.
+	IsChangeRequired OptBool `json:"isChangeRequired"`
+}
+
+// GetPassword returns the value of Password.
+func (s *SetUserPasswordRequest) GetPassword() string {
+	return s.Password
+}
+
+// GetIsChangeRequired returns the value of IsChangeRequired.
+func (s *SetUserPasswordRequest) GetIsChangeRequired() OptBool {
+	return s.IsChangeRequired
+}
+
+// SetPassword sets the value of Password.
+func (s *SetUserPasswordRequest) SetPassword(val string) {
+	s.Password = val
+}
+
+// SetIsChangeRequired sets the value of IsChangeRequired.
+func (s *SetUserPasswordRequest) SetIsChangeRequired(val OptBool) {
+	s.IsChangeRequired = val
+}
 
 // Configuration for a user-invokable action on a step. Keyed by action name
 // in the parent dictionary. The action name is sent back in the submit

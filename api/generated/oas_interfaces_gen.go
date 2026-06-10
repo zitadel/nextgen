@@ -157,6 +157,10 @@ type RevokeTokenRes interface {
 	revokeTokenRes()
 }
 
+type SetUserPasswordRes interface {
+	setUserPasswordRes()
+}
+
 type SubmitFlowEventRes interface {
 	submitFlowEventRes()
 }

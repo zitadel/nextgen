@@ -316,6 +316,12 @@ type Handler interface {
 	//
 	// POST /auth/revoke
 	RevokeToken(ctx context.Context, req *RevokeRequest) (RevokeTokenRes, error)
+	// SetUserPassword implements setUserPassword operation.
+	//
+	// Set user password.
+	//
+	// PUT /users/{user_id}/password
+	SetUserPassword(ctx context.Context, req *SetUserPasswordRequest, params SetUserPasswordParams) (SetUserPasswordRes, error)
 	// SubmitFlowEvent implements submitFlowEvent operation.
 	//
 	// Submits telemetry or fingerprint data from the frontend.
