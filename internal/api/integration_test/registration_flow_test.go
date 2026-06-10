@@ -11,6 +11,7 @@ import (
 	"github.com/descope/virtualwebauthn"
 	"github.com/stretchr/testify/require"
 	api "github.com/zitadel/nextgen/api/generated"
+	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -30,7 +31,7 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
 	require.NoError(t, err)
 
-	harness.CreateUserSchema(t, project.ID, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
+	harness.CreateUserSchema(t, project, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
 
 	userSchemaURL, err := url.Parse(
 		"https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml",
@@ -91,7 +92,9 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 		SignCount:    1,
 	}))
 
-	client := harness.EnsureAPIClient(t, project.ID)
+	client, err := helpers.NewApiClient(testServer.URL)
+	require.NoError(t, err)
+	client.SetToken(project.ProjectSecret)
 
 	// Two-step flow: passkey auth → passkey_register → done.
 	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{

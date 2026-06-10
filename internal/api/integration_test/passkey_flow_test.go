@@ -12,6 +12,7 @@ import (
 	"github.com/descope/virtualwebauthn"
 	"github.com/stretchr/testify/require"
 	api "github.com/zitadel/nextgen/api/generated"
+	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 )
@@ -32,7 +33,7 @@ func TestPasskeyFlowLogin(t *testing.T) {
 
 	// Create the user schema so the resolver can look it up from the DB.  The
 	// schema's $id becomes the URL that the flow definition references.
-	harness.CreateUserSchema(t, project.ID, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
+	harness.CreateUserSchema(t, project, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
 
 	userSchemaURL, err := url.Parse(
 		"https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml",
@@ -91,7 +92,9 @@ func TestPasskeyFlowLogin(t *testing.T) {
 	}))
 
 	// --- Create passkey login flow definition ---------------------------------
-	client := harness.EnsureAPIClient(t, project.ID)
+	client, err := helpers.NewApiClient(testServer.URL)
+	require.NoError(t, err)
+	client.SetToken(project.ProjectSecret)
 
 	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID: api.ProjectID(project.ID),
