@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/url"
 	"testing"
-	"time"
 
 	"github.com/go-faster/jx"
 	"github.com/stretchr/testify/assert"
@@ -138,8 +137,6 @@ func TestCreateFlowDefinition(t *testing.T) {
 					},
 					Steps: validSteps(),
 				},
-				CreatedAt: time.Now().UTC(),
-				UpdatedAt: time.Now().UTC(),
 			},
 		},
 		{
@@ -315,7 +312,6 @@ func assertFlowDefinitionResponse(t *testing.T, want, got any) {
 		assert.Equal(t, expected.ProjectID, actual.ProjectID)
 		assert.Equal(t, expected.Status, actual.Status)
 		assert.Equal(t, expected.FlowDefinition, actual.FlowDefinition)
-		assert.WithinDuration(t, expected.CreatedAt, actual.CreatedAt, 5*time.Second)
 	case *api.CreateFlowDefinitionBadRequest:
 		expected, ok := want.(*api.CreateFlowDefinitionBadRequest)
 		require.True(t, ok)
@@ -697,9 +693,6 @@ func TestListFlowDefinitions(t *testing.T) {
 				assert.Equal(t, expectedFlowDefsMap[flowDef.Name].Name, actualFlowDefsMap[flowDef.Name].Name)
 				assert.Equal(t, expectedFlowDefsMap[flowDef.Name].ProjectID, actualFlowDefsMap[flowDef.Name].ProjectID)
 				assert.Equal(t, expectedFlowDefsMap[flowDef.Name].Status, actualFlowDefsMap[flowDef.Name].Status)
-				// the spanner tests are flaky when the timestamps are asserted directly for equality, so we assert that they are within a certain duration of each other instead
-				assert.WithinDuration(t, expectedFlowDefsMap[flowDef.Name].CreatedAt, actualFlowDefsMap[flowDef.Name].CreatedAt, 5*time.Second)
-				assert.WithinDuration(t, expectedFlowDefsMap[flowDef.Name].UpdatedAt, actualFlowDefsMap[flowDef.Name].UpdatedAt, 5*time.Second)
 			}
 		})
 	}

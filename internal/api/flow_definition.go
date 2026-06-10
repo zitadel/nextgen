@@ -15,15 +15,12 @@ import (
 func (h Handler) CreateFlowDefinition(ctx context.Context, req *api.CreateFlowDefinitionRequest) (api.CreateFlowDefinitionRes, error) {
 	svcReq, err := mapCreateRequestToService(req)
 	if err != nil {
-		return &api.CreateFlowDefinitionBadRequest{
-			Code:    "invalid_flow_definition",
-			Message: "invalid flow definition",
-		}, nil
+		return nil, err
 	}
 
 	flowDefinition, err := h.flowDefinitionService.Create(ctx, svcReq)
 	if err != nil {
-		return errorResponse(err), nil // todo (grvijayan): review
+		return nil, err
 	}
 
 	return flowDefinitionDetailResponse(flowDefinition), nil
@@ -32,7 +29,7 @@ func (h Handler) CreateFlowDefinition(ctx context.Context, req *api.CreateFlowDe
 func (h Handler) GetFlowDefinition(ctx context.Context, params api.GetFlowDefinitionParams) (api.GetFlowDefinitionRes, error) {
 	definition, err := h.flowDefinitionService.Get(ctx, string(params.ProjectID), params.ID)
 	if err != nil {
-		return errorResponse(err), nil
+		return nil, err
 	}
 	return flowDefinitionDetailResponse(definition), nil
 }
@@ -42,7 +39,7 @@ func (h Handler) ListFlowDefinitions(ctx context.Context, params api.ListFlowDef
 
 	definitions, err := h.flowDefinitionService.List(ctx, svcReq)
 	if err != nil {
-		return errorResponse(err), nil
+		return nil, err
 	}
 	respDefinitions := make([]api.FlowDefinitionResponse, 0, len(definitions))
 	for _, def := range definitions {
@@ -54,7 +51,7 @@ func (h Handler) ListFlowDefinitions(ctx context.Context, params api.ListFlowDef
 func (h Handler) DeleteFlowDefinition(ctx context.Context, params api.DeleteFlowDefinitionParams) (api.DeleteFlowDefinitionRes, error) {
 	err := h.flowDefinitionService.Delete(ctx, string(params.ProjectID), params.ID)
 	if err != nil {
-		return errorResponse(err), nil
+		return nil, err
 	}
 	return &api.DeleteFlowDefinitionNoContent{}, nil
 }

@@ -97,7 +97,7 @@ delete:
         $ref: ../../../components/schemas/project-id.yaml
   responses:
     '204':
-      description: Flow definition deleted successfully.
+      description: Flow definition deleted successfully. This is an idempotent operation, so if the flow definition does not exist, it will still return a 204 status code.
     default:
       description: Unexpected error.
       content:
