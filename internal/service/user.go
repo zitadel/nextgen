@@ -41,11 +41,11 @@ type GetMyUserInput struct {
 // ---- Implementation -------------------------------------------------------------
 
 type UserService struct {
-	pool       database.Pool
-	userRepo   domain.UserRepository
+	pool         database.Pool
+	userRepo     domain.UserRepository
 	passwordRepo domain.UserPasswordRepository
-	schemaRepo domain.JSONSchemaRepository
-	decrypter  crypto.Decrypter
+	schemaRepo   domain.JSONSchemaRepository
+	decrypter    crypto.Decrypter
 	hasher       crypto.Hasher
 }
 
