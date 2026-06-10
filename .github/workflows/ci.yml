@@ -102,6 +102,14 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Prune npm package tags for GoReleaser
+        run: |
+          # Changesets creates scoped package tags such as @zitadel/sdk-nuxt@0.1.0-alpha.0.
+          # GoReleaser should derive server versions only from server release tags.
+          git tag -l '@zitadel/*' | while read -r tag; do
+            git tag -d "$tag"
+          done
+
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
@@ -181,8 +189,9 @@ jobs:
         with:
           name: goreleaser-snapshot
           path: goreleaser-dist
-      # Boots the Goreleaser-built binary on the embedded-postgres default connector:
-      # zero-config / single-binary path. UI is already embedded by GoReleaser hooks.
+      # Boots the Goreleaser-built binary directly on the embedded-postgres
+      # default connector. This proves the single binary starts, migrates, and
+      # handles SIGTERM; Docker image and quick-start surfaces are covered below.
       - name: Install embedded-postgres runtime deps
         run: sudo apt-get update -qq && sudo apt-get install -y -qq libicu-dev libssl-dev
       - name: Cache embedded-postgres binary
@@ -199,7 +208,6 @@ jobs:
           chmod +x ./nextgen
       - name: Smoke test (start, migrate, graceful exit 0)
         run: |
-          export NEXTGEN_SERVER_ENCRYPTION_KEY=4D61737465726B65794E65656473546F48617665333243686172616374657273
           ./nextgen > server.log 2>&1 &
           pid=$!
           # "server listening" is logged only after embedded PG is up, migrations
@@ -216,6 +224,7 @@ jobs:
             echo "::error::timed out waiting for server readiness"; cat server.log
             kill -TERM "$pid" 2>/dev/null || true; exit 1
           fi
+          test -f nextgen-data/server-encryption-key
           kill -TERM "$pid"
           code=0; wait "$pid" || code=$?
           cat server.log
@@ -296,6 +305,75 @@ jobs:
           docker load -i goreleaser-dist/nextgen-image.tar
           docker image inspect -f '{{.Os}}/{{.Architecture}}' "$(cat goreleaser-dist/nextgen-image.tag)" | grep -q '^linux/amd64$'
 
+      - name: Smoke test CLI-style local runtime image
+        run: |
+          set -euo pipefail
+          IMAGE="$(cat goreleaser-dist/nextgen-image.tag)"
+          DATA_DIR="$RUNNER_TEMP/nextgen-dev-data"
+          RUNTIME_DIR="$RUNNER_TEMP/nextgen-dev-runtime"
+          HOST_UID="$(id -u)"
+          HOST_GID="$(id -g)"
+          PASSWD_FILE="$RUNTIME_DIR/container-passwd"
+          GROUP_FILE="$RUNTIME_DIR/container-group"
+          mkdir -p "$DATA_DIR" "$RUNTIME_DIR"
+          # Mirror `zitadel start`: run the container as the host user so
+          # bind-mounted state stays editable, and provide passwd/group entries
+          # because embedded Postgres initdb refuses unknown numeric users.
+          {
+            echo "root:x:0:0:root:/root:/bin/sh"
+            echo "nonroot:x:65532:65532:nonroot:/nonexistent:/usr/sbin/nologin"
+            echo "zitadel-local:x:${HOST_UID}:${HOST_GID}:Zitadel local user:/tmp:/usr/sbin/nologin"
+          } > "$PASSWD_FILE"
+          {
+            echo "root:x:0:"
+            echo "nonroot:x:65532:"
+            echo "zitadel-local:x:${HOST_GID}:"
+          } > "$GROUP_FILE"
+          CONTAINER="$(
+            docker run -d \
+              -p 127.0.0.1:18080:8080 \
+              -v "$DATA_DIR:/var/lib/zitadel/nextgen-data" \
+              -v "$PASSWD_FILE:/etc/passwd:ro" \
+              -v "$GROUP_FILE:/etc/group:ro" \
+              --user "${HOST_UID}:${HOST_GID}" \
+              -e NEXTGEN_SERVER_ADDRESS=:8080 \
+              -e NEXTGEN_SERVER_DATA_DIR=/var/lib/zitadel/nextgen-data \
+              "$IMAGE"
+          )"
+          cleanup() {
+            docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
+          }
+          diagnose() {
+            docker logs "$CONTAINER" || true
+          }
+          trap cleanup EXIT
+
+          ready=0
+          for _ in $(seq 1 120); do
+            if curl -fsS http://localhost:18080/healthz >/dev/null; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then
+            echo "::error::timed out waiting for zero-config /healthz"
+            diagnose
+            exit 1
+          fi
+          test -f "$DATA_DIR/server-encryption-key"
+          if ! curl -fsS -o /dev/null -w "%{http_code}\n" http://localhost:18080/ui/console/ | grep -q '^200$'; then
+            echo "::error::zero-config /ui/console/ did not return 200"
+            diagnose
+            exit 1
+          fi
+          if ! curl -fsS -o /dev/null -w "%{http_code}\n" http://localhost:18080/ui/login/ | grep -q '^200$'; then
+            echo "::error::zero-config /ui/login/ did not return 200"
+            diagnose
+            exit 1
+          fi
+          echo "CLI-style local runtime image smoke test passed"
+
       - name: Prepare quick-start compose stack
         run: |
           mkdir -p nextgen_quickstart
@@ -304,7 +382,6 @@ jobs:
           {
             echo "NEXTGEN_IMAGE=${IMAGE}"
             echo "NEXTGEN_PORT=8080"
-            echo "NEXTGEN_SERVER_ENCRYPTION_KEY=4d61737465726b65794e65656473546f48617665333243686172616374657273"
           } > nextgen_quickstart/.env
           docker compose -f nextgen_quickstart/docker-compose.yaml --env-file nextgen_quickstart/.env config >/dev/null
 
@@ -323,6 +400,8 @@ jobs:
       - name: Start stack and verify HTTP endpoints
         run: |
           set -euo pipefail
+          # Separate from the CLI-style smoke above: this keeps the documented
+          # compose fallback valid for operators/manual quick-start usage.
           COMPOSE=(docker compose -f nextgen_quickstart/docker-compose.yaml --env-file nextgen_quickstart/.env)
           "${COMPOSE[@]}" up -d --wait
           ready=0
@@ -353,7 +432,12 @@ jobs:
 
       - name: Tear down compose stack
         if: always()
-        run: docker compose -f nextgen_quickstart/docker-compose.yaml --env-file nextgen_quickstart/.env down -v
+        run: |
+          if [ -f nextgen_quickstart/.env ]; then
+            docker compose -f nextgen_quickstart/docker-compose.yaml --env-file nextgen_quickstart/.env down -v
+          else
+            echo "Skipping compose teardown because nextgen_quickstart/.env was not created."
+          fi
 
   node-e2e:
     runs-on: ubuntu-latest
@@ -458,16 +542,19 @@ jobs:
       - name: Dry-run npm packs
         run: |
           for dir in apps/cli packages/api packages/components packages/sdk-core packages/sdk-next packages/sdk-nuxt; do
-            (cd "$dir" && npm pack --dry-run)
+            corepack pnpm --dir "$dir" pack --dry-run
           done
 
       - name: Create npm package artifacts
         run: |
           mkdir -p "$RUNNER_TEMP/zitadel-npm-packages"
           for dir in apps/cli packages/api packages/components packages/sdk-core packages/sdk-next packages/sdk-nuxt; do
-            (cd "$dir" && npm pack --pack-destination "$RUNNER_TEMP/zitadel-npm-packages")
+            corepack pnpm --dir "$dir" pack --pack-destination "$RUNNER_TEMP/zitadel-npm-packages"
           done
           ls -lh "$RUNNER_TEMP/zitadel-npm-packages"
+
+      - name: Verify npm package artifacts
+        run: node apps/cli-journey-e2e/scripts/verify-tarballs.mjs "$RUNNER_TEMP/zitadel-npm-packages"
 
       - name: Upload npm package artifacts
         uses: actions/upload-artifact@v7
@@ -476,3 +563,207 @@ jobs:
           path: ${{ runner.temp }}/zitadel-npm-packages/*.tgz
           if-no-files-found: error
           retention-days: 7
+
+  consumer-journey-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    needs: [goreleaser-snapshot, npm-pack-smoke]
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v5
+        with:
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Download GoReleaser snapshot
+        uses: actions/download-artifact@v6
+        with:
+          name: goreleaser-snapshot
+          path: goreleaser-dist
+
+      - name: Download npm package artifacts
+        uses: actions/download-artifact@v6
+        with:
+          name: npm-packages
+          path: ${{ runner.temp }}/zitadel-npm-packages
+
+      - name: Restore Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: >-
+          corepack pnpm --filter @zitadel/cli-journey-e2e
+          exec playwright install --with-deps chromium
+
+      - name: Install Playwright system deps
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: >-
+          corepack pnpm --filter @zitadel/cli-journey-e2e
+          exec playwright install-deps chromium
+
+      - name: Start temporary npm registry
+        env:
+          VERDACCIO_CONFIG: ${{ runner.temp }}/verdaccio/config.yaml
+          VERDACCIO_LOG: ${{ runner.temp }}/verdaccio.log
+          VERDACCIO_NPMRC: ${{ runner.temp }}/verdaccio.npmrc
+          VERDACCIO_STORAGE: ${{ runner.temp }}/verdaccio/storage
+        run: |
+          mkdir -p "$(dirname "$VERDACCIO_CONFIG")" "$VERDACCIO_STORAGE"
+          cat > "$VERDACCIO_CONFIG" <<EOF
+          storage: $VERDACCIO_STORAGE
+          uplinks:
+            npmjs:
+              url: https://registry.npmjs.org/
+          packages:
+            '@zitadel/*':
+              access: \$all
+              publish: \$all
+              unpublish: \$all
+            '@*/*':
+              access: \$all
+              publish: \$all
+              unpublish: \$all
+              proxy: npmjs
+            '**':
+              access: \$all
+              publish: \$all
+              unpublish: \$all
+              proxy: npmjs
+          logs:
+            - { type: stdout, format: pretty, level: http }
+          EOF
+          npm exec --yes verdaccio@6.2.2 -- --config "$VERDACCIO_CONFIG" --listen 127.0.0.1:4873 > "$VERDACCIO_LOG" 2>&1 &
+          echo "VERDACCIO_PID=$!" >> "$GITHUB_ENV"
+          ready=0
+          for _ in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:4873/-/ping >/dev/null; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then
+            echo "::error::timed out waiting for Verdaccio"
+            cat "$VERDACCIO_LOG"
+            exit 1
+          fi
+          {
+            echo "registry=http://127.0.0.1:4873/"
+            echo "//127.0.0.1:4873/:_authToken=journey-token"
+            echo "always-auth=true"
+          } > "$VERDACCIO_NPMRC"
+
+      - name: Publish current npm packages to temporary registry
+        env:
+          JOURNEY_REGISTRY_URL: http://127.0.0.1:4873
+          NPM_CONFIG_USERCONFIG: ${{ runner.temp }}/verdaccio.npmrc
+        run: >-
+          node apps/cli-journey-e2e/scripts/publish-tarballs.mjs
+          "$RUNNER_TEMP/zitadel-npm-packages"
+
+      - name: Load snapshot Docker image
+        run: |
+          test -f goreleaser-dist/nextgen-image.tar
+          test -f goreleaser-dist/nextgen-image.tag
+          docker load -i goreleaser-dist/nextgen-image.tar
+          docker image inspect -f '{{.Os}}/{{.Architecture}}' "$(cat goreleaser-dist/nextgen-image.tag)" | grep -q '^linux/amd64$'
+
+      - name: Start backend stack
+        run: |
+          mkdir -p "$RUNNER_TEMP/nextgen-journey"
+          cp docs/operations/docker-compose.yaml "$RUNNER_TEMP/nextgen-journey/docker-compose.yaml"
+          IMAGE="$(cat goreleaser-dist/nextgen-image.tag)"
+          {
+            echo "NEXTGEN_IMAGE=${IMAGE}"
+            echo "NEXTGEN_PORT=8080"
+          } > "$RUNNER_TEMP/nextgen-journey/.env"
+          docker compose -f "$RUNNER_TEMP/nextgen-journey/docker-compose.yaml" --env-file "$RUNNER_TEMP/nextgen-journey/.env" up -d --wait
+          for _ in $(seq 1 90); do
+            if curl -fsS http://localhost:8080/healthz >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::timed out waiting for backend /healthz"
+          docker compose -f "$RUNNER_TEMP/nextgen-journey/docker-compose.yaml" --env-file "$RUNNER_TEMP/nextgen-journey/.env" logs nextgen
+          exit 1
+
+      - name: Prepare fresh Next.js app
+        id: prepare-app
+        env:
+          JOURNEY_BACKEND_URL: http://localhost:8080
+          JOURNEY_CREATE_NEXT_APP_VERSION: 16.2.4
+          JOURNEY_REGISTRY_URL: http://127.0.0.1:4873
+          JOURNEY_WORK_DIR: ${{ runner.temp }}/zitadel-cli-journey
+        run: node apps/cli-journey-e2e/scripts/prepare-next-app.mjs
+
+      - name: Start generated Next.js app
+        run: |
+          cd "$JOURNEY_APP_DIR"
+          npm run dev -- --hostname localhost --port 3000 > "$RUNNER_TEMP/next-app.log" 2>&1 &
+          echo "NEXT_APP_PID=$!" >> "$GITHUB_ENV"
+          for _ in $(seq 1 90); do
+            if curl -fsS http://localhost:3000/login >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::timed out waiting for generated Next.js app"
+          cat "$RUNNER_TEMP/next-app.log"
+          exit 1
+
+      - name: Run consumer journey Playwright tests
+        run: >-
+          corepack pnpm --filter @zitadel/cli-journey-e2e
+          exec playwright test --config playwright.config.mts
+
+      - name: Collect diagnostics
+        if: failure()
+        run: |
+          docker compose -f "$RUNNER_TEMP/nextgen-journey/docker-compose.yaml" --env-file "$RUNNER_TEMP/nextgen-journey/.env" logs > "$RUNNER_TEMP/backend-compose.log" 2>&1 || true
+          DIAG_DIR="$RUNNER_TEMP/consumer-journey-diagnostics"
+          mkdir -p "$DIAG_DIR/generated-app"
+          cp "$RUNNER_TEMP/backend-compose.log" "$DIAG_DIR/" 2>/dev/null || true
+          cp "$RUNNER_TEMP/next-app.log" "$DIAG_DIR/" 2>/dev/null || true
+          cp "$RUNNER_TEMP/verdaccio.log" "$DIAG_DIR/" 2>/dev/null || true
+          cp "$RUNNER_TEMP/zitadel-cli-journey/setup.json" "$DIAG_DIR/" 2>/dev/null || true
+          cp "$RUNNER_TEMP/zitadel-cli-journey/setup.stderr.log" "$DIAG_DIR/" 2>/dev/null || true
+          cp "$RUNNER_TEMP/zitadel-cli-journey/metadata.json" "$DIAG_DIR/" 2>/dev/null || true
+          cp "$RUNNER_TEMP/zitadel-cli-journey/myapp/package.json" "$DIAG_DIR/generated-app/" 2>/dev/null || true
+          cp "$RUNNER_TEMP/zitadel-cli-journey/myapp/package-lock.json" "$DIAG_DIR/generated-app/" 2>/dev/null || true
+
+      - name: Upload consumer journey diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: consumer-journey-diagnostics
+          path: |
+            apps/cli-journey-e2e/test-output/playwright/report/**
+            apps/cli-journey-e2e/test-output/playwright/output/**
+            ${{ runner.temp }}/consumer-journey-diagnostics/**
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Tear down consumer journey services
+        if: always()
+        run: |
+          if [ -n "${NEXT_APP_PID:-}" ]; then kill "$NEXT_APP_PID" 2>/dev/null || true; fi
+          if [ -n "${VERDACCIO_PID:-}" ]; then kill "$VERDACCIO_PID" 2>/dev/null || true; fi
+          if [ -f "$RUNNER_TEMP/nextgen-journey/docker-compose.yaml" ]; then
+            docker compose -f "$RUNNER_TEMP/nextgen-journey/docker-compose.yaml" --env-file "$RUNNER_TEMP/nextgen-journey/.env" down -v
+          fi

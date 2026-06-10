@@ -48,15 +48,27 @@ func fileHandler(root fs.FS) http.Handler {
 		}
 
 		if _, err := fs.Stat(root, name); err == nil {
+			setCacheHeaders(w, name)
 			http.ServeFileFS(w, r, root, name)
 			return
 		}
 
 		if !strings.Contains(path.Base(name), ".") {
+			setCacheHeaders(w, "index.html")
 			http.ServeFileFS(w, r, root, "index.html")
 			return
 		}
 
 		http.NotFound(w, r)
 	})
+}
+
+func setCacheHeaders(w http.ResponseWriter, name string) {
+	if path.Base(name) == "index.html" {
+		w.Header().Set("Cache-Control", "no-store")
+		return
+	}
+	if strings.HasPrefix(name, "assets/") {
+		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+	}
 }

@@ -6,10 +6,10 @@ This directory contains architecture decision records (ADRs) for nextgen.
 
 | ID | Title | Summary |
 |---|---|---|
-| [001](001-server-cli-cobra-viper.md) | Standardize Server CLI on Cobra and Viper | Proposes Cobra and Viper as the standard server CLI/configuration stack; captures open questions around backend-specific option presentation. |
+| [001](001-server-cli-cobra-viper.md) | Standardize Server Command Surface on Cobra and Viper | Proposes Cobra and Viper as the standard server command/configuration stack; captures open questions around backend-specific option presentation. |
 | [002](002-multi-package-release-strategy.md) | Multi-package Release Strategy | GoReleaser for the server binary and embedded console; changesets for npm packages; console ships with the server version, not as a standalone npm package. |
 | [003](003-create-first-claim-later.md) | Create First, Claim Later | **Withdrawn.** Pre-claim/claim lifecycle removed from CLI and api-mock pending a server-side `claim` contract. |
-| [004](004-agent-contract-and-agents-md.md) | Agent Contract and AGENTS.md | `apps/cli/AGENTS.md` is the generated agent contract; agents use `--non-interactive --json` and parse the stable envelope. |
+| [004](004-agent-contract-and-agents-md.md) | CLI Agent Contract and SKILLS.md | `apps/cli/SKILLS.md` is the CLI agent guidance; agents use `--non-interactive --json` and parse the stable envelope. |
 | [005](005-public-runtime-private-credentials.md) | Public Runtime and Private Credentials | Browser UI receives only public runtime metadata; secrets stay in CLI, server, or secret stores. |
 | [006](006-web-component-renderer-direction.md) | Web Component Renderer Direction | Target auth UI is a `<zitadel-flow>` web component; React shim prepares the contract until the package ships. |
 | [007](007-gitops-configuration-surface.md) | GitOps Configuration Surface | Repo files describe config; `plan`/`apply` validate and upload bundles; local secrets excluded from VCS. |

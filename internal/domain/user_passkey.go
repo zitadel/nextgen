@@ -163,6 +163,13 @@ func PasskeysToCredentials(passkeys []*UserPasskey) []webauthn.Credential {
 				AAGUID:    pkey.AAGUID,
 				SignCount: uint32(pkey.SignCount),
 			},
+			Flags: webauthn.CredentialFlags{
+				BackupEligible: pkey.BackupEligible,
+				BackupState:    pkey.BackupState,
+				// TODO: what to do with the missing flags
+				//UserPresent:    false,
+				//UserVerified:   false,
+			},
 		})
 	}
 
@@ -328,7 +335,7 @@ func VerifyPasskeyRegistration(challenge *PasskeyRegistrationChallenge, attestat
 	now := time.Now()
 	return &CreateUserPasskey{
 		UserID:          challenge.UserID,
-		CredentialID:    base64.RawURLEncoding.EncodeToString(credential.ID),
+		CredentialID:    EncodePasskeyCredentialID(credential.ID),
 		PublicKey:       credential.PublicKey,
 		AAGUID:          credential.Authenticator.AAGUID,
 		AttestationType: &attestationType,
@@ -351,6 +358,13 @@ func registrationSessionData(c *PasskeyRegistrationChallenge) webauthn.SessionDa
 		CredParams:     c.CredParams,
 		Extensions:     c.Extensions,
 	}
+}
+
+// EncodePasskeyCredentialID returns the storage form for WebAuthn credential IDs.
+// Credential IDs are arbitrary bytes, so TEXT database columns must store an
+// ASCII-safe representation.
+func EncodePasskeyCredentialID(id []byte) string {
+	return base64.RawURLEncoding.EncodeToString(id)
 }
 
 // decodeCredentialID reverses the base64url encoding used when storing a

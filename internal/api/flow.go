@@ -132,18 +132,29 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 		}
 	}
 	// The browser Origin header drives the WebAuthn relying-party params when a
-	// step issues a passkey challenge. Validate it against the project's allowlist.
+	// step issues or verifies a passkey challenge. Same-origin browser fetches may
+	// not include Origin; fall back to the effective request host injected by the
+	// WithRequestHostMiddleware (X-Forwarded-Host or r.Host).
+	originStr := ""
 	if origin, ok := params.Origin.Get(); ok {
-		if rp := passkeyRPFromOrigin(origin); rp != nil {
-			project, err := h.projectService.Get(ctx, state.ProjectID)
-			if err != nil {
-				return internalErrorResponse(err), nil
+		originStr = origin.String()
+	} else if h, ok := requestOriginFromContext(ctx); ok {
+		originStr = h
+	}
+	if originStr != "" {
+		originURL, err := url.Parse(originStr)
+		if err == nil {
+			if rp := passkeyRPFromOrigin(*originURL); rp != nil {
+				project, err := h.projectService.Get(ctx, state.ProjectID)
+				if err != nil {
+					return internalErrorResponse(err), nil
+				}
+				if err := validateOriginAgainstProject(originStr, project); err != nil {
+					return errorResponseWithStatusCode(http.StatusBadRequest,
+						domain.ErrRequestInvalid().WithMessage(err.Error())), nil
+				}
+				submitReq.PasskeyRP = rp
 			}
-			if err := validateOriginAgainstProject(origin.String(), project); err != nil {
-				return errorResponseWithStatusCode(http.StatusBadRequest,
-					domain.ErrRequestInvalid().WithMessage(err.Error())), nil
-			}
-			submitReq.PasskeyRP = rp
 		}
 	}
 
@@ -227,6 +238,11 @@ func flowSetCookie(value string, clear bool) string {
 		HttpOnly: true,
 		Secure:   true,
 		SameSite: http.SameSiteStrictMode,
+		// Path=/ ensures that each Set-Cookie replaces the previous one in
+		// the browser's cookie jar rather than accumulating — without an
+		// explicit path the browser derives the path from the request URI,
+		// which differs across /flow and /flow/{id}/submit endpoints.
+		Path: "/",
 	}
 	if clear {
 		c.MaxAge = -1 // emits "Max-Age=0", instructing browsers to delete
@@ -290,10 +306,6 @@ func toFlowStep(step *domain.FlowStep) api.FlowStep {
 func toFlowStepChallenge(c domain.FlowStepChallenge) api.FlowStepChallenge {
 	out := api.FlowStepChallenge{}
 	if c.Method != "" {
-		// All challenge ceremonies are exposed as "passkey" to the client; the
-		// distinction between authentication and registration is implicit in the
-		// shape of the options JSON (request vs creation options). The internal
-		// FlowChallengeMethodPasskeyRegister constant remains server-side only.
 		out.Method = api.NewOptFlowStepChallengeMethod(api.FlowStepChallengeMethodPasskey)
 	}
 	if c.ChallengeID != "" {
@@ -510,14 +522,37 @@ var (
 	codeFlowDefinitionNotFound        = domain.ErrFlowDefinitionNotFound().Code
 	codeFlowDefinitionPurposeMismatch = domain.ErrFlowDefinitionPurposeMismatch().Code
 	codeFlowDefinitionInvalid         = domain.ErrFlowDefinitionInvalid(nil, nil).Code
+	codeMissingFlowDefinitionID       = domain.ErrMissingFlowDefinitionID().Code
+	codeMissingProjectID              = domain.ErrMissingProjectID().Code
+	codeFlowDefinitionAlreadyExists   = domain.ErrFlowDefinitionAlreadyExists().Code
 )
 
 func flowDefinitionErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 	switch err.Code {
 	case codeFlowDefinitionNotFound:
 		return errorResponseWithStatusCode(http.StatusNotFound, err)
-	case codeFlowDefinitionPurposeMismatch, codeFlowDefinitionInvalid:
+	case codeFlowDefinitionPurposeMismatch,
+		codeMissingFlowDefinitionID,
+		codeMissingProjectID:
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
+	case codeFlowDefinitionInvalid:
+		errResp := errorResponseWithStatusCode(http.StatusBadRequest, err)
+		if err.Details != nil {
+			if details, ok := err.Details.(string); ok {
+				b, marshalErr := json.Marshal(details)
+				if marshalErr == nil {
+					errResp.Response.Details = api.OptErrorDetailsDetails{
+						Value: api.ErrorDetailsDetails{
+							"details": b,
+						},
+						Set: true,
+					}
+				}
+			}
+		}
+		return errResp
+	case codeFlowDefinitionAlreadyExists:
+		return errorResponseWithStatusCode(http.StatusConflict, err)
 	default:
 		return internalErrorResponse(err)
 	}

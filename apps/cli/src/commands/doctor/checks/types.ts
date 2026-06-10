@@ -12,6 +12,7 @@ export type CheckOutcome = {
 export type CheckContext = {
   readonly cwd: string;
   readonly orca: Orca;
+  readonly cliVersion: string;
   /** When true, {@link SanityCheck.fix} must preview without writing. */
   readonly dryRun: boolean;
 };

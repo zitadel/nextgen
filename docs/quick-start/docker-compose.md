@@ -21,14 +21,19 @@ If the image is not published yet, build locally — see [CONTRIBUTING.md](../..
 | `postgres` | PostgreSQL 18 with database `nextgen` |
 | `nextgen` | API + embedded `/ui/console/` and `/ui/login/` |
 
-## Environment
+## Environment And Volumes
 
 Copy [`env.example`](../operations/env.example) to `.env` in the same directory as the compose file.
 
-Required variables:
+The template exposes:
 
-- `NEXTGEN_DATABASE_POSTGRES` — connection URL (set in compose for the bundled Postgres)
-- `NEXTGEN_SERVER_ENCRYPTION_KEY` — 32-byte hex key for flow cookies (**dev example only**)
+- `NEXTGEN_IMAGE` — server image tag, defaulting to `ghcr.io/zitadel/nextgen:latest`
+- `NEXTGEN_PORT` — local HTTP port, defaulting to `8080`
+
+The compose file sets `NEXTGEN_DATABASE_POSTGRES` for the bundled Postgres
+container and persists server data under the `nextgen-server-data` volume. When
+no `NEXTGEN_SERVER_ENCRYPTION_KEY` is set, the server creates and reuses
+`server-encryption-key` in that mounted data directory.
 
 ## Bootstrap users
 
@@ -46,5 +51,5 @@ See [`examples/bootstrap-users/`](../../examples/bootstrap-users/).
 ```sh
 docker compose logs -f nextgen
 docker compose down
-docker compose down -v   # also remove the Postgres volume
+docker compose down -v   # also remove Postgres and server data volumes
 ```

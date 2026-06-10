@@ -14,7 +14,7 @@ import (
 //go:embed examples/default-login-flow-definition.json
 var defaultLoginFlowDefinition []byte
 
-func DefaultLoginFlowDefinitions(serverURL string, projectID string) ([]*domain.FlowDefinition, error) {
+func DefaultLoginFlowDefinitions(serverURL string, projectID string, userSchemaURL string) ([]*domain.FlowDefinition, error) {
 	bss := [][]byte{defaultLoginFlowDefinition}
 
 	defs := make([]*domain.FlowDefinition, len(bss))
@@ -23,6 +23,7 @@ func DefaultLoginFlowDefinitions(serverURL string, projectID string) ([]*domain.
 		jscontent := string(bs)
 		jscontent = strings.ReplaceAll(jscontent, "${PROJECT_ID}", projectID)
 		jscontent = strings.ReplaceAll(jscontent, "${SERVER_URL}", serverURL)
+		jscontent = strings.ReplaceAll(jscontent, "${USER_SCHEMA_URL}", userSchemaURL)
 
 		req := &api.CreateFlowDefinitionRequest{}
 		err := req.UnmarshalJSON([]byte(jscontent))

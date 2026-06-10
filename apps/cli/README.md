@@ -3,7 +3,8 @@
 Scaffolds Zitadel auth (login, register, profile, middleware) into a Next.js app.
 
 ```sh
-npx @zitadel/cli@latest setup --framework next --server <your-zitadel-server>
+npx @zitadel/cli@latest start
+npx @zitadel/cli@latest setup --framework next --server local
 ```
 
 > **Beta.** This is the **next-generation Zitadel**, a ground-up rewrite of the platform. It is distinct from the established Zitadel at [github.com/zitadel/zitadel](https://github.com/zitadel/zitadel). APIs and CLI flags will change.
@@ -11,27 +12,41 @@ npx @zitadel/cli@latest setup --framework next --server <your-zitadel-server>
 ## Requirements
 
 - Node 20+
+- Docker for the managed local Zitadel runtime
 - A Next.js project created with `create-next-app`
-- A running next-generation Zitadel server to point at:
-  - **Zitadel Cloud** — coming soon
-  - **Self-hosted** — grab a binary from [github.com/zitadel/nextgen/releases](https://github.com/zitadel/nextgen/releases) and run it locally
 
 ## Quickstart
 
 ```sh
 npx create-next-app@latest my-app
 cd my-app
-npx @zitadel/cli@latest setup --framework next --server http://localhost:8080
+npx @zitadel/cli@latest doctor
+npx @zitadel/cli@latest start
+npx @zitadel/cli@latest setup --framework next --server local
+npm install
 npm run dev
 ```
 
-`setup` creates a project on the Zitadel server, scaffolds `app/login`, `app/register`, `app/profile`, and `middleware.ts`, and writes `.env.local` and `.zitadel/`. The project's default user schema and login flow are provisioned server-side at creation time, so the CLI does not scaffold or upload them. Open `http://localhost:3000/login` to see the login page.
+`start` runs a Docker-backed local Zitadel server and stores runtime data
+under `.zitadel/local/`. It uses `ghcr.io/zitadel/nextgen:latest` unless
+overridden with `--image` or `ZITADEL_LOCAL_IMAGE`. `setup --server local`
+creates a project on that local server, scaffolds `app/login`, `app/register`, and
+`middleware.ts`, and writes `.env.local` and `.zitadel/`. The project's default
+user schema and login flow are provisioned server-side at creation time, so the
+CLI does not scaffold or upload them. Open `http://localhost:3000/login` to see
+the login page.
+
+The default project flow supports password registration/login, passkey
+registration/login, and optional passkey setup after password registration.
+Users who skip passkey setup can still sign in with password; users who add a
+passkey can sign in with either credential.
 
 ## Other commands
 
-- `zitadel doctor` — verify the generated files and local state
-- `zitadel status` — summarise the local project
+- `zitadel doctor` — verify the local Docker runtime and generated project files
+- `zitadel status` — summarise the local Docker runtime and project
 - `zitadel eject` — remove what setup wrote (alias: `zitadel uninstall`)
+- `zitadel start|stop|logs|reset` — manage the local Docker runtime
 
 ## Reference
 
@@ -44,9 +59,13 @@ npm run dev
 * [`zitadel doctor`](#zitadel-doctor)
 * [`zitadel eject`](#zitadel-eject)
 * [`zitadel help [COMMAND]`](#zitadel-help-command)
+* [`zitadel logs`](#zitadel-logs)
+* [`zitadel reset`](#zitadel-reset)
 * [`zitadel search`](#zitadel-search)
 * [`zitadel setup`](#zitadel-setup)
+* [`zitadel start`](#zitadel-start)
 * [`zitadel status`](#zitadel-status)
+* [`zitadel stop`](#zitadel-stop)
 * [`zitadel uninstall`](#zitadel-uninstall)
 * [`zitadel version`](#zitadel-version)
 * [`zitadel which`](#zitadel-which)
@@ -113,11 +132,12 @@ _See code: [@oclif/plugin-commands](https://github.com/oclif/plugin-commands/blo
 
 ## `zitadel doctor`
 
-Verify generated files and local state.
+Verify local runtime and project state.
 
 ```
 USAGE
   $ zitadel doctor [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug] [--fix]
+    [--image <value>] [--port <value>]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -127,13 +147,15 @@ FLAGS
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
       --fix              Re-apply missing managed files.
+      --image=<value>    Container image to check.
+      --port=<value>     [default: 8080] Local HTTP port.
       --verbose          Verbose logging.
 
 GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  Verify generated files and local state.
+  Verify local runtime and project state.
 ```
 
 ## `zitadel eject`
@@ -183,6 +205,57 @@ DESCRIPTION
 
 _See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/6.2.49/src/commands/help.ts)_
 
+## `zitadel logs`
+
+Show local Zitadel server logs.
+
+```
+USAGE
+  $ zitadel logs [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug] [--follow]
+    [--tail <value>]
+
+FLAGS
+  -c, --cwd=<value>      Project directory to operate on.
+  -f, --force            Overwrite protected files on conflict.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as an agent.
+  -s, --server=<value>   Override the resolved server URL.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --follow           Follow logs.
+      --tail=<value>     [default: 200] Number of lines to show.
+      --verbose          Verbose logging.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Show local Zitadel server logs.
+```
+
+## `zitadel reset`
+
+Delete the local Zitadel server runtime and data.
+
+```
+USAGE
+  $ zitadel reset [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug]
+
+FLAGS
+  -c, --cwd=<value>      Project directory to operate on.
+  -f, --force            Overwrite protected files on conflict.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as an agent.
+  -s, --server=<value>   Override the resolved server URL.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --verbose          Verbose logging.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Delete the local Zitadel server runtime and data.
+```
+
 ## `zitadel search`
 
 Search for a command.
@@ -231,9 +304,36 @@ EXAMPLES
   $ zitadel setup --framework next
 ```
 
+## `zitadel start`
+
+Start a local Zitadel server.
+
+```
+USAGE
+  $ zitadel start [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug] [--image
+    <value>] [--port <value>]
+
+FLAGS
+  -c, --cwd=<value>      Project directory to operate on.
+  -f, --force            Overwrite protected files on conflict.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as an agent.
+  -s, --server=<value>   Override the resolved server URL.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --image=<value>    Container image to run.
+      --port=<value>     [default: 8080] Local HTTP port.
+      --verbose          Verbose logging.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Start a local Zitadel server.
+```
+
 ## `zitadel status`
 
-Summarize the local project state.
+Summarize the local Zitadel server and project state.
 
 ```
 USAGE
@@ -252,7 +352,31 @@ GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  Summarize the local project state.
+  Summarize the local Zitadel server and project state.
+```
+
+## `zitadel stop`
+
+Stop the local Zitadel server.
+
+```
+USAGE
+  $ zitadel stop [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug]
+
+FLAGS
+  -c, --cwd=<value>      Project directory to operate on.
+  -f, --force            Overwrite protected files on conflict.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as an agent.
+  -s, --server=<value>   Override the resolved server URL.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --verbose          Verbose logging.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Stop the local Zitadel server.
 ```
 
 ## `zitadel uninstall`

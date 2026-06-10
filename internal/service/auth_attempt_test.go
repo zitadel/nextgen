@@ -576,7 +576,7 @@ func TestAuthAttemptService_VerifyPasskeyProof(t *testing.T) {
 		// A successful assertion must persist the authenticator's advanced sign count and backup
 		// state. gomock enforces that Update is called exactly once.
 		var persistedSignCount int64
-		passkeys.EXPECT().UniqueCondition(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+		passkeys.EXPECT().UniqueCondition("proj", passkeyUserID, domain.EncodePasskeyCredentialID(f.cred.ID)).Return(nil)
 		passkeys.EXPECT().SetSignCount(gomock.Any()).DoAndReturn(func(c int64) database.Change {
 			persistedSignCount = c
 			return nil

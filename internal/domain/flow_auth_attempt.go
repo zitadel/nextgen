@@ -33,6 +33,16 @@ type FlowAuthAttemptService interface {
 	// Handoff mints the single-use token the client exchanges for a
 	// session. Called by the state machine on the terminal step.
 	Handoff(ctx context.Context, in FlowHandoffInput) (FlowHandoffOutput, error)
+	// RegisterCreatedUser registers a newly-created user's ID as a verified
+	// user factor on the auth attempt. Called after on_success: create_user
+	// and passkey registration so that the session gets user_id after exchange.
+	RegisterCreatedUser(ctx context.Context, in FlowRegisterCreatedUserInput) error
+}
+
+type FlowRegisterCreatedUserInput struct {
+	ProjectID string
+	AttemptID string
+	UserID    string
 }
 
 // FlowCreateAttemptInput is the bootstrap input to
