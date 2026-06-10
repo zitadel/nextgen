@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
 import { join } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
 import { buildLocalRuntimeImage, LOCAL_RUNTIME_IMAGE } from "./build-local-runtime-image.mjs";
-import { forwardedArgs, run } from "./dev-process.mjs";
+import { forwardedArgs, isDirectRun, run } from "./dev-process.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const cliBin = join(repoRoot, "apps/cli/bin/run.js");
@@ -94,10 +94,6 @@ if (isDirectRun(import.meta.url)) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exit(exitCodeForError(error));
   }
-}
-
-function isDirectRun(moduleUrl) {
-  return Boolean(process.argv[1] && moduleUrl === pathToFileURL(process.argv[1]).href);
 }
 
 function exitCodeForError(error) {

@@ -2,9 +2,9 @@
 import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir as systemTmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
-import { run, runCapture } from "./dev-process.mjs";
+import { isDirectRun, run, runCapture } from "./dev-process.mjs";
 
 export const LOCAL_RUNTIME_IMAGE = "ghcr.io/zitadel/nextgen:local-dev";
 
@@ -136,10 +136,6 @@ if (isDirectRun(import.meta.url)) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exit(exitCodeForError(error));
   }
-}
-
-function isDirectRun(moduleUrl) {
-  return Boolean(process.argv[1] && moduleUrl === pathToFileURL(process.argv[1]).href);
 }
 
 function exitCodeForError(error) {
