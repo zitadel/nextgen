@@ -2187,16 +2187,15 @@ func (s *ErrorDetails) SetDetails(val OptErrorDetailsDetails) {
 	s.Details = val
 }
 
-func (*ErrorDetails) authorizeDeviceRes()      {}
-func (*ErrorDetails) authorizeGetRes()         {}
-func (*ErrorDetails) createFlowRes()           {}
-func (*ErrorDetails) createProjectRes()        {}
-func (*ErrorDetails) createSessionRes()        {}
-func (*ErrorDetails) deleteFlowDefinitionRes() {}
-func (*ErrorDetails) endSessionRes()           {}
-func (*ErrorDetails) introspectRes()           {}
-func (*ErrorDetails) listFlowDefinitionsRes()  {}
-func (*ErrorDetails) submitFlowStepRes()       {}
+func (*ErrorDetails) authorizeDeviceRes()     {}
+func (*ErrorDetails) authorizeGetRes()        {}
+func (*ErrorDetails) createFlowRes()          {}
+func (*ErrorDetails) createProjectRes()       {}
+func (*ErrorDetails) createSessionRes()       {}
+func (*ErrorDetails) endSessionRes()          {}
+func (*ErrorDetails) introspectRes()          {}
+func (*ErrorDetails) listFlowDefinitionsRes() {}
+func (*ErrorDetails) submitFlowStepRes()      {}
 
 // Additional error-specific context.
 type ErrorDetailsDetails map[string]jx.Raw
