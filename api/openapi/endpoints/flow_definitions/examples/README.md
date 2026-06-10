@@ -14,14 +14,14 @@ For the shape and validation rules, see
 
 ## Index
 
-| # | Folder | Purposes | Demonstrates |
+| # | Purposes | Methods | Demonstrates |
 |---|---|---|---|
-| 01 | [password-login](./01-password-login/) | `login` | Identifier → password, terminal `show`. The minimal login flow. |
-| 02 | [password-register](./02-password-register/) | `register` | Single-step signup with `on_success: create_user`. |
-| 03 | [passkey-login](./03-passkey-login/) | `login` | Discoverable passkey login — single action, no identifier. |
-| 04 | [passkey-register](./04-passkey-register/) | `register` | Identifier-first passkey signup — provisional user finalized in the verify leg. |
-| 05 | [combined-password](./05-combined-login-register/) | `login` + `register` | Flip-table coverage: `user_not_found` and `user_already_exists` wired on entry steps. |
-| 06 | [combined-password-passkey](./06-combined-password-passkey/) | `login` + `register` | Password + passkey on both purposes, passkey upsell after password signup, terminal `redirect`. |
+| [01](./01-password-login/) | `login` | password | Minimal login flow. |
+| [02](./02-password-register/) | `register` | password | Single-step signup with `on_success: create_user`. |
+| [03](./03-passkey-login/) | `login` | passkey | Discoverable passkey login. |
+| [04](./04-passkey-register/) | `register` | passkey | Passkey signup with provisional user finalized on verify. |
+| [05](./05-combined-login-register/) | `login` + `register` | password | Flip-table coverage between sub-flows. |
+| [06](./06-combined-password-passkey/) | `login` + `register` | password, passkey | Both methods on both purposes plus post-signup passkey upsell. |
 
 The existing `default-login-flow-definition.json` at the root of this folder is
 embedded by the server as the default project flow; it mirrors example 06 but
