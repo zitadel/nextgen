@@ -2219,6 +2219,10 @@ func (s *Server) handleDeleteFlowDefinitionRequest(args [1]string, argsEscaped b
 					Name: "id",
 					In:   "path",
 				}: params.ID,
+				{
+					Name: "project_id",
+					In:   "query",
+				}: params.ProjectID,
 			},
 			Raw: r,
 		}
@@ -3023,6 +3027,10 @@ func (s *Server) handleGetFlowDefinitionRequest(args [1]string, argsEscaped bool
 					Name: "id",
 					In:   "path",
 				}: params.ID,
+				{
+					Name: "project_id",
+					In:   "query",
+				}: params.ProjectID,
 			},
 			Raw: r,
 		}
@@ -7120,6 +7128,10 @@ func (s *Server) handleSubmitFlowStepRequest(args [1]string, argsEscaped bool, w
 					Name: "_zflow",
 					In:   "cookie",
 				}: params.Zflow,
+				{
+					Name: "Origin",
+					In:   "header",
+				}: params.Origin,
 			},
 			Raw: r,
 		}
@@ -7322,6 +7334,10 @@ func (s *Server) handleUpdateFlowDefinitionRequest(args [1]string, argsEscaped b
 					Name: "id",
 					In:   "path",
 				}: params.ID,
+				{
+					Name: "project_id",
+					In:   "query",
+				}: params.ProjectID,
 			},
 			Raw: r,
 		}

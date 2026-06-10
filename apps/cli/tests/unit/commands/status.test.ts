@@ -61,9 +61,15 @@ describe("status command", () => {
     expect(res.exitCode).toBe(0);
     const json = parseJson(res.stdout) as {
       status: string;
-      data: { project: { project_id: string; issuer?: string }; next_commands: string[] };
+      data: {
+        server: { lifecycle: string };
+        project: { lifecycle: string; project_id: string; issuer?: string };
+        next_commands: string[];
+      };
     };
     expect(json.status).toBe("ok");
+    expect(json.data.server.lifecycle).toBe("missing");
+    expect(json.data.project.lifecycle).toBe("configured");
     expect(json.data.project.project_id).toBe("proj-001");
     expect(json.data.project.issuer).toBe("http://localhost:3000");
     expect(json.data.next_commands).toContain("zitadel doctor");
@@ -81,26 +87,36 @@ describe("status command", () => {
     expect(res.exitCode).toBe(0);
     const json = parseJson(res.stdout) as {
       status: string;
-      reason: string;
-      next_commands: string[];
-      data: { project_id?: string; lifecycle: string };
+      data: {
+        project: { project_id?: string; lifecycle: string };
+        next_commands: string[];
+      };
     };
-    expect(json.status).toBe("skipped");
-    expect(json.reason).toBe("orphaned-config");
-    expect(json.next_commands).toContain("zitadel setup --force");
-    expect(json.data.project_id).toBe("orphan");
-    expect(json.data.lifecycle).toBe("orphaned-config");
+    expect(json.status).toBe("ok");
+    expect(json.data.next_commands).toContain("zitadel setup --force");
+    expect(json.data.project.project_id).toBe("orphan");
+    expect(json.data.project.lifecycle).toBe("orphaned-config");
   });
 
-  it("errors with E_VALIDATION when zitadel.json is missing entirely", async () => {
+  it("reports not-configured when zitadel.json is missing entirely", async () => {
     const cwd = await makeProject();
 
     const res = await status(cwd);
 
-    expect(res.exitCode).toBe(3);
-    const json = parseJson(res.stdout) as { status: string; code: string };
-    expect(json.status).toBe("error");
-    expect(json.code).toBe("E_VALIDATION");
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as {
+      status: string;
+      data: {
+        server: { lifecycle: string };
+        project: { lifecycle: string };
+        next_commands: string[];
+      };
+    };
+    expect(json.status).toBe("ok");
+    expect(json.data.server.lifecycle).toBe("missing");
+    expect(json.data.project.lifecycle).toBe("not-configured");
+    expect(json.data.next_commands).toContain("zitadel start");
+    expect(json.data.next_commands).toContain("zitadel setup --framework next --server local");
   });
 
   it("falls back to the secret project_id when config.project is absent", async () => {
@@ -116,9 +132,10 @@ describe("status command", () => {
     expect(res.exitCode).toBe(0);
     const json = parseJson(res.stdout) as {
       status: string;
-      data: { project: { project_id: string; issuer?: string } };
+      data: { project: { lifecycle: string; project_id: string; issuer?: string } };
     };
     expect(json.status).toBe("ok");
+    expect(json.data.project.lifecycle).toBe("configured");
     expect(json.data.project.project_id).toBe("proj-001");
     expect(json.data.project.issuer).toBeUndefined();
   });

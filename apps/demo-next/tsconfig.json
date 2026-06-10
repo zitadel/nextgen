@@ -1,6 +1,10 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "emitDeclarationOnly": false,
     "baseUrl": ".",
     "jsx": "preserve",
     "lib": ["ES2022", "DOM"],

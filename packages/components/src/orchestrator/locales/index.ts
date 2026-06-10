@@ -7,8 +7,10 @@
  */
 export { en, type Locale } from "./en.js";
 export { de } from "./de.js";
+export { it } from "./it.js";
 
 import { en, type Locale } from "./en.js";
 import { de } from "./de.js";
+import { it } from "./it.js";
 
-export const builtinLocales: Readonly<Record<string, Locale>> = { en, de };
+export const builtinLocales: Readonly<Record<string, Locale>> = { en, de, it };

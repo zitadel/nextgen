@@ -1,6 +1,41 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
 import { nxViteTsPaths } from "@nx/vite/plugins/nx-tsconfig-paths.plugin";
 import { playwright } from "@vitest/browser-playwright";
-import { defineConfig } from "vitest/config";
+import { defineConfig, type Plugin } from "vitest/config";
+
+/**
+ * Vite plugin: import `.liquid` files as default-exported strings.
+ *
+ * Uses `resolveId` to tag `.liquid` imports with a `\0liquid:` prefix, then
+ * `load` intercepts the tagged ID and returns the file contents as a JS
+ * default export. This prevents Vite's built-in loaders from treating the
+ * Liquid syntax as invalid JS.
+ */
+function liquidRaw(): Plugin {
+  return {
+    name: "liquid-raw",
+    enforce: "pre",
+    resolveId(source, importer) {
+      if (source.endsWith(".liquid") && importer) {
+        const dir = importer.replace(/\/[^/]*$/, "");
+        const resolved = resolve(dir, source);
+        return `\0liquid:${resolved}`;
+      }
+      return null;
+    },
+    load(id) {
+      if (!id.startsWith("\0liquid:")) return null;
+      const filePath = id.slice("\0liquid:".length);
+      const content = readFileSync(filePath, "utf-8");
+      return `export default ${JSON.stringify(content)};`;
+    },
+  };
+}
+
+/** Shared plugins for all vitest projects. */
+const sharedPlugins = () => [nxViteTsPaths(), liquidRaw()];
 
 /**
  * Two test projects:
@@ -16,7 +51,7 @@ import { defineConfig } from "vitest/config";
  * `pnpm test:browser` runs the browser project. `pnpm test:all` runs both.
  */
 export default defineConfig({
-  plugins: [nxViteTsPaths()],
+  plugins: sharedPlugins(),
   resolve: { conditions: ["@zitadel/source"] },
   test: {
     name: "@zitadel/components",
@@ -28,6 +63,8 @@ export default defineConfig({
     },
     projects: [
       {
+        plugins: sharedPlugins(),
+        resolve: { conditions: ["@zitadel/source"] },
         test: {
           name: "unit",
           globals: true,
@@ -37,6 +74,8 @@ export default defineConfig({
         },
       },
       {
+        plugins: sharedPlugins(),
+        resolve: { conditions: ["@zitadel/source"] },
         test: {
           name: "browser",
           globals: true,

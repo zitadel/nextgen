@@ -81,6 +81,10 @@ func (stubAuthAttempt) Handoff(context.Context, service.HandoffInput) (*domain.A
 	return nil, errors.New("stub auth attempt")
 }
 
+func (stubAuthAttempt) RegisterCreatedUser(context.Context, string, string, string) error {
+	return errors.New("stub auth attempt")
+}
+
 var _ service.AuthAttemptService = stubAuthAttempt{}
 
 // fixedKey is a deterministic crypter key for tests.

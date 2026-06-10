@@ -6,9 +6,12 @@
         <zitadel-logout :project="project" post-sign-out-url="/login" />
       </ClientOnly>
     </div>
-    <p style="color: #6b7280">
-      Signed in as {{ auth?.isAuthenticated ? auth.session.email : "unknown" }}
-    </p>
+    <template v-if="auth?.isAuthenticated">
+      <ClientOnly>
+        <SessionDetails />
+      </ClientOnly>
+    </template>
+    <p v-else style="color: #6b7280">Not signed in</p>
   </main>
 </template>
 

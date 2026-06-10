@@ -332,7 +332,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
     expect(submits.length).toBeGreaterThanOrEqual(2);
     const proofSubmit = submits.find((s) => s.body.challenge_response);
     expect(proofSubmit).toBeDefined();
-    expect(proofSubmit?.body.action).toBe("submit");
+    expect(proofSubmit?.body.action).toBe("passkey");
     expect(proofSubmit?.body.challenge_response).toEqual({
       challenge_id: "ch_mock_passkey_login",
       method: "passkey",

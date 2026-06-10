@@ -2,6 +2,8 @@ package api
 
 import (
 	"context"
+	"net/http"
+	"strings"
 
 	"github.com/ogen-go/ogen/ogenerrors"
 	api "github.com/zitadel/nextgen/api/generated"
@@ -51,6 +53,42 @@ func (s SecurityHandler) HandleOAuth2(ctx context.Context, operationName api.Ope
 var _ api.SecurityHandler = (*SecurityHandler)(nil)
 
 type contextKey struct{}
+
+// requestHostKey is a context key for the effective request host injected
+// by WithRequestHostMiddleware. Needed because same-origin browser fetches
+// do not send the Origin header, so the handler falls back to this value.
+type requestHostKey struct{}
+
+// WithRequestHostMiddleware injects the effective request proto+host into the
+// context so handlers can derive a WebAuthn RPID even when the browser omits
+// the Origin header (same-origin fetches).
+func WithRequestHostMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		proto := r.Header.Get("X-Forwarded-Proto")
+		if proto == "" {
+			if r.TLS != nil {
+				proto = "https"
+			} else {
+				proto = "http"
+			}
+		}
+		host := r.Header.Get("X-Forwarded-Host")
+		if host == "" {
+			host = r.Host
+		}
+		if host != "" {
+			ctx := context.WithValue(r.Context(), requestHostKey{}, proto+"://"+host)
+			next.ServeHTTP(w, r.WithContext(ctx))
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func requestOriginFromContext(ctx context.Context) (string, bool) {
+	v, ok := ctx.Value(requestHostKey{}).(string)
+	return v, ok && v != ""
+}
 
 type ScopeContext struct {
 	ProjectID string

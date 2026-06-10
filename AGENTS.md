@@ -44,6 +44,9 @@ Secrets").
 - `apps/demo-next-e2e/` and `apps/demo-nuxt-e2e/` are the Playwright projects
   that exercise each demo through real framework middleware against the
   api-mock TCP server.
+- `apps/cli-journey-e2e/` contains the fresh Next.js consumer journey
+  Playwright project. It installs local package tarballs through a temporary
+  registry and verifies CLI setup plus real registration/login flows.
 - `packages/components/` contains shared Lit components.
 - `packages/sdk-core/`, `packages/sdk-next/`, and `packages/sdk-nuxt/` contain
   public TypeScript SDKs.
@@ -52,20 +55,58 @@ Secrets").
 - `packages/lint/` contains the local Nx plugin that infers Oxlint targets.
 - `docs/` contains design notes and ADRs that explain product intent.
 
+## Workflow Front Doors
+
+### I am contributing to Zitadel
+
+| I want to... | Run |
+| --- | --- |
+| Check my setup | `corepack pnpm run doctor` |
+| Try the local Zitadel CLI | `corepack pnpm run cli -- --help` |
+| Run the server from source | `corepack pnpm run server -- --help` |
+| Test the fresh-app onboarding path | `corepack pnpm run journey` |
+| Run normal local checks | `corepack pnpm run check` |
+| Mirror CI locally | `corepack pnpm run check -- --full` |
+| Rerun one failed phase | `corepack pnpm run check -- --only node` |
+
+### I am adding Zitadel to my app
+
+| I want to... | Run |
+| --- | --- |
+| Check local runtime prerequisites | `npx @zitadel/cli@alpha doctor` |
+| Start local Zitadel | `npx @zitadel/cli@alpha start` |
+| Add auth to Next.js | `npx @zitadel/cli@alpha setup --framework next --server local` |
+| Check generated app files | `npx @zitadel/cli@alpha doctor` |
+| Stop local Zitadel, keeping data | `npx @zitadel/cli@alpha stop` |
+| Delete local Zitadel data | `npx @zitadel/cli@alpha reset --force` |
+
+`corepack pnpm run server` is a repository contributor command that runs the Go
+server from source. `zitadel start` is a published product CLI command that
+runs the released Docker image for app developers and agents; it must not rely
+on Go, Nx, or this source checkout.
+
 ## Local Checks
 
 Use Node.js from `.nvmrc` and the pinned pnpm version from `package.json`.
 
 ```sh
-corepack pnpm install --frozen-lockfile
-corepack pnpm nx run-many -t lint,typecheck,build,test
-
-go vet ./...
-go test ./...
+corepack pnpm run doctor
+corepack pnpm run check
 ```
+
+Use `corepack pnpm run check -- --full` for slower CI-parity phases and
+`corepack pnpm run check -- --only <phase>` to rerun one named phase.
 
 Prefer Nx project targets for narrow package work, for example
 `corepack pnpm nx test @zitadel/cli`.
+
+Nx manages TypeScript workspace targets. Go commands and long-running local
+orchestration run through repository scripts, not Nx, so server processes are
+signaled and cleaned up directly.
+
+`corepack pnpm run server` syncs the embedded console/login UI before non-help
+startup, then runs `go run .`. Direct `go run .` callers must sync the embed
+folders themselves or disable both embedded UI surfaces.
 
 End-to-end tests are **opt-in locally** — they're not part of the
 default `run-many -t lint,typecheck,build,test` invocation because they
@@ -73,13 +114,28 @@ boot real dev servers and need browsers installed:
 
 ```sh
 corepack pnpm exec playwright install
-corepack pnpm nx run-many -t e2e
+corepack pnpm nx run-many -t e2e -p @zitadel/demo-next-e2e,@zitadel/demo-nuxt-e2e
 ```
 
-In CI the dedicated `node-e2e` job (in `.github/workflows/ci.yml`) gates
-merges on the e2e suites, so changes that break the demo integrations
-fail the PR. Browsers are cached on the runner; an unrelated PR pays
-roughly one minute of wall time.
+The local reproduction command for the fresh-app consumer journey gate is:
+
+```sh
+corepack pnpm run journey
+```
+
+This runner requires Docker for Verdaccio. By default it starts the backend from
+source with embedded Postgres, ensures the Playwright Chromium browsers are
+installed, builds and packs local npm packages with pnpm, creates a temporary
+Next.js app outside the repo, runs CLI setup through npm, starts the generated
+app on `localhost`, and runs Playwright with one worker. Use
+`-- --backend image --image <docker-tag>` to run the backend through the local
+compose profile for image parity.
+
+In CI the dedicated `node-e2e` job (in `.github/workflows/ci.yml`) gates merges
+on the checked-in demo integrations. The separate `consumer-journey-e2e` job is
+the fresh-app quality gate: it consumes the current workflow's GoReleaser image
+and npm package artifacts instead of public Zitadel packages. Browsers are
+cached on the runner to reduce install cost.
 
 ## Testing Layers
 
@@ -98,6 +154,10 @@ upward**. When deciding where a new test belongs:
    SDK (`sdk-next`, `sdk-nuxt`) has its own e2e project because the proxy
    and route-protection layers are framework-specific.
 
+The consumer journey suite is the exception to the checked-in demo ownership
+rule: it belongs in `apps/cli-journey-e2e/` and must exercise a freshly
+generated app because it protects the real CLI onboarding path.
+
 A new test belongs at e2e level only when the boundary it covers is
 exclusively the framework integration (middleware, cookie origin, full
 navigation). Component, atom, and orchestrator behaviour stays in
@@ -115,9 +175,8 @@ changes.
 - Do not hand-edit generated package output under `dist/`.
 - Do not hand-edit `apps/console/src/routeTree.gen.ts`; update route files and
   let the TanStack Router plugin regenerate it.
-- Do not hand-edit the generated section of `apps/cli/AGENTS.md`; update the CLI
-  registry or `apps/cli/scripts/gen-agents-md.ts`, then run
-  `corepack pnpm nx run @zitadel/cli:gen:agents-md`.
+- Keep `apps/cli/SKILLS.md` aligned with the current CLI command surface and
+  agent contract when CLI behavior changes.
 
 ## CLI Contract
 
@@ -125,10 +184,21 @@ The CLI is an agent-facing product surface. Preserve the JSON envelope contract:
 `--json` output must be parseable JSON on stdout, include top-level
 `cli_version`, `command`, `source`, and `status`, and avoid stray stdout text.
 Agent scripts should pass `--non-interactive --json` and prefer structured
-`next_commands` over prose hints.
+`next_commands` over prose hints. When invoking the local root wrapper for JSON
+capture, use `corepack pnpm --silent run cli -- ... --json`; plain `pnpm run`
+prints its own script prelude before the CLI output.
+
+For customer-local runtime workflows, agents should prefer
+`zitadel doctor`, `zitadel start`, and `--server local` before running
+`zitadel setup`.
 
 ## Release, Licensing, And Secrets
 
+- PR titles must pass the Semantic PR check. Use the conventional format
+  `<type>(optional-scope): <summary>` and treat `.github/semantic.yml` as the
+  source of truth for allowed types and scopes. Scopes are optional; omit the
+  scope instead of inventing one. For documentation-only changes, use the
+  `docs` type, for example `docs: add preview status disclaimer`.
 - User-visible changes to a public npm package need a changeset. The public
   packages are `@zitadel/cli` (`apps/cli/`), `@zitadel/api`,
   `@zitadel/components`, `@zitadel/sdk-core`, `@zitadel/sdk-next`, and
@@ -163,7 +233,8 @@ Agent scripts should pass `--non-interactive --json` and prefer structured
 ## General Guidelines for working with Nx
 
 - For navigating/exploring the workspace, invoke the `nx-workspace` skill first - it has patterns for querying projects, targets, and dependencies
-- When running tasks (for example build, lint, test, e2e, etc.), always prefer running the task through `nx` (i.e. `nx run`, `nx run-many`, `nx affected`) instead of using the underlying tooling directly
+- When running TypeScript workspace tasks (for example build, lint, test, e2e, etc.), always prefer running the task through `nx` (i.e. `nx run`, `nx run-many`, `nx affected`) instead of using the underlying tooling directly
+- Do not use Nx to own Go server lifecycle or multi-service local orchestration; use the root npm scripts for those workflows
 - Prefix nx commands with the workspace's package manager (e.g., `pnpm nx build`, `npm exec nx test`) - avoids using globally installed CLI
 - You have access to the Nx MCP server and its tools, use them to help the user
 - For Nx plugin best practices, check `node_modules/@nx/<plugin>/PLUGIN.md`. Not all plugins have this file - proceed without it if unavailable.
@@ -224,9 +295,10 @@ For the currently pinned `playwright-core@1.59.1` these are `147.0.7727.15` / `1
 Standard commands are documented in root `AGENTS.md` → **Local Checks** and
 **README.md**. Key quick-reference:
 
-- **TS lint + typecheck + build + test:** `corepack pnpm nx run-many -t lint,typecheck,build,test`
-- **Go vet + test:** `go vet ./... && go test -timeout=10m ./...`
+- **Fast local checks:** `corepack pnpm run check`
+- **Full local checks:** `corepack pnpm run check -- --full`
 - **E2E:** `corepack pnpm nx run-many -t e2e -p @zitadel/demo-next-e2e,@zitadel/demo-nuxt-e2e`
+- **Consumer journey E2E:** `corepack pnpm run journey`
 
 ### Running demo apps manually
 

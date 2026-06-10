@@ -1,23 +1,30 @@
 {
   "title": "ExampleUserSchema",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "metaSchema": "${SERVER_URL}/user-schema.json",
-  "$id": "${SERVER_URL}/user.json",
+  "$id": "${USER_SCHEMA_URL}",
   "kind": "user-schema",
   "type": "object",
   "description": "This is an example of a user schema definition.",
   "x-auth-methods": {
     "password": {
-      "enabled": false,
+      "enabled": true,
       "position": 1
+    },
+    "passkey": {
+      "enabled": true,
+      "position": 2
     }
   },
   "required": [
-    "email"
+    "email",
+    "password"
   ],
   "properties": {
     "email": {
       "type": "string",
       "format": "email",
+      "x-unique": "project",
       "description": "The user's email address."
     },
     "password": {

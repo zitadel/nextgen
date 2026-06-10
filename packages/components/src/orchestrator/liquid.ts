@@ -18,11 +18,11 @@ import { Liquid } from "liquidjs";
 import type { FlowError } from "./template-context.js";
 import type { Locale } from "./locales/en.js";
 import { mandatoryGatesMarkerComment } from "./mandatory-gates.js";
-import { authFormTemplate } from "./templates/auth-form.liquid.js";
-import { defaultTemplate } from "./templates/default.liquid.js";
-import { passkeyUpsellTemplate } from "./templates/passkey-upsell.liquid.js";
-import { signedInTemplate } from "./templates/signed-in.liquid.js";
-import { TEMPLATE_NAMES } from "./template-names.js";
+import defaultTemplate from "./templates/default.liquid";
+
+export const TEMPLATE_NAMES = {
+  default: "default",
+} as const;
 
 export type CreateLiquidOptions = {
   locale: Locale;
@@ -37,9 +37,6 @@ export type CreateLiquidOptions = {
 export function createLiquidEngine(options: CreateLiquidOptions): Liquid {
   const templates: Record<string, string> = {
     [TEMPLATE_NAMES.default]: defaultTemplate,
-    [TEMPLATE_NAMES.authForm]: authFormTemplate,
-    [TEMPLATE_NAMES.passkeyUpsell]: passkeyUpsellTemplate,
-    [TEMPLATE_NAMES.signedIn]: signedInTemplate,
     ...(options.templates ?? {}),
   };
 

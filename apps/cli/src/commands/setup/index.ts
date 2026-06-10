@@ -123,6 +123,7 @@ export default class Setup extends BaseCommand {
       project,
       issuer,
       server: answers.server,
+      cliVersion: this.meta.cliVersion,
     };
     consola.start(`Patching project files${dryRun ? " (dry run)" : ""}`);
     const result = await orca.patcherFor(framework.id).patch(ctx, { cwd, dryRun, force });

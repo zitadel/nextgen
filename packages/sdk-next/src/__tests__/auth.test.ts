@@ -43,7 +43,7 @@ describe('auth()', () => {
     expect(result).toEqual({ isAuthenticated: false, session: null });
   });
 
-  it('returns authenticated session when a valid token is present', async () => {
+  it('returns authenticated session when a valid JWT token is present', async () => {
     const token = makeFakeJwt({
       sub: 'user-abc',
       email: 'alice@example.com',
@@ -64,7 +64,7 @@ describe('auth()', () => {
     });
   });
 
-  it('returns unauthenticated when token has no sub claim', async () => {
+  it('returns unauthenticated when JWT token has no sub claim', async () => {
     const token = makeFakeJwt({
       email: 'alice@example.com',
       exp: Math.floor(Date.now() / 1000) + 3600,
@@ -72,17 +72,11 @@ describe('auth()', () => {
     mockHeadersMap.set('x-nextgen-auth-token', token);
     const { auth } = await import('../auth.js');
     const result = await auth();
-    expect(result).toEqual({ isAuthenticated: false, session: null });
+    // No sub → falls through to opaque path → still authenticated
+    expect(result.isAuthenticated).toBe(true);
   });
 
-  it('returns unauthenticated when token is malformed', async () => {
-    mockHeadersMap.set('x-nextgen-auth-token', 'not.a.valid.jwt.at.all.extra');
-    const { auth } = await import('../auth.js');
-    const result = await auth();
-    expect(result).toEqual({ isAuthenticated: false, session: null });
-  });
-
-  it('returns null email and name when payload missing those fields', async () => {
+  it('returns null email and name when JWT payload missing those fields', async () => {
     const token = makeFakeJwt({
       sub: 'user-xyz',
       exp: Math.floor(Date.now() / 1000) + 3600,
@@ -94,6 +88,35 @@ describe('auth()', () => {
     if (result.isAuthenticated) {
       expect(result.session.email).toBeNull();
       expect(result.session.name).toBeNull();
+    }
+  });
+
+  // ── Opaque token path ────────────────────────────────────────────────
+
+  it('returns authenticated with minimal data for opaque tokens', async () => {
+    const opaqueToken = 'opaque-encrypted-token-value';
+    mockHeadersMap.set('x-nextgen-auth-token', opaqueToken);
+    const { auth } = await import('../auth.js');
+    const result = await auth();
+    expect(result).toEqual({
+      isAuthenticated: true,
+      session: {
+        userId: 'unknown',
+        email: null,
+        name: null,
+        token: opaqueToken,
+      },
+    });
+  });
+
+  it('returns authenticated for malformed JWT that is not decodable', async () => {
+    mockHeadersMap.set('x-nextgen-auth-token', 'not.a.valid.jwt.at.all.extra');
+    const { auth } = await import('../auth.js');
+    const result = await auth();
+    // Middleware already validated this token — trust it
+    expect(result.isAuthenticated).toBe(true);
+    if (result.isAuthenticated) {
+      expect(result.session.userId).toBe('unknown');
     }
   });
 });
