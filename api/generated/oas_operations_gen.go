@@ -44,6 +44,7 @@ const (
 	RevokeMySessionOperation        OperationName = "RevokeMySession"
 	RevokeSessionOperation          OperationName = "RevokeSession"
 	RevokeTokenOperation            OperationName = "RevokeToken"
+	SetUserPasswordOperation        OperationName = "SetUserPassword"
 	SubmitFlowEventOperation        OperationName = "SubmitFlowEvent"
 	SubmitFlowStepOperation         OperationName = "SubmitFlowStep"
 	UpdateFlowDefinitionOperation   OperationName = "UpdateFlowDefinition"
