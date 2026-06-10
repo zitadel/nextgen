@@ -2194,7 +2194,6 @@ func (*ErrorDetails) createProjectRes()        {}
 func (*ErrorDetails) createSessionRes()        {}
 func (*ErrorDetails) deleteFlowDefinitionRes() {}
 func (*ErrorDetails) endSessionRes()           {}
-func (*ErrorDetails) getFlowDefinitionRes()    {}
 func (*ErrorDetails) getMyUserRes()            {}
 func (*ErrorDetails) introspectRes()           {}
 func (*ErrorDetails) listFlowDefinitionsRes()  {}
@@ -2754,64 +2753,17 @@ func (s *FlowDefinition) SetSteps(val []FlowDefinitionStep) {
 	s.Steps = val
 }
 
-// Merged schema.
 // Ref: #
 type FlowDefinitionDetailResponse struct {
-	// Stable identifier for this flow, used as the target of cross-flow
-	// `switch` and `pivot` transitions. Renaming is not supported — the
-	// `name` is part of the public contract another definition may
-	// reference. Acts as the human display label as well; no separate slug.
-	Name string `json:"name"`
-	// User schema this flow operates on. Step `fields` reference properties
-	// defined in this schema. The engine resolves field types, validation,
-	// and implicit outcomes from schema annotations at runtime.
-	UserSchema url.URL `json:"user_schema"`
-	// Maps each purpose this definition handles to its entry-point step.
-	// Keys are purpose names; values must match a `name` in `steps`. A
-	// definition can serve multiple purposes (e.g. a combined login/register
-	// flow) by listing one entry per purpose.
-	Purposes FlowDefinitionDetailResponsePurposes `json:"purposes"`
-	Audience OptFlowAudience                      `json:"audience"`
-	// Ordered list of steps in this flow. The order is for human readability —
-	// actual step sequencing is determined by transitions.
-	Steps []FlowDefinitionStep `json:"steps"`
 	// Unique identifier for the flow definition.
 	ID string `json:"id"`
 	// Identifier of the project this flow definition belongs to.
 	ProjectID string `json:"project_id"`
-	// URI of the flow definition schema this definition was authored against.
-	// If the schema_uri was not provided in the request, the flow definition is validated against the
-	// latest version of the schema, and the response includes the schema_uri of the latest version.
-	SchemaURI url.URL `json:"schema_uri"`
 	// Status of the flow definition.
-	Status    string    `json:"status"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-}
-
-// GetName returns the value of Name.
-func (s *FlowDefinitionDetailResponse) GetName() string {
-	return s.Name
-}
-
-// GetUserSchema returns the value of UserSchema.
-func (s *FlowDefinitionDetailResponse) GetUserSchema() url.URL {
-	return s.UserSchema
-}
-
-// GetPurposes returns the value of Purposes.
-func (s *FlowDefinitionDetailResponse) GetPurposes() FlowDefinitionDetailResponsePurposes {
-	return s.Purposes
-}
-
-// GetAudience returns the value of Audience.
-func (s *FlowDefinitionDetailResponse) GetAudience() OptFlowAudience {
-	return s.Audience
-}
-
-// GetSteps returns the value of Steps.
-func (s *FlowDefinitionDetailResponse) GetSteps() []FlowDefinitionStep {
-	return s.Steps
+	Status         string         `json:"status"`
+	FlowDefinition FlowDefinition `json:"flow_definition"`
+	CreatedAt      time.Time      `json:"created_at"`
+	UpdatedAt      time.Time      `json:"updated_at"`
 }
 
 // GetID returns the value of ID.
@@ -2824,14 +2776,14 @@ func (s *FlowDefinitionDetailResponse) GetProjectID() string {
 	return s.ProjectID
 }
 
-// GetSchemaURI returns the value of SchemaURI.
-func (s *FlowDefinitionDetailResponse) GetSchemaURI() url.URL {
-	return s.SchemaURI
-}
-
 // GetStatus returns the value of Status.
 func (s *FlowDefinitionDetailResponse) GetStatus() string {
 	return s.Status
+}
+
+// GetFlowDefinition returns the value of FlowDefinition.
+func (s *FlowDefinitionDetailResponse) GetFlowDefinition() FlowDefinition {
+	return s.FlowDefinition
 }
 
 // GetCreatedAt returns the value of CreatedAt.
@@ -2844,31 +2796,6 @@ func (s *FlowDefinitionDetailResponse) GetUpdatedAt() time.Time {
 	return s.UpdatedAt
 }
 
-// SetName sets the value of Name.
-func (s *FlowDefinitionDetailResponse) SetName(val string) {
-	s.Name = val
-}
-
-// SetUserSchema sets the value of UserSchema.
-func (s *FlowDefinitionDetailResponse) SetUserSchema(val url.URL) {
-	s.UserSchema = val
-}
-
-// SetPurposes sets the value of Purposes.
-func (s *FlowDefinitionDetailResponse) SetPurposes(val FlowDefinitionDetailResponsePurposes) {
-	s.Purposes = val
-}
-
-// SetAudience sets the value of Audience.
-func (s *FlowDefinitionDetailResponse) SetAudience(val OptFlowAudience) {
-	s.Audience = val
-}
-
-// SetSteps sets the value of Steps.
-func (s *FlowDefinitionDetailResponse) SetSteps(val []FlowDefinitionStep) {
-	s.Steps = val
-}
-
 // SetID sets the value of ID.
 func (s *FlowDefinitionDetailResponse) SetID(val string) {
 	s.ID = val
@@ -2879,14 +2806,14 @@ func (s *FlowDefinitionDetailResponse) SetProjectID(val string) {
 	s.ProjectID = val
 }
 
-// SetSchemaURI sets the value of SchemaURI.
-func (s *FlowDefinitionDetailResponse) SetSchemaURI(val url.URL) {
-	s.SchemaURI = val
-}
-
 // SetStatus sets the value of Status.
 func (s *FlowDefinitionDetailResponse) SetStatus(val string) {
 	s.Status = val
+}
+
+// SetFlowDefinition sets the value of FlowDefinition.
+func (s *FlowDefinitionDetailResponse) SetFlowDefinition(val FlowDefinition) {
+	s.FlowDefinition = val
 }
 
 // SetCreatedAt sets the value of CreatedAt.
@@ -2902,21 +2829,6 @@ func (s *FlowDefinitionDetailResponse) SetUpdatedAt(val time.Time) {
 func (*FlowDefinitionDetailResponse) createFlowDefinitionRes() {}
 func (*FlowDefinitionDetailResponse) getFlowDefinitionRes()    {}
 func (*FlowDefinitionDetailResponse) updateFlowDefinitionRes() {}
-
-// Maps each purpose this definition handles to its entry-point step.
-// Keys are purpose names; values must match a `name` in `steps`. A
-// definition can serve multiple purposes (e.g. a combined login/register
-// flow) by listing one entry per purpose.
-type FlowDefinitionDetailResponsePurposes map[string]string
-
-func (s *FlowDefinitionDetailResponsePurposes) init() FlowDefinitionDetailResponsePurposes {
-	m := *s
-	if m == nil {
-		m = map[string]string{}
-		*s = m
-	}
-	return m
-}
 
 // Ref: #
 type FlowDefinitionListResponse struct {
@@ -2974,7 +2886,7 @@ type FlowDefinitionResponse struct {
 	// URI of the flow definition schema this definition was authored against.
 	// If the schema_uri was not provided in the request, the flow definition is validated against the
 	// latest version of the schema, and the response includes the schema_uri of the latest version.
-	SchemaURI url.URL `json:"schema_uri"`
+	SchemaURI OptURI `json:"schema_uri"`
 	// Status of the flow definition.
 	Status string `json:"status"`
 	// Timestamp when the flow definition was created.
@@ -2999,7 +2911,7 @@ func (s *FlowDefinitionResponse) GetProjectID() string {
 }
 
 // GetSchemaURI returns the value of SchemaURI.
-func (s *FlowDefinitionResponse) GetSchemaURI() url.URL {
+func (s *FlowDefinitionResponse) GetSchemaURI() OptURI {
 	return s.SchemaURI
 }
 
@@ -3034,7 +2946,7 @@ func (s *FlowDefinitionResponse) SetProjectID(val string) {
 }
 
 // SetSchemaURI sets the value of SchemaURI.
-func (s *FlowDefinitionResponse) SetSchemaURI(val url.URL) {
+func (s *FlowDefinitionResponse) SetSchemaURI(val OptURI) {
 	s.SchemaURI = val
 }
 

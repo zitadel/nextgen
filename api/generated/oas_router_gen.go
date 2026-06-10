@@ -51,7 +51,7 @@ var (
 		"POST": "Content-Type",
 	}
 	rn49AllowedHeaders = map[string]string{
-		"POST": "Content-Type",
+		"POST": "Content-Type,Origin",
 	}
 	rn8AllowedHeaders = map[string]string{
 		"GET":  "Authorization",
