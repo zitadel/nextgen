@@ -88,8 +88,8 @@ func (f LogFormat) ErrorHandler(options *slog.HandlerOptions) slog.Handler {
 		stdErrHandler,
 		&slogctx.HandlerOptions{
 			Prependers: []slogctx.AttrExtractor{
-				extractors.ErrCauseExtractor,
-				extractors.RequestDetailsExtractor,
+				extractors.ExtractErrCause,
+				extractors.ExtractRequestID,
 				slogotel.ExtractTraceSpanID,
 				slogctx.ExtractPrepended,
 			},
