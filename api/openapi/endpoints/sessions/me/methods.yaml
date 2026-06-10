@@ -11,12 +11,7 @@ get:
   tags:
     - Sessions
   parameters:
-    - name: __nextgen_session
-      in: cookie
-      required: true
-      description: The __nextgen_session cookie issued at session creation or superseding handoff exchange.
-      schema:
-        type: string
+    - $ref: ../../../components/parameters/session-cookie.yaml
   security: []
   responses:
     '200':
@@ -55,12 +50,7 @@ delete:
   tags:
     - Sessions
   parameters:
-      - name: __nextgen_session
-        in: cookie
-        required: true
-        description: The session_token cookie issued at session creation or superseding handoff exchange.
-        schema:
-          type: string
+    - $ref: ../../../components/parameters/session-cookie.yaml
   security: []
   responses:
     '204':

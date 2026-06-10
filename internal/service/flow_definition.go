@@ -15,6 +15,7 @@ type FlowDefinitionService interface {
 	Create(ctx context.Context, req CreateFlowDefinitionRequest) (*domain.FlowDefinition, error)
 	Get(ctx context.Context, projectID, id string) (*domain.FlowDefinition, error)
 	List(ctx context.Context, req ListFlowDefinitionsRequest) ([]*domain.FlowDefinition, error)
+	Delete(ctx context.Context, projectID string, id string) error
 }
 
 type SchemaGetter interface {
@@ -224,4 +225,14 @@ func (fd *flowDefinitionService) List(ctx context.Context, req ListFlowDefinitio
 		return nil, err
 	}
 	return defs, nil
+}
+
+func (fd *flowDefinitionService) Delete(ctx context.Context, projectID, id string) error {
+	if projectID == "" {
+		return domain.ErrMissingProjectID()
+	}
+	if id == "" {
+		return domain.ErrMissingFlowDefinitionID()
+	}
+	return fd.flowDefinitionRepo.DeleteFlowDefinition(ctx, fd.db, projectID, id)
 }

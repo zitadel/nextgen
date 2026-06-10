@@ -15,20 +15,50 @@ import (
 func (h Handler) CreateFlowDefinition(ctx context.Context, req *api.CreateFlowDefinitionRequest) (api.CreateFlowDefinitionRes, error) {
 	svcReq, err := mapCreateRequestToService(req)
 	if err != nil {
-		return &api.CreateFlowDefinitionBadRequest{
-			Code:    "invalid_flow_definition",
-			Message: "invalid flow definition",
-		}, nil
+		return nil, err
 	}
 
 	flowDefinition, err := h.flowDefinitionService.Create(ctx, svcReq)
 	if err != nil {
-		return errorResponse(err), nil // todo (grvijayan): review
+		return nil, err
 	}
 
 	return flowDefinitionDetailResponse(flowDefinition), nil
 }
 
+func (h Handler) GetFlowDefinition(ctx context.Context, params api.GetFlowDefinitionParams) (api.GetFlowDefinitionRes, error) {
+	definition, err := h.flowDefinitionService.Get(ctx, string(params.ProjectID), params.ID)
+	if err != nil {
+		return nil, err
+	}
+	return flowDefinitionDetailResponse(definition), nil
+}
+
+func (h Handler) ListFlowDefinitions(ctx context.Context, params api.ListFlowDefinitionsParams) (api.ListFlowDefinitionsRes, error) {
+	svcReq := mapListRequestToService(params)
+
+	definitions, err := h.flowDefinitionService.List(ctx, svcReq)
+	if err != nil {
+		return nil, err
+	}
+	respDefinitions := make([]api.FlowDefinitionResponse, 0, len(definitions))
+	for _, def := range definitions {
+		respDefinitions = append(respDefinitions, flowDefinitionResponse(def))
+	}
+	return &api.FlowDefinitionListResponse{FlowDefinitions: respDefinitions}, nil
+}
+
+func (h Handler) DeleteFlowDefinition(ctx context.Context, params api.DeleteFlowDefinitionParams) (api.DeleteFlowDefinitionRes, error) {
+	err := h.flowDefinitionService.Delete(ctx, string(params.ProjectID), params.ID)
+	if err != nil {
+		return nil, err
+	}
+	return &api.DeleteFlowDefinitionNoContent{}, nil
+}
+
+/* ---------------- CONVERTERS ---------------- */
+
+/* API request to service/domain converters */
 func mapCreateRequestToService(req *api.CreateFlowDefinitionRequest) (service.CreateFlowDefinitionRequest, error) {
 	definition := req.GetFlowDefinition()
 
@@ -154,35 +184,6 @@ func mapCreateRequestToService(req *api.CreateFlowDefinitionRequest) (service.Cr
 	return svcReq, nil
 }
 
-func onSuccessString(o *domain.FlowOnSuccess) string {
-	if o == nil {
-		return ""
-	}
-	return o.String()
-}
-
-func (h Handler) GetFlowDefinition(ctx context.Context, params api.GetFlowDefinitionParams) (api.GetFlowDefinitionRes, error) {
-	definition, err := h.flowDefinitionService.Get(ctx, string(params.ProjectID), params.ID)
-	if err != nil {
-		return errorResponse(err), nil
-	}
-	return flowDefinitionDetailResponse(definition), nil
-}
-
-func (h Handler) ListFlowDefinitions(ctx context.Context, params api.ListFlowDefinitionsParams) (api.ListFlowDefinitionsRes, error) {
-	svcReq := mapListRequestToService(params)
-
-	definitions, err := h.flowDefinitionService.List(ctx, svcReq)
-	if err != nil {
-		return errorResponse(err), nil
-	}
-	respDefinitions := make([]api.FlowDefinitionResponse, 0, len(definitions))
-	for _, def := range definitions {
-		respDefinitions = append(respDefinitions, flowDefinitionResponse(def))
-	}
-	return &api.FlowDefinitionListResponse{FlowDefinitions: respDefinitions}, nil
-}
-
 func mapListRequestToService(params api.ListFlowDefinitionsParams) service.ListFlowDefinitionsRequest {
 	req := service.ListFlowDefinitionsRequest{
 		ProjectID: string(params.ProjectID),
@@ -201,6 +202,8 @@ func mapListRequestToService(params api.ListFlowDefinitionsParams) service.ListF
 	}
 	return req
 }
+
+/* domain to API response converters */
 
 func flowDefinitionResponse(flowDefinition *domain.FlowDefinition) api.FlowDefinitionResponse {
 	return api.FlowDefinitionResponse{
@@ -376,4 +379,11 @@ func mapGatesToAPI(domainGates map[string]domain.FlowStepGate) map[string]api.Ga
 		}
 	}
 	return gates
+}
+
+func onSuccessString(o *domain.FlowOnSuccess) string {
+	if o == nil {
+		return ""
+	}
+	return o.String()
 }
