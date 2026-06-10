@@ -46,8 +46,9 @@ func TestCreateUser(t *testing.T) {
 				userjson: helpers.MustMarshal(t, map[string]any{
 					"$schema":     "https://test.example.schemas.com/schemas/default-human-user.json",
 					"email":       "john.doe.withalloptionalproperties@example.com",
-					"name":        "john doe",
-					"phoneNumber": "0384902938",
+					"givenName":   "John",
+					"familyName":  "Doe",
+					"dateOfBirth": "1990-05-12",
 					"password":    "my-strong-password",
 				}),
 			},
@@ -57,9 +58,11 @@ func TestCreateUser(t *testing.T) {
 					ProjectID: api.ProjectID(project.ID),
 				},
 				userjson: helpers.MustMarshal(t, map[string]any{
-					"$schema":  "https://test.example.schemas.com/schemas/default-human-user.json",
-					"email":    "john.doe.withoutoptionalproperties@example.com",
-					"password": "my-strong-password",
+					"$schema":    "https://test.example.schemas.com/schemas/default-human-user.json",
+					"email":      "john.doe.withoutoptionalproperties@example.com",
+					"givenName":  "John",
+					"familyName": "Doe",
+					"password":   "my-strong-password",
 				}),
 			},
 			{
@@ -68,9 +71,11 @@ func TestCreateUser(t *testing.T) {
 					ProjectID: api.ProjectID(project.ID),
 				},
 				userjson: helpers.MustMarshal(t, map[string]any{
-					"$schema":  "https://test.example.schemas.com/schemas/default-human-user.json",
-					"email":    "john.doe.withoutteammembership@example.com",
-					"password": "my-strong-password",
+					"$schema":    "https://test.example.schemas.com/schemas/default-human-user.json",
+					"email":      "john.doe.withoutteammembership@example.com",
+					"givenName":  "John",
+					"familyName": "Doe",
+					"password":   "my-strong-password",
 				}),
 			},
 			{
@@ -80,9 +85,11 @@ func TestCreateUser(t *testing.T) {
 					TeamID:    api.OptTeamID{Set: true, Value: api.TeamID(team.ID)},
 				},
 				userjson: helpers.MustMarshal(t, map[string]any{
-					"$schema":  "https://test.example.schemas.com/schemas/default-human-user.json",
-					"email":    "john.doe.withteammembermship@example.com",
-					"password": "my-strong-password",
+					"$schema":    "https://test.example.schemas.com/schemas/default-human-user.json",
+					"email":      "john.doe.withteammembermship@example.com",
+					"givenName":  "John",
+					"familyName": "Doe",
+					"password":   "my-strong-password",
 				}),
 			},
 			{
@@ -122,18 +129,20 @@ func TestCreateUser(t *testing.T) {
 				{
 					name: "missing required email property",
 					userjson: helpers.MustMarshal(t, map[string]any{
-						"$schema":  "https://test.example.schemas.com/schemas/default-human-user.json",
-						"name":     "john doe",
-						"password": "my-strong-password",
+						"$schema":    "https://test.example.schemas.com/schemas/default-human-user.json",
+						"givenName":  "John",
+						"familyName": "Doe",
+						"password":   "my-strong-password",
 					}),
 				},
 				{
-					name: "first name too long",
+					name: "given name too long",
 					userjson: helpers.MustMarshal(t, map[string]any{
-						"$schema":  "https://test.example.schemas.com/schemas/default-human-user.json",
-						"email":    "john.withawaytolongname@example.com",
-						"name":     "john doe with a waaaaaaaaaaaaaaaaaaaaaaaaaaaaay too long name",
-						"password": "my-strong-password",
+						"$schema":    "https://test.example.schemas.com/schemas/default-human-user.json",
+						"email":      "john.withawaytolongname@example.com",
+						"givenName":  "john doe with a waaaaaaaaaaaaaaaaaaaaaaaaaaaaay too long name",
+						"familyName": "Doe",
+						"password":   "my-strong-password",
 					}),
 				},
 			}
