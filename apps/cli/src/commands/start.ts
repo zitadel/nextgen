@@ -2,7 +2,6 @@ import { setTimeout as sleep } from "node:timers/promises";
 
 import { Flags } from "@oclif/core";
 
-import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
 import { ZitadelError } from "../lib/errors";
 import {
   currentUser,
@@ -22,6 +21,8 @@ import {
   localServerUrl,
   writeRuntimeMetadata,
 } from "../lib/local-server/runtime";
+import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
+import { publicCliCommand } from "../lib/public-cli";
 
 const START_TIMEOUT_MS = 90_000;
 
@@ -56,7 +57,7 @@ export default class Start extends BaseCommand {
             console: `${serverUrl}/ui/console/`,
             login: `${serverUrl}/ui/login/`,
           },
-          next_commands: ["zitadel start"],
+          next_commands: [publicCliCommand("start", this.meta.cliVersion)],
         },
       });
     }
@@ -75,7 +76,7 @@ export default class Start extends BaseCommand {
         serverUrl,
       });
       await writeRuntimeMetadata(this.meta.cwd, metadata);
-      return this.emit({ status: "ok", data: readyData(metadata, true) });
+      return this.emit({ status: "ok", data: readyData(metadata, true, this.meta.cliVersion) });
     }
 
     if (existing.exists) {
@@ -90,7 +91,7 @@ export default class Start extends BaseCommand {
       dataDir: paths.dataDir,
       identity: await ensureContainerIdentity(this.meta.cwd, currentUser()),
     });
-    await waitForHealth(serverUrl, containerName);
+    await waitForHealth(serverUrl, containerName, this.meta.cliVersion);
 
     const metadata = metadataFromStart({
       cwdDataDir: paths.dataDir,
@@ -102,11 +103,15 @@ export default class Start extends BaseCommand {
       serverUrl,
     });
     await writeRuntimeMetadata(this.meta.cwd, metadata);
-    return this.emit({ status: "ok", data: readyData(metadata, false) });
+    return this.emit({ status: "ok", data: readyData(metadata, false, this.meta.cliVersion) });
   }
 }
 
-function readyData(metadata: ReturnType<typeof metadataFromStart>, alreadyRunning: boolean) {
+function readyData(
+  metadata: ReturnType<typeof metadataFromStart>,
+  alreadyRunning: boolean,
+  cliVersion: string,
+) {
   return {
     title: alreadyRunning
       ? "Local Zitadel server is already running."
@@ -123,16 +128,19 @@ function readyData(metadata: ReturnType<typeof metadataFromStart>, alreadyRunnin
       console: `${metadata.server_url}/ui/console/`,
       login: `${metadata.server_url}/ui/login/`,
     },
-    next_actions: ["Set up your app, then start its dev server."],
-    next_commands: [
-      "npx @zitadel/cli@alpha setup --framework next --server local",
-      "npm install",
-      "npm run dev",
+    next_actions: [
+      "From your app directory, run setup; the CLI will detect the framework or ask when needed.",
+      "Setup installs dependencies when needed; then start your app dev server.",
     ],
+    next_commands: [publicCliCommand("setup --server local", cliVersion)],
   };
 }
 
-async function waitForHealth(serverUrl: string, containerName: string): Promise<void> {
+async function waitForHealth(
+  serverUrl: string,
+  containerName: string,
+  cliVersion: string,
+): Promise<void> {
   const started = Date.now();
   while (Date.now() - started < START_TIMEOUT_MS) {
     if (await checkLocalServerHealth(serverUrl, 1000)) {
@@ -142,7 +150,10 @@ async function waitForHealth(serverUrl: string, containerName: string): Promise<
   }
   throw new ZitadelError("E_NETWORK", "Local Zitadel server did not become healthy", {
     hint: "Inspect the container logs, then reset the local runtime if needed.",
-    nextCommands: ["zitadel logs", "zitadel reset --force"],
+    nextCommands: [
+      publicCliCommand("logs", cliVersion),
+      publicCliCommand("reset --force", cliVersion),
+    ],
     details: { container_name: containerName, server_url: serverUrl },
   });
 }

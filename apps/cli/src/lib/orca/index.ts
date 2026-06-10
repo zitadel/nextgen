@@ -51,9 +51,13 @@ export class Orca {
         return facts;
       }
     }
-    throw new ZitadelError("E_FRAMEWORK_NOT_DETECTED", "Could not detect a supported framework", {
-      hint: `Run this from a supported project (${this.frameworkIds().join(", ")}) or pass --cwd <path>.`,
-    });
+    throw new ZitadelError(
+      "E_FRAMEWORK_NOT_DETECTED",
+      "Could not detect a supported app framework",
+      {
+        hint: "Run setup from your app project directory, pass --cwd <path-to-app>, or run setup from an empty directory to scaffold a new app.",
+      },
+    );
   }
 
   /**
@@ -112,7 +116,9 @@ export class Orca {
     const scaffolder = this.scaffolders.find((candidate) => candidate.canScaffold(framework));
     if (!scaffolder) {
       throw new ZitadelError("E_VALIDATION", `No scaffolder supports "${framework}"`, {
-        hint: `Available frameworks: ${this.availableFrameworks().map((f) => f.id).join(", ")}.`,
+        hint: `Available frameworks: ${this.availableFrameworks()
+          .map((f) => f.id)
+          .join(", ")}.`,
       });
     }
     return scaffolder;
