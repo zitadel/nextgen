@@ -9,7 +9,9 @@ Example file: [`docs/operations/nextgen.example.yaml`](../operations/nextgen.exa
 | YAML key | Environment | Default | Description |
 | -------- | ----------- | ------- | ----------- |
 | `server.address` | `NEXTGEN_SERVER_ADDRESS` | `:8080` | Listen address |
-| `server.encryption_key` | `NEXTGEN_SERVER_ENCRYPTION_KEY` | *(required)* | 64-char hex (32 bytes) for sealing flow cookies |
+| `server.data_dir` | `NEXTGEN_SERVER_DATA_DIR` | `nextgen-data` next to the binary | Local runtime data root |
+| `server.encryption_key` | `NEXTGEN_SERVER_ENCRYPTION_KEY` | unset | Optional 64-char hex key for sealing flow cookies |
+| `server.encryption_key_file` | `NEXTGEN_SERVER_ENCRYPTION_KEY_FILE` | `<server.data_dir>/server-encryption-key` | Generated/reused key file when `server.encryption_key` is unset |
 | `server.console_enabled` | `NEXTGEN_SERVER_CONSOLE_ENABLED` | `true` | Serve embedded management console |
 | `server.console_path` | `NEXTGEN_SERVER_CONSOLE_PATH` | `/ui/console` | Console URL prefix |
 | `server.login_enabled` | `NEXTGEN_SERVER_LOGIN_ENABLED` | `true` | Serve embedded login shell |
@@ -40,6 +42,9 @@ When `-c` is not passed, the server looks for `nextgen.yaml` in:
 - `./config`
 - `/etc/nextgen`
 
-## Dev-only cookie key
+## Local cookie key
 
-The example compose env file uses a fixed sealer key suitable for local development only. Generate a unique random 32-byte key for any shared or production deployment.
+For local development, leave `server.encryption_key` unset and persist
+`server.data_dir`; the server creates and reuses `server-encryption-key`.
+For shared or production deployments, provide managed secret material through
+your deployment environment rather than committing it to source control.

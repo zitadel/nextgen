@@ -2,9 +2,9 @@
 
 This repository uses a split licensing model. The Zitadel product, including the
 server and embedded console, is licensed under the GNU Affero General Public
-License v3.0 only (AGPL-3.0-only). Client libraries, integration surfaces, API
-contracts, and documentation that are meant to be consumed by downstream
-applications are licensed under the MIT License.
+License v3.0 only (AGPL-3.0-only). Client libraries, integration examples, API
+contracts, public documentation, and other surfaces meant to be consumed by
+downstream applications are licensed under the MIT License.
 
 We use SPDX license identifiers for standard license naming.
 
@@ -22,6 +22,9 @@ cmd/
 internal/
 apps/console/
 ```
+
+The private root workspace package (`package.json`) follows this default
+because it describes the source tree as a whole, not a published client package.
 
 The Docker images published from this repository, including
 `ghcr.io/zitadel/nextgen`, are AGPL-3.0-only because they contain the server and
@@ -42,13 +45,24 @@ The following files and directories, including their subdirectories, are
 licensed under the MIT License:
 
 ```text
+README.md
+CONTRIBUTING.md
+AGENTS.md
+LICENSING.md
+VISION.md
+api/
+docs/
 apps/cli/
+apps/demo-next/
+apps/demo-nuxt/
+packages/api/
 packages/components/
+packages/design-tokens/
+packages/shared-component-styles/
+packages/ui-react/
 packages/sdk-core/
 packages/sdk-next/
 packages/sdk-*/
-api/
-docs/
 ```
 
 These exceptions cover code and contracts that are intended to be imported,
@@ -59,11 +73,15 @@ For `api/`, OpenAPI `info.license` metadata describes the exposed API
 contract/specification license. It does not describe or override the
 AGPL-3.0-only license of the Zitadel server implementation.
 
-Each MIT-licensed npm package must:
+Each published MIT-licensed npm package must:
 
 - declare `"license": "MIT"` in its `package.json`,
 - include a `LICENSE` file at the package root containing the MIT license text,
 - carry an SPDX header in source files where reasonable.
+
+Private demo, design-system, and integration workspaces that are listed above
+are covered by the path exception while they remain private. Add package-level
+MIT `LICENSE` files before publishing any of them as npm packages.
 
 For non-package MIT paths such as `api/` and `docs/`, SPDX headers, generated
 metadata, or local README notes are sufficient when the format supports them.

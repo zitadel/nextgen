@@ -420,10 +420,12 @@ func rowToFlowDefinition(row flowDefinitionRow) (*domain.FlowDefinition, error) 
 		Name:          row.Name,
 		SchemaVersion: row.SchemaVersion,
 		Status:        row.Status,
-		CreatedAt:     row.CreatedAt,
-		UpdatedAt:     row.UpdatedAt,
-		UserSchema:    content.UserSchema,
-		Purposes:      purposes,
+		// the spanner setup returns time in UTC while pgx returns in the local timezone by default,
+		// so the timezone is normalized to UTC here
+		CreatedAt:  row.CreatedAt.UTC(),
+		UpdatedAt:  row.UpdatedAt.UTC(),
+		UserSchema: content.UserSchema,
+		Purposes:   purposes,
 		Audience: domain.FlowDefinitionAudience{
 			AppIDs:  content.Audience.AppIDs,
 			TeamIDs: content.Audience.TeamIDs,

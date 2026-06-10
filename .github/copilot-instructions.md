@@ -7,22 +7,35 @@ more than polish.
   TypeScript packages, `go vet ./...` and `go test ./...` for Go, package smoke
   checks for publishable npm changes.
 - Treat generated files carefully. Do not ask authors to hand-edit
-  `api/generated/**`, package `dist/**`, or the generated block in
-  `apps/cli/AGENTS.md`.
+  `api/generated/**` or package `dist/**`.
+- Treat `apps/cli/SKILLS.md` as the current CLI agent guidance and keep it in
+  sync with CLI behavior.
+- Keep the two local-development front doors separate: contributors use root
+  `corepack pnpm run ...` scripts, while customers use published
+  `zitadel ...` runtime commands and `--server local`.
 - Preserve the CLI JSON envelope. In `--json` mode stdout must stay parseable,
   with top-level `cli_version`, `command`, `source`, and `status`; diagnostics
   belong in structured fields or stderr when appropriate.
-- Protect the claim boundary. Agents may surface a human `claim_url`, but must
-  not complete account ownership or hide production-apply requirements.
+- For local JSON capture, prefer
+  `corepack pnpm --silent run cli -- ... --json`; plain `pnpm run` prints its
+  own script prelude before CLI stdout.
+- Do not reintroduce the removed pre-claim / claim lifecycle unless a real
+  server contract lands first.
 - Watch for secret leakage. Project, preview, token, and `.zitadel/secret` style
   values must not enter source control or browser-safe env metadata.
 - User-visible changes to a public npm package need a changeset; author the
   `.changeset/<slug>.md` file directly rather than via the interactive prompt.
   See `AGENTS.md` for the package list and file format. npm package manifests
   must keep `"license": "MIT"`.
+- PR titles must pass Semantic PR. Use `<type>(optional-scope): <summary>` and
+  verify allowed types/scopes against `.github/semantic.yml`; for docs-only
+  changes, use a title such as `docs: add preview status disclaimer`.
 - Server and embedded console changes are AGPL-3.0-only by default; public API,
   docs, CLI, and SDK paths are MIT exceptions per `LICENSING.md`.
 - For `consumer-journey-e2e` or `apps/cli-journey-e2e/**` changes, verify that
   the test uses current workflow artifacts, a temporary registry for Zitadel
   packages, the CLI JSON setup contract, required passkey coverage in CI, and
   focused diagnostics that exclude bulky generated app directories.
+- For local runtime command changes, verify Docker command construction, local
+  `.zitadel/local/` state handling, `--server local` resolution, and the
+  zero-config image smoke path with no `NEXTGEN_SERVER_ENCRYPTION_KEY`.

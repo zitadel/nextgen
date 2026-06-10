@@ -1,4 +1,5 @@
 import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -18,16 +19,23 @@ const VALID_USER_SCHEMA = {
   properties: { email: { type: "string" } },
 };
 
-function doctor(cwd: string, extra: string[] = []) {
+async function doctor(cwd: string, extra: string[] = []) {
+  const fake = await fakeDocker();
+  const port = await freePort();
   return runCliForTest([
     "doctor",
     "--cwd",
     cwd,
     "--json",
+    "--port",
+    String(port),
     "--server",
     "https://api.zitadel.cloud",
     ...extra,
-  ]);
+  ], {
+    PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
+    DOCKER_LOG: fake.logPath,
+  });
 }
 
 /**
@@ -213,3 +221,40 @@ describe("doctor command", () => {
     expect(dependency?.status).toBe("pass");
   });
 });
+
+async function fakeDocker(): Promise<{ binDir: string; logPath: string }> {
+  const binDir = await mkdtemp(join(tmpdir(), "zitadel-fake-docker-"));
+  tempDirs.push(binDir);
+  const logPath = join(binDir, "docker.log");
+  const dockerPath = join(binDir, "docker");
+  await writeFile(
+    dockerPath,
+    `#!/usr/bin/env node
+const fs = require("node:fs");
+const args = process.argv.slice(2);
+fs.appendFileSync(process.env.DOCKER_LOG, JSON.stringify(args) + "\\n");
+if (args[0] === "version") {
+  console.log("29.0.0");
+  process.exit(0);
+}
+if (args[0] === "pull") {
+  console.log(args[args.length - 1]);
+  process.exit(0);
+}
+process.exit(0);
+`,
+  );
+  await chmod(dockerPath, 0o755);
+  return { binDir, logPath };
+}
+
+async function freePort(): Promise<number> {
+  const server = createServer();
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
+  const address = server.address();
+  await new Promise<void>((resolve) => server.close(() => resolve()));
+  if (!address || typeof address === "string") {
+    throw new Error("free port probe did not expose a TCP address");
+  }
+  return address.port;
+}
