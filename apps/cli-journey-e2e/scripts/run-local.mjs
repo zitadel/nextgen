@@ -71,6 +71,7 @@ try {
 
   log(`work dir: ${workDir}`);
   await assertDockerAvailable();
+  await ensurePlaywrightBrowsers();
   await buildPackages();
   await packPackages();
   await run("node", [
@@ -352,6 +353,19 @@ async function packageName(relativePath) {
     throw new Error(`${relativePath}/package.json has no name`);
   }
   return manifest.name;
+}
+
+async function ensurePlaywrightBrowsers() {
+  log("ensuring Playwright Chromium browsers are installed");
+  await run("corepack", [
+    "pnpm",
+    "--filter",
+    "@zitadel/cli-journey-e2e",
+    "exec",
+    "playwright",
+    "install",
+    "chromium",
+  ]);
 }
 
 async function assertDockerAvailable() {

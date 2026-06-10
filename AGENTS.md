@@ -125,11 +125,12 @@ corepack pnpm run journey
 ```
 
 This runner requires Docker for Verdaccio. By default it starts the backend from
-source with embedded Postgres, builds and packs local npm packages with pnpm,
-creates a temporary Next.js app outside the repo, runs CLI setup through npm,
-starts the generated app on `localhost`, and runs Playwright with one worker.
-Use `-- --backend image --image <docker-tag>` to run the backend through the
-local compose profile for image parity.
+source with embedded Postgres, ensures the Playwright Chromium browsers are
+installed, builds and packs local npm packages with pnpm, creates a temporary
+Next.js app outside the repo, runs CLI setup through npm, starts the generated
+app on `localhost`, and runs Playwright with one worker. Use
+`-- --backend image --image <docker-tag>` to run the backend through the local
+compose profile for image parity.
 
 In CI the dedicated `node-e2e` job (in `.github/workflows/ci.yml`) gates merges
 on the checked-in demo integrations. The separate `consumer-journey-e2e` job is
@@ -201,6 +202,11 @@ For customer-local runtime workflows, agents should prefer
 - Do not wire the runtime GoReleaser workflow to publish a Homebrew `zitadel`
   command. Native Homebrew/curl distribution belongs to a future CLI artifact
   publisher for the `zitadel` CLI.
+- PR titles must pass the Semantic PR check. Use the conventional format
+  `<type>(optional-scope): <summary>` and treat `.github/semantic.yml` as the
+  source of truth for allowed types and scopes. Scopes are optional; omit the
+  scope instead of inventing one. For documentation-only changes, use the
+  `docs` type, for example `docs: add preview status disclaimer`.
 - User-visible changes to a public npm package, runtime, API, or
   product-level docs need a changeset. The public packages are `@zitadel/cli`
   (`apps/cli/`), `@zitadel/api`, `@zitadel/components`, `@zitadel/sdk-core`,

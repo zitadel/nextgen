@@ -2,7 +2,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 import { runCapture } from "./dev-process.mjs";
 
@@ -101,8 +101,8 @@ async function checkDocker() {
 }
 
 async function checkPlaywright() {
-  const browserInfo = findPlaywrightBrowserInfo();
-  if (!browserInfo) {
+  const playwrightInfo = findPlaywrightBrowserInfo();
+  if (!playwrightInfo) {
     warn(
       "Playwright package metadata is unavailable",
       "Run: corepack pnpm install --frozen-lockfile",
@@ -110,8 +110,8 @@ async function checkPlaywright() {
     return;
   }
 
-  const cacheRoot = join(homedir(), ".cache", "ms-playwright");
-  const missing = browserInfo
+  const cacheRoot = resolvePlaywrightBrowserPath(playwrightInfo.packageRoot);
+  const missing = playwrightInfo.browsers
     .filter((browser) => !existsSync(join(cacheRoot, browser.directory)))
     .map((browser) => browser.name);
 
@@ -122,7 +122,7 @@ async function checkPlaywright() {
 
   warn(
     `Playwright browsers missing: ${missing.join(", ")}`,
-    "Run: corepack pnpm --filter @zitadel/demo-next-e2e exec playwright install chromium",
+    "Run: corepack pnpm --filter @zitadel/cli-journey-e2e exec playwright install chromium",
   );
 }
 
@@ -166,15 +166,42 @@ function findPlaywrightBrowserInfo() {
     return null;
   }
   const metadata = JSON.parse(readFileSync(browsersPath, "utf8"));
-  return metadata.browsers
-    .filter((browser) => ["chromium", "chromium-headless-shell"].includes(browser.name))
-    .map((browser) => ({
-      name: browser.name,
-      directory:
-        browser.name === "chromium-headless-shell"
-          ? `chromium_headless_shell-${browser.revision}`
-          : `chromium-${browser.revision}`,
-    }));
+  return {
+    packageRoot: join(pnpmDir, playwrightCoreDir, "node_modules", "playwright-core"),
+    browsers: metadata.browsers
+      .filter((browser) => ["chromium", "chromium-headless-shell"].includes(browser.name))
+      .map((browser) => ({
+        name: browser.name,
+        directory:
+          browser.name === "chromium-headless-shell"
+            ? `chromium_headless_shell-${browser.revision}`
+            : `chromium-${browser.revision}`,
+      })),
+  };
+}
+
+function resolvePlaywrightBrowserPath(packageRoot) {
+  const envPath = process.env.PLAYWRIGHT_BROWSERS_PATH;
+  if (envPath === "0") {
+    return join(packageRoot, ".local-browsers");
+  }
+  if (envPath) {
+    return resolve(process.env.INIT_CWD || process.cwd(), envPath);
+  }
+  return join(defaultCacheDirectory(), "ms-playwright");
+}
+
+function defaultCacheDirectory() {
+  switch (process.platform) {
+    case "linux":
+      return process.env.XDG_CACHE_HOME || join(homedir(), ".cache");
+    case "darwin":
+      return join(homedir(), "Library", "Caches");
+    case "win32":
+      return process.env.LOCALAPPDATA || join(homedir(), "AppData", "Local");
+    default:
+      return join(homedir(), ".cache");
+  }
 }
 
 function readText(relativePath) {

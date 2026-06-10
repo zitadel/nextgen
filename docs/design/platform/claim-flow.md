@@ -2,6 +2,11 @@
 
 > **Status:** Draft
 > **See also:** [README](README.md) · [Overview](overview.md) · [Project Secret](secret.md) · [Configuration Surface](configuration-surface.md) · [Claim API](api/claim-api.yaml) · [Glossary](../glossary.md)
+>
+> **Current implementation note:** This is a target design for the future
+> claim lifecycle. The checked-in CLI and server do not currently expose these
+> endpoints or a `zitadel claim` command; see ADR 003 for the shipped-state
+> decision.
 
 Claim is the transaction that attaches ownership and accountability to a project. Before claim, the project exists but has no accountable owner. After claim, it belongs to a **team** with at least one accountable human. The transition is atomic — nothing partial.
 

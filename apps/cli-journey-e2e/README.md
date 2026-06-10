@@ -17,18 +17,19 @@ corepack pnpm run journey
 The default mode uses Docker only for Verdaccio. The backend runs from local
 source with embedded Postgres:
 
-1. Build the public workspace packages used by the workflow artifact set.
-2. Pack package tarballs with `corepack pnpm --dir <package> pack`.
-3. Verify tarballs are installable and do not contain `catalog:` or
+1. Ensure the Playwright Chromium browsers are installed.
+2. Build the public workspace packages used by the workflow artifact set.
+3. Pack package tarballs with `corepack pnpm --dir <package> pack`.
+4. Verify tarballs are installable and do not contain `catalog:` or
    `workspace:` dependency specs.
-4. Start Verdaccio with npmjs proxying enabled.
-5. Publish tarballs to Verdaccio with `alpha` and `latest` tags.
-6. Start `go run .` on a free local port.
-7. Create a pinned `create-next-app` project in a temporary directory.
-8. Run CLI setup through `npx <cli-package>@alpha`.
-9. Run `npm install` in the generated app against the temporary registry.
-10. Start the generated app on `localhost`.
-11. Run the Playwright tests with one worker.
+5. Start Verdaccio with npmjs proxying enabled.
+6. Publish tarballs to Verdaccio with `alpha` and `latest` tags.
+7. Start `go run .` on a free local port.
+8. Create a pinned `create-next-app` project in a temporary directory.
+9. Run CLI setup through `npx <cli-package>@alpha`.
+10. Run `npm install` in the generated app against the temporary registry.
+11. Start the generated app on `localhost`.
+12. Run the Playwright tests with one worker.
 
 ### Options
 
