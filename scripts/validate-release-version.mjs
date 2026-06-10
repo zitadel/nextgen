@@ -15,7 +15,7 @@ const config = readJson(".changeset/config.json");
 const expectedNames = lockstepPackages.map((manifestPackage) => manifestPackage.name);
 const fixedGroups = config.fixed ?? [];
 const fixedGroup = fixedGroups.find((group) =>
-  expectedNames.every((name) => group.includes(name)),
+  group.some((name) => expectedNames.includes(name)),
 );
 
 if (!fixedGroup) {
@@ -23,9 +23,16 @@ if (!fixedGroup) {
     `.changeset/config.json must contain one fixed group with: ${expectedNames.join(", ")}`,
   );
 } else {
+  const missingNames = expectedNames.filter((name) => !fixedGroup.includes(name));
   const extraNames = fixedGroup.filter((name) => !expectedNames.includes(name));
-  if (extraNames.length > 0 || fixedGroup.length !== expectedNames.length) {
-    errors.push(`lockstep fixed group has unexpected packages: ${extraNames.join(", ")}`);
+  if (missingNames.length > 0 || extraNames.length > 0) {
+    errors.push(
+      [
+        "lockstep fixed group mismatch:",
+        `missing packages: ${formatPackageList(missingNames)};`,
+        `extra packages: ${formatPackageList(extraNames)}`,
+      ].join(" "),
+    );
   }
 }
 
@@ -71,3 +78,7 @@ if (errors.length > 0) {
 }
 
 console.log(`release train is aligned for ${tag}`);
+
+function formatPackageList(packageNames) {
+  return packageNames.length > 0 ? packageNames.join(", ") : "(none)";
+}

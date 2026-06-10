@@ -26,7 +26,6 @@ if (!productSection) {
 const packageSections = publicPackages
   .map((manifestPackage) => ({
     ...manifestPackage,
-    version: readPackage(manifestPackage).version,
     section: extractChangelogSection(readChangelog(manifestPackage), version),
   }))
   .filter((manifestPackage) => manifestPackage.section.length > 0);

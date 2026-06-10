@@ -20,6 +20,8 @@ const releaseNoteRoots = [
   "packages/sdk-react/",
   "packages/sdk-vue/",
   "packages/sdk-angular/",
+  "docs/",
+  "README.md",
   "api/openapi/",
   "cmd/",
   "internal/",
