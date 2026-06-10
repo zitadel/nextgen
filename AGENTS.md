@@ -194,18 +194,18 @@ For customer-local runtime workflows, agents should prefer
 
 ## Release, Licensing, And Secrets
 
-- Zitadel v5 alpha releases are lockstep product releases documented in
+- Zitadel v5 alpha releases are lockstep preview releases documented in
   `docs/releases.md`. Changesets owns npm versions, package changelogs, and npm
   publishing; GoReleaser creates the single draft GitHub Release and runtime
   artifacts.
 - Do not wire the runtime GoReleaser workflow to publish a Homebrew `zitadel`
   command. Native Homebrew/curl distribution belongs to a future CLI artifact
   publisher for the `zitadel` CLI.
-- User-visible changes to a public npm package, runtime, API, Helm surface, or
+- User-visible changes to a public npm package, runtime, API, or
   product-level docs need a changeset. The public packages are `@zitadel/cli`
   (`apps/cli/`), `@zitadel/api`, `@zitadel/components`, `@zitadel/sdk-core`,
   `@zitadel/sdk-next`, `@zitadel/sdk-nuxt`, `@zitadel/sdk-react`,
-  `@zitadel/sdk-vue`, and `@zitadel/sdk-angular`. Runtime, API, Helm, and
+  `@zitadel/sdk-vue`, and `@zitadel/sdk-angular`. Runtime, API, and
   product-level changes use the private `@zitadel/product` changeset anchor. CI
   fails a PR that touches these release surfaces without a changeset
   (`changeset-check` in `.github/workflows/ci.yml`).

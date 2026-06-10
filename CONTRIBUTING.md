@@ -121,7 +121,7 @@ Dev servers use `/` as the Vite base; production embeds use `/ui/console/` and `
 
 ## Release workflows
 
-Zitadel v5 alpha releases are lockstep product releases. Read
+Zitadel v5 alpha releases are lockstep preview releases. Read
 [docs/releases.md](docs/releases.md) before changing release automation or
 cutting a release.
 

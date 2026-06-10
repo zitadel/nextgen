@@ -4,7 +4,7 @@ name: release-npm
 # @zitadel/components, @zitadel/sdk-core, @zitadel/sdk-next, @zitadel/sdk-nuxt,
 # @zitadel/sdk-react, @zitadel/sdk-vue, @zitadel/sdk-angular)
 # via changesets. The public packages plus the private @zitadel/product
-# release-note anchor are fixed together as the Zitadel v5 alpha train.
+# release-note anchor are fixed together as the Zitadel v5 alpha preview train.
 # Pushing changesets to main opens a "Version Packages" PR; merging that PR
 # publishes the public npm packages. Package publishes do not create GitHub
 # Releases; release.yml creates the single Zitadel GitHub Release with

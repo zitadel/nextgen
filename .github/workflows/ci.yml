@@ -258,7 +258,7 @@ jobs:
   changeset-check:
     # Gate PRs: fail when a PR changes a publishable package or runtime/API
     # release surface without adding a changeset. Package changes mention their
-    # package; runtime/API/Helm/product changes mention @zitadel/product.
+    # package; runtime/API/product changes mention @zitadel/product.
     # Publishing itself runs on pushes to main in release-npm.yml.
     #
     # The check lives in scripts/check-changeset-required.mjs so the publishable

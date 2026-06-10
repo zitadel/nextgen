@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -48,6 +49,10 @@ export function readPackage(manifestPackage) {
 
 export function readChangelog(manifestPackage) {
   return readFileSync(join(repoRoot, manifestPackage.path, "CHANGELOG.md"), "utf8");
+}
+
+export function git(args) {
+  return execFileSync("git", args, { cwd: repoRoot, encoding: "utf8" }).trim();
 }
 
 export function extractChangelogSection(markdown, version) {

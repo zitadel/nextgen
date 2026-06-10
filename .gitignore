@@ -99,6 +99,7 @@ coverage
 nextgen.yaml
 /nextgen
 /release-notes.md
+/release-manifest.json
 nextgen-data/
 .zitadel/local/
 

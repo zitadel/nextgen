@@ -146,9 +146,9 @@ service logs. These artifacts expire after 7 days and are not release artifacts.
 
 ## Build & release
 
-Zitadel v5 alpha releases are lockstep product releases. One version such as
-`v5.0.0-alpha.1` represents the tested runtime, CLI, SDKs, components, Docker
-image, and future Helm chart. The v5 major is intentional because this
+Zitadel v5 alpha releases are lockstep preview releases. One version such as
+`v5.0.0-alpha.1` represents the tested runtime, CLI, SDKs, components, and
+Docker image. The v5 major is intentional because this
 next-generation project may become the successor to the classic Zitadel product
 released from `zitadel/zitadel`. See [docs/releases.md](docs/releases.md) and
 [docs/adrs/002-multi-package-release-strategy.md](docs/adrs/002-multi-package-release-strategy.md).
@@ -164,13 +164,14 @@ After the Changesets "Version Packages" PR is merged, run the manual
 `.github/workflows/release.yml` workflow (`release-zitadel`) with the matching
 version tag, for example `v5.0.0-alpha.1`. It validates that package versions
 match the typed tag, generates product release notes from changelogs, creates or
-verifies the tag, and asks GoReleaser to create the draft GitHub Release.
+verifies the tag, writes a tiny `release-manifest.json`, and asks GoReleaser to
+create the draft GitHub Release.
 
 ### Runtime artifacts (`goreleaser`)
 
 GoReleaser builds the Zitadel runtime archives, checksums, metadata, Docker
 image, and embedded console/login UI. In the release workflow it creates the
-single draft `Zitadel v5.0.0-alpha.N` GitHub Release.
+single draft `Zitadel next-generation preview v5.0.0-alpha.N` GitHub Release.
 
 ```sh
 # Local snapshot (no publish, no signing)
@@ -193,8 +194,8 @@ user-visible change to those packages:
 corepack pnpm changeset
 ```
 
-For runtime, API, Helm, docs-for-users, or product-level changes, write the
-changeset against the private `@zitadel/product` package. The changesets
+For runtime, API, docs-for-users, or product-level changes, write the changeset
+against the private `@zitadel/product` package. The changesets
 workflow opens a "Version Packages" PR. Merging that PR versions and publishes
 the lockstep public packages through npm trusted publishing. npm package
 publishes do not create GitHub Releases.

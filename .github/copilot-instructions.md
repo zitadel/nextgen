@@ -28,7 +28,7 @@ more than polish.
   file directly rather than via the interactive prompt. Package changes mention
   the package; runtime/API/product changes mention `@zitadel/product`. npm
   package manifests must keep `"license": "MIT"`.
-- Zitadel v5 alpha releases are lockstep product releases. Changesets owns npm
+- Zitadel v5 alpha releases are lockstep preview releases. Changesets owns npm
   versions, changelogs, and publishing; `.github/workflows/release.yml` uses
   GoReleaser to create the single draft GitHub Release. npm package publishes
   must not create GitHub Releases.

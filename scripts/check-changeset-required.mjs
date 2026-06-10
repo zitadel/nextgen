@@ -3,7 +3,7 @@
 // surface without adding a changeset, so no consumer-visible change merges
 // without a release note.
 //
-// Package changes should mention the changed package. Runtime/API/Helm/product
+// Package changes should mention the changed package. Runtime/API/product
 // changes should mention the private @zitadel/product package. For changes
 // that release nothing (docs/tests/CI/chores), add an empty changeset:
 // `corepack pnpm changeset --empty`.
@@ -21,7 +21,6 @@ const releaseNoteRoots = [
   "packages/sdk-vue/",
   "packages/sdk-angular/",
   "api/openapi/",
-  "charts/",
   "cmd/",
   "internal/",
   "Dockerfile",

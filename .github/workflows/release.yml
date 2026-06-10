@@ -56,11 +56,21 @@ jobs:
       - name: Generate release notes
         run: node scripts/generate-release-notes.mjs --version "${{ inputs.version }}" --output release-notes.md
 
-      - name: Upload release notes preview
+      - name: Generate release manifest
+        run: |
+          node scripts/generate-release-manifest.mjs \
+            --version "${{ inputs.version }}" \
+            --ref "${{ inputs.ref }}" \
+            --commit "$(git rev-parse HEAD)" \
+            --output release-manifest.json
+
+      - name: Upload release preview
         uses: actions/upload-artifact@v7
         with:
-          name: release-notes
-          path: release-notes.md
+          name: release-preview
+          path: |
+            release-notes.md
+            release-manifest.json
           if-no-files-found: error
           retention-days: 7
 
@@ -83,7 +93,7 @@ jobs:
               exit 1
             fi
           else
-            git tag -a "$VERSION" -m "Zitadel $VERSION" "$COMMIT"
+            git tag -a "$VERSION" -m "Zitadel next-generation preview $VERSION" "$COMMIT"
             git push origin "refs/tags/${VERSION}"
           fi
 
@@ -131,3 +141,9 @@ jobs:
           args: release --clean --release-notes release-notes.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload release manifest
+        if: ${{ ! inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ inputs.version }}" release-manifest.json --clobber

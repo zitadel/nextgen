@@ -1,8 +1,8 @@
 # Releases
 
-Zitadel v5 alpha releases are lockstep product releases. One version such as
-`v5.0.0-alpha.1` represents the tested runtime, CLI, SDKs, components, Docker
-image, and future Helm chart for that alpha.
+Zitadel v5 alpha releases are lockstep preview releases. One version such as
+`v5.0.0-alpha.1` represents the tested runtime, CLI, SDKs, components, and
+Docker image for that alpha.
 
 The v5 major is intentional: this repository is the next-generation Zitadel
 project and may become the successor to the classic Zitadel product released
@@ -11,7 +11,8 @@ and opt-in.
 
 ## Versioning model
 
-- GitHub Releases are named `Zitadel v5.0.0-alpha.N`.
+- GitHub Releases are named
+  `Zitadel next-generation preview v5.0.0-alpha.N`.
 - Public npm packages and the private `@zitadel/product` release-note anchor are
   fixed together in Changesets.
 - npm package publishes do not create GitHub Releases.
@@ -19,13 +20,17 @@ and opt-in.
   archives, checksums, metadata, and the Docker image.
 - Package changelogs remain the detailed package history. The GitHub Release is
   the readable product entry point.
+- SemVer-shaped alpha versions are release coordinates. Breaking changes can
+  happen between alpha releases and must be called out in the release notes.
+- `release-manifest.json` is attached as a small machine-readable receipt for
+  agents; it does not own release policy.
 
 ## Changesets
 
 Every user-visible change needs a changeset:
 
 - Package changes mention the affected public package.
-- Runtime, API, Helm, docs-for-users, and product-level changes mention
+- Runtime, API, docs-for-users, and product-level changes mention
   `@zitadel/product`.
 - Chores/tests/CI-only changes use an empty changeset.
 
@@ -40,18 +45,20 @@ or product changeset bumps the whole train.
 2. Let `.github/workflows/release-npm.yml` open the "Version Packages" PR.
 3. Review the Version Packages PR: versions should all be the next
    `5.0.0-alpha.N`, package changelogs should contain the detailed notes, and
-   `packages/product/CHANGELOG.md` should summarize product/runtime/Helm/API
-   changes.
+   `packages/product/CHANGELOG.md` should summarize product/runtime/API changes
+   and known limitations.
 4. Merge the Version Packages PR. It publishes the public npm packages under
    the `alpha` dist-tag and does not create GitHub Releases.
 5. Run `.github/workflows/release.yml` (`release-zitadel`) with:
    - `version`: the matching tag, for example `v5.0.0-alpha.1`
    - `ref`: the merged Version Packages commit or `main`
    - `dry_run`: `true`
-6. Review the generated `release-notes` workflow artifact.
+6. Review the generated `release-preview` workflow artifact containing
+   `release-notes.md` and `release-manifest.json`.
 7. Rerun `release-zitadel` with `dry_run: false`. The workflow creates or
    verifies the `v5.0.0-alpha.N` tag, then GoReleaser creates a draft GitHub
-   Release named `Zitadel v5.0.0-alpha.N`.
+   Release named `Zitadel next-generation preview v5.0.0-alpha.N` and uploads
+   `release-manifest.json`.
 8. Review and publish the draft GitHub Release.
 
 ## Local checks
@@ -70,19 +77,20 @@ node scripts/generate-release-notes.mjs \
   --output /tmp/zitadel-release-notes.md
 ```
 
+Generate the manifest attached to the GitHub Release:
+
+```sh
+node scripts/generate-release-manifest.mjs \
+  --version v5.0.0-alpha.1 \
+  --output /tmp/zitadel-release-manifest.json
+```
+
 Run a local GoReleaser snapshot:
 
 ```sh
 goreleaser release --snapshot --clean --skip=publish,sign \
   --release-notes /tmp/zitadel-release-notes.md
 ```
-
-## Helm
-
-During alpha and beta, Helm chart `version` and `appVersion` match the product
-version. Chart-only fixes still become a new `v5.0.0-alpha.N` release so users
-and support can keep one compatibility answer. Revisit independent chart
-versions after stable v5.
 
 ## Native CLI distribution
 

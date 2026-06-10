@@ -1,6 +1,6 @@
 # Changesets
 
-This directory holds [changesets](https://github.com/changesets/changesets) for the Zitadel v5 alpha release train. The **public** packages are:
+This directory holds [changesets](https://github.com/changesets/changesets) for the Zitadel v5 alpha preview train. The **public** packages are:
 
 - `@zitadel/cli` (`apps/cli`)
 - `@zitadel/api` (`packages/api`)
@@ -13,13 +13,13 @@ This directory holds [changesets](https://github.com/changesets/changesets) for 
 - `@zitadel/sdk-angular` (`packages/sdk-angular`)
 
 The private `@zitadel/product` package is not published. It exists only as the
-Changesets target for runtime, API, Helm, docs-for-users, and product-level
-release notes. Everything else (`@zitadel/api-mock`, `@zitadel/design-tokens`,
+Changesets target for runtime, API, docs-for-users, and product-level release
+notes. Everything else (`@zitadel/api-mock`, `@zitadel/design-tokens`,
 `@zitadel/shared-component-styles`, `@zitadel/ui-react`, `@zitadel/lint`, the
 demos, the console) is marked `"private": true` and is never published.
 
 When you make a user-visible change to one of the public packages or to the
-product/runtime/API/Helm surface, run:
+product/runtime/API surface, run:
 
 ```sh
 corepack pnpm changeset

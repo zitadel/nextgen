@@ -72,7 +72,7 @@ release:
   draft: true
   prerelease: auto
   make_latest: false
-  name_template: 'Zitadel {{ .Tag }}'
+  name_template: 'Zitadel next-generation preview {{ .Tag }}'
   use_existing_draft: true
   mode: replace
   replace_existing_artifacts: true

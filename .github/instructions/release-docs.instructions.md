@@ -15,7 +15,7 @@ state of the repo.
   and no required `NEXTGEN_SERVER_ENCRYPTION_KEY`.
 - The release workflow is manual and draft-oriented while the repo is
   pre-release.
-- Zitadel v5 alpha releases are lockstep product releases. Changesets owns npm
+- Zitadel v5 alpha releases are lockstep preview releases. Changesets owns npm
   versions, package changelogs, and npm publishing; `release.yml` validates the
   manually typed `v5.0.0-alpha.N` tag and uses GoReleaser to create the single
   draft GitHub Release. npm package publishes must not create GitHub Releases.
