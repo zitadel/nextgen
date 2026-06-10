@@ -19,7 +19,7 @@ For the shape and validation rules, see
 | 01 | [password-login](./01-password-login/) | `login` | Identifier → password, terminal `show`. The minimal login flow. |
 | 02 | [password-register](./02-password-register/) | `register` | Single-step signup with `on_success: create_user`. |
 | 03 | [passkey-login](./03-passkey-login/) | `login` | Discoverable passkey login — single action, no identifier. |
-| 04 | [passkey-register](./04-passkey-register/) | `register` | Usernameless passkey signup — provisional user pattern. |
+| 04 | [passkey-register](./04-passkey-register/) | `register` | Identifier-first passkey signup — provisional user finalized in the verify leg. |
 | 05 | [combined-password](./05-combined-login-register/) | `login` + `register` | Flip-table coverage: `user_not_found` and `user_already_exists` wired on entry steps. |
 | 06 | [combined-password-passkey](./06-combined-password-passkey/) | `login` + `register` | Password + passkey on both purposes, passkey upsell after password signup, terminal `redirect`. |
 

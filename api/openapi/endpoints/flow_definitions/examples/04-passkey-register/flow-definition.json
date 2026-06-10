@@ -10,6 +10,7 @@
     "steps": [
       {
         "name": "signup",
+        "fields": ["email"],
         "actions": {
           "passkey_register": { "primary": true }
         },

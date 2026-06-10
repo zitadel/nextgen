@@ -32,7 +32,7 @@ post:
             summary: Discoverable passkey login — no identifier collected up front.
             externalValue: examples/03-passkey-login/flow-definition.json
           passkeyRegister:
-            summary: Usernameless passkey signup with provisional user materialization.
+            summary: Identifier-first passkey signup; provisional user finalized in the verify leg.
             externalValue: examples/04-passkey-register/flow-definition.json
           combinedPasswordLoginRegister:
             summary: Combined login + register with user_not_found and user_already_exists wired between sub-flows.
