@@ -1,5 +1,15 @@
 # @zitadel/cli
 
+## 0.1.0-alpha.1
+
+### Minor Changes
+
+- [#245](https://github.com/zitadel/nextgen/pull/245) [`85f90f2`](https://github.com/zitadel/nextgen/commit/85f90f29aa8976daa5267b42a3fed41b0c4bc57a) Thanks [@fforootd](https://github.com/fforootd)! - Add top-level `zitadel` commands for managing a Docker-backed local Zitadel runtime.
+
+### Patch Changes
+
+- [#228](https://github.com/zitadel/nextgen/pull/228) [`9e4c981`](https://github.com/zitadel/nextgen/commit/9e4c981fac960220643562a8c3c210b697269b48) Thanks [@fforootd](https://github.com/fforootd)! - Scaffold prerelease SDK dependencies on the same npm dist-tag as the CLI.
+
 ## 0.1.0-alpha.0
 
 ### Minor Changes
