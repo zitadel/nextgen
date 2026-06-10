@@ -38,6 +38,8 @@ Each invocation prints one JSON object:
 - On failure: `code` (e.g. `E_VALIDATION`, `E_NETWORK`, `E_CONFLICT`) and
   `message`.
 - `next_commands`: the suggested follow-ups. Prefer these over free-text hints.
+- `E_LOCAL_SERVER_NOT_RUNNING`: start the local Docker runtime with
+  `zitadel start`, then retry with `--server local`.
 
 Exit codes mirror the error class (3 = validation, 4 = network, 5 = conflict,
 1 = auth, 2 = not-implemented). An unknown command is handled by the CLI's help
@@ -51,16 +53,26 @@ layer, not the envelope.
   scaffolds nor uploads them. Flags: `--framework`, `--renderer`.
 - `plan` — validate config and preview the sync diff without mutating anything.
 - `apply` — validate and upload repo config to the platform.
-- `doctor` — verify generated files and local state; `--fix` re-applies missing
+- `doctor` — verify local Docker runtime prerequisites and, once `zitadel.json`
+  exists, generated app files and local state; `--fix` re-applies missing
   managed files.
-- `status` — summarize the local project state.
+- `status` — summarize the local Docker runtime and project state.
 - `eject` (alias `uninstall`) — remove managed files and local Zitadel state;
+  requires `--force` when non-interactive.
+- `start` — start the managed local Zitadel container and persist runtime
+  metadata under `.zitadel/local/runtime.json`.
+- `stop` — stop/remove the managed container while preserving
+  `.zitadel/local/nextgen-data`.
+- `logs` — print managed container logs; `--follow` streams in human mode.
+- `reset` — stop/remove the managed container and delete local runtime data;
   requires `--force` when non-interactive.
 
 ## Golden path
 
 ```sh
-npx @zitadel/cli@latest setup --framework next --non-interactive --json
+npx @zitadel/cli@latest doctor --non-interactive --json
+npx @zitadel/cli@latest start --non-interactive --json
+npx @zitadel/cli@latest setup --framework next --server local --non-interactive --json
 npx @zitadel/cli@latest doctor --non-interactive --json
 npx @zitadel/cli@latest plan --non-interactive --json
 npx @zitadel/cli@latest apply --non-interactive --json
@@ -69,3 +81,6 @@ npx @zitadel/cli@latest apply --non-interactive --json
 Repo config is authoritative: edit `zitadel.json` or files under `.zitadel/`,
 then re-run `plan` and `apply`. Managed files carry a marker comment; `eject`
 removes only files that still carry it, preserving anything the user replaced.
+For app-local development, `--server local` resolves through
+`.zitadel/local/runtime.json` and requires a healthy `zitadel start`
+runtime.
