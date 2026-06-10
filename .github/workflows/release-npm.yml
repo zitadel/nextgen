@@ -3,12 +3,16 @@ name: release-npm
 # Publishes the public npm packages (@zitadel/cli, @zitadel/api,
 # @zitadel/components, @zitadel/sdk-core, @zitadel/sdk-next, @zitadel/sdk-nuxt,
 # @zitadel/sdk-react, @zitadel/sdk-vue, @zitadel/sdk-angular)
-# via changesets. Pushing changesets to main opens a "Version Packages" PR;
-# merging that PR publishes to npm.
+# via changesets. The public packages plus the private @zitadel/product
+# release-note anchor are fixed together as the Zitadel v5 alpha train.
+# Pushing changesets to main opens a "Version Packages" PR; merging that PR
+# publishes the public npm packages. Package publishes do not create GitHub
+# Releases; release.yml creates the single Zitadel GitHub Release with
+# GoReleaser.
 #
 # The repo is in changesets PRERELEASE mode (.changeset/pre.json, tag "alpha"),
-# so versions are cut as X.Y.Z-alpha.N and published under the `alpha` npm
-# dist-tag — `npm install @zitadel/cli` keeps resolving the last stable
+# so versions are cut as 5.0.0-alpha.N and published under the `alpha` npm
+# dist-tag. `npm install @zitadel/cli` keeps resolving the last stable
 # `latest`; consumers opt into prereleases with `@zitadel/cli@alpha`. Run
 # `pnpm changeset pre exit` to leave alpha and cut a stable `latest` release.
 #
@@ -94,6 +98,7 @@ jobs:
           publish: corepack pnpm changeset publish
           title: "chore: version packages"
           commit: "chore: version packages"
+          createGithubReleases: false
         env:
           # App token (not GITHUB_TOKEN) so the Version Packages PR triggers CI.
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}

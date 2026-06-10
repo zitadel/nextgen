@@ -3,8 +3,8 @@
 Scaffolds Zitadel auth (login, register, profile, middleware) into a Next.js app.
 
 ```sh
-npx @zitadel/cli@latest start
-npx @zitadel/cli@latest setup --framework next --server local
+npx @zitadel/cli@alpha start
+npx @zitadel/cli@alpha setup --framework next --server local
 ```
 
 > **Beta.** This is the **next-generation Zitadel**, a ground-up rewrite of the platform. It is distinct from the established Zitadel at [github.com/zitadel/zitadel](https://github.com/zitadel/zitadel). APIs and CLI flags will change.
@@ -20,9 +20,9 @@ npx @zitadel/cli@latest setup --framework next --server local
 ```sh
 npx create-next-app@latest my-app
 cd my-app
-npx @zitadel/cli@latest doctor
-npx @zitadel/cli@latest start
-npx @zitadel/cli@latest setup --framework next --server local
+npx @zitadel/cli@alpha doctor
+npx @zitadel/cli@alpha start
+npx @zitadel/cli@alpha setup --framework next --server local
 npm install
 npm run dev
 ```

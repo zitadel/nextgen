@@ -146,14 +146,31 @@ service logs. These artifacts expire after 7 days and are not release artifacts.
 
 ## Build & release
 
-This monorepo separates Go release artifacts, console build output, and npm
-package artifacts. The full rationale lives in
+Zitadel v5 alpha releases are lockstep product releases. One version such as
+`v5.0.0-alpha.1` represents the tested runtime, CLI, SDKs, components, Docker
+image, and future Helm chart. The v5 major is intentional because this
+next-generation project may become the successor to the classic Zitadel product
+released from `zitadel/zitadel`. See [docs/releases.md](docs/releases.md) and
 [docs/adrs/002-multi-package-release-strategy.md](docs/adrs/002-multi-package-release-strategy.md).
 
-### Go server binary + embedded UIs (`goreleaser`)
+### Release flow
 
-GoReleaser builds the console and login-ui SPAs, syncs them into `internal/*/dist`,
-and embeds them into the `nextgen` binary (`scripts/sync-embedded-ui-dist.sh`).
+Changesets owns npm versions, package changelogs, and npm publishing. The public
+npm packages and the private `@zitadel/product` release-note anchor are fixed
+together, so any user-visible package or product change bumps the whole
+`5.0.0-alpha.N` train. npm publishes stay out of GitHub Releases.
+
+After the Changesets "Version Packages" PR is merged, run the manual
+`.github/workflows/release.yml` workflow (`release-zitadel`) with the matching
+version tag, for example `v5.0.0-alpha.1`. It validates that package versions
+match the typed tag, generates product release notes from changelogs, creates or
+verifies the tag, and asks GoReleaser to create the draft GitHub Release.
+
+### Runtime artifacts (`goreleaser`)
+
+GoReleaser builds the Zitadel runtime archives, checksums, metadata, Docker
+image, and embedded console/login UI. In the release workflow it creates the
+single draft `Zitadel v5.0.0-alpha.N` GitHub Release.
 
 ```sh
 # Local snapshot (no publish, no signing)
@@ -166,23 +183,24 @@ docker run --rm -p 8080:8080 \
   ghcr.io/zitadel/nextgen:<snapshot-tag>-amd64
 ```
 
-The publish-capable release workflow is currently manual-only via
-`.github/workflows/release.yml` (`workflow_dispatch`). It can run a dry snapshot
-or, when intentionally invoked for a release tag, produce multi-arch tarballs and
-push a multi-arch image manifest to `ghcr.io/zitadel/nextgen`.
-
 ### npm packages (`changesets`)
 
-`apps/cli` and the public packages under `packages/` publish to npm via
-[changesets](https://github.com/changesets/changesets). On any user-visible
-change to those packages:
+`apps/cli` and the public SDK/component/API packages under `packages/` publish
+to npm via [changesets](https://github.com/changesets/changesets). On any
+user-visible change to those packages:
 
 ```sh
 corepack pnpm changeset
 ```
 
-The changesets workflow opens a "Version Packages" PR. Merging that PR versions
-and publishes the affected packages through npm trusted publishing.
+For runtime, API, Helm, docs-for-users, or product-level changes, write the
+changeset against the private `@zitadel/product` package. The changesets
+workflow opens a "Version Packages" PR. Merging that PR versions and publishes
+the lockstep public packages through npm trusted publishing. npm package
+publishes do not create GitHub Releases.
+
+Native Homebrew/curl distribution for the `zitadel` CLI belongs to a future CLI
+artifact publisher, not the server-runtime artifact flow.
 
 ### Local development
 

@@ -23,10 +23,15 @@ more than polish.
   server contract lands first.
 - Watch for secret leakage. Project, preview, token, and `.zitadel/secret` style
   values must not enter source control or browser-safe env metadata.
-- User-visible changes to a public npm package need a changeset; author the
-  `.changeset/<slug>.md` file directly rather than via the interactive prompt.
-  See `AGENTS.md` for the package list and file format. npm package manifests
-  must keep `"license": "MIT"`.
+- User-visible changes to a public npm package, runtime/API release surface, or
+  product-level user docs need a changeset; author the `.changeset/<slug>.md`
+  file directly rather than via the interactive prompt. Package changes mention
+  the package; runtime/API/product changes mention `@zitadel/product`. npm
+  package manifests must keep `"license": "MIT"`.
+- Zitadel v5 alpha releases are lockstep product releases. Changesets owns npm
+  versions, changelogs, and publishing; `.github/workflows/release.yml` uses
+  GoReleaser to create the single draft GitHub Release. npm package publishes
+  must not create GitHub Releases.
 - Server and embedded console changes are AGPL-3.0-only by default; public API,
   docs, CLI, and SDK paths are MIT exceptions per `LICENSING.md`.
 - For `consumer-journey-e2e` or `apps/cli-journey-e2e/**` changes, verify that

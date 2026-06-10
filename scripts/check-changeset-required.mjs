@@ -1,24 +1,34 @@
 #!/usr/bin/env node
-// Gate PRs: fail when a PR touches a public npm package without adding a
-// changeset, so no consumer-visible change merges without a release note.
+// Gate PRs: fail when a PR touches a public npm package or runtime/API release
+// surface without adding a changeset, so no consumer-visible change merges
+// without a release note.
 //
-// Only the public packages are listed here; private workspace packages
-// (apps, demos, mocks, lint, design-tokens, ui-react, ...) are never
-// published, so they do not require a changeset. For changes that release
-// nothing (docs/tests/CI/chores), add an empty changeset:
+// Package changes should mention the changed package. Runtime/API/Helm/product
+// changes should mention the private @zitadel/product package. For changes
+// that release nothing (docs/tests/CI/chores), add an empty changeset:
 // `corepack pnpm changeset --empty`.
 import { execFileSync } from "node:child_process";
 
-const publishableRoots = [
+const releaseNoteRoots = [
   "apps/cli/",
+  "packages/product/",
   "packages/api/",
   "packages/components/",
   "packages/sdk-core/",
   "packages/sdk-next/",
   "packages/sdk-nuxt/",
+  "packages/sdk-react/",
+  "packages/sdk-vue/",
+  "packages/sdk-angular/",
+  "api/openapi/",
+  "charts/",
+  "cmd/",
+  "internal/",
+  "Dockerfile",
+  ".goreleaser.yaml",
 ];
 
-// Files under a publishable package that never ship to npm and so should not
+// Files under release-surface roots that never ship to users and so should not
 // require a changeset on their own.
 const ignoredSuffixes = ["/AGENTS.md"];
 
@@ -33,11 +43,11 @@ const output = execFileSync("git", ["diff", "--name-only", `${base}...HEAD`], {
 });
 const changedFiles = output.split("\n").filter(Boolean);
 
-const packageChanges = changedFiles.filter((file) => {
+const releaseSurfaceChanges = changedFiles.filter((file) => {
   if (ignoredSuffixes.some((suffix) => file.endsWith(suffix))) {
     return false;
   }
-  return publishableRoots.some((root) => file.startsWith(root));
+  return releaseNoteRoots.some((root) => file === root || file.startsWith(root));
 });
 
 const hasChangeset = changedFiles.some(
@@ -47,11 +57,11 @@ const hasChangeset = changedFiles.some(
     file !== ".changeset/README.md",
 );
 
-if (packageChanges.length > 0 && !hasChangeset) {
-  console.error("Publishable package changes require a changeset.");
+if (releaseSurfaceChanges.length > 0 && !hasChangeset) {
+  console.error("Release-surface changes require a changeset.");
   console.error("");
-  console.error("Changed publishable package files:");
-  for (const file of packageChanges) {
+  console.error("Changed release-surface files:");
+  for (const file of releaseSurfaceChanges) {
     console.error(`- ${file}`);
   }
   console.error("");

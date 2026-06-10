@@ -104,8 +104,8 @@ jobs:
 
       - name: Prune npm package tags for GoReleaser
         run: |
-          # Changesets creates scoped package tags such as @zitadel/sdk-nuxt@0.1.0-alpha.0.
-          # GoReleaser should derive server versions only from server release tags.
+          # Changesets may create scoped package tags such as @zitadel/sdk-nuxt@5.0.0-alpha.1.
+          # GoReleaser should derive versions only from Zitadel v* release tags.
           git tag -l '@zitadel/*' | while read -r tag; do
             git tag -d "$tag"
           done
@@ -256,11 +256,10 @@ jobs:
         run: corepack pnpm nx run-many -t lint,typecheck,build,test
 
   changeset-check:
-    # Gate PRs: fail when a PR changes a public npm package without adding a
-    # changeset, so no consumer-visible change merges without a release note.
-    # Private packages (apps, demos, mocks, lint, design-tokens, ui-react, ...)
-    # are never published and so do not require a changeset. Publishing itself
-    # runs on pushes to main in release-npm.yml.
+    # Gate PRs: fail when a PR changes a publishable package or runtime/API
+    # release surface without adding a changeset. Package changes mention their
+    # package; runtime/API/Helm/product changes mention @zitadel/product.
+    # Publishing itself runs on pushes to main in release-npm.yml.
     #
     # The check lives in scripts/check-changeset-required.mjs so the publishable
     # package list and rules are testable and shared, rather than duplicated in
@@ -278,7 +277,7 @@ jobs:
           # Full history so we can diff against the PR base branch.
           fetch-depth: 0
 
-      - name: Require a changeset for public package changes
+      - name: Require a changeset for release-surface changes
         run: |
           git fetch --no-tags origin "${{ github.base_ref }}"
           node scripts/check-changeset-required.mjs --base "origin/${{ github.base_ref }}"
@@ -541,14 +540,14 @@ jobs:
 
       - name: Dry-run npm packs
         run: |
-          for dir in apps/cli packages/api packages/components packages/sdk-core packages/sdk-next packages/sdk-nuxt; do
+          for dir in apps/cli packages/api packages/components packages/sdk-core packages/sdk-next packages/sdk-nuxt packages/sdk-react packages/sdk-vue packages/sdk-angular; do
             corepack pnpm --dir "$dir" pack --dry-run
           done
 
       - name: Create npm package artifacts
         run: |
           mkdir -p "$RUNNER_TEMP/zitadel-npm-packages"
-          for dir in apps/cli packages/api packages/components packages/sdk-core packages/sdk-next packages/sdk-nuxt; do
+          for dir in apps/cli packages/api packages/components packages/sdk-core packages/sdk-next packages/sdk-nuxt packages/sdk-react packages/sdk-vue packages/sdk-angular; do
             corepack pnpm --dir "$dir" pack --pack-destination "$RUNNER_TEMP/zitadel-npm-packages"
           done
           ls -lh "$RUNNER_TEMP/zitadel-npm-packages"

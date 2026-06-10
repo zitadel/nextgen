@@ -18,7 +18,7 @@ function ctxFor(appDir: "app" | "src/app"): PatchContext {
     },
     issuer: "http://localhost:3000",
     server: "https://api.zitadel.cloud",
-    cliVersion: "0.1.0-alpha.0",
+    cliVersion: "5.0.0-alpha.0",
   };
 }
 

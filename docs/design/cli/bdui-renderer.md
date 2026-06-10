@@ -51,7 +51,7 @@ Step rendering is the whole job, but rendering is now **Liquid execution**, not 
 
 ## Why web components
 
-**Framework-agnostic.** One implementation, not one per ecosystem. A React consumer, a Vue consumer, and a vanilla-HTML consumer see the same component. We do not want to maintain `@zitadel/sdk-react`, `@zitadel/sdk-vue`, `@zitadel/sdk-svelte`.
+**Framework-agnostic.** One renderer implementation, not one renderer per ecosystem. React, Vue, Angular, and vanilla-HTML consumers should see the same component contract; framework SDKs stay thin adapters around that shared surface.
 
 **Stable output.** The shadow DOM encapsulates our styles. Customer Tailwind / CSS resets / design systems do not mangle our login UI. For customers who want to restyle, we expose CSS custom properties (`--zitadel-primary-color`, `--zitadel-border-radius`) and slots for branded header/footer.
 

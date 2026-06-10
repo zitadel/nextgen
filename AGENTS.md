@@ -48,8 +48,9 @@ Secrets").
   Playwright project. It installs local package tarballs through a temporary
   registry and verifies CLI setup plus real registration/login flows.
 - `packages/components/` contains shared Lit components.
-- `packages/sdk-core/`, `packages/sdk-next/`, and `packages/sdk-nuxt/` contain
-  public TypeScript SDKs.
+- `packages/sdk-core/`, `packages/sdk-next/`, `packages/sdk-nuxt/`,
+  `packages/sdk-react/`, `packages/sdk-vue/`, and `packages/sdk-angular/`
+  contain public TypeScript SDKs.
 - `packages/api-mock/` contains the in-process MSW handlers and standalone
   mock auth server used by demos and e2e tests.
 - `packages/lint/` contains the local Nx plugin that infers Oxlint targets.
@@ -193,10 +194,20 @@ For customer-local runtime workflows, agents should prefer
 
 ## Release, Licensing, And Secrets
 
-- User-visible changes to a public npm package need a changeset. The public
-  packages are `@zitadel/cli` (`apps/cli/`), `@zitadel/api`,
-  `@zitadel/components`, `@zitadel/sdk-core`, `@zitadel/sdk-next`, and
-  `@zitadel/sdk-nuxt`. CI fails a PR that touches them without one
+- Zitadel v5 alpha releases are lockstep product releases documented in
+  `docs/releases.md`. Changesets owns npm versions, package changelogs, and npm
+  publishing; GoReleaser creates the single draft GitHub Release and runtime
+  artifacts.
+- Do not wire the runtime GoReleaser workflow to publish a Homebrew `zitadel`
+  command. Native Homebrew/curl distribution belongs to a future CLI artifact
+  publisher for the `zitadel` CLI.
+- User-visible changes to a public npm package, runtime, API, Helm surface, or
+  product-level docs need a changeset. The public packages are `@zitadel/cli`
+  (`apps/cli/`), `@zitadel/api`, `@zitadel/components`, `@zitadel/sdk-core`,
+  `@zitadel/sdk-next`, `@zitadel/sdk-nuxt`, `@zitadel/sdk-react`,
+  `@zitadel/sdk-vue`, and `@zitadel/sdk-angular`. Runtime, API, Helm, and
+  product-level changes use the private `@zitadel/product` changeset anchor. CI
+  fails a PR that touches these release surfaces without a changeset
   (`changeset-check` in `.github/workflows/ci.yml`).
 - Add a changeset by writing the file directly — do not depend on the
   interactive `pnpm changeset` prompt. Create `.changeset/<short-slug>.md`:
@@ -209,10 +220,10 @@ For customer-local runtime workflows, agents should prefer
   One-line, user-facing summary of the change.
   ```
 
-  List only public package names; pick `patch` (fixes), `minor` (features), or
-  `major` (breaking). The repo is in `alpha` prerelease mode
-  (`.changeset/pre.json`), so versions cut as `X.Y.Z-alpha.N` automatically — no
-  extra action needed.
+  List only public package names or `@zitadel/product`; pick `patch` (fixes),
+  `minor` (features), or `major` (breaking). The repo is in `alpha` prerelease
+  mode (`.changeset/pre.json`) and the release packages are fixed together, so
+  versions cut as `5.0.0-alpha.N` automatically — no extra action needed.
 - For changes that release nothing (docs, tests, CI, chores), add an empty
   changeset: `corepack pnpm changeset --empty`.
 - npm packages under `apps/cli/` and `packages/*` must stay MIT-licensed.

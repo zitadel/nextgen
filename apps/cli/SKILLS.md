@@ -24,7 +24,7 @@ parse the result rather than scraping human output.
   metadata) or run `zitadel <command> --help` for the full per-command flag list.
 
 ```sh
-npx @zitadel/cli@latest <command> --non-interactive --json
+npx @zitadel/cli@alpha <command> --non-interactive --json
 ```
 
 ## Reading the envelope
@@ -70,12 +70,12 @@ layer, not the envelope.
 ## Golden path
 
 ```sh
-npx @zitadel/cli@latest doctor --non-interactive --json
-npx @zitadel/cli@latest start --non-interactive --json
-npx @zitadel/cli@latest setup --framework next --server local --non-interactive --json
-npx @zitadel/cli@latest doctor --non-interactive --json
-npx @zitadel/cli@latest plan --non-interactive --json
-npx @zitadel/cli@latest apply --non-interactive --json
+npx @zitadel/cli@alpha doctor --non-interactive --json
+npx @zitadel/cli@alpha start --non-interactive --json
+npx @zitadel/cli@alpha setup --framework next --server local --non-interactive --json
+npx @zitadel/cli@alpha doctor --non-interactive --json
+npx @zitadel/cli@alpha plan --non-interactive --json
+npx @zitadel/cli@alpha apply --non-interactive --json
 ```
 
 Repo config is authoritative: edit `zitadel.json` or files under `.zitadel/`,

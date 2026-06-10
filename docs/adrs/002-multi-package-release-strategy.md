@@ -1,65 +1,98 @@
-# ADR 002: Multi-package Release Strategy
+# ADR 002: Lockstep Zitadel v5 Alpha Release Train
 
 > **Status:** Accepted
-> **Date:** 2026-04-25 (accepted 2026-06-03)
+> **Date:** 2026-04-25 (revised 2026-06-09)
 > **Context:** nextgen monorepo release pipelines
 
 ## Decision
 
-Release the three artifact families produced by this monorepo with two complementary tools, on independent cadences:
+Release this repository as the lockstep Zitadel v5 alpha train.
 
-1. **Go server binary + embedded React console**: released by `goreleaser` against an explicit release tag. While this repository is pre-release, the publish-capable workflow is `workflow_dispatch` only; automatic `v*` tag releases can be enabled when the server is ready. The release produces multi-arch archives (linux/darwin/windows × amd64/arm64, minus windows/arm64), per-arch Docker images, and a `ghcr.io/zitadel/nextgen` manifest list. The console SPA is built by Vite during goreleaser's `before.hooks` and embedded into the binary via `//go:embed`. GoReleaser jobs prune Changesets-created npm package tags (`@zitadel/*`) from the local checkout before running so scoped package tags are never interpreted as server release tags.
-2. **TypeScript packages**: released by `changesets` via the [`release-npm.yml`](../../.github/workflows/release-npm.yml) workflow. The six public packages are `@zitadel/cli` (`apps/cli/`), `@zitadel/api`, `@zitadel/components`, `@zitadel/sdk-core`, `@zitadel/sdk-next`, and `@zitadel/sdk-nuxt`. Every other workspace package is marked `"private": true` and never publishes. Each PR adds a `.changeset/*.md` describing the bump; pushing changesets to `main` opens a "Version Packages" PR aggregating pending changes, and merging that PR versions the packages and publishes them to npm. Authentication uses **npm trusted publishing (OIDC)** — there is no `NPM_TOKEN`. npm provenance is disabled while the repository is private because npm only accepts provenance attestations from public source repositories; re-enable it when `zitadel/nextgen` is public. The repo is in changesets **prerelease mode** (`.changeset/pre.json`, tag `alpha`): versions are cut as `X.Y.Z-alpha.N` and published under the `alpha` dist-tag until `changeset pre exit` cuts a stable `latest` release.
-3. **The console SPA is intentionally not a separately versioned npm package.** It is the Go server's UI; it ships embedded in the server binary at the server's version. If a future use case calls for a standalone console library, it becomes a new entry under `packages/` managed by changesets, and the Go server pins a specific version.
+One version such as `v5.0.0-alpha.1` represents the tested runtime, CLI, SDKs,
+components, Docker image, and future Helm chart. The v5 major is intentional:
+this repository is the next-generation Zitadel project and may become the
+successor to the classic Zitadel product released from `zitadel/zitadel`.
 
-Cross-package coordination is handled via changeset notes and peer-dep ranges, not unified tags.
+Changesets owns npm package versions, package changelogs, and npm publishing.
+GoReleaser owns the GitHub Release, runtime archives, checksums, metadata, and
+Docker image. The release workflow stitches those tools together by validating
+that the manually entered `v5.0.0-alpha.N` tag matches the fixed Changesets
+package versions and by passing generated product notes to GoReleaser.
 
-## Context
+The fixed release train contains:
 
-This monorepo contains three meaningfully different release surfaces:
+- `@zitadel/product` (`packages/product/`, private release-note anchor)
+- `@zitadel/cli` (`apps/cli/`)
+- `@zitadel/api`
+- `@zitadel/components`
+- `@zitadel/sdk-core`
+- `@zitadel/sdk-next`
+- `@zitadel/sdk-nuxt`
+- `@zitadel/sdk-react`
+- `@zitadel/sdk-vue`
+- `@zitadel/sdk-angular`
 
-- A Go server binary distributed as containers and tarballs to operators.
-- A TypeScript developer CLI (`apps/cli/`), published as `@zitadel/cli` (binary name `zitadel`).
-- A web components library and TypeScript SDKs (`packages/...`) consumed by application developers.
-
-Each surface has different consumers, different cadences, and different distribution channels. Forcing them onto a single release tool either compromises one (changesets is npm-focused; goreleaser is Go-focused) or invents a custom orchestration layer that no contributor will recognize.
-
-The console SPA sits between these: it is built and published as part of the Go server, never as its own npm package. This commitment is non-obvious enough to warrant explicit documentation.
+npm package publishes must not create GitHub Releases. Package consumers learn
+package-level details from package changelogs and npm package pages. The single
+GitHub Release is the product-level entry point.
 
 ## Consequences
 
 Positive:
 
-- Each tool is used for its strength. `goreleaser` is the de facto standard for Go binary + multi-arch Docker releases. `changesets` is what most pnpm-workspace projects (Astro, Remix, Vercel SDKs) converge on.
-- Release cadences stay independent. A bug fix in `@zitadel/cli` does not require a server release; a server patch does not bump CLI versions.
-- New contributors recognize both workflows from prior projects.
-- The `.changeset/*.md` files in PRs make user-visible changes self-documenting before release, even before npm publishing automation is enabled.
+- Users, release managers, and support can talk about one alpha version.
+- Compatibility is explicit: one v5 alpha number means one tested bundle.
+- GitHub Releases stay readable because npm package publishes stay out of the
+  GitHub Release feed.
+- Server/runtime/Helm changes get normal Changesets notes through the private
+  `@zitadel/product` package.
+- The implementation uses familiar tools rather than a custom product manifest
+  layer: Changesets for versions/changelogs/npm and GoReleaser for artifacts.
 
 Trade-offs:
 
-- Two release tools to learn. New maintainers need to know both `goreleaser` (for the server) and `changesets` (for npm).
-- Cross-package version coupling is manual: when a CLI release requires a specific server version, the changeset note records it and the CLI's `package.json` peer-dep range encodes it.
-- The console SPA cannot be consumed standalone without re-architecting it as a `packages/console-ui` library. We accept this trade for now because the SPA is tightly coupled to the server's API and capability handshake.
+- Packages may bump even when their code did not change.
+- A small SDK or CLI fix becomes a new product alpha release by default.
+- Release managers still need two tools, but one manual release workflow checks
+  that they agree.
+- Before stable v5, chart-only fixes also become new v5 alpha releases to keep
+  compatibility easy to explain.
+
+## Release flow
+
+1. PRs add changesets for user-visible changes.
+2. `.github/workflows/release-npm.yml` opens the Changesets "Version Packages"
+   PR.
+3. Merging that PR bumps every fixed package to the next `5.0.0-alpha.N`,
+   updates package changelogs, and publishes public npm packages under the
+   `alpha` dist-tag.
+4. A release manager runs `.github/workflows/release.yml` (`release-zitadel`)
+   with the matching tag, for example `v5.0.0-alpha.1`.
+5. The workflow validates lockstep package versions, generates release notes
+   from `packages/product/CHANGELOG.md` plus package changelogs, creates or
+   verifies the tag, and runs GoReleaser.
+6. GoReleaser creates a draft GitHub Release named `Zitadel v5.0.0-alpha.N`.
 
 ## Alternatives considered
 
-- **`release-please` (Google).** Handles Go and npm in a single tool using conventional commits. Heavier, less idiomatic for pnpm workspaces, and changesets' explicit `.changeset/*.md` files give clearer per-PR signal than commit-message scraping.
-- **`nx release`.** Native to the Nx workspace already in use. npm-focused; would still need a Go-side companion. Adds one more vendor-specific tool without removing `goreleaser`.
-- **Custom workflows with tag-pattern matchers** (e.g. `cli-v*`, `components-v*`, `v*`). Maximum flexibility but reinvents what changesets and goreleaser already do well, and pushes maintenance burden onto the team.
-- **Single all-in-one tag.** A `v1.2.3` tag releasing server + CLI + components together. Couples cadences artificially: every CLI patch becomes a server release.
-
-## Open questions
-
-- Whether to put `@zitadel/sdk-core` and `@zitadel/sdk-next` into a `linked` group in `.changeset/config.json` once the SDK packages mature and want lockstep versioning.
-- When to layer image signing (`cosign`) and SLSA provenance attestations onto the goreleaser pipeline. Out of scope for the initial setup, but the `release.yml` workflow already requests `id-token: write` so the keyless flow is available when needed. npm provenance for the TypeScript packages should be re-enabled once the source repository is public.
-- Whether to publish the console SPA as a documentation/preview artifact (e.g., to a CDN bucket) for design reviews, separate from the embedded Go server release.
-- When to run `changeset pre exit` to leave the `alpha` prerelease line and cut the first stable `latest` release.
+- **Independent package releases.** Best for package purity and small fixes, but
+  too costly for alpha users who need to know which runtime, CLI, SDK, Docker
+  image, and future Helm chart belong together.
+- **Product manifest workflow.** Explicit compatibility sets, but it added a
+  custom release layer that felt harder to explain than the problem it solved.
+- **GoReleaser as the only release owner.** Good for runtime artifacts, but it
+  cannot replace Changesets for npm workspace changelogs and package publishing.
+- **Changesets as the only release owner.** Good for npm, but it does not build
+  Go binaries, Docker images, checksums, or future operator artifacts.
+- **Monthly product posts as the release.** Useful communication, but not a
+  reliable installable artifact or support boundary.
 
 ## Follow-up
 
-- ✅ The `@zitadel` npm scope is owned (the main `zitadel` repo already publishes `@zitadel/client` and `@zitadel/proto` under it).
-- ✅ The changesets publishing workflow ([`release-npm.yml`](../../.github/workflows/release-npm.yml)) is enabled, using npm trusted publishing (OIDC) — no `NPM_TOKEN` secret. Provenance is disabled while this source repository is private.
-- One-time bootstrap per public package: a maintainer must do the first manual publish (the names do not exist on npm yet) and then add the GitHub Actions trusted publisher on npmjs.com (repo `zitadel/nextgen`, workflow `release-npm.yml`). See [`.changeset/README.md`](../../.changeset/README.md).
-- Decide when to switch the Go release workflow from manual `workflow_dispatch` to automatic `v*` tag releases.
-- Draft a `CONTRIBUTING.md` section pointing contributors at `pnpm changeset` for npm changes and conventional commit prefixes for the goreleaser changelog.
-- Decide ADR 003 territory: should server config schemas or other stable contracts have their own release/versioning policy that crosses both tools?
+- Add Helm chart publishing to the `release-zitadel` flow once charts exist.
+  During alpha/beta, chart `version` and `appVersion` match the product version.
+- Revisit independent package or chart patch releases after stable v5 if the
+  support and compatibility story is clear.
+- Re-enable npm provenance when the source repository is public.
+- Evaluate native CLI distribution for Homebrew/curl once the CLI needs
+  non-npm distribution.

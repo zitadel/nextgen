@@ -1,14 +1,19 @@
-name: release
+name: release-zitadel
 
 on:
   workflow_dispatch:
     inputs:
-      ref:
-        description: "Git tag or ref to release, for example v0.1.0."
+      version:
+        description: "Zitadel release tag, for example v5.0.0-alpha.1."
         required: true
         type: string
-      snapshot:
-        description: "Run a non-publishing snapshot instead of a real release."
+      ref:
+        description: "Commit SHA, branch, or tag to release."
+        required: true
+        default: "main"
+        type: string
+      dry_run:
+        description: "Validate, generate notes, and run a GoReleaser snapshot without publishing."
         required: true
         default: true
         type: boolean
@@ -18,11 +23,15 @@ permissions:
   packages: write
   id-token: write
 
+concurrency:
+  group: release-zitadel-${{ inputs.version }}
+  cancel-in-progress: false
+
 jobs:
-  goreleaser:
+  release:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout release ref
         uses: actions/checkout@v6
         with:
           ref: ${{ inputs.ref }}
@@ -30,11 +39,53 @@ jobs:
 
       - name: Prune npm package tags for GoReleaser
         run: |
-          # Changesets creates scoped package tags such as @zitadel/sdk-nuxt@0.1.0-alpha.0.
-          # GoReleaser should derive server versions only from server release tags.
+          # Changesets may create scoped package tags such as @zitadel/sdk-nuxt@5.0.0-alpha.1.
+          # GoReleaser should derive the product version from the v* Zitadel tag only.
           git tag -l '@zitadel/*' | while read -r tag; do
             git tag -d "$tag"
           done
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+
+      - name: Validate lockstep release version
+        run: node scripts/validate-release-version.mjs --version "${{ inputs.version }}"
+
+      - name: Generate release notes
+        run: node scripts/generate-release-notes.mjs --version "${{ inputs.version }}" --output release-notes.md
+
+      - name: Upload release notes preview
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-notes
+          path: release-notes.md
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Create or verify release tag
+        if: ${{ ! inputs.dry_run }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          VERSION="${{ inputs.version }}"
+          COMMIT="$(git rev-parse HEAD)"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if git rev-parse -q --verify "refs/tags/${VERSION}" >/dev/null; then
+            TAG_COMMIT="$(git rev-list -n 1 "$VERSION")"
+            if [[ "$TAG_COMMIT" != "$COMMIT" ]]; then
+              echo "::error::tag ${VERSION} points at ${TAG_COMMIT}, not ${COMMIT}"
+              exit 1
+            fi
+          else
+            git tag -a "$VERSION" -m "Zitadel $VERSION" "$COMMIT"
+            git push origin "refs/tags/${VERSION}"
+          fi
 
       - name: Set up Go
         uses: actions/setup-go@v6
@@ -47,12 +98,6 @@ jobs:
         with:
           run_install: false
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
-
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
 
@@ -60,29 +105,29 @@ jobs:
         uses: docker/setup-buildx-action@v4
 
       - name: Login to GHCR
-        if: ${{ ! inputs.snapshot }}
+        if: ${{ ! inputs.dry_run }}
         uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Run GoReleaser (snapshot)
-        if: ${{ inputs.snapshot }}
+      - name: Run GoReleaser snapshot
+        if: ${{ inputs.dry_run }}
         uses: goreleaser/goreleaser-action@v7
         with:
           distribution: goreleaser
           version: "~> v2"
-          args: release --snapshot --clean --skip=publish,sign
+          args: release --snapshot --clean --skip=publish,sign --release-notes release-notes.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Run GoReleaser
-        if: ${{ ! inputs.snapshot }}
+      - name: Run GoReleaser release
+        if: ${{ ! inputs.dry_run }}
         uses: goreleaser/goreleaser-action@v7
         with:
           distribution: goreleaser
           version: "~> v2"
-          args: release --clean
+          args: release --clean --release-notes release-notes.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

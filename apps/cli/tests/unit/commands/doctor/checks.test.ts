@@ -78,7 +78,7 @@ async function makeProject(): Promise<string> {
 }
 
 function ctxFor(cwd: string, dryRun = false): CheckContext {
-  return { cwd, orca: createOrca(), cliVersion: "0.1.0-alpha.0", dryRun };
+  return { cwd, orca: createOrca(), cliVersion: "5.0.0-alpha.0", dryRun };
 }
 
 afterEach(async () => {
@@ -281,11 +281,11 @@ describe("ProjectMatchCheck", () => {
 describe("loadPatchContext", () => {
   it("reconstructs the patch context from on-disk project files", async () => {
     const cwd = await makeProject();
-    const ctx = await loadPatchContext(cwd, createOrca(), "0.1.0-alpha.0");
+    const ctx = await loadPatchContext(cwd, createOrca(), "5.0.0-alpha.0");
 
     expect(ctx.framework.id).toBe("next");
     expect(ctx.project.id).toBe("proj-001");
     expect(ctx.issuer).toBe("http://localhost:3000");
-    expect(ctx.cliVersion).toBe("0.1.0-alpha.0");
+    expect(ctx.cliVersion).toBe("5.0.0-alpha.0");
   });
 });

@@ -1,0 +1,7 @@
+{
+  "name": "@zitadel/product",
+  "version": "5.0.0-alpha.0",
+  "private": true,
+  "description": "Release-note anchor for the lockstep Zitadel v5 alpha train.",
+  "license": "MIT"
+}

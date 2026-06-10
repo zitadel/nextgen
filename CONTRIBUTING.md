@@ -119,7 +119,13 @@ corepack pnpm nx dev @zitadel/login-ui  # http://localhost:5175
 
 Dev servers use `/` as the Vite base; production embeds use `/ui/console/` and `/ui/login/`.
 
-## GoReleaser snapshot
+## Release workflows
+
+Zitadel v5 alpha releases are lockstep product releases. Read
+[docs/releases.md](docs/releases.md) before changing release automation or
+cutting a release.
+
+## GoReleaser runtime snapshot
 
 ```sh
 goreleaser release --snapshot --clean --skip=publish,sign
@@ -127,7 +133,7 @@ goreleaser release --snapshot --clean --skip=publish,sign
 
 The `before` hook runs `scripts/sync-embedded-ui-dist.sh` automatically.
 
-### Local Docker image from snapshot
+### Local Docker image from runtime snapshot
 
 After a snapshot build, binaries are under `dist/`:
 
