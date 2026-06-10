@@ -64,6 +64,8 @@ func TestEmbeddedPostgresOptionsUseDataDir(t *testing.T) {
 	root := filepath.Join(dataDir, "embedded-postgres")
 	assert.Equal(t, filepath.Join(root, "runtime"), options.RuntimePath)
 	assert.Equal(t, filepath.Join(root, "data"), options.DataPath)
+	assert.Equal(t, filepath.Join(root, "cache"), options.CachePath)
 	assert.Equal(t, filepath.Join(root, "postgres.log"), options.LogPath)
 	assert.NotEqual(t, options.RuntimePath, filepath.Dir(options.DataPath))
+	assert.NotEqual(t, options.RuntimePath, options.CachePath)
 }

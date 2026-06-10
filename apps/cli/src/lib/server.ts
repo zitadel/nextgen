@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { ZitadelError } from "./errors";
+import { resolveLocalServer } from "./local-server/runtime";
 import { isObject, parseJsonObject } from "./json";
 
 /**
@@ -18,7 +19,7 @@ export const DEFAULT_SERVER = "https://api.zitadel.cloud";
  */
 export type ResolvedServer = {
   value: string;
-  origin: "flag" | "env" | "config-env" | "config-top" | "default";
+  origin: "flag" | "env" | "config-env" | "config-top" | "default" | "local";
 };
 
 /**
@@ -43,28 +44,32 @@ export type ResolveServerInput = {
  */
 export async function resolveServer(input: ResolveServerInput): Promise<ResolvedServer> {
   if (input.serverFlag) {
-    return validate({ value: input.serverFlag, origin: "flag" });
+    return validate(input.cwd, { value: input.serverFlag, origin: "flag" });
   }
   const envValue = input.env.ZITADEL_API_BASE;
   if (envValue) {
-    return validate({ value: envValue, origin: "env" });
+    return validate(input.cwd, { value: envValue, origin: "env" });
   }
 
   const config = await readConfig(input.cwd);
   if (config) {
     const envBranch = readEnvServer(config, input.environment);
     if (envBranch) {
-      return validate({ value: envBranch, origin: "config-env" });
+      return validate(input.cwd, { value: envBranch, origin: "config-env" });
     }
     if (typeof config.server === "string") {
-      return validate({ value: config.server, origin: "config-top" });
+      return validate(input.cwd, { value: config.server, origin: "config-top" });
     }
   }
 
   return { value: DEFAULT_SERVER, origin: "default" };
 }
 
-function validate(resolved: ResolvedServer): ResolvedServer {
+async function validate(cwd: string, resolved: ResolvedServer): Promise<ResolvedServer> {
+  if (resolved.value === "local") {
+    return { value: await resolveLocalServer(cwd), origin: "local" };
+  }
+
   try {
     const url = new URL(resolved.value);
     if (url.protocol !== "https:" && url.protocol !== "http:") {

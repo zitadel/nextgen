@@ -89,6 +89,13 @@ func (r *UserPasswordRepository) ResetFailedAttempts() database.Change {
 	return database.NewChange(colPasswordFailedAttempts, int16(0))
 }
 
+func (r *UserPasswordRepository) GetByUserID(ctx context.Context, client database.QueryExecutor, projectID string, userID string) (*domain.UserPassword, error) {
+	condition := database.And(
+		r.ProjectIDCondition(projectID),
+		r.UserIDCondition(userID))
+	return r.Get(ctx, client, database.WithCondition(condition))
+}
+
 func (r *UserPasswordRepository) Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*domain.UserPassword, error) {
 	builder := database.NewStatementBuilder("SELECT ")
 	database.Columns{
@@ -167,6 +174,16 @@ func (r *UserPasswordRepository) Create(ctx context.Context, client database.Que
 	builder.WriteString(")")
 	_, err := client.Exec(ctx, builder.String(), builder.Args()...)
 	return err
+}
+
+func (r *UserPasswordRepository) DeleteByUserID(ctx context.Context, client database.QueryExecutor, projectID string, userID string) error {
+	condition := database.And(
+		r.ProjectIDCondition(projectID),
+		r.UserIDCondition(userID))
+	return r.Delete(ctx, client, condition)
+}
+func (r *UserPasswordRepository) DeleteByID(ctx context.Context, client database.QueryExecutor, passwordID int64) error {
+	return r.Delete(ctx, client, r.PrimaryKeyCondition(passwordID))
 }
 
 func (r *UserPasswordRepository) Delete(ctx context.Context, client database.QueryExecutor, condition database.Condition) error {

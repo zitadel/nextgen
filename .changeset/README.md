@@ -61,4 +61,8 @@ The Go server binary is **not** managed by changesets — it is released with `g
 
 ## Licensing reminder
 
-npm packages published from this repo are **MIT-licensed**, not AGPL like the server. Every `package.json` under `apps/cli/` and `packages/*` must set `"license": "MIT"` and ship a `LICENSE` file. See [/LICENSING.md](../LICENSING.md).
+npm packages published from this repo are **MIT-licensed**, not AGPL like the
+server. Public packages under `apps/cli/` and `packages/*` must set
+`"license": "MIT"` and ship a package-level `LICENSE` file before publishing.
+Private demo, design-system, and integration workspaces are covered by the path
+exceptions in [/LICENSING.md](../LICENSING.md) while they remain private.
