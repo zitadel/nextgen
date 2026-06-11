@@ -348,7 +348,7 @@ export class ZlPasskey extends LitElement {
 export const zlPasskeyManifest: AtomManifest = {
   tag: "zl-passkey",
   consumes: {},
-  attrs: ["ceremony", "challenge-id", "options", "manual"],
+  attrs: ["ceremony", "method", "challenge-id", "options", "manual"],
   parts: [],
   slots: [],
   events: ["zl-passkey-result", "zl-passkey-error"],

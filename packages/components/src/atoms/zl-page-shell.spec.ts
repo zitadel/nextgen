@@ -18,4 +18,21 @@ describe("zl-page-shell", () => {
     expect(footer?.classList.contains("zr-page-shell__region--empty")).toBe(true);
     expect(footer?.getBoundingClientRect().height).toBe(0);
   });
+
+  it("reacts to a footer slotted after first render (slotchange)", async () => {
+    const el = document.createElement("zl-page-shell") as ZlPageShell;
+    document.body.append(el);
+    await el.updateComplete;
+
+    const note = document.createElement("div");
+    note.setAttribute("slot", "footer");
+    note.textContent = "Secured";
+    el.appendChild(note);
+    // slotchange -> requestUpdate is async; flush then await the re-render.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await el.updateComplete;
+
+    const footer = el.shadowRoot?.querySelector(".zr-page-shell__footer");
+    expect(footer?.classList.contains("zr-page-shell__region--empty")).toBe(false);
+  });
 });
