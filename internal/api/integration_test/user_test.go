@@ -16,6 +16,8 @@ import (
 )
 
 func TestCreateUser(t *testing.T) {
+	t.Parallel()
+
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
 	require.NoError(t, err)
 
@@ -24,7 +26,9 @@ func TestCreateUser(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	client := harness.EnsureAPIClient(t, project.ID)
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	client.SetToken(project.ProjectSecret)
 
 	params := api.CreateUserParams{
 		ProjectID: api.ProjectID(project.ID),
@@ -32,6 +36,8 @@ func TestCreateUser(t *testing.T) {
 	}
 
 	t.Run("ok", func(t *testing.T) {
+		t.Parallel()
+
 		tcs := []struct {
 			name     string
 			params   api.CreateUserParams
@@ -87,6 +93,8 @@ func TestCreateUser(t *testing.T) {
 		}
 		for _, tc := range tcs {
 			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+
 				user := &api.User{}
 				err = user.UnmarshalJSON([]byte(tc.userjson))
 				require.NoError(t, err)
@@ -100,7 +108,11 @@ func TestCreateUser(t *testing.T) {
 	})
 
 	t.Run("error", func(t *testing.T) {
+		t.Parallel()
+
 		t.Run("invalid user data according to schema", func(t *testing.T) {
+			t.Parallel()
+
 			tcs := []struct {
 				name     string
 				userjson string
@@ -125,18 +137,24 @@ func TestCreateUser(t *testing.T) {
 			}
 
 			for _, tc := range tcs {
-				user := &api.User{}
-				err = user.UnmarshalJSON([]byte(tc.userjson))
-				require.NoError(t, err)
+				t.Run(tc.name, func(t *testing.T) {
+					t.Parallel()
 
-				resp, err := client.CreateUser(t.Context(), user, params)
-				assert.NoError(t, err)
+					user := &api.User{}
+					err = user.UnmarshalJSON([]byte(tc.userjson))
+					require.NoError(t, err)
 
-				assert.IsType(t, &api.CreateUserBadRequest{}, resp, helpers.MustMarshal(t, resp))
+					resp, err := client.CreateUser(t.Context(), user, params)
+					assert.NoError(t, err)
+
+					assert.IsType(t, &api.CreateUserBadRequest{}, resp, helpers.MustMarshal(t, resp))
+				})
 			}
 		})
 
 		t.Run("duplicate mail address", func(t *testing.T) {
+			t.Parallel()
+
 			usermap := harness.TestData.Generator.GenerateUser(t, "testcreateuser.error.duplicatemailaddress@example.com")
 
 			user := &api.User{}
@@ -155,6 +173,8 @@ func TestCreateUser(t *testing.T) {
 }
 
 func TestSetUserPassword(t *testing.T) {
+	t.Parallel()
+
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
 	require.NoError(t, err)
 
@@ -171,10 +191,16 @@ func TestSetUserPassword(t *testing.T) {
 		UserID:    api.UserID(userID),
 	}
 
-	client := harness.EnsureAPIClient(t, project.ID)
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	client.SetToken(project.ProjectSecret)
 
 	t.Run("ok", func(t *testing.T) {
+		t.Parallel()
+
 		t.Run("create initial password", func(t *testing.T) {
+			t.Parallel()
+
 			const password = "fake-password"
 			request := &api.SetUserPasswordRequest{
 				Password: password,
@@ -193,6 +219,8 @@ func TestSetUserPassword(t *testing.T) {
 		})
 
 		t.Run("update password", func(t *testing.T) {
+			t.Parallel()
+
 			const originalPassword = "fake-password"
 			request := &api.SetUserPasswordRequest{
 				Password: originalPassword,
@@ -229,11 +257,13 @@ func TestSetUserPassword(t *testing.T) {
 	})
 
 	t.Run("error", func(t *testing.T) {
+		t.Parallel()
+
 		t.Run("user not found", func(t *testing.T) {
+			t.Parallel()
+
 			project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
 			require.NoError(t, err)
-
-			client := harness.EnsureAPIClient(t, project.ID)
 
 			request := &api.SetUserPasswordRequest{
 				Password: "fake-password",
@@ -252,31 +282,41 @@ func TestSetUserPassword(t *testing.T) {
 }
 
 func TestGetUser(t *testing.T) {
+	t.Parallel()
+
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
 	require.NoError(t, err)
 
-		user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
-			ProjectID: project.ID,
-			User:      harness.TestData.Generator.GenerateUser(t, "testgetuser@example.com"),
-		})
-		require.NoError(t, err)
-
-		params := api.GetUserByIDParams{
-			ProjectID: api.ProjectID(project.ID),
-			UserID:    api.UserID(user["id"].(string)),
-		}
-
-		resp, err := client.GetUserByID(t.Context(), params)
-		assert.NoError(t, err)
-
-		assert.IsType(t, &api.GetUserByIDOK{}, resp, helpers.MustMarshal(t, resp))
+	user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
+		ProjectID: project.ID,
+		User:      harness.TestData.Generator.GenerateUser(t, "testgetuser@example.com"),
 	})
+	require.NoError(t, err)
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	client.SetToken(project.ProjectSecret)
+
+	params := api.GetUserByIDParams{
+		ProjectID: api.ProjectID(project.ID),
+		UserID:    api.UserID(user["id"].(string)),
+	}
+
+	resp, err := client.GetUserByID(t.Context(), params)
+	assert.NoError(t, err)
+
+	assert.IsType(t, &api.GetUserByIDOK{}, resp, helpers.MustMarshal(t, resp))
 }
 
 func TestGetMyUser(t *testing.T) {
+	t.Parallel()
+
 	t.Run("ok", func(t *testing.T) {
+		t.Parallel()
+
 		project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
-		client := harness.EnsureAPIClient(t, project.ID)
+		require.NoError(t, err)
+		client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 		require.NoError(t, err)
 
 		// CREATE USER
@@ -310,7 +350,7 @@ func TestGetMyUser(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		sessionToken, err := session.Token(harness.EnsureCrypter(t))
+		sessionToken, err := session.Token(harness.EnsureOpaqueTokenGenerator(t))
 		require.NoError(t, err)
 
 		// GET USER USING TOKEN

@@ -720,17 +720,22 @@ func TestListFlowDefinitions(t *testing.T) {
 
 func TestDeleteFlowDefinitionUnauthenticated(t *testing.T) {
 	t.Parallel()
-	client := harness.EnsureAnonymousAPIClient(t)
+	server := harness.EnsureTestServer(t)
+
+	client, err := helpers.NewApiClient(server.URL)
+	require.NoError(t, err)
+
 	resp, err := client.DeleteFlowDefinition(t.Context(), api.DeleteFlowDefinitionParams{
 		ID:        "flowDef_1234",
 		ProjectID: "proj_1234",
 	})
 	require.NoError(t, err)
+
 	expectedResp := &api.ErrorDetailsStatusCode{
 		StatusCode: http.StatusUnauthorized,
 		Response: api.ErrorDetails{
 			Code:    "auth.unauthorized",
-			Message: `operation DeleteFlowDefinition: security "OAuth2": security requirement is not satisfied`,
+			Message: `operation DeleteFlowDefinition: security "": security requirement is not satisfied`,
 		},
 	}
 	assert.Equal(t, expectedResp, resp)
@@ -738,14 +743,22 @@ func TestDeleteFlowDefinitionUnauthenticated(t *testing.T) {
 
 func TestDeleteFlowDefinition(t *testing.T) {
 	t.Parallel()
+	server := harness.EnsureTestServer(t)
+
+	client, err := helpers.NewApiClient(server.URL)
+	require.NoError(t, err)
+
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
 	require.NoError(t, err)
-	harness.CreateUserSchema(t, project.ID, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
+
+	client.SetToken(project.ProjectSecret)
+
+	harness.CreateUserSchema(t, project, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
 	u := "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml"
 	userSchemaURI, err := url.Parse(u)
 	require.NoError(t, err)
 
-	createResp, err := harness.EnsureAPIClient(t, project.ID).CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+	createResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID: api.ProjectID(project.ID),
 		FlowDefinition: api.FlowDefinition{
 			Name:       "existing-flow",
@@ -761,6 +774,8 @@ func TestDeleteFlowDefinition(t *testing.T) {
 			Steps: validSteps(),
 		},
 	})
+	assert.IsType(t, &api.FlowDefinitionDetailResponse{}, createResp, helpers.MustMarshal(t, createResp))
+
 	flowDef, ok := createResp.(*api.FlowDefinitionDetailResponse)
 	require.True(t, ok)
 
@@ -797,7 +812,7 @@ func TestDeleteFlowDefinition(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			client := harness.EnsureAPIClient(t, project.ID)
+
 			resp, err := client.DeleteFlowDefinition(t.Context(), tt.req)
 			assert.NoError(t, err)
 			assert.Equal(t, tt.wantResp, resp)
