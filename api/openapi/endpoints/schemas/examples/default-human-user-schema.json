@@ -18,9 +18,7 @@
   },
   "required": [
     "email",
-    "password",
-    "givenName",
-    "familyName"
+    "password"
   ],
   "properties": {
     "email": {
