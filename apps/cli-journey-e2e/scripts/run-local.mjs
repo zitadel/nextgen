@@ -26,6 +26,9 @@ const packageDirs = [
   "packages/sdk-core",
   "packages/sdk-next",
   "packages/sdk-nuxt",
+  "packages/sdk-react",
+  "packages/sdk-vue",
+  "packages/sdk-angular",
 ];
 
 const options = parseArgs(process.argv.slice(2));

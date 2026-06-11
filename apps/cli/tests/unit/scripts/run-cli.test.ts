@@ -63,12 +63,6 @@ describe("run-cli wrapper", () => {
       false,
     );
     expect(
-      runCli.shouldAutoBuildLocalRuntimeImage(["start", "--preview-manifest", "preview.json"], {}),
-    ).toBe(false);
-    expect(
-      runCli.shouldAutoBuildLocalRuntimeImage(["start", "--preview-manifest=preview.json"], {}),
-    ).toBe(false);
-    expect(
       runCli.shouldAutoBuildLocalRuntimeImage(["start"], {
         ZITADEL_LOCAL_IMAGE: "custom:tag",
       }),

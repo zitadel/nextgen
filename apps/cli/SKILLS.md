@@ -68,10 +68,11 @@ layer, not the envelope.
 - `reset` — stop/remove the managed container and delete local runtime data;
   requires `--force` when non-interactive.
 
-For an external `zitadel-preview` bundle, pass
-`--preview-manifest <path-or-url>` to `doctor`, `start`, and `setup`. The
-manifest pins the server image and SDK package versions that were tested
-together. `zitadel start --image <ref>` remains the explicit image override.
+Alpha releases are lockstep trains. `npx @zitadel/cli@alpha start` runs the
+latest tested alpha server image, and
+`npx @zitadel/cli@0.1.0-alpha.N start` runs
+`ghcr.io/zitadel/nextgen:0.1.0-alpha.N`. `zitadel start --image <ref>` remains
+the explicit image override for debugging.
 
 ## Golden path
 
@@ -84,12 +85,12 @@ npx @zitadel/cli@alpha plan --non-interactive --json
 npx @zitadel/cli@alpha apply --non-interactive --json
 ```
 
-Preview bundle invocation:
+Exact alpha train invocation:
 
 ```sh
-npx @zitadel/cli@<exact-version> doctor --preview-manifest <manifest-url> --non-interactive --json
-npx @zitadel/cli@<exact-version> start --preview-manifest <manifest-url> --non-interactive --json
-npx @zitadel/cli@<exact-version> setup --framework next --server local --preview-manifest <manifest-url> --non-interactive --json
+npx @zitadel/cli@0.1.0-alpha.N doctor --non-interactive --json
+npx @zitadel/cli@0.1.0-alpha.N start --non-interactive --json
+npx @zitadel/cli@0.1.0-alpha.N setup --framework next --server local --non-interactive --json
 ```
 
 Repo config is authoritative: edit `zitadel.json` or files under `.zitadel/`,

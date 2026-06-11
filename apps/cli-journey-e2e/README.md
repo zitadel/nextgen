@@ -18,7 +18,7 @@ The default mode uses Docker only for Verdaccio. The backend runs from local
 source with embedded Postgres:
 
 1. Ensure the Playwright Chromium browsers are installed.
-2. Build the six public workspace packages.
+2. Build the public workspace packages.
 3. Pack package tarballs with `corepack pnpm --dir <package> pack`.
 4. Verify tarballs are installable and do not contain `catalog:` or
    `workspace:` dependency specs.
@@ -57,7 +57,7 @@ Useful environment overrides:
 ## CI gate
 
 The `consumer-journey-e2e` workflow job does not use public Zitadel packages. It
-downloads the GoReleaser snapshot image and the six public npm package tarballs
+downloads the GoReleaser snapshot image and the public npm package tarballs
 produced by the same workflow, publishes those tarballs to Verdaccio, creates a
 fresh Next.js app, and runs the same Playwright project against the generated
 app. Private support packages such as design tokens are bundled into the public

@@ -9,7 +9,6 @@ import { BaseCommand, type JsonEnvelope } from "../../lib/oclif";
 import { createOrca, issuerFromPort, type FrameworkFacts, type Orca } from "../../lib/orca";
 import { RENDERER_IDS } from "../../lib/orca/patchers/rule/next/renderers/registry";
 import type { PatchContext } from "../../lib/orca/patchers/types";
-import { loadPreviewManifest, previewNpmVersions } from "../../lib/preview-manifest";
 import { hasZitadelConfig, hasZitadelSecret } from "../../lib/project";
 import { installDependenciesForSetup } from "./install";
 import { PickFrameworkPrompt, SETUP_PROMPTS, type SetupAnswers } from "./prompts";
@@ -59,19 +58,12 @@ export default class Setup extends BaseCommand {
     "skip-install": Flags.boolean({
       description: "Do not install dependencies after setup updates package.json.",
     }),
-    "preview-manifest": Flags.string({
-      description: "Path or URL to a zitadel-preview manifest.",
-    }),
   };
 
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(Setup);
     await this.toMeta(flags);
     const { cwd, nonInteractive, dryRun, force } = this.meta;
-    const preview = flags["preview-manifest"]
-      ? await loadPreviewManifest(flags["preview-manifest"], cwd)
-      : undefined;
-    const dependencyVersions = preview ? previewNpmVersions(preview) : undefined;
 
     if (await hasZitadelConfig(cwd)) {
       return this.emit({ status: "skipped", reason: "already-initialized" });
@@ -143,7 +135,6 @@ export default class Setup extends BaseCommand {
       issuer,
       server: answers.server,
       cliVersion: this.meta.cliVersion,
-      dependencyVersions,
     };
     consola.start(`Patching project files${dryRun ? " (dry run)" : ""}`);
     const result = await orca.patcherFor(framework.id).patch(ctx, { cwd, dryRun, force });
@@ -210,12 +201,6 @@ export default class Setup extends BaseCommand {
         files_written: result.filesWritten.map((file) => relativeDisplay(cwd, file)),
         files_skipped: result.filesSkipped.map((file) => relativeDisplay(cwd, file)),
         install: installOutcome.install,
-        preview: preview
-          ? {
-              product: preview.product,
-              manifest: flags["preview-manifest"],
-            }
-          : undefined,
         next_actions: installOutcome.nextActions,
         next_commands: installOutcome.nextCommands,
       },

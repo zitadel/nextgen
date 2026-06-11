@@ -166,9 +166,12 @@ service logs. These artifacts expire after 7 days and are not release artifacts.
 
 ## Build & release
 
-This monorepo separates Go release artifacts, console build output, and npm
-package artifacts. The full rationale lives in
-[docs/adrs/002-multi-package-release-strategy.md](docs/adrs/002-multi-package-release-strategy.md).
+This monorepo uses GoReleaser for Go artifacts and Changesets for npm package
+versioning. During the public alpha period, the release train intentionally
+publishes one version across the server image, server binary, CLI, and public
+npm packages. The full rationale lives in
+[docs/adrs/002-multi-package-release-strategy.md](docs/adrs/002-multi-package-release-strategy.md)
+and [docs/adrs/023-lockstep-alpha-release-train.md](docs/adrs/023-lockstep-alpha-release-train.md).
 
 ### Go server binary + embedded UIs (`goreleaser`)
 
@@ -186,10 +189,10 @@ docker run --rm -p 8080:8080 \
   ghcr.io/zitadel/nextgen:<snapshot-tag>-amd64
 ```
 
-The publish-capable release workflow is currently manual-only via
-`.github/workflows/release.yml` (`workflow_dispatch`). It can run a dry snapshot
-or, when intentionally invoked for a release tag, produce multi-arch tarballs and
-push a multi-arch image manifest to `ghcr.io/zitadel/nextgen`.
+The manual `.github/workflows/release.yml` workflow remains available for server
+snapshots and fallback releases. The normal public alpha path runs GoReleaser
+from [`release-npm.yml`](.github/workflows/release-npm.yml) after npm publishing
+succeeds, so the server image and npm packages share the same alpha version.
 
 ### npm packages (`changesets`)
 
@@ -201,38 +204,31 @@ change to those packages:
 corepack pnpm changeset
 ```
 
-The changesets workflow opens a "Version Packages" PR. Merging that PR versions
-and publishes the affected packages through npm trusted publishing.
+The changesets workflow opens a "Version Packages" PR. Merging that PR publishes
+the fixed alpha package group through npm trusted publishing, validates that all
+public packages share the same `0.1.0-alpha.N` version, creates `v<version>`,
+runs GoReleaser, and updates one draft GitHub Release titled
+`ZITADEL Alpha <version>`. Alpha releases are GitHub prereleases and publish only
+the immutable image tag, for example `ghcr.io/zitadel/nextgen:0.1.0-alpha.N`;
+they do not move `ghcr.io/zitadel/nextgen:latest`.
 
-### Preview product bundles (`zitadel-preview`)
+Follow the short [alpha release runbook](docs/runbooks/release-alpha-train.md)
+when cutting a public alpha train.
 
-`zitadel-preview@0.x` is the customer-facing bundle layer for external testers.
-It does not replace the GoReleaser or Changesets workflows; it records the exact
-server image and npm package versions that were tested together.
-
-Release ceremony:
-
-1. Merge normal feature and fix PRs with changesets as usual.
-2. Let [`release-npm.yml`](.github/workflows/release-npm.yml) publish the npm
-   prerelease packages.
-3. Run [`release.yml`](.github/workflows/release.yml) for the server image.
-4. Run [`release-preview.yml`](.github/workflows/release-preview.yml) with:
-   - `preview_version`, for example `0.1.0`;
-   - immutable `server_image`, for example `ghcr.io/zitadel/nextgen:v0.1.0-alpha.3`;
-   - exact `cli_version` and `sdk_next_version`;
-   - optional extra npm packages as JSON.
-
-Follow the short [preview release runbook](docs/runbooks/release-preview.md)
-when cutting a bundle.
-
-The preview workflow creates a draft GitHub Release tagged
-`zitadel-preview-v<version>` with a `zitadel-preview-<version>.json` manifest
-asset and generated tester commands:
+Release process checks can be run locally with:
 
 ```sh
-npx @zitadel/cli@<exact-cli-version> doctor --preview-manifest <manifest-url>
-npx @zitadel/cli@<exact-cli-version> start --preview-manifest <manifest-url>
-npx @zitadel/cli@<exact-cli-version> setup --framework next --server local --preview-manifest <manifest-url>
+corepack pnpm run check -- --only release
+```
+
+Tester commands use either the latest alpha stream or an exact train:
+
+```sh
+npx @zitadel/cli@alpha doctor
+npx @zitadel/cli@alpha start
+npx @zitadel/cli@alpha setup --framework next --server local
+
+npx @zitadel/cli@0.1.0-alpha.N start
 ```
 
 ### Local development

@@ -16,6 +16,9 @@ const publishableRoots = [
   "packages/sdk-core/",
   "packages/sdk-next/",
   "packages/sdk-nuxt/",
+  "packages/sdk-react/",
+  "packages/sdk-vue/",
+  "packages/sdk-angular/",
 ];
 
 // Files under a publishable package that never ship to npm and so should not

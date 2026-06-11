@@ -27,8 +27,10 @@ npm run dev
 ```
 
 `start` runs a Docker-backed local Zitadel server and stores runtime data
-under `.zitadel/local/`. It uses `ghcr.io/zitadel/nextgen:latest` unless
-overridden with `--image`, `--preview-manifest`, or `ZITADEL_LOCAL_IMAGE`.
+under `.zitadel/local/`. Alpha CLI versions use the matching
+`ghcr.io/zitadel/nextgen:<cli-version>` image by default; local/dev builds fall
+back to `ghcr.io/zitadel/nextgen:latest`. Override with `--image` or
+`ZITADEL_LOCAL_IMAGE` for advanced debugging.
 `setup --server local` creates a project on that local server, scaffolds
 `app/login`, `app/register`, and `middleware.ts`, writes `.env.local` and
 `.zitadel/`, and installs dependencies with the detected package manager. Pass
@@ -37,14 +39,13 @@ and login flow are provisioned server-side at creation time, so the CLI does
 not scaffold or upload them. Open `http://localhost:3000/login` to see the
 login page.
 
-For a `zitadel-preview` bundle, use the exact manifest URL from the GitHub
-Release so the CLI starts the tested server image and scaffolds the tested SDK
-versions:
+For a reproducible tester report, use the exact alpha train from the GitHub
+Release:
 
 ```sh
-npx @zitadel/cli@<exact-version> doctor --preview-manifest <manifest-url>
-npx @zitadel/cli@<exact-version> start --preview-manifest <manifest-url>
-npx @zitadel/cli@<exact-version> setup --framework next --server local --preview-manifest <manifest-url>
+npx @zitadel/cli@0.1.0-alpha.N doctor
+npx @zitadel/cli@0.1.0-alpha.N start
+npx @zitadel/cli@0.1.0-alpha.N setup --framework next --server local
 ```
 
 The default project flow supports password registration/login, passkey
@@ -149,7 +150,7 @@ Verify local runtime and project state.
 ```
 USAGE
   $ zitadel doctor [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug] [--fix]
-    [--image <value>] [--port <value>] [--preview-manifest <value>]
+    [--image <value>] [--port <value>]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -161,8 +162,6 @@ FLAGS
       --fix              Re-apply missing managed files.
       --image=<value>    Container image to check.
       --port=<value>     [default: 8080] Local HTTP port.
-      --preview-manifest=<value>
-                          Path or URL to a zitadel-preview manifest.
       --verbose          Verbose logging.
 
 GLOBAL FLAGS
@@ -293,7 +292,7 @@ Create a Zitadel project and scaffold local auth.
 ```
 USAGE
   $ zitadel setup [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug]
-    [--framework next] [--renderer react|web-component] [--skip-install] [--preview-manifest <value>]
+    [--framework next] [--renderer react|web-component] [--skip-install]
 
 FLAGS
   -c, --cwd=<value>         Project directory to operate on.
@@ -304,8 +303,6 @@ FLAGS
       --dry-run             Preview without mutating files or the platform.
       --framework=<option>  Framework to target.
                             <options: next>
-      --preview-manifest=<value>
-                            Path or URL to a zitadel-preview manifest.
       --renderer=<option>   Renderer (default: react).
                             <options: react|web-component>
       --skip-install        Do not install dependencies after setup updates package.json.
@@ -328,7 +325,7 @@ Start a local Zitadel server.
 ```
 USAGE
   $ zitadel start [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug] [--image
-    <value>] [--port <value>] [--preview-manifest <value>]
+    <value>] [--port <value>]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -339,8 +336,6 @@ FLAGS
       --dry-run          Preview without mutating files or the platform.
       --image=<value>    Container image to run.
       --port=<value>     [default: 8080] Local HTTP port.
-      --preview-manifest=<value>
-                          Path or URL to a zitadel-preview manifest.
       --verbose          Verbose logging.
 
 GLOBAL FLAGS

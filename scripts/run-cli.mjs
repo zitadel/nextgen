@@ -61,10 +61,7 @@ function hasRuntimeImageSource(args, env) {
   }
   return args.some(
     (arg) =>
-      arg === "--image" ||
-      arg.startsWith("--image=") ||
-      arg === "--preview-manifest" ||
-      arg.startsWith("--preview-manifest="),
+      arg === "--image" || arg.startsWith("--image="),
   );
 }
 

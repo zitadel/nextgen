@@ -13,7 +13,8 @@ Vitest.
   renderer props, or package entry points should include tests and README or
   contract updates when user-facing.
 - The public npm packages (`apps/cli`, `packages/api`, `packages/components`,
-  `packages/sdk-core`, `packages/sdk-next`, `packages/sdk-nuxt`) must keep
+  `packages/sdk-core`, `packages/sdk-next`, `packages/sdk-nuxt`,
+  `packages/sdk-react`, `packages/sdk-vue`, `packages/sdk-angular`) must keep
   `"license": "MIT"`.
 - User-visible changes to those packages need a changeset; write the
   `.changeset/<slug>.md` file directly rather than via the interactive prompt.
