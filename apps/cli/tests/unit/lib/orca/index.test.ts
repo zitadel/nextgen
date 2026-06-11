@@ -35,6 +35,11 @@ describe("Orca selection", () => {
     expect(orca.patcherFor("next").canPatch("next")).toBe(true);
   });
 
+  it("selects the Nuxt scaffolder and patcher", () => {
+    expect(orca.scaffolderFor("nuxt").canScaffold("nuxt")).toBe(true);
+    expect(orca.patcherFor("nuxt").canPatch("nuxt")).toBe(true);
+  });
+
   it("selects the React scaffolder and patcher", () => {
     expect(orca.scaffolderFor("react").canScaffold("react")).toBe(true);
     expect(orca.patcherFor("react").canPatch("react")).toBe(true);
@@ -58,6 +63,7 @@ describe("Orca selection", () => {
   it("derives available frameworks from the scaffolder registry", () => {
     expect(orca.availableFrameworks().map((choice) => choice.id)).toEqual([
       "next",
+      "nuxt",
       "react",
       "vue",
       "angular",

@@ -1,5 +1,6 @@
 import { AngularScaffolder } from "./angular";
 import { NextScaffolder } from "./next";
+import { NuxtScaffolder } from "./nuxt";
 import { ReactScaffolder } from "./react";
 import { VueScaffolder } from "./vue";
 import type { Scaffolder } from "./types";
@@ -11,6 +12,7 @@ import type { Scaffolder } from "./types";
  */
 export const scaffolders = [
   new NextScaffolder(),
+  new NuxtScaffolder(),
   new ReactScaffolder(),
   new VueScaffolder(),
   new AngularScaffolder(),

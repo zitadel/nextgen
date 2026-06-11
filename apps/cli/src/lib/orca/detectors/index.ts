@@ -1,5 +1,6 @@
 import { AngularDetector } from "./angular";
 import { NextDetector } from "./next";
+import { NuxtDetector } from "./nuxt";
 import { ReactDetector } from "./react";
 import { VueDetector } from "./vue";
 import type { Detector } from "./types";
@@ -13,6 +14,7 @@ import type { Detector } from "./types";
  */
 export const detectors = [
   new NextDetector(),
+  new NuxtDetector(),
   new ReactDetector(),
   new VueDetector(),
   new AngularDetector(),

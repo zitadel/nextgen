@@ -1,6 +1,7 @@
 import { builders, generateCode, parseModule } from "magicast";
 
 import { ZitadelError } from "../../../errors";
+import { importIsPresent, resolveDefaultExportObject } from "./magicast-config";
 
 /**
  * Shared Vite dev-server proxy injected into `vite.config.ts` for the SPA
@@ -72,7 +73,7 @@ export function viteProxyEdit(serverPort: number): (source: string | undefined) 
         details: { cause: error instanceof Error ? error.message : String(error) },
       });
     }
-    const config = resolveConfigObject(mod);
+    const config = resolveDefaultExportObject(mod, "vite.config.ts");
     if (config.server === undefined) config.server = {};
     if (config.server.host === undefined) config.server.host = "localhost";
     if (config.server.port === undefined) config.server.port = serverPort;
@@ -86,37 +87,4 @@ export function viteProxyEdit(serverPort: number): (source: string | undefined) 
     const code = generateCode(mod).code;
     return code.endsWith("\n") ? code : `${code}\n`;
   };
-}
-
-/**
- * Reaches the config object literal in a Vite config module — the argument of
- * `export default defineConfig({...})` or a bare `export default {...}`. Throws
- * `E_VALIDATION` for shapes magicast cannot safely edit (function-form configs,
- * configs built elsewhere) so the patcher can fall back to manual steps.
- */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function resolveConfigObject(mod: any): any {
-  const def = mod.exports?.default;
-  const unreachable = () =>
-    new ZitadelError("E_VALIDATION", "Could not locate the config object in vite.config.ts", {
-      hint: 'Add a server.proxy["/__nextgen"] entry manually (see the SDK README).',
-    });
-  if (!def) throw unreachable();
-  if (def.$type === "function-call") {
-    const arg = def.$args?.[0];
-    if (!arg || arg.$type !== "object") throw unreachable();
-    return arg;
-  }
-  if (def.$type === "object") return def;
-  throw unreachable();
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function importIsPresent(mod: any, local: string): boolean {
-  try {
-    const items: ReadonlyArray<{ local?: string }> = mod.imports?.$items ?? [];
-    return items.some((item) => item.local === local);
-  } catch {
-    return false;
-  }
 }
