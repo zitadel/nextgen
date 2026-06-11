@@ -55,6 +55,10 @@ export default class Setup extends BaseCommand {
       description: "Renderer (default: react).",
       options: [...RENDERER_IDS],
     }),
+    "dev-port": Flags.integer({
+      description:
+        "Dev-server port; also the issuer origin registered with Zitadel. Defaults to the detected port. Use distinct ports to run several scaffolded apps side by side.",
+    }),
     "skip-install": Flags.boolean({
       description: "Do not install dependencies after setup updates package.json.",
     }),
@@ -100,6 +104,17 @@ export default class Setup extends BaseCommand {
       } else {
         throw error;
       }
+    }
+
+    // An explicit --dev-port overrides the detected port for the whole run, so
+    // the issuer, the registered origin, and the patched dev-server config all
+    // agree (and several apps can be scaffolded on distinct ports).
+    if (flags["dev-port"] !== undefined) {
+      framework = {
+        ...framework,
+        devPort: flags["dev-port"],
+        url: issuerFromPort(flags["dev-port"]),
+      };
     }
 
     let answers: SetupAnswers = {

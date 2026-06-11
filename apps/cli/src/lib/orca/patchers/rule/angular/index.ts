@@ -37,6 +37,10 @@ export class AngularPatcher extends AbstractRulePatcher {
         path: "angular.json",
         edit: angularProxyEdit({ proxyConfig: "proxy.conf.cjs", port: ctx.framework.devPort }),
       },
+      // `ng new` only adds a `start` script; the CLI tells every framework to run
+      // `npm run dev`, so give Angular a matching `dev` script (ng serve reads the
+      // proxy + port from angular.json).
+      { kind: "merge-json", path: "package.json", patch: { scripts: { dev: "ng serve" } } },
       {
         kind: "add-dep",
         name: SDK_DEPENDENCY,
