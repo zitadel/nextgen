@@ -28,7 +28,7 @@ Permission is denied before any resource content is fetched. Enumeration oracles
 | Principal | Identifier | Scope semantics |
 |---|---|---|
 | **user** (user token) | `user_id` | Resolved against `team_memberships` and project grants for the project the user lives in. |
-| **`sk_proj_…`** (claimed) | `project_id`, `team_id` (owner) | Project-wide. |
+| **`sk_proj_…`** (claimed) | `project_id`, `team_id` (owning team) | Project-wide. |
 | **`sk_proj_…`** (pre-claim) | `project_id`, `pre_claim: true` | Project-wide against an unclaimed project. |
 | **`sk_proj_…`** (origin-scoped) | `project_id`, `origin_patterns` | Project-wide, gated on request `Origin` matching a pattern. |
 | **`sk_team_…`** | `project_id`, `team_id` | Narrow allowlist — see [§ sk_team_ narrow model](#sk_team_-narrow-model). |
@@ -46,6 +46,26 @@ Permissions are dotted strings: `users.read`, `projects.settings.write`, `team.m
 - **Role** — a named bundle of permissions inside an app_group. A role is assigned to a principal via a grant or a team_membership.
 
 For end-users: token issuance resolves grants and roles, embeds claims/scopes into the OIDC access token, and the customer's app reads the claims locally. For users in the platform project (developers/admins): the permission check runs per request — there is no "token with baked-in claims" path for platform-project operations.
+
+## Authorization vs lifecycle ownership
+
+**LOCKED by [ADR 022](../../adrs/022-user-team-lifecycle-ownership.md).**
+FGA decides whether a principal may perform an action. It does not decide who
+owns a user's identity lifecycle or what deletion/deprovisioning should do after
+the action is authorized.
+
+Lifecycle mutations run in two steps:
+
+1. Authorization checks whether the caller can request the mutation in the
+   resolved scope.
+2. Lifecycle policy decides the mutation's effects: deactivate/tombstone, revoke
+   credentials, remove memberships, preserve project-owned users, deactivate
+   team-owned users, or schedule purge.
+
+Roles such as `owner`, `admin`, and `member` are authorization roles. A user can
+own/administer a team through a membership role while still being a
+project-owned identity. A team only owns a user's lifecycle when explicit
+project/team/provisioning policy marks that user as team-owned.
 
 ## FGA decision surface
 

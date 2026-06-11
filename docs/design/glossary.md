@@ -19,7 +19,11 @@ Three layers. Long-form in [`api/hierarchy.md`](api/hierarchy.md).
 |---|---|
 | **Project** | A tenant / deployment. Owns branding, IdPs, custom domain, feature flags, teams, users, apps, flows, sessions. One project is reserved as the **platform project** — Zitadel's own project, where the accounts that pay Zitadel live. **LOCKED rename** from today's "instance". |
 | **Team** | A tenant-grouping inside any project. Two canonical shapes: (a) a team inside the **platform project** represents a paying customer / developer account; (b) a team inside a **customer project** represents a B2B end-customer tenant. Same resource, different project context. |
-| **User** | An identity inside any project. A user inside the platform project is what used to be called a "platform_user" (a developer/admin). A user inside a customer project is an end-user. Memberships bind users to teams. |
+| **User** | An identity inside any project. A user inside the platform project is what used to be called a "platform_user" (a developer/admin). A user inside a customer project is an end-user. Memberships attach users to teams; lifecycle ownership is explicit policy. |
+| **lifecycle_owner** | The configured authority for a user's identity lifecycle: `project`, `team`, or `external`. Separate from membership roles and authorization. See [ADR 022](../adrs/022-user-team-lifecycle-ownership.md). |
+| **project-owned user** | A user whose lifecycle belongs to the project identity namespace. Default for self-serve signup and user-created teams. Team deletion does not delete this user. |
+| **team-owned user** | A managed user whose lifecycle belongs to a specific team by policy, common for enterprise invite, JIT, or SCIM-style provisioning. Team deletion or lifecycle-owner membership removal may deactivate the user according to policy. |
+| **externally managed user** | A user whose source identity lifecycle is owned by an upstream IdP or directory. Zitadel enforces local access state without pretending to own upstream deletion. |
 
 The platform project's `project_id` is discoverable via the authenticated `/capabilities` response (`defaults.project_id`). Self-hosted returns a singleton; cloud returns whichever project is the caller's platform project.
 
@@ -55,7 +59,7 @@ Core nouns used across the API. Full endpoint map in [`api/resource-map.md`](api
 | **session** | Durable post-auth container, carries verified factors and every currently satisfied `assurance_levels[]` value. Produced by a completed auth_attempt. Detail in [`flowengine/session-api.md`](flowengine/session-api.md). |
 | **grant** | Explicit access record (user ↔ app, team ↔ project, member ↔ role). |
 | **role** | Named permission bundle inside an app_group. |
-| **team_membership** | First-class resource binding a user to a team with roles. The unified membership resource (there are no other membership kinds). |
+| **team_membership** | First-class resource attaching a user to a team with roles and membership status. The unified membership resource (there are no other membership kinds). |
 | **auth_attempt** | Ephemeral state machine driving a single authentication attempt. Exposes *auth primitives* (challenges, verify, handoff). OIDC context is owned by the OIDC adapter (`auth_requests`), not by auth_attempt. Long-form in [`api/authn-and-auth-flows.md`](api/authn-and-auth-flows.md). |
 | **handoff_token** | Short-lived, audience-bound token produced by `POST /auth_attempts/{id}/handoff`, consumed by `POST /sessions/exchange`. |
 | **challenge** | A single-factor challenge (password prompt, OTP, passkey, OIDC redirect) issued inside an auth_attempt. |

@@ -7,8 +7,8 @@
 | Layer | What it is |
 |---|---|
 | **Project** | A tenant / deployment. Owns branding, IdPs, custom domain, feature flags, teams, users, apps, flows, sessions. |
-| **Team** | A tenant-grouping inside any project. Carries billing (in the platform project) or acts as a B2B end-customer boundary (in a customer project). Members are users. |
-| **User** | An identity inside any project. Memberships bind users to teams. |
+| **Team** | A tenant-grouping inside any project. Carries billing (in the platform project), acts as a B2B end-customer boundary (in a customer project), and owns team-scoped collaboration/data state. |
+| **User** | An identity inside any project. Memberships attach users to teams; lifecycle ownership is explicit policy, not implied by containment. |
 
 ## Platform is a reserved project
 
@@ -58,9 +58,57 @@ graph TD
   TeamMobile --> Users
 ```
 
+## Ownership vs membership
+
+**LOCKED by [ADR 022](../../adrs/022-user-team-lifecycle-ownership.md).**
+Users are project-scoped identities. Teams are collaboration, data, and
+lifecycle boundaries. A membership is the relationship that gives a user a role
+inside a team.
+
+These are separate ideas:
+
+- A user can create and administer a team through a membership role such as
+  `owner` without being lifecycle-owned by that team.
+- A team can lifecycle-own a managed user when project/team/provisioning policy
+  says so, for example enterprise invite, JIT provisioning, or SCIM-style
+  tenant management.
+- A user can have zero, one, or many team memberships while retaining one
+  lifecycle owner.
+- FGA consumes memberships, roles, grants, and resource hierarchy to answer
+  access questions. It does not decide whether an identity should be
+  deprovisioned or purged.
+
+User lifecycle ownership is configurable:
+
+| Owner | Default meaning |
+|---|---|
+| `project` | Self-serve/default signup. The user survives team deletion unless explicitly deleted. |
+| `team` | Managed account. Team deletion or lifecycle-owner membership removal can deactivate the user according to policy. |
+| `external` | Upstream IdP/directory owns the source identity. Zitadel enforces local access state. |
+
+DB-facing lifecycle summary:
+
+| Operation | Canonical effect |
+|---|---|
+| Delete team | Deactivate/tombstone team, revoke team-scoped API keys, deactivate/remove memberships, preserve project-owned users, and deactivate team-owned users according to policy. |
+| Delete user | Deactivate/tombstone user, revoke sessions/tokens/credentials, deactivate memberships, preserve teams/resources unless a resource-specific cleanup policy applies. |
+| Delete membership | Remove access to that team; only deprovision the user if that membership is the configured lifecycle-owner relationship and policy requires it. |
+
+Status is also separate:
+
+| Resource | Example statuses |
+|---|---|
+| User | `active`, `suspended`, `deactivated`, `pending_purge` |
+| Team membership | `pending`, `active`, `inactive`, `removed` |
+
+Transitional storage artifacts such as `users.team_id` or team-to-user
+`ON DELETE CASCADE` must not be read as canonical product semantics. Database
+follow-up should align storage with the N:N membership model in ADR 022.
+
 ## Memberships are first-class and unified
 
-Every `team_membership` record binds a `user` to a `team` with roles. That covers both:
+Every `team_membership` record binds a `user` to a `team` with roles and
+membership status. That covers both:
 
 - A developer's membership in their paying team in the platform project.
 - An end-user's membership in a B2B tenant team in a customer project.
