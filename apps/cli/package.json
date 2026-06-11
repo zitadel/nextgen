@@ -61,6 +61,7 @@
     "@zitadel/api": "workspace:*",
     "ajv": "catalog:",
     "consola": "^3.4.2",
+    "magicast": "^0.3.5",
     "safe-stable-stringify": "catalog:",
     "zod": "catalog:",
     "picocolors": "^1.1.1"

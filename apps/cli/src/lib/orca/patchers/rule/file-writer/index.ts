@@ -58,7 +58,7 @@ async function applyOp(
       await writeText(
         abs(opts.cwd, op.path),
         op.contents,
-        { mode: op.mode, force: opts.force, dryRun: opts.dryRun },
+        { mode: op.mode, force: opts.force || Boolean(op.overwrite), dryRun: opts.dryRun },
         result,
       );
       break;
@@ -77,7 +77,38 @@ async function applyOp(
     case "add-dep":
       await addDependency(abs(opts.cwd, "package.json"), op, opts.dryRun, result);
       break;
+    case "edit":
+      await editFile(abs(opts.cwd, op.path), op.edit, opts.dryRun, result);
+      break;
   }
+}
+
+/**
+ * Generic content edit: read the file, run the patcher-supplied transform, write
+ * the result. Framework knowledge lives entirely in `edit` (next to its
+ * patcher); this executor only owns idempotency, dry-run, and the atomic write.
+ */
+async function editFile(
+  path: string,
+  edit: (source: string | undefined) => string,
+  dryRun: boolean,
+  result: ScaffoldAccumulator,
+): Promise<void> {
+  const source = await readIfExists(path);
+  const next = edit(source);
+  if (next === source) {
+    result.filesSkipped.push(path);
+    return;
+  }
+  if (dryRun) {
+    result.filesWritten.push(path);
+    return;
+  }
+  await mkdir(dirname(path), { recursive: true });
+  const tmp = `${path}.tmp-${process.pid}-${Date.now()}`;
+  await writeFile(tmp, next);
+  await rename(tmp, path);
+  result.filesWritten.push(path);
 }
 
 async function ensureDir(
