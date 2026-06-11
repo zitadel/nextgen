@@ -32,7 +32,7 @@ Every user has exactly one lifecycle owner inside its project. Long-form in [ADR
 | Term | Meaning |
 |---|---|
 | **lifecycle_owner** | The configured local authority for a user's identity lifecycle: `self` or `team`. Separate from membership roles, authorization, and external provisioning source. |
-| **self-owned user** | A user that owns its own lifecycle inside the project. Default for self-serve signup and user-created teams. Team deletion does not delete this user. |
+| **self-owned user** | A user that owns its own lifecycle inside the project. Default for self-serve signup and user-created teams. The product may auto-create a personal team/workspace for UX, but team deletion does not delete this user. |
 | **team-owned user** | A managed user whose lifecycle belongs to a specific team by policy, common for enterprise invite, JIT, or SCIM-style provisioning. Team deletion or lifecycle-owner membership removal may deactivate the user according to policy. |
 | **external provisioning source** | An upstream IdP or directory that is authoritative for attributes or provisioning events. It is source metadata, not a third lifecycle owner; the local user is still self-owned or team-owned. |
 

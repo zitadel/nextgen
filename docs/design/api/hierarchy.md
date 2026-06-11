@@ -83,8 +83,11 @@ Every user has exactly one lifecycle owner:
 
 | Owner | Default meaning |
 |---|---|
-| `self` | Self-serve/default signup. The user survives team deletion unless explicitly deleted. |
+| `self` | Self-serve/default signup. The user survives team deletion unless explicitly deleted. The product may still auto-create a personal team/workspace for team-context UX. |
 | `team` | Managed account. Team deletion or lifecycle-owner membership removal can deactivate the user according to policy. |
+
+An auto-created personal team is a normal team resource. It gives a self-owned
+user a default workspace, but it does not own the user's lifecycle.
 
 External IdPs and directories are provisioning authorities, not lifecycle
 owners. They feed into one of the two local ownership modes: self-owned for

@@ -45,10 +45,14 @@ Every user has exactly one lifecycle owner inside the project:
 | `self` | The user owns its own lifecycle inside the project and may have zero or many team memberships. | Self-serve signup, user-created workspaces. |
 | `team` | The user's lifecycle is managed by a specific team. Removing that team or its lifecycle-owner relationship can deactivate the user according to policy. | Enterprise invite, JIT provisioning, SCIM-style tenant management. |
 
-The default for self-serve/default signup is `self`. A team-owned user can
-create or administer another team, but that does not make the new team a child
-of the user's lifecycle owner. It creates a team resource and a membership with
-an authorization role such as `owner`.
+The default for self-serve/default signup is `self`. Product surfaces may
+auto-create a default personal team/workspace for that user so the UI and API
+can always start in a team context. That personal team is a normal team
+resource, not the user's lifecycle owner.
+
+A team-owned user can create or administer another team, but that does not make
+the new team a child of the user's lifecycle owner. It creates a team resource
+and a participation/authorization relationship such as `owner`.
 
 Lifecycle ownership is not transitive. Deleting or deprovisioning a user
 deactivates that user and removes their memberships/access. It does not delete
