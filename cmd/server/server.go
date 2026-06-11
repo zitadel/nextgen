@@ -24,13 +24,12 @@ import (
 	"github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/bootstrap/users"
-	"github.com/zitadel/nextgen/internal/build"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/domain/idgen"
 	"github.com/zitadel/nextgen/internal/instrumentation"
-	"github.com/zitadel/nextgen/internal/instrumentation/otel"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
+	"github.com/zitadel/nextgen/internal/instrumentation/zotel"
 	"github.com/zitadel/nextgen/internal/secrets"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/staticui/console"
@@ -41,9 +40,9 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database/repository"
 	"github.com/zitadel/oidc/v3/pkg/op"
 	"go.opentelemetry.io/contrib/bridges/otelslog"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/sdk/resource"
-	semconv "go.opentelemetry.io/otel/semconv/v1.39.0"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/log"
+	"go.opentelemetry.io/otel/propagation"
 )
 
 func NewCommand() *cobra.Command {
@@ -215,7 +214,10 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		api.NewSecurityHandler(),
 		oasapi.WithMiddleware(
 			middleware.AddOperationIdToContext(),
+			// logging is done at net/http level
 		),
+		oasapi.WithMeterProvider(otel.GetMeterProvider()),
+		oasapi.WithTracerProvider(otel.GetTracerProvider()),
 		oasapi.WithErrorHandler(api.OgenErrorHandler))
 	if err != nil {
 		return fmt.Errorf("failed to build api server: %w", err)
@@ -444,15 +446,41 @@ func buildCrypter(hexKey string) (crypto.Crypter, error) {
 
 func SetUpInstrumentation(
 	ctx context.Context,
-	sf *ShutdownFuncs,
+	sfs *ShutdownFuncs,
 	cfg instrumentation.Config,
 ) error {
-	otelResource, err := createResource(cfg.ServiceName)
+	otelResource, err := zotel.CreateResource(cfg.ServiceName)
 	if err != nil {
 		return err
 	}
 
-	err = setUpLogging(ctx, sf, cfg.Log, otelResource)
+	propagator := propagation.NewCompositeTextMapPropagator(
+		propagation.TraceContext{},
+		propagation.Baggage{},
+	)
+	otel.SetTextMapPropagator(propagator)
+
+	tracerProvider, err := zotel.NewTracerProvider(ctx, cfg.Trace.Exporter, cfg.Trace.Fraction, otelResource)
+	if err != nil {
+		return nil
+	}
+	sfs.Add(tracerProvider.Shutdown)
+	otel.SetTracerProvider(tracerProvider)
+
+	meterProvider, err := zotel.NewMeterProvider(ctx, cfg.Metric.Exporter, otelResource)
+	if err != nil {
+		return nil
+	}
+	sfs.Add(meterProvider.Shutdown)
+	otel.SetMeterProvider(meterProvider)
+
+	loggerProvider, err := zotel.NewLoggerProvider(ctx, cfg.Log.Exporter, otelResource)
+	if err != nil {
+		return err
+	}
+	sfs.Add(loggerProvider.Shutdown)
+
+	err = setUpLogging(cfg.Log, loggerProvider)
 	if err != nil {
 		return err
 	}
@@ -460,29 +488,10 @@ func SetUpInstrumentation(
 	return nil
 }
 
-func createResource(serviceName string) (*resource.Resource, error) {
-	attributes := []attribute.KeyValue{
-		semconv.ServiceNameKey.String(serviceName),
-	}
-	if build.Version() != "" {
-		attributes = append(attributes, semconv.ServiceVersionKey.String(build.Version()))
-	}
-	return resource.Merge(
-		resource.Default(),
-		resource.NewWithAttributes("", attributes...),
-	)
-}
-
-func setUpLogging(ctx context.Context, sfs *ShutdownFuncs, cfg instrumentation.LogConfig, rsc *resource.Resource) error {
-	provider, err := otel.NewLoggerProvider(ctx, cfg.Exporter, rsc)
-	if err != nil {
-		return err
-	}
-	sfs.Add(provider.Shutdown)
-
+func setUpLogging(cfg instrumentation.LogConfig, otelProvider log.LoggerProvider) error {
 	otelHandler := otelslog.NewHandler(
 		Name,
-		otelslog.WithLoggerProvider(provider),
+		otelslog.WithLoggerProvider(otelProvider),
 	)
 
 	stdErrHandler := cfg.Format.ErrorHandler(cfg.SlogHandlerOptions())
