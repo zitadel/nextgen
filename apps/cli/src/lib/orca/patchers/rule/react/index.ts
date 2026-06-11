@@ -1,3 +1,4 @@
+import { npmDistTagForCliVersion } from "../../../../public-cli";
 import type { FileOp } from "../file-writer/types";
 import type { PatchContext, PatchView } from "../../types";
 import { AbstractRulePatcher } from "../base";
@@ -36,7 +37,7 @@ export class ReactPatcher extends AbstractRulePatcher implements ViteSupport {
       {
         kind: "add-dep",
         name: SDK_DEPENDENCY,
-        version: dependencyVersionForCli(ctx.cliVersion, "alpha"),
+        version: npmDistTagForCliVersion(ctx.cliVersion),
       },
     ];
   }
@@ -56,14 +57,4 @@ export class ReactPatcher extends AbstractRulePatcher implements ViteSupport {
         "Wrote src/App.tsx auth entry and merged the /__nextgen dev proxy into vite.config.ts.",
     };
   }
-}
-
-/**
- * Pins the SDK to the CLI's own prerelease tag (e.g. a `0.1.0-alpha.N` CLI
- * installs `@zitadel/sdk-react@alpha`), falling back to a stable range. Mirrors
- * the Next patcher so the two cannot drift.
- */
-function dependencyVersionForCli(cliVersion: string, fallback: string): string {
-  const prerelease = cliVersion.match(/^\d+\.\d+\.\d+-([0-9A-Za-z]+)(?:[.-]|$)/)?.[1];
-  return prerelease ?? fallback;
 }

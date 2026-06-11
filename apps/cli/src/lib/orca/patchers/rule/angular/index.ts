@@ -1,3 +1,4 @@
+import { npmDistTagForCliVersion } from "../../../../public-cli";
 import type { FileOp } from "../file-writer/types";
 import type { PatchContext, PatchView } from "../../types";
 import { AbstractRulePatcher } from "../base";
@@ -40,7 +41,7 @@ export class AngularPatcher extends AbstractRulePatcher {
       {
         kind: "add-dep",
         name: SDK_DEPENDENCY,
-        version: dependencyVersionForCli(ctx.cliVersion, "alpha"),
+        version: npmDistTagForCliVersion(ctx.cliVersion),
       },
     ];
   }
@@ -60,9 +61,4 @@ export class AngularPatcher extends AbstractRulePatcher {
         "Wrote the app root component + proxy.conf.cjs and wired the /__nextgen dev proxy into angular.json.",
     };
   }
-}
-
-function dependencyVersionForCli(cliVersion: string, fallback: string): string {
-  const prerelease = cliVersion.match(/^\d+\.\d+\.\d+-([0-9A-Za-z]+)(?:[.-]|$)/)?.[1];
-  return prerelease ?? fallback;
 }

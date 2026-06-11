@@ -1,3 +1,4 @@
+import { npmDistTagForCliVersion } from "../../../../public-cli";
 import { configCandidates } from "../config-paths";
 import type { FileOp } from "../file-writer/types";
 import type { PatchContext, PatchView } from "../../types";
@@ -54,7 +55,7 @@ export class NuxtPatcher extends AbstractRulePatcher {
       {
         kind: "add-dep",
         name: SDK_DEPENDENCY,
-        version: dependencyVersionForCli(ctx.cliVersion, "alpha"),
+        version: npmDistTagForCliVersion(ctx.cliVersion),
       },
     ];
   }
@@ -81,9 +82,4 @@ export class NuxtPatcher extends AbstractRulePatcher {
         "Wrote login/register/profile pages + plugins and registered @zitadel/sdk-nuxt in nuxt.config.ts.",
     };
   }
-}
-
-function dependencyVersionForCli(cliVersion: string, fallback: string): string {
-  const prerelease = cliVersion.match(/^\d+\.\d+\.\d+-([0-9A-Za-z]+)(?:[.-]|$)/)?.[1];
-  return prerelease ?? fallback;
 }

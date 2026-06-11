@@ -1,3 +1,4 @@
+import { npmDistTagForCliVersion } from "../../../../public-cli";
 import type { FileOp } from "../file-writer/types";
 import type { PatchContext, PatchView } from "../../types";
 import { AbstractRulePatcher } from "../base";
@@ -31,7 +32,7 @@ export class VuePatcher extends AbstractRulePatcher implements ViteSupport {
       {
         kind: "add-dep",
         name: SDK_DEPENDENCY,
-        version: dependencyVersionForCli(ctx.cliVersion, "alpha"),
+        version: npmDistTagForCliVersion(ctx.cliVersion),
       },
     ];
   }
@@ -50,9 +51,4 @@ export class VuePatcher extends AbstractRulePatcher implements ViteSupport {
       detail: "Wrote src/App.vue auth entry and merged the /__nextgen dev proxy into vite.config.ts.",
     };
   }
-}
-
-function dependencyVersionForCli(cliVersion: string, fallback: string): string {
-  const prerelease = cliVersion.match(/^\d+\.\d+\.\d+-([0-9A-Za-z]+)(?:[.-]|$)/)?.[1];
-  return prerelease ?? fallback;
 }
