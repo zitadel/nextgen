@@ -222,10 +222,13 @@ describe("<zitadel-login> form + focus (chromium)", () => {
       const title = element.shadowRoot?.querySelector(".zl-card-title");
       return title?.textContent?.includes("Sign in faster") ? title : null;
     });
-    // Allow the rAF in moveFocusToFirstField to fire.
-    await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+    // Focus moves once the new step's markup has committed (rAF today;
+    // `await this.updateComplete` after the Phase 5 refactor). Poll until it
+    // lands so this pins the behaviour regardless of the scheduling mechanism.
     const primary = element.shadowRoot?.querySelector('zl-button[hierarchy="primary"]');
     expect(primary).toBeTruthy();
+    await waitFor(() => (element.shadowRoot?.activeElement === primary ? primary : null));
+    expect(element.shadowRoot?.activeElement).toBe(primary);
   });
 
   // Regression: frameworks like @lit/react attach the element first and

@@ -5,10 +5,10 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { parseJson, runCliForTest } from "../../helpers/run-cli";
 import { MANAGED_MARKER } from "../../../src/lib/paths";
+import { parseJson, runCliForTest } from "../../helpers/run-cli";
 
-type Check = { name: string; status: "pass" | "fail"; message: string; path?: string };
+type Check = { name: string; status: "pass" | "warn" | "fail"; message: string; path?: string };
 
 const tempDirs: string[] = [];
 
@@ -22,20 +22,23 @@ const VALID_USER_SCHEMA = {
 async function doctor(cwd: string, extra: string[] = []) {
   const fake = await fakeDocker();
   const port = await freePort();
-  return runCliForTest([
-    "doctor",
-    "--cwd",
-    cwd,
-    "--json",
-    "--port",
-    String(port),
-    "--server",
-    "https://api.zitadel.cloud",
-    ...extra,
-  ], {
-    PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
-    DOCKER_LOG: fake.logPath,
-  });
+  return runCliForTest(
+    [
+      "doctor",
+      "--cwd",
+      cwd,
+      "--json",
+      "--port",
+      String(port),
+      "--server",
+      "https://api.zitadel.cloud",
+      ...extra,
+    ],
+    {
+      PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
+      DOCKER_LOG: fake.logPath,
+    },
+  );
 }
 
 /**
@@ -87,12 +90,18 @@ async function makeHealthyProject(): Promise<string> {
     ["ZITADEL_PROJECT_ID=", "ZITADEL_ENVIRONMENT=", "ZITADEL_ISSUER="].join("\n"),
   );
   await writeFile(join(cwd, ".zitadel/schemas/user.json"), JSON.stringify(VALID_USER_SCHEMA));
-  await writeFile(join(cwd, "app/login/page.tsx"), `${MANAGED_MARKER}\nexport default function L() {}\n`);
+  await writeFile(
+    join(cwd, "app/login/page.tsx"),
+    `${MANAGED_MARKER}\nexport default function L() {}\n`,
+  );
   await writeFile(
     join(cwd, "app/register/page.tsx"),
     `${MANAGED_MARKER}\nexport default function R() {}\n`,
   );
-  await writeFile(join(cwd, "middleware.ts"), `${MANAGED_MARKER}\nexport function middleware() {}\n`);
+  await writeFile(
+    join(cwd, "middleware.ts"),
+    `${MANAGED_MARKER}\nexport function middleware() {}\n`,
+  );
   return cwd;
 }
 
@@ -111,7 +120,10 @@ describe("doctor command", () => {
     const res = await doctor(cwd);
 
     expect(res.exitCode).toBe(0);
-    const json = parseJson(res.stdout) as { status: string; data: { ok: boolean; checks: Check[] } };
+    const json = parseJson(res.stdout) as {
+      status: string;
+      data: { ok: boolean; checks: Check[] };
+    };
     expect(json.status).toBe("ok");
     expect(json.data.ok).toBe(true);
     expect(json.data.checks.every((check) => check.status === "pass")).toBe(true);
@@ -136,7 +148,11 @@ describe("doctor command", () => {
     const res = await doctor(cwd);
 
     expect(res.exitCode).toBe(3);
-    const json = parseJson(res.stdout) as { status: string; code: string; details: { checks: Check[] } };
+    const json = parseJson(res.stdout) as {
+      status: string;
+      code: string;
+      details: { checks: Check[] };
+    };
     expect(json.status).toBe("error");
     expect(json.code).toBe("E_VALIDATION");
     const dependency = json.details.checks.find((check) => check.name === "dependency");
@@ -172,7 +188,10 @@ describe("doctor command", () => {
     const res = await doctor(cwd, ["--fix"]);
 
     expect(res.exitCode).toBe(0);
-    const json = parseJson(res.stdout) as { status: string; data: { ok: boolean; checks: Check[] } };
+    const json = parseJson(res.stdout) as {
+      status: string;
+      data: { ok: boolean; checks: Check[] };
+    };
     expect(json.status).toBe("ok");
     const perms = json.data.checks.find((check) => check.name === "secret-permissions");
     expect(perms?.status).toBe("pass");
@@ -197,10 +216,16 @@ describe("doctor command", () => {
     const res = await doctor(cwd, ["--fix"]);
 
     expect(res.exitCode).toBe(3);
-    const json = parseJson(res.stdout) as { status: string; code: string; details: { checks: Check[] } };
+    const json = parseJson(res.stdout) as {
+      status: string;
+      code: string;
+      details: { checks: Check[] };
+    };
     expect(json.status).toBe("error");
     expect(json.code).toBe("E_VALIDATION");
-    expect(json.details.checks.find((check) => check.name === "project-match")?.status).toBe("fail");
+    expect(json.details.checks.find((check) => check.name === "project-match")?.status).toBe(
+      "fail",
+    );
   });
 
   it("re-applies a missing Zitadel dependency via --fix and then passes", async () => {
@@ -214,7 +239,10 @@ describe("doctor command", () => {
     const res = await doctor(cwd, ["--fix"]);
 
     expect(res.exitCode).toBe(0);
-    const json = parseJson(res.stdout) as { status: string; data: { ok: boolean; checks: Check[] } };
+    const json = parseJson(res.stdout) as {
+      status: string;
+      data: { ok: boolean; checks: Check[] };
+    };
     expect(json.status).toBe("ok");
     expect(json.data.ok).toBe(true);
     const dependency = json.data.checks.find((check) => check.name === "dependency");

@@ -1,4 +1,4 @@
-import { chmod, mkdir, mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, realpath, stat, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -27,17 +27,35 @@ function cli(args: string[], env: NodeJS.ProcessEnv = {}) {
 describe("Next setup integration", () => {
   it("sets up, verifies, plans, applies, and preserves idempotency", async () => {
     const cwd = await createNextProject();
+    const fakeNpm = await fakePackageManager("npm");
 
-    const setup = await cli([
-      "setup",
-      "--cwd",
-      cwd,
-      "--non-interactive",
-      "--json",
-    ]);
+    const setup = await cli(["setup", "--cwd", cwd, "--non-interactive", "--json"], {
+      PACKAGE_MANAGER_LOG: fakeNpm.logPath,
+      PATH: `${fakeNpm.binDir}:${process.env.PATH ?? ""}`,
+    });
     expect(setup.exitCode).toBe(0);
-    const setupJson = parseJson(setup.stdout) as { status: string };
+    const setupJson = parseJson(setup.stdout) as {
+      status: string;
+      data: {
+        install: { status: string; package_manager: string; command: string };
+        next_commands: string[];
+      };
+    };
     expect(setupJson.status).toBe("ok");
+    expect(setup.stdout).not.toContain("fake npm stdout");
+    expect(setup.stderr).toContain("fake npm stdout");
+    expect(setup.stderr).toContain("fake npm stderr");
+    expect(setupJson.data.install).toMatchObject({
+      status: "completed",
+      package_manager: "npm",
+      command: "npm install",
+    });
+    expect(setupJson.data.next_commands).toEqual(["npm run dev"]);
+    const installLog = JSON.parse((await readFile(fakeNpm.logPath, "utf8")).trim()) as {
+      cwd: string;
+      args: string[];
+    };
+    expect(installLog).toEqual({ cwd: await realpath(cwd), args: ["install"] });
 
     // The user schema and flow are provisioned server-side when the project
     // is created, so setup does not write `.zitadel/schemas` or
@@ -122,20 +140,15 @@ describe("Next setup integration", () => {
 
   it("fails apply clearly for missing env refs", async () => {
     const cwd = await createNextProject();
-    await cli([
-      "setup",
-      "--cwd",
-      cwd,
-      "--non-interactive",
-      "--json",
-    ]);
+    await cli(["setup", "--cwd", cwd, "--non-interactive", "--json", "--skip-install"]);
 
     const flowWithEnvRef = {
       // Spec: `name` is the slug-pattern stable identifier; required fields
       // are [name, user_schema, purposes, steps]. `purposes` is a map
       // from purpose name to entry-point step name.
       name: "default",
-      user_schema: "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/human-user.yaml",
+      user_schema:
+        "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/human-user.yaml",
       purposes: { login: "identifier" },
       steps: [
         {
@@ -152,7 +165,10 @@ describe("Next setup integration", () => {
         },
       ],
     };
-    await writeFile(join(cwd, ".zitadel/flows/default.json"), JSON.stringify(flowWithEnvRef, null, 2));
+    await writeFile(
+      join(cwd, ".zitadel/flows/default.json"),
+      JSON.stringify(flowWithEnvRef, null, 2),
+    );
 
     const apply = await cli(["apply", "--cwd", cwd, "--json"]);
     expect(apply.exitCode).toBe(3);
@@ -160,10 +176,11 @@ describe("Next setup integration", () => {
     expect(applyJson.code).toBe("E_VALIDATION");
     expect(applyJson.message).toContain("Missing environment variables");
 
-    const applyWithEnv = await cli(["apply", "--cwd", cwd, "--json"], { MY_CAPTCHA_SECRET: "hunter2" });
+    const applyWithEnv = await cli(["apply", "--cwd", cwd, "--json"], {
+      MY_CAPTCHA_SECRET: "hunter2",
+    });
     expect(applyWithEnv.exitCode).toBe(0);
   });
-
 });
 
 async function createNextProject(): Promise<string> {
@@ -191,6 +208,27 @@ async function createNextProject(): Promise<string> {
     "export default function RootLayout({ children }: { children: React.ReactNode }) { return <html><body>{children}</body></html>; }\n",
   );
   return cwd;
+}
+
+async function fakePackageManager(name: "npm"): Promise<{ binDir: string; logPath: string }> {
+  const binDir = await mkdtemp(join(tmpdir(), "zitadel-fake-pm-"));
+  const logPath = join(binDir, "package-manager.log");
+  const binPath = join(binDir, name);
+  await writeFile(
+    binPath,
+    `#!/usr/bin/env node
+const fs = require("node:fs");
+fs.appendFileSync(
+  process.env.PACKAGE_MANAGER_LOG,
+  JSON.stringify({ cwd: process.cwd(), args: process.argv.slice(2) }) + "\\n",
+);
+process.stdout.write("fake npm stdout\\n");
+process.stderr.write("fake npm stderr\\n");
+process.exit(0);
+`,
+  );
+  await chmod(binPath, 0o755);
+  return { binDir, logPath };
 }
 
 async function fakeDocker(): Promise<{ binDir: string; logPath: string }> {
