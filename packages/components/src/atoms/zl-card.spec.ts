@@ -28,4 +28,32 @@ describe("zl-card", () => {
     expect(footer?.classList.contains("zr-card__region--empty")).toBe(true);
     expect(footer?.getBoundingClientRect().height).toBe(0);
   });
+
+  it("applies the compact modifier class", async () => {
+    const el = document.createElement("zl-card") as ZlCard;
+    el.compact = true;
+    document.body.append(el);
+    await el.updateComplete;
+    expect(el.shadowRoot?.querySelector(".zr-card")?.classList.contains("zr-card--compact")).toBe(
+      true,
+    );
+  });
+
+  it("reacts to a header slotted after first render (slotchange)", async () => {
+    const el = document.createElement("zl-card") as ZlCard;
+    document.body.append(el);
+    await el.updateComplete;
+
+    const heading = document.createElement("h1");
+    heading.setAttribute("slot", "header");
+    heading.textContent = "Sign in";
+    el.appendChild(heading);
+    // slotchange -> requestUpdate is async; flush the slotchange microtask,
+    // then wait for the re-render to commit.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await el.updateComplete;
+
+    const header = el.shadowRoot?.querySelector(".zr-card__header");
+    expect(header?.classList.contains("zr-card__region--empty")).toBe(false);
+  });
 });

@@ -1,4 +1,4 @@
-import { getZitadelConfig, getApi, type ZitadelProject } from "@zitadel/api/config";
+import { type ZitadelProject } from "@zitadel/api/config";
 import type {
   CreateFlow201,
   CreateFlow201Step,
@@ -18,17 +18,20 @@ import {
   startFlow as apiStartFlow,
   submitStep as apiSubmitStep,
 } from "./api-client.js";
+import { resolveApi } from "./resolve-api.js";
 import type { Branding } from "./branding.js";
 import { applyBaseTokens, applyBrandingTokens } from "./branding-to-tokens.js";
 import { validateBranding } from "./branding-validator.js";
 import { applyFontUrl } from "./font-loader.js";
+import { emit } from "../internal/emit.js";
+import { escapeHtml } from "../internal/escape-html.js";
 import { createLiquidEngine } from "./liquid.js";
 import { TEMPLATE_NAMES } from "./template-names.js";
 import { en, builtinLocales, type Locale } from "./locales/index.js";
 import { patchMandatoryGates } from "./mandatory-gates.js";
 import { zitadelAttributionPillInnerHtml } from "@zitadel/shared-component-styles/attribution-markup";
 import { createSanitiser } from "./sanitiser.js";
-import type { FlowError, LiquidContext } from "./template-context.js";
+import type { FlowError, FlowIdentity, LiquidContext } from "./template-context.js";
 import layoutChromeCss from "./templates/layout-chrome.css?inline";
 import { ThemeController } from "./theme-controller.js";
 
@@ -241,11 +244,24 @@ export class ZitadelLogin extends LitElement {
   override updated(changed: PropertyValues<this>): void {
     const props = changed as Map<string, unknown>;
     if (!props.has("response")) return;
-    // Step markup exists only after this commit; defer field hydration/focus.
-    requestAnimationFrame(() => {
-      this.applyValuesToFields();
-      this.moveFocusToFirstField();
-    });
+    void this.hydrateStepAfterRender();
+  }
+
+  /**
+   * Apply captured values and move focus once the new step has fully
+   * rendered. This commit produces the step's `zl-field`/`zl-button` atoms,
+   * but those render their own shadow DOM on a later microtask — so await
+   * this element's update *and* the child atoms' first render before touching
+   * them, rather than guessing a frame with `requestAnimationFrame`.
+   */
+  private async hydrateStepAfterRender(): Promise<void> {
+    await this.updateComplete;
+    const atoms = this.shadowRoot?.querySelectorAll<LitElement>("zl-field, zl-button");
+    if (atoms) {
+      await Promise.all(Array.from(atoms).map((atom) => atom.updateComplete));
+    }
+    this.applyValuesToFields();
+    this.moveFocusToFirstField();
   }
 
   override render() {
@@ -275,6 +291,10 @@ export class ZitadelLogin extends LitElement {
    * Figma sign-in frame where the pill sits 24px below the card, both
    * centred on the page). It can't be a sibling of the page-shell because
    * the page-shell already occupies the full viewport height.
+   *
+   * This markup is appended AFTER `renderStep` has sanitised the Liquid
+   * output, so it is not run through DOMPurify. It is orchestrator-owned and
+   * any tenant-supplied values (`custom_link`) are escaped via `escapeHtml`.
    */
   private injectAttribution(rendered: string): string {
     const html = this.renderAttributionHtml();
@@ -300,42 +320,31 @@ export class ZitadelLogin extends LitElement {
       return "";
     }
     if (custom) {
-      const safeHref = String(custom.href).replace(/"/g, "&quot;");
-      const safeLabel = String(custom.label)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;");
+      const safeHref = escapeHtml(String(custom.href));
+      const safeLabel = escapeHtml(String(custom.label));
       return `<div slot="footer" part="attribution" class="zl-attribution"><zl-pill tone="neutral" href="${safeHref}">${safeLabel}</zl-pill></div>`;
     }
     return `<div slot="footer" part="attribution" class="zl-attribution"><zl-pill tone="neutral" href="https://zitadel.com" part="attribution-pill" aria-label="Secured with Zitadel">${zitadelAttributionPillInnerHtml()}</zl-pill></div>`;
   }
 
   private async startFlow(): Promise<void> {
-    const cfg = this.project ?? getZitadelConfig();
-
-    // Resolve project ID from handle.
-    const projectId = cfg?.projectId || "";
-
-    if (!cfg) {
-      throw new Error(
-        "<zitadel-login> requires a `config` prop (from configureZitadel()) or configureZitadel() must be called before use.",
-      );
-    }
-    const api = getApi(cfg);
-
     this.loading = true;
     this.startupError = null;
     try {
+      // Resolve inside the try so a missing configuration surfaces through
+      // `handleTransportError` (rendered as `startupError`) rather than as an
+      // unhandled promise rejection from `firstUpdated`'s microtask.
+      const { project: cfg, api } = resolveApi(this.project, "<zitadel-login>");
       let wire: CreateFlow201;
       if (this.resumeFlowId) {
         wire = await getCurrentStep(api, this.resumeFlowId);
       } else {
-        if (!projectId) {
+        if (!cfg.projectId) {
           throw new Error(
-            "<zitadel-login> requires a `project-id` attribute (or configureZitadel()) to start a flow.",
+            "<zitadel-login> requires a project id (configureZitadel({ projectId }) or a `project` handle) to start a flow.",
           );
         }
-        wire = await apiStartFlow(api, { project_id: projectId, purpose: this.purpose });
+        wire = await apiStartFlow(api, { project_id: cfg.projectId, purpose: this.purpose });
       }
       this.applyResponse(wire);
     } catch (error) {
@@ -375,18 +384,12 @@ export class ZitadelLogin extends LitElement {
     const behavior = response.step.complete;
     if (!behavior) return;
 
-    this.dispatchEvent(
-      new CustomEvent("zitadel-flow-complete", {
-        bubbles: true,
-        composed: true,
-        detail: {
-          behavior,
-          redirect_uri: response.redirect_uri,
-          handoff_token: response.handoff_token,
-          handoff_token_expires_at: response.handoff_token_expires_at,
-        },
-      }),
-    );
+    emit(this, "zitadel-flow-complete", {
+      behavior,
+      redirect_uri: response.redirect_uri,
+      handoff_token: response.handoff_token,
+      handoff_token_expires_at: response.handoff_token_expires_at,
+    });
 
     if (typeof window === "undefined") return;
     if (behavior === "redirect" && response.redirect_uri) {
@@ -398,9 +401,7 @@ export class ZitadelLogin extends LitElement {
     if (behavior === "show" && handoffToken && this.postSignInUrl) {
       this.loading = true;
       try {
-        const cfg = this.project ?? getZitadelConfig();
-        if (!cfg) throw new Error("<zitadel-login> config is required for exchange.");
-        const api = getApi(cfg);
+        const { project: cfg, api } = resolveApi(this.project, "<zitadel-login>");
         await exchangeSession(api, { handoff_token: handoffToken }, { project_id: cfg.projectId });
         window.location.assign(this.postSignInUrl);
       } catch (error) {
@@ -473,7 +474,7 @@ export class ZitadelLogin extends LitElement {
    * identifier step; display name composes from `given_name` /
    * `family_name` when the register step ran.
    */
-  private deriveIdentity(): import("./template-context.js").FlowIdentity | null {
+  private deriveIdentity(): FlowIdentity | null {
     const email = this.formValues.email?.trim();
     const given = this.formValues.given_name?.trim();
     const family = this.formValues.family_name?.trim();
@@ -505,13 +506,7 @@ export class ZitadelLogin extends LitElement {
     const { name, value } = event.detail;
     if (!name) return;
     this.formValues = { ...this.formValues, [name]: value };
-    this.dispatchEvent(
-      new CustomEvent("zitadel-flow-input", {
-        bubbles: true,
-        composed: true,
-        detail: { name, value },
-      }),
-    );
+    emit(this, "zitadel-flow-input", { name, value });
   };
 
   private handleAtomSubmit = (event: CustomEvent<{ action: string | null }>): void => {
@@ -603,11 +598,9 @@ export class ZitadelLogin extends LitElement {
   private moveFocusToFirstField(): void {
     const root = this.shadowRoot;
     if (!root) return;
-    requestAnimationFrame(() => {
-      const focusables = root.querySelectorAll<HTMLElement>("zl-field, zl-button");
-      const target = Array.from(focusables).find((el) => !el.hasAttribute("disabled"));
-      target?.focus();
-    });
+    const focusables = root.querySelectorAll<HTMLElement>("zl-field, zl-button");
+    const target = Array.from(focusables).find((el) => !el.hasAttribute("disabled"));
+    target?.focus();
   }
 
   private async submit(
@@ -635,18 +628,10 @@ export class ZitadelLogin extends LitElement {
         fields,
         ...(challengeResponse ? { challenge_response: challengeResponse } : {}),
       };
-      const cfg = this.project ?? getZitadelConfig();
-      if (!cfg) throw new Error("<zitadel-login> config is required for submit.");
-      const api = getApi(cfg);
+      const { api } = resolveApi(this.project, "<zitadel-login>");
       const wire = await apiSubmitStep(api, id, body);
       this.applyResponse(wire);
-      this.dispatchEvent(
-        new CustomEvent("zitadel-flow-step", {
-          bubbles: true,
-          composed: true,
-          detail: { step: wire.step },
-        }),
-      );
+      emit(this, "zitadel-flow-step", { step: wire.step });
     } catch (error) {
       this.handleTransportError(error);
     } finally {
@@ -659,13 +644,7 @@ export class ZitadelLogin extends LitElement {
       error instanceof Error ? error.message : "Unexpected error contacting the Flow API.";
     this.startupError = message;
     console.error("[zitadel-login]", error);
-    this.dispatchEvent(
-      new CustomEvent("zitadel-flow-error", {
-        bubbles: true,
-        composed: true,
-        detail: { message },
-      }),
-    );
+    emit(this, "zitadel-flow-error", { message });
   }
 }
 

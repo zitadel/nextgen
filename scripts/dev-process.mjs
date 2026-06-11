@@ -1,4 +1,6 @@
 import { spawn } from "node:child_process";
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 
 export function run(command, args = [], options = {}) {
   return new Promise((resolve, reject) => {
@@ -90,6 +92,10 @@ export function formatCommand(command, args = []) {
 
 export function forwardedArgs(args = process.argv.slice(2)) {
   return args[0] === "--" ? args.slice(1) : args;
+}
+
+export function isDirectRun(moduleUrl, argv = process.argv) {
+  return Boolean(argv[1] && moduleUrl === pathToFileURL(resolve(argv[1])).href);
 }
 
 function shellQuote(value) {

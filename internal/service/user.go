@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"time"
 
 	"github.com/ianlancetaylor/jsonschema"
+	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/maputil"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -19,29 +21,49 @@ type CreateUserInput struct {
 	User      map[string]any
 }
 
+type SetPasswordInput struct {
+	ProjectID                string
+	UserID                   string
+	Password                 string
+	IsPasswordChangeRequired bool
+}
+
 type GetUserInput struct {
 	ProjectID string
 	TeamID    *string
 	UserID    string
 }
 
+type GetMyUserInput struct {
+	SessionToken string
+}
+
 // ---- Implementation -------------------------------------------------------------
 
 type UserService struct {
-	pool       database.Pool
-	userRepo   domain.UserRepository
-	schemaRepo domain.JSONSchemaRepository
+	pool         database.Pool
+	userRepo     domain.UserRepository
+	passwordRepo domain.UserPasswordRepository
+	schemaRepo   domain.JSONSchemaRepository
+	decrypter    crypto.Decrypter
+	hasher       crypto.Hasher
 }
 
 func NewUserService(
 	pool database.Pool,
 	userRepo domain.UserRepository,
+	passwordRepo domain.UserPasswordRepository,
 	schemaRepo domain.JSONSchemaRepository,
+	decrypter crypto.Decrypter,
+	hasher crypto.Hasher,
 ) *UserService {
 	return &UserService{
-		pool:       pool,
-		userRepo:   userRepo,
-		schemaRepo: schemaRepo,
+		pool:         pool,
+		userRepo:     userRepo,
+		passwordRepo: passwordRepo,
+		schemaRepo:   schemaRepo,
+		hasher:       hasher,
+		decrypter:    decrypter,
 	}
 }
 
@@ -120,4 +142,74 @@ func (s *UserService) GetUserByID(ctx context.Context, input GetUserInput) (map[
 
 	user["id"] = flatUser.ID
 	return user, nil
+}
+
+func (s *UserService) SetPassword(ctx context.Context, input SetPasswordInput) (err error) {
+	hash, err := domain.HashPassword(input.Password, s.hasher)
+	if err != nil {
+		return err
+	}
+
+	tx, err := s.pool.Begin(ctx, nil)
+	if err != nil {
+		return domain.ErrInternal(err).WithMessage("failed to create transaction")
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback(ctx)
+		}
+	}()
+
+	err = s.passwordRepo.DeleteByUserID(ctx, tx, input.ProjectID, input.UserID)
+	if err != nil {
+		return domain.ErrInternal(err).WithMessage("failed to remove old password from database")
+	}
+
+	err = s.passwordRepo.Create(ctx, tx, &domain.CreateUserPassword{
+		ProjectID:      input.ProjectID,
+		UserID:         input.UserID,
+		EncodedHash:    hash,
+		ChangeRequired: input.IsPasswordChangeRequired,
+		VerificationID: nil, // TODO what should I do with this?
+	})
+	if err != nil {
+		if _, ok := errors.AsType[*database.ForeignKeyError](err); ok {
+			return domain.ErrUserNotFound()
+		}
+		return domain.ErrInternal(err).WithMessage("failed to set initial password")
+	}
+
+	err = tx.Commit(ctx)
+	if err != nil {
+		return domain.ErrInternal(err).WithMessage("failed to commit transaction while setting password")
+	}
+	return nil
+}
+
+func (s *UserService) GetMyUser(ctx context.Context, input GetMyUserInput) ([]byte, error) {
+	sessionToken, err := domain.DecryptSessionTokenString(input.SessionToken, s.decrypter)
+	if err != nil {
+		return nil, domain.ErrSessionTokenInvalid()
+	}
+	if time.Now().After(sessionToken.ExpiresAt) {
+		return nil, domain.ErrSessionTokenInvalid()
+	}
+	if sessionToken.UserID == nil {
+		return nil, domain.ErrUserNotFound()
+	}
+
+	user, err := s.userRepo.GetByID(ctx, s.pool, sessionToken.ProjectID, nil, *sessionToken.UserID)
+	if err != nil {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+			return nil, domain.ErrUserNotFound()
+		}
+		return nil, domain.ErrInternal(err).WithMessage("failed to get user from database")
+	}
+
+	userbs, err := json.Marshal(user)
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to serialize user")
+	}
+
+	return userbs, nil
 }

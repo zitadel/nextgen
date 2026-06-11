@@ -709,8 +709,113 @@ func TestListFlowDefinitions(t *testing.T) {
 					assert.Equal(t, flowDef.ProjectID, actualFlowDefsMap[flowDef.Name].ProjectID)
 					continue
 				}
-				assert.Equal(t, expectedFlowDefsMap[flowDef.Name], actualFlowDefsMap[flowDef.Name])
+				assert.Equal(t, expectedFlowDefsMap[flowDef.Name].ID, actualFlowDefsMap[flowDef.Name].ID)
+				assert.Equal(t, expectedFlowDefsMap[flowDef.Name].Name, actualFlowDefsMap[flowDef.Name].Name)
+				assert.Equal(t, expectedFlowDefsMap[flowDef.Name].ProjectID, actualFlowDefsMap[flowDef.Name].ProjectID)
+				assert.Equal(t, expectedFlowDefsMap[flowDef.Name].Status, actualFlowDefsMap[flowDef.Name].Status)
 			}
+		})
+	}
+}
+
+func TestDeleteFlowDefinitionUnauthenticated(t *testing.T) {
+	t.Parallel()
+	client := harness.EnsureAnonymousAPIClient(t)
+	resp, err := client.DeleteFlowDefinition(t.Context(), api.DeleteFlowDefinitionParams{
+		ID:        "flowDef_1234",
+		ProjectID: "proj_1234",
+	})
+	require.NoError(t, err)
+	expectedResp := &api.ErrorDetailsStatusCode{
+		StatusCode: http.StatusUnauthorized,
+		Response: api.ErrorDetails{
+			Code:    "auth.unauthorized",
+			Message: `operation DeleteFlowDefinition: security "OAuth2": security requirement is not satisfied`,
+		},
+	}
+	assert.Equal(t, expectedResp, resp)
+}
+
+func TestDeleteFlowDefinition(t *testing.T) {
+	t.Parallel()
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+	require.NoError(t, err)
+	harness.CreateUserSchema(t, project.ID, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
+	u := "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml"
+	userSchemaURI, err := url.Parse(u)
+	require.NoError(t, err)
+
+	createResp, err := harness.EnsureAPIClient(t, project.ID).CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+		ProjectID: api.ProjectID(project.ID),
+		FlowDefinition: api.FlowDefinition{
+			Name:       "existing-flow",
+			UserSchema: *userSchemaURI,
+			Purposes:   map[string]string{"login": "step_1"},
+			Audience: api.OptFlowAudience{
+				Value: api.FlowAudience{
+					TeamIds: []string{"team-1", "team-2"},
+					AppIds:  []string{"app-1", "app-2"},
+				},
+				Set: true,
+			},
+			Steps: validSteps(),
+		},
+	})
+	flowDef, ok := createResp.(*api.FlowDefinitionDetailResponse)
+	require.True(t, ok)
+
+	tests := []struct {
+		name     string
+		req      api.DeleteFlowDefinitionParams
+		wantResp api.DeleteFlowDefinitionRes
+	}{
+		{
+			name: "delete flow definition succeeds",
+			req: api.DeleteFlowDefinitionParams{
+				ID:        flowDef.ID,
+				ProjectID: api.ProjectID(project.ID),
+			},
+			wantResp: &api.DeleteFlowDefinitionNoContent{},
+		},
+		{
+			name: "delete non-existing flow definition",
+			req: api.DeleteFlowDefinitionParams{
+				ID:        "non-existing-id",
+				ProjectID: api.ProjectID(project.ID),
+			},
+			wantResp: &api.DeleteFlowDefinitionNoContent{},
+		},
+		{
+			name: "invalid project id",
+			req: api.DeleteFlowDefinitionParams{
+				ID:        "non-existing-id",
+				ProjectID: "invalid-project-id",
+			},
+			wantResp: &api.DeleteFlowDefinitionNoContent{},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			client := harness.EnsureAPIClient(t, project.ID)
+			resp, err := client.DeleteFlowDefinition(t.Context(), tt.req)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wantResp, resp)
+
+			// if the flow definition is deleted, the get request should return a not found error
+			getResp, err := client.GetFlowDefinition(t.Context(), api.GetFlowDefinitionParams{
+				ID:        tt.req.ID,
+				ProjectID: tt.req.ProjectID,
+			})
+			assert.NoError(t, err)
+			expectedGetResp := &api.ErrorDetailsStatusCode{
+				StatusCode: http.StatusNotFound,
+				Response: api.ErrorDetails{
+					Code:    "flowdef.not_found",
+					Message: "flow definition: not found",
+				},
+			}
+			assert.Equal(t, expectedGetResp, getResp)
 		})
 	}
 }

@@ -35,6 +35,7 @@
     },
     "name": {
       "type": "string",
+      "maxLength": 50,
       "description": "The user's name."
     },
     "phoneNumber": {
