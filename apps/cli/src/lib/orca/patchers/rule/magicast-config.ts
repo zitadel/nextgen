@@ -1,3 +1,5 @@
+import { parseModule } from "magicast";
+
 import { ZitadelError } from "../../../errors";
 
 /**
@@ -5,6 +7,30 @@ import { ZitadelError } from "../../../errors";
  * They navigate a module's default export — they carry no framework knowledge
  * beyond "find the config object literal" and "is this import present".
  */
+
+/**
+ * Parses a config file with magicast, throwing a clean `E_VALIDATION` (instead
+ * of a raw parse error) when the source is missing or unparseable. `filename` is
+ * only used in the error message, so each patcher can name its own config file.
+ */
+export function parseConfigModule(
+  source: string | undefined,
+  filename: string,
+): ReturnType<typeof parseModule> {
+  if (source === undefined) {
+    throw new ZitadelError("E_VALIDATION", `Cannot edit ${filename}: file not found`, {
+      hint: `Run setup from a project that has ${filename}.`,
+    });
+  }
+  try {
+    return parseModule(source);
+  } catch (error) {
+    throw new ZitadelError("E_VALIDATION", `Could not parse ${filename}`, {
+      hint: `Ensure ${filename} is valid, or apply the Zitadel changes manually.`,
+      details: { cause: error instanceof Error ? error.message : String(error) },
+    });
+  }
+}
 
 /**
  * Reaches the object literal of a module's default export — the argument of

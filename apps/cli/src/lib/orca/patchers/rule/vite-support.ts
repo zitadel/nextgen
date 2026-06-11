@@ -1,9 +1,8 @@
-import { builders, generateCode, parseModule } from "magicast";
+import { builders, generateCode } from "magicast";
 
-import { ZitadelError } from "../../../errors";
 import { configCandidates } from "./config-paths";
 import type { FileOp } from "./file-writer/types";
-import { importIsPresent, resolveDefaultExportObject } from "./magicast-config";
+import { importIsPresent, parseConfigModule, resolveDefaultExportObject } from "./magicast-config";
 import { PROXY_PATH } from "./proxy";
 
 /**
@@ -61,20 +60,7 @@ export const PROXY_IMPORT = {
  */
 export function viteProxyEdit(serverPort: number): (source: string | undefined) => string {
   return (source) => {
-    if (source === undefined) {
-      throw new ZitadelError("E_VALIDATION", "Cannot merge Vite config: vite.config.ts not found", {
-        hint: "Run setup from a Vite project, or create vite.config.ts first.",
-      });
-    }
-    let mod: ReturnType<typeof parseModule>;
-    try {
-      mod = parseModule(source);
-    } catch (error) {
-      throw new ZitadelError("E_VALIDATION", "Could not parse vite.config.ts", {
-        hint: "Ensure vite.config.ts is valid, or add the /__nextgen server.proxy block manually.",
-        details: { cause: error instanceof Error ? error.message : String(error) },
-      });
-    }
+    const mod = parseConfigModule(source, "vite.config.ts");
     const config = resolveDefaultExportObject(mod, "vite.config.ts");
     if (config.server === undefined) {
       config.server = {};

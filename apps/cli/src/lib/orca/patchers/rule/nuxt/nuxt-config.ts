@@ -1,9 +1,9 @@
-import { builders, generateCode, parseModule } from "magicast";
+import { builders, generateCode } from "magicast";
 
-import { ZitadelError } from "../../../../errors";
 import {
   ensureArrayItem,
   ensureEditableObject,
+  parseConfigModule,
   resolveDefaultExportObject,
 } from "../magicast-config";
 
@@ -22,20 +22,7 @@ export function nuxtConfigEdit(opts: {
   server: string;
 }): (source: string | undefined) => string {
   return (source) => {
-    if (source === undefined) {
-      throw new ZitadelError("E_VALIDATION", "Cannot edit Nuxt config: nuxt.config.ts not found", {
-        hint: "Run setup from a Nuxt project.",
-      });
-    }
-    let mod: ReturnType<typeof parseModule>;
-    try {
-      mod = parseModule(source);
-    } catch (error) {
-      throw new ZitadelError("E_VALIDATION", "Could not parse nuxt.config.ts", {
-        hint: "Ensure nuxt.config.ts is valid, or add the @zitadel/sdk-nuxt config manually.",
-        details: { cause: error instanceof Error ? error.message : String(error) },
-      });
-    }
+    const mod = parseConfigModule(source, "nuxt.config.ts");
     const config = resolveDefaultExportObject(mod, "nuxt.config.ts");
 
     ensureArrayItem(config, "modules", NUXT_MODULE);

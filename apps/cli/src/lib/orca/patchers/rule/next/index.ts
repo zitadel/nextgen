@@ -69,24 +69,23 @@ export class NextPatcher extends AbstractRulePatcher {
  * cannot drift.
  */
 function nextCodeFilePaths(appDir: string, renderer: RendererSpec): ReadonlyArray<string> {
-  const paths = [join(appDir, "login/page.tsx"), join(appDir, "register/page.tsx")];
-  if (renderer.templates.profilePage) {
-    paths.push(join(appDir, "profile/page.tsx"));
-  }
-  paths.push(join(appDir, "../middleware.ts"));
-  if (renderer.templates.provider) {
-    paths.push(join(appDir, renderer.templates.provider.filename));
-  }
-  if (renderer.templates.customElementsDts) {
-    paths.push(join(appDir, "../custom-elements.d.ts"));
-  }
-  return paths;
+  return [
+    join(appDir, "login/page.tsx"),
+    join(appDir, "register/page.tsx"),
+    renderer.templates.profilePage ? join(appDir, "profile/page.tsx") : undefined,
+    join(appDir, "../middleware.ts"),
+    renderer.templates.provider ? join(appDir, renderer.templates.provider.filename) : undefined,
+    renderer.templates.customElementsDts ? join(appDir, "../custom-elements.d.ts") : undefined,
+  ].filter((path): path is string => path !== undefined);
 }
 
 /** The Next route/middleware write ops plus the SDK dependency. */
 function nextCodeOps(ctx: PatchContext, renderer: RendererSpec): FileOp[] {
   const appDir = ctx.framework.appDir;
-  const ops: FileOp[] = [
+  const profile = renderer.templates.profilePage?.();
+  const provider = renderer.templates.provider;
+  const dts = renderer.templates.customElementsDts?.();
+  return [
     {
       kind: "write",
       path: join(appDir, "login/page.tsx"),
@@ -97,30 +96,22 @@ function nextCodeOps(ctx: PatchContext, renderer: RendererSpec): FileOp[] {
       path: join(appDir, "register/page.tsx"),
       contents: renderer.templates.authPage("register").contents,
     },
-  ];
-  const profile = renderer.templates.profilePage?.();
-  if (profile) {
-    ops.push({ kind: "write", path: join(appDir, "profile/page.tsx"), contents: profile.contents });
-  }
-  ops.push({ kind: "write", path: join(appDir, "../middleware.ts"), contents: middlewareTemplate });
-  const provider = renderer.templates.provider;
-  if (provider) {
-    ops.push({ kind: "write", path: join(appDir, provider.filename), contents: provider.contents });
-  }
-  const dts = renderer.templates.customElementsDts?.();
-  if (dts) {
-    ops.push({
-      kind: "write",
-      path: join(appDir, "../custom-elements.d.ts"),
-      contents: dts.contents,
-    });
-  }
-  ops.push({
-    kind: "add-dep",
-    name: renderer.dependency.name,
-    version: dependencyVersionForCli(ctx.cliVersion, renderer.dependency.version),
-  });
-  return ops;
+    profile
+      ? { kind: "write", path: join(appDir, "profile/page.tsx"), contents: profile.contents }
+      : undefined,
+    { kind: "write", path: join(appDir, "../middleware.ts"), contents: middlewareTemplate },
+    provider
+      ? { kind: "write", path: join(appDir, provider.filename), contents: provider.contents }
+      : undefined,
+    dts
+      ? { kind: "write", path: join(appDir, "../custom-elements.d.ts"), contents: dts.contents }
+      : undefined,
+    {
+      kind: "add-dep",
+      name: renderer.dependency.name,
+      version: dependencyVersionForCli(ctx.cliVersion, renderer.dependency.version),
+    },
+  ].filter((op): op is FileOp => op !== undefined);
 }
 
 function dependencyVersionForCli(cliVersion: string, fallback: string): string {
