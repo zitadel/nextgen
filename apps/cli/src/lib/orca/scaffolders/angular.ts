@@ -5,8 +5,10 @@ import { AbstractCLIScaffolder } from "./cli";
 
 /**
  * Scaffolds a new Angular app with the Angular CLI, then removes the starter
- * `app.ts`/`app.html` root component so the patcher can write the managed ones
- * without colliding with boilerplate. Requires a Node version Angular supports
+ * `app.ts`/`app.html` root component (and its now-unreferenced `app.css`) so the
+ * patcher can write the managed ones without colliding with boilerplate. The
+ * managed component uses only `templateUrl`, so `app.css` would otherwise be a
+ * dangling file eject never cleans up. Requires a Node version Angular supports
  * (Angular 22 needs Node ^22.22.3 || ^24.15.0 || >=26).
  */
 export class AngularScaffolder extends AbstractCLIScaffolder {
@@ -30,5 +32,6 @@ export class AngularScaffolder extends AbstractCLIScaffolder {
     );
     await rm(join(cwd, "src/app/app.ts"), { force: true });
     await rm(join(cwd, "src/app/app.html"), { force: true });
+    await rm(join(cwd, "src/app/app.css"), { force: true });
   }
 }
