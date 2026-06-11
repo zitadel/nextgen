@@ -308,10 +308,7 @@ func loadConfig(configPath string) (Config, error) {
 	v.SetDefault("instrumentation.log.add_source", true)
 	v.SetDefault("instrumentation.log.errors.report_location", true)
 	v.SetDefault("instrumentation.log.errors.stack_trace", true)
-	//v.SetDefault("instrumentation.log.exporter.type", zotel.ExporterTypeStdOut)
 	v.SetDefault("instrumentation.trace.fraction", 1.0)
-	v.SetDefault("instrumentation.trace.exporter.type", zotel.ExporterTypeStdOut)
-	//v.SetDefault("instrumentation.metric.exporter.type", zotel.ExporterTypeStdOut)
 
 	// AutomaticEnv only resolves nested keys viper already knows about
 	// (via default, config file, fields of config struct or explicit BindEnv).
