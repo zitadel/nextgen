@@ -119,7 +119,14 @@ describe("check-alpha-release-plan script", () => {
         "        with:",
         "          createGithubReleases: false",
         "      - run: |",
-        "          node scripts/release-alpha-train.mjs prepare | tee dist/alpha-release.env",
+        "          node scripts/release-alpha-train.mjs status --published \"$PUBLISHED\" --remote false",
+        "      - if: ${{ steps.alpha-status.outputs.should_complete == 'true' }}",
+        "        run: |",
+        "          node scripts/release-alpha-train.mjs prepare --published \"$PUBLISHED\" --out-dir dist/alpha-release | tee dist/alpha-release.env",
+        "      - if: ${{ steps.alpha.outputs.create_tag == 'true' }}",
+        "        run: git tag \"$TAG\"",
+        "      - if: ${{ steps.alpha.outputs.run_goreleaser == 'true' }}",
+        "        run: goreleaser release --clean",
         "      - run: gh release edit \"$TAG\" --prerelease --latest=false",
         "",
       ].join("\n"),
@@ -128,6 +135,37 @@ describe("check-alpha-release-plan script", () => {
     await expect(
       checkAlphaReleasePlanModule.checkAlphaReleasePlan({ cwd, statusPath }),
     ).rejects.toThrow("must write alpha release notes outside the checkout");
+  });
+
+  it("rejects workflow steps gated only on the current Changesets publish result", async () => {
+    const { cwd, statusPath } = await fixtureRepo({
+      releaseWorkflow: [
+        "jobs:",
+        "  release:",
+        "    steps:",
+        "      - uses: changesets/action@v1",
+        "        with:",
+        "          createGithubReleases: false",
+        "      - run: |",
+        "          alpha_env=\"$RUNNER_TEMP/alpha-release.env\"",
+        "          node scripts/release-alpha-train.mjs status --published \"$PUBLISHED\" --remote false",
+        "      - if: ${{ steps.alpha-status.outputs.should_complete == 'true' }}",
+        "        run: |",
+        "          node scripts/release-alpha-train.mjs prepare --published \"$PUBLISHED\" --out-dir \"$RUNNER_TEMP/alpha-release\" | tee \"$alpha_env\"",
+        "          cat \"$alpha_env\" >> \"$GITHUB_OUTPUT\"",
+        "      - if: ${{ steps.alpha.outputs.create_tag == 'true' }}",
+        "        run: git tag \"$TAG\"",
+        "      - if: ${{ steps.alpha.outputs.run_goreleaser == 'true' }}",
+        "        run: goreleaser release --clean",
+        "      - if: ${{ steps.changesets.outputs.published == 'true' }}",
+        "        run: gh release edit \"$TAG\" --prerelease --latest=false",
+        "",
+      ].join("\n"),
+    });
+
+    await expect(
+      checkAlphaReleasePlanModule.checkAlphaReleasePlan({ cwd, statusPath }),
+    ).rejects.toThrow("post-npm alpha train steps must not be gated only on Changesets publishing");
   });
 });
 
@@ -171,10 +209,19 @@ async function fixtureRepo(
         "      - uses: changesets/action@v1",
         "        with:",
         "          createGithubReleases: false",
-        "      - run: |",
+        "      - id: alpha-status",
+        "        run: |",
+        "          node scripts/release-alpha-train.mjs status --published \"$PUBLISHED\" --remote false",
+        "      - if: ${{ steps.alpha-status.outputs.should_complete == 'true' }}",
+        "        id: alpha",
+        "        run: |",
         "          alpha_env=\"$RUNNER_TEMP/alpha-release.env\"",
-        "          node scripts/release-alpha-train.mjs prepare --out-dir \"$RUNNER_TEMP/alpha-release\" | tee \"$alpha_env\"",
+        "          node scripts/release-alpha-train.mjs prepare --published \"$PUBLISHED\" --out-dir \"$RUNNER_TEMP/alpha-release\" | tee \"$alpha_env\"",
         "          cat \"$alpha_env\" >> \"$GITHUB_OUTPUT\"",
+        "      - if: ${{ steps.alpha.outputs.create_tag == 'true' }}",
+        "        run: git tag \"$TAG\"",
+        "      - if: ${{ steps.alpha.outputs.run_goreleaser == 'true' }}",
+        "        run: goreleaser release --clean",
         "      - run: gh release edit \"$TAG\" --prerelease --latest=false",
         "",
       ].join("\n"),

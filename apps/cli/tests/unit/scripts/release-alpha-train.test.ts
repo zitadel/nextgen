@@ -7,22 +7,36 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 type ReleaseAlphaTrainModule = {
   PUBLIC_PACKAGE_MANIFESTS: string[];
   PUBLIC_PACKAGE_NAMES: string[];
+  inspectAlphaReleaseTrain: (options: {
+    cwd: string;
+    execFile?: ExecFileMock;
+    published?: boolean | string;
+    remote?: boolean | string;
+  }) => Promise<{
+    shouldComplete: boolean;
+    skipReason?: string;
+  }>;
   prepareAlphaReleaseTrain: (options: {
     cwd: string;
     outDir?: string;
-    execFile?: (
-      command: string,
-      args: string[],
-      options: { cwd: string },
-    ) => Promise<{ stdout: string; stderr: string }>;
+    execFile?: ExecFileMock;
+    published?: boolean | string;
   }) => Promise<{
     version: string;
     tagName: string;
     title: string;
     image: string;
     notesPath: string;
+    shouldCreateTag: boolean;
+    shouldRunGoreleaser: boolean;
+    shouldUpdateRelease: boolean;
   }>;
 };
+type ExecFileMock = (
+  command: string,
+  args: string[],
+  options: { cwd: string },
+) => Promise<{ stdout: string; stderr: string }>;
 
 let releaseAlphaTrain: ReleaseAlphaTrainModule;
 const tempDirs: string[] = [];
@@ -46,11 +60,7 @@ describe("release-alpha-train script", () => {
   it("generates release notes for a lockstep alpha train", async () => {
     const cwd = await fixtureRepo();
     const outDir = join(cwd, "dist/alpha-release");
-    const execFile = vi.fn(async () => {
-      const error = new Error("missing tag") as Error & { code: number };
-      error.code = 1;
-      throw error;
-    });
+    const execFile = commandMock();
 
     const result = await releaseAlphaTrain.prepareAlphaReleaseTrain({ cwd, outDir, execFile });
 
@@ -58,9 +68,12 @@ describe("release-alpha-train script", () => {
     expect(result.tagName).toBe("v0.1.0-alpha.5");
     expect(result.title).toBe("ZITADEL Alpha 0.1.0-alpha.5");
     expect(result.image).toBe("ghcr.io/zitadel/nextgen:0.1.0-alpha.5");
+    expect(result.shouldCreateTag).toBe(true);
+    expect(result.shouldRunGoreleaser).toBe(true);
+    expect(result.shouldUpdateRelease).toBe(true);
     expect(execFile).toHaveBeenCalledWith(
       "git",
-      ["rev-parse", "--verify", "refs/tags/v0.1.0-alpha.5"],
+      ["rev-list", "-n", "1", "v0.1.0-alpha.5"],
       { cwd },
     );
 
@@ -79,11 +92,7 @@ describe("release-alpha-train script", () => {
     await expect(
       releaseAlphaTrain.prepareAlphaReleaseTrain({
         cwd,
-        execFile: async () => {
-          const error = new Error("missing tag") as Error & { code: number };
-          error.code = 1;
-          throw error;
-        },
+        execFile: commandMock(),
       }),
     ).rejects.toThrow("public package versions must be lockstep");
   });
@@ -94,24 +103,94 @@ describe("release-alpha-train script", () => {
     await expect(
       releaseAlphaTrain.prepareAlphaReleaseTrain({
         cwd,
-        execFile: async () => {
-          const error = new Error("missing tag") as Error & { code: number };
-          error.code = 1;
-          throw error;
-        },
+        execFile: commandMock(),
       }),
     ).rejects.toThrow("changesets fixed group must contain exactly the public alpha packages");
   });
 
-  it("rejects an existing Go release tag", async () => {
+  it("reuses an existing Go release tag when it points at the current commit", async () => {
+    const cwd = await fixtureRepo();
+
+    const result = await releaseAlphaTrain.prepareAlphaReleaseTrain({
+      cwd,
+      execFile: commandMock({ tagCommit: "head-commit" }),
+    });
+
+    expect(result.shouldCreateTag).toBe(false);
+    expect(result.shouldRunGoreleaser).toBe(true);
+  });
+
+  it("rejects an existing Go release tag when it points at another commit during publish recovery", async () => {
     const cwd = await fixtureRepo();
 
     await expect(
       releaseAlphaTrain.prepareAlphaReleaseTrain({
         cwd,
-        execFile: async () => ({ stdout: "tag", stderr: "" }),
+        execFile: commandMock({ tagCommit: "other-commit" }),
+        published: true,
       }),
-    ).rejects.toThrow("release tag v0.1.0-alpha.5 already exists");
+    ).rejects.toThrow("release tag v0.1.0-alpha.5 already exists at other-commit");
+  });
+
+  it("skips normal main pushes when the current version was already released from another commit", async () => {
+    const cwd = await fixtureRepo();
+
+    await expect(
+      releaseAlphaTrain.inspectAlphaReleaseTrain({
+        cwd,
+        execFile: commandMock({ tagCommit: "other-commit" }),
+        remote: false,
+      }),
+    ).resolves.toMatchObject({
+      shouldComplete: false,
+      skipReason: "version 0.1.0-alpha.5 was already released from other-commit",
+    });
+  });
+
+  it("skips GoReleaser when both the GitHub Release and container image already exist", async () => {
+    const cwd = await fixtureRepo();
+
+    const result = await releaseAlphaTrain.prepareAlphaReleaseTrain({
+      cwd,
+      execFile: commandMock({
+        tagCommit: "head-commit",
+        releaseExists: true,
+        imageExists: true,
+      }),
+    });
+
+    expect(result.shouldCreateTag).toBe(false);
+    expect(result.shouldRunGoreleaser).toBe(false);
+    expect(result.shouldUpdateRelease).toBe(true);
+  });
+
+  it("runs GoReleaser when the image exists but the GitHub Release is missing", async () => {
+    const cwd = await fixtureRepo();
+
+    const result = await releaseAlphaTrain.prepareAlphaReleaseTrain({
+      cwd,
+      execFile: commandMock({
+        tagCommit: "head-commit",
+        imageExists: true,
+      }),
+    });
+
+    expect(result.shouldCreateTag).toBe(false);
+    expect(result.shouldRunGoreleaser).toBe(true);
+  });
+
+  it("rejects a partial GitHub Release whose container image is missing", async () => {
+    const cwd = await fixtureRepo();
+
+    await expect(
+      releaseAlphaTrain.prepareAlphaReleaseTrain({
+        cwd,
+        execFile: commandMock({
+          tagCommit: "head-commit",
+          releaseExists: true,
+        }),
+      }),
+    ).rejects.toThrow("exists but ghcr.io/zitadel/nextgen:0.1.0-alpha.5 is missing");
   });
 });
 
@@ -154,4 +233,45 @@ async function fixtureRepo(
   );
 
   return cwd;
+}
+
+function commandMock(
+  options: {
+    headCommit?: string;
+    imageExists?: boolean;
+    releaseExists?: boolean;
+    tagCommit?: string;
+  } = {},
+): ExecFileMock {
+  const headCommit = options.headCommit ?? "head-commit";
+  return vi.fn(async (command: string, args: string[]) => {
+    if (command === "git" && args.join(" ") === "rev-parse HEAD") {
+      return { stdout: `${headCommit}\n`, stderr: "" };
+    }
+    if (command === "git" && args.join(" ") === "rev-list -n 1 v0.1.0-alpha.5") {
+      if (options.tagCommit) {
+        return { stdout: `${options.tagCommit}\n`, stderr: "" };
+      }
+      throw missingCommand();
+    }
+    if (command === "gh" && args[0] === "release" && args[1] === "view") {
+      if (options.releaseExists) {
+        return { stdout: '{"tagName":"v0.1.0-alpha.5"}\n', stderr: "" };
+      }
+      throw missingCommand();
+    }
+    if (command === "docker" && args[0] === "manifest" && args[1] === "inspect") {
+      if (options.imageExists) {
+        return { stdout: "{}\n", stderr: "" };
+      }
+      throw missingCommand();
+    }
+    throw new Error(`unexpected command: ${command} ${args.join(" ")}`);
+  });
+}
+
+function missingCommand(): Error & { code: number } {
+  const error = new Error("missing") as Error & { code: number };
+  error.code = 1;
+  return error;
 }

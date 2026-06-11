@@ -31,6 +31,7 @@ const dependencyFields = [
   "optionalDependencies",
 ];
 const unsupportedProtocol = /^(catalog|workspace):/;
+const alphaVersion = /^\d+\.\d+\.\d+-alpha\.\d+$/;
 const manifests = new Map();
 
 const tarballs = (await readdir(tarballsDir))
@@ -62,6 +63,8 @@ for (const expectedName of requiredPackageNames) {
     throw new Error(`missing tarball for ${expectedName}`);
   }
 }
+
+assertLockstepAlphaVersions(manifests);
 
 console.log(
   `verified ${manifests.size} installable tarballs; required packages present: ${[...requiredPackageNames].sort().join(", ")}`,
@@ -96,6 +99,22 @@ function assertInstallableManifest(tarball, manifest) {
         throw new Error(`${tarball} has unresolved ${field}.${name}: ${spec}`);
       }
     }
+  }
+}
+
+function assertLockstepAlphaVersions(manifests) {
+  const versions = new Set([...manifests.values()].map((manifest) => manifest.version));
+  if (versions.size !== 1) {
+    throw new Error(
+      `public package tarballs must use one lockstep alpha version: ${[...manifests.values()]
+        .map((manifest) => `${manifest.name}@${manifest.version}`)
+        .sort()
+        .join(", ")}`,
+    );
+  }
+  const version = [...versions][0];
+  if (!alphaVersion.test(version)) {
+    throw new Error(`public package tarballs must use an alpha train version: ${version}`);
   }
 }
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { execFile as execFileCallback } from "node:child_process";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
@@ -42,6 +42,59 @@ export async function prepareAlphaReleaseTrain(options = {}) {
   const execFileFn = options.execFile ?? execFile;
   const outDir = options.outDir ?? join(cwd, "dist/alpha-release");
 
+  const state = await inspectAlphaReleaseTrain({
+    cwd,
+    execFile: execFileFn,
+    readFile: readFileFn,
+    readdir: options.readdir ?? readdir,
+    published: options.published,
+    remote: options.remote,
+  });
+  if (state.skipReason) {
+    throw new Error(`alpha release train is not ready to complete: ${state.skipReason}`);
+  }
+  if (state.tagExists && !state.tagMatchesHead) {
+    throw new Error(
+      `release tag ${state.tagName} already exists at ${state.tagCommit}, not ${state.headCommit}`,
+    );
+  }
+  if (state.releaseExists && !state.imageExists) {
+    throw new Error(
+      `GitHub Release ${state.tagName} exists but ${state.image} is missing; recover that partial release manually before rerunning the alpha train`,
+    );
+  }
+
+  const { image, packages, tagName, title, version } = state;
+  const notes = renderAlphaReleaseNotes({ title, version, image, packages });
+  await mkdirFn(outDir, { recursive: true });
+  const notesPath = join(outDir, `zitadel-alpha-${version}-notes.md`);
+  await writeFileFn(notesPath, notes);
+
+  return {
+    version,
+    tagName,
+    title,
+    image,
+    notesPath,
+    packages,
+    shouldComplete: state.shouldComplete,
+    shouldCreateTag: state.shouldCreateTag,
+    shouldRunGoreleaser: state.shouldRunGoreleaser,
+    shouldUpdateRelease: state.shouldUpdateRelease,
+    tagExists: state.tagExists,
+    releaseExists: state.releaseExists,
+    imageExists: state.imageExists,
+  };
+}
+
+export async function inspectAlphaReleaseTrain(options = {}) {
+  const cwd = options.cwd ?? process.cwd();
+  const readFileFn = options.readFile ?? readFile;
+  const readdirFn = options.readdir ?? readdir;
+  const execFileFn = options.execFile ?? execFile;
+  const published = normalizeBoolean(options.published);
+  const remote = options.remote === undefined ? true : normalizeBoolean(options.remote);
+
   const packages = await readPublicPackageManifests(cwd, readFileFn);
   const config = JSON.parse(await readFileFn(join(cwd, ".changeset/config.json"), "utf8"));
   validateChangesetsFixedGroup(config);
@@ -58,18 +111,90 @@ export async function prepareAlphaReleaseTrain(options = {}) {
   const version = [...versions][0];
   validateAlphaVersion(version);
   const tagName = `v${version}`;
-  if (await tagExists(tagName, execFileFn, cwd)) {
-    throw new Error(`release tag ${tagName} already exists`);
-  }
-
   const image = `${SERVER_IMAGE_NAME}:${version}`;
   const title = `ZITADEL Alpha ${version}`;
-  const notes = renderAlphaReleaseNotes({ title, version, image, packages });
-  await mkdirFn(outDir, { recursive: true });
-  const notesPath = join(outDir, `zitadel-alpha-${version}-notes.md`);
-  await writeFileFn(notesPath, notes);
+  const activeChangesets = await activeChangesetFiles(cwd, readdirFn);
+  const headCommit = await gitOutput(execFileFn, cwd, ["rev-parse", "HEAD"]);
+  const tagCommit = await tagCommitFor(tagName, execFileFn, cwd);
+  const tagExists = Boolean(tagCommit);
+  const tagMatchesHead = tagCommit === headCommit;
 
-  return { version, tagName, title, image, notesPath, packages };
+  if (!published && activeChangesets.length > 0) {
+    return {
+      version,
+      tagName,
+      title,
+      image,
+      packages,
+      activeChangesets,
+      headCommit,
+      tagCommit,
+      tagExists,
+      tagMatchesHead,
+      releaseExists: false,
+      imageExists: false,
+      shouldComplete: false,
+      shouldCreateTag: false,
+      shouldRunGoreleaser: false,
+      shouldUpdateRelease: false,
+      skipReason: `pending changesets: ${activeChangesets.join(", ")}`,
+    };
+  }
+
+  if (!published && tagExists && !tagMatchesHead) {
+    return {
+      version,
+      tagName,
+      title,
+      image,
+      packages,
+      activeChangesets,
+      headCommit,
+      tagCommit,
+      tagExists,
+      tagMatchesHead,
+      releaseExists: false,
+      imageExists: false,
+      shouldComplete: false,
+      shouldCreateTag: false,
+      shouldRunGoreleaser: false,
+      shouldUpdateRelease: false,
+      skipReason: `version ${version} was already released from ${tagCommit}`,
+    };
+  }
+
+  if (tagExists && !tagMatchesHead) {
+    throw new Error(`release tag ${tagName} already exists at ${tagCommit}, not ${headCommit}`);
+  }
+
+  const releaseExists = remote ? await githubReleaseExists(tagName, execFileFn, cwd) : false;
+  const imageExists = remote ? await containerImageExists(image, execFileFn, cwd) : false;
+  if (releaseExists && !imageExists) {
+    throw new Error(
+      `GitHub Release ${tagName} exists but ${image} is missing; recover that partial release manually before rerunning the alpha train`,
+    );
+  }
+
+  const shouldRunGoreleaser = !(releaseExists && imageExists);
+  return {
+    version,
+    tagName,
+    title,
+    image,
+    packages,
+    activeChangesets,
+    headCommit,
+    tagCommit,
+    tagExists,
+    tagMatchesHead,
+    releaseExists,
+    imageExists,
+    shouldComplete: true,
+    shouldCreateTag: !tagExists,
+    shouldRunGoreleaser,
+    shouldUpdateRelease: true,
+    skipReason: "",
+  };
 }
 
 export async function readPublicPackageManifests(cwd, readFileFn = readFile) {
@@ -118,16 +243,7 @@ export function validateAlphaVersion(version) {
 }
 
 export async function tagExists(tagName, execFileFn = execFile, cwd = process.cwd()) {
-  try {
-    await execFileFn("git", ["rev-parse", "--verify", `refs/tags/${tagName}`], { cwd });
-    return true;
-  } catch (error) {
-    const code = error && typeof error === "object" ? error.code : undefined;
-    if (code === 1 || code === 128) {
-      return false;
-    }
-    throw error;
-  }
+  return Boolean(await tagCommitFor(tagName, execFileFn, cwd));
 }
 
 export function renderAlphaReleaseNotes({ title, version, image, packages }) {
@@ -168,9 +284,10 @@ export function renderAlphaReleaseNotes({ title, version, image, packages }) {
   return lines.join("\n");
 }
 
-export function parsePrepareArgs(args) {
-  if (args[0] !== "prepare") {
-    throw new Error("Usage: release-alpha-train.mjs prepare [--out-dir <path>]");
+export function parseAlphaReleaseArgs(args) {
+  const command = args[0];
+  if (command !== "prepare" && command !== "status") {
+    throw new Error("Usage: release-alpha-train.mjs <status|prepare> [--out-dir <path>] [--published <true|false>]");
   }
   const values = {};
   for (let index = 1; index < args.length; index += 1) {
@@ -186,11 +303,101 @@ export function parsePrepareArgs(args) {
     values[key] = value;
     index += 1;
   }
-  return values;
+  return { command, values };
 }
 
 function camelCase(value) {
   return value.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
+}
+
+async function activeChangesetFiles(cwd, readdirFn = readdir) {
+  let entries = [];
+  try {
+    entries = await readdirFn(join(cwd, ".changeset"), { withFileTypes: true });
+  } catch (error) {
+    if (isMissingPath(error)) {
+      return [];
+    }
+    throw error;
+  }
+  return entries
+    .filter((entry) => entry.isFile?.() ?? false)
+    .map((entry) => entry.name)
+    .filter((name) => name.endsWith(".md") && name !== "README.md")
+    .sort();
+}
+
+async function tagCommitFor(tagName, execFileFn = execFile, cwd = process.cwd()) {
+  try {
+    return await gitOutput(execFileFn, cwd, ["rev-list", "-n", "1", tagName]);
+  } catch (error) {
+    if (isExpectedMissingCommand(error)) {
+      return "";
+    }
+    throw error;
+  }
+}
+
+async function githubReleaseExists(tagName, execFileFn = execFile, cwd = process.cwd()) {
+  try {
+    await execFileFn("gh", ["release", "view", tagName, "--json", "tagName"], { cwd });
+    return true;
+  } catch (error) {
+    if (isExpectedMissingCommand(error)) {
+      return false;
+    }
+    throw error;
+  }
+}
+
+async function containerImageExists(image, execFileFn = execFile, cwd = process.cwd()) {
+  try {
+    await execFileFn("docker", ["manifest", "inspect", image], { cwd });
+    return true;
+  } catch (error) {
+    if (isExpectedMissingCommand(error)) {
+      return false;
+    }
+    throw error;
+  }
+}
+
+async function gitOutput(execFileFn, cwd, args) {
+  const result = await execFileFn("git", args, { cwd });
+  return String(result.stdout ?? "").trim();
+}
+
+function normalizeBoolean(value) {
+  return value === true || value === "true";
+}
+
+function isMissingPath(error) {
+  return error && typeof error === "object" && error.code === "ENOENT";
+}
+
+function isExpectedMissingCommand(error) {
+  const code = error && typeof error === "object" ? error.code : undefined;
+  return code === 1 || code === 128;
+}
+
+function printAlphaOutputs(result) {
+  console.log(`version=${result.version}`);
+  console.log(`tag=${result.tagName}`);
+  console.log(`title=${result.title}`);
+  console.log(`image=${result.image}`);
+  if (result.notesPath) {
+    console.log(`notes_path=${result.notesPath}`);
+  }
+  console.log(`should_complete=${String(result.shouldComplete)}`);
+  console.log(`create_tag=${String(result.shouldCreateTag)}`);
+  console.log(`run_goreleaser=${String(result.shouldRunGoreleaser)}`);
+  console.log(`update_release=${String(result.shouldUpdateRelease)}`);
+  console.log(`tag_exists=${String(result.tagExists)}`);
+  console.log(`release_exists=${String(result.releaseExists)}`);
+  console.log(`image_exists=${String(result.imageExists)}`);
+  if (result.skipReason) {
+    console.log(`skip_reason=${result.skipReason}`);
+  }
 }
 
 function isDirectRun(url) {
@@ -199,12 +406,12 @@ function isDirectRun(url) {
 
 if (isDirectRun(import.meta.url)) {
   try {
-    const result = await prepareAlphaReleaseTrain(parsePrepareArgs(process.argv.slice(2)));
-    console.log(`version=${result.version}`);
-    console.log(`tag=${result.tagName}`);
-    console.log(`title=${result.title}`);
-    console.log(`image=${result.image}`);
-    console.log(`notes_path=${result.notesPath}`);
+    const { command, values } = parseAlphaReleaseArgs(process.argv.slice(2));
+    const result =
+      command === "status"
+        ? await inspectAlphaReleaseTrain(values)
+        : await prepareAlphaReleaseTrain(values);
+    printAlphaOutputs(result);
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exit(1);

@@ -99,7 +99,17 @@ export async function validateReleaseTooling(cwd, readFileFn = readFileDefault) 
   );
   assertContains(
     releaseWorkflow,
-    "node scripts/release-alpha-train.mjs prepare",
+    "node scripts/release-alpha-train.mjs status --published \"$PUBLISHED\" --remote false",
+    "release-npm.yml must inspect alpha train recovery status without remote checks",
+  );
+  assertContains(
+    releaseWorkflow,
+    "steps.alpha-status.outputs.should_complete == 'true'",
+    "release-npm.yml must complete recoverable alpha trains even when npm publish is not rerun",
+  );
+  assertContains(
+    releaseWorkflow,
+    "node scripts/release-alpha-train.mjs prepare --published \"$PUBLISHED\"",
     "release-npm.yml must prepare the alpha train before GoReleaser",
   );
   assertContains(
@@ -111,6 +121,21 @@ export async function validateReleaseTooling(cwd, readFileFn = readFileDefault) 
     releaseWorkflow,
     'alpha_env="$RUNNER_TEMP/alpha-release.env"',
     "release-npm.yml must write alpha release outputs outside the checkout before GoReleaser --clean",
+  );
+  assertContains(
+    releaseWorkflow,
+    "steps.alpha.outputs.create_tag == 'true'",
+    "release-npm.yml must create the Go tag only when the alpha train needs it",
+  );
+  assertContains(
+    releaseWorkflow,
+    "steps.alpha.outputs.run_goreleaser == 'true'",
+    "release-npm.yml must skip GoReleaser when the alpha release and image already exist",
+  );
+  assertNotContains(
+    releaseWorkflow,
+    "if: ${{ steps.changesets.outputs.published == 'true' }}",
+    "post-npm alpha train steps must not be gated only on Changesets publishing in the current rerun",
   );
   assertContains(
     releaseWorkflow,
@@ -126,6 +151,12 @@ export async function validateReleaseTooling(cwd, readFileFn = readFileDefault) 
 
 function assertContains(input, expected, message) {
   if (!input.includes(expected)) {
+    throw new Error(message);
+  }
+}
+
+function assertNotContains(input, expected, message) {
+  if (input.includes(expected)) {
     throw new Error(message);
   }
 }

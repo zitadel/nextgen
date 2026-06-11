@@ -14,7 +14,7 @@ import {
   writeRuntimeMetadata,
   type RuntimeMetadata,
 } from "../../../src/lib/local-server/runtime";
-import { parseJson, runCliForTest } from "../../helpers/run-cli";
+import { expectedPublicCliCommand, parseJson, runCliForTest } from "../../helpers/run-cli";
 
 const tempDirs: string[] = [];
 const servers: Server[] = [];
@@ -147,8 +147,8 @@ describe("local runtime commands", () => {
     };
     expect(envelope.status).toBe("error");
     expect(envelope.hint).toContain("Existing local runtime metadata");
-    expect(envelope.next_commands).toContain("npx @zitadel/cli@alpha start");
-    expect(envelope.next_commands).toContain("npx @zitadel/cli@alpha reset --force");
+    expect(envelope.next_commands).toContain(expectedPublicCliCommand("start"));
+    expect(envelope.next_commands).toContain(expectedPublicCliCommand("reset --force"));
     expect(envelope.details.checks.find((check) => check.name === "runtime")).toMatchObject({
       status: "fail",
     });
@@ -174,7 +174,7 @@ describe("local runtime commands", () => {
     expect(envelope.data.urls.api).toBe(serverUrl);
     expect(envelope.data.next_actions.join("\n")).toContain("From your app directory");
     expect(envelope.data.next_actions.join("\n")).toContain("Setup installs dependencies");
-    expect(envelope.data.next_commands).toEqual(["npx @zitadel/cli@alpha setup --server local"]);
+    expect(envelope.data.next_commands).toEqual([expectedPublicCliCommand("setup --server local")]);
     expect(envelope.data.next_commands).not.toContain("npm install");
     expect(envelope.data.next_commands).not.toContain("npm run dev");
 
@@ -293,7 +293,7 @@ describe("local runtime commands", () => {
       next_commands?: string[];
     };
     expect(envelope.status).toBe("error");
-    expect(envelope.next_commands).toEqual(["npx @zitadel/cli@alpha start"]);
+    expect(envelope.next_commands).toEqual([expectedPublicCliCommand("start")]);
   });
 
   it("stop succeeds without suggesting a restart", async () => {
@@ -329,7 +329,7 @@ describe("local runtime commands", () => {
       data: { next_commands?: string[] };
     };
     expect(envelope.status).toBe("ok");
-    expect(envelope.data.next_commands).toEqual(["npx @zitadel/cli@alpha stop"]);
+    expect(envelope.data.next_commands).toEqual([expectedPublicCliCommand("stop")]);
   });
 
   it("reset --force deletes local runtime data without suggesting a restart", async () => {
@@ -371,7 +371,7 @@ describe("local runtime commands", () => {
       next_commands?: string[];
     };
     expect(envelope.status).toBe("error");
-    expect(envelope.next_commands).toEqual(["npx @zitadel/cli@alpha reset --force"]);
+    expect(envelope.next_commands).toEqual([expectedPublicCliCommand("reset --force")]);
   });
 });
 

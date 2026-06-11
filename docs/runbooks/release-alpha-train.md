@@ -56,6 +56,9 @@ For `@zitadel/cli@0.1.0-alpha.N`, the CLI starts
 
 - If npm publish fails, do not create the Go tag manually; rerun or fix npm
   publishing first.
+- If npm publish succeeds but a later tag, GoReleaser, GHCR, or GitHub Release
+  step fails, rerun the same workflow for the same commit. It reuses a matching
+  `v<version>` tag and completes only the missing release side.
 - If the alpha preparation step fails, check for mismatched public package
   versions, a missing Changesets fixed group entry, or an existing `v<version>`
   tag.
