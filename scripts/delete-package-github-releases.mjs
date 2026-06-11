@@ -2,8 +2,7 @@
 import { spawnSync } from "node:child_process";
 
 const execute = process.argv.includes("--execute");
-const limitIndex = process.argv.indexOf("--limit");
-const limit = limitIndex >= 0 ? process.argv[limitIndex + 1] : "200";
+const limit = readLimit(process.argv.slice(2));
 
 const releases = JSON.parse(
   run("gh", [
@@ -50,4 +49,26 @@ function run(command, args, options = {}) {
     throw new Error(`${command} ${args.join(" ")} failed: ${result.stderr || result.status}`);
   }
   return result;
+}
+
+function readLimit(args) {
+  const limitIndex = args.indexOf("--limit");
+  if (limitIndex < 0) {
+    return "200";
+  }
+
+  const value = args[limitIndex + 1];
+  if (!value || value.startsWith("-") || !/^[1-9]\d*$/.test(value)) {
+    usage(`--limit must be followed by a positive integer, got ${JSON.stringify(value)}`);
+  }
+
+  return value;
+}
+
+function usage(message) {
+  console.error(message);
+  console.error(
+    "usage: node scripts/delete-package-github-releases.mjs [--execute] [--limit <positive-integer>]",
+  );
+  process.exit(1);
 }

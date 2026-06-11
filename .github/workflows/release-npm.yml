@@ -11,6 +11,8 @@ name: release-npm
 # dist-tag — `npm install @zitadel/cli` keeps resolving the last stable
 # `latest`; consumers opt into preview bundles with `@zitadel/cli@preview`. Run
 # `pnpm changeset pre exit` to leave alpha and cut a stable `latest` release.
+# The publish wrapper checks .changeset/pre.json: prereleases publish with
+# `--tag preview`; stable releases use Changesets' default dist-tag.
 #
 # Authentication uses npm trusted publishing (OIDC) — there is no NPM_TOKEN.
 # A maintainer must configure the trusted publisher for each public package
@@ -92,7 +94,7 @@ jobs:
         uses: changesets/action@v1
         with:
           version: corepack pnpm changeset version
-          publish: corepack pnpm changeset publish --tag preview
+          publish: node scripts/publish-changesets.mjs
           title: "chore: version packages"
           commit: "chore: version packages"
           createGithubReleases: false

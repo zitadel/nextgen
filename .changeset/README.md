@@ -29,7 +29,7 @@ The repo is currently in changesets **prerelease mode** with the `alpha` tag
 public npm channel for community testing is `preview`. While in this mode:
 
 - `changeset version` cuts versions like `0.1.0-alpha.0`, `0.1.0-alpha.1`, …
-- `changeset publish --tag preview` publishes them under the **`preview`** npm dist-tag, **not** `latest`. So `npm install @zitadel/cli` keeps resolving the last stable release; consumers opt into preview bundles with `@zitadel/cli@preview`.
+- `scripts/publish-changesets.mjs` publishes them under the **`preview`** npm dist-tag, **not** `latest`, while `.changeset/pre.json` exists. So `npm install @zitadel/cli` keeps resolving the last stable release; consumers opt into preview bundles with `@zitadel/cli@preview`.
 - The public packages are configured as a fixed MVP preview group, so the Version Packages PR keeps their versions aligned.
 
 To leave alpha and cut a stable `latest` release:
@@ -41,7 +41,7 @@ corepack pnpm changeset version   # strips the -alpha suffix
 
 ## Publishing (npm trusted publishing / OIDC)
 
-The [`.github/workflows/release-npm.yml`](../.github/workflows/release-npm.yml) workflow runs the [changesets GitHub Action](https://github.com/changesets/action). Pushing changesets to `main` opens a "Version Packages" PR aggregating all pending changesets; merging that PR bumps versions, updates `CHANGELOG.md` files, and publishes to npm (under the `preview` dist-tag while in prerelease mode). Package-level GitHub Releases are disabled; GoReleaser owns the product-level `ZITADEL Preview` releases. For the full product release order, follow the operator runbook in [`docs/operations/releasing.md`](../docs/operations/releasing.md).
+The [`.github/workflows/release-npm.yml`](../.github/workflows/release-npm.yml) workflow runs the [changesets GitHub Action](https://github.com/changesets/action). Pushing changesets to `main` opens a "Version Packages" PR aggregating all pending changesets; merging that PR bumps versions, updates `CHANGELOG.md` files, and publishes to npm. While `.changeset/pre.json` exists, the publish step uses the `preview` dist-tag; after `changeset pre exit`, it uses Changesets' default dist-tag (`latest`). Package-level GitHub Releases are disabled; GoReleaser owns the product-level `ZITADEL Preview` releases. For the full product release order, follow the operator runbook in [`docs/operations/releasing.md`](../docs/operations/releasing.md).
 
 Publishing authenticates with **npm trusted publishing (OIDC)** — there is **no `NPM_TOKEN`** secret. Before the first automated publish, a maintainer must, once per public package:
 
