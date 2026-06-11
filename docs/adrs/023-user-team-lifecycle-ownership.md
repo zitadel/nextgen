@@ -1,4 +1,4 @@
-# ADR 022: User, Team, and Lifecycle Ownership
+# ADR 023: User, Team, and Lifecycle Ownership
 
 > **Status:** Accepted
 > **Date:** 2026-06-11

@@ -60,7 +60,7 @@ graph TD
 
 ## Ownership vs membership
 
-**LOCKED by [ADR 022](../../adrs/022-user-team-lifecycle-ownership.md).**
+**LOCKED by [ADR 023](../../adrs/023-user-team-lifecycle-ownership.md).**
 Users are project-scoped identities. Teams are collaboration, data, and
 lifecycle boundaries. A membership is the team roster/status relationship. FGA
 can consume or mirror that relationship as an authorization fact, but it does
@@ -117,7 +117,7 @@ Status is also separate:
 
 Transitional storage artifacts such as `users.team_id` or team-to-user
 `ON DELETE CASCADE` must not be read as canonical product semantics. Database
-follow-up should align storage with the N:N membership model in ADR 022.
+follow-up should align storage with the N:N membership model in ADR 023.
 
 ## Memberships are first-class and unified
 

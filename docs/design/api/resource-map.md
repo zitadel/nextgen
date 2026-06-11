@@ -50,7 +50,7 @@ GET  /teams?project_id=…
 `DELETE /teams/{id}` deactivates/tombstones the team, revokes team-scoped API
 keys, and deactivates/removes memberships. Self-owned users survive. Users whose
 lifecycle owner is the deleted team are deactivated according to policy.
-See [ADR 022](../../adrs/022-user-team-lifecycle-ownership.md).
+See [ADR 023](../../adrs/023-user-team-lifecycle-ownership.md).
 
 ---
 
