@@ -41,7 +41,7 @@ corepack pnpm changeset version   # strips the -alpha suffix
 
 ## Publishing (npm trusted publishing / OIDC)
 
-The [`.github/workflows/release-npm.yml`](../.github/workflows/release-npm.yml) workflow runs the [changesets GitHub Action](https://github.com/changesets/action). Pushing changesets to `main` opens a "Version Packages" PR aggregating all pending changesets; merging that PR bumps versions, updates `CHANGELOG.md` files, and publishes to npm (under the `preview` dist-tag while in prerelease mode). Package-level GitHub Releases are disabled; GoReleaser owns the product-level `ZITADEL Preview` releases.
+The [`.github/workflows/release-npm.yml`](../.github/workflows/release-npm.yml) workflow runs the [changesets GitHub Action](https://github.com/changesets/action). Pushing changesets to `main` opens a "Version Packages" PR aggregating all pending changesets; merging that PR bumps versions, updates `CHANGELOG.md` files, and publishes to npm (under the `preview` dist-tag while in prerelease mode). Package-level GitHub Releases are disabled; GoReleaser owns the product-level `ZITADEL Preview` releases. For the full product release order, follow the operator runbook in [`docs/operations/releasing.md`](../docs/operations/releasing.md).
 
 Publishing authenticates with **npm trusted publishing (OIDC)** — there is **no `NPM_TOKEN`** secret. Before the first automated publish, a maintainer must, once per public package:
 
@@ -59,7 +59,7 @@ short-lived OIDC credentials, but npm only accepts public provenance
 attestations from public source repositories. Re-enable provenance when
 `zitadel/nextgen` is public.
 
-The Go server binary is **not** managed by changesets — it is released with `goreleaser` through the manual [`release.yml`](../.github/workflows/release.yml) workflow while the repo is pre-release. See [docs/adrs/002-multi-package-release-strategy.md](../docs/adrs/002-multi-package-release-strategy.md).
+The Go server binary is **not** managed by changesets — it is released with `goreleaser` through the manual [`release.yml`](../.github/workflows/release.yml) workflow while the repo is pre-release. See [docs/adrs/002-multi-package-release-strategy.md](../docs/adrs/002-multi-package-release-strategy.md) for the rationale and [`docs/operations/releasing.md`](../docs/operations/releasing.md) for the release checklist.
 
 ## Licensing reminder
 

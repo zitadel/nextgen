@@ -167,45 +167,15 @@ service logs. These artifacts expire after 7 days and are not release artifacts.
 ## Build & release
 
 This monorepo separates Go release artifacts, console build output, and npm
-package artifacts. The full rationale lives in
+package artifacts. To cut a ZITADEL Preview release, follow the operator
+checklist in [docs/operations/releasing.md](docs/operations/releasing.md). The
+release strategy rationale lives in
 [docs/adrs/002-multi-package-release-strategy.md](docs/adrs/002-multi-package-release-strategy.md).
 
-### Go server binary + embedded UIs (`goreleaser`)
-
-GoReleaser builds the console and login-ui SPAs, syncs them into `internal/*/dist`,
-and embeds them into the `nextgen` binary (`scripts/sync-embedded-ui-dist.sh`).
-
-```sh
-# Local snapshot (no publish, no signing)
-goreleaser release --snapshot --clean --skip=publish,sign
-
-# Run a snapshot Docker image (defaults to `nextgen server`)
-docker run --rm -p 8080:8080 \
-  -v "$PWD/.zitadel/local/nextgen-data:/var/lib/zitadel/nextgen-data" \
-  -e NEXTGEN_SERVER_DATA_DIR=/var/lib/zitadel/nextgen-data \
-  ghcr.io/zitadel/zitadel-preview:<snapshot-tag>-amd64
-```
-
-The publish-capable release workflow is currently manual-only via
-`.github/workflows/release.yml` (`workflow_dispatch`). It can run a dry snapshot
-or, when intentionally invoked for a release tag, produce `ZITADEL Preview`
-tarballs and push a multi-arch image manifest to
-`ghcr.io/zitadel/zitadel-preview`. `ghcr.io/zitadel/nextgen` is kept as a
-temporary compatibility alias while the repository is still named nextgen.
-
-### npm packages (`changesets`)
-
-`apps/cli` and the public packages under `packages/` publish to npm via
-[changesets](https://github.com/changesets/changesets). On any user-visible
-change to those packages:
-
-```sh
-corepack pnpm changeset
-```
-
-The changesets workflow opens a "Version Packages" PR. Merging that PR versions
-and publishes the public preview package set through npm trusted publishing
-under the `preview` dist-tag, while versions keep their `-alpha.N` suffix.
+In short: Changesets versions and publishes the public npm package bundle under
+the `preview` dist-tag, while GoReleaser creates the product-level
+`ZITADEL Preview` GitHub Release, `zitadel-preview_*` archives, and
+`ghcr.io/zitadel/zitadel-preview` images.
 
 ### Local development
 

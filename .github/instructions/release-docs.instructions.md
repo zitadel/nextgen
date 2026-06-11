@@ -13,8 +13,10 @@ state of the repo.
 - Local-runtime image changes should preserve the zero-config Docker smoke:
   mounted `nextgen-data`, generated `server-encryption-key`, embedded Postgres,
   and no required `NEXTGEN_SERVER_ENCRYPTION_KEY`.
-- The release workflow is manual and draft-oriented while the repo is
-  pre-release. Do not imply official npm publishing is enabled.
+- The product release workflow is manual and draft-oriented while the repo is
+  pre-release. npm package publishing uses Changesets trusted publishing; keep
+  the full release sequence in `docs/operations/releasing.md` in sync with any
+  release workflow, Changesets, GoReleaser, or helper-script change.
 - npm package changes use changesets; Go server releases use GoReleaser.
 - Public preview docs should use `@zitadel/cli@preview` and
   `ghcr.io/zitadel/zitadel-preview`; keep `nextgen` only for repo-internal or
