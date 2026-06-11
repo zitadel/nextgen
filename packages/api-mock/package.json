@@ -1,7 +1,8 @@
 {
-  "name": "@zitadel-nextgen/api-mock",
+  "name": "@zitadel/api-mock",
   "version": "0.0.0",
-  "description": "Mock support library for @zitadel-nextgen/api",
+  "description": "Mock support library for @zitadel/api",
+  "private": true,
   "type": "module",
   "exports": {
     ".": {
@@ -29,7 +30,8 @@
   },
   "dependencies": {
     "@mswjs/http-middleware": "catalog:",
-    "@zitadel-nextgen/api": "workspace:*",
+    "@zitadel/api": "workspace:*",
+    "cookie-parser": "catalog:",
     "express": "catalog:",
     "xstate": "catalog:"
   },
@@ -37,6 +39,7 @@
     "msw": "catalog:"
   },
   "devDependencies": {
+    "@types/cookie-parser": "catalog:",
     "@types/express": "catalog:",
     "@types/node": "catalog:",
     "@vitest/browser-playwright": "catalog:",

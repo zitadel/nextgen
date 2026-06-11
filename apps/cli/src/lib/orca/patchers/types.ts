@@ -1,5 +1,3 @@
-import type { CreateSchemaBody } from "@zitadel-nextgen/api/generated/model";
-
 import type { FrameworkFacts } from "../detectors/types";
 import type { CreateProjectResponse } from "../../api/client";
 
@@ -16,16 +14,20 @@ export type PatchView = Readonly<{
 
 /**
  * Everything a patcher needs to integrate Zitadel into a project. Extends
- * {@link PatchView} with the resolved project, issuer, and schema/auth choices
- * that fill file contents. Readonly: a patcher never mutates its input.
+ * {@link PatchView} with the resolved project, issuer, and server it points
+ * at, which fill file contents. Readonly: a patcher never mutates its input.
+ *
+ * Note: the user schema and flow definition are NOT here. The server
+ * provisions those defaults when the project is created, so the patcher no
+ * longer scaffolds them locally. The builders (`lib/user-schema`, `lib/flows`)
+ * and sync engine (`lib/sync`) remain for the future pull-based workflow.
  */
 export type PatchContext = PatchView &
   Readonly<{
     project: CreateProjectResponse;
     issuer: string;
-    userFields: ReadonlyArray<string>;
-    userSchema: CreateSchemaBody;
     server: string;
+    cliVersion: string;
   }>;
 
 /** Where and how a patch is applied. Family-neutral (no file-op coupling). */

@@ -15,7 +15,7 @@ import type { RendererSpec } from "./renderers/types";
  * Carries the managed marker so `doctor --fix` reclaims it and `eject` removes it.
  */
 const middlewareTemplate = `${MANAGED_MARKER}
-import { nextgenMiddleware } from "@zitadel-nextgen/sdk-next/middleware";
+import { nextgenMiddleware } from "@zitadel/sdk-next/middleware";
 import type { NextRequest } from "next/server";
 
 export function middleware(req: NextRequest) {
@@ -115,6 +115,15 @@ function nextCodeOps(ctx: PatchContext, renderer: RendererSpec): FileOp[] {
       contents: dts.contents,
     });
   }
-  ops.push({ kind: "add-dep", name: renderer.dependency.name, version: renderer.dependency.version });
+  ops.push({
+    kind: "add-dep",
+    name: renderer.dependency.name,
+    version: dependencyVersionForCli(ctx.cliVersion, renderer.dependency.version),
+  });
   return ops;
+}
+
+function dependencyVersionForCli(cliVersion: string, fallback: string): string {
+  const prerelease = cliVersion.match(/^\d+\.\d+\.\d+-([0-9A-Za-z]+)(?:[.-]|$)/)?.[1];
+  return prerelease ?? fallback;
 }

@@ -6,9 +6,9 @@ import { defineConfig } from "vitest/config";
  * token fails CI instead of silently breaking atoms.
  */
 export default defineConfig({
-  resolve: { conditions: ["@zitadel-nextgen/source"] },
+  resolve: { conditions: ["@zitadel/source"] },
   test: {
-    name: "@zitadel-nextgen/design-tokens",
+    name: "@zitadel/design-tokens",
     watch: false,
     globals: true,
     environment: "node",

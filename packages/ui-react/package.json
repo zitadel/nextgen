@@ -1,7 +1,8 @@
 {
-  "name": "@zitadel-nextgen/ui-react",
-  "version": "0.0.0",
-  "description": "Paired React implementations of @zitadel-nextgen/components Lit atoms. Visually identical, consume @zitadel-nextgen/design-tokens, used by the internal Zitadel console.",
+  "name": "@zitadel/ui-react",
+  "version": "0.1.0-alpha.0",
+  "private": true,
+  "description": "Paired React implementations of @zitadel/components Lit atoms. Visually identical, consume @zitadel/design-tokens, used by the internal Zitadel console.",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/ui-react#readme",
   "bugs": {
     "url": "https://github.com/zitadel/nextgen/issues"
@@ -20,22 +21,19 @@
   "exports": {
     "./package.json": "./package.json",
     ".": {
-      "@zitadel-nextgen/source": "./src/index.ts",
+      "@zitadel/source": "./src/index.ts",
       "types": "./dist/index.d.mts",
       "import": "./dist/index.mjs",
       "default": "./dist/index.mjs"
     },
     "./styles.css": "./src/styles.css"
   },
-  "publishConfig": {
-    "access": "public"
-  },
   "scripts": {
     "build": "tsdown"
   },
   "dependencies": {
-    "@zitadel-nextgen/design-tokens": "workspace:*",
-    "@zitadel-nextgen/shared-component-styles": "workspace:*",
+    "@zitadel/design-tokens": "workspace:*",
+    "@zitadel/shared-component-styles": "workspace:*",
     "lucide-react": "catalog:"
   },
   "peerDependencies": {

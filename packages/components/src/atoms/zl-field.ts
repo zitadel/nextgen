@@ -1,9 +1,9 @@
-import type { CreateFlow201StepFieldsType } from "@zitadel-nextgen/api/generated/model";
+import type { CreateFlow201StepFieldsType } from "@zitadel/api/generated/model";
 import { LitElement, html, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 
-import fieldHost from "@zitadel-nextgen/shared-component-styles/lit/text-field-host.css?inline";
-import fieldSurface from "@zitadel-nextgen/shared-component-styles/text-field.css?inline";
+import fieldHost from "@zitadel/shared-component-styles/lit/text-field-host.css?inline";
+import fieldSurface from "@zitadel/shared-component-styles/text-field.css?inline";
 
 import { nextUid } from "../internal/unique-id.js";
 import type { AtomManifest } from "../manifest.js";
@@ -49,7 +49,19 @@ export class ZlField extends LitElement {
     ...surfaceStyles(fieldHost, fieldSurface),
   ];
 
-  @property() accessor name = "";
+  /**
+   * Field name — used as the key in form submission and in `zl-input` event
+   * detail. For form-associated custom elements the browser owns a native
+   * `name` property; using `@property()` would create a conflicting accessor
+   * that loses sync with the DOM attribute. We therefore manage it manually.
+   */
+  get name(): string {
+    return this.getAttribute("name") ?? "";
+  }
+
+  set name(value: string) {
+    this.setAttribute("name", value);
+  }
   @property() accessor label = "";
   @property() accessor type: ZlFieldType = "text";
   @property() accessor value = "";

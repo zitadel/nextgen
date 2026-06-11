@@ -1,11 +1,11 @@
-import { getZitadelConfig, getApi, type ZitadelProject } from "@zitadel-nextgen/api/config";
+import { getZitadelConfig, getApi, type ZitadelProject } from "@zitadel/api/config";
 import type {
   CreateFlow201,
   CreateFlow201Step,
   CreateFlowBodyPurpose,
   SubmitFlowStepBody,
   SubmitFlowStepBodyChallengeResponse,
-} from "@zitadel-nextgen/api/generated/model";
+} from "@zitadel/api/generated/model";
 import { css, html, LitElement, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
@@ -22,19 +22,20 @@ import type { Branding } from "./branding.js";
 import { applyBaseTokens, applyBrandingTokens } from "./branding-to-tokens.js";
 import { validateBranding } from "./branding-validator.js";
 import { applyFontUrl } from "./font-loader.js";
-import { createLiquidEngine, TEMPLATE_NAMES } from "./liquid.js";
+import { createLiquidEngine } from "./liquid.js";
+import { TEMPLATE_NAMES } from "./template-names.js";
 import { en, builtinLocales, type Locale } from "./locales/index.js";
 import { patchMandatoryGates } from "./mandatory-gates.js";
-import { zitadelAttributionPillInnerHtml } from "@zitadel-nextgen/shared-component-styles/attribution-markup";
+import { zitadelAttributionPillInnerHtml } from "@zitadel/shared-component-styles/attribution-markup";
 import { createSanitiser } from "./sanitiser.js";
 import type { FlowError, LiquidContext } from "./template-context.js";
-import { layoutChromeCss } from "./templates/default.liquid.js";
+import layoutChromeCss from "./templates/layout-chrome.css?inline";
 import { ThemeController } from "./theme-controller.js";
 
 /**
  * `<zitadel-login>` — the auth-UI orchestrator.
  *
- * Drives the typed `@zitadel-nextgen/api` Flow API directly: `POST /flow`
+ * Drives the typed `@zitadel/api` Flow API directly: `POST /flow`
  * starts a flow, `POST /flow/{id}/submit` advances it. Renders each step
  * through LiquidJS, sanitises the output via DOMPurify, and mounts the
  * result inside a real `<form>` element in its Shadow DOM via Lit's
@@ -121,7 +122,7 @@ export class ZitadelLogin extends LitElement {
    * precedence over the built-in dictionaries for matching language codes.
    *
    * ```ts
-   * import { en } from "@zitadel-nextgen/components";
+   * import { en } from "@zitadel/components";
    * const locales = {
    *   en: { ...en, "identifier.title": "Welcome" },
    *   de: myGermanDict,
@@ -206,14 +207,19 @@ export class ZitadelLogin extends LitElement {
    * resolved language is used as the base; entries from the `locales` map (if
    * set) are spread on top so partial overrides work without importing and
    * spreading the full base dictionary.
+   *
+   * Priority: explicit `lang` attr → `navigator.language` (user preference)
+   * → `document.documentElement.lang` (page default) → English fallback.
    */
   private resolveLocale(): Locale {
-    const code = this.lang
-      || (typeof document !== "undefined" ? document.documentElement.lang : "")
-      || (typeof navigator !== "undefined" ? navigator.language : "");
+    const code =
+      this.lang ||
+      (typeof navigator !== "undefined" ? navigator.language : "") ||
+      (typeof document !== "undefined" ? document.documentElement.lang : "");
     const primary = (code.split("-")[0] ?? "").toLowerCase();
     const builtin = builtinLocales[primary] ?? en;
     const custom = this.locales?.[primary];
+
     return custom ? { ...builtin, ...custom } : builtin;
   }
 
@@ -251,9 +257,7 @@ export class ZitadelLogin extends LitElement {
     if (!this.response || !this.engine) {
       return html`<slot name="loader"></slot>`;
     }
-    const rendered = this.injectAttribution(
-      this.renderStep(this.response.step, this.engine),
-    );
+    const rendered = this.injectAttribution(this.renderStep(this.response.step, this.engine));
     return html`<form
       class="zl-mount"
       part="form"
@@ -313,7 +317,9 @@ export class ZitadelLogin extends LitElement {
     const projectId = cfg?.projectId || "";
 
     if (!cfg) {
-      throw new Error("<zitadel-login> requires a `config` prop (from configureZitadel()) or configureZitadel() must be called before use.");
+      throw new Error(
+        "<zitadel-login> requires a `config` prop (from configureZitadel()) or configureZitadel() must be called before use.",
+      );
     }
     const api = getApi(cfg);
 
@@ -325,7 +331,9 @@ export class ZitadelLogin extends LitElement {
         wire = await getCurrentStep(api, this.resumeFlowId);
       } else {
         if (!projectId) {
-          throw new Error("<zitadel-login> requires a `project-id` attribute (or configureZitadel()) to start a flow.");
+          throw new Error(
+            "<zitadel-login> requires a `project-id` attribute (or configureZitadel()) to start a flow.",
+          );
         }
         wire = await apiStartFlow(api, { project_id: projectId, purpose: this.purpose });
       }
@@ -405,8 +413,7 @@ export class ZitadelLogin extends LitElement {
 
   private renderStep(step: CreateFlow201Step, engine: Liquid): string {
     const tenantSource =
-      typeof this.branding?.liquid_template === "string" &&
-      this.branding.liquid_template.length > 0
+      typeof this.branding?.liquid_template === "string" && this.branding.liquid_template.length > 0
         ? this.branding.liquid_template
         : null;
 
@@ -547,7 +554,7 @@ export class ZitadelLogin extends LitElement {
   ): void => {
     if (this.loading) return;
     const { challenge_id, method, proof } = event.detail;
-    void this.submit("submit", {
+    void this.submit(method, {
       challenge_id,
       method,
       proof,
@@ -579,13 +586,16 @@ export class ZitadelLogin extends LitElement {
       ...this.response,
       step: { ...stepWithoutChallenge, error: errorKey },
     };
-    console.warn(`[zitadel-login] passkey ceremony ${aborted ? "cancelled" : "failed"}: ${message}`);
+    console.warn(
+      `[zitadel-login] passkey ceremony ${aborted ? "cancelled" : "failed"}: ${message}`,
+    );
   };
 
   private findPrimaryAction(): string | null {
     const root = this.shadowRoot;
     if (!root) return null;
-    const primary = root.querySelector('zl-button[hierarchy="primary"][type="submit"]') ??
+    const primary =
+      root.querySelector('zl-button[hierarchy="primary"][type="submit"]') ??
       root.querySelector('zl-button[hierarchy="primary"]');
     return primary?.getAttribute("action") || null;
   }

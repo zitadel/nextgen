@@ -7,7 +7,7 @@ import { AbstractSanityCheck, type CheckContext } from "./types";
 /**
  * Verifies the project still declares a Zitadel SDK dependency in
  * `package.json`. The patcher adds a scoped package (e.g.
- * `@zitadel-nextgen/sdk-next`); the check is generic over the `@zitadel*`
+ * `@zitadel/sdk-next`); the check is generic over the `@zitadel*`
  * scope so any framework renderer's dependency satisfies it.
  */
 export class DependencyCheck extends AbstractSanityCheck {
@@ -38,7 +38,7 @@ export class DependencyCheck extends AbstractSanityCheck {
    * so going through `repair` is the only sanctioned path.
    */
   override async fix(ctx: CheckContext): Promise<void> {
-    const patchCtx = await loadPatchContext(ctx.cwd, ctx.orca);
+    const patchCtx = await loadPatchContext(ctx.cwd, ctx.orca, ctx.cliVersion);
     await ctx.orca.patcherFor(patchCtx.framework.id).repair(patchCtx, {
       cwd: ctx.cwd,
       dryRun: ctx.dryRun,

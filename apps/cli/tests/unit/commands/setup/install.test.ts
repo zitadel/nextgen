@@ -1,0 +1,117 @@
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import {
+  installDependenciesForSetup,
+  type SetupInstallInput,
+} from "../../../../src/commands/setup/install";
+
+const dirs: string[] = [];
+
+afterEach(async () => {
+  await Promise.all(dirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
+});
+
+async function tempProject(packageJson: Record<string, unknown> = {}): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), "zitadel-setup-install-"));
+  dirs.push(dir);
+  await writeFile(join(dir, "package.json"), JSON.stringify({ name: "demo", ...packageJson }));
+  return dir;
+}
+
+function input(overrides: Partial<SetupInstallInput> = {}): SetupInstallInput {
+  return {
+    cwd: "",
+    depsAdded: ["@zitadel/sdk-next"],
+    dryRun: false,
+    env: {},
+    issuer: "http://localhost:3000",
+    json: true,
+    scaffoldedFramework: false,
+    skipInstall: false,
+    ...overrides,
+  };
+}
+
+describe("setup dependency installation", () => {
+  it("installs when setup added a dependency", async () => {
+    const cwd = await tempProject();
+    const run = vi.fn(async () => undefined);
+
+    const result = await installDependenciesForSetup(input({ cwd, run }));
+
+    expect(run).toHaveBeenCalledOnce();
+    expect(run.mock.calls[0]?.[0].display).toBe("npm install");
+    expect(run.mock.calls[0]?.[1]).toMatchObject({
+      cwd,
+      redirectStdoutToStderr: true,
+    });
+    expect(result.install).toMatchObject({
+      status: "completed",
+      package_manager: "npm",
+      command: "npm install",
+    });
+    expect(result.nextCommands).toEqual(["npm run dev"]);
+  });
+
+  it("installs after fresh scaffolding even when no Zitadel dependency changed", async () => {
+    const cwd = await tempProject({ packageManager: "pnpm@10.33.2" });
+    const run = vi.fn(async () => undefined);
+
+    const result = await installDependenciesForSetup(
+      input({ cwd, depsAdded: [], scaffoldedFramework: true, run }),
+    );
+
+    expect(run.mock.calls[0]?.[0].display).toBe("pnpm install");
+    expect(result.nextCommands).toEqual(["pnpm dev"]);
+  });
+
+  it("skips and recommends install when --skip-install is set", async () => {
+    const cwd = await tempProject();
+    const run = vi.fn(async () => undefined);
+
+    const result = await installDependenciesForSetup(input({ cwd, run, skipInstall: true }));
+
+    expect(run).not.toHaveBeenCalled();
+    expect(result.install).toMatchObject({ status: "skipped", reason: "skip-install" });
+    expect(result.nextCommands).toEqual(["npm install", "npm run dev"]);
+  });
+
+  it("skips and recommends install during dry-run", async () => {
+    const cwd = await tempProject();
+    const run = vi.fn(async () => undefined);
+
+    const result = await installDependenciesForSetup(input({ cwd, dryRun: true, run }));
+
+    expect(run).not.toHaveBeenCalled();
+    expect(result.install).toMatchObject({ status: "skipped", reason: "dry-run" });
+    expect(result.nextCommands).toEqual(["npm install", "npm run dev"]);
+  });
+
+  it("does not install when no dependency changed", async () => {
+    const cwd = await tempProject();
+    const run = vi.fn(async () => undefined);
+
+    const result = await installDependenciesForSetup(input({ cwd, depsAdded: [], run }));
+
+    expect(run).not.toHaveBeenCalled();
+    expect(result.install).toMatchObject({ status: "not-needed" });
+    expect(result.nextCommands).toEqual(["npm run dev"]);
+  });
+
+  it("surfaces install failures with remediation", async () => {
+    const cwd = await tempProject();
+    const run = vi.fn(async () => {
+      throw Object.assign(new Error("boom"), { code: 1 });
+    });
+
+    await expect(installDependenciesForSetup(input({ cwd, run }))).rejects.toMatchObject({
+      code: "E_VALIDATION",
+      message: "Dependency install failed: npm install",
+      nextCommands: ["npm install"],
+    });
+  });
+});

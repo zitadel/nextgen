@@ -85,6 +85,10 @@ type GetMySessionRes interface {
 	getMySessionRes()
 }
 
+type GetMyUserRes interface {
+	getMyUserRes()
+}
+
 type GetOpenIDConfigurationRes interface {
 	getOpenIDConfigurationRes()
 }
@@ -151,6 +155,10 @@ type RevokeSessionRes interface {
 
 type RevokeTokenRes interface {
 	revokeTokenRes()
+}
+
+type SetUserPasswordRes interface {
+	setUserPasswordRes()
 }
 
 type SubmitFlowEventRes interface {

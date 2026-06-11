@@ -103,6 +103,7 @@ func TestProjectService_Create(t *testing.T) {
 			flowDefinitionRepo := domainmock.NewMockFlowDefinitionRepository(ctrl)
 			const baseURL = "https://example.com/api/schemas"
 			schemaValidator, err := domain.NewSchemaValidator(baseURL)
+			require.NoError(t, err)
 
 			tc.setupProjectRepo(projectRepo)
 			if tc.setupSchemaRepo != nil {
@@ -185,6 +186,7 @@ func TestProjectService_Get(t *testing.T) {
 			flowDefinitionRepo := domainmock.NewMockFlowDefinitionRepository(ctrl)
 			const baseURL = "https://example.com"
 			schemaValidator, err := domain.NewSchemaValidator(baseURL)
+			require.NoError(t, err)
 			tc.setupRepo(projectRepo)
 
 			svc := service.NewProjectService(

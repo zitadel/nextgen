@@ -18,7 +18,7 @@ three problems:
 2. **Redundant server round-trip** — the browser already knows its preferred
    language via `navigator.language`, which mirrors the `Accept-Language`
    header the server receives.
-3. **Tight coupling** — translation files shipped from `@zitadel-nextgen/components`
+3. **Tight coupling** — translation files shipped from `@zitadel/components`
    but had to be imported, resolved, and injected by application code.
 
 ## Decision

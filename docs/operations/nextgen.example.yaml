@@ -1,0 +1,24 @@
+server:
+  address: ":8080"
+  # Optional. If unset, a nextgen-data directory next to the server binary is used.
+  data_dir: ./nextgen-data
+  # Optional. If unset, the server creates and reuses server.encryption_key_file.
+  # encryption_key: "4d61737465726b65794e65656473546f48617665333243686172616374657273"
+  # Optional. Defaults to <server.data_dir>/server-encryption-key.
+  encryption_key_file: ./nextgen-data/server-encryption-key
+  console_enabled: true
+  console_path: /ui/console
+  login_enabled: true
+  login_path: /ui/login
+
+database:
+  postgres: postgres://zitadel:zitadel@localhost:5432/nextgen?sslmode=disable
+
+password_hasher:
+  hasher:
+    algorithm: bcrypt
+    cost: 10
+
+schema:
+  lru_cache_size: 1000
+  builtin_public_base: https://nextgen.com/api/schemas

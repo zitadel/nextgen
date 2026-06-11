@@ -6,15 +6,18 @@
         <zitadel-logout :project="project" post-sign-out-url="/login" />
       </ClientOnly>
     </div>
-    <p style="color: #6b7280">
-      Signed in as {{ auth?.isAuthenticated ? auth.session.email : "unknown" }}
-    </p>
+    <template v-if="auth?.isAuthenticated">
+      <ClientOnly>
+        <SessionDetails />
+      </ClientOnly>
+    </template>
+    <p v-else style="color: #6b7280">Not signed in</p>
   </main>
 </template>
 
 <script setup lang="ts">
-import type { ClientAuthResult } from "@zitadel-nextgen/sdk-nuxt";
-import { useZitadelProject } from "@zitadel-nextgen/sdk-nuxt";
+import type { ClientAuthResult } from "@zitadel/sdk-nuxt";
+import { useZitadelProject } from "@zitadel/sdk-nuxt";
 
 const auth = useState<ClientAuthResult>("nextgen-auth");
 const project = useZitadelProject();

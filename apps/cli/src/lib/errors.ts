@@ -1,4 +1,4 @@
-import { ApiError } from "@zitadel-nextgen/api/runtime/fetch";
+import { ApiError } from "@zitadel/api/runtime/fetch";
 
 /**
  * Closed set of failure categories the CLI can surface. Every error the
@@ -13,6 +13,7 @@ export type ZitadelErrorCode =
   | "E_NETWORK"
   | "E_AUTH"
   | "E_CONFLICT"
+  | "E_LOCAL_SERVER_NOT_RUNNING"
   | "E_VALIDATION"
   | "E_NOT_IMPLEMENTED";
 
@@ -28,6 +29,7 @@ export const EXIT_CODES: Record<ZitadelErrorCode, number> = {
   E_NETWORK: 4,
   E_AUTH: 1,
   E_CONFLICT: 5,
+  E_LOCAL_SERVER_NOT_RUNNING: 4,
   E_VALIDATION: 3,
   E_NOT_IMPLEMENTED: 2,
 };

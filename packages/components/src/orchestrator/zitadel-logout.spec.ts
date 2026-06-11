@@ -2,7 +2,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
-import { configureZitadel, _resetConfigForTesting } from "@zitadel-nextgen/api/config";
+import { configureZitadel, _resetConfigForTesting } from "@zitadel/api/config";
 
 import "./zitadel-logout.js";
 import type { ZitadelLogout } from "./zitadel-logout.js";
@@ -16,7 +16,7 @@ import type { ZitadelLogout } from "./zitadel-logout.js";
 const API_BASE = "https://logout.test.invalid";
 const requestLog: { url: string; method: string; credentials: string }[] = [];
 
-const okHandler = http.get(`${API_BASE}/auth/end-session`, ({ request }) => {
+const okHandler = http.delete(`${API_BASE}/sessions/me`, ({ request }) => {
   requestLog.push({
     url: request.url,
     method: request.method,
@@ -141,7 +141,7 @@ describe("<zitadel-logout>", () => {
     expect(element.shadowRoot?.querySelector(".trigger")).toBeNull();
   });
 
-  it("calls the typed end-session operation, fires zitadel-signout", async () => {
+  it("calls DELETE /sessions/me with credentials, fires zitadel-signout", async () => {
     setDisplayCookie("Alice Liddell", "alice@acme.com");
     const element = mount();
     await element.updateComplete;
@@ -158,8 +158,8 @@ describe("<zitadel-logout>", () => {
     await element.updateComplete;
 
     expect(requestLog).toHaveLength(1);
-    expect(requestLog[0]?.method).toBe("GET");
-    expect(requestLog[0]?.url).toBe(`${API_BASE}/auth/end-session`);
+    expect(requestLog[0]?.method).toBe("DELETE");
+    expect(requestLog[0]?.url).toBe(`${API_BASE}/sessions/me`);
     expect(requestLog[0]?.credentials).toBe("include");
     expect(signoutEvents).toHaveLength(1);
     expect(signoutEvents[0]?.detail).toEqual({
@@ -168,30 +168,29 @@ describe("<zitadel-logout>", () => {
     });
   });
 
-  it("forwards client-id and post-sign-out-url as end-session query params", async () => {
+  it("navigates to post-sign-out-url after successful revoke", async () => {
     setDisplayCookie("Alice", "alice@acme.com");
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...window.location, href: "" },
+      writable: true,
+    });
     const element = mount();
-    element.clientId = "console-app";
     element.postSignOutUrl = "https://app.test/done";
     await element.updateComplete;
     shadowQuery<HTMLButtonElement>(element, ".trigger").click();
     await element.updateComplete;
     shadowQuery<HTMLButtonElement>(element, ".signout-btn").click();
-    await new Promise((resolve) => setTimeout(resolve, 16));
+    await new Promise((resolve) => setTimeout(resolve, 32));
 
     expect(requestLog).toHaveLength(1);
-    const first = requestLog[0];
-    if (!first) throw new Error("expected at least one captured request");
-    const url = new URL(first.url);
-    expect(url.searchParams.get("client_id")).toBe("console-app");
-    expect(url.searchParams.get("post_logout_redirect_uri")).toBe(
-      "https://app.test/done",
-    );
+    expect(requestLog[0]?.method).toBe("DELETE");
+    expect(window.location.href).toBe("https://app.test/done");
   });
 
   it("surfaces a network error in the dropdown without redirecting", async () => {
     setDisplayCookie("Alice", "alice@acme.com");
-    server.use(http.get(`${API_BASE}/auth/end-session`, () => HttpResponse.error()));
+    server.use(http.delete(`${API_BASE}/sessions/me`, () => HttpResponse.error()));
 
     const element = mount();
     await element.updateComplete;

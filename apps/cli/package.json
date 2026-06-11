@@ -1,6 +1,6 @@
 {
-  "name": "@zitadel-nextgen/cli",
-  "version": "0.0.0",
+  "name": "@zitadel/cli",
+  "version": "0.1.0-alpha.1",
   "description": "Agent-friendly Zitadel CLI",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/apps/cli#readme",
   "bugs": {
@@ -21,6 +21,9 @@
     "oclif.manifest.json",
     "SKILLS.md"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "oclif": {
     "bin": "zitadel",
     "dirname": "zitadel",
@@ -55,7 +58,7 @@
     "@oclif/plugin-search": "catalog:",
     "@oclif/plugin-version": "catalog:",
     "@oclif/plugin-which": "catalog:",
-    "@zitadel-nextgen/api": "workspace:*",
+    "@zitadel/api": "workspace:*",
     "ajv": "catalog:",
     "consola": "^3.4.2",
     "safe-stable-stringify": "catalog:",
@@ -64,8 +67,8 @@
   },
   "devDependencies": {
     "@types/node": "catalog:",
-    "@zitadel-nextgen/api-mock": "workspace:*",
-    "@zitadel-nextgen/sdk-next": "workspace:*",
+    "@zitadel/api-mock": "workspace:*",
+    "@zitadel/sdk-next": "workspace:*",
     "msw": "catalog:",
     "oclif": "catalog:",
     "tsdown": "^0.21.10",

@@ -21,7 +21,7 @@ export default defineConfig({
   },
   /* Run your local dev server before starting the tests */
   webServer: {
-    command: "npx nx run @zitadel-nextgen/console:preview",
+    command: "npx nx run @zitadel/console:preview",
     url: "http://localhost:4173",
     reuseExistingServer: true,
     cwd: workspaceRoot,

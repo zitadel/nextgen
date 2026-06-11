@@ -193,7 +193,7 @@ func sessionToAPI(session *domain.Session) *api.SessionResponse {
 	resp := &api.SessionResponse{
 		SessionID:       api.SessionID(session.ID),
 		ProjectID:       api.ProjectID(session.ProjectID),
-		State:           sessionStateToAPI(session.State),
+		State:           sessionStateToAPI(session.State()),
 		Factors:         factors,
 		AssuranceLevels: nil,                                 // TODO: ?!
 		Metadata:        api.OptNilSessionResponseMetadata{}, // TODO: ?!

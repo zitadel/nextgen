@@ -1,19 +1,16 @@
-import { Flags } from "@oclif/core";
 import { intro, outro } from "@clack/prompts";
+import { Flags } from "@oclif/core";
+import { createZitadelClient } from "@zitadel/api/client";
+import type { CreateProject201 } from "@zitadel/api/generated/model";
 import { consola } from "consola";
 
-import { BaseCommand, type JsonEnvelope } from "../../lib/oclif";
 import { ZitadelError } from "../../lib/errors";
+import { BaseCommand, type JsonEnvelope } from "../../lib/oclif";
 import { createOrca, issuerFromPort, type FrameworkFacts, type Orca } from "../../lib/orca";
-import type { PatchContext } from "../../lib/orca/patchers/types";
 import { RENDERER_IDS } from "../../lib/orca/patchers/rule/next/renderers/registry";
-import { CreateSchemaBody } from "@zitadel-nextgen/api/generated/endpoints/zitadelNextGen.zod";
-import type { CreateProject201 } from "@zitadel-nextgen/api/generated/model";
-import { createZitadelClient } from "@zitadel-nextgen/api/client";
-
-import { buildUserSchema } from "../../lib/user-schema";
-import { makeSyncers, runSyncLoop } from "../../lib/sync";
-import { hasZitadelConfig, hasZitadelSecret, readZitadelSecret } from "../../lib/project";
+import type { PatchContext } from "../../lib/orca/patchers/types";
+import { hasZitadelConfig, hasZitadelSecret } from "../../lib/project";
+import { installDependenciesForSetup } from "./install";
 import { PickFrameworkPrompt, SETUP_PROMPTS, type SetupAnswers } from "./prompts";
 import {
   detectProjectFacts,
@@ -26,9 +23,6 @@ import {
   type Row,
   type Section,
 } from "./summary";
-
-/** The user-schema fields scaffolded for every project. */
-const DEFAULT_USER_FIELDS = ["email", "given_name", "family_name"] as const;
 
 /**
  * The frameworks `--framework` accepts, derived from Orca's registry so the
@@ -44,8 +38,9 @@ const FRAMEWORK_OPTIONS = createOrca()
  *
  * Detects (or, for an empty directory, scaffolds then re-detects) the
  * framework, runs the wizard prompts to fill in any answers not pre-supplied
- * by flags, creates the remote project, patches the local files via
- * `Orca`'s framework patcher, and optionally applies the config.
+ * by flags, creates the remote project (whose default user schema and login
+ * flow are provisioned server-side), and patches the local files via
+ * `Orca`'s framework patcher.
  *
  * Every interactive question lives in {@link SETUP_PROMPTS} (the main wizard
  * — each entry is a small class) and {@link PickFrameworkPrompt} (the
@@ -56,14 +51,19 @@ export default class Setup extends BaseCommand {
   static override examples = ["<%= config.bin %> setup --framework next"];
   static override flags = {
     framework: Flags.string({ description: "Framework to target.", options: FRAMEWORK_OPTIONS }),
-    renderer: Flags.string({ description: "Renderer (default: react).", options: [...RENDERER_IDS] }),
-    "no-apply": Flags.boolean({ description: "Skip the automatic apply at the end of setup." }),
+    renderer: Flags.string({
+      description: "Renderer (default: react).",
+      options: [...RENDERER_IDS],
+    }),
+    "skip-install": Flags.boolean({
+      description: "Do not install dependencies after setup updates package.json.",
+    }),
   };
 
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(Setup);
     await this.toMeta(flags);
-    const { cwd, env, nonInteractive, dryRun, force } = this.meta;
+    const { cwd, nonInteractive, dryRun, force } = this.meta;
 
     if (await hasZitadelConfig(cwd)) {
       return this.emit({ status: "skipped", reason: "already-initialized" });
@@ -81,7 +81,9 @@ export default class Setup extends BaseCommand {
     let scaffoldedFramework = false;
     try {
       framework = await orca.detect(cwd, flags.framework);
-      consola.success(`Detected ${framework.id}${framework.devPort ? ` (dev port ${framework.devPort})` : ""}`);
+      consola.success(
+        `Detected ${framework.id}${framework.devPort ? ` (dev port ${framework.devPort})` : ""}`,
+      );
     } catch (error) {
       if (
         error instanceof ZitadelError &&
@@ -89,7 +91,10 @@ export default class Setup extends BaseCommand {
         (await orca.isEmpty(cwd))
       ) {
         consola.info("Empty directory — scaffolding a fresh project");
-        framework = await orca.scaffold(cwd, await resolveScaffoldFramework(flags.framework, nonInteractive, orca));
+        framework = await orca.scaffold(
+          cwd,
+          await resolveScaffoldFramework(flags.framework, nonInteractive, orca),
+        );
         scaffoldedFramework = true;
         consola.success(`Scaffolded ${framework.id} skeleton`);
       } else {
@@ -112,19 +117,10 @@ export default class Setup extends BaseCommand {
     }
 
     const issuer = issuerFromPort(answers.devPort);
-    const userFields = [...DEFAULT_USER_FIELDS];
-    const userSchema = buildUserSchema(userFields);
-    const schemaValidation = CreateSchemaBody.safeParse(userSchema);
-    if (!schemaValidation.success) {
-      throw new ZitadelError("E_VALIDATION", "Generated user schema is invalid", {
-        details: { issues: schemaValidation.error.issues },
-      });
-    }
-    consola.info(`User schema: ${userFields.length} fields (${userFields.join(", ")})`);
 
-    // `POST /projects` is unauthenticated; the returned `projectSecret`
-    // authorises every subsequent call (we build a second, token-bound
-    // client further down for the sync loop).
+    // `POST /projects` is unauthenticated. Creating the project also
+    // provisions its default user schema and login flow server-side, so the
+    // CLI no longer builds, scaffolds, or uploads those resources here.
     consola.start(`Creating project on ${answers.server}${dryRun ? " (dry run)" : ""}`);
     const unauthClient = createZitadelClient({ baseUrl: answers.server });
     const project = dryRun
@@ -137,9 +133,8 @@ export default class Setup extends BaseCommand {
       rendererId: flags.renderer ?? "react",
       project,
       issuer,
-      userFields,
-      userSchema,
       server: answers.server,
+      cliVersion: this.meta.cliVersion,
     };
     consola.start(`Patching project files${dryRun ? " (dry run)" : ""}`);
     const result = await orca.patcherFor(framework.id).patch(ctx, { cwd, dryRun, force });
@@ -155,26 +150,16 @@ export default class Setup extends BaseCommand {
         (result.filesSkipped.length > 0 ? ` (${result.filesSkipped.length} unchanged)` : ""),
     );
 
-    let apply: { synced: boolean } | undefined;
-    if (!flags["no-apply"] && !dryRun) {
-      consola.start("Syncing schemas and flows to Zitadel");
-      const secret = await readZitadelSecret(cwd);
-      const client = createZitadelClient({
-        baseUrl: answers.server,
-        token: secret.project_secret,
-      });
-      // `runSyncLoop` emits one `consola.info` line per resource action.
-      await runSyncLoop(
-        cwd,
-        makeSyncers({ client, projectId: secret.project_id, env }),
-      );
-      apply = { synced: true };
-      consola.success("Sync complete");
-    } else if (flags["no-apply"]) {
-      consola.info("Skipping apply (--no-apply); run `zitadel apply` later to sync");
-    } else if (dryRun) {
-      consola.info("Skipping apply (--dry-run)");
-    }
+    const installOutcome = await installDependenciesForSetup({
+      cwd,
+      depsAdded: result.depsAdded,
+      dryRun,
+      env: this.meta.env,
+      issuer,
+      json: this.jsonEnabled(),
+      scaffoldedFramework,
+      skipInstall: Boolean(flags["skip-install"]),
+    });
 
     const writtenRel = result.filesWritten.map((file) => relativeDisplay(cwd, file));
     // The structured report is human-only. Under `--json` we let the
@@ -188,8 +173,6 @@ export default class Setup extends BaseCommand {
         project,
         server: answers.server,
         issuer,
-        userFields,
-        synced: Boolean(apply?.synced),
         scaffoldedFramework,
       });
       // Frame the report in a consola box so it reads as a distinct
@@ -198,11 +181,7 @@ export default class Setup extends BaseCommand {
       // pre-coloured rows (path/url/id helpers) survive intact.
       consola.box({
         title: "Zitadel is ready",
-        message: [
-          renderSummary(sections),
-          "",
-          `Open your app on ${styleUrl(`${issuer}/login`)} and register your first user.`,
-        ].join("\n"),
+        message: [renderSummary(sections), "", installOutcome.nextActions.join("\n")].join("\n"),
         style: { padding: 1, borderStyle: "rounded", borderColor: "green" },
       });
     }
@@ -221,9 +200,9 @@ export default class Setup extends BaseCommand {
         server: answers.server,
         files_written: result.filesWritten.map((file) => relativeDisplay(cwd, file)),
         files_skipped: result.filesSkipped.map((file) => relativeDisplay(cwd, file)),
-        apply,
-        next_actions: [`Start your project: npm install && npm run dev (then open ${issuer}/login)`],
-        next_commands: ["npm install", "npm run dev"],
+        install: installOutcome.install,
+        next_actions: installOutcome.nextActions,
+        next_commands: installOutcome.nextCommands,
       },
     });
   }
@@ -244,7 +223,7 @@ async function resolveScaffoldFramework(
   }
   if (nonInteractive) {
     throw new ZitadelError("E_FRAMEWORK_NOT_DETECTED", "Empty directory — pass --framework", {
-      hint: "Example: --framework next",
+      hint: "Run without --json/--non-interactive to choose from a prompt, or pass --framework for scripted setup.",
     });
   }
   return new PickFrameworkPrompt().ask(orca.availableFrameworks());
@@ -282,8 +261,7 @@ function shortPath(absolute: string): string {
  * Picks one written file by suffix so the corresponding INSTALLED row can
  * reference it without hard-coding the path the patcher chose. Returns
  * the first match; falls back to `undefined` when the patcher didn't
- * write that artifact (e.g. `--no-apply` would still write everything,
- * but a user opting out of, say, register pages would not).
+ * write that artifact (e.g. a renderer without a register page).
  */
 function pickWrittenFile(written: string[], suffix: string): string | undefined {
   return written.find((file) => file.endsWith(suffix));
@@ -302,11 +280,7 @@ function describeWrittenFile(relPath: string, dryRun: boolean): string | null {
   // Mkdir ops surface in `filesWritten` alongside actual file writes.
   // They're noise at the per-step layer (the files inside them get
   // narrated on their own lines), so swallow them here.
-  if (
-    relPath === ".zitadel" ||
-    relPath === ".zitadel/flows" ||
-    relPath === ".zitadel/schemas"
-  ) {
+  if (relPath === ".zitadel" || relPath === ".zitadel/flows" || relPath === ".zitadel/schemas") {
     return null;
   }
   const verb = dryRun ? "Would write" : "Wrote";
@@ -327,8 +301,6 @@ const SENTENCE_BY_PATH: Record<string, { subject: string }> = {
   ".gitignore": { subject: "the project's .gitignore additions" },
   ".zitadel/secret": { subject: "the local project secret" },
   "zitadel.json": { subject: "the Zitadel project configuration" },
-  ".zitadel/schemas/user.json": { subject: "the user schema definition" },
-  ".zitadel/flows/default.json": { subject: "the default authentication flow" },
   ".env.example": { subject: "the .env example template" },
   ".env.local": { subject: "the local development environment variables" },
   ".zitadel/state.json": { subject: "the empty sync state file" },
@@ -347,17 +319,13 @@ function buildSummary(opts: {
   project: CreateProject201;
   server: string;
   issuer: string;
-  userFields: string[];
-  synced: boolean;
   scaffoldedFramework: boolean;
 }): Section[] {
-  const { projectFacts, writtenRel, project, server, issuer, userFields, synced, scaffoldedFramework } = opts;
-  const sdkPackage = "@zitadel-nextgen/sdk-next";
+  const { projectFacts, writtenRel, project, server, issuer, scaffoldedFramework } = opts;
+  const sdkPackage = "@zitadel/sdk-next";
   const packageJsonHit = pickWrittenFile(writtenRel, "package.json");
 
-  const detected: Row[] = [
-    { label: "Framework", value: formatFrameworkLine(projectFacts) },
-  ];
+  const detected: Row[] = [{ label: "Framework", value: formatFrameworkLine(projectFacts) }];
   if (scaffoldedFramework) {
     detected.push({ label: "Scaffold", value: "fresh project (no existing files)" });
   }
@@ -381,25 +349,15 @@ function buildSummary(opts: {
     if (hit) installedRows.push({ label, value: stylePath(hit) });
   }
 
-  const configuredRows: Row[] = [
-    {
-      label: "User schema",
-      value: `${userFields.length} fields (${userFields.join(", ")})`,
-    },
-    { label: "Auth method", value: "Password" },
-  ];
-
   const projectRows: Row[] = [
     { label: "Project id", value: styleId(project.id) },
     { label: "Server", value: styleUrl(server) },
     { label: "App will run", value: styleUrl(issuer) },
-    { label: "Synced", value: synced ? "yes" : "no" },
   ];
 
   return [
     { title: "Detected", rows: detected },
     { title: "Installed", rows: installedRows },
-    { title: "Configured", rows: configuredRows },
     { title: "Project", rows: projectRows },
   ];
 }

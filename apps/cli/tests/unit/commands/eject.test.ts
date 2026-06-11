@@ -101,7 +101,7 @@ describe("eject command", () => {
     expect(json.status).toBe("ok");
     // The CLI doesn't touch package.json (lockfile + other deps), but suggests
     // the user uninstall the SDK package the patcher added.
-    expect(json.data.next_commands).toContain("npm uninstall @zitadel-nextgen/sdk-next");
+    expect(json.data.next_commands).toContain("npm uninstall @zitadel/sdk-next");
 
     // Managed files and config/state are gone.
     expect(json.data.files_removed).toContain("zitadel.json");

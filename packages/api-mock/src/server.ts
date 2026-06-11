@@ -8,6 +8,7 @@
  *
  * Custom-only routes added on top:
  *   POST   /sessions/exchange     — exchange handoff_token for session cookie
+ *   GET    /sessions/me           — get current session from opaque cookie
  *   GET    /auth/end-session      — OIDC-style end-session, clears cookies
  *   GET    /.well-known/jwks.json — JWKS for JWT verification (dev convenience)
  *   GET    /auth/keys             — JWKS, spec-defined endpoint (operation `getKeys`)
@@ -24,15 +25,16 @@
  *   PATCH  /flow_definitions/:id      — update flow definition
  *   DELETE /flow_definitions/:id      — delete flow definition
  */
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { type Server } from "node:http";
 
-import type { ExchangeHandoff200 } from "@zitadel-nextgen/api/generated/model";
+import type { ExchangeHandoff200, GetMySession200 } from "@zitadel/api/generated/model";
 import express from "express";
+import cookieParser from "cookie-parser";
 import { createMiddleware } from "@mswjs/http-middleware";
 
 import { applyBranding } from "./branding.js";
-import { HandoffError, JWK, signSessionToken, verifyHandoffToken } from "./crypto.js";
+import { HandoffError, JWK, verifyHandoffToken } from "./crypto.js";
 import { defaultDevBranding } from "./default-dev-branding.js";
 import { setupMockHandlers } from "./handlers.js";
 import { errorBody, setupPlatformHandlers } from "./platform-handlers.js";
@@ -49,6 +51,22 @@ const SESSION_TTL_SECONDS = 3600;
  * across requests. Vitest workers get their own copy via worker isolation.
  */
 const consumedHandoffJtis = new Set<string>();
+
+/**
+ * In-memory session store. Maps opaque session tokens to session data.
+ * Mimics the Go server's encrypted opaque tokens without actual encryption.
+ * We extend the API type with an `email` field for client lookups.
+ */
+type StoredSession = GetMySession200 & { email?: string | null };
+const sessionStore = new Map<string, StoredSession>();
+
+/**
+ * Generates an opaque session token (random hex, not a JWT).
+ * This matches the Go server's behaviour of issuing encrypted opaque tokens.
+ */
+function generateOpaqueToken(): string {
+  return randomBytes(32).toString("hex");
+}
 
 /**
  * Cache of completed `/sessions/exchange` responses keyed by the caller's
@@ -68,6 +86,7 @@ export function startMockServer(port: number): Server {
   applyBranding(defaultDevBranding);
   const iss = `http://localhost:${port}`;
   const app = express();
+  app.use(cookieParser());
 
   app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
     const origin = req.headers.origin;
@@ -181,25 +200,45 @@ export function startMockServer(port: number): Server {
         consumedHandoffJtis.add(jti);
       }
 
-      const sessionJwt = await signSessionToken({ sub: claims.sub, email: claims.sub, iss });
+      const opaqueToken = generateOpaqueToken();
+      const createdAt = new Date();
+      const expiresAt = new Date(createdAt.getTime() + SESSION_TTL_SECONDS * 1000);
+      const sessionId = `sess_${randomUUID().replaceAll("-", "").slice(0, 12)}`;
+      const userId = `user_${randomUUID().replaceAll("-", "").slice(0, 12)}`;
+
+      // Store the session data for GET /sessions/me lookups.
+      // The `email` field is kept alongside the spec-typed fields for
+      // client display purposes (same as the Go server's response).
+      const sessionData: StoredSession = {
+        session_id: sessionId,
+        project_id: projectId,
+        state: "active",
+        user_id: userId,
+        factors: [],
+        assurance_levels: [],
+        created_at: createdAt.toISOString(),
+        expires_at: expiresAt.toISOString(),
+        email: claims.sub,
+      };
+      sessionStore.set(opaqueToken, sessionData);
+
       const setCookie = [
-        `__nextgen_session=${sessionJwt}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${SESSION_TTL_SECONDS}`,
+        `__nextgen_session=${opaqueToken}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${SESSION_TTL_SECONDS}`,
         `_zflow=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
       ];
       res.setHeader("Set-Cookie", setCookie);
-      const createdAt = new Date();
-      const expiresAt = new Date(createdAt.getTime() + SESSION_TTL_SECONDS * 1000);
       const body: ExchangeHandoff200 = {
         session: {
-          session_id: `sess_${randomUUID().replaceAll("-", "").slice(0, 12)}`,
+          session_id: sessionId,
           project_id: projectId,
           state: "active",
+          user_id: userId,
           factors: [],
           assurance_levels: [],
           created_at: createdAt.toISOString(),
           expires_at: expiresAt.toISOString(),
         },
-        session_token: sessionJwt,
+        session_token: opaqueToken,
       };
 
       if (idempotencyKey) {
@@ -211,7 +250,34 @@ export function startMockServer(port: number): Server {
     },
   );
 
-  app.get("/auth/end-session", (_req: express.Request, res: express.Response) => {
+  // GET /sessions/me — validate opaque session cookie and return session data.
+  // Mirrors the Go server's GetMySession handler.
+  app.get("/sessions/me", (req: express.Request, res: express.Response) => {
+    const token = (req.cookies as Record<string, string>).__nextgen_session;
+    if (!token) {
+      res.status(401).json(errorBody("unauthenticated", "no session cookie"));
+      return;
+    }
+    const session = sessionStore.get(token);
+    if (!session) {
+      res.status(401).json(errorBody("unauthenticated", "invalid or expired session"));
+      return;
+    }
+    // Check expiry
+    if (new Date(session.expires_at) < new Date()) {
+      sessionStore.delete(token);
+      res.status(401).json(errorBody("unauthenticated", "session expired"));
+      return;
+    }
+    res.json(session);
+  });
+
+  app.get("/auth/end-session", (req: express.Request, res: express.Response) => {
+    // Clean up session from store when logging out
+    const token = (req.cookies as Record<string, string>).__nextgen_session;
+    if (token) {
+      sessionStore.delete(token);
+    }
     res.setHeader("Set-Cookie", [
       `__nextgen_session=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
       `__nextgen_display=; Path=/; SameSite=Lax; Max-Age=0`,

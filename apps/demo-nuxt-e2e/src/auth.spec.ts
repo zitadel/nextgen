@@ -8,12 +8,13 @@ import { expect, test } from "@playwright/test";
  *    Nuxt's SSR pass.
  * 2. Form interactions reach the orchestrator across atom shadow roots.
  * 3. The terminal step's internal `POST /sessions/exchange` traverses the
- *    Nitro `/__nextgen` proxy installed by `@zitadel-nextgen/sdk-nuxt` and the
+ *    Nitro `/__nextgen` proxy installed by `@zitadel/sdk-nuxt` and the
  *    api-mock RS256 verification.
  * 4. `__nextgen_session` is set on the demo origin and `<zitadel-login>`'s
  *    full-page navigation lands on the protected `/admin` route.
- * 5. The Nitro auth middleware accepts the cookie on the next request
- *    and the page renders the captured email.
+ * 5. `nextgenMiddleware` validates the opaque session cookie via
+ *    `GET /sessions/me` and the client-side `SessionDetails` component
+ *    fetches the user_id through the `/__nextgen` proxy.
  *
  * Anything narrower (form participation, exchange call shape, atom focus)
  * is covered in `packages/components`'s Vitest suite.
@@ -31,7 +32,9 @@ test("signs in via the embedded component and lands on /admin", async ({ page })
 
   await page.waitForURL("**/admin");
   await expect(page.getByRole("heading", { name: "Admin" })).toBeVisible();
-  await expect(page.getByText(`Signed in as ${email}`)).toBeVisible();
+  // SessionDetails component fetches /sessions/me and renders identity + details.
+  await expect(page.getByText(/Signed in as user_/)).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText("Session details")).toBeVisible();
 
   const sessionCookie = (await page.context().cookies()).find(
     (c) => c.name === "__nextgen_session",

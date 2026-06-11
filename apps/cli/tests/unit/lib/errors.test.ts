@@ -9,6 +9,7 @@ describe("EXIT_CODES", () => {
       E_FRAMEWORK_NOT_DETECTED: 3,
       E_UNSUPPORTED_PROJECT_SHAPE: 3,
       E_NETWORK: 4,
+      E_LOCAL_SERVER_NOT_RUNNING: 4,
       E_AUTH: 1,
       E_CONFLICT: 5,
       E_VALIDATION: 3,

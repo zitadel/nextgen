@@ -1,22 +1,22 @@
 /**
  * jsdom-friendly integration tests for `<zitadel-login>`. Network calls go
- * through the typed `@zitadel-nextgen/api` fetch client; we intercept them
+ * through the typed `@zitadel/api` fetch client; we intercept them
  * with `msw/node` driven by the shared xstate flow walker in
- * `@zitadel-nextgen/api-mock`.
+ * `@zitadel/api-mock`.
  *
  * Behaviour that needs the FACE platform (form participation, focus
  * delegation, real Enter-to-submit) lives in
  * `zitadel-login.browser.spec.ts` because jsdom 29 only ships a partial
  * `ElementInternals` implementation.
  */
-import { configureZitadel, _resetConfigForTesting } from "@zitadel-nextgen/api/config";
+import { configureZitadel, _resetConfigForTesting } from "@zitadel/api/config";
 import {
   applyBranding,
   clearBranding,
   setupMockHandlers,
   type CapturedRequest,
   type MockHandle,
-} from "@zitadel-nextgen/api-mock";
+} from "@zitadel/api-mock";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import {
@@ -332,7 +332,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
     expect(submits.length).toBeGreaterThanOrEqual(2);
     const proofSubmit = submits.find((s) => s.body.challenge_response);
     expect(proofSubmit).toBeDefined();
-    expect(proofSubmit?.body.action).toBe("submit");
+    expect(proofSubmit?.body.action).toBe("passkey");
     expect(proofSubmit?.body.challenge_response).toEqual({
       challenge_id: "ch_mock_passkey_login",
       method: "passkey",

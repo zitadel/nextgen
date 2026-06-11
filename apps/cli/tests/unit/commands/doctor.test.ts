@@ -1,13 +1,14 @@
 import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { parseJson, runCliForTest } from "../../helpers/run-cli";
 import { MANAGED_MARKER } from "../../../src/lib/paths";
+import { parseJson, runCliForTest } from "../../helpers/run-cli";
 
-type Check = { name: string; status: "pass" | "fail"; message: string; path?: string };
+type Check = { name: string; status: "pass" | "warn" | "fail"; message: string; path?: string };
 
 const tempDirs: string[] = [];
 
@@ -18,16 +19,26 @@ const VALID_USER_SCHEMA = {
   properties: { email: { type: "string" } },
 };
 
-function doctor(cwd: string, extra: string[] = []) {
-  return runCliForTest([
-    "doctor",
-    "--cwd",
-    cwd,
-    "--json",
-    "--server",
-    "https://api.zitadel.cloud",
-    ...extra,
-  ]);
+async function doctor(cwd: string, extra: string[] = []) {
+  const fake = await fakeDocker();
+  const port = await freePort();
+  return runCliForTest(
+    [
+      "doctor",
+      "--cwd",
+      cwd,
+      "--json",
+      "--port",
+      String(port),
+      "--server",
+      "https://api.zitadel.cloud",
+      ...extra,
+    ],
+    {
+      PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
+      DOCKER_LOG: fake.logPath,
+    },
+  );
 }
 
 /**
@@ -47,7 +58,7 @@ async function makeHealthyProject(): Promise<string> {
     join(cwd, "package.json"),
     JSON.stringify({
       name: "demo",
-      dependencies: { next: "^15", "@zitadel-nextgen/sdk-next": "latest" },
+      dependencies: { next: "^15", "@zitadel/sdk-next": "latest" },
     }),
   );
   await writeFile(
@@ -79,12 +90,18 @@ async function makeHealthyProject(): Promise<string> {
     ["ZITADEL_PROJECT_ID=", "ZITADEL_ENVIRONMENT=", "ZITADEL_ISSUER="].join("\n"),
   );
   await writeFile(join(cwd, ".zitadel/schemas/user.json"), JSON.stringify(VALID_USER_SCHEMA));
-  await writeFile(join(cwd, "app/login/page.tsx"), `${MANAGED_MARKER}\nexport default function L() {}\n`);
+  await writeFile(
+    join(cwd, "app/login/page.tsx"),
+    `${MANAGED_MARKER}\nexport default function L() {}\n`,
+  );
   await writeFile(
     join(cwd, "app/register/page.tsx"),
     `${MANAGED_MARKER}\nexport default function R() {}\n`,
   );
-  await writeFile(join(cwd, "middleware.ts"), `${MANAGED_MARKER}\nexport function middleware() {}\n`);
+  await writeFile(
+    join(cwd, "middleware.ts"),
+    `${MANAGED_MARKER}\nexport function middleware() {}\n`,
+  );
   return cwd;
 }
 
@@ -103,7 +120,10 @@ describe("doctor command", () => {
     const res = await doctor(cwd);
 
     expect(res.exitCode).toBe(0);
-    const json = parseJson(res.stdout) as { status: string; data: { ok: boolean; checks: Check[] } };
+    const json = parseJson(res.stdout) as {
+      status: string;
+      data: { ok: boolean; checks: Check[] };
+    };
     expect(json.status).toBe("ok");
     expect(json.data.ok).toBe(true);
     expect(json.data.checks.every((check) => check.status === "pass")).toBe(true);
@@ -128,7 +148,11 @@ describe("doctor command", () => {
     const res = await doctor(cwd);
 
     expect(res.exitCode).toBe(3);
-    const json = parseJson(res.stdout) as { status: string; code: string; details: { checks: Check[] } };
+    const json = parseJson(res.stdout) as {
+      status: string;
+      code: string;
+      details: { checks: Check[] };
+    };
     expect(json.status).toBe("error");
     expect(json.code).toBe("E_VALIDATION");
     const dependency = json.details.checks.find((check) => check.name === "dependency");
@@ -157,19 +181,6 @@ describe("doctor command", () => {
     expect(match?.status).toBe("fail");
   });
 
-  it("fails the schema check when the user schema is not valid JSON Schema", async () => {
-    const cwd = await makeHealthyProject();
-    // `type` must be a string/array of strings; a number makes the schema invalid.
-    await writeFile(join(cwd, ".zitadel/schemas/user.json"), JSON.stringify({ type: 123 }));
-
-    const res = await doctor(cwd);
-
-    expect(res.exitCode).toBe(3);
-    const json = parseJson(res.stdout) as { details: { checks: Check[] } };
-    const schema = json.details.checks.find((check) => check.name === "schema");
-    expect(schema?.status).toBe("fail");
-  });
-
   it("re-locks loose secret permissions via --fix and then passes", async () => {
     const cwd = await makeHealthyProject();
     await chmod(join(cwd, ".zitadel/secret"), 0o644);
@@ -177,7 +188,10 @@ describe("doctor command", () => {
     const res = await doctor(cwd, ["--fix"]);
 
     expect(res.exitCode).toBe(0);
-    const json = parseJson(res.stdout) as { status: string; data: { ok: boolean; checks: Check[] } };
+    const json = parseJson(res.stdout) as {
+      status: string;
+      data: { ok: boolean; checks: Check[] };
+    };
     expect(json.status).toBe("ok");
     const perms = json.data.checks.find((check) => check.name === "secret-permissions");
     expect(perms?.status).toBe("pass");
@@ -185,21 +199,33 @@ describe("doctor command", () => {
 
   it("reports E_VALIDATION (not a crash) when --fix cannot repair a broken project", async () => {
     const cwd = await makeHealthyProject();
-    // Remove the user schema: schema check fails outright, and dependency's
-    // repair can't rebuild its context — --fix must stay best-effort.
-    await rm(join(cwd, ".zitadel/schemas/user.json"));
+    // project-match has no auto-repair: a secret/config project_id mismatch
+    // stays failed through --fix, so doctor must report E_VALIDATION rather
+    // than crash.
     await writeFile(
-      join(cwd, "package.json"),
-      JSON.stringify({ name: "demo", dependencies: { next: "^15" } }),
+      join(cwd, ".zitadel/secret"),
+      JSON.stringify({
+        project_id: "mismatch",
+        project_secret: "sk_proj_test",
+        preview_secret: "sk_proj_preview",
+        preview_origins: [],
+      }),
     );
+    await chmod(join(cwd, ".zitadel/secret"), 0o600);
 
     const res = await doctor(cwd, ["--fix"]);
 
     expect(res.exitCode).toBe(3);
-    const json = parseJson(res.stdout) as { status: string; code: string; details: { checks: Check[] } };
+    const json = parseJson(res.stdout) as {
+      status: string;
+      code: string;
+      details: { checks: Check[] };
+    };
     expect(json.status).toBe("error");
     expect(json.code).toBe("E_VALIDATION");
-    expect(json.details.checks.find((check) => check.name === "schema")?.status).toBe("fail");
+    expect(json.details.checks.find((check) => check.name === "project-match")?.status).toBe(
+      "fail",
+    );
   });
 
   it("re-applies a missing Zitadel dependency via --fix and then passes", async () => {
@@ -213,10 +239,50 @@ describe("doctor command", () => {
     const res = await doctor(cwd, ["--fix"]);
 
     expect(res.exitCode).toBe(0);
-    const json = parseJson(res.stdout) as { status: string; data: { ok: boolean; checks: Check[] } };
+    const json = parseJson(res.stdout) as {
+      status: string;
+      data: { ok: boolean; checks: Check[] };
+    };
     expect(json.status).toBe("ok");
     expect(json.data.ok).toBe(true);
     const dependency = json.data.checks.find((check) => check.name === "dependency");
     expect(dependency?.status).toBe("pass");
   });
 });
+
+async function fakeDocker(): Promise<{ binDir: string; logPath: string }> {
+  const binDir = await mkdtemp(join(tmpdir(), "zitadel-fake-docker-"));
+  tempDirs.push(binDir);
+  const logPath = join(binDir, "docker.log");
+  const dockerPath = join(binDir, "docker");
+  await writeFile(
+    dockerPath,
+    `#!/usr/bin/env node
+const fs = require("node:fs");
+const args = process.argv.slice(2);
+fs.appendFileSync(process.env.DOCKER_LOG, JSON.stringify(args) + "\\n");
+if (args[0] === "version") {
+  console.log("29.0.0");
+  process.exit(0);
+}
+if (args[0] === "pull") {
+  console.log(args[args.length - 1]);
+  process.exit(0);
+}
+process.exit(0);
+`,
+  );
+  await chmod(dockerPath, 0o755);
+  return { binDir, logPath };
+}
+
+async function freePort(): Promise<number> {
+  const server = createServer();
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
+  const address = server.address();
+  await new Promise<void>((resolve) => server.close(() => resolve()));
+  if (!address || typeof address === "string") {
+    throw new Error("free port probe did not expose a TCP address");
+  }
+  return address.port;
+}

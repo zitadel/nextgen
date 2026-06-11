@@ -16,18 +16,24 @@ export {
 } from "./branding-to-tokens.js";
 export { ThemeController, type ResolvedTheme } from "./theme-controller.js";
 export { applyFontUrl } from "./font-loader.js";
-export { createLiquidEngine, TEMPLATE_NAMES } from "./liquid.js";
-export { en, de, builtinLocales, type Locale } from "./locales/index.js";
+// `createLiquidEngine` is intentionally NOT re-exported: it returns LiquidJS'
+// `Liquid` type, whose declarations reference Node ambient types (`NodeJS`),
+// which would force every browser consumer of this package to install
+// `@types/node` under `skipLibCheck: false`. It's an internal rendering detail
+// of `<zitadel-login>` — import it directly from `./liquid.js` within the
+// package. `TEMPLATE_NAMES` is sourced from its own liquidjs-free module for
+// the same reason (re-exporting it from `liquid.js` would pull that `Liquid`
+// import back into the public declaration bundle).
+export { TEMPLATE_NAMES } from "./template-names.js";
+export { en, de, it, builtinLocales, type Locale } from "./locales/index.js";
 export {
   patchMandatoryGates,
   mandatoryGatesMarkerComment,
   MANDATORY_GATES_MARKER,
 } from "./mandatory-gates.js";
 export { createSanitiser } from "./sanitiser.js";
-export { defaultTemplate, layoutChromeCss } from "./templates/default.liquid.js";
-export { authFormTemplate } from "./templates/auth-form.liquid.js";
-export { passkeyUpsellTemplate } from "./templates/passkey-upsell.liquid.js";
-export { signedInTemplate } from "./templates/signed-in.liquid.js";
+export { default as defaultTemplate } from "./templates/default.liquid";
+export { default as layoutChromeCss } from "./templates/layout-chrome.css?inline";
 export { startFlow, submitStep, getCurrentStep } from "./api-client.js";
 export { validateBranding, type BrandingValidationResult } from "./branding-validator.js";
 export type {

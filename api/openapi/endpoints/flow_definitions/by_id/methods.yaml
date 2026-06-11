@@ -9,6 +9,12 @@ get:
         - flow_definitions.read
   parameters:
     - $ref: ../../../components/parameters/flow-definition-id.yaml
+    - name: project_id
+      in: query
+      description: The project id to filter by.
+      required: true
+      schema:
+        $ref: ../../../components/schemas/project-id.yaml
   responses:
     '200':
       description: Flow definition found.
@@ -16,12 +22,6 @@ get:
         application/json:
           schema:
             $ref: ../../../components/flows/flow-definition-detail-response.yaml
-    '404':
-      description: Flow definition not found.
-      content:
-        application/json:
-          schema:
-            $ref: ../../../components/error-details.yaml
     default:
       description: Unexpected error.
       content:
@@ -40,6 +40,12 @@ patch:
         - flow_definitions.write
   parameters:
     - $ref: ../../../components/parameters/flow-definition-id.yaml
+    - name: project_id
+      in: query
+      description: The project id to filter by.
+      required: true
+      schema:
+        $ref: ../../../components/schemas/project-id.yaml
   requestBody:
     required: true
     content:
@@ -83,15 +89,15 @@ delete:
         - flow_definitions.delete
   parameters:
     - $ref: ../../../components/parameters/flow-definition-id.yaml
+    - name: project_id
+      in: query
+      description: The project id to filter by.
+      required: true
+      schema:
+        $ref: ../../../components/schemas/project-id.yaml
   responses:
     '204':
-      description: Flow definition deleted successfully.
-    '404':
-      description: Flow definition not found.
-      content:
-        application/json:
-          schema:
-            $ref: ../../../components/error-details.yaml
+      description: Flow definition deleted successfully. This is an idempotent operation, so if the flow definition does not exist, it will still return a 204 status code.
     default:
       description: Unexpected error.
       content:

@@ -2,8 +2,8 @@ import {
   createFlow,
   getFlowStep,
   submitFlowStep,
-} from "@zitadel-nextgen/api/generated/endpoints/zitadelNextGen";
-import { configureZitadel } from "@zitadel-nextgen/api/config";
+} from "@zitadel/api/generated/endpoints/zitadelNextGen";
+import { configureZitadel } from "@zitadel/api/config";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "vitest";
 

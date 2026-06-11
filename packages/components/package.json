@@ -1,6 +1,6 @@
 {
-  "name": "@zitadel-nextgen/components",
-  "version": "0.0.1",
+  "name": "@zitadel/components",
+  "version": "0.1.0-alpha.0",
   "description": "Lit-based atomic web components and the <zitadel-login> orchestrator for the Zitadel auth UI.",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/components#readme",
   "bugs": {
@@ -58,9 +58,7 @@
     "dompurify": "catalog:",
     "liquidjs": "catalog:",
     "lit": "catalog:",
-    "lucide": "catalog:",
-    "@zitadel-nextgen/design-tokens": "workspace:*",
-    "@zitadel-nextgen/shared-component-styles": "workspace:*"
+    "lucide": "catalog:"
   },
   "nx": {
     "targets": {
@@ -80,7 +78,7 @@
     "@tsdown/css": "catalog:",
     "@vitest/browser": "catalog:",
     "@vitest/browser-playwright": "catalog:",
-    "@zitadel-nextgen/api-mock": "workspace:*",
+    "@zitadel/api-mock": "workspace:*",
     "jsdom": "catalog:",
     "msw": "catalog:",
     "playwright": "catalog:",
@@ -89,8 +87,8 @@
     "lightningcss": "catalog:",
     "tsdown": "catalog:",
     "tslib": "catalog:",
-    "@zitadel-nextgen/api": "workspace:*",
-    "@zitadel-nextgen/design-tokens": "workspace:*",
-    "@zitadel-nextgen/shared-component-styles": "workspace:*"
+    "@zitadel/api": "workspace:*",
+    "@zitadel/design-tokens": "workspace:*",
+    "@zitadel/shared-component-styles": "workspace:*"
   }
 }

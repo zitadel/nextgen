@@ -122,6 +122,14 @@ export type NextgenMiddlewareOptions = {
   proxyTimeoutMs?: number;
 
   /**
+   * Timeout in milliseconds for opaque (non-JWT) session token validation
+   * via the backend's `GET /sessions/me` endpoint. Tokens that cannot be
+   * validated within this window are treated as invalid.
+   * @default 5000
+   */
+  opaqueTokenTimeoutMs?: number;
+
+  /**
    * Optional hook called when a `POST /sessions/exchange` response is
    * proxied back to the browser. Receives the upstream `Response` after
    * hop-by-hop stripping and cookie upgrading. Return a modified

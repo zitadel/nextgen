@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -11,17 +12,14 @@ import (
 )
 
 type FlowDefinitionService interface {
-	Create(ctx context.Context, req CreateFlowDefinitionRequest) (*domain.FlowDefinition, string, error)
+	Create(ctx context.Context, req CreateFlowDefinitionRequest) (*domain.FlowDefinition, error)
+	Get(ctx context.Context, projectID, id string) (*domain.FlowDefinition, error)
+	List(ctx context.Context, req ListFlowDefinitionsRequest) ([]*domain.FlowDefinition, error)
+	Delete(ctx context.Context, projectID string, id string) error
 }
 
-type SchemaResolver interface {
-	Resolve(
-		ctx context.Context,
-		client database.QueryExecutor,
-		projectID string,
-		schemaURL string,
-		rootSchema []byte,
-	) (*jsonschema.Schema, error)
+type SchemaGetter interface {
+	GetSchema(ctx context.Context, projectID string, teamID string, schemaID string) (*domain.JSONSchema, error)
 }
 
 type BuiltinSchemaProvider interface {
@@ -32,20 +30,19 @@ type BuiltinSchemaProvider interface {
 type flowDefinitionValidatorFunc func(userSchema *jsonschema.Schema, flowDefinition domain.FlowDefinition) ([]domain.PivotingTarget, error)
 
 type CreateFlowDefinitionRequest struct {
-	ProjectID         string
-	Name              string
-	SchemaVersion     string // todo (grvijayan): currently empty as the request does not contain schema version
-	FlowSchemaURI     string // todo (grvijayan): schema_version (semver) stored in the db vs schema_uri needed for validation
-	UserSchema        string
-	Purposes          map[string]string
-	Audience          domain.FlowDefinitionAudience
-	Steps             []domain.FlowDefinitionStep
-	RawFlowDefinition []byte
+	ProjectID     string
+	Name          string
+	SchemaVersion string // todo (grvijayan): currently empty as the request does not contain schema version
+	FlowSchemaURI string // todo (grvijayan): schema_version (semver) stored in the db vs schema_uri needed for validation
+	UserSchema    string
+	Purposes      map[string]string
+	Audience      domain.FlowDefinitionAudience
+	Steps         []domain.FlowDefinitionStep
 }
 
 type flowDefinitionService struct {
 	db                     database.Pool
-	schemaResolver         SchemaResolver
+	schemaGetter           SchemaGetter
 	builtinSchemaProvider  BuiltinSchemaProvider
 	validateFlowDefinition flowDefinitionValidatorFunc
 	flowDefinitionRepo     domain.FlowDefinitionRepository
@@ -53,7 +50,7 @@ type flowDefinitionService struct {
 
 func NewFlowDefinitionService(
 	db database.Pool,
-	schemaResolver SchemaResolver,
+	schemaGetter SchemaGetter,
 	schemaProvider BuiltinSchemaProvider,
 	flowDefinitionValidatorFn flowDefinitionValidatorFunc,
 	flowDefinitionRepo domain.FlowDefinitionRepository,
@@ -63,14 +60,14 @@ func NewFlowDefinitionService(
 	}
 	return &flowDefinitionService{
 		db:                     db,
-		schemaResolver:         schemaResolver,
+		schemaGetter:           schemaGetter,
 		builtinSchemaProvider:  schemaProvider,
 		validateFlowDefinition: flowDefinitionValidatorFn,
 		flowDefinitionRepo:     flowDefinitionRepo,
 	}
 }
 
-func (fd *flowDefinitionService) Create(ctx context.Context, req CreateFlowDefinitionRequest) (*domain.FlowDefinition, string, error) {
+func (fd *flowDefinitionService) Create(ctx context.Context, req CreateFlowDefinitionRequest) (*domain.FlowDefinition, error) {
 	// check if a flow definition (name + schema version) already exists in the project
 	opts := []domain.FlowDefinitionListOption{
 		domain.WithFlowDefinitionName(req.Name),
@@ -79,16 +76,16 @@ func (fd *flowDefinitionService) Create(ctx context.Context, req CreateFlowDefin
 	defs, err := fd.flowDefinitionRepo.ListFlowDefinitions(ctx, fd.db, req.ProjectID, opts...)
 	if err != nil {
 		if !errors.Is(err, &database.NoRowFoundError{}) {
-			return nil, "", err
+			return nil, err
 		}
 	}
 	if len(defs) > 0 {
-		return nil, "", domain.ErrFlowDefinitionAlreadyExists()
+		return nil, domain.ErrFlowDefinitionAlreadyExists()
 	}
 
 	purposes, err := mapPurposesToDomain(req.Purposes)
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 
 	flowDefinition, err := domain.NewFlowDefinition(
@@ -101,34 +98,35 @@ func (fd *flowDefinitionService) Create(ctx context.Context, req CreateFlowDefin
 		req.Steps,
 	)
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 
-	// if req.FlowSchemaURI is empty, use the latest flow definition schema from the builtin schema provider
-	flowSchemaURI := req.FlowSchemaURI
-	if flowSchemaURI == "" {
-		flowSchemaURI, err = fd.builtinSchemaProvider.LatestSchemaURI(domain.SchemaKindFlowDefinition)
-		if err != nil {
-			return nil, "", domain.ErrSchemaFetchFailed("failed to get latest flow definition schema URI", err)
-		}
-	}
 	err = fd.Validate(ctx, flowDefinition)
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 	err = fd.flowDefinitionRepo.CreateFlowDefinition(ctx, fd.db, flowDefinition)
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
-	return flowDefinition, flowSchemaURI, nil
+	return flowDefinition, nil
 }
 
 // Validate validates the flow definition steps and transitions
 func (fd *flowDefinitionService) Validate(ctx context.Context, flowDefinition *domain.FlowDefinition) error {
 	// resolve the user schema from the user schema URI
-	userSchema, err := fd.schemaResolver.Resolve(ctx, fd.db, flowDefinition.ProjectID, flowDefinition.UserSchema, nil)
+	sch, err := fd.schemaGetter.GetSchema(ctx, flowDefinition.ProjectID, "", flowDefinition.UserSchema)
 	if err != nil {
-		return domain.ErrSchemaFetchFailed("failed to resolve user schema", err)
+		if errors.Is(err, domain.ErrJSONSchemaNotFound()) {
+			return domain.ErrFlowDefinitionInvalid(fmt.Sprintf("user schema %q not found", flowDefinition.UserSchema), err)
+		}
+		return domain.ErrSchemaFetchFailed("failed to fetch user schema", err)
+	}
+
+	var userSchema *jsonschema.Schema
+	err = json.Unmarshal(sch.Schema, &userSchema)
+	if err != nil {
+		return domain.ErrSchemaFetchFailed("failed to unmarshal user schema", err)
 	}
 
 	// validate the flow steps, fields against the user schema, transitions, reachability, trapped cycles, etc.
@@ -173,4 +171,68 @@ func mapPurposesToDomain(reqPurposes map[string]string) (map[domain.FlowDefiniti
 		purposes[purpose] = entryStep
 	}
 	return purposes, nil
+}
+
+func (fd *flowDefinitionService) Get(ctx context.Context, projectID, id string) (*domain.FlowDefinition, error) {
+	// todo (grvijayan): get the project ID from the context when the functionality is implemented
+	if projectID == "" {
+		return nil, domain.ErrMissingProjectID()
+	}
+	if id == "" {
+		return nil, domain.ErrMissingFlowDefinitionID()
+	}
+	definition, err := fd.flowDefinitionRepo.GetFlowDefinition(ctx, fd.db, projectID, id)
+	if err != nil {
+		if errors.Is(err, &database.NoRowFoundError{}) {
+			return nil, domain.ErrFlowDefinitionNotFound()
+		}
+		return nil, err
+	}
+	return definition, nil
+}
+
+type ListFlowDefinitionsRequest struct {
+	ProjectID string
+	Purpose   string
+	Limit     int
+	PageToken string
+}
+
+func (fd *flowDefinitionService) List(ctx context.Context, req ListFlowDefinitionsRequest) ([]*domain.FlowDefinition, error) {
+	// todo (grvijayan): get the project ID from the context when the functionality is implemented
+	if req.ProjectID == "" {
+		return nil, domain.ErrMissingProjectID()
+	}
+	var filterOpts []domain.FlowDefinitionListOption
+	if req.Purpose != "" {
+		purpose, err := domain.FlowDefinitionPurposeString(req.Purpose)
+		if err != nil {
+			return nil, domain.ErrFlowDefinitionInvalid("invalid purpose", nil)
+		}
+		filterOpts = append(filterOpts, domain.WithFlowDefinitionPurpose(purpose))
+	}
+	// todo: the repository layer supports offset at the moment, but not page token
+	if req.Limit > 0 {
+		filterOpts = append(filterOpts, domain.WithFlowDefinitionLimit(uint32(req.Limit)))
+	}
+	defs, err := fd.flowDefinitionRepo.ListFlowDefinitions(
+		ctx,
+		fd.db,
+		req.ProjectID,
+		filterOpts...,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return defs, nil
+}
+
+func (fd *flowDefinitionService) Delete(ctx context.Context, projectID, id string) error {
+	if projectID == "" {
+		return domain.ErrMissingProjectID()
+	}
+	if id == "" {
+		return domain.ErrMissingFlowDefinitionID()
+	}
+	return fd.flowDefinitionRepo.DeleteFlowDefinition(ctx, fd.db, projectID, id)
 }

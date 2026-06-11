@@ -1,34 +1,31 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import type { CreateSchemaBody } from "@zitadel-nextgen/api/generated/model";
-
-import { isObject } from "../../lib/json";
 import { issuerFromPort, type FrameworkFacts, type Orca } from "../../lib/orca";
 import type { PatchContext } from "../../lib/orca/patchers/types";
 import { readDevelopmentIssuer, readRendererId, readZitadelConfig, readZitadelSecret } from "../../lib/project";
 
 /**
- * Reconstructs a {@link PatchContext} from the on-disk project (config, secret,
- * user schema) plus fresh framework detection, so a patcher repair can rebuild
- * its plan. The user-schema property names are read back from disk; only
- * `.zitadel/` resource contents depend on them, and a repair filters those out
- * anyway. Used by the dependency check's `fix`, which reclaims the
- * framework-specific SDK package via `patcher.repair`.
+ * Reconstructs a {@link PatchContext} from the on-disk project (config, secret)
+ * plus fresh framework detection, so a patcher repair can rebuild its plan.
+ * Used by the dependency check's `fix`, which reclaims the framework-specific
+ * SDK package via `patcher.repair`. The user schema and flow definition are
+ * server-owned and no longer scaffolded locally, so nothing here reads them.
  */
-export async function loadPatchContext(cwd: string, orca: Orca): Promise<PatchContext> {
+export async function loadPatchContext(
+  cwd: string,
+  orca: Orca,
+  cliVersion: string,
+): Promise<PatchContext> {
   const config = await readZitadelConfig(cwd);
   const secret = await readZitadelSecret(cwd);
   const framework = await orca.detect(cwd);
-  const raw = JSON.parse(
-    await readFile(join(cwd, ".zitadel/schemas/user.json"), "utf8"),
-  ) as Record<string, unknown>;
-  const properties = isObject(raw.properties) ? raw.properties : {};
   return {
     framework,
     rendererId: readRendererId(config),
     issuer: await resolveIssuer(cwd, config, framework),
     server: typeof config.server === "string" ? config.server : "",
+    cliVersion,
     project: {
       id: secret.project_id,
       projectSecret: secret.project_secret,
@@ -36,8 +33,6 @@ export async function loadPatchContext(cwd: string, orca: Orca): Promise<PatchCo
       previewOrigins: secret.preview_origins,
       createdAt: secret.created_at,
     },
-    userFields: Object.keys(properties),
-    userSchema: raw as CreateSchemaBody,
   };
 }
 

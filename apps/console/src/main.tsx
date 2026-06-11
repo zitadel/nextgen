@@ -5,6 +5,7 @@ import { routeTree } from "./routeTree.gen";
 
 const router = createRouter({
   routeTree,
+  basepath: import.meta.env.PROD ? "/ui/console" : undefined,
   defaultPreload: "intent",
   scrollRestoration: true,
 });
