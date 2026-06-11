@@ -31,10 +31,14 @@ describe("AngularScaffolder", () => {
 
     const [command, args, opts] = mockSpawn.mock.calls[0] ?? [];
     expect(command).toBe("npx");
+    // ng new rejects "." as a project name, so a slug from the dir is passed
+    // with --directory . to populate the current directory.
     expect(args).toEqual([
       "-y",
       "@angular/cli@latest",
       "new",
+      "proj",
+      "--directory",
       ".",
       "--defaults",
       "--style=css",
