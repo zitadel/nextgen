@@ -1,5 +1,7 @@
 package crypto
 
+//go:generate go tool mockgen -typed -package cryptomock -destination ./cryptomock/hash.mock.go . Hasher
+
 type Hasher interface {
 	Hash(string) (string, error)
 }

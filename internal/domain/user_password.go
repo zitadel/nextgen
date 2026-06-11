@@ -50,6 +50,8 @@ type CreateUserPassword struct {
 	VerificationID *string
 }
 
+//go:generate go tool mockgen -typed -package domainmock -destination ./mock/user_password.mock.go . UserPasswordRepository
+
 type UserPasswordRepository interface {
 	Repository
 
