@@ -108,6 +108,27 @@ describe("check-alpha-release-plan script", () => {
       checkAlphaReleasePlanModule.checkAlphaReleasePlan({ cwd, statusPath }),
     ).rejects.toThrow("Changesets must not create package-shaped GitHub Releases");
   });
+
+  it("rejects alpha release notes generated inside the checkout", async () => {
+    const { cwd, statusPath } = await fixtureRepo({
+      releaseWorkflow: [
+        "jobs:",
+        "  release:",
+        "    steps:",
+        "      - uses: changesets/action@v1",
+        "        with:",
+        "          createGithubReleases: false",
+        "      - run: |",
+        "          node scripts/release-alpha-train.mjs prepare | tee dist/alpha-release.env",
+        "      - run: gh release edit \"$TAG\" --prerelease --latest=false",
+        "",
+      ].join("\n"),
+    });
+
+    await expect(
+      checkAlphaReleasePlanModule.checkAlphaReleasePlan({ cwd, statusPath }),
+    ).rejects.toThrow("must write alpha release notes outside the checkout");
+  });
 });
 
 async function fixtureRepo(
@@ -150,7 +171,10 @@ async function fixtureRepo(
         "      - uses: changesets/action@v1",
         "        with:",
         "          createGithubReleases: false",
-        "      - run: node scripts/release-alpha-train.mjs prepare",
+        "      - run: |",
+        "          alpha_env=\"$RUNNER_TEMP/alpha-release.env\"",
+        "          node scripts/release-alpha-train.mjs prepare --out-dir \"$RUNNER_TEMP/alpha-release\" | tee \"$alpha_env\"",
+        "          cat \"$alpha_env\" >> \"$GITHUB_OUTPUT\"",
         "      - run: gh release edit \"$TAG\" --prerelease --latest=false",
         "",
       ].join("\n"),

@@ -104,6 +104,16 @@ export async function validateReleaseTooling(cwd, readFileFn = readFileDefault) 
   );
   assertContains(
     releaseWorkflow,
+    '--out-dir "$RUNNER_TEMP/alpha-release"',
+    "release-npm.yml must write alpha release notes outside the checkout before GoReleaser --clean",
+  );
+  assertContains(
+    releaseWorkflow,
+    'alpha_env="$RUNNER_TEMP/alpha-release.env"',
+    "release-npm.yml must write alpha release outputs outside the checkout before GoReleaser --clean",
+  );
+  assertContains(
+    releaseWorkflow,
     "--prerelease",
     "alpha GitHub Releases must be marked as prereleases",
   );

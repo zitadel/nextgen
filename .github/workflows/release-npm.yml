@@ -129,9 +129,9 @@ jobs:
         id: alpha
         run: |
           set -euo pipefail
-          mkdir -p dist
-          node scripts/release-alpha-train.mjs prepare | tee dist/alpha-release.env
-          cat dist/alpha-release.env >> "$GITHUB_OUTPUT"
+          alpha_env="$RUNNER_TEMP/alpha-release.env"
+          node scripts/release-alpha-train.mjs prepare --out-dir "$RUNNER_TEMP/alpha-release" | tee "$alpha_env"
+          cat "$alpha_env" >> "$GITHUB_OUTPUT"
 
       - name: Create and push Go release tag
         if: ${{ steps.changesets.outputs.published == 'true' }}
