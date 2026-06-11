@@ -37,9 +37,11 @@ if (!execute) {
 }
 
 function run(command, args, options = {}) {
+  const { stdio = "pipe", ...spawnOptions } = options;
   const result = spawnSync(command, args, {
+    ...spawnOptions,
     encoding: "utf8",
-    stdio: options.stdio ?? "pipe",
+    stdio,
   });
   if (result.error) {
     throw new Error(`${command} ${args.join(" ")} failed: ${result.error.message}`);

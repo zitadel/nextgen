@@ -43,15 +43,15 @@ function readTag(args) {
   const tagIndex = args.indexOf("--tag");
   const value = tagIndex >= 0 ? args[tagIndex + 1] : process.env.GITHUB_REF_NAME;
   if (!value) {
-    throw new Error("usage: node scripts/verify-preview-release.mjs --tag v0.1.0-alpha.N");
+    throw new Error("usage: node scripts/verify-preview-release.mjs --tag v0.1.0[-alpha.N]");
   }
   return value;
 }
 
 function normalizeTag(value) {
   const normalized = value.trim().replace(/^refs\/tags\//, "").replace(/^v/, "");
-  if (!/^\d+\.\d+\.\d+-alpha\.\d+$/.test(normalized)) {
-    throw new Error(`preview release tag must look like v0.1.0-alpha.N, got ${value}`);
+  if (!/^\d+\.\d+\.\d+(?:-alpha\.\d+)?$/.test(normalized)) {
+    throw new Error(`release tag must look like v0.1.0 or v0.1.0-alpha.N, got ${value}`);
   }
   return normalized;
 }
