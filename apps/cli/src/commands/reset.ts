@@ -1,6 +1,5 @@
 import { cancel, confirm, isCancel } from "@clack/prompts";
 
-import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
 import { ZitadelError } from "../lib/errors";
 import { stopAndRemoveContainer } from "../lib/local-server/docker";
 import {
@@ -10,6 +9,8 @@ import {
   removeLocalData,
   removeRuntimeMetadata,
 } from "../lib/local-server/runtime";
+import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
+import { publicCliCommand } from "../lib/public-cli";
 
 export default class Reset extends BaseCommand {
   static override description = "Delete the local Zitadel server runtime and data.";
@@ -32,7 +33,7 @@ export default class Reset extends BaseCommand {
             container_name: containerName,
             data_deleted: true,
           },
-          next_commands: ["zitadel reset --force"],
+          next_commands: [publicCliCommand("reset --force", this.meta.cliVersion)],
         },
       });
     }
@@ -41,7 +42,7 @@ export default class Reset extends BaseCommand {
       if (this.meta.nonInteractive) {
         throw new ZitadelError("E_VALIDATION", "Reset requires --force in non-interactive mode", {
           hint: "Pass --force to delete `.zitadel/local/nextgen-data`.",
-          nextCommands: ["zitadel reset --force"],
+          nextCommands: [publicCliCommand("reset --force", this.meta.cliVersion)],
         });
       }
       const answer = await confirm({
@@ -69,7 +70,6 @@ export default class Reset extends BaseCommand {
           container_name: containerName,
           data_deleted: true,
         },
-        next_commands: ["zitadel start"],
       },
     });
   }

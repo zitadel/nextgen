@@ -58,7 +58,7 @@ describe("envelope contract", () => {
     expect(envelope.status).toBe("error");
     expect(envelope.code).toBe("E_VALIDATION");
     expect(envelope.message).toBeTypeOf("string");
-    expect(envelope.next_commands).toContain("zitadel setup");
+    expect(envelope.next_commands).toContain("npx @zitadel/cli@alpha setup");
   });
 
   it("renders a human-readable summary (and server suffix) without --json", async () => {
@@ -83,7 +83,13 @@ describe("envelope contract", () => {
       }),
     );
 
-    const result = await runCliForTest(["status", "--cwd", cwd, "--server", "https://self.example"]);
+    const result = await runCliForTest([
+      "status",
+      "--cwd",
+      cwd,
+      "--server",
+      "https://self.example",
+    ]);
     expect(result.exitCode).toBe(0);
     // Pretty (non-JSON) rendering: the title, the project section, the source
     // suffix for a non-default server, and the next-steps block.
