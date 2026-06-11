@@ -97,7 +97,6 @@ export abstract class AbstractRulePatcher implements Patcher {
           ZITADEL_ENVIRONMENT: "",
           ZITADEL_ISSUER: "",
           ZITADEL_URL: "",
-          NEXT_PUBLIC_ZITADEL_PROJECT_ID: "",
         },
       },
       {
@@ -108,7 +107,6 @@ export abstract class AbstractRulePatcher implements Patcher {
           ZITADEL_ENVIRONMENT: "development",
           ZITADEL_ISSUER: ctx.issuer,
           ZITADEL_URL: ctx.server,
-          NEXT_PUBLIC_ZITADEL_PROJECT_ID: ctx.project.id,
         },
       },
       {

@@ -58,7 +58,7 @@ export const PROXY_IMPORT = {
  * or the config object cannot be reached (function-built/exotic configs), with a
  * hint to add the block manually.
  */
-export function viteProxyEdit(serverPort: number): (source: string | undefined) => string {
+export function viteProxyEdit(devPort: number): (source: string | undefined) => string {
   return (source) => {
     const mod = parseConfigModule(source, "vite.config.ts");
     const config = resolveDefaultExportObject(mod, "vite.config.ts");
@@ -69,7 +69,7 @@ export function viteProxyEdit(serverPort: number): (source: string | undefined) 
       config.server.host = "localhost";
     }
     if (config.server.port === undefined) {
-      config.server.port = serverPort;
+      config.server.port = devPort;
     }
     if (config.server.proxy === undefined) {
       config.server.proxy = {};
